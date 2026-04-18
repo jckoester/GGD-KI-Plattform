@@ -1,0 +1,18 @@
+# Passwörter mit bcrypt gehasht:
+# python -c "from passlib.hash import bcrypt; print(bcrypt.hash('geheim'))"
+
+users:
+  - username: lehrer01
+    password_hash: <bcrypt-hash>
+    role: teacher
+    grade: null
+
+  - username: schueler01
+    password_hash: <bcrypt-hash>
+    role: student
+    grade: "10"
+
+  - username: admin
+    password_hash: <bcrypt-hash>
+    role: admin
+    grade: null

@@ -7,6 +7,7 @@ AGENTS.md
 .env.local
 .env.*.local
 config/auth.yaml
+config/test_users.yaml
 config/budget_tiers.yaml
 config/assistants.yaml
 config/crisis_triggers.yaml

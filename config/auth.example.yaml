@@ -15,7 +15,7 @@ iserv:
 yaml_test:
   users_file: config/test_users.yaml
 
-# IServ-Gruppen -> Plattform-Rollen
+# SSO-Gruppen -> Plattform-Rollen
 group_role_map:
   - group: ki-admins
     role: admin
