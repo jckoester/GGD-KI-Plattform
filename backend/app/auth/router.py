@@ -1,8 +1,13 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.auth.base import AuthAdapter, LoginChallenge, NormalizedIdentity
-from app.auth.dependencies import get_auth_adapter
+from app.auth.dependencies import get_auth_adapter, get_current_user, get_jwt_service
+from app.auth.jwt import JwtPayload, JwtService
+from app.db.session import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -42,12 +47,25 @@ async def login_direct(
 @router.post("/logout")
 async def logout(
     response: Response,
-) -> JSONResponse:
-    raise HTTPException(status_code=501, detail="Schritt 1c: JWT-Revokation noch nicht implementiert")
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    jwt_service: JwtService = Depends(get_jwt_service),
+) -> dict:
+    await jwt_service.revoke(
+        db,
+        jti=current_user.jti,
+        pseudonym=current_user.sub,
+        expires_at=datetime.fromtimestamp(current_user.exp, timezone.utc),
+        reason="user_logout",
+    )
+    response.delete_cookie("session", httponly=True, samesite="lax")
+    return {"ok": True}
 
 
 @router.get("/me")
-async def get_me(
-    request: Request,
-) -> JSONResponse:
-    raise HTTPException(status_code=501, detail="Schritt 1c: JWT-Validierung noch nicht implementiert")
+async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
+    return {
+        "pseudonym": current_user.sub,
+        "role": current_user.role,
+        "grade": current_user.grade,
+    }

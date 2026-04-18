@@ -1,8 +1,14 @@
 from functools import lru_cache
 
+from fastapi import Depends, HTTPException, Request
+from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.base import AuthAdapter
 from app.auth.config import load_auth_config
+from app.auth.jwt import JwtPayload, JwtService
 from app.config import settings
+from app.db.session import get_db
 
 
 @lru_cache(maxsize=1)
@@ -16,3 +22,28 @@ def get_auth_adapter() -> AuthAdapter:
         from app.auth.adapters.yaml_test import YamlTestAdapter
         return YamlTestAdapter(auth_config.yaml_test, group_role_map)
     raise ValueError(f"Unbekannter Adapter: {auth_config.adapter}")
+
+
+@lru_cache(maxsize=1)
+def get_jwt_service() -> JwtService:
+    return JwtService(
+        secret=settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+async def get_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    jwt_service: JwtService = Depends(get_jwt_service),
+) -> JwtPayload:
+    token = request.cookies.get("session")
+    if not token:
+        raise HTTPException(status_code=401, detail="Nicht authentifiziert")
+    try:
+        payload = jwt_service.verify(token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Ungültiger Token")
+    if await jwt_service.is_revoked(db, payload):
+        raise HTTPException(status_code=401, detail="Token revoziert")
+    return payload

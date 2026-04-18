@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     auth_config_path: str = "config/auth.yaml"
     budget_tiers_path: str = "config/budget_tiers.yaml"
     auth_iserv_client_secret: str = ""
+    jwt_algorithm: str = "HS256"
 
 
 settings = Settings()
