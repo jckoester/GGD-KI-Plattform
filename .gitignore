@@ -1,4 +1,43 @@
+# Claude Code / Agents
 CLAUDE.md
 AGENTS.md
-Konzept
-Plaene
+
+# Secrets & local config
+.env
+.env.local
+.env.*.local
+config/auth.yaml
+config/budget_tiers.yaml
+config/assistants.yaml
+config/crisis_triggers.yaml
+config/rate_limits.yaml
+config/help_resources.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Node / Svelte
+node_modules/
+.svelte-kit/
+frontend/build/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db

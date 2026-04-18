@@ -1,0 +1,193 @@
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Numeric, Boolean
+
+import enum
+from typing import Optional
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# Enums for CHECK constraints
+class AssistantStatus(enum.Enum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    ARCHIVED = "archived"
+
+
+class MessageRole(enum.Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ExchangeRateSource(enum.Enum):
+    ECB = "ECB"
+    MANUAL = "manual"
+
+
+# 1. subjects
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(unique=True, nullable=False)
+    min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    sort_order: Mapped[int] = mapped_column(default=0, nullable=False)
+
+
+# 2. assistants
+class Assistant(Base):
+    __tablename__ = "assistants"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(
+        default="draft",
+        server_default=text("'draft'")
+    )
+    force_cost_display: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    created_by_pseudonym: Mapped[Optional[str]] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'active', 'disabled', 'archived')",
+            name="check_assistant_status"
+        ),
+    )
+
+
+# 3. conversations
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    pseudonym: Mapped[str] = mapped_column(nullable=False)
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL")
+    )
+    assistant_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assistants.id", ondelete="SET NULL")
+    )
+    system_prompt_snapshot: Mapped[Optional[str]] = mapped_column(nullable=True)
+    total_cost_usd: Mapped[Optional[float]] = mapped_column(
+        Numeric(10, 6), default=0, server_default=text("0")
+    )
+    last_message_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("idx_conversations_pseudonym", "pseudonym"),
+        Index("idx_conversations_last_message_at", "last_message_at"),
+    )
+
+
+# 4. messages
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    role: Mapped[str] = mapped_column(nullable=False)
+    content: Mapped[str] = mapped_column(nullable=False)
+    # cost/token fields - nullable, only for assistant
+    cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
+    input_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
+    output_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="check_message_role"
+        ),
+        Index("idx_messages_conversation_id", "conversation_id"),
+    )
+
+
+# 5. user_preferences
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+
+    pseudonym: Mapped[str] = mapped_column(primary_key=True)
+    preferences: Mapped[dict] = mapped_column(
+        JSONB, default={}, server_default=text("'{}'")
+    )
+
+
+# 6. pseudonym_audit
+class PseudonymAudit(Base):
+    __tablename__ = "pseudonym_audit"
+
+    pseudonym: Mapped[str] = mapped_column(primary_key=True)
+    role: Mapped[str] = mapped_column(nullable=False)
+    grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    last_login_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    revoked_all_before: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+
+# 7. jwt_revocations
+class JwtRevocation(Base):
+    __tablename__ = "jwt_revocations"
+
+    jti: Mapped[str] = mapped_column(primary_key=True)
+    pseudonym: Mapped[str] = mapped_column(nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    reason: Mapped[Optional[str]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_jwt_revocations_pseudonym", "pseudonym"),
+        Index("idx_jwt_revocations_expires_at", "expires_at"),
+    )
+
+
+# 8. exchange_rates
+class ExchangeRate(Base):
+    __tablename__ = "exchange_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    eur_usd_rate: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False)
+    source: Mapped[str] = mapped_column(nullable=False)
+    effective_from: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_exchange_rates_effective_from", "effective_from"),
+        CheckConstraint(
+            "source IN ('ECB', 'manual')",
+            name="check_exchange_rate_source"
+        ),
+    )
