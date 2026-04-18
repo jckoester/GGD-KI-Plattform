@@ -15,4 +15,8 @@ httpx>=0.27.0
 # Dev / Test
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+pytest-httpx>=0.25.0
 testcontainers[postgresql]>=4.7.0
+
+# Runtime - Auth
+passlib[bcrypt]>=1.7.4

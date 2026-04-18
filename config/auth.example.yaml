@@ -5,6 +5,11 @@ iserv:
   base_url: https://iserv.example.de
   client_id: ggd-ki-plattform
   redirect_uri: https://ki.example.de/auth/callback
+  # Regex mit Capture-Group für den Jahrgang.
+  # Gruppe "jahrgang.10" → grade="10"
+  grade_group_pattern: '^jahrgang\.(\d{1,2})$'
+  # Zum Deaktivieren auskommentieren oder auf null setzen:
+  # grade_group_pattern: null
   # client_secret kommt aus Env-Variable AUTH_ISERV_CLIENT_SECRET
 
 yaml_test:

@@ -1,7 +1,7 @@
 import yaml
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class GroupRoleMapping(BaseModel):
@@ -14,6 +14,15 @@ class AuthConfig(BaseModel):
     iserv: dict = {}
     yaml_test: dict = {}
     group_role_map: list[GroupRoleMapping] = []
+
+    @computed_field
+    @property
+    def group_role_map_dict(self) -> dict[str, Literal["student", "teacher", "admin"]]:
+        """Konvertiert die Liste der GroupRoleMapping in ein Dictionary für schnellen Lookup."""
+        result: dict[str, str] = {}
+        for mapping in self.group_role_map:
+            result[mapping.group] = mapping.role
+        return result
 
 
 def load_auth_config(path: str) -> AuthConfig:
