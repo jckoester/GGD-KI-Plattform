@@ -1,0 +1,20 @@
+# Welcher Adapter aktiv ist: "iserv" oder "yaml_test"
+adapter: yaml_test
+
+iserv:
+  base_url: https://iserv.example.de
+  client_id: ggd-ki-plattform
+  redirect_uri: https://ki.example.de/auth/callback
+  # client_secret kommt aus Env-Variable AUTH_ISERV_CLIENT_SECRET
+
+yaml_test:
+  users_file: config/test_users.yaml
+
+# IServ-Gruppen -> Plattform-Rollen
+group_role_map:
+  - group: ki-admins
+    role: admin
+  - group: lehrer
+    role: teacher
+  - group: schueler
+    role: student
