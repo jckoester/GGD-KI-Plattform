@@ -1,21 +1,26 @@
 import os
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from app.auth.audit import upsert_pseudonym_audit
+from app.auth.base import NormalizedIdentity
+from app.auth.dependencies import get_auth_adapter, get_jwt_service
+from app.auth.jwt import JwtService
+from app.auth.pseudonym import pseudonymize
+from app.auth.router import router as auth_router
+from app.db.session import get_db
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from jose import jwt as jose_jwt
 
-from app.auth.dependencies import get_jwt_service
-from app.auth.jwt import JwtPayload, JwtService
-from app.auth.router import router as auth_router
-from app.db.session import get_db
-
 os.environ["JWT_SECRET"] = "test-secret-123"
 os.environ["JWT_ALGORITHM"] = "HS256"
+os.environ["SCHOOL_SECRET"] = "test-school-secret"
+os.environ["ENVIRONMENT"] = "development"
 
 _TEST_SECRET = "test-secret-123"
+_SCHOOL_SECRET = "test-school-secret"
 
 
 def _make_jwt_service() -> JwtService:
@@ -28,7 +33,44 @@ def _no_revocation_db():
         db.add = MagicMock()
         db.get.return_value = None
         yield db
+
     return override
+
+
+# Fixtures for login/callback tests
+@pytest.fixture
+def mock_direct_adapter():
+    """Mock adapter with mode='direct' that returns a test identity."""
+    adapter = AsyncMock()
+    adapter.mode = "direct"
+    return adapter
+
+
+@pytest.fixture
+def mock_redirect_adapter():
+    """Mock adapter with mode='redirect' that returns a test identity."""
+    adapter = AsyncMock()
+    adapter.mode = "redirect"
+    return adapter
+
+
+@pytest.fixture
+def test_identity():
+    """Sample NormalizedIdentity for testing."""
+    return NormalizedIdentity(
+        external_id="test_user_123",
+        role="student",
+        grade="10"
+    )
+
+
+@pytest.fixture
+def mock_db():
+    """Mock database session."""
+    db = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    return db
 
 
 @pytest.fixture
@@ -157,3 +199,187 @@ class TestAuthRouterAuthenticated:
         db = captured[-1]
         db.add.assert_called_once()
         db.commit.assert_awaited_once()
+
+
+class TestLogin:
+    """Tests for POST /login endpoint."""
+
+    @pytest.fixture
+    def app_with_mocks(self, mock_direct_adapter, test_identity, mock_db):
+        """Create app with mocked dependencies for login tests."""
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_direct_adapter
+
+        async def get_mock_db():
+            yield mock_db
+
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = get_mock_db
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+        return app
+
+    def test_login_success_sets_cookie(self, app_with_mocks, mock_direct_adapter, test_identity, mock_db):
+        """Valid credentials -> 200 + Set-Cookie: session=..."""
+        mock_direct_adapter.authenticate_direct = AsyncMock(return_value=test_identity)
+
+        with patch("app.auth.router.pseudonymize") as mock_pseudo, \
+             patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.settings") as mock_settings:
+            mock_settings.school_secret = _SCHOOL_SECRET
+            mock_settings.environment = "development"
+            mock_pseudo.return_value = "test_pseudo_abc"
+            mock_audit.return_value = None
+
+            client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            response = client.post(
+                "/login",
+                json={"username": "testuser", "password": "testpass"}
+            )
+            assert response.status_code == 200
+            assert response.json() == {"ok": True}
+            set_cookie = response.headers.get("set-cookie", "")
+            assert "session=" in set_cookie
+            assert "HttpOnly" in set_cookie
+            assert "Path=/" in set_cookie
+
+    def test_login_wrong_password(self, app_with_mocks, mock_direct_adapter, mock_db):
+        """authenticate_direct returns None -> 401"""
+        mock_direct_adapter.authenticate_direct = AsyncMock(return_value=None)
+
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        response = client.post(
+            "/login",
+            json={"username": "testuser", "password": "wrong"}
+        )
+        assert response.status_code == 401
+        assert "Falsche Anmeldedaten" in response.json()["detail"]
+
+    def test_login_missing_fields(self, app_with_mocks, mock_direct_adapter, mock_db):
+        """Body without password -> 400"""
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        response = client.post(
+            "/login",
+            json={"username": "testuser"}
+        )
+        assert response.status_code == 400
+        assert "Missing username or password" in response.json()["detail"]
+
+    def test_login_wrong_adapter_mode(self, mock_redirect_adapter, test_identity, mock_db):
+        """Redirect adapter on /login -> 405"""
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_redirect_adapter
+
+        async def get_mock_db():
+            yield mock_db
+
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = get_mock_db
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.post(
+            "/login",
+            json={"username": "test", "password": "test"}
+        )
+        assert response.status_code == 405
+        assert "Adapter unterstützt kein direktes Login" in response.json()["detail"]
+
+    def test_login_upserts_audit(self, app_with_mocks, mock_direct_adapter, test_identity, mock_db):
+        """upsert_pseudonym_audit is called on successful login"""
+        mock_direct_adapter.authenticate_direct = AsyncMock(return_value=test_identity)
+
+        with patch("app.auth.router.pseudonymize") as mock_pseudo, \
+             patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.settings") as mock_settings:
+            mock_settings.school_secret = _SCHOOL_SECRET
+            mock_settings.environment = "development"
+            mock_pseudo.return_value = "test_pseudo_abc"
+
+            client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            response = client.post(
+                "/login",
+                json={"username": "testuser", "password": "testpass"}
+            )
+            assert response.status_code == 200
+            mock_audit.assert_called_once()
+
+
+class TestCallback:
+    """Tests for GET /auth/callback endpoint."""
+
+    @pytest.fixture
+    def app_with_mocks(self, mock_redirect_adapter, test_identity, mock_db):
+        """Create app with mocked dependencies for callback tests."""
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_redirect_adapter
+
+        async def get_mock_db():
+            yield mock_db
+
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = get_mock_db
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+        return app
+
+    def test_callback_success_sets_cookie(self, app_with_mocks, mock_redirect_adapter, test_identity, mock_db):
+        """Valid code/state -> 200 + Cookie"""
+        mock_redirect_adapter.exchange_code = AsyncMock(return_value=test_identity)
+
+        with patch("app.auth.router.pseudonymize") as mock_pseudo, \
+             patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.settings") as mock_settings:
+            mock_settings.school_secret = _SCHOOL_SECRET
+            mock_settings.environment = "development"
+            mock_pseudo.return_value = "test_pseudo_abc"
+
+            client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            response = client.get("/callback?code=test_code&state=test_state")
+            assert response.status_code == 200
+            assert response.json() == {"ok": True}
+            set_cookie = response.headers.get("set-cookie", "")
+            assert "session=" in set_cookie
+
+    def test_callback_missing_params(self, app_with_mocks, mock_redirect_adapter, mock_db):
+        """No code -> 400"""
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        response = client.get("/callback?state=test_state")
+        assert response.status_code == 400
+        assert "Missing code or state" in response.json()["detail"]
+
+    def test_callback_wrong_adapter_mode(self, mock_direct_adapter, test_identity, mock_db):
+        """Direct adapter on /callback -> 405"""
+        app = FastAPI()
+        app.include_router(auth_router)
+
+        async def get_mock_adapter():
+            return mock_direct_adapter
+
+        async def get_mock_db():
+            yield mock_db
+
+        app.dependency_overrides[get_auth_adapter] = get_mock_adapter
+        app.dependency_overrides[get_db] = get_mock_db
+        app.dependency_overrides[get_jwt_service] = _make_jwt_service
+
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/callback?code=test&state=test")
+        assert response.status_code == 405
+        assert "Adapter unterstützt kein OIDC-Callback" in response.json()["detail"]
+
+    def test_callback_exchange_error(self, app_with_mocks, mock_redirect_adapter, mock_db):
+        """exchange_code raises exception -> 401"""
+        mock_redirect_adapter.exchange_code = AsyncMock(side_effect=Exception("Auth failed"))
+
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        response = client.get("/callback?code=test&state=test")
+        assert response.status_code == 401
+        assert "Authentifizierung fehlgeschlagen" in response.json()["detail"]

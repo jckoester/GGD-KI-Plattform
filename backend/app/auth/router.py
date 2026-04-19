@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
 
-from app.auth.base import AuthAdapter, LoginChallenge, NormalizedIdentity
+from app.auth.audit import upsert_pseudonym_audit
+from app.auth.base import AuthAdapter, LoginChallenge
 from app.auth.dependencies import get_auth_adapter, get_current_user, get_jwt_service
 from app.auth.jwt import JwtPayload, JwtService
+from app.auth.pseudonym import pseudonymize
+from app.config import settings
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,26 +24,61 @@ async def get_login_challenge(
 @router.get("/callback")
 async def auth_callback(
     request: Request,
+    response: Response,
     adapter: AuthAdapter = Depends(get_auth_adapter),
-) -> JSONResponse:
+    db: AsyncSession = Depends(get_db),
+    jwt_service: JwtService = Depends(get_jwt_service),
+) -> dict:
+    if adapter.mode != "redirect":
+        raise HTTPException(status_code=405, detail="Adapter unterstützt kein OIDC-Callback")
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     if code is None or state is None:
         raise HTTPException(status_code=400, detail="Missing code or state")
-    raise HTTPException(status_code=501, detail="Schritt 1c + 1d: Pseudonymisierung + JWT noch nicht implementiert")
+    try:
+        identity = await adapter.exchange_code(code, state)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
+    pseudonym = pseudonymize(identity.external_id, settings.school_secret)
+    await upsert_pseudonym_audit(db, pseudonym, identity)
+    token, _ = jwt_service.issue(pseudonym, identity.role, identity.grade)
+    secure = settings.environment != "development"
+    response.set_cookie(
+        "session", token,
+        httponly=True, secure=secure, samesite="lax",
+        max_age=30 * 24 * 3600, path="/",
+    )
+    return {"ok": True}
 
 
 @router.post("/login")
 async def login_direct(
     request: Request,
+    response: Response,
     adapter: AuthAdapter = Depends(get_auth_adapter),
-) -> JSONResponse:
+    db: AsyncSession = Depends(get_db),
+    jwt_service: JwtService = Depends(get_jwt_service),
+) -> dict:
+    if adapter.mode != "direct":
+        raise HTTPException(status_code=405, detail="Adapter unterstützt kein direktes Login")
     body = await request.json()
     username = body.get("username")
     password = body.get("password")
     if username is None or password is None:
         raise HTTPException(status_code=400, detail="Missing username or password")
-    raise HTTPException(status_code=501, detail="Schritt 1c + 1d: Pseudonymisierung + JWT noch nicht implementiert")
+    identity = await adapter.authenticate_direct(username, password)
+    if identity is None:
+        raise HTTPException(status_code=401, detail="Falsche Anmeldedaten")
+    pseudonym = pseudonymize(identity.external_id, settings.school_secret)
+    await upsert_pseudonym_audit(db, pseudonym, identity)
+    token, _ = jwt_service.issue(pseudonym, identity.role, identity.grade)
+    secure = settings.environment != "development"
+    response.set_cookie(
+        "session", token,
+        httponly=True, secure=secure, samesite="lax",
+        max_age=30 * 24 * 3600, path="/",
+    )
+    return {"ok": True}
 
 
 @router.post("/logout")
