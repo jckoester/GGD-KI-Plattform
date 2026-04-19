@@ -1,0 +1,20 @@
+{
+  "name": "ggd-ki-frontend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^3.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.4",
+    "svelte": "^5.55.4",
+    "vite": "^5.0.0"
+  }
+}
