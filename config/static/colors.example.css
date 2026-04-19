@@ -1,0 +1,5 @@
+:root {
+  --brand-primary: #4f46e5;      /* Hauptfarbe: Buttons, Links, Akzente */
+  --brand-primary-dark: #4338ca; /* Hover-Zustand */
+  --brand-accent: #06b6d4;       /* Sekundärfarbe */
+}

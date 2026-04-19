@@ -15,7 +15,14 @@ router = APIRouter()
 
 
 @router.get("/login")
-async def get_login_challenge(
+async def get_login_challenge_v1(
+    adapter: AuthAdapter = Depends(get_auth_adapter),
+) -> LoginChallenge:
+    return await adapter.get_login_challenge()
+
+
+@router.get("/login-challenge")
+async def login_challenge(
     adapter: AuthAdapter = Depends(get_auth_adapter),
 ) -> LoginChallenge:
     return await adapter.get_login_challenge()
