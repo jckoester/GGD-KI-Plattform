@@ -1,5 +1,5 @@
 <script>
-    import { Sun, Moon, Monitor } from "lucide-svelte";
+    import { Sun, Moon, Monitor, Save } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { goto } from "$app/navigation";
 
@@ -46,7 +46,7 @@
             class="px-4 py-2 rounded-md text-sm font-medium bg-light-gr-2 dark:bg-dark-gr-2 text-white hover:bg-light-gr dark:hover:bg-dark-gr transition-colors"
             onclick={doSave}
         >
-            Speichern
+            <Save class="w-4 h-4 inline-block mr-1 mb-1" /> Speichern
         </button>
     </section>
 </div>
