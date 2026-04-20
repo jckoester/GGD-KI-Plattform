@@ -39,7 +39,7 @@
     <div class="relative">
         <button
             onclick={toggleMenu}
-            class="w-full flex items-center p-2 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+            class="w-full flex items-center p-2 rounded bg-light-ui-3 dark:bg-dark-ui-3 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
                    text-left border border-light-ui-3 dark:border-dark-ui-3 mb-3"
         >
             <div

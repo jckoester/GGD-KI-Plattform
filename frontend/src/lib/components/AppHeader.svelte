@@ -5,7 +5,14 @@
     import { goto } from "$app/navigation";
 
     // Props
-    let { sidebarOpen, onToggle } = $props();
+    let {
+        sidebarOpen,
+        onToggle,
+        bgClass = "bg-light-bg dark:bg-dark-bg-2",
+        textClass = "text-light-tx dark:text-dark-tx",
+        borderClass = "border-light-ui-2 dark:border-dark-ui-2",
+        hoverClass = "hover:bg-light-ui-3 dark:hover:bg-dark-ui-3",
+    } = $props();
 
     // Abgeleiteter Titel
     let title = $derived($page.data.title ?? "");
@@ -17,7 +24,7 @@
 </script>
 
 <header
-    class="h-14 bg-light-bg dark:bg-dark-bg-2 border-b border-light-ui-3 dark:border-dark-ui-3 flex-shrink-0
+    class="h-14 {bgClass} border-b {borderClass} flex-shrink-0
            flex items-center justify-between px-1"
 >
     <div class="flex items-center gap-4">
@@ -25,7 +32,7 @@
         <button
             onclick={onToggle}
             aria-label="Menü {sidebarOpen ? 'schließen' : 'öffnen'}"
-            class="p-2 rounded-lg hover:bg-light-ui-2 dark:hover:bg-dark-ui dark:text-dark-tx-2 transition-colors md:p-1"
+            class="p-2 rounded-lg hover:bg-light-ui-2 dark:hover:bg-dark-ui {textClass} transition-colors md:p-1"
         >
             {#if sidebarOpen}
                 <PanelLeftClose size={24} />
@@ -35,7 +42,7 @@
         </button>
 
         <!-- Seitentitel -->
-        <h1 class="text-lg font-semibold text-light-tx dark:text-dark-tx">
+        <h1 class="text-lg font-semibold {textClass}">
             {title}
         </h1>
     </div>
@@ -43,7 +50,7 @@
     <!-- Abmelden-Button -->
     <button
         onclick={handleLogout}
-        class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx
+        class="text-sm {textClass} hover:text-light-tx dark:hover:text-dark-tx
                px-3 py-1.5 rounded-lg hover:bg-light-ui dark:hover:bg-dark-ui transition-colors"
     >
         <LogOut size={16} class="inline-block mr-1" />Abmelden

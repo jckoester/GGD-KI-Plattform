@@ -43,15 +43,15 @@
 
 <div
     bind:this={menuRef}
-    class="absolute bottom-16 left-0 right-0 mx-3 bg-light-bg dark:bg-dark-ui rounded-md shadow-lg border border-light-ui-3 dark:border-dark-ui-3 py-1 z-50"
+    class="absolute bottom-16 left-0 right-0 mx-3 bg-light-bg dark:bg-dark-ui rounded-md shadow-lg border border-light-ui-3 dark:border-dark-ui-3 py-0 z-50"
 >
     <!-- Admin (nur bei admin-Rolle) -->
     {#if $user?.roles.includes("admin")}
         <a
             href="/admin"
-            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui dark:hover:bg-dark-ui"
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
-            <Shield class="w-4 h-4 mr-3" />
+            <Shield class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
             Admin
         </a>
     {/if}
@@ -92,7 +92,7 @@
     <!-- Trenner wenn Rollen-Menüs vorhanden -->
     {#if $user?.roles.some( (r) => ["admin", "review", "budget", "statistics"].includes(r), )}
         <div
-            class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"
+            class="border-t border-light-ui-3 dark:border-dark-ui-3 my-0"
         ></div>
     {/if}
 
@@ -107,7 +107,7 @@
     </a>
 
     <!-- Trenner -->
-    <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
+    <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-0"></div>
 
     <!-- Abmelden (immer sichtbar) -->
     <button
