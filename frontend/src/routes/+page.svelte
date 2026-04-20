@@ -35,8 +35,8 @@
   const initials = (name) => name.slice(0, 2).toUpperCase()
 </script>
 
-<div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-lg w-full max-w-sm p-8 space-y-6">
+<div class="min-h-screen bg-light-bg-2 dark:bg-dark-bg flex items-center justify-center p-4">
+  <div class="bg-light-bg dark:bg-dark-ui rounded-2xl shadow-lg w-full max-w-sm p-8 space-y-6">
 
     <div class="flex flex-col items-center gap-2">
       {#if branding.logo_url}
@@ -47,7 +47,7 @@
           {initials(branding.name)}
         </div>
       {/if}
-      <h1 class="text-2xl font-semibold text-gray-800">{branding.name}</h1>
+      <h1 class="text-2xl font-semibold text-light-tx dark:text-dark-tx">{branding.name}</h1>
     </div>
 
     {#if challenge.type === 'redirect'}
@@ -59,23 +59,25 @@
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit() }} class="space-y-4">
         <div class="space-y-1">
-          <label for="username" class="block text-sm font-medium text-gray-700">
+          <label for="username" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2">
             Benutzername
           </label>
           <input id="username" type="text" bind:value={username} required
-                 class="w-full rounded-lg border-gray-300 focus:border-primary
-                        focus:ring-primary" />
+                 class="w-full rounded-lg border-light-ui-3 dark:border-dark-ui-3
+                        bg-light-bg dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                        focus:border-primary focus:ring-primary" />
         </div>
         <div class="space-y-1">
-          <label for="password" class="block text-sm font-medium text-gray-700">
+          <label for="password" class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2">
             Passwort
           </label>
           <input id="password" type="password" bind:value={password} required
-                 class="w-full rounded-lg border-gray-300 focus:border-primary
-                        focus:ring-primary" />
+                 class="w-full rounded-lg border-light-ui-3 dark:border-dark-ui-3
+                        bg-light-bg dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                        focus:border-primary focus:ring-primary" />
         </div>
         {#if error}
-          <p class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          <p class="text-sm text-light-re dark:text-dark-re bg-red-50 dark:bg-dark-ui rounded-lg px-3 py-2">{error}</p>
         {/if}
         <button type="submit" disabled={loading}
                 class="w-full py-2.5 px-4 rounded-lg bg-primary hover:bg-primary-dark

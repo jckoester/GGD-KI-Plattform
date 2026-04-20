@@ -2,6 +2,8 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+@variant dark (.dark &);
+
 @theme {
     --color-primary: var(--brand-primary, #4f46e5);
     --color-primary-dark: var(--brand-primary-dark, #4338ca);
@@ -146,7 +148,9 @@
 
 /* Define some semantic aliases. */
 @theme inline {
-    --color-light-bg: var(--color-paper);
+    --color-primary: var(--color-blue-600);
+    --color-primary-dark: var(--color-blue-400);
+    --color-light-bg: var(--color-base-100);
     --color-light-bg-2: var(--color-base-50);
     --color-light-tx: var(--color-black);
     --color-light-tx-2: var(--color-base-600);

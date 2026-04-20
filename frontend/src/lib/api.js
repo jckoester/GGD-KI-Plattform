@@ -30,3 +30,18 @@ export async function getMe() {
   if (!res.ok) throw new Error('Nicht angemeldet')
   return res.json()  // { pseudonym, roles: string[], grade }
 }
+
+export async function getPreferences() {
+  const res = await fetch(`${BASE}/preferences`, { credentials: 'include' })
+  if (!res.ok) return {}
+  return res.json()
+}
+
+export async function patchPreferences(updates) {
+  await fetch(`${BASE}/preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(updates),
+  })
+}
