@@ -1,6 +1,7 @@
 <script>
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
+    import SidebarBottom from "./SidebarBottom.svelte";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
 </script>
@@ -26,8 +27,11 @@
         <span class="ml-2 font-semibold text-gray-800">{branding.name}</span>
     </div>
 
-    <!-- Sidebar-Inhalt (Platzhalter für Schritt 3b) -->
+    <!-- Sidebar-Inhalt (Platzhalter für Schritt 3c) -->
     <div class="flex-1 overflow-y-auto p-4">
-        <p class="text-sm text-gray-400">Navigation folgt in Schritt 3b</p>
+        <p class="text-sm text-gray-400">Navigation folgt in Schritt 3c</p>
     </div>
+
+    <!-- Unterer Bereich -->
+    <SidebarBottom />
 </aside>

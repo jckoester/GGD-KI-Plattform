@@ -59,7 +59,7 @@ def test_identity():
     """Sample NormalizedIdentity for testing."""
     return NormalizedIdentity(
         external_id="test_user_123",
-        role="student",
+        roles=["student"],
         grade="10"
     )
 
@@ -80,7 +80,7 @@ def jwt_service():
 
 @pytest.fixture
 def valid_token(jwt_service):
-    token, _ = jwt_service.issue("test_pseudo", "student", "10")
+    token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
     return token
 
 
@@ -115,7 +115,7 @@ class TestAuthRouterUnauthenticated:
         now = datetime.now(timezone.utc)
         expired_payload = {
             "sub": "test_user",
-            "role": "student",
+            "roles": ["student"],
             "grade": "10",
             "jti": "expired-jti",
             "iat": int((now - timedelta(days=10)).timestamp()),
@@ -149,7 +149,7 @@ class TestAuthRouterAuthenticated:
         assert response.status_code == 200
         data = response.json()
         assert data["pseudonym"] == "test_pseudo"
-        assert data["role"] == "student"
+        assert data["roles"] == ["student"]
         assert data["grade"] == "10"
 
     def test_me_with_revoked_token(self, valid_token):
@@ -239,7 +239,10 @@ class TestLogin:
                 json={"username": "testuser", "password": "testpass"}
             )
             assert response.status_code == 200
-            assert response.json() == {"ok": True}
+            data = response.json()
+            assert data["ok"] is True
+            assert data["display_name"] is None
+            assert data["username"] == "testuser"
             set_cookie = response.headers.get("set-cookie", "")
             assert "session=" in set_cookie
             assert "HttpOnly" in set_cookie
@@ -344,7 +347,9 @@ class TestCallback:
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.get("/callback?code=test_code&state=test_state")
             assert response.status_code == 200
-            assert response.json() == {"ok": True}
+            data = response.json()
+            assert data["ok"] is True
+            assert data["display_name"] is None
             set_cookie = response.headers.get("set-cookie", "")
             assert "session=" in set_cookie
 

@@ -14,19 +14,19 @@ def temp_users_file(tmp_path: Path):
             {
                 "username": "schueler10a",
                 "password_hash": "$2b$12$/9DdLzVyejpZ6KJBopnYZubL.saVp.X0zOjhPUtLpa9tDLime0GrS",
-                "role": "student",
+                "roles": ["student"],
                 "grade": "10a",
             },
             {
                 "username": "lehrer01",
                 "password_hash": "$2b$12$oK3VKqm5UJo/iEQv2iInR.nCUA3jBrZwu7v7dLvmQIovz1dZtiEl2",
-                "role": "teacher",
+                "roles": ["teacher"],
                 "grade": None,
             },
             {
                 "username": "admin",
                 "password_hash": "$2b$12$j42wD/P9FYGN/7XhfbTVtuqP.tRwIk8DU1XNK6wOGZLqQwyvT5XaS",
-                "role": "admin",
+                "roles": ["teacher", "admin"],
                 "grade": None,
             },
         ]
@@ -48,7 +48,7 @@ class TestYamlTestAdapter:
         identity = await yaml_adapter.authenticate_direct("schueler10a", "schueler10a")
         assert identity is not None
         assert identity.external_id == "schueler10a"
-        assert identity.role == "student"
+        assert identity.roles == ["student"]
         assert identity.grade == "10a"
 
     @pytest.mark.asyncio
@@ -56,7 +56,7 @@ class TestYamlTestAdapter:
         identity = await yaml_adapter.authenticate_direct("lehrer01", "lehrer01")
         assert identity is not None
         assert identity.external_id == "lehrer01"
-        assert identity.role == "teacher"
+        assert identity.roles == ["teacher"]
         assert identity.grade is None
 
     @pytest.mark.asyncio
@@ -64,7 +64,7 @@ class TestYamlTestAdapter:
         identity = await yaml_adapter.authenticate_direct("admin", "admin")
         assert identity is not None
         assert identity.external_id == "admin"
-        assert identity.role == "admin"
+        assert identity.roles == ["teacher", "admin"]
         assert identity.grade is None
 
     @pytest.mark.asyncio

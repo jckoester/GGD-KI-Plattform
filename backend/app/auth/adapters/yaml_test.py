@@ -16,8 +16,9 @@ class YamlTestConfig(BaseModel):
 class YamlUser:
     username: str
     password_hash: str  # bcrypt-Hash
-    role: Literal["student", "teacher", "admin"]
-    grade: str | None  # nur bei role="student"
+    roles: list[str]
+    grade: str | None
+    display_name: str | None = None
 
 
 class YamlTestAdapter(AuthAdapter):
@@ -35,8 +36,9 @@ class YamlTestAdapter(AuthAdapter):
             user = YamlUser(
                 username=user_data["username"],
                 password_hash=user_data["password_hash"],
-                role=user_data["role"],
+                roles=user_data.get("roles", [user_data.get("role", "student")]),
                 grade=user_data.get("grade"),
+                display_name=user_data.get("display_name"),
             )
             users[user.username] = user
         return users
@@ -61,6 +63,7 @@ class YamlTestAdapter(AuthAdapter):
             return None
         return NormalizedIdentity(
             external_id=username,
-            role=user.role,
+            roles=user.roles,
             grade=user.grade,
+            display_name=user.display_name,
         )

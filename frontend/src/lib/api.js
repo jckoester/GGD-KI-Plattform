@@ -11,6 +11,9 @@ export async function login(username, password) {
     const data = await res.json().catch(() => ({}))
     throw new Error(data.detail ?? 'Login fehlgeschlagen')
   }
+  const data = await res.json()
+  // Nur UI-Anzeige; endet mit Tab-Lebenszyklus (sessionStorage)
+  sessionStorage.setItem('display_name', data.display_name ?? username)
 }
 
 export async function logout() {
@@ -25,5 +28,5 @@ export async function getMe() {
     credentials: 'include',
   })
   if (!res.ok) throw new Error('Nicht angemeldet')
-  return res.json()  // { pseudonym, role, grade }
+  return res.json()  // { pseudonym, roles: string[], grade }
 }

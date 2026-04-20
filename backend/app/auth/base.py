@@ -4,18 +4,23 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
+BASE_ROLES = {"student", "teacher", "admin"}
+
 
 class NormalizedIdentity(BaseModel):
     external_id: str
-    role: Literal["student", "teacher", "admin"]
+    roles: list[str]  # mind. eine Basisrolle; admin additiv zu teacher möglich
     grade: str | None = None
+    display_name: str | None = None  # nur UI-Anzeige, niemals persistieren
 
     @model_validator(mode="after")
-    def grade_only_for_student(self) -> "NormalizedIdentity":
-        if self.grade is not None and self.role != "student":
+    def validate_roles(self) -> "NormalizedIdentity":
+        if not any(r in BASE_ROLES for r in self.roles):
             raise ValueError(
-                "Klasse (`grade`) darf nur bei `role='student'` gesetzt sein"
+                "roles muss mind. eine Basisrolle enthalten (student/teacher/admin)"
             )
+        if self.grade is not None and "student" not in self.roles:
+            raise ValueError("grade darf nur gesetzt sein, wenn 'student' in roles")
         return self
 
 

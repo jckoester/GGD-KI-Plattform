@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 class JwtPayload(BaseModel):
     sub: str                                      # Pseudonym
-    role: Literal["student", "teacher", "admin"]
+    roles: list[str]                              # Liste aller Rollen
     grade: str | None
     jti: str                                      # UUID4, für Revokation
     iat: int                                      # Unix-Timestamp
@@ -24,13 +24,13 @@ class JwtService:
         self._algorithm = algorithm
         self._ttl = timedelta(days=ttl_days)
 
-    def issue(self, pseudonym: str, role: str, grade: str | None) -> tuple[str, str]:
+    def issue(self, pseudonym: str, roles: list[str], grade: str | None) -> tuple[str, str]:
         """Gibt (token, jti) zurück."""
         now = datetime.now(timezone.utc)
         jti = str(uuid4())
         payload = {
             "sub": pseudonym,
-            "role": role,
+            "roles": roles,
             "grade": grade,
             "jti": jti,
             "iat": int(now.timestamp()),

@@ -11,16 +11,16 @@ class TestNormalizedIdentity:
     def test_valid_roles(self):
         for role in ("student", "teacher", "admin"):
             grade = "9b" if role == "student" else None
-            ident = NormalizedIdentity(external_id="testuser", role=role, grade=grade)
-            assert ident.role == role
+            ident = NormalizedIdentity(external_id="testuser", roles=[role], grade=grade)
+            assert ident.roles == [role]
 
     def test_invalid_role(self):
         with pytest.raises(ValidationError):
-            NormalizedIdentity(external_id="x", role="principal", grade=None)
+            NormalizedIdentity(external_id="x", roles=["principal"], grade=None)
 
     def test_grade_only_for_student(self):
         with pytest.raises(ValidationError, match="grade"):
-            NormalizedIdentity(external_id="x", role="teacher", grade="10a")
+            NormalizedIdentity(external_id="x", roles=["teacher"], grade="10a")
 
 
 class TestAuthConfig:

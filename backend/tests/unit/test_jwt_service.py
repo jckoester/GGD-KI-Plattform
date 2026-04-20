@@ -21,23 +21,23 @@ def mock_db():
 
 class TestJwtServiceIssue:
     def test_issue_returns_token_and_jti(self, jwt_service):
-        token, jti = jwt_service.issue("test_pseudo", "student", "10")
+        token, jti = jwt_service.issue("test_pseudo", ["student"], "10")
         assert isinstance(token, str)
         assert len(token) > 0
         assert len(jti) == 36  # UUID4 string length
 
     def test_issue_with_none_grade(self, jwt_service):
-        token, jti = jwt_service.issue("test_pseudo", "teacher", None)
+        token, jti = jwt_service.issue("test_pseudo", ["teacher"], None)
         assert isinstance(token, str)
         assert len(jti) == 36
 
 
 class TestJwtServiceVerify:
     def test_verify_decodes_correctly(self, jwt_service):
-        token, jti = jwt_service.issue("test_pseudo", "student", "10")
+        token, jti = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
         assert payload.sub == "test_pseudo"
-        assert payload.role == "student"
+        assert payload.roles == ["student"]
         assert payload.grade == "10"
         assert payload.jti == jti
         assert payload.iat > 0
@@ -52,7 +52,7 @@ class TestJwtServiceVerify:
         expired_token = jose_jwt.encode(
             {
                 "sub": "test_pseudo",
-                "role": "student",
+                "roles": ["student"],
                 "grade": "10",
                 "jti": "test-jti",
                 "iat": int(time.time()) - 100,  # 100 seconds ago
@@ -66,12 +66,12 @@ class TestJwtServiceVerify:
 
     def test_verify_rejects_wrong_signature(self, jwt_service):
         wrong_service = JwtService(secret="wrong-secret-456", algorithm="HS256")
-        wrong_token = wrong_service.issue("test_pseudo", "student", "10")[0]
+        wrong_token = wrong_service.issue("test_pseudo", ["student"], "10")[0]
         with pytest.raises(JWTError):
             jwt_service.verify(wrong_token)
 
     def test_verify_rejects_tampered_payload(self, jwt_service):
-        token, _ = jwt_service.issue("test_pseudo", "student", "10")
+        token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
         # Tamper with the token by changing a character
         tampered_token = token[:-5] + "xxxxx"
         with pytest.raises(JWTError):
@@ -92,7 +92,7 @@ class TestJwtServiceRevoke:
 class TestJwtServiceIsRevoked:
     @pytest.mark.asyncio
     async def test_is_revoked_true_for_known_jti(self, jwt_service, mock_db):
-        token, jti = jwt_service.issue("test_pseudo", "student", "10")
+        token, jti = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
         
         # Mock db.get to return a revocation record
@@ -105,7 +105,7 @@ class TestJwtServiceIsRevoked:
 
     @pytest.mark.asyncio
     async def test_is_revoked_false_for_unknown_jti(self, jwt_service, mock_db):
-        token, _ = jwt_service.issue("test_pseudo", "student", "10")
+        token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
         
         # Mock db.get to return None for both lookups
@@ -116,7 +116,7 @@ class TestJwtServiceIsRevoked:
 
     @pytest.mark.asyncio
     async def test_is_revoked_true_for_mass_revocation(self, jwt_service, mock_db):
-        token, _ = jwt_service.issue("test_pseudo", "student", "10")
+        token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
         
         # Create an iat that is before the revoked_all_before timestamp
@@ -133,7 +133,7 @@ class TestJwtServiceIsRevoked:
 
     @pytest.mark.asyncio
     async def test_is_revoked_false_after_revoked_all_before(self, jwt_service, mock_db):
-        token, _ = jwt_service.issue("test_pseudo", "student", "10")
+        token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
         
         # Create an iat that is after the revoked_all_before timestamp

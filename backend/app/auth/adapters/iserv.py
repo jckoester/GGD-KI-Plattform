@@ -116,25 +116,40 @@ class IServAdapter(AuthAdapter):
     def _userinfo_to_identity(self, userinfo: dict) -> NormalizedIdentity:
         external_id = userinfo["preferred_username"]
         groups: list[str] = userinfo.get("groups", [])
-        role = self._map_role(groups)
-        grade = self._extract_grade(groups) if role == "student" else None
-        return NormalizedIdentity(external_id=external_id, role=role, grade=grade)
+        roles, grade = self._map_roles_and_grade(groups)
+        return NormalizedIdentity(
+            external_id=external_id,
+            roles=roles,
+            grade=grade,
+            display_name=userinfo.get("name", userinfo.get("preferred_username")),
+        )
 
-    def _map_role(
+    def _map_roles_and_grade(
         self, groups: list[str]
-    ) -> Literal["student", "teacher", "admin"]:
-        # Gruppen gegen group_role_map prüfen, Priorität: admin > teacher > student
-        # Kein Match → "student" als sicherer Default
-        role_priority: list[Literal["admin", "teacher", "student"]] = [
-            "admin",
-            "teacher",
-            "student",
-        ]
-        for priority_role in role_priority:
-            for group, role in self._group_role_map.items():
-                if role == priority_role and group in groups:
-                    return priority_role
-        return "student"
+    ) -> tuple[list[str], str | None]:
+        # Sammle alle Rollen aus den Gruppen
+        roles: set[str] = set()
+        grade: str | None = None
+        
+        # Mapping aus Gruppen zu Rollen
+        for group in groups:
+            if group in self._group_role_map:
+                role = self._group_role_map[group]
+                roles.add(role)
+            
+            # Extrahiere Jahrgang
+            if self._config.grade_group_pattern and grade is None:
+                pattern = re.compile(self._config.grade_group_pattern)
+                m = pattern.match(group)
+                if m:
+                    grade = m.group(1)
+        
+        # Falls keine Rolle gemappt wurde, Default: student
+        if not roles:
+            roles.add("student")
+        
+        # Konvertiere zu Liste
+        return list(roles), grade
 
     def _extract_grade(self, groups: list[str]) -> str | None:
         if self._config.grade_group_pattern is None:

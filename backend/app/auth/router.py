@@ -48,14 +48,17 @@ async def auth_callback(
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     await upsert_pseudonym_audit(db, pseudonym, identity)
-    token, _ = jwt_service.issue(pseudonym, identity.role, identity.grade)
+    token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
         "session", token,
         httponly=True, secure=secure, samesite="lax",
         max_age=30 * 24 * 3600, path="/",
     )
-    return {"ok": True}
+    return {
+        "ok": True,
+        "display_name": identity.display_name,
+    }
 
 
 @router.post("/login")
@@ -78,14 +81,18 @@ async def login_direct(
         raise HTTPException(status_code=401, detail="Falsche Anmeldedaten")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     await upsert_pseudonym_audit(db, pseudonym, identity)
-    token, _ = jwt_service.issue(pseudonym, identity.role, identity.grade)
+    token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
         "session", token,
         httponly=True, secure=secure, samesite="lax",
         max_age=30 * 24 * 3600, path="/",
     )
-    return {"ok": True}
+    return {
+        "ok": True,
+        "display_name": identity.display_name,
+        "username": username,
+    }
 
 
 @router.post("/logout")
@@ -110,6 +117,6 @@ async def logout(
 async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
     return {
         "pseudonym": current_user.sub,
-        "role": current_user.role,
+        "roles": current_user.roles,
         "grade": current_user.grade,
     }

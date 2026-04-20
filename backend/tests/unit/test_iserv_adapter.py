@@ -142,7 +142,7 @@ class TestIServAdapter:
             challenge = await iserv_adapter.get_login_challenge()
             identity = await iserv_adapter.exchange_code("test_code", challenge.state)
         assert identity.external_id == "testuser"
-        assert identity.role == "student"
+        assert identity.roles == ["student"]
         assert identity.grade == "10"
 
     @pytest.mark.asyncio
@@ -154,7 +154,7 @@ class TestIServAdapter:
         with patch("app.auth.adapters.iserv.httpx.AsyncClient", return_value=mock_client):
             challenge = await iserv_adapter.get_login_challenge()
             identity = await iserv_adapter.exchange_code("test_code", challenge.state)
-        assert identity.role == "teacher"
+        assert identity.roles == ["teacher"]
         assert identity.grade is None
 
     @pytest.mark.asyncio
@@ -166,7 +166,7 @@ class TestIServAdapter:
         with patch("app.auth.adapters.iserv.httpx.AsyncClient", return_value=mock_client):
             challenge = await iserv_adapter.get_login_challenge()
             identity = await iserv_adapter.exchange_code("test_code", challenge.state)
-        assert identity.role == "student"
+        assert identity.roles == ["student"]
         assert identity.grade == "10"
 
     @pytest.mark.asyncio

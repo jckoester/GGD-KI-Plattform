@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
     import { getMe } from "$lib/api.js";
+    import { user } from "$lib/stores/user.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -12,7 +13,11 @@
 
     onMount(async () => {
         try {
-            await getMe();
+            const me = await getMe();
+            user.set({
+                ...me,
+                display_name: sessionStorage.getItem('display_name') ?? me.pseudonym,
+            });
         } catch {
             goto("/");
         }
