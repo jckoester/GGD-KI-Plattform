@@ -68,7 +68,7 @@
     <!-- Rechter Bereich: Header + Inhalt -->
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader {sidebarOpen} onToggle={toggleSidebar} />
-        <main class="flex-1 overflow-y-auto bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-4">
+        <main class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2">
             {@render children()}
         </main>
     </div>

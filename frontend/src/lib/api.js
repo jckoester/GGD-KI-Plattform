@@ -1,5 +1,12 @@
 const BASE = '/api'
 
+export class ApiError extends Error {
+  constructor(status, detail) {
+    super(detail ?? `Fehler ${status}`)
+    this.status = status
+  }
+}
+
 export async function login(username, password) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
@@ -44,4 +51,51 @@ export async function patchPreferences(updates) {
     credentials: 'include',
     body: JSON.stringify(updates),
   })
+}
+
+export async function* streamChat(messages) {
+  let res
+  try {
+    res = await fetch(`${BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ messages }),
+    })
+  } catch {
+    throw new ApiError(0, 'Verbindung zum Server fehlgeschlagen.')
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    // Pydantic-Validierungsfehler liefern detail als Array
+    const detail = Array.isArray(body.detail)
+      ? body.detail.map(e => e.msg ?? String(e)).join('; ')
+      : body.detail
+    throw new ApiError(res.status, detail)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const payload = line.slice(6)
+      if (payload === '[DONE]') return
+      try {
+        const token = JSON.parse(payload).choices?.[0]?.delta?.content
+        if (token) yield token
+      } catch {
+        // unvollständiges JSON oder Metadaten-Zeile — überspringen
+      }
+    }
+  }
 }

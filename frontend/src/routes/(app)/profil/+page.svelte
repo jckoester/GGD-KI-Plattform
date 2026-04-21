@@ -15,7 +15,7 @@
     }
 </script>
 
-<div class="max-w-2xl mx-auto p-6">
+<div class="h-full overflow-y-auto"><div class="max-w-2xl mx-auto p-6">
     <h1 class="text-2xl font-bold mb-6 text-light-tx dark:text-dark-tx">
         Profil
     </h1>
@@ -49,4 +49,4 @@
             <Save class="w-4 h-4 inline-block mr-1 mb-1" /> Speichern
         </button>
     </section>
-</div>
+</div></div>
