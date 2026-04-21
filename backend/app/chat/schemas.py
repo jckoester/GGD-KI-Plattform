@@ -1,5 +1,7 @@
 from pydantic import BaseModel, model_validator
 from typing import Literal
+from uuid import UUID
+from typing import Optional
 
 
 class ChatMessage(BaseModel):
@@ -9,6 +11,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
+    conversation_id: Optional[UUID] = None
 
     @model_validator(mode="after")
     def at_least_one_message(self):

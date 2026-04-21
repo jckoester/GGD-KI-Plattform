@@ -9,6 +9,7 @@
   let isStreaming = $state(false)
   let error = $state(null)
   let scrollAnchor = $state(null)
+  let conversationId = $state(null)
 
   let textAreaRows = $state(1)
 
@@ -45,10 +46,16 @@
         .slice(0, assistantIndex)
         .filter(m => m.role === 'user' || m.role === 'assistant')
 
-      for await (const token of streamChat(apiMessages)) {
+      for await (const item of streamChat(apiMessages, conversationId)) {
+        // Start-Event mit conversationId
+        if (item.type === 'start') {
+          conversationId = item.conversationId
+          continue
+        }
+        // Token von Assistant
         messages[assistantIndex] = {
           ...messages[assistantIndex],
-          content: messages[assistantIndex].content + token
+          content: messages[assistantIndex].content + item
         }
         messages = messages
       }

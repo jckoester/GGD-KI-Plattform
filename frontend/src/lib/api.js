@@ -53,14 +53,14 @@ export async function patchPreferences(updates) {
   })
 }
 
-export async function* streamChat(messages) {
+export async function* streamChat(messages, conversationId = null) {
   let res
   try {
     res = await fetch(`${BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, conversation_id: conversationId }),
     })
   } catch {
     throw new ApiError(0, 'Verbindung zum Server fehlgeschlagen.')
@@ -73,6 +73,14 @@ export async function* streamChat(messages) {
       ? body.detail.map(e => e.msg ?? String(e)).join('; ')
       : body.detail
     throw new ApiError(res.status, detail)
+  }
+
+  // X-Conversation-Id Header auslesen
+  const conversationIdFromHeader = res.headers.get('X-Conversation-Id')
+  
+  // Erstes Event: start mit conversationId
+  if (conversationIdFromHeader) {
+    yield { type: 'start', conversationId: conversationIdFromHeader }
   }
 
   const reader = res.body.getReader()

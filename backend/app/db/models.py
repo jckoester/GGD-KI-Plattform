@@ -87,6 +87,11 @@ class Conversation(Base):
     last_message_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    title: Mapped[Optional[str]] = mapped_column(nullable=True)
+    model_used: Mapped[str] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
 
     __table_args__ = (
         Index("idx_conversations_pseudonym", "pseudonym"),
@@ -105,10 +110,11 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(nullable=False)
     content: Mapped[str] = mapped_column(nullable=False)
+    model: Mapped[Optional[str]] = mapped_column(nullable=True)
     # cost/token fields - nullable, only for assistant
     cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
-    input_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
-    output_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
+    tokens_input: Mapped[Optional[int]] = mapped_column(nullable=True)
+    tokens_output: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
