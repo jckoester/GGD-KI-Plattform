@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     jwt_secret: str
     litellm_proxy_url: str = "http://localhost:4000"
     litellm_master_key: str = ""
+    litellm_verify_ssl: bool = True
     frontend_origin: str = "http://localhost:5173"
     environment: str = "development"
     auth_config_path: str = "config/auth.yaml"

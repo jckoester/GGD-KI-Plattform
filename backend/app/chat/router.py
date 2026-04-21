@@ -107,7 +107,7 @@ async def chat(
         "user": current_user.sub,
     }
 
-    client = httpx.AsyncClient(timeout=_LITELLM_TIMEOUT)
+    client = httpx.AsyncClient(timeout=_LITELLM_TIMEOUT, verify=settings.litellm_verify_ssl)
     user_message = request.messages[-1].content if request.messages else ""
 
     # Conversation anlegen oder laden — eigene Transaktion, direkt committet
@@ -124,7 +124,8 @@ async def chat(
         await db.flush()
         await db.refresh(new_conv)
         conversation_id = new_conv.id
-        await db.commit()
+        # Kein commit hier — _persist() committet Konversation + Nachrichten zusammen.
+        # Falls LiteLLM nicht erreichbar ist, wird die Session ohne commit geschlossen → kein leerer Eintrag.
     else:
         result = await db.execute(
             select(Conversation).where(
@@ -148,8 +149,9 @@ async def chat(
             json=litellm_payload,
         )
         response = await client.send(req, stream=True)
-    except httpx.ConnectError:
+    except httpx.HTTPError as exc:
         await client.aclose()
+        logger.error("LiteLLM nicht erreichbar (%s): %s", type(exc).__name__, exc)
         raise HTTPException(status_code=502, detail="LiteLLM Proxy nicht erreichbar")
 
     if response.status_code != 200:
