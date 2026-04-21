@@ -2,7 +2,7 @@ import yaml
 from dataclasses import dataclass
 from typing import Literal
 
-from passlib.hash import bcrypt
+import bcrypt
 from pydantic import BaseModel
 
 from app.auth.base import AuthAdapter, LoginChallenge, NormalizedIdentity
@@ -59,7 +59,7 @@ class YamlTestAdapter(AuthAdapter):
         user = self._users.get(username)
         if user is None:
             return None
-        if not bcrypt.verify(password, user.password_hash):
+        if not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
             return None
         return NormalizedIdentity(
             external_id=username,

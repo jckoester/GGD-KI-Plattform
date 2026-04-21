@@ -19,4 +19,4 @@ pytest-httpx>=0.25.0
 testcontainers[postgresql]>=4.7.0
 
 # Runtime - Auth
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
