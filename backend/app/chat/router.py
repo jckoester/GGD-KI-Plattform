@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -18,7 +19,7 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import ChatRequest
 from app.db.models import Conversation, Message
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 
 
 class ConversationItem(BaseModel):
@@ -53,10 +54,60 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+_TITLE_TIMEOUT = httpx.Timeout(5.0)
 
 
 def make_title(text: str) -> str:
     return text[:40].rsplit(" ", 1)[0] if len(text) > 40 else text
+
+
+async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
+    logger.debug("Titelgenerierung gestartet für %s (model=%s)", conversation_id, settings.title_model)
+    litellm_payload = {
+        "model": settings.title_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Du generierst kurze, prägnante Titel für Lernkonversationen. "
+                    "Antworte nur mit dem Titel selbst — keine Anführungszeichen, kein Punkt am Ende. "
+                    "Maximal 6 Wörter."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "user": "titlegen",
+    }
+
+    client = httpx.AsyncClient(timeout=_TITLE_TIMEOUT, verify=settings.litellm_verify_ssl)
+    try:
+        req = client.build_request(
+            "POST",
+            f"{settings.litellm_proxy_url}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
+            json=litellm_payload,
+        )
+        response = await client.send(req)
+        response.raise_for_status()
+        data = response.json()
+        title = data["choices"][0]["message"]["content"].strip()[:60]
+        logger.debug("Titelgenerierung: LLM antwortete mit %r", title)
+
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation_id)
+                .values(title=title)
+            )
+            await db.commit()
+        logger.debug("Titelgenerierung: DB aktualisiert für %s", conversation_id)
+        return title
+    except Exception as exc:
+        logger.warning("Titelgenerierung fehlgeschlagen (%s): %s", type(exc).__name__, exc)
+        return None
+    finally:
+        await client.aclose()
 
 
 async def _persist(
@@ -110,10 +161,11 @@ async def chat(
     client = httpx.AsyncClient(timeout=_LITELLM_TIMEOUT, verify=settings.litellm_verify_ssl)
     user_message = request.messages[-1].content if request.messages else ""
 
-    # Conversation anlegen oder laden — eigene Transaktion, direkt committet
     conversation_id = request.conversation_id
+    is_new = conversation_id is None
+    title_prompt: str | None = None
 
-    if conversation_id is None:
+    if is_new:
         first_user_msg = next((m.content for m in request.messages if m.role == "user"), "")
         new_conv = Conversation(
             pseudonym=current_user.sub,
@@ -124,8 +176,9 @@ async def chat(
         await db.flush()
         await db.refresh(new_conv)
         conversation_id = new_conv.id
-        # Kein commit hier — _persist() committet Konversation + Nachrichten zusammen.
-        # Falls LiteLLM nicht erreichbar ist, wird die Session ohne commit geschlossen → kein leerer Eintrag.
+        # Kein commit hier — verhindert leere Einträge wenn LiteLLM nicht erreichbar ist.
+        if settings.title_model and len(first_user_msg) > 20:
+            title_prompt = first_user_msg
     else:
         result = await db.execute(
             select(Conversation).where(
@@ -134,7 +187,6 @@ async def chat(
             )
         )
         existing = result.scalar_one_or_none()
-
         if existing is None:
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
@@ -163,6 +215,22 @@ async def chat(
             detail=f"LiteLLM Fehler: {error_body.decode()}" if error_body else "LiteLLM Fehler",
         )
 
+    # LiteLLM hat geantwortet → neue Konversation jetzt committen (eigene Session in _generate_title
+    # setzt danach ein UPDATE ab, die Konversation muss also committed sein).
+    if is_new:
+        await db.commit()
+
+    # Titelgenerierung parallel zum Stream starten
+    if title_prompt:
+        logger.debug("Starte Titel-Task für Konversation %s", conversation_id)
+    else:
+        logger.debug("Keine Titelgenerierung (title_model=%r, prompt_len=%d, is_new=%s)",
+                     settings.title_model, len(user_message), is_new)
+    title_task: asyncio.Task[str | None] | None = (
+        asyncio.create_task(_generate_title(conversation_id, title_prompt))
+        if title_prompt else None
+    )
+
     async def generate():
         full_content: list[str] = []
         usage: dict = {}
@@ -175,8 +243,21 @@ async def chat(
                     continue
                 payload = line[6:]
                 if payload == "[DONE]":
+                    # Titel-Task abwarten (max. 3 s) und Event vor [DONE] einfügen
+                    if title_task:
+                        try:
+                            title = await asyncio.wait_for(asyncio.shield(title_task), timeout=3.0)
+                            if title:
+                                logger.debug("Sende title-SSE-Event: %r", title)
+                                yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
+                            else:
+                                logger.debug("Titel-Task lieferte None — kein SSE-Event")
+                        except asyncio.TimeoutError:
+                            logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
+                        except Exception:
+                            logger.exception("Fehler beim Warten auf Titel-Task")
                     yield f"{line}\n\n"
-                    return
+                    break
                 try:
                     chunk = json.loads(payload)
                     token = chunk.get("choices", [{}])[0].get("delta", {}).get("content") or ""
@@ -190,10 +271,11 @@ async def chat(
         finally:
             await response.aclose()
             await client.aclose()
-            try:
-                await _persist(db, conversation_id, user_message, "".join(full_content), usage, model_used)
-            except Exception:
-                logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
+
+        try:
+            await _persist(db, conversation_id, user_message, "".join(full_content), usage, model_used)
+        except Exception:
+            logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
 
     return StreamingResponse(
         generate(),

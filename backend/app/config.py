@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     auth_iserv_client_secret: str = ""
     jwt_algorithm: str = "HS256"
     chat_default_model: str = "openai/gpt-4o-mini"
+    title_model: str = ""
 
 
 settings = Settings()

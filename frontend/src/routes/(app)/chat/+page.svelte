@@ -29,6 +29,8 @@
     textAreaRows = rows
   }
 
+  import { updateConversationTitle } from '$lib/stores/conversations.js'
+  
   async function handleSubmit() {
     if (!input.trim() || isStreaming) return
 
@@ -56,6 +58,11 @@
         // Start-Event mit conversationId
         if (item.type === 'start') {
           conversationId = item.conversationId
+          continue
+        }
+        // Titel-Event
+        if (item.type === 'title') {
+          updateConversationTitle(conversationId, item.title)
           continue
         }
         // Token von Assistant

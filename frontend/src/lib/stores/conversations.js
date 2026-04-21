@@ -12,3 +12,9 @@ export async function refreshConversations(limit = 10) {
     // Nicht weiterwerfen — UI soll nicht blockieren
   }
 }
+
+export function updateConversationTitle(id, title) {
+  recentConversations.update(list =>
+    list.map(c => c.id === id ? { ...c, title } : c)
+  )
+}

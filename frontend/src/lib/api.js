@@ -112,6 +112,8 @@ export async function* streamChat(messages, conversationId = null) {
   const decoder = new TextDecoder()
   let buffer = ''
 
+  let currentEventType = null
+
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -120,8 +122,27 @@ export async function* streamChat(messages, conversationId = null) {
     buffer = lines.pop()
 
     for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEventType = line.slice(7).trim()
+        continue
+      }
+      if (line === '') {
+        currentEventType = null
+        continue
+      }
       if (!line.startsWith('data: ')) continue
+
       const payload = line.slice(6)
+
+      if (currentEventType === 'title') {
+        try {
+          const { title } = JSON.parse(payload)
+          yield { type: 'title', title }
+        } catch {}
+        currentEventType = null
+        continue
+      }
+
       if (payload === '[DONE]') return
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content
@@ -129,6 +150,7 @@ export async function* streamChat(messages, conversationId = null) {
       } catch {
         // unvollständiges JSON oder Metadaten-Zeile — überspringen
       }
+      currentEventType = null
     }
   }
 }
