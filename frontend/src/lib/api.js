@@ -53,6 +53,31 @@ export async function patchPreferences(updates) {
   })
 }
 
+export async function getRecentConversations(limit = 10, offset = 0) {
+  const params = new URLSearchParams({ limit, offset })
+  const res = await fetch(`${BASE}/conversations?${params}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Konversationen')
+  }
+  return res.json()
+}
+
+export async function getConversationMessages(conversationId) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 404) {
+      throw new ApiError(404, 'Konversation nicht gefunden')
+    }
+    if (res.status === 403) {
+      throw new ApiError(403, 'Zugriff verweigert')
+    }
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Konversation')
+  }
+  return res.json()
+}
+
 export async function* streamChat(messages, conversationId = null) {
   let res
   try {

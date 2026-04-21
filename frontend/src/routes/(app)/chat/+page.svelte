@@ -1,7 +1,11 @@
 <script>
-  import { Send, Loader2 } from 'lucide-svelte'
+  import { Send, Loader2, AlertCircle } from 'lucide-svelte'
   import { goto } from '$app/navigation'
-  import { streamChat, ApiError } from '$lib/api.js'
+  import { page } from '$app/stores'
+  import { streamChat, ApiError, getConversationMessages } from '$lib/api.js'
+  import { refreshConversations } from '$lib/stores/conversations.js'
+  import { user } from '$lib/stores/user.js'
+  import { onMount } from 'svelte'
 
   let messages = $state([])
   let input = $state('')
@@ -10,6 +14,8 @@
   let error = $state(null)
   let scrollAnchor = $state(null)
   let conversationId = $state(null)
+  let loadingConversation = $state(false)
+  let conversationError = $state(null)
 
   let textAreaRows = $state(1)
 
@@ -83,6 +89,8 @@
       messages = [...messages, { role: 'error', content: errorMessage }]
     } finally {
       isStreaming = false
+      // Konversationen in Sidebar neu laden
+      triggerSidebarRefresh()
     }
   }
 
@@ -97,21 +105,85 @@
     adjustTextareaHeight()
   }
 
-  // Scroll to bottom when messages change
+  // Laden der Konversation basierend auf URL-Parameter
+  async function loadConversation() {
+    const id = $page.url.searchParams.get('id')
+    conversationError = null
+    
+    if (id) {
+        loadingConversation = true
+        try {
+            const data = await getConversationMessages(id)
+            messages = data.messages.map(m => ({ role: m.role, content: m.content }))
+            conversationId = data.id
+        } catch (err) {
+            if (err instanceof ApiError) {
+                conversationError = err.message
+                // Bei 403 oder 404: Konversation nicht gefunden
+                if (err.status === 403 || err.status === 404) {
+                    messages = []
+                    conversationId = null
+                }
+            } else {
+                conversationError = 'Fehler beim Laden der Konversation'
+            }
+        } finally {
+            loadingConversation = false
+        }
+    } else {
+        // Neue Konversation
+        messages = []
+        conversationId = null
+        conversationError = null
+    }
+  }
+
+  // Reagieren auf URL-Änderungen
+  $effect(() => {
+    $page.url
+    loadConversation()
+  })
+
+  // Automatisch Konversationen neu laden nach Stream-Ende
+  // (wird aus Sidebar aufgerufen via refreshConversations)
+  function triggerSidebarRefresh() {
+    const limit = $user?.preferences?.sidebar_recent_chats_limit ?? 10
+    refreshConversations(limit)
+  }
+
+  // Scroll to bottom when messages change (aber nicht beim initialen Laden)
   $effect(() => {
     messages
-    requestAnimationFrame(() => {
-      if (scrollAnchor) {
-        scrollAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' })
-      }
-    })
+    if (!loadingConversation) {
+      requestAnimationFrame(() => {
+        if (scrollAnchor) {
+          scrollAnchor.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        }
+      })
+    }
   })
 
 </script>
 
 <div class="h-full flex flex-col">
   <div class="flex-1 overflow-y-auto px-4 py-4">
-    {#if messages.length === 0}
+    {#if loadingConversation}
+      <div class="flex items-center justify-center h-full">
+        <div class="flex flex-col items-center gap-2 text-gray-500">
+          <Loader2 class="w-6 h-6 animate-spin" />
+          <p>Konversation wird geladen...</p>
+        </div>
+      </div>
+    {:else if conversationError}
+      <div class="flex items-center justify-center h-full">
+        <div class="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600 max-w-md">
+          <p class="flex items-center gap-2">
+            <AlertCircle class="w-5 h-5 flex-shrink-0" />
+            {conversationError}
+          </p>
+        </div>
+      </div>
+    {:else if messages.length === 0}
       <div class="flex items-center justify-center h-full">
         <div class="text-center text-gray-500">
           <p class="text-lg">Womit kann ich helfen?</p>

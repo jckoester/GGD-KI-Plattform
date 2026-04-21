@@ -1,7 +1,15 @@
 <script>
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
+    import { goto } from "$app/navigation";
+    import { Plus, ChevronDown, ChevronRight, History } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
+    import {
+        recentConversations,
+        refreshConversations,
+    } from "$lib/stores/conversations.js";
+    import { user } from "$lib/stores/user.js";
+    import { page } from "$app/stores";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
 
@@ -10,6 +18,78 @@
         textClass = "text-light-tx dark:text-dark-tx",
         borderClass = "border-light-ui-2 dark:border-dark-ui-2",
     } = $props();
+
+    // Aufklappbarer Bereich für Letzte Chats
+    let recentChatsOpen = $state(true);
+
+    function toggleRecentChats() {
+        recentChatsOpen = !recentChatsOpen;
+    }
+
+    function openRecentChats() {
+        recentChatsOpen = true;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        const now = new Date();
+
+        // Prüfe ob heute
+        const today = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+        );
+        const dateDate = new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+        );
+
+        if (dateDate.getTime() === today.getTime()) {
+            // Heute: nur Uhrzeit
+            return date.toLocaleTimeString("de-DE", {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+
+        // Prüfe ob gestern
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (dateDate.getTime() === yesterday.getTime()) {
+            return "Gestern";
+        }
+
+        // Prüfe ob dieses Jahr
+        if (date.getFullYear() === now.getFullYear()) {
+            return date.toLocaleDateString("de-DE", {
+                day: "2-digit",
+                month: "2-digit",
+            });
+        }
+
+        // Älter: voller Datum
+        return date.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
+    }
+
+    // Aktive Konversations-ID aus URL extrahieren
+    const currentConversationId = $derived($page.url.searchParams.get("id"));
+
+    // Limit aus User-Präferenzen
+    const limit = $derived(
+        $user?.preferences?.sidebar_recent_chats_limit ?? 10,
+    );
+
+    // Aktualisieren beim Ändern des Limits
+    $effect(() => {
+        refreshConversations(limit);
+    });
 </script>
 
 <aside
@@ -33,11 +113,82 @@
         <span class="ml-2 font-semibold {textClass}">{branding.name}</span>
     </div>
 
-    <!-- Sidebar-Inhalt (Platzhalter für Schritt 3c) -->
-    <div class="flex-1 overflow-y-auto p-4">
-        <p class="text-sm text-light-tx-3 dark:text-dark-tx-3">
-            Navigation folgt in Schritt 3c
-        </p>
+    <!-- Sidebar-Inhalt -->
+    <div class="flex-1 overflow-y-auto p-2">
+        <!-- Neuer Chat Button -->
+        <button
+            onclick={() => goto("/chat")}
+            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+        >
+            <Plus class="w-4 h-4" />
+            Neuer Chat
+        </button>
+
+        <!-- Letzte Chats Sektion -->
+        <div class="mt-2">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+            >
+                <button
+                    onclick={() => {
+                        openRecentChats();
+                        goto("/history");
+                    }}
+                >
+                    <span class="flex items-center gap-2">
+                        <History class="w-4 h-4" />
+                        Letzte Chats
+                    </span>
+                </button>
+                <button onclick={toggleRecentChats}>
+                    <span class="flex items-center gap-2">
+                        {#if recentChatsOpen}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </span>
+                </button>
+            </div>
+
+            {#if recentChatsOpen}
+                <div class="mt-1 space-y-1 pl-2">
+                    {#if $recentConversations.length === 0}
+                        <p
+                            class="text-sm text-light-tx-3 dark:text-dark-tx-3 px-3 py-1"
+                        >
+                            Noch keine Chats
+                        </p>
+                    {:else}
+                        {#each $recentConversations as conv}
+                            <button
+                                onclick={() => goto(`/chat?id=${conv.id}`)}
+                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                       {conv.id === currentConversationId
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2'
+                                    : ''}"
+                            >
+                                <div class="flex justify-between items-center">
+                                    <span
+                                        class="truncate max-w-[70%]"
+                                        title={conv.title ?? "Unbenannter Chat"}
+                                    >
+                                        {conv.title ?? "Unbenannter Chat"}
+                                    </span>
+                                    <span
+                                        class="text-xs text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap"
+                                    >
+                                        {formatDate(conv.last_message_at)}
+                                    </span>
+                                </div>
+                            </button>
+                        {/each}
+                    {/if}
+                </div>
+            {/if}
+        </div>
     </div>
 
     <!-- Unterer Bereich -->

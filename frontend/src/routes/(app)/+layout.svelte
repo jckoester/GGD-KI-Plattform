@@ -18,6 +18,7 @@
             user.set({
                 ...me,
                 display_name: sessionStorage.getItem('display_name') ?? me.pseudonym,
+                preferences: prefs,
             });
             themePref.syncFromServer(prefs.theme ?? 'system')
         } catch {
