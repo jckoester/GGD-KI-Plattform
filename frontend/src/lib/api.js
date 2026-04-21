@@ -78,6 +78,31 @@ export async function getConversationMessages(conversationId) {
   return res.json()
 }
 
+export async function renameConversation(conversationId, title) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Umbenennen')
+  }
+  return res.json()
+}
+
+export async function deleteConversation(conversationId) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen')
+  }
+}
+
 export async function* streamChat(messages, conversationId = null) {
   let res
   try {

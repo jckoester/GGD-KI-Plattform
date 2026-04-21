@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
@@ -282,6 +282,66 @@ async def chat(
         media_type="text/event-stream",
         headers={"X-Conversation-Id": str(conversation_id)},
     )
+
+
+class ConversationUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+
+
+@router.patch("/conversations/{conversation_id}")
+async def update_conversation_title(
+    conversation_id: UUID,
+    request: ConversationUpdateRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ConversationItem:
+    # Konversation laden und Sicherheitscheck
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+
+    if conversation.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+
+    # Titel aktualisieren
+    conversation.title = request.title
+    await db.commit()
+
+    return ConversationItem(
+        id=conversation.id,
+        title=conversation.title,
+        last_message_at=conversation.last_message_at,
+        model_used=conversation.model_used,
+    )
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    # Konversation laden und Sicherheitscheck
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+
+    if conversation.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+
+    # Löschen (cascading delete für Nachrichten)
+    await db.delete(conversation)
+    await db.commit()
+
+    return None
 
 
 @router.get("/conversations")

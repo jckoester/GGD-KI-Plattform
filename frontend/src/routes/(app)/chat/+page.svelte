@@ -5,7 +5,6 @@
   import { streamChat, ApiError, getConversationMessages } from '$lib/api.js'
   import { refreshConversations } from '$lib/stores/conversations.js'
   import { user } from '$lib/stores/user.js'
-  import { onMount } from 'svelte'
 
   let messages = $state([])
   let input = $state('')
@@ -30,6 +29,8 @@
   }
 
   import { updateConversationTitle } from '$lib/stores/conversations.js'
+  import { pageTitle, activeConversationId } from '$lib/stores/pageTitle.js'
+  import { onDestroy } from 'svelte'
   
   async function handleSubmit() {
     if (!input.trim() || isStreaming) return
@@ -63,6 +64,7 @@
         // Titel-Event
         if (item.type === 'title') {
           updateConversationTitle(conversationId, item.title)
+          pageTitle.set(item.title)
           continue
         }
         // Token von Assistant
@@ -123,6 +125,8 @@
             const data = await getConversationMessages(id)
             messages = data.messages.map(m => ({ role: m.role, content: m.content }))
             conversationId = data.id
+            pageTitle.set(data.title || '')
+            activeConversationId.set(data.id)
         } catch (err) {
             if (err instanceof ApiError) {
                 conversationError = err.message
@@ -130,9 +134,13 @@
                 if (err.status === 403 || err.status === 404) {
                     messages = []
                     conversationId = null
+                    pageTitle.set('')
+                    activeConversationId.set(null)
                 }
             } else {
                 conversationError = 'Fehler beim Laden der Konversation'
+                pageTitle.set('')
+                activeConversationId.set(null)
             }
         } finally {
             loadingConversation = false
@@ -142,6 +150,8 @@
         messages = []
         conversationId = null
         conversationError = null
+        pageTitle.set('')
+        activeConversationId.set(null)
     }
   }
 
@@ -149,6 +159,12 @@
   $effect(() => {
     $page.url
     loadConversation()
+  })
+
+  // Stores zurücksetzen beim Verlassen der Seite
+  onDestroy(() => {
+    pageTitle.set('')
+    activeConversationId.set(null)
   })
 
   // Automatisch Konversationen neu laden nach Stream-Ende

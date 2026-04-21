@@ -112,7 +112,7 @@
     <!-- Abmelden (immer sichtbar) -->
     <button
         onclick={doLogout}
-        class="w-full flex items-center px-4 py-2 text-sm text-light-re dark:text-dark-re hover:bg-red-50 dark:hover:bg-red-900 dark:hover:bg-dark-ui"
+        class="w-full flex items-center px-4 py-2 text-sm text-light-re dark:text-dark-re hover:bg-red-100 dark:hover:bg-red-900 dark:hover:bg-dark-ui"
     >
         <LogOut class="w-4 h-4 mr-3" />
         Abmelden

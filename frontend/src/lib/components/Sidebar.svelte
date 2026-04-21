@@ -10,6 +10,7 @@
     } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
     import { page } from "$app/stores";
+    import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
 
@@ -90,10 +91,17 @@
     $effect(() => {
         refreshConversations(limit);
     });
+
+    function handleDeleted(deletedId) {
+        conversations = conversations.filter((c) => c.id !== deletedId);
+        total -= 1;
+        hasMore = offset + conversations.length < total;
+        refreshConversations();
+    }
 </script>
 
 <aside
-    class="w-64 h-full bg-light-bg dark:bg-dark-bg-2 border-r border-light-ui-3 dark:border-dark-ui-3 flex flex-col"
+    class="w-72 h-full bg-light-bg dark:bg-dark-bg-2 border-r border-light-ui-3 dark:border-dark-ui-3 flex flex-col"
     transition:slide={{ duration: 250, axis: "x" }}
 >
     <!-- Sidebar-Header mit Branding -->
@@ -182,6 +190,12 @@
                                     >
                                         {formatDate(conv.last_message_at)}
                                     </span>
+                                    <ConversationMenu
+                                        conversationId={conv.id}
+                                        title={conv.title}
+                                        onDelete={handleDeleted}
+                                        iconSize={12}
+                                    />
                                 </div>
                             </button>
                         {/each}
