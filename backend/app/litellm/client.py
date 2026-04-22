@@ -51,17 +51,18 @@ class LiteLLMClient:
                 "Authorization": f"Bearer {self.master_key}",
             }
             params = {"user_id": pseudonym}
-            
+
             response = await client.get(url, headers=headers, params=params)
-            
+
             if response.status_code == 404:
                 return None
             if response.status_code == 200:
                 return response.json()
-            
+
             logger.error(
                 "LiteLLM get_user fehlerhaft: status=%d, body=%s",
-                response.status_code, response.text
+                response.status_code,
+                response.text,
             )
             return None
         except Exception as e:
@@ -83,8 +84,8 @@ class LiteLLMClient:
             "Authorization": f"Bearer {self.master_key}",
             "Content-Type": "application/json",
         }
-        
-        # max_budget kann null sein (für admin - kein Limit)
+
+        # max_budget kann null sein (kein Limit)
         payload = {
             "user_id": pseudonym,
             "max_budget": max_budget,
@@ -96,7 +97,9 @@ class LiteLLMClient:
         if response.status_code not in (200, 201):
             logger.error(
                 "LiteLLM create_user fehlerhaft: status=%d, body=%s, payload=%s",
-                response.status_code, response.text, payload
+                response.status_code,
+                response.text,
+                payload,
             )
             raise RuntimeError(f"Failed to create LiteLLM user: {response.text}")
 
@@ -117,7 +120,7 @@ class LiteLLMClient:
             "Authorization": f"Bearer {self.master_key}",
             "Content-Type": "application/json",
         }
-        
+
         payload = {
             "user_id": pseudonym,
             "max_budget": max_budget,
@@ -129,8 +132,10 @@ class LiteLLMClient:
         if response.status_code not in (200, 201):
             logger.error(
                 "LiteLLM update_user_budget fehlerhaft: status=%d, body=%s, payload=%s",
-                response.status_code, response.text, payload
+                response.status_code,
+                response.text,
+                payload,
             )
             raise RuntimeError(f"Failed to update LiteLLM user budget: {response.text}")
-        
-        logger.debug("LiteLLM-User %s Budget erfolgreich aktualisiert", pseudonym)
+
+        logger.info("LiteLLM-User %s Budget erfolgreich aktualisiert", pseudonym)

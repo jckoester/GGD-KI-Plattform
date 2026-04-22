@@ -48,8 +48,15 @@ async def auth_callback(
     except Exception:
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
-    await upsert_pseudonym_audit(db, pseudonym, identity)
-    await ensure_litellm_user(db, pseudonym, identity.roles, identity.grade)
+    old_role, old_grade = await upsert_pseudonym_audit(db, pseudonym, identity)
+    await ensure_litellm_user(
+        db,
+        pseudonym,
+        identity.roles,
+        identity.grade,
+        old_role=old_role,
+        old_grade=old_grade,
+    )
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
@@ -82,8 +89,15 @@ async def login_direct(
     if identity is None:
         raise HTTPException(status_code=401, detail="Falsche Anmeldedaten")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
-    await upsert_pseudonym_audit(db, pseudonym, identity)
-    await ensure_litellm_user(db, pseudonym, identity.roles, identity.grade)
+    old_role, old_grade = await upsert_pseudonym_audit(db, pseudonym, identity)
+    await ensure_litellm_user(
+        db,
+        pseudonym,
+        identity.roles,
+        identity.grade,
+        old_role=old_role,
+        old_grade=old_grade,
+    )
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(

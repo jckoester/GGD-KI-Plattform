@@ -227,11 +227,13 @@ class TestLogin:
 
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
             mock_pseudo.return_value = "test_pseudo_abc"
-            mock_audit.return_value = None
+            mock_audit.return_value = ("student", 10)
+            mock_ensure_user.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.post(
@@ -247,6 +249,14 @@ class TestLogin:
             assert "session=" in set_cookie
             assert "HttpOnly" in set_cookie
             assert "Path=/" in set_cookie
+            mock_ensure_user.assert_awaited_once_with(
+                mock_db,
+                "test_pseudo_abc",
+                ["student"],
+                "10",
+                old_role="student",
+                old_grade=10,
+            )
 
     def test_login_wrong_password(self, app_with_mocks, mock_direct_adapter, mock_db):
         """authenticate_direct returns None -> 401"""
@@ -299,10 +309,13 @@ class TestLogin:
 
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
             mock_pseudo.return_value = "test_pseudo_abc"
+            mock_audit.return_value = ("student", 10)
+            mock_ensure_user.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.post(
@@ -339,10 +352,13 @@ class TestCallback:
 
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
             mock_pseudo.return_value = "test_pseudo_abc"
+            mock_audit.return_value = ("student", 10)
+            mock_ensure_user.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.get("/callback?code=test_code&state=test_state")
