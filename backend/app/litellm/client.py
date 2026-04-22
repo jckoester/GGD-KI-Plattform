@@ -193,3 +193,29 @@ class LiteLLMClient:
             model_ids.append(model_id)
 
         return model_ids
+
+    async def delete_user(self, pseudonym: str) -> None:
+        """
+        POST /user/delete.
+        404 wird als Erfolg behandelt (idempotentes Verhalten).
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/user/delete"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {"user_ids": [pseudonym]}
+
+        response = await client.post(url, headers=headers, json=payload)
+        if response.status_code in (200, 202, 204, 404):
+            return
+
+        logger.error(
+            "LiteLLM delete_user fehlerhaft: status=%d, body=%s, pseudonym=%s payload=%s",
+            response.status_code,
+            response.text,
+            pseudonym,
+            payload,
+        )
+        raise RuntimeError(f"Failed to delete LiteLLM user: {response.text}")

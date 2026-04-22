@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,7 +12,7 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
-from app.chat.router import router as chat_router
+from app.chat.router import chat, router as chat_router
 from app.chat.schemas import ChatRequest
 from app.litellm.client import LiteLLMClient
 
@@ -107,3 +108,131 @@ def test_get_models_returns_502_when_litellm_fails():
 
     assert response.status_code == 502
     assert response.json()["detail"] == "LiteLLM Proxy nicht erreichbar"
+
+
+class _FakeStreamResponse:
+    status_code = 200
+
+    async def aiter_lines(self):
+        yield "data: [DONE]"
+
+    async def aclose(self):
+        return None
+
+    async def aread(self):
+        return b""
+
+
+class _FakeHttpClient:
+    def __init__(self):
+        self.last_json = None
+
+    def build_request(self, method, url, headers=None, json=None):
+        self.last_json = json
+        return {"method": method, "url": url}
+
+    async def send(self, request, stream=False):
+        return _FakeStreamResponse()
+
+    async def aclose(self):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_post_chat_new_conversation_uses_requested_model_id():
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    db.commit = AsyncMock()
+
+    fake_http_client = _FakeHttpClient()
+    request = ChatRequest(
+        messages=[{"role": "user", "content": "Hallo"}],
+        model_id="openai/gpt-4.1-mini",
+    )
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=fake_http_client), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "openai/gpt-4o-mini"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+
+        await chat(request, current_user=_fake_payload(), db=db)
+
+    assert fake_http_client.last_json["model"] == "openai/gpt-4.1-mini"
+
+
+@pytest.mark.asyncio
+async def test_post_chat_new_conversation_without_model_uses_default():
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    db.commit = AsyncMock()
+
+    fake_http_client = _FakeHttpClient()
+    request = ChatRequest(
+        messages=[{"role": "user", "content": "Hallo"}],
+        model_id=None,
+    )
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=fake_http_client), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "openai/gpt-4o-mini"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+
+        await chat(request, current_user=_fake_payload(), db=db)
+
+    assert fake_http_client.last_json["model"] == "openai/gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+async def test_post_chat_existing_conversation_ignores_model_id_and_uses_stored_model():
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.refresh = AsyncMock()
+    db.commit = AsyncMock()
+
+    conversation_id = uuid4()
+    existing_conv = MagicMock()
+    existing_conv.id = conversation_id
+    existing_conv.pseudonym = "pseudo-1"
+    existing_conv.model_used = "openai/gpt-4o-mini"
+
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = existing_conv
+    db.execute = AsyncMock(return_value=result)
+
+    fake_http_client = _FakeHttpClient()
+    request = ChatRequest(
+        messages=[{"role": "user", "content": "Weiter"}],
+        conversation_id=conversation_id,
+        model_id="openai/gpt-4.1-mini",
+    )
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=fake_http_client), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "openai/gpt-4o-mini"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+
+        await chat(request, current_user=_fake_payload(), db=db)
+
+    assert fake_http_client.last_json["model"] == "openai/gpt-4o-mini"
