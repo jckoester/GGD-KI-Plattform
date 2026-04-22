@@ -1,0 +1,136 @@
+import logging
+from typing import Optional
+
+import httpx
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class LiteLLMClient:
+    """Schlanker Wrapper um die LiteLLM Management API."""
+
+    def __init__(self) -> None:
+        self.base_url = settings.litellm_proxy_url.rstrip("/")
+        self.master_key = settings.litellm_master_key
+        self.verify_ssl = settings.litellm_verify_ssl
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Lazy initialization of the HTTP client."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                verify=self.verify_ssl,
+                timeout=30.0,
+            )
+        return self._client
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def __aenter__(self) -> "LiteLLMClient":
+        await self._get_client()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.close()
+
+    async def get_user(self, pseudonym: str) -> Optional[dict]:
+        """
+        GET /user/info?user_id={pseudonym}.
+        Gibt None bei 404 zurück.
+        """
+        try:
+            client = await self._get_client()
+            url = f"{self.base_url}/user/info"
+            headers = {
+                "Authorization": f"Bearer {self.master_key}",
+            }
+            params = {"user_id": pseudonym}
+            
+            response = await client.get(url, headers=headers, params=params)
+            
+            if response.status_code == 404:
+                return None
+            if response.status_code == 200:
+                return response.json()
+            
+            logger.error(
+                "LiteLLM get_user fehlerhaft: status=%d, body=%s",
+                response.status_code, response.text
+            )
+            return None
+        except Exception as e:
+            logger.error("LiteLLM get_user Exception: %s", e)
+            return None
+
+    async def create_user(
+        self,
+        pseudonym: str,
+        max_budget: Optional[float],
+        budget_duration: str,
+    ) -> None:
+        """
+        POST /user/new
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/user/new"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        
+        # max_budget kann null sein (für admin - kein Limit)
+        payload = {
+            "user_id": pseudonym,
+            "max_budget": max_budget,
+            "budget_duration": budget_duration,
+        }
+
+        response = await client.post(url, headers=headers, json=payload)
+
+        if response.status_code not in (200, 201):
+            logger.error(
+                "LiteLLM create_user fehlerhaft: status=%d, body=%s, payload=%s",
+                response.status_code, response.text, payload
+            )
+            raise RuntimeError(f"Failed to create LiteLLM user: {response.text}")
+
+        logger.info("LiteLLM-User %s erfolgreich angelegt", pseudonym)
+
+    async def update_user_budget(
+        self,
+        pseudonym: str,
+        max_budget: Optional[float],
+        budget_duration: str,
+    ) -> None:
+        """
+        POST /user/update
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/user/update"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        
+        payload = {
+            "user_id": pseudonym,
+            "max_budget": max_budget,
+            "budget_duration": budget_duration,
+        }
+
+        response = await client.post(url, headers=headers, json=payload)
+
+        if response.status_code not in (200, 201):
+            logger.error(
+                "LiteLLM update_user_budget fehlerhaft: status=%d, body=%s, payload=%s",
+                response.status_code, response.text, payload
+            )
+            raise RuntimeError(f"Failed to update LiteLLM user budget: {response.text}")
+        
+        logger.debug("LiteLLM-User %s Budget erfolgreich aktualisiert", pseudonym)

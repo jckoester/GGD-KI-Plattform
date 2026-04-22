@@ -9,6 +9,7 @@ from app.auth.jwt import JwtPayload, JwtService
 from app.auth.pseudonym import pseudonymize
 from app.config import settings
 from app.db.session import get_db
+from app.litellm.user_service import ensure_litellm_user
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
@@ -48,6 +49,7 @@ async def auth_callback(
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     await upsert_pseudonym_audit(db, pseudonym, identity)
+    await ensure_litellm_user(db, pseudonym, identity.roles, identity.grade)
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
@@ -81,6 +83,7 @@ async def login_direct(
         raise HTTPException(status_code=401, detail="Falsche Anmeldedaten")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     await upsert_pseudonym_audit(db, pseudonym, identity)
+    await ensure_litellm_user(db, pseudonym, identity.roles, identity.grade)
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(

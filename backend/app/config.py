@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     chat_default_model: str = "openai/gpt-4o-mini"
     title_model: str = ""
+    exchange_rate_fallback: float = 1.10
 
 
 settings = Settings()
