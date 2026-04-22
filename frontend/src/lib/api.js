@@ -78,6 +78,15 @@ export async function getConversationMessages(conversationId) {
   return res.json()
 }
 
+export async function getModels() {
+  const res = await fetch(`${BASE}/models`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Modelle')
+  }
+  return res.json()
+}
+
 export async function renameConversation(conversationId, title) {
   const res = await fetch(`${BASE}/conversations/${conversationId}`, {
     method: 'PATCH',
@@ -103,14 +112,18 @@ export async function deleteConversation(conversationId) {
   }
 }
 
-export async function* streamChat(messages, conversationId = null) {
+export async function* streamChat(messages, conversationId = null, modelId = null) {
   let res
   try {
+    const body = { messages, conversation_id: conversationId }
+    if (modelId) {
+      body.model_id = modelId
+    }
     res = await fetch(`${BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ messages, conversation_id: conversationId }),
+      body: JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, 'Verbindung zum Server fehlgeschlagen.')

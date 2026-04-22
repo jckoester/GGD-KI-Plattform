@@ -2,7 +2,7 @@
   import { Send, Loader2, AlertCircle } from 'lucide-svelte'
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
-  import { streamChat, ApiError, getConversationMessages } from '$lib/api.js'
+  import { streamChat, ApiError, getConversationMessages, getModels } from '$lib/api.js'
   import { refreshConversations } from '$lib/stores/conversations.js'
   import { user } from '$lib/stores/user.js'
 
@@ -15,6 +15,12 @@
   let conversationId = $state(null)
   let loadingConversation = $state(false)
   let conversationError = $state(null)
+  let currentConversationModel = $state(null)
+  let availableModels = $state([])
+  let selectedModelId = $state('')
+  let modelsLoading = $state(false)
+  let modelsError = $state(null)
+  const MODEL_STORAGE_KEY = 'chat_model_id'
 
   let textAreaRows = $state(1)
 
@@ -30,7 +36,46 @@
 
   import { updateConversationTitle } from '$lib/stores/conversations.js'
   import { pageTitle, activeConversationId } from '$lib/stores/pageTitle.js'
-  import { onDestroy } from 'svelte'
+  import { onDestroy, onMount } from 'svelte'
+
+  async function loadModels() {
+    modelsLoading = true
+    modelsError = null
+
+    try {
+      const data = await getModels()
+      availableModels = data.models ?? []
+
+      const modelIds = availableModels.map((m) => m.id).filter(Boolean)
+      const savedModel = sessionStorage.getItem(MODEL_STORAGE_KEY)
+
+      if (savedModel && modelIds.includes(savedModel)) {
+        selectedModelId = savedModel
+      } else if (data.default_model && modelIds.includes(data.default_model)) {
+        selectedModelId = data.default_model
+      } else {
+        selectedModelId = modelIds[0] ?? ''
+      }
+
+      if (selectedModelId) {
+        sessionStorage.setItem(MODEL_STORAGE_KEY, selectedModelId)
+      }
+    } catch (err) {
+      availableModels = []
+      modelsError = err?.message ?? 'Modelle konnten nicht geladen werden.'
+      selectedModelId = sessionStorage.getItem(MODEL_STORAGE_KEY) ?? ''
+    } finally {
+      modelsLoading = false
+    }
+  }
+
+  function handleModelChange() {
+    if (selectedModelId) {
+      sessionStorage.setItem(MODEL_STORAGE_KEY, selectedModelId)
+    } else {
+      sessionStorage.removeItem(MODEL_STORAGE_KEY)
+    }
+  }
   
   async function handleSubmit() {
     if (!input.trim() || isStreaming) return
@@ -55,7 +100,8 @@
         .slice(0, assistantIndex)
         .filter(m => m.role === 'user' || m.role === 'assistant')
 
-      for await (const item of streamChat(apiMessages, conversationId)) {
+      const modelId = conversationId ? null : selectedModelId
+      for await (const item of streamChat(apiMessages, conversationId, modelId)) {
         // Start-Event mit conversationId
         if (item.type === 'start') {
           conversationId = item.conversationId
@@ -125,6 +171,7 @@
             const data = await getConversationMessages(id)
             messages = data.messages.map(m => ({ role: m.role, content: m.content }))
             conversationId = data.id
+            currentConversationModel = data.model_used
             pageTitle.set(data.title || '')
             activeConversationId.set(data.id)
         } catch (err) {
@@ -134,11 +181,13 @@
                 if (err.status === 403 || err.status === 404) {
                     messages = []
                     conversationId = null
+                    currentConversationModel = null
                     pageTitle.set('')
                     activeConversationId.set(null)
                 }
             } else {
                 conversationError = 'Fehler beim Laden der Konversation'
+                currentConversationModel = null
                 pageTitle.set('')
                 activeConversationId.set(null)
             }
@@ -149,6 +198,7 @@
         // Neue Konversation
         messages = []
         conversationId = null
+        currentConversationModel = null
         conversationError = null
         pageTitle.set('')
         activeConversationId.set(null)
@@ -162,6 +212,10 @@
   })
 
   // Stores zurücksetzen beim Verlassen der Seite
+  onMount(() => {
+    loadModels()
+  })
+
   onDestroy(() => {
     pageTitle.set('')
     activeConversationId.set(null)
@@ -244,6 +298,50 @@
   </div>
 
   <div class="flex-shrink-0 px-4 pb-4">
+    <div class="max-w-4xl mx-auto mb-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <label for="chat-model" class="text-sm text-gray-600 dark:text-gray-300">Modell</label>
+        {#if conversationId}
+          <select
+            id="chat-model"
+            disabled={true}
+            class="min-w-[220px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-2 py-1 text-sm text-gray-700 dark:text-gray-200"
+            value={currentConversationModel || ''}
+          >
+            {#if currentConversationModel}
+              <option value={currentConversationModel}>{currentConversationModel}</option>
+            {:else}
+              <option value="">Unbekannt</option>
+            {/if}
+          </select>
+          <span class="text-xs text-gray-500">In laufenden Konversationen bleibt das Modell fix.</span>
+        {:else}
+          <select
+            id="chat-model"
+            bind:value={selectedModelId}
+            disabled={isStreaming || modelsLoading}
+            onchange={handleModelChange}
+            class="min-w-[220px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-gray-100 disabled:opacity-60"
+          >
+            {#if availableModels.length > 0}
+              {#each availableModels as model}
+                <option value={model.id}>{model.id}</option>
+              {/each}
+            {:else}
+              <option value={selectedModelId || ''}>
+                {selectedModelId || 'Standardmodell (Backend)'}
+              </option>
+            {/if}
+          </select>
+          {#if modelsLoading}
+            <span class="text-xs text-gray-500">Modelle werden geladen...</span>
+          {:else if modelsError}
+            <span class="text-xs text-red-600">{modelsError}</span>
+          {/if}
+        {/if}
+      </div>
+    </div>
+
     <div class="flex gap-2 max-w-4xl mx-auto">
       <textarea
         bind:this={textarea}

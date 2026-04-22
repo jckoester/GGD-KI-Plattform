@@ -139,3 +139,57 @@ class LiteLLMClient:
             raise RuntimeError(f"Failed to update LiteLLM user budget: {response.text}")
 
         logger.info("LiteLLM-User %s Budget erfolgreich aktualisiert", pseudonym)
+
+    async def list_models(self) -> list[str]:
+        """
+        GET /models.
+        Gibt eine deduplizierte Liste von Modell-IDs zurück.
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/models"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+        }
+
+        response = await client.get(url, headers=headers)
+        if response.status_code != 200:
+            logger.error(
+                "LiteLLM list_models fehlerhaft: status=%d, body=%s",
+                response.status_code,
+                response.text,
+            )
+            raise RuntimeError(f"Failed to fetch LiteLLM models: {response.text}")
+
+        payload = response.json()
+        entries: list = []
+
+        if isinstance(payload, dict):
+            if isinstance(payload.get("data"), list):
+                entries = payload["data"]
+            elif isinstance(payload.get("models"), list):
+                entries = payload["models"]
+        elif isinstance(payload, list):
+            entries = payload
+
+        model_ids: list[str] = []
+        seen: set[str] = set()
+        for entry in entries:
+            model_id = None
+            if isinstance(entry, str):
+                model_id = entry
+            elif isinstance(entry, dict):
+                model_id = (
+                    entry.get("id")
+                    or entry.get("model_name")
+                    or entry.get("model")
+                    or entry.get("name")
+                )
+
+            if not model_id or not isinstance(model_id, str):
+                continue
+            if model_id in seen:
+                continue
+            seen.add(model_id)
+            model_ids.append(model_id)
+
+        return model_ids

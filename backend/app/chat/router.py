@@ -20,6 +20,7 @@ from app.config import settings
 from app.chat.schemas import ChatRequest
 from app.db.models import Conversation, Message
 from app.db.session import get_db, AsyncSessionLocal
+from app.litellm.client import LiteLLMClient
 
 
 class ConversationItem(BaseModel):
@@ -48,6 +49,15 @@ class ConversationDetailResponse(BaseModel):
     model_used: str
     last_message_at: Optional[datetime]
     messages: list[MessageItem]
+
+
+class ModelItem(BaseModel):
+    id: str
+
+
+class ModelListResponse(BaseModel):
+    models: list[ModelItem]
+    default_model: str
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +159,7 @@ async def chat(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    model_used = settings.chat_default_model
+    model_used = request.model_id or settings.chat_default_model
     litellm_payload = {
         "model": model_used,
         "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
@@ -190,6 +200,7 @@ async def chat(
         if existing is None:
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+        # Laufende Konversationen behalten ihr ursprüngliches Modell.
         model_used = existing.model_used
         litellm_payload["model"] = model_used
 
@@ -281,6 +292,26 @@ async def chat(
         generate(),
         media_type="text/event-stream",
         headers={"X-Conversation-Id": str(conversation_id)},
+    )
+
+
+@router.get("/models")
+async def list_models(
+    current_user: JwtPayload = Depends(get_current_user),
+) -> ModelListResponse:
+    _ = current_user
+    client = LiteLLMClient()
+    try:
+        model_ids = await client.list_models()
+    except Exception as exc:
+        logger.error("LiteLLM /models nicht erreichbar (%s): %s", type(exc).__name__, exc)
+        raise HTTPException(status_code=502, detail="LiteLLM Proxy nicht erreichbar")
+    finally:
+        await client.close()
+
+    return ModelListResponse(
+        models=[ModelItem(id=model_id) for model_id in model_ids],
+        default_model=settings.chat_default_model,
     )
 
 

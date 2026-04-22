@@ -12,9 +12,13 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     conversation_id: Optional[UUID] = None
+    model_id: Optional[str] = None
 
     @model_validator(mode="after")
     def at_least_one_message(self):
         if not self.messages:
             raise ValueError("messages darf nicht leer sein")
+        if self.model_id is not None:
+            normalized = self.model_id.strip()
+            self.model_id = normalized or None
         return self
