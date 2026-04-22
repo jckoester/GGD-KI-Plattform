@@ -69,6 +69,10 @@ class LiteLLMClient:
             logger.error("LiteLLM get_user Exception: %s", e)
             return None
 
+    async def get_user_info(self, pseudonym: str) -> Optional[dict]:
+        """Alias für get_user mit konsistentem Namensschema."""
+        return await self.get_user(pseudonym)
+
     async def create_user(
         self,
         pseudonym: str,
@@ -219,3 +223,86 @@ class LiteLLMClient:
             payload,
         )
         raise RuntimeError(f"Failed to delete LiteLLM user: {response.text}")
+
+    async def list_teams(self) -> list[dict]:
+        """
+        GET /team/list.
+        Gibt eine Liste von Team-Objekten zurück.
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/team/list"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+        }
+
+        response = await client.get(url, headers=headers)
+        if response.status_code != 200:
+            logger.error(
+                "LiteLLM list_teams fehlerhaft: status=%d, body=%s",
+                response.status_code,
+                response.text,
+            )
+            raise RuntimeError(f"Failed to list LiteLLM teams: {response.text}")
+
+        payload = response.json()
+        if isinstance(payload, dict):
+            if isinstance(payload.get("data"), list):
+                return payload["data"]
+            if isinstance(payload.get("teams"), list):
+                return payload["teams"]
+        if isinstance(payload, list):
+            return payload
+        return []
+
+    async def add_team_member(self, team_id: str, pseudonym: str) -> None:
+        """
+        POST /team/member_add.
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/team/member_add"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "team_id": team_id,
+            "member": {"role": "user", "user_id": pseudonym},
+        }
+
+        response = await client.post(url, headers=headers, json=payload)
+        if response.status_code not in (200, 201):
+            logger.error(
+                "LiteLLM add_team_member fehlerhaft: status=%d, body=%s, payload=%s",
+                response.status_code,
+                response.text,
+                payload,
+            )
+            raise RuntimeError(f"Failed to add team member: {response.text}")
+
+    async def remove_team_member(self, team_id: str, pseudonym: str) -> None:
+        """
+        POST /team/member_delete.
+        404 wird als idempotenter Erfolg behandelt.
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/team/member_delete"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "team_id": team_id,
+            "user_id": pseudonym,
+        }
+
+        response = await client.post(url, headers=headers, json=payload)
+        if response.status_code in (200, 201, 204, 404):
+            return
+
+        logger.error(
+            "LiteLLM remove_team_member fehlerhaft: status=%d, body=%s, payload=%s",
+            response.status_code,
+            response.text,
+            payload,
+        )
+        raise RuntimeError(f"Failed to remove team member: {response.text}")
