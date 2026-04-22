@@ -105,6 +105,7 @@
         // Start-Event mit conversationId
         if (item.type === 'start') {
           conversationId = item.conversationId
+          currentConversationModel = selectedModelId || currentConversationModel
           continue
         }
         // Titel-Event
