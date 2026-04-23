@@ -57,7 +57,9 @@ class LiteLLMClient:
             if response.status_code == 404:
                 return None
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # /user/info wraps user data under a nested "user_info" key
+                return data.get("user_info", data)
 
             logger.error(
                 "LiteLLM get_user fehlerhaft: status=%d, body=%s",
@@ -336,3 +338,33 @@ class LiteLLMClient:
             payload,
         )
         raise RuntimeError(f"Failed to remove team member: {response.text}")
+
+    async def generate_key(self, pseudonym: str) -> str:
+        """
+        POST /key/generate — legt einen Virtual Key für den User an.
+        Gibt den Key-String zurück (wird im Backend gespeichert).
+        """
+        client = await self._get_client()
+        payload = {"user_id": pseudonym}
+        response = await client.post(
+            f"{self.base_url}/key/generate",
+            headers={"Authorization": f"Bearer {self.master_key}", "Content-Type": "application/json"},
+            json=payload,
+        )
+        if response.status_code not in (200, 201):
+            raise RuntimeError(f"Failed to generate LiteLLM key: {response.text}")
+        return response.json()["key"]
+
+    async def delete_key(self, key: str) -> None:
+        """
+        POST /key/delete — löscht den Virtual Key. Idempotent (404 = Erfolg).
+        """
+        client = await self._get_client()
+        response = await client.post(
+            f"{self.base_url}/key/delete",
+            headers={"Authorization": f"Bearer {self.master_key}", "Content-Type": "application/json"},
+            json={"keys": [key]},
+        )
+        if response.status_code in (200, 204, 404):
+            return
+        raise RuntimeError(f"Failed to delete LiteLLM key: {response.text}")

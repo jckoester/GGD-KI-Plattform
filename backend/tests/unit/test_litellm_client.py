@@ -183,3 +183,65 @@ async def test_create_team_raises_on_unexpected_status():
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         with pytest.raises(RuntimeError):
             await client.create_team("jahrgang-8")
+
+
+@pytest.mark.asyncio
+async def test_generate_key_returns_key_string():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"key": "sk-abc123"}
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        key = await client.generate_key("pseudo-1")
+
+    assert key == "sk-abc123"
+    call_args = http_client.post.await_args
+    assert call_args.args[0].endswith("/key/generate")
+    assert call_args.kwargs["json"] == {"user_id": "pseudo-1"}
+
+
+@pytest.mark.asyncio
+async def test_generate_key_raises_on_error():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 500
+    response.text = "internal error"
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(RuntimeError):
+            await client.generate_key("pseudo-1")
+
+
+@pytest.mark.asyncio
+async def test_delete_key_accepts_404_as_success():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 404
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.delete_key("sk-abc123")
+
+    call_args = http_client.post.await_args
+    assert call_args.args[0].endswith("/key/delete")
+    assert call_args.kwargs["json"] == {"keys": ["sk-abc123"]}
+
+
+@pytest.mark.asyncio
+async def test_delete_key_raises_on_unexpected_status():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 500
+    response.text = "error"
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(RuntimeError):
+            await client.delete_key("sk-abc123")

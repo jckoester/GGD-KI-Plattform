@@ -22,6 +22,8 @@ class CleanupStats:
     deleted_local: int = 0
     litellm_delete_ok: int = 0
     litellm_delete_failed: int = 0
+    litellm_key_delete_ok: int = 0
+    litellm_key_delete_failed: int = 0
     errors: int = 0
     duration_ms: int = 0
 
@@ -62,7 +64,7 @@ async def cleanup_inactive_accounts(
     try:
         while True:
             query = (
-                select(PseudonymAudit.pseudonym)
+                select(PseudonymAudit)
                 .where(PseudonymAudit.last_login_at < cutoff)
                 .order_by(PseudonymAudit.last_login_at.asc())
                 .limit(limit)
@@ -71,13 +73,14 @@ async def cleanup_inactive_accounts(
                 query = query.where(~PseudonymAudit.pseudonym.in_(failed_pseudonyms))
 
             result = await db.execute(query)
-            pseudonyms = list(result.scalars().all())
-            if not pseudonyms:
+            audit_entries = list(result.scalars().all())
+            if not audit_entries:
                 break
 
-            stats.found += len(pseudonyms)
+            stats.found += len(audit_entries)
 
-            for pseudonym in pseudonyms:
+            for audit_entry in audit_entries:
+                pseudonym = audit_entry.pseudonym
                 try:
                     await client.delete_user(pseudonym)
                     stats.litellm_delete_ok += 1
@@ -88,6 +91,19 @@ async def cleanup_inactive_accounts(
                         pseudonym,
                         exc,
                     )
+
+                # Virtual Key löschen falls vorhanden
+                if audit_entry.litellm_key:
+                    try:
+                        await client.delete_key(audit_entry.litellm_key)
+                        stats.litellm_key_delete_ok += 1
+                    except Exception as exc:
+                        stats.litellm_key_delete_failed += 1
+                        logger.warning(
+                            "LiteLLM-Key konnte nicht gelöscht werden pseudonym=%s error=%s",
+                            pseudonym,
+                            exc,
+                        )
 
                 try:
                     # Atomare lokale Löschung pro Pseudonym.
@@ -118,11 +134,14 @@ async def cleanup_inactive_accounts(
         stats.duration_ms = int((perf_counter() - started) * 1000)
 
     logger.info(
-        "cleanup_inactive_accounts fertig found=%d deleted_local=%d litellm_ok=%d litellm_failed=%d errors=%d duration_ms=%d",
+        "cleanup_inactive_accounts fertig found=%d deleted_local=%d litellm_ok=%d litellm_failed=%d "
+        "key_delete_ok=%d key_delete_failed=%d errors=%d duration_ms=%d",
         stats.found,
         stats.deleted_local,
         stats.litellm_delete_ok,
         stats.litellm_delete_failed,
+        stats.litellm_key_delete_ok,
+        stats.litellm_key_delete_failed,
         stats.errors,
         stats.duration_ms,
     )

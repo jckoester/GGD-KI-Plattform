@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP
+from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Numeric, Boolean
@@ -154,6 +154,7 @@ class PseudonymAudit(Base):
     revoked_all_before: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    litellm_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 # 7. jwt_revocations

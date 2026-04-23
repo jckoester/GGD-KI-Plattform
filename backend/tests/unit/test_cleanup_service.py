@@ -34,6 +34,13 @@ class _ResultList:
         return self._values
 
 
+def _audit_entry(pseudonym: str, litellm_key: str | None = None):
+    entry = MagicMock()
+    entry.pseudonym = pseudonym
+    entry.litellm_key = litellm_key
+    return entry
+
+
 class _ResultCount:
     def __init__(self, value):
         self._value = value
@@ -60,7 +67,7 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.execute = AsyncMock(
         side_effect=[
-            _ResultList(["pseudo-1"]),  # Kandidaten
+            _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
             MagicMock(),  # delete conversations
             MagicMock(),  # delete user_preferences
             MagicMock(),  # delete jwt_revocations
@@ -90,7 +97,7 @@ async def test_cleanup_inactive_accounts_rolls_back_single_pseudonym_on_local_er
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.execute = AsyncMock(
         side_effect=[
-            _ResultList(["pseudo-1"]),  # Kandidaten
+            _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
             MagicMock(),  # delete conversations
             RuntimeError("delete failed"),  # delete user_preferences
             _ResultList([]),  # nächste Runde durch Exclusion leer

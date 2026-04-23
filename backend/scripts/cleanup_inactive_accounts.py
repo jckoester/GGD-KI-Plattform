@@ -50,11 +50,14 @@ async def run_cleanup(
             now=now,
         )
     logger.info(
-        "cleanup_inactive_accounts done found=%d deleted_local=%d litellm_ok=%d litellm_failed=%d errors=%d duration_ms=%d",
+        "cleanup_inactive_accounts done found=%d deleted_local=%d litellm_ok=%d litellm_failed=%d "
+        "key_delete_ok=%d key_delete_failed=%d errors=%d duration_ms=%d",
         stats.found,
         stats.deleted_local,
         stats.litellm_delete_ok,
         stats.litellm_delete_failed,
+        stats.litellm_key_delete_ok,
+        stats.litellm_key_delete_failed,
         stats.errors,
         stats.duration_ms,
     )

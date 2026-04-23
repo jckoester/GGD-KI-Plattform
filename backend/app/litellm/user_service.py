@@ -2,10 +2,12 @@ import logging
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 
 from app.auth.audit import get_primary_role
 from app.budget.exchange import get_current_rate
 from app.budget.tiers import get_budget_for
+from app.db.models import PseudonymAudit
 from app.litellm.client import LiteLLMClient
 from app.litellm.team_service import reconcile_user_team
 from app.litellm.teams import get_target_team_id
@@ -112,6 +114,23 @@ async def ensure_litellm_user(
                         grade_int,
                         max_budget_usd,
                     )
+            
+            # Virtual Key generieren falls noch nicht vorhanden
+            key_result = await db.execute(
+                select(PseudonymAudit.litellm_key).where(PseudonymAudit.pseudonym == pseudonym)
+            )
+            litellm_key = key_result.scalar_one_or_none()
+            
+            if litellm_key is None:
+                # Key generieren und speichern
+                key = await client.generate_key(pseudonym)
+                await db.execute(
+                    update(PseudonymAudit)
+                    .where(PseudonymAudit.pseudonym == pseudonym)
+                    .values(litellm_key=key)
+                )
+                await db.commit()
+                logger.info("LiteLLM-Virtual-Key generiert und gespeichert pseudonym=%s", pseudonym)
         finally:
             await client.close()
             

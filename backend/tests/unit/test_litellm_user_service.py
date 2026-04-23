@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -119,6 +119,57 @@ def test_extract_current_team_ids_from_multiple_shapes():
     assert "jahrgang-8" in team_ids
     assert "jahrgang-7" in team_ids
     assert "lehrkraefte" in team_ids
+
+
+@pytest.mark.asyncio
+async def test_ensure_litellm_user_generates_key_when_none_in_db():
+    """Kein Key in DB → generate_key wird aufgerufen und Key committed."""
+    execute_result = MagicMock()
+    execute_result.scalar_one_or_none.return_value = None
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=execute_result)
+    client = AsyncMock()
+    client.get_user.return_value = None
+    client.generate_key = AsyncMock(return_value="sk-new-key")
+
+    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
+         patch("app.litellm.user_service.LiteLLMClient", return_value=client):
+        await ensure_litellm_user(
+            db,
+            pseudonym="pseudo-key",
+            roles=["student"],
+            grade="9",
+            old_role=None,
+            old_grade=None,
+        )
+
+    client.generate_key.assert_awaited_once_with("pseudo-key")
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_ensure_litellm_user_skips_key_generation_when_key_exists():
+    """Key bereits in DB → generate_key wird nicht aufgerufen."""
+    db = AsyncMock()
+    db.execute.return_value.scalar_one_or_none.return_value = "sk-existing-key"
+    client = AsyncMock()
+    client.get_user.return_value = {"user_id": "pseudo-has-key"}
+
+    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
+         patch("app.litellm.user_service.LiteLLMClient", return_value=client):
+        await ensure_litellm_user(
+            db,
+            pseudonym="pseudo-has-key",
+            roles=["student"],
+            grade="9",
+            old_role="student",
+            old_grade=9,
+        )
+
+    client.generate_key.assert_not_awaited()
+    db.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio

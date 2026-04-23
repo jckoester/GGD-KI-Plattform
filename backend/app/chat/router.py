@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import ChatRequest
-from app.db.models import Conversation, Message
+from app.db.models import Conversation, Message, PseudonymAudit
 from app.db.session import get_db, AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
 
@@ -212,11 +212,21 @@ async def chat(
         model_used = existing.model_used
         litellm_payload["model"] = model_used
 
+    # Key aus DB laden
+    key_result = await db.execute(
+        select(PseudonymAudit.litellm_key).where(PseudonymAudit.pseudonym == current_user.sub)
+    )
+    litellm_key = key_result.scalar_one_or_none()
+
+    if litellm_key is None:
+        await client.aclose()
+        raise HTTPException(status_code=503, detail="LiteLLM-Key nicht verfügbar")
+
     try:
         req = client.build_request(
             "POST",
             f"{settings.litellm_proxy_url}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
+            headers={"Authorization": f"Bearer {litellm_key}"},
             json=litellm_payload,
         )
         response = await client.send(req, stream=True)
