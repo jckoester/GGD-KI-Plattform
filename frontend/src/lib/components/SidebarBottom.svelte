@@ -1,5 +1,6 @@
 <script>
     import { user } from "$lib/stores/user.js";
+    import { budget } from "$lib/stores/budget.js";
     import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
     import UserMenu from "./UserMenu.svelte";
 
@@ -21,19 +22,39 @@
     function closeMenu() {
         menuOpen = false;
     }
+
+    // Formatierung: 2 Dezimalstellen, Komma als Trennzeichen
+    function fmt(v) {
+        if (v == null) return '–'
+        return v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+
+    let pct = $derived(
+        $budget?.max_budget_eur && $budget?.spend_eur != null
+            ? Math.min(100, Math.round(($budget.spend_eur / $budget.max_budget_eur) * 100))
+            : null
+    )
 </script>
 
 <div
     class="pb-0 p-3 border-t border-light-ui-3 dark:border-dark-ui-3 flex-shrink-0"
 >
     <!-- Budget-Zeile -->
-    <div class="flex items-center text-xs mb-3">
+    <div class="flex items-center text-xs mb-2">
         <Coins class="w-3 h-3 mr-2 text-light-tx-2 dark:text-dark-tx-2" />
-        <span class="text-light-tx-2 dark:text-dark-tx-2">–/– €</span>
-        <span class="ml-auto text-xs text-light-tx-3 dark:text-dark-tx-3"
-            >r: –</span
-        >
+        <span class="text-light-tx-2 dark:text-dark-tx-2">{fmt($budget?.spend_eur)} / {fmt($budget?.max_budget_eur)} €</span>
+        {#if pct != null}
+            <span class="ml-auto text-xs text-light-tx-3 dark:text-dark-tx-3">{pct} %</span>
+        {/if}
     </div>
+    {#if pct != null}
+        <div class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 mb-3">
+            <div
+                class="h-1 rounded transition-all {pct >= 90 ? 'bg-red-500' : 'bg-primary'}"
+                style="width: {pct}%"
+            ></div>
+        </div>
+    {/if}
 
     <!-- Benutzerbereich -->
     <div class="relative">

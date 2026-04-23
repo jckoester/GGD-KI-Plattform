@@ -41,6 +41,7 @@ class MessageItem(BaseModel):
     role: str
     content: str
     created_at: datetime
+    cost_usd: Optional[float] = None
 
 
 class ConversationDetailResponse(BaseModel):
@@ -48,6 +49,7 @@ class ConversationDetailResponse(BaseModel):
     title: Optional[str]
     model_used: str
     last_message_at: Optional[datetime]
+    total_cost_usd: Optional[float] = None
     messages: list[MessageItem]
 
 
@@ -127,6 +129,7 @@ async def _persist(
     assistant_content: str,
     usage: dict,
     model_used: str,
+    cost_usd: Optional[float] = None,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
@@ -143,12 +146,17 @@ async def _persist(
         model=model_used,
         tokens_input=tokens_input,
         tokens_output=tokens_output,
-        cost_usd=None,
+        cost_usd=cost_usd,
     ))
+
+    update_values: dict = {"last_message_at": func.now()}
+    if cost_usd is not None:
+        update_values["total_cost_usd"] = Conversation.total_cost_usd + cost_usd
+
     await db.execute(
         update(Conversation)
         .where(Conversation.id == conversation_id)
-        .values(last_message_at=func.now())
+        .values(**update_values)
     )
     await db.commit()
 
@@ -245,6 +253,7 @@ async def chat(
     async def generate():
         full_content: list[str] = []
         usage: dict = {}
+        cost_usd: Optional[float] = None
         try:
             async for line in response.aiter_lines():
                 if not line:
@@ -254,7 +263,7 @@ async def chat(
                     continue
                 payload = line[6:]
                 if payload == "[DONE]":
-                    # Titel-Task abwarten (max. 3 s) und Event vor [DONE] einfügen
+                    # Titel-Task abwarten (max. 3 s)
                     if title_task:
                         try:
                             title = await asyncio.wait_for(asyncio.shield(title_task), timeout=3.0)
@@ -267,6 +276,16 @@ async def chat(
                             logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
                         except Exception:
                             logger.exception("Fehler beim Warten auf Titel-Task")
+                    # Kosten aus Response-Header lesen (bei Streaming immer None/0.0 — strukturelle LiteLLM-Einschränkung)
+                    cost_header = response.headers.get("x-litellm-response-cost")
+                    if cost_header is not None:
+                        try:
+                            cost_usd = float(cost_header)
+                        except (ValueError, TypeError):
+                            logger.warning("Ungültiger x-litellm-response-cost Header: %s", cost_header)
+                    if cost_usd is not None:
+                        logger.debug("Sende cost-SSE-Event: cost_usd=%s", cost_usd)
+                        yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
                     yield f"{line}\n\n"
                     break
                 try:
@@ -284,7 +303,10 @@ async def chat(
             await client.aclose()
 
         try:
-            await _persist(db, conversation_id, user_message, "".join(full_content), usage, model_used)
+            await _persist(
+                db, conversation_id, user_message, "".join(full_content),
+                usage, model_used, cost_usd=cost_usd,
+            )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
 
@@ -450,6 +472,7 @@ async def get_conversation_messages(
             "role": msg.role,
             "content": msg.content,
             "created_at": msg.created_at,
+            "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
         }
         for msg in messages
     ]
@@ -459,5 +482,6 @@ async def get_conversation_messages(
         title=conversation.title,
         model_used=conversation.model_used,
         last_message_at=conversation.last_message_at,
+        total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         messages=messages_list,
     )

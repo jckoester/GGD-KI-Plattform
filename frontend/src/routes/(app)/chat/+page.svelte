@@ -5,6 +5,7 @@
   import { streamChat, ApiError, getConversationMessages, getModels } from '$lib/api.js'
   import { refreshConversations } from '$lib/stores/conversations.js'
   import { user } from '$lib/stores/user.js'
+  import { budget, refreshBudget } from '$lib/stores/budget.js'
 
   let messages = $state([])
   let input = $state('')
@@ -20,9 +21,20 @@
   let selectedModelId = $state('')
   let modelsLoading = $state(false)
   let modelsError = $state(null)
+  let totalCostUsd = $state(null)
   const MODEL_STORAGE_KEY = 'chat_model_id'
 
   let textAreaRows = $state(1)
+
+  // Hilfsfunktion zur Kostenformatierung
+  function formatCostEur(costUsd, rate) {
+    if (costUsd == null || !rate) return null
+    const eur = costUsd / rate
+    if (eur < 0.01) return '< 0,01'
+    return eur.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  let granularity = $derived($user?.preferences?.cost_granularity ?? 'none')
 
   function adjustTextareaHeight() {
     if (!textarea) return
@@ -114,6 +126,18 @@
           pageTitle.set(item.title)
           continue
         }
+        // Cost-Event
+        if (item.type === 'cost') {
+          messages[assistantIndex] = {
+            ...messages[assistantIndex],
+            cost_usd: item.cost_usd,
+          }
+          messages = messages
+          if (item.cost_usd != null) {
+            totalCostUsd = (totalCostUsd ?? 0) + item.cost_usd
+          }
+          continue
+        }
         // Token von Assistant
         messages[assistantIndex] = {
           ...messages[assistantIndex],
@@ -147,6 +171,7 @@
       isStreaming = false
       // Konversationen in Sidebar neu laden
       triggerSidebarRefresh()
+      refreshBudget()   // neu: Budget-Store aktualisieren
     }
   }
 
@@ -170,9 +195,14 @@
         loadingConversation = true
         try {
             const data = await getConversationMessages(id)
-            messages = data.messages.map(m => ({ role: m.role, content: m.content }))
+            messages = data.messages.map(m => ({
+              role: m.role,
+              content: m.content,
+              cost_usd: m.cost_usd ?? null
+            }))
             conversationId = data.id
             currentConversationModel = data.model_used
+            totalCostUsd = data.total_cost_usd ?? null
             pageTitle.set(data.title || '')
             activeConversationId.set(data.id)
         } catch (err) {
@@ -200,6 +230,7 @@
         messages = []
         conversationId = null
         currentConversationModel = null
+        totalCostUsd = null
         conversationError = null
         pageTitle.set('')
         activeConversationId.set(null)
@@ -280,6 +311,11 @@
             <div class="flex justify-start">
               <div class="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-bl-none px-4 py-2 max-w-[80%]">
                 <p class="whitespace-pre-wrap">{message.content}</p>
+                {#if (granularity === 'message' || granularity === 'both') && message.cost_usd != null}
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {formatCostEur(message.cost_usd, $budget?.eur_usd_rate)} €
+                  </p>
+                {/if}
                 {#if isStreaming && i === messages.length - 1}
                   <span class="animate-pulse cursor-default">|</span>
                 {/if}
@@ -293,6 +329,11 @@
             </div>
           {/if}
         {/each}
+        {#if (granularity === 'conversation' || granularity === 'both') && totalCostUsd != null}
+          <div class="text-xs text-right text-gray-500 dark:text-gray-400 mt-2">
+            Konversation: {formatCostEur(totalCostUsd, $budget?.eur_usd_rate)} €
+          </div>
+        {/if}
       </div>
     {/if}
     <div bind:this={scrollAnchor} class="h-0"></div>

@@ -1,9 +1,10 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
-    import { getMe, getPreferences } from "$lib/api.js";
+    import { getMe, getPreferences, getBudget } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import { themePref } from "$lib/stores/theme.js";
+    import { budget } from "$lib/stores/budget.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -14,12 +15,13 @@
 
     onMount(async () => {
         try {
-            const [me, prefs] = await Promise.all([getMe(), getPreferences()])
+            const [me, prefs, budgetData] = await Promise.all([getMe(), getPreferences(), getBudget()])
             user.set({
                 ...me,
                 display_name: sessionStorage.getItem('display_name') ?? me.pseudonym,
                 preferences: prefs,
             });
+            budget.set(budgetData)
             themePref.syncFromServer(prefs.theme ?? 'system')
         } catch {
             goto("/");

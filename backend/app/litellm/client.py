@@ -73,6 +73,7 @@ class LiteLLMClient:
         """Alias für get_user mit konsistentem Namensschema."""
         return await self.get_user(pseudonym)
 
+
     async def create_user(
         self,
         pseudonym: str,

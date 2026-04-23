@@ -87,6 +87,16 @@ export async function getModels() {
   return res.json()
 }
 
+export async function getBudget() {
+  try {
+    const res = await fetch(`${BASE}/budget/me`, { credentials: 'include' })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
 export async function renameConversation(conversationId, title) {
   const res = await fetch(`${BASE}/conversations/${conversationId}`, {
     method: 'PATCH',
@@ -176,6 +186,15 @@ export async function* streamChat(messages, conversationId = null, modelId = nul
         try {
           const { title } = JSON.parse(payload)
           yield { type: 'title', title }
+        } catch {}
+        currentEventType = null
+        continue
+      }
+
+      if (currentEventType === 'cost') {
+        try {
+          const { cost_usd } = JSON.parse(payload)
+          yield { type: 'cost', cost_usd }
         } catch {}
         currentEventType = null
         continue
