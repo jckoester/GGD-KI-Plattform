@@ -9,6 +9,7 @@ from app.auth.router import router as auth_router
 from app.db.session import AsyncSessionLocal
 from app.db.models import ExchangeRate
 from app.preferences.router import router as preferences_router
+from app.budget.router import router as budget_router
 from app.chat.router import router as chat_router
 
 logger = logging.getLogger(__name__)
@@ -48,5 +49,6 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(budget_router)
 app.include_router(preferences_router)
 app.include_router(chat_router)
