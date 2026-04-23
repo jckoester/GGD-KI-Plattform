@@ -224,6 +224,35 @@ class LiteLLMClient:
         )
         raise RuntimeError(f"Failed to delete LiteLLM user: {response.text}")
 
+    async def create_team(self, team_id: str) -> None:
+        """
+        POST /team/new — legt Team an, falls noch nicht vorhanden.
+        409/Konflikt wird als Erfolg behandelt (idempotent).
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/team/new"
+        headers = {
+            "Authorization": f"Bearer {self.master_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "team_id": team_id,
+            "team_alias": team_id,
+        }
+
+        response = await client.post(url, headers=headers, json=payload)
+
+        if response.status_code in (200, 201, 409):
+            return
+
+        logger.error(
+            "LiteLLM create_team fehlerhaft: status=%d, body=%s, payload=%s",
+            response.status_code,
+            response.text,
+            payload,
+        )
+        raise RuntimeError(f"Failed to create LiteLLM team: {response.text}")
+
     async def list_teams(self) -> list[dict]:
         """
         GET /team/list.

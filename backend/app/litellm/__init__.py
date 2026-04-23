@@ -7,6 +7,7 @@ from app.litellm.teams import (
     is_phase1_team,
     normalize_grade,
 )
+from app.litellm.user_service import ensure_litellm_team_membership
 
 __all__ = [
     "TEACHER_TEAM_ID",
@@ -16,4 +17,5 @@ __all__ = [
     "get_target_team_id",
     "is_phase1_team",
     "reconcile_user_team",
+    "ensure_litellm_team_membership",
 ]

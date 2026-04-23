@@ -122,3 +122,64 @@ async def test_add_team_member_raises_on_unexpected_status():
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         with pytest.raises(RuntimeError):
             await client.add_team_member("jahrgang-9", "pseudo-c")
+
+
+@pytest.mark.asyncio
+async def test_create_team_calls_expected_endpoint_and_payload():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.text = ""
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.create_team("jahrgang-7")
+
+    call_args = http_client.post.await_args
+    assert call_args is not None
+    assert call_args.args[0].endswith("/team/new")
+    assert call_args.kwargs["json"] == {
+        "team_id": "jahrgang-7",
+        "team_alias": "jahrgang-7",
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_team_accepts_201_as_success():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 201
+    response.text = ""
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.create_team("jahrgang-8")
+
+
+@pytest.mark.asyncio
+async def test_create_team_accepts_409_as_success_idempotent():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 409
+    response.text = "already exists"
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.create_team("jahrgang-8")
+
+
+@pytest.mark.asyncio
+async def test_create_team_raises_on_unexpected_status():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 500
+    response.text = "internal error"
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(RuntimeError):
+            await client.create_team("jahrgang-8")

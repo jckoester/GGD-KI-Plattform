@@ -9,7 +9,7 @@ from app.auth.jwt import JwtPayload, JwtService
 from app.auth.pseudonym import pseudonymize
 from app.config import settings
 from app.db.session import get_db
-from app.litellm.user_service import ensure_litellm_user
+from app.litellm.user_service import ensure_litellm_team_membership, ensure_litellm_user
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
@@ -57,6 +57,7 @@ async def auth_callback(
         old_role=old_role,
         old_grade=old_grade,
     )
+    await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
@@ -98,6 +99,7 @@ async def login_direct(
         old_role=old_role,
         old_grade=old_grade,
     )
+    await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(

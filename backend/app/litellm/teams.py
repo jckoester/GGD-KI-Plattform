@@ -29,10 +29,10 @@ def get_target_team_id(roles: list[str], grade: int | str | None) -> str:
         if grade_int is None:
             raise ValueError("Kein gültiger year/grade für student vorhanden")
         if grade_int not in VALID_GRADES:
-            raise ValueError(f"Nicht unterstützter grade für Phase1-Team: {grade_int}")
+            raise ValueError(f"Nicht unterstützter grade für Team: {grade_int}")
         return f"{STUDENT_TEAM_PREFIX}{grade_int}"
 
-    raise ValueError(f"Kein Phase-1-Zielteam ableitbar für roles={roles}")
+    raise ValueError(f"Kein Zielteam ableitbar für roles={roles}")
 
 
 def is_phase1_team(team_id: str) -> bool:
@@ -40,7 +40,7 @@ def is_phase1_team(team_id: str) -> bool:
         return True
     if team_id.startswith(STUDENT_TEAM_PREFIX):
         try:
-            return int(team_id[len(STUDENT_TEAM_PREFIX):]) in VALID_GRADES
+            return int(team_id[len(STUDENT_TEAM_PREFIX) :]) in VALID_GRADES
         except ValueError:
             return False
     return False
