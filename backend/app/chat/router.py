@@ -205,7 +205,7 @@ async def chat(
                 Conversation.pseudonym == current_user.sub,
             )
         )
-        existing = result.scalar_one_or_none()
+        existing = await result.scalar_one_or_none()
         if existing is None:
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
@@ -217,7 +217,7 @@ async def chat(
     key_result = await db.execute(
         select(PseudonymAudit.litellm_key).where(PseudonymAudit.pseudonym == current_user.sub)
     )
-    litellm_key = key_result.scalar_one_or_none()
+    litellm_key = await key_result.scalar_one_or_none()
 
     if litellm_key is None:
         await client.aclose()

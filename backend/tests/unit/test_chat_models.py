@@ -149,6 +149,7 @@ async def test_post_chat_new_conversation_uses_requested_model_id():
 
     db.refresh = AsyncMock(side_effect=_refresh)
     db.commit = AsyncMock()
+    db.execute = AsyncMock()
 
     fake_http_client = _FakeHttpClient()
     request = ChatRequest(
@@ -173,6 +174,9 @@ async def test_post_chat_new_conversation_uses_requested_model_id():
 async def test_post_chat_new_conversation_without_model_uses_default():
     db = AsyncMock()
     db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = AsyncMock()
     db.flush = AsyncMock()
 
     async def _refresh(obj):
@@ -215,8 +219,13 @@ async def test_post_chat_existing_conversation_ignores_model_id_and_uses_stored_
     existing_conv.model_used = "openai/gpt-4o-mini"
 
     result = MagicMock()
-    result.scalar_one_or_none.return_value = existing_conv
-    db.execute = AsyncMock(return_value=result)
+    result.scalar_one_or_none = AsyncMock(return_value=existing_conv)
+    result2 = MagicMock()
+    result2.scalar_one_or_none = AsyncMock(return_value="sk-key")
+    
+    # db.execute wird twice aufgerufen: einmal für Conversation, einmal für PseudonymAudit.litellm_key
+    db.execute = AsyncMock(side_effect=[result, result2])
+    db.add = MagicMock()
 
     fake_http_client = _FakeHttpClient()
     request = ChatRequest(

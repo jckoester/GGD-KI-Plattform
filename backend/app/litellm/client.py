@@ -380,15 +380,15 @@ class LiteLLMClient:
         """
         from datetime import date, timedelta
         today = date.today()
-        client = await self._get_client()
-        url = f"{self.base_url}/spend/logs/v2"
-        headers = {"Authorization": f"Bearer {self.master_key}"}
-        params = {
-            "request_id": request_id,
-            "start_date": (today - timedelta(days=1)).isoformat(),
-            "end_date": (today + timedelta(days=1)).isoformat(),
-        }
         try:
+            client = await self._get_client()
+            url = f"{self.base_url}/spend/logs/v2"
+            headers = {"Authorization": f"Bearer {self.master_key}"}
+            params = {
+                "request_id": request_id,
+                "start_date": (today - timedelta(days=1)).isoformat(),
+                "end_date": (today + timedelta(days=1)).isoformat(),
+            }
             response = await client.get(url, headers=headers, params=params)
             if response.status_code != 200:
                 logger.warning(

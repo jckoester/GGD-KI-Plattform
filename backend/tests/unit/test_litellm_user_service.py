@@ -125,7 +125,7 @@ def test_extract_current_team_ids_from_multiple_shapes():
 async def test_ensure_litellm_user_generates_key_when_none_in_db():
     """Kein Key in DB → generate_key wird aufgerufen und Key committed."""
     execute_result = MagicMock()
-    execute_result.scalar_one_or_none.return_value = None
+    execute_result.scalar_one_or_none = AsyncMock(return_value=None)
     db = AsyncMock()
     db.execute = AsyncMock(return_value=execute_result)
     client = AsyncMock()
@@ -152,7 +152,7 @@ async def test_ensure_litellm_user_generates_key_when_none_in_db():
 async def test_ensure_litellm_user_skips_key_generation_when_key_exists():
     """Key bereits in DB → generate_key wird nicht aufgerufen."""
     db = AsyncMock()
-    db.execute.return_value.scalar_one_or_none.return_value = "sk-existing-key"
+    db.execute.return_value.scalar_one_or_none = AsyncMock(return_value="sk-existing-key")
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-has-key"}
 

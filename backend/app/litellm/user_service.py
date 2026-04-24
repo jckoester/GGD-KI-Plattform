@@ -119,7 +119,7 @@ async def ensure_litellm_user(
             key_result = await db.execute(
                 select(PseudonymAudit.litellm_key).where(PseudonymAudit.pseudonym == pseudonym)
             )
-            litellm_key = key_result.scalar_one_or_none()
+            litellm_key = await key_result.scalar_one_or_none()
             
             if litellm_key is None:
                 # Key generieren und speichern
