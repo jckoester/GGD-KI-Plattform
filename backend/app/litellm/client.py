@@ -371,11 +371,12 @@ class LiteLLMClient:
 
     async def get_spend_log(self, request_id: str) -> float | None:
         """
-        GET /spend/logs/v2?request_id={request_id}
-        Gibt data[0]["spend"] zurück, None wenn kein Eintrag gefunden.
+        GET /spend/logs/v2?request_id={request_id}&start_date=...&end_date=...
+        Gibt die Kosten des Requests zurück, None wenn nicht gefunden.
 
-        start_date/end_date werden explizit mitgeschickt (gestern–morgen), weil der
-        Endpoint ohne Datumsfilter in manchen LiteLLM-Versionen leere Ergebnisse liefert.
+        start_date/end_date (±1 Tag) sind Pflichtparameter des Endpoints.
+        request_id wird unverändert übergeben — LiteLLM speichert IDs im selben
+        Format wie der Stream-Chunk sie liefert (OpenAI: chatcmpl-..., andere: UUID).
         """
         from datetime import date, timedelta
         today = date.today()
@@ -387,7 +388,6 @@ class LiteLLMClient:
             "start_date": (today - timedelta(days=1)).isoformat(),
             "end_date": (today + timedelta(days=1)).isoformat(),
         }
-
         try:
             response = await client.get(url, headers=headers, params=params)
             if response.status_code != 200:
@@ -399,8 +399,17 @@ class LiteLLMClient:
             data = response.json().get("data", [])
             if not data:
                 return None
-            spend = data[0].get("spend")
-            return float(spend) if spend is not None else None
+            entry = data[0]
+            spend = entry.get("spend")
+            if spend:
+                return float(spend)
+            # Fallback: spend=0 bei sehr günstigen Modellen
+            total_cost = (
+                entry.get("metadata", {})
+                    .get("cost_breakdown", {})
+                    .get("total_cost")
+            )
+            return float(total_cost) if total_cost else None
         except Exception:
             logger.exception("get_spend_log Exception für request_id=%s", request_id)
             return None
