@@ -67,6 +67,7 @@ router = APIRouter(tags=["chat"])
 
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
+_SPEND_LOG_DELAY: float = settings.spend_log_delay
 
 
 def make_title(text: str) -> str:
@@ -263,6 +264,7 @@ async def chat(
     async def generate():
         full_content: list[str] = []
         usage: dict = {}
+        chunk_id: str | None = None
         cost_usd: Optional[float] = None
         try:
             async for line in response.aiter_lines():
@@ -286,15 +288,19 @@ async def chat(
                             logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
                         except Exception:
                             logger.exception("Fehler beim Warten auf Titel-Task")
-                    # Kosten aus Response-Header lesen (bei Streaming immer None/0.0 — strukturelle LiteLLM-Einschränkung)
-                    cost_header = response.headers.get("x-litellm-response-cost")
-                    if cost_header is not None:
+                    # Kosten aus SpendLogs holen (Retry, weil LiteLLM asynchron schreibt)
+                    if chunk_id:
+                        litellm_client = LiteLLMClient()
                         try:
-                            cost_usd = float(cost_header)
-                        except (ValueError, TypeError):
-                            logger.warning("Ungültiger x-litellm-response-cost Header: %s", cost_header)
+                            for attempt in range(3):
+                                await asyncio.sleep(_SPEND_LOG_DELAY)
+                                cost_usd = await litellm_client.get_spend_log(chunk_id)
+                                if cost_usd is not None:
+                                    break
+                        finally:
+                            await litellm_client.close()
+
                     if cost_usd is not None:
-                        logger.debug("Sende cost-SSE-Event: cost_usd=%s", cost_usd)
                         yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
                     yield f"{line}\n\n"
                     break
@@ -306,6 +312,7 @@ async def chat(
                         yield f"{line}\n\n"
                     if "usage" in chunk:
                         usage = chunk["usage"]
+                        chunk_id = chunk.get("id")
                 except (json.JSONDecodeError, IndexError, KeyError):
                     yield f"{line}\n\n"
         finally:

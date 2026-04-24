@@ -368,3 +368,39 @@ class LiteLLMClient:
         if response.status_code in (200, 204, 404):
             return
         raise RuntimeError(f"Failed to delete LiteLLM key: {response.text}")
+
+    async def get_spend_log(self, request_id: str) -> float | None:
+        """
+        GET /spend/logs/v2?request_id={request_id}
+        Gibt data[0]["spend"] zurück, None wenn kein Eintrag gefunden.
+
+        start_date/end_date werden explizit mitgeschickt (gestern–morgen), weil der
+        Endpoint ohne Datumsfilter in manchen LiteLLM-Versionen leere Ergebnisse liefert.
+        """
+        from datetime import date, timedelta
+        today = date.today()
+        client = await self._get_client()
+        url = f"{self.base_url}/spend/logs/v2"
+        headers = {"Authorization": f"Bearer {self.master_key}"}
+        params = {
+            "request_id": request_id,
+            "start_date": (today - timedelta(days=1)).isoformat(),
+            "end_date": (today + timedelta(days=1)).isoformat(),
+        }
+
+        try:
+            response = await client.get(url, headers=headers, params=params)
+            if response.status_code != 200:
+                logger.warning(
+                    "get_spend_log fehlerhaft: status=%d request_id=%s body=%s",
+                    response.status_code, request_id, response.text[:200],
+                )
+                return None
+            data = response.json().get("data", [])
+            if not data:
+                return None
+            spend = data[0].get("spend")
+            return float(spend) if spend is not None else None
+        except Exception:
+            logger.exception("get_spend_log Exception für request_id=%s", request_id)
+            return None

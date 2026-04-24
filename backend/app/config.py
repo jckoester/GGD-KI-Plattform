@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     title_model: str = ""
     exchange_rate_fallback: float = 1.10
     student_grades: list[int] = [5, 6, 7, 8, 9, 10, 11, 12]
+    spend_log_delay: float = 1.0
 
 
 settings = Settings()
