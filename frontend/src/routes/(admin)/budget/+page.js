@@ -4,11 +4,11 @@ import { user } from '$lib/stores/user.js'
 
 export function load() {
     const $user = get(user)
-    if (!$user?.roles.includes('admin')) {
+    if (!$user?.roles.some((r) => ['budget', 'admin'].includes(r))) {
         redirect(302, '/')
     }
     return {
-        title: 'Administration',
-        headerColor: 'bg-violet-800 dark:bg-violet-950',
+        title: 'Budget',
+        headerColor: 'bg-amber-700 dark:bg-amber-900',
     }
 }

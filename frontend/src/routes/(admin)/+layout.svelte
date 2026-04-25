@@ -1,12 +1,12 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
     import { getMe, getPreferences } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import { themePref } from "$lib/stores/theme.js";
-    import Sidebar from "$lib/components/Sidebar.svelte";
+    import Sidebar from "$lib/components/AdminSidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
-    import { Binary } from "lucide-svelte";
 
     let { children } = $props();
 
@@ -75,7 +75,7 @@
         <AppHeader
             {sidebarOpen}
             onToggle={toggleSidebar}
-            bgClass="bg-dark-re dark:bg-dark-re"
+            bgClass={$page.data.headerColor ?? "bg-dark-re dark:bg-dark-re"}
             textClass="text-dark-tx dark:text-dark-tx-1"
         />
         <main

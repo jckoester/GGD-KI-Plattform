@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from functools import lru_cache
 
 from fastapi import Depends, HTTPException, Request
@@ -47,3 +48,21 @@ async def get_current_user(
     if await jwt_service.is_revoked(db, payload):
         raise HTTPException(status_code=401, detail="Token revoziert")
     return payload
+
+
+def require_role(role: str) -> Callable:
+    """Dependency-Factory: 403 wenn `role` nicht in user.roles."""
+    async def _guard(current_user: JwtPayload = Depends(get_current_user)) -> JwtPayload:
+        if role not in current_user.roles:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        return current_user
+    return _guard
+
+
+def require_any_role(roles: list[str]) -> Callable:
+    """Dependency-Factory: 403 wenn keine der `roles` in user.roles."""
+    async def _guard(current_user: JwtPayload = Depends(get_current_user)) -> JwtPayload:
+        if not any(r in current_user.roles for r in roles):
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        return current_user
+    return _guard
