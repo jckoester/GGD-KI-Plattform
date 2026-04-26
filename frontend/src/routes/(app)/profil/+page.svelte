@@ -1,5 +1,5 @@
 <script>
-    import { Sun, Moon, Monitor, Save, ArrowLeft } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, Save, ArrowLeft } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -79,17 +79,21 @@
     );
 </script>
 
+<button
+    onclick={() => history.back()}
+    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+>
+    <ArrowLeft class="w-4 h-4" /> Zurück
+</button>
+
 <div class="h-full overflow-y-auto">
     <div class="max-w-2xl mx-auto p-6">
-        <button
-            onclick={() => history.back()}
-            class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+        <div
+            class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx"
         >
-            <ArrowLeft class="w-4 h-4" /> Zurück
-        </button>
-        <h1 class="text-2xl font-bold mb-6 text-light-tx dark:text-dark-tx">
-            Profil
-        </h1>
+            <User class="w-6 h-6 " />
+            <h1 class="text-2xl font-semibold">Profil</h1>
+        </div>
 
         <!-- Budget-Abschnitt -->
         <section class="mb-8">

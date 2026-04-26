@@ -15,14 +15,19 @@
 
     onMount(async () => {
         try {
-            const [me, prefs, budgetData] = await Promise.all([getMe(), getPreferences(), getBudget()])
+            const [me, prefs, budgetData] = await Promise.all([
+                getMe(),
+                getPreferences(),
+                getBudget(),
+            ]);
             user.set({
                 ...me,
-                display_name: sessionStorage.getItem('display_name') ?? me.pseudonym,
+                display_name:
+                    sessionStorage.getItem("display_name") ?? me.pseudonym,
                 preferences: prefs,
             });
-            budget.set(budgetData)
-            themePref.syncFromServer(prefs.theme ?? 'system')
+            budget.set(budgetData);
+            themePref.syncFromServer(prefs.theme ?? "system");
         } catch {
             goto("/");
         }
@@ -71,7 +76,9 @@
     <!-- Rechter Bereich: Header + Inhalt -->
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader {sidebarOpen} onToggle={toggleSidebar} />
-        <main class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2">
+        <main
+            class="flex-1 overflow-hidden bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-4"
+        >
             {@render children()}
         </main>
     </div>

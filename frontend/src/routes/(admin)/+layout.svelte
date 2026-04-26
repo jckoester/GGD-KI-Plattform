@@ -64,8 +64,9 @@
             class={!isDesktop ? "fixed inset-y-0 left-0 z-50" : "flex-shrink-0"}
         >
             <Sidebar
-                bgHeaderClass="bg-light-re dark:bg-light-re"
                 textClass="text-dark-tx dark:text-dark-tx-1"
+                bgHeaderClass={$page.data.headerColor ??
+                    "bg-dark-re dark:bg-dark-re"}
             />
         </div>
     {/if}
@@ -76,7 +77,8 @@
             {sidebarOpen}
             onToggle={toggleSidebar}
             bgClass={$page.data.headerColor ?? "bg-dark-re dark:bg-dark-re"}
-            textClass="text-dark-tx dark:text-dark-tx-1"
+            textClass={$page.data.headerTextColor ??
+                "text-light-tx dark:text-light-tx-1"}
         />
         <main
             class="flex-1 overflow-y-auto bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-4"

@@ -2,12 +2,12 @@
     import { user } from "$lib/stores/user.js";
     import { goto } from "$app/navigation";
     import {
-        Shield,
+        Settings,
         User,
         LogOut,
         Eye,
-        Wallet,
-        BarChart2,
+        PiggyBank,
+        ChartNoAxesCombined,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
     import { onMount } from "svelte";
@@ -48,11 +48,11 @@
     <!-- Admin (nur bei admin-Rolle) -->
     {#if $user?.roles.includes("admin")}
         <a
-            href="/admin"
+            href="/settings"
             class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
-            <Shield class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
-            Admin
+            <Settings class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
+            Einstellungen
         </a>
     {/if}
 
@@ -60,7 +60,7 @@
     {#if $user?.roles.includes("review")}
         <a
             href="#"
-            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui dark:hover:bg-dark-ui"
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
             <Eye class="w-4 h-4 mr-3" />
             Review
@@ -68,23 +68,25 @@
     {/if}
 
     <!-- Budget (nur bei budget-Rolle) - vorbereitet für später -->
-    {#if $user?.roles.includes("budget")}
+    {#if $user?.roles.some((r) => ["budget", "admin"].includes(r))}
         <a
-            href="#"
-            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui dark:hover:bg-dark-ui"
+            href="/budget"
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
-            <Wallet class="w-4 h-4 mr-3" />
+            <PiggyBank class="w-4 h-4 mr-3 text-light-ma dark:text-dark-ma" />
             Budget
         </a>
     {/if}
 
     <!-- Statistik (nur bei statistics-Rolle) - vorbereitet für später -->
-    {#if $user?.roles.includes("statistics")}
+    {#if $user?.roles.some((r) => ["statistics", "admin"].includes(r))}
         <a
-            href="#"
-            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui dark:hover:bg-dark-ui"
+            href="/statistik"
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
-            <BarChart2 class="w-4 h-4 mr-3" />
+            <ChartNoAxesCombined
+                class="w-4 h-4 mr-3 text-light-gr dark:text-dark-gr"
+            />
             Statistik
         </a>
     {/if}

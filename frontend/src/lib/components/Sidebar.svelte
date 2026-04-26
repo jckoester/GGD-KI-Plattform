@@ -2,7 +2,15 @@
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
     import { goto } from "$app/navigation";
-    import { Plus, ChevronDown, ChevronRight, History, ShieldCheck, BarChart2, PiggyBank } from "lucide-svelte";
+    import {
+        Plus,
+        ChevronDown,
+        ChevronRight,
+        History,
+        ShieldCheck,
+        BarChart2,
+        PiggyBank,
+    } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
         recentConversations,
@@ -204,45 +212,6 @@
             {/if}
         </div>
     </div>
-
-    <!-- Verwaltungslinks -->
-    {#if $user?.roles.some((r) => ['admin', 'statistics', 'budget'].includes(r))}
-        <div class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
-            <p class="px-3 py-1 text-xs font-medium text-light-tx-3 dark:text-dark-tx-3 uppercase tracking-wide">
-                Verwaltung
-            </p>
-            {#if $user.roles.includes('admin')}
-                <a href="/admin"
-                   class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm
-                          text-light-tx dark:text-dark-tx
-                          hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                          {$page.url.pathname === '/admin' ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}">
-                    <ShieldCheck class="w-4 h-4" />
-                    Administration
-                </a>
-            {/if}
-            {#if $user.roles.some((r) => ['statistics', 'admin'].includes(r))}
-                <a href="/statistik"
-                   class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm
-                          text-light-tx dark:text-dark-tx
-                          hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                          {$page.url.pathname === '/statistik' ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}">
-                    <BarChart2 class="w-4 h-4" />
-                    Statistik
-                </a>
-            {/if}
-            {#if $user.roles.some((r) => ['budget', 'admin'].includes(r))}
-                <a href="/budget"
-                   class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm
-                          text-light-tx dark:text-dark-tx
-                          hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                          {$page.url.pathname === '/budget' ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}">
-                    <PiggyBank class="w-4 h-4" />
-                    Budget
-                </a>
-            {/if}
-        </div>
-    {/if}
 
     <!-- Unterer Bereich -->
     <SidebarBottom />

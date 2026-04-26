@@ -10,11 +10,14 @@
     let {
         sidebarOpen,
         onToggle,
-        bgClass = "bg-light-bg dark:bg-dark-bg-2",
+        bgClass = "bg-light-bg-2 dark:bg-dark-bg-2",
         textClass = "text-light-tx dark:text-dark-tx",
         borderClass = "border-light-ui-2 dark:border-dark-ui-2",
         hoverClass = "hover:bg-light-ui-3 dark:hover:bg-dark-ui-3",
     } = $props();
+
+    // Hintergrundfarbe
+    //let bgClass = $page.data.headerColor ?? "bg-light-bg-2 dark:bg-dark-bg-2";
 
     // Abgeleiteter Titel
     let title = $derived($pageTitle || ($page.data.title ?? ""));
