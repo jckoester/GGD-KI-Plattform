@@ -14,6 +14,8 @@
         FileQuestionMark,
         TriangleAlert,
         ChartNoAxesCombined,
+        ChartColumn,
+        ReceiptEuro,
         ShieldCheck,
         BarChart2,
         PiggyBank,
@@ -252,7 +254,7 @@
                         Statistiken
                     </span>
                 </button>
-                <!--<button
+                <button
                     onclick={() => {
                         toggleOpenSection("statistics");
                     }}
@@ -264,10 +266,39 @@
                             <ChevronRight class="w-4 h-4" />
                         {/if}
                     </span>
-                </button>-->
+                </button>
             </div>
         </div>
-
+        {#if openSection === "statistics"}
+            <div class="mt-1 space-y-1 pl-2">
+                <button
+                    onclick={() => goto(`/statistik/anzahl_prompts`)}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <div class="flex justify-between items-center">
+                        <span class="flex items-center gap-2">
+                            <ChartColumn class="w-4 h4" />
+                            Anzahl Prompts
+                        </span>
+                    </div>
+                </button>
+            </div>
+            <div class="mt-1 space-y-1 pl-2">
+                <button
+                    onclick={() => goto(`/statistik/kosten`)}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <div class="flex justify-between items-center">
+                        <span class="flex items-center gap-2">
+                            <ReceiptEuro class="w-4 h4" />
+                            Kosten
+                        </span>
+                    </div>
+                </button>
+            </div>
+        {/if}
         <!--Budget-->
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
             <div
