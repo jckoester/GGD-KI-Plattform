@@ -100,7 +100,7 @@
                 <button
                     onclick={() => {
                         toggleOpenSection("settings");
-                        goto("/admin");
+                        goto("/settings");
                     }}
                 >
                     <span class="flex items-center gap-2">
@@ -135,7 +135,7 @@
         {#if openSection === "settings" || openSection === "settings-texts"}
             <div class="mt-1 space-y-1 pl-2">
                 <button
-                    onclick={() => goto(`/settings`)}
+                    onclick={() => goto(`/settings/models`)}
                     class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                            hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                 >

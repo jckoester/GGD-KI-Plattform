@@ -211,3 +211,20 @@ export async function* streamChat(messages, conversationId = null, modelId = nul
     }
   }
 }
+
+export async function getModelMatrix() {
+  const res = await fetch(`${BASE}/admin/models/matrix`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { models, teams, allowlists }
+}
+
+export async function saveModelMatrix(allowlists) {
+  const res = await fetch(`${BASE}/admin/models/matrix`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ allowlists }),
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}

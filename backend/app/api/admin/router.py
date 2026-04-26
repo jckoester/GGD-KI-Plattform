@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends
 from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+from app.api.admin.models import router as models_router
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+router.include_router(models_router)
 
 
 @router.get("/ping")

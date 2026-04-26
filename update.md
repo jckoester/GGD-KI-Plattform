@@ -4,6 +4,24 @@ Hinweise und Fallstricke beim Aktualisieren der Plattform-Komponenten.
 
 ---
 
+## Modell-Freischaltung (Admin-Matrix)
+
+### Leere Allowlist = alle Modelle freigegeben
+
+LiteLLM interpretiert eine leere `models`-Liste bei einem Team als **keine Einschränkung** — nicht als „kein Modell erlaubt". Ein Team mit leerer Allowlist kann damit alle im Proxy konfigurierten Modelle nutzen.
+
+**Konsequenz:** Neu angelegte Teams (z. B. nach dem Erstellen der LiteLLM-Teams per `create_litellm_teams.py`) haben standardmäßig Zugriff auf alle Modelle, bis ein Admin in der Modell-Freischaltungsmatrix (`/admin`) explizit Werte setzt.
+
+**Empfohlene Vorgehensweise nach dem Ersteinrichten:**
+
+1. Als Admin `/admin` aufrufen.
+2. Für **jedes** Team mindestens ein Modell aktivieren — auch wenn es das einzige verfügbare ist.
+3. Speichern. Erst danach sind die Allowlists in LiteLLM gesetzt und wirksam.
+
+Ein Team, das bewusst keinen Modellzugriff haben soll, muss trotzdem im Budget oder über andere Maßnahmen eingeschränkt werden — eine leere Allowlist genügt dafür nicht.
+
+---
+
 ## LiteLLM
 
 ### Nach jedem LiteLLM-Update

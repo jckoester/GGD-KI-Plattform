@@ -245,3 +245,98 @@ async def test_delete_key_raises_on_unexpected_status():
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         with pytest.raises(RuntimeError):
             await client.delete_key("sk-abc123")
+
+
+@pytest.mark.asyncio
+async def test_get_team_info_returns_models():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"team_id": "jahrgang-5", "models": ["gpt-4o-mini"]}
+    http_client.get = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        result = await client.get_team_info("jahrgang-5")
+
+    assert result == {"team_id": "jahrgang-5", "models": ["gpt-4o-mini"]}
+    call_args = http_client.get.await_args
+    assert call_args.args[0].endswith("/team/info")
+    assert call_args.kwargs["params"]["team_id"] == "jahrgang-5"
+
+
+@pytest.mark.asyncio
+async def test_get_team_info_returns_none_on_404():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 404
+    response.text = "not found"
+    http_client.get = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        result = await client.get_team_info("nonexistent-team")
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_team_info_returns_empty_list_for_missing_models_field():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"team_id": "jahrgang-5"}
+    http_client.get = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        result = await client.get_team_info("jahrgang-5")
+
+    assert result == {"team_id": "jahrgang-5"}
+
+
+@pytest.mark.asyncio
+async def test_update_team_models_calls_correct_payload():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.text = ""
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.update_team_models("jahrgang-7", ["gpt-4o-mini", "gpt-3.5-turbo"])
+
+    call_args = http_client.post.await_args
+    assert call_args.args[0].endswith("/team/update")
+    assert call_args.kwargs["json"] == {
+        "team_id": "jahrgang-7",
+        "models": ["gpt-4o-mini", "gpt-3.5-turbo"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_team_models_accepts_201_as_success():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 201
+    response.text = ""
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.update_team_models("lehrkraefte", ["gpt-4"])
+
+
+@pytest.mark.asyncio
+async def test_update_team_models_raises_on_unexpected_status():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 500
+    response.text = "internal error"
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(RuntimeError):
+            await client.update_team_models("jahrgang-8", ["gpt-4"])

@@ -286,6 +286,52 @@ class LiteLLMClient:
             return payload
         return []
 
+    async def get_team_info(self, team_id: str) -> dict | None:
+        """
+        GET /team/info?team_id={team_id}.
+        Gibt das Team-Objekt zurück; None bei 404.
+        Das Feld 'models' im Response enthält die Allowlist (list[str]).
+        Fehlt es oder ist es None, wird [] zurückgegeben.
+        """
+        client = await self._get_client()
+        response = await client.get(
+            f"{self.base_url}/team/info",
+            headers={"Authorization": f"Bearer {self.master_key}"},
+            params={"team_id": team_id},
+        )
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            logger.error(
+                "LiteLLM get_team_info fehlerhaft: status=%d, team=%s, body=%s",
+                response.status_code, team_id, response.text,
+            )
+            raise RuntimeError(f"Failed to get team info for {team_id}: {response.text}")
+        data = response.json()
+        return data.get("team_info", data)
+
+    async def update_team_models(self, team_id: str, models: list[str]) -> None:
+        """
+        POST /team/update - setzt die Allowlist des Teams.
+        """
+        client = await self._get_client()
+        payload = {"team_id": team_id, "models": models}
+        response = await client.post(
+            f"{self.base_url}/team/update",
+            headers={
+                "Authorization": f"Bearer {self.master_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        if response.status_code not in (200, 201):
+            logger.error(
+                "LiteLLM update_team_models fehlerhaft: status=%d, team=%s, body=%s",
+                response.status_code, team_id, response.text,
+            )
+            raise RuntimeError(f"Failed to update team models for {team_id}: {response.text}")
+        logger.info("LiteLLM-Team %s Allowlist aktualisiert: %s", team_id, models)
+
     async def add_team_member(self, team_id: str, pseudonym: str) -> None:
         """
         POST /team/member_add.
