@@ -142,6 +142,7 @@ async def test_create_team_calls_expected_endpoint_and_payload():
     assert call_args.kwargs["json"] == {
         "team_id": "jahrgang-7",
         "team_alias": "jahrgang-7",
+        "models": ["no-default-models"],
     }
 
 

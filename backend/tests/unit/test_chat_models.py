@@ -80,6 +80,7 @@ def test_get_models_success():
     with patch("app.chat.router.LiteLLMClient") as client_cls:
         client = AsyncMock()
         client.list_models.return_value = ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]
+        client.get_team_info.return_value = {"models": ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]}
         client.close.return_value = None
         client_cls.return_value = client
 

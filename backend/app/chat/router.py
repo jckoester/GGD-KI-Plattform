@@ -21,6 +21,7 @@ from app.chat.schemas import ChatRequest
 from app.db.models import Conversation, Message, PseudonymAudit
 from app.db.session import get_db, AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
+from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 
 
 class ConversationItem(BaseModel):
@@ -68,6 +69,20 @@ router = APIRouter(tags=["chat"])
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
 _SPEND_LOG_DELAY: float = settings.spend_log_delay
+
+
+def _team_id_for_user(payload: JwtPayload) -> str | None:
+    """
+    Leitet die Team-ID aus dem JWT-Payload ab.
+    Admin: None (kein Filter), Teacher: TEACHER_TEAM_ID, Student: jahrgang-{grade}
+    """
+    if "admin" in payload.roles:
+        return None  # kein Filter
+    if "teacher" in payload.roles:
+        return TEACHER_TEAM_ID
+    if "student" in payload.roles:
+        return f"{STUDENT_TEAM_PREFIX}{payload.grade}"
+    return None  # Fallback: kein Team
 
 
 def make_title(text: str) -> str:
@@ -338,18 +353,44 @@ async def chat(
 async def list_models(
     current_user: JwtPayload = Depends(get_current_user),
 ) -> ModelListResponse:
-    _ = current_user
     client = LiteLLMClient()
     try:
-        model_ids = await client.list_models()
+        all_models = await client.list_models()
     except Exception as exc:
         logger.error("LiteLLM /models nicht erreichbar (%s): %s", type(exc).__name__, exc)
         raise HTTPException(status_code=502, detail="LiteLLM Proxy nicht erreichbar")
-    finally:
-        await client.close()
+
+    team_id = _team_id_for_user(current_user)
+    if team_id is not None:
+        # Team-basierte Filterung für nicht-Admin-Nutzer
+        try:
+            info = await client.get_team_info(team_id)
+        except Exception:
+            logger.error("get_team_info fehlgeschlagen für %s — ungefilterte Modelle", team_id)
+            # Fallback: alle Modelle zurückgeben, kein Hard-Fail
+            filtered_models = all_models
+        else:
+            if info is None:
+                # Team existiert nicht in LiteLLM → alle Modelle zurückgeben
+                filtered_models = all_models
+            else:
+                allowlist = info.get("models") or []
+
+                if not allowlist or allowlist == ["no-default-models"]:
+                    # Kein Modell erlaubt oder explizit gesperrt
+                    filtered_models = []
+                else:
+                    # Nur Modelle in der Allowlist zurückgeben
+                    allowlist_set = set(allowlist)
+                    filtered_models = [m for m in all_models if m in allowlist_set]
+    else:
+        # Admin: alle Modelle
+        filtered_models = all_models
+
+    await client.close()
 
     return ModelListResponse(
-        models=[ModelItem(id=model_id) for model_id in model_ids],
+        models=[ModelItem(id=model_id) for model_id in filtered_models],
         default_model=settings.chat_default_model,
     )
 

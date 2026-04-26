@@ -241,6 +241,7 @@ class LiteLLMClient:
         payload = {
             "team_id": team_id,
             "team_alias": team_id,
+            "models": ["no-default-models"],
         }
 
         response = await client.post(url, headers=headers, json=payload)
