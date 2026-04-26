@@ -228,3 +228,17 @@ export async function saveModelMatrix(allowlists) {
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
 }
+
+export async function getHeatmap() {
+  const res = await fetch(`${BASE}/admin/stats/heatmap`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+  // { week_start, week_end, cells: [{dow, hour, count}], team_id }
+}
+
+export async function getSpend() {
+  const res = await fetch(`${BASE}/admin/stats/spend`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+  // { entries: [{period, usd, eur}], total_usd, total_eur, eur_usd_rate, team_id }
+}
