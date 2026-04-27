@@ -12,7 +12,7 @@ from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.db.models import ExchangeRate
 from app.db.session import get_db
-from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX
+from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX, VALID_GRADES
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["admin-stats"])
@@ -46,6 +46,23 @@ class SpendResponse(BaseModel):
     total_eur: float
     eur_usd_rate: float
     team_id: str | None
+
+
+class TeamOption(BaseModel):
+    id: str
+    label: str
+
+
+@router.get("/teams", response_model=list[TeamOption])
+async def get_stats_teams(
+    _: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
+) -> list[TeamOption]:
+    options = [
+        TeamOption(id=f"{STUDENT_TEAM_PREFIX}{g}", label=f"Jahrgang {g}")
+        for g in sorted(VALID_GRADES)
+    ]
+    options.append(TeamOption(id=TEACHER_TEAM_ID, label="Lehrkräfte"))
+    return options
 
 
 def _team_conditions(team_id: str | None) -> list[tuple[str, str | int]]:

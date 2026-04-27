@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { getHeatmap } from "$lib/api.js";
+    import { getHeatmap, getStatsTeams } from "$lib/api.js";
     import {
         ArrowLeft,
         ChartColumn,
@@ -13,6 +13,8 @@
     let data = $state(null);
     let loading = $state(true);
     let error = $state(null);
+    let teams = $state([]);
+    let selectedTeam = $state(null);
 
     // Einmal berechnet, nicht per Zelle
     let maxCount = $derived(
@@ -28,14 +30,21 @@
         return `${fmt(start)} – ${fmt(end)}${y}`;
     }
 
-    onMount(async () => {
+    async function reload() {
+        loading = true;
+        error = null;
         try {
-            data = await getHeatmap();
+            data = await getHeatmap(selectedTeam);
         } catch (e) {
             error = e.message;
         } finally {
             loading = false;
         }
+    }
+
+    onMount(async () => {
+        const [teamsData] = await Promise.all([getStatsTeams(), reload()]);
+        teams = teamsData;
     });
 </script>
 
@@ -62,6 +71,34 @@
             </span>
         {/if}
     </div>
+
+    {#if teams.length > 0}
+        <div class="flex items-center gap-2 text-sm">
+            <label
+                for="team-select"
+                class="text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+            >
+                Team:
+            </label>
+            <select
+                id="team-select"
+                value={selectedTeam ?? ""}
+                onchange={(e) => {
+                    selectedTeam = e.target.value || null;
+                    reload();
+                }}
+                class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                 bg-light-ui dark:bg-dark-ui
+                 text-light-tx dark:text-dark-tx
+                 px-2 py-1 text-sm min-w-[10rem]"
+            >
+                <option value="">Alle Teams</option>
+                {#each teams as t}
+                    <option value={t.id}>{t.label}</option>
+                {/each}
+            </select>
+        </div>
+    {/if}
 
     {#if error}
         <div

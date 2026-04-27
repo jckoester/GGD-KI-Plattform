@@ -229,16 +229,26 @@ export async function saveModelMatrix(allowlists) {
   return res.json()
 }
 
-export async function getHeatmap() {
-  const res = await fetch(`${BASE}/admin/stats/heatmap`, { credentials: 'include' })
+export async function getHeatmap(teamId = null) {
+  const url = new URL(`${BASE}/admin/stats/heatmap`, location.href)
+  if (teamId) url.searchParams.set('team_id', teamId)
+  const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
   // { week_start, week_end, cells: [{dow, hour, count}], team_id }
 }
 
-export async function getSpend() {
-  const res = await fetch(`${BASE}/admin/stats/spend`, { credentials: 'include' })
+export async function getSpend(teamId = null) {
+  const url = new URL(`${BASE}/admin/stats/spend`, location.href)
+  if (teamId) url.searchParams.set('team_id', teamId)
+  const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
   // { entries: [{period, usd, eur}], total_usd, total_eur, eur_usd_rate, team_id }
+}
+
+export async function getStatsTeams() {
+  const res = await fetch(`${BASE}/admin/stats/teams`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // TeamOption[]  { id, label }
 }
