@@ -29,16 +29,22 @@ def _load_budget_tiers() -> dict:
     return _budget_tiers_cache
 
 
+def invalidate_budget_tiers_cache() -> None:
+    """Invalidiert den Cache für Budget-Tiers. Wird nach YAML-Änderungen aufgerufen."""
+    global _budget_tiers_cache
+    _budget_tiers_cache = None
+
+
 def get_budget_for(roles: list[str], grade: Optional[int]) -> tuple[Optional[float], str]:
     """
     Gibt (max_budget_eur, budget_duration) zurück.
-
+    
     Logik:
     - Wenn "teacher" in roles → Lehrer-Budget (gilt auch für teacher+admin)
-    - Wenn "student" in roles → Tier aus tiers anhand grade
-    - Keine Rolle erkannt → niedrigstes Tier als sicherer Fallback
+    - Wenn "student" in roles → Budget aus grades-Dict anhand grade
+    - Keine Rolle erkannt → niedrigstes Budget als sicherer Fallback
     """
-    tiers_config = _load_budget_tiers()
+    config = _load_budget_tiers()
 
     # grade kann als String ankommen (z.B. aus SSO-Claims) — normalisieren
     if grade is not None:
@@ -46,37 +52,37 @@ def get_budget_for(roles: list[str], grade: Optional[int]) -> tuple[Optional[flo
             grade = int(grade)
         except (ValueError, TypeError):
             grade = None
-    
+
     # Lehrer (inkl. teacher+admin, teacher+budget, etc.)
     if "teacher" in roles:
-        teacher_config = tiers_config.get("roles", {}).get("teacher", {})
+        teacher_config = config.get("roles", {}).get("teacher", {})
         max_budget = teacher_config.get("max_budget_eur")
         duration = teacher_config.get("budget_duration", "1mo")
         return (max_budget, duration)
-    
-    # Schüler - Suche passendes Tier anhand grade
+
+    # Schüler - direkte Grade-Lookup
     if "student" in roles and grade is not None:
-        tiers = tiers_config.get("tiers", [])
-        for tier in tiers:
-            if grade in tier.get("grades", []):
-                return (tier.get("max_budget_eur"), tier.get("budget_duration", "1mo"))
+        grade_config = config.get("grades", {}).get(grade)
+        if grade_config:
+            return (grade_config.get("max_budget_eur"), grade_config.get("budget_duration", "1mo"))
         
-        # Kein passender Tier gefunden - niedrigstes Tier als Fallback
-        if tiers:
-            lowest_tier = min(tiers, key=lambda t: min(t.get("grades", [999])))
+        # Fallback: niedrigstes konfiguriertes Jahrgangsbudget
+        grades = config.get("grades", {})
+        if grades:
+            lowest = grades[min(grades.keys())]
             logger.warning(
-                "Kein Budget-Tier für grade=%s gefunden. Verwende Fallback: %s",
-                grade, lowest_tier.get("name", "unknown")
+                "Kein Budget für grade=%s, Fallback auf Jahrgang %s",
+                grade, min(grades.keys())
             )
-            return (lowest_tier.get("max_budget_eur"), lowest_tier.get("budget_duration", "1mo"))
-    
-    # Fallback: niedrigstes Tier
-    tiers = tiers_config.get("tiers", [])
-    if tiers:
-        lowest_tier = min(tiers, key=lambda t: min(t.get("grades", [999])))
-        logger.warning("Keine bekannte Rolle in %s. Verwende Fallback-Tier: %s", roles, lowest_tier.get("name", "unknown"))
-        return (lowest_tier.get("max_budget_eur"), lowest_tier.get("budget_duration", "1mo"))
-    
+            return (lowest.get("max_budget_eur"), lowest.get("budget_duration", "1mo"))
+
+    # Fallback: niedrigstes Budget aus grades
+    grades = config.get("grades", {})
+    if grades:
+        lowest = grades[min(grades.keys())]
+        logger.warning("Keine bekannte Rolle in %s. Verwende Fallback-Jahrgang: %s", roles, min(grades.keys()))
+        return (lowest.get("max_budget_eur"), lowest.get("budget_duration", "1mo"))
+
     # Letzter Fallback
-    logger.error("Keine Budget-Tiers konfiguriert und keine Rolle erkannt für roles=%s, grade=%s", roles, grade)
+    logger.error("Kein Budget ermittelbar für roles=%s grade=%s", roles, grade)
     return (1.00, "1mo")

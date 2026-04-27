@@ -270,3 +270,22 @@ export async function getStatsModels() {
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // string[]
 }
+
+export async function getBudgetGrades() {
+  const res = await fetch(`${BASE}/admin/budgets/grades`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+  // { grades: [{key, label, grade, max_budget_eur, budget_duration, user_count}], eur_usd_rate }
+}
+
+export async function saveBudgetGrades(grades) {
+  // grades: [{key, max_budget_eur}]
+  const res = await fetch(`${BASE}/admin/budgets/grades`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grades }),
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { ok, updated_users }
+}
