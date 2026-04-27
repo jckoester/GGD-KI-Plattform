@@ -8,6 +8,14 @@
         CircleX,
     } from "lucide-svelte";
 
+    function toDateString(d) {
+        return d.toLocaleDateString('sv-SE')
+    }
+
+    const today = new Date()
+    const defaultFrom = new Date(today)
+    defaultFrom.setDate(today.getDate() - 90)
+
     let data = $state(null);
     let loading = $state(true);
     let reloading = $state(false);
@@ -16,6 +24,9 @@
     let selectedTeam = $state(null);
     let models = $state([]);
     let selectedModel = $state(null);
+    let fromDate = $state(toDateString(defaultFrom))
+    let toDate = $state(toDateString(today))
+    let granularity = $state('month')
 
     let canvas = $state(null);
     let chart = null;
@@ -23,13 +34,13 @@
 
     async function reload() {
         if (chart) {
-            reloading = true;   // Canvas bleibt im DOM, Overlay erscheint
+            reloading = true;
         } else {
-            loading = true;     // Erster Ladevorgang: voller Spinner
+            loading = true;
         }
         error = null;
         try {
-            data = await getSpend(selectedTeam, selectedModel);
+            data = await getSpend(selectedTeam, selectedModel, fromDate, toDate, granularity);
         } catch (e) {
             error = e.message;
             loading = false;
@@ -199,6 +210,59 @@
         {/if}
       </div>
     {/if}
+
+    <!-- Zeitraum-Filter -->
+    <div class="flex flex-wrap items-center gap-4 text-sm">
+      <div class="flex items-center gap-2">
+        <label for="from-date"
+               class="text-light-tx-2 dark:text-dark-tx-2 shrink-0">Von:</label>
+        <input
+          id="from-date"
+          type="date"
+          bind:value={fromDate}
+          max={toDate}
+          onchange={() => { if (fromDate <= toDate) reload() }}
+          class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                 bg-light-ui dark:bg-dark-ui
+                 text-light-tx dark:text-dark-tx
+                 px-2 py-1 text-sm"
+        />
+      </div>
+
+      <div class="flex items-center gap-2">
+        <label for="to-date"
+               class="text-light-tx-2 dark:text-dark-tx-2 shrink-0">Bis:</label>
+        <input
+          id="to-date"
+          type="date"
+          bind:value={toDate}
+          min={fromDate}
+          onchange={() => { if (fromDate <= toDate) reload() }}
+          class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                 bg-light-ui dark:bg-dark-ui
+                 text-light-tx dark:text-dark-tx
+                 px-2 py-1 text-sm"
+        />
+      </div>
+
+      <div class="flex items-center gap-2">
+        <label for="granularity-select"
+               class="text-light-tx-2 dark:text-dark-tx-2 shrink-0">Ansicht:</label>
+        <select
+          id="granularity-select"
+          bind:value={granularity}
+          onchange={reload}
+          class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                 bg-light-ui dark:bg-dark-ui
+                 text-light-tx dark:text-dark-tx
+                 px-2 py-1 text-sm min-w-[7rem]"
+        >
+          <option value="month">Monat</option>
+          <option value="week">Woche</option>
+          <option value="day">Tag</option>
+        </select>
+      </div>
+    </div>
 
     {#if error}
         <div

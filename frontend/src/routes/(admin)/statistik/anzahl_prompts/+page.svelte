@@ -4,6 +4,8 @@
     import {
         ArrowLeft,
         ChartColumn,
+        ChevronLeft,
+        ChevronRight,
         LoaderCircle,
         CircleX,
     } from "lucide-svelte";
@@ -17,6 +19,7 @@
     let selectedTeam = $state(null);
     let models = $state([]);
     let selectedModel = $state(null);
+    let weekOffset = $state(0);
 
     // Einmal berechnet, nicht per Zelle
     let maxCount = $derived(
@@ -36,7 +39,7 @@
         loading = true;
         error = null;
         try {
-            data = await getHeatmap(selectedTeam, selectedModel);
+            data = await getHeatmap(selectedTeam, selectedModel, weekOffset);
         } catch (e) {
             error = e.message;
         } finally {
@@ -72,11 +75,49 @@
             <ChartColumn class="w-6 h-6" />
             <h1 class="text-2xl font-semibold">Anzahl Prompts</h1>
         </div>
-        {#if data}
-            <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                {formatWeek(data.week_start, data.week_end)}
+
+        <!-- Wochennavigation -->
+        <div class="flex items-center gap-1">
+            <button
+                onclick={() => { weekOffset -= 1; reload() }}
+                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                       text-light-tx-2 dark:text-dark-tx-2 transition-colors"
+                title="Vorherige Woche"
+            >
+                <ChevronLeft class="w-4 h-4" />
+            </button>
+
+            <span class="px-2 text-sm text-light-tx-2 dark:text-dark-tx-2 min-w-[11rem] text-center">
+                {#if data}
+                    {formatWeek(data.week_start, data.week_end)}
+                {:else}
+                    …
+                {/if}
             </span>
-        {/if}
+
+            <button
+                onclick={() => { weekOffset += 1; reload() }}
+                disabled={weekOffset >= 0}
+                class="p-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                       text-light-tx-2 dark:text-dark-tx-2 transition-colors
+                       disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Nächste Woche"
+            >
+                <ChevronRight class="w-4 h-4" />
+            </button>
+
+            {#if weekOffset < 0}
+                <button
+                    onclick={() => { weekOffset = 0; reload() }}
+                    class="ml-1 px-2 py-0.5 rounded text-xs
+                           border border-light-tx-2 dark:border-dark-tx-2
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    Heute
+                </button>
+            {/if}
+        </div>
     </div>
 
     {#if teams.length > 0 || models.length > 0}

@@ -229,20 +229,30 @@ export async function saveModelMatrix(allowlists) {
   return res.json()
 }
 
-export async function getHeatmap(teamId = null, model = null) {
+export async function getHeatmap(teamId = null, model = null, weekOffset = 0) {
   const url = new URL(`${BASE}/admin/stats/heatmap`, location.href)
   if (teamId) url.searchParams.set('team_id', teamId)
   if (model) url.searchParams.set('model', model)
+  if (weekOffset) url.searchParams.set('week_offset', weekOffset)
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
   // { week_start, week_end, cells: [{dow, hour, count}], team_id, model }
 }
 
-export async function getSpend(teamId = null, model = null) {
+export async function getSpend(
+  teamId = null,
+  model = null,
+  fromDate = null,
+  toDate = null,
+  granularity = null,
+) {
   const url = new URL(`${BASE}/admin/stats/spend`, location.href)
   if (teamId) url.searchParams.set('team_id', teamId)
   if (model) url.searchParams.set('model', model)
+  if (fromDate) url.searchParams.set('from_date', fromDate)
+  if (toDate) url.searchParams.set('to_date', toDate)
+  if (granularity) url.searchParams.set('granularity', granularity)
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
