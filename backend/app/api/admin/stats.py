@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role
@@ -32,6 +32,7 @@ class HeatmapResponse(BaseModel):
     week_end: date
     cells: list[HeatmapCell]
     team_id: str | None
+    model: str | None
 
 
 class SpendEntry(BaseModel):
@@ -46,6 +47,7 @@ class SpendResponse(BaseModel):
     total_eur: float
     eur_usd_rate: float
     team_id: str | None
+    model: str | None
 
 
 class TeamOption(BaseModel):
@@ -63,6 +65,17 @@ async def get_stats_teams(
     ]
     options.append(TeamOption(id=TEACHER_TEAM_ID, label="Lehrkräfte"))
     return options
+
+
+@router.get("/models", response_model=list[str])
+async def get_stats_models(
+    _: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> list[str]:
+    result = await db.execute(
+        text("SELECT DISTINCT model_used FROM conversations ORDER BY model_used")
+    )
+    return [row[0] for row in result.fetchall()]
 
 
 def _team_conditions(team_id: str | None) -> list[tuple[str, str | int]]:
@@ -112,6 +125,7 @@ def _format_period(period_dt: datetime, granularity: Literal["month", "week", "d
 async def get_heatmap(
     week_offset: int = 0,
     team_id: str | None = None,
+    model: str | None = None,
     _: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
     db: AsyncSession = Depends(get_db),
 ) -> HeatmapResponse:
@@ -129,6 +143,11 @@ async def get_heatmap(
     team_where, team_params = _build_team_where(team_id, params)
     params.update(team_params)
 
+    model_where = ""
+    if model:
+        model_where = " AND c.model_used = :model"
+        params["model"] = model
+
     sql = f"""
         SELECT
             (EXTRACT(DOW FROM m.created_at AT TIME ZONE 'Europe/Berlin')::int + 6) % 7 AS dow,
@@ -141,12 +160,12 @@ async def get_heatmap(
           AND m.created_at >= :from_utc
           AND m.created_at <= :to_utc
           {team_where}
+          {model_where}
         GROUP BY dow, hour
         ORDER BY dow, hour
     """
 
     try:
-        from sqlalchemy import text
         result = await db.execute(text(sql), params)
         rows = result.fetchall()
     except Exception:
@@ -159,6 +178,7 @@ async def get_heatmap(
         week_end=week_end,
         cells=cells,
         team_id=team_id,
+        model=model,
     )
 
 
@@ -167,6 +187,7 @@ async def get_spend(
     from_date: date | None = None,
     to_date: date | None = None,
     team_id: str | None = None,
+    model: str | None = None,
     granularity: Literal["month", "week", "day"] = "month",
     _: JwtPayload = Depends(require_any_role(["statistics", "admin"])),
     db: AsyncSession = Depends(get_db),
@@ -193,6 +214,11 @@ async def get_spend(
     team_where, team_params = _build_team_where(team_id, params)
     params.update(team_params)
 
+    model_where = ""
+    if model:
+        model_where = " AND c.model_used = :model"
+        params["model"] = model
+
     sql = f"""
         SELECT
             DATE_TRUNC('{granularity}', m.created_at AT TIME ZONE 'Europe/Berlin') AS period,
@@ -205,12 +231,12 @@ async def get_spend(
           AND m.created_at >= :from_utc
           AND m.created_at <= :to_utc
           {team_where}
+          {model_where}
         GROUP BY period
         ORDER BY period
     """
 
     try:
-        from sqlalchemy import text
         result = await db.execute(text(sql), params)
         rows = result.fetchall()
     except Exception:
@@ -237,4 +263,5 @@ async def get_spend(
         total_eur=round(total_eur, 6),
         eur_usd_rate=rate,
         team_id=team_id,
+        model=model,
     )

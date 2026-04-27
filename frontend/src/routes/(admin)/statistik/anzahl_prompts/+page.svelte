@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { getHeatmap, getStatsTeams } from "$lib/api.js";
+    import { getHeatmap, getStatsTeams, getStatsModels } from "$lib/api.js";
     import {
         ArrowLeft,
         ChartColumn,
@@ -15,6 +15,8 @@
     let error = $state(null);
     let teams = $state([]);
     let selectedTeam = $state(null);
+    let models = $state([]);
+    let selectedModel = $state(null);
 
     // Einmal berechnet, nicht per Zelle
     let maxCount = $derived(
@@ -34,7 +36,7 @@
         loading = true;
         error = null;
         try {
-            data = await getHeatmap(selectedTeam);
+            data = await getHeatmap(selectedTeam, selectedModel);
         } catch (e) {
             error = e.message;
         } finally {
@@ -43,8 +45,13 @@
     }
 
     onMount(async () => {
-        const [teamsData] = await Promise.all([getStatsTeams(), reload()]);
+        const [teamsData, modelsData] = await Promise.all([
+            getStatsTeams(),
+            getStatsModels(),
+            reload(),
+        ]);
         teams = teamsData;
+        models = modelsData;
     });
 </script>
 
@@ -72,31 +79,63 @@
         {/if}
     </div>
 
-    {#if teams.length > 0}
-        <div class="flex items-center gap-2 text-sm">
-            <label
-                for="team-select"
-                class="text-light-tx-2 dark:text-dark-tx-2 shrink-0"
-            >
-                Team:
-            </label>
-            <select
-                id="team-select"
-                value={selectedTeam ?? ""}
-                onchange={(e) => {
-                    selectedTeam = e.target.value || null;
-                    reload();
-                }}
-                class="rounded border border-light-tx-2 dark:border-dark-tx-2
-                 bg-light-ui dark:bg-dark-ui
-                 text-light-tx dark:text-dark-tx
-                 px-2 py-1 text-sm min-w-[10rem]"
-            >
-                <option value="">Alle Teams</option>
-                {#each teams as t}
-                    <option value={t.id}>{t.label}</option>
-                {/each}
-            </select>
+    {#if teams.length > 0 || models.length > 0}
+        <div class="flex flex-wrap items-center gap-4 text-sm">
+            {#if teams.length > 0}
+                <div class="flex items-center gap-2">
+                    <label
+                        for="team-select"
+                        class="text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                    >
+                        Team:
+                    </label>
+                    <select
+                        id="team-select"
+                        value={selectedTeam ?? ''}
+                        onchange={(e) => {
+                            selectedTeam = e.target.value || null;
+                            reload();
+                        }}
+                        class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                               bg-light-ui dark:bg-dark-ui
+                               text-light-tx dark:text-dark-tx
+                               px-2 py-1 text-sm min-w-[10rem]"
+                    >
+                        <option value="">Alle Teams</option>
+                        {#each teams as t}
+                            <option value={t.id}>{t.label}</option>
+                        {/each}
+                    </select>
+                </div>
+            {/if}
+
+            {#if models.length > 0}
+                <div class="flex items-center gap-2">
+                    <label
+                        for="model-select"
+                        class="text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                    >
+                        Modell:
+                    </label>
+                    <select
+                        id="model-select"
+                        value={selectedModel ?? ''}
+                        onchange={(e) => {
+                            selectedModel = e.target.value || null;
+                            reload();
+                        }}
+                        class="rounded border border-light-tx-2 dark:border-dark-tx-2
+                               bg-light-ui dark:bg-dark-ui
+                               text-light-tx dark:text-dark-tx
+                               px-2 py-1 text-sm min-w-[10rem]"
+                    >
+                        <option value="">Alle Modelle</option>
+                        {#each models as m}
+                            <option value={m}>{m}</option>
+                        {/each}
+                    </select>
+                </div>
+            {/if}
         </div>
     {/if}
 

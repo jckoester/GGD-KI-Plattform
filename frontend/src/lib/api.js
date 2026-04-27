@@ -229,26 +229,34 @@ export async function saveModelMatrix(allowlists) {
   return res.json()
 }
 
-export async function getHeatmap(teamId = null) {
+export async function getHeatmap(teamId = null, model = null) {
   const url = new URL(`${BASE}/admin/stats/heatmap`, location.href)
   if (teamId) url.searchParams.set('team_id', teamId)
+  if (model) url.searchParams.set('model', model)
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
-  // { week_start, week_end, cells: [{dow, hour, count}], team_id }
+  // { week_start, week_end, cells: [{dow, hour, count}], team_id, model }
 }
 
-export async function getSpend(teamId = null) {
+export async function getSpend(teamId = null, model = null) {
   const url = new URL(`${BASE}/admin/stats/spend`, location.href)
   if (teamId) url.searchParams.set('team_id', teamId)
+  if (model) url.searchParams.set('model', model)
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
-  // { entries: [{period, usd, eur}], total_usd, total_eur, eur_usd_rate, team_id }
+  // { entries: [{period, usd, eur}], total_usd, total_eur, eur_usd_rate, team_id, model }
 }
 
 export async function getStatsTeams() {
   const res = await fetch(`${BASE}/admin/stats/teams`, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // TeamOption[]  { id, label }
+}
+
+export async function getStatsModels() {
+  const res = await fetch(`${BASE}/admin/stats/models`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // string[]
 }
