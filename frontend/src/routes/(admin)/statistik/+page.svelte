@@ -1,5 +1,5 @@
 <script>
-    import { Settings, ChartNoAxesCombined, ArrowLeft } from "lucide-svelte";
+    import { ChartNoAxesCombined, ChartColumn, ReceiptEuro, ArrowLeft } from "lucide-svelte";
 </script>
 
 <button
@@ -9,12 +9,35 @@
     <ArrowLeft class="w-4 h-4" /> Zurück
 </button>
 
-<div class="max-w-4xl mx-auto py-8">
+<div class="max-w-2xl mx-auto py-8">
     <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
         <ChartNoAxesCombined class="w-6 h-6" />
-        <h1 class="text-2xl font-semibold">Statistik</h1>
+        <h1 class="text-2xl font-semibold">Statistiken</h1>
     </div>
-    <p class="text-light-tx-2 dark:text-dark-tx-2">
-        Wird in Schritt 7d implementiert.
-    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <a
+            href="/statistik/anzahl_prompts"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <ChartColumn class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Anzahl Prompts</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Nutzungs-Heatmap nach Wochentag und Uhrzeit
+            </div>
+        </a>
+        <a
+            href="/statistik/kosten"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <ReceiptEuro class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Kosten</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Budgetverbrauch nach Zeitraum und Jahrgang
+            </div>
+        </a>
+    </div>
 </div>
