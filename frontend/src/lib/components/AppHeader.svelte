@@ -60,13 +60,5 @@
             syncPageTitle={true}
             buttonClasses=" hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         />
-    {:else}
-        <button
-            onclick={handleLogout}
-            class="text-sm {textClass} hover:text-light-tx dark:hover:text-dark-tx
-                   px-3 py-1.5 rounded-lg hover:bg-light-ui dark:hover:bg-dark-ui transition-colors"
-        >
-            <LogOut size={16} class="inline-block mr-1" />Abmelden
-        </button>
     {/if}
 </header>
