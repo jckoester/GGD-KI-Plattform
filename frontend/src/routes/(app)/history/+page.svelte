@@ -7,6 +7,7 @@
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { History, ArrowLeft } from "lucide-svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let conversations = $state([]);
     let loading = $state(true);
@@ -93,11 +94,7 @@
                 </div>
             </div>
         {:else if error}
-            <div
-                class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 mb-4"
-            >
-                {error}
-            </div>
+            <ErrorBanner message={error} />
         {:else if conversations.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
                 <p class="text-lg">Noch keine Chats gespeichert.</p>

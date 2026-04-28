@@ -4,7 +4,7 @@
     import { goto } from "$app/navigation";
     import { getSiteText, saveSiteText } from "$lib/api.js";
     import { renderMarkdown } from "$lib/markdown.js";
-    import { CircleX } from "lucide-svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     const VALID_KEYS = ["impressum", "datenschutz", "hilfe", "regeln"];
     const LABELS = {
@@ -93,17 +93,7 @@
         <h1 class="text-2xl font-semibold">Site-Texte bearbeiten</h1>
     </div>
 
-    {#if error}
-        <div
-            class="flex items-center gap-3 p-4 rounded border
-                bg-light-re-2 dark:bg-dark-re-2
-                border-light-re dark:border-dark-re
-                text-dark-tx dark:text-light-tx mb-4"
-        >
-            <CircleX class="w-5 h-5 shrink-0" />
-            <span class="text-sm">{error}</span>
-        </div>
-    {/if}
+    {#if error}<ErrorBanner message={error} />{/if}
 
     <!-- Tabs -->
     <div

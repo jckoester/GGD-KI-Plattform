@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
     import { PiggyBank, ArrowLeft, LoaderCircle, CircleX } from 'lucide-svelte';
+    import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 
     let data = $state(null);           // BudgetGradesResponse
     let loading = $state(true);
@@ -106,9 +107,7 @@
     </div>
 
     {#if error}
-        <div class="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-6">
-            Fehler: {error}
-        </div>
+        <ErrorBanner message={error} />
     {:else if loading}
         <div class="flex justify-center items-center h-64">
             <LoaderCircle class="w-8 h-8 animate-spin" />
@@ -246,12 +245,7 @@
                 Änderungen werden sofort auf alle bestehenden Nutzer angewendet.
             </p>
 
-            {#if saveError}
-                <div class="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded">
-                    <CircleX class="w-4 h-4 inline-block mr-1" />
-                    {saveError}
-                </div>
-            {/if}
+            {#if saveError}<ErrorBanner message={saveError} />{/if}
 
             <div class="flex gap-3 justify-end">
                 <button

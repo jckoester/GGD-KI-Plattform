@@ -1,14 +1,9 @@
 <script>
     import { onMount } from "svelte";
     import { getModelMatrix, saveModelMatrix } from "$lib/api.js";
-    import {
-        CloudCog,
-        Info,
-        TriangleAlert,
-        LoaderCircle,
-        CircleX,
-        Save,
-    } from "lucide-svelte";
+    import { CloudCog, Info, TriangleAlert, Save } from "lucide-svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import LoadingBanner from "$lib/components/LoadingBanner.svelte";
 
     let matrix = $state(null); // { models, teams, allowlists }
     let dirty = $state({}); // { team_id: Set<model_id> } — lokale Änderungen
@@ -83,32 +78,11 @@
         </span>
     </div>
     {#if error}
-        <div
-            class="flex items-center gap-4 bg-light-re-2 dark:bg-dark-re-2 border rounded border-light-re dark:border-dark-re text-dark-tx-2 dark:text-light-tx-2 p-4"
-        >
-            <CircleX class="w-4 h-4" />
-            <span class="text-sm">
-                {error}
-            </span>
-        </div>
+        <ErrorBanner message={error} />
     {:else if loading}
-        <div
-            class="flex items-center gap-4 border-light-tx-2 dark:border-dark-tx-2 border-text-light-tx-2 dark:text-dark-tx-2 p-4 border rounded bg-light-bg dark:bg-light-bg-2"
-        >
-            <LoaderCircle class="w-5 h-5 animate-spin" />
-            <span>Lädt…</span>
-        </div>
+        <LoadingBanner />
     {:else}
-        {#if saveError}
-            <div
-                class="flex items-center gap-4 bg-light-re-2 dark:bg-dark-re-2 border rounded border-light-re dark:border-dark-re text-dark-tx-2 dark:text-light-tx-2 p-4"
-            >
-                <CircleX class="w-4 h-4" />
-                <span class="text-sm">
-                    {saveError}
-                </span>
-            </div>
-        {/if}
+        {#if saveError}<ErrorBanner message={saveError} />{/if}
 
         <button
             onclick={save}

@@ -1,14 +1,9 @@
 <script>
     import { onMount } from "svelte";
     import { getHeatmap, getStatsTeams, getStatsModels } from "$lib/api.js";
-    import {
-        ArrowLeft,
-        ChartColumn,
-        ChevronLeft,
-        ChevronRight,
-        LoaderCircle,
-        CircleX,
-    } from "lucide-svelte";
+    import { ArrowLeft, ChartColumn, ChevronLeft, ChevronRight } from "lucide-svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import LoadingBanner from "$lib/components/LoadingBanner.svelte";
 
     const DAY_NAMES = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
@@ -181,25 +176,9 @@
     {/if}
 
     {#if error}
-        <div
-            class="flex items-center gap-3 p-4 rounded border
-                bg-light-re-2 dark:bg-dark-re-2
-                border-light-re dark:border-dark-re
-                text-dark-tx dark:text-light-tx"
-        >
-            <CircleX class="w-5 h-5 shrink-0" />
-            <span class="text-sm">{error}</span>
-        </div>
+        <ErrorBanner message={error} />
     {:else if loading}
-        <div
-            class="flex items-center gap-3 p-4 rounded border
-                bg-light-bg dark:bg-dark-bg
-                border-light-tx-2 dark:border-dark-tx-2
-                text-light-tx-2 dark:text-dark-tx-2"
-        >
-            <LoaderCircle class="w-5 h-5 animate-spin shrink-0" />
-            <span>Lädt…</span>
-        </div>
+        <LoadingBanner />
     {:else if data}
         <div
             class="rounded border border-light-tx-2 dark:border-dark-tx-2 inline-block"
