@@ -21,7 +21,11 @@
         PiggyBank,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
-    import { user } from "$lib/stores/user.js";
+    import { user, hasAnyRole } from "$lib/stores/user.js";
+
+    const canSeeSettings   = hasAnyRole(['admin']);
+    const canSeeStatistics = hasAnyRole(['statistics', 'admin']);
+    const canSeeBudget     = hasAnyRole(['budget', 'admin']);
     import { page } from "$app/stores";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
@@ -95,6 +99,7 @@
         </div>
 
         <!-- Einstellungen -->
+        {#if $canSeeSettings}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
@@ -249,8 +254,10 @@
                 {/if}
             </div>
         {/if}
+        {/if}
 
         <!-- Statistiken -->
+        {#if $canSeeStatistics}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
@@ -313,7 +320,9 @@
                 </button>
             </div>
         {/if}
+        {/if}
         <!--Budget-->
+        {#if $canSeeBudget}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
@@ -346,6 +355,7 @@
                 </button>-->
             </div>
         </div>
+        {/if}
     </div>
 
     <!-- Unterer Bereich -->
