@@ -97,7 +97,7 @@
     <!-- Quick-Links -->
     <div class="space-y-1 mb-0 flex gap-3 text-xs ml-0">
         <a
-            href="#"
+            href="/info/hilfe"
             class="flex items-center text-xs text-light-tx-2 dark:text-dark-tx-2
                    hover:text-primary dark:hover:text-primary-dark
                    hover:bg-light-ui dark:hover:bg-dark-ui rounded px-0 py-1"
@@ -106,7 +106,7 @@
             Hilfe
         </a>
         <a
-            href="#"
+            href="/info/datenschutz"
             class="flex items-center text-xs text-light-tx-2 dark:text-dark-tx-2
                    hover:text-primary dark:hover:text-primary-dark
                    hover:bg-light-ui dark:hover:bg-dark-ui rounded px-0 py-1"
@@ -115,7 +115,7 @@
             Datenschutz
         </a>
         <a
-            href="#"
+            href="/info/regeln"
             class="flex items-center text-xs text-light-tx-2 dark:text-dark-tx-2
                    hover:text-primary dark:hover:text-primary-dark
                    hover:bg-light-ui dark:hover:bg-dark-ui rounded px-0 py-1 mb-1"

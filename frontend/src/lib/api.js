@@ -289,3 +289,20 @@ export async function saveBudgetGrades(grades) {
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // { ok, updated_users }
 }
+
+export async function getSiteText(key) {
+  const res = await fetch(`${BASE}/site-texts/${key}`, { credentials: 'include' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()   // { key, content, updated_at }
+}
+
+export async function saveSiteText(key, content) {
+  const res = await fetch(`${BASE}/admin/site-texts/${key}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()   // { key, updated_at }
+}

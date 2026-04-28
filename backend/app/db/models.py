@@ -198,3 +198,16 @@ class ExchangeRate(Base):
             name="check_exchange_rate_source"
         ),
     )
+
+
+# 9. site_texts
+class SiteText(Base):
+    __tablename__ = "site_texts"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()")
+    )

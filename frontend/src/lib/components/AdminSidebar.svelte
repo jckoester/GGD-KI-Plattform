@@ -154,7 +154,7 @@
                 >
                     <button
                         onclick={() => {
-                            goto(`/settings`);
+                            goto(`/settings/texts?tab=impressum`);
                             openSection = "settings-texts";
                         }}
                     >
@@ -184,9 +184,12 @@
                 {#if openSection === "settings-texts"}
                     <div class="mt-1 space-y-1 pl-4">
                         <button
-                            onclick={() => goto(`/settings`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            onclick={() => goto(`/settings/texts?tab=impressum`)}
+                            class="w-full text-left px-3 py-1 text-sm rounded-lg 
+                                   {openSection === 'settings-texts' && $page.url.searchParams.get('tab') === 'impressum'
+                                       ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
+                                       : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
+                                   } transition-colors"
                         >
                             <div class="flex justify-between items-center">
                                 <span class="flex items-center gap-2">
@@ -196,9 +199,12 @@
                             </div>
                         </button>
                         <button
-                            onclick={() => goto(`/settings`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            onclick={() => goto(`/settings/texts?tab=datenschutz`)}
+                            class="w-full text-left px-3 py-1 text-sm rounded-lg 
+                                   {openSection === 'settings-texts' && $page.url.searchParams.get('tab') === 'datenschutz'
+                                       ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
+                                       : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
+                                   } transition-colors"
                         >
                             <div class="flex justify-between items-center">
                                 <span class="flex items-center gap-2">
@@ -208,9 +214,12 @@
                             </div>
                         </button>
                         <button
-                            onclick={() => goto(`/settings`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            onclick={() => goto(`/settings/texts?tab=hilfe`)}
+                            class="w-full text-left px-3 py-1 text-sm rounded-lg 
+                                   {openSection === 'settings-texts' && $page.url.searchParams.get('tab') === 'hilfe'
+                                       ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
+                                       : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
+                                   } transition-colors"
                         >
                             <div class="flex justify-between items-center">
                                 <span class="flex items-center gap-2">
@@ -220,9 +229,12 @@
                             </div>
                         </button>
                         <button
-                            onclick={() => goto(`/settings`)}
-                            class="w-full text-left px-3 py-1 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            onclick={() => goto(`/settings/texts?tab=regeln`)}
+                            class="w-full text-left px-3 py-1 text-sm rounded-lg 
+                                   {openSection === 'settings-texts' && $page.url.searchParams.get('tab') === 'regeln'
+                                       ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'
+                                       : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'
+                                   } transition-colors"
                         >
                             <div class="flex justify-between items-center">
                                 <span class="flex items-center gap-2">

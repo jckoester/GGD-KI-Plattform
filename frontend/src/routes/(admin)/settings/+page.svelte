@@ -22,10 +22,12 @@
         <h1 class="text-2xl font-semibold">Einstellungen</h1>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <!-- Modell-Freischaltung (7b) -->
-        <div
+        <!-- Modell-Freischaltung -->
+        <a
+            href="/settings/models"
             class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
-                    rounded-lg p-5 opacity-40 cursor-not-allowed select-none"
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
         >
             <CloudCog
                 class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2"
@@ -34,23 +36,25 @@
                 Modell-Freischaltung
             </div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Folgt in Schritt 7b
+                Welche Modelle für welche Gruppen verfügbar sind
             </div>
-        </div>
-        <!-- Einstellungen (7f) -->
-        <div
+        </a>
+        <!-- Site-Texte (7f) -->
+        <a
+            href="/settings/texts?tab=impressum"
             class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
-                    rounded-lg p-5 opacity-40 cursor-not-allowed select-none"
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
         >
             <Settings
                 class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2"
             />
             <div class="font-medium text-light-tx dark:text-dark-tx">
-                Einstellungen
+                Site-Texte
             </div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Folgt in Schritt 7f
+                Impressum, Datenschutz, Hilfe, Regeln
             </div>
-        </div>
+        </a>
     </div>
 </div>
