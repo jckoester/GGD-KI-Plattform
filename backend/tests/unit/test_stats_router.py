@@ -225,3 +225,57 @@ def test_get_spend_requires_statistics_or_admin_role():
     client = TestClient(app)
     response = client.get("/stats/spend")
     assert response.status_code == 403
+
+
+def test_get_heatmap_model_filter_is_passed_to_sql():
+    """Test: Modell-Filter (?model=) wird korrekt an SQL weitergegeben"""
+    from sqlalchemy import text
+    
+    # Mock DB mit Aufruf-Rückverfolgung
+    session = AsyncMock()
+    captured_params = {}
+    
+    def track_execute(stmt, params=None):
+        nonlocal captured_params
+        captured_params = params or {}
+        result = MagicMock()
+        result.fetchall.return_value = []
+        return result
+    
+    session.execute.side_effect = track_execute
+    
+    app = _make_stats_app(_fake_stats_payload(), session)
+    client = TestClient(app)
+    response = client.get("/stats/heatmap?model=gpt-4o-mini")
+    
+    assert response.status_code == 200
+    assert "model" in captured_params
+    assert captured_params["model"] == "gpt-4o-mini"
+
+
+def test_get_spend_model_filter_is_passed_to_sql():
+    """Test: Modell-Filter in /stats/spend wird korrekt an SQL weitergegeben"""
+    # Mock DB mit Aufruf-Rückverfolgung
+    session = AsyncMock()
+    captured_params = {}
+    
+    def track_execute(stmt, params=None):
+        nonlocal captured_params
+        captured_params = params or {}
+        result = MagicMock()
+        # Für Spend-Endpoint: erster Aufruf = rate, zweiter = spend
+        if "eur_usd_rate" in str(stmt):
+            result.scalar_one_or_none.return_value = 1.08
+        else:
+            result.fetchall.return_value = []
+        return result
+    
+    session.execute.side_effect = track_execute
+    
+    app = _make_stats_app(_fake_stats_payload(), session)
+    client = TestClient(app)
+    response = client.get("/stats/spend?model=gpt-4o")
+    
+    assert response.status_code == 200
+    # Prüfe dass model-Parameter in wenigstens einem der SQL-Aufrufe war
+    assert "model" in captured_params

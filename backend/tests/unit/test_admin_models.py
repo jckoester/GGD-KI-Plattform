@@ -123,3 +123,108 @@ async def test_fetch_matrix_maps_no_default_models_to_empty():
     assert allowlists["jahrgang-5"] == []
     assert allowlists["jahrgang-6"] == ["m1"]
     assert allowlists["jahrgang-7"] == []
+
+
+# ========== Router Endpoint Tests ==========
+
+
+@pytest.fixture
+def mock_litellm_client():
+    """Mock für LiteLLMClient mit Grundfunktionen"""
+    client = AsyncMock()
+    client.list_models.return_value = ["gpt-4o-mini", "gpt-4o"]
+    client.get_team_info.return_value = {"models": ["gpt-4o-mini"]}
+    client.update_team_models.return_value = None
+    client.close.return_value = None
+    return client
+
+
+@pytest.mark.asyncio
+async def test_get_model_matrix_requires_admin_role(mock_litellm_client):
+    """Test: GET /models/matrix erfordert Admin-Rolle"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.admin.models import router as models_router
+    from app.auth.dependencies import get_current_user
+    from app.auth.jwt import JwtPayload
+    
+    # Teacher-Payload (keine Admin-Rolle)
+    teacher_payload = JwtPayload(
+        sub="p-1", roles=["teacher"], grade=None,
+        jti="j-1", iat=1, exp=9999999999
+    )
+    
+    app = FastAPI()
+    app.include_router(models_router)
+    
+    async def fake_user():
+        return teacher_payload
+    
+    async def fake_client():
+        return mock_litellm_client
+    
+    app.dependency_overrides[get_current_user] = fake_user
+    
+    with patch("app.litellm.client.LiteLLMClient", return_value=mock_litellm_client):
+        client = TestClient(app)
+        response = client.get("/models/matrix")
+    
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_model_matrix_returns_structure():
+    """Test: GET /models/matrix gibt korrekte Struktur zurück für Admin"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.admin.models import router as models_router
+    from app.auth.dependencies import get_current_user
+    from app.auth.jwt import JwtPayload
+    from unittest.mock import patch
+    
+    admin_payload = JwtPayload(
+        sub="p-1", roles=["admin"], grade=None,
+        jti="j-1", iat=1, exp=9999999999
+    )
+    
+    app = FastAPI()
+    app.include_router(models_router)
+    
+    async def fake_user():
+        return admin_payload
+    
+    app.dependency_overrides[get_current_user] = fake_user
+    
+    # Team-Infos für alle validen Teams
+    from app.litellm.teams import VALID_GRADES
+    team_ids = [f"jahrgang-{g}" for g in sorted(VALID_GRADES)] + ["lehrkraefte"]
+    
+    # Mock für die _fetch_matrix Funktion
+    from app.api.admin.models import _fetch_matrix, _client
+    
+    mock_fetch_result = {
+        "models": ["gpt-4o-mini", "gpt-4o"],
+        "teams": team_ids,
+        "allowlists": {team_id: ["gpt-4o-mini"] for team_id in team_ids}
+    }
+    
+    with patch("app.api.admin.models._fetch_matrix", new=AsyncMock(return_value=mock_fetch_result)):
+        client = TestClient(app, raise_server_exceptions=True)
+        response = client.get("/models/matrix")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Prüfe Struktur
+    assert "models" in data
+    assert "teams" in data
+    assert "allowlists" in data
+    
+    # Prüfe Modelle
+    assert set(data["models"]) == {"gpt-4o-mini", "gpt-4o"}
+    
+    # Prüfe Teams
+    assert data["teams"] == team_ids
+    
+    # Prüfe Allowlists
+    assert isinstance(data["allowlists"], dict)

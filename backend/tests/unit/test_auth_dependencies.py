@@ -42,3 +42,19 @@ async def test_require_any_role_denies_if_none_match():
     with pytest.raises(HTTPException) as exc:
         await guard(current_user=payload)
     assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_require_any_role_with_budget_role():
+    guard = require_any_role(["budget", "admin"])
+    payload = make_payload(["budget"])
+    result = await guard(current_user=payload)
+    assert result == payload
+
+
+@pytest.mark.asyncio
+async def test_require_any_role_with_budget_and_admin_combination():
+    guard = require_any_role(["budget", "admin"])
+    payload = make_payload(["teacher", "budget"])
+    result = await guard(current_user=payload)
+    assert result == payload
