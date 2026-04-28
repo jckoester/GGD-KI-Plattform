@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
+  envDir: '../config',
+  envPrefix: ['VITE_', 'PUBLIC_'],
   server: {
     proxy: {
       '/api': {
