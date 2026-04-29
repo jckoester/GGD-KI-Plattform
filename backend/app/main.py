@@ -68,6 +68,11 @@ app.add_middleware(
     expose_headers=["X-Conversation-Id"],
 )
 
+@app.get("/health", tags=["meta"])
+async def health():
+    return {"status": "ok"}
+
+
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(admin_router)
 app.include_router(budget_router)

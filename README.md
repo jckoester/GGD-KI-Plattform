@@ -62,9 +62,10 @@ Für datenschutzsensible Anwendungsfälle und bei erschöpftem Budget ist eine s
 ### Voraussetzungen
 
 - Docker + Docker Compose
-- Eine laufende **LiteLLM**-Proxy-Instanz (mit PostgreSQL-Backend)
-- Eine laufende **PostgreSQL**-Instanz für die Plattform selbst
-- Anmeldung mit OAuth2/OIDC (Produktivbetrieb) oder der YAML-Testadapter (Entwicklung)
+- Eine laufende **LiteLLM**-Proxy-Instanz (extern, nicht im Stack)
+- IServ mit OAuth2/OIDC-App (Produktivbetrieb) oder YAML-Testadapter (Entwicklung)
+
+Die Plattform-Datenbank (PostgreSQL) läuft als eigener Service im Docker-Stack.
 
 ### Schritt 1 — Repository klonen
 
@@ -78,18 +79,19 @@ cd ggd-ki-plattform
 ```bash
 cp config/.env.example config/.env
 cp config/auth.example.yaml config/auth.yaml
-cp infra/litellm_config.example.yaml infra/litellm_config.yaml
 ```
 
 `config/.env` befüllen — die wichtigsten Variablen:
 
 | Variable | Bedeutung |
 |---|---|
-| `DATABASE_URL` | PostgreSQL-Verbindung der Plattform |
+| `POSTGRES_PASSWORD` | Datenbankpasswort (`openssl rand -base64 32`) |
+| `DATABASE_URL` | `postgresql+asyncpg://postgres:<POSTGRES_PASSWORD>@db:5432/ggd_ki` |
 | `SCHOOL_SECRET` | Geheimnis für HMAC-Pseudonymisierung (`openssl rand -base64 32`) |
 | `JWT_SECRET` | Geheimnis für JWT-Cookies (`openssl rand -base64 32`) |
 | `LITELLM_PROXY_URL` | URL der LiteLLM-Instanz |
 | `LITELLM_MASTER_KEY` | Master-Key der LiteLLM-Instanz |
+| `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (z.B. `https://ki.beispielschule.de`) |
 | `PUBLIC_SCHOOL_NAME` | Anzeigename der Schule in der UI |
 | `PUBLIC_SCHOOL_LOGO_URL` | Pfad zum Schul-Logo (leer = Initialen-Kreis) |
 
@@ -99,27 +101,25 @@ cp infra/litellm_config.example.yaml infra/litellm_config.yaml
 
 In [`config/budget_tiers.yaml`](config/budget_tiers.yaml) die monatlichen EUR-Limits pro Jahrgang und Rolle eintragen.
 
-### Schritt 4 — Datenbank migrieren
+### Schritt 4 — Stack starten
 
 ```bash
-cd backend
-python -m alembic upgrade head
+docker compose --env-file config/.env up -d
 ```
+
+Die Datenbank-Migration (`alembic upgrade head`) läuft automatisch beim ersten Start des Backend-Containers.
 
 ### Schritt 5 — LiteLLM-Teams anlegen
 
 ```bash
-cd backend
-python scripts/create_litellm_teams.py
+docker compose exec backend python scripts/create_litellm_teams.py
 ```
 
 Danach im Admin-Bereich (`/admin → Modell-Freischaltung`) für jedes Team mindestens ein Modell aktivieren — eine leere Allowlist gilt in LiteLLM als „alle Modelle erlaubt" (siehe [update.md](update.md)).
 
-### Schritt 6 — Starten
+### Schritt 6 — Reverse Proxy (TLS)
 
-```bash
-docker compose up -d
-```
+Der Stack lauscht auf Port 80 (intern). TLS-Terminierung erfolgt über den Reverse Proxy des Schulservers (nginx oder Caddy), der auf den Stack-Port weiterleitet. Eine Beispiel-nginx-Konfiguration liegt in [`infra/nginx.conf`](infra/nginx.conf).
 
 ---
 
