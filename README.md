@@ -51,9 +51,6 @@ Plattform (Pseudonym) → LiteLLM-Proxy (Pseudonym intern) → KI-Anbieter (nur 
 
 Die Löschskripte laufen als Cron-Jobs auf dem Server (siehe [backend/README.md](backend/README.md)).
 
-### Ollama als Pflicht-Fallback
-
-Für datenschutzsensible Anwendungsfälle und bei erschöpftem Budget ist eine selbst gehostete Ollama-Instanz als Fallback konfiguriert. Dabei verlassen keine Daten den Schulserver.
 
 ---
 
@@ -126,9 +123,3 @@ docker compose up -d
 ## Update
 
 Hinweise zu Fallstricken beim Update einzelner Komponenten (insbesondere LiteLLM) sind in [`update.md`](update.md) dokumentiert.
-
----
-
-## Entwicklung
-
-Anleitungen für die lokale Entwicklungsumgebung stehen in [`CLAUDE.md`](CLAUDE.md) (Backend, Frontend, Tests).
