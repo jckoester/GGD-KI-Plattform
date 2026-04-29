@@ -1,0 +1,29 @@
+grades:
+  5:
+    budget_duration: 1mo
+    max_budget_eur: 1.0
+  6:
+    budget_duration: 1mo
+    max_budget_eur: 1.0
+  7:
+    budget_duration: 1mo
+    max_budget_eur: 1.0
+  8:
+    budget_duration: 1mo
+    max_budget_eur: 2.0
+  9:
+    budget_duration: 1mo
+    max_budget_eur: 1.5
+  10:
+    budget_duration: 1mo
+    max_budget_eur: 2.0
+  11:
+    budget_duration: 1mo
+    max_budget_eur: 3.5
+  12:
+    budget_duration: 1mo
+    max_budget_eur: 3.5
+roles:
+  teacher:
+    budget_duration: 1mo
+    max_budget_eur: 8.0

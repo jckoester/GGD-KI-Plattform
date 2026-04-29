@@ -51,9 +51,6 @@ Plattform (Pseudonym) → LiteLLM-Proxy (Pseudonym intern) → KI-Anbieter (nur 
 
 Die Löschskripte laufen als Cron-Jobs auf dem Server (siehe [backend/README.md](backend/README.md)).
 
-### Ollama als Pflicht-Fallback
-
-Für datenschutzsensible Anwendungsfälle und bei erschöpftem Budget ist eine selbst gehostete Ollama-Instanz als Fallback konfiguriert. Dabei verlassen keine Daten den Schulserver.
 
 ---
 
@@ -101,23 +98,30 @@ cp config/auth.example.yaml config/auth.yaml
 
 In [`config/budget_tiers.yaml`](config/budget_tiers.yaml) die monatlichen EUR-Limits pro Jahrgang und Rolle eintragen.
 
-### Schritt 4 — Stack starten
+### Schritt 4 — Datenbank starten und migrieren
+
+```bash
+docker compose --env-file config/.env up -d db
+docker compose --env-file config/.env run --rm backend alembic upgrade head
+```
+
+Der erste Befehl startet nur die Datenbank. Der zweite startet einen temporären Backend-Container, führt die Migration aus und beendet sich danach. Nach Updates genügt es, diesen zweiten Befehl erneut auszuführen.
+
+### Schritt 5 — LiteLLM-Teams anlegen
+
+```bash
+docker compose --env-file config/.env run --rm backend python scripts/create_litellm_teams.py
+```
+
+Dieser Schritt ist nur einmalig beim Ersteinrichten nötig. Danach im Admin-Bereich (`/admin → Modell-Freischaltung`) für jedes Team mindestens ein Modell aktivieren — eine leere Allowlist gilt in LiteLLM als „alle Modelle erlaubt" (siehe [update.md](update.md)).
+
+### Schritt 6 — Stack vollständig starten
 
 ```bash
 docker compose --env-file config/.env up -d
 ```
 
-Die Datenbank-Migration (`alembic upgrade head`) läuft automatisch beim ersten Start des Backend-Containers.
-
-### Schritt 5 — LiteLLM-Teams anlegen
-
-```bash
-docker compose exec backend python scripts/create_litellm_teams.py
-```
-
-Danach im Admin-Bereich (`/admin → Modell-Freischaltung`) für jedes Team mindestens ein Modell aktivieren — eine leere Allowlist gilt in LiteLLM als „alle Modelle erlaubt" (siehe [update.md](update.md)).
-
-### Schritt 6 — Reverse Proxy (TLS)
+### Schritt 7 — Reverse Proxy (TLS)
 
 Der Stack lauscht auf Port 80 (intern). TLS-Terminierung erfolgt über den Reverse Proxy des Schulservers (nginx oder Caddy), der auf den Stack-Port weiterleitet. Eine Beispiel-nginx-Konfiguration liegt in [`infra/nginx.conf`](infra/nginx.conf).
 
@@ -126,9 +130,3 @@ Der Stack lauscht auf Port 80 (intern). TLS-Terminierung erfolgt über den Rever
 ## Update
 
 Hinweise zu Fallstricken beim Update einzelner Komponenten (insbesondere LiteLLM) sind in [`update.md`](update.md) dokumentiert.
-
----
-
-## Entwicklung
-
-Anleitungen für die lokale Entwicklungsumgebung stehen in [`CLAUDE.md`](CLAUDE.md) (Backend, Frontend, Tests).
