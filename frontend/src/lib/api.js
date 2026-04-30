@@ -306,3 +306,23 @@ export async function saveSiteText(key, content) {
   if (!res.ok) throw new Error(await res.text())
   return res.json()   // { key, updated_at }
 }
+
+export async function uploadFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  let res
+  try {
+    res = await fetch(`${BASE}/upload/session`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    })
+  } catch {
+    throw new ApiError(0, 'Verbindung zum Server fehlgeschlagen.')
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? `Upload fehlgeschlagen (${res.status})`)
+  }
+  return res.json()  // TextUploadResult | ImageUploadResult
+}

@@ -1,6 +1,7 @@
 <script>
     import { Send, Loader2, AlertCircle, Paperclip } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
+    import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -8,6 +9,7 @@
         ApiError,
         getConversationMessages,
         getModels,
+        uploadFile,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
@@ -28,6 +30,15 @@
     let modelsLoading = $state(false);
     let modelsError = $state(null);
     let totalCostUsd = $state(null);
+
+    // Attachment-State
+    let attachments = $state([]);
+    let fileInput = $state(null);
+
+    const MAX_FILES = 3;
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+    const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".webp"];
+
     const MODEL_STORAGE_KEY = "chat_model_id";
 
     let textAreaRows = $state(1);
@@ -100,6 +111,64 @@
         } else {
             sessionStorage.removeItem(MODEL_STORAGE_KEY);
         }
+    }
+
+    function handleUploadClick() {
+      fileInput?.click();
+    }
+
+    async function handleFilesSelected(event) {
+      const files = Array.from(event.target.files ?? []);
+      event.target.value = ''; // Reset, damit dieselbe Datei erneut wählbar ist
+
+      const remaining = MAX_FILES - attachments.length;
+      if (remaining <= 0) return;
+
+      for (const file of files.slice(0, remaining)) {
+        // Client-seitige Validierung
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+          const id = crypto.randomUUID();
+          attachments = [...attachments, {
+            id,
+            filename: file.name,
+            status: 'error',
+            result: null,
+            error: `Format '${ext}' wird nicht unterstützt.`,
+          }];
+          continue;
+        }
+        if (file.size > MAX_BYTES) {
+          const id = crypto.randomUUID();
+          attachments = [...attachments, {
+            id,
+            filename: file.name,
+            status: 'error',
+            result: null,
+            error: `Datei zu groß (max. 10 MB).`,
+          }];
+          continue;
+        }
+
+        const id = crypto.randomUUID();
+        attachments = [...attachments, { id, filename: file.name, status: 'uploading', result: null, error: null }];
+
+        uploadFile(file)
+          .then((result) => {
+            attachments = attachments.map((a) =>
+              a.id === id ? { ...a, status: 'ready', result } : a
+            );
+          })
+          .catch((err) => {
+            attachments = attachments.map((a) =>
+              a.id === id ? { ...a, status: 'error', error: err.message } : a
+            );
+          });
+      }
+    }
+
+    function removeAttachment(id) {
+      attachments = attachments.filter((a) => a.id !== id);
     }
 
     async function handleSubmit() {
@@ -365,17 +434,29 @@
 
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
             <div class="flex gap-2 items-start">
-                <!-- Upload-Platzhalter (Funktion kommt in Schritt 2) -->
+                <input
+                  bind:this={fileInput}
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_EXTENSIONS.join(',')}
+                  onchange={handleFilesSelected}
+                  class="sr-only"
+                  aria-hidden="true"
+                />
+                <!-- Upload-Button -->
                 <button
-                    type="button"
-                    disabled
-                    title="Datei hochladen (bald verfügbar)"
-                    aria-label="Datei hochladen"
-                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                           text-light-tx-2 dark:text-dark-tx-2
-                           opacity-40 cursor-not-allowed shrink-0"
+                  type="button"
+                  onclick={handleUploadClick}
+                  disabled={isStreaming || attachments.length >= MAX_FILES}
+                  title={attachments.length >= MAX_FILES ? `Maximal ${MAX_FILES} Anhänge` : 'Datei hochladen'}
+                  aria-label="Datei hochladen"
+                  class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                         text-light-tx-2 dark:text-dark-tx-2
+                         hover:bg-light-ui dark:hover:bg-dark-ui
+                         disabled:opacity-40 disabled:cursor-not-allowed shrink-0
+                         transition-colors"
                 >
-                    <Paperclip class="w-5 h-5" />
+                  <Paperclip class="w-5 h-5" />
                 </button>
 
                 <!-- Textarea -->
@@ -409,6 +490,20 @@
                     {/if}
                 </button>
             </div>
+
+            <!-- Attachment-Chips (nur wenn Anhänge vorhanden) -->
+            {#if attachments.length > 0}
+              <div class="flex flex-wrap gap-1.5">
+                {#each attachments as att (att.id)}
+                  <AttachmentChip
+                    filename={att.filename}
+                    status={att.status}
+                    error={att.error}
+                    onremove={() => removeAttachment(att.id)}
+                  />
+                {/each}
+              </div>
+            {/if}
 
             <!-- Toolbar-Zeile: Modell-Auswahl + Hinweistexte -->
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
