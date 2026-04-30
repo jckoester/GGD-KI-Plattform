@@ -1,0 +1,164 @@
+/* Basis: Code-Block-Container */
+.code-block {
+    position: relative;
+    margin: 0.75rem 0;
+    border-radius: 0.375rem;
+    background-color: var(--color-base-50);
+    border: 1px solid var(--color-base-200);
+    overflow: hidden;
+}
+
+.dark .code-block {
+    background-color: var(--color-base-950);
+    border-color: var(--color-base-800);
+}
+
+.code-block pre {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+.code-block code.hljs {
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;    /* 13px */
+    line-height: 1.6;
+    color: var(--color-black);
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+}
+
+.dark .code-block code.hljs {
+    color: var(--color-base-200);
+}
+
+/* Sprach-Label oben rechts (wird per CSS aus data-lang erzeugt) */
+.code-block[data-lang]:not([data-lang=""])::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0.375rem;
+    right: 2.5rem;   /* Platz für Copy-Button */
+    font-size: 0.6875rem;
+    font-family: ui-monospace, monospace;
+    color: var(--color-base-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+}
+
+/* ── Token-Farben ──────────────────────────────────────────── */
+
+/* Schlüsselwörter: blau */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-tag .hljs-name {
+    color: var(--color-blue-600);
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in,
+.dark .hljs-tag .hljs-name {
+    color: var(--color-blue-400);
+}
+
+/* Strings: grün */
+.hljs-string,
+.hljs-attr,
+.hljs-template-string {
+    color: var(--color-green-700);
+}
+.dark .hljs-string,
+.dark .hljs-attr,
+.dark .hljs-template-string {
+    color: var(--color-green-400);
+}
+
+/* Zahlen & Literale: orange */
+.hljs-number,
+.hljs-literal,
+.hljs-boolean {
+    color: var(--color-orange-600);
+}
+.dark .hljs-number,
+.dark .hljs-literal,
+.dark .hljs-boolean {
+    color: var(--color-orange-400);
+}
+
+/* Kommentare: gedämpft */
+.hljs-comment,
+.hljs-quote {
+    color: var(--color-base-400);
+    font-style: italic;
+}
+.dark .hljs-comment,
+.dark .hljs-quote {
+    color: var(--color-base-500);
+}
+
+/* Funktionen & Methoden: cyan */
+.hljs-title,
+.hljs-title.function_,
+.hljs-selector-id,
+.hljs-selector-class {
+    color: var(--color-cyan-700);
+}
+.dark .hljs-title,
+.dark .hljs-title.function_,
+.dark .hljs-selector-id,
+.dark .hljs-selector-class {
+    color: var(--color-cyan-400);
+}
+
+/* Typen & Klassen: lila */
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ {
+    color: var(--color-purple-600);
+}
+.dark .hljs-type,
+.dark .hljs-class .hljs-title,
+.dark .hljs-title.class_ {
+    color: var(--color-purple-400);
+}
+
+/* HTML-Tags: rot */
+.hljs-tag {
+    color: var(--color-red-600);
+}
+.dark .hljs-tag {
+    color: var(--color-red-400);
+}
+
+/* Variablen & Parameter: magenta */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params {
+    color: var(--color-magenta-600);
+}
+.dark .hljs-variable,
+.dark .hljs-template-variable,
+.dark .hljs-params {
+    color: var(--color-magenta-400);
+}
+
+/* Operatoren & Interpunktion */
+.hljs-operator,
+.hljs-punctuation {
+    color: var(--color-base-600);
+}
+.dark .hljs-operator,
+.dark .hljs-punctuation {
+    color: var(--color-base-400);
+}
+
+/* Imports / Meta */
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+    color: var(--color-yellow-700);
+}
+.dark .hljs-meta,
+.dark .hljs-meta .hljs-keyword {
+    color: var(--color-yellow-400);
+}

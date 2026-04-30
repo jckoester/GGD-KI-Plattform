@@ -1,6 +1,6 @@
 <script>
-    import { Send, Loader2, AlertCircle } from "lucide-svelte";
-    import MessageBubble from '$lib/components/MessageBubble.svelte';
+    import { Send, Loader2, AlertCircle, Paperclip } from "lucide-svelte";
+    import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -303,7 +303,9 @@
     <div class="flex-1 overflow-y-auto px-4 py-4">
         {#if loadingConversation}
             <div class="flex items-center justify-center h-full">
-                <div class="flex flex-col items-center gap-2 text-gray-500">
+                <div
+                    class="flex flex-col items-center gap-2 text-light-tx-2 dark:text-dark-tx-2"
+                >
                     <Loader2 class="w-6 h-6 animate-spin" />
                     <p>Konversation wird geladen...</p>
                 </div>
@@ -311,17 +313,17 @@
         {:else if conversationError}
             <div class="flex items-center justify-center h-full">
                 <div
-                    class="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600 max-w-md"
+                    class="flex items-start gap-2 bg-red-50 dark:bg-red-950/20
+                            border border-red-200 dark:border-red-900
+                            rounded-lg px-4 py-3 text-light-re dark:text-dark-re max-w-md"
                 >
-                    <p class="flex items-center gap-2">
-                        <AlertCircle class="w-5 h-5 flex-shrink-0" />
-                        {conversationError}
-                    </p>
+                    <AlertCircle class="w-4 h-4 mt-0.5 shrink-0" />
+                    <p class="text-sm">{conversationError}</p>
                 </div>
             </div>
         {:else if messages.length === 0}
             <div class="flex items-center justify-center h-full">
-                <div class="text-center text-gray-500">
+                <div class="text-center text-light-tx-2 dark:text-dark-tx-2">
                     <p class="text-lg">Womit kann ich helfen?</p>
                 </div>
             </div>
@@ -331,103 +333,157 @@
                     <MessageBubble
                         {message}
                         isStreaming={isStreaming && i === messages.length - 1}
-                        costEur={(granularity === 'message' || granularity === 'both')
-                            ? formatCostEur(message.cost_usd, $budget?.eur_usd_rate)
+                        costEur={granularity === "message" ||
+                        granularity === "both"
+                            ? formatCostEur(
+                                  message.cost_usd,
+                                  $budget?.eur_usd_rate,
+                              )
                             : null}
                     />
                 {/each}
-                {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
-                    <div
-                        class="text-xs text-right text-gray-500 dark:text-gray-400 mt-2"
-                    >
-                        Konversation: {formatCostEur(
-                            totalCostUsd,
-                            $budget?.eur_usd_rate,
-                        )} €
-                    </div>
-                {/if}
             </div>
         {/if}
         <div bind:this={scrollAnchor} class="h-0"></div>
     </div>
 
-    <div class="flex-shrink-0 px-4 pb-4">
-        <div class="max-w-4xl mx-auto mb-2">
-            <div class="flex flex-wrap items-center gap-2">
-                <label
-                    for="chat-model"
-                    class="text-sm text-gray-600 dark:text-gray-300"
-                    >Modell</label
+    <div
+        class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 px-4 pt-3 pb-4"
+    >
+        <div class="max-w-4xl mx-auto space-y-2">
+            <!-- Konversationskosten -->
+            {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
+                <div
+                    class="text-xs text-right text-light-tx-2 dark:text-dark-tx-2"
                 >
-                {#if conversationId}
-                    <select
-                        id="chat-model"
-                        disabled={true}
-                        class="min-w-[220px] rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-2 py-1 text-sm text-gray-700 dark:text-gray-200"
-                        value={currentConversationModel || ""}
-                    >
-                        {#if currentConversationModel}
-                            <option value={currentConversationModel}
-                                >{currentConversationModel}</option
-                            >
-                        {:else}
-                            <option value="">Unbekannt</option>
-                        {/if}
-                    </select>
-                    <span class="text-xs text-gray-500"
-                        >In laufenden Konversationen bleibt das Modell fix.</span
-                    >
-                {:else}
-                    <select
-                        id="chat-model"
-                        bind:value={selectedModelId}
-                        disabled={isStreaming || modelsLoading}
-                        onchange={handleModelChange}
-                        class="min-w-[220px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm text-gray-800 dark:text-gray-100 disabled:opacity-60"
-                    >
-                        {#if availableModels.length > 0}
-                            {#each availableModels as model}
-                                <option value={model.id}>{model.id}</option>
-                            {/each}
-                        {:else}
-                            <option value={selectedModelId || ""}>
-                                {selectedModelId || "Standardmodell (Backend)"}
-                            </option>
-                        {/if}
-                    </select>
-                    {#if modelsLoading}
-                        <span class="text-xs text-gray-500"
-                            >Modelle werden geladen...</span
-                        >
-                    {:else if modelsError}
-                        <span class="text-xs text-red-600">{modelsError}</span>
+                    Kosten dieses Chats: {formatCostEur(
+                        totalCostUsd,
+                        $budget?.eur_usd_rate,
+                    )} €
+                </div>
+            {/if}
+
+            <!-- Eingabe-Zeile: Upload + Textarea + Send -->
+            <div class="flex gap-2 items-start">
+                <!-- Upload-Platzhalter (Funktion kommt in Schritt 2) -->
+                <button
+                    type="button"
+                    disabled
+                    title="Datei hochladen (bald verfügbar)"
+                    aria-label="Datei hochladen"
+                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx-2 dark:text-dark-tx-2
+                           opacity-40 cursor-not-allowed shrink-0"
+                >
+                    <Paperclip class="w-5 h-5" />
+                </button>
+
+                <!-- Textarea -->
+                <textarea
+                    bind:this={textarea}
+                    rows={textAreaRows}
+                    onkeydown={handleKeydown}
+                    oninput={handleInput}
+                    bind:value={input}
+                    disabled={isStreaming}
+                    placeholder={isStreaming ? "" : "Nachricht eingeben…"}
+                    class="flex-1 resize-none rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                           px-3 py-2
+                           disabled:opacity-50 disabled:cursor-not-allowed
+                           focus:outline-none focus:ring-2 focus:ring-primary"
+                ></textarea>
+
+                <!-- Send-Button -->
+                <button
+                    onclick={handleSubmit}
+                    disabled={isStreaming || !input.trim()}
+                    class="p-2 bg-primary text-white rounded-lg
+                           hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                           transition-colors flex items-center justify-center min-w-[44px] shrink-0"
+                >
+                    {#if isStreaming}
+                        <Loader2 class="w-5 h-5 animate-spin" />
+                    {:else}
+                        <Send class="w-5 h-5" />
                     {/if}
+                </button>
+            </div>
+
+            <!-- Toolbar-Zeile: Modell-Auswahl + Hinweistexte -->
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <!-- Modell-Auswahl -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <label
+                        for="chat-model"
+                        class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
+                    >
+                        Modell
+                    </label>
+                    {#if conversationId}
+                        <select
+                            id="chat-model"
+                            disabled={true}
+                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                   bg-light-ui dark:bg-dark-ui
+                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                   opacity-60 cursor-not-allowed"
+                            value={currentConversationModel || ""}
+                        >
+                            {#if currentConversationModel}
+                                <option value={currentConversationModel}
+                                    >{currentConversationModel}</option
+                                >
+                            {:else}
+                                <option value="">Unbekannt</option>
+                            {/if}
+                        </select>
+                    {:else}
+                        <select
+                            id="chat-model"
+                            bind:value={selectedModelId}
+                            disabled={isStreaming || modelsLoading}
+                            onchange={handleModelChange}
+                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                   bg-light-bg-2 dark:bg-dark-bg-2
+                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                   disabled:opacity-60"
+                        >
+                            {#if availableModels.length > 0}
+                                {#each availableModels as model}
+                                    <option value={model.id}>{model.id}</option>
+                                {/each}
+                            {:else}
+                                <option value={selectedModelId || ""}>
+                                    {selectedModelId ||
+                                        "Standardmodell (Backend)"}
+                                </option>
+                            {/if}
+                        </select>
+                    {/if}
+                </div>
+
+                <!-- Modell-Statustexte (Laden / Fehler / Fix-Hinweis) -->
+                {#if conversationId}
+                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Im laufenden Chat kann das Modell nicht geändert werden.
+                    </span>
+                {:else if modelsLoading}
+                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Modelle werden geladen…
+                    </span>
+                {:else if modelsError}
+                    <span class="text-xs text-light-re dark:text-dark-re"
+                        >{modelsError}</span
+                    >
                 {/if}
             </div>
-        </div>
-
-        <div class="flex gap-2 max-w-4xl mx-auto">
-            <textarea
-                bind:this={textarea}
-                rows={textAreaRows}
-                onkeydown={handleKeydown}
-                oninput={handleInput}
-                bind:value={input}
-                disabled={isStreaming}
-                placeholder={isStreaming ? "" : "Nachricht eingeben..."}
-                class="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
-            ></textarea>
-            <button
-                onclick={handleSubmit}
-                disabled={isStreaming || !input.trim()}
-                class="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center min-w-[44px]"
-            >
-                {#if isStreaming}
-                    <Loader2 class="w-5 h-5 animate-spin" />
-                {:else}
-                    <Send class="w-5 h-5" />
-                {/if}
-            </button>
+            <div>
+                <!-- Globaler Hinweistext -->
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    KI-Ergebnisse kritisch prüfen.
+                </p>
+            </div>
         </div>
     </div>
 </div>
