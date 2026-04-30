@@ -1,5 +1,6 @@
 <script>
     import { Send, Loader2, AlertCircle } from "lucide-svelte";
+    import MessageBubble from '$lib/components/MessageBubble.svelte';
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -327,53 +328,13 @@
         {:else}
             <div class="space-y-4 max-w-4xl mx-auto">
                 {#each messages as message, i}
-                    {#if message.role === "user"}
-                        <div class="flex justify-end">
-                            <div
-                                class="bg-blue-500 text-white rounded-xl rounded-br-none px-4 py-2 max-w-[80%]"
-                            >
-                                <p class="whitespace-pre-wrap">
-                                    {message.content}
-                                </p>
-                            </div>
-                        </div>
-                    {:else if message.role === "assistant"}
-                        <div class="flex justify-start">
-                            <div
-                                class="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-bl-none px-4 py-2 max-w-[80%]"
-                            >
-                                <p class="whitespace-pre-wrap">
-                                    {message.content}
-                                </p>
-
-                                {#if (granularity === "message" || granularity === "both") && message.cost_usd != null}
-                                    <p
-                                        class="text-xs text-gray-500 dark:text-gray-400 mt-1"
-                                    >
-                                        {formatCostEur(
-                                            message.cost_usd,
-                                            $budget?.eur_usd_rate,
-                                        )} €
-                                    </p>
-                                {/if}
-                                {#if isStreaming && i === messages.length - 1}
-                                    <span class="animate-pulse cursor-default"
-                                        >|</span
-                                    >
-                                {/if}
-                            </div>
-                        </div>
-                    {:else if message.role === "error"}
-                        <div class="w-full">
-                            <div
-                                class="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600"
-                            >
-                                <p class="whitespace-pre-wrap">
-                                    {message.content}
-                                </p>
-                            </div>
-                        </div>
-                    {/if}
+                    <MessageBubble
+                        {message}
+                        isStreaming={isStreaming && i === messages.length - 1}
+                        costEur={(granularity === 'message' || granularity === 'both')
+                            ? formatCostEur(message.cost_usd, $budget?.eur_usd_rate)
+                            : null}
+                    />
                 {/each}
                 {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                     <div
