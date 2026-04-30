@@ -1,12 +1,36 @@
-from pydantic import BaseModel, model_validator
-from typing import Literal
+from pydantic import BaseModel, Field, model_validator
+from typing import Annotated, Literal, Union
 from uuid import UUID
 from typing import Optional
 
 
+# ── Content-Part-Typen ──────────────────────────────────────────────────────
+
+class TextPart(BaseModel):
+    type: Literal["text"]
+    text: str
+
+
+class ImageUrlContent(BaseModel):
+    url: str  # "data:image/png;base64,..." oder https://...
+
+
+class ImageUrlPart(BaseModel):
+    type: Literal["image_url"]
+    image_url: ImageUrlContent
+
+
+ContentPart = Annotated[
+    Union[TextPart, ImageUrlPart],
+    Field(discriminator="type"),
+]
+
+
+# ── Chat-Schemas ────────────────────────────────────────────────────────────
+
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: Union[str, list[ContentPart]]
 
 
 class ChatRequest(BaseModel):

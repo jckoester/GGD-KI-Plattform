@@ -17,7 +17,7 @@ import httpx
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.chat.schemas import ChatRequest
+from app.chat.schemas import ChatRequest, TextPart
 from app.db.models import Conversation, Message, PseudonymAudit
 from app.db.session import get_db, AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
@@ -138,6 +138,20 @@ async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
         await client.aclose()
 
 
+def _text_from_content(content: str | list) -> str:
+    """Extrahiert den Text-Anteil aus str- oder list-Content (für DB-Speicherung und Titelgenerierung)."""
+    if isinstance(content, str):
+        return content
+    return " ".join(part.text for part in content if isinstance(part, TextPart))
+
+
+def _serialize_content(content: str | list) -> str | list:
+    """Serialisiert Content für den LiteLLM-Payload (Pydantic-Modelle → dicts)."""
+    if isinstance(content, str):
+        return content
+    return [part.model_dump() for part in content]
+
+
 async def _persist(
     db: AsyncSession,
     conversation_id: UUID,
@@ -186,21 +200,21 @@ async def chat(
     model_used = request.model_id or settings.chat_default_model
     litellm_payload = {
         "model": model_used,
-        "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
+        "messages": [{"role": msg.role, "content": _serialize_content(msg.content)} for msg in request.messages],
         "stream": True,
         "stream_options": {"include_usage": True},
         "user": current_user.sub,
     }
 
     client = httpx.AsyncClient(timeout=_LITELLM_TIMEOUT, verify=settings.litellm_verify_ssl)
-    user_message = request.messages[-1].content if request.messages else ""
+    user_message = _text_from_content(request.messages[-1].content) if request.messages else ""
 
     conversation_id = request.conversation_id
     is_new = conversation_id is None
     title_prompt: str | None = None
 
     if is_new:
-        first_user_msg = next((m.content for m in request.messages if m.role == "user"), "")
+        first_user_msg = next((_text_from_content(m.content) for m in request.messages if m.role == "user"), "")
         new_conv = Conversation(
             pseudonym=current_user.sub,
             model_used=model_used,
