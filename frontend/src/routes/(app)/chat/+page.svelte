@@ -171,17 +171,51 @@
       attachments = attachments.filter((a) => a.id !== id);
     }
 
+    function buildUserContent(text, uploads) {
+      if (!uploads.length) return text;
+
+      const parts = [];
+      for (const { filename, result } of uploads) {
+        if (result.type === 'text') {
+          parts.push({ type: 'text', text: `[${filename}]\n${result.content}` });
+        } else {
+          // Bild: base64-data-URL aus result.data + result.mime_type
+          parts.push({
+            type: 'image_url',
+            image_url: { url: `data:${result.mime_type};base64,${result.data}` },
+          });
+        }
+      }
+      if (text) parts.push({ type: 'text', text });
+      return parts;
+    }
+
     async function handleSubmit() {
-        if (!input.trim() || isStreaming) return;
+        // Neu: auch senden, wenn nur Anhänge vorhanden (kein Text nötig)
+        const readyAttachments = attachments.filter(a => a.status === 'ready');
+        if ((!input.trim() && readyAttachments.length === 0) || isStreaming) return;
+        // Neu: Senden blockieren, solange noch Uploads laufen
+        if (attachments.some(a => a.status === 'uploading')) return;
 
         const userMessage = input.trim();
         input = "";
         adjustTextareaHeight();
 
-        // Add user message
-        messages = [...messages, { role: "user", content: userMessage }];
+        // Neu: Anhänge snapshotten und sofort leeren
+        const snapshotAttachments = readyAttachments.map(a => ({
+          filename: a.filename,
+          result: a.result,
+        }));
+        attachments = [];
 
-        // Add placeholder for assistant response
+        // Neu: message-Objekt mit Attachment-Metadaten für Anzeige
+        messages = [...messages, {
+          role: "user",
+          content: userMessage,
+          uploadedAttachments: snapshotAttachments,
+        }];
+
+        // Assistent-Placeholder (unverändert)
         const assistantIndex = messages.length;
         messages = [...messages, { role: "assistant", content: "" }];
 
@@ -189,10 +223,16 @@
         error = null;
 
         try {
-            // Nur user/assistant-Nachrichten senden — error-Einträge sind reine UI-Elemente
+            // Neu: Content je User-Nachricht aufbauen
             const apiMessages = messages
                 .slice(0, assistantIndex)
-                .filter((m) => m.role === "user" || m.role === "assistant");
+                .filter(m => m.role === "user" || m.role === "assistant")
+                .map(m => ({
+                  role: m.role,
+                  content: m.role === 'user'
+                    ? buildUserContent(m.content, m.uploadedAttachments ?? [])
+                    : m.content,
+                }));
 
             const modelId = conversationId ? null : selectedModelId;
             for await (const item of streamChat(
@@ -477,11 +517,13 @@
 
                 <!-- Send-Button -->
                 <button
-                    onclick={handleSubmit}
-                    disabled={isStreaming || !input.trim()}
-                    class="p-2 bg-primary text-white rounded-lg
-                           hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
-                           transition-colors flex items-center justify-center min-w-[44px] shrink-0"
+                  onclick={handleSubmit}
+                  disabled={isStreaming
+                    || attachments.some(a => a.status === 'uploading')
+                    || (!input.trim() && !attachments.some(a => a.status === 'ready'))}
+                  class="p-2 bg-primary text-white rounded-lg
+                         hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                         transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
                     {#if isStreaming}
                         <Loader2 class="w-5 h-5 animate-spin" />

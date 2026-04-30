@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle } from 'lucide-svelte';
+    import { AlertCircle, FileText, Image } from 'lucide-svelte';
     import { renderMarkdown } from '$lib/markdown.js';
 
     let { message, isStreaming = false, costEur = null } = $props();
@@ -58,7 +58,24 @@
 {#if message.role === 'user'}
     <div class="flex justify-end">
         <div class="bg-primary dark:bg-primary-dark text-white rounded-xl rounded-br-none px-4 py-2 max-w-[80%]">
-            <p class="whitespace-pre-wrap">{message.content}</p>
+            {#if message.content}
+                <p class="whitespace-pre-wrap">{message.content}</p>
+            {/if}
+            {#if message.uploadedAttachments?.length}
+                <div class="flex flex-wrap gap-1 {message.content ? 'mt-2' : ''}">
+                    {#each message.uploadedAttachments as att}
+                        <span class="inline-flex items-center gap-1 text-xs
+                                     bg-white/20 rounded-full px-2 py-0.5">
+                            {#if att.result.type === 'image'}
+                                <Image class="w-3 h-3 shrink-0" />
+                            {:else}
+                                <FileText class="w-3 h-3 shrink-0" />
+                            {/if}
+                            <span class="max-w-[100px] truncate">{att.filename}</span>
+                        </span>
+                    {/each}
+                </div>
+            {/if}
         </div>
     </div>
 

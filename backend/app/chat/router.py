@@ -17,7 +17,7 @@ import httpx
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.chat.schemas import ChatRequest, TextPart
+from app.chat.schemas import ChatRequest, TextPart, ImageUrlPart
 from app.db.models import Conversation, Message, PseudonymAudit
 from app.db.session import get_db, AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
-_LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+_LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
 _SPEND_LOG_DELAY: float = settings.spend_log_delay
 
@@ -263,6 +263,14 @@ async def chat(
     except httpx.HTTPError as exc:
         await client.aclose()
         logger.error("LiteLLM nicht erreichbar (%s): %s", type(exc).__name__, exc)
+        if isinstance(exc, httpx.ReadError) and any(
+            isinstance(msg.content, list) and any(isinstance(p, ImageUrlPart) for p in msg.content)
+            for msg in request.messages
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Das ausgewählte Modell unterstützt keine Bilddateien. Bitte wähle ein Modell mit Vision-Support (z. B. GPT-4o).",
+            )
         raise HTTPException(status_code=502, detail="LiteLLM Proxy nicht erreichbar")
 
     if response.status_code != 200:
