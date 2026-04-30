@@ -1,0 +1,10 @@
+# Caddy als externer Reverse Proxy (TLS-Terminierung)
+# Ersetze ki.beispielschule.de durch die tatsächliche Domain.
+# Caddy übernimmt TLS automatisch via Let's Encrypt.
+#
+# Voraussetzung: docker-compose.yml exponiert nginx auf Port 80
+# (Standard-Konfiguration). Caddy leitet dann alles an nginx weiter.
+
+ki.beispielschule.de {
+    reverse_proxy localhost:80
+}
