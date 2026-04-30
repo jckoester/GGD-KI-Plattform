@@ -115,13 +115,21 @@ docker compose --env-file config/.env run --rm backend python scripts/create_lit
 
 Dieser Schritt ist nur einmalig beim Ersteinrichten nötig. Danach im Admin-Bereich (`/admin → Modell-Freischaltung`) für jedes Team mindestens ein Modell aktivieren — eine leere Allowlist gilt in LiteLLM als „alle Modelle erlaubt" (siehe [update.md](update.md)).
 
-### Schritt 6 — Stack vollständig starten
+### Schritt 6 — Wechselkurs initialisieren
+
+```bash
+docker compose --env-file config/.env run --rm backend python scripts/refresh_ecb_rate.py
+```
+
+Holt den aktuellen EUR/USD-Kurs von der EZB und speichert ihn in der Datenbank. Ohne diesen Schritt werden keine Budgets angezeigt. Der Cron-Job aktualisiert den Kurs danach automatisch monatlich.
+
+### Schritt 7 — Stack vollständig starten
 
 ```bash
 docker compose --env-file config/.env up -d
 ```
 
-### Schritt 7 — Reverse Proxy (TLS)
+### Schritt 8 — Reverse Proxy (TLS)
 
 Der Stack lauscht auf Port 80 (intern). TLS-Terminierung erfolgt über den Reverse Proxy des Schulservers (nginx oder Caddy), der auf den Stack-Port weiterleitet. Eine Beispiel-nginx-Konfiguration liegt in [`infra/nginx.conf`](infra/nginx.conf).
 
