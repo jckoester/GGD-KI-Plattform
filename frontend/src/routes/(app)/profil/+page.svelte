@@ -109,7 +109,7 @@
                             class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 mb-3"
                         >
                             <div
-                                class="h-1 rounded transition-all {pct >= 20
+                                class="h-1 rounded transition-all {pct >= 80
                                     ? 'bg-red-500'
                                     : 'bg-primary'}"
                                 style="width: {100 - pct}%"
