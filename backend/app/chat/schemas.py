@@ -37,6 +37,7 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     conversation_id: Optional[UUID] = None
     model_id: Optional[str] = None
+    assistant_id: Optional[int] = None
 
     @model_validator(mode="after")
     def at_least_one_message(self):

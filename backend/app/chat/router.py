@@ -18,8 +18,9 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant
 from app.db.session import get_db, AsyncSessionLocal
+from app.api.assistants import _is_visible_for_user
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 
@@ -198,9 +199,8 @@ async def chat(
     db: AsyncSession = Depends(get_db),
 ):
     model_used = request.model_id or settings.chat_default_model
+    system_prompt_snapshot: Optional[str] = None
     litellm_payload = {
-        "model": model_used,
-        "messages": [{"role": msg.role, "content": _serialize_content(msg.content)} for msg in request.messages],
         "stream": True,
         "stream_options": {"include_usage": True},
         "user": current_user.sub,
@@ -214,11 +214,28 @@ async def chat(
     title_prompt: str | None = None
 
     if is_new:
+        if request.assistant_id is not None:
+            asst_result = await db.execute(
+                select(Assistant).where(Assistant.id == request.assistant_id)
+            )
+            assistant = asst_result.scalar_one_or_none()
+            if assistant is None:
+                await client.aclose()
+                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+            if not _is_visible_for_user(assistant, current_user.roles):
+                await client.aclose()
+                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+            system_prompt_snapshot = assistant.system_prompt
+            if not request.model_id:
+                model_used = assistant.model
+
         first_user_msg = next((_text_from_content(m.content) for m in request.messages if m.role == "user"), "")
         new_conv = Conversation(
             pseudonym=current_user.sub,
             model_used=model_used,
             title=make_title(first_user_msg) if first_user_msg else None,
+            assistant_id=request.assistant_id,
+            system_prompt_snapshot=system_prompt_snapshot,
         )
         db.add(new_conv)
         await db.flush()
@@ -238,9 +255,19 @@ async def chat(
         if existing is None:
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
-        # Laufende Konversationen behalten ihr ursprüngliches Modell.
+        # Laufende Konversationen behalten ihr ursprüngliches Modell und Snapshot.
         model_used = existing.model_used
-        litellm_payload["model"] = model_used
+        system_prompt_snapshot = existing.system_prompt_snapshot
+
+    llm_messages: list[dict] = []
+    if system_prompt_snapshot:
+        llm_messages.append({"role": "system", "content": system_prompt_snapshot})
+    llm_messages.extend(
+        {"role": msg.role, "content": _serialize_content(msg.content)}
+        for msg in request.messages
+    )
+    litellm_payload["model"] = model_used
+    litellm_payload["messages"] = llm_messages
 
     # Key aus DB laden
     key_result = await db.execute(

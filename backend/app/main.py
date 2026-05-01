@@ -30,6 +30,7 @@ from app.preferences.router import router as preferences_router
 from app.budget.router import router as budget_router
 from app.chat.router import router as chat_router
 from app.api.admin.router import router as admin_router
+from app.api.assistants import router as assistants_router
 from app.site_texts.router import router as site_texts_router
 from app.upload.router import router as upload_router
 
@@ -76,6 +77,7 @@ async def health():
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(admin_router)
+app.include_router(assistants_router)
 app.include_router(budget_router)
 app.include_router(preferences_router)
 app.include_router(chat_router)

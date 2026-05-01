@@ -27,3 +27,18 @@ def test_chat_message_invalid_content_part():
 def test_chat_request_empty_messages_raises():
     with pytest.raises(ValidationError):
         ChatRequest(messages=[])
+
+
+def test_chat_request_with_assistant_id():
+    req = ChatRequest(
+        messages=[ChatMessage(role="user", content="Hallo")],
+        assistant_id=5,
+    )
+    assert req.assistant_id == 5
+
+
+def test_chat_request_without_assistant_id_defaults_to_none():
+    req = ChatRequest(
+        messages=[ChatMessage(role="user", content="Hallo")],
+    )
+    assert req.assistant_id is None
