@@ -8,6 +8,7 @@
         Eye,
         PiggyBank,
         ChartNoAxesCombined,
+        Bot,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
     import { onMount } from "svelte";
@@ -45,6 +46,17 @@
     bind:this={menuRef}
     class="absolute bottom-16 left-0 right-0 mx-3 bg-light-bg dark:bg-dark-ui rounded-md shadow-lg border border-light-ui-3 dark:border-dark-ui-3 py-0 z-50"
 >
+    <!-- Assistenten (derzeit nur bei admin-Rolle) -->
+    {#if $user?.roles.includes("admin")}
+        <a
+            href="/assistants"
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        >
+            <Bot class="w-4 h-4 mr-3 text-light-bl dark:text-dark-bl" />
+            Assistenten
+        </a>
+    {/if}
+
     <!-- Admin (nur bei admin-Rolle) -->
     {#if $user?.roles.includes("admin")}
         <a
