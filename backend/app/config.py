@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     spend_log_delay: float = 1.0
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3
+    assistant_schema_path: str = "config/assistant_schema.json"
 
 
 settings = Settings()

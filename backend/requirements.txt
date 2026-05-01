@@ -22,3 +22,4 @@ testcontainers[postgresql]>=4.7.0
 
 # Runtime - Auth
 bcrypt>=4.0.0
+jsonschema>=4.22.0
