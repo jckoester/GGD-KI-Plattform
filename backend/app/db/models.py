@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Numeric, Boolean
@@ -20,6 +20,23 @@ class AssistantStatus(enum.Enum):
     ACTIVE = "active"
     DISABLED = "disabled"
     ARCHIVED = "archived"
+
+
+class AssistantAudience(enum.Enum):
+    STUDENT = "student"
+    TEACHER = "teacher"
+    ALL = "all"
+
+
+class AssistantScope(enum.Enum):
+    PRIVATE = "private"
+    SUBJECT_DEPARTMENT = "subject_department"
+    TEACHERS = "teachers"
+    ACTIVITY_GROUP = "activity_group"
+    CLASS_GROUP = "class_group"
+    GRADE = "grade"
+    ALL_STUDENTS = "all_students"
+    ALL = "all"
 
 
 class MessageRole(enum.Enum):
@@ -48,23 +65,68 @@ class Assistant(Base):
     __tablename__ = "assistants"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     subject_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("subjects.id", ondelete="SET NULL")
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
     )
-    status: Mapped[str] = mapped_column(
-        default="draft",
-        server_default=text("'draft'")
-    )
+    system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    temperature: Mapped[Optional[float]] = mapped_column(Numeric(3, 2), nullable=True)
+    max_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    status: Mapped[str] = mapped_column(default="draft", server_default=text("'draft'"))
+    audience: Mapped[str] = mapped_column(default="student", server_default=text("'student'"))
+    scope: Mapped[str] = mapped_column(default="private", server_default=text("'private'"))
+    scope_pending: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scope_group_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    tags: Mapped[Optional[list]] = mapped_column(ARRAY(Text), nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    import_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
     force_cost_display: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
-    created_by_pseudonym: Mapped[Optional[str]] = mapped_column(nullable=True)
+    sort_order: Mapped[int] = mapped_column(default=0, server_default=text("0"))
+
+    available_from:  Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    available_until: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
+    created_by_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_by_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('draft', 'active', 'disabled', 'archived')",
-            name="check_assistant_status"
+            "status IN ('draft','active','disabled','archived')",
+            name="check_assistant_status",
         ),
+        CheckConstraint(
+            "audience IN ('student','teacher','all')",
+            name="check_assistant_audience",
+        ),
+        CheckConstraint(
+            "scope IN ('private','subject_department','teachers','activity_group',"
+            "          'class_group','grade','all_students','all')",
+            name="check_assistant_scope",
+        ),
+        CheckConstraint(
+            "scope_pending IS NULL OR scope_pending IN "
+            "('private','subject_department','teachers','activity_group',"
+            " 'class_group','grade','all_students','all')",
+            name="check_assistant_scope_pending",
+        ),
+        Index("idx_assistants_status", "status"),
+        Index("idx_assistants_subject_id", "subject_id"),
     )
 
 
