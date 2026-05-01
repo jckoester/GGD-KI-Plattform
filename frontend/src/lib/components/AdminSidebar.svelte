@@ -19,6 +19,7 @@
         ShieldCheck,
         BarChart2,
         PiggyBank,
+        Bot,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import { user, hasAnyRole } from "$lib/stores/user.js";
@@ -97,6 +98,28 @@
                 </button>
             </div>
         </div>
+
+        <!-- Assistenten -->
+        {#if $canSeeSettings}
+        <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
+            <div
+                class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg
+                       {openSection === 'assistants' ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+            >
+                <button
+                    onclick={() => {
+                        goto('/assistants');
+                    }}
+                >
+                    <span class="flex items-center gap-2">
+                        <Bot class="w-4 h-4 text-light-bl dark:text-dark-bl" />
+                        Assistenten
+                    </span>
+                </button>
+            </div>
+        </div>
+        {/if}
 
         <!-- Einstellungen -->
         {#if $canSeeSettings}

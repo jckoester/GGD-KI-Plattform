@@ -326,3 +326,89 @@ export async function uploadFile(file) {
   }
   return res.json()  // TextUploadResult | ImageUploadResult
 }
+
+// Liste (mit optionalen Filtern)
+export async function getAdminAssistants(params = {}) {
+  const url = new URL(`${BASE}/admin/assistants`, location.href)
+  Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { items: AssistantResponse[], total: int }
+}
+
+// Anlegen
+export async function createAssistant(data) {
+  const res = await fetch(`${BASE}/admin/assistants`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}
+
+// Bearbeiten (PATCH)
+export async function updateAssistant(id, data) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}
+
+// Löschen
+export async function deleteAssistant(id) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+}
+
+// Aktivieren
+export async function activateAssistant(id) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}/activate`, {
+    method: 'POST', credentials: 'include',
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}
+
+export async function deactivateAssistant(id) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}/deactivate`, {
+    method: 'POST', credentials: 'include',
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}
+
+// Export: YAML-Datei herunterladen
+export async function exportAssistant(id, filename) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}/export`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Import: YAML-Datei hochladen (optional mit model_override)
+export async function importAssistant(file, modelOverride = null) {
+  const form = new FormData()
+  form.append('file', file)
+  if (modelOverride) form.append('model_override', modelOverride)
+  const res = await fetch(`${BASE}/admin/assistants/import`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()
+}
