@@ -151,6 +151,9 @@ class Conversation(Base):
     )
     title: Mapped[Optional[str]] = mapped_column(nullable=True)
     model_used: Mapped[str] = mapped_column(nullable=False)
+    is_test: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )

@@ -128,12 +128,13 @@ export async function getAssistants() {
   return res.json()  // { items: AssistantSummary[] }
 }
 
-export async function* streamChat(messages, conversationId = null, modelId = null, assistantId = null) {
+export async function* streamChat(messages, conversationId = null, modelId = null, assistantId = null, isTest = false) {
   let res
   try {
     const body = { messages, conversation_id: conversationId }
     if (modelId)     body.model_id     = modelId
     if (assistantId) body.assistant_id = assistantId
+    if (isTest)     body.is_test      = true
     res = await fetch(`${BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -330,6 +331,13 @@ export async function uploadFile(file) {
     throw new ApiError(res.status, data.detail ?? `Upload fehlgeschlagen (${res.status})`)
   }
   return res.json()  // TextUploadResult | ImageUploadResult
+}
+
+// Einzelner Assistent (für Bearbeiten)
+export async function getAdminAssistant(id) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // AssistantResponse
 }
 
 // Liste (mit optionalen Filtern)

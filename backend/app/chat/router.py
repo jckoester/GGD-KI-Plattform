@@ -31,6 +31,7 @@ class ConversationItem(BaseModel):
     last_message_at: Optional[datetime]
     model_used: str
     assistant_name: Optional[str] = None
+    is_test: bool = False
 
 
 class ConversationListResponse(BaseModel):
@@ -55,6 +56,7 @@ class ConversationDetailResponse(BaseModel):
     assistant_name: Optional[str] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
+    is_test: bool = False
     messages: list[MessageItem]
 
 
@@ -225,7 +227,12 @@ async def chat(
             if assistant is None:
                 await client.aclose()
                 raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-            if not _is_visible_for_user(assistant, current_user.roles):
+            if request.is_test:
+                # Testchat: nur Admins und Lehrkräfte dürfen inaktive Assistenten testen
+                if "admin" not in current_user.roles and "teacher" not in current_user.roles:
+                    await client.aclose()
+                    raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
+            elif not _is_visible_for_user(assistant, current_user.roles):
                 await client.aclose()
                 raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
             system_prompt_snapshot = assistant.system_prompt
@@ -239,6 +246,7 @@ async def chat(
             title=make_title(first_user_msg) if first_user_msg else None,
             assistant_id=request.assistant_id,
             system_prompt_snapshot=system_prompt_snapshot,
+            is_test=request.is_test,
         )
         db.add(new_conv)
         await db.flush()
@@ -512,12 +520,17 @@ async def delete_conversation(
 async def list_conversations(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    include_test: bool = Query(default=False),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationListResponse:
-    # Gesamtzahl aller eigenen Konversationen
+    # Filter für is_test
+    is_test_filter = Conversation.is_test == False if not include_test else True
+
+    # Gesamtzahl aller eigenen Konversationen (mit Filter)
     total_stmt = select(func.count()).select_from(Conversation).where(
-        Conversation.pseudonym == current_user.sub
+        Conversation.pseudonym == current_user.sub,
+        is_test_filter,
     )
     total_result = await db.execute(total_stmt)
     total = total_result.scalar()
@@ -526,7 +539,10 @@ async def list_conversations(
     stmt = (
         select(Conversation, Assistant.name.label("assistant_name"))
         .outerjoin(Assistant, Conversation.assistant_id == Assistant.id)
-        .where(Conversation.pseudonym == current_user.sub)
+        .where(
+            Conversation.pseudonym == current_user.sub,
+            is_test_filter,
+        )
         .order_by(Conversation.last_message_at.desc().nulls_last())
         .limit(limit)
         .offset(offset)
@@ -541,6 +557,7 @@ async def list_conversations(
             last_message_at=conv.last_message_at,
             model_used=conv.model_used,
             assistant_name=asst_name,
+            is_test=conv.is_test,
         )
         for conv, asst_name in rows
     ]
@@ -607,5 +624,6 @@ async def get_conversation_messages(
         assistant_name=assistant_name,
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
+        is_test=conversation.is_test,
         messages=messages_list,
     )
