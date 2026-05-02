@@ -773,7 +773,9 @@
                 <!-- Globaler Hinweistext -->
                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                     KI kann Fehler machen. Ergebnisse immer kritisch prüfen.
-                    Verwende <code>/</code> um Assistenten zu starten.
+                    {#if !conversationId && !selectedAssistant && availableAssistants.length > 0}
+                        Verwende <code>/</code> um Assistenten zu starten.
+                    {/if}
                 </p>
             </div>
         </div>
