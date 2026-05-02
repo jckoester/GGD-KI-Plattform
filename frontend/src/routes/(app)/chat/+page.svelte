@@ -1,7 +1,8 @@
 <script>
-    import { Send, Loader2, AlertCircle, Paperclip } from "lucide-svelte";
+    import { Send, Loader2, AlertCircle, Paperclip, Bot, X } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
+    import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -10,6 +11,7 @@
         getConversationMessages,
         getModels,
         uploadFile,
+        getAssistants,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
@@ -34,6 +36,12 @@
     // Attachment-State
     let attachments = $state([]);
     let fileInput = $state(null);
+
+    // Assistenten-State
+    let availableAssistants = $state([])
+    let selectedAssistant = $state(null)
+    let pickerOpen = $state(false)
+    let conversationAssistant = $state(null) // Assistenten-Objekt für laufende Konversation
 
     const MAX_FILES = 3;
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -234,17 +242,25 @@
                     : m.content,
                 }));
 
-            const modelId = conversationId ? null : selectedModelId;
+            const modelId = (conversationId || selectedAssistant) ? null : selectedModelId
+            const assistantId = conversationId ? null : (selectedAssistant?.id ?? null)
+
             for await (const item of streamChat(
                 apiMessages,
                 conversationId,
                 modelId,
+                assistantId,
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
                     conversationId = item.conversationId;
-                    currentConversationModel =
-                        selectedModelId || currentConversationModel;
+                    currentConversationModel = selectedAssistant
+                        ? selectedAssistant.name
+                        : (selectedModelId || currentConversationModel);
+                    // Assistenten-Referenz für laufende Konversation speichern
+                    if (selectedAssistant) {
+                        conversationAssistant = selectedAssistant
+                    }
                     continue;
                 }
                 // Titel-Event
@@ -314,8 +330,26 @@
         }
     }
 
-    function handleInput() {
+    function handleInput(e) {
         adjustTextareaHeight();
+        // /-Shortcut für Assistenten-Auswahl
+        // e.target.value statt input: bind:value aktualisiert input erst nach dem Handler
+        if (e.target.value === '/' && !conversationId && availableAssistants.length > 0) {
+            input = ''
+            pickerOpen = true
+        }
+    }
+
+    // Picker-Callbacks
+    function handleAssistantSelect(assistant) {
+        selectedAssistant = assistant
+        pickerOpen = false
+        textarea?.focus()
+    }
+
+    function handlePickerClose() {
+        pickerOpen = false
+        textarea?.focus()
     }
 
     // Laden der Konversation basierend auf URL-Parameter
@@ -335,6 +369,10 @@
                 conversationId = data.id;
                 currentConversationModel = data.model_used;
                 totalCostUsd = data.total_cost_usd ?? null;
+                selectedAssistant = null;
+                conversationAssistant = data.assistant_name
+                    ? { id: data.assistant_id, name: data.assistant_name }
+                    : null;
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
             } catch (err) {
@@ -366,6 +404,9 @@
             conversationError = null;
             pageTitle.set("");
             activeConversationId.set(null);
+            selectedAssistant = null;
+            conversationAssistant = null;
+            pickerOpen = false;
         }
     }
 
@@ -375,9 +416,20 @@
         loadConversation();
     });
 
+    // Assistenten laden (parallel zu Modellen)
+    async function loadAssistants() {
+        try {
+            const data = await getAssistants()
+            availableAssistants = data.items
+        } catch {
+            // kein hard fail — Assistenten sind optional
+        }
+    }
+
     // Stores zurücksetzen beim Verlassen der Seite
     onMount(() => {
         loadModels();
+        loadAssistants();
     });
 
     onDestroy(() => {
@@ -459,7 +511,16 @@
     <div
         class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 px-4 pt-3 pb-4"
     >
-        <div class="max-w-4xl mx-auto space-y-2">
+        <div class="max-w-4xl mx-auto space-y-2 relative">
+            <!-- AssistantPicker Overlay -->
+            {#if pickerOpen}
+                <AssistantPicker
+                    assistants={availableAssistants}
+                    onselect={handleAssistantSelect}
+                    onclose={handlePickerClose}
+                />
+            {/if}
+
             <!-- Konversationskosten -->
             {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                 <div
@@ -469,6 +530,26 @@
                         totalCostUsd,
                         $budget?.eur_usd_rate,
                     )} €
+                </div>
+            {/if}
+
+            <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
+            {#if selectedAssistant && !conversationId && !conversationAssistant}
+                <div class="flex items-center gap-1.5">
+                    <span class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+                                 bg-light-bl/15 dark:bg-dark-bl/15
+                                 text-light-bl dark:text-dark-bl
+                                 border border-light-bl/30 dark:border-dark-bl/30">
+                        <Bot class="w-3 h-3" />
+                        {selectedAssistant.name}
+                    </span>
+                    <button
+                        onclick={() => { selectedAssistant = null }}
+                        class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+                        title="Assistenten entfernen"
+                    >
+                        <X class="w-3 h-3" />
+                    </button>
                 </div>
             {/if}
 
@@ -522,7 +603,7 @@
                     || attachments.some(a => a.status === 'uploading')
                     || (!input.trim() && !attachments.some(a => a.status === 'ready'))}
                   class="p-2 bg-primary text-white rounded-lg
-                         hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                         hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
                     {#if isStreaming}
@@ -547,61 +628,69 @@
               </div>
             {/if}
 
-            <!-- Toolbar-Zeile: Modell-Auswahl + Hinweistexte -->
+            <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte -->
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <!-- Modell-Auswahl -->
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <label
-                        for="chat-model"
-                        class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
-                    >
-                        Modell
-                    </label>
-                    {#if conversationId}
-                        <select
-                            id="chat-model"
-                            disabled={true}
-                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                   bg-light-ui dark:bg-dark-ui
-                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                   opacity-60 cursor-not-allowed"
-                            value={currentConversationModel || ""}
+                {#if conversationAssistant || selectedAssistant}
+                    <!-- Assistenten-Anzeige statt Modell -->
+                    <span class="flex items-center gap-1.5 text-xs text-light-bl dark:text-dark-bl shrink-0">
+                        <Bot class="w-3.5 h-3.5" />
+                        {conversationAssistant?.name || selectedAssistant?.name}
+                    </span>
+                {:else}
+                    <!-- Modell-Auswahl -->
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <label
+                            for="chat-model"
+                            class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
                         >
-                            {#if currentConversationModel}
-                                <option value={currentConversationModel}
-                                    >{currentConversationModel}</option
-                                >
-                            {:else}
-                                <option value="">Unbekannt</option>
-                            {/if}
-                        </select>
-                    {:else}
-                        <select
-                            id="chat-model"
-                            bind:value={selectedModelId}
-                            disabled={isStreaming || modelsLoading}
-                            onchange={handleModelChange}
-                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                   bg-light-bg-2 dark:bg-dark-bg-2
-                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                   disabled:opacity-60"
-                        >
-                            {#if availableModels.length > 0}
-                                {#each availableModels as model}
-                                    <option value={model.id}>{model.id}</option>
-                                {/each}
-                            {:else}
-                                <option value={selectedModelId || ""}>
-                                    {selectedModelId ||
-                                        "Standardmodell (Backend)"}
-                                </option>
-                            {/if}
-                        </select>
-                    {/if}
-                </div>
+                            Modell
+                        </label>
+                        {#if conversationId}
+                            <select
+                                id="chat-model"
+                                disabled={true}
+                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                       bg-light-ui dark:bg-dark-ui
+                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                       opacity-60 cursor-not-allowed"
+                                value={currentConversationModel || ""}
+                            >
+                                {#if currentConversationModel}
+                                    <option value={currentConversationModel}
+                                        >{currentConversationModel}</option
+                                    >
+                                {:else}
+                                    <option value="">Unbekannt</option>
+                                {/if}
+                            </select>
+                        {:else}
+                            <select
+                                id="chat-model"
+                                bind:value={selectedModelId}
+                                disabled={isStreaming || modelsLoading}
+                                onchange={handleModelChange}
+                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                       bg-light-bg-2 dark:bg-dark-bg-2
+                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                       disabled:opacity-60"
+                            >
+                                {#if availableModels.length > 0}
+                                    {#each availableModels as model}
+                                        <option value={model.id}>{model.id}</option>
+                                    {/each}
+                                {:else}
+                                    <option value={selectedModelId || ""}>
+                                        {selectedModelId ||
+                                            "Standardmodell (Backend)"}
+                                    </option>
+                                {/if}
+                            </select>
+                        {/if}
+                    </div>
+                {/if}
 
                 <!-- Modell-Statustexte (Laden / Fehler / Fix-Hinweis) -->
-                {#if conversationId}
+                {#if conversationId && !conversationAssistant}
                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                         Im laufenden Chat kann das Modell nicht geändert werden.
                     </span>

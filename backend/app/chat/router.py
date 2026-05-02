@@ -50,6 +50,8 @@ class ConversationDetailResponse(BaseModel):
     id: UUID
     title: Optional[str]
     model_used: str
+    assistant_id: Optional[int] = None
+    assistant_name: Optional[str] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     messages: list[MessageItem]
@@ -584,10 +586,21 @@ async def get_conversation_messages(
         for msg in messages
     ]
 
+    assistant_name: Optional[str] = None
+    if conversation.assistant_id is not None:
+        asst_result = await db.execute(
+            select(Assistant).where(Assistant.id == conversation.assistant_id)
+        )
+        asst = asst_result.scalar_one_or_none()
+        if asst:
+            assistant_name = asst.name
+
     return ConversationDetailResponse(
         id=conversation.id,
         title=conversation.title,
         model_used=conversation.model_used,
+        assistant_id=conversation.assistant_id,
+        assistant_name=assistant_name,
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         messages=messages_list,
