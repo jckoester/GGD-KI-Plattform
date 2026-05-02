@@ -103,12 +103,11 @@
         {#if $canSeeSettings}
         <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
             <div
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg
-                       {openSection === 'assistants' ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
             >
                 <button
                     onclick={() => {
+                        toggleOpenSection('assistants');
                         goto('/assistants');
                     }}
                 >
@@ -117,8 +116,33 @@
                         Assistenten
                     </span>
                 </button>
+                <button
+                    onclick={() => toggleOpenSection('assistants')}
+                >
+                    <span class="flex items-center gap-2">
+                        {#if openSection === 'assistants'}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </span>
+                </button>
             </div>
         </div>
+        {#if openSection === 'assistants'}
+            <div class="mt-1 space-y-1 pl-2">
+                <button
+                    onclick={() => goto('/assistants/verwalten')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <Settings class="w-4 h-4" />
+                        Verwalten
+                    </span>
+                </button>
+            </div>
+        {/if}
         {/if}
 
         <!-- Einstellungen -->
@@ -175,6 +199,16 @@
                             Modell-Freischaltung
                         </span>
                     </div>
+                </button>
+                <button
+                    onclick={() => goto('/settings/assistants')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <Bot class="w-4 h-4" />
+                        Assistenten-Freigabe
+                    </span>
                 </button>
                 <div
                     class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx

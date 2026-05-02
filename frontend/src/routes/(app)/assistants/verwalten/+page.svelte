@@ -5,8 +5,6 @@
         Plus,
         Pencil,
         Trash2,
-        Eye,
-        EyeOff,
         Download,
         Upload,
         X,
@@ -24,8 +22,6 @@
         createAssistant,
         updateAssistant,
         deleteAssistant,
-        activateAssistant,
-        deactivateAssistant,
         exportAssistant,
         importAssistant,
         getModels,
@@ -301,23 +297,7 @@
         }
     }
 
-    // Aktivieren/Deaktivieren
-    async function toggleActivate(assistant) {
-        try {
-            if (assistant.status === "active") {
-                await deactivateAssistant(assistant.id);
-                successMessage = "Assistent wurde deaktiviert.";
-            } else {
-                await activateAssistant(assistant.id);
-                successMessage = "Assistent wurde aktiviert.";
-            }
-            await reload();
-        } catch (e) {
-            error = e.message;
-        }
-    }
-
-    // Aktionsschaltflächen pro Zeile
+    // Aktionsschaltflächen pro Zeile (ohne Aktivieren/Deaktivieren)
     function getActions(assistant) {
         const actions = [];
         actions.push({
@@ -325,25 +305,6 @@
             action: () => openPanel(assistant),
             icon: Pencil,
         });
-        if (assistant.status === "active") {
-            actions.push({
-                label: "Deaktivieren",
-                action: () => toggleActivate(assistant),
-                icon: EyeOff,
-            });
-        } else if (
-            assistant.status === "draft" ||
-            assistant.status === "disabled" ||
-            assistant.status === "archived"
-        ) {
-            if (assistant.status !== "active") {
-                actions.push({
-                    label: "Aktivieren",
-                    action: () => toggleActivate(assistant),
-                    icon: Eye,
-                });
-            }
-        }
         actions.push({
             label: "Exportieren",
             action: () => doExport(assistant),
@@ -380,10 +341,6 @@
     });
 </script>
 
-<svelte:head>
-    <title>Assistenten</title>
-</svelte:head>
-
 <div class="h-full flex flex-col">
     <!-- Kopfzeile -->
     <div
@@ -392,7 +349,7 @@
         <div class="flex items-center gap-2">
             <Bot class="w-6 h-6 text-light-bl dark:text-dark-bl" />
             <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-                Assistenten
+                Assistenten verwalten
             </h1>
         </div>
         <div class="flex items-center gap-2">
@@ -496,8 +453,7 @@
                                 class="border-b border-light-ui-3 dark:border-dark-ui-3"
                             >
                                 <th class="pb-3 pr-4 font-medium">Name</th>
-                                <th class="pb-3 pr-4 font-medium">Zielgruppe</th
-                                >
+                                <th class="pb-3 pr-4 font-medium">Zielgruppe</th>
                                 <th class="pb-3 pr-4 font-medium">Status</th>
                                 <th class="pb-3 pr-4 font-medium">Aktionen</th>
                             </tr>

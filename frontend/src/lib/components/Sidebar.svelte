@@ -11,6 +11,7 @@
         BarChart2,
         PiggyBank,
         Bot,
+        Settings,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -31,6 +32,12 @@
 
     // Aufklappbarer Bereich für Letzte Chats
     let recentChatsOpen = $state(true);
+    // Aufklappbarer Bereich für Assistenten
+    let assistantsOpen = $state($page.url.pathname.startsWith('/assistants'));
+
+    $effect(() => {
+        if ($page.url.pathname.startsWith('/assistants')) assistantsOpen = true;
+    });
 
     function toggleRecentChats() {
         recentChatsOpen = !recentChatsOpen;
@@ -38,6 +45,10 @@
 
     function openRecentChats() {
         recentChatsOpen = true;
+    }
+
+    function toggleAssistants() {
+        assistantsOpen = !assistantsOpen;
     }
 
     function formatDate(dateString) {
@@ -142,19 +153,46 @@
             Neuer Chat
         </button>
 
-        <!-- Assistenten Menüpunkt -->
-        <button
-            onclick={() => goto("/assistants")}
-            class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-                   text-light-tx dark:text-dark-tx
-                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                   {$page.url.pathname === '/assistants'
-                ? 'bg-light-ui-2 dark:bg-dark-ui-2'
-                : ''}"
-        >
-            <Bot class="w-4 h-4" />
-            Assistenten
-        </button>
+        <!-- Assistenten -->
+        <div class="mt-2">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       {$page.url.pathname.startsWith('/assistants') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+            >
+                <button onclick={() => { assistantsOpen = true; goto('/assistants') }}>
+                    <span class="flex items-center gap-2">
+                        <Bot class="w-4 h-4" />
+                        Assistenten
+                    </span>
+                </button>
+                {#if $user?.roles.includes('admin')}
+                    <button onclick={toggleAssistants}>
+                        {#if assistantsOpen}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </button>
+                {/if}
+            </div>
+            {#if assistantsOpen && $user?.roles.includes('admin')}
+                <div class="mt-1 space-y-1 pl-2">
+                    <button
+                        onclick={() => goto('/assistants/verwalten')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/assistants/verwalten'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <Settings class="w-4 h-4" />
+                            Verwalten
+                        </span>
+                    </button>
+                </div>
+            {/if}
+        </div>
 
         <!-- Letzte Chats Sektion -->
         <div class="mt-2">
