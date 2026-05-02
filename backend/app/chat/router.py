@@ -30,6 +30,7 @@ class ConversationItem(BaseModel):
     title: Optional[str]
     last_message_at: Optional[datetime]
     model_used: str
+    assistant_name: Optional[str] = None
 
 
 class ConversationListResponse(BaseModel):
@@ -478,6 +479,7 @@ async def update_conversation_title(
         title=conversation.title,
         last_message_at=conversation.last_message_at,
         model_used=conversation.model_used,
+        assistant_name=None,  # Rename-Response enthält keinen Assistenten-Namen
     )
 
 
@@ -520,16 +522,17 @@ async def list_conversations(
     total_result = await db.execute(total_stmt)
     total = total_result.scalar()
 
-    # Paginierte Liste
+    # Paginierte Liste mit Outer Join für Assistenten
     stmt = (
-        select(Conversation)
+        select(Conversation, Assistant.name.label("assistant_name"))
+        .outerjoin(Assistant, Conversation.assistant_id == Assistant.id)
         .where(Conversation.pseudonym == current_user.sub)
         .order_by(Conversation.last_message_at.desc().nulls_last())
         .limit(limit)
         .offset(offset)
     )
     result = await db.execute(stmt)
-    conversations = result.scalars().all()
+    rows = result.all()
 
     items = [
         ConversationItem(
@@ -537,8 +540,9 @@ async def list_conversations(
             title=conv.title,
             last_message_at=conv.last_message_at,
             model_used=conv.model_used,
+            assistant_name=asst_name,
         )
-        for conv in conversations
+        for conv, asst_name in rows
     ]
 
     return ConversationListResponse(

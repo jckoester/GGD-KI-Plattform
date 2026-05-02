@@ -458,9 +458,12 @@
             conversationError = null;
             pageTitle.set("");
             activeConversationId.set(null);
-            selectedAssistant = null;
             conversationAssistant = null;
             pickerOpen = false;
+            // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
+            if (!$page.url.searchParams.get('assistant_id')) {
+                selectedAssistant = null;
+            }
         }
     }
 
@@ -468,6 +471,15 @@
     $effect(() => {
         $page.url;
         loadConversation();
+    });
+
+    // Assistenten-ID aus URL-Parameter auswerten
+    $effect(() => {
+        const paramId = $page.url.searchParams.get('assistant_id')
+        if (paramId && availableAssistants.length > 0) {
+            const found = availableAssistants.find(a => String(a.id) === paramId)
+            if (found) selectedAssistant = found
+        }
     });
 
     // Assistenten laden (parallel zu Modellen)

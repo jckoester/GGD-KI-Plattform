@@ -10,6 +10,7 @@
         ShieldCheck,
         BarChart2,
         PiggyBank,
+        Bot,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -141,6 +142,20 @@
             Neuer Chat
         </button>
 
+        <!-- Assistenten Menüpunkt -->
+        <button
+            onclick={() => goto("/assistants")}
+            class="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                   text-light-tx dark:text-dark-tx
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                   {$page.url.pathname === '/assistants'
+                ? 'bg-light-ui-2 dark:bg-dark-ui-2'
+                : ''}"
+        >
+            <Bot class="w-4 h-4" />
+            Assistenten
+        </button>
+
         <!-- Letzte Chats Sektion -->
         <div class="mt-2">
             <div
@@ -186,13 +201,26 @@
                                     ? 'bg-light-ui-2 dark:bg-dark-ui-2'
                                     : ''}"
                             >
-                                <div class="flex justify-between items-center">
-                                    <span
-                                        class="truncate max-w-[70%]"
-                                        title={conv.title ?? "Unbenannter Chat"}
+                                <div
+                                    class="flex justify-between items-center gap-1"
+                                >
+                                    <div
+                                        class="flex items-center gap-1 min-w-0"
                                     >
-                                        {conv.title ?? "Unbenannter Chat"}
-                                    </span>
+                                        {#if conv.assistant_name}
+                                            <Bot
+                                                class="w-3 h-3 shrink-0 text-light-bl dark:text-dark-bl"
+                                                title={conv.assistant_name}
+                                            />
+                                        {/if}
+                                        <span
+                                            class="truncate"
+                                            title={conv.title ??
+                                                "Unbenannter Chat"}
+                                        >
+                                            {conv.title ?? "Unbenannter Chat"}
+                                        </span>
+                                    </div>
                                     <span
                                         class="text-xs text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap"
                                     >

@@ -3,7 +3,7 @@
     import { goto } from "$app/navigation";
     import { getRecentConversations } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
-    import { Loader2 } from "lucide-svelte";
+    import { Loader2, Bot } from "lucide-svelte";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { History, ArrowLeft } from "lucide-svelte";
@@ -128,7 +128,13 @@
                                 <td
                                     class="px-4 py-3 text-light-tx dark:text-dark-tx"
                                 >
-                                    {conv.title ?? "Unbenannter Chat"}
+                                    <div class="flex items-center gap-2">
+                                        {#if conv.assistant_name}
+                                            <Bot class="w-4 h-4 shrink-0 text-light-bl dark:text-dark-bl"
+                                                 title={conv.assistant_name} />
+                                        {/if}
+                                        <span>{conv.title ?? "Unbenannter Chat"}</span>
+                                    </div>
                                 </td>
                                 <td
                                     class="px-4 py-3 text-sm text-light-tx-3 dark:text-dark-tx-3"
