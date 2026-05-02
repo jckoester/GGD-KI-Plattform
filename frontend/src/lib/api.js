@@ -122,13 +122,18 @@ export async function deleteConversation(conversationId) {
   }
 }
 
-export async function* streamChat(messages, conversationId = null, modelId = null) {
+export async function getAssistants() {
+  const res = await fetch(`${BASE}/assistants`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { items: AssistantSummary[] }
+}
+
+export async function* streamChat(messages, conversationId = null, modelId = null, assistantId = null) {
   let res
   try {
     const body = { messages, conversation_id: conversationId }
-    if (modelId) {
-      body.model_id = modelId
-    }
+    if (modelId)     body.model_id     = modelId
+    if (assistantId) body.assistant_id = assistantId
     res = await fetch(`${BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

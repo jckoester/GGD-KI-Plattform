@@ -1,7 +1,15 @@
 <script>
-    import { Send, Loader2, AlertCircle, Paperclip } from "lucide-svelte";
+    import {
+        Send,
+        Loader2,
+        AlertCircle,
+        Paperclip,
+        Bot,
+        X,
+    } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
+    import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -10,6 +18,7 @@
         getConversationMessages,
         getModels,
         uploadFile,
+        getAssistants,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
@@ -35,9 +44,24 @@
     let attachments = $state([]);
     let fileInput = $state(null);
 
+    // Assistenten-State
+    let availableAssistants = $state([]);
+    let selectedAssistant = $state(null);
+    let pickerOpen = $state(false);
+    let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
+
     const MAX_FILES = 3;
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-    const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".webp"];
+    const ACCEPTED_EXTENSIONS = [
+        ".pdf",
+        ".txt",
+        ".md",
+        ".csv",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+    ];
 
     const MODEL_STORAGE_KEY = "chat_model_id";
 
@@ -114,106 +138,134 @@
     }
 
     function handleUploadClick() {
-      fileInput?.click();
+        fileInput?.click();
     }
 
     async function handleFilesSelected(event) {
-      const files = Array.from(event.target.files ?? []);
-      event.target.value = ''; // Reset, damit dieselbe Datei erneut wählbar ist
+        const files = Array.from(event.target.files ?? []);
+        event.target.value = ""; // Reset, damit dieselbe Datei erneut wählbar ist
 
-      const remaining = MAX_FILES - attachments.length;
-      if (remaining <= 0) return;
+        const remaining = MAX_FILES - attachments.length;
+        if (remaining <= 0) return;
 
-      for (const file of files.slice(0, remaining)) {
-        // Client-seitige Validierung
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!ACCEPTED_EXTENSIONS.includes(ext)) {
-          const id = crypto.randomUUID();
-          attachments = [...attachments, {
-            id,
-            filename: file.name,
-            status: 'error',
-            result: null,
-            error: `Format '${ext}' wird nicht unterstützt.`,
-          }];
-          continue;
+        for (const file of files.slice(0, remaining)) {
+            // Client-seitige Validierung
+            const ext = "." + file.name.split(".").pop().toLowerCase();
+            if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+                const id = crypto.randomUUID();
+                attachments = [
+                    ...attachments,
+                    {
+                        id,
+                        filename: file.name,
+                        status: "error",
+                        result: null,
+                        error: `Format '${ext}' wird nicht unterstützt.`,
+                    },
+                ];
+                continue;
+            }
+            if (file.size > MAX_BYTES) {
+                const id = crypto.randomUUID();
+                attachments = [
+                    ...attachments,
+                    {
+                        id,
+                        filename: file.name,
+                        status: "error",
+                        result: null,
+                        error: `Datei zu groß (max. 10 MB).`,
+                    },
+                ];
+                continue;
+            }
+
+            const id = crypto.randomUUID();
+            attachments = [
+                ...attachments,
+                {
+                    id,
+                    filename: file.name,
+                    status: "uploading",
+                    result: null,
+                    error: null,
+                },
+            ];
+
+            uploadFile(file)
+                .then((result) => {
+                    attachments = attachments.map((a) =>
+                        a.id === id ? { ...a, status: "ready", result } : a,
+                    );
+                })
+                .catch((err) => {
+                    attachments = attachments.map((a) =>
+                        a.id === id
+                            ? { ...a, status: "error", error: err.message }
+                            : a,
+                    );
+                });
         }
-        if (file.size > MAX_BYTES) {
-          const id = crypto.randomUUID();
-          attachments = [...attachments, {
-            id,
-            filename: file.name,
-            status: 'error',
-            result: null,
-            error: `Datei zu groß (max. 10 MB).`,
-          }];
-          continue;
-        }
-
-        const id = crypto.randomUUID();
-        attachments = [...attachments, { id, filename: file.name, status: 'uploading', result: null, error: null }];
-
-        uploadFile(file)
-          .then((result) => {
-            attachments = attachments.map((a) =>
-              a.id === id ? { ...a, status: 'ready', result } : a
-            );
-          })
-          .catch((err) => {
-            attachments = attachments.map((a) =>
-              a.id === id ? { ...a, status: 'error', error: err.message } : a
-            );
-          });
-      }
     }
 
     function removeAttachment(id) {
-      attachments = attachments.filter((a) => a.id !== id);
+        attachments = attachments.filter((a) => a.id !== id);
     }
 
     function buildUserContent(text, uploads) {
-      if (!uploads.length) return text;
+        if (!uploads.length) return text;
 
-      const parts = [];
-      for (const { filename, result } of uploads) {
-        if (result.type === 'text') {
-          parts.push({ type: 'text', text: `[${filename}]\n${result.content}` });
-        } else {
-          // Bild: base64-data-URL aus result.data + result.mime_type
-          parts.push({
-            type: 'image_url',
-            image_url: { url: `data:${result.mime_type};base64,${result.data}` },
-          });
+        const parts = [];
+        for (const { filename, result } of uploads) {
+            if (result.type === "text") {
+                parts.push({
+                    type: "text",
+                    text: `[${filename}]\n${result.content}`,
+                });
+            } else {
+                // Bild: base64-data-URL aus result.data + result.mime_type
+                parts.push({
+                    type: "image_url",
+                    image_url: {
+                        url: `data:${result.mime_type};base64,${result.data}`,
+                    },
+                });
+            }
         }
-      }
-      if (text) parts.push({ type: 'text', text });
-      return parts;
+        if (text) parts.push({ type: "text", text });
+        return parts;
     }
 
     async function handleSubmit() {
         // Neu: auch senden, wenn nur Anhänge vorhanden (kein Text nötig)
-        const readyAttachments = attachments.filter(a => a.status === 'ready');
-        if ((!input.trim() && readyAttachments.length === 0) || isStreaming) return;
+        const readyAttachments = attachments.filter(
+            (a) => a.status === "ready",
+        );
+        if ((!input.trim() && readyAttachments.length === 0) || isStreaming)
+            return;
         // Neu: Senden blockieren, solange noch Uploads laufen
-        if (attachments.some(a => a.status === 'uploading')) return;
+        if (attachments.some((a) => a.status === "uploading")) return;
 
         const userMessage = input.trim();
         input = "";
         adjustTextareaHeight();
 
         // Neu: Anhänge snapshotten und sofort leeren
-        const snapshotAttachments = readyAttachments.map(a => ({
-          filename: a.filename,
-          result: a.result,
+        const snapshotAttachments = readyAttachments.map((a) => ({
+            filename: a.filename,
+            result: a.result,
         }));
         attachments = [];
 
         // Neu: message-Objekt mit Attachment-Metadaten für Anzeige
-        messages = [...messages, {
-          role: "user",
-          content: userMessage,
-          uploadedAttachments: snapshotAttachments,
-        }];
+        messages = [
+            ...messages,
+            {
+                role: "user",
+                content: userMessage,
+                uploadedAttachments: snapshotAttachments,
+            },
+        ];
 
         // Assistent-Placeholder (unverändert)
         const assistantIndex = messages.length;
@@ -226,25 +278,40 @@
             // Neu: Content je User-Nachricht aufbauen
             const apiMessages = messages
                 .slice(0, assistantIndex)
-                .filter(m => m.role === "user" || m.role === "assistant")
-                .map(m => ({
-                  role: m.role,
-                  content: m.role === 'user'
-                    ? buildUserContent(m.content, m.uploadedAttachments ?? [])
-                    : m.content,
+                .filter((m) => m.role === "user" || m.role === "assistant")
+                .map((m) => ({
+                    role: m.role,
+                    content:
+                        m.role === "user"
+                            ? buildUserContent(
+                                  m.content,
+                                  m.uploadedAttachments ?? [],
+                              )
+                            : m.content,
                 }));
 
-            const modelId = conversationId ? null : selectedModelId;
+            const modelId =
+                conversationId || selectedAssistant ? null : selectedModelId;
+            const assistantId = conversationId
+                ? null
+                : (selectedAssistant?.id ?? null);
+
             for await (const item of streamChat(
                 apiMessages,
                 conversationId,
                 modelId,
+                assistantId,
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
                     conversationId = item.conversationId;
-                    currentConversationModel =
-                        selectedModelId || currentConversationModel;
+                    currentConversationModel = selectedAssistant
+                        ? selectedAssistant.name
+                        : selectedModelId || currentConversationModel;
+                    // Assistenten-Referenz für laufende Konversation speichern
+                    if (selectedAssistant) {
+                        conversationAssistant = selectedAssistant;
+                    }
                     continue;
                 }
                 // Titel-Event
@@ -314,8 +381,30 @@
         }
     }
 
-    function handleInput() {
+    function handleInput(e) {
         adjustTextareaHeight();
+        // /-Shortcut für Assistenten-Auswahl
+        // e.target.value statt input: bind:value aktualisiert input erst nach dem Handler
+        if (
+            e.target.value === "/" &&
+            !conversationId &&
+            availableAssistants.length > 0
+        ) {
+            input = "";
+            pickerOpen = true;
+        }
+    }
+
+    // Picker-Callbacks
+    function handleAssistantSelect(assistant) {
+        selectedAssistant = assistant;
+        pickerOpen = false;
+        textarea?.focus();
+    }
+
+    function handlePickerClose() {
+        pickerOpen = false;
+        textarea?.focus();
     }
 
     // Laden der Konversation basierend auf URL-Parameter
@@ -335,6 +424,10 @@
                 conversationId = data.id;
                 currentConversationModel = data.model_used;
                 totalCostUsd = data.total_cost_usd ?? null;
+                selectedAssistant = null;
+                conversationAssistant = data.assistant_name
+                    ? { id: data.assistant_id, name: data.assistant_name }
+                    : null;
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
             } catch (err) {
@@ -366,6 +459,9 @@
             conversationError = null;
             pageTitle.set("");
             activeConversationId.set(null);
+            selectedAssistant = null;
+            conversationAssistant = null;
+            pickerOpen = false;
         }
     }
 
@@ -375,9 +471,20 @@
         loadConversation();
     });
 
+    // Assistenten laden (parallel zu Modellen)
+    async function loadAssistants() {
+        try {
+            const data = await getAssistants();
+            availableAssistants = data.items;
+        } catch {
+            // kein hard fail — Assistenten sind optional
+        }
+    }
+
     // Stores zurücksetzen beim Verlassen der Seite
     onMount(() => {
         loadModels();
+        loadAssistants();
     });
 
     onDestroy(() => {
@@ -459,7 +566,16 @@
     <div
         class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 px-4 pt-3 pb-4"
     >
-        <div class="max-w-4xl mx-auto space-y-2">
+        <div class="max-w-4xl mx-auto space-y-2 relative">
+            <!-- AssistantPicker Overlay -->
+            {#if pickerOpen}
+                <AssistantPicker
+                    assistants={availableAssistants}
+                    onselect={handleAssistantSelect}
+                    onclose={handlePickerClose}
+                />
+            {/if}
+
             <!-- Konversationskosten -->
             {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                 <div
@@ -472,31 +588,57 @@
                 </div>
             {/if}
 
+            <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
+            {#if selectedAssistant && !conversationId && !conversationAssistant}
+                <div class="flex items-center gap-1.5">
+                    <span
+                        class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+                                 bg-light-bl/15 dark:bg-dark-bl/15
+                                 text-light-bl dark:text-dark-bl
+                                 border border-light-bl/30 dark:border-dark-bl/30"
+                    >
+                        <Bot class="w-3 h-3" />
+                        {selectedAssistant.name}
+                    </span>
+                    <button
+                        onclick={() => {
+                            selectedAssistant = null;
+                        }}
+                        class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+                        title="Assistenten entfernen"
+                    >
+                        <X class="w-3 h-3" />
+                    </button>
+                </div>
+            {/if}
+
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
             <div class="flex gap-2 items-start">
                 <input
-                  bind:this={fileInput}
-                  type="file"
-                  multiple
-                  accept={ACCEPTED_EXTENSIONS.join(',')}
-                  onchange={handleFilesSelected}
-                  class="sr-only"
-                  aria-hidden="true"
+                    bind:this={fileInput}
+                    type="file"
+                    multiple
+                    accept={ACCEPTED_EXTENSIONS.join(",")}
+                    onchange={handleFilesSelected}
+                    class="sr-only"
+                    aria-hidden="true"
                 />
                 <!-- Upload-Button -->
                 <button
-                  type="button"
-                  onclick={handleUploadClick}
-                  disabled={isStreaming || attachments.length >= MAX_FILES}
-                  title={attachments.length >= MAX_FILES ? `Maximal ${MAX_FILES} Anhänge` : 'Datei hochladen'}
-                  aria-label="Datei hochladen"
-                  class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                    type="button"
+                    onclick={handleUploadClick}
+                    disabled={isStreaming || attachments.length >= MAX_FILES}
+                    title={attachments.length >= MAX_FILES
+                        ? `Maximal ${MAX_FILES} Anhänge`
+                        : "Datei hochladen"}
+                    aria-label="Datei hochladen"
+                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
                          text-light-tx-2 dark:text-dark-tx-2
                          hover:bg-light-ui dark:hover:bg-dark-ui
                          disabled:opacity-40 disabled:cursor-not-allowed shrink-0
                          transition-colors"
                 >
-                  <Paperclip class="w-5 h-5" />
+                    <Paperclip class="w-5 h-5" />
                 </button>
 
                 <!-- Textarea -->
@@ -517,12 +659,13 @@
 
                 <!-- Send-Button -->
                 <button
-                  onclick={handleSubmit}
-                  disabled={isStreaming
-                    || attachments.some(a => a.status === 'uploading')
-                    || (!input.trim() && !attachments.some(a => a.status === 'ready'))}
-                  class="p-2 bg-primary text-white rounded-lg
-                         hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                    onclick={handleSubmit}
+                    disabled={isStreaming ||
+                        attachments.some((a) => a.status === "uploading") ||
+                        (!input.trim() &&
+                            !attachments.some((a) => a.status === "ready"))}
+                    class="p-2 bg-primary text-white rounded-lg
+                         hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
                     {#if isStreaming}
@@ -535,73 +678,85 @@
 
             <!-- Attachment-Chips (nur wenn Anhänge vorhanden) -->
             {#if attachments.length > 0}
-              <div class="flex flex-wrap gap-1.5">
-                {#each attachments as att (att.id)}
-                  <AttachmentChip
-                    filename={att.filename}
-                    status={att.status}
-                    error={att.error}
-                    onremove={() => removeAttachment(att.id)}
-                  />
-                {/each}
-              </div>
+                <div class="flex flex-wrap gap-1.5">
+                    {#each attachments as att (att.id)}
+                        <AttachmentChip
+                            filename={att.filename}
+                            status={att.status}
+                            error={att.error}
+                            onremove={() => removeAttachment(att.id)}
+                        />
+                    {/each}
+                </div>
             {/if}
 
-            <!-- Toolbar-Zeile: Modell-Auswahl + Hinweistexte -->
+            <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte -->
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <!-- Modell-Auswahl -->
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <label
-                        for="chat-model"
-                        class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
+                {#if conversationAssistant || selectedAssistant}
+                    <!-- Assistenten-Anzeige statt Modell -->
+                    <span
+                        class="flex items-center gap-1.5 text-xs text-light-bl dark:text-dark-bl shrink-0"
                     >
-                        Modell
-                    </label>
-                    {#if conversationId}
-                        <select
-                            id="chat-model"
-                            disabled={true}
-                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                   bg-light-ui dark:bg-dark-ui
-                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                   opacity-60 cursor-not-allowed"
-                            value={currentConversationModel || ""}
+                        <Bot class="w-3.5 h-3.5" />
+                        {conversationAssistant?.name || selectedAssistant?.name}
+                    </span>
+                {:else}
+                    <!-- Modell-Auswahl -->
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <label
+                            for="chat-model"
+                            class="text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap"
                         >
-                            {#if currentConversationModel}
-                                <option value={currentConversationModel}
-                                    >{currentConversationModel}</option
-                                >
-                            {:else}
-                                <option value="">Unbekannt</option>
-                            {/if}
-                        </select>
-                    {:else}
-                        <select
-                            id="chat-model"
-                            bind:value={selectedModelId}
-                            disabled={isStreaming || modelsLoading}
-                            onchange={handleModelChange}
-                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                   bg-light-bg-2 dark:bg-dark-bg-2
-                                   px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                   disabled:opacity-60"
-                        >
-                            {#if availableModels.length > 0}
-                                {#each availableModels as model}
-                                    <option value={model.id}>{model.id}</option>
-                                {/each}
-                            {:else}
-                                <option value={selectedModelId || ""}>
-                                    {selectedModelId ||
-                                        "Standardmodell (Backend)"}
-                                </option>
-                            {/if}
-                        </select>
-                    {/if}
-                </div>
+                            Modell
+                        </label>
+                        {#if conversationId}
+                            <select
+                                id="chat-model"
+                                disabled={true}
+                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                       bg-light-ui dark:bg-dark-ui
+                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                       opacity-60 cursor-not-allowed"
+                                value={currentConversationModel || ""}
+                            >
+                                {#if currentConversationModel}
+                                    <option value={currentConversationModel}
+                                        >{currentConversationModel}</option
+                                    >
+                                {:else}
+                                    <option value="">Unbekannt</option>
+                                {/if}
+                            </select>
+                        {:else}
+                            <select
+                                id="chat-model"
+                                bind:value={selectedModelId}
+                                disabled={isStreaming || modelsLoading}
+                                onchange={handleModelChange}
+                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                       bg-light-bg-2 dark:bg-dark-bg-2
+                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
+                                       disabled:opacity-60"
+                            >
+                                {#if availableModels.length > 0}
+                                    {#each availableModels as model}
+                                        <option value={model.id}
+                                            >{model.id}</option
+                                        >
+                                    {/each}
+                                {:else}
+                                    <option value={selectedModelId || ""}>
+                                        {selectedModelId ||
+                                            "Standardmodell (Backend)"}
+                                    </option>
+                                {/if}
+                            </select>
+                        {/if}
+                    </div>
+                {/if}
 
                 <!-- Modell-Statustexte (Laden / Fehler / Fix-Hinweis) -->
-                {#if conversationId}
+                {#if conversationId && !conversationAssistant}
                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                         Im laufenden Chat kann das Modell nicht geändert werden.
                     </span>
@@ -618,7 +773,8 @@
             <div>
                 <!-- Globaler Hinweistext -->
                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    KI-Ergebnisse kritisch prüfen.
+                    KI kann Fehler machen. Ergebnisse immer kritisch prüfen.
+                    Verwende <code>/</code> um Assistenten zu starten.
                 </p>
             </div>
         </div>
