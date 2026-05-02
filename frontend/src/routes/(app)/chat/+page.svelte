@@ -1,5 +1,4 @@
 <script>
-<<<<<<< HEAD
     import {
         Send,
         Loader2,
@@ -8,9 +7,6 @@
         Bot,
         X,
     } from "lucide-svelte";
-=======
-    import { Send, Loader2, AlertCircle, Paperclip, Bot, X } from "lucide-svelte";
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
@@ -49,17 +45,10 @@
     let fileInput = $state(null);
 
     // Assistenten-State
-<<<<<<< HEAD
     let availableAssistants = $state([]);
     let selectedAssistant = $state(null);
     let pickerOpen = $state(false);
     let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
-=======
-    let availableAssistants = $state([])
-    let selectedAssistant = $state(null)
-    let pickerOpen = $state(false)
-    let conversationAssistant = $state(null) // Assistenten-Objekt für laufende Konversation
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
 
     const MAX_FILES = 3;
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -300,17 +289,11 @@
                               )
                             : m.content,
                 }));
-
-<<<<<<< HEAD
             const modelId =
                 conversationId || selectedAssistant ? null : selectedModelId;
             const assistantId = conversationId
                 ? null
                 : (selectedAssistant?.id ?? null);
-=======
-            const modelId = (conversationId || selectedAssistant) ? null : selectedModelId
-            const assistantId = conversationId ? null : (selectedAssistant?.id ?? null)
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
 
             for await (const item of streamChat(
                 apiMessages,
@@ -323,17 +306,10 @@
                     conversationId = item.conversationId;
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
-<<<<<<< HEAD
                         : selectedModelId || currentConversationModel;
                     // Assistenten-Referenz für laufende Konversation speichern
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
-=======
-                        : (selectedModelId || currentConversationModel);
-                    // Assistenten-Referenz für laufende Konversation speichern
-                    if (selectedAssistant) {
-                        conversationAssistant = selectedAssistant
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                     }
                     continue;
                 }
@@ -408,7 +384,6 @@
         adjustTextareaHeight();
         // /-Shortcut für Assistenten-Auswahl
         // e.target.value statt input: bind:value aktualisiert input erst nach dem Handler
-<<<<<<< HEAD
         if (
             e.target.value === "/" &&
             !conversationId &&
@@ -416,17 +391,11 @@
         ) {
             input = "";
             pickerOpen = true;
-=======
-        if (e.target.value === '/' && !conversationId && availableAssistants.length > 0) {
-            input = ''
-            pickerOpen = true
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
         }
     }
 
     // Picker-Callbacks
     function handleAssistantSelect(assistant) {
-<<<<<<< HEAD
         selectedAssistant = assistant;
         pickerOpen = false;
         textarea?.focus();
@@ -435,16 +404,6 @@
     function handlePickerClose() {
         pickerOpen = false;
         textarea?.focus();
-=======
-        selectedAssistant = assistant
-        pickerOpen = false
-        textarea?.focus()
-    }
-
-    function handlePickerClose() {
-        pickerOpen = false
-        textarea?.focus()
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
     }
 
     // Laden der Konversation basierend auf URL-Parameter
@@ -514,13 +473,8 @@
     // Assistenten laden (parallel zu Modellen)
     async function loadAssistants() {
         try {
-<<<<<<< HEAD
             const data = await getAssistants();
             availableAssistants = data.items;
-=======
-            const data = await getAssistants()
-            availableAssistants = data.items
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
         } catch {
             // kein hard fail — Assistenten sind optional
         }
@@ -636,30 +590,19 @@
             <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
             {#if selectedAssistant && !conversationId && !conversationAssistant}
                 <div class="flex items-center gap-1.5">
-<<<<<<< HEAD
                     <span
                         class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                                  bg-light-bl/15 dark:bg-dark-bl/15
                                  text-light-bl dark:text-dark-bl
                                  border border-light-bl/30 dark:border-dark-bl/30"
                     >
-=======
-                    <span class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                                 bg-light-bl/15 dark:bg-dark-bl/15
-                                 text-light-bl dark:text-dark-bl
-                                 border border-light-bl/30 dark:border-dark-bl/30">
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                         <Bot class="w-3 h-3" />
                         {selectedAssistant.name}
                     </span>
                     <button
-<<<<<<< HEAD
                         onclick={() => {
                             selectedAssistant = null;
                         }}
-=======
-                        onclick={() => { selectedAssistant = null }}
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                         class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
                         title="Assistenten entfernen"
                     >
@@ -715,20 +658,12 @@
 
                 <!-- Send-Button -->
                 <button
-<<<<<<< HEAD
                     onclick={handleSubmit}
                     disabled={isStreaming ||
                         attachments.some((a) => a.status === "uploading") ||
                         (!input.trim() &&
                             !attachments.some((a) => a.status === "ready"))}
                     class="p-2 bg-primary text-white rounded-lg
-=======
-                  onclick={handleSubmit}
-                  disabled={isStreaming
-                    || attachments.some(a => a.status === 'uploading')
-                    || (!input.trim() && !attachments.some(a => a.status === 'ready'))}
-                  class="p-2 bg-primary text-white rounded-lg
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                          hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
@@ -758,13 +693,9 @@
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {#if conversationAssistant || selectedAssistant}
                     <!-- Assistenten-Anzeige statt Modell -->
-<<<<<<< HEAD
                     <span
                         class="flex items-center gap-1.5 text-xs text-light-bl dark:text-dark-bl shrink-0"
                     >
-=======
-                    <span class="flex items-center gap-1.5 text-xs text-light-bl dark:text-dark-bl shrink-0">
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                         <Bot class="w-3.5 h-3.5" />
                         {conversationAssistant?.name || selectedAssistant?.name}
                     </span>
@@ -808,13 +739,9 @@
                             >
                                 {#if availableModels.length > 0}
                                     {#each availableModels as model}
-<<<<<<< HEAD
                                         <option value={model.id}
                                             >{model.id}</option
                                         >
-=======
-                                        <option value={model.id}>{model.id}</option>
->>>>>>> 1751dc7b73c9895d5a7aa489aef23f68b3f635c8
                                     {/each}
                                 {:else}
                                     <option value={selectedModelId || ""}>
