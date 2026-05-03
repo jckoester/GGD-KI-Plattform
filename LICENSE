@@ -1,0 +1,571 @@
+EUROPEAN UNION PUBLIC LICENCE v. 1.2
+EUPL © the European Union 2007, 2016
+
+This European Union Public Licence (EUPL) is copyrighted by the European Union.
+
+Any use of this EUPL text is subject to the terms and conditions of the Creative Commons
+Attribution-ShareAlike-NonCommercial 3.0 Ported licence (CC BY-SA-NC 3.0).
+The full text of the CC BY-SA-NC 3.0 licence can be found at
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+ qualquer outro tipo de utilize do texto da EUPL poderá ser feito sob os termos e
+condições da licença-quadro da UE para a reutilização de documentos da Comissão Europeia.
+
+
+EUPL © l'Union européenne 2007, 2016
+
+Cette Licence de l'Union européenne (EUPL) est protégée par le droit d'auteur par l'Union européenne.
+
+Toute utilisation du texte de l'EUPL est soumise aux termes et conditions de la licence
+Creative Commons Attribution - Partage dans les mêmes conditions - Pas d'utilisation
+commerciale 3.0 non transposé (CC BY-SA-NC 3.0). Le texte complet de la licence CC BY-SA-NC 3.0
+est disponible à l'adresse suivante : https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Toute autre utilisation du texte de l'EUPL peut être faite sous les termes et conditions
+de la licence-cadre de l'UE pour la réutilisation des documents de la Commission européenne.
+
+
+EUPL © von der Europäischen Union 2007, 2016
+
+Diese Europäische Union Public Lizenz (EUPL) ist urheberrechtlich durch die Europäische Union geschützt.
+
+Die Nutzung dieses EUPL-Textes unterliegt den Bedingungen der Creative Commons
+Namensnennung - Weitergabe unter gleichen Bedingungen - Keine kommerzielle Nutzung
+3.0 Unported Lizenz (CC BY-SA-NC 3.0). Der vollständige Wortlaut der CC BY-SA-NC 3.0
+Lizenz kann unter folgendem Link abgerufen werden:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Jede andere Nutzung des EUPL-Textes kann unter den Bedingungen und Vorbehalten der
+Rahmenlizenz der EU für die Weiterverwendung von Dokumenten der Europäischen Kommission erfolgen.
+
+
+EUPL © dell'Unione europea 2007, 2016
+
+La presente Licenza dell'Unione europea (EUPL) è protetta dal diritto d'autore dall'Unione europea.
+
+L'utilizzo del testo EUPL è soggetto ai termini e alle condizioni della licenza Creative
+Commons Attribuzione - Condividi allo stesso modo - Non commerciale 3.0 Unported (CC BY-SA-NC 3.0).
+Il testo integrale della licenza CC BY-SA-NC 3.0 è disponibile al seguente indirizzo:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Qualsiasi altro tipo di utilizzo del testo EUPL può essere effettuato nei limiti e alle
+condizioni della licenza quadro dell'UE per il riutilizzo dei documenti della Commissione europea.
+
+
+EUPL © de la Unión Europea 2007, 2016
+
+Esta Licencia de la Unión Europea (EUPL) está protegida por derechos de autor por la Unión Europea.
+
+Cualquier utilización del texto de la EUPL está sujeta a los términos y condiciones de la
+licencia Creative Commons Reconocimiento-CompartirIgual 3.0 no adaptada (CC BY-SA-NC 3.0).
+El texto completo de la licencia CC BY-SA-NC 3.0 puede consultarse en la siguiente dirección:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Cualquier otro tipo de utilización del texto de la EUPL podrá realizarse bajo las
+condiciones de la licencia marco de la UE para la reutilización de documentos de la Comisión Europea.
+
+
+EUPL © van de Europese Unie 2007, 2016
+
+Deze Europese Unie Publieke Licentie (EUPL) is auteursrechtelijk beschermd door de Europese Unie.
+
+Het gebruik van deze EUPL-tekst is onderworpen aan de voorwaarden van de Creative Commons
+Naamsvermelding-GelijkDelen-NietCommercieel 3.0 Unported-licentie (CC BY-SA-NC 3.0). De volledige
+t Tekst van de CC BY-SA-NC 3.0-licentie is beschikbaar op:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Elk ander gebruik van de EUPL-tekst kan worden gedaan onder de voorwaarden en voorbehouden
+die zijn vastgelegd in de frame-licentie van de EU voor de hergebruik van documenten van de Europese Commissie.
+
+
+EUPL © Českoj unie 2007, 2016
+
+Tato licence Evropské unie (EUPL) je chráněna autorskými právy Evropskou unií.
+
+Použití textu EUPL podléhá podmínkám licence Creative Commons Uveďte původ-Zachovejte
+licenci-Neužívejte komerčně 3.0 (CC BY-SA-NC 3.0). Kompletní znění licence CC BY-SA-NC 3.0
+naleznete na adrese: https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Každé jiné použití textu EUPL lze uskutečnit za podmínek a omezení stanovených v
+rámcové licenci EU pro opětovné použití dokumentů Evropské komise.
+
+
+EUPL © Ευρωπαϊκής Ένωσης 2007, 2016
+
+Η παρούσα Άδεια Ευρωπαϊκής Ένωσης (EUPL) προστατεύεται από πνευματικά δικαιώματα από την Ευρωπαϊκή Ένωση.
+
+Η χρήση του κειμένου της EUPL υπόκειται στους όρους και τις προϋποθέσεις της άδειας Creative
+Commons Αναφορά Δημιουργού - Παρόμοια Διανομή - Μη Εμπορική Χρήση 3.0 (CC BY-SA-NC 3.0). Το
+πλήρες κείμενο της άδειας CC BY-SA-NC 3.0 είναι διαθέσιμο στην ακόλουθη διεύθυνση:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Οποιαδήποτε άλλη χρήση του κειμένου της EUPL μπορεί να πραγματοποιηθεί υπό τους όρους και
+τις προϋποθέσεις της πλαίσιο άδειας της ΕΕ για την επαν descenso χρήσης εγγράφων της Ευρωπαϊκής Επιτροπής.
+
+
+EUPL © az Európai Unió 2007, 2016
+
+Ez az Európai Unió Közösségi Licenc (EUPL) szerzői jogvédelem alatt áll az Európai Unió által.
+
+Az EUPL szövegének használata a Creative Commons Nevezd meg! - Így add tovább! - Ne add el!
+3.0 (CC BY-SA-NC 3.0) licenc feltételei és feltétlenül alárendelt. Az EUPL teljes szövege
+eredhető a következő címen: https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Az EUPL szövegének bármely más foglakoztatása az EU keretlicenc feltételei és korlátai
+mentén történhet az Európai Bizottság iratok újrahasznosítására.
+
+
+EUPL © Unijne Europejskie 2007, 2016
+
+Niniejsza Licencja Unii Europejskiej (EUPL) jest chroniona prawem autorskim przez Unię Europejską.
+
+Korzystanie z tekstu EUPL podlega warunkom licencji Creative Commons Uznanie autorstwa -
+Na tych samych warunkach - Użycie niekomercyjne 3.0 (CC BY-SA-NC 3.0). Pełna treść licencji
+CC BY-SA-NC 3.0 dostępna jest pod adresem: https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Każde inne wykorzystanie tekstu EUPL może nastąpić na warunkach i z zastrzeżeniami
+określonymi w ramowej licencji UE dotyczącej ponownego wykorzystania dokumentów Komisji Europejskiej.
+
+
+EUPL © União Europeia 2007, 2016
+
+A presente Licença da União Europeia (EUPL) está protegida por direitos de autor pela União Europeia.
+
+A utilização do texto da EUPL está sujeita aos termos e condições da licença Creative
+Commons Atribuição - Partilha nos Mesmos Termos - Não Comercial 3.0 (CC BY-SA-NC 3.0). O texto
+integral da licença CC BY-SA-NC 3.0 está disponível no seguinte endereço:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Qualquer outro tipo de utilização do texto da EUPL pode ser feita nos termos e condições
+da licença-quadro da UE para a reutilização de documentos da Comissão Europeia.
+
+
+EUPL © Europeiske Union 2007, 2016
+
+Denne Europa Parliamentets Licens (EUPL) er copyright af Den Europæiske Union.
+
+Anvendelsen af denne EUPL tekst er underlagt betingelserne i Creative Commons
+Navngivelse-DelPåSammeVilkår-IkkeKommerciel 3.0 (CC BY-SA-NC 3.0). Den fulde tekst af
+CC BY-SA-NC 3.0 licensen kan findes på følgende adresse:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Enhver anden anvendelse af EUPL teksten kan ske på betingelserne i EU ramme licensen
+for genbrug af dokumenter fra den Europæiske Kommission.
+
+
+EUPL © Eurooppa Liit 2007, 2016
+
+See Euroopa Liidu avalik litsents (EUPL) on Euroopa Liidu autorikaitse all.
+
+Selle EUPL teksti kasutamine on aluseks Creative Commons'i litsentsi "Autori nõustamine -
+Jaga samal viisil - Ära kasutaks ärilisel eesmärgil" 3.0 tingimustele (CC BY-SA-NC 3.0).
+Täielik CC BY-SA-NC 3.0 litsentsi tekst on leitav aadressilt:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Mingi teistsugune EUPL teksti kasutamine võib toimuda Euroopa Liidu raamilitsentsi
+tingimustel ja piirangutega Euroopa Komisjoni dokumentide taaskasutamiseks.
+
+
+EUPL © Europské únie 2007, 2016
+
+Táto Licencia Európskej únie (EUPL) je chránená autorskými právami Európskou úniou.
+
+Použitie textu EUPL podlieha podmienkam licencie Creative Commons Uveďte autora -
+Zachovajte rovnaké podmienky 3.0 Neprevzaté (CC BY-SA-NC 3.0). Úplné znenie licencie
+CC BY-SA-NC 3.0 nájdete na adrese: https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Akékolvek iné použitie textu EUPL sa môže uskutočniť za podmienok a obmedzení
+stanovených v rámci licencie EÚ pre opätovné použitie dokumentov Európskej komisie.
+
+
+EUPL © Europske unije 2007, 2016
+
+Ta licenca Evropske unije (EUPL) je zaščitena z avtorskimi pravicami s strani Evropske unije.
+
+Uporaba besedila EUPL je podvržena pogojem in pogojem licence Creative Commons
+Priznanje avtorstva-Deli pod enakimi pogoji-Ni za komercialne namene 3.0 (CC BY-SA-NC 3.0).
+Polno besedilo licence CC BY-SA-NC 3.0 je na voljo na:
+https://creativecommons.org/licenses/by-sa-nc/3.0/legalcode
+
+Karkoli druga vrst uporabe besedila EUPL je mogoča pod pogoji in omejitvami okvirne
+licence EU za ponovno uporabo dokumentov Evropske komisije.
+
+
+================================================================================
+
+EUPL v1.2
+
+European Union Public Licence v. 1.2
+
+EUPL © the European Union, 2007, 2016
+
+This licence is copyrighted by the European Union.
+
+
+Preamble
+
+The European Union, hereinafter referred to as "the Licensor", represented by the
+European Commission (the "Commission") as the operator of the Joinup collaboration
+platform, has developed the European Union Public Licence (EUPL) as an open source
+licence.
+
+The EUPL is a licence under European law to be used by natural or legal persons
+(hereinafter: the "Licensee" or "Licensees") copying, distributing, communicating and/or
+modifying a work (hereinafter: the "Work") or works.
+
+
+Article 1
+Definitions
+
+1.1. 'Work'
+    means any work or software, as well as any material protected by copyright law in
+the literary, artistic or scientific domain.
+
+1.2. 'Derivative Work'
+    means any work or software directly derived from the Work or from another
+derivative work of the Work.
+
+1.3. 'Source Code'
+    means the preferred form in which a computer program is made available to the
+public, including the underlying code and the accompanying material such as
+comments and documentation.
+
+1.4. 'Object Code'
+    means any form resulting from mechanical transformation or translation of a
+Source Code or parts thereof, which can be executed by a computer.
+
+1.5. 'Licence'
+    means this document.
+
+1.6. 'Contributor'
+    means any natural or legal person that creates or contributes to the creation of
+modifications to the Work within a Project.
+
+1.7. 'Project'
+    means a set of files, including an executable file, and its Source Code, where the
+work on the computer program has been organised. Every version of the set or any of
+its components can be a Work to which this Licence is applied.
+
+1.8. 'Compatibility Matrix'
+    means the table located at the following URL
+    https://joinup.ec.europa.eu/collection/eupl/external-licence-compatibility-eupl
+    which is part of the Licence and which may be updated from time to time to reflect
+the evolution of the Licence and the compatibility with other licences. If a Work
+is integrated in a larger work, the conditions of the Licence are applicable to that
+part which is subject to the EUPL. Any use of a Work that is not covered by this
+Licence is outside the scope of this Licence and remains subject to the licence
+terms covering that use.
+
+1.9. 'Notice'
+    means the copyright notice, the patent notice, the disclaimer of warranty and the
+    limitation of liability provided in Article 5 of the Licence.
+
+
+Article 2
+Scope of the Licence
+
+2.1. The Work is provided under the terms of this Licence, to the maximum extent
+possible, to any person obtaining a copy of the Work from the Licensor or from a
+Licensee.
+
+2.2. This Licence applies to any work or software, and to any other copyrightable
+material in the literary, artistic or scientific domain that is distributed, or
+communicated with the Work or part of it, or attached to it.
+
+
+Article 3
+Acceptance
+
+3.1. The Licensee shall accept all the terms of this Licence by performing any act
+that would, in the absence of this Licence, be restricted by copyright on the Work,
+including but not limited to use, copy, modify, merge, publish, distribute, communicate,
+reproduce, and create Derivative Works.
+
+3.2. The Licensee may explicitly express its acceptance of the Licence by affixing a
+copy of the Licence to the Work.
+
+
+Article 4
+Licensees' rights
+
+4.1. The Licensee is granted a worldwide, royalty-free, non-exclusive, sublicensable
+licence to do the following, for the duration of copyright on the Work:
+
+a) use the Work in any circumstances and for all use, commercial or non-commercial;
+
+b) reproduce the Work;
+
+c) modify the Work and make Derivative Works based upon the Work;
+
+d) communicate to the public, distribute or publish the Work or any Derivative Work;
+
+e) lend and rent the Work or any Derivative Work;
+
+f) sublicense rights in the Work or any Derivative Work under any licence of the
+Licensee's choice.
+
+4.2. The rights mentioned in Article 4.1 may be exercised on all media and by all
+means, with or without modifications, for any purpose, namely commercial or
+non-commercial.
+
+4.3. The Licensee may grant commercial licences on the Work or Derivative Works under
+different terms and conditions, provided that these licence agreements respect the
+terms and conditions of this Licence or are compatible with them.
+
+4.4. The Licensee may use a copy of the Work as a starting point for a new software
+product, then develop and modify it to create a Modified Work different from the
+original Work, and license, or otherwise provide, the Modified Work to others
+under different licence terms, including a proprietary licence, provided that such
+licence terms do not attempt to limit the Licensee's rights under this Licence.
+
+
+Article 5
+Obligations of the Licensee
+
+5.1. The Licensee shall maintain the copyright notices on all copies of the Work
+released. The Licensee shall ensure that all parts of the Source Code of the Work that
+are to be published are given a copyright notice.
+
+5.2. The Licensee shall ensure that all the copies of the Work, which the Licensee
+communicates, publishes or distributes, are marked with the Notice (as defined in
+Article 1.9) in a conspicuous place. If the Work is in Source Code form, the Notice
+shall be included in each file of the Source Code of the Work that includes a
+copyright notice. In the case of a Derivative Work, the Notice shall be included in
+each file that includes a copyright notice.
+
+5.3. The Licensee shall include a copy of the Licence with every copy of the Work
+or Derivative Work that the Licensee communicates, publishes or distributes. Such copy
+may be in any form (including electronic, paper or written media).
+
+
+Article 6
+Patent rights
+
+6.1. The Licensee is granted a worldwide, royalty-free, non-exclusive licence to use
+any patent claims held by the Licensor to the extent necessary to make, use, sell,
+offer for sale, import or otherwise transfer the Work, where such licence applies
+only to those patent claims licensable by the Licensor that are necessarily
+infringed by the Work as provided by the Licensor under this Licence, when making,
+using, selling, offering for sale, importing or otherwise transferring the Work
+without modification.
+
+6.2. If the Licensee makes a Derivative Work or any modification based upon the
+Work, this licence granted under Article 6.1 shall extend to the Derivative Work and
+any such modification.
+
+6.3. No additional permissions or authorisations are granted by the Commission
+(whatsoever the nature of the rights) for any use that exceeds the terms of this
+Licence. Therefore, if the Licensee combines the Work with other works or computer
+programs protected by other patent claims, this licence granted under Article 6.1
+shall not extend to these other works or computer programs.
+
+6.4. This licence granted under Article 6 does not grant the Licensee any rights on
+the use of the trade names, trademarks, service marks, or other distinctive signs
+belonging to the Licensor.
+
+
+Article 7
+Limitations of liability
+
+7.1. The Licensee acknowledges that the Work is provided under the Licence on an "as
+is" and "with all faults" basis. To the maximum extent permitted by applicable law,
+the Licensor excludes all representations, warranties, obligations and liabilities in
+relation to the Work and the use thereof, whether express or implied, statutory or
+otherwise.
+
+7.2. The Licensor shall not be liable for any direct, indirect, incidental, special,
+exemplary, punitive or consequential damages, including without limitation, loss of
+profit, loss of use, loss of data or business interruption, whatever the cause and
+on any theory of liability, whether in contract, strict liability or tort (including
+negligence), arising in any way out of the use of the Work, even if advised of the
+possibility of such damage.
+
+7.3. The Licensee shall be solely responsible for determining the appropriateness of
+the Work and assumes any risks associated with its exercise, use, reproduction,
+modification, communication or distribution, and the Licensee releases the
+Licensor from any and all claims, actions or demands arising from such use, to the
+maximum extent permitted by applicable law.
+
+
+Article 8
+Warranty
+
+8.1. The Licensee acknowledges that the Licensor warrants that the Work: (a) does not
+infringe any third party's intellectual property right, (b) does not contain any
+computer virus, (c) will not be affected by any interruption or lack of continuance in
+its provision, and (d) will operate without fault in any circumstances and for any
+use. Unless explicitly stated otherwise, any Work released under this Licence is
+provided on an "as is" and "with all faults" basis, exclusive of any warranty or
+condition, express or implied, and the Licensor disclaims all responsibility and
+liability in connection with the Work, to the maximum extent permitted by applicable
+law.
+
+8.2. The Licensee acknowledges that the Licensor, to the maximum extent permitted by
+applicable law, provides the Work on an "as available" and "with all its faults" basis
+and disclaims all other warranties and conditions, either express or implied,
+including, without limitation, any warranties or conditions of title, non-infringement,
+the absence of latent or other defects, accuracy, or the presence or absence of errors,
+whether or not known or discoverable. Where such disclaimers are held invalid or
+unenforceable, the Licensor grants the Licensee the most extensive and commercially
+reasonable remedy and liability on terms that the Licensor deems appropriate.
+
+
+Article 9
+Termination
+
+9.1. The rights granted under this Licence shall automatically terminate upon any
+breach by the Licensee of the terms of this Licence.
+
+9.2. However, the obligations imposed on the Licensee by this Licence with regard to
+Derivative Works shall not terminate and the Licensee must comply with those
+obligations.
+
+9.3. Failure by the Licensor to comply with its obligations under this Licence does
+not entitle the Licensee to terminate this Licence.
+
+9.4. The Licensee may terminate this Licence at any time.
+
+9.5. The provisions of Articles 7, 8 and 9.4 shall remain applicable after termination
+for as long as the Licensee uses, reproduces, modifies, communicates, distributes or
+creates Derivative Works based upon the Work.
+
+
+Article 10
+Miscellaneous
+
+10.1. Without the Licensor's prior written consent, this Licence shall not be amended or
+modified.
+
+10.2. Termination of this Licence does not entitle any other Licensee to make use of the
+Work and Derivative Works already made available under this Licence and this
+Licence shall continue to apply to them.
+
+10.3. If any provision of this Licence is or becomes invalid, illegal or unenforceable,
+the validity, legality and enforceability of the remaining provisions shall not be
+affected or impaired thereby.
+
+10.4. No party shall be liable to the other for any indirect, special, incidental or
+consequential damages of any character arising under this Licence. In no event
+shall the Licensor's total aggregate liability to the Licensee, under whatever legal
+theory and for whatever cause, exceed the amount paid by the Licensee for the
+licence of the Work.
+
+10.5. If the Commission decides to charge a fee for the use of the EUPL, it will offer the
+Licensee the possibility to acquire a EUPL licence free of charge.
+
+
+Article 11
+Languages
+
+11.1. The Licence has been translated into all the official languages of the European
+Union. In case of a discrepancy between the original English text and any of its
+translations, the English text shall prevail.
+
+
+Article 12
+Applicable law and competent court
+
+12.1. This Licence shall be governed by the law of the European Union Member State
+where the Licensor has its seat, without prejudice to its conflict of laws provisions.
+
+12.2. Any litigation arising from the application of this Licence shall be subject to
+the exclusive jurisdiction of the court of the European Union Member State where the
+Licensor has its seat, without prejudice to its conflict of laws provisions.
+
+
+Article 13
+Revision of the Licence
+
+13.1. Versions of the EUPL are numbered according to the following pattern:
+"EUPL v. X.Y", where X is the major version and Y is the minor version number.
+
+13.2. A new version of this Licence is published when changes are brought which affect
+the obligations or the rights of the Licensee or the Licensor, or if the changes modify
+or delete any of the essential elements of the Licence such as the scope of the rights
+granted, the limitations and the obligations of the Licensee.
+
+13.3. A new version number (X and/or Y) is assigned only when a new version of the
+Licence is published. A minor version number change (Y) does not entitle the
+Licensee to terminate the Licence, and a new version of the Licence shall automatically
+apply to all copies of the Work that have been communicated, published or distributed
+before the publication of this new version, except if the Licensee decides to apply the
+new version to all or part of those copies of the Work.
+
+13.4. When a new version of the Licence is published, the Licensee may continue to use
+the Work under the terms of the previous version of the Licence for the duration of
+the copyright on the Work.
+
+13.5. The Commission may publish other linguistic versions of this Licence or versions
+in other formats. So far as they are accurate and complete translations of the original
+text, they will have the same value as the original version. In case of discrepancies
+between the original English text and a translation, the original version shall
+prevail.
+
+
+Article 14
+List of works using the EUPL
+
+The Commission shall maintain a list of works distributed under the EUPL. Any person
+or entity having knowledge of the use of the EUPL for a particular work may notify
+the Commission accordingly at the following email address:
+OPEN-SOURCE-SOFTWARE@ec.europa.eu
+
+
+Article 15
+Guiding Principles
+
+In order to facilitate the reuse of software and promote the development of an open
+source software community, the Commission, when distributing software, will in
+principle use the EUPL as its open source software licence.
+
+The use of the EUPL for a particular software code should be decided on a
+case-by-case basis, with the main objective of maximising the reuse of the code and
+the benefits for the public and European institutions in general.
+
+When reusing the software, the Licensee should include a note that the Work is
+originally developed by a European Union institution.
+
+
+================================================================================
+
+Annex: Compatibility notice
+
+The European Union Public Licence (EUPL) v1.2 is compatible with the following licences:
+- GNU General Public Licence (GPL) version 2, and all later versions
+- Open Software Licence (OSL) v2.1, v2.0, v1.1, v1.0
+- Common Public Licence version 1.0
+- Eclipse Public Licence version 1.0
+- CeCILL version 2.1
+- Mozilla Public Licence version 1.1 or later versions
+- GNU Affero General Public Licence (AGPL) v3
+
+The above list is not exhaustive.
+
+The compatibility matrix published on the EU Joinup portal shall be consulted for the
+most up-to-date information regarding licence compatibility.
+
+
+================================================================================
+
+How to use this Licence
+
+To use this Licence, in compliance with Article 5.3, the Licensee has to include the
+Notice in the distributed copies. The Notice has to be included in a copy of the
+Licence in all the official languages of the European Union.
+
+However, the Notice can be included in a translated version in any language as far as
+the translation is accurate and complete and clearly indicates that it is a
+non-official translation.
+
+The name of the European Union institution which developed the Work and its
+contributors, when mentioned in the Work, shall not be used for advertising or
+otherwise to imply endorsement of commercial products or services, in particular
+by using the name of the Work or its contributors as trademarks.
+
+
+================================================================================
+
+EUPL FAQ
+
+A Frequently Asked Questions document is available at the following URL:
+https://joinup.ec.europa.eu/collection/eupl/eupl-frequently-asked-questions-faq
