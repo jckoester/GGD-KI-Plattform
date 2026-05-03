@@ -66,8 +66,13 @@
     <div
         class="h-14 border-b {bgHeaderClass} {borderClass} flex items-center px-4 flex-shrink-0"
     >
-        {#if branding.logo_url}
-            <img src={branding.logo_url} alt="Logo" class="h-8 w-auto" />
+        {#if branding.logo_url_light || branding.logo_url_dark}
+            {#if branding.logo_url_light}
+                <img src={branding.logo_url_light} alt="Logo" class="h-8 w-auto dark:hidden" />
+            {/if}
+            {#if branding.logo_url_dark}
+                <img src={branding.logo_url_dark} alt="Logo" class="h-8 w-auto hidden dark:block" />
+            {/if}
         {:else}
             <div
                 class="w-8 h-8 rounded-full bg-primary flex items-center justify-center

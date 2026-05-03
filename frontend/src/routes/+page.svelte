@@ -50,8 +50,13 @@
         class="bg-light-bg dark:bg-dark-ui rounded-2xl shadow-lg w-full max-w-sm p-8 space-y-6"
     >
         <div class="flex flex-col items-center gap-2">
-            {#if branding.logo_url}
-                <img src={branding.logo_url} alt="Logo" class="h-16 w-auto" />
+            {#if branding.logo_url_light || branding.logo_url_dark}
+                {#if branding.logo_url_light}
+                    <img src={branding.logo_url_light} alt="Logo" class="h-16 w-auto dark:hidden" />
+                {/if}
+                {#if branding.logo_url_dark}
+                    <img src={branding.logo_url_dark} alt="Logo" class="h-16 w-auto hidden dark:block" />
+                {/if}
             {:else}
                 <div
                     class="w-14 h-14 rounded-full bg-primary flex items-center justify-center

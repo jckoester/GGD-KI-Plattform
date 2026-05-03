@@ -7,7 +7,7 @@
 <div
   class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
          {status === 'error'
-           ? 'border-light-re dark:border-dark-re text-light-re dark:text-dark-re bg-red-50 dark:bg-red-950'
+           ? 'border-light-re dark:border-dark-re text-light-re dark:text-dark-re bg-light-re-bg dark:bg-dark-re-bg'
            : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2'}"
   title={error ?? filename}
 >

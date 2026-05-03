@@ -80,10 +80,10 @@ _SPEND_LOG_DELAY: float = settings.spend_log_delay
 def _team_id_for_user(payload: JwtPayload) -> str | None:
     """
     Leitet die Team-ID aus dem JWT-Payload ab.
-    Admin: None (kein Filter), Teacher: TEACHER_TEAM_ID, Student: jahrgang-{grade}
+    Admin: TEACHER_TEAM_ID, Teacher: TEACHER_TEAM_ID, Student: jahrgang-{grade}
     """
     if "admin" in payload.roles:
-        return None  # kein Filter
+        return TEACHER_TEAM_ID
     if "teacher" in payload.roles:
         return TEACHER_TEAM_ID
     if "student" in payload.roles:

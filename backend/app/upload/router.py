@@ -1,10 +1,10 @@
 import base64
 import logging
 from pathlib import Path
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
@@ -41,7 +41,10 @@ class ImageUploadResult(BaseModel):
     size_bytes: int
 
 
-UploadResult = Union[TextUploadResult, ImageUploadResult]
+UploadResult = Annotated[
+    Union[TextUploadResult, ImageUploadResult],
+    Field(discriminator="type")
+]
 
 
 @router.post("/upload/session", response_model=UploadResult)

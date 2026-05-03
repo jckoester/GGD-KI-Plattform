@@ -109,9 +109,9 @@
 
 {:else if message.role === 'error'}
     <div class="w-full">
-        <div class="flex items-start gap-2 bg-red-50 dark:bg-red-950/20
+        <div class="flex items-start gap-2 bg-light-re-bg dark:bg-dark-re-bg/20
                     border border-red-200 dark:border-red-900
-                    rounded-lg px-4 py-3 text-red-600 dark:text-red-400">
+                    rounded-lg px-4 py-3 text-light-re dark:text-dark-re">
             <AlertCircle class="w-4 h-4 mt-0.5 shrink-0" />
             <p class="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>

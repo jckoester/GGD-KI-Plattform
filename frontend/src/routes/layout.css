@@ -194,6 +194,8 @@
     --color-light-pu-2: var(--color-purple-400);
     --color-light-ma-2: var(--color-magenta-400);
     --color-dark-re-2: var(--color-red-600);
+    --color-light-re-bg: var(--color-red-50);
+    --color-dark-re-bg: var(--color-red-950);
     --color-dark-or-2: var(--color-orange-600);
     --color-dark-ye-2: var(--color-yellow-600);
     --color-dark-gr-2: var(--color-green-600);
