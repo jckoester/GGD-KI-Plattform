@@ -134,8 +134,8 @@
     function getActions(assistant) {
         const actions = [];
         actions.push({
-            label: "Bearbeiten",
-            action: () => goto(`/assistants/verwalten/${assistant.id}`),
+            label: "Edit",
+            action: () => goto(`/assistants/manage/${assistant.id}`),
             icon: Pencil,
         });
         actions.push({
@@ -226,7 +226,7 @@
         <div class="flex items-center gap-2">
             <Bot class="w-6 h-6 text-light-bl dark:text-dark-bl" />
             <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-                Assistenten verwalten
+                Manage Assistants
             </h1>
         </div>
         <div class="flex items-center gap-2">
@@ -239,7 +239,7 @@
                 Importieren
             </button>
             <button
-                onclick={() => goto('/assistants/verwalten/neu')}
+                onclick={() => goto('/assistants/manage/new')}
                 class="px-4 py-2 bg-primary text-white rounded-lg
                        hover:bg-primary-dark transition-colors flex items-center gap-2"
             >

@@ -13,7 +13,7 @@
     onMount(async () => {
         try {
             await getMe();
-            goto("/hello");
+            goto("/welcome");
             return;
         } catch {
             /* weiter */
@@ -32,7 +32,7 @@
         loading = true;
         try {
             await login(username, password);
-            goto("/hello");
+            goto("/welcome");
         } catch (e) {
             error = e.message;
         } finally {

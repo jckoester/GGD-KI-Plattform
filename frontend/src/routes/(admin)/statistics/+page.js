@@ -8,7 +8,7 @@ export function load() {
     redirect(302, "/");
   }
   return {
-    title: "Statistik",
+    title: "Statistics",
     headerColor: "bg-light-gr dark:bg-dark-gr",
     headerTextColor: "text-dark-tx dark:text-light-tx-1",
     sidebarSection: "statistics",

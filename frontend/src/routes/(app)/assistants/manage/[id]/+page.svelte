@@ -20,6 +20,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import MessageBubble from "$lib/components/MessageBubble.svelte";
     import {
         getAdminAssistant,
         getAdminAssistants,
@@ -27,17 +28,19 @@
         updateAssistant,
         deleteAssistant,
         exportAssistant,
+        activateAssistant,
+        deactivateAssistant,
         getModels,
         streamChat,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
 
-    // URL Parameter - neu Seite hat keine ID
+    // URL Parameter
     let { data } = $props();
 
-    const assistantId = null;
-    const isNew = true;
+    const assistantId = data.id;
+    const isNew = assistantId === 'neu';
 
     // State für Formular
     let form = $state(emptyForm());
@@ -172,7 +175,7 @@
                 successMessage = "Assistent wurde erfolgreich angelegt.";
                 savedForm = { ...form };
                 // Navigiere zur Bearbeitungsseite mit der neuen ID
-                goto(`/assistants/verwalten/${result.id}`);
+                goto(`/assistants/manage/${result.id}`);
             } else {
                 await updateAssistant(assistantId, payload);
                 successMessage = "Assistent wurde erfolgreich aktualisiert.";
@@ -190,14 +193,17 @@
         if (!assistantId) return;
         loading = true;
         try {
-            // Aktiviere oder deaktiviere - wir müssen die API aufrufen
-            // Da wir keine direkten Aktivieren/Deaktivieren Funktionen mehr in api.js haben,
-            // nutzen wir updateAssistant mit status-Änderung
-            const newStatus = form.status === 'active' ? 'disabled' : 'active';
-            await updateAssistant(assistantId, { status: newStatus });
-            form.status = newStatus;
-            savedForm.status = newStatus;
-            successMessage = `Assistent wurde ${newStatus === 'active' ? 'aktiviert' : 'deaktiviert'}.`;
+            if (form.status === 'active') {
+                await deactivateAssistant(assistantId);
+                form.status = 'disabled';
+                savedForm = { ...savedForm, status: 'disabled' };
+                successMessage = 'Assistent wurde deaktiviert.';
+            } else {
+                await activateAssistant(assistantId);
+                form.status = 'active';
+                savedForm = { ...savedForm, status: 'active' };
+                successMessage = 'Assistent wurde aktiviert.';
+            }
         } catch (e) {
             error = e.message ?? 'Fehler beim Ändern des Status';
         } finally {
@@ -320,7 +326,7 @@
     >
         <div class="flex items-center gap-2">
             <button
-                onclick={() => goto('/assistants/verwalten')}
+                onclick={() => goto('/assistants/manage')}
                 class="flex items-center gap-2 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
             >
                 <X class="w-4 h-4" />
@@ -687,25 +693,12 @@
                                 <p>Stellen Sie dem Assistenten eine Testfrage.</p>
                             </div>
                         {:else}
-                            {#each testMessages as message}
-                                <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
-                                    <div
-                                        class="max-w-[80%] rounded-lg px-4 py-2
-                                             {message.role === 'user' 
-                                                 ? 'bg-light-bl/10 dark:bg-dark-bl/10 text-light-tx dark:text-dark-tx'
-                                                 : 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx'}"
-                                    >
-                                        {message.content}
-                                    </div>
-                                </div>
+                            {#each testMessages as message, i}
+                                <MessageBubble
+                                    {message}
+                                    isStreaming={testIsStreaming && i === testMessages.length - 1 && message.role === 'assistant'}
+                                />
                             {/each}
-                        {/if}
-                        {#if testIsStreaming}
-                            <div class="flex justify-start">
-                                <div class="bg-light-ui-2 dark:bg-dark-ui-2 rounded-lg px-4 py-2">
-                                    <Loader2 class="w-4 h-4 animate-spin" />
-                                </div>
-                            </div>
                         {/if}
                         {#if testError}
                             <div class="flex justify-center">

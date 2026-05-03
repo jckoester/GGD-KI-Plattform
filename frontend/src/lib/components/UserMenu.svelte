@@ -90,16 +90,16 @@
         </a>
     {/if}
 
-    <!-- Statistik (nur bei statistics-Rolle) - vorbereitet für später -->
+    <!-- Statistics (nur bei statistics-Rolle) - vorbereitet für später -->
     {#if $user?.roles.some((r) => ["statistics", "admin"].includes(r))}
         <a
-            href="/statistik"
+            href="/statistics"
             class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
             <ChartNoAxesCombined
                 class="w-4 h-4 mr-3 text-light-gr dark:text-dark-gr"
             />
-            Statistik
+            Statistics
         </a>
     {/if}
 
@@ -110,14 +110,14 @@
         ></div>
     {/if}
 
-    <!-- Profil (immer sichtbar) -->
+    <!-- Profile (immer sichtbar) -->
     <a
-        href="/profil"
+        href="/profile"
         onclick={onClose}
         class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
     >
         <User class="w-4 h-4 mr-3" />
-        Profil
+        Profile
     </a>
 
     <!-- Trenner -->

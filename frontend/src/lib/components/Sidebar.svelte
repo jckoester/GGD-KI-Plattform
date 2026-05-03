@@ -184,10 +184,10 @@
             {#if assistantsOpen && $user?.roles.includes('admin')}
                 <div class="mt-1 space-y-1 pl-2">
                     <button
-                        onclick={() => goto('/assistants/verwalten')}
+                        onclick={() => goto('/assistants/manage')}
                         class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/assistants/verwalten'
+                               {$page.url.pathname === '/assistants/manage'
                                     ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                     >
                         <span class="flex items-center gap-2">
