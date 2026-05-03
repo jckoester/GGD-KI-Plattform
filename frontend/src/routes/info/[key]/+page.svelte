@@ -3,11 +3,10 @@
     import { getSiteText } from '$lib/api.js';
     import { renderMarkdown } from '$lib/markdown.js';
 
-    const VALID_KEYS = ['impressum', 'datenschutz', 'hilfe', 'regeln'];
+    const VALID_KEYS = ['impressum', 'datenschutz', 'regeln'];
     const LABELS = {
         impressum: 'Impressum',
         datenschutz: 'Datenschutzerklärung',
-        hilfe: 'Hilfe',
         regeln: 'Nutzungsregeln'
     };
 

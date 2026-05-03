@@ -104,9 +104,8 @@
                     GitHub-Repository
                 </a>
                 <a
-                    href={repository + "docs/user/README.md"}
+                    href="/help"
                     class="flex items-center gap-2 text-light-bl dark:text-dark-bl hover:underline"
-                    target="_blank"
                 >
                     <ExternalLink class="w-4 h-4" />
                     Hilfe

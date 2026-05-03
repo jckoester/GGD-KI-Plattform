@@ -6,7 +6,7 @@
     import { renderMarkdown } from "$lib/markdown.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
-    const VALID_KEYS = ["impressum", "datenschutz", "hilfe", "regeln"];
+    const VALID_KEYS = ["impressum", "datenschutz", "regeln"];
     const LABELS = {
         impressum: "Impressum",
         datenschutz: "Datenschutzerklärung",
@@ -49,7 +49,11 @@
 
     function switchTab(key) {
         activeKey = key;
-        goto(`/settings/texts?tab=${key}`, { replaceState: true, noScroll: true, keepFocus: true });
+        goto(`/settings/texts?tab=${key}`, {
+            replaceState: true,
+            noScroll: true,
+            keepFocus: true,
+        });
         loadTab(key);
     }
 
@@ -67,7 +71,9 @@
             // Update cached text after successful save
             texts[activeKey] = edited[activeKey];
             saveSuccess = activeKey;
-            setTimeout(() => { saveSuccess = null; }, 3000);
+            setTimeout(() => {
+                saveSuccess = null;
+            }, 3000);
         } catch (e) {
             saveError = e.message || "Fehler beim Speichern";
         } finally {

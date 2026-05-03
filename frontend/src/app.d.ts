@@ -13,4 +13,9 @@ declare global {
 declare const __GIT_COMMIT__: string;
 declare const __APP_VERSION__: string;
 
+declare module '*?raw' {
+	const content: string;
+	export default content;
+}
+
 export {};
