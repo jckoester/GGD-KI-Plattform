@@ -296,7 +296,10 @@
                 }));
             // Anhang-Metadaten nur für die aktuelle (letzte) Nachricht mitsenden
             const currentMsg = messages[assistantIndex - 1];
-            if (currentMsg?.role === "user" && currentMsg.uploadedAttachments?.length > 0) {
+            if (
+                currentMsg?.role === "user" &&
+                currentMsg.uploadedAttachments?.length > 0
+            ) {
                 apiMessages[apiMessages.length - 1].attachments =
                     currentMsg.uploadedAttachments.map((a) => ({
                         name: a.filename,
@@ -481,7 +484,7 @@
             conversationAssistant = null;
             pickerOpen = false;
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
-            if (!$page.url.searchParams.get('assistant_id')) {
+            if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;
             }
         }
@@ -495,10 +498,12 @@
 
     // Assistenten-ID aus URL-Parameter auswerten
     $effect(() => {
-        const paramId = $page.url.searchParams.get('assistant_id')
+        const paramId = $page.url.searchParams.get("assistant_id");
         if (paramId && availableAssistants.length > 0) {
-            const found = availableAssistants.find(a => String(a.id) === paramId)
-            if (found) selectedAssistant = found
+            const found = availableAssistants.find(
+                (a) => String(a.id) === paramId,
+            );
+            if (found) selectedAssistant = found;
         }
     });
 
@@ -766,8 +771,10 @@
                                 onchange={handleModelChange}
                                 class="rounded border border-light-ui-3 dark:border-dark-ui-3
                                        bg-light-bg-2 dark:bg-dark-bg-2
-                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                       disabled:opacity-60"
+                                       px-1.5 py-0.5 text-xs disabled:opacity-60
+                                       {availableModels.length === 0 && !selectedModelId
+                                           ? 'text-light-re dark:text-dark-re'
+                                           : 'text-light-tx dark:text-dark-tx'}"
                             >
                                 {#if availableModels.length > 0}
                                     {#each availableModels as model}
@@ -778,7 +785,7 @@
                                 {:else}
                                     <option value={selectedModelId || ""}>
                                         {selectedModelId ||
-                                            "Standardmodell (Backend)"}
+                                            "Nur Assistenten verfügbar"}
                                     </option>
                                 {/if}
                             </select>
