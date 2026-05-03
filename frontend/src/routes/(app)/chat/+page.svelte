@@ -213,17 +213,22 @@
     }
 
     function buildUserContent(text, uploads) {
-        if (!uploads.length) return text;
+        // Nur Anhänge mit tatsächlichem Inhalt einbauen (history-Chips haben keinen)
+        const hasContent = uploads.some(
+            (u) =>
+                (u.result?.type === "text" && u.result.content != null) ||
+                (u.result?.type === "image" && u.result.data != null),
+        );
+        if (!hasContent) return text;
 
         const parts = [];
         for (const { filename, result } of uploads) {
-            if (result.type === "text") {
+            if (result?.type === "text" && result.content != null) {
                 parts.push({
                     type: "text",
                     text: `[${filename}]\n${result.content}`,
                 });
-            } else {
-                // Bild: base64-data-URL aus result.data + result.mime_type
+            } else if (result?.type === "image" && result.data != null) {
                 parts.push({
                     type: "image_url",
                     image_url: {
@@ -289,6 +294,15 @@
                               )
                             : m.content,
                 }));
+            // Anhang-Metadaten nur für die aktuelle (letzte) Nachricht mitsenden
+            const currentMsg = messages[assistantIndex - 1];
+            if (currentMsg?.role === "user" && currentMsg.uploadedAttachments?.length > 0) {
+                apiMessages[apiMessages.length - 1].attachments =
+                    currentMsg.uploadedAttachments.map((a) => ({
+                        name: a.filename,
+                        type: a.result.type,
+                    }));
+            }
             const modelId =
                 conversationId || selectedAssistant ? null : selectedModelId;
             const assistantId = conversationId
@@ -419,6 +433,12 @@
                     role: m.role,
                     content: m.content,
                     cost_usd: m.cost_usd ?? null,
+                    uploadedAttachments: m.attachments?.length
+                        ? m.attachments.map((a) => ({
+                              filename: a.name,
+                              result: { type: a.type },
+                          }))
+                        : undefined,
                 }));
                 conversationId = data.id;
                 currentConversationModel = data.model_used;

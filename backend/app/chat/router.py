@@ -17,7 +17,7 @@ import httpx
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.chat.schemas import ChatRequest, TextPart, ImageUrlPart
+from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.db.models import Conversation, Message, PseudonymAudit, Assistant
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
@@ -46,6 +46,7 @@ class MessageItem(BaseModel):
     content: str
     created_at: datetime
     cost_usd: Optional[float] = None
+    attachments: list[AttachmentMeta] = []
 
 
 class ConversationDetailResponse(BaseModel):
@@ -144,11 +145,16 @@ async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
         await client.aclose()
 
 
-def _text_from_content(content: str | list) -> str:
-    """Extrahiert den Text-Anteil aus str- oder list-Content (für DB-Speicherung und Titelgenerierung)."""
+def _user_text(msg: ChatMessage) -> str:
+    """Gibt nur den vom Nutzer eingetippten Text zurück (ohne Datei-Inhalte)."""
+    content = msg.content
     if isinstance(content, str):
         return content
-    return " ".join(part.text for part in content if isinstance(part, TextPart))
+    text_parts = [part.text for part in content if isinstance(part, TextPart)]
+    if msg.attachments:
+        # buildUserContent hängt den Nutzertext als letztes TextPart an
+        return text_parts[-1] if text_parts else ""
+    return " ".join(text_parts)
 
 
 def _serialize_content(content: str | list) -> str | list:
@@ -158,10 +164,28 @@ def _serialize_content(content: str | list) -> str | list:
     return [part.model_dump() for part in content]
 
 
+def _parse_stored_content(content: str) -> tuple[str, list[AttachmentMeta]]:
+    """Parst ggf. strukturierten DB-Inhalt. Gibt (Anzeigetext, Anhänge) zurück."""
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict) and parsed.get("v") == 1:
+            text = parsed.get("text", "")
+            files = [
+                AttachmentMeta(name=f["name"], type=f["type"])
+                for f in parsed.get("files", [])
+                if isinstance(f, dict) and f.get("name") and f.get("type") in ("text", "image")
+            ]
+            return text, files
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+        pass
+    return content, []
+
+
 async def _persist(
     db: AsyncSession,
     conversation_id: UUID,
     user_message: str,
+    user_attachments: list[AttachmentMeta],
     assistant_content: str,
     usage: dict,
     model_used: str,
@@ -170,10 +194,19 @@ async def _persist(
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
 
+    if user_attachments:
+        stored_content = json.dumps({
+            "v": 1,
+            "text": user_message,
+            "files": [{"name": a.name, "type": a.type} for a in user_attachments],
+        }, ensure_ascii=False)
+    else:
+        stored_content = user_message
+
     db.add(Message(
         conversation_id=conversation_id,
         role="user",
-        content=user_message,
+        content=stored_content,
     ))
     db.add(Message(
         conversation_id=conversation_id,
@@ -212,7 +245,7 @@ async def chat(
     }
 
     client = httpx.AsyncClient(timeout=_LITELLM_TIMEOUT, verify=settings.litellm_verify_ssl)
-    user_message = _text_from_content(request.messages[-1].content) if request.messages else ""
+    user_message = _user_text(request.messages[-1]) if request.messages else ""
 
     conversation_id = request.conversation_id
     is_new = conversation_id is None
@@ -239,7 +272,7 @@ async def chat(
             if not request.model_id:
                 model_used = assistant.model
 
-        first_user_msg = next((_text_from_content(m.content) for m in request.messages if m.role == "user"), "")
+        first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
         new_conv = Conversation(
             pseudonym=current_user.sub,
             model_used=model_used,
@@ -320,6 +353,9 @@ async def chat(
             detail=f"LiteLLM Fehler: {error_body.decode()}" if error_body else "LiteLLM Fehler",
         )
 
+    # Anhänge der letzten Nachricht für Persistierung merken
+    last_attachments = request.messages[-1].attachments if request.messages else []
+
     # LiteLLM hat geantwortet → neue Konversation jetzt committen (eigene Session in _generate_title
     # setzt danach ein UPDATE ab, die Konversation muss also committed sein).
     if is_new:
@@ -396,7 +432,7 @@ async def chat(
 
         try:
             await _persist(
-                db, conversation_id, user_message, "".join(full_content),
+                db, conversation_id, user_message, last_attachments, "".join(full_content),
                 usage, model_used, cost_usd=cost_usd,
             )
         except Exception:
@@ -597,15 +633,25 @@ async def get_conversation_messages(
     )
     messages = messages_result.scalars().all()
 
-    messages_list = [
-        {
-            "role": msg.role,
-            "content": msg.content,
-            "created_at": msg.created_at,
-            "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
-        }
-        for msg in messages
-    ]
+    messages_list = []
+    for msg in messages:
+        if msg.role == "user":
+            display_text, attachments = _parse_stored_content(msg.content)
+            messages_list.append({
+                "role": msg.role,
+                "content": display_text,
+                "created_at": msg.created_at,
+                "cost_usd": None,
+                "attachments": attachments,
+            })
+        else:
+            messages_list.append({
+                "role": msg.role,
+                "content": msg.content,
+                "created_at": msg.created_at,
+                "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
+                "attachments": [],
+            })
 
     assistant_name: Optional[str] = None
     if conversation.assistant_id is not None:

@@ -26,11 +26,19 @@ ContentPart = Annotated[
 ]
 
 
+# ── Attachment-Metadaten ────────────────────────────────────────────────────
+
+class AttachmentMeta(BaseModel):
+    name: str
+    type: Literal["text", "image"]
+
+
 # ── Chat-Schemas ────────────────────────────────────────────────────────────
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: Union[str, list[ContentPart]]
+    attachments: list[AttachmentMeta] = []
 
 
 class ChatRequest(BaseModel):
