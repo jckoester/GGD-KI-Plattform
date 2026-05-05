@@ -190,21 +190,21 @@ class TestAssistantResponse:
 
 
 class TestValidateAssistantFields:
-    def test_subject_department_scope_raises(self):
-        """subject_department-Scope — wirft HTTPException(422)."""
+    def test_subject_department_scope_without_group_id_raises(self):
+        """subject_department-Scope ohne scope_group_id — wirft HTTPException(422)."""
         with pytest.raises(HTTPException) as exc_info:
-            _validate_assistant_fields(scope="subject_department")
+            _validate_assistant_fields(scope="subject_department", scope_group_id=None)
         assert exc_info.value.status_code == 422
-        assert "Gruppen-Scopes" in exc_info.value.detail
+        assert "scope_group_id" in exc_info.value.detail
 
-    def test_activity_group_scope_raises(self):
-        """activity_group-Scope — wirft HTTPException(422)."""
+    def test_activity_group_scope_without_group_id_raises(self):
+        """activity_group-Scope ohne scope_group_id — wirft HTTPException(422)."""
         with pytest.raises(HTTPException) as exc_info:
-            _validate_assistant_fields(scope="activity_group")
+            _validate_assistant_fields(scope="activity_group", scope_group_id=None)
         assert exc_info.value.status_code == 422
 
     def test_class_group_scope_raises(self):
-        """class_group-Scope — wirft HTTPException(422)."""
+        """class_group-Scope (umbenannt in teaching_group) — wirft HTTPException(422)."""
         with pytest.raises(HTTPException) as exc_info:
             _validate_assistant_fields(scope="class_group")
         assert exc_info.value.status_code == 422

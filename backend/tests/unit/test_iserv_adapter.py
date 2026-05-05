@@ -217,3 +217,42 @@ class TestIServAdapter:
     async def test_authenticate_direct_raises(self, iserv_adapter):
         with pytest.raises(NotImplementedError, match="IServAdapter unterstützt kein direktes Login"):
             await iserv_adapter.authenticate_direct("user", "pass")
+
+    @pytest.mark.asyncio
+    async def test_sso_groups_passed_to_identity(self, iserv_adapter):
+        """IServAdapter übergibt SSO-Gruppen unverändert an NormalizedIdentity."""
+        mock_client = _make_mock_client(
+            _mock_token(),
+            _mock_userinfo("testuser", ["FS.Mathematik", "Klasse.8a", "lehrer"]),
+        )
+        with patch("app.auth.adapters.iserv.httpx.AsyncClient", return_value=mock_client):
+            challenge = await iserv_adapter.get_login_challenge()
+            identity = await iserv_adapter.exchange_code("test_code", challenge.state)
+        assert "FS.Mathematik" in identity.sso_groups
+        assert "Klasse.8a" in identity.sso_groups
+        assert "lehrer" in identity.sso_groups
+        assert len(identity.sso_groups) == 3
+
+    @pytest.mark.asyncio
+    async def test_sso_groups_empty_when_no_groups(self, iserv_adapter):
+        """Ohne groups-Claim ist sso_groups leer."""
+        mock_client = _make_mock_client(
+            _mock_token(),
+            _mock_userinfo("testuser", []),
+        )
+        with patch("app.auth.adapters.iserv.httpx.AsyncClient", return_value=mock_client):
+            challenge = await iserv_adapter.get_login_challenge()
+            identity = await iserv_adapter.exchange_code("test_code", challenge.state)
+        assert identity.sso_groups == []
+
+    @pytest.mark.asyncio
+    async def test_sso_groups_empty_when_no_groups_key(self, iserv_adapter):
+        """Fehlender groups-Claim ergibt leere sso_groups."""
+        resp = MagicMock()
+        resp.json.return_value = {"preferred_username": "testuser"}
+        resp.raise_for_status = MagicMock()
+        mock_client = _make_mock_client(_mock_token(), resp)
+        with patch("app.auth.adapters.iserv.httpx.AsyncClient", return_value=mock_client):
+            challenge = await iserv_adapter.get_login_challenge()
+            identity = await iserv_adapter.exchange_code("test_code", challenge.state)
+        assert identity.sso_groups == []

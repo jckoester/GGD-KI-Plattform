@@ -122,6 +122,7 @@ class IServAdapter(AuthAdapter):
             roles=roles,
             grade=grade,
             display_name=userinfo.get("name", userinfo.get("preferred_username")),
+            sso_groups=groups,  # NEU
         )
 
     def _map_roles_and_grade(

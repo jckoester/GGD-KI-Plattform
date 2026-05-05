@@ -48,6 +48,7 @@ class AssistantCreate(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: str = Field(default="student")
     scope: str = Field(default="private")
+    scope_group_id: Optional[int] = None
     min_grade: Optional[int] = Field(default=None, ge=1, le=13)
     max_grade: Optional[int] = Field(default=None, ge=1, le=13)
     tags: Optional[list[str]] = None
@@ -67,6 +68,7 @@ class AssistantUpdate(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: Optional[str] = None
     scope: Optional[str] = None
+    scope_group_id: Optional[int] = None
     min_grade: Optional[int] = Field(default=None, ge=1, le=13)
     max_grade: Optional[int] = Field(default=None, ge=1, le=13)
     tags: Optional[list[str]] = None
@@ -88,6 +90,7 @@ class AssistantResponse(BaseModel):
     status: str
     audience: str
     scope: str
+    scope_group_id: Optional[int]
     scope_pending: Optional[str]
     min_grade: Optional[int]
     max_grade: Optional[int]
@@ -114,9 +117,9 @@ class AssistantListResponse(BaseModel):
 VALID_AUDIENCES = {"student", "teacher", "all"}
 VALID_SCOPES = {
     "private", "subject_department", "teachers", "activity_group",
-    "class_group", "grade", "all_students", "all",
+    "teaching_group", "grade", "all_students", "all",
 }
-GROUP_SCOPES = {"subject_department", "activity_group", "class_group"}
+GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 
 
 def _validate_assistant_fields(
@@ -124,6 +127,7 @@ def _validate_assistant_fields(
     system_prompt: Optional[str] = None,
     audience: Optional[str] = None,
     scope: Optional[str] = None,
+    scope_group_id: Optional[int] = None,
     min_grade: Optional[int] = None,
     max_grade: Optional[int] = None,
     available_from: Optional[datetime] = None,
@@ -138,10 +142,15 @@ def _validate_assistant_fields(
         raise HTTPException(status_code=422, detail="Ungültiger audience-Wert")
     if scope is not None and scope not in VALID_SCOPES:
         raise HTTPException(status_code=422, detail="Ungültiger scope-Wert")
-    if scope is not None and scope in GROUP_SCOPES:
+    if scope is not None and scope in GROUP_SCOPES and scope_group_id is None:
         raise HTTPException(
             status_code=422,
-            detail="Gruppen-Scopes sind erst ab Phase 3 verfügbar"
+            detail="Gruppen-Scope erfordert eine scope_group_id",
+        )
+    if scope is not None and scope not in GROUP_SCOPES and scope_group_id is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="scope_group_id darf nur bei Gruppen-Scopes gesetzt sein",
         )
     if audience == "teacher" and scope in {"all_students", "all"}:
         raise HTTPException(
@@ -304,6 +313,7 @@ async def create_assistant(
         system_prompt=request.system_prompt,
         audience=request.audience,
         scope=request.scope,
+        scope_group_id=request.scope_group_id,
         min_grade=request.min_grade,
         max_grade=request.max_grade,
         available_from=request.available_from,
@@ -314,6 +324,7 @@ async def create_assistant(
         name=request.name,
         description=request.description,
         subject_id=request.subject_id,
+        scope_group_id=request.scope_group_id,
         system_prompt=request.system_prompt,
         model=request.model,
         temperature=request.temperature,
@@ -376,6 +387,7 @@ async def update_assistant(
         system_prompt=update_data.get("system_prompt"),
         audience=update_data.get("audience"),
         scope=update_data.get("scope"),
+        scope_group_id=update_data.get("scope_group_id"),
         min_grade=update_data.get("min_grade"),
         max_grade=update_data.get("max_grade"),
         available_from=update_data.get("available_from"),
@@ -554,6 +566,7 @@ async def import_assistant(
         system_prompt=fields.get("system_prompt"),
         audience=fields.get("audience"),
         scope=fields.get("scope"),
+        scope_group_id=fields.get("scope_group_id"),
         min_grade=fields.get("min_grade"),
         max_grade=fields.get("max_grade"),
         available_from=fields.get("available_from"),

@@ -6,13 +6,21 @@ users:
     password_hash: <bcrypt-hash>
     role: teacher
     grade: null
+    sso_groups:             # optional; folgt den Mustern aus auth.yaml sso.groups
+      - FS.Mathematik
+      - Klasse.8a
+      - unterricht.8a.Mathematik
 
   - username: schueler01
     password_hash: <bcrypt-hash>
     role: student
     grade: "10"
+    sso_groups:
+      - Klasse.10
+      - unterricht.10.Mathematik
 
   - username: admin
     password_hash: <bcrypt-hash>
     role: admin
     grade: null
+    sso_groups: []

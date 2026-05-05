@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from app.auth.audit import upsert_pseudonym_audit
 from app.auth.base import NormalizedIdentity
+from app.auth.config import SsoGroupPatterns, SsoConfig
 from app.auth.dependencies import get_auth_adapter, get_jwt_service
+from app.auth.group_sync import sync_groups
 from app.auth.jwt import JwtService
 from app.auth.pseudonym import pseudonymize
 from app.auth.router import router as auth_router
@@ -228,12 +230,19 @@ class TestLogin:
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
              patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
+             patch("app.auth.router.ensure_litellm_team_membership") as mock_ensure_team, \
+             patch("app.auth.router.load_auth_config") as mock_load_config, \
+             patch("app.auth.router.sync_groups") as mock_sync, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
+            mock_settings.auth_config_path = "test/path"
             mock_pseudo.return_value = "test_pseudo_abc"
             mock_audit.return_value = ("student", 10)
             mock_ensure_user.return_value = None
+            mock_ensure_team.return_value = None
+            mock_load_config.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.post(
@@ -310,12 +319,19 @@ class TestLogin:
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
              patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
+             patch("app.auth.router.ensure_litellm_team_membership") as mock_ensure_team, \
+             patch("app.auth.router.load_auth_config") as mock_load_config, \
+             patch("app.auth.router.sync_groups") as mock_sync, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
+            mock_settings.auth_config_path = "test/path"
             mock_pseudo.return_value = "test_pseudo_abc"
             mock_audit.return_value = ("student", 10)
             mock_ensure_user.return_value = None
+            mock_ensure_team.return_value = None
+            mock_load_config.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.post(
@@ -324,6 +340,45 @@ class TestLogin:
             )
             assert response.status_code == 200
             mock_audit.assert_called_once()
+
+    def test_login_calls_sync_groups(self, app_with_mocks, mock_direct_adapter, mock_db):
+        """POST /login ruft sync_groups mit korrekten Parametern auf."""
+        identity = NormalizedIdentity(
+            external_id="test_user_123",
+            roles=["student"],
+            grade="10",
+            sso_groups=["Klasse.8a", "unterricht.8a.Mathematik"]
+        )
+        mock_direct_adapter.authenticate_direct = AsyncMock(return_value=identity)
+
+        with patch("app.auth.router.pseudonymize") as mock_pseudo, \
+             patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
+             patch("app.auth.router.ensure_litellm_team_membership") as mock_ensure_team, \
+             patch("app.auth.router.load_auth_config") as mock_load_config, \
+             patch("app.auth.router.sync_groups") as mock_sync, \
+             patch("app.auth.router.settings") as mock_settings:
+            mock_settings.school_secret = _SCHOOL_SECRET
+            mock_settings.environment = "development"
+            mock_settings.auth_config_path = "test/path"
+            mock_pseudo.return_value = "test_pseudo_abc"
+            mock_audit.return_value = ("student", 10)
+            mock_ensure_user.return_value = None
+            mock_ensure_team.return_value = None
+            mock_load_config.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            mock_sync.return_value = None
+
+            client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            response = client.post(
+                "/login",
+                json={"username": "testuser", "password": "testpass"}
+            )
+            assert response.status_code == 200
+            mock_sync.assert_awaited_once()
+            call_args = mock_sync.call_args
+            assert call_args.kwargs["pseudonym"] == "test_pseudo_abc"
+            assert call_args.kwargs["sso_groups"] == ["Klasse.8a", "unterricht.8a.Mathematik"]
+            assert call_args.kwargs["primary_role"] == "student"
 
 
 class TestCallback:
@@ -353,12 +408,19 @@ class TestCallback:
         with patch("app.auth.router.pseudonymize") as mock_pseudo, \
              patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
              patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
+             patch("app.auth.router.ensure_litellm_team_membership") as mock_ensure_team, \
+             patch("app.auth.router.load_auth_config") as mock_load_config, \
+             patch("app.auth.router.sync_groups") as mock_sync, \
              patch("app.auth.router.settings") as mock_settings:
             mock_settings.school_secret = _SCHOOL_SECRET
             mock_settings.environment = "development"
+            mock_settings.auth_config_path = "test/path"
             mock_pseudo.return_value = "test_pseudo_abc"
             mock_audit.return_value = ("student", 10)
             mock_ensure_user.return_value = None
+            mock_ensure_team.return_value = None
+            mock_load_config.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
             response = client.get("/callback?code=test_code&state=test_state")
@@ -404,3 +466,39 @@ class TestCallback:
         response = client.get("/callback?code=test&state=test")
         assert response.status_code == 401
         assert "Authentifizierung fehlgeschlagen" in response.json()["detail"]
+
+    def test_callback_calls_sync_groups(self, app_with_mocks, mock_redirect_adapter, mock_db):
+        """GET /callback ruft sync_groups mit korrekten Parametern auf."""
+        identity = NormalizedIdentity(
+            external_id="test_user_456",
+            roles=["teacher"],
+            grade=None,
+            sso_groups=["FS.Mathematik", "Klasse.10b", "unterricht.10b.Physik"]
+        )
+        mock_redirect_adapter.exchange_code = AsyncMock(return_value=identity)
+
+        with patch("app.auth.router.pseudonymize") as mock_pseudo, \
+             patch("app.auth.router.upsert_pseudonym_audit") as mock_audit, \
+             patch("app.auth.router.ensure_litellm_user") as mock_ensure_user, \
+             patch("app.auth.router.ensure_litellm_team_membership") as mock_ensure_team, \
+             patch("app.auth.router.load_auth_config") as mock_load_config, \
+             patch("app.auth.router.sync_groups") as mock_sync, \
+             patch("app.auth.router.settings") as mock_settings:
+            mock_settings.school_secret = _SCHOOL_SECRET
+            mock_settings.environment = "development"
+            mock_settings.auth_config_path = "test/path"
+            mock_pseudo.return_value = "test_pseudo_xyz"
+            mock_audit.return_value = ("teacher", None)
+            mock_ensure_user.return_value = None
+            mock_ensure_team.return_value = None
+            mock_load_config.return_value = MagicMock(sso=SsoConfig(groups=SsoGroupPatterns()))
+            mock_sync.return_value = None
+
+            client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            response = client.get("/callback?code=test_code&state=test_state")
+            assert response.status_code == 200
+            mock_sync.assert_awaited_once()
+            call_args = mock_sync.call_args
+            assert call_args.kwargs["pseudonym"] == "test_pseudo_xyz"
+            assert call_args.kwargs["sso_groups"] == ["FS.Mathematik", "Klasse.10b", "unterricht.10b.Physik"]
+            assert call_args.kwargs["primary_role"] == "teacher"

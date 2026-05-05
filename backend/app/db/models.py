@@ -33,7 +33,7 @@ class AssistantScope(enum.Enum):
     SUBJECT_DEPARTMENT = "subject_department"
     TEACHERS = "teachers"
     ACTIVITY_GROUP = "activity_group"
-    CLASS_GROUP = "class_group"
+    TEACHING_GROUP = "teaching_group"
     GRADE = "grade"
     ALL_STUDENTS = "all_students"
     ALL = "all"
@@ -63,7 +63,52 @@ class Subject(Base):
     sort_order: Mapped[int] = mapped_column(default=0, nullable=False)
 
 
-# 2. assistants
+# 2. groups
+class Group(Base):
+    __tablename__ = "groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    sso_group_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('school_class','subject_department','teaching_group','activity_group','teachers')",
+            name="check_groups_type",
+        ),
+        Index("idx_groups_type", "type"),
+        Index("idx_groups_subject_id", "subject_id"),
+    )
+
+
+# 3. group_memberships
+class GroupMembership(Base):
+    __tablename__ = "group_memberships"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    pseudonym: Mapped[str] = mapped_column(Text, primary_key=True)
+    role_in_group: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "role_in_group IS NULL OR role_in_group IN ('teacher','student')",
+            name="check_group_memberships_role",
+        ),
+        Index("idx_group_memberships_pseudonym", "pseudonym"),
+    )
+
+
+# 4. assistants
 class Assistant(Base):
     __tablename__ = "assistants"
 
@@ -82,7 +127,9 @@ class Assistant(Base):
     audience: Mapped[str] = mapped_column(default="student", server_default=text("'student'"))
     scope: Mapped[str] = mapped_column(default="private", server_default=text("'private'"))
     scope_pending: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    scope_group_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    scope_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    )
 
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
@@ -119,13 +166,13 @@ class Assistant(Base):
         ),
         CheckConstraint(
             "scope IN ('private','subject_department','teachers','activity_group',"
-            "          'class_group','grade','all_students','all')",
+            "          'teaching_group','grade','all_students','all')",
             name="check_assistant_scope",
         ),
         CheckConstraint(
             "scope_pending IS NULL OR scope_pending IN "
             "('private','subject_department','teachers','activity_group',"
-            " 'class_group','grade','all_students','all')",
+            " 'teaching_group','grade','all_students','all')",
             name="check_assistant_scope_pending",
         ),
         Index("idx_assistants_status", "status"),
@@ -133,7 +180,7 @@ class Assistant(Base):
     )
 
 
-# 3. conversations
+# 5. conversations
 class Conversation(Base):
     __tablename__ = "conversations"
 
@@ -167,7 +214,7 @@ class Conversation(Base):
     )
 
 
-# 4. messages
+# 6. messages
 class Message(Base):
     __tablename__ = "messages"
 
@@ -196,7 +243,7 @@ class Message(Base):
     )
 
 
-# 5. user_preferences
+# 7. user_preferences
 class UserPreference(Base):
     __tablename__ = "user_preferences"
 
@@ -206,7 +253,7 @@ class UserPreference(Base):
     )
 
 
-# 6. pseudonym_audit
+# 8. pseudonym_audit
 class PseudonymAudit(Base):
     __tablename__ = "pseudonym_audit"
 
@@ -225,7 +272,7 @@ class PseudonymAudit(Base):
     litellm_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
-# 7. jwt_revocations
+# 9. jwt_revocations
 class JwtRevocation(Base):
     __tablename__ = "jwt_revocations"
 
@@ -245,7 +292,7 @@ class JwtRevocation(Base):
     )
 
 
-# 8. exchange_rates
+# 10. exchange_rates
 class ExchangeRate(Base):
     __tablename__ = "exchange_rates"
 
@@ -268,7 +315,7 @@ class ExchangeRate(Base):
     )
 
 
-# 9. site_texts
+# 11. site_texts
 class SiteText(Base):
     __tablename__ = "site_texts"
 

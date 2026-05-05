@@ -12,6 +12,7 @@ class NormalizedIdentity(BaseModel):
     roles: list[str]  # mind. eine Basisrolle; admin additiv zu teacher möglich
     grade: str | None = None
     display_name: str | None = None  # nur UI-Anzeige, niemals persistieren
+    sso_groups: list[str] = []  # rohe SSO-Gruppen-IDs vom Provider
 
     @model_validator(mode="after")
     def validate_roles(self) -> "NormalizedIdentity":

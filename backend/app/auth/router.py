@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from app.auth.audit import upsert_pseudonym_audit
+from app.auth.audit import get_primary_role, upsert_pseudonym_audit
 from app.auth.base import AuthAdapter, LoginChallenge
+from app.auth.config import load_auth_config
 from app.auth.dependencies import get_auth_adapter, get_current_user, get_jwt_service
+from app.auth.group_sync import sync_groups
 from app.auth.jwt import JwtPayload, JwtService
 from app.auth.pseudonym import pseudonymize
 from app.config import settings
@@ -58,6 +60,18 @@ async def auth_callback(
         old_grade=old_grade,
     )
     await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
+    
+    # Sync SSO-Gruppen
+    auth_config = load_auth_config(settings.auth_config_path)
+    primary_role = get_primary_role(identity.roles)
+    await sync_groups(
+        db=db,
+        pseudonym=pseudonym,
+        sso_groups=identity.sso_groups,
+        primary_role=primary_role,
+        patterns=auth_config.sso.groups,
+    )
+    
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(
@@ -100,6 +114,18 @@ async def login_direct(
         old_grade=old_grade,
     )
     await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
+    
+    # Sync SSO-Gruppen
+    auth_config = load_auth_config(settings.auth_config_path)
+    primary_role = get_primary_role(identity.roles)
+    await sync_groups(
+        db=db,
+        pseudonym=pseudonym,
+        sso_groups=identity.sso_groups,
+        primary_role=primary_role,
+        patterns=auth_config.sso.groups,
+    )
+    
     token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
     secure = settings.environment != "development"
     response.set_cookie(

@@ -19,7 +19,7 @@ class TestAssistantEnums:
         assert AssistantScope.SUBJECT_DEPARTMENT.value == "subject_department"
         assert AssistantScope.TEACHERS.value == "teachers"
         assert AssistantScope.ACTIVITY_GROUP.value == "activity_group"
-        assert AssistantScope.CLASS_GROUP.value == "class_group"
+        assert AssistantScope.TEACHING_GROUP.value == "teaching_group"
         assert AssistantScope.GRADE.value == "grade"
         assert AssistantScope.ALL_STUDENTS.value == "all_students"
         assert AssistantScope.ALL.value == "all"

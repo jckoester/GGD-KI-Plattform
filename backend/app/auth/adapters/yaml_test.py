@@ -1,5 +1,5 @@
 import yaml
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import bcrypt
@@ -19,6 +19,7 @@ class YamlUser:
     roles: list[str]
     grade: str | None
     display_name: str | None = None
+    sso_groups: list[str] = field(default_factory=list)  # NEU
 
 
 class YamlTestAdapter(AuthAdapter):
@@ -39,6 +40,7 @@ class YamlTestAdapter(AuthAdapter):
                 roles=user_data.get("roles", [user_data.get("role", "student")]),
                 grade=user_data.get("grade"),
                 display_name=user_data.get("display_name"),
+                sso_groups=user_data.get("sso_groups", []),  # NEU
             )
             users[user.username] = user
         return users
@@ -66,4 +68,5 @@ class YamlTestAdapter(AuthAdapter):
             roles=user.roles,
             grade=user.grade,
             display_name=user.display_name,
+            sso_groups=user.sso_groups,  # NEU
         )
