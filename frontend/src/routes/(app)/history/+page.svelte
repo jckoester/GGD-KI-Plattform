@@ -145,6 +145,7 @@
                                     <ConversationMenu
                                         conversationId={conv.id}
                                         title={conv.title}
+                                        subject_id={conv.subject_id ?? null}
                                         onDeleted={handleDeleted}
                                     />
                                 </td>

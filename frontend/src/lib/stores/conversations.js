@@ -18,3 +18,9 @@ export function updateConversationTitle(id, title) {
     list.map(c => c.id === id ? { ...c, title } : c)
   )
 }
+
+export function updateConversationSubject(id, subjectId) {
+  recentConversations.update(list =>
+    list.map(c => c.id === id ? { ...c, subject_id: subjectId } : c)
+  )
+}

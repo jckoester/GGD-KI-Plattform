@@ -111,6 +111,20 @@ export async function renameConversation(conversationId, title) {
   return res.json()
 }
 
+export async function patchConversationSubject(conversationId, subjectId) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ subject_id: subjectId }),  // null zum Entfernen
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Setzen des Fachs')
+  }
+  return res.json()
+}
+
 export async function deleteConversation(conversationId) {
   const res = await fetch(`${BASE}/conversations/${conversationId}`, {
     method: 'DELETE',
@@ -430,4 +444,18 @@ export async function getSubjects() {
   const res = await fetch(`${BASE}/subjects`, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // { items: SubjectOut[] }
+}
+
+export async function patchConversationSubject(conversationId, subjectId) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ subject_id: subjectId }),  // null zum Entfernen
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Setzen des Fachs')
+  }
+  return res.json()
 }

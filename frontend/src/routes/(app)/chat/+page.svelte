@@ -92,7 +92,7 @@
     }
 
     import { updateConversationTitle } from "$lib/stores/conversations.js";
-    import { pageTitle, activeConversationId } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationId, activeConversationSubjectId } from "$lib/stores/pageTitle.js";
     import { onDestroy, onMount } from "svelte";
 
     async function loadModels() {
@@ -328,6 +328,8 @@
                     // Assistenten-Referenz für laufende Konversation speichern
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
+                        // subject_id aus Assistent übernehmen
+                        activeConversationSubjectId.set(selectedAssistant.subject_id ?? null);
                     }
                     continue;
                 }
@@ -453,6 +455,7 @@
                     : null;
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
+                activeConversationSubjectId.set(data.subject_id ?? null);
             } catch (err) {
                 if (err instanceof ApiError) {
                     conversationError = err.message;
@@ -463,12 +466,14 @@
                         currentConversationModel = null;
                         pageTitle.set("");
                         activeConversationId.set(null);
+                        activeConversationSubjectId.set(null);
                     }
                 } else {
                     conversationError = "Fehler beim Laden der Konversation";
                     currentConversationModel = null;
                     pageTitle.set("");
                     activeConversationId.set(null);
+                    activeConversationSubjectId.set(null);
                 }
             } finally {
                 loadingConversation = false;
@@ -482,6 +487,7 @@
             conversationError = null;
             pageTitle.set("");
             activeConversationId.set(null);
+            activeConversationSubjectId.set(null);
             conversationAssistant = null;
             pickerOpen = false;
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
@@ -527,6 +533,7 @@
     onDestroy(() => {
         pageTitle.set("");
         activeConversationId.set(null);
+        activeConversationSubjectId.set(null);
     });
 
     // Automatisch Konversationen neu laden nach Stream-Ende

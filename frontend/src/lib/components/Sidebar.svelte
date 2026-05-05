@@ -283,6 +283,7 @@
                                     <ConversationMenu
                                         conversationId={conv.id}
                                         title={conv.title}
+                                        subject_id={conv.subject_id}
                                         onDelete={handleDeleted}
                                         iconSize={12}
                                     />

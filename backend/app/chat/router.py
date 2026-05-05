@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.litellm.client import LiteLLMClient
@@ -56,6 +56,7 @@ class ConversationDetailResponse(BaseModel):
     model_used: str
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
+    subject_id: Optional[int] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     is_test: bool = False
@@ -253,6 +254,7 @@ async def chat(
     title_prompt: str | None = None
 
     if is_new:
+        assistant: Optional[Assistant] = None
         if request.assistant_id is not None:
             asst_result = await db.execute(
                 select(Assistant).where(Assistant.id == request.assistant_id)
@@ -279,6 +281,7 @@ async def chat(
             model_used=model_used,
             title=make_title(first_user_msg) if first_user_msg else None,
             assistant_id=request.assistant_id,
+            subject_id=assistant.subject_id if assistant is not None else None,
             system_prompt_snapshot=system_prompt_snapshot,
             is_test=request.is_test,
         )
@@ -493,16 +496,21 @@ async def list_models(
 
 
 class ConversationUpdateRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
+    title: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    subject_id: Optional[int] = None
 
 
 @router.patch("/conversations/{conversation_id}")
-async def update_conversation_title(
+async def update_conversation(
     conversation_id: UUID,
     request: ConversationUpdateRequest,
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationItem:
+    # Mindestens ein Feld muss gesetzt sein
+    if not request.model_fields_set:
+        raise HTTPException(status_code=422, detail="Keine Felder angegeben")
+
     # Konversation laden und Sicherheitscheck
     result = await db.execute(
         select(Conversation).where(Conversation.id == conversation_id)
@@ -515,16 +523,31 @@ async def update_conversation_title(
     if conversation.pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
-    # Titel aktualisieren
-    conversation.title = request.title
+    if 'title' in request.model_fields_set and request.title is not None:
+        conversation.title = request.title
+
+    if 'subject_id' in request.model_fields_set:
+        # Erlaubt null (Fach entfernen) oder gültige ID
+        if request.subject_id is not None:
+            # FK-Prüfung: subject muss existieren
+            subj = await db.execute(
+                select(Subject).where(Subject.id == request.subject_id)
+            )
+            if subj.scalar_one_or_none() is None:
+                raise HTTPException(status_code=404, detail="Fach nicht gefunden")
+        conversation.subject_id = request.subject_id
+
     await db.commit()
+    await db.refresh(conversation)
 
     return ConversationItem(
         id=conversation.id,
         title=conversation.title,
         last_message_at=conversation.last_message_at,
         model_used=conversation.model_used,
-        assistant_name=None,  # Rename-Response enthält keinen Assistenten-Namen
+        assistant_name=None,
+        subject_id=conversation.subject_id,
+        is_test=conversation.is_test,
     )
 
 
@@ -670,6 +693,7 @@ async def get_conversation_messages(
         model_used=conversation.model_used,
         assistant_id=conversation.assistant_id,
         assistant_name=assistant_name,
+        subject_id=conversation.subject_id,
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         is_test=conversation.is_test,

@@ -1,19 +1,25 @@
 <script>
-    import { EllipsisVertical, Pencil, Trash2 } from "lucide-svelte";
+    import { EllipsisVertical, Pencil, Trash2, BookOpen } from "lucide-svelte";
     import { onDestroy } from "svelte";
     import { goto } from "$app/navigation";
-    import { deleteConversation, renameConversation } from "$lib/api.js";
+    import { deleteConversation, renameConversation, patchConversationSubject } from "$lib/api.js";
     import {
         refreshConversations,
         updateConversationTitle,
+        updateConversationSubject,
     } from "$lib/stores/conversations.js";
-    import { pageTitle } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationSubjectId } from "$lib/stores/pageTitle.js";
+    import { subjects } from "$lib/stores/subjects.js";
+    import SubjectDot from "$lib/components/SubjectDot.svelte";
+    import { user } from "$lib/stores/user.js";
 
     // syncPageTitle: nur im Chat-Header auf true setzen
     // onDeleted: optionaler Callback; wenn nicht angegeben, wird zu /chat navigiert
+    // subject_id: aktuell zugewiesenes Fach (null = kein Fach)
     let {
         conversationId,
         title,
+        subject_id = null,
         syncPageTitle = false,
         onDeleted = null,
         iconSize = 20,
@@ -23,9 +29,38 @@
     let isOpen = $state(false);
     let isRenaming = $state(false);
     let isDeleting = $state(false);
+    let isAssigningSubject = $state(false);
     let newTitle = $state("");
     let buttonEl = $state(null);
     let dropdownStyle = $state("");
+
+    // Gefilterte Fächer: Schüler sehen nur Fächer passend zum Jahrgang
+    const visibleSubjects = $derived.by(() => {
+        const grade = $user?.grade ?? null
+        const isStudent = $user?.roles?.includes('student') ?? false
+        if (!isStudent || grade == null) return $subjects
+        return $subjects.filter(s =>
+            (s.min_grade == null || s.min_grade <= grade) &&
+            (s.max_grade == null || s.max_grade >= grade)
+        )
+    })
+
+    function startAssigningSubject() {
+        isAssigningSubject = true
+        isRenaming = false
+        isDeleting = false
+    }
+
+    async function assignSubject(newSubjectId) {
+        try {
+            await patchConversationSubject(conversationId, newSubjectId)
+            updateConversationSubject(conversationId, newSubjectId)
+            if (syncPageTitle) activeConversationSubjectId.set(newSubjectId)
+            closeMenu()
+        } catch (err) {
+            console.error("Fehler beim Setzen des Fachs:", err)
+        }
+    }
 
     function openMenu() {
         if (buttonEl) {
@@ -44,6 +79,7 @@
         isOpen = false;
         isRenaming = false;
         isDeleting = false;
+        isAssigningSubject = false;
     }
 
     function handleClickOutside(event) {
@@ -129,7 +165,7 @@
             class="fixed w-52 bg-light-bg dark:bg-dark-bg rounded-lg shadow-lg border border-light-ui-2 dark:border-dark-ui-2 z-50"
             style={dropdownStyle}
         >
-            {#if !isRenaming && !isDeleting}
+            {#if !isRenaming && !isDeleting && !isAssigningSubject}
                 <div>
                     <button
                         onclick={(e) => {
@@ -141,6 +177,17 @@
                     >
                         <Pencil size={14} />
                         Umbenennen
+                    </button>
+                    <button
+                        onclick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            startAssigningSubject();
+                        }}
+                        class="w-full text-left px-4 py-2 text-sm text-light-tx dark:text-dark-tx hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2"
+                    >
+                        <BookOpen size={14} />
+                        Fach zuweisen
                     </button>
                     <button
                         onclick={(e) => {
@@ -213,6 +260,37 @@
                             Nein
                         </button>
                     </div>
+                </div>
+            {:else if isAssigningSubject}
+                <div class="py-1">
+                    <!-- "Kein Fach"-Option -->
+                    <button
+                        onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignSubject(null) }}
+                        class="w-full text-left px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2
+                       hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
+                       {subject_id == null ? 'font-semibold' : ''}"
+                    >
+                        <span class="w-2 h-2 rounded-full border border-light-ui-3 dark:border-dark-ui-3 shrink-0"></span>
+                        Kein Fach
+                    </button>
+                    {#each visibleSubjects as subj}
+                        <button
+                            onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignSubject(subj.id) }}
+                            class="w-full text-left px-4 py-2 text-sm text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
+                       {subject_id === subj.id ? 'font-semibold' : ''}"
+                        >
+                            <SubjectDot color={subj.color} />
+                            {subj.name}
+                        </button>
+                    {/each}
+                    <button
+                        onclick={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu() }}
+                        class="w-full text-left px-4 py-2 rounded-b-lg text-sm text-light-tx-2 dark:text-dark-tx-2
+                   hover:bg-light-ui-3 dark:hover:bg-dark-ui border-t border-light-ui-2 dark:border-dark-ui-2"
+                    >
+                        Abbrechen
+                    </button>
                 </div>
             {/if}
         </div>
