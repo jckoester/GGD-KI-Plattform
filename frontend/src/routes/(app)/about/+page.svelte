@@ -33,6 +33,15 @@
     const authors = [{ name: "Jan Köster", github: "jckoester" }];
 
     const repository = "https://github.com/jckoester/GGD-KI-Plattform/";
+
+    function initials(name) {
+        return name
+            .split(/\s+/)
+            .map((w) => w[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2);
+    }
 </script>
 
 <div class="h-full overflow-y-auto">
