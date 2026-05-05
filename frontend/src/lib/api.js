@@ -425,3 +425,9 @@ export async function importAssistant(file, modelOverride = null) {
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()
 }
+
+export async function getSubjects() {
+  const res = await fetch(`${BASE}/subjects`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { items: SubjectOut[] }
+}

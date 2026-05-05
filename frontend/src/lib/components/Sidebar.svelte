@@ -20,6 +20,7 @@
     } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
     import { page } from "$app/stores";
+    import { subjectMap } from "$lib/stores/subjects.js";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
@@ -236,14 +237,24 @@
                         </p>
                     {:else}
                         {#each $recentConversations as conv}
+                            {@const convColor = conv.subject_id != null
+                                ? ($subjectMap[conv.subject_id]?.color ?? null)
+                                : null}
                             <button
                                 onclick={() => goto(`/chat?id=${conv.id}`)}
                                 class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors relative overflow-hidden
                                        {conv.id === currentConversationId
                                     ? 'bg-light-ui-2 dark:bg-dark-ui-2'
                                     : ''}"
                             >
+                                <!-- Farbstreifen links (nur wenn Fach mit Farbe) -->
+                                {#if convColor}
+                                    <span
+                                        class="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
+                                        style="background-color: {convColor}"
+                                    ></span>
+                                {/if}
                                 <div
                                     class="flex justify-between items-center gap-1"
                                 >

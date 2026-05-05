@@ -5,6 +5,7 @@
     import { user } from "$lib/stores/user.js";
     import { themePref } from "$lib/stores/theme.js";
     import { budget } from "$lib/stores/budget.js";
+    import { refreshSubjects } from "$lib/stores/subjects.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -28,6 +29,7 @@
             });
             budget.set(budgetData);
             themePref.syncFromServer(prefs.theme ?? "system");
+            refreshSubjects()   // fire-and-forget; Fehler werden intern ignoriert
         } catch {
             goto("/");
         }

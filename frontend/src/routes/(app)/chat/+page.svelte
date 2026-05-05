@@ -23,6 +23,7 @@
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
     import { budget, refreshBudget } from "$lib/stores/budget.js";
+    import { subjectMap } from "$lib/stores/subjects.js";
 
     let messages = $state([]);
     let input = $state("");
@@ -626,12 +627,18 @@
 
             <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
             {#if selectedAssistant && !conversationId && !conversationAssistant}
+                {@const chipColor = selectedAssistant.subject_id != null
+                    ? ($subjectMap[selectedAssistant.subject_id]?.color ?? null)
+                    : null}
                 <div class="flex items-center gap-1.5">
                     <span
                         class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                                 bg-light-bl/15 dark:bg-dark-bl/15
-                                 text-light-bl dark:text-dark-bl
-                                 border border-light-bl/30 dark:border-dark-bl/30"
+                                 {chipColor
+                                     ? 'text-light-tx dark:text-dark-tx border'
+                                     : 'bg-light-bl/15 dark:bg-dark-bl/15 text-light-bl dark:text-dark-bl border border-light-bl/30 dark:border-dark-bl/30'}"
+                        style={chipColor
+                            ? `background-color: ${chipColor}1a; border-color: ${chipColor}40; border-left: 3px solid ${chipColor}`
+                            : ''}
                     >
                         <Bot class="w-3 h-3" />
                         {selectedAssistant.name}

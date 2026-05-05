@@ -31,6 +31,7 @@ class ConversationItem(BaseModel):
     last_message_at: Optional[datetime]
     model_used: str
     assistant_name: Optional[str] = None
+    subject_id: Optional[int] = None
     is_test: bool = False
 
 
@@ -593,6 +594,7 @@ async def list_conversations(
             last_message_at=conv.last_message_at,
             model_used=conv.model_used,
             assistant_name=asst_name,
+            subject_id=conv.subject_id,
             is_test=conv.is_test,
         )
         for conv, asst_name in rows

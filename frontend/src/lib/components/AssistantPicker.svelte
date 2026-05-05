@@ -1,5 +1,7 @@
 <script>
     import { onMount } from 'svelte';
+    import SubjectDot from '$lib/components/SubjectDot.svelte'
+    import { subjectMap } from '$lib/stores/subjects.js'
 
     let { assistants = [], onselect, onclose } = $props()
     // assistants: AssistantSummary[]
@@ -122,7 +124,9 @@
                                transition-colors
                                {i === focusedIndex ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
                     >
-                        <span class="w-2 h-2 mt-1.5 rounded-full bg-light-bl dark:bg-dark-bl shrink-0"></span>
+                        <span class="mt-1.5 shrink-0">
+                            <SubjectDot color={$subjectMap[assistant.subject_id]?.color ?? null} />
+                        </span>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <span class="font-medium">{assistant.name}</span>

@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { getAssistants } from "$lib/api.js";
+    import { subjectMap } from "$lib/stores/subjects.js"
     import { Bot, Loader2 } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
@@ -59,21 +60,33 @@
         {:else}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {#each assistants as assistant}
+                    {@const subjectColor = assistant.subject_id != null
+                        ? ($subjectMap[assistant.subject_id]?.color ?? null)
+                        : null}
                     <button
                         onclick={() => startChat(assistant)}
                         class="w-full bg-light-bg-2 dark:bg-dark-bg-2
                                border border-light-ui-3 dark:border-dark-ui-3
-                               rounded-lg p-4
+                               rounded-lg overflow-hidden
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
-                               transition-colors text-left"
+                               transition-colors text-left relative"
                     >
-                        <div class="flex items-start gap-3">
-                            <Bot class="w-5 h-5 text-light-bl dark:text-dark-bl shrink-0 mt-0.5" />
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-medium text-light-tx dark:text-dark-tx">
-                                        {assistant.name}
-                                    </span>
+                        <!-- Farbiger Top-Streifen (nur wenn Fach mit Farbe) -->
+                        {#if subjectColor}
+                            <span
+                                class="block h-[3px] w-full"
+                                style="background-color: {subjectColor}"
+                            ></span>
+                        {/if}
+
+                        <div class="p-4">
+                            <div class="flex items-start gap-3">
+                                <Bot class="w-5 h-5 text-light-bl dark:text-dark-bl shrink-0 mt-0.5" />
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-light-tx dark:text-dark-tx">
+                                            {assistant.name}
+                                        </span>
                                     {#if assistant.audience}
                                         <span class="text-xs px-1.5 py-0.5 rounded-full
                                              bg-light-ui-3 dark:bg-dark-ui-3
@@ -100,6 +113,7 @@
                                     </div>
                                 {/if}
                             </div>
+                        </div>
                         </div>
                     </button>
                 {/each}
