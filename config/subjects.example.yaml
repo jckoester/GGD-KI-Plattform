@@ -1,0 +1,123 @@
+# Fächer-Konfiguration
+# Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
+#         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order
+subjects:
+  - slug: mathematik
+    name: Mathematik
+    icon: square-radical
+    color: "#3b82f6"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 10
+
+  - slug: deutsch
+    name: Deutsch
+    icon: book-open
+    color: "#ef4444"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 20
+
+  - slug: englisch
+    name: Englisch
+    icon: globe
+    color: "#10b981"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 30
+
+  - slug: physik
+    name: Physik
+    icon: atom
+    color: "#8b5cf6"
+    min_grade: 7
+    max_grade: 13
+    sort_order: 40
+
+  - slug: chemie
+    name: Chemie
+    icon: flask-conical
+    color: "#f59e0b"
+    min_grade: 7
+    max_grade: 13
+    sort_order: 50
+
+  - slug: biologie
+    name: Biologie
+    icon: leaf
+    color: "#22c55e"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 60
+
+  - slug: geschichte
+    name: Geschichte
+    icon: landmark
+    color: "#a78bfa"
+    min_grade: 6
+    max_grade: 13
+    sort_order: 70
+
+  - slug: geographie
+    name: Geographie
+    icon: map
+    color: "#06b6d4"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 80
+
+  - slug: informatik
+    name: Informatik
+    icon: code-2
+    color: "#64748b"
+    min_grade: 7
+    max_grade: 13
+    sort_order: 90
+
+  - slug: kunst
+    name: Kunst
+    icon: palette
+    color: "#ec4899"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 100
+
+  - slug: musik
+    name: Musik
+    icon: music
+    color: "#f97316"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 110
+
+  - slug: sport
+    name: Sport
+    icon: dumbbell
+    color: "#14b8a6"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 120
+
+  - slug: religion
+    name: Religion
+    icon: sun
+    color: "#fbbf24"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 130
+
+  - slug: ethik
+    name: Ethik
+    icon: heart-handshake
+    color: "#f43f5e"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 140
+
+  - slug: nwt
+    name: NwT
+    icon: microscope
+    color: "#0ea5e9"
+    min_grade: 8
+    max_grade: 10
+    sort_order: 150
