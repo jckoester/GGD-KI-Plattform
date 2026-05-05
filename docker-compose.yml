@@ -34,7 +34,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         PUBLIC_SCHOOL_NAME: ${PUBLIC_SCHOOL_NAME:-ki@schule}
         PUBLIC_SCHOOL_LOGO_URL: ${PUBLIC_SCHOOL_LOGO_URL:-}

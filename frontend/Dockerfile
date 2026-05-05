@@ -2,10 +2,12 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci
 
-COPY . .
+COPY frontend/ .
+# docs/user/ muss beim Vite-Build erreichbar sein (Alias $docs → /docs/user)
+COPY docs/user/ /docs/user/
 
 ARG PUBLIC_SCHOOL_NAME=ki@schule
 ARG PUBLIC_SCHOOL_LOGO_URL=

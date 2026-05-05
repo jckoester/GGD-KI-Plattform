@@ -1,0 +1,26 @@
+# Entwicklung
+**/.git
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.svelte-kit
+
+# Frontend-Build-Artefakt
+frontend/build
+
+# Backend-venv
+backend/venv
+
+# Lokale Konfiguration (wird per Volume gemountet)
+config/.env
+config/auth.yaml
+config/test_users.yaml
+
+# Planungs- und Konzeptdokumente (nicht nötig im Build-Kontext)
+Plaene/
+Konzept/
+UI/
+
+# Sonstiges
+**/.DS_Store

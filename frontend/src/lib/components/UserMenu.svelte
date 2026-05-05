@@ -60,13 +60,14 @@
 
     <!-- Review (nur bei review-Rolle) - vorbereitet für später -->
     {#if $user?.roles.includes("review")}
-        <a
-            href="#"
-            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        <button
+            type="button"
+            disabled
+            class="flex items-center w-full px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 opacity-50 cursor-not-allowed"
         >
             <Eye class="w-4 h-4 mr-3" />
             Review
-        </a>
+        </button>
     {/if}
 
     <!-- Budget (nur bei budget-Rolle) - vorbereitet für später -->
