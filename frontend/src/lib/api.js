@@ -144,6 +144,12 @@ export async function patchConversationContext(conversationId, subjectId, groupI
   return res.json()  // ConversationItem mit aktualisierten subject_id + group_id
 }
 
+export async function getConversationCounts() {
+  const res = await fetch(`${BASE}/conversations/counts`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { by_subject: { "1": 3 }, by_group: { "5": 2 } }
+}
+
 export async function deleteConversation(conversationId) {
   const res = await fetch(`${BASE}/conversations/${conversationId}`, {
     method: 'DELETE',

@@ -12,6 +12,7 @@
         PiggyBank,
         Bot,
         Settings,
+        BookOpen,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -21,6 +22,9 @@
     import { user } from "$lib/stores/user.js";
     import { page } from "$app/stores";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js"
+    import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
+    import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
     const initials = (name) => name.slice(0, 2).toUpperCase();
@@ -111,7 +115,11 @@
     // Aktualisieren beim Ändern des Limits
     $effect(() => {
         refreshConversations(limit);
+        refreshConversationCounts();
     });
+
+    // State für Fächer-Sektion
+    let subjectsOpen = $state(true);
 
     function handleDeleted(deletedId) {
         conversations = conversations.filter((c) => c.id !== deletedId);
@@ -199,6 +207,37 @@
                 </div>
             {/if}
         </div>
+
+        {#if $sidebarSubjectSections.length > 0}
+          <div class="mt-2">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <button
+                    onclick={() => { subjectsOpen = !subjectsOpen }}
+                    class="flex items-center gap-2"
+                >
+                    <BookOpen size={16} />
+                    Meine Fächer
+                </button>
+                <button onclick={() => { subjectsOpen = !subjectsOpen }}>
+                    {#if subjectsOpen}
+                        <ChevronDown class="w-4 h-4" />
+                    {:else}
+                        <ChevronRight class="w-4 h-4" />
+                    {/if}
+                </button>
+            </div>
+
+            {#if subjectsOpen}
+                <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    {#each $sidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
+                        <SidebarSubjectItem {section} />
+                    {/each}
+                </div>
+            {/if}
+          </div>
+        {/if}
 
         <!-- Letzte Chats Sektion -->
         <div class="mt-2">

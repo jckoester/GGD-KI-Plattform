@@ -7,6 +7,8 @@
     import { budget } from "$lib/stores/budget.js";
     import { refreshSubjects } from "$lib/stores/subjects.js";
     import { refreshMyGroups } from "$lib/stores/myGroups.js";
+    import { refreshAssistants } from "$lib/stores/assistants.js";
+    import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -31,7 +33,9 @@
             budget.set(budgetData);
             themePref.syncFromServer(prefs.theme ?? "system");
             refreshSubjects()   // fire-and-forget; Fehler werden intern ignoriert
-            refreshMyGroups()   // NEU — fire-and-forget
+            refreshMyGroups()   // fire-and-forget
+            refreshAssistants()          // NEU — für Sichtbarkeitsregel
+            refreshConversationCounts()  // NEU — für Chat-Anzahl in Sidebar
         } catch {
             goto("/");
         }

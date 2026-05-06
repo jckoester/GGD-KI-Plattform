@@ -65,6 +65,11 @@ class ConversationDetailResponse(BaseModel):
     messages: list[MessageItem]
 
 
+class ConversationCountsResponse(BaseModel):
+    by_subject: dict[str, int]
+    by_group: dict[str, int]
+
+
 class ModelItem(BaseModel):
     id: str
 
@@ -661,6 +666,38 @@ async def list_conversations(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/conversations/counts", response_model=ConversationCountsResponse)
+async def get_conversation_counts(
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ConversationCountsResponse:
+    result = await db.execute(
+        select(
+            Conversation.subject_id,
+            Conversation.group_id,
+            func.count().label("cnt"),
+        )
+        .where(
+            Conversation.pseudonym == current_user.sub,
+            Conversation.is_test.is_(False),
+        )
+        .group_by(Conversation.subject_id, Conversation.group_id)
+    )
+    rows = result.all()
+
+    by_subject: dict[str, int] = {}
+    by_group: dict[str, int] = {}
+    for subject_id, group_id, cnt in rows:
+        if subject_id is not None:
+            key = str(subject_id)
+            by_subject[key] = by_subject.get(key, 0) + cnt
+        if group_id is not None:
+            key = str(group_id)
+            by_group[key] = by_group.get(key, 0) + cnt
+
+    return ConversationCountsResponse(by_subject=by_subject, by_group=by_group)
 
 
 @router.get("/conversations/{conversation_id}/messages")
