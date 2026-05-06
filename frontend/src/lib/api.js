@@ -183,13 +183,18 @@ export async function getAssistants() {
   return res.json()  // { items: AssistantSummary[] }
 }
 
-export async function* streamChat(messages, conversationId = null, modelId = null, assistantId = null, isTest = false) {
+export async function* streamChat(messages, conversationId = null, modelId = null, assistantId = null, isTest = false, subjectId = null, groupId = null) {
   let res
   try {
     const body = { messages, conversation_id: conversationId }
     if (modelId)     body.model_id     = modelId
     if (assistantId) body.assistant_id = assistantId
     if (isTest)     body.is_test      = true
+    // Nur für neue Konversationen (conversationId == null) mitgeben
+    if (!conversationId) {
+      if (subjectId != null) body.subject_id = subjectId
+      if (groupId != null)   body.group_id   = groupId
+    }
     res = await fetch(`${BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

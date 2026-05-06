@@ -10,6 +10,9 @@
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
+    import SubjectPicker from "$lib/components/SubjectPicker.svelte";
+    import SubjectIcon from "$lib/components/SubjectIcon.svelte";
+    import SubjectDot from "$lib/components/SubjectDot.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -19,12 +22,20 @@
         getModels,
         uploadFile,
         getAssistants,
+        patchConversationContext,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
     import { budget, refreshBudget } from "$lib/stores/budget.js";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups } from "$lib/stores/myGroups.js";
+    import {
+        pageTitle,
+        activeConversationId,
+        activeConversationSubjectId,
+        activeConversationGroupId,
+    } from "$lib/stores/pageTitle.js";
 
     let messages = $state([]);
     let input = $state("");
@@ -51,6 +62,23 @@
     let selectedAssistant = $state(null);
     let pickerOpen = $state(false);
     let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
+
+    // Fach-Kontext-State
+    let subjectPickerOpen = $state(false);
+    // Pending-Kontext für neue Konversation (gesetzt per #-Shortcut vor erstem Send)
+    let pendingSubjectId = $state(null);
+    let pendingGroupId = $state(null);
+
+    // Computed: aktiver Kontext (pending für neue Konversation, sonst aus Store)
+    const activeSubjectId = $derived(
+        pendingSubjectId ?? $activeConversationSubjectId,
+    );
+    const activeGroupId = $derived(
+        pendingGroupId ?? $activeConversationGroupId,
+    );
+
+    // Hilfsfunktion: hat User Fächer/Gruppen mit subject_id?
+    const hasFachItems = $derived($myGroups.some((g) => g.subject_id != null));
 
     const MAX_FILES = 3;
     const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -93,7 +121,6 @@
     }
 
     import { updateConversationTitle } from "$lib/stores/conversations.js";
-    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
     import { onDestroy, onMount } from "svelte";
 
     async function loadModels() {
@@ -319,10 +346,13 @@
                 conversationId,
                 modelId,
                 assistantId,
+                false, // isTest
+                pendingSubjectId, // subjectId
+                pendingGroupId, // groupId
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
-                    const wasNewConversation = conversationId == null
+                    const wasNewConversation = conversationId == null;
                     conversationId = item.conversationId;
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
@@ -331,12 +361,24 @@
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
                         // subject_id aus Assistent übernehmen; group_id bleibt null
-                        activeConversationSubjectId.set(selectedAssistant.subject_id ?? null);
+                        activeConversationSubjectId.set(
+                            selectedAssistant.subject_id ?? null,
+                        );
                         activeConversationGroupId.set(null);
+                    }
+                    // Pending-Kontext in aktive Stores übernehmen (neue Konversation)
+                    if (
+                        wasNewConversation &&
+                        (pendingSubjectId || pendingGroupId)
+                    ) {
+                        activeConversationSubjectId.set(pendingSubjectId);
+                        activeConversationGroupId.set(pendingGroupId);
+                        pendingSubjectId = null;
+                        pendingGroupId = null;
                     }
                     // Sidebar-Zähler aktualisieren für neue Konversation
                     if (wasNewConversation) {
-                        refreshConversationCounts()
+                        refreshConversationCounts();
                     }
                     continue;
                 }
@@ -403,6 +445,7 @@
     function handleKeydown(e) {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
+            if (subjectPickerOpen || pickerOpen) return;
             handleSubmit();
         }
     }
@@ -418,6 +461,12 @@
         ) {
             input = "";
             pickerOpen = true;
+            return;
+        }
+        // #-Shortcut für Fach-Zuweisung
+        if (e.target.value === "#" && hasFachItems) {
+            input = "";
+            subjectPickerOpen = true;
         }
     }
 
@@ -430,6 +479,50 @@
 
     function handlePickerClose() {
         pickerOpen = false;
+        textarea?.focus();
+    }
+
+    // Subject-Picker-Callbacks
+    async function handleSubjectSelect(item) {
+        subjectPickerOpen = false;
+        textarea?.focus();
+
+        if (conversationId) {
+            // Bestehende Konversation: sofort patchen (item == null → Kontext entfernen)
+            const newSubjectId =
+                item == null
+                    ? null
+                    : item.type === "subject"
+                      ? item.id
+                      : (item.subjectId ?? null);
+            const newGroupId =
+                item == null ? null : item.type === "group" ? item.id : null;
+            try {
+                const result = await patchConversationContext(
+                    conversationId,
+                    newSubjectId,
+                    newGroupId,
+                );
+                activeConversationSubjectId.set(result.subject_id);
+                activeConversationGroupId.set(result.group_id);
+            } catch (err) {
+                console.error("Fehler beim Fach-Zuweisen:", err);
+            }
+        } else {
+            // Neue Konversation: pending speichern (null → Kontext entfernen)
+            pendingGroupId =
+                item == null ? null : item.type === "group" ? item.id : null;
+            pendingSubjectId =
+                item == null
+                    ? null
+                    : item.type === "subject"
+                      ? item.id
+                      : (item.subjectId ?? null);
+        }
+    }
+
+    function handleSubjectPickerClose() {
+        subjectPickerOpen = false;
         textarea?.focus();
     }
 
@@ -501,6 +594,9 @@
             activeConversationGroupId.set(null);
             conversationAssistant = null;
             pickerOpen = false;
+            subjectPickerOpen = false;
+            pendingSubjectId = null;
+            pendingGroupId = null;
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
             if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;
@@ -632,6 +728,14 @@
                 />
             {/if}
 
+            <!-- SubjectPicker Overlay -->
+            {#if subjectPickerOpen}
+                <SubjectPicker
+                    onselect={handleSubjectSelect}
+                    onclose={handleSubjectPickerClose}
+                />
+            {/if}
+
             <!-- Konversationskosten -->
             {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                 <div
@@ -646,18 +750,20 @@
 
             <!-- Assistent-Chip (nur bei neuer Konversation mit gewähltem Assistenten) -->
             {#if selectedAssistant && !conversationId && !conversationAssistant}
-                {@const chipColor = selectedAssistant.subject_id != null
-                    ? ($subjectMap[selectedAssistant.subject_id]?.color ?? null)
-                    : null}
+                {@const chipColor =
+                    selectedAssistant.subject_id != null
+                        ? ($subjectMap[selectedAssistant.subject_id]?.color ??
+                          null)
+                        : null}
                 <div class="flex items-center gap-1.5">
                     <span
                         class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
                                  {chipColor
-                                     ? 'text-light-tx dark:text-dark-tx border'
-                                     : 'bg-light-bl/15 dark:bg-dark-bl/15 text-light-bl dark:text-dark-bl border border-light-bl/30 dark:border-dark-bl/30'}"
+                            ? 'text-light-tx dark:text-dark-tx border'
+                            : 'bg-light-bl/15 dark:bg-dark-bl/15 text-light-bl dark:text-dark-bl border border-light-bl/30 dark:border-dark-bl/30'}"
                         style={chipColor
                             ? `background-color: ${chipColor}1a; border-color: ${chipColor}40; border-left: 3px solid ${chipColor}`
-                            : ''}
+                            : ""}
                     >
                         <Bot class="w-3 h-3" />
                         {selectedAssistant.name}
@@ -737,21 +843,50 @@
                     {/if}
                 </button>
             </div>
-
-            <!-- Attachment-Chips (nur wenn Anhänge vorhanden) -->
-            {#if attachments.length > 0}
+            {#if activeSubjectId || activeGroupId || attachments.length > 0}
                 <div class="flex flex-wrap gap-1.5">
-                    {#each attachments as att (att.id)}
-                        <AttachmentChip
-                            filename={att.filename}
-                            status={att.status}
-                            error={att.error}
-                            onremove={() => removeAttachment(att.id)}
-                        />
-                    {/each}
+                    <!-- Fach-Kontext-Chip (wenn Kontext aktiv ist) -->
+                    {#if activeSubjectId || activeGroupId}
+                        {@const subj = $subjectMap[activeSubjectId]}
+                        <div
+                            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
+                      border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2"
+                            style="border-color:{subj?.color ??
+                                'border-light-ui-3 dark:border-dark-ui-3'}"
+                        >
+                            <SubjectIcon
+                                name={subj?.icon ?? null}
+                                color={subj?.color ?? null}
+                                size={16}
+                                class="shrink-0"
+                            />
+                            <span>
+                                {#if activeGroupId}
+                                    <!-- Gruppenname aus myTeachingGroups -->
+                                    {$myGroups.find(
+                                        (g) => g.id === activeGroupId,
+                                    )?.name ??
+                                        subj?.name ??
+                                        ""}
+                                {:else}
+                                    {subj?.name ?? ""}
+                                {/if}
+                            </span>
+                        </div>
+                    {/if}
+                    <!-- Attachment-Chips (nur wenn Anhänge vorhanden) -->
+                    {#if attachments.length > 0}
+                        {#each attachments as att (att.id)}
+                            <AttachmentChip
+                                filename={att.filename}
+                                status={att.status}
+                                error={att.error}
+                                onremove={() => removeAttachment(att.id)}
+                            />
+                        {/each}
+                    {/if}
                 </div>
             {/if}
-
             <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte -->
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {#if conversationAssistant || selectedAssistant}
@@ -798,9 +933,10 @@
                                 class="rounded border border-light-ui-3 dark:border-dark-ui-3
                                        bg-light-bg-2 dark:bg-dark-bg-2
                                        px-1.5 py-0.5 text-xs disabled:opacity-60
-                                       {availableModels.length === 0 && !selectedModelId
-                                           ? 'text-light-re dark:text-dark-re'
-                                           : 'text-light-tx dark:text-dark-tx'}"
+                                       {availableModels.length === 0 &&
+                                !selectedModelId
+                                    ? 'text-light-re dark:text-dark-re'
+                                    : 'text-light-tx dark:text-dark-tx'}"
                             >
                                 {#if availableModels.length > 0}
                                     {#each availableModels as model}

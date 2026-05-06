@@ -9,8 +9,9 @@
         updateConversationContext,
     } from "$lib/stores/conversations.js";
     import { pageTitle, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
-    import { subjects, subjectMap } from "$lib/stores/subjects.js";
-    import { myGroups, myTeachingGroups } from "$lib/stores/myGroups.js";
+    import { subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups } from "$lib/stores/myGroups.js";
+    import { studentPickerItems, teacherPickerItems } from "$lib/stores/subjectPickerItems.js";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import { user } from "$lib/stores/user.js";
 
@@ -37,53 +38,9 @@
     let buttonEl = $state(null);
     let dropdownStyle = $state("");
 
-    // Schüler: teaching_groups als flache Liste mit Fachname als Label.
-    // Wenn zwei Gruppen dasselbe Fach haben, wird der Gruppenname als Zusatz angezeigt.
-    const studentItems = $derived.by(() => {
-        const groups = $myTeachingGroups
-        // Fächer mit mehr als einer Gruppe identifizieren
-        const countPerSubject = {}
-        for (const g of groups) {
-            countPerSubject[g.subject_id] = (countPerSubject[g.subject_id] ?? 0) + 1
-        }
-        return groups.map(g => ({
-            type: 'group',
-            id: g.id,
-            subjectId: g.subject_id,
-            label: countPerSubject[g.subject_id] > 1
-                ? `${$subjectMap[g.subject_id]?.name ?? g.name} · ${g.name}`
-                : ($subjectMap[g.subject_id]?.name ?? g.name),
-            color: $subjectMap[g.subject_id]?.color ?? null,
-        }))
-    })
-
-    // Lehrkräfte (inkl. Admin): Fächer aus allen eigenen Gruppen mit subject_id
-    // (subject_department = Fachschaft, teaching_group = konkrete Unterrichtsgruppe).
-    // Unter jedem Fach erscheinen die zugehörigen teaching_groups eingerückt.
-    // Fächer ohne teaching_group erscheinen nur als Fach-Zeile (subject-level assignment).
-    const teacherItems = $derived.by(() => {
-        const teachingGroups = $myTeachingGroups
-        // Alle Gruppen mit subject_id als Quelle für erreichbare Fächer
-        const allSubjectIds = [...new Set(
-            $myGroups
-                .filter(g => g.subject_id != null)
-                .map(g => g.subject_id)
-        )]
-        // Sortiert nach subjects.sort_order
-        const sortedSubjects = allSubjectIds
-            .map(id => $subjectMap[id])
-            .filter(Boolean)
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-
-        const items = []
-        for (const subj of sortedSubjects) {
-            items.push({ type: 'subject', id: subj.id, label: subj.name, color: subj.color })
-            for (const g of teachingGroups.filter(g => g.subject_id === subj.id)) {
-                items.push({ type: 'group', id: g.id, subjectId: subj.id, label: g.name, color: subj.color })
-            }
-        }
-        return items
-    })
+    // Items aus Store
+    const studentItems = $derived($studentPickerItems)
+    const teacherItems = $derived($teacherPickerItems)
 
     const isTeacher = $derived(
         $user?.roles?.includes('teacher') || $user?.roles?.includes('admin')

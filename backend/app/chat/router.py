@@ -283,12 +283,32 @@ async def chat(
                 model_used = assistant.model
 
         first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
+        
+        # Kontext aus Request oder Assistent ableiten
+        if request.group_id is not None:
+            # group_id gesetzt: subject_id aus Gruppe ableiten
+            grp_result = await db.execute(
+                select(Group).where(Group.id == request.group_id)
+            )
+            grp = grp_result.scalar_one_or_none()
+            subject_id = grp.subject_id if grp else None
+            group_id = request.group_id
+        elif request.subject_id is not None:
+            # Nur subject_id gesetzt (Lehrkraft: Fach-Ebene ohne Gruppe)
+            subject_id = request.subject_id
+            group_id = None
+        else:
+            # Fallback: aus Assistent ableiten
+            subject_id = assistant.subject_id if assistant is not None else None
+            group_id = None
+        
         new_conv = Conversation(
             pseudonym=current_user.sub,
             model_used=model_used,
             title=make_title(first_user_msg) if first_user_msg else None,
             assistant_id=request.assistant_id,
-            subject_id=assistant.subject_id if assistant is not None else None,
+            subject_id=subject_id,
+            group_id=group_id,
             system_prompt_snapshot=system_prompt_snapshot,
             is_test=request.is_test,
         )
