@@ -63,6 +63,22 @@ export async function getRecentConversations(limit = 10, offset = 0) {
   return res.json()
 }
 
+/**
+ * Lädt Konversationen mit optionalen Filtern.
+ * @param {{ limit?: number, offset?: number, subjectId?: number|null, groupId?: number|null }} opts
+ */
+export async function getConversations({ limit = 25, offset = 0, subjectId = null, groupId = null } = {}) {
+  const params = new URLSearchParams({ limit, offset })
+  if (subjectId != null) params.set('subject_id', subjectId)
+  if (groupId != null)   params.set('group_id', groupId)
+  const res = await fetch(`${BASE}/conversations?${params}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Konversationen')
+  }
+  return res.json()  // { items: ConversationItem[], total: int, limit: int, offset: int }
+}
+
 export async function getConversationMessages(conversationId) {
   const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, { credentials: 'include' })
   if (!res.ok) {

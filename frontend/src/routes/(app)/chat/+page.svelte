@@ -21,6 +21,7 @@
         getAssistants,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
+    import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
     import { budget, refreshBudget } from "$lib/stores/budget.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -321,6 +322,7 @@
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
+                    const wasNewConversation = conversationId == null
                     conversationId = item.conversationId;
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
@@ -331,6 +333,10 @@
                         // subject_id aus Assistent übernehmen; group_id bleibt null
                         activeConversationSubjectId.set(selectedAssistant.subject_id ?? null);
                         activeConversationGroupId.set(null);
+                    }
+                    // Sidebar-Zähler aktualisieren für neue Konversation
+                    if (wasNewConversation) {
+                        refreshConversationCounts()
                     }
                     continue;
                 }

@@ -617,17 +617,26 @@ async def list_conversations(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     include_test: bool = Query(default=False),
+    subject_id: Optional[int] = Query(None),
+    group_id: Optional[int] = Query(None),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationListResponse:
     # Filter für is_test
     is_test_filter = Conversation.is_test == False if not include_test else True
 
-    # Gesamtzahl aller eigenen Konversationen (mit Filter)
-    total_stmt = select(func.count()).select_from(Conversation).where(
+    # Build where conditions
+    where_conditions = [
         Conversation.pseudonym == current_user.sub,
         is_test_filter,
-    )
+    ]
+    if subject_id is not None:
+        where_conditions.append(Conversation.subject_id == subject_id)
+    if group_id is not None:
+        where_conditions.append(Conversation.group_id == group_id)
+
+    # Gesamtzahl aller eigenen Konversationen (mit Filter)
+    total_stmt = select(func.count()).select_from(Conversation).where(*where_conditions)
     total_result = await db.execute(total_stmt)
     total = total_result.scalar()
 
@@ -635,10 +644,7 @@ async def list_conversations(
     stmt = (
         select(Conversation, Assistant.name.label("assistant_name"))
         .outerjoin(Assistant, Conversation.assistant_id == Assistant.id)
-        .where(
-            Conversation.pseudonym == current_user.sub,
-            is_test_filter,
-        )
+        .where(*where_conditions)
         .order_by(Conversation.last_message_at.desc().nulls_last())
         .limit(limit)
         .offset(offset)

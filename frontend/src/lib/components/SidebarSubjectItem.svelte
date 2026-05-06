@@ -33,21 +33,29 @@
   </a>
 
 {:else if section.type === 'teacher'}
-  <!-- Lehrkraft-Kopfzeile: aufklappbar -->
-  <button
-    onclick={toggle}
-    class="flex items-center gap-2 w-full px-3 py-1.5 rounded-md text-sm
-           text-light-tx dark:text-dark-tx font-medium
-           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-  >
-    <SubjectIcon name={section.icon} size={15} color={section.color} />
-    <span class="flex-1 text-left truncate">{section.name}</span>
-    {#if expanded}
-      <ChevronDown size={14} class="shrink-0 text-light-tx-2 dark:text-dark-tx-2" />
-    {:else}
-      <ChevronRight size={14} class="shrink-0 text-light-tx-2 dark:text-dark-tx-2" />
-    {/if}
-  </button>
+  <!-- Lehrkraft-Kopfzeile: Link zum Fach + separater Chevron-Toggle -->
+  <div class="flex items-center gap-0 rounded-md
+              hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
+    <a
+      href={`/subjects/${section.slug}`}
+      class="flex items-center gap-2 flex-1 min-w-0 px-3 py-1.5 text-sm
+             text-light-tx dark:text-dark-tx font-medium"
+    >
+      <SubjectIcon name={section.icon} size={15} color={section.color} />
+      <span class="flex-1 truncate">{section.name}</span>
+    </a>
+    <button
+      onclick={toggle}
+      class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+      aria-label={expanded ? 'Zuklappen' : 'Aufklappen'}
+    >
+      {#if expanded}
+        <ChevronDown size={14} />
+      {:else}
+        <ChevronRight size={14} />
+      {/if}
+    </button>
+  </div>
 
   {#if expanded}
     <div transition:slide={{ duration: 150 }}>
