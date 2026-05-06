@@ -33,7 +33,7 @@
   </a>
 
 {:else if section.type === 'teacher'}
-  <!-- Lehrkraft-Kopfzeile: Link zum Fach + separater Chevron-Toggle -->
+  <!-- Lehrkraft-Kopfzeile: Link zum Fach + optionaler Chevron-Toggle -->
   <div class="flex items-center gap-0 rounded-md
               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
     <a
@@ -44,20 +44,22 @@
       <SubjectIcon name={section.icon} size={15} color={section.color} />
       <span class="flex-1 truncate">{section.name}</span>
     </a>
-    <button
-      onclick={toggle}
-      class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
-      aria-label={expanded ? 'Zuklappen' : 'Aufklappen'}
-    >
-      {#if expanded}
-        <ChevronDown size={14} />
-      {:else}
-        <ChevronRight size={14} />
-      {/if}
-    </button>
+    {#if section.groups.length > 0}
+      <button
+        onclick={toggle}
+        class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+        aria-label={expanded ? 'Zuklappen' : 'Aufklappen'}
+      >
+        {#if expanded}
+          <ChevronDown size={14} />
+        {:else}
+          <ChevronRight size={14} />
+        {/if}
+      </button>
+    {/if}
   </div>
 
-  {#if expanded}
+  {#if expanded && section.groups.length > 0}
     <div transition:slide={{ duration: 150 }}>
       {#each section.groups as group (group.groupId)}
         <a

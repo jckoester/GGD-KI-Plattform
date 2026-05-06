@@ -1,20 +1,25 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { myTeachingGroups } from './myGroups.js'
+import { myGroups, myTeachingGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
 
 export const sidebarSubjectSections = derived(
-  [user, subjectMap, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds],
-  ([$user, $subjectMap, $myTeachingGroups, $byGroup, $assistantSubjectIds]) => {
-    if (!$user || $myTeachingGroups.length === 0) return []
+  [user, subjectMap, myGroups, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds],
+  ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds]) => {
+    if (!$user) return []
 
     const isTeacher = $user.roles?.includes('teacher')
 
     if (isTeacher) {
-      // Lehrkraft: aufklappbare Fach-Sektionen mit Unterrichtsgruppen
-      const subjectIds = [...new Set($myTeachingGroups.map(g => g.subject_id).filter(Boolean))]
+      // Lehrkraft: Fächer aus teaching_groups UND subject_department-Gruppen
+      const teachingSubjectIds = $myTeachingGroups.map(g => g.subject_id).filter(Boolean)
+      const deptSubjectIds = $myGroups
+        .filter(g => g.type === 'subject_department' && g.subject_id != null)
+        .map(g => g.subject_id)
+      const subjectIds = [...new Set([...teachingSubjectIds, ...deptSubjectIds])]
+      if (subjectIds.length === 0) return []
       return subjectIds
         .map(id => $subjectMap[id])
         .filter(Boolean)
