@@ -3,8 +3,9 @@
     import SubjectDot from '$lib/components/SubjectDot.svelte'
     import { subjectMap } from '$lib/stores/subjects.js'
 
-    let { assistants = [], onselect, onclose } = $props()
+    let { assistants = [], subjectId = null, onselect, onclose } = $props()
     // assistants: AssistantSummary[]
+    // subjectId: optional - wenn gesetzt, werden Assistenten dieses Fachs oben angezeigt
     // onselect(assistant): Nutzer wählt einen Assistenten
     // onclose(): Nutzer schließt ohne Auswahl (Escape oder Klick außerhalb)
 
@@ -12,8 +13,8 @@
     let focusedIndex = $state(0)
     let container = $state(null)
 
-    // Filterlogik
-    let filtered = $derived(
+    // Filterlogik (unverändert)
+    const filtered = $derived(
         query.trim()
             ? assistants.filter(a =>
                 a.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -22,9 +23,24 @@
             : assistants
     )
 
+    // Gruppierte Liste: Fach-Assistenten zuerst, dann Rest (nur wenn subjectId gesetzt und kein query)
+    const sorted = $derived.by(() => {
+        if (!subjectId || query.trim()) return filtered
+        const forSubject = filtered.filter(a => a.subject_id === subjectId)
+        const others = filtered.filter(a => a.subject_id !== subjectId)
+        return [...forSubject, ...others]
+    })
+
+    // Trennposition: Index des ersten "anderen" Assistenten (0 = keine Trennlinie)
+    const dividerIndex = $derived(
+        subjectId && !query.trim()
+            ? filtered.filter(a => a.subject_id === subjectId).length
+            : 0
+    )
+
     // Tastatur-Navigation
     function handleKeydown(e) {
-        const count = filtered.length
+        const count = sorted.length
         if (count === 0) return
 
         switch (e.key) {
@@ -41,7 +57,7 @@
             case 'Enter':
                 e.preventDefault()
                 if (count > 0) {
-                    onselect(filtered[focusedIndex])
+                    onselect(sorted[focusedIndex])
                 }
                 break
             case 'Escape':
@@ -107,12 +123,18 @@
 
         <!-- Ergebnisse -->
         <div class="max-h-[300px] overflow-y-auto">
-            {#if filtered.length === 0}
+            {#if sorted.length === 0}
                 <div class="px-3 py-4 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
                     Keine Assistenten gefunden.
                 </div>
             {:else}
-                {#each filtered as assistant, i}
+                {#each sorted as assistant, i}
+                    {#if i === dividerIndex && dividerIndex > 0}
+                        <div class="px-3 py-1 text-xs font-medium text-light-tx-2 dark:text-dark-tx-2
+                            border-t border-light-ui-2 dark:border-dark-ui-2 mt-1 pt-2">
+                            Weitere Assistenten
+                        </div>
+                    {/if}
                     <button
                         data-index={i}
                         onmousedown={(e) => e.preventDefault()}

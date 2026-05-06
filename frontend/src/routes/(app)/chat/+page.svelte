@@ -723,6 +723,7 @@
             {#if pickerOpen}
                 <AssistantPicker
                     assistants={availableAssistants}
+                    subjectId={activeSubjectId}
                     onselect={handleAssistantSelect}
                     onclose={handlePickerClose}
                 />
