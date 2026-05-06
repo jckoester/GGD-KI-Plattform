@@ -92,7 +92,7 @@
     }
 
     import { updateConversationTitle } from "$lib/stores/conversations.js";
-    import { pageTitle, activeConversationId, activeConversationSubjectId } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
     import { onDestroy, onMount } from "svelte";
 
     async function loadModels() {
@@ -328,8 +328,9 @@
                     // Assistenten-Referenz für laufende Konversation speichern
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
-                        // subject_id aus Assistent übernehmen
+                        // subject_id aus Assistent übernehmen; group_id bleibt null
                         activeConversationSubjectId.set(selectedAssistant.subject_id ?? null);
+                        activeConversationGroupId.set(null);
                     }
                     continue;
                 }
@@ -456,6 +457,7 @@
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
                 activeConversationSubjectId.set(data.subject_id ?? null);
+                activeConversationGroupId.set(data.group_id ?? null);
             } catch (err) {
                 if (err instanceof ApiError) {
                     conversationError = err.message;
@@ -467,6 +469,7 @@
                         pageTitle.set("");
                         activeConversationId.set(null);
                         activeConversationSubjectId.set(null);
+                        activeConversationGroupId.set(null);
                     }
                 } else {
                     conversationError = "Fehler beim Laden der Konversation";
@@ -474,6 +477,7 @@
                     pageTitle.set("");
                     activeConversationId.set(null);
                     activeConversationSubjectId.set(null);
+                    activeConversationGroupId.set(null);
                 }
             } finally {
                 loadingConversation = false;
@@ -488,6 +492,7 @@
             pageTitle.set("");
             activeConversationId.set(null);
             activeConversationSubjectId.set(null);
+            activeConversationGroupId.set(null);
             conversationAssistant = null;
             pickerOpen = false;
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
@@ -534,6 +539,7 @@
         pageTitle.set("");
         activeConversationId.set(null);
         activeConversationSubjectId.set(null);
+        activeConversationGroupId.set(null);
     });
 
     // Automatisch Konversationen neu laden nach Stream-Ende

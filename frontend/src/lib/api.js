@@ -111,18 +111,37 @@ export async function renameConversation(conversationId, title) {
   return res.json()
 }
 
-export async function patchConversationSubject(conversationId, subjectId) {
+export async function getMyGroups() {
+  const res = await fetch(`${BASE}/groups/me`, { credentials: 'include' })
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
+  return res.json()  // { items: GroupOut[] }
+}
+
+// Ersetzt patchConversationSubject
+export async function patchConversationContext(conversationId, subjectId, groupId) {
+  // Nur die geänderte Seite senden:
+  // group_id gesetzt → Backend leitet subject_id ab; wir senden nur group_id
+  // nur subject_id → Lehrkraft-Fach-Ebene
+  // beides null → Kein Fach (beide explizit senden)
+  let body
+  if (groupId !== undefined && groupId !== null) {
+    body = { group_id: groupId }
+  } else if (subjectId !== undefined && subjectId !== null) {
+    body = { subject_id: subjectId }
+  } else {
+    body = { group_id: null, subject_id: null }
+  }
   const res = await fetch(`${BASE}/conversations/${conversationId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ subject_id: subjectId }),  // null zum Entfernen
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Fehler beim Setzen des Fachs')
   }
-  return res.json()
+  return res.json()  // ConversationItem mit aktualisierten subject_id + group_id
 }
 
 export async function deleteConversation(conversationId) {
@@ -444,18 +463,4 @@ export async function getSubjects() {
   const res = await fetch(`${BASE}/subjects`, { credentials: 'include' })
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // { items: SubjectOut[] }
-}
-
-export async function patchConversationSubject(conversationId, subjectId) {
-  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ subject_id: subjectId }),  // null zum Entfernen
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.detail ?? 'Fehler beim Setzen des Fachs')
-  }
-  return res.json()
 }

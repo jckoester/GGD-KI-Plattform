@@ -8,6 +8,8 @@
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { History, ArrowLeft } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import SubjectDot from "$lib/components/SubjectDot.svelte";
+    import { subjectMap } from "$lib/stores/subjects.js";
 
     let conversations = $state([]);
     let loading = $state(true);
@@ -129,6 +131,9 @@
                                     class="px-4 py-3 text-light-tx dark:text-dark-tx"
                                 >
                                     <div class="flex items-center gap-2">
+                                        {#if conv.subject_id}
+                                            <SubjectDot color={$subjectMap[conv.subject_id]?.color ?? null} />
+                                        {/if}
                                         {#if conv.assistant_name}
                                             <Bot class="w-4 h-4 shrink-0 text-light-bl dark:text-dark-bl"
                                                  title={conv.assistant_name} />
@@ -146,6 +151,7 @@
                                         conversationId={conv.id}
                                         title={conv.title}
                                         subject_id={conv.subject_id ?? null}
+                                        group_id={conv.group_id ?? null}
                                         onDeleted={handleDeleted}
                                     />
                                 </td>

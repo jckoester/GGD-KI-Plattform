@@ -284,6 +284,7 @@
                                         conversationId={conv.id}
                                         title={conv.title}
                                         subject_id={conv.subject_id}
+                                        group_id={conv.group_id}
                                         onDelete={handleDeleted}
                                         iconSize={12}
                                     />

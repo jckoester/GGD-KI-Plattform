@@ -2,24 +2,27 @@
     import { EllipsisVertical, Pencil, Trash2, BookOpen } from "lucide-svelte";
     import { onDestroy } from "svelte";
     import { goto } from "$app/navigation";
-    import { deleteConversation, renameConversation, patchConversationSubject } from "$lib/api.js";
+    import { deleteConversation, renameConversation, patchConversationContext } from "$lib/api.js";
     import {
         refreshConversations,
         updateConversationTitle,
-        updateConversationSubject,
+        updateConversationContext,
     } from "$lib/stores/conversations.js";
-    import { pageTitle, activeConversationSubjectId } from "$lib/stores/pageTitle.js";
-    import { subjects } from "$lib/stores/subjects.js";
+    import { pageTitle, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
+    import { subjects, subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups, myTeachingGroups } from "$lib/stores/myGroups.js";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import { user } from "$lib/stores/user.js";
 
     // syncPageTitle: nur im Chat-Header auf true setzen
     // onDeleted: optionaler Callback; wenn nicht angegeben, wird zu /chat navigiert
     // subject_id: aktuell zugewiesenes Fach (null = kein Fach)
+    // group_id: aktuell zugewiesene Gruppe (null = kein Fach)
     let {
         conversationId,
         title,
         subject_id = null,
+        group_id = null,
         syncPageTitle = false,
         onDeleted = null,
         iconSize = 20,
@@ -34,16 +37,57 @@
     let buttonEl = $state(null);
     let dropdownStyle = $state("");
 
-    // Gefilterte Fächer: Schüler sehen nur Fächer passend zum Jahrgang
-    const visibleSubjects = $derived.by(() => {
-        const grade = $user?.grade ?? null
-        const isStudent = $user?.roles?.includes('student') ?? false
-        if (!isStudent || grade == null) return $subjects
-        return $subjects.filter(s =>
-            (s.min_grade == null || s.min_grade <= grade) &&
-            (s.max_grade == null || s.max_grade >= grade)
-        )
+    // Schüler: teaching_groups als flache Liste mit Fachname als Label.
+    // Wenn zwei Gruppen dasselbe Fach haben, wird der Gruppenname als Zusatz angezeigt.
+    const studentItems = $derived.by(() => {
+        const groups = $myTeachingGroups
+        // Fächer mit mehr als einer Gruppe identifizieren
+        const countPerSubject = {}
+        for (const g of groups) {
+            countPerSubject[g.subject_id] = (countPerSubject[g.subject_id] ?? 0) + 1
+        }
+        return groups.map(g => ({
+            type: 'group',
+            id: g.id,
+            subjectId: g.subject_id,
+            label: countPerSubject[g.subject_id] > 1
+                ? `${$subjectMap[g.subject_id]?.name ?? g.name} · ${g.name}`
+                : ($subjectMap[g.subject_id]?.name ?? g.name),
+            color: $subjectMap[g.subject_id]?.color ?? null,
+        }))
     })
+
+    // Lehrkräfte (inkl. Admin): Fächer aus allen eigenen Gruppen mit subject_id
+    // (subject_department = Fachschaft, teaching_group = konkrete Unterrichtsgruppe).
+    // Unter jedem Fach erscheinen die zugehörigen teaching_groups eingerückt.
+    // Fächer ohne teaching_group erscheinen nur als Fach-Zeile (subject-level assignment).
+    const teacherItems = $derived.by(() => {
+        const teachingGroups = $myTeachingGroups
+        // Alle Gruppen mit subject_id als Quelle für erreichbare Fächer
+        const allSubjectIds = [...new Set(
+            $myGroups
+                .filter(g => g.subject_id != null)
+                .map(g => g.subject_id)
+        )]
+        // Sortiert nach subjects.sort_order
+        const sortedSubjects = allSubjectIds
+            .map(id => $subjectMap[id])
+            .filter(Boolean)
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+        const items = []
+        for (const subj of sortedSubjects) {
+            items.push({ type: 'subject', id: subj.id, label: subj.name, color: subj.color })
+            for (const g of teachingGroups.filter(g => g.subject_id === subj.id)) {
+                items.push({ type: 'group', id: g.id, subjectId: subj.id, label: g.name, color: subj.color })
+            }
+        }
+        return items
+    })
+
+    const isTeacher = $derived(
+        $user?.roles?.includes('teacher') || $user?.roles?.includes('admin')
+    )
 
     function startAssigningSubject() {
         isAssigningSubject = true
@@ -51,11 +95,21 @@
         isDeleting = false
     }
 
-    async function assignSubject(newSubjectId) {
+    async function assignContext(item) {
+        // item = { type: 'subject'|'group', id, subjectId? } oder null (= Kein Fach)
+        const newSubjectId = item?.type === 'subject' ? item.id
+                           : item?.type === 'group'   ? item.subjectId
+                           : null
+        const newGroupId   = item?.type === 'group' ? item.id : null
+
         try {
-            await patchConversationSubject(conversationId, newSubjectId)
-            updateConversationSubject(conversationId, newSubjectId)
-            if (syncPageTitle) activeConversationSubjectId.set(newSubjectId)
+            const result = await patchConversationContext(conversationId, newSubjectId, newGroupId)
+            // Backend gibt aktualisierte subject_id + group_id zurück
+            updateConversationContext(conversationId, result.subject_id, result.group_id)
+            if (syncPageTitle) {
+                activeConversationSubjectId.set(result.subject_id)
+                activeConversationGroupId.set(result.group_id)
+            }
             closeMenu()
         } catch (err) {
             console.error("Fehler beim Setzen des Fachs:", err)
@@ -262,27 +316,43 @@
                     </div>
                 </div>
             {:else if isAssigningSubject}
-                <div class="py-1">
-                    <!-- "Kein Fach"-Option -->
+                <div class="py-1 max-h-64 overflow-y-auto">
+                    <!-- Kein Fach -->
                     <button
-                        onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignSubject(null) }}
+                        onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignContext(null) }}
                         class="w-full text-left px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2
-                       hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
-                       {subject_id == null ? 'font-semibold' : ''}"
+                   hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
+                   {group_id == null && subject_id == null ? 'font-semibold' : ''}"
                     >
                         <span class="w-2 h-2 rounded-full border border-light-ui-3 dark:border-dark-ui-3 shrink-0"></span>
                         Kein Fach
                     </button>
-                    {#each visibleSubjects as subj}
-                        <button
-                            onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignSubject(subj.id) }}
-                            class="w-full text-left px-4 py-2 text-sm text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
-                       {subject_id === subj.id ? 'font-semibold' : ''}"
-                        >
-                            <SubjectDot color={subj.color} />
-                            {subj.name}
-                        </button>
+
+                    {#each (isTeacher ? teacherItems : studentItems) as item}
+                        {#if item.type === 'subject'}
+                            <!-- Fach-Zeile (nur Lehrkraft) -->
+                            <button
+                                onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignContext(item) }}
+                                class="w-full text-left px-4 py-2 text-sm text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
+                           {subject_id === item.id && group_id == null ? 'font-semibold' : ''}"
+                            >
+                                <SubjectDot color={item.color} />
+                                {item.label}
+                            </button>
+                        {:else}
+                            <!-- Unterrichtsgruppe (Lehrkraft) oder Fach-Alias (Schüler) -->
+                            <button
+                                onclick={(e) => { e.preventDefault(); e.stopPropagation(); assignContext(item) }}
+                                class="w-full text-left text-sm text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-3 dark:hover:bg-dark-ui flex items-center gap-2
+                           {isTeacher ? 'pl-8 pr-4 py-1.5' : 'px-4 py-2'}
+                           {group_id === item.id ? 'font-semibold' : ''}"
+                            >
+                                <SubjectDot color={item.color} />
+                                {item.label}
+                            </button>
+                        {/if}
                     {/each}
                     <button
                         onclick={(e) => { e.preventDefault(); e.stopPropagation(); closeMenu() }}

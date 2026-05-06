@@ -28,6 +28,6 @@ group_role_map:
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).
 sso:
   groups:
-    subject_department: '^FS\\.(.+)$'        # FS.Mathematik → subject_department
-    school_class: '^Klasse\\.(.+)$'          # Klasse.8a → school_class
-    teaching_group: '^unterricht\\.(.+)$'    # unterricht.8a.Mathematik → teaching_group
+    subject_department: '^FS\.(.+)$'        # FS.Mathematik → subject_department
+    school_class: '^Klasse\.(.+)$'          # Klasse.8a → school_class
+    teaching_group: '^unterricht\.(.+)$'    # unterricht.8a.Mathematik → teaching_group

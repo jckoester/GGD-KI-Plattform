@@ -6,6 +6,7 @@
     import { themePref } from "$lib/stores/theme.js";
     import { budget } from "$lib/stores/budget.js";
     import { refreshSubjects } from "$lib/stores/subjects.js";
+    import { refreshMyGroups } from "$lib/stores/myGroups.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -30,6 +31,7 @@
             budget.set(budgetData);
             themePref.syncFromServer(prefs.theme ?? "system");
             refreshSubjects()   // fire-and-forget; Fehler werden intern ignoriert
+            refreshMyGroups()   // NEU — fire-and-forget
         } catch {
             goto("/");
         }

@@ -19,8 +19,8 @@ export function updateConversationTitle(id, title) {
   )
 }
 
-export function updateConversationSubject(id, subjectId) {
+export function updateConversationContext(id, subjectId, groupId) {
   recentConversations.update(list =>
-    list.map(c => c.id === id ? { ...c, subject_id: subjectId } : c)
+    list.map(c => c.id === id ? { ...c, subject_id: subjectId, group_id: groupId } : c)
   )
 }

@@ -1,7 +1,7 @@
 <script>
     import { PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-svelte";
     import { page } from "$app/stores";
-    import { pageTitle, activeConversationId, activeConversationSubjectId } from "$lib/stores/pageTitle.js";
+    import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
     import { logout } from "$lib/api.js";
     import { goto } from "$app/navigation";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
@@ -58,6 +58,7 @@
             conversationId={$activeConversationId}
             title={$pageTitle}
             subject_id={$activeConversationSubjectId}
+            group_id={$activeConversationGroupId}
             syncPageTitle={true}
             buttonClasses=" hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         />

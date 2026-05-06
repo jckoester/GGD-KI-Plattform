@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.litellm.client import LiteLLMClient
@@ -32,6 +32,7 @@ class ConversationItem(BaseModel):
     model_used: str
     assistant_name: Optional[str] = None
     subject_id: Optional[int] = None
+    group_id: Optional[int] = None
     is_test: bool = False
 
 
@@ -57,6 +58,7 @@ class ConversationDetailResponse(BaseModel):
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     subject_id: Optional[int] = None
+    group_id: Optional[int] = None
     last_message_at: Optional[datetime]
     total_cost_usd: Optional[float] = None
     is_test: bool = False
@@ -498,6 +500,7 @@ async def list_models(
 class ConversationUpdateRequest(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=100)
     subject_id: Optional[int] = None
+    group_id: Optional[int] = None
 
 
 @router.patch("/conversations/{conversation_id}")
@@ -526,16 +529,43 @@ async def update_conversation(
     if 'title' in request.model_fields_set and request.title is not None:
         conversation.title = request.title
 
-    if 'subject_id' in request.model_fields_set:
-        # Erlaubt null (Fach entfernen) oder gültige ID
+    if 'group_id' in request.model_fields_set:
+        if request.group_id is not None:
+            # Gruppe laden, Typ prüfen, Mitgliedschaft prüfen
+            grp_result = await db.execute(
+                select(Group)
+                .join(GroupMembership, GroupMembership.group_id == Group.id)
+                .where(
+                    Group.id == request.group_id,
+                    Group.type == 'teaching_group',
+                    GroupMembership.pseudonym == current_user.sub,
+                )
+            )
+            grp = grp_result.scalar_one_or_none()
+            if grp is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Gruppe nicht gefunden oder keine Mitgliedschaft"
+                )
+            conversation.group_id = grp.id
+            conversation.subject_id = grp.subject_id  # immer ableiten
+        else:
+            # group_id explizit auf null setzen
+            conversation.group_id = None
+            # subject_id nur löschen, wenn auch subject_id null gesendet wurde
+            if 'subject_id' in request.model_fields_set and request.subject_id is None:
+                conversation.subject_id = None
+
+    elif 'subject_id' in request.model_fields_set:
+        # Nur subject_id ändern (Lehrkraft: Fach-Ebene ohne Gruppe)
         if request.subject_id is not None:
-            # FK-Prüfung: subject muss existieren
             subj = await db.execute(
                 select(Subject).where(Subject.id == request.subject_id)
             )
             if subj.scalar_one_or_none() is None:
                 raise HTTPException(status_code=404, detail="Fach nicht gefunden")
         conversation.subject_id = request.subject_id
+        conversation.group_id = None  # Fach-Ebene impliziert kein group_id
 
     await db.commit()
     await db.refresh(conversation)
@@ -547,6 +577,7 @@ async def update_conversation(
         model_used=conversation.model_used,
         assistant_name=None,
         subject_id=conversation.subject_id,
+        group_id=conversation.group_id,
         is_test=conversation.is_test,
     )
 
@@ -618,6 +649,7 @@ async def list_conversations(
             model_used=conv.model_used,
             assistant_name=asst_name,
             subject_id=conv.subject_id,
+            group_id=conv.group_id,
             is_test=conv.is_test,
         )
         for conv, asst_name in rows
@@ -694,6 +726,7 @@ async def get_conversation_messages(
         assistant_id=conversation.assistant_id,
         assistant_name=assistant_name,
         subject_id=conversation.subject_id,
+        group_id=conversation.group_id,
         last_message_at=conversation.last_message_at,
         total_cost_usd=float(conversation.total_cost_usd) if conversation.total_cost_usd else None,
         is_test=conversation.is_test,
