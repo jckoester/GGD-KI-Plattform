@@ -5,7 +5,7 @@
      * size: Pixel-Größe (wird als `size`-Prop an die Lucide-Komponente übergeben).
      * class: Zusätzliche CSS-Klassen.
      */
-    let { name = null, size = 16, class: className = '' } = $props()
+    let { name = null, size = 16, class: className = '', color = null } = $props()
 
     let Component = $state(null)
 
@@ -37,5 +37,5 @@
 </script>
 
 {#if Component}
-    <svelte:component this={Component} {size} class={className} />
+    <svelte:component this={Component} {size} {color} class={className} />
 {/if}

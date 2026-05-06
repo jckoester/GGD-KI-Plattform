@@ -5,6 +5,8 @@
     import { logout } from "$lib/api.js";
     import { goto } from "$app/navigation";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
+    import SubjectIcon from "$lib/components/SubjectIcon.svelte";
+    import { subjectMap } from "$lib/stores/subjects.js";
 
     // Props
     let {
@@ -46,10 +48,18 @@
             {/if}
         </button>
 
-        <!-- Seitentitel -->
-        <h1 class="text-lg font-semibold {textClass}">
-            {title}
-        </h1>
+        <!-- Seitentitel (mit optionalem Fach-Icon) -->
+        <div class="flex items-center gap-2">
+            {#if $activeConversationSubjectId && $subjectMap[$activeConversationSubjectId]}
+                <SubjectIcon
+                    name={$subjectMap[$activeConversationSubjectId].icon}
+                    color={$subjectMap[$activeConversationSubjectId].color}
+                    size={18}
+                    class="shrink-0"
+                />
+            {/if}
+            <h1 class="text-lg font-semibold {textClass}">{title}</h1>
+        </div>
     </div>
 
     <!-- Rechte Seite: Abmelden-Button oder Konversationsmenü -->

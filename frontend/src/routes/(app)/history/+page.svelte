@@ -8,7 +8,7 @@
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { History, ArrowLeft } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
-    import SubjectDot from "$lib/components/SubjectDot.svelte";
+    import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
 
     let conversations = $state([]);
@@ -132,7 +132,12 @@
                                 >
                                     <div class="flex items-center gap-2">
                                         {#if conv.subject_id}
-                                            <SubjectDot color={$subjectMap[conv.subject_id]?.color ?? null} />
+                                            <SubjectIcon
+                                                name={$subjectMap[conv.subject_id]?.icon ?? null}
+                                                color={$subjectMap[conv.subject_id]?.color ?? null}
+                                                size={16}
+                                                class="shrink-0"
+                                            />
                                         {/if}
                                         {#if conv.assistant_name}
                                             <Bot class="w-4 h-4 shrink-0 text-light-bl dark:text-dark-bl"
