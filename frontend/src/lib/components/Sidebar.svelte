@@ -121,11 +121,9 @@
     // State für Fächer-Sektion
     let subjectsOpen = $state(true);
 
-    function handleDeleted(deletedId) {
-        conversations = conversations.filter((c) => c.id !== deletedId);
-        total -= 1;
-        hasMore = offset + conversations.length < total;
-        refreshConversations();
+    function handleDeleted() {
+        refreshConversations(limit);
+        refreshConversationCounts();
     }
 </script>
 
@@ -324,7 +322,7 @@
                                         title={conv.title}
                                         subject_id={conv.subject_id}
                                         group_id={conv.group_id}
-                                        onDelete={handleDeleted}
+                                        onDeleted={handleDeleted}
                                         iconSize={12}
                                     />
                                 </div>
