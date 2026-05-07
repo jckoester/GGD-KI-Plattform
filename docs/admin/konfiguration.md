@@ -39,14 +39,15 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 
 ## `config/auth.yaml`
 
-Steuert, welcher Authentifizierungsadapter verwendet wird und wie SSO-Gruppen
-auf Plattform-Rollen abgebildet werden.
+Steuert, welcher Authentifizierungsadapter verwendet wird, wie SSO-Gruppen
+auf Plattform-Rollen abgebildet werden und wie Unterrichtsgruppen aus dem
+SSO-Import befüllt werden.
 
 ```yaml
-# Aktiver Adapter: "iserv" für Produktion, "yaml_test" für Entwicklung
-adapter: iserv
+# Aktiver Adapter: "oauth" für Produktion, "yaml_test" für Entwicklung
+adapter: oauth
 
-iserv:
+oauth:
   base_url: https://sso.beispielschule.de
   client_id: ki-plattform
   redirect_uri: https://ki.beispielschule.de/auth/callback
@@ -55,6 +56,11 @@ iserv:
   grade_group_pattern: '^jahrgang\.(\d{1,2})$'
   # Deaktivieren: auf null setzen oder auskommentieren
   # grade_group_pattern: null
+  # Optionale Endpunkt-Overrides. Standard: IServ-Pfade unterhalb von base_url.
+  # Nur setzen, wenn ein anderer OAuth2/OIDC-Provider verwendet wird:
+  # auth_url: "https://sso.beispielschule.de/oauth2/authorize"
+  # token_url: "https://sso.beispielschule.de/oauth2/token"
+  # userinfo_url: "https://sso.beispielschule.de/oauth2/userinfo"
 
 yaml_test:
   users_file: config/test_users.yaml
@@ -67,10 +73,37 @@ group_role_map:
     role: teacher
   - group: schueler
     role: student
+
+# SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung.
+# Jedes Muster muss genau eine Capture-Group enthalten.
+sso:
+  # false = Lehrkräfte können keine Unterrichtsgruppen manuell anlegen;
+  # sinnvoll, wenn der SSO-Provider alle Unterrichtsgruppen vollständig liefert.
+  allow_manual_teaching_groups: true
+
+  # Kurzname → Subject-Slug (Groß-/Kleinschreibung wird ignoriert).
+  # Nötig, wenn SSO-Gruppen Kürzel verwenden, die vom Fach-Slug abweichen.
+  subject_aliases:
+    D:    deutsch
+    E:    englisch
+    M:    mathematik
+    Bio:  biologie
+    Ch:   chemie
+    Ph:   physik
+
+  # Regex-Muster für Gruppentypen (je eine Capture-Group):
+  groups:
+    subject_department: '^FS\.(.+)$'        # FS.Mathematik → Fachschaft
+    school_class: '^Klasse\.(.+)$'          # Klasse.8a → Schulklasse
+    teaching_group: '^unterricht\.(.+)$'    # unterricht.8a.Mathematik → Unterrichtsgruppe
 ```
 
 **Rollen:** `admin`, `teacher`, `student`. Nutzer:innen, deren SSO-Gruppen
 keiner Rolle zugeordnet sind, können sich nicht einloggen.
+
+> **Hinweis:** Das Client-Secret des SSO-Providers wird **nicht** in dieser Datei
+> gespeichert, sondern über die Umgebungsvariable `AUTH_ISERV_CLIENT_SECRET` in
+> `config/.env` übergeben.
 
 ---
 
