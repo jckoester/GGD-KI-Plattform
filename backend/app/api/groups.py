@@ -1,22 +1,20 @@
+import re
 from datetime import datetime
 from typing import Optional
-import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user
+from app.auth.config import SsoConfig
+from app.auth.dependencies import get_current_user, get_sso_config
 from app.auth.jwt import JwtPayload
 from app.db.models import Group, GroupMembership, Subject, TeacherGroupExclusion
 from app.db.session import get_db
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
-
-# Hilfsfunktion: Jahrgang aus Klassenname parsen
-import re
 
 def _parse_grade(class_name: str) -> Optional[int]:
     """Extrahiert die führende Jahrgangs-Zahl aus einem Klassennamen.
@@ -79,7 +77,18 @@ async def list_my_groups(
     return MyGroupsResponse(items=list(result.scalars().all()))
 
 
-# --- Schritt 2: Phase 5 API-Endpunkte ---
+class GroupsConfigResponse(BaseModel):
+    allow_manual_teaching_groups: bool
+
+
+@router.get("/config", response_model=GroupsConfigResponse)
+async def get_groups_config(
+    _: JwtPayload = Depends(get_current_user),
+    sso_config: SsoConfig = Depends(get_sso_config),
+) -> GroupsConfigResponse:
+    return GroupsConfigResponse(
+        allow_manual_teaching_groups=sso_config.allow_manual_teaching_groups
+    )
 
 
 class PotentialTeachingGroupItem(BaseModel):
@@ -100,8 +109,11 @@ class PotentialTeachingGroupsResponse(BaseModel):
 @router.get("/teaching/potential", response_model=PotentialTeachingGroupsResponse)
 async def list_potential_teaching_groups(
     current_user: JwtPayload = Depends(get_current_user),
+    sso_config: SsoConfig = Depends(get_sso_config),
     db: AsyncSession = Depends(get_db),
 ) -> PotentialTeachingGroupsResponse:
+    if not sso_config.allow_manual_teaching_groups:
+        return PotentialTeachingGroupsResponse(items=[])
     if "teacher" not in current_user.roles:
         return PotentialTeachingGroupsResponse(items=[])
 
@@ -203,8 +215,11 @@ class TeachingGroupOut(BaseModel):
 async def create_teaching_group(
     body: CreateTeachingGroupRequest,
     current_user: JwtPayload = Depends(get_current_user),
+    sso_config: SsoConfig = Depends(get_sso_config),
     db: AsyncSession = Depends(get_db),
 ) -> TeachingGroupOut:
+    if not sso_config.allow_manual_teaching_groups:
+        raise HTTPException(403, "Manuelles Anlegen von Unterrichtsgruppen ist in dieser Installation deaktiviert")
     if "teacher" not in current_user.roles:
         raise HTTPException(403, "Nur Lehrkräfte können Unterrichtsgruppen anlegen")
 

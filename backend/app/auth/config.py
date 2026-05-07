@@ -1,7 +1,7 @@
 import re
-import yaml
 from typing import Literal
 
+import yaml
 from pydantic import BaseModel, computed_field, model_validator
 
 
@@ -12,9 +12,10 @@ class GroupRoleMapping(BaseModel):
 
 class SsoGroupPatterns(BaseModel):
     """Reguläre Ausdrücke (je eine Capture-Group) für SSO-Gruppenmuster."""
+
     subject_department: str | None = None  # z.B. "^FS\\.(.+)$"
-    school_class: str | None = None        # z.B. "^Klasse\\.(.+)$"
-    teaching_group: str | None = None      # z.B. "^unterricht\\.(.+)$"
+    school_class: str | None = None  # z.B. "^Klasse\\.(.+)$"
+    teaching_group: str | None = None  # z.B. "^unterricht\\.(.+)$"
 
     @model_validator(mode="after")
     def check_capture_groups(self) -> "SsoGroupPatterns":
@@ -34,14 +35,16 @@ class SsoGroupPatterns(BaseModel):
 
 class SsoConfig(BaseModel):
     groups: SsoGroupPatterns = SsoGroupPatterns()
+    subject_aliases: dict[str, str] = {}
+    allow_manual_teaching_groups: bool = True
 
 
 class AuthConfig(BaseModel):
-    adapter: Literal["iserv", "yaml_test"]
-    iserv: dict = {}
+    adapter: Literal["oauth", "yaml_test"]
+    oauth: dict = {}
     yaml_test: dict = {}
     group_role_map: list[GroupRoleMapping] = []
-    sso: SsoConfig = SsoConfig()  # NEU
+    sso: SsoConfig = SsoConfig()
 
     @computed_field
     @property

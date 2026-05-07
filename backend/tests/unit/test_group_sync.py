@@ -6,6 +6,7 @@ from app.auth.group_sync import (
     parse_sso_groups,
     _sso_id_to_slug,
     _derive_subject_slug,
+    _normalize_for_slug,
     ParsedGroup,
 )
 
@@ -16,6 +17,28 @@ PATTERNS = SsoGroupPatterns(
     school_class=r'^Klasse\.(.+)$',
     teaching_group=r'^unterricht\.(.+)$',
 )
+
+
+# =============================================================================
+# Tests für _normalize_for_slug
+# =============================================================================
+
+def test_normalize_lowercase():
+    assert _normalize_for_slug("Mathematik") == "mathematik"
+    assert _normalize_for_slug("NWT") == "nwt"
+    assert _normalize_for_slug("physik") == "physik"
+
+
+def test_normalize_umlauts():
+    assert _normalize_for_slug("Übung") == "uebung"
+    assert _normalize_for_slug("Ästhetik") == "aesthetik"
+    assert _normalize_for_slug("Öffentlichkeit") == "oeffentlichkeit"
+    assert _normalize_for_slug("Straße") == "strasse"
+
+
+def test_normalize_mixed():
+    assert _normalize_for_slug("Bürotechnik") == "buerotechnik"
+    assert _normalize_for_slug("BÜROTECHNIK") == "buerotechnik"
 
 
 # =============================================================================

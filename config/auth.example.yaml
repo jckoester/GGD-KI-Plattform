@@ -1,7 +1,7 @@
-# Welcher Adapter aktiv ist: "iserv" oder "yaml_test"
+# Welcher Adapter aktiv ist: "oauth" oder "yaml_test"
 adapter: yaml_test
 
-iserv:
+oauth:
   base_url: https://iserv.example.de
   client_id: ggd-ki-plattform
   redirect_uri: https://ki.example.de/auth/callback
@@ -11,6 +11,11 @@ iserv:
   # Zum Deaktivieren auskommentieren oder auf null setzen:
   # grade_group_pattern: null
   # client_secret kommt aus Env-Variable AUTH_ISERV_CLIENT_SECRET
+  # Optionale URL-Overrides (Standard: aus base_url + IServ-Pfaden abgeleitet).
+  # Nur setzen, wenn ein anderer OAuth2/OIDC-Provider verwendet wird:
+  # auth_url: "https://sso.example.de/oauth2/authorize"
+  # token_url: "https://sso.example.de/oauth2/token"
+  # userinfo_url: "https://sso.example.de/oauth2/userinfo"
 
 yaml_test:
   users_file: config/test_users.yaml
@@ -31,3 +36,11 @@ sso:
     subject_department: '^FS\.(.+)$'        # FS.Mathematik → subject_department
     school_class: '^Klasse\.(.+)$'          # Klasse.8a → school_class
     teaching_group: '^unterricht\.(.+)$'    # unterricht.8a.Mathematik → teaching_group
+  allow_manual_teaching_groups: true   # false = Sidebar-Vorschläge deaktiviert
+  subject_aliases:                     # Kurzname → Subject-Slug (case-insensitiv)
+    D:    deutsch
+    E:    englisch
+    M:    mathematik
+    Bio:  biologie
+    Ch:   chemie
+    Ph:   physik

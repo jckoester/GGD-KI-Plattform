@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
@@ -7,6 +8,55 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.config import SsoGroupPatterns
+
+logger = logging.getLogger(__name__)
+
+_UMLAUT_TABLE = str.maketrans({
+    'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss',
+    'Ä': 'ae', 'Ö': 'oe', 'Ü': 'ue',
+})
+
+
+def _normalize_for_slug(value: str) -> str:
+    """Normalisiert für Slug-Vergleich: Umlaute ersetzen + lowercase."""
+    return value.translate(_UMLAUT_TABLE).lower()
+
+
+async def _resolve_subject_id(
+    db: AsyncSession,
+    subject_slug: str,
+    aliases: dict[str, str],
+) -> Optional[int]:
+    """Löst einen aus dem SSO-Token abgeleiteten Wert auf einen Subject-ID auf.
+
+    Reihenfolge:
+    1. Direkter Vergleich: normalisierter Wert == normalisierter subject.slug
+    2. Alias-Map: normalisierten Wert gegen normalisierte Alias-Keys prüfen,
+       dann den Alias-Zielwert wieder als Slug nachschlagen
+    """
+    from app.db.models import Subject
+
+    normalized = _normalize_for_slug(subject_slug)
+
+    # 1. Direkter case-insensitives Matching
+    res = await db.execute(
+        select(Subject.id).where(func.lower(Subject.slug) == normalized)
+    )
+    subject_id = res.scalar_one_or_none()
+    if subject_id is not None:
+        return subject_id
+
+    # 2. Alias-Map (Keys und Values ebenfalls normalisiert vergleichen)
+    normalized_aliases = {_normalize_for_slug(k): _normalize_for_slug(v)
+                          for k, v in aliases.items()}
+    alias_target = normalized_aliases.get(normalized)
+    if alias_target:
+        res = await db.execute(
+            select(Subject.id).where(func.lower(Subject.slug) == alias_target)
+        )
+        return res.scalar_one_or_none()
+
+    return None
 
 
 @dataclass
@@ -115,6 +165,7 @@ async def sync_groups(
     sso_groups: list[str],
     primary_role: str,
     patterns: SsoGroupPatterns,
+    aliases: dict[str, str] = {},
 ) -> None:
     """Synchronisiert Gruppen und Mitgliedschaften für einen einloggenden Nutzer.
 
@@ -141,10 +192,13 @@ async def sync_groups(
         # Subject-ID optional nachschlagen
         subject_id: Optional[int] = None
         if pg.subject_slug:
-            res = await db.execute(
-                select(Subject.id).where(Subject.slug == pg.subject_slug)
-            )
-            subject_id = res.scalar_one_or_none()
+            subject_id = await _resolve_subject_id(db, pg.subject_slug, aliases)
+            if subject_id is None:
+                logger.warning(
+                    "SSO-Gruppe '%s' (Typ '%s'): Fach-Slug '%s' nicht aufgelöst. "
+                    "subject_aliases in auth.yaml prüfen.",
+                    pg.sso_group_id, pg.type, pg.subject_slug,
+                )
 
         # Groups upsert (by sso_group_id — eindeutige externe ID)
         # Wir suchen zuerst nach sso_group_id, dann nach slug

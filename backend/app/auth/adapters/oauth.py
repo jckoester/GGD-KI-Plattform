@@ -12,7 +12,7 @@ from app.auth.base import AuthAdapter, LoginChallenge, NormalizedIdentity
 from app.config import Settings
 
 
-class IServConfig(BaseModel):
+class OAuthConfig(BaseModel):
     base_url: str  # z.B. https://iserv.example.de
     client_id: str
     redirect_uri: str
@@ -21,16 +21,30 @@ class IServConfig(BaseModel):
     # Beispiel GGD: "^jahrgang\.(\d{1,2})$"
     # None → Jahrgangs-Erkennung deaktiviert, grade ist immer None
     # client_secret kommt aus Settings (Env-Variable), nicht aus YAML
+    # Optionale URL-Overrides; wenn None, werden IServ-Defaults aus base_url abgeleitet
+    auth_url: str | None = None
+    token_url: str | None = None
+    userinfo_url: str | None = None
+
+    @property
+    def effective_auth_url(self) -> str:
+        return self.auth_url or f"{self.base_url}/iserv/oauth/v2/auth"
+
+    @property
+    def effective_token_url(self) -> str:
+        return self.token_url or f"{self.base_url}/iserv/oauth/v2/token"
+
+    @property
+    def effective_userinfo_url(self) -> str:
+        return self.userinfo_url or f"{self.base_url}/iserv/oauth/v2/userinfo"
 
     @model_validator(mode="after")
-    def check_grade_pattern_has_capture_group(self) -> "IServConfig":
+    def check_grade_pattern_has_capture_group(self) -> "OAuthConfig":
         if self.grade_group_pattern is not None:
             try:
                 compiled = re.compile(self.grade_group_pattern)
             except re.error as e:
-                raise ValueError(
-                    f"grade_group_pattern ist kein gültiges Regex: {e}"
-                )
+                raise ValueError(f"grade_group_pattern ist kein gültiges Regex: {e}")
             if compiled.groups < 1:
                 raise ValueError(
                     "grade_group_pattern muss genau eine Capture-Group enthalten"
@@ -38,14 +52,14 @@ class IServConfig(BaseModel):
         return self
 
 
-class IServAdapter(AuthAdapter):
+class OAuthAdapter(AuthAdapter):
     def __init__(
         self,
         raw: dict,
         settings: Settings,
         group_role_map: dict[str, str] | None = None,
     ) -> None:
-        self._config = IServConfig.model_validate(raw)
+        self._config = OAuthConfig.model_validate(raw)
         self._client_secret = settings.auth_iserv_client_secret
         self._school_secret = settings.school_secret
         self._group_role_map = group_role_map or {}
@@ -67,17 +81,14 @@ class IServAdapter(AuthAdapter):
             "scope": "openid profile email",
             "state": state,
         }
-        url = (
-            f"{self._config.base_url}/iserv/oauth/v2/auth?"
-            + urlencode(params)
-        )
+        url = f"{self._config.effective_auth_url}?" + urlencode(params)
         return LoginChallenge(type="redirect", redirect_url=url, state=state)
 
     async def exchange_code(self, code: str, state: str) -> NormalizedIdentity:
         self._verify_state(state)
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
-                f"{self._config.base_url}/iserv/oauth/v2/token",
+                self._config.effective_token_url,
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
@@ -90,7 +101,7 @@ class IServAdapter(AuthAdapter):
             access_token = token_resp.json()["access_token"]
 
             userinfo_resp = await client.get(
-                f"{self._config.base_url}/iserv/oauth/v2/userinfo",
+                self._config.effective_userinfo_url,
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             userinfo_resp.raise_for_status()
@@ -100,7 +111,7 @@ class IServAdapter(AuthAdapter):
     async def authenticate_direct(
         self, username: str, password: str
     ) -> NormalizedIdentity | None:
-        raise NotImplementedError("IServAdapter unterstützt kein direktes Login")
+        raise NotImplementedError("OAuthAdapter unterstützt kein direktes Login")
 
     def _verify_state(self, state: str) -> None:
         try:
@@ -125,39 +136,28 @@ class IServAdapter(AuthAdapter):
             sso_groups=groups,  # NEU
         )
 
-    def _map_roles_and_grade(
-        self, groups: list[str]
-    ) -> tuple[list[str], str | None]:
+    def _map_roles_and_grade(self, groups: list[str]) -> tuple[list[str], str | None]:
         # Sammle alle Rollen aus den Gruppen
         roles: set[str] = set()
         grade: str | None = None
-        
+
         # Mapping aus Gruppen zu Rollen
         for group in groups:
             if group in self._group_role_map:
                 role = self._group_role_map[group]
                 roles.add(role)
-            
+
             # Extrahiere Jahrgang
             if self._config.grade_group_pattern and grade is None:
                 pattern = re.compile(self._config.grade_group_pattern)
                 m = pattern.match(group)
                 if m:
                     grade = m.group(1)
-        
+
         # Falls keine Rolle gemappt wurde, Default: student
         if not roles:
             roles.add("student")
-        
+
         # Konvertiere zu Liste
         return list(roles), grade
 
-    def _extract_grade(self, groups: list[str]) -> str | None:
-        if self._config.grade_group_pattern is None:
-            return None
-        pattern = re.compile(self._config.grade_group_pattern)
-        for group in groups:
-            m = pattern.match(group)
-            if m:
-                return m.group(1)
-        return None

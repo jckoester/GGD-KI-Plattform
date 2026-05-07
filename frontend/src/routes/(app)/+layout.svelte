@@ -9,6 +9,7 @@
     import { refreshMyGroups } from "$lib/stores/myGroups.js";
     import { refreshAssistants } from "$lib/stores/assistants.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
+    import { refreshGroupsConfig } from "$lib/stores/groupsConfig.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -32,10 +33,11 @@
             });
             budget.set(budgetData);
             themePref.syncFromServer(prefs.theme ?? "system");
-            refreshSubjects()   // fire-and-forget; Fehler werden intern ignoriert
-            refreshMyGroups()   // fire-and-forget
-            refreshAssistants()          // NEU — für Sichtbarkeitsregel
-            refreshConversationCounts()  // NEU — für Chat-Anzahl in Sidebar
+            refreshSubjects(); // fire-and-forget; Fehler werden intern ignoriert
+            refreshMyGroups(); // fire-and-forget
+            refreshAssistants(); // NEU — für Sichtbarkeitsregel
+            refreshConversationCounts(); // NEU — für Chat-Anzahl in Sidebar
+            refreshGroupsConfig(); // NEU — für allow_manual_teaching_groups Flag
         } catch {
             goto("/");
         }

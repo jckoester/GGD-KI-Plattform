@@ -6,7 +6,7 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.base import AuthAdapter
-from app.auth.config import load_auth_config
+from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
 from app.config import settings
 from app.db.session import get_db
@@ -16,11 +16,13 @@ from app.db.session import get_db
 def get_auth_adapter() -> AuthAdapter:
     auth_config = load_auth_config(settings.auth_config_path)
     group_role_map = auth_config.group_role_map_dict
-    if auth_config.adapter == "iserv":
-        from app.auth.adapters.iserv import IServAdapter
-        return IServAdapter(auth_config.iserv, settings, group_role_map)
+    if auth_config.adapter == "oauth":
+        from app.auth.adapters.oauth import OAuthAdapter
+
+        return OAuthAdapter(auth_config.oauth, settings, group_role_map)
     elif auth_config.adapter == "yaml_test":
         from app.auth.adapters.yaml_test import YamlTestAdapter
+
         return YamlTestAdapter(auth_config.yaml_test, group_role_map)
     raise ValueError(f"Unbekannter Adapter: {auth_config.adapter}")
 
@@ -31,6 +33,12 @@ def get_jwt_service() -> JwtService:
         secret=settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
+
+
+@lru_cache(maxsize=1)
+def get_sso_config() -> SsoConfig:
+    """Gibt die SSO-Konfiguration zurück (gecacht; Neustart bei Änderung)."""
+    return load_auth_config(settings.auth_config_path).sso
 
 
 async def get_current_user(
@@ -52,17 +60,25 @@ async def get_current_user(
 
 def require_role(role: str) -> Callable:
     """Dependency-Factory: 403 wenn `role` nicht in user.roles."""
-    async def _guard(current_user: JwtPayload = Depends(get_current_user)) -> JwtPayload:
+
+    async def _guard(
+        current_user: JwtPayload = Depends(get_current_user),
+    ) -> JwtPayload:
         if role not in current_user.roles:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
         return current_user
+
     return _guard
 
 
 def require_any_role(roles: list[str]) -> Callable:
     """Dependency-Factory: 403 wenn keine der `roles` in user.roles."""
-    async def _guard(current_user: JwtPayload = Depends(get_current_user)) -> JwtPayload:
+
+    async def _guard(
+        current_user: JwtPayload = Depends(get_current_user),
+    ) -> JwtPayload:
         if not any(r in current_user.roles for r in roles):
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
         return current_user
+
     return _guard
