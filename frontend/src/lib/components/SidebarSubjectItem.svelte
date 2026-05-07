@@ -2,6 +2,10 @@
   import { slide } from 'svelte/transition'
   import { ChevronDown, ChevronRight } from 'lucide-svelte'
   import SubjectIcon from './SubjectIcon.svelte'
+  import TeachingGroupMenu from './TeachingGroupMenu.svelte'
+  import PotentialGroupMenu from './PotentialGroupMenu.svelte'
+  import { refreshMyGroups } from '$lib/stores/myGroups.js'
+  import { refreshPotentialTeachingGroups } from '$lib/stores/potentialTeachingGroups.js'
 
   let { section } = $props()
 
@@ -44,7 +48,7 @@
       <SubjectIcon name={section.icon} size={15} color={section.color} />
       <span class="flex-1 truncate">{section.name}</span>
     </a>
-    {#if section.groups.length > 0}
+    {#if section.groups.length > 0 || section.potentialGroups.length > 0}
       <button
         onclick={toggle}
         class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
@@ -59,18 +63,48 @@
     {/if}
   </div>
 
-  {#if expanded && section.groups.length > 0}
+  {#if expanded && (section.groups.length > 0 || section.potentialGroups.length > 0)}
     <div transition:slide={{ duration: 150 }}>
+      <!-- Bestätigte Gruppen -->
       {#each section.groups as group (group.groupId)}
-        <a
-          href={`/subjects/${section.slug}/groups/${group.groupId}`}
-          class="flex items-center gap-2 pl-7 pr-3 py-1.5 rounded-md text-sm
-                 text-light-tx-2 dark:text-dark-tx-2
-                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-        >
-          <span class="flex-1 truncate">{group.name}</span>
-          <span class="text-xs shrink-0">{formatCount(group.count)}</span>
-        </a>
+        <div class="flex items-center group/item pl-7 pr-1 rounded-md
+                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
+          <a href={`/subjects/${section.slug}/groups/${group.groupId}`}
+             class="flex items-center gap-2 flex-1 py-1.5 text-sm
+                    text-light-tx-2 dark:text-dark-tx-2 min-w-0">
+            <span class="flex-1 truncate">{group.name}</span>
+            <span class="text-xs shrink-0">{formatCount(group.count)}</span>
+          </a>
+          {#if group.isManual}
+            <TeachingGroupMenu
+              groupId={group.groupId}
+              className={group.name}
+              subjectId={section.subjectId}
+              onrefresh={() => { refreshMyGroups(); refreshPotentialTeachingGroups() }}
+            />
+          {/if}
+        </div>
+      {/each}
+
+      <!-- Trennlinie (nur wenn beide Listen nicht leer) -->
+      {#if section.groups.length > 0 && section.potentialGroups.length > 0}
+        <div class="mx-3 my-1 border-t border-light-ui-2 dark:border-dark-ui-2"></div>
+      {/if}
+
+      <!-- Potenzielle Gruppen -->
+      {#each section.potentialGroups as pot (pot.classGroupId + '-' + pot.subjectId)}
+        <div class="flex items-center pl-7 pr-1 rounded-md
+                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
+          <span class="flex-1 py-1.5 text-sm text-light-tx-3 dark:text-dark-tx-3 truncate">
+            {pot.className}
+          </span>
+          <PotentialGroupMenu
+            classGroupId={pot.classGroupId}
+            subjectId={pot.subjectId}
+            className={pot.className}
+            onrefresh={() => { refreshMyGroups(); refreshPotentialTeachingGroups() }}
+          />
+        </div>
       {/each}
     </div>
   {/if}

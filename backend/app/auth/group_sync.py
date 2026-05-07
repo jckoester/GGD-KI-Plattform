@@ -154,17 +154,41 @@ async def sync_groups(
         group = res.scalar_one_or_none()
 
         if group is None:
-            # Neu anlegen; bei Slug-Kollision (selten) Suffix anhängen
-            slug = await _unique_slug(db, pg.slug)
-            group = Group(
-                name=pg.name,
-                slug=slug,
-                type=pg.type,
-                subject_id=subject_id,
-                sso_group_id=pg.sso_group_id,
-            )
-            db.add(group)
-            await db.flush()  # group.id sofort verfügbar
+            # Merge-Logik: bei teaching_group-Typen nach manueller TG suchen
+            if pg.type == "teaching_group" and subject_id is not None:
+                # Manuelle TG mit gleichem Fach, die über eine Klasse erstellt wurde
+                # und noch keine sso_group_id hat — adoptieren statt neu anlegen
+                from sqlalchemy.orm import joinedload
+                res = await db.execute(
+                    select(Group)
+                    .join(GroupMembership, GroupMembership.group_id == Group.id)
+                    .where(
+                        GroupMembership.pseudonym == pseudonym,
+                        Group.type == "teaching_group",
+                        Group.subject_id == subject_id,
+                        Group.sso_group_id.is_(None),
+                        Group.source_class_group_id.is_not(None),
+                    )
+                )
+                manual_group = res.scalar_one_or_none()
+                if manual_group is not None:
+                    # SSO-ID übernehmen; Gruppe bleibt erhalten
+                    manual_group.sso_group_id = pg.sso_group_id
+                    manual_group.name = pg.name  # SSO-Name übernehmen
+                    group = manual_group
+
+            if group is None:
+                # Neu anlegen; bei Slug-Kollision (selten) Suffix anhängen
+                slug = await _unique_slug(db, pg.slug)
+                group = Group(
+                    name=pg.name,
+                    slug=slug,
+                    type=pg.type,
+                    subject_id=subject_id,
+                    sso_group_id=pg.sso_group_id,
+                )
+                db.add(group)
+                await db.flush()  # group.id sofort verfügbar
         else:
             # Vorhandene Gruppe aktualisieren (Name kann sich geändert haben)
             group.name = pg.name

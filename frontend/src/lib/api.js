@@ -491,3 +491,54 @@ export async function getSubjects() {
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail)
   return res.json()  // { items: SubjectOut[] }
 }
+
+// --- Phase 5: Teaching Groups API ---
+
+export async function getPotentialTeachingGroups() {
+  const res = await fetch(`${BASE}/groups/teaching/potential`, { credentials: 'include' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function createTeachingGroup(classGroupId, subjectId) {
+  const res = await fetch(`${BASE}/groups/teaching`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ class_group_id: classGroupId, subject_id: subjectId }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function deleteTeachingGroup(groupId) {
+  const res = await fetch(`${BASE}/groups/teaching/${groupId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(await res.text())
+}
+
+export async function getExclusions() {
+  const res = await fetch(`${BASE}/groups/exclusions`, { credentials: 'include' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function addExclusion(classGroupId, subjectId) {
+  const res = await fetch(`${BASE}/groups/exclusions`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ class_group_id: classGroupId, subject_id: subjectId }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+}
+
+export async function removeExclusion(classGroupId, subjectId) {
+  const res = await fetch(`${BASE}/groups/exclusions/${classGroupId}/${subjectId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(await res.text())
+}

@@ -24,6 +24,7 @@
     import { subjectMap } from "$lib/stores/subjects.js";
     import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js"
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
+    import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
@@ -116,6 +117,7 @@
     $effect(() => {
         refreshConversations(limit);
         refreshConversationCounts();
+        refreshPotentialTeachingGroups();
     });
 
     // State für Fächer-Sektion
@@ -124,6 +126,7 @@
     function handleDeleted() {
         refreshConversations(limit);
         refreshConversationCounts();
+        refreshPotentialTeachingGroups();
     }
 </script>
 

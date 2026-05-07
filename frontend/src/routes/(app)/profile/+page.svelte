@@ -1,5 +1,5 @@
 <script>
-    import { User, Sun, Moon, Monitor, Save, ArrowLeft } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, ChevronRight } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -149,6 +149,22 @@
                 </div>
             {/if}
         </section>
+
+        <!-- Unterrichtsgruppen-Link (nur für Lehrkräfte) -->
+        {#if $user?.roles?.includes('teacher')}
+        <section class="mb-8">
+            <a
+                href="/profile/teaching-groups"
+                class="flex items-center gap-2 px-4 py-3 rounded-lg
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <BookOpen class="w-4 h-4" />
+                <span>Unterrichtsgruppen verwalten</span>
+                <ChevronRight class="w-4 h-4 ml-auto" />
+            </a>
+        </section>
+        {/if}
 
         <section class="mb-8">
             <h2

@@ -75,6 +75,9 @@ class Group(Base):
         ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
     )
     sso_group_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_class_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -86,6 +89,20 @@ class Group(Base):
         ),
         Index("idx_groups_type", "type"),
         Index("idx_groups_subject_id", "subject_id"),
+        Index("idx_groups_source_class_group_id", "source_class_group_id"),
+    )
+
+
+# 2b. teacher_group_exclusions
+class TeacherGroupExclusion(Base):
+    __tablename__ = "teacher_group_exclusions"
+
+    pseudonym: Mapped[str] = mapped_column(Text, primary_key=True)
+    class_group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    subject_id: Mapped[int] = mapped_column(
+        ForeignKey("subjects.id", ondelete="CASCADE"), primary_key=True
     )
 
 

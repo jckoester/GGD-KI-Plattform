@@ -4,10 +4,11 @@ import { myGroups, myTeachingGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
+import { potentialTeachingGroups } from './potentialTeachingGroups.js'
 
 export const sidebarSubjectSections = derived(
-  [user, subjectMap, myGroups, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds],
-  ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds]) => {
+  [user, subjectMap, myGroups, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups],
+  ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds, $potential]) => {
     if (!$user) return []
 
     const isTeacher = $user.roles?.includes('teacher')
@@ -37,6 +38,14 @@ export const sidebarSubjectSections = derived(
               groupId: g.id,
               name: g.name,
               count: parseInt($byGroup[String(g.id)] ?? 0),
+              isManual: !g.sso_group_id,  // für Lösch-Button
+            })),
+          potentialGroups: $potential
+            .filter(p => p.subject_id === subj.id)
+            .map(p => ({
+              classGroupId: p.class_group_id,
+              className: p.class_name,
+              subjectId: p.subject_id,
             })),
         }))
     } else {
