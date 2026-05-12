@@ -220,14 +220,14 @@
         {#if $sidebarSubjectSections.length > 0}
           <div class="mt-2">
             <div
-                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       {$page.url.pathname.startsWith('/subjects') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
             >
-                <button
-                    onclick={toggleSubjects}
-                    class="flex items-center gap-2"
-                >
-                    <BookOpen size={16} />
-                    Meine Fächer
+                <button onclick={() => { toggleSubjects(); goto('/subjects') }}>
+                    <span class="flex items-center gap-2">
+                        <BookOpen size={16} />
+                        Meine Fächer
+                    </span>
                 </button>
                 <button onclick={toggleSubjects}>
                     {#if subjectsOpen}
