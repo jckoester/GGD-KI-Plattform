@@ -15,6 +15,7 @@
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import { tick } from "svelte";
     import {
         streamChat,
         ApiError,
@@ -618,6 +619,18 @@
                 (a) => String(a.id) === paramId,
             );
             if (found) selectedAssistant = found;
+        }
+    });
+
+    // Vorausgefüllter Text aus ?q= (z. B. von der Welcome-Seite)
+    $effect(() => {
+        const prefillText = $page.url.searchParams.get('q')
+        if (prefillText && !conversationId) {
+            input = prefillText
+            // Fokus auf das Textarea setzen
+            tick().then(() => {
+                textarea?.focus()
+            })
         }
     });
 
