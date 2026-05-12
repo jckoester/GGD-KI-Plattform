@@ -36,26 +36,28 @@
         borderClass = "border-light-ui-2 dark:border-dark-ui-2",
     } = $props();
 
-    // Aufklappbarer Bereich für Letzte Chats
-    let recentChatsOpen = $state(true);
-    // Aufklappbarer Bereich für Assistenten
-    let assistantsOpen = $state($page.url.pathname.startsWith('/assistants'));
+    // Zentrales Öffnungs-Signal: 'recent' | 'assistants' | 'subject-<id>' | null
+    let openSection = $state(null)
 
+    function toggle(key) {
+        openSection = openSection === key ? null : key
+    }
+
+    // Assistenten-Sektion beim Navigieren auf /assistants/* auto-öffnen
     $effect(() => {
-        if ($page.url.pathname.startsWith('/assistants')) assistantsOpen = true;
-    });
+        if ($page.url.pathname.startsWith('/assistants')) {
+            openSection = 'assistants'
+        }
+    })
 
-    function toggleRecentChats() {
-        recentChatsOpen = !recentChatsOpen;
-    }
-
-    function openRecentChats() {
-        recentChatsOpen = true;
-    }
-
-    function toggleAssistants() {
-        assistantsOpen = !assistantsOpen;
-    }
+    // Fach-Sektion beim Navigieren auf /subjects/<slug>[/*] auto-öffnen
+    $effect(() => {
+        const slug = $page.url.pathname.match(/^\/subjects\/([^/]+)/)?.[1]
+        if (slug) {
+            const found = $sidebarSubjectSections.find(s => s.slug === slug)
+            if (found) openSection = `subject-${found.subjectId}`
+        }
+    })
 
     function formatDate(dateString) {
         if (!dateString) return "";
@@ -120,8 +122,14 @@
         refreshPotentialTeachingGroups();
     });
 
-    // State für Fächer-Sektion
-    let subjectsOpen = $state(true);
+    // Fächer-Container offen wenn ein Fach oder der Container selbst aktiv ist
+    const subjectsOpen = $derived(
+        openSection === 'subjects' || (openSection?.startsWith('subject-') ?? false)
+    )
+
+    function toggleSubjects() {
+        openSection = subjectsOpen ? null : 'subjects'
+    }
 
     function handleDeleted() {
         refreshConversations(limit);
@@ -175,15 +183,15 @@
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        {$page.url.pathname.startsWith('/assistants') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
             >
-                <button onclick={() => { assistantsOpen = true; goto('/assistants') }}>
+                <button onclick={() => { openSection = 'assistants'; goto('/assistants') }}>
                     <span class="flex items-center gap-2">
                         <Bot class="w-4 h-4" />
                         Assistenten
                     </span>
                 </button>
                 {#if $user?.roles.includes('admin')}
-                    <button onclick={toggleAssistants}>
-                        {#if assistantsOpen}
+                    <button onclick={() => toggle('assistants')}>
+                        {#if openSection === 'assistants'}
                             <ChevronDown class="w-4 h-4" />
                         {:else}
                             <ChevronRight class="w-4 h-4" />
@@ -191,7 +199,7 @@
                     </button>
                 {/if}
             </div>
-            {#if assistantsOpen && $user?.roles.includes('admin')}
+            {#if openSection === 'assistants' && $user?.roles.includes('admin')}
                 <div class="mt-1 space-y-1 pl-2">
                     <button
                         onclick={() => goto('/assistants/manage')}
@@ -215,13 +223,13 @@
                 class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
                 <button
-                    onclick={() => { subjectsOpen = !subjectsOpen }}
+                    onclick={toggleSubjects}
                     class="flex items-center gap-2"
                 >
                     <BookOpen size={16} />
                     Meine Fächer
                 </button>
-                <button onclick={() => { subjectsOpen = !subjectsOpen }}>
+                <button onclick={toggleSubjects}>
                     {#if subjectsOpen}
                         <ChevronDown class="w-4 h-4" />
                     {:else}
@@ -233,7 +241,11 @@
             {#if subjectsOpen}
                 <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
                     {#each $sidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
-                        <SidebarSubjectItem {section} />
+                        <SidebarSubjectItem
+                            {section}
+                            expanded={openSection === `subject-${section.subjectId}`}
+                            ontoggle={() => toggle(`subject-${section.subjectId}`)}
+                        />
                     {/each}
                 </div>
             {/if}
@@ -247,7 +259,7 @@
             >
                 <button
                     onclick={() => {
-                        openRecentChats();
+                        openSection = 'recent';
                         goto("/history");
                     }}
                 >
@@ -256,9 +268,9 @@
                         Letzte Chats
                     </span>
                 </button>
-                <button onclick={toggleRecentChats}>
+                <button onclick={() => toggle('recent')}>
                     <span class="flex items-center gap-2">
-                        {#if recentChatsOpen}
+                        {#if openSection === 'recent'}
                             <ChevronDown class="w-4 h-4" />
                         {:else}
                             <ChevronRight class="w-4 h-4" />
@@ -267,7 +279,7 @@
                 </button>
             </div>
 
-            {#if recentChatsOpen}
+            {#if openSection === 'recent'}
                 <div class="mt-1 space-y-1 pl-2">
                     {#if $recentConversations.length === 0}
                         <p

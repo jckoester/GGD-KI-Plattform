@@ -8,13 +8,7 @@
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js";
     import { groupsConfig } from "$lib/stores/groupsConfig.js";
 
-    let { section } = $props();
-
-    let expanded = $state(true);
-
-    function toggle() {
-        expanded = !expanded;
-    }
+    let { section, expanded = false, ontoggle = () => {} } = $props()
 
     function formatCount(n) {
         if (n === 0) return "–";
@@ -54,7 +48,7 @@
         </a>
         {#if section.groups.length > 0 || ($groupsConfig.allow_manual_teaching_groups && section.potentialGroups.length > 0)}
             <button
-                onclick={toggle}
+                onclick={ontoggle}
                 class="px-2 py-1.5 text-light-tx-2 dark:text-dark-tx-2 shrink-0"
                 aria-label={expanded ? "Zuklappen" : "Aufklappen"}
             >
