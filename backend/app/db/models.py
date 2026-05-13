@@ -17,6 +17,7 @@ class Base(DeclarativeBase):
 # Enums for CHECK constraints
 class AssistantStatus(enum.Enum):
     DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
     ACTIVE = "active"
     DISABLED = "disabled"
     ARCHIVED = "archived"
@@ -163,8 +164,12 @@ class Assistant(Base):
     available_from:  Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     available_until: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
-    created_by_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     updated_by_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    creator_role: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'admin'")
+    )
+    reject_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -174,7 +179,7 @@ class Assistant(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('draft','active','disabled','archived')",
+            "status IN ('draft','pending_review','active','disabled','archived')",
             name="check_assistant_status",
         ),
         CheckConstraint(
@@ -192,8 +197,33 @@ class Assistant(Base):
             " 'teaching_group','grade','all_students','all')",
             name="check_assistant_scope_pending",
         ),
+        CheckConstraint(
+            "creator_role IN ('admin', 'teacher')",
+            name="check_assistant_creator_role",
+        ),
         Index("idx_assistants_status", "status"),
         Index("idx_assistants_subject_id", "subject_id"),
+    )
+
+
+# 4b. assistant_documents
+class AssistantDocument(Base):
+    __tablename__ = "assistant_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    assistant_id: Mapped[int] = mapped_column(
+        ForeignKey("assistants.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_assistant_documents_assistant_id", "assistant_id"),
     )
 
 

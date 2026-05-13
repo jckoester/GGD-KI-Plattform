@@ -131,7 +131,7 @@ async def test_assistant_status_check_constraint(db_session):
         assistant = Assistant(
             subject_id=None,
             status="invalid_status",
-            created_by_pseudonym="test-pseudo",
+            created_by="test-pseudo",
         )
         db_session.add(assistant)
         await db_session.commit()

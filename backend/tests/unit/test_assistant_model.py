@@ -56,7 +56,7 @@ class TestAssistantModel:
         
         # Sortierung & Audit
         assert hasattr(Assistant, 'sort_order')
-        assert hasattr(Assistant, 'created_by_pseudonym')
+        assert hasattr(Assistant, 'created_by')
         assert hasattr(Assistant, 'updated_by_pseudonym')
         assert hasattr(Assistant, 'created_at')
         assert hasattr(Assistant, 'updated_at')

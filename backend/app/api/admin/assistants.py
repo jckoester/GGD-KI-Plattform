@@ -99,7 +99,7 @@ class AssistantResponse(BaseModel):
     available_from: Optional[datetime]
     available_until: Optional[datetime]
     sort_order: int
-    created_by_pseudonym: Optional[str]
+    created_by: Optional[str]
     updated_by_pseudonym: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -339,7 +339,7 @@ async def create_assistant(
         available_from=request.available_from,
         available_until=request.available_until,
         sort_order=request.sort_order,
-        created_by_pseudonym=current_user.sub,
+        created_by=current_user.sub,
         updated_by_pseudonym=current_user.sub,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -577,7 +577,7 @@ async def import_assistant(
     assistant = Assistant(
         **fields,
         status="draft",
-        created_by_pseudonym=current_user.sub,
+        created_by=current_user.sub,
         updated_by_pseudonym=current_user.sub,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
