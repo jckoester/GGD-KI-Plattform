@@ -111,7 +111,7 @@
         </h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {#each subjectAssistants as assistant (assistant.id)}
-            <AssistantCard {assistant} />
+            <AssistantCard {assistant} {subject} groups={myGroupsForSubject} />
           {/each}
         </div>
       </section>
@@ -133,35 +133,44 @@
           Noch keine Chats in diesem Fach.
         </p>
       {:else}
-        <div class="divide-y divide-light-ui-2 dark:divide-dark-ui-2">
-          {#each conversations as conv (conv.id)}
-            <div class="flex items-center gap-2 py-2.5 group">
-              <a
-                href={`/chat?id=${conv.id}`}
-                class="flex-1 min-w-0 flex items-center gap-3
-                       hover:text-primary dark:hover:text-primary-dark transition-colors"
-              >
-                <span class="text-sm text-light-tx dark:text-dark-tx truncate flex-1">
-                  {conv.title ?? 'Unbenannter Chat'}
-                </span>
-                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
-                  {conv.last_message_at
-                    ? new Date(conv.last_message_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
-                    : ''}
-                </span>
-              </a>
-              <div class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <ConversationMenu
-                  conversationId={conv.id}
-                  title={conv.title}
-                  subject_id={conv.subject_id}
-                  group_id={conv.group_id}
-                  onDeleted={() => handleConversationDeleted(conv.id)}
-                  iconSize={14}
-                />
-              </div>
-            </div>
-          {/each}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
+                <th class="px-4 py-3 text-sm font-medium text-light-tx-2 dark:text-dark-tx-2">Titel</th>
+                <th class="px-4 py-3 text-sm font-medium text-light-tx-2 dark:text-dark-tx-2">letzte Aktivität</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each conversations as conv (conv.id)}
+                <tr
+                  class="border-b border-light-ui-3 dark:border-dark-ui-3
+                         hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors cursor-pointer"
+                  onclick={() => goto(`/chat?id=${conv.id}`)}
+                >
+                  <td class="px-4 py-3 text-light-tx dark:text-dark-tx">
+                    {conv.title ?? 'Unbenannter Chat'}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap">
+                    {conv.last_message_at
+                      ? new Date(conv.last_message_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : ''}
+                  </td>
+                  <td>
+                    <ConversationMenu
+                      conversationId={conv.id}
+                      title={conv.title}
+                      subject_id={conv.subject_id}
+                      group_id={conv.group_id}
+                      onDeleted={() => handleConversationDeleted(conv.id)}
+                      iconSize={14}
+                    />
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
 
         {#if conversations.length < total}
