@@ -72,33 +72,30 @@
 </script>
 
 <div class="flex min-h-0 flex-1">
-  <!-- Linke Gruppe-Navigationsleiste (nur Lehrkraft) -->
-  {#if isTeacher && myGroupsForSubject.length > 0}
-    <nav class="w-48 shrink-0 border-r border-light-ui-2 dark:border-dark-ui-2
-                flex flex-col gap-1 p-3 overflow-y-auto">
-      <p class="text-xs font-semibold uppercase tracking-wide
-                text-light-tx-2 dark:text-dark-tx-2 px-2 mb-1">
-        Unterrichtsgruppen
-      </p>
-      {#each myGroupsForSubject as group (group.id)}
-        <a
-          href={`/subjects/${subject.slug}/groups/${group.id}`}
-          class="px-2 py-1.5 rounded-md text-sm text-light-tx dark:text-dark-tx
-                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors truncate"
-        >
-          {group.name}
-        </a>
-      {/each}
-    </nav>
-  {/if}
-
-  <!-- Hauptinhalt -->
   <main class="flex-1 overflow-y-auto p-6 max-w-3xl">
     <!-- Kopfzeile -->
     {#if subject}
       <div class="flex items-center gap-3 mb-6">
         <SubjectIcon name={subject.icon} size={28} color={subject.color} />
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">{subject.name}</h1>
+      </div>
+    {/if}
+
+    <!-- Unterrichtsgruppen-Chips (nur Lehrkraft) -->
+    {#if isTeacher && myGroupsForSubject.length > 0}
+      <div class="flex flex-wrap gap-2 mb-6">
+        {#each myGroupsForSubject as group (group.id)}
+          {@const isActive = $page.url.pathname === `/subjects/${subject.slug}/groups/${group.id}`}
+          <a
+            href={`/subjects/${subject.slug}/groups/${group.id}`}
+            class="inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition-colors
+                   {isActive
+                     ? 'border-primary dark:border-primary-dark bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark font-medium'
+                     : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:border-primary dark:hover:border-primary-dark'}"
+          >
+            {group.name}
+          </a>
+        {/each}
       </div>
     {/if}
 
@@ -119,10 +116,19 @@
 
     <!-- Meine Chats -->
     <section class="mb-8">
-      <h2 class="text-xs font-semibold uppercase tracking-wide
-                 text-light-tx-2 dark:text-dark-tx-2 mb-3">
-        Meine Chats
-      </h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wide
+                   text-light-tx-2 dark:text-dark-tx-2">
+          Meine Chats
+        </h2>
+        <button
+          onclick={() => goto('/chat')}
+          class="text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
+                 text-white font-medium hover:opacity-90 transition-opacity"
+        >
+          + Neuer Chat
+        </button>
+      </div>
 
       {#if loading}
         <div class="flex justify-center py-8">

@@ -7,6 +7,7 @@
     import { refreshMyGroups } from "$lib/stores/myGroups.js";
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js";
     import { groupsConfig } from "$lib/stores/groupsConfig.js";
+    import { page } from "$app/stores";
 
     let { section, expanded = false, ontoggle = () => {} } = $props()
 
@@ -20,9 +21,11 @@
     <!-- Schüler-Zeile: Fachname, Anzahl, Link -->
     <a
         href={section.slug ? `/subjects/${section.slug}` : "/history"}
-        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
-           text-light-tx dark:text-dark-tx
-           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors
+               text-light-tx dark:text-dark-tx
+               {section.slug && $page.url.pathname.startsWith(`/subjects/${section.slug}`)
+                 ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
+                 : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
     >
         <SubjectIcon name={section.icon} size={15} color={section.color} />
         <span class="flex-1 truncate">
@@ -33,15 +36,18 @@
         </span>
     </a>
 {:else if section.type === "teacher"}
+    {@const isSubjectActive = $page.url.pathname.startsWith(`/subjects/${section.slug}`)}
     <!-- Lehrkraft-Kopfzeile: Link zum Fach + optionaler Chevron-Toggle -->
     <div
-        class="flex items-center gap-0 rounded-md
-              hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+        class="flex items-center gap-0 rounded-md transition-colors
+               {isSubjectActive
+                 ? 'bg-light-ui-2 dark:bg-dark-ui-2'
+                 : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
     >
         <a
             href={`/subjects/${section.slug}`}
-            class="flex items-center gap-2 flex-1 min-w-0 px-3 py-1.5 text-sm
-             text-light-tx dark:text-dark-tx font-medium"
+            class="flex items-center gap-2 flex-1 min-w-0 px-3 py-1.5 text-sm font-medium
+                   text-light-tx dark:text-dark-tx"
         >
             <SubjectIcon name={section.icon} size={15} color={section.color} />
             <span class="flex-1 truncate">{section.name}</span>
@@ -65,14 +71,17 @@
         <div transition:slide={{ duration: 150 }}>
             <!-- Bestätigte Gruppen -->
             {#each section.groups as group (group.groupId)}
+                {@const isGroupActive = $page.url.pathname === `/subjects/${section.slug}/groups/${group.groupId}`}
                 <div
-                    class="flex items-center group/item pl-7 pr-1 rounded-md
-                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                    class="flex items-center group/item pl-7 pr-1 rounded-md transition-colors
+                           {isGroupActive
+                             ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
+                             : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
                 >
                     <a
                         href={`/subjects/${section.slug}/groups/${group.groupId}`}
-                        class="flex items-center gap-2 flex-1 py-1.5 text-sm
-                    text-light-tx-2 dark:text-dark-tx-2 min-w-0"
+                        class="flex items-center gap-2 flex-1 py-1.5 text-sm min-w-0
+                               text-light-tx-2 dark:text-dark-tx-2"
                     >
                         <span class="flex-1 truncate">{group.name}</span>
                         <span class="text-xs shrink-0"
