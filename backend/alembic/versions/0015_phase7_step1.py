@@ -16,15 +16,15 @@ depends_on = None
 
 def upgrade():
     # 1-1: creator_role — wer hat diesen Assistenten erstellt?
+    #       Erst nullable hinzufügen, dann backfüllen, dann NOT NULL + CHECK setzen.
+    #       So ist garantiert, dass PostgreSQL keine Zeilen ohne gültigen Wert sieht.
     op.add_column(
         "assistants",
-        sa.Column(
-            "creator_role",
-            sa.Text(),
-            nullable=False,
-            server_default="'admin'",   # alle bestehenden Assistenten gelten als Admin-Assistenten
-        ),
+        sa.Column("creator_role", sa.Text(), nullable=True),
     )
+    op.execute("UPDATE assistants SET creator_role = 'admin' WHERE creator_role IS NULL")
+    op.alter_column("assistants", "creator_role", nullable=False,
+                    server_default=sa.text("'admin'"))
     op.create_check_constraint(
         "check_assistant_creator_role",
         "assistants",
