@@ -100,11 +100,17 @@ class AssistantResponse(BaseModel):
     available_until: Optional[datetime]
     sort_order: int
     created_by: Optional[str]
+    creator_role: str
+    reject_reason: Optional[str]
     updated_by_pseudonym: Optional[str]
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RejectBody(BaseModel):
+    reason: Optional[str] = None
 
 
 class AssistantListResponse(BaseModel):
@@ -300,6 +306,28 @@ async def list_assistants(
     )
 
 
+@router.get("/pending", response_model=AssistantListResponse)
+async def list_pending_assistants(
+    limit: int = 50,
+    offset: int = 0,
+    _: JwtPayload = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantListResponse:
+    """Gibt alle Assistenten im Status 'pending_review' zurück."""
+    stmt = select(Assistant).where(Assistant.status == "pending_review")
+
+    total_stmt = select(text("count(*)")).select_from(stmt.subquery())
+    total = (await db.execute(total_stmt)).scalar()
+
+    stmt = stmt.order_by(Assistant.updated_at.asc()).limit(limit).offset(offset)
+    assistants = (await db.execute(stmt)).scalars().all()
+
+    return AssistantListResponse(
+        items=[AssistantResponse.model_validate(a) for a in assistants],
+        total=total,
+    )
+
+
 @router.post("", response_model=AssistantResponse, status_code=201)
 async def create_assistant(
     request: AssistantCreate,
@@ -339,6 +367,7 @@ async def create_assistant(
         available_from=request.available_from,
         available_until=request.available_until,
         sort_order=request.sort_order,
+        creator_role="admin",
         created_by=current_user.sub,
         updated_by_pseudonym=current_user.sub,
         created_at=datetime.now(timezone.utc),
@@ -348,6 +377,61 @@ async def create_assistant(
     await db.commit()
     await db.refresh(assistant)
     
+    return AssistantResponse.model_validate(assistant)
+
+
+@router.post("/{assistant_id}/approve", response_model=AssistantResponse)
+async def approve_assistant(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Gibt einen eingereichten Assistenten frei (→ active)."""
+    result = await db.execute(select(Assistant).where(Assistant.id == assistant_id))
+    assistant = result.scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+    if assistant.status != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail="Nur Assistenten im Status 'pending_review' können freigegeben werden.",
+        )
+
+    assistant.status = "active"
+    assistant.reject_reason = None
+    assistant.updated_at = datetime.now(timezone.utc)
+    assistant.updated_by_pseudonym = current_user.sub
+
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+@router.post("/{assistant_id}/reject", response_model=AssistantResponse)
+async def reject_assistant(
+    assistant_id: int,
+    body: RejectBody,
+    current_user: JwtPayload = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Lehnt einen eingereichten Assistenten ab (→ draft + reject_reason)."""
+    result = await db.execute(select(Assistant).where(Assistant.id == assistant_id))
+    assistant = result.scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+    if assistant.status != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail="Nur Assistenten im Status 'pending_review' können abgelehnt werden.",
+        )
+
+    assistant.status = "draft"
+    assistant.reject_reason = body.reason
+    assistant.updated_at = datetime.now(timezone.utc)
+    assistant.updated_by_pseudonym = current_user.sub
+
+    await db.commit()
+    await db.refresh(assistant)
     return AssistantResponse.model_validate(assistant)
 
 
