@@ -157,6 +157,14 @@ export async function getMyGroups() {
   return res.json(); // { items: GroupOut[] }
 }
 
+export async function getAllGroups() {
+  // Nur für Admins als Fallback wenn getMyGroups() leer zurückkommt
+  const res = await fetch(`${BASE}/groups`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { items: GroupOut[] }
+}
+
 // Ersetzt patchConversationSubject
 export async function patchConversationContext(
   conversationId,
