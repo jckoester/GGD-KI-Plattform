@@ -457,9 +457,9 @@ export async function uploadFile(file) {
   return res.json(); // TextUploadResult | ImageUploadResult
 }
 
-// Einzelner Assistent (für Bearbeiten)
+// Einzelner Assistent (für Bearbeiten) - jetzt gemeinsamer Endpunkt
 export async function getAdminAssistant(id) {
-  const res = await fetch(`${BASE}/admin/assistants/${id}`, {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
     credentials: "include",
   });
   if (!res.ok)
@@ -467,7 +467,17 @@ export async function getAdminAssistant(id) {
   return res.json(); // AssistantResponse
 }
 
-// Liste (mit optionalen Filtern)
+// Einzelner Assistent für Lehrkräfte (neu)
+export async function getMyAssistant(id) {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // AssistantResponse
+}
+
+// Liste (mit optionalen Filtern) - Admin-only
 export async function getAdminAssistants(params = {}) {
   const url = new URL(`${BASE}/admin/assistants`, location.href);
   Object.entries(params).forEach(
@@ -479,9 +489,9 @@ export async function getAdminAssistants(params = {}) {
   return res.json(); // { items: AssistantResponse[], total: int }
 }
 
-// Anlegen
+// Anlegen - jetzt gemeinsamer Endpunkt
 export async function createAssistant(data) {
-  const res = await fetch(`${BASE}/admin/assistants`, {
+  const res = await fetch(`${BASE}/assistants`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -492,9 +502,9 @@ export async function createAssistant(data) {
   return res.json();
 }
 
-// Bearbeiten (PATCH)
+// Bearbeiten (PATCH) - jetzt gemeinsamer Endpunkt
 export async function updateAssistant(id, data) {
-  const res = await fetch(`${BASE}/admin/assistants/${id}`, {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
     method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -505,9 +515,9 @@ export async function updateAssistant(id, data) {
   return res.json();
 }
 
-// Löschen
+// Löschen - jetzt gemeinsamer Endpunkt
 export async function deleteAssistant(id) {
-  const res = await fetch(`${BASE}/admin/assistants/${id}`, {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
     method: "DELETE",
     credentials: "include",
   });
@@ -536,9 +546,9 @@ export async function deactivateAssistant(id) {
   return res.json();
 }
 
-// Export: YAML-Datei herunterladen
+// Export: YAML-Datei herunterladen - jetzt gemeinsamer Endpunkt
 export async function exportAssistant(id, filename) {
-  const res = await fetch(`${BASE}/admin/assistants/${id}/export`, {
+  const res = await fetch(`${BASE}/assistants/${id}/export`, {
     credentials: "include",
   });
   if (!res.ok)
@@ -552,12 +562,12 @@ export async function exportAssistant(id, filename) {
   URL.revokeObjectURL(url);
 }
 
-// Import: YAML-Datei hochladen (optional mit model_override)
+// Import: YAML-Datei hochladen (optional mit model_override) - jetzt gemeinsamer Endpunkt
 export async function importAssistant(file, modelOverride = null) {
   const form = new FormData();
   form.append("file", file);
   if (modelOverride) form.append("model_override", modelOverride);
-  const res = await fetch(`${BASE}/admin/assistants/import`, {
+  const res = await fetch(`${BASE}/assistants/import`, {
     method: "POST",
     credentials: "include",
     body: form,
@@ -565,6 +575,29 @@ export async function importAssistant(file, modelOverride = null) {
   if (!res.ok)
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json();
+}
+
+// Import für Lehrkräfte (neu) - alias für importAssistant
+export async function importMyAssistant(file, modelOverride = null) {
+  return importAssistant(file, modelOverride);
+}
+
+// Export aller Assistenten (Admin-only, ZIP)
+export async function exportAllAssistants(status = "active") {
+  const url = new URL(`${BASE}/admin/assistants/export-all`, location.href);
+  if (status) url.searchParams.set("status", status);
+  const res = await fetch(url, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  const blob = await res.blob();
+  const urlObj = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = urlObj;
+  a.download = "assistants-export.zip";
+  a.click();
+  URL.revokeObjectURL(urlObj);
 }
 
 export async function getSubjects() {
