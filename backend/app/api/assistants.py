@@ -11,6 +11,7 @@ from sqlalchemy import and_, or_, select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
+from app.config import settings
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.db.models import Assistant, Subject
@@ -248,6 +249,21 @@ VALID_SCOPES = {
     "teaching_group", "grade", "all_students", "all",
 }
 GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
+SCHOOLWIDE_SCOPES = {"grade", "all_students", "all"}
+
+
+def _initial_status(scope: str, creator_role: str) -> str:
+    """Bestimmt den initialen Status eines Assistenten bei Erstellung.
+
+    Admins starten immer im Draft. Lehrkraefte erhalten sofort 'active' fuer
+    private und gruppen-beschraenkte Scopes; schulweite Scopes koennen eine
+    Admin-Freigabe erfordern (abhaengig von teacher_schoolwide_sharing_requires_admin).
+    """
+    if creator_role == "admin":
+        return "draft"
+    if scope in SCHOOLWIDE_SCOPES:
+        return "pending_review" if settings.teacher_schoolwide_sharing_requires_admin else "active"
+    return "active"
 
 
 def validate_assistant_fields(
@@ -361,6 +377,11 @@ async def list_assistants(
                     and_(Assistant.audience == "student", is_student),
                     and_(Assistant.audience == "teacher", is_teacher),
                 ),
+                # private-Scope: nur fuer den Ersteller sichtbar
+                or_(
+                    Assistant.scope != "private",
+                    Assistant.created_by == current_user.sub,
+                ),
             )
         )
         .order_by(Assistant.sort_order.asc(), Assistant.name.asc())
@@ -442,11 +463,9 @@ async def create_assistant(
     )
     
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
-    
-    # sort_order: nur Admin kann das wirklich nutzen, aber wir speichern es
-    # Lehrkraefte koennen es mitschicken, es wird aber nur von Admins gewertet
     sort_order = request.sort_order if "admin" in current_user.roles else 0
-    
+    initial_status = _initial_status(request.scope, creator_role)
+
     assistant = Assistant(
         name=request.name,
         description=request.description,
@@ -455,7 +474,7 @@ async def create_assistant(
         model=request.model,
         temperature=request.temperature,
         max_tokens=request.max_tokens,
-        status="draft",
+        status=initial_status,
         audience=request.audience,
         scope=request.scope,
         scope_group_id=request.scope_group_id,
@@ -503,7 +522,18 @@ async def update_assistant(
     # sort_order: nur Admin kann das aendern
     if not is_admin and "sort_order" in update_data:
         update_data["sort_order"] = assistant.sort_order
-    
+
+    # Scope-Aenderung durch Lehrkraft: Status automatisch anpassen
+    if not is_admin and "scope" in update_data:
+        new_scope = update_data["scope"]
+        new_status = _initial_status(new_scope, "teacher")
+        # Nur umschalten wenn der Assistent nicht bereits im Ziel-Status ist
+        if assistant.status in ("active", "pending_review") and new_status != assistant.status:
+            update_data["status"] = new_status
+        # Wechsel von schulweit → privat/gruppe: reject_reason loeschen
+        if new_status == "active" and assistant.reject_reason:
+            update_data["reject_reason"] = None
+
     for field, value in update_data.items():
         setattr(assistant, field, value)
     assistant.updated_at = datetime.now(timezone.utc)

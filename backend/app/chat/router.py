@@ -271,10 +271,16 @@ async def chat(
                 await client.aclose()
                 raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
             if request.is_test:
-                # Testchat: nur Admins und Lehrkräfte dürfen inaktive Assistenten testen
-                if "admin" not in current_user.roles and "teacher" not in current_user.roles:
+                is_admin = "admin" in current_user.roles
+                is_teacher = "teacher" in current_user.roles
+                if not is_admin and not is_teacher:
                     await client.aclose()
                     raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
+                # Nicht-aktive Assistenten: nur Ersteller oder Admin darf testen
+                if assistant.status != "active" and not is_admin:
+                    if assistant.created_by != current_user.sub:
+                        await client.aclose()
+                        raise HTTPException(status_code=403, detail="Nur der Ersteller kann diesen Assistenten testen")
             elif not _is_visible_for_user(assistant, current_user.roles):
                 await client.aclose()
                 raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")

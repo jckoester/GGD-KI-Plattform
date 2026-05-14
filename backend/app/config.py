@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3
     assistant_schema_path: str = "config/assistant_schema.json"
+    teacher_schoolwide_sharing_requires_admin: bool = True
 
 
 settings = Settings()
