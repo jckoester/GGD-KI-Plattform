@@ -10,6 +10,8 @@
     Loader2,
     ChevronDown,
     Play,
+    Upload,
+    X,
   } from "lucide-svelte";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
   import SuccessBanner from "$lib/components/SuccessBanner.svelte";
@@ -17,6 +19,8 @@
     getMyAssistants,
     deleteMyAssistant,
     submitMyAssistant,
+    importAssistant,
+    getModels,
     ApiError,
   } from "$lib/api.js";
 
@@ -51,6 +55,14 @@
   let submitTarget = $state(null);
   let submitLoading = $state(false);
 
+  // Import
+  let importOpen = $state(false);
+  let importFile = $state(null);
+  let importModelOverride = $state("");
+  let importingFile = $state(false);
+  let importError = $state(null);
+  let availableModels = $state([]);
+
   // ── Ladefunktion ───────────────────────────────────────────────────────────
   async function load() {
     loading = true;
@@ -66,7 +78,53 @@
     }
   }
 
-  onMount(load);
+  onMount(async () => {
+    const [, models] = await Promise.allSettled([load(), getModels()]);
+    if (models.status === "fulfilled") {
+      availableModels = models.value.models?.map((m) => m.id) ?? [];
+    }
+  });
+
+  // ── Import ────────────────────────────────────────────────────────────────
+  function openImport() {
+    importOpen = true;
+    importFile = null;
+    importModelOverride = "";
+    importError = null;
+  }
+
+  function closeImport() {
+    importOpen = false;
+    importError = null;
+  }
+
+  async function doImport() {
+    if (!importFile) return;
+    importingFile = true;
+    importError = null;
+    try {
+      const result = await importAssistant(importFile, importModelOverride || null);
+      importOpen = false;
+      success = "Assistent wurde importiert.";
+      await load();
+      goto(`/assistants/my/${result.id}`);
+    } catch (e) {
+      importError = e.message;
+    } finally {
+      importingFile = false;
+    }
+  }
+
+  function handleFileDrop(event) {
+    event.preventDefault();
+    const files = event.dataTransfer?.files;
+    if (files?.length > 0) importFile = files[0];
+  }
+
+  function handleFileSelect(event) {
+    const files = event.target.files;
+    if (files?.length > 0) importFile = files[0];
+  }
 
   // ── Einreichen ─────────────────────────────────────────────────────────────
   async function confirmSubmit() {
@@ -135,15 +193,27 @@
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">
       Meine Assistenten
     </h1>
-    <button
-      onclick={() => goto("/assistants/my/neu")}
-      class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
-             bg-primary dark:bg-primary-dark text-white
-             hover:opacity-90 transition-opacity"
-    >
-      <Plus size={16} />
-      Neuer Assistent
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        onclick={openImport}
+        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
+               border border-light-ui-3 dark:border-dark-ui-3
+               text-light-tx dark:text-dark-tx
+               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+      >
+        <Upload size={16} />
+        Importieren
+      </button>
+      <button
+        onclick={() => goto("/assistants/my/neu")}
+        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
+               bg-primary dark:bg-primary-dark text-white
+               hover:opacity-90 transition-opacity"
+      >
+        <Plus size={16} />
+        Neuer Assistent
+      </button>
+    </div>
   </div>
 
   <!-- Error & Success -->
@@ -422,3 +492,93 @@
     </div>
   {/if}
 </div>
+
+<!-- Import-Dialog -->
+{#if importOpen}
+  <div class="fixed inset-0 bg-black/50 z-40" onclick={closeImport}></div>
+  <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96
+              bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx">
+        Assistenten importieren
+      </h2>
+      <button onclick={closeImport} class="p-1 rounded-lg hover:bg-light-ui-2 dark:hover:bg-dark-ui-2">
+        <X size={20} class="text-light-tx-2 dark:text-dark-tx-2" />
+      </button>
+    </div>
+
+    {#if importError}
+      <div class="mb-4">
+        <ErrorBanner message={importError} />
+      </div>
+    {/if}
+
+    <div
+      class="border-2 border-dashed rounded-xl p-8 text-center mb-4 transition-colors
+             {importFile
+               ? 'border-light-gr dark:border-dark-gr bg-light-gr/10 dark:bg-dark-gr/10'
+               : 'border-light-ui-3 dark:border-dark-ui-3'}"
+      ondragenter={(e) => e.preventDefault()}
+      ondragover={(e) => e.preventDefault()}
+      ondrop={handleFileDrop}
+    >
+      <input type="file" accept=".yaml,.yml" onchange={handleFileSelect}
+             class="hidden" id="my-import-file-input" />
+      <label for="my-import-file-input" class="cursor-pointer">
+        <Upload size={48} class="mx-auto text-light-tx-2 dark:text-dark-tx-2 mb-2" />
+        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+          Datei auswählen oder hier ablegen
+        </p>
+        <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-1">
+          {importFile?.name || "Keine Datei ausgewählt (.yaml)"}
+        </p>
+      </label>
+    </div>
+
+    {#if availableModels.length > 0}
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+          Modell überschreiben (optional)
+        </label>
+        <select
+          bind:value={importModelOverride}
+          class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                 bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                 px-3 py-2 text-sm"
+        >
+          <option value="">Modell aus Datei übernehmen</option>
+          {#each availableModels as m}
+            <option value={m}>{m}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+
+    <div class="flex justify-end gap-2">
+      <button
+        onclick={closeImport}
+        disabled={importingFile}
+        class="px-4 py-2 rounded-md text-sm font-medium
+               bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx dark:text-dark-tx
+               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3 transition-colors disabled:opacity-50"
+      >
+        Abbrechen
+      </button>
+      <button
+        onclick={doImport}
+        disabled={importingFile || !importFile}
+        class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+               bg-primary dark:bg-primary-dark text-white
+               hover:opacity-90 transition-opacity disabled:opacity-50"
+      >
+        {#if importingFile}
+          <Loader2 size={16} class="animate-spin" />
+          Wird importiert…
+        {:else}
+          <Upload size={16} />
+          Importieren
+        {/if}
+      </button>
+    </div>
+  </div>
+{/if}
