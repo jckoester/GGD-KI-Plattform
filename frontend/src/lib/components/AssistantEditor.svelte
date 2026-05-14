@@ -257,12 +257,24 @@
             }
             groups = myGroups ?? [];
 
-            // 4. Assistenten-Daten laden (wenn nicht neu)
+            // 4. Assistenten-Daten laden (wenn nicht neu, oder Vorlage duplizieren)
             if (!isNew) {
                 const a = await getMyAssistant(assistantId);
                 form = mapAssistantToForm(a);
             } else {
-                form = emptyForm();
+                const fromId = $page.url.searchParams.get("from");
+                if (fromId) {
+                    const template = await getMyAssistant(fromId);
+                    form = {
+                        ...mapAssistantToForm(template),
+                        name: `Kopie von ${template.name}`,
+                        status: "draft",
+                        sort_order: 0,
+                        reject_reason: null,
+                    };
+                } else {
+                    form = emptyForm();
+                }
             }
             savedForm = { ...form };
         } catch (e) {

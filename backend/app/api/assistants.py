@@ -66,6 +66,7 @@ class AssistantSummary(BaseModel):
     tags: Optional[list[str]]
     min_grade: Optional[int]
     max_grade: Optional[int]
+    created_by: Optional[str]
     model_config = ConfigDict(from_attributes=True)
 
 
