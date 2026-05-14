@@ -738,3 +738,27 @@ export async function submitMyAssistant(id) {
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json(); // TeacherAssistantResponse
 }
+
+// Admin: Assistent freigeben
+export async function approveAssistant(id) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}/approve`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // AssistantResponse
+}
+
+// Admin: Assistent ablehnen
+export async function rejectAssistant(id, reason = null) {
+  const res = await fetch(`${BASE}/admin/assistants/${id}/reject`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // AssistantResponse
+}

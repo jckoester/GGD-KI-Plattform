@@ -30,10 +30,13 @@
         deactivateAssistant,
         submitMyAssistant,
         exportAssistant,
+        approveAssistant,
+        rejectAssistant,
         streamChat,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
+    import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
     // ── Props ─────────────────────────────────────────────────────────────────
     let {
@@ -64,6 +67,12 @@
     let testError = $state(null);
     let testTextarea = $state(null);
     let testAreaRows = $state(1);
+
+    // Admin: Approve/Reject State
+    let rejectDialogOpen = $state(false);
+    let rejectReason = $state("");
+    let approving = $state(false);
+    let rejecting = $state(false);
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
     const isNew = assistantId === "neu";
@@ -342,6 +351,53 @@
         }
     }
 
+    async function approveInEditor() {
+        if (!assistantId || isNew) return;
+        approving = true;
+        error = null;
+        try {
+            await approveAssistant(assistantId);
+            form.status = "active";
+            savedForm = { ...savedForm, status: "active" };
+            success = "Assistent wurde freigegeben.";
+            await refreshPendingCount();
+        } catch (e) {
+            error = e.message ?? "Fehler beim Freigeben";
+        } finally {
+            approving = false;
+        }
+    }
+
+    async function rejectInEditor() {
+        if (!assistantId || isNew) return;
+        rejecting = true;
+        error = null;
+        try {
+            await rejectAssistant(assistantId, rejectReason || null);
+            form.status = "draft";
+            form.reject_reason = rejectReason || null;
+            savedForm = { ...savedForm, status: "draft", reject_reason: rejectReason || null };
+            success = "Assistent wurde abgelehnt.";
+            rejectDialogOpen = false;
+            rejectReason = "";
+            await refreshPendingCount();
+        } catch (e) {
+            error = e.message ?? "Fehler beim Ablehnen";
+        } finally {
+            rejecting = false;
+        }
+    }
+
+    function openRejectDialog() {
+        rejectDialogOpen = true;
+        rejectReason = "";
+    }
+
+    function closeRejectDialog() {
+        rejectDialogOpen = false;
+        rejectReason = "";
+    }
+
     async function toggleActivate() {
         if (!assistantId || isNew) return;
         saving = true;
@@ -503,32 +559,62 @@
             {#if isAdmin}
                 <!-- Admin: Speichern + Aktivieren/Deaktivieren + Exportieren -->
                 {#if !isNew}
-                    <button
-                        onclick={toggleActivate}
-                        disabled={saving}
-                        class="px-3 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                   text-light-tx dark:text-dark-tx
-                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    {#if form.status === "pending_review"}
+                        <!-- Admin bei pending_review: Freigeben/Ablehnen -->
+                        <button
+                            onclick={approveInEditor}
+                            disabled={saving || approving}
+                            class="px-3 py-1.5 text-sm rounded-lg bg-light-gr/10 dark:bg-dark-gr/10 text-light-gr dark:text-dark-gr
+                   hover:bg-light-gr/20 dark:hover:bg-dark-gr/20 transition-colors
                    flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                        {#if form.status === "active"}
-                            <EyeOff class="w-4 h-4" />
-                            Deaktivieren
-                        {:else}
-                            <Eye class="w-4 h-4" />
-                            Aktivieren
-                        {/if}
-                    </button>
-                    <button
-                        onclick={doExport}
-                        disabled={saving}
-                        class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
-                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50
-                   flex items-center gap-1.5 text-sm"
-                    >
-                        <Download class="w-4 h-4" />
-                        Exportieren
-                    </button>
+                        >
+                            {#if approving}
+                                <Loader2 class="w-4 h-4 animate-spin" />
+                                Freigeben...
+                            {:else}
+                                <Check class="w-4 h-4" />
+                                Freigeben
+                            {/if}
+                        </button>
+                        <button
+                            onclick={openRejectDialog}
+                            disabled={saving}
+                            class="px-3 py-1.5 text-sm rounded-lg bg-light-re/10 dark:bg-dark-re/10 text-light-re dark:text-dark-re
+                   hover:bg-light-re/20 dark:hover:bg-dark-re/20 transition-colors
+                   flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                            <X class="w-4 h-4" />
+                            Ablehnen
+                        </button>
+                    {:else}
+                        <!-- Admin bei anderen Status: Aktivieren/Deaktivieren -->
+                        <button
+                            onclick={toggleActivate}
+                            disabled={saving}
+                            class="px-3 py-1.5 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                            {#if form.status === "active"}
+                                <EyeOff class="w-4 h-4" />
+                                Deaktivieren
+                            {:else}
+                                <Eye class="w-4 h-4" />
+                                Aktivieren
+                            {/if}
+                        </button>
+                        <button
+                            onclick={doExport}
+                            disabled={saving}
+                            class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50
+                       flex items-center gap-1.5 text-sm"
+                        >
+                            <Download class="w-4 h-4" />
+                            Exportieren
+                        </button>
+                    {/if}
                 {/if}
             {/if}
 
@@ -1084,3 +1170,63 @@
         </div>
     </div>
 </div>
+
+<!-- Ablehnen-Dialog (Modal) - nur Admin, nur bei pending_review -->
+{#if isAdmin && !isNew && form.status === "pending_review" && rejectDialogOpen}
+    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeRejectDialog} />
+    <div
+        class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
+    >
+        <div class="flex items-start gap-3 mb-4">
+            <AlertCircle
+                class="w-5 h-5 text-light-ye dark:text-dark-ye shrink-0 mt-0.5"
+            />
+            <div>
+                <h2
+                    class="text-lg font-semibold text-light-tx dark:text-dark-tx"
+                >
+                    Einreichung ablehnen
+                </h2>
+                <p class="text-sm text-light-tx-3 dark:text-dark-tx-3 mt-1">
+                    Begründung (optional) — wird der Lehrkraft im Editor angezeigt.
+                </p>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <textarea
+                bind:value={rejectReason}
+                placeholder="Begründung für die Ablehnung (optional)"
+                rows="3"
+                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 resize-none"
+            ></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2">
+            <button
+                onclick={closeRejectDialog}
+                disabled={rejecting}
+                class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50"
+            >
+                Abbrechen
+            </button>
+            <button
+                onclick={rejectInEditor}
+                disabled={rejecting}
+                class="px-4 py-2 bg-light-re dark:bg-dark-re text-white rounded-lg
+                       hover:bg-light-re-2 dark:hover:bg-dark-re-2 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+                {#if rejecting}
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                    Wird abgelehnt...
+                {:else}
+                    <X class="w-4 h-4" />
+                    Ablehnen
+                {/if}
+            </button>
+        </div>
+    </div>
+{/if}

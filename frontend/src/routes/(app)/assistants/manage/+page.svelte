@@ -12,16 +12,20 @@
         Check,
         Loader2,
         AlertCircle,
+        Eye,
     } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import {
         getAdminAssistants,
         deleteAssistant,
         exportAssistant,
         importAssistant,
         getModels,
+        approveAssistant,
+        rejectAssistant,
         ApiError,
     } from "$lib/api.js";
 
@@ -52,6 +56,16 @@
     // Success Banner
     let successMessage = $state(null);
 
+    // Pending Queue
+    let pendingItems = $state([]);
+    let loadingPending = $state(false);
+
+    // Reject Modal
+    let rejectTarget = $state(null);
+    let rejectReason = $state("");
+    let rejecting = $state(false);
+    let rejectError = $state(null);
+
     // Übersetzungen für UI
     const AUDIENCE_LABELS = {
         student: "Schüler:innen",
@@ -68,12 +82,14 @@
     // Status-Badge-Farben
     const STATUS_CLASS = {
         draft: "bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2",
+        pending_review: "bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye",
         active: "bg-light-gr/20 dark:bg-dark-gr/20 text-light-gr dark:text-dark-gr",
-        disabled: "bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye",
+        disabled: "bg-light-re/20 dark:bg-dark-re/20 text-light-re dark:text-dark-re",
         archived: "bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2",
     };
     const STATUS_LABEL = {
         draft: "Entwurf",
+        pending_review: "In Prüfung",
         active: "Aktiv",
         disabled: "Deaktiviert",
         archived: "Archiviert",
@@ -94,6 +110,55 @@
             error = e.message;
         } finally {
             loading = false;
+        }
+    }
+
+    async function loadPending() {
+        loadingPending = true;
+        try {
+            const result = await getAdminAssistants({ status: 'pending_review', limit: 100 });
+            pendingItems = result.items;
+        } catch (e) {
+            // Fehler ignorieren - Pending-Queue ist optional
+        } finally {
+            loadingPending = false;
+        }
+    }
+
+    async function doApprove(assistant) {
+        try {
+            await approveAssistant(assistant.id);
+            successMessage = `"${assistant.name}" wurde freigegeben.`;
+            await Promise.all([reload(), loadPending(), refreshPendingCount()]);
+        } catch (e) {
+            error = e.message;
+        }
+    }
+
+    function openReject(assistant) {
+        rejectTarget = assistant;
+        rejectReason = "";
+        rejectError = null;
+    }
+
+    function closeReject() {
+        rejectTarget = null;
+        rejectReason = "";
+        rejectError = null;
+    }
+
+    async function confirmReject() {
+        if (!rejectTarget) return;
+        rejecting = true;
+        try {
+            await rejectAssistant(rejectTarget.id, rejectReason || null);
+            successMessage = `"${rejectTarget.name}" wurde abgelehnt.`;
+            closeReject();
+            await Promise.all([reload(), loadPending(), refreshPendingCount()]);
+        } catch (e) {
+            rejectError = e.message;
+        } finally {
+            rejecting = false;
         }
     }
 
@@ -134,10 +199,22 @@
     function getActions(assistant) {
         const actions = [];
         actions.push({
-            label: "Edit",
+            label: "Bearbeiten",
             action: () => goto(`/assistants/manage/${assistant.id}`),
             icon: Pencil,
         });
+        if (assistant.status === "pending_review") {
+            actions.push({
+                label: "Freigeben",
+                action: () => doApprove(assistant),
+                icon: Check,
+            });
+            actions.push({
+                label: "Ablehnen",
+                action: () => openReject(assistant),
+                icon: X,
+            });
+        }
         actions.push({
             label: "Exportieren",
             action: () => doExport(assistant),
@@ -199,7 +276,11 @@
 
     // Lebenszyklus
     onMount(async () => {
-        const [, models] = await Promise.allSettled([reload(), getModels()]);
+        const [, , models] = await Promise.allSettled([
+            reload(),
+            loadPending(),
+            getModels(),
+        ]);
         if (models.status === "fulfilled") {
             availableModels = models.value.models.map((m) => m.id);
         }
@@ -249,6 +330,55 @@
         </div>
     </div>
 
+    <!-- Pending Queue (offene Freigaben) -->
+    {#if pendingItems.length > 0}
+        <div class="p-6 border-b border-light-ui-3 dark:border-dark-ui-3 bg-light-ye/5 dark:bg-dark-ye/5">
+            <h2 class="text-sm font-semibold text-light-ye dark:text-dark-ye mb-3 flex items-center gap-2">
+                <AlertCircle class="w-4 h-4" />
+                Offene Freigaben ({pendingItems.length})
+            </h2>
+            <div class="space-y-2">
+                {#each pendingItems as item}
+                    <div class="flex items-center justify-between p-3 rounded-lg
+                        bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3">
+                        <div class="flex-1 min-w-0 mr-4">
+                            <span class="font-medium text-light-tx dark:text-dark-tx">{item.name}</span>
+                            {#if item.description}
+                                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate">{item.description}</p>
+                            {/if}
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button
+                                onclick={() => goto(`/assistants/manage/${item.id}`)}
+                                title="Ansehen"
+                                class="p-1.5 rounded-md hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                                     text-light-tx-2 dark:text-dark-tx-2 transition-colors"
+                            >
+                                <Eye class="w-4 h-4" />
+                            </button>
+                            <button
+                                onclick={() => doApprove(item)}
+                                title="Freigeben"
+                                class="p-1.5 rounded-md hover:bg-light-gr/10 dark:hover:bg-dark-gr/10
+                                     text-light-gr dark:text-dark-gr transition-colors"
+                            >
+                                <Check class="w-4 h-4" />
+                            </button>
+                            <button
+                                onclick={() => openReject(item)}
+                                title="Ablehnen"
+                                class="p-1.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
+                                     text-light-re dark:text-dark-re transition-colors"
+                            >
+                                <X class="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        </div>
+    {/if}
+
     <!-- Filterzeile -->
     <div class="p-6 border-b border-light-ui-3 dark:border-dark-ui-3">
         <div class="flex flex-wrap items-center gap-4">
@@ -262,6 +392,7 @@
                 >
                     <option value="">Alle</option>
                     <option value="draft">Entwurf</option>
+                    <option value="pending_review">In Prüfung</option>
                     <option value="active">Aktiv</option>
                     <option value="disabled">Deaktiviert</option>
                     <option value="archived">Archiviert</option>
@@ -541,6 +672,75 @@
                 {:else}
                     <Trash2 class="w-4 h-4" />
                     Löschen
+                {/if}
+            </button>
+        </div>
+    </div>
+{/if}
+
+<!-- Ablehnen-Bestätigung (Modal) -->
+{#if rejectTarget}
+    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeReject} />
+    <div
+        class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
+    >
+        <div class="flex items-start gap-3 mb-4">
+            <AlertCircle
+                class="w-5 h-5 text-light-ye dark:text-dark-ye shrink-0 mt-0.5"
+            />
+            <div>
+                <h2
+                    class="text-lg font-semibold text-light-tx dark:text-dark-tx"
+                >
+                    Einreichung ablehnen
+                </h2>
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                    Möchten Sie die Einreichung "{rejectTarget.name}" wirklich ablehnen?
+                </p>
+                <p class="text-sm text-light-tx-3 dark:text-dark-tx-3 mt-1">
+                    Begründung (optional) — wird der Lehrkraft im Editor angezeigt.
+                </p>
+            </div>
+        </div>
+
+        {#if rejectError}
+            <div class="mb-4">
+                <ErrorBanner message={rejectError} />
+            </div>
+        {/if}
+
+        <div class="mb-4">
+            <textarea
+                bind:value={rejectReason}
+                placeholder="Begründung für die Ablehnung (optional)"
+                rows="3"
+                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       px-3 py-2 resize-none"
+            ></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2">
+            <button
+                onclick={closeReject}
+                disabled={rejecting}
+                class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50"
+            >
+                Abbrechen
+            </button>
+            <button
+                onclick={confirmReject}
+                disabled={rejecting}
+                class="px-4 py-2 bg-light-re dark:bg-dark-re text-white rounded-lg
+                       hover:bg-light-re-2 dark:hover:bg-dark-re-2 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+                {#if rejecting}
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                    Wird abgelehnt...
+                {:else}
+                    <X class="w-4 h-4" />
+                    Ablehnen
                 {/if}
             </button>
         </div>

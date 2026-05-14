@@ -26,6 +26,7 @@
     import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js"
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
+    import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js"
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
@@ -216,7 +217,7 @@
                     </button>
                     {#if $user?.roles.includes('admin')}
                         <button
-                            onclick={() => goto('/assistants/manage')}
+                            onclick={() => { goto('/assistants/manage'); refreshPendingCount(); }}
                             class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                                    {$page.url.pathname === '/assistants/manage'
@@ -225,6 +226,12 @@
                             <span class="flex items-center gap-2">
                                 <Settings class="w-4 h-4" />
                                 Verwalten
+                                {#if $pendingCount > 0}
+                                    <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
+                                        {$pendingCount}
+                                    </span>
+                                {/if}
                             </span>
                         </button>
                     {/if}
