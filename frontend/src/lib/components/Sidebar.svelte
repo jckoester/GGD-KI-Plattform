@@ -13,6 +13,7 @@
         Bot,
         Settings,
         BookOpen,
+        Pencil,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -189,7 +190,7 @@
                         Assistenten
                     </span>
                 </button>
-                {#if $user?.roles.includes('admin')}
+                {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
                     <button onclick={() => toggle('assistants')}>
                         {#if openSection === 'assistants'}
                             <ChevronDown class="w-4 h-4" />
@@ -199,20 +200,34 @@
                     </button>
                 {/if}
             </div>
-            {#if openSection === 'assistants' && $user?.roles.includes('admin')}
+            {#if openSection === 'assistants' && ($user?.roles.includes('teacher') || $user?.roles.includes('admin'))}
                 <div class="mt-1 space-y-1 pl-2">
                     <button
-                        onclick={() => goto('/assistants/manage')}
+                        onclick={() => goto('/assistants/my')}
                         class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/assistants/manage'
+                               {$page.url.pathname.startsWith('/assistants/my')
                                     ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
                     >
                         <span class="flex items-center gap-2">
-                            <Settings class="w-4 h-4" />
-                            Verwalten
+                            <Pencil class="w-4 h-4" />
+                            Meine Assistenten
                         </span>
                     </button>
+                    {#if $user?.roles.includes('admin')}
+                        <button
+                            onclick={() => goto('/assistants/manage')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/assistants/manage'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <Settings class="w-4 h-4" />
+                                Verwalten
+                            </span>
+                        </button>
+                    {/if}
                 </div>
             {/if}
         </div>

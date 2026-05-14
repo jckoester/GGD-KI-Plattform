@@ -643,3 +643,57 @@ export async function removeExclusion(classGroupId, subjectId) {
   );
   if (!res.ok) throw new Error(await res.text());
 }
+
+// ── Teacher: Eigene Assistenten ──────────────────────────────────────────────
+
+export async function getMyAssistants(params = {}) {
+  const url = new URL(`${BASE}/assistants/mine`, location.href);
+  Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { items: TeacherAssistantResponse[], total: int }
+}
+
+export async function createMyAssistant(data) {
+  const res = await fetch(`${BASE}/assistants`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // TeacherAssistantResponse
+}
+
+export async function updateMyAssistant(id, data) {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // TeacherAssistantResponse
+}
+
+export async function deleteMyAssistant(id) {
+  const res = await fetch(`${BASE}/assistants/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+}
+
+export async function submitMyAssistant(id) {
+  const res = await fetch(`${BASE}/assistants/${id}/submit`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // TeacherAssistantResponse
+}
