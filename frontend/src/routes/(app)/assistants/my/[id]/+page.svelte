@@ -235,8 +235,7 @@
     } else {
       await load();
     }
-    chatMessages = [];
-    chatError = null;
+    resetTestChat();
     error = null;
   }
 

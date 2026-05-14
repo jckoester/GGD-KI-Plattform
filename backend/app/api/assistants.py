@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api._assistant_validation import validate_assistant_fields
 from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
 from app.db.models import Assistant
@@ -122,61 +123,6 @@ class TeacherAssistantListResponse(BaseModel):
     total: int
 
 
-# ── Validation ──────────────────────────────────────────────────────────────
-
-_VALID_AUDIENCES = {"student", "teacher", "all"}
-_VALID_SCOPES = {
-    "private", "subject_department", "teachers", "activity_group",
-    "teaching_group", "grade", "all_students", "all",
-}
-_GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
-
-
-def _validate_teacher_fields(
-    name: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    audience: Optional[str] = None,
-    scope: Optional[str] = None,
-    scope_group_id: Optional[int] = None,
-    min_grade: Optional[int] = None,
-    max_grade: Optional[int] = None,
-    available_from: Optional[datetime] = None,
-    available_until: Optional[datetime] = None,
-) -> None:
-    """Validiert Business-Regeln für Lehrkraft-Assistenten. Wirft HTTPException(422)."""
-    if name is not None and not name.strip():
-        raise HTTPException(status_code=422, detail="name darf nicht leer sein")
-    if system_prompt is not None and not system_prompt.strip():
-        raise HTTPException(status_code=422, detail="system_prompt darf nicht leer sein")
-    if audience is not None and audience not in _VALID_AUDIENCES:
-        raise HTTPException(status_code=422, detail="Ungültiger audience-Wert")
-    if scope is not None and scope not in _VALID_SCOPES:
-        raise HTTPException(status_code=422, detail="Ungültiger scope-Wert")
-    if scope is not None and scope in _GROUP_SCOPES and scope_group_id is None:
-        raise HTTPException(
-            status_code=422, detail="Gruppen-Scope erfordert eine scope_group_id"
-        )
-    if scope is not None and scope not in _GROUP_SCOPES and scope_group_id is not None:
-        raise HTTPException(
-            status_code=422, detail="scope_group_id darf nur bei Gruppen-Scopes gesetzt sein"
-        )
-    if audience == "teacher" and scope in {"all_students", "all"}:
-        raise HTTPException(
-            status_code=422,
-            detail="teacher-Assistenten dürfen nicht für Schüler:innen sichtbar sein",
-        )
-    if available_from is not None and available_until is not None:
-        if available_from >= available_until:
-            raise HTTPException(
-                status_code=422, detail="available_from muss vor available_until liegen"
-            )
-    if min_grade is not None and max_grade is not None:
-        if min_grade > max_grade:
-            raise HTTPException(
-                status_code=422, detail="min_grade darf nicht größer als max_grade sein"
-            )
-
-
 router = APIRouter(prefix="/assistants", tags=["assistants"])
 
 
@@ -249,7 +195,7 @@ async def create_my_assistant(
     db: AsyncSession = Depends(get_db),
 ) -> TeacherAssistantResponse:
     """Erstellt einen neuen Assistenten im Entwurfsstatus."""
-    _validate_teacher_fields(
+    validate_assistant_fields(
         name=request.name,
         system_prompt=request.system_prompt,
         audience=request.audience,
@@ -313,7 +259,7 @@ async def update_my_assistant(
         )
 
     update_data = request.model_dump(exclude_unset=True)
-    _validate_teacher_fields(**{k: update_data.get(k) for k in (
+    validate_assistant_fields(**{k: update_data.get(k) for k in (
         "name", "system_prompt", "audience", "scope", "scope_group_id",
         "min_grade", "max_grade", "available_from", "available_until",
     )})
