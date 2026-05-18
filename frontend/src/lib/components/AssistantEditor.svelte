@@ -90,6 +90,26 @@
 
     let totalTokens = $derived(documents.reduce((sum, d) => sum + d.token_estimate, 0));
 
+    // Verfügbarkeits-Zusammenfassung
+    function formatAvailDate(dateStr) {
+        if (!dateStr) return null;
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day).toLocaleDateString("de-DE", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    }
+
+    let availabilitySummary = $derived((() => {
+        const from = form.available_from;
+        const until = form.available_until;
+        if (!from && !until) return "Zeitlich unbegrenzt";
+        if (from && !until) return `Ab ${formatAvailDate(from)} verfügbar`;
+        if (!from && until) return `Verfügbar bis ${formatAvailDate(until)}`;
+        return `Aktiv vom ${formatAvailDate(from)} bis ${formatAvailDate(until)}`;
+    })());
+
     // Dokumente laden wenn Assistent bekannt (nicht neu)
     async function loadDocuments() {
       if (!form.id) return;
@@ -1204,6 +1224,15 @@
                             />
                         </div>
                     </div>
+
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1.5">
+                        {#if form.available_from || form.available_until}
+                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-light-gr dark:bg-dark-gr shrink-0"></span>
+                        {:else}
+                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-light-ui-3 dark:bg-dark-ui-3 shrink-0"></span>
+                        {/if}
+                        {availabilitySummary}
+                    </p>
 
                     <!-- Admin-only: Sortier-Reihenfolge -->
                     {#if isAdmin}
