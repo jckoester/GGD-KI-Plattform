@@ -485,6 +485,39 @@ export async function getMyAssistant(id) {
   return res.json(); // AssistantResponse
 }
 
+// ── Dokument-API ──────────────────────────────────────────────────────────────
+
+export async function uploadAssistantDocument(assistantId, file) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/assistants/${assistantId}/documents`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // DocumentUploadResponse
+}
+
+export async function getAssistantDocuments(assistantId) {
+  const res = await fetch(`${BASE}/assistants/${assistantId}/documents`, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // AssistantDocumentOut[]
+}
+
+export async function deleteAssistantDocument(assistantId, docId) {
+  const res = await fetch(`${BASE}/assistants/${assistantId}/documents/${docId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+}
+
 // Liste (mit optionalen Filtern) - Admin-only
 export async function getAdminAssistants(params = {}) {
   const url = new URL(`${BASE}/admin/assistants`, location.href);

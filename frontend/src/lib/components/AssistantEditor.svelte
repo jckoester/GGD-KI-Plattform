@@ -14,6 +14,8 @@
         Eye,
         EyeOff,
         Download,
+        Upload,
+        Trash2,
     } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
@@ -33,6 +35,9 @@
         approveAssistant,
         rejectAssistant,
         streamChat,
+        getAssistantDocuments,
+        uploadAssistantDocument,
+        deleteAssistantDocument,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
@@ -73,6 +78,65 @@
     let rejectReason = $state("");
     let approving = $state(false);
     let rejecting = $state(false);
+
+    // Dokument-State
+    let documents = $state([]);
+    let docUploading = $state(false);
+    let docError = $state(null);
+
+    const MAX_DOCS = 3;
+    const MAX_TOTAL_TOKENS = 15_000;
+    const WARN_TOKENS = 10_000;
+
+    let totalTokens = $derived(documents.reduce((sum, d) => sum + d.token_estimate, 0));
+
+    // Dokumente laden wenn Assistent bekannt (nicht neu)
+    async function loadDocuments() {
+      if (!form.id) return;
+      try {
+        documents = await getAssistantDocuments(form.id);
+      } catch {
+        // Fehler nicht anzeigen — UI-Einschränkung bei fehlendem Zugriff
+      }
+    }
+
+    async function handleDocUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      docError = null;
+      docUploading = true;
+      try {
+        // Neuen Assistenten automatisch speichern, bevor das erste Dokument hochgeladen wird
+        if (!form.id) {
+          if (!form.name.trim() || !form.system_prompt.trim() || !form.model) {
+            docError = "Bitte zuerst Name, System-Prompt und Modell ausfüllen.";
+            return;
+          }
+          const result = await createAssistant(buildPayload());
+          form.id = result.id;
+          savedForm = { ...form };
+          // URL aktualisieren ohne SvelteKit-Navigation (Komponente bleibt gemountet)
+          history.replaceState({}, "", `${backUrl}/${result.id}`);
+        }
+        await uploadAssistantDocument(form.id, file);
+        documents = await getAssistantDocuments(form.id);
+      } catch (e) {
+        docError = e.message ?? "Upload fehlgeschlagen.";
+      } finally {
+        docUploading = false;
+        event.target.value = "";
+      }
+    }
+
+    async function handleDocDelete(docId) {
+      docError = null;
+      try {
+        await deleteAssistantDocument(form.id, docId);
+        documents = documents.filter((d) => d.id !== docId);
+      } catch (e) {
+        docError = e.message ?? "Löschen fehlgeschlagen.";
+      }
+    }
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
     const isNew = assistantId === "neu";
@@ -177,6 +241,7 @@
 
     function mapAssistantToForm(a) {
         return {
+            id: a.id,
             name: a.name || "",
             description: a.description || "",
             subject_id: a.subject_id || null,
@@ -270,6 +335,8 @@
             if (!isNew) {
                 const a = await getMyAssistant(assistantId);
                 form = mapAssistantToForm(a);
+                // Dokumente laden für bestehenden Assistenten
+                await loadDocuments();
             } else {
                 const fromId = $page.url.searchParams.get("from");
                 if (fromId) {
@@ -974,6 +1041,99 @@
                      bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                      px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
+                    </div>
+
+                    <!-- Kontext-Dokumente -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                            Kontext-Dokumente
+                          </label>
+                          <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            {totalTokens.toLocaleString("de")} / {MAX_TOTAL_TOKENS.toLocaleString("de")} Tokens
+                          </span>
+                        </div>
+
+                        <!-- Token-Fortschrittsbalken -->
+                        <div class="h-1.5 w-full rounded-full bg-light-ui-2 dark:bg-dark-ui-2 overflow-hidden">
+                          <div
+                            class="h-full rounded-full transition-all"
+                            class:bg-light-gr={totalTokens < WARN_TOKENS}
+                            class:dark:bg-dark-gr={totalTokens < WARN_TOKENS}
+                            class:bg-light-ye={totalTokens >= WARN_TOKENS && totalTokens < MAX_TOTAL_TOKENS}
+                            class:dark:bg-dark-ye={totalTokens >= WARN_TOKENS && totalTokens < MAX_TOTAL_TOKENS}
+                            class:bg-light-re={totalTokens >= MAX_TOTAL_TOKENS}
+                            class:dark:bg-dark-re={totalTokens >= MAX_TOTAL_TOKENS}
+                            style="width: {Math.min((totalTokens / MAX_TOTAL_TOKENS) * 100, 100)}%"
+                          ></div>
+                        </div>
+
+                        <!-- Warnhinweis ab 10 000 Tokens -->
+                        {#if totalTokens >= WARN_TOKENS}
+                          <p class="text-xs text-light-ye dark:text-dark-ye">
+                            Diese Dokumente verbrauchen bei jedem Chat-Turn ca. {totalTokens.toLocaleString("de")} Tokens Kontext.
+                            Bei langen Gesprächen kann das Kontextfenster erschöpft werden.
+                          </p>
+                        {/if}
+
+                        <!-- Hochgeladene Dokumente -->
+                        {#if documents.length > 0}
+                          <ul class="space-y-1.5">
+                            {#each documents as doc (doc.id)}
+                              <li class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg
+                          bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3">
+                                <div class="flex-1 min-w-0">
+                                  <span class="text-sm text-light-tx dark:text-dark-tx truncate block">{doc.filename}</span>
+                                  <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    {(doc.size_bytes / 1024).toFixed(1)} KB · ~{doc.token_estimate.toLocaleString("de")} Tokens
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onclick={() => handleDocDelete(doc.id)}
+                                  class="p-1.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
+                         text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re
+                         transition-colors shrink-0"
+                                  title="Dokument entfernen"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </li>
+                            {/each}
+                          </ul>
+                        {/if}
+
+                        <!-- Upload-Button (ausgeblendet wenn Limit erreicht) -->
+                        {#if documents.length < MAX_DOCS}
+                          <label class="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed
+                         border-light-ui-3 dark:border-dark-ui-3 cursor-pointer
+                         hover:border-primary dark:hover:border-primary-dark
+                         text-sm text-light-tx-2 dark:text-dark-tx-2 transition-colors
+                         {docUploading ? 'opacity-50 pointer-events-none' : ''}">
+                            <Upload size={14} />
+                            {#if docUploading}
+                              Wird hochgeladen…
+                            {:else}
+                              PDF, TXT oder Markdown hochladen (max. 2 MB)
+                            {/if}
+                            <input
+                              type="file"
+                              accept=".pdf,.txt,.md"
+                              class="sr-only"
+                              onchange={handleDocUpload}
+                              disabled={docUploading}
+                            />
+                          </label>
+                        {:else}
+                          <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Maximal {MAX_DOCS} Dokumente erreicht.
+                          </p>
+                        {/if}
+
+                        <!-- Fehlermeldung -->
+                        {#if docError}
+                          <p class="text-sm text-light-re dark:text-dark-re">{docError}</p>
+                        {/if}
                     </div>
 
                     <!-- Verfügbarkeit -->

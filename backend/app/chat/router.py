@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.litellm.client import LiteLLMClient
@@ -340,7 +340,31 @@ async def chat(
         model_used = existing.model_used
         system_prompt_snapshot = existing.system_prompt_snapshot
 
+    # Dokumente für den Assistenten laden (falls vorhanden)
+    assistant_id_for_docs: int | None = None
+    if is_new and request.assistant_id is not None:
+        assistant_id_for_docs = request.assistant_id
+    elif not is_new and existing.assistant_id is not None:
+        assistant_id_for_docs = existing.assistant_id
+
     llm_messages: list[dict] = []
+    if assistant_id_for_docs is not None:
+        docs_result = await db.execute(
+            select(AssistantDocument)
+            .where(AssistantDocument.assistant_id == assistant_id_for_docs)
+            .order_by(AssistantDocument.created_at)
+        )
+        docs = docs_result.scalars().all()
+        if docs:
+            parts = [
+                f"Hintergrunddokument \"{doc.filename}\":\n\n{doc.content}"
+                for doc in docs
+            ]
+            llm_messages.append({
+                "role": "system",
+                "content": "\n\n---\n\n".join(parts),
+            })
+
     if system_prompt_snapshot:
         llm_messages.append({"role": "system", "content": system_prompt_snapshot})
     llm_messages.extend(

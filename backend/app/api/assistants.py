@@ -14,8 +14,9 @@ from app.auth.dependencies import get_current_user, require_any_role
 from app.config import settings
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.db.models import Assistant, Subject
+from app.db.models import Assistant, Subject, AssistantDocument
 from app.db.session import get_db
+from app.upload.extractor import extract_pdf, extract_plaintext
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,41 @@ class AssistantSummary(BaseModel):
 
 class AssistantListResponse(BaseModel):
     items: list[AssistantSummary]
+
+
+# ── Dokument-Schemas ────────────────────────────────────────────────────────
+
+class AssistantDocumentOut(BaseModel):
+    id: int
+    filename: str
+    mime_type: str
+    size_bytes: int
+    token_estimate: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentUploadResponse(BaseModel):
+    id: int
+    filename: str
+    size_bytes: int
+    token_estimate: int
+    total_tokens: int
+    document_count: int
+
+
+# ── Hilfsfunktion für Dokument-Konvertierung ────────────────────────────────
+
+def _doc_to_out(doc: AssistantDocument) -> AssistantDocumentOut:
+    return AssistantDocumentOut(
+        id=doc.id,
+        filename=doc.filename,
+        mime_type=doc.mime_type,
+        size_bytes=doc.size_bytes,
+        token_estimate=len(doc.content) // 4,
+        created_at=doc.created_at,
+    )
 
 
 # ── Konsolidierte Schemas (ersetzt TeacherAssistant* und Admin Assistant*) ───
@@ -143,6 +179,7 @@ class AssistantResponse(BaseModel):
     updated_by_pseudonym: Optional[str]
     created_at: datetime
     updated_at: datetime
+    documents: list[AssistantDocumentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -314,6 +351,19 @@ def validate_assistant_fields(
 
 # ── Permission Helpers ───────────────────────────────────────────────────────
 
+async def _load_and_authorize_assistant(assistant_id: int, current_user: JwtPayload, db: AsyncSession) -> Assistant:
+    """Lädt einen Assistenten und prüft die Berechtigung. Wirft 404 oder 403."""
+    result = await db.execute(select(Assistant).where(Assistant.id == assistant_id))
+    assistant = result.scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+    
+    is_admin = "admin" in current_user.roles
+    if not is_admin and assistant.created_by != current_user.sub:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    return assistant
+
+
 def _check_assistant_access(assistant: Assistant, current_user: JwtPayload, is_admin: bool) -> None:
     """Prueft Zugriffsrechte auf einen Assistenten."""
     if not is_admin and assistant.created_by != current_user.sub:
@@ -441,7 +491,17 @@ async def get_assistant(
     is_admin = "admin" in current_user.roles
     _check_assistant_access(assistant, current_user, is_admin)
 
-    return AssistantResponse.model_validate(assistant)
+    # Dokumente für den Assistenten laden
+    docs = (
+        await db.execute(
+            select(AssistantDocument)
+            .where(AssistantDocument.assistant_id == assistant_id)
+            .order_by(AssistantDocument.created_at)
+        )
+    ).scalars().all()
+
+    response = AssistantResponse.model_validate(assistant)
+    return response.model_copy(update={"documents": [_doc_to_out(d) for d in docs]})
 
 
 @router.post("", response_model=AssistantResponse, status_code=201)
@@ -591,6 +651,135 @@ async def submit_assistant(
     await db.commit()
     await db.refresh(assistant)
     return AssistantResponse.model_validate(assistant)
+
+
+# ── Dokument-Endpunkte ──────────────────────────────────────────────────────
+
+MAX_DOCS = 3
+MAX_TOTAL_TOKENS = 15_000
+MAX_FILE_BYTES = 2 * 1024 * 1024  # 2 MB
+ALLOWED_MIME = {"application/pdf", "text/plain", "text/markdown"}
+
+
+@router.post("/{assistant_id}/documents", response_model=DocumentUploadResponse, status_code=201)
+async def upload_assistant_document(
+    assistant_id: int,
+    file: UploadFile = File(...),
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentUploadResponse:
+    """Lädt ein Kontext-Dokument für einen Assistenten hoch."""
+    # 1. Assistent laden + Besitzprüfung
+    assistant = await _load_and_authorize_assistant(assistant_id, current_user, db)
+    
+    # 2. Datei-Validierung
+    data = await file.read()
+    if len(data) > MAX_FILE_BYTES:
+        raise HTTPException(422, "Datei überschreitet das Maximum von 2 MB.")
+    mime = file.content_type or ""
+    if mime not in ALLOWED_MIME:
+        # Fallback: Endung prüfen
+        name = (file.filename or "").lower()
+        if name.endswith(".pdf"):
+            mime = "application/pdf"
+        elif name.endswith(".md"):
+            mime = "text/markdown"
+        elif name.endswith(".txt"):
+            mime = "text/plain"
+        else:
+            raise HTTPException(422, "Nur PDF, TXT und Markdown (MD) sind erlaubt.")
+    
+    # 3. Klartext extrahieren
+    try:
+        if mime == "application/pdf":
+            text = extract_pdf(data)
+        else:
+            text = extract_plaintext(data)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    
+    # 4. Constraints prüfen
+    existing_docs = (
+        await db.execute(
+            select(AssistantDocument).where(AssistantDocument.assistant_id == assistant_id)
+        )
+    ).scalars().all()
+    
+    if len(existing_docs) >= MAX_DOCS:
+        raise HTTPException(422, f"Maximal {MAX_DOCS} Dokumente pro Assistent erlaubt.")
+    
+    existing_tokens = sum(len(d.content) // 4 for d in existing_docs)
+    new_tokens = len(text) // 4
+    if existing_tokens + new_tokens > MAX_TOTAL_TOKENS:
+        raise HTTPException(
+            422,
+            f"Dieses Dokument würde das Token-Limit überschreiten "
+            f"({existing_tokens + new_tokens} / {MAX_TOTAL_TOKENS}). "
+            "Bitte entferne ein anderes Dokument oder verwende eine kürzere Datei."
+        )
+    
+    # 5. Speichern
+    doc = AssistantDocument(
+        assistant_id=assistant_id,
+        filename=file.filename or "dokument",
+        mime_type=mime,
+        size_bytes=len(data),
+        content=text,
+    )
+    db.add(doc)
+    await db.commit()
+    await db.refresh(doc)
+    
+    total = existing_tokens + new_tokens
+    return DocumentUploadResponse(
+        id=doc.id,
+        filename=doc.filename,
+        size_bytes=doc.size_bytes,
+        token_estimate=new_tokens,
+        total_tokens=total,
+        document_count=len(existing_docs) + 1,
+    )
+
+
+@router.get("/{assistant_id}/documents", response_model=list[AssistantDocumentOut])
+async def list_assistant_documents(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> list[AssistantDocumentOut]:
+    """Listet alle Kontext-Dokumente eines Assistenten auf."""
+    await _load_and_authorize_assistant(assistant_id, current_user, db)
+    docs = (
+        await db.execute(
+            select(AssistantDocument)
+            .where(AssistantDocument.assistant_id == assistant_id)
+            .order_by(AssistantDocument.created_at)
+        )
+    ).scalars().all()
+    return [_doc_to_out(d) for d in docs]
+
+
+@router.delete("/{assistant_id}/documents/{doc_id}", status_code=204)
+async def delete_assistant_document(
+    assistant_id: int,
+    doc_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Löscht ein Kontext-Dokument eines Assistenten."""
+    await _load_and_authorize_assistant(assistant_id, current_user, db)
+    doc = (
+        await db.execute(
+            select(AssistantDocument).where(
+                AssistantDocument.id == doc_id,
+                AssistantDocument.assistant_id == assistant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if doc is None:
+        raise HTTPException(404, "Dokument nicht gefunden.")
+    await db.delete(doc)
+    await db.commit()
 
 
 @router.post("/import", response_model=AssistantResponse, status_code=201)
