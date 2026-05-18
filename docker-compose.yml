@@ -2,10 +2,10 @@ services:
 
   db:
     image: postgres:16-alpine
+    env_file: config/.env
     environment:
       POSTGRES_DB: ggd_ki
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,6 +18,9 @@ services:
   backend:
     build: ./backend
     env_file: config/.env
+    environment:
+      AUTH_CONFIG_PATH: /app/config/auth.yaml
+      BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
     volumes:
       - ./config:/app/config:ro
       - ./static:/app/static:ro
@@ -57,6 +60,9 @@ services:
   cron:
     build: ./backend
     env_file: config/.env
+    environment:
+      AUTH_CONFIG_PATH: /app/config/auth.yaml
+      BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
     volumes:
       - ./config:/app/config:ro
     depends_on:
