@@ -1,6 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
+    import yaml from 'js-yaml';
     import {
         Bot,
         Plus,
@@ -22,6 +23,7 @@
         getAdminAssistants,
         deleteAssistant,
         exportAssistant,
+        exportAllAssistants,
         importAssistant,
         getModels,
         approveAssistant,
@@ -47,6 +49,28 @@
     let importModelOverride = $state("");
     let importing = $state(false);
     let importError = $state(null);
+    let importPreview = $state(null);
+    // { name: string, system_prompt: string, model: string }
+    let importModelMismatch = $state(false);
+
+    async function parseImportPreview(file) {
+        importPreview = null;
+        importModelMismatch = false;
+        try {
+            const text = await file.text();
+            const data = yaml.load(text);
+            if (!data || typeof data !== 'object') return;
+            const name = data.metadata?.name ?? null;
+            const system_prompt = data.config?.system_prompt ?? null;
+            const model = data.config?.model ?? null;
+            importPreview = { name, system_prompt, model };
+            if (model && availableModels.length > 0) {
+                importModelMismatch = !availableModels.includes(model);
+            }
+        } catch {
+            // Parsing-Fehler werden beim eigentlichen Import behandelt
+        }
+    }
 
     // Löschen
     let deleteTarget = $state(null);
@@ -168,6 +192,14 @@
         await exportAssistant(assistant.id, `${slug}.yaml`);
     }
 
+    async function doExportAll() {
+        try {
+            await exportAllAssistants("active");
+        } catch (e) {
+            error = e.message;
+        }
+    }
+
     // Löschen-Dialog
     function openDelete(target) {
         deleteTarget = target;
@@ -236,11 +268,15 @@
         importFile = null;
         importModelOverride = "";
         importError = null;
+        importPreview = null;
+        importModelMismatch = false;
     }
 
     function closeImport() {
         importOpen = false;
         importError = null;
+        importPreview = null;
+        importModelMismatch = false;
     }
 
     async function doImport() {
@@ -259,18 +295,20 @@
         }
     }
 
-    function handleFileDrop(event) {
+    async function handleFileDrop(event) {
         event.preventDefault();
         const files = event.dataTransfer?.files;
         if (files && files.length > 0) {
             importFile = files[0];
+            await parseImportPreview(importFile);
         }
     }
 
-    function handleFileSelect(event) {
+    async function handleFileSelect(event) {
         const files = event.target.files;
         if (files && files.length > 0) {
             importFile = files[0];
+            await parseImportPreview(importFile);
         }
     }
 
@@ -311,6 +349,14 @@
             </h1>
         </div>
         <div class="flex items-center gap-2">
+            <button
+                onclick={doExportAll}
+                class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors flex items-center gap-2"
+            >
+                <Download class="w-4 h-4" />
+                Alle exportieren
+            </button>
             <button
                 onclick={openImport}
                 class="px-4 py-2 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
@@ -579,20 +625,51 @@
             </label>
         </div>
 
+        <!-- Vorschau-Block -->
+        {#if importPreview}
+            <div class="mb-4 p-3 rounded-lg bg-light-bg-2 dark:bg-dark-bg-2
+                        border border-light-ui-3 dark:border-dark-ui-3 space-y-2">
+                {#if importPreview.name}
+                    <p class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                        {importPreview.name}
+                    </p>
+                {/if}
+                {#if importPreview.model}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        Modell: <span class="font-mono">{importPreview.model}</span>
+                    </p>
+                {/if}
+                {#if importModelMismatch}
+                    <p class="text-xs text-light-ye dark:text-dark-ye flex items-center gap-1">
+                        <AlertCircle class="w-3 h-3 shrink-0" />
+                        Dieses Modell ist nicht freigeschaltet — bitte unten überschreiben.
+                    </p>
+                {/if}
+                {#if importPreview.system_prompt}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 line-clamp-3 whitespace-pre-wrap">
+                        {importPreview.system_prompt}
+                    </p>
+                {/if}
+            </div>
+        {/if}
+
         <div class="space-y-2 mb-4">
             <label
                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
             >
                 Modell überschreiben (optional)
             </label>
-            <input
+            <select
                 bind:value={importModelOverride}
-                type="text"
-                placeholder="openai/gpt-4o-mini"
                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                        bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                        px-3 py-2"
-            />
+            >
+                <option value="">Modell aus Datei übernehmen</option>
+                {#each availableModels as m}
+                    <option value={m}>{m}</option>
+                {/each}
+            </select>
         </div>
 
         <div class="flex justify-end gap-2">

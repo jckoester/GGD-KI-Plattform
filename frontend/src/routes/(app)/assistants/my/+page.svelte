@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import yaml from 'js-yaml';
   import {
     Plus,
     Pencil,
@@ -12,6 +13,7 @@
     Play,
     Upload,
     X,
+    Download,
   } from "lucide-svelte";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
   import SuccessBanner from "$lib/components/SuccessBanner.svelte";
@@ -20,6 +22,7 @@
     deleteMyAssistant,
     submitMyAssistant,
     importAssistant,
+    exportAssistant,
     getModels,
     ApiError,
   } from "$lib/api.js";
@@ -62,6 +65,28 @@
   let importingFile = $state(false);
   let importError = $state(null);
   let availableModels = $state([]);
+  let importPreview = $state(null);
+  // { name: string, system_prompt: string, model: string }
+  let importModelMismatch = $state(false);
+
+  async function parseImportPreview(file) {
+      importPreview = null;
+      importModelMismatch = false;
+      try {
+          const text = await file.text();
+          const data = yaml.load(text);
+          if (!data || typeof data !== 'object') return;
+          const name = data.metadata?.name ?? null;
+          const system_prompt = data.config?.system_prompt ?? null;
+          const model = data.config?.model ?? null;
+          importPreview = { name, system_prompt, model };
+          if (model && availableModels.length > 0) {
+              importModelMismatch = !availableModels.includes(model);
+          }
+      } catch {
+          // Parsing-Fehler werden beim eigentlichen Import behandelt
+      }
+  }
 
   // ── Ladefunktion ───────────────────────────────────────────────────────────
   async function load() {
@@ -91,11 +116,15 @@
     importFile = null;
     importModelOverride = "";
     importError = null;
+    importPreview = null;
+    importModelMismatch = false;
   }
 
   function closeImport() {
     importOpen = false;
     importError = null;
+    importPreview = null;
+    importModelMismatch = false;
   }
 
   async function doImport() {
@@ -115,15 +144,31 @@
     }
   }
 
-  function handleFileDrop(event) {
+  async function handleFileDrop(event) {
     event.preventDefault();
     const files = event.dataTransfer?.files;
-    if (files?.length > 0) importFile = files[0];
+    if (files?.length > 0) {
+        importFile = files[0];
+        await parseImportPreview(importFile);
+    }
   }
 
-  function handleFileSelect(event) {
+  async function handleFileSelect(event) {
     const files = event.target.files;
-    if (files?.length > 0) importFile = files[0];
+    if (files?.length > 0) {
+        importFile = files[0];
+        await parseImportPreview(importFile);
+    }
+  }
+
+  // ── Export ───────────────────────────────────────────────────────────────
+  async function doExportItem(item) {
+      const slug = item.name.toLowerCase().replace(/\s+/g, "-");
+      try {
+          await exportAssistant(item.id, `${slug}.yaml`);
+      } catch (e) {
+          error = e.message;
+      }
   }
 
   // ── Einreichen ─────────────────────────────────────────────────────────────
@@ -382,6 +427,16 @@
                     >
                       <Play size={14} />
                     </button>
+                    {#if item.status === "active"}
+                        <button
+                            onclick={() => doExportItem(item)}
+                            title="Als YAML exportieren"
+                            class="p-1.5 rounded-md hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                                   text-light-tx-2 dark:text-dark-tx-2 transition-colors"
+                        >
+                            <Download size={14} />
+                        </button>
+                    {/if}
                   {/if}
                 </div>
               </td>
@@ -534,6 +589,34 @@
         </p>
       </label>
     </div>
+
+    <!-- Vorschau-Block -->
+    {#if importPreview}
+        <div class="mb-4 p-3 rounded-lg bg-light-bg-2 dark:bg-dark-bg-2
+                    border border-light-ui-3 dark:border-dark-ui-3 space-y-2">
+            {#if importPreview.name}
+                <p class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                    {importPreview.name}
+                </p>
+            {/if}
+            {#if importPreview.model}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    Modell: <span class="font-mono">{importPreview.model}</span>
+                </p>
+            {/if}
+            {#if importModelMismatch}
+                <p class="text-xs text-light-ye dark:text-dark-ye flex items-center gap-1">
+                    <AlertCircle size={12} class="shrink-0" />
+                    Dieses Modell ist nicht freigeschaltet — bitte unten überschreiben.
+                </p>
+            {/if}
+            {#if importPreview.system_prompt}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 line-clamp-3 whitespace-pre-wrap">
+                    {importPreview.system_prompt}
+                </p>
+            {/if}
+        </div>
+    {/if}
 
     {#if availableModels.length > 0}
       <div class="mb-4">
