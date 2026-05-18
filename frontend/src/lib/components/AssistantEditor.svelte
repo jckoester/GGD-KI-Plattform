@@ -139,7 +139,7 @@
     }
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
-    const isNew = assistantId === "neu";
+    let isNew = $derived(assistantId === "neu");
     const SCHOOLWIDE_SCOPES = new Set(["grade", "all_students", "all"]);
     let isDraft = $derived(isNew || form.status === "draft");
     // Lehrkräfte können auch aktive Assistenten bearbeiten, sofern kein schulweiter Scope
@@ -671,18 +671,22 @@
                                 Aktivieren
                             {/if}
                         </button>
-                        <button
-                            onclick={doExport}
-                            disabled={saving}
-                            class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50
-                       flex items-center gap-1.5 text-sm"
-                        >
-                            <Download class="w-4 h-4" />
-                            Exportieren
-                        </button>
                     {/if}
                 {/if}
+            {/if}
+
+            <!-- Export-Button für alle Rollen — nur bei aktiven Assistenten -->
+            {#if !isNew && form.status === "active"}
+                <button
+                    onclick={doExport}
+                    disabled={saving}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50
+                   flex items-center gap-1.5 text-sm"
+                >
+                    <Download class="w-4 h-4" />
+                    Exportieren
+                </button>
             {/if}
 
             <button
@@ -757,11 +761,13 @@
                     <!-- Name & Beschreibung -->
                     <div class="space-y-2">
                         <label
+                            for="ae-name"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             Name *
                         </label>
                         <input
+                            id="ae-name"
                             bind:value={form.name}
                             disabled={!canEdit}
                             type="text"
@@ -774,11 +780,13 @@
 
                     <div class="space-y-2">
                         <label
+                            for="ae-description"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             Beschreibung
                         </label>
                         <textarea
+                            id="ae-description"
                             bind:value={form.description}
                             disabled={!canEdit}
                             rows="2"
@@ -792,11 +800,13 @@
                     <!-- Fach-Dropdown -->
                     <div class="space-y-2">
                         <label
+                            for="ae-subject"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             Fach
                         </label>
                         <select
+                            id="ae-subject"
                             bind:value={form.subject_id}
                             disabled={!canEdit}
                             class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
@@ -815,11 +825,13 @@
                     <!-- System-Prompt -->
                     <div class="space-y-2">
                         <label
+                            for="ae-system-prompt"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             System-Prompt *
                         </label>
                         <textarea
+                            id="ae-system-prompt"
                             bind:value={form.system_prompt}
                             disabled={!canEdit}
                             rows="8"
@@ -833,12 +845,14 @@
                     <!-- Modell & Parameter -->
                     <div class="space-y-2">
                         <label
+                            for="ae-model"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             Modell *
                         </label>
                         {#if models.length > 0}
                             <select
+                                id="ae-model"
                                 bind:value={form.model}
                                 disabled={!canEdit}
                                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
@@ -854,6 +868,7 @@
                             </select>
                         {:else}
                             <input
+                                id="ae-model"
                                 bind:value={form.model}
                                 disabled={!canEdit}
                                 type="text"
@@ -868,11 +883,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <label
+                                for="ae-temperature"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Temperatur
                             </label>
                             <input
+                                id="ae-temperature"
                                 bind:value={form.temperature}
                                 disabled={!canEdit}
                                 type="number"
@@ -887,11 +904,13 @@
                         </div>
                         <div class="space-y-2">
                             <label
+                                for="ae-max-tokens"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Max. Tokens
                             </label>
                             <input
+                                id="ae-max-tokens"
                                 bind:value={form.max_tokens}
                                 disabled={!canEdit}
                                 type="number"
@@ -908,11 +927,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <label
+                                for="ae-audience"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Zielgruppe
                             </label>
                             <select
+                                id="ae-audience"
                                 bind:value={form.audience}
                                 disabled={!canEdit}
                                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
@@ -928,11 +949,13 @@
                         </div>
                         <div class="space-y-2">
                             <label
+                                for="ae-scope"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Sichtbarkeit
                             </label>
                             <select
+                                id="ae-scope"
                                 bind:value={form.scope}
                                 disabled={!canEdit}
                                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
@@ -952,12 +975,14 @@
                     {#if needsGroup(form.scope)}
                         <div class="space-y-2">
                             <label
+                                for="ae-scope-group"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Gruppe
                             </label>
                             {#if getFilteredGroups(form.scope).length > 0}
                                 <select
+                                    id="ae-scope-group"
                                     bind:value={form.scope_group_id}
                                     disabled={!canEdit}
                                     class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
@@ -988,11 +1013,13 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <label
+                                    for="ae-min-grade"
                                     class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                                 >
                                     Jahrgang von
                                 </label>
                                 <input
+                                    id="ae-min-grade"
                                     bind:value={form.min_grade}
                                     disabled={!canEdit}
                                     type="number"
@@ -1006,11 +1033,13 @@
                             </div>
                             <div class="space-y-2">
                                 <label
+                                    for="ae-max-grade"
                                     class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                                 >
                                     Jahrgang bis
                                 </label>
                                 <input
+                                    id="ae-max-grade"
                                     bind:value={form.max_grade}
                                     disabled={!canEdit}
                                     type="number"
@@ -1028,11 +1057,13 @@
                     <!-- Tags -->
                     <div class="space-y-2">
                         <label
+                            for="ae-tags"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
                             Tags (kommagetrennt)
                         </label>
                         <input
+                            id="ae-tags"
                             bind:value={form.tags}
                             disabled={!canEdit}
                             type="text"
@@ -1046,9 +1077,9 @@
                     <!-- Kontext-Dokumente -->
                     <div class="space-y-3">
                         <div class="flex items-center justify-between">
-                          <label class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                          <span class="block text-sm font-medium text-light-tx dark:text-dark-tx">
                             Kontext-Dokumente
-                          </label>
+                          </span>
                           <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                             {totalTokens.toLocaleString("de")} / {MAX_TOTAL_TOKENS.toLocaleString("de")} Tokens
                           </span>
@@ -1140,11 +1171,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-2">
                             <label
+                                for="ae-available-from"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Verfügbar von
                             </label>
                             <input
+                                id="ae-available-from"
                                 bind:value={form.available_from}
                                 disabled={!canEdit}
                                 type="date"
@@ -1155,11 +1188,13 @@
                         </div>
                         <div class="space-y-2">
                             <label
+                                for="ae-available-until"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Verfügbar bis
                             </label>
                             <input
+                                id="ae-available-until"
                                 bind:value={form.available_until}
                                 disabled={!canEdit}
                                 type="date"
@@ -1174,11 +1209,13 @@
                     {#if isAdmin}
                         <div class="space-y-2">
                             <label
+                                for="ae-sort-order"
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Sortier-Reihenfolge
                             </label>
                             <input
+                                id="ae-sort-order"
                                 bind:value={form.sort_order}
                                 type="number"
                                 placeholder="0"
@@ -1194,11 +1231,11 @@
                         <div
                             class="space-y-2 pt-2 border-t border-light-ui-3 dark:border-dark-ui-3"
                         >
-                            <label
+                            <span
                                 class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                             >
                                 Status
-                            </label>
+                            </span>
                             <div class="flex items-center gap-3">
                                 <span
                                     class="px-2 py-1 rounded-full text-xs {STATUS_CLASS[
@@ -1333,7 +1370,12 @@
 
 <!-- Ablehnen-Dialog (Modal) - nur Admin, nur bei pending_review -->
 {#if isAdmin && !isNew && form.status === "pending_review" && rejectDialogOpen}
-    <div class="fixed inset-0 bg-black/50 z-40" onclick={closeRejectDialog} />
+    <div
+        class="fixed inset-0 bg-black/50 z-40"
+        onclick={closeRejectDialog}
+        onkeydown={(e) => e.key === 'Escape' && closeRejectDialog()}
+        role="presentation"
+    ></div>
     <div
         class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 bg-light-bg dark:bg-dark-bg rounded-xl shadow-2xl z-50 p-6"
     >
