@@ -25,6 +25,12 @@ from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 
 
+_MARKDOWN_GUARDRAIL = (
+    "Deine Antworten werden direkt als Markdown gerendert. "
+    "Verwende keine umschließenden Code-Fences für deine gesamte Antwort."
+)
+
+
 class ConversationItem(BaseModel):
     id: UUID
     title: Optional[str]
@@ -367,6 +373,7 @@ async def chat(
 
     if system_prompt_snapshot:
         llm_messages.append({"role": "system", "content": system_prompt_snapshot})
+    llm_messages.append({"role": "system", "content": _MARKDOWN_GUARDRAIL})
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
         for msg in request.messages
