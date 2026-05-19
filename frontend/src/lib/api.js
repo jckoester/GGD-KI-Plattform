@@ -77,10 +77,12 @@ export async function getConversations({
   offset = 0,
   subjectId = null,
   groupId = null,
+  excludeGroups = false,
 } = {}) {
   const params = new URLSearchParams({ limit, offset });
   if (subjectId != null) params.set("subject_id", subjectId);
   if (groupId != null) params.set("group_id", groupId);
+  if (excludeGroups) params.set("exclude_groups", "true");
   const res = await fetch(`${BASE}/conversations?${params}`, {
     credentials: "include",
   });

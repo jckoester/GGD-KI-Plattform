@@ -669,6 +669,7 @@ async def list_conversations(
     include_test: bool = Query(default=False),
     subject_id: Optional[int] = Query(None),
     group_id: Optional[int] = Query(None),
+    exclude_groups: bool = Query(default=False),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ConversationListResponse:
@@ -684,6 +685,8 @@ async def list_conversations(
         where_conditions.append(Conversation.subject_id == subject_id)
     if group_id is not None:
         where_conditions.append(Conversation.group_id == group_id)
+    if exclude_groups:
+        where_conditions.append(Conversation.group_id.is_(None))
 
     # Gesamtzahl aller eigenen Konversationen (mit Filter)
     total_stmt = select(func.count()).select_from(Conversation).where(*where_conditions)

@@ -45,7 +45,7 @@
     if (append) loadingMore = true
     else loading = true
     try {
-      const opts = { limit: LIMIT, offset: append ? conversations.length : 0, subjectId: subject.id }
+      const opts = { limit: LIMIT, offset: append ? conversations.length : 0, subjectId: subject.id, excludeGroups: true }
       const data = await getConversations(opts)
       if (append) {
         conversations = [...conversations, ...data.items]
