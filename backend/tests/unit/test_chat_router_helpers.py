@@ -1,4 +1,9 @@
+import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from app.chat.schemas import AttachmentMeta, ChatMessage, TextPart, ImageUrlPart, ImageUrlContent
 from app.chat.router import _user_text, _serialize_content, _parse_stored_content
 
@@ -114,3 +119,57 @@ def test_parse_stored_content_skips_invalid_files():
     assert text == "Text"
     assert len(files) == 1
     assert files[0].name == "ok.pdf"
+
+
+# ========== _get_guardrail_prompt ==========
+
+@pytest.mark.asyncio
+async def test_get_guardrail_prompt_returns_value():
+    """DB liefert 'Testprompt' → Funktion gibt ihn zurück und befüllt Cache."""
+    from app.chat.router import _get_guardrail_prompt
+    import app.chat.router as chat_router
+    chat_router._guardrail_prompt_cache = None
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = "Testprompt"
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = mock_result
+
+    result = await _get_guardrail_prompt(mock_db)
+
+    assert result == "Testprompt"
+    assert chat_router._guardrail_prompt_cache is not None
+    assert chat_router._guardrail_prompt_cache[0] == "Testprompt"
+
+
+@pytest.mark.asyncio
+async def test_get_guardrail_prompt_returns_none_when_missing():
+    """DB liefert None (kein Eintrag) → Funktion gibt None zurück."""
+    from app.chat.router import _get_guardrail_prompt
+    import app.chat.router as chat_router
+    chat_router._guardrail_prompt_cache = None
+
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = mock_result
+
+    result = await _get_guardrail_prompt(mock_db)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_guardrail_prompt_uses_cache():
+    """Frischer Cache → DB wird nicht abgefragt."""
+    from app.chat.router import _get_guardrail_prompt
+    import app.chat.router as chat_router
+
+    future = asyncio.get_event_loop().time() + 60
+    chat_router._guardrail_prompt_cache = ("CachedPrompt", future)
+
+    mock_db = AsyncMock()
+    result = await _get_guardrail_prompt(mock_db)
+
+    assert result == "CachedPrompt"
+    mock_db.execute.assert_not_called()

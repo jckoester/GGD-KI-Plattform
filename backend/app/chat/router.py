@@ -18,7 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.litellm.client import LiteLLMClient
@@ -94,6 +94,10 @@ router = APIRouter(tags=["chat"])
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
 _SPEND_LOG_DELAY: float = settings.spend_log_delay
+
+# Guardrail-Prompt-Cache
+_GUARDRAIL_TTL = 60.0  # Sekunden
+_guardrail_prompt_cache: tuple[str | None, float] | None = None
 
 
 def _team_id_for_user(payload: JwtPayload) -> str | None:
@@ -197,6 +201,20 @@ def _parse_stored_content(content: str) -> tuple[str, list[AttachmentMeta]]:
     except (json.JSONDecodeError, TypeError, ValueError, KeyError):
         pass
     return content, []
+
+
+async def _get_guardrail_prompt(db: AsyncSession) -> str | None:
+    """Liest den schulweiten Guardrail-Prompt aus site_config (mit 60-s-Cache)."""
+    global _guardrail_prompt_cache
+    now = asyncio.get_event_loop().time()
+    if _guardrail_prompt_cache is not None and now < _guardrail_prompt_cache[1]:
+        return _guardrail_prompt_cache[0]
+    result = await db.execute(
+        select(SiteConfig.value).where(SiteConfig.key == "guardrail_prompt")
+    )
+    prompt = result.scalar_one_or_none()
+    _guardrail_prompt_cache = (prompt, now + _GUARDRAIL_TTL)
+    return prompt
 
 
 async def _persist(
@@ -395,6 +413,11 @@ async def chat(
     assistant_id_for_docs = active_assistant_id
 
     llm_messages: list[dict] = []
+
+    guardrail_prompt = await _get_guardrail_prompt(db)
+    if guardrail_prompt:
+        llm_messages.append({"role": "system", "content": guardrail_prompt})
+
     if assistant_id_for_docs is not None:
         docs_result = await db.execute(
             select(AssistantDocument)
