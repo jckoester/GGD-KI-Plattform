@@ -31,7 +31,8 @@ Multimodaler Inhalt (Dateianhänge) wird als Liste in `content` kodiert:
 POST /api/chat
   1. JWT prüfen → user: JwtPayload
   2. Falls assistant_id: Assistent laden, Sichtbarkeit prüfen (Rolle/Audience)
-  3. Konversation anlegen (neu) oder laden (bestehende conversation_id)
+  3. Konversation anlegen (neu) oder laden (bestehende conversation_id);
+       bei Wechsel von assistant_id / model_id mid-Chat: neue Werte auflösen
   4. Nachrichten-History aus DB laden
   5. System-Prompt des Assistenten vorne einfügen (falls vorhanden)
   6. Neue User-Message an History anhängen
@@ -49,8 +50,15 @@ POST /api/chat
  11. Konversation + Nachrichten in DB persistieren (asyncio.Task)
 ```
 
-Der Response-Header `X-Conversation-Id` enthält die UUID der Konversation —
-damit kann das Frontend die URL aktualisieren, bevor der erste Token eintrifft.
+Drei Response-Header begleiten den Stream:
+
+| Header | Inhalt |
+|--------|--------|
+| `X-Conversation-Id` | UUID der Konversation (neu oder bestehend) |
+| `X-Model-Id` | Tatsächlich verwendetes Modell für diese Antwort |
+| `X-Assistant-Id` | ID des aktiven Assistenten (leer wenn keiner) |
+
+Das Frontend kann die URL aktualisieren, bevor der erste Token eintrifft, und den Modell-/Assistent-Wechsel im UI anzeigen.
 
 ## SSE-Eventformat
 
@@ -68,11 +76,16 @@ async generator und liefert vereinheitlichte Objekte:
 
 ```js
 // Yield-Typen von streamChat():
-{ type: 'start',  conversationId: '...' }   // aus X-Conversation-Id-Header
-{ type: 'token',  content: '...' }           // extrahiert aus Delta-JSON
-{ type: 'title',  title: '...' }
-{ type: 'cost',   cost_usd: 0.000312 }
+{ type: 'start', conversationId: '...', model: '...', assistantId: 3 }  // aus Response-Headern
+{ type: 'title', title: '...' }
+{ type: 'cost',  cost_usd: 0.000312 }
+// alle anderen Yields: direkt der Token-String
 ```
+
+Das `start`-Event enthält neben `conversationId` jetzt auch `model` und `assistantId`.
+`+page.svelte` nutzt diese Werte, um bei einem Modell- oder Assistent-Wechsel einen
+`role: 'change'`-Trenner in das `messages`-Array einzufügen (gefiltert aus `apiMessages`,
+sichtbar im UI als horizontale Linie mit Label).
 
 ## SpendLog-Timing
 

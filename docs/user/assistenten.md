@@ -14,7 +14,9 @@ Assistenten werden von Lehrkräften oder Administratoren angelegt und für besti
 2. Sie sehen eine Liste der verfügbaren Assistenten mit einer kurzen Beschreibung.
 3. Klicken Sie auf einen Assistenten, um einen neuen Chat mit ihm zu starten.
 
-Der Assistent ist für die gesamte Dauer des Gesprächs aktiv. Wenn Sie einen anderen Assistenten nutzen möchten, starten Sie einen neuen Chat.
+Sie können auch direkt im Chat-Eingabefeld **`/`** tippen, um den Assistenten-Picker zu öffnen — das funktioniert sowohl vor dem ersten Senden als auch mitten in einem laufenden Gespräch.
+
+Wenn Sie den Assistenten während eines Gesprächs wechseln, bleibt der bisherige Verlauf erhalten und bleibt Teil des Kontexts für den neuen Assistenten. Im Verlauf erscheint ein Trenner, der den Wechsel markiert.
 
 ## Unterschied zum normalen Chat
 
@@ -23,6 +25,7 @@ Der Assistent ist für die gesamte Dauer des Gesprächs aktiv. Wenn Sie einen an
 | Rolle der KI | Allgemein | Vorgegeben (z. B. Tutor, Korrektor) |
 | Modell | Frei wählbar | Ggf. vom Assistenten vorgegeben |
 | Einstieg | Freie Frage | Thema ist bereits gesetzt |
+| Wechsel im Chat | Modell jederzeit wechselbar | Assistent jederzeit per `/` wechselbar |
 
 Im Verlauf sind Assistenten-Gespräche mit einem Icon gekennzeichnet, damit Sie sie leicht von normalen Chats unterscheiden können.
 

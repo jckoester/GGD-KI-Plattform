@@ -8,11 +8,19 @@ Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten
 
 ## Modell wechseln
 
-Über das Auswahlmenü im Chatfenster können Sie zwischen verschiedenen KI-Modellen wechseln. Welche Modelle verfügbar sind, hängt von der Konfiguration Ihrer Schule ab.
+Über das Auswahlmenü im Chatfenster können Sie zwischen verschiedenen KI-Modellen wechseln — auch mitten in einem laufenden Gespräch. Welche Modelle verfügbar sind, hängt von der Konfiguration Ihrer Schule ab.
 
 Ein einmal gewähltes Modell wird gespeichert und beim nächsten Chat automatisch vorausgewählt. Sie können es jederzeit wieder ändern.
 
 Modelle unterscheiden sich in Geschwindigkeit, Qualität und Kosten. Für die meisten Aufgaben reicht das voreingestellte Modell aus. Wenn Sie sehr lange Texte verarbeiten oder besonders anspruchsvolle Aufgaben stellen, kann ein leistungsstärkeres Modell besser geeignet sein.
+
+Wenn Sie das Modell wechseln, erscheint im Gesprächsverlauf ein schmaler Trenner, der anzeigt, ab welcher Antwort das neue Modell aktiv war. Der bisherige Verlauf bleibt vollständig erhalten und ist weiterhin Teil des Kontexts.
+
+## Assistenten im laufenden Chat wechseln
+
+Sie können auch während eines Gesprächs zu einem anderen Assistenten wechseln, ohne einen neuen Chat starten zu müssen. Tippen Sie dazu **`/`** in das Textfeld — der Assistenten-Picker öffnet sich und Sie können einen anderen Assistenten auswählen.
+
+Nach dem Wechsel erscheint ein Hinweis über dem Eingabefeld, der den neuen Assistenten bestätigt. Beim nächsten Senden ist der neue Assistent aktiv. Im Gesprächsverlauf wird der Wechsel durch einen Trenner markiert.
 
 ## Dateien hochladen
 
