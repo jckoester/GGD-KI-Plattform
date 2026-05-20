@@ -98,6 +98,37 @@
 
     const MODEL_STORAGE_KEY = "chat_model_id";
 
+    // Hilfsfunktionen für Trenner
+    function lastAssistantMessage(msgs) {
+        for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === "assistant") return msgs[i];
+        }
+        return null;
+    }
+
+    function insertSeparators(rawMessages) {
+        const result = [];
+        let prevAssistant = null;
+        for (const msg of rawMessages) {
+            if (msg.role === "assistant" && prevAssistant) {
+                const modelChanged = msg.model && msg.model !== prevAssistant.model;
+                const assistantChanged = msg.assistantId != null
+                    && msg.assistantId !== prevAssistant.assistantId;
+                if (modelChanged || assistantChanged) {
+                    result.push({
+                        role: "change",
+                        model: msg.model,
+                        assistantId: msg.assistantId,
+                        assistantName: msg.assistantName ?? null,
+                    });
+                }
+            }
+            result.push(msg);
+            if (msg.role === "assistant") prevAssistant = msg;
+        }
+        return result;
+    }
+
     let textAreaRows = $state(1);
 
     // Hilfsfunktion zur Kostenformatierung
@@ -307,8 +338,8 @@
             },
         ];
 
-        // Assistent-Placeholder (unverändert)
-        const assistantIndex = messages.length;
+        // Assistent-Placeholder
+        let assistantIndex = messages.length;
         messages = [...messages, { role: "assistant", content: "" }];
 
         isStreaming = true;
@@ -361,6 +392,37 @@
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
                         : selectedModelId || currentConversationModel;
+
+                    // Trenner bei Modell- oder Assistent-Wechsel
+                    if (!wasNewConversation && (item.model || item.assistantId != null)) {
+                        const prev = lastAssistantMessage(messages.slice(0, assistantIndex));
+                        const modelChanged = prev && item.model && item.model !== prev.model;
+                        const assistantChanged = prev && item.assistantId != null
+                            && item.assistantId !== prev.assistantId;
+                        if (modelChanged || assistantChanged) {
+                            const separator = {
+                                role: "change",
+                                model: item.model,
+                                assistantId: item.assistantId,
+                                assistantName: selectedAssistant?.name ?? conversationAssistant?.name ?? null,
+                            };
+                            messages = [
+                                ...messages.slice(0, assistantIndex),
+                                separator,
+                                ...messages.slice(assistantIndex),
+                            ];
+                            assistantIndex += 1;
+                        }
+                    }
+
+                    // Modell/Assistent an den Streaming-Placeholder heften
+                    messages[assistantIndex] = {
+                        ...messages[assistantIndex],
+                        model: item.model,
+                        assistantId: item.assistantId,
+                    };
+                    messages = messages;
+
                     // Assistenten-Referenz für laufende Konversation speichern
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
@@ -539,7 +601,8 @@
             loadingConversation = true;
             try {
                 const data = await getConversationMessages(id);
-                messages = data.messages.map((m) => ({
+                // Map messages mit model, assistantId, assistantName
+                const rawMessages = data.messages.map((m) => ({
                     role: m.role,
                     content: m.content,
                     cost_usd: m.cost_usd ?? null,
@@ -549,7 +612,11 @@
                               result: { type: a.type },
                           }))
                         : undefined,
+                    model: m.model ?? null,
+                    assistantId: m.assistant_id ?? null,
+                    assistantName: m.assistant_name ?? null,
                 }));
+                messages = insertSeparators(rawMessages);
                 conversationId = data.id;
                 currentConversationModel = data.model_used;
                 totalCostUsd = data.total_cost_usd ?? null;

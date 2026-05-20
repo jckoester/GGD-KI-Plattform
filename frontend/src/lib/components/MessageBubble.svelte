@@ -116,4 +116,14 @@
             <p class="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
     </div>
+{:else if message.role === 'change'}
+    <div class="w-full">
+        <div class="flex items-center gap-2 my-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+            <span class="flex-1 border-t border-light-ui-3 dark:border-dark-ui-3"></span>
+            <span class="shrink-0 px-1">
+                {#if message.model}Modell: {message.model}{/if}{#if message.model && message.assistantName} · {/if}{#if message.assistantName}Assistent: {message.assistantName}{/if}
+            </span>
+            <span class="flex-1 border-t border-light-ui-3 dark:border-dark-ui-3"></span>
+        </div>
+    </div>
 {/if}

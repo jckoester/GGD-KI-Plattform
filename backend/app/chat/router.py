@@ -55,6 +55,9 @@ class MessageItem(BaseModel):
     created_at: datetime
     cost_usd: Optional[float] = None
     attachments: list[AttachmentMeta] = []
+    model: Optional[str] = None
+    assistant_id: Optional[int] = None
+    assistant_name: Optional[str] = None
 
 
 class ConversationDetailResponse(BaseModel):
@@ -549,7 +552,11 @@ async def chat(
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
-        headers={"X-Conversation-Id": str(conversation_id)},
+        headers={
+            "X-Conversation-Id": str(conversation_id),
+            "X-Model-Id": model_used or "",
+            "X-Assistant-Id": str(active_assistant_id) if active_assistant_id else "",
+        },
     )
 
 
@@ -825,16 +832,19 @@ async def get_conversation_messages(
     if conversation.pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
-    # Nachrichten laden
+    # Nachrichten laden mit Assistenten-JOIN
     messages_result = await db.execute(
-        select(Message)
+        select(Message, Assistant.name.label("assistant_name"))
+        .outerjoin(Assistant, Assistant.id == Message.assistant_id)
         .where(Message.conversation_id == conversation_id)
         .order_by(Message.created_at.asc())
     )
-    messages = messages_result.scalars().all()
+    rows = messages_result.all()
 
     messages_list = []
-    for msg in messages:
+    for row in rows:
+        msg = row.Message
+        asst_name = row.assistant_name
         if msg.role == "user":
             display_text, attachments = _parse_stored_content(msg.content)
             messages_list.append({
@@ -843,6 +853,9 @@ async def get_conversation_messages(
                 "created_at": msg.created_at,
                 "cost_usd": None,
                 "attachments": attachments,
+                "model": None,
+                "assistant_id": None,
+                "assistant_name": None,
             })
         else:
             messages_list.append({
@@ -851,6 +864,9 @@ async def get_conversation_messages(
                 "created_at": msg.created_at,
                 "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
                 "attachments": [],
+                "model": msg.model,
+                "assistant_id": msg.assistant_id,
+                "assistant_name": asst_name,
             })
 
     assistant_name: Optional[str] = None
