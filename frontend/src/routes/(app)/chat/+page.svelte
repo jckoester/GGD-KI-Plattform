@@ -6,6 +6,7 @@
         Paperclip,
         Bot,
         X,
+        Info,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
@@ -63,6 +64,7 @@
     let selectedAssistant = $state(null);
     let pickerOpen = $state(false);
     let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
+    let assistantSwitchHint = $state(null); // string | null
 
     // Fach-Kontext-State
     let subjectPickerOpen = $state(false);
@@ -272,6 +274,9 @@
     }
 
     async function handleSubmit() {
+        // 3-4: Hinweis beim Senden löschen
+        assistantSwitchHint = null;
+
         // Neu: auch senden, wenn nur Anhänge vorhanden (kein Text nötig)
         const readyAttachments = attachments.filter(
             (a) => a.status === "ready",
@@ -336,11 +341,9 @@
                         type: a.result.type,
                     }));
             }
-            const modelId =
-                conversationId || selectedAssistant ? null : selectedModelId;
-            const assistantId = conversationId
-                ? null
-                : (selectedAssistant?.id ?? null);
+            // 3-3: assistant_id und model_id immer mitsenden
+            const modelId = selectedAssistant ? null : selectedModelId;
+            const assistantId = selectedAssistant?.id ?? null;
 
             for await (const item of streamChat(
                 apiMessages,
@@ -455,11 +458,7 @@
         adjustTextareaHeight();
         // /-Shortcut für Assistenten-Auswahl
         // e.target.value statt input: bind:value aktualisiert input erst nach dem Handler
-        if (
-            e.target.value === "/" &&
-            !conversationId &&
-            availableAssistants.length > 0
-        ) {
+        if (e.target.value === "/" && availableAssistants.length > 0) {
             input = "";
             pickerOpen = true;
             return;
@@ -473,6 +472,10 @@
 
     // Picker-Callbacks
     function handleAssistantSelect(assistant) {
+        // Hinweis nur bei laufender Konversation und tatsächlichem Wechsel
+        if (conversationId && assistant.id !== conversationAssistant?.id) {
+            assistantSwitchHint = `Assistent gewechselt zu „${assistant.name}“. Der bisherige Chatverlauf bleibt im Kontext sichtbar.`;
+        }
         selectedAssistant = assistant;
         pickerOpen = false;
         textarea?.focus();
@@ -554,6 +557,10 @@
                 conversationAssistant = data.assistant_name
                     ? { id: data.assistant_id, name: data.assistant_name }
                     : null;
+                // 3-1: Selector auf Konversations-Modell vorbelegen
+                if (availableModels.some(m => m.id === data.model_used)) {
+                    selectedModelId = data.model_used;
+                }
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
                 activeConversationSubjectId.set(data.subject_id ?? null);
@@ -794,6 +801,14 @@
                 </div>
             {/if}
 
+            <!-- Hinweis bei Assistentenwechsel -->
+            {#if assistantSwitchHint}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1 mb-2">
+                    <Info class="w-3.5 h-3.5 shrink-0" />
+                    {assistantSwitchHint}
+                </p>
+            {/if}
+
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
             <div class="flex gap-2 items-start">
                 <input
@@ -909,7 +924,7 @@
                         class="flex items-center gap-1.5 text-xs text-light-bl dark:text-dark-bl shrink-0"
                     >
                         <Bot class="w-3.5 h-3.5" />
-                        {conversationAssistant?.name || selectedAssistant?.name}
+                        {selectedAssistant?.name || conversationAssistant?.name}
                     </span>
                 {:else}
                     <!-- Modell-Auswahl -->
@@ -920,61 +935,37 @@
                         >
                             Modell
                         </label>
-                        {#if conversationId}
-                            <select
-                                id="chat-model"
-                                disabled={true}
-                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                       bg-light-ui dark:bg-dark-ui
-                                       px-1.5 py-0.5 text-xs text-light-tx dark:text-dark-tx
-                                       opacity-60 cursor-not-allowed"
-                                value={currentConversationModel || ""}
-                            >
-                                {#if currentConversationModel}
-                                    <option value={currentConversationModel}
-                                        >{currentConversationModel}</option
+                        <select
+                            id="chat-model"
+                            bind:value={selectedModelId}
+                            disabled={isStreaming || modelsLoading}
+                            onchange={handleModelChange}
+                            class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                                   bg-light-bg-2 dark:bg-dark-bg-2
+                                   px-1.5 py-0.5 text-xs disabled:opacity-60
+                                   {availableModels.length === 0 &&
+                            !selectedModelId
+                                ? 'text-light-re dark:text-dark-re'
+                                : 'text-light-tx dark:text-dark-tx'}"
+                        >
+                            {#if availableModels.length > 0}
+                                {#each availableModels as model}
+                                    <option value={model.id}
+                                        >{model.id}</option
                                     >
-                                {:else}
-                                    <option value="">Unbekannt</option>
-                                {/if}
-                            </select>
-                        {:else}
-                            <select
-                                id="chat-model"
-                                bind:value={selectedModelId}
-                                disabled={isStreaming || modelsLoading}
-                                onchange={handleModelChange}
-                                class="rounded border border-light-ui-3 dark:border-dark-ui-3
-                                       bg-light-bg-2 dark:bg-dark-bg-2
-                                       px-1.5 py-0.5 text-xs disabled:opacity-60
-                                       {availableModels.length === 0 &&
-                                !selectedModelId
-                                    ? 'text-light-re dark:text-dark-re'
-                                    : 'text-light-tx dark:text-dark-tx'}"
-                            >
-                                {#if availableModels.length > 0}
-                                    {#each availableModels as model}
-                                        <option value={model.id}
-                                            >{model.id}</option
-                                        >
-                                    {/each}
-                                {:else}
-                                    <option value={selectedModelId || ""}>
-                                        {selectedModelId ||
-                                            "Nur Assistenten verfügbar"}
-                                    </option>
-                                {/if}
-                            </select>
-                        {/if}
+                                {/each}
+                            {:else}
+                                <option value={selectedModelId || ""}>
+                                    {selectedModelId ||
+                                        "Nur Assistenten verfügbar"}
+                                </option>
+                            {/if}
+                        </select>
                     </div>
                 {/if}
 
-                <!-- Modell-Statustexte (Laden / Fehler / Fix-Hinweis) -->
-                {#if conversationId && !conversationAssistant}
-                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                        Im laufenden Chat kann das Modell nicht geändert werden.
-                    </span>
-                {:else if modelsLoading}
+                <!-- Modell-Statustexte (Laden / Fehler) -->
+                {#if modelsLoading}
                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                         Modelle werden geladen…
                     </span>
@@ -988,8 +979,8 @@
                 <!-- Globaler Hinweistext -->
                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                     KI kann Fehler machen. Ergebnisse immer kritisch prüfen.
-                    {#if !conversationId && !selectedAssistant && availableAssistants.length > 0}
-                        Verwende <code>/</code> um Assistenten zu starten.
+                    {#if !selectedAssistant && availableAssistants.length > 0}
+                        Verwende <code>/</code> um {conversationId ? "den Assistenten zu wechseln" : "Assistenten zu starten"}.
                     {/if}
                 </p>
             </div>
