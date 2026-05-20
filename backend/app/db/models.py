@@ -371,14 +371,14 @@ class ExchangeRate(Base):
     )
 
 
-# 11. site_texts
-class SiteText(Base):
-    __tablename__ = "site_texts"
+# 11. site_config
+class SiteConfig(Base):
+    __tablename__ = "site_config"
 
     key: Mapped[str] = mapped_column(Text, primary_key=True)
-    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False,
-        server_default=text("now()"),
-        onupdate=text("now()")
+        server_default=text("now()")
     )
+    updated_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

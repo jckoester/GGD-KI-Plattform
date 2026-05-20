@@ -16,7 +16,7 @@ os.environ.setdefault("STUDENT_GRADES", "[5,6,7,8,9,10,11,12]")
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
-from app.db.models import SiteText
+from app.db.models import SiteConfig
 from app.db.session import get_db
 from app.site_texts.router import router as site_texts_router
 from app.api.admin.site_texts import router as admin_site_texts_router
@@ -67,11 +67,11 @@ def _make_admin_site_texts_app(payload: JwtPayload, mock_db) -> FastAPI:
     return app
 
 
-def _mock_site_text_db(site_text: SiteText | None) -> AsyncMock:
-    """DB-Mock für SiteText-Abfragen"""
+def _mock_site_config_db(site_config: SiteConfig | None) -> AsyncMock:
+    """DB-Mock für SiteConfig-Abfragen"""
     session = AsyncMock()
     result = MagicMock()
-    result.scalar_one_or_none.return_value = site_text
+    result.scalar_one_or_none.return_value = site_config
     session.execute.return_value = result
     return session
 
@@ -80,10 +80,10 @@ def _mock_site_text_db(site_text: SiteText | None) -> AsyncMock:
 
 
 def test_get_site_text_returns_content():
-    """DB liefert SiteText(key="impressum", content="Test"), 200 erwartet"""
-    mock_site_text = MagicMock(spec=SiteText)
+    """DB liefert SiteConfig(key="impressum", value="Test"), 200 erwartet"""
+    mock_site_text = MagicMock(spec=SiteConfig)
     mock_site_text.key = "impressum"
-    mock_site_text.content = "Test"
+    mock_site_text.value = "Test"
     mock_site_text.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     
     app = _make_site_texts_app()
@@ -144,10 +144,10 @@ def test_get_site_text_missing_in_db_returns_404():
 
 def test_get_site_text_requires_no_auth():
     """Kein Auth-Override → 200 (kein 401/403)"""
-    mock_site_text = MagicMock(spec=SiteText)
-    mock_site_text.key = "impressum"
-    mock_site_text.content = "Test"
-    mock_site_text.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_site_config = MagicMock(spec=SiteConfig)
+    mock_site_config.key = "impressum"
+    mock_site_config.value = "Test"
+    mock_site_config.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
     
     app = FastAPI()
     app.include_router(site_texts_router)
@@ -156,7 +156,7 @@ def test_get_site_text_requires_no_auth():
         from sqlalchemy import select
         session = AsyncMock()
         result = MagicMock()
-        result.scalar_one_or_none.return_value = mock_site_text
+        result.scalar_one_or_none.return_value = mock_site_config
         session.execute.return_value = result
         return session
     
@@ -183,32 +183,34 @@ def test_put_site_text_requires_admin_role():
 
 
 def test_put_site_text_updates_content():
-    """admin, body={content: "Neuer Text"} → 200, updated_at in Antwort"""
+    """admin, body={content: "Neuer Text"} → 200, updated_at und updated_by in Antwort"""
     from sqlalchemy import select, update as sql_update
     
-    mock_site_text = MagicMock(spec=SiteText)
-    mock_site_text.key = "impressum"
-    mock_site_text.content = "Alter Text"
-    mock_site_text.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_site_config = MagicMock(spec=SiteConfig)
+    mock_site_config.key = "impressum"
+    mock_site_config.value = "Alter Text"
+    mock_site_config.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_site_config.updated_by = None
     
     new_updated_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
-    mock_updated_text = MagicMock(spec=SiteText)
-    mock_updated_text.key = "impressum"
-    mock_updated_text.content = "Neuer Text"
-    mock_updated_text.updated_at = new_updated_at
+    mock_updated = MagicMock(spec=SiteConfig)
+    mock_updated.key = "impressum"
+    mock_updated.value = "Neuer Text"
+    mock_updated.updated_at = new_updated_at
+    mock_updated.updated_by = "p-1"
     
     session = AsyncMock()
     
-    # Erste Abfrage: SiteText finden
+    # Erste Abfrage: SiteConfig finden
     result1 = MagicMock()
-    result1.scalar_one_or_none.return_value = mock_site_text
+    result1.scalar_one_or_none.return_value = mock_site_config
     
     # Update-Abfrage
     result2 = MagicMock()
     
     # Zweite Abfrage: Aktualisierten Datensatz holen
     result3 = MagicMock()
-    result3.scalar_one.return_value = mock_updated_text
+    result3.scalar_one.return_value = mock_updated
     
     session.execute.side_effect = [result1, result2, result3]
     session.commit = AsyncMock()
@@ -222,6 +224,7 @@ def test_put_site_text_updates_content():
     data = response.json()
     assert data["key"] == "impressum"
     assert "updated_at" in data
+    assert data["updated_by"] == "p-1"
 
 
 def test_put_site_text_unknown_key_returns_404():
@@ -251,26 +254,28 @@ def test_put_site_text_empty_content_allowed():
     """content="" → 200 (leerer String ist gültig)"""
     from sqlalchemy import select, update as sql_update
     
-    mock_site_text = MagicMock(spec=SiteText)
-    mock_site_text.key = "impressum"
-    mock_site_text.content = "Alter Text"
-    mock_site_text.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_site_config = MagicMock(spec=SiteConfig)
+    mock_site_config.key = "impressum"
+    mock_site_config.value = "Alter Text"
+    mock_site_config.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    mock_site_config.updated_by = None
     
     new_updated_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
-    mock_updated_text = MagicMock(spec=SiteText)
-    mock_updated_text.key = "impressum"
-    mock_updated_text.content = ""
-    mock_updated_text.updated_at = new_updated_at
+    mock_updated = MagicMock(spec=SiteConfig)
+    mock_updated.key = "impressum"
+    mock_updated.value = ""
+    mock_updated.updated_at = new_updated_at
+    mock_updated.updated_by = "p-1"
     
     session = AsyncMock()
     
     result1 = MagicMock()
-    result1.scalar_one_or_none.return_value = mock_site_text
+    result1.scalar_one_or_none.return_value = mock_site_config
     
     result2 = MagicMock()
     
     result3 = MagicMock()
-    result3.scalar_one.return_value = mock_updated_text
+    result3.scalar_one.return_value = mock_updated
     
     session.execute.side_effect = [result1, result2, result3]
     session.commit = AsyncMock()
