@@ -70,7 +70,24 @@ docker compose exec backend alembic upgrade head
 Dieser Befehl legt alle Datenbanktabellen an. Er ist bei jeder Installation
 und nach jedem Update mit neuen Migrationen auszuführen.
 
-## Schritt 5: Initialen Wechselkurs eintragen
+## Schritt 5: Fächer einspielen
+
+Die Fächer-Tabelle wird nicht automatisch befüllt. Vor dem ersten Login müssen
+die Fächer aus `config/subjects.yaml` in die Datenbank eingespielt werden:
+
+```bash
+docker compose exec backend python scripts/seed_subjects.py
+```
+
+Das Skript liest `config/subjects.yaml` und legt alle darin definierten Fächer
+(Slug, Name, Icon, Farbe, Jahrgangsstufen) per Upsert an. Es ist idempotent —
+mehrfaches Ausführen aktualisiert bestehende Einträge, legt keine Duplikate an.
+
+> **Wichtig:** Ohne diesen Schritt können Nutzer:innen zwar Fächer und Gruppen
+> aus dem SSO-System sehen, aber die Fach-Zuordnung (Icon, Farbe) fehlt. Bei
+> Lehrkräften erscheinen SSO-Unterrichtsgruppen nicht in der Fach-Ansicht.
+
+## Schritt 7: Initialen Wechselkurs eintragen
 
 Das Budget-System rechnet intern in USD und benötigt einen EUR/USD-Wechselkurs
 in der Datenbank. Den aktuellen Kurs (z. B. von der EZB) eintragen:
@@ -82,7 +99,7 @@ docker compose exec backend python scripts/seed_exchange_rate.py --rate 1.08
 Der monatliche Cron-Job aktualisiert den Kurs danach automatisch. Das Skript
 bricht ab, wenn bereits ein Eintrag vorhanden ist.
 
-## Schritt 6: LiteLLM-Teams anlegen
+## Schritt 8: LiteLLM-Teams anlegen
 
 Einmalig nach der Erstinstallation:
 
@@ -94,7 +111,7 @@ Dieses Skript legt in LiteLLM die Teams an, über die Budgets und
 Modell-Freischaltungen pro Nutzergruppe durchgesetzt werden. Es ist idempotent —
 mehrfaches Ausführen ist unschädlich.
 
-## Schritt 7: Reverse Proxy einrichten
+## Schritt 9: Reverse Proxy einrichten
 
 Der nginx-Container hört auf Port 80 und leitet Anfragen intern an Backend und
 Frontend weiter. Für HTTPS wird ein vorgelagerter Reverse Proxy empfohlen.
@@ -116,7 +133,7 @@ Den internen nginx-Port in `docker-compose.yml` auf einen anderen Host-Port
 legen (z. B. `8080:80`) und einen externen nginx als TLS-Terminator davor
 schalten.
 
-## Schritt 8: Erster Login und Grundkonfiguration
+## Schritt 10: Erster Login und Grundkonfiguration
 
 1. Die Plattform im Browser unter der konfigurierten Domain aufrufen.
 2. Mit einem Konto einloggen, das im SSO-Provider der Gruppe mit der Rolle

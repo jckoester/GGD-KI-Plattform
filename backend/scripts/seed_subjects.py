@@ -25,7 +25,12 @@ from app.db.models import Subject
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-DEFAULT_YAML = Path(__file__).resolve().parent.parent.parent / "config" / "subjects.yaml"
+_SCRIPT_DIR = Path(__file__).resolve().parent
+# Docker: /app/scripts → /app/config/subjects.yaml
+# Lokal:  backend/scripts → backend/../config/subjects.yaml
+_docker_path = _SCRIPT_DIR.parent / "config" / "subjects.yaml"
+_local_path  = _SCRIPT_DIR.parent.parent / "config" / "subjects.yaml"
+DEFAULT_YAML = _docker_path if _docker_path.exists() else _local_path
 
 
 async def seed(yaml_path: Path) -> None:
