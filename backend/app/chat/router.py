@@ -205,6 +205,8 @@ async def _persist(
     usage: dict,
     model_used: str,
     cost_usd: Optional[float] = None,
+    assistant_id: Optional[int] = None,
+    conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
@@ -228,6 +230,7 @@ async def _persist(
         role="assistant",
         content=assistant_content,
         model=model_used,
+        assistant_id=assistant_id,    # 2-3
         tokens_input=tokens_input,
         tokens_output=tokens_output,
         cost_usd=cost_usd,
@@ -236,6 +239,11 @@ async def _persist(
     update_values: dict = {"last_message_at": func.now()}
     if cost_usd is not None:
         update_values["total_cost_usd"] = Conversation.total_cost_usd + cost_usd
+    # 2-4: Assistenten-Wechsel atomar mitspeichern
+    if conv_assistant_update is not None:
+        new_asst_id, new_snapshot = conv_assistant_update
+        update_values["assistant_id"] = new_asst_id
+        update_values["system_prompt_snapshot"] = new_snapshot
 
     await db.execute(
         update(Conversation)
@@ -265,6 +273,10 @@ async def chat(
     conversation_id = request.conversation_id
     is_new = conversation_id is None
     title_prompt: str | None = None
+
+    # Für Assistentenwechsel mid-Chat
+    active_assistant_id: Optional[int] = None
+    conv_assistant_update: Optional[tuple[int, Optional[str]]] = None
 
     if is_new:
         assistant: Optional[Assistant] = None
@@ -331,6 +343,7 @@ async def chat(
         # Kein commit hier — verhindert leere Einträge wenn LiteLLM nicht erreichbar ist.
         if settings.title_model and len(first_user_msg) > 20:
             title_prompt = first_user_msg
+        active_assistant_id = request.assistant_id
     else:
         result = await db.execute(
             select(Conversation).where(
@@ -342,16 +355,41 @@ async def chat(
         if existing is None:
             await client.aclose()
             raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
-        # Laufende Konversationen behalten ihr ursprüngliches Modell und Snapshot.
+
+        # Startwerte aus bestehender Konversation
         model_used = existing.model_used
         system_prompt_snapshot = existing.system_prompt_snapshot
+        active_assistant_id = existing.assistant_id
 
-    # Dokumente für den Assistenten laden (falls vorhanden)
-    assistant_id_for_docs: int | None = None
-    if is_new and request.assistant_id is not None:
-        assistant_id_for_docs = request.assistant_id
-    elif not is_new and existing.assistant_id is not None:
-        assistant_id_for_docs = existing.assistant_id
+        # 2-1: Assistentenwechsel mid-Chat
+        if request.assistant_id is not None:
+            asst_result = await db.execute(
+                select(Assistant).where(Assistant.id == request.assistant_id)
+            )
+            new_assistant = asst_result.scalar_one_or_none()
+            if new_assistant is None:
+                await client.aclose()
+                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+            if not _is_visible_for_user(new_assistant, current_user.roles):
+                await client.aclose()
+                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+
+            system_prompt_snapshot = new_assistant.system_prompt
+            active_assistant_id = new_assistant.id
+
+            # Conversation-Update vormerken (atomar mit _persist geschrieben)
+            conv_assistant_update = (new_assistant.id, new_assistant.system_prompt)
+
+            # Assistentenmodell als Fallback wenn kein explizites model_id
+            if not request.model_id and new_assistant.model:
+                model_used = new_assistant.model
+
+        # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
+        if request.model_id:
+            model_used = request.model_id
+
+    # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
+    assistant_id_for_docs = active_assistant_id
 
     llm_messages: list[dict] = []
     if assistant_id_for_docs is not None:
@@ -502,6 +540,8 @@ async def chat(
             await _persist(
                 db, conversation_id, user_message, last_attachments, "".join(full_content),
                 usage, model_used, cost_usd=cost_usd,
+                assistant_id=active_assistant_id,
+                conv_assistant_update=conv_assistant_update,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
