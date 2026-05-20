@@ -239,9 +239,11 @@ class Conversation(Base):
     group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL")
     )
+    # Ab Phase 8: aktuell aktiver Assistent (wird bei Wechsel mid-Chat aktualisiert)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL")
     )
+    # Ab Phase 8: Snapshot beim letzten Assistentenwechsel (nicht nur beim Start)
     system_prompt_snapshot: Mapped[Optional[str]] = mapped_column(nullable=True)
     total_cost_usd: Mapped[Optional[float]] = mapped_column(
         Numeric(10, 6), default=0, server_default=text("0")
@@ -276,6 +278,9 @@ class Message(Base):
     role: Mapped[str] = mapped_column(nullable=False)
     content: Mapped[str] = mapped_column(nullable=False)
     model: Mapped[Optional[str]] = mapped_column(nullable=True)
+    assistant_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
+    )
     # cost/token fields - nullable, only for assistant
     cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
     tokens_input: Mapped[Optional[int]] = mapped_column(nullable=True)
@@ -290,6 +295,7 @@ class Message(Base):
             name="check_message_role"
         ),
         Index("idx_messages_conversation_id", "conversation_id"),
+        Index("idx_messages_assistant_id", "assistant_id"),
     )
 
 
