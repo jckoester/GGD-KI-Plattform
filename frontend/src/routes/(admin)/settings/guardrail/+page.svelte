@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { ShieldCheck } from "lucide-svelte";
-  import { getGuardrailPrompt, saveGuardrailPrompt } from "$lib/api.js";
+  import { getGuardrailPrompt, saveGuardrailPrompt, getLiteLLMGuardrails } from "$lib/api.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
   let prompt = $state("");
@@ -14,22 +14,42 @@
   let error = $state(null);
   let saveError = $state(null);
   let hintsOpen = $state(false);
+  let litellmGuardrails = $state([]);
+  let litellmAvailable = $state(true);
+  let litellmLoading = $state(true);
 
   let isChanged = $derived(edited !== prompt);
   let isActive = $derived(prompt.length > 0);
 
   onMount(async () => {
-    try {
-      const data = await getGuardrailPrompt();
+    // Beide Requests parallel starten
+    const [promptResult, guardrailsResult] = await Promise.allSettled([
+      getGuardrailPrompt(),
+      getLiteLLMGuardrails(),
+    ]);
+
+    // Prompt
+    if (promptResult.status === "fulfilled") {
+      const data = promptResult.value;
       prompt = data.prompt ?? "";
       edited = data.prompt ?? "";
       updatedAt = data.updated_at;
       updatedBy = data.updated_by;
-    } catch (e) {
-      error = e.message;
-    } finally {
-      loading = false;
+    } else {
+      error = promptResult.reason?.message ?? "Prompt konnte nicht geladen werden.";
     }
+    loading = false;
+
+    // LiteLLM-Guardrails
+    if (guardrailsResult.status === "fulfilled") {
+      litellmGuardrails = guardrailsResult.value.guardrails ?? [];
+      litellmAvailable = guardrailsResult.value.available ?? true;
+    } else {
+      // Soft-Fail: LiteLLM-Abschnitt zeigt Hinweis, Seite bleibt nutzbar
+      litellmGuardrails = [];
+      litellmAvailable = false;
+    }
+    litellmLoading = false;
   });
 
   async function handleSave() {
@@ -207,6 +227,53 @@
       {/if}
     </div>
 
-    <!-- Platzhalter für Schritt 5: LiteLLM-Guardrail-Anzeige -->
+    <!-- LiteLLM-Guardrail-Anzeige -->
+    <div class="mt-10 pt-8 border-t border-light-ui-3 dark:border-dark-ui-3">
+      <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
+        LiteLLM-Guardrails
+      </h2>
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
+        Diese Guardrails sind in der LiteLLM-Konfiguration hinterlegt und können nur
+        per Deployment geändert werden.
+        <a href="/help/guardrails" class="underline hover:text-light-tx dark:hover:text-dark-tx">
+          Hinweise zur Konfiguration →
+        </a>
+      </p>
+
+      {#if litellmLoading}
+        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Laden...</p>
+      {:else if !litellmAvailable}
+        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+          LiteLLM ist momentan nicht erreichbar — die Guardrail-Liste kann nicht angezeigt werden.
+        </p>
+      {:else if litellmGuardrails.length === 0}
+        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+          Keine Guardrails konfiguriert.
+        </p>
+      {:else}
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse">
+            <thead>
+              <tr class="border-b border-light-ui-3 dark:border-dark-ui-3
+                         text-left text-light-tx-2 dark:text-dark-tx-2">
+                <th class="pb-2 pr-6 font-medium">Name</th>
+                <th class="pb-2 font-medium">Modus</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each litellmGuardrails as g}
+                <tr class="border-b border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx">
+                  <td class="py-2 pr-6 font-mono text-xs">{g.name}</td>
+                  <td class="py-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    {g.mode ?? "—"}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </div>
   {/if}
 </div>
