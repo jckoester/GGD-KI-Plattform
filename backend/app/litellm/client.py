@@ -416,6 +416,53 @@ class LiteLLMClient:
             return
         raise RuntimeError(f"Failed to delete LiteLLM key: {response.text}")
 
+    async def list_guardrails(self) -> list[dict]:
+        """
+        GET /guardrails/list.
+        Gibt eine normalisierte Liste von Guardrail-Objekten zurück.
+        Bei Fehler: leere Liste (kein Hard-Fail — LiteLLM ist optional konfiguriert).
+
+        Normalisiertes Format je Eintrag:
+          { "name": str, "mode": str | None }
+        """
+        try:
+            client = await self._get_client()
+            response = await client.get(
+                f"{self.base_url}/guardrails/list",
+                headers={"Authorization": f"Bearer {self.master_key}"},
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    "list_guardrails fehlerhaft: status=%d, body=%s",
+                    response.status_code, response.text[:200],
+                )
+                return []
+            payload = response.json()
+            raw: list = []
+            if isinstance(payload, dict):
+                raw = payload.get("guardrails", [])
+            elif isinstance(payload, list):
+                raw = payload
+
+            result = []
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                params = item.get("litellm_params", {}) or {}
+                name = (
+                    item.get("guardrail_name")
+                    or params.get("guardrail_name")
+                    or params.get("guardrail")
+                    or ""
+                )
+                mode = params.get("mode")
+                if name:
+                    result.append({"name": name, "mode": mode})
+            return result
+        except Exception:
+            logger.exception("list_guardrails Exception")
+            return []
+
     async def get_spend_log(self, request_id: str) -> float | None:
         """
         GET /spend/logs/v2?request_id={request_id}&start_date=...&end_date=...
