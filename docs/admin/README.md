@@ -55,3 +55,4 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Modelle freischalten, Assistenten verwalten
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Schuljahreswechsel, Troubleshooting
+- [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
