@@ -20,13 +20,13 @@ Alle Konfigurationsdateien liegen im Verzeichnis `config/` und `infra/`.
 Aus den mitgelieferten Beispieldateien jeweils eine produktive Kopie erstellen:
 
 ```bash
-cp config/.env.example           config/.env
+cp .env.example                  .env
 cp config/auth.example.yaml      config/auth.yaml
 cp config/budget_tiers.example.yaml config/budget_tiers.yaml
 cp infra/litellm_config.example.yaml infra/litellm_config.yaml
 ```
 
-Anschließend `config/.env` mit einem Texteditor öffnen und mindestens diese
+Anschließend `.env` mit einem Texteditor öffnen und mindestens diese
 Pflichtfelder befüllen:
 
 ```bash

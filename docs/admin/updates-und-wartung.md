@@ -119,7 +119,7 @@ Häufige Meldungen und ihre Bedeutung:
 | `429` von LiteLLM | Budget einer Nutzerin aufgebraucht | Normal, kein Handlungsbedarf |
 | `Connection refused` zu LiteLLM | LiteLLM-Container nicht erreichbar | `LITELLM_PROXY_URL` in `.env` prüfen |
 | `alembic.util.exc.CommandError` beim Start | Datenbank-Migration fehlt | `alembic upgrade head` ausführen |
-| `SCHOOL_SECRET not set` | Pflichtumgebungsvariable fehlt | `config/.env` prüfen |
+| `SCHOOL_SECRET not set` | Pflichtumgebungsvariable fehlt | `.env` prüfen |
 
 ## Troubleshooting
 
@@ -137,6 +137,6 @@ Cron-Log prüfen: `docker compose logs cron`. Bei Bedarf Skripte manuell
 ausführen (siehe [Budget-System](budget.md)).
 
 **Pseudonyme haben sich geändert**
-`SCHOOL_SECRET` wurde in `config/.env` geändert. Dieser Vorgang ist nicht
+`SCHOOL_SECRET` wurde in `.env` geändert. Dieser Vorgang ist nicht
 reversibel — alle bestehenden Nutzerzuordnungen sind ungültig.
 Backup einspielen und `SCHOOL_SECRET` auf den ursprünglichen Wert zurücksetzen.

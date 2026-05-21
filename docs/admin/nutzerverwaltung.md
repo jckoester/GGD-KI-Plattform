@@ -28,7 +28,7 @@ manuell angelegt — Konten entstehen automatisch beim ersten Login.
 - Client-ID: frei wählbar, z. B. `ki-plattform`
 - Redirect-URI: `https://ki.beispielschule.de/auth/callback`
 - Benötigte Scopes: `openid`, `profile`, `groups` (o. ä. — Provider-abhängig)
-- Client-Secret in `AUTH_ISERV_CLIENT_SECRET` in `config/.env` eintragen
+- Client-Secret in `AUTH_ISERV_CLIENT_SECRET` in `.env` eintragen
 
 ## Gruppen → Rollen (`group_role_map`)
 
@@ -141,7 +141,7 @@ angepasst werden.
 
 > **Hinweis:** Der Einsatz mit anderen Providern als IServ ist experimentell
 > und noch nicht produktiv getestet. Das Client-Secret wird unabhängig vom
-> Provider immer über `AUTH_ISERV_CLIENT_SECRET` in `config/.env` übergeben —
+> Provider immer über `AUTH_ISERV_CLIENT_SECRET` in `.env` übergeben —
 > der Variablenname bleibt aus Kompatibilitätsgründen unverändert.
 
 ## Automatische Kontoverwaltung

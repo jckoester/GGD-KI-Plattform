@@ -32,7 +32,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 
 - [ ] Systemvoraussetzungen prüfen (Docker ≥ 24, Docker Compose ≥ 2.20)
 - [ ] Repository klonen
-- [ ] `config/.env` aus `config/.env.example` erstellen und befüllen
+- [ ] `.env` aus `.env.example` erstellen und befüllen
 - [ ] `config/auth.yaml` aus `config/auth.example.yaml` erstellen und befüllen
 - [ ] `config/budget_tiers.yaml` aus `config/budget_tiers.example.yaml` erstellen
 - [ ] `infra/litellm_config.yaml` aus `infra/litellm_config.example.yaml` erstellen

@@ -6,7 +6,7 @@ und `infra/` (Infrastruktur). Beispieldateien enden auf `.example.yaml` bzw.
 
 ---
 
-## `config/.env`
+## `.env`
 
 Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen.
 
@@ -103,7 +103,7 @@ keiner Rolle zugeordnet sind, können sich nicht einloggen.
 
 > **Hinweis:** Das Client-Secret des SSO-Providers wird **nicht** in dieser Datei
 > gespeichert, sondern über die Umgebungsvariable `AUTH_ISERV_CLIENT_SECRET` in
-> `config/.env` übergeben.
+> `.env` übergeben.
 
 ---
 

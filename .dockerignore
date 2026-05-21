@@ -13,7 +13,7 @@ frontend/build
 backend/venv
 
 # Lokale Konfiguration (wird per Volume gemountet)
-config/.env
+.env
 config/auth.yaml
 config/test_users.yaml
 

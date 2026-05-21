@@ -43,7 +43,7 @@ Kurzversion:
 # Backend
 cd backend && python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp config/.env.example config/.env  # befüllen
+cp .env.example .env  # befüllen
 alembic upgrade head
 uvicorn app.main:app --reload
 

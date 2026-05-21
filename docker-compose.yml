@@ -2,7 +2,7 @@ services:
 
   db:
     image: postgres:16-alpine
-    env_file: config/.env
+    env_file: .env
     environment:
       POSTGRES_DB: ggd_ki
       POSTGRES_USER: postgres
@@ -17,7 +17,7 @@ services:
 
   backend:
     build: ./backend
-    env_file: config/.env
+    env_file: .env
     environment:
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
@@ -59,7 +59,7 @@ services:
 
   cron:
     build: ./backend
-    env_file: config/.env
+    env_file: .env
     environment:
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml

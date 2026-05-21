@@ -33,7 +33,7 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Konfiguration anlegen
-cp config/.env.example config/.env
+cp .env.example .env
 ```
 
 Minimale `.env` für die lokale Entwicklung:
