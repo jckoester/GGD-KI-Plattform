@@ -173,7 +173,8 @@
                     onclick={() => {
                         if (
                             openSection === "settings-texts" ||
-                            openSection === "settings"
+                            openSection === "settings" ||
+                            openSection === "settings-guardrail"
                         ) {
                             openSection = "";
                         } else {
@@ -182,7 +183,7 @@
                     }}
                 >
                     <span class="flex items-center gap-2">
-                        {#if openSection === "settings" || openSection === "settings-texts"}
+                        {#if openSection === "settings" || openSection === "settings-texts" || openSection === "settings-guardrail"}
                             <ChevronDown class="w-4 h-4" />
                         {:else}
                             <ChevronRight class="w-4 h-4" />
@@ -191,7 +192,7 @@
                 </button>
             </div>
         </div>
-        {#if openSection === "settings" || openSection === "settings-texts"}
+        {#if openSection === "settings" || openSection === "settings-texts" || openSection === "settings-guardrail"}
             <div class="mt-1 space-y-1 pl-2">
                 <button
                     onclick={() => goto(`/settings/models`)}
@@ -213,6 +214,16 @@
                     <span class="flex items-center gap-2">
                         <Bot class="w-4 h-4" />
                         Assistenten-Freigabe
+                    </span>
+                </button>
+                <button
+                    onclick={() => goto('/settings/guardrail')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <ShieldCheck class="w-4 h-4" />
+                        Guardrails
                     </span>
                 </button>
                 <div

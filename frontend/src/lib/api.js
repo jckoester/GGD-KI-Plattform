@@ -447,6 +447,42 @@ export async function saveSiteText(key, content) {
   return res.json(); // { key, updated_at }
 }
 
+export async function getGuardrailPrompt() {
+  const res = await fetch(`${BASE}/admin/guardrail/prompt`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { prompt: str | null, updated_at: str | null, updated_by: str | null }
+}
+
+export async function saveGuardrailPrompt(prompt) {
+  const res = await fetch(`${BASE}/admin/guardrail/prompt`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { prompt, updated_at, updated_by }
+}
+
+export async function getLiteLLMGuardrails() {
+  const res = await fetch(`${BASE}/admin/guardrail/litellm`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { guardrails: [{ name, mode }], available: bool }
+}
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);
