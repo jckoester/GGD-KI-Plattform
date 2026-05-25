@@ -39,7 +39,7 @@ def run_migrations(db_url, postgres_container):
     alembic_cfg = Config("alembic.ini")
     # Alembic-URL auf Testcontainer zeigen lassen (sync-URL für Alembic)
     sync_url = postgres_container.get_connection_url()
-    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
     command.upgrade(alembic_cfg, "head")
     return alembic_cfg
 
