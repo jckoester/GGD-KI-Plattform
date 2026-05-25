@@ -3,7 +3,6 @@
 Startet eine pgvector-Postgres-Instanz für die gesamte Test-Session.
 """
 
-import asyncio
 from collections.abc import AsyncIterator
 
 import pytest
@@ -47,7 +46,7 @@ def run_migrations(postgres_container):
     return sync_url
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def async_engine(db_url, run_migrations):
     """Async-Engine gegen die migrierte Test-DB."""
     engine = create_async_engine(db_url, echo=False)
@@ -55,7 +54,7 @@ async def async_engine(db_url, run_migrations):
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def db_session(async_engine) -> AsyncIterator[AsyncSession]:
     """Transaktionale DB-Session — wird nach jedem Test zurückgerollt."""
     session_factory = async_sessionmaker(

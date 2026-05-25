@@ -55,7 +55,7 @@ class TestMigration:
     def test_all_tables_exist(self, run_migrations, postgres_container):
         """Alle fünf Tabellen sind nach upgrade head vorhanden."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url())
+        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
         cur = conn.cursor()
         expected = {
             "context_nodes",
@@ -75,7 +75,7 @@ class TestMigration:
     def test_pgvector_extension_installed(self, run_migrations, postgres_container):
         """pgvector-Extension ist nach der Migration verfügbar."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url())
+        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
         cur = conn.cursor()
         cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
         assert cur.fetchone() is not None, "pgvector nicht installiert"
@@ -85,7 +85,7 @@ class TestMigration:
     def test_embedding_column_is_vector_type(self, run_migrations, postgres_container):
         """embedding-Spalte hat Typ vector(1536)."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url())
+        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
         cur = conn.cursor()
         cur.execute("""
             SELECT udt_name
