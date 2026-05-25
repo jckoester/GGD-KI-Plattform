@@ -35,6 +35,7 @@ from app.api.groups import router as groups_router
 from app.api.subjects import router as subjects_router
 from app.site_texts.router import router as site_texts_router
 from app.upload.router import router as upload_router
+from app.context.router import router as context_router
 
 logger = logging.getLogger(__name__)
 
@@ -87,3 +88,4 @@ app.include_router(site_texts_router)
 app.include_router(upload_router)
 app.include_router(subjects_router)
 app.include_router(groups_router)
+app.include_router(context_router)
