@@ -1,6 +1,8 @@
 # Claude Code / Agents
 CLAUDE.md
 AGENTS.md
+.claude/
+.claude/settings.local.json
 
 # Secrets & local config
 .env
