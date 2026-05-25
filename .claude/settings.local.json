@@ -6,5 +6,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/assistants -H \"Cookie: session=invalid\")",
       "Bash(kill %1)"
     ]
+    "additionalDirectories": [
+      "/Users/jan/Documents/PKM/Projekte/Konzeption GGD KI Client"
+    ]
   }
 }
