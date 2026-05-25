@@ -1,10 +1,11 @@
-from datetime import datetime
-from uuid import UUID
+from datetime import datetime, date
+from uuid import UUID, UUID as UUIDType
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Numeric, Boolean
+from pgvector.sqlalchemy import Vector
 
 import enum
 from typing import Optional
@@ -382,3 +383,254 @@ class SiteConfig(Base):
         server_default=text("now()")
     )
     updated_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# 12. context_nodes
+class ContextNode(Base):
+    __tablename__ = "context_nodes"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=text("'{}'")
+    )
+    embedding: Mapped[Optional[list]] = mapped_column(Vector(1536), nullable=True)
+
+    owner_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    read_scope: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'school'")
+    )
+    write_scope: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'private'")
+    )
+    read_scope_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    )
+    write_scope_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    )
+    assistant_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
+    )
+
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'active'")
+    )
+    valid_until: Mapped[Optional[date]] = mapped_column(nullable=True)
+    archived_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    schuljahr: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('document','knowledge','artifact','concept')",
+            name="check_context_nodes_category",
+        ),
+        CheckConstraint(
+            "read_scope IN ('global','school','subject','group','private')",
+            name="check_context_nodes_read_scope",
+        ),
+        CheckConstraint(
+            "write_scope IN ('global','school','subject','group','private')",
+            name="check_context_nodes_write_scope",
+        ),
+        CheckConstraint(
+            "status IN ('active','archived','deleted')",
+            name="check_context_nodes_status",
+        ),
+        CheckConstraint(
+            "read_scope NOT IN ('subject','group') OR read_scope_group_id IS NOT NULL",
+            name="check_context_nodes_read_group_id",
+        ),
+        CheckConstraint(
+            "write_scope NOT IN ('subject','group') OR write_scope_group_id IS NOT NULL",
+            name="check_context_nodes_write_group_id",
+        ),
+        CheckConstraint(
+            """
+            CASE write_scope
+              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
+              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+            END
+            <=
+            CASE read_scope
+              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
+              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+            END
+            """,
+            name="check_context_nodes_scope_restrictivity",
+        ),
+        Index("idx_context_nodes_cat_type", "category", "content_type"),
+        Index("idx_context_nodes_read", "read_scope", "read_scope_group_id"),
+        Index(
+            "idx_context_nodes_owner", "owner_pseudonym",
+            postgresql_where=text("owner_pseudonym IS NOT NULL"),
+        ),
+        Index(
+            "idx_context_nodes_assistant", "assistant_id",
+            postgresql_where=text("assistant_id IS NOT NULL"),
+        ),
+        Index("idx_context_nodes_status", "status"),
+        Index(
+            "idx_context_nodes_valid_until", "valid_until",
+            postgresql_where=text("valid_until IS NOT NULL"),
+        ),
+        Index(
+            "idx_context_nodes_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_where=text("embedding IS NOT NULL"),
+        ),
+    )
+
+
+# 13. context_edges
+class ContextEdge(Base):
+    __tablename__ = "context_edges"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    from_node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    to_node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    relation: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=text("'{}'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "relation IN ('requires','used_with','part_of','develops',"
+            "             'supersedes','references','follows','reflects_on','derived_from')",
+            name="check_context_edges_relation",
+        ),
+        Index("idx_context_edges_from", "from_node_id"),
+        Index("idx_context_edges_to", "to_node_id"),
+        Index("idx_context_edges_relation", "relation"),
+        Index(
+            "idx_context_edges_unique",
+            "from_node_id", "to_node_id", "relation",
+            unique=True,
+        ),
+    )
+
+
+# 14. node_engagement
+class NodeEngagement(Base):
+    __tablename__ = "node_engagement"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=True
+    )
+    node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    relation: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    strength: Mapped[Optional[float]] = mapped_column(Numeric(3, 2), nullable=True)
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=text("'{}'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "relation IN ('introduced','knows','mastered','struggles_with')",
+            name="check_node_engagement_relation",
+        ),
+        CheckConstraint(
+            "(pseudonym IS NOT NULL) <> (group_id IS NOT NULL)",
+            name="check_node_engagement_subject_xor",
+        ),
+        CheckConstraint(
+            "group_id IS NULL OR relation = 'introduced'",
+            name="check_node_engagement_group_relation",
+        ),
+        Index(
+            "idx_engagement_pseudonym", "pseudonym",
+            postgresql_where=text("pseudonym IS NOT NULL"),
+        ),
+        Index(
+            "idx_engagement_group", "group_id",
+            postgresql_where=text("group_id IS NOT NULL"),
+        ),
+        Index("idx_engagement_node", "node_id"),
+        Index(
+            "idx_engagement_unique_user",
+            "pseudonym", "node_id", "relation",
+            unique=True,
+            postgresql_where=text("pseudonym IS NOT NULL"),
+        ),
+        Index(
+            "idx_engagement_unique_group",
+            "group_id", "node_id", "relation",
+            unique=True,
+            postgresql_where=text("group_id IS NOT NULL"),
+        ),
+    )
+
+
+# 15. assistant_context_anchors
+class AssistantContextAnchor(Base):
+    __tablename__ = "assistant_context_anchors"
+
+    assistant_id: Mapped[int] = mapped_column(
+        ForeignKey("assistants.id", ondelete="CASCADE"), primary_key=True
+    )
+    node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(Text, primary_key=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('always_include','retrieval_scope')",
+            name="check_assistant_context_anchors_role",
+        ),
+    )
+
+
+# 16. chat_context_nodes
+class ChatContextNode(Base):
+    __tablename__ = "chat_context_nodes"
+
+    chat_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
