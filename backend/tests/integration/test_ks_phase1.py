@@ -21,8 +21,6 @@ from app.db.models import (
 )
 
 
-pytestmark = pytest.mark.asyncio
-
 
 # ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
