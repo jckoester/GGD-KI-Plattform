@@ -46,15 +46,15 @@ def run_migrations(postgres_container):
     return sync_url
 
 
-@pytest_asyncio.fixture(scope="session", loop_scope="session")
+@pytest_asyncio.fixture
 async def async_engine(db_url, run_migrations):
-    """Async-Engine gegen die migrierte Test-DB."""
+    """Async-Engine gegen die migrierte Test-DB — neu pro Test."""
     engine = create_async_engine(db_url, echo=False)
     yield engine
     await engine.dispose()
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture
 async def db_session(async_engine) -> AsyncIterator[AsyncSession]:
     """Transaktionale DB-Session — wird nach jedem Test zurückgerollt."""
     session_factory = async_sessionmaker(
