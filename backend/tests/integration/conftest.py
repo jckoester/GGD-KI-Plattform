@@ -31,17 +31,20 @@ def db_url(postgres_container) -> str:
 
 
 @pytest.fixture(scope="session")
-def run_migrations(db_url, postgres_container):
+def run_migrations(postgres_container):
     """Spielt die Alembic-Migrationen gegen die Test-DB durch."""
     from alembic import command
     from alembic.config import Config
+    from sqlalchemy import create_engine
 
-    alembic_cfg = Config("alembic.ini")
-    # Alembic-URL auf Testcontainer zeigen lassen (sync-URL für Alembic)
     sync_url = postgres_container.get_connection_url()
-    alembic_cfg.set_main_option("sqlalchemy.url", sync_url.replace("%", "%%"))
-    command.upgrade(alembic_cfg, "head")
-    return alembic_cfg
+    engine = create_engine(sync_url)
+    with engine.connect() as connection:
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.attributes["connection"] = connection
+        command.upgrade(alembic_cfg, "head")
+    engine.dispose()
+    return sync_url
 
 
 @pytest_asyncio.fixture(scope="session")
