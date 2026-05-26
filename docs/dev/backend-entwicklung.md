@@ -64,9 +64,9 @@ def test_something(httpx_mock: HTTPXMock):
 
 ### Integrationstests
 
-Integrationstests (`testcontainers[postgresql]`) sind vorbereitet, aber noch
-nicht vollständig ausgebaut. Sie starten eine echte PostgreSQL-Instanz in
-Docker und testen End-to-End. Ausführung setzt Docker voraus.
+Integrationstests laufen gegen eine lokale PostgreSQL-Instanz mit pgvector.
+Die Verbindungs-URL wird aus `TEST_DATABASE_URL` (`.env`) gelesen.
+Alembic-Migrationen werden automatisch vor der Test-Session eingespielt.
 
 ## Skripte (`backend/scripts/`)
 

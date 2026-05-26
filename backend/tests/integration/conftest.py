@@ -1,42 +1,48 @@
-"""Testcontainers-Fixtures für Integrationstests.
+"""Fixtures für Integrationstests.
 
-Startet eine pgvector-Postgres-Instanz für die gesamte Test-Session.
+Erwartet eine laufende PostgreSQL-Instanz mit pgvector.
+Verbindungs-URL aus TEST_DATABASE_URL (Umgebungsvariable oder .env).
+
+Beispiel:
+  TEST_DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/ggd_ki_test
 """
 
+import os
 from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from testcontainers.postgres import PostgresContainer
+
+load_dotenv()
 
 
-POSTGRES_IMAGE = "pgvector/pgvector:pg16"
-
-
-@pytest.fixture(scope="session")
-def postgres_container():
-    """Startet den Postgres-Container für die gesamte Test-Session."""
-    with PostgresContainer(POSTGRES_IMAGE) as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def db_url(postgres_container) -> str:
-    """Asyncpg-URL des Testcontainers."""
-    sync_url = postgres_container.get_connection_url()
-    # testcontainers liefert psycopg2-URL; für asyncpg das Schema tauschen
-    return sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+def _get_test_db_url() -> str:
+    url = os.environ.get("TEST_DATABASE_URL", "")
+    if not url:
+        raise RuntimeError(
+            "TEST_DATABASE_URL ist nicht gesetzt. "
+            "Bitte in .env oder als Umgebungsvariable setzen:\n"
+            "  TEST_DATABASE_URL=postgresql+asyncpg://postgres:pw@localhost:5432/ggd_ki_test"
+        )
+    return url
 
 
 @pytest.fixture(scope="session")
-def run_migrations(postgres_container):
+def db_url() -> str:
+    """Asyncpg-URL der Test-Datenbank (aus TEST_DATABASE_URL)."""
+    return _get_test_db_url()
+
+
+@pytest.fixture(scope="session")
+def run_migrations(db_url):
     """Spielt die Alembic-Migrationen gegen die Test-DB durch."""
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import create_engine
 
-    sync_url = postgres_container.get_connection_url()
+    sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
     engine = create_engine(sync_url)
     with engine.connect() as connection:
         alembic_cfg = Config("alembic.ini")

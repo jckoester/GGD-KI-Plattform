@@ -1,7 +1,4 @@
-"""Integrationstests für KS-Phase-1: Migration und CRUD-Roundtrip.
-
-Testet gegen eine echte pgvector-Postgres-Instanz via Testcontainers.
-"""
+"""Integrationstests für KS-Phase-1: Migration und CRUD-Roundtrip."""
 
 import pytest
 import pytest_asyncio
@@ -50,10 +47,10 @@ async def insert_node(db, **kwargs) -> ContextNode:
 
 class TestMigration:
 
-    def test_all_tables_exist(self, run_migrations, postgres_container):
+    def test_all_tables_exist(self, run_migrations, db_url):
         """Alle fünf Tabellen sind nach upgrade head vorhanden."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
         cur = conn.cursor()
         expected = {
             "context_nodes",
@@ -70,20 +67,20 @@ class TestMigration:
         cur.close()
         conn.close()
 
-    def test_pgvector_extension_installed(self, run_migrations, postgres_container):
+    def test_pgvector_extension_installed(self, run_migrations, db_url):
         """pgvector-Extension ist nach der Migration verfügbar."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
         cur = conn.cursor()
         cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
         assert cur.fetchone() is not None, "pgvector nicht installiert"
         cur.close()
         conn.close()
 
-    def test_embedding_column_is_vector_type(self, run_migrations, postgres_container):
+    def test_embedding_column_is_vector_type(self, run_migrations, db_url):
         """embedding-Spalte hat Typ vector(1536)."""
         import psycopg2
-        conn = psycopg2.connect(postgres_container.get_connection_url().replace("postgresql+psycopg2://", "postgresql://"))
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
         cur = conn.cursor()
         cur.execute("""
             SELECT udt_name
