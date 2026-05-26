@@ -523,7 +523,8 @@ class ContextEdge(Base):
     __table_args__ = (
         CheckConstraint(
             "relation IN ('requires','used_with','part_of','develops',"
-            "             'supersedes','references','follows','reflects_on','derived_from')",
+            "             'supersedes','references','follows','reflects_on','derived_from',"
+            "             'related_to')",
             name="check_context_edges_relation",
         ),
         Index("idx_context_edges_from", "from_node_id"),

@@ -88,9 +88,17 @@ class TestGetValidUntilOffset:
 class TestGetScopeDefaults:
 
     def test_global_types(self):
-        for ct in ("fachplan", "ik_kompetenz", "pk_kompetenz", "leitidee"):
+        for ct in ("fachplan", "ik_kompetenz", "pk_kompetenz", "leitidee", "leitperspektive_aspekt"):
             read, write = get_scope_defaults(ct)
             assert read == "global" and write == "global"
+
+    def test_leitperspektive_aspekt_valid(self):
+        validate_content_type("knowledge", "leitperspektive_aspekt")
+
+    def test_leitperspektive_aspekt_scope_defaults(self):
+        read_scope, write_scope = get_scope_defaults("leitperspektive_aspekt")
+        assert read_scope == "global"
+        assert write_scope == "global"
 
     def test_school_subject_curriculum(self):
         read, write = get_scope_defaults("curriculum")
