@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
 from app.context.schemas import ContextNodeCreate, ContextNodeRead, ContextNodeUpdate
+from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
 from app.db.models import ContextNode
 from app.db.session import get_db
@@ -112,8 +113,8 @@ async def create_node(
     await db.commit()
     await db.refresh(node)
 
-    # Embedding-Job in KS-Phase-2 hier einfügen:
-    # await enqueue_embedding_job(node.id, db)
+    # Embedding-Job
+    await enqueue_embedding_job(node.id, db)
 
     return node
 
