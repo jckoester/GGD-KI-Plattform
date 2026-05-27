@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.db.models import ContextNode
 from app.context.embedding import (
     EMBEDDING_CONTENT_TYPES,
-    build_embedding_input,
+    _build_embedding_input as build_embedding_input,
     generate_embedding,
 )
 
