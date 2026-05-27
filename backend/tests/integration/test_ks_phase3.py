@@ -1,9 +1,55 @@
 """KS-Phase-3 Integrationstests."""
+import json
+import uuid as _uuid
+
 import pytest
 import psycopg2
 from pathlib import Path
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def unit_vec(pos: int, dim: int = 1536) -> list[float]:
+    """Erzeugt einen Einheitsvektor an Position pos (1536 Dimensionen)."""
+    v = [0.0] * dim
+    v[pos] = 1.0
+    return v
+
+
+def insert_node_sync(db_url: str, *, content_type: str, title: str, content: str,
+                      metadata: dict, embedding: list[float] | None = None) -> str:
+    """Legt einen aktiven Knoten an, gibt seine UUID als String zurueck."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    node_id = str(_uuid.uuid4())
+    emb_str = "[" + ",".join(str(v) for v in embedding) + "]" if embedding else None
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO context_nodes
+              (id, category, content_type, title, content, metadata,
+               read_scope, write_scope, status)
+            VALUES (%s, 'knowledge', %s, %s, %s, %s, 'global', 'global', 'active')
+        """, (node_id, content_type, title, content, json.dumps(metadata)))
+        if emb_str:
+            cur.execute(
+                f"UPDATE context_nodes SET embedding = '{emb_str}'::vector WHERE id = %s",
+                (node_id,)
+            )
+    conn.commit()
+    conn.close()
+    return node_id
+
+
+def insert_edge_sync(db_url: str, from_id: str, to_id: str, relation: str) -> None:
+    """Legt eine Kante an."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO context_edges (from_node_id, to_node_id, relation)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (from_node_id, to_node_id, relation) DO NOTHING
+        """, (from_id, to_id, relation))
+    conn.commit()
+    conn.close()
 
 
 @pytest.fixture(autouse=True)
@@ -233,3 +279,352 @@ class TestContextAnchorsAPI:
             headers=auth_headers,
         )
         assert add_resp2.status_code == 409
+
+
+# -----------------------------------------------------------------------------
+
+class TestSemanticSearch:
+    """Integrationstests fuer die semantische Suche in retrieval.py."""
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_finds_relevant_node(self, db_session, db_url):
+        """Anlegen von 3 Knoten mit verschiedenen Embeddings; Query-Embedding ahnlich zu Knoten 1 -> Knoten 1 ist erstes Ergebnis."""
+        from app.context.retrieval import get_semantic_context
+
+        # 3 Knoten mit unterschiedlichen Embeddings anlegen
+        node1 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Knoten 1",
+            content="Inhalt 1",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        node2 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Knoten 2",
+            content="Inhalt 2",
+            metadata={},
+            embedding=unit_vec(100),
+        )
+        node3 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Knoten 3",
+            content="Inhalt 3",
+            metadata={},
+            embedding=unit_vec(200),
+        )
+
+        # Query-Embedding nah an node1 (pos 0 mit hohem Wert)
+        # Mock von generate_embedding
+        from unittest.mock import patch, AsyncMock
+        query_embedding = [0.9] + [0.01] * 1535
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=query_embedding,
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[node1, node2, node3],
+                query_text="irgendwas",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        # node1 sollte erstes Ergebnis sein (kleinstes Cosinus-Distance)
+        assert len(results) == 3
+        assert str(results[0].id) == node1
+
+    @pytest.mark.asyncio
+    async def test_no_anchors_returns_empty(self, db_session):
+        """anchor_ids=[] -> leere Liste, kein Fehler."""
+        from app.context.retrieval import get_semantic_context
+
+        results = await get_semantic_context(
+            anchor_ids=[],
+            query_text="irgendwas",
+            pseudonym="test",
+            db=db_session,
+            top_k=10,
+        )
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_archived_nodes_excluded(self, db_session, db_url):
+        """Archivierter Knoten im Scope -> nicht im Ergebnis."""
+        from app.context.retrieval import get_semantic_context
+
+        node1 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Aktiv",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        node2 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Archiviert",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(100),
+        )
+
+        # node2 archivieren
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("UPDATE context_nodes SET status = 'archived' WHERE id = %s", (node2,))
+        conn.commit()
+        conn.close()
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(0),
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[node1, node2],
+                query_text="test",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        # Nur node1 sollte zurueckgegeben werden
+        assert len(results) == 1
+        assert str(results[0].id) == node1
+
+    @pytest.mark.asyncio
+    async def test_node_without_embedding_excluded(self, db_session, db_url):
+        """Knoten ohne Embedding im Scope -> nicht im Ergebnis."""
+        from app.context.retrieval import get_semantic_context
+
+        node1 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Mit Embedding",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        node2 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Ohne Embedding",
+            content="Inhalt",
+            metadata={},
+            embedding=None,
+        )
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(0),
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[node1, node2],
+                query_text="test",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        assert len(results) == 1
+        assert str(results[0].id) == node1
+
+    @pytest.mark.asyncio
+    async def test_scope_cte_follows_part_of(self, db_session, db_url):
+        """Anker = Leitidee-Knoten; ik_kompetenz-Knoten mit part_of-Kante -> im Ergebnis."""
+        from app.context.retrieval import get_semantic_context
+
+        leitidee = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Leitidee",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        ik = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(100),
+        )
+
+        # ik ist part_of leitidee
+        insert_edge_sync(db_url, from_id=ik, to_id=leitidee, relation="part_of")
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(100),
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[leitidee],
+                query_text="test",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        # Beide Knoten sollten im Ergebnis sein
+        result_ids = {str(r.id) for r in results}
+        assert leitidee in result_ids
+        assert ik in result_ids
+
+    @pytest.mark.asyncio
+    async def test_scope_cte_follows_references(self, db_session, db_url):
+        """Anker = UE-Knoten; ik_kompetenz mit references-Kante vom Anker -> im Ergebnis."""
+        from app.context.retrieval import get_semantic_context
+
+        ue = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="UE",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        ik = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(100),
+        )
+
+        # ue referenziert ik
+        insert_edge_sync(db_url, from_id=ue, to_id=ik, relation="references")
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(100),
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[ue],
+                query_text="test",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        result_ids = {str(r.id) for r in results}
+        assert ue in result_ids
+        assert ik in result_ids
+
+    @pytest.mark.asyncio
+    async def test_read_scope_private_excluded_for_other_user(self, db_session, db_url):
+        """Knoten mit read_scope='private', owner='anderes-pseudonym' -> nicht im Ergebnis fuer aktuelles Pseudonym."""
+        from app.context.retrieval import get_semantic_context
+
+        node1 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Privat fuer other",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+
+        # node1 als privat fuer anderes Pseudonym markieren
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE context_nodes SET read_scope = 'private', write_scope = 'private', owner_pseudonym = 'other' WHERE id = %s",
+                (node1,)
+            )
+        conn.commit()
+        conn.close()
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(0),
+        ):
+            results = await get_semantic_context(
+                anchor_ids=[node1],
+                query_text="test",
+                pseudonym="current_user",
+                db=db_session,
+                top_k=10,
+            )
+
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_scope_filter_excludes_out_of_scope(self, db_session, db_url):
+        """Zwei Anker-Subgraphen; Knoten ausserhalb des Scope werden nicht zurueckgegeben."""
+        from app.context.retrieval import get_semantic_context
+
+        # Anker 1 mit seinem Subgraphen
+        anchor1 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker 1",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        node1 = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK 1",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(1),
+        )
+        insert_edge_sync(db_url, from_id=node1, to_id=anchor1, relation="part_of")
+
+        # Anker 2 mit seinem Subgraphen
+        anchor2 = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker 2",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(100),
+        )
+        node2 = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK 2",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(101),
+        )
+        insert_edge_sync(db_url, from_id=node2, to_id=anchor2, relation="part_of")
+
+        from unittest.mock import patch, AsyncMock
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(1),
+        ):
+            # Suche nur im Scope von anchor1
+            results = await get_semantic_context(
+                anchor_ids=[anchor1],
+                query_text="test",
+                pseudonym="test",
+                db=db_session,
+                top_k=10,
+            )
+
+        result_ids = {str(r.id) for r in results}
+        assert anchor1 in result_ids
+        assert node1 in result_ids
+        assert anchor2 not in result_ids
+        assert node2 not in result_ids

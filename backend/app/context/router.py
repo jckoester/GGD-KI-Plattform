@@ -20,6 +20,7 @@ from app.auth.jwt import JwtPayload
 from app.context.schemas import ContextAnchorCreate, ContextAnchorRead, ContextNodeCreate, ContextNodeRead, ContextNodeUpdate
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
+from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.db.models import Assistant, AssistantContextAnchor, ContextNode
 from app.db.session import get_db
 
@@ -28,12 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/context", tags=["context"])
 
 _TEACHER_OR_ADMIN = require_any_role(["teacher", "admin"])
-
-# Nur strukturell sinnvolle Einstiegspunkte als retrieval_scope zulässig
-VALID_SCOPE_ANCHOR_TYPES: frozenset[str] = frozenset({
-    "fachplan", "leitidee", "pk_gruppe", "curriculum", "themengebiet",
-    "unterrichtseinheit", "unterrichtsstunde",
-})
 
 
 async def _check_anchor_permission(
