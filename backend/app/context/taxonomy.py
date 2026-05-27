@@ -18,6 +18,7 @@ VALID_CONTENT_TYPES: Final[dict[str, frozenset[str]]] = {
     }),
     "knowledge": frozenset({
         "fachplan",
+        "themengebiet",
         "leitidee",
         "ik_kompetenz",
         "pk_gruppe",
@@ -75,6 +76,7 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "pk_kompetenz": None,
     "leitperspektive": None,
     "leitperspektive_aspekt": None,
+    "themengebiet": None,
     "curriculum": None,
     "unterrichtseinheit": None,
     "methode": None,
@@ -112,6 +114,7 @@ SCOPE_DEFAULTS: Final[dict[str, tuple[str, str]]] = {
     "pk_kompetenz": ("global", "global"),
     "leitperspektive": ("global", "global"),
     "leitperspektive_aspekt": ("global", "global"),
+    "themengebiet": ("school", "school"),
     "curriculum": ("school", "subject"),
     "unterrichtseinheit": ("school", "subject"),
     "methode": ("school", "subject"),
@@ -178,3 +181,13 @@ def get_scope_defaults(content_type: str | None) -> tuple[str, str]:
     if content_type is None:
         return ("school", "private")
     return SCOPE_DEFAULTS.get(content_type, ("school", "private"))
+
+
+# Gibt an, welche metadata-Felder der Embedding-Job zusaetzlich zu `content`
+# in den Embedding-Input einbezieht. Kein Eintrag -> nur content wird embedded.
+EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
+    ("concept", "bauteil"): ["metadata.schaltzeichen.beschreibung"],
+    ("concept", "funktion"): ["metadata.signatur"],
+    ("knowledge", "ik_kompetenz"): ["metadata.breadcrumb"],
+    ("knowledge", "pk_kompetenz"): ["metadata.breadcrumb"],
+}

@@ -10,6 +10,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode
+from app.context.taxonomy import EMBEDDING_ENRICHMENT
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +24,66 @@ EMBEDDING_CONTENT_TYPES = frozenset({
 })
 
 
-def build_embedding_input(node: ContextNode) -> str:
-    """Baut den Embedding-Input-String mit Breadcrumb-Praefix.
+def _build_signature_line(signatur: dict) -> str:
+    """Rekonstruiert eine lesbare Signaturzeile aus dem signatur-Dict.
 
-    Format: "Gymnasium | Chemie | Klasse 7/8 | Leitidee XY: <content>"
-    Der Breadcrumb kommt aus node.metadata_['breadcrumb'].
+    Beispiel: 'digitalWrite(pin: int, value: int) -> void'
+    Gibt leeren String zurueck wenn signatur leer oder unvollstaendig.
     """
-    breadcrumb: list[str] = node.metadata_.get('breadcrumb', [])
-    prefix = ' | '.join(breadcrumb)
-    content = node.content or node.title or ''
-    return f"{prefix}: {content}" if prefix else content
+    name = signatur.get("name", "")
+    if not name:
+        return ""
+    params = signatur.get("parameter", [])
+    rueckgabe = (signatur.get("rueckgabe") or {}).get("typ", "")
+    param_str = ", ".join(
+        f"{p.get('name', '?')}: {p.get('typ', '?')}" for p in params
+    )
+    arrow = f" -> {rueckgabe}" if rueckgabe else ""
+    return f"{name}({param_str}){arrow}"
+
+
+def _extract_metadata_field(metadata: dict, field_path: str) -> str:
+    """Extrahiert einen Wert aus verschachteltem metadata anhand eines Punktpfades.
+
+    Sonderfall: field_path == 'metadata.signatur' -> Signaturzeile rekonstruieren.
+    """
+    # Pfad ohne fuehrendes 'metadata.'
+    path = field_path.removeprefix("metadata.")
+
+    # Sonderfall: strukturierte Signaturzeile aus metadata.signatur
+    if path == "signatur":
+        return _build_signature_line(metadata.get("signatur", {}))
+
+    # Generischer Punktpfad-Zugriff (z.B. 'schaltzeichen.beschreibung')
+    parts = path.split(".")
+    value = metadata
+    for part in parts:
+        if not isinstance(value, dict):
+            return ""
+        value = value.get(part, "")
+    if isinstance(value, list):
+        return " | ".join(str(v) for v in value) if value else ""
+    return str(value) if value else ""
+
+
+def _build_embedding_input(node: ContextNode) -> str:
+    """Erstellt den Embedding-Input fuer einen Knoten.
+
+    Reichert `content` mit content_type-spezifischen metadata-Feldern an,
+    analog zur breadcrumb-Anreicherung fuer Bildungsplan-Knoten.
+    """
+    base = node.content or ""
+    enrichment_fields = EMBEDDING_ENRICHMENT.get((node.category, node.content_type), [])
+
+    prefixes: list[str] = []
+    for field_path in enrichment_fields:
+        value = _extract_metadata_field(node.metadata_ or {}, field_path)
+        if value:
+            prefixes.append(value)
+
+    if not prefixes:
+        return base
+    return "\n".join(prefixes) + "\n" + base
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -66,7 +117,7 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
     if node.content_type not in EMBEDDING_CONTENT_TYPES:
         return
     try:
-        text = build_embedding_input(node)
+        text = _build_embedding_input(node)
         embedding = await generate_embedding(text)
         await db.execute(
             update(ContextNode)

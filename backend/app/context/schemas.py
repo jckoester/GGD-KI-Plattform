@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class ContextNodeCreate(BaseModel):
@@ -46,7 +46,10 @@ class ContextNodeRead(BaseModel):
     content_type: str | None
     title: str
     content: str | None
-    metadata_: dict[str, Any] = Field(alias="metadata")
+    metadata_: dict[str, Any] = Field(
+        validation_alias=AliasChoices("metadata_", "metadata"),
+        serialization_alias="metadata",
+    )
     owner_pseudonym: str | None
     read_scope: str
     write_scope: str
@@ -61,3 +64,23 @@ class ContextNodeRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+# ── Context Anchor Schemas ──────────────────────────────────────────────────
+
+from typing import Literal
+
+
+class ContextAnchorCreate(BaseModel):
+    node_id: UUID
+    role: Literal["always_include", "retrieval_scope"]
+
+
+class ContextAnchorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    assistant_id: int
+    node_id: UUID
+    role: str
+    node_title: str
+    node_content_type: str | None = None
