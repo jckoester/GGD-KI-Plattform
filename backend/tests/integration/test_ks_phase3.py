@@ -52,13 +52,55 @@ def insert_edge_sync(db_url: str, from_id: str, to_id: str, relation: str) -> No
     conn.close()
 
 
+def insert_engagement_sync(db_url: str, *, node_id: str, pseudonym: str,
+                            relation: str = "knows", source: str = "chat_inference") -> None:
+    """Legt ein Nutzer-Engagement an."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO node_engagement (id, pseudonym, node_id, relation, source, metadata)
+            VALUES (gen_random_uuid(), %s, %s, %s, %s, '{}')
+            ON CONFLICT DO NOTHING
+        """, (pseudonym, node_id, relation, source))
+    conn.commit()
+    conn.close()
+
+
+def insert_group_engagement_sync(db_url: str, *, node_id: str, group_id: int,
+                                  relation: str = "introduced") -> None:
+    """Legt ein Gruppen-Engagement an."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO node_engagement (id, group_id, node_id, relation, source, metadata)
+            VALUES (gen_random_uuid(), %s, %s, %s, 'lesson_plan', '{}')
+            ON CONFLICT DO NOTHING
+        """, (group_id, node_id, relation))
+    conn.commit()
+    conn.close()
+
+
+def insert_group_membership_sync(db_url: str, *, group_id: int, pseudonym: str,
+                                   role_in_group: str = "student") -> None:
+    """Legt eine Gruppen-Mitgliedschaft an."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (group_id, pseudonym) DO NOTHING
+        """, (group_id, pseudonym, role_in_group))
+    conn.commit()
+    conn.close()
+
+
 @pytest.fixture(autouse=True)
-def truncate_ks3_tables(db_url, run_migrations):
+def truncate_ks3_tables(db_url, run_migrations, seed_test_group):
     """Leert alle Tabellen vor jedem Test."""
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
         cur.execute("""
-            TRUNCATE assistant_context_anchors, context_edges, context_nodes
+            TRUNCATE group_memberships, assistant_context_anchors, context_edges, context_nodes
             RESTART IDENTITY CASCADE
         """)
     conn.commit()
@@ -628,3 +670,289 @@ class TestSemanticSearch:
         assert node1 in result_ids
         assert anchor2 not in result_ids
         assert node2 not in result_ids
+
+
+# -----------------------------------------------------------------------------
+
+class TestEngagementRetrieval:
+    """Integrationstests fuer Engagement-Retrieval mit Scope-Filter."""
+
+    @pytest.mark.asyncio
+    async def test_personal_engagement_in_scope_returned(self, db_session, db_url):
+        """Schueler hat Engagement fuer Knoten im Scope -> Entry in Ergebnis."""
+        from app.context.retrieval import get_engagement_context
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(0),
+        )
+        node = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(1),
+        )
+        insert_edge_sync(db_url, from_id=node, to_id=anchor, relation="part_of")
+
+        # Engagement fuer node anlegen
+        insert_engagement_sync(db_url, node_id=node, pseudonym="test_user", relation="knows")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        assert len(results) == 1
+        assert str(results[0].node.id) == node
+        assert "knows" in results[0].relations
+        assert "user" in results[0].origins
+        assert isinstance(results[0].node.metadata_, dict)
+
+    @pytest.mark.asyncio
+    async def test_engagement_outside_scope_excluded(self, db_session, db_url):
+        """Schueler hat Engagement fuer Knoten ausserhalb des Anker-Subgraphen -> nicht im Ergebnis."""
+        from app.context.retrieval import get_engagement_context
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker",
+            content="Inhalt",
+            metadata={},
+        )
+        other_node = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="Anderer Knoten",
+            content="Inhalt",
+            metadata={},
+        )
+
+        # Engagement fuer other_node anlegen (nicht im Scope von anchor)
+        insert_engagement_sync(db_url, node_id=other_node, pseudonym="test_user", relation="knows")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_group_engagement_included(self, db_session, db_url):
+        """Gruppe hat introduced-Engagement fuer Knoten im Scope; Schueler ist Gruppenmitglied -> Entry mit origin=['group']."""
+        from app.context.retrieval import get_engagement_context
+
+        # Gruppe und Mitgliedschaft anlegen
+        group_id = 1
+        insert_group_membership_sync(db_url, group_id=group_id, pseudonym="test_user")
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker",
+            content="Inhalt",
+            metadata={},
+        )
+        node = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+        )
+        insert_edge_sync(db_url, from_id=node, to_id=anchor, relation="part_of")
+
+        # Gruppen-Engagement anlegen
+        insert_group_engagement_sync(db_url, node_id=node, group_id=group_id, relation="introduced")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        assert len(results) == 1
+        assert str(results[0].node.id) == node
+        assert "introduced" in results[0].relations
+        assert "group" in results[0].origins
+
+    @pytest.mark.asyncio
+    async def test_user_and_group_engagement_combined(self, db_session, db_url):
+        """Schueler hat eigenes UND Gruppen-Engagement fuer denselben Knoten -> ein Entry mit beiden origins."""
+        from app.context.retrieval import get_engagement_context
+
+        # Gruppe und Mitgliedschaft anlegen
+        group_id = 1
+        insert_group_membership_sync(db_url, group_id=group_id, pseudonym="test_user")
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker",
+            content="Inhalt",
+            metadata={},
+        )
+        node = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+        )
+        insert_edge_sync(db_url, from_id=node, to_id=anchor, relation="part_of")
+
+        # Eigenes Engagement
+        insert_engagement_sync(db_url, node_id=node, pseudonym="test_user", relation="knows")
+        # Gruppen-Engagement
+        insert_group_engagement_sync(db_url, node_id=node, group_id=group_id, relation="introduced")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        assert len(results) == 1
+        assert str(results[0].node.id) == node
+        assert "knows" in results[0].relations
+        assert "introduced" in results[0].relations
+        assert "user" in results[0].origins
+        assert "group" in results[0].origins
+
+    @pytest.mark.asyncio
+    async def test_no_anchors_returns_empty(self, db_session):
+        """anchor_ids=[] -> leere Liste, kein Fehler."""
+        from app.context.retrieval import get_engagement_context
+
+        results = await get_engagement_context(
+            anchor_ids=[],
+            pseudonym="test_user",
+            db=db_session,
+        )
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_archived_node_excluded(self, db_session, db_url):
+        """Engagement auf archivierten Knoten -> nicht im Ergebnis."""
+        from app.context.retrieval import get_engagement_context
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Anker",
+            content="Inhalt",
+            metadata={},
+        )
+        node = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+        )
+        insert_edge_sync(db_url, from_id=node, to_id=anchor, relation="part_of")
+
+        # Engagement anlegen
+        insert_engagement_sync(db_url, node_id=node, pseudonym="test_user", relation="knows")
+
+        # node archivieren
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("UPDATE context_nodes SET status = 'archived' WHERE id = %s", (node,))
+        conn.commit()
+        conn.close()
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_scope_via_part_of_chain(self, db_session, db_url):
+        """Anker = fachplan; ik_kompetenz im Subgraphen mit Engagement -> im Ergebnis."""
+        from app.context.retrieval import get_engagement_context
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="fachplan",
+            title="Fachplan",
+            content="Inhalt",
+            metadata={},
+        )
+        leitidee = insert_node_sync(
+            db_url,
+            content_type="leitidee",
+            title="Leitidee",
+            content="Inhalt",
+            metadata={},
+        )
+        ik = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+        )
+
+        # Kette: ik -> part_of -> leitidee -> part_of -> anchor
+        insert_edge_sync(db_url, from_id=ik, to_id=leitidee, relation="part_of")
+        insert_edge_sync(db_url, from_id=leitidee, to_id=anchor, relation="part_of")
+
+        # Engagement anlegen
+        insert_engagement_sync(db_url, node_id=ik, pseudonym="test_user", relation="mastered")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        result_ids = {str(r.node.id) for r in results}
+        assert ik in result_ids
+
+    @pytest.mark.asyncio
+    async def test_scope_via_references_edge(self, db_session, db_url):
+        """Anker = UE; ik_kompetenz via references-Edge mit Engagement -> im Ergebnis."""
+        from app.context.retrieval import get_engagement_context
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="UE",
+            content="Inhalt",
+            metadata={},
+        )
+        ik = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="IK",
+            content="Inhalt",
+            metadata={},
+        )
+
+        # UE referenziert IK
+        insert_edge_sync(db_url, from_id=anchor, to_id=ik, relation="references")
+
+        # Engagement anlegen
+        insert_engagement_sync(db_url, node_id=ik, pseudonym="test_user", relation="knows")
+
+        results = await get_engagement_context(
+            anchor_ids=[anchor],
+            pseudonym="test_user",
+            db=db_session,
+        )
+
+        result_ids = {str(r.node.id) for r in results}
+        assert ik in result_ids

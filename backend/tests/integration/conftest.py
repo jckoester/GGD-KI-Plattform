@@ -120,6 +120,22 @@ def seed_test_assistant(db_url, run_migrations):
     return 1
 
 
+@pytest.fixture(scope="session")
+def seed_test_group(db_url, run_migrations):
+    """Legt Gruppe ID=1 einmalig in der Test-DB an (für Engagement-Tests)."""
+    sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    conn = psycopg2.connect(sync_url)
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO groups (id, name, slug, type)
+            VALUES (1, 'Test-Gruppe', 'test-gruppe', 'teaching_group')
+            ON CONFLICT (id) DO NOTHING
+        """)
+    conn.commit()
+    conn.close()
+    return 1
+
+
 @pytest_asyncio.fixture
 async def test_client(async_engine, seed_test_assistant):
     """Async HTTP-TestClient für die FastAPI-App gegen die Test-DB."""
