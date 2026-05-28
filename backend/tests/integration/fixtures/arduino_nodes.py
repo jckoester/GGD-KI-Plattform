@@ -103,6 +103,20 @@ NODES: list[dict] = [
             "rueckgabe": {"typ": "unsigned long", "beschreibung": "Laufzeit in ms"},
         }},
     },
+    {
+        "slug": "arduino-fn-serialbegin",
+        "category": "concept", "content_type": "funktion",
+        "title": "Serial.begin",
+        "content": "Initialisiert die serielle Kommunikation mit der angegebenen Baudrate. Muss in setup() aufgerufen werden.",
+        "parent_slug": ROOT_SLUG,
+        "extra_metadata": {"signatur": {
+            "name": "Serial.begin", "sprache": "arduino_cpp",
+            "parameter": [
+                {"name": "speed", "typ": "long", "beschreibung": "Baudrate (z.B. 9600, 115200)"},
+            ],
+            "rueckgabe": {"typ": "void", "beschreibung": ""},
+        }},
+    },
 
     # ── Bauteile ─────────────────────────────────────────────────────────────
     {
@@ -183,6 +197,19 @@ NODES: list[dict] = [
             "kennung": "US",
         }},
     },
+    {
+        "slug": "arduino-bauteil-rgb-led",
+        "category": "concept", "content_type": "bauteil",
+        "title": "RGB-LED",
+        "content": "LED mit drei Farbkanälen (Rot, Grün, Blau). Gemeinsame Kathode (GND) oder Anode (+). Jeder Kanal braucht einen Vorwiderstand; Farbe durch Mischung der drei PWM-Werte.",
+        "parent_slug": ROOT_SLUG,
+        "extra_metadata": {"schaltzeichen": {
+            "svg": "",
+            "beschreibung": "Drei Diodensymbole (R/G/B) mit gemeinsamer Kathode; kein normiertes IEC-Symbol, schulübliche Darstellung",
+            "norm": None,
+            "kennung": "LED-RGB",
+        }},
+    },
 
     # ── Abstrakte Konzepte ───────────────────────────────────────────────────
     {
@@ -211,6 +238,20 @@ NODES: list[dict] = [
         "category": "concept", "content_type": "abstrakt",
         "title": "Duty Cycle",
         "content": "Verhältnis von HIGH-Zeit zur Gesamtperiode beim PWM-Signal, angegeben in Prozent (0-100 %) oder als Wert 0-255.",
+        "parent_slug": ROOT_SLUG,
+    },
+    {
+        "slug": "arduino-abstrakt-spi",
+        "category": "concept", "content_type": "abstrakt",
+        "title": "SPI",
+        "content": "Serial Peripheral Interface: schnelles synchrones Vier-Draht-Protokoll (MOSI, MISO, SCK, SS). Für Displays, SD-Karten und Sensoren mit hohem Datendurchsatz.",
+        "parent_slug": ROOT_SLUG,
+    },
+    {
+        "slug": "arduino-abstrakt-interrupt",
+        "category": "concept", "content_type": "abstrakt",
+        "title": "Interrupt",
+        "content": "Unterbricht den normalen Programmablauf bei einem externen Ereignis (z.B. steigende Flanke an einem Pin). Eingerichtet mit attachInterrupt(); die ISR muss kurz und IRAM_ATTR sein.",
         "parent_slug": ROOT_SLUG,
     },
 
