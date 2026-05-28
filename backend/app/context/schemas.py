@@ -84,3 +84,43 @@ class ContextAnchorRead(BaseModel):
     role: str
     node_title: str
     node_content_type: str | None = None
+
+
+# ── KS-Phase-4 Schemas ────────────────────────────────────────────────────
+
+
+class ContextEdgeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    from_node_id: UUID
+    to_node_id: UUID
+    relation: str
+    metadata_: dict[str, Any] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("metadata_", "metadata"),
+        serialization_alias="metadata",
+    )
+    created_at: datetime
+
+
+class NeighborhoodResponse(BaseModel):
+    nodes: list[ContextNodeRead]
+    edges: list[ContextEdgeRead]
+
+
+class ArchivedReferenceRead(BaseModel):
+    id: UUID
+    title: str
+    category: str
+    content_type: str | None
+    archived_at: datetime
+    relation: str
+    suggested_successor_id: UUID | None
+
+
+class ContextNodeCopyRequest(BaseModel):
+    schuljahr: str | None = None
+    valid_until: date | None = None
+    read_scope_group_id: int | None = None
+    write_scope_group_id: int | None = None
