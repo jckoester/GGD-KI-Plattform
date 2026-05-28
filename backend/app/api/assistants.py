@@ -14,7 +14,7 @@ from app.auth.dependencies import get_current_user, require_any_role
 from app.config import settings
 from app.auth.jwt import JwtPayload
 from app.config import settings
-from app.db.models import Assistant, Subject, AssistantDocument
+from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility
 from app.db.session import get_db
 from app.upload.extractor import extract_pdf, extract_plaintext
 
@@ -63,6 +63,7 @@ class AssistantSummary(BaseModel):
     subject_id: Optional[int]
     audience: str
     scope: str
+    visibility: str
     icon: Optional[str]
     tags: Optional[list[str]]
     min_grade: Optional[int]
@@ -122,6 +123,7 @@ class AssistantCreate(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: str = Field(default="student")
     scope: str = Field(default="private")
+    visibility: str = Field(default="public")
     scope_group_id: Optional[int] = None
     min_grade: Optional[int] = Field(default=None, ge=1, le=13)
     max_grade: Optional[int] = Field(default=None, ge=1, le=13)
@@ -142,6 +144,7 @@ class AssistantUpdate(BaseModel):
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: Optional[str] = None
     scope: Optional[str] = None
+    visibility: Optional[str] = None
     scope_group_id: Optional[int] = None
     min_grade: Optional[int] = Field(default=None, ge=1, le=13)
     max_grade: Optional[int] = Field(default=None, ge=1, le=13)
@@ -164,6 +167,7 @@ class AssistantResponse(BaseModel):
     status: str
     audience: str
     scope: str
+    visibility: str
     scope_group_id: Optional[int]
     scope_pending: Optional[str]
     min_grade: Optional[int]
@@ -227,6 +231,7 @@ def _assistant_to_yaml(assistant: Assistant, subject_slug: Optional[str]) -> str
             "grades": _grades_list(assistant.min_grade, assistant.max_grade),
             "tags": assistant.tags or [],
             "audience": assistant.audience,
+            "visibility": assistant.visibility,
             "available_from": assistant.available_from.isoformat() if assistant.available_from else None,
             "available_until": assistant.available_until.isoformat() if assistant.available_until else None,
             "updated": assistant.updated_at.date().isoformat(),
@@ -266,6 +271,7 @@ def _yaml_to_assistant_fields(data: dict, subject_id: Optional[int]) -> dict:
         "max_tokens": config.get("max_tokens"),
         "audience": meta["audience"],
         "scope": "private",
+        "visibility": meta.get("visibility", "public"),
         "min_grade": min(grades) if grades else None,
         "max_grade": max(grades) if grades else None,
         "tags": meta.get("tags"),
@@ -286,6 +292,7 @@ VALID_SCOPES = {
     "private", "subject_department", "teachers", "activity_group",
     "teaching_group", "grade", "all_students", "all",
 }
+VALID_VISIBILITIES = {"public", "private", "hidden"}
 GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 SCHOOLWIDE_SCOPES = {"grade", "all_students", "all"}
 
@@ -309,6 +316,7 @@ def validate_assistant_fields(
     system_prompt: Optional[str] = None,
     audience: Optional[str] = None,
     scope: Optional[str] = None,
+    visibility: Optional[str] = None,
     scope_group_id: Optional[int] = None,
     min_grade: Optional[int] = None,
     max_grade: Optional[int] = None,
@@ -324,6 +332,8 @@ def validate_assistant_fields(
         raise HTTPException(status_code=422, detail="Ungültiger audience-Wert")
     if scope is not None and scope not in VALID_SCOPES:
         raise HTTPException(status_code=422, detail="Ungültiger scope-Wert")
+    if visibility is not None and visibility not in VALID_VISIBILITIES:
+        raise HTTPException(status_code=422, detail="Ungültiger visibility-Wert")
     if scope is not None and scope in GROUP_SCOPES and scope_group_id is None:
         raise HTTPException(
             status_code=422, detail="Gruppen-Scope erfordert eine scope_group_id"
@@ -516,6 +526,7 @@ async def create_assistant(
         system_prompt=request.system_prompt,
         audience=request.audience,
         scope=request.scope,
+        visibility=request.visibility,
         scope_group_id=request.scope_group_id,
         min_grade=request.min_grade,
         max_grade=request.max_grade,
@@ -538,6 +549,7 @@ async def create_assistant(
         status=initial_status,
         audience=request.audience,
         scope=request.scope,
+        visibility=request.visibility,
         scope_group_id=request.scope_group_id,
         min_grade=request.min_grade,
         max_grade=request.max_grade,
@@ -576,7 +588,7 @@ async def update_assistant(
     
     update_data = request.model_dump(exclude_unset=True)
     validate_assistant_fields(**{k: update_data.get(k) for k in (
-        "name", "system_prompt", "audience", "scope", "scope_group_id",
+        "name", "system_prompt", "audience", "scope", "visibility", "scope_group_id",
         "min_grade", "max_grade", "available_from", "available_until",
     )})
     
@@ -838,6 +850,7 @@ async def import_assistant(
         system_prompt=fields.get("system_prompt"),
         audience=fields.get("audience"),
         scope=fields.get("scope"),
+        visibility=fields.get("visibility"),
         scope_group_id=fields.get("scope_group_id"),
         min_grade=fields.get("min_grade"),
         max_grade=fields.get("max_grade"),

@@ -70,10 +70,12 @@ def _make_assistant_ns(
     subject_id: int | None = None,
     audience: str = "all",
     scope: str = "private",
+    visibility: str = "public",
     icon: str | None = None,
     tags: list | None = None,
     min_grade: int | None = None,
     max_grade: int | None = None,
+    created_by: str | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=id,
@@ -82,10 +84,12 @@ def _make_assistant_ns(
         subject_id=subject_id,
         audience=audience,
         scope=scope,
+        visibility=visibility,
         icon=icon,
         tags=tags,
         min_grade=min_grade,
         max_grade=max_grade,
+        created_by=created_by,
     )
 
 

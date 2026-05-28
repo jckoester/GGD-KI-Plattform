@@ -956,3 +956,184 @@ class TestEngagementRetrieval:
 
         result_ids = {str(r.node.id) for r in results}
         assert ik in result_ids
+
+
+def insert_anchor_sync(db_url: str, *, assistant_id: int, node_id: str, role: str) -> None:
+    """Legt einen AssistantContextAnchor an."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO assistant_context_anchors (assistant_id, node_id, role)
+            VALUES (%s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (assistant_id, node_id, role))
+    conn.commit()
+    conn.close()
+
+
+class TestContextAssembly:
+    """Integrationstests fuer get_context_for_query (KS-Phase-3, Schritt 4)."""
+
+    @pytest.mark.asyncio
+    async def test_empty_string_without_anchors(self, db_session, seed_test_assistant):
+        """Assistent ohne konfigurierte Anker gibt leeren Kontext-String zurück."""
+        from app.context.service import get_context_for_query
+
+        result = await get_context_for_query(
+            assistant_id=seed_test_assistant,
+            pseudonym="test_user",
+            query_text="Was ist eine Funktion?",
+            chat_id=None,
+            db=db_session,
+        )
+
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_semantic_nodes_in_output(self, db_session, db_url, seed_test_assistant):
+        """Anker konfiguriert + Knoten mit Embedding im Scope → Titel im Kontext."""
+        from unittest.mock import AsyncMock, patch
+        from app.context.service import get_context_for_query
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="Funktionsbegriff",
+            content="Einführung Funktionen",
+            metadata={},
+        )
+        child = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="Lineare Funktionen",
+            content="Beschreibung lineare Funktionen",
+            metadata={"breadcrumb": ["Mathematik", "Funktionen"]},
+            embedding=unit_vec(0),
+        )
+        insert_edge_sync(db_url, from_id=child, to_id=anchor, relation="part_of")
+        insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
+
+        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
+            result = await get_context_for_query(
+                assistant_id=seed_test_assistant,
+                pseudonym="test_user",
+                query_text="Lineare Funktionen",
+                chat_id=None,
+                db=db_session,
+            )
+
+        assert "Lineare Funktionen" in result
+        assert "## Relevante Lerninhalte" in result
+
+    @pytest.mark.asyncio
+    async def test_engagement_in_output(self, db_session, db_url, seed_test_assistant):
+        """Schüler hat Engagement für Scope-Knoten → Vorwissen-Abschnitt im Kontext."""
+        from unittest.mock import AsyncMock, patch
+        from app.context.service import get_context_for_query
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="Funktionsbegriff",
+            content="Inhalt",
+            metadata={},
+        )
+        kompetenz = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="Steigung berechnen",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(1),
+        )
+        insert_edge_sync(db_url, from_id=kompetenz, to_id=anchor, relation="part_of")
+        insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
+        insert_engagement_sync(db_url, node_id=kompetenz, pseudonym="test_user", relation="knows")
+
+        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(1))):
+            result = await get_context_for_query(
+                assistant_id=seed_test_assistant,
+                pseudonym="test_user",
+                query_text="Steigungsdreieck",
+                chat_id=None,
+                db=db_session,
+            )
+
+        assert "## Vorwissen dieses Lernenden" in result
+        assert "Steigung berechnen" in result
+
+    @pytest.mark.asyncio
+    async def test_no_engagement_section_if_empty(self, db_session, db_url, seed_test_assistant):
+        """Keine Engagements → kein Vorwissen-Abschnitt im Kontext-String."""
+        from unittest.mock import AsyncMock, patch
+        from app.context.service import get_context_for_query
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="Stochastik",
+            content="Inhalt",
+            metadata={},
+        )
+        child = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="Wahrscheinlichkeit",
+            content="Inhalt",
+            metadata={},
+            embedding=unit_vec(2),
+        )
+        insert_edge_sync(db_url, from_id=child, to_id=anchor, relation="part_of")
+        insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
+
+        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(2))):
+            result = await get_context_for_query(
+                assistant_id=seed_test_assistant,
+                pseudonym="test_user",
+                query_text="Wahrscheinlichkeit",
+                chat_id=None,
+                db=db_session,
+            )
+
+        assert "## Vorwissen dieses Lernenden" not in result
+        assert result != ""
+
+    @pytest.mark.asyncio
+    async def test_context_string_format(self, db_session, db_url, seed_test_assistant):
+        """Prüft Markdown-Abschnitte und Trennzeichen wenn beide Abschnitte vorhanden sind."""
+        from unittest.mock import AsyncMock, patch
+        from app.context.service import get_context_for_query
+
+        anchor = insert_node_sync(
+            db_url,
+            content_type="unterrichtseinheit",
+            title="Geometrie",
+            content="Inhalt",
+            metadata={},
+        )
+        kompetenz = insert_node_sync(
+            db_url,
+            content_type="ik_kompetenz",
+            title="Dreiecke",
+            content="Dreieck-Inhalt",
+            metadata={"breadcrumb": ["Mathematik", "Geometrie"]},
+            embedding=unit_vec(3),
+        )
+        insert_edge_sync(db_url, from_id=kompetenz, to_id=anchor, relation="part_of")
+        insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
+        insert_engagement_sync(db_url, node_id=kompetenz, pseudonym="test_user", relation="mastered")
+
+        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(3))):
+            result = await get_context_for_query(
+                assistant_id=seed_test_assistant,
+                pseudonym="test_user",
+                query_text="Dreiecke",
+                chat_id=None,
+                db=db_session,
+            )
+
+        assert "## Relevante Lerninhalte" in result
+        assert "## Vorwissen dieses Lernenden" in result
+        assert "\n\n---\n\n" in result
+        assert "Mathematik | Geometrie" in result
+        assert "beherrscht" in result

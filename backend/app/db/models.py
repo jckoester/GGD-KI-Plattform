@@ -41,6 +41,12 @@ class AssistantScope(enum.Enum):
     ALL = "all"
 
 
+class AssistantVisibility(enum.Enum):
+    PUBLIC = "public"
+    PRIVATE = "private"
+    HIDDEN = "hidden"
+
+
 class MessageRole(enum.Enum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -150,6 +156,10 @@ class Assistant(Base):
         ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
     )
 
+    visibility: Mapped[str] = mapped_column(
+        Text, default="public", server_default=text("'public'")
+    )
+
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
 
@@ -197,6 +207,10 @@ class Assistant(Base):
             "('private','subject_department','teachers','activity_group',"
             " 'teaching_group','grade','all_students','all')",
             name="check_assistant_scope_pending",
+        ),
+        CheckConstraint(
+            "visibility IN ('public','private','hidden')",
+            name="check_assistant_visibility",
         ),
         CheckConstraint(
             "creator_role IN ('admin', 'teacher')",

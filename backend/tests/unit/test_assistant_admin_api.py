@@ -9,11 +9,13 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.api.admin.assistants import (
+    AssistantResponse,
+)
+from app.api.assistants import (
     AssistantCreate,
     AssistantUpdate,
-    AssistantResponse,
     AssistantListResponse,
-    _validate_assistant_fields,
+    validate_assistant_fields as _validate_assistant_fields,
     _grades_list,
     _parse_iso,
     _assistant_to_yaml,
@@ -164,6 +166,7 @@ class TestAssistantResponse:
             status="draft",
             audience="student",
             scope="private",
+            visibility="public",
             scope_pending=None,
             min_grade=5,
             max_grade=10,
@@ -174,6 +177,7 @@ class TestAssistantResponse:
             sort_order=0,
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
+            creator_role="teacher",
             created_at=now,
             updated_at=now,
         )

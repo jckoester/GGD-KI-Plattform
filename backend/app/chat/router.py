@@ -21,6 +21,7 @@ from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart,
 from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
+from app.context.service import get_context_for_query
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 
@@ -412,6 +413,17 @@ async def chat(
     # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
     assistant_id_for_docs = active_assistant_id
 
+    # Kontext aus Kontextspeicher laden (KS-Phase-3)
+    context_str = ""
+    if active_assistant_id is not None:
+        context_str = await get_context_for_query(
+            assistant_id=active_assistant_id,
+            pseudonym=current_user.sub,
+            query_text=user_message,
+            chat_id=conversation_id,
+            db=db,
+        )
+
     llm_messages: list[dict] = []
 
     guardrail_prompt = await _get_guardrail_prompt(db)
@@ -436,7 +448,12 @@ async def chat(
             })
 
     if system_prompt_snapshot:
-        llm_messages.append({"role": "system", "content": system_prompt_snapshot})
+        effective_system_prompt = (
+            context_str + "\n\n---\n\n" + system_prompt_snapshot
+            if context_str
+            else system_prompt_snapshot
+        )
+        llm_messages.append({"role": "system", "content": effective_system_prompt})
     llm_messages.append({"role": "system", "content": _MARKDOWN_GUARDRAIL})
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
