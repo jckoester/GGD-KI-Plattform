@@ -26,7 +26,7 @@ from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/context", tags=["context"])
+router = APIRouter(prefix="/context", tags=["context"])
 
 _TEACHER_OR_ADMIN = require_any_role(["teacher", "admin"])
 
@@ -66,21 +66,24 @@ def _visibility_filter(query, user: JwtPayload):
 
 @router.get("/nodes", response_model=list[ContextNodeRead])
 async def list_nodes(
+    q: str | None = Query(default=None),
     category: str | None = Query(default=None),
-    content_type: str | None = Query(default=None),
+    content_type: list[str] | None = Query(default=None),
     status: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    q = select(ContextNode)
-    q = _visibility_filter(q, user)
+    query = select(ContextNode)
+    query = _visibility_filter(query, user)
+    if q:
+        query = query.where(ContextNode.title.ilike(f"%{q}%"))
     if category:
-        q = q.where(ContextNode.category == category)
+        query = query.where(ContextNode.category == category)
     if content_type:
-        q = q.where(ContextNode.content_type == content_type)
+        query = query.where(ContextNode.content_type.in_(content_type))
     if status:
-        q = q.where(ContextNode.status == status)
-    result = await db.execute(q.order_by(ContextNode.created_at.desc()))
+        query = query.where(ContextNode.status == status)
+    result = await db.execute(query.order_by(ContextNode.created_at.desc()))
     return result.scalars().all()
 
 

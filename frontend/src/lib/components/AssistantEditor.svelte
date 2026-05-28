@@ -1,5 +1,5 @@
 <script>
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import {
@@ -38,6 +38,10 @@
         getAssistantDocuments,
         uploadAssistantDocument,
         deleteAssistantDocument,
+        getContextAnchors,
+        addContextAnchor,
+        deleteContextAnchor,
+        searchContextNodes,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
@@ -84,6 +88,19 @@
     let docUploading = $state(false);
     let docError = $state(null);
 
+    // Kontext-Anker State (KS-Phase-3 Schritt 5)
+    let retrievalAnchors = $state([]);
+    let anchorQuery = $state("");
+    let anchorSearchResults = $state([]);
+    let anchorSearchLoading = $state(false);
+    let anchorError = $state(null);
+
+    // Content-Types für Retrieval-Scope
+    const SCOPE_CONTENT_TYPES = [
+        "fachplan", "leitidee", "pk_gruppe", "curriculum", "themengebiet",
+        "unterrichtseinheit", "unterrichtsstunde",
+    ];
+
     const MAX_DOCS = 3;
     const MAX_TOTAL_TOKENS = 15_000;
     const WARN_TOKENS = 10_000;
@@ -117,6 +134,79 @@
         documents = await getAssistantDocuments(form.id);
       } catch {
         // Fehler nicht anzeigen — UI-Einschränkung bei fehlendem Zugriff
+      }
+    }
+
+    // ── Kontext-Anker Funktionen (KS-Phase-3 Schritt 5) ───────────────────────
+
+    /**
+     * Lädt die Kontext-Anker für den Assistenten
+     */
+    async function loadContextAnchors() {
+      if (!form.id) return;
+      try {
+        const anchors = await getContextAnchors(form.id);
+        retrievalAnchors = anchors.filter((a) => a.role === "retrieval_scope");
+      } catch (e) {
+        // Fehler nicht anzeigen
+      }
+    }
+
+    /**
+     * Sucht nach Kontext-Knoten (mit Debounce)
+     */
+    let searchTimeout;
+    async function searchAnchorNodes() {
+      if (anchorQuery.length < 2) {
+        anchorSearchResults = [];
+        return;
+      }
+      anchorSearchLoading = true;
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(async () => {
+        try {
+          anchorSearchResults = await searchContextNodes(anchorQuery, SCOPE_CONTENT_TYPES);
+        } catch (e) {
+          anchorError = e.message ?? "Suche fehlgeschlagen";
+          anchorSearchResults = [];
+        } finally {
+          anchorSearchLoading = false;
+        }
+      }, 300);
+    }
+
+    /**
+     * Fügt einen neuen Kontext-Anker hinzu
+     */
+    async function addAnchor(node) {
+      if (!form.id) return;
+      
+      const already = retrievalAnchors.some((a) => a.node_id === node.id);
+      if (already) return;
+
+      try {
+        const anchor = await addContextAnchor(form.id, node.id, "retrieval_scope");
+        retrievalAnchors = [...retrievalAnchors, anchor];
+        anchorQuery = "";
+        anchorSearchResults = [];
+        anchorError = null;
+      } catch (e) {
+        anchorError = e.message ?? "Fehler beim Hinzufügen";
+      }
+    }
+
+    /**
+     * Entfernt einen Kontext-Anker
+     */
+    async function removeAnchor(anchor) {
+      if (!form.id) return;
+      
+      try {
+        await deleteContextAnchor(form.id, anchor.node_id, "retrieval_scope");
+        retrievalAnchors = retrievalAnchors.filter((a) => a.node_id !== anchor.node_id);
+        anchorError = null;
+      } catch (e) {
+        anchorError = e.message ?? "Fehler beim Entfernen";
       }
     }
 
@@ -357,6 +447,8 @@
                 form = mapAssistantToForm(a);
                 // Dokumente laden für bestehenden Assistenten
                 await loadDocuments();
+                // Kontext-Anker laden
+                await loadContextAnchors();
             } else {
                 const fromId = $page.url.searchParams.get("from");
                 if (fromId) {
@@ -599,6 +691,11 @@
     // ━━━━━━━━━━━━━━━━━━━━━━ Lifecycle ━━━━━━━━━━━━━━━━━━━━━
 
     onMount(load);
+
+    // Cleanup für Search-Timeout
+    onDestroy(() => {
+        clearTimeout(searchTimeout);
+    });
 
     $effect(() => {
         if (success) {
@@ -1184,6 +1281,85 @@
                         <!-- Fehlermeldung -->
                         {#if docError}
                           <p class="text-sm text-light-re dark:text-dark-re">{docError}</p>
+                        {/if}
+                    </div>
+
+                    <!-- Wissenskontext (KS-Phase-3 Schritt 5) -->
+                    <div class="space-y-3">
+                        <h3 class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                            Wissenskontext
+                        </h3>
+
+                        <div class="anchor-search relative">
+                            <input
+                                type="text"
+                                placeholder="Wissensgebiet suchen…"
+                                bind:value={anchorQuery}
+                                oninput={searchAnchorNodes}
+                                disabled={!canEdit}
+                                class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
+                         bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                         px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            {#if anchorSearchLoading}
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <Loader2 class="w-4 h-4 animate-spin text-light-tx-2 dark:text-dark-tx-2" />
+                                </div>
+                            {/if}
+                            {#if anchorSearchResults.length > 0 && anchorQuery.length >= 2}
+                                <ul class="absolute top-full left-0 right-0 mt-1 z-10 max-h-48 overflow-y-auto
+                            border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
+                            bg-light-bg-2 dark:bg-dark-bg-2 shadow-lg">
+                                    {#each anchorSearchResults as node}
+                                        <li class="px-3 py-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 cursor-pointer">
+                                            <button
+                                                type="button"
+                                                onclick={() => addAnchor(node)}
+                                                class="w-full text-left flex items-center gap-2 text-light-tx dark:text-dark-tx"
+                                            >
+                                                <span>{node.title}</span>
+                                                {#if node.content_type}
+                                                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2
+                                                        bg-light-ui-2 dark:bg-dark-ui-2 px-1.5 py-0.5 rounded-full">
+                                                        {node.content_type}
+                                                    </span>
+                                                {/if}
+                                            </button>
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                        </div>
+
+                        <div class="anchor-tags flex flex-wrap gap-2">
+                            {#each retrievalAnchors as anchor}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                            bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3
+                            text-sm text-light-tx dark:text-dark-tx">
+                                    {anchor.node_title}
+                                    <button
+                                        type="button"
+                                        onclick={() => removeAnchor(anchor)}
+                                        disabled={!canEdit}
+                                        class="p-0.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
+                               text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re
+                               transition-colors disabled:opacity-50"
+                                        title="Anker entfernen"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </span>
+                            {/each}
+                        </div>
+
+                        {#if anchorError}
+                            <p class="text-sm text-light-re dark:text-dark-re">{anchorError}</p>
+                        {/if}
+
+                        {#if retrievalAnchors.length > 0}
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Der Assistent sucht in allen Knoten, die diesen Wissensgebieten zugeordnet sind.
+                            </p>
                         {/if}
                     </div>
 

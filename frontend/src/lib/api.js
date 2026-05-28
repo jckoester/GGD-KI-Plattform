@@ -836,3 +836,84 @@ export async function rejectAssistant(id, reason = null) {
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json(); // AssistantResponse
 }
+
+// ── Kontext-Anker API (KS-Phase-3 Schritt 5) ────────────────────────────────
+
+/**
+ * Lädt alle Kontext-Anker für einen Assistenten
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @returns {Promise<ContextAnchorRead[]>} Liste der Anker
+ */
+export async function getContextAnchors(assistantId) {
+  const res = await fetch(`${BASE}/context/assistants/${assistantId}/anchors`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Laden der Kontext-Anker");
+  }
+  return res.json(); // ContextAnchorRead[]
+}
+
+/**
+ * Fügt einen neuen Kontext-Anker hinzu
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @param {string} nodeId - Die Knoten-ID
+ * @param {string} role - Die Rolle (z.B. "retrieval_scope")
+ * @returns {Promise<ContextAnchorRead>} Der neue Anker
+ */
+export async function addContextAnchor(assistantId, nodeId, role = "retrieval_scope") {
+  const res = await fetch(`${BASE}/context/assistants/${assistantId}/anchors`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_id: nodeId, role }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Hinzufügen des Kontext-Ankers");
+  }
+  return res.json(); // ContextAnchorRead
+}
+
+/**
+ * Entfernt einen Kontext-Anker
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @param {string} nodeId - Die Knoten-ID
+ * @param {string} role - Die Rolle (z.B. "retrieval_scope")
+ */
+export async function deleteContextAnchor(assistantId, nodeId, role = "retrieval_scope") {
+  const res = await fetch(
+    `${BASE}/context/assistants/${assistantId}/anchors/${nodeId}/${role}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Entfernen des Kontext-Ankers");
+  }
+}
+
+/**
+ * Durchsucht Kontext-Knoten nach Titel
+ * @param {string} query - Suchbegriff
+ * @param {string[]} contentTypes - Content-Types zum Filtern
+ * @returns {Promise<ContextNodeResult[]>} Suchergebnisse
+ */
+export async function searchContextNodes(query, contentTypes = []) {
+  if (query.length < 2) return [];
+  
+  const params = new URLSearchParams({ q: query });
+  contentTypes.forEach((type) => params.append("content_type", type));
+  
+  const res = await fetch(`${BASE}/context/nodes?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler bei der Knotensuche");
+  }
+  return res.json(); // ContextNodeResult[]
+}

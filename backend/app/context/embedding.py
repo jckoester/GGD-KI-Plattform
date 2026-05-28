@@ -16,11 +16,18 @@ logger = logging.getLogger(__name__)
 
 # content_types die ein Embedding erhalten (Whitelist)
 EMBEDDING_CONTENT_TYPES = frozenset({
+    # Bildungsplan-Typen
     'ik_kompetenz',
     'pk_kompetenz',
     'pk_gruppe',
     'leitidee',
     'leitperspektive_aspekt',
+    # Manuelle Wissensgraph-Typen (Arduino und andere)
+    'themengebiet',
+    'funktion',
+    'bauteil',
+    'abstrakt',
+    'konvention',
 })
 
 

@@ -117,7 +117,7 @@ class TestContextAnchorsAPI:
         """POST mit gueltigem fachplan-Knoten -> 201, Anker in DB."""
         # Erst einen Knoten erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "fachplan",
@@ -131,7 +131,7 @@ class TestContextAnchorsAPI:
 
         # Anker hinzufuegen
         add_resp = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
@@ -144,7 +144,7 @@ class TestContextAnchorsAPI:
         """POST mit ik_kompetenz-Knoten als retrieval_scope -> 422."""
         # Erst einen Knoten erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "ik_kompetenz",
@@ -158,7 +158,7 @@ class TestContextAnchorsAPI:
 
         # Anker hinzufuegen - sollte fehlschlagen
         add_resp = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
@@ -170,7 +170,7 @@ class TestContextAnchorsAPI:
         """POST mit themengebiet-Knoten -> 201 (Typ ist in VALID_SCOPE_ANCHOR_TYPES)."""
         # Erst einen Knoten erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "themengebiet",
@@ -184,7 +184,7 @@ class TestContextAnchorsAPI:
 
         # Anker hinzufuegen
         add_resp = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
@@ -195,7 +195,7 @@ class TestContextAnchorsAPI:
         """GET gibt alle Anker mit node_title zurueck."""
         # Erst einen Knoten und Anker erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "fachplan",
@@ -207,14 +207,14 @@ class TestContextAnchorsAPI:
         node_id = create_node_resp.json()["id"]
 
         await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
 
         # Liste abrufen
         list_resp = await test_client.get(
-            "/api/context/assistants/1/anchors",
+            "/context/assistants/1/anchors",
             headers=auth_headers,
         )
         assert list_resp.status_code == 200
@@ -227,7 +227,7 @@ class TestContextAnchorsAPI:
         """DELETE -> 204, Anker nicht mehr in DB."""
         # Erst einen Knoten und Anker erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "fachplan",
@@ -239,21 +239,21 @@ class TestContextAnchorsAPI:
         node_id = create_node_resp.json()["id"]
 
         await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
 
         # Loeschen
         del_resp = await test_client.delete(
-            f"/api/context/assistants/1/anchors/{node_id}/retrieval_scope",
+            f"/context/assistants/1/anchors/{node_id}/retrieval_scope",
             headers=auth_headers,
         )
         assert del_resp.status_code == 204
 
         # Pruefen dass geloescht
         list_resp = await test_client.get(
-            "/api/context/assistants/1/anchors",
+            "/context/assistants/1/anchors",
             headers=auth_headers,
         )
         assert len(list_resp.json()) == 0
@@ -263,7 +263,7 @@ class TestContextAnchorsAPI:
         """POST von fremdem Pseudonym -> 403."""
         # Erst einen Knoten erstellen (als teacher2)
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "fachplan",
@@ -278,7 +278,7 @@ class TestContextAnchorsAPI:
         # Versuchen als teacher1 einen Anker fuer Assistent 1 zu erstellen
         # (Assistent 1 gehoert teacher1, teacher2 darf nicht aendern)
         add_resp = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers_teacher2,
         )
@@ -296,7 +296,7 @@ class TestContextAnchorsAPI:
         """Zweimal denselben Anker -> 409."""
         # Erst einen Knoten erstellen
         create_node_resp = await test_client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={
                 "category": "knowledge",
                 "content_type": "fachplan",
@@ -309,7 +309,7 @@ class TestContextAnchorsAPI:
 
         # Ersten Anker hinzufuegen
         add_resp1 = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )
@@ -317,7 +317,7 @@ class TestContextAnchorsAPI:
 
         # Zweiten identischen Anker hinzufuegen -> sollte fehlschlagen
         add_resp2 = await test_client.post(
-            f"/api/context/assistants/1/anchors",
+            f"/context/assistants/1/anchors",
             json={"node_id": str(node_id), "role": "retrieval_scope"},
             headers=auth_headers,
         )

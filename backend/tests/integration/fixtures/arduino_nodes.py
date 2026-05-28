@@ -324,3 +324,17 @@ async def seed(db: AsyncSession) -> None:
         )
 
     await db.commit()
+
+
+async def teardown(db: AsyncSession) -> None:
+    """Löscht alle Arduino-Wissensgraph-Knoten aus der Datenbank.
+
+    Cascades automatisch auf context_edges, assistant_context_anchors
+    und node_engagement (alle FKs mit ON DELETE CASCADE).
+    """
+    for node in NODES:
+        await db.execute(
+            text("DELETE FROM context_nodes WHERE metadata->>'slug' = :slug"),
+            {"slug": node["slug"]},
+        )
+    await db.commit()
