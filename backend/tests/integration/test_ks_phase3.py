@@ -1,5 +1,6 @@
 """KS-Phase-3 Integrationstests."""
 import json
+import os
 import uuid as _uuid
 
 import pytest
@@ -1137,3 +1138,195 @@ class TestContextAssembly:
         assert "\n\n---\n\n" in result
         assert "Mathematik | Geometrie" in result
         assert "beherrscht" in result
+
+
+# =============================================================================
+# KS-Phase-3-Schritt-6: Arduino-Assistent E2E-Tests
+# =============================================================================
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from tests.integration.fixtures.arduino_nodes import NODES, seed as _seed_arduino
+import pytest_asyncio
+
+
+@pytest_asyncio.fixture
+async def arduino_seed(db_url, run_migrations):
+    """Seed Arduino-Wissensgraph direkt in die Test-DB (idempotent)."""
+    engine = create_async_engine(db_url)
+    async with AsyncSession(engine) as db:
+        await _seed_arduino(db)
+    await engine.dispose()
+
+
+class TestArduinoE2E:
+    """E2E-Tests für Arduino-Wissensgraph und Assistenten."""
+
+    async def test_seed_creates_root_node(self, db_url, arduino_seed):
+        """Nach Seed: themengebiet-Knoten 'Arduino-Wissensgraph' in DB."""
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM context_nodes 
+                WHERE content_type = 'themengebiet' 
+                  AND metadata->>'slug' = 'arduino-wissensgraph'
+            """)
+            count = cur.fetchone()[0]
+        conn.close()
+        assert count == 1
+
+    async def test_seed_creates_all_part_of_edges(self, db_url, arduino_seed):
+        """Alle Nicht-Wurzel-Knoten haben eine part_of-Kante zum Wurzelknoten."""
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            # Alle Nicht-Wurzel-Knoten
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM context_nodes 
+                WHERE metadata->>'slug' != 'arduino-wissensgraph'
+            """)
+            non_root_count = cur.fetchone()[0]
+            
+            # part_of-Kanten zur Wurzel
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM context_edges 
+                WHERE relation = 'part_of' 
+                  AND to_node_id = (
+                      SELECT id FROM context_nodes 
+                      WHERE metadata->>'slug' = 'arduino-wissensgraph'
+                  )
+            """)
+            edge_count = cur.fetchone()[0]
+        conn.close()
+        assert edge_count == non_root_count
+
+    async def test_seed_idempotent(self, db_url, arduino_seed):
+        """Zweiter Seed-Lauf ändert Knotenzahl nicht."""
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM context_nodes")
+            count_before = cur.fetchone()[0]
+        conn.close()
+
+        engine = create_async_engine(db_url)
+        async with AsyncSession(engine) as db:
+            await _seed_arduino(db)
+        await engine.dispose()
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM context_nodes")
+            count_after = cur.fetchone()[0]
+        conn.close()
+        assert count_before == count_after
+
+    async def test_scope_covers_all_concept_nodes(self, db_url, arduino_seed):
+        """Scope-CTE mit Wurzelknoten als Anker -> alle Nicht-Wurzel-Knoten im Ergebnis."""
+        engine = create_async_engine(db_url)
+        async with AsyncSession(engine) as db:
+            # Wurzelknoten ID holen
+            result = await db.execute(
+                text("SELECT id FROM context_nodes WHERE metadata->>'slug' = 'arduino-wissensgraph'")
+            )
+            root_id = result.scalar_one()
+            
+            # Scope-Abfrage: Kanten gehen FROM child TO parent (part_of),
+            # also Kinder finden indem man nach to_node_id = parent sucht.
+            result = await db.execute(
+                text("""
+                    WITH RECURSIVE scope_nodes AS (
+                        SELECT id, metadata->>'slug' as slug
+                        FROM context_nodes
+                        WHERE id = :root_id
+                        UNION
+                        SELECT cn.id, cn.metadata->>'slug' as slug
+                        FROM context_nodes cn
+                        JOIN context_edges ce ON ce.from_node_id = cn.id
+                        JOIN scope_nodes sn ON ce.to_node_id = sn.id
+                        WHERE ce.relation = 'part_of'
+                    )
+                    SELECT COUNT(*) FROM scope_nodes WHERE slug != 'arduino-wissensgraph'
+                """),
+                {"root_id": str(root_id)}
+            )
+            count = result.scalar()
+            
+        await engine.dispose()
+        
+        # Sollte alle Nicht-Wurzel-Knoten enthalten
+        expected_non_root = len(NODES) - 1
+        assert count == expected_non_root
+
+    @pytest.mark.skipif(True, reason="Benötigt echte Embeddings - nicht im Standard-CI")
+    async def test_semantic_search_finds_led_for_light_query(self, db_url):
+        """Nach Embedding-Batch: Suche 'Licht ansteuern' findet LED-Knoten."""
+        # Dieser Test benoetigt tatsaechlich generierte Embeddings
+        # und sollte nur explizit ausgefuehrt werden
+        pass
+
+    async def test_context_string_contains_relevant_node(self, db_url, arduino_seed):
+        """Testet, dass der Kontext-String relevante Knoten enthaelt."""
+        from app.context.service import get_context_for_query
+        from unittest.mock import AsyncMock, patch
+
+        engine = create_async_engine(db_url)
+        async with AsyncSession(engine) as db:
+            # Wurzelknoten ID holen
+            result = await db.execute(
+                text("SELECT id FROM context_nodes WHERE metadata->>'slug' = 'arduino-wissensgraph'")
+            )
+            root_id = result.scalar_one()
+            
+            # digitalWrite-Knoten ein Embedding geben, damit semantische Suche ihn findet
+            emb_str = "[" + ",".join(str(v) for v in unit_vec(0)) + "]"
+            await db.execute(
+                text(
+                    "UPDATE context_nodes SET embedding = CAST(:emb AS vector)"
+                    " WHERE metadata->>'slug' = 'arduino-fn-digitalwrite'"
+                ),
+                {"emb": emb_str},
+            )
+            await db.flush()
+
+            # Mock für Embedding-Generierung
+            with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
+                # Assistent mit Retrieval-Scope Kontext erstellen
+                assistant_result = await db.execute(
+                    text("""
+                        INSERT INTO assistants 
+                          (name, system_prompt, model, status, audience, scope, visibility, created_by)
+                        VALUES ('Arduino-Helfer', 'Arduino-Assistent', 'gpt-4o-mini', 'active', 'all', 'all', 'public', 'admin')
+                        RETURNING id
+                    """)
+                )
+                assistant_id = assistant_result.scalar_one()
+                
+                # Anchor für den Wurzelknoten erstellen
+                await db.execute(
+                    text("""
+                        INSERT INTO assistant_context_anchors 
+                          (assistant_id, node_id, role)
+                        VALUES (:assistant_id, :node_id, 'retrieval_scope')
+                        ON CONFLICT DO NOTHING
+                    """),
+                    {"assistant_id": assistant_id, "node_id": str(root_id)}
+                )
+                
+                context = await get_context_for_query(
+                    assistant_id=assistant_id,
+                    pseudonym="test_user",
+                    query_text="Pin schalten",
+                    chat_id=None,
+                    db=db,
+                )
+                
+                await db.rollback()
+        
+        await engine.dispose()
+        
+        # Der Kontext sollte relevante Knoten enthalten
+        assert context is not None
+        assert len(context) > 0
+        assert "digitalWrite" in context or "LED" in context or "Pin" in context
