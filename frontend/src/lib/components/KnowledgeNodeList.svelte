@@ -3,9 +3,11 @@
     import {
         CONTENT_TYPES,
         CATEGORY_LABELS,
+        CONTENT_TYPE_LABELS,
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
+    import { subjects } from "$lib/stores/subjects.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import { Anchor } from "lucide-svelte";
 
@@ -23,6 +25,7 @@
 
     // Filter-State
     let q = $state("");
+    let selectedSubjectSlug = $state("");
     let selectedCategory = $state("");
     let selectedContentType = $state("");
     let selectedStatus = $state("active");
@@ -44,6 +47,7 @@
             };
             if (q.trim().length >= 2) params.q = q.trim();
             if (fixedSubjectSlug) params.subject_slug = fixedSubjectSlug;
+            else if (selectedSubjectSlug) params.subject_slug = selectedSubjectSlug;
             if (fixedGroupId) params.group_id = fixedGroupId;
             if (onlyEntryNodes) {
                 params.content_type = [...SCOPE_ANCHOR_CONTENT_TYPES];
@@ -62,6 +66,7 @@
 
     $effect(() => {
         // Reaktiv auf alle Filter (fixedSubjectSlug/fixedGroupId sind stabil)
+        selectedSubjectSlug;
         selectedCategory;
         selectedContentType;
         selectedStatus;
@@ -97,6 +102,20 @@
            text-light-tx dark:text-dark-tx
            focus:outline-none focus:border-primary dark:focus:border-primary-dark"
     />
+
+    <!-- Fach-Filter (nur im globalen /knowledge-Kontext) -->
+    {#if showSubjectFilter && $subjects.length > 0}
+        <select
+            bind:value={selectedSubjectSlug}
+            class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                   bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+        >
+            <option value="">Alle Fächer</option>
+            {#each $subjects as subject}
+                <option value={subject.slug}>{subject.name}</option>
+            {/each}
+        </select>
+    {/if}
 
     <!-- Toggle: Nur Einstiegsknoten -->
     <button
@@ -245,7 +264,7 @@
                             {CATEGORY_LABELS[node.category] ?? node.category}
                             {#if node.content_type}
                                 <span class="opacity-60">
-                                    / {node.content_type}</span
+                                    / {CONTENT_TYPE_LABELS[node.content_type] ?? node.content_type}</span
                                 >
                             {/if}
                         </td>
