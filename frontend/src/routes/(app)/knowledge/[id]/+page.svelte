@@ -2,7 +2,7 @@
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
   import { CONTENT_TYPES, CATEGORY_LABELS } from '$lib/taxonomy.js'
-  import { getContextNode, updateContextNode } from '$lib/api.js'
+  import { getContextNode, updateContextNode, getArchivedReferences, copyContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
 
@@ -40,6 +40,20 @@
   let saving = $state(false)
   let errors = $state({})
   let savedMessage = $state(null)
+
+  // Archivierte Referenzen
+  let archivedRefs = $state([])
+
+  // Kopieren-Dialog
+  let showCopyDialog = $state(false)
+  let copySchuljahr = $state('')
+  let copyValidUntil = $state('')
+  let copyLoading = $state(false)
+  let copyError = $state(null)
+
+  // Archivieren-Bestätigung
+  let showArchiveConfirm = $state(false)
+  let archiveLoading = $state(false)
 
   // ── Rollen & Berechtigungen ────────────────────────────────────────────
   const isAdmin = $derived($user?.roles?.includes('admin') ?? false)
@@ -128,6 +142,10 @@
         } else {
           metadata = JSON.stringify(n.metadata ?? {}, null, 2)
         }
+        // Archivierte Referenzen laden
+        if (n.status === 'active') {
+          getArchivedReferences(n.id).then(refs => { archivedRefs = refs })
+        }
       })
       .catch(e => { errors.general = e.message })
       .finally(() => { loadingNode = false })
@@ -186,6 +204,41 @@
       year: 'numeric'
     })
   }
+
+  // ── Lifecycle-Funktionen ──────────────────────────────────────────────
+  async function archive() {
+    archiveLoading = true
+    try {
+      node = await updateContextNode(node.id, { status: 'archived' })
+      showArchiveConfirm = false
+      archivedRefs = []
+    } catch (e) {
+      errors.general = e.message
+    } finally {
+      archiveLoading = false
+    }
+  }
+
+  async function restore() {
+    node = await updateContextNode(node.id, { status: 'active' })
+  }
+
+  async function confirmCopy() {
+    copyLoading = true
+    copyError = null
+    try {
+      const created = await copyContextNode(node.id, {
+        schuljahr: copySchuljahr || null,
+        valid_until: copyValidUntil || null,
+      })
+      showCopyDialog = false
+      goto(`/knowledge/${created.id}`)
+    } catch (e) {
+      copyError = e.message
+    } finally {
+      copyLoading = false
+    }
+  }
 </script>
 
 <div class="h-full overflow-y-auto p-6 max-w-2xl">
@@ -223,6 +276,36 @@
         </a>
       {/if}
     </div>
+
+    <!-- Banner für archivierte Referenzen -->
+    {#if archivedRefs.length > 0}
+      <div class="mb-4 px-4 py-3 rounded-md border border-light-ye dark:border-dark-ye
+                  bg-light-ye/10 dark:bg-dark-ye/10 text-sm text-light-tx dark:text-dark-tx">
+        <p class="font-medium mb-1">
+          ⚠️ Dieser Knoten verweist auf archivierte Inhalte:
+        </p>
+        <ul class="space-y-1 ml-2">
+          {#each archivedRefs as ref (ref.id)}
+            <li>
+              <span class="text-light-tx-2 dark:text-dark-tx-2">{ref.relation}:</span>
+              <a href="/knowledge/{ref.id}"
+                 class="underline text-light-tx dark:text-dark-tx hover:text-primary dark:hover:text-primary-dark">
+                {ref.title}
+              </a>
+              {#if ref.suggested_successor_id}
+                <span class="ml-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  → Möglicher Nachfolger:
+                  <a href="/knowledge/{ref.suggested_successor_id}"
+                     class="underline hover:text-primary dark:hover:text-primary-dark">
+                    Knoten anzeigen
+                  </a>
+                </span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
 
     <form onsubmit={e => { e.preventDefault(); save() }} class="space-y-6">
       <!-- Titel -->
@@ -688,6 +771,41 @@
         </button>
       </div>
 
+      <!-- Lifecycle-Aktionen -->
+      {#if canEdit && node}
+        <div class="mt-6 pt-6 border-t border-light-ui-2 dark:border-dark-ui-2 flex flex-wrap gap-3">
+          {#if node.status === 'active'}
+            <button
+              onclick={() => { showArchiveConfirm = true }}
+              class="text-sm px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     text-light-tx-2 dark:text-dark-tx-2
+                     hover:border-light-re dark:hover:border-dark-re
+                     hover:text-light-re dark:hover:text-dark-re transition-colors"
+            >
+              Archivieren
+            </button>
+          {:else}
+            <button
+              onclick={restore}
+              class="text-sm px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     text-light-tx-2 dark:text-dark-tx-2
+                     hover:border-primary dark:hover:border-primary-dark transition-colors"
+            >
+              Wiederherstellen
+            </button>
+          {/if}
+
+          <button
+            onclick={() => { copySchuljahr = schuljahr; copyValidUntil = ''; showCopyDialog = true }}
+            class="text-sm px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                   text-light-tx-2 dark:text-dark-tx-2
+                   hover:border-primary dark:hover:border-primary-dark transition-colors"
+          >
+            Als Vorlage kopieren
+          </button>
+        </div>
+      {/if}
+
       <!-- Erfolgsmeldung -->
       {#if savedMessage}
         <div class="mt-4 p-3 text-sm text-green-700 dark:text-green-400
@@ -701,6 +819,89 @@
         <div class="mt-4 p-3 text-sm text-light-re dark:text-dark-re
                     bg-light-re/10 dark:bg-dark-re/10 rounded-md">
           {errors.general}
+        </div>
+      {/if}
+
+      <!-- Bestätigungsdialog: Archivieren -->
+      {#if showArchiveConfirm}
+        <div class="mt-3 px-4 py-3 rounded-md border border-light-ye dark:border-dark-ye
+                    bg-light-ye/10 dark:bg-dark-ye/10 text-sm">
+          <p class="text-light-tx dark:text-dark-tx mb-3">
+            Dieser Knoten wird für Assistenten und Schüler unsichtbar.
+            Kanten und Konfigurationen bleiben erhalten. Fortfahren?
+          </p>
+          <div class="flex gap-2">
+            <button
+              onclick={archive}
+              disabled={archiveLoading}
+              class="px-3 py-1.5 rounded-md bg-light-re dark:bg-dark-re text-white text-sm
+                     hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {archiveLoading ? 'Wird archiviert…' : 'Ja, archivieren'}
+            </button>
+            <button
+              onclick={() => { showArchiveConfirm = false }}
+              class="px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     text-sm text-light-tx-2 dark:text-dark-tx-2 hover:border-primary transition-colors"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Dialog: Vorlage kopieren -->
+      {#if showCopyDialog}
+        <div class="mt-3 px-4 py-4 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                    bg-light-bg-2 dark:bg-dark-bg-2 text-sm space-y-3">
+          <p class="font-medium text-light-tx dark:text-dark-tx">Kopie erstellen</p>
+
+          <label class="block">
+            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1 block">Schuljahr</span>
+            <input
+              type="text"
+              bind:value={copySchuljahr}
+              placeholder="z. B. 2026/27"
+              class="w-full px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx text-sm
+                     focus:outline-none focus:border-primary dark:focus:border-primary-dark"
+            />
+          </label>
+
+          <label class="block">
+            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1 block">
+              Ablaufdatum (leer = permanent)
+            </span>
+            <input
+              type="date"
+              bind:value={copyValidUntil}
+              class="px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx text-sm
+                     focus:outline-none focus:border-primary dark:focus:border-primary-dark"
+            />
+          </label>
+
+          {#if copyError}
+            <p class="text-light-re dark:text-dark-re text-xs">{copyError}</p>
+          {/if}
+
+          <div class="flex gap-2 pt-1">
+            <button
+              onclick={confirmCopy}
+              disabled={copyLoading}
+              class="px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark text-white text-sm
+                     hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {copyLoading ? 'Wird kopiert…' : 'Kopie erstellen'}
+            </button>
+            <button
+              onclick={() => { showCopyDialog = false; copyError = null }}
+              class="px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                     text-sm text-light-tx-2 dark:text-dark-tx-2 hover:border-primary transition-colors"
+            >
+              Abbrechen
+            </button>
+          </div>
         </div>
       {/if}
     </form>
