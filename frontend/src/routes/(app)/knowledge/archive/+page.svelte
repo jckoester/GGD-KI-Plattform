@@ -1,6 +1,7 @@
 <script>
   import { getContextNodes, updateContextNode, deleteContextNode } from '$lib/api.js'
   import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_ANCHOR_CONTENT_TYPES } from '$lib/taxonomy.js'
+  import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
 
   let nodes = $state([])
   let loading = $state(false)
@@ -146,9 +147,10 @@
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors">
               <td class="px-3 py-2">
                 <a href="/knowledge/{node.id}"
-                   class="text-light-tx dark:text-dark-tx font-medium hover:underline">
+                   class="text-light-tx dark:text-dark-tx font-medium hover:underline flex items-center gap-2">
+                  <NodeTypeIcon category={node.category} contentType={node.content_type} size={16} />
                   {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}
-                    <span class="mr-1 opacity-60">⚓</span>
+                    <span title="Einstiegsknoten" class="opacity-60">⚓</span>
                   {/if}
                   {node.title}
                 </a>

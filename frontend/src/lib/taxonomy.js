@@ -33,11 +33,19 @@ export const CATEGORY_LABELS = {
   concept: 'Konzept',
 }
 
+// Farb-Tokens für Kategorien
+export const CATEGORY_COLORS = {
+  document: 'bl',
+  knowledge: 'gr',
+  artifact: 'or',
+  concept: 'pu',
+}
+
 // Lesbare Labels für content_types (Auswahl der häufigsten)
 export const CONTENT_TYPE_LABELS = {
   fachplan: 'Fachplan', themengebiet: 'Themengebiet', leitidee: 'Leitidee',
   curriculum: 'Schulcurriculum', unterrichtseinheit: 'Unterrichtseinheit',
-  unterrichtsstunde: 'Unterrichtsstunde', themengebiet: 'Themengebiet',
+  unterrichtsstunde: 'Unterrichtsstunde',
   arbeitsblatt: 'Arbeitsblatt', aufgabe: 'Aufgabe', konvention: 'Konvention',
   funktion: 'Funktion', bauteil: 'Bauteil', abstrakt: 'Abstraktes Konzept',
   code_beispiel: 'Code-Beispiel',

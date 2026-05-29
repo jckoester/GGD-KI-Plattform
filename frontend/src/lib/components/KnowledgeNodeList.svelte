@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation'
   import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_ANCHOR_CONTENT_TYPES } from '$lib/taxonomy.js'
   import { getContextNodes, updateContextNode } from '$lib/api.js'
+  import NodeTypeIcon from './NodeTypeIcon.svelte'
 
   let {
     fixedSubjectSlug = null,   // gesetzt im Subject-Kontext-Tab
@@ -183,12 +184,15 @@
                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors cursor-pointer"
             onclick={() => onNodeClick ? onNodeClick(node) : goto(`/knowledge/${node.id}`)}
           >
-            <!-- Titel + optionales Einstiegsknoten-Icon -->
+            <!-- Titel mit Icon -->
             <td class="px-3 py-2 text-light-tx dark:text-dark-tx font-medium">
-              {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}
-                <span title="Einstiegsknoten" class="mr-1 opacity-60">⚓</span>
-              {/if}
-              {node.title}
+              <div class="flex items-center gap-2">
+                <NodeTypeIcon category={node.category} contentType={node.content_type} size={16} />
+                {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}
+                  <span title="Einstiegsknoten" class="opacity-60">⚓</span>
+                {/if}
+                {node.title}
+              </div>
             </td>
             <!-- category / content_type -->
             <td class="px-3 py-2 text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap">
