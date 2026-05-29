@@ -1,63 +1,55 @@
-"""Knoten-Taxonomie: valide category × content_type-Kombinationen und Lifecycle-Defaults."""
+"""Knoten-Taxonomie: valide category × content_type-Kombinationen und Lifecycle-Defaults.
 
+Lädt aus config/taxonomy.yaml als Single Source of Truth.
+"""
+
+from pathlib import Path
 from typing import Final
+import yaml
+import os
 
-# Valide content_types pro category.
-# Erweiterungen erfordern einen bewussten Entscheid über Embedding-Strategie,
-# Edge-Konventionen und Lifecycle-Defaults — daher kein dynamisches Laden.
-VALID_CONTENT_TYPES: Final[dict[str, frozenset[str]]] = {
-    "document": frozenset({
-        "formatierungsvorlage",
-        "vokabelliste",
-        "aufgabenblatt",
-        "quelltext",
-        "konvention",
-        "methodenblatt",
-        "operatorenblatt",
-        "praesentation",
-    }),
-    "knowledge": frozenset({
-        "fachplan",
-        "themengebiet",
-        "leitidee",
-        "ik_kompetenz",
-        "pk_gruppe",
-        "pk_kompetenz",
-        "leitperspektive",
-        "leitperspektive_aspekt",
-        "curriculum",
-        "unterrichtseinheit",
-        "methode",
-        "operator_didaktisch",
-        "jahresplan",
-        "pruefungsanforderung",
-    }),
-    "artifact": frozenset({
-        "unterrichtsentwurf",
-        "unterrichtsstunde",
-        "reflexion",
-        "arbeitsblatt",
-        "aufgabe",
-        "klausur",
-        "code_beispiel",
-        "lerntext",
-        "gliederung",
-        "mindmap",
-        "lernplan",
-        "schuelertext",
-        "feedback_text",
-    }),
-    "concept": frozenset({
-        "funktion",
-        "bauteil",
-        "operator_math",
-        "abstrakt",
-    }),
+# Ermittele den absoluten Pfad dieses Moduls
+_module_path = Path(__file__).resolve()
+# Navigiere zum Projekt-Root: backend/app/context -> backend -> Projekt-Root
+_project_root = _module_path.parent.parent.parent.parent
+_taxonomy_path = _project_root / "config" / "taxonomy.yaml"
+
+
+def _load() -> dict:
+    with open(_taxonomy_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+_data = _load()
+
+# dict[category_key, list[content_type_key]]
+VALID_CONTENT_TYPES: Final[dict[str, list[str]]] = {
+    cat: [ct["key"] for ct in info["content_types"]]
+    for cat, info in _data["categories"].items()
+}
+
+# frozenset[content_type_key] — identisch mit SCOPE_ANCHOR_CONTENT_TYPES in frontend
+VALID_SCOPE_ANCHOR_TYPES: Final[frozenset[str]] = frozenset(
+    ct["key"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if ct.get("scope_anchor")
+)
+
+# dict[content_type_key, category_key] — für schnelle Rückwärtssuche
+CONTENT_TYPE_TO_CATEGORY: Final[dict[str, str]] = {
+    ct["key"]: cat
+    for cat, info in _data["categories"].items()
+    for ct in info["content_types"]
+}
+
+# dict[category, color_token] für Frontend-Icons
+CATEGORY_COLORS: Final[dict[str, str]] = {
+    cat: info["color"]
+    for cat, info in _data["categories"].items()
 }
 
 # Voreinstellung für valid_until-Offset in Tagen ab heute (None = permanent).
-# Wird im Upload-Formular und beim Assistenten-Artefakt-Dialog als Vorschlagswert
-# verwendet; die Lehrkraft kann überschreiben.
 VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # document
     "formatierungsvorlage": None,
@@ -84,15 +76,15 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "jahresplan": None,
     "pruefungsanforderung": None,
     # artifact — zeitlich begrenzte Inhalte
-    "unterrichtsentwurf": None,       # Lehrkraft setzt manuell
-    "unterrichtsstunde": None,         # Lehrkraft setzt manuell
+    "unterrichtsentwurf": None,  # Lehrkraft setzt manuell
+    "unterrichtsstunde": None,    # Lehrkraft setzt manuell
     "reflexion": None,
-    "arbeitsblatt": None,              # permanent wiederverwendbar
-    "aufgabe": None,                   # permanent wiederverwendbar
+    "arbeitsblatt": None,         # permanent wiederverwendbar
+    "aufgabe": None,              # permanent wiederverwendbar
     "klausur": None,
     "code_beispiel": None,
     "lerntext": None,
-    "gliederung": 42,                  # ~6 Wochen
+    "gliederung": 42,             # ~6 Wochen
     "mindmap": 42,
     "lernplan": 42,
     "schuelertext": 42,
@@ -104,48 +96,16 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "abstrakt": None,
 }
 
+
 # Typische read_scope/write_scope-Defaults pro content_type.
 # Tuple: (read_scope, write_scope)
 SCOPE_DEFAULTS: Final[dict[str, tuple[str, str]]] = {
-    "fachplan": ("global", "global"),
-    "leitidee": ("global", "global"),
-    "ik_kompetenz": ("global", "global"),
-    "pk_gruppe": ("global", "global"),
-    "pk_kompetenz": ("global", "global"),
-    "leitperspektive": ("global", "global"),
-    "leitperspektive_aspekt": ("global", "global"),
-    "themengebiet": ("school", "school"),
-    "curriculum": ("school", "subject"),
-    "unterrichtseinheit": ("school", "subject"),
-    "methode": ("school", "subject"),
-    "operator_didaktisch": ("school", "subject"),
-    "jahresplan": ("private", "private"),
-    "pruefungsanforderung": ("school", "school"),
-    "formatierungsvorlage": ("school", "school"),
-    "konvention": ("school", "school"),
-    "methodenblatt": ("school", "subject"),
-    "operatorenblatt": ("school", "subject"),
-    "praesentation": ("school", "subject"),
-    "aufgabenblatt": ("group", "private"),
-    "vokabelliste": ("group", "private"),
-    "quelltext": ("group", "private"),
-    "unterrichtsentwurf": ("private", "private"),
-    "unterrichtsstunde": ("private", "private"),
-    "reflexion": ("private", "private"),
-    "arbeitsblatt": ("group", "private"),
-    "aufgabe": ("group", "private"),
-    "klausur": ("private", "private"),
-    "code_beispiel": ("school", "private"),
-    "lerntext": ("school", "private"),
-    "gliederung": ("private", "private"),
-    "mindmap": ("private", "private"),
-    "lernplan": ("private", "private"),
-    "schuelertext": ("private", "private"),
-    "feedback_text": ("private", "private"),
-    "funktion": ("school", "school"),
-    "bauteil": ("school", "school"),
-    "operator_math": ("school", "school"),
-    "abstrakt": ("school", "school"),
+    ct["key"]: (
+        ct["scope_defaults"]["read_scope"],
+        ct["scope_defaults"]["write_scope"],
+    )
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
 }
 
 
@@ -183,7 +143,7 @@ def get_scope_defaults(content_type: str | None) -> tuple[str, str]:
     return SCOPE_DEFAULTS.get(content_type, ("school", "private"))
 
 
-# Gibt an, welche metadata-Felder der Embedding-Job zusaetzlich zu `content`
+# Gibt an, welche metadata-Felder der Embedding-Job zusätzlich zu `content`
 # in den Embedding-Input einbezieht. Kein Eintrag -> nur content wird embedded.
 EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
     ("concept", "bauteil"): ["metadata.schaltzeichen.beschreibung"],

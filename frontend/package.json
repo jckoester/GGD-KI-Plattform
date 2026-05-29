@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "generate:taxonomy": "python3 ../scripts/generate_taxonomy.py",
+    "prebuild": "npm run generate:taxonomy",
+    "dev": "npm run generate:taxonomy && vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check",
