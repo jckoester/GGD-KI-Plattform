@@ -11,6 +11,7 @@
     import { user } from "$lib/stores/user.js";
     import { myTeachingGroups } from "$lib/stores/myGroups.js";
     import { ArrowLeft } from "lucide-svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
 
     // ── Knoten laden ────────────────────────────────────────────────────────
     let node = $state(null);
@@ -326,6 +327,11 @@
                 </a>
             {/if}
         </div>
+
+        <!-- Banner: Nur-Lesen-Hinweis -->
+        {#if node && !canEdit}
+            <InfoBanner message="Du kannst diesen Knoten nur lesen. Zum Bearbeiten ist eine Schreibberechtigung erforderlich." />
+        {/if}
 
         <!-- Banner für archivierte Referenzen -->
         {#if archivedRefs.length > 0}
@@ -912,12 +918,6 @@
                     >
                         {saving ? "Speichern…" : "Speichern"}
                     </button>
-                {:else}
-                    <p
-                        class="text-sm text-light-tx-2 dark:text-dark-tx-2 italic"
-                    >
-                        Du kannst diesen Knoten nur lesen.
-                    </p>
                 {/if}
             </div>
 
