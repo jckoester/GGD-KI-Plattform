@@ -1,0 +1,231 @@
+<script>
+  import { goto } from '$app/navigation'
+  import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_ANCHOR_CONTENT_TYPES } from '$lib/taxonomy.js'
+  import { getContextNodes, updateContextNode } from '$lib/api.js'
+
+  let {
+    fixedSubjectSlug = null,   // gesetzt im Subject-Kontext-Tab
+    fixedGroupId = null,        // gesetzt im Gruppen-Kontext-Tab
+    showSubjectFilter = true,   // false in Subject/Gruppen-Tabs
+    showNewButton = true,
+    onNodeClick = null,         // optional: callback statt goto
+  } = $props()
+
+  let nodes = $state([])
+  let loading = $state(false)
+  let error = $state(null)
+
+  // Filter-State
+  let q = $state('')
+  let selectedCategory = $state('')
+  let selectedContentType = $state('')
+  let selectedStatus = $state('active')
+  let onlyEntryNodes = $state(false)
+
+  // Debounce-Timer für Suchfeld
+  let searchTimer = null
+
+  const contentTypeOptions = $derived(
+    selectedCategory ? CONTENT_TYPES[selectedCategory] ?? [] : []
+  )
+
+  async function load() {
+    loading = true
+    error = null
+    try {
+      const params = {
+        status: selectedStatus || 'active',
+      }
+      if (q.trim().length >= 2) params.q = q.trim()
+      if (fixedSubjectSlug)      params.subject_slug = fixedSubjectSlug
+      if (fixedGroupId)          params.group_id = fixedGroupId
+      if (onlyEntryNodes) {
+        params.content_type = [...SCOPE_ANCHOR_CONTENT_TYPES]
+      } else {
+        if (selectedCategory)    params.category = selectedCategory
+        if (selectedContentType) params.content_type = selectedContentType
+      }
+      nodes = await getContextNodes(params)
+    } catch (e) {
+      error = e.message
+    } finally {
+      loading = false
+    }
+  }
+
+  $effect(() => {
+    // Reaktiv auf alle Filter (fixedSubjectSlug/fixedGroupId sind stabil)
+    selectedCategory; selectedContentType; selectedStatus; onlyEntryNodes; fixedSubjectSlug; fixedGroupId
+    load()
+  })
+
+  function onSearchInput(e) {
+    q = e.target.value
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(load, 300)
+  }
+
+  async function archiveNode(node) {
+    await updateContextNode(node.id, { status: 'archived' })
+    nodes = nodes.filter(n => n.id !== node.id)
+  }
+</script>
+
+<!-- Filterleiste -->
+<div class="flex flex-wrap gap-2 mb-4 items-center">
+  <!-- Suchfeld -->
+  <input
+    type="search"
+    placeholder="Titel suchen…"
+    value={q}
+    oninput={onSearchInput}
+    class="flex-1 min-w-48 px-3 py-1.5 text-sm rounded-md border
+           border-light-ui-3 dark:border-dark-ui-3
+           bg-light-bg dark:bg-dark-bg
+           text-light-tx dark:text-dark-tx
+           focus:outline-none focus:border-primary dark:focus:border-primary-dark"
+  />
+
+  <!-- Toggle: Nur Einstiegsknoten -->
+  <button
+    onclick={() => { onlyEntryNodes = !onlyEntryNodes; selectedCategory = ''; selectedContentType = '' }}
+    class="px-3 py-1.5 text-sm rounded-md border transition-colors
+           {onlyEntryNodes
+             ? 'bg-primary/10 dark:bg-primary-dark/10 border-primary dark:border-primary-dark text-primary dark:text-primary-dark font-medium'
+             : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:border-primary dark:hover:border-primary-dark'}"
+  >
+    ⚓ Einstiegsknoten
+  </button>
+
+  <!-- Category-Filter (nur wenn nicht onlyEntryNodes) -->
+  {#if !onlyEntryNodes}
+    <select
+      bind:value={selectedCategory}
+      onchange={() => { selectedContentType = '' }}
+      class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+             bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+    >
+      <option value="">Alle Typen</option>
+      {#each Object.keys(CONTENT_TYPES) as cat}
+        <option value={cat}>{CATEGORY_LABELS[cat]}</option>
+      {/each}
+    </select>
+
+    {#if contentTypeOptions.length > 0}
+      <select
+        bind:value={selectedContentType}
+        class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+      >
+        <option value="">Alle Untertypen</option>
+        {#each contentTypeOptions as ct}
+          <option value={ct}>{ct}</option>
+        {/each}
+      </select>
+    {/if}
+  {/if}
+
+  <!-- Status-Filter -->
+  <select
+    bind:value={selectedStatus}
+    class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+           bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+  >
+    <option value="active">Aktiv</option>
+    <option value="archived">Archiviert</option>
+  </select>
+
+  <!-- Neuer-Knoten-Button -->
+  {#if showNewButton}
+    {@const newUrl = fixedGroupId
+      ? `/knowledge/new?group_id=${fixedGroupId}&read_scope=group`
+      : fixedSubjectSlug
+        ? `/knowledge/new?subject_slug=${fixedSubjectSlug}&read_scope=school`
+        : '/knowledge/new'}
+    <a
+      href={newUrl}
+      class="ml-auto px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
+             text-white font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
+    >
+      + Neuer Knoten
+    </a>
+  {/if}
+</div>
+
+<!-- Tabelle -->
+{#if loading}
+  <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">Wird geladen…</div>
+{:else if error}
+  <div class="py-4 text-sm text-light-re dark:text-dark-re">{error}</div>
+{:else if nodes.length === 0}
+  <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
+    Keine Knoten gefunden.
+    {#if showNewButton}
+      <a href="/knowledge/new" class="ml-1 text-primary dark:text-dark-bl underline">Ersten Knoten anlegen</a>
+    {/if}
+  </div>
+{:else}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
+          <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Titel</th>
+          <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Typ</th>
+          <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Sichtbarkeit</th>
+          <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Aktualisiert</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each nodes as node (node.id)}
+          <tr
+            class="border-b border-light-ui-3 dark:border-dark-ui-3
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors cursor-pointer"
+            onclick={() => onNodeClick ? onNodeClick(node) : goto(`/knowledge/${node.id}`)}
+          >
+            <!-- Titel + optionales Einstiegsknoten-Icon -->
+            <td class="px-3 py-2 text-light-tx dark:text-dark-tx font-medium">
+              {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}
+                <span title="Einstiegsknoten" class="mr-1 opacity-60">⚓</span>
+              {/if}
+              {node.title}
+            </td>
+            <!-- category / content_type -->
+            <td class="px-3 py-2 text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap">
+              {CATEGORY_LABELS[node.category] ?? node.category}
+              {#if node.content_type}
+                <span class="opacity-60"> / {node.content_type}</span>
+              {/if}
+            </td>
+            <!-- read_scope Badge -->
+            <td class="px-3 py-2">
+              <span class="text-xs px-2 py-0.5 rounded-full bg-light-ui-2 dark:bg-dark-ui-2
+                           text-light-tx-2 dark:text-dark-tx-2">
+                {node.read_scope}
+              </span>
+            </td>
+            <!-- Datum -->
+            <td class="px-3 py-2 text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap text-xs">
+              {new Date(node.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </td>
+            <!-- Aktionen -->
+            <td class="px-3 py-2" onclick={e => e.stopPropagation()}>
+              {#if node.status === 'active'}
+                <button
+                  onclick={() => archiveNode(node)}
+                  title="Archivieren"
+                  class="text-xs text-light-tx-2 dark:text-dark-tx-2
+                         hover:text-light-re dark:hover:text-dark-re transition-colors"
+                >
+                  Archivieren
+                </button>
+              {:else}
+                <span class="text-xs text-light-tx-3 dark:text-dark-tx-3 italic">archiviert</span>
+              {/if}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}

@@ -9,6 +9,7 @@
   import ConversationMenu from '$lib/components/ConversationMenu.svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import AssistantCard from '$lib/components/AssistantCard.svelte'
+  import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
 
   // ── Gruppe + Fach aus Stores ──────────────────────────────────────────────
   const group = $derived(
@@ -223,15 +224,13 @@
       </p>
     </div>
 
-  <!-- Tab: Kontext (Platzhalter) -->
+  <!-- Tab: Kontext -->
   {:else if activeTab === 'kontext'}
-    <div class="py-8 text-center text-light-tx-2 dark:text-dark-tx-2">
-      <p class="font-medium mb-2 text-light-tx dark:text-dark-tx">Kontext</p>
-      <p class="text-sm max-w-sm mx-auto">
-        Hier werden in Phase 5 verknüpfte Dokumente und Vektoren dieser Unterrichtsgruppe
-        einsehbar und bearbeitbar sein.
-      </p>
-    </div>
+    <KnowledgeNodeList
+      fixedGroupId={group?.id}
+      showSubjectFilter={false}
+      showNewButton={true}
+    />
   {/if}
 
 </div>

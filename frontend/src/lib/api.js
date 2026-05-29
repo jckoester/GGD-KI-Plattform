@@ -917,3 +917,113 @@ export async function searchContextNodes(query, contentTypes = []) {
   }
   return res.json(); // ContextNodeResult[]
 }
+
+// ── Context Nodes CRUD ──────────────────────────────────────────────────────
+
+/**
+ * Lädt Kontextknoten mit optionalen Filtern.
+ * @param {{ q?, category?, content_type?, status?, subject_slug?, group_id?, owner? }} params
+ */
+export async function getContextNodes(params = {}) {
+  const p = new URLSearchParams()
+  if (params.q)            p.set('q', params.q)
+  if (params.category)     p.set('category', params.category)
+  if (params.status)       p.set('status', params.status)
+  if (params.subject_slug) p.set('subject_slug', params.subject_slug)
+  if (params.group_id)     p.set('group_id', params.group_id)
+  if (params.owner)        p.set('owner', params.owner)
+  if (params.content_type) {
+    const types = Array.isArray(params.content_type) ? params.content_type : [params.content_type]
+    types.forEach(t => p.append('content_type', t))
+  }
+  const res = await fetch(`${BASE}/context/nodes?${p}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Knoten')
+  }
+  return res.json()
+}
+
+export async function getContextNode(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Knoten nicht gefunden')
+  }
+  return res.json()
+}
+
+export async function createContextNode(payload) {
+  const res = await fetch(`${BASE}/context/nodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen')
+  }
+  return res.json()
+}
+
+export async function updateContextNode(nodeId, payload) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Speichern')
+  }
+  return res.json()
+}
+
+export async function deleteContextNode(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen')
+  }
+}
+
+export async function getArchivedReferences(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/archived-references`, {
+    credentials: 'include',
+  })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function copyContextNode(nodeId, payload = {}) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/copy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Kopieren')
+  }
+  return res.json()
+}
+
+export async function getNeighborhood(nodeId, { depth = 2, relation = [], category = [] } = {}) {
+  const p = new URLSearchParams({ depth })
+  relation.forEach(r => p.append('relation', r))
+  category.forEach(c => p.append('category', c))
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/neighborhood?${p}`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden des Graphen')
+  }
+  return res.json()
+}

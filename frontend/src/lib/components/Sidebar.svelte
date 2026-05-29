@@ -14,6 +14,7 @@
         Settings,
         BookOpen,
         Pencil,
+        Database,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -238,6 +239,22 @@
                 </div>
             {/if}
         </div>
+
+        <!-- Wissensgraph (nur Lehrkräfte/Admins) -->
+        {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
+          <div class="mt-2">
+            <a
+              href="/knowledge"
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                     text-light-tx dark:text-dark-tx
+                     hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                     {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+            >
+              <Database class="w-4 h-4" />
+              Wissensgraph
+            </a>
+          </div>
+        {/if}
 
         {#if $sidebarSubjectSections.length > 0}
           <div class="mt-2">
