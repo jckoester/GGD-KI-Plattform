@@ -25,7 +25,9 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "@xyflow/svelte": "^1.5.2",
     "chart.js": "^4.5.1",
+    "dagre": "^0.8.5",
     "dompurify": "^3.4.1",
     "highlight.js": "^11.11.1",
     "js-yaml": "^4.1.1",
