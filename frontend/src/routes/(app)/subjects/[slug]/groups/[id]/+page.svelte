@@ -33,8 +33,8 @@
       : []
   )
 
-  // ── Tab-Zustand ────────────────────────────────────────────────────────────
-  let activeTab = $state('vorbereitung')
+  // ── Tab-Zustand (URL-basiert, damit Zurück-Navigation den Tab erhält) ──────
+  const activeTab = $derived($page.url.searchParams.get('tab') ?? 'vorbereitung')
 
   // ── Konversationen (Tab "Vorbereitung") ───────────────────────────────────
   let conversations = $state([])
@@ -100,7 +100,7 @@
       { id: 'kontext',      label: 'Kontext'       },
     ] as tab (tab.id)}
       <button
-        onclick={() => { activeTab = tab.id }}
+        onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
                {activeTab === tab.id
                  ? 'border-primary text-light-bl dark:text-dark-bl dark:border-primary-dark'
