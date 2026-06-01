@@ -431,6 +431,11 @@ class ContextNode(Base):
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
     )
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'active'")

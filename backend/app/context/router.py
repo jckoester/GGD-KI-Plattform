@@ -327,6 +327,9 @@ async def create_node(
         read_scope_group_id=payload.read_scope_group_id,
         write_scope_group_id=payload.write_scope_group_id,
         assistant_id=payload.assistant_id,
+        subject_id=payload.subject_id,
+        min_grade=payload.min_grade,
+        max_grade=payload.max_grade,
         valid_until=payload.valid_until,
         schuljahr=payload.schuljahr,
     )

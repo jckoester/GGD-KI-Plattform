@@ -19,6 +19,9 @@ class ContextNodeCreate(BaseModel):
     read_scope_group_id: int | None = None
     write_scope_group_id: int | None = None
     assistant_id: int | None = None
+    subject_id: int | None = None
+    min_grade: int | None = None
+    max_grade: int | None = None
     valid_until: date | None = None
     schuljahr: str | None = None
 
@@ -33,6 +36,9 @@ class ContextNodeUpdate(BaseModel):
     write_scope: str | None = None
     read_scope_group_id: int | None = None
     write_scope_group_id: int | None = None
+    subject_id: int | None = None
+    min_grade: int | None = None
+    max_grade: int | None = None
     valid_until: date | None = None
     schuljahr: str | None = None
     status: str | None = None
@@ -56,6 +62,9 @@ class ContextNodeRead(BaseModel):
     read_scope_group_id: int | None
     write_scope_group_id: int | None
     assistant_id: int | None
+    subject_id: int | None
+    min_grade: int | None
+    max_grade: int | None
     status: str
     valid_until: date | None
     archived_at: datetime | None
