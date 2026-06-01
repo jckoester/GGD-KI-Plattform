@@ -251,11 +251,12 @@
 
     <!-- Neuer-Knoten-Button -->
     {#if showNewButton}
+        {@const backParam = `&back=${encodeURIComponent(window.location.pathname + window.location.search)}`}
         {@const newUrl = fixedGroupId
-            ? `/knowledge/new?group_id=${fixedGroupId}&read_scope=group`
+            ? `/knowledge/new?group_id=${fixedGroupId}&read_scope=group${backParam}`
             : fixedSubjectSlug
-              ? `/knowledge/new?subject_slug=${fixedSubjectSlug}&read_scope=school`
-              : "/knowledge/new"}
+              ? `/knowledge/new?subject_slug=${fixedSubjectSlug}&read_scope=school${backParam}`
+              : `/knowledge/new?${backParam.slice(1)}`}
         <a
             href={newUrl}
             class="ml-auto px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
@@ -374,7 +375,7 @@
                         onclick={() =>
                             onNodeClick
                                 ? onNodeClick(node)
-                                : goto(`/knowledge/${node.id}`)}
+                                : goto(`/knowledge/${node.id}?back=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
                     >
                         <!-- Titel mit Icon -->
                         <td

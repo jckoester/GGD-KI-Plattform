@@ -148,7 +148,8 @@
         max_grade: maxGrade ? Number(maxGrade) : null,
       }
       const created = await createContextNode(payload)
-      goto(`/knowledge/${created.id}`)
+      const backUrl = $page.url.searchParams.get('back')
+      goto(backUrl ?? `/knowledge/${created.id}`)
     } catch (e) {
       if (e.status === 422) {
         errors.general = e.message
@@ -619,14 +620,13 @@
       >
         {saving ? 'Speichern…' : 'Speichern'}
       </button>
-      <button
-        type="button"
-        onclick={() => history.back()}
+      <a
+        href={$page.url.searchParams.get('back') ?? '/knowledge'}
         class="px-4 py-2 text-sm rounded-md text-light-tx dark:text-dark-tx
                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
       >
         Abbrechen
-      </button>
+      </a>
     </div>
 
     <!-- Fehler -->
