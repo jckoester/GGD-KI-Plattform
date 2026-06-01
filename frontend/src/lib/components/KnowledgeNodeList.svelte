@@ -17,6 +17,7 @@
         showSubjectFilter = true, // false in Subject/Gruppen-Tabs
         showNewButton = true,
         onNodeClick = null, // optional: callback statt goto
+        initialGrade = null, // voreingestellte Jahrgangsstufe
     } = $props();
 
     let nodes = $state([]);
@@ -30,6 +31,7 @@
     let selectedContentType = $state("");
     let selectedStatus = $state("active");
     let onlyEntryNodes = $state(false);
+    let selectedGrade = $state(initialGrade);
 
     // Debounce-Timer für Suchfeld
     let searchTimer = null;
@@ -49,6 +51,7 @@
             if (fixedSubjectSlug) params.subject_slug = fixedSubjectSlug;
             else if (selectedSubjectSlug) params.subject_slug = selectedSubjectSlug;
             if (fixedGroupId) params.group_id = fixedGroupId;
+            if (selectedGrade) params.grade = Number(selectedGrade);
             if (onlyEntryNodes) {
                 params.content_type = [...SCOPE_ANCHOR_CONTENT_TYPES];
             } else {
@@ -71,6 +74,7 @@
         selectedContentType;
         selectedStatus;
         onlyEntryNodes;
+        selectedGrade;
         fixedSubjectSlug;
         fixedGroupId;
         load();
@@ -170,6 +174,18 @@
     >
         <option value="active">Aktiv</option>
         <option value="archived">Archiviert</option>
+    </select>
+
+    <!-- Jahrgangsstufe -->
+    <select
+        bind:value={selectedGrade}
+        class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+           bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+    >
+        <option value={null}>Alle Jahrgangsstufen</option>
+        {#each Array.from({ length: 13 }, (_, i) => i + 1) as g}
+            <option value={g}>Klasse {g}</option>
+        {/each}
     </select>
 
     <!-- Neuer-Knoten-Button -->

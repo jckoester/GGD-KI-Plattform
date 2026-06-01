@@ -18,6 +18,8 @@
   const subject = $derived(
     group ? ($subjectMap[group.subject_id] ?? null) : null
   )
+  // Voreingestellte Jahrgangsstufe aus dem Fach ableiten
+  const defaultGrade = $derived(subject?.min_grade ?? null)
 
   // ── Assistenten für diese Gruppe ──────────────────────────────────────────
   const groupAssistants = $derived(
@@ -230,6 +232,7 @@
       fixedGroupId={group?.id}
       showSubjectFilter={false}
       showNewButton={true}
+      initialGrade={defaultGrade}
     />
   {/if}
 
