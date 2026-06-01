@@ -33,6 +33,48 @@
     let onlyEntryNodes = $state(false);
     let selectedGrade = $state(initialGrade);
 
+    // Sortierung
+    let sortCol = $state('subject_id'); // Default: Fach-Knoten vor Leitperspektiven
+    let sortDir = $state('asc');
+
+    const sortedNodes = $derived.by(() => {
+        const arr = [...nodes];
+        arr.sort((a, b) => {
+            let av, bv;
+            if (sortCol === 'subject_id') {
+                // null (Leitperspektiven) immer ans Ende, unabhängig von sortDir
+                if (a.subject_id == null && b.subject_id != null) return 1;
+                if (a.subject_id != null && b.subject_id == null) return -1;
+                av = a.title ?? '';
+                bv = b.title ?? '';
+            } else if (sortCol === 'title') {
+                av = a.title ?? '';
+                bv = b.title ?? '';
+            } else if (sortCol === 'content_type') {
+                av = (CATEGORY_LABELS[a.category] ?? a.category) + (a.content_type ?? '');
+                bv = (CATEGORY_LABELS[b.category] ?? b.category) + (b.content_type ?? '');
+            } else if (sortCol === 'updated_at') {
+                av = a.updated_at ?? '';
+                bv = b.updated_at ?? '';
+            } else {
+                av = a[sortCol] ?? '';
+                bv = b[sortCol] ?? '';
+            }
+            const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return arr;
+    });
+
+    function toggleSort(col) {
+        if (sortCol === col) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortCol = col;
+            sortDir = 'asc';
+        }
+    }
+
     // Debounce-Timer für Suchfeld
     let searchTimer = null;
 
@@ -228,27 +270,33 @@
         <table class="w-full text-left border-collapse text-sm">
             <thead>
                 <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
-                    <th
-                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
-                        >Titel</th
-                    >
-                    <th
-                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
-                        >Typ</th
-                    >
-                    <th
-                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
-                        >Sichtbarkeit</th
-                    >
-                    <th
-                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
-                        >Aktualisiert</th
-                    >
+                    {#each [
+                        { col: 'title',        label: 'Titel'       },
+                        { col: 'content_type', label: 'Typ'         },
+                        { col: 'updated_at',   label: 'Aktualisiert'},
+                    ] as h (h.col)}
+                        <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">
+                            <button
+                                onclick={() => toggleSort(h.col)}
+                                class="flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                            >
+                                {h.label}
+                                <span class="text-xs opacity-50">
+                                    {#if sortCol === h.col}
+                                        {sortDir === 'asc' ? '▲' : '▼'}
+                                    {:else}
+                                        ⇅
+                                    {/if}
+                                </span>
+                            </button>
+                        </th>
+                    {/each}
+                    <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Sichtbarkeit</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                {#each nodes as node (node.id)}
+                {#each sortedNodes as node (node.id)}
                     <tr
                         class="border-b border-light-ui-3 dark:border-dark-ui-3
                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors cursor-pointer"
@@ -284,15 +332,6 @@
                                 >
                             {/if}
                         </td>
-                        <!-- read_scope Badge -->
-                        <td class="px-3 py-2">
-                            <span
-                                class="text-xs px-2 py-0.5 rounded-full bg-light-ui-2 dark:bg-dark-ui-2
-                           text-light-tx-2 dark:text-dark-tx-2"
-                            >
-                                {node.read_scope}
-                            </span>
-                        </td>
                         <!-- Datum -->
                         <td
                             class="px-3 py-2 text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap text-xs"
@@ -305,6 +344,15 @@
                                     year: "numeric",
                                 },
                             )}
+                        </td>
+                        <!-- read_scope Badge -->
+                        <td class="px-3 py-2">
+                            <span
+                                class="text-xs px-2 py-0.5 rounded-full bg-light-ui-2 dark:bg-dark-ui-2
+                           text-light-tx-2 dark:text-dark-tx-2"
+                            >
+                                {node.read_scope}
+                            </span>
                         </td>
                         <!-- Aktionen -->
                         <td
