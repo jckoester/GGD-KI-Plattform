@@ -83,7 +83,7 @@ def validate_subjects_yaml(cfg: dict) -> list[str]:
 
 
 def preflight_check_migration(conn) -> None:
-    """Wirft RuntimeError wenn Migration 0019 (related_to) nicht eingespielt ist."""
+    """Wirft RuntimeError wenn Migration 0019 (related_to) oder 0021 (subject_id, etc.) nicht eingespielt ist."""
     with conn.cursor() as cur:
         cur.execute("""
             SELECT conname, pg_get_constraintdef(oid)
@@ -102,6 +102,28 @@ def preflight_check_migration(conn) -> None:
                 "Constraint 'check_context_edges_relation' enthaelt nicht 'related_to'. "
                 "Bitte Migration 0019 einspielen: alembic upgrade head"
             )
+        
+        # Check für neue Spalten aus Migration 0021
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'context_nodes'
+              AND column_name IN ('subject_id', 'min_grade', 'max_grade')
+        """)
+        found = {row[0] for row in cur.fetchall()}
+        missing = {'subject_id', 'min_grade', 'max_grade'} - found
+        if missing:
+            raise RuntimeError(
+                f"Spalten fehlen in context_nodes: {missing}. "
+                "Bitte Migration 0021 einspielen: alembic upgrade head"
+            )
+
+
+def build_subject_id_lookup(conn) -> dict[str, int]:
+    """Gibt dict fach_slug -> subject_id aus der subjects-Tabelle zurück."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT slug, id FROM subjects")
+        return {row[0]: row[1] for row in cur.fetchall()}
 
 
 # -- Laden und Sortieren ---------------------------------------------------------
@@ -152,6 +174,7 @@ def upsert_node(
     cur,
     node: dict,
     dry_run: bool,
+    subject_id_lookup: dict[str, int],
 ) -> tuple[str, UUID | None]:
     """
     Fuehrt INSERT oder UPDATE durch je nach Idempotenz-Status.
@@ -165,6 +188,14 @@ def upsert_node(
     new_hash = node.get("content_hash", "")
     visibility = node.get("visibility", "global")
     metadata = build_metadata(node)
+
+    # Neue Felder aus JSONL
+    min_grade = node.get("min_grade")
+    max_grade = node.get("max_grade")
+
+    # subject_id: aus fach_slug ableiten (nur für Bildungsplan-Knoten mit fach_slug)
+    fach_slug = node.get("fach_slug")
+    subject_id = subject_id_lookup.get(fach_slug) if fach_slug else None
 
     # Existenz pruefen
     cur.execute(
@@ -180,9 +211,11 @@ def upsert_node(
                 """
                 INSERT INTO context_nodes
                     (category, content_type, title, content, metadata,
-                     read_scope, write_scope, status, owner_pseudonym, assistant_id)
+                     read_scope, write_scope, status, owner_pseudonym, assistant_id,
+                     subject_id, min_grade, max_grade)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL)
+                    (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL,
+                     %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -193,6 +226,9 @@ def upsert_node(
                     json.dumps(metadata, ensure_ascii=False),
                     visibility,
                     visibility,
+                    subject_id,
+                    min_grade,
+                    max_grade,
                 ),
             )
             node_id = cur.fetchone()[0]
@@ -202,9 +238,22 @@ def upsert_node(
 
     existing_id, existing_hash = row
     if existing_hash == new_hash:
+        # Content unverändert — neue Metadaten-Spalten trotzdem setzen (initialer Roll-out)
+        # COALESCE: bestehende Non-NULL-Werte werden nicht überschrieben
+        if not dry_run and any(v is not None for v in (subject_id, min_grade, max_grade)):
+            cur.execute(
+                """
+                UPDATE context_nodes
+                SET subject_id = COALESCE(subject_id, %s),
+                    min_grade  = COALESCE(min_grade,  %s),
+                    max_grade  = COALESCE(max_grade,  %s)
+                WHERE id = %s
+                """,
+                (subject_id, min_grade, max_grade, existing_id),
+            )
         return "skipped", UUID(str(existing_id))
 
-    # UPDATE (Hash geaendert -> embedding zuruecksetzen)
+    # UPDATE (Hash geaendert -> embedding zuruecksetzen, auch neue Felder aktualisieren)
     if not dry_run:
         cur.execute(
             """
@@ -212,11 +261,15 @@ def upsert_node(
             SET content = %s,
                 title = %s,
                 metadata = %s,
+                subject_id = %s,
+                min_grade = %s,
+                max_grade = %s,
                 embedding = NULL,
                 updated_at = now()
             WHERE id = %s
         """,
-            (content, title, json.dumps(metadata, ensure_ascii=False), existing_id),
+            (content, title, json.dumps(metadata, ensure_ascii=False),
+             subject_id, min_grade, max_grade, existing_id),
         )
     return "updated", UUID(str(existing_id))
 
@@ -365,9 +418,35 @@ def run_import(
     conn = psycopg2.connect(psycopg2_url)
     psycopg2.extras.register_uuid()
 
+    # Hilfsfunktion zum Extrahieren von fach_slug aus bp_id
+    def _fach_slug_from_bp_id(bp_id: str) -> str | None:
+        """Versucht den Fach-Slug aus der bp_id zu extrahieren.
+        
+        Bildungsplan-IDs enthalten den Fach-Code als Segment:
+        'BP2016BW_ALLG_GYM_CH_IK_7-8_01' -> 'CH'
+        'BNE_01' (Leitperspektive) -> None
+        """
+        # Suche nach bekannten Fach-Codes in bp_id
+        # fach_code_to_slug wird unten aus cfg aufgebaut
+        parts = bp_id.split('_')
+        for part in parts:
+            if part in fach_code_to_slug:
+                return fach_code_to_slug[part]
+        return None
+
+    # fach_code -> slug Mapping aus subjects.yaml bauen
+    fach_code_to_slug: dict[str, str] = {}
+    for fach in cfg.get("subjects", []):
+        fc = fach.get("fach_code")
+        if fc:
+            fach_code_to_slug[fc.upper()] = fach["slug"]
+
     try:
         # Pre-Flight
         preflight_check_migration(conn)
+
+        # Lookup-Tabelle aus DB laden
+        subject_id_lookup = build_subject_id_lookup(conn)
 
         with conn.cursor() as cur:
             warnings: list[str] = []
@@ -382,7 +461,9 @@ def run_import(
             # Knoten upserten
             node_id_map: dict[str, UUID] = {}  # bp_id -> uuid
             for node in nodes:
-                status, node_id = upsert_node(cur, node, dry_run)
+                # fach_slug für subject_id-Lookup anhängen
+                node["fach_slug"] = _fach_slug_from_bp_id(node["bp_id"])
+                status, node_id = upsert_node(cur, node, dry_run, subject_id_lookup)
                 stats[status] += 1
                 if node_id:
                     node_id_map[node["bp_id"]] = node_id
