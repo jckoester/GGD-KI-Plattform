@@ -10,6 +10,7 @@
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import { myTeachingGroups } from "$lib/stores/myGroups.js";
+    import { subjects } from "$lib/stores/subjects.js";
     import { ArrowLeft } from "lucide-svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
 
@@ -28,6 +29,9 @@
     let writeScopeGroupId = $state(null);
     let validUntil = $state("");
     let schuljahr = $state("");
+    let subjectId = $state(null);
+    let minGrade = $state(null);
+    let maxGrade = $state(null);
     let metadata = $state("{}");
 
     // Strukturierte Metadaten
@@ -47,6 +51,13 @@
     let saving = $state(false);
     let errors = $state({});
     let savedMessage = $state(null);
+
+    // Validierung für Jahrgangsstufen
+    const gradeError = $derived(
+        minGrade && maxGrade && Number(minGrade) > Number(maxGrade)
+            ? 'Von-Wert muss kleiner oder gleich Bis-Wert sein'
+            : null
+    );
 
     // Archivierte Referenzen
     let archivedRefs = $state([]);
@@ -148,6 +159,9 @@
                 writeScopeGroupId = n.write_scope_group_id;
                 validUntil = n.valid_until ?? "";
                 schuljahr = n.schuljahr ?? currentSchuljahr();
+                subjectId = n.subject_id ?? null;
+                minGrade = n.min_grade ?? null;
+                maxGrade = n.max_grade ?? null;
                 // Metadata deserialisieren
                 if (
                     n.category === "concept" &&
@@ -185,6 +199,10 @@
         if (!title.trim()) errors.title = "Pflichtfeld";
         if (!category) errors.category = "Pflichtfeld";
         if (!contentType) errors.contentType = "Pflichtfeld";
+        if (gradeError) {
+            errors.grade = gradeError;
+            return;
+        }
         if (Object.keys(errors).length > 0) return;
 
         saving = true;
@@ -206,6 +224,9 @@
                     : null,
                 valid_until: validUntil || null,
                 schuljahr: schuljahr || null,
+                subject_id: subjectId,
+                min_grade: minGrade ? Number(minGrade) : null,
+                max_grade: maxGrade ? Number(maxGrade) : null,
             };
             await updateContextNode(id, payload);
             // Erfolgsmeldung
@@ -903,6 +924,82 @@
                             placeholder="z. B. 2024/2025"
                         />
                     </div>
+
+                    <!-- Fach und Jahrgangsstufen - nur für knowledge-Knoten -->
+                    {#if category === 'knowledge'}
+                        <!-- Fachzuordnung -->
+                        <div class="space-y-1">
+                            <label
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
+                            >
+                                Fach
+                            </label>
+                            {#if canEdit}
+                                <select
+                                    bind:value={subjectId}
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                                >
+                                    <option value={null}>— fächerübergreifend —</option>
+                                    {#each $subjects as s (s.id)}
+                                        <option value={s.id}>{s.name}</option>
+                                    {/each}
+                                </select>
+                            {:else}
+                                <p class="text-sm text-light-tx dark:text-dark-tx">
+                                    {subjectId
+                                        ? ($subjects.find(s => s.id === subjectId)?.name ?? '—')
+                                        : 'fächerübergreifend'}
+                                </p>
+                            {/if}
+                        </div>
+
+                        <!-- Jahrgangsstufen -->
+                        <div class="space-y-1">
+                            <label
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
+                            >
+                                Jahrgangsstufe
+                            </label>
+                            {#if canEdit}
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        type="number" min="1" max="13"
+                                        bind:value={minGrade}
+                                        placeholder="von"
+                                        class="w-20 px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                                    />
+                                    <span class="text-light-tx-2 dark:text-dark-tx-2 text-sm">–</span>
+                                    <input
+                                        type="number" min="1" max="13"
+                                        bind:value={maxGrade}
+                                        placeholder="bis"
+                                        class="w-20 px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
+                                    />
+                                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                        (leer = alle Stufen)
+                                    </span>
+                                </div>
+                                {#if gradeError}
+                                    <p class="text-xs text-light-re dark:text-dark-re mt-1">{gradeError}</p>
+                                {/if}
+                            {:else}
+                                <p class="text-sm text-light-tx dark:text-dark-tx">
+                                    {#if minGrade && maxGrade}
+                                        Klasse {minGrade}–{maxGrade}
+                                    {:else if minGrade}
+                                        ab Klasse {minGrade}
+                                    {:else if maxGrade}
+                                        bis Klasse {maxGrade}
+                                    {:else}
+                                        alle Jahrgangsstufen
+                                    {/if}
+                                </p>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
             </details>
 
