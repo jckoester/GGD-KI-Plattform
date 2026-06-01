@@ -133,3 +133,19 @@ class ContextNodeCopyRequest(BaseModel):
     valid_until: date | None = None
     read_scope_group_id: int | None = None
     write_scope_group_id: int | None = None
+
+
+# ── KS-Phase-5 Chat Context Nodes ────────────────────────────────────────
+
+
+class ChatContextNodeAdd(BaseModel):
+    node_id: UUID
+
+
+class ChatContextNodeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    node_id: UUID
+    title: str
+    content_type: str | None
+    added_at: datetime

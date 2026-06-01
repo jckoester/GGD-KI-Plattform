@@ -27,11 +27,22 @@ from app.context.schemas import (
     NeighborhoodResponse,
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
+    ChatContextNodeAdd,
+    ChatContextNodeRead,
 )
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
-from app.db.models import Assistant, AssistantContextAnchor, ContextEdge, ContextNode, Group, Subject
+from app.db.models import (
+    Assistant,
+    AssistantContextAnchor,
+    ChatContextNode,
+    ContextEdge,
+    ContextNode,
+    Conversation,
+    Group,
+    Subject,
+)
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -511,4 +522,112 @@ async def remove_context_anchor(
     if anchor is None:
         raise HTTPException(status_code=404, detail="Anker nicht gefunden")
     await db.delete(anchor)
+    await db.commit()
+
+
+# ── KS-Phase-5 Chat Context Nodes ──────────────────────────────────────────
+
+
+async def _get_conversation_or_403(
+    conversation_id: UUID,
+    pseudonym: str,
+    db: AsyncSession,
+) -> None:
+    """404 wenn Konversation nicht existiert, 403 wenn sie nicht dem Nutzer gehört."""
+    conv = await db.get(Conversation, conversation_id)
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+    if conv.pseudonym != pseudonym:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+
+@router.get(
+    "/conversations/{conversation_id}/nodes",
+    response_model=list[ChatContextNodeRead],
+)
+async def list_chat_context_nodes(
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    await _get_conversation_or_403(conversation_id, user.sub, db)
+
+    result = await db.execute(
+        sa.select(
+            ChatContextNode.node_id,
+            ContextNode.title,
+            ContextNode.content_type,
+            ChatContextNode.added_at,
+        )
+        .join(ContextNode, ContextNode.id == ChatContextNode.node_id)
+        .where(
+            ChatContextNode.chat_id == conversation_id,
+            ContextNode.status == "active",
+        )
+        .order_by(ChatContextNode.added_at)
+    )
+    rows = result.mappings().all()
+    return [ChatContextNodeRead(**dict(row)) for row in rows]
+
+
+@router.post(
+    "/conversations/{conversation_id}/nodes",
+    response_model=ChatContextNodeRead,
+    status_code=201,
+)
+async def add_chat_context_node(
+    conversation_id: UUID,
+    payload: ChatContextNodeAdd,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    await _get_conversation_or_403(conversation_id, user.sub, db)
+
+    # Knoten existiert und ist aktiv?
+    node = await db.get(ContextNode, payload.node_id)
+    if node is None or node.status != "active":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden oder inaktiv")
+
+    # Sichtbarkeit prüfen (kein privater Fremd-Knoten)
+    if node.read_scope == "private" and node.owner_pseudonym != user.sub:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    existing = await db.get(ChatContextNode, (conversation_id, payload.node_id))
+    if existing is not None:
+        return ChatContextNodeRead(
+            node_id=node.id,
+            title=node.title,
+            content_type=node.content_type,
+            added_at=existing.added_at,
+        )
+
+    entry = ChatContextNode(chat_id=conversation_id, node_id=payload.node_id)
+    db.add(entry)
+    await db.flush()
+    await db.commit()
+
+    return ChatContextNodeRead(
+        node_id=node.id,
+        title=node.title,
+        content_type=node.content_type,
+        added_at=entry.added_at,
+    )
+
+
+@router.delete(
+    "/conversations/{conversation_id}/nodes/{node_id}",
+    status_code=204,
+)
+async def remove_chat_context_node(
+    conversation_id: UUID,
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    await _get_conversation_or_403(conversation_id, user.sub, db)
+
+    entry = await db.get(ChatContextNode, (conversation_id, node_id))
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    await db.delete(entry)
     await db.commit()
