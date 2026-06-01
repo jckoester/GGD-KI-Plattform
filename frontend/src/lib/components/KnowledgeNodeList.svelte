@@ -7,8 +7,9 @@
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
-    import { subjects } from "$lib/stores/subjects.js";
+    import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
+    import SubjectIcon from "./SubjectIcon.svelte";
     import { Anchor } from "lucide-svelte";
 
     let {
@@ -34,44 +35,61 @@
     let selectedGrade = $state(initialGrade);
 
     // Sortierung
-    let sortCol = $state('subject_id'); // Default: Fach-Knoten vor Leitperspektiven
-    let sortDir = $state('asc');
+    let sortCol = $state("subject_id"); // Default: Fach-Knoten vor Leitperspektiven
+    let sortDir = $state("asc");
 
     const sortedNodes = $derived.by(() => {
         const arr = [...nodes];
         arr.sort((a, b) => {
             let av, bv;
-            if (sortCol === 'subject_id') {
+            if (sortCol === "subject_id") {
                 // null (Leitperspektiven) immer ans Ende, unabhängig von sortDir
                 if (a.subject_id == null && b.subject_id != null) return 1;
                 if (a.subject_id != null && b.subject_id == null) return -1;
-                av = a.title ?? '';
-                bv = b.title ?? '';
-            } else if (sortCol === 'title') {
-                av = a.title ?? '';
-                bv = b.title ?? '';
-            } else if (sortCol === 'content_type') {
-                av = (CATEGORY_LABELS[a.category] ?? a.category) + (a.content_type ?? '');
-                bv = (CATEGORY_LABELS[b.category] ?? b.category) + (b.content_type ?? '');
-            } else if (sortCol === 'updated_at') {
-                av = a.updated_at ?? '';
-                bv = b.updated_at ?? '';
+                av = a.title ?? "";
+                bv = b.title ?? "";
+            } else if (sortCol === "subject") {
+                const sa =
+                    a.subject_id != null
+                        ? ($subjectMap[a.subject_id]?.name ?? "")
+                        : "";
+                const sb =
+                    b.subject_id != null
+                        ? ($subjectMap[b.subject_id]?.name ?? "")
+                        : "";
+                if (!sa && sb) return 1;
+                if (sa && !sb) return -1;
+                av = sa;
+                bv = sb;
+            } else if (sortCol === "title") {
+                av = a.title ?? "";
+                bv = b.title ?? "";
+            } else if (sortCol === "content_type") {
+                av =
+                    (CATEGORY_LABELS[a.category] ?? a.category) +
+                    (a.content_type ?? "");
+                bv =
+                    (CATEGORY_LABELS[b.category] ?? b.category) +
+                    (b.content_type ?? "");
+            } else if (sortCol === "updated_at") {
+                av = a.updated_at ?? "";
+                bv = b.updated_at ?? "";
             } else {
-                av = a[sortCol] ?? '';
-                bv = b[sortCol] ?? '';
+                av = a[sortCol] ?? "";
+                bv = b[sortCol] ?? "";
             }
             const cmp = av < bv ? -1 : av > bv ? 1 : 0;
-            return sortDir === 'asc' ? cmp : -cmp;
+            return sortDir === "asc" ? cmp : -cmp;
         });
         return arr;
     });
 
     function toggleSort(col) {
         if (sortCol === col) {
-            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+            sortDir = sortDir === "asc" ? "desc" : "asc";
         } else {
             sortCol = col;
-            sortDir = 'asc';
+            sortDir = "asc";
         }
     }
 
@@ -91,7 +109,8 @@
             };
             if (q.trim().length >= 2) params.q = q.trim();
             if (fixedSubjectSlug) params.subject_slug = fixedSubjectSlug;
-            else if (selectedSubjectSlug) params.subject_slug = selectedSubjectSlug;
+            else if (selectedSubjectSlug)
+                params.subject_slug = selectedSubjectSlug;
             if (fixedGroupId) params.group_id = fixedGroupId;
             if (selectedGrade) params.grade = Number(selectedGrade);
             if (onlyEntryNodes) {
@@ -270,28 +289,80 @@
         <table class="w-full text-left border-collapse text-sm">
             <thead>
                 <tr class="border-b border-light-ui-3 dark:border-dark-ui-3">
-                    {#each [
-                        { col: 'title',        label: 'Titel'       },
-                        { col: 'content_type', label: 'Typ'         },
-                        { col: 'updated_at',   label: 'Aktualisiert'},
-                    ] as h (h.col)}
-                        <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">
+                    <th
+                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
+                    >
+                        <button
+                            onclick={() => toggleSort("title")}
+                            class="flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                        >
+                            Titel
+                            <span class="text-xs opacity-50">
+                                {#if sortCol === "title"}
+                                    {sortDir === "asc" ? "▲" : "▼"}
+                                {:else}
+                                    ⇅
+                                {/if}
+                            </span>
+                        </button>
+                    </th>
+                    <th
+                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
+                    >
+                        <button
+                            onclick={() => toggleSort("content_type")}
+                            class="flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                        >
+                            Typ
+                            <span class="text-xs opacity-50">
+                                {#if sortCol === "content_type"}
+                                    {sortDir === "asc" ? "▲" : "▼"}
+                                {:else}
+                                    ⇅
+                                {/if}
+                            </span>
+                        </button>
+                    </th>
+                    {#if !fixedSubjectSlug}
+                        <th
+                            class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
+                        >
                             <button
-                                onclick={() => toggleSort(h.col)}
+                                onclick={() => toggleSort("subject")}
                                 class="flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
                             >
-                                {h.label}
+                                Fach
                                 <span class="text-xs opacity-50">
-                                    {#if sortCol === h.col}
-                                        {sortDir === 'asc' ? '▲' : '▼'}
+                                    {#if sortCol === "subject"}
+                                        {sortDir === "asc" ? "▲" : "▼"}
                                     {:else}
                                         ⇅
                                     {/if}
                                 </span>
                             </button>
                         </th>
-                    {/each}
-                    <th class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2">Sichtbarkeit</th>
+                    {/if}
+                    <th
+                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
+                    >
+                        <button
+                            onclick={() => toggleSort("updated_at")}
+                            class="flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                        >
+                            Aktualisiert
+                            <span class="text-xs opacity-50">
+                                {#if sortCol === "updated_at"}
+                                    {sortDir === "asc" ? "▲" : "▼"}
+                                {:else}
+                                    ⇅
+                                {/if}
+                            </span>
+                        </button>
+                    </th>
+                    <th
+                        class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2"
+                        >Sichtbarkeit</th
+                    >
                     <th></th>
                 </tr>
             </thead>
@@ -328,11 +399,37 @@
                             {CATEGORY_LABELS[node.category] ?? node.category}
                             {#if node.content_type}
                                 <span class="opacity-60">
-                                    / {CONTENT_TYPE_LABELS[node.content_type] ?? node.content_type}</span
+                                    / {CONTENT_TYPE_LABELS[node.content_type] ??
+                                        node.content_type}</span
                                 >
                             {/if}
                         </td>
                         <!-- Datum -->
+                        {#if !fixedSubjectSlug}
+                            {@const subj =
+                                node.subject_id != null
+                                    ? ($subjectMap[node.subject_id] ?? null)
+                                    : null}
+                            <td class="px-3 py-2">
+                                {#if subj}
+                                    <span
+                                        title={subj.name}
+                                        class="flex items-center justify-center"
+                                    >
+                                        <SubjectIcon
+                                            name={subj.icon}
+                                            size={16}
+                                            color={subj.color}
+                                        />
+                                    </span>
+                                {:else}
+                                    <span
+                                        class="text-xs text-light-tx-3 dark:text-dark-tx-3"
+                                        >–</span
+                                    >
+                                {/if}
+                            </td>
+                        {/if}
                         <td
                             class="px-3 py-2 text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap text-xs"
                         >
