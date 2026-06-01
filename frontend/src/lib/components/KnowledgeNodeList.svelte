@@ -10,7 +10,7 @@
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
-    import { Anchor } from "lucide-svelte";
+    import { Anchor, Archive } from "lucide-svelte";
 
     let {
         fixedSubjectSlug = null, // gesetzt im Subject-Kontext-Tab
@@ -375,7 +375,9 @@
                         onclick={() =>
                             onNodeClick
                                 ? onNodeClick(node)
-                                : goto(`/knowledge/${node.id}?back=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+                                : goto(
+                                      `/knowledge/${node.id}?back=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+                                  )}
                     >
                         <!-- Titel mit Icon -->
                         <td
@@ -464,7 +466,7 @@
                                     class="text-xs text-light-tx-2 dark:text-dark-tx-2
                          hover:text-light-re dark:hover:text-dark-re transition-colors"
                                 >
-                                    Archivieren
+                                    <Archive size="16" />
                                 </button>
                             {:else}
                                 <span
