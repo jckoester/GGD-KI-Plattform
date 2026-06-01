@@ -6,6 +6,7 @@
         CONTENT_TYPE_LABELS,
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
+    import { PUBLIC_STUDENT_GRADES } from "$env/static/public";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
@@ -35,6 +36,8 @@
     let selectedGrade = $state(initialGrade);
 
     // Sortierung
+    const studentGrades = JSON.parse(PUBLIC_STUDENT_GRADES ?? "[5,6,7,8,9,10,11,12]");
+
     let sortCol = $state("subject_id"); // Default: Fach-Knoten vor Leitperspektiven
     let sortDir = $state("asc");
 
@@ -244,7 +247,7 @@
            bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
     >
         <option value={null}>Alle Jahrgangsstufen</option>
-        {#each Array.from({ length: 13 }, (_, i) => i + 1) as g}
+        {#each studentGrades as g}
             <option value={g}>Klasse {g}</option>
         {/each}
     </select>
