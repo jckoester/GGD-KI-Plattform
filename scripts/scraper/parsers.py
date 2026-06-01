@@ -15,6 +15,19 @@ from bs4 import BeautifulSoup
 
 from scripts.scraper.references import classify_reference, strip_soft_hyphens
 
+_GRADE_FROM_BPID = re.compile(r'_(?:IK|PK)_(\d+)(?:-(\d+))?(?:-[A-Za-z]+)?_')
+
+
+def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:
+    """Extrahiert (min_grade, max_grade) aus bp_id, z.B. 'BP...CH_IK_7-8_01' -> (7, 8)."""  
+    m = _GRADE_FROM_BPID.search(bp_id)
+    if not m:
+        return None, None
+    grades = [int(g) for g in m.groups() if g is not None]
+    if not grades:
+        return None, None
+    return min(grades), max(grades)
+
 
 class ScraperParseError(Exception):
     """Wird geworfen wenn ein Parser auf einer Seite die erwartete Struktur nicht findet."""
@@ -46,9 +59,9 @@ def _extract_breadcrumb(soup: BeautifulSoup, url: str) -> list[str]:
     for li in nav.find_all('li'):
         a = li.find('a')
         if a:
-            text = strip_soft_hyphens(a.get_text(strip=True))
+            text = strip_soft_hyphens(a.get_text(separator=" ", strip=True))
         else:
-            text = strip_soft_hyphens(li.get_text(strip=True))
+            text = strip_soft_hyphens(li.get_text(separator=" ", strip=True))
         if text:
             crumbs.append(text)
     return crumbs
@@ -59,10 +72,10 @@ def _find_title(soup: BeautifulSoup) -> str | None:
     # Fachplan and Leitidee overview pages use h1 with class headline--2
     h1 = soup.find('h1', class_=lambda c: c and 'headline--2' in c)
     if h1:
-        return strip_soft_hyphens(h1.get_text(strip=True))
+        return strip_soft_hyphens(h1.get_text(separator=" ", strip=True))
     h2 = soup.find('h2')
     if h2:
-        return strip_soft_hyphens(h2.get_text(strip=True))
+        return strip_soft_hyphens(h2.get_text(separator=" ", strip=True))
     return None
 
 
@@ -88,12 +101,14 @@ def parse_fachplan(soup: BeautifulSoup, url: str) -> dict[str, Any]:
     for elem in main.find_all(['p', 'h2'], limit=10):
         if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
             continue
-        text = strip_soft_hyphens(elem.get_text(strip=True))
+        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
         if text:
             content_parts.append(text)
             if len(content_parts) >= 3:
                 break
     content = '\n'.join(content_parts) if content_parts else title
+
+    min_grade, max_grade = extract_grades_from_bp_id(bp_id)
 
     return {
         'bp_id': bp_id,
@@ -104,6 +119,8 @@ def parse_fachplan(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'content_hash': _content_hash(content),
         'parent_bp_id': None,
         'relations': [],
+        'min_grade': min_grade,
+        'max_grade': max_grade,
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -152,12 +169,13 @@ def parse_leitidee(soup: BeautifulSoup, url: str) -> dict[str, Any]:
             continue
         if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
             continue
-        text = strip_soft_hyphens(elem.get_text(strip=True))
+        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
         if text:
             content_parts.append(text)
     content = '\n'.join(content_parts) if content_parts else title
 
     parent_bp_id = _ik_parent_bp_id(bp_id)
+    min_grade, max_grade = extract_grades_from_bp_id(bp_id)
 
     return {
         'bp_id': bp_id,
@@ -168,6 +186,8 @@ def parse_leitidee(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'content_hash': _content_hash(content),
         'parent_bp_id': parent_bp_id,
         'relations': [],
+        'min_grade': min_grade,
+        'max_grade': max_grade,
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -193,12 +213,23 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
     standard_pattern = re.compile(r'^\((\d+)\)')
     rows = tktable.find_all('tr')
 
+    # Extrahiere Leitideen-Nummer aus parent_bp_id für kompetenz_nr
+    ik_suffix = re.sub(r'^.*_IK_', '', parent_bp_id)
+    li_segments = ik_suffix.split('_')
+    li_nr = None
+    for seg in reversed(li_segments):
+        if seg and seg.isdigit():
+            li_nr = seg
+            break
+
+    min_grade, max_grade = extract_grades_from_bp_id(parent_bp_id)
+
     for i, row in enumerate(rows):
         cells = row.find_all(['td', 'th'])
         if not cells:
             continue
 
-        first_text = strip_soft_hyphens(cells[0].get_text(strip=True))
+        first_text = strip_soft_hyphens(cells[0].get_text(separator=" ", strip=True))
         m = standard_pattern.match(first_text)
         if not m:
             continue
@@ -212,12 +243,18 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
         if i + 1 < len(rows):
             next_cells = rows[i + 1].find_all(['td', 'th'])
             if next_cells:
-                ref_text = strip_soft_hyphens(next_cells[0].get_text(strip=True))
+                ref_text = strip_soft_hyphens(next_cells[0].get_text(separator=" ", strip=True))
                 if not standard_pattern.match(ref_text):
                     for token in re.split(r'[,\s]+', ref_text):
                         ref = classify_reference(token.strip())
                         if ref:
                             relations.append(ref)
+
+        # Berechne hierarchische Kompetenz-Nummer
+        try:
+            kompetenz_nr = f"{int(li_nr)}.{nr}" if li_nr else f"{nr}"
+        except (ValueError, TypeError):
+            kompetenz_nr = f"{nr}"
 
         nodes.append({
             'bp_id': sub_bp_id,
@@ -228,9 +265,12 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
             'content_hash': _content_hash(content),
             'parent_bp_id': parent_bp_id,
             'relations': relations,
+            'min_grade': min_grade,
+            'max_grade': max_grade,
             'metadata': {
                 'bp_id': sub_bp_id,
                 'standard_nr': nr,
+                'kompetenz_nr': kompetenz_nr,
                 'breadcrumb': breadcrumb,
                 'source_url': url,
                 'scraped_at': _now_iso(),
@@ -257,12 +297,13 @@ def parse_pk_gruppe(soup: BeautifulSoup, url: str) -> dict[str, Any]:
             continue
         if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
             continue
-        text = strip_soft_hyphens(elem.get_text(strip=True))
+        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
         if text:
             content_parts.append(text)
     content = '\n'.join(content_parts) if content_parts else title
 
     parent_bp_id = re.sub(r'_PK_.*$', '', bp_id)
+    min_grade, max_grade = extract_grades_from_bp_id(bp_id)
 
     return {
         'bp_id': bp_id,
@@ -273,6 +314,8 @@ def parse_pk_gruppe(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'content_hash': _content_hash(content),
         'parent_bp_id': parent_bp_id,
         'relations': [],
+        'min_grade': min_grade,
+        'max_grade': max_grade,
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -298,12 +341,14 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
     current_gruppe = None
     nr_pattern = re.compile(r'^(\d+)\.')
 
+    min_grade, max_grade = extract_grades_from_bp_id(parent_bp_id)
+
     for row in table.find_all('tr'):
         cells = row.find_all(['td', 'th'])
         if not cells:
             continue
 
-        first_text = strip_soft_hyphens(cells[0].get_text(strip=True))
+        first_text = strip_soft_hyphens(cells[0].get_text(separator=" ", strip=True))
 
         # Thematische Zwischengruppe (unnummerierte Zeile, kursiv oder colspan)
         if len(cells) == 1 and not nr_pattern.match(first_text):
@@ -318,9 +363,20 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
         content = first_text
         sub_bp_id = f"{parent_bp_id}_{nr:02d}"
 
+        # Berechne hierarchische Kompetenz-Nummer
+        kompetenz_nr = f"{nr}"
+        if current_gruppe:
+            try:
+                gruppe_nr_match = re.search(r'(\d+)', current_gruppe)
+                if gruppe_nr_match:
+                    kompetenz_nr = f"{gruppe_nr_match.group(1)}.{nr}"
+            except (ValueError, TypeError):
+                pass
+
         meta: dict[str, Any] = {
             'bp_id': sub_bp_id,
             'standard_nr': nr,
+            'kompetenz_nr': kompetenz_nr,
             'breadcrumb': breadcrumb,
             'source_url': url,
             'scraped_at': _now_iso(),
@@ -337,6 +393,8 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
             'content_hash': _content_hash(content),
             'parent_bp_id': parent_bp_id,
             'relations': [],
+            'min_grade': min_grade,
+            'max_grade': max_grade,
             'metadata': meta,
             'visibility': 'global',
         })
@@ -360,7 +418,7 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
     for elem in main.find_all(['p', 'h2']):
         if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
             continue
-        text = strip_soft_hyphens(elem.get_text(strip=True))
+        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
         if text:
             content_parts.append(text)
     content = '\n'.join(content_parts[:5]) if content_parts else title
@@ -374,6 +432,8 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
         'content_hash': _content_hash(content),
         'parent_bp_id': None,
         'relations': [],
+        'min_grade': None,
+        'max_grade': None,
         'metadata': {
             'bp_id': bp_id,
             'kuerzel': kuerzel,
@@ -405,7 +465,7 @@ def parse_leitperspektive_aspekt_list(
     parent_bp_id = f"BP2016BW_ALLG_LP_{kuerzel}"
 
     for idx, li in enumerate(ul.find_all('li', recursive=False), start=1):
-        content = strip_soft_hyphens(li.get_text(strip=True))
+        content = strip_soft_hyphens(li.get_text(separator=" ", strip=True))
         if not content:
             continue
         sub_bp_id = f"{kuerzel}_{idx:02d}"
@@ -418,6 +478,8 @@ def parse_leitperspektive_aspekt_list(
             'content_hash': _content_hash(content),
             'parent_bp_id': parent_bp_id,
             'relations': [],
+            'min_grade': None,
+            'max_grade': None,
             'metadata': {
                 'bp_id': sub_bp_id,
                 'kuerzel': kuerzel,

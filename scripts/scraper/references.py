@@ -8,8 +8,10 @@ _IK_PATTERN = re.compile(r'BP\w+_IK_')
 
 
 def strip_soft_hyphens(text: str) -> str:
-    """Entfernt Soft-Hyphens (U+00AD) aus Text."""
-    return text.replace('\u00ad', '')
+    """Entfernt Soft-Hyphens (U+00AD) und normalisiert Leerzeichen."""
+    text = text.replace('\u00ad', '')
+    # Mehrfache Leerzeichen (können durch separator=' ' entstehen) auf eines reduzieren
+    return re.sub(r' {2,}', ' ', text).strip()
 
 
 def classify_reference(token: str) -> dict | None:
