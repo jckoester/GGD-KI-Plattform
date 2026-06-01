@@ -922,16 +922,17 @@ export async function searchContextNodes(query, contentTypes = []) {
 
 /**
  * Lädt Kontextknoten mit optionalen Filtern.
- * @param {{ q?, category?, content_type?, status?, subject_slug?, group_id?, owner? }} params
+ * @param {{ q?, category?, content_type?, status?, subject_slug?, group_id?, grade?, owner? }} params
  */
 export async function getContextNodes(params = {}) {
   const p = new URLSearchParams()
-  if (params.q)            p.set('q', params.q)
-  if (params.category)     p.set('category', params.category)
-  if (params.status)       p.set('status', params.status)
-  if (params.subject_slug) p.set('subject_slug', params.subject_slug)
-  if (params.group_id)     p.set('group_id', params.group_id)
-  if (params.owner)        p.set('owner', params.owner)
+  if (params.q)             p.set('q', params.q)
+  if (params.category)      p.set('category', params.category)
+  if (params.status)        p.set('status', params.status)
+  if (params.subject_slug)  p.set('subject_slug', params.subject_slug)
+  if (params.group_id)      p.set('group_id', params.group_id)
+  if (params.grade != null) p.set('grade', params.grade)
+  if (params.owner)         p.set('owner', params.owner)
   if (params.content_type) {
     const types = Array.isArray(params.content_type) ? params.content_type : [params.content_type]
     types.forEach(t => p.append('content_type', t))

@@ -87,6 +87,7 @@ async def list_nodes(
     status: str | None = Query(default=None),
     subject_slug: str | None = Query(default=None),
     group_id: int | None = Query(default=None),
+    grade: int | None = Query(default=None, ge=1, le=13, description="Jahrgangsstufe"),
     owner: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
@@ -95,11 +96,17 @@ async def list_nodes(
     query = _visibility_filter(query, user, status_override=status)
 
     # subject_slug: Knoten deren Scope-Gruppe zu diesem Fach gehört,
-    # plus schulweite/globale knowledge-Knoten
+    # plus schulweite/globale knowledge-Knoten mit passendem Fach oder fächerübergreifend
     if subject_slug:
         subquery_group_ids = (
             sa.select(Group.id)
             .join(Subject, Subject.id == Group.subject_id)
+            .where(Subject.slug == subject_slug)
+            .scalar_subquery()
+        )
+        # subject_id der Ziel-Slug nachschlagen
+        subject_id_subq = (
+            sa.select(Subject.id)
             .where(Subject.slug == subject_slug)
             .scalar_subquery()
         )
@@ -109,6 +116,10 @@ async def list_nodes(
                 and_(
                     ContextNode.read_scope.in_(["global", "school"]),
                     ContextNode.category == "knowledge",
+                    or_(
+                        ContextNode.subject_id == subject_id_subq,
+                        ContextNode.subject_id.is_(None),
+                    ),
                 ),
             )
         )
@@ -116,6 +127,18 @@ async def list_nodes(
     # group_id: nur Knoten mit exakt dieser read_scope_group_id
     if group_id is not None:
         query = query.where(ContextNode.read_scope_group_id == group_id)
+
+    # grade: Jahrgangsstufen-Filter
+    if grade is not None:
+        query = query.where(
+            or_(
+                ContextNode.min_grade.is_(None),  # keine Stufenangabe = für alle
+                and_(
+                    ContextNode.min_grade <= grade,
+                    ContextNode.max_grade >= grade,
+                ),
+            )
+        )
 
     # owner=me: nur eigene Knoten
     if owner is not None:
