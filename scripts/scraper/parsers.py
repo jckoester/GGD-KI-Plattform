@@ -213,14 +213,18 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
     standard_pattern = re.compile(r'^\((\d+)\)')
     rows = tktable.find_all('tr')
 
-    # Extrahiere Leitideen-Nummer aus parent_bp_id für kompetenz_nr
-    ik_suffix = re.sub(r'^.*_IK_', '', parent_bp_id)
-    li_segments = ik_suffix.split('_')
-    li_nr = None
-    for seg in reversed(li_segments):
-        if seg and seg.isdigit():
-            li_nr = seg
-            break
+    # Numerisches Präfix aus dem letzten Breadcrumb-Eintrag extrahieren
+    # z.B. "3.1.1 Leitidee Zahl…" → "3.1.1"  (Fallback: bp_id-Segmente)
+    _heading_nr = re.compile(r'^(\d+(?:\.\d+)*)\s')
+    leitidee_prefix = None
+    if breadcrumb:
+        m_bc = _heading_nr.match(breadcrumb[-1])
+        if m_bc:
+            leitidee_prefix = m_bc.group(1)
+    if not leitidee_prefix:
+        ik_suffix = re.sub(r'^.*_IK_', '', parent_bp_id)
+        li_nrs = [int(s) for s in ik_suffix.split('_') if s and s.isdigit()]
+        leitidee_prefix = '.'.join(str(n) for n in li_nrs) if li_nrs else None
 
     min_grade, max_grade = extract_grades_from_bp_id(parent_bp_id)
 
@@ -250,17 +254,18 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
                         if ref:
                             relations.append(ref)
 
-        # Berechne hierarchische Kompetenz-Nummer
-        try:
-            kompetenz_nr = f"{int(li_nr)}.{nr}" if li_nr else f"{nr}"
-        except (ValueError, TypeError):
-            kompetenz_nr = f"{nr}"
+        # Berechne hierarchische Kompetenz-Nummer, z.B. "3.1.1.(2)"
+        kompetenz_nr = f"{leitidee_prefix}.({nr})" if leitidee_prefix else f"({nr})"
+
+        # Titel: (n)-Präfix durch vollständige Kompetenznummer ersetzen
+        title_text = re.sub(r'^\(\d+\)\s*', '', content).strip()
+        title = f"{kompetenz_nr} {title_text}"
 
         nodes.append({
             'bp_id': sub_bp_id,
             'type': 'knowledge',
             'content_type': 'ik_kompetenz',
-            'title': content[:200],
+            'title': title[:200],
             'content': content,
             'content_hash': _content_hash(content),
             'parent_bp_id': parent_bp_id,
@@ -341,6 +346,14 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
     current_gruppe = None
     nr_pattern = re.compile(r'^(\d+)\.')
 
+    # Numerisches Präfix aus letztem Breadcrumb-Eintrag, z.B. "2.1 Erkenntnisgewinnung" → "2.1"
+    _heading_nr = re.compile(r'^(\d+(?:\.\d+)*)\s')
+    pk_prefix = None
+    if breadcrumb:
+        m_bc = _heading_nr.match(breadcrumb[-1])
+        if m_bc:
+            pk_prefix = m_bc.group(1)
+
     min_grade, max_grade = extract_grades_from_bp_id(parent_bp_id)
 
     for row in table.find_all('tr'):
@@ -363,15 +376,21 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
         content = first_text
         sub_bp_id = f"{parent_bp_id}_{nr:02d}"
 
-        # Berechne hierarchische Kompetenz-Nummer
-        kompetenz_nr = f"{nr}"
-        if current_gruppe:
+        # Berechne hierarchische Kompetenz-Nummer, z.B. "2.1.1"
+        if pk_prefix:
+            kompetenz_nr = f"{pk_prefix}.{nr}"
+        elif current_gruppe:
             try:
                 gruppe_nr_match = re.search(r'(\d+)', current_gruppe)
-                if gruppe_nr_match:
-                    kompetenz_nr = f"{gruppe_nr_match.group(1)}.{nr}"
+                kompetenz_nr = f"{gruppe_nr_match.group(1)}.{nr}" if gruppe_nr_match else f"{nr}"
             except (ValueError, TypeError):
-                pass
+                kompetenz_nr = f"{nr}"
+        else:
+            kompetenz_nr = f"{nr}"
+
+        # Titel: "1. Text…" → "2.1.1 Text…"
+        title_text = re.sub(r'^\d+\.\s*', '', content).strip()
+        title = f"{kompetenz_nr} {title_text}"
 
         meta: dict[str, Any] = {
             'bp_id': sub_bp_id,
@@ -388,7 +407,7 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
             'bp_id': sub_bp_id,
             'type': 'knowledge',
             'content_type': 'pk_kompetenz',
-            'title': content[:200],
+            'title': title[:200],
             'content': content,
             'content_hash': _content_hash(content),
             'parent_bp_id': parent_bp_id,

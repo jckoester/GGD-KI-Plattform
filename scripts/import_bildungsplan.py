@@ -238,18 +238,20 @@ def upsert_node(
 
     existing_id, existing_hash = row
     if existing_hash == new_hash:
-        # Content unverändert — neue Metadaten-Spalten trotzdem setzen (initialer Roll-out)
-        # COALESCE: bestehende Non-NULL-Werte werden nicht überschrieben
-        if not dry_run and any(v is not None for v in (subject_id, min_grade, max_grade)):
+        # Content unverändert — abgeleitete Felder trotzdem aktualisieren:
+        # title/metadata immer (fangen Scraper-Fixes auf), subject_id/grades per COALESCE
+        if not dry_run:
             cur.execute(
                 """
                 UPDATE context_nodes
-                SET subject_id = COALESCE(subject_id, %s),
+                SET title      = %s,
+                    metadata   = %s,
+                    subject_id = COALESCE(subject_id, %s),
                     min_grade  = COALESCE(min_grade,  %s),
                     max_grade  = COALESCE(max_grade,  %s)
                 WHERE id = %s
                 """,
-                (subject_id, min_grade, max_grade, existing_id),
+                (title, json.dumps(metadata), subject_id, min_grade, max_grade, existing_id),
             )
         return "skipped", UUID(str(existing_id))
 
