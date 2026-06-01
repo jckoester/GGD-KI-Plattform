@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 from scripts.scraper.references import classify_reference, strip_soft_hyphens
 
-_GRADE_FROM_BPID = re.compile(r'_(?:IK|PK)_(\d+)(?:-(\d+))?(?:-[A-Za-z]+)?_')
+_GRADE_FROM_BPID = re.compile(r'_(?:IK|PK)_(\d+)(?:-(\d+))?(?:-(\d+))?(?:-[A-Za-z]+)?_')
 
 
 def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:

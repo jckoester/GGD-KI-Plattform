@@ -50,7 +50,7 @@ subjects:
     name: Chemie
     icon: flask-conical
     color: "#f59e0b"
-    min_grade: 7
+    min_grade: 8
     max_grade: 13
     sort_order: 50
     fach_code: CH # kein Override, Basisfassung für alle Stufen
