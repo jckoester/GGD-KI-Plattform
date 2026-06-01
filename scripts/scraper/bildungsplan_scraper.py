@@ -210,7 +210,7 @@ async def scrape_fach(
     return neu, geaendert, unveraendert
 
 
-async def main(subjects_path: str, output_dir: str, fach_filter: str | None = None) -> None:
+async def main(subjects_path: str, output_dir: str, fach_filter: str | None = None, leitperspektiven_only: bool = False) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s %(message)s',
@@ -256,6 +256,9 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                 for node in lp_nodes:
                     f.write(json.dumps(node, ensure_ascii=False) + '\n')
             logger.info(f"Leitperspektiven: {len(lp_nodes)} Knoten geschrieben")
+
+        if leitperspektiven_only:
+            return
 
         # Faeccher
         for fach in cfg['subjects']:
@@ -310,5 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--subjects', default='config/subjects.yaml')
     parser.add_argument('--output', default='scripts/scraper/output')
     parser.add_argument('--fach', default=None, help='Nur dieses Fach scrapen (z.B. CH)')
+    parser.add_argument('--leitperspektiven-only', action='store_true',
+                        help='Nur Leitperspektiven scrapen, keine Fächer')
     args = parser.parse_args()
-    asyncio.run(main(args.subjects, args.output, args.fach))
+    asyncio.run(main(args.subjects, args.output, args.fach, args.leitperspektiven_only))

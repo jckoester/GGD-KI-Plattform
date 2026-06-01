@@ -456,9 +456,14 @@ def parse_leitperspektive_aspekt_list(
     Falls keine Liste vorhanden -> leere Liste (LFDB-Sonderfall).
     """
     nodes = []
-    # Aspekt-Liste steht im main-Content, nicht im Breadcrumb
     main = soup.find('main') or soup
-    ul = main.find(['ul', 'ol'])
+    # Erstes ul/ol das nicht in Navigation/Breadcrumb liegt
+    ul = None
+    for candidate in main.find_all(['ul', 'ol']):
+        if not candidate.find_parent(re.compile(r'^nav$')) and \
+           not candidate.find_parent(class_=re.compile(r'breadcrumb|nav|header|footer')):
+            ul = candidate
+            break
     if not ul:
         return nodes
 
