@@ -14,6 +14,7 @@
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
+    import ContextChips from "$lib/components/ContextChips.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -85,6 +86,27 @@
     // Kontext-Knoten für diese Konversation
     let contextNodes = $state([]); // ChatContextNodeRead[]
     let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
+
+    // Kombinierter Nodes-State für die Chips-Anzeige
+    const displayContextNodes = $derived(
+        conversationId ? contextNodes : pendingContextNodes
+    );
+
+    async function handleRemoveContextNode(nodeId) {
+        // Optimistisch entfernen
+        contextNodes = contextNodes.filter(n => n.node_id !== nodeId);
+        pendingContextNodes = pendingContextNodes.filter(n => n.node_id !== nodeId);
+
+        if (conversationId) {
+            try {
+                await removeChatContextNode(conversationId, nodeId);
+            } catch (err) {
+                console.error('Kontext-Knoten konnte nicht entfernt werden:', err);
+                // Bei Fehler: Knoten wieder anzeigen (kein Reload nötig — State bleibt
+                // inkonsistent bis zur nächsten Konversation; kein kritischer Fehler)
+            }
+        }
+    }
 
     // Computed: aktiver Kontext (pending für neue Konversation, sonst aus Store)
     const activeSubjectId = $derived(
@@ -613,7 +635,7 @@
         // @-Fragment im Eingabefeld durch Knoten-Titel ersetzen
         const cursorPos = textarea?.selectionStart ?? input.length;
         const textBeforeCursor = input.slice(0, cursorPos);
-        const replaced = textBeforeCursor.replace(/@\S*$/, node.title);
+        const replaced = textBeforeCursor.replace(/@\S*$/, '');
         input = replaced + input.slice(cursorPos);
 
         // Knoten zum Kontext hinzufügen
@@ -995,6 +1017,13 @@
                     {assistantSwitchHint}
                 </p>
             {/if}
+
+            <!-- Kontext-Knoten-Chips -->
+            <ContextChips
+                nodes={displayContextNodes}
+                onremove={handleRemoveContextNode}
+                disabled={isStreaming}
+            />
 
             <!-- @-Mention Dropdown -->
             {#if mentionOpen && mentionResults.length > 0}
