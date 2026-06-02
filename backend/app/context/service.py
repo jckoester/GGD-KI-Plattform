@@ -61,34 +61,30 @@ def _assemble_context(
 
 
 async def get_context_for_query(
-    assistant_id: int,
+    assistant_id: int | None,
     pseudonym: str,
     query_text: str,
     chat_id: UUID | None,
     db: AsyncSession,
 ) -> str:
-    """Assembliert den Kontext-String für einen Assistenten-Prompt.
+    """Assembliert den Kontext-String für einen Chat-Prompt.
 
     Kombiniert semantische Suche, Engagement-Retrieval und explizit gepinnte Knoten.
-    Gibt leeren String zurück wenn kein retrieval_scope konfiguriert ist.
+    Pinned nodes werden unabhängig von einem Assistenten oder retrieval_scope geladen.
     """
-    result = await db.execute(
-        sa.select(AssistantContextAnchor.node_id)
-        .where(
-            AssistantContextAnchor.assistant_id == assistant_id,
-            AssistantContextAnchor.role == "retrieval_scope",
+    # Retrieval-Scope-Anker nur laden wenn ein Assistent aktiv ist
+    anchor_ids: list[UUID] = []
+    if assistant_id is not None:
+        result = await db.execute(
+            sa.select(AssistantContextAnchor.node_id)
+            .where(
+                AssistantContextAnchor.assistant_id == assistant_id,
+                AssistantContextAnchor.role == "retrieval_scope",
+            )
         )
-    )
-    anchor_ids: list[UUID] = [row[0] for row in result.all()]
+        anchor_ids = [row[0] for row in result.all()]
 
-    if not anchor_ids:
-        return ""
-
-    semantic_nodes, engagement_entries = await asyncio.gather(
-        get_semantic_context(anchor_ids, query_text, pseudonym, db),
-        get_engagement_context(anchor_ids, pseudonym, db),
-    )
-
+    # Gepinnte Knoten immer laden (unabhängig von retrieval_scope)
     pinned_nodes: list[ContextNode] = []
     if chat_id is not None:
         pinned_result = await db.execute(
@@ -100,5 +96,14 @@ async def get_context_for_query(
             )
         )
         pinned_nodes = list(pinned_result.scalars().all())
+
+    # Semantische Suche nur wenn retrieval_scope-Anker vorhanden
+    semantic_nodes: list[ContextNode] = []
+    engagement_entries: list[EngagementEntry] = []
+    if anchor_ids:
+        semantic_nodes, engagement_entries = await asyncio.gather(
+            get_semantic_context(anchor_ids, query_text, pseudonym, db),
+            get_engagement_context(anchor_ids, pseudonym, db),
+        )
 
     return _assemble_context(semantic_nodes, engagement_entries, pinned_nodes)

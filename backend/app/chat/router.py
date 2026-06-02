@@ -413,16 +413,14 @@ async def chat(
     # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
     assistant_id_for_docs = active_assistant_id
 
-    # Kontext aus Kontextspeicher laden (KS-Phase-3)
-    context_str = ""
-    if active_assistant_id is not None:
-        context_str = await get_context_for_query(
-            assistant_id=active_assistant_id,
-            pseudonym=current_user.sub,
-            query_text=user_message,
-            chat_id=conversation_id,
-            db=db,
-        )
+    # Kontext aus Kontextspeicher laden — immer, auch ohne Assistenten (KS-Phase-5)
+    context_str = await get_context_for_query(
+        assistant_id=active_assistant_id,
+        pseudonym=current_user.sub,
+        query_text=user_message,
+        chat_id=conversation_id,
+        db=db,
+    )
 
     llm_messages: list[dict] = []
 
@@ -454,6 +452,8 @@ async def chat(
             else system_prompt_snapshot
         )
         llm_messages.append({"role": "system", "content": effective_system_prompt})
+    elif context_str:
+        llm_messages.append({"role": "system", "content": context_str})
     llm_messages.append({"role": "system", "content": _MARKDOWN_GUARDRAIL})
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
