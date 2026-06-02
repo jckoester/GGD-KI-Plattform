@@ -25,6 +25,10 @@
         uploadFile,
         getAssistants,
         patchConversationContext,
+        getChatContextNodes,
+        addChatContextNode,
+        removeChatContextNode,
+        getContextNodes,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
@@ -71,6 +75,16 @@
     // Pending-Kontext für neue Konversation (gesetzt per #-Shortcut vor erstem Send)
     let pendingSubjectId = $state(null);
     let pendingGroupId = $state(null);
+
+    // @-Mention State für Kontext-Knoten
+    let mentionQuery = $state('');
+    let mentionResults = $state([]);
+    let mentionOpen = $state(false);
+    let mentionSelectedIndex = $state(0);
+    let mentionDebounceTimer = $state(null);
+    // Kontext-Knoten für diese Konversation
+    let contextNodes = $state([]); // ChatContextNodeRead[]
+    let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
 
     // Computed: aktiver Kontext (pending für neue Konversation, sonst aus Store)
     const activeSubjectId = $derived(
@@ -446,6 +460,16 @@
                     if (wasNewConversation) {
                         refreshConversationCounts();
                     }
+                    // Pending-Kontext-Knoten persistieren (neue Konversation)
+                    if (wasNewConversation && pendingContextNodes.length > 0) {
+                        // Fire-and-forget: Fehler werden nur geloggt, nicht dem User angezeigt
+                        const toAdd = [...pendingContextNodes];
+                        pendingContextNodes = [];
+                        for (const node of toAdd) {
+                            addChatContextNode(item.conversationId, node.node_id).catch(console.error);
+                        }
+                        contextNodes = toAdd; // optimistisch setzen
+                    }
                     continue;
                 }
                 // Titel-Event
@@ -509,9 +533,34 @@
     }
 
     function handleKeydown(e) {
+        // @-Dropdown Navigation
+        if (mentionOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                mentionSelectedIndex = Math.min(mentionSelectedIndex + 1, mentionResults.length - 1);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                if (mentionResults.length > 0) {
+                    e.preventDefault();
+                    selectMention(mentionResults[mentionSelectedIndex]);
+                    return;
+                }
+            }
+            if (e.key === 'Escape') {
+                mentionOpen = false;
+                return;
+            }
+        }
+
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            if (subjectPickerOpen || pickerOpen) return;
+            if (subjectPickerOpen || pickerOpen || mentionOpen) return;
             handleSubmit();
         }
     }
@@ -529,7 +578,70 @@
         if (e.target.value === "#" && hasFachItems) {
             input = "";
             subjectPickerOpen = true;
+            return;
         }
+
+        // @-Trigger: suche @ am oder vor der aktuellen Cursor-Position
+        const cursorPos = e.target.selectionStart ?? input.length;
+        const textBeforeCursor = input.slice(0, cursorPos);
+        const match = textBeforeCursor.match(/@(\S*)$/);
+        if (match) {
+            mentionQuery = match[1];
+            mentionOpen = true;
+            mentionSelectedIndex = 0;
+            clearTimeout(mentionDebounceTimer);
+            mentionDebounceTimer = setTimeout(() => fetchMentionResults(mentionQuery), 200);
+        } else {
+            mentionOpen = false;
+            mentionResults = [];
+        }
+    }
+
+    async function fetchMentionResults(q) {
+        try {
+            const data = await getContextNodes({ q, status: 'active' });
+            mentionResults = data.items?.slice(0, 8) ?? data.slice(0, 8);
+        } catch {
+            mentionResults = [];
+        }
+    }
+
+    async function selectMention(node) {
+        mentionOpen = false;
+        mentionResults = [];
+
+        // @-Fragment im Eingabefeld durch Knoten-Titel ersetzen
+        const cursorPos = textarea?.selectionStart ?? input.length;
+        const textBeforeCursor = input.slice(0, cursorPos);
+        const replaced = textBeforeCursor.replace(/@\S*$/, node.title);
+        input = replaced + input.slice(cursorPos);
+
+        // Knoten zum Kontext hinzufügen
+        if (conversationId) {
+            try {
+                const added = await addChatContextNode(conversationId, node.id);
+                if (!contextNodes.some(n => n.node_id === added.node_id)) {
+                    contextNodes = [...contextNodes, added];
+                }
+            } catch (err) {
+                console.error('Kontext-Knoten konnte nicht hinzugefügt werden:', err);
+            }
+        } else {
+            // Neue Konversation: puffern — nach erstem Send wird conversationId bekannt
+            const alreadyPending = pendingContextNodes.some(n => n.node_id === node.id);
+            if (!alreadyPending) {
+                pendingContextNodes = [
+                    ...pendingContextNodes,
+                    { node_id: node.id, title: node.title, content_type: node.content_type, added_at: new Date().toISOString() },
+                ];
+            }
+        }
+
+        textarea?.focus();
+    }
+
+    function handleTextareaBlur() {
+        setTimeout(() => { mentionOpen = false; }, 100);
     }
 
     // Picker-Callbacks
@@ -632,6 +744,12 @@
                 activeConversationId.set(data.id);
                 activeConversationSubjectId.set(data.subject_id ?? null);
                 activeConversationGroupId.set(data.group_id ?? null);
+                // Kontext-Knoten laden
+                try {
+                    contextNodes = await getChatContextNodes(data.id);
+                } catch {
+                    contextNodes = [];
+                }
             } catch (err) {
                 if (err instanceof ApiError) {
                     conversationError = err.message;
@@ -672,6 +790,8 @@
             subjectPickerOpen = false;
             pendingSubjectId = null;
             pendingGroupId = null;
+            contextNodes = [];
+            pendingContextNodes = [];
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
             if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;
@@ -876,6 +996,32 @@
                 </p>
             {/if}
 
+            <!-- @-Mention Dropdown -->
+            {#if mentionOpen && mentionResults.length > 0}
+                <div
+                    class="absolute bottom-full left-0 right-0 mb-1 z-50
+                           bg-light-bg-2 dark:bg-dark-bg-2
+                           border border-light-ui-3 dark:border-dark-ui-3
+                           rounded-lg shadow-lg overflow-hidden"
+                >
+                    {#each mentionResults as node, i}
+                        <button
+                            type="button"
+                            class="w-full text-left px-3 py-2 text-sm flex items-center gap-2
+                                   {i === mentionSelectedIndex
+                                       ? 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx'
+                                       : 'text-light-tx dark:text-dark-tx hover:bg-light-ui dark:hover:bg-dark-ui'}"
+                            onmousedown={(e) => { e.preventDefault(); selectMention(node); }}
+                        >
+                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                {node.content_type ?? ''}
+                            </span>
+                            <span class="truncate">{node.title}</span>
+                        </button>
+                    {/each}
+                </div>
+            {/if}
+
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
             <div class="flex gap-2 items-start">
                 <input
@@ -911,6 +1057,7 @@
                     rows={textAreaRows}
                     onkeydown={handleKeydown}
                     oninput={handleInput}
+                    onblur={handleTextareaBlur}
                     bind:value={input}
                     disabled={isStreaming}
                     placeholder={isStreaming ? "" : "Nachricht eingeben…"}

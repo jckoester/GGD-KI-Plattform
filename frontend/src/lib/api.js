@@ -1028,3 +1028,32 @@ export async function getNeighborhood(nodeId, { depth = 2, relation = [], catego
   }
   return res.json()
 }
+
+// ── Chat Context Nodes ──────────────────────────────────────────────────────
+
+export async function getChatContextNodes(conversationId) {
+  const res = await fetch(`${BASE}/context/conversations/${conversationId}/nodes`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // ChatContextNodeRead[]
+}
+
+export async function addChatContextNode(conversationId, nodeId) {
+  const res = await fetch(`${BASE}/context/conversations/${conversationId}/nodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ node_id: nodeId }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // ChatContextNodeRead
+}
+
+export async function removeChatContextNode(conversationId, nodeId) {
+  const res = await fetch(
+    `${BASE}/context/conversations/${conversationId}/nodes/${nodeId}`,
+    { method: 'DELETE', credentials: 'include' },
+  );
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+}
