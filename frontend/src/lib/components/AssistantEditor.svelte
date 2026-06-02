@@ -979,7 +979,7 @@
                                 <option value="">— Modell auswählen —</option>
                                 {#each models as model}
                                     <option value={model.id}
-                                        >{model.label || model.id}</option
+                                        >{model.label || model.id}{model.supports_function_calling === true ? ' ⚙' : ''}</option
                                     >
                                 {/each}
                             </select>

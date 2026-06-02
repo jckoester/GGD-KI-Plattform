@@ -7,6 +7,7 @@
         Bot,
         X,
         Info,
+        Search,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
@@ -90,6 +91,12 @@
     // Kombinierter Nodes-State für die Chips-Anzeige
     const displayContextNodes = $derived(
         conversationId ? contextNodes : pendingContextNodes
+    );
+
+    // Tool-Calling-Fähigkeit des aktuell gewählten Modells
+    const supportsToolCalling = $derived(
+        availableModels.find((m) => m.id === selectedModelId)
+            ?.supports_function_calling ?? null
     );
 
     async function handleRemoveContextNode(nodeId) {
@@ -666,6 +673,16 @@
         setTimeout(() => { mentionOpen = false; }, 100);
     }
 
+    function handleLookupRequest() {
+        // Platziert einen Hinweis-Prefix in die Textarea, damit der Nutzer
+        // im Fließtext beschreibt, welchen Kontext er braucht.
+        // Das LLM erkennt die Anfrage und ruft das Tool automatisch auf.
+        if (input.trim() === '') {
+            input = 'Suche passenden Kontext: ';
+        }
+        textarea?.focus();
+    }
+
     // Picker-Callbacks
     function handleAssistantSelect(assistant) {
         // Hinweis nur bei laufender Konversation und tatsächlichem Wechsel
@@ -1080,6 +1097,24 @@
                     <Paperclip class="w-5 h-5" />
                 </button>
 
+                <!-- Kontext-Lookup-Button (nur wenn Modell Tool Calling unterstützt oder unbekannt) -->
+                {#if supportsToolCalling !== false}
+                    <button
+                        type="button"
+                        onclick={handleLookupRequest}
+                        disabled={isStreaming}
+                        title="Kontext-Knoten per KI suchen lassen"
+                        aria-label="Kontext-Lookup"
+                        class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx-2 dark:text-dark-tx-2
+                               hover:bg-light-ui dark:hover:bg-dark-ui
+                               disabled:opacity-40 disabled:cursor-not-allowed shrink-0
+                               transition-colors"
+                    >
+                        <Search class="w-5 h-5" />
+                    </button>
+                {/if}
+
                 <!-- Textarea -->
                 <textarea
                     bind:this={textarea}
@@ -1194,7 +1229,7 @@
                             {#if availableModels.length > 0}
                                 {#each availableModels as model}
                                     <option value={model.id}
-                                        >{model.id}</option
+                                        >{model.id}{model.supports_function_calling === true ? ' ⚙' : ''}</option
                                     >
                                 {/each}
                             {:else}
