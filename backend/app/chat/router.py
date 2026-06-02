@@ -82,6 +82,7 @@ class ConversationCountsResponse(BaseModel):
 
 class ModelItem(BaseModel):
     id: str
+    supports_function_calling: bool | None = None
 
 
 class ModelListResponse(BaseModel):
@@ -99,6 +100,10 @@ _SPEND_LOG_DELAY: float = settings.spend_log_delay
 # Guardrail-Prompt-Cache
 _GUARDRAIL_TTL = 60.0  # Sekunden
 _guardrail_prompt_cache: tuple[str | None, float] | None = None
+
+# Model-Info-Cache (supports_function_calling pro Modell)
+_MODEL_INFO_TTL = 60.0  # Sekunden
+_model_info_cache: tuple[dict[str, bool | None], float] | None = None
 
 
 def _team_id_for_user(payload: JwtPayload) -> str | None:
@@ -216,6 +221,23 @@ async def _get_guardrail_prompt(db: AsyncSession) -> str | None:
     prompt = result.scalar_one_or_none()
     _guardrail_prompt_cache = (prompt, now + _GUARDRAIL_TTL)
     return prompt
+
+
+async def _get_model_info() -> dict[str, bool | None]:
+    """Gibt eine Map model_id → supports_function_calling zurück (60-s-Cache)."""
+    global _model_info_cache
+    now = asyncio.get_event_loop().time()
+    if _model_info_cache is not None and now < _model_info_cache[1]:
+        return _model_info_cache[0]
+    litellm_client = LiteLLMClient()
+    try:
+        info = await litellm_client.get_model_info()
+    except Exception:
+        info = {}
+    finally:
+        await litellm_client.close()
+    _model_info_cache = (info, now + _MODEL_INFO_TTL)
+    return info
 
 
 async def _persist(
@@ -613,35 +635,36 @@ async def list_models(
 
     team_id = _team_id_for_user(current_user)
     if team_id is not None:
-        # Team-basierte Filterung für nicht-Admin-Nutzer
         try:
             info = await client.get_team_info(team_id)
         except Exception:
             logger.error("get_team_info fehlgeschlagen für %s — ungefilterte Modelle", team_id)
-            # Fallback: alle Modelle zurückgeben, kein Hard-Fail
             filtered_models = all_models
         else:
             if info is None:
-                # Team existiert nicht in LiteLLM → alle Modelle zurückgeben
                 filtered_models = all_models
             else:
                 allowlist = info.get("models") or []
-
                 if not allowlist or allowlist == ["no-default-models"]:
-                    # Kein Modell erlaubt oder explizit gesperrt
                     filtered_models = []
                 else:
-                    # Nur Modelle in der Allowlist zurückgeben
                     allowlist_set = set(allowlist)
                     filtered_models = [m for m in all_models if m in allowlist_set]
     else:
-        # Admin: alle Modelle
         filtered_models = all_models
 
     await client.close()
 
+    capability_map = await _get_model_info()
+
     return ModelListResponse(
-        models=[ModelItem(id=model_id) for model_id in filtered_models],
+        models=[
+            ModelItem(
+                id=model_id,
+                supports_function_calling=capability_map.get(model_id),
+            )
+            for model_id in filtered_models
+        ],
         default_model=settings.chat_default_model,
     )
 
