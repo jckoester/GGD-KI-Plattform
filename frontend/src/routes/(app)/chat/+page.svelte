@@ -654,7 +654,7 @@
             if (!alreadyPending) {
                 pendingContextNodes = [
                     ...pendingContextNodes,
-                    { node_id: node.id, title: node.title, content_type: node.content_type, added_at: new Date().toISOString() },
+                    { node_id: node.id, category: node.category, title: node.title, content_type: node.content_type, added_at: new Date().toISOString() },
                 ];
             }
         }

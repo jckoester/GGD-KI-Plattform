@@ -146,6 +146,7 @@ class ChatContextNodeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     node_id: UUID
+    category: str
     title: str
     content_type: str | None
     added_at: datetime

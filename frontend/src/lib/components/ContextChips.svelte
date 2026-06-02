@@ -1,11 +1,10 @@
 <script>
-    import { X } from 'lucide-svelte';
+    import { X } from "lucide-svelte";
+    import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
 
-    let {
-        nodes = $bindable([]),
-        onremove,
-        disabled = false,
-    } = $props();
+    import NodeTypeIcon from "./NodeTypeIcon.svelte";
+
+    let { nodes = $bindable([]), onremove, disabled = false } = $props();
 </script>
 
 {#if nodes.length > 0}
@@ -18,8 +17,16 @@
                        text-light-tx dark:text-dark-tx"
             >
                 {#if node.content_type}
-                    <span class="text-light-tx-2 dark:text-dark-tx-2 font-mono text-[10px]">
-                        {node.content_type}
+                    <NodeTypeIcon
+                        category={node.category}
+                        contentType={node.content_type}
+                        size={16}
+                    />
+                    <span
+                        class="text-light-tx-2 dark:text-dark-tx-2 font-mono text-[10px]"
+                    >
+                        {CONTENT_TYPE_LABELS[node.content_type] ??
+                            node.content_type}
                     </span>
                 {/if}
                 <span class="max-w-[200px] truncate" title={node.title}>

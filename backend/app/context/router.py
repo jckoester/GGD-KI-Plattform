@@ -555,6 +555,7 @@ async def list_chat_context_nodes(
     result = await db.execute(
         sa.select(
             ChatContextNode.node_id,
+            ContextNode.category,
             ContextNode.title,
             ContextNode.content_type,
             ChatContextNode.added_at,
@@ -596,6 +597,7 @@ async def add_chat_context_node(
     if existing is not None:
         return ChatContextNodeRead(
             node_id=node.id,
+            category=node.category,
             title=node.title,
             content_type=node.content_type,
             added_at=existing.added_at,
@@ -608,6 +610,7 @@ async def add_chat_context_node(
 
     return ChatContextNodeRead(
         node_id=node.id,
+        category=node.category,
         title=node.title,
         content_type=node.content_type,
         added_at=entry.added_at,
