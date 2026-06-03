@@ -23,6 +23,9 @@
   // ── Tab-Zustand (URL-basiert, damit Zurück-Navigation den Tab erhält) ──────
   const activeTab = $derived($page.url.searchParams.get('tab') ?? 'uebersicht')
 
+  // Import für Curriculum-Tab
+  import CurriculumList from '$lib/components/CurriculumList.svelte'
+
   // ── Eigene Unterrichtsgruppen dieses Fachs (Lehrkraft) ────────────────────
   const myGroupsForSubject = $derived(
     isTeacher && subject
@@ -108,6 +111,7 @@
       <nav class="flex gap-1 border-b border-light-ui-2 dark:border-dark-ui-2 mb-6 -mx-6 px-6">
         {#each [
           { id: 'uebersicht', label: 'Übersicht' },
+          { id: 'curriculum', label: 'Curriculum' },
           { id: 'kontext',    label: 'Kontext'   },
         ] as tab (tab.id)}
           <button
@@ -229,6 +233,8 @@
           Dieser Bereich wird in Phase 5 mit verknüpften Dokumenten und Vektoren befüllt.
         </p>
       </section>
+    {:else if activeTab === 'curriculum' && isTeacher}
+      <CurriculumList subjectId={subject?.id} subjectSlug={subject?.slug} showNewButton={true} />
     {:else if activeTab === 'kontext' && isTeacher}
       <KnowledgeNodeList
         fixedSubjectSlug={subject?.slug}

@@ -14,10 +14,67 @@
     import { ArrowLeft } from "lucide-svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
 
-    // ── Knoten laden ────────────────────────────────────────────────────────
+    // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
     let loadingNode = $state(true);
     const backUrl = $derived($page.url.searchParams.get('back') ?? '/knowledge');
+
+    // Knoten laden mit Weiterleitung für Curriculum-Knoten
+    $effect(() => {
+        const id = $page.params.id;
+        loadingNode = true;
+        getContextNode(id)
+            .then((n) => {
+                // Weiterleitung wenn content_type === 'curriculum'
+                if (n.content_type === 'curriculum') {
+                    goto(`/knowledge/curriculum/${id}`, { replaceState: true });
+                    return;
+                }
+                node = n;
+                // Formularfelder befüllen
+                title = n.title;
+                category = n.category;
+                contentType = n.content_type ?? "";
+                content = n.content ?? "";
+                readScope = n.read_scope;
+                writeScope = n.write_scope;
+                readScopeGroupId = n.read_scope_group_id;
+                writeScopeGroupId = n.write_scope_group_id;
+                validUntil = n.valid_until ?? "";
+                schuljahr = n.schuljahr ?? currentSchuljahr();
+                subjectId = n.subject_id ?? null;
+                minGrade = n.min_grade ?? null;
+                maxGrade = n.max_grade ?? null;
+                // Metadata deserialisieren
+                if (
+                    n.category === "concept" &&
+                    n.content_type === "funktion" &&
+                    n.metadata?.signatur
+                ) {
+                    signatur = n.metadata.signatur;
+                } else if (
+                    n.category === "concept" &&
+                    n.content_type === "bauteil" &&
+                    n.metadata?.schaltzeichen
+                ) {
+                    schaltzeichen = n.metadata.schaltzeichen;
+                } else {
+                    metadata = JSON.stringify(n.metadata ?? {}, null, 2);
+                }
+                // Archivierte Referenzen laden
+                if (n.status === "active") {
+                    getArchivedReferences(n.id).then((refs) => {
+                        archivedRefs = refs;
+                    });
+                }
+            })
+            .catch((e) => {
+                errors.general = e.message;
+            })
+            .finally(() => {
+                loadingNode = false;
+            });
+    });
 
     // ── Formularfelder ──────────────────────────────────────────────────────
     let title = $state("");
@@ -141,58 +198,6 @@
         signatur.parameter[index][field] = value;
         signatur.parameter = [...signatur.parameter];
     }
-
-    // ── Knoten laden beim Mount ────────────────────────────────────────────
-    $effect(() => {
-        const id = $page.params.id;
-        loadingNode = true;
-        getContextNode(id)
-            .then((n) => {
-                node = n;
-                // Formularfelder befüllen
-                title = n.title;
-                category = n.category;
-                contentType = n.content_type ?? "";
-                content = n.content ?? "";
-                readScope = n.read_scope;
-                writeScope = n.write_scope;
-                readScopeGroupId = n.read_scope_group_id;
-                writeScopeGroupId = n.write_scope_group_id;
-                validUntil = n.valid_until ?? "";
-                schuljahr = n.schuljahr ?? currentSchuljahr();
-                subjectId = n.subject_id ?? null;
-                minGrade = n.min_grade ?? null;
-                maxGrade = n.max_grade ?? null;
-                // Metadata deserialisieren
-                if (
-                    n.category === "concept" &&
-                    n.content_type === "funktion" &&
-                    n.metadata?.signatur
-                ) {
-                    signatur = n.metadata.signatur;
-                } else if (
-                    n.category === "concept" &&
-                    n.content_type === "bauteil" &&
-                    n.metadata?.schaltzeichen
-                ) {
-                    schaltzeichen = n.metadata.schaltzeichen;
-                } else {
-                    metadata = JSON.stringify(n.metadata ?? {}, null, 2);
-                }
-                // Archivierte Referenzen laden
-                if (n.status === "active") {
-                    getArchivedReferences(n.id).then((refs) => {
-                        archivedRefs = refs;
-                    });
-                }
-            })
-            .catch((e) => {
-                errors.general = e.message;
-            })
-            .finally(() => {
-                loadingNode = false;
-            });
-    });
 
     // ── Speichern ──────────────────────────────────────────────────────────
     async function save() {

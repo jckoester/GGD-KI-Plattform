@@ -1080,3 +1080,29 @@ export async function removeChatContextNode(conversationId, nodeId) {
   );
   if (!res.ok) throw new ApiError(res.status, await res.text());
 }
+
+// ============================================================================
+// KS-Phase-6 Curriculum API
+// ============================================================================
+
+export async function getCurriculum(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}`, {
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Curriculum nicht gefunden')
+  }
+  return res.json()
+}
+
+export async function getCurriculaBySubject(subjectId) {
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}`, {
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Curricula')
+  }
+  return res.json()
+}
