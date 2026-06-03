@@ -5,9 +5,10 @@ Sichtbarkeitsfilter werden in KS-Phase-3 um group_memberships-Prüfung erweitert
 """
 
 import logging
+import os
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +32,9 @@ from app.context.schemas import (
     ChatContextNodeRead,
     ContextSearchRequest,
     ContextSearchResult,
+    CurriculumRead,
+    CurriculumDraft,
+    CurriculumDraftConfirmed,
 )
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
@@ -44,6 +48,7 @@ from app.db.models import (
     ContextNode,
     Conversation,
     Group,
+    GroupMembership,
     Subject,
 )
 from app.db.session import get_db
@@ -657,3 +662,696 @@ async def search_context_nodes(
         limit = 8
     results = await _exec_search_context_nodes(request.query, user.sub, db, limit=limit)
     return results
+
+
+# ── KS-Phase-6 Curriculum Endpoints ──────────────────────────────────────
+
+
+@router.get("/curricula/{curriculum_id}", response_model=CurriculumRead)
+async def get_curriculum(
+    curriculum_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Gibt das vollständige Curriculum als verschachteltes Objekt zurück."""
+    import os
+    
+    # Curriculum-Knoten laden
+    result = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.id == curriculum_id,
+            ContextNode.status == "active",
+            ContextNode.content_type == "curriculum",
+        )
+    )
+    curriculum = result.scalar_one_or_none()
+    
+    if not curriculum:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+    
+    # Sichtbarkeit prüfen
+    if curriculum.read_scope == "private":
+        if curriculum.owner_pseudonym != user.sub:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    elif curriculum.read_scope == "subject":
+        # Schüler dürfen nur mit ENV-Flag zugreifen
+        if "student" in user.roles and "teacher" not in user.roles:
+            if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
+                raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    
+    # Alle Kapitel zu diesem Curriculum laden (via part_of-Kanten)
+    result = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == curriculum_id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "kapitel",
+            ContextNode.status == "active",
+        )
+        .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
+    )
+    kapitel_nodes = result.scalars().all()
+
+    kapitel_list = []
+    for kap_node in kapitel_nodes:
+        # Alle Lernsequenzen zu diesem Kapitel laden
+        result = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == kap_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "lernsequenz",
+                ContextNode.status == "active",
+            )
+            .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
+        )
+        lernsequenz_nodes = result.scalars().all()
+
+        lernsequenzen_list = []
+        for ls_node in lernsequenz_nodes:
+            # IK-Referenzen laden
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title, e.metadata->>'partiell' as partiell
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'references'
+                      AND n.content_type = 'ik_kompetenz'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            ik_refs = [
+                {"node_id": str(row.id), "title": row.title, "partiell": row.partiell == "true"}
+                for row in result.mappings().all()
+            ]
+
+            # PK-Referenzen laden
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'develops'
+                      AND n.content_type = 'pk_kompetenz'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            pk_refs = [
+                {"node_id": str(row.id), "title": row.title}
+                for row in result.mappings().all()
+            ]
+
+            # Leitperspektive-Referenzen laden
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title, n.metadata->>'code' as lp_code
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'references'
+                      AND n.content_type = 'leitperspektive'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            leitperspektive_refs = [
+                {"node_id": str(row.id), "title": row.title, "lp_code": row.lp_code}
+                for row in result.mappings().all()
+            ]
+            
+            lernsequenzen_list.append({
+                "id": ls_node.id,
+                "title": ls_node.title,
+                "metadata": ls_node.metadata_ or {},
+                "ik_refs": ik_refs,
+                "pk_refs": pk_refs,
+                "leitperspektive_refs": leitperspektive_refs,
+            })
+        
+        kapitel_list.append({
+            "id": kap_node.id,
+            "title": kap_node.title,
+            "metadata": kap_node.metadata_ or {},
+            "lernsequenzen": lernsequenzen_list,
+        })
+    
+    # Prüfe ob User editieren darf
+    can_edit = False
+    if "admin" in user.roles:
+        can_edit = True
+    elif curriculum.write_scope_group_id:
+        result = await db.execute(
+            sa.select(1).where(
+                sa.exists().where(
+                    GroupMembership.group_id == curriculum.write_scope_group_id,
+                    GroupMembership.pseudonym == user.sub,
+                )
+            )
+        )
+        can_edit = result.scalar_one_or_none() is not None
+
+    return {
+        "id": curriculum.id,
+        "title": curriculum.title,
+        "metadata": curriculum.metadata_ or {},
+        "subject_id": curriculum.subject_id,
+        "write_scope_group_id": curriculum.write_scope_group_id,
+        "kapitel": kapitel_list,
+        "can_edit": can_edit,
+    }
+
+
+@router.get("/curricula/by-subject/{subject_id}", response_model=list[ContextNodeRead])
+async def list_curricula_by_subject(
+    subject_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Gibt alle Curriculum-Knoten eines Fachs zurück."""
+    result = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type == "curriculum",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+            sa.or_(
+                ContextNode.read_scope.in_(["global", "school", "subject"]),
+                ContextNode.owner_pseudonym == user.sub,
+            ),
+        ).order_by(ContextNode.metadata_["jahrgangsstufe"])
+    )
+    curricula = result.scalars().all()
+    return curricula
+
+
+# ── KS-Phase-6 Curriculum Convert (Stufe 1) ─────────────────────────────────
+
+@router.post("/curricula/convert", response_model=CurriculumDraft)
+async def convert_curriculum(
+    file: UploadFile,
+    fachplan_id: str = Form(...),
+    bp_version: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Konvertiert PDF/Word-Dokument zu strukturiertem Zwischenformat (Stufe 1).
+    
+    Nimmt ein PDF- oder Word-Dokument entgegen und extrahiert die Curriculum-Struktur
+    mit LLM-Unterstützung. Das Ergebnis ist ein CurriculumDraft für den Prüfungsschritt.
+    """
+    import re
+    from fastapi import UploadFile, Form
+    
+    # Datei-Inhalt lesen
+    try:
+        content = await file.read()
+    except Exception as e:
+        logger.error(f"Fehler beim Lesen der Datei: {e}")
+        raise HTTPException(status_code=400, detail="Datei konnte nicht gelesen werden")
+    
+    # Dateityp erkennen
+    filename = file.filename or ""
+    is_pdf = filename.lower().endswith(".pdf")
+    is_word = filename.lower().endswith((".docx", ".doc"))
+    
+    if not is_pdf and not is_word:
+        raise HTTPException(
+            status_code=400,
+            detail="Nur PDF oder Word-Dokumente (.docx, .doc) werden unterstützt"
+        )
+    
+    # Text extrahieren
+    text_content = ""
+    try:
+        if is_pdf:
+            text_content = _extract_text_from_pdf(content)
+        elif is_word:
+            text_content = _extract_text_from_word(content)
+    except Exception as e:
+        logger.error(f"Fehler bei der Textextraktion: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Textextraktion fehlgeschlagen: {str(e)}"
+        )
+    
+    # Format erkennen
+    format_detected, warnings = _detect_format(text_content)
+    
+    if format_detected is None:
+        return CurriculumDraft(
+            unsupported_format=True,
+            format_detected=None,
+            warnings=[
+                "Dokument hat ein nicht unterstütztes Format (Kompetenzmatrix). "
+                "Bitte als statischen 'document'-Knoten hochladen."
+            ],
+            data=None
+        )
+    
+    # LLM-Extraktion (vereinfacht - in Produktion mit echtem LLM-Aufruf)
+    try:
+        draft_data = _extract_curriculum_structure(text_content, format_detected, fachplan_id, bp_version)
+        return CurriculumDraft(
+            unsupported_format=False,
+            format_detected=format_detected,
+            warnings=warnings,
+            data=draft_data
+        )
+    except Exception as e:
+        logger.error(f"LLM-Extraktion fehlgeschlagen: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Strukturextraktion fehlgeschlagen: {str(e)}"
+        )
+
+
+def _extract_text_from_pdf(content: bytes) -> str:
+    """Extrahiert Text aus PDF-Datei."""
+    try:
+        import pdfplumber
+        import io
+        
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            text_parts = []
+            for page in pdf.pages:
+                text_parts.append(page.extract_text() or "")
+            return "\n".join(text_parts)
+    except ImportError:
+        logger.warning("pdfplumber nicht installiert - verwende Fallback")
+        # Fallback: versuche mit PyPDF2
+        try:
+            from PyPDF2 import PdfReader
+            import io
+            reader = PdfReader(io.BytesIO(content))
+            text_parts = []
+            for page in reader.pages:
+                text_parts.append(page.extract_text() or "")
+            return "\n".join(text_parts)
+        except ImportError:
+            raise ImportError("Weder pdfplumber noch PyPDF2 installiert")
+
+
+def _extract_text_from_word(content: bytes) -> str:
+    """Extrahiert Text aus Word-Dokument."""
+    try:
+        from docx import Document
+        import io
+        
+        doc = Document(io.BytesIO(content))
+        return "\n".join([p.text for p in doc.paragraphs])
+    except ImportError:
+        logger.warning("python-docx nicht installiert - versuche textract")
+        try:
+            import textract
+            return textract.process(content).decode("utf-8", errors="replace")
+        except ImportError:
+            raise ImportError("Weder python-docx noch textract installiert")
+
+
+def _detect_format(text_content: str) -> tuple[str | None, list[str]]:
+    """Erkennt das Dokumentenformat (A, B oder nicht unterstützt).
+    
+    Rückgabe: (format_detected, warnings)
+    """
+    warnings = []
+    lines = text_content.split("\n")
+    
+    # Zeilen analysieren
+    has_4_columns = False
+    has_lernsequenz_header = False
+    has_ik_column = False
+    has_pk_column = False
+    has_kompetenzmatrix = False
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Prüfe auf 4-Spalten-Struktur (Format A und B)
+        # Typische Trennzeichen: Tab, |, oder feste Spaltenbreiten
+        parts = [p.strip() for p in re.split(r'[\t|]', line) if p.strip()]
+        if len(parts) >= 4:
+            has_4_columns = True
+            # Prüfe ob erste Spalte PK-ähnlich ist
+            if re.match(r'^(PK|pK|P\.?K\.?)', parts[0], re.IGNORECASE):
+                has_pk_column = True
+            # Prüfe ob IK-ähnliche Einträge in der Zeile sind
+            if re.search(r'\bIK\s*\d+', line, re.IGNORECASE) or re.search(r'\b[1-9]\d*\.\d+', line):
+                has_ik_column = True
+        
+        # Prüfe auf Lernsequenz-Header (fett in Spalte 3)
+        # In PDFs oft als **Text** oder mit speziellen Markern
+        if re.search(r'\*\*(.+?)\*\*', line) or re.search(r'\bLernsequenz\b', line, re.IGNORECASE):
+            has_lernsequenz_header = True
+        
+        # Prüfe auf Kompetenzmatrix-Format (nicht unterstützt)
+        if re.search(r'Kompetenzmatrix', line, re.IGNORECASE) or \
+           (re.search(r'IK\s*[1-9]', line) and not has_4_columns):
+            has_kompetenzmatrix = True
+    
+    # Entscheidungslogik
+    if has_kompetenzmatrix:
+        return None, ["Kompetenzmatrix-Format erkannt - nicht unterstützt"]
+    
+    if has_4_columns and has_ik_column:
+        if has_lernsequenz_header:
+            return "A", []
+        else:
+            return "B", ["Format B erkannt - Lernsequenzen ohne explizite Header"]
+    
+    # Fallback: wenn wir IK- und PK-Referenzen finden
+    if has_ik_column and has_pk_column:
+        return "B", ["Format B angenommen (keine Lernsequenz-Header gefunden)"]
+    
+    return None, ["Format konnte nicht eindeutig erkannt werden"]
+
+
+def _extract_curriculum_structure(
+    text_content: str,
+    format_detected: str,
+    fachplan_id: str,
+    bp_version: str
+) -> "CurriculumDraftData":
+    """Extrahiert die Curriculum-Struktur aus dem Text.
+    
+    Vereinfachte Version ohne echtes LLM - in Produktion würde hier ein LLM-Aufruf
+    die strukturierte Extraktion durchführen.
+    """
+    from app.context.schemas import CurriculumDraftData, CurriculumDraftKapitel, CurriculumDraftLernsequenz, CurriculumDraftEntry
+    
+    lines = text_content.split("\n")
+    
+    # Vereinfachte Extraktion für Demo/Testing
+    # In Produktion: LLM-Prompt für strukturierte Extraktion
+    
+    # Suche nach Schul- und Fachinformationen in den ersten Zeilen
+    schule = ""
+    schulart = ""
+    jahrgangsstufe = ""
+    fach_code = ""
+    fach = ""
+    
+    for line in lines[:20]:
+        line = line.strip()
+        # Schulname
+        if re.search(r'(Schule|Gymnasium|Realschule|Grundschule|Gemeinschaftsschule)', line, re.IGNORECASE):
+            schule = line
+        # Schulart
+        if re.search(r'\b(G8|G9|GMS|Realschule|Gymnasium|Berufliches Gymnasium)\b', line, re.IGNORECASE):
+            schulart = line
+        # Jahrgangsstufe
+        match = re.search(r'\b(Klasse|Kl\.?|Jg\.?|Jahrgangsstufe)\s*(\d{1,2})', line, re.IGNORECASE)
+        if match:
+            jahrgangsstufe = match.group(2)
+        # Fachcode
+        match = re.search(r'\b(BW|DE|EN|FR|M|MA|PH|CH|BI|GE|GK|SP|RE|ETH|KU|MU|SPT)\b', line)
+        if match:
+            fach_code = match.group(1)
+        # Fachname
+        if re.search(r'\b(Mathematik|Deutsch|Englisch|Französisch|Physik|Chemie|Biologie|Gemeinschaftskunde|Geographie|Religion|Ethik|Kunst|Musik|Sport)\b', line, re.IGNORECASE):
+            fach = line
+    
+    # Vereinfachte Kapitel-Extraktion
+    # Suche nach Kapitel-Headern (typischerweise fett oder mit Stundenangabe)
+    kapitel_list = []
+    current_kapitel = None
+    current_lernsequenz = None
+    
+    for line in lines[20:]:  # Skip header
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Kapitel-Header erkennen (z.B. "Kapitel 1: Titel" oder "1. Titel (X Stunden)")
+        kapitel_match = re.match(
+            r'^(?:Kapitel\s+\d+|\d+\.|\d+)\.?\s+(.+?)(?:\s+\(\d+\s*Stunden?\))?$',
+            line,
+            re.IGNORECASE
+        )
+        if kapitel_match:
+            if current_kapitel:
+                kapitel_list.append(current_kapitel)
+            current_kapitel = CurriculumDraftKapitel(
+                titel=kapitel_match.group(1).strip(),
+                reihenfolge=len(kapitel_list) + 1,
+                std=None,
+                hinweis=None,
+                konkretisierung=[],
+                lernsequenzen=[],
+                confidence=0.8,
+                warnings=[]
+            )
+            current_lernsequenz = None
+            continue
+        
+        # Lernsequenz-Header erkennen (fett in Spalte 3)
+        ls_match = re.match(r'\*\*(.+?)\*\*|^(?:LS|Lernsequenz)\s+\d+\.?\s+(.+)$', line, re.IGNORECASE)
+        if ls_match:
+            ls_title = ls_match.group(1) or ls_match.group(2)
+            if current_kapitel:
+                if current_lernsequenz:
+                    current_kapitel.lernsequenzen.append(current_lernsequenz)
+                current_lernsequenz = CurriculumDraftLernsequenz(
+                    bp_titel=ls_title.strip(),
+                    bp_leitidee=None,
+                    reihenfolge=len(current_kapitel.lernsequenzen) + 1,
+                    eintraege=[],
+                    confidence=0.7,
+                    warnings=[]
+                )
+            continue
+        
+        # Tabellenzeilen (4 Spalten)
+        parts = [p.strip() for p in re.split(r'[\t|]', line) if p.strip()]
+        if len(parts) >= 4 and current_kapitel and current_lernsequenz:
+            entry = CurriculumDraftEntry(
+                ik=parts[1] if len(parts) > 1 and parts[1] else None,
+                ik_partiell="[" in (parts[1] if len(parts) > 1 else ""),
+                pk=[parts[0]] if len(parts) > 0 else [],
+                konkretisierung=parts[2] if len(parts) > 2 else None,
+                hinweise=parts[3] if len(parts) > 3 else None,
+                lp=_extract_lp_codes(parts[3] if len(parts) > 3 else ""),
+                confidence=0.6,
+                warnings=[]
+            )
+            current_lernsequenz.eintraege.append(entry)
+    
+    # Letzte Elemente hinzufügen
+    if current_lernsequenz and current_kapitel:
+        current_kapitel.lernsequenzen.append(current_lernsequenz)
+    if current_kapitel:
+        kapitel_list.append(current_kapitel)
+    
+    return CurriculumDraftData(
+        schule=schule or "Unbekannte Schule",
+        fach_code=fach_code or "UNKNOWN",
+        fach=fach or None,
+        schulart=schulart or "G8",
+        jahrgangsstufe=jahrgangsstufe or "5",
+        fachplan_id=fachplan_id,
+        bp_version=bp_version,
+        vorwort=None,
+        kapitel=kapitel_list
+    )
+
+
+def _extract_lp_codes(text: str) -> list[str]:
+    """Extrahiert Leitperspektive-Codes aus Text."""
+    # Muster: L BO, (L) BTV, LP-XX, etc.
+    patterns = [
+        r'\bL\s+[A-Z]{2,3}\b',  # L BO
+        r'\(L\)\s+[A-Z]{2,4}',  # (L) BTV
+        r'\bLP[-_]?[A-Z0-9]+\b',  # LP-XX
+    ]
+    codes = []
+    for pattern in patterns:
+        codes.extend(re.findall(pattern, text, re.IGNORECASE))
+    return codes
+
+
+# ── KS-Phase-6 Curriculum Create (Stufe 2) ──────────────────────────────────
+
+@router.post("/curricula", response_model=CurriculumRead, status_code=201)
+async def create_curriculum(
+    payload: CurriculumDraftConfirmed,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Speichert ein bestätigtes Curriculum aus dem Zwischenformat (Stufe 2).
+    
+    Nimmt das bestätigte Zwischenformat entgegen und erstellt alle Knoten und Kanten.
+    """
+    from app.context.service import import_curriculum_from_draft
+    
+    try:
+        curriculum_id, stats = await import_curriculum_from_draft(
+            db, payload, user.sub
+        )
+        
+        # Log warnings
+        for warning in stats.warnings:
+            logger.warning(f"Curriculum-Import Warnung: {warning}")
+        
+        # Lade das erstellte Curriculum für die Rückgabe
+        result = await db.execute(
+            sa.select(ContextNode).where(ContextNode.id == curriculum_id)
+        )
+        curriculum = result.scalar_one()
+        
+        # Baue die verschachtelte Struktur (wie in get_curriculum)
+        # Da wir gerade erstellt haben, können wir direkt die IDs verwenden
+        kapitel_list = []
+        for kap in payload.kapitel:
+            # Finde kapitel_id
+            kapitel_import_key = f"{payload.fachplan_id}_{payload.jahrgangsstufe}_kapitel_{kap.reihenfolge}"
+            kap_result = await db.execute(
+                sa.select(ContextNode.id).where(
+                    ContextNode.content_type == "kapitel",
+                    ContextNode.metadata_["import_key"].astext == kapitel_import_key
+                )
+            )
+            kap_id = kap_result.scalar_one_or_none()
+            
+            if not kap_id:
+                continue
+                
+            lernsequenzen_list = []
+            for ls in kap.lernsequenzen:
+                ls_reihenfolge = ls.reihenfolge if ls.reihenfolge is not None else 0
+                ls_import_key = f"{kapitel_import_key}_ls_{ls_reihenfolge}"
+                ls_result = await db.execute(
+                    sa.select(ContextNode).where(
+                        ContextNode.content_type == "lernsequenz",
+                        ContextNode.metadata_["import_key"].astext == ls_import_key
+                    )
+                )
+                ls_node = ls_result.scalar_one_or_none()
+                
+                if not ls_node:
+                    continue
+                
+                # IK-Referenzen laden
+                ik_result = await db.execute(
+                    sa.text("""
+                        SELECT n.id, n.title, e.metadata->>'partiell' as partiell
+                        FROM context_nodes n
+                        JOIN context_edges e ON e.to_node_id = n.id
+                        WHERE e.from_node_id = :ls_id
+                          AND e.relation = 'references'
+                          AND n.content_type = 'ik_kompetenz'
+                          AND n.status = 'active'
+                    """),
+                    {"ls_id": str(ls_node.id)},
+                )
+                ik_refs = [
+                    {"node_id": str(row.id), "title": row.title, "partiell": row.partiell == "true"}
+                    for row in ik_result.mappings().all()
+                ]
+
+                # PK-Referenzen laden
+                pk_result = await db.execute(
+                    sa.text("""
+                        SELECT n.id, n.title
+                        FROM context_nodes n
+                        JOIN context_edges e ON e.to_node_id = n.id
+                        WHERE e.from_node_id = :ls_id
+                          AND e.relation = 'develops'
+                          AND n.content_type = 'pk_kompetenz'
+                          AND n.status = 'active'
+                    """),
+                    {"ls_id": str(ls_node.id)},
+                )
+                pk_refs = [
+                    {"node_id": str(row.id), "title": row.title}
+                    for row in pk_result.mappings().all()
+                ]
+
+                # Leitperspektive-Referenzen laden
+                lp_result = await db.execute(
+                    sa.text("""
+                        SELECT n.id, n.title, n.metadata->>'code' as lp_code
+                        FROM context_nodes n
+                        JOIN context_edges e ON e.to_node_id = n.id
+                        WHERE e.from_node_id = :ls_id
+                          AND e.relation = 'references'
+                          AND n.content_type = 'leitperspektive'
+                          AND n.status = 'active'
+                    """),
+                    {"ls_id": str(ls_node.id)},
+                )
+                leitperspektive_refs = [
+                    {"node_id": str(row.id), "title": row.title, "lp_code": row.lp_code}
+                    for row in lp_result.mappings().all()
+                ]
+                
+                lernsequenzen_list.append({
+                    "id": ls_node.id,
+                    "title": ls_node.title,
+                    "metadata": ls_node.metadata_ or {},
+                    "ik_refs": ik_refs,
+                    "pk_refs": pk_refs,
+                    "leitperspektive_refs": leitperspektive_refs,
+                })
+            
+            kapitel_list.append({
+                "id": kap_id,
+                "title": kap_node.title if 'kap_node' in locals() else kap.titel,
+                "metadata": {},  # Wird unten korrigiert
+                "lernsequenzen": lernsequenzen_list,
+            })
+        
+        # Korrigiere Kapitel-Metadata
+        for kap in payload.kapitel:
+            kapitel_import_key = f"{payload.fachplan_id}_{payload.jahrgangsstufe}_kapitel_{kap.reihenfolge}"
+            kap_result = await db.execute(
+                sa.select(ContextNode).where(
+                    ContextNode.content_type == "kapitel",
+                    ContextNode.metadata_["import_key"].astext == kapitel_import_key
+                )
+            )
+            kap_node = kap_result.scalar_one_or_none()
+            if kap_node:
+                for k in kapitel_list:
+                    if str(k["id"]) == str(kap_node.id):
+                        k["metadata"] = kap_node.metadata_ or {}
+                        k["title"] = kap_node.title
+                        break
+        
+        # Prüfe can_edit
+        department_group_id = curriculum.write_scope_group_id
+        can_edit = False
+        if "admin" in user.roles:
+            can_edit = True
+        elif department_group_id:
+            result = await db.execute(
+                sa.select(1).where(
+                    sa.exists().where(
+                        GroupMembership.group_id == department_group_id,
+                        GroupMembership.pseudonym == user.sub,
+                    )
+                )
+            )
+            can_edit = result.scalar_one_or_none() is not None
+        
+        return {
+            "id": curriculum.id,
+            "title": curriculum.title,
+            "metadata": curriculum.metadata_ or {},
+            "subject_id": curriculum.subject_id,
+            "write_scope_group_id": curriculum.write_scope_group_id,
+            "kapitel": kapitel_list,
+            "can_edit": can_edit,
+        }
+        
+    except ValueError as e:
+        logger.error(f"Validierungsfehler beim Curriculum-Import: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Fehler beim Curriculum-Import: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

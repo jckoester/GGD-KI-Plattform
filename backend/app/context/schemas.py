@@ -1,7 +1,7 @@
 """Pydantic-Schemas für die Context-Nodes-API."""
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -164,3 +164,121 @@ class ContextSearchResult(BaseModel):
     title: str
     category: str
     content_type: str | None
+
+
+# ── KS-Phase-6 Curriculum ───────────────────────────────────────────────
+
+
+# -- KS-Phase-6 Curriculum Draft (für Konvertierungs-Assistent) ---------------
+
+
+class CurriculumDraftEntry(BaseModel):
+    """Ein einzelner Eintrag in einer Lernsequenz-Tabelle."""
+    ik: str | None = None
+    ik_partiell: bool = False
+    pk: list[str | dict] = Field(default_factory=list)
+    konkretisierung: str | None = None
+    hinweise: str | None = None
+    lp: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, description="Konfidenz der Extraktion (0.0-1.0)")
+    warnings: list[str] = Field(default_factory=list, description="Warnungen für diesen Eintrag")
+
+
+class CurriculumDraftLernsequenz(BaseModel):
+    """Eine Lernsequenz im Zwischenformat."""
+    bp_titel: str | None = None
+    bp_leitidee: str | None = None
+    reihenfolge: int | None = None
+    eintraege: list[CurriculumDraftEntry] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, description="Konfidenz der Extraktion")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CurriculumDraftKapitel(BaseModel):
+    """Ein Kapitel im Zwischenformat."""
+    titel: str
+    reihenfolge: int
+    std: str | None = None
+    hinweis: str | None = None
+    konkretisierung: list[str] = Field(default_factory=list)
+    lernsequenzen: list[CurriculumDraftLernsequenz] = Field(default_factory=list)
+    confidence: float = Field(default=1.0)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CurriculumDraftData(BaseModel):
+    """Das vollständige Zwischenformat (entspricht YAML-Struktur)."""
+    schule: str
+    fach_code: str
+    fach: str | None = None
+    schulart: str
+    jahrgangsstufe: str
+    fachplan_id: str
+    bp_version: str
+    vorwort: str | None = None
+    kapitel: list[CurriculumDraftKapitel] = Field(default_factory=list)
+
+
+class CurriculumDraft(BaseModel):
+    """Ergebnis der LLM-Extraktion (Stufe 1)."""
+    unsupported_format: bool = False
+    format_detected: Literal["A", "B"] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    data: CurriculumDraftData | None = None
+
+
+class CurriculumDraftConfirmed(BaseModel):
+    """Bestätigtes Zwischenformat für die Speicherung (Stufe 2)."""
+    schule: str
+    fach_code: str
+    fach: str | None = None
+    schulart: str
+    jahrgangsstufe: str
+    fachplan_id: str
+    bp_version: str
+    vorwort: str | None = None
+    kapitel: list[CurriculumDraftKapitel]
+
+
+# -- KS-Phase-6 Curriculum Read Models -----------------------------------------
+
+
+class LernsequenzRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+    ik_refs: list[dict]  # [{node_id, title, partiell}, ...]
+    pk_refs: list[dict]  # [{node_id, title}, ...]
+    leitperspektive_refs: list[dict]  # [{node_id, title, lp_code}, ...]
+
+
+class KapitelRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+    lernsequenzen: list[LernsequenzRead]
+
+
+class CurriculumRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+    subject_id: int | None
+    write_scope_group_id: int | None
+    kapitel: list[KapitelRead]
+    can_edit: bool
