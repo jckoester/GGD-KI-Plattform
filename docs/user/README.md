@@ -19,6 +19,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - Dateien (PDF, Bilder, Textdateien) in ein Gespräch einbinden
 - Zwischen verschiedenen KI-Modellen wählen
 - Vorgefertigte Assistenten für bestimmte Aufgaben nutzen (z. B. Texte korrigieren, Ideen entwickeln)
+- Wissensbausteine aus dem Kontextspeicher in ein Gespräch einbinden (Bildungsplan, Unterrichtsmaterial)
 - Frühere Gespräche im Verlauf wiederfinden
 
 ## Inhaltsverzeichnis
@@ -26,6 +27,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Erste Schritte](erste-schritte.md) — Anmelden, Oberfläche, erster Chat
 - [Den Chat nutzen](chat.md) — Nachrichten, Dateien, Modelle, Verlauf
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
+- [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?
 
