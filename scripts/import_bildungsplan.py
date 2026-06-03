@@ -379,6 +379,110 @@ def archive_removed_nodes(cur, known_bp_ids: set[str], dry_run: bool) -> int:
     return len(rows)
 
 
+def parse_grade_range(grade_str: str) -> tuple[int, int]:
+    """Parst '5-6' zu (5, 6).
+
+    Erwartet genau zwei durch '-' getrennte Integer. Wirft ValueError bei
+    ungültigem Format, damit der Aufrufer explizit warnen kann.
+    """
+    parts = grade_str.split("-")
+    if len(parts) != 2:
+        raise ValueError(f"Ungültiges Klassenstufen-Format: '{grade_str}'")
+    return int(parts[0]), int(parts[1])
+
+
+def archive_superseded_nodes(
+    cur,
+    subjects_cfg: dict,
+    subject_id_lookup: dict[str, int],
+    dry_run: bool,
+) -> int:
+    """Archiviert BP-Knoten die durch eine neuere Version im selben Fach/Klassenstufe
+    überholt sind, gemäß bildungsplan_overrides in subjects.yaml.
+
+    Erkennung: bp_id des veralteten Knotens enthält NICHT '{fach_code}{version_suffix}'
+    (z.B. 'M.V2'), während der neuere Knoten dieses Segment enthält.
+    Nur Knoten mit gesetzten Klassenstufen (min_grade/max_grade NOT NULL) werden
+    archiviert — Leitideen und Fachpläne bleiben unberührt.
+    """
+    total_archived = 0
+
+    for fach in subjects_cfg.get("subjects", []):
+        overrides = fach.get("bildungsplan_overrides", {})
+        if not overrides:
+            continue
+        fach_slug = fach.get("slug")
+        fach_code = fach.get("fach_code")
+        if not fach_slug or not fach_code:
+            continue
+        subject_id = subject_id_lookup.get(fach_slug)
+        if subject_id is None:
+            logger.warning(
+                f"archive_superseded: subject_id für '{fach_slug}' nicht gefunden"
+            )
+            continue
+
+        for grade_str, version_suffix in overrides.items():
+            try:
+                min_grade, max_grade = parse_grade_range(grade_str)
+            except ValueError as exc:
+                logger.warning(f"archive_superseded: {exc} — überspringe")
+                continue
+
+            # Neue Version: bp_id enthält z.B. 'M.V2'
+            new_version_marker = fach_code + version_suffix
+
+            cur.execute(
+                """
+                SELECT id, metadata->>'bp_id' AS bp_id
+                FROM context_nodes
+                WHERE subject_id = %s
+                  AND status = 'active'
+                  AND category = 'knowledge'
+                  AND content_type = ANY(%s)
+                  AND min_grade = %s
+                  AND max_grade = %s
+                  AND metadata->>'bp_id' NOT LIKE %s
+                """,
+                (
+                    subject_id,
+                    list(BP_CONTENT_TYPES),
+                    min_grade,
+                    max_grade,
+                    f"%{new_version_marker}%",
+                ),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                logger.info(
+                    f"archive_superseded: {fach_slug} Kl. {grade_str} — "
+                    f"keine veralteten Knoten gefunden"
+                )
+                continue
+
+            bp_ids_preview = [r[1] for r in rows[:3]]
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}"
+                f"archive_superseded: {fach_slug} Kl. {grade_str} — "
+                f"{len(rows)} veraltete Knoten archivieren "
+                f"(z.B. {bp_ids_preview})"
+            )
+
+            if not dry_run:
+                ids = [row[0] for row in rows]
+                cur.execute(
+                    """
+                    UPDATE context_nodes
+                    SET status = 'archived', archived_at = now()
+                    WHERE id = ANY(%s)
+                    """,
+                    (ids,),
+                )
+            total_archived += len(rows)
+
+    return total_archived
+
+
 # -- Hauptfunktion ---------------------------------------------------------------
 
 
@@ -490,6 +594,12 @@ def run_import(
             # Entfernte Knoten archivieren (nur beim Voll-Import, nicht bei --fach-Filter)
             if not fach_filter:
                 stats["archived"] = archive_removed_nodes(cur, known_bp_ids, dry_run)
+
+            # Veraltete Knoten durch neuere BP-Version ersetzen
+            superseded = archive_superseded_nodes(
+                cur, cfg, subject_id_lookup, dry_run
+            )
+            stats["archived"] += superseded
 
             if not dry_run:
                 conn.commit()
