@@ -69,10 +69,14 @@ categories:
         label_de: "Schulcurriculum"
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
-      - key: unterrichtseinheit
-        label_de: "Unterrichtseinheit"
+      - key: kapitel
+        label_de: "Kapitel"
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
+      - key: lernsequenz
+        label_de: "Lernsequenz"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        scope_anchor: false
       - key: methode
         label_de: "Methode"
         scope_defaults: {read_scope: school,   write_scope: subject }
@@ -90,13 +94,14 @@ categories:
     label_de: "Artefakt"
     color: "or"
     content_types:
-      - key: unterrichtsentwurf
-        label_de: "Unterrichtsentwurf"
-        scope_defaults: {read_scope: private,  write_scope: private }
       - key: unterrichtsstunde
         label_de: "Unterrichtsstunde"
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: true
+      - key: unterrichtseinheit
+        label_de: "Unterrichtseinheit"
+        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_anchor: false
       - key: reflexion
         label_de: "Reflexion"
         scope_defaults: {read_scope: private,  write_scope: private }

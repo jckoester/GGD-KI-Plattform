@@ -70,13 +70,14 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "leitperspektive_aspekt": None,
     "themengebiet": None,
     "curriculum": None,
-    "unterrichtseinheit": None,
+    "kapitel": None,
+    "lernsequenz": None,
     "methode": None,
     "operator_didaktisch": None,
     "jahresplan": None,
     "pruefungsanforderung": None,
     # artifact — zeitlich begrenzte Inhalte
-    "unterrichtsentwurf": None,  # Lehrkraft setzt manuell
+    "unterrichtseinheit": None,   # Lehrkraft setzt manuell
     "unterrichtsstunde": None,    # Lehrkraft setzt manuell
     "reflexion": None,
     "arbeitsblatt": None,         # permanent wiederverwendbar
@@ -150,4 +151,5 @@ EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
     ("concept", "funktion"): ["metadata.signatur"],
     ("knowledge", "ik_kompetenz"): ["metadata.breadcrumb"],
     ("knowledge", "pk_kompetenz"): ["metadata.breadcrumb"],
+    ("knowledge", "kapitel"): ["metadata.breadcrumb"],
 }

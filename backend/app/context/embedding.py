@@ -22,6 +22,8 @@ EMBEDDING_CONTENT_TYPES = frozenset({
     'pk_gruppe',
     'leitidee',
     'leitperspektive_aspekt',
+    # Curriculum-Typen
+    'kapitel',
     # Manuelle Wissensgraph-Typen (Arduino und andere)
     'themengebiet',
     'funktion',

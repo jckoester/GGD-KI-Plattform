@@ -24,15 +24,16 @@ export const CONTENT_TYPES = {
     "leitperspektive",
     "leitperspektive_aspekt",
     "curriculum",
-    "unterrichtseinheit",
+    "kapitel",
+    "lernsequenz",
     "methode",
     "operator_didaktisch",
     "jahresplan",
     "pruefungsanforderung"
   ],
   "artifact": [
-    "unterrichtsentwurf",
     "unterrichtsstunde",
+    "unterrichtseinheit",
     "reflexion",
     "arbeitsblatt",
     "aufgabe",
@@ -59,7 +60,7 @@ export const SCOPE_ANCHOR_CONTENT_TYPES = new Set([
   "leitidee",
   "pk_gruppe",
   "curriculum",
-  "unterrichtseinheit",
+  "kapitel",
   "unterrichtsstunde"
 ])
 
@@ -95,12 +96,13 @@ export const CONTENT_TYPE_LABELS = {
   "leitperspektive": "Leitperspektive",
   "leitperspektive_aspekt": "Leitperspektive-Aspekt",
   "curriculum": "Schulcurriculum",
-  "unterrichtseinheit": "Unterrichtseinheit",
+  "kapitel": "Kapitel",
+  "lernsequenz": "Lernsequenz",
   "methode": "Methode",
   "operator_didaktisch": "Didaktischer Operator",
   "jahresplan": "Jahresplan",
   "pruefungsanforderung": "Prüfungsanforderung",
-  "unterrichtsentwurf": "Unterrichtsentwurf",
+  "unterrichtseinheit": "Unterrichtseinheit",
   "unterrichtsstunde": "Unterrichtsstunde",
   "reflexion": "Reflexion",
   "arbeitsblatt": "Arbeitsblatt",
@@ -188,7 +190,11 @@ export const SCOPE_DEFAULTS = {
     "school",
     "subject"
   ],
-  "unterrichtseinheit": [
+  "kapitel": [
+    "school",
+    "subject"
+  ],
+  "lernsequenz": [
     "school",
     "subject"
   ],
@@ -208,7 +214,7 @@ export const SCOPE_DEFAULTS = {
     "school",
     "school"
   ],
-  "unterrichtsentwurf": [
+  "unterrichtseinheit": [
     "private",
     "private"
   ],
