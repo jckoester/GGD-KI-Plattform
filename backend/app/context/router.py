@@ -137,12 +137,7 @@ async def list_nodes(
                     ContextNode.category == "knowledge",
                     or_(
                         ContextNode.subject_id == subject_id_subq,
-                        and_(
-                            ContextNode.subject_id.is_(None),
-                            ContextNode.content_type.in_(
-                                ["leitperspektive", "leitperspektive_aspekt"]
-                            ),
-                        ),
+                        ContextNode.subject_id.is_(None),
                     ),
                 ),
             )

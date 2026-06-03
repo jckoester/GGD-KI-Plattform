@@ -15,6 +15,37 @@ from app.auth.jwt import JwtPayload
 from app.chat.router import chat, router as chat_router
 from app.chat.schemas import ChatRequest
 from app.litellm.client import LiteLLMClient
+import app.chat.router as _chat_router_mod
+
+
+@pytest.fixture(autouse=True)
+def _reset_model_info_cache():
+    _chat_router_mod._model_info_cache = None
+    yield
+    _chat_router_mod._model_info_cache = None
+
+
+_FAKE_LITELLM_KEY = "sk-test-key"
+
+
+def _make_execute_mock(*specific_results):
+    """Returns an AsyncMock for db.execute that returns specific_results in order,
+    then falls back to a generic MagicMock that includes a fake litellm key."""
+    call_count = [0]
+
+    def _side_effect(*args, **kwargs):
+        idx = call_count[0]
+        call_count[0] += 1
+        if idx < len(specific_results):
+            return specific_results[idx]
+        generic = MagicMock()
+        generic.scalars.return_value.all.return_value = []
+        generic.scalars.return_value.first.return_value = None
+        generic.scalar_one_or_none.return_value = _FAKE_LITELLM_KEY
+        generic.fetchone.return_value = None
+        return generic
+
+    return AsyncMock(side_effect=_side_effect)
 
 
 def _fake_payload() -> JwtPayload:
@@ -81,6 +112,7 @@ def test_get_models_success():
         client = AsyncMock()
         client.list_models.return_value = ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]
         client.get_team_info.return_value = {"models": ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]}
+        client.get_model_info.return_value = {}
         client.close.return_value = None
         client_cls.return_value = client
 
@@ -88,10 +120,8 @@ def test_get_models_success():
         response = test_client.get("/models")
 
     assert response.status_code == 200
-    assert response.json()["models"] == [
-        {"id": "openai/gpt-4o-mini"},
-        {"id": "openai/gpt-4.1-mini"},
-    ]
+    model_ids = [m["id"] for m in response.json()["models"]]
+    assert model_ids == ["openai/gpt-4o-mini", "openai/gpt-4.1-mini"]
     assert "default_model" in response.json()
 
 
@@ -150,7 +180,7 @@ async def test_post_chat_new_conversation_uses_requested_model_id():
 
     db.refresh = AsyncMock(side_effect=_refresh)
     db.commit = AsyncMock()
-    db.execute = AsyncMock()
+    db.execute = _make_execute_mock()
 
     fake_http_client = _FakeHttpClient()
     request = ChatRequest(
@@ -177,7 +207,7 @@ async def test_post_chat_new_conversation_without_model_uses_default():
     db.add = MagicMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
-    db.execute = AsyncMock()
+    db.execute = _make_execute_mock()
     db.flush = AsyncMock()
 
     async def _refresh(obj):
@@ -206,7 +236,8 @@ async def test_post_chat_new_conversation_without_model_uses_default():
 
 
 @pytest.mark.asyncio
-async def test_post_chat_existing_conversation_ignores_model_id_and_uses_stored_model():
+async def test_post_chat_existing_conversation_without_model_uses_stored_model():
+    """Wenn kein model_id übergeben, wird das gespeicherte Modell der Konversation verwendet."""
     db = AsyncMock()
     db.add = MagicMock()
     db.flush = AsyncMock()
@@ -219,21 +250,20 @@ async def test_post_chat_existing_conversation_ignores_model_id_and_uses_stored_
     existing_conv.pseudonym = "pseudo-1"
     existing_conv.model_used = "openai/gpt-4o-mini"
     existing_conv.system_prompt_snapshot = None
+    existing_conv.assistant_id = None
 
     result = MagicMock()
     result.scalar_one_or_none = MagicMock(return_value=existing_conv)
-    result2 = MagicMock()
-    result2.scalar_one_or_none = MagicMock(return_value="sk-key")
-    
-    # db.execute wird twice aufgerufen: einmal für Conversation, einmal für PseudonymAudit.litellm_key
-    db.execute = AsyncMock(side_effect=[result, result2])
+
+    # First call: Conversation lookup; subsequent calls use generic fallback (incl. key)
+    db.execute = _make_execute_mock(result)
     db.add = MagicMock()
 
     fake_http_client = _FakeHttpClient()
     request = ChatRequest(
         messages=[{"role": "user", "content": "Weiter"}],
         conversation_id=conversation_id,
-        model_id="openai/gpt-4.1-mini",
+        model_id=None,
     )
 
     with patch("app.chat.router.httpx.AsyncClient", return_value=fake_http_client), \

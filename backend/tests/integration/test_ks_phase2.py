@@ -1,5 +1,6 @@
 """KS-Phase-2 Integrations-Tests: Import-Skript, Embedding-Batch."""
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -10,6 +11,23 @@ import psycopg2.extras
 import pytest
 
 FIXTURE_DIR = Path(__file__).parent / 'fixtures'
+_REPO_SCRIPTS = Path(__file__).parent.parent.parent.parent / 'scripts'
+
+
+def _import_repo_script(module_name: str):
+    """Load a module from GGD-KI-Plattform/scripts/ by absolute path.
+
+    Registers the module under 'scripts.<module_name>' in sys.modules so that
+    unittest.mock.patch() can locate it by its dotted name, regardless of what
+    'scripts' package may already be cached from backend/scripts/.
+    """
+    script_path = _REPO_SCRIPTS / f'{module_name}.py'
+    full_name = f'scripts.{module_name}'
+    spec = importlib.util.spec_from_file_location(full_name, script_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[full_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 
 @pytest.fixture(autouse=True)
@@ -32,10 +50,7 @@ def run_import(db_url: str, jsonl_path: Path) -> None:
     """Hilfsfunktion: import_bildungsplan.run_import() gegen Test-DB aufrufen."""
     import tempfile
     import yaml
-    # Import-Skript liegt im Repo-Root (zwei Ebenen ueber backend/)
-    repo_root = Path(__file__).parent.parent.parent.parent
-    sys.path.insert(0, str(repo_root))
-    from scripts.import_bildungsplan import run_import as _run_import
+    _run_import = _import_repo_script('import_bildungsplan').run_import
 
     # Minimale subjects.yaml fuer den Test
     subjects_cfg = {
@@ -290,9 +305,7 @@ class TestUnresolvableEdge:
         # Darf nicht werfen
         import tempfile
         import yaml
-        repo_root = Path(__file__).parent.parent.parent.parent
-        sys.path.insert(0, str(repo_root))
-        from scripts.import_bildungsplan import run_import as _run_import
+        _run_import = _import_repo_script('import_bildungsplan').run_import
         subjects_cfg = {
             'schulart': 'GYM', 'schuljahr': '2026/27',
             'bildungsplan_default': {'bp_basis': 'BP2016BW', 'suffix': ''},
@@ -331,19 +344,16 @@ class TestEmbeddingBatch:
 
         fake_embedding = [0.1] * 1536
 
-        repo_root = Path(__file__).parent.parent.parent.parent
-        sys.path.insert(0, str(repo_root))
-
         # asyncpg-URL verwenden
         asyncpg_url = db_url  # db_url aus conftest ist bereits asyncpg
 
+        run_embedding_batch = _import_repo_script('run_embedding_batch')
         with patch(
             'scripts.run_embedding_batch.generate_embedding',
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
-            from scripts.run_embedding_batch import run_batch
-            await run_batch(asyncpg_url, batch_size=10, dry_run=False)
+            await run_embedding_batch.run_batch(asyncpg_url, batch_size=10, dry_run=False)
 
         conn = psycopg2.connect(get_sync_url(db_url))
         with conn.cursor() as cur:

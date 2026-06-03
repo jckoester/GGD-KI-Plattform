@@ -51,6 +51,9 @@ def make_node(
         read_scope_group_id=None,
         write_scope_group_id=None,
         assistant_id=None,
+        subject_id=None,
+        min_grade=None,
+        max_grade=None,
         status=status,
         valid_until=None,
         archived_at=None,
@@ -80,7 +83,7 @@ def make_mock_db(nodes: list = None) -> AsyncMock:
     return db
 
 
-# ── GET /api/context/nodes ────────────────────────────────────────────────────
+# ── GET /context/nodes ────────────────────────────────────────────────────
 
 class TestListNodes:
 
@@ -88,7 +91,7 @@ class TestListNodes:
         nodes = [make_node(), make_node(title="analogRead", content_type="funktion")]
         db = make_mock_db(nodes)
         client = TestClient(make_app(db))
-        resp = client.get("/api/context/nodes")
+        resp = client.get("/context/nodes")
         assert resp.status_code == 200
         assert len(resp.json()) == 2
 
@@ -100,18 +103,18 @@ class TestListNodes:
         app.include_router(context_router)
         # kein dependency_override → echter Guard
         client = TestClient(app, raise_server_exceptions=False)
-        resp = client.get("/api/context/nodes")
+        resp = client.get("/context/nodes")
         assert resp.status_code in (401, 422)  # je nach FastAPI-Version
 
     def test_student_role_denied(self):
         db = make_mock_db()
         user = make_jwt(roles=["student"])
         client = TestClient(make_app(db, user))
-        resp = client.get("/api/context/nodes")
+        resp = client.get("/context/nodes")
         assert resp.status_code == 403
 
 
-# ── POST /api/context/nodes ───────────────────────────────────────────────────
+# ── POST /context/nodes ───────────────────────────────────────────────────
 
 class TestCreateNode:
 
@@ -140,6 +143,9 @@ class TestCreateNode:
                 self.status = "active"
                 self.embedding = None
                 self.archived_at = None
+                self.subject_id = None
+                self.min_grade = None
+                self.max_grade = None
                 self.created_at = datetime.now(timezone.utc)
                 self.updated_at = datetime.now(timezone.utc)
 
@@ -147,7 +153,7 @@ class TestCreateNode:
         try:
             client = TestClient(make_app(db))
             resp = client.post(
-                "/api/context/nodes",
+                "/context/nodes",
                 json={"category": "concept", "content_type": "funktion", "title": "digitalWrite"},
             )
             assert resp.status_code == 201
@@ -158,7 +164,7 @@ class TestCreateNode:
         db = make_mock_db()
         client = TestClient(make_app(db))
         resp = client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={"category": "document", "content_type": "fachplan", "title": "Test"},
         )
         assert resp.status_code == 422
@@ -169,13 +175,13 @@ class TestCreateNode:
         user = make_jwt(roles=["student"])
         client = TestClient(make_app(db, user))
         resp = client.post(
-            "/api/context/nodes",
+            "/context/nodes",
             json={"category": "concept", "content_type": "funktion", "title": "Test"},
         )
         assert resp.status_code == 403
 
 
-# ── GET /api/context/nodes/{id} ───────────────────────────────────────────────
+# ── GET /context/nodes/{id} ───────────────────────────────────────────────
 
 class TestGetNode:
 
@@ -184,7 +190,7 @@ class TestGetNode:
         db = make_mock_db()
         db.get = AsyncMock(return_value=node)
         client = TestClient(make_app(db))
-        resp = client.get(f"/api/context/nodes/{node.id}")
+        resp = client.get(f"/context/nodes/{node.id}")
         assert resp.status_code == 200
         assert resp.json()["title"] == node.title
 
@@ -192,7 +198,7 @@ class TestGetNode:
         db = make_mock_db()
         db.get = AsyncMock(return_value=None)
         client = TestClient(make_app(db))
-        resp = client.get(f"/api/context/nodes/{uuid4()}")
+        resp = client.get(f"/context/nodes/{uuid4()}")
         assert resp.status_code == 404
 
     def test_private_node_other_user_returns_403(self):
@@ -201,11 +207,11 @@ class TestGetNode:
         db.get = AsyncMock(return_value=node)
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
         client = TestClient(make_app(db, user))
-        resp = client.get(f"/api/context/nodes/{node.id}")
+        resp = client.get(f"/context/nodes/{node.id}")
         assert resp.status_code == 403
 
 
-# ── DELETE /api/context/nodes/{id} ───────────────────────────────────────────
+# ── DELETE /context/nodes/{id} ───────────────────────────────────────────
 
 class TestDeleteNode:
 
@@ -217,7 +223,7 @@ class TestDeleteNode:
         db.commit = AsyncMock()
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
         client = TestClient(make_app(db, user))
-        resp = client.delete(f"/api/context/nodes/{node.id}")
+        resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204
 
     def test_non_owner_cannot_delete(self):
@@ -226,7 +232,7 @@ class TestDeleteNode:
         db.get = AsyncMock(return_value=node)
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
         client = TestClient(make_app(db, user))
-        resp = client.delete(f"/api/context/nodes/{node.id}")
+        resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 403
 
     def test_admin_can_delete_any(self):
@@ -237,5 +243,5 @@ class TestDeleteNode:
         db.commit = AsyncMock()
         user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
         client = TestClient(make_app(db, user))
-        resp = client.delete(f"/api/context/nodes/{node.id}")
+        resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204

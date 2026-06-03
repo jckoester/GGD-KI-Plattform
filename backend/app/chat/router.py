@@ -845,7 +845,8 @@ async def list_models(
         raise HTTPException(status_code=502, detail="LiteLLM Proxy nicht erreichbar")
 
     team_id = _team_id_for_user(current_user)
-    if team_id is not None:
+    is_admin = "admin" in current_user.roles
+    if team_id is not None and not is_admin:
         try:
             info = await client.get_team_info(team_id)
         except Exception:
