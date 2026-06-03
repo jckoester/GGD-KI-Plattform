@@ -41,7 +41,7 @@
         getContextAnchors,
         addContextAnchor,
         deleteContextAnchor,
-        searchContextNodes,
+        searchContextNodesLegacy,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
@@ -165,7 +165,7 @@
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(async () => {
         try {
-          anchorSearchResults = await searchContextNodes(anchorQuery, SCOPE_CONTENT_TYPES);
+          anchorSearchResults = await searchContextNodesLegacy(anchorQuery, SCOPE_CONTENT_TYPES);
         } catch (e) {
           anchorError = e.message ?? "Suche fehlgeschlagen";
           anchorSearchResults = [];

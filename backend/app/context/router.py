@@ -29,6 +29,8 @@ from app.context.schemas import (
     ContextNodeCopyRequest,
     ChatContextNodeAdd,
     ChatContextNodeRead,
+    ContextSearchRequest,
+    ContextSearchResult,
 )
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
@@ -634,3 +636,18 @@ async def remove_chat_context_node(
         raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
     await db.delete(entry)
     await db.commit()
+
+
+# ── KS-Phase-5 Semantic Search ──────────────────────────────────────────
+
+
+@router.post("/search", response_model=list[ContextSearchResult])
+async def search_context_nodes(
+    request: ContextSearchRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Semantische Suche über sichtbare Knoten anhand eines Freitexts."""
+    from app.chat.router import _exec_search_context_nodes
+    results = await _exec_search_context_nodes(request.query, user.sub, db)
+    return results

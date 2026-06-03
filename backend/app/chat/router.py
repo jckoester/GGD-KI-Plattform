@@ -8,9 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
+
+import sqlalchemy as sa
 
 import httpx
 
@@ -18,10 +20,11 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig
+from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
+from app.context.embedding import generate_embedding
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 
@@ -104,6 +107,28 @@ _guardrail_prompt_cache: tuple[str | None, float] | None = None
 # Model-Info-Cache (supports_function_calling pro Modell)
 _MODEL_INFO_TTL = 60.0  # Sekunden
 _model_info_cache: tuple[dict[str, bool | None], float] | None = None
+
+_SEARCH_CONTEXT_NODES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_context_nodes",
+        "description": (
+            "Sucht Wissensknoten im Kontextspeicher der Plattform anhand einer "
+            "Suchanfrage. Nutze dieses Tool, wenn du gezielt thematisch passende "
+            "Inhalte finden sollst."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Suchbegriff oder kurze Suchanfrage",
+                }
+            },
+            "required": ["query"],
+        },
+    },
+}
 
 
 def _team_id_for_user(payload: JwtPayload) -> str | None:
@@ -238,6 +263,78 @@ async def _get_model_info() -> dict[str, bool | None]:
         await litellm_client.close()
     _model_info_cache = (info, now + _MODEL_INFO_TTL)
     return info
+
+
+async def _exec_search_context_nodes(
+    query: str, pseudonym: str, db: AsyncSession
+) -> list[dict]:
+    """Semantische Suche über alle sichtbaren ContextNodes, max. 8 Treffer.
+
+    Fällt auf ILIKE zurück wenn kein Embedding generiert werden kann oder
+    kein Knoten ein Embedding hat.
+    """
+    try:
+        query_embedding = await generate_embedding(query)
+        embedding_str = "[" + ",".join(f"{v:.10f}" for v in query_embedding) + "]"
+
+        sql = sa.text("""
+            SELECT id, category, content_type, title
+            FROM context_nodes
+            WHERE status = 'active'
+              AND embedding IS NOT NULL
+              AND (
+                  read_scope IN ('global', 'school', 'subject', 'group')
+                  OR owner_pseudonym = :pseudonym
+              )
+            ORDER BY embedding <=> CAST(:embedding AS vector)
+            LIMIT 8
+        """)
+        result = await db.execute(
+            sql,
+            {"pseudonym": pseudonym, "embedding": embedding_str},
+        )
+        rows = result.mappings().all()
+        if rows:
+            return [
+                {
+                    "node_id": str(row["id"]),
+                    "title": row["title"],
+                    "category": row["category"],
+                    "content_type": row["content_type"],
+                }
+                for row in rows
+            ]
+        # Kein Knoten hat ein Embedding → Fallback
+    except Exception:
+        logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
+
+    # Fallback: ILIKE-Suche auf Titel und Inhalt
+    result = await db.execute(
+        select(ContextNode)
+        .where(
+            or_(
+                ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
+                ContextNode.owner_pseudonym == pseudonym,
+            )
+        )
+        .where(ContextNode.status == "active")
+        .where(
+            or_(
+                ContextNode.title.ilike(f"%{query}%"),
+                ContextNode.content.ilike(f"%{query}%"),
+            )
+        )
+        .limit(8)
+    )
+    return [
+        {
+            "node_id": str(n.id),
+            "title": n.title,
+            "category": n.category,
+            "content_type": n.content_type,
+        }
+        for n in result.scalars().all()
+    ]
 
 
 async def _persist(
@@ -484,6 +581,12 @@ async def chat(
     litellm_payload["model"] = model_used
     litellm_payload["messages"] = llm_messages
 
+    # Tool-Calling aktivieren, wenn Modell es unterstützt (oder Capability unbekannt)
+    _capability_map = await _get_model_info()
+    if _capability_map.get(model_used) is not False:
+        litellm_payload["tools"] = [_SEARCH_CONTEXT_NODES_TOOL]
+        litellm_payload["tool_choice"] = "auto"
+
     # Key aus DB laden
     key_result = await db.execute(
         select(PseudonymAudit.litellm_key).where(PseudonymAudit.pseudonym == current_user.sub)
@@ -548,6 +651,13 @@ async def chat(
         usage: dict = {}
         chunk_id: str | None = None
         cost_usd: Optional[float] = None
+
+        # Tool-Call-Accumulation
+        _tc_id: str | None = None
+        _tc_name: str | None = None
+        _tc_args: list[str] = []
+        _finish_reason: str | None = None
+
         try:
             async for line in response.aiter_lines():
                 if not line:
@@ -557,38 +667,31 @@ async def chat(
                     continue
                 payload = line[6:]
                 if payload == "[DONE]":
-                    # Titel-Task abwarten (max. 3 s)
-                    if title_task:
-                        try:
-                            title = await asyncio.wait_for(asyncio.shield(title_task), timeout=3.0)
-                            if title:
-                                logger.debug("Sende title-SSE-Event: %r", title)
-                                yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
-                            else:
-                                logger.debug("Titel-Task lieferte None — kein SSE-Event")
-                        except asyncio.TimeoutError:
-                            logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
-                        except Exception:
-                            logger.exception("Fehler beim Warten auf Titel-Task")
-                    # Kosten aus SpendLogs holen (Retry, weil LiteLLM asynchron schreibt)
-                    if chunk_id:
-                        litellm_client = LiteLLMClient()
-                        try:
-                            for attempt in range(3):
-                                await asyncio.sleep(_SPEND_LOG_DELAY)
-                                cost_usd = await litellm_client.get_spend_log(chunk_id)
-                                if cost_usd is not None:
-                                    break
-                        finally:
-                            await litellm_client.close()
-
-                    if cost_usd is not None:
-                        yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
-                    yield f"{line}\n\n"
                     break
                 try:
                     chunk = json.loads(payload)
-                    token = chunk.get("choices", [{}])[0].get("delta", {}).get("content") or ""
+                    choice = chunk.get("choices", [{}])[0]
+                    delta = choice.get("delta", {})
+                    fr = choice.get("finish_reason")
+                    if fr:
+                        _finish_reason = fr
+
+                    # Tool-Call-Delta akkumulieren (Zeilen nicht forwarden)
+                    if delta.get("tool_calls"):
+                        for tc in delta["tool_calls"]:
+                            if tc.get("id"):
+                                _tc_id = tc["id"]
+                            fn = tc.get("function") or {}
+                            if fn.get("name"):
+                                _tc_name = fn["name"]
+                            if fn.get("arguments"):
+                                _tc_args.append(fn["arguments"])
+                        if "usage" in chunk:
+                            usage = chunk["usage"]
+                            chunk_id = chunk.get("id")
+                        continue
+
+                    token = delta.get("content") or ""
                     if token:
                         full_content.append(token)
                         yield f"{line}\n\n"
@@ -597,14 +700,122 @@ async def chat(
                         chunk_id = chunk.get("id")
                 except (json.JSONDecodeError, IndexError, KeyError):
                     yield f"{line}\n\n"
+
+            # -- Tool-Call verarbeiten --
+            if _finish_reason == "tool_calls" and _tc_name == "search_context_nodes":
+                try:
+                    args = json.loads("".join(_tc_args) or "{}")
+                    suggestions = await _exec_search_context_nodes(
+                        args.get("query", ""), current_user.sub, db
+                    )
+                    yield (
+                        f"event: context_suggestions\n"
+                        f"data: {json.dumps({'nodes': suggestions})}\n\n"
+                    )
+
+                    tool_messages = llm_messages + [
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": _tc_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": _tc_name,
+                                        "arguments": "".join(_tc_args),
+                                    },
+                                }
+                            ],
+                        },
+                        {
+                            "role": "tool",
+                            "tool_call_id": _tc_id,
+                            "content": json.dumps(
+                                {"nodes": [n["title"] for n in suggestions]}
+                            ),
+                        },
+                    ]
+                    second_payload = {**litellm_payload, "messages": tool_messages}
+                    second_payload.pop("tools", None)
+                    second_payload.pop("tool_choice", None)
+
+                    req2 = client.build_request(
+                        "POST",
+                        f"{settings.litellm_proxy_url}/chat/completions",
+                        headers={"Authorization": f"Bearer {litellm_key}"},
+                        json=second_payload,
+                    )
+                    resp2 = await client.send(req2, stream=True)
+                    try:
+                        async for line2 in resp2.aiter_lines():
+                            if not line2:
+                                continue
+                            if not line2.startswith("data: "):
+                                yield f"{line2}\n\n"
+                                continue
+                            p2 = line2[6:]
+                            if p2 == "[DONE]":
+                                break
+                            try:
+                                c2 = json.loads(p2)
+                                token2 = (
+                                    c2.get("choices", [{}])[0]
+                                    .get("delta", {})
+                                    .get("content") or ""
+                                )
+                                if token2:
+                                    full_content.append(token2)
+                                    yield f"{line2}\n\n"
+                                if "usage" in c2:
+                                    usage = c2["usage"]
+                                    chunk_id = c2.get("id")
+                            except (json.JSONDecodeError, IndexError, KeyError):
+                                yield f"{line2}\n\n"
+                    finally:
+                        await resp2.aclose()
+                except Exception:
+                    logger.exception("Tool-Ausführung fehlgeschlagen")
+
+            # -- Title-Task abwarten --
+            if title_task:
+                try:
+                    title = await asyncio.wait_for(asyncio.shield(title_task), timeout=3.0)
+                    if title:
+                        logger.debug("Sende title-SSE-Event: %r", title)
+                        yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
+                    else:
+                        logger.debug("Titel-Task lieferte None — kein SSE-Event")
+                except asyncio.TimeoutError:
+                    logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
+                except Exception:
+                    logger.exception("Fehler beim Warten auf Titel-Task")
+
+            # -- Kosten aus SpendLogs holen --
+            if chunk_id:
+                litellm_client = LiteLLMClient()
+                try:
+                    for attempt in range(3):
+                        await asyncio.sleep(_SPEND_LOG_DELAY)
+                        cost_usd = await litellm_client.get_spend_log(chunk_id)
+                        if cost_usd is not None:
+                            break
+                finally:
+                    await litellm_client.close()
+
+            if cost_usd is not None:
+                yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
+
+            yield "data: [DONE]\n\n"
+
         finally:
             await response.aclose()
             await client.aclose()
 
         try:
             await _persist(
-                db, conversation_id, user_message, last_attachments, "".join(full_content),
-                usage, model_used, cost_usd=cost_usd,
+                db, conversation_id, user_message, last_attachments,
+                "".join(full_content), usage, model_used, cost_usd=cost_usd,
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
             )

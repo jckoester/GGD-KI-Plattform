@@ -16,6 +16,7 @@
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import ContextChips from "$lib/components/ContextChips.svelte";
+    import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -31,6 +32,7 @@
         addChatContextNode,
         removeChatContextNode,
         getContextNodes,
+        searchContextNodes,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
@@ -88,6 +90,9 @@
     let contextNodes = $state([]); // ChatContextNodeRead[]
     let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
 
+    // Vorschläge aus LLM-Tool-Call (warten auf Bestätigung durch Nutzer)
+    let pendingSuggestions = $state(null); // null | Array<{node_id, title, category, content_type}>
+
     // Kombinierter Nodes-State für die Chips-Anzeige
     const displayContextNodes = $derived(
         conversationId ? contextNodes : pendingContextNodes
@@ -113,6 +118,34 @@
                 // inkonsistent bis zur nächsten Konversation; kein kritischer Fehler)
             }
         }
+    }
+
+    async function handleSuggestionsConfirm(confirmedNodes) {
+        pendingSuggestions = null;
+        if (!confirmedNodes.length) return;
+
+        if (conversationId) {
+            for (const node of confirmedNodes) {
+                try {
+                    await addChatContextNode(conversationId, node.node_id);
+                    if (!contextNodes.some((n) => n.node_id === node.node_id)) {
+                        contextNodes = [...contextNodes, node];
+                    }
+                } catch (err) {
+                    console.error("Kontext-Knoten konnte nicht hinzugefügt werden:", err);
+                }
+            }
+        } else {
+            for (const node of confirmedNodes) {
+                if (!pendingContextNodes.some((n) => n.node_id === node.node_id)) {
+                    pendingContextNodes = [...pendingContextNodes, node];
+                }
+            }
+        }
+    }
+
+    function handleSuggestionsDismiss() {
+        pendingSuggestions = null;
     }
 
     // Computed: aktiver Kontext (pending für neue Konversation, sonst aus Store)
@@ -519,6 +552,11 @@
                     }
                     continue;
                 }
+                // Kontext-Vorschläge aus LLM-Tool-Call
+                if (item.type === "context_suggestions") {
+                    pendingSuggestions = item.nodes;
+                    continue;
+                }
                 // Token von Assistant
                 messages[assistantIndex] = {
                     ...messages[assistantIndex],
@@ -673,14 +711,20 @@
         setTimeout(() => { mentionOpen = false; }, 100);
     }
 
-    function handleLookupRequest() {
-        // Platziert einen Hinweis-Prefix in die Textarea, damit der Nutzer
-        // im Fließtext beschreibt, welchen Kontext er braucht.
-        // Das LLM erkennt die Anfrage und ruft das Tool automatisch auf.
-        if (input.trim() === '') {
-            input = 'Suche passenden Kontext: ';
+    async function handleLookupRequest() {
+        const query = input.trim();
+        if (!query) return;
+        try {
+            const results = await searchContextNodes(query);
+            pendingSuggestions = results.map((n) => ({
+                node_id: n.node_id,
+                title: n.title,
+                category: n.category,
+                content_type: n.content_type,
+            }));
+        } catch (err) {
+            console.error('Kontext-Suche fehlgeschlagen:', err);
         }
-        textarea?.focus();
     }
 
     // Picker-Callbacks
@@ -789,6 +833,7 @@
                 } catch {
                     contextNodes = [];
                 }
+                pendingSuggestions = null;
             } catch (err) {
                 if (err instanceof ApiError) {
                     conversationError = err.message;
@@ -801,6 +846,7 @@
                         activeConversationId.set(null);
                         activeConversationSubjectId.set(null);
                         activeConversationGroupId.set(null);
+                        pendingSuggestions = null;
                     }
                 } else {
                     conversationError = "Fehler beim Laden der Konversation";
@@ -810,6 +856,7 @@
                     activeConversationSubjectId.set(null);
                     activeConversationGroupId.set(null);
                 }
+                pendingSuggestions = null;
             } finally {
                 loadingConversation = false;
             }
@@ -1042,6 +1089,15 @@
                 disabled={isStreaming}
             />
 
+            <!-- Kontext-Vorschläge aus LLM-Tool-Call -->
+            {#if pendingSuggestions !== null}
+                <ContextSuggestions
+                    nodes={pendingSuggestions}
+                    onconfirm={handleSuggestionsConfirm}
+                    ondismiss={handleSuggestionsDismiss}
+                />
+            {/if}
+
             <!-- @-Mention Dropdown -->
             {#if mentionOpen && mentionResults.length > 0}
                 <div
@@ -1097,24 +1153,6 @@
                     <Paperclip class="w-5 h-5" />
                 </button>
 
-                <!-- Kontext-Lookup-Button (nur wenn Modell Tool Calling unterstützt oder unbekannt) -->
-                {#if supportsToolCalling !== false}
-                    <button
-                        type="button"
-                        onclick={handleLookupRequest}
-                        disabled={isStreaming}
-                        title="Kontext-Knoten per KI suchen lassen"
-                        aria-label="Kontext-Lookup"
-                        class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx-2 dark:text-dark-tx-2
-                               hover:bg-light-ui dark:hover:bg-dark-ui
-                               disabled:opacity-40 disabled:cursor-not-allowed shrink-0
-                               transition-colors"
-                    >
-                        <Search class="w-5 h-5" />
-                    </button>
-                {/if}
-
                 <!-- Textarea -->
                 <textarea
                     bind:this={textarea}
@@ -1131,6 +1169,22 @@
                            disabled:opacity-50 disabled:cursor-not-allowed
                            focus:outline-none focus:ring-2 focus:ring-primary"
                 ></textarea>
+
+                <!-- Kontext-Lookup-Button -->
+                <button
+                    type="button"
+                    onclick={handleLookupRequest}
+                    disabled={isStreaming || !input.trim()}
+                    title="Passende Kontextknoten zum eingetippten Text suchen"
+                    aria-label="Kontext-Lookup"
+                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui dark:hover:bg-dark-ui
+                           disabled:opacity-40 disabled:cursor-not-allowed shrink-0
+                           transition-colors"
+                >
+                    <Search class="w-5 h-5" />
+                </button>
 
                 <!-- Send-Button -->
                 <button

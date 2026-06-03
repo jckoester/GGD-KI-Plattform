@@ -322,6 +322,15 @@ export async function* streamChat(
         continue;
       }
 
+      if (currentEventType === "context_suggestions") {
+        try {
+          const { nodes } = JSON.parse(payload);
+          yield { type: "context_suggestions", nodes };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;
@@ -902,7 +911,7 @@ export async function deleteContextAnchor(assistantId, nodeId, role = "retrieval
  * @param {string[]} contentTypes - Content-Types zum Filtern
  * @returns {Promise<ContextNodeResult[]>} Suchergebnisse
  */
-export async function searchContextNodes(query, contentTypes = []) {
+export async function searchContextNodesLegacy(query, contentTypes = []) {
   if (query.length < 2) return [];
   
   const params = new URLSearchParams({ q: query });
@@ -943,6 +952,20 @@ export async function getContextNodes(params = {}) {
     throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Knoten')
   }
   return res.json()
+}
+
+export async function searchContextNodes(query) {
+  const res = await fetch(`${BASE}/context/search`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler bei der Kontext-Suche')
+  }
+  return res.json() // ContextSearchResult[]
 }
 
 export async function getContextNode(nodeId) {

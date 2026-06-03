@@ -150,3 +150,17 @@ class ChatContextNodeRead(BaseModel):
     title: str
     content_type: str | None
     added_at: datetime
+
+
+# ── KS-Phase-5 Semantic Search ──────────────────────────────────────────
+
+
+class ContextSearchRequest(BaseModel):
+    query: str
+
+
+class ContextSearchResult(BaseModel):
+    node_id: UUID
+    title: str
+    category: str
+    content_type: str | None
