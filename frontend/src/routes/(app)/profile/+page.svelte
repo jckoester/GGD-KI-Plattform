@@ -14,6 +14,7 @@
     ];
 
     const sidebarLimitOptions = [5, 10, 15, 20, 25];
+    const contextSearchLimitOptions = [5, 8, 10, 15, 20, 30];
     const costGranularityOptions = [
         { value: "none", label: "Gar nicht" },
         { value: "conversation", label: "Pro Konversation" },
@@ -61,6 +62,11 @@
     async function updateSidebarLimit(event) {
         const value = parseInt(event.target.value);
         await updatePreference("sidebar_recent_chats_limit", value);
+    }
+
+    async function updateContextSearchLimit(event) {
+        const value = parseInt(event.target.value);
+        await updatePreference("context_search_limit", value);
     }
 
     function doSave() {
@@ -242,6 +248,33 @@
                         {/each}
                     </select>
                 </div>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2
+                class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
+            >
+                Kontext-Suche
+            </h2>
+            <div>
+                <label
+                    class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
+                >
+                    Maximale Trefferzahl beim Kontext-Lookup
+                </label>
+                <select
+                    value={preferences?.context_search_limit ?? 8}
+                    onchange={updateContextSearchLimit}
+                    class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
+                           focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                >
+                    {#each contextSearchLimitOptions as opt}
+                        <option value={opt}>{opt}</option>
+                    {/each}
+                </select>
             </div>
         </section>
 

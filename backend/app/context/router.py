@@ -35,6 +35,7 @@ from app.context.schemas import (
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
+from app.preferences.service import get_preferences
 from app.db.models import (
     Assistant,
     AssistantContextAnchor,
@@ -649,5 +650,10 @@ async def search_context_nodes(
 ):
     """Semantische Suche über sichtbare Knoten anhand eines Freitexts."""
     from app.chat.router import _exec_search_context_nodes
-    results = await _exec_search_context_nodes(request.query, user.sub, db)
+    prefs = await get_preferences(db, user.sub)
+    try:
+        limit = max(5, min(30, int(prefs.get("context_search_limit", 8))))
+    except (TypeError, ValueError):
+        limit = 8
+    results = await _exec_search_context_nodes(request.query, user.sub, db, limit=limit)
     return results

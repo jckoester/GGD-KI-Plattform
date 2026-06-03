@@ -266,9 +266,9 @@ async def _get_model_info() -> dict[str, bool | None]:
 
 
 async def _exec_search_context_nodes(
-    query: str, pseudonym: str, db: AsyncSession
+    query: str, pseudonym: str, db: AsyncSession, *, limit: int = 8
 ) -> list[dict]:
-    """Semantische Suche über alle sichtbaren ContextNodes, max. 8 Treffer.
+    """Semantische Suche über alle sichtbaren ContextNodes, max. limit Treffer.
 
     Fällt auf ILIKE zurück wenn kein Embedding generiert werden kann oder
     kein Knoten ein Embedding hat.
@@ -287,11 +287,11 @@ async def _exec_search_context_nodes(
                   OR owner_pseudonym = :pseudonym
               )
             ORDER BY embedding <=> CAST(:embedding AS vector)
-            LIMIT 8
+            LIMIT :limit
         """)
         result = await db.execute(
             sql,
-            {"pseudonym": pseudonym, "embedding": embedding_str},
+            {"pseudonym": pseudonym, "embedding": embedding_str, "limit": limit},
         )
         rows = result.mappings().all()
         if rows:
@@ -324,7 +324,7 @@ async def _exec_search_context_nodes(
                 ContextNode.content.ilike(f"%{query}%"),
             )
         )
-        .limit(8)
+        .limit(limit)
     )
     return [
         {
