@@ -1174,20 +1174,6 @@ export async function getFachplaene() {
     return res.json()
 }
 
-export async function convertCurriculum(formData) {
-    // formData: FormData mit file, fachplan_id, bp_version, schulart
-    const res = await fetch(`${BASE}/context/curricula/convert`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-    })
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new ApiError(res.status, data.detail ?? 'Extraktion fehlgeschlagen')
-    }
-    return res.json()
-}
-
 export async function createCurriculumFromDraft(draft) {
     const res = await fetch(`${BASE}/context/curricula`, {
         method: 'POST',

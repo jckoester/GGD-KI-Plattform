@@ -117,15 +117,5 @@
             {/each}
         </div>
         
-        <!-- Neues Curriculum Button -->
-        {#if showNewButton && canEditSubject}
-            <button
-                onclick={() => goto(`/knowledge/curriculum/import?subject=${subjectSlug}`)}
-                class="w-full sm:w-auto px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
-                   text-white font-medium hover:opacity-90 transition-opacity mt-4"
-            >
-                + Neues Curriculum anlegen
-            </button>
-        {/if}
     {/if}
 </div>
