@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     upload_max_files: int = 3
     assistant_schema_path: str = "config/assistant_schema.json"
     teacher_schoolwide_sharing_requires_admin: bool = True
+    schulart: str = "GYM"
 
 
 settings = Settings()

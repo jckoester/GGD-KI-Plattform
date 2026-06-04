@@ -1160,3 +1160,44 @@ export async function createCurriculum(payload) {
   }
   return res.json()
 }
+
+// ============================================================================
+// KS-Phase-6 Schritt 5a: Curriculum Import API
+// ============================================================================
+
+export async function getFachplaene() {
+    const res = await fetch(
+        `${BASE}/context/nodes?content_type=fachplan&status=active`,
+        { credentials: 'include' }
+    )
+    if (!res.ok) throw new ApiError(res.status, 'Fehler beim Laden der Bildungspläne')
+    return res.json()
+}
+
+export async function convertCurriculum(formData) {
+    // formData: FormData mit file, fachplan_id, bp_version, schulart
+    const res = await fetch(`${BASE}/context/curricula/convert`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+    })
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new ApiError(res.status, data.detail ?? 'Extraktion fehlgeschlagen')
+    }
+    return res.json()
+}
+
+export async function createCurriculumFromDraft(draft) {
+    const res = await fetch(`${BASE}/context/curricula`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+    })
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new ApiError(res.status, data.detail ?? 'Curriculum konnte nicht gespeichert werden')
+    }
+    return res.json()
+}

@@ -4,8 +4,10 @@ Minimalimplementierung für KS-Phase-1 und -2-Tests.
 Sichtbarkeitsfilter werden in KS-Phase-3 um group_memberships-Prüfung erweitert.
 """
 
+import io
 import logging
 import os
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -852,7 +854,8 @@ async def list_curricula_by_subject(
 async def convert_curriculum(
     file: UploadFile,
     fachplan_id: str = Form(...),
-    bp_version: str = Form(...),
+    fach: str = Form(...),
+    jahrgangsstufe: str = Form(...),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
@@ -861,9 +864,8 @@ async def convert_curriculum(
     Nimmt ein PDF- oder Word-Dokument entgegen und extrahiert die Curriculum-Struktur
     mit LLM-Unterstützung. Das Ergebnis ist ein CurriculumDraft für den Prüfungsschritt.
     """
-    import re
     from fastapi import UploadFile, Form
-    
+
     # Datei-Inhalt lesen
     try:
         content = await file.read()
@@ -896,9 +898,22 @@ async def convert_curriculum(
             detail=f"Textextraktion fehlgeschlagen: {str(e)}"
         )
     
+    # bp_version aus Fachplan-Metadaten lesen
+    from app.db.models import ContextNode as ContextNodeModel
+    try:
+        fachplan_uuid = UUID(fachplan_id)
+        fachplan_node = await db.get(ContextNodeModel, fachplan_uuid)
+        bp_version = (fachplan_node.metadata_ or {}).get("bp_version", "") if fachplan_node else ""
+    except Exception:
+        bp_version = ""
+
+    # Schulart aus Konfiguration
+    from app.config import settings as _settings
+    schulart = _settings.schulart
+
     # Format erkennen
     format_detected, warnings = _detect_format(text_content)
-    
+
     if format_detected is None:
         return CurriculumDraft(
             unsupported_format=True,
@@ -909,10 +924,13 @@ async def convert_curriculum(
             ],
             data=None
         )
-    
+
     # LLM-Extraktion (vereinfacht - in Produktion mit echtem LLM-Aufruf)
     try:
-        draft_data = _extract_curriculum_structure(text_content, format_detected, fachplan_id, bp_version)
+        draft_data = _extract_curriculum_structure(
+            text_content, format_detected, fachplan_id, bp_version,
+            fach=fach, jahrgangsstufe=jahrgangsstufe, schulart=schulart
+        )
         return CurriculumDraft(
             unsupported_format=False,
             format_detected=format_detected,
@@ -928,37 +946,15 @@ async def convert_curriculum(
 
 
 def _extract_text_from_pdf(content: bytes) -> str:
-    """Extrahiert Text aus PDF-Datei."""
-    try:
-        import pdfplumber
-        import io
-        
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            text_parts = []
-            for page in pdf.pages:
-                text_parts.append(page.extract_text() or "")
-            return "\n".join(text_parts)
-    except ImportError:
-        logger.warning("pdfplumber nicht installiert - verwende Fallback")
-        # Fallback: versuche mit PyPDF2
-        try:
-            from PyPDF2 import PdfReader
-            import io
-            reader = PdfReader(io.BytesIO(content))
-            text_parts = []
-            for page in reader.pages:
-                text_parts.append(page.extract_text() or "")
-            return "\n".join(text_parts)
-        except ImportError:
-            raise ImportError("Weder pdfplumber noch PyPDF2 installiert")
+    """Extrahiert Text aus PDF-Datei (via pdfminer.six)."""
+    from pdfminer.high_level import extract_text
+    return extract_text(io.BytesIO(content))
 
 
 def _extract_text_from_word(content: bytes) -> str:
     """Extrahiert Text aus Word-Dokument."""
     try:
         from docx import Document
-        import io
-        
         doc = Document(io.BytesIO(content))
         return "\n".join([p.text for p in doc.paragraphs])
     except ImportError:
@@ -1033,7 +1029,10 @@ def _extract_curriculum_structure(
     text_content: str,
     format_detected: str,
     fachplan_id: str,
-    bp_version: str
+    bp_version: str,
+    fach: str = "",
+    jahrgangsstufe: str = "",
+    schulart: str = "",
 ) -> "CurriculumDraftData":
     """Extrahiert die Curriculum-Struktur aus dem Text.
     
@@ -1043,36 +1042,19 @@ def _extract_curriculum_structure(
     from app.context.schemas import CurriculumDraftData, CurriculumDraftKapitel, CurriculumDraftLernsequenz, CurriculumDraftEntry
     
     lines = text_content.split("\n")
-    
-    # Vereinfachte Extraktion für Demo/Testing
-    # In Produktion: LLM-Prompt für strukturierte Extraktion
-    
-    # Suche nach Schul- und Fachinformationen in den ersten Zeilen
+
+    # Schul- und Fachinformationen: aus Formulardaten übernehmen,
+    # fehlende Angaben ergänzend aus den ersten Zeilen des Dokuments extrahieren.
     schule = ""
-    schulart = ""
-    jahrgangsstufe = ""
     fach_code = ""
-    fach = ""
-    
+
     for line in lines[:20]:
         line = line.strip()
-        # Schulname
         if re.search(r'(Schule|Gymnasium|Realschule|Grundschule|Gemeinschaftsschule)', line, re.IGNORECASE):
             schule = line
-        # Schulart
-        if re.search(r'\b(G8|G9|GMS|Realschule|Gymnasium|Berufliches Gymnasium)\b', line, re.IGNORECASE):
-            schulart = line
-        # Jahrgangsstufe
-        match = re.search(r'\b(Klasse|Kl\.?|Jg\.?|Jahrgangsstufe)\s*(\d{1,2})', line, re.IGNORECASE)
-        if match:
-            jahrgangsstufe = match.group(2)
-        # Fachcode
         match = re.search(r'\b(BW|DE|EN|FR|M|MA|PH|CH|BI|GE|GK|SP|RE|ETH|KU|MU|SPT)\b', line)
         if match:
             fach_code = match.group(1)
-        # Fachname
-        if re.search(r'\b(Mathematik|Deutsch|Englisch|Französisch|Physik|Chemie|Biologie|Gemeinschaftskunde|Geographie|Religion|Ethik|Kunst|Musik|Sport)\b', line, re.IGNORECASE):
-            fach = line
     
     # Vereinfachte Kapitel-Extraktion
     # Suche nach Kapitel-Headern (typischerweise fett oder mit Stundenangabe)
@@ -1147,10 +1129,10 @@ def _extract_curriculum_structure(
     
     return CurriculumDraftData(
         schule=schule or "Unbekannte Schule",
-        fach_code=fach_code or "UNKNOWN",
+        fach_code=fach_code or fach[:2].upper() if fach else "UNKNOWN",
         fach=fach or None,
-        schulart=schulart or "G8",
-        jahrgangsstufe=jahrgangsstufe or "5",
+        schulart=schulart,
+        jahrgangsstufe=jahrgangsstufe,
         fachplan_id=fachplan_id,
         bp_version=bp_version,
         vorwort=None,
