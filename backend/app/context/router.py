@@ -1411,94 +1411,75 @@ class ChapterChunk:
     pages: list[PageBlock]
 
 
-# System Prompt für die LLM-Extraktion
-EXTRACTION_SYSTEM_PROMPT = """Du bist ein Expert:innen-System für die Extraktion von Bildungsplan-Curricula des Landes Baden-Württemberg (BW BP 2016).
+# System Prompt für die LLM-Extraktion (Revision 2 - verbatim nur, keine Schlüssel)
+EXTRACTION_SYSTEM_PROMPT = """Du bist ein Expert:innen-System für die Extraktion von Bildungsplan-Curricula des Landes Baden-Württemberg.
 
-Deine Aufgabe: Extrahiere die Curriculum-Daten so, dass IK- und PK-Referenzen direkt mit den Knoten des Bildungsplans verknüpft werden können.
+Deine Aufgabe: Analysiere die serialisierten PDF-Tabellen und extrahiere die Daten in ein strukturiertes JSON-Format.
 
-═══ KNOTENFORMAT IM BILDUNGSPLAN ═══
+SPALTENSEMANTIK:
+- C0 = Prozessbezogene Kompetenzen (PK) — z.B. "2.4 Mit symbolischen Elementen umgehen"
+- C1 = Inhaltsbezogene Kompetenzen (IK) — z.B. "(1) Prinzipien des Stellenwertsystems beschreiben"
+- C2 = Konkretisierung / Vorgehen — konkrete Umsetzung im Unterricht
+- C3 = Hinweise — methodische Hinweise, Materialien, Differenzierung
 
-IK-Knoten haben den Titel:  3.1.1.(1) die Prinzipien des Stellenwertsystems...
-PK-Knoten haben den Titel:  2.1.4 in einer mathematischen Aussage zwischen Voraussetzung und Behauptung...
+WICHTIGE REGELN ( strikt einhalten ):
+1. Zeilentyp klassifizieren:
+   - kapitel_kopf: Titel + "ca. N Std." oder "ca. N Stunden" → kapitel.titel und kapitel.std
+   - lernsequenz_header: NUR IK-Notation wie "3.1.1 Zahlbereiche erkunden" in C1 (C0 und C2 leer) → neue Lernsequenz
+   - datenzeile: alle anderen Zeilen mit Inhalt in C1 oder C2
 
-Deine Extraktionen müssen EXAKT diese Referenzformate liefern:
-- IK-Referenz:  ABSCHNITT.(N)   z.B. "3.1.1.(1)", "3.1.1.(18)", "[3.1.1.(6)]" (eckige Klammern = partiell)
-- PK-Referenz:  GRUPPE.N        z.B. "2.4.1", "2.4.3", "2.5.1"
+2. VERBATIM ÜBERNEHMEN — das ist die zentrale Regel:
+   - pk_raw = der KOMMPLETTE, unveränderte C0-Text (mit ↵ als Zeilentrenner)
+   - ik_raw = der KOMMPLETTE, unveränderte C1-Text (alle (N)-Items am Stück, mit ↵)
+   - konkretisierung = C2 WÖRTLICH
+   - hinweise = C3 VOLLSTÄNDIG und wörtlich (keine Kürzung!)
 
-═══ SPALTENSEMANTIK ═══
+3. Aktuellen IK-Abschnitt mitführen:
+   - Bei lernsequenz_header: ik_abschnitt = der IK-Code (z.B. "3.1.1")
+   - Bei datenzeilen: ik_abschnitt der aktuellen Lernsequenz weitergeben
 
-Zellen werden mit ↵ als Zeilentrennzeichen geliefert (anstelle echter Zeilenumbrüche).
+4. MERGED PK-Zellen:
+   - Ist C0 leer/None → pk_raw = None und pk_merged_from_above = true
+   - Die Vererbung übernimmt die Normalisierung, NICHT das LLM
 
-C0 = Prozessbezogene Kompetenzen. Aufbau (↵ = Zeilenumbruch):
-   "2.4 Gruppenname↵1. Item-Text↵3. Item-Text↵2.5 Gruppenname↵1. Item-Text"
-   → PK-Gruppe erkennbar: beginnt mit "X.Y Wortname"
-   → Item erkennbar: beginnt mit "N. " (Ziffer + Punkt + Leerzeichen)
-   → Referenzen: Gruppe 2.4 Item 1 → "2.4.1"; Gruppe 2.4 Item 3 → "2.4.3"; Gruppe 2.5 Item 1 → "2.5.1"
+5. KEINE REFERENZ-SCHLÜSSEL BAUEN: NICHT "3.1.1.(1)" oder "2.4.1" erzeugen!
+   NICHT eckige Klammern um IK-Items entfernen!
+   NICHT Texte über mehrere Einträge duplizieren!
+   Das LLM liefert NUR die Roh-Daten.
 
-C1 = Inhaltsbezogene Kompetenzen. Aufbau in Datenzeilen (↵ = Zeilenumbruch):
-   "(1) Kompetenztext↵(2) Kompetenztext↵(18) Kompetenztext"
-   → Item erkennbar: beginnt mit "(N)" (Ziffer in runden Klammern)
-   → Referenz: aktueller Abschnitt + ".(N)"  z.B. "(1)" in Abschnitt "3.1.1" → "3.1.1.(1)"
+6. KEIN ERFINDEN: Unklare Felder leer lassen + Warnung hinzufügen.
+   Antworte NUR mit dem JSON-Objekt, kein zusätzlicher Text.
 
-C2 = Konkretisierung / Vorgehen im Unterricht
-C3 = Ergänzende Hinweise, Arbeitsmittel, Verweise
+BEISPIELE:
 
-═══ ZEILEN ÜBERSPRINGEN ═══
+Format A (mit Lernsequenz-Header):
+=== Seite 1, Tabelle 1 ===
+[Z0] C0:"Prozessbezogene Kompetenzen" | C1:"Inhaltsbezogene Kompetenzen"
+→ ÜBERSPRINGEN (Spaltenüberschriften)
 
-Vollständig ignorieren (kein Eintrag, kein hinweis):
-- Tabellenüberschrift-Zeilen mit Spaltentiteln wie "Prozessbezogene Kompetenzen", "Inhaltsbezogene Kompetenzen", "Konkretisierung / Vorgehen", "Hinweise / Bemerkungen"
-- Standardformulierungen: "Die Schülerinnen und Schüler können" als eigenständige Zeile
-- Leerzeilen
+[Z1] C1:"Die Schülerinnen und Schüler können"
+→ ÜBERSPRINGEN
 
-FLIESSTEXT-BLÖCKE: kapitel.hinweis NUR für echte fachliche Einleitungstexte (≥ 2 inhaltliche Sätze). Einzelne kurze Zeilen → ignorieren.
+[Z2] C1:"3.1.1 Zahlbereiche erkunden"
+→ Lernsequenz: bp_titel="3.1.1 Zahlbereiche erkunden", ik_abschnitt="3.1.1"
 
-═══ EXTRAKTIONSREGELN ═══
+[Z3] C0:"2.5 Kommunizieren↵1. mathematische Einsichten dokumentieren↵2.4 Mit symbolischen Elementen umgehen↵1. zwischen natürlicher und symbolischer Sprache wechseln" | C1:"(1) Prinzipien beschreiben↵(2) Zahlen lesen↵(18) Zahlen runden" | C2:"Natürliche Zahlen↵Große Zahlen" | C3:"Hinweis auf den Grundschulbildungsplan: …↵MINT: Umrechnung vom Binärsystem"
+→ 1 Eintrag: pk_raw="2.5 Kommunizieren↵1. …↵2.4 Mit symbolischen Elementen umgehen↵1. …", 
+   ik_raw="(1) Prinzipien beschreiben↵(2) Zahlen lesen↵(18) Zahlen runden",
+   konkretisierung="Natürliche Zahlen↵Große Zahlen",
+   hinweise="Hinweis auf den Grundschulbildungsplan: …↵MINT: Umrechnung vom Binärsystem"
 
-1. LERNSEQUENZ-HEADER: Zeile mit NUR "3.X.X Titel" in C1 (C0 und C2 leer/None)
-   → Neue Lernsequenz; bp_titel = "3.X.X Titel"; aktuellen Abschnitt auf "3.X.X" setzen.
+Format B (ohne Lernsequenz-Header):
+=== Seite 1, Tabelle 1 ===
+[Z0] C0:"2.1 Argumentieren" | C1:"3.1.1" | C2:"Lineare Gleichungen lösen" | C3:"Bezug zu den Basiskonzepten: Funktion, Algebra"
+→ 1 Eintrag: ik_abschnitt=None, pk_raw="2.1 Argumentieren", ik_raw=None, konkretisierung="Lineare Gleichungen lösen", hinweise="Bezug zu den Basiskonzepten: Funktion, Algebra"
 
-2. KAPITEL-KOPF: "Titel ca. N Std." oder "ca. N Stunden" → kapitel.titel und kapitel.std.
-
-3. EIN EINTRAG PRO IK-ITEM: Jedes (N)-Item in C1 einer Datenzeile → ein separater Eintrag.
-   ik = "AKTUELLER_ABSCHNITT.(N)"  — die runden Klammern um N sind PFLICHT und Teil des Formats.
-   Beispiele: "3.1.1.(1)", "3.1.1.(18)", "3.2.3.(4)" — NIEMALS "3.1.1.1" oder "3.1.1. 1".
-   Falls IK-Item in eckigen Klammern wie "[…]": ik_partiell = true, ik = "[ABSCHNITT.(N)]"
-
-4. PK-REFERENZEN PRO EINTRAG: Aus C0 alle nummerierten Items extrahieren.
-   Format: Gruppencode + "." + Item-Nummer  (z.B. "2.4.1", "2.4.3", "2.5.1")
-   Ein Eintrag bekommt ALLE pk-Referenzen aus der aktuellen C0-Zelle.
-
-5. MERGED PK-CELLS: Ist C0 None/leer → pk-Liste aus der letzten befüllten C0-Zelle übernehmen.
-
-6. HINWEISE VOLLTEXT ERHALTEN: C3 enthält oft langen Fließtext (Grundschulverweise, MINT-Hinweise,
-   Links, methodische Anmerkungen). Dieser Text kommt VOLLSTÄNDIG in das hinweise-Feld.
-   Zusätzlich: Leitperspektiven-Codes wie "L BO", "(L) BTV", "L VB", "L MB", "L BNE" → auch ins lp-Array.
-   Das lp-Array ergänzt hinweise, ersetzt es aber NICHT.
-
-7. KONFIDENZ: confidence (0–1) und warnings setzen bei unsicherer Spaltenzuordnung.
-
-8. KEIN ERFINDEN: Unklare Felder leer lassen + Warnung. Antworte NUR mit dem JSON-Objekt.
-
-═══ BEISPIEL ═══
-
-Eingabe:
-[Z0] C0:"Prozessbezogene Kompetenzen" | C1:"Inhaltsbezogene Kompetenzen"  → ÜBERSPRINGEN
-[Z1] C1:"Die Schülerinnen und Schüler können"                              → ÜBERSPRINGEN
-[Z2] C1:"3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen"                  → Lernsequenz bp_titel="3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen"; Abschnitt = "3.1.1"
-[Z3] C0:"2.5 Kommunizieren↵1. mathematische Einsichten schriftlich dokumentieren↵2.4 Mit symbolischen Elementen umgehen↵1. zwischen natürlicher und symbolischer Sprache wechseln↵3. zwischen Darstellungen wechseln↵5. Routineverfahren anwenden" | C1:"(1) Prinzipien des Stellenwertsystems beschreiben↵(2) natürliche Zahlen bis Billion lesen↵(18) Zahlenwerte runden↵(6) [Zahlen und Punkte auf der Zahlengeraden zuordnen]" | C2:"Natürliche Zahlen↵Große Zahlen↵Zahlen runden" | C3:"Hinweis auf den Grundschulbildungsplan: „den Aufbau des Stellenwertsystems nutzen"↵Prinzipien in Analogie zum Dualsystem herausarbeiten↵MINT: Umrechnung vom Binärsystem ins Hexadezimalsystem"
-
-Ausgabe für [Z3] → 4 Einträge (ein Eintrag je IK-Item), alle mit denselben pk, konkretisierung, hinweise:
-  Eintrag 1: ik="3.1.1.(1)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung="Natürliche Zahlen\nGroße Zahlen\nZahlen runden", hinweise="Hinweis auf den Grundschulbildungsplan: „den Aufbau des dezimalen Stellenwertsystems nutzen…"\nPrinzipien in Analogie zum Dualsystem\nMINT: Umrechnung vom Binärsystem ins Hexadezimalsystem", lp=[]
-  Eintrag 2: ik="3.1.1.(2)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
-  Eintrag 3: ik="3.1.1.(18)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
-  Eintrag 4: ik="[3.1.1.(6)]", ik_partiell=true, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
-
-Antworte STRIKT im angegebenen JSON-Schema."""
+Antworte STRIKT im angegebenen JSON-Schema. """
 
 
-# JSON Schema für Chapter Extraction (wird mit CurriculumDraftKapitel generiert)
-_KAPITEL_EXTRACT_SCHEMA = {
-    "name": "kapitel_extract",
+# JSON Schema für RawKapitelExtraction (LLM-Output, Revision 2)
+_RAW_KAPITEL_EXTRACT_SCHEMA = {
+    "name": "raw_kapitel_extract",
     "schema": {
         "type": "object",
         "properties": {
@@ -1506,41 +1487,25 @@ _KAPITEL_EXTRACT_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "titel": {"type": "string", "description": "Kapitel-Titel"},
-                    "reihenfolge": {"type": "integer", "description": "Reihenfolge-Nummer"},
                     "std": {"type": ["string", "null"], "description": "Stundenangabe z.B. '5 Std.'"},
-                    "hinweis": {"type": ["string", "null"], "description": "Einleitungstext oder Hinweise"},
-                    "konkretisierung": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Allgemeine Konkretisierungen für das Kapitel"
-                    },
+                    "einleitung": {"type": ["string", "null"], "description": "Einleitungstext (Format B)"},
                     "lernsequenzen": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "bp_titel": {"type": ["string", "null"], "description": "Titel der Lernsequenz"},
-                                "bp_leitidee": {"type": ["string", "null"], "description": "Leitidee"},
-                                "reihenfolge": {"type": ["integer", "null"], "description": "Reihenfolge-Nummer"},
+                                "bp_titel": {"type": ["string", "null"], "description": "Titel der Lernsequenz (verbatim)"},
+                                "ik_abschnitt": {"type": ["string", "null"], "description": "Aktueller IK-Abschnitt z.B. '3.1.1'"},
                                 "eintraege": {
                                     "type": "array",
                                     "items": {
                                         "type": "object",
                                         "properties": {
-                                            "ik": {"type": ["string", "null"], "description": "Inhaltsbezogene Kompetenz"},
-                                            "ik_partiell": {"type": "boolean", "default": False, "description": "True wenn IK partiell (z.B. [3.1.1])"},
-                                            "pk": {
-                                                "type": "array",
-                                                "items": {"type": "string"},
-                                                "description": "Prozessbezogene Kompetenzen"
-                                            },
-                                            "konkretisierung": {"type": ["string", "null"], "description": "Konkretisierung"},
-                                            "hinweise": {"type": ["string", "null"], "description": "Hinweise"},
-                                            "lp": {
-                                                "type": "array",
-                                                "items": {"type": "string"},
-                                                "description": "Leitperspektive-Codes"
-                                            },
+                                            "ik_raw": {"type": ["string", "null"], "description": "Kompletter C1-Text, alle (N)-Items am Stück"},
+                                            "pk_raw": {"type": ["string", "null"], "description": "Kompletter C0-Text, verbatim"},
+                                            "pk_merged_from_above": {"type": "boolean", "default": False, "description": "True wenn PK von oben vererbt werden soll"},
+                                            "konkretisierung": {"type": ["string", "null"], "description": "C2 wörtlich"},
+                                            "hinweise": {"type": ["string", "null"], "description": "C3 vollständig"},
                                             "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0},
                                             "warnings": {
                                                 "type": "array",
@@ -1548,7 +1513,7 @@ _KAPITEL_EXTRACT_SCHEMA = {
                                                 "default": []
                                             }
                                         },
-                                        "required": ["ik", "pk", "konkretisierung"]
+                                        "required": ["ik_raw", "pk_raw", "konkretisierung", "hinweise"]
                                     }
                                 },
                                 "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0},
@@ -1568,6 +1533,63 @@ _KAPITEL_EXTRACT_SCHEMA = {
                         "default": []
                     }
                 },
+                "required": ["titel", "lernsequenzen"]
+            }
+        },
+        "required": ["kapitel"]
+    },
+    "strict": True
+}
+
+
+# Altes Schema für Fallback (wird nicht mehr verwendet, bleibt für Kompatibilität)
+_KAPITEL_EXTRACT_SCHEMA = {
+    "name": "kapitel_extract",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "kapitel": {
+                "type": "object",
+                "properties": {
+                    "titel": {"type": "string", "description": "Kapitel-Titel"},
+                    "reihenfolge": {"type": "integer", "description": "Reihenfolge-Nummer"},
+                    "std": {"type": ["string", "null"], "description": "Stundenangabe"},
+                    "hinweis": {"type": ["string", "null"], "description": "Einleitungstext"},
+                    "konkretisierung": {"type": "array", "items": {"type": "string"}},
+                    "lernsequenzen": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "bp_titel": {"type": ["string", "null"]},
+                                "bp_leitidee": {"type": ["string", "null"]},
+                                "reihenfolge": {"type": ["integer", "null"]},
+                                "eintraege": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "ik": {"type": ["string", "null"]},
+                                            "ik_partiell": {"type": "boolean", "default": False},
+                                            "pk": {"type": "array", "items": {"type": "string"}},
+                                            "konkretisierung": {"type": ["string", "null"]},
+                                            "hinweise": {"type": ["string", "null"]},
+                                            "lp": {"type": "array", "items": {"type": "string"}},
+                                            "confidence": {"type": "number", "default": 1.0},
+                                            "warnings": {"type": "array", "items": {"type": "string"}, "default": []}
+                                        },
+                                        "required": ["ik", "pk", "konkretisierung"]
+                                    }
+                                },
+                                "confidence": {"type": "number", "default": 1.0},
+                                "warnings": {"type": "array", "items": {"type": "string"}, "default": []}
+                            },
+                            "required": ["bp_titel", "eintraege"]
+                        }
+                    },
+                    "confidence": {"type": "number", "default": 1.0},
+                    "warnings": {"type": "array", "items": {"type": "string"}, "default": []}
+                },
                 "required": ["titel", "reihenfolge", "lernsequenzen"]
             }
         },
@@ -1584,7 +1606,7 @@ def _strictify_schema(node: Any) -> Any:
     - `additionalProperties: false`
     - alle Property-Keys in `required` (Optionalität nur über nullable-Typ ausdrücken)
     und lehnt Keywords wie `default`/`minimum`/`maximum` ab. Das von Hand gepflegte
-    `_KAPITEL_EXTRACT_SCHEMA` bleibt für den json_object-Fallback unverändert lesbar;
+    Schema bleibt für den json_object-Fallback unverändert lesbar;
     diese Funktion erzeugt daraus die strikte Variante.
     """
     if isinstance(node, dict):
@@ -1599,6 +1621,13 @@ def _strictify_schema(node: Any) -> Any:
         for item in node:
             _strictify_schema(item)
     return node
+
+
+_RAW_KAPITEL_EXTRACT_SCHEMA_STRICT = {
+    "name": _RAW_KAPITEL_EXTRACT_SCHEMA["name"],
+    "schema": _strictify_schema(copy.deepcopy(_RAW_KAPITEL_EXTRACT_SCHEMA["schema"])),
+    "strict": True,
+}
 
 
 _KAPITEL_EXTRACT_SCHEMA_STRICT = {
@@ -1893,13 +1922,13 @@ async def _call_extraction_llm(
     # Gestufte Strategie: json_schema → json_object → ganz ohne response_format.
     # Ein 400 (Modell unterstützt den response_format-Modus nicht) oder unparsebares
     # JSON degradiert auf die nächste Stufe; 429/Verbindung/sonstige Status brechen ab.
-    schema_hint = json.dumps(_KAPITEL_EXTRACT_SCHEMA["schema"], ensure_ascii=False, indent=2)
+    schema_hint = json.dumps(_RAW_KAPITEL_EXTRACT_SCHEMA["schema"], ensure_ascii=False, indent=2)
     fallback_messages = [
         {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT + f"\n\nAntworte STRIKT im folgenden JSON-Schema:\n{schema_hint}"},
         {"role": "user", "content": serialized_content},
     ]
     attempts = [
-        ("json_schema", {**base_payload, "response_format": {"type": "json_schema", "json_schema": _KAPITEL_EXTRACT_SCHEMA_STRICT}}),
+        ("json_schema", {**base_payload, "response_format": {"type": "json_schema", "json_schema": _RAW_KAPITEL_EXTRACT_SCHEMA_STRICT}}),
         ("json_object", {**base_payload, "messages": fallback_messages, "response_format": {"type": "json_object"}}),
         ("plain", {**base_payload, "messages": fallback_messages}),
     ]
@@ -1962,15 +1991,17 @@ async def _extract_curriculum_via_llm(
     jahrgangsstufe: str = "",
     schulart: str = "",
 ) -> "CurriculumDraftData":
-    """Extrahiert Curriculum-Struktur via LLM.
+    """Extrahiert Curriculum-Struktur via LLM (Revision 2).
     
     1. Seiten serialisieren
     2. In Kapitel-Chunks gruppieren
-    3. Pro Chunk LLM-Call → JSON → Validierung
-    4. Ergebnisse zusammenführen
+    3. Pro Chunk LLM-Call → RawKapitelExtraction (verbatim)
+    4. Normalisierung: RawKapitelExtraction → CurriculumDraftKapitel
+    5. Ergebnisse zusammenführen
     """
     from app.config import settings as app_settings
-    from app.context.schemas import CurriculumDraftData, CurriculumDraftKapitel, CurriculumDraftLernsequenz
+    from app.context.schemas import CurriculumDraftData, RawKapitelExtraction
+    from app.context.curriculum_normalize import normalize_raw_extraction
     
     # Serialisierung
     try:
@@ -1993,7 +2024,8 @@ async def _extract_curriculum_via_llm(
     concurrency = app_settings.curriculum_extract_concurrency
     semaphore = asyncio.Semaphore(concurrency)
     
-    async def process_chunk(chunk: ChapterChunk, index: int) -> CurriculumDraftKapitel:
+    async def process_chunk(chunk: ChapterChunk, index: int) -> dict[str, Any]:
+        """Verarbeitet einen Chunk und gibt RawKapitelExtraction-Rohdaten zurück."""
         async with semaphore:
             # Chunk für LLM serialisieren
             chunk_text_parts = []
@@ -2011,13 +2043,9 @@ async def _extract_curriculum_via_llm(
                 try:
                     result = await _call_extraction_llm(serialized_input, index, app_settings)
                     
-                    # JSON zu CurriculumDraftKapitel validieren
-                    chapter_data = result.get("kapitel", {})
-                    chapter = CurriculumDraftKapitel.model_validate(chapter_data)
-                    
-                    # Reihenfolge anpassen
-                    chapter.reihenfolge = index + 1
-                    return chapter
+                    # Rohdaten validieren
+                    raw_chapter = RawKapitelExtraction.model_validate(result.get("kapitel", {}))
+                    return {"index": index, "raw": result, "validated": raw_chapter}
                     
                 except Exception as e:
                     if attempt == 0:
@@ -2027,25 +2055,41 @@ async def _extract_curriculum_via_llm(
                         continue
                     else:
                         logger.error(f"LLM-Extraktion fehlgeschlagen (Kapitel {index}): {e}")
-                        # Platzhalter-Kapitel mit Warnung
-                        return CurriculumDraftKapitel(
-                            titel=f"Kapitel {index + 1} (Fehler bei Extraktion)",
-                            reihenfolge=index + 1,
-                            std=None,
-                            hinweis=None,
-                            konkretisierung=[],
-                            lernsequenzen=[],
-                            confidence=0.0,
-                            warnings=[f"Extraktion fehlgeschlagen: {str(e)}"]
-                        )
+                        # Platzhalter-Rohdaten
+                        return {
+                            "index": index,
+                            "raw": {
+                                "kapitel": {
+                                    "titel": f"Kapitel {index + 1} (Fehler bei Extraktion)",
+                                    "lernsequenzen": []
+                                }
+                            },
+                            "validated": RawKapitelExtraction(
+                                titel=f"Kapitel {index + 1} (Fehler bei Extraktion)",
+                                lernsequenzen=[],
+                                warnings=[f"Extraktion fehlgeschlagen: {str(e)}"]
+                            )
+                        }
     
     # Chunks verarbeiten
-    chapters = []
-    tasks = []
-    for index, chunk in enumerate(chunks):
-        tasks.append(process_chunk(chunk, index))
+    raw_results = await asyncio.gather(*[process_chunk(chunk, index) for index, chunk in enumerate(chunks)])
     
-    chapters = await asyncio.gather(*tasks)
+    # Normalisierung: Raw → CurriculumDraftKapitel
+    normalized_chapters = []
+    for raw_result in raw_results:
+        try:
+            # Normalisierung durchführen
+            chapters = normalize_raw_extraction(raw_result["raw"])
+            normalized_chapters.extend(chapters)
+        except Exception as e:
+            logger.error(f"Normalisierung fehlgeschlagen: {e}")
+            # Fallback: Platzhalter-Kapitel
+            normalized_chapters.append({
+                "titel": f"Kapitel (Normalisierungsfehler)",
+                "reihenfolge": len(normalized_chapters) + 1,
+                "lernsequenzen": [],
+                "warnings": [f"Normalisierung fehlgeschlagen: {str(e)}"]
+            })
     
     # Zusammenführen zu CurriculumDraftData
     return CurriculumDraftData(
@@ -2057,7 +2101,7 @@ async def _extract_curriculum_via_llm(
         fachplan_id=fachplan_id,
         bp_version=bp_version,
         vorwort=None,
-        kapitel=chapters,
+        kapitel=normalized_chapters,
     )
 
 

@@ -175,8 +175,29 @@ async def get_subject_department_group_id(db: AsyncSession, subject_id: int) -> 
     return row[0] if row else None
 
 
+def _normalize_ref(ref: str) -> str:
+    """Normalisiert eine Referenz für toleranten Vergleich.
+    
+    Entfernt Leerzeichen, vereinheitlicht Klammern und Punkte.
+    Wird für resolve_ik_node und resolve_pk_node verwendet.
+    """
+    if not ref:
+        return ""
+    # Leerzeichen entfernen
+    ref = ref.replace(" ", "")
+    # Klammern vereinheitlichen
+    ref = ref.replace("[", "(").replace("]", ")")
+    # Doppelte Punkte entfernen
+    ref = ref.replace(".(", "(").replace(")", ".")
+    return ref
+
+
 async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | None:
-    """Löst IK-Nummer zu node_id auf."""
+    """Löst IK-Nummer zu node_id auf (mit toleranter Normalisierung)."""
+    # Normalisierte Suche
+    normalized_nr = _normalize_ref(nr)
+    
+    # Erst: exakter Vergleich
     result = await db.execute(
         sa.select(ContextNode.id).where(
             ContextNode.content_type == "ik_kompetenz",
@@ -186,11 +207,31 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
         )
     )
     row = result.fetchone()
-    return row[0] if row else None
+    if row:
+        return row[0]
+    
+    # Fallback: normalisierter Vergleich
+    result = await db.execute(
+        sa.select(ContextNode.id).where(
+            ContextNode.content_type == "ik_kompetenz",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+        )
+    )
+    for row in result.fetchall():
+        node_nr = row[0].metadata_.get("nr", "")
+        if _normalize_ref(node_nr) == normalized_nr:
+            return row[0]
+    
+    return None
 
 
 async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
-    """Löst PK-ID zu node_id auf."""
+    """Löst PK-ID zu node_id auf (mit toleranter Normalisierung)."""
+    # Normalisierte Suche
+    normalized_pk = _normalize_ref(pk_id)
+    
+    # Erst: exakter Vergleich
     result = await db.execute(
         sa.select(ContextNode.id).where(
             ContextNode.content_type == "pk_kompetenz",
@@ -199,7 +240,22 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
         )
     )
     row = result.fetchone()
-    return row[0] if row else None
+    if row:
+        return row[0]
+    
+    # Fallback: normalisierter Vergleich
+    result = await db.execute(
+        sa.select(ContextNode.id).where(
+            ContextNode.content_type == "pk_kompetenz",
+            ContextNode.status == "active",
+        )
+    )
+    for row in result.fetchall():
+        node_pk = row[0].metadata_.get("pk_id", "")
+        if _normalize_ref(node_pk) == normalized_pk:
+            return row[0]
+    
+    return None
 
 
 async def resolve_leitperspektive_node(db: AsyncSession, lp_code: str) -> UUID | None:

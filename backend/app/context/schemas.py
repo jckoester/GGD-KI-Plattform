@@ -208,6 +208,38 @@ class CurriculumCreate(BaseModel):
 # ── KS-Phase-6 Curriculum ───────────────────────────────────────────────
 
 
+# -- KS-Phase-6 Raw Extraction Schemas (LLM-Output, Revision 2) --------------------
+
+class RawEntry(BaseModel):
+    """Ein Roh-Eintrag aus der LLM-Extraktion (verbatim, keine Schlüssel)."""
+    ik_raw: str | None = None          # kompletter C1-Text, alle (N)-Items am Stück
+    pk_raw: str | None = None          # kompletter C0-Text, verbatim
+    pk_merged_from_above: bool = False   # True wenn PK von oben vererbt werden soll
+    konkretisierung: str | None = None
+    hinweise: str | None = None        # C3 VOLLSTÄNDIG
+    confidence: float = Field(default=1.0, description="Konfidenz der Extraktion (0.0-1.0)")
+    warnings: list[str] = Field(default_factory=list, description="Warnungen für diesen Eintrag")
+
+
+class RawLernsequenz(BaseModel):
+    """Eine Roh-Lernsequenz aus der LLM-Extraktion."""
+    bp_titel: str | None = None        # z. B. "3.1.1 Zahlbereiche erkunden" (verbatim) oder None (Format B)
+    ik_abschnitt: str | None = None    # "3.1.1" — getrennt extrahiert, dient der Normalisierung
+    eintraege: list[RawEntry] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, description="Konfidenz der Extraktion")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RawKapitelExtraction(BaseModel):
+    """Ein Roh-Kapitel aus der LLM-Extraktion (verbatim, keine Referenz-Keys)."""
+    titel: str
+    std: str | None = None
+    einleitung: str | None = None      # Einleitungstext (Format B)
+    lernsequenzen: list[RawLernsequenz] = Field(default_factory=list)
+    confidence: float = Field(default=1.0)
+    warnings: list[str] = Field(default_factory=list)
+
+
 # -- KS-Phase-6 Curriculum Draft (für Konvertierungs-Assistent) ---------------
 
 
