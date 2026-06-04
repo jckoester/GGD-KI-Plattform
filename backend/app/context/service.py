@@ -212,17 +212,17 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
     
     # Fallback: normalisierter Vergleich
     result = await db.execute(
-        sa.select(ContextNode.id).where(
+        sa.select(ContextNode).where(
             ContextNode.content_type == "ik_kompetenz",
             ContextNode.subject_id == subject_id,
             ContextNode.status == "active",
         )
     )
-    for row in result.fetchall():
-        node_nr = row[0].metadata_.get("nr", "")
+    for (node,) in result.fetchall():
+        node_nr = (node.metadata_ or {}).get("nr", "")
         if _normalize_ref(node_nr) == normalized_nr:
-            return row[0]
-    
+            return node.id
+
     return None
 
 
@@ -245,16 +245,16 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
     
     # Fallback: normalisierter Vergleich
     result = await db.execute(
-        sa.select(ContextNode.id).where(
+        sa.select(ContextNode).where(
             ContextNode.content_type == "pk_kompetenz",
             ContextNode.status == "active",
         )
     )
-    for row in result.fetchall():
-        node_pk = row[0].metadata_.get("pk_id", "")
+    for (node,) in result.fetchall():
+        node_pk = (node.metadata_ or {}).get("pk_id", "")
         if _normalize_ref(node_pk) == normalized_pk:
-            return row[0]
-    
+            return node.id
+
     return None
 
 

@@ -44,60 +44,60 @@ def _normalize_ref(ref: str) -> str:
     return ref
 
 
+_IK_PARTIAL_RE = re.compile(r'\[\s*\(\s*(\d+)\s*\)')  # [(N) — Item in eckigen Klammern
+
+
+def _split_lines(text: str) -> list[str]:
+    """Teilt Text an echten Zeilenumbrüchen UND am ↵-Trennzeichen der Serialisierung."""
+    return text.replace('↵', '\n').splitlines()
+
+
 def _extract_ik_items(text: str) -> list[tuple[str, bool]]:
     """Extrahiert IK-Items aus ik_raw Text.
-    
-    Rückgabe: Liste von (ik_nummer, ist_partiell) Tuples
-    z.B. [("1", False), ("2", False), ("18", False), ("6", True)]
+
+    Rückgabe: Liste von (ik_nummer, ist_partiell) Tuples.
+    Partiell = nur wenn das konkrete (N) in eckigen Klammern steht: [(N)…].
+    Ellipsen-Klammern im Fließtext wie "(6) […] Text" gelten NICHT als partiell.
     """
     if not text:
         return []
-    
+
+    partial_nums = {m.group(1) for m in _IK_PARTIAL_RE.finditer(text)}
     items = []
-    # Finde alle (N) Items
-    matches = _IK_ITEM_RE.findall(text)
-    
-    # Prüfe auf eckige Klammern für partiell
-    has_brackets = '[' in text and ']' in text
-    
-    for match in matches:
-        items.append((match, has_brackets))
-    
+    for num in _IK_ITEM_RE.findall(text):
+        items.append((num, num in partial_nums))
     return items
 
 
 def _extract_pk_items(pk_raw: str) -> list[str]:
     """Extrahiert PK-Referenzen aus pk_raw Text.
-    
-    Verarbeitet zeilenweise:
+
+    Verarbeitet zeilenweise (trennt an ↵ und \\n):
     - Zeilen die mit "X.Y Text" beginnen → Gruppe merken
     - Zeilen die mit "N. Text" beginnen → Item zu aktueller Gruppe
-    
+
     Rückgabe: Liste von PK-Schlüsseln wie ["2.5.1", "2.4.1", "2.4.3", "2.4.5"]
     """
     if not pk_raw:
         return []
-    
-    lines = pk_raw.split('\n')
+
     pks = []
     current_group = None
-    
-    for line in lines:
+
+    for line in _split_lines(pk_raw):
         line = line.strip()
         if not line:
             continue
-        
-        # Gruppe erkennen (z.B. "2.4 Mit symbolischen...")
+
         group_match = _PK_GROUP_RE.match(line)
         if group_match:
             current_group = group_match.group(1)
             continue
-        
-        # Item erkennen (z.B. "1. zwischen...")
+
         item_match = _PK_ITEM_RE.match(line)
         if item_match and current_group:
             pks.append(f"{current_group}.{item_match.group(1)}")
-    
+
     return pks
 
 

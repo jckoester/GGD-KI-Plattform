@@ -1394,6 +1394,9 @@ from typing import Literal
 # Timeout für LLM-Extraktion
 _CURRICULUM_TIMEOUT = 120
 
+# Spaltennamen für bessere LLM-Orientierung
+_COL_NAMES = {0: "PK", 1: "IK", 2: "Konkretisierung", 3: "Hinweise"}
+
 
 @dataclass
 class PageBlock:
@@ -1416,23 +1419,34 @@ EXTRACTION_SYSTEM_PROMPT = """Du bist ein Expert:innen-System für die Extraktio
 
 Deine Aufgabe: Analysiere die serialisierten PDF-Tabellen und extrahiere die Daten in ein strukturiertes JSON-Format.
 
-SPALTENSEMANTIK:
+SPALTENZUORDNUNG (STRIKT EINHALTEN):
 - C0 = Prozessbezogene Kompetenzen (PK) — z.B. "2.4 Mit symbolischen Elementen umgehen"
-- C1 = Inhaltsbezogene Kompetenzen (IK) — z.B. "(1) Prinzipien des Stellenwertsystems beschreiben"
+- C1 = Inhaltsbezogene Kompetenzen (IK) — z.B. "3.1.1 Zahlbereiche", "(1) Prinzipien beschreiben"
 - C2 = Konkretisierung / Vorgehen — konkrete Umsetzung im Unterricht
 - C3 = Hinweise — methodische Hinweise, Materialien, Differenzierung
 
-WICHTIGE REGELN ( strikt einhalten ):
-1. Zeilentyp klassifizieren:
-   - kapitel_kopf: Titel + "ca. N Std." oder "ca. N Stunden" → kapitel.titel und kapitel.std
-   - lernsequenz_header: NUR IK-Notation wie "3.1.1 Zahlbereiche erkunden" in C1 (C0 und C2 leer) → neue Lernsequenz
-   - datenzeile: alle anderen Zeilen mit Inhalt in C1 oder C2
+HINWEIS: Jede Zeile in der Serialisierung zeigt ALLE Spalten (auch leere als Cn:""); 
+         die Spaltenheader "Spalten: C0:PK | C1:IK | C2:Konkretisierung | C3:Hinweise" zeigt die Bedeutung.
 
-2. VERBATIM ÜBERNEHMEN — das ist die zentrale Regel:
-   - pk_raw = der KOMMPLETTE, unveränderte C0-Text (mit ↵ als Zeilentrenner)
-   - ik_raw = der KOMMPLETTE, unveränderte C1-Text (alle (N)-Items am Stück, mit ↵)
-   - konkretisierung = C2 WÖRTLICH
-   - hinweise = C3 VOLLSTÄNDIG und wörtlich (keine Kürzung!)
+WICHTIGE REGELN (STRIKT einhalten):
+1. SPALTENZUORDNUNG PRO ZEILE:
+   - C0-Inhalt → pk_raw (Prozessbezogene Kompetenzen)
+   - C1-Inhalt → ik_raw (Inhaltsbezogene Kompetenzen) ODER bp_titel (wenn Lernsequenz-Header)
+   - C2-Inhalt → konkretisierung
+   - C3-Inhalt → hinweise
+
+2. Zeilentyp klassifizieren:
+   - kapitel_kopf: Titel + "ca. N Std." oder "ca. N Stunden" → kapitel.titel und kapitel.std
+   - lernsequenz_header: C1 enthält NUR IK-Notation wie "3.1.1 Zahlbereiche erkunden" UND C0, C2, C3 sind leer → neue Lernsequenz mit bp_titel aus C1, ik_abschnitt extrahieren
+   - datenzeile: alle anderen Zeilen mit Inhalt → ein Eintrag
+
+3. VERBATIM ÜBERNEHMEN — das ist die zentrale Regel:
+   - pk_raw = C0-Inhalt KOMMPLETT und unverändert (mit ↵ als Zeilentrenner)
+   - ik_raw = C1-Inhalt KOMMPLETT und unverändert (alle (N)-Items am Stück, mit ↵)
+   - konkretisierung = C2-Inhalt WÖRTLICH
+   - hinweise = C3-Inhalt VOLLSTÄNDIG und wörtlich (KEINE Kürzung!)
+   
+   WICHTIG: Auch wenn C0 oder C1 leer ist, müssen die Felder pk_raw und ik_raw als leere Strings gesetzt werden!
 
 3. Aktuellen IK-Abschnitt mitführen:
    - Bei lernsequenz_header: ik_abschnitt = der IK-Code (z.B. "3.1.1")
@@ -1453,26 +1467,28 @@ WICHTIGE REGELN ( strikt einhalten ):
 BEISPIELE:
 
 Format A (mit Lernsequenz-Header):
-=== Seite 1, Tabelle 1 ===
-[Z0] C0:"Prozessbezogene Kompetenzen" | C1:"Inhaltsbezogene Kompetenzen"
-→ ÜBERSPRINGEN (Spaltenüberschriften)
+=== Seite 1, Tabelle 1 (5 Zeilen × 4 Spalten) ===
+Spalten: C0:PK | C1:IK | C2:Konkretisierung | C3:Hinweise
+[Z0] C0:"Prozessbezogene Kompetenzen" | C1:"Inhaltsbezogene Kompetenzen" | C2:"Konkretisierung / Vorgehen" | C3:"Hinweise / Bemerkungen"
+→ ÜBERSPRINGEN (Tabellenüberschriften)
 
-[Z1] C1:"Die Schülerinnen und Schüler können"
+[Z1] C0:"", C1:"Die Schülerinnen und Schüler können", C2:"", C3:""
 → ÜBERSPRINGEN
 
-[Z2] C1:"3.1.1 Zahlbereiche erkunden"
-→ Lernsequenz: bp_titel="3.1.1 Zahlbereiche erkunden", ik_abschnitt="3.1.1"
+[Z2] C0:"", C1:"3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen", C2:"", C3:""
+→ Lernsequenz: bp_titel="3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen", ik_abschnitt="3.1.1"
 
-[Z3] C0:"2.5 Kommunizieren↵1. mathematische Einsichten dokumentieren↵2.4 Mit symbolischen Elementen umgehen↵1. zwischen natürlicher und symbolischer Sprache wechseln" | C1:"(1) Prinzipien beschreiben↵(2) Zahlen lesen↵(18) Zahlen runden" | C2:"Natürliche Zahlen↵Große Zahlen" | C3:"Hinweis auf den Grundschulbildungsplan: …↵MINT: Umrechnung vom Binärsystem"
+[Z3] C0:"2.5 Kommunizieren↵1. mathematische Einsichten schriftlich dokumentieren↵2.4 Mit symbolischen Elementen umgehen↵1. zwischen natürlicher und symbolischer Sprache wechseln↵3. zwischen Darstellungen wechseln↵5. Routineverfahren anwenden", C1:"(1) Prinzipien des Stellenwertsystems beschreiben↵(2) natürliche Zahlen bis Billion lesen↵(18) Zahlenwerte runden↵(6) [Zahlen und Punkte auf der Zahlengeraden zuordnen]", C2:"Natürliche Zahlen↵Große Zahlen↵Zahlen runden", C3:"Hinweis auf den Grundschulbildungsplan: „den Aufbau des Stellenwertsystems nutzen"↵Prinzipien in Analogie zum Dualsystem herausarbeiten↵MINT: Umrechnung vom Binärsystem ins Hexadezimalsystem"
 → 1 Eintrag: pk_raw="2.5 Kommunizieren↵1. …↵2.4 Mit symbolischen Elementen umgehen↵1. …", 
-   ik_raw="(1) Prinzipien beschreiben↵(2) Zahlen lesen↵(18) Zahlen runden",
-   konkretisierung="Natürliche Zahlen↵Große Zahlen",
-   hinweise="Hinweis auf den Grundschulbildungsplan: …↵MINT: Umrechnung vom Binärsystem"
+   ik_raw="(1) Prinzipien des Stellenwertsystems beschreiben↵(2) natürliche Zahlen bis Billion lesen↵(18) Zahlenwerte runden↵(6) [Zahlen und Punkte auf der Zahlengeraden zuordnen]",
+   konkretisierung="Natürliche Zahlen↵Große Zahlen↵Zahlen runden",
+   hinweise="Hinweis auf den Grundschulbildungsplan: „den Aufbau des Stellenwertsystems nutzen"↵Prinzipien in Analogie zum Dualsystem herausarbeiten↵MINT: Umrechnung vom Binärsystem ins Hexadezimalsystem"
 
 Format B (ohne Lernsequenz-Header):
-=== Seite 1, Tabelle 1 ===
-[Z0] C0:"2.1 Argumentieren" | C1:"3.1.1" | C2:"Lineare Gleichungen lösen" | C3:"Bezug zu den Basiskonzepten: Funktion, Algebra"
-→ 1 Eintrag: ik_abschnitt=None, pk_raw="2.1 Argumentieren", ik_raw=None, konkretisierung="Lineare Gleichungen lösen", hinweise="Bezug zu den Basiskonzepten: Funktion, Algebra"
+=== Seite 1, Tabelle 1 (5 Zeilen × 4 Spalten) ===
+Spalten: C0:PK | C1:IK | C2:Konkretisierung | C3:Hinweise
+[Z0] C0:"2.1 Argumentieren", C1:"3.1.1", C2:"Lineare Gleichungen lösen", C3:"Bezug zu den Basiskonzepten: Funktion, Algebra"
+→ 1 Eintrag: ik_abschnitt="3.1.1", pk_raw="2.1 Argumentieren", ik_raw="", konkretisierung="Lineare Gleichungen lösen", hinweise="Bezug zu den Basiskonzepten: Funktion, Algebra"
 
 Antworte STRIKT im angegebenen JSON-Schema. """
 
@@ -1652,9 +1668,10 @@ def _serialize_pdf_for_llm(content: bytes) -> list[PageBlock]:
     """Serialisiert PDF-Inhalt für das LLM mit Tabellen und Fließtext.
     
     Erzeugt eine kompakte Repräsentation, die Layout-Hinweise erhält:
-    - Pro Seite, pro Tabelle: Zellen mit Spaltenindex (C0, C1, ...)
-    - Leere Zellen werden weggelassen
+    - Pro Seite, pro Tabelle: ALLE Spalten mit Index (C0, C1, C2, C3)
+    - Auch leere Zellen werden als Cn:"" dargestellt (wichtig für korrekte Zuordnung!)
     - Fließtext der Seite als Kontextblock
+    - PDF-Silbentrennungen werden aufgelöst
     """
     import pdfplumber
     from pdfminer.high_level import extract_text
@@ -1662,8 +1679,6 @@ def _serialize_pdf_for_llm(content: bytes) -> list[PageBlock]:
     pages: list[PageBlock] = []
     
     with pdfplumber.open(io.BytesIO(content)) as pdf:
-        total_pages = len(pdf.pages)
-        
         for page_idx, page in enumerate(pdf.pages):
             page_number = page_idx + 1
             
@@ -1681,24 +1696,29 @@ def _serialize_pdf_for_llm(content: bytes) -> list[PageBlock]:
                         continue
                     
                     row_parts: list[str] = []
-                    for col_idx, cell in enumerate(row):
-                        if cell is None or cell.strip() == "":
-                            continue
-                        # PDF-Silbentrennungen auflösen ("Lö-\nsungswege" → "Lösungswege"),
-                        # strukturelle Zeilenumbrüche danach erhalten (sie trennen Gruppen/Items).
-                        cleaned = re.sub(r'-\s*\n\s*', '', cell).strip()
-                        if cleaned:
-                            # Eingebettete Zeilenumbrüche als sichtbares ↵ darstellen,
-                            # damit die Zeilen-Trennlogik des LLM nicht verwirrt wird.
-                            display = cleaned.replace("\n", "↵")
-                            row_parts.append(f"C{col_idx}:\"{display}\"")
+                    # ALLE Spalten ausgeben (auch leere) für korrekte Zuordnung
+                    for col_idx in range(num_cols):
+                        cell = row[col_idx] if col_idx < len(row) else None
+                        
+                        # PDF-Silbentrennungen auflösen ("Lö-\nsungswege" → "Lösungswege")
+                        if cell is not None:
+                            cleaned = re.sub(r'-\s*\n\s*', '', cell).strip()
+                        else:
+                            cleaned = ""
+                        
+                        # Eingebettete Zeilenumbrüche als sichtbares ↵ darstellen
+                        display = cleaned.replace("\n", "↵")
+                        row_parts.append(f"C{col_idx}:\"{display}\"")
 
                     if row_parts:
                         table_lines.append(f"[Z{row_idx}] {' | '.join(row_parts)}")
                 
                 if table_lines:
                     header = f"=== Seite {page_number}, Tabelle {table_idx + 1} ({len(table)} Zeilen × {num_cols} Spalten) ==="
+                    # Spaltenheader hinzufügen für bessere Orientierung des LLM
+                    col_headers = " | ".join([f"C{col}:{_COL_NAMES.get(col, '?')}" for col in range(num_cols)])
                     tables_serialized.append(header)
+                    tables_serialized.append(f"Spalten: {col_headers}")
                     tables_serialized.extend(table_lines)
             
             # Fließtext extrahieren (pdfminer nutzt 0-basierte Seitennummern)
