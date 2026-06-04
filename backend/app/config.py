@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     assistant_schema_path: str = "config/assistant_schema.json"
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
+    curriculum_extract_model: str = ""
+    curriculum_extract_max_pages_per_call: int = 4
+    curriculum_extract_concurrency: int = 3
 
 
 settings = Settings()

@@ -20,6 +20,9 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `LITELLM_MASTER_KEY` | Zugangsschlüssel für LiteLLM-Admin-API | `sk-...` |
 | `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat | `gpt-4o-mini` |
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel | `gpt-4o-mini` |
+| `CURRICULUM_EXTRACT_MODEL` | Modell für die LLM-Extraktion beim Bildungsplan-Import (leer → `CHAT_DEFAULT_MODEL`). Siehe Abschnitt *Curriculum-Extraktion* | `gpt-4o` |
+| `CURRICULUM_EXTRACT_MAX_PAGES_PER_CALL` | Seiten pro LLM-Aufruf (Chunk-Größe beim Import) | `4` |
+| `CURRICULUM_EXTRACT_CONCURRENCY` | Parallele Extraktions-Aufrufe | `3` |
 | `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (für CORS) | `https://ki.beispielschule.de` |
 | `ENVIRONMENT` | `development` oder `production` | `production` |
 | `AUTH_CONFIG_PATH` | Pfad zur auth.yaml | `config/auth.yaml` |
@@ -165,3 +168,42 @@ general_settings:
 
 Die vollständige Referenz für `model_list` und Anbieter-Konfigurationen
 findet sich in der [LiteLLM-Dokumentation](https://docs.litellm.ai).
+
+---
+
+## Curriculum-Extraktion (Bildungsplan-Import)
+
+Beim Import eines Bildungsplan-Dokuments (PDF/Word) über die Verwaltungsoberfläche
+extrahiert ein LLM die Kapitelstruktur. Der Aufruf läuft ausschließlich über den
+LiteLLM-Proxy und nutzt strukturierte Ausgabe (`response_format`). Gesteuert wird
+das über die drei `CURRICULUM_EXTRACT_*`-Variablen in `.env` (siehe Tabelle oben).
+
+> Der Wert von `CURRICULUM_EXTRACT_MODEL` muss **exakt** einem `model_name` aus
+> `infra/litellm_config.yaml` entsprechen. Ein unbekannter Name führt beim Import
+> zu einem 404 vom Proxy, ein Modell ohne `response_format`-Unterstützung zu einem
+> 400 (jedes Kapitel erscheint dann als „Fehler bei Extraktion").
+
+### Anforderung an das Modell
+
+Das Modell muss `response_format` unterstützen — idealerweise striktes
+`json_schema` (Structured Outputs). Der Import versucht gestuft:
+`json_schema` (strict) → `json_object` → ganz ohne `response_format`. Ein Modell,
+das die strikte Stufe beherrscht, liefert die zuverlässigsten Ergebnisse; die
+weiteren Stufen sind nur ein Sicherheitsnetz und ohne Schema-Garantie.
+
+### Geeignete Modelle
+
+| Eignung | Modelle | Hinweis |
+|---------|---------|---------|
+| **Empfohlen** — strict `json_schema` | OpenAI `gpt-4o` (Snapshot 2024-08-06 oder neuer), `gpt-4o-mini`, `gpt-4.1`-Reihe, `o`-Reihe (Reasoning-Modelle), `gpt-5`-Reihe · Google Gemini 2.0+ · xAI Grok-2+ · Anthropic Claude Sonnet 4.5 / Opus 4.1 (über LiteLLM, Beta-Header wird automatisch gesetzt) | Beste Struktur-Treue; die primäre Stufe greift direkt |
+| **Funktioniert über Fallback** — nur `json_object` | Ältere Claude-Modelle ohne Structured-Outputs-Beta, Gemini 1.5, diverse Bedrock-Modelle | Läuft, aber ohne Schema-Garantie; vereinzelt Nachpflege im Prüfschritt nötig |
+| **Ungeeignet** | Legacy `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo` (kein `response_format`) · kleine lokale Ollama-Modelle | `gpt-4` löst den 400-Fehler aus; lokale Klein-Modelle: Extraktionsqualität ungeprüft |
+
+### Empfehlung für die Praxis
+
+Der Import läuft selten (Erst- oder Re-Import eines Bildungsplans), daher ist ein
+stärkeres, etwas teureres Modell vertretbar. Für die fragmentierten, mehrspaltigen
+Tabellen mancher Fächer liefern `gpt-4o` und `Claude Sonnet 4.5` in der Praxis die
+robustesten Ergebnisse; `gpt-4o-mini` ist günstiger und für sauber gesetzte
+Curricula meist ausreichend. Die Extraktion sollte unabhängig vom Modell nach jedem
+Import im Prüfschritt der Verwaltungsoberfläche kontrolliert werden.

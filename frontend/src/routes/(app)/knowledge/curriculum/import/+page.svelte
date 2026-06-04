@@ -206,8 +206,8 @@
     })
 </script>
 
-<div class="flex min-h-0 flex-1">
-    <main class="flex-1 overflow-y-auto p-6 max-w-6xl">
+<div class="h-full overflow-y-auto">
+    <main class="p-6 max-w-6xl">
         <!-- Header mit Zurück-Button -->
         <div class="mb-6">
             <a
@@ -438,7 +438,7 @@
 
                 <!-- Vorschau-Tabelle -->
                 {#if preview}
-                    <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-lg overflow-hidden">
+                    <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-lg overflow-x-auto">
                         <CurriculumTable curriculum={preview} editMode={false} />
                     </div>
                 {/if}

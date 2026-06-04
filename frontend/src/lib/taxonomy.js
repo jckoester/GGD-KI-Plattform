@@ -102,8 +102,8 @@ export const CONTENT_TYPE_LABELS = {
   "operator_didaktisch": "Didaktischer Operator",
   "jahresplan": "Jahresplan",
   "pruefungsanforderung": "Prüfungsanforderung",
-  "unterrichtseinheit": "Unterrichtseinheit",
   "unterrichtsstunde": "Unterrichtsstunde",
+  "unterrichtseinheit": "Unterrichtseinheit",
   "reflexion": "Reflexion",
   "arbeitsblatt": "Arbeitsblatt",
   "aufgabe": "Aufgabe",
@@ -214,11 +214,11 @@ export const SCOPE_DEFAULTS = {
     "school",
     "school"
   ],
-  "unterrichtseinheit": [
+  "unterrichtsstunde": [
     "private",
     "private"
   ],
-  "unterrichtsstunde": [
+  "unterrichtseinheit": [
     "private",
     "private"
   ],

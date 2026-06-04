@@ -5,6 +5,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 import pytest
@@ -776,6 +777,291 @@ class TestGetCurriculum:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 3
+
+
+# ============================================================================
+# Test: Serialisierung (_serialize_pdf_for_llm)
+# ============================================================================
+
+# Minimales gültiges PDF mit einer Seite (kein Tabelleninhalt, aber parseable)
+_MINIMAL_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >>\nendobj\n"
+    b"4 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\n"
+    b"xref\n0 5\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000058 00000 n \n"
+    b"0000000115 00000 n \n"
+    b"0000000266 00000 n \n"
+    b"trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n316\n%%EOF"
+)
+
+
+class TestSerializePdfForLlm:
+    """Unit-Tests für _serialize_pdf_for_llm."""
+
+    def test_returns_list_of_page_blocks(self):
+        from app.context.router import _serialize_pdf_for_llm, PageBlock
+        pages = _serialize_pdf_for_llm(_MINIMAL_PDF)
+        assert isinstance(pages, list)
+        assert len(pages) == 1
+        page = pages[0]
+        assert isinstance(page, PageBlock)
+        assert page.page_number == 1
+        assert isinstance(page.tables, list)
+        assert isinstance(page.flow_text, str)
+
+    def test_no_tables_for_minimal_pdf(self):
+        from app.context.router import _serialize_pdf_for_llm
+        pages = _serialize_pdf_for_llm(_MINIMAL_PDF)
+        assert pages[0].tables == []
+
+    def test_page_numbers_sequential(self):
+        """Seitennummern müssen 1-basiert und aufsteigend sein."""
+        from app.context.router import _serialize_pdf_for_llm
+        # Zwei-Seiten-PDF via Überschreiben des PDF-Parsers geht nicht trivial —
+        # stattdessen prüfen wir nur die Struktur mit dem Minimal-PDF
+        pages = _serialize_pdf_for_llm(_MINIMAL_PDF)
+        for i, page in enumerate(pages):
+            assert page.page_number == i + 1
+
+
+# ============================================================================
+# Test: Chunking (_chunk_pages_by_kapitel)
+# ============================================================================
+
+
+class TestChunkPagesByKapitel:
+    """Unit-Tests für _chunk_pages_by_kapitel."""
+
+    @staticmethod
+    def _make_pages(flow_texts: list[str]):
+        from app.context.router import PageBlock
+        return [
+            PageBlock(page_number=i + 1, tables=[], flow_text=text)
+            for i, text in enumerate(flow_texts)
+        ]
+
+    def test_fallback_window_when_no_std_pattern(self):
+        from app.context.router import _chunk_pages_by_kapitel
+        pages = self._make_pages(["Einführung", "Inhalt", "Schluss", "Anhang", "Ende"])
+        chunks = _chunk_pages_by_kapitel(pages, max_pages_per_call=3)
+        assert len(chunks) >= 2
+        # Alle Seiten müssen in mindestens einem Chunk vorkommen
+        covered = {p.page_number for chunk in chunks for p in chunk.pages}
+        assert covered == {1, 2, 3, 4, 5}
+
+    def test_recognizes_std_pattern(self):
+        from app.context.router import _chunk_pages_by_kapitel
+        pages = self._make_pages([
+            "Kapitel 1: Zahlen ca. 12 Std. Einführung",
+            "Inhalt Kapitel 1",
+            "Kapitel 2: Geometrie ca. 8 Stunden",
+            "Inhalt Kapitel 2",
+        ])
+        chunks = _chunk_pages_by_kapitel(pages, max_pages_per_call=10)
+        # Muss mindestens 2 Kapitel-Chunks erkennen
+        assert len(chunks) >= 2
+
+    def test_both_std_notations(self):
+        from app.context.router import _chunk_pages_by_kapitel
+        pages = self._make_pages([
+            "Kapitel A ca. 5 Std.",
+            "Inhalt A",
+            "Kapitel B ca. 3 Stunden.",
+            "Inhalt B",
+        ])
+        chunks = _chunk_pages_by_kapitel(pages, max_pages_per_call=10)
+        assert len(chunks) >= 2
+
+    def test_empty_pages_returns_empty(self):
+        from app.context.router import _chunk_pages_by_kapitel
+        assert _chunk_pages_by_kapitel([], max_pages_per_call=4) == []
+
+
+# ============================================================================
+# Test: LLM-Extraktion mit gemocktem _call_extraction_llm
+# ============================================================================
+
+# Fixiertes realistisches JSON-Ergebnis für Format A
+_MOCK_KAPITEL_RESPONSE = {
+    "kapitel": {
+        "titel": "Zahlen und Operationen",
+        "reihenfolge": 1,
+        "std": "12 Std.",
+        "hinweis": None,
+        "konkretisierung": [],
+        "lernsequenzen": [
+            {
+                "bp_titel": "3.1.1 Natürliche Zahlen",
+                "bp_leitidee": "Zahl",
+                "reihenfolge": 1,
+                "eintraege": [
+                    {
+                        "ik": "3.1.1",
+                        "ik_partiell": False,
+                        "pk": ["2.1 Argumentieren"],
+                        "konkretisierung": "Natürliche Zahlen lesen und schreiben",
+                        "hinweise": None,
+                        "lp": [],
+                        "confidence": 0.95,
+                        "warnings": [],
+                    }
+                ],
+                "confidence": 0.95,
+                "warnings": [],
+            }
+        ],
+        "confidence": 0.95,
+        "warnings": [],
+    }
+}
+
+
+class TestExtractCurriculumViaLlm:
+    """Tests für _extract_curriculum_via_llm mit gemocktem LLM-Call."""
+
+    @pytest.mark.asyncio
+    async def test_successful_extraction(self):
+        """Vollständiger Pipeline-Lauf: PDF → Serialisierung → (mock) LLM → CurriculumDraftData."""
+        from app.context.router import _extract_curriculum_via_llm
+        from app.context.schemas import CurriculumDraftData
+
+        with patch(
+            "app.context.router._call_extraction_llm",
+            new=AsyncMock(return_value=_MOCK_KAPITEL_RESPONSE),
+        ):
+            result = await _extract_curriculum_via_llm(
+                _MINIMAL_PDF,
+                fachplan_id="BP_2016_MA",
+                bp_version="2016",
+                fach="Mathematik",
+                jahrgangsstufe="5",
+                schulart="GYM",
+            )
+
+        assert isinstance(result, CurriculumDraftData)
+        assert len(result.kapitel) >= 1
+        assert result.kapitel[0].titel == "Zahlen und Operationen"
+        assert result.fach == "Mathematik"
+        assert result.jahrgangsstufe == "5"
+
+    @pytest.mark.asyncio
+    async def test_retry_on_invalid_json_then_success(self):
+        """Erster LLM-Call liefert kaputtes JSON, zweiter ist valide → Ergebnis korrekt."""
+        from app.context.router import _extract_curriculum_via_llm
+
+        call_count = 0
+
+        async def mock_llm(serialized_content, chapter_index, settings):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Kaputtes JSON: Pydantic-Validierung schlägt fehl
+                return {"kapitel": {"titel": None, "reihenfolge": "FALSCH", "lernsequenzen": "nicht_eine_liste"}}
+            return _MOCK_KAPITEL_RESPONSE
+
+        with patch("app.context.router._call_extraction_llm", new=mock_llm):
+            result = await _extract_curriculum_via_llm(
+                _MINIMAL_PDF,
+                fachplan_id="BP_2016_MA",
+                bp_version="2016",
+                fach="Mathematik",
+                jahrgangsstufe="5",
+                schulart="GYM",
+            )
+
+        # Nach Retry muss ein gültiges Kapitel vorhanden sein
+        assert len(result.kapitel) >= 1
+        # Mindestens 2 Aufrufe (Original + Retry)
+        assert call_count >= 2
+
+    @pytest.mark.asyncio
+    async def test_placeholder_when_both_attempts_fail(self):
+        """Beide Versuche schlagen fehl → Platzhalter-Kapitel mit confidence=0."""
+        from app.context.router import _extract_curriculum_via_llm
+
+        async def always_broken(serialized_content, chapter_index, settings):
+            return {"kapitel": {"titel": None, "reihenfolge": "FALSCH", "lernsequenzen": "FALSCH"}}
+
+        with patch("app.context.router._call_extraction_llm", new=always_broken):
+            result = await _extract_curriculum_via_llm(
+                _MINIMAL_PDF,
+                fachplan_id="BP_2016_MA",
+                bp_version="2016",
+                fach="Mathematik",
+                jahrgangsstufe="5",
+                schulart="GYM",
+            )
+
+        # Jeder fehlgeschlagene Chunk landet als Platzhalter
+        assert len(result.kapitel) >= 1
+        assert all(kap.confidence == 0.0 for kap in result.kapitel)
+        assert all(kap.warnings for kap in result.kapitel)
+
+
+class TestCallExtractionLlmFallback:
+    """Tests für den json_object-Fallback in _call_extraction_llm."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_json_object_on_schema_failure(self):
+        """Wenn json_schema-Request einen JSON-Fehler liefert, wird json_object probiert."""
+        from unittest.mock import MagicMock
+        from app.config import settings as app_settings
+        from app.context.router import _call_extraction_llm
+
+        valid_json = json.dumps(_MOCK_KAPITEL_RESPONSE)
+
+        # Erster Call: json_schema → kein valides JSON
+        resp1 = MagicMock()
+        resp1.status_code = 200
+        resp1.json.return_value = {"choices": [{"message": {"content": "kein json hier"}}]}
+
+        # Zweiter Call: json_object-Fallback → valides JSON
+        resp2 = MagicMock()
+        resp2.status_code = 200
+        resp2.json.return_value = {"choices": [{"message": {"content": valid_json}}]}
+
+        with patch("httpx.AsyncClient") as MockClient:
+            instance = MagicMock()
+            instance.__aenter__ = AsyncMock(return_value=instance)
+            instance.__aexit__ = AsyncMock(return_value=False)
+            instance.post = AsyncMock(side_effect=[resp1, resp2])
+            MockClient.return_value = instance
+
+            result = await _call_extraction_llm("test content", 0, app_settings)
+
+        # Fallback muss ausgelöst worden sein (mindestens 2 HTTP-Calls)
+        assert instance.post.call_count >= 2
+        assert "kapitel" in result
+
+    @pytest.mark.asyncio
+    async def test_budget_exceeded_raises_429(self):
+        """429 vom LiteLLM-Proxy wird als HTTPException 429 weitergegeben."""
+        from unittest.mock import MagicMock
+        from fastapi import HTTPException
+        from app.config import settings as app_settings
+        from app.context.router import _call_extraction_llm
+
+        resp = MagicMock()
+        resp.status_code = 429
+        resp.text = "Budget exceeded"
+        resp.json.return_value = {}
+
+        with patch("httpx.AsyncClient") as MockClient:
+            instance = MagicMock()
+            instance.__aenter__ = AsyncMock(return_value=instance)
+            instance.__aexit__ = AsyncMock(return_value=False)
+            instance.post = AsyncMock(return_value=resp)
+            MockClient.return_value = instance
+
+            with pytest.raises(HTTPException) as exc_info:
+                await _call_extraction_llm("test", 0, app_settings)
+
+        assert exc_info.value.status_code == 429
 
 
 # ============================================================================

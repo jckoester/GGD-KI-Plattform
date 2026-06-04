@@ -864,8 +864,6 @@ async def convert_curriculum(
     Nimmt ein PDF- oder Word-Dokument entgegen und extrahiert die Curriculum-Struktur
     mit LLM-Unterstützung. Das Ergebnis ist ein CurriculumDraft für den Prüfungsschritt.
     """
-    from fastapi import UploadFile, Form
-
     # Datei-Inhalt lesen
     try:
         content = await file.read()
@@ -884,20 +882,6 @@ async def convert_curriculum(
             detail="Nur PDF oder Word-Dokumente (.docx, .doc) werden unterstützt"
         )
     
-    # Text extrahieren
-    text_content = ""
-    try:
-        if is_pdf:
-            text_content = _extract_text_from_pdf(content)
-        elif is_word:
-            text_content = _extract_text_from_word(content)
-    except Exception as e:
-        logger.error(f"Fehler bei der Textextraktion: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Textextraktion fehlgeschlagen: {str(e)}"
-        )
-    
     # bp_version aus Fachplan-Metadaten lesen
     from app.db.models import ContextNode as ContextNodeModel
     try:
@@ -912,246 +896,73 @@ async def convert_curriculum(
     schulart = _settings.schulart
 
     # Format erkennen
-    format_detected, warnings = _detect_format(text_content)
+    is_supported, format_detected, warnings = _detect_format(
+        _extract_text_from_pdf(content) if is_pdf else _extract_text_from_word(content)
+    )
 
-    if format_detected is None:
+    if not is_supported:
         return CurriculumDraft(
             unsupported_format=True,
-            format_detected=None,
-            warnings=[
-                "Dokument hat ein nicht unterstütztes Format (Kompetenzmatrix). "
-                "Bitte als statischen 'document'-Knoten hochladen."
-            ],
+            format_detected=format_detected,
+            warnings=warnings,
             data=None
         )
 
-    # LLM-Extraktion (vereinfacht - in Produktion mit echtem LLM-Aufruf)
+    # LLM-basierte Strukturextraktion
     try:
-        draft_data = _extract_curriculum_structure(
-            text_content, format_detected, fachplan_id, bp_version,
-            fach=fach, jahrgangsstufe=jahrgangsstufe, schulart=schulart
-        )
+        if is_pdf:
+            draft_data = await _extract_curriculum_via_llm(
+                content, fachplan_id, bp_version,
+                fach=fach, jahrgangsstufe=jahrgangsstufe, schulart=schulart
+            )
+        else:
+            # Für Word: Serialisierung + LLM-Pfad
+            pages = _serialize_word_for_llm(content)
+            
+            # Temporäre Umwandlung für LLM-Extraktion
+            # Da Word-Dokumente typischerweise weniger Seiten haben, können wir alle auf einmal verarbeiten
+            all_content_parts = []
+            for page in pages:
+                if page.tables:
+                    all_content_parts.extend(page.tables)
+                if page.flow_text.strip():
+                    all_content_parts.append(f"--- Fließtext Seite {page.page_number} ---")
+                    all_content_parts.append(page.flow_text.strip())
+            
+            serialized_input = "\n".join(all_content_parts)
+            
+            # LLM aufrufen für Word-Inhalt
+            result = await _call_extraction_llm(serialized_input, 0, _settings)
+            chapter_data = result.get("kapitel", {})
+            chapter = CurriculumDraftKapitel.model_validate(chapter_data)
+            chapter.reihenfolge = 1
+            
+            draft_data = CurriculumDraftData(
+                schule="",
+                fach_code=fach[:2].upper() if fach else "??",
+                fach=fach or None,
+                schulart=schulart,
+                jahrgangsstufe=jahrgangsstufe,
+                fachplan_id=fachplan_id,
+                bp_version=bp_version,
+                vorwort=None,
+                kapitel=[chapter],
+            )
+        
         return CurriculumDraft(
             unsupported_format=False,
             format_detected=format_detected,
             warnings=warnings,
             data=draft_data
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"LLM-Extraktion fehlgeschlagen: {e}")
+        logger.error(f"LLM-basierte Strukturextraktion fehlgeschlagen: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Strukturextraktion fehlgeschlagen: {str(e)}"
+            detail=f"LLM-basierte Strukturextraktion fehlgeschlagen: {str(e)}"
         )
-
-
-def _extract_text_from_pdf(content: bytes) -> str:
-    """Extrahiert Text aus PDF-Datei (via pdfminer.six)."""
-    from pdfminer.high_level import extract_text
-    return extract_text(io.BytesIO(content))
-
-
-def _extract_text_from_word(content: bytes) -> str:
-    """Extrahiert Text aus Word-Dokument."""
-    try:
-        from docx import Document
-        doc = Document(io.BytesIO(content))
-        return "\n".join([p.text for p in doc.paragraphs])
-    except ImportError:
-        logger.warning("python-docx nicht installiert - versuche textract")
-        try:
-            import textract
-            return textract.process(content).decode("utf-8", errors="replace")
-        except ImportError:
-            raise ImportError("Weder python-docx noch textract installiert")
-
-
-def _detect_format(text_content: str) -> tuple[str | None, list[str]]:
-    """Erkennt das Dokumentenformat (A, B oder nicht unterstützt).
-    
-    Rückgabe: (format_detected, warnings)
-    """
-    warnings = []
-    lines = text_content.split("\n")
-    
-    # Zeilen analysieren
-    has_4_columns = False
-    has_lernsequenz_header = False
-    has_ik_column = False
-    has_pk_column = False
-    has_kompetenzmatrix = False
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        
-        # Prüfe auf 4-Spalten-Struktur (Format A und B)
-        # Typische Trennzeichen: Tab, |, oder feste Spaltenbreiten
-        parts = [p.strip() for p in re.split(r'[\t|]', line) if p.strip()]
-        if len(parts) >= 4:
-            has_4_columns = True
-            # Prüfe ob erste Spalte PK-ähnlich ist
-            if re.match(r'^(PK|pK|P\.?K\.?)', parts[0], re.IGNORECASE):
-                has_pk_column = True
-            # Prüfe ob IK-ähnliche Einträge in der Zeile sind
-            if re.search(r'\bIK\s*\d+', line, re.IGNORECASE) or re.search(r'\b[1-9]\d*\.\d+', line):
-                has_ik_column = True
-        
-        # Prüfe auf Lernsequenz-Header (fett in Spalte 3)
-        # In PDFs oft als **Text** oder mit speziellen Markern
-        if re.search(r'\*\*(.+?)\*\*', line) or re.search(r'\bLernsequenz\b', line, re.IGNORECASE):
-            has_lernsequenz_header = True
-        
-        # Prüfe auf Kompetenzmatrix-Format (nicht unterstützt)
-        if re.search(r'Kompetenzmatrix', line, re.IGNORECASE) or \
-           (re.search(r'IK\s*[1-9]', line) and not has_4_columns):
-            has_kompetenzmatrix = True
-    
-    # Entscheidungslogik
-    if has_kompetenzmatrix:
-        return None, ["Kompetenzmatrix-Format erkannt - nicht unterstützt"]
-    
-    if has_4_columns and has_ik_column:
-        if has_lernsequenz_header:
-            return "A", []
-        else:
-            return "B", ["Format B erkannt - Lernsequenzen ohne explizite Header"]
-    
-    # Fallback: wenn wir IK- und PK-Referenzen finden
-    if has_ik_column and has_pk_column:
-        return "B", ["Format B angenommen (keine Lernsequenz-Header gefunden)"]
-    
-    return None, ["Format konnte nicht eindeutig erkannt werden"]
-
-
-def _extract_curriculum_structure(
-    text_content: str,
-    format_detected: str,
-    fachplan_id: str,
-    bp_version: str,
-    fach: str = "",
-    jahrgangsstufe: str = "",
-    schulart: str = "",
-) -> "CurriculumDraftData":
-    """Extrahiert die Curriculum-Struktur aus dem Text.
-    
-    Vereinfachte Version ohne echtes LLM - in Produktion würde hier ein LLM-Aufruf
-    die strukturierte Extraktion durchführen.
-    """
-    from app.context.schemas import CurriculumDraftData, CurriculumDraftKapitel, CurriculumDraftLernsequenz, CurriculumDraftEntry
-    
-    lines = text_content.split("\n")
-
-    # Schul- und Fachinformationen: aus Formulardaten übernehmen,
-    # fehlende Angaben ergänzend aus den ersten Zeilen des Dokuments extrahieren.
-    schule = ""
-    fach_code = ""
-
-    for line in lines[:20]:
-        line = line.strip()
-        if re.search(r'(Schule|Gymnasium|Realschule|Grundschule|Gemeinschaftsschule)', line, re.IGNORECASE):
-            schule = line
-        match = re.search(r'\b(BW|DE|EN|FR|M|MA|PH|CH|BI|GE|GK|SP|RE|ETH|KU|MU|SPT)\b', line)
-        if match:
-            fach_code = match.group(1)
-    
-    # Vereinfachte Kapitel-Extraktion
-    # Suche nach Kapitel-Headern (typischerweise fett oder mit Stundenangabe)
-    kapitel_list = []
-    current_kapitel = None
-    current_lernsequenz = None
-    
-    for line in lines[20:]:  # Skip header
-        line = line.strip()
-        if not line:
-            continue
-        
-        # Kapitel-Header erkennen (z.B. "Kapitel 1: Titel" oder "1. Titel (X Stunden)")
-        kapitel_match = re.match(
-            r'^(?:Kapitel\s+\d+|\d+\.|\d+)\.?\s+(.+?)(?:\s+\(\d+\s*Stunden?\))?$',
-            line,
-            re.IGNORECASE
-        )
-        if kapitel_match:
-            if current_kapitel:
-                kapitel_list.append(current_kapitel)
-            current_kapitel = CurriculumDraftKapitel(
-                titel=kapitel_match.group(1).strip(),
-                reihenfolge=len(kapitel_list) + 1,
-                std=None,
-                hinweis=None,
-                konkretisierung=[],
-                lernsequenzen=[],
-                confidence=0.8,
-                warnings=[]
-            )
-            current_lernsequenz = None
-            continue
-        
-        # Lernsequenz-Header erkennen (fett in Spalte 3)
-        ls_match = re.match(r'\*\*(.+?)\*\*|^(?:LS|Lernsequenz)\s+\d+\.?\s+(.+)$', line, re.IGNORECASE)
-        if ls_match:
-            ls_title = ls_match.group(1) or ls_match.group(2)
-            if current_kapitel:
-                if current_lernsequenz:
-                    current_kapitel.lernsequenzen.append(current_lernsequenz)
-                current_lernsequenz = CurriculumDraftLernsequenz(
-                    bp_titel=ls_title.strip(),
-                    bp_leitidee=None,
-                    reihenfolge=len(current_kapitel.lernsequenzen) + 1,
-                    eintraege=[],
-                    confidence=0.7,
-                    warnings=[]
-                )
-            continue
-        
-        # Tabellenzeilen (4 Spalten)
-        parts = [p.strip() for p in re.split(r'[\t|]', line) if p.strip()]
-        if len(parts) >= 4 and current_kapitel and current_lernsequenz:
-            entry = CurriculumDraftEntry(
-                ik=parts[1] if len(parts) > 1 and parts[1] else None,
-                ik_partiell="[" in (parts[1] if len(parts) > 1 else ""),
-                pk=[parts[0]] if len(parts) > 0 else [],
-                konkretisierung=parts[2] if len(parts) > 2 else None,
-                hinweise=parts[3] if len(parts) > 3 else None,
-                lp=_extract_lp_codes(parts[3] if len(parts) > 3 else ""),
-                confidence=0.6,
-                warnings=[]
-            )
-            current_lernsequenz.eintraege.append(entry)
-    
-    # Letzte Elemente hinzufügen
-    if current_lernsequenz and current_kapitel:
-        current_kapitel.lernsequenzen.append(current_lernsequenz)
-    if current_kapitel:
-        kapitel_list.append(current_kapitel)
-    
-    return CurriculumDraftData(
-        schule=schule or "Unbekannte Schule",
-        fach_code=fach_code or fach[:2].upper() if fach else "UNKNOWN",
-        fach=fach or None,
-        schulart=schulart,
-        jahrgangsstufe=jahrgangsstufe,
-        fachplan_id=fachplan_id,
-        bp_version=bp_version,
-        vorwort=None,
-        kapitel=kapitel_list
-    )
-
-
-def _extract_lp_codes(text: str) -> list[str]:
-    """Extrahiert Leitperspektive-Codes aus Text."""
-    # Muster: L BO, (L) BTV, LP-XX, etc.
-    patterns = [
-        r'\bL\s+[A-Z]{2,3}\b',  # L BO
-        r'\(L\)\s+[A-Z]{2,4}',  # (L) BTV
-        r'\bLP[-_]?[A-Z0-9]+\b',  # LP-XX
-    ]
-    codes = []
-    for pattern in patterns:
-        codes.extend(re.findall(pattern, text, re.IGNORECASE))
-    return codes
 
 
 # ── KS-Phase-6 Curriculum Create (Stufe 2) ──────────────────────────────────
@@ -1570,3 +1381,756 @@ async def create_curriculum_node(
         await db.commit()
     
     return curriculum
+
+
+# ── KS-Phase-6 LLM-based PDF Extraction (Stufe 1) ────────────────────────────
+
+import asyncio
+import copy
+import json
+from dataclasses import dataclass
+from typing import Literal
+
+# Timeout für LLM-Extraktion
+_CURRICULUM_TIMEOUT = 120
+
+
+@dataclass
+class PageBlock:
+    """Serialisierte Repräsentation einer PDF-Seite für das LLM."""
+    page_number: int
+    tables: list[str]  # Serialisierte Tabellen
+    flow_text: str  # Fließtext der Seite
+
+
+@dataclass
+class ChapterChunk:
+    """Ein Kapitel-Chunk mit Seitenbereichen."""
+    start_page: int
+    end_page: int
+    pages: list[PageBlock]
+
+
+# System Prompt für die LLM-Extraktion
+EXTRACTION_SYSTEM_PROMPT = """Du bist ein Expert:innen-System für die Extraktion von Bildungsplan-Curricula des Landes Baden-Württemberg (BW BP 2016).
+
+Deine Aufgabe: Extrahiere die Curriculum-Daten so, dass IK- und PK-Referenzen direkt mit den Knoten des Bildungsplans verknüpft werden können.
+
+═══ KNOTENFORMAT IM BILDUNGSPLAN ═══
+
+IK-Knoten haben den Titel:  3.1.1.(1) die Prinzipien des Stellenwertsystems...
+PK-Knoten haben den Titel:  2.1.4 in einer mathematischen Aussage zwischen Voraussetzung und Behauptung...
+
+Deine Extraktionen müssen EXAKT diese Referenzformate liefern:
+- IK-Referenz:  ABSCHNITT.(N)   z.B. "3.1.1.(1)", "3.1.1.(18)", "[3.1.1.(6)]" (eckige Klammern = partiell)
+- PK-Referenz:  GRUPPE.N        z.B. "2.4.1", "2.4.3", "2.5.1"
+
+═══ SPALTENSEMANTIK ═══
+
+Zellen werden mit ↵ als Zeilentrennzeichen geliefert (anstelle echter Zeilenumbrüche).
+
+C0 = Prozessbezogene Kompetenzen. Aufbau (↵ = Zeilenumbruch):
+   "2.4 Gruppenname↵1. Item-Text↵3. Item-Text↵2.5 Gruppenname↵1. Item-Text"
+   → PK-Gruppe erkennbar: beginnt mit "X.Y Wortname"
+   → Item erkennbar: beginnt mit "N. " (Ziffer + Punkt + Leerzeichen)
+   → Referenzen: Gruppe 2.4 Item 1 → "2.4.1"; Gruppe 2.4 Item 3 → "2.4.3"; Gruppe 2.5 Item 1 → "2.5.1"
+
+C1 = Inhaltsbezogene Kompetenzen. Aufbau in Datenzeilen (↵ = Zeilenumbruch):
+   "(1) Kompetenztext↵(2) Kompetenztext↵(18) Kompetenztext"
+   → Item erkennbar: beginnt mit "(N)" (Ziffer in runden Klammern)
+   → Referenz: aktueller Abschnitt + ".(N)"  z.B. "(1)" in Abschnitt "3.1.1" → "3.1.1.(1)"
+
+C2 = Konkretisierung / Vorgehen im Unterricht
+C3 = Ergänzende Hinweise, Arbeitsmittel, Verweise
+
+═══ ZEILEN ÜBERSPRINGEN ═══
+
+Vollständig ignorieren (kein Eintrag, kein hinweis):
+- Tabellenüberschrift-Zeilen mit Spaltentiteln wie "Prozessbezogene Kompetenzen", "Inhaltsbezogene Kompetenzen", "Konkretisierung / Vorgehen", "Hinweise / Bemerkungen"
+- Standardformulierungen: "Die Schülerinnen und Schüler können" als eigenständige Zeile
+- Leerzeilen
+
+FLIESSTEXT-BLÖCKE: kapitel.hinweis NUR für echte fachliche Einleitungstexte (≥ 2 inhaltliche Sätze). Einzelne kurze Zeilen → ignorieren.
+
+═══ EXTRAKTIONSREGELN ═══
+
+1. LERNSEQUENZ-HEADER: Zeile mit NUR "3.X.X Titel" in C1 (C0 und C2 leer/None)
+   → Neue Lernsequenz; bp_titel = "3.X.X Titel"; aktuellen Abschnitt auf "3.X.X" setzen.
+
+2. KAPITEL-KOPF: "Titel ca. N Std." oder "ca. N Stunden" → kapitel.titel und kapitel.std.
+
+3. EIN EINTRAG PRO IK-ITEM: Jedes (N)-Item in C1 einer Datenzeile → ein separater Eintrag.
+   ik = "AKTUELLER_ABSCHNITT.(N)"  — die runden Klammern um N sind PFLICHT und Teil des Formats.
+   Beispiele: "3.1.1.(1)", "3.1.1.(18)", "3.2.3.(4)" — NIEMALS "3.1.1.1" oder "3.1.1. 1".
+   Falls IK-Item in eckigen Klammern wie "[…]": ik_partiell = true, ik = "[ABSCHNITT.(N)]"
+
+4. PK-REFERENZEN PRO EINTRAG: Aus C0 alle nummerierten Items extrahieren.
+   Format: Gruppencode + "." + Item-Nummer  (z.B. "2.4.1", "2.4.3", "2.5.1")
+   Ein Eintrag bekommt ALLE pk-Referenzen aus der aktuellen C0-Zelle.
+
+5. MERGED PK-CELLS: Ist C0 None/leer → pk-Liste aus der letzten befüllten C0-Zelle übernehmen.
+
+6. HINWEISE VOLLTEXT ERHALTEN: C3 enthält oft langen Fließtext (Grundschulverweise, MINT-Hinweise,
+   Links, methodische Anmerkungen). Dieser Text kommt VOLLSTÄNDIG in das hinweise-Feld.
+   Zusätzlich: Leitperspektiven-Codes wie "L BO", "(L) BTV", "L VB", "L MB", "L BNE" → auch ins lp-Array.
+   Das lp-Array ergänzt hinweise, ersetzt es aber NICHT.
+
+7. KONFIDENZ: confidence (0–1) und warnings setzen bei unsicherer Spaltenzuordnung.
+
+8. KEIN ERFINDEN: Unklare Felder leer lassen + Warnung. Antworte NUR mit dem JSON-Objekt.
+
+═══ BEISPIEL ═══
+
+Eingabe:
+[Z0] C0:"Prozessbezogene Kompetenzen" | C1:"Inhaltsbezogene Kompetenzen"  → ÜBERSPRINGEN
+[Z1] C1:"Die Schülerinnen und Schüler können"                              → ÜBERSPRINGEN
+[Z2] C1:"3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen"                  → Lernsequenz bp_titel="3.1.1 Zahlbereiche erkunden, Mit Zahlen Rechnen"; Abschnitt = "3.1.1"
+[Z3] C0:"2.5 Kommunizieren↵1. mathematische Einsichten schriftlich dokumentieren↵2.4 Mit symbolischen Elementen umgehen↵1. zwischen natürlicher und symbolischer Sprache wechseln↵3. zwischen Darstellungen wechseln↵5. Routineverfahren anwenden" | C1:"(1) Prinzipien des Stellenwertsystems beschreiben↵(2) natürliche Zahlen bis Billion lesen↵(18) Zahlenwerte runden↵(6) [Zahlen und Punkte auf der Zahlengeraden zuordnen]" | C2:"Natürliche Zahlen↵Große Zahlen↵Zahlen runden" | C3:"Hinweis auf den Grundschulbildungsplan: „den Aufbau des Stellenwertsystems nutzen"↵Prinzipien in Analogie zum Dualsystem herausarbeiten↵MINT: Umrechnung vom Binärsystem ins Hexadezimalsystem"
+
+Ausgabe für [Z3] → 4 Einträge (ein Eintrag je IK-Item), alle mit denselben pk, konkretisierung, hinweise:
+  Eintrag 1: ik="3.1.1.(1)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung="Natürliche Zahlen\nGroße Zahlen\nZahlen runden", hinweise="Hinweis auf den Grundschulbildungsplan: „den Aufbau des dezimalen Stellenwertsystems nutzen…"\nPrinzipien in Analogie zum Dualsystem\nMINT: Umrechnung vom Binärsystem ins Hexadezimalsystem", lp=[]
+  Eintrag 2: ik="3.1.1.(2)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
+  Eintrag 3: ik="3.1.1.(18)", ik_partiell=false, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
+  Eintrag 4: ik="[3.1.1.(6)]", ik_partiell=true, pk=["2.5.1","2.4.1","2.4.3","2.4.5"], konkretisierung=gleich, hinweise=gleich, lp=gleich
+
+Antworte STRIKT im angegebenen JSON-Schema."""
+
+
+# JSON Schema für Chapter Extraction (wird mit CurriculumDraftKapitel generiert)
+_KAPITEL_EXTRACT_SCHEMA = {
+    "name": "kapitel_extract",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "kapitel": {
+                "type": "object",
+                "properties": {
+                    "titel": {"type": "string", "description": "Kapitel-Titel"},
+                    "reihenfolge": {"type": "integer", "description": "Reihenfolge-Nummer"},
+                    "std": {"type": ["string", "null"], "description": "Stundenangabe z.B. '5 Std.'"},
+                    "hinweis": {"type": ["string", "null"], "description": "Einleitungstext oder Hinweise"},
+                    "konkretisierung": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Allgemeine Konkretisierungen für das Kapitel"
+                    },
+                    "lernsequenzen": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "bp_titel": {"type": ["string", "null"], "description": "Titel der Lernsequenz"},
+                                "bp_leitidee": {"type": ["string", "null"], "description": "Leitidee"},
+                                "reihenfolge": {"type": ["integer", "null"], "description": "Reihenfolge-Nummer"},
+                                "eintraege": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "ik": {"type": ["string", "null"], "description": "Inhaltsbezogene Kompetenz"},
+                                            "ik_partiell": {"type": "boolean", "default": False, "description": "True wenn IK partiell (z.B. [3.1.1])"},
+                                            "pk": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "description": "Prozessbezogene Kompetenzen"
+                                            },
+                                            "konkretisierung": {"type": ["string", "null"], "description": "Konkretisierung"},
+                                            "hinweise": {"type": ["string", "null"], "description": "Hinweise"},
+                                            "lp": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "description": "Leitperspektive-Codes"
+                                            },
+                                            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0},
+                                            "warnings": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "default": []
+                                            }
+                                        },
+                                        "required": ["ik", "pk", "konkretisierung"]
+                                    }
+                                },
+                                "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0},
+                                "warnings": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "default": []
+                                }
+                            },
+                            "required": ["bp_titel", "eintraege"]
+                        }
+                    },
+                    "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0},
+                    "warnings": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "default": []
+                    }
+                },
+                "required": ["titel", "reihenfolge", "lernsequenzen"]
+            }
+        },
+        "required": ["kapitel"]
+    },
+    "strict": True
+}
+
+
+def _strictify_schema(node: Any) -> Any:
+    """Macht ein JSON-Schema OpenAI-strict-konform (in-place, rekursiv).
+
+    OpenAIs Structured-Output-Strict-Modus verlangt für JEDES Objekt:
+    - `additionalProperties: false`
+    - alle Property-Keys in `required` (Optionalität nur über nullable-Typ ausdrücken)
+    und lehnt Keywords wie `default`/`minimum`/`maximum` ab. Das von Hand gepflegte
+    `_KAPITEL_EXTRACT_SCHEMA` bleibt für den json_object-Fallback unverändert lesbar;
+    diese Funktion erzeugt daraus die strikte Variante.
+    """
+    if isinstance(node, dict):
+        for kw in ("default", "minimum", "maximum"):
+            node.pop(kw, None)
+        if node.get("type") == "object" and "properties" in node:
+            node["additionalProperties"] = False
+            node["required"] = list(node["properties"].keys())
+        for value in node.values():
+            _strictify_schema(value)
+    elif isinstance(node, list):
+        for item in node:
+            _strictify_schema(item)
+    return node
+
+
+_KAPITEL_EXTRACT_SCHEMA_STRICT = {
+    "name": _KAPITEL_EXTRACT_SCHEMA["name"],
+    "schema": _strictify_schema(copy.deepcopy(_KAPITEL_EXTRACT_SCHEMA["schema"])),
+    "strict": True,
+}
+
+
+def _extract_tables_from_pdf(content: bytes) -> list[list[list[str | None]]]:
+    """Extrahiert alle Tabellenzeilen aus einem PDF via pdfplumber."""
+    import pdfplumber
+    rows: list[list[str | None]] = []
+    with pdfplumber.open(io.BytesIO(content)) as pdf:
+        for page in pdf.pages:
+            for table in page.extract_tables():
+                rows.extend(table)
+    return rows
+
+
+def _serialize_pdf_for_llm(content: bytes) -> list[PageBlock]:
+    """Serialisiert PDF-Inhalt für das LLM mit Tabellen und Fließtext.
+    
+    Erzeugt eine kompakte Repräsentation, die Layout-Hinweise erhält:
+    - Pro Seite, pro Tabelle: Zellen mit Spaltenindex (C0, C1, ...)
+    - Leere Zellen werden weggelassen
+    - Fließtext der Seite als Kontextblock
+    """
+    import pdfplumber
+    from pdfminer.high_level import extract_text
+    
+    pages: list[PageBlock] = []
+    
+    with pdfplumber.open(io.BytesIO(content)) as pdf:
+        total_pages = len(pdf.pages)
+        
+        for page_idx, page in enumerate(pdf.pages):
+            page_number = page_idx + 1
+            
+            # Tabellen extrahieren und serialisieren
+            tables_serialized: list[str] = []
+            for table_idx, table in enumerate(page.extract_tables()):
+                if not table or not table[0]:
+                    continue
+                
+                num_cols = len(table[0])
+                table_lines: list[str] = []
+                
+                for row_idx, row in enumerate(table):
+                    if not row or all(c is None or c.strip() == "" for c in row):
+                        continue
+                    
+                    row_parts: list[str] = []
+                    for col_idx, cell in enumerate(row):
+                        if cell is None or cell.strip() == "":
+                            continue
+                        # PDF-Silbentrennungen auflösen ("Lö-\nsungswege" → "Lösungswege"),
+                        # strukturelle Zeilenumbrüche danach erhalten (sie trennen Gruppen/Items).
+                        cleaned = re.sub(r'-\s*\n\s*', '', cell).strip()
+                        if cleaned:
+                            # Eingebettete Zeilenumbrüche als sichtbares ↵ darstellen,
+                            # damit die Zeilen-Trennlogik des LLM nicht verwirrt wird.
+                            display = cleaned.replace("\n", "↵")
+                            row_parts.append(f"C{col_idx}:\"{display}\"")
+
+                    if row_parts:
+                        table_lines.append(f"[Z{row_idx}] {' | '.join(row_parts)}")
+                
+                if table_lines:
+                    header = f"=== Seite {page_number}, Tabelle {table_idx + 1} ({len(table)} Zeilen × {num_cols} Spalten) ==="
+                    tables_serialized.append(header)
+                    tables_serialized.extend(table_lines)
+            
+            # Fließtext extrahieren (pdfminer nutzt 0-basierte Seitennummern)
+            try:
+                flow_text = extract_text(io.BytesIO(content), page_numbers=[page_idx])
+            except Exception:
+                flow_text = ""
+            
+            pages.append(PageBlock(
+                page_number=page_number,
+                tables=tables_serialized,
+                flow_text=flow_text
+            ))
+
+    # Dokumentkopfzeilen entfernen: Zeilen, die auf ≥30% der Seiten (mind. 3) identisch
+    # wiederkehren, sind Seiten-Header/-Footer und kein inhaltlicher Text.
+    if len(pages) >= 3:
+        from collections import Counter
+        line_counts: Counter = Counter()
+        for p in pages:
+            seen: set[str] = set()
+            for line in p.flow_text.splitlines():
+                s = line.strip()
+                if s and s not in seen:
+                    line_counts[s] += 1
+                    seen.add(s)
+        min_occurrences = max(3, len(pages) // 3)
+        repeated = {line for line, n in line_counts.items() if n >= min_occurrences}
+        if repeated:
+            pages = [
+                PageBlock(
+                    page_number=p.page_number,
+                    tables=p.tables,
+                    flow_text="\n".join(
+                        line for line in p.flow_text.splitlines()
+                        if line.strip() not in repeated
+                    ),
+                )
+                for p in pages
+            ]
+
+    return pages
+
+
+def _serialize_word_for_llm(content: bytes) -> list[PageBlock]:
+    """Serialisiert Word-Inhalt für das LLM (analog zu PDF)."""
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(content))
+        
+        pages: list[PageBlock] = []
+        current_page = PageBlock(page_number=1, tables=[], flow_text="")
+        
+        for paragraph in doc.paragraphs:
+            text = paragraph.text
+            if text.strip():
+                current_page.flow_text += text + "\n"
+        
+        # Tabellen extrahieren
+        for table_idx, table in enumerate(doc.tables):
+            table_lines: list[str] = []
+            for row_idx, row in enumerate(table.rows):
+                row_parts: list[str] = []
+                for col_idx, cell in enumerate(row.cells):
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        row_parts.append(f"C{col_idx}:\"{cell_text}\"")
+                if row_parts:
+                    table_lines.append(f"[Z{row_idx}] {" | ".join(row_parts)}")
+            
+            if table_lines:
+                header = f"=== Seite 1, Tabelle {table_idx + 1} ({len(table.rows)} Zeilen × {len(table.columns)} Spalten) ==="
+                current_page.tables.append(header)
+                current_page.tables.extend(table_lines)
+        
+        pages.append(current_page)
+        return pages
+        
+    except ImportError:
+        logger.warning("python-docx nicht installiert - versuche textract")
+        try:
+            import textract
+            text = textract.process(content).decode("utf-8", errors="replace")
+            return [PageBlock(page_number=1, tables=[], flow_text=text)]
+        except ImportError:
+            raise ImportError("Weder python-docx noch textract installiert")
+
+
+def _chunk_pages_by_kapitel(pages: list[PageBlock], max_pages_per_call: int = 4) -> list[ChapterChunk]:
+    """Gruppiert Seiten in Kapitel-Chunks basierend auf Stunden-Kopfzeilen.
+    
+    Strategie:
+    1. Kapitel-Grenzen über 'ca. N Std.' oder 'ca. N Stunden' im Fließtext erkennen
+    2. Pro Kapitel ein Chunk erstellen
+    3. Falls keine Kapitel gefunden: feste Fenster mit Überlappung
+    """
+    import re
+    
+    if not pages:
+        return []
+    
+    # Kapitel-Grenzen erkennen über Stunden-Muster
+    chapter_pattern = re.compile(r'ca\.\s*\d+\s*(?:Std\.?|Stunden)', re.IGNORECASE)
+    
+    chapter_boundaries: list[int] = [0]  # Start bei Seite 0
+    
+    for page_idx, page in enumerate(pages):
+        # Im Fließtext nach Kapitel-Muster suchen
+        if chapter_pattern.search(page.flow_text):
+            # Kapitel beginnt auf dieser Seite
+            if page_idx > 0 and page_idx != chapter_boundaries[-1]:
+                # Vermeide Duplikate
+                if page_idx not in chapter_boundaries:
+                    chapter_boundaries.append(page_idx)
+    
+    # Immer letzte Seite als Boundary hinzufügen
+    if chapter_boundaries[-1] != len(pages):
+        chapter_boundaries.append(len(pages))
+    
+    # Falls nur eine Boundary (kein Kapitel gefunden) oder zu viele Seiten pro Chunk
+    if len(chapter_boundaries) <= 2:
+        # Fallback: feste Fenster mit Überlappung
+        chunks = []
+        page_idx = 0
+        chunk_num = 0
+        while page_idx < len(pages):
+            end_page = min(page_idx + max_pages_per_call, len(pages))
+            chunks.append(ChapterChunk(
+                start_page=page_idx + 1,
+                end_page=end_page,
+                pages=pages[page_idx:end_page]
+            ))
+            # Überlappung von 1 Seite für Kontinuität
+            page_idx = end_page - 1 if end_page > page_idx + 1 else end_page
+            chunk_num += 1
+        return chunks
+    
+    # Kapitel-Chunks erstellen
+    chunks = []
+    for i in range(len(chapter_boundaries) - 1):
+        start = chapter_boundaries[i]
+        end = chapter_boundaries[i + 1]
+        if start < end:
+            chunks.append(ChapterChunk(
+                start_page=start + 1,
+                end_page=end,
+                pages=pages[start:end]
+            ))
+    
+    # Letzten Chunk anpassen, falls er zu groß ist
+    for chunk in chunks:
+        if len(chunk.pages) > max_pages_per_call:
+            # Aufteilen in kleinere Chunks
+            sub_chunks = []
+            page_idx = 0
+            while page_idx < len(chunk.pages):
+                sub_end = min(page_idx + max_pages_per_call, len(chunk.pages))
+                sub_chunks.append(ChapterChunk(
+                    start_page=chunk.start_page + page_idx,
+                    end_page=chunk.start_page + sub_end - 1,
+                    pages=chunk.pages[page_idx:sub_end]
+                ))
+                page_idx = sub_end
+            chunks.extend(sub_chunks)
+            chunks.remove(chunk)
+    
+    return chunks
+
+
+async def _call_extraction_llm(
+    serialized_content: str,
+    chapter_index: int,
+    settings: "Settings",
+) -> dict:
+    """Ruft das LLM über den LiteLLM-Proxy für die Extraktion auf.
+
+    Primär: response_format=json_schema (Structured Output).
+    Fallback: response_format=json_object + Schema im Prompt, danach tolerantes Parsen.
+    """
+    import httpx
+    from app.config import settings as app_settings
+
+    model = settings.curriculum_extract_model or app_settings.chat_default_model
+
+    base_payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+            {"role": "user", "content": serialized_content},
+        ],
+        "stream": False,
+        "temperature": 0,
+        "user": "curriculum-import",
+    }
+
+    # Vom Proxy gemeldeter Upstream-Fehler mit erhaltenem HTTP-Status, damit der
+    # Aufrufer einen 400 (Parameter nicht unterstützt) von echten Fehlern (4xx/5xx)
+    # unterscheiden kann.
+    class _LLMUpstreamError(Exception):
+        def __init__(self, status_code: int, text: str):
+            self.status_code = status_code
+            self.text = text
+            super().__init__(f"{status_code}: {text}")
+
+    async def _post(payload: dict) -> str:
+        async with httpx.AsyncClient(timeout=_CURRICULUM_TIMEOUT) as client:
+            resp = await client.post(
+                f"{app_settings.litellm_proxy_url}/chat/completions",
+                headers={"Authorization": f"Bearer {app_settings.litellm_master_key}"},
+                json=payload,
+            )
+        if resp.status_code == 429:
+            raise HTTPException(status_code=429, detail="Budget erschöpft - bitte später erneut versuchen")
+        if resp.status_code != 200:
+            raise _LLMUpstreamError(resp.status_code, resp.text)
+        data = resp.json()
+        if not data.get("choices"):
+            raise ValueError(f"Unerwartetes Antwortformat: {data}")
+        return data["choices"][0]["message"]["content"]
+
+    # Gestufte Strategie: json_schema → json_object → ganz ohne response_format.
+    # Ein 400 (Modell unterstützt den response_format-Modus nicht) oder unparsebares
+    # JSON degradiert auf die nächste Stufe; 429/Verbindung/sonstige Status brechen ab.
+    schema_hint = json.dumps(_KAPITEL_EXTRACT_SCHEMA["schema"], ensure_ascii=False, indent=2)
+    fallback_messages = [
+        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT + f"\n\nAntworte STRIKT im folgenden JSON-Schema:\n{schema_hint}"},
+        {"role": "user", "content": serialized_content},
+    ]
+    attempts = [
+        ("json_schema", {**base_payload, "response_format": {"type": "json_schema", "json_schema": _KAPITEL_EXTRACT_SCHEMA_STRICT}}),
+        ("json_object", {**base_payload, "messages": fallback_messages, "response_format": {"type": "json_object"}}),
+        ("plain", {**base_payload, "messages": fallback_messages}),
+    ]
+
+    try:
+        last_err: Exception | None = None
+        for mode, payload in attempts:
+            try:
+                raw = await _post(payload)
+                # _parse_llm_response strippt Markdown-Fences und parst tolerant.
+                return _parse_llm_response(raw)
+            except _LLMUpstreamError as err:
+                if err.status_code != 400:
+                    # Echter Proxy-/Provider-Fehler (z. B. 401/404/5xx) → nicht degradieren.
+                    raise HTTPException(status_code=502, detail=f"LLM-Request fehlgeschlagen: {err.text}")
+                last_err = err
+                logger.warning(
+                    f"Modus '{mode}' vom Modell abgelehnt (Kapitel {chapter_index}): "
+                    f"{err.text[:200]} — nächste Stufe"
+                )
+            except (json.JSONDecodeError, ValueError) as err:
+                last_err = err
+                logger.warning(
+                    f"Modus '{mode}' lieferte ungültiges JSON (Kapitel {chapter_index}): {err} — nächste Stufe"
+                )
+        # Alle Stufen erschöpft → Aufrufer erzeugt Platzhalter-Kapitel mit Warnung.
+        raise HTTPException(status_code=502, detail=f"LLM-Request fehlgeschlagen (alle Modi): {last_err}")
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail=f"LLM-Timeout nach {_CURRICULUM_TIMEOUT}s")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Keine Verbindung zum LiteLLM-Proxy")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LLM-Aufruf fehlgeschlagen (Kapitel {chapter_index}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _parse_llm_response(content: str) -> dict[str, Any]:
+    """Parsed die LLM-Antwort falls kein json_schema unterstützt wird.
+    
+    Versuch JSON zu extrahieren, auch wenn es in Markdown-Fences eingebettet ist.
+    """
+    # Markdown-Fences entfernen
+    content = re.sub(r'^```(?:json)?\s*', '', content, flags=re.MULTILINE)
+    content = re.sub(r'\s*```\s*$', '', content, flags=re.MULTILINE)
+    content = content.strip()
+    
+    # Wirft bei unparsebarem Inhalt — der Aufrufer (_call_extraction_llm) degradiert dann
+    # auf die nächste Stufe bzw. erzeugt am Ende ein Platzhalter-Kapitel mit Warnung.
+    return json.loads(content)
+
+
+async def _extract_curriculum_via_llm(
+    content: bytes,
+    fachplan_id: str,
+    bp_version: str,
+    fach: str = "",
+    jahrgangsstufe: str = "",
+    schulart: str = "",
+) -> "CurriculumDraftData":
+    """Extrahiert Curriculum-Struktur via LLM.
+    
+    1. Seiten serialisieren
+    2. In Kapitel-Chunks gruppieren
+    3. Pro Chunk LLM-Call → JSON → Validierung
+    4. Ergebnisse zusammenführen
+    """
+    from app.config import settings as app_settings
+    from app.context.schemas import CurriculumDraftData, CurriculumDraftKapitel, CurriculumDraftLernsequenz
+    
+    # Serialisierung
+    try:
+        pages = _serialize_pdf_for_llm(content)
+    except Exception as e:
+        logger.error(f"PDF-Serialisierung fehlgeschlagen: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF-Serialisierung fehlgeschlagen: {str(e)}")
+    
+    if not pages:
+        raise HTTPException(status_code=400, detail="Keine Seiten im PDF gefunden")
+    
+    # Chunking
+    max_pages = app_settings.curriculum_extract_max_pages_per_call
+    chunks = _chunk_pages_by_kapitel(pages, max_pages)
+    
+    if not chunks:
+        raise HTTPException(status_code=400, detail="Keine Kapitel im Dokument erkannt")
+    
+    # Parallel LLM-Calls ausführen (begrenzt via Semaphore)
+    concurrency = app_settings.curriculum_extract_concurrency
+    semaphore = asyncio.Semaphore(concurrency)
+    
+    async def process_chunk(chunk: ChapterChunk, index: int) -> CurriculumDraftKapitel:
+        async with semaphore:
+            # Chunk für LLM serialisieren
+            chunk_text_parts = []
+            for page in chunk.pages:
+                if page.tables:
+                    chunk_text_parts.extend(page.tables)
+                if page.flow_text.strip():
+                    chunk_text_parts.append(f"--- Fließtext Seite {page.page_number} ---")
+                    chunk_text_parts.append(page.flow_text.strip())
+            
+            serialized_input = "\n".join(chunk_text_parts)
+            
+            # LLM aufrufen (mit Retry bei Validierungsfehler)
+            for attempt in range(2):  # 1 Original + 1 Retry
+                try:
+                    result = await _call_extraction_llm(serialized_input, index, app_settings)
+                    
+                    # JSON zu CurriculumDraftKapitel validieren
+                    chapter_data = result.get("kapitel", {})
+                    chapter = CurriculumDraftKapitel.model_validate(chapter_data)
+                    
+                    # Reihenfolge anpassen
+                    chapter.reihenfolge = index + 1
+                    return chapter
+                    
+                except Exception as e:
+                    if attempt == 0:
+                        logger.warning(f"Erster Versuch fehlgeschlagen (Kapitel {index}): {e}, Retry...")
+                        # Warte kurz vor Retry
+                        await asyncio.sleep(1)
+                        continue
+                    else:
+                        logger.error(f"LLM-Extraktion fehlgeschlagen (Kapitel {index}): {e}")
+                        # Platzhalter-Kapitel mit Warnung
+                        return CurriculumDraftKapitel(
+                            titel=f"Kapitel {index + 1} (Fehler bei Extraktion)",
+                            reihenfolge=index + 1,
+                            std=None,
+                            hinweis=None,
+                            konkretisierung=[],
+                            lernsequenzen=[],
+                            confidence=0.0,
+                            warnings=[f"Extraktion fehlgeschlagen: {str(e)}"]
+                        )
+    
+    # Chunks verarbeiten
+    chapters = []
+    tasks = []
+    for index, chunk in enumerate(chunks):
+        tasks.append(process_chunk(chunk, index))
+    
+    chapters = await asyncio.gather(*tasks)
+    
+    # Zusammenführen zu CurriculumDraftData
+    return CurriculumDraftData(
+        schule="",
+        fach_code=fach[:2].upper() if fach else "??",
+        fach=fach or None,
+        schulart=schulart,
+        jahrgangsstufe=jahrgangsstufe,
+        fachplan_id=fachplan_id,
+        bp_version=bp_version,
+        vorwort=None,
+        kapitel=chapters,
+    )
+
+
+def _extract_text_from_pdf(content: bytes) -> str:
+    """Extrahiert Text aus PDF-Datei (via pdfminer.six)."""
+    from pdfminer.high_level import extract_text
+    return extract_text(io.BytesIO(content))
+
+
+def _detect_format(text_content: str) -> tuple[bool, str | None, list[str]]:
+    """Erkennt ob das Dokument unterstützt wird.
+    
+    Rückgabe: (is_supported, format_detected, warnings)
+    - is_supported: True wenn Curriculum, False wenn nicht unterstützt (z.B. Kompetenzmatrix)
+    - format_detected: "A", "B" oder None (nur für UI-Badge)
+    - warnings: Liste mit Warnungen
+    """
+    warnings = []
+    text_lower = text_content.lower()
+    
+    # Abbruch: Kompetenzmatrix-Dokument
+    if "kompetenzmatrix" in text_lower:
+        return False, None, ["Kompetenzmatrix-Format erkannt – nicht unterstützt"]
+    
+    # Pflicht-Signale für ein BW-Schulcurriculum
+    has_pk_header = bool(re.search(r'prozessbezogene\s+kompetenzen', text_lower))
+    has_ik_header = bool(re.search(r'inhaltsbezogene\s+kompetenzen', text_lower))
+    
+    # IK-Nummern: dreistellig (3.1.1) oder zweistellig (3.1)
+    ik_numbers = re.findall(r'\b\d+\.\d+(?:\.\d+)?\b', text_content)
+    # PK-Nummern: zweistellig am Zeilenanfang (2.5 Kommunizieren)
+    pk_numbers = re.findall(r'(?m)^\s*\d+\.\d+\s+[A-ZÄÖÜ]', text_content)
+    
+    has_curriculum_structure = (
+        (has_pk_header or has_ik_header)
+        and len(ik_numbers) >= 3
+    ) or (len(ik_numbers) >= 5 and len(pk_numbers) >= 3)
+    
+    if not has_curriculum_structure:
+        return False, None, ["Kein erkennbares Curriculum-Format gefunden"]
+    
+    # Format erkennung für UI-Badge
+    has_lernsequenz = bool(re.search(r'\blernsequenz', text_lower))
+    format_detected = "A" if has_lernsequenz else "B"
+    
+    return True, format_detected, warnings
+
+
+def _extract_text_from_word(content: bytes) -> str:
+    """Extrahiert Text aus Word-Dokument."""
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(content))
+        return "\n".join([p.text for p in doc.paragraphs])
+    except ImportError:
+        logger.warning("python-docx nicht installiert - versuche textract")
+        try:
+            import textract
+            return textract.process(content).decode("utf-8", errors="replace")
+        except ImportError:
+            raise ImportError("Weder python-docx noch textract installiert")
+
+
+def _extract_lp_codes(text: str) -> list[str]:
+    """Extrahiert Leitperspektive-Codes aus Text."""
+    patterns = [
+        r'\bL\s+[A-Z]{2,3}\b',  # L BO
+        r'\(L\)\s+[A-Z]{2,4}',  # (L) BTV
+        r'\bLP[-_]?[A-Z0-9]+\b',  # LP-XX
+    ]
+    codes = []
+    for pattern in patterns:
+        codes.extend(re.findall(pattern, text, re.IGNORECASE))
+    return codes
+
+
