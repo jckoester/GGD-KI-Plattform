@@ -1106,3 +1106,57 @@ export async function getCurriculaBySubject(subjectId) {
   }
   return res.json()
 }
+
+// Edge API-Funktionen
+export async function createEdge(payload) {
+  const res = await fetch(`${BASE}/context/edges`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen der Kante')
+  }
+  return res.json()
+}
+
+export async function deleteEdge(edgeId) {
+  const res = await fetch(`${BASE}/context/edges/${edgeId}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen der Kante')
+  }
+}
+
+export async function getNodeEdges(nodeId, relation = null) {
+  const url = new URL(`${BASE}/context/nodes/${nodeId}/edges`)
+  if (relation) {
+    url.searchParams.set('relation', relation.join(','))
+  }
+  const res = await fetch(url.toString(), { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Kanten')
+  }
+  return res.json()
+}
+
+// Curriculum Create
+export async function createCurriculum(payload) {
+  const res = await fetch(`${BASE}/context/curricula/new`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen des Curriculums')
+  }
+  return res.json()
+}

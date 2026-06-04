@@ -22,6 +22,7 @@ from app.context.schemas import (
     ContextAnchorCreate,
     ContextAnchorRead,
     ContextEdgeRead,
+    ContextEdgeCreate,
     ContextNodeCreate,
     ContextNodeRead,
     ContextNodeUpdate,
@@ -35,6 +36,7 @@ from app.context.schemas import (
     CurriculumRead,
     CurriculumDraft,
     CurriculumDraftConfirmed,
+    CurriculumCreate,
 )
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
@@ -1350,3 +1352,239 @@ async def create_curriculum(
     except Exception as e:
         logger.error(f"Fehler beim Curriculum-Import: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── KS-Phase-6 Edge CRUD Endpoints ──────────────────────────────────────
+
+
+@router.post("/edges", response_model=ContextEdgeRead, status_code=201)
+async def create_edge(
+    payload: ContextEdgeCreate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Erstellt eine neue Kante zwischen zwei Knoten."""
+    from app.db.models import ContextNode
+    
+    # Prüfe ob beide Knoten existieren
+    from_node = await db.get(ContextNode, payload.from_node_id)
+    to_node = await db.get(ContextNode, payload.to_node_id)
+    
+    if not from_node or from_node.status != "active":
+        raise HTTPException(status_code=404, detail=f"Startknoten {payload.from_node_id} nicht gefunden")
+    if not to_node or to_node.status != "active":
+        raise HTTPException(status_code=404, detail=f"Zielknoten {payload.to_node_id} nicht gefunden")
+    
+    # Prüfe Schreibrecht auf from_node
+    if from_node.write_scope == "private" and from_node.owner_pseudonym != user.sub:
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
+    if from_node.write_scope == "subject" or from_node.write_scope == "group":
+        if from_node.write_scope_group_id:
+            # Prüfe ob User Mitglied der Gruppe ist
+            is_member = await db.execute(
+                sa.select(1).where(
+                    GroupMembership.group_id == from_node.write_scope_group_id,
+                    GroupMembership.pseudonym == user.sub,
+                )
+            )
+            if not is_member.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
+    
+    # Prüfe ob Kante bereits existiert (idempotent)
+    existing = await db.execute(
+        sa.select(ContextEdge).where(
+            ContextEdge.from_node_id == payload.from_node_id,
+            ContextEdge.to_node_id == payload.to_node_id,
+            ContextEdge.relation == payload.relation,
+        )
+    )
+    existing_edge = existing.scalar_one_or_none()
+    if existing_edge:
+        return existing_edge
+    
+    # Kante erstellen
+    edge = ContextEdge(
+        from_node_id=payload.from_node_id,
+        to_node_id=payload.to_node_id,
+        relation=payload.relation,
+        metadata_=payload.metadata_,
+    )
+    db.add(edge)
+    await db.commit()
+    await db.refresh(edge)
+    return edge
+
+
+@router.delete("/edges/{edge_id}", status_code=204)
+async def delete_edge(
+    edge_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Löscht eine Kante."""
+    edge = await db.get(ContextEdge, edge_id)
+    if not edge:
+        raise HTTPException(status_code=404, detail="Kante nicht gefunden")
+    
+    # Prüfe Schreibrecht auf from_node
+    from_node = await db.get(ContextNode, edge.from_node_id)
+    if not from_node or from_node.status != "active":
+        raise HTTPException(status_code=404, detail="Startknoten nicht gefunden")
+    
+    if from_node.write_scope == "private" and from_node.owner_pseudonym != user.sub:
+        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
+    if from_node.write_scope == "subject" or from_node.write_scope == "group":
+        if from_node.write_scope_group_id:
+            is_member = await db.execute(
+                sa.select(1).where(
+                    GroupMembership.group_id == from_node.write_scope_group_id,
+                    GroupMembership.pseudonym == user.sub,
+                )
+            )
+            if not is_member.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
+    
+    await db.delete(edge)
+    await db.commit()
+
+
+@router.get("/nodes/{node_id}/edges", response_model=list[ContextEdgeRead])
+async def get_node_edges(
+    node_id: UUID,
+    relation: list[str] | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Gibt alle ausgehenden Kanten eines Knotens zurück."""
+    # Prüfe ob Knoten existiert und sichtbar ist
+    node = await db.get(ContextNode, node_id)
+    if not node or node.status != "active":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    
+    # Sichtbarkeitsprüfung
+    if node.read_scope == "private" and node.owner_pseudonym != user.sub:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    
+    query = select(ContextEdge).where(
+        ContextEdge.from_node_id == node_id,
+    )
+    if relation:
+        query = query.where(ContextEdge.relation.in_(relation))
+    
+    edges = (await db.execute(query)).scalars().all()
+    return edges
+
+
+# ── KS-Phase-6 Curriculum Create Endpoint ──────────────────────────────────
+
+
+@router.post("/curricula/new", response_model=ContextNodeRead, status_code=201)
+async def create_curriculum_node(
+    payload: CurriculumCreate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Erstellt einen neuen leeren Curriculum-Knoten für den Editor."""
+    from app.db.models import Group
+    
+    # Subject laden
+    subject = await db.execute(
+        sa.select(Group.subject_id).where(
+            sa.or_(
+                Group.type == "subject_department",
+                Group.type == "subject",
+            ),
+            Group.metadata_["fach_code"].astext == payload.fach_code,
+        ).limit(1)
+    )
+    subject_row = subject.fetchone()
+    if not subject_row:
+        # Alternative: direkt aus subjects Tabelle
+        subj = await db.execute(
+            sa.select(Subject.id).where(
+                Subject.metadata_["fach_code"].astext == payload.fach_code
+            ).limit(1)
+        )
+        subject_id = subj.scalar_one_or_none()
+    else:
+        subject_id = subject_row[0]
+    
+    if not subject_id:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Fach mit fach_code '{payload.fach_code}' nicht gefunden"
+        )
+    
+    # Fachschafts-Gruppen-ID
+    department_group = await db.execute(
+        sa.select(Group.id).where(
+            Group.subject_id == subject_id,
+            Group.type == "subject_department",
+        ).limit(1)
+    )
+    department_group_id = department_group.scalar_one_or_none()
+    
+    # Prüfe ob User Mitglied der Fachschaft ist
+    if department_group_id:
+        is_member = await db.execute(
+            sa.select(1).where(
+                GroupMembership.group_id == department_group_id,
+                GroupMembership.pseudonym == user.sub,
+            )
+        )
+        if not is_member.scalar_one_or_none() and "admin" not in user.roles:
+            raise HTTPException(
+                status_code=403,
+                detail="Keine Berechtigung - Sie müssen Mitglied der Fachschaft sein"
+            )
+    
+    # Fachplan laden
+    fachplan = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type == "fachplan",
+            ContextNode.metadata_["fachplan_id"].astext == payload.fachplan_id,
+            ContextNode.status == "active",
+        ).limit(1)
+    )
+    fachplan_node = fachplan.scalar_one_or_none()
+    
+    # Curriculum-Knoten erstellen
+    import_key = f"new_{user.sub}_{payload.fach_code}_{payload.jahrgangsstufe}"
+    
+    curriculum = ContextNode(
+        category="knowledge",
+        content_type="curriculum",
+        title=f"{payload.fach_code} {payload.schulart} Kl. {payload.jahrgangsstufe}",
+        content=None,
+        read_scope="school",
+        write_scope="subject",
+        write_scope_group_id=department_group_id,
+        subject_id=subject_id,
+        owner_pseudonym=user.sub,
+        metadata_={
+            "fachplan_id": payload.fachplan_id,
+            "bp_version": payload.bp_version,
+            "schule": payload.schule,
+            "fach_code": payload.fach_code,
+            "schulart": payload.schulart,
+            "jahrgangsstufe": payload.jahrgangsstufe,
+            "import_key": import_key,
+        },
+        status="active",
+    )
+    db.add(curriculum)
+    await db.commit()
+    await db.refresh(curriculum)
+    
+    # part_of-Kante zum Fachplan
+    if fachplan_node:
+        edge = ContextEdge(
+            from_node_id=curriculum.id,
+            to_node_id=fachplan_node.id,
+            relation="part_of",
+            metadata_={},
+        )
+        db.add(edge)
+        await db.commit()
+    
+    return curriculum

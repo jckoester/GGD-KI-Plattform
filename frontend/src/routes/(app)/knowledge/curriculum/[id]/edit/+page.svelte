@@ -1,0 +1,354 @@
+<script>
+    import { page } from '$app/stores'
+    import { goto } from '$app/navigation'
+    import { getCurriculum, updateContextNode, createContextNode,
+             deleteContextNode, createEdge, deleteEdge, getNodeEdges } from '$lib/api.js'
+    import { user } from '$lib/stores/user.js'
+    import CurriculumTable from '$lib/components/CurriculumTable.svelte'
+    import SuccessBanner from '$lib/components/SuccessBanner.svelte'
+    import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+    import LoadingBanner from '$lib/components/LoadingBanner.svelte'
+    import { ArrowLeft } from 'lucide-svelte'
+
+    let curriculum = $state(null)
+    let draft = $state(null)
+    let dirty = $state(false)
+    let loading = $state(true)
+    let saving = $state(false)
+    let saveError = $state(null)
+    let saveSuccess = $state(false)
+    let canEdit = $state(false)
+
+    // Lade Curriculum und prüfe Berechtigungen
+    $effect(async () => {
+        try {
+            curriculum = await getCurriculum($page.params.id)
+            // Prüfe ob User editieren darf
+            if (!curriculum?.can_edit) {
+                // Weiterleitung zur Read-only-Ansicht
+                goto(`/knowledge/curriculum/${$page.params.id}`, { replaceState: true })
+                return
+            }
+            canEdit = true
+            draft = structuredClone(curriculum)
+        } catch (e) {
+            saveError = e.message
+        } finally {
+            loading = false
+        }
+    })
+
+    // Speichern-Funktion
+    async function save() {
+        if (!dirty || saving) return
+        
+        saving = true
+        saveError = null
+        saveSuccess = false
+        
+        try {
+            await flushDraftToApi(draft, curriculum)
+            // Aktualisiere Original nach dem Speichern
+            curriculum = await getCurriculum($page.params.id)
+            draft = structuredClone(curriculum)
+            dirty = false
+            saveSuccess = true
+            setTimeout(() => { saveSuccess = false }, 3000)
+        } catch (e) {
+            saveError = e.message
+        } finally {
+            saving = false
+        }
+    }
+
+    // Speicher-Logik: Vergleicht draft mit original und führt API-Calls aus
+    async function flushDraftToApi(draft, original) {
+        // 1. Curriculum-Knoten selbst aktualisieren
+        if (draft.title !== original.title || 
+            JSON.stringify(draft.metadata) !== JSON.stringify(original.metadata)) {
+            await updateContextNode(draft.id, {
+                title: draft.title,
+                metadata: draft.metadata
+            })
+        }
+
+        // 2. Kapitel verarbeiten
+        const origKapMap = new Map(original.kapitel?.map(k => [k.id, k]) || [])
+        const draftKapMap = new Map(draft.kapitel?.map(k => [k.id, k]) || [])
+        
+        // Gelöschte Kapitel
+        for (const origKap of original.kapitel || []) {
+            if (!draftKapMap.has(origKap.id)) {
+                // Kapitel und alle untergeordneten Knoten löschen (cascading)
+                await deleteContextNode(origKap.id)
+            }
+        }
+        
+        // Neue oder aktualisierte Kapitel
+        for (const draftKap of draft.kapitel || []) {
+            const origKap = origKapMap.get(draftKap.id)
+            
+            if (!origKap) {
+                // Neues Kapitel erstellen
+                const newKap = await createContextNode({
+                    category: 'knowledge',
+                    content_type: 'kapitel',
+                    title: draftKap.title,
+                    content: draftKap.metadata?.einleitung || '',
+                    read_scope: 'school',
+                    write_scope: 'subject',
+                    write_scope_group_id: original.write_scope_group_id,
+                    subject_id: original.subject_id,
+                    metadata: {
+                        std: draftKap.metadata?.std || '',
+                        reihenfolge: draftKap.metadata?.reihenfolge || 0,
+                        einleitung: draftKap.metadata?.einleitung || '',
+                        breadcrumb: draftKap.metadata?.breadcrumb || ''
+                    }
+                })
+                draftKap.id = newKap.id
+                draftKap.metadata.import_key = `temp_${newKap.id}`
+                
+                // part_of-Kante zum Curriculum
+                await createEdge({
+                    from_node_id: newKap.id,
+                    to_node_id: draft.id,
+                    relation: 'part_of',
+                    metadata: {}
+                })
+            } else if (draftKap.title !== origKap.title ||
+                       JSON.stringify(draftKap.metadata) !== JSON.stringify(origKap.metadata)) {
+                // Kapitel aktualisieren
+                await updateContextNode(draftKap.id, {
+                    title: draftKap.title,
+                    content: draftKap.metadata?.einleitung || '',
+                    metadata: draftKap.metadata
+                })
+            }
+            
+            // Lernsequenzen im Kapitel verarbeiten
+            const origLsMap = new Map(origKap?.lernsequenzen?.map(ls => [ls.id, ls]) || [])
+            const draftLsMap = new Map(draftKap.lernsequenzen?.map(ls => [ls.id, ls]) || [])
+            
+            // Gelöschte Lernsequenzen
+            for (const origLs of origKap?.lernsequenzen || []) {
+                if (!draftLsMap.has(origLs.id)) {
+                    await deleteContextNode(origLs.id)
+                }
+            }
+            
+            // Neue oder aktualisierte Lernsequenzen
+            for (const draftLs of draftKap.lernsequenzen || []) {
+                const origLs = origLsMap.get(draftLs.id)
+                
+                if (!origLs) {
+                    // Neue Lernsequenz erstellen
+                    const newLs = await createContextNode({
+                        category: 'knowledge',
+                        content_type: 'lernsequenz',
+                        title: draftLs.title || '',
+                        content: null,
+                        read_scope: 'school',
+                        write_scope: 'subject',
+                        write_scope_group_id: original.write_scope_group_id,
+                        subject_id: original.subject_id,
+                        metadata: {
+                            bp_leitidee: draftLs.metadata?.bp_leitidee || '',
+                            reihenfolge: draftLs.metadata?.reihenfolge || 0,
+                            eintraege: draftLs.metadata?.eintraege || []
+                        }
+                    })
+                    draftLs.id = newLs.id
+                    draftLs.metadata.import_key = `temp_${newLs.id}`
+                    
+                    // part_of-Kante zum Kapitel
+                    await createEdge({
+                        from_node_id: newLs.id,
+                        to_node_id: draftKap.id,
+                        relation: 'part_of',
+                        metadata: {}
+                    })
+                } else if (draftLs.title !== origLs.title ||
+                           JSON.stringify(draftLs.metadata) !== JSON.stringify(origLs.metadata)) {
+                    // Lernsequenz aktualisieren
+                    await updateContextNode(draftLs.id, {
+                        title: draftLs.title || '',
+                        metadata: draftLs.metadata
+                    })
+                }
+                
+                // Kanten für IK/PK/Leitperspektiven aktualisieren
+                await updateEdgesForLernsequenz(draftLs, origLs || { id: null, ik_refs: [], pk_refs: [], leitperspektive_refs: [] })
+            }
+        }
+    }
+
+    // Hilfsfunktion: Aktualisiere Kanten für eine Lernsequenz
+    async function updateEdgesForLernsequenz(draftLs, origLs) {
+        const lsId = draftLs.id
+        
+        // Alle bestehenden Kanten der Lernsequenz laden
+        const existingEdges = await getNodeEdges(lsId)
+        const existingEdgeIds = new Set(existingEdges.map(e => e.id))
+        const processedEdgeIds = new Set()
+        
+        // IK-Referenzen aktualisieren
+        const draftIkRefs = draftLs.ik_refs || []
+        const origIkRefs = origLs.ik_refs || []
+        
+        for (const ikRef of draftIkRefs) {
+            // Prüfe ob diese IK-Referenz bereits existiert
+            const existingIkEdge = existingEdges.find(e => 
+                e.relation === 'references' && 
+                e.to_node_id === ikRef.node_id
+            )
+            
+            if (existingIkEdge) {
+                // Prüfe ob partiell-Flag geändert wurde
+                if (existingIkEdge.metadata?.partiell !== String(ikRef.partiell)) {
+                    // Kante aktualisieren ist nicht direkt möglich, also löschen und neu erstellen
+                    await deleteEdge(existingIkEdge.id)
+                    await createEdge({
+                        from_node_id: lsId,
+                        to_node_id: ikRef.node_id,
+                        relation: 'references',
+                        metadata: { partiell: String(ikRef.partiell) }
+                    })
+                }
+                processedEdgeIds.add(existingIkEdge.id)
+            } else {
+                // Neue IK-Kante erstellen
+                await createEdge({
+                    from_node_id: lsId,
+                    to_node_id: ikRef.node_id,
+                    relation: 'references',
+                    metadata: { partiell: String(ikRef.partiell) }
+                })
+            }
+        }
+        
+        // PK-Referenzen aktualisieren
+        const draftPkRefs = draftLs.pk_refs || []
+        for (const pkRef of draftPkRefs) {
+            const existingPkEdge = existingEdges.find(e => 
+                e.relation === 'develops' && 
+                e.to_node_id === pkRef.node_id
+            )
+            
+            if (existingPkEdge) {
+                processedEdgeIds.add(existingPkEdge.id)
+            } else {
+                await createEdge({
+                    from_node_id: lsId,
+                    to_node_id: pkRef.node_id,
+                    relation: 'develops',
+                    metadata: {}
+                })
+            }
+        }
+        
+        // Leitperspektive-Referenzen aktualisieren
+        const draftLpRefs = draftLs.leitperspektive_refs || []
+        for (const lpRef of draftLpRefs) {
+            const existingLpEdge = existingEdges.find(e => 
+                e.relation === 'references' && 
+                e.to_node_id === lpRef.node_id
+            )
+            
+            if (existingLpEdge) {
+                processedEdgeIds.add(existingLpEdge.id)
+            } else {
+                await createEdge({
+                    from_node_id: lsId,
+                    to_node_id: lpRef.node_id,
+                    relation: 'references',
+                    metadata: {}
+                })
+            }
+        }
+        
+        // Gelöschte Kanten entfernen (die nicht verarbeitet wurden)
+        for (const edge of existingEdges) {
+            if (!processedEdgeIds.has(edge.id)) {
+                await deleteEdge(edge.id)
+            }
+        }
+    }
+
+    // Zurück-Navigation
+    function goBack() {
+        goto(`/knowledge/curriculum/${$page.params.id}`)
+    }
+</script>
+
+<div class="flex min-h-0 flex-1">
+    <main class="flex-1 overflow-y-auto p-6 max-w-4xl">
+        {#if loading}
+            <LoadingBanner />
+        {:else if !canEdit}
+            <!-- Sollte nicht passieren, aber als Fallback -->
+            <ErrorBanner message="Keine Berechtigung zum Bearbeiten dieses Curriculums." />
+        {:else}
+            <!-- Kopfzeile -->
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <button
+                        onclick={goBack}
+                        class="flex items-center gap-1 mb-2 text-sm text-light-tx-2 dark:text-dark-tx-2
+                             hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                    >
+                        <ArrowLeft class="w-4 h-4" /> Zurück
+                    </button>
+                    <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
+                        {curriculum?.title ?? 'Curriculum bearbeiten'}
+                    </h1>
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                        Bearbeitungsmodus
+                    </p>
+                </div>
+                <div class="flex gap-2 items-center">
+                    {#if dirty}
+                        <span class="text-sm text-light-ye dark:text-dark-ye">
+                            Ungespeicherte Änderungen
+                        </span>
+                    {/if}
+                    <button onclick={goBack} class="px-4 py-2 text-sm rounded-md 
+                           border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx 
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                    >
+                        Abbrechen
+                    </button>
+                    <button 
+                        onclick={save} 
+                        disabled={saving || !dirty}
+                        class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
+                               text-white font-medium hover:opacity-90 transition-opacity
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {saving ? 'Wird gespeichert…' : 'Speichern'}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fehler/Erfolg -->
+            {#if saveError}
+                <ErrorBanner message={saveError} />
+            {/if}
+            {#if saveSuccess}
+                <SuccessBanner message="Curriculum erfolgreich gespeichert." />
+            {/if}
+
+            <!-- Curriculum-Tabelle im Edit-Mode -->
+            {#if draft}
+                <div class="bg-white dark:bg-dark-bg rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
+                    <CurriculumTable 
+                        curriculum={draft} 
+                        editMode={true} 
+                        onchange={() => { dirty = true }}
+                    />
+                </div>
+            {/if}
+        {/if}
+    </main>
+</div>

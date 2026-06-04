@@ -166,6 +166,45 @@ class ContextSearchResult(BaseModel):
     content_type: str | None
 
 
+# ── KS-Phase-6 Edge Schemas ─────────────────────────────────────────────
+
+
+class ContextEdgeCreate(BaseModel):
+    from_node_id: UUID
+    to_node_id: UUID
+    relation: str
+    metadata_: dict[str, Any] = Field(default_factory=dict, alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContextEdgeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    from_node_id: UUID
+    to_node_id: UUID
+    relation: str
+    metadata_: dict[str, Any] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("metadata_", "metadata"),
+        serialization_alias="metadata",
+    )
+    created_at: datetime
+
+
+# ── KS-Phase-6 Curriculum Create ─────────────────────────────────────────
+
+
+class CurriculumCreate(BaseModel):
+    """Schema für das Anlegen eines neuen Curriculum-Knotens über die UI."""
+    fach_code: str
+    schulart: str
+    jahrgangsstufe: str
+    bp_version: str
+    schule: str
+    model_config = ConfigDict(populate_by_name=True)
+
+
 # ── KS-Phase-6 Curriculum ───────────────────────────────────────────────
 
 
