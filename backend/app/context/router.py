@@ -113,14 +113,20 @@ async def list_nodes(
     content_type: list[str] | None = Query(default=None),
     status: str | None = Query(default=None),
     subject_slug: str | None = Query(default=None),
+    subject_id: int | None = Query(default=None, description="Direkte Subject-ID-Filterung"),
     group_id: int | None = Query(default=None),
     grade: int | None = Query(default=None, ge=1, le=13, description="Jahrgangsstufe"),
     owner: str | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=500, description="Maximale Anzahl Ergebnisse"),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
     query = select(ContextNode)
     query = _visibility_filter(query, user, status_override=status)
+
+    # subject_id: direkte Filterung nach Subject-ID
+    if subject_id is not None:
+        query = query.where(ContextNode.subject_id == subject_id)
 
     # subject_slug: Knoten deren Scope-Gruppe zu diesem Fach gehört,
     # plus schulweite/globale knowledge-Knoten mit passendem Fach oder fächerübergreifend
@@ -180,7 +186,11 @@ async def list_nodes(
     if content_type:
         query = query.where(ContextNode.content_type.in_(content_type))
 
-    result = await db.execute(query.order_by(ContextNode.created_at.desc()))
+    query = query.order_by(ContextNode.created_at.desc())
+    if limit is not None:
+        query = query.limit(limit)
+
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -1268,6 +1278,40 @@ async def create_curriculum_node(
         await db.commit()
     
     return curriculum
+
+
+# ── Fach-Code Lookup ─────────────────────────────────────────────────────────
+
+
+@router.get("/subjects/by-code/{fach_code}")
+async def get_subject_by_fach_code(
+    fach_code: str,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Löst einen Fach-Code (z.B. 'ETH', 'MAT') zu subject_id und subject_slug auf."""
+    # Erst über Groups suchen (trägt fach_code in metadata)
+    row = await db.execute(
+        sa.select(Subject.id, Subject.slug)
+        .join(Group, Group.subject_id == Subject.id)
+        .where(
+            Group.type.in_(["subject_department", "subject"]),
+            Group.metadata_["fach_code"].astext == fach_code.upper(),
+        )
+        .limit(1)
+    )
+    result = row.fetchone()
+    if not result:
+        # Fallback: direkt in subjects.metadata suchen
+        row2 = await db.execute(
+            sa.select(Subject.id, Subject.slug)
+            .where(Subject.metadata_["fach_code"].astext == fach_code.upper())
+            .limit(1)
+        )
+        result = row2.fetchone()
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Kein Fach mit fach_code '{fach_code}' gefunden")
+    return {"subject_id": result[0], "subject_slug": result[1]}
 
 
 # ── Bildungsplan Hierarchie Endpoint ────────────────────────────────────────

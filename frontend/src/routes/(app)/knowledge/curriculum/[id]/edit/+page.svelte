@@ -183,41 +183,89 @@
         }
     }
 
-    // Hilfsfunktion: Aktualisiere Kanten für eine Lernsequenz
-    async function updateEdgesForLernsequenz(draftLs, origLs) {
+    // Leitet IK/PK/LP-Refs aus den Einträgen einer Lernsequenz ab.
+    // eintrag.ik: Array<{node_id, nr, partiell}> (neues Format nach E.1.b)
+    // eintrag.pk: Array<{node_id, pk_id}>
+    // eintrag.hinweise: Text mit @[Label](lp:uuid) und #[Label](ik:uuid) Tokens
+    function deriveRefsFromEntries(eintraege) {
+        const ikMap = new Map()   // node_id → {node_id, partiell}
+        const pkSet = new Set()   // node_id
+        const lpSet = new Set()   // node_id (Leitperspektive aus hinweise)
+        const crossIkSet = new Set() // node_id (Cross-Fach-IK aus hinweise)
+
+        for (const eintrag of eintraege || []) {
+            // IK-Array (neues Format: Array<{node_id, nr, partiell}>)
+            const ikArray = Array.isArray(eintrag.ik) ? eintrag.ik : []
+            for (const ik of ikArray) {
+                if (!ik.node_id) continue
+                const existing = ikMap.get(ik.node_id)
+                // "partiell=false" gewinnt über "partiell=true" (volle Referenz schlägt partielle)
+                if (!existing || (!ik.partiell && existing.partiell)) {
+                    ikMap.set(ik.node_id, { node_id: ik.node_id, partiell: !!ik.partiell })
+                }
+            }
+
+            // PK-Array (neues Format: Array<{node_id, pk_id}>)
+            const pkArray = Array.isArray(eintrag.pk) ? eintrag.pk : []
+            for (const pk of pkArray) {
+                if (pk.node_id) pkSet.add(pk.node_id)
+            }
+
+            // Hinweise: Token-Notation @[Label](lp:uuid) und #[Label](ik:uuid)
+            const hinweiseText = eintrag.hinweise || ''
+            for (const m of hinweiseText.matchAll(/@\[[^\]]*\]\(lp:([0-9a-f-]{36})\)/g)) {
+                lpSet.add(m[1])
+            }
+            for (const m of hinweiseText.matchAll(/#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)/g)) {
+                crossIkSet.add(m[1])
+            }
+        }
+
+        return {
+            ik: Array.from(ikMap.values()),
+            pk: Array.from(pkSet).map(id => ({ node_id: id })),
+            // LP und cross-IK landen beide als 'references'-Kanten
+            references: [
+                ...Array.from(lpSet).map(id => ({ node_id: id })),
+                ...Array.from(crossIkSet).map(id => ({ node_id: id })),
+            ],
+        }
+    }
+
+    // Aktualisiert Kanten für eine Lernsequenz.
+    // Soll-Menge wird aus den Einträgen abgeleitet, nicht aus LS-Top-Level-Feldern.
+    // Nur 'references'- und 'develops'-Kanten werden verwaltet; 'part_of' bleibt unangetastet.
+    async function updateEdgesForLernsequenz(draftLs, _origLs) {
         const lsId = draftLs.id
-        
-        // Alle bestehenden Kanten der Lernsequenz laden
-        const existingEdges = await getNodeEdges(lsId)
-        const existingEdgeIds = new Set(existingEdges.map(e => e.id))
+
+        const derived = deriveRefsFromEntries(draftLs.metadata?.eintraege)
+
+        // Bestehende Kanten laden (nur die verwalteten Relationen)
+        const allEdges = await getNodeEdges(lsId)
+        const managedEdges = allEdges.filter(e =>
+            e.relation === 'references' || e.relation === 'develops'
+        )
+
         const processedEdgeIds = new Set()
-        
-        // IK-Referenzen aktualisieren
-        const draftIkRefs = draftLs.ik_refs || []
-        const origIkRefs = origLs.ik_refs || []
-        
-        for (const ikRef of draftIkRefs) {
-            // Prüfe ob diese IK-Referenz bereits existiert
-            const existingIkEdge = existingEdges.find(e => 
-                e.relation === 'references' && 
-                e.to_node_id === ikRef.node_id
+
+        // IK → 'references' mit partiell-Metadata
+        for (const ikRef of derived.ik) {
+            const existing = managedEdges.find(e =>
+                e.relation === 'references' && e.to_node_id === ikRef.node_id
             )
-            
-            if (existingIkEdge) {
-                // Prüfe ob partiell-Flag geändert wurde
-                if (existingIkEdge.metadata?.partiell !== String(ikRef.partiell)) {
-                    // Kante aktualisieren ist nicht direkt möglich, also löschen und neu erstellen
-                    await deleteEdge(existingIkEdge.id)
+            if (existing) {
+                if (existing.metadata?.partiell !== String(ikRef.partiell)) {
+                    await deleteEdge(existing.id)
                     await createEdge({
                         from_node_id: lsId,
                         to_node_id: ikRef.node_id,
                         relation: 'references',
                         metadata: { partiell: String(ikRef.partiell) }
                     })
+                } else {
+                    processedEdgeIds.add(existing.id)
                 }
-                processedEdgeIds.add(existingIkEdge.id)
             } else {
-                // Neue IK-Kante erstellen
                 await createEdge({
                     from_node_id: lsId,
                     to_node_id: ikRef.node_id,
@@ -226,17 +274,14 @@
                 })
             }
         }
-        
-        // PK-Referenzen aktualisieren
-        const draftPkRefs = draftLs.pk_refs || []
-        for (const pkRef of draftPkRefs) {
-            const existingPkEdge = existingEdges.find(e => 
-                e.relation === 'develops' && 
-                e.to_node_id === pkRef.node_id
+
+        // PK → 'develops'
+        for (const pkRef of derived.pk) {
+            const existing = managedEdges.find(e =>
+                e.relation === 'develops' && e.to_node_id === pkRef.node_id
             )
-            
-            if (existingPkEdge) {
-                processedEdgeIds.add(existingPkEdge.id)
+            if (existing) {
+                processedEdgeIds.add(existing.id)
             } else {
                 await createEdge({
                     from_node_id: lsId,
@@ -246,29 +291,26 @@
                 })
             }
         }
-        
-        // Leitperspektive-Referenzen aktualisieren
-        const draftLpRefs = draftLs.leitperspektive_refs || []
-        for (const lpRef of draftLpRefs) {
-            const existingLpEdge = existingEdges.find(e => 
-                e.relation === 'references' && 
-                e.to_node_id === lpRef.node_id
+
+        // LP + Cross-IK → 'references' ohne partiell-Metadata
+        for (const ref of derived.references) {
+            const existing = managedEdges.find(e =>
+                e.relation === 'references' && e.to_node_id === ref.node_id
             )
-            
-            if (existingLpEdge) {
-                processedEdgeIds.add(existingLpEdge.id)
+            if (existing) {
+                processedEdgeIds.add(existing.id)
             } else {
                 await createEdge({
                     from_node_id: lsId,
-                    to_node_id: lpRef.node_id,
+                    to_node_id: ref.node_id,
                     relation: 'references',
                     metadata: {}
                 })
             }
         }
-        
-        // Gelöschte Kanten entfernen (die nicht verarbeitet wurden)
-        for (const edge of existingEdges) {
+
+        // Veraltete Kanten entfernen (nur verwaltete Relationen, nie part_of)
+        for (const edge of managedEdges) {
             if (!processedEdgeIds.has(edge.id)) {
                 await deleteEdge(edge.id)
             }
@@ -342,9 +384,11 @@
             <!-- Curriculum-Tabelle im Edit-Mode -->
             {#if draft}
                 <div class="bg-white dark:bg-dark-bg rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
-                    <CurriculumTable 
-                        curriculum={draft} 
-                        editMode={true} 
+                    <CurriculumTable
+                        curriculum={draft}
+                        editMode={true}
+                        subjectId={curriculum?.subject_id ?? null}
+                        grade={curriculum?.metadata?.jahrgangsstufe ?? null}
                         onchange={() => { dirty = true }}
                     />
                 </div>

@@ -10,7 +10,7 @@
 
     import { X, Search, Check } from 'lucide-svelte'
     
-    let { subjectId = null, selected = $bindable([]), onchange = () => {} } = $props()
+    let { subjectId = null, grade = null, selected = $bindable([]), onchange = () => {} } = $props()
     
     let searchQuery = $state('')
     let searchResults = $state([])
@@ -28,14 +28,14 @@
         const timer = setTimeout(async () => {
             loading = true
             try {
-                // Suche nach IK-Knoten (verwendet bestehende searchContextNodes Funktion)
                 const params = new URLSearchParams()
                 params.set('q', searchQuery)
                 params.append('content_type', 'ik_kompetenz')
                 if (subjectId) params.set('subject_id', subjectId)
-                params.set('limit', '10')
-                
-                const res = await fetch(`/api/context/search?${params}`, { credentials: 'include' })
+                if (grade) params.set('grade', grade)
+                params.set('limit', '20')
+
+                const res = await fetch(`/api/context/nodes?${params}`, { credentials: 'include' })
                 if (res.ok) {
                     searchResults = await res.json()
                 } else {

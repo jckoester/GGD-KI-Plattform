@@ -8,9 +8,13 @@
      * - onchange: Callback bei Änderungen im Edit-Mode
      */
     import HinweisChip from './HinweisChip.svelte'
+    import IKSelector from './IKSelector.svelte'
+    import PKSelector from './PKSelector.svelte'
+    import HinweisEditor from './HinweisEditor.svelte'
+    import { parseHinweise } from '$lib/hinweise.js'
     import { Plus, Trash2, MoreVertical, Move, Check, X, Pencil, Eye } from 'lucide-svelte'
 
-    let { curriculum = null, editMode = false, onchange = () => {} } = $props()
+    let { curriculum = null, editMode = false, subjectId = null, grade = null, onchange = () => {} } = $props()
     
     // Lokaler State für Edit-Mode
     let showContextMenu = $state(null) // { type: 'kapitel'|'ls'|'eintrag', id: string, x: number, y: number }
@@ -18,93 +22,44 @@
     let draggedItem = $state(null) // { type, id, chapterId, lsId }
     
     /**
-     * Hilfsfunktion: Finde IK-Referenz-Objekt für gegebene IK-Nummer
+     * Normalisiert eintrag.ik auf Array<{node_id, nr, partiell}>.
+     * Versteht altes String-Format ("3.1.1, 3.1.2 [partiell]") und neues Array-Format.
      */
-    function findIkRef(ikRefs, ikNr) {
-        if (!ikNr) return null
-        return ikRefs?.find(ref => ref.title === ikNr || ref.node_id?.endsWith(ikNr) || ref.title?.includes(ikNr)) || null
-    }
-    
-    /**
-     * Hilfsfunktion: Finde PK-Referenz-Objekt für gegebene PK-ID
-     */
-    function findPkRef(pkRefs, pkId) {
-        if (!pkId) return null
-        return pkRefs?.find(ref => ref.title === pkId || ref.node_id?.endsWith(pkId) || ref.title?.includes(pkId)) || null
-    }
-    
-    /**
-     * Hilfsfunktion: Erzeuge Link zu einem Knoten
-     */
-    function nodeLink(nodeId) {
-        return `/knowledge/${nodeId}`
-    }
-    
-    /**
-     * Hilfsfunktion: Parse und extrahiere Hinweise aus Text
-     */
-    function parseHinweise(hinweiseText) {
-        if (!hinweiseText) return []
-        
-        const hints = []
-        const text = hinweiseText.toString()
-        
-        // MINT-Hinweis
-        if (text.includes('[MINT]') || text.includes('MINT')) {
-            hints.push({ typ: 'mint', text: '' })
-        }
-        
-        // GS-Bezug
-        if (text.includes('[GS]') || text.includes('GS-Bezug') || text.includes('GS:')) {
-            hints.push({ typ: 'gs_bezug', text: '' })
-        }
-        
-        // Leitperspektiven: L BO, (L) BTV, etc.
-        const lpPattern = /\(?L\)?\s*([A-Z]{2,4})/g
-        let lpMatch
-        while ((lpMatch = lpPattern.exec(text)) !== null) {
-            hints.push({ typ: 'leitperspektive', lp_code: lpMatch[1] })
-        }
-        
-        // Fachbezug: →BNT, (F) ETH 3.1.1.1, BNT: ...
-        const fachPattern = /\(F\)\s*([A-Z]+)|→([A-Z]+)|([A-Z]+):/g
-        let fachMatch
-        while ((fachMatch = fachPattern.exec(text)) !== null) {
-            const fachCode = fachMatch[1] || fachMatch[2] || fachMatch[3]
-            if (fachCode) {
-                hints.push({ typ: 'fach_bezug', fach: fachCode })
-            }
-        }
-        
-        return hints
-    }
-    
-    /**
-     * Extrahiere IK-Nummern aus String oder Array
-     */
-    function extractIkNumbers(ikData) {
+    function normalizeIk(ikData) {
         if (!ikData) return []
+        // Neues Format: Array von Objekten
+        if (Array.isArray(ikData)) {
+            return ikData.map(ik => {
+                if (typeof ik === 'object' && ik !== null) return ik
+                return { node_id: null, nr: String(ik), partiell: false }
+            })
+        }
+        // Altes Format: String
         if (typeof ikData === 'string') {
-            // Versuche IK-Nummern zu extrahieren
-            const matches = ikData.match(/IK\s+([\d.]+)|([\d.]+[\d.]*)/g) || []
+            const matches = ikData.match(/(?:IK\s+)?([\d.]+(?:\s*\[partiell\])?)/g) || []
             return matches.map(m => {
-                const clean = m.replace('IK', '').trim().replace(/[\[\]]/g, '')
-                return { nr: clean, partiell: m.includes('[') }
+                const partiell = m.includes('[partiell]') || m.includes('[')
+                const nr = m.replace('IK', '').replace(/\[.*\]/g, '').trim()
+                return { node_id: null, nr, partiell }
             })
         }
         return []
     }
-    
+
     /**
-     * Extrahiere PK-IDs aus Array oder String
+     * Normalisiert eintrag.pk auf Array<{node_id, pk_id}>.
+     * Versteht altes String-Array-Format und neues Objekt-Array-Format.
      */
-    function extractPkIds(pkData) {
+    function normalizePk(pkData) {
         if (!pkData) return []
-        if (typeof pkData === 'string') return [pkData]
         if (Array.isArray(pkData)) {
-            return pkData.map(pk => typeof pk === 'string' ? pk : pk.id || pk.pk_id || String(pk))
+            return pkData.map(pk => {
+                if (typeof pk === 'object' && pk !== null) return pk
+                return { node_id: null, pk_id: String(pk) }
+            })
         }
-        return [pkData.id || pkData.pk_id || String(pkData)]
+        if (typeof pkData === 'string') return [{ node_id: null, pk_id: pkData }]
+        return []
     }
     
     /**
@@ -170,12 +125,10 @@
         if (!ls.metadata.eintraege) ls.metadata.eintraege = []
         
         ls.metadata.eintraege.push({
-            ik: '',
-            ik_partiell: false,
+            ik: [],
             pk: [],
             konkretisierung: '',
             hinweise: '',
-            lp: []
         })
         curriculum.kapitel = [...curriculum.kapitel]
         onchange()
@@ -582,63 +535,31 @@
                         >
                             <!-- PK-Spalte (nur bei erstem Eintrag mit rowspan) -->
                             {#if entryIndex === 0}
-                                <td 
-                                    rowspan={(ls.metadata?.eintraege || []).length} 
+                                <td
+                                    rowspan={(ls.metadata?.eintraege || []).length}
                                     class="px-3 py-2 vertical-align-top"
                                 >
                                     {#if editMode}
-                                        <div class="space-y-2">
-                                            {#each extractPkIds(eintrag.pk) as pkId, pkIdx}
-                                                <div class="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={pkId}
-                                                        oninput={(e) => {
-                                                            const newPk = [...extractPkIds(eintrag.pk)]
-                                                            newPk[pkIdx] = e.target.value
-                                                            eintrag.pk = newPk
-                                                            curriculum.kapitel = [...curriculum.kapitel]
-                                                            onchange()
-                                                        }}
-                                                        class="text-sm px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
-                                                        placeholder="PK-ID"
-                                                    />
-                                                    <button 
-                                                        onclick={() => {
-                                                            const newPk = extractPkIds(eintrag.pk).filter((_, i) => i !== pkIdx)
-                                                            eintrag.pk = newPk
-                                                            curriculum.kapitel = [...curriculum.kapitel]
-                                                            onchange()
-                                                        }}
-                                                        class="text-light-re dark:text-dark-re hover:text-light-re/80"
-                                                    >
-                                                        <X class="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            {/each}
-                                            <button
-                                                onclick={() => {
-                                                    const newPk = [...extractPkIds(eintrag.pk), '']
-                                                    eintrag.pk = newPk
-                                                    curriculum.kapitel = [...curriculum.kapitel]
-                                                    onchange()
-                                                }}
-                                                class="text-sm text-primary dark:text-dark-bl underline"
-                                            >
-                                                + PK hinzufügen
-                                            </button>
-                                        </div>
+                                        <PKSelector
+                                            {subjectId}
+                                            selected={normalizePk(eintrag.pk)}
+                                            onchange={(newPk) => {
+                                                eintrag.pk = newPk
+                                                curriculum.kapitel = [...curriculum.kapitel]
+                                                onchange()
+                                            }}
+                                        />
                                     {:else}
-                                        {#each extractPkIds(eintrag.pk) as pkId}
-                                            {#if findPkRef(ls.pk_refs, pkId)}
-                                                <a 
-                                                    href={nodeLink(findPkRef(ls.pk_refs, pkId).node_id)}
+                                        {#each normalizePk(eintrag.pk) as pk}
+                                            {#if pk.node_id}
+                                                <a
+                                                    href={nodeLink(pk.node_id)}
                                                     class="block mb-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                                 >
-                                                    {pkId}
+                                                    {pk.pk_id}
                                                 </a>
                                             {:else}
-                                                <span class="block mb-1 text-light-tx-2 dark:text-dark-tx-2">{pkId}</span>
+                                                <span class="block mb-1 text-light-tx-2 dark:text-dark-tx-2">{pk.pk_id}</span>
                                             {/if}
                                         {/each}
                                     {/if}
@@ -648,78 +569,30 @@
                             <!-- IK-Spalte -->
                             <td class="px-3 py-2 vertical-align-top">
                                 {#if editMode}
-                                    <div class="space-y-1">
-                                        {#each extractIkNumbers(eintrag.ik) as ik, ikIdx}
-                                            <div class="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={ik.nr}
-                                                    oninput={(e) => {
-                                                        const newIk = [...extractIkNumbers(eintrag.ik)]
-                                                        newIk[ikIdx].nr = e.target.value
-                                                        eintrag.ik = newIk.map(i => i.nr).join(', ')
-                                                        curriculum.kapitel = [...curriculum.kapitel]
-                                                        onchange()
-                                                    }}
-                                                    class="text-sm px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx w-20"
-                                                    placeholder="IK-Nr"
-                                                />
-                                                <label class="flex items-center gap-1 text-xs">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={ik.partiell}
-                                                        onchange={(e) => {
-                                                            const newIk = [...extractIkNumbers(eintrag.ik)]
-                                                            newIk[ikIdx].partiell = e.target.checked
-                                                            eintrag.ik = newIk.map(i => i.nr + (i.partiell ? ' [partiell]' : '')).join(', ')
-                                                            curriculum.kapitel = [...curriculum.kapitel]
-                                                            onchange()
-                                                        }}
-                                                    />
-                                                    partiell
-                                                </label>
-                                                <button 
-                                                    onclick={() => {
-                                                        const newIk = extractIkNumbers(eintrag.ik).filter((_, i) => i !== ikIdx)
-                                                        eintrag.ik = newIk.map(i => i.nr).join(', ')
-                                                        curriculum.kapitel = [...curriculum.kapitel]
-                                                        onchange()
-                                                    }}
-                                                    class="text-light-re dark:text-dark-re hover:text-light-re/80"
-                                                >
-                                                    <X class="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        {/each}
-                                        <button
-                                            onclick={() => {
-                                                const newIk = [...extractIkNumbers(eintrag.ik), { nr: '', partiell: false }]
-                                                eintrag.ik = newIk.map(i => i.nr).join(', ')
-                                                curriculum.kapitel = [...curriculum.kapitel]
-                                                onchange()
-                                            }}
-                                            class="text-sm text-primary dark:text-dark-bl underline"
-                                        >
-                                            + IK hinzufügen
-                                        </button>
-                                    </div>
+                                    <IKSelector
+                                        {subjectId}
+                                        {grade}
+                                        selected={normalizeIk(eintrag.ik)}
+                                        onchange={(newIk) => {
+                                            eintrag.ik = newIk
+                                            curriculum.kapitel = [...curriculum.kapitel]
+                                            onchange()
+                                        }}
+                                    />
                                 {:else}
-                                    {#each extractIkNumbers(eintrag.ik) as ik}
-                                        {#if findIkRef(ls.ik_refs, ik.nr)}
-                                            <a 
-                                                href={nodeLink(findIkRef(ls.ik_refs, ik.nr).node_id)}
+                                    {#each normalizeIk(eintrag.ik) as ik}
+                                        {#if ik.node_id}
+                                            <a
+                                                href={nodeLink(ik.node_id)}
                                                 class="inline-block mr-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                             >
                                                 {ik.nr}
                                             </a>
-                                            {#if ik.partiell}
-                                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">[…]</span>
-                                            {/if}
                                         {:else}
                                             <span class="inline-block mr-1 text-light-tx dark:text-dark-tx">{ik.nr}</span>
-                                            {#if ik.partiell}
-                                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">[…]</span>
-                                            {/if}
+                                        {/if}
+                                        {#if ik.partiell}
+                                            <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">[…]</span>
                                         {/if}
                                     {/each}
                                 {/if}
@@ -749,31 +622,35 @@
                             <!-- Hinweise -->
                             <td class="px-3 py-2 vertical-align-top">
                                 {#if editMode}
-                                    <textarea
+                                    <HinweisEditor
                                         value={eintrag.hinweise || ''}
-                                        oninput={(e) => {
-                                            eintrag.hinweise = e.target.value
+                                        onchange={(newVal) => {
+                                            eintrag.hinweise = newVal
                                             curriculum.kapitel = [...curriculum.kapitel]
                                             onchange()
                                         }}
-                                        class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2"
-                                        rows="2"
-                                        placeholder="Hinweise (z.B. [MINT], [GS], L BO, →BNT)"
                                     />
                                 {:else}
                                     {#if eintrag.hinweise}
-                                        <div class="space-y-1">
-                                            {#each parseHinweise(eintrag.hinweise) as hinweis}
-                                                <HinweisChip 
-                                                    typ={hinweis.typ} 
-                                                    text={hinweis.text}
-                                                    fach={hinweis.fach}
-                                                    lp_code={hinweis.lp_code}
-                                                />
+                                        {@const parts = parseHinweise(eintrag.hinweise)}
+                                        <div class="flex flex-wrap gap-1 items-center">
+                                            {#each parts as part}
+                                                {#if part.kind === 'lp'}
+                                                    <HinweisChip
+                                                        typ="leitperspektive"
+                                                        lp_code={part.label}
+                                                        href="/knowledge/{part.node_id}"
+                                                    />
+                                                {:else if part.kind === 'ik'}
+                                                    <HinweisChip
+                                                        typ="fach_bezug"
+                                                        fach={part.label}
+                                                        href="/knowledge/{part.node_id}"
+                                                    />
+                                                {:else if part.label.trim()}
+                                                    <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">{part.label}</span>
+                                                {/if}
                                             {/each}
-                                            {#if parseHinweise(eintrag.hinweise).length === 0}
-                                                <span class="text-light-tx-2 dark:text-dark-tx-2">{eintrag.hinweise}</span>
-                                            {/if}
                                         </div>
                                     {:else}
                                         <span class="text-light-tx-3 dark:text-dark-tx-3 text-xs">–</span>

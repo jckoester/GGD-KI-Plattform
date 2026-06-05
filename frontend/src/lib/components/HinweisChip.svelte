@@ -8,7 +8,7 @@
      * - fach: Fachcode (nur für fach_bezug)
      * - lp_code: Leitperspektive-Code (nur für leitperspektive)
      */
-    let { typ = 'didaktik', text = '', fach = null, lp_code = null } = $props()
+    let { typ = 'didaktik', text = '', fach = null, lp_code = null, href = null } = $props()
 
     // Farbzuordnung nach Typ
     const typeConfig = {
@@ -67,9 +67,20 @@
     })
 </script>
 
-<span 
-    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium 
-           {config.bg} {config.text} {config.border}"
->
-    {displayText}
-</span>
+{#if href}
+    <a
+        {href}
+        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+               hover:opacity-80 transition-opacity
+               {config.bg} {config.text} {config.border}"
+    >
+        {displayText}
+    </a>
+{:else}
+    <span
+        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+               {config.bg} {config.text} {config.border}"
+    >
+        {displayText}
+    </span>
+{/if}
