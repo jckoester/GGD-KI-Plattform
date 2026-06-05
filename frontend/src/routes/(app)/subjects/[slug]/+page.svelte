@@ -25,6 +25,8 @@
 
   // Import für Curriculum-Tab
   import CurriculumList from '$lib/components/CurriculumList.svelte'
+  // Import für Bildungsplan-Tab
+  import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
 
   // ── Eigene Unterrichtsgruppen dieses Fachs (Lehrkraft) ────────────────────
   const myGroupsForSubject = $derived(
@@ -110,9 +112,10 @@
     {#if isTeacher}
       <nav class="flex gap-1 border-b border-light-ui-2 dark:border-dark-ui-2 mb-6 -mx-6 px-6">
         {#each [
-          { id: 'uebersicht', label: 'Übersicht' },
-          { id: 'curriculum', label: 'Curriculum' },
-          { id: 'kontext',    label: 'Kontext'   },
+          { id: 'uebersicht',   label: 'Übersicht' },
+          { id: 'curriculum',   label: 'Curriculum' },
+          { id: 'bildungsplan', label: 'Bildungsplan' },
+          { id: 'kontext',      label: 'weiterer Kontext' },
         ] as tab (tab.id)}
           <button
             onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
@@ -235,11 +238,14 @@
       </section>
     {:else if activeTab === 'curriculum' && isTeacher}
       <CurriculumList subjectId={subject?.id} subjectSlug={subject?.slug} showNewButton={true} />
+    {:else if activeTab === 'bildungsplan' && isTeacher}
+      <BildungsplanTree subjectId={subject?.id} subjectSlug={subject?.slug} />
     {:else if activeTab === 'kontext' && isTeacher}
       <KnowledgeNodeList
         fixedSubjectSlug={subject?.slug}
         showSubjectFilter={false}
         showNewButton={true}
+        excludeContentTypes={['curriculum','fachplan','leitidee','ik_kompetenz','pk_gruppe','pk_kompetenz']}
       />
     {/if}
   </main>

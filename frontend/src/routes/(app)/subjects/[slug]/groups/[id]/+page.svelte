@@ -10,6 +10,8 @@
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import AssistantCard from '$lib/components/AssistantCard.svelte'
   import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
+  import CurriculumList from '$lib/components/CurriculumList.svelte'
+  import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
 
   // ── Gruppe + Fach aus Stores ──────────────────────────────────────────────
   const group = $derived(
@@ -94,10 +96,12 @@
   <!-- Tab-Leiste -->
   <nav class="flex gap-1 -mb-px mt-3">
     {#each [
-      { id: 'vorbereitung', label: 'Vorbereitung' },
-      { id: 'klasse',       label: 'Klasse'       },
-      { id: 'archiv',       label: 'Archiv'        },
-      { id: 'kontext',      label: 'Kontext'       },
+      { id: 'vorbereitung', label: 'Vorbereitung'    },
+      { id: 'curriculum',   label: 'Curriculum'      },
+      { id: 'bildungsplan', label: 'Bildungsplan'    },
+      { id: 'klasse',       label: 'Klasse'          },
+      { id: 'archiv',       label: 'Archiv'          },
+      { id: 'kontext',      label: 'weiterer Kontext' },
     ] as tab (tab.id)}
       <button
         onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
@@ -206,6 +210,28 @@
       {/if}
     {/if}
 
+  <!-- Tab: Curriculum -->
+  {:else if activeTab === 'curriculum'}
+    <CurriculumList
+      subjectId={subject?.id}
+      subjectSlug={subject?.slug}
+      showNewButton={true}
+    />
+
+  <!-- Tab: Bildungsplan -->
+  {:else if activeTab === 'bildungsplan'}
+    {#if subject?.id}
+      <BildungsplanTree
+        subjectId={subject.id}
+        subjectSlug={subject.slug}
+        initialGrade={defaultGrade}
+      />
+    {:else}
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 py-4">
+        Kein Fach zugeordnet.
+      </p>
+    {/if}
+
   <!-- Tab: Klasse (Platzhalter) -->
   {:else if activeTab === 'klasse'}
     <div class="py-8 text-center text-light-tx-2 dark:text-dark-tx-2">
@@ -226,13 +252,14 @@
       </p>
     </div>
 
-  <!-- Tab: Kontext -->
+  <!-- Tab: weiterer Kontext -->
   {:else if activeTab === 'kontext'}
     <KnowledgeNodeList
       fixedGroupId={group?.id}
       showSubjectFilter={false}
       showNewButton={true}
       initialGrade={defaultGrade}
+      excludeContentTypes={['curriculum','fachplan','leitidee','ik_kompetenz','pk_gruppe','pk_kompetenz']}
     />
   {/if}
 

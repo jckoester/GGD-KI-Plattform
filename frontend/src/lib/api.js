@@ -1107,6 +1107,21 @@ export async function getCurriculaBySubject(subjectId) {
   return res.json()
 }
 
+export async function getFachplanBySubject(subjectId, grade = null) {
+  let url = `${BASE}/context/fachplan/by-subject/${subjectId}`;
+  if (grade !== null && grade !== undefined) {
+    url += `?grade=${grade}`;
+  }
+  const res = await fetch(url, {
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden des Bildungsplans')
+  }
+  return res.json()
+}
+
 // Edge API-Funktionen
 export async function createEdge(payload) {
   const res = await fetch(`${BASE}/context/edges`, {

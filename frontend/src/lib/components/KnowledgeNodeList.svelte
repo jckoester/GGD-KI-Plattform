@@ -20,6 +20,7 @@
         showNewButton = true,
         onNodeClick = null, // optional: callback statt goto
         initialGrade = null, // voreingestellte Jahrgangsstufe
+        excludeContentTypes = [], // Content-Typen, die ausgeblendet werden sollen
     } = $props();
 
     let nodes = $state([]);
@@ -42,7 +43,11 @@
     let sortDir = $state("asc");
 
     const sortedNodes = $derived.by(() => {
-        const arr = [...nodes];
+        // Filter ausgeschlossen Content-Typen heraus
+        const visible = excludeContentTypes.length
+            ? nodes.filter(n => !excludeContentTypes.includes(n.content_type))
+            : nodes;
+        const arr = [...visible];
         arr.sort((a, b) => {
             let av, bv;
             if (sortCol === "subject_id") {

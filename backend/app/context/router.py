@@ -38,6 +38,11 @@ from app.context.schemas import (
     CurriculumRead,
     CurriculumDraftConfirmed,
     CurriculumCreate,
+    FachplanTreeRead,
+    LeitideeRead,
+    IkKompetenzRead,
+    PkGruppeRead,
+    PkKompetenzRead,
 )
 from app.context.embedding import enqueue_embedding_job
 from app.context.taxonomy import validate_content_type
@@ -1263,5 +1268,169 @@ async def create_curriculum_node(
         await db.commit()
     
     return curriculum
+
+
+# ── Bildungsplan Hierarchie Endpoint ────────────────────────────────────────
+
+
+@router.get("/fachplan/by-subject/{subject_id}", response_model=FachplanTreeRead)
+async def get_fachplan_by_subject(
+    subject_id: int,
+    grade: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Gibt die Bildungsplan-Hierarchie für ein Fach als verschachteltes Objekt zurück.
+    
+    Lädt den Fachplan und alle zugehörigen Leitideen mit IK-Kompetenz-Kindern
+    sowie PK-Gruppen mit PK-Kompetenz-Kindern für das gegebene Fach und optional
+    die angegebene Jahrgangsstufe.
+    
+    Die Hierarchie basiert auf part_of-Kanten:
+    - leitidee -> part_of -> fachplan
+    - ik_kompetenz -> part_of -> leitidee  
+    - pk_gruppe -> part_of -> fachplan
+    - pk_kompetenz -> part_of -> pk_gruppe
+    """
+    
+    # Fachplan-Knoten für dieses Fach laden
+    result = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type == "fachplan",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+        )
+    )
+    fachplan_node = result.scalar_one_or_none()
+    
+    if not fachplan_node:
+        # Kein Fachplan für dieses Fach gefunden
+        return FachplanTreeRead(
+            fachplan=None,
+            leitideen=[],
+            pk_gruppen=[],
+            can_edit=False,
+        )
+    
+    # Alle Leitideen laden, die part_of -> fachplan sind
+    leitideen_result = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == fachplan_node.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "leitidee",
+            ContextNode.status == "active",
+        )
+        .order_by(ContextNode.title)
+    )
+    leitideen_nodes = leitideen_result.scalars().all()
+    
+    # Für jede Leitidee die IK-Kompetenz-Kinder laden
+    leitideen_list = []
+    for ld_node in leitideen_nodes:
+        # Prüfe grade-Filter aus metadata wenn vorhanden
+        if grade and ld_node.metadata_.get("grade"):
+            # Leitidee hat grade-Metadaten, aber wir filtern IK-Kompetenz nach grade
+            pass
+        
+        # IK-Kompetenz-Kinder laden
+        ik_result = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == ld_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "ik_kompetenz",
+                ContextNode.status == "active",
+            )
+            .order_by(
+                sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
+                ContextNode.title,
+            )
+        )
+        ik_nodes = ik_result.scalars().all()
+        
+        # Filter nach grade wenn angegeben
+        if grade:
+            ik_nodes = [
+                n for n in ik_nodes
+                if str(grade) in str(n.metadata_.get("grade_band", ""))
+                or str(grade) in str(n.metadata_.get("jahrgangsstufe", ""))
+            ]
+        
+        ik_list = [
+            IkKompetenzRead(
+                id=n.id,
+                title=n.title,
+                metadata_=n.metadata_,
+            )
+            for n in ik_nodes
+        ]
+        
+        leitideen_list.append(
+            LeitideeRead(
+                id=ld_node.id,
+                title=ld_node.title,
+                metadata_=ld_node.metadata_,
+                ik_kompetenzen=ik_list,
+            )
+        )
+    
+    # Alle PK-Gruppen laden, die part_of -> fachplan sind
+    pk_gruppen_result = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == fachplan_node.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "pk_gruppe",
+            ContextNode.status == "active",
+        )
+        .order_by(ContextNode.title)
+    )
+    pk_gruppen_nodes = pk_gruppen_result.scalars().all()
+    
+    # Für jede PK-Gruppe die PK-Kompetenz-Kinder laden
+    pk_gruppen_list = []
+    for pg_node in pk_gruppen_nodes:
+        # PK-Kompetenz-Kinder laden
+        pk_result = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == pg_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "pk_kompetenz",
+                ContextNode.status == "active",
+            )
+            .order_by(ContextNode.title)
+        )
+        pk_nodes = pk_result.scalars().all()
+        
+        pk_list = [
+            PkKompetenzRead(
+                id=n.id,
+                title=n.title,
+                metadata_=n.metadata_,
+            )
+            for n in pk_nodes
+        ]
+        
+        pk_gruppen_list.append(
+            PkGruppeRead(
+                id=pg_node.id,
+                title=pg_node.title,
+                metadata_=pg_node.metadata_,
+                pk_kompetenzen=pk_list,
+            )
+        )
+    
+    return FachplanTreeRead(
+        fachplan=ContextNodeRead.model_validate(fachplan_node),
+        leitideen=leitideen_list,
+        pk_gruppen=pk_gruppen_list,
+        can_edit=False,  # Phase: read-only
+    )
 
 

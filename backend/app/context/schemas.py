@@ -295,3 +295,70 @@ class CurriculumRead(BaseModel):
     write_scope_group_id: int | None
     kapitel: list[KapitelRead]
     can_edit: bool
+
+
+# ── Bildungsplan Hierarchie Schemas ────────────────────────────────────────
+
+
+class IkKompetenzRead(BaseModel):
+    """Inhaltsbezogene Kompetenz (IK) für Bildungsplan-Hierarchie."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        default_factory=dict,
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+
+
+class LeitideeRead(BaseModel):
+    """Leitidee mit ihren IK-Kompetenz-Kindern."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        default_factory=dict,
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+    ik_kompetenzen: list[IkKompetenzRead] = Field(default_factory=list)
+
+
+class PkKompetenzRead(BaseModel):
+    """Prozessbezogene Kompetenz (PK) für Bildungsplan-Hierarchie."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        default_factory=dict,
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+
+
+class PkGruppeRead(BaseModel):
+    """PK-Gruppe mit ihren PK-Kompetenz-Kindern."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    metadata_: dict = Field(
+        default_factory=dict,
+        validation_alias="metadata",
+        serialization_alias="metadata",
+    )
+    pk_kompetenzen: list[PkKompetenzRead] = Field(default_factory=list)
+
+
+class FachplanTreeRead(BaseModel):
+    """Verschachtelte Bildungsplan-Hierarchie für ein Fach."""
+    model_config = ConfigDict(from_attributes=True)
+
+    fachplan: ContextNodeRead | None = None
+    leitideen: list[LeitideeRead] = Field(default_factory=list)
+    pk_gruppen: list[PkGruppeRead] = Field(default_factory=list)
+    can_edit: bool = False
