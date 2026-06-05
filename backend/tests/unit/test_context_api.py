@@ -245,3 +245,213 @@ class TestDeleteNode:
         client = TestClient(make_app(db, user))
         resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204
+
+
+# ── POST /context/curricula/new ──────────────────────────────────────────────
+
+def _exec_result(*, fetchone=None, scalar=None):
+    """Hilfsobjekt für db.execute()-Rückgaben."""
+    m = MagicMock()
+    m.fetchone.return_value = fetchone
+    m.scalar_one_or_none.return_value = scalar
+    return m
+
+
+def _make_curriculum_db(execute_results, *, fachplan_node=None):
+    """Baut ein AsyncMock-DB mit sequenziellen execute()-Ergebnissen.
+
+    execute_results: sequenzielle Rückgaben für db.execute()
+    fachplan_node:   Rückgabe für db.get() (Fachplan-Lookup per UUID)
+    """
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.commit = AsyncMock()
+    db.execute = AsyncMock(side_effect=execute_results)
+    db.get = AsyncMock(return_value=fachplan_node)
+
+    from datetime import datetime, timezone
+
+    async def _refresh(obj):
+        if not hasattr(obj, "id") or obj.id is None:
+            import uuid
+            obj.id = uuid.uuid4()
+        if not hasattr(obj, "created_at") or obj.created_at is None:
+            obj.created_at = datetime.now(timezone.utc)
+        if not hasattr(obj, "updated_at") or obj.updated_at is None:
+            obj.updated_at = datetime.now(timezone.utc)
+
+    db.refresh = _refresh
+    return db
+
+
+FACHPLAN_UUID = str(uuid4())
+
+VALID_CURRICULUM_PAYLOAD = {
+    "fach_code": "ETH",
+    "schulart": "Gymnasium",
+    "jahrgangsstufe": "7",
+    "bp_version": "2016",
+    "schule": "Testschule",
+    "fachplan_node_id": FACHPLAN_UUID,  # Node-UUID, nicht metadata.fachplan_id
+}
+
+
+class TestCreateCurriculumNode:
+
+    def test_unknown_fach_returns_422(self):
+        # fachplan_node=None → db.get() None → 422
+        db = _make_curriculum_db([], fachplan_node=None)
+        user = make_jwt(roles=["teacher"])
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 422
+        assert "Bildungsplan" in resp.json()["detail"]
+
+    def test_no_subject_on_fachplan_returns_422(self):
+        fp = make_node(content_type="fachplan")
+        fp.subject_id = None
+        db = _make_curriculum_db([], fachplan_node=fp)
+        user = make_jwt(roles=["teacher"])
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 422
+        assert "Fachplan" in resp.json()["detail"]
+
+    def test_non_member_without_dept_group_proceeds(self):
+        """Wenn keine Fachschaft-Gruppe existiert, wird die Mitgliedschaftsprüfung übersprungen."""
+        fp = make_node(content_type="fachplan")
+        fp.subject_id = 42
+        db = _make_curriculum_db(
+            [
+                _exec_result(fetchone=None),   # kein dept group → kein Check
+                _exec_result(scalar=None),     # kein existing node
+            ],
+            fachplan_node=fp,
+        )
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 201
+
+    def test_non_member_with_dept_group_returns_403(self):
+        fp = make_node(content_type="fachplan")
+        fp.subject_id = 42
+        dept_id = 99
+        db = _make_curriculum_db(
+            [
+                _exec_result(fetchone=(dept_id,)),  # dept group
+                _exec_result(scalar=None),          # kein Mitglied
+            ],
+            fachplan_node=fp,
+        )
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 403
+
+    def test_no_fachplan_returns_422(self):
+        db = _make_curriculum_db([], fachplan_node=None)
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 422
+        assert "Bildungsplan" in resp.json()["detail"]
+
+    def test_admin_bypasses_membership_check(self):
+        fp = make_node(content_type="fachplan")
+        fp.subject_id = 42
+        dept_id = 99
+        db = _make_curriculum_db(
+            [
+                _exec_result(fetchone=(dept_id,)),  # dept group
+                _exec_result(scalar=None),          # kein Mitglied
+                _exec_result(scalar=None),          # kein existing node
+            ],
+            fachplan_node=fp,
+        )
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 201
+
+    def test_idempotency_returns_existing_node(self):
+        fp = make_node(content_type="fachplan")
+        fp.subject_id = 42
+        dept_id = 99
+        existing = make_node(content_type="curriculum")
+        db = _make_curriculum_db(
+            [
+                _exec_result(fetchone=(dept_id,)),  # dept group
+                _exec_result(scalar=1),             # Mitglied
+                _exec_result(scalar=existing),      # bereits vorhanden → zurückliefern
+            ],
+            fachplan_node=fp,
+        )
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 201
+        assert resp.json()["id"] == str(existing.id)
+
+    def test_valid_payload_creates_node_and_returns_201(self):
+        from uuid import UUID
+        fp = make_node(content_type="fachplan", id=UUID(FACHPLAN_UUID))
+        fp.subject_id = 42
+        fp.metadata_ = {"fachplan_id": "BP2016_GYM_ETH"}  # Geschäftsschlüssel
+        db = _make_curriculum_db(
+            [
+                _exec_result(fetchone=None),   # kein dept group → kein Check
+                _exec_result(scalar=None),     # kein existing node
+            ],
+            fachplan_node=fp,
+        )
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/curricula/new", json=VALID_CURRICULUM_PAYLOAD)
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["content_type"] == "curriculum"
+        assert body["metadata"]["fach_code"] == "ETH"
+        assert body["metadata"]["jahrgangsstufe"] == "7"
+        assert body["metadata"]["bp_version"] == "2016"
+        # Geschäftsschlüssel kommt vom Fachplan-Knoten, nicht aus dem Payload
+        assert body["metadata"]["fachplan_id"] == "BP2016_GYM_ETH"
+        # Node-UUID des Fachplans wird separat abgelegt
+        assert body["metadata"]["fachplan_node_id"] == FACHPLAN_UUID
+
+
+class TestGetSubjectByFachCode:
+    """GET /context/subjects/by-code/{fach_code} — Auflösung über subjects.fach_code."""
+
+    def test_resolves_fach_code_to_subject(self):
+        # db.execute(...).fetchone() liefert (subject_id, slug)
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=_exec_result(fetchone=(42, "chemie")))
+        client = TestClient(make_app(db, make_jwt(roles=["teacher"])))
+        resp = client.get("/context/subjects/by-code/CH")
+        assert resp.status_code == 200
+        assert resp.json() == {"subject_id": 42, "subject_slug": "chemie"}
+
+    def test_lowercase_input_is_normalized(self):
+        # Eingabe 'ch' wird auf 'CH' normalisiert — Resolver matcht trotzdem.
+        captured = {}
+
+        async def _exec(stmt):
+            captured["stmt"] = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            return _exec_result(fetchone=(42, "chemie"))
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=_exec)
+        client = TestClient(make_app(db, make_jwt(roles=["teacher"])))
+        resp = client.get("/context/subjects/by-code/ch")
+        assert resp.status_code == 200
+        # Es wird gegen den Großbuchstaben-Code gefiltert, nicht gegen den Slug.
+        assert "'CH'" in captured["stmt"]
+        assert "fach_code" in captured["stmt"]
+
+    def test_unknown_fach_code_returns_404(self):
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=_exec_result(fetchone=None))
+        client = TestClient(make_app(db, make_jwt(roles=["teacher"])))
+        resp = client.get("/context/subjects/by-code/XYZ")
+        assert resp.status_code == 404

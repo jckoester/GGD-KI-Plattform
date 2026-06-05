@@ -123,9 +123,10 @@
                                 <h3 class="font-medium text-light-tx dark:text-dark-tx mb-3">
                                     {subject.name}
                                 </h3>
-                                <CurriculumList 
-                                    subjectId={subject.id} 
+                                <CurriculumList
+                                    subjectId={subject.id}
                                     subjectSlug={subject.slug}
+                                    subjectFachCode={subject.fach_code}
                                     showNewButton={true}
                                 />
                             </div>

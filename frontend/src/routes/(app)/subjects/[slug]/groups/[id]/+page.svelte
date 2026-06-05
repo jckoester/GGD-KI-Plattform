@@ -215,6 +215,7 @@
     <CurriculumList
       subjectId={subject?.id}
       subjectSlug={subject?.slug}
+      subjectFachCode={subject?.fach_code}
       showNewButton={true}
     />
 

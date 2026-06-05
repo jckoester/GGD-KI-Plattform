@@ -240,8 +240,8 @@ class TestCreateCurriculum:
         # Subject erstellen
         await db_session.execute(
             text("""
-                INSERT INTO subjects (id, name, slug)
-                VALUES (1, 'Mathematik', 'MA')
+                INSERT INTO subjects (id, name, slug, fach_code)
+                VALUES (1, 'Mathematik', 'mathematik', 'MA')
                 ON CONFLICT (id) DO NOTHING
             """),
         )
@@ -353,8 +353,8 @@ class TestCreateCurriculum:
         # Subject erstellen
         await db_session.execute(
             text("""
-                INSERT INTO subjects (id, name, slug)
-                VALUES (1, 'Mathematik', 'MA')
+                INSERT INTO subjects (id, name, slug, fach_code)
+                VALUES (1, 'Mathematik', 'mathematik', 'MA')
                 ON CONFLICT DO NOTHING
             """),
         )
@@ -434,8 +434,8 @@ class TestCurriculumService:
         
         await db_session.execute(
             text("""
-                INSERT INTO subjects (id, name, slug)
-                VALUES (1, 'Mathematik', 'MA')
+                INSERT INTO subjects (id, name, slug, fach_code)
+                VALUES (1, 'Mathematik', 'mathematik', 'MA')
                 ON CONFLICT DO NOTHING
             """),
         )
@@ -517,8 +517,8 @@ class TestCurriculumService:
         
         await db_session.execute(
             text("""
-                INSERT INTO subjects (id, name, slug)
-                VALUES (1, 'Mathematik', 'MA')
+                INSERT INTO subjects (id, name, slug, fach_code)
+                VALUES (1, 'Mathematik', 'mathematik', 'MA')
                 ON CONFLICT DO NOTHING
             """),
         )
@@ -739,8 +739,8 @@ class TestImportCurriculumCLI:
         
         await db_session.execute(
             text("""
-                INSERT INTO subjects (id, name, slug)
-                VALUES (1, 'Mathematik', 'MA')
+                INSERT INTO subjects (id, name, slug, fach_code)
+                VALUES (1, 'Mathematik', 'mathematik', 'MA')
                 ON CONFLICT DO NOTHING
             """),
         )

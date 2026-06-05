@@ -64,6 +64,9 @@ class Subject(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(unique=True, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Bildungsplan-Fachkürzel (z. B. 'M', 'CH'); aus config/subjects.yaml geseedet.
+    # Nullable: nicht jedes Fach hat einen Bildungsplan-Code (z. B. Deutsch).
+    fach_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     icon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     color: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)

@@ -196,12 +196,18 @@ class ContextEdgeRead(BaseModel):
 
 
 class CurriculumCreate(BaseModel):
-    """Schema für das Anlegen eines neuen Curriculum-Knotens über die UI."""
+    """Schema für das Anlegen eines neuen Curriculum-Knotens über die UI.
+
+    fachplan_node_id ist die ContextNode-UUID des fachplan-Knotens (Primärschlüssel) —
+    nicht zu verwechseln mit dem Geschäftsschlüssel metadata.fachplan_id der
+    Bildungsplan-Importe.
+    """
     fach_code: str
     schulart: str
     jahrgangsstufe: str
     bp_version: str
     schule: str
+    fachplan_node_id: str
     model_config = ConfigDict(populate_by_name=True)
 
 

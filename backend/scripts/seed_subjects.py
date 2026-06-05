@@ -51,6 +51,9 @@ async def seed(yaml_path: Path) -> None:
     async with session_factory() as db:
         for entry in subjects:
             slug = entry["slug"].lower()
+            # Fachkürzel normalisieren: leer/fehlend → None, sonst Großschreibung
+            raw_code = entry.get("fach_code")
+            fach_code = raw_code.strip().upper() if raw_code and raw_code.strip() else None
             result = await db.execute(
                 select(Subject).where(Subject.slug == slug)
             )
@@ -58,6 +61,7 @@ async def seed(yaml_path: Path) -> None:
 
             if existing:
                 existing.name = entry["name"]
+                existing.fach_code = fach_code
                 existing.icon = entry.get("icon")
                 existing.color = entry.get("color")
                 existing.min_grade = entry.get("min_grade")
@@ -69,6 +73,7 @@ async def seed(yaml_path: Path) -> None:
                     Subject(
                         slug=slug,
                         name=entry["name"],
+                        fach_code=fach_code,
                         icon=entry.get("icon"),
                         color=entry.get("color"),
                         min_grade=entry.get("min_grade"),

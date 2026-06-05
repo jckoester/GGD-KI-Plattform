@@ -5,6 +5,9 @@
      * Props:
      * - subjectId: ID des Fachs
      * - subjectSlug: Slug des Fachs (für Links)
+     * - subjectFachCode: Bildungsplan-Fachkürzel (z. B. 'M', 'CH') — für die
+     *   Vorbelegung der Curriculum-Neuanlage. NICHT der Slug! Fehlt der Code,
+     *   wird die Neuanlage ohne Vorbelegung verlinkt.
      * - showNewButton: boolean (Default: true) - Zeigt "Neues Curriculum anlegen" Button
      */
     import { goto } from '$app/navigation'
@@ -14,7 +17,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     
-    let { subjectId = null, subjectSlug = null, showNewButton = true } = $props()
+    let { subjectId = null, subjectSlug = null, subjectFachCode = null, showNewButton = true } = $props()
     
     let curricula = $state([])
     let loading = $state(true)
@@ -116,6 +119,20 @@
                 </a>
             {/each}
         </div>
-        
+    {/if}
+
+    <!-- "Neues Curriculum anlegen"-Button für Fachschaftsmitglieder / Admins -->
+    {#if showNewButton && canEditSubject}
+        <div class="pt-2">
+            <a
+                href={`/knowledge/curriculum/new${subjectFachCode ? `?fach_code=${encodeURIComponent(subjectFachCode)}` : ''}`}
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
+                       border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx-2 dark:text-dark-tx-2
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                + Neues Curriculum
+            </a>
+        </div>
     {/if}
 </div>

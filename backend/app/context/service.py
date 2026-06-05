@@ -140,11 +140,17 @@ class ImportStats:
 
 
 async def get_subject_id_by_code(db: AsyncSession, fach_code: str) -> int | None:
-    """Lädt subject_id aus DB für den gegebenen fach_code (matched per slug, case-insensitiv)."""
+    """Lädt subject_id aus DB für den gegebenen fach_code.
+
+    Match über die Spalte subjects.fach_code (Bildungsplan-Kürzel, z. B. 'M', 'CH'),
+    normalisiert auf Großschreibung — nicht über den Slug.
+    """
     from app.db.models import Subject
+    if not fach_code:
+        return None
     result = await db.execute(
         sa.select(Subject.id).where(
-            Subject.slug.ilike(fach_code),
+            Subject.fach_code == fach_code.strip().upper(),
         )
     )
     row = result.fetchone()

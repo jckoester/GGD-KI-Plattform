@@ -1176,44 +1176,31 @@ async def create_curriculum_node(
 ):
     """Erstellt einen neuen leeren Curriculum-Knoten für den Editor."""
     from app.db.models import Group
-    
-    # Subject laden
-    subject = await db.execute(
-        sa.select(Group.subject_id).where(
-            sa.or_(
-                Group.type == "subject_department",
-                Group.type == "subject",
-            ),
-            Group.metadata_["fach_code"].astext == payload.fach_code,
-        ).limit(1)
-    )
-    subject_row = subject.fetchone()
-    if not subject_row:
-        # Alternative: direkt aus subjects Tabelle
-        subj = await db.execute(
-            sa.select(Subject.id).where(
-                Subject.metadata_["fach_code"].astext == payload.fach_code
-            ).limit(1)
+    from app.context.service import get_subject_department_group_id
+    import uuid as _uuid
+
+    # Fachplan laden per Node-UUID — Pflicht (subject_id wird von dort abgeleitet)
+    try:
+        fachplan_uuid = _uuid.UUID(payload.fachplan_node_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="fachplan_node_id ist keine gültige UUID")
+    fachplan_node = await db.get(ContextNode, fachplan_uuid)
+    if not fachplan_node or fachplan_node.content_type != "fachplan" or fachplan_node.status != "active":
+        raise HTTPException(
+            status_code=422,
+            detail=f"Für Fach {payload.fach_code} / BP-Version {payload.bp_version} ist kein Bildungsplan importiert",
         )
-        subject_id = subj.scalar_one_or_none()
-    else:
-        subject_id = subject_row[0]
-    
+
+    subject_id = fachplan_node.subject_id
     if not subject_id:
         raise HTTPException(
             status_code=422,
-            detail=f"Fach mit fach_code '{payload.fach_code}' nicht gefunden"
+            detail=f"Fachplan nicht mit einem Fach verknüpft — bitte Bildungsplan neu importieren",
         )
-    
+
     # Fachschafts-Gruppen-ID
-    department_group = await db.execute(
-        sa.select(Group.id).where(
-            Group.subject_id == subject_id,
-            Group.type == "subject_department",
-        ).limit(1)
-    )
-    department_group_id = department_group.scalar_one_or_none()
-    
+    department_group_id = await get_subject_department_group_id(db, subject_id)
+
     # Prüfe ob User Mitglied der Fachschaft ist
     if department_group_id:
         is_member = await db.execute(
@@ -1227,20 +1214,19 @@ async def create_curriculum_node(
                 status_code=403,
                 detail="Keine Berechtigung - Sie müssen Mitglied der Fachschaft sein"
             )
-    
-    # Fachplan laden
-    fachplan = await db.execute(
+
+    # Idempotenz: bestehenden aktiven Knoten zurückliefern
+    import_key = f"new_{user.sub}_{payload.fach_code}_{payload.jahrgangsstufe}_{payload.bp_version}"
+    existing = await db.execute(
         sa.select(ContextNode).where(
-            ContextNode.content_type == "fachplan",
-            ContextNode.metadata_["fachplan_id"].astext == payload.fachplan_id,
+            ContextNode.metadata_["import_key"].astext == import_key,
             ContextNode.status == "active",
         ).limit(1)
     )
-    fachplan_node = fachplan.scalar_one_or_none()
-    
-    # Curriculum-Knoten erstellen
-    import_key = f"new_{user.sub}_{payload.fach_code}_{payload.jahrgangsstufe}"
-    
+    existing_node = existing.scalar_one_or_none()
+    if existing_node:
+        return existing_node
+
     curriculum = ContextNode(
         category="knowledge",
         content_type="curriculum",
@@ -1252,7 +1238,13 @@ async def create_curriculum_node(
         subject_id=subject_id,
         owner_pseudonym=user.sub,
         metadata_={
-            "fachplan_id": payload.fachplan_id,
+            # Geschäftsschlüssel des Bildungsplans — konsistent mit dem Import-Pfad
+            # (service.import_curriculum schreibt dasselbe Feld). Kann fehlen, wenn
+            # der Fachplan-Knoten keinen trägt.
+            "fachplan_id": (fachplan_node.metadata_ or {}).get("fachplan_id"),
+            # Node-UUID des Fachplans (Primärschlüssel) — redundant zur part_of-Kante,
+            # aber praktisch für direkte Lookups ohne Kanten-Query.
+            "fachplan_node_id": str(fachplan_node.id),
             "bp_version": payload.bp_version,
             "schule": payload.schule,
             "fach_code": payload.fach_code,
@@ -1267,15 +1259,14 @@ async def create_curriculum_node(
     await db.refresh(curriculum)
     
     # part_of-Kante zum Fachplan
-    if fachplan_node:
-        edge = ContextEdge(
-            from_node_id=curriculum.id,
-            to_node_id=fachplan_node.id,
-            relation="part_of",
-            metadata_={},
-        )
-        db.add(edge)
-        await db.commit()
+    edge = ContextEdge(
+        from_node_id=curriculum.id,
+        to_node_id=fachplan_node.id,
+        relation="part_of",
+        metadata_={},
+    )
+    db.add(edge)
+    await db.commit()
     
     return curriculum
 
@@ -1289,26 +1280,17 @@ async def get_subject_by_fach_code(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    """Löst einen Fach-Code (z.B. 'ETH', 'MAT') zu subject_id und subject_slug auf."""
-    # Erst über Groups suchen (trägt fach_code in metadata)
+    """Löst einen Fach-Code (z.B. 'M', 'CH', 'ETH') zu subject_id und subject_slug auf.
+
+    Match über die Spalte subjects.fach_code (aus config/subjects.yaml geseedet),
+    case-insensitiv normalisiert auf Großschreibung — NICHT über den Slug.
+    """
     row = await db.execute(
         sa.select(Subject.id, Subject.slug)
-        .join(Group, Group.subject_id == Subject.id)
-        .where(
-            Group.type.in_(["subject_department", "subject"]),
-            Group.metadata_["fach_code"].astext == fach_code.upper(),
-        )
+        .where(Subject.fach_code == fach_code.strip().upper())
         .limit(1)
     )
     result = row.fetchone()
-    if not result:
-        # Fallback: direkt in subjects.metadata suchen
-        row2 = await db.execute(
-            sa.select(Subject.id, Subject.slug)
-            .where(Subject.metadata_["fach_code"].astext == fach_code.upper())
-            .limit(1)
-        )
-        result = row2.fetchone()
     if not result:
         raise HTTPException(status_code=404, detail=f"Kein Fach mit fach_code '{fach_code}' gefunden")
     return {"subject_id": result[0], "subject_slug": result[1]}

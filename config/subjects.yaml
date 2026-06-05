@@ -1,6 +1,8 @@
 # Fächer-Konfiguration
 # Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
-#         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order
+#         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order,
+#         fach_code (optional, Bildungsplan-Fachkürzel wie M/CH; wird in die
+#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
 schuljahr: "2026/27" # aktuelles Schuljahr

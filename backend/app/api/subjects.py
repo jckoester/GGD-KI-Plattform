@@ -15,6 +15,7 @@ class SubjectOut(BaseModel):
     id: int
     slug: str
     name: str
+    fach_code: Optional[str] = None
     icon: Optional[str]
     color: Optional[str]
     min_grade: Optional[int]
