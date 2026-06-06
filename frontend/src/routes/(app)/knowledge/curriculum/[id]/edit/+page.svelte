@@ -19,23 +19,37 @@
     let saveSuccess = $state(false)
     let canEdit = $state(false)
 
-    // Lade Curriculum und prüfe Berechtigungen
-    $effect(async () => {
-        try {
-            curriculum = await getCurriculum($page.params.id)
-            // Prüfe ob User editieren darf
-            if (!curriculum?.can_edit) {
-                // Weiterleitung zur Read-only-Ansicht
-                goto(`/knowledge/curriculum/${$page.params.id}`, { replaceState: true })
-                return
+    // Lade Curriculum und prüfe Berechtigungen.
+    // Der Effekt selbst ist synchron (liest $page.params.id als Dependency,
+    // damit er bei Routenwechsel erneut läuft); die async-Arbeit passiert in
+    // einer inneren Funktion. Ein cancelled-Flag verwirft veraltete Antworten,
+    // falls die ID wechselt, bevor der Request zurückkommt.
+    $effect(() => {
+        const id = $page.params.id
+        let cancelled = false
+
+        loading = true
+        ;(async () => {
+            try {
+                const data = await getCurriculum(id)
+                if (cancelled) return
+                curriculum = data
+                // Prüfe ob User editieren darf
+                if (!data?.can_edit) {
+                    // Weiterleitung zur Read-only-Ansicht
+                    goto(`/knowledge/curriculum/${id}`, { replaceState: true })
+                    return
+                }
+                canEdit = true
+                draft = $state.snapshot(curriculum)
+            } catch (e) {
+                if (!cancelled) saveError = e.message
+            } finally {
+                if (!cancelled) loading = false
             }
-            canEdit = true
-            draft = $state.snapshot(curriculum)
-        } catch (e) {
-            saveError = e.message
-        } finally {
-            loading = false
-        }
+        })()
+
+        return () => { cancelled = true }
     })
 
     // Speichern-Funktion
