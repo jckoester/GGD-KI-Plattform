@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
-    import { getCurriculum } from '$lib/api.js'
+    import { getCurriculum, deleteContextNode } from '$lib/api.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -12,15 +12,45 @@
     let loading = $state(true)
     let error = $state(null)
 
-    $effect(async () => {
-        try {
-            curriculum = await getCurriculum($page.params.id)
-        } catch (e) {
-            error = e.message
-        } finally {
-            loading = false
-        }
+    // Löschen
+    let confirmDelete = $state(false)
+    let deleting = $state(false)
+    let deleteError = $state(null)
+
+    $effect(() => {
+        const id = $page.params.id
+        let cancelled = false
+
+        loading = true
+        ;(async () => {
+            try {
+                const data = await getCurriculum(id)
+                if (cancelled) return
+                curriculum = data
+            } catch (e) {
+                if (!cancelled) error = e.message
+            } finally {
+                if (!cancelled) loading = false
+            }
+        })()
+
+        return () => { cancelled = true }
     })
+
+    async function handleDelete() {
+        if (deleting || !curriculum) return
+        deleting = true
+        deleteError = null
+        try {
+            await deleteContextNode(curriculum.id)
+            goto('/knowledge/curricula', { replaceState: true })
+        } catch (e) {
+            deleteError = e.status === 403
+                ? 'Keine Berechtigung — Sie müssen Mitglied der Fachschaft sein.'
+                : (e.message || 'Curriculum konnte nicht gelöscht werden.')
+            deleting = false
+        }
+    }
 </script>
 
 <div class="flex min-h-0 flex-1">
@@ -52,13 +82,21 @@
                 </div>
                 <div class="flex gap-2">
                     {#if curriculum.can_edit}
-                        <a 
+                        <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"
                             class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark
                                text-white font-medium hover:opacity-90 transition-opacity"
                         >
                             Bearbeiten
                         </a>
+                        <button
+                            onclick={() => { deleteError = null; confirmDelete = true }}
+                            class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-re dark:text-dark-re font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            Löschen
+                        </button>
                     {/if}
                     <!-- Export-Buttons kommen in Schritt 5 -->
                 </div>
@@ -75,3 +113,42 @@
         {/if}
     </main>
 </div>
+
+{#if confirmDelete && curriculum}
+    <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-dark-bg-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-6 max-w-md w-full">
+            <h3 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-3">
+                Curriculum löschen
+            </h3>
+            <p class="text-light-tx-2 dark:text-dark-tx-2 mb-4">
+                Möchten Sie „{curriculum.title}" wirklich löschen? Alle enthaltenen
+                Kapitel und Lernsequenzen werden mitgelöscht. Dieser Vorgang kann
+                nicht rückgängig gemacht werden.
+            </p>
+            {#if deleteError}
+                <div class="mb-4">
+                    <ErrorBanner message={deleteError} />
+                </div>
+            {/if}
+            <div class="flex gap-3 justify-end">
+                <button
+                    onclick={() => confirmDelete = false}
+                    disabled={deleting}
+                    class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Abbrechen
+                </button>
+                <button
+                    onclick={handleDelete}
+                    disabled={deleting}
+                    class="px-4 py-2 text-sm rounded-md bg-light-re dark:bg-dark-re text-white
+                           hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {deleting ? 'Wird gelöscht…' : 'Löschen'}
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}

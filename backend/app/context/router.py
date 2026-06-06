@@ -448,7 +448,31 @@ async def delete_node(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     _check_write_permission(node, user)
-    await db.delete(node)
+
+    # Rekursiv alle untergeordneten Knoten einsammeln: Kinder zeigen per
+    # 'part_of'-Kante (from_node = Kind, to_node = Elternteil) auf ihr Elternteil.
+    # So wird z. B. ein ganzes Curriculum (Curriculum → Kapitel → Lernsequenz)
+    # in einem Rutsch gelöscht, statt verwaiste Knoten zu hinterlassen. Die
+    # Kanten selbst verschwinden über ON DELETE CASCADE der FK-Constraints.
+    to_delete: set[UUID] = {node_id}
+    frontier: list[UUID] = [node_id]
+    while frontier:
+        current = frontier.pop()
+        child_rows = await db.execute(
+            sa.select(ContextEdge.from_node_id).where(
+                ContextEdge.to_node_id == current,
+                ContextEdge.relation == "part_of",
+            )
+        )
+        for (child_id,) in child_rows:
+            if child_id not in to_delete:
+                to_delete.add(child_id)
+                frontier.append(child_id)
+
+    for nid in to_delete:
+        n = await db.get(ContextNode, nid)
+        if n is not None:
+            await db.delete(n)
     await db.commit()
 
 
