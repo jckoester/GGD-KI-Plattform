@@ -48,10 +48,11 @@ def _mock_fachplan_node(fachplan_id: UUID, subject_id: int = 1,
 
 
 def _mock_leitidee(ld_id: UUID, min_grade: int = 5, max_grade: int = 6,
-                   niveau: str = "regulär") -> MagicMock:
+                   niveau: str = "regulär", content: str | None = None) -> MagicMock:
     node = MagicMock()
     node.id = ld_id
     node.title = f"Leitidee (Kl. {min_grade}–{max_grade})"
+    node.content = content
     node.content_type = "leitidee"
     node.status = "active"
     node.metadata_ = {}

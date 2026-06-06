@@ -234,9 +234,12 @@
                 <span class="font-medium">{ld.title}</span>
             </div>
             <div class="flex items-center gap-2">
-                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    {countIk(ld)} Kompetenzen
-                </span>
+                <!-- Zähler nur anzeigen wenn Kompetenzen vorhanden; bei reinem Beschreibungstext weglassen -->
+                {#if countIk(ld) > 0}
+                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        {countIk(ld)} Kompetenzen
+                    </span>
+                {/if}
                 {#if expandedLeitideen[ld.id]}
                     <ChevronDown class="w-4 h-4 shrink-0" />
                 {:else}
@@ -246,6 +249,14 @@
         </button>
 
         {#if expandedLeitideen[ld.id]}
+            <!-- Beschreibungstext der Leitidee (oberhalb der Kompetenzen) -->
+            {#if ld.content}
+                <div class="px-3 pt-3 pb-1">
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 whitespace-pre-line leading-relaxed">
+                        {ld.content}
+                    </p>
+                </div>
+            {/if}
             <!-- Direkte IK-Kompetenzen -->
             {#if ld.ik_kompetenzen?.length > 0}
                 <div class="p-3 space-y-1">

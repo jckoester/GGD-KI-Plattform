@@ -328,6 +328,7 @@ class LeitideeRead(BaseModel):
 
     id: UUID
     title: str
+    content: str | None = None
     min_grade: int | None = None
     max_grade: int | None = None
     niveau: str = "regulär"

@@ -1465,6 +1465,7 @@ async def get_fachplan_by_subject(
         return LeitideeRead(
             id=parent_node.id,
             title=parent_node.title,
+            content=parent_node.content or None,
             min_grade=parent_node.min_grade,
             max_grade=parent_node.max_grade,
             niveau=parent_node.niveau,

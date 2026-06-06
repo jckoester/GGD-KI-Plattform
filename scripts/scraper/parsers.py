@@ -20,6 +20,15 @@ _NIVEAU_FROM_BPID = re.compile(r'_(?:IK|PK)_\d+(?:-\d+)*-(BF|LF)_')
 _VERSION_YEAR = re.compile(r'^BP(\d{4})')
 _VERSION_EDITION = re.compile(r'\.(V\d+)$')
 
+# Boilerplate-Strings in der Inhaltsspalte (case-insensitive exact match).
+# Gilt für alle Inhalts-Parser (Leitidee, PK-Gruppe, Fachplan).
+# Erweiterbar wenn bildungsplaene-bw.de das Layout ändert.
+_CONTENT_BOILERPLATE = frozenset([
+    "download als pdf",
+    "hinweis",        # alleinstehendes Service-Label — nicht der Knotentitel selbst
+    "umsetzungshilfen",
+])
+
 
 def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:
     """Extrahiert (min_grade, max_grade) aus bp_id, z.B. 'BP...CH_IK_7-8_01' -> (7, 8)."""
@@ -93,16 +102,122 @@ def _extract_breadcrumb(soup: BeautifulSoup, url: str) -> list[str]:
     return crumbs
 
 
+_JS_TEMPLATE = re.compile(r'\$\{|\$\w+\.\w+')
+
+
+def _is_template_literal(text: str) -> bool:
+    """Gibt True zurück wenn der Text ein ungerendertes JS-Template-Binding ist."""
+    return bool(_JS_TEMPLATE.search(text))
+
+
 def _find_title(soup: BeautifulSoup) -> str | None:
-    """Findet den Seitentitel: h1.headline--2 (Fachplan/Leitidee) oder h2 (LP/Standards)."""
-    # Fachplan and Leitidee overview pages use h1 with class headline--2
-    h1 = soup.find('h1', class_=lambda c: c and 'headline--2' in c)
-    if h1:
-        return strip_soft_hyphens(h1.get_text(separator=" ", strip=True))
-    h2 = soup.find('h2')
-    if h2:
-        return strip_soft_hyphens(h2.get_text(separator=" ", strip=True))
+    """Findet den Seitentitel robust über mehrere Quellen.
+
+    Reihenfolge:
+    1. *alle* h1/h2 mit Klasse ``headline--2`` (nicht nur das erste) — überspringt
+       ungerenderte JS-Template-Bindings wie ``$headline.text`` (neuere M.V2-Seiten)
+       und nimmt die erste echte Überschrift.
+    2. das ``og:title``-Meta-Tag — serverseitig gerendert, enthält nie ein JS-Binding.
+       Steht VOR dem generischen ``<h2>``-Fallback, weil auf Seiten mit nur einem
+       ``headline--2``-Platzhalter (M.V2-PK-Seiten) sonst eine ``headline--4``-
+       Zwischenüberschrift fälschlich als Titel genommen würde.
+    3. das erste echte ``<h2>`` (LP-/Standards-Seiten ohne ``headline--2``/``og:title``).
+
+    Gibt None zurück, wenn nur Template-Bindings/Leeres gefunden wurden, damit
+    Aufrufer zusätzlich auf den Breadcrumb-Fallback zurückfallen können.
+    """
+    def _clean(el) -> str:
+        return strip_soft_hyphens(el.get_text(separator=" ", strip=True))
+
+    # 1. Alle headline--2-Überschriften durchgehen (Platzhalter überspringen)
+    for el in soup.find_all(['h1', 'h2'], class_=lambda c: c and 'headline--2' in c):
+        text = _clean(el)
+        if text and not _is_template_literal(text):
+            return text
+
+    # 2. og:title-Meta als verlässlicher serverseitiger Fallback
+    og = soup.find('meta', attrs={'property': 'og:title'})
+    if og and og.get('content'):
+        text = strip_soft_hyphens(og['content'].strip())
+        if text and not _is_template_literal(text):
+            return text
+
+    # 3. Erstes echtes h2 (letzter Ausweg)
+    for el in soup.find_all('h2'):
+        text = _clean(el)
+        if text and not _is_template_literal(text):
+            return text
+
     return None
+
+
+# Klassen/Tags, die niemals Inhaltsfließtext tragen. Bewusst über semantische
+# Tag-Namen (nav/header/footer) statt über Substring-Klassenmatch — letzteres
+# schloss fälschlich Inhalts-Container wie ``page__header`` o. Ä. aus.
+def _in_noncontent_region(el) -> bool:
+    """True, wenn das Element in Navigation/Kopf/Fuß/Breadcrumb liegt."""
+    if el.find_parent(['nav', 'header', 'footer']):
+        return True
+    if el.find_parent(class_=re.compile(r'breadcrumb', re.I)):
+        return True
+    return False
+
+
+# Beginn des Service-/Boilerplate-Blocks am Seitenende. Ab hier wird kein
+# Inhaltstext mehr gesammelt (verhindert das Einsammeln von „Die Beispiel-
+# curricula …" u. Ä., die nicht in der Wort-Blocklist stehen).
+_SERVICE_BOUNDARY = re.compile(
+    r'^(die verlinkten unterst|umsetzungshilfen|die beispielcurricula)', re.I
+)
+
+
+def _collect_intro_text(soup: BeautifulSoup, title: str, *, limit: int | None = None) -> str:
+    """Sammelt den beschreibenden Einleitungstext einer Bildungsplan-Seite.
+
+    Strukturunabhängig: ab der Titelüberschrift (h1/h2.headline--2 mit Text == title)
+    werden in Dokumentreihenfolge alle <p>/<h3> gesammelt, bis der Service-Block
+    beginnt (_SERVICE_BOUNDARY). Wird die Titelüberschrift nicht gefunden (z. B. Titel
+    stammt aus og:title/Breadcrumb, weil das headline--2 ein JS-Platzhalter ist), wird
+    der gesamte <main> gescannt — die headline--2-Überschrift selbst ist kein <p>/<h3>
+    und fällt damit ohnehin heraus.
+
+    Bewusst NICHT an Grid-Spalten (.grid__col--1/2) gebunden — das Layout variiert
+    (grid--75-25 vs. grid--25-50-25) und der Inhalt liegt mal in col1, mal in col2.
+    Bewusst KEIN Substring-Klassenmatch (schloss Container wie „itk_header" fälschlich
+    aus); Navigation/Kopf/Fuß nur über semantische Tags (_in_noncontent_region).
+
+    limit: optionale Obergrenze für die Anzahl gesammelter Absätze (Fachplan-Kurztext).
+    """
+    main = soup.find('main') or soup
+    title_el = None
+    for el in main.find_all(['h1', 'h2'], class_=lambda c: c and 'headline--2' in c):
+        if strip_soft_hyphens(el.get_text(separator=" ", strip=True)) == title:
+            title_el = el
+            break
+
+    candidates = title_el.find_all_next(['p', 'h3']) if title_el else main.find_all(['p', 'h3'])
+
+    parts: list[str] = []
+    for elem in candidates:
+        if elem.find_parent('table'):
+            continue
+        if _in_noncontent_region(elem):
+            continue
+        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
+        if not text:
+            continue
+        low = text.lower()
+        if _SERVICE_BOUNDARY.match(low):
+            break  # Service-Block erreicht — Rest ist Boilerplate
+        if low in _CONTENT_BOILERPLATE:
+            continue
+        if text == title:
+            continue
+        parts.append(text)
+        if limit is not None and len(parts) >= limit:
+            break
+
+    return '\n'.join(parts)
 
 
 def _content_hash(text: str) -> str:
@@ -122,17 +237,9 @@ def parse_fachplan(soup: BeautifulSoup, url: str) -> dict[str, Any]:
     if not title:
         raise ScraperParseError(url, "Kein Titel (h1.headline--2 / h2) auf Fachplan-Seite")
 
-    content_parts = []
-    main = soup.find('main') or soup
-    for elem in main.find_all(['p', 'h2'], limit=10):
-        if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
-            continue
-        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
-        if text:
-            content_parts.append(text)
-            if len(content_parts) >= 3:
-                break
-    content = '\n'.join(content_parts) if content_parts else title
+    # Kurzbeschreibung strukturunabhängig erfassen (max. 3 Absätze, siehe
+    # _collect_intro_text). Reine Navigationsseiten (kein Fließtext) → content = title.
+    content = _collect_intro_text(soup, title, limit=3) or title
 
     min_grade, max_grade = extract_grades_from_bp_id(bp_id)
 
@@ -185,22 +292,13 @@ def parse_leitidee(soup: BeautifulSoup, url: str) -> dict[str, Any]:
     bp_id = _extract_bp_id_from_url(url)
     breadcrumb = _extract_breadcrumb(soup, url)
 
-    title = _find_title(soup)
+    title = _find_title(soup) or (breadcrumb[-1] if breadcrumb else None)
     if not title:
         raise ScraperParseError(url, "Kein Titel auf Leitidee-Seite")
 
-    # Einfuehrungstext: Paragraphen ausserhalb von Tabellen und Navigation
-    content_parts = []
-    main = soup.find('main') or soup
-    for elem in main.find_all(['p', 'h2', 'h3']):
-        if elem.find_parent('table'):
-            continue
-        if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
-            continue
-        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
-        if text:
-            content_parts.append(text)
-    content = '\n'.join(content_parts) if content_parts else title
+    # Einleitungstext strukturunabhängig erfassen (siehe _collect_intro_text).
+    # Kinderlose/reine Navigationsseiten liefern hier content = "".
+    content = _collect_intro_text(soup, title)
 
     parent_bp_id = _ik_parent_bp_id(bp_id)
     min_grade, max_grade = extract_grades_from_bp_id(bp_id)
@@ -323,21 +421,14 @@ def parse_pk_gruppe(soup: BeautifulSoup, url: str) -> dict[str, Any]:
     bp_id = _extract_bp_id_from_url(url)
     breadcrumb = _extract_breadcrumb(soup, url)
 
-    title = _find_title(soup)
+    title = _find_title(soup) or (breadcrumb[-1] if breadcrumb else None)
     if not title:
         raise ScraperParseError(url, "Kein Titel auf PK-Gruppen-Seite")
 
-    content_parts = []
-    main = soup.find('main') or soup
-    for elem in main.find_all(['p', 'h2', 'h3']):
-        if elem.find_parent('table'):
-            continue
-        if elem.find_parent(class_=re.compile('breadcrumb|nav|header|footer')):
-            continue
-        text = strip_soft_hyphens(elem.get_text(separator=" ", strip=True))
-        if text:
-            content_parts.append(text)
-    content = '\n'.join(content_parts) if content_parts else title
+    # Einleitungstext strukturunabhängig erfassen (siehe _collect_intro_text).
+    # Fängt zusätzlich das frühere Mitschleppen von Titel-Duplikat und dem
+    # JS-Platzhalter ``$headline.text`` im content ab.
+    content = _collect_intro_text(soup, title) or title
 
     parent_bp_id = re.sub(r'_PK_.*$', '', bp_id)
     min_grade, max_grade = extract_grades_from_bp_id(bp_id)
