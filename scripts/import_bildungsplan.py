@@ -130,11 +130,29 @@ def build_subject_id_lookup(conn) -> dict[str, int]:
 
 
 def load_jsonl_files(
-    input_dir: Path, fach_filter: str | None = None
-) -> list[dict[str, Any]]:
-    """Laedt alle JSONL-Dateien aus dem Input-Verzeichnis."""
+    input_path: Path, fach_filter: str | None = None
+) -> tuple[list[dict[str, Any]], bool]:
+    """Laedt JSONL-Dateien aus einem Verzeichnis oder einer einzelnen Datei.
+
+    Gibt (nodes, is_full_import) zurück. is_full_import ist False wenn nur eine
+    einzelne Datei geladen wurde (kein Verzeichnis-Scan), damit archive_removed_nodes
+    nicht versehentlich andere Fächer archiviert.
+    """
     nodes = []
-    for jsonl_file in sorted(input_dir.glob("*.jsonl")):
+    if input_path.is_file():
+        # Einzelne JSONL-Datei: nur diese laden, kein Voll-Import
+        with input_path.open(encoding="utf-8") as f:
+            for line_nr, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    nodes.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    logger.warning(f"{input_path.name}:{line_nr}: JSON-Fehler: {e}")
+        return nodes, False
+
+    for jsonl_file in sorted(input_path.glob("*.jsonl")):
         if fach_filter:
             stem = jsonl_file.stem.upper()
             if not stem.startswith(fach_filter.upper()):
@@ -150,7 +168,7 @@ def load_jsonl_files(
                     nodes.append(json.loads(line))
                 except json.JSONDecodeError as e:
                     logger.warning(f"{jsonl_file.name}:{line_nr}: JSON-Fehler: {e}")
-    return nodes
+    return nodes, True
 
 
 def sort_nodes_by_import_order(nodes: list[dict]) -> list[dict]:
@@ -514,7 +532,7 @@ def run_import(
         sys.exit(1)
 
     # JSONL laden
-    nodes = load_jsonl_files(Path(input_dir), fach_filter)
+    nodes, is_full_import = load_jsonl_files(Path(input_dir), fach_filter)
     if not nodes:
         logger.warning(f"Keine JSONL-Dateien in {input_dir}")
         return
@@ -600,8 +618,10 @@ def run_import(
                         cur, node, node_id, dry_run, warnings
                     )
 
-            # Entfernte Knoten archivieren (nur beim Voll-Import, nicht bei --fach-Filter)
-            if not fach_filter:
+            # Entfernte Knoten archivieren (nur beim echten Voll-Import: Verzeichnis
+            # ohne --fach-Filter). Bei einzelner Datei oder --fach würden sonst alle
+            # anderen Fächer versehentlich archiviert.
+            if is_full_import and not fach_filter:
                 stats["archived"] = archive_removed_nodes(cur, known_bp_ids, dry_run)
 
             # Veraltete Knoten durch neuere BP-Version ersetzen
