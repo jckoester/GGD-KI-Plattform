@@ -439,6 +439,7 @@ class ContextNode(Base):
     )
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
+    niveau: Mapped[str] = mapped_column(server_default="regulär")
 
     status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'active'")

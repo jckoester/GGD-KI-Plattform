@@ -16,10 +16,13 @@ from bs4 import BeautifulSoup
 from scripts.scraper.references import classify_reference, strip_soft_hyphens
 
 _GRADE_FROM_BPID = re.compile(r'_(?:IK|PK)_(\d+)(?:-(\d+))?(?:-(\d+))?(?:-[A-Za-z]+)?_')
+_NIVEAU_FROM_BPID = re.compile(r'_(?:IK|PK)_\d+(?:-\d+)*-(BF|LF)_')
+_VERSION_YEAR = re.compile(r'^BP(\d{4})')
+_VERSION_EDITION = re.compile(r'\.(V\d+)$')
 
 
 def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:
-    """Extrahiert (min_grade, max_grade) aus bp_id, z.B. 'BP...CH_IK_7-8_01' -> (7, 8)."""  
+    """Extrahiert (min_grade, max_grade) aus bp_id, z.B. 'BP...CH_IK_7-8_01' -> (7, 8)."""
     m = _GRADE_FROM_BPID.search(bp_id)
     if not m:
         return None, None
@@ -27,6 +30,29 @@ def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:
     if not grades:
         return None, None
     return min(grades), max(grades)
+
+
+def extract_niveau_from_bp_id(bp_id: str) -> str:
+    """'…11-12-BF_…' → 'basis', '…11-12-LF_…' → 'leistung', sonst 'regulär'."""
+    m = _NIVEAU_FROM_BPID.search(bp_id)
+    if not m:
+        return "regulär"
+    return {"BF": "basis", "LF": "leistung"}[m.group(1)]
+
+
+def extract_bp_version(bp_id: str) -> str:
+    """Leitet die BP-Versions-Kennung aus bp_id ab.
+
+    'BP2016BW_ALLG_GYM_M.V2_IK_…' → '2016.V2'
+    'BP2016BW_ALLG_GYM_M_IK_…'    → '2016'
+    """
+    year_m = _VERSION_YEAR.match(bp_id)
+    year = year_m.group(1) if year_m else ""
+    for part in bp_id.split("_"):
+        ed_m = _VERSION_EDITION.search(part)
+        if ed_m:
+            return year + "." + ed_m.group(1)
+    return year
 
 
 class ScraperParseError(Exception):
@@ -121,6 +147,8 @@ def parse_fachplan(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'relations': [],
         'min_grade': min_grade,
         'max_grade': max_grade,
+        'niveau': 'regulär',
+        'bp_version': extract_bp_version(bp_id),
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -188,6 +216,8 @@ def parse_leitidee(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'relations': [],
         'min_grade': min_grade,
         'max_grade': max_grade,
+        'niveau': extract_niveau_from_bp_id(bp_id),
+        'bp_version': extract_bp_version(bp_id),
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -272,6 +302,8 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
             'relations': relations,
             'min_grade': min_grade,
             'max_grade': max_grade,
+            'niveau': extract_niveau_from_bp_id(parent_bp_id),
+            'bp_version': extract_bp_version(parent_bp_id),
             'metadata': {
                 'bp_id': sub_bp_id,
                 'standard_nr': nr,
@@ -321,6 +353,8 @@ def parse_pk_gruppe(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'relations': [],
         'min_grade': min_grade,
         'max_grade': max_grade,
+        'niveau': extract_niveau_from_bp_id(bp_id),
+        'bp_version': extract_bp_version(bp_id),
         'metadata': {
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
@@ -414,6 +448,8 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
             'relations': [],
             'min_grade': min_grade,
             'max_grade': max_grade,
+            'niveau': extract_niveau_from_bp_id(parent_bp_id),
+            'bp_version': extract_bp_version(parent_bp_id),
             'metadata': meta,
             'visibility': 'global',
         })

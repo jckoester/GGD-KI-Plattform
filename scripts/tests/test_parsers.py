@@ -5,6 +5,9 @@ import re
 import pytest
 from scripts.scraper.parsers import (
     ScraperParseError,
+    extract_grades_from_bp_id,
+    extract_niveau_from_bp_id,
+    extract_bp_version,
     parse_leitidee,
     parse_ik_kompetenz_list,
     parse_pk_gruppe,
@@ -142,3 +145,81 @@ class TestParseLeitperspektive:
         for node in nodes:
             assert re.match(r'^BNE_\d{2}$', node['bp_id']), f"Ungueltige bp_id: {node['bp_id']}"
             assert node['parent_bp_id'] == 'BP2016BW_ALLG_LP_BNE'
+
+
+class TestExtractNiveauFromBpId:
+    def test_bf_marker_returns_basis(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_GYM_CH_IK_11-12-BF_01") == "basis"
+
+    def test_lf_marker_returns_leistung(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_GYM_CH_IK_11-12-LF_03") == "leistung"
+
+    def test_no_marker_returns_regulaer(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_GYM_M_IK_5-6_01") == "regulär"
+
+    def test_three_part_grade_returns_regulaer(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_GYM_CH_IK_8-9-10_01") == "regulär"
+
+    def test_leitperspektive_returns_regulaer(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_LP_BNE") == "regulär"
+
+    def test_bf_in_sub_node(self):
+        assert extract_niveau_from_bp_id("BP2016BW_ALLG_GYM_CH_IK_11-12-BF_01_01") == "basis"
+
+
+class TestExtractBpVersion:
+    def test_regular_m_returns_2016(self):
+        assert extract_bp_version("BP2016BW_ALLG_GYM_M_IK_5-6_01") == "2016"
+
+    def test_v2_m_returns_2016_v2(self):
+        assert extract_bp_version("BP2016BW_ALLG_GYM_M.V2_IK_5-6_01") == "2016.V2"
+
+    def test_ch_returns_2016(self):
+        assert extract_bp_version("BP2016BW_ALLG_GYM_CH_IK_8-9-10_01") == "2016"
+
+    def test_fachplan_m_returns_2016(self):
+        assert extract_bp_version("BP2016BW_ALLG_GYM_M") == "2016"
+
+    def test_fachplan_m_v2_returns_2016_v2(self):
+        assert extract_bp_version("BP2016BW_ALLG_GYM_M.V2") == "2016.V2"
+
+    def test_hypothetical_v3_returns_correct(self):
+        assert extract_bp_version("BP2030BW_ALLG_GYM_M.V3_IK_5-6_01") == "2030.V3"
+
+    def test_no_year_returns_empty(self):
+        assert extract_bp_version("BNE_01") == ""
+
+
+class TestParseNodeFields:
+    """Prüft dass parse_* alle neuen Felder setzen."""
+
+    def test_leitidee_has_niveau_and_bp_version(self):
+        soup = load_fixture('chemie_leitidee.html')
+        node = parse_leitidee(soup, CHEMIE_IK_URL)
+        assert 'niveau' in node
+        assert node['niveau'] in ('regulär', 'basis', 'leistung')
+        assert 'bp_version' in node
+        assert node['bp_version'] == "2016"
+
+    def test_ik_kompetenz_has_niveau_and_bp_version(self):
+        soup = load_fixture('chemie_ik_standards.html')
+        nodes = parse_ik_kompetenz_list(soup, CHEMIE_IK_STANDARD_URL,
+                                        "BP2016BW_ALLG_GYM_CH_IK_8-9-10_01")
+        assert len(nodes) > 0
+        for node in nodes:
+            assert node['niveau'] == "regulär"
+            assert node['bp_version'] == "2016"
+
+    def test_pk_gruppe_has_niveau_and_bp_version(self):
+        soup = load_fixture('chemie_pk_gruppe.html')
+        node = parse_pk_gruppe(soup, CHEMIE_PK_URL)
+        assert 'niveau' in node
+        assert node['niveau'] == "regulär"
+        assert node['bp_version'] == "2016"
+
+    def test_pk_kompetenz_has_niveau_and_bp_version(self):
+        soup = load_fixture('chemie_pk_gruppe.html')
+        nodes = parse_pk_kompetenz_list(soup, CHEMIE_PK_URL, "BP2016BW_ALLG_GYM_CH_PK_01")
+        for node in nodes:
+            assert node['niveau'] == "regulär"
+            assert node['bp_version'] == "2016"

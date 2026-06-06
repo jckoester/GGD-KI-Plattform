@@ -167,6 +167,7 @@ def build_metadata(node: dict) -> dict:
     meta = dict(node.get("metadata", {}))
     meta["bp_id"] = node["bp_id"]
     meta["content_hash"] = node.get("content_hash", "")
+    meta["bp_version"] = node.get("bp_version", "")
     return meta
 
 
@@ -192,6 +193,7 @@ def upsert_node(
     # Neue Felder aus JSONL
     min_grade = node.get("min_grade")
     max_grade = node.get("max_grade")
+    niveau = node.get("niveau", "regulär")
 
     # subject_id: aus fach_slug ableiten (nur für Bildungsplan-Knoten mit fach_slug)
     fach_slug = node.get("fach_slug")
@@ -212,10 +214,10 @@ def upsert_node(
                 INSERT INTO context_nodes
                     (category, content_type, title, content, metadata,
                      read_scope, write_scope, status, owner_pseudonym, assistant_id,
-                     subject_id, min_grade, max_grade)
+                     subject_id, min_grade, max_grade, niveau)
                 VALUES
                     (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL,
-                     %s, %s, %s)
+                     %s, %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -229,6 +231,7 @@ def upsert_node(
                     subject_id,
                     min_grade,
                     max_grade,
+                    niveau,
                 ),
             )
             node_id = cur.fetchone()[0]
@@ -248,10 +251,12 @@ def upsert_node(
                     metadata   = %s,
                     subject_id = COALESCE(subject_id, %s),
                     min_grade  = COALESCE(min_grade,  %s),
-                    max_grade  = COALESCE(max_grade,  %s)
+                    max_grade  = COALESCE(max_grade,  %s),
+                    niveau     = %s
                 WHERE id = %s
                 """,
-                (title, json.dumps(metadata), subject_id, min_grade, max_grade, existing_id),
+                (title, json.dumps(metadata), subject_id, min_grade, max_grade,
+                 niveau, existing_id),
             )
         return "skipped", UUID(str(existing_id))
 
@@ -266,12 +271,13 @@ def upsert_node(
                 subject_id = %s,
                 min_grade = %s,
                 max_grade = %s,
+                niveau = %s,
                 embedding = NULL,
                 updated_at = now()
             WHERE id = %s
         """,
             (content, title, json.dumps(metadata, ensure_ascii=False),
-             subject_id, min_grade, max_grade, existing_id),
+             subject_id, min_grade, max_grade, niveau, existing_id),
         )
     return "updated", UUID(str(existing_id))
 
@@ -525,19 +531,22 @@ def run_import(
     psycopg2.extras.register_uuid()
 
     # Hilfsfunktion zum Extrahieren von fach_slug aus bp_id
+    _edition_suffix = re.compile(r'\.\w+$')
+
     def _fach_slug_from_bp_id(bp_id: str) -> str | None:
         """Versucht den Fach-Slug aus der bp_id zu extrahieren.
-        
+
         Bildungsplan-IDs enthalten den Fach-Code als Segment:
-        'BP2016BW_ALLG_GYM_CH_IK_7-8_01' -> 'CH'
-        'BNE_01' (Leitperspektive) -> None
+        'BP2016BW_ALLG_GYM_CH_IK_7-8_01'  -> 'CH'
+        'BP2016BW_ALLG_GYM_M.V2_IK_5-6_01' -> 'M' (Edition-Suffix wird abgeschnitten)
+        'BNE_01' (Leitperspektive)          -> None
         """
-        # Suche nach bekannten Fach-Codes in bp_id
-        # fach_code_to_slug wird unten aus cfg aufgebaut
         parts = bp_id.split('_')
         for part in parts:
-            if part in fach_code_to_slug:
-                return fach_code_to_slug[part]
+            # Edition-Suffix entfernen: "M.V2" → "M", "M.V3" → "M"
+            part_clean = _edition_suffix.sub('', part)
+            if part_clean in fach_code_to_slug:
+                return fach_code_to_slug[part_clean]
         return None
 
     # fach_code -> slug Mapping aus subjects.yaml bauen
