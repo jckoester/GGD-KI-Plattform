@@ -39,6 +39,7 @@ from app.context.schemas import (
     CurriculumDraftConfirmed,
     CurriculumCreate,
     FachplanTreeRead,
+    BandRead,
     LeitideeRead,
     IkKompetenzRead,
     PkGruppeRead,
@@ -116,6 +117,7 @@ async def list_nodes(
     subject_id: int | None = Query(default=None, description="Direkte Subject-ID-Filterung"),
     group_id: int | None = Query(default=None),
     grade: int | None = Query(default=None, ge=1, le=13, description="Jahrgangsstufe"),
+    bp_version: str | None = Query(default=None, description="BP-Versionsfilter, z. B. '2016' oder '2016.V2'"),
     owner: str | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=500, description="Maximale Anzahl Ergebnisse"),
     db: AsyncSession = Depends(get_db),
@@ -171,6 +173,12 @@ async def list_nodes(
                     ContextNode.max_grade >= grade,
                 ),
             )
+        )
+
+    # bp_version: Bildungsplan-Versionsfilter (JSONB-Feld)
+    if bp_version is not None:
+        query = query.where(
+            ContextNode.metadata_["bp_version"].astext == bp_version
         )
 
     # owner=me: nur eigene Knoten
@@ -1299,47 +1307,174 @@ async def get_subject_by_fach_code(
 # ── Bildungsplan Hierarchie Endpoint ────────────────────────────────────────
 
 
+def _band_label(min_g: int, max_g: int, niveau: str) -> str:
+    grade = f"Kl. {min_g}" if min_g == max_g else f"Kl. {min_g}–{max_g}"
+    suffix = {"basis": " · Basis", "leistung": " · Leistung"}.get(niveau, "")
+    return grade + suffix
+
+
 @router.get("/fachplan/by-subject/{subject_id}", response_model=FachplanTreeRead)
 async def get_fachplan_by_subject(
     subject_id: int,
-    grade: int | None = None,
+    min_grade: int | None = None,
+    max_grade: int | None = None,
+    niveau: str | None = None,
+    bp_version: str | None = None,
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(get_current_user),
 ):
     """Gibt die Bildungsplan-Hierarchie für ein Fach als verschachteltes Objekt zurück.
-    
-    Lädt den Fachplan und alle zugehörigen Leitideen mit IK-Kompetenz-Kindern
-    sowie PK-Gruppen mit PK-Kompetenz-Kindern für das gegebene Fach und optional
-    die angegebene Jahrgangsstufe.
-    
-    Die Hierarchie basiert auf part_of-Kanten:
-    - leitidee -> part_of -> fachplan
-    - ik_kompetenz -> part_of -> leitidee  
-    - pk_gruppe -> part_of -> fachplan
-    - pk_kompetenz -> part_of -> pk_gruppe
+
+    Unterstützt mehrere Fachpläne pro Fach (verschiedene BP-Editionen). Wählt über
+    bp_version gezielt eine Edition; ohne bp_version wird die aktuellste genommen.
+    Filtert Leitideen/IK/PK nach Band (min_grade, max_grade, niveau).
     """
-    
-    # Fachplan-Knoten für dieses Fach laden
-    result = await db.execute(
-        sa.select(ContextNode).where(
+    # ── Fachplan laden (mehr-versionsfest) ───────────────────────────────────
+    q = (
+        sa.select(ContextNode)
+        .where(
             ContextNode.content_type == "fachplan",
             ContextNode.subject_id == subject_id,
             ContextNode.status == "active",
         )
+        .order_by(ContextNode.updated_at.desc())
     )
+    if bp_version:
+        q = q.where(ContextNode.metadata_["bp_version"].astext == bp_version)
+
+    result = await db.execute(q.limit(1))
     fachplan_node = result.scalar_one_or_none()
-    
+
     if not fachplan_node:
-        # Kein Fachplan für dieses Fach gefunden
-        return FachplanTreeRead(
-            fachplan=None,
-            leitideen=[],
-            pk_gruppen=[],
-            can_edit=False,
+        return FachplanTreeRead(fachplan=None, leitideen=[], pk_gruppen=[], can_edit=False)
+
+    # ── Verfügbare BP-Versionen für dieses Fach ───────────────────────────────
+    _bp_ver_col = ContextNode.metadata_["bp_version"].astext.label("bp_version")
+    vers_result = await db.execute(
+        sa.select(_bp_ver_col)
+        .where(
+            ContextNode.content_type == "fachplan",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
         )
-    
-    # Alle Leitideen laden, die part_of -> fachplan sind
-    leitideen_result = await db.execute(
+        .distinct()
+        .order_by(_bp_ver_col)
+    )
+    available_versions = [r[0] for r in vers_result.all() if r[0]]
+
+    # ── Band-Liste (DISTINCT über direkte Leitideen des Fachplans) ────────────
+    bands_result = await db.execute(
+        sa.select(ContextNode.min_grade, ContextNode.max_grade, ContextNode.niveau)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == fachplan_node.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "leitidee",
+            ContextNode.status == "active",
+            ContextNode.min_grade.isnot(None),
+        )
+        .distinct()
+        .order_by(ContextNode.min_grade, ContextNode.niveau)
+    )
+    bands = [
+        BandRead(
+            min_grade=r.min_grade,
+            max_grade=r.max_grade,
+            niveau=r.niveau,
+            label=_band_label(r.min_grade, r.max_grade, r.niveau),
+        )
+        for r in bands_result.all()
+    ]
+
+    # Default-Band: erstes aus der Liste wenn keines übergeben
+    if min_grade is None and bands:
+        selected = bands[0]
+        min_grade = selected.min_grade
+        max_grade = selected.max_grade
+        niveau = selected.niveau
+    elif min_grade is not None:
+        selected = next(
+            (b for b in bands if b.min_grade == min_grade
+             and b.max_grade == max_grade and b.niveau == (niveau or "regulär")),
+            bands[0] if bands else None,
+        )
+    else:
+        selected = None
+
+    # ── Rekursiver Leitideen-Baum ─────────────────────────────────────────────
+    async def _build_leitidee_subtree(parent_node: ContextNode) -> LeitideeRead:
+        # IK-Kinder laden, nach Band gefiltert
+        ik_q = (
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == parent_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "ik_kompetenz",
+                ContextNode.status == "active",
+            )
+            .order_by(
+                sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
+                ContextNode.title,
+            )
+        )
+        if min_grade is not None:
+            ik_q = ik_q.where(
+                ContextNode.min_grade == min_grade,
+                ContextNode.max_grade == max_grade,
+                ContextNode.niveau == (niveau or "regulär"),
+            )
+        ik_result = await db.execute(ik_q)
+        ik_nodes = ik_result.scalars().all()
+
+        ik_list = [
+            IkKompetenzRead(
+                id=n.id,
+                title=n.title,
+                min_grade=n.min_grade,
+                max_grade=n.max_grade,
+                niveau=n.niveau,
+                metadata_=n.metadata_,
+            )
+            for n in ik_nodes
+        ]
+
+        # Unter-Leitideen laden, nach Band gefiltert
+        unter_q = (
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == parent_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "leitidee",
+                ContextNode.status == "active",
+            )
+            .order_by(ContextNode.title)
+        )
+        if min_grade is not None:
+            unter_q = unter_q.where(
+                ContextNode.min_grade == min_grade,
+                ContextNode.max_grade == max_grade,
+                ContextNode.niveau == (niveau or "regulär"),
+            )
+        unter_result = await db.execute(unter_q)
+        unter_nodes = unter_result.scalars().all()
+
+        unter_list = [await _build_leitidee_subtree(n) for n in unter_nodes]
+
+        return LeitideeRead(
+            id=parent_node.id,
+            title=parent_node.title,
+            min_grade=parent_node.min_grade,
+            max_grade=parent_node.max_grade,
+            niveau=parent_node.niveau,
+            metadata_=parent_node.metadata_,
+            ik_kompetenzen=ik_list,
+            unter_leitideen=unter_list,
+        )
+
+    # Oberste Leitideen (direkte Kinder des Fachplans)
+    top_ld_q = (
         sa.select(ContextNode)
         .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
         .where(
@@ -1350,61 +1485,19 @@ async def get_fachplan_by_subject(
         )
         .order_by(ContextNode.title)
     )
-    leitideen_nodes = leitideen_result.scalars().all()
-    
-    # Für jede Leitidee die IK-Kompetenz-Kinder laden
-    leitideen_list = []
-    for ld_node in leitideen_nodes:
-        # Prüfe grade-Filter aus metadata wenn vorhanden
-        if grade and ld_node.metadata_.get("grade"):
-            # Leitidee hat grade-Metadaten, aber wir filtern IK-Kompetenz nach grade
-            pass
-        
-        # IK-Kompetenz-Kinder laden
-        ik_result = await db.execute(
-            sa.select(ContextNode)
-            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
-            .where(
-                ContextEdge.to_node_id == ld_node.id,
-                ContextEdge.relation == "part_of",
-                ContextNode.content_type == "ik_kompetenz",
-                ContextNode.status == "active",
-            )
-            .order_by(
-                sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
-                ContextNode.title,
-            )
+    if min_grade is not None:
+        top_ld_q = top_ld_q.where(
+            ContextNode.min_grade == min_grade,
+            ContextNode.max_grade == max_grade,
+            ContextNode.niveau == (niveau or "regulär"),
         )
-        ik_nodes = ik_result.scalars().all()
-        
-        # Filter nach grade wenn angegeben
-        if grade:
-            ik_nodes = [
-                n for n in ik_nodes
-                if str(grade) in str(n.metadata_.get("grade_band", ""))
-                or str(grade) in str(n.metadata_.get("jahrgangsstufe", ""))
-            ]
-        
-        ik_list = [
-            IkKompetenzRead(
-                id=n.id,
-                title=n.title,
-                metadata_=n.metadata_,
-            )
-            for n in ik_nodes
-        ]
-        
-        leitideen_list.append(
-            LeitideeRead(
-                id=ld_node.id,
-                title=ld_node.title,
-                metadata_=ld_node.metadata_,
-                ik_kompetenzen=ik_list,
-            )
-        )
-    
-    # Alle PK-Gruppen laden, die part_of -> fachplan sind
-    pk_gruppen_result = await db.execute(
+    top_ld_result = await db.execute(top_ld_q)
+    top_leitideen = top_ld_result.scalars().all()
+
+    leitideen_list = [await _build_leitidee_subtree(n) for n in top_leitideen]
+
+    # ── PK-Gruppen ────────────────────────────────────────────────────────────
+    pk_gruppen_q = (
         sa.select(ContextNode)
         .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
         .where(
@@ -1415,13 +1508,18 @@ async def get_fachplan_by_subject(
         )
         .order_by(ContextNode.title)
     )
+    if min_grade is not None:
+        pk_gruppen_q = pk_gruppen_q.where(
+            ContextNode.min_grade == min_grade,
+            ContextNode.max_grade == max_grade,
+            ContextNode.niveau == (niveau or "regulär"),
+        )
+    pk_gruppen_result = await db.execute(pk_gruppen_q)
     pk_gruppen_nodes = pk_gruppen_result.scalars().all()
-    
-    # Für jede PK-Gruppe die PK-Kompetenz-Kinder laden
+
     pk_gruppen_list = []
     for pg_node in pk_gruppen_nodes:
-        # PK-Kompetenz-Kinder laden
-        pk_result = await db.execute(
+        pk_q = (
             sa.select(ContextNode)
             .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
             .where(
@@ -1432,17 +1530,17 @@ async def get_fachplan_by_subject(
             )
             .order_by(ContextNode.title)
         )
-        pk_nodes = pk_result.scalars().all()
-        
-        pk_list = [
-            PkKompetenzRead(
-                id=n.id,
-                title=n.title,
-                metadata_=n.metadata_,
+        if min_grade is not None:
+            pk_q = pk_q.where(
+                ContextNode.min_grade == min_grade,
+                ContextNode.max_grade == max_grade,
+                ContextNode.niveau == (niveau or "regulär"),
             )
-            for n in pk_nodes
+        pk_result = await db.execute(pk_q)
+        pk_list = [
+            PkKompetenzRead(id=n.id, title=n.title, metadata_=n.metadata_)
+            for n in pk_result.scalars().all()
         ]
-        
         pk_gruppen_list.append(
             PkGruppeRead(
                 id=pg_node.id,
@@ -1451,12 +1549,16 @@ async def get_fachplan_by_subject(
                 pk_kompetenzen=pk_list,
             )
         )
-    
+
     return FachplanTreeRead(
         fachplan=ContextNodeRead.model_validate(fachplan_node),
         leitideen=leitideen_list,
         pk_gruppen=pk_gruppen_list,
-        can_edit=False,  # Phase: read-only
+        can_edit=False,
+        bands=bands,
+        selected_band=selected,
+        bp_version=fachplan_node.metadata_.get("bp_version", ""),
+        available_versions=available_versions,
     )
 
 

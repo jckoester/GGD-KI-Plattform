@@ -312,6 +312,9 @@ class IkKompetenzRead(BaseModel):
 
     id: UUID
     title: str
+    min_grade: int | None = None
+    max_grade: int | None = None
+    niveau: str = "regulär"
     metadata_: dict = Field(
         default_factory=dict,
         validation_alias="metadata",
@@ -320,17 +323,33 @@ class IkKompetenzRead(BaseModel):
 
 
 class LeitideeRead(BaseModel):
-    """Leitidee mit ihren IK-Kompetenz-Kindern."""
+    """Leitidee mit IK-Kompetenz-Kindern und optionalen Unter-Leitideen (rekursiv)."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     title: str
+    min_grade: int | None = None
+    max_grade: int | None = None
+    niveau: str = "regulär"
     metadata_: dict = Field(
         default_factory=dict,
         validation_alias="metadata",
         serialization_alias="metadata",
     )
     ik_kompetenzen: list[IkKompetenzRead] = Field(default_factory=list)
+    unter_leitideen: list["LeitideeRead"] = Field(default_factory=list)
+
+
+LeitideeRead.model_rebuild()
+
+
+class BandRead(BaseModel):
+    """Ein Jahrgangsstufen-Niveau-Band, z. B. Kl. 5–6 oder Kl. 11–12 · Basis."""
+
+    min_grade: int
+    max_grade: int
+    niveau: str
+    label: str
 
 
 class PkKompetenzRead(BaseModel):
@@ -368,3 +387,7 @@ class FachplanTreeRead(BaseModel):
     leitideen: list[LeitideeRead] = Field(default_factory=list)
     pk_gruppen: list[PkGruppeRead] = Field(default_factory=list)
     can_edit: bool = False
+    bands: list[BandRead] = Field(default_factory=list)
+    selected_band: BandRead | None = None
+    bp_version: str = ""
+    available_versions: list[str] = Field(default_factory=list)

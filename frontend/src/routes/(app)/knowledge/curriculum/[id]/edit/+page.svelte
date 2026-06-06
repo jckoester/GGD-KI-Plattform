@@ -389,6 +389,7 @@
                         editMode={true}
                         subjectId={curriculum?.subject_id ?? null}
                         grade={curriculum?.metadata?.jahrgangsstufe ?? null}
+                        bpVersion={curriculum?.metadata?.bp_version ?? null}
                         onchange={() => { dirty = true }}
                     />
                 </div>

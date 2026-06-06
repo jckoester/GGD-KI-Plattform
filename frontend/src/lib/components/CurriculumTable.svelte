@@ -14,7 +14,7 @@
     import { parseHinweise } from '$lib/hinweise.js'
     import { Plus, Trash2, MoreVertical, Move, Check, X, Pencil, Eye } from 'lucide-svelte'
 
-    let { curriculum = null, editMode = false, subjectId = null, grade = null, onchange = () => {} } = $props()
+    let { curriculum = null, editMode = false, subjectId = null, grade = null, bpVersion = null, onchange = () => {} } = $props()
     
     // Lokaler State für Edit-Mode
     let showContextMenu = $state(null) // { type: 'kapitel'|'ls'|'eintrag', id: string, x: number, y: number }
@@ -542,6 +542,7 @@
                                     {#if editMode}
                                         <PKSelector
                                             {subjectId}
+                                            {bpVersion}
                                             selected={normalizePk(eintrag.pk)}
                                             onchange={(newPk) => {
                                                 eintrag.pk = newPk
@@ -572,6 +573,7 @@
                                     <IKSelector
                                         {subjectId}
                                         {grade}
+                                        {bpVersion}
                                         selected={normalizeIk(eintrag.ik)}
                                         onchange={(newIk) => {
                                             eintrag.ik = newIk

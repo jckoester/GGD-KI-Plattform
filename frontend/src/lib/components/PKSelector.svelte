@@ -10,19 +10,19 @@
 
     import { X, Search, Check, ChevronDown, ChevronRight } from 'lucide-svelte'
     
-    let { subjectId = null, selected = $bindable([]), onchange = () => {} } = $props()
-    
+    let { subjectId = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
+
     let pkGruppen = $state([])
     let loadingGruppen = $state(false)
     let expandedGruppe = $state(null)
     let searchQuery = $state('')
     let filteredPkList = $state([])
     let showDropdown = $state(false)
-    
+
     // Lade PK-Gruppen und -Kompetenzknoten
     $effect(() => {
         if (!subjectId) return
-        
+
         async function loadPkData() {
             loadingGruppen = true
             try {
@@ -30,15 +30,17 @@
                 const paramsGruppen = new URLSearchParams()
                 paramsGruppen.append('content_type', 'pk_gruppe')
                 paramsGruppen.set('subject_id', subjectId)
+                if (bpVersion) paramsGruppen.set('bp_version', bpVersion)
                 paramsGruppen.set('limit', '100')
-                
+
                 const gruppenRes = await fetch(`/api/context/nodes?${paramsGruppen}`, { credentials: 'include' })
                 const gruppenData = gruppenRes.ok ? await gruppenRes.json() : []
-                
+
                 // PK-Kompetenzknoten laden
                 const paramsKompetenzen = new URLSearchParams()
                 paramsKompetenzen.append('content_type', 'pk_kompetenz')
                 paramsKompetenzen.set('subject_id', subjectId)
+                if (bpVersion) paramsKompetenzen.set('bp_version', bpVersion)
                 paramsKompetenzen.set('limit', '200')
                 
                 const kompetenzRes = await fetch(`/api/context/nodes?${paramsKompetenzen}`, { credentials: 'include' })

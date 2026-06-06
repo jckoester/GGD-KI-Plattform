@@ -1107,14 +1107,17 @@ export async function getCurriculaBySubject(subjectId) {
   return res.json()
 }
 
-export async function getFachplanBySubject(subjectId, grade = null) {
-  let url = `${BASE}/context/fachplan/by-subject/${subjectId}`;
-  if (grade !== null && grade !== undefined) {
-    url += `?grade=${grade}`;
+export async function getFachplanBySubject(subjectId, band = null, bpVersion = null) {
+  const params = new URLSearchParams()
+  if (band) {
+    params.set('min_grade', band.min_grade)
+    params.set('max_grade', band.max_grade)
+    params.set('niveau', band.niveau)
   }
-  const res = await fetch(url, {
-    credentials: 'include'
-  })
+  if (bpVersion) params.set('bp_version', bpVersion)
+  const qs = params.toString()
+  const url = `${BASE}/context/fachplan/by-subject/${subjectId}${qs ? '?' + qs : ''}`
+  const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden des Bildungsplans')

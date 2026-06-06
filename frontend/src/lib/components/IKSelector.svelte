@@ -10,7 +10,7 @@
 
     import { X, Search, Check } from 'lucide-svelte'
     
-    let { subjectId = null, grade = null, selected = $bindable([]), onchange = () => {} } = $props()
+    let { subjectId = null, grade = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
     
     let searchQuery = $state('')
     let searchResults = $state([])
@@ -33,6 +33,7 @@
                 params.append('content_type', 'ik_kompetenz')
                 if (subjectId) params.set('subject_id', subjectId)
                 if (grade) params.set('grade', grade)
+                if (bpVersion) params.set('bp_version', bpVersion)
                 params.set('limit', '20')
 
                 const res = await fetch(`/api/context/nodes?${params}`, { credentials: 'include' })
