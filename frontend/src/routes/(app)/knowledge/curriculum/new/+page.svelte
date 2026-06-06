@@ -2,14 +2,14 @@
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
     import { getFachplaene, createCurriculum } from '$lib/api.js'
-    import { user, hasAnyRole } from '$lib/stores/user.js'
+    import { user, userHasAnyRole } from '$lib/stores/user.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
 
     // Auth-Guard
     $effect(() => {
-        if ($user && !hasAnyRole(['teacher', 'admin'])($user)) {
+        if ($user && !userHasAnyRole($user, ['teacher', 'admin'])) {
             goto('/chat')
         }
     })

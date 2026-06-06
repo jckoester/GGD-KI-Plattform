@@ -1,7 +1,7 @@
 <script>
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
-    import { user, hasAnyRole } from '$lib/stores/user.js'
+    import { user, userHasAnyRole } from '$lib/stores/user.js'
     import { subjects } from '$lib/stores/subjects.js'
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
@@ -10,7 +10,7 @@
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
-        if ($page.url.pathname.startsWith('/knowledge/education-plans') && $user && !hasAnyRole(['teacher', 'admin'])($user)) {
+        if ($page.url.pathname.startsWith('/knowledge/education-plans') && $user && !userHasAnyRole($user, ['teacher', 'admin'])) {
             goto('/chat')
         }
     })

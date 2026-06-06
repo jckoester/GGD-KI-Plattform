@@ -1,7 +1,7 @@
 <script>
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
-    import { user, hasAnyRole } from '$lib/stores/user.js'
+    import { user, userHasAnyRole } from '$lib/stores/user.js'
     import { subjects, subjectMap } from '$lib/stores/subjects.js'
     import { myTeachingGroups } from '$lib/stores/myGroups.js'
     import { getCurriculaBySubject } from '$lib/api.js'
@@ -12,7 +12,7 @@
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
-        if ($page.url.pathname.startsWith('/knowledge/curricula') && $user && !hasAnyRole(['teacher', 'admin'])($user)) {
+        if ($page.url.pathname.startsWith('/knowledge/curricula') && $user && !userHasAnyRole($user, ['teacher', 'admin'])) {
             goto('/chat')
         }
     })
