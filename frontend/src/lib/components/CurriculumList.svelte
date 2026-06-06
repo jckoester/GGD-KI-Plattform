@@ -13,7 +13,7 @@
     import { goto } from '$app/navigation'
     import { getCurriculaBySubject } from '$lib/api.js'
     import { user } from '$lib/stores/user.js'
-    import { myTeachingGroups } from '$lib/stores/myGroups.js'
+    import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     
@@ -29,6 +29,7 @@
         if ($user.roles?.includes('admin')) return true
         if ($user.roles?.includes('teacher')) {
             return $myTeachingGroups.some(g => g.subject_id === subjectId)
+                || $myGroups.some(g => g.type === 'subject_department' && g.subject_id === subjectId)
         }
         return false
     })

@@ -30,7 +30,7 @@
                 return
             }
             canEdit = true
-            draft = structuredClone(curriculum)
+            draft = $state.snapshot(curriculum)
         } catch (e) {
             saveError = e.message
         } finally {
@@ -50,7 +50,7 @@
             await flushDraftToApi(draft, curriculum)
             // Aktualisiere Original nach dem Speichern
             curriculum = await getCurriculum($page.params.id)
-            draft = structuredClone(curriculum)
+            draft = $state.snapshot(curriculum)
             dirty = false
             saveSuccess = true
             setTimeout(() => { saveSuccess = false }, 3000)

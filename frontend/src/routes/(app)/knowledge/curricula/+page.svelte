@@ -3,7 +3,7 @@
     import { page } from '$app/stores'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
     import { subjects, subjectMap } from '$lib/stores/subjects.js'
-    import { myTeachingGroups } from '$lib/stores/myGroups.js'
+    import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import { getCurriculaBySubject } from '$lib/api.js'
     import CurriculumList from '$lib/components/CurriculumList.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -21,10 +21,11 @@
     let error = $state(null)
     let curriculaBySubject = $state({})
 
-    // Eigene Fach-IDs extrahieren
-    const mySubjectIds = $derived($myTeachingGroups
-        .filter(g => g.subject_id)
-        .map(g => g.subject_id))
+    // Eigene Fach-IDs extrahieren (teaching_groups + subject_department, identisch zur Sidebar)
+    const mySubjectIds = $derived([...new Set([
+        ...$myTeachingGroups.filter(g => g.subject_id).map(g => g.subject_id),
+        ...$myGroups.filter(g => g.type === 'subject_department' && g.subject_id != null).map(g => g.subject_id)
+    ])])
 
     // Lade Curricula für alle Fächer
     $effect(() => {
@@ -79,8 +80,7 @@
         .reduce((sum, curr) => sum + (curr?.length || 0), 0))
 </script>
 
-<div class="flex min-h-0 flex-1">
-    <main class="flex-1 overflow-y-auto p-6 max-w-6xl">
+<div class="h-full overflow-y-auto p-6 max-w-6xl">
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>
@@ -159,5 +159,4 @@
                 </div>
             {/if}
         {/if}
-    </main>
 </div>
