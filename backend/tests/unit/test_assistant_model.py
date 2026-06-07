@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
-from app.db.models import Assistant, AssistantAudience, AssistantScope
+from app.db.models import Assistant, AssistantAudience, AssistantScope, AssistantVisibility
 
 
 class TestAssistantEnums:
@@ -24,6 +24,12 @@ class TestAssistantEnums:
         assert AssistantScope.ALL_STUDENTS.value == "all_students"
         assert AssistantScope.ALL.value == "all"
 
+    def test_assistant_visibility_values(self):
+        """AssistantVisibility hat die korrekten Werte."""
+        assert AssistantVisibility.PUBLIC.value == "public"
+        assert AssistantVisibility.PRIVATE.value == "private"
+        assert AssistantVisibility.HIDDEN.value == "hidden"
+
 
 class TestAssistantModel:
     def test_assistant_has_all_required_columns(self):
@@ -42,6 +48,7 @@ class TestAssistantModel:
         # Sichtbarkeitsmodell
         assert hasattr(Assistant, 'audience')
         assert hasattr(Assistant, 'scope')
+        assert hasattr(Assistant, 'visibility')
         assert hasattr(Assistant, 'scope_pending')
         assert hasattr(Assistant, 'scope_group_id')
         
@@ -75,6 +82,7 @@ class TestAssistantModel:
         assert "check_assistant_audience" in constraint_names
         assert "check_assistant_scope" in constraint_names
         assert "check_assistant_scope_pending" in constraint_names
+        assert "check_assistant_visibility" in constraint_names
 
     def test_assistant_table_args_has_indexes(self):
         """Assistant __table_args__ enthält alle Indizes."""

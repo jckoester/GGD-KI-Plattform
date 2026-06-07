@@ -1,6 +1,16 @@
 # Fächer-Konfiguration
 # Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
-#         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order
+#         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order,
+#         fach_code (optional, Bildungsplan-Fachkürzel wie M/CH; wird in die
+#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
+#
+schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
+schuljahr: "2026/27" # aktuelles Schuljahr
+
+bildungsplan_default: # gilt für alle Fächer, wenn kein Override
+  bp_basis: BP2016BW # Prefix; zukunftsoffen für BP2030
+  suffix: "" # leer = Basisfassung; ".V2" = überarbeitete Fassung
+
 subjects:
   - slug: mathematik
     name: Mathematik
@@ -9,6 +19,9 @@ subjects:
     min_grade: 5
     max_grade: 13
     sort_order: 10
+    fach_code: M
+    bildungsplan_overrides: # Klassen 5-6 haben V2-Fassung
+      "5-6": ".V2"
 
   - slug: deutsch
     name: Deutsch
@@ -17,6 +30,7 @@ subjects:
     min_grade: 5
     max_grade: 13
     sort_order: 20
+    # kein fach_code → BP-Import überspringt Deutsch
 
   - slug: englisch
     name: Englisch
@@ -38,9 +52,10 @@ subjects:
     name: Chemie
     icon: flask-conical
     color: "#f59e0b"
-    min_grade: 7
+    min_grade: 8
     max_grade: 13
     sort_order: 50
+    fach_code: CH # kein Override, Basisfassung für alle Stufen
 
   - slug: biologie
     name: Biologie

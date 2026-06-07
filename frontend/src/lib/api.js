@@ -322,6 +322,15 @@ export async function* streamChat(
         continue;
       }
 
+      if (currentEventType === "context_suggestions") {
+        try {
+          const { nodes } = JSON.parse(payload);
+          yield { type: "context_suggestions", nodes };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;
@@ -835,4 +844,385 @@ export async function rejectAssistant(id, reason = null) {
   if (!res.ok)
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json(); // AssistantResponse
+}
+
+// ── Kontext-Anker API (KS-Phase-3 Schritt 5) ────────────────────────────────
+
+/**
+ * Lädt alle Kontext-Anker für einen Assistenten
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @returns {Promise<ContextAnchorRead[]>} Liste der Anker
+ */
+export async function getContextAnchors(assistantId) {
+  const res = await fetch(`${BASE}/context/assistants/${assistantId}/anchors`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Laden der Kontext-Anker");
+  }
+  return res.json(); // ContextAnchorRead[]
+}
+
+/**
+ * Fügt einen neuen Kontext-Anker hinzu
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @param {string} nodeId - Die Knoten-ID
+ * @param {string} role - Die Rolle (z.B. "retrieval_scope")
+ * @returns {Promise<ContextAnchorRead>} Der neue Anker
+ */
+export async function addContextAnchor(assistantId, nodeId, role = "retrieval_scope") {
+  const res = await fetch(`${BASE}/context/assistants/${assistantId}/anchors`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_id: nodeId, role }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Hinzufügen des Kontext-Ankers");
+  }
+  return res.json(); // ContextAnchorRead
+}
+
+/**
+ * Entfernt einen Kontext-Anker
+ * @param {number|string} assistantId - Die Assistenten-ID
+ * @param {string} nodeId - Die Knoten-ID
+ * @param {string} role - Die Rolle (z.B. "retrieval_scope")
+ */
+export async function deleteContextAnchor(assistantId, nodeId, role = "retrieval_scope") {
+  const res = await fetch(
+    `${BASE}/context/assistants/${assistantId}/anchors/${nodeId}/${role}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler beim Entfernen des Kontext-Ankers");
+  }
+}
+
+/**
+ * Durchsucht Kontext-Knoten nach Titel
+ * @param {string} query - Suchbegriff
+ * @param {string[]} contentTypes - Content-Types zum Filtern
+ * @returns {Promise<ContextNodeResult[]>} Suchergebnisse
+ */
+export async function searchContextNodesLegacy(query, contentTypes = []) {
+  if (query.length < 2) return [];
+  
+  const params = new URLSearchParams({ q: query });
+  contentTypes.forEach((type) => params.append("content_type", type));
+  
+  const res = await fetch(`${BASE}/context/nodes?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Fehler bei der Knotensuche");
+  }
+  return res.json(); // ContextNodeResult[]
+}
+
+// ── Context Nodes CRUD ──────────────────────────────────────────────────────
+
+/**
+ * Lädt Kontextknoten mit optionalen Filtern.
+ * @param {{ q?, category?, content_type?, status?, subject_slug?, group_id?, grade?, owner? }} params
+ */
+export async function getContextNodes(params = {}) {
+  const p = new URLSearchParams()
+  if (params.q)             p.set('q', params.q)
+  if (params.category)      p.set('category', params.category)
+  if (params.status)        p.set('status', params.status)
+  if (params.subject_slug)  p.set('subject_slug', params.subject_slug)
+  if (params.group_id)      p.set('group_id', params.group_id)
+  if (params.grade != null) p.set('grade', params.grade)
+  if (params.owner)         p.set('owner', params.owner)
+  if (params.content_type) {
+    const types = Array.isArray(params.content_type) ? params.content_type : [params.content_type]
+    types.forEach(t => p.append('content_type', t))
+  }
+  const res = await fetch(`${BASE}/context/nodes?${p}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Knoten')
+  }
+  return res.json()
+}
+
+export async function searchContextNodes(query) {
+  const res = await fetch(`${BASE}/context/search`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler bei der Kontext-Suche')
+  }
+  return res.json() // ContextSearchResult[]
+}
+
+export async function getContextNode(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Knoten nicht gefunden')
+  }
+  return res.json()
+}
+
+export async function createContextNode(payload) {
+  const res = await fetch(`${BASE}/context/nodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen')
+  }
+  return res.json()
+}
+
+export async function updateContextNode(nodeId, payload) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Speichern')
+  }
+  return res.json()
+}
+
+export async function deleteContextNode(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen')
+  }
+}
+
+export async function getArchivedReferences(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/archived-references`, {
+    credentials: 'include',
+  })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function copyContextNode(nodeId, payload = {}) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/copy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Kopieren')
+  }
+  return res.json()
+}
+
+export async function getNeighborhood(nodeId, { depth = 2, relation = [], category = [] } = {}) {
+  const p = new URLSearchParams({ depth })
+  relation.forEach(r => p.append('relation', r))
+  category.forEach(c => p.append('category', c))
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/neighborhood?${p}`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden des Graphen')
+  }
+  return res.json()
+}
+
+// ── Chat Context Nodes ──────────────────────────────────────────────────────
+
+export async function getChatContextNodes(conversationId) {
+  const res = await fetch(`${BASE}/context/conversations/${conversationId}/nodes`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // ChatContextNodeRead[]
+}
+
+export async function addChatContextNode(conversationId, nodeId) {
+  const res = await fetch(`${BASE}/context/conversations/${conversationId}/nodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ node_id: nodeId }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  return res.json(); // ChatContextNodeRead
+}
+
+export async function removeChatContextNode(conversationId, nodeId) {
+  const res = await fetch(
+    `${BASE}/context/conversations/${conversationId}/nodes/${nodeId}`,
+    { method: 'DELETE', credentials: 'include' },
+  );
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+}
+
+// ============================================================================
+// KS-Phase-6 Curriculum API
+// ============================================================================
+
+export async function getCurriculum(curriculumId) {
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}`, {
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Curriculum nicht gefunden')
+  }
+  return res.json()
+}
+
+export async function getCurriculaBySubject(subjectId) {
+  const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}`, {
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Curricula')
+  }
+  return res.json()
+}
+
+export async function getFachplanBySubject(subjectId, band = null, bpVersion = null) {
+  const params = new URLSearchParams()
+  if (band) {
+    params.set('min_grade', band.min_grade)
+    params.set('max_grade', band.max_grade)
+    params.set('niveau', band.niveau)
+  }
+  if (bpVersion) params.set('bp_version', bpVersion)
+  const qs = params.toString()
+  const url = `${BASE}/context/fachplan/by-subject/${subjectId}${qs ? '?' + qs : ''}`
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden des Bildungsplans')
+  }
+  return res.json()
+}
+
+// Edge API-Funktionen
+export async function createEdge(payload) {
+  const res = await fetch(`${BASE}/context/edges`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen der Kante')
+  }
+  return res.json()
+}
+
+export async function deleteEdge(edgeId) {
+  const res = await fetch(`${BASE}/context/edges/${edgeId}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen der Kante')
+  }
+}
+
+export async function getNodeEdges(nodeId, relation = null) {
+  const url = new URL(`${BASE}/context/nodes/${nodeId}/edges`, location.href)
+  if (relation) {
+    url.searchParams.set('relation', relation.join(','))
+  }
+  const res = await fetch(url.toString(), { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Kanten')
+  }
+  return res.json()
+}
+
+// Curriculum Create
+export async function createCurriculum(payload) {
+  const res = await fetch(`${BASE}/context/curricula/new`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Erstellen des Curriculums')
+  }
+  return res.json()
+}
+
+// ============================================================================
+// KS-Phase-6 Schritt 5a: Curriculum Import API
+// ============================================================================
+
+export async function getFachplaene() {
+    const res = await fetch(
+        `${BASE}/context/nodes?content_type=fachplan&status=active`,
+        { credentials: 'include' }
+    )
+    if (!res.ok) throw new ApiError(res.status, 'Fehler beim Laden der Bildungspläne')
+    return res.json()
+}
+
+export async function createCurriculumFromDraft(draft) {
+    const res = await fetch(`${BASE}/context/curricula`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+    })
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new ApiError(res.status, data.detail ?? 'Curriculum konnte nicht gespeichert werden')
+    }
+    return res.json()
+}
+
+/**
+ * Lädt ein Curriculum als YAML oder PDF herunter.
+ * @param {string} curriculumId - UUID des Curriculums
+ * @param {string} filename - Dateiname für den Download
+ * @param {'yaml'|'pdf'} format - Exportformat
+ */
+export async function exportCurriculum(curriculumId, filename, format = 'yaml') {
+    const res = await fetch(`${BASE}/context/curricula/${curriculumId}/export?format=${format}`, {
+        credentials: 'include',
+    })
+    if (!res.ok)
+        throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
 }

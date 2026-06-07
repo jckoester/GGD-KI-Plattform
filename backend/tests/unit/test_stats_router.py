@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("SCHOOL_SECRET", "test-school-secret")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
-os.environ.setdefault("STUDENT_GRADES", "[5,6,7,8,9,10,11,12,13]")
+os.environ.setdefault("PUBLIC_STUDENT_GRADES", "[5,6,7,8,9,10,11,12,13]")
 
 from app.api.admin.stats import (
     _build_team_where,

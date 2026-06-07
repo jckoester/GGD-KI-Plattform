@@ -2,10 +2,10 @@
 import pytest
 from fastapi import HTTPException
 
-from app.api.admin.assistants import (
+from app.api.assistants import (
     VALID_SCOPES,
     GROUP_SCOPES,
-    _validate_assistant_fields,
+    validate_assistant_fields as _validate_assistant_fields,
 )
 
 

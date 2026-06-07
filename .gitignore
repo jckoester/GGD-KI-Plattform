@@ -45,3 +45,8 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+scripts/scraper/output/*
+

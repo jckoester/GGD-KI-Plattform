@@ -33,6 +33,14 @@ Sie können einstellen, ob und wie die anfallenden Kosten pro Anfrage angezeigt 
 - **Pro Konversation** — Gesamtkosten des aktuellen Gesprächs werden angezeigt
 - **Beides** — Kosten pro Nachricht und pro Konversation
 
+## Kontext-Suche
+
+Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen können Sie diesen Wert erhöhen:
+
+- Öffnen Sie die Profilseite und wählen Sie unter **„Kontext-Suche"** die gewünschte maximale Trefferzahl.
+
+Verfügbare Werte: 5, 8, 10, 15, 20, 30.
+
 ## Accountdaten
 
 Ihr Anzeigename und Ihre Nutzerrolle kommen direkt aus dem Schulkonto (SSO) und können innerhalb von ki@schule nicht geändert werden. Für Änderungen am Schulkonto wenden Sie sich an den IT-Support Ihrer Schule.

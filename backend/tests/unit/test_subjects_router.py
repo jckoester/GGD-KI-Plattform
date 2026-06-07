@@ -34,6 +34,7 @@ def _make_mini_app(mock_db) -> FastAPI:
 
 def _make_subject(**kwargs) -> MagicMock:
     defaults = dict(id=1, slug="mathematik", name="Mathematik",
+                    fach_code="M",
                     icon="square-radical", color="#3b82f6",
                     min_grade=5, max_grade=13, sort_order=10)
     defaults.update(kwargs)
@@ -75,7 +76,7 @@ def test_get_subjects_contains_all_fields():
     client = TestClient(_make_mini_app(_make_db_mock([_make_subject()])))
     item = client.get("/subjects").json()["items"][0]
 
-    for field in ("id", "slug", "name", "icon", "color", "min_grade", "max_grade", "sort_order"):
+    for field in ("id", "slug", "name", "fach_code", "icon", "color", "min_grade", "max_grade", "sort_order"):
         assert field in item, f"Feld '{field}' fehlt in der Antwort"
 
 

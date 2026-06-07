@@ -14,6 +14,7 @@
         Settings,
         BookOpen,
         Pencil,
+        Database,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -58,6 +59,13 @@
         if (slug) {
             const found = $sidebarSubjectSections.find(s => s.slug === slug)
             if (found) openSection = `subject-${found.subjectId}`
+        }
+    })
+
+    // Wissensgraph-Sektion beim Navigieren auf /knowledge/* auto-öffnen
+    $effect(() => {
+        if ($page.url.pathname.startsWith('/knowledge/')) {
+            openSection = 'knowledge'
         }
     })
 
@@ -238,6 +246,70 @@
                 </div>
             {/if}
         </div>
+
+        <!-- Wissensgraph (nur Lehrkräfte/Admins) -->
+        {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
+          <div class="mt-2">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+            >
+                <button onclick={() => { toggle('knowledge'); goto('/knowledge') }}>
+                    <span class="flex items-center gap-2">
+                        <Database class="w-4 h-4" />
+                        Wissensgraph
+                    </span>
+                </button>
+                <button onclick={() => toggle('knowledge')}>
+                    {#if openSection === 'knowledge'}
+                        <ChevronDown class="w-4 h-4" />
+                    {:else}
+                        <ChevronRight class="w-4 h-4" />
+                    {/if}
+                </button>
+            </div>
+            {#if openSection === 'knowledge'}
+                <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    <button
+                        onclick={() => goto('/knowledge/curricula')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge/curricula'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <BookOpen class="w-4 h-4" />
+                            Curricula
+                        </span>
+                    </button>
+                    <button
+                        onclick={() => goto('/knowledge/education-plans')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge/education-plans'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <BookOpen class="w-4 h-4" />
+                            Bildungspläne
+                        </span>
+                    </button>
+                    <button
+                        onclick={() => goto('/knowledge/cross-cutting-themes')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge/cross-cutting-themes'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <ShieldCheck class="w-4 h-4" />
+                            Leitperspektiven
+                        </span>
+                    </button>
+                </div>
+            {/if}
+          </div>
+        {/if}
 
         {#if $sidebarSubjectSections.length > 0}
           <div class="mt-2">

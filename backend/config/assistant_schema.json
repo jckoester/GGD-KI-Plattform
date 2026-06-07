@@ -20,6 +20,7 @@
         "created":         { "type": "string" },
         "updated":         { "type": "string" },
         "audience":        { "type": "string", "enum": ["student", "teacher", "all"] },
+        "visibility":      { "type": "string", "enum": ["public", "private", "hidden"] },
         "available_from":  { "type": ["string", "null"] },
         "available_until": { "type": ["string", "null"] }
       }

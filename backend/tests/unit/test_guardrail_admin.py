@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("SCHOOL_SECRET", "test-secret")
 os.environ.setdefault("JWT_SECRET", "test-jwt")
-os.environ.setdefault("STUDENT_GRADES", "[5,6,7,8,9,10,11,12]")
+os.environ.setdefault("PUBLIC_STUDENT_GRADES", "[5,6,7,8,9,10,11,12]")
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload

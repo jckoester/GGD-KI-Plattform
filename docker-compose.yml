@@ -1,7 +1,7 @@
 services:
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     env_file: .env
     environment:
       POSTGRES_DB: ggd_ki
@@ -74,6 +74,7 @@ services:
              echo '30 2 * * * root python /app/scripts/cleanup_stale_conversations.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '0 6 1 * * root python /app/scripts/refresh_ecb_rate.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '0 7 1 * * root python /app/scripts/monthly_budget_reconcile.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
+             echo '15 3 * * * root python /app/scripts/embedding_backfill.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              chmod 0644 /etc/cron.d/ggd-ki &&
              cron -f"
     restart: unless-stopped

@@ -9,11 +9,13 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.api.admin.assistants import (
+    AssistantResponse,
+)
+from app.api.assistants import (
     AssistantCreate,
     AssistantUpdate,
-    AssistantResponse,
     AssistantListResponse,
-    _validate_assistant_fields,
+    validate_assistant_fields as _validate_assistant_fields,
     _grades_list,
     _parse_iso,
     _assistant_to_yaml,
@@ -164,6 +166,7 @@ class TestAssistantResponse:
             status="draft",
             audience="student",
             scope="private",
+            visibility="public",
             scope_pending=None,
             min_grade=5,
             max_grade=10,
@@ -174,6 +177,7 @@ class TestAssistantResponse:
             sort_order=0,
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
+            creator_role="teacher",
             created_at=now,
             updated_at=now,
         )
@@ -531,7 +535,8 @@ def client_with_admin():
     """TestClient mit Admin-Auth und gemockter DB-Session."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from app.api.admin.assistants import router as assistants_router
+    from app.api.admin.assistants import router as admin_assistants_router
+    from app.api.assistants import router as public_assistants_router
     from app.auth.dependencies import get_current_user
     from app.auth.jwt import JwtPayload
     from app.db.session import get_db
@@ -568,7 +573,10 @@ def client_with_admin():
         return mock_db
 
     mini_app = FastAPI()
-    mini_app.include_router(assistants_router)
+    # Admin-Router zuerst: GET /assistants liefert AssistantFullListResponse (mit total)
+    mini_app.include_router(admin_assistants_router)
+    # Public-Router: POST /assistants (create), POST /assistants/import, etc.
+    mini_app.include_router(public_assistants_router)
     mini_app.dependency_overrides[get_current_user] = mock_current_user
     mini_app.dependency_overrides[get_db] = mock_get_db
 

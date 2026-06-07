@@ -7,6 +7,7 @@
         Bot,
         X,
         Info,
+        Search,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
@@ -14,6 +15,8 @@
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
+    import ContextChips from "$lib/components/ContextChips.svelte";
+    import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -25,6 +28,11 @@
         uploadFile,
         getAssistants,
         patchConversationContext,
+        getChatContextNodes,
+        addChatContextNode,
+        removeChatContextNode,
+        getContextNodes,
+        searchContextNodes,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
@@ -72,6 +80,84 @@
     let pendingSubjectId = $state(null);
     let pendingGroupId = $state(null);
 
+    // @-Mention State für Kontext-Knoten
+    let mentionQuery = $state("");
+    let mentionResults = $state([]);
+    let mentionOpen = $state(false);
+    let mentionSelectedIndex = $state(0);
+    let mentionDebounceTimer = $state(null);
+    // Kontext-Knoten für diese Konversation
+    let contextNodes = $state([]); // ChatContextNodeRead[]
+    let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
+
+    // Vorschläge aus LLM-Tool-Call (warten auf Bestätigung durch Nutzer)
+    let pendingSuggestions = $state(null); // null | Array<{node_id, title, category, content_type}>
+
+    // Kombinierter Nodes-State für die Chips-Anzeige
+    const displayContextNodes = $derived(
+        conversationId ? contextNodes : pendingContextNodes,
+    );
+
+    // Tool-Calling-Fähigkeit des aktuell gewählten Modells
+    const supportsToolCalling = $derived(
+        availableModels.find((m) => m.id === selectedModelId)
+            ?.supports_function_calling ?? null,
+    );
+
+    async function handleRemoveContextNode(nodeId) {
+        // Optimistisch entfernen
+        contextNodes = contextNodes.filter((n) => n.node_id !== nodeId);
+        pendingContextNodes = pendingContextNodes.filter(
+            (n) => n.node_id !== nodeId,
+        );
+
+        if (conversationId) {
+            try {
+                await removeChatContextNode(conversationId, nodeId);
+            } catch (err) {
+                console.error(
+                    "Kontext-Knoten konnte nicht entfernt werden:",
+                    err,
+                );
+                // Bei Fehler: Knoten wieder anzeigen (kein Reload nötig — State bleibt
+                // inkonsistent bis zur nächsten Konversation; kein kritischer Fehler)
+            }
+        }
+    }
+
+    async function handleSuggestionsConfirm(confirmedNodes) {
+        pendingSuggestions = null;
+        if (!confirmedNodes.length) return;
+
+        if (conversationId) {
+            for (const node of confirmedNodes) {
+                try {
+                    await addChatContextNode(conversationId, node.node_id);
+                    if (!contextNodes.some((n) => n.node_id === node.node_id)) {
+                        contextNodes = [...contextNodes, node];
+                    }
+                } catch (err) {
+                    console.error(
+                        "Kontext-Knoten konnte nicht hinzugefügt werden:",
+                        err,
+                    );
+                }
+            }
+        } else {
+            for (const node of confirmedNodes) {
+                if (
+                    !pendingContextNodes.some((n) => n.node_id === node.node_id)
+                ) {
+                    pendingContextNodes = [...pendingContextNodes, node];
+                }
+            }
+        }
+    }
+
+    function handleSuggestionsDismiss() {
+        pendingSuggestions = null;
+    }
+
     // Computed: aktiver Kontext (pending für neue Konversation, sonst aus Store)
     const activeSubjectId = $derived(
         pendingSubjectId ?? $activeConversationSubjectId,
@@ -111,9 +197,11 @@
         let prevAssistant = null;
         for (const msg of rawMessages) {
             if (msg.role === "assistant" && prevAssistant) {
-                const modelChanged = msg.model && msg.model !== prevAssistant.model;
-                const assistantChanged = msg.assistantId != null
-                    && msg.assistantId !== prevAssistant.assistantId;
+                const modelChanged =
+                    msg.model && msg.model !== prevAssistant.model;
+                const assistantChanged =
+                    msg.assistantId != null &&
+                    msg.assistantId !== prevAssistant.assistantId;
                 if (modelChanged || assistantChanged) {
                     result.push({
                         role: "change",
@@ -394,17 +482,28 @@
                         : selectedModelId || currentConversationModel;
 
                     // Trenner bei Modell- oder Assistent-Wechsel
-                    if (!wasNewConversation && (item.model || item.assistantId != null)) {
-                        const prev = lastAssistantMessage(messages.slice(0, assistantIndex));
-                        const modelChanged = prev && item.model && item.model !== prev.model;
-                        const assistantChanged = prev && item.assistantId != null
-                            && item.assistantId !== prev.assistantId;
+                    if (
+                        !wasNewConversation &&
+                        (item.model || item.assistantId != null)
+                    ) {
+                        const prev = lastAssistantMessage(
+                            messages.slice(0, assistantIndex),
+                        );
+                        const modelChanged =
+                            prev && item.model && item.model !== prev.model;
+                        const assistantChanged =
+                            prev &&
+                            item.assistantId != null &&
+                            item.assistantId !== prev.assistantId;
                         if (modelChanged || assistantChanged) {
                             const separator = {
                                 role: "change",
                                 model: item.model,
                                 assistantId: item.assistantId,
-                                assistantName: selectedAssistant?.name ?? conversationAssistant?.name ?? null,
+                                assistantName:
+                                    selectedAssistant?.name ??
+                                    conversationAssistant?.name ??
+                                    null,
                             };
                             messages = [
                                 ...messages.slice(0, assistantIndex),
@@ -446,6 +545,19 @@
                     if (wasNewConversation) {
                         refreshConversationCounts();
                     }
+                    // Pending-Kontext-Knoten persistieren (neue Konversation)
+                    if (wasNewConversation && pendingContextNodes.length > 0) {
+                        // Fire-and-forget: Fehler werden nur geloggt, nicht dem User angezeigt
+                        const toAdd = [...pendingContextNodes];
+                        pendingContextNodes = [];
+                        for (const node of toAdd) {
+                            addChatContextNode(
+                                item.conversationId,
+                                node.node_id,
+                            ).catch(console.error);
+                        }
+                        contextNodes = toAdd; // optimistisch setzen
+                    }
                     continue;
                 }
                 // Titel-Event
@@ -464,6 +576,11 @@
                     if (item.cost_usd != null) {
                         totalCostUsd = (totalCostUsd ?? 0) + item.cost_usd;
                     }
+                    continue;
+                }
+                // Kontext-Vorschläge aus LLM-Tool-Call
+                if (item.type === "context_suggestions") {
+                    pendingSuggestions = item.nodes;
                     continue;
                 }
                 // Token von Assistant
@@ -509,9 +626,37 @@
     }
 
     function handleKeydown(e) {
+        // @-Dropdown Navigation
+        if (mentionOpen) {
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                mentionSelectedIndex = Math.min(
+                    mentionSelectedIndex + 1,
+                    mentionResults.length - 1,
+                );
+                return;
+            }
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
+                return;
+            }
+            if (e.key === "Enter" || e.key === "Tab") {
+                if (mentionResults.length > 0) {
+                    e.preventDefault();
+                    selectMention(mentionResults[mentionSelectedIndex]);
+                    return;
+                }
+            }
+            if (e.key === "Escape") {
+                mentionOpen = false;
+                return;
+            }
+        }
+
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            if (subjectPickerOpen || pickerOpen) return;
+            if (subjectPickerOpen || pickerOpen || mentionOpen) return;
             handleSubmit();
         }
     }
@@ -529,6 +674,101 @@
         if (e.target.value === "#" && hasFachItems) {
             input = "";
             subjectPickerOpen = true;
+            return;
+        }
+
+        // @-Trigger: suche @ am oder vor der aktuellen Cursor-Position
+        const cursorPos = e.target.selectionStart ?? input.length;
+        const textBeforeCursor = input.slice(0, cursorPos);
+        const match = textBeforeCursor.match(/@(\S*)$/);
+        if (match) {
+            mentionQuery = match[1];
+            mentionOpen = true;
+            mentionSelectedIndex = 0;
+            clearTimeout(mentionDebounceTimer);
+            mentionDebounceTimer = setTimeout(
+                () => fetchMentionResults(mentionQuery),
+                200,
+            );
+        } else {
+            mentionOpen = false;
+            mentionResults = [];
+        }
+    }
+
+    async function fetchMentionResults(q) {
+        try {
+            const data = await getContextNodes({ q, status: "active" });
+            mentionResults = data.items?.slice(0, 8) ?? data.slice(0, 8);
+        } catch {
+            mentionResults = [];
+        }
+    }
+
+    async function selectMention(node) {
+        mentionOpen = false;
+        mentionResults = [];
+
+        // @-Fragment im Eingabefeld durch Knoten-Titel ersetzen
+        const cursorPos = textarea?.selectionStart ?? input.length;
+        const textBeforeCursor = input.slice(0, cursorPos);
+        const replaced = textBeforeCursor.replace(/@\S*$/, "");
+        input = replaced + input.slice(cursorPos);
+
+        // Knoten zum Kontext hinzufügen
+        if (conversationId) {
+            try {
+                const added = await addChatContextNode(conversationId, node.id);
+                if (!contextNodes.some((n) => n.node_id === added.node_id)) {
+                    contextNodes = [...contextNodes, added];
+                }
+            } catch (err) {
+                console.error(
+                    "Kontext-Knoten konnte nicht hinzugefügt werden:",
+                    err,
+                );
+            }
+        } else {
+            // Neue Konversation: puffern — nach erstem Send wird conversationId bekannt
+            const alreadyPending = pendingContextNodes.some(
+                (n) => n.node_id === node.id,
+            );
+            if (!alreadyPending) {
+                pendingContextNodes = [
+                    ...pendingContextNodes,
+                    {
+                        node_id: node.id,
+                        category: node.category,
+                        title: node.title,
+                        content_type: node.content_type,
+                        added_at: new Date().toISOString(),
+                    },
+                ];
+            }
+        }
+
+        textarea?.focus();
+    }
+
+    function handleTextareaBlur() {
+        setTimeout(() => {
+            mentionOpen = false;
+        }, 100);
+    }
+
+    async function handleLookupRequest() {
+        const query = input.trim();
+        if (!query) return;
+        try {
+            const results = await searchContextNodes(query);
+            pendingSuggestions = results.map((n) => ({
+                node_id: n.node_id,
+                title: n.title,
+                category: n.category,
+                content_type: n.content_type,
+            }));
+        } catch (err) {
+            console.error("Kontext-Suche fehlgeschlagen:", err);
         }
     }
 
@@ -625,13 +865,20 @@
                     ? { id: data.assistant_id, name: data.assistant_name }
                     : null;
                 // 3-1: Selector auf Konversations-Modell vorbelegen
-                if (availableModels.some(m => m.id === data.model_used)) {
+                if (availableModels.some((m) => m.id === data.model_used)) {
                     selectedModelId = data.model_used;
                 }
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
                 activeConversationSubjectId.set(data.subject_id ?? null);
                 activeConversationGroupId.set(data.group_id ?? null);
+                // Kontext-Knoten laden
+                try {
+                    contextNodes = await getChatContextNodes(data.id);
+                } catch {
+                    contextNodes = [];
+                }
+                pendingSuggestions = null;
             } catch (err) {
                 if (err instanceof ApiError) {
                     conversationError = err.message;
@@ -644,6 +891,7 @@
                         activeConversationId.set(null);
                         activeConversationSubjectId.set(null);
                         activeConversationGroupId.set(null);
+                        pendingSuggestions = null;
                     }
                 } else {
                     conversationError = "Fehler beim Laden der Konversation";
@@ -653,6 +901,7 @@
                     activeConversationSubjectId.set(null);
                     activeConversationGroupId.set(null);
                 }
+                pendingSuggestions = null;
             } finally {
                 loadingConversation = false;
             }
@@ -672,6 +921,8 @@
             subjectPickerOpen = false;
             pendingSubjectId = null;
             pendingGroupId = null;
+            contextNodes = [];
+            pendingContextNodes = [];
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
             if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;
@@ -698,13 +949,13 @@
 
     // Vorausgefüllter Text aus ?q= (z. B. von der Welcome-Seite)
     $effect(() => {
-        const prefillText = $page.url.searchParams.get('q')
+        const prefillText = $page.url.searchParams.get("q");
         if (prefillText && !conversationId) {
-            input = prefillText
+            input = prefillText;
             // Fokus auf das Textarea setzen
             tick().then(() => {
-                textarea?.focus()
-            })
+                textarea?.focus();
+            });
         }
     });
 
@@ -870,10 +1121,59 @@
 
             <!-- Hinweis bei Assistentenwechsel -->
             {#if assistantSwitchHint}
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1 mb-2">
+                <p
+                    class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1 mb-2"
+                >
                     <Info class="w-3.5 h-3.5 shrink-0" />
                     {assistantSwitchHint}
                 </p>
+            {/if}
+
+            <!-- Kontext-Knoten-Chips -->
+            <ContextChips
+                nodes={displayContextNodes}
+                onremove={handleRemoveContextNode}
+                disabled={isStreaming}
+            />
+
+            <!-- Kontext-Vorschläge aus LLM-Tool-Call -->
+            {#if pendingSuggestions !== null}
+                <ContextSuggestions
+                    nodes={pendingSuggestions}
+                    onconfirm={handleSuggestionsConfirm}
+                    ondismiss={handleSuggestionsDismiss}
+                />
+            {/if}
+
+            <!-- @-Mention Dropdown -->
+            {#if mentionOpen && mentionResults.length > 0}
+                <div
+                    class="absolute bottom-full left-0 right-0 mb-1 z-50
+                           bg-light-bg-2 dark:bg-dark-bg-2
+                           border border-light-ui-3 dark:border-dark-ui-3
+                           rounded-lg shadow-lg overflow-hidden"
+                >
+                    {#each mentionResults as node, i}
+                        <button
+                            type="button"
+                            class="w-full text-left px-3 py-2 text-sm flex items-center gap-2
+                                   {i === mentionSelectedIndex
+                                ? 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx'
+                                : 'text-light-tx dark:text-dark-tx hover:bg-light-ui dark:hover:bg-dark-ui'}"
+                            onmousedown={(e) => {
+                                e.preventDefault();
+                                selectMention(node);
+                            }}
+                        >
+                            <span
+                                class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                            >
+                                {node.content_type ?? ""}
+                            </span>
+                            <span class="truncate">{node.title}</span>
+                        </button>
+                    {/each}
+                </div>
             {/if}
 
             <!-- Eingabe-Zeile: Upload + Textarea + Send -->
@@ -911,6 +1211,7 @@
                     rows={textAreaRows}
                     onkeydown={handleKeydown}
                     oninput={handleInput}
+                    onblur={handleTextareaBlur}
                     bind:value={input}
                     disabled={isStreaming}
                     placeholder={isStreaming ? "" : "Nachricht eingeben…"}
@@ -920,6 +1221,22 @@
                            disabled:opacity-50 disabled:cursor-not-allowed
                            focus:outline-none focus:ring-2 focus:ring-primary"
                 ></textarea>
+
+                <!-- Kontext-Lookup-Button -->
+                <button
+                    type="button"
+                    onclick={handleLookupRequest}
+                    disabled={isStreaming || !input.trim()}
+                    title="Passende Kontextknoten zum eingetippten Text suchen"
+                    aria-label="Kontext-Lookup"
+                    class="p-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui dark:hover:bg-dark-ui
+                           disabled:opacity-40 disabled:cursor-not-allowed shrink-0
+                           transition-colors"
+                >
+                    <Search class="w-5 h-5" />
+                </button>
 
                 <!-- Send-Button -->
                 <button
@@ -1018,7 +1335,10 @@
                             {#if availableModels.length > 0}
                                 {#each availableModels as model}
                                     <option value={model.id}
-                                        >{model.id}</option
+                                        >{model.id}{model.supports_function_calling ===
+                                        true
+                                            ? " ⚙"
+                                            : ""}</option
                                     >
                                 {/each}
                             {:else}
@@ -1045,10 +1365,20 @@
             <div>
                 <!-- Globaler Hinweistext -->
                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    KI kann Fehler machen. Ergebnisse immer kritisch prüfen.
-                    {#if !selectedAssistant && availableAssistants.length > 0}
-                        Verwende <code>/</code> um {conversationId ? "den Assistenten zu wechseln" : "Assistenten zu starten"}.
+                    <b
+                        >KI kann Fehler machen. Ergebnisse immer kritisch
+                        prüfen.</b
+                    >
+                </p>
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    {#if availableAssistants.length > 0}
+                        Verwende <code>/</code> um {selectedAssistant ||
+                        conversationAssistant
+                            ? "den Assistenten zu wechseln"
+                            : "Assistenten zu starten"},
                     {/if}
+                    <code>@</code> um Kontexte aus dem Speicher zu verknüpfen
+                    und <code>#</code> um den Chat einem Fach zuzuordnen.
                 </p>
             </div>
         </div>

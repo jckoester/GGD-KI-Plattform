@@ -10,3 +10,11 @@ export const hasAnyRole = (roles) =>
 /** true wenn der User die genannte Rolle hat */
 export const hasRole = (role) =>
     derived(user, ($u) => !!$u && $u.roles.includes(role))
+
+/**
+ * Reine Prädikat-Funktion auf einem bereits aufgelösten User-Objekt.
+ * Im Gegensatz zu {@link hasAnyRole} (liefert einen Store) für einmalige
+ * Checks gedacht, z. B. in `$effect`-Auth-Guards: `userHasAnyRole($user, [...])`.
+ */
+export const userHasAnyRole = (u, roles) =>
+    !!u && roles.some((r) => u.roles.includes(r))

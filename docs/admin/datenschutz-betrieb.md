@@ -41,12 +41,13 @@ solange `SCHOOL_SECRET` unverändert ist.
 
 ## Automatische Datenlöschung (Cron-Jobs)
 
-Zwei automatische Jobs löschen veraltete Daten täglich:
+Drei automatische Cron-Jobs laufen täglich. Zwei davon löschen veraltete Daten, der dritte ergänzt fehlende Embeddings:
 
-| Job | Zeitplan | Was wird gelöscht |
+| Job | Zeitplan | Was wird ausgeführt |
 |-----|---------|-----------------|
-| `cleanup_stale_conversations` | täglich 02:30 Uhr | Konversationen ohne neue Nachrichten seit 93 Tagen |
-| `cleanup_inactive_accounts` | täglich 02:00 Uhr | Nutzerkonten ohne Login seit 90 Tagen (inkl. aller Konversationen) |
+| `cleanup_inactive_accounts` | täglich 02:00 Uhr | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
+| `cleanup_stale_conversations` | täglich 02:30 Uhr | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
+| `embedding_backfill` | täglich 03:15 Uhr | Embeddings für Knoten ohne Embedding nachgenerieren |
 
 Die Löschung ist unwiederbringlich. Es gibt keine Wiederherstellungsfunktion.
 

@@ -9,6 +9,9 @@
   import ConversationMenu from '$lib/components/ConversationMenu.svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import AssistantCard from '$lib/components/AssistantCard.svelte'
+  import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
+  import CurriculumList from '$lib/components/CurriculumList.svelte'
+  import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
 
   // ── Gruppe + Fach aus Stores ──────────────────────────────────────────────
   const group = $derived(
@@ -17,6 +20,8 @@
   const subject = $derived(
     group ? ($subjectMap[group.subject_id] ?? null) : null
   )
+  // Voreingestellte Jahrgangsstufe aus dem Fach ableiten
+  const defaultGrade = $derived(subject?.min_grade ?? null)
 
   // ── Assistenten für diese Gruppe ──────────────────────────────────────────
   const groupAssistants = $derived(
@@ -30,8 +35,8 @@
       : []
   )
 
-  // ── Tab-Zustand ────────────────────────────────────────────────────────────
-  let activeTab = $state('vorbereitung')
+  // ── Tab-Zustand (URL-basiert, damit Zurück-Navigation den Tab erhält) ──────
+  const activeTab = $derived($page.url.searchParams.get('tab') ?? 'vorbereitung')
 
   // ── Konversationen (Tab "Vorbereitung") ───────────────────────────────────
   let conversations = $state([])
@@ -91,13 +96,15 @@
   <!-- Tab-Leiste -->
   <nav class="flex gap-1 -mb-px mt-3">
     {#each [
-      { id: 'vorbereitung', label: 'Vorbereitung' },
-      { id: 'klasse',       label: 'Klasse'       },
-      { id: 'archiv',       label: 'Archiv'        },
-      { id: 'kontext',      label: 'Kontext'       },
+      { id: 'vorbereitung', label: 'Vorbereitung'    },
+      { id: 'curriculum',   label: 'Curriculum'      },
+      { id: 'bildungsplan', label: 'Bildungsplan'    },
+      { id: 'klasse',       label: 'Klasse'          },
+      { id: 'archiv',       label: 'Archiv'          },
+      { id: 'kontext',      label: 'weiterer Kontext' },
     ] as tab (tab.id)}
       <button
-        onclick={() => { activeTab = tab.id }}
+        onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
                {activeTab === tab.id
                  ? 'border-primary text-light-bl dark:text-dark-bl dark:border-primary-dark'
@@ -203,6 +210,29 @@
       {/if}
     {/if}
 
+  <!-- Tab: Curriculum -->
+  {:else if activeTab === 'curriculum'}
+    <CurriculumList
+      subjectId={subject?.id}
+      subjectSlug={subject?.slug}
+      subjectFachCode={subject?.fach_code}
+      showNewButton={true}
+    />
+
+  <!-- Tab: Bildungsplan -->
+  {:else if activeTab === 'bildungsplan'}
+    {#if subject?.id}
+      <BildungsplanTree
+        subjectId={subject.id}
+        subjectSlug={subject.slug}
+        initialGrade={defaultGrade}
+      />
+    {:else}
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 py-4">
+        Kein Fach zugeordnet.
+      </p>
+    {/if}
+
   <!-- Tab: Klasse (Platzhalter) -->
   {:else if activeTab === 'klasse'}
     <div class="py-8 text-center text-light-tx-2 dark:text-dark-tx-2">
@@ -223,15 +253,15 @@
       </p>
     </div>
 
-  <!-- Tab: Kontext (Platzhalter) -->
+  <!-- Tab: weiterer Kontext -->
   {:else if activeTab === 'kontext'}
-    <div class="py-8 text-center text-light-tx-2 dark:text-dark-tx-2">
-      <p class="font-medium mb-2 text-light-tx dark:text-dark-tx">Kontext</p>
-      <p class="text-sm max-w-sm mx-auto">
-        Hier werden in Phase 5 verknüpfte Dokumente und Vektoren dieser Unterrichtsgruppe
-        einsehbar und bearbeitbar sein.
-      </p>
-    </div>
+    <KnowledgeNodeList
+      fixedGroupId={group?.id}
+      showSubjectFilter={false}
+      showNewButton={true}
+      initialGrade={defaultGrade}
+      excludeContentTypes={['curriculum','fachplan','leitidee','ik_kompetenz','pk_gruppe','pk_kompetenz']}
+    />
   {/if}
 
 </div>

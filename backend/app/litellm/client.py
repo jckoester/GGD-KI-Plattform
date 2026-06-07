@@ -507,3 +507,31 @@ class LiteLLMClient:
         except Exception:
             logger.exception("get_spend_log Exception für request_id=%s", request_id)
             return None
+
+    async def get_model_info(self) -> dict[str, bool | None]:
+        """
+        GET /model/info → Map model_name → supports_function_calling.
+        Gibt {} zurück bei Fehler (kein Hard-Fail).
+        Unbekannte/fehlende Werte → None.
+        """
+        try:
+            client = await self._get_client()
+            response = await client.get(
+                f"{self.base_url}/model/info",
+                headers={"Authorization": f"Bearer {self.master_key}"},
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    "get_model_info fehlerhaft: status=%d, body=%s",
+                    response.status_code, response.text[:200],
+                )
+                return {}
+            data = response.json().get("data", [])
+            return {
+                entry["model_name"]: entry.get("model_info", {}).get("supports_function_calling")
+                for entry in data
+                if isinstance(entry, dict) and "model_name" in entry
+            }
+        except Exception:
+            logger.exception("get_model_info Exception")
+            return {}

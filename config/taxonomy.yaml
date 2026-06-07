@@ -1,0 +1,170 @@
+# Jede category hat: label_de, color (Semantic-Token-Kürzel), content_types[]
+# Jeder content_type hat: key, label_de, scope_defaults (read_scope, write_scope),
+#   optional: scope_anchor (true/false)
+
+categories:
+
+  document:
+    label_de: "Dokument"
+    color: "bl"
+    content_types:
+      - key: formatierungsvorlage
+        label_de: "Formatierungsvorlage"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+      - key: vokabelliste
+        label_de: "Vokabelliste"
+        scope_defaults: {read_scope: group,    write_scope: private }
+      - key: aufgabenblatt
+        label_de: "Aufgabenblatt"
+        scope_defaults: {read_scope: group,    write_scope: private }
+      - key: quelltext
+        label_de: "Quelltext"
+        scope_defaults: {read_scope: group,    write_scope: private }
+      - key: konvention
+        label_de: "Konvention"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+      - key: methodenblatt
+        label_de: "Methodenblatt"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+      - key: operatorenblatt
+        label_de: "Operatorenblatt"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+      - key: praesentation
+        label_de: "Präsentation"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+
+  knowledge:
+    label_de: "Wissen"
+    color: "gr"
+    content_types:
+      - key: fachplan
+        label_de: "Fachplan"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        scope_anchor: true
+      - key: themengebiet
+        label_de: "Themengebiet"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        scope_anchor: true
+        embedding: true
+      - key: leitidee
+        label_de: "Leitidee"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        scope_anchor: true
+        embedding: true
+      - key: ik_kompetenz
+        label_de: "IK-Kompetenz"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
+      - key: pk_gruppe
+        label_de: "Prozessbezogene Kompetenzgruppe"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        scope_anchor: true
+        embedding: true
+      - key: pk_kompetenz
+        label_de: "Prozessbezogene Kompetenz"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
+      - key: leitperspektive
+        label_de: "Leitperspektive"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+      - key: leitperspektive_aspekt
+        label_de: "Leitperspektive-Aspekt"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+      - key: curriculum
+        label_de: "Schulcurriculum"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        scope_anchor: true
+      - key: kapitel
+        label_de: "Kapitel"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        scope_anchor: true
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
+      - key: lernsequenz
+        label_de: "Lernsequenz"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        scope_anchor: false
+      - key: methode
+        label_de: "Methode"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+      - key: operator_didaktisch
+        label_de: "Didaktischer Operator"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+      - key: jahresplan
+        label_de: "Jahresplan"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: pruefungsanforderung
+        label_de: "Prüfungsanforderung"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+
+  artifact:
+    label_de: "Artefakt"
+    color: "or"
+    content_types:
+      - key: unterrichtsstunde
+        label_de: "Unterrichtsstunde"
+        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_anchor: true
+      - key: unterrichtseinheit
+        label_de: "Unterrichtseinheit"
+        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_anchor: false
+      - key: reflexion
+        label_de: "Reflexion"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: arbeitsblatt
+        label_de: "Arbeitsblatt"
+        scope_defaults: {read_scope: group,    write_scope: private }
+      - key: aufgabe
+        label_de: "Aufgabe"
+        scope_defaults: {read_scope: group,    write_scope: private }
+      - key: klausur
+        label_de: "Klausur"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: code_beispiel
+        label_de: "Code-Beispiel"
+        scope_defaults: {read_scope: school,   write_scope: private }
+      - key: lerntext
+        label_de: "Lerntext"
+        scope_defaults: {read_scope: school,   write_scope: private }
+      - key: gliederung
+        label_de: "Gliederung"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: mindmap
+        label_de: "Mindmap"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: lernplan
+        label_de: "Lernplan"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: schuelertext
+        label_de: "Schülertext"
+        scope_defaults: {read_scope: private,  write_scope: private }
+      - key: feedback_text
+        label_de: "Feedback-Text"
+        scope_defaults: {read_scope: private,  write_scope: private }
+
+  concept:
+    label_de: "Konzept"
+    color: "pu"
+    content_types:
+      - key: funktion
+        label_de: "Funktion"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+        embedding_enrichment: ["metadata.signatur"]
+      - key: bauteil
+        label_de: "Bauteil"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+        embedding_enrichment: ["metadata.schaltzeichen.beschreibung"]
+      - key: operator_math
+        label_de: "Mathematischer Operator"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+      - key: abstrakt
+        label_de: "Abstraktes Konzept"
+        scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true

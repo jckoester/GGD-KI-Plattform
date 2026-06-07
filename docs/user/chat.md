@@ -34,6 +34,16 @@ Sie können Dateien direkt in ein Gespräch einbinden — zum Beispiel ein PDF, 
 **Unterstützte Dateitypen:** PDF, gängige Bildformate (JPG, PNG, …), Textdateien  
 **Maximale Dateigröße:** 10 MB pro Datei
 
+## Kontextbausteine hinzufügen
+
+Über den **Suche-Button** (Lupensymbol) neben dem Textfeld können Sie passende Wissensbausteine aus dem Kontextspeicher in den Chat einbinden — zum Beispiel Bildungsplan-Kompetenzen oder Unterrichtsmaterial. Die KI berücksichtigt diese Bausteine beim Antworten.
+
+Tippen Sie Ihre Frage oder einen beschreibenden Text ein und klicken Sie den Button. Die Plattform sucht semantisch passende Bausteine und zeigt sie zur Auswahl an. Bestätigte Bausteine erscheinen als Chips oberhalb des Textfelds und können dort wieder entfernt werden.
+
+Alternativ tippen Sie **`@`** ins Textfeld, um direkt nach einem Baustein zu suchen.
+
+Mehr dazu: [Kontextspeicher](kontext.md)
+
 ## Chat-Verlauf
 
 Alle Ihre Gespräche werden unter **„Letzte Chats"** in der Seitenleiste gespeichert. Von dort können Sie ein älteres Gespräch jederzeit wieder öffnen und fortsetzen.

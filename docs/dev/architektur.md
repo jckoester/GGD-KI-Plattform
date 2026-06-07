@@ -30,7 +30,7 @@ Cron-Container (separat):
 | `db/` | SQLAlchemy-Modelle (async), Session-Factory |
 | `api/admin/` | Admin-only-Endpunkte: Modell-Allowlists, Assistenten, Statistiken, Site-Texte |
 | `api/assistants.py` | Öffentlicher Assistenten-Endpunkt (Sichtbarkeit nach Rolle) |
-| `crons/` | Cleanup-Logik (Accounts, Konversationen) — wird von Skripten aufgerufen |
+| `crons/` | Cron-Logik (Cleanup Accounts/Konversationen, Embedding-Backfill) — wird von Skripten aufgerufen |
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
