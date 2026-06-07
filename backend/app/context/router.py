@@ -1533,12 +1533,6 @@ async def get_fachplan_by_subject(
         )
         .order_by(ContextNode.title)
     )
-    if min_grade is not None:
-        pk_gruppen_q = pk_gruppen_q.where(
-            ContextNode.min_grade == min_grade,
-            ContextNode.max_grade == max_grade,
-            ContextNode.niveau == (niveau or "regulär"),
-        )
     pk_gruppen_result = await db.execute(pk_gruppen_q)
     pk_gruppen_nodes = pk_gruppen_result.scalars().all()
 
@@ -1555,12 +1549,6 @@ async def get_fachplan_by_subject(
             )
             .order_by(ContextNode.title)
         )
-        if min_grade is not None:
-            pk_q = pk_q.where(
-                ContextNode.min_grade == min_grade,
-                ContextNode.max_grade == max_grade,
-                ContextNode.niveau == (niveau or "regulär"),
-            )
         pk_result = await db.execute(pk_q)
         pk_list = [
             PkKompetenzRead(id=n.id, title=n.title, metadata_=n.metadata_)

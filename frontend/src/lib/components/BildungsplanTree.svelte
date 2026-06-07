@@ -19,6 +19,9 @@
     // Ausgewählte BP-Version (null = aktuellste nehmen)
     let selectedVersion = $state(initialBpVersion);
 
+    // Ansicht: 'ik' = Inhaltsbezogene Kompetenzen, 'pk' = Prozessbezogene Kompetenzen
+    let view = $state('ik');
+
     // Accordion-Zustände
     let expandedLeitideen = $state({});
     let expandedPkGruppen = $state({});
@@ -66,21 +69,28 @@
     $effect(() => {
         if (subjectId) {
             selectedBand = null;
+            view = 'ik';
             load(null, selectedVersion);
         }
     });
 
-    // Band-Wechsel → neu laden (nur wenn bereits Daten vorhanden)
+    // Band-Wechsel → neu laden, IK-Ansicht aktivieren
     function selectBand(band) {
         selectedBand = band;
+        view = 'ik';
         load(band, selectedVersion);
     }
 
-    // Versions-Wechsel → Band zurücksetzen + neu laden
+    // Versions-Wechsel → Band + Ansicht zurücksetzen + neu laden
     function selectVersion(version) {
         selectedVersion = version;
         selectedBand = null;
+        view = 'ik';
         load(null, version);
+    }
+
+    function selectPk() {
+        view = 'pk';
     }
 
     function navigateToNode(nodeId) {
@@ -117,20 +127,33 @@
             </div>
         {/if}
 
-        <!-- Band-Leiste (ersetzt Klassen-Chips) -->
+        <!-- Band-Leiste + PK-Button -->
         {#if data.bands && data.bands.length > 0}
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 items-center">
                 {#each data.bands as band}
                     <button
                         onclick={() => selectBand(band)}
                         class="px-3 py-1.5 text-sm rounded-md border transition-colors
-                               {isSameBand(selectedBand, band)
+                               {view === 'ik' && isSameBand(selectedBand, band)
                                    ? 'border-primary dark:border-primary-dark bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark font-medium'
                                    : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:border-primary dark:hover:border-primary-dark'}"
                     >
                         {band.label}
                     </button>
                 {/each}
+                {#if data.pk_gruppen?.length > 0}
+                    <span class="text-light-ui-3 dark:text-dark-ui-3 select-none">|</span>
+                    <button
+                        onclick={selectPk}
+                        title="Prozessbezogene Kompetenzen"
+                        class="px-3 py-1.5 text-sm rounded-md border transition-colors
+                               {view === 'pk'
+                                   ? 'border-primary dark:border-primary-dark bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark font-medium'
+                                   : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:border-primary dark:hover:border-primary-dark'}"
+                    >
+                        PK
+                    </button>
+                {/if}
             </div>
         {/if}
 
@@ -147,74 +170,78 @@
         {/if}
 
         <!-- Inhaltsbezogene Kompetenzen -->
-        {#if !loading && data.leitideen && data.leitideen.length > 0}
-            <div class="space-y-2">
-                <h3 class="text-sm font-semibold uppercase tracking-wide
-                           text-light-tx-2 dark:text-dark-tx-2 mb-2">
-                    Inhaltsbezogene Kompetenzen
-                </h3>
-                {#each data.leitideen as leitidee (leitidee.id)}
-                    {@render renderLeitidee(leitidee, 0)}
-                {/each}
-            </div>
+        {#if !loading && view === 'ik'}
+            {#if data.leitideen && data.leitideen.length > 0}
+                <div class="space-y-2">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide
+                               text-light-tx-2 dark:text-dark-tx-2 mb-2">
+                        Inhaltsbezogene Kompetenzen
+                    </h3>
+                    {#each data.leitideen as leitidee (leitidee.id)}
+                        {@render renderLeitidee(leitidee, 0)}
+                    {/each}
+                </div>
+            {:else}
+                <InfoBanner message={selectedBand
+                    ? `Für ${selectedBand.label} sind keine Kompetenzen hinterlegt.`
+                    : 'Keine Bildungsplan-Daten verfügbar.'
+                } />
+            {/if}
         {/if}
 
         <!-- Prozessbezogene Kompetenzen -->
-        {#if !loading && data.pk_gruppen && data.pk_gruppen.length > 0}
-            <div class="space-y-2">
-                <h3 class="text-sm font-semibold uppercase tracking-wide
-                           text-light-tx-2 dark:text-dark-tx-2 mb-2">
-                    Prozessbezogene Kompetenzen
-                </h3>
-                {#each data.pk_gruppen as pkGruppe (pkGruppe.id)}
-                    <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-md overflow-hidden">
-                        <button
-                            onclick={() => togglePkGruppe(pkGruppe.id)}
-                            class="w-full flex items-center justify-between p-3 gap-3
-                                   bg-light-bg-2 dark:bg-dark-bg-2
-                                   text-light-tx dark:text-dark-tx hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
-                                   transition-colors"
-                        >
-                            <div class="flex items-center gap-3">
-                                <NodeTypeIcon contentType="pk_gruppe" size={18} />
-                                <span class="font-medium">{pkGruppe.title}</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    {pkGruppe.pk_kompetenzen?.length || 0} Kompetenzen
-                                </span>
-                                {#if expandedPkGruppen[pkGruppe.id]}
-                                    <ChevronDown class="w-4 h-4 shrink-0" />
-                                {:else}
-                                    <ChevronRight class="w-4 h-4 shrink-0" />
-                                {/if}
-                            </div>
-                        </button>
-                        {#if expandedPkGruppen[pkGruppe.id] && pkGruppe.pk_kompetenzen?.length > 0}
-                            <div class="p-3 space-y-1">
-                                {#each pkGruppe.pk_kompetenzen as pk (pk.id)}
-                                    <button
-                                        onclick={() => navigateToNode(pk.id)}
-                                        class="w-full flex items-center gap-3 p-2 rounded
-                                               hover:bg-light-bg-2 dark:hover:bg-dark-bg-2
-                                               text-light-tx dark:text-dark-tx text-sm transition-colors"
-                                    >
-                                        <NodeTypeIcon contentType="pk_kompetenz" size={16} />
-                                        <span class="flex-1 text-left">{pk.title}</span>
-                                    </button>
-                                {/each}
-                            </div>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-        {/if}
-
-        {#if !loading && (!data.leitideen?.length) && (!data.pk_gruppen?.length)}
-            <InfoBanner message={selectedBand
-                ? `Für ${selectedBand.label} sind keine Kompetenzen hinterlegt.`
-                : 'Keine Bildungsplan-Daten verfügbar.'
-            } />
+        {#if !loading && view === 'pk'}
+            {#if data.pk_gruppen && data.pk_gruppen.length > 0}
+                <div class="space-y-2">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide
+                               text-light-tx-2 dark:text-dark-tx-2 mb-2">
+                        Prozessbezogene Kompetenzen
+                    </h3>
+                    {#each data.pk_gruppen as pkGruppe (pkGruppe.id)}
+                        <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-md overflow-hidden">
+                            <button
+                                onclick={() => togglePkGruppe(pkGruppe.id)}
+                                class="w-full flex items-center justify-between p-3 gap-3
+                                       bg-light-bg-2 dark:bg-dark-bg-2
+                                       text-light-tx dark:text-dark-tx hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
+                                       transition-colors"
+                            >
+                                <div class="flex items-center gap-3">
+                                    <NodeTypeIcon contentType="pk_gruppe" size={18} />
+                                    <span class="font-medium">{pkGruppe.title}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                        {pkGruppe.pk_kompetenzen?.length || 0} Kompetenzen
+                                    </span>
+                                    {#if expandedPkGruppen[pkGruppe.id]}
+                                        <ChevronDown class="w-4 h-4 shrink-0" />
+                                    {:else}
+                                        <ChevronRight class="w-4 h-4 shrink-0" />
+                                    {/if}
+                                </div>
+                            </button>
+                            {#if expandedPkGruppen[pkGruppe.id] && pkGruppe.pk_kompetenzen?.length > 0}
+                                <div class="p-3 space-y-1">
+                                    {#each pkGruppe.pk_kompetenzen as pk (pk.id)}
+                                        <button
+                                            onclick={() => navigateToNode(pk.id)}
+                                            class="w-full flex items-center gap-3 p-2 rounded
+                                                   hover:bg-light-bg-2 dark:hover:bg-dark-bg-2
+                                                   text-light-tx dark:text-dark-tx text-sm transition-colors"
+                                        >
+                                            <NodeTypeIcon contentType="pk_kompetenz" size={16} />
+                                            <span class="flex-1 text-left">{pk.title}</span>
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            {:else}
+                <InfoBanner message="Keine prozessbezogenen Kompetenzen verfügbar." />
+            {/if}
         {/if}
     {/if}
 </div>

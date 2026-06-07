@@ -62,6 +62,19 @@ def _mock_leitidee(ld_id: UUID, min_grade: int = 5, max_grade: int = 6,
     return node
 
 
+def _mock_pk_gruppe(pg_id: UUID) -> MagicMock:
+    node = MagicMock()
+    node.id = pg_id
+    node.title = "Argumentieren"
+    node.content_type = "pk_gruppe"
+    node.status = "active"
+    node.metadata_ = {}
+    node.min_grade = None
+    node.max_grade = None
+    node.niveau = "regulär"
+    return node
+
+
 def _mock_ik(ik_id: UUID, min_grade: int = 5, max_grade: int = 6,
              niveau: str = "regulär") -> MagicMock:
     node = MagicMock()
@@ -337,6 +350,36 @@ class TestGetFachplanBySubject:
         assert len(top["unter_leitideen"]) == 1
         assert top["unter_leitideen"][0]["id"] == str(unter_id)
         assert len(top["unter_leitideen"][0]["ik_kompetenzen"]) == 1
+
+    def test_pk_gruppen_returned_regardless_of_band(self):
+        """PKs mit min_grade=None erscheinen trotz aktivem Band-Filter (Regression)."""
+        fp_id = uuid4()
+        ld_id = uuid4()
+        pg_id = uuid4()
+
+        fp = _mock_fachplan_node(fp_id, bp_version="2016")
+        ld = _mock_leitidee(ld_id, 5, 6)
+        pg = _mock_pk_gruppe(pg_id)
+
+        db = _mock_session()
+        db.execute.side_effect = [
+            _r_scalar(fp),                    # fachplan
+            _r_all([_version_row("2016")]),   # available_versions
+            _r_all([_band_row(5, 6)]),        # bands (default 5–6)
+            _r_scalars_all([ld]),             # top leitideen
+            _r_scalars_all([]),              # IK für ld
+            _r_scalars_all([]),              # unter_leitideen für ld
+            _r_scalars_all([pg]),            # pk_gruppen (grade=NULL, soll trotzdem kommen)
+            _r_scalars_all([]),              # pk_kompetenzen für pg
+        ]
+
+        client = TestClient(_make_app(db))
+        resp = client.get("/context/fachplan/by-subject/1")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["pk_gruppen"]) == 1
+        assert data["pk_gruppen"][0]["id"] == str(pg_id)
 
     def test_available_versions_in_response(self):
         """available_versions gibt alle BP-Versionen des Fachs zurück."""
