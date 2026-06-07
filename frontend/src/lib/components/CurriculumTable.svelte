@@ -13,6 +13,7 @@
     import HinweisEditor from "./HinweisEditor.svelte";
     import { parseHinweise } from "$lib/hinweise.js";
     import { kapitelStd, lernsequenzStd } from "$lib/curriculum.js";
+    import { renderMarkdown } from "$lib/markdown.js";
     import {
         Plus,
         Trash2,
@@ -853,10 +854,12 @@
                                     />
                                 {:else}
                                     {#if eintrag.konkretisierung}
-                                        {@html eintrag.konkretisierung.replace(
-                                            /\n/g,
-                                            "<br>",
-                                        )}
+                                        <div class="prose prose-sm dark:prose-invert max-w-none
+                                                    prose-p:my-1 prose-ul:my-1 prose-ol:my-1
+                                                    prose-p:text-light-tx dark:prose-p:text-dark-tx
+                                                    prose-a:text-light-bl dark:prose-a:text-dark-bl">
+                                            {@html renderMarkdown(eintrag.konkretisierung)}
+                                        </div>
                                     {/if}
                                 {/if}
                             </td>
