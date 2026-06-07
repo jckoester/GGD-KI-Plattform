@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }}</title>
+<style>
+  /* ── Seite & laufende Kopfzeile ─────────────────────────────────────────── */
+  @page {
+    size: A4 landscape;
+    margin: 18mm 12mm 12mm 12mm;
+    @top-left  { content: string(school-running); font-size: 8pt; color: #777; }
+    @top-right { content: "Seite " counter(page) " / " counter(pages);
+                 font-size: 8pt; color: #777; }
+  }
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    font-size: 9pt;
+    color: #1a1a1a;
+    line-height: 1.35;
+  }
+
+  /* ── Schul-Kopfzeile (setzt zugleich die laufende Kopfzeile) ─────────────── */
+  .school-header {
+    string-set: school-running content();
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    border-bottom: 1pt solid #1e3a5f;
+    padding-bottom: 1.5mm;
+    margin-bottom: 3mm;
+  }
+
+  /* ── Titelbereich ──────────────────────────────────────────────────────── */
+  .doc-title {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-bottom: 2mm;
+  }
+  .doc-meta {
+    font-size: 8pt;
+    color: #555;
+    margin-bottom: 6mm;
+  }
+
+  /* ── Kapitel- / Lernsequenz-Überschriften ──────────────────────────────── */
+  .kapitel-heading {
+    background: #1e3a5f;
+    color: #fff;
+    font-size: 10pt;
+    font-weight: bold;
+    padding: 2mm 3mm;
+    margin-top: 5mm;
+    margin-bottom: 0;
+  }
+  .kapitel-std { font-size: 8pt; font-weight: normal; opacity: 0.85; margin-left: 3mm; }
+  .ls-heading {
+    background: #d0dce8;
+    font-weight: bold;
+    font-size: 9pt;
+    padding: 1mm 3mm;
+    margin: 0;
+  }
+  .ls-std { font-size: 8pt; font-weight: normal; color: #333; margin-left: 3mm; }
+
+  /* ── Tabelle (feste, dokumentweit konsistente Spaltenbreiten) ───────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;          /* erzwingt die colgroup-Breiten überall gleich */
+    margin: 0;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #e8eef4;
+    border: 0.5pt solid #b0bec8;
+    padding: 1.5mm 2mm;
+    font-size: 8pt;
+    font-weight: bold;
+    text-align: left;
+  }
+  td {
+    border: 0.5pt solid #c8d4dc;
+    padding: 1.5mm 2mm;
+    vertical-align: top;
+    font-size: 8.5pt;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  col.col-pk   { width: 24%; }
+  col.col-ik   { width: 28%; }
+  col.col-konk { width: 26%; }
+  col.col-hw   { width: 22%; }
+
+  /* ── Kompetenz-Listen (PK/IK als Volltext) ──────────────────────────────── */
+  ul.komp-list { margin: 0; padding-left: 4mm; }
+  ul.komp-list li { margin-bottom: 1mm; }
+  li.ik-partiell::after { content: " (T)"; font-size: 7pt; color: #888; }
+
+  /* ── Konkretisierung (gerendertes Markdown) ─────────────────────────────── */
+  .konk p { margin: 0 0 1mm 0; }
+  .konk ul, .konk ol { margin: 0 0 1mm 0; padding-left: 4mm; }
+  .konk li { margin-bottom: 0.5mm; }
+  .konk code { font-family: "Liberation Mono", monospace; font-size: 8pt; }
+
+  /* ── Hinweis-/Material-Badges ───────────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    max-width: 100%;                /* nie breiter als die Spalte */
+    border-radius: 3pt;
+    padding: 0.5mm 2mm;
+    font-size: 7.5pt;
+    font-weight: bold;
+    overflow-wrap: break-word;      /* lange Labels umbrechen statt überlaufen */
+    word-break: break-word;
+    margin: 0.5mm 1mm 0.5mm 0;
+    line-height: 1.5;
+  }
+  .badge-lp   { background: #e4d0f5; color: #5c2d91; }
+  .badge-ik   { background: #d0e8f5; color: #1b5e8a; }
+  .badge-node { background: #d0f5e4; color: #1b5e3a; }
+  /* LP-Aspekt: Volltext kann lang sein → kein Chip, nur farbiger Fließtext */
+  .lp-aspekt  { color: #5c2d91; }
+</style>
+</head>
+<body>
+
+{% if school_name %}
+<div class="school-header">{{ school_name }}</div>
+{% endif %}
+
+<div class="doc-title">{{ title }}</div>
+<div class="doc-meta">
+  {{ meta.get('schulart', '') }} &nbsp;|&nbsp; Kl. {{ meta.get('jahrgangsstufe', '') }}
+  &nbsp;|&nbsp; BP {{ meta.get('bp_version', '') }}
+</div>
+
+{% for kap in kapitel %}
+<div class="kapitel-heading">
+  {{ kap.titel }}
+  {% if kap.std %}<span class="kapitel-std">({{ kap.std }} Std.)</span>{% endif %}
+</div>
+
+{% for ls in kap.lernsequenzen %}
+<div class="ls-heading">
+  {{ ls.title or '–' }}
+  {% if ls.std %}<span class="ls-std">{{ ls.std }} Std.</span>{% endif %}
+</div>
+
+<table>
+  <colgroup>
+    <col class="col-pk">
+    <col class="col-ik">
+    <col class="col-konk">
+    <col class="col-hw">
+  </colgroup>
+  <tr>
+    <th>PK</th>
+    <th>IK</th>
+    <th>Konkretisierung</th>
+    <th>Hinweise &amp; Material</th>
+  </tr>
+  {% for e in ls.eintraege %}
+  <tr>
+    {# ── PK (Volltext) ── #}
+    <td>
+      {% if e.pk_items %}
+      <ul class="komp-list">
+        {% for pk in e.pk_items %}<li>{{ pk.text }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </td>
+
+    {# ── IK (Volltext) ── #}
+    <td>
+      {% if e.ik_items %}
+      <ul class="komp-list">
+        {% for ik in e.ik_items %}
+        <li class="{{ 'ik-partiell' if ik.partiell else '' }}">{{ ik.text }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </td>
+
+    {# ── Konkretisierung (Markdown) ── #}
+    <td class="konk">{{ e.konkretisierung_html | safe }}</td>
+
+    {# ── Hinweise & Material ── #}
+    <td>
+      {% if e.hinweise_parts %}
+      <div>
+        {% for part in e.hinweise_parts %}
+          {% if part.kind == 'text' %}<span>{{ part.text }}</span>
+          {% elif part.kind == 'lp' %}<span class="badge badge-lp">{{ part.label }}</span>
+          {% elif part.kind == 'lpa' %}<span class="lp-aspekt">{{ part.label }}</span>
+          {% elif part.kind == 'ik' %}<span class="badge badge-ik">{{ part.label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if e.material_parts %}
+      <div style="margin-top:1mm; border-top: 0.3pt solid #ccc; padding-top:1mm;">
+        {% for part in e.material_parts %}
+          {% if part.kind == 'text' %}<span style="color:#555">{{ part.text }}</span>
+          {% elif part.kind == 'node' %}<span class="badge badge-node">{{ part.label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" style="color:#888; text-align:center;">(keine Einträge)</td></tr>
+  {% endfor %}
+</table>
+{% endfor %}{# /ls #}
+
+{% endfor %}{# /kapitel #}
+
+</body>
+</html>

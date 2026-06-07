@@ -1,7 +1,7 @@
 <script>
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
-    import { getCurriculum, deleteContextNode } from '$lib/api.js'
+    import { getCurriculum, deleteContextNode, exportCurriculum } from '$lib/api.js'
     import { curriculumStd } from '$lib/curriculum.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
@@ -18,6 +18,31 @@
     let confirmDelete = $state(false)
     let deleting = $state(false)
     let deleteError = $state(null)
+
+    // Export
+    let exportError = $state(null)
+    let exporting = $state(false)
+
+    function _exportFilename(format) {
+        const meta = curriculum?.metadata ?? {}
+        const fach = (meta.fach_code ?? 'curriculum').replace(/\s/g, '_')
+        const jg = meta.jahrgangsstufe ?? ''
+        const date = new Date().toISOString().slice(0, 10)
+        return `curriculum_${fach}_${jg}_${date}.${format}`
+    }
+
+    async function handleExport(format) {
+        if (exporting || !curriculum) return
+        exporting = true
+        exportError = null
+        try {
+            await exportCurriculum(curriculum.id, _exportFilename(format), format)
+        } catch (e) {
+            exportError = e.message || 'Export fehlgeschlagen.'
+        } finally {
+            exporting = false
+        }
+    }
 
     $effect(() => {
         const id = $page.params.id
@@ -102,9 +127,35 @@
                             Löschen
                         </button>
                     {/if}
-                    <!-- Export-Buttons kommen in Schritt 5 -->
+                    <button
+                        onclick={() => handleExport('yaml')}
+                        disabled={exporting}
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        YAML
+                    </button>
+                    <button
+                        onclick={() => handleExport('pdf')}
+                        disabled={exporting}
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        PDF
+                    </button>
                 </div>
             </div>
+
+            {#if exportError}
+                <div class="mb-4 p-3 rounded-md bg-light-re/10 dark:bg-dark-re/10
+                             text-light-re dark:text-dark-re text-sm">
+                    {exportError}
+                </div>
+            {/if}
 
             <!-- Curriculum-Tabelle -->
             <div class="bg-white dark:bg-dark-bg rounded-lg border border-light-ui-3 dark:border-dark-ui-3">

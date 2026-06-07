@@ -1205,3 +1205,24 @@ export async function createCurriculumFromDraft(draft) {
     }
     return res.json()
 }
+
+/**
+ * Lädt ein Curriculum als YAML oder PDF herunter.
+ * @param {string} curriculumId - UUID des Curriculums
+ * @param {string} filename - Dateiname für den Download
+ * @param {'yaml'|'pdf'} format - Exportformat
+ */
+export async function exportCurriculum(curriculumId, filename, format = 'yaml') {
+    const res = await fetch(`${BASE}/context/curricula/${curriculumId}/export?format=${format}`, {
+        credentials: 'include',
+    })
+    if (!res.ok)
+        throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+}

@@ -216,12 +216,14 @@ class CurriculumCreate(BaseModel):
 
 class CurriculumDraftEntry(BaseModel):
     """Ein einzelner Eintrag in einer Lernsequenz-Tabelle."""
-    ik: str | None = None
+    # ik akzeptiert: str (Legacy), list[str] (Legacy-Multi), list[dict({nr, partiell})] (neu)
+    ik: str | list | None = None
     ik_partiell: bool = False
     pk: list[str | dict] = Field(default_factory=list)
     konkretisierung: str | None = None
     hinweise: str | None = None
     lp: list[str] = Field(default_factory=list)
+    material: str | None = None
     confidence: float = Field(default=1.0, description="Konfidenz der Extraktion (0.0-1.0)")
     warnings: list[str] = Field(default_factory=list, description="Warnungen für diesen Eintrag")
 
@@ -231,6 +233,7 @@ class CurriculumDraftLernsequenz(BaseModel):
     bp_titel: str | None = None
     bp_leitidee: str | None = None
     reihenfolge: int | None = None
+    std: str | None = None
     eintraege: list[CurriculumDraftEntry] = Field(default_factory=list)
     confidence: float = Field(default=1.0, description="Konfidenz der Extraktion")
     warnings: list[str] = Field(default_factory=list)

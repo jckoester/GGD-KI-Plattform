@@ -89,6 +89,18 @@ def _check_write_permission(node: ContextNode, user: JwtPayload) -> None:
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
+def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
+    """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym)."""
+    read_scope = tree.get("read_scope", "school")
+    if read_scope == "private":
+        if tree.get("owner_pseudonym") != user.sub:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    elif read_scope == "subject":
+        if "student" in user.roles and "teacher" not in user.roles:
+            if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
+                raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+
 def _visibility_filter(query, user: JwtPayload, status_override: str | None = None):
     """Sichtbarkeitsfilter; status_override überschreibt den active-Default."""
     q = query.where(
@@ -712,6 +724,50 @@ async def search_context_nodes(
 # ── KS-Phase-6 Curriculum Endpoints ──────────────────────────────────────
 
 
+@router.get("/curricula/{curriculum_id}/export")
+async def export_curriculum(
+    curriculum_id: UUID,
+    format: str = Query("yaml", pattern="^(yaml|pdf)$"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Exportiert ein Curriculum als YAML oder PDF."""
+    from app.context.service import load_curriculum_tree
+    from app.context.curriculum_export import build_curriculum_export_dict, render_curriculum_pdf
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
+
+    _check_curriculum_read_permission(tree, user)
+
+    meta = tree.get("metadata", {})
+    fach_code = meta.get("fach_code", "curriculum")
+    jg = meta.get("jahrgangsstufe", "")
+    from datetime import date
+    date_str = date.today().isoformat()
+    filename_base = f"curriculum_{fach_code}_{jg}_{date_str}".replace(" ", "_")
+
+    if format == "yaml":
+        import yaml
+        from fastapi.responses import Response
+        export_dict = await build_curriculum_export_dict(db, tree)
+        yaml_text = yaml.safe_dump(export_dict, allow_unicode=True, sort_keys=False)
+        return Response(
+            content=yaml_text.encode("utf-8"),
+            media_type="application/x-yaml",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.yaml"'},
+        )
+    else:
+        from fastapi.responses import Response
+        pdf_bytes = await render_curriculum_pdf(db, tree)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.pdf"'},
+        )
+
+
 @router.get("/curricula/{curriculum_id}", response_model=CurriculumRead)
 async def get_curriculum(
     curriculum_id: UUID,
@@ -719,142 +775,23 @@ async def get_curriculum(
     user: JwtPayload = Depends(get_current_user),
 ):
     """Gibt das vollständige Curriculum als verschachteltes Objekt zurück."""
-    import os
-    
-    # Curriculum-Knoten laden
-    result = await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.id == curriculum_id,
-            ContextNode.status == "active",
-            ContextNode.content_type == "curriculum",
-        )
-    )
-    curriculum = result.scalar_one_or_none()
-    
-    if not curriculum:
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    if not tree:
         raise HTTPException(status_code=404, detail="Curriculum nicht gefunden oder inaktiv")
-    
-    # Sichtbarkeit prüfen
-    if curriculum.read_scope == "private":
-        if curriculum.owner_pseudonym != user.sub:
-            raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    elif curriculum.read_scope == "subject":
-        # Schüler dürfen nur mit ENV-Flag zugreifen
-        if "student" in user.roles and "teacher" not in user.roles:
-            if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
-                raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    
-    # Alle Kapitel zu diesem Curriculum laden (via part_of-Kanten)
-    result = await db.execute(
-        sa.select(ContextNode)
-        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
-        .where(
-            ContextEdge.to_node_id == curriculum_id,
-            ContextEdge.relation == "part_of",
-            ContextNode.content_type == "kapitel",
-            ContextNode.status == "active",
-        )
-        .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
-    )
-    kapitel_nodes = result.scalars().all()
 
-    kapitel_list = []
-    for kap_node in kapitel_nodes:
-        # Alle Lernsequenzen zu diesem Kapitel laden
-        result = await db.execute(
-            sa.select(ContextNode)
-            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
-            .where(
-                ContextEdge.to_node_id == kap_node.id,
-                ContextEdge.relation == "part_of",
-                ContextNode.content_type == "lernsequenz",
-                ContextNode.status == "active",
-            )
-            .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
-        )
-        lernsequenz_nodes = result.scalars().all()
+    _check_curriculum_read_permission(tree, user)
 
-        lernsequenzen_list = []
-        for ls_node in lernsequenz_nodes:
-            # IK-Referenzen laden
-            result = await db.execute(
-                sa.text("""
-                    SELECT n.id, n.title, e.metadata->>'partiell' as partiell
-                    FROM context_nodes n
-                    JOIN context_edges e ON e.to_node_id = n.id
-                    WHERE e.from_node_id = :ls_id
-                      AND e.relation = 'references'
-                      AND n.content_type = 'ik_kompetenz'
-                      AND n.status = 'active'
-                """),
-                {"ls_id": str(ls_node.id)},
-            )
-            ik_refs = [
-                {"node_id": str(row.id), "title": row.title, "partiell": row.partiell == "true"}
-                for row in result.mappings().all()
-            ]
-
-            # PK-Referenzen laden
-            result = await db.execute(
-                sa.text("""
-                    SELECT n.id, n.title
-                    FROM context_nodes n
-                    JOIN context_edges e ON e.to_node_id = n.id
-                    WHERE e.from_node_id = :ls_id
-                      AND e.relation = 'develops'
-                      AND n.content_type = 'pk_kompetenz'
-                      AND n.status = 'active'
-                """),
-                {"ls_id": str(ls_node.id)},
-            )
-            pk_refs = [
-                {"node_id": str(row.id), "title": row.title}
-                for row in result.mappings().all()
-            ]
-
-            # Leitperspektive-Referenzen laden
-            result = await db.execute(
-                sa.text("""
-                    SELECT n.id, n.title, n.metadata->>'code' as lp_code
-                    FROM context_nodes n
-                    JOIN context_edges e ON e.to_node_id = n.id
-                    WHERE e.from_node_id = :ls_id
-                      AND e.relation = 'references'
-                      AND n.content_type = 'leitperspektive'
-                      AND n.status = 'active'
-                """),
-                {"ls_id": str(ls_node.id)},
-            )
-            leitperspektive_refs = [
-                {"node_id": str(row.id), "title": row.title, "lp_code": row.lp_code}
-                for row in result.mappings().all()
-            ]
-            
-            lernsequenzen_list.append({
-                "id": ls_node.id,
-                "title": ls_node.title,
-                "metadata": ls_node.metadata_ or {},
-                "ik_refs": ik_refs,
-                "pk_refs": pk_refs,
-                "leitperspektive_refs": leitperspektive_refs,
-            })
-        
-        kapitel_list.append({
-            "id": kap_node.id,
-            "title": kap_node.title,
-            "metadata": kap_node.metadata_ or {},
-            "lernsequenzen": lernsequenzen_list,
-        })
-    
     # Prüfe ob User editieren darf
     can_edit = False
     if "admin" in user.roles:
         can_edit = True
-    elif curriculum.write_scope_group_id:
+    elif tree.get("write_scope_group_id"):
         result = await db.execute(
             sa.select(1).where(
                 sa.exists().where(
-                    GroupMembership.group_id == curriculum.write_scope_group_id,
+                    GroupMembership.group_id == tree["write_scope_group_id"],
                     GroupMembership.pseudonym == user.sub,
                 )
             )
@@ -862,12 +799,12 @@ async def get_curriculum(
         can_edit = result.scalar_one_or_none() is not None
 
     return {
-        "id": curriculum.id,
-        "title": curriculum.title,
-        "metadata": curriculum.metadata_ or {},
-        "subject_id": curriculum.subject_id,
-        "write_scope_group_id": curriculum.write_scope_group_id,
-        "kapitel": kapitel_list,
+        "id": tree["id"],
+        "title": tree["title"],
+        "metadata": tree["metadata"],
+        "subject_id": tree["subject_id"],
+        "write_scope_group_id": tree["write_scope_group_id"],
+        "kapitel": tree["kapitel"],
         "can_edit": can_edit,
     }
 

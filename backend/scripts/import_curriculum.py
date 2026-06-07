@@ -68,25 +68,25 @@ def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
         for ls_data in kap_data.get("lernsequenzen", []):
             eintraege = []
             for entry_data in ls_data.get("eintraege", []):
+                # ik akzeptiert: str, list[str], list[dict({nr, partiell})]
+                ik_raw = entry_data.get("ik")
                 entry = CurriculumDraftEntry(
-                    ik=entry_data.get("ik"),
+                    ik=ik_raw,
                     ik_partiell=entry_data.get("ik_partiell", False),
                     pk=entry_data.get("pk", []),
                     konkretisierung=entry_data.get("konkretisierung"),
                     hinweise=entry_data.get("hinweise"),
                     lp=entry_data.get("lp", []),
-                    _confidence=1.0,
-                    _warnings=[],
+                    material=entry_data.get("material"),
                 )
                 eintraege.append(entry)
-            
+
             ls = CurriculumDraftLernsequenz(
                 bp_titel=ls_data.get("bp_titel"),
                 bp_leitidee=ls_data.get("bp_leitidee"),
                 reihenfolge=ls_data.get("reihenfolge"),
+                std=str(ls_data["std"]) if ls_data.get("std") is not None else None,
                 eintraege=eintraege,
-                _confidence=1.0,
-                _warnings=[],
             )
             lernsequenzen.append(ls)
         
@@ -97,8 +97,6 @@ def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
             hinweis=kap_data.get("hinweis"),
             konkretisierung=kap_data.get("konkretisierung", []),
             lernsequenzen=lernsequenzen,
-            _confidence=1.0,
-            _warnings=[],
         )
         kapitel_list.append(kapitel)
     

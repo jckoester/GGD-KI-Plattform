@@ -277,6 +277,139 @@ async def resolve_leitperspektive_node(db: AsyncSession, lp_code: str) -> UUID |
     return row[0] if row else None
 
 
+async def resolve_leitperspektive_aspekt_node(db: AsyncSession, bp_id: str) -> UUID | None:
+    """Löst Leitperspektive-Aspekt-bp_id (z. B. 'BNE_01') zu node_id auf."""
+    result = await db.execute(
+        sa.select(ContextNode.id).where(
+            ContextNode.content_type == "leitperspektive_aspekt",
+            ContextNode.metadata_["bp_id"].astext == bp_id,
+            ContextNode.status == "active",
+        )
+    )
+    row = result.fetchone()
+    return row[0] if row else None
+
+
+async def resolve_ik_node_by_fach_code(
+    db: AsyncSession, fach_code: str, nr: str
+) -> UUID | None:
+    """Löst Cross-Fach-IK via (fach_code, nr) auf."""
+    # subject_id aus fach_code (Spalte heißt fach_code; Konvention: Großschreibung)
+    if not fach_code:
+        return None
+    result = await db.execute(
+        sa.text("SELECT id FROM subjects WHERE fach_code = :code LIMIT 1"),
+        {"code": fach_code.strip().upper()},
+    )
+    row = result.fetchone()
+    if not row:
+        return None
+    return await resolve_ik_node(db, row[0], nr)
+
+
+# ── Code-Token → UUID-Token Übersetzer (für Re-Import) ───────────────────────
+
+_LP_CODE_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lp:([^)]+)\)')
+_LPA_CODE_TOKEN = re.compile(r'@\[([^\]]*)\]\(lpa:([^)]+)\)')
+_IK_CODE_TOKEN  = re.compile(r'#\[([^\]]*)\]\(ik:([^/:)]+):([^)]+)\)')
+_NODE_UUID_TOKEN = re.compile(r'@\[([^\]]*)\]\(node:[0-9a-f-]{36}\)')
+
+
+async def hinweise_code_to_uuid(
+    text: str,
+    db: AsyncSession,
+    warnings: list[str],
+    context_label: str = "",
+) -> str:
+    """Übersetzt Code-Token im Hinweise-Feld zurück in UUID-Token.
+
+    Verarbeitet: lp:<code>, lpa:<bp_id>, ik:<fach>:<nr>.
+    node:<uuid> (Material) bleibt unverändert.
+    Unbekannte Tokens werden als Freitext belassen + Warnung.
+    """
+    if not text:
+        return text
+
+    all_matches: list[tuple[re.Match, str]] = []
+    for pattern, kind in [
+        (_LP_CODE_TOKEN, "lp"),
+        (_LPA_CODE_TOKEN, "lpa"),
+        (_IK_CODE_TOKEN, "ik"),
+    ]:
+        for m in pattern.finditer(text):
+            all_matches.append((m, kind))
+    if not all_matches:
+        return text
+    all_matches.sort(key=lambda x: x[0].start())
+
+    parts = []
+    last = 0
+    for m, kind in all_matches:
+        parts.append(text[last:m.start()])
+        label = m.group(1)
+        if kind == "lp":
+            code = m.group(2)
+            uid = await resolve_leitperspektive_node(db, code)
+            if uid:
+                parts.append(f"@[{label}](lp:{uid})")
+            else:
+                warnings.append(f"LP '{code}' nicht gefunden{' in ' + context_label if context_label else ''}")
+                parts.append(m.group(0))
+        elif kind == "lpa":
+            bp_id = m.group(2)
+            uid = await resolve_leitperspektive_aspekt_node(db, bp_id)
+            if uid:
+                parts.append(f"@[{label}](lpa:{uid})")
+            else:
+                warnings.append(f"LP-Aspekt '{bp_id}' nicht gefunden{' in ' + context_label if context_label else ''}")
+                parts.append(m.group(0))
+        elif kind == "ik":
+            fach_code = m.group(2)
+            nr = m.group(3)
+            uid = await resolve_ik_node_by_fach_code(db, fach_code, nr)
+            if uid:
+                parts.append(f"#[{label}](ik:{uid})")
+            else:
+                warnings.append(f"Cross-IK '{fach_code}:{nr}' nicht gefunden{' in ' + context_label if context_label else ''}")
+                parts.append(m.group(0))
+        last = m.end()
+    parts.append(text[last:])
+    return "".join(parts)
+
+
+async def material_resolve_nodes(
+    text: str,
+    db: AsyncSession,
+    warnings: list[str],
+    context_label: str = "",
+) -> list[UUID]:
+    """Extrahiert UUIDs aus Material-node-Token und prüft Existenz.
+
+    Gibt Liste gültiger node_ids zurück; fehlende → Warnung.
+    """
+    node_token = re.compile(r'@\[[^\]]*\]\(node:([0-9a-f-]{36})\)')
+    valid_ids = []
+    for m in node_token.finditer(text or ""):
+        uid_str = m.group(1)
+        try:
+            uid = UUID(uid_str)
+        except ValueError:
+            continue
+        result = await db.execute(
+            sa.select(ContextNode.id).where(
+                ContextNode.id == uid, ContextNode.status == "active"
+            )
+        )
+        if result.fetchone():
+            valid_ids.append(uid)
+        else:
+            warnings.append(
+                f"Material-Knoten '{uid_str}' nicht gefunden"
+                f"{' in ' + context_label if context_label else ''} – Token bleibt erhalten"
+            )
+    return valid_ids
+
+
 async def get_or_create_node(
     db: AsyncSession,
     category: str,
@@ -410,6 +543,143 @@ async def archive_orphaned_curriculum_nodes(
     return archived
 
 
+async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | None:
+    """Lädt das vollständige Curriculum als verschachtelten Dict (ohne Berechtigungsprüfung).
+
+    Gibt None zurück wenn das Curriculum nicht existiert oder inaktiv ist.
+    Der zurückgegebene Dict enthält `read_scope` und `owner_pseudonym` für die
+    Berechtigungsprüfung im Router.
+    """
+    result = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.id == curriculum_id,
+            ContextNode.status == "active",
+            ContextNode.content_type == "curriculum",
+        )
+    )
+    curriculum = result.scalar_one_or_none()
+    if not curriculum:
+        return None
+
+    # Kapitel laden
+    result = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == curriculum_id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "kapitel",
+            ContextNode.status == "active",
+        )
+        .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
+    )
+    kapitel_nodes = result.scalars().all()
+
+    kapitel_list = []
+    for kap_node in kapitel_nodes:
+        result = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == kap_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "lernsequenz",
+                ContextNode.status == "active",
+            )
+            .order_by(ContextNode.metadata_["reihenfolge"].as_integer())
+        )
+        lernsequenz_nodes = result.scalars().all()
+
+        lernsequenzen_list = []
+        for ls_node in lernsequenz_nodes:
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title,
+                           n.metadata->>'nr' AS nr,
+                           e.metadata->>'partiell' AS partiell
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'references'
+                      AND n.content_type = 'ik_kompetenz'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            ik_refs = [
+                {
+                    "node_id": str(row.id),
+                    "title": row.title,
+                    "nr": row.nr,
+                    "partiell": row.partiell == "true",
+                }
+                for row in result.mappings().all()
+            ]
+
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title, n.metadata->>'pk_id' AS pk_id
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'develops'
+                      AND n.content_type = 'pk_kompetenz'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            pk_refs = [
+                {"node_id": str(row.id), "title": row.title, "pk_id": row.pk_id}
+                for row in result.mappings().all()
+            ]
+
+            result = await db.execute(
+                sa.text("""
+                    SELECT n.id, n.title, n.metadata->>'code' AS lp_code
+                    FROM context_nodes n
+                    JOIN context_edges e ON e.to_node_id = n.id
+                    WHERE e.from_node_id = :ls_id
+                      AND e.relation = 'references'
+                      AND n.content_type = 'leitperspektive'
+                      AND n.status = 'active'
+                """),
+                {"ls_id": str(ls_node.id)},
+            )
+            leitperspektive_refs = [
+                {"node_id": str(row.id), "title": row.title, "lp_code": row.lp_code}
+                for row in result.mappings().all()
+            ]
+
+            lernsequenzen_list.append({
+                "id": ls_node.id,
+                "title": ls_node.title,
+                "metadata": ls_node.metadata_ or {},
+                "ik_refs": ik_refs,
+                "pk_refs": pk_refs,
+                "leitperspektive_refs": leitperspektive_refs,
+            })
+
+        kapitel_list.append({
+            "id": kap_node.id,
+            "title": kap_node.title,
+            "metadata": kap_node.metadata_ or {},
+            "content": kap_node.content,
+            "lernsequenzen": lernsequenzen_list,
+        })
+
+    return {
+        "id": curriculum.id,
+        "title": curriculum.title,
+        "metadata": curriculum.metadata_ or {},
+        "content": curriculum.content,
+        "subject_id": curriculum.subject_id,
+        "write_scope_group_id": curriculum.write_scope_group_id,
+        "read_scope": curriculum.read_scope,
+        "owner_pseudonym": curriculum.owner_pseudonym,
+        "kapitel": kapitel_list,
+    }
+
+
 async def import_curriculum_from_draft(
     db: AsyncSession,
     payload: CurriculumDraftConfirmed,
@@ -533,8 +803,85 @@ async def import_curriculum_from_draft(
         for ls in kap.lernsequenzen:
             ls_reihenfolge = ls.reihenfolge if ls.reihenfolge is not None else 0
             ls_import_key = f"{kapitel_import_key}_ls_{ls_reihenfolge}"
-            
-            # Lernsequenz-Knoten
+            ls_label = ls.bp_titel or "?"
+
+            # Einträge vorverarbeiten: IK/PK auflösen, Hinweise rewriten, Material prüfen
+            eintraege_for_meta = []
+            resolved_edges: list[tuple[UUID, UUID, str, dict]] = []  # (from, to, relation, meta)
+
+            for entry in ls.eintraege:
+                # ── IK normalisieren ────────────────────────────────────────
+                ik_pairs = _normalize_ik_input(entry.ik, entry.ik_partiell)
+                editor_ik = []
+                for ik_nr, partiell in ik_pairs:
+                    ik_node_id = await resolve_ik_node(db, subject_id, ik_nr)
+                    if ik_node_id:
+                        editor_ik.append({"node_id": str(ik_node_id), "nr": ik_nr, "partiell": partiell})
+                        resolved_edges.append((None, ik_node_id, "references", {"partiell": str(partiell).lower()}))
+                    else:
+                        w = f"IK {ik_nr} nicht gefunden für LS {ls_label}"
+                        if w not in stats.warnings:
+                            stats.warnings.append(w)
+                        logger.warning(w)
+
+                # ── PK normalisieren ─────────────────────────────────────────
+                pk_raw = entry.pk if isinstance(entry.pk, list) else ([entry.pk] if entry.pk else [])
+                editor_pk = []
+                for pk_ref in pk_raw:
+                    pk_id_str = pk_ref.get("id") if isinstance(pk_ref, dict) else str(pk_ref)
+                    if pk_id_str:
+                        pk_node_id = await resolve_pk_node(db, pk_id_str)
+                        if pk_node_id:
+                            editor_pk.append({"node_id": str(pk_node_id), "pk_id": pk_id_str})
+                            resolved_edges.append((None, pk_node_id, "develops", {}))
+                        else:
+                            w = f"PK {pk_id_str} nicht gefunden für LS {ls_label}"
+                            if w not in stats.warnings:
+                                stats.warnings.append(w)
+                            logger.warning(w)
+
+                # ── Hinweise: Code-Token → UUID-Token rewrite + Kanten ───────
+                hinweise_raw = entry.hinweise or ""
+                hinweise_uuid = await hinweise_code_to_uuid(hinweise_raw, db, stats.warnings, ls_label)
+
+                # LP-Kanten aus UUID-Token
+                for uid_str in re.findall(r'@\[[^\]]*\]\(lp:([0-9a-f-]{36})\)', hinweise_uuid):
+                    resolved_edges.append((None, UUID(uid_str), "references", {}))
+                # LPA-Kanten
+                for uid_str in re.findall(r'@\[[^\]]*\]\(lpa:([0-9a-f-]{36})\)', hinweise_uuid):
+                    resolved_edges.append((None, UUID(uid_str), "references", {}))
+                # Cross-IK-Kanten
+                for uid_str in re.findall(r'#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)', hinweise_uuid):
+                    resolved_edges.append((None, UUID(uid_str), "references", {}))
+
+                # Legacy lp-Liste (dedupliziert mit Token-Kanten)
+                for lp_code in (entry.lp or []):
+                    lp_node_id = await resolve_leitperspektive_node(db, str(lp_code))
+                    if lp_node_id:
+                        resolved_edges.append((None, lp_node_id, "references", {}))
+                    else:
+                        w = f"LP {lp_code} nicht gefunden für LS {ls_label}"
+                        if w not in stats.warnings:
+                            stats.warnings.append(w)
+                        logger.warning(w)
+
+                # ── Material: node-Token → used_with Kanten ──────────────────
+                material_text = entry.material or ""
+                material_uuids = await material_resolve_nodes(
+                    material_text, db, stats.warnings, ls_label
+                )
+                for mat_uid in material_uuids:
+                    resolved_edges.append((None, mat_uid, "used_with", {"via": "material"}))
+
+                eintraege_for_meta.append({
+                    "ik": editor_ik,
+                    "pk": editor_pk,
+                    "konkretisierung": entry.konkretisierung or "",
+                    "hinweise": hinweise_uuid,
+                    "material": material_text,
+                })
+
+            # Lernsequenz-Knoten (metadata mit editor-kompatiblen eintraege)
             ls_data = {
                 "category": "knowledge",
                 "content_type": "lernsequenz",
@@ -548,17 +895,8 @@ async def import_curriculum_from_draft(
                 "metadata_": {
                     "bp_leitidee": ls.bp_leitidee,
                     "reihenfolge": ls_reihenfolge,
-                    "eintraege": [
-                        {
-                            "ik": e.ik,
-                            "ik_partiell": e.ik_partiell,
-                            "pk": e.pk,
-                            "konkretisierung": e.konkretisierung,
-                            "hinweise": e.hinweise,
-                            "lp": e.lp,
-                        }
-                        for e in ls.eintraege
-                    ],
+                    "std": getattr(ls, "std", None),
+                    "eintraege": eintraege_for_meta,
                     "import_key": ls_import_key,
                 }
             }
@@ -568,62 +906,39 @@ async def import_curriculum_from_draft(
             all_import_keys.add(ls_import_key)
             if created:
                 stats.lernsequenz_count += 1
-            
+
             # Kante: lernsequenz -> kapitel
             await create_edge(db, lernsequenz_id, kapitel_id, "part_of")
             stats.edge_count += 1
-            
-            # 4. IK- und PK-Referenzen auflösen
-            for entry in ls.eintraege:
-                # IK-Referenzen
-                if entry.ik:
-                    ik_ids = entry.ik.split(",") if isinstance(entry.ik, str) else [str(entry.ik)]
-                    for ik_nr_single in ik_ids:
-                        ik_nr_single = ik_nr_single.strip()
-                        ik_node_id = await resolve_ik_node(db, subject_id, ik_nr_single)
-                        if ik_node_id:
-                            # Prüfe ob partiell
-                            partiell = entry.ik_partiell
-                            metadata = {"partiell": str(partiell).lower()}
-                            await create_edge(db, lernsequenz_id, ik_node_id, "references", metadata)
-                            stats.edge_count += 1
-                        else:
-                            warning = f"IK {ik_nr_single} nicht gefunden für LS {ls.bp_titel or '?'}"
-                            if warning not in stats.warnings:
-                                stats.warnings.append(warning)
-                            logger.warning(warning)
-                
-                # PK-Referenzen
-                if entry.pk:
-                    pk_list = entry.pk if isinstance(entry.pk, list) else [entry.pk]
-                    for pk_ref in pk_list:
-                        if isinstance(pk_ref, dict):
-                            pk_id = pk_ref.get("id")
-                        else:
-                            pk_id = str(pk_ref)
-                        if pk_id:
-                            pk_node_id = await resolve_pk_node(db, pk_id)
-                            if pk_node_id:
-                                await create_edge(db, lernsequenz_id, pk_node_id, "develops")
-                                stats.edge_count += 1
-                            else:
-                                warning = f"PK {pk_id} nicht gefunden für LS {ls.bp_titel or '?'}"
-                                if warning not in stats.warnings:
-                                    stats.warnings.append(warning)
-                                logger.warning(warning)
-                
-                # Leitperspektiven-Referenzen
-                if entry.lp:
-                    lp_list = entry.lp if isinstance(entry.lp, list) else [entry.lp]
-                    for lp_code in lp_list:
-                        lp_node_id = await resolve_leitperspektive_node(db, str(lp_code))
-                        if lp_node_id:
-                            await create_edge(db, lernsequenz_id, lp_node_id, "references")
-                            stats.edge_count += 1
-                        else:
-                            warning = f"LP {lp_code} nicht gefunden für LS {ls.bp_titel or '?'}"
-                            if warning not in stats.warnings:
-                                stats.warnings.append(warning)
-                            logger.warning(warning)
-    
+
+            # 4. Vorberechnete Kanten anlegen (dedupliziert nach to_node_id + relation)
+            seen_edges: set[tuple[str, str]] = set()
+            for (_from, to_id, relation, meta) in resolved_edges:
+                edge_key = (str(to_id), relation)
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                await create_edge(db, lernsequenz_id, to_id, relation, meta or None)
+                stats.edge_count += 1
+
     return curriculum_id, stats
+
+
+def _normalize_ik_input(ik_raw: str | list | None, ik_partiell_default: bool) -> list[tuple[str, bool]]:
+    """Normalisiert den ik-Eingabewert auf eine Liste von (nr, partiell)-Paaren."""
+    if not ik_raw:
+        return []
+    if isinstance(ik_raw, str):
+        return [(nr.strip(), ik_partiell_default) for nr in ik_raw.split(",") if nr.strip()]
+    if isinstance(ik_raw, list):
+        result = []
+        for item in ik_raw:
+            if isinstance(item, dict):
+                nr = item.get("nr")
+                partiell = bool(item.get("partiell", False))
+                if nr:
+                    result.append((str(nr), partiell))
+            elif isinstance(item, str) and item.strip():
+                result.append((item.strip(), ik_partiell_default))
+        return result
+    return []
