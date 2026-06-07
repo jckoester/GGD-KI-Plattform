@@ -12,6 +12,7 @@
     import PKSelector from "./PKSelector.svelte";
     import HinweisEditor from "./HinweisEditor.svelte";
     import { parseHinweise } from "$lib/hinweise.js";
+    import { kapitelStd, lernsequenzStd } from "$lib/curriculum.js";
     import {
         Plus,
         Trash2,
@@ -128,6 +129,7 @@
                 bp_titel: "",
                 bp_leitidee: "",
                 reihenfolge: newReihenfolge,
+                std: 0,
                 eintraege: [],
                 ik_refs: [],
                 pk_refs: [],
@@ -546,31 +548,9 @@
                                     }}
                                     class="font-bold text-light-tx dark:text-dark-tx bg-transparent border-none focus:outline-none flex-1"
                                 />
-                                <div
-                                    class="flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0"
-                                >
-                                    <span>(</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={kap.metadata?.std || ""}
-                                        oninput={(e) => {
-                                            kap.metadata = {
-                                                ...kap.metadata,
-                                                std: e.target.value,
-                                            };
-                                            curriculum.kapitel = [
-                                                ...curriculum.kapitel,
-                                            ];
-                                            onchange();
-                                        }}
-                                        class="w-12 text-xs text-center text-light-tx dark:text-dark-tx
-                                               bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3
-                                               rounded px-1 py-0.5 focus:outline-none focus:border-primary dark:focus:border-primary-dark"
-                                        placeholder="0"
-                                    />
-                                    <span>Std.)</span>
-                                </div>
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                    ({kapitelStd(kap)} Std.)
+                                </span>
                                 <button
                                     onclick={(e) =>
                                         showMenu(e, "kapitel", kap.id)}
@@ -583,11 +563,11 @@
                             </div>
                         {:else}
                             {kap.title}
-                            {#if kap.metadata?.std}
+                            {#if kapitelStd(kap) > 0}
                                 <span
                                     class="ml-2 text-light-tx-2 dark:text-dark-tx-2 text-xs"
                                 >
-                                    ({kap.metadata.std} Stunden)
+                                    ({kapitelStd(kap)} Stunden)
                                 </span>
                             {/if}
                         {/if}
@@ -681,6 +661,28 @@
                                                     .bp_leitidee})
                                             </span>
                                         {/if}
+                                        <div class="flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={ls.metadata?.std ?? ""}
+                                                oninput={(e) => {
+                                                    ls.metadata = {
+                                                        ...ls.metadata,
+                                                        std: Number(e.target.value),
+                                                    };
+                                                    curriculum.kapitel = [
+                                                        ...curriculum.kapitel,
+                                                    ];
+                                                    onchange();
+                                                }}
+                                                class="w-12 text-xs text-center text-light-tx dark:text-dark-tx
+                                                       bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3
+                                                       rounded px-1 py-0.5 focus:outline-none focus:border-primary dark:focus:border-primary-dark"
+                                                placeholder="0"
+                                            />
+                                            <span>Std.</span>
+                                        </div>
                                         <button
                                             onclick={(e) =>
                                                 showMenu(
@@ -704,6 +706,13 @@
                                         >
                                             (Leitidee: {ls.metadata
                                                 .bp_leitidee})
+                                        </span>
+                                    {/if}
+                                    {#if lernsequenzStd(ls) > 0}
+                                        <span
+                                            class="ml-2 text-light-tx-2 dark:text-dark-tx-2 text-xs"
+                                        >
+                                            ({lernsequenzStd(ls)} Std.)
                                         </span>
                                     {/if}
                                 {/if}

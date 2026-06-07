@@ -3,6 +3,7 @@
     import { goto } from '$app/navigation'
     import { getCurriculum, updateContextNode, createContextNode,
              deleteContextNode, createEdge, deleteEdge, getNodeEdges } from '$lib/api.js'
+    import { kapitelStd } from '$lib/curriculum.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
     import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -100,8 +101,11 @@
         
         // Neue oder aktualisierte Kapitel
         for (const draftKap of draft.kapitel || []) {
+            // Kapitel-Stundenzahl = Summe der Lernsequenz-Stunden (abgeleitet, nie manuell)
+            draftKap.metadata = { ...draftKap.metadata, std: kapitelStd(draftKap) }
+
             const origKap = origKapMap.get(draftKap.id)
-            
+
             if (!origKap) {
                 // Neues Kapitel erstellen
                 const newKap = await createContextNode({
@@ -169,6 +173,7 @@
                         metadata: {
                             bp_leitidee: draftLs.metadata?.bp_leitidee || '',
                             reihenfolge: draftLs.metadata?.reihenfolge || 0,
+                            std: draftLs.metadata?.std ?? 0,
                             eintraege: draftLs.metadata?.eintraege || []
                         }
                     })
