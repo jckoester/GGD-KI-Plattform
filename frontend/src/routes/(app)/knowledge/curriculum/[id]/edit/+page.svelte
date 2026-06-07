@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation'
     import { getCurriculum, updateContextNode, createContextNode,
              deleteContextNode, createEdge, deleteEdge, getNodeEdges } from '$lib/api.js'
-    import { kapitelStd } from '$lib/curriculum.js'
+    import { kapitelStd, curriculumStd } from '$lib/curriculum.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
     import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -19,6 +19,7 @@
     let saveError = $state(null)
     let saveSuccess = $state(false)
     let canEdit = $state(false)
+    const totalStd = $derived(curriculumStd(draft))
 
     // Lade Curriculum und prüfe Berechtigungen.
     // Der Effekt selbst ist synchron (liest $page.params.id als Dependency,
@@ -367,6 +368,9 @@
                     </h1>
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                         Bearbeitungsmodus
+                        {#if totalStd > 0}
+                            · Gesamt: {totalStd} Std.
+                        {/if}
                     </p>
                 </div>
                 <div class="flex gap-2 items-center">

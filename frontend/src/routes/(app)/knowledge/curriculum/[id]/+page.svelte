@@ -2,6 +2,7 @@
     import { page } from '$app/stores'
     import { goto } from '$app/navigation'
     import { getCurriculum, deleteContextNode } from '$lib/api.js'
+    import { curriculumStd } from '$lib/curriculum.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
@@ -9,6 +10,7 @@
     import { ArrowLeft } from 'lucide-svelte'
 
     let curriculum = $state(null)
+    const totalStd = $derived(curriculumStd(curriculum))
     let loading = $state(true)
     let error = $state(null)
 
@@ -73,10 +75,13 @@
                         {curriculum.title}
                     </h1>
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                        {curriculum.metadata?.schule} · 
-                        {curriculum.metadata?.schulart} · 
-                        BP {curriculum.metadata?.bp_version} · 
+                        {curriculum.metadata?.schule} ·
+                        {curriculum.metadata?.schulart} ·
+                        BP {curriculum.metadata?.bp_version} ·
                         Klasse {curriculum.metadata?.jahrgangsstufe}
+                        {#if totalStd > 0}
+                            · Gesamt: {totalStd} Std.
+                        {/if}
                     </p>
                 </div>
                 <div class="flex gap-2">
