@@ -1547,7 +1547,10 @@ async def get_fachplan_by_subject(
                 ContextNode.content_type == "pk_kompetenz",
                 ContextNode.status == "active",
             )
-            .order_by(ContextNode.title)
+            .order_by(
+                sa.cast(ContextNode.metadata_["standard_nr"], sa.Integer).asc(),
+                ContextNode.title,
+            )
         )
         pk_result = await db.execute(pk_q)
         pk_list = [
