@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.0.0",
@@ -22,7 +24,8 @@
     "@tailwindcss/vite": "^4.2.2",
     "svelte": "^5.55.4",
     "tailwindcss": "^4.2.2",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
