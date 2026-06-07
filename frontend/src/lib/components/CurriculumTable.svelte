@@ -394,6 +394,13 @@
         return `/knowledge/${nodeId}`;
     }
 
+    // Volltext einer IK/PK aus den Refs der Lernsequenz (für title-Attribut)
+    function refTitle(ls, nodeId, kind) {
+        if (!nodeId) return null;
+        const refs = kind === "ik" ? (ls.ik_refs || []) : (ls.pk_refs || []);
+        return refs.find((r) => r.node_id === nodeId)?.title ?? null;
+    }
+
     // Helper für Template-Strings
     function pathString(kapIndex, lsIndex = null, entryIndex = null) {
         let path = `kapitel[${kapIndex}]`;
@@ -779,6 +786,7 @@
                                             {#if pk.node_id}
                                                 <a
                                                     href={nodeLink(pk.node_id)}
+                                                    title={refTitle(ls, pk.node_id, "pk")}
                                                     class="block mb-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                                 >
                                                     {pk.pk_id}
@@ -815,6 +823,7 @@
                                         {#if ik.node_id}
                                             <a
                                                 href={nodeLink(ik.node_id)}
+                                                title={refTitle(ls, ik.node_id, "ik")}
                                                 class="inline-block mr-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                             >
                                                 {ik.nr}
