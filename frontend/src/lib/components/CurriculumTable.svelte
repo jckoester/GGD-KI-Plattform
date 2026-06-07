@@ -309,6 +309,11 @@
         onchange()
     }
     
+    // Link zu einem Wissensknoten (Read-only-Ansicht von PK/IK)
+    function nodeLink(nodeId) {
+        return `/knowledge/${nodeId}`
+    }
+
     // Helper für Template-Strings
     function pathString(kapIndex, lsIndex = null, entryIndex = null) {
         let path = `kapitel[${kapIndex}]`
