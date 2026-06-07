@@ -337,8 +337,7 @@
     }
 </script>
 
-<div class="flex min-h-0 flex-1">
-    <main class="flex-1 overflow-y-auto p-6 max-w-4xl">
+<div class="h-full overflow-y-auto p-6 max-w-4xl">
         {#if loading}
             <LoadingBanner />
         {:else if !canEdit}
@@ -409,5 +408,4 @@
                 </div>
             {/if}
         {/if}
-    </main>
 </div>

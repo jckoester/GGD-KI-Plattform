@@ -57,8 +57,7 @@
     }
 </script>
 
-<div class="flex min-h-0 flex-1">
-    <main class="flex-1 overflow-y-auto p-6 max-w-4xl">
+<div class="h-full overflow-y-auto p-6 max-w-4xl">
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>
@@ -127,5 +126,4 @@
                 {/each}
             </div>
         {/if}
-    </main>
 </div>

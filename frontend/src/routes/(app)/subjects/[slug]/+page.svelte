@@ -85,8 +85,7 @@
     });
 </script>
 
-<div class="flex min-h-0 flex-1">
-    <main class="flex-1 overflow-y-auto p-6 max-w-3xl">
+<div class="h-full overflow-y-auto p-6 max-w-3xl">
         <!-- Kopfzeile -->
         {#if subject}
             <div class="flex items-center gap-3 mb-6">
@@ -336,5 +335,4 @@
                 ]}
             />
         {/if}
-    </main>
 </div>
