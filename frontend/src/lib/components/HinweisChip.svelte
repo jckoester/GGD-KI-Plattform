@@ -36,6 +36,12 @@
             text: 'text-light-pur dark:text-dark-pur',
             border: 'border-light-pur/30 dark:border-dark-pur/30'
         },
+        leitperspektive_aspekt: {
+            prefix: '▸',
+            bg: 'bg-light-pur/20 dark:bg-dark-pur/20',
+            text: 'text-light-pur dark:text-dark-pur',
+            border: 'border-light-pur/30 dark:border-dark-pur/30'
+        },
         didaktik: {
             prefix: '⚙',
             bg: 'bg-light-ui-3/50 dark:bg-dark-ui-3/50',
@@ -59,6 +65,9 @@
         }
         if (typ === 'leitperspektive' && lp_code) {
             return lp_code
+        }
+        if (typ === 'leitperspektive_aspekt' && lp_code) {
+            return `${config.prefix} ${lp_code}`
         }
         if (config.prefix && text) {
             return `${config.prefix} ${text}`

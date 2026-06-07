@@ -880,6 +880,12 @@
                                                         lp_code={part.label}
                                                         href="/knowledge/{part.node_id}"
                                                     />
+                                                {:else if part.kind === "lpa"}
+                                                    <HinweisChip
+                                                        typ="leitperspektive_aspekt"
+                                                        lp_code={part.label}
+                                                        href="/knowledge/{part.node_id}"
+                                                    />
                                                 {:else if part.kind === "ik"}
                                                     <HinweisChip
                                                         typ="fach_bezug"

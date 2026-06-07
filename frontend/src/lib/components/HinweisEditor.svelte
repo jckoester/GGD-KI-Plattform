@@ -16,9 +16,12 @@
 
     // ── Dropdown-State ────────────────────────────────────────────────────────
     let dropdownOpen = $state(false);
-    let dropdownItems = $state([]); // Array von {id, label, sublabel, kind:'lp'|'ik', node_id, serialized}
+    let dropdownItems = $state([]); // Array von {label, sublabel, kind:'lp'|'lpa'|'ik', node_id, serialized, indented?, isHead?}
     let dropdownIndex = $state(0);
     let loading = $state(false);
+
+    // Cache für LP+Aspekte (einmaliger Abruf pro Editor-Instanz)
+    let lpCache = null; // { lps: Node[], aspekte: Node[] } | null
 
     // Für # Cross-Fach: welches Fach wurde erkannt?
     let resolvedFachCode = $state(null); // z.B. 'ETH'
@@ -55,31 +58,84 @@
         return null;
     }
 
+    // Kürzt einen Text auf maximal n Zeichen (mit …)
+    function trunc(text, n) {
+        return text.length <= n ? text : text.slice(0, n - 1) + '…'
+    }
+
     // ── Suche auslösen ────────────────────────────────────────────────────────
     async function search(trigger) {
         if (trigger.kind === "lp") {
-            loading = true;
-            try {
-                const params = new URLSearchParams({
-                    content_type: "leitperspektive",
-                    limit: "10",
-                });
-                if (trigger.query) params.set("q", trigger.query);
-                const res = await fetch(`/api/context/nodes?${params}`, {
-                    credentials: "include",
-                });
-                const nodes = res.ok ? await res.json() : [];
-                dropdownItems = nodes.map((n) => ({
-                    node_id: n.id,
-                    label: n.title,
-                    sublabel: null,
-                    kind: "lp",
-                    serialized: `@[${n.title}](lp:${n.id})`,
-                }));
-                dropdownOpen = dropdownItems.length > 0;
-            } finally {
-                loading = false;
+            // Alle LPs + Aspekte einmalig laden und cachen
+            if (!lpCache) {
+                loading = true;
+                try {
+                    const params = new URLSearchParams({ limit: "200" });
+                    params.append("content_type", "leitperspektive");
+                    params.append("content_type", "leitperspektive_aspekt");
+                    const res = await fetch(`/api/context/nodes?${params}`, {
+                        credentials: "include",
+                    });
+                    const raw = res.ok ? await res.json() : [];
+                    const nodes = Array.isArray(raw) ? raw : (raw.items ?? []);
+                    lpCache = {
+                        lps: nodes.filter((n) => n.content_type === "leitperspektive"),
+                        aspekte: nodes.filter((n) => n.content_type === "leitperspektive_aspekt"),
+                    };
+                } catch {
+                    lpCache = { lps: [], aspekte: [] };
+                } finally {
+                    loading = false;
+                }
             }
+
+            // Client-seitig filtern
+            const q = trigger.query.toLowerCase();
+            const items = [];
+            for (const lp of lpCache.lps) {
+                const kuerzel = lp.metadata?.kuerzel ?? "";
+                const lpAspekte = lpCache.aspekte
+                    .filter((a) => a.metadata?.kuerzel === kuerzel)
+                    .sort((a, b) => (a.metadata?.aspekt_nr ?? 0) - (b.metadata?.aspekt_nr ?? 0));
+
+                const lpMatches = !q || lp.title.toLowerCase().includes(q) || kuerzel.toLowerCase().includes(q);
+                const matchingAspekte = q
+                    ? lpAspekte.filter(
+                          (a) =>
+                              a.title.toLowerCase().includes(q) ||
+                              kuerzel.toLowerCase().includes(q),
+                      )
+                    : lpAspekte;
+
+                if (!lpMatches && matchingAspekte.length === 0) continue;
+
+                // LP-Kopf
+                items.push({
+                    node_id: lp.id,
+                    label: lp.title,
+                    sublabel: kuerzel || null,
+                    kind: "lp",
+                    isHead: true,
+                    serialized: `@[${lp.title}](lp:${lp.id})`,
+                });
+                // Aspekte eingerückt
+                for (const aspekt of matchingAspekte) {
+                    const aspektNr = aspekt.metadata?.aspekt_nr;
+                    const aspektPrefix = aspektNr != null ? `${kuerzel} ${aspektNr}` : kuerzel;
+                    const aspektLabel = `${aspektPrefix}: ${trunc(aspekt.title, 80)}`;
+                    items.push({
+                        node_id: aspekt.id,
+                        label: aspektLabel,
+                        sublabel: aspekt.title.length > 80 ? aspekt.title : null,
+                        kind: "lpa",
+                        indented: true,
+                        serialized: `@[${aspektLabel}](lpa:${aspekt.id})`,
+                    });
+                }
+            }
+
+            dropdownItems = items;
+            dropdownOpen = items.length > 0;
             return;
         }
 
@@ -249,17 +305,18 @@
                             confirmSelection(item);
                         }}
                         class="w-full px-3 py-2 text-left text-sm flex items-start gap-2 transition-colors
+                               {item.indented ? 'pl-6' : ''}
                                {i === dropdownIndex
                             ? 'bg-light-ui-2 dark:bg-dark-ui-2'
                             : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
                     >
                         <span
                             class="shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium
-                                     {item.kind === 'lp'
+                                     {item.kind === 'lp' || item.kind === 'lpa'
                                 ? 'bg-light-pur/20 dark:bg-dark-pur/20 text-light-pur dark:text-dark-pur'
                                 : 'bg-light-ui-3/50 dark:bg-dark-ui-3/50 text-light-tx dark:text-dark-tx'}"
                         >
-                            {item.kind === "lp" ? "LP" : "IK"}
+                            {item.kind === "lp" ? "LP" : item.kind === "lpa" ? "Asp." : "IK"}
                         </span>
                         <div class="min-w-0 flex-1">
                             <div
@@ -290,6 +347,8 @@
             {#each previewParts as part}
                 {#if part.kind === "lp"}
                     <HinweisChip typ="leitperspektive" lp_code={part.label} />
+                {:else if part.kind === "lpa"}
+                    <HinweisChip typ="leitperspektive_aspekt" lp_code={part.label} />
                 {:else if part.kind === "ik"}
                     <HinweisChip typ="fach_bezug" fach={part.label} />
                 {:else if part.label.trim()}

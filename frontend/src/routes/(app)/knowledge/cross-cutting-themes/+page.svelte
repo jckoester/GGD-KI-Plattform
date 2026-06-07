@@ -48,7 +48,7 @@
     // Ordne Aspekte ihren Leitperspektiven zu
     const leitperspektivenWithAspekte = $derived(groupedNodes.leitperspektiven.map(lp => ({
         ...lp,
-        aspekte: groupedNodes.aspekte.filter(a => a.metadata?.part_of === lp.id)
+        aspekte: groupedNodes.aspekte.filter(a => a.metadata?.kuerzel === lp.metadata?.kuerzel)
     })))
 
     // Navigationsfunktion
