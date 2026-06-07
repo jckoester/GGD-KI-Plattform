@@ -1152,7 +1152,7 @@ export async function deleteEdge(edgeId) {
 }
 
 export async function getNodeEdges(nodeId, relation = null) {
-  const url = new URL(`${BASE}/context/nodes/${nodeId}/edges`)
+  const url = new URL(`${BASE}/context/nodes/${nodeId}/edges`, location.href)
   if (relation) {
     url.searchParams.set('relation', relation.join(','))
   }
