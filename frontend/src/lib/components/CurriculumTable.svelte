@@ -681,7 +681,7 @@
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={ls.metadata?.std ?? ""}
+                                                value={ls.metadata?.std || ""}
                                                 oninput={(e) => {
                                                     ls.metadata = {
                                                         ...ls.metadata,
