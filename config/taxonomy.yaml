@@ -23,6 +23,7 @@ categories:
       - key: konvention
         label_de: "Konvention"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
       - key: methodenblatt
         label_de: "Methodenblatt"
         scope_defaults: {read_scope: school,   write_scope: subject }
@@ -45,26 +46,34 @@ categories:
         label_de: "Themengebiet"
         scope_defaults: {read_scope: school,   write_scope: school  }
         scope_anchor: true
+        embedding: true
       - key: leitidee
         label_de: "Leitidee"
         scope_defaults: {read_scope: global,   write_scope: global  }
         scope_anchor: true
+        embedding: true
       - key: ik_kompetenz
         label_de: "IK-Kompetenz"
         scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
       - key: pk_gruppe
         label_de: "Prozessbezogene Kompetenzgruppe"
         scope_defaults: {read_scope: global,   write_scope: global  }
         scope_anchor: true
+        embedding: true
       - key: pk_kompetenz
         label_de: "Prozessbezogene Kompetenz"
         scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
       - key: leitperspektive
         label_de: "Leitperspektive"
         scope_defaults: {read_scope: global,   write_scope: global  }
       - key: leitperspektive_aspekt
         label_de: "Leitperspektive-Aspekt"
         scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
       - key: curriculum
         label_de: "Schulcurriculum"
         scope_defaults: {read_scope: school,   write_scope: subject }
@@ -73,6 +82,8 @@ categories:
         label_de: "Kapitel"
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
+        embedding: true
+        embedding_enrichment: ["metadata.breadcrumb"]
       - key: lernsequenz
         label_de: "Lernsequenz"
         scope_defaults: {read_scope: school,   write_scope: subject }
@@ -143,12 +154,17 @@ categories:
       - key: funktion
         label_de: "Funktion"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+        embedding_enrichment: ["metadata.signatur"]
       - key: bauteil
         label_de: "Bauteil"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+        embedding_enrichment: ["metadata.schaltzeichen.beschreibung"]
       - key: operator_math
         label_de: "Mathematischer Operator"
         scope_defaults: {read_scope: school,   write_scope: school  }
       - key: abstrakt
         label_de: "Abstraktes Konzept"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true

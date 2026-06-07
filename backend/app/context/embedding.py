@@ -10,27 +10,12 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode
-from app.context.taxonomy import EMBEDDING_ENRICHMENT
+from app.context.taxonomy import EMBEDDING_CONTENT_TYPES, EMBEDDING_ENRICHMENT
 
 logger = logging.getLogger(__name__)
 
-# content_types die ein Embedding erhalten (Whitelist)
-EMBEDDING_CONTENT_TYPES = frozenset({
-    # Bildungsplan-Typen
-    'ik_kompetenz',
-    'pk_kompetenz',
-    'pk_gruppe',
-    'leitidee',
-    'leitperspektive_aspekt',
-    # Curriculum-Typen
-    'kapitel',
-    # Manuelle Wissensgraph-Typen (Arduino und andere)
-    'themengebiet',
-    'funktion',
-    'bauteil',
-    'abstrakt',
-    'konvention',
-})
+# Re-Export für Fremdimporte: from app.context.embedding import EMBEDDING_CONTENT_TYPES
+__all__ = ["EMBEDDING_CONTENT_TYPES", "EMBEDDING_ENRICHMENT"]
 
 
 def _build_signature_line(signatur: dict) -> str:

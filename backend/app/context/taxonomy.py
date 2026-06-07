@@ -144,12 +144,19 @@ def get_scope_defaults(content_type: str | None) -> tuple[str, str]:
     return SCOPE_DEFAULTS.get(content_type, ("school", "private"))
 
 
-# Gibt an, welche metadata-Felder der Embedding-Job zusätzlich zu `content`
-# in den Embedding-Input einbezieht. Kein Eintrag -> nur content wird embedded.
+# content_types die ein Embedding erhalten — abgeleitet aus taxonomy.yaml (embedding: true)
+EMBEDDING_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    ct["key"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if ct.get("embedding")
+)
+
+# Welche metadata-Felder der Embedding-Job zusätzlich zu `content` einbezieht.
+# Key: (category, content_type) — abgeleitet aus taxonomy.yaml (embedding_enrichment: [...])
 EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
-    ("concept", "bauteil"): ["metadata.schaltzeichen.beschreibung"],
-    ("concept", "funktion"): ["metadata.signatur"],
-    ("knowledge", "ik_kompetenz"): ["metadata.breadcrumb"],
-    ("knowledge", "pk_kompetenz"): ["metadata.breadcrumb"],
-    ("knowledge", "kapitel"): ["metadata.breadcrumb"],
+    (cat, ct["key"]): ct["embedding_enrichment"]
+    for cat, cat_info in _data["categories"].items()
+    for ct in cat_info["content_types"]
+    if ct.get("embedding_enrichment")
 }

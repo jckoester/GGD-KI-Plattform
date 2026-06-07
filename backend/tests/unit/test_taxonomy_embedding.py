@@ -3,8 +3,8 @@ import pytest
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from app.context.embedding import _build_signature_line, _extract_metadata_field, _build_embedding_input
-from app.context.taxonomy import EMBEDDING_ENRICHMENT, get_scope_defaults, validate_content_type
+from app.context.embedding import _build_signature_line, _extract_metadata_field, _build_embedding_input, EMBEDDING_CONTENT_TYPES
+from app.context.taxonomy import EMBEDDING_ENRICHMENT, EMBEDDING_CONTENT_TYPES as TAXONOMY_EMBEDDING_CONTENT_TYPES, get_scope_defaults, validate_content_type
 
 
 # ── Fixture: Mock ContextNode ────────────────────────────────────────────────
@@ -31,6 +31,43 @@ def make_node():
             title=title,
         )
     return _make
+
+
+# ── Embedding-Ableitung aus taxonomy.yaml ───────────────────────────────────
+
+EXPECTED_EMBEDDING_TYPES = frozenset({
+    'ik_kompetenz', 'pk_kompetenz', 'pk_gruppe', 'leitidee', 'leitperspektive_aspekt',
+    'kapitel', 'themengebiet', 'funktion', 'bauteil', 'abstrakt', 'konvention',
+})
+
+EXPECTED_ENRICHMENT_KEYS = {
+    ('concept', 'funktion'),
+    ('concept', 'bauteil'),
+    ('knowledge', 'ik_kompetenz'),
+    ('knowledge', 'pk_kompetenz'),
+    ('knowledge', 'kapitel'),
+}
+
+
+class TestEmbeddingDerivation:
+    def test_embedding_content_types_exact(self):
+        assert TAXONOMY_EMBEDDING_CONTENT_TYPES == EXPECTED_EMBEDDING_TYPES
+
+    def test_embedding_re_export_matches_taxonomy(self):
+        assert EMBEDDING_CONTENT_TYPES == TAXONOMY_EMBEDDING_CONTENT_TYPES
+
+    def test_embedding_enrichment_keys_exact(self):
+        assert set(EMBEDDING_ENRICHMENT.keys()) == EXPECTED_ENRICHMENT_KEYS
+
+    def test_consistency_guard_enrichment_implies_embedding(self):
+        """Jeder Typ mit embedding_enrichment muss auch embedding: true tragen."""
+        for cat, ct_key in EMBEDDING_ENRICHMENT:
+            assert ct_key in TAXONOMY_EMBEDDING_CONTENT_TYPES, (
+                f"({cat}, {ct_key}) hat embedding_enrichment aber kein embedding: true"
+            )
+
+    def test_enrichment_count(self):
+        assert len(EMBEDDING_ENRICHMENT) == 5
 
 
 # ── Taxonomie-Tests ─────────────────────────────────────────────────────────
