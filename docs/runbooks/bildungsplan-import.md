@@ -140,11 +140,13 @@ Nicht akzeptabel: Warnungen mit `bp_id`-Präfixen der konfigurierten Fächer
 
 ```bash
 # Dry-Run: zeigt Anzahl Knoten ohne Embedding
-python scripts/run_embedding_batch.py --db-url $DATABASE_URL --dry-run
+cd backend && python scripts/embedding_backfill.py --dry-run
 
-# Echter Lauf
-python scripts/run_embedding_batch.py --db-url $DATABASE_URL
+# Echter Lauf (nach großem Erstimport: --reindex ergänzen)
+cd backend && python scripts/embedding_backfill.py --reindex
 ```
+
+`DATABASE_URL` muss in der `.env` oder als Umgebungsvariable gesetzt sein.
 
 Erwartet: alle Knoten in der Whitelist haben danach `embedding IS NOT NULL`.
 Prüfen:

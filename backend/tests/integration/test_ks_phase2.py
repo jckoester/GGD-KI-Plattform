@@ -336,28 +336,27 @@ class TestEmbeddingBatch:
     """Embedding-Batch verarbeitet Whitelist-Knoten, ignoriert andere."""
 
     @pytest.mark.asyncio
-    async def test_batch_writes_embeddings_for_whitelist(self, db_session, db_url):
+    async def test_batch_writes_embeddings_for_whitelist(self, async_engine, db_url):
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
         from app.context.embedding import EMBEDDING_CONTENT_TYPES
+        from app.crons.embedding_backfill_service import backfill_embeddings
 
-        # Knoten importieren
+        # Knoten importieren (psycopg2, committed)
         run_import(db_url, FIXTURE_DIR / 'bp_import_5nodes.jsonl')
 
         fake_embedding = [0.1] * 1536
 
-        # asyncpg-URL verwenden
-        asyncpg_url = db_url  # db_url aus conftest ist bereits asyncpg
-
-        run_embedding_batch = _import_repo_script('run_embedding_batch')
+        factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
         with patch(
-            'scripts.run_embedding_batch.generate_embedding',
+            'app.crons.embedding_backfill_service.generate_embedding',
             new_callable=AsyncMock,
             return_value=fake_embedding,
         ):
-            await run_embedding_batch.run_batch(asyncpg_url, batch_size=10, dry_run=False)
+            async with factory() as db:
+                await backfill_embeddings(db, batch_size=10, dry_run=False)
 
         conn = psycopg2.connect(get_sync_url(db_url))
         with conn.cursor() as cur:
-            # ik_kompetenz und leitidee muessen Embedding haben
             cur.execute("""
                 SELECT content_type, count(*) FILTER (WHERE embedding IS NULL) as ohne
                 FROM context_nodes

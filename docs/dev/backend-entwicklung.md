@@ -89,6 +89,7 @@ docker compose exec backend python scripts/<skript>.py
 | `seed_exchange_rate.py` | Wechselkurs für frische DB setzen (einmalig) | — |
 | `cleanup_inactive_accounts.py` | Konten ohne Login > 90 Tage löschen | `--dry-run`, `--now`, `--limit` |
 | `cleanup_stale_conversations.py` | Konversationen ohne Nachrichten > 93 Tage löschen | `--dry-run`, `--now` |
+| `embedding_backfill.py` | Embeddings für Knoten ohne Embedding nachgenerieren | `--dry-run`, `--batch-size`, `--limit`, `--reindex` |
 
 `--dry-run` gibt aus, was gelöscht würde, ohne etwas zu löschen.
 `--now <ISO-Timestamp>` simuliert einen anderen „Jetzt"-Zeitpunkt —
