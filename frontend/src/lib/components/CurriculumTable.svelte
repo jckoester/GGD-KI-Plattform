@@ -424,9 +424,24 @@
                                     }}
                                     class="font-bold text-light-tx dark:text-dark-tx bg-transparent border-none focus:outline-none flex-1"
                                 />
-                                <span class="text-light-tx-2 dark:text-dark-tx-2 text-xs">
-                                    ({kap.metadata?.std || ''} Stunden)
-                                </span>
+                                <div class="flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                    <span>(</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={kap.metadata?.std || ''}
+                                        oninput={(e) => {
+                                            kap.metadata = { ...kap.metadata, std: e.target.value }
+                                            curriculum.kapitel = [...curriculum.kapitel]
+                                            onchange()
+                                        }}
+                                        class="w-12 text-xs text-center text-light-tx dark:text-dark-tx
+                                               bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3
+                                               rounded px-1 py-0.5 focus:outline-none focus:border-primary dark:focus:border-primary-dark"
+                                        placeholder="0"
+                                    />
+                                    <span>Std.)</span>
+                                </div>
                                 <button
                                     onclick={(e) => showMenu(e, 'kapitel', kap.id)}
                                     class="p-1 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 rounded"

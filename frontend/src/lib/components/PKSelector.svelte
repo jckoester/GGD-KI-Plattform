@@ -13,11 +13,24 @@
     let { subjectId = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
 
     let pkGruppen = $state([])
+    let allKompetenzen = $state([]) // flache Liste aller pk_kompetenz-Knoten
     let loadingGruppen = $state(false)
     let expandedGruppe = $state(null)
     let searchQuery = $state('')
     let filteredPkList = $state([])
     let showDropdown = $state(false)
+
+    // Extrahiere die führende, punktgetrennte Nummer aus einem Titel,
+    // z.B. "2.1 Erkenntnisgewinnung" -> "2.1", "2.1.1 chemische Phänomene…" -> "2.1.1"
+    function extractNr(title) {
+        const match = (title || '').match(/^\s*(\d+(?:\.\d+)*)/)
+        return match ? match[1] : ''
+    }
+
+    // PK-ID einer Kompetenz: bevorzugt metadata.kompetenz_nr, sonst Nummer aus dem Titel
+    function pkIdOf(node) {
+        return node?.metadata?.kompetenz_nr || extractNr(node?.title) || node?.title || ''
+    }
 
     // Lade PK-Gruppen und -Kompetenzknoten
     $effect(() => {
@@ -41,64 +54,67 @@
                 paramsKompetenzen.append('content_type', 'pk_kompetenz')
                 paramsKompetenzen.set('subject_id', subjectId)
                 if (bpVersion) paramsKompetenzen.set('bp_version', bpVersion)
-                paramsKompetenzen.set('limit', '200')
-                
+                paramsKompetenzen.set('limit', '500')
+
                 const kompetenzRes = await fetch(`/api/context/nodes?${paramsKompetenzen}`, { credentials: 'include' })
                 const kompetenzData = kompetenzRes.ok ? await kompetenzRes.json() : []
-                
-                // Gruppen strukturieren
-                const gruppenMap = new Map()
-                gruppenData.forEach(g => {
-                    gruppenMap.set(g.id, {
-                        ...g,
-                        kompetenzen: []
-                    })
-                })
-                
-                // Kompetenzen den Gruppen zuordnen (über metadata oder Titel)
+
+                allKompetenzen = kompetenzData
+
+                // Gruppen strukturieren, nach Gruppennummer aufsteigend sortiert
+                const gruppen = gruppenData
+                    .map(g => ({ ...g, _nr: extractNr(g.title), kompetenzen: [] }))
+                    .sort((a, b) => a._nr.localeCompare(b._nr, undefined, { numeric: true }))
+
+                // Kompetenzen den Gruppen über Nummern-Präfix zuordnen
+                // (z.B. Kompetenz "2.1.1" gehört zur Gruppe mit Nummer "2.1").
+                // metadata.pk_gruppe_id existiert nicht — die Hierarchie entsteht
+                // im Backend nur über part_of-Kanten.
                 kompetenzData.forEach(k => {
-                    // Versuche Gruppe aus metadata zu extrahieren
-                    const gruppeId = k.metadata?.pk_gruppe_id
-                    if (gruppeId && gruppenMap.has(gruppeId)) {
-                        gruppenMap.get(gruppeId).kompetenzen.push(k)
+                    const knr = pkIdOf(k)
+                    // längstes passendes Gruppen-Präfix wählen
+                    let best = null
+                    for (const g of gruppen) {
+                        if (g._nr && knr.startsWith(g._nr + '.')) {
+                            if (!best || g._nr.length > best._nr.length) best = g
+                        }
                     }
+                    if (best) best.kompetenzen.push(k)
                 })
-                
-                // Als Array für die Anzeige
-                pkGruppen = Array.from(gruppenMap.values())
-                
+
+                // Kompetenzen innerhalb der Gruppen nach Nummer sortieren
+                gruppen.forEach(g => {
+                    g.kompetenzen.sort((a, b) =>
+                        pkIdOf(a).localeCompare(pkIdOf(b), undefined, { numeric: true })
+                    )
+                })
+
+                pkGruppen = gruppen
+
             } catch (e) {
                 console.error('Fehler beim Laden der PK-Daten:', e)
             } finally {
                 loadingGruppen = false
             }
         }
-        
+
         loadPkData()
     })
-    
-    // Filter PKs basierend auf Suche
+
+    // Filter PKs basierend auf Suche (über alle Einzelkompetenzen)
     $effect(() => {
-        if (!searchQuery.trim()) {
+        const term = searchQuery.trim().toLowerCase()
+        if (!term) {
             filteredPkList = []
             return
         }
-        
-        // Durchsuche alle PK-Kompetenzknoten
-        const allPks = pkGruppen.flatMap(g => g.kompetenzen)
-        const matches = allPks.filter(pk => 
-            pk.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            extractPkIdFromTitle(pk.title).toLowerCase().includes(searchQuery.toLowerCase())
+
+        filteredPkList = allKompetenzen.filter(pk =>
+            (pk.title || '').toLowerCase().includes(term) ||
+            pkIdOf(pk).toLowerCase().includes(term)
         )
-        filteredPkList = matches
     })
-    
-    // Extrahiere PK-ID aus Titel (z.B. "PK_05.1" aus "PK 05.1 - Prozessbezogene Kompetenz")
-    function extractPkIdFromTitle(title) {
-        const match = title.match(/(PK[\-_]?\d+\.\d+)/i)
-        return match ? match[1].replace('-', '_').replace('.', '_') : title
-    }
-    
+
     // PK auswählen
     function selectPK(pkNode) {
         const alreadySelected = selected.some(s => s.node_id === pkNode.id)
@@ -106,7 +122,7 @@
             selected = [...selected, {
                 node_id: pkNode.id,
                 title: pkNode.title,
-                pk_id: extractPkIdFromTitle(pkNode.title)
+                pk_id: pkIdOf(pkNode)
             }]
             emitChange()
         }
@@ -133,9 +149,10 @@
     // Füge PK per Direkteingabe hinzu
     function addById() {
         if (!searchQuery.trim()) return
-        
-        const pkId = searchQuery.trim().replace('PK', '').replace('_', '.')
-        
+
+        // Nummer aus der Eingabe extrahieren (z.B. "2.1.1" aus "PK 2.1.1")
+        const pkId = extractNr(searchQuery) || searchQuery.trim()
+
         // Prüfe ob bereits ausgewählt
         const alreadySelected = selected.some(s => s.pk_id === pkId)
         if (alreadySelected) {
@@ -143,12 +160,12 @@
             showDropdown = false
             return
         }
-        
-        // Prüfe ob wir den Knoten in den Gruppen haben
-        const found = pkGruppen.flatMap(g => g.kompetenzen).find(pk => 
-            extractPkIdFromTitle(pk.title) === pkId || pk.title.includes(pkId)
+
+        // Prüfe ob wir den Knoten in den geladenen Kompetenzen haben
+        const found = allKompetenzen.find(pk =>
+            pkIdOf(pk) === pkId || (pk.title || '').includes(pkId)
         )
-        
+
         if (found) {
             selectPK(found)
         } else {
@@ -213,7 +230,7 @@
                         addById()
                     }
                 }}
-                placeholder="PK-ID suchen (z.B. PK_05.1)"
+                placeholder="PK suchen (z.B. 2.1.1)"
                 class="w-full pl-8 pr-10 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
                        focus:outline-none focus:border-primary dark:focus:border-primary-dark"
@@ -243,7 +260,7 @@
                                     {pk.title}
                                 </div>
                                 <div class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    {extractPkIdFromTitle(pk.title)}
+                                    {pkIdOf(pk)}
                                 </div>
                             </div>
                         </button>
@@ -292,7 +309,7 @@
                                                 {pk.title}
                                             </div>
                                             <div class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                                {extractPkIdFromTitle(pk.title)}
+                                                {pkIdOf(pk)}
                                             </div>
                                         </div>
                                     </button>
