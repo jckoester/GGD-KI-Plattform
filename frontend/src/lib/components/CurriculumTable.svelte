@@ -14,6 +14,9 @@
     import { parseHinweise } from "$lib/hinweise.js";
     import { kapitelStd, lernsequenzStd } from "$lib/curriculum.js";
     import { renderMarkdown } from "$lib/markdown.js";
+    import { parseMaterial } from "$lib/material.js";
+    import { linkifyText } from "$lib/linkify.js";
+    import MaterialEditor from "./MaterialEditor.svelte";
     import {
         Plus,
         Trash2,
@@ -161,6 +164,7 @@
             pk: [],
             konkretisierung: "",
             hinweise: "",
+            material: "",
         });
         curriculum.kapitel = [...curriculum.kapitel];
         onchange();
@@ -397,7 +401,7 @@
     // Volltext einer IK/PK aus den Refs der Lernsequenz (für title-Attribut)
     function refTitle(ls, nodeId, kind) {
         if (!nodeId) return null;
-        const refs = kind === "ik" ? (ls.ik_refs || []) : (ls.pk_refs || []);
+        const refs = kind === "ik" ? ls.ik_refs || [] : ls.pk_refs || [];
         return refs.find((r) => r.node_id === nodeId)?.title ?? null;
     }
 
@@ -507,7 +511,7 @@
                 <th
                     class="px-3 py-2 font-medium text-light-tx-2 dark:text-dark-tx-2 w-1/3"
                 >
-                    Hinweise
+                    Hinweise &amp; Material
                 </th>
                 {#if editMode}
                     <th class="px-3 py-2 w-12"></th>
@@ -556,7 +560,9 @@
                                     }}
                                     class="font-bold text-light-tx dark:text-dark-tx bg-transparent border-none focus:outline-none flex-1"
                                 />
-                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                <span
+                                    class="text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                                >
                                     ({kapitelStd(kap)} Std.)
                                 </span>
                                 <button
@@ -669,7 +675,9 @@
                                                     .bp_leitidee})
                                             </span>
                                         {/if}
-                                        <div class="flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0">
+                                        <div
+                                            class="flex items-center gap-1 text-xs text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                                        >
                                             <input
                                                 type="number"
                                                 min="0"
@@ -677,7 +685,9 @@
                                                 oninput={(e) => {
                                                     ls.metadata = {
                                                         ...ls.metadata,
-                                                        std: Number(e.target.value),
+                                                        std: Number(
+                                                            e.target.value,
+                                                        ),
                                                     };
                                                     curriculum.kapitel = [
                                                         ...curriculum.kapitel,
@@ -786,7 +796,11 @@
                                             {#if pk.node_id}
                                                 <a
                                                     href={nodeLink(pk.node_id)}
-                                                    title={refTitle(ls, pk.node_id, "pk")}
+                                                    title={refTitle(
+                                                        ls,
+                                                        pk.node_id,
+                                                        "pk",
+                                                    )}
                                                     class="block mb-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                                 >
                                                     {pk.pk_id}
@@ -823,7 +837,11 @@
                                         {#if ik.node_id}
                                             <a
                                                 href={nodeLink(ik.node_id)}
-                                                title={refTitle(ls, ik.node_id, "ik")}
+                                                title={refTitle(
+                                                    ls,
+                                                    ik.node_id,
+                                                    "ik",
+                                                )}
                                                 class="inline-block mr-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
                                             >
                                                 {ik.nr}
@@ -847,6 +865,11 @@
                             <!-- Konkretisierung -->
                             <td class="px-3 py-2 vertical-align-top">
                                 {#if editMode}
+                                    <p
+                                        class="text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
+                                    >
+                                        Konkretisierung
+                                    </p>
                                     <textarea
                                         value={eintrag.konkretisierung || ""}
                                         oninput={(e) => {
@@ -858,16 +881,20 @@
                                             onchange();
                                         }}
                                         class="w-full text-sm rounded border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx p-2"
-                                        rows="5"
+                                        rows="8"
                                         placeholder="Konkretisierungstext"
                                     />
                                 {:else}
                                     {#if eintrag.konkretisierung}
-                                        <div class="prose prose-sm dark:prose-invert max-w-none
+                                        <div
+                                            class="prose prose-sm dark:prose-invert max-w-none
                                                     prose-p:my-1 prose-ul:my-1 prose-ol:my-1
                                                     prose-p:text-light-tx dark:prose-p:text-dark-tx
-                                                    prose-a:text-light-bl dark:prose-a:text-dark-bl">
-                                            {@html renderMarkdown(eintrag.konkretisierung)}
+                                                    prose-a:text-light-bl dark:prose-a:text-dark-bl"
+                                        >
+                                            {@html renderMarkdown(
+                                                eintrag.konkretisierung,
+                                            )}
                                         </div>
                                     {/if}
                                 {/if}
@@ -876,57 +903,141 @@
                             <!-- Hinweise -->
                             <td class="px-3 py-2 vertical-align-top">
                                 {#if editMode}
-                                    <HinweisEditor
-                                        value={eintrag.hinweise || ""}
-                                        onchange={(newVal) => {
-                                            eintrag.hinweise = newVal;
-                                            curriculum.kapitel = [
-                                                ...curriculum.kapitel,
-                                            ];
-                                            onchange();
-                                        }}
-                                    />
-                                {:else}
-                                    {#if eintrag.hinweise}
-                                        {@const parts = parseHinweise(
-                                            eintrag.hinweise,
-                                        )}
-                                        <div
-                                            class="flex flex-wrap gap-1 items-center"
-                                        >
-                                            {#each parts as part}
-                                                {#if part.kind === "lp"}
-                                                    <HinweisChip
-                                                        typ="leitperspektive"
-                                                        lp_code={part.label}
-                                                        href="/knowledge/{part.node_id}"
-                                                    />
-                                                {:else if part.kind === "lpa"}
-                                                    <HinweisChip
-                                                        typ="leitperspektive_aspekt"
-                                                        lp_code={part.label}
-                                                        href="/knowledge/{part.node_id}"
-                                                    />
-                                                {:else if part.kind === "ik"}
-                                                    <HinweisChip
-                                                        typ="fach_bezug"
-                                                        fach={part.label}
-                                                        href="/knowledge/{part.node_id}"
-                                                    />
-                                                {:else if part.label.trim()}
-                                                    <span
-                                                        class="text-sm text-light-tx-2 dark:text-dark-tx-2"
-                                                        >{part.label}</span
-                                                    >
-                                                {/if}
-                                            {/each}
+                                    <div class="space-y-3">
+                                        <div>
+                                            <p
+                                                class="text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
+                                            >
+                                                Hinweise
+                                            </p>
+                                            <HinweisEditor
+                                                value={eintrag.hinweise || ""}
+                                                onchange={(newVal) => {
+                                                    eintrag.hinweise = newVal;
+                                                    curriculum.kapitel = [
+                                                        ...curriculum.kapitel,
+                                                    ];
+                                                    onchange();
+                                                }}
+                                            />
                                         </div>
-                                    {:else}
-                                        <span
-                                            class="text-light-tx-3 dark:text-dark-tx-3 text-xs"
-                                            >–</span
-                                        >
-                                    {/if}
+                                        <div>
+                                            <p
+                                                class="text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
+                                            >
+                                                Material
+                                            </p>
+                                            <MaterialEditor
+                                                value={eintrag.material || ""}
+                                                onchange={(newVal) => {
+                                                    eintrag.material = newVal;
+                                                    curriculum.kapitel = [
+                                                        ...curriculum.kapitel,
+                                                    ];
+                                                    onchange();
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                {:else}
+                                    <div class="space-y-2">
+                                        <!-- Hinweise -->
+                                        {#if eintrag.hinweise}
+                                            {@const parts = parseHinweise(
+                                                eintrag.hinweise,
+                                            )}
+                                            <div
+                                                class="flex flex-wrap gap-1 items-center"
+                                            >
+                                                {#each parts as part}
+                                                    {#if part.kind === "lp"}
+                                                        <HinweisChip
+                                                            typ="leitperspektive"
+                                                            lp_code={part.label}
+                                                            href="/knowledge/{part.node_id}"
+                                                        />
+                                                    {:else if part.kind === "lpa"}
+                                                        <HinweisChip
+                                                            typ="leitperspektive_aspekt"
+                                                            lp_code={part.label}
+                                                            href="/knowledge/{part.node_id}"
+                                                        />
+                                                    {:else if part.kind === "ik"}
+                                                        <HinweisChip
+                                                            typ="fach_bezug"
+                                                            fach={part.label}
+                                                            href="/knowledge/{part.node_id}"
+                                                        />
+                                                    {:else if part.label.trim()}
+                                                        {#each linkifyText(part.label) as sub}
+                                                            {#if sub.kind === "url"}
+                                                                <a
+                                                                    href={sub.href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    class="text-sm text-light-bl dark:text-dark-bl underline break-all"
+                                                                    >{sub.label}</a
+                                                                >
+                                                            {:else if sub.label.trim()}
+                                                                <span
+                                                                    class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                                                                    >{sub.label}</span
+                                                                >
+                                                            {/if}
+                                                        {/each}
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        {/if}
+
+                                        <!-- Material -->
+                                        {#if eintrag.material}
+                                            {@const matParts = parseMaterial(
+                                                eintrag.material,
+                                            )}
+                                            <div
+                                                class="flex flex-wrap gap-1 items-center"
+                                            >
+                                                <span
+                                                    class="text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                                                    >Material:</span
+                                                >
+                                                {#each matParts as part}
+                                                    {#if part.kind === "node"}
+                                                        <HinweisChip
+                                                            typ="material"
+                                                            text={part.label}
+                                                            href="/knowledge/{part.node_id}"
+                                                        />
+                                                    {:else if part.label.trim()}
+                                                        {#each linkifyText(part.label) as sub}
+                                                            {#if sub.kind === "url"}
+                                                                <a
+                                                                    href={sub.href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    class="text-sm text-light-bl dark:text-dark-bl underline break-all"
+                                                                    >{sub.label}</a
+                                                                >
+                                                            {:else if sub.label.trim()}
+                                                                <span
+                                                                    class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                                                                    >{sub.label}</span
+                                                                >
+                                                            {/if}
+                                                        {/each}
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        {/if}
+
+                                        {#if !eintrag.hinweise && !eintrag.material}
+                                            <span
+                                                class="text-light-tx-3 dark:text-dark-tx-3 text-xs"
+                                                >–</span
+                                            >
+                                        {/if}
+                                    </div>
                                 {/if}
                             </td>
 

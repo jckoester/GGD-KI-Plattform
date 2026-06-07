@@ -4,6 +4,7 @@
     import { getCurriculum, updateContextNode, createContextNode,
              deleteContextNode, createEdge, deleteEdge, getNodeEdges } from '$lib/api.js'
     import { kapitelStd, curriculumStd } from '$lib/curriculum.js'
+    import { extractNodeTargets } from '$lib/material.js'
     import { user } from '$lib/stores/user.js'
     import CurriculumTable from '$lib/components/CurriculumTable.svelte'
     import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -212,6 +213,7 @@
         const pkSet = new Set()   // node_id
         const lpSet = new Set()   // node_id (Leitperspektive aus hinweise)
         const crossIkSet = new Set() // node_id (Cross-Fach-IK aus hinweise)
+        const usedWithSet = new Set() // node_id (Knoten aus material)
 
         for (const eintrag of eintraege || []) {
             // IK-Array (neues Format: Array<{node_id, nr, partiell}>)
@@ -242,6 +244,11 @@
             for (const m of hinweiseText.matchAll(/#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)/g)) {
                 crossIkSet.add(m[1])
             }
+
+            // Material: @[Label](node:uuid) → used_with-Kanten
+            for (const nodeId of extractNodeTargets(eintrag.material || '')) {
+                usedWithSet.add(nodeId)
+            }
         }
 
         return {
@@ -252,6 +259,8 @@
                 ...Array.from(lpSet).map(id => ({ node_id: id })),
                 ...Array.from(crossIkSet).map(id => ({ node_id: id })),
             ],
+            // Material-Knoten → 'used_with'-Kanten mit via:'material'
+            usedWith: Array.from(usedWithSet).map(id => ({ node_id: id })),
         }
     }
 
@@ -266,7 +275,8 @@
         // Bestehende Kanten laden (nur die verwalteten Relationen)
         const allEdges = await getNodeEdges(lsId)
         const managedEdges = allEdges.filter(e =>
-            e.relation === 'references' || e.relation === 'develops'
+            e.relation === 'references' || e.relation === 'develops' ||
+            (e.relation === 'used_with' && e.metadata?.via === 'material')
         )
 
         const processedEdgeIds = new Set()
@@ -328,6 +338,23 @@
                     to_node_id: ref.node_id,
                     relation: 'references',
                     metadata: {}
+                })
+            }
+        }
+
+        // Material-Knoten → 'used_with' mit via:'material'
+        for (const ref of derived.usedWith) {
+            const existing = managedEdges.find(e =>
+                e.relation === 'used_with' && e.to_node_id === ref.node_id && e.metadata?.via === 'material'
+            )
+            if (existing) {
+                processedEdgeIds.add(existing.id)
+            } else {
+                await createEdge({
+                    from_node_id: lsId,
+                    to_node_id: ref.node_id,
+                    relation: 'used_with',
+                    metadata: { via: 'material' }
                 })
             }
         }
