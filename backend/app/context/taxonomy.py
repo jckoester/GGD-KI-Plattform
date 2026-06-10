@@ -8,11 +8,10 @@ from typing import Final
 import yaml
 import os
 
-# Ermittele den absoluten Pfad dieses Moduls
-_module_path = Path(__file__).resolve()
-# Navigiere zum Projekt-Root: backend/app/context -> backend -> Projekt-Root
-_project_root = _module_path.parent.parent.parent.parent
-_taxonomy_path = _project_root / "config" / "taxonomy.yaml"
+_taxonomy_path = Path(
+    os.environ.get("TAXONOMY_PATH")
+    or Path(__file__).resolve().parent.parent.parent.parent / "config" / "taxonomy.yaml"
+)
 
 
 def _load() -> dict:

@@ -21,6 +21,7 @@ services:
     environment:
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
+      TAXONOMY_PATH: /app/config/taxonomy.yaml
     volumes:
       - ./config:/app/config:ro
       - ./static:/app/static:ro
@@ -63,6 +64,7 @@ services:
     environment:
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
+      TAXONOMY_PATH: /app/config/taxonomy.yaml
     volumes:
       - ./config:/app/config:ro
     depends_on:
