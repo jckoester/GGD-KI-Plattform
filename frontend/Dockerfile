@@ -1,6 +1,6 @@
 FROM node:22-slim AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml git && rm -rf /var/lib/apt/lists/*
 
 # Repo-Struktur spiegeln: ROOT in generate_taxonomy.py = /repo
 # Skript erwartet /repo/frontend/, /repo/scripts/, /repo/config/
@@ -11,7 +11,7 @@ RUN npm ci
 
 COPY frontend/ .
 # docs/user/ muss beim Vite-Build erreichbar sein (Alias $docs → /docs/user)
-COPY docs/user/ /docs/user/
+COPY docs/user/ /repo/docs/user/
 COPY scripts/ /repo/scripts/
 COPY config/taxonomy.yaml /repo/config/taxonomy.yaml
 
