@@ -5,10 +5,13 @@ Gilt für Erstimport und Re-Import bei aktualisiertem Bildungsplan oder erweiter
 
 ## Voraussetzungen
 
-- Python-venv aktiv mit `requirements-scripts.txt` installiert:
+- Python-venv aktiv mit `requirements-scripts.txt` installiert (deckt die
+  gesamte Host-Pipeline ab: Scrape, Import, Embedding):
   ```bash
   pip install -r requirements-scripts.txt
   ```
+  > Wer **nur scrapen** will (ohne Import/Embedding auf dem Host), kann
+  > stattdessen die schlanke `scripts/scraper/requirements.txt` verwenden.
 - Backend-Package im Pfad (für Import-Skript und Embedding-Batch):
   ```bash
   export PYTHONPATH=backend

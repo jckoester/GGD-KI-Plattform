@@ -1,0 +1,244 @@
+# Bildungsplan-Import (Produktivsystem)
+
+Diese Anleitung beschreibt den Import der Bildungsplan-Daten in das **laufende
+Docker-Produktivsystem**. Sie richtet sich an Admins und setzt eine fertige
+Installation gemäß [Installation](installation.md) voraus.
+
+Der Bildungsplan liefert die fachlichen Kontextdaten (Leitideen, Kompetenzen,
+Leitperspektiven), die Assistenten als Wissensbasis nutzen. Ohne diesen Import
+funktioniert die Plattform, der fachliche Kontext fehlt jedoch.
+
+> **Wann ist dieser Schritt nötig?**
+> - Einmalig nach der Erstinstallation
+> - Bei einem aktualisierten Bildungsplan oder erweiterter `config/subjects.yaml`
+>
+> Die technischen Hintergründe (Scrape-Mechanik, Datenmodell, Idempotenz) stehen
+> im [Runbook Bildungsplan-Import](../runbooks/bildungsplan-import.md). Diese
+> Admin-Anleitung beschränkt sich auf den Ablauf im Docker-Produktivbetrieb.
+
+---
+
+## Überblick
+
+Der Import läuft in drei Etappen:
+
+```
+1. JSONL bereitstellen   (außerhalb Docker — Scrape oder vom Wartungsteam)
+        │
+        ▼
+2. Import in die DB      (Einmal-Container im Compose-Netz)
+        │
+        ▼
+3. Embeddings erzeugen   (im laufenden backend-Container)
+```
+
+> **Hinweis zur Architektur:** Der Scraper und das Import-Skript liegen im
+> Repository-Verzeichnis `scripts/` und sind **nicht Teil des Backend-Images**
+> (das Image wird nur aus `./backend` gebaut). Der Import wird deshalb über einen
+> **Einmal-Container** mit eingehängtem `scripts/`-Verzeichnis ausgeführt — so
+> erreicht er die Datenbank über das interne Docker-Netz (`db:5432`), ohne dass
+> ein Datenbank-Port nach außen geöffnet werden muss.
+
+Alle Befehle werden im Repository-Wurzelverzeichnis (`ki-plattform/`) auf dem
+Server ausgeführt.
+
+---
+
+## Schritt 1: JSONL-Dateien bereitstellen
+
+Der Import benötigt die gescrapten Bildungsplan-Daten als JSONL-Dateien im
+Verzeichnis `scripts/scraper/output/`.
+
+Diese Dateien sind **nicht im Repository enthalten** (`.gitignore`). Es gibt zwei
+Wege, sie bereitzustellen:
+
+**Variante A — selbst scrapen (Regelfall).**
+Das Scrapen läuft außerhalb von Docker — die Scraper-Abhängigkeiten sind bewusst
+nicht im Backend-Image, sondern in einer eigenen, schlanken
+`scripts/scraper/requirements.txt` (nur `beautifulsoup4`, `lxml`, `httpx`,
+`pyyaml`). Es genügt eine eigene Python-venv und Internetzugang zur
+Bildungsplan-Website — kein Datenbankzugriff:
+
+```bash
+# Einmalig: venv nur für den Scraper anlegen
+python -m venv .venv-scraper
+source .venv-scraper/bin/activate
+pip install -r scripts/scraper/requirements.txt
+```
+
+Anschließend scrapen (alle Fächer mit `fach_code` aus `config/subjects.yaml`):
+
+```bash
+python -m scripts.scraper.bildungsplan_scraper \
+  --subjects config/subjects.yaml \
+  --output scripts/scraper/output
+```
+
+Den vollständigen Ablauf inklusive Monitor (Änderungserkennung) und
+Warnungs-Prüfung beschreibt das
+[Runbook, Schritte 1–3](../runbooks/bildungsplan-import.md#schritt-2--monitor-änderungen-prüfen-bei-re-import).
+Ergebnis sind die JSONL-Dateien in `scripts/scraper/output/`, z. B.:
+`CH_2026-06-06.jsonl`, `M_2026-06-06.jsonl`, `M_V2_2026-06-06.jsonl`,
+`leitperspektiven_2026-06-06.jsonl`.
+
+**Variante B — fertige JSONL übernehmen.**
+Liegen die JSONL-Dateien bereits vor (z. B. vom Wartungsteam), genügt es, sie in
+das Output-Verzeichnis zu kopieren — Schritt »selbst scrapen« entfällt dann:
+
+```bash
+cp /pfad/zu/*.jsonl scripts/scraper/output/
+```
+
+> **Re-Import nach Datenmodell-Änderung:** Wurden Scraper oder Datenmodell
+> geändert, **zuerst die alten JSONL-Dateien des betroffenen Fachs löschen**,
+> dann neu scrapen. Der Import ist idempotent über den Content-Hash — ein altes
+> JSONL ohne neues Feld würde ein neues sonst stillschweigend überschreiben.
+
+---
+
+## Schritt 2: Dry-Run-Import gegen die Produktions-DB
+
+Zuerst ein Probelauf ohne Schreibzugriff. Der Befehl startet einen Einmal-Container
+aus dem `backend`-Image, hängt das `scripts/`-Verzeichnis read-only ein und
+verbindet sich über das Compose-Netz mit der Datenbank:
+
+```bash
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/import-scripts:ro" \
+  backend \
+  sh -c 'python /app/import-scripts/import_bildungsplan.py \
+    --subjects /app/config/subjects.yaml \
+    --input /app/import-scripts/scraper/output \
+    --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki" \
+    --dry-run'
+```
+
+> Das Datenbank-Passwort wird **im Container** aus der `.env` (`POSTGRES_PASSWORD`)
+> aufgelöst und erscheint nicht auf der Kommandozeile des Hosts.
+
+Die Ausgabe prüfen:
+
+- `[DRY RUN] N insertiert, 0 aktualisiert, ...` → Erstimport
+- `[DRY RUN] 0 insertiert, M aktualisiert, ...` → Re-Import mit Änderungen
+- `[DRY RUN] 0 insertiert, 0 aktualisiert, K unverändert` → keine Änderung, Import
+  nicht nötig
+
+---
+
+## Schritt 3: Import ausführen
+
+Sieht der Dry-Run plausibel aus, denselben Befehl **ohne** `--dry-run` ausführen:
+
+```bash
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/import-scripts:ro" \
+  backend \
+  sh -c 'python /app/import-scripts/import_bildungsplan.py \
+    --subjects /app/config/subjects.yaml \
+    --input /app/import-scripts/scraper/output \
+    --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki"'
+```
+
+Warnungen prüfen (das Import-Skript schreibt sie nach `data/import_logs/` im
+eingehängten `scripts/`-Elternverzeichnis bzw. in die Container-Ausgabe):
+
+- **Akzeptabel:** Querverweise auf Fächer, die nicht in `subjects.yaml` stehen
+  (z. B. BNT-Verweise aus Chemie auf andere Fächer).
+- **Nicht akzeptabel:** Warnungen mit `bp_id`-Präfixen der konfigurierten Fächer
+  (z. B. `BP2016BW_ALLG_GYM_CH_*`) → Scraper- oder Importfehler, untersuchen.
+
+---
+
+## Schritt 4: Embeddings erzeugen
+
+Neu importierte Knoten haben noch kein Embedding (`embedding IS NULL`) und werden
+in der semantischen Suche nicht gefunden. Das Embedding-Skript liegt im
+Backend-Image und läuft direkt im laufenden Container:
+
+```bash
+# Dry-Run: zeigt Anzahl Knoten ohne Embedding
+docker compose exec backend python scripts/embedding_backfill.py --dry-run
+
+# Echter Lauf (nach großem Erstimport: --reindex ergänzen)
+docker compose exec backend python scripts/embedding_backfill.py --reindex
+```
+
+> **LiteLLM muss erreichbar sein** (`text-embedding-3-small`). Das Skript nutzt
+> dieselbe LiteLLM-Konfiguration wie das Backend. Bei Fehlern den Eintrag
+> `metadata_['embedding_error']` der betroffenen Knoten prüfen.
+
+> **Automatik:** Der `cron`-Container füllt fehlende Embeddings ohnehin nächtlich
+> (03:15 Uhr) nach. Der manuelle Lauf ist nur sinnvoll, wenn die Daten sofort
+> verfügbar sein sollen.
+
+---
+
+## Schritt 5: HNSW-Index neu aufbauen
+
+Nach dem ersten vollständigen Import oder größeren Bulk-Updates den Vektor-Index
+neu aufbauen (im Produktivbetrieb ohne Tabellen-Sperre):
+
+```bash
+docker compose exec db psql -U postgres -d ggd_ki \
+  -c "REINDEX INDEX CONCURRENTLY idx_context_nodes_embedding;"
+```
+
+Bei kleinen inkrementellen Updates im laufenden Betrieb ist kein REINDEX nötig.
+
+---
+
+## Schritt 6: Validierung
+
+Stichproben gegen die Produktions-DB:
+
+```bash
+# Knotenzählung pro content_type inkl. Embedding-Abdeckung
+docker compose exec db psql -U postgres -d ggd_ki -c "
+SELECT content_type, count(*), count(embedding) AS mit_embedding
+FROM context_nodes WHERE status = 'active'
+GROUP BY content_type ORDER BY count DESC;"
+
+# Kein ik_kompetenz ohne part_of-Kante (Erwartet: 0)
+docker compose exec db psql -U postgres -d ggd_ki -c "
+SELECT count(*) FROM context_nodes n
+LEFT JOIN context_edges e ON e.from_node_id = n.id AND e.relation = 'part_of'
+WHERE n.content_type = 'ik_kompetenz' AND n.status = 'active' AND e.id IS NULL;"
+```
+
+Nach erfolgreichem Embedding-Lauf sollte `mit_embedding` für die Wissens-Knoten
+der Spaltensumme entsprechen (keine `NULL`-Embeddings).
+
+---
+
+## Rollback
+
+Erzeugte der Import fehlerhafte Daten, lassen sich alle Knoten eines Fachs gezielt
+entfernen (Kanten werden per FK-CASCADE mitgelöscht):
+
+```bash
+docker compose exec db psql -U postgres -d ggd_ki -c "
+BEGIN;
+DELETE FROM context_nodes
+WHERE category = 'knowledge'
+  AND metadata->>'bp_id' LIKE 'BP2016BW_ALLG_GYM_CH%';
+COMMIT;"
+```
+
+Anschließend JSONL korrigieren und den Import (Schritt 2–4) erneut ausführen.
+
+---
+
+## Fehlerbehebung
+
+| Symptom | Ursache | Lösung |
+|---------|---------|--------|
+| `could not translate host name "db"` | Befehl nicht über `docker compose run` im Compose-Netz gestartet | Befehl exakt wie in Schritt 2/3 verwenden |
+| `password authentication failed` | `POSTGRES_PASSWORD` in `.env` weicht von der DB ab | `.env` prüfen; Passwort entspricht dem bei der Installation gesetzten |
+| `0 Knoten` nach Import | Kein `fach_code` in `subjects.yaml` | `fach_code` für die gewünschten Fächer setzen (siehe Runbook, Schritt 1) |
+| `relation "context_nodes" does not exist` | Migrationen nicht eingespielt | `docker compose exec backend alembic upgrade head` |
+| `embedding IS NULL` bleibt | LiteLLM nicht erreichbar | LiteLLM-Erreichbarkeit prüfen; `metadata_['embedding_error']` ansehen |
+
+Tiefergehende Fehlerquellen und SQL-Diagnosen stehen im
+[Runbook Bildungsplan-Import](../runbooks/bildungsplan-import.md#fehlerbehebung).
+</content>
+</invoke>

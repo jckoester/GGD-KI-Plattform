@@ -53,6 +53,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Nutzerverwaltung & Rollen](nutzerverwaltung.md) — SSO, Gruppen, Rollen, Jahrgänge
 - [Budget-System](budget.md) — Tiers, ECB-Rate, Admin-UI
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Modelle freischalten, Assistenten verwalten
+- [Bildungsplan-Import](bildungsplan-import.md) — Fachkontext in das Docker-Produktivsystem importieren
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Schuljahreswechsel, Troubleshooting
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren

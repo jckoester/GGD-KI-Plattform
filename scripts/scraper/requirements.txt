@@ -1,0 +1,15 @@
+# Abhängigkeiten ausschließlich für den Bildungsplan-Scraper
+# (scripts/scraper/: bildungsplan_scraper.py, monitor.py, parsers.py, references.py).
+#
+# Bewusst minimal: nur was zum Scrapen/Parsen der Bildungsplan-Website nötig ist.
+# Datenbank- und Embedding-Abhängigkeiten (psycopg2, asyncpg, litellm) gehören
+# zum Import-Schritt und stehen in der projektweiten requirements-scripts.txt.
+#
+# Installation:
+#   python -m venv .venv-scraper && source .venv-scraper/bin/activate
+#   pip install -r scripts/scraper/requirements.txt
+
+beautifulsoup4>=4.12
+lxml>=5.0          # von BeautifulSoup als Parser genutzt (BeautifulSoup(html, "lxml"))
+httpx>=0.27
+pyyaml>=6.0
