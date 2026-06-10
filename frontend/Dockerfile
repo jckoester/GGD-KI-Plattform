@@ -1,6 +1,6 @@
 FROM node:22-slim AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -12,6 +12,7 @@ COPY frontend/ .
 COPY docs/user/ /docs/user/
 # generate:taxonomy ruft ../scripts/generate_taxonomy.py auf (relativ zu /app)
 COPY scripts/ /scripts/
+COPY config/taxonomy.yaml /config/taxonomy.yaml
 
 ARG PUBLIC_SCHOOL_NAME=ki@schule
 ARG PUBLIC_SCHOOL_LOGO_URL=
