@@ -321,6 +321,7 @@
             available_from: "",
             available_until: "",
             sort_order: 0,
+            tool_groups: [],
             status: "draft",
             reject_reason: null,
         };
@@ -376,6 +377,7 @@
                 ? a.available_until.split("T")[0]
                 : "",
             sort_order: a.sort_order ?? 0,
+            tool_groups: a.tool_groups ?? [],
             status: a.status || "draft",
             reject_reason: a.reject_reason || null,
         };
@@ -416,7 +418,10 @@
             available_from: form.available_from || null,
             available_until: form.available_until || null,
         };
-        if (isAdmin) p.sort_order = parseInt(form.sort_order) || 0;
+        if (isAdmin) {
+            p.sort_order = parseInt(form.sort_order) || 0;
+            p.tool_groups = form.tool_groups;
+        }
         return p;
     }
 
@@ -1410,7 +1415,7 @@
                         {availabilitySummary}
                     </p>
 
-                    <!-- Admin-only: Sortier-Reihenfolge -->
+                    <!-- Admin-only: Sortier-Reihenfolge + Werkzeuge -->
                     {#if isAdmin}
                         <div class="space-y-2">
                             <label
@@ -1428,6 +1433,30 @@
                        bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                        px-3 py-2"
                             />
+                        </div>
+
+                        <div class="space-y-2">
+                            <span class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                                Werkzeuge
+                            </span>
+                            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.tool_groups.includes('planning')}
+                                    onchange={(e) => {
+                                        if (e.currentTarget.checked) {
+                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'planning'), 'planning']
+                                        } else {
+                                            form.tool_groups = form.tool_groups.filter(g => g !== 'planning')
+                                        }
+                                    }}
+                                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                />
+                                Unterrichtsplanung
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    (Jahresplan, Slot-Zuweisung, Themen)
+                                </span>
+                            </label>
                         </div>
                     {/if}
 

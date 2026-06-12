@@ -50,6 +50,7 @@ from app.planning.schemas import (
     WeekPatternRead,
     WeekPatternSet,
 )
+from app.planning.service import create_unit_node
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
 
@@ -63,51 +64,6 @@ _SNAPSHOT_ASSIGNMENT_FIELDS = frozenset(
     {"ue_node_id", "stunde_node_id", "thema", "kategorie"}
 )
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-async def _get_or_create_jahresplan(
-    db: AsyncSession,
-    group_id: int,
-    group_subject_id: int | None,
-    user: JwtPayload,
-) -> ContextNode:
-    """Lazy: Jahresplan-Knoten pro Gruppe×Schuljahr, wird bei Bedarf erzeugt."""
-    from app.planning.calendar import load_school_year
-
-    cfg = load_school_year()
-    schuljahr = cfg.schuljahr
-
-    existing = await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.content_type == "jahresplan",
-            ContextNode.write_scope == "group",
-            ContextNode.write_scope_group_id == group_id,
-            ContextNode.metadata_["schuljahr"].astext == schuljahr,
-            ContextNode.status == "active",
-        )
-    )
-    node = existing.scalar_one_or_none()
-    if node:
-        return node
-
-    node = ContextNode(
-        category="knowledge",
-        content_type="jahresplan",
-        title=f"Jahresplan {schuljahr}",
-        read_scope="group",
-        write_scope="group",
-        read_scope_group_id=group_id,
-        write_scope_group_id=group_id,
-        owner_pseudonym=user.sub,
-        subject_id=group_subject_id,
-        metadata_={"schuljahr": schuljahr},
-        status="active",
-    )
-    db.add(node)
-    await db.flush()
-    return node
 
 
 async def _kapitel_std(db: AsyncSession, kapitel_node_id: UUID) -> int | None:
@@ -392,52 +348,15 @@ async def create_unit(
 ):
     group = await require_group_teacher(group_id, user, db)
 
-    from app.planning.calendar import load_school_year
-    cfg = load_school_year()
-
-    jahresplan = await _get_or_create_jahresplan(
-        db, group_id, group.subject_id, user
+    ue_node = await create_unit_node(
+        db=db,
+        group_id=group_id,
+        group_subject_id=group.subject_id,
+        user=user,
+        titel=payload.titel,
+        farbe=payload.farbe,
+        kapitel_node_id=payload.kapitel_node_id,
     )
-
-    meta: dict = {"schuljahr": cfg.schuljahr}
-    if payload.farbe is not None:
-        meta["farbe"] = payload.farbe
-
-    ue_node = ContextNode(
-        category="artifact",
-        content_type="unterrichtseinheit",
-        title=payload.titel,
-        read_scope="group",
-        write_scope="group",
-        read_scope_group_id=group_id,
-        write_scope_group_id=group_id,
-        owner_pseudonym=user.sub,
-        subject_id=group.subject_id,
-        metadata_=meta,
-        status="active",
-    )
-    db.add(ue_node)
-    await db.flush()
-
-    part_of_edge = ContextEdge(
-        from_node_id=ue_node.id,
-        to_node_id=jahresplan.id,
-        relation="part_of",
-        metadata_={},
-    )
-    db.add(part_of_edge)
-
-    if payload.kapitel_node_id:
-        ref_edge = ContextEdge(
-            from_node_id=ue_node.id,
-            to_node_id=payload.kapitel_node_id,
-            relation="references",
-            metadata_={},
-        )
-        db.add(ref_edge)
-
-    await db.commit()
-    await db.refresh(ue_node)
 
     kapitel_std = None
     if payload.kapitel_node_id:

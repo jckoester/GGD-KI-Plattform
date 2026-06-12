@@ -20,6 +20,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
+from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
 from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
@@ -27,6 +28,7 @@ from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
+import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 
 
 _MARKDOWN_GUARDRAIL = (
@@ -99,6 +101,7 @@ router = APIRouter(tags=["chat"])
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
 _SPEND_LOG_DELAY: float = settings.spend_log_delay
+_MAX_TOOL_ROUNDS: int = 6
 
 # Guardrail-Prompt-Cache
 _GUARDRAIL_TTL = 60.0  # Sekunden
@@ -337,6 +340,19 @@ async def _exec_search_context_nodes(
     ]
 
 
+async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> list[dict]:
+    return await _exec_search_context_nodes(args.get("query", ""), ctx.user.sub, ctx.db)
+
+
+register_tool(ChatTool(
+    name="search_context_nodes",
+    group="context_search",
+    writes=False,
+    definition=_SEARCH_CONTEXT_NODES_TOOL,
+    handler=_search_context_nodes_handler,
+))
+
+
 async def _persist(
     db: AsyncSession,
     conversation_id: UUID,
@@ -446,9 +462,10 @@ async def chat(
             system_prompt_snapshot = assistant.system_prompt
             if not request.model_id:
                 model_used = assistant.model
+        active_assistant = assistant
 
         first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
-        
+
         # Kontext aus Request oder Assistent ableiten
         if request.group_id is not None:
             # group_id gesetzt: subject_id aus Gruppe ableiten
@@ -466,7 +483,8 @@ async def chat(
             # Fallback: aus Assistent ableiten
             subject_id = assistant.subject_id if assistant is not None else None
             group_id = None
-        
+        conversation_group_id = group_id
+
         new_conv = Conversation(
             pseudonym=current_user.sub,
             model_used=model_used,
@@ -501,6 +519,8 @@ async def chat(
         model_used = existing.model_used
         system_prompt_snapshot = existing.system_prompt_snapshot
         active_assistant_id = existing.assistant_id
+        conversation_group_id = existing.group_id
+        active_assistant: Optional[Assistant] = None
 
         # 2-1: Assistentenwechsel mid-Chat
         if request.assistant_id is not None:
@@ -517,6 +537,7 @@ async def chat(
 
             system_prompt_snapshot = new_assistant.system_prompt
             active_assistant_id = new_assistant.id
+            active_assistant = new_assistant
 
             # Conversation-Update vormerken (atomar mit _persist geschrieben)
             conv_assistant_update = (new_assistant.id, new_assistant.system_prompt)
@@ -524,6 +545,12 @@ async def chat(
             # Assistentenmodell als Fallback wenn kein explizites model_id
             if not request.model_id and new_assistant.model:
                 model_used = new_assistant.model
+
+        if active_assistant is None and active_assistant_id is not None:
+            asst_r = await db.execute(
+                select(Assistant).where(Assistant.id == active_assistant_id)
+            )
+            active_assistant = asst_r.scalar_one_or_none()
 
         # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
         if request.model_id:
@@ -581,10 +608,28 @@ async def chat(
     litellm_payload["model"] = model_used
     litellm_payload["messages"] = llm_messages
 
-    # Tool-Calling aktivieren, wenn Modell es unterstützt (oder Capability unbekannt)
+    # Tool-Calling: aktive Tools aus Registry ermitteln
     _capability_map = await _get_model_info()
-    if _capability_map.get(model_used) is not False:
-        litellm_payload["tools"] = [_SEARCH_CONTEXT_NODES_TOOL]
+    _is_group_teacher = False
+    if conversation_group_id is not None:
+        from app.planning.permissions import require_group_teacher
+        import sqlalchemy as sa
+        from app.db.models import GroupMembership as _GM
+        _mbr = await db.execute(
+            sa.select(_GM).where(
+                _GM.group_id == conversation_group_id,
+                _GM.pseudonym == current_user.sub,
+                _GM.role_in_group == "teacher",
+            )
+        )
+        _is_group_teacher = _mbr.scalar_one_or_none() is not None
+
+    _active_tools = tools_for(active_assistant, conversation_group_id, _is_group_teacher)
+    _tool_defs = [t.definition for t in _active_tools]
+    _tool_map = {t.name: t for t in _active_tools}
+
+    if _tool_defs and _capability_map.get(model_used) is not False:
+        litellm_payload["tools"] = _tool_defs
         litellm_payload["tool_choice"] = "auto"
 
     # Key aus DB laden
@@ -646,136 +691,136 @@ async def chat(
         if title_prompt else None
     )
 
+    _extra_responses: list = []  # zusätzliche HTTP-Responses aus Tool-Runden
+
     async def generate():
         full_content: list[str] = []
         usage: dict = {}
         chunk_id: str | None = None
         cost_usd: Optional[float] = None
 
-        # Tool-Call-Accumulation
-        _tc_id: str | None = None
-        _tc_name: str | None = None
-        _tc_args: list[str] = []
-        _finish_reason: str | None = None
+        current_messages = list(llm_messages)
+        current_response = response
 
         try:
-            async for line in response.aiter_lines():
-                if not line:
-                    continue
-                if not line.startswith("data: "):
-                    yield f"{line}\n\n"
-                    continue
-                payload = line[6:]
-                if payload == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(payload)
-                    choice = chunk.get("choices", [{}])[0]
-                    delta = choice.get("delta", {})
-                    fr = choice.get("finish_reason")
-                    if fr:
-                        _finish_reason = fr
+            for _round in range(_MAX_TOOL_ROUNDS + 1):
+                _tc_id: str | None = None
+                _tc_name: str | None = None
+                _tc_args: list[str] = []
+                _finish_reason: str | None = None
 
-                    # Tool-Call-Delta akkumulieren (Zeilen nicht forwarden)
-                    if delta.get("tool_calls"):
-                        for tc in delta["tool_calls"]:
-                            if tc.get("id"):
-                                _tc_id = tc["id"]
-                            fn = tc.get("function") or {}
-                            if fn.get("name"):
-                                _tc_name = fn["name"]
-                            if fn.get("arguments"):
-                                _tc_args.append(fn["arguments"])
+                async for line in current_response.aiter_lines():
+                    if not line:
+                        continue
+                    if not line.startswith("data: "):
+                        yield f"{line}\n\n"
+                        continue
+                    payload = line[6:]
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                        choice = chunk.get("choices", [{}])[0]
+                        delta = choice.get("delta", {})
+                        fr = choice.get("finish_reason")
+                        if fr:
+                            _finish_reason = fr
+
+                        if delta.get("tool_calls"):
+                            for tc in delta["tool_calls"]:
+                                if tc.get("id"):
+                                    _tc_id = tc["id"]
+                                fn = tc.get("function") or {}
+                                if fn.get("name"):
+                                    _tc_name = fn["name"]
+                                if fn.get("arguments"):
+                                    _tc_args.append(fn["arguments"])
+                            if "usage" in chunk:
+                                usage = chunk["usage"]
+                                chunk_id = chunk.get("id")
+                            continue
+
+                        token = delta.get("content") or ""
+                        if token:
+                            full_content.append(token)
+                            yield f"{line}\n\n"
                         if "usage" in chunk:
                             usage = chunk["usage"]
                             chunk_id = chunk.get("id")
-                        continue
-
-                    token = delta.get("content") or ""
-                    if token:
-                        full_content.append(token)
+                    except (json.JSONDecodeError, IndexError, KeyError):
                         yield f"{line}\n\n"
-                    if "usage" in chunk:
-                        usage = chunk["usage"]
-                        chunk_id = chunk.get("id")
-                except (json.JSONDecodeError, IndexError, KeyError):
-                    yield f"{line}\n\n"
 
-            # -- Tool-Call verarbeiten --
-            if _finish_reason == "tool_calls" and _tc_name == "search_context_nodes":
+                # -- Tool-Call verarbeiten oder abbrechen --
+                if _finish_reason != "tool_calls" or not _tc_name:
+                    break
+
+                if _round >= _MAX_TOOL_ROUNDS:
+                    logger.warning("MAX_TOOL_ROUNDS (%d) erreicht — stoppe Tool-Loop", _MAX_TOOL_ROUNDS)
+                    break
+
+                tool = _tool_map.get(_tc_name)
+                if tool is None:
+                    logger.warning("Unbekanntes Tool '%s' — stoppe Tool-Loop", _tc_name)
+                    break
+
+                yield (
+                    f"event: tool_status\n"
+                    f"data: {json.dumps({'tool': _tc_name, 'round': _round + 1})}\n\n"
+                )
+
                 try:
                     args = json.loads("".join(_tc_args) or "{}")
-                    suggestions = await _exec_search_context_nodes(
-                        args.get("query", ""), current_user.sub, db
+                    tool_ctx = ToolContext(
+                        db=db,
+                        user=current_user,
+                        group_id=conversation_group_id,
+                        conversation_id=conversation_id,
                     )
+                    tool_result = await tool.handler(args, tool_ctx)
+                except Exception:
+                    logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
+                    tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
+
+                # Rückwärtskompatibilität: context_suggestions SSE für context_search
+                if tool.group == "context_search" and isinstance(tool_result, list):
                     yield (
                         f"event: context_suggestions\n"
-                        f"data: {json.dumps({'nodes': suggestions})}\n\n"
+                        f"data: {json.dumps({'nodes': tool_result})}\n\n"
                     )
+                    tool_result_str = json.dumps({"nodes": [n["title"] for n in tool_result]})
+                else:
+                    tool_result_str = json.dumps(tool_result)
 
-                    tool_messages = llm_messages + [
-                        {
-                            "role": "assistant",
-                            "content": None,
-                            "tool_calls": [
-                                {
-                                    "id": _tc_id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": _tc_name,
-                                        "arguments": "".join(_tc_args),
-                                    },
-                                }
-                            ],
-                        },
-                        {
-                            "role": "tool",
-                            "tool_call_id": _tc_id,
-                            "content": json.dumps(
-                                {"nodes": [n["title"] for n in suggestions]}
-                            ),
-                        },
-                    ]
-                    second_payload = {**litellm_payload, "messages": tool_messages}
-                    second_payload.pop("tools", None)
-                    second_payload.pop("tool_choice", None)
+                current_messages = current_messages + [
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [{
+                            "id": _tc_id,
+                            "type": "function",
+                            "function": {
+                                "name": _tc_name,
+                                "arguments": "".join(_tc_args),
+                            },
+                        }],
+                    },
+                    {
+                        "role": "tool",
+                        "tool_call_id": _tc_id,
+                        "content": tool_result_str,
+                    },
+                ]
 
-                    req2 = client.build_request(
-                        "POST",
-                        f"{settings.litellm_proxy_url}/chat/completions",
-                        headers={"Authorization": f"Bearer {litellm_key}"},
-                        json=second_payload,
-                    )
-                    resp2 = await client.send(req2, stream=True)
-                    try:
-                        async for line2 in resp2.aiter_lines():
-                            if not line2:
-                                continue
-                            if not line2.startswith("data: "):
-                                yield f"{line2}\n\n"
-                                continue
-                            p2 = line2[6:]
-                            if p2 == "[DONE]":
-                                break
-                            try:
-                                c2 = json.loads(p2)
-                                token2 = (
-                                    c2.get("choices", [{}])[0]
-                                    .get("delta", {})
-                                    .get("content") or ""
-                                )
-                                if token2:
-                                    full_content.append(token2)
-                                    yield f"{line2}\n\n"
-                                if "usage" in c2:
-                                    usage = c2["usage"]
-                                    chunk_id = c2.get("id")
-                            except (json.JSONDecodeError, IndexError, KeyError):
-                                yield f"{line2}\n\n"
-                    finally:
-                        await resp2.aclose()
-                except Exception:
-                    logger.exception("Tool-Ausführung fehlgeschlagen")
+                # Nächste Runde: Request MIT Tools (damit weitere Tool-Calls möglich sind)
+                next_payload = {**litellm_payload, "messages": current_messages}
+                req_next = client.build_request(
+                    "POST",
+                    f"{settings.litellm_proxy_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {litellm_key}"},
+                    json=next_payload,
+                )
+                current_response = await client.send(req_next, stream=True)
+                _extra_responses.append(current_response)
 
             # -- Title-Task abwarten --
             if title_task:
@@ -810,6 +855,11 @@ async def chat(
 
         finally:
             await response.aclose()
+            for _r in _extra_responses:
+                try:
+                    await _r.aclose()
+                except Exception:
+                    pass
             await client.aclose()
 
         try:

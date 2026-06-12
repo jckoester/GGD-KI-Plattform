@@ -947,6 +947,21 @@
         }
     });
 
+    // group_id aus URL-Parameter: Neue Konversation der Gruppe zuordnen
+    // + Planning-Assistenten vorauswählen, wenn einer verfügbar ist
+    $effect(() => {
+        const paramGroupId = $page.url.searchParams.get("group_id");
+        if (paramGroupId && !conversationId) {
+            pendingGroupId = parseInt(paramGroupId, 10);
+            if (availableAssistants.length > 0 && !selectedAssistant) {
+                const planningAssistant = availableAssistants.find(
+                    (a) => Array.isArray(a.tool_groups) && a.tool_groups.includes("planning"),
+                );
+                if (planningAssistant) selectedAssistant = planningAssistant;
+            }
+        }
+    });
+
     // Vorausgefüllter Text aus ?q= (z. B. von der Welcome-Seite)
     $effect(() => {
         const prefillText = $page.url.searchParams.get("q");

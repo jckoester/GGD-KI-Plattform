@@ -69,6 +69,7 @@ class AssistantSummary(BaseModel):
     min_grade: Optional[int]
     max_grade: Optional[int]
     created_by: Optional[str]
+    tool_groups: list[str] = []
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -132,6 +133,7 @@ class AssistantCreate(BaseModel):
     available_from: Optional[datetime] = None
     available_until: Optional[datetime] = None
     sort_order: int = 0  # nur Admin wertet das aus; Lehrkraefte senden 0 oder nichts
+    tool_groups: list[str] = []
 
 
 class AssistantUpdate(BaseModel):
@@ -153,6 +155,7 @@ class AssistantUpdate(BaseModel):
     available_from: Optional[datetime] = None
     available_until: Optional[datetime] = None
     sort_order: Optional[int] = None
+    tool_groups: Optional[list[str]] = None
 
 
 class AssistantResponse(BaseModel):
@@ -183,6 +186,7 @@ class AssistantResponse(BaseModel):
     updated_by_pseudonym: Optional[str]
     created_at: datetime
     updated_at: datetime
+    tool_groups: list[str] = []
     documents: list[AssistantDocumentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -557,6 +561,7 @@ async def create_assistant(
         icon=request.icon,
         available_from=request.available_from,
         available_until=request.available_until,
+        tool_groups=request.tool_groups,
         sort_order=sort_order,
         creator_role=creator_role,
         created_by=current_user.sub,

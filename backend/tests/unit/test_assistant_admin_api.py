@@ -175,6 +175,7 @@ class TestAssistantResponse:
             available_from=None,
             available_until=None,
             sort_order=0,
+            tool_groups=[],
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
             creator_role="teacher",

@@ -196,6 +196,21 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <!-- Assistent-Link -->
+      <a
+        href={`/chat?group_id=${groupId}`}
+        class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
+               bg-primary dark:bg-primary-dark text-white font-medium
+               hover:opacity-90 transition-opacity"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        Assistent
+      </a>
+
       <!-- Undo-Button -->
       <button
         onclick={openUndoPanel}

@@ -1,0 +1,21 @@
+# Beispiel-Assistenten für die GGD-KI-Plattform
+# In der Produktion werden Assistenten über die Admin-UI angelegt.
+# Diese Datei dient als Referenz und Seed für die Entwicklungsumgebung.
+
+assistants:
+
+  - name: Jahresplanung
+    description: >
+      Hilft Lehrkräften beim Erstellen eines Jahresplans: liest Lehrplan und
+      Slot-Angebot, schlägt eine UE-Verteilung vor und schreibt den Plan nach
+      Zustimmung direkt in die Plattform.
+    audience: teacher
+    scope: teachers
+    status: active
+    model: claude-sonnet-4-6          # tool-fähiges Modell erforderlich
+    tool_groups:
+      - planning
+    system_prompt_file: config/prompts/jahresplan_assistent.md
+    tags:
+      - planung
+      - jahresplan

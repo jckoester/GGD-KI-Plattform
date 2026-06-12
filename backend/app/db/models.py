@@ -172,6 +172,10 @@ class Assistant(Base):
     icon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     import_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
+    tool_groups: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+
     force_cost_display: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
