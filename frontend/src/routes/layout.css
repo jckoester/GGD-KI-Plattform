@@ -204,3 +204,32 @@
     --color-dark-pu-2: var(--color-purple-600);
     --color-dark-ma-2: var(--color-magenta-600);
 }
+
+/* ── Unterrichtsplaner: schulintern überschreibbar via CSS-Variablen ─────── */
+/* Ferien- und Feiertags-Bänder; Schulen können --planner-ferien-* in ihrer   */
+/* eigenen CSS-Datei überschreiben, ohne Komponenten-Code zu ändern.           */
+:root {
+    --planner-ferien-bg:     var(--color-yellow-50);
+    --planner-ferien-stripe: var(--color-yellow-200);
+    --planner-ferien-color:  var(--color-yellow-700);
+    --planner-ferien-border: var(--color-yellow-200);
+}
+.dark {
+    --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
+    --planner-ferien-stripe: color-mix(in srgb, var(--color-yellow-400) 22%, transparent);
+    --planner-ferien-color:  var(--color-yellow-200);
+    --planner-ferien-border: color-mix(in srgb, var(--color-yellow-400) 25%, transparent);
+}
+
+.planner-ferien-band {
+    background-color:  var(--planner-ferien-bg);
+    background-image:  repeating-linear-gradient(
+        135deg,
+        transparent        0px,
+        transparent        5px,
+        var(--planner-ferien-stripe) 5px,
+        var(--planner-ferien-stripe) 6px
+    );
+    color:             var(--planner-ferien-color);
+    border-bottom: 1px solid var(--planner-ferien-border);
+}
