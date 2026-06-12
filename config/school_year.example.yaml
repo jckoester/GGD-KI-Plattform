@@ -1,0 +1,26 @@
+schuljahr: "2026/27"
+beginn: 2026-09-14
+ende: 2027-07-28
+halbjahreswechsel: 2027-02-08      # erster Tag des 2. Halbjahrs
+
+ferien:
+  - { name: "Herbstferien",    von: 2026-10-26, bis: 2026-10-30 }
+  - { name: "Weihnachtsferien", von: 2026-12-23, bis: 2027-01-08 }
+  - { name: "Osterferien",     von: 2027-04-01, bis: 2027-04-16 }
+  - { name: "Pfingstferien",   von: 2027-05-26, bis: 2027-06-05 }
+
+feiertage:
+  - 2026-10-03   # Tag der Deutschen Einheit
+  - 2026-11-01   # Allerheiligen
+  - 2026-12-25   # 1. Weihnachtstag
+  - 2026-12-26   # 2. Weihnachtstag
+  - 2027-01-01   # Neujahr
+  - 2027-01-06   # Heilige Drei Könige
+  - 2027-04-02   # Karfreitag
+  - 2027-04-05   # Ostermontag
+  - 2027-05-13   # Christi Himmelfahrt
+  - 2027-05-24   # Pfingstmontag
+  - 2027-06-03   # Fronleichnam
+  - 2027-10-03   # Tag der Deutschen Einheit
+
+schulfreie_tage: []    # bewegliche Ferientage, Pädagogische Tage

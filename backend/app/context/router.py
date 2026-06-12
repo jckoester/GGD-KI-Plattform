@@ -83,10 +83,29 @@ async def _check_anchor_permission(
     return assistant
 
 
-def _check_write_permission(node: ContextNode, user: JwtPayload) -> None:
-    """403 wenn weder Admin noch owner_pseudonym."""
-    if "admin" not in user.roles and node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+async def _check_write_permission(
+    node: ContextNode, user: JwtPayload, db: AsyncSession
+) -> None:
+    """403 wenn weder Admin noch Owner noch Gruppen-Lehrkraft (bei write_scope='group')."""
+    if "admin" in user.roles:
+        return
+    if node.owner_pseudonym == user.sub:
+        return
+    if (
+        node.write_scope == "group"
+        and node.write_scope_group_id is not None
+        and "teacher" in user.roles
+    ):
+        result = await db.execute(
+            sa.select(sa.literal(1)).where(
+                GroupMembership.group_id == node.write_scope_group_id,
+                GroupMembership.pseudonym == user.sub,
+                GroupMembership.role_in_group == "teacher",
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
 def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
@@ -435,7 +454,7 @@ async def update_node(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
-    _check_write_permission(node, user)
+    await _check_write_permission(node, user, db)
 
     update_data = payload.model_dump(exclude_unset=True, by_alias=False)
     for field, value in update_data.items():
@@ -459,7 +478,7 @@ async def delete_node(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
-    _check_write_permission(node, user)
+    await _check_write_permission(node, user, db)
 
     # Rekursiv alle untergeordneten Knoten einsammeln: Kinder zeigen per
     # 'part_of'-Kante (from_node = Kind, to_node = Elternteil) auf ihr Elternteil.

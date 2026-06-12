@@ -109,10 +109,12 @@ categories:
         label_de: "Unterrichtsstunde"
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: true
+        valid_until_default: schuljahresende
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: false
+        valid_until_default: schuljahresende
       - key: reflexion
         label_de: "Reflexion"
         scope_defaults: {read_scope: private,  write_scope: private }

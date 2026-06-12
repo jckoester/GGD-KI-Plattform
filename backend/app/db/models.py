@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, date
 from uuid import UUID, UUID as UUIDType
 
@@ -642,6 +644,112 @@ class AssistantContextAnchor(Base):
             "role IN ('always_include','retrieval_scope')",
             name="check_assistant_context_anchors_role",
         ),
+    )
+
+
+# 17. group_week_patterns — Wochenmuster einer Unterrichtsgruppe pro Halbjahr
+class GroupWeekPattern(Base):
+    __tablename__ = "group_week_patterns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    halbjahr: Mapped[int] = mapped_column(nullable=False)
+    weekday: Mapped[int] = mapped_column(nullable=False)   # 0=Montag … 4=Freitag
+    start_period: Mapped[int] = mapped_column(nullable=False)
+    periods: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
+
+    __table_args__ = (
+        CheckConstraint("halbjahr IN (1, 2)", name="check_gwp_halbjahr"),
+        CheckConstraint("weekday BETWEEN 0 AND 4", name="check_gwp_weekday"),
+        CheckConstraint("periods IN (1, 2)", name="check_gwp_periods"),
+        Index(
+            "idx_gwp_unique",
+            "group_id", "halbjahr", "weekday", "start_period",
+            unique=True,
+        ),
+    )
+
+
+# 18. lesson_slots — Unterrichtsstunden-Slots einer Gruppe
+class LessonSlot(Base):
+    __tablename__ = "lesson_slots"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    date: Mapped[date] = mapped_column(nullable=False)
+    start_period: Mapped[Optional[int]] = mapped_column(nullable=True)
+    periods: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
+    halbjahr: Mapped[int] = mapped_column(nullable=False)
+    kategorie: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'unterricht'")
+    )
+    ue_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
+    stunde_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
+    thema: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pinned: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    anpassung_noetig: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    nachbereitet_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    nachbereitet_auto: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("halbjahr IN (1, 2)", name="check_ls_halbjahr"),
+        CheckConstraint(
+            "kategorie IN ('unterricht','pruefung','ausfall','puffer','vertretung')",
+            name="check_ls_kategorie",
+        ),
+        Index("idx_lesson_slots_group_date", "group_id", "date"),
+    )
+
+
+# 19. slot_plan_snapshots — Append-only Undo-Verlauf pro Gruppe
+class SlotPlanSnapshot(Base):
+    __tablename__ = "slot_plan_snapshots"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "reason IN ('manual','edit','swap','regeneration','restore','assistant','reflow')",
+            name="check_sps_reason",
+        ),
+        Index("idx_slot_snapshots_group", "group_id", "created_at"),
     )
 
 
