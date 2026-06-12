@@ -50,19 +50,28 @@ Plattform.
 und Planer-UI), der Bildungsplan muss für die betreffenden Fächer importiert
 sein.
 
-**Einmalige Einrichtung durch einen Admin:**
+**Einmalige Einrichtung (Seed-Skript):**
 
-1. `/assistants/manage/new` aufrufen.
-2. Felder befüllen:
-   - **Name:** z. B. „Jahresplanung"
-   - **System-Prompt:** Inhalt von `config/prompts/jahresplan_assistent.md`
-     kopieren (oder die Datei als Vorlage verwenden)
-   - **Modell:** Ein tool-fähiges Modell wählen, z. B. `claude-sonnet-4-6`
-   - **Zielgruppe:** Lehrkraft
-   - **Sichtbarkeit:** Lehrkräfte
-3. Im Abschnitt **Werkzeuge** (nur für Admins sichtbar) den Haken bei
-   **Unterrichtsplanung** setzen.
-4. Speichern und unter `/settings/assistants` aktivieren.
+```bash
+cd backend
+python scripts/seed_assistants.py
+```
+
+Das Skript liest `config/assistants.yaml` (bzw. `config/assistants.example.yaml`)
+und legt alle darin definierten Assistenten an, sofern noch kein Assistent
+gleichen Namens existiert. Mit `--dry-run` kann man vorab prüfen, was angelegt
+würde.
+
+Danach muss der Admin nur noch das gewünschte LLM-Modell einstellen:
+
+1. `/assistants/manage` aufrufen.
+2. „Jahresplanung" in der Liste anklicken.
+3. Im Feld **Modell** ein tool-fähiges Modell eintragen, z. B. `claude-sonnet-4-6`.
+4. Speichern.
+
+> **Hinweis:** Das Skript setzt `model: claude-sonnet-4-6` aus der YAML-Datei
+> als Standardwert. Soll ein anderes Modell verwendet werden, einfach im
+> Assistenten-Editor ändern.
 
 **Verhalten in der UI:** Öffnet eine Lehrkraft die Planungsansicht einer
 Unterrichtsgruppe und klickt auf „Assistent", wird der Chat mit diesem
