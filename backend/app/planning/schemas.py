@@ -149,6 +149,12 @@ class SnapshotRead(BaseModel):
 
 # ── Overview ──────────────────────────────────────────────────────────────────
 
+class FerienItem(BaseModel):
+    name: str
+    von: date
+    bis: date
+
+
 class OverviewRead(BaseModel):
     slots: list[SlotRead]
     patterns: list[WeekPatternRead]
@@ -156,3 +162,4 @@ class OverviewRead(BaseModel):
     balance: BalanceRead
     schuljahr: str
     halbjahreswechsel: date
+    ferien: list[FerienItem] = []

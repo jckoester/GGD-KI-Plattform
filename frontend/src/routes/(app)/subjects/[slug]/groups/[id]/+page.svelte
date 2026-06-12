@@ -113,6 +113,15 @@
         {tab.label}
       </button>
     {/each}
+    {#if group}
+      <a
+        href={`/subjects/${subject?.slug ?? $page.params.slug}/groups/${group.id}/planner`}
+        class="px-4 py-2 text-sm font-medium border-b-2 border-transparent
+               text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+      >
+        Planung
+      </a>
+    {/if}
   </nav>
 </div>
 

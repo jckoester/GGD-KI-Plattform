@@ -34,6 +34,7 @@ from app.db.session import get_db
 from app.planning.permissions import require_group_teacher
 from app.planning.schemas import (
     BalanceRead,
+    FerienItem,
     LessonCreate,
     OverviewRead,
     SlotGenStatsRead,
@@ -237,6 +238,7 @@ async def get_overview(
         balance=balance,
         schuljahr=cfg.schuljahr,
         halbjahreswechsel=cfg.halbjahreswechsel,
+        ferien=[FerienItem(name=f.name, von=f.von, bis=f.bis) for f in cfg.ferien],
     )
 
 

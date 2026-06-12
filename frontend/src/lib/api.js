@@ -1226,3 +1226,104 @@ export async function exportCurriculum(curriculumId, filename, format = 'yaml') 
     a.click()
     URL.revokeObjectURL(url)
 }
+
+// ── Unterrichtsplanung ────────────────────────────────────────────────────────
+
+export async function getPlanningOverview(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')
+    return res.json()
+}
+
+export async function updateSlot(slotId, updates) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Slot konnte nicht aktualisiert werden')
+    return res.json()
+}
+
+export async function swapSlots(groupId, slotAId, slotBId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/swap`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot_a_id: slotAId, slot_b_id: slotBId }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Tausch fehlgeschlagen')
+    return res.json()
+}
+
+export async function createUnit(groupId, data) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/units`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UE konnte nicht erstellt werden')
+    return res.json()
+}
+
+export async function listUnits(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/units`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UEs konnten nicht geladen werden')
+    return res.json()
+}
+
+export async function createLesson(unitNodeId, data) {
+    const res = await fetch(`${BASE}/planning/units/${unitNodeId}/lessons`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht erstellt werden')
+    return res.json()
+}
+
+export async function setWeekPattern(groupId, halbjahr, patterns) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/pattern`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ halbjahr, patterns }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Wochenmuster konnte nicht gespeichert werden')
+    return res.json()
+}
+
+export async function generateSlots(groupId, halbjahr, regenerate = false) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ halbjahr, regenerate }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Slots konnten nicht generiert werden')
+    return res.json()
+}
+
+export async function getBalance(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/balance`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bilanz konnte nicht geladen werden')
+    return res.json()
+}
+
+export async function listSnapshots(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/snapshots`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Verlauf konnte nicht geladen werden')
+    return res.json()
+}
+
+export async function restoreSnapshot(snapshotId) {
+    const res = await fetch(`${BASE}/planning/snapshots/${snapshotId}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Wiederherstellung fehlgeschlagen')
+    return res.json()
+}
