@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Optional  # noqa: F401 — Any used in LessonRead
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -111,6 +111,81 @@ class UnitRead(BaseModel):
 class LessonCreate(BaseModel):
     titel: str
     slot_id: Optional[UUID] = None
+
+
+VALID_PRIOS = {"kern", "uebung", "vertiefung"}
+
+
+class LessonLinkedItem(BaseModel):
+    typ: str  # "text" | "node"
+    wert: Optional[str] = None
+    node_id: Optional[UUID] = None
+    titel: Optional[str] = None
+
+
+class LessonPhaseItem(BaseModel):
+    id: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=200)
+    dauer_min: int = Field(..., ge=1, le=480)
+    beschreibung: Optional[str] = None
+    prio: str = Field("kern")
+    methode: Optional[LessonLinkedItem] = None
+    material: list[LessonLinkedItem] = []
+
+    def validate_prio(self) -> None:
+        if self.prio not in VALID_PRIOS:
+            raise ValueError(f"Ungültige Prio '{self.prio}'; erlaubt: {VALID_PRIOS}")
+
+
+class LessonRefItem(BaseModel):
+    node_id: UUID
+    typ: str  # "ik" | "pk" | "concept"
+    code: Optional[str] = None
+    titel: Optional[str] = None
+    partiell: bool = False
+
+
+class LessonUpdate(BaseModel):
+    titel: Optional[str] = Field(None, min_length=1, max_length=500)
+    stundenziel: Optional[str] = None
+    phasen: Optional[list[LessonPhaseItem]] = None
+    refs: Optional[list[LessonRefItem]] = None
+    refs_dismissed: Optional[list[UUID]] = None
+
+
+class LessonSlotContext(BaseModel):
+    id: UUID
+    date: date
+    start_period: Optional[int]
+    periods: int
+    verfuegbare_min: int
+
+
+class LessonUeContext(BaseModel):
+    id: UUID
+    titel: str
+    farbe: int
+
+
+class LessonNav(BaseModel):
+    prev_node_id: Optional[UUID]
+    next_node_id: Optional[UUID]
+    position: int
+    total: int
+
+
+class LessonRead(BaseModel):
+    id: UUID
+    titel: str
+    stundenziel: Optional[str]
+    phasen: list[Any]
+    refs: list[Any]
+    refs_dismissed: list[str]
+    ue: Optional[LessonUeContext]
+    slot: Optional[LessonSlotContext]
+    nav: LessonNav
+    group_id: int
+    subject_id: Optional[int]
 
 
 # ── Bilanz ───────────────────────────────────────────────────────────────────

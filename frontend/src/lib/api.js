@@ -1327,3 +1327,28 @@ export async function restoreSnapshot(snapshotId) {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Wiederherstellung fehlgeschlagen')
     return res.json()
 }
+
+export async function getLesson(nodeId) {
+    const res = await fetch(`${BASE}/planning/lessons/${nodeId}`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht geladen werden')
+    return res.json()
+}
+
+export async function patchLesson(nodeId, updates) {
+    const res = await fetch(`${BASE}/planning/lessons/${nodeId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht gespeichert werden')
+    return res.json()
+}
+
+export async function exportLesson(nodeId, format = 'md') {
+    const res = await fetch(`${BASE}/planning/lessons/${nodeId}/export?format=${format}`, {
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    return res.blob()
+}

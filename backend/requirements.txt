@@ -26,3 +26,4 @@ pytest-httpx>=0.25.0
 # Runtime - Auth
 bcrypt>=4.0.0
 jsonschema>=4.22.0
+python-docx>=1.1

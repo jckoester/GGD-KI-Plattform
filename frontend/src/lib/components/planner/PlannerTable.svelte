@@ -10,6 +10,7 @@
         halbjahreswechsel = null,
         onPatchSlot,
         onSwapSlots,
+        onEditLesson = null,
     } = $props();
 
     const hj2Vorlaeufig = $derived(!patterns.some((p) => p.halbjahr === 2));
@@ -98,6 +99,7 @@
                         vorlaeufig={hj2Vorlaeufig && slot.halbjahr === 2}
                         onPatch={(updates) => onPatchSlot(slot.id, updates)}
                         onSwap={(sourceId) => onSwapSlots(sourceId, slot.id)}
+                        {onEditLesson}
                     />
                 {/each}
             </div>

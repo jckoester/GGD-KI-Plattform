@@ -58,6 +58,18 @@ export function periodLabel(slot) {
     return `${slot.start_period}. Std`
 }
 
+export const PRIO_COLORS = {
+    kern:       ['#4a7fb5', '#7aabdf'],
+    uebung:     ['#5ba37a', '#85c9a0'],
+    vertiefung: ['#b07fb8', '#d4a8da'],
+}
+
+export const PRIO_LABELS = {
+    kern: 'Kern',
+    uebung: 'Übung',
+    vertiefung: 'Vertiefung',
+}
+
 export const KATEGORIE_LABELS = {
     unterricht: 'Unterricht',
     pruefung: 'Prüfung',

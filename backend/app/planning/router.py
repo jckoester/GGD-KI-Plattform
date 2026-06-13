@@ -36,6 +36,11 @@ from app.planning.schemas import (
     BalanceRead,
     FerienItem,
     LessonCreate,
+    LessonNav,
+    LessonRead,
+    LessonSlotContext,
+    LessonUeContext,
+    LessonUpdate,
     OverviewRead,
     SlotGenStatsRead,
     SlotGenerateRequest,
@@ -574,3 +579,241 @@ async def restore_snapshot_endpoint(
     await require_group_teacher(snapshot.group_id, user, db)
 
     return await restore_snapshot(db, snapshot_id, user)
+
+
+# ── Hilfsfunktion: Navigations-Reihenfolge innerhalb einer UE ─────────────────
+
+
+async def _build_lesson_nav(
+    db: AsyncSession,
+    node_id: UUID,
+    unit_id: UUID | None,
+) -> LessonNav:
+    if unit_id is None:
+        return LessonNav(prev_node_id=None, next_node_id=None, position=1, total=1)
+
+    lessons_result = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == unit_id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "unterrichtsstunde",
+            ContextNode.status == "active",
+        )
+    )
+    all_lessons = {n.id: n for n in lessons_result.scalars().all()}
+
+    if not all_lessons:
+        return LessonNav(prev_node_id=None, next_node_id=None, position=1, total=1)
+
+    follows_result = await db.execute(
+        sa.select(ContextEdge).where(
+            ContextEdge.from_node_id.in_(list(all_lessons.keys())),
+            ContextEdge.relation == "follows",
+        )
+    )
+    # follows[a] = b: lesson a follows lesson b (b is predecessor of a)
+    follows = {e.from_node_id: e.to_node_id for e in follows_result.scalars().all()}
+
+    # Build ordered list: first lesson has no outgoing follows edge
+    first_candidates = set(all_lessons.keys()) - set(follows.keys())
+    if not first_candidates:
+        ordered = [n.id for n in sorted(all_lessons.values(), key=lambda n: n.created_at)]
+    else:
+        current = next(iter(first_candidates))
+        ordered = [current]
+        reverse_follows = {v: k for k, v in follows.items()}
+        visited = {current}
+        while current in reverse_follows and reverse_follows[current] not in visited:
+            current = reverse_follows[current]
+            ordered.append(current)
+            visited.add(current)
+
+    total = len(ordered)
+    try:
+        pos = ordered.index(node_id) + 1
+    except ValueError:
+        pos = total
+
+    return LessonNav(
+        prev_node_id=ordered[pos - 2] if pos > 1 else None,
+        next_node_id=ordered[pos] if pos < total else None,
+        position=pos,
+        total=total,
+    )
+
+
+# ── GET /planning/lessons/{node_id} ──────────────────────────────────────────
+
+
+@router.get("/lessons/{node_id}", response_model=LessonRead)
+async def get_lesson(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    lesson = await db.get(ContextNode, node_id)
+    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+
+    group_id = lesson.write_scope_group_id
+    if group_id is None:
+        raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
+    await require_group_teacher(group_id, user, db)
+
+    # Übergeordnete UE
+    ue_edge_result = await db.execute(
+        sa.select(ContextEdge).where(
+            ContextEdge.from_node_id == node_id,
+            ContextEdge.relation == "part_of",
+        )
+    )
+    ue_edge = ue_edge_result.scalar_one_or_none()
+    ue_ctx: LessonUeContext | None = None
+    unit_id: UUID | None = None
+    if ue_edge:
+        unit_id = ue_edge.to_node_id
+        ue_node = await db.get(ContextNode, unit_id)
+        if ue_node:
+            ue_ctx = LessonUeContext(
+                id=ue_node.id,
+                titel=ue_node.title,
+                farbe=(ue_node.metadata_ or {}).get("farbe", 0),
+            )
+
+    # Slot-Kontext
+    slot_result = await db.execute(
+        sa.select(LessonSlot).where(LessonSlot.stunde_node_id == node_id)
+    )
+    slot = slot_result.scalar_one_or_none()
+    slot_ctx: LessonSlotContext | None = None
+    if slot:
+        slot_ctx = LessonSlotContext(
+            id=slot.id,
+            date=slot.date,
+            start_period=slot.start_period,
+            periods=slot.periods,
+            verfuegbare_min=slot.periods * 45,
+        )
+
+    nav = await _build_lesson_nav(db, node_id, unit_id)
+    meta = lesson.metadata_ or {}
+
+    return LessonRead(
+        id=lesson.id,
+        titel=lesson.title,
+        stundenziel=meta.get("stundenziel"),
+        phasen=meta.get("phasen", []),
+        refs=meta.get("refs", []),
+        refs_dismissed=[str(x) for x in meta.get("refs_dismissed", [])],
+        ue=ue_ctx,
+        slot=slot_ctx,
+        nav=nav,
+        group_id=group_id,
+        subject_id=lesson.subject_id,
+    )
+
+
+# ── PATCH /planning/lessons/{node_id} ────────────────────────────────────────
+
+
+@router.patch("/lessons/{node_id}", response_model=dict)
+async def patch_lesson(
+    node_id: UUID,
+    payload: LessonUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    lesson = await db.get(ContextNode, node_id)
+    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+
+    group_id = lesson.write_scope_group_id
+    if group_id is None:
+        raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
+    await require_group_teacher(group_id, user, db)
+
+    if payload.phasen is not None:
+        for phase in payload.phasen:
+            try:
+                phase.validate_prio()
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+
+    await create_snapshot(db, group_id, reason="edit", created_by=user.sub)
+
+    now = datetime.now(timezone.utc)
+    if payload.titel is not None:
+        lesson.title = payload.titel
+
+    meta = dict(lesson.metadata_ or {})
+    if payload.stundenziel is not None:
+        meta["stundenziel"] = payload.stundenziel
+    if payload.phasen is not None:
+        meta["phasen"] = [
+            p.model_dump(exclude_none=False, mode="json") for p in payload.phasen
+        ]
+    if payload.refs is not None:
+        meta["refs"] = [r.model_dump(mode="json") for r in payload.refs]
+    if payload.refs_dismissed is not None:
+        meta["refs_dismissed"] = [str(rid) for rid in payload.refs_dismissed]
+
+    lesson.metadata_ = meta
+    lesson.updated_at = now
+    await db.commit()
+
+    return {"ok": True}
+
+
+# ── GET /planning/lessons/{node_id}/export ────────────────────────────────────
+
+
+@router.get("/lessons/{node_id}/export")
+async def export_lesson(
+    node_id: UUID,
+    format: str = "md",  # md | pdf | docx
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    from fastapi.responses import Response
+
+    lesson = await db.get(ContextNode, node_id)
+    if lesson is None or lesson.status != "active" or lesson.content_type != "unterrichtsstunde":
+        raise HTTPException(status_code=404, detail="Stunde nicht gefunden")
+
+    group_id = lesson.write_scope_group_id
+    if group_id is None:
+        raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
+    await require_group_teacher(group_id, user, db)
+
+    from app.planning.lesson_export import build_lesson_export, export_docx, export_markdown, export_pdf
+
+    data = await build_lesson_export(db, node_id)
+
+    if format == "md":
+        content = export_markdown(data)
+        filename = f"{data.datum}-{data.gruppe_slug}-{data.titel_slug}.md"
+        return Response(
+            content=content.encode("utf-8"),
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    elif format == "pdf":
+        content = await export_pdf(data)
+        filename = f"{data.datum}-{data.gruppe_slug}-{data.titel_slug}.pdf"
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    elif format == "docx":
+        content = export_docx(data)
+        filename = f"{data.datum}-{data.gruppe_slug}-{data.titel_slug}.docx"
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    else:
+        raise HTTPException(status_code=422, detail=f"Unbekanntes Format: {format}")

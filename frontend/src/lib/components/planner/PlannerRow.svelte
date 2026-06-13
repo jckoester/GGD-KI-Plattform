@@ -1,7 +1,7 @@
 <script>
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS } from '$lib/planner.js'
 
-  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap } = $props()
+  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -264,6 +264,26 @@
         <path d="M12 2L8 6H4v4l2.5 2.5L3 16h4l1-3 4 4 4-4 1 3h4l-3.5-3.5L20 10V6h-4L12 2z"/>
       </svg>
     </button>
+
+    <!-- Stundenentwurf öffnen -->
+    {#if onEditLesson && slot.ue_node_id}
+      <button
+        onclick={(e) => { e.stopPropagation(); onEditLesson(slot.id, slot.stunde_node_id ?? null) }}
+        title={slot.stunde_node_id ? 'Stundenentwurf öffnen' : 'Stundenentwurf anlegen'}
+        aria-label={slot.stunde_node_id ? 'Stundenentwurf öffnen' : 'Stundenentwurf anlegen'}
+        class="p-1.5 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+               {slot.stunde_node_id
+                 ? 'text-primary dark:text-primary-dark'
+                 : 'text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-100'}"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    {/if}
 
     <!-- Kommentar -->
     <button

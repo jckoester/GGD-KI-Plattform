@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ data.titel }}</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 18mm 15mm 15mm 15mm;
+    @top-right { content: "Seite " counter(page); font-size: 8pt; color: #777; }
+  }
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    font-size: 9.5pt;
+    color: #1a1a1a;
+    line-height: 1.4;
+  }
+  .header { border-bottom: 1.5pt solid #1e3a5f; padding-bottom: 2mm; margin-bottom: 3mm; }
+  .header h1 { font-size: 14pt; margin: 0 0 1mm; color: #1e3a5f; }
+  .header .meta { font-size: 8pt; color: #555; }
+  .ziel { margin: 2mm 0; }
+  .ziel strong { color: #1e3a5f; }
+  .budget { font-size: 8.5pt; color: #555; margin-bottom: 3mm; }
+  .budget .warn { color: #c0392b; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin-top: 2mm; font-size: 9pt; }
+  th { background: #1e3a5f; color: #fff; text-align: left; padding: 2mm 2.5mm; font-size: 8.5pt; }
+  td { border: 0.5pt solid #ccc; padding: 2mm 2.5mm; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .prio-kern       { background: #dbeafe; }
+  .prio-uebung     { background: #dcfce7; }
+  .prio-vertiefung { background: #f3e8ff; }
+  .phase-name { font-weight: bold; }
+  .phase-desc { color: #444; font-size: 8.5pt; }
+  .kompetenzen { margin-top: 3mm; font-size: 8.5pt; }
+  .kompetenzen strong { color: #1e3a5f; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{ data.titel }}</h1>
+  <div class="meta">
+    {% if data.datum %}{{ data.datum }}{% endif %}
+    {% if data.gruppe %} · {{ data.gruppe }}{% endif %}
+    {% if data.ue_titel %} · UE: {{ data.ue_titel }}{% endif %}
+  </div>
+</div>
+
+{% if data.stundenziel %}
+<p class="ziel"><strong>Stundenziel:</strong> {{ data.stundenziel }}</p>
+{% endif %}
+
+{% set total = data.phasen | sum(attribute='dauer_min') %}
+<p class="budget">
+  Zeitbudget: {{ total }}′ geplant / {{ data.verfuegbare_min }}′ verfügbar
+  {% if total > data.verfuegbare_min %}
+    <span class="warn">(+{{ total - data.verfuegbare_min }}′ Überhang)</span>
+  {% endif %}
+</p>
+
+{% if data.phasen %}
+<table>
+  <thead>
+    <tr>
+      <th style="width:13%">Zeit</th>
+      <th style="width:10%">Prio</th>
+      <th style="width:30%">Phase</th>
+      <th style="width:22%">Methode / Sozialform</th>
+      <th style="width:25%">Material</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set ns = namespace(kum=0) %}
+    {% for phase in data.phasen %}
+    {% set prio_class = "prio-" ~ phase.prio %}
+    <tr>
+      <td>{{ ns.kum }}–{{ ns.kum + phase.dauer_min }}′</td>
+      <td class="{{ prio_class }}">
+        {% if phase.prio == "kern" %}Kern
+        {% elif phase.prio == "uebung" %}Übung
+        {% else %}Vertiefung{% endif %}
+      </td>
+      <td>
+        <span class="phase-name">{{ phase.name }}</span>
+        {% if phase.beschreibung %}<br><span class="phase-desc">{{ phase.beschreibung }}</span>{% endif %}
+      </td>
+      <td>{{ phase.methode or "" }}</td>
+      <td>{% for m in phase.material %}{% if m %}{{ m }}{% if not loop.last %}<br>{% endif %}{% endif %}{% endfor %}</td>
+    </tr>
+    {% set ns.kum = ns.kum + phase.dauer_min %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if data.refs %}
+<div class="kompetenzen">
+  <strong>Kompetenzen:</strong>
+  {% for r in data.refs %}
+    {{ r.code or r.titel }}{% if r.partiell %}[…]{% endif %}{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+</body>
+</html>

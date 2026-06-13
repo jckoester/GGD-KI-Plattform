@@ -9,6 +9,7 @@
     swapSlots,
     listSnapshots,
     restoreSnapshot,
+    createLesson,
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
@@ -98,6 +99,29 @@
       swapToast = true
       clearTimeout(swapToastTimer)
       swapToastTimer = setTimeout(() => { swapToast = false }, 3000)
+    } catch (e) {
+      patchError = e.message
+    }
+  }
+
+  // ── Stundenentwurf öffnen / anlegen ─────────────────────────────────────────
+  async function handleEditLesson(slotId, existingLessonNodeId) {
+    if (existingLessonNodeId) {
+      goto(`/subjects/${slug}/groups/${groupId}/planner/lessons/${existingLessonNodeId}`)
+      return
+    }
+    // Stunde noch nicht angelegt: Slot → UE ermitteln, dann Stunde anlegen
+    const slot = slots.find(s => s.id === slotId)
+    if (!slot?.ue_node_id) return
+    try {
+      const result = await createLesson(slot.ue_node_id, {
+        titel: slot.thema || 'Neue Stunde',
+        slot_id: slotId,
+      })
+      // Slot optimistisch aktualisieren
+      const idx = slots.findIndex(s => s.id === slotId)
+      if (idx !== -1) slots[idx] = { ...slots[idx], stunde_node_id: result.id }
+      goto(`/subjects/${slug}/groups/${groupId}/planner/lessons/${result.id}`)
     } catch (e) {
       patchError = e.message
     }
@@ -281,6 +305,7 @@
       halbjahreswechsel={overview.halbjahreswechsel}
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
+      onEditLesson={handleEditLesson}
     />
   </div>
 {/if}
