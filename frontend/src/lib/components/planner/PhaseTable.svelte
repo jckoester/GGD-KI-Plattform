@@ -9,6 +9,9 @@
    * - onChange(newPhasen)
    * - onSuggestCompetences(nodeId) — called when a node is linked (method/material)
    * - onMaterialCreate(phase, index) — called when ✦ is clicked on missing material
+   * - reviewMode: bool — aktiviert Nachbereiten-Modus (Status-Buttons statt Aktionen)
+   * - reviewStatus: Map<phase_id, 'erledigt'|'offen'|'gestrichen'> — aktueller Status
+   * - onReviewStatusChange(newMap) — callback wenn Status geändert
    */
   const {
     phasen = [],
@@ -16,6 +19,9 @@
     onChange,
     onSuggestCompetences = null,
     onMaterialCreate = null,
+    reviewMode = false,
+    reviewStatus = {},
+    onReviewStatusChange = null,
   } = $props()
 
   const gesamtMin = $derived((phasen || []).reduce((s, p) => s + (p.dauer_min || 0), 0))
@@ -167,6 +173,13 @@
               onMove={(dir) => movePhase(i, dir)}
               onLinkMethod={handleLinkMethod}
               onLinkMaterial={() => handleLinkMaterial(phase)}
+              {reviewMode}
+              reviewPhaseStatus={reviewStatus[phase.id ?? ''] ?? 'erledigt'}
+              onReviewStatusChange={(status) => {
+                if (onReviewStatusChange) {
+                  onReviewStatusChange({ ...reviewStatus, [phase.id ?? '']: status })
+                }
+              }}
             />
           {/each}
         </tbody>

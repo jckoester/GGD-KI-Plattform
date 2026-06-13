@@ -1352,3 +1352,31 @@ export async function exportLesson(nodeId, format = 'md') {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
     return res.blob()
 }
+
+export async function createReview(slotId, payload) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/review`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Nachbereitung fehlgeschlagen')
+    return res.json()
+}
+
+export async function deleteReview(slotId) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/review`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Undo fehlgeschlagen')
+    return res.json()
+}
+
+export async function getReviewStatus(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/review-status`, {
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Review-Status konnte nicht geladen werden')
+    return res.json()
+}

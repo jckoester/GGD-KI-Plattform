@@ -22,6 +22,9 @@
     onMove,
     onLinkMethod = null,
     onLinkMaterial = null,
+    reviewMode = false,
+    reviewPhaseStatus = 'erledigt',
+    onReviewStatusChange = null,
   } = $props()
 
   const PRIOS = ['kern', 'uebung', 'vertiefung']
@@ -217,29 +220,61 @@
     {/if}
   </td>
 
-  <!-- Aktionen -->
+  <!-- Aktionen / Review-Status -->
   <td class="px-1 py-2 w-14">
-    <div class="flex flex-col gap-0.5 items-end">
-      <button
-        onclick={() => onMove('up')}
-        disabled={!canMoveUp}
-        class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 disabled:opacity-20
-               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
-        aria-label="Phase nach oben"
-      >↑</button>
-      <button
-        onclick={() => onMove('down')}
-        disabled={!canMoveDown}
-        class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 disabled:opacity-20
-               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
-        aria-label="Phase nach unten"
-      >↓</button>
-      <button
-        onclick={onDelete}
-        class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re
-               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
-        aria-label="Phase löschen"
-      >✕</button>
-    </div>
+    {#if reviewMode}
+      <div class="flex flex-col gap-0.5 items-end">
+        <button
+          onclick={() => onReviewStatusChange?.('erledigt')}
+          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors
+                 {reviewPhaseStatus === 'erledigt'
+                   ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300'
+                   : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+          title="Erledigt"
+          aria-pressed={reviewPhaseStatus === 'erledigt'}
+        >✓</button>
+        <button
+          onclick={() => onReviewStatusChange?.('offen')}
+          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors
+                 {reviewPhaseStatus === 'offen'
+                   ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300'
+                   : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+          title="Offen (verschoben)"
+          aria-pressed={reviewPhaseStatus === 'offen'}
+        >⏸</button>
+        <button
+          onclick={() => onReviewStatusChange?.('gestrichen')}
+          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors
+                 {reviewPhaseStatus === 'gestrichen'
+                   ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                   : 'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+          title="Gestrichen"
+          aria-pressed={reviewPhaseStatus === 'gestrichen'}
+        >✕</button>
+      </div>
+    {:else}
+      <div class="flex flex-col gap-0.5 items-end">
+        <button
+          onclick={() => onMove('up')}
+          disabled={!canMoveUp}
+          class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 disabled:opacity-20
+                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+          aria-label="Phase nach oben"
+        >↑</button>
+        <button
+          onclick={() => onMove('down')}
+          disabled={!canMoveDown}
+          class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 disabled:opacity-20
+                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+          aria-label="Phase nach unten"
+        >↓</button>
+        <button
+          onclick={onDelete}
+          class="p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re
+                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+          aria-label="Phase löschen"
+        >✕</button>
+      </div>
+    {/if}
   </td>
 </tr>

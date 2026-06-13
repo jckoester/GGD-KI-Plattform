@@ -188,6 +188,32 @@ class LessonRead(BaseModel):
     subject_id: Optional[int]
 
 
+# ── Nachbereitung ────────────────────────────────────────────────────────────
+
+class ReviewCreate(BaseModel):
+    phasen_status: dict[str, str] = Field(
+        default_factory=dict,
+        description="phase_id → 'erledigt'|'offen'|'gestrichen'",
+    )
+    reflexion: Optional[str] = None
+    refs_offen: list[UUID] = []
+
+
+class ReviewResultRead(BaseModel):
+    engagements_written: int
+    engagements_skipped: int
+    refs_offen: list[str]
+    open_phases: list[str]
+
+
+class ReviewStatusItem(BaseModel):
+    slot_id: UUID
+    date: date
+    stunde_node_id: UUID
+    titel: Optional[str]
+    nachbereitet_auto: bool = False
+
+
 # ── Bilanz ───────────────────────────────────────────────────────────────────
 
 class UnitBalanceItem(BaseModel):

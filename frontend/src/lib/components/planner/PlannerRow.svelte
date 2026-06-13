@@ -1,7 +1,7 @@
 <script>
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS } from '$lib/planner.js'
 
-  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson } = $props()
+  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson, onReview = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -222,10 +222,18 @@
       </span>
     {/if}
     {#if slot.nachbereitet_at}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300">
-        nachbereitet
-      </span>
+      {#if slot.nachbereitet_auto}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                     bg-light-ui-2 text-light-tx-2 dark:bg-dark-ui-2 dark:text-dark-tx-2"
+              title="Automatisch bestätigt — Klick zum Undo">
+          ✓ auto
+        </span>
+      {:else}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                     bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300">
+          ✓ nachbereitet
+        </span>
+      {/if}
     {/if}
     {#if slot.anpassung_noetig}
       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
@@ -283,6 +291,20 @@
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
       </button>
+    {/if}
+
+    <!-- Nachbereiten -->
+    {#if onReview && slot.stunde_node_id && !slot.nachbereitet_at}
+      {@const isPast = new Date(slot.date) < new Date(new Date().toDateString())}
+      {#if isPast}
+        <button
+          onclick={(e) => { e.stopPropagation(); onReview(slot.id, slot.stunde_node_id) }}
+          title="Stunde nachbereiten"
+          aria-label="Stunde nachbereiten"
+          class="p-1.5 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                 text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-100"
+        >☑︎</button>
+      {/if}
     {/if}
 
     <!-- Kommentar -->

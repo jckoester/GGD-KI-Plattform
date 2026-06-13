@@ -127,6 +127,13 @@
     }
   }
 
+  // ── Nachbereitung starten ────────────────────────────────────────────────────
+  function handleReview(slotId, lessonNodeId) {
+    if (lessonNodeId) {
+      goto(`/subjects/${slug}/groups/${groupId}/planner/lessons/${lessonNodeId}?review=1`)
+    }
+  }
+
   // ── UE erstellt ──────────────────────────────────────────────────────────────
   async function onUnitCreated(unit) {
     showUnitDialog = false
@@ -306,6 +313,7 @@
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
       onEditLesson={handleEditLesson}
+      onReview={handleReview}
     />
   </div>
 {/if}

@@ -42,6 +42,9 @@ from app.planning.schemas import (
     LessonUeContext,
     LessonUpdate,
     OverviewRead,
+    ReviewCreate,
+    ReviewResultRead,
+    ReviewStatusItem,
     SlotGenStatsRead,
     SlotGenerateRequest,
     SlotRead,
@@ -764,6 +767,109 @@ async def patch_lesson(
     await db.commit()
 
     return {"ok": True}
+
+
+# ── POST /planning/slots/{slot_id}/review ────────────────────────────────────
+
+
+@router.post("/slots/{slot_id}/review", response_model=ReviewResultRead, status_code=200)
+async def create_review(
+    slot_id: UUID,
+    payload: ReviewCreate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+    await require_group_teacher(slot.group_id, user, db)
+    if slot.stunde_node_id is None:
+        raise HTTPException(status_code=409, detail="Slot hat keine Stunde")
+    if slot.nachbereitet_at is not None:
+        raise HTTPException(status_code=409, detail="Slot bereits nachbereitet")
+
+    from app.planning.review_service import complete_review
+
+    try:
+        result = await complete_review(
+            db,
+            slot_id,
+            group_id=slot.group_id,
+            phasen_status=payload.phasen_status,
+            reflexion=payload.reflexion,
+            refs_offen=payload.refs_offen,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    return ReviewResultRead(
+        engagements_written=result.engagements_written,
+        engagements_skipped=result.engagements_skipped,
+        refs_offen=result.refs_offen,
+        open_phases=result.open_phases,
+    )
+
+
+# ── DELETE /planning/slots/{slot_id}/review ───────────────────────────────────
+
+
+@router.delete("/slots/{slot_id}/review", response_model=dict)
+async def undo_review_endpoint(
+    slot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+    await require_group_teacher(slot.group_id, user, db)
+    if slot.nachbereitet_at is None:
+        raise HTTPException(status_code=409, detail="Slot ist nicht nachbereitet")
+
+    from app.planning.review_service import undo_review
+
+    deleted = await undo_review(db, slot_id, group_id=slot.group_id)
+    return {"ok": True, "deleted_engagements": deleted}
+
+
+# ── GET /planning/groups/{group_id}/review-status ────────────────────────────
+
+
+@router.get("/groups/{group_id}/review-status", response_model=list[ReviewStatusItem])
+async def get_review_status(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Vergangene Slots mit Stunde, die noch nicht nachbereitet wurden."""
+    await require_group_teacher(group_id, user, db)
+
+    from datetime import date as date_type
+    today = date_type.today()
+
+    result = await db.execute(
+        sa.select(LessonSlot).where(
+            LessonSlot.group_id == group_id,
+            LessonSlot.stunde_node_id.is_not(None),
+            LessonSlot.kategorie.in_(["unterricht", "vertretung"]),
+            LessonSlot.date < today,
+        ).order_by(LessonSlot.date.desc())
+    )
+    slots = result.scalars().all()
+
+    items: list[ReviewStatusItem] = []
+    for slot in slots:
+        stunde = await db.get(ContextNode, slot.stunde_node_id)
+        items.append(
+            ReviewStatusItem(
+                slot_id=slot.id,
+                date=slot.date,
+                stunde_node_id=slot.stunde_node_id,
+                titel=stunde.title if stunde else None,
+                nachbereitet_auto=slot.nachbereitet_auto,
+            )
+        )
+    return items
 
 
 # ── GET /planning/lessons/{node_id}/export ────────────────────────────────────
