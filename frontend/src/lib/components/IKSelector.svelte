@@ -100,10 +100,10 @@
         emitChange();
     }
 
-    // Extrahiere IK-Nummer aus Titel (z.B. "3.1.1" aus "IK 3.1.1 - Zahlbegriff")
+    // Extrahiere IK-Nummer aus Titel, z.B. "3.1.1(2)" aus "3.1.1(2) …" oder "3.1.1.(2) …"
     function extractNrFromTitle(title) {
-        const match = title.match(/(\d+\.\d+(?:\.\d+)*)/);
-        return match ? match[1] : title;
+        const match = title.match(/(\d+\.\d+(?:\.\d+)*(?:\.?\(\d+\))?)/);
+        return match ? match[1].replace(/\.\(/, '(') : title;
     }
 
     // Change-Event auslösen

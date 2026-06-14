@@ -382,8 +382,8 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
                         if ref:
                             relations.append(ref)
 
-        # Berechne hierarchische Kompetenz-Nummer, z.B. "3.1.1.(2)"
-        kompetenz_nr = f"{leitidee_prefix}.({nr})" if leitidee_prefix else f"({nr})"
+        # Berechne hierarchische Kompetenz-Nummer, z.B. "3.1.1(2)"
+        kompetenz_nr = f"{leitidee_prefix}({nr})" if leitidee_prefix else f"({nr})"
 
         # Titel: (n)-Präfix durch vollständige Kompetenznummer ersetzen
         title_text = re.sub(r'^\(\d+\)\s*', '', content).strip()
