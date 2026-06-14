@@ -6,7 +6,7 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    import { ArrowLeft } from 'lucide-svelte'
+    import { ArrowLeft, TriangleAlert } from 'lucide-svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -108,6 +108,15 @@
                                 {lp.aspekte.length} Aspekte
                             </span>
                         </button>
+
+                        <!-- Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
+                        {#if lp.metadata?.import_hinweis}
+                            <div class="flex items-start gap-2 px-4 py-3 border-t border-light-ui-3 dark:border-dark-ui-3
+                                        text-sm text-light-tx-2 dark:text-dark-tx-2">
+                                <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5 text-light-ye dark:text-dark-ye" />
+                                <span>{lp.metadata.import_hinweis}</span>
+                            </div>
+                        {/if}
 
                         <!-- Aspekte-Liste -->
                         {#if lp.aspekte.length > 0}

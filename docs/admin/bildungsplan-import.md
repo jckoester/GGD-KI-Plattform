@@ -8,6 +8,15 @@ Der Bildungsplan liefert die fachlichen Kontextdaten (Leitideen, Kompetenzen,
 Leitperspektiven), die Assistenten als Wissensbasis nutzen. Ohne diesen Import
 funktioniert die Plattform, der fachliche Kontext fehlt jedoch.
 
+> **Bekannte Lücke — Leitfaden Demokratiebildung (LFDB):** Der LFDB wird intern
+> wie eine Leitperspektive behandelt, auf den Seiten des Bildungsplans aber
+> anders dargestellt — er hat keine „Aspekte", sondern Kompetenzen, Bausteine
+> und Handlungsfelder, die **nur in einer separaten PDF** des Kultusministeriums
+> liegen und nicht auf der Webseite. Der Import erzeugt daher nur den
+> Übersichtsknoten **ohne Unterknoten** (0 Aspekte) und versieht ihn mit einem
+> sichtbaren Hinweis (`metadata.import_hinweis`). Das ist erwartetes Verhalten,
+> kein Importfehler.
+
 > **Wann ist dieser Schritt nötig?**
 > - Einmalig nach der Erstinstallation
 > - Bei einem aktualisierten Bildungsplan oder erweiterter `config/subjects.yaml`

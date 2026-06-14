@@ -569,6 +569,29 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
             content_parts.append(text)
     content = '\n'.join(content_parts[:5]) if content_parts else title
 
+    metadata = {
+        'bp_id': bp_id,
+        'kuerzel': kuerzel,
+        'breadcrumb': breadcrumb,
+        'source_url': url,
+        'scraped_at': _now_iso(),
+    }
+
+    # Sonderfall LFDB (Leitfaden Demokratiebildung): Die BP-Seite enthält nur
+    # Einleitungstexte, keine Aspekt-Liste. Die konkreten Inhalte (Kompetenzen,
+    # Bausteine, Handlungsfelder) liegen ausschließlich in einer separaten
+    # PDF-Datei des Kultusministeriums und werden derzeit nicht importiert.
+    if kuerzel == 'LFDB':
+        import_hinweis = (
+            'Die konkreten Inhalte des Leitfadens Demokratiebildung '
+            '(Kompetenzen, Bausteine und Handlungsfelder) sind nur in einer '
+            'separaten PDF des Kultusministeriums hinterlegt und derzeit nicht '
+            'in den Wissensgraph importiert. Hier steht nur die '
+            'Übersichtsbeschreibung zur Verfügung.'
+        )
+        metadata['import_hinweis'] = import_hinweis
+        content = f"{content}\n\n> Hinweis: {import_hinweis}"
+
     return {
         'bp_id': bp_id,
         'type': 'knowledge',
@@ -580,13 +603,7 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
         'relations': [],
         'min_grade': None,
         'max_grade': None,
-        'metadata': {
-            'bp_id': bp_id,
-            'kuerzel': kuerzel,
-            'breadcrumb': breadcrumb,
-            'source_url': url,
-            'scraped_at': _now_iso(),
-        },
+        'metadata': metadata,
         'visibility': 'global',
     }
 
