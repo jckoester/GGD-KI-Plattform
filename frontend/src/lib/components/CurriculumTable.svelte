@@ -26,6 +26,7 @@
         X,
         Pencil,
         Eye,
+        ChevronRight,
     } from "lucide-svelte";
 
     let {
@@ -41,6 +42,15 @@
     let showContextMenu = $state(null); // { type: 'kapitel'|'ls'|'eintrag', id: string, x: number, y: number }
     let deleteConfirm = $state(null); // { type, id, title }
     let draggedItem = $state(null); // { type, id, chapterId, lsId }
+
+    // Einklapp-Zustand der Kapitel (Set mit Kapitel-IDs)
+    let collapsedChapters = $state(new Set());
+
+    function toggleChapter(kapId) {
+        const next = new Set(collapsedChapters);
+        next.has(kapId) ? next.delete(kapId) : next.add(kapId);
+        collapsedChapters = next;
+    }
 
     /**
      * Normalisiert eintrag.ik auf Array<{node_id, nr, partiell}>.
@@ -545,6 +555,15 @@
                     >
                         {#if editMode}
                             <div class="flex items-center gap-2">
+                                <button
+                                    onclick={() => toggleChapter(kap.id)}
+                                    class="p-0.5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 rounded shrink-0"
+                                    title={collapsedChapters.has(kap.id) ? "Ausklappen" : "Einklappen"}
+                                >
+                                    <ChevronRight
+                                        class="w-4 h-4 text-light-tx-2 dark:text-dark-tx-2 transition-transform {collapsedChapters.has(kap.id) ? '' : 'rotate-90'}"
+                                    />
+                                </button>
                                 <Move
                                     class="w-4 h-4 text-light-tx-2 dark:text-dark-tx-2 cursor-move"
                                 />
@@ -576,17 +595,31 @@
                                 </button>
                             </div>
                         {:else}
-                            {kap.title}
-                            {#if kapitelStd(kap) > 0}
-                                <span
-                                    class="ml-2 text-light-tx-2 dark:text-dark-tx-2 text-xs"
+                            <div class="flex items-center gap-2">
+                                <button
+                                    onclick={() => toggleChapter(kap.id)}
+                                    class="p-0.5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 rounded shrink-0"
+                                    title={collapsedChapters.has(kap.id) ? "Ausklappen" : "Einklappen"}
                                 >
-                                    ({kapitelStd(kap)} Stunden)
-                                </span>
-                            {/if}
+                                    <ChevronRight
+                                        class="w-4 h-4 text-light-tx-2 dark:text-dark-tx-2 transition-transform {collapsedChapters.has(kap.id) ? '' : 'rotate-90'}"
+                                    />
+                                </button>
+                                <span>{kap.title}</span>
+                                {#if kapitelStd(kap) > 0}
+                                    <span
+                                        class="text-light-tx-2 dark:text-dark-tx-2 text-xs font-normal"
+                                    >
+                                        ({kapitelStd(kap)} Stunden)
+                                    </span>
+                                {/if}
+                            </div>
                         {/if}
                     </td>
                 </tr>
+
+                <!-- Kapitel-Inhalt (einklappbar) -->
+                {#if !collapsedChapters.has(kap.id)}
 
                 <!-- Kapitel-Einleitung (editierbar) -->
                 {#if kap.metadata?.einleitung || editMode}
@@ -940,7 +973,7 @@
                                         </div>
                                     </div>
                                 {:else}
-                                    <div class="space-y-2">
+                                    <div class="space-y-2 text-sm">
                                         <!-- Hinweise -->
                                         {#if eintrag.hinweise}
                                             {@const parts = parseHinweise(
@@ -975,12 +1008,12 @@
                                                                     href={sub.href}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    class="text-sm text-light-bl dark:text-dark-bl underline break-all"
+                                                                    class="text-light-bl dark:text-dark-bl underline break-all"
                                                                     >{sub.label}</a
                                                                 >
                                                             {:else if sub.label.trim()}
                                                                 <span
-                                                                    class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                                                                    class="text-light-tx-2 dark:text-dark-tx-2"
                                                                     >{sub.label}</span
                                                                 >
                                                             {/if}
@@ -1016,12 +1049,12 @@
                                                                     href={sub.href}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    class="text-sm text-light-bl dark:text-dark-bl underline break-all"
+                                                                    class="text-light-bl dark:text-dark-bl underline break-all"
                                                                     >{sub.label}</a
                                                                 >
                                                             {:else if sub.label.trim()}
                                                                 <span
-                                                                    class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                                                                    class="text-light-tx-2 dark:text-dark-tx-2"
                                                                     >{sub.label}</span
                                                                 >
                                                             {/if}
@@ -1136,6 +1169,8 @@
                         </td>
                     </tr>
                 {/if}
+
+                {/if}<!-- Ende einklappbarer Kapitelinhalt -->
             {/each}
 
             <!-- Neues Kapitel im Edit-Mode -->

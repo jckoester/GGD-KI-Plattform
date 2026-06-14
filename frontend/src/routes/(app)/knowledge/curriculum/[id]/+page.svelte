@@ -23,6 +23,21 @@
     let exportError = $state(null)
     let exporting = $state(false)
 
+    // Sticky-Footer: nur sichtbar, wenn die oberen Aktionen aus dem Scrollbereich sind
+    let scrollEl = $state(null)
+    let topActionsEl = $state(null)
+    let showStickyFooter = $state(false)
+
+    $effect(() => {
+        if (!scrollEl || !topActionsEl) return
+        const obs = new IntersectionObserver(
+            ([entry]) => { showStickyFooter = !entry.isIntersecting },
+            { root: scrollEl, threshold: 0 },
+        )
+        obs.observe(topActionsEl)
+        return () => obs.disconnect()
+    })
+
     function _exportFilename(format) {
         const meta = curriculum?.metadata ?? {}
         const fach = (meta.fach_code ?? 'curriculum').replace(/\s/g, '_')
@@ -80,7 +95,9 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-4xl">
+<div class="h-full flex flex-col relative">
+    <!-- Scrollbarer Inhaltsbereich -->
+    <div bind:this={scrollEl} class="flex-1 overflow-y-auto p-6 max-w-4xl">
         {#if loading}
             <LoadingBanner />
         {:else if error}
@@ -109,7 +126,7 @@
                         {/if}
                     </p>
                 </div>
-                <div class="flex gap-2">
+                <div bind:this={topActionsEl} class="flex gap-2">
                     {#if curriculum.can_edit}
                         <a
                             href="/knowledge/curriculum/{curriculum.id}/edit"
@@ -166,6 +183,42 @@
                 Curriculum nicht gefunden.
             </p>
         {/if}
+    </div>
+
+    <!-- Sticky-Footer: überlagert den Inhalt, nur sichtbar wenn obere Aktionen weggescrollt -->
+    {#if curriculum && showStickyFooter}
+        <div class="absolute bottom-0 left-0 right-0 border-t border-light-ui-3 dark:border-dark-ui-3 bg-light-bg/95 dark:bg-dark-bg/95 backdrop-blur px-6 py-2 flex gap-2 justify-end">
+            {#if curriculum.can_edit}
+                <a
+                    href="/knowledge/curriculum/{curriculum.id}/edit"
+                    class="px-4 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
+                           text-white font-medium hover:opacity-90 transition-opacity"
+                >
+                    Bearbeiten
+                </a>
+            {/if}
+            <button
+                onclick={() => handleExport('yaml')}
+                disabled={exporting}
+                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx dark:text-dark-tx font-medium
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                YAML
+            </button>
+            <button
+                onclick={() => handleExport('pdf')}
+                disabled={exporting}
+                class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                       text-light-tx dark:text-dark-tx font-medium
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                PDF
+            </button>
+        </div>
+    {/if}
 </div>
 
 {#if confirmDelete && curriculum}

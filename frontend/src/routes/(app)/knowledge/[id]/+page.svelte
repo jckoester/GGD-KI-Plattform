@@ -17,7 +17,9 @@
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
     let loadingNode = $state(true);
-    const backUrl = $derived($page.url.searchParams.get('back') ?? '/knowledge');
+    const backUrl = $derived(
+        $page.url.searchParams.get("back") ?? "/knowledge",
+    );
 
     // Knoten laden mit Weiterleitung für Curriculum-Knoten
     $effect(() => {
@@ -26,7 +28,7 @@
         getContextNode(id)
             .then((n) => {
                 // Weiterleitung wenn content_type === 'curriculum'
-                if (n.content_type === 'curriculum') {
+                if (n.content_type === "curriculum") {
                     goto(`/knowledge/curriculum/${id}`, { replaceState: true });
                     return;
                 }
@@ -113,8 +115,8 @@
     // Validierung für Jahrgangsstufen
     const gradeError = $derived(
         minGrade && maxGrade && Number(minGrade) > Number(maxGrade)
-            ? 'Von-Wert muss kleiner oder gleich Bis-Wert sein'
-            : null
+            ? "Von-Wert muss kleiner oder gleich Bis-Wert sein"
+            : null,
     );
 
     // Archivierte Referenzen
@@ -306,14 +308,14 @@
     }
 </script>
 
-<a
-    href={backUrl}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
-         hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</a>
 <div class="h-full overflow-y-auto p-6 max-w-2xl">
+    <a
+        href={backUrl}
+        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
+         hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+    >
+        <ArrowLeft class="w-4 h-4" /> Zurück
+    </a>
     {#if loadingNode}
         <div
             class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2"
@@ -331,11 +333,13 @@
                     Knoten bearbeiten
                 </h1>
                 {#if node}
-                    <span class="text-xs px-2 py-0.5 rounded-full
+                    <span
+                        class="text-xs px-2 py-0.5 rounded-full
                         {node.status === 'active'
                             ? 'bg-light-gr/20 dark:bg-dark-gr/20 text-light-gr dark:text-dark-gr'
-                            : 'bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye'}">
-                        {node.status === 'active' ? 'Aktiv' : 'Archiviert'}
+                            : 'bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye'}"
+                    >
+                        {node.status === "active" ? "Aktiv" : "Archiviert"}
                     </span>
                 {/if}
             </div>
@@ -357,7 +361,9 @@
 
         <!-- Banner: Nur-Lesen-Hinweis -->
         {#if node && !canEdit}
-            <InfoBanner message="Du kannst diesen Knoten nur lesen. Zum Bearbeiten ist eine Schreibberechtigung erforderlich." />
+            <InfoBanner
+                message="Du kannst diesen Knoten nur lesen. Zum Bearbeiten ist eine Schreibberechtigung erforderlich."
+            />
         {/if}
 
         <!-- Banner für archivierte Referenzen -->
@@ -932,7 +938,7 @@
                     </div>
 
                     <!-- Fach und Jahrgangsstufen - nur für knowledge-Knoten -->
-                    {#if category === 'knowledge'}
+                    {#if category === "knowledge"}
                         <!-- Fachzuordnung -->
                         <div class="space-y-1">
                             <label
@@ -946,16 +952,22 @@
                                     class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                            bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
                                 >
-                                    <option value={null}>— fächerübergreifend —</option>
+                                    <option value={null}
+                                        >— fächerübergreifend —</option
+                                    >
                                     {#each $subjects as s (s.id)}
                                         <option value={s.id}>{s.name}</option>
                                     {/each}
                                 </select>
                             {:else}
-                                <p class="text-sm text-light-tx dark:text-dark-tx">
+                                <p
+                                    class="text-sm text-light-tx dark:text-dark-tx"
+                                >
                                     {subjectId
-                                        ? ($subjects.find(s => s.id === subjectId)?.name ?? '—')
-                                        : 'fächerübergreifend'}
+                                        ? ($subjects.find(
+                                              (s) => s.id === subjectId,
+                                          )?.name ?? "—")
+                                        : "fächerübergreifend"}
                                 </p>
                             {/if}
                         </div>
@@ -970,29 +982,44 @@
                             {#if canEdit}
                                 <div class="flex items-center gap-2">
                                     <input
-                                        type="number" min="1" max="13"
+                                        type="number"
+                                        min="1"
+                                        max="13"
                                         bind:value={minGrade}
                                         placeholder="von"
                                         class="w-20 px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
                                     />
-                                    <span class="text-light-tx-2 dark:text-dark-tx-2 text-sm">–</span>
+                                    <span
+                                        class="text-light-tx-2 dark:text-dark-tx-2 text-sm"
+                                        >–</span
+                                    >
                                     <input
-                                        type="number" min="1" max="13"
+                                        type="number"
+                                        min="1"
+                                        max="13"
                                         bind:value={maxGrade}
                                         placeholder="bis"
                                         class="w-20 px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                                bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
                                     />
-                                    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    <span
+                                        class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                    >
                                         (leer = alle Stufen)
                                     </span>
                                 </div>
                                 {#if gradeError}
-                                    <p class="text-xs text-light-re dark:text-dark-re mt-1">{gradeError}</p>
+                                    <p
+                                        class="text-xs text-light-re dark:text-dark-re mt-1"
+                                    >
+                                        {gradeError}
+                                    </p>
                                 {/if}
                             {:else}
-                                <p class="text-sm text-light-tx dark:text-dark-tx">
+                                <p
+                                    class="text-sm text-light-tx dark:text-dark-tx"
+                                >
                                     {#if minGrade && maxGrade}
                                         Klasse {minGrade}–{maxGrade}
                                     {:else if minGrade}
