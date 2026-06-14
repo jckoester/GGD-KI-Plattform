@@ -6,7 +6,7 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    import { ArrowLeft, TriangleAlert } from 'lucide-svelte'
+    import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight } from 'lucide-svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -53,6 +53,13 @@
         aspekte: groupedNodes.aspekte.filter(a => a.metadata?.kuerzel === lp.metadata?.kuerzel)
     })))
 
+    // Einklapp-Zustand der Leitperspektiven (analog Leitideen im Fachplan,
+    // standardmäßig eingeklappt für eine kompakte Übersicht)
+    let expandedLPs = $state({})
+    function toggleLP(id) {
+        expandedLPs = { ...expandedLPs, [id]: !expandedLPs[id] }
+    }
+
     // Navigationsfunktion
     function navigateToNode(nodeId) {
         goto(`/knowledge/${nodeId}?back=${encodeURIComponent($page.url.pathname)}`)
@@ -94,19 +101,28 @@
                 {#each leitperspektivenWithAspekte as lp (lp.id)}
                     <div class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border 
                                 border-light-ui-3 dark:border-dark-ui-3 overflow-hidden">
-                        <!-- Leitperspektive Header -->
+                        <!-- Leitperspektive Header (Toggle, analog Leitideen) -->
                         <button
-                            onclick={() => navigateToNode(lp.id)}
-                            class="w-full flex items-center gap-3 p-4 
-                                   bg-light-bg-3 dark:bg-dark-bg-3 
+                            onclick={() => toggleLP(lp.id)}
+                            class="w-full flex items-center justify-between gap-3 p-4
+                                   bg-light-bg-3 dark:bg-dark-bg-3
                                    text-light-tx dark:text-dark-tx hover:bg-light-bg-4 dark:hover:bg-dark-bg-4
                                    transition-colors text-left"
                         >
-                            <NodeTypeIcon contentType="leitperspektive" size={20} />
-                            <span class="font-medium">{lp.title}</span>
-                            <span class="ml-auto text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                {lp.aspekte.length} Aspekte
-                            </span>
+                            <div class="flex items-center gap-3">
+                                <NodeTypeIcon contentType="leitperspektive" size={20} />
+                                <span class="font-medium">{lp.title}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    {lp.aspekte.length} Aspekte
+                                </span>
+                                {#if expandedLPs[lp.id]}
+                                    <ChevronDown class="w-4 h-4 shrink-0" />
+                                {:else}
+                                    <ChevronRight class="w-4 h-4 shrink-0" />
+                                {/if}
+                            </div>
                         </button>
 
                         <!-- Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
@@ -118,8 +134,8 @@
                             </div>
                         {/if}
 
-                        <!-- Aspekte-Liste -->
-                        {#if lp.aspekte.length > 0}
+                        <!-- Aspekte-Liste (einklappbar) -->
+                        {#if expandedLPs[lp.id] && lp.aspekte.length > 0}
                             <div class="p-3 space-y-2 border-t border-light-ui-3 dark:border-dark-ui-3">
                                 {#each lp.aspekte as aspekt (aspekt.id)}
                                     <button
