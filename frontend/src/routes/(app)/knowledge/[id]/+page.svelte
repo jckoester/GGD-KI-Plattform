@@ -13,6 +13,7 @@
     import { subjects } from "$lib/stores/subjects.js";
     import { ArrowLeft } from "lucide-svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
 
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
@@ -358,6 +359,11 @@
                 </a>
             {/if}
         </div>
+
+        <!-- Banner: Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
+        {#if node?.metadata?.import_hinweis}
+            <WarningBanner message={node.metadata.import_hinweis} />
+        {/if}
 
         <!-- Banner: Nur-Lesen-Hinweis -->
         {#if node && !canEdit}

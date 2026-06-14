@@ -6,7 +6,7 @@
     import LoadingBanner from "./LoadingBanner.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import InfoBanner from "./InfoBanner.svelte";
-    import { ChevronDown, ChevronRight } from "lucide-svelte";
+    import { ChevronDown, ChevronRight, ExternalLink } from "lucide-svelte";
 
     let { subjectId, subjectSlug, initialBpVersion = null } = $props();
 
@@ -94,8 +94,12 @@
     }
 
     function navigateToNode(nodeId) {
+        goto(nodeHref(nodeId));
+    }
+
+    function nodeHref(nodeId) {
         const back = $page.url.pathname + $page.url.search;
-        goto(`/knowledge/${nodeId}?back=${encodeURIComponent(back)}`);
+        return `/knowledge/${nodeId}?back=${encodeURIComponent(back)}`;
     }
 </script>
 
@@ -199,18 +203,34 @@
                     </h3>
                     {#each data.pk_gruppen as pkGruppe (pkGruppe.id)}
                         <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-md overflow-hidden">
-                            <button
-                                onclick={() => togglePkGruppe(pkGruppe.id)}
-                                class="w-full flex items-center justify-between p-3 gap-3
+                            <div
+                                class="w-full flex items-center justify-between gap-3
                                        bg-light-bg-2 dark:bg-dark-bg-2
-                                       text-light-tx dark:text-dark-tx hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
-                                       transition-colors"
+                                       hover:bg-light-bg-3 dark:hover:bg-dark-bg-3 transition-colors"
                             >
-                                <div class="flex items-center gap-3">
-                                    <NodeTypeIcon contentType="pk_gruppe" size={18} />
-                                    <span class="font-medium">{pkGruppe.title}</span>
+                                <div class="flex items-center gap-2 min-w-0 pl-3">
+                                    <button
+                                        onclick={() => togglePkGruppe(pkGruppe.id)}
+                                        class="flex items-center gap-3 min-w-0 py-3 text-left
+                                               text-light-tx dark:text-dark-tx"
+                                    >
+                                        <NodeTypeIcon contentType="pk_gruppe" size={18} />
+                                        <span class="font-medium truncate">{pkGruppe.title}</span>
+                                    </button>
+                                    <a
+                                        href={nodeHref(pkGruppe.id)}
+                                        title="Knotenansicht öffnen"
+                                        class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
+                                               hover:text-primary dark:hover:text-dark-bl transition-colors"
+                                    >
+                                        <ExternalLink class="w-4 h-4" />
+                                    </a>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <button
+                                    onclick={() => togglePkGruppe(pkGruppe.id)}
+                                    class="flex items-center gap-2 py-3 pr-3 pl-2 shrink-0
+                                           text-light-tx dark:text-dark-tx"
+                                >
                                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                                         {pkGruppe.pk_kompetenzen?.length || 0} Kompetenzen
                                     </span>
@@ -219,8 +239,8 @@
                                     {:else}
                                         <ChevronRight class="w-4 h-4 shrink-0" />
                                     {/if}
-                                </div>
-                            </button>
+                                </button>
+                            </div>
                             {#if expandedPkGruppen[pkGruppe.id] && pkGruppe.pk_kompetenzen?.length > 0}
                                 <div class="p-3 space-y-1">
                                     {#each pkGruppe.pk_kompetenzen as pk (pk.id)}
@@ -249,18 +269,34 @@
 {#snippet renderLeitidee(ld, depth)}
     <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-md overflow-hidden"
          style="margin-left: {depth * 16}px">
-        <button
-            onclick={() => toggleLeitidee(ld.id)}
-            class="w-full flex items-center justify-between p-3 gap-3
+        <div
+            class="w-full flex items-center justify-between gap-3
                    bg-light-bg-2 dark:bg-dark-bg-2
-                   text-light-tx dark:text-dark-tx hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
-                   transition-colors"
+                   hover:bg-light-bg-3 dark:hover:bg-dark-bg-3 transition-colors"
         >
-            <div class="flex items-center gap-3">
-                <NodeTypeIcon contentType="leitidee" size={18} />
-                <span class="font-medium">{ld.title}</span>
+            <div class="flex items-center gap-2 min-w-0 pl-3">
+                <button
+                    onclick={() => toggleLeitidee(ld.id)}
+                    class="flex items-center gap-3 min-w-0 py-3 text-left
+                           text-light-tx dark:text-dark-tx"
+                >
+                    <NodeTypeIcon contentType="leitidee" size={18} />
+                    <span class="font-medium truncate">{ld.title}</span>
+                </button>
+                <a
+                    href={nodeHref(ld.id)}
+                    title="Knotenansicht öffnen"
+                    class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
+                           hover:text-primary dark:hover:text-dark-bl transition-colors"
+                >
+                    <ExternalLink class="w-4 h-4" />
+                </a>
             </div>
-            <div class="flex items-center gap-2">
+            <button
+                onclick={() => toggleLeitidee(ld.id)}
+                class="flex items-center gap-2 py-3 pr-3 pl-2 shrink-0
+                       text-light-tx dark:text-dark-tx"
+            >
                 <!-- Zähler nur anzeigen wenn Kompetenzen vorhanden; bei reinem Beschreibungstext weglassen -->
                 {#if countIk(ld) > 0}
                     <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
@@ -272,8 +308,8 @@
                 {:else}
                     <ChevronRight class="w-4 h-4 shrink-0" />
                 {/if}
-            </div>
-        </button>
+            </button>
+        </div>
 
         {#if expandedLeitideen[ld.id]}
             <!-- Beschreibungstext der Leitidee (oberhalb der Kompetenzen) -->

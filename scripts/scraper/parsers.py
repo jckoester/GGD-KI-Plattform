@@ -569,6 +569,29 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
             content_parts.append(text)
     content = '\n'.join(content_parts[:5]) if content_parts else title
 
+    metadata = {
+        'bp_id': bp_id,
+        'kuerzel': kuerzel,
+        'breadcrumb': breadcrumb,
+        'source_url': url,
+        'scraped_at': _now_iso(),
+    }
+
+    # Sonderfall LFDB (Leitfaden Demokratiebildung): Die BP-Seite enthält nur
+    # Einleitungstexte, keine Aspekt-Liste. Die konkreten Inhalte (Kompetenzen,
+    # Bausteine, Handlungsfelder) liegen ausschließlich in einer separaten
+    # PDF-Datei des Kultusministeriums und werden derzeit nicht importiert.
+    if kuerzel == 'LFDB':
+        import_hinweis = (
+            'Die konkreten Inhalte des Leitfadens Demokratiebildung '
+            '(Kompetenzen, Bausteine und Handlungsfelder) sind nur in einer '
+            'separaten PDF des Kultusministeriums hinterlegt und derzeit nicht '
+            'in den Wissensgraph importiert. Hier steht nur die '
+            'Übersichtsbeschreibung zur Verfügung.'
+        )
+        metadata['import_hinweis'] = import_hinweis
+        content = f"{content}\n\n> Hinweis: {import_hinweis}"
+
     return {
         'bp_id': bp_id,
         'type': 'knowledge',
@@ -580,13 +603,7 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
         'relations': [],
         'min_grade': None,
         'max_grade': None,
-        'metadata': {
-            'bp_id': bp_id,
-            'kuerzel': kuerzel,
-            'breadcrumb': breadcrumb,
-            'source_url': url,
-            'scraped_at': _now_iso(),
-        },
+        'metadata': metadata,
         'visibility': 'global',
     }
 
@@ -603,13 +620,33 @@ def parse_leitperspektive_aspekt_list(
     """
     nodes = []
     main = soup.find('main') or soup
-    # Erstes ul/ol das nicht in Navigation/Breadcrumb liegt
+
+    def _is_content_list(candidate) -> bool:
+        return not candidate.find_parent(re.compile(r'^nav$')) and \
+            not candidate.find_parent(class_=re.compile(r'breadcrumb|nav|header|footer'))
+
+    # Die Konkretisierungsliste folgt dem Einleitungssatz
+    # „… durch folgende Begriffe konkretisiert:". Manche LP-Seiten (z. B. PG)
+    # haben davor eine andere Liste („Zentrale Lern- und Handlungsfelder"),
+    # daher zuerst nach dem Anker-Satz suchen und die erste Inhaltsliste
+    # dahinter nehmen.
     ul = None
-    for candidate in main.find_all(['ul', 'ol']):
-        if not candidate.find_parent(re.compile(r'^nav$')) and \
-           not candidate.find_parent(class_=re.compile(r'breadcrumb|nav|header|footer')):
+    for el in main.find_all(['p', 'h2', 'h3', 'h4']):
+        if 'durch folgende Begriffe konkretisiert' in \
+                strip_soft_hyphens(el.get_text(separator=" ", strip=True)):
+            candidate = el.find_next(['ul', 'ol'])
+            while candidate is not None and not _is_content_list(candidate):
+                candidate = candidate.find_next(['ul', 'ol'])
             ul = candidate
             break
+
+    # Fallback (z. B. LFDB ohne Anker-Satz): erste Inhaltsliste der Seite
+    if ul is None:
+        for candidate in main.find_all(['ul', 'ol']):
+            if _is_content_list(candidate):
+                ul = candidate
+                break
+
     if not ul:
         return nodes
 

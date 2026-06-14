@@ -25,6 +25,8 @@ CHEMIE_IK_STANDARD_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GY
 CHEMIE_IK_HINWEIS_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_IK_5-6_01"
 CHEMIE_PK_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_PK_01"
 LP_BNE_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_LP_BNE"
+LP_PG_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_LP_PG"
+LP_LFDB_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_LP_LFDB"
 
 
 class TestParseLeitidee:
@@ -147,6 +149,37 @@ class TestParseLeitperspektive:
         for node in nodes:
             assert re.match(r'^BNE_\d{2}$', node['bp_id']), f"Ungueltige bp_id: {node['bp_id']}"
             assert node['parent_bp_id'] == 'BP2016BW_ALLG_LP_BNE'
+
+    def test_pg_uses_konkretisierung_list_not_first_list(self):
+        # PG hat vor der Konkretisierungsliste eine andere Liste
+        # („Zentrale Lern- und Handlungsfelder", 5 Items). Der Parser muss
+        # die Liste nach dem Anker-Satz „… durch folgende Begriffe
+        # konkretisiert:" wählen (8 Aspekte), nicht die erste Liste.
+        soup = load_fixture('leitperspektive_pg.html')
+        nodes = parse_leitperspektive_aspekt_list(soup, LP_PG_URL, 'PG')
+        assert len(nodes) == 8, f"PG sollte 8 Aspekte haben, hat {len(nodes)}"
+        titles = [n['title'] for n in nodes]
+        assert titles[0] == 'Wahrnehmung und Empfindung'
+        assert 'Sucht und Abhängigkeit' in titles
+        assert 'Sicherheit und Unfallschutz' in titles
+
+    def test_lfdb_has_import_hinweis_and_no_aspekte(self):
+        # LFDB hat auf der BP-Seite keine Aspekt-Liste; die Inhalte stecken in
+        # einer PDF. Der Knoten muss einen Import-Hinweis tragen.
+        soup = load_fixture('leitperspektive_lfdb.html')
+        node = parse_leitperspektive(soup, LP_LFDB_URL, 'LFDB')
+        assert node['metadata']['kuerzel'] == 'LFDB'
+        assert 'import_hinweis' in node['metadata']
+        assert 'PDF' in node['metadata']['import_hinweis']
+        assert 'Hinweis' in node['content']
+        # Keine Aspekte (kein Anker-Satz, keine passende Liste)
+        aspekte = parse_leitperspektive_aspekt_list(soup, LP_LFDB_URL, 'LFDB')
+        assert aspekte == []
+
+    def test_non_lfdb_has_no_import_hinweis(self):
+        soup = load_fixture('leitperspektive_bne.html')
+        node = parse_leitperspektive(soup, LP_BNE_URL, 'BNE')
+        assert 'import_hinweis' not in node['metadata']
 
 
 class TestExtractNiveauFromBpId:
