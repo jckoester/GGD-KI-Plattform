@@ -25,6 +25,7 @@ CHEMIE_IK_STANDARD_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GY
 CHEMIE_IK_HINWEIS_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_IK_5-6_01"
 CHEMIE_PK_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_PK_01"
 LP_BNE_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_LP_BNE"
+LP_PG_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_LP_PG"
 
 
 class TestParseLeitidee:
@@ -147,6 +148,19 @@ class TestParseLeitperspektive:
         for node in nodes:
             assert re.match(r'^BNE_\d{2}$', node['bp_id']), f"Ungueltige bp_id: {node['bp_id']}"
             assert node['parent_bp_id'] == 'BP2016BW_ALLG_LP_BNE'
+
+    def test_pg_uses_konkretisierung_list_not_first_list(self):
+        # PG hat vor der Konkretisierungsliste eine andere Liste
+        # („Zentrale Lern- und Handlungsfelder", 5 Items). Der Parser muss
+        # die Liste nach dem Anker-Satz „… durch folgende Begriffe
+        # konkretisiert:" wählen (8 Aspekte), nicht die erste Liste.
+        soup = load_fixture('leitperspektive_pg.html')
+        nodes = parse_leitperspektive_aspekt_list(soup, LP_PG_URL, 'PG')
+        assert len(nodes) == 8, f"PG sollte 8 Aspekte haben, hat {len(nodes)}"
+        titles = [n['title'] for n in nodes]
+        assert titles[0] == 'Wahrnehmung und Empfindung'
+        assert 'Sucht und Abhängigkeit' in titles
+        assert 'Sicherheit und Unfallschutz' in titles
 
 
 class TestExtractNiveauFromBpId:

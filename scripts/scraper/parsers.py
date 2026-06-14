@@ -603,13 +603,33 @@ def parse_leitperspektive_aspekt_list(
     """
     nodes = []
     main = soup.find('main') or soup
-    # Erstes ul/ol das nicht in Navigation/Breadcrumb liegt
+
+    def _is_content_list(candidate) -> bool:
+        return not candidate.find_parent(re.compile(r'^nav$')) and \
+            not candidate.find_parent(class_=re.compile(r'breadcrumb|nav|header|footer'))
+
+    # Die Konkretisierungsliste folgt dem Einleitungssatz
+    # „… durch folgende Begriffe konkretisiert:". Manche LP-Seiten (z. B. PG)
+    # haben davor eine andere Liste („Zentrale Lern- und Handlungsfelder"),
+    # daher zuerst nach dem Anker-Satz suchen und die erste Inhaltsliste
+    # dahinter nehmen.
     ul = None
-    for candidate in main.find_all(['ul', 'ol']):
-        if not candidate.find_parent(re.compile(r'^nav$')) and \
-           not candidate.find_parent(class_=re.compile(r'breadcrumb|nav|header|footer')):
+    for el in main.find_all(['p', 'h2', 'h3', 'h4']):
+        if 'durch folgende Begriffe konkretisiert' in \
+                strip_soft_hyphens(el.get_text(separator=" ", strip=True)):
+            candidate = el.find_next(['ul', 'ol'])
+            while candidate is not None and not _is_content_list(candidate):
+                candidate = candidate.find_next(['ul', 'ol'])
             ul = candidate
             break
+
+    # Fallback (z. B. LFDB ohne Anker-Satz): erste Inhaltsliste der Seite
+    if ul is None:
+        for candidate in main.find_all(['ul', 'ol']):
+            if _is_content_list(candidate):
+                ul = candidate
+                break
+
     if not ul:
         return nodes
 
