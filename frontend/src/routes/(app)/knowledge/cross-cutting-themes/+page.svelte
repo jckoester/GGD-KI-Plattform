@@ -6,7 +6,7 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight } from 'lucide-svelte'
+    import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -62,7 +62,11 @@
 
     // Navigationsfunktion
     function navigateToNode(nodeId) {
-        goto(`/knowledge/${nodeId}?back=${encodeURIComponent($page.url.pathname)}`)
+        goto(nodeHref(nodeId))
+    }
+
+    function nodeHref(nodeId) {
+        return `/knowledge/${nodeId}?back=${encodeURIComponent($page.url.pathname)}`
     }
 </script>
 
@@ -102,18 +106,34 @@
                     <div class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border 
                                 border-light-ui-3 dark:border-dark-ui-3 overflow-hidden">
                         <!-- Leitperspektive Header (Toggle, analog Leitideen) -->
-                        <button
-                            onclick={() => toggleLP(lp.id)}
-                            class="w-full flex items-center justify-between gap-3 p-4
+                        <div
+                            class="w-full flex items-center justify-between gap-3
                                    bg-light-bg-3 dark:bg-dark-bg-3
-                                   text-light-tx dark:text-dark-tx hover:bg-light-bg-4 dark:hover:bg-dark-bg-4
-                                   transition-colors text-left"
+                                   hover:bg-light-bg-4 dark:hover:bg-dark-bg-4 transition-colors"
                         >
-                            <div class="flex items-center gap-3">
-                                <NodeTypeIcon contentType="leitperspektive" size={20} />
-                                <span class="font-medium">{lp.title}</span>
+                            <div class="flex items-center gap-2 min-w-0 pl-4">
+                                <button
+                                    onclick={() => toggleLP(lp.id)}
+                                    class="flex items-center gap-3 min-w-0 py-4 text-left
+                                           text-light-tx dark:text-dark-tx"
+                                >
+                                    <NodeTypeIcon contentType="leitperspektive" size={20} />
+                                    <span class="font-medium truncate">{lp.title}</span>
+                                </button>
+                                <a
+                                    href={nodeHref(lp.id)}
+                                    title="Knotenansicht öffnen"
+                                    class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
+                                           hover:text-primary dark:hover:text-dark-bl transition-colors"
+                                >
+                                    <ExternalLink class="w-4 h-4" />
+                                </a>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <button
+                                onclick={() => toggleLP(lp.id)}
+                                class="flex items-center gap-2 py-4 pr-4 pl-2 shrink-0
+                                       text-light-tx dark:text-dark-tx"
+                            >
                                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                                     {lp.aspekte.length} Aspekte
                                 </span>
@@ -122,8 +142,8 @@
                                 {:else}
                                     <ChevronRight class="w-4 h-4 shrink-0" />
                                 {/if}
-                            </div>
-                        </button>
+                            </button>
+                        </div>
 
                         <!-- Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
                         {#if lp.metadata?.import_hinweis}
