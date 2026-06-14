@@ -6,7 +6,7 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
-    import { ArrowLeft } from 'lucide-svelte'
+    import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -31,7 +31,9 @@
             const data = await getContextNodes({
                 content_type: ['leitperspektive', 'leitperspektive_aspekt']
             })
-            nodes = data.items || []
+            // getContextNodes liefert ein Array (response_model=list[...]),
+            // kein {items}-Objekt.
+            nodes = data || []
         } catch (e) {
             error = e.message || 'Fehler beim Laden der Leitperspektiven'
         } finally {
@@ -51,9 +53,20 @@
         aspekte: groupedNodes.aspekte.filter(a => a.metadata?.kuerzel === lp.metadata?.kuerzel)
     })))
 
+    // Einklapp-Zustand der Leitperspektiven (analog Leitideen im Fachplan,
+    // standardmäßig eingeklappt für eine kompakte Übersicht)
+    let expandedLPs = $state({})
+    function toggleLP(id) {
+        expandedLPs = { ...expandedLPs, [id]: !expandedLPs[id] }
+    }
+
     // Navigationsfunktion
     function navigateToNode(nodeId) {
-        goto(`/knowledge/${nodeId}?back=${encodeURIComponent($page.url.pathname)}`)
+        goto(nodeHref(nodeId))
+    }
+
+    function nodeHref(nodeId) {
+        return `/knowledge/${nodeId}?back=${encodeURIComponent($page.url.pathname)}`
     }
 </script>
 
@@ -92,23 +105,57 @@
                 {#each leitperspektivenWithAspekte as lp (lp.id)}
                     <div class="bg-light-bg-2 dark:bg-dark-bg-2 rounded-lg border 
                                 border-light-ui-3 dark:border-dark-ui-3 overflow-hidden">
-                        <!-- Leitperspektive Header -->
-                        <button
-                            onclick={() => navigateToNode(lp.id)}
-                            class="w-full flex items-center gap-3 p-4 
-                                   bg-light-bg-3 dark:bg-dark-bg-3 
-                                   text-light-tx dark:text-dark-tx hover:bg-light-bg-4 dark:hover:bg-dark-bg-4
-                                   transition-colors text-left"
+                        <!-- Leitperspektive Header (Toggle, analog Leitideen) -->
+                        <div
+                            class="w-full flex items-center justify-between gap-3
+                                   bg-light-bg-3 dark:bg-dark-bg-3
+                                   hover:bg-light-bg-4 dark:hover:bg-dark-bg-4 transition-colors"
                         >
-                            <NodeTypeIcon contentType="leitperspektive" size={20} />
-                            <span class="font-medium">{lp.title}</span>
-                            <span class="ml-auto text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                {lp.aspekte.length} Aspekte
-                            </span>
-                        </button>
+                            <div class="flex items-center gap-2 min-w-0 pl-4">
+                                <button
+                                    onclick={() => toggleLP(lp.id)}
+                                    class="flex items-center gap-3 min-w-0 py-4 text-left
+                                           text-light-tx dark:text-dark-tx"
+                                >
+                                    <NodeTypeIcon contentType="leitperspektive" size={20} />
+                                    <span class="font-medium truncate">{lp.title}</span>
+                                </button>
+                                <a
+                                    href={nodeHref(lp.id)}
+                                    title="Knotenansicht öffnen"
+                                    class="shrink-0 p-1 rounded text-light-tx-2 dark:text-dark-tx-2
+                                           hover:text-primary dark:hover:text-dark-bl transition-colors"
+                                >
+                                    <ExternalLink class="w-4 h-4" />
+                                </a>
+                            </div>
+                            <button
+                                onclick={() => toggleLP(lp.id)}
+                                class="flex items-center gap-2 py-4 pr-4 pl-2 shrink-0
+                                       text-light-tx dark:text-dark-tx"
+                            >
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    {lp.aspekte.length} Aspekte
+                                </span>
+                                {#if expandedLPs[lp.id]}
+                                    <ChevronDown class="w-4 h-4 shrink-0" />
+                                {:else}
+                                    <ChevronRight class="w-4 h-4 shrink-0" />
+                                {/if}
+                            </button>
+                        </div>
 
-                        <!-- Aspekte-Liste -->
-                        {#if lp.aspekte.length > 0}
+                        <!-- Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
+                        {#if lp.metadata?.import_hinweis}
+                            <div class="flex items-start gap-2 px-4 py-3 border-t border-light-ui-3 dark:border-dark-ui-3
+                                        text-sm text-light-tx-2 dark:text-dark-tx-2">
+                                <TriangleAlert class="w-4 h-4 shrink-0 mt-0.5 text-light-ye dark:text-dark-ye" />
+                                <span>{lp.metadata.import_hinweis}</span>
+                            </div>
+                        {/if}
+
+                        <!-- Aspekte-Liste (einklappbar) -->
+                        {#if expandedLPs[lp.id] && lp.aspekte.length > 0}
                             <div class="p-3 space-y-2 border-t border-light-ui-3 dark:border-dark-ui-3">
                                 {#each lp.aspekte as aspekt (aspekt.id)}
                                     <button

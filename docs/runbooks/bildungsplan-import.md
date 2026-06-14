@@ -98,6 +98,14 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 # Strukturfehler (fehlende Tabellen etc.) müssen untersucht werden
 ```
 
+> **Sonderfall LFDB (Leitfaden Demokratiebildung):** Der LFDB wird intern wie
+> eine Leitperspektive geführt, hat auf der BP-Webseite aber keine Aspekt-Liste —
+> seine Kompetenzen, Bausteine und Handlungsfelder stehen nur in einer separaten
+> PDF. Der Scraper erzeugt deshalb bewusst **0 `leitperspektive_aspekt`-Knoten**
+> für LFDB und setzt am Übersichtsknoten `metadata.import_hinweis`. 0 Aspekte bei
+> LFDB sind also **kein** Strukturfehler. Sollen die PDF-Inhalte künftig
+> importiert werden, ist ein eigener Parser nötig (siehe Todo).
+
 ---
 
 ## Schritt 4 — Dry-Run des Imports
