@@ -72,14 +72,14 @@
     }
 </script>
 
-<button
-    onclick={() => history.back()}
-    class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
->
-    <ArrowLeft class="w-4 h-4" /> Zurück
-</button>
-
 <div class="h-full overflow-y-auto p-6">
+    <button
+        onclick={() => history.back()}
+        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+    >
+        <ArrowLeft class="w-4 h-4" /> Zurück
+    </button>
+
     <div class="max-w-4xl mx-auto">
         <div
             class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx"
@@ -133,17 +133,26 @@
                                     <div class="flex items-center gap-2">
                                         {#if conv.subject_id}
                                             <SubjectIcon
-                                                name={$subjectMap[conv.subject_id]?.icon ?? null}
-                                                color={$subjectMap[conv.subject_id]?.color ?? null}
+                                                name={$subjectMap[
+                                                    conv.subject_id
+                                                ]?.icon ?? null}
+                                                color={$subjectMap[
+                                                    conv.subject_id
+                                                ]?.color ?? null}
                                                 size={16}
                                                 class="shrink-0"
                                             />
                                         {/if}
                                         {#if conv.assistant_name}
-                                            <Bot class="w-4 h-4 shrink-0 text-light-bl dark:text-dark-bl"
-                                                 title={conv.assistant_name} />
+                                            <Bot
+                                                class="w-4 h-4 shrink-0 text-light-bl dark:text-dark-bl"
+                                                title={conv.assistant_name}
+                                            />
                                         {/if}
-                                        <span>{conv.title ?? "Unbenannter Chat"}</span>
+                                        <span
+                                            >{conv.title ??
+                                                "Unbenannter Chat"}</span
+                                        >
                                     </div>
                                 </td>
                                 <td
