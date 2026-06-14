@@ -31,7 +31,9 @@
             const data = await getContextNodes({
                 content_type: ['leitperspektive', 'leitperspektive_aspekt']
             })
-            nodes = data.items || []
+            // getContextNodes liefert ein Array (response_model=list[...]),
+            // kein {items}-Objekt.
+            nodes = data || []
         } catch (e) {
             error = e.message || 'Fehler beim Laden der Leitperspektiven'
         } finally {
