@@ -310,3 +310,36 @@ async def test_hj2_regenerierung_hj1_unveraendert(
     snaps = await test_client.get("/planning/groups/100/snapshots", headers=auth_headers)
     reasons = [s["reason"] for s in snaps.json()]
     assert "regeneration" in reasons
+
+
+# ── UP-Phase-3a: Curriculum-Kapitel-Endpoint ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_curriculum_chapters_endpoint_lehrkraft(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Lehrkraft der Gruppe erhält 200 mit der erwarteten Struktur.
+
+    Gruppe 100 hat keinen Klassenbezug → grade_unbekannt; ohne Curriculum für das
+    Fach ist die Liste leer, der Endpoint liefert trotzdem 200.
+    """
+    resp = await test_client.get(
+        "/planning/groups/100/curriculum-chapters", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "curricula" in body
+    assert "grade_unbekannt" in body
+    assert isinstance(body["curricula"], list)
+
+
+@pytest.mark.asyncio
+async def test_curriculum_chapters_endpoint_fremde_lehrkraft_403(
+    test_client, auth_teacher2, seed_planning_fixtures
+):
+    """Lehrkraft ohne Mitgliedschaft in der Gruppe erhält 403."""
+    resp = await test_client.get(
+        "/planning/groups/100/curriculum-chapters", headers=auth_teacher2
+    )
+    assert resp.status_code == 403

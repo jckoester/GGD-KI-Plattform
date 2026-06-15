@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.embedding import enqueue_embedding_job
+from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context, get_semantic_context
 from app.context.schemas import CurriculumDraftConfirmed
 from app.db.models import (
@@ -450,6 +451,10 @@ async def get_or_create_node(
             update_data["write_scope_group_id"] = data["write_scope_group_id"]
         if "subject_id" in data:
             update_data["subject_id"] = data["subject_id"]
+        if "min_grade" in data:
+            update_data["min_grade"] = data["min_grade"]
+        if "max_grade" in data:
+            update_data["max_grade"] = data["max_grade"]
         if "metadata_" in data:
             update_data["metadata_"] = data["metadata_"]
         
@@ -472,6 +477,8 @@ async def get_or_create_node(
         "write_scope": data.get("write_scope", "private"),
         "write_scope_group_id": data.get("write_scope_group_id"),
         "subject_id": data.get("subject_id"),
+        "min_grade": data.get("min_grade"),
+        "max_grade": data.get("max_grade"),
         "metadata_": data.get("metadata_", {}),
         "status": "active",
         "created_at": datetime.now(timezone.utc),
@@ -723,6 +730,7 @@ async def import_curriculum_from_draft(
     all_import_keys: set[str] = set()
     
     # 1. Curriculum-Knoten
+    min_grade, max_grade = parse_grade_band(payload.jahrgangsstufe)
     curriculum_data = {
         "category": "knowledge",
         "content_type": "curriculum",
@@ -732,6 +740,8 @@ async def import_curriculum_from_draft(
         "write_scope": "subject" if department_group_id else "school",
         "write_scope_group_id": department_group_id,
         "subject_id": subject_id,
+        "min_grade": min_grade,
+        "max_grade": max_grade,
         "owner_pseudonym": user_pseudonym,
         "metadata_": {
             "fachplan_id": payload.fachplan_id,

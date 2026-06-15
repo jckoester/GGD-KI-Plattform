@@ -46,6 +46,7 @@ from app.context.schemas import (
     PkKompetenzRead,
 )
 from app.context.embedding import enqueue_embedding_job
+from app.context.grades import parse_grade_band
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.preferences.service import get_preferences
@@ -1215,6 +1216,7 @@ async def create_curriculum_node(
     if existing_node:
         return existing_node
 
+    cur_min_grade, cur_max_grade = parse_grade_band(payload.jahrgangsstufe)
     curriculum = ContextNode(
         category="knowledge",
         content_type="curriculum",
@@ -1224,6 +1226,8 @@ async def create_curriculum_node(
         write_scope="subject",
         write_scope_group_id=department_group_id,
         subject_id=subject_id,
+        min_grade=cur_min_grade,
+        max_grade=cur_max_grade,
         owner_pseudonym=user.sub,
         metadata_={
             # Geschäftsschlüssel des Bildungsplans — konsistent mit dem Import-Pfad

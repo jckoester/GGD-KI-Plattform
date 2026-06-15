@@ -106,6 +106,29 @@ class UnitRead(BaseModel):
         populate_by_name = True
 
 
+# ── Curriculum-Kapitel-Auswahl (UE-Picker) ────────────────────────────────────
+
+class CurriculumKapitelOption(BaseModel):
+    id: UUID
+    titel: str
+    std: Optional[int] = None
+    reihenfolge: Optional[int] = None
+    ues: list[str] = []
+
+
+class CurriculumOption(BaseModel):
+    curriculum_id: UUID
+    titel: str
+    jahrgangsstufe: Optional[str] = None
+    kapitel: list[CurriculumKapitelOption] = []
+
+
+class GroupCurriculaRead(BaseModel):
+    curricula: list[CurriculumOption] = []
+    grade: Optional[int] = None
+    grade_unbekannt: bool = False
+
+
 # ── Stunden-Knoten ────────────────────────────────────────────────────────────
 
 class LessonCreate(BaseModel):

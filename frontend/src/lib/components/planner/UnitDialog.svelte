@@ -1,6 +1,8 @@
 <script>
   import { ueColor, UE_PALETTE } from '$lib/planner.js'
-  import { createUnit } from '$lib/api.js'
+  import { createUnit, getGroupCurriculumChapters } from '$lib/api.js'
+  import LoadingBanner from '$lib/components/LoadingBanner.svelte'
+  import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
   const { open = false, groupId, onCreated, onClose } = $props()
 
@@ -9,16 +11,73 @@
   let saving = $state(false)
   let error = $state(null)
 
+  // Curriculum-Kapitel-Auswahl
+  let curricula = $state([])
+  let gradeUnbekannt = $state(false)
+  let loadingChapters = $state(false)
+  let chaptersError = $state(null)
+  let selectedKapitelId = $state('')
+
   $effect(() => {
-    if (open) { titel = ''; farbe = 0; error = null }
+    if (open) {
+      titel = ''
+      farbe = 0
+      error = null
+      selectedKapitelId = ''
+      loadChapters()
+    }
   })
+
+  async function loadChapters() {
+    loadingChapters = true
+    chaptersError = null
+    try {
+      const data = await getGroupCurriculumChapters(groupId)
+      curricula = data.curricula ?? []
+      gradeUnbekannt = data.grade_unbekannt ?? false
+    } catch (e) {
+      chaptersError = e.message
+      curricula = []
+      gradeUnbekannt = false
+    } finally {
+      loadingChapters = false
+    }
+  }
+
+  const hasChapters = $derived(curricula.some(c => c.kapitel.length > 0))
+
+  function findKapitel(id) {
+    if (!id) return null
+    for (const c of curricula) {
+      const k = c.kapitel.find(k => k.id === id)
+      if (k) return k
+    }
+    return null
+  }
+
+  const selectedStd = $derived(findKapitel(selectedKapitelId)?.std ?? null)
+
+  function onKapitelChange() {
+    // Leeres Titelfeld mit dem Kapiteltitel vorbelegen
+    if (titel.trim()) return
+    const k = findKapitel(selectedKapitelId)
+    if (k) titel = k.titel
+  }
+
+  function kapitelLabel(k) {
+    let label = k.reihenfolge ? `${k.reihenfolge}. ${k.titel}` : k.titel
+    if (k.std) label += ` · ${k.std} Std`
+    return label
+  }
 
   async function save() {
     if (!titel.trim()) { error = 'Titel ist erforderlich.'; return }
     saving = true
     error = null
     try {
-      const unit = await createUnit(groupId, { titel: titel.trim(), farbe })
+      const payload = { titel: titel.trim(), farbe }
+      if (selectedKapitelId) payload.kapitel_node_id = selectedKapitelId
+      const unit = await createUnit(groupId, payload)
       onCreated(unit)
     } catch (e) {
       error = e.message
@@ -60,7 +119,7 @@
         />
       </div>
 
-      <div class="mb-5">
+      <div class="mb-4">
         <label class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2">Farbe</label>
         <div class="flex gap-2 flex-wrap">
           {#each UE_PALETTE as [light], i}
@@ -73,6 +132,56 @@
             ></button>
           {/each}
         </div>
+      </div>
+
+      <!-- Curriculum-Kapitel (optional) -->
+      <div class="mb-5">
+        <label class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1">
+          Curriculum-Kapitel <span class="font-normal">(optional)</span>
+        </label>
+        {#if loadingChapters}
+          <LoadingBanner message="Curriculum wird geladen…" />
+        {:else if chaptersError}
+          <ErrorBanner message={chaptersError} />
+        {:else}
+          <select
+            bind:value={selectedKapitelId}
+            onchange={onKapitelChange}
+            class="w-full px-3 py-2 text-sm bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
+                   text-light-tx dark:text-dark-tx outline-none focus:border-primary dark:focus:border-primary-dark transition-colors"
+          >
+            <option value="">— Kein Kapitel —</option>
+            {#if curricula.length === 1}
+              {#each curricula[0].kapitel as k}
+                <option value={k.id}>{kapitelLabel(k)}</option>
+              {/each}
+            {:else}
+              {#each curricula as c}
+                {#if c.kapitel.length > 0}
+                  <optgroup label={c.jahrgangsstufe ? `${c.titel} (Kl. ${c.jahrgangsstufe})` : c.titel}>
+                    {#each c.kapitel as k}
+                      <option value={k.id}>{kapitelLabel(k)}</option>
+                    {/each}
+                  </optgroup>
+                {/if}
+              {/each}
+            {/if}
+          </select>
+          {#if !hasChapters}
+            <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+              Kein Curriculum für diese Gruppe gefunden – die Verknüpfung ist optional.
+            </p>
+          {:else if gradeUnbekannt}
+            <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+              Jahrgang nicht erkannt – es werden alle Curricula des Fachs angezeigt.
+            </p>
+          {/if}
+          {#if selectedStd != null}
+            <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
+              Soll-Umfang des Kapitels: {selectedStd} Stunden
+            </p>
+          {/if}
+        {/if}
       </div>
 
       {#if error}

@@ -1274,6 +1274,12 @@ export async function listUnits(groupId) {
     return res.json()
 }
 
+export async function getGroupCurriculumChapters(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/curriculum-chapters`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Curriculum-Kapitel konnten nicht geladen werden')
+    return res.json()
+}
+
 export async function createLesson(unitNodeId, data) {
     const res = await fetch(`${BASE}/planning/units/${unitNodeId}/lessons`, {
         method: 'POST',

@@ -31,10 +31,14 @@ from app.db.models import (
     SlotPlanSnapshot,
 )
 from app.db.session import get_db
+from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.permissions import require_group_teacher
 from app.planning.schemas import (
     BalanceRead,
+    CurriculumKapitelOption,
+    CurriculumOption,
     FerienItem,
+    GroupCurriculaRead,
     LessonCreate,
     LessonNav,
     LessonRead,
@@ -413,6 +417,46 @@ async def list_units(
             )
         )
     return result
+
+
+# ── GET /planning/groups/{group_id}/curriculum-chapters ───────────────────────
+
+
+@router.get(
+    "/groups/{group_id}/curriculum-chapters",
+    response_model=GroupCurriculaRead,
+)
+async def get_group_curriculum_chapters(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Zur Gruppe passende Curricula mit Kapiteln (Quelle für den UE-Picker)."""
+    await require_group_teacher(group_id, user, db)
+
+    resolved = await resolve_group_curricula(db, group_id)
+    return GroupCurriculaRead(
+        curricula=[
+            CurriculumOption(
+                curriculum_id=cur.curriculum_id,
+                titel=cur.titel,
+                jahrgangsstufe=cur.jahrgangsstufe,
+                kapitel=[
+                    CurriculumKapitelOption(
+                        id=k.id,
+                        titel=k.titel,
+                        std=k.std,
+                        reihenfolge=k.reihenfolge,
+                        ues=k.ues,
+                    )
+                    for k in cur.kapitel
+                ],
+            )
+            for cur in resolved.curricula
+        ],
+        grade=resolved.grade,
+        grade_unbekannt=resolved.grade_unbekannt,
+    )
 
 
 # ── POST /planning/units/{node_id}/lessons ────────────────────────────────────

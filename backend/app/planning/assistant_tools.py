@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.db.models import ContextEdge, ContextNode, LessonSlot
+from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.permissions import require_group_teacher
 
 logger = logging.getLogger(__name__)
@@ -142,61 +143,30 @@ register_tool(ChatTool(
 # ── get_curriculum_chapters ───────────────────────────────────────────────────
 
 
-async def _handle_get_curriculum_chapters(args: dict, ctx: ToolContext) -> list[dict]:
-    group_id = ctx.group_id
-    if group_id is None:
+async def _handle_get_curriculum_chapters(args: dict, ctx: ToolContext) -> dict:
+    if ctx.group_id is None:
         return {"error": "Kein Gruppenkontext"}
 
-    db = ctx.db
-
-    # Gruppe → subject_id + ggf. Lehrplan
-    from app.db.models import Group
-    group = await db.get(Group, group_id)
-    if group is None or group.subject_id is None:
-        return []
-
-    # Kapitel des Fachs (Bildungsplan-Knoten)
-    result = await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.content_type == "kapitel",
-            ContextNode.subject_id == group.subject_id,
-            ContextNode.status == "active",
-        ).order_by(ContextNode.metadata_["position"].astext.cast(sa.Integer).nullslast())
-    )
-    chapters = result.scalars().all()
-
-    # Welche UEs referenzieren welches Kapitel?
-    ue_result = await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.content_type == "unterrichtseinheit",
-            ContextNode.write_scope_group_id == group_id,
-            ContextNode.status == "active",
-        )
-    )
-    ues = ue_result.scalars().all()
-
-    # kapitel_id → [ue_titel]
-    ue_by_kapitel: dict[UUID, list[str]] = {}
-    for ue in ues:
-        edges = await db.execute(
-            sa.select(ContextEdge).where(
-                ContextEdge.from_node_id == ue.id,
-                ContextEdge.relation == "references",
-            )
-        )
-        for edge in edges.scalars().all():
-            ue_by_kapitel.setdefault(edge.to_node_id, []).append(ue.title)
-
-    return [
-        {
-            "id": str(c.id),
-            "titel": c.title,
-            "std": (c.metadata_ or {}).get("std"),
-            "lernsequenzen": (c.metadata_ or {}).get("lernsequenzen", []),
-            "ues": ue_by_kapitel.get(c.id, []),
-        }
-        for c in chapters
-    ]
+    resolved = await resolve_group_curricula(ctx.db, ctx.group_id)
+    return {
+        "grade_unbekannt": resolved.grade_unbekannt,
+        "curricula": [
+            {
+                "curriculum": c.titel,
+                "jahrgangsstufe": c.jahrgangsstufe,
+                "kapitel": [
+                    {
+                        "id": str(k.id),
+                        "titel": k.titel,
+                        "std": k.std,
+                        "ues": k.ues,
+                    }
+                    for k in c.kapitel
+                ],
+            }
+            for c in resolved.curricula
+        ],
+    }
 
 
 register_tool(ChatTool(
@@ -208,9 +178,11 @@ register_tool(ChatTool(
         "function": {
             "name": "get_curriculum_chapters",
             "description": (
-                "Gibt die Kapitel des Fachlehrplans für die Gruppe zurück. "
-                "Enthält Titel, Soll-Stunden (std), Lernsequenzen und bereits "
-                "angelegte UE-Verknüpfungen."
+                "Gibt die Kapitel des/der zur Gruppe passenden Curriculum(s) zurück "
+                "(gefiltert nach Fach und Jahrgang). Gruppiert je Curriculum; pro Kapitel "
+                "Titel, Soll-Stunden (std) und bereits angelegte UE-Verknüpfungen. "
+                "grade_unbekannt=true bedeutet: Jahrgang nicht ableitbar, alle Curricula "
+                "des Fachs enthalten."
             ),
             "parameters": {"type": "object", "properties": {}, "required": []},
         },

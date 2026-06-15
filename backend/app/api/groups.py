@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 from typing import Optional
 
@@ -10,19 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.config import SsoConfig
 from app.auth.dependencies import get_current_user, get_sso_config
 from app.auth.jwt import JwtPayload
+from app.context.grades import parse_class_grade as _parse_grade
 from app.db.models import Group, GroupMembership, Subject, TeacherGroupExclusion
 from app.db.session import get_db
 
 router = APIRouter(prefix="/groups", tags=["groups"])
-
-
-def _parse_grade(class_name: str) -> Optional[int]:
-    """Extrahiert die führende Jahrgangs-Zahl aus einem Klassennamen.
-
-    '10C' -> 10, '8a' -> 8, 'EF' -> None, 'Q1' -> None
-    """
-    m = re.match(r'^(\d+)', class_name)
-    return int(m.group(1)) if m else None
 
 
 class GroupOut(BaseModel):
