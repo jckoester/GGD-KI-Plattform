@@ -98,7 +98,9 @@ async def _build_balance(
 
     for ue_node in units:
         ue_slots = [s for s in slots if s.ue_node_id == ue_node.id]
-        zugewiesen = len(ue_slots)
+        # Curriculum-Stunden sind Einzelstunden; ein Doppelstunden-Slot (periods=2)
+        # zählt entsprechend als 2 Stunden. Daher Summe der periods, nicht Slot-Anzahl.
+        zugewiesen = sum(s.periods for s in ue_slots)
         for s in ue_slots:
             assigned_slot_ids.add(s.id)
 

@@ -154,6 +154,57 @@ async def test_ue_anlegen_slots_zuweisen_bilanz(
     assert ue_item["zugewiesen"] == 1
 
 
+@pytest.mark.asyncio
+async def test_bilanz_doppelstunde_zaehlt_zwei_stunden(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Ein Doppelstunden-Slot (periods=2) zählt in der Bilanz als 2 Einzelstunden,
+    da Curriculum-Soll-Stunden Einzelstunden sind."""
+    # Doppelstunden-Muster für HJ1 setzen und generieren
+    resp = await test_client.put(
+        "/planning/groups/100/pattern",
+        json={"halbjahr": 1, "patterns": [{"weekday": 0, "start_period": 1, "periods": 2}]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    resp = await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    # UE anlegen
+    resp = await test_client.post(
+        "/planning/groups/100/units",
+        json={"titel": "Doppelstunden-UE", "farbe": 1},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    ue_id = resp.json()["id"]
+
+    # Zwei Doppelstunden-Slots dem UE zuweisen
+    ov = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    slots = [s for s in ov.json()["slots"] if s["periods"] == 2][:2]
+    assert len(slots) == 2
+    for slot in slots:
+        resp = await test_client.patch(
+            f"/planning/slots/{slot['id']}",
+            json={"ue_node_id": ue_id},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    # Bilanz: 2 Doppelstunden = 4 Einzelstunden
+    resp = await test_client.get("/planning/groups/100/balance", headers=auth_headers)
+    assert resp.status_code == 200
+    ue_item = next(
+        (i for i in resp.json()["items"] if i["ue_node_id"] == ue_id), None
+    )
+    assert ue_item is not None
+    assert ue_item["zugewiesen"] == 4
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 
