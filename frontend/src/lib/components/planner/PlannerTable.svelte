@@ -1,5 +1,6 @@
 <script>
-    import { groupSlotsByWeek } from "$lib/planner.js";
+    import { tick } from "svelte";
+    import { groupSlotsByWeek, isoWeek } from "$lib/planner.js";
     import PlannerRow from "./PlannerRow.svelte";
     import SpecialDayRow from "./SpecialDayRow.svelte";
 
@@ -31,6 +32,43 @@
             ende,
         }),
     );
+
+    // Beim ersten Aufbau einmalig zur aktuellen (bzw. nächsten Schul-)Woche scrollen.
+    let didScroll = false;
+    let headerEl = $state(null); // Sticky-Spaltenheader, dessen Höhe beim Scrollen abgezogen wird
+
+    function currentWeekKey() {
+        const now = new Date();
+        const ds = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const { week, year } = isoWeek(ds);
+        return `${year}-W${String(week).padStart(2, "0")}`;
+    }
+
+    $effect(() => {
+        if (didScroll || !weekItems.length) return;
+        didScroll = true;
+
+        const keys = weekItems.filter((i) => i.type === "week").map((i) => i.key);
+        const wk = currentWeekKey();
+        // Exakte Woche; sonst die nächste folgende; sonst die letzte (Schuljahr vorbei).
+        const target = keys.includes(wk)
+            ? wk
+            : (keys.find((k) => k > wk) ?? keys.at(-1));
+        if (!target) return;
+
+        tick().then(() => {
+            const el = document.querySelector(`[data-week="${target}"]`);
+            const container = el?.closest(".overflow-y-auto");
+            if (!el || !container) return;
+            // Um die Höhe des Sticky-Spaltenheaders weniger scrollen, sonst
+            // verdeckt er die erste Stunde der Zielwoche.
+            const headerOffset = headerEl?.offsetHeight ?? 33;
+            const delta =
+                el.getBoundingClientRect().top -
+                container.getBoundingClientRect().top;
+            container.scrollTop += delta - headerOffset;
+        });
+    });
 
     function unitForId(id) {
         return id ? (units.find((u) => u.id === id) ?? null) : null;
@@ -64,6 +102,7 @@
 {:else}
     <!-- Spaltenheader (sticky, volle Breite) -->
     <div
+        bind:this={headerEl}
         class="grid grid-cols-[118px_6px_1fr_230px_120px] sticky top-0 z-20
               border-b-2 border-light-ui-3 dark:border-dark-ui-3
               bg-light-bg dark:bg-dark-bg text-xs font-semibold uppercase tracking-wide
@@ -84,6 +123,7 @@
         overflow:visible damit sticky und Dropdown-Popovers funktionieren.
       -->
             <div
+                data-week={item.key}
                 class="border-l-2 border-light-ui-3 dark:border-dark-ui-3 ml-1 mb-3"
             >
                 <!-- Wochenkopf (sticky innerhalb des Scroll-Containers) -->
