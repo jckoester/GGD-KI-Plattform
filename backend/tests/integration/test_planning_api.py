@@ -309,6 +309,53 @@ async def test_unit_loeschen_gibt_slots_frei(
     assert freed["ue_node_id"] is None
 
 
+@pytest.mark.asyncio
+async def test_ausfall_zaehlt_nicht_zur_ue(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Eine auf Ausfall gesetzte Stunde zählt nicht mehr zum Ist der UE."""
+    await test_client.put(
+        "/planning/groups/100/pattern",
+        json={"halbjahr": 1, "patterns": [{"weekday": 0, "start_period": 3, "periods": 1}]},
+        headers=auth_headers,
+    )
+    await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    ue_id = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Funktionen", "farbe": 0},
+            headers=auth_headers,
+        )
+    ).json()["id"]
+    slots = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()["slots"]
+    slot_id = slots[0]["id"]
+    await test_client.patch(
+        f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+    )
+
+    bal = (
+        await test_client.get("/planning/groups/100/balance", headers=auth_headers)
+    ).json()
+    item = next(i for i in bal["items"] if i["ue_node_id"] == ue_id)
+    assert item["zugewiesen"] == 1
+
+    # Stunde auf Ausfall setzen → zählt nicht mehr
+    await test_client.patch(
+        f"/planning/slots/{slot_id}", json={"kategorie": "ausfall"}, headers=auth_headers
+    )
+    bal = (
+        await test_client.get("/planning/groups/100/balance", headers=auth_headers)
+    ).json()
+    item = next(i for i in bal["items"] if i["ue_node_id"] == ue_id)
+    assert item["zugewiesen"] == 0
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 

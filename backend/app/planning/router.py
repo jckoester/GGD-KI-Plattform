@@ -109,12 +109,16 @@ async def _build_balance(
     units: list[ContextNode],
     slots: list[LessonSlot],
 ) -> BalanceRead:
-    total_slots = len(slots)
+    # Ausgefallene Stunden zählen nicht zum Unterrichtsbudget: sie fanden nicht
+    # statt. Die UE-Zuordnung bleibt am Slot erhalten (Nachvollziehbarkeit, einfaches
+    # Zurücksetzen), wird hier aber komplett aus der Bilanz herausgerechnet.
+    aktive_slots = [s for s in slots if s.kategorie != "ausfall"]
+    total_slots = len(aktive_slots)
     assigned_slot_ids: set[UUID] = set()
     items: list[UnitBalanceItem] = []
 
     for ue_node in units:
-        ue_slots = [s for s in slots if s.ue_node_id == ue_node.id]
+        ue_slots = [s for s in aktive_slots if s.ue_node_id == ue_node.id]
         # Curriculum-Stunden sind Einzelstunden; ein Doppelstunden-Slot (periods=2)
         # zählt entsprechend als 2 Stunden. Daher Summe der periods, nicht Slot-Anzahl.
         zugewiesen = sum(s.periods for s in ue_slots)
