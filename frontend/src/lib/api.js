@@ -1279,6 +1279,14 @@ export async function updateUnit(groupId, nodeId, data) {
     return res.json()
 }
 
+export async function deleteUnit(groupId, nodeId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/units/${nodeId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UE konnte nicht gelöscht werden')
+}
+
 export async function listUnits(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/units`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UEs konnten nicht geladen werden')

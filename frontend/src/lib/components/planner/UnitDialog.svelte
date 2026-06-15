@@ -1,11 +1,11 @@
 <script>
   import { ueColor, UE_PALETTE } from '$lib/planner.js'
-  import { createUnit, updateUnit, getGroupCurriculumChapters } from '$lib/api.js'
+  import { createUnit, updateUnit, deleteUnit, getGroupCurriculumChapters } from '$lib/api.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
   // `unit` gesetzt → Bearbeiten-Modus, sonst Anlegen.
-  const { open = false, groupId, unit = null, onCreated, onUpdated, onClose } = $props()
+  const { open = false, groupId, unit = null, onCreated, onUpdated, onDeleted, onClose } = $props()
 
   const isEdit = $derived(!!unit)
 
@@ -13,6 +13,8 @@
   let farbe = $state(0)
   let saving = $state(false)
   let error = $state(null)
+  let confirmDelete = $state(false)
+  let deleting = $state(false)
 
   // Curriculum-Kapitel-Auswahl
   let curricula = $state([])
@@ -26,6 +28,7 @@
       titel = unit?.title ?? ''
       farbe = unit?.metadata_?.farbe ?? 0
       error = null
+      confirmDelete = false
       selectedKapitelId = unit?.kapitel_node_id ?? ''
       loadChapters()
     }
@@ -93,6 +96,21 @@
       error = e.message
     } finally {
       saving = false
+    }
+  }
+
+  async function remove() {
+    if (!isEdit) return
+    deleting = true
+    error = null
+    try {
+      await deleteUnit(groupId, unit.id)
+      onDeleted?.(unit)
+    } catch (e) {
+      error = e.message
+      confirmDelete = false
+    } finally {
+      deleting = false
     }
   }
 
@@ -198,22 +216,74 @@
         <p class="text-sm text-light-re dark:text-dark-re mb-3">{error}</p>
       {/if}
 
-      <div class="flex justify-end gap-3">
-        <button
-          onclick={onClose}
-          class="px-4 py-2 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
-        >
-          Abbrechen
-        </button>
-        <button
-          onclick={save}
-          disabled={saving || !titel.trim()}
-          class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
-                 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? 'Speichern…' : isEdit ? 'Speichern' : 'Anlegen'}
-        </button>
-      </div>
+      {#if confirmDelete}
+        <!-- Bestätigung des Löschens -->
+        <div class="rounded-lg border border-light-re/40 dark:border-dark-re/40 bg-light-re/5 dark:bg-dark-re/10 p-3">
+          <p class="text-sm text-light-tx dark:text-dark-tx mb-1 font-medium">
+            Unterrichtseinheit „{unit?.title}" löschen?
+          </p>
+          <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-3">
+            Zugewiesene Stunden werden wieder freigegeben (nicht gelöscht).
+            Bereits angelegte Stundenentwürfe bleiben erhalten.
+          </p>
+          <div class="flex justify-end gap-3">
+            <button
+              onclick={() => { confirmDelete = false }}
+              disabled={deleting}
+              class="px-4 py-2 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              onclick={remove}
+              disabled={deleting}
+              class="px-4 py-2 text-sm rounded-lg font-medium bg-light-re dark:bg-dark-re text-white
+                     hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deleting ? 'Löschen…' : 'Endgültig löschen'}
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="flex items-center justify-between gap-3">
+          <!-- Löschen (nur im Bearbeiten-Modus) -->
+          {#if isEdit}
+            <button
+              onclick={() => { confirmDelete = true }}
+              title="Unterrichtseinheit löschen"
+              aria-label="Unterrichtseinheit löschen"
+              class="p-2 rounded-lg text-light-tx-2 dark:text-dark-tx-2
+                     hover:text-light-re dark:hover:text-dark-re hover:bg-light-re/10 dark:hover:bg-dark-re/10 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                   aria-hidden="true">
+                <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </button>
+          {:else}
+            <span></span>
+          {/if}
+
+          <div class="flex justify-end gap-3">
+            <button
+              onclick={onClose}
+              class="px-4 py-2 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              onclick={save}
+              disabled={saving || !titel.trim()}
+              class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
+                     hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Speichern…' : isEdit ? 'Speichern' : 'Anlegen'}
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}

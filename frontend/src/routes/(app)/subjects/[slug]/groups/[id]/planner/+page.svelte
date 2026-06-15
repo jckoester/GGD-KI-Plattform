@@ -159,6 +159,12 @@
     await refreshAfterUnitChange()
   }
 
+  async function onUnitDeleted() {
+    showUnitDialog = false
+    editUnit = null
+    await refreshAfterUnitChange()
+  }
+
   function closeUnitDialog() {
     showUnitDialog = false
     editUnit = null
@@ -351,6 +357,7 @@
   unit={editUnit}
   onCreated={onUnitCreated}
   onUpdated={onUnitUpdated}
+  onDeleted={onUnitDeleted}
   onClose={closeUnitDialog}
 />
 

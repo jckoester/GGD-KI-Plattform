@@ -64,7 +64,7 @@ from app.planning.schemas import (
     WeekPatternRead,
     WeekPatternSet,
 )
-from app.planning.service import create_unit_node, update_unit_node
+from app.planning.service import create_unit_node, delete_unit_node, update_unit_node
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
 
@@ -429,6 +429,20 @@ async def update_unit(
         kapitel_node_id=kapitel_node_id,
         kapitel_std=kapitel_std,
     )
+
+
+# ── DELETE /planning/groups/{group_id}/units/{node_id} ────────────────────────
+
+
+@router.delete("/groups/{group_id}/units/{node_id}", status_code=204)
+async def delete_unit(
+    group_id: int,
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    await require_group_teacher(group_id, user, db)
+    await delete_unit_node(db=db, node_id=node_id, group_id=group_id)
 
 
 # ── GET /planning/groups/{group_id}/units ────────────────────────────────────

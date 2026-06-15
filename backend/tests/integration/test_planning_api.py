@@ -265,6 +265,50 @@ async def test_unit_bearbeiten_404_unbekannt(
     assert resp.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_unit_loeschen_gibt_slots_frei(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """UE löschen: 204, UE verschwindet, zugewiesene Slots werden freigegeben."""
+    await test_client.put(
+        "/planning/groups/100/pattern",
+        json={"halbjahr": 1, "patterns": [{"weekday": 0, "start_period": 3, "periods": 1}]},
+        headers=auth_headers,
+    )
+    await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    ue_id = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Wird gelöscht", "farbe": 0},
+            headers=auth_headers,
+        )
+    ).json()["id"]
+
+    slots = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()["slots"]
+    slot_id = slots[0]["id"]
+    await test_client.patch(
+        f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+    )
+
+    resp = await test_client.delete(
+        f"/planning/groups/100/units/{ue_id}", headers=auth_headers
+    )
+    assert resp.status_code == 204
+
+    overview = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()
+    assert all(u["id"] != ue_id for u in overview["units"])
+    freed = next(s for s in overview["slots"] if s["id"] == slot_id)
+    assert freed["ue_node_id"] is None
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 

@@ -176,6 +176,30 @@ async def update_unit_node(
     return node
 
 
+async def delete_unit_node(
+    db: AsyncSession,
+    node_id: UUID,
+    group_id: int,
+) -> None:
+    """Löscht eine UE (committed).
+
+    Kanten (part_of/references) werden per FK-CASCADE mitgelöscht; zugewiesene
+    Slots verlieren ihre UE-Zuordnung über `lesson_slots.ue_node_id` ON DELETE
+    SET NULL. Verknüpfte Stundenentwürfe bleiben erhalten — nur ihre Slot-Zuordnung
+    wird damit ungebunden.
+    """
+    node = await db.get(ContextNode, node_id)
+    if (
+        node is None
+        or node.content_type != "unterrichtseinheit"
+        or node.write_scope_group_id != group_id
+    ):
+        raise HTTPException(status_code=404, detail="Unterrichtseinheit nicht gefunden")
+
+    await db.delete(node)
+    await db.commit()
+
+
 async def assign_slots_to_unit(
     db: AsyncSession,
     group_id: int,
