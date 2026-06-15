@@ -66,22 +66,28 @@
   const rowBase = 'grid items-start border-b border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors relative group'
   const rowCols = 'grid-cols-[118px_6px_1fr_230px_120px]'
 
+  // Ein offenes Popover macht die Zeile zum obersten Layer. Wichtig: solange ein
+  // Popover offen ist, NICHT dimmen — `opacity < 1` erzeugt einen Stacking-Context,
+  // der das Menü hinter die folgenden KW-Zeilen schiebt (z-index greift dann nicht).
+  const popoverOpen = $derived(uePicker || commentOpen || menuOpen)
+  const dim = (cls) => (popoverOpen ? '' : cls)
+
   const rowExtra = $derived(
     slot.kategorie === 'ausfall'
-      ? 'opacity-60 bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]'
+      ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
       : slot.kategorie === 'pruefung'
         ? 'bg-red-50/60 dark:bg-red-950/20'
         : slot.kategorie === 'puffer'
-          ? 'opacity-60'
+          ? dim('opacity-60')
           : vorlaeufig
-            ? 'opacity-55'
+            ? dim('opacity-55')
             : ''
   )
 </script>
 
 <div
   role="none"
-  class="{rowBase} {rowCols} {rowExtra}"
+  class="{rowBase} {rowCols} {rowExtra} {popoverOpen ? 'z-30' : ''}"
   draggable={!slot.pinned && slot.kategorie !== 'ausfall'}
   ondragstart={onDragStart}
   ondragover={onDragOver}
