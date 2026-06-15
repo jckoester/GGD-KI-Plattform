@@ -31,6 +31,14 @@
     if (newVal !== (slot.thema ?? null)) onPatch({ thema: newVal })
   }
 
+  // Bei verknüpfter Stunde ist der Titel ein Link zum Stundenentwurf, sonst Inline-Edit.
+  const themaIsLink = $derived(!!slot.stunde_node_id && !!onEditLesson)
+
+  function onThemaClick() {
+    if (themaIsLink) onEditLesson(slot.id, slot.stunde_node_id)
+    else startEditThema()
+  }
+
   function openComment() {
     noteInput   = slot.note ?? ''
     commentOpen = true
@@ -156,19 +164,21 @@
                outline-none text-sm text-light-tx dark:text-dark-tx"
       />
     {:else if slot.thema || slot.ue_node_id || !units.length}
-      <!-- Thema-Zeile (kursiv wenn nur Thema, fett wenn Stunde verknüpft) -->
+      <!-- Thema-Zeile: Link zum Stundenentwurf (fett) bzw. Inline-Edit (kursiv) -->
       <button
         type="button"
-        onclick={startEditThema}
-        class="cursor-text text-sm truncate leading-snug w-full text-left
+        onclick={onThemaClick}
+        class="text-sm truncate leading-snug w-full text-left
                {slot.kategorie === 'ausfall' ? 'line-through' : ''}
-               {slot.stunde_node_id
-                 ? 'font-semibold text-light-tx dark:text-dark-tx'
-                 : slot.thema
-                   ? 'italic text-light-tx dark:text-dark-tx'
-                   : 'italic text-light-tx-2 dark:text-dark-tx-2'}"
-        title={slot.thema ?? ''}
-        aria-label="Thema bearbeiten"
+               {themaIsLink
+                 ? 'cursor-pointer font-semibold text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl hover:underline transition-colors'
+                 : slot.stunde_node_id
+                   ? 'cursor-text font-semibold text-light-tx dark:text-dark-tx'
+                   : slot.thema
+                     ? 'cursor-text italic text-light-tx dark:text-dark-tx'
+                     : 'cursor-text italic text-light-tx-2 dark:text-dark-tx-2'}"
+        title={themaIsLink ? 'Stundenentwurf öffnen' : (slot.thema ?? '')}
+        aria-label={themaIsLink ? 'Stundenentwurf öffnen' : 'Thema bearbeiten'}
       >
         {slot.thema || 'Thema eingeben …'}
       </button>

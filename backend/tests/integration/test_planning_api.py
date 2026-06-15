@@ -356,6 +356,52 @@ async def test_ausfall_zaehlt_nicht_zur_ue(
     assert item["zugewiesen"] == 0
 
 
+@pytest.mark.asyncio
+async def test_lesson_anlegen_verknuepft_slot(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Stunde mit slot_id anlegen → der Slot trägt danach stunde_node_id (Overview)."""
+    await test_client.put(
+        "/planning/groups/100/pattern",
+        json={"halbjahr": 1, "patterns": [{"weekday": 0, "start_period": 3, "periods": 1}]},
+        headers=auth_headers,
+    )
+    await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    ue_id = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Funktionen", "farbe": 0},
+            headers=auth_headers,
+        )
+    ).json()["id"]
+    slots = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()["slots"]
+    slot_id = slots[0]["id"]
+    await test_client.patch(
+        f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+    )
+
+    resp = await test_client.post(
+        f"/planning/units/{ue_id}/lessons",
+        json={"titel": "Stunde 1", "slot_id": slot_id},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    lesson_id = resp.json()["id"]
+
+    # Overview neu laden → der Slot muss die Stunde verknüpft führen
+    overview = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()
+    slot = next(s for s in overview["slots"] if s["id"] == slot_id)
+    assert slot["stunde_node_id"] == lesson_id
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 

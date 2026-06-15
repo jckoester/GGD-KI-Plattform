@@ -1,6 +1,6 @@
 <script>
   import { page } from '$app/stores'
-  import { goto } from '$app/navigation'
+  import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import {
@@ -57,7 +57,11 @@
     }
   }
 
-  $effect(() => {
+  // Lädt beim ersten Mount UND bei jeder (Rück-)Navigation auf diese Seite — z.B.
+  // „Übersicht" aus dem Stundenentwurf. afterNavigate feuert auch initial, deshalb
+  // kein zusätzlicher Mount-Effect (sonst Doppel-Load). Sonst zeigte der Plan
+  // veraltete Slot↔Stunde-Verknüpfungen.
+  afterNavigate(() => {
     if (groupId) loadOverview()
   })
 
