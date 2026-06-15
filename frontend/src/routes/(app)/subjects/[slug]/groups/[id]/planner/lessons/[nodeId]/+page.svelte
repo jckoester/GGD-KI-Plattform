@@ -13,7 +13,7 @@
     createReview,
     deleteReview,
   } from '$lib/api.js'
-  import { periodLabel, dateLabel, weekdayLabel } from '$lib/planner.js'
+  import { periodLabel, dateLabel, weekdayLabel, ueColorIndex } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
@@ -286,7 +286,7 @@
           {#if lesson.ue}
             <div class="flex items-center gap-1.5 mb-1">
               <span class="w-3 h-3 rounded-full flex-shrink-0"
-                    style="background-color: hsl({(lesson.ue.farbe ?? 0) * 45}deg 50% 50%)"></span>
+                    style="background-color: {ueColorIndex(lesson.ue.farbe)}"></span>
               <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">{lesson.ue.titel}</span>
             </div>
           {/if}

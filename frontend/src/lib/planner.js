@@ -11,11 +11,15 @@ export const UE_PALETTE = [
     ['#7f9ab5', '#a8c5da'],
 ]
 
+/** Gibt die Palettenfarbe zum Farb-Index zurück (Light- oder Dark-Variante). */
+export function ueColorIndex(farbe = 0, dark = false) {
+    const pair = UE_PALETTE[(farbe ?? 0) % UE_PALETTE.length]
+    return dark ? pair[1] : pair[0]
+}
+
 /** Gibt die Farbe einer UE zurück (Light- oder Dark-Variante). */
 export function ueColor(unit, dark = false) {
-    const farbe = unit?.metadata_?.farbe ?? 0
-    const pair = UE_PALETTE[farbe % UE_PALETTE.length]
-    return dark ? pair[1] : pair[0]
+    return ueColorIndex(unit?.metadata_?.farbe ?? 0, dark)
 }
 
 /**
