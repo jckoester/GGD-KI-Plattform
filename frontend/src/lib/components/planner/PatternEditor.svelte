@@ -4,7 +4,9 @@
   const { open = false, groupId, patterns = [], schuljahr = '', onSaved, onGenerated, onClose } = $props()
 
   const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr']
-  const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8]
+  // Stundenraster der Schule — schulspezifisch, via Umgebungsvariable konfigurierbar.
+  // Ausgelassene Stunden (z.B. keine 7. Stunde) werden einfach in der Liste weggelassen.
+  const PERIODS = JSON.parse(import.meta.env.PUBLIC_PERIODS || '[1,2,3,4,5,6,7,8]')
 
   let halbjahr = $state(1)
   let rows = $state([])

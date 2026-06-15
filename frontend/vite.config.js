@@ -19,7 +19,7 @@ const gitCommit = (() => {
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
-  envDir: "../config",
+  envDir: "..",
   envPrefix: ["VITE_", "PUBLIC_"],
   resolve: {
     alias: {
