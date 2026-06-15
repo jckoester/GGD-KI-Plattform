@@ -87,6 +87,7 @@
 
 <div
   role="none"
+  data-slot={slot.id}
   class="{rowBase} {rowCols} {rowExtra} {popoverOpen ? 'z-30' : ''}"
   draggable={!slot.pinned && slot.kategorie !== 'ausfall'}
   ondragstart={onDragStart}

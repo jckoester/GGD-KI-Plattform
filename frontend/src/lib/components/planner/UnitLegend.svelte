@@ -6,6 +6,7 @@
     balance = null,
     onCreateUnit,
     onEditUnit = null,
+    onSelectUnit = null,
   } = $props()
 
   function balanceForUnit(unitId) {
@@ -67,25 +68,37 @@
             style="background-color: {ueColor(unit)}"
           ></div>
           <div class="min-w-0">
-            <button
-              type="button"
-              onclick={() => onEditUnit?.(unit)}
-              disabled={!onEditUnit}
-              title={onEditUnit ? `„${unit.title}" bearbeiten` : unit.title}
-              class="flex items-center gap-1 text-xs font-medium text-light-tx dark:text-dark-tx
-                     max-w-[180px] text-left
-                     {onEditUnit ? 'hover:text-light-bl dark:hover:text-dark-bl transition-colors cursor-pointer' : 'cursor-default'}"
-            >
-              <span class="truncate">{unit.title}</span>
+            <div class="flex items-center gap-1 min-w-0">
+              <!-- Titel: springt zur ersten Stunde der UE -->
+              <button
+                type="button"
+                onclick={() => onSelectUnit?.(unit)}
+                disabled={!onSelectUnit}
+                title={onSelectUnit ? `Zur ersten Stunde von „${unit.title}" springen` : unit.title}
+                class="text-xs font-medium text-light-tx dark:text-dark-tx max-w-[160px] truncate text-left
+                       {onSelectUnit ? 'hover:text-light-bl dark:hover:text-dark-bl transition-colors cursor-pointer' : 'cursor-default'}"
+              >
+                {unit.title}
+              </button>
+              <!-- Stift: Bearbeiten-Dialog -->
               {#if onEditUnit}
-                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     class="flex-shrink-0 opacity-0 group-hover/ue:opacity-60" aria-hidden="true">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
+                <button
+                  type="button"
+                  onclick={() => onEditUnit(unit)}
+                  title="Unterrichtseinheit bearbeiten"
+                  aria-label="Unterrichtseinheit bearbeiten"
+                  class="flex-shrink-0 p-0.5 rounded text-light-tx-2 dark:text-dark-tx-2
+                         opacity-0 group-hover/ue:opacity-100 hover:text-light-bl dark:hover:text-dark-bl transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                       aria-hidden="true">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
               {/if}
-            </button>
+            </div>
             {#if bal}
               <div class="flex items-center gap-1.5 mt-0.5">
                 <div class="w-20 h-1.5 bg-light-ui-3 dark:bg-dark-ui-3 rounded-full overflow-hidden">

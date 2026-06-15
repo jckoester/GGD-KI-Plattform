@@ -36,6 +36,7 @@
   // ── Modals ───────────────────────────────────────────────────────────────────
   let showUnitDialog = $state(false)
   let editUnit = $state(null)   // UE im Bearbeiten-Modus (null = Anlegen)
+  let plannerTable = $state(null)   // Komponenten-Instanz für scrollToUnit
   let showPatternEditor = $state(false)
   let showUndoPanel = $state(false)
   let snapshots = $state([])
@@ -328,11 +329,13 @@
     balance={overview.balance}
     onCreateUnit={() => { editUnit = null; showUnitDialog = true }}
     onEditUnit={openEditUnit}
+    onSelectUnit={(unit) => plannerTable?.scrollToUnit(unit.id)}
   />
 
   <!-- Tabelle (scrollbar) -->
   <div class="flex-1 overflow-y-auto">
     <PlannerTable
+      bind:this={plannerTable}
       {slots}
       units={overview.units}
       patterns={overview.patterns}

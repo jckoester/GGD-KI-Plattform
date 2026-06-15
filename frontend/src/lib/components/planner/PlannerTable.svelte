@@ -44,6 +44,37 @@
         return `${year}-W${String(week).padStart(2, "0")}`;
     }
 
+    // Scrollt das Element so in den Scroll-Container, dass es direkt unter dem
+    // Sticky-Spaltenheader sitzt. `extraOffset` zieht zusätzliche Sticky-Höhe ab
+    // (z.B. den Wochenkopf, der beim Sprung auf eine einzelne Slot-Zeile darüber liegt).
+    function scrollToEl(el, behavior = "auto", extraOffset = 0) {
+        const container = el?.closest(".overflow-y-auto");
+        if (!el || !container) return;
+        const headerOffset = headerEl?.offsetHeight ?? 33;
+        const delta =
+            el.getBoundingClientRect().top -
+            container.getBoundingClientRect().top;
+        container.scrollTo({
+            top: container.scrollTop + delta - headerOffset - extraOffset,
+            behavior,
+        });
+    }
+
+    // Von außen aufrufbar (UE-Legende): zur ersten Stunde einer UE springen —
+    // erste Stunde mit Entwurf, sonst erster zugewiesener Slot.
+    export function scrollToUnit(unitId) {
+        const ueSlots = slots
+            .filter((s) => s.ue_node_id === unitId)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        if (!ueSlots.length) return;
+        const target = ueSlots.find((s) => s.stunde_node_id) ?? ueSlots[0];
+        const el = document.querySelector(`[data-slot="${target.id}"]`);
+        // Zusätzlich den (sticky) Wochenkopf der Zielzeile abziehen, sonst verdeckt
+        // er die obere Hälfte der Slot-Zeile.
+        const weekHeader = el?.closest("[data-week]")?.firstElementChild;
+        scrollToEl(el, "smooth", weekHeader?.offsetHeight ?? 0);
+    }
+
     $effect(() => {
         if (didScroll || !weekItems.length) return;
         didScroll = true;
@@ -56,18 +87,9 @@
             : (keys.find((k) => k > wk) ?? keys.at(-1));
         if (!target) return;
 
-        tick().then(() => {
-            const el = document.querySelector(`[data-week="${target}"]`);
-            const container = el?.closest(".overflow-y-auto");
-            if (!el || !container) return;
-            // Um die Höhe des Sticky-Spaltenheaders weniger scrollen, sonst
-            // verdeckt er die erste Stunde der Zielwoche.
-            const headerOffset = headerEl?.offsetHeight ?? 33;
-            const delta =
-                el.getBoundingClientRect().top -
-                container.getBoundingClientRect().top;
-            container.scrollTop += delta - headerOffset;
-        });
+        tick().then(() =>
+            scrollToEl(document.querySelector(`[data-week="${target}"]`)),
+        );
     });
 
     function unitForId(id) {
