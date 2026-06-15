@@ -208,6 +208,8 @@ async def get_overview(
         units=unit_reads,
         balance=balance,
         schuljahr=cfg.schuljahr,
+        beginn=cfg.beginn,
+        ende=cfg.ende,
         halbjahreswechsel=cfg.halbjahreswechsel,
         ferien=[FerienItem(name=f.name, von=f.von, bis=f.bis) for f in cfg.ferien],
         feiertage=[SondertagItem(name=t.name, datum=t.datum) for t in cfg.feiertage],

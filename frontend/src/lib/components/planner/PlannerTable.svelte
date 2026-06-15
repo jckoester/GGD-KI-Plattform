@@ -11,6 +11,8 @@
         feiertage = [],
         unterrichtsfreie = [],
         halbjahreswechsel = null,
+        beginn = null,
+        ende = null,
         onPatchSlot,
         onSwapSlots,
         onEditLesson = null,
@@ -25,6 +27,8 @@
             feiertage,
             unterrichtsfreie,
             halbjahreswechsel,
+            beginn,
+            ende,
         }),
     );
 

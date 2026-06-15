@@ -214,6 +214,9 @@ async def test_overview_liefert_feiertage_und_unterrichtsfreie(
     resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
+    # Schuljahresgrenzen werden mitgeliefert (Frontend begrenzt Sondertage daran,
+    # nicht am Slot-Bereich, damit der letzte Schultag nicht verschwindet).
+    assert data["beginn"] and data["ende"]
     assert isinstance(data["feiertage"], list)
     assert isinstance(data["unterrichtsfreie_tage"], list)
     # Jeder Eintrag hat datum + (optionalen) name

@@ -312,6 +312,8 @@
       feiertage={overview.feiertage}
       unterrichtsfreie={overview.unterrichtsfreie_tage}
       halbjahreswechsel={overview.halbjahreswechsel}
+      beginn={overview.beginn}
+      ende={overview.ende}
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
       onEditLesson={handleEditLesson}

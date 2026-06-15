@@ -291,6 +291,8 @@ class OverviewRead(BaseModel):
     units: list[UnitRead]
     balance: BalanceRead
     schuljahr: str
+    beginn: date
+    ende: date
     halbjahreswechsel: date
     ferien: list[FerienItem] = []
     feiertage: list[SondertagItem] = []

@@ -105,7 +105,7 @@ export const KATEGORIE_LABELS = {
  * chronologisch sortiert.
  *
  * @param {Array} slots - LessonSlot-Objekte aus dem Overview-Endpoint
- * @param {{ ferien?: Array, feiertage?: Array, unterrichtsfreie?: Array, halbjahreswechsel?: string }} calendar
+ * @param {{ ferien?: Array, feiertage?: Array, unterrichtsfreie?: Array, halbjahreswechsel?: string, beginn?: string, ende?: string }} calendar
  * @returns Array of items:
  *   { type: 'week', key, week, year, slots, rows }
  *   { type: 'ferien', name, von, bis }
@@ -113,13 +113,17 @@ export const KATEGORIE_LABELS = {
  */
 export function groupSlotsByWeek(
     slots,
-    { ferien = [], feiertage = [], unterrichtsfreie = [], halbjahreswechsel } = {},
+    { ferien = [], feiertage = [], unterrichtsfreie = [], halbjahreswechsel, beginn, ende } = {},
 ) {
     if (!slots?.length) return []
 
     const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date))
-    const minDate = sorted[0].date
-    const maxDate = sorted.at(-1).date
+    // Sondertage werden am Schuljahr begrenzt (nicht am Slot-Bereich): Fällt der
+    // letzte Unterrichtstag des Jahres auf einen unterrichtsfreien Tag, läge er
+    // hinter dem letzten Slot und würde sonst verschwinden — der Plan endete
+    // kommentarlos vorzeitig. Fallback auf den Slot-Bereich, falls nicht gesetzt.
+    const rangeStart = beginn ?? sorted[0].date
+    const rangeEnd = ende ?? sorted.at(-1).date
 
     // Unterrichtswochentage der Gruppe je Halbjahr (Mo=0 … So=6) aus den Slots ableiten.
     const teachWd = new Map() // halbjahr → Set<weekday>
@@ -140,7 +144,7 @@ export function groupSlotsByWeek(
         ...feiertage.map((t) => ({ ...t, art: 'feiertag' })),
         ...unterrichtsfreie.map((t) => ({ ...t, art: 'unterrichtsfrei' })),
     ]) {
-        if (!t.datum || t.datum < minDate || t.datum > maxDate) continue
+        if (!t.datum || t.datum < rangeStart || t.datum > rangeEnd) continue
         if (inFerien(t.datum)) continue
         if (!teachWd.get(hjOf(t.datum))?.has(weekdayIndex(t.datum))) continue
         if (!specialByDate.has(t.datum)) {
