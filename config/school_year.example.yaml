@@ -9,9 +9,12 @@ ferien:
   - { name: "Osterferien",     von: 2027-04-01, bis: 2027-04-16 }
   - { name: "Pfingstferien",   von: 2027-05-26, bis: 2027-06-05 }
 
+# Feiertage und unterrichtsfreie Tage akzeptieren beide Schreibweisen:
+#   - 2026-10-03                                                 (nur Datum)
+#   - { name: "Tag der Deutschen Einheit", datum: 2026-10-03 }   (mit Namen, analog zu den Ferien)
 feiertage:
-  - 2026-10-03   # Tag der Deutschen Einheit
-  - 2026-11-01   # Allerheiligen
+  - { name: "Tag der Deutschen Einheit", datum: 2026-10-03 }
+  - 2026-11-01   # Allerheiligen (Kurzform ohne Namen weiterhin erlaubt)
   - 2026-12-25   # 1. Weihnachtstag
   - 2026-12-26   # 2. Weihnachtstag
   - 2027-01-01   # Neujahr
@@ -21,6 +24,6 @@ feiertage:
   - 2027-05-13   # Christi Himmelfahrt
   - 2027-05-24   # Pfingstmontag
   - 2027-06-03   # Fronleichnam
-  - 2027-10-03   # Tag der Deutschen Einheit
 
-schulfreie_tage: []    # bewegliche Ferientage, Pädagogische Tage
+# Bewegliche Ferientage, pädagogische Tage o. Ä. — gleiche Schreibweise wie feiertage
+unterrichtsfreie_tage: []

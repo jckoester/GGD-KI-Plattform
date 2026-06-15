@@ -205,6 +205,23 @@ async def test_bilanz_doppelstunde_zaehlt_zwei_stunden(
     assert ue_item["zugewiesen"] == 4
 
 
+@pytest.mark.asyncio
+async def test_overview_liefert_feiertage_und_unterrichtsfreie(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Overview gibt Feiertage und unterrichtsfreie Tage (mit Namen) aus der
+    school_year.yaml zurück, damit das Frontend sie als Sondertag-Zeilen anzeigen kann."""
+    resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data["feiertage"], list)
+    assert isinstance(data["unterrichtsfreie_tage"], list)
+    # Jeder Eintrag hat datum + (optionalen) name
+    for entry in data["feiertage"] + data["unterrichtsfreie_tage"]:
+        assert "datum" in entry
+        assert "name" in entry
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 

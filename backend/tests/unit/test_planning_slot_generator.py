@@ -26,7 +26,7 @@ def _mini_cfg() -> SchoolYearConfig:
             FerienPeriod(name="TestFerien", von=date(2026, 1, 12), bis=date(2026, 1, 16)),
         ],
         feiertage=[],
-        schulfreie_tage=[],
+        unterrichtsfreie_tage=[],
     )
 
 

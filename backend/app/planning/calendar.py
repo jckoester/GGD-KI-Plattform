@@ -21,14 +21,34 @@ class FerienPeriod(BaseModel):
     bis: date
 
 
+class NamedDay(BaseModel):
+    """Ein einzelner Tag (Feiertag oder unterrichtsfreier Tag), optional benannt.
+
+    Akzeptiert in der YAML sowohl ein bloßes Datum (``- 2026-10-03``) als auch
+    ein Mapping mit Namen (``- { name: "Tag der Deutschen Einheit", datum: 2026-10-03 }``),
+    analog zu den Ferien.
+    """
+
+    datum: date
+    name: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_bare_date(cls, value):
+        # Erlaubt die Kurzform ohne Namen: nur das Datum.
+        if isinstance(value, (date, str)):
+            return {"datum": value}
+        return value
+
+
 class SchoolYearConfig(BaseModel):
     schuljahr: str
     beginn: date
     ende: date
     halbjahreswechsel: date
     ferien: list[FerienPeriod] = []
-    feiertage: list[date] = []
-    schulfreie_tage: list[date] = []
+    feiertage: list[NamedDay] = []
+    unterrichtsfreie_tage: list[NamedDay] = []
 
     @model_validator(mode="after")
     def _validate_order(self) -> "SchoolYearConfig":
@@ -45,11 +65,11 @@ class SchoolYearConfig(BaseModel):
 
     @property
     def feiertage_set(self) -> frozenset[date]:
-        return frozenset(self.feiertage)
+        return frozenset(t.datum for t in self.feiertage)
 
     @property
-    def schulfreie_set(self) -> frozenset[date]:
-        return frozenset(self.schulfreie_tage)
+    def unterrichtsfrei_set(self) -> frozenset[date]:
+        return frozenset(t.datum for t in self.unterrichtsfreie_tage)
 
 
 _DEFAULT_PATH = Path(
@@ -75,7 +95,7 @@ def is_schoolday(d: date, cfg: SchoolYearConfig | None = None) -> bool:
         return False
     if d in c.feiertage_set:
         return False
-    if d in c.schulfreie_set:
+    if d in c.unterrichtsfrei_set:
         return False
     for f in c.ferien:
         if f.von <= d <= f.bis:

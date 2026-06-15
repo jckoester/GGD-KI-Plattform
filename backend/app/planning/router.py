@@ -38,6 +38,7 @@ from app.planning.schemas import (
     CurriculumKapitelOption,
     CurriculumOption,
     FerienItem,
+    SondertagItem,
     GroupCurriculaRead,
     LessonCreate,
     LessonNav,
@@ -209,6 +210,10 @@ async def get_overview(
         schuljahr=cfg.schuljahr,
         halbjahreswechsel=cfg.halbjahreswechsel,
         ferien=[FerienItem(name=f.name, von=f.von, bis=f.bis) for f in cfg.ferien],
+        feiertage=[SondertagItem(name=t.name, datum=t.datum) for t in cfg.feiertage],
+        unterrichtsfreie_tage=[
+            SondertagItem(name=t.name, datum=t.datum) for t in cfg.unterrichtsfreie_tage
+        ],
     )
 
 

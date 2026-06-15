@@ -15,6 +15,7 @@ config/assistants.yaml
 config/crisis_triggers.yaml
 config/rate_limits.yaml
 config/help_resources.yaml
+config/school_year.yaml
 config/static/colors.css
 
 # Python
@@ -49,4 +50,3 @@ Thumbs.db
 # Logs
 *.log
 scripts/scraper/output/*
-

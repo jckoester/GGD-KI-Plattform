@@ -213,12 +213,23 @@
     --planner-ferien-stripe: var(--color-yellow-200);
     --planner-ferien-color:  var(--color-yellow-700);
     --planner-ferien-border: var(--color-yellow-200);
+
+    /* Unterrichtsfreie Tage: orange-gelbe Variante (Farben ggü. Ferien getauscht) */
+    --planner-unterrichtsfrei-bg:     var(--color-orange-50);
+    --planner-unterrichtsfrei-stripe: var(--color-orange-200);
+    --planner-unterrichtsfrei-color:  var(--color-orange-700);
+    --planner-unterrichtsfrei-border: var(--color-orange-200);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
     --planner-ferien-stripe: color-mix(in srgb, var(--color-yellow-400) 22%, transparent);
     --planner-ferien-color:  var(--color-yellow-200);
     --planner-ferien-border: color-mix(in srgb, var(--color-yellow-400) 25%, transparent);
+
+    --planner-unterrichtsfrei-bg:     color-mix(in srgb, var(--color-orange-300) 8%, transparent);
+    --planner-unterrichtsfrei-stripe: color-mix(in srgb, var(--color-orange-400) 22%, transparent);
+    --planner-unterrichtsfrei-color:  var(--color-orange-200);
+    --planner-unterrichtsfrei-border: color-mix(in srgb, var(--color-orange-400) 25%, transparent);
 }
 
 .planner-ferien-band {
@@ -232,4 +243,17 @@
     );
     color:             var(--planner-ferien-color);
     border-bottom: 1px solid var(--planner-ferien-border);
+}
+
+.planner-unterrichtsfrei-band {
+    background-color:  var(--planner-unterrichtsfrei-bg);
+    background-image:  repeating-linear-gradient(
+        135deg,
+        transparent        0px,
+        transparent        5px,
+        var(--planner-unterrichtsfrei-stripe) 5px,
+        var(--planner-unterrichtsfrei-stripe) 6px
+    );
+    color:             var(--planner-unterrichtsfrei-color);
+    border-bottom: 1px solid var(--planner-unterrichtsfrei-border);
 }

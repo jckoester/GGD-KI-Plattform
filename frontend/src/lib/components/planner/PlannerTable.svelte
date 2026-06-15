@@ -1,12 +1,15 @@
 <script>
     import { groupSlotsByWeek } from "$lib/planner.js";
     import PlannerRow from "./PlannerRow.svelte";
+    import SpecialDayRow from "./SpecialDayRow.svelte";
 
     const {
         slots = [],
         units = [],
         patterns = [],
         ferien = [],
+        feiertage = [],
+        unterrichtsfreie = [],
         halbjahreswechsel = null,
         onPatchSlot,
         onSwapSlots,
@@ -17,7 +20,12 @@
     const hj2Vorlaeufig = $derived(!patterns.some((p) => p.halbjahr === 2));
 
     const weekItems = $derived(
-        groupSlotsByWeek(slots, { ferien, halbjahreswechsel }),
+        groupSlotsByWeek(slots, {
+            ferien,
+            feiertage,
+            unterrichtsfreie,
+            halbjahreswechsel,
+        }),
     );
 
     function unitForId(id) {
@@ -34,9 +42,10 @@
     }
 
     function weekRangeLabel(item) {
-        if (!item.slots.length) return "";
-        const first = new Date(item.slots[0].date + "T00:00:00");
-        const last = new Date(item.slots.at(-1).date + "T00:00:00");
+        const dates = (item.rows ?? []).map((r) => r.date).sort();
+        if (!dates.length) return "";
+        const first = new Date(dates[0] + "T00:00:00");
+        const last = new Date(dates.at(-1) + "T00:00:00");
         const fmtShort = (d) =>
             d.toLocaleDateString("de-DE", { day: "numeric", month: "numeric" });
         return `${fmtShort(first)} – ${fmtShort(last)}`;
@@ -91,18 +100,26 @@
                     </div>
                 </div>
 
-                <!-- Slot-Zeilen -->
-                {#each item.slots as slot (slot.id)}
-                    <PlannerRow
-                        {slot}
-                        unit={unitForId(slot.ue_node_id)}
-                        {units}
-                        vorlaeufig={hj2Vorlaeufig && slot.halbjahr === 2}
-                        onPatch={(updates) => onPatchSlot(slot.id, updates)}
-                        onSwap={(sourceId) => onSwapSlots(sourceId, slot.id)}
-                        {onEditLesson}
-                        {onReview}
-                    />
+                <!-- Slot- und Sondertag-Zeilen (chronologisch gemischt) -->
+                {#each item.rows as row (row.kind === "slot" ? row.slot.id : "sp-" + row.art + "-" + row.date)}
+                    {#if row.kind === "slot"}
+                        <PlannerRow
+                            slot={row.slot}
+                            unit={unitForId(row.slot.ue_node_id)}
+                            {units}
+                            vorlaeufig={hj2Vorlaeufig && row.slot.halbjahr === 2}
+                            onPatch={(updates) => onPatchSlot(row.slot.id, updates)}
+                            onSwap={(sourceId) => onSwapSlots(sourceId, row.slot.id)}
+                            {onEditLesson}
+                            {onReview}
+                        />
+                    {:else}
+                        <SpecialDayRow
+                            date={row.date}
+                            name={row.name}
+                            art={row.art}
+                        />
+                    {/if}
                 {/each}
             </div>
         {:else if item.type === "ferien"}

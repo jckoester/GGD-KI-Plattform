@@ -6,6 +6,7 @@ import pytest
 
 from app.planning.calendar import (
     FerienPeriod,
+    NamedDay,
     SchoolYearConfig,
     halbjahr_bounds,
     halbjahr_of,
@@ -23,7 +24,7 @@ def _cfg() -> SchoolYearConfig:
             FerienPeriod(name="Herbst", von=date(2026, 10, 26), bis=date(2026, 10, 30)),
         ],
         feiertage=[date(2026, 11, 1)],
-        schulfreie_tage=[date(2026, 10, 2)],
+        unterrichtsfreie_tage=[date(2026, 10, 2)],
     )
 
 
@@ -48,7 +49,7 @@ def test_is_schoolday_feiertag():
     assert is_schoolday(date(2026, 11, 1), _cfg()) is False
 
 
-def test_is_schoolday_schulfreier_tag():
+def test_is_schoolday_unterrichtsfreier_tag():
     assert is_schoolday(date(2026, 10, 2), _cfg()) is False
 
 
@@ -96,6 +97,39 @@ def test_validation_order_error():
             ende=date(2027, 7, 28),
             halbjahreswechsel=date(2026, 9, 14),
         )
+
+
+def test_named_and_bare_days_coexist():
+    """Feiertage/unterrichtsfreie Tage akzeptieren bloßes Datum und {name, datum}."""
+    cfg = SchoolYearConfig(
+        schuljahr="2026/27",
+        beginn=date(2026, 9, 14),
+        ende=date(2027, 7, 28),
+        halbjahreswechsel=date(2027, 2, 8),
+        feiertage=[
+            {"name": "Allerheiligen", "datum": date(2026, 11, 1)},
+            date(2026, 12, 25),  # Kurzform ohne Namen
+        ],
+        unterrichtsfreie_tage=[
+            {"name": "Pädagogischer Tag", "datum": date(2026, 10, 2)},
+        ],
+    )
+    # Namen bleiben erhalten
+    assert cfg.feiertage[0].name == "Allerheiligen"
+    assert cfg.feiertage[1].name is None
+    assert cfg.unterrichtsfreie_tage[0].name == "Pädagogischer Tag"
+    # Sets enthalten die Daten unabhängig von der Schreibweise
+    assert cfg.feiertage_set == {date(2026, 11, 1), date(2026, 12, 25)}
+    assert cfg.unterrichtsfrei_set == {date(2026, 10, 2)}
+    assert is_schoolday(date(2026, 12, 25), cfg) is False
+    assert is_schoolday(date(2026, 10, 2), cfg) is False
+
+
+def test_namedday_coerces_iso_string():
+    """YAML kann ein Datum als String liefern; NamedDay muss es akzeptieren."""
+    day = NamedDay.model_validate("2026-10-03")
+    assert day.datum == date(2026, 10, 3)
+    assert day.name is None
 
 
 def test_validation_ferien_outside():

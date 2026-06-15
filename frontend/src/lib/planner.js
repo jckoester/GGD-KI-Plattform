@@ -18,18 +18,28 @@ export function ueColor(unit, dark = false) {
     return dark ? pair[1] : pair[0]
 }
 
-/** ISO-Wochennummer und zugehöriges Jahr für einen Datum-String (YYYY-MM-DD). */
+/**
+ * ISO-Wochennummer und zugehöriges Jahr für einen Datum-String (YYYY-MM-DD).
+ *
+ * Bewusst durchgängig UTC: Würde man mit lokalen Date-Objekten rechnen, verschiebt
+ * der Sommerzeit-Übergang (ein 23-Stunden-Tag Ende März) die Millisekunden-Differenz
+ * unter eine 7-Tage-Grenze und liefert über die Umstellung hinweg falsche Wochen.
+ */
 export function isoWeek(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00')
-    const dow = (d.getDay() + 6) % 7 // Mon=0 … Sun=6
-    const thursday = new Date(d)
-    thursday.setDate(d.getDate() - dow + 3)
-    const year = thursday.getFullYear()
-    const jan1 = new Date(year, 0, 1)
-    const jan1Dow = (jan1.getDay() + 6) % 7
-    const firstThursday = new Date(year, 0, 1 + ((3 - jan1Dow + 7) % 7))
-    const week = 1 + Math.floor((thursday - firstThursday) / 604800000)
+    const d = new Date(dateStr + 'T00:00:00Z')
+    const dow = (d.getUTCDay() + 6) % 7 // Mon=0 … Sun=6
+    d.setUTCDate(d.getUTCDate() - dow + 3) // auf den Donnerstag derselben ISO-Woche
+    const thursday = d.getTime()
+    const year = d.getUTCFullYear()
+    const jan1Dow = (new Date(Date.UTC(year, 0, 1)).getUTCDay() + 6) % 7
+    const firstThursday = Date.UTC(year, 0, 1 + ((3 - jan1Dow + 7) % 7))
+    const week = 1 + Math.round((thursday - firstThursday) / 604800000)
     return { week, year }
+}
+
+/** Wochentag-Index (Mo=0 … So=6), UTC-basiert. */
+export function weekdayIndex(dateStr) {
+    return (new Date(dateStr + 'T00:00:00Z').getUTCDay() + 6) % 7
 }
 
 /** "KW 42" */
@@ -81,25 +91,95 @@ export const KATEGORIE_LABELS = {
 /**
  * Gruppiert Slots nach Kalenderwochen und fügt Ferien- und Halbjahresbänder ein.
  *
+ * Feiertage und unterrichtsfreie Tage werden als Sondertag-Zeilen eingefügt —
+ * aber nur an Wochentagen, an denen die Gruppe tatsächlich unterrichtet (aus den
+ * Slots abgeleitet, je Halbjahr). So ersetzt der Sondertag genau die Stunde, die
+ * an diesem Tag ausfiele: Fällt ein Slot auf einen Sondertag (z. B. weil das
+ * Raster vor der Pflege der school_year.yaml erzeugt wurde), wird der Slot
+ * unterdrückt und die Sondertag-Zeile **an seiner Stelle** gezeigt — nie beides.
+ * Liegt der einzige Unterrichtstag einer Woche auf dem Sondertag, erscheint die
+ * Woche trotzdem (mit nur der Sondertag-Zeile).
+ *
+ * Jede Woche erhält eine `rows`-Liste aus gemischten Einträgen:
+ * `{ kind: 'slot', slot, date }` und `{ kind: 'special', art, name, date }`,
+ * chronologisch sortiert.
+ *
  * @param {Array} slots - LessonSlot-Objekte aus dem Overview-Endpoint
- * @param {{ ferien?: Array, halbjahreswechsel?: string }} calendar
+ * @param {{ ferien?: Array, feiertage?: Array, unterrichtsfreie?: Array, halbjahreswechsel?: string }} calendar
  * @returns Array of items:
- *   { type: 'week', key, week, year, slots }
+ *   { type: 'week', key, week, year, slots, rows }
  *   { type: 'ferien', name, von, bis }
  *   { type: 'halbjahr' }
  */
-export function groupSlotsByWeek(slots, { ferien = [], halbjahreswechsel } = {}) {
+export function groupSlotsByWeek(
+    slots,
+    { ferien = [], feiertage = [], unterrichtsfreie = [], halbjahreswechsel } = {},
+) {
     if (!slots?.length) return []
 
     const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date))
+    const minDate = sorted[0].date
+    const maxDate = sorted.at(-1).date
+
+    // Unterrichtswochentage der Gruppe je Halbjahr (Mo=0 … So=6) aus den Slots ableiten.
+    const teachWd = new Map() // halbjahr → Set<weekday>
+    for (const slot of sorted) {
+        if (!teachWd.has(slot.halbjahr)) teachWd.set(slot.halbjahr, new Set())
+        teachWd.get(slot.halbjahr).add(weekdayIndex(slot.date))
+    }
+
+    const hjOf = (dateStr) =>
+        halbjahreswechsel && dateStr >= halbjahreswechsel ? 2 : 1
+    const inFerien = (dateStr) =>
+        ferien.some((f) => f.von <= dateStr && dateStr <= f.bis)
+
+    // Relevante Sondertage bestimmen: im Planungszeitraum, kein Ferientag und an
+    // einem Unterrichtswochentag der Gruppe (im jeweiligen Halbjahr).
+    const specialByDate = new Map() // datum → { art, name }
+    for (const t of [
+        ...feiertage.map((t) => ({ ...t, art: 'feiertag' })),
+        ...unterrichtsfreie.map((t) => ({ ...t, art: 'unterrichtsfrei' })),
+    ]) {
+        if (!t.datum || t.datum < minDate || t.datum > maxDate) continue
+        if (inFerien(t.datum)) continue
+        if (!teachWd.get(hjOf(t.datum))?.has(weekdayIndex(t.datum))) continue
+        if (!specialByDate.has(t.datum)) {
+            specialByDate.set(t.datum, { art: t.art, name: t.name ?? null })
+        }
+    }
 
     const byWeek = new Map()
-    for (const slot of sorted) {
-        const { week, year } = isoWeek(slot.date)
+    const ensureWeek = (dateStr) => {
+        const { week, year } = isoWeek(dateStr)
         const key = `${year}-W${String(week).padStart(2, '0')}`
-        if (!byWeek.has(key)) byWeek.set(key, { key, week, year, slots: [] })
-        byWeek.get(key).slots.push(slot)
+        if (!byWeek.has(key)) byWeek.set(key, { key, week, year, slots: [], special: [] })
+        return byWeek.get(key)
     }
+
+    // Slots einsortieren — außer wenn ihr Datum ein Sondertag ist (dann ersetzt
+    // ihn die Sondertag-Zeile; ein solcher Slot ist veralteter Rasterstand).
+    for (const slot of sorted) {
+        if (specialByDate.has(slot.date)) continue
+        ensureWeek(slot.date).slots.push(slot)
+    }
+    // Sondertage einsortieren (legt bei Bedarf eine ansonsten leere Woche an).
+    for (const [datum, info] of specialByDate) {
+        ensureWeek(datum).special.push({
+            kind: 'special',
+            art: info.art,
+            name: info.name,
+            date: datum,
+        })
+    }
+
+    // Repräsentatives Erst-/Letztdatum einer Woche (Slots + Sondertage gemischt).
+    const weekDates = (w) => [
+        ...w.slots.map((s) => s.date),
+        ...w.special.map((s) => s.date),
+    ]
+    const repFirst = (w) => weekDates(w).reduce((a, b) => (b < a ? b : a))
+    const repLast = (w) => weekDates(w).reduce((a, b) => (b > a ? b : a))
+    const weekHj = (w) => (w.slots.length ? w.slots[0].halbjahr : hjOf(repFirst(w)))
 
     const weekKeys = [...byWeek.keys()].sort()
     const items = []
@@ -110,12 +190,9 @@ export function groupSlotsByWeek(slots, { ferien = [], halbjahreswechsel } = {})
 
         if (i > 0) {
             const prevData = byWeek.get(weekKeys[i - 1])
-            const prevLastDate = prevData.slots.at(-1).date
-            const currFirstDate = weekData.slots[0].date
-
-            const gapStart = new Date(prevLastDate + 'T00:00:00')
+            const gapStart = new Date(repLast(prevData) + 'T00:00:00')
             gapStart.setDate(gapStart.getDate() + 1)
-            const gapEnd = new Date(currFirstDate + 'T00:00:00')
+            const gapEnd = new Date(repFirst(weekData) + 'T00:00:00')
             gapEnd.setDate(gapEnd.getDate() - 1)
 
             // Ferien-Bänder im Gap
@@ -130,17 +207,25 @@ export function groupSlotsByWeek(slots, { ferien = [], halbjahreswechsel } = {})
             }
 
             // Halbjahresbruch zwischen HJ1-Ende und HJ2-Beginn
-            if (!halbjahrInserted) {
-                const prevHj = prevData.slots[0]?.halbjahr
-                const currHj = weekData.slots[0]?.halbjahr
-                if (prevHj === 1 && currHj === 2) {
-                    items.push({ type: 'halbjahr' })
-                    halbjahrInserted = true
-                }
+            if (!halbjahrInserted && weekHj(prevData) === 1 && weekHj(weekData) === 2) {
+                items.push({ type: 'halbjahr' })
+                halbjahrInserted = true
             }
         }
 
-        items.push({ type: 'week', ...weekData })
+        const rows = [
+            ...weekData.slots.map((s) => ({ kind: 'slot', slot: s, date: s.date })),
+            ...weekData.special,
+        ].sort((a, b) => a.date.localeCompare(b.date))
+
+        items.push({
+            type: 'week',
+            key: weekData.key,
+            week: weekData.week,
+            year: weekData.year,
+            slots: weekData.slots,
+            rows,
+        })
     }
 
     return items

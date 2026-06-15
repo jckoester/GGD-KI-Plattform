@@ -279,6 +279,12 @@ class FerienItem(BaseModel):
     bis: date
 
 
+class SondertagItem(BaseModel):
+    """Feiertag oder unterrichtsfreier Tag (Einzeltag, optional benannt)."""
+    name: Optional[str] = None
+    datum: date
+
+
 class OverviewRead(BaseModel):
     slots: list[SlotRead]
     patterns: list[WeekPatternRead]
@@ -287,3 +293,5 @@ class OverviewRead(BaseModel):
     schuljahr: str
     halbjahreswechsel: date
     ferien: list[FerienItem] = []
+    feiertage: list[SondertagItem] = []
+    unterrichtsfreie_tage: list[SondertagItem] = []

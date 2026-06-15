@@ -309,6 +309,8 @@
       units={overview.units}
       patterns={overview.patterns}
       ferien={overview.ferien}
+      feiertage={overview.feiertage}
+      unterrichtsfreie={overview.unterrichtsfreie_tage}
       halbjahreswechsel={overview.halbjahreswechsel}
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
