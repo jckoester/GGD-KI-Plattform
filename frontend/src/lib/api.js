@@ -1268,6 +1268,17 @@ export async function createUnit(groupId, data) {
     return res.json()
 }
 
+export async function updateUnit(groupId, nodeId, data) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/units/${nodeId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UE konnte nicht geändert werden')
+    return res.json()
+}
+
 export async function listUnits(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/units`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'UEs konnten nicht geladen werden')

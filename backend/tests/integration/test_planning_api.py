@@ -225,6 +225,46 @@ async def test_overview_liefert_feiertage_und_unterrichtsfreie(
         assert "name" in entry
 
 
+@pytest.mark.asyncio
+async def test_unit_bearbeiten(test_client, auth_headers, seed_planning_fixtures):
+    """UE-Titel/Farbe lassen sich nachträglich korrigieren (Tippfehler-Fall)."""
+    resp = await test_client.post(
+        "/planning/groups/100/units",
+        json={"titel": "Tippfehlre", "farbe": 1},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    ue_id = resp.json()["id"]
+
+    resp = await test_client.patch(
+        f"/planning/groups/100/units/{ue_id}",
+        json={"titel": "Funktionen", "farbe": 3},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["title"] == "Funktionen"
+    assert data["metadata_"]["farbe"] == 3
+
+    # Änderung ist persistiert
+    units = (
+        await test_client.get("/planning/groups/100/units", headers=auth_headers)
+    ).json()
+    assert any(u["id"] == ue_id and u["title"] == "Funktionen" for u in units)
+
+
+@pytest.mark.asyncio
+async def test_unit_bearbeiten_404_unbekannt(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    resp = await test_client.patch(
+        "/planning/groups/100/units/00000000-0000-0000-0000-000000000000",
+        json={"titel": "X"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
 # ── Schritt 3: PATCH Kategorie → Auto-Snapshot → Restore ─────────────────────
 
 

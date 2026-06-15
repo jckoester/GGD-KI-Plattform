@@ -35,6 +35,7 @@
 
   // ── Modals ───────────────────────────────────────────────────────────────────
   let showUnitDialog = $state(false)
+  let editUnit = $state(null)   // UE im Bearbeiten-Modus (null = Anlegen)
   let showPatternEditor = $state(false)
   let showUndoPanel = $state(false)
   let snapshots = $state([])
@@ -134,13 +135,33 @@
     }
   }
 
-  // ── UE erstellt ──────────────────────────────────────────────────────────────
-  async function onUnitCreated(unit) {
-    showUnitDialog = false
+  // ── UE erstellt / bearbeitet ─────────────────────────────────────────────────
+  async function refreshAfterUnitChange() {
     // Overview neu laden damit Balance + Units aktuell ist
     const refreshed = await getPlanningOverview(groupId)
     overview = refreshed
     slots = refreshed.slots.map(s => slots.find(l => l.id === s.id) ?? s)
+  }
+
+  async function onUnitCreated() {
+    showUnitDialog = false
+    await refreshAfterUnitChange()
+  }
+
+  function openEditUnit(unit) {
+    editUnit = unit
+    showUnitDialog = true
+  }
+
+  async function onUnitUpdated() {
+    showUnitDialog = false
+    editUnit = null
+    await refreshAfterUnitChange()
+  }
+
+  function closeUnitDialog() {
+    showUnitDialog = false
+    editUnit = null
   }
 
   // ── Muster gespeichert / Slots generiert ────────────────────────────────────
@@ -299,7 +320,8 @@
   <UnitLegend
     units={overview.units}
     balance={overview.balance}
-    onCreateUnit={() => { showUnitDialog = true }}
+    onCreateUnit={() => { editUnit = null; showUnitDialog = true }}
+    onEditUnit={openEditUnit}
   />
 
   <!-- Tabelle (scrollbar) -->
@@ -326,8 +348,10 @@
 <UnitDialog
   open={showUnitDialog}
   {groupId}
+  unit={editUnit}
   onCreated={onUnitCreated}
-  onClose={() => { showUnitDialog = false }}
+  onUpdated={onUnitUpdated}
+  onClose={closeUnitDialog}
 />
 
 <PatternEditor

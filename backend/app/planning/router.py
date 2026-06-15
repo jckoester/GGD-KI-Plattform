@@ -59,11 +59,12 @@ from app.planning.schemas import (
     SnapshotRead,
     UnitBalanceItem,
     UnitCreate,
+    UnitUpdate,
     UnitRead,
     WeekPatternRead,
     WeekPatternSet,
 )
-from app.planning.service import create_unit_node
+from app.planning.service import create_unit_node, update_unit_node
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
 
@@ -85,6 +86,21 @@ async def _kapitel_std(db: AsyncSession, kapitel_node_id: UUID) -> int | None:
     if node is None:
         return None
     return (node.metadata_ or {}).get("std")
+
+
+async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int | None]:
+    """Verknüpftes Curriculum-Kapitel einer UE: (kapitel_node_id, std) oder (None, None)."""
+    edges = await db.execute(
+        sa.select(ContextEdge).where(
+            ContextEdge.from_node_id == ue_id,
+            ContextEdge.relation == "references",
+        )
+    )
+    for edge in edges.scalars().all():
+        kap = await db.get(ContextNode, edge.to_node_id)
+        if kap and kap.content_type == "kapitel":
+            return kap.id, (kap.metadata_ or {}).get("std")
+    return None, None
 
 
 async def _build_balance(
@@ -178,23 +194,13 @@ async def get_overview(
 
     unit_reads = []
     for ue in units:
-        kapitel_std = None
-        kapitel_edge = await db.execute(
-            sa.select(ContextEdge).where(
-                ContextEdge.from_node_id == ue.id,
-                ContextEdge.relation == "references",
-            )
-        )
-        for edge in kapitel_edge.scalars().all():
-            kap = await db.get(ContextNode, edge.to_node_id)
-            if kap and kap.content_type == "kapitel":
-                kapitel_std = (kap.metadata_ or {}).get("std")
-                break
+        kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue.id)
         unit_reads.append(
             UnitRead(
                 id=ue.id,
                 title=ue.title,
                 metadata_=ue.metadata_ or {},
+                kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
             )
         )
@@ -387,6 +393,40 @@ async def create_unit(
         id=ue_node.id,
         title=ue_node.title,
         metadata_=ue_node.metadata_ or {},
+        kapitel_node_id=payload.kapitel_node_id,
+        kapitel_std=kapitel_std,
+    )
+
+
+# ── PATCH /planning/groups/{group_id}/units/{node_id} ─────────────────────────
+
+
+@router.patch("/groups/{group_id}/units/{node_id}", response_model=UnitRead)
+async def update_unit(
+    group_id: int,
+    node_id: UUID,
+    payload: UnitUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    await require_group_teacher(group_id, user, db)
+
+    ue_node = await update_unit_node(
+        db=db,
+        node_id=node_id,
+        group_id=group_id,
+        titel=payload.titel,
+        farbe=payload.farbe,
+        kapitel_node_id=payload.kapitel_node_id,
+        update_kapitel="kapitel_node_id" in payload.model_fields_set,
+    )
+
+    kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue_node.id)
+    return UnitRead(
+        id=ue_node.id,
+        title=ue_node.title,
+        metadata_=ue_node.metadata_ or {},
+        kapitel_node_id=kapitel_node_id,
         kapitel_std=kapitel_std,
     )
 
@@ -405,23 +445,13 @@ async def list_units(
     units = await _load_units(db, group_id)
     result = []
     for ue in units:
-        kapitel_std = None
-        edge_result = await db.execute(
-            sa.select(ContextEdge).where(
-                ContextEdge.from_node_id == ue.id,
-                ContextEdge.relation == "references",
-            )
-        )
-        for edge in edge_result.scalars().all():
-            kap = await db.get(ContextNode, edge.to_node_id)
-            if kap and kap.content_type == "kapitel":
-                kapitel_std = (kap.metadata_ or {}).get("std")
-                break
+        kapitel_node_id, kapitel_std = await _kapitel_ref(db, ue.id)
         result.append(
             UnitRead(
                 id=ue.id,
                 title=ue.title,
                 metadata_=ue.metadata_ or {},
+                kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
             )
         )

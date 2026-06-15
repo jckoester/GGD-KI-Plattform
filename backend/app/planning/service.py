@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
@@ -112,6 +113,67 @@ async def create_unit_node(
     await db.commit()
     await db.refresh(ue_node)
     return ue_node
+
+
+async def update_unit_node(
+    db: AsyncSession,
+    node_id: UUID,
+    group_id: int,
+    titel: str | None = None,
+    farbe: int | None = None,
+    kapitel_node_id: UUID | None = None,
+    update_kapitel: bool = False,
+) -> ContextNode:
+    """Aktualisiert Titel/Farbe/Curriculum-Kapitel einer UE (committed).
+
+    `update_kapitel=True` bedeutet: die Kapitel-Verknüpfung wird gesetzt — bei
+    `kapitel_node_id=None` also entfernt. Ohne das Flag bleibt sie unangetastet.
+    """
+    node = await db.get(ContextNode, node_id)
+    if (
+        node is None
+        or node.content_type != "unterrichtseinheit"
+        or node.write_scope_group_id != group_id
+    ):
+        raise HTTPException(status_code=404, detail="Unterrichtseinheit nicht gefunden")
+
+    if titel is not None:
+        titel = titel.strip()
+        if not titel:
+            raise HTTPException(status_code=422, detail="Titel darf nicht leer sein")
+        node.title = titel
+
+    if farbe is not None:
+        # Neues dict, damit SQLAlchemy die JSON-Änderung erkennt.
+        node.metadata_ = {**(node.metadata_ or {}), "farbe": farbe}
+
+    if update_kapitel:
+        # Bestehende Kapitel-Verknüpfung(en) entfernen …
+        edges = await db.execute(
+            sa.select(ContextEdge).where(
+                ContextEdge.from_node_id == node.id,
+                ContextEdge.relation == "references",
+            )
+        )
+        for edge in edges.scalars().all():
+            kap = await db.get(ContextNode, edge.to_node_id)
+            if kap and kap.content_type == "kapitel":
+                await db.delete(edge)
+        await db.flush()
+        # … und die neue anlegen.
+        if kapitel_node_id:
+            db.add(
+                ContextEdge(
+                    from_node_id=node.id,
+                    to_node_id=kapitel_node_id,
+                    relation="references",
+                    metadata_={},
+                )
+            )
+
+    await db.commit()
+    await db.refresh(node)
+    return node
 
 
 async def assign_slots_to_unit(

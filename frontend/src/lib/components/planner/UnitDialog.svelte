@@ -1,10 +1,13 @@
 <script>
   import { ueColor, UE_PALETTE } from '$lib/planner.js'
-  import { createUnit, getGroupCurriculumChapters } from '$lib/api.js'
+  import { createUnit, updateUnit, getGroupCurriculumChapters } from '$lib/api.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
-  const { open = false, groupId, onCreated, onClose } = $props()
+  // `unit` gesetzt → Bearbeiten-Modus, sonst Anlegen.
+  const { open = false, groupId, unit = null, onCreated, onUpdated, onClose } = $props()
+
+  const isEdit = $derived(!!unit)
 
   let titel = $state('')
   let farbe = $state(0)
@@ -20,10 +23,10 @@
 
   $effect(() => {
     if (open) {
-      titel = ''
-      farbe = 0
+      titel = unit?.title ?? ''
+      farbe = unit?.metadata_?.farbe ?? 0
       error = null
-      selectedKapitelId = ''
+      selectedKapitelId = unit?.kapitel_node_id ?? ''
       loadChapters()
     }
   })
@@ -75,10 +78,17 @@
     saving = true
     error = null
     try {
-      const payload = { titel: titel.trim(), farbe }
-      if (selectedKapitelId) payload.kapitel_node_id = selectedKapitelId
-      const unit = await createUnit(groupId, payload)
-      onCreated(unit)
+      if (isEdit) {
+        // Beim Bearbeiten immer alle Felder senden (kapitel_node_id explizit, ggf. null).
+        const payload = { titel: titel.trim(), farbe, kapitel_node_id: selectedKapitelId || null }
+        const updated = await updateUnit(groupId, unit.id, payload)
+        onUpdated?.(updated)
+      } else {
+        const payload = { titel: titel.trim(), farbe }
+        if (selectedKapitelId) payload.kapitel_node_id = selectedKapitelId
+        const created = await createUnit(groupId, payload)
+        onCreated?.(created)
+      }
     } catch (e) {
       error = e.message
     } finally {
@@ -105,7 +115,7 @@
       onkeydown={onKeydown}
     >
       <h2 class="text-base font-semibold text-light-tx dark:text-dark-tx mb-4">
-        Unterrichtseinheit anlegen
+        {isEdit ? 'Unterrichtseinheit bearbeiten' : 'Unterrichtseinheit anlegen'}
       </h2>
 
       <div class="mb-4">
@@ -201,7 +211,7 @@
           class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
                  hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? 'Speichern…' : 'Anlegen'}
+          {saving ? 'Speichern…' : isEdit ? 'Speichern' : 'Anlegen'}
         </button>
       </div>
     </div>

@@ -95,10 +95,17 @@ class UnitCreate(BaseModel):
     farbe: Optional[int] = Field(None, ge=0, le=7)
 
 
+class UnitUpdate(BaseModel):
+    titel: Optional[str] = None
+    kapitel_node_id: Optional[UUID] = None
+    farbe: Optional[int] = Field(None, ge=0, le=7)
+
+
 class UnitRead(BaseModel):
     id: UUID
     title: str
     metadata_: dict = Field(alias="metadata_")
+    kapitel_node_id: Optional[UUID] = None
     kapitel_std: Optional[int] = None
 
     class Config:
