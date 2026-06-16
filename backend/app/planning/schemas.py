@@ -159,6 +159,7 @@ class LessonPhaseItem(BaseModel):
     dauer_min: int = Field(..., ge=1, le=480)
     beschreibung: Optional[str] = None
     prio: str = Field("kern")
+    sozialform: Optional[LessonLinkedItem] = None
     methode: Optional[LessonLinkedItem] = None
     material: list[LessonLinkedItem] = []
 

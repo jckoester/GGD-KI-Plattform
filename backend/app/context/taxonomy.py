@@ -194,7 +194,7 @@ def validate_unterrichtsstunde_metadata(metadata: dict) -> None:
                 f"Erlaubt: {sorted(_VALID_PHASEN_STATUS)}"
             )
 
-        for field in ("methode", "material"):
+        for field in ("sozialform", "methode", "material"):
             if field in phase and phase[field] is not None:
                 val = phase[field]
                 has_text = "text" in val
