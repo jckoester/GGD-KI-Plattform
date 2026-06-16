@@ -220,7 +220,15 @@ async def list_nodes(
         query = query.where(ContextNode.owner_pseudonym == user.sub)
 
     if q:
-        query = query.where(ContextNode.title.ilike(f"%{q}%"))
+        like = f"%{q}%"
+        # Titel ODER ein Synonym aus metadata_.aliase (JSONB-Textmatch). So sind
+        # Aliase systemweit suchbar (Krücke bis zum echten Alias-Feld an Knoten).
+        query = query.where(
+            or_(
+                ContextNode.title.ilike(like),
+                ContextNode.metadata_["aliase"].astext.ilike(like),
+            )
+        )
     if category:
         query = query.where(ContextNode.category == category)
     if content_type:
