@@ -818,12 +818,10 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
-    # Kompetenz-Sog: neu verknüpfte Methoden/Material-Knoten → Kompetenzen
+    # Kompetenz-Sog: nur aus verknüpften Material-Knoten. Methode/Sozialform sind
+    # kontrolliertes Vokabular ohne eigene Kompetenzen.
     new_node_ids = set()
     for p in phasen:
-        m = p.get("methode") or {}
-        if m.get("typ") == "node" and m.get("node_id"):
-            new_node_ids.add(m["node_id"])
         for mat in (p.get("material") or []):
             if mat.get("typ") == "node" and mat.get("node_id"):
                 new_node_ids.add(mat["node_id"])
@@ -873,8 +871,9 @@ register_tool(ChatTool(
         "function": {
             "name": "update_lesson_phases",
             "description": (
-                "Schreibt das Phasen-Array einer Stunde. "
-                "Gibt suggested_refs zurück: Kompetenzen aus verknüpften Methoden-/Material-Knoten, "
+                "Schreibt das Phasen-Array einer Stunde. Jede Phase kann sozialform und "
+                "methode tragen (je {typ:'text',wert} oder {typ:'node',node_id,titel}). "
+                "Gibt suggested_refs zurück: Kompetenzen aus verknüpften Material-Knoten, "
                 "die noch nicht in refs stehen. Nur nach Bestätigung durch die Lehrkraft übernehmen."
             ),
             "parameters": {
@@ -890,6 +889,7 @@ register_tool(ChatTool(
                                 "dauer_min": {"type": "integer", "minimum": 1},
                                 "beschreibung": {"type": "string"},
                                 "prio": {"type": "string", "enum": ["kern", "uebung", "vertiefung"]},
+                                "sozialform": {"type": "object"},
                                 "methode": {"type": "object"},
                                 "material": {"type": "array", "items": {"type": "object"}},
                             },
