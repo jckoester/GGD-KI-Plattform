@@ -1,5 +1,6 @@
 <script>
   import { PRIO_COLORS, PRIO_LABELS } from '$lib/planner.js'
+  import MaterialCell from './MaterialCell.svelte'
 
   /**
    * Props:
@@ -37,10 +38,6 @@
   function methodDisplay(m) {
     if (!m) return ''
     return m.typ === 'node' ? (m.titel || '') : (m.wert || '')
-  }
-
-  function materialItems(mats) {
-    return (mats || []).map(m => m.typ === 'node' ? (m.titel || '') : (m.wert || '')).filter(Boolean)
   }
 
   let editDesc = $state(false)
@@ -118,18 +115,17 @@
   </td>
 
   <!-- Dauer -->
-  <td class="px-2 py-2 w-16">
+  <td class="px-2 py-2 w-20 align-top">
     <input
       type="number"
       min="1"
       max="480"
       value={phase.dauer_min}
       onchange={(e) => patch({ dauer_min: Math.max(1, parseInt(e.currentTarget.value) || 1) })}
-      class="w-14 bg-transparent text-sm text-light-tx dark:text-dark-tx text-right
+      class="w-full bg-transparent text-sm text-light-tx dark:text-dark-tx text-right
              border-b border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
       aria-label="Dauer in Minuten"
     />
-    <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">′</span>
   </td>
 
   <!-- Methode -->
@@ -167,58 +163,12 @@
   </td>
 
   <!-- Material -->
-  <td class="px-2 py-2 min-w-[120px]">
-    {#each (phase.material || []) as mat, i}
-      {#if mat.typ === 'node'}
-        <span class="text-xs flex items-center gap-1 mb-0.5">
-          <span class="text-light-tx-2 dark:text-dark-tx-2">📎</span>
-          <span class="text-light-tx dark:text-dark-tx">{mat.titel || mat.node_id}</span>
-          <button
-            onclick={() => {
-              const updated = (phase.material || []).filter((_, j) => j !== i)
-              patch({ material: updated })
-            }}
-            class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re"
-            aria-label="Material entfernen"
-          >✕</button>
-        </span>
-      {:else}
-        <span class="text-xs flex items-center gap-1 mb-0.5">
-          <span
-            class="{!mat.wert ? 'text-light-re dark:text-dark-re' : 'text-light-tx dark:text-dark-tx'}"
-            title={!mat.wert ? 'Material fehlt' : ''}
-          >
-            {mat.wert || '(fehlt)'}
-          </span>
-          {#if !mat.wert && onLinkMaterial}
-            <button
-              onclick={() => onLinkMaterial(phase)}
-              class="text-xs text-primary dark:text-primary-dark font-medium"
-              title="Material erzeugen oder verknüpfen"
-            >✦</button>
-          {/if}
-          <button
-            onclick={() => {
-              const updated = (phase.material || []).filter((_, j) => j !== i)
-              patch({ material: updated })
-            }}
-            class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re"
-            aria-label="Material entfernen"
-          >✕</button>
-        </span>
-      {/if}
-    {/each}
-    <button
-      onclick={() => patch({ material: [...(phase.material || []), { typ: 'text', wert: '' }] })}
-      class="text-xs text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-60 hover:!opacity-100"
-    >+ Material</button>
-    {#if onLinkMaterial}
-      <button
-        onclick={() => onLinkMaterial(phase)}
-        class="text-xs text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-1"
-        title="Artefakt-Knoten verknüpfen"
-      >📎 Knoten</button>
-    {/if}
+  <td class="px-2 py-2 min-w-[140px] align-top">
+    <MaterialCell
+      material={phase.material || []}
+      onChange={(m) => patch({ material: m })}
+      onGenerate={onLinkMaterial ? () => onLinkMaterial(phase) : null}
+    />
   </td>
 
   <!-- Aktionen / Review-Status -->
