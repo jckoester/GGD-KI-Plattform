@@ -25,6 +25,7 @@ class ExportPhase:
     dauer_min: int
     beschreibung: str
     prio: str
+    sozialform: str  # display string
     methode: str  # display string
     material: list[str]  # display strings
 
@@ -106,6 +107,7 @@ async def build_lesson_export(db: AsyncSession, node_id: UUID) -> LessonExport:
             dauer_min=p.get("dauer_min", 0),
             beschreibung=p.get("beschreibung") or "",
             prio=p.get("prio", "kern"),
+            sozialform=_display_linked(p.get("sozialform") or {}),
             methode=_display_linked(p.get("methode") or {}),
             material=[_display_linked(m) for m in (p.get("material") or [])],
         )
@@ -162,8 +164,10 @@ def export_markdown(data: LessonExport) -> str:
         if phase.beschreibung:
             lines.append("")
             lines.append(phase.beschreibung)
+        if phase.sozialform:
+            lines.append(f"- **Sozialform:** {phase.sozialform}")
         if phase.methode:
-            lines.append(f"- **Methode/Sozialform:** {phase.methode}")
+            lines.append(f"- **Methode:** {phase.methode}")
         if phase.material:
             for m in phase.material:
                 if m:
@@ -255,7 +259,7 @@ def export_docx(data: LessonExport) -> bytes:
         table = doc.add_table(rows=1, cols=5)
         table.style = "Table Grid"
         hdr = table.rows[0].cells
-        for i, label in enumerate(["Zeit", "Prio", "Phase", "Methode", "Material"]):
+        for i, label in enumerate(["Zeit", "Prio", "Phase", "Sozialform / Methode", "Material"]):
             hdr[i].text = label
             hdr[i].paragraphs[0].runs[0].bold = True
 
@@ -275,7 +279,15 @@ def export_docx(data: LessonExport) -> bytes:
             run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
             row[2].text = f"{phase.name}\n{phase.beschreibung}" if phase.beschreibung else phase.name
-            row[3].text = phase.methode or ""
+
+            # Sozialform (fett) über Methode stapeln.
+            mc = row[3]
+            mc.text = phase.sozialform or phase.methode or ""
+            if phase.sozialform:
+                mc.paragraphs[0].runs[0].bold = True
+                if phase.methode:
+                    mc.add_paragraph(phase.methode)
+
             row[4].text = "\n".join(m for m in phase.material if m)
             kum += phase.dauer_min
 

@@ -22,6 +22,7 @@ def _make_export(**overrides) -> LessonExport:
                 dauer_min=15,
                 beschreibung="Aktivierung Vorwissen",
                 prio="kern",
+                sozialform="Partnerarbeit",
                 methode="Fishbowl",
                 material=["Folie 1"],
             ),
@@ -30,6 +31,7 @@ def _make_export(**overrides) -> LessonExport:
                 dauer_min=30,
                 beschreibung="",
                 prio="kern",
+                sozialform="",
                 methode="",
                 material=[],
             ),
@@ -38,6 +40,7 @@ def _make_export(**overrides) -> LessonExport:
                 dauer_min=15,
                 beschreibung="",
                 prio="uebung",
+                sozialform="Gruppenarbeit",
                 methode="Tafelbild",
                 material=["AB 1", "AB 2"],
             ),
@@ -124,8 +127,14 @@ def test_markdown_zeitbudget_with_ueberhang():
 
 def test_markdown_methode_included():
     md = export_markdown(_make_export())
-    assert "**Methode/Sozialform:** Fishbowl" in md
-    assert "**Methode/Sozialform:** Tafelbild" in md
+    assert "**Methode:** Fishbowl" in md
+    assert "**Methode:** Tafelbild" in md
+
+
+def test_markdown_sozialform_included():
+    md = export_markdown(_make_export())
+    assert "**Sozialform:** Partnerarbeit" in md
+    assert "**Sozialform:** Gruppenarbeit" in md
 
 
 def test_markdown_material_included():
