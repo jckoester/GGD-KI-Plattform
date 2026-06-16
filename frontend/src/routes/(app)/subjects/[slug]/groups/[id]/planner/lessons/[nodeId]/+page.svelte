@@ -100,6 +100,7 @@
           dauer_min: p.dauer_min,
           beschreibung: p.beschreibung,
           prio: p.prio ?? 'kern',
+          sozialform: p.sozialform ?? null,
           methode: p.methode ?? null,
           material: p.material ?? [],
         })),
@@ -448,6 +449,7 @@
         <PhaseTable
           {phasen}
           verfuegbareMin={lesson.slot?.verfuegbare_min ?? 45}
+          subjectId={lesson.subject_id}
           onChange={reviewMode ? () => {} : onPhasenChange}
           onSuggestCompetences={onSuggestCompetences}
           onMaterialCreate={openMaterialCreate}

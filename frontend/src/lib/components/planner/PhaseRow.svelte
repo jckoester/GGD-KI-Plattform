@@ -1,16 +1,17 @@
 <script>
   import { PRIO_COLORS, PRIO_LABELS } from '$lib/planner.js'
   import MaterialCell from './MaterialCell.svelte'
+  import LinkedTermInput from './LinkedTermInput.svelte'
 
   /**
    * Props:
-   * - phase: {id, name, dauer_min, beschreibung, prio, methode, material}
+   * - phase: {id, name, dauer_min, beschreibung, prio, sozialform, methode, material}
    * - kumMin: cumulative minutes before this phase
    * - canMoveUp / canMoveDown
    * - onChange(updatedPhase)
    * - onDelete()
    * - onMove(direction: 'up'|'down')
-   * - onLinkMethod(phase) — opens node-search for method
+   * - subjectId — Fach der Stunde (für die Vokabel-Suche/Anlegen in LinkedTermInput)
    * - onLinkMaterial(phase) — opens node-search for material
    */
   const {
@@ -21,8 +22,8 @@
     onChange,
     onDelete,
     onMove,
-    onLinkMethod = null,
     onLinkMaterial = null,
+    subjectId = null,
     reviewMode = false,
     reviewPhaseStatus = 'erledigt',
     onReviewStatusChange = null,
@@ -33,11 +34,6 @@
 
   function patch(updates) {
     onChange({ ...phase, ...updates })
-  }
-
-  function methodDisplay(m) {
-    if (!m) return ''
-    return m.typ === 'node' ? (m.titel || '') : (m.wert || '')
   }
 
   let editDesc = $state(false)
@@ -128,38 +124,24 @@
     />
   </td>
 
-  <!-- Methode -->
-  <td class="px-2 py-2 min-w-[120px]">
-    {#if phase.methode?.typ === 'node'}
-      <span class="text-xs flex items-center gap-1">
-        <span class="text-primary dark:text-primary-dark">⬡</span>
-        <span class="text-light-tx dark:text-dark-tx">{methodDisplay(phase.methode)}</span>
-        <button
-          onclick={() => patch({ methode: null })}
-          class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re ml-1"
-          aria-label="Methode entfernen"
-        >✕</button>
-      </span>
-    {:else}
-      <input
-        type="text"
-        value={phase.methode?.wert || ''}
-        onchange={(e) => {
-          const v = e.currentTarget.value.trim()
-          patch({ methode: v ? { typ: 'text', wert: v } : null })
-        }}
-        placeholder="Methode …"
-        class="w-full bg-transparent text-xs text-light-tx dark:text-dark-tx
-               border-b border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
+  <!-- Sozialform / Methode (gestapelt) -->
+  <td class="px-2 py-2 min-w-[150px] align-top">
+    <div class="space-y-1">
+      <LinkedTermInput
+        value={phase.sozialform ?? null}
+        contentType="sozialform"
+        {subjectId}
+        placeholder="Sozialform …"
+        onChange={(v) => patch({ sozialform: v })}
       />
-    {/if}
-    {#if onLinkMethod}
-      <button
-        onclick={() => onLinkMethod(phase)}
-        class="text-xs text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-60 hover:!opacity-100"
-        title="Methoden-Knoten verknüpfen"
-      >⬡ Knoten</button>
-    {/if}
+      <LinkedTermInput
+        value={phase.methode ?? null}
+        contentType="methode"
+        {subjectId}
+        placeholder="Methode …"
+        onChange={(v) => patch({ methode: v })}
+      />
+    </div>
   </td>
 
   <!-- Material -->

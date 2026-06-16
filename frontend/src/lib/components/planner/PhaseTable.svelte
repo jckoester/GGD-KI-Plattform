@@ -19,6 +19,7 @@
         onChange,
         onSuggestCompetences = null,
         onMaterialCreate = null,
+        subjectId = null,
         reviewMode = false,
         reviewStatus = {},
         onReviewStatusChange = null,
@@ -56,6 +57,7 @@
             dauer_min: 15,
             beschreibung: null,
             prio: "kern",
+            sozialform: null,
             methode: null,
             material: [],
         };
@@ -65,10 +67,8 @@
     function updatePhase(i, updated) {
         const next = [...phasen];
         next[i] = updated;
-        // Wenn ein node-Typ Method/Material verknüpft wird → Kompetenz-Sog
+        // Kompetenz-Sog nur aus Material-Knoten (Methode/Sozialform sind Vokabular).
         if (onSuggestCompetences) {
-            const m = updated.methode;
-            if (m?.typ === "node" && m.node_id) onSuggestCompetences(m.node_id);
             for (const mat of updated.material || []) {
                 if (mat?.typ === "node" && mat.node_id)
                     onSuggestCompetences(mat.node_id);
@@ -87,13 +87,6 @@
         if (j < 0 || j >= next.length) return;
         [next[i], next[j]] = [next[j], next[i]];
         onChange(next);
-    }
-
-    function handleLinkMethod(phase) {
-        // Öffnet Knoten-Suche in der Eltern-Seite — über Event oder Slot
-        // Da wir kein Event-System haben, rufen wir onSuggestCompetences mit null auf
-        // als Signal, dass der User einen Knoten-Link-Dialog braucht.
-        // Die Eltern-Seite kann das ignorieren oder eine Suche öffnen.
     }
 
     function handleLinkMaterial(phase) {
@@ -169,7 +162,7 @@
                         <th class="px-2 py-1.5 text-left w-24">Prio</th>
                         <th class="px-2 py-1.5 text-left">Phase</th>
                         <th class="px-2 py-1.5 text-left w-20">Min</th>
-                        <th class="px-2 py-1.5 text-left">Methode</th>
+                        <th class="px-2 py-1.5 text-left">Sozialform / Methode</th>
                         <th class="px-2 py-1.5 text-left">Material</th>
                         <th class="px-1 py-1.5 w-14"></th>
                     </tr>
@@ -184,8 +177,8 @@
                             onChange={(updated) => updatePhase(i, updated)}
                             onDelete={() => deletePhase(i)}
                             onMove={(dir) => movePhase(i, dir)}
-                            onLinkMethod={handleLinkMethod}
                             onLinkMaterial={() => handleLinkMaterial(phase)}
+                            {subjectId}
                             {reviewMode}
                             reviewPhaseStatus={reviewStatus[phase.id ?? ""] ??
                                 "erledigt"}

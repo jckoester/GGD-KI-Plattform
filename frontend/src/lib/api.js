@@ -939,8 +939,10 @@ export async function getContextNodes(params = {}) {
   if (params.category)      p.set('category', params.category)
   if (params.status)        p.set('status', params.status)
   if (params.subject_slug)  p.set('subject_slug', params.subject_slug)
+  if (params.subject_id != null) p.set('subject_id', params.subject_id)
   if (params.group_id)      p.set('group_id', params.group_id)
   if (params.grade != null) p.set('grade', params.grade)
+  if (params.limit != null) p.set('limit', params.limit)
   if (params.owner)         p.set('owner', params.owner)
   if (params.content_type) {
     const types = Array.isArray(params.content_type) ? params.content_type : [params.content_type]
