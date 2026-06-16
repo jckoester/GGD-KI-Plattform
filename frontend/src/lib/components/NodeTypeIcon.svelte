@@ -10,6 +10,8 @@
         BookOpen,
         Package,
         Circle,
+        Users,
+        Presentation,
     } from "lucide-svelte";
 
     let { category, contentType = undefined, size = 16 } = $props();
@@ -21,6 +23,8 @@
         themengebiet: Layers,
         bauteil: Cpu,
         abstrakt: Lightbulb,
+        methode: Presentation,
+        sozialform: Users,
     };
 
     // Fallback-Mapping für categories

@@ -73,6 +73,7 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "kapitel": None,
     "lernsequenz": None,
     "methode": None,
+    "sozialform": None,
     "operator_didaktisch": None,
     "jahresplan": None,
     "pruefungsanforderung": None,
