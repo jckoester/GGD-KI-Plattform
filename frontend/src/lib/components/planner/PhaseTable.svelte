@@ -153,7 +153,7 @@
           <tr class="border-b-2 border-light-ui-3 dark:border-dark-ui-3
                      text-xs font-semibold uppercase tracking-wide text-light-tx-2 dark:text-dark-tx-2">
             <th class="px-2 py-1.5 text-left w-20">Zeit</th>
-            <th class="px-1 py-1.5 w-6"></th>
+            <th class="px-2 py-1.5 text-left w-24">Prio</th>
             <th class="px-2 py-1.5 text-left">Phase</th>
             <th class="px-2 py-1.5 text-right w-16">Min</th>
             <th class="px-2 py-1.5 text-left">Methode</th>

@@ -194,14 +194,26 @@ async def export_pdf(data: LessonExport) -> bytes:
 def export_docx(data: LessonExport) -> bytes:
     try:
         from docx import Document
-        from docx.shared import Pt, Cm
+        from docx.shared import Pt, Cm, RGBColor
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
     except ImportError as e:
         raise RuntimeError(f"DOCX-Export benötigt 'python-docx' ({e}).") from e
 
     import io
 
     prio_labels = {"kern": "Kern", "uebung": "Übung", "vertiefung": "Vertiefung"}
+    prio_abbr = {"kern": "K", "uebung": "Ü", "vertiefung": "V"}
+    prio_hex = {"kern": "4A7FB5", "uebung": "5BA37A", "vertiefung": "B07FB8"}
+
+    def _shade_cell(cell, hex_color: str) -> None:
+        """Hintergrundfarbe einer Tabellenzelle setzen (python-docx kann das nicht direkt)."""
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), hex_color)
+        cell._tc.get_or_add_tcPr().append(shd)
 
     doc = Document()
 
@@ -251,7 +263,17 @@ def export_docx(data: LessonExport) -> bytes:
         for phase in data.phasen:
             row = table.add_row().cells
             row[0].text = f"{kum}–{kum + phase.dauer_min}′"
-            row[1].text = prio_labels.get(phase.prio, phase.prio)
+
+            # Prio: farbige Zelle + Kürzel (K/Ü/V), weiß zentriert — analog zur App.
+            prio_cell = row[1]
+            prio_cell.text = prio_abbr.get(phase.prio, "?")
+            _shade_cell(prio_cell, prio_hex.get(phase.prio, "888888"))
+            p = prio_cell.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.runs[0]
+            run.bold = True
+            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
             row[2].text = f"{phase.name}\n{phase.beschreibung}" if phase.beschreibung else phase.name
             row[3].text = phase.methode or ""
             row[4].text = "\n".join(m for m in phase.material if m)

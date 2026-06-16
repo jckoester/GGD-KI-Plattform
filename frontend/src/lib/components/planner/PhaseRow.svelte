@@ -56,16 +56,17 @@
     {kumMin}–{endMin}′
   </td>
 
-  <!-- Prio-Leiste + Select -->
-  <td class="px-1 py-2 w-6">
-    <div class="relative">
+  <!-- Prio-Pill + Select -->
+  <td class="px-2 py-2 w-24 align-top">
+    <div class="relative inline-block">
       <button
-        title={PRIO_LABELS[phase.prio]}
+        title="Priorität ändern"
         onclick={() => { prioOpen = !prioOpen }}
-        class="w-3 h-full min-h-[32px] rounded"
+        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+               text-white whitespace-nowrap hover:opacity-90 transition-opacity"
         style="background-color: {prioColor[0]}"
         aria-label="Priorität: {PRIO_LABELS[phase.prio]}"
-      ></button>
+      >{PRIO_LABELS[phase.prio]}</button>
       {#if prioOpen}
         <div
           role="none"
