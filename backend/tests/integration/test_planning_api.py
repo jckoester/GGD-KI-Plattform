@@ -591,3 +591,111 @@ async def test_curriculum_chapters_endpoint_fremde_lehrkraft_403(
         "/planning/groups/100/curriculum-chapters", headers=auth_teacher2
     )
     assert resp.status_code == 403
+
+
+# ── Schritt 4/8: sozialform-Round-Trip + Aliassuche ──────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lesson_sozialform_roundtrip(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """PATCH einer Stunde mit sozialform → GET liefert sie unverändert zurück."""
+    await test_client.put(
+        "/planning/groups/100/pattern",
+        json={"halbjahr": 1, "patterns": [{"weekday": 0, "start_period": 3, "periods": 1}]},
+        headers=auth_headers,
+    )
+    await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    ue_id = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Sozialform-UE", "farbe": 0},
+            headers=auth_headers,
+        )
+    ).json()["id"]
+    slot_id = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()["slots"][0]["id"]
+    await test_client.patch(
+        f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+    )
+    lesson_id = (
+        await test_client.post(
+            f"/planning/units/{ue_id}/lessons",
+            json={"titel": "Stunde S", "slot_id": slot_id},
+            headers=auth_headers,
+        )
+    ).json()["id"]
+
+    resp = await test_client.patch(
+        f"/planning/lessons/{lesson_id}",
+        json={
+            "phasen": [
+                {
+                    "id": "p1",
+                    "name": "Erarbeitung",
+                    "dauer_min": 20,
+                    "prio": "kern",
+                    "sozialform": {"typ": "text", "wert": "Gruppenarbeit"},
+                    "methode": {"typ": "text", "wert": "Gruppenpuzzle"},
+                }
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+
+    lesson = (
+        await test_client.get(f"/planning/lessons/{lesson_id}", headers=auth_headers)
+    ).json()
+    phase = lesson["phasen"][0]
+    assert phase["sozialform"]["typ"] == "text"
+    assert phase["sozialform"]["wert"] == "Gruppenarbeit"
+    assert phase["methode"]["wert"] == "Gruppenpuzzle"
+
+
+@pytest.mark.asyncio
+async def test_context_nodes_aliassuche(test_client, auth_headers):
+    """GET /context/nodes?q=<alias> findet den Knoten über metadata.aliase."""
+    create = await test_client.post(
+        "/context/nodes",
+        json={
+            "category": "knowledge",
+            "content_type": "methode",
+            "title": "Think-Pair-Share AliasTest",
+            "read_scope": "school",
+            "metadata": {"aliase": ["Ich-Du-Wir XYZ"]},
+        },
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+    node_id = create.json()["id"]
+
+    # Treffer über Alias
+    by_alias = (
+        await test_client.get(
+            "/context/nodes", params={"q": "Ich-Du-Wir XYZ"}, headers=auth_headers
+        )
+    ).json()
+    assert any(n["id"] == node_id for n in by_alias)
+
+    # Treffer über Titel
+    by_title = (
+        await test_client.get(
+            "/context/nodes", params={"q": "AliasTest"}, headers=auth_headers
+        )
+    ).json()
+    assert any(n["id"] == node_id for n in by_title)
+
+    # Kein Treffer bei nicht vorkommendem Begriff
+    none = (
+        await test_client.get(
+            "/context/nodes", params={"q": "ZZZ-nicht-vorhanden-QQQ"}, headers=auth_headers
+        )
+    ).json()
+    assert all(n["id"] != node_id for n in none)
