@@ -186,6 +186,15 @@
 
   const plannerBase = $derived(`/subjects/${slug}/groups/${groupId}/planner`)
 
+  // Einheitliche Button-Höhe für die Kopf-Aktionen; Export-Buttons sind kleiner (eigene Zeile).
+  const navBtn =
+    'h-8 inline-flex items-center gap-1 px-3 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3 ' +
+    'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 ' +
+    'hover:text-light-bl dark:hover:text-dark-bl transition-colors'
+  const exportBtn =
+    'h-7 inline-flex items-center gap-1 px-2 text-xs rounded border border-light-ui-3 dark:border-dark-ui-3 ' +
+    'text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors'
+
   // ── Nachbereiten ─────────────────────────────────────────────────────────────
 
   function startReview() {
@@ -308,51 +317,46 @@
           {/if}
         </div>
 
-        <!-- Navigation + Export + Assistent -->
-        <div class="flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <!-- Stunden-Navigation -->
-          {#if lesson.nav.prev_node_id}
-            <a href="{plannerBase}/lessons/{lesson.nav.prev_node_id}"
-               class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-bl dark:hover:text-dark-bl px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3">
-              ← Stunde {lesson.nav.position - 1}
-            </a>
-          {/if}
-          {#if lesson.nav.next_node_id}
-            <a href="{plannerBase}/lessons/{lesson.nav.next_node_id}"
-               class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-bl dark:hover:text-dark-bl px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3">
-              Stunde {lesson.nav.position + 1} →
-            </a>
-          {/if}
+        <!-- Aktionen: Hauptzeile (Navigation · Assistent · Nachbereiten), Export darunter -->
+        <div class="flex flex-col items-end gap-2 flex-shrink-0">
+          <!-- Hauptaktionen -->
+          <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            <!-- Navigationsblock: zurück · vor · Übersicht -->
+            <div class="flex items-center gap-1">
+              {#if lesson.nav.prev_node_id}
+                <a href="{plannerBase}/lessons/{lesson.nav.prev_node_id}" class={navBtn}>
+                  ← Stunde {lesson.nav.position - 1}
+                </a>
+              {/if}
+              {#if lesson.nav.next_node_id}
+                <a href="{plannerBase}/lessons/{lesson.nav.next_node_id}" class={navBtn}>
+                  Stunde {lesson.nav.position + 1} →
+                </a>
+              {/if}
+              <a href={plannerBase} class={navBtn} title="Zur Jahresübersicht">
+                ↩︎ Übersicht
+              </a>
+            </div>
 
-          <!-- Export -->
-          <div class="flex items-center gap-1">
-            <button onclick={() => download('md')}
-                    class="text-xs px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
-                           text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2">
-              MD
+            <!-- Assistent -->
+            <button
+              onclick={openAssistant}
+              class="h-8 inline-flex items-center gap-1.5 px-3 text-sm rounded-md
+                     bg-primary dark:bg-primary-dark text-white font-medium
+                     hover:opacity-90 transition-opacity"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4l3 3"/>
+              </svg>
+              Assistent
             </button>
-            <button onclick={copyMd}
-                    class="text-xs px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
-                           text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
-                    title="Als Markdown in Zwischenablage kopieren (Obsidian)">
-              📋
-            </button>
-            <button onclick={() => download('pdf')}
-                    class="text-xs px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
-                           text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2">
-              PDF
-            </button>
-            <button onclick={() => download('docx')}
-                    class="text-xs px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
-                           text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2">
-              DOCX
-            </button>
-          </div>
 
-          <!-- Nachbereiten -->
-          {#if isReviewed}
-            <div class="flex items-center gap-1.5">
-              <span class="text-xs px-2 py-1 rounded border
+            <!-- Nachbereiten -->
+            {#if isReviewed}
+              <span class="h-8 inline-flex items-center px-2 text-xs rounded-md border
                            {isAutoReviewed
                              ? 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2'
                              : 'border-green-400 text-green-700 dark:text-green-300'}">
@@ -361,45 +365,37 @@
               <button
                 onclick={undoReview}
                 disabled={reviewLoading}
-                class="text-xs px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3
-                       text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
+                class={navBtn}
                 title="Nachbereitung rückgängig machen"
               >↩︎ Rückgängig</button>
-            </div>
-          {:else if !reviewMode}
-            <button
-              onclick={startReview}
-              class="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border
-                     border-green-400 text-green-700 dark:text-green-300
-                     hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors font-medium"
-            >
-              ☑︎ Nachbereiten
+            {:else if !reviewMode}
+              <button
+                onclick={startReview}
+                class="h-8 inline-flex items-center gap-1 px-3 text-sm rounded-md border
+                       border-green-400 text-green-700 dark:text-green-300
+                       hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors font-medium"
+              >
+                ☑︎ Nachbereiten
+              </button>
+            {/if}
+          </div>
+
+          <!-- Export-Zeile -->
+          <div class="flex items-center gap-1">
+            <button onclick={() => download('md')} class={exportBtn}>MD</button>
+            <button onclick={copyMd} class={exportBtn}
+                    title="Als Markdown in Zwischenablage kopieren (Obsidian)"
+                    aria-label="Markdown in Zwischenablage kopieren">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
             </button>
-          {/if}
-
-          <!-- Assistent -->
-          <button
-            onclick={openAssistant}
-            class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
-                   bg-primary dark:bg-primary-dark text-white font-medium
-                   hover:opacity-90 transition-opacity"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                 stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 8v4l3 3"/>
-            </svg>
-            Assistent
-          </button>
-
-          <!-- Undo (Snapshot) -->
-          <a href={plannerBase}
-             class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-bl dark:hover:text-dark-bl
-                    px-2 py-1 rounded border border-light-ui-3 dark:border-dark-ui-3"
-             title="Zur Jahresübersicht (Undo über Verlauf-Button)">
-            ↩︎ Übersicht
-          </a>
+            <button onclick={() => download('pdf')} class={exportBtn}>PDF</button>
+            <button onclick={() => download('docx')} class={exportBtn}>DOCX</button>
+          </div>
         </div>
       </div>
 
