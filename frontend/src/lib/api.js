@@ -940,6 +940,7 @@ export async function getContextNodes(params = {}) {
   if (params.status)        p.set('status', params.status)
   if (params.subject_slug)  p.set('subject_slug', params.subject_slug)
   if (params.subject_id != null) p.set('subject_id', params.subject_id)
+  if (params.subject_id_or_global != null) p.set('subject_id_or_global', params.subject_id_or_global)
   if (params.group_id)      p.set('group_id', params.group_id)
   if (params.grade != null) p.set('grade', params.grade)
   if (params.limit != null) p.set('limit', params.limit)

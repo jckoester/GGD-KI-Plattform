@@ -147,6 +147,10 @@ async def list_nodes(
     status: str | None = Query(default=None),
     subject_slug: str | None = Query(default=None),
     subject_id: int | None = Query(default=None, description="Direkte Subject-ID-Filterung"),
+    subject_id_or_global: int | None = Query(
+        default=None,
+        description="Knoten dieses Fachs ODER fach­unabhängige (subject_id IS NULL)",
+    ),
     group_id: int | None = Query(default=None),
     grade: int | None = Query(default=None, ge=1, le=13, description="Jahrgangsstufe"),
     bp_version: str | None = Query(default=None, description="BP-Versionsfilter, z. B. '2016' oder '2016.V2'"),
@@ -161,6 +165,15 @@ async def list_nodes(
     # subject_id: direkte Filterung nach Subject-ID
     if subject_id is not None:
         query = query.where(ContextNode.subject_id == subject_id)
+
+    # subject_id_or_global: dieses Fach plus fach­unabhängige Knoten (z. B. Vokabular)
+    if subject_id_or_global is not None:
+        query = query.where(
+            or_(
+                ContextNode.subject_id == subject_id_or_global,
+                ContextNode.subject_id.is_(None),
+            )
+        )
 
     # subject_slug: Knoten deren Scope-Gruppe zu diesem Fach gehört,
     # plus schulweite/globale knowledge-Knoten mit passendem Fach oder fächerübergreifend

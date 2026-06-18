@@ -72,8 +72,11 @@
     loading = true
     dropdownOpen = true
     try {
+      // subject_id_or_global: dieses Fach plus fach­unabhängige Knoten (z. B. das
+      // generische Seed-Vokabular mit subject_id=NULL). Ein harter subject_id-Filter
+      // würde die fach­unabhängigen Werte ausschließen.
       const params = { content_type: contentType, q, limit: 8 }
-      if (subjectId) params.subject_id = subjectId
+      if (subjectId) params.subject_id_or_global = subjectId
       const res = await getContextNodes(params)
       items = Array.isArray(res) ? res : (res.items ?? [])
       activeIdx = 0

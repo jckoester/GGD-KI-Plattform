@@ -699,3 +699,57 @@ async def test_context_nodes_aliassuche(test_client, auth_headers):
         )
     ).json()
     assert all(n["id"] != node_id for n in none)
+
+
+@pytest.mark.asyncio
+async def test_context_nodes_subject_id_or_global(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """subject_id_or_global liefert fach­unabhängige (NULL) + Fach-Knoten, keine fremden."""
+    generic = (
+        await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge",
+                "content_type": "methode",
+                "title": "Vokab-Generisch-XYZ",
+                "read_scope": "school",
+            },
+            headers=auth_headers,
+        )
+    ).json()["id"]
+    fach = (
+        await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge",
+                "content_type": "methode",
+                "title": "Vokab-Fach100-XYZ",
+                "read_scope": "school",
+                "subject_id": 100,
+            },
+            headers=auth_headers,
+        )
+    ).json()["id"]
+
+    # Fach 100: generisch + Fach-100 enthalten
+    res100 = (
+        await test_client.get(
+            "/context/nodes",
+            params={"content_type": "methode", "subject_id_or_global": 100},
+            headers=auth_headers,
+        )
+    ).json()
+    ids100 = {n["id"] for n in res100}
+    assert generic in ids100 and fach in ids100
+
+    # Fremdes Fach: generisch enthalten, Fach-100 NICHT
+    res_other = (
+        await test_client.get(
+            "/context/nodes",
+            params={"content_type": "methode", "subject_id_or_global": 99999},
+            headers=auth_headers,
+        )
+    ).json()
+    ids_other = {n["id"] for n in res_other}
+    assert generic in ids_other and fach not in ids_other
