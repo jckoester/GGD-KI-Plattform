@@ -32,6 +32,9 @@ Neben dem Textfeld im Chat gibt es einen **Suche-Button** (Lupensymbol). Er ist 
 3. Eine Auswahlliste erscheint über dem Eingabefeld. Alle Treffer sind vorausgewählt; Sie können einzelne abwählen.
 4. Klicken Sie **„Hinzufügen"** — die gewählten Bausteine werden als Chips über dem Textfeld angeheftet.
 
+> 📷 *Screenshot folgt: Angeheftete Kontextbausteine als Chips über dem Eingabefeld.*
+<!-- Ersetzen durch: ![Kontext-Chips](/help-images/kontext/kontext-chips.png) -->
+
 Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwörter treffen — auch ein vollständig formulierter Prompt liefert passende Treffer.
 
 ### Über den @-Shortcode

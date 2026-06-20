@@ -14,6 +14,9 @@ Assistenten werden von Lehrkräften oder Administratoren angelegt und für besti
 2. Sie sehen eine Liste der verfügbaren Assistenten mit einer kurzen Beschreibung.
 3. Klicken Sie auf einen Assistenten, um einen neuen Chat mit ihm zu starten.
 
+> 📷 *Screenshot folgt: Assistenten-Liste mit Namen und Kurzbeschreibungen.*
+<!-- Ersetzen durch: ![Assistenten-Liste](/help-images/assistenten/assistenten-liste.png) -->
+
 Sie können auch direkt im Chat-Eingabefeld **`/`** tippen, um den Assistenten-Picker zu öffnen — das funktioniert sowohl vor dem ersten Senden als auch mitten in einem laufenden Gespräch.
 
 Wenn Sie den Assistenten während eines Gesprächs wechseln, bleibt der bisherige Verlauf erhalten und bleibt Teil des Kontexts für den neuen Assistenten. Im Verlauf erscheint ein Trenner, der den Wechsel markiert.

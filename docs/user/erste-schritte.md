@@ -10,6 +10,9 @@ Ein separater Account ist nicht notwendig. Wer ein Schulkonto hat, kann sofort l
 
 Nach der Anmeldung sehen Sie die Hauptansicht der Plattform:
 
+> 📷 *Screenshot folgt: Hauptansicht mit Seitenleiste, Chat-Bereich und User-Menü.*
+<!-- Ersetzen durch: ![Hauptansicht](/help-images/erste-schritte/oberflaeche.png) -->
+
 **Seitenleiste (links)**
 - **Neuer Chat** — startet ein leeres Gespräch
 - **Verlauf** — zeigt Ihre früheren Gespräche

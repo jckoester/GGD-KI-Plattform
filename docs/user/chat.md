@@ -6,9 +6,15 @@ Tippen Sie Ihre Nachricht in das Textfeld am unteren Rand des Chatfensters. Mit 
 
 Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten bisherigen Verlauf des aktuellen Gesprächs — Sie müssen Zusammenhänge nicht jedes Mal neu erklären.
 
+> 📷 *Screenshot folgt: Eingabefeld mit Büroklammer (Datei), Suche-Button und Modell-Auswahl.*
+<!-- Ersetzen durch: ![Chat-Eingabefeld](/help-images/chat/eingabefeld.png) -->
+
 ## Modell wechseln
 
 Über das Auswahlmenü im Chatfenster können Sie zwischen verschiedenen KI-Modellen wechseln — auch mitten in einem laufenden Gespräch. Welche Modelle verfügbar sind, hängt von der Konfiguration Ihrer Schule ab.
+
+> 📷 *Screenshot folgt: Geöffnete Modell-Auswahl im Chatfenster.*
+<!-- Ersetzen durch: ![Modell-Auswahl](/help-images/chat/modell-auswahl.png) -->
 
 Ein einmal gewähltes Modell wird gespeichert und beim nächsten Chat automatisch vorausgewählt. Sie können es jederzeit wieder ändern.
 

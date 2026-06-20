@@ -11,6 +11,9 @@ Auf der Profilseite sehen Sie:
 - Wie viel insgesamt zur Verfügung steht
 - Einen Fortschrittsbalken, der sich rot färbt, wenn das Budget knapp wird
 
+> 📷 *Screenshot folgt: Budget-Anzeige mit Fortschrittsbalken auf der Profilseite.*
+<!-- Ersetzen durch: ![Budget-Anzeige](/help-images/profil/budget.png) -->
+
 **Was passiert, wenn das Budget aufgebraucht ist?**
 Neue Nachrichten werden abgelehnt, bis das Budget zu Monatsbeginn automatisch erneuert wird. Sie können weiterhin ältere Gespräche lesen, aber keine neuen Nachrichten senden.
 
