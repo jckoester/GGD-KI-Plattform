@@ -23,7 +23,9 @@ Cron-Container (separat):
 | Modul | Zweck |
 |-------|-------|
 | `auth/` | OAuth2/OIDC-Flow, JWT-Ausgabe und -Prüfung, Pseudonymisierung, Adapter-Interface |
-| `chat/` | Chat-Endpunkte, SSE-Streaming, Konversations- und Nachrichtenverwaltung |
+| `chat/` | Chat-Endpunkte, SSE-Streaming, Konversations- und Nachrichtenverwaltung, Tool-Registry (`tools.py`: `planning` / `student_planning`) |
+| `context/` | Kontextspeicher: Knoten/Kanten, Curriculum-Import, Retrieval (semantisch + Engagement-UNION), Taxonomie |
+| `planning/` | Unterrichtsplanung (UP-Reihe): Slots/Snapshots, Jahresplan- und Stundenentwurfs-Logik, Assistenten-Tools. Verschiebe-Dialog: `reflow_service.py` (Reflow-Kontext + Überhang-Erkennung), `operations.py` (typisierte Plan-Operationen + atomarer Executor). Schüler-Kontext: `student_context.py` (aktuelles Thema, Klassenarbeits-Scope, Whitelist) |
 | `budget/` | Budget-Tiers aus YAML, ECB-Wechselkurs, Reconcile-Service |
 | `litellm/` | LiteLLM-HTTP-Client, Team-Anlage, User-Budget-Sync |
 | `upload/` | Dateiupload-Session, Text-Extraktion (PDF via pdfminer.six, Bilder via Base64) |

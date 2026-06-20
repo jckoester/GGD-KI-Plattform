@@ -20,6 +20,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - Zwischen verschiedenen KI-Modellen wählen
 - Vorgefertigte Assistenten für bestimmte Aufgaben nutzen (z. B. Texte korrigieren, Ideen entwickeln)
 - Wissensbausteine aus dem Kontextspeicher in ein Gespräch einbinden (Bildungsplan, Unterrichtsmaterial)
+- *(Lehrkräfte)* Den Unterricht planen — vom Jahresplan bis zum Stundenentwurf
 - Frühere Gespräche im Verlauf wiederfinden
 
 ## Inhaltsverzeichnis
@@ -27,6 +28,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Erste Schritte](erste-schritte.md) — Anmelden, Oberfläche, erster Chat
 - [Den Chat nutzen](chat.md) — Nachrichten, Dateien, Modelle, Verlauf
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
+- [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?

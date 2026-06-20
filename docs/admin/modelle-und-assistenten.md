@@ -79,6 +79,35 @@ Assistenten automatisch vorausgewählt. Existieren mehrere Assistenten mit
 aktivierter Unterrichtsplanung, wird der erste in der Sortierreihenfolge
 verwendet.
 
+### Werkzeug-Gruppen (`tool_groups`)
+
+Welche Planungs-Werkzeuge ein Assistent erhält, steuert das Feld `tool_groups`:
+
+| Gruppe | Werkzeuge | Freischaltung |
+|---|---|---|
+| `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
+| `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
+
+Schreibende Planungs-Werkzeuge bleiben damit strikt an die Lehrkraft-Rolle gebunden;
+für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt
+`student_planning`.
+
+### Verschiebe-Assistent einrichten
+
+Der Verschiebe-Assistent hilft Lehrkräften, den Plan bei Ausfall, Verschiebungen
+oder offenen Phasen neu zu ordnen. Er nutzt **dieselbe** Werkzeug-Gruppe `planning`
+wie der Jahresplan-Assistent, aber einen eigenen System-Prompt:
+
+1. Einen Assistenten anlegen (oder den bestehenden Planungs-Assistenten erweitern).
+2. `tool_groups` enthält **`planning`**.
+3. Als System-Prompt den Inhalt von `config/prompts/verschiebe_assistent.md` setzen.
+4. Ein tool-fähiges Modell wählen (z. B. `claude-sonnet-4-6`).
+
+Die Auslöser in der Planungs-UI (Ausfall-Banner, Drag & Drop einer geplanten Stunde,
+Halbjahres-Hinweis, Überhang-Hinweisleiste) öffnen jeweils einen Chat mit
+Gruppenbezug und vorbefülltem Anliegen — ein freigeschalteter Assistent mit
+`planning` ist Voraussetzung, damit die Werkzeuge greifen.
+
 ## Assistenten freigeben (`/settings/assistants`)
 
 Neu angelegte Assistenten sind zunächst nicht öffentlich sichtbar. Die

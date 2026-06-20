@@ -20,6 +20,12 @@ Wenn Sie eine Nachricht senden, wird diese über einen schuleigenen Vermittlungs
 
 Der KI-Anbieter erhält **keine** Informationen, die auf Sie persönlich schließen lassen: keinen Namen, keine E-Mail-Adresse, keine Klasse, kein Schulkonto. Stattdessen wird ein anonymer Code übermittelt, der keinen Rückschluss auf Ihre Identität zulässt. Die Zuordnung zwischen Code und Person liegt ausschließlich auf dem Schulserver.
 
+### Aktueller Unterricht in Gruppen-Chats
+
+Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Plattform einen kleinen Hinweis zum aktuellen Unterricht, damit der Assistent passend helfen kann: das zuletzt behandelte und das nächste Thema sowie Termin und Umfang der nächsten Klassenarbeit.
+
+**Nicht** übermittelt werden interne Planungsfelder der Lehrkraft — etwa Kommentare, Reflexionen, der Pin-Status oder die einzelnen Phasen einer Stunde. Es werden nur Angaben weitergegeben, die ohnehin für die Gruppe bestimmt sind (Themen, Stundenziele, Klassenarbeits-Umfang).
+
 ## Wer kann meine Chats lesen?
 
 Ihre Gespräche sind für andere Nutzerinnen und Nutzer — auch für Lehrkräfte — nicht einsehbar. Ein Zugriff durch Administratoren ist technisch möglich, erfolgt aber nur in begründeten Ausnahmefällen (z. B. auf richterliche Anordnung) und wird im Prüfprotokoll festgehalten.
