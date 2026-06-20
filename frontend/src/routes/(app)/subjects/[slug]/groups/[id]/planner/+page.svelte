@@ -46,6 +46,26 @@
   let restoringId = $state(null)
   let overhang = $state([])   // UP-6 Schritt 8: Überhang-Befunde für die Assistbar
   let reflowBanner = $state(null)  // UP-6 Schritt 6: Ausfall-mit-Inhalt → Verschiebe-Angebot
+  let regenHint = $state(false)    // UP-6 Schritt 7: nach HJ2-Regenerierung
+  let dragReflow = $state(null)    // UP-6 Schritt 6: Drag&Drop mit geplanter Stunde
+
+  function dragDeepLink(dr) {
+    const fmt = (iso) => { const [, m, d] = iso.split('-'); return `${+d}.${+m}.` }
+    const p = `Ich möchte Inhalte zwischen der Stunde am ${fmt(dr.a.date)} und dem Slot `
+      + `am ${fmt(dr.b.date)} umverteilen — eine davon ist bereits ausgeplant. `
+      + `Bitte hilf mir, das sauber umzuplanen.`
+    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+  }
+  // Hinweis verschwindet, sobald die HJ2-Slots wieder Zuordnungen tragen.
+  const showRegenHint = $derived(
+    regenHint && !slots.some(s => s.halbjahr === 2 && s.ue_node_id)
+  )
+
+  function regenDeepLink() {
+    const p = `Ich habe das 2. Halbjahr neu generiert. Bitte hilf mir, die UE-Folge und `
+      + `Themen aus dem vorigen Stand auf das neue Raster zu übertragen.`
+    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+  }
 
   function reflowDeepLink(b) {
     const [y, m, d] = b.date.split('-')
@@ -113,6 +133,14 @@
   // ── Slots tauschen ───────────────────────────────────────────────────────────
   async function handleSwapSlots(slotAId, slotBId) {
     patchError = null
+    const a = slots.find(s => s.id === slotAId)
+    const b = slots.find(s => s.id === slotBId)
+    // Ist eine geplante Stunde beteiligt, ist der Drop ein Auftrag, kein Commit:
+    // Verschiebe-Dialog öffnen statt einfach zu tauschen (UP-6 Schritt 6).
+    if (a?.stunde_node_id || b?.stunde_node_id) {
+      dragReflow = { a, b }
+      return
+    }
     try {
       const [updatedA, updatedB] = await swapSlots(groupId, slotAId, slotBId)
       slots = slots.map(s => {
@@ -200,11 +228,13 @@
     overview = { ...overview, patterns: [...otherPatterns, ...updatedPatterns] }
   }
 
-  async function onSlotsGenerated(stats) {
+  async function onSlotsGenerated(stats, meta = {}) {
     // Slots neu laden
     const refreshed = await getPlanningOverview(groupId)
     overview = refreshed
     slots = refreshed.slots
+    // Regenerierung des 2. Halbjahres → Neuaufbau-Hinweis (UP-6 Schritt 7).
+    if (meta.regenerate && meta.halbjahr === 2) regenHint = true
   }
 
   // ── Undo-Panel ───────────────────────────────────────────────────────────────
@@ -321,6 +351,50 @@
     </div>
   </div>
 </div>
+
+{#if dragReflow}
+  <div class="px-4 pt-2">
+    <div class="flex items-center gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
+      <span class="text-light-or dark:text-dark-or flex-shrink-0" aria-hidden="true">↹</span>
+      <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">
+        Eine der Stunden ist bereits ausgeplant — soll der Assistent die Umverteilung übernehmen?
+      </span>
+      <a
+        href={dragDeepLink(dragReflow)}
+        class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
+               text-white font-medium hover:opacity-90 transition-opacity"
+      >Umplanen (Assistent)</a>
+      <button
+        onclick={() => { dragReflow = null }}
+        aria-label="Schließen"
+        class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+      >✕</button>
+    </div>
+  </div>
+{/if}
+
+{#if showRegenHint}
+  <div class="px-4 pt-2">
+    <div class="flex items-center gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
+      <span class="text-light-or dark:text-dark-or flex-shrink-0" aria-hidden="true">⟳</span>
+      <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">
+        Das 2. Halbjahr wurde neu generiert — die Zuordnung muss neu aufgebaut werden.
+      </span>
+      <a
+        href={regenDeepLink()}
+        class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
+               text-white font-medium hover:opacity-90 transition-opacity"
+      >Neu aufbauen (Assistent)</a>
+      <button
+        onclick={() => { regenHint = false }}
+        aria-label="Schließen"
+        class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+      >✕</button>
+    </div>
+  </div>
+{/if}
 
 {#if reflowBanner}
   <div class="px-4 pt-2">

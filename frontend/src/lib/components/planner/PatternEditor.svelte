@@ -67,7 +67,7 @@
       const stats = await generateSlots(groupId, halbjahr, regenerate)
       genSuccess = `${stats.created} Slots für HJ ${halbjahr} generiert.`
       if (stats.used_hj1_fallback) genSuccess += ' (HJ-1-Muster als Fallback verwendet)'
-      onGenerated(stats)
+      onGenerated(stats, { regenerate, halbjahr })
     } catch (e) {
       error = e.message
     } finally {

@@ -165,6 +165,14 @@
     goto(`/chat?group_id=${groupId}&node_id=${nodeId}`)
   }
 
+  // ── Verschiebe-Dialog bei offenen Phasen (UP-6 Schritt 5) ────────────────────
+  function openReflowDialog() {
+    const offen = (reviewResult?.open_phases ?? []).join(', ')
+    const p = `In der Stunde „${titel}" sind Phasen offen geblieben (${offen}). `
+      + `Bitte hilf mir, die offenen Inhalte auf die Folgestunde zu übertragen.`
+    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`)
+  }
+
   // ── Material-Erzeugung (✦ Szenario 6) ───────────────────────────────────────
   function openMaterialCreate(phase) {
     const prompt = encodeURIComponent(
@@ -553,6 +561,12 @@
             <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
               Offene Phasen: {reviewResult.open_phases.join(', ')}
             </p>
+            <button
+              onclick={openReflowDialog}
+              class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
+                     bg-primary dark:bg-primary-dark text-white font-medium
+                     hover:opacity-90 transition-opacity"
+            >↪ Verschiebe-Dialog starten</button>
           {/if}
           <button
             onclick={undoReview}
