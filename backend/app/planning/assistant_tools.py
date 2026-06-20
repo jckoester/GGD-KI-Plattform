@@ -12,12 +12,16 @@ from datetime import date
 from uuid import UUID
 
 import sqlalchemy as sa
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.tools import ChatTool, ToolContext, register_tool
-from app.db.models import ContextEdge, ContextNode, LessonSlot
+from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
+from app.planning.operations import apply_operations, parse_operations
 from app.planning.permissions import require_group_teacher
+from app.planning.reflow_service import build_reflow_context
+from app.planning.snapshots import restore_snapshot
 from app.planning.student_context import get_exam_scope
 
 logger = logging.getLogger(__name__)
@@ -951,4 +955,150 @@ register_tool(ChatTool(
         },
     },
     handler=_handle_get_exam_scope,
+))
+
+
+# ── UP-6 Verschiebe-Dialog: get_reflow_context / apply_plan_operations / undo ──
+
+
+async def _handle_get_reflow_context(args: dict, ctx: ToolContext) -> dict:
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenkontext"}
+    trigger = args.get("trigger", "manual")
+    slot_ids = [UUID(s) for s in (args.get("slot_ids") or [])]
+    try:
+        rc = await build_reflow_context(
+            ctx.db, ctx.group_id, trigger=trigger, slot_ids=slot_ids or None
+        )
+    except ValueError as e:
+        return {"error": str(e)}
+    return rc.model_dump()
+
+
+register_tool(ChatTool(
+    name="get_reflow_context",
+    group="planning",
+    writes=False,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "get_reflow_context",
+            "description": (
+                "Liefert die Datengrundlage für eine Umverteilung: betroffene Slots, "
+                "Folge-Slots bis zum nächsten Fixpunkt, Fixpunkte mit verbleibendem "
+                "Slot-Vorrat, UE-Bilanz, bei trigger='open_phases' die offenen Phasen "
+                "der Quellstunde, bei 'regeneration' alte Zuordnung + neue Tranche. "
+                "Immer zuerst aufrufen; Zahlen nur von hier zitieren."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "trigger": {
+                        "type": "string",
+                        "enum": ["ausfall", "drag_drop", "open_phases", "regeneration", "manual"],
+                    },
+                    "slot_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Auslöser-Slot-UUIDs (optional je nach Trigger)",
+                    },
+                },
+                "required": ["trigger"],
+            },
+        },
+    },
+    handler=_handle_get_reflow_context,
+))
+
+
+async def _handle_apply_plan_operations(args: dict, ctx: ToolContext) -> dict:
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenkontext"}
+    summary = args.get("summary") or "Plan-Änderung"
+    try:
+        ops = parse_operations(args.get("operations") or [])
+    except ValidationError as e:
+        return {"ok": False, "errors": [f"Ungültige Operationen: {e.errors()[:3]}"]}
+    res = await apply_operations(
+        ctx.db, ctx.group_id, ops, summary=summary, created_by=ctx.user.sub
+    )
+    if res.errors:
+        return {"ok": False, "errors": res.errors}
+    return {"ok": True, "applied": res.applied, "snapshot_id": res.snapshot_id, "summary": summary}
+
+
+register_tool(ChatTool(
+    name="apply_plan_operations",
+    group="planning",
+    writes=True,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "apply_plan_operations",
+            "description": (
+                "Wendet eine Liste typisierter Plan-Operationen atomar an (Snapshot davor). "
+                "summary wird als Undo-Label gespeichert (z. B. 'KW43-Ausfall: 2 Themen "
+                "geschoben, Vertiefung gestrichen'). Bei Validierungsfehler wird nichts "
+                "angewendet (errors zurück). Nur nach Bestätigung der Lehrkraft."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": (
+                            "Operationen, je mit 'op': move_content{from_slot_id,to_slot_id}, "
+                            "swap_content{slot_a,slot_b}, set_topic{slot_id,thema}, "
+                            "set_unit{slot_id,unit_node_id}, set_category{slot_id,kategorie}, "
+                            "mark_needs_adjustment{slot_id,value}, "
+                            "transfer_phases{from_lesson_id,to_lesson_id,phase_ids}, "
+                            "shorten_phase{lesson_id,phase_id,dauer_min}, "
+                            "strike_phase{lesson_id,phase_id}"
+                        ),
+                    },
+                    "summary": {"type": "string", "description": "Kurzlabel für den Undo-Verlauf"},
+                },
+                "required": ["operations", "summary"],
+            },
+        },
+    },
+    handler=_handle_apply_plan_operations,
+))
+
+
+async def _handle_undo_last_change(args: dict, ctx: ToolContext) -> dict:
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenkontext"}
+    snap = (
+        await ctx.db.execute(
+            sa.select(SlotPlanSnapshot)
+            .where(SlotPlanSnapshot.group_id == ctx.group_id)
+            .order_by(SlotPlanSnapshot.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if snap is None:
+        return {"ok": False, "error": "Kein Snapshot zum Rückgängigmachen vorhanden"}
+    label = snap.label
+    await restore_snapshot(ctx.db, snap.id, ctx.user)
+    return {"ok": True, "restored_label": label}
+
+
+register_tool(ChatTool(
+    name="undo_last_change",
+    group="planning",
+    writes=True,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "undo_last_change",
+            "description": (
+                "Macht die letzte Plan-Änderung der Gruppe rückgängig (stellt den letzten "
+                "Snapshot wieder her). Gibt das Label der rückgängig gemachten Änderung zurück."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    handler=_handle_undo_last_change,
 ))

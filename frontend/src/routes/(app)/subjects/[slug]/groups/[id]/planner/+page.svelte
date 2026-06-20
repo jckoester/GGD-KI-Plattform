@@ -5,6 +5,7 @@
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import {
     getPlanningOverview,
+    getPlanningOverhang,
     updateSlot,
     swapSlots,
     listSnapshots,
@@ -18,6 +19,7 @@
   import UnitLegend from '$lib/components/planner/UnitLegend.svelte'
   import UnitDialog from '$lib/components/planner/UnitDialog.svelte'
   import PatternEditor from '$lib/components/planner/PatternEditor.svelte'
+  import ReflowAssistbar from '$lib/components/planner/ReflowAssistbar.svelte'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -42,6 +44,16 @@
   let snapshots = $state([])
   let snapshotsLoading = $state(false)
   let restoringId = $state(null)
+  let overhang = $state([])   // UP-6 Schritt 8: Überhang-Befunde für die Assistbar
+  let reflowBanner = $state(null)  // UP-6 Schritt 6: Ausfall-mit-Inhalt → Verschiebe-Angebot
+
+  function reflowDeepLink(b) {
+    const [y, m, d] = b.date.split('-')
+    const datum = `${+d}.${+m}.${y}`
+    const p = `Am ${datum} ist eine geplante Stunde ausgefallen. Bitte hilf mir, die Inhalte `
+      + `auf die folgenden Stunden zu verschieben.`
+    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+  }
 
   async function loadOverview() {
     loading = true
@@ -50,6 +62,7 @@
       const data = await getPlanningOverview(groupId)
       overview = data
       slots = [...data.slots]
+      getPlanningOverhang(groupId).then((f) => { overhang = f }).catch(() => { overhang = [] })
     } catch (e) {
       error = e.message
     } finally {
@@ -76,6 +89,11 @@
     try {
       const updated = await updateSlot(slotId, updates)
       slots[idx] = updated
+      // Ausfall einer Stunde mit Inhalt → Verschiebe-Dialog anbieten (UP-6 Schritt 6).
+      if (updates.kategorie === 'ausfall'
+          && (prev.ue_node_id || prev.stunde_node_id || prev.thema)) {
+        reflowBanner = { slotId, date: prev.date }
+      }
       // Balance + Units im Overview aktualisieren wenn UE-Zuweisung geändert
       if ('ue_node_id' in updates || 'stunde_node_id' in updates) {
         const refreshed = await getPlanningOverview(groupId)
@@ -304,6 +322,28 @@
   </div>
 </div>
 
+{#if reflowBanner}
+  <div class="px-4 pt-2">
+    <div class="flex items-center gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
+      <span class="text-light-or dark:text-dark-or flex-shrink-0" aria-hidden="true">↪</span>
+      <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">
+        Diese Stunde hatte geplante Inhalte. Sollen sie auf andere Stunden verschoben werden?
+      </span>
+      <a
+        href={reflowDeepLink(reflowBanner)}
+        class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
+               text-white font-medium hover:opacity-90 transition-opacity"
+      >Inhalte verschieben (Assistent)</a>
+      <button
+        onclick={() => { reflowBanner = null }}
+        aria-label="Schließen"
+        class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+      >✕</button>
+    </div>
+  </div>
+{/if}
+
 {#if patchError}
   <div class="px-4 pt-2">
     <ErrorBanner message={patchError} />
@@ -355,6 +395,9 @@
       onReview={handleReview}
     />
   </div>
+
+  <!-- UP-6 Schritt 8: Überhang-Hinweisleiste (Deep-Link in den Verschiebe-Dialog) -->
+  <ReflowAssistbar findings={overhang} {groupId} />
 {/if}
 
 <!-- Modals -->

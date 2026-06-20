@@ -65,6 +65,7 @@ from app.planning.schemas import (
     WeekPatternSet,
 )
 from app.planning.service import create_unit_node, delete_unit_node, update_unit_node
+from app.planning.reflow_service import OverhangFinding, detect_overhang
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
 
@@ -622,6 +623,20 @@ async def get_balance(
 
     units = await _load_units(db, group_id)
     return await _build_balance(db, group_id, units, slots)
+
+
+# ── GET /planning/groups/{group_id}/overhang ──────────────────────────────────
+
+
+@router.get("/groups/{group_id}/overhang", response_model=list[OverhangFinding])
+async def get_overhang(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Überhang-Befunde pro UE für die Assistenten-Hinweisleiste (UP-6 Schritt 8)."""
+    await require_group_teacher(group_id, user, db)
+    return await detect_overhang(db, group_id)
 
 
 # ── POST /planning/groups/{group_id}/snapshots ────────────────────────────────

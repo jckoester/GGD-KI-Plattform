@@ -1238,6 +1238,12 @@ export async function getPlanningOverview(groupId) {
     return res.json()
 }
 
+export async function getPlanningOverhang(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/overhang`, { credentials: 'include' })
+    if (!res.ok) return []
+    return res.json()
+}
+
 export async function updateSlot(slotId, updates) {
     const res = await fetch(`${BASE}/planning/slots/${slotId}`, {
         method: 'PATCH',
