@@ -8,6 +8,9 @@ Freischaltungslogik:
   planning       — nur wenn (a) 'planning' in assistant.tool_groups,
                             (b) conversation.group_id ist gesetzt,
                             (c) Nutzer ist Lehrkraft der Gruppe
+  student_planning — read-only (z. B. get_exam_scope): nur wenn
+                            'student_planning' in assistant.tool_groups und
+                            conversation.group_id gesetzt (auch für Schüler).
 """
 
 from __future__ import annotations
@@ -69,6 +72,10 @@ def tools_for(
                 and group_id is not None
                 and is_group_teacher
             ):
+                result.append(tool)
+        elif tool.group == "student_planning":
+            # Read-only Planungsdaten — kein Lehrkraft-Recht nötig, nur Gruppenbezug.
+            if "student_planning" in asst_tool_groups and group_id is not None:
                 result.append(tool)
 
     return result

@@ -24,7 +24,9 @@ from app.db.models import (
     ChatContextNode,
     ContextEdge,
     ContextNode,
+    Conversation,
     Group,
+    Subject,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,48 @@ async def get_context_for_query(
             get_engagement_context(anchor_ids, pseudonym, db),
         )
 
-    return _assemble_context(semantic_nodes, engagement_entries, pinned_nodes)
+    base = _assemble_context(semantic_nodes, engagement_entries, pinned_nodes)
+
+    # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
+    planning_block = await _planning_block(db, chat_id)
+    if planning_block:
+        return f"{planning_block}\n\n{base}" if base else planning_block
+    return base
+
+
+async def _group_label(db: AsyncSession, group_id: int) -> str:
+    group = await db.get(Group, group_id)
+    if group is None:
+        return "Unterricht"
+    subj = await db.get(Subject, group.subject_id) if group.subject_id else None
+    if subj and subj.name.lower() not in (group.name or "").lower():
+        return f"{subj.name}, {group.name}"
+    return group.name
+
+
+async def _planning_block(db: AsyncSession, chat_id: UUID | None) -> str | None:
+    """Markdown-Block aus den Planungsdaten der Conversation-Gruppe (UP-7)."""
+    if chat_id is None:
+        return None
+    conv = await db.get(Conversation, chat_id)
+    if conv is None or not isinstance(conv.group_id, int):
+        return None
+
+    # Lokaler Import vermeidet eine Modul-Zyklus-Abhängigkeit context ↔ planning.
+    from datetime import date as _date
+
+    from app.planning.student_context import (
+        get_current_topic,
+        get_exam_scope,
+        render_topic_block,
+    )
+
+    today = _date.today()
+    topic = await get_current_topic(db, conv.group_id, today)
+    exam = await get_exam_scope(db, conv.group_id, today=today)
+    if topic is None and exam is None:
+        return None
+    return render_topic_block(topic, await _group_label(db, conv.group_id), exam)
 
 
 # -- KS-Phase-6 Curriculum Import Logic -----------------------------------------

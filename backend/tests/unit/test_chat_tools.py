@@ -151,3 +151,58 @@ def test_tools_for_no_assistant():
 def test_max_tool_rounds_constant():
     from app.chat.router import _MAX_TOOL_ROUNDS
     assert _MAX_TOOL_ROUNDS >= 3, "MAX_TOOL_ROUNDS muss mindestens 3 betragen"
+
+
+# ── student_planning (UP-7) ───────────────────────────────────────────────────
+
+
+def _swap_registry(**tools):
+    """Hilfskontext: TOOL_REGISTRY temporär durch die übergebenen Tools ersetzen."""
+    import app.chat.tools as tools_mod
+
+    saved = dict(tools_mod.TOOL_REGISTRY)
+    tools_mod.TOOL_REGISTRY.clear()
+    tools_mod.TOOL_REGISTRY.update(tools)
+    return tools_mod, saved
+
+
+def test_student_planning_included_for_non_teacher_with_group():
+    """get_exam_scope ist auch für Nicht-Lehrkräfte aktiv (nur Gruppenbezug nötig)."""
+    mod, saved = _swap_registry(get_exam_scope=_make_tool("get_exam_scope", "student_planning"))
+    assistant = MagicMock()
+    assistant.tool_groups = ["student_planning"]
+    try:
+        result = tools_for(assistant, group_id=5, is_group_teacher=False)
+        assert any(t.name == "get_exam_scope" for t in result)
+    finally:
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)
+
+
+def test_student_planning_not_included_without_group():
+    mod, saved = _swap_registry(get_exam_scope=_make_tool("get_exam_scope", "student_planning"))
+    assistant = MagicMock()
+    assistant.tool_groups = ["student_planning"]
+    try:
+        result = tools_for(assistant, group_id=None, is_group_teacher=False)
+        assert all(t.name != "get_exam_scope" for t in result)
+    finally:
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)
+
+
+def test_student_sees_only_student_planning_not_planning_tools():
+    """Schüler-Assistent erhält get_exam_scope, aber keine schreibenden planning-Tools."""
+    mod, saved = _swap_registry(
+        get_exam_scope=_make_tool("get_exam_scope", "student_planning"),
+        get_lesson_slots=_make_tool("get_lesson_slots", "planning"),
+    )
+    assistant = MagicMock()
+    assistant.tool_groups = ["student_planning"]
+    try:
+        names = {t.name for t in tools_for(assistant, group_id=5, is_group_teacher=False)}
+        assert "get_exam_scope" in names
+        assert "get_lesson_slots" not in names
+    finally:
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)

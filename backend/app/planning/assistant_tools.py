@@ -18,6 +18,7 @@ from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.db.models import ContextEdge, ContextNode, LessonSlot
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.permissions import require_group_teacher
+from app.planning.student_context import get_exam_scope
 
 logger = logging.getLogger(__name__)
 
@@ -909,4 +910,45 @@ register_tool(ChatTool(
         },
     },
     handler=_handle_update_lesson_phases,
+))
+
+
+# ── get_exam_scope (student_planning, read-only) ──────────────────────────────
+
+
+async def _handle_get_exam_scope(args: dict, ctx: ToolContext) -> dict:
+    if ctx.group_id is None:
+        return {"error": "Kein Gruppenbezug — Tool nur in Gruppen-Conversations."}
+    scope = await get_exam_scope(ctx.db, ctx.group_id, today=date.today())
+    if scope is None:
+        return {"exam": None}
+    return {
+        "exam_date": scope.exam_date.isoformat(),
+        "unit_titles": scope.unit_titles,
+        "topics": scope.topics,
+        "refs": [
+            {"node_id": r.node_id, "titel": r.titel, "code": r.code}
+            for r in scope.refs
+        ],
+    }
+
+
+register_tool(ChatTool(
+    name="get_exam_scope",
+    group="student_planning",
+    writes=False,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "get_exam_scope",
+            "description": (
+                "Liefert Termin und Umfang der nächsten Klassenarbeit der Gruppe: "
+                "betroffene UE(s), Themenliste und die zu lernenden Kompetenzen "
+                "(refs mit node_id/titel/code) für Lernplan und Übungsauswahl. "
+                "Read-only. Gibt {exam: null} zurück, wenn keine Prüfung geplant ist."
+            ),
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    handler=_handle_get_exam_scope,
 ))
