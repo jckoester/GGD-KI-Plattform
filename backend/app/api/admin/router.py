@@ -4,6 +4,7 @@ from app.auth.jwt import JwtPayload
 
 from app.api.admin.assistants import router as assistants_router
 from app.api.admin.budgets import router as budgets_router
+from app.api.admin.flags import router as flags_router
 from app.api.admin.groups import router as groups_router
 from app.api.admin.guardrail import router as guardrail_router
 from app.api.admin.models import router as models_router
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 router.include_router(assistants_router)
 router.include_router(budgets_router)
+router.include_router(flags_router)
 router.include_router(groups_router)
 router.include_router(guardrail_router)
 router.include_router(models_router)

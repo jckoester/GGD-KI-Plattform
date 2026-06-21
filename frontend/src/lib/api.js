@@ -500,6 +500,21 @@ export async function getLiteLLMGuardrails() {
   return res.json(); // { guardrails: [{ name, mode }], available: bool }
 }
 
+// Admin: Krisen-/Moderations-Flags (pseudonymisiert, ohne Chat-Inhalte)
+export async function getFlags({ status = null, severity = null, limit = 25, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit, offset });
+  if (status) params.set("status", status);
+  if (severity) params.set("severity", severity);
+  const res = await fetch(`${BASE}/admin/flags?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { items: [...], total, limit, offset }
+}
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);

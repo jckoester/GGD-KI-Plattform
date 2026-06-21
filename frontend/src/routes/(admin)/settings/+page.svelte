@@ -7,6 +7,7 @@
         PiggyBank,
         ArrowLeft,
         Bot,
+        TriangleAlert,
     } from "lucide-svelte";
 </script>
 
@@ -81,6 +82,19 @@
             <div class="font-medium text-light-tx dark:text-dark-tx">Guardrails</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                 Schulweiter Prompt-Rahmen und LiteLLM-Schutzfilter
+            </div>
+        </a>
+        <!-- Krisen-Meldungen -->
+        <a
+            href="/settings/flags"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <TriangleAlert class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Krisen-Meldungen</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Erkannte Krisen-Hinweise (pseudonymisiert, ohne Inhalte)
             </div>
         </a>
     </div>
