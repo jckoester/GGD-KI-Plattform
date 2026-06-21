@@ -1,0 +1,60 @@
+# Krisen-Trigger für die lokale Backend-Erkennung (ADR-008 Teil 3).
+#
+# Jede eingehende Nutzer-Nachricht wird regex-basiert, case-insensitive und
+# Unicode-normalisiert (NFKC + casefold) gegen die patterns geprüft. Bei Treffer:
+# dezentes Hilfe-Ressourcen-Banner (help_topic → help_resources.yaml), ein
+# pseudonymes Flag und ein Log-Eintrag — KEINE Blockierung des Chats (ADR-008 Teil 3).
+#
+#   severity:        info | warning | alert
+#   help_topic:      muss einen Eintrag in help_resources.yaml (topics) referenzieren
+#   coreviewer_role: empfohlene Zweit-Rolle für die spätere 4-Augen-Einsicht (stets "review")
+#
+# ⚠ Startkuratierung — MUSS mit der Schulsozialarbeit final abgestimmt werden
+#   (Sprachsensibilität, Jugendsprache, regionale Ausdrücke, Fehlalarme).
+
+triggers:
+  - category: suizidalitaet
+    severity: alert
+    help_topic: crisis
+    coreviewer_role: review
+    patterns:
+      - "(will|möchte|würde gern|würde gerne) (mich )?(umbringen|sterben|nicht mehr leben)"
+      - "nicht mehr leben wollen"
+      - "keinen sinn mehr( im leben)?"
+      - "niemand würde mich vermissen"
+
+  - category: selbstverletzung
+    severity: alert
+    help_topic: crisis
+    coreviewer_role: review
+    patterns:
+      - "(ritze|ritz|schneide|schneid) mich"
+      - "mich selbst (verletzen|verletzt)"
+      - "mich selber (verletzen|verletzt)"
+
+  - category: haeusliche_gewalt
+    severity: alert
+    help_topic: crisis
+    coreviewer_role: review
+    patterns:
+      - "(vater|mutter|papa|mama|stiefvater|stiefmutter) (schlägt|haut|prügelt) mich"
+      - "werde zuhause geschlagen"
+      - "angst vor zuhause"
+
+  - category: essverhalten
+    severity: warning
+    help_topic: eating
+    coreviewer_role: review
+    patterns:
+      - "nichts mehr essen"
+      - "ich bin zu dick"
+      - "(gebrochen|erbrechen|erbreche) nach dem essen"
+
+  - category: mobbing
+    severity: warning
+    help_topic: school_social
+    coreviewer_role: review
+    patterns:
+      - "alle lachen über mich"
+      - "niemand mag mich in der klasse"
+      - "(ärgern|fertigmachen|mobben) mich (in der schule|in der klasse)"

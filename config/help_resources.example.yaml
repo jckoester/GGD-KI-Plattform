@@ -1,0 +1,51 @@
+# Hilfe-Ressourcen für die Krisen-Erkennung (ADR-008 Teil 4).
+#
+# Jeder topic-Key wird von einem Trigger in crisis_triggers.yaml (help_topic)
+# referenziert. Bei Treffer zeigt das Frontend ein dezentes, NICHT alarmierendes
+# Banner mit den hier hinterlegten internen und externen Anlaufstellen.
+#
+# ⚠ Interne Kontakte sind Platzhalter (N.N.) und MÜSSEN mit Schulleitung und
+#   Schulsozialarbeit gepflegt werden — Namen, Räume und Zeiten aktuell halten.
+
+topics:
+  crisis:
+    label: "Falls du gerade Unterstützung brauchst"
+    internal:
+      - name: "Schulsozialarbeit"
+        contact: "N.N., Raum 000"
+        hours: "Mo–Fr, 8:00–14:00 Uhr"
+        email: "sozialarbeit@example-schule.de"
+      - name: "Schulseelsorge"
+        contact: "N.N."
+        hours: "nach Vereinbarung"
+    external:
+      - name: "Telefonseelsorge"
+        phone: "0800 111 0 111"
+        hours: "24 Stunden, täglich"
+        free_of_charge: true
+        anonymous: true
+      - name: "Nummer gegen Kummer (Kinder- und Jugendtelefon)"
+        phone: "116 111"
+        hours: "Mo–Sa, 14:00–20:00 Uhr"
+        free_of_charge: true
+        anonymous: true
+
+  eating:
+    label: "Wenn du mit dem Essen kämpfst"
+    internal:
+      - name: "Schulsozialarbeit"
+        contact: "N.N., Raum 000"
+    external:
+      - name: "BZgA-Beratung bei Essstörungen"
+        phone: "0221 892 031"
+        website: "https://www.bzga-essstoerungen.de"
+
+  school_social:
+    label: "Wenn du dich in der Schule nicht wohlfühlst"
+    internal:
+      - name: "Klassenleitung"
+        contact: "siehe Stundenplan"
+      - name: "Beratungslehrkraft"
+        email: "beratung@example-schule.de"
+      - name: "Schulsozialarbeit"
+        contact: "N.N., Raum 000"
