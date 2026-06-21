@@ -28,6 +28,11 @@ group_role_map:
     role: teacher
   - group: schueler
     role: student
+  # Krisen-Einsicht (4-Augen-Prinzip): Personen, die geflaggte Konversationen
+  # mitfreigeben/einsehen dürfen — typischerweise Schulsozialarbeit/Beratung.
+  # Die Rolle darf eigenständig vorkommen (ohne Lehrkraft-Rolle).
+  - group: ki-reviewer
+    role: review
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).

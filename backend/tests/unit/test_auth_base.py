@@ -18,6 +18,22 @@ class TestNormalizedIdentity:
         with pytest.raises(ValidationError):
             NormalizedIdentity(external_id="x", roles=["principal"], grade=None)
 
+    def test_review_role_standalone_valid(self):
+        # review (Schulsozialarbeit) darf ohne Basisrolle gültig sein
+        ident = NormalizedIdentity(external_id="sozial01", roles=["review"], grade=None)
+        assert ident.roles == ["review"]
+
+    def test_review_role_additive_to_teacher_valid(self):
+        ident = NormalizedIdentity(
+            external_id="x", roles=["teacher", "review"], grade=None
+        )
+        assert "review" in ident.roles
+
+    def test_pure_extra_role_without_login_role_rejected(self):
+        # budget/statistics sind keine eigenständigen Login-Rollen
+        with pytest.raises(ValidationError, match="Login-Rolle"):
+            NormalizedIdentity(external_id="x", roles=["budget"], grade=None)
+
     def test_grade_only_for_student(self):
         with pytest.raises(ValidationError, match="grade"):
             NormalizedIdentity(external_id="x", roles=["teacher"], grade="10a")
@@ -53,6 +69,17 @@ group_role_map:
         )
         assert config.oauth["base_url"] == "https://x.de"
         assert config.yaml_test == {}
+
+    def test_group_role_map_review(self):
+        config = AuthConfig.model_validate(
+            {
+                "adapter": "yaml_test",
+                "yaml_test": {"users_file": "x.yaml"},
+                "group_role_map": [{"group": "ki-reviewer", "role": "review"}],
+            }
+        )
+        assert config.group_role_map[0].role == "review"
+        assert config.group_role_map_dict["ki-reviewer"] == "review"
 
 
 class TestAuthAdapter:

@@ -7,7 +7,7 @@ from pydantic import BaseModel, computed_field, model_validator
 
 class GroupRoleMapping(BaseModel):
     group: str
-    role: Literal["student", "teacher", "admin"]
+    role: Literal["student", "teacher", "admin", "review"]
 
 
 class SsoGroupPatterns(BaseModel):
@@ -48,7 +48,9 @@ class AuthConfig(BaseModel):
 
     @computed_field
     @property
-    def group_role_map_dict(self) -> dict[str, Literal["student", "teacher", "admin"]]:
+    def group_role_map_dict(
+        self,
+    ) -> dict[str, Literal["student", "teacher", "admin", "review"]]:
         """Konvertiert die Liste der GroupRoleMapping in ein Dictionary für schnellen Lookup."""
         result: dict[str, str] = {}
         for mapping in self.group_role_map:

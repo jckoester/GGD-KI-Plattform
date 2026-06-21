@@ -29,6 +29,13 @@ def temp_users_file(tmp_path: Path):
                 "roles": ["teacher", "admin"],
                 "grade": None,
             },
+            {
+                # Schulsozialarbeit: Rolle review eigenständig (ohne teacher)
+                "username": "sozial01",
+                "password_hash": "$2b$12$MDtrLORjrupFyHrHBUlkkOOhf9iywuwLOR/xVWnJO1GUh6B8OwnfK",
+                "roles": ["review"],
+                "grade": None,
+            },
         ]
     }
     users_file = tmp_path / "test_users.yaml"
@@ -65,6 +72,15 @@ class TestYamlTestAdapter:
         assert identity is not None
         assert identity.external_id == "admin"
         assert identity.roles == ["teacher", "admin"]
+        assert identity.grade is None
+
+    @pytest.mark.asyncio
+    async def test_valid_credentials_review_standalone(self, yaml_adapter: YamlTestAdapter):
+        # Rolle review darf ohne Basisrolle (teacher/student) gültig anmelden
+        identity = await yaml_adapter.authenticate_direct("sozial01", "sozial01")
+        assert identity is not None
+        assert identity.external_id == "sozial01"
+        assert identity.roles == ["review"]
         assert identity.grade is None
 
     @pytest.mark.asyncio

@@ -24,3 +24,11 @@ users:
     role: admin
     grade: null
     sso_groups: []
+
+  # Schulsozialarbeit/Krisen-Einsicht: Rolle review darf eigenständig vorkommen.
+  - username: sozial01
+    password_hash: <bcrypt-hash>
+    roles: [review]
+    grade: null
+    sso_groups:
+      - ki-reviewer

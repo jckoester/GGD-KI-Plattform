@@ -58,3 +58,20 @@ async def test_require_any_role_with_budget_and_admin_combination():
     payload = make_payload(["teacher", "budget"])
     result = await guard(current_user=payload)
     assert result == payload
+
+
+@pytest.mark.asyncio
+async def test_require_review_role_grants_for_standalone_review():
+    guard = require_any_role(["review"])
+    payload = make_payload(["review"])
+    result = await guard(current_user=payload)
+    assert result == payload
+
+
+@pytest.mark.asyncio
+async def test_require_review_role_denies_for_teacher_only():
+    guard = require_any_role(["review"])
+    payload = make_payload(["teacher"])
+    with pytest.raises(HTTPException) as exc:
+        await guard(current_user=payload)
+    assert exc.value.status_code == 403
