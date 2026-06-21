@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     budget_tiers_path: str = "config/budget_tiers.yaml"
     crisis_triggers_path: str = "config/crisis_triggers.yaml"
     help_resources_path: str = "config/help_resources.yaml"
+    pedagogy_path: str = "config/pedagogy.yaml"
     auth_iserv_client_secret: str = ""
     jwt_algorithm: str = "HS256"
     chat_default_model: str = "openai/gpt-4o-mini"
