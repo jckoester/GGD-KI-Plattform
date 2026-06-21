@@ -176,6 +176,7 @@ class TestAssistantResponse:
             available_until=None,
             sort_order=0,
             tool_groups=[],
+            disabled_augmentations=["socratic_preference"],
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
             creator_role="teacher",
@@ -187,6 +188,18 @@ class TestAssistantResponse:
         assert response.name == "Test"
         assert response.temperature == 0.5
         assert response.tags == ["math"]
+        assert response.disabled_augmentations == ["socratic_preference"]
+
+
+    def test_create_defaults_disabled_augmentations_empty(self):
+        from app.api.assistants import AssistantCreate
+        a = AssistantCreate(name="X", system_prompt="P", model="m")
+        assert a.disabled_augmentations == []
+
+    def test_update_accepts_disabled_augmentations(self):
+        from app.api.assistants import AssistantUpdate
+        u = AssistantUpdate(disabled_augmentations=["metacognitive_nudges"])
+        assert u.disabled_augmentations == ["metacognitive_nudges"]
 
 
 # =============================================================================

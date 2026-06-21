@@ -134,6 +134,7 @@ class AssistantCreate(BaseModel):
     available_until: Optional[datetime] = None
     sort_order: int = 0  # nur Admin wertet das aus; Lehrkraefte senden 0 oder nichts
     tool_groups: list[str] = []
+    disabled_augmentations: list[str] = []
 
 
 class AssistantUpdate(BaseModel):
@@ -156,6 +157,7 @@ class AssistantUpdate(BaseModel):
     available_until: Optional[datetime] = None
     sort_order: Optional[int] = None
     tool_groups: Optional[list[str]] = None
+    disabled_augmentations: Optional[list[str]] = None
 
 
 class AssistantResponse(BaseModel):
@@ -187,6 +189,7 @@ class AssistantResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     tool_groups: list[str] = []
+    disabled_augmentations: list[str] = []
     documents: list[AssistantDocumentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -562,6 +565,7 @@ async def create_assistant(
         available_from=request.available_from,
         available_until=request.available_until,
         tool_groups=request.tool_groups,
+        disabled_augmentations=request.disabled_augmentations,
         sort_order=sort_order,
         creator_role=creator_role,
         created_by=current_user.sub,

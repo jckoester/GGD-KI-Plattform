@@ -176,6 +176,13 @@ class Assistant(Base):
         JSONB, nullable=False, server_default=text("'[]'")
     )
 
+    # Pädagogische Lernverhalten-Augmentierungen (pedagogy.yaml), die für diesen
+    # Assistenten deaktiviert sind — Liste von Augmentierungs-Keys. Greift nur in der
+    # Schüler-Behandlung (Phase 13).
+    disabled_augmentations: Mapped[list] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'")
+    )
+
     force_cost_display: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
