@@ -7,6 +7,7 @@
     approveAccessRequest,
     denyAccessRequest,
   } from "$lib/api.js";
+  import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
   import StepUpDialog from "$lib/components/StepUpDialog.svelte";
 
@@ -57,12 +58,14 @@
     try {
       if (action === "approve") {
         await approveAccessRequest(id);
+        refreshCrisisAlerts();
         // Freigegeben → direkt in die Einsicht (Zweitperson ist Beteiligte).
         goto(`/access-requests/${id}`);
         return;
       }
       await denyAccessRequest(id);
       await load();
+      refreshCrisisAlerts();
     } catch (e) {
       if (e.stepUpRequired) {
         pendingAction = { id, action };

@@ -5,6 +5,7 @@
     import { getMe, getPreferences } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import { themePref } from "$lib/stores/theme.js";
+    import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
     import Sidebar from "$lib/components/AdminSidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -22,6 +23,7 @@
                     sessionStorage.getItem("display_name") ?? me.pseudonym,
             });
             themePref.syncFromServer(prefs.theme ?? "system");
+            refreshCrisisAlerts(); // Hinweis auf offene Krisen-Fälle (admin/review)
         } catch {
             goto("/");
         }

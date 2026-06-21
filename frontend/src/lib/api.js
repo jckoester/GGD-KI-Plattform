@@ -558,6 +558,25 @@ export async function createAccessRequest(flagId, { reason = null, windowHours =
   return res.json(); // { id, flag_id, conversation_id, status, requested_at, access_window_hours }
 }
 
+// Leichtgewichtige Zähler für den UI-Hinweis auf offene Krisen-Fälle.
+export async function getFlagSummary() {
+  const res = await fetch(`${BASE}/admin/flags/summary`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { open, in_review }
+}
+
+export async function getPendingRequestCount() {
+  const res = await fetch(`${BASE}/access-requests/pending-count`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { count }
+}
+
 // review-Rolle: offene Einsicht-Anträge (pseudonymisiert, ohne Inhalte)
 export async function getAccessRequests(status = "pending") {
   const params = new URLSearchParams({ status });

@@ -1,6 +1,7 @@
 <script>
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
+    import { crisisAlertTotal } from "$lib/stores/crisisAlerts.js";
     import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
     import UserMenu from "./UserMenu.svelte";
 
@@ -78,9 +79,16 @@
                    text-left border border-light-ui-3 dark:border-dark-ui-3 mb-3"
         >
             <div
-                class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold mr-3"
+                class="relative w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold mr-3"
             >
                 {getInitials($user?.display_name)}
+                {#if $crisisAlertTotal > 0}
+                    <span
+                        class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full
+                               bg-light-re dark:bg-dark-re ring-2 ring-light-bg dark:ring-dark-bg-2"
+                        title="Offene Krisen-Fälle"
+                    ></span>
+                {/if}
             </div>
             <div class="flex flex-col">
                 <span

@@ -13,6 +13,11 @@
         TriangleAlert,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
+    import {
+        openFlagCount,
+        inReviewFlagCount,
+        pendingRequestCount,
+    } from "$lib/stores/crisisAlerts.js";
     import { onMount } from "svelte";
 
     export let onClose = () => {};
@@ -68,6 +73,22 @@
         >
             <TriangleAlert class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
             Krisen-Meldungen
+            <span class="ml-auto flex items-center gap-1">
+                {#if $openFlagCount > 0}
+                    <span title="offen (neu)"
+                          class="text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                 bg-light-re/20 dark:bg-dark-re/20 text-light-re dark:text-dark-re">
+                        {$openFlagCount}
+                    </span>
+                {/if}
+                {#if $inReviewFlagCount > 0}
+                    <span title="in Prüfung (laufend)"
+                          class="text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                 bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl">
+                        {$inReviewFlagCount}
+                    </span>
+                {/if}
+            </span>
         </a>
     {/if}
 
@@ -80,6 +101,12 @@
         >
             <Eye class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
             Krisen-Freigaben
+            {#if $pendingRequestCount > 0}
+                <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                             bg-light-re/20 dark:bg-dark-re/20 text-light-re dark:text-dark-re">
+                    {$pendingRequestCount}
+                </span>
+            {/if}
         </a>
     {/if}
 

@@ -66,6 +66,21 @@ def test_list_allowed_for_review():
     assert r.json() == {"items": []}
 
 
+def test_pending_count_review():
+    db = AsyncMock()
+    db.scalar = AsyncMock(return_value=2)
+    app = _make_app(REVIEW, db=db)
+    r = TestClient(app).get("/access-requests/pending-count")
+    assert r.status_code == 200
+    assert r.json() == {"count": 2}
+
+
+def test_pending_count_requires_review():
+    app = _make_app(TEACHER)
+    r = TestClient(app).get("/access-requests/pending-count")
+    assert r.status_code == 403
+
+
 # ---------- approve/deny: Rolle + Step-up ----------
 
 def _stepup_cookie(sub):

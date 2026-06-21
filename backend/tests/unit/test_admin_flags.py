@@ -111,6 +111,33 @@ def test_list_flags_rejects_bad_limit():
     assert response.status_code == 422
 
 
+def test_flag_summary_admin():
+    db = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = [("open", 3), ("under_review", 2)]
+    db.execute = AsyncMock(return_value=result)
+    app = _make_app(_admin(), db)
+    r = TestClient(app).get("/flags/summary")
+    assert r.status_code == 200
+    assert r.json() == {"open": 3, "in_review": 2}
+
+
+def test_flag_summary_missing_status_defaults_zero():
+    db = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = [("open", 1)]  # keine under_review-Zeile
+    db.execute = AsyncMock(return_value=result)
+    app = _make_app(_admin(), db)
+    r = TestClient(app).get("/flags/summary")
+    assert r.json() == {"open": 1, "in_review": 0}
+
+
+def test_flag_summary_requires_admin():
+    app = _make_app(_teacher(), AsyncMock())
+    r = TestClient(app).get("/flags/summary")
+    assert r.status_code == 403
+
+
 # ========== POST /{flag_id}/access-requests ==========
 
 _FLAG_ID = "11111111-1111-1111-1111-111111111111"

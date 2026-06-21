@@ -13,7 +13,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role, require_fresh_stepup, require_role
@@ -49,6 +49,24 @@ class AccessRequestItem(BaseModel):
 
 class AccessRequestListResponse(BaseModel):
     items: list[AccessRequestItem]
+
+
+class CountResponse(BaseModel):
+    count: int
+
+
+@router.get("/pending-count", response_model=CountResponse)
+async def pending_request_count(
+    db: AsyncSession = Depends(get_db),
+    _: JwtPayload = Depends(require_any_role(["review"])),
+) -> CountResponse:
+    """Leichtgewichtige Anzahl offener Einsicht-Anträge — für den UI-Hinweis."""
+    n = await db.scalar(
+        select(func.count())
+        .select_from(ConversationAccessRequest)
+        .where(ConversationAccessRequest.status == "pending")
+    )
+    return CountResponse(count=n or 0)
 
 
 class ApprovalResponse(BaseModel):

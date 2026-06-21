@@ -419,6 +419,18 @@ Der:die Reviewer:in sieht das Pseudonym und den Gesprächsinhalt — die Identif
 der konkreten Person ist ein **organisatorischer Schritt außerhalb der Software**
 (Schulleitung/DSB), kein Knopfdruck im System. Das ist eine bewusste Schutzschwelle.
 
+### Personelle Voraussetzungen
+
+Damit das Verfahren auch bei Urlaub, Krankheit oder Ausfall handlungsfähig bleibt:
+
+- **Mindestens zwei Personen mit `admin`-Rechten.** Fällt eine aus, kann die andere
+  Anträge stellen und Fälle abschließen — sonst bleiben gemeldete Fälle liegen.
+- **Mehrere Personen mit `review`-Rolle.** Das Vier-Augen-Prinzip verlangt eine
+  **andere** Person als den:die Antragsteller:in; mit nur einer review-Person ist keine
+  Freigabe möglich, sobald diese selbst beteiligt oder abwesend ist.
+- Eine **Vertretungsregelung** festlegen (wer übernimmt bei Abwesenheit) und die
+  Benennung mit Schulleitung und Datenschutzbeauftragten dokumentieren.
+
 > **Für den Datenschutz:** Die Einsichtnahme in geflaggte Konversationen ist eine eigene
 > Verarbeitungstätigkeit und gehört ins **Verzeichnis von Verarbeitungstätigkeiten**
 > (Zweck, Rechtsgrundlage, beteiligte Rollen, Aufbewahrung, Protokollierung). Wer als

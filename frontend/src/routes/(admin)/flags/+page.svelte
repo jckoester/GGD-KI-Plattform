@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { TriangleAlert } from "lucide-svelte";
   import { getFlags, createAccessRequest } from "$lib/api.js";
+  import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
   let items = $state([]);
@@ -116,6 +117,7 @@
       });
       requestFor = null;
       await load();
+      refreshCrisisAlerts();
     } catch (e) {
       submitError = e.message ?? "Antrag konnte nicht gestellt werden.";
     } finally {

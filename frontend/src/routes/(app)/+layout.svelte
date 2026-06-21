@@ -10,6 +10,7 @@
     import { refreshAssistants } from "$lib/stores/assistants.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { refreshGroupsConfig } from "$lib/stores/groupsConfig.js";
+    import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
@@ -38,6 +39,7 @@
             refreshAssistants(); // NEU — für Sichtbarkeitsregel
             refreshConversationCounts(); // NEU — für Chat-Anzahl in Sidebar
             refreshGroupsConfig(); // NEU — für allow_manual_teaching_groups Flag
+            refreshCrisisAlerts(); // Hinweis auf offene Krisen-Fälle (admin/review)
         } catch {
             goto("/");
         }

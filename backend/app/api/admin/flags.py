@@ -50,6 +50,34 @@ class FlagListResponse(BaseModel):
     offset: int
 
 
+class FlagSummaryResponse(BaseModel):
+    open: int  # neu geflaggt, noch keine Reaktion
+    in_review: int  # Einsicht beantragt/läuft (under_review) — Fall noch nicht abgeschlossen
+
+
+@router.get("/summary", response_model=FlagSummaryResponse)
+async def flag_summary(
+    db: AsyncSession = Depends(get_db),
+    _: JwtPayload = Depends(require_role("admin")),
+) -> FlagSummaryResponse:
+    """Zähler für den UI-Hinweis: offene (neue) und laufende (in Prüfung) Fälle.
+
+    Getrennt, weil ein Einsicht-Antrag das Flag von 'open' → 'under_review' bewegt —
+    der Fall ist damit **nicht** abgeschlossen, soll also weiter sichtbar bleiben.
+    """
+    rows = (
+        await db.execute(
+            select(ConversationFlag.status, func.count())
+            .where(ConversationFlag.status.in_(("open", "under_review")))
+            .group_by(ConversationFlag.status)
+        )
+    ).all()
+    counts = {status: n for status, n in rows}
+    return FlagSummaryResponse(
+        open=counts.get("open", 0), in_review=counts.get("under_review", 0)
+    )
+
+
 @router.get("", response_model=FlagListResponse)
 async def list_flags(
     status: str | None = Query(default=None),
