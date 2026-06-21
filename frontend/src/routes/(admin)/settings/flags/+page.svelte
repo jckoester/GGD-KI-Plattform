@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { TriangleAlert } from "lucide-svelte";
-  import { getFlags } from "$lib/api.js";
+  import { getFlags, createAccessRequest } from "$lib/api.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
   let items = $state([]);
@@ -13,6 +13,17 @@
   let severity = $state("");
   let offset = $state(0);
   const limit = 25;
+
+  // Einsicht-Antrag-Dialog
+  const MIN_REASON = 50;
+  let requestFor = $state(null); // das Flag, für das ein Antrag gestellt wird
+  let reason = $state("");
+  let windowHours = $state(24);
+  let submitting = $state(false);
+  let submitError = $state(null);
+  let reasonOk = $derived(reason.trim().length >= MIN_REASON);
+
+  const CLOSED = new Set(["resolved", "dismissed"]);
 
   const SEVERITY = {
     alert: { label: "Alarm", cls: "bg-light-re-2 dark:bg-dark-re-2 text-light-re dark:text-dark-re" },
@@ -81,6 +92,36 @@
 
   function fmtDate(s) {
     return new Date(s).toLocaleString("de-DE");
+  }
+
+  function openRequest(flag) {
+    requestFor = flag;
+    reason = "";
+    windowHours = 24;
+    submitError = null;
+  }
+
+  function closeRequest() {
+    if (submitting) return;
+    requestFor = null;
+  }
+
+  async function submitRequest() {
+    if (!reasonOk || submitting) return;
+    submitting = true;
+    submitError = null;
+    try {
+      await createAccessRequest(requestFor.id, {
+        reason: reason.trim(),
+        windowHours,
+      });
+      requestFor = null;
+      await load();
+    } catch (e) {
+      submitError = e.message ?? "Antrag konnte nicht gestellt werden.";
+    } finally {
+      submitting = false;
+    }
   }
 
   onMount(load);
@@ -160,7 +201,8 @@
             <th class="pb-2 pr-4 font-medium">Pseudonym</th>
             <th class="pb-2 pr-4 font-medium">Zeitpunkt</th>
             <th class="pb-2 pr-4 font-medium">Status</th>
-            <th class="pb-2 font-medium">Antrag</th>
+            <th class="pb-2 pr-4 font-medium">Antrag</th>
+            <th class="pb-2 font-medium"></th>
           </tr>
         </thead>
         <tbody>
@@ -181,11 +223,23 @@
                 {fmtDate(f.flagged_at)}
               </td>
               <td class="py-2 pr-4 text-xs">{STATUS[f.status] ?? f.status}</td>
-              <td class="py-2 text-xs">
+              <td class="py-2 pr-4 text-xs">
                 {#if f.has_active_request}
                   <span class="text-light-bl dark:text-dark-bl">läuft</span>
                 {:else}
                   <span class="text-light-tx-2 dark:text-dark-tx-2">—</span>
+                {/if}
+              </td>
+              <td class="py-2 text-xs">
+                {#if f.has_active_request || CLOSED.has(f.status)}
+                  <span class="text-light-tx-2 dark:text-dark-tx-2">—</span>
+                {:else}
+                  <button
+                    onclick={() => openRequest(f)}
+                    class="text-light-bl dark:text-dark-bl hover:underline"
+                  >
+                    Einsicht beantragen
+                  </button>
                 {/if}
               </td>
             </tr>
@@ -220,3 +274,89 @@
     </div>
   {/if}
 </div>
+
+<!-- Einsicht-Antrag-Dialog -->
+{#if requestFor}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <button
+      class="absolute inset-0 bg-black/50"
+      onclick={closeRequest}
+      aria-label="Dialog schließen"
+    ></button>
+    <div
+      class="relative bg-light-bg dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3
+             rounded-lg shadow-lg w-full max-w-lg p-6"
+    >
+      <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
+        Einsicht beantragen
+      </h2>
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
+        Die Einsicht wird erst nach Freigabe durch eine zweite Person (Vier-Augen-Prinzip)
+        und nur innerhalb des gewählten Zeitfensters möglich. Jeder Zugriff wird protokolliert.
+      </p>
+
+      <label
+        for="access-reason"
+        class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
+      >
+        Begründung
+      </label>
+      <textarea
+        id="access-reason"
+        bind:value={reason}
+        rows="4"
+        placeholder="Warum ist die Einsicht erforderlich? (mind. {MIN_REASON} Zeichen)"
+        class="w-full p-3 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
+               bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx text-sm
+               focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark resize-y"
+      ></textarea>
+      <p class="text-xs mb-4 {reasonOk ? 'text-light-tx-2 dark:text-dark-tx-2' : 'text-light-re dark:text-dark-re'}">
+        {reason.trim().length} / {MIN_REASON} Zeichen
+      </p>
+
+      <label
+        for="access-window"
+        class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
+      >
+        Zeitfenster
+      </label>
+      <select
+        id="access-window"
+        bind:value={windowHours}
+        class="mb-5 px-2 py-1 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+               bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx text-sm"
+      >
+        <option value={24}>24 Stunden</option>
+        <option value={48}>48 Stunden</option>
+        <option value={72}>72 Stunden</option>
+        <option value={168}>1 Woche</option>
+      </select>
+
+      {#if submitError}
+        <p class="text-sm text-light-re dark:text-dark-re mb-3">{submitError}</p>
+      {/if}
+
+      <div class="flex justify-end gap-3">
+        <button
+          onclick={closeRequest}
+          disabled={submitting}
+          class="px-4 py-2 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
+                 text-light-tx-2 dark:text-dark-tx-2
+                 hover:bg-light-ui dark:hover:bg-dark-ui transition-colors
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Abbrechen
+        </button>
+        <button
+          onclick={submitRequest}
+          disabled={!reasonOk || submitting}
+          class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
+                 hover:bg-primary-dark dark:hover:bg-primary transition-colors
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Wird gestellt..." : "Antrag stellen"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

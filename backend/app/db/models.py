@@ -395,6 +395,11 @@ class ConversationAccessRequest(Base):
     required_coreviewer_role: Mapped[str] = mapped_column(
         Text, nullable=False, default="review", server_default=text("'review'")
     )
+    # Beim Antrag gewünschte Fensterdauer (Stunden); wird bei Freigabe (Schritt 6)
+    # zu access_granted_until = Freigabe-Zeitpunkt + access_window_hours.
+    access_window_hours: Mapped[int] = mapped_column(
+        nullable=False, default=24, server_default=text("24")
+    )
     # Pseudonym der zweitfreigebenden review-Person; bis dahin NULL.
     coreviewer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     coreviewer_approved_at: Mapped[Optional[datetime]] = mapped_column(
@@ -418,6 +423,10 @@ class ConversationAccessRequest(Base):
         CheckConstraint(
             "coreviewer IS NULL OR coreviewer <> requested_by",
             name="check_access_request_distinct_coreviewer",
+        ),
+        CheckConstraint(
+            "access_window_hours BETWEEN 1 AND 168",
+            name="check_access_request_window_hours",
         ),
         Index("idx_access_requests_conversation", "conversation_id"),
         Index("idx_access_requests_flag", "flag_id"),

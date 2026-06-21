@@ -106,3 +106,87 @@ def test_list_flags_rejects_bad_limit():
     app = _make_app(_admin(), AsyncMock())
     response = TestClient(app).get("/flags?limit=500")
     assert response.status_code == 422
+
+
+# ========== POST /{flag_id}/access-requests ==========
+
+_FLAG_ID = "11111111-1111-1111-1111-111111111111"
+_VALID_REASON = (
+    "Schülerin hat in mehreren Nachrichten deutliche Suizidalität geäußert; "
+    "Einsicht zur Einschätzung der akuten Gefährdung erforderlich."
+)
+
+
+def _flag_obj(status="open"):
+    flag = MagicMock()
+    flag.id = _FLAG_ID
+    flag.conversation_id = "22222222-2222-2222-2222-222222222222"
+    flag.status = status
+    return flag
+
+
+def _db_for_create(flag, existing=None):
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=flag)
+    session.scalar = AsyncMock(return_value=existing)
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+    return session
+
+
+def test_create_access_request_requires_admin():
+    app = _make_app(_teacher(), AsyncMock())
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests",
+        json={"reason": _VALID_REASON, "window_hours": 24},
+    )
+    assert r.status_code == 403
+
+
+def test_create_access_request_short_reason_422():
+    app = _make_app(_admin(), AsyncMock())
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": "zu kurz"}
+    )
+    assert r.status_code == 422
+
+
+def test_create_access_request_blank_reason_422():
+    app = _make_app(_admin(), AsyncMock())
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": " " * 60}
+    )
+    assert r.status_code == 422
+
+
+def test_create_access_request_window_out_of_range_422():
+    app = _make_app(_admin(), AsyncMock())
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests",
+        json={"reason": _VALID_REASON, "window_hours": 999},
+    )
+    assert r.status_code == 422
+
+
+def test_create_access_request_flag_not_found_404():
+    app = _make_app(_admin(), _db_for_create(None))
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert r.status_code == 404
+
+
+def test_create_access_request_closed_flag_409():
+    app = _make_app(_admin(), _db_for_create(_flag_obj(status="resolved")))
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert r.status_code == 409
+
+
+def test_create_access_request_duplicate_409():
+    app = _make_app(_admin(), _db_for_create(_flag_obj(), existing="existing-id"))
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert r.status_code == 409

@@ -515,6 +515,21 @@ export async function getFlags({ status = null, severity = null, limit = 25, off
   return res.json(); // { items: [...], total, limit, offset }
 }
 
+// Admin: Einsicht in eine geflaggte Konversation beantragen (4-Augen-Prinzip)
+export async function createAccessRequest(flagId, { reason, windowHours = 24 }) {
+  const res = await fetch(`${BASE}/admin/flags/${flagId}/access-requests`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason, window_hours: windowHours }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { id, flag_id, conversation_id, status, requested_at, access_window_hours }
+}
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);
