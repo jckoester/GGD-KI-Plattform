@@ -20,6 +20,7 @@ from app.crisis.config import (
     load_help_resources,
     missing_help_topics,
     normalize,
+    resolve_help_topic,
 )
 
 
@@ -51,6 +52,21 @@ def test_load_help_resources_real_file():
 def test_real_config_references_resolve():
     """Jeder Trigger.help_topic existiert in help_resources.yaml."""
     assert missing_help_topics() == []
+
+
+def test_resolve_help_topic_returns_payload():
+    payload = resolve_help_topic("crisis")
+    assert payload is not None
+    assert payload["help_topic"] == "crisis"
+    assert payload["label"]
+    assert payload["external"]  # mind. eine externe Anlaufstelle
+    # exclude_none: keine None-Felder im Payload
+    for contact in payload["internal"] + payload["external"]:
+        assert all(v is not None for v in contact.values())
+
+
+def test_resolve_unknown_topic_returns_none():
+    assert resolve_help_topic("does-not-exist") is None
 
 
 def test_loaders_use_cache():

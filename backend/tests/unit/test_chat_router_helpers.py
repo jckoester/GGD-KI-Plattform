@@ -5,7 +5,44 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.chat.schemas import AttachmentMeta, ChatMessage, TextPart, ImageUrlPart, ImageUrlContent
-from app.chat.router import _user_text, _serialize_content, _parse_stored_content
+from app.chat.router import _user_text, _serialize_content, _parse_stored_content, _crisis_sse_event, _CrisisRecord
+from app.crisis.detector import CrisisHit
+
+
+def _crisis_hit(help_topic="crisis"):
+    return CrisisHit(
+        category="suizidalitaet",
+        severity="alert",
+        help_topic=help_topic,
+        trigger_rule="crisis_triggers:suizidalitaet",
+        coreviewer_role="review",
+    )
+
+
+def test_crisis_sse_event_none_without_record():
+    assert _crisis_sse_event(None) is None
+
+
+def test_crisis_sse_event_none_when_banner_suppressed():
+    rec = _CrisisRecord(hit=_crisis_hit(), show_banner=False)
+    assert _crisis_sse_event(rec) is None
+
+
+def test_crisis_sse_event_emits_resolved_resources():
+    rec = _CrisisRecord(hit=_crisis_hit("crisis"), show_banner=True)
+    ev = _crisis_sse_event(rec)
+    assert ev is not None
+    assert ev.startswith("event: crisis\ndata: ")
+    assert ev.endswith("\n\n")
+    data = json.loads(ev.split("data: ", 1)[1].strip())
+    assert data["help_topic"] == "crisis"
+    assert data["label"]
+    assert data["external"]
+
+
+def test_crisis_sse_event_unknown_topic_returns_none():
+    rec = _CrisisRecord(hit=_crisis_hit("nonexistent-topic"), show_banner=True)
+    assert _crisis_sse_event(rec) is None
 
 
 def test_user_text_string():

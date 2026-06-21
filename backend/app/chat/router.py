@@ -28,6 +28,7 @@ from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
 from app.crisis.detector import CrisisHit, scan
+from app.crisis.config import resolve_help_topic
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
@@ -479,6 +480,20 @@ async def _record_crisis(
     return _CrisisRecord(hit=hit, show_banner=show_banner)
 
 
+def _crisis_sse_event(record: Optional[_CrisisRecord]) -> Optional[str]:
+    """SSE-Event-String für das Hilfe-Banner — None, wenn kein Banner gezeigt wird.
+
+    Löst den help_topic serverseitig aus help_resources.yaml auf; das Frontend
+    erhält fertige Kontaktdaten und kennt die YAML nicht.
+    """
+    if record is None or not record.show_banner:
+        return None
+    payload = resolve_help_topic(record.hit.help_topic)
+    if payload is None:
+        return None
+    return f"event: crisis\ndata: {json.dumps(payload)}\n\n"
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -784,6 +799,12 @@ async def chat(
 
         current_messages = list(llm_messages)
         current_response = response
+
+        # Hilfe-Ressourcen-Banner (ADR-008 Teil 3) zuerst — erreicht die Schüler:in
+        # auch dann, wenn der LLM-Stream später abbricht.
+        _crisis_event = _crisis_sse_event(crisis_record)
+        if _crisis_event:
+            yield _crisis_event
 
         try:
             for _round in range(_MAX_TOOL_ROUNDS + 1):

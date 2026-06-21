@@ -165,3 +165,21 @@ def missing_help_topics() -> list[str]:
     return sorted(
         {t.help_topic for t in load_crisis_triggers().triggers if t.help_topic not in known}
     )
+
+
+def resolve_help_topic(topic_key: str) -> dict | None:
+    """Löst einen help_topic-Key in das Banner-Payload für die SSE-Ausgabe auf.
+
+    Liefert ein JSON-serialisierbares Dict (label + interne/externe Kontakte, nur
+    gesetzte Felder) oder None, wenn der Key nicht existiert. Das Frontend rendert
+    nur — es kennt help_resources.yaml nicht.
+    """
+    topic = load_help_resources().topics.get(topic_key)
+    if topic is None:
+        return None
+    return {
+        "help_topic": topic_key,
+        "label": topic.label,
+        "internal": [c.model_dump(exclude_none=True) for c in topic.internal],
+        "external": [c.model_dump(exclude_none=True) for c in topic.external],
+    }
