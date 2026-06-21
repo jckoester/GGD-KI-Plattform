@@ -1144,6 +1144,22 @@ async def delete_conversation(
     if conversation.pseudonym != current_user.sub:
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
 
+    # ADR-008 Teil 7: Konversationen mit einem nicht verworfenen Flag werden nicht hart
+    # gelöscht, sondern nur für die Nutzerin ausgeblendet (sonst würde der Flag per
+    # Cascade mitgelöscht). Der Unterschied wird der Nutzerin bewusst nicht kommuniziert.
+    open_flag = await db.scalar(
+        select(ConversationFlag.id)
+        .where(
+            ConversationFlag.conversation_id == conversation_id,
+            ConversationFlag.status != "dismissed",
+        )
+        .limit(1)
+    )
+    if open_flag is not None:
+        conversation.hidden_by_user = True
+        await db.commit()
+        return None
+
     # Löschen (cascading delete für Nachrichten)
     await db.delete(conversation)
     await db.commit()
@@ -1169,6 +1185,7 @@ async def list_conversations(
     where_conditions = [
         Conversation.pseudonym == current_user.sub,
         is_test_filter,
+        Conversation.hidden_by_user.is_(False),
     ]
     if subject_id is not None:
         where_conditions.append(Conversation.subject_id == subject_id)
@@ -1230,6 +1247,7 @@ async def get_conversation_counts(
         .where(
             Conversation.pseudonym == current_user.sub,
             Conversation.is_test.is_(False),
+            Conversation.hidden_by_user.is_(False),
         )
         .group_by(Conversation.subject_id, Conversation.group_id)
     )
