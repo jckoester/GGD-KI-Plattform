@@ -27,6 +27,8 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `ENVIRONMENT` | `development` oder `production` | `production` |
 | `AUTH_CONFIG_PATH` | Pfad zur auth.yaml | `config/auth.yaml` |
 | `BUDGET_TIERS_PATH` | Pfad zur budget_tiers.yaml | `config/budget_tiers.yaml` |
+| `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
+| `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `AUTH_ISERV_CLIENT_SECRET` | OAuth2-Client-Secret des SSO-Providers | *(vom Provider) |
 | `STUDENT_GRADES` | Jahrgangsstufen als JSON-Array | `[5,6,7,8,9,10,11,12]` |
 | `PUBLIC_SCHOOL_NAME` | Anzeigename der Plattform | `ki@beispielschule` |
@@ -136,6 +138,23 @@ roles:
 ```bash
 docker compose exec backend python scripts/monthly_budget_reconcile.py
 ```
+
+---
+
+## `config/crisis_triggers.yaml` und `config/help_resources.yaml`
+
+Steuern die Krisen-Erkennung: `crisis_triggers.yaml` enthält die Stichwort-/
+Phrasenmuster je Kategorie, `help_resources.yaml` die Anlaufstellen, die im
+Hilfe-Banner erscheinen. Beide werden beim Start eingelesen und zwischengespeichert —
+nach Änderungen das **Backend neu starten** (im Dev-Betrieb löst `--reload` für
+Dateien außerhalb `backend/` keinen Reload aus).
+
+Aufbau, Beispiele und Pflegehinweise (Abstimmung mit der Schulsozialarbeit) stehen
+in [Content-Moderation & Guardrails](content-moderation.md), Abschnitt D.
+
+Die Pfade lassen sich über `CRISIS_TRIGGERS_PATH` / `HELP_RESOURCES_PATH` in `.env`
+überschreiben (Standard: `config/crisis_triggers.yaml` bzw.
+`config/help_resources.yaml`).
 
 ---
 

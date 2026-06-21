@@ -26,6 +26,21 @@ Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Pl
 
 **Nicht** übermittelt werden interne Planungsfelder der Lehrkraft — etwa Kommentare, Reflexionen, der Pin-Status oder die einzelnen Phasen einer Stunde. Es werden nur Angaben weitergegeben, die ohnehin für die Gruppe bestimmt sind (Themen, Stundenziele, Klassenarbeits-Umfang).
 
+## Hinweis auf Hilfsangebote
+
+Damit Sie in schwierigen Situationen nicht allein bleiben, prüft die Plattform Ihre
+Nachrichten **lokal auf dem Schulserver** auf Anzeichen einer persönlichen Krise —
+mit einer einfachen Stichwortliste, **ohne KI** und **ohne** dass dafür zusätzliche
+Daten an den KI-Anbieter gesendet werden.
+
+Erkennt die Plattform einen solchen Hinweis, erscheint im Chat ein **Hilfe-Banner**
+mit schulischen und externen Anlaufstellen. Ihr Gespräch wird dabei **nicht**
+unterbrochen, und es werden keine Inhalte über das hinaus gespeichert, was ohnehin
+als Konversation gespeichert wird.
+
+> 📷 *Screenshot folgt: Hilfe-Banner mit Anlaufstellen im Chat.*
+<!-- Ersetzen durch: ![Hilfe-Banner](/help-images/datenschutz/hilfe-banner.png) -->
+
 ## Wer kann meine Chats lesen?
 
 Ihre Gespräche sind für andere Nutzerinnen und Nutzer — auch für Lehrkräfte — nicht einsehbar. Ein Zugriff durch Administratoren ist technisch möglich, erfolgt aber nur in begründeten Ausnahmefällen (z. B. auf richterliche Anordnung) und wird im Prüfprotokoll festgehalten.

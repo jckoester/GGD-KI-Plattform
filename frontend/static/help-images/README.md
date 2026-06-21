@@ -37,3 +37,4 @@ Empfehlung: Breite ca. 1200–1600 px, heller Modus, keine echten Schüler:innen
 | `unterrichtsplanung/stundenentwurf.png` | Unterrichtsplanung | Stundenentwurf: Phasentabelle, Zeitbudget, Kompetenz-Leiste |
 | `unterrichtsplanung/methode-sozialform.png` | Unterrichtsplanung | Methodenspalte: gestapelte Sozialform/Methode + Vorschläge |
 | `unterrichtsplanung/hinweisleiste.png` | Unterrichtsplanung | Überhang-Hinweisleiste am unteren Rand |
+| `datenschutz/hilfe-banner.png` | Datenschutz | Hilfe-Banner (Krisen-Erkennung) mit internen + externen Anlaufstellen im Chat |

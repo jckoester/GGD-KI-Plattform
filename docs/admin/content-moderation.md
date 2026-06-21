@@ -1,11 +1,12 @@
 # Content-Moderation & Guardrails
 
-Die Plattform kennt zwei unabhängige Schutzmechanismen, die sich ergänzen:
+Die Plattform kennt drei unabhängige Schutzmechanismen, die sich ergänzen:
 
 | Ebene | Wo konfiguriert | Wirkung |
 |-------|----------------|---------|
 | Schulweiter Guardrail-Prompt | Admin-Dashboard (`/settings/guardrail`) | Leitlinien für das Modell — kein Blocking |
 | LiteLLM-Guardrails | `infra/litellm_config.yaml` + Deployment | Aktives Blocking vor oder nach der Modellantwort |
+| Krisen-Erkennung | `config/crisis_triggers.yaml` + `config/help_resources.yaml` | Lokale Stichwort-Erkennung in Nutzernachrichten → Hilfe-Banner, kein Blocking |
 
 ---
 
@@ -246,3 +247,99 @@ Blocking-Guardrails sind empfehlenswert, wenn:
 Beide Ebenen sind unabhängig — sie können einzeln oder kombiniert eingesetzt werden.
 Es gibt keine Konfliktgefahr: Der Guardrail-Prompt beeinflusst das Modellverhalten;
 LiteLLM-Guardrails entscheiden, ob eine Anfrage das Modell überhaupt erreicht.
+
+---
+
+## D — Krisen-Erkennung (Backend)
+
+Die dritte Ebene unterscheidet sich grundlegend von den ersten beiden: Sie prüft
+nicht die **Ausgabe** des Modells, sondern die **Eingabe** der Nutzer:innen auf
+Andeutungen einer persönlichen Krise (Suizidalität, Selbstverletzung, häusliche
+Gewalt, Essstörung, Mobbing) — und blendet bei einem Treffer ein dezentes
+Hilfe-Banner mit Anlaufstellen ein.
+
+### Wie es funktioniert
+
+- Jede eingehende Nutzernachricht wird **lokal im Backend** gegen eine kuratierte
+  Stichwort-/Phrasenliste geprüft — **ohne** LLM-Aufruf, parallel zur normalen Anfrage.
+- **Kein Blocking:** Das Gespräch läuft normal weiter. Wer sich öffnet, soll
+  sprechen dürfen (ADR-008 Teil 3).
+- Bei einem Treffer:
+  - Ein **Hilfe-Banner** mit internen und externen Anlaufstellen erscheint im Chat —
+    dezent, nicht alarmierend. Es erscheint **einmal pro Kategorie und Konversation**,
+    um Inflation zu vermeiden.
+  - Ein **Flag** wird in der Datenbank vermerkt (pseudonymisiert, ohne zusätzlichen
+    Klartext) — Grundlage für einen späteren, gesondert geregelten Einsichtsprozess.
+  - Ein **Log-Eintrag** auf INFO-Ebene nennt die ausgelöste Kategorie (kein
+    Nachrichteninhalt).
+- **Test-Chats** (Assistenten-Entwicklung) werden nicht geprüft.
+
+> **Abgrenzung zum Krisenhinweis-Baustein (Abschnitt A):** Der Guardrail-Prompt
+> *bittet das Modell*, bei Krisenandeutungen auf Hilfe hinzuweisen — das hängt vom
+> Modell ab. Die Krisen-Erkennung zeigt das Banner **deterministisch**, unabhängig
+> davon, wie das Modell antwortet. Beide ergänzen sich.
+
+### Konfigurationsdateien
+
+| Datei | Inhalt | Gepflegt von |
+|-------|--------|-------------|
+| `config/crisis_triggers.yaml` | Kategorien mit Stichwort-/Phrasenmustern (Regex), Schweregrad, zugehöriges Hilfe-Thema | Admin, **kuratiert mit Schulsozialarbeit** |
+| `config/help_resources.yaml` | Anlaufstellen je Hilfe-Thema (intern + extern), die im Banner erscheinen | Schulleitung + Schulsozialarbeit |
+
+**`crisis_triggers.yaml`** — je Eintrag eine Kategorie:
+
+```yaml
+triggers:
+  - category: suizidalitaet
+    severity: alert              # info | warning | alert
+    help_topic: crisis           # muss in help_resources.yaml existieren
+    coreviewer_role: review
+    patterns:
+      - "(will|möchte) (mich )?(umbringen|sterben|nicht mehr leben)"
+      - "niemand würde mich vermissen"
+```
+
+**`help_resources.yaml`** — je Hilfe-Thema (`help_topic`) eine Sammlung von Kontakten:
+
+```yaml
+topics:
+  crisis:
+    label: "Falls du gerade Unterstützung brauchst"
+    internal:
+      - name: "Schulsozialarbeit"
+        contact: "N.N., Raum 000"
+        hours: "Mo–Fr, 8:00–14:00 Uhr"
+        email: "sozialarbeit@beispielschule.de"
+    external:
+      - name: "Telefonseelsorge"
+        phone: "0800 111 0 111"
+        hours: "24 Stunden, täglich"
+        free_of_charge: true
+        anonymous: true
+```
+
+Die Mustererkennung ist **case-insensitive und unicode-normalisiert**; die Muster
+werden als reguläre Ausdrücke ausgewertet.
+
+### Pflege und Inbetriebnahme
+
+- **Kuratierung mit Schulsozialarbeit:** Die mitgelieferte Triggerliste ist nur ein
+  Startpunkt. Sie muss mit dem Präventionsteam abgestimmt werden — Sprachsensibilität
+  (Jugendsprache, regionale Ausdrücke), Vermeidung von Fehlalarmen und Lücken. Auch
+  die internen Kontakte in `help_resources.yaml` (Namen, Räume, Zeiten) sind
+  Platzhalter (`N.N.`) und müssen gepflegt werden, bevor das Banner echte Hilfe leistet.
+- **Falsch-Positive sind unvermeidbar:** Die Schwelle liegt bewusst niedrig, das
+  Banner ist nicht bedrohlich. Die Muster sollten dennoch regelmäßig nachgeschärft
+  werden, wenn ein harmloser Satz versehentlich anschlägt.
+- **Änderungen werden beim Start eingelesen (zwischengespeichert):** Nach dem
+  Editieren der YAML-Dateien das **Backend neu starten**, damit die Änderungen greifen.
+  Im Entwicklungsbetrieb beachten: Der `--reload`-Mechanismus überwacht nur das
+  `backend/`-Verzeichnis, **nicht** `config/` — YAML-Änderungen lösen dort also keinen
+  automatischen Reload aus.
+
+### Geflaggte Konversationen
+
+Löscht eine Schüler:in eine Konversation, an der ein offenes Flag hängt, wird sie
+**nicht** hart gelöscht, sondern nur ausgeblendet (sie verschwindet aus der eigenen
+Liste). So bleibt der Sachverhalt für einen späteren, gesondert geregelten
+Einsichtsprozess erhalten. Der Unterschied ist für die Nutzer:in nicht erkennbar.
