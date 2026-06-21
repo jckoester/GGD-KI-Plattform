@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -21,11 +22,12 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
-from app.db.models import Conversation, Message, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
+from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
+from app.crisis.detector import CrisisHit, scan
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
@@ -353,6 +355,17 @@ register_tool(ChatTool(
 ))
 
 
+def _serialize_user_message(user_message: str, attachments: list[AttachmentMeta]) -> str:
+    """Serialisiert die User-Nachricht für die DB (mit Anhang-Metadaten, falls vorhanden)."""
+    if attachments:
+        return json.dumps({
+            "v": 1,
+            "text": user_message,
+            "files": [{"name": a.name, "type": a.type} for a in attachments],
+        }, ensure_ascii=False)
+    return user_message
+
+
 async def _persist(
     db: AsyncSession,
     conversation_id: UUID,
@@ -364,24 +377,18 @@ async def _persist(
     cost_usd: Optional[float] = None,
     assistant_id: Optional[int] = None,
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
+    skip_user_message: bool = False,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
 
-    if user_attachments:
-        stored_content = json.dumps({
-            "v": 1,
-            "text": user_message,
-            "files": [{"name": a.name, "type": a.type} for a in user_attachments],
-        }, ensure_ascii=False)
-    else:
-        stored_content = user_message
-
-    db.add(Message(
-        conversation_id=conversation_id,
-        role="user",
-        content=stored_content,
-    ))
+    # Die User-Nachricht kann bereits früh persistiert worden sein (Krisen-Erkennung).
+    if not skip_user_message:
+        db.add(Message(
+            conversation_id=conversation_id,
+            role="user",
+            content=_serialize_user_message(user_message, user_attachments),
+        ))
     db.add(Message(
         conversation_id=conversation_id,
         role="assistant",
@@ -410,6 +417,68 @@ async def _persist(
     await db.commit()
 
 
+@dataclass
+class _CrisisRecord:
+    """Ergebnis der Krisen-Erkennung für eine Nachricht (Schritt 5: Banner-SSE)."""
+    hit: CrisisHit
+    show_banner: bool
+
+
+async def _record_crisis(
+    db: AsyncSession,
+    conversation_id: UUID,
+    user_message: str,
+    attachments: list[AttachmentMeta],
+    pseudonym: str,
+) -> Optional[_CrisisRecord]:
+    """Krisen-Erkennung (ADR-008 Teil 3) — OHNE Blockieren des Chats.
+
+    Bei Treffer wird die auslösende User-Nachricht früh persistiert (für die
+    message_id), ein Flag in conversation_flags angelegt und committet — unabhängig
+    vom Ausgang des LLM-Streams. Das Banner wird nur beim ersten Treffer einer
+    Kategorie je Konversation gezeigt; geflaggt wird jeder Treffer.
+
+    Gibt None zurück, wenn nichts greift. Kommt ein Record zurück, wurde die
+    User-Nachricht bereits geschrieben — der Aufrufer setzt _persist(skip_user_message=True).
+    """
+    hit = scan(user_message)
+    if hit is None:
+        return None
+
+    prior = await db.scalar(
+        select(ConversationFlag.id)
+        .where(
+            ConversationFlag.conversation_id == conversation_id,
+            ConversationFlag.flag_category == hit.category,
+        )
+        .limit(1)
+    )
+    show_banner = prior is None
+
+    user_row = Message(
+        conversation_id=conversation_id,
+        role="user",
+        content=_serialize_user_message(user_message, attachments),
+    )
+    db.add(user_row)
+    await db.flush()
+    db.add(ConversationFlag(
+        conversation_id=conversation_id,
+        message_id=user_row.id,
+        flag_source="auto_crisis",
+        flag_category=hit.category,
+        severity=hit.severity,
+        trigger_rule=hit.trigger_rule,
+        coreviewer_role=hit.coreviewer_role,
+    ))
+    await db.commit()
+    logger.warning(
+        "Krisen-Flag angelegt: kategorie=%s severity=%s pseudonym=%s conv=%s",
+        hit.category, hit.severity, pseudonym, conversation_id,
+    )
+    return _CrisisRecord(hit=hit, show_banner=show_banner)
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -429,6 +498,7 @@ async def chat(
 
     conversation_id = request.conversation_id
     is_new = conversation_id is None
+    conversation_is_test = request.is_test
     title_prompt: str | None = None
 
     # Für Assistentenwechsel mid-Chat
@@ -520,6 +590,7 @@ async def chat(
         system_prompt_snapshot = existing.system_prompt_snapshot
         active_assistant_id = existing.assistant_id
         conversation_group_id = existing.group_id
+        conversation_is_test = existing.is_test
         active_assistant: Optional[Assistant] = None
 
         # 2-1: Assistentenwechsel mid-Chat
@@ -555,6 +626,18 @@ async def chat(
         # 2-2: Modellwechsel mid-Chat (höchste Priorität, überschreibt Assistenten-Modell)
         if request.model_id:
             model_used = request.model_id
+
+    # Krisen-Erkennung (ADR-008 Teil 3): lokal, parallel zum LLM-Call, OHNE Blockieren.
+    # Test-Chats (Assistenten-Entwicklung) werden nicht geflaggt.
+    crisis_record: Optional[_CrisisRecord] = None
+    if not conversation_is_test:
+        crisis_record = await _record_crisis(
+            db,
+            conversation_id,
+            user_message,
+            request.messages[-1].attachments if request.messages else [],
+            current_user.sub,
+        )
 
     # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
     assistant_id_for_docs = active_assistant_id
@@ -868,6 +951,7 @@ async def chat(
                 "".join(full_content), usage, model_used, cost_usd=cost_usd,
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
+                skip_user_message=crisis_record is not None,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
