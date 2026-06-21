@@ -353,6 +353,11 @@ class ConversationFlag(Base):
     status: Mapped[str] = mapped_column(
         Text, nullable=False, default="open", server_default=text("'open'")
     )
+    # Zeitpunkt der Resolution (Flag → resolved/dismissed). Grundlage der
+    # 180-Tage-Aufbewahrung im Cleanup (ADR-008 Teil 7).
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

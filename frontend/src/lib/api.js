@@ -594,6 +594,21 @@ async function _accessAction(id, action) {
 export const approveAccessRequest = (id) => _accessAction(id, "approve");
 export const denyAccessRequest = (id) => _accessAction(id, "deny");
 
+// Admin: Fall abschließen — Flag → resolved/dismissed, Antrag abgeschlossen.
+export async function resolveAccessRequest(id, { outcome, note }) {
+  const res = await fetch(`${BASE}/access-requests/${id}/resolve`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { request_id, request_status, flag_status }
+}
+
 // Reader-View: read-only Einsicht in eine freigegebene Konversation. Wirft
 // `stepUpRequired` bei 401 + X-Stepup-Required (frische Auth nötig).
 export async function getReaderConversation(id) {

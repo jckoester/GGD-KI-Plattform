@@ -65,6 +65,7 @@ async def test_cleanup_inactive_accounts_dry_run_counts_only():
 async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_delete():
     db = AsyncMock()
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
+    db.scalar = AsyncMock(return_value=None)  # keine Krisen-Schutz-Konversation
     db.execute = AsyncMock(
         side_effect=[
             _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
@@ -95,6 +96,7 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
 async def test_cleanup_inactive_accounts_rolls_back_single_pseudonym_on_local_error():
     db = AsyncMock()
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
+    db.scalar = AsyncMock(return_value=None)  # keine Krisen-Schutz-Konversation
     db.execute = AsyncMock(
         side_effect=[
             _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten

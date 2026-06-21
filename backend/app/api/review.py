@@ -8,14 +8,15 @@ schließen Selbst-Freigabe aus (Antragsteller ≠ Zweitperson).
 
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_any_role, require_fresh_stepup
+from app.auth.dependencies import require_any_role, require_fresh_stepup, require_role
 from app.auth.jwt import JwtPayload
 from app.db.models import (
     Conversation,
@@ -293,3 +294,63 @@ async def export_conversation(
     # Download baut das Frontend aus der Antwort.
     req = await _authorize_reader(request_id, current_user, db)
     return await _build_reader_payload(req, current_user, db, request, action="export")
+
+
+# ---------- Resolution (Schritt 8, ADR-008 Teil 7) ----------
+
+
+class ResolveRequest(BaseModel):
+    outcome: Literal["resolved", "dismissed"]
+    # Resolutions-Notiz ist hier PFLICHT — anders als der Antrags-Kontext ist sie der
+    # eigentliche, fachlich gehaltvolle Abschlussvermerk (nach Sichtung des Falls).
+    note: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("note")
+    @classmethod
+    def note_not_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Resolutions-Notiz darf nicht leer sein.")
+        return stripped
+
+
+class ResolveResponse(BaseModel):
+    request_id: UUID
+    request_status: str
+    flag_status: str
+
+
+@router.post("/{request_id}/resolve", response_model=ResolveResponse)
+async def resolve_access_request(
+    request_id: UUID,
+    body: ResolveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: JwtPayload = Depends(require_role("admin")),
+) -> ResolveResponse:
+    req = await db.get(ConversationAccessRequest, request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Antrag nicht gefunden.")
+    if req.status not in ("pending", "approved"):
+        raise HTTPException(status_code=409, detail="Antrag ist bereits abgeschlossen.")
+
+    now = datetime.now(timezone.utc)
+    req.resolution_note = body.note
+    req.status = "expired"  # Antrag abgeschlossen (Zugriff nicht mehr nötig)
+
+    flag = await db.get(ConversationFlag, req.flag_id)
+    flag_status = ""
+    if flag is not None:
+        flag.status = body.outcome  # 'resolved' | 'dismissed'
+        flag.resolved_at = now  # startet die 180-Tage-Aufbewahrung
+        flag_status = flag.status
+
+    await db.commit()
+    logger.info(
+        "Krisen-Einsicht: Antrag aufgelöst (request=%s, flag=%s, outcome=%s)",
+        req.id,
+        req.flag_id,
+        body.outcome,
+    )
+    return ResolveResponse(
+        request_id=req.id, request_status=req.status, flag_status=flag_status
+    )

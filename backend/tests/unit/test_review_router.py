@@ -25,6 +25,7 @@ from app.db.session import get_db
 
 REVIEW = JwtPayload(sub="p-review", roles=["review"], grade=None, jti="j", iat=1, exp=9999999999)
 TEACHER = JwtPayload(sub="p-teacher", roles=["teacher"], grade=None, jti="j", iat=1, exp=9999999999)
+ADMIN = JwtPayload(sub="p-admin", roles=["teacher", "admin"], grade=None, jti="j", iat=1, exp=9999999999)
 
 
 def _make_app(user, db=None):
@@ -115,3 +116,32 @@ def test_export_requires_fresh_stepup():
     app = _make_app(REVIEW)
     r = TestClient(app).post(f"/access-requests/{uuid4()}/export")
     assert r.status_code == 401
+
+
+# ---------- Resolution: nur Admin, Notiz Pflicht (Schritt 8) ----------
+
+def test_resolve_requires_admin():
+    app = _make_app(REVIEW)  # review, aber kein admin
+    r = TestClient(app).post(
+        f"/access-requests/{uuid4()}/resolve",
+        json={"outcome": "resolved", "note": "abgeschlossen"},
+    )
+    assert r.status_code == 403
+
+
+def test_resolve_blank_note_422():
+    app = _make_app(ADMIN)
+    r = TestClient(app).post(
+        f"/access-requests/{uuid4()}/resolve",
+        json={"outcome": "resolved", "note": "   "},
+    )
+    assert r.status_code == 422
+
+
+def test_resolve_invalid_outcome_422():
+    app = _make_app(ADMIN)
+    r = TestClient(app).post(
+        f"/access-requests/{uuid4()}/resolve",
+        json={"outcome": "bogus", "note": "x"},
+    )
+    assert r.status_code == 422

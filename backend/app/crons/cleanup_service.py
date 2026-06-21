@@ -4,16 +4,56 @@ from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Conversation, JwtRevocation, PseudonymAudit, UserPreference
+from app.db.models import (
+    Conversation,
+    ConversationFlag,
+    JwtRevocation,
+    PseudonymAudit,
+    UserPreference,
+)
 from app.litellm.client import LiteLLMClient
 
 logger = logging.getLogger(__name__)
 
 _ACCOUNT_RETENTION_DAYS = 90
 _CONVERSATION_RETENTION_DAYS = 93
+# Geflaggte Konversationen werden nach Resolution 180 Tage aufbewahrt (ADR-008 Teil 7);
+# offene/in-Prüfung-Fälle gar nicht gelöscht, bis sie abgeschlossen sind.
+_FLAG_RETENTION_DAYS = 180
+
+
+def _protecting_flag_condition(now: datetime):
+    """Bedingung auf ConversationFlag: schützt das Flag (noch) vor Löschung?
+
+    Schützend ist ein Flag, das offen/in Prüfung ist ODER nach Resolution noch innerhalb
+    der 180-Tage-Aufbewahrung liegt (bzw. ohne resolved_at — konservativ geschützt).
+    """
+    cutoff = now - timedelta(days=_FLAG_RETENTION_DAYS)
+    return or_(
+        ConversationFlag.status.in_(("open", "under_review")),
+        and_(
+            ConversationFlag.status.in_(("resolved", "dismissed")),
+            or_(
+                ConversationFlag.resolved_at.is_(None),
+                ConversationFlag.resolved_at > cutoff,
+            ),
+        ),
+    )
+
+
+def _crisis_protected_exists(now: datetime):
+    """Korreliertes EXISTS auf die äußere Conversation: schützendes Flag vorhanden?"""
+    return (
+        select(ConversationFlag.id)
+        .where(
+            ConversationFlag.conversation_id == Conversation.id,
+            _protecting_flag_condition(now),
+        )
+        .exists()
+    )
 
 
 @dataclass
@@ -24,6 +64,7 @@ class CleanupStats:
     litellm_delete_failed: int = 0
     litellm_key_delete_ok: int = 0
     litellm_key_delete_failed: int = 0
+    skipped_protected: int = 0  # wegen Krisen-Aufbewahrung übersprungen
     errors: int = 0
     duration_ms: int = 0
 
@@ -61,6 +102,7 @@ async def cleanup_inactive_accounts(
 
     client = LiteLLMClient()
     failed_pseudonyms: set[str] = set()
+    protected_pseudonyms: set[str] = set()
     try:
         while True:
             query = (
@@ -69,8 +111,9 @@ async def cleanup_inactive_accounts(
                 .order_by(PseudonymAudit.last_login_at.asc())
                 .limit(limit)
             )
-            if failed_pseudonyms:
-                query = query.where(~PseudonymAudit.pseudonym.in_(failed_pseudonyms))
+            excluded = failed_pseudonyms | protected_pseudonyms
+            if excluded:
+                query = query.where(~PseudonymAudit.pseudonym.in_(excluded))
 
             result = await db.execute(query)
             audit_entries = list(result.scalars().all())
@@ -81,6 +124,24 @@ async def cleanup_inactive_accounts(
 
             for audit_entry in audit_entries:
                 pseudonym = audit_entry.pseudonym
+
+                # Krisen-Aufbewahrung überschreibt die Inaktivitäts-Löschung: hat dieser
+                # Account eine geschützte (geflaggte, nicht abgelaufene) Konversation,
+                # wird der gesamte Account übersprungen, bis die Aufbewahrung endet.
+                protected = await db.scalar(
+                    select(ConversationFlag.id)
+                    .join(Conversation, ConversationFlag.conversation_id == Conversation.id)
+                    .where(
+                        Conversation.pseudonym == pseudonym,
+                        _protecting_flag_condition(current_time),
+                    )
+                    .limit(1)
+                )
+                if protected is not None:
+                    stats.skipped_protected += 1
+                    protected_pseudonyms.add(pseudonym)
+                    continue
+
                 try:
                     await client.delete_user(pseudonym)
                     stats.litellm_delete_ok += 1
@@ -135,13 +196,14 @@ async def cleanup_inactive_accounts(
 
     logger.info(
         "cleanup_inactive_accounts fertig found=%d deleted_local=%d litellm_ok=%d litellm_failed=%d "
-        "key_delete_ok=%d key_delete_failed=%d errors=%d duration_ms=%d",
+        "key_delete_ok=%d key_delete_failed=%d skipped_protected=%d errors=%d duration_ms=%d",
         stats.found,
         stats.deleted_local,
         stats.litellm_delete_ok,
         stats.litellm_delete_failed,
         stats.litellm_key_delete_ok,
         stats.litellm_key_delete_failed,
+        stats.skipped_protected,
         stats.errors,
         stats.duration_ms,
     )
@@ -168,9 +230,14 @@ async def cleanup_stale_conversations(
         dry_run,
     )
 
+    # Krisen-geschützte Konversationen (offenes/aufzubewahrendes Flag) nie löschen.
+    protected = _crisis_protected_exists(current_time)
+
     if dry_run:
         count_result = await db.execute(
-            select(func.count()).select_from(Conversation).where(activity_ts < cutoff)
+            select(func.count())
+            .select_from(Conversation)
+            .where(activity_ts < cutoff, ~protected)
         )
         stats.found = int(count_result.scalar_one() or 0)
         stats.duration_ms = int((perf_counter() - started) * 1000)
@@ -179,7 +246,7 @@ async def cleanup_stale_conversations(
     while True:
         result = await db.execute(
             select(Conversation.id)
-            .where(activity_ts < cutoff)
+            .where(activity_ts < cutoff, ~protected)
             .order_by(activity_ts.asc())
             .limit(limit)
         )
