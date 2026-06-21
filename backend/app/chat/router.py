@@ -446,6 +446,11 @@ async def _record_crisis(
     if hit is None:
         return None
 
+    logger.info(
+        "Krisen-Erkennung: Regel '%s' ausgelöst (kategorie=%s, severity=%s, conv=%s)",
+        hit.trigger_rule, hit.category, hit.severity, conversation_id,
+    )
+
     prior = await db.scalar(
         select(ConversationFlag.id)
         .where(

@@ -32,6 +32,8 @@ def _clear_cache():
     [
         ("Ich will mich umbringen.", "suizidalitaet", "alert"),
         ("Ich möchte nicht mehr leben.", "suizidalitaet", "alert"),
+        ("Manchmal möchte ich nicht mehr leben.", "suizidalitaet", "alert"),
+        ("Ich will einfach nicht mehr leben.", "suizidalitaet", "alert"),
         ("Ich ritze mich.", "selbstverletzung", "alert"),
         ("Mein Vater schlägt mich.", "haeusliche_gewalt", "alert"),
         ("Ich bin zu dick.", "essverhalten", "warning"),

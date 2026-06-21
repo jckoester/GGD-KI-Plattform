@@ -18,7 +18,7 @@ triggers:
     help_topic: crisis
     coreviewer_role: review
     patterns:
-      - "(will|möchte|würde gern|würde gerne) (mich )?(umbringen|sterben|nicht mehr leben)"
+      - "(will|möchte|würde gern|würde gerne) (mich |ich |einfach |gerade )?(umbringen|sterben|nicht mehr leben)"
       - "nicht mehr leben wollen"
       - "keinen sinn mehr( im leben)?"
       - "niemand würde mich vermissen"
