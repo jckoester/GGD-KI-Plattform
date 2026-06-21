@@ -343,3 +343,83 @@ Löscht eine Schüler:in eine Konversation, an der ein offenes Flag hängt, wird
 **nicht** hart gelöscht, sondern nur ausgeblendet (sie verschwindet aus der eigenen
 Liste). So bleibt der Sachverhalt für einen späteren, gesondert geregelten
 Einsichtsprozess erhalten. Der Unterschied ist für die Nutzer:in nicht erkennbar.
+
+---
+
+## E — Krisen-Einsicht im Vier-Augen-Prinzip
+
+Die Krisen-Erkennung (Abschnitt D) erzeugt **Flags** — Hinweise auf eine mögliche
+Notlage, pseudonymisiert und **ohne Gesprächsinhalte**. Damit aus einem Flag Hilfe für
+die betroffene Person werden kann, muss in begründeten Fällen jemand in die Konversation
+sehen. Das ist der sensibelste Eingriff der Plattform und deshalb an ein
+**Zwei-Personen-Prinzip**, eine frische Authentifizierung, ein Zeitfenster und eine
+lückenlose Protokollierung gebunden (ADR-008 Teil 6+7).
+
+### Beteiligte Rollen
+
+| Rolle | Aufgabe |
+|-------|---------|
+| `admin` | Sieht Flags, **beantragt** Einsicht, schließt den Fall ab |
+| `review` | **Zweitperson** (Schulsozialarbeit, Beratung, Klassenleitung): gibt eine Einsicht frei oder lehnt sie ab |
+
+Die Rolle `review` wird über eine SSO-Gruppe vergeben (Beispiel in `auth.yaml`):
+
+```yaml
+group_role_map:
+  - group: ki-reviewer
+    role: review
+```
+
+`review` darf eigenständig vorkommen — eine Beratungsperson muss keine Lehrkraft sein.
+
+### Ablauf
+
+1. **Flag-Übersicht** (`/flags`, nur Admin): Liste offener Meldungen — Kategorie,
+   Schweregrad, Zeitpunkt, Pseudonym. **Keine Inhalte.**
+2. **Einsicht beantragen:** Der:die Admin stellt einen Antrag (optionaler Zusatzkontext,
+   Zeitfenster — Standard 48 h). Das Flag geht in „in Prüfung".
+3. **Zweitfreigabe** (`/review`, Rolle `review`): Eine **andere** Person als der:die
+   Antragsteller:in gibt frei oder lehnt ab. Selbst-Freigabe ist technisch
+   ausgeschlossen. Freigabe und Einsicht verlangen eine **frische Anmeldung**
+   (Re-Authentifizierung unmittelbar vor der Aktion).
+4. **Einsicht (read-only):** Nach Freigabe können **beide** Beteiligte die Konversation
+   innerhalb des Zeitfensters lesen — nur lesen, kein Antworten, kein Bearbeiten. Ein
+   Export ist möglich.
+5. **Protokoll:** **Jeder** Lese- und Export-Zugriff erzeugt einen manipulationssicheren
+   Audit-Eintrag (wer, wann, welche Aktion, IP).
+6. **Abschluss:** Der:die Admin schließt den Fall mit einem Pflicht-Vermerk ab — als
+   **erledigt** (Anliegen bearbeitet) oder **verworfen** (Fehlalarm).
+
+### Schutzmechanismen im Überblick
+
+| Mechanismus | Wirkung |
+|-------------|---------|
+| Zwei-Personen-Prinzip | Antragsteller:in ≠ Freigebende:r (auch auf Datenbank-Ebene erzwungen) |
+| Frische Authentifizierung (Step-up) | Freigabe und Einsicht nur nach erneuter Anmeldung |
+| Zeitfenster | Einsicht endet automatisch (Standard 48 h nach Freigabe) |
+| Read-only | Keine Antwort, keine Bearbeitung im Namen der Schüler:in |
+| Audit-Log | Jeder Zugriff append-only protokolliert |
+| Pseudonymität | Dashboard und Antrag zeigen nie Inhalte; Einsicht nur nach voller Freigabe |
+
+### Aufbewahrung geflaggter Konversationen
+
+- Solange ein Flag **offen** oder **in Prüfung** ist, wird die Konversation vom
+  automatischen Löschlauf **nicht** entfernt.
+- Nach dem **Abschluss** (erledigt/verworfen) wird sie noch **180 Tage** aufbewahrt und
+  danach dem normalen Löschzyklus überlassen.
+- Diese Aufbewahrung hat **Vorrang** vor der Inaktivitäts-Löschung von Konten: ein
+  Account mit einer geschützten Konversation wird erst nach Ablauf der
+  Krisen-Aufbewahrung gelöscht.
+
+### Was die Plattform bewusst NICHT kann
+
+Die Zuordnung **Pseudonym → reale Person** ist im System **nicht** möglich: Die
+Pseudonymisierung ist eine Einwegfunktion, die echte Kennung wird nirgends gespeichert.
+Der:die Reviewer:in sieht das Pseudonym und den Gesprächsinhalt — die Identifizierung
+der konkreten Person ist ein **organisatorischer Schritt außerhalb der Software**
+(Schulleitung/DSB), kein Knopfdruck im System. Das ist eine bewusste Schutzschwelle.
+
+> **Für den Datenschutz:** Die Einsichtnahme in geflaggte Konversationen ist eine eigene
+> Verarbeitungstätigkeit und gehört ins **Verzeichnis von Verarbeitungstätigkeiten**
+> (Zweck, Rechtsgrundlage, beteiligte Rollen, Aufbewahrung, Protokollierung). Wer als
+> `review` benannt wird, ist mit Schulleitung und Datenschutzbeauftragten abzustimmen.

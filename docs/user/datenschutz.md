@@ -43,7 +43,20 @@ als Konversation gespeichert wird.
 
 ## Wer kann meine Chats lesen?
 
-Ihre Gespräche sind für andere Nutzerinnen und Nutzer — auch für Lehrkräfte — nicht einsehbar. Ein Zugriff durch Administratoren ist technisch möglich, erfolgt aber nur in begründeten Ausnahmefällen (z. B. auf richterliche Anordnung) und wird im Prüfprotokoll festgehalten.
+Ihre Gespräche sind für andere Nutzerinnen und Nutzer — auch für Lehrkräfte — **nicht**
+einsehbar. In zwei eng geregelten Ausnahmefällen ist ein Zugriff möglich:
+
+- **Hinweis auf eine Krise:** Erkennt die Plattform Anzeichen einer Notlage (siehe
+  „Hinweis auf Hilfsangebote"), kann die Schule in begründeten Fällen Einsicht in das
+  betroffene Gespräch nehmen — aber nur im **Vier-Augen-Prinzip**: Zwei berechtigte
+  Personen (die Administration und eine beratende Person, z. B. die Schulsozialarbeit)
+  müssen **beide** zustimmen. Der Zugriff ist zeitlich befristet, erfolgt **nur lesend**,
+  und **jeder** Zugriff wird protokolliert.
+- **Rechtliche Verpflichtung:** etwa auf richterliche Anordnung.
+
+Die Plattform kann ein Gespräch **nicht** von sich aus Ihrer Person zuordnen: Die
+Verbindung zwischen dem anonymen Code und einer Person liegt allein auf dem Schulserver
+und wird nur in diesen geregelten Verfahren — und außerhalb der Software — hergestellt.
 
 ## Wie lange bleiben meine Daten?
 
@@ -53,6 +66,11 @@ Ihre Gespräche sind für andere Nutzerinnen und Nutzer — auch für Lehrkräft
 | Gesamter Account | 3 Monate nach dem letzten Login |
 
 Die Löschung erfolgt automatisch. Es gibt keine manuelle Wiederherstellung gelöschter Daten.
+
+> **Ausnahme bei Krisen-Hinweisen:** Wird ein Gespräch wegen eines möglichen
+> Krisen-Hinweises markiert, bleibt es länger erhalten — solange die Schule den Fall
+> bearbeitet und danach noch bis zu 180 Tage, auch wenn Sie es selbst löschen. So ist
+> sichergestellt, dass Hilfe nicht an einer zu frühen Löschung scheitert.
 
 > **Denken Sie daran:** Ergebnisse, die Sie aufbewahren möchten, müssen Sie
 > selbst kopieren — ki@schule ist kein dauerhafter Wissensspeicher.
