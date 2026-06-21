@@ -37,6 +37,7 @@ from app.site_texts.router import router as site_texts_router
 from app.upload.router import router as upload_router
 from app.context.router import router as context_router
 from app.planning.router import router as planning_router
+from app.api.review import router as review_router
 
 logger = logging.getLogger(__name__)
 
@@ -91,3 +92,4 @@ app.include_router(subjects_router)
 app.include_router(groups_router)
 app.include_router(context_router)
 app.include_router(planning_router)
+app.include_router(review_router)

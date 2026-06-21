@@ -558,6 +558,42 @@ export async function createAccessRequest(flagId, { reason = null, windowHours =
   return res.json(); // { id, flag_id, conversation_id, status, requested_at, access_window_hours }
 }
 
+// review-Rolle: offene Einsicht-Anträge (pseudonymisiert, ohne Inhalte)
+export async function getAccessRequests(status = "pending") {
+  const params = new URLSearchParams({ status });
+  const res = await fetch(`${BASE}/access-requests?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { items: [...] }
+}
+
+// Wirft einen Fehler mit `stepUpRequired = true`, wenn das Backend eine frische
+// Authentifizierung verlangt (401 + X-Stepup-Required) — das Frontend öffnet dann
+// den Step-up-Dialog und wiederholt die Aktion.
+async function _accessAction(id, action) {
+  const res = await fetch(`${BASE}/access-requests/${id}/${action}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    if (res.status === 401 && res.headers.get("X-Stepup-Required")) {
+      const err = new ApiError(401, "Re-Authentifizierung erforderlich");
+      err.stepUpRequired = true;
+      throw err;
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+export const approveAccessRequest = (id) => _accessAction(id, "approve");
+export const denyAccessRequest = (id) => _accessAction(id, "deny");
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);

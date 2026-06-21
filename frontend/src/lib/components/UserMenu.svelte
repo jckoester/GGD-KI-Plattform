@@ -10,6 +10,7 @@
         ChartNoAxesCombined,
         Bot,
         Info,
+        TriangleAlert,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
     import { onMount } from "svelte";
@@ -58,16 +59,28 @@
         </a>
     {/if}
 
-    <!-- Review (nur bei review-Rolle) - vorbereitet für später -->
-    {#if $user?.roles.includes("review")}
-        <button
-            type="button"
-            disabled
-            class="flex items-center w-full px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 opacity-50 cursor-not-allowed"
+    <!-- Krisen-Meldungen (nur bei admin-Rolle) -->
+    {#if $user?.roles.includes("admin")}
+        <a
+            href="/flags"
+            onclick={onClose}
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         >
-            <Eye class="w-4 h-4 mr-3" />
-            Review
-        </button>
+            <TriangleAlert class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
+            Krisen-Meldungen
+        </a>
+    {/if}
+
+    <!-- Krisen-Freigaben (nur bei review-Rolle) -->
+    {#if $user?.roles.includes("review")}
+        <a
+            href="/review"
+            onclick={onClose}
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        >
+            <Eye class="w-4 h-4 mr-3 text-light-re dark:text-dark-re" />
+            Krisen-Freigaben
+        </a>
     {/if}
 
     <!-- Budget (nur bei budget-Rolle) - vorbereitet für später -->

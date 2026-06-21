@@ -226,16 +226,6 @@
                         Guardrails
                     </span>
                 </button>
-                <button
-                    onclick={() => goto('/settings/flags')}
-                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-                >
-                    <span class="flex items-center gap-2">
-                        <TriangleAlert class="w-4 h-4" />
-                        Krisen-Meldungen
-                    </span>
-                </button>
                 <div
                     class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
@@ -337,6 +327,29 @@
                 {/if}
             </div>
         {/if}
+        {/if}
+
+        <!-- Krisen-Meldungen (operativer Bereich, nicht unter Einstellungen) -->
+        {#if $canSeeSettings}
+        <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+            >
+                <button
+                    onclick={() => {
+                        toggleOpenSection("flags");
+                        goto("/flags");
+                    }}
+                >
+                    <span class="flex items-center gap-2">
+                        <TriangleAlert
+                            class="w-4 h-4 text-light-re dark:text-dark-re"
+                        />
+                        Krisen-Meldungen
+                    </span>
+                </button>
+            </div>
+        </div>
         {/if}
 
         <!-- Statistiken -->
