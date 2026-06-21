@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { TriangleAlert } from "lucide-svelte";
   import { getFlags, createAccessRequest } from "$lib/api.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -222,14 +223,23 @@
               </td>
               <td class="py-2 pr-4 text-xs">{STATUS[f.status] ?? f.status}</td>
               <td class="py-2 pr-4 text-xs">
-                {#if f.has_active_request}
+                {#if f.active_request_status === "approved"}
+                  <span class="text-light-gr dark:text-dark-gr">freigegeben</span>
+                {:else if f.has_active_request}
                   <span class="text-light-bl dark:text-dark-bl">läuft</span>
                 {:else}
                   <span class="text-light-tx-2 dark:text-dark-tx-2">—</span>
                 {/if}
               </td>
               <td class="py-2 text-xs">
-                {#if f.has_active_request || CLOSED.has(f.status)}
+                {#if f.active_request_status === "approved"}
+                  <button
+                    onclick={() => goto(`/access-requests/${f.active_request_id}`)}
+                    class="text-light-gr dark:text-dark-gr hover:underline"
+                  >
+                    Einsehen
+                  </button>
+                {:else if f.has_active_request || CLOSED.has(f.status)}
                   <span class="text-light-tx-2 dark:text-dark-tx-2">—</span>
                 {:else}
                   <button

@@ -594,6 +594,42 @@ async function _accessAction(id, action) {
 export const approveAccessRequest = (id) => _accessAction(id, "approve");
 export const denyAccessRequest = (id) => _accessAction(id, "deny");
 
+// Reader-View: read-only Einsicht in eine freigegebene Konversation. Wirft
+// `stepUpRequired` bei 401 + X-Stepup-Required (frische Auth nötig).
+export async function getReaderConversation(id) {
+  const res = await fetch(`${BASE}/access-requests/${id}/conversation`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    if (res.status === 401 && res.headers.get("X-Stepup-Required")) {
+      const err = new ApiError(401, "Re-Authentifizierung erforderlich");
+      err.stepUpRequired = true;
+      throw err;
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Protokolliert action='export' und liefert dieselbe Konversation für den Download.
+export async function exportReaderConversation(id) {
+  const res = await fetch(`${BASE}/access-requests/${id}/export`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    if (res.status === 401 && res.headers.get("X-Stepup-Required")) {
+      const err = new ApiError(401, "Re-Authentifizierung erforderlich");
+      err.stepUpRequired = true;
+      throw err;
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
 export async function uploadFile(file) {
   const form = new FormData();
   form.append("file", file);

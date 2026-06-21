@@ -10,14 +10,20 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role, require_fresh_stepup
 from app.auth.jwt import JwtPayload
-from app.db.models import Conversation, ConversationAccessRequest, ConversationFlag
+from app.db.models import (
+    Conversation,
+    ConversationAccessAudit,
+    ConversationAccessRequest,
+    ConversationFlag,
+    Message,
+)
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -159,3 +165,131 @@ async def deny_access_request(
         coreviewer=req.coreviewer,
         access_granted_until=req.access_granted_until,
     )
+
+
+# ---------- Reader-View (read-only) + Audit (Schritt 7) ----------
+
+
+class ReaderMessage(BaseModel):
+    role: str  # 'user' | 'assistant'
+    content: str
+    created_at: datetime
+
+
+class ReaderConversationResponse(BaseModel):
+    request_id: UUID
+    conversation_id: UUID
+    subject_pseudonym: str
+    flag_category: str
+    severity: str
+    access_granted_until: datetime
+    messages: list[ReaderMessage]
+
+
+def _client_ip(request: Request) -> str | None:
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+async def _authorize_reader(
+    request_id: UUID, current_user: JwtPayload, db: AsyncSession
+) -> ConversationAccessRequest:
+    """Prüft Beteiligung, Freigabe und Zeitfenster. Wirft 403/404/410."""
+    req = await db.get(ConversationAccessRequest, request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Antrag nicht gefunden.")
+    # Nur die beiden Beteiligten (Antragsteller UND Zweitperson) dürfen einsehen.
+    if current_user.sub not in (req.requested_by, req.coreviewer):
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf diesen Antrag.")
+    if req.status != "approved":
+        raise HTTPException(status_code=403, detail="Einsicht ist nicht freigegeben.")
+    now = datetime.now(timezone.utc)
+    if req.access_granted_until is None or now >= req.access_granted_until:
+        raise HTTPException(status_code=410, detail="Das Einsicht-Zeitfenster ist abgelaufen.")
+    return req
+
+
+async def _build_reader_payload(
+    req: ConversationAccessRequest,
+    current_user: JwtPayload,
+    db: AsyncSession,
+    request: Request,
+    action: str,
+) -> ReaderConversationResponse:
+    from app.chat.router import _parse_stored_content  # lazy: vermeidet Import-Zyklus
+
+    flag = await db.get(ConversationFlag, req.flag_id)
+    conv = await db.get(Conversation, req.conversation_id)
+    if conv is None or flag is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden.")
+
+    rows = (
+        await db.execute(
+            select(Message)
+            .where(Message.conversation_id == req.conversation_id)
+            .order_by(Message.created_at.asc())
+        )
+    ).scalars().all()
+
+    messages: list[ReaderMessage] = []
+    for m in rows:
+        content = m.content
+        if m.role == "user":
+            content, _ = _parse_stored_content(m.content)  # Anhänge-Marker entfernen
+        messages.append(
+            ReaderMessage(role=m.role, content=content, created_at=m.created_at)
+        )
+
+    # Append-only-Audit: JEDER Zugriff wird protokolliert.
+    db.add(
+        ConversationAccessAudit(
+            access_request_id=req.id,
+            viewer=current_user.sub,
+            action=action,
+            ip_address=_client_ip(request),
+        )
+    )
+    await db.commit()
+    logger.info(
+        "Krisen-Einsicht: %s (request=%s, conv=%s, viewer=%s)",
+        action,
+        req.id,
+        req.conversation_id,
+        current_user.sub,
+    )
+
+    return ReaderConversationResponse(
+        request_id=req.id,
+        conversation_id=conv.id,
+        subject_pseudonym=conv.pseudonym,
+        flag_category=flag.flag_category,
+        severity=flag.severity,
+        access_granted_until=req.access_granted_until,
+        messages=messages,
+    )
+
+
+@router.get("/{request_id}/conversation", response_model=ReaderConversationResponse)
+async def read_conversation(
+    request_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: JwtPayload = Depends(require_fresh_stepup),
+) -> ReaderConversationResponse:
+    req = await _authorize_reader(request_id, current_user, db)
+    return await _build_reader_payload(req, current_user, db, request, action="view")
+
+
+@router.post("/{request_id}/export", response_model=ReaderConversationResponse)
+async def export_conversation(
+    request_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: JwtPayload = Depends(require_fresh_stepup),
+) -> ReaderConversationResponse:
+    # Gleiche Zugriffskontrolle; protokolliert action='export'. Den eigentlichen
+    # Download baut das Frontend aus der Antwort.
+    req = await _authorize_reader(request_id, current_user, db)
+    return await _build_reader_payload(req, current_user, db, request, action="export")

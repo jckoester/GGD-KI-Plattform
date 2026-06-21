@@ -70,7 +70,8 @@ def _db_with_rows(total, rows):
 
 def test_list_flags_returns_pseudonymous_items():
     flag = _fake_flag()
-    db = _db_with_rows(1, [(flag, "pseudo-x", True)])
+    req_id = str(uuid4())
+    db = _db_with_rows(1, [(flag, "pseudo-x", req_id, "approved")])
     app = _make_app(_admin(), db)
 
     response = TestClient(app).get("/flags")
@@ -83,6 +84,8 @@ def test_list_flags_returns_pseudonymous_items():
     assert item["flag_category"] == "suizidalitaet"
     assert item["severity"] == "alert"
     assert item["has_active_request"] is True
+    assert item["active_request_id"] == req_id
+    assert item["active_request_status"] == "approved"
     # Keine Chat-Inhalte im Dashboard
     assert "content" not in item
     assert "messages" not in item

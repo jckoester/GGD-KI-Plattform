@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { ShieldCheck } from "lucide-svelte";
   import {
     getAccessRequests,
@@ -10,6 +11,7 @@
   import StepUpDialog from "$lib/components/StepUpDialog.svelte";
 
   let items = $state([]);
+  let approved = $state([]);
   let loading = $state(true);
   let error = $state(null);
   let processing = $state(null); // id, der gerade verarbeitet wird
@@ -34,11 +36,16 @@
     loading = true;
     error = null;
     try {
-      const data = await getAccessRequests("pending");
-      items = data.items;
+      const [pend, appr] = await Promise.all([
+        getAccessRequests("pending"),
+        getAccessRequests("approved"),
+      ]);
+      items = pend.items;
+      approved = appr.items;
     } catch (e) {
       error = e.message ?? "Anträge konnten nicht geladen werden.";
       items = [];
+      approved = [];
     } finally {
       loading = false;
     }
@@ -48,8 +55,13 @@
     processing = id;
     error = null;
     try {
-      if (action === "approve") await approveAccessRequest(id);
-      else await denyAccessRequest(id);
+      if (action === "approve") {
+        await approveAccessRequest(id);
+        // Freigegeben → direkt in die Einsicht (Zweitperson ist Beteiligte).
+        goto(`/access-requests/${id}`);
+        return;
+      }
+      await denyAccessRequest(id);
       await load();
     } catch (e) {
       if (e.stepUpRequired) {
@@ -165,6 +177,35 @@
             </div>
           </div>
         {/each}
+      </div>
+    {/if}
+
+    <!-- Freigegebene Anträge: Einsicht erneut öffnen (Beteiligte) -->
+    {#if !loading && approved.length > 0}
+      <div class="mt-10">
+        <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-3">
+          Freigegeben
+        </h2>
+        <div class="space-y-2">
+          {#each approved as req (req.id)}
+            <div class="flex items-center justify-between gap-4 border border-light-ui-3 dark:border-dark-ui-3
+                        rounded-lg px-4 py-3 bg-light-ui dark:bg-dark-ui">
+              <div class="text-sm text-light-tx dark:text-dark-tx">
+                {CATEGORY[req.flag_category] ?? req.flag_category}
+                <span class="text-light-tx-2 dark:text-dark-tx-2 font-mono text-xs ml-1">
+                  {req.subject_pseudonym.slice(0, 10)}…
+                </span>
+              </div>
+              <button
+                onclick={() => goto(`/access-requests/${req.id}`)}
+                class="shrink-0 px-3 py-1.5 text-sm rounded-lg bg-primary dark:bg-primary-dark text-white
+                       hover:bg-primary-dark dark:hover:bg-primary transition-colors"
+              >
+                Öffnen
+              </button>
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
   </div>

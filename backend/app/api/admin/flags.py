@@ -12,7 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_role
@@ -39,6 +39,8 @@ class FlagItem(BaseModel):
     flagged_at: datetime
     status: str
     has_active_request: bool
+    active_request_id: UUID | None = None
+    active_request_status: str | None = None  # 'pending' | 'approved'
 
 
 class FlagListResponse(BaseModel):
@@ -67,23 +69,23 @@ async def list_flags(
         select(func.count()).select_from(ConversationFlag).where(*where_conditions)
     )
 
-    # Korreliertes EXISTS: läuft für dieses Flag bereits ein offener/freigegebener Antrag?
-    active_request = (
-        select(ConversationAccessRequest.id)
-        .where(
-            ConversationAccessRequest.flag_id == ConversationFlag.id,
-            ConversationAccessRequest.status.in_(_ACTIVE_REQUEST_STATUSES),
-        )
-        .exists()
-    )
-
+    # LEFT JOIN auf den aktiven Antrag (pending|approved; pro Flag max. einer) —
+    # liefert id+status für den Lese-Einstieg des Admins bei freigegebenen Anträgen.
     stmt = (
         select(
             ConversationFlag,
             Conversation.pseudonym,
-            active_request.label("has_active_request"),
+            ConversationAccessRequest.id.label("ar_id"),
+            ConversationAccessRequest.status.label("ar_status"),
         )
         .join(Conversation, ConversationFlag.conversation_id == Conversation.id)
+        .outerjoin(
+            ConversationAccessRequest,
+            and_(
+                ConversationAccessRequest.flag_id == ConversationFlag.id,
+                ConversationAccessRequest.status.in_(_ACTIVE_REQUEST_STATUSES),
+            ),
+        )
         .where(*where_conditions)
         .order_by(ConversationFlag.flagged_at.desc())
         .limit(limit)
@@ -102,9 +104,11 @@ async def list_flags(
             trigger_rule=flag.trigger_rule,
             flagged_at=flag.flagged_at,
             status=flag.status,
-            has_active_request=has_active_request,
+            has_active_request=ar_id is not None,
+            active_request_id=ar_id,
+            active_request_status=ar_status,
         )
-        for flag, pseudonym, has_active_request in rows
+        for flag, pseudonym, ar_id, ar_status in rows
     ]
     return FlagListResponse(items=items, total=total or 0, limit=limit, offset=offset)
 

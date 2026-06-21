@@ -100,3 +100,18 @@ def test_deny_requires_review_role():
     client.cookies.set("stepup", _stepup_cookie("p-teacher"))
     r = client.post(f"/access-requests/{uuid4()}/deny")
     assert r.status_code == 403
+
+
+# ---------- Reader-View: Step-up erzwungen (Schritt 7) ----------
+
+def test_read_conversation_requires_fresh_stepup():
+    app = _make_app(REVIEW)
+    r = TestClient(app).get(f"/access-requests/{uuid4()}/conversation")
+    assert r.status_code == 401
+    assert r.headers.get("X-Stepup-Required") == "1"
+
+
+def test_export_requires_fresh_stepup():
+    app = _make_app(REVIEW)
+    r = TestClient(app).post(f"/access-requests/{uuid4()}/export")
+    assert r.status_code == 401
