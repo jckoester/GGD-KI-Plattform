@@ -372,6 +372,86 @@ class ConversationFlag(Base):
     )
 
 
+# 6c. conversation_access_requests (ADR-008 Teil 6: 4-Augen-Einsichtnahme)
+# Antrag einer Person (i. d. R. Admin) auf Einsicht in eine geflaggte Konversation.
+# Wird erst nach Zweitfreigabe durch eine review-Person und nur im Zeitfenster wirksam.
+class ConversationAccessRequest(Base):
+    __tablename__ = "conversation_access_requests"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    flag_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_flags.id", ondelete="CASCADE"), nullable=False
+    )
+    # Pseudonym der antragstellenden Person (kein Klarname).
+    requested_by: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Begründung (Pflicht, min. 50 Zeichen — App-validiert, nicht DB).
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    required_coreviewer_role: Mapped[str] = mapped_column(
+        Text, nullable=False, default="review", server_default=text("'review'")
+    )
+    # Pseudonym der zweitfreigebenden review-Person; bis dahin NULL.
+    coreviewer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    coreviewer_approved_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    # Zeitfenster, bis zu dem die Einsicht erlaubt ist (gesetzt bei Freigabe).
+    access_granted_until: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="pending", server_default=text("'pending'")
+    )
+    resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','approved','denied','expired','revoked')",
+            name="check_access_request_status",
+        ),
+        # 4-Augen-Prinzip auch auf DB-Ebene: Zweitperson ≠ Antragsteller.
+        CheckConstraint(
+            "coreviewer IS NULL OR coreviewer <> requested_by",
+            name="check_access_request_distinct_coreviewer",
+        ),
+        Index("idx_access_requests_conversation", "conversation_id"),
+        Index("idx_access_requests_flag", "flag_id"),
+        Index("idx_access_requests_status", "status"),
+    )
+
+
+# 6d. conversation_access_audit (ADR-008 Teil 6: Protokoll)
+# Append-only: jeder Einsicht-/Export-Zugriff erzeugt einen Eintrag. Wird von der
+# App nie aktualisiert oder gelöscht (nur über CASCADE mit der Konversation).
+class ConversationAccessAudit(Base):
+    __tablename__ = "conversation_access_audit"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    access_request_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_access_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    # Pseudonym der zugreifenden Person.
+    viewer: Mapped[str] = mapped_column(Text, nullable=False)
+    viewed_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(Text, nullable=False)  # view | export | annotate | share
+    ip_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('view','export','annotate','share')",
+            name="check_access_audit_action",
+        ),
+        Index("idx_access_audit_request", "access_request_id"),
+    )
+
+
 # 7. user_preferences
 class UserPreference(Base):
     __tablename__ = "user_preferences"
