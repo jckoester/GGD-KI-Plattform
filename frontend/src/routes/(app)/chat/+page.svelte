@@ -583,6 +583,15 @@
                     pendingSuggestions = item.nodes;
                     continue;
                 }
+                // Krisen-Hilfe-Banner (ADR-008): an die Assistenten-Nachricht heften
+                if (item.type === "crisis") {
+                    messages[assistantIndex] = {
+                        ...messages[assistantIndex],
+                        crisis: item.crisis,
+                    };
+                    messages = messages;
+                    continue;
+                }
                 // Token von Assistant
                 messages[assistantIndex] = {
                     ...messages[assistantIndex],
@@ -597,7 +606,11 @@
             }
 
             // Leeren Assistent-Placeholder entfernen, falls kein Token ankam
-            if (messages[assistantIndex]?.content === "") {
+            // (aber behalten, wenn ein Krisen-Hilfe-Banner daran hängt)
+            if (
+                messages[assistantIndex]?.content === "" &&
+                !messages[assistantIndex]?.crisis
+            ) {
                 messages = [
                     ...messages.slice(0, assistantIndex),
                     ...messages.slice(assistantIndex + 1),

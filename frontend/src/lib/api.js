@@ -331,6 +331,14 @@ export async function* streamChat(
         continue;
       }
 
+      if (currentEventType === "crisis") {
+        try {
+          yield { type: "crisis", crisis: JSON.parse(payload) };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;

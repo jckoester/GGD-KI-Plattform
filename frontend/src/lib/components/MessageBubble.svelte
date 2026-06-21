@@ -1,6 +1,7 @@
 <script>
     import { AlertCircle, FileText, Image } from 'lucide-svelte';
     import { renderMarkdown } from '$lib/markdown.js';
+    import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
     let { message, isStreaming = false, costEur = null } = $props();
 
@@ -80,7 +81,8 @@
     </div>
 
 {:else if message.role === 'assistant'}
-    <div class="flex justify-start">
+    <div class="flex flex-col items-start">
+        {#if message.content || isStreaming}
         <div class="bg-light-secondary dark:bg-dark-secondary rounded-xl rounded-bl-none px-4 py-3 max-w-[80%]">
             <div class="prose dark:prose-invert max-w-none
                         prose-p:my-1 prose-headings:mt-3 prose-headings:mb-1
@@ -105,6 +107,12 @@
                 </p>
             {/if}
         </div>
+        {/if}
+        {#if message.crisis}
+            <div class="max-w-[80%] w-full">
+                <HelpResourcesBanner topic={message.crisis} />
+            </div>
+        {/if}
     </div>
 
 {:else if message.role === 'error'}
