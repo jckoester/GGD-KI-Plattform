@@ -280,6 +280,11 @@ class Conversation(Base):
     is_test: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
+    # Ab Phase 11 (ADR-008 Teil 7): Soft-Delete-Marker für geflaggte Konversationen.
+    # Eine Konversation mit offenem Flag wird beim Nutzer-Löschwunsch nur ausgeblendet.
+    hidden_by_user: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -320,6 +325,50 @@ class Message(Base):
         ),
         Index("idx_messages_conversation_id", "conversation_id"),
         Index("idx_messages_assistant_id", "assistant_id"),
+    )
+
+
+# 6b. conversation_flags (ADR-008 Teil 5)
+# Automatisch (Phase 11: nur flag_source='auto_crisis') oder menschlich erzeugte Flags
+# auf Konversationen. Persistent bis zum Löschen der Konversation.
+class ConversationFlag(Base):
+    __tablename__ = "conversation_flags"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    # Die auslösende Nachricht; CASCADE, damit kein verwaister Flag zurückbleibt.
+    message_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
+    )
+    flag_source: Mapped[str] = mapped_column(Text, nullable=False)  # auto_crisis | auto_guardrail | manual_admin
+    flag_category: Mapped[str] = mapped_column(Text, nullable=False)  # z. B. 'suizidalitaet'
+    severity: Mapped[str] = mapped_column(Text, nullable=False)  # info | warning | alert
+    trigger_rule: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Regelname, kein Klartext
+    coreviewer_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    flagged_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="open", server_default=text("'open'")
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "flag_source IN ('auto_crisis','auto_guardrail','manual_admin')",
+            name="check_flag_source",
+        ),
+        CheckConstraint(
+            "severity IN ('info','warning','alert')",
+            name="check_flag_severity",
+        ),
+        CheckConstraint(
+            "status IN ('open','under_review','resolved','dismissed')",
+            name="check_flag_status",
+        ),
+        Index("idx_flags_conversation", "conversation_id"),
+        Index("idx_flags_status_severity", "status", "severity"),
     )
 
 
