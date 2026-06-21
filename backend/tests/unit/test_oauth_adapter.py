@@ -286,3 +286,66 @@ class TestOAuthAdapter:
             challenge = await oauth_adapter.get_login_challenge()
             identity = await oauth_adapter.exchange_code("test_code", challenge.state)
         assert identity.sso_groups == []
+
+
+# =============================================================================
+# Step-up-Re-Authentifizierung (Phase 12, Schritt 5)
+# =============================================================================
+
+import base64 as _b64
+import json as _json
+
+
+def _fake_id_token(auth_time):
+    header = _b64.urlsafe_b64encode(b'{"alg":"none"}').decode().rstrip("=")
+    payload = _b64.urlsafe_b64encode(
+        _json.dumps({"auth_time": auth_time}).encode()
+    ).decode().rstrip("=")
+    return f"{header}.{payload}.sig"
+
+
+def _mock_token_with_id(auth_time, access_token="t"):
+    resp = MagicMock()
+    body = {"access_token": access_token}
+    if auth_time is not None:
+        body["id_token"] = _fake_id_token(auth_time)
+    resp.json.return_value = body
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+class TestOAuthStepup:
+    @pytest.mark.asyncio
+    async def test_get_stepup_challenge_forces_login(self, oauth_adapter):
+        ch = await oauth_adapter.get_stepup_challenge("su.abc.def.nonce.sig")
+        assert ch.type == "redirect"
+        assert "prompt=login" in ch.redirect_url
+        assert "max_age=0" in ch.redirect_url
+        assert "state=su." in ch.redirect_url
+        assert "client_id=test_client_id" in ch.redirect_url
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_fresh_extracts_auth_time(self, oauth_adapter):
+        mock_client = _make_mock_client(
+            _mock_token_with_id(1_700_000_000),
+            _mock_userinfo("testuser", ["schueler"]),
+        )
+        with patch(
+            "app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client
+        ):
+            fresh = await oauth_adapter.exchange_code_fresh("code", "su.state")
+        assert fresh.identity.external_id == "testuser"
+        assert fresh.auth_time == 1_700_000_000
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_fresh_without_id_token(self, oauth_adapter):
+        mock_client = _make_mock_client(
+            _mock_token_with_id(None),
+            _mock_userinfo("testuser", ["schueler"]),
+        )
+        with patch(
+            "app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client
+        ):
+            fresh = await oauth_adapter.exchange_code_fresh("code", "su.state")
+        assert fresh.auth_time is None
+        assert fresh.identity.external_id == "testuser"

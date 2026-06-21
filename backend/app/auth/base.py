@@ -40,6 +40,18 @@ class LoginChallenge:
     state: str | None = None
 
 
+@dataclass
+class FreshIdentity:
+    """Ergebnis einer Step-up-Re-Authentifizierung (Redirect-Pfad).
+
+    `auth_time` ist der Unix-Zeitpunkt der IdP-Authentifizierung aus dem ID-Token
+    (None, wenn der Provider keinen liefert) — Grundlage der Frische-Prüfung.
+    """
+
+    identity: NormalizedIdentity
+    auth_time: int | None
+
+
 class AuthAdapter(ABC):
     @property
     @abstractmethod
@@ -55,3 +67,17 @@ class AuthAdapter(ABC):
     async def authenticate_direct(
         self, username: str, password: str
     ) -> NormalizedIdentity | None: ...
+
+    # ---- Step-up-Re-Authentifizierung (Phase 12, Schritt 5) ----
+    # Nur der Redirect-Pfad braucht diese Methoden; der direct-Adapter nutzt für
+    # Step-up authenticate_direct() und überschreibt sie daher nicht.
+
+    async def get_stepup_challenge(self, state: str) -> LoginChallenge:
+        raise NotImplementedError(
+            "Dieser Adapter unterstützt keine Redirect-Step-up-Challenge"
+        )
+
+    async def exchange_code_fresh(self, code: str, state: str) -> FreshIdentity:
+        raise NotImplementedError(
+            "Dieser Adapter unterstützt keinen Redirect-Step-up-Austausch"
+        )

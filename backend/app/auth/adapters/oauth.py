@@ -1,5 +1,8 @@
+import base64
+import binascii
 import hashlib
 import hmac
+import json
 import re
 import secrets
 from typing import Literal
@@ -8,8 +11,25 @@ from urllib.parse import urlencode
 import httpx
 from pydantic import BaseModel, model_validator
 
-from app.auth.base import AuthAdapter, LoginChallenge, NormalizedIdentity
+from app.auth.base import AuthAdapter, FreshIdentity, LoginChallenge, NormalizedIdentity
 from app.config import Settings
+
+
+def _unverified_jwt_claims(token: str) -> dict:
+    """Dekodiert die Claims eines JWT **ohne** Signaturprüfung.
+
+    Zulässig nur für das ID-Token aus der Back-Channel-Token-Antwort: es kommt direkt
+    vom IdP-Token-Endpunkt über TLS (nicht über den Browser), daher gilt derselbe
+    Trust wie für die userinfo-Antwort. Wird ausschließlich gelesen, um `auth_time`
+    für die Step-up-Frische zu ermitteln.
+    """
+    try:
+        payload_b64 = token.split(".")[1]
+        padding = "=" * (-len(payload_b64) % 4)
+        raw = base64.urlsafe_b64decode(payload_b64 + padding)
+        return json.loads(raw)
+    except (IndexError, binascii.Error, ValueError):
+        return {}
 
 
 class OAuthConfig(BaseModel):
@@ -112,6 +132,56 @@ class OAuthAdapter(AuthAdapter):
         self, username: str, password: str
     ) -> NormalizedIdentity | None:
         raise NotImplementedError("OAuthAdapter unterstützt kein direktes Login")
+
+    async def get_stepup_challenge(self, state: str) -> LoginChallenge:
+        # prompt=login + max_age=0 erzwingen eine frische Credential-Eingabe beim IdP.
+        # Gleicher redirect_uri wie beim Login → kein zweiter registrierter URI nötig;
+        # der Callback unterscheidet Login vs. Step-up am State-Präfix.
+        params = {
+            "response_type": "code",
+            "client_id": self._config.client_id,
+            "redirect_uri": self._config.redirect_uri,
+            "scope": "openid profile email",
+            "state": state,
+            "prompt": "login",
+            "max_age": "0",
+        }
+        url = f"{self._config.effective_auth_url}?" + urlencode(params)
+        return LoginChallenge(type="redirect", redirect_url=url, state=state)
+
+    async def exchange_code_fresh(self, code: str, state: str) -> FreshIdentity:
+        # Wie exchange_code, aber zusätzlich auth_time aus dem ID-Token. Die State-
+        # Signatur (an sub gebunden) prüft der Router via parse_stepup_state.
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                self._config.effective_token_url,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": self._config.redirect_uri,
+                    "client_id": self._config.client_id,
+                    "client_secret": self._client_secret,
+                },
+            )
+            token_resp.raise_for_status()
+            token_json = token_resp.json()
+            access_token = token_json["access_token"]
+
+            userinfo_resp = await client.get(
+                self._config.effective_userinfo_url,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            userinfo_resp.raise_for_status()
+
+        identity = self._userinfo_to_identity(userinfo_resp.json())
+        id_token = token_json.get("id_token")
+        auth_time = None
+        if id_token:
+            claims = _unverified_jwt_claims(id_token)
+            raw_at = claims.get("auth_time")
+            if isinstance(raw_at, (int, float)):
+                auth_time = int(raw_at)
+        return FreshIdentity(identity=identity, auth_time=auth_time)
 
     def _verify_state(self, state: str) -> None:
         try:

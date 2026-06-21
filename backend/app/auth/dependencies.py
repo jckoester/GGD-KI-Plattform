@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
+from app.auth.stepup import verify_stepup_token
 from app.config import settings
 from app.db.session import get_db
 
@@ -82,3 +83,21 @@ def require_any_role(roles: list[str]) -> Callable:
         return current_user
 
     return _guard
+
+
+async def require_fresh_stepup(
+    request: Request,
+    current_user: JwtPayload = Depends(get_current_user),
+) -> JwtPayload:
+    """Verlangt ein gültiges, frisches Step-up-Token (separates `stepup`-Cookie),
+    das auf den aktuellen Nutzer ausgestellt ist. Sonst 401 mit Hinweis-Header,
+    damit das Frontend die Re-Authentifizierung anstoßen kann. (Phase 12, Schritt 5)
+    """
+    token = request.cookies.get("stepup")
+    if not token or not verify_stepup_token(token, settings.jwt_secret, current_user.sub):
+        raise HTTPException(
+            status_code=401,
+            detail="Re-Authentifizierung erforderlich",
+            headers={"X-Stepup-Required": "1"},
+        )
+    return current_user

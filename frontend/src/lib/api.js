@@ -23,6 +23,34 @@ export async function login(username, password) {
   sessionStorage.setItem("display_name", data.display_name ?? username);
 }
 
+// Step-up-Re-Authentifizierung (Phase 12): beschreibt den Re-Auth-Weg.
+export async function getStepUpChallenge(returnTo = "/welcome") {
+  const params = new URLSearchParams({ return_to: returnTo });
+  const res = await fetch(`${BASE}/auth/step-up?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { mode: "direct" } | { mode: "redirect", redirect_url }
+}
+
+// Step-up im direct-Modus (Dev/Test): Passwort-Re-Entry → setzt stepup-Cookie.
+export async function stepUpDirect(username, password) {
+  const res = await fetch(`${BASE}/auth/step-up`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { ok: true }
+}
+
 export async function logout() {
   await fetch(`${BASE}/auth/logout`, {
     method: "POST",
