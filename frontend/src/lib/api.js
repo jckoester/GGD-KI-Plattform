@@ -516,7 +516,7 @@ export async function getFlags({ status = null, severity = null, limit = 25, off
 }
 
 // Admin: Einsicht in eine geflaggte Konversation beantragen (4-Augen-Prinzip)
-export async function createAccessRequest(flagId, { reason, windowHours = 24 }) {
+export async function createAccessRequest(flagId, { reason = null, windowHours = 48 }) {
   const res = await fetch(`${BASE}/admin/flags/${flagId}/access-requests`, {
     method: "POST",
     credentials: "include",

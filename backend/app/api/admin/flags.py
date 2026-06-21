@@ -116,16 +116,17 @@ _REQUESTABLE_FLAG_STATUSES = ("open", "under_review")
 
 
 class AccessRequestCreate(BaseModel):
-    reason: str = Field(min_length=50, max_length=2000)
-    window_hours: int = Field(default=24, ge=1, le=168)
+    # Optionaler Zusatzkontext; kein erzwungener Mindesttext. Der Zweck ergibt sich
+    # aus dem Flag (Kategorie/Schweregrad), nicht aus diesem Freitext.
+    reason: str | None = Field(default=None, max_length=2000)
+    window_hours: int = Field(default=48, ge=1, le=168)
 
     @field_validator("reason")
     @classmethod
-    def reason_not_blank(cls, v: str) -> str:
-        stripped = v.strip()
-        if len(stripped) < 50:
-            raise ValueError("Begründung muss mindestens 50 Zeichen enthalten.")
-        return stripped
+    def normalize_reason(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.strip() or None  # leer/whitespace → None
 
 
 class AccessRequestResponse(BaseModel):

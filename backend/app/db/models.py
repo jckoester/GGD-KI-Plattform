@@ -390,15 +390,17 @@ class ConversationAccessRequest(Base):
     requested_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
-    # Begründung (Pflicht, min. 50 Zeichen — App-validiert, nicht DB).
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    # Optionaler Zusatzkontext der antragstellenden Person (z. B. out-of-band-Hinweis
+    # einer Lehrkraft). NICHT der Zweck selbst — der ergibt sich aus dem Flag
+    # (Kategorie + Schweregrad). Kein erzwungener Boilerplate-Mindesttext.
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     required_coreviewer_role: Mapped[str] = mapped_column(
         Text, nullable=False, default="review", server_default=text("'review'")
     )
     # Beim Antrag gewünschte Fensterdauer (Stunden); wird bei Freigabe (Schritt 6)
     # zu access_granted_until = Freigabe-Zeitpunkt + access_window_hours.
     access_window_hours: Mapped[int] = mapped_column(
-        nullable=False, default=24, server_default=text("24")
+        nullable=False, default=48, server_default=text("48")
     )
     # Pseudonym der zweitfreigebenden review-Person; bis dahin NULL.
     coreviewer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

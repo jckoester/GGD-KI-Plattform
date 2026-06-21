@@ -143,18 +143,10 @@ def test_create_access_request_requires_admin():
     assert r.status_code == 403
 
 
-def test_create_access_request_short_reason_422():
+def test_create_access_request_reason_too_long_422():
     app = _make_app(_admin(), AsyncMock())
     r = TestClient(app).post(
-        f"/flags/{_FLAG_ID}/access-requests", json={"reason": "zu kurz"}
-    )
-    assert r.status_code == 422
-
-
-def test_create_access_request_blank_reason_422():
-    app = _make_app(_admin(), AsyncMock())
-    r = TestClient(app).post(
-        f"/flags/{_FLAG_ID}/access-requests", json={"reason": " " * 60}
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": "x" * 2001}
     )
     assert r.status_code == 422
 

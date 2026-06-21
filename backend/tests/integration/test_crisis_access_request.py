@@ -80,7 +80,33 @@ async def test_create_request_default_window(db, open_flag):
     resp = await create_access_request(
         flag_id=flag.id, body=AccessRequestCreate(reason=REASON), db=db, current_user=ADMIN
     )
-    assert resp.access_window_hours == 24
+    assert resp.access_window_hours == 48
+
+
+async def test_create_request_without_reason(db, open_flag):
+    """reason ist optional — Antrag ohne Begründung ist gültig, Flag → under_review."""
+    conv, flag = open_flag
+    resp = await create_access_request(
+        flag_id=flag.id, body=AccessRequestCreate(), db=db, current_user=ADMIN
+    )
+    assert resp.status == "pending"
+    row = await db.scalar(
+        select(ConversationAccessRequest).where(ConversationAccessRequest.id == resp.id)
+    )
+    assert row.reason is None
+    await db.refresh(flag)
+    assert flag.status == "under_review"
+
+
+async def test_create_request_blank_reason_stored_as_null(db, open_flag):
+    conv, flag = open_flag
+    resp = await create_access_request(
+        flag_id=flag.id, body=AccessRequestCreate(reason="   "), db=db, current_user=ADMIN
+    )
+    row = await db.scalar(
+        select(ConversationAccessRequest).where(ConversationAccessRequest.id == resp.id)
+    )
+    assert row.reason is None
 
 
 async def test_create_request_duplicate_rejected(db, open_flag):

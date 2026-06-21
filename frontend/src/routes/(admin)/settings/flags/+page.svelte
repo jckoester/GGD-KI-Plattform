@@ -15,13 +15,11 @@
   const limit = 25;
 
   // Einsicht-Antrag-Dialog
-  const MIN_REASON = 50;
   let requestFor = $state(null); // das Flag, für das ein Antrag gestellt wird
   let reason = $state("");
-  let windowHours = $state(24);
+  let windowHours = $state(48);
   let submitting = $state(false);
   let submitError = $state(null);
-  let reasonOk = $derived(reason.trim().length >= MIN_REASON);
 
   const CLOSED = new Set(["resolved", "dismissed"]);
 
@@ -97,7 +95,7 @@
   function openRequest(flag) {
     requestFor = flag;
     reason = "";
-    windowHours = 24;
+    windowHours = 48;
     submitError = null;
   }
 
@@ -107,12 +105,12 @@
   }
 
   async function submitRequest() {
-    if (!reasonOk || submitting) return;
+    if (submitting) return;
     submitting = true;
     submitError = null;
     try {
       await createAccessRequest(requestFor.id, {
-        reason: reason.trim(),
+        reason: reason.trim() || null,
         windowHours,
       });
       requestFor = null;
@@ -291,28 +289,29 @@
         Einsicht beantragen
       </h2>
       <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
-        Die Einsicht wird erst nach Freigabe durch eine zweite Person (Vier-Augen-Prinzip)
-        und nur innerhalb des gewählten Zeitfensters möglich. Jeder Zugriff wird protokolliert.
+        Anlass ist die Meldung
+        <strong>{CATEGORY[requestFor.flag_category] ?? requestFor.flag_category}</strong>
+        ({SEVERITY[requestFor.severity]?.label ?? requestFor.severity}) vom
+        {fmtDate(requestFor.flagged_at)}. Die Einsicht wird erst nach Freigabe durch
+        eine zweite Person (Vier-Augen-Prinzip) und nur innerhalb des Zeitfensters
+        möglich; jeder Zugriff wird protokolliert.
       </p>
 
       <label
         for="access-reason"
         class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
       >
-        Begründung
+        Zusätzlicher Kontext <span class="font-normal text-light-tx-2 dark:text-dark-tx-2">(optional)</span>
       </label>
       <textarea
         id="access-reason"
         bind:value={reason}
-        rows="4"
-        placeholder="Warum ist die Einsicht erforderlich? (mind. {MIN_REASON} Zeichen)"
+        rows="3"
+        placeholder="Nur ausfüllen, wenn weitere Hinweise vorliegen (z. B. Meldung einer Lehrkraft, wiederholtes Muster)."
         class="w-full p-3 border border-light-ui-3 dark:border-dark-ui-3 rounded-lg
                bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx text-sm
-               focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark resize-y"
+               focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark resize-y mb-4"
       ></textarea>
-      <p class="text-xs mb-4 {reasonOk ? 'text-light-tx-2 dark:text-dark-tx-2' : 'text-light-re dark:text-dark-re'}">
-        {reason.trim().length} / {MIN_REASON} Zeichen
-      </p>
 
       <label
         for="access-window"
@@ -349,7 +348,7 @@
         </button>
         <button
           onclick={submitRequest}
-          disabled={!reasonOk || submitting}
+          disabled={submitting}
           class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
                  hover:bg-primary-dark dark:hover:bg-primary transition-colors
                  disabled:opacity-50 disabled:cursor-not-allowed"
