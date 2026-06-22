@@ -29,6 +29,7 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `BUDGET_TIERS_PATH` | Pfad zur budget_tiers.yaml | `config/budget_tiers.yaml` |
 | `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
+| `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
 | `AUTH_ISERV_CLIENT_SECRET` | OAuth2-Client-Secret des SSO-Providers | *(vom Provider) |
 | `STUDENT_GRADES` | Jahrgangsstufen als JSON-Array | `[5,6,7,8,9,10,11,12]` |
 | `PUBLIC_SCHOOL_NAME` | Anzeigename der Plattform | `ki@beispielschule` |
@@ -158,6 +159,27 @@ Die Pfade lassen sich über `CRISIS_TRIGGERS_PATH` / `HELP_RESOURCES_PATH` in `.
 
 ---
 
+## `config/pedagogy.yaml`
+
+Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferenziert):
+
+- `preambles.universal_base` — gilt für **alle** Assistenten (Faktentreue,
+  Prompt-Injection-Abwehr, Krisen-Hinweispflicht).
+- `preambles.student_extension` / `teacher_extension` — Zielgruppen-Erweiterung; das
+  Backend wählt nach `assistant.audience` (bzw. bei `audience: all` und ohne Assistent
+  nach der Rolle der anfragenden Person).
+- `student_augmentations` — sanfte Lernverhalten-Leitplanken (keine Komplettlösungen,
+  sokratische Rückfragen …), **nur** für die Schüler-Behandlung. Pro Assistent über die
+  Checkbox-Liste im Editor abschaltbar.
+- `output_format` — universelle Ausgabe-Anweisung (Markdown ohne umschließende Fences).
+
+Anders als die Krisen-Dateien ist `pedagogy.yaml` **versioniert**: Änderungen wirken erst
+nach **Backend-Neustart** (Deployment-Gate + Git-Audit-Trail; kein Hot-Reload). Pfad-
+Override über `PEDAGOGY_PATH`. Aufbau und Auswahl-Logik stehen in
+[Content-Moderation & Guardrails](content-moderation.md), Abschnitt F.
+
+---
+
 ## `infra/litellm_config.yaml`
 
 Konfiguriert den LiteLLM-Proxy: welche KI-Modelle verfügbar sind, über
@@ -187,6 +209,12 @@ general_settings:
 
 Die vollständige Referenz für `model_list` und Anbieter-Konfigurationen
 findet sich in der [LiteLLM-Dokumentation](https://docs.litellm.ai).
+
+Die **Jugendschutz-Guardrails** am Proxy (Block harter Ausgaben für alle Rollen) sowie
+die zugehörigen Pattern-Dateien (`infra/guardrails/`) sind als kuratierungsbedürftige
+Vorlage in `infra/litellm_config.example.yaml` enthalten — Details und die wichtige
+Warnung zu Selbstverletzungs-Mustern stehen in
+[Content-Moderation & Guardrails](content-moderation.md), Abschnitt B.
 
 ---
 

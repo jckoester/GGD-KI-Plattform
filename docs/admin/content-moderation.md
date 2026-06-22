@@ -1,12 +1,13 @@
 # Content-Moderation & Guardrails
 
-Die Plattform kennt drei unabhängige Schutzmechanismen, die sich ergänzen:
+Die Plattform kennt mehrere Schutz- und Steuerungsmechanismen, die sich ergänzen:
 
 | Ebene | Wo konfiguriert | Wirkung |
 |-------|----------------|---------|
 | Schulweiter Guardrail-Prompt | Admin-Dashboard (`/settings/guardrail`) | Leitlinien für das Modell — kein Blocking |
-| LiteLLM-Guardrails | `infra/litellm_config.yaml` + Deployment | Aktives Blocking vor oder nach der Modellantwort |
+| LiteLLM-Guardrails (Jugendschutz) | `infra/litellm_config.yaml` + `infra/guardrails/` + Deployment | Aktives Blocking harter Ausgaben für alle Rollen |
 | Krisen-Erkennung | `config/crisis_triggers.yaml` + `config/help_resources.yaml` | Lokale Stichwort-Erkennung in Nutzernachrichten → Hilfe-Banner, kein Blocking |
+| Pädagogische Leitplanken | `config/pedagogy.yaml` | Zielgruppenabhängige System-Prompt-Präambeln + Lernverhalten für Schüler:innen — formt den Dialog, kein Blocking |
 
 ---
 
@@ -103,6 +104,18 @@ vom Modell. Sie können Anfragen **blockieren**, bevor das Modell antwortet
 ist bewusst so: Blocking-Mechanismen sollen nicht per Klick im Dashboard
 ein- und ausgeschaltet werden können, sondern über einen kontrollierten
 Deployment-Prozess mit Nachvollziehbarkeit (Git-History).
+
+> **Mitgelieferte Vorlage:** Eine startfertige Jugendschutz-Konfiguration liegt in
+> `infra/litellm_config.example.yaml` samt den Regex-Pattern-Dateien unter
+> `infra/guardrails/` (mit `README.md`). Die Muster sind **bewusst minimal** und müssen
+> vor der Aktivierung mit Schulleitung, Schulsozialarbeit und Fachschaften **kuratiert**
+> und getestet werden.
+>
+> **⚠ Wichtig zu Selbstverletzung:** Selbstverletzung und sexuelle Inhalte laufen in der
+> Vorlage über `openai_moderation` (kontextsensitiv), **nicht** über aktive Regex. Eine
+> Regex auf Selbstverletzungs-Begriffe würde sonst leicht die *fürsorgliche* Krisen-
+> Antwort des Modells wegfiltern (vgl. Abschnitt D / ADR-008 Teil 3). Die Regex-Dateien
+> dafür sind standardmäßig **ausgeschaltet**.
 
 ### Guardrail-Typen
 
@@ -435,3 +448,73 @@ Damit das Verfahren auch bei Urlaub, Krankheit oder Ausfall handlungsfähig blei
 > Verarbeitungstätigkeit und gehört ins **Verzeichnis von Verarbeitungstätigkeiten**
 > (Zweck, Rechtsgrundlage, beteiligte Rollen, Aufbewahrung, Protokollierung). Wer als
 > `review` benannt wird, ist mit Schulleitung und Datenschutzbeauftragten abzustimmen.
+
+---
+
+## F — Pädagogische Leitplanken & Zielgruppen-Differenzierung
+
+Diese Ebene formt den Dialog **nicht durch Blockieren, sondern über den System-Prompt**.
+Vor jede Modellanfrage stellt das Backend zielgruppenabhängige Leitplanken aus
+`config/pedagogy.yaml` (ADR-008 Teil 2 + 1B). Das ist der pädagogische Mehrwert
+gegenüber generischen KI-Zugängen: Schüler:innen werden beim **Lernen** unterstützt,
+Lehrkräfte behalten **vollständige, direkte** Antworten.
+
+### Aufbau von `pedagogy.yaml`
+
+| Block | Gilt für | Inhalt |
+|-------|----------|--------|
+| `universal_base` | **alle** | Faktentreue, Prompt-Injection-Abwehr, Krisen-Hinweispflicht |
+| `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — Denkanstöße statt Komplettlösungen |
+| `teacher_extension` | Lehrkraft-Behandlung | direkt, vollständig, Musterlösungen ausdrücklich erwünscht |
+| `student_augmentations` | nur Schüler-Behandlung | sanfte Lernverhalten-Leitplanken (s. u.), pro Assistent abschaltbar |
+| `output_format` | **alle** | Ausgabe als Markdown ohne umschließende Code-Fences |
+
+### Wer bekommt welche Behandlung? (`audience` + Rolle)
+
+Das Backend wählt die Präambel nach der Zielgruppe des Assistenten und — bei `all` oder
+bei Chats ohne Assistenten — nach der Rolle der anfragenden Person:
+
+| Situation | Behandlung |
+|-----------|-----------|
+| `audience: student` | **Schüler** (immer, auch wenn eine Lehrkraft testet) |
+| `audience: teacher` | **Lehrkraft** (immer) |
+| `audience: all`, Person ist Schüler:in | **Schüler** |
+| `audience: all`, Person ist Lehrkraft | **Lehrkraft** |
+| Chat **ohne** Assistenten | nach Rolle der Person |
+
+> **Hinweis zu `audience: all`:** Solche Assistenten verhalten sich für Schüler:innen
+> pädagogisch geformt (Denkanstöße statt Komplettlösungen) und für Lehrkräfte direkt und
+> vollständig — ein und derselbe Assistent, zwei Verhaltensweisen. Der Editor weist beim
+> Anlegen darauf hin.
+
+Test-Chats einer Lehrkraft an einem `student`-Assistenten zeigen bewusst die
+**Schüler-Erfahrung** — so lässt sich vor der Freigabe prüfen, was Schüler:innen erhalten.
+
+### Lernverhalten-Leitplanken (`student_augmentations`)
+
+Greifen **nur** in der Schüler-Behandlung und sind **sanfte Augmentierungen, keine
+Blockaden**. Mitgeliefert sind u. a. „keine Komplettlösungen", „sokratische Rückfragen",
+„zum Paraphrasieren motivieren", „Reflexions-Hinweise". Pro Assistent lassen sie sich im
+**Editor** (Checkbox-Liste, nur bei Zielgruppe Schüler:innen/Alle) einzeln abwählen.
+
+### `audience` als bewusster Prüfpunkt beim Freigeben
+
+Ein falsch gesetztes `audience`-Feld hat **pädagogische Folgen** (Schüler:innen-
+Sichtbarkeit **und** Präambel-/Augmentierungs-Auswahl). Der Freigabe-Workflow macht die
+Zielgruppe daher sichtbar (Badge in der „Offene Freigaben"-Liste) und verlangt beim
+Freigeben eines für Schüler:innen sichtbaren Assistenten eine **bewusste Bestätigung**;
+die Freigabe wird mit `audience` protokolliert.
+
+### Pflege
+
+`pedagogy.yaml` ist **versioniert** — Änderungen erfordern Backend-Neustart (Deployment-
+Gate + Git-Audit-Trail, kein Hot-Reload). Die Schüler:innen-Texte mit **Fachschaft
+Deutsch** und **Schulsozialarbeit** gegenlesen, bevor sie produktiv gehen.
+
+### Reihenfolge im System-Prompt
+
+```
+schulweiter Guardrail-Prompt  →  Assistenten-Dokumente  →
+[universal_base + Zielgruppen-Erweiterung + Wissens-Kontext + Assistenten-Prompt
+ + (nur Schüler) Lernverhalten-Augmentierungen]  →  output_format  →  Nutzer-Nachrichten
+```

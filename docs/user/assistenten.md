@@ -32,6 +32,14 @@ Wenn Sie den Assistenten während eines Gesprächs wechseln, bleibt der bisherig
 
 Im Verlauf sind Assistenten-Gespräche mit einem Icon gekennzeichnet, damit Sie sie leicht von normalen Chats unterscheiden können.
 
+## Lernhilfe statt fertiger Lösungen
+
+Für **Schüler:innen** ist die KI darauf ausgelegt, beim **Lernen** zu helfen: Sie gibt
+eher Denkanstöße, Zwischenschritte und Leitfragen als fertige Komplettlösungen — das ist
+gewollt und hilft beim eigenen Verstehen. **Lehrkräfte** erhalten dagegen vollständige,
+direkte Antworten (z. B. für die Unterrichtsvorbereitung). Manche Assistenten sind für
+beide Gruppen sichtbar und verhalten sich dann je nach angemeldeter Person unterschiedlich.
+
 ## Eigene Assistenten erstellen
 
 Das Anlegen von Assistenten ist Lehrkräften und Administratoren vorbehalten. Wenn Sie eine Idee für einen nützlichen Assistenten haben, sprechen Sie Ihre Lehrkraft oder den IT-Verantwortlichen an.
