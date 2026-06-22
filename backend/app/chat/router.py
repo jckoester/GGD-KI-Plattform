@@ -29,15 +29,11 @@ from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
+from app.pedagogy.config import load_pedagogy
+from app.pedagogy.compose import compose_system_content, is_student_treatment
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
-
-
-_MARKDOWN_GUARDRAIL = (
-    "Deine Antworten werden direkt als Markdown gerendert. "
-    "Verwende keine umschließenden Code-Fences für deine gesamte Antwort."
-)
 
 
 class ConversationItem(BaseModel):
@@ -694,16 +690,30 @@ async def chat(
                 "content": "\n\n---\n\n".join(parts),
             })
 
-    if system_prompt_snapshot:
-        effective_system_prompt = (
-            context_str + "\n\n---\n\n" + system_prompt_snapshot
-            if context_str
-            else system_prompt_snapshot
+    # Pädagogische Leitplanken (ADR-008 Teil 2 + 1B): universelle Basis +
+    # zielgruppenspezifische Erweiterung + Wissens-Kontext + Assistenten-Prompt +
+    # (nur Schüler-Behandlung) Lernverhalten-Augmentierungen. Auswahl nach D1.
+    pedagogy = load_pedagogy()
+    user_is_student = "student" in current_user.roles
+    audience = active_assistant.audience if active_assistant is not None else None
+    disabled_aug = (
+        active_assistant.disabled_augmentations if active_assistant is not None else None
+    )
+    student_treatment = is_student_treatment(audience, user_is_student)
+    llm_messages.append({
+        "role": "system",
+        "content": compose_system_content(
+            pedagogy,
+            student_treatment=student_treatment,
+            context_str=context_str,
+            assistant_system_prompt=system_prompt_snapshot,
+            disabled_augmentations=disabled_aug,
+        ),
+    })
+    if pedagogy.output_format.strip():
+        llm_messages.append(
+            {"role": "system", "content": pedagogy.output_format.strip()}
         )
-        llm_messages.append({"role": "system", "content": effective_system_prompt})
-    elif context_str:
-        llm_messages.append({"role": "system", "content": context_str})
-    llm_messages.append({"role": "system", "content": _MARKDOWN_GUARDRAIL})
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
         for msg in request.messages
