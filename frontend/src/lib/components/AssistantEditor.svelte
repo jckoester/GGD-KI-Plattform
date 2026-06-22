@@ -42,6 +42,7 @@
         addContextAnchor,
         deleteContextAnchor,
         searchContextNodesLegacy,
+        getAugmentations,
         ApiError,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
@@ -67,6 +68,22 @@
     let models = $state([]);
     let subjects = $state([]);
     let groups = $state([]);
+    let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
+
+    // Augmentierungs-Abschnitt nur bei Schüler-Zielgruppen (student/all) zeigen.
+    let showAugmentations = $derived(
+        (form.audience === "student" || form.audience === "all") &&
+            augmentations.length > 0,
+    );
+
+    function isAugmentationActive(key) {
+        return !form.disabled_augmentations.includes(key);
+    }
+
+    function toggleAugmentation(key, active) {
+        const without = form.disabled_augmentations.filter((k) => k !== key);
+        form.disabled_augmentations = active ? without : [...without, key];
+    }
 
     // Testchat State
     let testConversationId = $state(null);
@@ -322,6 +339,7 @@
             available_until: "",
             sort_order: 0,
             tool_groups: [],
+            disabled_augmentations: [],
             status: "draft",
             reject_reason: null,
         };
@@ -378,6 +396,7 @@
                 : "",
             sort_order: a.sort_order ?? 0,
             tool_groups: a.tool_groups ?? [],
+            disabled_augmentations: a.disabled_augmentations ?? [],
             status: a.status || "draft",
             reject_reason: a.reject_reason || null,
         };
@@ -417,6 +436,8 @@
                 .filter(Boolean),
             available_from: form.available_from || null,
             available_until: form.available_until || null,
+            // Greift nur in der Schüler-Behandlung; bei Lehrkraft-Zielgruppe ohne Wirkung.
+            disabled_augmentations: form.disabled_augmentations,
         };
         if (isAdmin) {
             p.sort_order = parseInt(form.sort_order) || 0;
@@ -445,6 +466,13 @@
                 myGroups = allGroupsResult.items ?? [];
             }
             groups = myGroups ?? [];
+
+            // 3b. Lernverhalten-Augmentierungen (für Schüler-Zielgruppen)
+            try {
+                augmentations = (await getAugmentations()).augmentations ?? [];
+            } catch {
+                augmentations = []; // Editor bleibt nutzbar, Abschnitt entfällt
+            }
 
             // 4. Assistenten-Daten laden (wenn nicht neu, oder Vorlage duplizieren)
             if (!isNew) {
@@ -1092,6 +1120,51 @@
                             </select>
                         </div>
                     </div>
+
+                    <!-- Hinweis: all-Assistenten verhalten sich rollenabhängig (D1) -->
+                    {#if form.audience === "all"}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 -mt-2">
+                            Bei der Zielgruppe „Alle" verhält sich der Assistent für
+                            <strong>Schüler:innen</strong> pädagogisch geformt (Denkanstöße statt
+                            Komplettlösungen) und für <strong>Lehrkräfte</strong> direkt und
+                            vollständig.
+                        </p>
+                    {/if}
+
+                    <!-- Lernverhalten-Leitplanken (nur Schüler-Zielgruppen) -->
+                    {#if showAugmentations}
+                        <div
+                            class="space-y-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3"
+                        >
+                            <span
+                                class="block text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                Lernverhalten-Leitplanken
+                            </span>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Gelten nur für Schüler:innen. Abgewählte Leitplanken werden für
+                                diesen Assistenten nicht angewendet.
+                            </p>
+                            {#each augmentations as aug (aug.key)}
+                                <label
+                                    class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={isAugmentationActive(aug.key)}
+                                        disabled={!canEdit}
+                                        onchange={(e) =>
+                                            toggleAugmentation(
+                                                aug.key,
+                                                e.currentTarget.checked,
+                                            )}
+                                        class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                    />
+                                    {aug.label}
+                                </label>
+                            {/each}
+                        </div>
+                    {/if}
 
                     <!-- scope_group_id (konditionell) -->
                     {#if needsGroup(form.scope)}

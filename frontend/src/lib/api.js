@@ -753,6 +753,14 @@ export async function getAdminAssistants(params = {}) {
 }
 
 // Anlegen - jetzt gemeinsamer Endpunkt
+// Pädagogische Lernverhalten-Augmentierungen (Key + Label) für den Editor.
+export async function getAugmentations() {
+  const res = await fetch(`${BASE}/pedagogy/augmentations`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { augmentations: [{ key, label }] }
+}
+
 export async function createAssistant(data) {
   const res = await fetch(`${BASE}/assistants`, {
     method: "POST",
