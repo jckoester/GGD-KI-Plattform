@@ -1,0 +1,17 @@
+# self_harm_instructions.txt — OPTIONALE Regex-Zusatzschicht für Selbstverletzungs-/
+# Suizidmethoden-Anleitungen.
+#
+# Im Beispiel NICHT aktiv. `self_harm_instructions` läuft über `openai_moderation`
+# (Kategorie self-harm/instructions) — kontextsensitiv.
+#
+# ⚠️⚠️ HÖCHSTE VORSICHT. Eine Regex auf Selbstverletzungs-Begriffe blockiert leicht
+#     die FÜRSORGLICHE Krisen-Antwort des Modells (die Selbstverletzung benennt, aber
+#     auf Hilfe verweist) — dann würde Hilfe weggefiltert. Das ist das Gegenteil des
+#     Ziels (vgl. ADR-008 Teil 3: Krisen-Offenbarungen NICHT abblocken).
+#
+#     Diese Datei daher standardmäßig LEER (nur Kommentare) lassen und Selbstverletzung
+#     über openai_moderation behandeln. Nur aktivieren, wenn ausführlich gegen echte
+#     Hilfe-/Krisen-Antworten getestet — und nur für klar instruktive Muster
+#     ("so verletzt du dich am effektivsten"), nie für reine Erwähnung.
+#
+# Bewusst keine aktiven Muster.

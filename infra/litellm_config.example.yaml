@@ -1,0 +1,92 @@
+# litellm_config.example.yaml — Beispiel-Konfiguration für den LiteLLM-Proxy
+#
+# Dies ist eine VORLAGE. Vor dem Produktivbetrieb anpassen und — besonders die
+# Guardrails — mit Schulleitung, Schulsozialarbeit und Fachschaften kuratieren.
+# Änderungen erfordern einen Neustart des LiteLLM-Containers (Deployment-Gate +
+# Git-Audit-Trail, ADR-008 Teil 1A).
+#
+# Hinweis zur Syntax: Die genaue Guardrail-Konfiguration hängt von der eingesetzten
+# LiteLLM-Version ab. Die hier gezeigte Form orientiert sich an ADR-008 Teil 1A;
+# beim Deployment gegen die LiteLLM-Doku der verwendeten Version abgleichen.
+
+model_list:
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  # Self-hosted Fallback (Pflicht laut Projektvorgabe — Ollama im lokalen Netz):
+  - model_name: ollama-fallback
+    litellm_params:
+      model: ollama/llama3
+      api_base: os.environ/OLLAMA_BASE_URL
+
+# ── Jugendschutz-Guardrails (proxy-global, ADR-008 Teil 1A) ───────────────────
+# Gelten für ALLE Modellanfragen, unabhängig von Assistent, Zielgruppe und Modell.
+# Sie greifen am Output (post_call) und blockieren harte Verstöße. Lernverhalten-
+# Leitplanken (Schüler:innen) sind hier BEWUSST NICHT konfiguriert — die liegen
+# audience-abhängig im Backend (pedagogy.yaml), damit Lehrkräfte volle Antworten
+# behalten.
+litellm_settings:
+  guardrails:
+    # Explizit sexuelle Inhalte. Empfehlung: openai_moderation (kontextsensitiv,
+    # weniger Fehlalarme als reine Regex). Die Regex-Variante (pattern_set) ist als
+    # optionale Zusatzschicht gedacht — nur nach Kuratierung aktivieren.
+    - guardrail_name: "explicit_sexual_content"
+      litellm_params:
+        guardrail: openai_moderation
+        mode: post_call
+        default_on: true
+      guardrail_info:
+        params:
+          categories: ["sexual/minors", "sexual"]
+          threshold: 0.5
+
+    # Grafische Gewalt — kontextsensitiv blocken, historisch/bildungsrelevante
+    # Darstellung zulassen → openai_moderation statt Regex (ADR-008 Teil 1A).
+    - guardrail_name: "graphic_violence"
+      litellm_params:
+        guardrail: openai_moderation
+        mode: post_call
+        default_on: true
+      guardrail_info:
+        params:
+          categories: ["violence/graphic"]
+          threshold: 0.7
+
+    # Anleitungen zu Selbstverletzung/Suizidmethoden — strenges Blocken.
+    # ⚠️ VORSICHT: Diese Guardrail darf NICHT die fürsorgliche Krisen-Antwort des
+    #    Modells blockieren (die Selbstverletzung NENNT, aber auf Hilfe verweist).
+    #    Daher openai_moderation (self-harm/instructions) bevorzugen; die optionale
+    #    Regex-Schicht (self_harm_instructions.txt) erst nach gründlichem Test
+    #    aktivieren — sonst riskiert man, Hilfe wegzufiltern.
+    - guardrail_name: "self_harm_instructions"
+      litellm_params:
+        guardrail: openai_moderation
+        mode: post_call
+        default_on: true
+      guardrail_info:
+        params:
+          categories: ["self-harm/instructions"]
+          threshold: 0.5
+
+    # Konkrete Herstellungs-/Beschaffungsanleitungen für illegale Drogen blocken,
+    # Aufklärung zulassen. Regex-Pattern-Datei (kuratieren!).
+    - guardrail_name: "illegal_drugs_how_to"
+      litellm_params:
+        guardrail: regex
+        mode: post_call
+        action: block
+        pattern_set: "./guardrails/drugs_how_to.txt"
+
+    # Optional: Regex-Zusatzschicht für explizit sexuelle Inhalte (erst nach
+    # Kuratierung aktivieren — auskommentiert lassen, bis getestet).
+    # - guardrail_name: "explicit_sexual_content_regex"
+    #   litellm_params:
+    #     guardrail: regex
+    #     mode: post_call
+    #     action: block
+    #     pattern_set: "./guardrails/explicit_sexual.txt"
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

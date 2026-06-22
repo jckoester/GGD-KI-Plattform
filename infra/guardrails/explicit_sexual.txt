@@ -1,0 +1,15 @@
+# explicit_sexual.txt — OPTIONALE Regex-Zusatzschicht für explizit sexuelle Inhalte.
+#
+# Im Beispiel NICHT aktiv (auskommentiert in litellm_config.example.yaml). Primär
+# sollte `openai_moderation` (Kategorien sexual/minors, sexual) greifen — kontext-
+# sensitiv und mit deutlich weniger Fehlalarmen als Regex.
+#
+# ⚠️ Regex auf sexuelle Begriffe blockiert leicht legitime Sexualkunde-/Aufklärungs-
+#    inhalte. Nur nach Kuratierung mit Fachschaft (Biologie/Ethik) + Beratung und
+#    gründlichem Test aktivieren.
+#
+# Standardmäßig sind alle Muster auskommentiert — diese Datei blockiert nichts, bis
+# bewusst kuratierte Muster ergänzt werden.
+
+# Beispiel (auskommentiert lassen, bis getestet):
+# (explizite|detaillierte)\s+(schilderung|beschreibung)[^\n.]{0,30}(sexuell|geschlechtsverkehr)

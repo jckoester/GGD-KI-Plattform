@@ -1,0 +1,21 @@
+# drugs_how_to.txt — Regex-Muster zum Blocken konkreter Drogen-Herstellungs-/
+# Beschaffungsanleitungen in der Modell-Ausgabe (post_call, block).
+#
+# ZIEL: Anleitungen blocken ("so synthetisierst du …"), Aufklärung zulassen
+# ("Drogen sind gefährlich, weil …"). Muster kombinieren daher einen Anleitungs-
+# Verb mit einem Substanz-Begriff in geringem Abstand.
+#
+# STARTER — vor Aktivierung mit Fachschaft (Chemie/Biologie) + Beratung kuratieren
+# und gegen legitime Aufklärungsinhalte testen.
+
+# Synthese/Herstellung in der Nähe einer harten Substanz:
+(synthese|synthetisier|herstellung|herstellen|kochrezept|zubereit)[^\n.]{0,40}(methamphetamin|crystal\s*meth|kokain|heroin|mdma|amphetamin|lsd|fentanyl)
+
+# „so machst/stellst du … selbst/her" in der Nähe einer Substanz:
+(so\s+)?(machst|stellst|kochst)\s+du[^\n.]{0,40}(meth|kokain|heroin|crystal|mdma|ecstasy|lsd)[^\n.]{0,15}(selbst|her)
+
+# Schritt-für-Schritt-Anleitung im Drogenkontext:
+(schritt[- ]für[- ]schritt|anleitung|rezept)[^\n.]{0,40}(droge|meth|kokain|heroin|crystal|synthese)
+
+# Englische Varianten:
+(how\s+to\s+(make|synthesi[sz]e|cook))[^\n.]{0,30}(meth|cocaine|heroin|mdma|fentanyl|lsd)
