@@ -150,6 +150,19 @@
     }
 
     async function doApprove(assistant) {
+        // Zielgruppe ist ein bewusster Prüfpunkt (Phase 13): student/all sind für
+        // Schüler:innen sichtbar — eine Fehlkonfiguration hätte pädagogische Folgen.
+        if (assistant.audience === "student" || assistant.audience === "all") {
+            const label = AUDIENCE_LABELS[assistant.audience] || assistant.audience;
+            if (
+                !confirm(
+                    `„${assistant.name}" wird für Schüler:innen sichtbar ` +
+                        `(Zielgruppe: ${label}). Zielgruppe geprüft und freigeben?`,
+                )
+            ) {
+                return;
+            }
+        }
         try {
             await approveAssistant(assistant.id);
             successMessage = `"${assistant.name}" wurde freigegeben.`;
@@ -389,6 +402,15 @@
                         bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3">
                         <div class="flex-1 min-w-0 mr-4">
                             <span class="font-medium text-light-tx dark:text-dark-tx">{item.name}</span>
+                            <span
+                                class="ml-2 px-1.5 py-0.5 rounded-full text-xs font-medium align-middle
+                                    {item.audience === 'teacher'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 text-light-tx-2 dark:text-dark-tx-2'
+                                    : 'bg-light-or/20 dark:bg-dark-or/20 text-light-or dark:text-dark-or'}"
+                                title="Zielgruppe"
+                            >
+                                {AUDIENCE_LABELS[item.audience] || item.audience}
+                            </span>
                             {#if item.description}
                                 <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate">{item.description}</p>
                             {/if}

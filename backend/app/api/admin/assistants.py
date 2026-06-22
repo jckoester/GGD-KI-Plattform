@@ -112,6 +112,14 @@ async def approve_assistant(
 
     await db.commit()
     await db.refresh(assistant)
+    # Zielgruppe ist ein bewusster Prüfpunkt (Phase 13): eine Fehlkonfiguration hat
+    # pädagogische Folgen (Schüler:innen-Sichtbarkeit, Präambel-/Augmentierungs-Auswahl).
+    logger.info(
+        "Assistent freigegeben (id=%s, audience=%s, scope=%s)",
+        assistant.id,
+        assistant.audience,
+        assistant.scope,
+    )
     return AssistantResponse.model_validate(assistant)
 
 
