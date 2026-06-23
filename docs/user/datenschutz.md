@@ -26,6 +26,33 @@ Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Pl
 
 **Nicht** übermittelt werden interne Planungsfelder der Lehrkraft — etwa Kommentare, Reflexionen, der Pin-Status oder die einzelnen Phasen einer Stunde. Es werden nur Angaben weitergegeben, die ohnehin für die Gruppe bestimmt sind (Themen, Stundenziele, Klassenarbeits-Umfang).
 
+## Warnung bei persönlichen Daten
+
+Auch wenn der KI-Anbieter Ihren Namen nie erfährt (siehe oben): Der **Inhalt** Ihrer
+Nachricht wird übertragen. Tippen Sie dort echte Namen, Adressen oder Kontaktdaten —
+von sich oder von anderen — hinein, landen diese beim Anbieter, obwohl das selten
+nötig ist.
+
+Damit das nicht aus Versehen passiert, prüft die Plattform Ihre Nachricht **vor dem
+Senden lokal auf dem Schulserver** auf personenbezogene Daten: Namen, Wohnorte und
+Adressen sowie E-Mail-Adressen, Telefonnummern und IBANs.
+
+Wird etwas gefunden, erscheint ein Hinweis mit den markierten Stellen — **gesendet
+wurde zu diesem Zeitpunkt noch nichts.** Sie entscheiden:
+
+- **Bearbeiten:** zurück zur Nachricht, um die Angaben zu entfernen oder zu ändern.
+- **Trotzdem senden:** wenn die Daten bewusst gewollt sind (z. B. eine erfundene
+  Beispieladresse für eine Übung), senden Sie die Nachricht unverändert.
+
+Der Hinweis ist eine **Empfehlung, keine Sperre.** Die Prüfung läuft vollständig auf
+dem Schulserver, **ruft nichts extern auf** und **speichert nichts**.
+
+> **Ehrlich gesagt:** Die Erkennung findet vieles, aber nicht alles — verlassen Sie
+> sich nicht allein darauf. Die Entscheidung, welche Daten Sie teilen, bleibt bei Ihnen.
+
+> 📷 *Screenshot folgt: Hinweis auf persönliche Daten vor dem Senden.*
+<!-- Ersetzen durch: ![PII-Warnung](/help-images/datenschutz/pii-warnung.png) -->
+
 ## Hinweis auf Hilfsangebote
 
 Damit Sie in schwierigen Situationen nicht allein bleiben, prüft die Plattform Ihre

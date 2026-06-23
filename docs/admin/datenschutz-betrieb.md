@@ -39,6 +39,34 @@ solange `SCHOOL_SECRET` unverändert ist.
 | Gewähltes Modell | Klasse / Jahrgang |
 | | IP-Adresse der Nutzerin |
 
+## PII-Eingabewarnung (Datensparsamkeit)
+
+Zusätzlich zur Pseudonymisierung warnt die Plattform Nutzer:innen, **bevor** sie
+versehentlich personenbezogene Daten in den Gesprächsinhalt tippen. Die Prüfung läuft
+**lokal auf dem Schulserver**, ruft **nichts extern** auf und **speichert nichts** —
+sie ist ein freiwilliger Schutz-Hinweis, keine Sperre (fail-open: bei Fehler oder
+Timeout wird die Eingabe nicht blockiert).
+
+| Kategorie | Schicht | Verfahren |
+|-----------|---------|-----------|
+| Name, Wohnort / Adresse | Backend | lokale NER (spaCy `de_core_news_md`) + Cue-Muster + Adress-Regex |
+| E-Mail, Telefon, IBAN | Frontend | Regex (latenzfrei, ohne Server-Anfrage) |
+
+**Pflege der Muster:** Die Erkennungsmuster liegen **im Code**, nicht in einer
+YAML-Konfiguration:
+
+- Name/Wohnort (Cues, Adress-Regex, NER-Schwelle): `backend/app/pii/scanner.py`
+- E-Mail/Telefon/IBAN (Regex): `frontend/src/lib/pii_client.js`
+
+Anpassungen sind also Code-Änderungen — mit den zugehörigen Tests in
+`backend/tests/unit/test_pii_scanner.py` bzw. `frontend/src/lib/pii_*.test.js`. Das
+NER-Modell wird wie unter
+[PII-NER-Modell aktualisieren](updates-und-wartung.md#pii-ner-modell-aktualisieren)
+beschrieben aktualisiert.
+
+> **Grenzen:** Gute deutsche NER erkennt vieles, aber nicht jeden kleingeschriebenen
+> oder seltenen Namen — die Warnung ist ein Nudge, kein vollständiger Filter.
+
 ## Automatische Datenlöschung (Cron-Jobs)
 
 Drei automatische Cron-Jobs laufen täglich. Zwei davon löschen veraltete Daten, der dritte ergänzt fehlende Embeddings:
@@ -78,6 +106,8 @@ KI-Anbietern relevant:
 - Pseudonym als technische Kennung ohne Personenbezug auf Anbieterseite
 - Automatische Löschung spätestens nach 93 Tagen
 - Kein Training auf Basis der Anfragen (von Anbietern vertraglich sicherstellen)
+- Zusätzliche Datensparsamkeit: lokale PII-Eingabewarnung vor dem Senden
+  (siehe oben) — kein externer Aufruf, keine Speicherung der geprüften Eingaben
 
 > **Hinweis:** Diese Seite ist eine technische Orientierungshilfe und kein
 > Ersatz für rechtliche Beratung.
