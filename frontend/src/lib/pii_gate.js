@@ -92,6 +92,18 @@ export function uniqueCategories(spans) {
 }
 
 /**
+ * Soll vor dem Senden überhaupt gescannt werden? Nur bei getipptem Text und wenn
+ * das Gate für die Konversation nicht stummgeschaltet ist — spart den Server-Call,
+ * wenn ohnehin nicht gewarnt würde. (Anhänge sind nicht Teil der Prüfung.)
+ *
+ * @param {{text: string, suppressed: boolean}} arg
+ * @returns {boolean}
+ */
+export function shouldScanForPii({ text, suppressed }) {
+    return Boolean(text) && !suppressed;
+}
+
+/**
  * Scannt einen Text über beide Schichten und liefert die kombinierten Spans.
  *
  * Die Client-Regex läuft immer (synchron, latenzfrei). Der Server-Scan ist

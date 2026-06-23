@@ -32,6 +32,11 @@ def _cats(text):
     "Im Schwarzwald gibt es viele Wanderwege.",            # Region als Thema
     "schreib mir ein gedicht über den herbst",
     "Was ist der Unterschied zwischen Akkusativ und Dativ?",
+    "Nenne drei Sehenswürdigkeiten in Berlin.",            # Ort als Thema, kein Wohn-Cue
+    "Wie funktioniert ein Verbrennungsmotor?",
+    "Fasse das Buch Die Welle kurz zusammen.",
+    "Wer hat den Zweiten Weltkrieg begonnen?",
+    "Welche Mannschaft hat 2014 die Weltmeisterschaft gewonnen?",
 ])
 def test_must_not_warn(text):
     assert scan(text) == [], f"Fehlwarnung bei: {text!r}"
@@ -45,6 +50,8 @@ def test_must_not_warn(text):
     "mein kumpel tim versteht das auch nicht",              # Cue, kleingeschrieben
     "ich heiße sophie müller",                              # Cue, kleingeschrieben
     "Schreib einen Steckbrief über meine Schwester Marie Becker.",  # Beziehungs-Cue
+    "ich bin der lukas aus der 7a",                        # Selbst-Cue, kleingeschrieben
+    "Kannst du meinem Freund Paul Weber helfen?",          # Beziehungs-Cue + Vollname
 ])
 def test_must_warn_name(text):
     assert "name" in _cats(text), f"Name nicht erkannt: {text!r}"
@@ -57,6 +64,8 @@ def test_must_warn_name(text):
     "Meine Adresse ist Am Bach 12, 72760 Reutlingen.",  # PLZ + Ort
     "Wir ziehen nächsten Monat nach Kornwestheim um.",  # Wohn-Cue + LOC
     "ich komme aus tübingen",                           # Wohn-Cue + LOC klein
+    "Ich wohne in München.",                            # Wohn-Cue + LOC
+    "Wir sind letztes Jahr nach Stuttgart gezogen.",    # Umzugs-Cue getrennt + LOC
 ])
 def test_must_warn_wohnort(text):
     assert "wohnort" in _cats(text), f"Wohnort nicht erkannt: {text!r}"

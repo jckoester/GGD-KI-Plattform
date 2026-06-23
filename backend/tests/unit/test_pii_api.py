@@ -34,8 +34,25 @@ def test_scan_returns_spans_for_name():
     assert {"category", "start", "end", "text"} <= s.keys()
 
 
+def test_scan_returns_wohnort():
+    r = TestClient(_make_app()).post(
+        "/pii/scan", json={"text": "Ich wohne in der Lindenstraße 4 in Reutlingen."}
+    )
+    assert r.status_code == 200
+    assert any(s["category"] == "wohnort" for s in r.json()["spans"])
+
+
 def test_scan_empty_for_topic():
     r = TestClient(_make_app()).post("/pii/scan", json={"text": "Erklär mir die Photosynthese."})
+    assert r.status_code == 200
+    assert r.json()["spans"] == []
+
+
+def test_scan_ignores_structured_pii():
+    # E-Mail/Telefon werden client-seitig erkannt (D-C) — der Endpoint warnt hier nicht.
+    r = TestClient(_make_app()).post(
+        "/pii/scan", json={"text": "Erreichbar unter info@beispielschule.de"}
+    )
     assert r.status_code == 200
     assert r.json()["spans"] == []
 

@@ -18,7 +18,7 @@
     import ContextChips from "$lib/components/ContextChips.svelte";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
-    import { scanForPii } from "$lib/pii_gate.js";
+    import { scanForPii, shouldScanForPii } from "$lib/pii_gate.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -419,7 +419,7 @@
         // PII-Eingabe-Gate (Phase 14): nur getippten Text lokal prüfen, bevor
         // gesendet wird. Anhänge sind nicht Teil der Prüfung — Schwerpunkt ist das
         // unbeabsichtigte Tippen personenbezogener Daten. Fail-open in scanForPii.
-        if (userMessage && !piiWarningSuppressed) {
+        if (shouldScanForPii({ text: userMessage, suppressed: piiWarningSuppressed })) {
             piiChecking = true;
             let spans = [];
             try {
