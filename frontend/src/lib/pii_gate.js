@@ -9,13 +9,20 @@
  * Die reinen Funktionen (`combinePiiSpans`, `segmentText`) sind ohne Netzwerk
  * testbar; `scanForPii` orchestriert beide Schichten.
  *
- * Charakter: Schutz-Nudge, **fail-open**. Fällt der Server-Scan aus, bleibt die
- * Client-Schicht aktiv — die Eingabe wird nie hart blockiert. (Timeout-Härtung in
- * Schritt 6.)
+ * Charakter: Schutz-Nudge, **fail-open**. Fällt der Server-Scan aus ODER läuft er
+ * in den Timeout, bleibt die Client-Schicht aktiv — die Eingabe wird nie hart
+ * blockiert und hängt nie länger als `PII_SCAN_TIMEOUT_MS`.
  */
 
 import { scanStructured } from "./pii_client.js";
 import { scanPii } from "./api.js";
+
+/**
+ * Obergrenze für den Server-Scan. spaCy `md` braucht real ~Millisekunden; der
+ * großzügige Wert greift nur, wenn das Backend tatsächlich hängt/überlastet ist —
+ * dann fällt das Gate auf die Client-Schicht zurück, statt die Eingabe zu blockieren.
+ */
+export const PII_SCAN_TIMEOUT_MS = 1500;
 
 /** @typedef {{category: string, start: number, end: number, text: string}} PiiSpan */
 
@@ -86,24 +93,40 @@ export function uniqueCategories(spans) {
 
 /**
  * Scannt einen Text über beide Schichten und liefert die kombinierten Spans.
- * Der Server-Scan ist **fail-open**: schlägt er fehl, bleibt nur die
- * Client-Erkennung — die Eingabe wird nie blockiert.
+ *
+ * Die Client-Regex läuft immer (synchron, latenzfrei). Der Server-Scan ist
+ * **fail-open** und durch einen Timeout begrenzt: Bei Fehler ODER Timeout bleibt
+ * nur die Client-Erkennung — die Eingabe wird nie blockiert und hängt nie länger
+ * als `timeoutMs`.
  *
  * @param {string} text
+ * @param {{timeoutMs?: number}} [opts]
  * @returns {Promise<PiiSpan[]>}
  */
-export async function scanForPii(text) {
+export async function scanForPii(text, { timeoutMs = PII_SCAN_TIMEOUT_MS } = {}) {
     const clientSpans = scanStructured(text);
     let serverSpans = [];
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const res = await scanPii(text);
+        const res = await scanPii(text, { signal: controller.signal });
         serverSpans = res?.spans ?? [];
     } catch (err) {
-        // fail-open: nur Client-Schicht; Eingabe nicht hart blockieren
-        console.error(
-            "Server-PII-Scan fehlgeschlagen — nutze nur Client-Erkennung:",
-            err,
-        );
+        // fail-open: Timeout ODER Endpoint-Fehler → nur Client-Schicht
+        if (err?.name === "AbortError") {
+            console.warn(
+                "Server-PII-Scan abgebrochen (Timeout) — nutze nur Client-Erkennung.",
+            );
+        } else {
+            console.error(
+                "Server-PII-Scan fehlgeschlagen — nutze nur Client-Erkennung:",
+                err,
+            );
+        }
+    } finally {
+        clearTimeout(timer);
     }
+
     return combinePiiSpans(clientSpans, serverSpans);
 }

@@ -259,12 +259,14 @@ export async function getAssistants() {
 // PII-Scan (Phase 14, Datensparsamkeit): prüft eine Eingabe lokal auf dem
 // Schulserver auf Name/Wohnort, bevor sie gesendet wird. Kein Persistieren,
 // kein externer Call — nichts verlässt die Schule vor der Bestätigung.
-export async function scanPii(text) {
+// `signal` erlaubt dem Aufrufer einen Timeout (fail-open in scanForPii).
+export async function scanPii(text, { signal } = {}) {
   const res = await fetch(`${BASE}/pii/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({ text }),
+    signal,
   });
   if (!res.ok)
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
