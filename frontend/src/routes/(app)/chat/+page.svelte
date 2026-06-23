@@ -17,6 +17,8 @@
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import ContextChips from "$lib/components/ContextChips.svelte";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
+    import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
+    import { scanForPii } from "$lib/pii_gate.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -92,6 +94,14 @@
 
     // Vorschläge aus LLM-Tool-Call (warten auf Bestätigung durch Nutzer)
     let pendingSuggestions = $state(null); // null | Array<{node_id, title, category, content_type}>
+
+    // PII-Eingabe-Gate (Phase 14): blockierender Bestätigungsdialog vor dem Senden
+    let piiDialogOpen = $state(false);
+    let piiSpans = $state([]);
+    let piiText = $state("");
+    let piiChecking = $state(false);
+    // Pro Konversation: „in dieser Konversation nicht erneut warnen"
+    let piiWarningSuppressed = $state(false);
 
     // Kombinierter Nodes-State für die Chips-Anzeige
     const displayContextNodes = $derived(
@@ -396,6 +406,56 @@
         // 3-4: Hinweis beim Senden löschen
         assistantSwitchHint = null;
 
+        const readyAttachments = attachments.filter(
+            (a) => a.status === "ready",
+        );
+        if ((!input.trim() && readyAttachments.length === 0) || isStreaming)
+            return;
+        if (attachments.some((a) => a.status === "uploading")) return;
+        if (piiChecking) return;
+
+        const userMessage = input.trim();
+
+        // PII-Eingabe-Gate (Phase 14): nur getippten Text lokal prüfen, bevor
+        // gesendet wird. Anhänge sind nicht Teil der Prüfung — Schwerpunkt ist das
+        // unbeabsichtigte Tippen personenbezogener Daten. Fail-open in scanForPii.
+        if (userMessage && !piiWarningSuppressed) {
+            piiChecking = true;
+            let spans = [];
+            try {
+                spans = await scanForPii(userMessage);
+            } finally {
+                piiChecking = false;
+            }
+            if (spans.length > 0) {
+                piiText = userMessage;
+                piiSpans = spans;
+                piiDialogOpen = true;
+                return; // Senden pausiert bis zur Bestätigung im Dialog
+            }
+        }
+
+        performSend();
+    }
+
+    // Dialog: „Bearbeiten" — Senden abbrechen, Eingabe bleibt erhalten.
+    function handlePiiEdit() {
+        piiDialogOpen = false;
+        piiSpans = [];
+        piiText = "";
+        textarea?.focus();
+    }
+
+    // Dialog: „Trotzdem senden" — optional für diese Konversation stumm schalten.
+    function handlePiiSendAnyway(suppress) {
+        piiDialogOpen = false;
+        piiSpans = [];
+        piiText = "";
+        if (suppress) piiWarningSuppressed = true;
+        performSend();
+    }
+
+    async function performSend() {
         // Neu: auch senden, wenn nur Anhänge vorhanden (kein Text nötig)
         const readyAttachments = attachments.filter(
             (a) => a.status === "ready",
@@ -850,6 +910,10 @@
         const id = $page.url.searchParams.get("id");
         conversationError = null;
 
+        // PII-Gate pro Konversation zurücksetzen (Phase 14)
+        piiWarningSuppressed = false;
+        piiDialogOpen = false;
+
         if (id) {
             loadingConversation = true;
             try {
@@ -1103,6 +1167,16 @@
                 />
             {/if}
 
+            <!-- PII-Eingabe-Gate (Phase 14) -->
+            {#if piiDialogOpen}
+                <PiiWarningDialog
+                    text={piiText}
+                    spans={piiSpans}
+                    onedit={handlePiiEdit}
+                    onsend={handlePiiSendAnyway}
+                />
+            {/if}
+
             <!-- Konversationskosten -->
             {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                 <div
@@ -1270,6 +1344,7 @@
                 <button
                     onclick={handleSubmit}
                     disabled={isStreaming ||
+                        piiChecking ||
                         attachments.some((a) => a.status === "uploading") ||
                         (!input.trim() &&
                             !attachments.some((a) => a.status === "ready"))}
@@ -1277,7 +1352,7 @@
                          hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed
                          transition-colors flex items-center justify-center min-w-[44px] shrink-0"
                 >
-                    {#if isStreaming}
+                    {#if isStreaming || piiChecking}
                         <Loader2 class="w-5 h-5 animate-spin" />
                     {:else}
                         <Send class="w-5 h-5" />
