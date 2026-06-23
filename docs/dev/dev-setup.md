@@ -29,12 +29,18 @@ cd backend
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# Abhängigkeiten installieren
+# Abhängigkeiten installieren (inkl. spaCy + deutschem NER-Modell ~45 MB
+# für die PII-Erkennung — als gepinntes Wheel in requirements.txt verankert)
 pip install -r requirements.txt
 
 # Konfiguration anlegen
 cp .env.example .env
 ```
+
+> **Hinweis (PII-Modell):** Das deutsche NER-Modell `de_core_news_md` wird über eine
+> gepinnte Wheel-URL in `requirements.txt` mitinstalliert — **nicht** über
+> `python -m spacy download` (das scheitert in uv-/manchen Umgebungen). Schlägt der
+> Wheel-Download fehl, das Wheel manuell laden und `pip install <pfad>.whl` ausführen.
 
 Minimale `.env` für die lokale Entwicklung:
 

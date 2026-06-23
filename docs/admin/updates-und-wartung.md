@@ -46,6 +46,20 @@ docker compose exec litellm sh -c "
 docker compose restart litellm
 ```
 
+## PII-NER-Modell aktualisieren
+
+Die PII-Erkennung (Datensparsamkeit) nutzt das deutsche spaCy-Modell `de_core_news_md`,
+gepinnt in `backend/requirements.txt`. Zum Aktualisieren die Wheel-URL auf die neue
+Version anheben (muss zur `spacy`-Minor-Version passen) und das Backend-Image neu bauen:
+
+```bash
+# requirements.txt: de_core_news_md-Wheel-URL auf neue Version setzen, dann:
+docker compose build backend && docker compose up -d backend
+```
+
+Ein Modell-Update ist selten nötig und betrifft nur die Treffergüte der PII-Warnung —
+keine Datenmigration. Es wird **nichts** extern aufgerufen; das Modell läuft lokal.
+
 ## Datenbank-Backup
 
 Ein tägliches Backup des PostgreSQL-Volumes wird empfohlen:
