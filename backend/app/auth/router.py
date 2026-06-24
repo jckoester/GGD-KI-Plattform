@@ -42,7 +42,7 @@ async def login_challenge(
     return await adapter.get_login_challenge()
 
 
-@router.get("/callback")
+@router.get("/callback", response_model=None)
 async def auth_callback(
     request: Request,
     response: Response,
