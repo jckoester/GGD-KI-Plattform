@@ -50,6 +50,27 @@ Alternativ tippen Sie **`@`** ins Textfeld, um direkt nach einem Baustein zu suc
 
 Mehr dazu: [Kontextspeicher](kontext.md)
 
+## Formeln, Chemie und Diagramme
+
+Mathematische Formeln, chemische Gleichungen und einfache Diagramme werden im Chat
+**grafisch dargestellt** statt als Rohtext — sowohl in den Antworten der KI als auch in dem,
+was Sie selbst schreiben.
+
+- **Mathematik** in LaTeX-Schreibweise zwischen Dollarzeichen: `$a^2 + b^2 = c^2$` im Text
+  oder `$$\int_0^1 x\,dx$$` als abgesetzte Formel.
+- **Chemie** mit `\ce{ }`: `$\ce{2 H2 + O2 -> 2 H2O}$` ergibt eine gesetzte Reaktionsgleichung.
+- **Diagramme** als Codeblock mit der Sprache **mermaid** — zum Beispiel ein Flussdiagramm:
+
+      flowchart LR
+        A[Frage] --> B[Antwort]
+
+Die Darstellung passiert automatisch auf Ihrem Gerät. Wenn Sie die LaTeX-Schreibweise nicht
+kennen, bitten Sie die KI einfach, etwas „als Formel" zu schreiben — sie kümmert sich um die
+richtige Notation.
+
+> **Hinweis:** Elektrische Schaltpläne werden derzeit noch nicht grafisch dargestellt; diese
+> Funktion ist in Vorbereitung.
+
 ## Chat-Verlauf
 
 Alle Ihre Gespräche werden unter **„Letzte Chats"** in der Seitenleiste gespeichert. Von dort können Sie ein älteres Gespräch jederzeit wieder öffnen und fortsetzen.

@@ -41,3 +41,38 @@ dieselbe Pipeline (kein separates SVG-Handling).
    bleibt frei), aber ein **Timeout/Worker-Kill** ist Pflicht.
 3. **Zweites schweres Lazy-Bundle** (~5 MB zusätzlich zu Mermaids ~6 MB). Beide lazy/gecacht;
    selten beide in einer Antwort. Schmaleres Einsatzfeld (Physik/NwT) als Mathe/Mermaid.
+
+---
+
+## NACHTRAG — Browser-Integrations-PoC (2026-06-24): **Blocker für reines Client-seitig**
+
+Beim Start von Schritt 4 (Vite-Integrations-PoC) ein entscheidender Befund: **Es gibt kein
+sauberes, fertiges Browser-npm-Paket, das CircuiTikZ rendert.** Die TikZJax-Builds bündeln
+unterschiedliche Paketsätze:
+
+| Build | circuitikz? | Browser-tauglich? |
+|---|---|---|
+| `@rod2ik/tikzjax` (sauberes Browser-Paket) | **NEIN** (kein `circuitikz.sty`/`pgfcirc` in `tex_files`, kein CDN-Nachladen) | ja |
+| `node-tikzjax` | **JA** (`pgfcirc` in `core.dump` gebacken, + `tex_files.tar.gz`) | **NEIN** (Glue nutzt `fs`/`path`/`zlib`/`tar-fs`/`memfs` — reines Node) |
+| `obsidian-tikzjax` | ja | ja, aber **Obsidian-Plugin** (vendort eine eigene artisticat-`ww-modifications`-Build, kein wiederverwendbares Lib) |
+
+**Folge:** Client-seitiges CircuiTikZ erfordert **echte Eigenarbeit** — entweder den
+artisticat-`ww-modifications`-Browser-Build (mit circuitikz) vendoren+zusammensetzen
+(matched wasm/dump/tex_files), oder node-tikzjax' Node-Bootstrap (memfs/tar/zlib/wasm) auf
+einen Browser-Web-Worker portieren. Kein „npm install + nutzen".
+
+**Server-seitig (`node-tikzjax`) funktioniert dagegen heute** — circuitikz inklusive, hands-on
+bestätigt (Schritt-3-Spike), ~0,4 s/Render, cachebar.
+
+### Re-Bewertung D6
+Die ursprüngliche Empfehlung „client-seitig, weil sauberes Frontend-Dep wie Mermaid" ist
+damit **hinfällig** — die Prämisse (sauberes Browser-Paket) trifft für circuitikz nicht zu.
+Neue Lage:
+- **Client-seitig** = Custom-Engine-Arbeit (vendoren/zusammensetzen oder portieren) + Wartung.
+- **Server-seitig** (node-tikzjax) = funktioniert sofort, braucht aber einen Node-Renderer
+  neben dem Python-Backend — **dieselbe Server-Render-Infrastruktur, die auch D5
+  (PDF-Mathe-Export) braucht** → fügt sich natürlich in Phase 17 (Server-Render/Artefakte).
+
+**Empfehlung (neu): Schaltplan-Rendering in Phase 17 (Server-Render) mit node-tikzjax**, statt
+in Phase 15 eine fragile Client-Engine zu bauen. Phase 15 schließt mit KaTeX+mhchem (✅) +
+Mermaid (✅) + Doku. → **Nutzerentscheidung** (siehe Plan, D6/Schritt 4).

@@ -130,6 +130,46 @@ for await (const event of streamChat(messages, conversationId, modelId)) {
 Die zugehörigen SSE-Events und ihr Format sind in
 [chat-streaming.md](chat-streaming.md) dokumentiert.
 
+## Rich-Rendering im Markdown (KaTeX, Mermaid)
+
+Ein **zentraler** Renderer `frontend/src/lib/markdown.js` (`renderMarkdown`) speist Chat
+(`MessageBubble`), Wissensgraph (`/knowledge/[id]`), Curriculum-Tabelle und Hilfeseiten —
+eine Erweiterung dort wirkt überall. Pipeline: `marked` → `DOMPurify.sanitize`
+(+ highlight.js für Codeblöcke).
+
+### Mathematik & Chemie (KaTeX, synchron)
+
+- KaTeX als **marked-Extension** (Tokenizer) — respektiert den Code-Kontext, d. h. Formeln
+  in Inline-Code/```-Blöcken bleiben Quelltext. Delimiter: `\(…\)`/`\[…\]` und `$…$`/`$$…$$`.
+  `throwOnError: false`, damit unvollständige (Streaming) oder fehlerhafte Formeln das
+  Rendering nicht brechen.
+- **Chemie:** `import 'katex/contrib/mhchem'` registriert `\ce{}`/`\pu{}` (Reaktionsgleichungen).
+- **Sicherheit — „protect-and-reinsert":** Die von KaTeX **erzeugte** Ausgabe ist
+  vertrauenswürdig (KaTeX parst TeX, schleust kein HTML durch; `trust:false`-Default) und soll
+  die strikte Markdown-Sanitisierung nicht aufweichen. Formeln werden vor `marked`+DOMPurify
+  durch einen Platzhalter ersetzt und erst **nach** der Sanitisierung wieder eingesetzt —
+  DOMPurify bleibt strikt fürs Markdown und zerschießt die KaTeX-Inline-Styles nicht.
+
+### Diagramme (Mermaid, asynchron)
+
+- Mermaid rendert **asynchron** und passt nicht in den synchronen `renderMarkdown`. Der
+  Code-Renderer erzeugt für ```mermaid daher nur einen **Platzhalter**
+  `<div class="mermaid-block">QUELLE</div>`; die Svelte-Action
+  `frontend/src/lib/diagrams.js → renderDiagrams` rendert ihn nach dem Mount im DOM.
+- **Lazy:** `import('mermaid')` → eigener (~6 MB) Chunk, erst beim ersten Diagramm geladen.
+- `securityLevel: 'strict'`, Theme aus der `dark`-Klasse von `documentElement`. **Debounce
+  (250 ms)** gegen Streaming-Flackern (rendert erst, wenn der Inhalt zur Ruhe kommt);
+  `data-processed` vor dem `await` gegen Doppel-Render; Fehlerfall → `.mermaid-error` + Quelltext.
+- Eingehängt via `use:renderDiagrams` in `MessageBubble` (neben `use:copyButtons`) und
+  `knowledge/[id]`.
+
+### Schaltpläne (CircuiTikZ) — bewusst NICHT client-seitig
+
+Elektrische Schaltpläne brauchen eine TeX-Engine (CircuiTikZ); ein Spike + Browser-PoC ergab,
+dass es **kein sauberes Browser-npm-Paket mit circuitikz** gibt (`node-tikzjax` kann es, ist
+aber reines Node). Entscheidung: **Server-Render in Phase 17** (`node-tikzjax`), gemeinsam mit
+dem LaTeX-PDF-Export. Hintergrund: `frontend/scripts/circuit_spike/DECISION.md`.
+
 ## Stores (`frontend/src/lib/stores/`)
 
 | Store | Typ | Inhalt |
