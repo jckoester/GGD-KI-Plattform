@@ -4,7 +4,7 @@ adapter: yaml_test
 oauth:
   base_url: https://iserv.example.de
   client_id: ggd-ki-plattform
-  redirect_uri: https://ki.example.de/auth/callback
+  redirect_uri: https://ki.example.de/api/auth/callback
   # Regex mit Capture-Group für den Jahrgang.
   # Gruppe "jahrgang.10" → grade="10"
   grade_group_pattern: '^jahrgang\.(\d{1,2})$'
@@ -38,14 +38,14 @@ group_role_map:
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).
 sso:
   groups:
-    subject_department: '^FS\.(.+)$'        # FS.Mathematik → subject_department
-    school_class: '^Klasse\.(.+)$'          # Klasse.8a → school_class
-    teaching_group: '^unterricht\.(.+)$'    # unterricht.8a.Mathematik → teaching_group
-  allow_manual_teaching_groups: true   # false = Sidebar-Vorschläge deaktiviert
-  subject_aliases:                     # Kurzname → Subject-Slug (case-insensitiv)
-    D:    deutsch
-    E:    englisch
-    M:    mathematik
-    Bio:  biologie
-    Ch:   chemie
-    Ph:   physik
+    subject_department: '^FS\.(.+)$' # FS.Mathematik → subject_department
+    school_class: '^Klasse\.(.+)$' # Klasse.8a → school_class
+    teaching_group: '^unterricht\.(.+)$' # unterricht.8a.Mathematik → teaching_group
+  allow_manual_teaching_groups: true # false = Sidebar-Vorschläge deaktiviert
+  subject_aliases: # Kurzname → Subject-Slug (case-insensitiv)
+    D: deutsch
+    E: englisch
+    M: mathematik
+    Bio: biologie
+    Ch: chemie
+    Ph: physik

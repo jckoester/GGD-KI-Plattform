@@ -49,7 +49,7 @@ async def auth_callback(
     adapter: AuthAdapter = Depends(get_auth_adapter),
     db: AsyncSession = Depends(get_db),
     jwt_service: JwtService = Depends(get_jwt_service),
-) -> dict:
+) -> RedirectResponse | dict:
     if adapter.mode != "redirect":
         raise HTTPException(status_code=405, detail="Adapter unterstützt kein OIDC-Callback")
     code = request.query_params.get("code")
@@ -89,17 +89,17 @@ async def auth_callback(
         aliases=auth_config.sso.subject_aliases,
     )
     
-    token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
+    token, _ = jwt_service.issue(
+        pseudonym, identity.roles, identity.grade, identity.display_name
+    )
     secure = settings.environment != "development"
-    response.set_cookie(
+    redirect = RedirectResponse(url="/welcome", status_code=303)
+    redirect.set_cookie(
         "session", token,
         httponly=True, secure=secure, samesite="lax",
         max_age=30 * 24 * 3600, path="/",
     )
-    return {
-        "ok": True,
-        "display_name": identity.display_name,
-    }
+    return redirect
 
 
 # ===== Step-up-Re-Authentifizierung (Phase 12, Schritt 5) =====
@@ -253,7 +253,9 @@ async def login_direct(
         aliases=auth_config.sso.subject_aliases,
     )
     
-    token, _ = jwt_service.issue(pseudonym, identity.roles, identity.grade)
+    token, _ = jwt_service.issue(
+        pseudonym, identity.roles, identity.grade, identity.display_name
+    )
     secure = settings.environment != "development"
     response.set_cookie(
         "session", token,
@@ -291,4 +293,5 @@ async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
         "pseudonym": current_user.sub,
         "roles": current_user.roles,
         "grade": current_user.grade,
+        "display_name": current_user.display_name,
     }

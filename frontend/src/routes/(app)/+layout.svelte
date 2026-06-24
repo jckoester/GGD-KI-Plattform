@@ -29,7 +29,7 @@
             user.set({
                 ...me,
                 display_name:
-                    sessionStorage.getItem("display_name") ?? me.pseudonym,
+                    me.display_name ?? sessionStorage.getItem("display_name") ?? me.pseudonym,
                 preferences: prefs,
             });
             budget.set(budgetData);

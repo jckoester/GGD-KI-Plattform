@@ -13,6 +13,7 @@ class JwtPayload(BaseModel):
     sub: str                                      # Pseudonym
     roles: list[str]                              # Liste aller Rollen
     grade: str | None
+    display_name: str | None = None               # nur Browser-Anzeige, nicht persistiert
     jti: str                                      # UUID4, für Revokation
     iat: int                                      # Unix-Timestamp
     exp: int                                      # Unix-Timestamp
@@ -24,7 +25,10 @@ class JwtService:
         self._algorithm = algorithm
         self._ttl = timedelta(days=ttl_days)
 
-    def issue(self, pseudonym: str, roles: list[str], grade: str | None) -> tuple[str, str]:
+    def issue(
+        self, pseudonym: str, roles: list[str], grade: str | None,
+        display_name: str | None = None,
+    ) -> tuple[str, str]:
         """Gibt (token, jti) zurück."""
         now = datetime.now(timezone.utc)
         jti = str(uuid4())
@@ -32,6 +36,7 @@ class JwtService:
             "sub": pseudonym,
             "roles": roles,
             "grade": grade,
+            "display_name": display_name,
             "jti": jti,
             "iat": int(now.timestamp()),
             "exp": int((now + self._ttl).timestamp()),

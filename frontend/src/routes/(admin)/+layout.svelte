@@ -20,7 +20,7 @@
             user.set({
                 ...me,
                 display_name:
-                    sessionStorage.getItem("display_name") ?? me.pseudonym,
+                    me.display_name ?? sessionStorage.getItem("display_name") ?? me.pseudonym,
             });
             themePref.syncFromServer(prefs.theme ?? "system");
             refreshCrisisAlerts(); // Hinweis auf offene Krisen-Fälle (admin/review)
