@@ -95,6 +95,26 @@ describe('renderMarkdown — Code-Kontext bleibt Quelltext', () => {
     })
 })
 
+describe('renderMarkdown — Mermaid-Platzhalter', () => {
+    it('```mermaid wird zu einem .mermaid-block-Platzhalter (nicht hervorgehoben)', () => {
+        const html = renderMarkdown('```mermaid\ngraph TD\n A --> B\n```')
+        expect(html).toContain('mermaid-block')
+        expect(html).not.toContain('hljs') // kein Syntax-Highlighting für Mermaid
+        expect(html).toContain('graph TD') // Quelle bleibt als Textinhalt erhalten
+    })
+
+    it('normale Codeblöcke werden weiterhin hervorgehoben (Regression)', () => {
+        const html = renderMarkdown('```python\nprint("hi")\n```')
+        expect(html).toContain('hljs')
+        expect(html).not.toContain('mermaid-block')
+    })
+
+    it('Mermaid-Block überlebt die Sanitisierung', () => {
+        const html = renderMarkdown('```mermaid\nflowchart LR\n X-->Y\n```')
+        expect(html).toContain('class="mermaid-block"')
+    })
+})
+
 describe('renderMarkdown — False-Positive-Disziplin & Robustheit', () => {
     it('Währungsbeträge lösen kein Mathe aus', () => {
         expect(hasKatex(renderMarkdown('Das kostet 5 $ und nochmal 10 $.'))).toBe(false)

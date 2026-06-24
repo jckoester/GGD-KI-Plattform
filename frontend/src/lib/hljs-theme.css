@@ -1,3 +1,20 @@
+/* Mermaid-Diagramme (Phase 15): zentriert, gerendertes SVG skaliert mit */
+.mermaid-block {
+    margin: 0.75rem 0;
+    text-align: center;
+}
+
+.mermaid-block svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.mermaid-error {
+    font-size: 0.875rem;
+    color: var(--color-light-re, #b00);
+    margin-bottom: 0.25rem;
+}
+
 /* Basis: Code-Block-Container */
 .code-block {
     position: relative;

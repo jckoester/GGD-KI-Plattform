@@ -41,7 +41,17 @@ renderer.link = ({ href, title, text }) => {
     return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
 };
 
+function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 renderer.code = function({ text, lang }) {
+    // Mermaid: synchroner Platzhalter; das async Rendern macht die Svelte-Action
+    // `renderDiagrams` (siehe diagrams.js). Quelle als (escaptes) Textinhalt — die
+    // Action liest sie via textContent zurück.
+    if (lang === 'mermaid') {
+        return `<div class="mermaid-block">${escapeHtml(text)}</div>`;
+    }
     const language = lang && hljs.getLanguage(lang) ? lang : null;
     const highlighted = language
         ? hljs.highlight(text, { language }).value
