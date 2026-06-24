@@ -27,32 +27,41 @@ async def _resolve_subject_id(
     subject_slug: str,
     aliases: dict[str, str],
 ) -> Optional[int]:
-    """Löst einen aus dem SSO-Token abgeleiteten Wert auf einen Subject-ID auf.
+    """Löst einen aus dem SSO-Token abgeleiteten Wert auf eine Subject-ID auf.
 
     Reihenfolge:
-    1. Direkter Vergleich: normalisierter Wert == normalisierter subject.slug
-    2. Alias-Map: normalisierten Wert gegen normalisierte Alias-Keys prüfen,
-       dann den Alias-Zielwert wieder als Slug nachschlagen
+    1. Direkter Vergleich: case-insensitiv gegen subject.slug — sowohl umlaut-
+       normalisiert (ä→ae) als auch roh kleingeschrieben, damit Slugs in beiden
+       Schreibweisen treffen (DB-Slugs sollten umlautfrei sein, vgl. subjects.yaml).
+    2. Alias-Map: konfigurierte Kurz-/Variantennamen (auth.yaml → sso.subject_aliases)
+       auf einen Slug abbilden, dann erneut nachschlagen.
     """
     from app.db.models import Subject
 
-    normalized = _normalize_for_slug(subject_slug)
+    # Kandidaten: umlaut-normalisiert UND roh klein (deckt beide Slug-Schreibweisen ab)
+    candidates = {_normalize_for_slug(subject_slug), subject_slug.lower()}
 
-    # 1. Direkter case-insensitives Matching
+    # 1. Direktes case-insensitives Matching
     res = await db.execute(
-        select(Subject.id).where(func.lower(Subject.slug) == normalized)
+        select(Subject.id).where(func.lower(Subject.slug).in_(list(candidates))).limit(1)
     )
     subject_id = res.scalar_one_or_none()
     if subject_id is not None:
         return subject_id
 
-    # 2. Alias-Map (Keys und Values ebenfalls normalisiert vergleichen)
-    normalized_aliases = {_normalize_for_slug(k): _normalize_for_slug(v)
-                          for k, v in aliases.items()}
-    alias_target = normalized_aliases.get(normalized)
+    # 2. Alias-Map (Keys umlaut-normalisiert UND roh klein vergleichen)
+    normalized_aliases: dict[str, str] = {}
+    for key, value in aliases.items():
+        target = value.lower()
+        normalized_aliases[_normalize_for_slug(key)] = target
+        normalized_aliases.setdefault(key.lower(), target)
+    alias_target = next(
+        (normalized_aliases[c] for c in candidates if c in normalized_aliases),
+        None,
+    )
     if alias_target:
         res = await db.execute(
-            select(Subject.id).where(func.lower(Subject.slug) == alias_target)
+            select(Subject.id).where(func.lower(Subject.slug) == alias_target).limit(1)
         )
         return res.scalar_one_or_none()
 
@@ -119,7 +128,10 @@ def parse_sso_groups(
 
     for sso_id in sso_groups:
         for group_type, pattern in type_patterns:
-            m = re.match(pattern, sso_id)
+            # IGNORECASE: IServ liefert kleingeschriebene Accountnamen (fs.mathematik),
+            # die Muster sind aber oft mit Großpräfix notiert (^FS\.). Case-insensitiv
+            # matchen, damit beide Schreibweisen treffen.
+            m = re.match(pattern, sso_id, re.IGNORECASE)
             if m:
                 captured = m.group(1)
                 # Name ableiten

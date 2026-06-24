@@ -36,16 +36,19 @@ group_role_map:
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).
+# Matching ist case-insensitiv: IServ liefert kleingeschriebene Accountnamen
+# (z.B. fs.mathematik), die Muster dürfen aber Großpräfixe verwenden.
 sso:
   groups:
-    subject_department: '^FS\.(.+)$' # FS.Mathematik → subject_department
-    school_class: '^Klasse\.(.+)$' # Klasse.8a → school_class
-    teaching_group: '^unterricht\.(.+)$' # unterricht.8a.Mathematik → teaching_group
+    subject_department: '^FS\.(.+)$' # matcht fs.mathematik → subject_department
+    school_class: '^Klasse\.(.+)$' # matcht klasse.8a → school_class
+    teaching_group: '^unterricht\.(.+)$' # matcht unterricht.8a.mathematik → teaching_group
   allow_manual_teaching_groups: true # false = Sidebar-Vorschläge deaktiviert
-  subject_aliases: # Kurzname → Subject-Slug (case-insensitiv)
-    D: deutsch
-    E: englisch
-    M: mathematik
-    Bio: biologie
-    Ch: chemie
-    Ph: physik
+  # Variantenname → Subject-Slug (case-insensitiv). Nur nötig, wenn der aus dem
+  # Accountnamen abgeleitete Wert (fs.<X> → X) nicht direkt einem Subject-Slug
+  # entspricht. Beispiele aus echten Fachschaftsgruppen:
+  subject_aliases:
+    bildende.kunst: kunst # Account fs.bildende.kunst → Subject "kunst"
+    reli: religion # Kurzform
+    religion.ev: religion # konfessionelle Untergruppen auf ein Subject mappen
+    religion.kath: religion

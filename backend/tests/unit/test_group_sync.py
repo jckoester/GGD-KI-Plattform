@@ -210,3 +210,45 @@ def test_valid_patterns():
         teaching_group=r"^unterricht\.(.+)$",
     )
     assert patterns is not None
+
+
+# =============================================================================
+# Tests für case-insensitives Pattern-Matching (echte IServ-Accountnamen)
+# =============================================================================
+
+def test_parse_lowercase_iserv_account():
+    """IServ liefert kleingeschriebene Account-Namen (fs.mathematik) → matcht ^FS\\."""
+    result = parse_sso_groups(["fs.mathematik"], PATTERNS)
+    assert len(result) == 1
+    r = result[0]
+    assert r.type == "subject_department"
+    assert r.slug == "fs-mathematik"
+    assert r.subject_slug == "mathematik"
+
+
+def test_parse_case_insensitive_prefix_variants():
+    """Gleiches Ergebnis unabhängig von der Schreibweise des Präfixes."""
+    for sso_id in ["fs.nwt", "FS.NwT", "Fs.nwt"]:
+        result = parse_sso_groups([sso_id], PATTERNS)
+        assert len(result) == 1, sso_id
+        assert result[0].type == "subject_department", sso_id
+        assert result[0].subject_slug == "nwt", sso_id
+
+
+def test_parse_dotted_subject_department():
+    """Mehrteilige Fachschaftsnamen behalten den Punkt im subject_slug (Alias nötig)."""
+    result = parse_sso_groups(["fs.bildende.kunst", "fs.religion.ev"], PATTERNS)
+    assert all(r.type == "subject_department" for r in result)
+    slugs = {r.subject_slug for r in result}
+    assert slugs == {"bildende.kunst", "religion.ev"}
+
+
+def test_parse_real_iserv_fachschaften():
+    """Repräsentativer Ausschnitt echter Gymnasium-Ditzingen-Fachschaftsgruppen."""
+    groups = ["fs.mathematik", "fs.deutsch", "fs.nwt", "fs.bili", "fs.franzoesisch"]
+    result = parse_sso_groups(groups, PATTERNS)
+    assert len(result) == 5
+    assert all(r.type == "subject_department" for r in result)
+    by_id = {r.sso_group_id: r.subject_slug for r in result}
+    assert by_id["fs.mathematik"] == "mathematik"
+    assert by_id["fs.bili"] == "bili"  # kein Subject → später NULL (Warnung)
