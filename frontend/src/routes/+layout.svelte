@@ -1,5 +1,6 @@
 <script>
   import './layout.css'
+  import 'katex/dist/katex.min.css' // Mathe-/Chemie-Rendering (Phase 15)
   import { onMount } from 'svelte'
   import { themePref } from '$lib/stores/theme.js'
 

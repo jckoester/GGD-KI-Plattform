@@ -1,6 +1,8 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js/lib/core';
+import katex from 'katex';
+import 'katex/contrib/mhchem'; // registriert \ce{} und \pu{} (Chemie) auf der katex-Instanz
 
 // Sprachimporte
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -53,10 +55,112 @@ renderer.code = function({ text, lang }) {
 
 marked.use({ renderer });
 
+// ── KaTeX (Mathe + Chemie via mhchem) ───────────────────────────────────────
+// Strategie (Plan Phase 15, D2): KaTeX-Ausgabe wird von uns aus der Quell-Notation
+// ERZEUGT (vertrauenswürdig, KaTeX rendert TeX in eine feste span/MathML-Struktur,
+// `trust:false` per Default → kein \href javascript:). Sie soll die strikte
+// DOMPurify-Sanitisierung des Markdowns NICHT aufweichen. Deshalb: marked-Extension
+// liefert nur einen Platzhalter, die echte KaTeX-Ausgabe wird erst NACH DOMPurify
+// wieder eingesetzt — so bleibt DOMPurify strikt und zerschießt KaTeX-Styles nicht.
+//
+// Die Extension respektiert über marked den Code-Kontext: Formeln in `…`-Spans und
+// ```-Blöcken bleiben Quelltext (wichtig z. B. für `$VAR` in Bash-Snippets).
+
+// Per-Aufruf-Speicher. marked.parse läuft synchron und nicht-reentrant, daher ist
+// das modulweite Zurücksetzen am Anfang von renderMarkdown sicher.
+let _mathStore = {};
+let _mathCount = 0;
+let _mathNonce = '';
+
+function renderKatexPlaceholder(tex, display) {
+    let html;
+    try {
+        html = katex.renderToString(tex, {
+            displayMode: !!display,
+            throwOnError: false, // fehlerhafte/unvollständige Formeln (Streaming!) nicht werfen
+            output: 'htmlAndMathml',
+        });
+    } catch {
+        // Sollte mit throwOnError:false praktisch nicht auftreten → Rohtext zurückgeben.
+        const d = display ? '$$' : '$';
+        return d + tex + d;
+    }
+    const id = _mathCount++;
+    _mathStore[id] = html;
+    return `KMATH${_mathNonce}X${id}X`;
+}
+
+// Display-Mathe ($$…$$, \[…\]) — auch als Inline-Fallback verwendet.
+function matchDisplayMath(src) {
+    let m;
+    if ((m = /^\$\$([\s\S]+?)\$\$/.exec(src))) return { raw: m[0], text: m[1], display: true };
+    if ((m = /^\\\[([\s\S]+?)\\\]/.exec(src))) return { raw: m[0], text: m[1], display: true };
+    return null;
+}
+
+// Inline-Mathe: Display zuerst, dann \(…\) und $…$.
+// $…$-Heuristik gegen Währungs-Fehltreffer (D1): öffnendes $ nicht von Space/$ gefolgt,
+// schließendes $ nicht von einer Ziffer gefolgt ($5 … $10 bleibt so Text).
+function matchInlineMath(src) {
+    const d = matchDisplayMath(src);
+    if (d) return d;
+    let m;
+    if ((m = /^\\\(([\s\S]+?)\\\)/.exec(src))) return { raw: m[0], text: m[1], display: false };
+    if ((m = /^\$(?![\s$])((?:\\.|[^$\\\n])+?)\$(?!\d)/.exec(src)))
+        return { raw: m[0], text: m[1], display: false };
+    return null;
+}
+
+const katexBlockExt = {
+    name: 'katexBlock',
+    level: 'block',
+    start(src) {
+        const i = src.search(/\$\$|\\\[/);
+        return i < 0 ? undefined : i;
+    },
+    tokenizer(src) {
+        const t = matchDisplayMath(src);
+        if (t) return { type: 'katexBlock', raw: t.raw, text: t.text, display: t.display };
+    },
+    renderer(token) {
+        return renderKatexPlaceholder(token.text, token.display);
+    },
+};
+
+const katexInlineExt = {
+    name: 'katexInline',
+    level: 'inline',
+    start(src) {
+        const i = src.search(/\$|\\[([]/);
+        return i < 0 ? undefined : i;
+    },
+    tokenizer(src) {
+        const t = matchInlineMath(src);
+        if (t) return { type: 'katexInline', raw: t.raw, text: t.text, display: t.display };
+    },
+    renderer(token) {
+        return renderKatexPlaceholder(token.text, token.display);
+    },
+};
+
+marked.use({ extensions: [katexBlockExt, katexInlineExt] });
+
 export function renderMarkdown(text) {
     if (!text) return '';
-    return DOMPurify.sanitize(marked.parse(text), {
+    // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
+    _mathStore = {};
+    _mathCount = 0;
+    _mathNonce = Math.random().toString(36).slice(2, 10);
+
+    const clean = DOMPurify.sanitize(marked.parse(text), {
         ADD_TAGS: ['div'],
         ADD_ATTR: ['data-lang', 'class', 'target', 'rel'],
     });
+
+    if (_mathCount === 0) return clean;
+    // Platzhalter durch die (vertrauenswürdige) KaTeX-Ausgabe ersetzen.
+    return clean.replace(
+        new RegExp(`KMATH${_mathNonce}X(\\d+)X`, 'g'),
+        (_, id) => _mathStore[id] ?? '',
+    );
 }
