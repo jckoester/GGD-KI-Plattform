@@ -44,11 +44,5 @@ sso:
     school_class: '^Klasse\.(.+)$' # matcht klasse.8a → school_class
     teaching_group: '^unterricht\.(.+)$' # matcht unterricht.8a.mathematik → teaching_group
   allow_manual_teaching_groups: true # false = Sidebar-Vorschläge deaktiviert
-  # Variantenname → Subject-Slug (case-insensitiv). Nur nötig, wenn der aus dem
-  # Accountnamen abgeleitete Wert (fs.<X> → X) nicht direkt einem Subject-Slug
-  # entspricht. Beispiele aus echten Fachschaftsgruppen:
-  subject_aliases:
-    bildende.kunst: kunst # Account fs.bildende.kunst → Subject "kunst"
-    reli: religion # Kurzform
-    religion.ev: religion # konfessionelle Untergruppen auf ein Subject mappen
-    religion.kath: religion
+  # Hinweis: Fach-Aliase (alternative SSO-Gruppennamen, z. B. fs.bildende.kunst → kunst)
+  # werden pro Fach in config/subjects.yaml gepflegt (Feld sso_aliases) — nicht mehr hier.

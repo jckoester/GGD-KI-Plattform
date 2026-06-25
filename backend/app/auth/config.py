@@ -35,7 +35,6 @@ class SsoGroupPatterns(BaseModel):
 
 class SsoConfig(BaseModel):
     groups: SsoGroupPatterns = SsoGroupPatterns()
-    subject_aliases: dict[str, str] = {}
     allow_manual_teaching_groups: bool = True
 
 

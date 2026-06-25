@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 from app.db.models import Subject
+from app.auth.group_sync import _normalize_for_slug
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,6 +55,13 @@ async def seed(yaml_path: Path) -> None:
             # Fachkürzel normalisieren: leer/fehlend → None, sonst Großschreibung
             raw_code = entry.get("fach_code")
             fach_code = raw_code.strip().upper() if raw_code and raw_code.strip() else None
+            # SSO-Aliase normalisieren (lowercase + Umlaute), damit sie dem
+            # Matching-Kandidaten in _resolve_subject_id entsprechen.
+            sso_aliases = sorted({
+                _normalize_for_slug(str(a))
+                for a in (entry.get("sso_aliases") or [])
+                if a and str(a).strip()
+            })
             result = await db.execute(
                 select(Subject).where(Subject.slug == slug)
             )
@@ -67,6 +75,7 @@ async def seed(yaml_path: Path) -> None:
                 existing.min_grade = entry.get("min_grade")
                 existing.max_grade = entry.get("max_grade")
                 existing.sort_order = entry.get("sort_order", 0)
+                existing.sso_aliases = sso_aliases
                 updated += 1
             else:
                 db.add(
@@ -79,6 +88,7 @@ async def seed(yaml_path: Path) -> None:
                         min_grade=entry.get("min_grade"),
                         max_grade=entry.get("max_grade"),
                         sort_order=entry.get("sort_order", 0),
+                        sso_aliases=sso_aliases,
                     )
                 )
                 inserted += 1

@@ -5,7 +5,7 @@ from uuid import UUID, UUID as UUIDType
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
 from sqlalchemy import Numeric, Boolean
 from pgvector.sqlalchemy import Vector
 
@@ -74,6 +74,14 @@ class Subject(Base):
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     sort_order: Mapped[int] = mapped_column(default=0, nullable=False)
+    # Alternative SSO-Gruppennamen (z. B. 'bildende.kunst' → Fach 'kunst',
+    # 'religion.ev' → 'religion-ev'); geseedet aus config/subjects.yaml.
+    # Single Source of Truth statt sso.subject_aliases in auth.yaml.
+    # PG-ARRAY (statt generischem sa.ARRAY), damit der Overlap-Operator (&&)
+    # für das Alias-Matching in _resolve_subject_id zur Verfügung steht.
+    sso_aliases: Mapped[list[str]] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
 
 
 # 2. groups

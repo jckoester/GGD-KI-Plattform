@@ -86,7 +86,6 @@ async def auth_callback(
         sso_groups=identity.sso_groups,
         primary_role=primary_role,
         patterns=auth_config.sso.groups,
-        aliases=auth_config.sso.subject_aliases,
     )
     
     token, _ = jwt_service.issue(
@@ -250,7 +249,6 @@ async def login_direct(
         sso_groups=identity.sso_groups,
         primary_role=primary_role,
         patterns=auth_config.sso.groups,
-        aliases=auth_config.sso.subject_aliases,
     )
     
     token, _ = jwt_service.issue(

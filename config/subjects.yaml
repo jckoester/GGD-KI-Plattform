@@ -2,7 +2,11 @@
 # Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
 #         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order,
 #         fach_code (optional, Bildungsplan-Fachkürzel wie M/CH; wird in die
-#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
+#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf),
+#         sso_aliases (optional, Liste alternativer SSO-Gruppennamen, die beim
+#         Gruppenimport auf dieses Fach gemappt werden — z.B. [bildende.kunst]
+#         für die IServ-Gruppe fs.bildende.kunst. Single Source of Truth statt
+#         eines separaten Alias-Blocks in auth.yaml.)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
 schuljahr: "2026/27" # aktuelles Schuljahr
@@ -81,12 +85,14 @@ subjects:
     max_grade: 13
     sort_order: 80
 
+  # Sammelfach der Fachschaft Informatik: IuM (Informatik und Medienbildung,
+  # Kl. 5-10) + Informatik (Kursstufe 11/12). IServ: fs.informatik (direkter Treffer).
   - slug: informatik
     name: Informatik
     icon: code-2
     color: "#64748b"
-    min_grade: 7
-    max_grade: 13
+    min_grade: 5
+    max_grade: 12
     sort_order: 90
 
   - slug: kunst
@@ -96,6 +102,7 @@ subjects:
     min_grade: 5
     max_grade: 13
     sort_order: 100
+    sso_aliases: [bildende.kunst]   # IServ: fs.bildende.kunst
 
   - slug: musik
     name: Musik
@@ -113,13 +120,36 @@ subjects:
     max_grade: 13
     sort_order: 120
 
-  - slug: religion
-    name: Religion
+  # Drei eigenständige konfessionelle Fächer mit je eigenem Bildungsplan.
+  # Die IServ-Sammelgruppe fs.reli dient nur dem Austausch und ist KEINEM Fach
+  # zugeordnet (wird daher hier nicht als Alias geführt).
+  - slug: religion-ev
+    name: Evangelische Religion
     icon: sun
     color: "#fbbf24"
     min_grade: 5
     max_grade: 13
     sort_order: 130
+    sso_aliases: [religion.ev]   # IServ: fs.religion.ev
+
+  - slug: religion-kath
+    name: Katholische Religion
+    icon: sun
+    color: "#d97706"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 131
+    sso_aliases: [religion.kath]   # IServ: fs.religion.kath
+
+  # Vorbereitet für die künftige Fachschaft fs.religion.isl (Gruppe noch nicht angelegt).
+  - slug: religion-isl
+    name: Islamische Religion
+    icon: sun
+    color: "#0d9488"
+    min_grade: 5
+    max_grade: 13
+    sort_order: 132
+    sso_aliases: [religion.isl]   # IServ: fs.religion.isl (künftig)
 
   - slug: ethik
     name: Ethik
@@ -129,10 +159,24 @@ subjects:
     max_grade: 13
     sort_order: 140
 
+  # Sammelfach der Fachschaft NwT: NwT (G8, Kl. 8-12) + NIT (Naturwissenschaft,
+  # Informatik und Technik; G9, Kl. 8-13). NIT wächst von unten nach und läuft nie
+  # parallel zu NwT — Unterschied liegt nur im Bildungsplan. IServ: fs.nwt.
   - slug: nwt
     name: NwT
     icon: microscope
     color: "#0ea5e9"
     min_grade: 8
-    max_grade: 10
+    max_grade: 13
     sort_order: 150
+
+  # Sammelfach der Fachschaft Wirtschaft: WBS (Wirtschaft, Berufs- und
+  # Studienorientierung; Kl. 8-10) + Wirtschaft (Kursstufe 11/12).
+  # IServ: fs.wirtschaft (direkter Treffer).
+  - slug: wirtschaft
+    name: Wirtschaft
+    icon: trending-up
+    color: "#65a30d"
+    min_grade: 8
+    max_grade: 12
+    sort_order: 160
