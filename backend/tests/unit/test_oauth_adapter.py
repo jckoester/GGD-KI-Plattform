@@ -452,6 +452,34 @@ class TestRoleMatching:
         assert identity.sso_groups == ["Kollegium", "fs.mathematik"]
         assert identity.sso_roles == ["Lehrer"]
 
+    @pytest.mark.asyncio
+    async def test_real_iserv_shape_end_to_end(self, mock_settings, oauth_config_dict):
+        """Realistische IServ-userinfo: ROLE_TEACHER → teacher, Gruppen = act-Werte."""
+        adapter = _adapter_with_map(
+            mock_settings,
+            oauth_config_dict,
+            {"ROLE_TEACHER": "teacher", "ROLE_STUDENT": "student", "ki-admins": "admin"},
+        )
+        resp = MagicMock()
+        resp.json.return_value = {
+            "preferred_username": "t",
+            "iserv:groups": {
+                "1": {"id": "1", "act": "kollegium", "name": "Kollegium"},
+                "2": {"id": "2", "act": "fs.mathematik", "name": "FS Mathematik"},
+                "3": {"id": "3", "act": "klasse.8d", "name": "Klasse 8D"},
+            },
+            "iserv:roles": ["ROLE_TEACHER", "ROLE_ADMIN"],
+        }
+        resp.raise_for_status = MagicMock()
+        mock_client = _make_mock_client(_mock_token(), resp)
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await adapter.get_login_challenge()
+            identity = await adapter.exchange_code("c", ch.state)
+        # ROLE_TEACHER → teacher; ROLE_ADMIN bewusst NICHT gemappt → kein admin
+        assert identity.roles == ["teacher"]
+        assert identity.sso_groups == ["kollegium", "fs.mathematik", "klasse.8d"]
+        assert identity.sso_roles == ["ROLE_TEACHER", "ROLE_ADMIN"]
+
 
 class TestAsStrList:
     def test_list_of_strings_passthrough(self):
@@ -462,6 +490,17 @@ class TestAsStrList:
 
     def test_objects_name_field_extracted(self):
         assert _as_str_list([{"name": "Kollegium"}, {"act": "fs.x"}]) == ["Kollegium", "fs.x"]
+
+    def test_dict_of_objects_prefers_act(self):
+        """IServ-Gruppenformat: Map id→Objekt, `act` wird bevorzugt."""
+        value = {
+            "id1": {"id": "id1", "act": "fs.mathematik", "name": "FS Mathematik"},
+            "id2": {"id": "id2", "act": "kollegium", "name": "Kollegium"},
+        }
+        assert _as_str_list(value) == ["fs.mathematik", "kollegium"]
+
+    def test_single_object_dict(self):
+        assert _as_str_list({"act": "kollegium", "name": "Kollegium"}) == ["kollegium"]
 
     def test_none_and_garbage_yield_empty(self):
         assert _as_str_list(None) == []

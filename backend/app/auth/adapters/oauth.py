@@ -19,30 +19,45 @@ logger = logging.getLogger(__name__)
 
 
 def _as_str_list(value) -> list[str]:
-    """Normalisiert einen userinfo-Claim auf eine Liste von Strings.
+    """Normalisiert einen userinfo-Claim auf eine Liste von String-Bezeichnern.
 
-    Toleriert: Liste[str] (Standard), Einzel-String, Liste[dict] (Namensfeld wird
-    extrahiert). So bricht weder das Matching (`.lower()`) noch die `list[str]`-
-    Validierung von NormalizedIdentity, falls ein Provider Gruppen/Rollen als
-    Objekte statt als Strings liefert.
+    Toleriert die Formate, die SSO-Provider in der Praxis liefern:
+    - Liste von Strings  (IServ `iserv:roles` → ['ROLE_TEACHER', ...])
+    - Dict id→Objekt     (IServ `iserv:groups` → {'<id>': {'act': 'fs.mathematik', ...}})
+    - Liste von Objekten
+    - Einzel-String
+
+    Aus Objekten wird **`act`** bevorzugt: das ist der IServ-Account-Name
+    (`fs.mathematik`/`klasse.8d`/`kollegium`) und passt zu den SSO-Gruppenmustern
+    (`^FS\\.(.+)$` …) und zur `group_role_map`. `name` (z. B. „FS Mathematik")
+    enthält Leerzeichen und träfe die Muster nicht. Fallback `name`/`id`/`value`.
     """
     if isinstance(value, str):
         return [value]
-    if not isinstance(value, (list, tuple)):
+    if isinstance(value, dict):
+        # IServ liefert Gruppen als Map id→Objekt. Sind die Werte selbst Objekte,
+        # ist es eine solche Map (→ Werte iterieren); sonst ein einzelnes Objekt.
+        if value and all(isinstance(v, dict) for v in value.values()):
+            items = list(value.values())
+        else:
+            items = [value]
+    elif isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
         return []
     out: list[str] = []
-    for item in value:
+    for item in items:
         if isinstance(item, str):
             out.append(item)
         elif isinstance(item, dict):
-            name = (
-                item.get("name")
-                or item.get("act")
+            ident = (
+                item.get("act")
+                or item.get("name")
                 or item.get("id")
                 or item.get("value")
             )
-            if isinstance(name, str):
-                out.append(name)
+            if isinstance(ident, str):
+                out.append(ident)
     return out
 
 
