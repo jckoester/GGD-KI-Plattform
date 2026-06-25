@@ -45,6 +45,7 @@ async def check_for_updates(subjects_path: str = 'config/subjects.yaml') -> list
     schulart = cfg['schulart']
     bp_default = cfg.get('bildungsplan_default', {})
     bp_basis = bp_default.get('bp_basis', 'BP2016BW')
+    default_suffix = bp_default.get('suffix', '')
 
     changed = []
     async with httpx.AsyncClient(timeout=15) as client:
@@ -52,7 +53,9 @@ async def check_for_updates(subjects_path: str = 'config/subjects.yaml') -> list
             fach_code = fach.get('fach_code')
             if not fach_code:
                 continue
-            bp_id = f"{bp_basis}_ALLG_{schulart}_{fach_code}"
+            # Fach-Default-Edition überwachen (z.B. '.V2'), nicht nur die Basis.
+            suffix = fach.get('bildungsplan_suffix', default_suffix)
+            bp_id = f"{bp_basis}_ALLG_{schulart}_{fach_code}{suffix}"
             current_date = await fetch_version_date(client, bp_id)
             if current_date and state.get(bp_id) != current_date:
                 changed.append(fach_code)
