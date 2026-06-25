@@ -105,6 +105,9 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
     Wird nach dem INSERT eines neuen Knotens via API aufgerufen.
     Fehler werden geloggt aber nicht weitergeworfen (Embedding ist kein kritischer Pfad).
     """
+    from app.config import settings
+    if not settings.embeddings_enabled:
+        return
     node = await db.get(ContextNode, node_id)
     if node is None:
         return

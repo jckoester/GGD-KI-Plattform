@@ -51,7 +51,7 @@ def seed_planning_fixtures(db_url, run_migrations):
 
 @pytest.fixture
 def auth_student(jwt_service):
-    token, _ = jwt_service.issue(pseudonym=STUDENT_PSEUDO, roles=["student"], grade=10)
+    token, _ = jwt_service.issue(pseudonym=STUDENT_PSEUDO, roles=["student"], grade="10")
     return {"Cookie": f"session={token}"}
 
 

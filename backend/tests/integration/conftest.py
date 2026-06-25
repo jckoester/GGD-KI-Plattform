@@ -18,6 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 load_dotenv()
 
+# Inline-Embeddings in Tests global deaktivieren: In der Testumgebung läuft kein
+# LiteLLM-Proxy; der Embedding-Aufruf würde fehlschlagen und 'embedding_error' in
+# die Knoten-Metadaten schreiben (verfälscht Tests, z. B. Metadaten-Vergleiche).
+# Früh genug (Modulimport der conftest), bevor App-Module/Seeds Knoten anlegen.
+# Der Batch-Service backfill_embeddings bleibt unberührt (Tests mocken dort gezielt).
+from app.config import settings as _settings
+_settings.embeddings_enabled = False
+
 # Pseudonyme der Test-Nutzer
 TEACHER1_PSEUDO = "teacher1-pseudo"
 TEACHER2_PSEUDO = "teacher2-pseudo"
@@ -42,13 +50,31 @@ def db_url() -> str:
 
 @pytest.fixture(scope="session")
 def run_migrations(db_url):
-    """Spielt die Alembic-Migrationen gegen die Test-DB durch."""
+    """Setzt das Schema der Test-DB zurück und spielt alle Migrationen durch.
+
+    Der Schema-Reset (DROP/CREATE) zu Session-Beginn garantiert eine saubere DB pro
+    Test-Lauf und verhindert Pollution durch committende, nicht-idempotente Session-
+    Seeds (z. B. seed_phase4_data mit festen IDs), die sonst Folgeläufe mit
+    Duplicate-Key brechen lassen.
+    """
     from alembic import command
     from alembic.config import Config
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, text
 
     sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    # Sicherheitsnetz: niemals eine Nicht-Test-DB zurücksetzen.
+    db_name = sync_url.rsplit("/", 1)[-1].split("?", 1)[0].lower()
+    if "test" not in db_name:
+        raise RuntimeError(
+            f"Schema-Reset abgelehnt: TEST_DATABASE_URL zeigt nicht auf eine Test-DB "
+            f"('test' im DB-Namen erwartet, gefunden: '{db_name}')."
+        )
+
     engine = create_engine(sync_url)
+    with engine.connect() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+        connection.commit()
     with engine.connect() as connection:
         alembic_cfg = Config("alembic.ini")
         alembic_cfg.attributes["connection"] = connection

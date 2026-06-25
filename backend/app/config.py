@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     litellm_proxy_url: str = "http://localhost:4000"
     litellm_master_key: str = ""
     litellm_verify_ssl: bool = True
+    # Inline-Embedding-Generierung beim Anlegen/Ändern von Knoten (enqueue_embedding_job).
+    # In Tests deaktivierbar, da dort kein LiteLLM-Proxy läuft.
+    embeddings_enabled: bool = True
     frontend_origin: str = "http://localhost:5173"
     environment: str = "development"
     auth_config_path: str = "config/auth.yaml"

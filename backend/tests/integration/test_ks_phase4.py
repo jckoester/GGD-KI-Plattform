@@ -82,6 +82,24 @@ def seed_phase4_data(db_url: str) -> dict:
     
     try:
         with conn.cursor() as cur:
+            # ── Clean slate ───────────────────────────────────────────────────
+            # Frühere (committende) Tests im selben Lauf können Fächer mit denselben
+            # Slugs hinterlassen (z. B. 'mathematik' aus den Curriculum-Tests). Da der
+            # Seed feste IDs UND Slugs nutzt, würde der Insert sonst an der UNIQUE-
+            # Constraint subjects_slug_key scheitern. subject_id-FKs sind ON DELETE
+            # SET NULL, daher ist das Entfernen unkritisch.
+            cur.execute(
+                "DELETE FROM groups WHERE id = ANY(%s)",
+                ([MATH_GROUP_1["id"], MATH_GROUP_2["id"], PHYSICS_GROUP_1["id"]],),
+            )
+            cur.execute(
+                "DELETE FROM subjects WHERE id = ANY(%s) OR slug = ANY(%s)",
+                (
+                    [MATH_SUBJECT["id"], PHYSICS_SUBJECT["id"]],
+                    [MATH_SUBJECT["slug"], PHYSICS_SUBJECT["slug"]],
+                ),
+            )
+
             # ── Fächer anlegen ────────────────────────────────────────────────
             for subject in [MATH_SUBJECT, PHYSICS_SUBJECT]:
                 cur.execute("""
@@ -418,9 +436,14 @@ def teardown_phase4_data(db_url: str, node_ids: dict) -> None:
 
 @pytest.fixture(scope="session")
 def phase4_node_ids(db_url, run_migrations):
-    """Legt alle Phase-4 Testdaten einmalig an und gibt node_ids zurück."""
+    """Legt alle Phase-4 Testdaten einmalig an und räumt danach wieder auf.
+
+    Der Teardown verhindert, dass die committeten Fächer/Gruppen/Knoten (feste IDs)
+    in nachfolgende Testdateien leaken.
+    """
     node_ids = seed_phase4_data(db_url)
-    return node_ids
+    yield node_ids
+    teardown_phase4_data(db_url, node_ids)
 
 
 
