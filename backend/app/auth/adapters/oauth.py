@@ -18,6 +18,34 @@ from app.config import Settings
 logger = logging.getLogger(__name__)
 
 
+def _as_str_list(value) -> list[str]:
+    """Normalisiert einen userinfo-Claim auf eine Liste von Strings.
+
+    Toleriert: Liste[str] (Standard), Einzel-String, Liste[dict] (Namensfeld wird
+    extrahiert). So bricht weder das Matching (`.lower()`) noch die `list[str]`-
+    Validierung von NormalizedIdentity, falls ein Provider Gruppen/Rollen als
+    Objekte statt als Strings liefert.
+    """
+    if isinstance(value, str):
+        return [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    out: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, dict):
+            name = (
+                item.get("name")
+                or item.get("act")
+                or item.get("id")
+                or item.get("value")
+            )
+            if isinstance(name, str):
+                out.append(name)
+    return out
+
+
 def _unverified_jwt_claims(token: str) -> dict:
     """Dekodiert die Claims eines JWT **ohne** Signaturprüfung.
 
@@ -207,24 +235,27 @@ class OAuthAdapter(AuthAdapter):
     def _userinfo_to_identity(self, userinfo: dict) -> NormalizedIdentity:
         external_id = userinfo["preferred_username"]
         # Claim-Key robust lesen: je nach Provider/Version `groups` oder `iserv:groups`.
-        groups: list[str] = userinfo.get("groups") or userinfo.get("iserv:groups") or []
-        sso_roles: list[str] = userinfo.get("roles") or userinfo.get("iserv:roles") or []
+        # Werte defensiv auf Strings normalisieren (manche Provider liefern Objekte).
+        raw_groups = userinfo.get("groups") or userinfo.get("iserv:groups") or []
+        raw_roles = userinfo.get("roles") or userinfo.get("iserv:roles") or []
+        groups = _as_str_list(raw_groups)
+        sso_roles = _as_str_list(raw_roles)
         roles, grade = self._map_roles_and_grade(groups, sso_roles)
 
         # Diagnose (immer, ohne PII): zeigt, ob `groups`/`roles` überhaupt ankommen.
-        # Fehlt der `groups`-Key komplett, ist meist der OAuth-Scope/-Clientrecht
+        # Fehlt der Gruppen-Key komplett, ist meist der OAuth-Scope/-Clientrecht
         # in IServ das Problem, nicht das Matching.
         logger.info(
-            "OAuth-Login: userinfo-Claims=%s, groups=%d, sso_roles=%s → Rollen=%s%s",
+            "OAuth-Login: userinfo-Claims=%s, groups=%d, sso_roles=%s → Rollen=%s",
             sorted(userinfo.keys()),
             len(groups),
             sso_roles,
             roles,
-            "" if roles != ["student"] or groups or sso_roles
-            else "  [!] kein Rollen-Treffer → student-Fallback",
         )
         if self._debug_userinfo:
-            logger.info("OAuth-Login [debug] rohe groups=%s", groups)
+            logger.info(
+                "OAuth-Login [debug] rohe groups=%r rohe roles=%r", raw_groups, raw_roles
+            )
 
         return NormalizedIdentity(
             external_id=external_id,

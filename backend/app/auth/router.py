@@ -85,6 +85,7 @@ async def auth_callback(
     try:
         identity = await adapter.exchange_code(code, state)
     except Exception:
+        logger.exception("OAuth-Callback: exchange_code/Identity-Aufbau fehlgeschlagen")
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
     pseudonym = pseudonymize(identity.external_id, settings.school_secret)
     old_role, old_grade = await upsert_pseudonym_audit(db, pseudonym, identity)

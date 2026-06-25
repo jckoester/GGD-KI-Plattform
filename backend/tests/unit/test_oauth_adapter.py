@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from app.auth.adapters.oauth import OAuthAdapter, OAuthConfig
+from app.auth.adapters.oauth import OAuthAdapter, OAuthConfig, _as_str_list
 from app.config import Settings
 
 
@@ -433,6 +433,40 @@ class TestRoleMatching:
         assert identity.roles == ["teacher"]
         assert identity.sso_groups == ["Kollegium", "FS.Mathematik"]
         assert identity.sso_roles == ["Lehrer"]
+
+    @pytest.mark.asyncio
+    async def test_object_shaped_claims_do_not_crash(self, oauth_adapter):
+        """Gruppen/Rollen als Objekte (statt Strings) brechen den Login nicht."""
+        resp = MagicMock()
+        resp.json.return_value = {
+            "preferred_username": "t",
+            "groups": [{"name": "Kollegium"}, {"act": "fs.mathematik"}],
+            "roles": [{"name": "Lehrer"}],
+        }
+        resp.raise_for_status = MagicMock()
+        mock_client = _make_mock_client(_mock_token(), resp)
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]  # über die Rolle "Lehrer"
+        assert identity.sso_groups == ["Kollegium", "fs.mathematik"]
+        assert identity.sso_roles == ["Lehrer"]
+
+
+class TestAsStrList:
+    def test_list_of_strings_passthrough(self):
+        assert _as_str_list(["a", "b"]) == ["a", "b"]
+
+    def test_single_string_wrapped(self):
+        assert _as_str_list("a") == ["a"]
+
+    def test_objects_name_field_extracted(self):
+        assert _as_str_list([{"name": "Kollegium"}, {"act": "fs.x"}]) == ["Kollegium", "fs.x"]
+
+    def test_none_and_garbage_yield_empty(self):
+        assert _as_str_list(None) == []
+        assert _as_str_list(123) == []
+        assert _as_str_list([1, 2, {"foo": "bar"}]) == []
 
 
 # =============================================================================
