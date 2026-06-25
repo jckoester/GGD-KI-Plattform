@@ -253,9 +253,9 @@ class OAuthAdapter(AuthAdapter):
             roles,
         )
         if self._debug_userinfo:
-            logger.info(
-                "OAuth-Login [debug] rohe groups=%r rohe roles=%r", raw_groups, raw_roles
-            )
+            # Komplette userinfo (enthält PII!) — zeigt den exakten Key/die Struktur
+            # der Gruppen. Nur temporär per AUTH_DEBUG_USERINFO=true aktivieren.
+            logger.info("OAuth-Login [debug] vollständige userinfo=%r", userinfo)
 
         return NormalizedIdentity(
             external_id=external_id,
