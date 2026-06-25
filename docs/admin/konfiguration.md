@@ -57,6 +57,9 @@ oauth:
   base_url: https://sso.beispielschule.de
   client_id: ki-plattform
   redirect_uri: https://ki.beispielschule.de/auth/callback
+  # OAuth-Scopes. IServ liefert die Gruppen-/Rollen-Claims NUR mit `groups`-Scope
+  # (Standard). Der OAuth-Client muss in IServ für diesen Scope freigeschaltet sein.
+  scope: "openid profile email groups"
   # Regex mit Capture-Group für den Jahrgang aus dem Gruppenname.
   # Beispiel: Gruppe "jahrgang.10" → grade="10"
   grade_group_pattern: '^jahrgang\.(\d{1,2})$'
@@ -116,6 +119,18 @@ der Adapter bleibt damit provider-neutral.
 > betroffene Person findet die rohen, vom SSO gelieferten Gruppen und Rollen im
 > eigenen **Profil → „SSO-Mitgliedschaften (Diagnose)"** — diese Namen exakt (in
 > beliebiger Schreibweise) in `group_role_map` aufnehmen.
+>
+> **Diagnose „keine SSO-Daten" / alle sind student:** Zeigt das Profil *gar keine*
+> Gruppen/Rollen und werden alle als `student` eingestuft, kommen die Claims nicht
+> an. Prüfen:
+> 1. `scope` enthält `groups` **und** der OAuth-Client ist in IServ für diesen
+>    Scope freigeschaltet (IServ → Verwaltung → OAuth-Clients).
+> 2. Server-Log beim Login: Die Zeile `OAuth-Login: userinfo-Claims=[…], groups=N`
+>    zeigt, ob `groups`/`roles` überhaupt im Token sind. Fehlt der `groups`-Key,
+>    ist es der Scope/das Clientrecht. Für die rohen Gruppenwerte im Log temporär
+>    `AUTH_DEBUG_USERINFO=true` setzen.
+> 3. Nach einer Scope-Änderung müssen sich Nutzer:innen **neu anmelden** (die
+>    Gruppen stecken im 30-Tage-Cookie).
 
 > **Hinweis:** Das Client-Secret des SSO-Providers wird **nicht** in dieser Datei
 > gespeichert, sondern über die Umgebungsvariable `AUTH_ISERV_CLIENT_SECRET` in

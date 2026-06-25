@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     help_resources_path: str = "config/help_resources.yaml"
     pedagogy_path: str = "config/pedagogy.yaml"
     auth_iserv_client_secret: str = ""
+    # Wenn True, loggt der OAuth-Adapter beim Login die rohen userinfo-Gruppen/-Rollen
+    # (zur Diagnose der Rollen-/Fächer-Zuordnung). Enthält Gruppennamen → nur temporär
+    # aktivieren. Standard-Log (ohne Werte: Claim-Keys + Anzahl) läuft immer.
+    auth_debug_userinfo: bool = False
     jwt_algorithm: str = "HS256"
     chat_default_model: str = "openai/gpt-4o-mini"
     title_model: str = ""

@@ -13,6 +13,7 @@ def mock_settings():
     settings = MagicMock(spec=Settings)
     settings.auth_iserv_client_secret = "test_client_secret"
     settings.school_secret = "test_school_secret"
+    settings.auth_debug_userinfo = False
     return settings
 
 
@@ -115,6 +116,20 @@ class TestOAuthConfig:
         )
         assert config.grade_group_pattern is None
 
+    def test_default_scope_includes_groups(self, oauth_config_dict):
+        """Ohne explizite Angabe wird der `groups`-Scope angefordert."""
+        config = OAuthConfig.model_validate(oauth_config_dict)
+        assert "groups" in config.scope.split()
+
+    def test_scope_is_configurable(self):
+        config = OAuthConfig(
+            base_url="https://iserv.example.de",
+            client_id="c",
+            redirect_uri="https://ki.example.de/auth/callback",
+            scope="openid groups roles",
+        )
+        assert config.scope == "openid groups roles"
+
 
 class TestOAuthAdapter:
     def test_mode_is_redirect(self, oauth_adapter):
@@ -128,6 +143,8 @@ class TestOAuthAdapter:
         assert "client_id=test_client_id" in challenge.redirect_url
         assert "redirect_uri=" in challenge.redirect_url
         assert "state=" in challenge.redirect_url
+        assert "scope=" in challenge.redirect_url
+        assert "groups" in challenge.redirect_url  # groups-Scope wird angefordert
         assert challenge.state is not None
 
     @pytest.mark.asyncio

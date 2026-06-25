@@ -3,6 +3,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import logging
 import re
 import secrets
 from typing import Literal
@@ -13,6 +14,8 @@ from pydantic import BaseModel, model_validator
 
 from app.auth.base import AuthAdapter, FreshIdentity, LoginChallenge, NormalizedIdentity
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def _unverified_jwt_claims(token: str) -> dict:
@@ -36,6 +39,10 @@ class OAuthConfig(BaseModel):
     base_url: str  # z.B. https://iserv.example.de
     client_id: str
     redirect_uri: str
+    # OAuth-Scopes. IServ liefert Gruppen-/Rollen-Claims NUR, wenn der `groups`-Scope
+    # angefordert wird (und der OAuth-Client in IServ dafür freigeschaltet ist).
+    # Anpassen, falls der Provider andere Scope-Namen erwartet (z. B. zusätzlich `roles`).
+    scope: str = "openid profile email groups"
     grade_group_pattern: str | None = None
     # Regex mit genau einer Capture-Group, die den Jahrgangswert liefert.
     # Beispiel GGD: "^jahrgang\.(\d{1,2})$"
@@ -83,6 +90,7 @@ class OAuthAdapter(AuthAdapter):
         self._client_secret = settings.auth_iserv_client_secret
         self._school_secret = settings.school_secret
         self._group_role_map = group_role_map or {}
+        self._debug_userinfo = settings.auth_debug_userinfo
 
     @property
     def mode(self) -> Literal["redirect"]:
@@ -98,7 +106,7 @@ class OAuthAdapter(AuthAdapter):
             "response_type": "code",
             "client_id": self._config.client_id,
             "redirect_uri": self._config.redirect_uri,
-            "scope": "openid profile email",
+            "scope": self._config.scope,
             "state": state,
         }
         url = f"{self._config.effective_auth_url}?" + urlencode(params)
@@ -141,7 +149,7 @@ class OAuthAdapter(AuthAdapter):
             "response_type": "code",
             "client_id": self._config.client_id,
             "redirect_uri": self._config.redirect_uri,
-            "scope": "openid profile email",
+            "scope": self._config.scope,
             "state": state,
             "prompt": "login",
             "max_age": "0",
@@ -199,6 +207,22 @@ class OAuthAdapter(AuthAdapter):
         groups: list[str] = userinfo.get("groups") or []
         sso_roles: list[str] = userinfo.get("roles") or []
         roles, grade = self._map_roles_and_grade(groups, sso_roles)
+
+        # Diagnose (immer, ohne PII): zeigt, ob `groups`/`roles` überhaupt ankommen.
+        # Fehlt der `groups`-Key komplett, ist meist der OAuth-Scope/-Clientrecht
+        # in IServ das Problem, nicht das Matching.
+        logger.info(
+            "OAuth-Login: userinfo-Claims=%s, groups=%d, sso_roles=%s → Rollen=%s%s",
+            sorted(userinfo.keys()),
+            len(groups),
+            sso_roles,
+            roles,
+            "" if roles != ["student"] or groups or sso_roles
+            else "  [!] kein Rollen-Treffer → student-Fallback",
+        )
+        if self._debug_userinfo:
+            logger.info("OAuth-Login [debug] rohe groups=%s", groups)
+
         return NormalizedIdentity(
             external_id=external_id,
             roles=roles,
