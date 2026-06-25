@@ -39,10 +39,12 @@ class OAuthConfig(BaseModel):
     base_url: str  # z.B. https://iserv.example.de
     client_id: str
     redirect_uri: str
-    # OAuth-Scopes. IServ liefert Gruppen-/Rollen-Claims NUR, wenn der `groups`-Scope
-    # angefordert wird (und der OAuth-Client in IServ dafür freigeschaltet ist).
-    # Anpassen, falls der Provider andere Scope-Namen erwartet (z. B. zusätzlich `roles`).
-    scope: str = "openid profile email groups"
+    # OAuth-Scopes. IServ liefert Gruppen-/Rollen-Claims NUR, wenn die jeweiligen
+    # Scopes angefordert werden UND der OAuth-Client in IServ dafür freigeschaltet ist.
+    # Achtung: IServ benennt diese Scopes mit `iserv:`-Präfix (`iserv:groups`,
+    # `iserv:roles`) — `groups`/`roles` ohne Präfix werden mit „scope not allowed"
+    # abgelehnt. Bei anderen Providern entsprechend anpassen.
+    scope: str = "openid profile email iserv:groups iserv:roles"
     grade_group_pattern: str | None = None
     # Regex mit genau einer Capture-Group, die den Jahrgangswert liefert.
     # Beispiel GGD: "^jahrgang\.(\d{1,2})$"
@@ -204,8 +206,9 @@ class OAuthAdapter(AuthAdapter):
 
     def _userinfo_to_identity(self, userinfo: dict) -> NormalizedIdentity:
         external_id = userinfo["preferred_username"]
-        groups: list[str] = userinfo.get("groups") or []
-        sso_roles: list[str] = userinfo.get("roles") or []
+        # Claim-Key robust lesen: je nach Provider/Version `groups` oder `iserv:groups`.
+        groups: list[str] = userinfo.get("groups") or userinfo.get("iserv:groups") or []
+        sso_roles: list[str] = userinfo.get("roles") or userinfo.get("iserv:roles") or []
         roles, grade = self._map_roles_and_grade(groups, sso_roles)
 
         # Diagnose (immer, ohne PII): zeigt, ob `groups`/`roles` überhaupt ankommen.

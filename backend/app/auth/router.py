@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import datetime, timezone
 
@@ -26,6 +27,7 @@ from app.litellm.user_service import ensure_litellm_team_membership, ensure_lite
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/login")
@@ -54,7 +56,26 @@ async def auth_callback(
         raise HTTPException(status_code=405, detail="Adapter unterstützt kein OIDC-Callback")
     code = request.query_params.get("code")
     state = request.query_params.get("state")
+    # OAuth-Fehler-Redirect des Providers (z. B. ungültiger Scope, abgelehnte
+    # Zustimmung): kommt mit ?error=...&error_description=... statt code/state.
+    error = request.query_params.get("error")
+    if error is not None:
+        logger.warning(
+            "OAuth-Callback: Provider meldet error=%r description=%r (state vorhanden=%s)",
+            error,
+            request.query_params.get("error_description"),
+            state is not None,
+        )
+        raise HTTPException(
+            status_code=400, detail=f"Anmeldung vom Schulkonto abgelehnt: {error}"
+        )
     if code is None or state is None:
+        # Diagnose: zeigt, welche Parameter der Provider tatsächlich geschickt hat,
+        # ohne deren (potenziell sensible) Werte zu loggen.
+        logger.warning(
+            "OAuth-Callback ohne code/state. Vorhandene Query-Parameter: %s",
+            sorted(request.query_params.keys()),
+        )
         raise HTTPException(status_code=400, detail="Missing code or state")
     # Step-up-Rückkehr nutzt denselben redirect_uri; am State-Präfix unterscheidbar.
     if is_stepup_state(state):

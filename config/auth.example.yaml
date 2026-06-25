@@ -5,11 +5,12 @@ oauth:
   base_url: https://iserv.example.de
   client_id: ggd-ki-plattform
   redirect_uri: https://ki.example.de/api/auth/callback
-  # OAuth-Scopes. WICHTIG: IServ liefert die Gruppen-/Rollen-Claims NUR, wenn der
-  # `groups`-Scope angefordert wird UND der OAuth-Client in IServ dafür
-  # freigeschaltet ist (IServ → Verwaltung → OAuth-Clients → Scopes). Ohne
-  # `groups` werden alle als `student` eingestuft (kein Rollen-/Fach-Match).
-  scope: "openid profile email groups"
+  # OAuth-Scopes. WICHTIG: IServ liefert die Gruppen-/Rollen-Claims NUR, wenn die
+  # Scopes angefordert werden UND der OAuth-Client in IServ dafür freigeschaltet ist
+  # (IServ → Verwaltung → OAuth-Clients → Scopes). IServ benennt sie mit `iserv:`-
+  # Präfix — `groups`/`roles` ohne Präfix werden mit „scope not allowed" abgelehnt.
+  # Ohne diese Scopes werden alle als `student` eingestuft (kein Rollen-/Fach-Match).
+  scope: "openid profile email iserv:groups iserv:roles"
   # Regex mit Capture-Group für den Jahrgang.
   # Gruppe "jahrgang.10" → grade="10"
   grade_group_pattern: '^jahrgang\.(\d{1,2})$'

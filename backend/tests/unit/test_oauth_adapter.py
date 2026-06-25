@@ -116,10 +116,11 @@ class TestOAuthConfig:
         )
         assert config.grade_group_pattern is None
 
-    def test_default_scope_includes_groups(self, oauth_config_dict):
-        """Ohne explizite Angabe wird der `groups`-Scope angefordert."""
+    def test_default_scope_includes_iserv_groups(self, oauth_config_dict):
+        """Ohne explizite Angabe wird der IServ-Scope `iserv:groups` angefordert."""
         config = OAuthConfig.model_validate(oauth_config_dict)
-        assert "groups" in config.scope.split()
+        assert "iserv:groups" in config.scope.split()
+        assert "iserv:roles" in config.scope.split()
 
     def test_scope_is_configurable(self):
         config = OAuthConfig(
@@ -414,6 +415,24 @@ class TestRoleMatching:
             identity = await oauth_adapter.exchange_code("c", ch.state)
         assert identity.roles == ["teacher"]
         assert identity.grade is None
+
+    @pytest.mark.asyncio
+    async def test_reads_iserv_prefixed_claim_keys(self, oauth_adapter):
+        """Claims unter `iserv:groups`/`iserv:roles` werden ebenfalls gelesen."""
+        resp = MagicMock()
+        resp.json.return_value = {
+            "preferred_username": "t",
+            "iserv:groups": ["Kollegium", "FS.Mathematik"],
+            "iserv:roles": ["Lehrer"],
+        }
+        resp.raise_for_status = MagicMock()
+        mock_client = _make_mock_client(_mock_token(), resp)
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]
+        assert identity.sso_groups == ["Kollegium", "FS.Mathematik"]
+        assert identity.sso_roles == ["Lehrer"]
 
 
 # =============================================================================
