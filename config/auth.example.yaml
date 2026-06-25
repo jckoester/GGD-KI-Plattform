@@ -28,26 +28,27 @@ yaml_test:
 
 # SSO-Gruppen UND SSO-Rollen -> Plattform-Rollen.
 # Beim Login matcht der OAuth-Adapter jeden `group:`-Eintrag CASE-INSENSITIV
-# gegen die vom Provider gelieferten Gruppen (`groups`-Claim) UND Rollen
-# (`roles`-Claim). IServ liefert die Rollen `Lehrer`, `Schüler`, `Administrator`;
-# zusätzlich kann man schul-spezifische Gruppen (z. B. `Kollegium`) mappen.
-# Die Schreibweise ist egal (`lehrer` trifft `Lehrer`). Greift kein Eintrag,
-# fällt die Rolle auf `student` zurück (kein Login-Reject) — zur Diagnose zeigt
-# das Profil die rohen SSO-Gruppen/-Rollen unter „SSO-Mitgliedschaften".
+# gegen die vom Provider gelieferten Gruppen (`iserv:groups`) UND Rollen
+# (`iserv:roles`). WICHTIG: IServ liefert die Rollen als Symfony-Tokens
+# `ROLE_TEACHER`, `ROLE_STUDENT`, `ROLE_ADMIN` (NICHT `Lehrer`/`Schüler`).
+# Zusätzlich kann man schul-spezifische Gruppennamen (z. B. `Kollegium`) mappen.
+# Die Schreibweise ist egal. Greift kein Eintrag, fällt die Rolle auf `student`
+# zurück (kein Login-Reject) — zur Diagnose zeigt das Profil die rohen
+# SSO-Gruppen/-Rollen unter „SSO-Mitgliedschaften".
 group_role_map:
-  # Plattform-Admin (Budget/Statistik/Einstellungen/De-Anonymisierung): bewusst
-  # eine EIGENE, kleine SSO-Gruppe — NICHT die IServ-Rolle `Administrator`, sonst
-  # wären alle IT-Admins automatisch Plattform-Admins.
-  - group: ki-admins
-    role: admin
-  # Lehrkräfte: IServ-Rolle `Lehrer` und/oder die Kollegiums-Gruppe.
-  - group: lehrer
+  # Lehrkräfte: IServ-Rollentoken ROLE_TEACHER (und/oder die Kollegiums-Gruppe).
+  - group: ROLE_TEACHER
     role: teacher
   - group: Kollegium
     role: teacher
-  # Schüler:innen: IServ-Rolle `Schüler` (ist zugleich der Default-Fallback).
-  - group: schueler
+  # Schüler:innen: IServ-Rollentoken ROLE_STUDENT (zugleich der Default-Fallback).
+  - group: ROLE_STUDENT
     role: student
+  # Plattform-Admin (Budget/Statistik/Einstellungen/De-Anonymisierung): bewusst
+  # eine EIGENE, kleine SSO-Gruppe — NICHT `ROLE_ADMIN`, sonst wäre jede:r
+  # IServ-Administrator automatisch Plattform-Admin.
+  - group: ki-admins
+    role: admin
   # Krisen-Einsicht (4-Augen-Prinzip): Personen, die geflaggte Konversationen
   # mitfreigeben/einsehen dürfen — typischerweise Schulsozialarbeit/Beratung.
   # Die Rolle darf eigenständig vorkommen (ohne Lehrkraft-Rolle).

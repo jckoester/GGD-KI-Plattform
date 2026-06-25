@@ -78,19 +78,20 @@ yaml_test:
 
 # SSO-Gruppen UND SSO-Rollen → Plattform-Rollen.
 # Jeder `group:`-Eintrag wird CASE-INSENSITIV sowohl gegen die Gruppen
-# (`groups`-Claim) als auch gegen die Rollen (`roles`-Claim) der userinfo
-# geprüft. IServ liefert die Rollen `Lehrer`, `Schüler`, `Administrator`.
+# (`iserv:groups`) als auch gegen die Rollen (`iserv:roles`) der userinfo geprüft.
+# WICHTIG: IServ liefert die Rollen als Symfony-Tokens ROLE_TEACHER, ROLE_STUDENT,
+# ROLE_ADMIN (nicht "Lehrer"/"Schüler").
 group_role_map:
-  # Plattform-Admin bewusst über eine eigene, kleine Gruppe — NICHT über die
-  # IServ-Rolle `Administrator` (sonst wären alle IT-Admins Plattform-Admins).
-  - group: ki-admins
-    role: admin
-  - group: lehrer          # IServ-Rolle "Lehrer"
+  - group: ROLE_TEACHER    # IServ-Rollentoken
     role: teacher
   - group: Kollegium       # zusätzlich: schul-spezifische Lehrkraft-Gruppe
     role: teacher
-  - group: schueler        # IServ-Rolle "Schüler"
+  - group: ROLE_STUDENT    # IServ-Rollentoken
     role: student
+  # Plattform-Admin bewusst über eine eigene, kleine Gruppe — NICHT über
+  # ROLE_ADMIN (sonst wären alle IServ-Admins automatisch Plattform-Admins).
+  - group: ki-admins
+    role: admin
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung.
 # Jedes Muster muss genau eine Capture-Group enthalten.
@@ -112,9 +113,9 @@ sso:
 
 **Rollen:** `admin`, `teacher`, `student`, `review`. Das Matching ist
 case-insensitiv und berücksichtigt Gruppen **und** Rollen, sodass z. B. die
-Gruppe `Kollegium` oder die IServ-Rolle `Lehrer` zu `teacher` führt. Greift kein
-Eintrag, wird die Rolle auf **`student`** zurückgesetzt (kein Login-Reject) —
-der Adapter bleibt damit provider-neutral.
+Gruppe `Kollegium` oder das IServ-Rollentoken `ROLE_TEACHER` zu `teacher` führt.
+Greift kein Eintrag, wird die Rolle auf **`student`** zurückgesetzt (kein
+Login-Reject) — der Adapter bleibt damit provider-neutral.
 
 > **Diagnose bei falscher Rolle:** Wird eine Lehrkraft fälschlich als Schüler:in
 > eingestuft, fehlt meist nur ein passender `group_role_map`-Eintrag. Die
