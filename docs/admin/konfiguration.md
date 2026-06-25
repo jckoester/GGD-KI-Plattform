@@ -117,28 +117,50 @@ Gruppe `Kollegium` oder das IServ-Rollentoken `ROLE_TEACHER` zu `teacher` führt
 Greift kein Eintrag, wird die Rolle auf **`student`** zurückgesetzt (kein
 Login-Reject) — der Adapter bleibt damit provider-neutral.
 
-> **Diagnose bei falscher Rolle:** Wird eine Lehrkraft fälschlich als Schüler:in
-> eingestuft, fehlt meist nur ein passender `group_role_map`-Eintrag. Die
-> betroffene Person findet die rohen, vom SSO gelieferten Gruppen und Rollen im
-> eigenen **Profil → „SSO-Mitgliedschaften (Diagnose)"** — diese Namen exakt (in
-> beliebiger Schreibweise) in `group_role_map` aufnehmen.
->
-> **Diagnose „keine SSO-Daten" / alle sind student:** Zeigt das Profil *gar keine*
-> Gruppen/Rollen und werden alle als `student` eingestuft, kommen die Claims nicht
-> an. Prüfen:
-> 1. `scope` enthält `iserv:groups` (mit Präfix!) **und** der OAuth-Client ist in
->    IServ für diesen Scope freigeschaltet (IServ → Verwaltung → OAuth-Clients).
->    Falscher Scope-Name → Redirect zurück mit `?error=...&error_description=…+scope+not+allowed`.
-> 2. Server-Log beim Login: Die Zeile `OAuth-Login: userinfo-Claims=[…], groups=N`
->    zeigt, ob `groups`/`roles` überhaupt im Token sind. Fehlt der `groups`-Key,
->    ist es der Scope/das Clientrecht. Für die rohen Gruppenwerte im Log temporär
->    `AUTH_DEBUG_USERINFO=true` setzen.
-> 3. Nach einer Scope-Änderung müssen sich Nutzer:innen **neu anmelden** (die
->    Gruppen stecken im 30-Tage-Cookie).
-
 > **Hinweis:** Das Client-Secret des SSO-Providers wird **nicht** in dieser Datei
 > gespeichert, sondern über die Umgebungsvariable `AUTH_ISERV_CLIENT_SECRET` in
 > `.env` übergeben.
+
+### SSO-Rollen/-Gruppen einrichten und diagnostizieren
+
+Welche Namen in `group_role_map` und in die `groups`-Muster gehören, hängt davon
+ab, was der SSO-Provider tatsächlich liefert. Dafür gibt es drei eingebaute
+Diagnose-Hilfen:
+
+1. **Profil → „SSO-Mitgliedschaften (Diagnose)"** — für jede angemeldete Person
+   sichtbar. Zeigt die rohen, vom SSO gelieferten Gruppen und Rollen sowie die
+   daraus abgeleiteten Plattform-Rollen. Erste Anlaufstelle bei falscher Rolle:
+   die angezeigten Namen 1:1 (Schreibweise egal) in `group_role_map` übernehmen.
+2. **Server-Log bei jedem Login** (immer aktiv, ohne personenbezogene Werte):
+   ```
+   OAuth-Login: userinfo-Claims=[…], groups=8, sso_roles=['ROLE_TEACHER'] → Rollen=['teacher']
+   ```
+   Zeigt, welche Claim-Keys ankommen, wie viele Gruppen erkannt wurden und welche
+   Plattform-Rollen herauskommen.
+3. **`AUTH_DEBUG_USERINFO=true`** (in `.env`, danach Backend neu starten) — loggt
+   zusätzlich die **komplette userinfo** inklusive Werten; nützlich, um Key-Namen
+   und Datenstruktur zu sehen. **Enthält Klarnamen/E-Mail → nur temporär aktivieren.**
+
+Schlägt der Login mit „Anmeldung vom Schulkonto abgelehnt: …" bzw. „Missing code
+or state" fehl, loggt der Callback den vom Provider gemeldeten OAuth-`error`
+(häufig `invalid_scope` → falscher oder nicht freigeschalteter Scope-Name).
+
+> **IServ-Spezifika.** Damit die Diagnose im Regelfall gar nicht nötig ist — diese
+> Werte liefert IServ konkret:
+> - **Scopes** tragen das Präfix `iserv:` → `iserv:groups`, `iserv:roles`
+>   (`groups`/`roles` ohne Präfix ⇒ „scope not allowed"). Die Scopes müssen am
+>   OAuth-Client in IServ freigeschaltet sein.
+> - **Rollen** kommen als Symfony-Tokens **`ROLE_TEACHER`, `ROLE_STUDENT`,
+>   `ROLE_ADMIN`** (nicht „Lehrer"/„Schüler") — genau diese in `group_role_map`
+>   mappen. `ROLE_ADMIN` bewusst nicht auf `admin` legen (sonst ist jede:r
+>   IServ-Admin Plattform-Admin); dafür eine eigene Gruppe verwenden.
+> - **Gruppen** kommen als Objekte; maßgeblich ist der **Account-Name (`act`)** in
+>   Kleinschreibung mit Punkt-Notation: `kollegium`, `fs.mathematik`, `klasse.8d`.
+>   Genau diese Form treffen die `groups`-Muster (`^FS\.(.+)$` …) und die
+>   `group_role_map`.
+
+> **Wichtig:** Nach jeder Änderung an `scope` oder `group_role_map` müssen sich die
+> Betroffenen **neu anmelden** — Rollen und Gruppen stecken im 30-Tage-Session-Cookie.
 
 ---
 
