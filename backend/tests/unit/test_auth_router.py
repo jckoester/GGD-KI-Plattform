@@ -154,6 +154,30 @@ class TestAuthRouterAuthenticated:
         assert data["roles"] == ["student"]
         assert data["grade"] == "10"
 
+    def test_me_returns_sso_groups_and_roles(self, app_no_revocation, jwt_service):
+        """/me liefert die rohen SSO-Gruppen/-Rollen für die Profil-Diagnose."""
+        token, _ = jwt_service.issue(
+            "test_pseudo", ["teacher"], None,
+            sso_groups=["Kollegium", "FS.Mathematik"], sso_roles=["Lehrer"],
+        )
+        client = TestClient(app_no_revocation)
+        client.cookies.set("session", token)
+        response = client.get("/me")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sso_groups"] == ["Kollegium", "FS.Mathematik"]
+        assert data["sso_roles"] == ["Lehrer"]
+
+    def test_me_sso_fields_default_empty_for_legacy_token(
+        self, app_no_revocation, valid_token
+    ):
+        """Alt-Token ohne SSO-Felder: /me liefert leere Listen (kein Fehler)."""
+        client = TestClient(app_no_revocation)
+        client.cookies.set("session", valid_token)
+        data = client.get("/me").json()
+        assert data["sso_groups"] == []
+        assert data["sso_roles"] == []
+
     def test_me_with_revoked_token(self, valid_token):
         async def revoked_db():
             db = AsyncMock()

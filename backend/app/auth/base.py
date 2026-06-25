@@ -20,6 +20,7 @@ class NormalizedIdentity(BaseModel):
     grade: str | None = None
     display_name: str | None = None  # nur UI-Anzeige, niemals persistieren
     sso_groups: list[str] = []  # rohe SSO-Gruppen-IDs vom Provider
+    sso_roles: list[str] = []  # rohe SSO-Rollen (z.B. IServ: Lehrer/Schüler/Administrator)
 
     @model_validator(mode="after")
     def validate_roles(self) -> "NormalizedIdentity":

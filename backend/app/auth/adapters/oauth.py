@@ -196,38 +196,57 @@ class OAuthAdapter(AuthAdapter):
 
     def _userinfo_to_identity(self, userinfo: dict) -> NormalizedIdentity:
         external_id = userinfo["preferred_username"]
-        groups: list[str] = userinfo.get("groups", [])
-        roles, grade = self._map_roles_and_grade(groups)
+        groups: list[str] = userinfo.get("groups") or []
+        sso_roles: list[str] = userinfo.get("roles") or []
+        roles, grade = self._map_roles_and_grade(groups, sso_roles)
         return NormalizedIdentity(
             external_id=external_id,
             roles=roles,
             grade=grade,
             display_name=userinfo.get("name", userinfo.get("preferred_username")),
-            sso_groups=groups,  # NEU
+            sso_groups=groups,
+            sso_roles=sso_roles,
         )
 
-    def _map_roles_and_grade(self, groups: list[str]) -> tuple[list[str], str | None]:
-        # Sammle alle Rollen aus den Gruppen
+    def _map_roles_and_grade(
+        self, groups: list[str], sso_roles: list[str]
+    ) -> tuple[list[str], str | None]:
+        """Bildet SSO-Gruppen UND SSO-Rollen auf Plattform-Rollen ab.
+
+        Gruppen und Rollen werden gemeinsam gegen ``group_role_map`` geprüft,
+        damit z. B. die Gruppe ``Kollegium`` ODER die IServ-Rolle ``Lehrer`` zur
+        Plattform-Rolle ``teacher`` führt. Das Matching ist **case-insensitiv**:
+        IServ liefert Rollen kapitalisiert (``Lehrer``), Gruppennamen ggf.
+        kleingeschrieben — die ``group_role_map`` darf beliebig geschrieben sein.
+        """
+        # Case-insensitiver Lookup über alle konfigurierten Namen
+        lc_map = {name.lower(): role for name, role in self._group_role_map.items()}
+
         roles: set[str] = set()
+        for name in (*groups, *sso_roles):
+            mapped = lc_map.get(name.lower())
+            if mapped is not None:
+                roles.add(mapped)
+
+        # Jahrgang nur aus Gruppen (case-insensitiv)
         grade: str | None = None
-
-        # Mapping aus Gruppen zu Rollen
-        for group in groups:
-            if group in self._group_role_map:
-                role = self._group_role_map[group]
-                roles.add(role)
-
-            # Extrahiere Jahrgang
-            if self._config.grade_group_pattern and grade is None:
-                pattern = re.compile(self._config.grade_group_pattern)
+        if self._config.grade_group_pattern:
+            pattern = re.compile(self._config.grade_group_pattern, re.IGNORECASE)
+            for group in groups:
                 m = pattern.match(group)
                 if m:
                     grade = m.group(1)
+                    break
 
-        # Falls keine Rolle gemappt wurde, Default: student
+        # Fallback: kein Rollen-Treffer → student. Der Adapter bleibt bewusst
+        # provider-neutral (kein Login-Reject). Stille Downgrades diagnostiziert
+        # man über die Roh-Gruppen/-Rollen im Profil.
         if not roles:
             roles.add("student")
 
-        # Konvertiere zu Liste
+        # grade nur bei Schüler:innen behalten (NormalizedIdentity-Invariante)
+        if "student" not in roles:
+            grade = None
+
         return list(roles), grade
 

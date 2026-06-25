@@ -71,13 +71,20 @@ oauth:
 yaml_test:
   users_file: config/test_users.yaml
 
-# SSO-Gruppen → Plattform-Rollen
+# SSO-Gruppen UND SSO-Rollen → Plattform-Rollen.
+# Jeder `group:`-Eintrag wird CASE-INSENSITIV sowohl gegen die Gruppen
+# (`groups`-Claim) als auch gegen die Rollen (`roles`-Claim) der userinfo
+# geprüft. IServ liefert die Rollen `Lehrer`, `Schüler`, `Administrator`.
 group_role_map:
+  # Plattform-Admin bewusst über eine eigene, kleine Gruppe — NICHT über die
+  # IServ-Rolle `Administrator` (sonst wären alle IT-Admins Plattform-Admins).
   - group: ki-admins
     role: admin
-  - group: lehrer
+  - group: lehrer          # IServ-Rolle "Lehrer"
     role: teacher
-  - group: schueler
+  - group: Kollegium       # zusätzlich: schul-spezifische Lehrkraft-Gruppe
+    role: teacher
+  - group: schueler        # IServ-Rolle "Schüler"
     role: student
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung.
@@ -87,16 +94,6 @@ sso:
   # sinnvoll, wenn der SSO-Provider alle Unterrichtsgruppen vollständig liefert.
   allow_manual_teaching_groups: true
 
-  # Kurzname → Subject-Slug (Groß-/Kleinschreibung wird ignoriert).
-  # Nötig, wenn SSO-Gruppen Kürzel verwenden, die vom Fach-Slug abweichen.
-  subject_aliases:
-    D:    deutsch
-    E:    englisch
-    M:    mathematik
-    Bio:  biologie
-    Ch:   chemie
-    Ph:   physik
-
   # Regex-Muster für Gruppentypen (je eine Capture-Group):
   groups:
     subject_department: '^FS\.(.+)$'        # FS.Mathematik → Fachschaft
@@ -104,8 +101,21 @@ sso:
     teaching_group: '^unterricht\.(.+)$'    # unterricht.8a.Mathematik → Unterrichtsgruppe
 ```
 
-**Rollen:** `admin`, `teacher`, `student`. Nutzer:innen, deren SSO-Gruppen
-keiner Rolle zugeordnet sind, können sich nicht einloggen.
+> **Fach-Aliase** (alternative SSO-Gruppennamen pro Fach, z. B. `fs.bildende.kunst`
+> → Kunst) werden **nicht** hier, sondern pro Fach in `config/subjects.yaml`
+> (Feld `sso_aliases`) gepflegt.
+
+**Rollen:** `admin`, `teacher`, `student`, `review`. Das Matching ist
+case-insensitiv und berücksichtigt Gruppen **und** Rollen, sodass z. B. die
+Gruppe `Kollegium` oder die IServ-Rolle `Lehrer` zu `teacher` führt. Greift kein
+Eintrag, wird die Rolle auf **`student`** zurückgesetzt (kein Login-Reject) —
+der Adapter bleibt damit provider-neutral.
+
+> **Diagnose bei falscher Rolle:** Wird eine Lehrkraft fälschlich als Schüler:in
+> eingestuft, fehlt meist nur ein passender `group_role_map`-Eintrag. Die
+> betroffene Person findet die rohen, vom SSO gelieferten Gruppen und Rollen im
+> eigenen **Profil → „SSO-Mitgliedschaften (Diagnose)"** — diese Namen exakt (in
+> beliebiger Schreibweise) in `group_role_map` aufnehmen.
 
 > **Hinweis:** Das Client-Secret des SSO-Providers wird **nicht** in dieser Datei
 > gespeichert, sondern über die Umgebungsvariable `AUTH_ISERV_CLIENT_SECRET` in

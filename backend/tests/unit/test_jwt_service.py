@@ -31,6 +31,21 @@ class TestJwtServiceIssue:
         assert isinstance(token, str)
         assert len(jti) == 36
 
+    def test_issue_roundtrips_sso_groups_and_roles(self, jwt_service):
+        token, _ = jwt_service.issue(
+            "test_pseudo", ["teacher"], None,
+            sso_groups=["Kollegium", "FS.Mathematik"], sso_roles=["Lehrer"],
+        )
+        payload = jwt_service.verify(token)
+        assert payload.sso_groups == ["Kollegium", "FS.Mathematik"]
+        assert payload.sso_roles == ["Lehrer"]
+
+    def test_issue_sso_fields_default_empty(self, jwt_service):
+        token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
+        payload = jwt_service.verify(token)
+        assert payload.sso_groups == []
+        assert payload.sso_roles == []
+
 
 class TestJwtServiceVerify:
     def test_verify_decodes_correctly(self, jwt_service):

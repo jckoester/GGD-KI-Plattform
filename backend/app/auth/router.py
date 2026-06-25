@@ -89,7 +89,8 @@ async def auth_callback(
     )
     
     token, _ = jwt_service.issue(
-        pseudonym, identity.roles, identity.grade, identity.display_name
+        pseudonym, identity.roles, identity.grade, identity.display_name,
+        sso_groups=identity.sso_groups, sso_roles=identity.sso_roles,
     )
     secure = settings.environment != "development"
     redirect = RedirectResponse(url="/welcome", status_code=303)
@@ -252,7 +253,8 @@ async def login_direct(
     )
     
     token, _ = jwt_service.issue(
-        pseudonym, identity.roles, identity.grade, identity.display_name
+        pseudonym, identity.roles, identity.grade, identity.display_name,
+        sso_groups=identity.sso_groups, sso_roles=identity.sso_roles,
     )
     secure = settings.environment != "development"
     response.set_cookie(
@@ -292,4 +294,8 @@ async def get_me(current_user: JwtPayload = Depends(get_current_user)) -> dict:
         "roles": current_user.roles,
         "grade": current_user.grade,
         "display_name": current_user.display_name,
+        # Roh-Claims vom SSO-Provider, nur zur Selbst-Diagnose im Profil
+        # (z.B. fälschlich als student eingestufte Lehrkraft sieht ihre Gruppen).
+        "sso_groups": current_user.sso_groups,
+        "sso_roles": current_user.sso_roles,
     }

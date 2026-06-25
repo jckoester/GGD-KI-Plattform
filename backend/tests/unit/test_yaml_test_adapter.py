@@ -129,6 +129,7 @@ def temp_users_file_with_sso_groups(tmp_path: Path):
                 "roles": ["teacher"],
                 "grade": None,
                 "sso_groups": ["FS.Mathematik", "Klasse.8a", "unterricht.8a.Mathematik"],
+                "sso_roles": ["Lehrer"],
             },
             {
                 "username": "schueler05",
@@ -196,3 +197,12 @@ class TestYamlTestAdapterSsoGroups:
         identity = await yaml_adapter_with_sso_groups.authenticate_direct("admin", "admin")
         assert identity is not None
         assert identity.sso_groups == []
+
+    @pytest.mark.asyncio
+    async def test_sso_roles_loaded_and_default_empty(self, yaml_adapter_with_sso_groups: YamlTestAdapter):
+        """sso_roles werden geladen bzw. defaulten auf []."""
+        identity = await yaml_adapter_with_sso_groups.authenticate_direct("lehrer01", "lehrer01")
+        assert identity is not None
+        assert identity.sso_roles == ["Lehrer"]
+        admin = await yaml_adapter_with_sso_groups.authenticate_direct("admin", "admin")
+        assert admin.sso_roles == []

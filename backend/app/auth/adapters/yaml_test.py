@@ -20,6 +20,7 @@ class YamlUser:
     grade: str | None
     display_name: str | None = None
     sso_groups: list[str] = field(default_factory=list)  # NEU
+    sso_roles: list[str] = field(default_factory=list)
 
 
 class YamlTestAdapter(AuthAdapter):
@@ -41,6 +42,7 @@ class YamlTestAdapter(AuthAdapter):
                 grade=user_data.get("grade"),
                 display_name=user_data.get("display_name"),
                 sso_groups=user_data.get("sso_groups", []),  # NEU
+                sso_roles=user_data.get("sso_roles", []),
             )
             users[user.username] = user
         return users
@@ -69,4 +71,5 @@ class YamlTestAdapter(AuthAdapter):
             grade=user.grade,
             display_name=user.display_name,
             sso_groups=user.sso_groups,  # NEU
+            sso_roles=user.sso_roles,
         )

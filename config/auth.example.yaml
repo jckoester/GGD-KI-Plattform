@@ -20,12 +20,26 @@ oauth:
 yaml_test:
   users_file: config/test_users.yaml
 
-# SSO-Gruppen -> Plattform-Rollen
+# SSO-Gruppen UND SSO-Rollen -> Plattform-Rollen.
+# Beim Login matcht der OAuth-Adapter jeden `group:`-Eintrag CASE-INSENSITIV
+# gegen die vom Provider gelieferten Gruppen (`groups`-Claim) UND Rollen
+# (`roles`-Claim). IServ liefert die Rollen `Lehrer`, `Schüler`, `Administrator`;
+# zusätzlich kann man schul-spezifische Gruppen (z. B. `Kollegium`) mappen.
+# Die Schreibweise ist egal (`lehrer` trifft `Lehrer`). Greift kein Eintrag,
+# fällt die Rolle auf `student` zurück (kein Login-Reject) — zur Diagnose zeigt
+# das Profil die rohen SSO-Gruppen/-Rollen unter „SSO-Mitgliedschaften".
 group_role_map:
+  # Plattform-Admin (Budget/Statistik/Einstellungen/De-Anonymisierung): bewusst
+  # eine EIGENE, kleine SSO-Gruppe — NICHT die IServ-Rolle `Administrator`, sonst
+  # wären alle IT-Admins automatisch Plattform-Admins.
   - group: ki-admins
     role: admin
+  # Lehrkräfte: IServ-Rolle `Lehrer` und/oder die Kollegiums-Gruppe.
   - group: lehrer
     role: teacher
+  - group: Kollegium
+    role: teacher
+  # Schüler:innen: IServ-Rolle `Schüler` (ist zugleich der Default-Fallback).
   - group: schueler
     role: student
   # Krisen-Einsicht (4-Augen-Prinzip): Personen, die geflaggte Konversationen

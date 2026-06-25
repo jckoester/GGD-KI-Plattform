@@ -14,6 +14,8 @@ class JwtPayload(BaseModel):
     roles: list[str]                              # Liste aller Rollen
     grade: str | None
     display_name: str | None = None               # nur Browser-Anzeige, nicht persistiert
+    sso_groups: list[str] = []                    # rohe SSO-Gruppen, nur Browser-Diagnose
+    sso_roles: list[str] = []                     # rohe SSO-Rollen, nur Browser-Diagnose
     jti: str                                      # UUID4, für Revokation
     iat: int                                      # Unix-Timestamp
     exp: int                                      # Unix-Timestamp
@@ -28,6 +30,8 @@ class JwtService:
     def issue(
         self, pseudonym: str, roles: list[str], grade: str | None,
         display_name: str | None = None,
+        sso_groups: list[str] | None = None,
+        sso_roles: list[str] | None = None,
     ) -> tuple[str, str]:
         """Gibt (token, jti) zurück."""
         now = datetime.now(timezone.utc)
@@ -37,6 +41,8 @@ class JwtService:
             "roles": roles,
             "grade": grade,
             "display_name": display_name,
+            "sso_groups": sso_groups or [],
+            "sso_roles": sso_roles or [],
             "jti": jti,
             "iat": int(now.timestamp()),
             "exp": int((now + self._ttl).timestamp()),

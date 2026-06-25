@@ -67,9 +67,12 @@ def _mock_token(access_token="test_token"):
     return resp
 
 
-def _mock_userinfo(username, groups):
+def _mock_userinfo(username, groups, roles=None):
     resp = MagicMock()
-    resp.json.return_value = {"preferred_username": username, "groups": groups}
+    body = {"preferred_username": username, "groups": groups}
+    if roles is not None:
+        body["roles"] = roles
+    resp.json.return_value = body
     resp.raise_for_status = MagicMock()
     return resp
 
@@ -286,6 +289,114 @@ class TestOAuthAdapter:
             challenge = await oauth_adapter.get_login_challenge()
             identity = await oauth_adapter.exchange_code("test_code", challenge.state)
         assert identity.sso_groups == []
+
+
+# =============================================================================
+# Rollen-Matching: Gruppen + Rollen, case-insensitiv (Kollegium / IServ-Rollen)
+# =============================================================================
+
+
+def _adapter_with_map(mock_settings, config, role_map):
+    return OAuthAdapter(raw=config, settings=mock_settings, group_role_map=role_map)
+
+
+class TestRoleMatching:
+    @pytest.mark.asyncio
+    async def test_iserv_role_claim_maps_to_role(self, oauth_adapter):
+        """Die IServ-Rolle `Lehrer` (roles-Claim) trifft die Config `lehrer`."""
+        mock_client = _make_mock_client(
+            _mock_token(), _mock_userinfo("t", groups=[], roles=["Lehrer"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]
+
+    @pytest.mark.asyncio
+    async def test_group_match_is_case_insensitive(self, oauth_adapter):
+        """Gruppen-Schreibweise egal: `LEHRER` trifft Config `lehrer`."""
+        mock_client = _make_mock_client(
+            _mock_token(), _mock_userinfo("t", groups=["LEHRER"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]
+
+    @pytest.mark.asyncio
+    async def test_kollegium_group_maps_to_teacher(self, mock_settings, oauth_config_dict):
+        """Schul-spezifische Gruppe `Kollegium` → teacher (IServ liefert klein)."""
+        adapter = _adapter_with_map(
+            mock_settings, oauth_config_dict, {"Kollegium": "teacher"}
+        )
+        mock_client = _make_mock_client(
+            _mock_token(), _mock_userinfo("t", groups=["kollegium"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await adapter.get_login_challenge()
+            identity = await adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]
+
+    @pytest.mark.asyncio
+    async def test_groups_and_roles_are_unioned(self, oauth_adapter):
+        """Gruppen UND Rollen matchen: ki-admins (Gruppe) + Lehrer (Rolle)."""
+        mock_client = _make_mock_client(
+            _mock_token(),
+            _mock_userinfo("t", groups=["ki-admins"], roles=["Lehrer"]),
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert set(identity.roles) == {"admin", "teacher"}
+
+    @pytest.mark.asyncio
+    async def test_sso_roles_passed_to_identity(self, oauth_adapter):
+        """Der rohe roles-Claim landet unverändert in sso_roles (Diagnose)."""
+        mock_client = _make_mock_client(
+            _mock_token(),
+            _mock_userinfo("t", groups=["Kollegium"], roles=["Lehrer", "Administrator"]),
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.sso_roles == ["Lehrer", "Administrator"]
+        assert identity.sso_groups == ["Kollegium"]
+
+    @pytest.mark.asyncio
+    async def test_unmapped_group_falls_back_to_student(self, oauth_adapter):
+        """Bug-Fall vor Config-Fix: `Kollegium` ungemappt → student-Fallback."""
+        mock_client = _make_mock_client(
+            _mock_token(), _mock_userinfo("t", groups=["Kollegium"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["student"]
+
+    @pytest.mark.asyncio
+    async def test_grade_extraction_is_case_insensitive(self, oauth_adapter):
+        """Jahrgang case-insensitiv: `JAHRGANG.10` → grade 10."""
+        mock_client = _make_mock_client(
+            _mock_token(), _mock_userinfo("t", groups=["schueler", "JAHRGANG.10"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["student"]
+        assert identity.grade == "10"
+
+    @pytest.mark.asyncio
+    async def test_grade_dropped_for_non_student(self, oauth_adapter):
+        """Lehrkraft mit jahrgang-Gruppe: grade wird verworfen (Invariante)."""
+        mock_client = _make_mock_client(
+            _mock_token(),
+            _mock_userinfo("t", groups=["jahrgang.10"], roles=["Lehrer"]),
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=mock_client):
+            ch = await oauth_adapter.get_login_challenge()
+            identity = await oauth_adapter.exchange_code("c", ch.state)
+        assert identity.roles == ["teacher"]
+        assert identity.grade is None
 
 
 # =============================================================================

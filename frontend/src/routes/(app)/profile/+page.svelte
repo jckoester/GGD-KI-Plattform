@@ -288,6 +288,90 @@
             </div>
         </section>
 
+        <!-- SSO-Diagnose: rohe Gruppen/Rollen vom Anmeldedienst, für alle sichtbar -->
+        <section class="mb-8">
+            <details
+                class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 bg-light-bg-2 dark:bg-dark-bg-2"
+            >
+                <summary
+                    class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-light-tx dark:text-dark-tx"
+                >
+                    SSO-Mitgliedschaften (Diagnose)
+                </summary>
+                <div class="px-4 pb-4 pt-1 space-y-4 text-sm">
+                    <p class="text-light-tx-2 dark:text-dark-tx-2">
+                        Diese Angaben kommen unverändert vom Anmeldedienst (SSO) und
+                        dienen der Fehlersuche bei der Rollen- und Fächer-Zuordnung.
+                        Stimmt deine Rolle nicht, gib diese Liste an die Administration
+                        weiter.
+                    </p>
+
+                    <div>
+                        <h3
+                            class="font-medium text-light-tx dark:text-dark-tx mb-1"
+                        >
+                            Plattform-Rollen
+                        </h3>
+                        <div class="flex flex-wrap gap-1.5">
+                            {#each $user?.roles ?? [] as r}
+                                <span
+                                    class="px-2 py-0.5 rounded-full bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark text-xs"
+                                    >{r}</span
+                                >
+                            {/each}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3
+                            class="font-medium text-light-tx dark:text-dark-tx mb-1"
+                        >
+                            SSO-Rollen
+                        </h3>
+                        {#if ($user?.sso_roles ?? []).length > 0}
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each $user.sso_roles as g}
+                                    <span
+                                        class="px-2 py-0.5 rounded-full bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 text-xs font-mono"
+                                        >{g}</span
+                                    >
+                                {/each}
+                            </div>
+                        {:else}
+                            <p class="text-light-tx-2 dark:text-dark-tx-2">— keine —</p>
+                        {/if}
+                    </div>
+
+                    <div>
+                        <h3
+                            class="font-medium text-light-tx dark:text-dark-tx mb-1"
+                        >
+                            SSO-Gruppen
+                        </h3>
+                        {#if ($user?.sso_groups ?? []).length > 0}
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each $user.sso_groups as g}
+                                    <span
+                                        class="px-2 py-0.5 rounded-full bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 text-xs font-mono"
+                                        >{g}</span
+                                    >
+                                {/each}
+                            </div>
+                        {:else}
+                            <p class="text-light-tx-2 dark:text-dark-tx-2">— keine —</p>
+                        {/if}
+                    </div>
+
+                    {#if ($user?.sso_groups ?? []).length === 0 && ($user?.sso_roles ?? []).length === 0}
+                        <p class="text-light-tx-2 dark:text-dark-tx-2">
+                            Keine SSO-Daten vorhanden. Melde dich neu an, damit aktuelle
+                            Gruppen- und Rollen-Informationen geladen werden.
+                        </p>
+                    {/if}
+                </div>
+            </details>
+        </section>
+
         <section class="mb-8">
             <button
                 class="px-4 py-2 rounded-md text-sm font-medium bg-light-gr-2 dark:bg-dark-gr-2 text-white hover:bg-light-gr dark:hover:bg-dark-gr transition-colors"
