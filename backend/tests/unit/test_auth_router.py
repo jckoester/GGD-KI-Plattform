@@ -423,11 +423,12 @@ class TestCallback:
             mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
-            response = client.get("/callback?code=test_code&state=test_state")
-            assert response.status_code == 200
-            data = response.json()
-            assert data["ok"] is True
-            assert data["display_name"] is None
+            response = client.get(
+                "/callback?code=test_code&state=test_state", follow_redirects=False
+            )
+            # Erfolg → 303-Redirect auf /welcome (Frontend-Route) mit Session-Cookie
+            assert response.status_code == 303
+            assert response.headers["location"] == "/welcome"
             set_cookie = response.headers.get("set-cookie", "")
             assert "session=" in set_cookie
 
@@ -495,8 +496,10 @@ class TestCallback:
             mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
-            response = client.get("/callback?code=test_code&state=test_state")
-            assert response.status_code == 200
+            response = client.get(
+                "/callback?code=test_code&state=test_state", follow_redirects=False
+            )
+            assert response.status_code == 303
             mock_sync.assert_awaited_once()
             call_args = mock_sync.call_args
             assert call_args.kwargs["pseudonym"] == "test_pseudo_xyz"
