@@ -22,34 +22,58 @@ def _normalize_for_slug(value: str) -> str:
     return value.translate(_UMLAUT_TABLE).lower()
 
 
-async def _resolve_subject_id(
+async def _resolve_subject_ids(
     db: AsyncSession,
     subject_slug: str,
-) -> Optional[int]:
-    """Löst einen aus dem SSO-Token abgeleiteten Wert auf eine Subject-ID auf.
+) -> list[int]:
+    """Löst einen aus dem SSO-Token abgeleiteten Wert auf Subject-IDs auf.
 
-    Case-insensitiv (umlaut-normalisiert ä→ae UND roh kleingeschrieben, deckt
-    beide Slug-Schreibweisen ab) gegen:
-    1. den Subject-Slug (subjects.slug), und
-    2. die alternativen SSO-Gruppennamen (subjects.sso_aliases, geseedet aus
-       config/subjects.yaml — z. B. 'bildende.kunst' → Fach 'kunst').
+    Case-insensitiv (umlaut-normalisiert ä→ae UND roh kleingeschrieben) gegen:
+    1. den Subject-Slug (subjects.slug) — **Direkt-Treffer**, und
+    2. die alternativen SSO-Gruppennamen (subjects.sso_aliases) — **Alias-Treffer**.
+
+    Eine Fachschaft kann mehrere Fächer betreuen (z. B. fs.wirtschaft → wirtschaft
+    direkt + wbs per Alias). Direkt-Treffer stehen **vorne**, damit Unterrichtsgruppen
+    (spezifischer Fachname) eindeutig das gemeinte Fach treffen.
     """
     from app.db.models import Subject
 
     candidates = list({_normalize_for_slug(subject_slug), subject_slug.lower()})
 
-    res = await db.execute(
+    direct = await db.execute(
         select(Subject.id)
-        .where(
-            or_(
-                func.lower(Subject.slug).in_(candidates),
-                Subject.sso_aliases.overlap(candidates),
-            )
-        )
+        .where(func.lower(Subject.slug).in_(candidates))
         .order_by(Subject.id)
-        .limit(1)
     )
-    return res.scalar_one_or_none()
+    direct_ids = [row[0] for row in direct.all()]
+
+    alias = await db.execute(
+        select(Subject.id)
+        .where(Subject.sso_aliases.overlap(candidates))
+        .order_by(Subject.id)
+    )
+    seen = set(direct_ids)
+    alias_ids = [row[0] for row in alias.all() if row[0] not in seen]
+
+    return direct_ids + alias_ids
+
+
+async def _resolve_subject_id(
+    db: AsyncSession,
+    subject_slug: str,
+) -> Optional[int]:
+    """Einzel-Auflösung: erster (direkt bevorzugter) Treffer oder None."""
+    ids = await _resolve_subject_ids(db, subject_slug)
+    return ids[0] if ids else None
+
+
+async def _subject_slugs(db: AsyncSession, subject_ids: list[int]) -> dict[int, str]:
+    """Map subject_id → slug für die übergebenen IDs (für eindeutige Gruppen-Slugs)."""
+    from app.db.models import Subject
+    res = await db.execute(
+        select(Subject.id, Subject.slug).where(Subject.id.in_(subject_ids))
+    )
+    return {row[0]: row[1] for row in res.all()}
 
 
 @dataclass
@@ -155,6 +179,79 @@ async def _unique_slug(db: AsyncSession, base_slug: str) -> str:
     return f"{base_slug}-{id(base_slug)}"  # Notfall-Fallback
 
 
+async def _upsert_group_and_membership(
+    db: AsyncSession,
+    pg: ParsedGroup,
+    subject_id: Optional[int],
+    base_slug: str,
+    pseudonym: str,
+    primary_role: str,
+) -> int:
+    """Upsert genau einer Gruppe (für ein Ziel-Fach) + Mitgliedschaft. Gibt group.id.
+
+    Eindeutigkeit einer Gruppe ist das Paar (sso_group_id, subject_id) — eine
+    Fachschaft kann mehrere Fächer betreuen und hat dann je Fach eine eigene Gruppe.
+    subject_id darf NULL sein (Klasse, Sammelgruppe ohne Fach).
+    """
+    from app.db.models import Group, GroupMembership
+
+    subject_pred = (
+        Group.subject_id == subject_id if subject_id is not None
+        else Group.subject_id.is_(None)
+    )
+    res = await db.execute(
+        select(Group).where(Group.sso_group_id == pg.sso_group_id, subject_pred)
+    )
+    group = res.scalar_one_or_none()
+
+    if group is None:
+        # Merge-Logik: bei teaching_group eine manuell (aus Fach+Klasse) erstellte
+        # Gruppe ohne sso_group_id adoptieren statt neu anlegen.
+        if pg.type == "teaching_group" and subject_id is not None:
+            res = await db.execute(
+                select(Group)
+                .join(GroupMembership, GroupMembership.group_id == Group.id)
+                .where(
+                    GroupMembership.pseudonym == pseudonym,
+                    Group.type == "teaching_group",
+                    Group.subject_id == subject_id,
+                    Group.sso_group_id.is_(None),
+                    Group.source_class_group_id.is_not(None),
+                )
+            )
+            manual_group = res.scalar_one_or_none()
+            if manual_group is not None:
+                manual_group.sso_group_id = pg.sso_group_id
+                manual_group.name = pg.name
+                group = manual_group
+
+        if group is None:
+            slug = await _unique_slug(db, base_slug)
+            group = Group(
+                name=pg.name,
+                slug=slug,
+                type=pg.type,
+                subject_id=subject_id,
+                sso_group_id=pg.sso_group_id,
+            )
+            db.add(group)
+            await db.flush()  # group.id sofort verfügbar
+    else:
+        # Vorhandene Gruppe: Name kann sich geändert haben (subject_id ist Lookup-Teil)
+        group.name = pg.name
+
+    role_in_group = "teacher" if pg.type == "subject_department" else primary_role
+    await db.execute(
+        pg_insert(GroupMembership)
+        .values(group_id=group.id, pseudonym=pseudonym, role_in_group=role_in_group)
+        .on_conflict_do_update(
+            index_elements=["group_id", "pseudonym"],
+            set_={"role_in_group": role_in_group},
+        )
+    )
+    return group.id
+
+
 async def sync_groups(
     db: AsyncSession,
     pseudonym: str,
@@ -164,13 +261,13 @@ async def sync_groups(
 ) -> None:
     """Synchronisiert Gruppen und Mitgliedschaften für einen einloggenden Nutzer.
 
-    Ablauf:
-    1. Parse sso_groups → ParsedGroup-Liste
-    2. Upsert Groups (by sso_group_id) — legt fehlende an, aktualisiert Namen
-    3. Upsert Mitgliedschaften für alle geparsten Gruppen
-    4. Entfernt Mitgliedschaften für Gruppen, die im aktuellen Token nicht mehr vorkommen
+    Eine Fachschaft (subject_department) kann mehrere Fächer betreuen (z. B.
+    fs.wirtschaft → wirtschaft + wbs); dann wird je Fach eine eigene Gruppe geführt
+    (Slug `<fachschaft>-<fachslug>`). Unterrichtsgruppen treffen genau ein Fach
+    (direkter Slug bevorzugt), Klassen kein Fach. Immediate Mirror entfernt
+    Mitgliedschaften, die im aktuellen Token nicht mehr vorkommen.
     """
-    from app.db.models import Group, GroupMembership, Subject
+    from app.db.models import GroupMembership
 
     parsed = parse_sso_groups(sso_groups, patterns)
     if not parsed:
@@ -184,85 +281,40 @@ async def sync_groups(
     matched_group_ids: list[int] = []
 
     for pg in parsed:
-        # Subject-ID optional nachschlagen
-        subject_id: Optional[int] = None
-        if pg.subject_slug:
+        # Ziel-Fächer + Gruppen-Slug je Fach bestimmen
+        targets: list[tuple[Optional[int], str]]
+        if pg.type == "subject_department" and pg.subject_slug:
+            subject_ids = await _resolve_subject_ids(db, pg.subject_slug)
+            if not subject_ids:
+                logger.warning(
+                    "SSO-Gruppe '%s' (subject_department): Fach-Slug '%s' nicht aufgelöst. "
+                    "Fach + ggf. sso_aliases in config/subjects.yaml prüfen.",
+                    pg.sso_group_id, pg.subject_slug,
+                )
+                targets = [(None, pg.slug)]
+            elif len(subject_ids) == 1:
+                targets = [(subject_ids[0], pg.slug)]
+            else:
+                # Mehrere Fächer je Fachschaft → je Fach eine Gruppe mit eindeutigem Slug
+                slugs = await _subject_slugs(db, subject_ids)
+                targets = [(sid, f"{pg.slug}-{slugs.get(sid, sid)}") for sid in subject_ids]
+        elif pg.type == "teaching_group" and pg.subject_slug:
             subject_id = await _resolve_subject_id(db, pg.subject_slug)
             if subject_id is None:
                 logger.warning(
-                    "SSO-Gruppe '%s' (Typ '%s'): Fach-Slug '%s' nicht aufgelöst. "
+                    "SSO-Gruppe '%s' (teaching_group): Fach-Slug '%s' nicht aufgelöst. "
                     "Fach + ggf. sso_aliases in config/subjects.yaml prüfen.",
-                    pg.sso_group_id, pg.type, pg.subject_slug,
+                    pg.sso_group_id, pg.subject_slug,
                 )
-
-        # Groups upsert (by sso_group_id — eindeutige externe ID)
-        # Wir suchen zuerst nach sso_group_id, dann nach slug
-        res = await db.execute(
-            select(Group).where(Group.sso_group_id == pg.sso_group_id)
-        )
-        group = res.scalar_one_or_none()
-
-        if group is None:
-            # Merge-Logik: bei teaching_group-Typen nach manueller TG suchen
-            if pg.type == "teaching_group" and subject_id is not None:
-                # Manuelle TG mit gleichem Fach, die über eine Klasse erstellt wurde
-                # und noch keine sso_group_id hat — adoptieren statt neu anlegen
-                from sqlalchemy.orm import joinedload
-                res = await db.execute(
-                    select(Group)
-                    .join(GroupMembership, GroupMembership.group_id == Group.id)
-                    .where(
-                        GroupMembership.pseudonym == pseudonym,
-                        Group.type == "teaching_group",
-                        Group.subject_id == subject_id,
-                        Group.sso_group_id.is_(None),
-                        Group.source_class_group_id.is_not(None),
-                    )
-                )
-                manual_group = res.scalar_one_or_none()
-                if manual_group is not None:
-                    # SSO-ID übernehmen; Gruppe bleibt erhalten
-                    manual_group.sso_group_id = pg.sso_group_id
-                    manual_group.name = pg.name  # SSO-Name übernehmen
-                    group = manual_group
-
-            if group is None:
-                # Neu anlegen; bei Slug-Kollision (selten) Suffix anhängen
-                slug = await _unique_slug(db, pg.slug)
-                group = Group(
-                    name=pg.name,
-                    slug=slug,
-                    type=pg.type,
-                    subject_id=subject_id,
-                    sso_group_id=pg.sso_group_id,
-                )
-                db.add(group)
-                await db.flush()  # group.id sofort verfügbar
+            targets = [(subject_id, pg.slug)]
         else:
-            # Vorhandene Gruppe aktualisieren (Name kann sich geändert haben)
-            group.name = pg.name
-            if subject_id is not None:
-                group.subject_id = subject_id
+            targets = [(None, pg.slug)]
 
-        matched_group_ids.append(group.id)
-
-        # role_in_group nach Gruppentyp
-        role_in_group = "teacher" if pg.type == "subject_department" else primary_role
-
-        # Membership upsert
-        stmt = (
-            pg_insert(GroupMembership)
-            .values(
-                group_id=group.id,
-                pseudonym=pseudonym,
-                role_in_group=role_in_group,
+        for subject_id, base_slug in targets:
+            gid = await _upsert_group_and_membership(
+                db, pg, subject_id, base_slug, pseudonym, primary_role
             )
-            .on_conflict_do_update(
-                index_elements=["group_id", "pseudonym"],
-                set_={"role_in_group": role_in_group},
-            )
-        )
-        await db.execute(stmt)
+            matched_group_ids.append(gid)
 
     # Immediate Mirror: Mitgliedschaften für nicht mehr enthaltene Gruppen entfernen
     if matched_group_ids:

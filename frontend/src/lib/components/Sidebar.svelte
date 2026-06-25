@@ -24,7 +24,7 @@
     import { user } from "$lib/stores/user.js";
     import { page } from "$app/stores";
     import { subjectMap } from "$lib/stores/subjects.js";
-    import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js"
+    import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js"
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
     import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js"
@@ -57,7 +57,7 @@
     $effect(() => {
         const slug = $page.url.pathname.match(/^\/subjects\/([^/]+)/)?.[1]
         if (slug) {
-            const found = $sidebarSubjectSections.find(s => s.slug === slug)
+            const found = $visibleSidebarSubjectSections.find(s => s.slug === slug)
             if (found) openSection = `subject-${found.subjectId}`
         }
     })
@@ -311,7 +311,7 @@
           </div>
         {/if}
 
-        {#if $sidebarSubjectSections.length > 0}
+        {#if $visibleSidebarSubjectSections.length > 0}
           <div class="mt-2">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
@@ -334,7 +334,7 @@
 
             {#if subjectsOpen}
                 <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
-                    {#each $sidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
+                    {#each $visibleSidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
                         <SidebarSubjectItem
                             {section}
                             expanded={openSection === `subject-${section.subjectId}`}

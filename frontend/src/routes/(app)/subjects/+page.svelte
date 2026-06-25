@@ -1,5 +1,5 @@
 <script>
-    import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js";
+    import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { conversationCountsBySubject } from "$lib/stores/conversationCounts.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { LayoutGrid, List } from "lucide-svelte";
@@ -16,7 +16,7 @@
     // Gruppen im gleichen Fach haben — auf der Übersicht zählt das Fach einmal)
     const sorted = $derived.by(() => {
         const seen = new Set()
-        return $sidebarSubjectSections.filter(s => {
+        return $visibleSidebarSubjectSections.filter(s => {
             if (seen.has(s.subjectId)) return false
             seen.add(s.subjectId)
             return true

@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { Check, Trash2, X } from "lucide-svelte";
+    import { ArrowLeft, Check, Trash2, X } from "lucide-svelte";
     import { myTeachingGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import {
         potentialTeachingGroups,
@@ -86,7 +86,14 @@
     });
 </script>
 
-<div class="p-6 max-w-2xl">
+<div class="h-full overflow-y-auto">
+    <div class="max-w-2xl p-6">
+    <button
+        onclick={() => history.back()}
+        class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+    >
+        <ArrowLeft class="w-4 h-4" /> Zurück
+    </button>
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
             Unterrichtsgruppen verwalten
@@ -334,4 +341,5 @@
             Gruppen (ohne SSO-Verknüpfung) können gelöscht werden.
         </p>
     </section>
+    </div>
 </div>

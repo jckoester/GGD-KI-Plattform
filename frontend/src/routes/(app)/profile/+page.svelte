@@ -1,5 +1,5 @@
 <script>
-    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, ChevronRight } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -156,9 +156,9 @@
             {/if}
         </section>
 
-        <!-- Unterrichtsgruppen-Link (nur für Lehrkräfte) -->
+        <!-- Lehrkraft-Verwaltungslinks (nur für Lehrkräfte) -->
         {#if $user?.roles?.includes('teacher')}
-        <section class="mb-8">
+        <section class="mb-8 flex flex-col gap-2">
             <a
                 href="/profile/teaching-groups"
                 class="flex items-center gap-2 px-4 py-3 rounded-lg
@@ -167,6 +167,16 @@
             >
                 <BookOpen class="w-4 h-4" />
                 <span>Unterrichtsgruppen verwalten</span>
+                <ChevronRight class="w-4 h-4 ml-auto" />
+            </a>
+            <a
+                href="/profile/subjects"
+                class="flex items-center gap-2 px-4 py-3 rounded-lg
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <Eye class="w-4 h-4" />
+                <span>Fächer in der Seitenleiste</span>
                 <ChevronRight class="w-4 h-4 ml-auto" />
             </a>
         </section>

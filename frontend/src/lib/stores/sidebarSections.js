@@ -5,6 +5,7 @@ import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
 import { potentialTeachingGroups } from './potentialTeachingGroups.js'
+import { hiddenSubjectIds } from './subjectVisibility.js'
 
 export const sidebarSubjectSections = derived(
   [user, subjectMap, myGroups, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups],
@@ -77,4 +78,14 @@ export const sidebarSubjectSections = derived(
         .filter(Boolean)
     }
   }
+)
+
+/**
+ * Wie {@link sidebarSubjectSections}, aber ohne persönlich ausgeblendete Fächer.
+ * Die Sidebar nutzt diese Variante; die Fächer-Übersicht (/subjects) zeigt
+ * weiterhin alle (inkl. ausgeblendeter, mit Wieder-Einblenden-Schalter).
+ */
+export const visibleSidebarSubjectSections = derived(
+  [sidebarSubjectSections, hiddenSubjectIds],
+  ([$sections, $hidden]) => $sections.filter((s) => !$hidden.has(s.subjectId)),
 )

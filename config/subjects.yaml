@@ -85,13 +85,23 @@ subjects:
     max_grade: 13
     sort_order: 80
 
-  # Sammelfach der Fachschaft Informatik: IuM (Informatik und Medienbildung,
-  # Kl. 5-10) + Informatik (Kursstufe 11/12). IServ: fs.informatik (direkter Treffer).
-  - slug: informatik
-    name: Informatik
+  # Fachschaft Informatik (fs.informatik) betreut ZWEI eigenständige Fächer mit
+  # je eigenem Bildungsplan: IuM (Sek I) + Informatik (Kursstufe). Beide werden über
+  # die Fachschaft aufgelöst — Informatik direkt (Slug=informatik), IuM per sso_aliases.
+  - slug: ium
+    name: IuM
     icon: code-2
     color: "#64748b"
     min_grade: 5
+    max_grade: 10
+    sort_order: 88
+    sso_aliases: [informatik]   # IServ: fs.informatik
+
+  - slug: informatik
+    name: Informatik
+    icon: code-2
+    color: "#475569"
+    min_grade: 11
     max_grade: 12
     sort_order: 90
 
@@ -159,24 +169,42 @@ subjects:
     max_grade: 13
     sort_order: 140
 
-  # Sammelfach der Fachschaft NwT: NwT (G8, Kl. 8-12) + NIT (Naturwissenschaft,
-  # Informatik und Technik; G9, Kl. 8-13). NIT wächst von unten nach und läuft nie
-  # parallel zu NwT — Unterschied liegt nur im Bildungsplan. IServ: fs.nwt.
+  # Fachschaft NwT (fs.nwt) betreut zwei eigenständige Fächer mit je eigenem BP:
+  # NwT (G8) + NIT (G9-Nachfolger). NIT wächst von unten nach und läuft nie parallel
+  # zu NwT (disjunkte Bänder, jährlich verschoben). NwT direkt, NIT per sso_aliases.
   - slug: nwt
     name: NwT
     icon: microscope
     color: "#0ea5e9"
     min_grade: 8
-    max_grade: 13
+    max_grade: 12
     sort_order: 150
 
-  # Sammelfach der Fachschaft Wirtschaft: WBS (Wirtschaft, Berufs- und
-  # Studienorientierung; Kl. 8-10) + Wirtschaft (Kursstufe 11/12).
-  # IServ: fs.wirtschaft (direkter Treffer).
-  - slug: wirtschaft
-    name: Wirtschaft
+  - slug: nit
+    name: NIT
+    icon: microscope
+    color: "#0284c7"
+    min_grade: 8
+    max_grade: 13
+    sort_order: 151
+    sso_aliases: [nwt]   # IServ: fs.nwt
+
+  # Fachschaft Wirtschaft (fs.wirtschaft) betreut zwei eigenständige Fächer mit je
+  # eigenem BP: WBS (Wirtschaft, Berufs- und Studienorientierung; Sek I) + Wirtschaft
+  # (Kursstufe). Wirtschaft direkt (Slug=wirtschaft), WBS per sso_aliases.
+  - slug: wbs
+    name: WBS
     icon: trending-up
     color: "#65a30d"
     min_grade: 8
+    max_grade: 10
+    sort_order: 155
+    sso_aliases: [wirtschaft]   # IServ: fs.wirtschaft
+
+  - slug: wirtschaft
+    name: Wirtschaft
+    icon: trending-up
+    color: "#4d7c0f"
+    min_grade: 11
     max_grade: 12
     sort_order: 160
