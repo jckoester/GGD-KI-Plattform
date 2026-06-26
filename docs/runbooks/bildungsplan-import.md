@@ -30,26 +30,70 @@ Gilt für Erstimport und Re-Import bei aktualisiertem Bildungsplan oder erweiter
 
 ## Schritt 1 — Fächer konfigurieren
 
-In `config/subjects.yaml` die gewünschten Fächer mit `fach_code` versehen:
+In `config/subjects.yaml` die gewünschten Fächer mit einem Bildungsplan-Fachcode
+versehen. Fächer **ohne** Code werden beim Scrape/Import übersprungen (kein Fehler).
 
 ```yaml
 schulart: GYM
 schuljahr: "2026/27"
 bildungsplan_default:
   bp_basis: BP2016BW
-  suffix: ""
+  suffix: ""              # globaler Fallback (siehe Editions-Kaskade)
 
 subjects:
   - slug: chemie
-    fach_code: CH
-    # … restliche Felder unverändert
+    fach_code: CH          # ein Code, Basisfassung
   - slug: mathematik
     fach_code: M
-    bildungsplan_overrides:
-      "5-6": ".V2"
+    bildungsplan_suffix: ".V2"   # ganzes Fach auf der überarbeiteten Fassung
 ```
 
-Fächer ohne `fach_code` werden übersprungen (kein Fehler).
+### Bildungsplan-Edition (Suffix)
+
+Die Fassung (`""` = Basis, `.V2` = überarbeitet) wird in drei Stufen aufgelöst,
+Präzedenz fallend:
+
+1. **`bildungsplan_overrides`** (pro Fach, pro Jahrgangsband) — für **phasenweisen
+   Rollout**, wenn nur einzelne Stufen umgestellt sind:
+   ```yaml
+   - slug: mathematik
+     fach_code: M
+     bildungsplan_overrides:
+       "5-6": ".V2"         # nur Klasse 5–6 auf Neufassung
+   ```
+2. **`bildungsplan_suffix`** (pro Fach, ganze Klassenspanne) — wenn das **ganze
+   Fach** auf der Neufassung ist.
+3. **`bildungsplan_default.suffix`** (global) — Fallback, üblicherweise `""`.
+
+### Fächer mit zwei Bildungsplänen (`fach_codes`)
+
+Manche Fächer haben über die Klassenspanne **zwei Bildungspläne mit zwei
+Fachcodes** (z. B. NwT: `NWT` für Klasse 8–10, `NWTBFO` für 11–12). Statt eines
+einzelnen `fach_code` wird dann `fach_codes` (Map Jahrgangsband → Code) gesetzt:
+
+```yaml
+  - slug: nwt
+    name: NwT
+    min_grade: 8
+    max_grade: 12
+    fach_codes:
+      "8-10": NWT
+      "11-12": NWTBFO
+```
+
+Beide Codes werden gescrapt (je eigene JSONL: `NWT_*.jsonl`, `NWTBFO_*.jsonl`) und
+importiert; alle Knoten hängen am selben Fach (`nwt`). `fach_codes` schließt
+`fach_code`, `bildungsplan_suffix` und `bildungsplan_overrides` aus (gegenseitig
+ausschließend, vom Import validiert).
+
+> **Datenbank-Seed nach Code-Änderung:** Wird ein `fach_code`/`fach_codes` in
+> `subjects.yaml` ergänzt oder geändert, die `subjects`-Tabelle neu seeden, damit
+> die Cross-Fach-Auflösung (`#`-Bezüge, Curriculum-Erstellung) **beide** Codes
+> kennt:
+> ```bash
+> cd backend && alembic upgrade head   # einmalig für die fach_codes-Spalte (0034)
+> python scripts/seed_subjects.py
+> ```
 
 Validierung:
 ```bash
@@ -266,7 +310,8 @@ python -m scripts.scraper.monitor --subjects config/subjects.yaml
 | Symptom | Ursache | Lösung |
 |---------|---------|--------|
 | `related_to` Constraint-Fehler | Migration 0019 nicht eingespielt | `cd backend && alembic upgrade head` |
-| `0 Knoten` nach Import | Kein `fach_code` in `subjects.yaml` | `fach_code` für gewünschte Fächer setzen |
+| `0 Knoten` nach Import | Kein `fach_code`/`fach_codes` in `subjects.yaml` | Code für gewünschte Fächer setzen (Schritt 1) |
+| Cross-Fach-`#`-Bezug auf zweiten Code (z. B. `NWTBFO`) findet nichts | `subjects.fach_codes` nicht geseedet | `alembic upgrade head` + `python scripts/seed_subjects.py` |
 | Viele Warnungen zu konfigurierten Fächern | Scraper-Parsing-Fehler | Scraper-Log + HTML-Struktur prüfen |
 | `embedding IS NULL` nach Batch | LiteLLM nicht erreichbar | `metadata_['embedding_error']` pro Knoten prüfen |
 | Sequential Scan statt HNSW | Index nicht aktuell | `REINDEX INDEX idx_context_nodes_embedding` |

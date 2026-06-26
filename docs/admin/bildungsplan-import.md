@@ -243,7 +243,8 @@ Anschließend JSONL korrigieren und den Import (Schritt 2–4) erneut ausführen
 |---------|---------|--------|
 | `could not translate host name "db"` | Befehl nicht über `docker compose run` im Compose-Netz gestartet | Befehl exakt wie in Schritt 2/3 verwenden |
 | `password authentication failed` | `POSTGRES_PASSWORD` in `.env` weicht von der DB ab | `.env` prüfen; Passwort entspricht dem bei der Installation gesetzten |
-| `0 Knoten` nach Import | Kein `fach_code` in `subjects.yaml` | `fach_code` für die gewünschten Fächer setzen (siehe Runbook, Schritt 1) |
+| `0 Knoten` nach Import | Kein `fach_code`/`fach_codes` in `subjects.yaml` | Code für die gewünschten Fächer setzen (siehe Runbook, Schritt 1) |
+| Cross-Fach-`#`-Bezug auf zweiten Code (Multi-Code-Fach, z. B. `NWTBFO`) findet nichts | `subjects.fach_codes` nicht geseedet | `alembic upgrade head` + `seed_subjects.py` (siehe [Installation, Schritt 5](installation.md)) |
 | `relation "context_nodes" does not exist` | Migrationen nicht eingespielt | `docker compose exec backend alembic upgrade head` |
 | `embedding IS NULL` bleibt | LiteLLM nicht erreichbar | LiteLLM-Erreichbarkeit prüfen; `metadata_['embedding_error']` ansehen |
 
