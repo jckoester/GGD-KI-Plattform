@@ -82,6 +82,13 @@ class Subject(Base):
     sso_aliases: Mapped[list[str]] = mapped_column(
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
     )
+    # Alle Bildungsplan-Fachcodes dieses Fachs. Normalerweise genau einer (== fach_code);
+    # Multi-Code-Fächer (z. B. NwT: NWT 8-10 + NWTBFO 11-12) listen hier beide. Cross-Fach-
+    # Auflösung (get_subject_id_by_code, resolve_ik_node_by_fach_code) matcht gegen
+    # fach_code ODER fach_codes; fach_code bleibt der Primär-/Anzeige-Code.
+    fach_codes: Mapped[list[str]] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
 
 
 # 2. groups

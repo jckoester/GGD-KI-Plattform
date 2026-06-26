@@ -1295,12 +1295,14 @@ async def get_subject_by_fach_code(
 ):
     """Löst einen Fach-Code (z.B. 'M', 'CH', 'ETH') zu subject_id und subject_slug auf.
 
-    Match über die Spalte subjects.fach_code (aus config/subjects.yaml geseedet),
-    case-insensitiv normalisiert auf Großschreibung — NICHT über den Slug.
+    Match über subjects.fach_code ODER subjects.fach_codes (Multi-Code-Fächer wie NwT:
+    'NWT'/'NWTBFO'; aus config/subjects.yaml geseedet), case-insensitiv normalisiert auf
+    Großschreibung — NICHT über den Slug.
     """
+    code = fach_code.strip().upper()
     row = await db.execute(
         sa.select(Subject.id, Subject.slug)
-        .where(Subject.fach_code == fach_code.strip().upper())
+        .where(sa.or_(Subject.fach_code == code, Subject.fach_codes.any(code)))
         .limit(1)
     )
     result = row.fetchone()
