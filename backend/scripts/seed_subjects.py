@@ -34,49 +34,6 @@ _local_path  = _SCRIPT_DIR.parent.parent / "config" / "subjects.yaml"
 DEFAULT_YAML = _docker_path if _docker_path.exists() else _local_path
 
 
-def _resolve_fach_code(entry: dict) -> str | None:
-    """Primärer Fachcode für die (skalare) subjects.fach_code-Spalte.
-
-    Skalares ``fach_code`` direkt; bei Multi-Code (``fach_codes``-Map) der Code des
-    untersten Jahrgangsbands. Hinweis: Die skalare Spalte trägt vorerst nur diesen
-    Primär-Code — die Laufzeit-Auflösung *beider* Codes folgt mit subjects.fach_codes.
-    """
-    raw = entry.get("fach_code")
-    if raw and str(raw).strip():
-        return str(raw).strip().upper()
-    codes = entry.get("fach_codes") or {}
-    if not codes:
-        return None
-
-    def _band_min(band) -> int:
-        try:
-            return int(str(band).split("-")[0])
-        except (ValueError, IndexError):
-            return 999
-
-    primary = codes[min(codes, key=_band_min)]
-    return str(primary).strip().upper() if primary and str(primary).strip() else None
-
-
-def _all_fach_codes(entry: dict) -> list[str]:
-    """Alle Fachcodes eines Fachs (für die subjects.fach_codes-Spalte).
-
-    Skalares ``fach_code`` → genau dieser Code; Multi-Code (``fach_codes``-Map) →
-    alle Codes, dedupliziert, Großschreibung. Gegen diese Liste matcht die
-    Cross-Fach-Auflösung (zusätzlich zur skalaren fach_code-Spalte).
-    """
-    raw = entry.get("fach_code")
-    if raw and str(raw).strip():
-        return [str(raw).strip().upper()]
-    seen: list[str] = []
-    for code in (entry.get("fach_codes") or {}).values():
-        if code and str(code).strip():
-            upper = str(code).strip().upper()
-            if upper not in seen:
-                seen.append(upper)
-    return seen
-
-
 async def seed(yaml_path: Path) -> None:
     with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
@@ -95,11 +52,9 @@ async def seed(yaml_path: Path) -> None:
     async with session_factory() as db:
         for entry in subjects:
             slug = entry["slug"].lower()
-            # Fachkürzel normalisieren: leer/fehlend → None, sonst Großschreibung.
-            # Multi-Code-Fächer (fach_codes) → Primär-Code (unterstes Band) +
-            # vollständige Code-Liste für die Cross-Fach-Auflösung.
-            fach_code = _resolve_fach_code(entry)
-            fach_codes = _all_fach_codes(entry)
+            # Fachkürzel normalisieren: leer/fehlend → None, sonst Großschreibung
+            raw_code = entry.get("fach_code")
+            fach_code = raw_code.strip().upper() if raw_code and raw_code.strip() else None
             # SSO-Aliase normalisieren (lowercase + Umlaute), damit sie dem
             # Matching-Kandidaten in _resolve_subject_id entsprechen.
             sso_aliases = sorted({
@@ -121,7 +76,6 @@ async def seed(yaml_path: Path) -> None:
                 existing.max_grade = entry.get("max_grade")
                 existing.sort_order = entry.get("sort_order", 0)
                 existing.sso_aliases = sso_aliases
-                existing.fach_codes = fach_codes
                 updated += 1
             else:
                 db.add(
@@ -135,7 +89,6 @@ async def seed(yaml_path: Path) -> None:
                         max_grade=entry.get("max_grade"),
                         sort_order=entry.get("sort_order", 0),
                         sso_aliases=sso_aliases,
-                        fach_codes=fach_codes,
                     )
                 )
                 inserted += 1

@@ -56,10 +56,7 @@ _scraper = _load_isolated(
 )
 
 validate_subjects_yaml = _import_bp.validate_subjects_yaml
-subject_fach_codes = _scraper.subject_fach_codes
-fach_code_editions = _scraper.fach_code_editions
-# subject_fach_codes existiert in beiden Skripten identisch — gegen Drift prüfen.
-import_subject_fach_codes = _import_bp.subject_fach_codes
+subject_editions = _scraper.subject_editions
 
 
 def _cfg(*subjects: dict) -> dict:
@@ -105,17 +102,17 @@ def test_overrides_without_fach_code_still_errors():
     assert any("bildungsplan_overrides" in e and "fach_code" in e for e in errors)
 
 
-# -- fach_code_editions: Editions-Auflösung pro Fachcode -----------------------
+# -- subject_editions: Editions-Auflösung pro Fach -----------------------------
 
 
 def test_subject_suffix_whole_subject():
     fach = {"fach_code": "CH", "bildungsplan_suffix": ".V2"}
-    assert fach_code_editions(fach, "CH", default_suffix="") == [("CH", ".V2")]
+    assert subject_editions(fach, default_suffix="") == [("CH", ".V2")]
 
 
 def test_grade_band_override_on_base_default():
     fach = {"fach_code": "M", "bildungsplan_overrides": {"5-6": ".V2"}}
-    assert fach_code_editions(fach, "M", default_suffix="") == [("M", ""), ("M_V2", ".V2")]
+    assert subject_editions(fach, default_suffix="") == [("M", ""), ("M_V2", ".V2")]
 
 
 def test_subject_suffix_with_downgrade_override():
@@ -125,13 +122,13 @@ def test_subject_suffix_with_downgrade_override():
         "bildungsplan_suffix": ".V2",
         "bildungsplan_overrides": {"11-13": ""},
     }
-    assert fach_code_editions(fach, "M", default_suffix="") == [("M", ".V2"), ("M_BASIS", "")]
+    assert subject_editions(fach, default_suffix="") == [("M", ".V2"), ("M_BASIS", "")]
 
 
 def test_no_suffix_no_overrides_uses_global_default():
     fach = {"fach_code": "M"}
-    assert fach_code_editions(fach, "M", default_suffix="") == [("M", "")]
-    assert fach_code_editions(fach, "M", default_suffix=".V2") == [("M", ".V2")]
+    assert subject_editions(fach, default_suffix="") == [("M", "")]
+    assert subject_editions(fach, default_suffix=".V2") == [("M", ".V2")]
 
 
 def test_override_equal_to_subject_suffix_not_duplicated():
@@ -140,83 +137,4 @@ def test_override_equal_to_subject_suffix_not_duplicated():
         "bildungsplan_suffix": ".V2",
         "bildungsplan_overrides": {"5-6": ".V2"},
     }
-    assert fach_code_editions(fach, "M", default_suffix="") == [("M", ".V2")]
-
-
-# -- subject_fach_codes: Single- vs. Multi-Code --------------------------------
-
-
-def test_fach_codes_scalar():
-    assert subject_fach_codes({"fach_code": "M"}) == ["M"]
-
-
-def test_fach_codes_none():
-    assert subject_fach_codes({"slug": "deutsch"}) == []
-
-
-def test_fach_codes_multi_band():
-    fach = {"fach_codes": {"8-10": "NWT", "11-12": "NWTBFO"}}
-    assert subject_fach_codes(fach) == ["NWT", "NWTBFO"]
-
-
-def test_fach_codes_multi_dedup():
-    # Derselbe Code in mehreren Bändern → nur einmal scrapen.
-    fach = {"fach_codes": {"8-10": "NWT", "9-10": "NWT"}}
-    assert subject_fach_codes(fach) == ["NWT"]
-
-
-def test_import_and_scraper_subject_fach_codes_agree():
-    # Beide Skripte definieren subject_fach_codes identisch.
-    fach = {"fach_codes": {"8-10": "NWT", "11-12": "NWTBFO"}}
-    assert import_subject_fach_codes(fach) == subject_fach_codes(fach)
-
-
-# -- validate_subjects_yaml: fach_codes (Multi-Code) ---------------------------
-
-
-def test_fach_codes_valid():
-    errors = validate_subjects_yaml(
-        _cfg({"slug": "nwt", "fach_codes": {"8-10": "NWT", "11-12": "NWTBFO"}})
-    )
-    assert errors == []
-
-
-def test_fach_code_and_fach_codes_mutually_exclusive():
-    errors = validate_subjects_yaml(
-        _cfg({"slug": "nwt", "fach_code": "NWT", "fach_codes": {"8-10": "NWT"}})
-    )
-    assert any("sowohl fach_code als auch fach_codes" in e for e in errors)
-
-
-def test_fach_codes_with_overrides_errors():
-    errors = validate_subjects_yaml(
-        _cfg({
-            "slug": "nwt",
-            "fach_codes": {"8-10": "NWT", "11-12": "NWTBFO"},
-            "bildungsplan_overrides": {"8-10": ".V2"},
-        })
-    )
-    assert any("nicht mit bildungsplan_overrides" in e for e in errors)
-
-
-def test_fach_codes_with_suffix_errors():
-    errors = validate_subjects_yaml(
-        _cfg({
-            "slug": "nwt",
-            "fach_codes": {"8-10": "NWT", "11-12": "NWTBFO"},
-            "bildungsplan_suffix": ".V2",
-        })
-    )
-    assert any("nicht mit bildungsplan_suffix" in e for e in errors)
-
-
-def test_fach_codes_invalid_band_errors():
-    errors = validate_subjects_yaml(
-        _cfg({"slug": "nwt", "fach_codes": {"achtbiszehn": "NWT"}})
-    )
-    assert any("ungültiges Jahrgangsband" in e for e in errors)
-
-
-def test_fach_codes_empty_map_errors():
-    errors = validate_subjects_yaml(_cfg({"slug": "nwt", "fach_codes": {}}))
-    assert any("nicht-leere Map" in e for e in errors)
+    assert subject_editions(fach, default_suffix="") == [("M", ".V2")]

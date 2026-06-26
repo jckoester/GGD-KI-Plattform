@@ -82,15 +82,12 @@ docker compose exec backend python scripts/seed_subjects.py
 ```
 
 Das Skript liest `config/subjects.yaml` und legt alle darin definierten Fächer
-(Slug, Name, Icon, Farbe, Jahrgangsstufen, Bildungsplan-Fachcode(s), SSO-Aliase)
+(Slug, Name, Icon, Farbe, Jahrgangsstufen, Bildungsplan-Fachcode, SSO-Aliase)
 per Upsert an. Es ist idempotent — mehrfaches Ausführen aktualisiert bestehende
-Einträge, legt keine Duplikate an. Fächer mit zwei Bildungsplänen über die
-Klassenspanne (`fach_codes`, z. B. NwT) werden mit beiden Codes geseedet, damit
-die Cross-Fach-Auflösung beide kennt.
+Einträge, legt keine Duplikate an.
 
-> **Nach Code-Änderung in `subjects.yaml`** (neuer/geänderter `fach_code` bzw.
-> `fach_codes`) dieses Seed-Skript erneut ausführen — sonst kennt die Datenbank
-> die neuen Codes nicht.
+> **Nach Code-Änderung in `subjects.yaml`** (neuer/geänderter `fach_code`) dieses
+> Seed-Skript erneut ausführen — sonst kennt die Datenbank die neuen Codes nicht.
 
 > **Wichtig:** Ohne diesen Schritt können Nutzer:innen zwar Fächer und Gruppen
 > aus dem SSO-System sehen, aber die Fach-Zuordnung (Icon, Farbe) fehlt. Bei

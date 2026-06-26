@@ -210,37 +210,15 @@ async def scrape_fach(
     return neu, geaendert, unveraendert
 
 
-def subject_fach_codes(fach: dict) -> list[str]:
-    """Liefert alle Bildungsplan-Fachcodes eines Fachs.
+def subject_editions(fach: dict, default_suffix: str) -> list[tuple[str, str]]:
+    """Liefert die zu scrapenden Editionen eines Fachs als (label, suffix)-Paare.
 
-    Entweder ein einzelner ``fach_code`` (skalar) oder mehrere über ``fach_codes``
-    (Map Jahrgangsband → Code, z.B. NwT: {"8-10": NWT, "11-12": NWTBFO}). Ein Fach
-    mit ``fach_codes`` hat keinen ``fach_code`` (gegenseitig ausschließend, validiert).
-    Reihenfolge stabil nach Bandschlüssel; Duplikate entfernt.
+    Erste Edition ist die Fach-Default-Edition (Dateiname-Label = fach_code), aus
+    ``bildungsplan_suffix`` oder ersatzweise dem globalen Default. Danach folgen
+    zusätzliche Editionen aus ``bildungsplan_overrides`` (Übergangsphase), sofern sie
+    von der Default-Edition abweichen.
     """
-    fc = fach.get('fach_code')
-    if fc:
-        return [fc]
-    codes = fach.get('fach_codes')
-    if codes:
-        seen: list[str] = []
-        for band in codes:
-            code = codes[band]
-            if code not in seen:
-                seen.append(code)
-        return seen
-    return []
-
-
-def fach_code_editions(fach: dict, fach_code: str, default_suffix: str) -> list[tuple[str, str]]:
-    """Liefert die zu scrapenden Editionen *eines* Fachcodes als (label, suffix)-Paare.
-
-    Erste Edition ist die Default-Edition (Dateiname-Label = fach_code), aus
-    ``bildungsplan_suffix`` oder ersatzweise dem globalen Default. Danach zusätzliche
-    Editionen aus ``bildungsplan_overrides`` (Übergangsphase), sofern abweichend.
-    Bei Multi-Code-Fächern (``fach_codes``) sind Suffix/Overrides ausgeschlossen
-    (validiert) → es bleibt allein die Default-Edition pro Code.
-    """
+    fach_code = fach['fach_code']
     overrides = fach.get('bildungsplan_overrides', {})
     suffix = fach.get('bildungsplan_suffix', default_suffix)
     editions = [(fach_code, suffix)]
@@ -302,35 +280,32 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
 
         # Faeccher
         for fach in cfg['subjects']:
-            fach_codes = subject_fach_codes(fach)
-            if not fach_codes:
+            fach_code = fach.get('fach_code')
+            if not fach_code:
                 continue
-            # --fach filtert auf einen konkreten Fachcode (auch bei Multi-Code).
-            if fach_filter:
-                fach_codes = [c for c in fach_codes if c.upper() == fach_filter.upper()]
-                if not fach_codes:
-                    continue
+            if fach_filter and fach_code.upper() != fach_filter.upper():
+                continue
 
+            bp_id_basis = f"{bp_basis_prefix}_ALLG_{schulart}_{fach_code}"
+
+            # Alle Editionen des Fachs: Fach-Default-Edition + Zusatz-Editionen aus
+            # den Jahrgangsband-Overrides.
             neu = geaendert = unveraendert = 0
-            for fach_code in fach_codes:
-                bp_id_basis = f"{bp_basis_prefix}_ALLG_{schulart}_{fach_code}"
-                # Alle Editionen dieses Codes: Default-Edition + Zusatz-Editionen
-                # aus den Jahrgangsband-Overrides.
-                for label, edition_suffix in fach_code_editions(fach, fach_code, default_suffix):
-                    if label == fach_code:
-                        logger.info(
-                            f"Starte Scrape: {fach['slug']} "
-                            f"(bp_id_basis={bp_id_basis}, edition='{edition_suffix or 'Basis'}')"
-                        )
-                    else:
-                        logger.info(
-                            f"  Zusatz-Edition '{edition_suffix or 'Basis'}' ({label})"
-                        )
-                    n, g, u = await scrape_fach(
-                        client, label, bp_id_basis, edition_suffix, output,
-                        existing_hashes, warnings,
+            for label, edition_suffix in subject_editions(fach, default_suffix):
+                if label == fach_code:
+                    logger.info(
+                        f"Starte Scrape: {fach['slug']} "
+                        f"(bp_id_basis={bp_id_basis}, edition='{edition_suffix or 'Basis'}')"
                     )
-                    neu += n; geaendert += g; unveraendert += u
+                else:
+                    logger.info(
+                        f"  Zusatz-Edition '{edition_suffix or 'Basis'}' ({label})"
+                    )
+                n, g, u = await scrape_fach(
+                    client, label, bp_id_basis, edition_suffix, output,
+                    existing_hashes, warnings,
+                )
+                neu += n; geaendert += g; unveraendert += u
 
             logger.info(
                 f"{fach['slug']}: {neu} neu, {geaendert} geaendert, "

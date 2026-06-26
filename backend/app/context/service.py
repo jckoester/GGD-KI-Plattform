@@ -186,21 +186,16 @@ class ImportStats:
 async def get_subject_id_by_code(db: AsyncSession, fach_code: str) -> int | None:
     """Lädt subject_id aus DB für den gegebenen fach_code.
 
-    Match über subjects.fach_code ODER subjects.fach_codes (Bildungsplan-Kürzel,
-    z. B. 'M', 'CH', oder bei Multi-Code-Fächern 'NWT'/'NWTBFO'), normalisiert auf
-    Großschreibung — nicht über den Slug.
+    Match über die Spalte subjects.fach_code (Bildungsplan-Kürzel, z. B. 'M', 'CH'),
+    normalisiert auf Großschreibung — nicht über den Slug.
     """
     from app.db.models import Subject
     if not fach_code:
         return None
-    code = fach_code.strip().upper()
     result = await db.execute(
         sa.select(Subject.id).where(
-            sa.or_(
-                Subject.fach_code == code,
-                Subject.fach_codes.any(code),
-            )
-        ).limit(1)
+            Subject.fach_code == fach_code.strip().upper(),
+        )
     )
     row = result.fetchone()
     return row[0] if row else None
@@ -343,14 +338,11 @@ async def resolve_ik_node_by_fach_code(
     db: AsyncSession, fach_code: str, nr: str
 ) -> UUID | None:
     """Löst Cross-Fach-IK via (fach_code, nr) auf."""
-    # subject_id aus fach_code ODER fach_codes (Multi-Code-Fächer); Großschreibung
+    # subject_id aus fach_code (Spalte heißt fach_code; Konvention: Großschreibung)
     if not fach_code:
         return None
     result = await db.execute(
-        sa.text(
-            "SELECT id FROM subjects "
-            "WHERE fach_code = :code OR :code = ANY(fach_codes) LIMIT 1"
-        ),
+        sa.text("SELECT id FROM subjects WHERE fach_code = :code LIMIT 1"),
         {"code": fach_code.strip().upper()},
     )
     row = result.fetchone()
