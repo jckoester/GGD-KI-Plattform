@@ -14,6 +14,8 @@ from pathlib import Path
 import httpx
 import yaml
 
+from scripts.scraper.bildungsplan_scraper import subject_fach_codes
+
 BASE_URL = 'https://www.bildungsplaene-bw.de/,Lde/'
 STATE_FILE = Path('data/scraper_state.json')
 
@@ -50,17 +52,16 @@ async def check_for_updates(subjects_path: str = 'config/subjects.yaml') -> list
     changed = []
     async with httpx.AsyncClient(timeout=15) as client:
         for fach in cfg['subjects']:
-            fach_code = fach.get('fach_code')
-            if not fach_code:
-                continue
-            # Fach-Default-Edition überwachen (z.B. '.V2'), nicht nur die Basis.
+            # Fach-Default-Edition je Code überwachen (z.B. '.V2'); Multi-Code-Fächer
+            # (fach_codes) liefern mehrere Codes — jeden einzeln prüfen.
             suffix = fach.get('bildungsplan_suffix', default_suffix)
-            bp_id = f"{bp_basis}_ALLG_{schulart}_{fach_code}{suffix}"
-            current_date = await fetch_version_date(client, bp_id)
-            if current_date and state.get(bp_id) != current_date:
-                changed.append(fach_code)
-                state[bp_id] = current_date
-            await asyncio.sleep(0.5)
+            for fach_code in subject_fach_codes(fach):
+                bp_id = f"{bp_basis}_ALLG_{schulart}_{fach_code}{suffix}"
+                current_date = await fetch_version_date(client, bp_id)
+                if current_date and state.get(bp_id) != current_date:
+                    changed.append(fach_code)
+                    state[bp_id] = current_date
+                await asyncio.sleep(0.5)
 
     STATE_FILE.parent.mkdir(exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))

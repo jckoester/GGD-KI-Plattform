@@ -63,6 +63,28 @@ SCHULJAHR_RE = re.compile(r"^\d{4}/\d{2}$")
 # -- Validierung ---------------------------------------------------------------
 
 
+def subject_fach_codes(fach: dict) -> list[str]:
+    """Liefert alle Bildungsplan-Fachcodes eines Fachs.
+
+    Entweder ein einzelner ``fach_code`` (skalar) oder mehrere über ``fach_codes``
+    (Map Jahrgangsband → Code, z.B. NwT: {"8-10": NWT, "11-12": NWTBFO}). Beide
+    schließen sich gegenseitig aus (validiert). Reihenfolge stabil nach Bandschlüssel,
+    Duplikate entfernt.
+    """
+    fc = fach.get("fach_code")
+    if fc:
+        return [fc]
+    codes = fach.get("fach_codes")
+    if codes:
+        seen: list[str] = []
+        for band in codes:
+            code = codes[band]
+            if code not in seen:
+                seen.append(code)
+        return seen
+    return []
+
+
 def validate_subjects_yaml(cfg: dict) -> list[str]:
     """Gibt Liste der Fehler zurueck (leer = OK)."""
     errors = []
@@ -73,20 +95,58 @@ def validate_subjects_yaml(cfg: dict) -> list[str]:
             f"schuljahr '{cfg.get('schuljahr')}' hat falsches Format (erwartet: YYYY/YY)"
         )
     for fach in cfg.get("subjects", []):
+        slug = fach.get("slug")
         fach_code = fach.get("fach_code")
+        fach_codes = fach.get("fach_codes")
         overrides = fach.get("bildungsplan_overrides", {})
-        if overrides and not fach_code:
-            errors.append(
-                f"Fach '{fach['slug']}' hat bildungsplan_overrides aber keinen fach_code"
-            )
         suffix = fach.get("bildungsplan_suffix")
+
+        # fach_code (skalar) und fach_codes (Map) schließen sich aus
+        if fach_code and fach_codes is not None:
+            errors.append(
+                f"Fach '{slug}' hat sowohl fach_code als auch fach_codes — nur eines erlaubt"
+            )
+
+        if fach_codes is not None:
+            if not isinstance(fach_codes, dict) or not fach_codes:
+                errors.append(
+                    f"Fach '{slug}': fach_codes muss eine nicht-leere Map "
+                    f"Jahrgangsband→Code sein"
+                )
+            else:
+                for band, code in fach_codes.items():
+                    try:
+                        parse_grade_range(str(band))
+                    except ValueError:
+                        errors.append(
+                            f"Fach '{slug}': ungültiges Jahrgangsband '{band}' in fach_codes"
+                        )
+                    if not isinstance(code, str) or not code.strip():
+                        errors.append(
+                            f"Fach '{slug}': fach_codes['{band}'] ist kein gültiger Fachcode"
+                        )
+            # Multi-Code nicht mit der bandbasierten Editions-Kaskade kombinieren
+            if overrides:
+                errors.append(
+                    f"Fach '{slug}': fach_codes nicht mit bildungsplan_overrides kombinierbar"
+                )
+            if suffix:
+                errors.append(
+                    f"Fach '{slug}': fach_codes nicht mit bildungsplan_suffix kombinierbar"
+                )
+
+        # Single-Code-Regeln (greifen nur ohne fach_codes)
+        if overrides and not fach_code and fach_codes is None:
+            errors.append(
+                f"Fach '{slug}' hat bildungsplan_overrides aber keinen fach_code"
+            )
         if suffix is not None and not isinstance(suffix, str):
             errors.append(
-                f"Fach '{fach['slug']}' hat ein nicht-textuelles bildungsplan_suffix"
+                f"Fach '{slug}' hat ein nicht-textuelles bildungsplan_suffix"
             )
-        elif suffix and not fach_code:
+        elif suffix and not fach_code and fach_codes is None:
             errors.append(
-                f"Fach '{fach['slug']}' hat bildungsplan_suffix aber keinen fach_code"
+                f"Fach '{slug}' hat bildungsplan_suffix aber keinen fach_code"
             )
     return errors
 
@@ -683,11 +743,11 @@ def run_import(
                 return fach_code_to_slug[part_clean]
         return None
 
-    # fach_code -> slug Mapping aus subjects.yaml bauen
+    # fach_code -> slug Mapping aus subjects.yaml bauen (alle Codes eines Fachs,
+    # auch Multi-Code: NWT und NWTBFO zeigen beide auf slug 'nwt').
     fach_code_to_slug: dict[str, str] = {}
     for fach in cfg.get("subjects", []):
-        fc = fach.get("fach_code")
-        if fc:
+        for fc in subject_fach_codes(fach):
             fach_code_to_slug[fc.upper()] = fach["slug"]
 
     try:

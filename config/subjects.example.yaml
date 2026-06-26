@@ -2,7 +2,9 @@
 # Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
 #         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order,
 #         fach_code (optional, Bildungsplan-Fachkürzel wie M/CH; wird in die
-#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
+#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf),
+#         fach_codes (optional, Map Jahrgangsband→Code für Fächer mit zwei BPs über
+#         die Klassenspanne, z.B. NwT; schließt fach_code/Suffix/Overrides aus)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
 schuljahr: "2026/27" # aktuelles Schuljahr
@@ -134,5 +136,10 @@ subjects:
     icon: microscope
     color: "#0ea5e9"
     min_grade: 8
-    max_grade: 10
+    max_grade: 12
     sort_order: 150
+    # Zwei BP-Dokumente über die Klassenspanne → fach_codes pro Jahrgangsband
+    # statt eines einzelnen fach_code (nicht mit Suffix/Overrides kombinierbar).
+    fach_codes:
+      "8-10": NWT
+      "11-12": NWTBFO
