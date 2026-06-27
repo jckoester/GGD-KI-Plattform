@@ -1,5 +1,6 @@
 <script>
-    import { goto } from "$app/navigation";
+    import { goto, beforeNavigate } from "$app/navigation";
+    import { tick } from "svelte";
     import { page } from "$app/stores";
     import { getFachplanBySubject } from "$lib/api.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
@@ -13,6 +14,7 @@
     let data = $state(null);
     let loading = $state(false);
     let error = $state(null);
+    let rootEl = $state(null);
 
     // Ausgewähltes Band (Objekt mit min_grade/max_grade/niveau/label)
     let selectedBand = $state(null);
@@ -65,14 +67,77 @@
         }
     }
 
-    // Erstladen bei Mount / subjectId-Wechsel
-    $effect(() => {
-        if (subjectId) {
-            selectedBand = null;
-            view = 'ik';
-            load(null, selectedVersion);
+    // ── UI-Zustand über die Knoten-Detailansicht hinweg erhalten ──────────────
+    // Beim Öffnen einer Kompetenz (Detailseite) sichern wir Tab, Band, Version,
+    // Aufklapp-Zustand und Scroll-Position in sessionStorage (pro Fach); bei der
+    // Rückkehr (?back= → education-plans?subject=) wird der Zustand wiederher-
+    // gestellt, statt auf den Default (IK, ganz oben) zu springen.
+    const stateKey = (sid) => `bptree:${sid}`;
+
+    function scrollContainer() {
+        return rootEl?.closest(".overflow-y-auto") ?? null;
+    }
+
+    function saveTreeState() {
+        if (typeof sessionStorage === "undefined" || !subjectId) return;
+        try {
+            sessionStorage.setItem(stateKey(subjectId), JSON.stringify({
+                view, selectedBand, selectedVersion,
+                expandedLeitideen, expandedPkGruppen,
+                scrollTop: scrollContainer()?.scrollTop ?? 0,
+            }));
+        } catch { /* sessionStorage nicht verfügbar → ohne Wiederherstellung */ }
+    }
+
+    function readTreeState(sid) {
+        if (typeof sessionStorage === "undefined" || !sid) return null;
+        try {
+            const raw = sessionStorage.getItem(stateKey(sid));
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    }
+
+    async function restoreScroll(top) {
+        if (!top) return;
+        await tick();
+        const sc = scrollContainer();
+        if (sc) sc.scrollTop = top;
+    }
+
+    // Vor dem Öffnen einer Knoten-Detailseite (/knowledge/<id>) Zustand sichern —
+    // greift für Klick-Handler (goto) UND direkte <a href>-Links gleichermaßen.
+    beforeNavigate((nav) => {
+        if (/^\/knowledge\/\d+$/.test(nav.to?.url.pathname ?? "")) {
+            saveTreeState();
         }
     });
+
+    // Erstladen bei Mount / Fachwechsel — mit Wiederherstellung gesicherten Zustands.
+    let lastLoadedSubject = null;
+    $effect(() => {
+        if (!subjectId || subjectId === lastLoadedSubject) return;
+        lastLoadedSubject = subjectId;
+        initForSubject(subjectId);
+    });
+
+    function initForSubject(sid) {
+        const saved = readTreeState(sid);
+        if (saved) {
+            // Einmalig verbrauchen: nur die unmittelbare Rückkehr stellt wieder her;
+            // ein späterer Fachwechsel startet wieder beim Default.
+            try { sessionStorage.removeItem(stateKey(sid)); } catch { /* egal */ }
+            view = saved.view ?? "ik";
+            selectedBand = saved.selectedBand ?? null;
+            selectedVersion = saved.selectedVersion ?? selectedVersion;
+            expandedLeitideen = saved.expandedLeitideen ?? {};
+            expandedPkGruppen = saved.expandedPkGruppen ?? {};
+            load(selectedBand, selectedVersion).then(() => restoreScroll(saved.scrollTop));
+        } else {
+            selectedBand = null;
+            view = "ik";
+            load(null, selectedVersion);
+        }
+    }
 
     // Band-Wechsel → neu laden, IK-Ansicht aktivieren
     function selectBand(band) {
@@ -103,7 +168,7 @@
     }
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6" bind:this={rootEl}>
     {#if loading && !data}
         <LoadingBanner message="Bildungsplan wird geladen…" />
     {/if}

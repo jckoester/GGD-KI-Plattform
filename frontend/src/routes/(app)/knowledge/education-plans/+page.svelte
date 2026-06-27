@@ -34,16 +34,25 @@
             return a.name.localeCompare(b.name, 'de')
         }))
 
-    // Setze erstes eigenes Fach als Standard, sonst erstes Fach
+    // Initiales Fach aus der URL (?subject=) wiederherstellen — sonst erstes eigenes
+    // Fach, sonst erstes Fach. So landet die Zurück-Navigation aus der Detailansicht
+    // wieder im zuvor gewählten Fach statt beim Default.
     $effect(() => {
         if (sortedSubjects.length > 0 && selectedSubjectId === null) {
+            const fromUrl = Number($page.url.searchParams.get('subject'))
+            const valid = fromUrl && sortedSubjects.some(s => s.id === fromUrl)
             const firstOwn = sortedSubjects.find(s => mySubjectIds.includes(s.id))
-            selectedSubjectId = firstOwn?.id || sortedSubjects[0]?.id
+            selectedSubjectId = valid ? fromUrl : (firstOwn?.id || sortedSubjects[0]?.id)
         }
     })
 
     function selectSubject(subjectId) {
         selectedSubjectId = subjectId
+        // Fach in die URL spiegeln (ohne History-Eintrag), damit der von der
+        // Detailansicht erfasste ?back=-Parameter das Fach behält.
+        const url = new URL($page.url)
+        url.searchParams.set('subject', String(subjectId))
+        goto(url, { replaceState: true, keepFocus: true, noScroll: true })
     }
 
     // Gruppe Fächer nach eigenen/anderen
