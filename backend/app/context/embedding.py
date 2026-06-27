@@ -6,6 +6,7 @@ Embedding-Modell: text-embedding-3-small (OpenAI, 1536 Dimensionen) via LiteLLM.
 import logging
 from uuid import UUID
 
+import httpx
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,22 +82,22 @@ def _build_embedding_input(node: ContextNode) -> str:
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """Ruft text-embedding-3-small via LiteLLM-Proxy auf.
+    """Ruft text-embedding-3-small ueber den LiteLLM-Proxy auf (HTTP, OpenAI-kompatibel).
 
-    Liest LITELLM_PROXY_URL und LITELLM_MASTER_KEY aus der Umgebung.
-    Wirft litellm.exceptions.APIError bei Fehlern (Aufrufer behandelt).
+    Konsistent mit dem Chat-Pfad: Das Backend spricht den LiteLLM-Proxy ausschliesslich
+    ueber HTTP an (kein litellm-SDK). Proxy-URL/Master-Key/SSL aus den Settings.
+    Wirft httpx.HTTPError bei Fehlern (Aufrufer behandelt).
     """
-    import os
-    import litellm
-    proxy_url = os.environ.get('LITELLM_PROXY_URL', 'http://localhost:4000')
-    api_key = os.environ.get('LITELLM_MASTER_KEY', 'dummy')
-    response = await litellm.aembedding(
-        model='text-embedding-3-small',
-        input=[text],
-        api_base=proxy_url,
-        api_key=api_key,
-    )
-    return response.data[0]['embedding']
+    from app.config import settings
+    async with httpx.AsyncClient(timeout=30.0, verify=settings.litellm_verify_ssl) as client:
+        response = await client.post(
+            f"{settings.litellm_proxy_url}/embeddings",
+            headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
+            json={"model": "text-embedding-3-small", "input": [text]},
+        )
+        response.raise_for_status()
+        data = response.json()
+    return data["data"][0]["embedding"]
 
 
 async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
