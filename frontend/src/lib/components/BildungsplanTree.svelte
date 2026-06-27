@@ -104,10 +104,13 @@
         if (sc) sc.scrollTop = top;
     }
 
-    // Vor dem Öffnen einer Knoten-Detailseite (/knowledge/<id>) Zustand sichern —
+    // Vor dem Öffnen einer Knoten-Detailseite (/knowledge/<uuid>) Zustand sichern —
     // greift für Klick-Handler (goto) UND direkte <a href>-Links gleichermaßen.
+    // Knoten-IDs sind UUIDs (nicht numerisch); benannte Unterseiten (archive,
+    // education-plans …) matchen bewusst nicht.
     beforeNavigate((nav) => {
-        if (/^\/knowledge\/\d+$/.test(nav.to?.url.pathname ?? "")) {
+        const path = nav.to?.url.pathname ?? "";
+        if (/^\/knowledge\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(path)) {
             saveTreeState();
         }
     });
