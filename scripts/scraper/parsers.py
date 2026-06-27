@@ -368,7 +368,11 @@ def parse_ik_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
 
         nr = int(m.group(1))
         content = first_text
-        sub_bp_id = f"{parent_bp_id}_{nr:02d}"
+        # Kanonische bp_id der Quelle (data-bpid) bevorzugen statt selbst zu
+        # synthetisieren — sonst fehlt bei mehrstufigen IK-Seiten die
+        # Zwischenebene (z.B. Kursstufe-Basisfach: …_{Leitidee}_00_{Nr}), und
+        # keine Querverweise lösen auf. Fallback: bisherige Synthese.
+        sub_bp_id = cells[0].get("data-bpid") or f"{parent_bp_id}_{nr:02d}"
 
         # Naechste Zeile enthaelt Referenzen (falls vorhanden und keine neue Standard-Zeile)
         relations = []
@@ -499,7 +503,9 @@ def parse_pk_kompetenz_list(soup: BeautifulSoup, url: str, parent_bp_id: str) ->
 
         nr = int(m.group(1))
         content = first_text
-        sub_bp_id = f"{parent_bp_id}_{nr:02d}"
+        # Kanonische bp_id der Quelle (data-bpid) bevorzugen statt selbst zu
+        # synthetisieren (siehe parse_ik_kompetenz_list). Fallback: Synthese.
+        sub_bp_id = cells[0].get("data-bpid") or f"{parent_bp_id}_{nr:02d}"
 
         # Berechne hierarchische Kompetenz-Nummer, z.B. "2.1.1"
         if pk_prefix:

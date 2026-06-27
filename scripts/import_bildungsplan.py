@@ -234,36 +234,38 @@ def upsert_node(
     row = cur.fetchone()
 
     if row is None:
-        # INSERT
-        if not dry_run:
-            cur.execute(
-                """
-                INSERT INTO context_nodes
-                    (category, content_type, title, content, metadata,
-                     read_scope, write_scope, status, owner_pseudonym, assistant_id,
-                     subject_id, min_grade, max_grade, niveau)
-                VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL,
-                     %s, %s, %s, %s)
-                RETURNING id
-            """,
-                (
-                    category,
-                    content_type,
-                    title,
-                    content,
-                    json.dumps(metadata, ensure_ascii=False),
-                    visibility,
-                    visibility,
-                    subject_id,
-                    min_grade,
-                    max_grade,
-                    niveau,
-                ),
-            )
-            node_id = cur.fetchone()[0]
-        else:
-            node_id = None
+        # INSERT — bewusst AUCH im Dry-Run ausgeführt. Alle Schreibvorgänge laufen
+        # in einer Transaktion, die run_import am Ende per rollback() verwirft
+        # (statt commit). Nur dadurch sehen die nachfolgenden resolve_edges-Lookups
+        # die neu importierten Knoten — sonst würde der Dry-Run Querverweise auf
+        # frisch gescrapte Knoten fälschlich als unaufgelöst melden (er fragte sonst
+        # den zuletzt committeten DB-Stand ab).
+        cur.execute(
+            """
+            INSERT INTO context_nodes
+                (category, content_type, title, content, metadata,
+                 read_scope, write_scope, status, owner_pseudonym, assistant_id,
+                 subject_id, min_grade, max_grade, niveau)
+            VALUES
+                (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL,
+                 %s, %s, %s, %s)
+            RETURNING id
+        """,
+            (
+                category,
+                content_type,
+                title,
+                content,
+                json.dumps(metadata, ensure_ascii=False),
+                visibility,
+                visibility,
+                subject_id,
+                min_grade,
+                max_grade,
+                niveau,
+            ),
+        )
+        node_id = cur.fetchone()[0]
         return "inserted", node_id
 
     existing_id, existing_hash = row
