@@ -55,7 +55,9 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
+      # Host-Port konfigurierbar (z.B. hinter einem vorgelagerten Reverse-Proxy);
+      # Container-Port bleibt 80. Setzen über NGINX_PORT in .env, Default 80.
+      - "${NGINX_PORT:-80}:80"
     volumes:
       - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

@@ -22,6 +22,7 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel | `gpt-4o-mini` |
 | `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (für CORS) | `https://ki.beispielschule.de` |
 | `ENVIRONMENT` | `development` oder `production` | `production` |
+| `NGINX_PORT` | Host-Port, auf dem nginx lauscht (Default `80`; höher setzen, wenn ein Reverse-Proxy davorliegt) | `8080` |
 | `AUTH_CONFIG_PATH` | Pfad zur auth.yaml | `config/auth.yaml` |
 | `BUDGET_TIERS_PATH` | Pfad zur budget_tiers.yaml | `config/budget_tiers.yaml` |
 | `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
