@@ -3,12 +3,15 @@
     import { goto } from "$app/navigation";
     import { login, getMe } from "$lib/api.js";
     import { branding } from "$lib/branding.js";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import LoadingBanner from "$lib/components/LoadingBanner.svelte";
 
     let username = "";
     let password = "";
     let error = "";
     let loading = false;
-    let challenge = { type: "form", redirect_url: null };
+    let challenge = null; // null = lädt; sonst { type, redirect_url } vom Backend
+    let loadError = false; // login-challenge nicht erreichbar (Backend/Proxy)
 
     onMount(async () => {
         try {
@@ -16,14 +19,17 @@
             goto("/welcome");
             return;
         } catch {
-            /* weiter */
+            /* nicht eingeloggt → Login anzeigen */
         }
 
         try {
             const res = await fetch("/api/auth/login-challenge");
-            if (res.ok) challenge = await res.json();
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            challenge = await res.json();
         } catch {
-            /* Standardwert: form */
+            // Anmeldedienst nicht erreichbar → bewusst KEIN Test-Login-Formular zeigen
+            // (das würde einen Backend-/Proxy-Ausfall maskieren), sondern Fehler.
+            loadError = true;
         }
     });
 
@@ -70,7 +76,13 @@
             </h1>
         </div>
 
-        {#if challenge.type === "redirect"}
+        {#if loadError}
+            <ErrorBanner
+                message="Anmeldedienst nicht erreichbar. Bitte später erneut versuchen oder die Administration informieren."
+            />
+        {:else if challenge === null}
+            <LoadingBanner />
+        {:else if challenge.type === "redirect"}
             <a
                 href={challenge.redirect_url}
                 class="block w-full text-center py-2.5 px-4 rounded-lg bg-primary
