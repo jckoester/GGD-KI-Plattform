@@ -42,9 +42,6 @@ class Settings(BaseSettings):
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
-    curriculum_extract_model: str = ""
-    curriculum_extract_max_pages_per_call: int = 4
-    curriculum_extract_concurrency: int = 3
 
 
 settings = Settings()
