@@ -606,6 +606,11 @@ class ContextNode(Base):
     min_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     max_grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     niveau: Mapped[str] = mapped_column(server_default="regulär")
+    # Bildungsplan-Edition als eigenes Feld (statt nur implizit im bp_id):
+    # "" = Basis/V1, ".V2", ".V3" … Treibt die schuljahresabhängige Editionsauswahl.
+    bp_version: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("''")
+    )
 
     status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'active'")

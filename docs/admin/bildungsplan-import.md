@@ -148,13 +148,32 @@ docker compose run --rm \
     --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki"'
 ```
 
-Warnungen prüfen (das Import-Skript schreibt sie nach `data/import_logs/` im
-eingehängten `scripts/`-Elternverzeichnis bzw. in die Container-Ausgabe):
+Warnungen prüfen — das Import-Skript schreibt sie nach
+`data/import_logs/import_warnings_<datum>.log`. **Achtung:** Der Pfad ist **relativ
+zum Arbeitsverzeichnis** des Skripts (im Container `/app/data/…`). Damit das Log einen
+`docker compose run --rm`-Lauf überlebt, das `data/`-Verzeichnis mit einhängen
+(`-v "$(pwd)/data:/app/data"`) oder die Auswertung **im selben Container** ausführen —
+sonst geht die Datei mit dem Container verloren.
 
-- **Akzeptabel:** Querverweise auf Fächer, die nicht in `subjects.yaml` stehen
-  (z. B. BNT-Verweise aus Chemie auf andere Fächer).
-- **Nicht akzeptabel:** Warnungen mit `bp_id`-Präfixen der konfigurierten Fächer
-  (z. B. `BP2016BW_ALLG_GYM_CH_*`) → Scraper- oder Importfehler, untersuchen.
+Die meisten Warnungen sind **erwartbar**, nicht jede ist ein Fehler:
+
+- **Akzeptabel — Verweis auf ein nicht importiertes Fach:** Der Bildungsplan verlinkt
+  quer durch den gesamten Gymnasial-Katalog; die Schule importiert nur eine Teilmenge.
+  Verweise auf nicht konfigurierte/nicht gescrapte Fächer (Fremdsprachen — nur als PDF
+  verfügbar; nicht angebotene Religionskonfessionen; Profilfächer) laufen daher ins
+  Leere. Kein Handlungsbedarf.
+- **Bekanntes Quelldaten-Rauschen — `BO_07`:** Mehrere Fächer verweisen auf den
+  Leitperspektive-Aspekt `BO_07`. Die Leitperspektive Berufsorientierung hat aber nur
+  **6 Aspekte** (BO_01–06); die BP-Quelle nummeriert ihren 6. Aspekt fälschlich als
+  `07` (Anker-Off-by-one). Der Scraper übernimmt den Code originalgetreu → **unkritisch**,
+  kein Import-/Scraper-Fehler.
+- **Editionsübergang (V1/V2):** Verweise auf die **ältere Fassung** eines Fachs, das
+  inzwischen auf `.V2` umgestellt ist (z. B. `…_GEO_…` statt `…_GEO.V2_…`), lösen nicht
+  auf, weil nur die neue Edition importiert ist. Während der Übergangszeit erwartbar
+  (siehe Versionierungs-Konzept).
+- **Echter Fehler — untersuchen:** Verweis auf die **aktuelle** Edition eines
+  konfigurierten, gescrapten Fachs, dessen Zielknoten fehlt (z. B. `…_CH.V2_…` ohne
+  Treffer) → Scraper-/Importfehler.
 
 ---
 

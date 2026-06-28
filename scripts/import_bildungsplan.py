@@ -221,6 +221,8 @@ def upsert_node(
     min_grade = node.get("min_grade")
     max_grade = node.get("max_grade")
     niveau = node.get("niveau", "regulär")
+    # Bildungsplan-Edition (z. B. "2016", "2016.V2") — maßgeblich vom Scraper.
+    bp_version = node.get("bp_version", "")
 
     # subject_id: aus fach_slug ableiten (nur für Bildungsplan-Knoten mit fach_slug)
     fach_slug = node.get("fach_slug")
@@ -245,10 +247,10 @@ def upsert_node(
             INSERT INTO context_nodes
                 (category, content_type, title, content, metadata,
                  read_scope, write_scope, status, owner_pseudonym, assistant_id,
-                 subject_id, min_grade, max_grade, niveau)
+                 subject_id, min_grade, max_grade, niveau, bp_version)
             VALUES
                 (%s, %s, %s, %s, %s, %s, %s, 'active', NULL, NULL,
-                 %s, %s, %s, %s)
+                 %s, %s, %s, %s, %s)
             RETURNING id
         """,
             (
@@ -263,6 +265,7 @@ def upsert_node(
                 min_grade,
                 max_grade,
                 niveau,
+                bp_version,
             ),
         )
         node_id = cur.fetchone()[0]
@@ -281,11 +284,12 @@ def upsert_node(
                     subject_id = COALESCE(subject_id, %s),
                     min_grade  = COALESCE(min_grade,  %s),
                     max_grade  = COALESCE(max_grade,  %s),
-                    niveau     = %s
+                    niveau     = %s,
+                    bp_version = %s
                 WHERE id = %s
                 """,
                 (title, json.dumps(metadata), subject_id, min_grade, max_grade,
-                 niveau, existing_id),
+                 niveau, bp_version, existing_id),
             )
         return "skipped", UUID(str(existing_id))
 
@@ -301,12 +305,13 @@ def upsert_node(
                 min_grade = %s,
                 max_grade = %s,
                 niveau = %s,
+                bp_version = %s,
                 embedding = NULL,
                 updated_at = now()
             WHERE id = %s
         """,
             (content, title, json.dumps(metadata, ensure_ascii=False),
-             subject_id, min_grade, max_grade, niveau, existing_id),
+             subject_id, min_grade, max_grade, niveau, bp_version, existing_id),
         )
     return "updated", UUID(str(existing_id))
 
