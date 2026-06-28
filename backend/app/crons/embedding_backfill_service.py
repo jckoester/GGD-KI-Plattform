@@ -20,6 +20,7 @@ class EmbeddingBackfillStats:
     found: int = 0
     ok: int = 0
     errors: int = 0
+    skipped: int = 0  # Knoten ohne einbettbaren Text (leer) — übersprungen, kein Fehler
     duration_ms: int = 0
 
 
@@ -69,11 +70,16 @@ async def backfill_embeddings(
     for batch_idx, i in enumerate(range(0, stats.found, batch_size), start=1):
         batch = nodes[i : i + batch_size]
         for node in batch:
+            inp = _build_embedding_input(node)
+            if not inp.strip():
+                # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.
+                stats.skipped += 1
+                continue
             if dry_run:
                 stats.ok += 1
                 continue
             try:
-                embedding = await generate_embedding(_build_embedding_input(node))
+                embedding = await generate_embedding(inp)
                 await db.execute(
                     update(ContextNode)
                     .where(ContextNode.id == node.id)
@@ -82,9 +88,13 @@ async def backfill_embeddings(
                 stats.ok += 1
             except Exception as exc:
                 stats.errors += 1
-                logger.error("Embedding-Fehler Knoten %s: %s", node.id, exc)
+                # Bei HTTP-Fehlern den Response-Body (der eigentliche Grund, z. B.
+                # LiteLLM-400-Detail) festhalten, nicht nur die generische httpx-Meldung.
+                resp = getattr(exc, "response", None)
+                detail = (resp.text if resp is not None else str(exc))[:2000]
+                logger.error("Embedding-Fehler Knoten %s: %s", node.id, detail)
                 meta = dict(node.metadata_ or {})
-                meta["embedding_error"] = str(exc)
+                meta["embedding_error"] = detail
                 await db.execute(
                     update(ContextNode)
                     .where(ContextNode.id == node.id)
@@ -116,10 +126,11 @@ async def backfill_embeddings(
 
     stats.duration_ms = int((perf_counter() - started) * 1000)
     logger.info(
-        "backfill_embeddings fertig found=%d ok=%d errors=%d duration_ms=%d",
+        "backfill_embeddings fertig found=%d ok=%d errors=%d skipped=%d duration_ms=%d",
         stats.found,
         stats.ok,
         stats.errors,
+        stats.skipped,
         stats.duration_ms,
     )
     return stats

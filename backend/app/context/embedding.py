@@ -81,14 +81,22 @@ def _build_embedding_input(node: ContextNode) -> str:
     return "\n".join(prefixes) + "\n" + base
 
 
+# text-embedding-3-small akzeptiert max. 8191 Tokens. Konservativer Zeichen-Cap
+# (sicher selbst bei dichter Tokenisierung) gegen 400er bei sehr langen Knoten —
+# für die semantische Einbettung genügt der Textanfang.
+_MAX_EMBED_CHARS = 16000
+
+
 async def generate_embedding(text: str) -> list[float]:
     """Ruft text-embedding-3-small ueber den LiteLLM-Proxy auf (HTTP, OpenAI-kompatibel).
 
     Konsistent mit dem Chat-Pfad: Das Backend spricht den LiteLLM-Proxy ausschliesslich
     ueber HTTP an (kein litellm-SDK). Proxy-URL/Master-Key/SSL aus den Settings.
+    Sehr langer Input wird auf ``_MAX_EMBED_CHARS`` gekürzt (Token-Limit des Modells).
     Wirft httpx.HTTPError bei Fehlern (Aufrufer behandelt).
     """
     from app.config import settings
+    text = text[:_MAX_EMBED_CHARS]
     async with httpx.AsyncClient(timeout=30.0, verify=settings.litellm_verify_ssl) as client:
         response = await client.post(
             f"{settings.litellm_proxy_url}/embeddings",

@@ -124,6 +124,39 @@ class TestBackfillEmbeddings:
             assert node.embedding is None  # nicht geschrieben
 
     @pytest.mark.asyncio
+    async def test_empty_content_node_is_skipped_not_errored(self, session_factory):
+        # Whitelist-Knoten ohne einbettbaren Text → überspringen statt 400/Fehler.
+        async with session_factory() as db:
+            node = ContextNode(
+                id=uuid.uuid4(),
+                title="Leerer Knoten",
+                content="",
+                category="knowledge",
+                content_type="ik_kompetenz",
+                status="active",
+                read_scope="global",
+                write_scope="global",
+                metadata_={},
+            )
+            db.add(node)
+            await db.commit()
+            node_id = node.id
+
+        mock = AsyncMock(return_value=[0.5] * 1536)
+        with patch("app.crons.embedding_backfill_service.generate_embedding", mock):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db)
+
+        assert stats.found == 1
+        assert stats.skipped == 1
+        assert stats.ok == 0
+        assert stats.errors == 0
+        mock.assert_not_awaited()  # leerer Input → kein Embedding-Call
+        async with session_factory() as db:
+            node = await db.get(ContextNode, node_id)
+            assert node.embedding is None
+
+    @pytest.mark.asyncio
     async def test_error_sets_embedding_error_metadata(self, session_factory, seed_nodes):
         with patch(
             "app.crons.embedding_backfill_service.generate_embedding",

@@ -42,10 +42,11 @@ async def run(
             reindex=reindex,
         )
     logger.info(
-        "embedding_backfill done found=%d ok=%d errors=%d duration_ms=%d",
+        "embedding_backfill done found=%d ok=%d errors=%d skipped=%d duration_ms=%d",
         stats.found,
         stats.ok,
         stats.errors,
+        stats.skipped,
         stats.duration_ms,
     )
     return 1 if stats.errors else 0
