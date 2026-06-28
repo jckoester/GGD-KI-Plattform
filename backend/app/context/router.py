@@ -45,6 +45,7 @@ from app.context.schemas import (
     PkGruppeRead,
     PkKompetenzRead,
 )
+from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.taxonomy import validate_content_type
@@ -1318,6 +1319,39 @@ def _band_label(min_g: int, max_g: int, niveau: str) -> str:
     return grade + suffix
 
 
+@router.get("/subjects/{subject_id}/active-bp-version")
+async def get_active_bp_version(
+    subject_id: int,
+    grade: int = Query(..., ge=1, le=13, description="Jahrgangsstufe"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Berechnet die für (Fach, Stufe, aktuelles Schuljahr) geltende ``bp_version``.
+
+    Verbindet den Editions-Fahrplan (``subjects.yaml``) + Schuljahr
+    (``school_year.yaml``) mit dem tatsächlich importierten Editionsbestand des
+    Fachs. Für editionsbewusste Editor-Filter (IK-Autocomplete): die zurückgegebene
+    ``bp_version`` ist der Filterwert für die Knotensuche; ``null`` = Fach hat keine
+    versionierten Knoten → nicht filtern.
+    """
+    _bp = ContextNode.metadata_["bp_version"].astext
+    rows = await db.execute(
+        sa.select(_bp)
+        .where(
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+            _bp.isnot(None),
+            _bp != "",
+        )
+        .distinct()
+    )
+    available = sorted({r[0] for r in rows.all() if r[0]})
+    return {
+        "bp_version": aktive_bp_version(grade, set(available)),
+        "available": available,
+    }
+
+
 @router.get("/fachplan/by-subject/{subject_id}", response_model=FachplanTreeRead)
 async def get_fachplan_by_subject(
     subject_id: int,
@@ -1334,7 +1368,28 @@ async def get_fachplan_by_subject(
     bp_version gezielt eine Edition; ohne bp_version wird die aktuellste genommen.
     Filtert Leitideen/IK/PK nach Band (min_grade, max_grade, niveau).
     """
-    # ── Fachplan laden (mehr-versionsfest) ───────────────────────────────────
+    # ── Verfügbare (aktive) BP-Versionen für dieses Fach ──────────────────────
+    _bp_ver_col = ContextNode.metadata_["bp_version"].astext.label("bp_version")
+    vers_result = await db.execute(
+        sa.select(_bp_ver_col)
+        .where(
+            ContextNode.content_type == "fachplan",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+        )
+        .distinct()
+        .order_by(_bp_ver_col)
+    )
+    available_versions = [r[0] for r in vers_result.all() if r[0]]
+
+    # ── Default-Edition aus Fahrplan + Schuljahr berechnen ────────────────────
+    # Ohne explizite bp_version und mit Stufenbezug (min_grade) wählt die
+    # schuljahresabhängige Frontier die geltende Edition; sonst bleibt es bei der
+    # neuesten aktiven (Verhalten wie bisher). Vor V3 ein No-Op (Frontier = V2).
+    if not bp_version and min_grade is not None and available_versions:
+        bp_version = aktive_bp_version(min_grade, set(available_versions)) or bp_version
+
+    # ── Fachplan laden (mehr-versionsfest) ────────────────────────────────────
     q = (
         sa.select(ContextNode)
         .where(
@@ -1352,20 +1407,6 @@ async def get_fachplan_by_subject(
 
     if not fachplan_node:
         return FachplanTreeRead(fachplan=None, leitideen=[], pk_gruppen=[], can_edit=False)
-
-    # ── Verfügbare BP-Versionen für dieses Fach ───────────────────────────────
-    _bp_ver_col = ContextNode.metadata_["bp_version"].astext.label("bp_version")
-    vers_result = await db.execute(
-        sa.select(_bp_ver_col)
-        .where(
-            ContextNode.content_type == "fachplan",
-            ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
-        )
-        .distinct()
-        .order_by(_bp_ver_col)
-    )
-    available_versions = [r[0] for r in vers_result.all() if r[0]]
 
     # ── Band-Liste (DISTINCT über direkte Leitideen des Fachplans) ────────────
     bands_result = await db.execute(

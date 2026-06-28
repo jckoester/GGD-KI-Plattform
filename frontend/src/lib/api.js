@@ -1154,6 +1154,21 @@ export async function getContextNodes(params = {}) {
   return res.json()
 }
 
+export async function getActiveBpVersion(subjectId, grade) {
+  // Aktive BP-Edition für (Fach, Stufe, Schuljahr) — für editionsbewusste Filter
+  // (z. B. IK-Autocomplete). Fail-soft: bei Fehler kein Filter (bp_version null).
+  try {
+    const res = await fetch(
+      `${BASE}/context/subjects/${subjectId}/active-bp-version?grade=${grade}`,
+      { credentials: 'include' },
+    )
+    if (!res.ok) return { bp_version: null, available: [] }
+    return res.json()
+  } catch {
+    return { bp_version: null, available: [] }
+  }
+}
+
 export async function searchContextNodes(query) {
   const res = await fetch(`${BASE}/context/search`, {
     method: 'POST',

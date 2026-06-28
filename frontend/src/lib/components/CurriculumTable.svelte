@@ -814,6 +814,7 @@
                                     {#if editMode}
                                         <PKSelector
                                             {subjectId}
+                                            {grade}
                                             {bpVersion}
                                             selected={normalizePk(eintrag.pk)}
                                             onchange={(newPk) => {

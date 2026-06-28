@@ -5,7 +5,8 @@
 #         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
-schuljahr: "2026/27" # aktuelles Schuljahr
+# aktuelles Schuljahr: Single Source of Truth ist config/school_year.yaml
+# (hier bewusst NICHT mehr gepflegt, um Doppelkonfig/Divergenz zu vermeiden).
 
 bildungsplan_default: # gilt für alle Fächer, wenn kein Override
   bp_basis: BP2016BW # Prefix; zukunftsoffen für BP2030

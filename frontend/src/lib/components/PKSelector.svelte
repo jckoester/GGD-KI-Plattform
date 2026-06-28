@@ -9,8 +9,9 @@
      */
 
     import { X, Search, Check, ChevronDown, ChevronRight } from 'lucide-svelte'
-    
-    let { subjectId = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
+    import { getActiveBpVersion } from '$lib/api'
+
+    let { subjectId = null, grade = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
 
     let pkGruppen = $state([])
     let allKompetenzen = $state([]) // flache Liste aller pk_kompetenz-Knoten
@@ -32,9 +33,26 @@
         return node?.metadata?.kompetenz_nr || extractNr(node?.title) || node?.title || ''
     }
 
+    // Aktive BP-Edition für (Fach, Stufe, Schuljahr) auflösen, wenn keine explizit
+    // übergeben ist (editionsbewusst — PK variieren je BP-Edition). Vor V3 No-Op.
+    let resolvedBpVersion = $state(null)
+    $effect(() => {
+        if (bpVersion || !subjectId || !grade) {
+            resolvedBpVersion = null
+            return
+        }
+        let cancelled = false
+        getActiveBpVersion(subjectId, grade)
+            .then((r) => { if (!cancelled) resolvedBpVersion = r?.bp_version ?? null })
+            .catch(() => { if (!cancelled) resolvedBpVersion = null })
+        return () => { cancelled = true }
+    })
+
     // Lade PK-Gruppen und -Kompetenzknoten
     $effect(() => {
         if (!subjectId) return
+        // synchron lesen → reaktiv, sobald die aktive Edition aufgelöst ist
+        const effectiveBp = bpVersion ?? resolvedBpVersion
 
         async function loadPkData() {
             loadingGruppen = true
@@ -43,7 +61,7 @@
                 const paramsGruppen = new URLSearchParams()
                 paramsGruppen.append('content_type', 'pk_gruppe')
                 paramsGruppen.set('subject_id', subjectId)
-                if (bpVersion) paramsGruppen.set('bp_version', bpVersion)
+                if (effectiveBp) paramsGruppen.set('bp_version', effectiveBp)
                 paramsGruppen.set('limit', '100')
 
                 const gruppenRes = await fetch(`/api/context/nodes?${paramsGruppen}`, { credentials: 'include' })
@@ -53,7 +71,7 @@
                 const paramsKompetenzen = new URLSearchParams()
                 paramsKompetenzen.append('content_type', 'pk_kompetenz')
                 paramsKompetenzen.set('subject_id', subjectId)
-                if (bpVersion) paramsKompetenzen.set('bp_version', bpVersion)
+                if (effectiveBp) paramsKompetenzen.set('bp_version', effectiveBp)
                 paramsKompetenzen.set('limit', '500')
 
                 const kompetenzRes = await fetch(`/api/context/nodes?${paramsKompetenzen}`, { credentials: 'include' })

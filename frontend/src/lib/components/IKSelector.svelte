@@ -9,6 +9,7 @@
      */
 
     import { X, Search, Check } from "lucide-svelte";
+    import { getActiveBpVersion } from "$lib/api";
 
     let {
         subjectId = null,
@@ -24,8 +25,31 @@
     let showDropdown = $state(false);
     let warnings = $state([]); // Array von nicht gefundenen IK-Nummern
 
+    // Aktive BP-Edition für (Fach, Stufe, Schuljahr) auflösen, wenn keine explizit
+    // übergeben ist (editionsbewusster Autocomplete; vor V3 ein No-Op = aktuelle V2).
+    let resolvedBpVersion = $state(null);
+    $effect(() => {
+        if (bpVersion || !subjectId || !grade) {
+            resolvedBpVersion = null;
+            return;
+        }
+        let cancelled = false;
+        getActiveBpVersion(subjectId, grade)
+            .then((r) => {
+                if (!cancelled) resolvedBpVersion = r?.bp_version ?? null;
+            })
+            .catch(() => {
+                if (!cancelled) resolvedBpVersion = null;
+            });
+        return () => {
+            cancelled = true;
+        };
+    });
+
     // Lade IK-Knoten basierend auf der Suche
     $effect(() => {
+        // synchron lesen → Suche reagiert, sobald die aktive Edition aufgelöst ist
+        const effectiveBp = bpVersion ?? resolvedBpVersion;
         if (!searchQuery.trim() || searchQuery.length < 1) {
             searchResults = [];
             return;
@@ -39,7 +63,7 @@
                 params.append("content_type", "ik_kompetenz");
                 if (subjectId) params.set("subject_id", subjectId);
                 if (grade) params.set("grade", grade);
-                if (bpVersion) params.set("bp_version", bpVersion);
+                if (effectiveBp) params.set("bp_version", effectiveBp);
                 params.set("limit", "20");
 
                 const res = await fetch(`/api/context/nodes?${params}`, {

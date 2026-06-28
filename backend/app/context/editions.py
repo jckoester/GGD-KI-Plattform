@@ -11,8 +11,13 @@ abhängige Auswahl (``aktive_edition``) baut darauf auf (Folgeschritt).
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+
+import yaml
 
 
 @dataclass(frozen=True)
@@ -163,3 +168,50 @@ def aktive_edition(
         return None
     # neueste gewinnt: höchstes ab_jahr; Basis (ab_jahr None) ist die älteste.
     return max(kandidaten, key=lambda e: (e.ab_jahr is not None, e.ab_jahr or 0))
+
+
+# ── Laufzeit-Resolver (verdrahtet Fahrplan + Schuljahr + DB-Editionsbestand) ──
+
+_DEFAULT_SUBJECTS_PATH = Path(
+    os.environ.get("SUBJECTS_PATH", "")
+    or Path(__file__).resolve().parents[3] / "config" / "subjects.yaml"
+)
+
+
+@lru_cache(maxsize=1)
+def load_subjects_config(path: Path | None = None) -> dict:
+    """Lädt ``subjects.yaml`` (gecacht). ``SUBJECTS_PATH`` überschreibt den Pfad."""
+    p = path or _DEFAULT_SUBJECTS_PATH
+    with open(p, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def aktuelles_schuljahr_start() -> int:
+    """Startjahr des aktuellen Schuljahres — Single Source of Truth:
+    ``school_year.yaml`` (über ``planning.calendar``)."""
+    from app.planning.calendar import load_school_year
+
+    return parse_schuljahr_start(load_school_year().schuljahr)
+
+
+def aktive_bp_version(
+    stufe: int,
+    verfuegbare_bp_versions: set[str],
+    schuljahr_start: int | None = None,
+) -> str | None:
+    """Die für (Stufe, aktuelles Schuljahr) geltende ``bp_version``.
+
+    Verbindet den Editions-Fahrplan (``subjects.yaml``) mit dem **tatsächlich
+    importierten** Editionsbestand des Fachs (``verfuegbare_bp_versions``, i. d. R.
+    die distinct ``context_nodes.bp_version`` des Fachs) und dem aktuellen Schuljahr.
+    ``None``, wenn keine Edition passt (z. B. Bestand leer). ``schuljahr_start``
+    explizit nur für Tests; sonst aus ``school_year.yaml``.
+    """
+    editions = load_edition_schedule(load_subjects_config())
+    jahr = (
+        schuljahr_start
+        if schuljahr_start is not None
+        else aktuelles_schuljahr_start()
+    )
+    ed = aktive_edition(editions, stufe, jahr, verfuegbare_bp_versions)
+    return ed.bp_version if ed else None

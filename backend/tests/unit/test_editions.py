@@ -7,8 +7,10 @@ import yaml
 
 from app.context.editions import (
     Edition,
+    aktive_bp_version,
     aktive_edition,
     load_edition_schedule,
+    load_subjects_config,
     obergrenze,
     parse_schuljahr_start,
 )
@@ -136,3 +138,31 @@ def test_obergrenze_waechst_jahrgangsweise():
 
 def test_keine_edition_wenn_liste_leer():
     assert aktive_edition([], 5, 2026) is None
+
+
+def test_load_subjects_config_from_path(tmp_path):
+    f = tmp_path / "s.yaml"
+    f.write_text(
+        "schuljahr: '2026/27'\nbildungsplan_default:\n  bp_basis: BP2016BW\n",
+        encoding="utf-8",
+    )
+    cfg = load_subjects_config(f)
+    assert cfg["schuljahr"] == "2026/27"
+
+
+def test_aktive_bp_version_gegen_echte_subjects_yaml():
+    # Nutzt den echten Fahrplan (Basis/V2/V3); Schuljahr explizit (keine I/O).
+    # V3 laut Fahrplan in Kraft (2026, Stufe 5), aber nur Basis+V2 importiert → V2.
+    assert aktive_bp_version(5, {"2016", "2016.V2"}, schuljahr_start=2026) == "2016.V2"
+    # V3 importiert → V3.
+    assert (
+        aktive_bp_version(5, {"2016", "2016.V2", "2016.V3"}, schuljahr_start=2026)
+        == "2016.V3"
+    )
+    # Stufe 9 in 2026: V3-Frontier (7) nicht erreicht → V2.
+    assert (
+        aktive_bp_version(9, {"2016", "2016.V2", "2016.V3"}, schuljahr_start=2026)
+        == "2016.V2"
+    )
+    # Leerer Editionsbestand → None.
+    assert aktive_bp_version(5, set(), schuljahr_start=2026) is None

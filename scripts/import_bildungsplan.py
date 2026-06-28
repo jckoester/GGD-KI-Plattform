@@ -68,9 +68,12 @@ def validate_subjects_yaml(cfg: dict) -> list[str]:
     errors = []
     if cfg.get("schulart") not in VALID_SCHULARTEN:
         errors.append(f"schulart '{cfg.get('schulart')}' nicht in {VALID_SCHULARTEN}")
-    if not SCHULJAHR_RE.match(str(cfg.get("schuljahr", ""))):
+    # schuljahr ist optional — Single Source of Truth ist config/school_year.yaml.
+    # Wenn dennoch gesetzt, wird nur das Format geprüft.
+    sj = cfg.get("schuljahr")
+    if sj is not None and not SCHULJAHR_RE.match(str(sj)):
         errors.append(
-            f"schuljahr '{cfg.get('schuljahr')}' hat falsches Format (erwartet: YYYY/YY)"
+            f"schuljahr '{sj}' hat falsches Format (erwartet: YYYY/YY)"
         )
     for fach in cfg.get("subjects", []):
         fach_code = fach.get("fach_code")
