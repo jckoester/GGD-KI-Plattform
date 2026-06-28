@@ -9,7 +9,22 @@ schuljahr: "2026/27" # aktuelles Schuljahr
 
 bildungsplan_default: # gilt für alle Fächer, wenn kein Override
   bp_basis: BP2016BW # Prefix; zukunftsoffen für BP2030
-  suffix: "" # leer = Basisfassung; ".V2" = überarbeitete Fassung
+  suffix: "" # leer = Basisfassung; ".V2" = überarbeitete Fassung (Scraper/Import; wird vom Fahrplan abgelöst)
+  # Editions-Fahrplan (Versionierung): pro Edition, ab welchem Schuljahr sie gilt
+  # und für welche Stufen. Die Stufen-Zuordnung wird daraus + dem aktuellen
+  # Schuljahr BERECHNET (keine jährliche subjects.yaml-Pflege). Die Frontier
+  # wandert jahrgangsweise nach oben; ein Fach ohne veröffentlichten BP fällt
+  # automatisch auf die vorige Edition zurück.
+  # bp_version (= Wert in context_nodes) = <Jahr aus bp_basis> + suffix, z. B. "2016.V2".
+  editionen:
+    - suffix: "" # Basis/V1 — immer als Fallback gültig
+    - suffix: ".V2" # überarbeitete Fassung, bereits vollständig in Kraft
+      ab_schuljahr: "2016/17"
+      einstieg_stufen: [5, 13]
+    - suffix: ".V3" # ab August 2026; startet in 5–7 und wächst jährlich nach oben
+      ab_schuljahr: "2026/27"
+      einstieg_stufen: [5, 7]
+      wachstum: nach_oben
 
 subjects:
   - slug: mathematik
