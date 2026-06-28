@@ -131,12 +131,16 @@
             try { sessionStorage.removeItem(stateKey(sid)); } catch { /* egal */ }
             view = saved.view ?? "ik";
             selectedBand = saved.selectedBand ?? null;
-            selectedVersion = saved.selectedVersion ?? selectedVersion;
+            selectedVersion = saved.selectedVersion ?? initialBpVersion;
             expandedLeitideen = saved.expandedLeitideen ?? {};
             expandedPkGruppen = saved.expandedPkGruppen ?? {};
             load(selectedBand, selectedVersion).then(() => restoreScroll(saved.scrollTop));
         } else {
             selectedBand = null;
+            // Version pro Fach zurücksetzen: BP-Editionen sind fachspezifisch, eine
+            // vom vorigen Fach übernommene Version (z. B. "2016.V2") liefert für ein
+            // Fach ohne diese Edition einen leeren Fachplan. Frischer Default je Fach.
+            selectedVersion = initialBpVersion;
             view = "ik";
             load(null, selectedVersion);
         }
