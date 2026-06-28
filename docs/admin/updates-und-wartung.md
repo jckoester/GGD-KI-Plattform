@@ -18,6 +18,36 @@ Nach dem Update die Plattform kurz im Browser prüfen und die Logs beobachten:
 docker compose logs -f backend
 ```
 
+## Fächer ändern (`subjects.yaml`)
+
+`config/subjects.yaml` ist die einzige Quelle der Wahrheit für die Fächerliste.
+Nach **jeder** Änderung (neues Fach, geänderter `fach_code`, Umbenennung, Entfernung)
+die `subjects`-Tabelle neu seeden:
+
+```bash
+# Vorschau: zeigt an, welche Fächer eingefügt/aktualisiert/verwaist sind (löscht nichts)
+docker compose exec backend python scripts/seed_subjects.py
+```
+
+Das Skript ist ein **Upsert** über den Slug und legt keine Duplikate an. Es **löscht
+standardmäßig nichts** — Fächer, die nicht mehr in der YAML stehen (z. B. nach einer
+Umbenennung „Kunst" → „Bildende Kunst" oder Aufspaltung von „Religion" in Ev./Kath./Isl.),
+bleiben als **verwaiste Zeilen** in der DB und werden nur als Warnung gemeldet.
+
+Verwaiste Zeilen sind nicht harmlos: Sie erscheinen weiter im Fach-Dropdown, und wenn
+der Bildungsplan unter der *neuen* Fach-`id` importiert wurde, zeigt die alte Zeile
+einen **leeren Bildungsplan**. Zum Entfernen:
+
+```bash
+# entfernt verwaiste Fächer — aber NUR unreferenzierte
+docker compose exec backend python scripts/seed_subjects.py --prune
+```
+
+`--prune` löscht ein verwaistes Fach nur, wenn es von **keiner** Konversation, Gruppe,
+keinem Assistenten usw. mehr referenziert wird. Referenzierte Fächer werden nie gelöscht,
+sondern mit Referenzzählung gemeldet — dann muss erst die Referenz umgehängt werden,
+bevor die alte Zeile entfernt werden kann.
+
 ## LiteLLM updaten
 
 LiteLLM verwaltet sein eigenes Datenbankschema über Prisma. Ein einfaches
@@ -154,3 +184,10 @@ ausführen (siehe [Budget-System](budget.md)).
 `SCHOOL_SECRET` wurde in `.env` geändert. Dieser Vorgang ist nicht
 reversibel — alle bestehenden Nutzerzuordnungen sind ungültig.
 Backup einspielen und `SCHOOL_SECRET` auf den ursprünglichen Wert zurücksetzen.
+
+**Ein Fach erscheint doppelt im Dropdown oder zeigt „Kein Bildungsplan für dieses
+Fach verfügbar"**
+Eine verwaiste Fach-Zeile in der DB — das Fach wurde in `config/subjects.yaml`
+umbenannt oder entfernt, die alte Zeile aber nie gelöscht. Der neue Bildungsplan
+hängt an der neuen `id`, die alte Zeile bleibt leer. Bereinigen mit
+`python scripts/seed_subjects.py --prune` (siehe [Fächer ändern](#fächer-ändern-subjectsyaml)).

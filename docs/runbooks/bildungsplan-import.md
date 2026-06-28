@@ -67,7 +67,9 @@ Präzedenz fallend:
 
 > **Seed nach Code-Änderung:** Wird ein `fach_code` in `subjects.yaml` ergänzt oder
 > geändert, die `subjects`-Tabelle neu seeden (`python scripts/seed_subjects.py`),
-> damit die Cross-Fach-`#`-Bezüge den Code kennen.
+> damit die Cross-Fach-`#`-Bezüge den Code kennen. Wurde ein Fach **umbenannt oder
+> entfernt**, zusätzlich mit `--prune` laufen lassen, um die verwaiste alte Zeile zu
+> entfernen (nur unreferenzierte; siehe `docs/admin/installation.md`, Schritt 5).
 
 Validierung:
 ```bash

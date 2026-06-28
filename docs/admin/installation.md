@@ -89,6 +89,21 @@ Einträge, legt keine Duplikate an.
 > **Nach Code-Änderung in `subjects.yaml`** (neuer/geänderter `fach_code`) dieses
 > Seed-Skript erneut ausführen — sonst kennt die Datenbank die neuen Codes nicht.
 
+> **Entfernte oder umbenannte Fächer:** Der Standardlauf *löscht nichts*. Fächer,
+> die nicht (mehr) in der YAML stehen (z. B. nach Umbenennung wie „Kunst" →
+> „Bildende Kunst" oder Aufspaltung von „Religion" in Ev./Kath./Isl.), bleiben
+> sonst als verwaiste Zeilen in der DB — sie tauchen weiter im Fach-Dropdown auf
+> und zeigen u. U. einen leeren Bildungsplan (die andere `id` trägt den Fachplan).
+> Solche Zeilen meldet das Skript als Warnung. Zum Entfernen:
+>
+> ```bash
+> docker compose exec backend python scripts/seed_subjects.py --prune
+> ```
+>
+> `--prune` löscht **nur unreferenzierte** verwaiste Fächer; Fächer, die noch von
+> Konversationen, Gruppen, Assistenten o. Ä. referenziert werden, werden nie
+> gelöscht, sondern mit Referenzzählung gemeldet.
+
 > **Wichtig:** Ohne diesen Schritt können Nutzer:innen zwar Fächer und Gruppen
 > aus dem SSO-System sehen, aber die Fach-Zuordnung (Icon, Farbe) fehlt. Bei
 > Lehrkräften erscheinen SSO-Unterrichtsgruppen nicht in der Fach-Ansicht.
