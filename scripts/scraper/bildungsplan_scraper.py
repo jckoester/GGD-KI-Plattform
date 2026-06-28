@@ -210,21 +210,54 @@ async def scrape_fach(
     return neu, geaendert, unveraendert
 
 
-def subject_editions(fach: dict, default_suffix: str) -> list[tuple[str, str]]:
+def schedule_suffixes(bp_default: dict) -> list[str]:
+    """Geordnete Editions-Suffixe aus dem Fahrplan (``bildungsplan_default.editionen``):
+    Basis ("") zuerst, danach nach ``ab_schuljahr`` aufsteigend.
+
+    Fallback (kein Fahrplan): nur die globale ``suffix``-Basis.
+    """
+    editionen = bp_default.get('editionen')
+    if not editionen:
+        return [bp_default.get('suffix', '')]
+
+    def _start(entry: dict) -> tuple[int, int]:
+        ab = entry.get('ab_schuljahr')
+        if not ab:
+            return (0, 0)  # Basis/ohne ab_schuljahr zuerst
+        m = re.match(r'\s*(\d{4})', str(ab))
+        return (1, int(m.group(1)) if m else 0)
+
+    return [e.get('suffix', '') for e in sorted(editionen, key=_start)]
+
+
+def subject_editions(
+    fach: dict, ordered_suffixes: list[str], default_suffix: str
+) -> list[tuple[str, str]]:
     """Liefert die zu scrapenden Editionen eines Fachs als (label, suffix)-Paare.
 
-    Erste Edition ist die Fach-Default-Edition (Dateiname-Label = fach_code), aus
-    ``bildungsplan_suffix`` oder ersatzweise dem globalen Default. Danach folgen
-    zusätzliche Editionen aus ``bildungsplan_overrides`` (Übergangsphase), sofern sie
-    von der Default-Edition abweichen.
+    Ein Fach trägt während des Editionsübergangs **mehrere** Editionen gleichzeitig:
+    die Basis plus alle Fahrplan-Editionen bis einschließlich der aktuellen
+    Fach-Edition (``bildungsplan_suffix``). Die ältere(n) bleiben als (später
+    archivierte) Verweisziele erhalten, die aktuelle ist das gelebte Curriculum.
+
+    Datei-Label: die **aktuelle** Edition bekommt ``fach_code`` (Hauptdatei), die
+    übrigen ein qualifiziertes Label (z. B. ``CH_BASIS``, ``CH_V2``).
     """
     fach_code = fach['fach_code']
-    overrides = fach.get('bildungsplan_overrides', {})
-    suffix = fach.get('bildungsplan_suffix', default_suffix)
-    editions = [(fach_code, suffix)]
-    for extra in sorted(set(overrides.values()) - {suffix}):
-        label = f"{fach_code}_{extra.lstrip('.') or 'BASIS'}"
-        editions.append((label, extra))
+    current = fach.get('bildungsplan_suffix', default_suffix)
+    if current in ordered_suffixes:
+        wanted = ordered_suffixes[: ordered_suffixes.index(current) + 1]
+    else:
+        # Fahrplan kennt die Fach-Edition nicht → nur diese scrapen.
+        wanted = [current]
+
+    editions: list[tuple[str, str]] = []
+    for suf in wanted:
+        if suf == current:
+            label = fach_code
+        else:
+            label = f"{fach_code}_{suf.lstrip('.') or 'BASIS'}"
+        editions.append((label, suf))
     return editions
 
 
@@ -243,6 +276,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
     bp_default = cfg.get('bildungsplan_default', {})
     bp_basis_prefix = bp_default.get('bp_basis', 'BP2016BW')
     default_suffix = bp_default.get('suffix', '')
+    ordered_suffixes = schedule_suffixes(bp_default)
 
     # Bestehendes JSONL fuer Hash-Vergleich einlesen
     existing_hashes: dict[str, str] = {}
@@ -291,7 +325,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
             # Alle Editionen des Fachs: Fach-Default-Edition + Zusatz-Editionen aus
             # den Jahrgangsband-Overrides.
             neu = geaendert = unveraendert = 0
-            for label, edition_suffix in subject_editions(fach, default_suffix):
+            for label, edition_suffix in subject_editions(fach, ordered_suffixes, default_suffix):
                 if label == fach_code:
                     logger.info(
                         f"Starte Scrape: {fach['slug']} "

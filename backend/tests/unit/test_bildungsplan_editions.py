@@ -57,6 +57,7 @@ _scraper = _load_isolated(
 
 validate_subjects_yaml = _import_bp.validate_subjects_yaml
 subject_editions = _scraper.subject_editions
+schedule_suffixes = _scraper.schedule_suffixes
 
 
 def _cfg(*subjects: dict) -> dict:
@@ -102,39 +103,63 @@ def test_overrides_without_fach_code_still_errors():
     assert any("bildungsplan_overrides" in e and "fach_code" in e for e in errors)
 
 
-# -- subject_editions: Editions-Auflösung pro Fach -----------------------------
+# -- subject_editions: Editions-Auflösung pro Fach (Fahrplan-basiert) ----------
+
+# Geordneter Editions-Fahrplan: Basis → V2 → V3.
+_SUFFIXES = ["", ".V2", ".V3"]
 
 
-def test_subject_suffix_whole_subject():
-    fach = {"fach_code": "CH", "bildungsplan_suffix": ".V2"}
-    assert subject_editions(fach, default_suffix="") == [("CH", ".V2")]
-
-
-def test_grade_band_override_on_base_default():
-    fach = {"fach_code": "M", "bildungsplan_overrides": {"5-6": ".V2"}}
-    assert subject_editions(fach, default_suffix="") == [("M", ""), ("M_V2", ".V2")]
-
-
-def test_subject_suffix_with_downgrade_override():
-    # Ganzes Fach auf .V2, aber Oberstufe noch auf Basis → beide Editionen scrapen.
-    fach = {
-        "fach_code": "M",
-        "bildungsplan_suffix": ".V2",
-        "bildungsplan_overrides": {"11-13": ""},
-    }
-    assert subject_editions(fach, default_suffix="") == [("M", ".V2"), ("M_BASIS", "")]
-
-
-def test_no_suffix_no_overrides_uses_global_default():
+def test_basis_fach_nur_basis():
     fach = {"fach_code": "M"}
-    assert subject_editions(fach, default_suffix="") == [("M", "")]
-    assert subject_editions(fach, default_suffix=".V2") == [("M", ".V2")]
+    assert subject_editions(fach, _SUFFIXES, default_suffix="") == [("M", "")]
 
 
-def test_override_equal_to_subject_suffix_not_duplicated():
-    fach = {
-        "fach_code": "M",
-        "bildungsplan_suffix": ".V2",
-        "bildungsplan_overrides": {"5-6": ".V2"},
+def test_v2_fach_scrapt_basis_und_v2():
+    # Aktuelle Edition .V2 → Basis (als Verweisziel) + V2 (Hauptdatei = fach_code).
+    fach = {"fach_code": "CH", "bildungsplan_suffix": ".V2"}
+    assert subject_editions(fach, _SUFFIXES, default_suffix="") == [
+        ("CH_BASIS", ""),
+        ("CH", ".V2"),
+    ]
+
+
+def test_v3_fach_scrapt_alle_bisherigen():
+    # Künftig (Fach auf .V3): Basis + V2 + V3.
+    fach = {"fach_code": "CH", "bildungsplan_suffix": ".V3"}
+    assert subject_editions(fach, _SUFFIXES, default_suffix="") == [
+        ("CH_BASIS", ""),
+        ("CH_V2", ".V2"),
+        ("CH", ".V3"),
+    ]
+
+
+def test_globaler_default_suffix_wird_geerbt():
+    # Kein Fach-Suffix, aber globaler Default .V2 → Basis + V2.
+    fach = {"fach_code": "M"}
+    assert subject_editions(fach, _SUFFIXES, default_suffix=".V2") == [
+        ("M_BASIS", ""),
+        ("M", ".V2"),
+    ]
+
+
+def test_edition_nicht_im_fahrplan_nur_diese():
+    # Fach-Edition, die der Fahrplan nicht kennt → nur sie selbst.
+    fach = {"fach_code": "X", "bildungsplan_suffix": ".VX"}
+    assert subject_editions(fach, _SUFFIXES, default_suffix="") == [("X", ".VX")]
+
+
+def test_schedule_suffixes_ordnung():
+    bp_default = {
+        "suffix": "",
+        "editionen": [
+            {"suffix": ".V3", "ab_schuljahr": "2026/27"},
+            {"suffix": ""},
+            {"suffix": ".V2", "ab_schuljahr": "2016/17"},
+        ],
     }
-    assert subject_editions(fach, default_suffix="") == [("M", ".V2")]
+    assert schedule_suffixes(bp_default) == ["", ".V2", ".V3"]
+
+
+def test_schedule_suffixes_fallback_ohne_fahrplan():
+    assert schedule_suffixes({"suffix": ""}) == [""]
+    assert schedule_suffixes({"suffix": ".V2"}) == [".V2"]
