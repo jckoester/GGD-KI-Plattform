@@ -217,6 +217,7 @@ class LessonRead(BaseModel):
     nav: LessonNav
     group_id: int
     subject_id: Optional[int]
+    grade: Optional[int] = None  # Jahrgang der Gruppe (für editionsbewusste Kompetenz-Auswahl)
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────

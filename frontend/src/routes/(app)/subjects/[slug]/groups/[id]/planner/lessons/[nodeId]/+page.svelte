@@ -439,6 +439,7 @@
           {refs}
           {suggestions}
           subjectId={lesson.subject_id}
+          grade={lesson.grade}
           onChange={onRefsChange}
           onDismissSuggestion={onDismissSuggestion}
         />

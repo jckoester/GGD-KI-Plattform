@@ -15,6 +15,7 @@
     refs = [],
     suggestions = [],
     subjectId = null,
+    grade = null,
     readonly = false,
     onChange = () => {},
     onDismissSuggestion = () => {},
@@ -133,6 +134,7 @@
         </div>
         <IKSelector
           {subjectId}
+          {grade}
           selected={ikSelected}
           onchange={onIkChange}
         />
@@ -143,6 +145,7 @@
         </div>
         <PKSelector
           {subjectId}
+          {grade}
           selected={pkSelected}
           onchange={onPkChange}
         />

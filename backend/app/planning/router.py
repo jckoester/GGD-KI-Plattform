@@ -819,6 +819,10 @@ async def get_lesson(
     nav = await _build_lesson_nav(db, node_id, unit_id)
     meta = lesson.metadata_ or {}
 
+    # Jahrgang der Gruppe (gleiche Quelle wie die Curriculum-Anzeige) — für die
+    # editionsbewusste IK/PK-Auswahl in der Stundenplanung. Kursstufe → None.
+    resolved_curricula = await resolve_group_curricula(db, group_id)
+
     return LessonRead(
         id=lesson.id,
         titel=lesson.title,
@@ -831,6 +835,7 @@ async def get_lesson(
         nav=nav,
         group_id=group_id,
         subject_id=lesson.subject_id,
+        grade=resolved_curricula.grade,
     )
 
 
