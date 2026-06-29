@@ -1187,7 +1187,10 @@ async def create_curriculum_node(
 ):
     """Erstellt einen neuen leeren Curriculum-Knoten für den Editor."""
     from app.db.models import Group
-    from app.context.service import get_subject_department_group_id
+    from app.context.service import (
+        get_subject_department_group_id,
+        is_subject_department_member,
+    )
     import uuid as _uuid
 
     # Fachplan laden per Node-UUID — Pflicht (subject_id wird von dort abgeleitet)
@@ -1209,18 +1212,15 @@ async def create_curriculum_node(
             detail=f"Fachplan nicht mit einem Fach verknüpft — bitte Bildungsplan neu importieren",
         )
 
-    # Fachschafts-Gruppen-ID
+    # Fachschafts-Gruppen-ID (deterministisch) — für write_scope_group_id unten.
     department_group_id = await get_subject_department_group_id(db, subject_id)
 
-    # Prüfe ob User Mitglied der Fachschaft ist
-    if department_group_id:
-        is_member = await db.execute(
-            sa.select(1).where(
-                GroupMembership.group_id == department_group_id,
-                GroupMembership.pseudonym == user.sub,
-            )
-        )
-        if not is_member.scalar_one_or_none() and "admin" not in user.roles:
+    # Fachschafts-Zugehörigkeit prüfen: Mitgliedschaft in IRGENDEINER
+    # subject_department-Gruppe des Fachs (robust gegen Alt-/Doppelgruppen mit
+    # abweichender sso_group_id). Existiert für das Fach gar keine Fachschaft,
+    # wird nicht geprüft (Verhalten wie bisher). Admins sind ausgenommen.
+    if department_group_id is not None and "admin" not in user.roles:
+        if not await is_subject_department_member(db, subject_id, user.sub):
             raise HTTPException(
                 status_code=403,
                 detail="Keine Berechtigung - Sie müssen Mitglied der Fachschaft sein"

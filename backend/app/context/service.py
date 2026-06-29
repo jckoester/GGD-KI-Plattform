@@ -26,6 +26,7 @@ from app.db.models import (
     ContextNode,
     Conversation,
     Group,
+    GroupMembership,
     Subject,
 )
 
@@ -214,15 +215,51 @@ async def get_fachplan_node(db: AsyncSession, fachplan_id: str) -> ContextNode |
 
 
 async def get_subject_department_group_id(db: AsyncSession, subject_id: int) -> int | None:
-    """Lädt die Fachschafts-Gruppen-ID für ein Fach."""
+    """Lädt eine Fachschafts-Gruppen-ID für ein Fach (deterministisch: kleinste id).
+
+    Wird für `write_scope_group_id` neuer Curriculum-Knoten genutzt. `ORDER BY id`
+    sorgt für eine stabile Auswahl, falls für ein Fach mehrere subject_department-
+    Gruppen existieren (z. B. Alt-/Doppelgruppen mit abweichender sso_group_id aus
+    früheren Sync-Ständen). Für die **Berechtigungsprüfung** nicht diese eine Gruppe
+    verwenden, sondern `is_subject_department_member` (prüft Mitgliedschaft über
+    *alle* Fachschaftsgruppen des Fachs).
+    """
     result = await db.execute(
         sa.select(Group.id).where(
             Group.subject_id == subject_id,
             Group.type == "subject_department",
-        ).limit(1)
+        ).order_by(Group.id).limit(1)
     )
     row = result.fetchone()
     return row[0] if row else None
+
+
+async def subject_has_department_group(db: AsyncSession, subject_id: int) -> bool:
+    """True, wenn für das Fach überhaupt eine Fachschaftsgruppe existiert."""
+    return await get_subject_department_group_id(db, subject_id) is not None
+
+
+async def is_subject_department_member(
+    db: AsyncSession, subject_id: int, pseudonym: str
+) -> bool:
+    """Ist der/die Nutzer:in Mitglied **irgendeiner** Fachschaftsgruppe des Fachs?
+
+    Robust gegen mehrere subject_department-Gruppen pro Fach: Es zählt allein, ob
+    eine Mitgliedschaft in *einer* von ihnen besteht — nicht, welche Gruppe zuerst
+    gefunden wird. Das war die Schwäche der früheren „eine Gruppe per LIMIT 1, dann
+    Mitgliedschaft prüfen"-Logik (sie konnte die *falsche* Doppelgruppe treffen).
+    """
+    result = await db.execute(
+        sa.select(GroupMembership.group_id)
+        .join(Group, Group.id == GroupMembership.group_id)
+        .where(
+            Group.subject_id == subject_id,
+            Group.type == "subject_department",
+            GroupMembership.pseudonym == pseudonym,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 def _normalize_ref(ref: str) -> str:

@@ -3,9 +3,22 @@
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
+    import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
+    import { subjectMap } from "$lib/stores/subjects.js";
     import { goto } from "$app/navigation";
     import { patchPreferences, getPreferences } from "$lib/api.js";
     import { onMount } from "svelte";
+
+    // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
+    const membershipGroups = $derived([
+        { type: "subject_department", label: "Fachschaften" },
+        { type: "teaching_group", label: "Unterrichtsgruppen" },
+        { type: "school_class", label: "Klassen" },
+    ].map((g) => ({
+        ...g,
+        items: ($myGroups ?? []).filter((m) => m.type === g.type),
+    })));
+
 
     const themeOptions = [
         { value: "light", label: "Hell", Icon: Sun },
@@ -43,6 +56,8 @@
         } finally {
             loading = false;
         }
+        // Aufgelöste Mitgliedschaften für die Diagnose frisch laden
+        refreshMyGroups();
     });
 
     async function updatePreference(key, value) {
@@ -368,6 +383,48 @@
                             Gruppen- und Rollen-Informationen geladen werden.
                         </p>
                     {/if}
+
+                    <!-- Aufgelöste Plattform-Mitgliedschaften: was das System aus den
+                         SSO-Gruppen tatsächlich abgeleitet hat (Soll/Ist-Abgleich). -->
+                    <div class="border-t border-light-ui-3 dark:border-dark-ui-3 pt-4">
+                        <h3 class="font-medium text-light-tx dark:text-dark-tx mb-1">
+                            Aufgelöste Mitgliedschaften
+                        </h3>
+                        <p class="text-light-tx-2 dark:text-dark-tx-2 mb-3">
+                            So hat die Plattform deine SSO-Gruppen umgesetzt. Fehlt hier
+                            eine Fachschaft, obwohl die passende <code class="font-mono">fs.*</code>-Gruppe
+                            oben steht, ist die Zuordnung fehlerhaft — diese Liste an die
+                            Administration weitergeben.
+                        </p>
+                        {#if ($myGroups ?? []).length > 0}
+                            <div class="space-y-3">
+                                {#each membershipGroups as grp}
+                                    {#if grp.items.length > 0}
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide text-light-tx-2 dark:text-dark-tx-2 mb-1">
+                                                {grp.label}
+                                            </p>
+                                            <div class="flex flex-wrap gap-1.5">
+                                                {#each grp.items as m (m.id)}
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-full bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 text-xs"
+                                                    >
+                                                        {m.name}{#if m.subject_id != null && $subjectMap[m.subject_id]}
+                                                            <span class="opacity-70"> · {$subjectMap[m.subject_id].name}</span>
+                                                        {/if}
+                                                    </span>
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    {/if}
+                                {/each}
+                            </div>
+                        {:else}
+                            <p class="text-light-tx-2 dark:text-dark-tx-2">
+                                — keine Mitgliedschaften aufgelöst —
+                            </p>
+                        {/if}
+                    </div>
                 </div>
             </details>
         </section>
