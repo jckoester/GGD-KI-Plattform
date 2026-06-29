@@ -29,6 +29,15 @@
     let canEdit = $state(false);
     const totalStd = $derived(curriculumStd(draft));
 
+    // Repräsentative Jahrgangsstufe (Int) aus der jahrgangsstufe-Angabe des
+    // Curriculums (kann ein Band sein, z. B. "8/9/10" oder "8-10"). Wird für die
+    // editionsbewusste IK/PK-Auflösung und den Stufenfilter der Suche gebraucht —
+    // die Endpunkte erwarten eine Ganzzahl, kein Band-String.
+    const gradeInt = $derived.by(() => {
+        const m = String(curriculum?.metadata?.jahrgangsstufe ?? "").match(/\d+/);
+        return m ? Number(m[0]) : null;
+    });
+
     // Sticky-Footer: nur sichtbar, wenn die oberen Aktionen aus dem Scrollbereich sind
     let scrollEl = $state(null);
     let topActionsEl = $state(null);
@@ -524,8 +533,7 @@
                         curriculum={draft}
                         editMode={true}
                         subjectId={curriculum?.subject_id ?? null}
-                        grade={curriculum?.metadata?.jahrgangsstufe ?? null}
-                        bpVersion={curriculum?.metadata?.bp_version ?? null}
+                        grade={gradeInt}
                         onchange={() => {
                             dirty = true;
                         }}
