@@ -313,7 +313,7 @@
                         <span
                             class="shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium
                                      {item.kind === 'lp' || item.kind === 'lpa'
-                                ? 'bg-light-pur/20 dark:bg-dark-pur/20 text-light-pur dark:text-dark-pur'
+                                ? 'bg-light-pu/20 dark:bg-dark-pu/20 text-light-pu dark:text-dark-pu'
                                 : 'bg-light-ui-3/50 dark:bg-dark-ui-3/50 text-light-tx dark:text-dark-tx'}"
                         >
                             {item.kind === "lp" ? "LP" : item.kind === "lpa" ? "Asp." : "IK"}

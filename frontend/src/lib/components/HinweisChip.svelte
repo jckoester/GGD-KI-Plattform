@@ -32,15 +32,15 @@
         },
         leitperspektive: {
             prefix: '',
-            bg: 'bg-light-pur/20 dark:bg-dark-pur/20',
-            text: 'text-light-pur dark:text-dark-pur',
-            border: 'border-light-pur/30 dark:border-dark-pur/30'
+            bg: 'bg-light-pu/20 dark:bg-dark-pu/20',
+            text: 'text-light-pu dark:text-dark-pu',
+            border: 'border-light-pu/30 dark:border-dark-pu/30'
         },
         leitperspektive_aspekt: {
             prefix: '▸',
-            bg: 'bg-light-pur/20 dark:bg-dark-pur/20',
-            text: 'text-light-pur dark:text-dark-pur',
-            border: 'border-light-pur/30 dark:border-dark-pur/30'
+            bg: 'bg-light-pu/20 dark:bg-dark-pu/20',
+            text: 'text-light-pu dark:text-dark-pu',
+            border: 'border-light-pu/30 dark:border-dark-pu/30'
         },
         didaktik: {
             prefix: '⚙',

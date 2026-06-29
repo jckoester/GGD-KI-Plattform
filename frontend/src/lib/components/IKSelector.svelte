@@ -70,7 +70,14 @@
                     credentials: "include",
                 });
                 if (res.ok) {
-                    searchResults = await res.json();
+                    // Nach IK-Nummer natürlich sortieren (3.2.1.1(2) vor 3.2.1.1(11)),
+                    // nicht in Backend-Reihenfolge (created_at). numeric:true vergleicht
+                    // Zahlblöcke statt lexikografisch.
+                    searchResults = (await res.json()).sort((a, b) =>
+                        (a.title || "").localeCompare(b.title || "", undefined, {
+                            numeric: true,
+                        }),
+                    );
                 } else {
                     searchResults = [];
                 }

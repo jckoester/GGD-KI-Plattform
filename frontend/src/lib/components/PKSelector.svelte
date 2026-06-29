@@ -127,10 +127,16 @@
             return
         }
 
-        filteredPkList = allKompetenzen.filter(pk =>
-            (pk.title || '').toLowerCase().includes(term) ||
-            pkIdOf(pk).toLowerCase().includes(term)
-        )
+        filteredPkList = allKompetenzen
+            .filter(pk =>
+                (pk.title || '').toLowerCase().includes(term) ||
+                pkIdOf(pk).toLowerCase().includes(term)
+            )
+            // Nach PK-Nummer natürlich sortieren (2.1.1 vor 2.1.11), nicht in
+            // Backend-Reihenfolge (created_at). numeric:true vergleicht Zahlblöcke.
+            .sort((a, b) =>
+                pkIdOf(a).localeCompare(pkIdOf(b), undefined, { numeric: true })
+            )
     })
 
     // PK auswählen
