@@ -191,3 +191,17 @@ Eine verwaiste Fach-Zeile in der DB — das Fach wurde in `config/subjects.yaml`
 umbenannt oder entfernt, die alte Zeile aber nie gelöscht. Der neue Bildungsplan
 hängt an der neuen `id`, die alte Zeile bleibt leer. Bereinigen mit
 `python scripts/seed_subjects.py --prune` (siehe [Fächer ändern](#fächer-ändern-subjectsyaml)).
+
+**Lehrkraft hat eine `fs.*`-Gruppe, darf aber kein Curriculum im Fach anlegen
+(„Sie müssen Mitglied der Fachschaft sein") / eine Fachschaft erscheint doppelt**
+Doppelte Gruppen-Zeilen für dieselbe SSO-Gruppe, entstanden vor der case-
+insensitiven Behandlung der `sso_group_id` (z. B. `FS.Chemie` **und** `fs.chemie`).
+Die Mitgliedschaft sitzt dann evtl. an der „falschen" der beiden. Bereinigen
+(verschmilzt Doppelgruppen je `lower(sso_group_id) + Typ + Fach`, hängt
+Mitgliedschaften/Curricula auf die überlebende Gruppe um):
+```bash
+docker compose exec backend python scripts/dedup_groups.py          # Vorschau (Dry-Run)
+docker compose exec backend python scripts/dedup_groups.py --apply  # ausführen
+```
+Neue Dubletten entstehen nicht mehr — der Gruppen-Sync speichert `sso_group_id`
+seither normalisiert (lowercase) und sucht case-insensitiv.

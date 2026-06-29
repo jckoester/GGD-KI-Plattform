@@ -195,14 +195,22 @@ async def _upsert_group_and_membership(
     """
     from app.db.models import Group, GroupMembership
 
+    # sso_group_id normalisiert (lowercase) als kanonischer Schlüssel: verhindert
+    # Doppelgruppen, wenn der Provider die Schreibweise ändert (z. B. 'FS.Chemie'
+    # vs 'fs.chemie'). Lookup case-insensitiv, gespeichert wird stets lowercase.
+    sso_id_norm = pg.sso_group_id.lower()
     subject_pred = (
         Group.subject_id == subject_id if subject_id is not None
         else Group.subject_id.is_(None)
     )
     res = await db.execute(
-        select(Group).where(Group.sso_group_id == pg.sso_group_id, subject_pred)
+        select(Group).where(
+            func.lower(Group.sso_group_id) == sso_id_norm, subject_pred
+        )
     )
-    group = res.scalar_one_or_none()
+    # .first() statt .scalar_one_or_none(): toleriert Alt-Bestände mit (noch nicht
+    # deduplizierten) Doppelgruppen, bis dedup_groups.py gelaufen ist.
+    group = res.scalars().first()
 
     if group is None:
         # Merge-Logik: bei teaching_group eine manuell (aus Fach+Klasse) erstellte
@@ -221,7 +229,7 @@ async def _upsert_group_and_membership(
             )
             manual_group = res.scalar_one_or_none()
             if manual_group is not None:
-                manual_group.sso_group_id = pg.sso_group_id
+                manual_group.sso_group_id = sso_id_norm
                 manual_group.name = pg.name
                 group = manual_group
 
@@ -232,12 +240,15 @@ async def _upsert_group_and_membership(
                 slug=slug,
                 type=pg.type,
                 subject_id=subject_id,
-                sso_group_id=pg.sso_group_id,
+                sso_group_id=sso_id_norm,
             )
             db.add(group)
             await db.flush()  # group.id sofort verfügbar
     else:
-        # Vorhandene Gruppe: Name kann sich geändert haben (subject_id ist Lookup-Teil)
+        # Vorhandene Gruppe: Name kann sich geändert haben (subject_id ist Lookup-Teil).
+        # sso_group_id bei Bedarf auf lowercase normalisieren (heilt Alt-Schreibweisen).
+        if group.sso_group_id != sso_id_norm:
+            group.sso_group_id = sso_id_norm
         group.name = pg.name
 
     role_in_group = "teacher" if pg.type == "subject_department" else primary_role
