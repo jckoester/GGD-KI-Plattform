@@ -71,9 +71,11 @@
 
   const chipBase = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium'
   function chipColor(typ) {
-    if (typ === 'ik') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
-    if (typ === 'pk') return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-    return 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200'
+    // Semantische Tokens (kein rohes Palettengrün/-blau/-lila) — Muster wie HinweisChip:
+    // /20-Tönung als Hintergrund, volle Farbe als Text.
+    if (typ === 'ik') return 'bg-light-bl/20 text-light-bl dark:bg-dark-bl/20 dark:text-dark-bl'
+    if (typ === 'pk') return 'bg-light-gr/20 text-light-gr dark:bg-dark-gr/20 dark:text-dark-gr'
+    return 'bg-light-pu/20 text-light-pu dark:bg-dark-pu/20 dark:text-dark-pu'
   }
 </script>
 
