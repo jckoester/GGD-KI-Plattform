@@ -28,7 +28,7 @@ export const CONTENT_TYPES = {
     "lernsequenz",
     "methode",
     "sozialform",
-    "operator_didaktisch",
+    "operator",
     "jahresplan",
     "pruefungsanforderung"
   ],
@@ -101,7 +101,7 @@ export const CONTENT_TYPE_LABELS = {
   "lernsequenz": "Lernsequenz",
   "methode": "Methode",
   "sozialform": "Sozialform",
-  "operator_didaktisch": "Didaktischer Operator",
+  "operator": "Operator",
   "jahresplan": "Jahresplan",
   "pruefungsanforderung": "Prüfungsanforderung",
   "unterrichtsstunde": "Unterrichtsstunde",
@@ -208,9 +208,9 @@ export const SCOPE_DEFAULTS = {
     "school",
     "subject"
   ],
-  "operator_didaktisch": [
-    "school",
-    "subject"
+  "operator": [
+    "global",
+    "global"
   ],
   "jahresplan": [
     "private",

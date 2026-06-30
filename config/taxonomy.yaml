@@ -94,9 +94,10 @@ categories:
       - key: sozialform
         label_de: "Sozialform"
         scope_defaults: {read_scope: school,   write_scope: subject }
-      - key: operator_didaktisch
-        label_de: "Didaktischer Operator"
-        scope_defaults: {read_scope: school,   write_scope: subject }
+      - key: operator
+        label_de: "Operator"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
       - key: jahresplan
         label_de: "Jahresplan"
         scope_defaults: {read_scope: private,  write_scope: private }

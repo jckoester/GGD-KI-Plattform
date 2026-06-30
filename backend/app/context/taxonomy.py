@@ -74,7 +74,7 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "lernsequenz": None,
     "methode": None,
     "sozialform": None,
-    "operator_didaktisch": None,
+    "operator": None,
     "jahresplan": None,
     "pruefungsanforderung": None,
     # artifact — zeitlich begrenzte Inhalte

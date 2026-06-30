@@ -38,6 +38,7 @@ def make_node():
 EXPECTED_EMBEDDING_TYPES = frozenset({
     'ik_kompetenz', 'pk_kompetenz', 'pk_gruppe', 'leitidee', 'leitperspektive_aspekt',
     'kapitel', 'themengebiet', 'funktion', 'bauteil', 'abstrakt', 'konvention',
+    'operator',
 })
 
 EXPECTED_ENRICHMENT_KEYS = {
