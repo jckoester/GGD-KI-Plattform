@@ -46,9 +46,13 @@
         const bpId = node.metadata?.bp_id || ''
         const breadcrumb = node.metadata?.breadcrumb || []
 
-        const bpVersionMatch = bpId.match(/^BP(\d{4})/)
-        const bp_version = bpVersionMatch ? bpVersionMatch[1]
-            : (breadcrumb[0]?.match(/\d{4}/)?.[0] || '')
+        // bp_version: bevorzugt der autoritative Wert aus den Knoten-Metadaten
+        // (vom Import gesetzt, inkl. Editions-Suffix wie ".V2"). Der Regex auf bp_id
+        // liefert nur das Basisjahr und verlöre die Unterversion – daher nur Fallback.
+        const bp_version = node.metadata?.bp_version
+            || bpId.match(/^BP(\d{4})/)?.[1]
+            || breadcrumb[0]?.match(/\d{4}/)?.[0]
+            || ''
 
         const schulartMatch = bpId.match(/_(GYM|RS|GMS|GS|BSO)_/)
         const schulart = schulartMatch
