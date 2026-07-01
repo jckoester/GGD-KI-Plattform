@@ -126,6 +126,16 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 > LFDB sind also **kein** Strukturfehler. Sollen die PDF-Inhalte künftig
 > importiert werden, ist ein eigener Parser nötig (siehe Todo).
 
+> **Operatoren-Anhang:** Jeder Fach-Bildungsplan hat einen Anhang „Operatoren"
+> (handlungsleitende Verben wie *analysieren*, *erläutern*, gegliedert nach
+> Anforderungsbereichen AFB I–III). Dieser wird beim Fach-Scrape **automatisch
+> mitgezogen** (Seite `…{FACHCODE}{suffix}_OP`) und als `operator`-Knoten (je
+> Edition eigene, `bp_version`-getaggt) exportiert — **kein** separater Aufruf nötig.
+> Titel-Synonyme („ein-, zuordnen", „(be-)nennen", „analysieren/untersuchen") werden
+> zu einem kanonischen Titel + `metadata.aliase` normalisiert. Fächer ohne HTML-Anhang
+> (die nur als PDF veröffentlichten Fremdsprachen Englisch/Französisch) werden
+> übersprungen und im Log vermerkt (kein Fehler).
+
 ---
 
 ## Schritt 4 — Dry-Run des Imports
@@ -179,13 +189,23 @@ cd backend && python scripts/embedding_backfill.py --reindex
 
 `DATABASE_URL` muss in der `.env` oder als Umgebungsvariable gesetzt sein.
 
+> **Gezieltes Nachziehen einzelner Typen:** Wurde nur ein content_type neu importiert
+> (z. B. die Operatoren nachträglich ergänzt), lässt sich das Embedding darauf
+> eingrenzen — statt den gesamten Bestand erneut zu prüfen:
+> ```bash
+> cd backend && python scripts/embedding_backfill.py --content-type operator
+> ```
+> `--content-type` ist mehrfach angebbar. Für `operator` fließt das Verb (Titel) +
+> `metadata.aliase` mit in den Embedding-Text ein, damit die semantische Suche den
+> Operator über sein Verb findet.
+
 Erwartet: alle Knoten in der Whitelist haben danach `embedding IS NOT NULL`.
 Prüfen:
 ```sql
 SELECT content_type, count(*) FILTER (WHERE embedding IS NULL) as ohne
 FROM context_nodes
 WHERE content_type IN (
-    'ik_kompetenz','pk_kompetenz','pk_gruppe','leitidee','leitperspektive_aspekt'
+    'ik_kompetenz','pk_kompetenz','pk_gruppe','leitidee','leitperspektive_aspekt','operator'
 )
   AND status = 'active'
 GROUP BY content_type;

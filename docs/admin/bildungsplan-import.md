@@ -199,6 +199,13 @@ docker compose exec backend python scripts/embedding_backfill.py --reindex
 > (03:15 Uhr) nach. Der manuelle Lauf ist nur sinnvoll, wenn die Daten sofort
 > verfügbar sein sollen.
 
+> **Nur einen Typ nachziehen:** Wurde ein content_type nachträglich ergänzt (z. B.
+> die Operatoren-Anhänge zu einem bereits importierten Bildungsplan), lässt sich das
+> Embedding gezielt darauf eingrenzen:
+> ```bash
+> docker compose exec backend python scripts/embedding_backfill.py --content-type operator
+> ```
+
 ---
 
 ## Schritt 5: HNSW-Index neu aufbauen
