@@ -68,6 +68,15 @@ def _build_embedding_input(node: ContextNode) -> str:
     analog zur breadcrumb-Anreicherung fuer Bildungsplan-Knoten.
     """
     base = node.content or ""
+
+    # Operatoren: das Verb (Titel) trägt die zentrale Semantik und steht NICHT im
+    # content (= Definition/Erwartungshorizont). Titel + Synonyme (metadata.aliase)
+    # voranstellen, damit die semantische Suche den Operator über sein Verb findet.
+    if node.content_type == "operator":
+        verbs = [node.title or ""] + list((node.metadata_ or {}).get("aliase", []) or [])
+        prefix = ", ".join(v for v in verbs if v)
+        return f"{prefix}\n{base}" if base else prefix
+
     enrichment_fields = EMBEDDING_ENRICHMENT.get((node.category, node.content_type), [])
 
     prefixes: list[str] = []

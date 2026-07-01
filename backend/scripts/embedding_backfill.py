@@ -32,6 +32,7 @@ async def run(
     limit: int | None,
     dry_run: bool,
     reindex: bool,
+    content_types: list[str] | None,
 ) -> int:
     async with AsyncSessionLocal() as db:
         stats = await backfill_embeddings(
@@ -40,6 +41,7 @@ async def run(
             limit=limit,
             dry_run=dry_run,
             reindex=reindex,
+            content_types=content_types,
         )
     logger.info(
         "embedding_backfill done found=%d ok=%d errors=%d skipped=%d duration_ms=%d",
@@ -64,6 +66,13 @@ def main() -> None:
         action="store_true",
         help="Nach dem Lauf REINDEX INDEX idx_context_nodes_embedding ausführen",
     )
+    parser.add_argument(
+        "--content-type",
+        action="append",
+        default=None,
+        dest="content_types",
+        help="Nur diesen content_type einbetten (mehrfach angebbar, z. B. --content-type operator)",
+    )
     args = parser.parse_args()
 
     if args.batch_size < 1:
@@ -77,6 +86,7 @@ def main() -> None:
                 limit=args.limit,
                 dry_run=args.dry_run,
                 reindex=args.reindex,
+                content_types=args.content_types,
             )
         )
     except Exception:

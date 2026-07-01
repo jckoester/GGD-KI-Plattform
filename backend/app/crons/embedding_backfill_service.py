@@ -31,16 +31,28 @@ async def backfill_embeddings(
     limit: int | None = None,
     dry_run: bool = False,
     reindex: bool = False,
+    content_types: list[str] | None = None,
 ) -> EmbeddingBackfillStats:
     stats = EmbeddingBackfillStats()
     started = perf_counter()
 
+    # Optional auf bestimmte content_types eingrenzen (z. B. gezieltes Nachziehen nach
+    # dem Import eines neuen Typs). Nur einbettbare Typen sind zulässig.
+    if content_types is None:
+        selected_types = EMBEDDING_CONTENT_TYPES
+    else:
+        selected_types = [t for t in content_types if t in EMBEDDING_CONTENT_TYPES]
+        ignored = sorted(set(content_types) - set(selected_types))
+        if ignored:
+            logger.warning("backfill_embeddings: nicht einbettbare content_types ignoriert: %s", ignored)
+
     logger.info(
-        "backfill_embeddings gestartet batch_size=%d limit=%s dry_run=%s reindex=%s",
+        "backfill_embeddings gestartet batch_size=%d limit=%s dry_run=%s reindex=%s content_types=%s",
         batch_size,
         limit,
         dry_run,
         reindex,
+        content_types or "alle",
     )
 
     query = (
@@ -48,7 +60,7 @@ async def backfill_embeddings(
         .where(
             ContextNode.embedding.is_(None),
             ContextNode.status == "active",
-            ContextNode.content_type.in_(EMBEDDING_CONTENT_TYPES),
+            ContextNode.content_type.in_(selected_types),
         )
         .order_by(ContextNode.created_at.asc())
     )

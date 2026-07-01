@@ -222,3 +222,28 @@ class TestBuildEmbeddingInput:
         result = _build_embedding_input(node)
         assert "Gymnasium | Mathematik | Klasse 7/8 | Algebra" in result
         assert "Die Schuelerinnen und Schueler koennen..." in result
+
+    def test_build_embedding_input_operator(self, make_node):
+        """Operator: Titel (Verb) + Synonyme werden dem content (Definition) vorangestellt."""
+        node = make_node(
+            category="knowledge",
+            content_type="operator",
+            content="Sachverhalte auf Regeln zurueckfuehren",
+            metadata={"afb": ["III"], "aliase": ["begruenden"]},
+            title="begründen",
+        )
+        result = _build_embedding_input(node)
+        assert result.startswith("begründen, begruenden")
+        assert "Sachverhalte auf Regeln zurueckfuehren" in result
+
+    def test_build_embedding_input_operator_no_aliase(self, make_node):
+        """Operator ohne Synonyme: nur der Titel wird vorangestellt."""
+        node = make_node(
+            category="knowledge",
+            content_type="operator",
+            content="Elemente ohne Erlaeuterung wiedergeben",
+            metadata={"afb": ["I"], "aliase": []},
+            title="nennen",
+        )
+        result = _build_embedding_input(node)
+        assert result == "nennen\nElemente ohne Erlaeuterung wiedergeben"
