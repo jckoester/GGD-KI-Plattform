@@ -12,6 +12,7 @@
         Circle,
         Users,
         Presentation,
+        Zap,
     } from "lucide-svelte";
 
     let { category, contentType = undefined, size = 16 } = $props();
@@ -25,6 +26,7 @@
         abstrakt: Lightbulb,
         methode: Presentation,
         sozialform: Users,
+        operator: Zap,
     };
 
     // Fallback-Mapping für categories

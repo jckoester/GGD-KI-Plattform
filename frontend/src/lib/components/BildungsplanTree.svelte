@@ -2,7 +2,7 @@
     import { goto, beforeNavigate } from "$app/navigation";
     import { tick } from "svelte";
     import { page } from "$app/stores";
-    import { getFachplanBySubject } from "$lib/api.js";
+    import { getFachplanBySubject, getContextNodes } from "$lib/api.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import LoadingBanner from "./LoadingBanner.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
@@ -21,12 +21,21 @@
     // Ausgewählte BP-Version (null = aktuellste nehmen)
     let selectedVersion = $state(initialBpVersion);
 
-    // Ansicht: 'ik' = Inhaltsbezogene Kompetenzen, 'pk' = Prozessbezogene Kompetenzen
+    // Ansicht: 'ik' = Inhaltsbezogene Kompetenzen, 'pk' = Prozessbezogene Kompetenzen,
+    // 'operatoren' = Operatoren-Anhang (handlungsleitende Verben, nach AFB gruppiert)
     let view = $state('ik');
 
     // Accordion-Zustände
     let expandedLeitideen = $state({});
     let expandedPkGruppen = $state({});
+    let expandedAfb = $state({}); // AFB-Gruppen im Operatoren-View (Default: aufgeklappt)
+
+    // Operatoren des Fachs für die aktuell angezeigte Edition (editionsbewusst).
+    let operators = $state([]);
+    let operatorsLoading = $state(false);
+    let _opKey = null; // (subjectId|bp_version) — verhindert redundantes Nachladen bei Band-Wechsel
+
+    const AFB_ORDER = ['I', 'II', 'III'];
 
     function toggleLeitidee(id) {
         expandedLeitideen = { ...expandedLeitideen, [id]: !expandedLeitideen[id] };
@@ -34,6 +43,50 @@
     function togglePkGruppe(id) {
         expandedPkGruppen = { ...expandedPkGruppen, [id]: !expandedPkGruppen[id] };
     }
+    // AFB-Gruppen sind standardmäßig aufgeklappt (kompakte Referenzliste)
+    const isAfbOpen = (afb) => expandedAfb[afb] !== false;
+    function toggleAfb(afb) {
+        expandedAfb = { ...expandedAfb, [afb]: !isAfbOpen(afb) };
+    }
+
+    // Operatoren nach AFB gruppieren; Mehrfachzuordnung → Operator erscheint je AFB.
+    const operatorsByAfb = $derived.by(() => {
+        const groups = { I: [], II: [], III: [], other: [] };
+        for (const op of operators) {
+            const raw = op.metadata?.afb;
+            const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+            const targets = list.filter((a) => groups[a]);
+            if (targets.length === 0) groups.other.push(op);
+            for (const a of targets) groups[a].push(op);
+        }
+        for (const k of Object.keys(groups)) {
+            groups[k].sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de'));
+        }
+        return groups;
+    });
+
+    // Operatoren laden, sobald Fach/Edition feststehen (data.bp_version = angezeigte Edition).
+    $effect(() => {
+        const sid = subjectId;
+        const edition = data?.bp_version ?? null;
+        if (!sid || !data?.fachplan) {
+            operators = [];
+            _opKey = null;
+            return;
+        }
+        const key = `${sid}|${edition ?? ''}`;
+        if (key === _opKey) return; // bereits für diese (Fach, Edition) geladen
+        _opKey = key;
+        let cancelled = false;
+        operatorsLoading = true;
+        const params = { content_type: ['operator'], subject_id: sid, status: 'active' };
+        if (edition) params.bp_version = edition;
+        getContextNodes(params)
+            .then((r) => { if (!cancelled) operators = Array.isArray(r) ? r : []; })
+            .catch(() => { if (!cancelled) operators = []; })
+            .finally(() => { if (!cancelled) operatorsLoading = false; });
+        return () => { cancelled = true; };
+    });
 
     function isSameBand(a, b) {
         if (!a || !b) return false;
@@ -83,7 +136,7 @@
         try {
             sessionStorage.setItem(stateKey(subjectId), JSON.stringify({
                 view, selectedBand, selectedVersion,
-                expandedLeitideen, expandedPkGruppen,
+                expandedLeitideen, expandedPkGruppen, expandedAfb,
                 scrollTop: scrollContainer()?.scrollTop ?? 0,
             }));
         } catch { /* sessionStorage nicht verfügbar → ohne Wiederherstellung */ }
@@ -134,6 +187,7 @@
             selectedVersion = saved.selectedVersion ?? initialBpVersion;
             expandedLeitideen = saved.expandedLeitideen ?? {};
             expandedPkGruppen = saved.expandedPkGruppen ?? {};
+            expandedAfb = saved.expandedAfb ?? {};
             load(selectedBand, selectedVersion).then(() => restoreScroll(saved.scrollTop));
         } else {
             selectedBand = null;
@@ -228,6 +282,19 @@
                                    : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:border-primary dark:hover:border-primary-dark'}"
                     >
                         PK
+                    </button>
+                {/if}
+                {#if operators.length > 0}
+                    <span class="text-light-ui-3 dark:text-dark-ui-3 select-none">|</span>
+                    <button
+                        onclick={() => (view = 'operatoren')}
+                        title="Operatoren (handlungsleitende Verben)"
+                        class="px-3 py-1.5 text-sm rounded-md border transition-colors
+                               {view === 'operatoren'
+                                   ? 'border-primary dark:border-primary-dark bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark font-medium'
+                                   : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx dark:text-dark-tx hover:border-primary dark:hover:border-primary-dark'}"
+                    >
+                        Operatoren
                     </button>
                 {/if}
             </div>
@@ -333,6 +400,74 @@
                 </div>
             {:else}
                 <InfoBanner message="Keine prozessbezogenen Kompetenzen verfügbar." />
+            {/if}
+        {/if}
+
+        <!-- Operatoren (handlungsleitende Verben, nach AFB gruppiert) -->
+        {#if view === 'operatoren'}
+            {#if operatorsLoading && operators.length === 0}
+                <LoadingBanner message="Operatoren werden geladen…" />
+            {:else if operators.length > 0}
+                <div class="space-y-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide
+                               text-light-tx-2 dark:text-dark-tx-2 mb-2">
+                        Operatoren
+                    </h3>
+                    {#each [...AFB_ORDER, 'other'] as afb}
+                        {#if operatorsByAfb[afb]?.length > 0}
+                            <div class="border border-light-ui-3 dark:border-dark-ui-3 rounded-md overflow-hidden">
+                                <button
+                                    onclick={() => toggleAfb(afb)}
+                                    class="w-full flex items-center justify-between gap-3 py-3 px-3
+                                           bg-light-bg-2 dark:bg-dark-bg-2
+                                           hover:bg-light-bg-3 dark:hover:bg-dark-bg-3 transition-colors
+                                           text-light-tx dark:text-dark-tx"
+                                >
+                                    <span class="font-medium">
+                                        {afb === 'other' ? 'Ohne AFB-Zuordnung' : `Anforderungsbereich ${afb}`}
+                                    </span>
+                                    <span class="flex items-center gap-2 shrink-0">
+                                        <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                            {operatorsByAfb[afb].length}
+                                        </span>
+                                        {#if isAfbOpen(afb)}
+                                            <ChevronDown class="w-4 h-4" />
+                                        {:else}
+                                            <ChevronRight class="w-4 h-4" />
+                                        {/if}
+                                    </span>
+                                </button>
+                                {#if isAfbOpen(afb)}
+                                    <div class="p-3 space-y-1">
+                                        {#each operatorsByAfb[afb] as op (op.id)}
+                                            <button
+                                                onclick={() => navigateToNode(op.id)}
+                                                class="w-full flex items-start gap-3 p-2 rounded text-left
+                                                       hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
+                                            >
+                                                <span class="mt-0.5 shrink-0">
+                                                    <NodeTypeIcon contentType="operator" size={16} />
+                                                </span>
+                                                <span class="flex-1 min-w-0">
+                                                    <span class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                                                        {op.title}
+                                                    </span>
+                                                    {#if op.content}
+                                                        <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                                            {op.content}
+                                                        </span>
+                                                    {/if}
+                                                </span>
+                                            </button>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        {/if}
+                    {/each}
+                </div>
+            {:else}
+                <InfoBanner message="Keine Operatoren verfügbar." />
             {/if}
         {/if}
     {/if}
