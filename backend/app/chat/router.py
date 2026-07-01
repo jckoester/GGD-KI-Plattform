@@ -352,6 +352,92 @@ register_tool(ChatTool(
 ))
 
 
+_GET_OPERATOREN_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_operatoren",
+        "description": (
+            "Gibt die offiziellen Operatoren (handlungsleitende Verben) des Fachs "
+            "dieser Konversation laut Bildungsplan zurück — je Operator mit Definition "
+            "und Anforderungsbereich (AFB I–III). Nutze dieses Tool, um Aufgaben­"
+            "stellungen mit den korrekten fachspezifischen Operatoren zu formulieren "
+            "oder um die korrekte Verwendung von Operatoren in einer Schülerlösung zu "
+            "prüfen. Ohne Fachbezug der Konversation liefert es eine leere Liste."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
+}
+
+
+async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
+    """Leitet das Fach (subject_id) der Konversation ab: Gruppe → Fach, sonst
+    conversation.subject_id (bzw. deren Gruppe). None wenn kein Fachbezug."""
+    if ctx.group_id is not None:
+        grp = await ctx.db.get(Group, ctx.group_id)
+        if grp and grp.subject_id is not None:
+            return grp.subject_id
+    if ctx.conversation_id is not None:
+        conv = await ctx.db.get(Conversation, ctx.conversation_id)
+        if conv is not None:
+            if conv.subject_id is not None:
+                return conv.subject_id
+            if conv.group_id is not None:
+                grp = await ctx.db.get(Group, conv.group_id)
+                if grp:
+                    return grp.subject_id
+    return None
+
+
+async def _exec_get_operatoren(ctx: ToolContext) -> list[dict]:
+    """Operatoren des Konversations-Fachs (aktuelle Edition) für den Assistenten.
+
+    Deterministisch (keine Top-k-Suche): liefert die vollständige Operatorenliste
+    der neuesten importierten Edition (`bp_version`) des Fachs, alphabetisch.
+    """
+    subject_id = await _resolve_conversation_subject_id(ctx)
+    if subject_id is None:
+        return []
+    rows = (await ctx.db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type == "operator",
+            ContextNode.subject_id == subject_id,
+            ContextNode.status == "active",
+        )
+    )).scalars().all()
+    if not rows:
+        return []
+    # Aktuelle Edition = neuestes bp_version (V1/V2/V3 koexistieren als Knoten).
+    newest = max((n.metadata_ or {}).get("bp_version", "") for n in rows)
+    current = [n for n in rows if (n.metadata_ or {}).get("bp_version", "") == newest]
+    current.sort(key=lambda n: (n.title or "").lower())
+    out: list[dict] = []
+    for n in current:
+        md = n.metadata_ or {}
+        afb = md.get("afb") or []
+        entry = {
+            "operator": n.title,
+            "afb": ", ".join(afb) if isinstance(afb, list) else str(afb),
+            "bedeutung": n.content or "",
+        }
+        if md.get("aliase"):
+            entry["synonyme"] = md["aliase"]
+        out.append(entry)
+    return out
+
+
+async def _get_operatoren_handler(args: dict, ctx: ToolContext) -> list[dict]:
+    return await _exec_get_operatoren(ctx)
+
+
+register_tool(ChatTool(
+    name="get_operatoren",
+    group="context_search",
+    writes=False,
+    definition=_GET_OPERATOREN_TOOL,
+    handler=_get_operatoren_handler,
+))
+
+
 def _serialize_user_message(user_message: str, attachments: list[AttachmentMeta]) -> str:
     """Serialisiert die User-Nachricht für die DB (mit Anhang-Metadaten, falls vorhanden)."""
     if attachments:

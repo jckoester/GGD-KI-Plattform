@@ -1,6 +1,7 @@
 """Tests für Tool-Registry und Mehrrunden-Loop-Logik (chat/tools.py)."""
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -189,6 +190,60 @@ def test_student_planning_not_included_without_group():
     finally:
         mod.TOOL_REGISTRY.clear()
         mod.TOOL_REGISTRY.update(saved)
+
+
+# ── get_operatoren (Operatoren-Zugriff für Assistenten) ───────────────────────
+
+
+def test_get_operatoren_registered_as_context_search():
+    """get_operatoren ist immer aktiv (Gruppe context_search) und read-only."""
+    from app.chat import router  # noqa: F401 — registriert das Tool
+    tool = TOOL_REGISTRY.get("get_operatoren")
+    assert tool is not None
+    assert tool.group == "context_search"
+    assert tool.writes is False
+
+
+async def test_get_operatoren_no_subject_returns_empty():
+    """Ohne Fachbezug (kein group_id / keine conversation) → leere Liste, kein DB-Zugriff."""
+    from app.chat import router
+    db = MagicMock()
+    db.get = AsyncMock()  # darf nicht aufgerufen werden
+    ctx = ToolContext(db=db, user=None, group_id=None, conversation_id=None)
+    result = await router._exec_get_operatoren(ctx)
+    assert result == []
+    db.get.assert_not_called()
+
+
+async def test_get_operatoren_current_edition_only_and_mapping():
+    """Liefert nur die neueste Edition, alphabetisch, mit operator/afb/bedeutung/synonyme."""
+    from app.chat import router
+
+    nodes = [
+        SimpleNamespace(title="anwenden", content="alte Fassung",
+                        metadata_={"bp_version": "2016", "afb": ["II"], "aliase": []}),
+        SimpleNamespace(title="beurteilen", content="def-b",
+                        metadata_={"bp_version": "2016.V2", "afb": ["III"], "aliase": ["bewerten"]}),
+        SimpleNamespace(title="analysieren", content="def-a",
+                        metadata_={"bp_version": "2016.V2", "afb": ["II", "III"]}),
+    ]
+    exec_result = MagicMock()
+    exec_result.scalars.return_value.all.return_value = nodes
+
+    db = MagicMock()
+    db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))  # Group → Fach
+    db.execute = AsyncMock(return_value=exec_result)
+
+    ctx = ToolContext(db=db, user=None, group_id=2, conversation_id=None)
+    result = await router._exec_get_operatoren(ctx)
+
+    # Nur 2016.V2-Operatoren, alphabetisch nach Titel
+    assert [r["operator"] for r in result] == ["analysieren", "beurteilen"]
+    assert result[0]["afb"] == "II, III"
+    assert "synonyme" not in result[0]           # keine aliase → Feld weggelassen
+    assert result[1]["afb"] == "III"
+    assert result[1]["bedeutung"] == "def-b"
+    assert result[1]["synonyme"] == ["bewerten"]
 
 
 def test_student_sees_only_student_planning_not_planning_tools():

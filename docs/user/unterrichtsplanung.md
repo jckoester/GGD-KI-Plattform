@@ -146,3 +146,11 @@ per Assistent).
 Der Assistent erkennt das an der Stundenzahl und schlägt vor, die Phasen auf zwei
 Stunden zu verteilen oder die Stunde umzubauen, statt sie stillschweigend zu
 quetschen.
+
+**Kennt der Assistent die Operatoren des Fachs?**
+Ja. In einem fach- oder gruppengebundenen Chat kann der Assistent die offizielle
+Operatorenliste des Fachs (handlungsleitende Verben mit Definition und
+Anforderungsbereich AFB I–III) abrufen — etwa um eine Aufgabenstellung mit den
+korrekten Operatoren zu formulieren oder um zu prüfen, ob eine Schülerlösung den
+geforderten Operator angemessen umsetzt. Die Liste selbst finden Sie im
+Bildungsplan-View unter dem Reiter **Operatoren**.
