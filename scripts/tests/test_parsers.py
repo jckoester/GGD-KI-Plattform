@@ -15,12 +15,15 @@ from scripts.scraper.parsers import (
     parse_pk_kompetenz_list,
     parse_leitperspektive,
     parse_leitperspektive_aspekt_list,
+    parse_operator_list,
+    expand_operator_title,
 )
 
 from scripts.tests.conftest import load_fixture
 
 
 CHEMIE_IK_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_IK_8-9-10_01"
+OPERATOREN_CH_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH.V2_OP"
 CHEMIE_IK_STANDARD_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_IK_8-9-10_01_01"
 CHEMIE_IK_HINWEIS_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_IK_5-6_01"
 CHEMIE_PK_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_CH_PK_01"
@@ -475,3 +478,98 @@ class TestLiveFixtureRegressions:
         assert 'Umsetzungshilfen' not in node['content']
         assert 'Beispielcurricula' not in node['content']
         assert 'Download als PDF' not in node['content']
+
+
+class TestExpandOperatorTitle:
+    """Zerlegung der Operator-Titelzelle in (Titel, Aliase) — reale BW-Schreibweisen."""
+
+    @pytest.mark.parametrize("raw, expected_title, expected_aliase", [
+        # Ergänzungsstrich (Komma/Slash) — Stamm-Extraktion
+        ("ein-, zuordnen", "einordnen", ["zuordnen"]),
+        ("ein-/zuordnen, erfassen", "einordnen", ["zuordnen", "erfassen"]),
+        ("an-/verwenden, nutzen, einsetzen; beachten",
+         "anwenden", ["verwenden", "nutzen", "einsetzen", "beachten"]),
+        # Klammer-Präfix
+        ("(be-)nennen", "nennen", ["benennen"]),
+        ("(nach-)erzählen", "erzählen", ["nacherzählen"]),
+        # einfache Synonyme (Komma / einwortiger Slash)
+        ("beurteilen, bewerten", "beurteilen", ["bewerten"]),
+        ("analysieren/untersuchen", "analysieren", ["untersuchen"]),
+        # Einzelverb — keine Aliase
+        ("nennen", "nennen", []),
+        # beschreibende Phrasen (' und ') → verbatim, keine Aliase
+        ("wahrnehmen und darüber sprechen/sich äußern",
+         "wahrnehmen und darüber sprechen/sich äußern", []),
+        # Komma innerhalb Klammern → nicht zerlegen
+        ("(global, detailliert, selektiv) verstehen",
+         "(global, detailliert, selektiv) verstehen", []),
+    ])
+    def test_expand(self, raw, expected_title, expected_aliase):
+        title, aliase = expand_operator_title(raw)
+        assert title == expected_title
+        assert aliase == expected_aliase
+
+    def test_soft_hyphens_and_asterisks_stripped(self):
+        title, aliase = expand_operator_title("ab­lei­ten")
+        assert title == "ableiten"
+        assert aliase == []
+        title2, _ = expand_operator_title("(*zeigen*)/aufzeigen")
+        assert "*" not in title2
+
+    def test_empty(self):
+        assert expand_operator_title("   ") == ("", [])
+
+
+class TestParseOperatorList:
+    """parse_operator_list gegen die echte Chemie-Operatoren-Anhangseite (V2)."""
+
+    PARENT = "BP2016BW_ALLG_GYM_CH.V2"
+
+    def _nodes(self):
+        soup = load_fixture('operatoren_chemie_live.html')
+        return parse_operator_list(soup, OPERATOREN_CH_URL, self.PARENT)
+
+    def test_returns_operator_nodes(self):
+        nodes = self._nodes()
+        assert len(nodes) == 20
+        assert all(n['content_type'] == 'operator' for n in nodes)
+        assert all(n['type'] == 'knowledge' for n in nodes)
+        assert all(n['visibility'] == 'global' for n in nodes)
+
+    def test_edition_and_parent(self):
+        nodes = self._nodes()
+        assert all(n['bp_version'] == '2016.V2' for n in nodes)
+        assert all(n['parent_bp_id'] == self.PARENT for n in nodes)
+        assert all(n['min_grade'] is None and n['max_grade'] is None for n in nodes)
+
+    def test_afb_is_list_of_roman(self):
+        nodes = self._nodes()
+        allowed = {'I', 'II', 'III'}
+        for n in nodes:
+            afb = n['metadata']['afb']
+            assert isinstance(afb, list) and afb
+            assert set(afb) <= allowed
+
+    def test_bp_id_and_metadata(self):
+        nodes = self._nodes()
+        first = nodes[0]
+        assert first['bp_id'] == 'BP2016BW_ALLG_GYM_CH.V2_OP_01'
+        assert first['metadata']['operator_nr'] == 1
+        assert 'aliase' in first['metadata']
+
+    def test_soft_hyphens_stripped_in_titles_and_content(self):
+        nodes = self._nodes()
+        assert all('­' not in n['title'] for n in nodes)
+        assert all('­' not in n['content'] for n in nodes)
+
+    def test_known_operator_present(self):
+        nodes = self._nodes()
+        by_title = {n['title']: n for n in nodes}
+        assert 'ableiten' in by_title
+        assert by_title['ableiten']['metadata']['afb'] == ['II']
+        assert by_title['ableiten']['content']
+
+    def test_no_table_returns_empty(self):
+        from bs4 import BeautifulSoup
+        empty = BeautifulSoup("<html><body><p>kein Anhang</p></body></html>", 'lxml')
+        assert parse_operator_list(empty, OPERATOREN_CH_URL, self.PARENT) == []

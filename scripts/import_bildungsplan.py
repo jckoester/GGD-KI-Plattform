@@ -43,6 +43,7 @@ BP_CONTENT_TYPES = {
     "pk_kompetenz",
     "leitperspektive",
     "leitperspektive_aspekt",
+    "operator",
 }
 
 # Reihenfolge fuer INSERT (FK-sichere Topologie)
@@ -54,6 +55,7 @@ IMPORT_ORDER = [
     "pk_gruppe",
     "ik_kompetenz",
     "pk_kompetenz",
+    "operator",
 ]
 
 VALID_SCHULARTEN = {"GYM", "RS", "GMS", "GS", "BSO", "SBBZ"}

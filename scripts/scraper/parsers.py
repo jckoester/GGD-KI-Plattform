@@ -685,3 +685,150 @@ def parse_leitperspektive_aspekt_list(
         })
 
     return nodes
+
+
+# ── Operatoren (handlungsleitende Verben) ────────────────────────────────────
+
+# Trennbare/untrennbare Verbpräfixe (längste zuerst) — für die Stamm-Extraktion
+# beim Ergänzungsstrich ("ein-, zuordnen" → Stamm "ordnen" → "einordnen").
+_VERB_PREFIXES = sorted(
+    [
+        'zusammen', 'zurück', 'voraus', 'wieder', 'hervor', 'heraus', 'herein',
+        'hinaus', 'hinein', 'durch', 'unter', 'über', 'nach', 'fort', 'fest',
+        'dar', 'weg', 'weiter', 'her', 'hin', 'los', 'ab', 'an', 'auf', 'aus',
+        'be', 'bei', 'ein', 'ent', 'er', 'ge', 'mit', 'um', 'ver', 'vor', 'zer', 'zu',
+    ],
+    key=len, reverse=True,
+)
+_ERGAENZUNGSSTRICH = re.compile(r'^(\w+)-\s*[,/]\s*(\w+)\b')
+_KLAMMER_PRAEFIX = re.compile(r'\((\w+)-\)(\w+)')
+
+
+def _verb_stem(full: str) -> str | None:
+    """Stamm eines präfigierten Verbs ('zuordnen' → 'ordnen'); None falls kein Präfix passt."""
+    for p in _VERB_PREFIXES:
+        if full.startswith(p) and len(full) > len(p) + 2:
+            return full[len(p):]
+    return None
+
+
+def _split_top_level(text: str, seps: str) -> list[str]:
+    """Splittet an Trennzeichen außerhalb von Klammern (...)."""
+    out, buf, depth = [], '', 0
+    for ch in text:
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth = max(0, depth - 1)
+        if ch in seps and depth == 0:
+            out.append(buf)
+            buf = ''
+        else:
+            buf += ch
+    out.append(buf)
+    return [x.strip() for x in out if x.strip()]
+
+
+def expand_operator_title(raw: str) -> tuple[str, list[str]]:
+    """Zerlegt eine Operator-Titelzelle in (Titel, Aliase).
+
+    Behandelt die realen Schreibweisen der BW-Operatorenlisten:
+    - Ergänzungsstrich: 'ein-, zuordnen' / 'ein-/zuordnen' → 'einordnen' + ['zuordnen']
+    - Klammer-Präfix:   '(be-)nennen' → 'nennen' + ['benennen']
+    - Synonyme (Komma/Semikolon/einwortiger Slash): 'beurteilen, bewerten' →
+      Titel 'beurteilen', Alias 'bewerten'
+    - beschreibende Phrasen (' und ') und Klammer-Inhalte bleiben unzerlegt.
+    """
+    title = re.sub(r'\s+', ' ', strip_soft_hyphens(raw).replace('*', '')).strip()
+    if not title:
+        return '', []
+    # Beschreibende Phrase → verbatim, keine Aliase
+    if ' und ' in f' {title} ':
+        return title, []
+    # Klammer-Präfix: (be-)nennen → nennen + benennen
+    m = _KLAMMER_PRAEFIX.fullmatch(title)
+    if m:
+        pre, base = m.group(1), m.group(2)
+        return base, [pre + base]
+    forms: list[str] = []
+    rest = title
+    # Ergänzungsstrich am Anfang: 'ein-, zuordnen' / 'an-/verwenden'
+    m = _ERGAENZUNGSSTRICH.match(title)
+    if m:
+        pre, full = m.group(1), m.group(2)
+        stem = _verb_stem(full)
+        forms += [pre + stem, full] if stem else [full]
+        rest = title[m.end():]
+    # Restliche Synonyme: , ; (klammer-bewusst) + einwortige /
+    for frag in _split_top_level(rest, ';,'):
+        if '/' in frag and ' ' not in frag and '(' not in frag:
+            forms += [f.strip() for f in frag.split('/') if f.strip()]
+        else:
+            forms.append(frag)
+    # dedup, Reihenfolge wahren
+    seen, out = set(), []
+    for f in forms:
+        if f and f not in seen:
+            seen.add(f)
+            out.append(f)
+    if not out:
+        return title, []
+    return out[0], out[1:]
+
+
+def parse_operator_list(
+    soup: BeautifulSoup, url: str, parent_bp_id: str
+) -> list[dict[str, Any]]:
+    """Extrahiert Operator-Knoten aus der Operatoren-Anhangseite (content_type='operator').
+
+    Quelle: eine ``<table border="1">`` mit Spalten Operator | Beschreibung | AFB.
+    Synthetische bp_id: ``{op_page_bp_id}_{NR:02d}``. AFB als Liste (komma-getrennt,
+    Mehrfachzuordnung möglich). Titel-Synonyme → ``metadata.aliase`` via
+    ``expand_operator_title``. Keine Tabelle → leere Liste (Fach ohne Operatoren-Anhang).
+    """
+    op_page_bp_id = _extract_bp_id_from_url(url)
+    tbl = soup.find('table', attrs={'border': '1'})
+    if tbl is None:
+        return []
+
+    nodes: list[dict[str, Any]] = []
+    nr = 0
+    for row in tbl.find_all('tr'):
+        cells = row.find_all('td')  # Header-Zeile (<th>) wird so übersprungen
+        if len(cells) < 3:
+            continue
+        title, aliase = expand_operator_title(cells[0].get_text(separator=" ", strip=True))
+        content = strip_soft_hyphens(cells[1].get_text(separator=" ", strip=True))
+        afb = [s.strip() for s in
+               strip_soft_hyphens(cells[2].get_text(separator=" ", strip=True)).split(',')
+               if s.strip()]
+        if not title or not content:
+            continue
+        nr += 1
+        bp_id = f"{op_page_bp_id}_{nr:02d}"
+        hash_input = f"{title}|{content}|{','.join(afb)}|{','.join(aliase)}"
+        nodes.append({
+            'bp_id': bp_id,
+            'type': 'knowledge',
+            'content_type': 'operator',
+            'title': title,
+            'content': content,
+            'content_hash': _content_hash(hash_input),
+            'parent_bp_id': parent_bp_id,
+            'relations': [],
+            'min_grade': None,
+            'max_grade': None,
+            'niveau': 'regulär',
+            'bp_version': extract_bp_version(bp_id),
+            'metadata': {
+                'bp_id': bp_id,
+                'afb': afb,
+                'aliase': aliase,
+                'operator_nr': nr,
+                'source_url': url,
+                'scraped_at': _now_iso(),
+            },
+            'visibility': 'global',
+        })
+
+    return nodes

@@ -30,6 +30,7 @@ from scripts.scraper.parsers import (
     parse_pk_kompetenz_list,
     parse_leitperspektive,
     parse_leitperspektive_aspekt_list,
+    parse_operator_list,
 )
 
 logger = logging.getLogger('bildungsplan_scraper')
@@ -87,6 +88,20 @@ def _discover_all_ik_urls(soup: BeautifulSoup, base_bp_id: str) -> dict[str, str
             if parent_bp_id not in result:
                 result[parent_bp_id] = full_url.rsplit('_', 1)[0]
     return result
+
+
+def _discover_operator_url(soup: BeautifulSoup, fach_bp_id: str) -> str | None:
+    """Findet die verlinkte Operatoren-Anhangseite ({fach_bp_id}_OP) auf der Fachplan-Seite.
+
+    Operatoren stehen als eigener Gliederungspunkt im Fach-BP. Kein Link → None
+    (Fach ohne Operatoren-Anhang, z. B. nur als PDF veröffentlichte Fremdsprachen).
+    """
+    op_bp_id = f"{fach_bp_id}_OP"
+    for a in soup.find_all('a', href=True):
+        path_part = a['href'].split(',Lde/')[-1].split('?')[0].rstrip('/')
+        if path_part == op_bp_id:
+            return a['href'] if a['href'].startswith('http') else BASE_URL + path_part
+    return None
 
 
 def _discover_pk_gruppen(soup: BeautifulSoup, base_bp_id: str) -> list[tuple[str, str]]:
@@ -183,6 +198,25 @@ async def scrape_fach(
         except ScraperParseError as e:
             warnings.append(str(e))
             logger.error(str(e))
+
+    # Operatoren-Anhang entdecken (eigene Seite {fachplan}_OP, editionsspezifisch)
+    fach_bp_id = bp_id_basis + suffix
+    op_url = _discover_operator_url(soup, fach_bp_id)
+    if op_url is None:
+        logger.info(f"Kein Operatoren-Link fuer {fach_bp_id} (uebersprungen)")
+    else:
+        try:
+            op_html = await fetch(client, op_url)
+            op_soup = BeautifulSoup(op_html, 'lxml')
+            operator_nodes = parse_operator_list(op_soup, op_url, fach_bp_id)
+            if operator_nodes:
+                nodes.extend(operator_nodes)
+            else:
+                warnings.append(f"Operatoren-Seite ohne Tabelle: {fach_bp_id}")
+                logger.warning(f"Operatoren-Seite ohne Tabelle: {op_url}")
+        except Exception as e:
+            warnings.append(f"Operatoren fuer {fach_bp_id} nicht abrufbar: {e}")
+            logger.error(f"Operatoren fuer {fach_bp_id} ({op_url}): {e}")
 
     # Idempotenz-Filter: nur neue/geaenderte Knoten schreiben
     neu, geaendert, unveraendert = 0, 0, 0
