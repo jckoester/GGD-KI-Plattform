@@ -682,7 +682,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
             result = await db.execute(
                 sa.text("""
                     SELECT n.id, n.title,
-                           n.metadata->>'nr' AS nr,
+                           n.metadata->>'kompetenz_nr' AS nr,
                            e.metadata->>'partiell' AS partiell
                     FROM context_nodes n
                     JOIN context_edges e ON e.to_node_id = n.id
@@ -707,7 +707,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
 
             result = await db.execute(
                 sa.text("""
-                    SELECT n.id, n.title, n.metadata->>'pk_id' AS pk_id
+                    SELECT n.id, n.title, n.metadata->>'kompetenz_nr' AS pk_id
                     FROM context_nodes n
                     JOIN context_edges e ON e.to_node_id = n.id
                     WHERE e.from_node_id = :ls_id

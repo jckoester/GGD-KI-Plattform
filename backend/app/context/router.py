@@ -851,6 +851,48 @@ async def get_curriculum(
     }
 
 
+@router.post("/curricula/{curriculum_id}/relink")
+async def relink_curriculum_endpoint(
+    curriculum_id: UUID,
+    apply: bool = Query(default=False, description="false=Vorschau, true=anwenden"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Aktualisiert ein Curriculum auf die aktuelle Bildungsplan-Edition.
+
+    ``apply=false`` liefert die Vorschau (Modus + je Kompetenz relink/outdated/current);
+    ``apply=true`` wendet an — in-place, oder bei gespaltenem Jahrgangsband als migrierte
+    **Kopie** (Original bleibt). Recht wie Curriculum-Bearbeitung: Admin oder Mitglied der
+    ``write_scope_group``.
+    """
+    from app.context.relink import relink_curriculum
+
+    if "teacher" not in user.roles and "admin" not in user.roles:
+        raise HTTPException(status_code=403, detail="Nur für Lehrkräfte/Admins")
+
+    cur = await db.get(ContextNode, curriculum_id)
+    if cur is None or cur.content_type != "curriculum" or cur.status != "active":
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
+
+    if "admin" not in user.roles:
+        allowed = False
+        if cur.write_scope_group_id is not None:
+            r = await db.execute(
+                sa.select(1).where(sa.exists().where(
+                    GroupMembership.group_id == cur.write_scope_group_id,
+                    GroupMembership.pseudonym == user.sub,
+                ))
+            )
+            allowed = r.scalar_one_or_none() is not None
+        if not allowed:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung zum Bearbeiten dieses Curriculums")
+
+    result = await relink_curriculum(db, curriculum_id, apply)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
+    return result
+
+
 @router.get("/curricula/by-subject/{subject_id}", response_model=list[ContextNodeRead])
 async def list_curricula_by_subject(
     subject_id: int,

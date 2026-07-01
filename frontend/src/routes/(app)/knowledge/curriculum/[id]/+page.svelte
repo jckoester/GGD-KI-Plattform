@@ -5,6 +5,7 @@
         getCurriculum,
         deleteContextNode,
         exportCurriculum,
+        relinkCurriculum,
     } from "$lib/api.js";
     import { curriculumStd } from "$lib/curriculum.js";
     import { user } from "$lib/stores/user.js";
@@ -91,6 +92,45 @@
         };
     });
 
+    // ── Auf aktuellen Bildungsplan aktualisieren (Re-Link) ────────────────────
+    let relinkPreview = $state(null);   // Vorschau-Plan (mode/summary/target)
+    let relinkBusy = $state(false);
+    let relinkError = $state(null);
+
+    async function handleRelinkPreview() {
+        if (relinkBusy || !curriculum) return;
+        relinkBusy = true;
+        relinkError = null;
+        try {
+            relinkPreview = await relinkCurriculum(curriculum.id, false);
+        } catch (e) {
+            relinkError = e.message || "Vorschau fehlgeschlagen.";
+        } finally {
+            relinkBusy = false;
+        }
+    }
+
+    async function handleRelinkApply() {
+        if (relinkBusy || !curriculum || !relinkPreview) return;
+        relinkBusy = true;
+        relinkError = null;
+        try {
+            const res = await relinkCurriculum(curriculum.id, true);
+            relinkPreview = null;
+            const newId = res.result_curriculum_id;
+            if (newId && newId !== String(curriculum.id)) {
+                // Band-Split: migrierte Kopie → dorthin navigieren
+                goto(`/knowledge/curriculum/${newId}`);
+            } else {
+                curriculum = await getCurriculum(curriculum.id); // neu laden
+            }
+        } catch (e) {
+            relinkError = e.message || "Aktualisierung fehlgeschlagen.";
+        } finally {
+            relinkBusy = false;
+        }
+    }
+
     async function handleDelete() {
         if (deleting || !curriculum) return;
         deleting = true;
@@ -153,6 +193,17 @@
                         >
                             Bearbeiten
                         </a>
+                        <button
+                            onclick={handleRelinkPreview}
+                            disabled={relinkBusy}
+                            title="Prüft, ob das Curriculum auf die aktuelle Bildungsplan-Fassung aktualisiert werden kann"
+                            class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx font-medium
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Bildungsplan aktualisieren
+                        </button>
                         <button
                             onclick={() => {
                                 deleteError = null;
@@ -289,6 +340,69 @@
                     {deleting ? "Wird gelöscht…" : "Löschen"}
                 </button>
             </div>
+        </div>
+    </div>
+{/if}
+
+{#if relinkPreview}
+    <div class="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-dark-bg-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-6 max-w-md w-full">
+            <h3 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-3">
+                Bildungsplan aktualisieren
+            </h3>
+            {#if relinkError}
+                <div class="mb-4"><ErrorBanner message={relinkError} /></div>
+            {/if}
+            {#if relinkPreview.mode === "none"}
+                <p class="text-light-tx-2 dark:text-dark-tx-2 mb-4">
+                    Das Curriculum ist bereits auf der aktuellen Bildungsplan-Fassung
+                    (BP {relinkPreview.current_bp_version || "—"}). Keine Aktualisierung nötig.
+                </p>
+                <div class="flex justify-end">
+                    <button
+                        onclick={() => (relinkPreview = null)}
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+                    >Schließen</button>
+                </div>
+            {:else}
+                <p class="text-light-tx-2 dark:text-dark-tx-2 mb-2">
+                    {#if relinkPreview.mode === "duplicate"}
+                        Der Bildungsplan gilt nur für einen Teil des Jahrgangsbandes in der neuen
+                        Fassung (BP {relinkPreview.target_bp_version}). Es wird eine <strong>Kopie</strong>
+                        auf die neue Fassung angelegt; das Original (BP {relinkPreview.current_bp_version || "—"})
+                        bleibt erhalten.
+                    {:else}
+                        Das Curriculum wird auf BP {relinkPreview.target_bp_version} aktualisiert.
+                    {/if}
+                </p>
+                <ul class="text-sm text-light-tx dark:text-dark-tx mb-4 list-disc pl-5 space-y-1">
+                    <li><strong>{relinkPreview.summary.relink}</strong> Kompetenzen werden auf die neue Fassung umgelinkt.</li>
+                    {#if relinkPreview.summary.outdated > 0}
+                        <li><strong>{relinkPreview.summary.outdated}</strong> Kompetenzen werden als
+                            <span class="text-light-re dark:text-dark-re">veraltet</span> markiert
+                            (im aktuellen Bildungsplan nicht mehr enthalten oder inhaltlich geändert) — bitte danach prüfen.</li>
+                    {/if}
+                    {#if relinkPreview.summary.current > 0}
+                        <li>{relinkPreview.summary.current} sind bereits aktuell.</li>
+                    {/if}
+                </ul>
+                <div class="flex gap-3 justify-end">
+                    <button
+                        onclick={() => (relinkPreview = null)}
+                        disabled={relinkBusy}
+                        class="px-4 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    >Abbrechen</button>
+                    <button
+                        onclick={handleRelinkApply}
+                        disabled={relinkBusy}
+                        class="px-4 py-2 text-sm rounded-md bg-primary dark:bg-primary-dark text-white
+                               hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >{relinkBusy ? "Wird angewendet…" : (relinkPreview.mode === "duplicate" ? "Kopie anlegen" : "Aktualisieren")}</button>
+                </div>
+            {/if}
         </div>
     </div>
 {/if}

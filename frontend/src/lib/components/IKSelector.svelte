@@ -195,8 +195,9 @@
         <div class="flex flex-wrap gap-2">
             {#each selected as ik}
                 <div
-                    title={ik.title || null}
-                    class="flex items-center gap-1 px-2 py-1 rounded-full bg-light-bl/20 dark:bg-dark-bl/20"
+                    title={ik.veraltet ? "Im aktuellen Bildungsplan nicht mehr enthalten oder geändert – bitte ersetzen." : (ik.title || null)}
+                    class="flex items-center gap-1 px-2 py-1 rounded-full
+                           {ik.veraltet ? 'bg-light-re/20 dark:bg-dark-re/20' : 'bg-light-bl/20 dark:bg-dark-bl/20'}"
                 >
                     <input
                         type="checkbox"
@@ -205,10 +206,12 @@
                         class="w-3 h-3 cursor-pointer"
                         title="Partiell (Häkchen = nur Teilaspekte dieser Kompetenz werden behandelt)"
                     />
-                    <span class="text-sm text-light-tx dark:text-dark-tx">
+                    <span class="text-sm text-light-tx dark:text-dark-tx {ik.veraltet ? 'line-through' : ''}">
                         {ik.nr}
                     </span>
-                    {#if !ik.node_id}
+                    {#if ik.veraltet}
+                        <span class="text-xs text-light-re dark:text-dark-re" title="veraltet">⚠</span>
+                    {:else if !ik.node_id}
                         <span
                             class="text-xs text-light-ye dark:text-dark-ye"
                             title="Nicht in Datenbank gefunden"

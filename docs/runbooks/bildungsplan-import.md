@@ -273,6 +273,28 @@ git commit -m "chore: scraper_state.json nach Bildungsplan-Import aktualisiert"
 
 ---
 
+## Nach Editions-Wechsel: Curricula aktualisieren (Lehrkraft-Aufgabe)
+
+Wird ein Fach durch Re-Import auf eine neue BP-Edition umgestellt, werden die alten
+IK/PK-Knoten **archiviert** und die neue Edition trägt neue `node_id`s. Bestehende
+Schulcurricula zeigen dann noch auf die archivierten Knoten. **Das wird bewusst
+nicht automatisch migriert** (eine neue Edition gilt stufenweise, nicht in allen
+Jahrgängen gleichzeitig).
+
+Stattdessen aktualisiert die **Lehrkraft** ein Curriculum manuell:
+in der Curriculum-Ansicht → Button **„Bildungsplan aktualisieren"**. Das System
+zeigt eine Vorschau und:
+- verlinkt Kompetenzen mit **gleicher Nummer und weitgehend identischem Text** auf
+  die neue Edition,
+- markiert Kompetenzen, die es in der neuen Edition **nicht mehr gibt oder die sich
+  inhaltlich geändert haben**, als **„veraltet"** (bleiben erhalten, zum Prüfen/Ersetzen),
+- legt bei einem **gespaltenen Jahrgangsband** (neue Edition erst in einzelnen Stufen)
+  eine migrierte **Kopie** an; das Original bleibt für die noch nicht übergegangenen Stufen.
+
+Kein Skript, keine Admin-Aktion nötig.
+
+---
+
 ## Rollback
 
 Falls der Import Fehler erzeugt hat:

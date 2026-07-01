@@ -28,6 +28,10 @@
         ChevronRight,
     } from "lucide-svelte";
 
+    // Tooltip für als „veraltet" markierte Kompetenzen (nach BP-Migration ohne Zwilling).
+    const VERALTET_HINT =
+        "Diese Kompetenz ist im aktuellen Bildungsplan nicht mehr enthalten oder wurde inhaltlich geändert – bitte prüfen.";
+
     let {
         curriculum = null,
         editMode = false,
@@ -839,19 +843,17 @@
                                             {#if pk.node_id}
                                                 <a
                                                     href={nodeLink(pk.node_id)}
-                                                    title={refTitle(
-                                                        ls,
-                                                        pk.node_id,
-                                                        "pk",
-                                                    )}
-                                                    class="block mb-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
+                                                    title={pk.veraltet ? VERALTET_HINT : refTitle(ls, pk.node_id, "pk")}
+                                                    class="block mb-1 underline hover:text-primary dark:hover:text-primary-dark
+                                                           {pk.veraltet ? 'line-through text-light-re dark:text-dark-re' : 'text-light-bl dark:text-dark-bl'}"
                                                 >
-                                                    {pk.pk_id}
+                                                    {pk.pk_id}{#if pk.veraltet}&nbsp;⚠{/if}
                                                 </a>
                                             {:else}
                                                 <span
-                                                    class="block mb-1 text-light-tx-2 dark:text-dark-tx-2"
-                                                    >{pk.pk_id}</span
+                                                    class="block mb-1 {pk.veraltet ? 'line-through text-light-re dark:text-dark-re' : 'text-light-tx-2 dark:text-dark-tx-2'}"
+                                                    title={pk.veraltet ? VERALTET_HINT : null}
+                                                    >{pk.pk_id}{#if pk.veraltet}&nbsp;⚠{/if}</span
                                                 >
                                             {/if}
                                         {/each}
@@ -880,19 +882,17 @@
                                         {#if ik.node_id}
                                             <a
                                                 href={nodeLink(ik.node_id)}
-                                                title={refTitle(
-                                                    ls,
-                                                    ik.node_id,
-                                                    "ik",
-                                                )}
-                                                class="inline-block mr-1 text-light-bl dark:text-dark-bl underline hover:text-primary dark:hover:text-primary-dark"
+                                                title={ik.veraltet ? VERALTET_HINT : refTitle(ls, ik.node_id, "ik")}
+                                                class="inline-block mr-1 underline hover:text-primary dark:hover:text-primary-dark
+                                                       {ik.veraltet ? 'line-through text-light-re dark:text-dark-re' : 'text-light-bl dark:text-dark-bl'}"
                                             >
-                                                {ik.nr}
+                                                {ik.nr}{#if ik.veraltet}&nbsp;⚠{/if}
                                             </a>
                                         {:else}
                                             <span
-                                                class="inline-block mr-1 text-light-tx dark:text-dark-tx"
-                                                >{ik.nr}</span
+                                                class="inline-block mr-1 {ik.veraltet ? 'line-through text-light-re dark:text-dark-re' : 'text-light-tx dark:text-dark-tx'}"
+                                                title={ik.veraltet ? VERALTET_HINT : null}
+                                                >{ik.nr}{#if ik.veraltet}&nbsp;⚠{/if}</span
                                             >
                                         {/if}
                                         {#if ik.partiell}

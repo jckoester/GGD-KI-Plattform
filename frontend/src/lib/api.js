@@ -1312,6 +1312,20 @@ export async function getCurriculum(curriculumId) {
   return res.json()
 }
 
+export async function relinkCurriculum(curriculumId, apply = false) {
+  // Curriculum auf die aktuelle BP-Edition aktualisieren.
+  // apply=false → Vorschau-Plan; apply=true → anwenden (in-place bzw. Kopie bei Band-Split).
+  const res = await fetch(
+    `${BASE}/context/curricula/${curriculumId}/relink?apply=${apply ? 'true' : 'false'}`,
+    { method: 'POST', credentials: 'include' },
+  )
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Aktualisierung fehlgeschlagen')
+  }
+  return res.json()
+}
+
 export async function getCurriculaBySubject(subjectId) {
   const res = await fetch(`${BASE}/context/curricula/by-subject/${subjectId}`, {
     credentials: 'include'

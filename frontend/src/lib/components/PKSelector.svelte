@@ -218,11 +218,15 @@
     {#if selected.length > 0}
         <div class="flex flex-wrap gap-2">
             {#each selected as pk}
-                <div title={pk.title || null} class="flex items-center gap-1 px-2 py-1 rounded-full bg-light-gr/20 dark:bg-dark-gr/20">
-                    <span class="text-sm text-light-tx dark:text-dark-tx">
+                <div title={pk.veraltet ? "Im aktuellen Bildungsplan nicht mehr enthalten oder geändert – bitte ersetzen." : (pk.title || null)}
+                     class="flex items-center gap-1 px-2 py-1 rounded-full
+                            {pk.veraltet ? 'bg-light-re/20 dark:bg-dark-re/20' : 'bg-light-gr/20 dark:bg-dark-gr/20'}">
+                    <span class="text-sm text-light-tx dark:text-dark-tx {pk.veraltet ? 'line-through' : ''}">
                         {pk.pk_id}
                     </span>
-                    {#if !pk.node_id}
+                    {#if pk.veraltet}
+                        <span class="text-xs text-light-re dark:text-dark-re" title="veraltet">⚠</span>
+                    {:else if !pk.node_id}
                         <span class="text-xs text-light-ye dark:text-dark-ye" title="Nicht in Datenbank gefunden">
                             ⚠
                         </span>
