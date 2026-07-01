@@ -15,7 +15,6 @@
     import { kapitelStd, lernsequenzStd } from "$lib/curriculum.js";
     import { renderMarkdown } from "$lib/markdown.js";
     import { parseMaterial } from "$lib/material.js";
-    import { linkifyText } from "$lib/linkify.js";
     import MaterialEditor from "./MaterialEditor.svelte";
     import {
         Plus,
@@ -981,7 +980,11 @@
                                                 eintrag.hinweise,
                                             )}
                                             <div
-                                                class="flex flex-wrap gap-1 items-center"
+                                                class="prose prose-sm dark:prose-invert max-w-none
+                                                       prose-p:my-1 prose-ul:my-1 prose-ol:my-1
+                                                       prose-p:text-light-tx-2 dark:prose-p:text-dark-tx-2
+                                                       prose-li:text-light-tx-2 dark:prose-li:text-dark-tx-2
+                                                       prose-a:text-light-bl dark:prose-a:text-dark-bl"
                                             >
                                                 {#each parts as part}
                                                     {#if part.kind === "lp"}
@@ -1003,22 +1006,8 @@
                                                             href="/knowledge/{part.node_id}"
                                                         />
                                                     {:else if part.label.trim()}
-                                                        {#each linkifyText(part.label) as sub}
-                                                            {#if sub.kind === "url"}
-                                                                <a
-                                                                    href={sub.href}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    class="text-light-bl dark:text-dark-bl underline break-all"
-                                                                    >{sub.label}</a
-                                                                >
-                                                            {:else if sub.label.trim()}
-                                                                <span
-                                                                    class="text-light-tx-2 dark:text-dark-tx-2"
-                                                                    >{sub.label}</span
-                                                                >
-                                                            {/if}
-                                                        {/each}
+                                                        <!-- Freitext als Markdown (URLs verlinkt marked/gfm selbst) -->
+                                                        {@html renderMarkdown(part.label)}
                                                     {/if}
                                                 {/each}
                                             </div>
@@ -1029,39 +1018,31 @@
                                             {@const matParts = parseMaterial(
                                                 eintrag.material,
                                             )}
-                                            <div
-                                                class="flex flex-wrap gap-1 items-center"
-                                            >
+                                            <div class="text-xs">
                                                 <span
-                                                    class="text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 shrink-0"
+                                                    class="font-medium text-light-tx-2 dark:text-dark-tx-2"
                                                     >Material:</span
                                                 >
-                                                {#each matParts as part}
-                                                    {#if part.kind === "node"}
-                                                        <HinweisChip
-                                                            typ="material"
-                                                            text={part.label}
-                                                            href="/knowledge/{part.node_id}"
-                                                        />
-                                                    {:else if part.label.trim()}
-                                                        {#each linkifyText(part.label) as sub}
-                                                            {#if sub.kind === "url"}
-                                                                <a
-                                                                    href={sub.href}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    class="text-light-bl dark:text-dark-bl underline break-all"
-                                                                    >{sub.label}</a
-                                                                >
-                                                            {:else if sub.label.trim()}
-                                                                <span
-                                                                    class="text-light-tx-2 dark:text-dark-tx-2"
-                                                                    >{sub.label}</span
-                                                                >
-                                                            {/if}
-                                                        {/each}
-                                                    {/if}
-                                                {/each}
+                                                <div
+                                                    class="prose prose-sm dark:prose-invert max-w-none
+                                                           prose-p:my-1 prose-ul:my-1 prose-ol:my-1
+                                                           prose-p:text-light-tx-2 dark:prose-p:text-dark-tx-2
+                                                           prose-li:text-light-tx-2 dark:prose-li:text-dark-tx-2
+                                                           prose-a:text-light-bl dark:prose-a:text-dark-bl"
+                                                >
+                                                    {#each matParts as part}
+                                                        {#if part.kind === "node"}
+                                                            <HinweisChip
+                                                                typ="material"
+                                                                text={part.label}
+                                                                href="/knowledge/{part.node_id}"
+                                                            />
+                                                        {:else if part.label.trim()}
+                                                            <!-- Freitext als Markdown (URLs verlinkt marked/gfm selbst) -->
+                                                            {@html renderMarkdown(part.label)}
+                                                        {/if}
+                                                    {/each}
+                                                </div>
                                             </div>
                                         {/if}
 
