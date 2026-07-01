@@ -3,6 +3,7 @@
     import { tick } from "svelte";
     import { page } from "$app/stores";
     import { getFachplanBySubject, getContextNodes } from "$lib/api.js";
+    import { sortOperatorsByTitle, formatAfb } from "$lib/operators.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import LoadingBanner from "./LoadingBanner.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
@@ -42,9 +43,7 @@
 
     // Operatoren alphabetisch nach Titel — tabellarische Anzeige (Operator | Bedeutung | AFB),
     // wie in der Quelle. Gesucht wird i. d. R. über den Titel, nicht über den AFB.
-    const operatorsSorted = $derived(
-        [...operators].sort((a, b) => (a.title || '').localeCompare(b.title || '', 'de')),
-    );
+    const operatorsSorted = $derived(sortOperatorsByTitle(operators));
 
     // Operatoren laden, sobald Fach/Edition feststehen (data.bp_version = angezeigte Edition).
     $effect(() => {
@@ -425,7 +424,7 @@
                                         </td>
                                         <td class="py-2 px-3 align-top text-center whitespace-nowrap
                                                    text-light-tx-2 dark:text-dark-tx-2">
-                                            {(op.metadata?.afb ?? []).join(', ')}
+                                            {formatAfb(op)}
                                         </td>
                                     </tr>
                                 {/each}

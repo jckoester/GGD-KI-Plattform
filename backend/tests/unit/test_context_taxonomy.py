@@ -88,7 +88,7 @@ class TestGetValidUntilOffset:
 class TestGetScopeDefaults:
 
     def test_global_types(self):
-        for ct in ("fachplan", "ik_kompetenz", "pk_kompetenz", "leitidee", "leitperspektive_aspekt"):
+        for ct in ("fachplan", "ik_kompetenz", "pk_kompetenz", "leitidee", "leitperspektive_aspekt", "operator"):
             read, write = get_scope_defaults(ct)
             assert read == "global" and write == "global"
 
