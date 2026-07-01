@@ -195,6 +195,7 @@
         <div class="flex flex-wrap gap-2">
             {#each selected as ik}
                 <div
+                    title={ik.title || null}
                     class="flex items-center gap-1 px-2 py-1 rounded-full bg-light-bl/20 dark:bg-dark-bl/20"
                 >
                     <input

@@ -414,6 +414,16 @@
         return refs.find((r) => r.node_id === nodeId)?.title ?? null;
     }
 
+    // Reichert normalisierte IK/PK-Einträge mit dem Volltext (title) an — für den
+    // Hover-Tooltip in den IK/PK-Selektoren (Editor). Deckt auch Altdaten ab, in
+    // denen der Titel nicht im Eintrag gespeichert ist (Fallback über die Refs).
+    function withRefTitle(items, ls, kind) {
+        return items.map((it) => ({
+            ...it,
+            title: it.title ?? refTitle(ls, it.node_id, kind) ?? undefined,
+        }));
+    }
+
     // Helper für Template-Strings
     function pathString(kapIndex, lsIndex = null, entryIndex = null) {
         let path = `kapitel[${kapIndex}]`;
@@ -815,7 +825,7 @@
                                             {subjectId}
                                             {grade}
                                             {bpVersion}
-                                            selected={normalizePk(eintrag.pk)}
+                                            selected={withRefTitle(normalizePk(eintrag.pk), ls, "pk")}
                                             onchange={(newPk) => {
                                                 eintrag.pk = newPk;
                                                 curriculum.kapitel = [
@@ -856,7 +866,7 @@
                                         {subjectId}
                                         {grade}
                                         {bpVersion}
-                                        selected={normalizeIk(eintrag.ik)}
+                                        selected={withRefTitle(normalizeIk(eintrag.ik), ls, "ik")}
                                         onchange={(newIk) => {
                                             eintrag.ik = newIk;
                                             curriculum.kapitel = [

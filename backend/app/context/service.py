@@ -689,7 +689,9 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
                     WHERE e.from_node_id = :ls_id
                       AND e.relation = 'references'
                       AND n.content_type = 'ik_kompetenz'
-                      AND n.status = 'active'
+                    -- Status bewusst NICHT gefiltert: Curricula referenzieren teils
+                    -- durch BP-Re-Import archivierte IK-Knoten; deren Volltext soll für
+                    -- Tooltip/Export erhalten bleiben (Kante von genau dieser Lernsequenz).
                 """),
                 {"ls_id": str(ls_node.id)},
             )
@@ -711,7 +713,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
                     WHERE e.from_node_id = :ls_id
                       AND e.relation = 'develops'
                       AND n.content_type = 'pk_kompetenz'
-                      AND n.status = 'active'
+                    -- Status bewusst NICHT gefiltert (siehe IK-Query oben).
                 """),
                 {"ls_id": str(ls_node.id)},
             )
@@ -728,7 +730,7 @@ async def load_curriculum_tree(db: AsyncSession, curriculum_id: UUID) -> dict | 
                     WHERE e.from_node_id = :ls_id
                       AND e.relation = 'references'
                       AND n.content_type = 'leitperspektive'
-                      AND n.status = 'active'
+                    -- Status bewusst NICHT gefiltert (siehe IK-Query oben).
                 """),
                 {"ls_id": str(ls_node.id)},
             )

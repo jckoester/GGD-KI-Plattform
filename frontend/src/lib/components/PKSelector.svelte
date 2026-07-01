@@ -218,7 +218,7 @@
     {#if selected.length > 0}
         <div class="flex flex-wrap gap-2">
             {#each selected as pk}
-                <div class="flex items-center gap-1 px-2 py-1 rounded-full bg-light-gr/20 dark:bg-dark-gr/20">
+                <div title={pk.title || null} class="flex items-center gap-1 px-2 py-1 rounded-full bg-light-gr/20 dark:bg-dark-gr/20">
                     <span class="text-sm text-light-tx dark:text-dark-tx">
                         {pk.pk_id}
                     </span>
