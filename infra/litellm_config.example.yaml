@@ -111,6 +111,20 @@ litellm_settings:
     #     action: block
     #     pattern_set: "./guardrails/explicit_sexual.txt"
 
+    # ── Bild-Prompt-Filter (Phase 16, Bildgenerierung, pre_call) ───────────────
+    # Defense-in-Depth für /images/generations: Der Backend-Handler moderiert den
+    # Bild-Prompt bereits lokal (Krisen-Scan + config/image_blocklist.yaml). Diese
+    # Guardrail prüft den Prompt zusätzlich am Proxy — `pre_call`, BEVOR der Provider
+    # ihn sieht (`async_moderation_hook` greift bei Bildern NICHT → Content-Filter
+    # im pre_call-Modus nutzen). Blockwörter kuratieren! Erst nach Test aktivieren.
+    # - guardrail_name: "image_prompt_filter"
+    #   litellm_params:
+    #     guardrail: litellm_content_filter
+    #     mode: pre_call
+    #     blocked_words:
+    #       - keyword: "..."
+    #         action: "BLOCK"
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   database_url: os.environ/DATABASE_URL

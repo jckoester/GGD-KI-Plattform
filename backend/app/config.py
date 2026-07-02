@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     image_default_model: str = "gpt-image-1"
     image_default_size: str = "1024x1024"
     image_generation_timeout: float = 120.0
+    image_blocklist_path: str = "config/image_blocklist.yaml"
 
 
 settings = Settings()

@@ -22,6 +22,7 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
+from app.chat.image_moderation import image_prompt_block_reason
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
@@ -477,13 +478,13 @@ _ALLOWED_IMAGE_SIZES = {"1024x1024", "1024x1536", "1536x1024"}
 
 
 def _image_prompt_block_reason(prompt: str) -> Optional[str]:
-    """Moderations-Stub für Bild-Prompts (→ Schritt 3: Krisen-Scan + Bild-Blockliste).
+    """Moderation des (LLM-gebildeten) Bild-Prompts vor dem Call.
 
-    Gibt einen Ablehnungsgrund zurück oder None (= erlaubt). Aktuell immer None —
-    der Bild-Prompt wird beim Tool-Call vom LLM gebildet und umgeht damit das
-    Frontend-PII-Gate; Schritt 3 füllt diese serverseitige Prüfung.
+    Delegiert an ``app.chat.image_moderation``: Krisen-Scan (blockierend für Bilder)
+    + kuratierte Bild-Blockliste. Gibt einen Ablehnungsgrund (für den LLM) zurück
+    oder None (= erlaubt). Bleibt als Modul-Symbol bestehen (Test-Seam).
     """
-    return None
+    return image_prompt_block_reason(prompt)
 
 
 async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:

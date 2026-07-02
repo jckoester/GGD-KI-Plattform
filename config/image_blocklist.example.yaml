@@ -1,0 +1,51 @@
+# image_blocklist.yaml — Blockliste für Bild-Prompts (Phase 16, Bildgenerierung)
+#
+# Diese Datei ist eine STARTKURATIERUNG. Vor dem Produktivbetrieb mit Schulleitung
+# und Schulsozialarbeit/Präventionsteam final abstimmen (analog crisis_triggers.yaml).
+#
+# Wirkungsweise: Der Backend-Handler prüft den (vom LLM gebildeten) Bild-Prompt
+# VOR dem Aufruf des Bild-Endpoints gegen diese Regeln — zusätzlich zum Krisen-Scan
+# (Selbstverletzung/Suizid/Gewalt aus crisis_triggers.yaml) und zur optionalen
+# LiteLLM-`pre_call`-Guardrail am Proxy. Greift eine Regel, wird KEIN Bild erzeugt;
+# der Assistent formuliert die Absage anhand von `reason`.
+#
+# Patterns sind Regex, die gegen NFKC-normalisierten + casefold-Text geprüft werden
+# (also klein schreiben, Umlaute wie im Text). Bewusst konservativ gehalten, um
+# legitime Bildwünsche (z. B. Aktzeichnen in der Oberstufe, historische Gewaltdar-
+# stellung) nicht pauschal zu blocken — die Feinabstimmung ist Kuratierungsaufgabe.
+
+rules:
+  - category: sexual_minors
+    reason: >-
+      Zu diesem Thema wird kein Bild erzeugt.
+    patterns:
+      - "kinderporno"
+      - "child\\s*porn"
+      - "(minderjährig|kind(er)?|schüler(in)?).{0,25}(nackt|sexuell|sex\\b|porno)"
+      - "(child|minor|kid).{0,25}(nude|sexual|porn)"
+
+  - category: sexual_explicit
+    reason: >-
+      Zu sexuellen oder nicht jugendfreien Inhalten wird kein Bild erzeugt.
+    patterns:
+      - "pornograf"
+      - "\\bhardcore\\b.{0,15}sex"
+      - "explizit.{0,10}(sex|nackt|geschlechtsverkehr)"
+
+  - category: graphic_violence
+    reason: >-
+      Zu drastischen Gewalt- oder Gore-Darstellungen wird kein Bild erzeugt.
+    patterns:
+      - "enthauptung"
+      - "\\bbeheading\\b"
+      - "zerstückel"
+      - "\\bdismember"
+      - "\\bgore\\b"
+
+  - category: weapons_making
+    reason: >-
+      Zu Anleitungen für Waffen oder Sprengsätze wird kein Bild erzeugt.
+    patterns:
+      - "bombenbau"
+      - "\\bbomb\\b.{0,15}(bauen|making|instruction|anleitung)"
+      - "sprengsatz.{0,15}(bau|anleitung)"
