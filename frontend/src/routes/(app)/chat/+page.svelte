@@ -945,6 +945,7 @@
                     model: m.model ?? null,
                     assistantId: m.assistant_id ?? null,
                     assistantName: m.assistant_name ?? null,
+                    images: m.images?.length ? m.images : undefined,
                 }));
                 messages = insertSeparators(rawMessages);
                 conversationId = data.id;

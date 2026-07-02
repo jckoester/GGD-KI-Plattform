@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle, FileText, Image } from 'lucide-svelte';
+    import { AlertCircle, Download, FileText, Image } from 'lucide-svelte';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
@@ -9,6 +9,12 @@
     let renderedContent = $derived(
         message.role === 'assistant' ? renderMarkdown(message.content) : ''
     );
+
+    // Generierte Bilder (Phase 16): fehlgeschlagene Ladevorgänge je image_id merken.
+    let failedImages = $state(new Set());
+    function onImageError(id) {
+        failedImages = new Set(failedImages).add(id);
+    }
 
     // Svelte-Action: Copy-Buttons in code-block-Containern einbinden
     function copyButtons(node) {
@@ -108,6 +114,41 @@
                 </p>
             {/if}
         </div>
+        {/if}
+        {#if message.images?.length}
+            <div class="flex flex-col gap-2 mt-2 max-w-[80%]">
+                {#each message.images as img (img.image_id)}
+                    {#if failedImages.has(img.image_id)}
+                        <div class="flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2
+                                    border border-light-ui-3 dark:border-dark-ui-3 rounded-xl px-4 py-3">
+                            <AlertCircle class="w-4 h-4 shrink-0" />
+                            Bild konnte nicht geladen werden.
+                        </div>
+                    {:else}
+                        <div class="group relative inline-block">
+                            <img
+                                src="/api/images/{img.image_id}"
+                                alt="Generiertes Bild"
+                                loading="lazy"
+                                class="rounded-xl max-w-full h-auto border border-light-ui-3 dark:border-dark-ui-3"
+                                onerror={() => onImageError(img.image_id)}
+                            />
+                            <a
+                                href="/api/images/{img.image_id}"
+                                download="bild-{img.image_id}.png"
+                                aria-label="Bild herunterladen"
+                                class="absolute top-1.5 right-1.5 p-1.5 rounded-lg
+                                       bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                       text-light-tx-2 dark:text-dark-tx-2
+                                       hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
+                                       opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Download class="w-4 h-4" />
+                            </a>
+                        </div>
+                    {/if}
+                {/each}
+            </div>
         {/if}
         {#if message.crisis}
             <div class="max-w-[80%] w-full">

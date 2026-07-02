@@ -27,6 +27,7 @@ from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
     link_images_to_message,
+    list_message_images,
     read_image_bytes,
     save_generated_image,
     unlink_paths,
@@ -63,6 +64,11 @@ class ConversationListResponse(BaseModel):
     offset: int
 
 
+class GeneratedImageRef(BaseModel):
+    image_id: str
+    size: Optional[str] = None
+
+
 class MessageItem(BaseModel):
     role: str
     content: str
@@ -72,6 +78,7 @@ class MessageItem(BaseModel):
     model: Optional[str] = None
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
+    images: list[GeneratedImageRef] = []
 
 
 class ConversationDetailResponse(BaseModel):
@@ -1579,6 +1586,9 @@ async def get_conversation_messages(
     )
     rows = messages_result.all()
 
+    # Generierte Bilder je Nachricht (Phase 16, Schritt 6: History-Rehydrierung).
+    img_map = await list_message_images(db, conversation_id)
+
     messages_list = []
     for row in rows:
         msg = row.Message
@@ -1594,6 +1604,7 @@ async def get_conversation_messages(
                 "model": None,
                 "assistant_id": None,
                 "assistant_name": None,
+                "images": [],
             })
         else:
             messages_list.append({
@@ -1605,6 +1616,7 @@ async def get_conversation_messages(
                 "model": msg.model,
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,
+                "images": img_map.get(msg.id, []),
             })
 
     assistant_name: Optional[str] = None

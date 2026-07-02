@@ -81,6 +81,25 @@ async def get_image_record(db: AsyncSession, image_id: UUID) -> GeneratedImage |
     return await db.get(GeneratedImage, image_id)
 
 
+async def list_message_images(db: AsyncSession, conversation_id: UUID) -> dict[UUID, list[dict]]:
+    """Bilder einer Konversation nach `message_id` gruppiert (für die History-Rehydrierung).
+
+    Nur an eine Nachricht verknüpfte Bilder (message_id gesetzt); je Eintrag
+    `{image_id, size}`, chronologisch."""
+    rows = (await db.execute(
+        select(GeneratedImage.id, GeneratedImage.size, GeneratedImage.message_id)
+        .where(
+            GeneratedImage.conversation_id == conversation_id,
+            GeneratedImage.message_id.isnot(None),
+        )
+        .order_by(GeneratedImage.created_at.asc())
+    )).all()
+    out: dict[UUID, list[dict]] = {}
+    for image_id, size, message_id in rows:
+        out.setdefault(message_id, []).append({"image_id": str(image_id), "size": size})
+    return out
+
+
 async def link_images_to_message(db: AsyncSession, image_ids: list[UUID], message_id: UUID) -> None:
     """Hängt die (mid-Stream erzeugten) Bilder an die jetzt persistierte Assistant-Nachricht.
 
