@@ -72,18 +72,18 @@ _blocklist_cache: ImageBlocklist | None = None
 def load_image_blocklist() -> ImageBlocklist:
     """Lädt + validiert image_blocklist.yaml (einmalig, danach aus dem Cache).
 
-    Fehlt die Datei, wird eine leere Blockliste verwendet (nur der Krisen-Scan
-    greift dann) — Bildgenerierung soll nicht an einer fehlenden optionalen
-    Kuratierungsdatei scheitern.
+    Fehlt die Datei, wird — wie bei ``crisis_triggers.yaml`` — ein ``FileNotFoundError``
+    geworfen: Die Live-Config wird beim Setup aus ``image_blocklist.example.yaml``
+    provisioniert; eine fehlende Jugendschutz-Blockliste soll nicht stillschweigend
+    zu schwächerer Moderation führen (fail-closed).
     """
     global _blocklist_cache
     if _blocklist_cache is not None:
         return _blocklist_cache
     path = _resolve(settings.image_blocklist_path)
     if not path.exists():
-        logger.warning("Bild-Blockliste nicht gefunden unter %s — nur Krisen-Scan aktiv", path)
-        _blocklist_cache = ImageBlocklist()
-        return _blocklist_cache
+        logger.error("Bild-Blockliste nicht gefunden unter %s", path)
+        raise FileNotFoundError(f"Konfigurationsdatei nicht gefunden: {path}")
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     _blocklist_cache = ImageBlocklist.model_validate(data)

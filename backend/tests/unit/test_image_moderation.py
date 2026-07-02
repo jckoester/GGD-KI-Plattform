@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("SCHOOL_SECRET", "test-school-secret")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
@@ -44,13 +46,13 @@ def test_blocklist_pattern_blocked():
         invalidate_image_blocklist_cache()
 
 
-def test_missing_blocklist_file_is_soft(monkeypatch):
-    """Fehlt die YAML, wird eine leere Blockliste genutzt (kein Hard-Fail)."""
+def test_missing_blocklist_file_raises(monkeypatch, tmp_path):
+    """Fehlt die YAML, faultet der Loader (wie crisis_triggers) — kein stiller Moderationsverlust."""
     invalidate_image_blocklist_cache()
-    monkeypatch.setattr(im.settings, "image_blocklist_path", "config/does-not-exist.yaml")
+    monkeypatch.setattr(im.settings, "image_blocklist_path", str(tmp_path / "nope.yaml"))
     try:
-        bl = load_image_blocklist()
-        assert bl.rules == []
+        with pytest.raises(FileNotFoundError):
+            load_image_blocklist()
     finally:
         invalidate_image_blocklist_cache()
 
