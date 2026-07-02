@@ -438,6 +438,121 @@ register_tool(ChatTool(
 ))
 
 
+# ── Bildgenerierung (Phase 16) ────────────────────────────────────────────────
+
+_GENERATE_IMAGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": (
+            "Erzeugt ein Bild aus einer natürlichsprachlichen Beschreibung "
+            "(Text-zu-Bild). Nutze dieses Tool, wenn die Nutzerin oder der Nutzer ein "
+            "Bild, eine Illustration, eine Skizze oder eine Grafik erzeugt haben "
+            "möchte. Formuliere einen klaren, beschreibenden Bild-Prompt. Verwende "
+            "keine echten Personennamen oder personenbezogenen Daten im Prompt."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Beschreibung des gewünschten Bildes.",
+                },
+                "size": {
+                    "type": "string",
+                    "enum": ["1024x1024", "1024x1536", "1536x1024"],
+                    "description": (
+                        "Bildformat: quadratisch (1024x1024), hoch (1024x1536) oder "
+                        "quer (1536x1024). Standard: quadratisch."
+                    ),
+                },
+            },
+            "required": ["prompt"],
+        },
+    },
+}
+
+# Nur abgerechnete Standardgrößen zulassen (sonst Spend=0-Risiko bei LiteLLM).
+_ALLOWED_IMAGE_SIZES = {"1024x1024", "1024x1536", "1536x1024"}
+
+
+def _image_prompt_block_reason(prompt: str) -> Optional[str]:
+    """Moderations-Stub für Bild-Prompts (→ Schritt 3: Krisen-Scan + Bild-Blockliste).
+
+    Gibt einen Ablehnungsgrund zurück oder None (= erlaubt). Aktuell immer None —
+    der Bild-Prompt wird beim Tool-Call vom LLM gebildet und umgeht damit das
+    Frontend-PII-Gate; Schritt 3 füllt diese serverseitige Prüfung.
+    """
+    return None
+
+
+async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
+    """Erzeugt ein Bild über den LiteLLM-Bild-Endpoint (Schritt 2: roh, ohne Persistenz).
+
+    Moderiert den Bild-Prompt (Stub), generiert dann über den **User-Virtual-Key**
+    (Spend/Budget beim User). Die Bytes werden hier noch nicht persistiert/angezeigt
+    (→ Schritt 4/5/6); der LLM erhält eine knappe Bestätigung.
+    """
+    prompt = (args.get("prompt") or "").strip()
+    if not prompt:
+        return {"status": "error", "error": "Kein Bild-Prompt angegeben."}
+
+    reason = _image_prompt_block_reason(prompt)
+    if reason:
+        return {"status": "blocked", "error": reason}
+
+    if ctx.litellm_key is None:
+        logger.error(
+            "generate_image: kein LiteLLM-Key im ToolContext (pseudonym=%s)",
+            getattr(ctx.user, "sub", None),
+        )
+        return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
+
+    size = args.get("size")
+    if size not in _ALLOWED_IMAGE_SIZES:
+        size = settings.image_default_size
+
+    client = LiteLLMClient()
+    try:
+        image_bytes = await client.generate_image(
+            prompt,
+            model=settings.image_default_model,
+            api_key=ctx.litellm_key,
+            user=ctx.user.sub,
+            size=size,
+            response_format=None,  # gpt-image-1 liefert immer Base64 und lehnt den Param ab
+        )
+    except Exception:
+        logger.exception("Bildgenerierung fehlgeschlagen")
+        return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
+    finally:
+        await client.close()
+
+    # Schritt 2 (roh): Bytes werden noch nicht persistiert/angezeigt (→ Schritt 4/5/6).
+    logger.info(
+        "Bild generiert: %d Bytes (model=%s, size=%s)",
+        len(image_bytes), settings.image_default_model, size,
+    )
+    return {
+        "status": "ok",
+        "size": size,
+        "note": "Bild wurde erzeugt. Die Anzeige im Chat wird gerade umgesetzt.",
+    }
+
+
+async def _generate_image_handler(args: dict, ctx: ToolContext) -> dict:
+    return await _exec_generate_image(args, ctx)
+
+
+register_tool(ChatTool(
+    name="generate_image",
+    group="image_generation",
+    writes=False,
+    definition=_GENERATE_IMAGE_TOOL,
+    handler=_generate_image_handler,
+))
+
+
 def _serialize_user_message(user_message: str, attachments: list[AttachmentMeta]) -> str:
     """Serialisiert die User-Nachricht für die DB (mit Anhang-Metadaten, falls vorhanden)."""
     if attachments:
@@ -980,6 +1095,7 @@ async def chat(
                         user=current_user,
                         group_id=conversation_group_id,
                         conversation_id=conversation_id,
+                        litellm_key=litellm_key,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:

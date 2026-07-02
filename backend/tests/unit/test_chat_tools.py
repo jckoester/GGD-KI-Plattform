@@ -2,9 +2,10 @@
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+from app.config import settings
 from app.chat.tools import ChatTool, ToolContext, TOOL_REGISTRY, register_tool, tools_for
 
 
@@ -261,3 +262,119 @@ def test_student_sees_only_student_planning_not_planning_tools():
     finally:
         mod.TOOL_REGISTRY.clear()
         mod.TOOL_REGISTRY.update(saved)
+
+
+# ── generate_image (Bildgenerierung Phase 16) ─────────────────────────────────
+
+
+def test_generate_image_registered_as_image_generation():
+    """generate_image ist registriert und in der Gruppe image_generation."""
+    from app.chat import router  # noqa: F401 — registriert das Tool
+    tool = TOOL_REGISTRY.get("generate_image")
+    assert tool is not None
+    assert tool.group == "image_generation"
+
+
+def test_generate_image_gated_by_tool_group():
+    """Nur aktiv, wenn 'image_generation' in assistant.tool_groups — sonst (auch ohne
+    Assistent) nicht."""
+    mod, saved = _swap_registry(generate_image=_make_tool("generate_image", "image_generation"))
+    try:
+        enabled = MagicMock()
+        enabled.tool_groups = ["image_generation"]
+        assert any(t.name == "generate_image"
+                   for t in tools_for(enabled, group_id=None, is_group_teacher=False))
+
+        disabled = MagicMock()
+        disabled.tool_groups = []
+        assert all(t.name != "generate_image"
+                   for t in tools_for(disabled, group_id=None, is_group_teacher=False))
+
+        assert all(t.name != "generate_image"
+                   for t in tools_for(None, group_id=None, is_group_teacher=False))
+    finally:
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)
+
+
+async def test_generate_image_handler_happy_path():
+    """Prompt → Bild-Bytes; generate_image mit User-Key + Pseudonym + Default-Modell."""
+    from app.chat import router
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(return_value=b"\x89PNG-bytes")
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="pseudo-9"),
+        group_id=None, conversation_id=None, litellm_key="sk-user",
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image(
+            {"prompt": "ein roter Würfel", "size": "1024x1024"}, ctx,
+        )
+
+    assert result["status"] == "ok"
+    assert result["size"] == "1024x1024"
+    call = instance.generate_image.await_args
+    assert call.kwargs["api_key"] == "sk-user"
+    assert call.kwargs["user"] == "pseudo-9"
+    assert call.kwargs["model"] == settings.image_default_model
+    assert call.kwargs["response_format"] is None  # gpt-image-1 lehnt den Param ab
+    instance.close.assert_awaited_once()
+
+
+async def test_generate_image_invalid_size_falls_back_to_default():
+    """Nicht-Standard-Größe → settings.image_default_size (Spend=0-Schutz)."""
+    from app.chat import router
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(return_value=b"img")
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=None, litellm_key="k",
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image({"prompt": "x", "size": "999x999"}, ctx)
+
+    assert result["size"] == settings.image_default_size
+    assert instance.generate_image.await_args.kwargs["size"] == settings.image_default_size
+
+
+async def test_generate_image_no_key_returns_error():
+    """Kein Virtual Key im Kontext → Fehler, kein Proxy-Aufruf."""
+    from app.chat import router
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=None, litellm_key=None,
+    )
+    with patch.object(router, "LiteLLMClient") as cls:
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+    assert result["status"] == "error"
+    cls.assert_not_called()
+
+
+async def test_generate_image_empty_prompt_returns_error():
+    """Leerer Prompt → Fehler, kein Proxy-Aufruf."""
+    from app.chat import router
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=None, litellm_key="k",
+    )
+    with patch.object(router, "LiteLLMClient") as cls:
+        result = await router._exec_generate_image({"prompt": "   "}, ctx)
+    assert result["status"] == "error"
+    cls.assert_not_called()
+
+
+async def test_generate_image_blocked_by_moderation(monkeypatch):
+    """Moderations-Stub liefert Grund → status blocked, kein Proxy-Aufruf."""
+    from app.chat import router
+    monkeypatch.setattr(router, "_image_prompt_block_reason", lambda p: "unzulässiger Inhalt")
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=None, litellm_key="k",
+    )
+    with patch.object(router, "LiteLLMClient") as cls:
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+    assert result["status"] == "blocked"
+    assert "unzulässig" in result["error"]
+    cls.assert_not_called()
