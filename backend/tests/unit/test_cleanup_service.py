@@ -69,6 +69,7 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
     db.execute = AsyncMock(
         side_effect=[
             _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
+            _ResultList([]),  # collect_pseudonym_image_paths (keine Bilder)
             MagicMock(),  # delete conversations
             MagicMock(),  # delete user_preferences
             MagicMock(),  # delete jwt_revocations
@@ -100,6 +101,7 @@ async def test_cleanup_inactive_accounts_rolls_back_single_pseudonym_on_local_er
     db.execute = AsyncMock(
         side_effect=[
             _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
+            _ResultList([]),  # collect_pseudonym_image_paths (keine Bilder)
             MagicMock(),  # delete conversations
             RuntimeError("delete failed"),  # delete user_preferences
             _ResultList([]),  # nächste Runde durch Exclusion leer
@@ -138,7 +140,8 @@ async def test_cleanup_stale_conversations_deletes_batch():
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.execute = AsyncMock(
         side_effect=[
-            _ResultList(["conv-1", "conv-2"]),
+            _ResultList(["conv-1", "conv-2"]),  # select ids
+            _ResultList([]),  # collect_conversation_image_paths (keine Bilder)
             MagicMock(),  # delete batch
             _ResultList([]),
         ]

@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     image_default_size: str = "1024x1024"
     image_generation_timeout: float = 120.0
     image_blocklist_path: str = "config/image_blocklist.yaml"
+    # Ablage generierter Bilder (repo-root-relativ, falls nicht absolut) + harte
+    # Maximal-Aufbewahrung als Backstop. Normalerweise stirbt ein Bild mit seiner
+    # Konversation (93-Tage-Lifecycle); der Max-Wert (>> 93+180) fängt Anomalien ab.
+    image_storage_dir: str = "data/generated_images"
+    image_max_retention_days: int = 400
 
 
 settings = Settings()

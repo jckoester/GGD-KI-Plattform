@@ -298,28 +298,34 @@ def test_generate_image_gated_by_tool_group():
 
 
 async def test_generate_image_handler_happy_path():
-    """Prompt → Bild-Bytes; generate_image mit User-Key + Pseudonym + Default-Modell."""
+    """Prompt → Bild-Bytes; generate_image mit User-Key + Pseudonym + Default-Modell; persistiert."""
     from app.chat import router
     instance = MagicMock()
     instance.generate_image = AsyncMock(return_value=b"\x89PNG-bytes")
     instance.close = AsyncMock()
+    conv_id, img_id = uuid4(), uuid4()
     ctx = ToolContext(
         db=MagicMock(), user=SimpleNamespace(sub="pseudo-9"),
-        group_id=None, conversation_id=None, litellm_key="sk-user",
+        group_id=None, conversation_id=conv_id, litellm_key="sk-user",
     )
-    with patch.object(router, "LiteLLMClient", return_value=instance):
+    with patch.object(router, "LiteLLMClient", return_value=instance), \
+         patch.object(router, "save_generated_image", new=AsyncMock(return_value=img_id)) as save:
         result = await router._exec_generate_image(
             {"prompt": "ein roter Würfel", "size": "1024x1024"}, ctx,
         )
 
     assert result["status"] == "ok"
     assert result["size"] == "1024x1024"
+    assert result["image_id"] == str(img_id)
     call = instance.generate_image.await_args
     assert call.kwargs["api_key"] == "sk-user"
     assert call.kwargs["user"] == "pseudo-9"
     assert call.kwargs["model"] == settings.image_default_model
     assert call.kwargs["response_format"] is None  # gpt-image-1 lehnt den Param ab
     instance.close.assert_awaited_once()
+    save_call = save.await_args
+    assert save_call.kwargs["pseudonym"] == "pseudo-9"
+    assert save_call.kwargs["conversation_id"] == conv_id
 
 
 async def test_generate_image_invalid_size_falls_back_to_default():
@@ -330,13 +336,27 @@ async def test_generate_image_invalid_size_falls_back_to_default():
     instance.close = AsyncMock()
     ctx = ToolContext(
         db=MagicMock(), user=SimpleNamespace(sub="p"),
-        group_id=None, conversation_id=None, litellm_key="k",
+        group_id=None, conversation_id=uuid4(), litellm_key="k",
     )
-    with patch.object(router, "LiteLLMClient", return_value=instance):
+    with patch.object(router, "LiteLLMClient", return_value=instance), \
+         patch.object(router, "save_generated_image", new=AsyncMock(return_value=uuid4())):
         result = await router._exec_generate_image({"prompt": "x", "size": "999x999"}, ctx)
 
     assert result["size"] == settings.image_default_size
     assert instance.generate_image.await_args.kwargs["size"] == settings.image_default_size
+
+
+async def test_generate_image_no_conversation_returns_error():
+    """Ohne conversation_id kein Persistenzziel → Fehler, kein Proxy-Aufruf."""
+    from app.chat import router
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=None, litellm_key="k",
+    )
+    with patch.object(router, "LiteLLMClient") as cls:
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+    assert result["status"] == "error"
+    cls.assert_not_called()
 
 
 async def test_generate_image_no_key_returns_error():

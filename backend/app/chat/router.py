@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update, or_
@@ -23,6 +23,13 @@ from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
 from app.chat.image_moderation import image_prompt_block_reason
+from app.chat.image_store import (
+    collect_conversation_image_paths,
+    get_image_record,
+    read_image_bytes,
+    save_generated_image,
+    unlink_paths,
+)
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
@@ -509,6 +516,11 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         )
         return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
 
+    if ctx.conversation_id is None:
+        # Ohne Konversation kein Persistenzziel → gar nicht erst generieren (spart Budget).
+        logger.error("generate_image: keine conversation_id im ToolContext")
+        return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
+
     size = args.get("size")
     if size not in _ALLOWED_IMAGE_SIZES:
         size = settings.image_default_size
@@ -529,15 +541,26 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     finally:
         await client.close()
 
-    # Schritt 2 (roh): Bytes werden noch nicht persistiert/angezeigt (→ Schritt 4/5/6).
-    logger.info(
-        "Bild generiert: %d Bytes (model=%s, size=%s)",
-        len(image_bytes), settings.image_default_model, size,
-    )
+    try:
+        image_id = await save_generated_image(
+            ctx.db,
+            pseudonym=ctx.user.sub,
+            conversation_id=ctx.conversation_id,
+            image_bytes=image_bytes,
+            model=settings.image_default_model,
+            size=size,
+            mime_type="image/png",
+        )
+    except Exception:
+        logger.exception("Bild konnte nicht gespeichert werden")
+        return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
+
+    # SSE-image-Event + Frontend-Anzeige (Bild an der Nachricht) folgen in Schritt 5/6.
     return {
         "status": "ok",
+        "image_id": str(image_id),
         "size": size,
-        "note": "Bild wurde erzeugt. Die Anzeige im Chat wird gerade umgesetzt.",
+        "note": "Bild wurde erzeugt und gespeichert.",
     }
 
 
@@ -1373,11 +1396,35 @@ async def delete_conversation(
         await db.commit()
         return None
 
-    # Löschen (cascading delete für Nachrichten)
+    # Generierte Bilder dieser Konversation vor dem Löschen aufsammeln (die DB-Zeilen
+    # gehen per FK-Cascade mit; die Dateien nach erfolgreichem Commit von Disk räumen).
+    image_paths = await collect_conversation_image_paths(db, [conversation_id])
+
+    # Löschen (cascading delete für Nachrichten + generated_images)
     await db.delete(conversation)
     await db.commit()
+    unlink_paths(image_paths)
 
     return None
+
+
+@router.get("/images/{image_id}")
+async def get_generated_image(
+    image_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Liefert ein generiertes Bild aus — nur an die Eigentümer:in (Pseudonym-Autorisierung)."""
+    record = await get_image_record(db, image_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+    if record.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    data = read_image_bytes(record)
+    if data is None:
+        # Referenz existiert, Datei fehlt (bereits geräumt) — als nicht gefunden behandeln.
+        raise HTTPException(status_code=404, detail="Bilddatei nicht gefunden")
+    return Response(content=data, media_type=record.mime_type)
 
 
 @router.get("/conversations")

@@ -343,6 +343,39 @@ class Message(Base):
     )
 
 
+# 6b. generated_images (Phase 16 — Bildgenerierung)
+class GeneratedImage(Base):
+    """Referenz auf ein generiertes Bild; die Bytes liegen auf Disk (image_store).
+
+    Stirbt per FK-Cascade mit seiner Konversation (93-Tage-Lifecycle) bzw. Nachricht.
+    `message_id` wird erst in Schritt 5 gesetzt — die Assistant-Nachricht existiert bei
+    der Generierung mid-Stream noch nicht.
+    """
+
+    __tablename__ = "generated_images"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    pseudonym: Mapped[str] = mapped_column(nullable=False)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    message_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
+    )
+    model: Mapped[str] = mapped_column(nullable=False)
+    size: Mapped[str] = mapped_column(nullable=False)
+    mime_type: Mapped[str] = mapped_column(nullable=False)
+    byte_size: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_generated_images_conversation_id", "conversation_id"),
+        Index("idx_generated_images_pseudonym", "pseudonym"),
+    )
+
+
 # 6b. conversation_flags (ADR-008 Teil 5)
 # Automatisch (Phase 11: nur flag_source='auto_crisis') oder menschlich erzeugte Flags
 # auf Konversationen. Persistent bis zum Löschen der Konversation.
