@@ -15,17 +15,18 @@ _PNG = b"\x89PNG\r\n\x1a\n-fake-image-bytes"
 _B64 = base64.b64encode(_PNG).decode()
 
 
-def _mock_response(status_code=200, json_body=None, text=""):
+def _mock_response(status_code=200, json_body=None, text="", headers=None):
     response = MagicMock()
     response.status_code = status_code
     response.json.return_value = json_body if json_body is not None else {}
     response.text = text
+    response.headers = headers or {}
     return response
 
 
 @pytest.mark.asyncio
 async def test_generate_image_returns_decoded_bytes():
-    """data[0].b64_json -> dekodierte Roh-Bytes."""
+    """data[0].b64_json -> dekodierte Roh-Bytes im Ergebnis-Objekt."""
     client = LiteLLMClient()
     http_client = AsyncMock()
     http_client.post = AsyncMock(return_value=_mock_response(
@@ -37,7 +38,33 @@ async def test_generate_image_returns_decoded_bytes():
             "ein roter Würfel", model="gpt-image-1", api_key="sk-user", user="pseudo-1",
         )
 
-    assert result == _PNG
+    assert result.image_bytes == _PNG
+
+
+@pytest.mark.asyncio
+async def test_generate_image_extracts_cost_from_header():
+    """x-litellm-response-cost -> cost_usd; fehlt der Header -> None."""
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    http_client.post = AsyncMock(return_value=_mock_response(
+        json_body={"data": [{"b64_json": _B64}]},
+        headers={"x-litellm-response-cost": "0.042"},
+    ))
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        result = await client.generate_image("x", model="gpt-image-1", api_key="k", user="u")
+    assert result.cost_usd == 0.042
+
+
+@pytest.mark.asyncio
+async def test_generate_image_cost_none_when_header_absent():
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    http_client.post = AsyncMock(return_value=_mock_response(
+        json_body={"data": [{"b64_json": _B64}]},
+    ))
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        result = await client.generate_image("x", model="gpt-image-1", api_key="k", user="u")
+    assert result.cost_usd is None
 
 
 @pytest.mark.asyncio

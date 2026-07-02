@@ -33,6 +33,11 @@ model_list:
       api_key: os.environ/OPENAI_API_KEY
     model_info:
       mode: image_generation
+      # Kosten-Tracking: Für bekannte Modelle (gpt-image-*) liefert LiteLLM den
+      # `x-litellm-response-cost`-Header automatisch → das Backend bucht die Bild-
+      # Kosten mit (messages.cost_usd / total_cost_usd). Für Custom-/lokale Modelle
+      # ohne hinterlegtes Pricing hier `input_cost_per_image: <USD>` setzen, sonst
+      # zählt der Bild-Spend 0.
   # Self-hosted Bild-Fallback (sensibler Pfad, analog Ollama) — OpenAI-kompatibler
   # lokaler Server (z. B. vLLM-Omni), api_base im lokalen Netz. Auskommentiert lassen,
   # bis der lokale Bild-Server steht (end-to-end testen, vgl. Plan §7).

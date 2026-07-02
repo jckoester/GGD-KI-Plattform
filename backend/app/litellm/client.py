@@ -1,5 +1,6 @@
 import base64
 import logging
+from dataclasses import dataclass
 from typing import Optional
 
 import httpx
@@ -7,6 +8,13 @@ import httpx
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ImageGenerationResult:
+    """Ergebnis eines Bild-Calls: dekodierte Bytes + Kosten (aus dem LiteLLM-Header)."""
+    image_bytes: bytes
+    cost_usd: Optional[float] = None
 
 
 class LiteLLMClient:
@@ -547,9 +555,14 @@ class LiteLLMClient:
         size: str | None = None,
         response_format: str | None = "b64_json",
         n: int = 1,
-    ) -> bytes:
+    ) -> "ImageGenerationResult":
         """
-        POST /images/generations (OpenAI-kompatibel) → dekodierte Bild-Bytes.
+        POST /images/generations (OpenAI-kompatibel) → Bytes + Kosten.
+
+        Die Kosten kommen aus dem ``x-litellm-response-cost``-Header des (nicht
+        gestreamten) Bild-Calls — kein zweiter Spend-Log-Roundtrip nötig. Fehlt der
+        Header (z. B. kein Pricing hinterlegt), ist ``cost_usd`` None; das Budget am
+        Virtual Key greift trotzdem, nur die angezeigten Kosten unterzählen dann.
 
         Ruft über den **Virtual Key des Users** (``api_key``) — nicht den Master-Key —,
         damit Spend/Budget dem User zugerechnet werden (wie der Chat-Call). Kein
@@ -596,6 +609,12 @@ class LiteLLMClient:
             )
             raise RuntimeError(f"Failed to generate image: {response.text}")
 
+        raw_cost = response.headers.get("x-litellm-response-cost")
+        try:
+            cost_usd = float(raw_cost) if raw_cost else None
+        except (TypeError, ValueError):
+            cost_usd = None
+
         data = response.json().get("data", [])
         if not data:
             logger.error("LiteLLM generate_image: leere data-Liste (model=%s)", model)
@@ -604,7 +623,7 @@ class LiteLLMClient:
         entry = data[0]
         b64 = entry.get("b64_json")
         if b64:
-            return base64.b64decode(b64)
+            return ImageGenerationResult(image_bytes=base64.b64decode(b64), cost_usd=cost_usd)
 
         # Datenschutz-Grenze: keine extern gehosteten Bild-URLs verarbeiten.
         if entry.get("url"):

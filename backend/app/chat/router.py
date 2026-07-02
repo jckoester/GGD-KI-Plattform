@@ -535,7 +535,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
 
     client = LiteLLMClient()
     try:
-        image_bytes = await client.generate_image(
+        result = await client.generate_image(
             prompt,
             model=settings.image_default_model,
             api_key=ctx.litellm_key,
@@ -554,7 +554,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             ctx.db,
             pseudonym=ctx.user.sub,
             conversation_id=ctx.conversation_id,
-            image_bytes=image_bytes,
+            image_bytes=result.image_bytes,
             model=settings.image_default_model,
             size=size,
             mime_type="image/png",
@@ -563,11 +563,13 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         logger.exception("Bild konnte nicht gespeichert werden")
         return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
 
-    # SSE-image-Event + Frontend-Anzeige (Bild an der Nachricht) folgen in Schritt 5/6.
+    # image_id + cost_usd werden im Stream-Loop ausgewertet (SSE-Event bzw. Kosten-Buchung);
+    # cost_usd wird vor dem Senden an den LLM entfernt (§ Loop). None, wenn kein Header kam.
     return {
         "status": "ok",
         "image_id": str(image_id),
         "size": size,
+        "cost_usd": result.cost_usd,
         "note": "Bild wurde erzeugt und gespeichert.",
     }
 
@@ -1053,6 +1055,7 @@ async def chat(
         chunk_id: str | None = None
         cost_usd: Optional[float] = None
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
+        _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
 
         current_messages = list(llm_messages)
         current_response = response
@@ -1150,22 +1153,23 @@ async def chat(
                         f"data: {json.dumps({'nodes': tool_result})}\n\n"
                     )
                     tool_result_str = json.dumps({"nodes": [n["title"] for n in tool_result]})
+                elif _tc_name == "generate_image" and isinstance(tool_result, dict):
+                    # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
+                    # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)
+                    # sammeln. Der LLM erhält eine bereinigte Bestätigung OHNE cost_usd/image_id.
+                    if tool_result.get("status") == "ok" and tool_result.get("image_id"):
+                        _generated_image_ids.append(UUID(tool_result["image_id"]))
+                        if tool_result.get("cost_usd") is not None:
+                            _image_cost_total += float(tool_result["cost_usd"])
+                        yield (
+                            f"event: image\n"
+                            f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size')})}\n\n"
+                        )
+                    tool_result_str = json.dumps({
+                        k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
+                    })
                 else:
                     tool_result_str = json.dumps(tool_result)
-
-                # Bild-Tool (Phase 16, Schritt 5): Referenz ans Frontend senden + für die
-                # message_id-Verknüpfung (in _persist) sammeln.
-                if (
-                    _tc_name == "generate_image"
-                    and isinstance(tool_result, dict)
-                    and tool_result.get("status") == "ok"
-                    and tool_result.get("image_id")
-                ):
-                    _generated_image_ids.append(UUID(tool_result["image_id"]))
-                    yield (
-                        f"event: image\n"
-                        f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size')})}\n\n"
-                    )
 
                 current_messages = current_messages + [
                     {
@@ -1223,6 +1227,11 @@ async def chat(
                             break
                 finally:
                     await litellm_client.close()
+
+            # Bild-Kosten (Phase 16, Schritt 7) zur Text-Summe addieren — dasselbe
+            # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).
+            if _image_cost_total > 0:
+                cost_usd = (cost_usd or 0.0) + _image_cost_total
 
             if cost_usd is not None:
                 yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"

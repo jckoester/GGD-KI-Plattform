@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.chat.tools import ChatTool, ToolContext, TOOL_REGISTRY, register_tool, tools_for
+from app.litellm.client import ImageGenerationResult
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -301,7 +302,9 @@ async def test_generate_image_handler_happy_path():
     """Prompt → Bild-Bytes; generate_image mit User-Key + Pseudonym + Default-Modell; persistiert."""
     from app.chat import router
     instance = MagicMock()
-    instance.generate_image = AsyncMock(return_value=b"\x89PNG-bytes")
+    instance.generate_image = AsyncMock(
+        return_value=ImageGenerationResult(image_bytes=b"\x89PNG-bytes", cost_usd=0.03)
+    )
     instance.close = AsyncMock()
     conv_id, img_id = uuid4(), uuid4()
     ctx = ToolContext(
@@ -317,6 +320,7 @@ async def test_generate_image_handler_happy_path():
     assert result["status"] == "ok"
     assert result["size"] == "1024x1024"
     assert result["image_id"] == str(img_id)
+    assert result["cost_usd"] == 0.03  # Kosten fürs Buchen (Schritt 7)
     call = instance.generate_image.await_args
     assert call.kwargs["api_key"] == "sk-user"
     assert call.kwargs["user"] == "pseudo-9"
@@ -326,13 +330,16 @@ async def test_generate_image_handler_happy_path():
     save_call = save.await_args
     assert save_call.kwargs["pseudonym"] == "pseudo-9"
     assert save_call.kwargs["conversation_id"] == conv_id
+    assert save_call.kwargs["image_bytes"] == b"\x89PNG-bytes"
 
 
 async def test_generate_image_invalid_size_falls_back_to_default():
     """Nicht-Standard-Größe → settings.image_default_size (Spend=0-Schutz)."""
     from app.chat import router
     instance = MagicMock()
-    instance.generate_image = AsyncMock(return_value=b"img")
+    instance.generate_image = AsyncMock(
+        return_value=ImageGenerationResult(image_bytes=b"img", cost_usd=None)
+    )
     instance.close = AsyncMock()
     ctx = ToolContext(
         db=MagicMock(), user=SimpleNamespace(sub="p"),
@@ -344,6 +351,22 @@ async def test_generate_image_invalid_size_falls_back_to_default():
 
     assert result["size"] == settings.image_default_size
     assert instance.generate_image.await_args.kwargs["size"] == settings.image_default_size
+
+
+async def test_generate_image_handler_generation_error():
+    """Bild-Call schlägt fehl (z. B. 429 bei erschöpftem Budget) → Fehler-Result, close greift."""
+    from app.chat import router
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(side_effect=RuntimeError("budget exceeded"))
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"),
+        group_id=None, conversation_id=uuid4(), litellm_key="k",
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+    assert result["status"] == "error"
+    instance.close.assert_awaited_once()
 
 
 async def test_generate_image_no_conversation_returns_error():
