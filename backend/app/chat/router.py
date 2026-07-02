@@ -26,6 +26,7 @@ from app.chat.image_moderation import image_prompt_block_reason
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
+    link_images_to_message,
     read_image_bytes,
     save_generated_image,
     unlink_paths,
@@ -600,6 +601,7 @@ async def _persist(
     assistant_id: Optional[int] = None,
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
     skip_user_message: bool = False,
+    generated_image_ids: Optional[list] = None,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
@@ -611,7 +613,7 @@ async def _persist(
             role="user",
             content=_serialize_user_message(user_message, user_attachments),
         ))
-    db.add(Message(
+    assistant_msg = Message(
         conversation_id=conversation_id,
         role="assistant",
         content=assistant_content,
@@ -620,7 +622,14 @@ async def _persist(
         tokens_input=tokens_input,
         tokens_output=tokens_output,
         cost_usd=cost_usd,
-    ))
+    )
+    db.add(assistant_msg)
+
+    # Mid-Stream erzeugte Bilder an diese Assistant-Nachricht hängen (Phase 16, Schritt 5).
+    # Flush macht die server-generierte message_id verfügbar.
+    if generated_image_ids:
+        await db.flush()
+        await link_images_to_message(db, generated_image_ids, assistant_msg.id)
 
     update_values: dict = {"last_message_at": func.now()}
     if cost_usd is not None:
@@ -1036,6 +1045,7 @@ async def chat(
         usage: dict = {}
         chunk_id: str | None = None
         cost_usd: Optional[float] = None
+        _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
 
         current_messages = list(llm_messages)
         current_response = response
@@ -1136,6 +1146,20 @@ async def chat(
                 else:
                     tool_result_str = json.dumps(tool_result)
 
+                # Bild-Tool (Phase 16, Schritt 5): Referenz ans Frontend senden + für die
+                # message_id-Verknüpfung (in _persist) sammeln.
+                if (
+                    _tc_name == "generate_image"
+                    and isinstance(tool_result, dict)
+                    and tool_result.get("status") == "ok"
+                    and tool_result.get("image_id")
+                ):
+                    _generated_image_ids.append(UUID(tool_result["image_id"]))
+                    yield (
+                        f"event: image\n"
+                        f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size')})}\n\n"
+                    )
+
                 current_messages = current_messages + [
                     {
                         "role": "assistant",
@@ -1214,6 +1238,7 @@ async def chat(
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
                 skip_user_message=crisis_record is not None,
+                generated_image_ids=_generated_image_ids,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -79,6 +79,19 @@ async def save_generated_image(
 
 async def get_image_record(db: AsyncSession, image_id: UUID) -> GeneratedImage | None:
     return await db.get(GeneratedImage, image_id)
+
+
+async def link_images_to_message(db: AsyncSession, image_ids: list[UUID], message_id: UUID) -> None:
+    """Hängt die (mid-Stream erzeugten) Bilder an die jetzt persistierte Assistant-Nachricht.
+
+    Der Aufrufer commit-tet (Teil derselben Persistenz-Transaktion in `_persist`)."""
+    if not image_ids:
+        return
+    await db.execute(
+        update(GeneratedImage)
+        .where(GeneratedImage.id.in_(image_ids))
+        .values(message_id=message_id)
+    )
 
 
 def read_image_bytes(record: GeneratedImage) -> bytes | None:

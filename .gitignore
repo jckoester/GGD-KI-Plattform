@@ -52,3 +52,4 @@ Thumbs.db
 *.log
 scripts/scraper/output/*
 config/image_blocklist.yaml
+data/generated_images/*

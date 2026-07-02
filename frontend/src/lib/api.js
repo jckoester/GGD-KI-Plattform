@@ -384,6 +384,15 @@ export async function* streamChat(
         continue;
       }
 
+      if (currentEventType === "image") {
+        try {
+          const { image_id, size } = JSON.parse(payload);
+          yield { type: "image", image_id, size };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;

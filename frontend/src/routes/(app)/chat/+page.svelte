@@ -652,6 +652,19 @@
                     messages = messages;
                     continue;
                 }
+                // Generiertes Bild (Phase 16): Referenz an die Assistenten-Nachricht heften
+                // (Anzeige folgt in Schritt 6 in der MessageBubble).
+                if (item.type === "image") {
+                    messages[assistantIndex] = {
+                        ...messages[assistantIndex],
+                        images: [
+                            ...(messages[assistantIndex].images ?? []),
+                            { image_id: item.image_id, size: item.size },
+                        ],
+                    };
+                    messages = messages;
+                    continue;
+                }
                 // Token von Assistant
                 messages[assistantIndex] = {
                     ...messages[assistantIndex],

@@ -67,6 +67,54 @@ async def test_collect_empty_conversation_ids_shortcircuits():
     db.execute.assert_not_called()
 
 
+# ── message_id-Verknüpfung (Schritt 5) ─────────────────────────────────────────
+
+async def test_link_images_to_message_issues_update():
+    db = MagicMock()
+    db.execute = AsyncMock()
+    await store.link_images_to_message(db, [uuid4(), uuid4()], uuid4())
+    db.execute.assert_awaited_once()
+
+
+async def test_link_images_to_message_empty_shortcircuits():
+    db = MagicMock()
+    db.execute = AsyncMock()
+    await store.link_images_to_message(db, [], uuid4())
+    db.execute.assert_not_called()
+
+
+async def test_persist_links_generated_images():
+    """_persist flusht + verknüpft die mid-Stream erzeugten Bilder mit der Nachricht."""
+    from app.chat import router
+    db = MagicMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    ids = [uuid4()]
+    with patch.object(router, "link_images_to_message", new=AsyncMock()) as link:
+        await router._persist(
+            db, uuid4(), "hallo", [], "antwort", {}, "model-x", generated_image_ids=ids,
+        )
+    db.flush.assert_awaited_once()
+    link.assert_awaited_once()
+    assert link.await_args.args[1] == ids
+    db.commit.assert_awaited_once()
+
+
+async def test_persist_without_images_does_not_link_or_flush():
+    from app.chat import router
+    db = MagicMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.execute = AsyncMock()
+    db.commit = AsyncMock()
+    with patch.object(router, "link_images_to_message", new=AsyncMock()) as link:
+        await router._persist(db, uuid4(), "hallo", [], "antwort", {}, "model-x")
+    link.assert_not_awaited()
+    db.flush.assert_not_awaited()
+
+
 # ── Backstop-Cron: verwaist + über-alt ──────────────────────────────────────────
 
 async def test_cleanup_removes_orphans_and_aged_keeps_live(monkeypatch, tmp_path):
