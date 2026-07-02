@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
+    # Bildgenerierung (Phase 16) — Default-Bildmodell, Standardgröße (nur abgerechnete
+    # Größen verwenden, sonst Spend=0-Risiko) und großzügigeres Timeout, da die
+    # Generierung Sekunden dauert und (anders als Chat) nicht gestreamt wird.
+    image_default_model: str = "gpt-image-1"
+    image_default_size: str = "1024x1024"
+    image_generation_timeout: float = 120.0
 
 
 settings = Settings()

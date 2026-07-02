@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Optional
 
@@ -535,3 +536,87 @@ class LiteLLMClient:
         except Exception:
             logger.exception("get_model_info Exception")
             return {}
+
+    async def generate_image(
+        self,
+        prompt: str,
+        *,
+        model: str,
+        api_key: str,
+        user: str,
+        size: str | None = None,
+        response_format: str | None = "b64_json",
+        n: int = 1,
+    ) -> bytes:
+        """
+        POST /images/generations (OpenAI-kompatibel) → dekodierte Bild-Bytes.
+
+        Ruft über den **Virtual Key des Users** (``api_key``) — nicht den Master-Key —,
+        damit Spend/Budget dem User zugerechnet werden (wie der Chat-Call). Kein
+        Streaming: ein Request / eine Response; die Generierung dauert Sekunden →
+        eigenes, großzügigeres Timeout (``settings.image_generation_timeout``).
+
+        Datenschutz: Es werden **nur Base64-Bilder** verarbeitet. Liefert der Provider
+        stattdessen eine (extern gehostete) URL, wird abgebrochen — die Bytes sollen
+        das Schulnetz nicht über einen zweiten Request zum Provider verlassen.
+        ``response_format="b64_json"`` erzwingt Base64 bei URL-fähigen Modellen; für
+        Modelle, die ohnehin nur Base64 liefern und den Parameter ablehnen
+        (``gpt-image-1``), ``response_format=None`` übergeben.
+
+        Wirft ``RuntimeError`` bei Nicht-200, leerer/fehlender Bilddaten oder wenn der
+        Provider eine URL statt Base64 liefert.
+        """
+        client = await self._get_client()
+        url = f"{self.base_url}/images/generations"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload: dict = {
+            "model": model,
+            "prompt": prompt,
+            "n": n,
+            "size": size or settings.image_default_size,
+            "user": user,
+        }
+        if response_format:
+            payload["response_format"] = response_format
+
+        response = await client.post(
+            url,
+            headers=headers,
+            json=payload,
+            timeout=settings.image_generation_timeout,
+        )
+
+        if response.status_code != 200:
+            logger.error(
+                "LiteLLM generate_image fehlerhaft: status=%d, model=%s, body=%s",
+                response.status_code, model, response.text[:500],
+            )
+            raise RuntimeError(f"Failed to generate image: {response.text}")
+
+        data = response.json().get("data", [])
+        if not data:
+            logger.error("LiteLLM generate_image: leere data-Liste (model=%s)", model)
+            raise RuntimeError("Image generation returned no data")
+
+        entry = data[0]
+        b64 = entry.get("b64_json")
+        if b64:
+            return base64.b64decode(b64)
+
+        # Datenschutz-Grenze: keine extern gehosteten Bild-URLs verarbeiten.
+        if entry.get("url"):
+            logger.error(
+                "LiteLLM generate_image lieferte URL statt Base64 (model=%s) — "
+                "response_format=b64_json setzen bzw. b64-fähiges Modell nutzen.",
+                model,
+            )
+            raise RuntimeError(
+                "Image provider returned a URL instead of base64; "
+                "external image URLs are not permitted."
+            )
+
+        logger.error("LiteLLM generate_image: weder b64_json noch url (model=%s)", model)
+        raise RuntimeError("Image generation response missing image data")
