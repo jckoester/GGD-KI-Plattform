@@ -1284,7 +1284,7 @@ async def create_curriculum_node(
     curriculum = ContextNode(
         category="knowledge",
         content_type="curriculum",
-        title=f"{payload.fach_code} {payload.schulart} Kl. {payload.jahrgangsstufe}",
+        title=f"{payload.fach_code} Kl. {payload.jahrgangsstufe}",
         content=None,
         read_scope="school",
         write_scope="subject",

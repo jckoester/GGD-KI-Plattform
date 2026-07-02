@@ -477,11 +477,17 @@
                     >
                         <ArrowLeft class="w-4 h-4" /> Zurück
                     </button>
-                    <h1
-                        class="text-2xl font-bold text-light-tx dark:text-dark-tx"
-                    >
-                        {curriculum?.title ?? "Curriculum bearbeiten"}
-                    </h1>
+                    <input
+                        type="text"
+                        bind:value={draft.title}
+                        oninput={() => (dirty = true)}
+                        placeholder="Curriculum-Titel"
+                        aria-label="Curriculum-Titel"
+                        class="text-2xl font-bold text-light-tx dark:text-dark-tx bg-transparent w-full
+                               border-b border-transparent hover:border-light-ui-3 dark:hover:border-dark-ui-3
+                               focus:border-primary dark:focus:border-primary-dark
+                               focus:outline-none transition-colors"
+                    />
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                         Bearbeitungsmodus
                         {#if totalStd > 0}

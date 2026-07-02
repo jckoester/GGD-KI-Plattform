@@ -816,7 +816,7 @@ async def import_curriculum_from_draft(
     curriculum_data = {
         "category": "knowledge",
         "content_type": "curriculum",
-        "title": f"{payload.fach or payload.fach_code} {payload.schulart} Kl. {payload.jahrgangsstufe}",
+        "title": f"{payload.fach or payload.fach_code} Kl. {payload.jahrgangsstufe}",
         "content": payload.vorwort or "",
         "read_scope": "school",
         "write_scope": "subject" if department_group_id else "school",
