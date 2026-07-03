@@ -46,6 +46,20 @@ beim nächsten Monats-Reconcile (1. des Monats). Um Änderungen sofort anzuwende
 docker compose exec backend python scripts/monthly_budget_reconcile.py
 ```
 
+## Bildgenerierung
+
+Bildgenerierung hat **kein separates Kontingent** — der Bild-Aufruf läuft über den
+Virtual Key der Nutzer:in und zählt gegen **dasselbe** monatliche USD-Budget wie
+Chat-Nachrichten. Ein Bild ist dabei in der Regel **teurer** als eine Textnachricht,
+verbraucht das Budget also schneller (bewusst so). Ist das Budget erschöpft, lehnt
+LiteLLM auch den Bild-Aufruf ab (429), und der Assistent formuliert eine Absage.
+
+Die Bild-Kosten werden mitgebucht: Das Backend liest den `x-litellm-response-cost`-Header
+des Bild-Aufrufs und addiert ihn zu `messages.cost_usd` / `total_cost_usd`. Für bekannte
+Modelle (z. B. `gpt-image-*`) liefert LiteLLM diesen Header automatisch. Für Custom-/lokale
+Bild-Modelle ohne hinterlegtes Pricing in der LiteLLM-Config `input_cost_per_image` setzen —
+sonst zählt der Bild-Spend 0.
+
 ## Cron-Jobs
 
 Zwei automatische Jobs sorgen dafür, dass Budgets korrekt verwaltet werden:

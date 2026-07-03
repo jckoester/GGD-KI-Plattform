@@ -20,6 +20,38 @@ Als Einstiegspunkt empfiehlt es sich, zunächst ein einzelnes,
 kostengünstiges Modell für alle Gruppen freizuschalten und die Matrix
 später gezielt zu erweitern.
 
+## Bildgenerierung: Bild-Modelle & Bild-Assistenten
+
+Bildgenerierung ist an **zwei Schlüssel** gebunden — beide müssen gesetzt sein, damit
+im Chat tatsächlich Bilder entstehen:
+
+1. **Bild-Modell für die Gruppe freigeschaltet.** Auf `/settings/models` gibt es unter
+   den Chat-Modellen einen zweiten Abschnitt **„Bild-Modelle"**. Er erscheint nur, wenn
+   in LiteLLM ein Bild-Modell mit `model_info.mode: image_generation` konfiguriert ist.
+   Beide Matrizen schreiben in dieselbe LiteLLM-Team-Allowlist — die Freigaben werden
+   gegenseitig **bewahrt** (das Speichern der Chat-Matrix wischt Bild-Freigaben nicht weg
+   und umgekehrt).
+2. **Assistent mit der Werkzeug-Gruppe `image_generation`.** Im Assistenten-Editor die
+   Checkbox **„Bildgenerierung"** aktivieren (siehe [Werkzeug-Gruppen](#werkzeug-gruppen-tool_groups)).
+
+**Nutzerseitige Auffindbarkeit:** Assistenten mit Bildgenerierung erscheinen zusätzlich
+unter dem Seitenleisten-Menüpunkt **„Werkzeuge"** (`/tools`), der alle
+artefakterzeugenden Assistenten bündelt.
+
+**Jugendschutz-Prüfpunkt:** Ein **schulweiter**, für Schüler:innen sichtbarer
+Bild-Assistent geht **immer** in die Admin-Freigabe (`pending_review`) — auch wenn der
+allgemeine Schalter für schulweites Teilen aus ist. Details in
+[Content-Moderation → Bild-Assistenten](content-moderation.md).
+
+**Lokaler Bild-Fallback (sensibler Pfad):** Analog zum Ollama-Chat-Fallback kann ein
+lokaler, OpenAI-kompatibler Bild-Server (z. B. vLLM-Omni) als Bild-Modell in LiteLLM
+eingetragen werden (`infra/litellm_config.yaml`, `model_info.mode: image_generation`).
+Der Client fordert stets Base64 an — es werden **keine** extern gehosteten Bild-URLs
+verarbeitet, die Bytes bleiben im Schulnetz. Vor dem Produktivbetrieb end-to-end testen.
+
+**Kosten:** Bildgenerierung läuft über das **bestehende** USD-Budget der Nutzer:innen
+(kein separates Kontingent). Siehe [Budget-System → Bildgenerierung](budget.md).
+
 ## Assistenten anlegen (`/assistants/manage/new`)
 
 Assistenten sind vorkonfigurierte Chat-Umgebungen mit einer bestimmten Rolle
@@ -87,6 +119,7 @@ Welche Planungs-Werkzeuge ein Assistent erhält, steuert das Feld `tool_groups`:
 |---|---|---|
 | `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
+| `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
 Schreibende Planungs-Werkzeuge bleiben damit strikt an die Lehrkraft-Rolle gebunden;
 für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt

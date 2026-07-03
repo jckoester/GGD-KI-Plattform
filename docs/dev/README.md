@@ -58,6 +58,7 @@ cd frontend && npm install && npm run dev
 - [Systemarchitektur](architektur.md) — Komponenten, Datenfluss, Privacy-Invariante
 - [Auth-Flow & Pseudonymisierung](auth-flow.md) — Adapter-Interface, JWT, Pseudonymisierung
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
+- [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Lokales Dev-Setup](dev-setup.md) — Entwicklungsumgebung ohne Docker
 - [Backend-Entwicklung](backend-entwicklung.md) — Migrationen, Tests, Skripte
 - [Neuen Auth-Adapter implementieren](neuer-auth-adapter.md) — AuthAdapter-Interface

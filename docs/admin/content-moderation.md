@@ -538,3 +538,29 @@ schulweiter Guardrail-Prompt  →  Assistenten-Dokumente  →
 [universal_base + Zielgruppen-Erweiterung + Wissens-Kontext + Assistenten-Prompt
  + (nur Schüler) Lernverhalten-Augmentierungen]  →  output_format  →  Nutzer-Nachrichten
 ```
+
+## G — Bild-Prompt-Moderation (Bildgenerierung)
+
+Bei einem Bild-Werkzeug wird der eigentliche Bild-Prompt **vom Modell** beim Werkzeug-Aufruf
+gebildet — er umgeht damit das Frontend-Gate (PII-Warnung), das nur die rohe Nutzernachricht
+prüft. Der Bild-Prompt wird deshalb **mehrschichtig** moderiert:
+
+1. **Backend-Tool-Handler (lokal, immer aktiv).** Vor jeder Bilderzeugung läuft der Prompt durch
+   - den **Krisen-Scan** — für Bilder **blockierend** (anders als im Text-Chat, der nicht
+     blockiert; das fürsorgliche Hilfe-Banner kommt weiterhin aus der Nutzernachricht), und
+   - eine **kuratierte Bild-Blockliste** `config/image_blocklist.yaml`
+     (Start-Kategorien: sexuelle Darstellung Minderjähriger, explizit sexuell, grafische Gewalt,
+     Waffenherstellung). Ein Treffer → **keine** Bilderzeugung, der Assistent formuliert eine
+     kurze Absage.
+2. **LiteLLM `pre_call`-Content-Filter (Proxy, optional).** Als Defense-in-Depth kann in
+   `infra/litellm_config.yaml` ein `litellm_content_filter` im `pre_call`-Modus für
+   `/images/generations` aktiviert werden (Vorlage auskommentiert in der Beispiel-Config).
+   Bei Bildern greift `async_moderation_hook` **nicht** → bewusst `pre_call` nutzen.
+3. **Provider-seitige Moderation.** Der Anbieter (z. B. `gpt-image-1`) lehnt unzulässige
+   Prompts zusätzlich selbst ab.
+
+**Blockliste pflegen.** `config/image_blocklist.yaml` ist — wie `crisis_triggers.yaml` — nicht im
+Repo (die Live-Datei ist gitignored); aus `config/image_blocklist.example.yaml` provisionieren.
+**Fehlt die Datei, startet das Backend nicht** (fail-closed). Die Begriffe mit der
+**Schulsozialarbeit** kuratieren. Änderungen an der Blockliste greifen sofort (Hot-Reload);
+Änderungen an den LiteLLM-Guardrails erfordern einen Neustart des LiteLLM-Containers.
