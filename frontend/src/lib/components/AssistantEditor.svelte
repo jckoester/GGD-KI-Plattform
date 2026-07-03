@@ -19,6 +19,7 @@
     } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import {
         getModels,
@@ -1548,6 +1549,11 @@
                                     (erzeugt Bilder im Chat; Bild-Modell muss fürs Team freigegeben sein)
                                 </span>
                             </label>
+                            {#if form.tool_groups.includes('image_generation') && (form.audience === 'student' || form.audience === 'all')}
+                                <WarningBanner
+                                    message="Jugendschutz: Dieser Assistent erzeugt Bilder und ist für Schüler:innen sichtbar. Ein schulweiter Bild-Assistent für Schüler:innen wird erst nach Admin-Freigabe aktiv. Bitte Zielgruppe und Jahrgänge (min./max.) bewusst wählen und die Blockliste beachten."
+                                />
+                            {/if}
                         </div>
                     {/if}
 

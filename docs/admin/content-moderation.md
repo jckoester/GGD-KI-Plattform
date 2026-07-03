@@ -505,6 +505,26 @@ Zielgruppe daher sichtbar (Badge in der „Offene Freigaben"-Liste) und verlangt
 Freigeben eines für Schüler:innen sichtbaren Assistenten eine **bewusste Bestätigung**;
 die Freigabe wird mit `audience` protokolliert.
 
+### Bild-Assistenten: verschärfter Jugendschutz-Prüfpunkt
+
+Assistenten mit der Werkzeug-Gruppe **Bildgenerierung** (`image_generation`) sind
+sensibler als reine Text-Assistenten. Daher gilt zusätzlich:
+
+- **Schulweite, für Schüler:innen sichtbare Bild-Assistenten** (Zielgruppe „Schüler:innen"
+  oder „Alle" mit schulweitem Geltungsbereich — `grade`, `all_students`, `all`) gehen
+  **immer** in `pending_review` und werden erst nach **Admin-Freigabe** aktiv —
+  **unabhängig** davon, ob der allgemeine Schalter „schulweites Teilen erfordert
+  Admin-Freigabe" gesetzt ist.
+- **Gruppen-/private Bild-Assistenten** bleiben selbst-freigebbar: Die Lehrkraft
+  verantwortet ihre eigene Gruppe.
+- Im Assistenten-Editor erscheint bei Bildgenerierung + Schüler-Zielgruppe eine
+  **Warnung** (Jugendschutz, bewusste Zielgruppen-/Jahrgangswahl, Blockliste beachten).
+- **Zwei-Schlüssel-Prinzip:** Bildgenerierung funktioniert nur, wenn (a) der Assistent die
+  Werkzeug-Gruppe führt **und** (b) das Bild-Modell für das Team freigeschaltet ist
+  (`/settings/models`, Abschnitt „Bild-Modelle").
+- Nutzerseitig steht unter jedem erzeugten Bild ein Hinweis, dass KI-Bilder fehlerhaft
+  sein können und sich nicht zur Darstellung realer Personen eignen.
+
 ### Pflege
 
 `pedagogy.yaml` ist **versioniert** — Änderungen erfordern Backend-Neustart (Deployment-

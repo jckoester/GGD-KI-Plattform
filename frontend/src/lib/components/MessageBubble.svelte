@@ -148,6 +148,11 @@
                         </div>
                     {/if}
                 {/each}
+                <!-- Jugendschutz-/Qualitätshinweis zu KI-Bildern (Phase 16 Schritt 9) -->
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    KI-erzeugte Bilder können fehlerhaft sein und eignen sich nicht
+                    zur Darstellung realer Personen.
+                </p>
             </div>
         {/if}
         {#if message.crisis}
