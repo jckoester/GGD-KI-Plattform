@@ -426,6 +426,27 @@ export async function saveModelMatrix(allowlists) {
   return res.json();
 }
 
+export async function getImageModelMatrix() {
+  const res = await fetch(`${BASE}/admin/image-models/matrix`, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { models, teams, allowlists }
+}
+
+export async function saveImageModelMatrix(allowlists) {
+  const res = await fetch(`${BASE}/admin/image-models/matrix`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ allowlists }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
 export async function getHeatmap(teamId = null, model = null, weekOffset = 0) {
   const url = new URL(`${BASE}/admin/stats/heatmap`, location.href);
   if (teamId) url.searchParams.set("team_id", teamId);

@@ -545,6 +545,45 @@ class LiteLLMClient:
             logger.exception("get_model_info Exception")
             return {}
 
+    async def get_image_model_ids(self) -> list[str]:
+        """
+        GET /model/info → Modell-IDs mit ``model_info.mode == "image_generation"``.
+
+        Trennt Bild-Modelle von Chat-Modellen anhand des in der LiteLLM-Config
+        gesetzten Modus (``model_info.mode``). Wird von beiden Freischaltungs-Matrizen
+        genutzt: die Chat-Matrix blendet diese IDs aus, die Bild-Matrix zeigt nur sie.
+        Gibt [] zurück bei Fehler (kein Hard-Fail — die aufrufende Matrix degradiert
+        dann sauber: keine Bild-Spalten bzw. keine Ausblendung, aber kein Datenverlust).
+        """
+        try:
+            client = await self._get_client()
+            response = await client.get(
+                f"{self.base_url}/model/info",
+                headers={"Authorization": f"Bearer {self.master_key}"},
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    "get_image_model_ids fehlerhaft: status=%d, body=%s",
+                    response.status_code, response.text[:200],
+                )
+                return []
+            data = response.json().get("data", [])
+            ids: list[str] = []
+            seen: set[str] = set()
+            for entry in data:
+                if not isinstance(entry, dict) or "model_name" not in entry:
+                    continue
+                mode = (entry.get("model_info") or {}).get("mode")
+                if mode == "image_generation":
+                    name = entry["model_name"]
+                    if name not in seen:
+                        seen.add(name)
+                        ids.append(name)
+            return ids
+        except Exception:
+            logger.exception("get_image_model_ids Exception")
+            return []
+
     async def generate_image(
         self,
         prompt: str,

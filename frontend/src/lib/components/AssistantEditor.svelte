@@ -1530,6 +1530,24 @@
                                     (Jahresplan, Slot-Zuweisung, Themen)
                                 </span>
                             </label>
+                            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.tool_groups.includes('image_generation')}
+                                    onchange={(e) => {
+                                        if (e.currentTarget.checked) {
+                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'image_generation'), 'image_generation']
+                                        } else {
+                                            form.tool_groups = form.tool_groups.filter(g => g !== 'image_generation')
+                                        }
+                                    }}
+                                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                />
+                                Bildgenerierung
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    (erzeugt Bilder im Chat; Bild-Modell muss fürs Team freigegeben sein)
+                                </span>
+                            </label>
                         </div>
                     {/if}
 

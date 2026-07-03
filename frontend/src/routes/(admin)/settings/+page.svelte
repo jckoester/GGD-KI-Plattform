@@ -37,7 +37,7 @@
                 Modell-Freischaltung
             </div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Welche Modelle für welche Gruppen verfügbar sind
+                Welche Modelle (Chat &amp; Bild) für welche Gruppen verfügbar sind
             </div>
         </a>
         <!-- Site-Texte (7f) -->

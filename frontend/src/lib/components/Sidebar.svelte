@@ -15,6 +15,7 @@
         BookOpen,
         Pencil,
         Database,
+        Wrench,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import {
@@ -245,6 +246,19 @@
                     {/if}
                 </div>
             {/if}
+        </div>
+
+        <!-- Werkzeuge (alle Rollen) -->
+        <div class="mt-2">
+            <button
+                onclick={() => goto('/tools')}
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                       {$page.url.pathname.startsWith('/tools') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+            >
+                <Wrench class="w-4 h-4" />
+                Werkzeuge
+            </button>
         </div>
 
         <!-- Wissensgraph (nur Lehrkräfte/Admins) -->
