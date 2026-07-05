@@ -52,6 +52,12 @@ renderer.code = function({ text, lang }) {
     if (lang === 'mermaid') {
         return `<div class="mermaid-block">${escapeHtml(text)}</div>`;
     }
+    // Server-Render (Phase 17): synchroner Platzhalter; das async Rendern (POST an
+    // /render/circuit) übernimmt die Svelte-Action `renderServerBlocks` (serverRender.js).
+    // Quelle als escaptes textContent — die Action liest sie zurück.
+    if (lang === 'circuitikz') {
+        return `<div class="circuit-block">${escapeHtml(text)}</div>`;
+    }
     const language = lang && hljs.getLanguage(lang) ? lang : null;
     const highlighted = language
         ? hljs.highlight(text, { language }).value

@@ -15,6 +15,30 @@
     margin-bottom: 0.25rem;
 }
 
+/* Server-gerenderte Blöcke (Phase 17): CircuiTikZ-Schaltpläne, später Plots */
+.circuit-block,
+.plot-block {
+    margin: 0.75rem 0;
+    text-align: center;
+}
+
+.circuit-block svg,
+.plot-block svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.server-render-loading {
+    font-size: 0.875rem;
+    color: var(--color-light-tx-2, #666);
+}
+
+.server-render-error {
+    font-size: 0.875rem;
+    color: var(--color-light-re, #b00);
+    margin-bottom: 0.25rem;
+}
+
 /* Basis: Code-Block-Container */
 .code-block {
     position: relative;

@@ -2,6 +2,7 @@
     import { AlertCircle, Download, FileText, Image } from 'lucide-svelte';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
+    import { renderServerBlocks } from '$lib/serverRender.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
     let { message, isStreaming = false, costEur = null } = $props();
@@ -101,7 +102,7 @@
                         prose-a:text-light-bl dark:prose-a:text-dark-bl
                         prose-code:text-light-tx dark:prose-code:text-dark-tx
                         prose-blockquote:text-light-tx-2 dark:prose-blockquote:text-dark-tx-2"
-                 use:copyButtons use:renderDiagrams>
+                 use:copyButtons use:renderDiagrams use:renderServerBlocks>
                 {@html renderedContent}
             </div>
             {#if isStreaming}
