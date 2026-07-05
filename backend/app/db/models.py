@@ -376,6 +376,28 @@ class GeneratedImage(Base):
     )
 
 
+class RenderedSvg(Base):
+    """Cache: Hash der Render-Quelle → fertiges SVG (Phase 17, Server-Rendering).
+
+    Rendern ist eine reine, deterministische Funktion (Quelle → SVG), daher
+    content-adressiert per Hash. Konversations-/nutzerunabhängig; altersbasiert
+    aufgeräumt (`app.render.cache.cleanup_rendered_svg`). Der Sidecar hält zusätzlich
+    einen eigenen In-Prozess-Cache; dies ist der persistente Haupt-Cache.
+    """
+
+    __tablename__ = "rendered_svg"
+
+    hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    svg: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_rendered_svg_created_at", "created_at"),
+    )
+
+
 # 6b. conversation_flags (ADR-008 Teil 5)
 # Automatisch (Phase 11: nur flag_source='auto_crisis') oder menschlich erzeugte Flags
 # auf Konversationen. Persistent bis zum Löschen der Konversation.

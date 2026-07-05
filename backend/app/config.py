@@ -55,5 +55,14 @@ class Settings(BaseSettings):
     image_storage_dir: str = "data/generated_images"
     image_max_retention_days: int = 400
 
+    # ── Server-Rendering (Phase 17) ──────────────────────────────────────────
+    # Interner Node-Render-Sidecar (CircuiTikZ→SVG, KaTeX). Nur lokal/compose-intern
+    # erreichbar; nie öffentlich. render_timeout etwas höher als der sidecar-eigene
+    # Render-Timeout, damit ein legitimer, langsamer Render nicht clientseitig abbricht.
+    render_sidecar_url: str = "http://127.0.0.1:3200"
+    render_timeout: float = 15.0
+    # Aufbewahrung des SVG-Caches (rendered_svg); altersbasierter Aufräum-Cron.
+    render_cache_max_age_days: int = 90
+
 
 settings = Settings()
