@@ -5,6 +5,7 @@
     import { getContextNode, getArchivedReferences } from "$lib/api.js";
     import { renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
+    import { renderServerBlocks } from "$lib/serverRender.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { ArrowLeft, Pencil } from "lucide-svelte";
@@ -245,7 +246,7 @@
                        prose-strong:text-light-tx dark:prose-strong:text-dark-tx
                        prose-li:text-light-tx dark:prose-li:text-dark-tx
                        prose-a:text-light-bl dark:prose-a:text-dark-bl"
-                use:renderDiagrams
+                use:renderDiagrams use:renderServerBlocks
             >
                 {@html contentHtml}
             </div>
