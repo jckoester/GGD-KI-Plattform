@@ -22,6 +22,19 @@ describe('renderMarkdown: ```circuitikz-Platzhalter', () => {
     expect(html).toContain('code-block')
     expect(html).not.toContain('circuit-block')
   })
+
+  it('erkennt Tag-Varianten (Groß/Klein, Tippfehler, circuit)', () => {
+    for (const tag of ['CircuiTikZ', 'circuittikz', 'circuit', 'Circuit']) {
+      const html = renderMarkdown('```' + tag + '\n\\draw (0,0);\n```')
+      expect(html, tag).toContain('circuit-block')
+      expect(html, tag).not.toContain('code-block')
+    }
+  })
+
+  it('behandelt latex/tex NICHT als Schaltplan', () => {
+    const html = renderMarkdown('```latex\n\\textbf{x}\n```')
+    expect(html).not.toContain('circuit-block')
+  })
 })
 
 describe('sanitizeSvg', () => {
