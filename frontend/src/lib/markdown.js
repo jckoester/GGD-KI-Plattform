@@ -63,6 +63,11 @@ renderer.code = function({ text, lang }) {
     if (langNorm === 'circuitikz' || langNorm === 'circuittikz' || langNorm === 'circuit') {
         return `<div class="circuit-block">${escapeHtml(text)}</div>`;
     }
+    // Funktionsgraph (Phase 17, Schritt 6): ```plot-Block → Platzhalter; dieselbe
+    // renderServerBlocks-Action holt das SVG (POST /render/plot).
+    if (langNorm === 'plot') {
+        return `<div class="plot-block">${escapeHtml(text)}</div>`;
+    }
     const language = lang && hljs.getLanguage(lang) ? lang : null;
     const highlighted = language
         ? hljs.highlight(text, { language }).value

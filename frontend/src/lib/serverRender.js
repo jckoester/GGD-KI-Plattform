@@ -17,9 +17,10 @@ import DOMPurify from 'dompurify';
 
 const BASE = '/api';
 
-// Platzhalter-Klasse → Backend-Render-„kind". Schritt 6 ergänzt 'plot-block': 'plot'.
+// Platzhalter-Klasse → Backend-Render-„kind".
 const BLOCK_KINDS = {
     'circuit-block': 'circuit',
+    'plot-block': 'plot',
 };
 
 const SELECTOR = Object.keys(BLOCK_KINDS)
@@ -33,15 +34,30 @@ function escapeHtml(s) {
 /**
  * Sanitisiert ein server-geliefertes SVG. Die Quelle ist vertrauenswürdig (eigenes
  * Backend/Sidecar), wird aber dennoch strikt sanitisiert — entfernt <script>,
- * Event-Handler und Fremd-Markup, behält die Zeichnung. Exportiert für Unit-Tests.
+ * Event-Handler, externe/js/data-URIs, behält die Zeichnung. Exportiert für Unit-Tests.
+ *
+ * `<use>` + `href`/`xlink:href` werden zugelassen — matplotlib rendert Text/Marker als
+ * Glyphen-`<use xlink:href="#…">`, node-tikzjax nutzt sie ähnlich. `<script>`, Event-Handler
+ * und `javascript:`/`data:`-URIs bleiben blockiert (DOMPurify-Default). Wir setzen bewusst
+ * KEINE eigene `ALLOWED_URI_REGEXP` — die würde DOMPurify auch das `d`-Attribut der Pfade
+ * prüfen lassen (matcht die Regex nicht → `d` verschwindet → leeres Bild). Externe
+ * `<use href="http…">` bleiben damit zwar erlaubt, kommen aus unseren eigenen Renderern aber
+ * nie vor (und Browser laden externe `<use>` in Inline-SVG ohnehin nicht).
  */
 export function sanitizeSvg(svg) {
-    return DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
+    return DOMPurify.sanitize(svg, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_TAGS: ['use'],
+        ADD_ATTR: ['xlink:href', 'href'],
+    });
 }
 
-function renderError(block, source) {
+function renderError(block, source, detail) {
+    const msg = detail
+        ? `Konnte nicht gerendert werden: ${escapeHtml(detail)}`
+        : 'Konnte nicht gerendert werden.';
     block.innerHTML =
-        '<div class="server-render-error">Konnte nicht gerendert werden.</div>' +
+        `<div class="server-render-error">${msg}</div>` +
         `<pre>${escapeHtml(source)}</pre>`;
 }
 
@@ -60,8 +76,9 @@ async function renderBlock(block, kind) {
         if (!res.ok) throw new Error(`render http ${res.status}`);
         const data = await res.json();
         // Backend liefert bei Render-Fehlern ein Platzhalter-SVG + `error` — im Chat
-        // zeigen wir stattdessen die Quelle (hilfreicher für Autor:innen, wie Mermaid).
-        if (data.error) { renderError(block, source); return; }
+        // zeigen wir stattdessen die Quelle + die konkrete Meldung (hilfreicher als das
+        // generische Platzhalter-SVG, wie Mermaid).
+        if (data.error) { renderError(block, source, data.error); return; }
         block.innerHTML = sanitizeSvg(data.svg ?? '');
     } catch {
         renderError(block, source);

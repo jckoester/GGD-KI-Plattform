@@ -35,10 +35,16 @@ describe('renderMarkdown: ```circuitikz-Platzhalter', () => {
     const html = renderMarkdown('```latex\n\\textbf{x}\n```')
     expect(html).not.toContain('circuit-block')
   })
+
+  it('erzeugt einen plot-block-Platzhalter für ```plot', () => {
+    const html = renderMarkdown('```plot\nfunctions:\n  - x^2\ndomain: [-3, 3]\n```')
+    expect(html).toContain('class="plot-block"')
+    expect(html).not.toContain('code-block')
+  })
 })
 
 describe('sanitizeSvg', () => {
-  it('entfernt <script> und Event-Handler, behält die Zeichnung', () => {
+  it('entfernt <script> und Event-Handler, behält die Zeichnung inkl. d-Attribut', () => {
     const dirty =
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">' +
       '<script>alert(1)</script>' +
@@ -49,8 +55,26 @@ describe('sanitizeSvg', () => {
     expect(clean).not.toContain('<script')
     expect(clean).not.toContain('onload')
     expect(clean).not.toContain('alert(1)')
-    expect(clean).toContain('<path')
+    // Pfad-Daten MÜSSEN erhalten bleiben — sonst zeichnet der Pfad nichts (leeres Bild).
+    expect(clean).toContain('d="M0 0 L10 10"')
     expect(clean).toContain('<svg')
+  })
+
+  it('behält Geometrie (d, clip-path, lokale <use>) und blockt js-URIs/Handler', () => {
+    const dirty =
+      '<svg xmlns="http://www.w3.org/2000/svg">' +
+      '<defs><path id="g" d="M0 0 L1 1"/></defs>' +
+      '<use href="#g"/>' +                            // matplotlib-Glyphen-Referenz
+      '<path d="M2 2 L3 3" clip-path="url(#c)"/>' +
+      '<a href="javascript:alert(1)">x</a>' +
+      '<rect onload="evil()" width="4" height="4"/>' +
+      '</svg>'
+    const clean = sanitizeSvg(dirty)
+    expect(clean).toContain('d="M2 2 L3 3"')   // Pfad-Daten überleben (Regressionsschutz)
+    expect(clean).toContain('href="#g"')        // lokale <use>-Referenz überlebt
+    expect(clean).toContain('url(#c)')          // clip-path überlebt
+    expect(clean).not.toContain('javascript:')  // js-URI entfernt
+    expect(clean).not.toContain('onload')       // Event-Handler entfernt
   })
 
   it('gibt bei leerem Input leeren String zurück', () => {

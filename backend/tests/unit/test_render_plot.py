@@ -36,6 +36,12 @@ def test_power_right_associative():
     assert np.allclose(compile_expr("2^3^2")(np.array([0.0])), [512])
 
 
+def test_accepts_python_double_star_power():
+    # LLMs schreiben Potenzen oft als ** (Python) → wie ^ behandelt
+    assert np.allclose(compile_expr("2 ** 3")(np.array([0.0])), [8])
+    assert np.allclose(compile_expr("x**2")(np.array([3.0])), [9])
+
+
 @pytest.mark.parametrize("expr", [
     "__import__('os')",           # kein Aufruf beliebiger Builtins
     "os.system('rm')",            # '.' nicht in der Grammatik

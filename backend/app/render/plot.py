@@ -118,6 +118,9 @@ def compile_expr(expr: str) -> Callable[[np.ndarray], np.ndarray]:
         raise PlotError("leerer Ausdruck")
     if len(expr) > MAX_EXPR_LEN:
         raise PlotError("Ausdruck zu lang")
+    # LLMs schreiben Potenzen oft als `**` (Python) statt `^`. In Mathe-Termen meint `**`
+    # eindeutig Potenzierung → sicher ersetzbar (kein anderer Sinn).
+    expr = expr.replace("**", "^")
     try:
         tree = _PARSER.parse(expr)
     except LarkError:
@@ -210,7 +213,12 @@ def parse_plot_spec(source: str) -> PlotSpec:
 
 def _render_sync(spec: PlotSpec) -> str:
     """Kompiliert die Terme und rendert matplotlib→SVG (synchron, in einem Thread)."""
-    from matplotlib.figure import Figure  # lazy: Import kostet ~1 s, nur bei Plot-Nutzung
+    import matplotlib  # lazy: Import kostet ~1 s, nur bei Plot-Nutzung
+    from matplotlib.figure import Figure
+
+    # Text als Vektor-Pfade statt <use>/Glyph-Referenzen → self-contained SVG, das die
+    # DOMPurify-Sanitisierung im Frontend unbeschadet übersteht (nur <path> + inline style).
+    matplotlib.rcParams["svg.fonttype"] = "path"
 
     xs = np.linspace(spec.domain[0], spec.domain[1], SAMPLES)
     fig = Figure(figsize=(6.0, 4.0))
