@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     render_timeout: float = 15.0
     # Aufbewahrung des SVG-Caches (rendered_svg); altersbasierter Aufräum-Cron.
     render_cache_max_age_days: int = 90
+    # Plot-Rendering (matplotlib, in-process): Timeout gegen pathologische Funktionen.
+    plot_render_timeout: float = 10.0
 
 
 settings = Settings()

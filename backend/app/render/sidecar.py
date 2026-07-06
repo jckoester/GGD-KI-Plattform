@@ -11,12 +11,9 @@ from typing import Optional
 import httpx
 
 from app.config import settings
+from app.render.errors import RenderError  # re-exportiert (Rückwärtskompat.)
 
 logger = logging.getLogger(__name__)
-
-
-class RenderError(Exception):
-    """Rendern fehlgeschlagen (Sidecar-Fehler, Timeout oder nicht erreichbar)."""
 
 
 _client: Optional[httpx.AsyncClient] = None

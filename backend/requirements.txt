@@ -18,6 +18,14 @@ python-multipart>=0.0.9
 pdfminer.six>=20221105
 pgvector>=0.3.0
 
+# Runtime - Server-Rendering: Funktionsgraphen (Phase 17, ```plot)
+# matplotlib rendert die Plots in-process zu SVG (kein Sidecar); numpy wertet die
+# geparsten Ausdrücke vektorisiert aus; lark parst die Funktions-Terme über eine
+# Whitelist-Grammatik (eval-frei — kein sympy/parse_expr).
+numpy>=1.26
+matplotlib>=3.8
+lark>=1.1
+
 # Dev / Test
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
