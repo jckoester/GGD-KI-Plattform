@@ -59,6 +59,7 @@ cd frontend && npm install && npm run dev
 - [Auth-Flow & Pseudonymisierung](auth-flow.md) — Adapter-Interface, JWT, Pseudonymisierung
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
+- [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
 - [Lokales Dev-Setup](dev-setup.md) — Entwicklungsumgebung ohne Docker
 - [Backend-Entwicklung](backend-entwicklung.md) — Migrationen, Tests, Skripte
 - [Neuen Auth-Adapter implementieren](neuer-auth-adapter.md) — AuthAdapter-Interface

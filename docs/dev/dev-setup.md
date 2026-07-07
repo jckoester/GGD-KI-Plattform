@@ -82,6 +82,22 @@ npm run dev
 # /api wird automatisch an http://localhost:8000 proxied (vite.config.js)
 ```
 
+## Render-Sidecar (für Schaltpläne & PDF-Mathe)
+
+Server-Rendering (CircuiTikZ, MathJax-Mathe im PDF) läuft über einen **eigenen Node-Dienst**,
+der — wie LiteLLM — lokal in einem separaten Terminal gestartet wird:
+
+```bash
+cd render-sidecar
+npm install          # einmalig (node-tikzjax + mathjax-full, ~5 MB WASM)
+npm start            # http://127.0.0.1:3200
+```
+
+Das Backend erreicht ihn per Default unter `http://127.0.0.1:3200` (`RENDER_SIDECAR_URL`).
+**Läuft er nicht**, zeigen Schaltpläne im Chat einen Fehler-Platzhalter und PDF-Formeln
+erscheinen als Quelltext — Funktionsgraphen (```plot) laufen dagegen in-process im Backend und
+brauchen den Sidecar nicht. Details: [Server-Rendering](server-rendering.md).
+
 ## Test-Authentifizierung
 
 Für die lokale Entwicklung den `yaml_test`-Adapter verwenden — kein SSO-Provider
