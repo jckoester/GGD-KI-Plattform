@@ -50,7 +50,7 @@
 </div>
 
 {% if data.stundenziel %}
-<p class="ziel"><strong>Stundenziel:</strong> {{ data.stundenziel }}</p>
+<p class="ziel"><strong>Stundenziel:</strong> {{ stundenziel_html | safe }}</p>
 {% endif %}
 
 {% set total = data.phasen | sum(attribute='dauer_min') %}
@@ -84,7 +84,7 @@
       </td>
       <td>
         <span class="phase-name">{{ phase.name }}</span>
-        {% if phase.beschreibung %}<br><span class="phase-desc">{{ phase.beschreibung }}</span>{% endif %}
+        {% if phase.beschreibung %}<br><span class="phase-desc">{{ beschreibungen[loop.index0] | safe }}</span>{% endif %}
       </td>
       <td>
         {% if phase.sozialform %}<span class="sozialform">{{ phase.sozialform }}</span>{% endif %}

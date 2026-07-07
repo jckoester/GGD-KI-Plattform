@@ -267,13 +267,16 @@ def _render_markdown(text: str) -> str:
     return _md_parser.render(text)
 
 
-def _build_pdf_kapitel(tree: dict) -> list[dict]:
+async def _build_pdf_kapitel(tree: dict) -> list[dict]:
     """Reichert die Curriculum-Struktur fürs PDF-Template an.
 
     - IK/PK als Volltext (Knoten-Titel aus ik_refs/pk_refs), Fallback nr/pk_id
-    - Konkretisierung als gerendertes Markdown
+    - Konkretisierung als gerendertes Markdown **inkl. server-gerenderter Formeln/Diagramme**
+      (Phase 17, D5): `$…$`/```circuitikz/```plot → eingebettetes SVG
     - Hinweise/Material als vorgeparste Segment-Listen
     """
+    from app.render.export import render_markdown_for_pdf
+
     kapitel_out = []
     for kap in tree.get("kapitel", []):
         kap_meta = kap.get("metadata", {})
@@ -306,7 +309,7 @@ def _build_pdf_kapitel(tree: dict) -> list[dict]:
                 eintraege_out.append({
                     "ik_items": ik_items,
                     "pk_items": pk_items,
-                    "konkretisierung_html": _render_markdown(e.get("konkretisierung") or ""),
+                    "konkretisierung_html": await render_markdown_for_pdf(e.get("konkretisierung") or ""),
                     "hinweise_parts": _parse_hinweise_for_pdf(e.get("hinweise") or ""),
                     "material_parts": _parse_material_for_pdf(e.get("material") or ""),
                 })
@@ -351,7 +354,7 @@ async def render_curriculum_pdf(db: AsyncSession, tree: dict) -> bytes:
         title=tree.get("title", ""),
         school_name=school_name,
         meta=meta,
-        kapitel=_build_pdf_kapitel(tree),
+        kapitel=await _build_pdf_kapitel(tree),
     )
     pdf_bytes = weasyprint.HTML(string=html_str, base_url=templates_dir).write_pdf()
     return pdf_bytes

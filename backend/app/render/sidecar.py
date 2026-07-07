@@ -55,3 +55,26 @@ async def render_circuit(source: str) -> str:
     except Exception:
         msg = resp.text[:200]
     raise RenderError(msg or f"Sidecar-Status {resp.status_code}")
+
+
+async def render_math(tex: str, display: bool = False) -> str:
+    """POST /render/math → MathJax-SVG (str). Wirft RenderError bei Fehler/Timeout."""
+    url = f"{settings.render_sidecar_url.rstrip('/')}/render/math"
+    try:
+        resp = await _get_client().post(url, json={"tex": tex, "display": bool(display)})
+    except httpx.TimeoutException as e:
+        raise RenderError("Render-Timeout (Sidecar)") from e
+    except httpx.HTTPError as e:
+        raise RenderError(f"Sidecar nicht erreichbar: {e}") from e
+
+    if resp.status_code == 200:
+        svg = resp.json().get("svg")
+        if not svg or not isinstance(svg, str):
+            raise RenderError("Sidecar lieferte kein SVG")
+        return svg
+
+    try:
+        msg = resp.json().get("error") or resp.text[:200]
+    except Exception:
+        msg = resp.text[:200]
+    raise RenderError(msg or f"Sidecar-Status {resp.status_code}")

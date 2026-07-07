@@ -54,19 +54,19 @@ for (const c of circuits) {
   }
 }
 
-// KaTeX-Mathe + mhchem
+// MathJax-Mathe (→ SVG) + mhchem
 try {
   const math = renderMath(String.raw`\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`, true);
-  const okM = math.includes('katex') && math.includes('</math>'); // htmlAndMathml
-  console.log(`${okM ? '✓' : '✗'} KaTeX Mathe: ${math.length} B`);
+  const okM = math.trimStart().startsWith('<svg') && math.includes('<path');
+  console.log(`${okM ? '✓' : '✗'} MathJax Mathe: ${math.length} B`);
   allOk = allOk && okM;
 
   const chem = renderMath(String.raw`\ce{2 H2 + O2 -> 2 H2O}`, false);
-  const okC = chem.includes('katex');
-  console.log(`${okC ? '✓' : '✗'} KaTeX mhchem: ${chem.length} B`);
+  const okC = chem.trimStart().startsWith('<svg') && chem.includes('<path');
+  console.log(`${okC ? '✓' : '✗'} MathJax mhchem: ${chem.length} B`);
   allOk = allOk && okC;
 } catch (e) {
-  console.log(`✗ KaTeX: FEHLER — ${String(e.message ?? e).slice(0, 200)}`);
+  console.log(`✗ MathJax: FEHLER — ${String(e.message ?? e).slice(0, 200)}`);
   allOk = false;
 }
 

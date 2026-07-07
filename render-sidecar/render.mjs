@@ -1,7 +1,11 @@
-// Gemeinsame Render-Helfer: TeX-Wrapping, KaTeX-Mathe, bounded Cache.
+// Gemeinsame Render-Helfer: TeX-Wrapping, MathJax-Mathe (→ SVG), bounded Cache.
 import crypto from 'node:crypto';
-import katex from 'katex';
-import 'katex/contrib/mhchem'; // \ce{}/\pu{} — Parität zum Frontend (markdown.js)
+import { mathjax } from 'mathjax-full/js/mathjax.js';
+import { TeX } from 'mathjax-full/js/input/tex.js';
+import { SVG } from 'mathjax-full/js/output/svg.js';
+import { liteAdaptor } from 'mathjax-full/js/adaptors/liteAdaptor.js';
+import { RegisterHTMLHandler } from 'mathjax-full/js/handlers/html.js';
+import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js';
 
 export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -11,14 +15,21 @@ export function wrapCircuit(source) {
   return `\\usepackage{circuitikz}\n\\begin{document}\n${source}\n\\end{document}`;
 }
 
-// KaTeX rendert im Hauptthread: nicht turing-vollständig, schnell, kein Runaway-Risiko.
-// Optionen spiegeln den Frontend-Renderer (output htmlAndMathml, lenient).
+// MathJax TeX→SVG. Für den PDF-Export (D5): **self-contained SVG** (fontCache:'none', Glyphen als
+// Pfade) — weasyprint bettet es ohne CSS/Font-Abhängigkeit perfekt ein. `AllPackages` enthält
+// mhchem (\ce{}/\pu{}). MathJax ist nicht turing-vollständig → im Hauptthread, kein Runaway.
+const _adaptor = liteAdaptor();
+RegisterHTMLHandler(_adaptor);
+const _mjDoc = mathjax.document('', {
+  InputJax: new TeX({ packages: AllPackages }),
+  OutputJax: new SVG({ fontCache: 'none' }),
+});
+
 export function renderMath(tex, display = false) {
-  return katex.renderToString(tex, {
-    displayMode: !!display,
-    output: 'htmlAndMathml',
-    throwOnError: false,
-  });
+  const node = _mjDoc.convert(tex, { display: !!display });
+  // Nur das <svg> (trägt selbst vertical-align + ex-Sizing für die Inline-Baseline) —
+  // ohne den <mjx-container>-Wrapper.
+  return _adaptor.outerHTML(_adaptor.firstChild(node));
 }
 
 // Kleiner LRU-Cache (Map behält Einfügereihenfolge; get schiebt ans Ende).

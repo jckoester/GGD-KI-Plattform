@@ -6,7 +6,7 @@
 //
 //   GET  /health          → { status, pool }
 //   POST /render/circuit  { source }        → { svg }   | { error }
-//   POST /render/math     { tex, display }  → { html }  | { error }
+//   POST /render/math     { tex, display }  → { svg }   | { error }   (MathJax → SVG)
 import http from 'node:http';
 import { CircuitRenderPool } from './pool.mjs';
 import { wrapCircuit, renderMath, sha256, BoundedCache } from './render.mjs';
@@ -74,11 +74,11 @@ const server = http.createServer(async (req, res) => {
       }
       const key = 'math:' + (display ? 'd:' : 'i:') + sha256(tex);
       const hit = cache.get(key);
-      if (hit !== undefined) return send(res, 200, { html: hit, cached: true });
+      if (hit !== undefined) return send(res, 200, { svg: hit, cached: true });
       try {
-        const html = renderMath(tex, display);
-        cache.set(key, html);
-        return send(res, 200, { html });
+        const svg = renderMath(tex, display);
+        cache.set(key, svg);
+        return send(res, 200, { svg });
       } catch (e) {
         return send(res, 422, { error: String(e?.message ?? e).slice(0, 500) });
       }
