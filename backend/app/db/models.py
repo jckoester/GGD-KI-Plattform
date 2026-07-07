@@ -398,6 +398,38 @@ class RenderedSvg(Base):
     )
 
 
+class Artifact(Base):
+    """Persönliche Bibliothek: persistentes, konversationsübergreifendes Artefakt (Phase 18).
+
+    Anders als `generated_images` (konversationsgebunden, 90/93-Tage-Lifecycle) überlebt ein
+    Artefakt die Konversation. Bytes auf Disk (`app.artifacts.store`); `source` hält bei
+    code-generierten Artefakten den **rohen Quelltext** (kopier-/re-export-fähig).
+    `expires_at` wird beim Speichern aus der role-/jahrgangsbasierten Aufbewahrung eingefroren
+    (kein Rollen-Lookup im Cleanup nötig). `origin_conversation_id` ist nur Herkunfts-Notiz
+    (kein FK/CASCADE — das Artefakt überlebt die Konversation bewusst).
+    """
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    owner_pseudonym: Mapped[str] = mapped_column(nullable=False)
+    kind: Mapped[str] = mapped_column(nullable=False)  # image | render_svg | ggb | (document …)
+    mime_type: Mapped[str] = mapped_column(nullable=False)
+    byte_size: Mapped[int] = mapped_column(nullable=False)
+    title: Mapped[str] = mapped_column(nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    origin_conversation_id: Mapped[Optional[UUID]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("idx_artifacts_owner", "owner_pseudonym"),
+        Index("idx_artifacts_expires_at", "expires_at"),
+    )
+
+
 # 6b. conversation_flags (ADR-008 Teil 5)
 # Automatisch (Phase 11: nur flag_source='auto_crisis') oder menschlich erzeugte Flags
 # auf Konversationen. Persistent bis zum Löschen der Konversation.

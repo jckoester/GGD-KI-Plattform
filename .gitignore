@@ -54,3 +54,5 @@ scripts/scraper/output/*
 config/image_blocklist.yaml
 data/generated_images/*
 config/pedagogy.yaml
+config/artifact_limits.yaml
+data/artifacts/*

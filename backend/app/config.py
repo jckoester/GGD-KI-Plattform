@@ -66,5 +66,11 @@ class Settings(BaseSettings):
     # Plot-Rendering (matplotlib, in-process): Timeout gegen pathologische Funktionen.
     plot_render_timeout: float = 10.0
 
+    # ── Artefaktbibliothek (Phase 18) ────────────────────────────────────────
+    # Ablage der Artefakt-Bytes (repo-root-relativ, falls nicht absolut).
+    artifact_storage_dir: str = "data/artifacts"
+    # Role-/jahrgangsbasierte Aufbewahrung + Quota (Struktur wie budget_tiers.yaml).
+    artifact_limits_path: str = "config/artifact_limits.yaml"
+
 
 settings = Settings()
