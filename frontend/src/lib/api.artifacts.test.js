@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { saveImageToLibrary, saveDiagramToLibrary, ApiError } from './api.js';
+import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, ApiError } from './api.js';
 
 function mockFetch(status, body) {
     return vi.fn().mockResolvedValue({
@@ -61,5 +61,23 @@ describe('saveDiagramToLibrary', () => {
         const err = await saveDiagramToLibrary('banana', 'x').catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.status).toBe(422);
+    });
+});
+
+describe('getPlotGgbBlob', () => {
+    it('POSTet die Plot-Quelle und liefert einen Blob', async () => {
+        const blob = new Blob(['PK'], { type: 'application/vnd.geogebra.file' });
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, blob: async () => blob });
+        const r = await getPlotGgbBlob('functions:\n  - x^2');
+        expect(r).toBe(blob);
+        const [url, opts] = global.fetch.mock.calls[0];
+        expect(url).toBe('/api/artifacts/ggb');
+        expect(opts.method).toBe('POST');
+        expect(JSON.parse(opts.body)).toEqual({ source: 'functions:\n  - x^2', title: null });
+    });
+
+    it('wirft ApiError mit Status bei ungültiger Spec (422)', async () => {
+        global.fetch = mockFetch(422, { detail: 'ungültige Plot-Spec' });
+        await expect(getPlotGgbBlob('kaputt')).rejects.toMatchObject({ status: 422 });
     });
 });

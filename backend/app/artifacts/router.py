@@ -11,14 +11,32 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.artifacts import promote, store
+import re
+
+from app.artifacts import geogebra, promote, store
 from app.artifacts.limits import get_artifact_limits
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.models import Artifact
 from app.db.session import get_db
+from app.render.errors import RenderError
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+
+_GGB_MIME = "application/vnd.geogebra.file"
+
+
+def _ggb_filename(title: str | None) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (title or "funktionsgraph").lower()).strip("-")[:60]
+    return f"{slug or 'funktionsgraph'}.ggb"
+
+
+def _ggb_response(data: bytes, title: str | None) -> Response:
+    return Response(
+        content=data,
+        media_type=_GGB_MIME,
+        headers={"Content-Disposition": f'attachment; filename="{_ggb_filename(title)}"'},
+    )
 
 # SVG-Artefakte können (mermaid) aus Client-gerendertem Markup stammen. Auslieferung nur an
 # die Eigentümer:in, aber zusätzlich gehärtet: kein Skript, kein aktiver Inhalt, kein Sniffing.
@@ -69,6 +87,11 @@ class FromDiagramRequest(BaseModel):
     kind: str            # circuit | plot | mermaid
     source: str
     svg: str | None = None   # nur mermaid: bereits im Browser gerendertes SVG
+    title: str | None = None
+
+
+class GgbRequest(BaseModel):
+    source: str          # rohe Plot-Spec (YAML)
     title: str | None = None
 
 
@@ -185,3 +208,40 @@ async def delete_artifact_endpoint(
         raise HTTPException(status_code=403, detail="Zugriff verweigert")
     await store.delete_artifact(db, record)
     return {"ok": True}
+
+
+@router.post("/ggb")
+async def ggb_from_source(
+    req: GgbRequest,
+    _: JwtPayload = Depends(get_current_user),
+) -> Response:
+    """Konvertiert eine rohe Plot-Spec direkt in eine `.ggb`-Datei (Download im Chat).
+
+    Zustandslos (kein Persistenzbezug) — nur eingeloggt. 422 bei ungültiger Plot-Spec.
+    """
+    try:
+        data = geogebra.ggb_bytes_from_source(req.source)
+    except RenderError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _ggb_response(data, req.title)
+
+
+@router.get("/{artifact_id}/ggb")
+async def ggb_from_artifact(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """`.ggb`-Export eines gespeicherten Plot-Artefakts (aus dessen `source`)."""
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if record.kind != "plot" or not record.source:
+        raise HTTPException(status_code=422, detail="Kein GeoGebra-Export für dieses Artefakt")
+    try:
+        data = geogebra.ggb_bytes_from_source(record.source)
+    except RenderError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _ggb_response(data, record.title)

@@ -330,3 +330,47 @@ def test_delete_artifact_missing_404(monkeypatch):
     client = _client(monkeypatch)
     resp = client.request("DELETE", f"/artifacts/{uuid4()}")
     assert resp.status_code == 404
+
+
+# ── GeoGebra-Export (Schritt 4) ───────────────────────────────────────────────
+
+def test_ggb_from_source_ok(monkeypatch):
+    client = _client(monkeypatch)
+    resp = client.post("/artifacts/ggb", json={"source": "functions:\n  - x^2\n", "title": "Parabel"})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/vnd.geogebra.file"
+    assert "parabel.ggb" in resp.headers["content-disposition"]
+    assert resp.content[:2] == b"PK"   # ZIP-Signatur
+
+
+def test_ggb_from_source_invalid_422(monkeypatch):
+    client = _client(monkeypatch)
+    resp = client.post("/artifacts/ggb", json={"source": "kein plot"})
+    assert resp.status_code == 422
+
+
+def test_ggb_from_artifact_ok(monkeypatch):
+    rec = SimpleNamespace(
+        owner_pseudonym="p", kind="plot", source="functions:\n  - x^2\n", title="Parabel",
+    )
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=rec))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/ggb")
+    assert resp.status_code == 200
+    assert resp.content[:2] == b"PK"
+
+
+def test_ggb_from_artifact_wrong_kind_422(monkeypatch):
+    rec = SimpleNamespace(owner_pseudonym="p", kind="circuit", source="...", title="x")
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=rec))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/ggb")
+    assert resp.status_code == 422
+
+
+def test_ggb_from_artifact_foreign_403(monkeypatch):
+    rec = SimpleNamespace(owner_pseudonym="anders", kind="plot", source="functions:\n  - x\n", title="x")
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=rec))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/ggb")
+    assert resp.status_code == 403

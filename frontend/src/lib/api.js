@@ -1716,3 +1716,15 @@ export async function deleteArtifact(artifactId) {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Löschen fehlgeschlagen')
     return res.json()
 }
+
+// Rohe Plot-Spec → `.ggb`-Datei (Blob) für den GeoGebra-Download direkt am Plot im Chat.
+export async function getPlotGgbBlob(source, title = null) {
+    const res = await fetch(`${BASE}/artifacts/ggb`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'GeoGebra-Export fehlgeschlagen')
+    return res.blob()
+}

@@ -3,7 +3,8 @@
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
-    import { saveImageToLibrary, saveDiagramToLibrary } from '$lib/api.js';
+    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob } from '$lib/api.js';
+    import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
     let { message, isStreaming = false, costEur = null } = $props();
@@ -61,35 +62,64 @@
                 block.style.position = 'relative';
                 block.classList.add('group');
 
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.setAttribute('aria-label', 'In Bibliothek speichern');
-                btn.title = 'In Bibliothek speichern';
-                btn.className = [
-                    'save-lib-btn absolute top-1.5 right-1.5',
+                const bar = document.createElement('div');
+                bar.className = [
+                    'absolute top-1.5 right-1.5 flex gap-1',
+                    'opacity-0 group-hover:opacity-100 transition-opacity',
+                ].join(' ');
+
+                const btnClass = [
                     'px-1.5 py-0.5 rounded text-xs',
                     'bg-light-bg-2/80 dark:bg-dark-bg-2/80',
                     'text-light-tx-2 dark:text-dark-tx-2',
                     'hover:bg-light-ui-3 dark:hover:bg-dark-ui-3',
-                    'opacity-0 group-hover:opacity-100 transition-opacity',
                 ].join(' ');
-                btn.textContent = 'In Bibliothek';
 
-                btn.addEventListener('click', async () => {
-                    if (btn.disabled) return;
-                    btn.disabled = true;
+                const saveBtn = document.createElement('button');
+                saveBtn.type = 'button';
+                saveBtn.setAttribute('aria-label', 'In Bibliothek speichern');
+                saveBtn.title = 'In Bibliothek speichern';
+                saveBtn.className = btnClass;
+                saveBtn.textContent = 'In Bibliothek';
+                saveBtn.addEventListener('click', async () => {
+                    if (saveBtn.disabled) return;
+                    saveBtn.disabled = true;
                     const src = block.dataset.source ?? '';
                     const svg = kind === 'mermaid' ? block.querySelector('svg')?.outerHTML ?? null : null;
                     try {
                         const r = await saveDiagramToLibrary(kind, src, { svg });
-                        btn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
+                        saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
                     } catch (e) {
-                        btn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
+                        saveBtn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
                     }
-                    setTimeout(() => { btn.textContent = 'In Bibliothek'; btn.disabled = false; }, 2200);
+                    setTimeout(() => { saveBtn.textContent = 'In Bibliothek'; saveBtn.disabled = false; }, 2200);
                 });
+                bar.appendChild(saveBtn);
 
-                block.appendChild(btn);
+                // Funktionsgraphen zusätzlich als GeoGebra-Datei (.ggb) herunterladbar.
+                if (kind === 'plot') {
+                    const ggbBtn = document.createElement('button');
+                    ggbBtn.type = 'button';
+                    ggbBtn.setAttribute('aria-label', 'Als GeoGebra-Datei herunterladen');
+                    ggbBtn.title = 'Als GeoGebra-Datei (.ggb) herunterladen';
+                    ggbBtn.className = btnClass;
+                    ggbBtn.textContent = 'GeoGebra';
+                    ggbBtn.addEventListener('click', async () => {
+                        if (ggbBtn.disabled) return;
+                        ggbBtn.disabled = true;
+                        try {
+                            const blob = await getPlotGgbBlob(block.dataset.source ?? '');
+                            triggerDownload(blob, 'funktionsgraph.ggb');
+                            ggbBtn.textContent = '✓ .ggb';
+                        } catch {
+                            ggbBtn.textContent = 'Fehler';
+                        }
+                        setTimeout(() => { ggbBtn.textContent = 'GeoGebra'; ggbBtn.disabled = false; }, 2200);
+                    });
+                    bar.appendChild(ggbBtn);
+                }
+
+                block.appendChild(bar);
             });
         }
 

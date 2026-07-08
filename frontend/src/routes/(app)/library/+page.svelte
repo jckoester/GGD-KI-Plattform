@@ -4,6 +4,7 @@
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText,
     } from 'lucide-svelte';
     import { getLibrary, deleteArtifact } from '$lib/api.js';
+    import { triggerDownload } from '$lib/download.js';
     import {
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
         isImageLike, isSvg, slugify,
@@ -47,17 +48,6 @@
         } catch {
             return '';
         }
-    }
-
-    function triggerDownload(blob, filename) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
     }
 
     function downloadOriginal(item) {
@@ -255,6 +245,18 @@
                                     >
                                         <FileDown class="w-3.5 h-3.5" /> PNG
                                     </button>
+                                {/if}
+
+                                {#if item.kind === 'plot'}
+                                    <a
+                                        href="/api/artifacts/{item.id}/ggb"
+                                        download="{slugify(item.title)}.ggb"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                    >
+                                        <FileDown class="w-3.5 h-3.5" /> GeoGebra
+                                    </a>
                                 {/if}
 
                                 {#if item.source}
