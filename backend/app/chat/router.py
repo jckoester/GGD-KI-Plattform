@@ -558,6 +558,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             model=settings.image_default_model,
             size=size,
             mime_type="image/png",
+            prompt=prompt,
         )
     except Exception:
         logger.exception("Bild konnte nicht gespeichert werden")

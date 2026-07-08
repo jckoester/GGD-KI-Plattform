@@ -42,10 +42,28 @@ def invalidate_cache() -> None:
     _cache = None
 
 
-def get_artifact_limits(roles: list[str], grade: Optional[int]) -> tuple[int, int]:
+def _grade_entry(grades: dict, grade) -> Optional[dict]:
+    """Jahrgangseintrag, robust gegen int-/str-Schlüssel (JWT liefert grade als String)."""
+    if grade in grades:
+        return grades[grade]
+    for key in (str(grade), _maybe_int(grade)):
+        if key is not None and key in grades:
+            return grades[key]
+    return None
+
+
+def _maybe_int(grade):
+    try:
+        return int(grade)
+    except (ValueError, TypeError):
+        return None
+
+
+def get_artifact_limits(roles: list[str], grade) -> tuple[int, int]:
     """Gibt (retention_days, quota_bytes) für die Nutzer:in zurück.
 
     teacher (auch teacher+admin) → `roles.teacher`; student → `grades[grade]`; sonst Fallback.
+    `grade` darf int oder str sein (JWT liefert einen String).
     """
     cfg = _load()
     roles = roles or []
@@ -55,8 +73,7 @@ def get_artifact_limits(roles: list[str], grade: Optional[int]) -> tuple[int, in
         return int(t["retention_days"]), int(t["quota_bytes"])
 
     if "student" in roles and grade is not None:
-        grades = cfg.get("grades") or {}
-        g = grades.get(grade) or grades.get(str(grade)) or _DEFAULT_STUDENT
+        g = _grade_entry(cfg.get("grades") or {}, grade) or _DEFAULT_STUDENT
         return int(g["retention_days"]), int(g["quota_bytes"])
 
     return _DEFAULT_FALLBACK["retention_days"], _DEFAULT_FALLBACK["quota_bytes"]

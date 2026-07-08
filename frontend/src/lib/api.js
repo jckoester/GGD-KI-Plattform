@@ -1671,3 +1671,31 @@ export async function getReviewStatus(groupId) {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Review-Status konnte nicht geladen werden')
     return res.json()
 }
+
+// ── Artefaktbibliothek (Phase 18) ──────────────────────────────────────────────
+
+// „In Bibliothek speichern": ein generiertes Bild dauerhaft ablegen.
+export async function saveImageToLibrary(imageId, title = null) {
+    const res = await fetch(`${BASE}/artifacts/from-image`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_id: imageId, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}
+
+// „In Bibliothek speichern": ein gerendertes Diagramm ablegen. `kind` ∈ circuit|plot|mermaid.
+// mermaid liefert zusätzlich das im Browser gerenderte SVG; circuit/plot werden serverseitig
+// aus `source` neu gerendert.
+export async function saveDiagramToLibrary(kind, source, { svg = null, title = null } = {}) {
+    const res = await fetch(`${BASE}/artifacts/from-diagram`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, source, svg, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}

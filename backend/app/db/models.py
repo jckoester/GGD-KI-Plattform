@@ -366,6 +366,9 @@ class GeneratedImage(Base):
     size: Mapped[str] = mapped_column(nullable=False)
     mime_type: Mapped[str] = mapped_column(nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)
+    # Der (LLM-gebildete) Bild-Prompt — dient als „roher Quelltext" beim Promoten in die
+    # Artefaktbibliothek (Phase 18). Nullable: Alt-Bilder vor Einführung der Spalte.
+    prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -413,11 +416,14 @@ class Artifact(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
     owner_pseudonym: Mapped[str] = mapped_column(nullable=False)
-    kind: Mapped[str] = mapped_column(nullable=False)  # image | render_svg | ggb | (document …)
+    kind: Mapped[str] = mapped_column(nullable=False)  # image | circuit | plot | mermaid | ggb | (document …)
     mime_type: Mapped[str] = mapped_column(nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)
     title: Mapped[str] = mapped_column(nullable=False)
     source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Idempotenz-Schlüssel der Herkunft: `image:<image_id>` bzw. `<kind>:<quell-hash>`.
+    # Zweimaliges „In Bibliothek speichern" desselben Inhalts liefert dasselbe Artefakt.
+    origin_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     origin_conversation_id: Mapped[Optional[UUID]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
@@ -427,6 +433,12 @@ class Artifact(Base):
     __table_args__ = (
         Index("idx_artifacts_owner", "owner_pseudonym"),
         Index("idx_artifacts_expires_at", "expires_at"),
+        # Idempotenz: pro Eigentümer:in höchstens ein Artefakt je Herkunft (partiell — nur
+        # wenn origin_ref gesetzt; manuell erzeugte Artefakte tragen keine Herkunft).
+        Index(
+            "uq_artifacts_owner_origin", "owner_pseudonym", "origin_ref",
+            unique=True, postgresql_where=text("origin_ref IS NOT NULL"),
+        ),
     )
 
 

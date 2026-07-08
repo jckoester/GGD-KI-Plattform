@@ -1,8 +1,9 @@
 <script>
-    import { AlertCircle, Download, FileText, Image } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, Image } from 'lucide-svelte';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
+    import { saveImageToLibrary, saveDiagramToLibrary } from '$lib/api.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
     let { message, isStreaming = false, costEur = null } = $props();
@@ -15,6 +16,87 @@
     let failedImages = $state(new Set());
     function onImageError(id) {
         failedImages = new Set(failedImages).add(id);
+    }
+
+    // „In Bibliothek speichern" (Phase 18): Status je Bild — idle | saving | saved | exists | full | error.
+    let imageSaveState = $state({});
+    async function saveImage(imageId) {
+        if (imageSaveState[imageId] === 'saving') return;
+        imageSaveState = { ...imageSaveState, [imageId]: 'saving' };
+        try {
+            const r = await saveImageToLibrary(imageId);
+            imageSaveState = { ...imageSaveState, [imageId]: r.created ? 'saved' : 'exists' };
+        } catch (e) {
+            imageSaveState = { ...imageSaveState, [imageId]: e?.status === 409 ? 'full' : 'error' };
+        }
+        setTimeout(() => {
+            imageSaveState = { ...imageSaveState, [imageId]: 'idle' };
+        }, 2500);
+    }
+    function imageSaveTitle(state) {
+        return {
+            saving: 'Wird gespeichert…',
+            saved: 'In Bibliothek gespeichert',
+            exists: 'Bereits in der Bibliothek',
+            full: 'Bibliothek voll',
+            error: 'Speichern fehlgeschlagen',
+        }[state] ?? 'In Bibliothek speichern';
+    }
+
+    // Server-/Client-gerenderte Diagramme (circuit/plot/mermaid) bekommen einen
+    // „In Bibliothek speichern"-Knopf, sobald sie erfolgreich zu SVG gerendert wurden.
+    // Die Rohquelle liegt in `data-source` (von serverRender.js/diagrams.js gestasht).
+    const DIAGRAM_KIND = { 'circuit-block': 'circuit', 'plot-block': 'plot', 'mermaid-block': 'mermaid' };
+    function libraryButtons(node) {
+        function attach() {
+            node.querySelectorAll('.circuit-block, .plot-block, .mermaid-block').forEach((block) => {
+                if (block.hasAttribute('data-lib-attached')) return;
+                if (!block.dataset.source) return;        // Rohquelle noch nicht gestasht
+                if (!block.querySelector('svg')) return;   // noch nicht erfolgreich gerendert
+                const cls = [...block.classList].find((c) => DIAGRAM_KIND[c]);
+                const kind = cls && DIAGRAM_KIND[cls];
+                if (!kind) return;
+
+                block.setAttribute('data-lib-attached', '');
+                block.style.position = 'relative';
+                block.classList.add('group');
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('aria-label', 'In Bibliothek speichern');
+                btn.title = 'In Bibliothek speichern';
+                btn.className = [
+                    'save-lib-btn absolute top-1.5 right-1.5',
+                    'px-1.5 py-0.5 rounded text-xs',
+                    'bg-light-bg-2/80 dark:bg-dark-bg-2/80',
+                    'text-light-tx-2 dark:text-dark-tx-2',
+                    'hover:bg-light-ui-3 dark:hover:bg-dark-ui-3',
+                    'opacity-0 group-hover:opacity-100 transition-opacity',
+                ].join(' ');
+                btn.textContent = 'In Bibliothek';
+
+                btn.addEventListener('click', async () => {
+                    if (btn.disabled) return;
+                    btn.disabled = true;
+                    const src = block.dataset.source ?? '';
+                    const svg = kind === 'mermaid' ? block.querySelector('svg')?.outerHTML ?? null : null;
+                    try {
+                        const r = await saveDiagramToLibrary(kind, src, { svg });
+                        btn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
+                    } catch (e) {
+                        btn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
+                    }
+                    setTimeout(() => { btn.textContent = 'In Bibliothek'; btn.disabled = false; }, 2200);
+                });
+
+                block.appendChild(btn);
+            });
+        }
+
+        attach();
+        const observer = new MutationObserver(attach);
+        observer.observe(node, { childList: true, subtree: true });
+        return { destroy() { observer.disconnect(); } };
     }
 
     // Svelte-Action: Copy-Buttons in code-block-Containern einbinden
@@ -102,7 +184,7 @@
                         prose-a:text-light-bl dark:prose-a:text-dark-bl
                         prose-code:text-light-tx dark:prose-code:text-dark-tx
                         prose-blockquote:text-light-tx-2 dark:prose-blockquote:text-dark-tx-2"
-                 use:copyButtons use:renderDiagrams use:renderServerBlocks>
+                 use:copyButtons use:renderDiagrams use:renderServerBlocks use:libraryButtons>
                 {@html renderedContent}
             </div>
             {#if isStreaming}
@@ -134,18 +216,39 @@
                                 class="rounded-xl max-w-full h-auto border border-light-ui-3 dark:border-dark-ui-3"
                                 onerror={() => onImageError(img.image_id)}
                             />
-                            <a
-                                href="/api/images/{img.image_id}"
-                                download="bild-{img.image_id}.png"
-                                aria-label="Bild herunterladen"
-                                class="absolute top-1.5 right-1.5 p-1.5 rounded-lg
-                                       bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                       text-light-tx-2 dark:text-dark-tx-2
-                                       hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
-                                       opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <Download class="w-4 h-4" />
-                            </a>
+                            <div class="absolute top-1.5 right-1.5 flex gap-1
+                                        opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    type="button"
+                                    onclick={() => saveImage(img.image_id)}
+                                    disabled={imageSaveState[img.image_id] === 'saving'}
+                                    aria-label={imageSaveTitle(imageSaveState[img.image_id])}
+                                    title={imageSaveTitle(imageSaveState[img.image_id])}
+                                    class="p-1.5 rounded-lg
+                                           bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                           text-light-tx-2 dark:text-dark-tx-2
+                                           hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+                                >
+                                    {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
+                                        <Check class="w-4 h-4" />
+                                    {:else if imageSaveState[img.image_id] === 'full' || imageSaveState[img.image_id] === 'error'}
+                                        <AlertCircle class="w-4 h-4" />
+                                    {:else}
+                                        <BookmarkPlus class="w-4 h-4" />
+                                    {/if}
+                                </button>
+                                <a
+                                    href="/api/images/{img.image_id}"
+                                    download="bild-{img.image_id}.png"
+                                    aria-label="Bild herunterladen"
+                                    class="p-1.5 rounded-lg
+                                           bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                           text-light-tx-2 dark:text-dark-tx-2
+                                           hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+                                >
+                                    <Download class="w-4 h-4" />
+                                </a>
+                            </div>
                         </div>
                     {/if}
                 {/each}

@@ -56,6 +56,7 @@ async def save_generated_image(
     model: str,
     size: str,
     mime_type: str = "image/png",
+    prompt: str | None = None,
 ) -> UUID:
     """Schreibt die Bytes auf Disk + legt die DB-Referenz an (committed). Gibt die ID zurück."""
     image_id = uuid4()
@@ -71,6 +72,7 @@ async def save_generated_image(
         size=size,
         mime_type=mime_type,
         byte_size=len(image_bytes),
+        prompt=prompt,
     ))
     await db.commit()
     logger.info("Bild persistiert id=%s conv=%s bytes=%d", image_id, conversation_id, len(image_bytes))

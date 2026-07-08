@@ -12,6 +12,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts.limits import get_artifact_limits
@@ -56,6 +57,19 @@ async def used_bytes(db: AsyncSession, owner_pseudonym: str) -> int:
     return int(result.scalar_one())
 
 
+async def find_by_origin_ref(
+    db: AsyncSession, owner_pseudonym: str, origin_ref: str
+) -> Optional[Artifact]:
+    """Bereits gespeichertes Artefakt gleicher Herkunft (Idempotenz von „In Bibliothek speichern")."""
+    result = await db.execute(
+        select(Artifact).where(
+            Artifact.owner_pseudonym == owner_pseudonym,
+            Artifact.origin_ref == origin_ref,
+        )
+    )
+    return result.scalars().first()
+
+
 async def save_artifact(
     db: AsyncSession,
     *,
@@ -67,13 +81,22 @@ async def save_artifact(
     data: bytes,
     title: str,
     source: Optional[str] = None,
+    origin_ref: Optional[str] = None,
     origin_conversation_id: Optional[UUID] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Speichert ein Artefakt: Quota prüfen → Bytes auf Disk → Row mit `expires_at`.
 
-    Wirft `QuotaExceeded`, wenn die Bibliothek der Nutzer:in dadurch überliefe.
+    Idempotent über `origin_ref`: existiert bereits ein Artefakt dieser Herkunft, wird es
+    unverändert zurückgegeben (kein zweiter Disk-Write, kein Quota-Verbrauch). Wirft
+    `QuotaExceeded`, wenn die Bibliothek der Nutzer:in durch das Speichern überliefe.
     """
+    # Idempotenz: gleiche Herkunft → bestehendes Artefakt, ohne erneut zu schreiben.
+    if origin_ref is not None:
+        existing = await find_by_origin_ref(db, owner_pseudonym, origin_ref)
+        if existing is not None:
+            return existing
+
     retention_days, quota_bytes = get_artifact_limits(roles, grade)
     size = len(data)
     used = await used_bytes(db, owner_pseudonym)
@@ -94,12 +117,24 @@ async def save_artifact(
         byte_size=size,
         title=title,
         source=source,
+        origin_ref=origin_ref,
         origin_conversation_id=origin_conversation_id,
         created_at=ts,
         expires_at=ts + timedelta(days=retention_days),
     )
     db.add(artifact)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Wettlauf (Doppelklick): der Unique-Index hat den zweiten Insert verhindert.
+        # Datei verwerfen, bestehendes Artefakt zurückgeben.
+        await db.rollback()
+        _file_path(artifact_id, mime_type).unlink(missing_ok=True)
+        if origin_ref is not None:
+            existing = await find_by_origin_ref(db, owner_pseudonym, origin_ref)
+            if existing is not None:
+                return existing
+        raise
     return artifact
 
 

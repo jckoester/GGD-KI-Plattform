@@ -65,6 +65,7 @@ async function renderBlock(block, kind) {
     const source = (block.textContent ?? '').trim();
     block.setAttribute('data-processed', ''); // vor await: re-entrante Läufe überspringen
     if (!source) return;
+    block.dataset.source = source; // Rohquelle für „In Bibliothek speichern" bewahren
     block.innerHTML = '<div class="server-render-loading">Wird gerendert…</div>';
     try {
         const res = await fetch(`${BASE}/render/${kind}`, {
