@@ -1699,3 +1699,20 @@ export async function saveDiagramToLibrary(kind, source, { svg = null, title = n
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
     return res.json()
 }
+
+// Die eigene Bibliothek laden: { items: [...], used_bytes, quota_bytes }.
+export async function getLibrary() {
+    const res = await fetch(`${BASE}/artifacts`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bibliothek konnte nicht geladen werden')
+    return res.json()
+}
+
+// Ein Artefakt löschen (Row + Datei).
+export async function deleteArtifact(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Löschen fehlgeschlagen')
+    return res.json()
+}

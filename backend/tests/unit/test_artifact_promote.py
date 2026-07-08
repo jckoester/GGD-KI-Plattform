@@ -275,3 +275,58 @@ def test_get_foreign_artifact_forbidden(monkeypatch):
     client = _client(monkeypatch)
     resp = client.get(f"/artifacts/{uuid4()}")
     assert resp.status_code == 403
+
+
+# ── GET /artifacts (Liste + Quota) & DELETE ───────────────────────────────────
+
+def test_list_library_returns_items_and_usage(monkeypatch):
+    from datetime import datetime, timezone
+    ts = datetime(2026, 7, 8, tzinfo=timezone.utc)
+    rec = SimpleNamespace(
+        id=uuid4(), kind="plot", mime_type="image/svg+xml", title="Funktionsgraph",
+        byte_size=1234, source="functions: []", created_at=ts, expires_at=ts,
+    )
+    monkeypatch.setattr(store_mod, "list_artifacts", AsyncMock(return_value=[rec]))
+    monkeypatch.setattr(store_mod, "used_bytes", AsyncMock(return_value=1234))
+    monkeypatch.setattr(
+        "app.artifacts.router.get_artifact_limits", lambda roles, grade: (365, 52428800)
+    )
+    client = _client(monkeypatch)
+    resp = client.get("/artifacts")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["used_bytes"] == 1234
+    assert body["quota_bytes"] == 52428800
+    assert len(body["items"]) == 1
+    assert body["items"][0]["source"] == "functions: []"
+    assert body["items"][0]["kind"] == "plot"
+
+
+def test_delete_artifact_owner_ok(monkeypatch):
+    rec = SimpleNamespace(owner_pseudonym="p", mime_type="image/png")
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=rec))
+    deleted = AsyncMock()
+    monkeypatch.setattr(store_mod, "delete_artifact", deleted)
+    client = _client(monkeypatch)
+    resp = client.request("DELETE", f"/artifacts/{uuid4()}")
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    deleted.assert_awaited_once()
+
+
+def test_delete_artifact_foreign_forbidden(monkeypatch):
+    rec = SimpleNamespace(owner_pseudonym="jemand-anderes", mime_type="image/png")
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=rec))
+    deleted = AsyncMock()
+    monkeypatch.setattr(store_mod, "delete_artifact", deleted)
+    client = _client(monkeypatch)
+    resp = client.request("DELETE", f"/artifacts/{uuid4()}")
+    assert resp.status_code == 403
+    deleted.assert_not_called()
+
+
+def test_delete_artifact_missing_404(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=None))
+    client = _client(monkeypatch)
+    resp = client.request("DELETE", f"/artifacts/{uuid4()}")
+    assert resp.status_code == 404

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts import promote, store
+from app.artifacts.limits import get_artifact_limits
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.models import Artifact
@@ -38,6 +39,25 @@ class SavedArtifact(BaseModel):
     created_at: datetime
     expires_at: datetime
     created: bool  # False ⇒ war bereits in der Bibliothek (idempotent)
+
+
+class ArtifactItem(BaseModel):
+    """Ein Bibliotheks-Eintrag (Metadaten + roher Quelltext für Kopieren/Download)."""
+
+    id: UUID
+    kind: str
+    mime_type: str
+    title: str
+    byte_size: int
+    source: str | None
+    created_at: datetime
+    expires_at: datetime
+
+
+class LibraryResponse(BaseModel):
+    items: list[ArtifactItem]
+    used_bytes: int
+    quota_bytes: int
 
 
 class FromImageRequest(BaseModel):
@@ -112,6 +132,26 @@ async def save_diagram_to_library(
     return _saved(artifact, created)
 
 
+@router.get("", response_model=LibraryResponse)
+async def list_library(
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> LibraryResponse:
+    """Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige."""
+    records = await store.list_artifacts(db, current_user.sub)
+    used = await store.used_bytes(db, current_user.sub)
+    _, quota_bytes = get_artifact_limits(current_user.roles, current_user.grade)
+    items = [
+        ArtifactItem(
+            id=r.id, kind=r.kind, mime_type=r.mime_type, title=r.title,
+            byte_size=r.byte_size, source=r.source,
+            created_at=r.created_at, expires_at=r.expires_at,
+        )
+        for r in records
+    ]
+    return LibraryResponse(items=items, used_bytes=used, quota_bytes=quota_bytes)
+
+
 @router.get("/{artifact_id}")
 async def get_artifact_file(
     artifact_id: UUID,
@@ -129,3 +169,19 @@ async def get_artifact_file(
         raise HTTPException(status_code=404, detail="Artefakt-Datei nicht gefunden")
     headers = _SVG_HARDENING if record.mime_type == "image/svg+xml" else None
     return Response(content=data, media_type=record.mime_type, headers=headers)
+
+
+@router.delete("/{artifact_id}")
+async def delete_artifact_endpoint(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Löscht ein Artefakt (Row + Datei) — nur die Eigentümer:in."""
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    await store.delete_artifact(db, record)
+    return {"ok": True}
