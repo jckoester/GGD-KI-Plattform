@@ -27,9 +27,14 @@ services:
       RENDER_SIDECAR_URL: http://render-sidecar:3200
       # matplotlib (Plot-Rendering) braucht ein schreibbares Verzeichnis für den Font-Cache.
       MPLCONFIGDIR: /tmp/matplotlib
+      # Persistente Ablage generierter Bilder (Phase 16) + Bibliotheks-Artefakte (Phase 18).
+      # Absolute Pfade → cwd-unabhängig; das ./data-Volume teilen backend + cron.
+      IMAGE_STORAGE_DIR: /app/data/generated_images
+      ARTIFACT_STORAGE_DIR: /app/data/artifacts
     volumes:
       - ./config:/app/config:ro
       - ./static:/app/static:ro
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -101,8 +106,12 @@ services:
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
       TAXONOMY_PATH: /app/config/taxonomy.yaml
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
+      # Muss zu backend passen (dasselbe ./data-Volume) — sonst räumt der Cron ins Leere.
+      IMAGE_STORAGE_DIR: /app/data/generated_images
+      ARTIFACT_STORAGE_DIR: /app/data/artifacts
     volumes:
       - ./config:/app/config:ro
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -115,6 +124,8 @@ services:
              echo '15 3 * * * root python /app/scripts/embedding_backfill.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '45 3 * * * root python /app/scripts/auto_confirm_reviews.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '0 4 * * * root python /app/scripts/cleanup_rendered_svg.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
+             echo '30 4 * * * root python /app/scripts/cleanup_generated_images.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
+             echo '45 4 * * * root python /app/scripts/cleanup_artifacts.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              chmod 0644 /etc/cron.d/ggd-ki &&
              cron -f"
     restart: unless-stopped

@@ -30,6 +30,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
 - [Bilder erzeugen](bilder-erzeugen.md) — Bild-Werkzeuge finden, nutzen, Grenzen & Kosten
 - [Diagramme & Graphen](diagramme.md) — Diagramme, Schaltpläne, Funktionsgraphen im Chat
+- [Bibliothek](bibliothek.md) — Bilder & Diagramme dauerhaft speichern, herunterladen, GeoGebra-Export
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen

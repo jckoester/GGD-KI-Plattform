@@ -58,3 +58,4 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Schuljahreswechsel, Troubleshooting
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
 - [Server-Rendering-Sidecar](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Betrieb, Config, Cache-Cleanup
+- [Artefaktbibliothek](artefaktbibliothek.md) — Aufbewahrung/Quota, Ablage-Volume, Cleanup-Cron

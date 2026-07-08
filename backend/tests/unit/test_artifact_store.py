@@ -94,3 +94,31 @@ async def test_cleanup_removes_expired(monkeypatch, tmp_path):
 
     assert stats.expired_removed == 1
     assert not (tmp_path / f"{aid}.svg").exists()  # Datei mitgelöscht
+
+
+async def test_cleanup_dry_run_keeps_files(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    aid = uuid4()
+    (tmp_path / f"{aid}.svg").write_bytes(b"svg")
+    art = SimpleNamespace(id=aid, mime_type="image/svg+xml")
+    sel = MagicMock(); sel.scalars.return_value.all.return_value = [art]
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(side_effect=[sel])
+
+    stats = await store.cleanup_artifacts(db, now=_NOW, dry_run=True)
+
+    assert stats.scanned == 1 and stats.expired_removed == 1
+    assert (tmp_path / f"{aid}.svg").exists()  # dry-run löscht nichts
+    db.commit.assert_not_awaited()
+
+
+def test_storage_dir_relative_is_repo_root_based(monkeypatch, tmp_path):
+    # Relativer Pfad → aufgelöst gegen _REPO_ROOT (cwd-unabhängig, wichtig für den Cron).
+    monkeypatch.setattr(store, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", "data/artifacts")
+    assert store.storage_dir() == tmp_path / "data" / "artifacts"
+
+
+def test_storage_dir_absolute_used_verbatim(monkeypatch, tmp_path):
+    abspath = tmp_path / "abs"
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(abspath))
+    assert store.storage_dir() == abspath

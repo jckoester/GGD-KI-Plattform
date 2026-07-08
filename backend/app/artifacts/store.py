@@ -21,6 +21,9 @@ from app.db.models import Artifact
 
 logger = logging.getLogger(__name__)
 
+# Repo-Root: backend/app/artifacts/store.py → parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 _EXT_BY_MIME = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -34,7 +37,12 @@ class QuotaExceeded(Exception):
 
 
 def storage_dir() -> Path:
-    d = Path(settings.artifact_storage_dir)
+    """Ablageverzeichnis (repo-root-relativ, falls nicht absolut) — cwd-unabhängig.
+
+    Wichtig für den Cleanup-Cron: der läuft nicht aus dem Backend-Verzeichnis, muss aber
+    denselben Pfad auflösen wie das Backend beim Speichern (analog `image_store`)."""
+    base = Path(settings.artifact_storage_dir)
+    d = base if base.is_absolute() else _REPO_ROOT / base
     d.mkdir(parents=True, exist_ok=True)
     return d
 

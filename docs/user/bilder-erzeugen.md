@@ -17,8 +17,9 @@ einen Chat damit.
 1. In der Seitenleiste **Werkzeuge** öffnen und einen Bild-Assistenten wählen.
 2. Im Chat **beschreiben**, was das Bild zeigen soll — je genauer, desto besser
    (Motiv, Stil, Bildausschnitt).
-3. Das fertige Bild erscheint in der Antwort. Über das Symbol oben rechts am Bild
-   kannst du es **herunterladen**.
+3. Das fertige Bild erscheint in der Antwort. Über die Symbole oben rechts am Bild
+   kannst du es **herunterladen** oder mit dem Lesezeichen-Symbol in deine
+   [Bibliothek](bibliothek.md) übernehmen — sonst verschwindet es mit dem Chat.
 
 ## Grenzen
 

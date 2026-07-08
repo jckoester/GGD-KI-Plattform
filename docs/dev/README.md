@@ -60,6 +60,7 @@ cd frontend && npm install && npm run dev
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
+- [Artefaktbibliothek](artefaktbibliothek.md) — `artifacts`-Modell, Promotion/Idempotenz, ggb-Export
 - [Lokales Dev-Setup](dev-setup.md) — Entwicklungsumgebung ohne Docker
 - [Backend-Entwicklung](backend-entwicklung.md) — Migrationen, Tests, Skripte
 - [Neuen Auth-Adapter implementieren](neuer-auth-adapter.md) — AuthAdapter-Interface
