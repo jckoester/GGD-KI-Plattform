@@ -10,6 +10,9 @@ erreichbar.
 - Node.js 20+ (`node --version`)
 - PostgreSQL erreichbar (lokal installiert oder als einzelner Docker-Container)
 - LiteLLM (lokal oder im Netz)
+- **Pandoc** — nur für den Office-Export (DOCX/ODT) der Material-Werkstatt (Phase 19):
+  `brew install pandoc` (macOS) bzw. `apt-get install pandoc` (Linux). Fehlt es, ist der
+  Office-Export deaktiviert (Feature-Flag) — der Rest läuft normal.
 
 PostgreSQL als Docker-Container (ohne Compose):
 ```bash

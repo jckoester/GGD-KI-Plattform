@@ -72,5 +72,13 @@ class Settings(BaseSettings):
     # Role-/jahrgangsbasierte Aufbewahrung + Quota (Struktur wie budget_tiers.yaml).
     artifact_limits_path: str = "config/artifact_limits.yaml"
 
+    # ── Material-Werkstatt / Pandoc (Phase 19) ───────────────────────────────
+    # Office-Export (DOCX/ODT) läuft über Pandoc als Subprozess. PDF nutzt weiterhin die
+    # weasyprint-Pipeline (Phase 17). Fehlt das Binary, wird der Office-Export sauber
+    # deaktiviert (Feature-Flag), statt zu crashen.
+    pandoc_bin: str = "pandoc"
+    pandoc_timeout: float = 20.0
+    pandoc_max_input_chars: int = 500_000
+
 
 settings = Settings()

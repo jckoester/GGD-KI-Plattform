@@ -6,6 +6,7 @@ FROM python:3.12-slim
 #    (Curriculum-PDF-Export, KS-Phase-6 Schritt 5)
 #  - shared-mime-info: MIME-Erkennung für eingebettete Bilder
 #  - fonts-liberation: Schriften (PDF-Template nutzt "Liberation Sans")
+#  - pandoc: Office-Export DOCX/ODT der Material-Werkstatt (Phase 19)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cron \
         curl \
@@ -17,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libffi8 \
         shared-mime-info \
         fonts-liberation \
+        pandoc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
