@@ -95,6 +95,29 @@ class GgbRequest(BaseModel):
     title: str | None = None
 
 
+class DocumentCreateRequest(BaseModel):
+    title: str | None = None
+    markdown: str = ""
+    origin_conversation_id: UUID | None = None
+
+
+class DocumentUpdateRequest(BaseModel):
+    title: str | None = None
+    markdown: str = ""
+
+
+class DocumentResponse(BaseModel):
+    """Ein Text-Dokument fürs Bearbeiten (Quelle = Markdown)."""
+
+    id: UUID
+    title: str
+    kind: str
+    source: str
+    byte_size: int
+    created_at: datetime
+    expires_at: datetime
+
+
 def _saved(artifact: Artifact, created: bool) -> SavedArtifact:
     return SavedArtifact(
         id=artifact.id,
@@ -173,6 +196,81 @@ async def list_library(
         for r in records
     ]
     return LibraryResponse(items=items, used_bytes=used, quota_bytes=quota_bytes)
+
+
+# ── Text-Dokumente (Material-Werkstatt, Phase 19) ─────────────────────────────
+
+@router.post("/document", response_model=SavedArtifact)
+async def create_document(
+    req: DocumentCreateRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SavedArtifact:
+    """Legt ein neues Markdown-Dokument an (leer oder aus dem Chat promotet)."""
+    try:
+        artifact = await store.create_document(
+            db,
+            owner_pseudonym=current_user.sub,
+            roles=current_user.roles,
+            grade=current_user.grade,
+            title=req.title,
+            markdown=req.markdown,
+            origin_conversation_id=req.origin_conversation_id,
+        )
+    except store.QuotaExceeded:
+        raise HTTPException(
+            status_code=409,
+            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+        )
+    return _saved(artifact, True)
+
+
+@router.get("/{artifact_id}/document", response_model=DocumentResponse)
+async def get_document(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentResponse:
+    """Lädt ein Dokument zum Bearbeiten (Quelle = Markdown)."""
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if record.kind != "document":
+        raise HTTPException(status_code=422, detail="Kein Text-Dokument")
+    return DocumentResponse(
+        id=record.id, title=record.title, kind=record.kind, source=record.source or "",
+        byte_size=record.byte_size, created_at=record.created_at, expires_at=record.expires_at,
+    )
+
+
+@router.put("/{artifact_id}", response_model=SavedArtifact)
+async def update_document(
+    artifact_id: UUID,
+    req: DocumentUpdateRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SavedArtifact:
+    """Überschreibt ein Dokument (nur die Eigentümer:in, nur `kind='document'`)."""
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if record.kind != "document":
+        raise HTTPException(status_code=422, detail="Kein Text-Dokument")
+    try:
+        artifact = await store.update_document(
+            db, record=record, roles=current_user.roles, grade=current_user.grade,
+            title=req.title, markdown=req.markdown,
+        )
+    except store.QuotaExceeded:
+        raise HTTPException(
+            status_code=409,
+            detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+        )
+    return _saved(artifact, False)
 
 
 @router.get("/{artifact_id}")

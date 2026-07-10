@@ -1717,6 +1717,39 @@ export async function deleteArtifact(artifactId) {
     return res.json()
 }
 
+// ── Text-Dokumente / Material-Werkstatt (Phase 19) ─────────────────────────────
+
+// Neues Markdown-Dokument anlegen (leer oder aus dem Chat promotet). Gibt u. a. { id } zurück.
+export async function createDocument(title, markdown = '', { originConversationId = null } = {}) {
+    const res = await fetch(`${BASE}/artifacts/document`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, markdown, origin_conversation_id: originConversationId }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Dokument konnte nicht angelegt werden')
+    return res.json()
+}
+
+// Ein Dokument zum Bearbeiten laden: { id, title, source, kind, ... }.
+export async function getDocument(id) {
+    const res = await fetch(`${BASE}/artifacts/${id}/document`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Dokument konnte nicht geladen werden')
+    return res.json()
+}
+
+// Ein Dokument überschreiben (Titel + Markdown).
+export async function updateDocument(id, title, markdown) {
+    const res = await fetch(`${BASE}/artifacts/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, markdown }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}
+
 // Rohe Plot-Spec → `.ggb`-Datei (Blob) für den GeoGebra-Download direkt am Plot im Chat.
 export async function getPlotGgbBlob(source, title = null) {
     const res = await fetch(`${BASE}/artifacts/ggb`, {

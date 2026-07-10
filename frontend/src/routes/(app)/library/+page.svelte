@@ -1,9 +1,10 @@
 <script>
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
     import {
-        Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText,
+        Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit,
     } from 'lucide-svelte';
-    import { getLibrary, deleteArtifact } from '$lib/api.js';
+    import { getLibrary, deleteArtifact, createDocument } from '$lib/api.js';
     import { triggerDownload } from '$lib/download.js';
     import {
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
@@ -39,6 +40,20 @@
     }
 
     onMount(load);
+
+    let creatingDoc = $state(false);
+    async function newDocument() {
+        if (creatingDoc) return;
+        creatingDoc = true;
+        error = null;
+        try {
+            const doc = await createDocument('Neues Dokument', '');
+            await goto(`/library/${doc.id}/edit`);
+        } catch (err) {
+            creatingDoc = false;
+            error = err.message ?? 'Dokument konnte nicht angelegt werden.';
+        }
+    }
 
     function fmtDate(iso) {
         try {
@@ -140,13 +155,25 @@
 
 <div class="h-full overflow-y-auto p-6">
     <div class="max-w-5xl mx-auto">
-        <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
-            <Library class="w-6 h-6" />
-            <h1 class="text-2xl font-semibold">Bibliothek</h1>
+        <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
+                <Library class="w-6 h-6" />
+                <h1 class="text-2xl font-semibold">Bibliothek</h1>
+            </div>
+            <button
+                type="button"
+                onclick={newDocument}
+                disabled={creatingDoc}
+                class="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg shrink-0
+                       bg-primary dark:bg-primary-dark text-white
+                       hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+                <FilePlus class="w-4 h-4" /> Neues Dokument
+            </button>
         </div>
         <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Deine gespeicherten Bilder und Diagramme. Sie bleiben unabhängig vom Chat erhalten,
-            bis du sie löschst oder die Aufbewahrungsfrist abläuft.
+            Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
+            erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
         </p>
 
         {#if !loading && quotaBytes > 0}
@@ -223,6 +250,16 @@
                             <!-- Aktionen -->
                             <div class="flex flex-wrap items-center gap-1 mt-3 pt-2
                                         border-t border-light-ui-3 dark:border-dark-ui-3">
+                                {#if item.kind === 'document'}
+                                    <a
+                                        href="/library/{item.id}/edit"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                    >
+                                        <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
+                                    </a>
+                                {/if}
                                 <button
                                     type="button"
                                     onclick={() => downloadOriginal(item)}

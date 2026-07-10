@@ -29,7 +29,13 @@ _EXT_BY_MIME = {
     "image/jpeg": ".jpg",
     "image/svg+xml": ".svg",
     "application/vnd.geogebra.file": ".ggb",
+    "text/markdown": ".md",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.oasis.opendocument.text": ".odt",
+    "application/pdf": ".pdf",
 }
+
+DOCUMENT_MIME = "text/markdown"
 
 
 class QuotaExceeded(Exception):
@@ -148,6 +154,69 @@ async def save_artifact(
 
 async def get_artifact(db: AsyncSession, artifact_id: UUID) -> Optional[Artifact]:
     return await db.get(Artifact, artifact_id)
+
+
+def _clean_title(title: Optional[str]) -> str:
+    return (title or "").strip()[:200] or "Dokument"
+
+
+async def create_document(
+    db: AsyncSession,
+    *,
+    owner_pseudonym: str,
+    roles: list[str],
+    grade: Optional[int],
+    title: str,
+    markdown: str,
+    origin_conversation_id: Optional[UUID] = None,
+    now: Optional[datetime] = None,
+) -> Artifact:
+    """Legt ein Text-Dokument (`kind='document'`, Markdown) an — mutabel, **kein** `origin_ref`."""
+    return await save_artifact(
+        db,
+        owner_pseudonym=owner_pseudonym,
+        roles=roles,
+        grade=grade,
+        kind="document",
+        mime_type=DOCUMENT_MIME,
+        data=markdown.encode("utf-8"),
+        title=_clean_title(title),
+        source=markdown,
+        origin_ref=None,          # Dokumente sind veränderbar, nicht content-adressiert
+        origin_conversation_id=origin_conversation_id,
+        now=now,
+    )
+
+
+async def update_document(
+    db: AsyncSession,
+    *,
+    record: Artifact,
+    roles: list[str],
+    grade: Optional[int],
+    title: str,
+    markdown: str,
+    now: Optional[datetime] = None,
+) -> Artifact:
+    """Überschreibt ein Dokument in-place (Quelle/Bytes/Titel). Aufbewahrung wird bei aktiver
+    Bearbeitung erneuert (`expires_at = now + retention`), Quota unter Abzug der alten Größe geprüft."""
+    data = markdown.encode("utf-8")
+    new_size = len(data)
+    retention_days, quota_bytes = get_artifact_limits(roles, grade)
+    used = await used_bytes(db, record.owner_pseudonym)
+    if used - record.byte_size + new_size > quota_bytes:
+        raise QuotaExceeded(
+            f"Bibliothek voll: {used - record.byte_size + new_size} > {quota_bytes} Bytes"
+        )
+
+    _file_path(record.id, record.mime_type).write_bytes(data)
+    ts = _now(now)
+    record.title = _clean_title(title)
+    record.source = markdown
+    record.byte_size = new_size
+    record.expires_at = ts + timedelta(days=retention_days)
+    await db.commit()
+    return record
 
 
 async def list_artifacts(db: AsyncSession, owner_pseudonym: str) -> list[Artifact]:

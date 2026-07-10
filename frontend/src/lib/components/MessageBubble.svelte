@@ -1,9 +1,11 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, Image } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image } from 'lucide-svelte';
+    import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
-    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob } from '$lib/api.js';
+    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument } from '$lib/api.js';
+    import { deriveDocTitle } from '$lib/workshop.js';
     import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
@@ -174,6 +176,25 @@
             destroy() { observer.disconnect(); }
         };
     }
+
+    // „In Werkstatt öffnen" (Phase 19): den Antworttext als Markdown-Dokument ablegen
+    // und in den Editor springen.
+    let openingWorkshop = $state(false);
+    let workshopError = $state(null);
+    async function openInWorkshop() {
+        if (openingWorkshop) return;
+        openingWorkshop = true;
+        workshopError = null;
+        try {
+            const doc = await createDocument(deriveDocTitle(message.content), message.content ?? '');
+            await goto(`/library/${doc.id}/edit`);
+        } catch (e) {
+            openingWorkshop = false;
+            workshopError = e?.status === 409
+                ? 'Bibliothek voll — bitte zuerst aufräumen.'
+                : 'Konnte nicht in die Werkstatt übernommen werden.';
+        }
+    }
 </script>
 
 {#if message.role === 'user'}
@@ -227,6 +248,25 @@
                 </p>
             {/if}
         </div>
+        {/if}
+        {#if message.content && !isStreaming}
+            <div class="mt-1 max-w-[80%]">
+                <button
+                    type="button"
+                    onclick={openInWorkshop}
+                    disabled={openingWorkshop}
+                    class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           disabled:opacity-50"
+                >
+                    <FileEdit class="w-3.5 h-3.5" />
+                    {openingWorkshop ? 'Wird geöffnet…' : 'In Werkstatt öffnen'}
+                </button>
+                {#if workshopError}
+                    <p class="text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
+                {/if}
+            </div>
         {/if}
         {#if message.images?.length}
             <div class="flex flex-col gap-2 mt-2 max-w-[80%]">

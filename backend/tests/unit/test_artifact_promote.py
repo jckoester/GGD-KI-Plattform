@@ -374,3 +374,78 @@ def test_ggb_from_artifact_foreign_403(monkeypatch):
     client = _client(monkeypatch)
     resp = client.get(f"/artifacts/{uuid4()}/ggb")
     assert resp.status_code == 403
+
+
+# ── Dokumente (Material-Werkstatt, Phase 19) ──────────────────────────────────
+
+def _doc(**kw):
+    from datetime import datetime, timezone
+    ts = datetime(2026, 7, 9, tzinfo=timezone.utc)
+    base = dict(
+        id=uuid4(), owner_pseudonym="p", kind="document", mime_type="text/markdown",
+        title="Arbeitsblatt", source="# Titel", byte_size=7, created_at=ts, expires_at=ts,
+    )
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def test_create_document_ok(monkeypatch):
+    monkeypatch.setattr(store_mod, "create_document", AsyncMock(return_value=_doc()))
+    client = _client(monkeypatch)
+    resp = client.post("/artifacts/document", json={"title": "AB", "markdown": "# Titel"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["created"] is True and body["kind"] == "document"
+
+
+def test_create_document_quota(monkeypatch):
+    monkeypatch.setattr(store_mod, "create_document", AsyncMock(side_effect=QuotaExceeded("voll")))
+    client = _client(monkeypatch)
+    resp = client.post("/artifacts/document", json={"markdown": "x"})
+    assert resp.status_code == 409
+
+
+def test_get_document_ok(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(source="# Hallo")))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/document")
+    assert resp.status_code == 200
+    assert resp.json()["source"] == "# Hallo"
+
+
+def test_get_document_wrong_kind_422(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(kind="image")))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/document")
+    assert resp.status_code == 422
+
+
+def test_get_document_foreign_403(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(owner_pseudonym="x")))
+    client = _client(monkeypatch)
+    resp = client.get(f"/artifacts/{uuid4()}/document")
+    assert resp.status_code == 403
+
+
+def test_update_document_ok(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    monkeypatch.setattr(store_mod, "update_document", AsyncMock(return_value=_doc(title="Neu")))
+    client = _client(monkeypatch)
+    resp = client.put(f"/artifacts/{uuid4()}", json={"title": "Neu", "markdown": "# Neu"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["created"] is False and body["title"] == "Neu"
+
+
+def test_update_document_wrong_kind_422(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(kind="plot")))
+    client = _client(monkeypatch)
+    resp = client.put(f"/artifacts/{uuid4()}", json={"markdown": "x"})
+    assert resp.status_code == 422
+
+
+def test_update_document_foreign_403(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(owner_pseudonym="x")))
+    client = _client(monkeypatch)
+    resp = client.put(f"/artifacts/{uuid4()}", json={"markdown": "x"})
+    assert resp.status_code == 403

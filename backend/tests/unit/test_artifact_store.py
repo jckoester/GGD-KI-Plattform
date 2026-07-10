@@ -122,3 +122,66 @@ def test_storage_dir_absolute_used_verbatim(monkeypatch, tmp_path):
     abspath = tmp_path / "abs"
     monkeypatch.setattr(store.settings, "artifact_storage_dir", str(abspath))
     assert store.storage_dir() == abspath
+
+
+# ── Dokumente (Material-Werkstatt, Phase 19) ──────────────────────────────────
+
+async def test_create_document_delegates_to_save(monkeypatch):
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(store, "save_artifact", fake_save)
+    await store.create_document(
+        MagicMock(), owner_pseudonym="p", roles=["teacher"], grade=None,
+        title="  Arbeitsblatt  ", markdown="# Titel\n\nText",
+    )
+    assert captured["kind"] == "document"
+    assert captured["mime_type"] == "text/markdown"
+    assert captured["source"] == "# Titel\n\nText"
+    assert captured["data"] == b"# Titel\n\nText"
+    assert captured["origin_ref"] is None        # mutabel, nicht content-adressiert
+    assert captured["title"] == "Arbeitsblatt"    # getrimmt
+
+
+async def test_update_document_rewrites_and_refreshes(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    aid = uuid4()
+    (tmp_path / f"{aid}.md").write_bytes(b"alt")
+    record = SimpleNamespace(
+        id=aid, owner_pseudonym="p", mime_type="text/markdown", byte_size=3,
+        title="Alt", source="alt", expires_at=None,
+    )
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=3)   # used=3 (nur dieses Dok)
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    out = await store.update_document(
+        db, record=record, roles=["teacher"], grade=None, title="Neu", markdown="viel mehr text", now=_NOW,
+    )
+    assert out.title == "Neu"
+    assert out.source == "viel mehr text"
+    assert out.byte_size == len(b"viel mehr text")
+    assert out.expires_at == _NOW + timedelta(days=365)     # Aufbewahrung erneuert
+    assert (tmp_path / f"{aid}.md").read_bytes() == b"viel mehr text"
+    db.commit.assert_awaited_once()
+
+
+async def test_update_document_quota_exceeded(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 100))
+    record = SimpleNamespace(
+        id=uuid4(), owner_pseudonym="p", mime_type="text/markdown", byte_size=10,
+        title="Alt", source="x", expires_at=None,
+    )
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=90)  # used=90 (inkl. dieses 10)
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    # 90 - 10 (alt) + 30 (neu) = 110 > 100 → Quota
+    with pytest.raises(store.QuotaExceeded):
+        await store.update_document(
+            db, record=record, roles=["teacher"], grade=None, title="Neu", markdown="x" * 30,
+        )
+    db.commit.assert_not_awaited()
