@@ -43,5 +43,8 @@ Zu jedem Eintrag gibt es:
   Ablaufdatum steht an jeder Karte. Möchtest du etwas dauerhaft behalten, lade es rechtzeitig
   herunter.
 
+Auch **Text-Dokumente** (Arbeitsblätter) liegen in der Bibliothek — sie bearbeitest du im Editor
+der [Material-Werkstatt](werkstatt.md) und exportierst sie als PDF/Word/ODT.
+
 → Wie du Bilder und Diagramme überhaupt erzeugst, steht unter
 [Bilder erzeugen](bilder-erzeugen.md) und [Diagramme & Graphen](diagramme.md).

@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 # fmt → Dateiendung des Pandoc-Ausgabeformats.
 OFFICE_FORMATS = {"docx": ".docx", "odt": ".odt"}
 
-# Reader-Dialekt: CommonMark + Erweiterungen (Tabellen, Fußnoten, Task-Listen …), **ohne**
-# raw_tex. Nah an dem, was markdown-it in der Vorschau rendert (Parität-Tests → Schritt 7).
-_READER = "commonmark_x"
+# Reader-Dialekt: CommonMark + Erweiterungen (Tabellen, Fußnoten, Task-Listen, Strikethrough …),
+# **ohne** raw_tex. `hard_line_breaks` spiegelt das `breaks: true` der Vorschau (marked) — ein
+# einzelner Zeilenumbruch wird zum Umbruch, nicht zum Leerzeichen (Parität, Schritt 7).
+_READER = "commonmark_x+hard_line_breaks"
 
 
 class PandocError(Exception):

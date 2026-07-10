@@ -107,7 +107,9 @@ async def _render_one(kind: str, content: str, display: bool) -> str:
 
 # ── markdown-it mit dollarmath + Render-Regeln, die aus env['_render_map'] lesen ──
 def _build_md() -> MarkdownIt:
-    md = MarkdownIt("commonmark", {"html": False})
+    # commonmark + GFM-Tabellen/Strikethrough — nähert den PDF-Export an die Vorschau (marked,
+    # GFM) an (Phase-19-Parität). Zusätzlich von curriculum-/lesson-PDF genutzt (additiv, sicher).
+    md = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
     md.use(dollarmath_plugin, double_inline=True)
 
     def _from_map(self, tokens, idx, options, env):
