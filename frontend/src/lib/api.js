@@ -1750,6 +1750,26 @@ export async function updateDocument(id, title, markdown) {
     return res.json()
 }
 
+// Dokument exportieren und herunterladen (PDF/DOCX/ODT) — liefert einen Blob.
+export async function getDocumentExportBlob(id, format) {
+    const res = await fetch(`${BASE}/artifacts/${id}/export?format=${format}`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    return res.blob()
+}
+
+// Dokument exportieren und als Artefakt in der Bibliothek behalten — liefert die Metadaten.
+export async function saveDocumentExport(id, format) {
+    const res = await fetch(`${BASE}/artifacts/${id}/export?format=${format}&save=true`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    return res.json()
+}
+
 // Rohe Plot-Spec → `.ggb`-Datei (Blob) für den GeoGebra-Download direkt am Plot im Chat.
 export async function getPlotGgbBlob(source, title = null) {
     const res = await fetch(`${BASE}/artifacts/ggb`, {

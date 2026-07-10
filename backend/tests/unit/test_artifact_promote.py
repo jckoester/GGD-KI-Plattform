@@ -19,8 +19,10 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
 
 import app.artifacts.promote as promote
 import app.artifacts.store as store_mod
+import app.export.document as doc_export_mod
 from app.artifacts.router import router
 from app.artifacts.store import QuotaExceeded
+from app.export.pandoc import PandocUnavailable
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.session import get_db
@@ -448,4 +450,67 @@ def test_update_document_foreign_403(monkeypatch):
     monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(owner_pseudonym="x")))
     client = _client(monkeypatch)
     resp = client.put(f"/artifacts/{uuid4()}", json={"markdown": "x"})
+    assert resp.status_code == 403
+
+
+# ── Dokument-Export (Schritt 4) ───────────────────────────────────────────────
+
+def test_export_download(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(title="Mein AB")))
+    monkeypatch.setattr(
+        doc_export_mod, "export_document",
+        AsyncMock(return_value=(b"%PDF-1.7 ...", "application/pdf")),
+    )
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert "mein-ab.pdf" in resp.headers["content-disposition"]
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_export_save_returns_json(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    monkeypatch.setattr(
+        doc_export_mod, "export_document",
+        AsyncMock(return_value=(b"PKdocx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+    )
+    saved = _doc(kind="export_docx", mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    monkeypatch.setattr(store_mod, "save_artifact", AsyncMock(return_value=saved))
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=docx&save=true")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["created"] is True and body["kind"] == "export_docx"
+
+
+def test_export_wrong_kind_422(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(kind="image")))
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=pdf")
+    assert resp.status_code == 422
+
+
+def test_export_bad_format_422(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=txt")
+    assert resp.status_code == 422   # Query-Pattern lehnt txt ab
+
+
+def test_export_office_unavailable_503(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    monkeypatch.setattr(
+        doc_export_mod, "export_document",
+        AsyncMock(side_effect=PandocUnavailable("weg")),
+    )
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=docx")
+    assert resp.status_code == 503
+
+
+def test_export_foreign_403(monkeypatch):
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(owner_pseudonym="x")))
+    client = _client(monkeypatch)
+    resp = client.post(f"/artifacts/{uuid4()}/export?format=pdf")
     assert resp.status_code == 403

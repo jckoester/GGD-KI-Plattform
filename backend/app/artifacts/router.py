@@ -7,7 +7,9 @@ Liste/Löschen/Download-Varianten kommen in Schritt 3.
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,8 @@ from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.models import Artifact
 from app.db.session import get_db
+from app.export import document as doc_export
+from app.export import pandoc
 from app.render.errors import RenderError
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
@@ -26,9 +30,13 @@ router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 _GGB_MIME = "application/vnd.geogebra.file"
 
 
+def _slug(title: str | None, fallback: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")[:60]
+    return slug or fallback
+
+
 def _ggb_filename(title: str | None) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", (title or "funktionsgraph").lower()).strip("-")[:60]
-    return f"{slug or 'funktionsgraph'}.ggb"
+    return f"{_slug(title, 'funktionsgraph')}.ggb"
 
 
 def _ggb_response(data: bytes, title: str | None) -> Response:
@@ -271,6 +279,65 @@ async def update_document(
             detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
         )
     return _saved(artifact, False)
+
+
+@router.post("/{artifact_id}/export")
+async def export_document(
+    artifact_id: UUID,
+    format: str = Query(..., pattern="^(pdf|docx|odt)$"),
+    save: bool = Query(False),
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Exportiert ein Dokument (PDF via weasyprint, DOCX/ODT via Pandoc).
+
+    `save=false` → Datei-Download; `save=true` → zusätzlich als `export_*`-Artefakt ablegen
+    (Antwort dann JSON mit den Artefakt-Metadaten).
+    """
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if record.kind != "document":
+        raise HTTPException(status_code=422, detail="Kein Text-Dokument")
+
+    try:
+        data, mime = await doc_export.export_document(
+            db, markdown=record.source or "", title=record.title, fmt=format,
+        )
+    except pandoc.PandocUnavailable:
+        raise HTTPException(status_code=503, detail="Office-Export ist auf diesem Server nicht verfügbar.")
+    except pandoc.PandocError as exc:
+        raise HTTPException(status_code=422, detail=f"Export fehlgeschlagen: {exc}")
+
+    if save:
+        try:
+            artifact = await store.save_artifact(
+                db,
+                owner_pseudonym=current_user.sub,
+                roles=current_user.roles,
+                grade=current_user.grade,
+                kind=f"export_{format}",
+                mime_type=mime,
+                data=data,
+                title=record.title,
+                source=None,
+                origin_ref=None,
+            )
+        except store.QuotaExceeded:
+            raise HTTPException(
+                status_code=409,
+                detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
+            )
+        return JSONResponse(jsonable_encoder(_saved(artifact, True)))
+
+    filename = f"{_slug(record.title, 'dokument')}.{format}"
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{artifact_id}")

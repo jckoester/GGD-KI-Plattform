@@ -10,6 +10,12 @@ describe('kindLabel', () => {
         expect(kindLabel('plot')).toBe('Funktionsgraph');
         expect(kindLabel('mermaid')).toBe('Diagramm');
     });
+    it('kennt Dokument- und Export-Arten', () => {
+        expect(kindLabel('document')).toBe('Dokument');
+        expect(kindLabel('export_pdf')).toBe('PDF');
+        expect(kindLabel('export_docx')).toBe('Word');
+        expect(kindLabel('export_odt')).toBe('ODT');
+    });
     it('gibt unbekannte Art unverändert zurück', () => {
         expect(kindLabel('banana')).toBe('banana');
     });
@@ -20,6 +26,9 @@ describe('mimeExt / codeExt', () => {
         expect(mimeExt('image/png')).toBe('png');
         expect(mimeExt('image/svg+xml')).toBe('svg');
         expect(mimeExt('application/vnd.geogebra.file')).toBe('ggb');
+        expect(mimeExt('text/markdown')).toBe('md');
+        expect(mimeExt('application/pdf')).toBe('pdf');
+        expect(mimeExt('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('docx');
         expect(mimeExt('irgendwas')).toBe('bin');
     });
     it('mappt kind auf Code-Endung', () => {

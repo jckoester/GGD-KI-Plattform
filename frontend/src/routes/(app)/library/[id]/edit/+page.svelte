@@ -1,12 +1,22 @@
 <script>
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
-    import { ArrowLeft, Save, Loader2 } from 'lucide-svelte';
-    import { getDocument, updateDocument } from '$lib/api.js';
+    import { ArrowLeft, Save, Loader2, Download } from 'lucide-svelte';
+    import {
+        getDocument, updateDocument, getDocumentExportBlob, saveDocumentExport,
+    } from '$lib/api.js';
+    import { triggerDownload } from '$lib/download.js';
+    import { slugify } from '$lib/library.js';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
+
+    const EXPORT_FORMATS = [
+        { fmt: 'pdf', label: 'PDF' },
+        { fmt: 'docx', label: 'Word' },
+        { fmt: 'odt', label: 'ODT' },
+    ];
 
     let id = $derived($page.params.id);
 
@@ -54,6 +64,37 @@
             saving = false;
         }
     }
+
+    // Export (PDF/DOCX/ODT). Der Server exportiert die gespeicherte Fassung — darum
+    // ungespeicherte Änderungen zuvor sichern, damit der Export dem Editor entspricht.
+    let keepInLibrary = $state(false);
+    let exportingFmt = $state(null);
+    let exportMsg = $state(null);
+    async function doExport(fmt) {
+        if (exportingFmt) return;
+        exportMsg = null;
+        error = null;
+        if (dirty) {
+            await save();
+            if (error) return;   // Speichern fehlgeschlagen → nicht exportieren
+        }
+        exportingFmt = fmt;
+        try {
+            if (keepInLibrary) {
+                await saveDocumentExport(id, fmt);
+                exportMsg = `${fmt.toUpperCase()} in der Bibliothek gespeichert.`;
+            } else {
+                const blob = await getDocumentExportBlob(id, fmt);
+                triggerDownload(blob, `${slugify(title)}.${fmt}`);
+            }
+        } catch (err) {
+            error = err?.status === 503
+                ? 'Office-Export ist auf diesem Server nicht verfügbar.'
+                : (err.message ?? 'Export fehlgeschlagen.');
+        } finally {
+            exportingFmt = null;
+        }
+    }
 </script>
 
 <div class="flex flex-col h-full">
@@ -90,6 +131,31 @@
         >
             <Save class="w-4 h-4" /> Speichern
         </button>
+    </div>
+
+    <!-- Export-Leiste -->
+    <div class="flex items-center flex-wrap gap-2 px-4 py-1.5 text-xs
+                border-b border-light-ui-3 dark:border-dark-ui-3
+                text-light-tx-2 dark:text-dark-tx-2">
+        <span class="flex items-center gap-1"><Download class="w-3.5 h-3.5" /> Export:</span>
+        {#each EXPORT_FORMATS as f}
+            <button
+                type="button"
+                onclick={() => doExport(f.fmt)}
+                disabled={exportingFmt !== null}
+                class="px-2 py-1 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2
+                       transition-colors disabled:opacity-50"
+            >
+                {exportingFmt === f.fmt ? '…' : f.label}
+            </button>
+        {/each}
+        <label class="flex items-center gap-1 ml-1 cursor-pointer select-none">
+            <input type="checkbox" bind:checked={keepInLibrary} class="accent-primary" />
+            In Bibliothek behalten
+        </label>
+        {#if exportMsg}
+            <span class="text-light-tx-2 dark:text-dark-tx-2">{exportMsg}</span>
+        {/if}
     </div>
 
     {#if error}

@@ -13,6 +13,9 @@ export const KIND_LABELS = {
     mermaid: 'Diagramm',
     ggb: 'GeoGebra',
     document: 'Dokument',
+    export_pdf: 'PDF',
+    export_docx: 'Word',
+    export_odt: 'ODT',
 };
 
 export function kindLabel(kind) {
@@ -24,6 +27,10 @@ const MIME_EXT = {
     'image/jpeg': 'jpg',
     'image/svg+xml': 'svg',
     'application/vnd.geogebra.file': 'ggb',
+    'text/markdown': 'md',
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.oasis.opendocument.text': 'odt',
 };
 
 export function mimeExt(mime) {
