@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     pandoc_bin: str = "pandoc"
     pandoc_timeout: float = 20.0
     pandoc_max_input_chars: int = 500_000
+    # Ablage schulweiter Export-Vorlagen (DOCX/ODT-reference-docs). CSS liegt in site_config.
+    # In Docker absolut aufs ./data-Volume setzen (persistent), sonst repo-root-relativ.
+    export_template_dir: str = "data/export_templates"
+    export_reference_max_bytes: int = 5_242_880  # 5 MB
 
 
 settings = Settings()

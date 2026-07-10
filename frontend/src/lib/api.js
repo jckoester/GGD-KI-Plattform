@@ -507,6 +507,47 @@ export async function getBudgetGrades() {
   // { grades: [{key, label, grade, max_budget_eur, budget_duration, user_count}], eur_usd_rate }
 }
 
+// ── Export-Vorlagen (Admin, Phase 19) ──────────────────────────────────────────
+
+export async function getExportTemplates() {
+  const res = await fetch(`${BASE}/admin/export-templates`, { credentials: "include" });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+  // { css, css_updated_at, css_updated_by, has_docx_reference, has_odt_reference }
+}
+
+export async function updateExportCss(css) {
+  const res = await fetch(`${BASE}/admin/export-templates/css`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ css }),
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Speichern fehlgeschlagen");
+  return res.json();
+}
+
+export async function uploadExportReference(fmt, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/admin/export-templates/reference/${fmt}`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Upload fehlgeschlagen");
+  return res.json();
+}
+
+export async function deleteExportReference(fmt) {
+  const res = await fetch(`${BASE}/admin/export-templates/reference/${fmt}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Löschen fehlgeschlagen");
+  return res.json();
+}
+
 export async function saveBudgetGrades(grades) {
   // grades: [{key, max_budget_eur}]
   const res = await fetch(`${BASE}/admin/budgets/grades`, {

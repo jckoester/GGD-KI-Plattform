@@ -18,11 +18,18 @@ os.environ.setdefault("SCHOOL_SECRET", "test-school-secret")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
 
 import app.artifacts.promote as promote
+import app.artifacts.router as artifacts_router
 import app.artifacts.store as store_mod
 import app.export.document as doc_export_mod
 from app.artifacts.router import router
 from app.artifacts.store import QuotaExceeded
 from app.export.pandoc import PandocUnavailable
+
+
+def _stub_templates(monkeypatch):
+    """Schulweite Vorlagen (Schritt 6) neutralisieren — kein DB/Filesystem im Export-Test."""
+    monkeypatch.setattr(artifacts_router.export_templates, "get_export_css", AsyncMock(return_value=""))
+    monkeypatch.setattr(artifacts_router.export_templates, "reference_path", lambda fmt: None)
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.session import get_db
@@ -456,6 +463,7 @@ def test_update_document_foreign_403(monkeypatch):
 # ── Dokument-Export (Schritt 4) ───────────────────────────────────────────────
 
 def test_export_download(monkeypatch):
+    _stub_templates(monkeypatch)
     monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc(title="Mein AB")))
     monkeypatch.setattr(
         doc_export_mod, "export_document",
@@ -470,6 +478,7 @@ def test_export_download(monkeypatch):
 
 
 def test_export_save_returns_json(monkeypatch):
+    _stub_templates(monkeypatch)
     monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
     monkeypatch.setattr(
         doc_export_mod, "export_document",
@@ -499,6 +508,7 @@ def test_export_bad_format_422(monkeypatch):
 
 
 def test_export_office_unavailable_503(monkeypatch):
+    _stub_templates(monkeypatch)
     monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
     monkeypatch.setattr(
         doc_export_mod, "export_document",
@@ -514,3 +524,24 @@ def test_export_foreign_403(monkeypatch):
     client = _client(monkeypatch)
     resp = client.post(f"/artifacts/{uuid4()}/export?format=pdf")
     assert resp.status_code == 403
+
+
+def test_export_passes_school_templates(monkeypatch, tmp_path):
+    # Schulweite Vorlagen (Schritt 6) müssen in export_document durchgereicht werden.
+    import app.artifacts.router as artifacts_router
+    monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    monkeypatch.setattr(artifacts_router.export_templates, "get_export_css", AsyncMock(return_value="h1{color:navy}"))
+    ref = tmp_path / "reference.docx"; ref.write_bytes(b"PK")
+    monkeypatch.setattr(artifacts_router.export_templates, "reference_path", lambda fmt: ref if fmt == "docx" else None)
+    captured = {}
+
+    async def fake_export(db, **kw):
+        captured.update(kw)
+        return b"PKdocx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+    monkeypatch.setattr(doc_export_mod, "export_document", fake_export)
+    resp = _client(monkeypatch).post(f"/artifacts/{uuid4()}/export?format=docx")
+    assert resp.status_code == 200
+    assert captured["reference_doc"] == str(ref)
+    # CSS wird nur für PDF gelesen — bei DOCX leer
+    assert captured["extra_css"] == ""

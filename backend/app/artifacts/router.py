@@ -23,6 +23,7 @@ from app.db.models import Artifact
 from app.db.session import get_db
 from app.export import document as doc_export
 from app.export import pandoc
+from app.export import templates as export_templates
 from app.render.errors import RenderError
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
@@ -302,9 +303,13 @@ async def export_document(
     if record.kind != "document":
         raise HTTPException(status_code=422, detail="Kein Text-Dokument")
 
+    # Schulweite Vorlagen (Schritt 6): CSS für PDF, reference-doc für DOCX/ODT.
+    extra_css = await export_templates.get_export_css(db) if format == "pdf" else ""
+    ref = export_templates.reference_path(format)
     try:
         data, mime = await doc_export.export_document(
             db, markdown=record.source or "", title=record.title, fmt=format,
+            reference_doc=str(ref) if ref else None, extra_css=extra_css,
         )
     except pandoc.PandocUnavailable:
         raise HTTPException(status_code=503, detail="Office-Export ist auf diesem Server nicht verfügbar.")

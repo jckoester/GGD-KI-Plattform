@@ -27,10 +27,12 @@ services:
       RENDER_SIDECAR_URL: http://render-sidecar:3200
       # matplotlib (Plot-Rendering) braucht ein schreibbares Verzeichnis für den Font-Cache.
       MPLCONFIGDIR: /tmp/matplotlib
-      # Persistente Ablage generierter Bilder (Phase 16) + Bibliotheks-Artefakte (Phase 18).
-      # Absolute Pfade → cwd-unabhängig; das ./data-Volume teilen backend + cron.
+      # Persistente Ablage generierter Bilder (Phase 16) + Bibliotheks-Artefakte (Phase 18)
+      # + schulweite Export-Vorlagen (Phase 19). Absolute Pfade → cwd-unabhängig; das
+      # ./data-Volume teilen backend + cron.
       IMAGE_STORAGE_DIR: /app/data/generated_images
       ARTIFACT_STORAGE_DIR: /app/data/artifacts
+      EXPORT_TEMPLATE_DIR: /app/data/export_templates
     volumes:
       - ./config:/app/config:ro
       - ./static:/app/static:ro
