@@ -54,7 +54,9 @@ class YamlTestAdapter(AuthAdapter):
     async def get_login_challenge(self) -> LoginChallenge:
         return LoginChallenge(type="form")
 
-    async def exchange_code(self, code: str, state: str) -> NormalizedIdentity:
+    async def exchange_code(
+        self, code: str, state: str, code_verifier: str | None = None
+    ) -> NormalizedIdentity:
         raise NotImplementedError("YamlTestAdapter unterstützt kein OIDC")
 
     async def authenticate_direct(

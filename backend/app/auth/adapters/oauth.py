@@ -147,28 +147,45 @@ class OAuthAdapter(AuthAdapter):
             self._school_secret.encode(), nonce.encode(), hashlib.sha256
         ).hexdigest()
         state = f"{nonce}.{sig}"
+        # PKCE (Audit #4): code_verifier bleibt browsergebunden (HttpOnly-Cookie, vom Router
+        # gesetzt), nur die S256-Challenge geht an den IdP. Verhindert Auth-Code-Interception.
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = (
+            base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
+            .decode()
+            .rstrip("=")
+        )
         params = {
             "response_type": "code",
             "client_id": self._config.client_id,
             "redirect_uri": self._config.redirect_uri,
             "scope": self._config.scope,
             "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
         url = f"{self._config.effective_auth_url}?" + urlencode(params)
-        return LoginChallenge(type="redirect", redirect_url=url, state=state)
+        return LoginChallenge(
+            type="redirect", redirect_url=url, state=state, code_verifier=code_verifier
+        )
 
-    async def exchange_code(self, code: str, state: str) -> NormalizedIdentity:
+    async def exchange_code(
+        self, code: str, state: str, code_verifier: str | None = None
+    ) -> NormalizedIdentity:
         self._verify_state(state)
+        token_data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": self._config.redirect_uri,
+            "client_id": self._config.client_id,
+            "client_secret": self._client_secret,
+        }
+        if code_verifier:
+            token_data["code_verifier"] = code_verifier
         async with httpx.AsyncClient() as client:
             token_resp = await client.post(
                 self._config.effective_token_url,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": self._config.redirect_uri,
-                    "client_id": self._config.client_id,
-                    "client_secret": self._client_secret,
-                },
+                data=token_data,
             )
             token_resp.raise_for_status()
             access_token = token_resp.json()["access_token"]

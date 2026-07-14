@@ -447,6 +447,7 @@ class TestCallback:
             mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            client.cookies.set("oauth_login", "test_state|verifier123")  # Browser-Bindung (Audit #4)
             response = client.get(
                 "/callback?code=test_code&state=test_state", follow_redirects=False
             )
@@ -488,6 +489,7 @@ class TestCallback:
         mock_redirect_adapter.exchange_code = AsyncMock(side_effect=Exception("Auth failed"))
 
         client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        client.cookies.set("oauth_login", "test|verifier123")  # Bindung ok → erreicht exchange_code
         response = client.get("/callback?code=test&state=test")
         assert response.status_code == 401
         assert "Authentifizierung fehlgeschlagen" in response.json()["detail"]
@@ -520,6 +522,7 @@ class TestCallback:
             mock_sync.return_value = None
 
             client = TestClient(app_with_mocks, raise_server_exceptions=False)
+            client.cookies.set("oauth_login", "test_state|verifier123")  # Browser-Bindung (Audit #4)
             response = client.get(
                 "/callback?code=test_code&state=test_state", follow_redirects=False
             )
@@ -529,3 +532,20 @@ class TestCallback:
             assert call_args.kwargs["pseudonym"] == "test_pseudo_xyz"
             assert call_args.kwargs["sso_groups"] == ["FS.Mathematik", "Klasse.10b", "unterricht.10b.Physik"]
             assert call_args.kwargs["primary_role"] == "teacher"
+
+    def test_callback_missing_binding_cookie_401(self, app_with_mocks, mock_redirect_adapter, mock_db):
+        """Kein Browser-Bindungs-Cookie → 401, exchange_code wird nicht erreicht (Login-CSRF, Audit #4)."""
+        mock_redirect_adapter.exchange_code = AsyncMock()
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        response = client.get("/callback?code=test&state=test_state")
+        assert response.status_code == 401
+        mock_redirect_adapter.exchange_code.assert_not_awaited()
+
+    def test_callback_state_cookie_mismatch_401(self, app_with_mocks, mock_redirect_adapter, mock_db):
+        """State im Cookie ≠ State in der Query → 401 (fremder Login untergeschoben)."""
+        mock_redirect_adapter.exchange_code = AsyncMock()
+        client = TestClient(app_with_mocks, raise_server_exceptions=False)
+        client.cookies.set("oauth_login", "anderer_state|verifier123")
+        response = client.get("/callback?code=test&state=test_state")
+        assert response.status_code == 401
+        mock_redirect_adapter.exchange_code.assert_not_awaited()

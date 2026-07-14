@@ -39,6 +39,10 @@ class LoginChallenge:
     type: Literal["redirect", "form"]
     redirect_url: str | None = None
     state: str | None = None
+    # PKCE-`code_verifier` (Audit #4): router-intern. Der Router legt ihn in ein
+    # kurzlebiges HttpOnly-Cookie (Browser-Bindung + PKCE) und gibt ihn **nie** an den
+    # Client zurück (wird vor der Antwort auf None gesetzt).
+    code_verifier: str | None = None
 
 
 @dataclass
@@ -62,7 +66,9 @@ class AuthAdapter(ABC):
     async def get_login_challenge(self) -> LoginChallenge: ...
 
     @abstractmethod
-    async def exchange_code(self, code: str, state: str) -> NormalizedIdentity: ...
+    async def exchange_code(
+        self, code: str, state: str, code_verifier: str | None = None
+    ) -> NormalizedIdentity: ...
 
     @abstractmethod
     async def authenticate_direct(

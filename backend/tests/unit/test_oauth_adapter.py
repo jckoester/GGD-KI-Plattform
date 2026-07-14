@@ -162,6 +162,61 @@ class TestOAuthAdapter:
         assert hmac.compare_digest(expected_sig, received_sig)
 
     @pytest.mark.asyncio
+    async def test_get_login_challenge_includes_pkce(self, oauth_adapter):
+        import base64
+        challenge = await oauth_adapter.get_login_challenge()
+        assert "code_challenge_method=S256" in challenge.redirect_url
+        assert challenge.code_verifier  # router-intern, browsergebunden
+        expected = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(challenge.code_verifier.encode()).digest()
+            ).decode().rstrip("=")
+        )
+        assert f"code_challenge={expected}" in challenge.redirect_url
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_sends_code_verifier(self, oauth_adapter):
+        captured = {}
+
+        async def capturing_post(url, data=None, **kwargs):
+            captured["data"] = data
+            return _mock_token()
+
+        async def mock_get(*a, **k):
+            return _mock_userinfo("u", ["schueler"])
+
+        client = MagicMock()
+        client.post = capturing_post
+        client.get = mock_get
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
+            challenge = await oauth_adapter.get_login_challenge()
+            await oauth_adapter.exchange_code("code", challenge.state, "my-verifier")
+        assert captured["data"]["code_verifier"] == "my-verifier"
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_without_verifier_omits_it(self, oauth_adapter):
+        captured = {}
+
+        async def capturing_post(url, data=None, **kwargs):
+            captured["data"] = data
+            return _mock_token()
+
+        async def mock_get(*a, **k):
+            return _mock_userinfo("u", ["schueler"])
+
+        client = MagicMock()
+        client.post = capturing_post
+        client.get = mock_get
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
+            challenge = await oauth_adapter.get_login_challenge()
+            await oauth_adapter.exchange_code("code", challenge.state)
+        assert "code_verifier" not in captured["data"]
+
+    @pytest.mark.asyncio
     async def test_exchange_code_success(self, oauth_adapter):
         mock_client = _make_mock_client(
             _mock_token(),

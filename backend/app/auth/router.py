@@ -38,11 +38,30 @@ async def get_login_challenge_v1(
     return await adapter.get_login_challenge()
 
 
+# Kurzlebiges Browser-Bindungs-Cookie für den OAuth-Login (Audit #4): trägt den signierten
+# `state` (Double-Submit gegen Login-CSRF) + den PKCE-`code_verifier`. HttpOnly, SameSite=Lax
+# (wird bei der Top-Level-Rücknavigation vom IdP mitgesendet).
+_OAUTH_LOGIN_COOKIE = "oauth_login"
+_OAUTH_LOGIN_TTL = 600  # 10 Minuten für den Login-Round-Trip
+
+
 @router.get("/login-challenge")
 async def login_challenge(
+    response: Response,
     adapter: AuthAdapter = Depends(get_auth_adapter),
 ) -> LoginChallenge:
-    return await adapter.get_login_challenge()
+    challenge = await adapter.get_login_challenge()
+    # Nur der Redirect-Pfad (OAuth) liefert einen code_verifier → Browser-Bindung setzen.
+    if challenge.code_verifier and challenge.state:
+        secure = settings.environment != "development"
+        response.set_cookie(
+            _OAUTH_LOGIN_COOKIE,
+            f"{challenge.state}|{challenge.code_verifier}",
+            httponly=True, secure=secure, samesite="lax",
+            max_age=_OAUTH_LOGIN_TTL, path="/",
+        )
+        challenge.code_verifier = None  # niemals an den Client zurückgeben
+    return challenge
 
 
 @router.get("/callback", response_model=None)
@@ -83,8 +102,19 @@ async def auth_callback(
         return await _handle_stepup_callback(
             request, db, jwt_service, adapter, code, state
         )
+    # Browser-Bindung (Audit #4): der Callback muss aus demselben Browser kommen, der die
+    # Challenge geholt hat. Das HttpOnly-Cookie trägt den erwarteten `state` (Double-Submit
+    # gegen Login-CSRF) + den PKCE-`code_verifier`.
+    cookie = request.cookies.get(_OAUTH_LOGIN_COOKIE)
+    if not cookie or "|" not in cookie:
+        logger.warning("OAuth-Callback ohne gültiges Login-Bindungs-Cookie")
+        raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
+    cookie_state, code_verifier = cookie.split("|", 1)
+    if not secrets.compare_digest(cookie_state, state):
+        logger.warning("OAuth-Callback: State stimmt nicht mit dem Browser-Cookie überein")
+        raise HTTPException(status_code=401, detail="Anmeldung abgelaufen oder ungültig")
     try:
-        identity = await adapter.exchange_code(code, state)
+        identity = await adapter.exchange_code(code, state, code_verifier)
     except Exception:
         logger.exception("OAuth-Callback: exchange_code/Identity-Aufbau fehlgeschlagen")
         raise HTTPException(status_code=401, detail="Authentifizierung fehlgeschlagen")
@@ -122,6 +152,7 @@ async def auth_callback(
         httponly=True, secure=secure, samesite="lax",
         max_age=30 * 24 * 3600, path="/",
     )
+    redirect.delete_cookie(_OAUTH_LOGIN_COOKIE, path="/")  # Bindungs-Cookie verbraucht
     return redirect
 
 
