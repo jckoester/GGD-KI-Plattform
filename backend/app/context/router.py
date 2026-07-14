@@ -110,6 +110,58 @@ async def _check_write_permission(
     raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
+async def _check_read_permission(
+    node: ContextNode, user: JwtPayload, db: AsyncSession
+) -> None:
+    """403 wenn der Knoten für die Nutzer:in nicht lesbar ist.
+
+    Gegenstück zum Schreibpfad (`_check_write_permission`): `private` → nur Owner;
+    `group` → nur Gruppenmitglieder; `subject`/`school`/`global` sind für eingeloggte
+    Nutzer:innen lesbar. Admin und Owner immer erlaubt. (Vorher prüfte der Lesepfad **nur**
+    `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Sicherheits-Audit #1.)
+    """
+    if "admin" in user.roles:
+        return
+    if node.owner_pseudonym == user.sub:
+        return
+    if node.read_scope == "private":
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if node.read_scope == "group":
+        if node.read_scope_group_id is None:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        result = await db.execute(
+            sa.select(sa.literal(1)).where(
+                GroupMembership.group_id == node.read_scope_group_id,
+                GroupMembership.pseudonym == user.sub,
+            )
+        )
+        if result.scalar_one_or_none() is None:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+
+def _read_scope_clause(user: JwtPayload):
+    """SQL-Klausel für die lesbaren Knoten (Liste/Nachbarschaft). Für Nicht-Admins werden
+    `group`-Knoten auf die eigenen Gruppenmitgliedschaften eingeschränkt (Audit #1)."""
+    if "admin" in user.roles:
+        return or_(
+            ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
+            ContextNode.owner_pseudonym == user.sub,
+        )
+    my_group_ids = (
+        sa.select(GroupMembership.group_id)
+        .where(GroupMembership.pseudonym == user.sub)
+        .scalar_subquery()
+    )
+    return or_(
+        ContextNode.read_scope.in_(["global", "school", "subject"]),
+        ContextNode.owner_pseudonym == user.sub,
+        and_(
+            ContextNode.read_scope == "group",
+            ContextNode.read_scope_group_id.in_(my_group_ids),
+        ),
+    )
+
+
 def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
     """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym)."""
     read_scope = tree.get("read_scope", "school")
@@ -124,12 +176,7 @@ def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
 
 def _visibility_filter(query, user: JwtPayload, status_override: str | None = None):
     """Sichtbarkeitsfilter; status_override überschreibt den active-Default."""
-    q = query.where(
-        or_(
-            ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
-            ContextNode.owner_pseudonym == user.sub,
-        ),
-    )
+    q = query.where(_read_scope_clause(user))
     if status_override is not None:
         q = q.where(ContextNode.status == status_override)
     else:
@@ -272,6 +319,7 @@ async def get_neighborhood(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    await _check_read_permission(node, user, db)
 
     # Recursive CTE für bidirektionale Traversierung
     neighborhood_cte = text("""
@@ -297,14 +345,11 @@ async def get_neighborhood(
     result = await db.execute(neighborhood_cte, {"node_id": str(node_id), "depth": depth})
     neighbor_ids = [row[0] for row in result.fetchall()]
 
-    # Knoten laden + Sichtbarkeitsfilter anwenden
+    # Knoten laden + Sichtbarkeitsfilter anwenden (group-Knoten nur eigener Gruppen, Audit #1)
     nodes_query = select(ContextNode).where(
         ContextNode.id.in_(neighbor_ids),
         ContextNode.status == "active",
-        or_(
-            ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
-            ContextNode.owner_pseudonym == user.sub,
-        ),
+        _read_scope_clause(user),
     )
     if category:
         nodes_query = nodes_query.where(ContextNode.category.in_(category))
@@ -339,6 +384,7 @@ async def get_archived_references(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    await _check_read_permission(node, user, db)
 
     sql = text("""
         SELECT
@@ -384,6 +430,8 @@ async def copy_node(
     source = await db.get(ContextNode, node_id)
     if source is None or source.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    # Nur lesbare Quellknoten dürfen kopiert werden (sonst Exfiltration per UUID, Audit #1).
+    await _check_read_permission(source, user, db)
 
     # Neuen Knoten anlegen
     new_node = ContextNode(
@@ -419,8 +467,7 @@ async def get_node(
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
-    if node.read_scope == "private" and node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    await _check_read_permission(node, user, db)
     return node
 
 
@@ -443,7 +490,8 @@ async def create_node(
         title=payload.title,
         content=payload.content,
         metadata_=payload.metadata_,
-        owner_pseudonym=payload.owner_pseudonym or user.sub,
+        # Autorenschaft immer serverseitig aus dem JWT — kein Client-Override (Audit #1).
+        owner_pseudonym=user.sub,
         read_scope=payload.read_scope,
         write_scope=payload.write_scope,
         read_scope_group_id=payload.read_scope_group_id,
@@ -696,9 +744,8 @@ async def add_chat_context_node(
     if node is None or node.status != "active":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden oder inaktiv")
 
-    # Sichtbarkeit prüfen (kein privater Fremd-Knoten)
-    if node.read_scope == "private" and node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    # Sichtbarkeit prüfen (kein privater/fremd-gruppen Knoten, Audit #1)
+    await _check_read_permission(node, user, db)
 
     existing = await db.get(ChatContextNode, (conversation_id, payload.node_id))
     if existing is not None:
@@ -1204,10 +1251,9 @@ async def get_node_edges(
     if not node or node.status != "active":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     
-    # Sichtbarkeitsprüfung
-    if node.read_scope == "private" and node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    
+    # Sichtbarkeitsprüfung (privat/fremd-gruppen ausgeschlossen, Audit #1)
+    await _check_read_permission(node, user, db)
+
     query = select(ContextEdge).where(
         ContextEdge.from_node_id == node_id,
     )

@@ -211,6 +211,99 @@ class TestGetNode:
         assert resp.status_code == 403
 
 
+# ── Sicherheits-Audit #1: Lese-Berechtigung für fremde group-Knoten ───────────
+
+def _group_node(group_id=7, owner="other-user"):
+    node = make_node(read_scope="group", owner_pseudonym=owner)
+    node.read_scope_group_id = group_id
+    return node
+
+
+class TestReadPermissionAudit1:
+
+    def test_group_node_member_returns_200(self):
+        node = _group_node()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.execute = AsyncMock(return_value=_exec_result(scalar=1))   # ist Mitglied
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 200
+
+    def test_group_node_non_member_returns_403(self):
+        node = _group_node()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.execute = AsyncMock(return_value=_exec_result(scalar=None))  # kein Mitglied
+        user = make_jwt(roles=["teacher"], sub="fremde-lehrkraft")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 403
+
+    def test_group_node_admin_returns_200_without_membership_check(self):
+        node = _group_node()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.execute = AsyncMock(side_effect=AssertionError("Admin darf keine Mitgliedsprüfung auslösen"))
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 200
+
+    def test_school_node_readable_by_any_teacher(self):
+        node = make_node(read_scope="school", owner_pseudonym="other-user")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.execute = AsyncMock(side_effect=AssertionError("school braucht keine Mitgliedsprüfung"))
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 200
+
+    def test_copy_foreign_group_node_non_member_returns_403(self):
+        node = _group_node()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.execute = AsyncMock(return_value=_exec_result(scalar=None))
+        user = make_jwt(roles=["teacher"], sub="fremde-lehrkraft")
+        resp = TestClient(make_app(db, user)).post(f"/context/nodes/{node.id}/copy", json={})
+        assert resp.status_code == 403
+
+    def test_create_node_ignores_client_owner_override(self):
+        import app.context.router as ctx_router_mod
+        original_cn = ctx_router_mod.ContextNode
+        captured = {}
+
+        class FakeContextNode:
+            def __init__(self, **kwargs):
+                for k, v in kwargs.items():
+                    setattr(self, k, v)
+                from datetime import datetime, timezone
+                self.id = uuid4()
+                self.status = "active"
+                self.embedding = None
+                self.archived_at = None
+                self.created_at = datetime.now(timezone.utc)
+                self.updated_at = datetime.now(timezone.utc)
+                captured["node"] = self
+
+        db = AsyncMock()
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock(side_effect=lambda n: None)
+        ctx_router_mod.ContextNode = FakeContextNode
+        try:
+            user = make_jwt(roles=["teacher"], sub="echte-lehrkraft")
+            resp = TestClient(make_app(db, user)).post(
+                "/context/nodes",
+                json={
+                    "category": "concept", "content_type": "funktion", "title": "x",
+                    "owner_pseudonym": "fremdes-pseudonym",
+                },
+            )
+            assert resp.status_code == 201
+            assert captured["node"].owner_pseudonym == "echte-lehrkraft"  # Override ignoriert
+        finally:
+            ctx_router_mod.ContextNode = original_cn
+
+
 # ── DELETE /context/nodes/{id} ───────────────────────────────────────────
 
 class TestDeleteNode:
