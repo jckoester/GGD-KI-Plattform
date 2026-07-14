@@ -5,6 +5,7 @@ Integrationstest test_crisis_approval.py ab.
 """
 
 import os
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -116,6 +117,60 @@ def test_deny_requires_review_role():
     client.cookies.set("stepup", _stepup_cookie("p-teacher"))
     r = client.post(f"/access-requests/{uuid4()}/deny")
     assert r.status_code == 403
+
+
+# ---------- Gewaltenteilung / Vier-Augen (Audit #3) ----------
+
+REVIEW_ADMIN = JwtPayload(
+    sub="p-review-admin", roles=["review", "admin"], grade=None, jti="j", iat=1, exp=9999999999
+)
+
+
+def _pending_req(requested_by="p-antragsteller"):
+    from datetime import datetime, timezone
+    return SimpleNamespace(
+        id=uuid4(), conversation_id=uuid4(), flag_id=uuid4(),
+        requested_by=requested_by, status="pending", access_window_hours=24,
+        coreviewer=None, coreviewer_approved_at=None, access_granted_until=None,
+        requested_at=datetime.now(timezone.utc),
+    )
+
+
+def test_approve_rejected_for_self():
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=_pending_req(requested_by="p-review"))
+    app = _make_app(REVIEW, db=db)
+    client = TestClient(app)
+    client.cookies.set("stepup", _stepup_cookie("p-review"))
+    r = client.post(f"/access-requests/{uuid4()}/approve")
+    assert r.status_code == 403
+    assert "Selbst-Freigabe" in r.json()["detail"]
+
+
+def test_approve_rejected_for_admin_reviewer():
+    # additive Rollen review+admin: darf NICHT freigeben (Unabhängigkeit)
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=_pending_req(requested_by="p-antragsteller"))
+    app = _make_app(REVIEW_ADMIN, db=db)
+    client = TestClient(app)
+    client.cookies.set("stepup", _stepup_cookie("p-review-admin"))
+    r = client.post(f"/access-requests/{uuid4()}/approve")
+    assert r.status_code == 403
+    assert "Admin" in r.json()["detail"]
+
+
+def test_approve_allowed_for_independent_reviewer():
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=_pending_req(requested_by="p-antragsteller"))
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    app = _make_app(REVIEW, db=db)
+    client = TestClient(app)
+    client.cookies.set("stepup", _stepup_cookie("p-review"))
+    r = client.post(f"/access-requests/{uuid4()}/approve")
+    assert r.status_code == 200
+    assert r.json()["status"] == "approved"
+    assert r.json()["coreviewer"] == "p-review"
 
 
 # ---------- Reader-View: Step-up erzwungen (Schritt 7) ----------

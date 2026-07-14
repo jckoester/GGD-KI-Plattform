@@ -128,10 +128,18 @@ async def approve_access_request(
         raise HTTPException(status_code=404, detail="Antrag nicht gefunden.")
     if req.status != "pending":
         raise HTTPException(status_code=409, detail="Antrag ist nicht offen.")
-    # Vier-Augen-Prinzip: Zweitperson darf nicht der Antragsteller sein.
+    # Vier-Augen-Prinzip / Gewaltenteilung (Audit #3): Die Zweitperson muss eine
+    # **unabhängige** Review-Person sein — nicht die antragstellende Person und (weil Rollen
+    # additiv sind) auch nicht Admin. Sonst könnte eine Person mit admin+review die eigene
+    # (als Admin gestellte) Anfrage freigeben bzw. die Unabhängigkeit unterlaufen.
     if req.requested_by == current_user.sub:
         raise HTTPException(
             status_code=403, detail="Selbst-Freigabe ist nicht zulässig."
+        )
+    if "admin" in current_user.roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Freigabe nur durch eine unabhängige Review-Person (nicht Admin).",
         )
 
     now = datetime.now(timezone.utc)
