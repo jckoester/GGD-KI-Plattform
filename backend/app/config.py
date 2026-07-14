@@ -6,6 +6,16 @@ _PLACEHOLDER_MASTER_KEYS = {
     "sk-1234", "sk-1234567890", "changeme", "sk-changeme", "your-master-key", "sk-your-key",
 }
 
+# Mindestlänge für die Krypto-Geheimnisse in Produktion (Audit #7).
+# `openssl rand -base64 32` erzeugt ~44 Zeichen — 32 ist die untere Schranke.
+_MIN_SECRET_LEN = 32
+
+# Bekannte Platzhalter-/Test-Werte für SCHOOL_SECRET/JWT_SECRET (Audit #7).
+_PLACEHOLDER_SECRETS = {
+    "changeme", "change-me", "secret", "your-secret", "your-school-secret", "your-jwt-secret",
+    "test", "test-secret", "test-school-secret", "test-jwt-secret", "dev", "development",
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -66,6 +76,28 @@ class Settings(BaseSettings):
                 "starken, zufälligen Schlüssel (≥ 20 Zeichen) setzen — er gewährt volle Kontrolle "
                 "über den LiteLLM-Proxy."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_strong_secrets_in_prod(self) -> "Settings":
+        """In Produktion müssen `SCHOOL_SECRET` und `JWT_SECRET` stark sein (Sicherheits-Audit #7).
+
+        `SCHOOL_SECRET` ist der HMAC-Schlüssel der Pseudonymisierung — ist er schwach/erratbar,
+        lassen sich Pseudonyme rückführen (Bruch der Datenschutz-Invariante). `JWT_SECRET` signiert
+        die Auth-Cookies — schwach bedeutet fälschbare Sitzungen. In `development` bleiben kurze
+        Test-Werte erlaubt, damit die lokale Umgebung/Tests nicht brechen.
+        """
+        if self.environment == "development":
+            return self
+        for name, value in (("SCHOOL_SECRET", self.school_secret), ("JWT_SECRET", self.jwt_secret)):
+            secret = (value or "").strip()
+            if len(secret) < _MIN_SECRET_LEN or secret.lower() in _PLACEHOLDER_SECRETS:
+                raise ValueError(
+                    f"{name} fehlt, ist ein Platzhalter oder zu kurz. In Produktion einen starken, "
+                    f"zufälligen Wert (≥ {_MIN_SECRET_LEN} Zeichen, z. B. `openssl rand -base64 32`) "
+                    "setzen — schwache Krypto-Geheimnisse erlauben Pseudonym-Rückführung bzw. "
+                    "Token-Fälschung."
+                )
         return self
 
 
