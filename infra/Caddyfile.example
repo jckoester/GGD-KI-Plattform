@@ -7,4 +7,9 @@
 
 ki.beispielschule.de {
     reverse_proxy localhost:80
+
+    # Security-Header (HSTS, X-Frame-Options, CSP/frame-ancestors, nosniff, Referrer-Policy)
+    # setzt das interne nginx (infra/nginx.conf) — Caddy reicht sie über HTTPS durch, sodass
+    # u. a. HSTS beim Client greift. Wird TLS NICHT über Caddy/nginx terminiert, müssen die
+    # Header am tatsächlichen TLS-Edge gesetzt werden.
 }
