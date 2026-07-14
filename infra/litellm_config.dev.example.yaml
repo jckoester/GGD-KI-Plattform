@@ -1,0 +1,66 @@
+# litellm_config.dev.example.yaml — LiteLLM-Proxy für die LOKALE Entwicklung
+#
+# Diese Datei ersetzt im Dev-Betrieb den im Homelab gehosteten Proxy
+# (früher LITELLM_PROXY_URL=https://alan-dev.jckoester.de). Sie startet einen
+# lokalen, DB-gestützten LiteLLM-Proxy auf http://localhost:4000.
+#
+# Anders als infra/litellm_config.example.yaml (Produktion) sind hier die
+# Jugendschutz-Guardrails BEWUSST weggelassen, damit lokal ohne kuratierte
+# Pattern-Sets/Moderation-Setup entwickelt werden kann. Für Guardrail-Arbeit
+# die Blöcke aus der Produktions-Vorlage übernehmen.
+#
+# Kopieren und anpassen:
+#   cp infra/litellm_config.dev.example.yaml infra/litellm_config.dev.yaml
+#
+# Start (aus dem Repo-Root, backend-venv aktiviert):
+#   set -a && source .env && set +a
+#   litellm --config infra/litellm_config.dev.yaml --port 4000
+#
+# Siehe docs/dev/dev-setup.md → "LiteLLM lokal starten".
+
+model_list:
+  # ── Chat-/Titel-Modell ──────────────────────────────────────────────────────
+  # Das Backend/die Assistenten fragen Modelle unter ihrem model_name an
+  # (CHAT_DEFAULT_MODEL / TITLE_MODEL in .env). Der Name bleibt "gpt-4", damit
+  # Assistenten-Configs unverändert funktionieren; dahinter liegt im Dev das
+  # günstige gpt-4o-mini. Für höhere Qualität auf openai/gpt-4o umstellen.
+  - model_name: gpt-4
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── Embeddings ──────────────────────────────────────────────────────────────
+  # Fest von app/context/embedding.py erwartet (Model-Name hardcodiert).
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── Bildgenerierung ─────────────────────────────────────────────────────────
+  # model_name entspricht IMAGE_DEFAULT_MODEL in .env (gpt-image-1.5).
+  # Optional — nur nötig, wenn Bildfunktionen lokal getestet werden.
+  - model_name: gpt-image-1.5
+    litellm_params:
+      model: openai/gpt-image-1
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── Self-hosted Fallback (Ollama, im lokalen Netz) ──────────────────────────
+  # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md „Key Constraints"): wenn
+  # Budget erschöpft ist oder für sensible Fälle. Voraussetzung: Ollama läuft
+  # (`ollama serve`) und das Modell ist gezogen (`ollama pull llama3`).
+  - model_name: ollama-fallback
+    litellm_params:
+      model: ollama/llama3
+      api_base: os.environ/OLLAMA_BASE_URL
+
+general_settings:
+  # Voller Zugriff auf die Management-API (User/Teams/Keys/Budgets). Muss mit
+  # LITELLM_MASTER_KEY in .env übereinstimmen — das Backend authentifiziert sich
+  # damit gegen den Proxy. Lokal darf ein schwacher Dev-Key stehen (z. B. sk-dev).
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+  # Eigene Postgres-DB für den Proxy (Virtual Keys, Teams, Budgets, SpendLogs).
+  # WICHTIG: plain postgresql:// (NICHT der asyncpg-DSN des Backends) und eine
+  # SEPARATE Datenbank, damit LiteLLMs Prisma-Schema nicht mit dem Alembic-Schema
+  # der App kollidiert. Siehe LITELLM_DATABASE_URL in .env.example.
+  database_url: os.environ/LITELLM_DATABASE_URL

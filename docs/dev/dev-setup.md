@@ -1,15 +1,16 @@
 # Lokales Dev-Setup
 
 Die Entwicklung läuft lokal ohne Docker Compose. Backend und Frontend werden
-direkt gestartet; LiteLLM läuft entweder lokal oder ist im lokalen Netz
-erreichbar.
+direkt gestartet; der LiteLLM-Proxy läuft als Prozess in der backend-venv (siehe
+[LiteLLM lokal starten](#litellm-lokal-starten)).
 
 ## Voraussetzungen
 
 - Python 3.10+ (`python3 --version`)
 - Node.js 20+ (`node --version`)
 - PostgreSQL erreichbar (lokal installiert oder als einzelner Docker-Container)
-- LiteLLM (lokal oder im Netz)
+- LiteLLM-Proxy lokal in der backend-venv (Abschnitt unten)
+- Optional: Ollama für den self-hosted Fallback (`ollama serve`)
 
 PostgreSQL als Docker-Container (ohne Compose):
 ```bash
@@ -51,6 +52,9 @@ SCHOOL_SECRET=dev-school-secret-not-for-production
 JWT_SECRET=dev-jwt-secret-not-for-production
 LITELLM_PROXY_URL=http://localhost:4000
 LITELLM_MASTER_KEY=sk-dev
+OPENAI_API_KEY=sk-...               # Provider-Key, den der lokale Proxy nutzt
+OLLAMA_BASE_URL=http://localhost:11434
+LITELLM_DATABASE_URL=postgresql://postgres:devpassword@localhost:5432/litellm
 CHAT_DEFAULT_MODEL=gpt-4o-mini
 TITLE_MODEL=gpt-4o-mini
 FRONTEND_ORIGIN=http://localhost:5173
@@ -69,6 +73,110 @@ uvicorn app.main:app --reload
 # Backend läuft auf http://localhost:8000
 # API-Doku: http://localhost:8000/docs
 ```
+
+## LiteLLM lokal starten
+
+Früher zeigte `LITELLM_PROXY_URL` auf den im Homelab gehosteten Proxy
+(`https://alan-dev.jckoester.de`). Im Dev-Setup läuft LiteLLM stattdessen lokal
+als Prozess in der backend-venv auf `http://localhost:4000`. Das Backend spricht
+den Proxy sowohl über die Management-API (User/Teams/Keys/Budgets/SpendLogs) als
+auch über die OpenAI-kompatiblen Endpunkte (`/chat/completions`, `/embeddings`)
+an — beides braucht einen **DB-gestützten** Proxy.
+
+### 1. Proxy-Abhängigkeiten installieren
+
+Das Backend importiert `litellm` nicht (nur HTTP), daher steht es nicht in
+`backend/requirements.txt`. Der Proxy inkl. Prisma bekommt eine **eigene venv**.
+
+> **⚠ Nicht die backend-venv verwenden.** Die läuft auf Python 3.14; Proxy-Deps
+> wie `orjson` haben dafür keine vorgebauten Wheels und scheitern beim
+> Rust/PyO3-Build (`PyO3's maximum supported version (3.13)`). Deshalb eine
+> dedizierte venv auf **Python 3.13** (oder ≤3.13) — dort gibt es Binär-Wheels,
+> kein Compiler/Rust-Toolchain nötig.
+
+```bash
+# aus dem Repo-Root:
+python3.13 -m venv infra/litellm-venv
+source infra/litellm-venv/bin/activate
+pip install -r infra/litellm-requirements.txt
+
+# Prisma-Client einmalig erzeugen. Wichtig: --schema auf LiteLLMs mitgeliefertes
+# Schema zeigen (nacktes `prisma generate` sucht im Projektordner und findet es
+# nicht). Pfad versionsunabhängig auflösen:
+SCHEMA=$(python -c "import litellm, os; print(os.path.join(os.path.dirname(litellm.__file__), 'proxy', 'schema.prisma'))")
+prisma generate --schema="$SCHEMA"
+```
+
+Die venv `infra/litellm-venv/` ist in `.gitignore` ausgenommen. Das Start-Skript
+(Schritt 4) aktiviert die venv **und** generiert den Prisma-Client automatisch,
+falls er noch fehlt — die beiden Zeilen oben sind also optional, aber nützlich
+zum Verifizieren.
+
+> **Warum `prisma` extra?** Bei LiteLLM 1.83.7 hängt `prisma` am Extra
+> `extra-proxy`, nicht an `proxy` — `litellm[proxy]` allein lässt den Proxy mit
+> `ModuleNotFoundError: No module named 'prisma'` abbrechen. Deshalb ist
+> `prisma==0.11.0` in `infra/litellm-requirements.txt` explizit gepinnt.
+
+### 2. Eigene Postgres-DB für den Proxy anlegen
+
+LiteLLM legt seine Tabellen (Virtual Keys, Teams, Budgets, SpendLogs) über
+Prisma an. Dafür eine **separate** Datenbank verwenden — nicht die App-DB, damit
+sich Prisma- und Alembic-Schema nicht in die Quere kommen:
+
+```bash
+createdb -U postgres litellm
+# oder in psql:  CREATE DATABASE litellm;
+```
+
+`LITELLM_DATABASE_URL` in `.env` muss ein **plain** `postgresql://`-DSN sein
+(nicht der `postgresql+asyncpg://`-DSN des Backends).
+
+### 3. Config anlegen
+
+```bash
+cp infra/litellm_config.dev.example.yaml infra/litellm_config.dev.yaml
+```
+
+Die Dev-Config exponiert die Modellnamen, die der Code erwartet: `gpt-4`
+(Chat/Titel), `text-embedding-3-small` (in `app/context/embedding.py`
+fest verdrahtet), `gpt-image-1.5` (Bild, optional) sowie `ollama-fallback`.
+Die Jugendschutz-Guardrails aus `infra/litellm_config.example.yaml` (Produktion)
+sind hier bewusst weggelassen.
+
+### 4. Proxy starten
+
+Am einfachsten über das Start-Skript (lädt `.env`, aktiviert die venv, prüft
+Pflicht-Variablen):
+
+```bash
+./infra/litellm_start_dev.sh          # Port 4000; PORT=… / CONFIG=… überschreibbar
+```
+
+Oder von Hand:
+
+```bash
+# aus dem Repo-Root, Proxy-venv aktiviert:
+source infra/litellm-venv/bin/activate
+set -a && source .env && set +a          # OPENAI_API_KEY, LITELLM_MASTER_KEY, … exportieren
+litellm --config infra/litellm_config.dev.yaml --port 4000
+```
+
+### 5. Prüfen
+
+```bash
+# Modelle sichtbar? (Master-Key aus .env)
+curl -s http://localhost:4000/models -H "Authorization: Bearer $LITELLM_MASTER_KEY"
+
+# Chat-Completion durchreichen
+curl -s http://localhost:4000/chat/completions \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4","messages":[{"role":"user","content":"ping"}]}'
+```
+
+Liefern beide Aufrufe eine sinnvolle Antwort, kann das Backend gestartet werden.
+Zum schnellen Zurückschalten auf den Homelab-Proxy die auskommentierte
+`LITELLM_PROXY_URL`-Zeile in `.env` wieder aktivieren.
 
 ## Frontend
 

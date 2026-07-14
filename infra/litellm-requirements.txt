@@ -1,0 +1,29 @@
+# Abhängigkeiten für den LOKALEN LiteLLM-Proxy (Dev).
+#
+# Das Backend selbst importiert litellm NICHT (es spricht den Proxy nur über HTTP
+# an), deshalb steht litellm bewusst nicht in backend/requirements.txt. Für den
+# lokalen Proxy-Betrieb wird hier das proxy-Extra (Prisma, uvicorn, …) gepinnt.
+#
+# ⚠️ Python-Version: NICHT in die backend-venv (Python 3.14) installieren!
+#    Proxy-Deps wie orjson haben für 3.14 keine vorgebauten Wheels und scheitern
+#    beim Rust/PyO3-Build. Eine dedizierte venv auf Python 3.13 (oder ≤3.13)
+#    verwenden — dort gibt es Binär-Wheels, kein Compiler nötig:
+#
+#      python3.13 -m venv infra/litellm-venv
+#      source infra/litellm-venv/bin/activate
+#      pip install -r infra/litellm-requirements.txt
+#
+# Version an die bereits genutzte Homelab-/Prod-Version angeglichen; bei einem
+# Upgrade hier UND ggf. die Guardrail-Syntax in der Config prüfen.
+litellm[proxy]==1.83.7
+
+# Prisma hängt bei LiteLLM am Extra `extra-proxy` (NICHT `proxy`) und fehlt daher
+# bei `litellm[proxy]` — ohne es scheitert der DB-gestützte Start mit
+# `ModuleNotFoundError: No module named 'prisma'`. Version aus LiteLLMs Pin.
+# Nach der Installation einmalig den Prisma-Client generieren. `prisma generate`
+# OHNE --schema sucht im Projektordner und findet LiteLLMs Schema NICHT — es liegt
+# im Paket (litellm/proxy/schema.prisma). Daher Pfad explizit setzen:
+#   SCHEMA=$(python -c "import litellm,os;print(os.path.join(os.path.dirname(litellm.__file__),'proxy','schema.prisma'))")
+#   prisma generate --schema="$SCHEMA"
+# (infra/litellm_start_dev.sh erledigt das automatisch.)
+prisma==0.11.0

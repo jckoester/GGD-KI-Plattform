@@ -37,6 +37,8 @@ venv/
 .venv/
 env/
 .env/
+# Dedizierte venv für den lokalen LiteLLM-Proxy (Python 3.13, siehe dev-setup.md)
+infra/litellm-venv/
 
 # Node / Svelte
 node_modules/
@@ -56,3 +58,4 @@ data/generated_images/*
 config/pedagogy.yaml
 config/artifact_limits.yaml
 data/artifacts/*
+infra/litellm_config.dev.yaml
