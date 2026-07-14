@@ -78,6 +78,37 @@ def _mock_userinfo(username, groups, roles=None):
     return resp
 
 
+def _mock_token_signed_id(access_token, id_token):
+    resp = MagicMock()
+    resp.json.return_value = {"access_token": access_token, "id_token": id_token}
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+# ── RS256/JWKS-Helfer für die ID-Token-Signaturprüfung (Audit #6) ──────────────
+
+def _make_rsa_jwks(kid="k1"):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from jose import jwk as jose_jwk
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    j = jose_jwk.construct(key.public_key(), "RS256").to_dict()
+    j.update({"kid": kid, "alg": "RS256", "use": "sig"})
+    return {"keys": [j]}, pem
+
+
+def _sign(pem, claims, kid="k1"):
+    from jose import jwt as jose_jwt
+
+    return jose_jwt.encode(claims, pem, algorithm="RS256", headers={"kid": kid})
+
+
 class TestOAuthConfig:
     def test_valid_config(self, oauth_config_dict):
         config = OAuthConfig.model_validate(oauth_config_dict)
@@ -215,6 +246,58 @@ class TestOAuthAdapter:
             challenge = await oauth_adapter.get_login_challenge()
             await oauth_adapter.exchange_code("code", challenge.state)
         assert "code_verifier" not in captured["data"]
+
+    # ── ID-Token-Signaturprüfung (Audit #6) ──────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_verify_id_token_valid(self, oauth_adapter):
+        jwks, pem = _make_rsa_jwks()
+        token = _sign(pem, {"sub": "x", "auth_time": 1700000000})
+        oauth_adapter._fetch_jwks = AsyncMock(return_value=jwks)
+        claims = await oauth_adapter._verify_id_token(token)
+        assert claims is not None and claims["auth_time"] == 1700000000
+
+    @pytest.mark.asyncio
+    async def test_verify_id_token_tampered(self, oauth_adapter):
+        jwks, pem = _make_rsa_jwks()
+        token = _sign(pem, {"sub": "x", "auth_time": 1}) + "x"
+        oauth_adapter._fetch_jwks = AsyncMock(return_value=jwks)
+        assert await oauth_adapter._verify_id_token(token) is None
+
+    @pytest.mark.asyncio
+    async def test_verify_id_token_wrong_key(self, oauth_adapter):
+        _, pem = _make_rsa_jwks()             # signiert mit Key A
+        other_jwks, _ = _make_rsa_jwks()      # JWKS trägt Key B (gleiche kid, anderes Material)
+        token = _sign(pem, {"sub": "x", "auth_time": 1})
+        oauth_adapter._fetch_jwks = AsyncMock(return_value=other_jwks)
+        assert await oauth_adapter._verify_id_token(token) is None
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_fresh_uses_verified_auth_time(self, oauth_adapter):
+        jwks, pem = _make_rsa_jwks()
+        id_token = _sign(pem, {"sub": "x", "auth_time": 1700000000})
+        oauth_adapter._config.jwks_url = "https://idp/jwks"  # aktiviert strikte Prüfung
+        oauth_adapter._fetch_jwks = AsyncMock(return_value=jwks)
+        client = _make_mock_client(
+            _mock_token_signed_id("at", id_token), _mock_userinfo("u", ["schueler"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
+            fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
+        assert fresh.auth_time == 1700000000
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_fresh_rejects_bad_signature(self, oauth_adapter):
+        _, pem = _make_rsa_jwks()
+        other_jwks, _ = _make_rsa_jwks()      # ID-Token mit Key A signiert, JWKS = Key B
+        id_token = _sign(pem, {"sub": "x", "auth_time": 1700000000})
+        oauth_adapter._config.jwks_url = "https://idp/jwks"
+        oauth_adapter._fetch_jwks = AsyncMock(return_value=other_jwks)
+        client = _make_mock_client(
+            _mock_token_signed_id("at", id_token), _mock_userinfo("u", ["schueler"])
+        )
+        with patch("app.auth.adapters.oauth.httpx.AsyncClient", return_value=client):
+            fresh = await oauth_adapter.exchange_code_fresh("code", "nonce.sig")
+        assert fresh.auth_time is None  # ungültige Signatur → keine vertrauenswürdige auth_time
 
     @pytest.mark.asyncio
     async def test_exchange_code_success(self, oauth_adapter):

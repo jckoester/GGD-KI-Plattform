@@ -1,5 +1,10 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Bekannte Platzhalter-/Beispiel-Keys, die in Produktion abgelehnt werden (Audit #9).
+_PLACEHOLDER_MASTER_KEYS = {
+    "sk-1234", "sk-1234567890", "changeme", "sk-changeme", "your-master-key", "sk-your-key",
+}
 
 
 class Settings(BaseSettings):
@@ -43,6 +48,25 @@ class Settings(BaseSettings):
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
+
+    @model_validator(mode="after")
+    def _require_strong_master_key_in_prod(self) -> "Settings":
+        """In Produktion muss `LITELLM_MASTER_KEY` stark sein (Sicherheits-Audit #9).
+
+        Der Master-Key gibt volle Kontrolle über den LiteLLM-Proxy (Key-Minting, Budgets) —
+        ein leerer/Platzhalter-/zu kurzer Wert wäre bei Netz-Exposition fatal. In `development`
+        bleibt der schwache Dev-Key (z. B. `sk-1234`) für den lokalen Proxy erlaubt.
+        """
+        if self.environment == "development":
+            return self
+        key = (self.litellm_master_key or "").strip()
+        if len(key) < 20 or key.lower() in _PLACEHOLDER_MASTER_KEYS:
+            raise ValueError(
+                "LITELLM_MASTER_KEY fehlt, ist ein Platzhalter oder zu kurz. In Produktion einen "
+                "starken, zufälligen Schlüssel (≥ 20 Zeichen) setzen — er gewährt volle Kontrolle "
+                "über den LiteLLM-Proxy."
+            )
+        return self
 
 
 settings = Settings()

@@ -10,6 +10,7 @@ from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
+from jose import JWTError, jwt
 from pydantic import BaseModel, model_validator
 
 from app.auth.base import AuthAdapter, FreshIdentity, LoginChallenge, NormalizedIdentity
@@ -97,6 +98,11 @@ class OAuthConfig(BaseModel):
     auth_url: str | None = None
     token_url: str | None = None
     userinfo_url: str | None = None
+    # JWKS-Endpoint des IdP (Sicherheits-Audit #6). Ist er gesetzt, wird die Signatur des
+    # ID-Tokens im Step-up-Pfad gegen die JWKS geprüft, bevor `auth_time` vertraut wird.
+    # Bleibt er None, greift der bisherige Back-Channel-Trust (ID-Token kommt über TLS
+    # direkt vom Token-Endpoint) — dann OHNE Signaturprüfung (Warnung im Log).
+    jwks_url: str | None = None
 
     @property
     def effective_auth_url(self) -> str:
@@ -136,6 +142,7 @@ class OAuthAdapter(AuthAdapter):
         self._school_secret = settings.school_secret
         self._group_role_map = group_role_map or {}
         self._debug_userinfo = settings.auth_debug_userinfo
+        self._jwks: dict | None = None  # JWKS-Cache (Audit #6)
 
     @property
     def mode(self) -> Literal["redirect"]:
@@ -247,11 +254,57 @@ class OAuthAdapter(AuthAdapter):
         id_token = token_json.get("id_token")
         auth_time = None
         if id_token:
-            claims = _unverified_jwt_claims(id_token)
-            raw_at = claims.get("auth_time")
+            if self._config.jwks_url:
+                # Strikte Prüfung: nur eine gültige Signatur liefert eine vertrauenswürdige
+                # auth_time. Schlägt die Prüfung fehl → None → Step-up wird als „nicht frisch"
+                # abgelehnt (fail-closed).
+                claims = await self._verify_id_token(id_token)
+            else:
+                logger.warning(
+                    "OAuth-Step-up: jwks_url nicht konfiguriert — ID-Token-Signatur wird NICHT "
+                    "geprüft (Audit #6). Für strikte Prüfung `oauth.jwks_url` in auth.yaml setzen."
+                )
+                claims = _unverified_jwt_claims(id_token)
+            raw_at = (claims or {}).get("auth_time")
             if isinstance(raw_at, (int, float)):
                 auth_time = int(raw_at)
         return FreshIdentity(identity=identity, auth_time=auth_time)
+
+    async def _fetch_jwks(self) -> dict | None:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(self._config.jwks_url)
+                resp.raise_for_status()
+                return resp.json()
+        except Exception:
+            logger.exception("OAuth: JWKS-Abruf fehlgeschlagen (%s)", self._config.jwks_url)
+            return None
+
+    async def _verify_id_token(self, id_token: str) -> dict | None:
+        """Prüft die Signatur des ID-Tokens gegen die IdP-JWKS (Audit #6). Claims oder None.
+
+        `aud`/`iss` werden bewusst nicht erzwungen (das Token kommt aus dem eigenen
+        Back-Channel-Code-Tausch → inhärent unser Client); geprüft werden Signatur + Ablauf.
+        Bei kid-Miss wird die JWKS einmal neu geladen (Key-Rotation)."""
+        for attempt in range(2):
+            if self._jwks is None:
+                self._jwks = await self._fetch_jwks()
+            if not self._jwks:
+                return None
+            try:
+                return jwt.decode(
+                    id_token,
+                    self._jwks,
+                    algorithms=["RS256", "RS384", "RS512"],
+                    options={"verify_aud": False},
+                )
+            except JWTError:
+                if attempt == 0:
+                    self._jwks = None  # evtl. Key-Rotation → einmal neu laden und erneut prüfen
+                    continue
+                logger.warning("OAuth: ID-Token-Signatur ungültig")
+                return None
+        return None
 
     def _verify_state(self, state: str) -> None:
         try:

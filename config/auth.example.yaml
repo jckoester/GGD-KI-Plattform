@@ -22,6 +22,12 @@ oauth:
   # auth_url: "https://sso.example.de/oauth2/authorize"
   # token_url: "https://sso.example.de/oauth2/token"
   # userinfo_url: "https://sso.example.de/oauth2/userinfo"
+  #
+  # JWKS-Endpoint des IdP (Sicherheits-Audit #6): Ist er gesetzt, wird die Signatur des
+  # ID-Tokens im Step-up-Pfad geprüft (nur so wird `auth_time` vertraut). Empfohlen. Die
+  # exakte URL steht in der OIDC-Discovery des Providers
+  # (`<issuer>/.well-known/openid-configuration` → `jwks_uri`).
+  # jwks_url: "https://sso.example.de/oauth2/certs"
 
 yaml_test:
   users_file: config/test_users.yaml
