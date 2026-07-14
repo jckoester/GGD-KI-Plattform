@@ -8,9 +8,9 @@ Bestätigungsdialog (Schritt 5).
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.pii.scanner import scan
+from app.ratelimit.dependency import rate_limit
 
 router = APIRouter(prefix="/pii", tags=["pii"])
 
@@ -33,7 +33,7 @@ class PiiScanResponse(BaseModel):
 @router.post("/scan", response_model=PiiScanResponse)
 async def pii_scan(
     body: PiiScanRequest,
-    _: JwtPayload = Depends(get_current_user),
+    _: JwtPayload = Depends(rate_limit("pii_scan")),
 ) -> PiiScanResponse:
     spans = scan(body.text)
     return PiiScanResponse(

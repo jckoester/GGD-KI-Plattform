@@ -19,6 +19,7 @@ import httpx
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
+from app.ratelimit.dependency import rate_limit
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
@@ -584,7 +585,7 @@ def _crisis_sse_event(record: Optional[_CrisisRecord]) -> Optional[str]:
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
-    current_user: JwtPayload = Depends(get_current_user),
+    current_user: JwtPayload = Depends(rate_limit("chat")),
     db: AsyncSession = Depends(get_db),
 ):
     model_used = request.model_id or settings.chat_default_model

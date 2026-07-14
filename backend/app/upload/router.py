@@ -6,9 +6,9 @@ from typing import Annotated, Literal, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.config import settings
+from app.ratelimit.dependency import rate_limit
 from app.upload.extractor import extract_pdf, extract_plaintext
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ UploadResult = Annotated[
 @router.post("/upload/session", response_model=UploadResult)
 async def upload_session(
     file: UploadFile = File(...),
-    current_user: JwtPayload = Depends(get_current_user),
+    current_user: JwtPayload = Depends(rate_limit("upload")),
 ) -> UploadResult:
     # Dateiendung bestimmen
     suffix = Path(file.filename or "").suffix.lower()

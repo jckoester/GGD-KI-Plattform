@@ -1,0 +1,19 @@
+# rate_limits.yaml — Drosselung pro Nutzer:in (Sicherheits-Audit #2)
+#
+# Je Bucket: limit Anfragen pro window Sekunden, gezählt pro Pseudonym (JWT sub).
+# Optional pro Rolle überschreibbar (großzügigstes zutreffendes Rollen-Limit gewinnt).
+# Fehlt diese Datei, greifen konservative Built-in-Defaults. Live-Datei ist gitignored;
+# aus dieser .example provisionieren.
+#
+# Hinweis: Das App-Limit ist prozess-lokal (je uvicorn-Worker). Für strikte,
+# worker-übergreifende Drosselung zusätzlich nginx `limit_req_zone` einsetzen.
+
+buckets:
+  pii_scan: { limit: 30, window: 60 }   # lokaler spaCy-Scan (CPU-intensiv)
+  upload:   { limit: 20, window: 60 }   # Datei-Upload (bis 10 MB je Datei)
+  chat:     { limit: 60, window: 60 }   # Chat-/LLM-Anfragen
+
+# Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
+roles:
+  teacher:
+    chat: { limit: 120, window: 60 }
