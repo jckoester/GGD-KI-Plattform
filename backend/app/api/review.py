@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_any_role, require_fresh_stepup, require_role
+from app.auth.dependencies import require_any_role, require_fresh_stepup_for, require_role
 from app.auth.jwt import JwtPayload
 from app.db.models import (
     Conversation,
@@ -121,7 +121,7 @@ async def approve_access_request(
     request_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: JwtPayload = Depends(require_any_role(["review"])),
-    _fresh: JwtPayload = Depends(require_fresh_stepup),
+    _fresh: JwtPayload = Depends(require_fresh_stepup_for("approve")),
 ) -> ApprovalResponse:
     req = await db.get(ConversationAccessRequest, request_id)
     if req is None:
@@ -169,7 +169,7 @@ async def deny_access_request(
     request_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: JwtPayload = Depends(require_any_role(["review"])),
-    _fresh: JwtPayload = Depends(require_fresh_stepup),
+    _fresh: JwtPayload = Depends(require_fresh_stepup_for("deny")),
 ) -> ApprovalResponse:
     req = await db.get(ConversationAccessRequest, request_id)
     if req is None:
@@ -303,7 +303,7 @@ async def read_conversation(
     request_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: JwtPayload = Depends(require_fresh_stepup),
+    current_user: JwtPayload = Depends(require_fresh_stepup_for("read")),
 ) -> ReaderConversationResponse:
     req = await _authorize_reader(request_id, current_user, db)
     return await _build_reader_payload(req, current_user, db, request, action="view")
@@ -314,7 +314,7 @@ async def export_conversation(
     request_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: JwtPayload = Depends(require_fresh_stepup),
+    current_user: JwtPayload = Depends(require_fresh_stepup_for("export")),
 ) -> ReaderConversationResponse:
     # Gleiche Zugriffskontrolle; protokolliert action='export'. Den eigentlichen
     # Download baut das Frontend aus der Antwort.

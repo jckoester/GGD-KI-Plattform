@@ -22,6 +22,8 @@
   let exporting = $state(false);
   let showStepUp = $state(false);
   let pendingIntent = $state(null); // "view" | "export"
+  // Backend-Step-up-Aktion für die anstehende Absicht (Audit #3-Bindung).
+  let stepUpAction = $derived(pendingIntent === "export" ? "export" : "read");
 
   let isAdmin = $derived($user?.roles?.includes("admin") ?? false);
 
@@ -207,7 +209,12 @@
 </div>
 
 {#if showStepUp}
-  <StepUpDialog onSuccess={onStepUpSuccess} onCancel={onStepUpCancel} />
+  <StepUpDialog
+    action={stepUpAction}
+    resourceId={id}
+    onSuccess={onStepUpSuccess}
+    onCancel={onStepUpCancel}
+  />
 {/if}
 
 {#if showResolve}

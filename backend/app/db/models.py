@@ -532,6 +532,27 @@ class JwtRevocation(Base):
     )
 
 
+class StepupConsumed(Base):
+    """Verbrauchte Step-up-Token-`jti` (Einmalverwendung, Sicherheits-Audit #3 Teil C).
+
+    Ein Step-up-Token ist an (sub, action, resource_id) gebunden und darf **nur einmal**
+    eingelöst werden. Beim Einlösen wird die `jti` hier eingefügt; ein zweiter Versuch
+    (Replay im TTL-Fenster) kollidiert am Primärschlüssel → abgelehnt. `expires_at`
+    erlaubt das Aufräumen abgelaufener Einträge."""
+
+    __tablename__ = "stepup_consumed"
+
+    jti: Mapped[str] = mapped_column(primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_stepup_consumed_expires_at", "expires_at"),
+    )
+
+
 # 10. exchange_rates
 class ExchangeRate(Base):
     __tablename__ = "exchange_rates"

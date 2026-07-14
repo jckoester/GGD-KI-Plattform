@@ -8,7 +8,9 @@
   import { ShieldCheck } from "lucide-svelte";
   import { getStepUpChallenge, stepUpDirect } from "$lib/api.js";
 
-  let { onSuccess, onCancel } = $props();
+  // action (approve|deny|read|export) + resourceId (request_id) binden das Step-up-Token
+  // an genau diese Aktion/Ressource (Sicherheits-Audit #3).
+  let { onSuccess, onCancel, action, resourceId } = $props();
 
   let mode = $state(null); // "direct" | "redirect"
   let redirectUrl = $state(null);
@@ -22,7 +24,7 @@
   onMount(async () => {
     try {
       const returnTo = window.location.pathname + window.location.search;
-      const data = await getStepUpChallenge(returnTo);
+      const data = await getStepUpChallenge(returnTo, action, resourceId);
       mode = data.mode;
       redirectUrl = data.redirect_url ?? null;
     } catch (e) {
@@ -41,7 +43,7 @@
     submitting = true;
     error = null;
     try {
-      await stepUpDirect(username, password);
+      await stepUpDirect(username, password, action, resourceId);
       onSuccess?.();
     } catch (e) {
       error = e.message ?? "Re-Authentifizierung fehlgeschlagen.";

@@ -14,6 +14,7 @@ from app.auth.group_sync import sync_groups
 from app.auth.jwt import JwtPayload, JwtService
 from app.auth.pseudonym import pseudonymize
 from app.auth.stepup import (
+    ALLOWED_STEPUP_ACTIONS,
     STEPUP_TTL_SECONDS,
     auth_time_is_fresh,
     is_stepup_state,
@@ -155,9 +156,11 @@ async def _handle_stepup_callback(
     parsed = parse_stepup_state(settings.school_secret, state)
     if parsed is None:
         raise HTTPException(status_code=400, detail="Ungültiger Step-up-State")
-    state_sub, return_to = parsed
+    state_sub, return_to, action, resource_id = parsed
     if state_sub != current.sub:
         raise HTTPException(status_code=401, detail="Step-up gehört zu anderem Nutzer")
+    if action not in ALLOWED_STEPUP_ACTIONS:
+        raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
 
     try:
         fresh = await adapter.exchange_code_fresh(code, state)
@@ -171,7 +174,7 @@ async def _handle_stepup_callback(
     if pseudonymize(fresh.identity.external_id, settings.school_secret) != current.sub:
         raise HTTPException(status_code=401, detail="Re-Authentifizierung als anderer Nutzer")
 
-    token = issue_stepup_token(settings.jwt_secret, current.sub)
+    token = issue_stepup_token(settings.jwt_secret, current.sub, action, resource_id)
     secure = settings.environment != "development"
     redirect = RedirectResponse(url=_safe_return_to(return_to), status_code=303)
     redirect.set_cookie(
@@ -185,19 +188,25 @@ async def _handle_stepup_callback(
 @router.get("/step-up")
 async def step_up_challenge(
     return_to: str = "/welcome",
+    action: str = "",
+    resource_id: str = "",
     current_user: JwtPayload = Depends(get_current_user),
     adapter: AuthAdapter = Depends(get_auth_adapter),
 ) -> dict:
     """Beschreibt, wie sich der:die Nutzer:in frisch authentifiziert.
 
-    direct: Frontend zeigt Passwort-Dialog (→ POST /step-up).
-    redirect: Frontend leitet auf die zurückgegebene URL (prompt=login) weiter.
+    `action`+`resource_id` binden das entstehende Step-up-Token an genau eine sensible
+    Aktion (Audit #3). direct: Frontend zeigt Passwort-Dialog (→ POST /step-up mit denselben
+    Feldern). redirect: Aktion/Ressource reisen mitsigniert im State.
     """
+    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+        raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     if adapter.mode == "direct":
         return {"mode": "direct"}
     nonce = secrets.token_urlsafe(16)
     state = sign_stepup_state(
-        settings.school_secret, current_user.sub, _safe_return_to(return_to), nonce
+        settings.school_secret, current_user.sub, _safe_return_to(return_to),
+        nonce, action, resource_id,
     )
     challenge = await adapter.get_stepup_challenge(state)
     return {"mode": "redirect", "redirect_url": challenge.redirect_url}
@@ -216,14 +225,18 @@ async def step_up_direct(
     body = await request.json()
     username = body.get("username")
     password = body.get("password")
+    action = body.get("action") or ""
+    resource_id = body.get("resource_id") or ""
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing username or password")
+    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+        raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     identity = await adapter.authenticate_direct(username, password)
     if identity is None:
         raise HTTPException(status_code=401, detail="Re-Authentifizierung fehlgeschlagen")
     if pseudonymize(identity.external_id, settings.school_secret) != current_user.sub:
         raise HTTPException(status_code=401, detail="Re-Authentifizierung als anderer Nutzer")
-    token = issue_stepup_token(settings.jwt_secret, current_user.sub)
+    token = issue_stepup_token(settings.jwt_secret, current_user.sub, action, resource_id)
     secure = settings.environment != "development"
     response.set_cookie(
         "stepup", token,

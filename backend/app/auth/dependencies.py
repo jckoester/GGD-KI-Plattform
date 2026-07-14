@@ -1,14 +1,17 @@
 from collections.abc import Callable
+from datetime import datetime, timezone
 from functools import lru_cache
+from uuid import UUID
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Path, Request
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
-from app.auth.stepup import verify_stepup_token
+from app.auth.stepup import decode_stepup_token
+from app.auth.stepup_nonce import consume_stepup_jti
 from app.config import settings
 from app.db.session import get_db
 
@@ -85,19 +88,43 @@ def require_any_role(roles: list[str]) -> Callable:
     return _guard
 
 
-async def require_fresh_stepup(
-    request: Request,
-    current_user: JwtPayload = Depends(get_current_user),
-) -> JwtPayload:
-    """Verlangt ein gültiges, frisches Step-up-Token (separates `stepup`-Cookie),
-    das auf den aktuellen Nutzer ausgestellt ist. Sonst 401 mit Hinweis-Header,
-    damit das Frontend die Re-Authentifizierung anstoßen kann. (Phase 12, Schritt 5)
+_STEPUP_REQUIRED = HTTPException(
+    status_code=401,
+    detail="Re-Authentifizierung erforderlich",
+    headers={"X-Stepup-Required": "1"},
+)
+
+
+def require_fresh_stepup_for(action: str) -> Callable:
+    """Dependency-Fabrik: verlangt ein frisches Step-up-Token, das an **genau diese**
+    `action` und den Pfad-Parameter `request_id` (Ressource) gebunden ist, und löst es
+    **einmalig** ein (Nonce). Schließt Cross-Action-Reuse und Replay (Audit #3 Teil B/C).
+
+    Ersetzt das frühere, nur an `sub` gebundene `require_fresh_stepup`.
     """
-    token = request.cookies.get("stepup")
-    if not token or not verify_stepup_token(token, settings.jwt_secret, current_user.sub):
-        raise HTTPException(
-            status_code=401,
-            detail="Re-Authentifizierung erforderlich",
-            headers={"X-Stepup-Required": "1"},
-        )
-    return current_user
+    async def _guard(
+        request: Request,
+        request_id: UUID = Path(...),
+        current_user: JwtPayload = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> JwtPayload:
+        token = request.cookies.get("stepup")
+        claims = decode_stepup_token(token, settings.jwt_secret) if token else None
+        if (
+            not claims
+            or claims.get("sub") != current_user.sub
+            or claims.get("action") != action
+            or claims.get("resource_id") != str(request_id)
+        ):
+            raise _STEPUP_REQUIRED
+        jti = claims.get("jti")
+        exp = claims.get("exp")
+        if not jti or not exp:
+            raise _STEPUP_REQUIRED
+        expires_at = datetime.fromtimestamp(int(exp), tz=timezone.utc)
+        # Einmalverwendung: bereits eingelöst → Replay, ablehnen.
+        if not await consume_stepup_jti(db, jti, expires_at):
+            raise _STEPUP_REQUIRED
+        return current_user
+
+    return _guard

@@ -11,8 +11,13 @@ import base64
 import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from jose import JWTError, jwt
+
+# Erlaubte Step-up-Aktionen (an den `action`-Claim gebunden). Neue sensible Aktion → hier
+# ergänzen und einen `require_fresh_stepup_for(...)`-Guard setzen.
+ALLOWED_STEPUP_ACTIONS = frozenset({"approve", "deny", "read", "export"})
 
 # Gültigkeitsdauer des Step-up-Tokens (Zeitfenster für die sensible Aktion).
 STEPUP_TTL_SECONDS = 300  # 5 Minuten
@@ -25,26 +30,39 @@ _STATE_PREFIX = "su."
 
 # ---------- Step-up-Token (separates Cookie, getrennt vom Session-JWT) ----------
 
-def issue_stepup_token(secret: str, pseudonym: str, algorithm: str = "HS256") -> str:
+def issue_stepup_token(
+    secret: str, pseudonym: str, action: str, resource_id: str, algorithm: str = "HS256"
+) -> str:
+    """Frisches, **einmalig** einlösbares Step-up-Token, gebunden an Aktion + Ressource.
+
+    `jti` erlaubt die Einmalverwendung (Nonce-Store), `action`/`resource_id` binden das
+    Token an genau eine sensible Aktion auf genau eine Ressource (kein Cross-Action-Reuse).
+    """
     now = datetime.now(timezone.utc)
     payload = {
         "sub": pseudonym,
         "purpose": "stepup",
+        "action": action,
+        "resource_id": resource_id,
+        "jti": str(uuid4()),
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(seconds=STEPUP_TTL_SECONDS)).timestamp()),
     }
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 
-def verify_stepup_token(
-    token: str, secret: str, expected_sub: str, algorithm: str = "HS256"
-) -> bool:
-    """True nur, wenn Token gültig, nicht abgelaufen, purpose=stepup und sub passt."""
+def decode_stepup_token(token: str, secret: str, algorithm: str = "HS256") -> dict | None:
+    """Dekodiert + validiert Signatur/Ablauf/`purpose`. Gibt die Claims zurück oder None.
+
+    Aktions-/Ressourcen-/sub-Abgleich und die Einmalverwendung (jti) macht der Guard
+    (`require_fresh_stepup_for`)."""
     try:
         raw = jwt.decode(token, secret, algorithms=[algorithm])
     except JWTError:
-        return False
-    return raw.get("purpose") == "stepup" and raw.get("sub") == expected_sub
+        return None
+    if raw.get("purpose") != "stepup":
+        return None
+    return raw
 
 
 # ---------- Signierter Step-up-State (OAuth-Redirect-Pfad, an sub gebunden) ----------
@@ -62,9 +80,14 @@ def _state_sig(secret: str, payload: str) -> str:
     return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
-def sign_stepup_state(secret: str, sub: str, return_to: str, nonce: str) -> str:
-    """Baut einen signierten State `su.<sub>.<b64(return_to)>.<nonce>.<sig>`."""
-    payload = f"{_STATE_PREFIX}{sub}.{_b64(return_to)}.{nonce}"
+def sign_stepup_state(
+    secret: str, sub: str, return_to: str, nonce: str, action: str, resource_id: str
+) -> str:
+    """Signierter State `su.<sub>.<b64(return_to)>.<nonce>.<action>.<resource_id>.<sig>`.
+
+    `action`/`resource_id` reisen mitsigniert durch den OAuth-Redirect, damit der Callback
+    das Step-up-Token an dieselbe Aktion/Ressource binden kann (Redirect-Pfad, Audit #3)."""
+    payload = f"{_STATE_PREFIX}{sub}.{_b64(return_to)}.{nonce}.{action}.{resource_id}"
     return f"{payload}.{_state_sig(secret, payload)}"
 
 
@@ -72,22 +95,22 @@ def is_stepup_state(state: str | None) -> bool:
     return bool(state) and state.startswith(_STATE_PREFIX)
 
 
-def parse_stepup_state(secret: str, state: str) -> tuple[str, str] | None:
-    """Verifiziert Signatur, gibt (sub, return_to) zurück oder None bei Ungültigkeit."""
+def parse_stepup_state(secret: str, state: str) -> tuple[str, str, str, str] | None:
+    """Verifiziert Signatur, gibt (sub, return_to, action, resource_id) oder None."""
     if not is_stepup_state(state):
         return None
     parts = state.split(".")
-    if len(parts) != 5:
+    if len(parts) != 7:
         return None
-    _, sub, rt_b64, nonce, sig = parts
-    payload = f"{_STATE_PREFIX}{sub}.{rt_b64}.{nonce}"
+    _, sub, rt_b64, nonce, action, resource_id, sig = parts
+    payload = f"{_STATE_PREFIX}{sub}.{rt_b64}.{nonce}.{action}.{resource_id}"
     if not hmac.compare_digest(_state_sig(secret, payload), sig):
         return None
     try:
         return_to = _unb64(rt_b64)
     except Exception:
         return None
-    return sub, return_to
+    return sub, return_to, action, resource_id
 
 
 # ---------- auth_time-Frische (Redirect-Pfad) ----------

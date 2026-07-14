@@ -215,5 +215,10 @@
 </div>
 
 {#if showStepUp}
-  <StepUpDialog onSuccess={onStepUpSuccess} onCancel={onStepUpCancel} />
+  <StepUpDialog
+    action={pendingAction?.action}
+    resourceId={pendingAction?.id}
+    onSuccess={onStepUpSuccess}
+    onCancel={onStepUpCancel}
+  />
 {/if}

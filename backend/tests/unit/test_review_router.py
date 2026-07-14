@@ -84,8 +84,18 @@ def test_pending_count_requires_review():
 
 # ---------- approve/deny: Rolle + Step-up ----------
 
-def _stepup_cookie(sub):
-    return issue_stepup_token(settings.jwt_secret, sub)
+def _stepup_cookie(sub, action="approve", rid=None):
+    return issue_stepup_token(settings.jwt_secret, sub, action, rid or str(uuid4()))
+
+
+def _stepup_db(req, rowcount=1):
+    """db-Mock, das den Nonce-Verbrauch (db.execute→rowcount) und db.get(req) bedient."""
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=req)
+    db.execute = AsyncMock(return_value=SimpleNamespace(rowcount=rowcount))
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    return db
 
 
 def test_approve_requires_review_role():
@@ -137,40 +147,49 @@ def _pending_req(requested_by="p-antragsteller"):
 
 
 def test_approve_rejected_for_self():
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=_pending_req(requested_by="p-review"))
+    rid = uuid4()
+    db = _stepup_db(_pending_req(requested_by="p-review"))
     app = _make_app(REVIEW, db=db)
     client = TestClient(app)
-    client.cookies.set("stepup", _stepup_cookie("p-review"))
-    r = client.post(f"/access-requests/{uuid4()}/approve")
+    client.cookies.set("stepup", _stepup_cookie("p-review", "approve", str(rid)))
+    r = client.post(f"/access-requests/{rid}/approve")
     assert r.status_code == 403
     assert "Selbst-Freigabe" in r.json()["detail"]
 
 
 def test_approve_rejected_for_admin_reviewer():
     # additive Rollen review+admin: darf NICHT freigeben (Unabhängigkeit)
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=_pending_req(requested_by="p-antragsteller"))
+    rid = uuid4()
+    db = _stepup_db(_pending_req(requested_by="p-antragsteller"))
     app = _make_app(REVIEW_ADMIN, db=db)
     client = TestClient(app)
-    client.cookies.set("stepup", _stepup_cookie("p-review-admin"))
-    r = client.post(f"/access-requests/{uuid4()}/approve")
+    client.cookies.set("stepup", _stepup_cookie("p-review-admin", "approve", str(rid)))
+    r = client.post(f"/access-requests/{rid}/approve")
     assert r.status_code == 403
     assert "Admin" in r.json()["detail"]
 
 
 def test_approve_allowed_for_independent_reviewer():
-    db = AsyncMock()
-    db.get = AsyncMock(return_value=_pending_req(requested_by="p-antragsteller"))
-    db.commit = AsyncMock()
-    db.refresh = AsyncMock()
+    rid = uuid4()
+    db = _stepup_db(_pending_req(requested_by="p-antragsteller"))
     app = _make_app(REVIEW, db=db)
     client = TestClient(app)
-    client.cookies.set("stepup", _stepup_cookie("p-review"))
-    r = client.post(f"/access-requests/{uuid4()}/approve")
+    client.cookies.set("stepup", _stepup_cookie("p-review", "approve", str(rid)))
+    r = client.post(f"/access-requests/{rid}/approve")
     assert r.status_code == 200
     assert r.json()["status"] == "approved"
     assert r.json()["coreviewer"] == "p-review"
+
+
+def test_approve_replay_rejected():
+    # Bereits eingelöstes Step-up-Token (Nonce verbraucht, rowcount=0) → 401
+    rid = uuid4()
+    db = _stepup_db(_pending_req(), rowcount=0)
+    app = _make_app(REVIEW, db=db)
+    client = TestClient(app)
+    client.cookies.set("stepup", _stepup_cookie("p-review", "approve", str(rid)))
+    r = client.post(f"/access-requests/{rid}/approve")
+    assert r.status_code == 401
 
 
 # ---------- Reader-View: Step-up erzwungen (Schritt 7) ----------

@@ -24,8 +24,14 @@ export async function login(username, password) {
 }
 
 // Step-up-Re-Authentifizierung (Phase 12): beschreibt den Re-Auth-Weg.
-export async function getStepUpChallenge(returnTo = "/welcome") {
-  const params = new URLSearchParams({ return_to: returnTo });
+// Step-up wird an genau eine Aktion (approve|deny|read|export) und Ressource (request_id)
+// gebunden (Sicherheits-Audit #3) — action + resourceId sind Pflicht.
+export async function getStepUpChallenge(returnTo, action, resourceId) {
+  const params = new URLSearchParams({
+    return_to: returnTo ?? "/welcome",
+    action: action ?? "",
+    resource_id: resourceId ?? "",
+  });
   const res = await fetch(`${BASE}/auth/step-up?${params}`, {
     credentials: "include",
   });
@@ -37,12 +43,12 @@ export async function getStepUpChallenge(returnTo = "/welcome") {
 }
 
 // Step-up im direct-Modus (Dev/Test): Passwort-Re-Entry → setzt stepup-Cookie.
-export async function stepUpDirect(username, password) {
+export async function stepUpDirect(username, password, action, resourceId) {
   const res = await fetch(`${BASE}/auth/step-up`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, action, resource_id: resourceId }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
