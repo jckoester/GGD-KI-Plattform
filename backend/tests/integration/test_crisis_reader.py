@@ -106,22 +106,44 @@ async def test_coreviewer_can_read(db):
     assert len(resp.messages) == 2
 
 
-async def test_read_writes_view_audit_with_ip(db):
+async def _audit_ip(db, req_id):
+    row = await db.scalar(
+        select(ConversationAccessAudit).where(
+            ConversationAccessAudit.access_request_id == req_id
+        )
+    )
+    return row
+
+
+async def test_read_writes_view_audit_with_ip_trusted_proxy(db):
+    # Peer ist ein vertrauenswürdiger Proxy (127.0.0.1) → X-Forwarded-For wird ausgewertet;
+    # genommen wird der rechteste NICHT-Proxy-Eintrag (echter Client, den nginx anhängt),
+    # nicht der spoofbare linke Eintrag (Sicherheits-Audit #13).
     conv, flag, req = await _make_request(db)
     await read_conversation(
         request_id=req.id,
-        request=_req(fwd="203.0.113.7, 10.0.0.1"),
+        request=_req(ip="127.0.0.1", fwd="203.0.113.7, 10.0.0.1"),
         db=db,
         current_user=_user(REVIEWER),
     )
     assert await _audit_count(db, req.id, "view") == 1
-    row = await db.scalar(
-        select(ConversationAccessAudit).where(
-            ConversationAccessAudit.access_request_id == req.id
-        )
-    )
+    row = await _audit_ip(db, req.id)
     assert row.viewer == REVIEWER
-    assert row.ip_address == "203.0.113.7"  # erster Eintrag aus X-Forwarded-For
+    assert row.ip_address == "10.0.0.1"  # rechtester Nicht-Proxy-Eintrag
+
+
+async def test_read_audit_ignores_xff_from_untrusted_peer(db):
+    # Peer ist KEIN vertrauenswürdiger Proxy → X-Forwarded-For ist spoofbar und wird ignoriert;
+    # geloggt wird der tatsächliche TCP-Peer (Anti-Spoofing, Sicherheits-Audit #13).
+    conv, flag, req = await _make_request(db)
+    await read_conversation(
+        request_id=req.id,
+        request=_req(ip="10.0.0.5", fwd="203.0.113.7"),
+        db=db,
+        current_user=_user(REVIEWER),
+    )
+    row = await _audit_ip(db, req.id)
+    assert row.ip_address == "10.0.0.5"
 
 
 async def test_non_participant_forbidden(db):

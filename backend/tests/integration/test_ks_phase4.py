@@ -567,12 +567,13 @@ class TestListNodesFilters:
         data = resp.json()
         
         titles = [n["title"] for n in data]
-        # Sollte archivierte Knoten enthalten
+        # Sollte archivierte Knoten enthalten (Math Thema 1 gehört teacher1 → über Owner sichtbar)
         assert "Math Thema 1 (archiviert)" in titles
         assert "Copy-Quelle (archiviert)" in titles
-        # teacher2's archivierter Knoten sollte auch enthalten sein (sichtbar über Gruppe)
-        assert "Math Thema 2 alt (teacher2)" in titles
-        
+        # teacher2's Gruppen-Knoten (MATH_GROUP_2) ist für teacher1 NICHT sichtbar: teacher1 ist
+        # kein Mitglied dieser Gruppe → group-Knoten nur für Mitglieder (Sicherheits-Audit #1).
+        assert "Math Thema 2 alt (teacher2)" not in titles
+
         # Sollte aktive Knoten NICHT enthalten
         assert "Math Thema 1 (aktiv)" not in titles
 

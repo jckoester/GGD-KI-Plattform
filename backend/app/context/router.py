@@ -115,17 +115,19 @@ async def _check_read_permission(
 ) -> None:
     """403 wenn der Knoten für die Nutzer:in nicht lesbar ist.
 
-    Gegenstück zum Schreibpfad (`_check_write_permission`): `private` → nur Owner;
-    `group` → nur Gruppenmitglieder; `subject`/`school`/`global` sind für eingeloggte
-    Nutzer:innen lesbar. Admin und Owner immer erlaubt. (Vorher prüfte der Lesepfad **nur**
-    `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Sicherheits-Audit #1.)
+    `private` → **nur** Owner (auch Admins sehen fremde private Knoten NICHT — konsistent mit
+    dem Listen-Filter `_read_scope_clause`); `group` → nur Gruppenmitglieder (Admin ausgenommen);
+    `subject`/`school`/`global` → für alle eingeloggten Nutzer:innen lesbar. (Vorher prüfte der
+    Lesepfad **nur** `private` → fremde group-Knoten waren per UUID lesbar/kopierbar — Audit #1.)
     """
-    if "admin" in user.roles:
-        return
     if node.owner_pseudonym == user.sub:
         return
+    # Privat ist owner-only — bewusst VOR der Admin-Ausnahme, damit Admins fremde private
+    # Knoten nicht lesen können (deckt sich mit `_read_scope_clause`, das private ausschließt).
     if node.read_scope == "private":
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if "admin" in user.roles:
+        return
     if node.read_scope == "group":
         if node.read_scope_group_id is None:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")

@@ -248,6 +248,25 @@ class TestReadPermissionAudit1:
         resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
         assert resp.status_code == 200
 
+    def test_private_node_admin_returns_403(self):
+        # Privat ist owner-only — auch Admins sehen fremde private Knoten NICHT
+        # (konsistent mit dem Listen-Filter _read_scope_clause).
+        node = make_node(read_scope="private", owner_pseudonym="other-user")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 403
+
+    def test_private_node_owner_admin_returns_200(self):
+        # Der Owner (auch wenn Admin) darf seinen eigenen privaten Knoten lesen.
+        node = make_node(read_scope="private", owner_pseudonym="pseudo-admin")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
+        assert resp.status_code == 200
+
     def test_school_node_readable_by_any_teacher(self):
         node = make_node(read_scope="school", owner_pseudonym="other-user")
         db = AsyncMock()
