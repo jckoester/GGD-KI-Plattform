@@ -153,8 +153,9 @@ def _version_row(version: str) -> MagicMock:
 
 
 # Query-Reihenfolge im Endpoint (pro Fachplan-Aufruf):
-# 1. fachplan laden         → _r_scalar(fachplan_node)
-# 2. available_versions     → _r_all([version_row, ...])
+# 1. available_versions     → _r_all([version_row, ...])   (VOR dem Fachplan: liefert die
+#                                                            Editionen für die Default-Edition)
+# 2. fachplan laden         → _r_scalar(fachplan_node)
 # 3. bands                  → _r_all([band_row, ...])
 # 4. top leitideen          → _r_scalars_all([...])
 # pro Leitidee:
@@ -179,8 +180,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016")]),       # available_versions (zuerst)
             _r_scalar(fp),                       # fachplan
-            _r_all([_version_row("2016")]),       # available_versions
             _r_all([_band_row(5, 6)]),            # bands
             _r_scalars_all([ld]),                 # top leitideen
             _r_scalars_all([ik]),                 # IK für ld
@@ -221,8 +222,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016")]),   # available_versions (zuerst)
             _r_scalar(fp),
-            _r_all([_version_row("2016")]),
             _r_all([_band_row(5, 6), _band_row(7, 8), _band_row(11, 12, "basis"), _band_row(11, 12, "leistung")]),
             _r_scalars_all([]),   # top leitideen für default band (5-6)
             _r_scalars_all([]),   # pk_gruppen
@@ -248,8 +249,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016"), _version_row("2016.V2")]),   # available_versions (zuerst)
             _r_scalar(fp_v2),
-            _r_all([_version_row("2016"), _version_row("2016.V2")]),
             _r_all([_band_row(5, 6)]),
             _r_scalars_all([]),
             _r_scalars_all([]),
@@ -275,8 +276,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016")]),   # available_versions (zuerst)
             _r_scalar(fp),
-            _r_all([_version_row("2016")]),
             _r_all([_band_row(11, 12, "basis"), _band_row(11, 12, "leistung")]),
             _r_scalars_all([ld_basis]),   # nur Basis-Leitidee
             _r_scalars_all([]),           # IK für ld_basis
@@ -302,8 +303,8 @@ class TestGetFachplanBySubject:
         # scalar_one_or_none wird NICHT mehr verwendet (limit(1) + scalar_one_or_none statt
         # scalar_one) — der Mock liefert einfach den ersten Fachplan zurück
         db.execute.side_effect = [
+            _r_all([_version_row("2016"), _version_row("2016.V2")]),   # available_versions (zuerst)
             _r_scalar(fp),
-            _r_all([_version_row("2016"), _version_row("2016.V2")]),
             _r_all([_band_row(5, 6)]),
             _r_scalars_all([]),
             _r_scalars_all([]),
@@ -329,8 +330,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016")]),   # available_versions (zuerst)
             _r_scalar(fp),
-            _r_all([_version_row("2016")]),
             _r_all([_band_row(5, 6)]),
             _r_scalars_all([ld]),        # top leitideen
             _r_scalars_all([]),          # IK für ld (keine direkt)
@@ -363,8 +364,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016")]),   # available_versions (zuerst)
             _r_scalar(fp),                    # fachplan
-            _r_all([_version_row("2016")]),   # available_versions
             _r_all([_band_row(5, 6)]),        # bands (default 5–6)
             _r_scalars_all([ld]),             # top leitideen
             _r_scalars_all([]),              # IK für ld
@@ -388,8 +389,8 @@ class TestGetFachplanBySubject:
 
         db = _mock_session()
         db.execute.side_effect = [
+            _r_all([_version_row("2016"), _version_row("2016.V2")]),   # available_versions (zuerst)
             _r_scalar(fp),
-            _r_all([_version_row("2016"), _version_row("2016.V2")]),
             _r_all([_band_row(5, 6)]),
             _r_scalars_all([]),
             _r_scalars_all([]),
