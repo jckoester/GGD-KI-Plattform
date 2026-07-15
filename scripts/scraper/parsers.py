@@ -41,6 +41,43 @@ def extract_grades_from_bp_id(bp_id: str) -> tuple[int | None, int | None]:
     return min(grades), max(grades)
 
 
+# Kursstufen-Basisfächer (z. B. NWTBFO) nummerieren IK/PK mit zero-padded
+# Kompetenzbereichs-Nummern (…_IK_03_02_01, …_PK_02) statt Jahrgangsbändern. Ein solches
+# "03" darf NICHT als Klassenstufe 3 gelesen werden — Sek-I-Bänder sind nie zero-padded
+# (…_IK_5-6_01, …_IK_8-9-10_02_01).
+_KOMPETENZBEREICH_NR = re.compile(r'_(?:IK|PK)_0\d')
+
+
+def _plausibles_url_band(bp_id: str, url_min: int, url_max: int) -> bool:
+    """True, wenn das aus der bp_id gelesene Band echte Klassenstufen sind (5–13) und
+    keine (zero-padded) Kursstufen-Kompetenzbereichs-Nummer."""
+    if _KOMPETENZBEREICH_NR.search(bp_id):
+        return False
+    return 5 <= url_min and url_max <= 13
+
+
+def resolve_grade_band(
+    bp_id: str,
+    url_min: int | None,
+    url_max: int | None,
+    cfg_min: int | None,
+    cfg_max: int | None,
+) -> tuple[int | None, int | None]:
+    """Bestimmt das Jahrgangsband eines Knotens (Todo B1).
+
+    - Kein URL-Band (Fachplan) → unverändert (bleibt None).
+    - Plausibles URL-Band (echte Stufen 5–13, nicht zero-padded) → behalten. So bleibt der
+      legitime Sek-I-Hinweisknoten …_IK_5-6_01 erhalten.
+    - Sonst (Kursstufen-Kompetenzbereich, z. B. NWTBFO …_IK_03_…, → fälschlich (3,3)) →
+      das Fach-Band aus der Config (subjects.yaml min_grade/max_grade) setzen.
+    """
+    if url_min is None:
+        return url_min, url_max
+    if _plausibles_url_band(bp_id, url_min, url_max):
+        return url_min, url_max
+    return cfg_min, cfg_max
+
+
 def extract_niveau_from_bp_id(bp_id: str) -> str:
     """'…11-12-BF_…' → 'basis', '…11-12-LF_…' → 'leistung', sonst 'regulär'."""
     m = _NIVEAU_FROM_BPID.search(bp_id)

@@ -31,6 +31,7 @@ from scripts.scraper.parsers import (
     parse_leitperspektive,
     parse_leitperspektive_aspekt_list,
     parse_operator_list,
+    resolve_grade_band,
 )
 
 logger = logging.getLogger('bildungsplan_scraper')
@@ -61,6 +62,14 @@ async def fetch(client: httpx.AsyncClient, url: str) -> str:
     raise RuntimeError(f"Alle {MAX_RETRIES} Versuche fuer {url} fehlgeschlagen")
 
 
+def _fach_segment_re(base_bp_id: str, kind: str) -> re.Pattern:
+    """Regex, das `base_bp_id` an der Segmentgrenze matcht: optional gefolgt von einem
+    Editions-Suffix (`.V2`), dann `_IK_`/`_PK_`. Verhindert die Präfix-Kollision
+    `…_NWT` ⊂ `…_NWTBFO` (Substring-Match zöge NWTBFO-Links in einen NWT-Scrape; Todo B1)
+    und bleibt zugleich editionskompatibel (`…_CH.V2_IK_…`)."""
+    return re.compile(re.escape(base_bp_id) + r'(?:\.[A-Za-z0-9]+)?_' + kind + '_')
+
+
 def _discover_all_ik_urls(soup: BeautifulSoup, base_bp_id: str) -> dict[str, str]:
     """Entdeckt alle verlinkten IK-Seiten auf der Fach-Uebersichtsseite.
 
@@ -69,10 +78,11 @@ def _discover_all_ik_urls(soup: BeautifulSoup, base_bp_id: str) -> dict[str, str
     - direkt verlinkte 3-Segment-Seiten (IK_{JG}_{LI}_{NR}, z.B. IK_8-9-10_01_01)
     - abgeleitete Leitidee-Seiten (Eltern von 3-Segment-Seiten)
     """
+    ik_seg = _fach_segment_re(base_bp_id, 'IK')
     result: dict[str, str] = {}
     for a in soup.find_all('a', href=True):
         href = a['href']
-        if base_bp_id not in href or '_IK_' not in href:
+        if not ik_seg.search(href):
             continue
         # BP-ID ist der Pfad-Teil nach ',Lde/'
         path_part = href.split(',Lde/')[-1].split('?')[0].rstrip('/')
@@ -106,10 +116,11 @@ def _discover_operator_url(soup: BeautifulSoup, fach_bp_id: str) -> str | None:
 
 def _discover_pk_gruppen(soup: BeautifulSoup, base_bp_id: str) -> list[tuple[str, str]]:
     """Entdeckt verlinkte PK-Gruppen-Seiten."""
+    pk_seg = _fach_segment_re(base_bp_id, 'PK')
     result = []
     for a in soup.find_all('a', href=True):
         href = a['href']
-        if base_bp_id in href and '_PK_' in href:
+        if pk_seg.search(href):
             # Nur PK-Gruppen (haben Nummer nach _PK_): BP..._PK_01, _PK_02
             m = re.search(r'_PK_(\d+)$', href.rstrip('/'))
             if m:
@@ -148,6 +159,8 @@ async def scrape_fach(
     output_dir: Path,
     existing_hashes: dict[str, str],
     warnings: list[str],
+    subject_min_grade: int | None = None,
+    subject_max_grade: int | None = None,
 ) -> tuple[int, int, int]:
     """
     Scrapt ein Fach vollstaendig.
@@ -217,6 +230,16 @@ async def scrape_fach(
         except Exception as e:
             warnings.append(f"Operatoren fuer {fach_bp_id} nicht abrufbar: {e}")
             logger.error(f"Operatoren fuer {fach_bp_id} ({op_url}): {e}")
+
+    # Jahrgangsband korrigieren (Todo B1): Kursstufen-Basisfächer (z. B. NWTBFO) tragen
+    # in der IK/PK-URL keine Stufen, sondern zero-padded Kompetenzbereichs-Nummern
+    # (…_IK_03_…). Für unplausible URL-Bänder das Fach-Band aus subjects.yaml setzen;
+    # plausible Bänder (inkl. Sek-I-Hinweisknoten …_IK_5-6_…) bleiben unangetastet.
+    for node in nodes:
+        node['min_grade'], node['max_grade'] = resolve_grade_band(
+            node['bp_id'], node.get('min_grade'), node.get('max_grade'),
+            subject_min_grade, subject_max_grade,
+        )
 
     # Idempotenz-Filter: nur neue/geaenderte Knoten schreiben
     neu, geaendert, unveraendert = 0, 0, 0
@@ -381,6 +404,8 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                     n, g, u = await scrape_fach(
                         client, label, bp_id_basis, edition_suffix, output,
                         existing_hashes, warnings,
+                        subject_min_grade=fach.get('min_grade'),
+                        subject_max_grade=fach.get('max_grade'),
                     )
                     neu += n; geaendert += g; unveraendert += u
             except Exception as exc:

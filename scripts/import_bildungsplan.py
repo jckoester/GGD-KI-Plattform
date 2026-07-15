@@ -273,17 +273,21 @@ def upsert_node(
 
     existing_id, existing_hash = row
     if existing_hash == new_hash:
-        # Content unverändert — abgeleitete Felder trotzdem aktualisieren:
-        # title/metadata immer (fangen Scraper-Fixes auf), subject_id/grades per COALESCE
+        # Content unverändert — abgeleitete Felder trotzdem aktualisieren, damit
+        # Scraper-Korrekturen (z. B. das Jahrgangsband der Kursstufen-Basisfächer, Todo B1)
+        # auch ohne Hash-Änderung durchschlagen. min_grade/max_grade/subject_id sind
+        # deterministisch scraper-/config-abgeleitet → der NEUE Wert gewinnt, sofern gesetzt;
+        # ein NULL aus dem Scrape überschreibt einen vorhandenen DB-Wert NICHT
+        # (`COALESCE(neu, alt)` — Reihenfolge wichtig).
         if not dry_run:
             cur.execute(
                 """
                 UPDATE context_nodes
                 SET title      = %s,
                     metadata   = %s,
-                    subject_id = COALESCE(subject_id, %s),
-                    min_grade  = COALESCE(min_grade,  %s),
-                    max_grade  = COALESCE(max_grade,  %s),
+                    subject_id = COALESCE(%s, subject_id),
+                    min_grade  = COALESCE(%s, min_grade),
+                    max_grade  = COALESCE(%s, max_grade),
                     niveau     = %s,
                     bp_version = %s
                 WHERE id = %s
