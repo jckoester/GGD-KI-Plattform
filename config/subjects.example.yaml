@@ -8,7 +8,7 @@ schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
 # aktuelles Schuljahr: Single Source of Truth ist config/school_year.yaml
 # (hier bewusst NICHT mehr gepflegt, um Doppelkonfig/Divergenz zu vermeiden).
 
-bildungsplan_default: # gilt für alle Fächer, wenn kein Override
+bildungsplan_default: # gilt für alle Fächer ohne eigene Fach-Edition (bildungsplan_suffix)
   bp_basis: BP2016BW # Prefix; zukunftsoffen für BP2030
   suffix: "" # leer = Basisfassung; ".V2" = überarbeitete Fassung (Scraper/Import; wird vom Fahrplan abgelöst)
   # Editions-Fahrplan (Versionierung): pro Edition, ab welchem Schuljahr sie gilt
@@ -36,8 +36,8 @@ subjects:
     max_grade: 13
     sort_order: 10
     fach_code: M
-    bildungsplan_overrides: # Klassen 5-6 haben V2-Fassung
-      "5-6": ".V2"
+    # bildungsplan_suffix: ".V2"   # optional: dieses Fach fest auf EINE Edition pinnen.
+    #   Ohne Angabe greift der globale `editionen`-Fahrplan (oben) schuljahres-/stufenabhängig.
 
   - slug: deutsch
     name: Deutsch
@@ -71,7 +71,7 @@ subjects:
     min_grade: 7
     max_grade: 13
     sort_order: 50
-    fach_code: CH # kein Override, Basisfassung für alle Stufen
+    fach_code: CH # keine eigene Edition, Basisfassung für alle Stufen
 
   - slug: biologie
     name: Biologie

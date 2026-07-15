@@ -50,20 +50,22 @@ subjects:
 
 ### Bildungsplan-Edition (Suffix)
 
-Die Fassung (`""` = Basis, `.V2` = überarbeitet) wird in drei Stufen aufgelöst,
+Die Fassung (`""` = Basis, `.V2` = überarbeitet) wird in zwei Stufen aufgelöst,
 Präzedenz fallend:
 
-1. **`bildungsplan_overrides`** (pro Fach, pro Jahrgangsband) — für **phasenweisen
-   Rollout**, wenn nur einzelne Stufen umgestellt sind:
+1. **`bildungsplan_suffix`** (pro Fach, ganze Klassenspanne) — wenn das **ganze
+   Fach** auf der Neufassung ist:
    ```yaml
    - slug: mathematik
      fach_code: M
-     bildungsplan_overrides:
-       "5-6": ".V2"         # nur Klasse 5–6 auf Neufassung
+     bildungsplan_suffix: ".V2"   # ganzes Fach auf der überarbeiteten Fassung
    ```
-2. **`bildungsplan_suffix`** (pro Fach, ganze Klassenspanne) — wenn das **ganze
-   Fach** auf der Neufassung ist.
-3. **`bildungsplan_default.suffix`** (global) — Fallback, üblicherweise `""`.
+2. **`bildungsplan_default.suffix`** (global) — Fallback, üblicherweise `""`.
+
+> Der **schuljahres-/stufenabhängige** Rollout (früher `bildungsplan_overrides` pro
+> Jahrgangsband) läuft jetzt über den **Editions-Fahrplan** (`bildungsplan_default.editionen`
+> mit `ab_schuljahr`/`einstieg_stufen`) — siehe Abschnitt Bildungsplan-Versionierung. Der
+> Scraper scrapt alle Editionen des Fachs; `/fachplan/by-subject` wählt je Stufe die geltende.
 
 > **Seed nach Code-Änderung:** Wird ein `fach_code` in `subjects.yaml` ergänzt oder
 > geändert, die `subjects`-Tabelle neu seeden (`python scripts/seed_subjects.py`),

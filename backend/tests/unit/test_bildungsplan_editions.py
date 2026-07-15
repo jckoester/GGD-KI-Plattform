@@ -97,14 +97,6 @@ def test_empty_suffix_needs_no_fach_code():
     assert errors == []
 
 
-def test_overrides_without_fach_code_still_errors():
-    # Regression: bestehende Override-Regel bleibt intakt.
-    errors = validate_subjects_yaml(
-        _cfg({"slug": "deutsch", "bildungsplan_overrides": {"5-6": ".V2"}})
-    )
-    assert any("bildungsplan_overrides" in e and "fach_code" in e for e in errors)
-
-
 # -- subject_editions: Editions-Auflösung pro Fach (Fahrplan-basiert) ----------
 
 # Geordneter Editions-Fahrplan: Basis → V2 → V3.

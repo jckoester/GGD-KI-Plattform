@@ -79,11 +79,6 @@ def validate_subjects_yaml(cfg: dict) -> list[str]:
         )
     for fach in cfg.get("subjects", []):
         fach_code = fach.get("fach_code")
-        overrides = fach.get("bildungsplan_overrides", {})
-        if overrides and not fach_code:
-            errors.append(
-                f"Fach '{fach['slug']}' hat bildungsplan_overrides aber keinen fach_code"
-            )
         suffix = fach.get("bildungsplan_suffix")
         if suffix is not None and not isinstance(suffix, str):
             errors.append(
@@ -424,18 +419,6 @@ def archive_removed_nodes(cur, known_bp_ids: set[str], dry_run: bool) -> int:
     return len(rows)
 
 
-def parse_grade_range(grade_str: str) -> tuple[int, int]:
-    """Parst '5-6' zu (5, 6).
-
-    Erwartet genau zwei durch '-' getrennte Integer. Wirft ValueError bei
-    ungültigem Format, damit der Aufrufer explizit warnen kann.
-    """
-    parts = grade_str.split("-")
-    if len(parts) != 2:
-        raise ValueError(f"Ungültiges Klassenstufen-Format: '{grade_str}'")
-    return int(parts[0]), int(parts[1])
-
-
 def archive_superseded_nodes(
     cur,
     subjects_cfg: dict,
@@ -445,12 +428,8 @@ def archive_superseded_nodes(
     """Archiviert BP-Knoten die durch eine neuere Edition überholt sind, gemäß
     subjects.yaml.
 
-    Zwei Ebenen mit Präzedenz Jahrgangsband-Override > Fach-Suffix > Basis:
-    1. ``bildungsplan_overrides`` ({"5-6": ".V2"}) — phasenweiser Rollout, archiviert
-       pro exaktem (min,max)-Band die Knoten ohne den Banden-Marker.
-    2. ``bildungsplan_suffix`` (z.B. ".V2") — ganzes Fach auf einer neuen Edition;
-       archiviert fach-weit die Knoten ohne den Editions-Marker, außerhalb der
-       explizit per Override geregelten Bänder (siehe _archive_subject_edition).
+    Maßgeblich ist ``bildungsplan_suffix`` (z.B. ".V2") — das ganze Fach steht auf einer
+    Edition; fach-weit werden die Knoten ohne den Editions-Marker archiviert.
 
     Erkennung: bp_id des veralteten Knotens enthält NICHT '{fach_code}{suffix}'
     (z.B. 'M.V2'), während der neuere Knoten dieses Segment enthält.
@@ -461,11 +440,9 @@ def archive_superseded_nodes(
     default_suffix = subjects_cfg.get("bildungsplan_default", {}).get("suffix", "")
 
     for fach in subjects_cfg.get("subjects", []):
-        overrides = fach.get("bildungsplan_overrides", {})
         subject_suffix = fach.get("bildungsplan_suffix", default_suffix)
-        # Nichts zu tun, wenn weder Jahrgangsband-Overrides noch eine vom Basis-
-        # Default abweichende Fach-Edition konfiguriert sind.
-        if not overrides and not subject_suffix:
+        # Nichts zu tun, wenn keine vom Basis-Default abweichende Fach-Edition konfiguriert ist.
+        if not subject_suffix:
             continue
         fach_slug = fach.get("slug")
         fach_code = fach.get("fach_code")
@@ -478,73 +455,10 @@ def archive_superseded_nodes(
             )
             continue
 
-        # 1. Jahrgangsband-Overrides (Übergangsphase): exakte (min,max)-Bänder
-        override_bands: list[tuple[int, int]] = []
-        for grade_str, version_suffix in overrides.items():
-            try:
-                min_grade, max_grade = parse_grade_range(grade_str)
-            except ValueError as exc:
-                logger.warning(f"archive_superseded: {exc} — überspringe")
-                continue
-            override_bands.append((min_grade, max_grade))
-
-            # Neue Version: bp_id enthält z.B. 'M.V2'
-            new_version_marker = fach_code + version_suffix
-
-            cur.execute(
-                """
-                SELECT id, metadata->>'bp_id' AS bp_id
-                FROM context_nodes
-                WHERE subject_id = %s
-                  AND status = 'active'
-                  AND category = 'knowledge'
-                  AND content_type = ANY(%s)
-                  AND min_grade = %s
-                  AND max_grade = %s
-                  AND metadata->>'bp_id' NOT LIKE %s
-                """,
-                (
-                    subject_id,
-                    list(BP_CONTENT_TYPES),
-                    min_grade,
-                    max_grade,
-                    f"%{new_version_marker}%",
-                ),
-            )
-            rows = cur.fetchall()
-            if not rows:
-                logger.info(
-                    f"archive_superseded: {fach_slug} Kl. {grade_str} — "
-                    f"keine veralteten Knoten gefunden"
-                )
-                continue
-
-            bp_ids_preview = [r[1] for r in rows[:3]]
-            logger.info(
-                f"{'[DRY RUN] ' if dry_run else ''}"
-                f"archive_superseded: {fach_slug} Kl. {grade_str} — "
-                f"{len(rows)} veraltete Knoten archivieren "
-                f"(z.B. {bp_ids_preview})"
-            )
-
-            if not dry_run:
-                ids = [row[0] for row in rows]
-                cur.execute(
-                    """
-                    UPDATE context_nodes
-                    SET status = 'archived', archived_at = now()
-                    WHERE id = ANY(%s)
-                    """,
-                    (ids,),
-                )
-            total_archived += len(rows)
-
-        # 2. Fach-weite Edition (z.B. ganzes Fach auf '.V2')
-        if subject_suffix:
-            total_archived += _archive_subject_edition(
-                cur, subject_id, fach_slug, fach_code, subject_suffix,
-                override_bands, dry_run,
-            )
+        # Fach-weite Edition (z.B. ganzes Fach auf '.V2')
+        total_archived += _archive_subject_edition(
+            cur, subject_id, fach_slug, fach_code, subject_suffix, dry_run,
+        )
 
     return total_archived
 
@@ -555,15 +469,12 @@ def _archive_subject_edition(
     fach_slug: str,
     fach_code: str,
     subject_suffix: str,
-    override_bands: list[tuple[int, int]],
     dry_run: bool,
 ) -> int:
     """Archiviert veraltete Knoten eines ganzen Fachs, das auf eine neue Edition
     (z.B. '.V2') umgestellt wurde.
 
-    Anders als die Jahrgangsband-Overrides gilt der Fach-Suffix für die gesamte
-    Klassenstufen-Spanne. Bänder, die per ``bildungsplan_overrides`` explizit auf
-    eine andere Edition zeigen, werden ausgenommen (sie regeln sich selbst).
+    Der Fach-Suffix gilt für die gesamte Klassenstufen-Spanne.
 
     Sicherheitsnetz: Es wird nur archiviert, wenn mindestens ein aktiver Knoten der
     neuen Edition existiert — sonst würde ein Teil-Import (nur Basis-Edition) das
@@ -591,23 +502,19 @@ def _archive_subject_edition(
         )
         return 0
 
-    # Veraltete Knoten = aktive Wissensknoten ohne den Editions-Marker,
-    # außerhalb der explizit per Override geregelten Bänder.
-    sql = [
-        "SELECT id, metadata->>'bp_id' AS bp_id",
-        "FROM context_nodes",
-        "WHERE subject_id = %s",
-        "  AND status = 'active'",
-        "  AND category = 'knowledge'",
-        "  AND content_type = ANY(%s)",
-        "  AND metadata->>'bp_id' NOT LIKE %s",
-    ]
-    params: list = [subject_id, list(BP_CONTENT_TYPES), f"%{marker}%"]
-    for b_min, b_max in override_bands:
-        sql.append("  AND NOT (min_grade = %s AND max_grade = %s)")
-        params.extend([b_min, b_max])
-
-    cur.execute("\n".join(sql), tuple(params))
+    # Veraltete Knoten = aktive Wissensknoten ohne den Editions-Marker.
+    cur.execute(
+        """
+        SELECT id, metadata->>'bp_id' AS bp_id
+        FROM context_nodes
+        WHERE subject_id = %s
+          AND status = 'active'
+          AND category = 'knowledge'
+          AND content_type = ANY(%s)
+          AND metadata->>'bp_id' NOT LIKE %s
+        """,
+        (subject_id, list(BP_CONTENT_TYPES), f"%{marker}%"),
+    )
     rows = cur.fetchall()
     if not rows:
         logger.info(
