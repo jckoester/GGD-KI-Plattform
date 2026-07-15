@@ -25,6 +25,45 @@ describe('renderMarkdown — Markdown-Grundlagen', () => {
     })
 })
 
+describe('renderMarkdown — URL-Allowlist (Audit #16)', () => {
+    it('javascript:-Link wird entschärft', () => {
+        const html = renderMarkdown('[klick](javascript:alert(1))')
+        expect(html).not.toContain('javascript:')
+    })
+
+    it('data:text/html in einem Link wird blockiert', () => {
+        // <a href="data:…"> ist ein Vektor (Top-Level-Navigation) → von der Allowlist erfasst.
+        // (data: auf <img> ist DOMPurify-Default und kein XSS-Vektor, daher hier nicht geprüft.)
+        const html = renderMarkdown('[x](data:text/html;base64,PHNjcmlwdD4=)')
+        expect(html).not.toContain('data:text/html')
+    })
+
+    it('vbscript:-Link wird blockiert', () => {
+        const html = renderMarkdown('[x](vbscript:msgbox(1))')
+        expect(html).not.toContain('vbscript:')
+    })
+
+    it('https-Link bleibt erhalten', () => {
+        const html = renderMarkdown('[GGD](https://example.de/seite)')
+        expect(html).toContain('href="https://example.de/seite"')
+    })
+
+    it('mailto-Link bleibt erhalten', () => {
+        const html = renderMarkdown('[Mail](mailto:info@example.de)')
+        expect(html).toContain('href="mailto:info@example.de"')
+    })
+
+    it('relativer Pfad bleibt erhalten', () => {
+        const html = renderMarkdown('[Hilfe](/help/chat)')
+        expect(html).toContain('href="/help/chat"')
+    })
+
+    it('Anchor-Link (#) bleibt erhalten', () => {
+        const html = renderMarkdown('[Abschnitt](#ziele)')
+        expect(html).toContain('href="#ziele"')
+    })
+})
+
 describe('renderMarkdown — Mathe (KaTeX)', () => {
     it('Inline-Mathe $…$ wird gerendert', () => {
         const html = renderMarkdown('Die Formel $E=mc^2$ ist berühmt.')

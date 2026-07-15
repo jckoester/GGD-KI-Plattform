@@ -155,6 +155,13 @@ const katexInlineExt = {
 
 marked.use({ extensions: [katexBlockExt, katexInlineExt] });
 
+// Explizite URL-Allowlist (Sicherheits-Audit #16): nur http(s)/mailto sowie relative bzw.
+// Anchor-URLs (kein Schema). Bewusst version-UNABHÄNGIG — statt auf DOMPurifys sich änderndes
+// Default-Verhalten zu vertrauen. Blockiert javascript:, data:, tel:, vbscript: usw. Es ist die
+// DOMPurify-Default-Regex mit auf `https?|mailto` verengter Schema-Liste; der zweite Zweig
+// (`[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)`) lässt schema-lose relative Pfade und #Anker weiter zu.
+const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+
 export function renderMarkdown(text) {
     if (!text) return '';
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
@@ -165,6 +172,7 @@ export function renderMarkdown(text) {
     const clean = DOMPurify.sanitize(marked.parse(text), {
         ADD_TAGS: ['div'],
         ADD_ATTR: ['data-lang', 'class', 'target', 'rel'],
+        ALLOWED_URI_REGEXP,
     });
 
     if (_mathCount === 0) return clean;
