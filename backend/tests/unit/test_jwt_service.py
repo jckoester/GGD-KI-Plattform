@@ -150,15 +150,36 @@ class TestJwtServiceIsRevoked:
     async def test_is_revoked_false_after_revoked_all_before(self, jwt_service, mock_db):
         token, _ = jwt_service.issue("test_pseudo", ["student"], "10")
         payload = jwt_service.verify(token)
-        
+
         # Create an iat that is after the revoked_all_before timestamp
         recent_iat = datetime.now(timezone.utc) - timedelta(days=1)
         payload.iat = int(recent_iat.timestamp())
-        
+
         # Mock db.get to return None for jti, but a PseudonymAudit with revoked_all_before
         mock_audit = MagicMock()
         mock_audit.revoked_all_before = datetime.now(timezone.utc) - timedelta(days=5)
         mock_db.get.side_effect = [None, mock_audit]
-        
+
         result = await jwt_service.is_revoked(mock_db, payload)
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_fresh_token_survives_same_second_mass_revocation(self, jwt_service, mock_db):
+        # Audit #11 „E": revoked_all_before wird auf die volle Sekunde abgerundet. Ein in
+        # derselben Sekunde ausgestelltes Token (iat sekundengenau == Grenze) darf NICHT
+        # revoziert werden, sonst würde der Login den Nutzer sofort wieder aussperren.
+        now = datetime.now(timezone.utc)
+        boundary = datetime.fromtimestamp(int(now.timestamp()), tz=timezone.utc)
+        payload = jwt_service.verify(jwt_service.issue("p", ["teacher"], None)[0])
+        payload.iat = int(boundary.timestamp())  # Gleichstand
+        mock_db.get.side_effect = [None, MagicMock(revoked_all_before=boundary)]
+        assert await jwt_service.is_revoked(mock_db, payload) is False
+
+    @pytest.mark.asyncio
+    async def test_older_token_revoked_by_second_boundary(self, jwt_service, mock_db):
+        now = datetime.now(timezone.utc)
+        boundary = datetime.fromtimestamp(int(now.timestamp()), tz=timezone.utc)
+        payload = jwt_service.verify(jwt_service.issue("p", ["teacher", "admin"], None)[0])
+        payload.iat = int(boundary.timestamp()) - 1  # eine Sekunde früher (Alt-Session)
+        mock_db.get.side_effect = [None, MagicMock(revoked_all_before=boundary)]
+        assert await jwt_service.is_revoked(mock_db, payload) is True

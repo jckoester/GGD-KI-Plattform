@@ -49,6 +49,38 @@ group_role_map:
   **nicht** einloggen — sie erhalten eine Fehlermeldung.
 - Die Gruppen-Namen müssen exakt mit den Gruppen-Namen im SSO-Provider übereinstimmen.
 
+## Rollenänderungen & Sitzungen beenden
+
+Die Rollen einer Nutzerin stehen im Session-Token (JWT, 30 Tage gültig). Ändert
+sich die SSO-Zugehörigkeit, greift das **erst beim nächsten Login** — bis dahin
+gilt die im Token gespeicherte Rolle. Das ist vor allem beim **Entzug** additiver
+Rollen relevant (z. B. `admin` oder `review` wird einer Lehrkraft weggenommen):
+Die laufende Sitzung würde die erhöhten Rechte sonst bis zu 30 Tage behalten.
+
+Zwei Mechanismen adressieren das:
+
+1. **Automatisch beim nächsten Login (Rollen-Schrumpfung):** Meldet sich die
+   Nutzerin erneut an und wurde ihr seit dem letzten Login mindestens eine Rolle
+   **entzogen**, werden alle zuvor ausgestellten Token sofort ungültig — auch
+   parallele Sitzungen auf anderen Geräten. Das neue Token trägt die korrekten,
+   reduzierten Rollen. (Reine Hochstufungen lösen das nicht aus, da eine alte
+   Sitzung dann nur *weniger* Rechte hätte — kein Sicherheitsproblem.)
+
+2. **Manuell sofort — „Nutzer & Sitzungen":** Unter **Einstellungen → Nutzer &
+   Sitzungen** (`/settings/users`) sehen Admins alle Konten mit ihren aktuellen
+   Rollen und dem letzten Login. Über **„Sitzungen beenden"** werden alle aktiven
+   Sitzungen eines Kontos sofort ungültig; die Person muss sich neu anmelden,
+   wobei die Rollen frisch aus dem SSO bewertet werden. Nutze das, wenn der
+   Rollenentzug **nicht** bis zum nächsten (freiwilligen) Login der Person warten
+   soll. Filter nach Rolle (z. B. `admin`) und Suche nach Pseudonym helfen beim
+   Finden des richtigen Kontos.
+
+> **Hinweis:** Der volle Rollensatz wird erst ab dem ersten Login **nach dem
+> Update** gespeichert. Für Konten, die sich seither noch nicht angemeldet haben,
+> zeigt die Liste ersatzweise nur die Primärrolle (teacher/student), und die
+> automatische Schrumpfungs-Erkennung (1.) greift erst ab deren zweitem Login.
+> Der manuelle Hebel (2.) funktioniert unabhängig davon jederzeit.
+
 ## SSO-Gruppenimport: Unterrichtsgruppen
 
 Wenn der SSO-Provider Gruppen für Fachschaften, Schulklassen und

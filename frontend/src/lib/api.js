@@ -1647,3 +1647,23 @@ export async function getReviewStatus(groupId) {
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Review-Status konnte nicht geladen werden')
     return res.json()
 }
+
+// Admin: Nutzer-/Sitzungsverwaltung (Sicherheits-Audit #11 — Rollenentzug wirksam machen)
+export async function getAdminUsers(role = null) {
+  const url = new URL(`${BASE}/admin/users`, location.href);
+  if (role) url.searchParams.set("role", role);
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { users: [{ pseudonym, roles, grade, last_login_at, revoked_all_before }] }
+}
+
+export async function revokeUserSessions(pseudonym) {
+  const res = await fetch(`${BASE}/admin/users/${encodeURIComponent(pseudonym)}/revoke-sessions`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { ok, pseudonym, revoked_all_before }
+}

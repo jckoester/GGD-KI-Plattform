@@ -498,7 +498,11 @@ class PseudonymAudit(Base):
     __tablename__ = "pseudonym_audit"
 
     pseudonym: Mapped[str] = mapped_column(primary_key=True)
-    role: Mapped[str] = mapped_column(nullable=False)
+    role: Mapped[str] = mapped_column(nullable=False)  # Primärrolle (teacher>student), für Budget
+    # Voller Rollensatz inkl. additiver Rollen (admin/review) — Basis für die automatische
+    # Session-Revocation bei Rollen-Schrumpfung (Sicherheits-Audit #11). Nullable, wird beim
+    # ersten Login nach dem Rollout gefüllt.
+    roles: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     grade: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
