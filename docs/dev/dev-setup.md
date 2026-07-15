@@ -178,6 +178,27 @@ Liefern beide Aufrufe eine sinnvolle Antwort, kann das Backend gestartet werden.
 Zum schnellen Zurückschalten auf den Homelab-Proxy die auskommentierte
 `LITELLM_PROXY_URL`-Zeile in `.env` wieder aktivieren.
 
+### Admin-UI des Proxys (optional)
+
+Der Proxy bringt eine eigene Admin-UI unter `http://localhost:4000/ui` mit
+(Keys, Teams, Budgets, SpendLogs einsehen). Der Login ist standardmäßig:
+
+- **Username:** `admin`
+- **Passwort:** der Wert von `LITELLM_MASTER_KEY`
+
+Häufiger Stolperstein: Der Master-Key gehört ins **Passwort**-Feld, nicht ins
+Username-Feld. Wer lieber einen kurzen Dev-Login statt des langen Keys möchte,
+setzt in `.env` `UI_USERNAME`/`UI_PASSWORD` und startet den Proxy neu:
+
+```
+UI_USERNAME=admin
+UI_PASSWORD=dev
+```
+
+Diese UI betrifft **nur** den Proxy. Der Login der GGD-KI-Plattform selbst
+(`http://localhost:5173`) läuft unabhängig davon über den `yaml_test`-Adapter
+(siehe [Test-Authentifizierung](#test-authentifizierung)).
+
 ## Frontend
 
 ```bash
