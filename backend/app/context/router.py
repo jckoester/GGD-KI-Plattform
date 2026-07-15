@@ -206,7 +206,13 @@ async def list_nodes(
     grade: int | None = Query(default=None, ge=1, le=13, description="Jahrgangsstufe"),
     bp_version: str | None = Query(default=None, description="BP-Versionsfilter, z. B. '2016' oder '2016.V2'"),
     owner: str | None = Query(default=None),
+    exclude_content_type: list[str] | None = Query(
+        default=None,
+        description="content_types, die ausgeschlossen werden (z. B. BP-Curriculum-Typen "
+                    "in der freien /knowledge-Liste). NULL-Typen bleiben erhalten.",
+    ),
     limit: int | None = Query(default=None, ge=1, le=500, description="Maximale Anzahl Ergebnisse"),
+    offset: int | None = Query(default=None, ge=0, description="Versatz für Pagination"),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
@@ -297,8 +303,21 @@ async def list_nodes(
         query = query.where(ContextNode.category == category)
     if content_type:
         query = query.where(ContextNode.content_type.in_(content_type))
+    if exclude_content_type:
+        # BP-Curriculum-Typen aus der freien Liste heraushalten (C2). Knoten ohne
+        # content_type (NULL) bleiben erhalten — `NOT IN` würde sie sonst verwerfen.
+        query = query.where(
+            or_(
+                ContextNode.content_type.is_(None),
+                ContextNode.content_type.notin_(exclude_content_type),
+            )
+        )
 
-    query = query.order_by(ContextNode.created_at.desc())
+    # id als stabiler Tiebreaker → deterministische Reihenfolge für Pagination
+    # (created_at allein hat bei gleichzeitig importierten/geseedeten Knoten viele Ties).
+    query = query.order_by(ContextNode.created_at.desc(), ContextNode.id)
+    if offset is not None:
+        query = query.offset(offset)
     if limit is not None:
         query = query.limit(limit)
 

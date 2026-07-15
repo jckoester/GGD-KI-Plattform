@@ -1,5 +1,6 @@
 <script>
     import KnowledgeNodeList from "$lib/components/KnowledgeNodeList.svelte";
+    import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
 </script>
 
 <div class="h-full overflow-y-auto p-6">
@@ -8,5 +9,11 @@
             Wissensgraph
         </h1>
     </div>
-    <KnowledgeNodeList showSubjectFilter={true} showNewButton={true} />
+    <!-- BP-Curriculum-Knoten (ik/pk/leitidee/…) gehören in BildungsplanTree/Curricula,
+         nicht in die freie Liste — serverseitig ausgeblendet (C2). -->
+    <KnowledgeNodeList
+        showSubjectFilter={true}
+        showNewButton={true}
+        excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
+    />
 </div>

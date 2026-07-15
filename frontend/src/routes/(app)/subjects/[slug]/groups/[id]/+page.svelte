@@ -2,6 +2,7 @@
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
+  import { BP_CURRICULUM_CONTENT_TYPES } from '$lib/taxonomy.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { assistants } from '$lib/stores/assistants.js'
   import { refreshConversationCounts } from '$lib/stores/conversationCounts.js'
@@ -269,7 +270,7 @@
       showSubjectFilter={false}
       showNewButton={true}
       initialGrade={defaultGrade}
-      excludeContentTypes={['curriculum','fachplan','leitidee','ik_kompetenz','pk_gruppe','pk_kompetenz']}
+      excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
     />
   {/if}
 

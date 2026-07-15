@@ -2,6 +2,7 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
+    import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
     import { assistants } from "$lib/stores/assistants.js";
     import { myTeachingGroups } from "$lib/stores/myGroups.js";
     import { user } from "$lib/stores/user.js";
@@ -325,14 +326,7 @@
                 fixedSubjectSlug={subject?.slug}
                 showSubjectFilter={false}
                 showNewButton={true}
-                excludeContentTypes={[
-                    "curriculum",
-                    "fachplan",
-                    "leitidee",
-                    "ik_kompetenz",
-                    "pk_gruppe",
-                    "pk_kompetenz",
-                ]}
+                excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
             />
         {/if}
 </div>

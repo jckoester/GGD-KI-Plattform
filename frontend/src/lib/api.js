@@ -1148,10 +1148,16 @@ export async function getContextNodes(params = {}) {
   if (params.grade != null) p.set('grade', params.grade)
   if (params.bp_version)    p.set('bp_version', params.bp_version)
   if (params.limit != null) p.set('limit', params.limit)
+  if (params.offset != null) p.set('offset', params.offset)
   if (params.owner)         p.set('owner', params.owner)
   if (params.content_type) {
     const types = Array.isArray(params.content_type) ? params.content_type : [params.content_type]
     types.forEach(t => p.append('content_type', t))
+  }
+  if (params.exclude_content_type) {
+    const types = Array.isArray(params.exclude_content_type)
+      ? params.exclude_content_type : [params.exclude_content_type]
+    types.forEach(t => p.append('exclude_content_type', t))
   }
   const res = await fetch(`${BASE}/context/nodes?${p}`, { credentials: 'include' })
   if (!res.ok) {

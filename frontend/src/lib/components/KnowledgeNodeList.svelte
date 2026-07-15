@@ -25,7 +25,13 @@
 
     let nodes = $state([]);
     let loading = $state(false);
+    let loadingMore = $state(false);
     let error = $state(null);
+
+    // Pagination (C2): serverseitig begrenzt laden, "Mehr laden" hängt an.
+    const PAGE_SIZE = 100;
+    let offset = $state(0);
+    let hasMore = $state(false);
 
     // Filter-State
     let q = $state("");
@@ -105,34 +111,59 @@
     let searchTimer = null;
 
     const contentTypeOptions = $derived(
-        selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : [],
+        (selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : []).filter(
+            (ct) => !excludeContentTypes.includes(ct),
+        ),
     );
+
+    function buildParams() {
+        const params = {
+            status: selectedStatus || "active",
+            limit: PAGE_SIZE,
+        };
+        if (q.trim().length >= 2) params.q = q.trim();
+        if (fixedSubjectSlug) params.subject_slug = fixedSubjectSlug;
+        else if (selectedSubjectSlug) params.subject_slug = selectedSubjectSlug;
+        if (fixedGroupId) params.group_id = fixedGroupId;
+        if (selectedGrade) params.grade = Number(selectedGrade);
+        if (onlyEntryNodes) {
+            params.content_type = [...SCOPE_ANCHOR_CONTENT_TYPES];
+        } else {
+            if (selectedCategory) params.category = selectedCategory;
+            if (selectedContentType) params.content_type = selectedContentType;
+        }
+        // BP-Curriculum-Typen serverseitig ausblenden (C2) — nicht nur clientseitig.
+        if (excludeContentTypes.length) params.exclude_content_type = excludeContentTypes;
+        return params;
+    }
 
     async function load() {
         loading = true;
         error = null;
+        offset = 0;
         try {
-            const params = {
-                status: selectedStatus || "active",
-            };
-            if (q.trim().length >= 2) params.q = q.trim();
-            if (fixedSubjectSlug) params.subject_slug = fixedSubjectSlug;
-            else if (selectedSubjectSlug)
-                params.subject_slug = selectedSubjectSlug;
-            if (fixedGroupId) params.group_id = fixedGroupId;
-            if (selectedGrade) params.grade = Number(selectedGrade);
-            if (onlyEntryNodes) {
-                params.content_type = [...SCOPE_ANCHOR_CONTENT_TYPES];
-            } else {
-                if (selectedCategory) params.category = selectedCategory;
-                if (selectedContentType)
-                    params.content_type = selectedContentType;
-            }
-            nodes = await getContextNodes(params);
+            const page = await getContextNodes({ ...buildParams(), offset: 0 });
+            nodes = page;
+            hasMore = page.length === PAGE_SIZE;
         } catch (e) {
             error = e.message;
         } finally {
             loading = false;
+        }
+    }
+
+    async function loadMore() {
+        loadingMore = true;
+        error = null;
+        try {
+            offset += PAGE_SIZE;
+            const page = await getContextNodes({ ...buildParams(), offset });
+            nodes = [...nodes, ...page];
+            hasMore = page.length === PAGE_SIZE;
+        } catch (e) {
+            error = e.message;
+        } finally {
+            loadingMore = false;
         }
     }
 
@@ -487,5 +518,20 @@
                 {/each}
             </tbody>
         </table>
+    </div>
+    <div
+        class="flex items-center justify-between gap-3 mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2"
+    >
+        <span>{sortedNodes.length}{hasMore ? "+" : ""} Knoten</span>
+        {#if hasMore}
+            <button
+                onclick={loadMore}
+                disabled={loadingMore}
+                class="px-3 py-1.5 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 disabled:opacity-50 transition-colors"
+            >
+                {loadingMore ? "Lädt…" : "Mehr laden"}
+            </button>
+        {/if}
     </div>
 {/if}

@@ -65,6 +65,24 @@ export const SCOPE_ANCHOR_CONTENT_TYPES = new Set([
   "unterrichtsstunde"
 ])
 
+// Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die
+// BildungsplanTree-/Curricula-Ansichten, NICHT in die freie /knowledge-Liste
+// (dort kosten sie Ladezeit und verstopfen die UX) — C2. Werden serverseitig
+// über exclude_content_type ausgeblendet.
+export const BP_CURRICULUM_CONTENT_TYPES = [
+  "curriculum",
+  "fachplan",
+  "leitidee",
+  "ik_kompetenz",
+  "pk_gruppe",
+  "pk_kompetenz",
+  "operator",
+  "leitperspektive",
+  "leitperspektive_aspekt",
+  "kapitel",
+  "lernsequenz",
+]
+
 export const CATEGORY_LABELS = {
   "document": "Dokument",
   "knowledge": "Wissen",

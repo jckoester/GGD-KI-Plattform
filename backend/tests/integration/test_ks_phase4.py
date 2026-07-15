@@ -591,9 +591,37 @@ class TestListNodesFilters:
         # Sollte aktive Knoten enthalten
         assert "Math Thema 1 (aktiv)" in titles
         assert "Math Thema 2 (aktiv)" in titles
-        
+
         # Sollte archivierte Knoten NICHT enthalten
         assert "Math Thema 1 (archiviert)" not in titles
+
+    @pytest.mark.asyncio
+    async def test_list_nodes_exclude_content_type(self, test_client, teacher_headers, phase4_node_ids):
+        """exclude_content_type blendet die genannten Typen serverseitig aus (C2)."""
+        resp_all = await test_client.get(
+            "/context/nodes?subject_slug=mathematik", headers=teacher_headers
+        )
+        assert "thema" in {n["content_type"] for n in resp_all.json()}
+
+        resp_ex = await test_client.get(
+            "/context/nodes?subject_slug=mathematik&exclude_content_type=thema",
+            headers=teacher_headers,
+        )
+        assert resp_ex.status_code == 200
+        types = {n["content_type"] for n in resp_ex.json()}
+        assert "thema" not in types
+        # Andere Knoten bleiben erhalten → weniger, aber nicht leer.
+        assert len(resp_ex.json()) < len(resp_all.json())
+
+    @pytest.mark.asyncio
+    async def test_list_nodes_offset_paginates(self, test_client, teacher_headers, phase4_node_ids):
+        """limit + offset liefern disjunkte Seiten (Pagination, C2)."""
+        page1 = await test_client.get("/context/nodes?limit=1", headers=teacher_headers)
+        page2 = await test_client.get("/context/nodes?limit=1&offset=1", headers=teacher_headers)
+        assert page1.status_code == 200 and page2.status_code == 200
+        assert len(page1.json()) == 1
+        assert len(page2.json()) == 1
+        assert page1.json()[0]["id"] != page2.json()[0]["id"]
 
 
 
