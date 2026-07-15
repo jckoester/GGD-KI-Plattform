@@ -152,8 +152,20 @@ def make_title(text: str) -> str:
     return text[:40].rsplit(" ", 1)[0] if len(text) > 40 else text
 
 
-async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
+async def _generate_title(
+    conversation_id: UUID, prompt: str, litellm_key: str, user_sub: str
+) -> str | None:
+    """Erzeugt einen Konversationstitel über den User-Virtual-Key (Audit #8).
+
+    Läuft über den persönlichen LiteLLM-Key des Nutzers (`Bearer {litellm_key}`, `user=sub`),
+    nicht mehr über den Master-Key. So wird der Titel-Spend budgetiert und dem Nutzer
+    zugeordnet; ist das Budget erschöpft, schlägt der Aufruf mit 429 fehl → kein Titel
+    (graceful), aber kein unbudgetierter Master-Key-Spend.
+    """
     logger.debug("Titelgenerierung gestartet für %s (model=%s)", conversation_id, settings.title_model)
+    if not litellm_key:
+        logger.debug("Titelgenerierung übersprungen (kein Virtual-Key für %s)", user_sub)
+        return None
     litellm_payload = {
         "model": settings.title_model,
         "messages": [
@@ -168,7 +180,7 @@ async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
             {"role": "user", "content": prompt},
         ],
         "stream": False,
-        "user": "titlegen",
+        "user": user_sub,
     }
 
     client = httpx.AsyncClient(timeout=_TITLE_TIMEOUT, verify=settings.litellm_verify_ssl)
@@ -176,7 +188,7 @@ async def _generate_title(conversation_id: UUID, prompt: str) -> str | None:
         req = client.build_request(
             "POST",
             f"{settings.litellm_proxy_url}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
+            headers={"Authorization": f"Bearer {litellm_key}"},
             json=litellm_payload,
         )
         response = await client.send(req)
@@ -887,7 +899,7 @@ async def chat(
         logger.debug("Keine Titelgenerierung (title_model=%r, prompt_len=%d, is_new=%s)",
                      settings.title_model, len(user_message), is_new)
     title_task: asyncio.Task[str | None] | None = (
-        asyncio.create_task(_generate_title(conversation_id, title_prompt))
+        asyncio.create_task(_generate_title(conversation_id, title_prompt, litellm_key, current_user.sub))
         if title_prompt else None
     )
 

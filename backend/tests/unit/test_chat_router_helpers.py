@@ -1,11 +1,16 @@
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
 from app.chat.schemas import AttachmentMeta, ChatMessage, TextPart, ImageUrlPart, ImageUrlContent
-from app.chat.router import _user_text, _serialize_content, _parse_stored_content, _crisis_sse_event, _CrisisRecord
+from app.chat.router import (
+    _user_text, _serialize_content, _parse_stored_content, _crisis_sse_event, _CrisisRecord,
+    _generate_title,
+)
 from app.crisis.detector import CrisisHit
 
 
@@ -210,3 +215,72 @@ async def test_get_guardrail_prompt_uses_cache():
 
     assert result == "CachedPrompt"
     mock_db.execute.assert_not_called()
+
+
+# --- Titelgenerierung: budgetiert über User-Virtual-Key (Sicherheits-Audit #8) ---
+
+def _mock_title_client(content="Ein kurzer Titel"):
+    """Mockt httpx.AsyncClient für _generate_title und gibt (client, captured) zurück.
+
+    `captured` sammelt die build_request-kwargs (headers/json), damit der Test prüfen
+    kann, welcher Key + welches user-Feld verwendet wurde.
+    """
+    captured = {}
+    response = MagicMock()
+    response.raise_for_status = MagicMock()
+    response.json = MagicMock(return_value={"choices": [{"message": {"content": content}}]})
+
+    def _build_request(method, url, headers=None, json=None):
+        captured["method"] = method
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["json"] = json
+        return MagicMock()
+
+    client = MagicMock()
+    client.build_request = MagicMock(side_effect=_build_request)
+    client.send = AsyncMock(return_value=response)
+    client.aclose = AsyncMock()
+    return client, captured
+
+
+@asynccontextmanager
+async def _noop_session():
+    db = AsyncMock()
+    yield db
+
+
+@pytest.mark.asyncio
+async def test_generate_title_uses_virtual_key_and_user_sub():
+    """Titel-Call läuft über den User-Virtual-Key + user=sub, nicht über den Master-Key (#8)."""
+    client, captured = _mock_title_client("Bruchrechnung üben")
+    with patch("app.chat.router.httpx.AsyncClient", return_value=client), \
+         patch("app.chat.router.AsyncSessionLocal", _noop_session), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.title_model = "openai/gpt-4o-mini"
+        mock_settings.litellm_proxy_url = "http://proxy"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.litellm_master_key = "sk-MASTER-should-not-be-used"
+
+        title = await _generate_title(uuid4(), "Erkläre mir Brüche", "sk-user-vkey", "pseudo-abc")
+
+    assert title == "Bruchrechnung üben"
+    assert captured["headers"]["Authorization"] == "Bearer sk-user-vkey"
+    assert "sk-MASTER-should-not-be-used" not in captured["headers"]["Authorization"]
+    assert captured["json"]["user"] == "pseudo-abc"
+    assert captured["json"]["user"] != "titlegen"
+
+
+@pytest.mark.asyncio
+async def test_generate_title_skips_without_key():
+    """Ohne Virtual-Key kein Master-Key-Fallback → None, kein HTTP-Call."""
+    client, captured = _mock_title_client()
+    with patch("app.chat.router.httpx.AsyncClient", return_value=client) as mk, \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.title_model = "openai/gpt-4o-mini"
+
+        title = await _generate_title(uuid4(), "Prompt", "", "pseudo-abc")
+
+    assert title is None
+    mk.assert_not_called()
+    assert captured == {}
