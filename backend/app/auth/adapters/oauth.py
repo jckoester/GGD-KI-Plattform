@@ -143,6 +143,13 @@ class OAuthAdapter(AuthAdapter):
         self._group_role_map = group_role_map or {}
         self._debug_userinfo = settings.auth_debug_userinfo
         self._jwks: dict | None = None  # JWKS-Cache (Audit #6)
+        if self._debug_userinfo:
+            # Einmalige, unübersehbare Startwarnung (Audit #15): der Flag loggt Klartext-PII.
+            logger.warning(
+                "AUTH_DEBUG_USERINFO=true — der Login loggt die vollständige userinfo im KLARTEXT "
+                "(Namen, E-Mail, Gruppen). Nur temporär zur Diagnose aktivieren, in Produktion "
+                "danach zwingend wieder auf false setzen."
+            )
 
     @property
     def mode(self) -> Literal["redirect"]:
@@ -339,8 +346,10 @@ class OAuthAdapter(AuthAdapter):
         )
         if self._debug_userinfo:
             # Komplette userinfo (enthält PII!) — zeigt den exakten Key/die Struktur
-            # der Gruppen. Nur temporär per AUTH_DEBUG_USERINFO=true aktivieren.
-            logger.info("OAuth-Login [debug] vollständige userinfo=%r", userinfo)
+            # der Gruppen. Nur temporär per AUTH_DEBUG_USERINFO=true aktivieren. Auf WARNING-
+            # Ebene (Audit #15), damit die PII-Ausgabe auch bei INFO-Filter sichtbar bleibt und
+            # ein vergessener Flag im Log auffällt.
+            logger.warning("OAuth-Login [debug/PII] vollständige userinfo=%r", userinfo)
 
         return NormalizedIdentity(
             external_id=external_id,

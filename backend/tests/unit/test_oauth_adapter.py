@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -707,3 +708,19 @@ class TestOAuthStepup:
             fresh = await oauth_adapter.exchange_code_fresh("code", "su.state")
         assert fresh.auth_time is None
         assert fresh.identity.external_id == "testuser"
+
+
+# --- AUTH_DEBUG_USERINFO-Warnung (Sicherheits-Audit #15) ---
+
+def test_debug_userinfo_emits_startup_warning(mock_settings, oauth_config_dict, caplog):
+    mock_settings.auth_debug_userinfo = True
+    with caplog.at_level(logging.WARNING, logger="app.auth.adapters.oauth"):
+        OAuthAdapter(raw=oauth_config_dict, settings=mock_settings, group_role_map={})
+    assert any("AUTH_DEBUG_USERINFO" in r.getMessage() for r in caplog.records)
+
+
+def test_no_debug_userinfo_no_startup_warning(mock_settings, oauth_config_dict, caplog):
+    mock_settings.auth_debug_userinfo = False
+    with caplog.at_level(logging.WARNING, logger="app.auth.adapters.oauth"):
+        OAuthAdapter(raw=oauth_config_dict, settings=mock_settings, group_role_map={})
+    assert not any("AUTH_DEBUG_USERINFO" in r.getMessage() for r in caplog.records)

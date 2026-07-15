@@ -21,6 +21,7 @@ logging.config.dictConfig({
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import settings
 from app.auth.router import router as auth_router
@@ -66,7 +67,27 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def configure_host_guard(app: FastAPI) -> bool:
+    """Host-Header-Schutz als Defense-in-Depth (Audit #18).
+
+    Standard `["*"]` (deaktiviert, wie zuvor); in Produktion `ALLOWED_HOSTS` in .env auf die
+    echten Hostnamen setzen. Der Reverse-Proxy bleibt die primäre Absicherung; diese Middleware
+    fängt Fehlkonfigurationen/Direkt-Exposition ab. Gibt True zurück, wenn die Middleware greift.
+    """
+    if settings.allowed_hosts and settings.allowed_hosts != ["*"]:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+        return True
+    if settings.environment != "development":
+        logger.warning(
+            "ALLOWED_HOSTS ist nicht gesetzt (Default '*') — Host-Header-Schutz inaktiv (Audit #18). "
+            "In Produktion die echten Hostnamen setzen."
+        )
+    return False
+
+
 app = FastAPI(title="GGD-KI-Plattform", lifespan=lifespan)
+
+configure_host_guard(app)
 
 app.add_middleware(
     CORSMiddleware,

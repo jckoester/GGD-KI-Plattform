@@ -349,7 +349,11 @@ async def logout(
         expires_at=datetime.fromtimestamp(current_user.exp, timezone.utc),
         reason="user_logout",
     )
-    response.delete_cookie("session", httponly=True, samesite="lax")
+    # Attribute müssen mit dem set_cookie übereinstimmen, sonst löscht der Browser nicht
+    # zuverlässig. Auch das kurzlebige `stepup`-Cookie mitlöschen (Audit #12).
+    secure = settings.environment != "development"
+    response.delete_cookie("session", path="/", httponly=True, secure=secure, samesite="lax")
+    response.delete_cookie("stepup", path="/", httponly=True, secure=secure, samesite="lax")
     return {"ok": True}
 
 

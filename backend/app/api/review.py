@@ -25,6 +25,8 @@ from app.db.models import (
     ConversationFlag,
     Message,
 )
+from app.config import settings
+from app.core.client_ip import client_ip
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -214,10 +216,8 @@ class ReaderConversationResponse(BaseModel):
 
 
 def _client_ip(request: Request) -> str | None:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else None
+    # Vertrauenswürdige Ableitung: X-Forwarded-For nur hinter konfiguriertem Proxy (Audit #13).
+    return client_ip(request, settings.trusted_proxies)
 
 
 async def _authorize_reader(

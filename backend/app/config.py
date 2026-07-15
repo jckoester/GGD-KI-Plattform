@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     title_model: str = ""
     exchange_rate_fallback: float = 1.10
     student_grades: list[int] = Field(default=[5, 6, 7, 8, 9, 10, 11, 12], alias="public_student_grades")
+    # Host-Header-Allowlist für TrustedHostMiddleware (Audit #18). Default `*` (aus, wie bisher);
+    # in Produktion die echten Hostnamen setzen, z. B. ["ki.example.de"]. Defense-in-Depth
+    # zusätzlich zum Reverse-Proxy.
+    allowed_hosts: list[str] = ["*"]
+    # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
+    # der direkte TCP-Peer hier gelistet ist, wird `X-Forwarded-For` ausgewertet — sonst spoofbar.
+    trusted_proxies: list[str] = ["127.0.0.1", "::1"]
     spend_log_delay: float = 1.0
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3

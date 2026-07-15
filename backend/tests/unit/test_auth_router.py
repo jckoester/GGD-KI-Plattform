@@ -203,6 +203,19 @@ class TestAuthRouterAuthenticated:
         assert "session" in set_cookie
         assert "max-age=0" in set_cookie.lower()
 
+    def test_logout_clears_session_and_stepup_cookies(self, app_no_revocation, valid_token):
+        # Audit #12: Logout löscht auch das stepup-Cookie, beide mit Path=/.
+        client = TestClient(app_no_revocation)
+        client.cookies.set("session", valid_token)
+        response = client.post("/logout")
+        assert response.status_code == 200
+        cookies = "\n".join(response.headers.get_list("set-cookie")).lower()
+        assert "session=" in cookies
+        assert "stepup=" in cookies
+        # Beide werden gelöscht (max-age=0) und mit Path=/ überschrieben.
+        assert cookies.count("max-age=0") >= 2
+        assert cookies.count("path=/") >= 2
+
     def test_logout_writes_revocation(self, valid_token):
         captured: list[AsyncMock] = []
 
