@@ -1227,6 +1227,22 @@ export async function updateContextNode(nodeId, payload) {
   return res.json()
 }
 
+// Nur-Titel-Korrektur importierter BP-Knoten (C1, admin-only). Sperrt den Titel
+// gegen den nächsten BP-Re-Import (title_locked).
+export async function updateNodeTitle(nodeId, title) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/title`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Titel konnte nicht gespeichert werden')
+  }
+  return res.json()
+}
+
 export async function deleteContextNode(nodeId) {
   const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
     method: 'DELETE',

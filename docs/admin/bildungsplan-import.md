@@ -253,6 +253,23 @@ der Spaltensumme entsprechen (keine `NULL`-Embeddings).
 
 ---
 
+## Fehlerhafte Titel korrigieren (überlebt Re-Import)
+
+Die Bildungsplan-Quelle enthält gelegentlich fehlerhafte Kapitel-/Knoten-Titel
+(Nummerierung, Schreibweise). Der Import übernimmt sie originalgetreu. **Admins** können
+einen einzelnen Knoten-Titel direkt in der App korrigieren:
+
+1. Den Knoten öffnen (z. B. aus dem Bildungsplan-Baum → Knotenansicht `/knowledge/<id>`).
+2. Neben dem Titel auf das **Stift-Symbol** klicken, korrigieren, speichern.
+
+Der korrigierte Titel wird mit `title_locked` markiert; ein **späterer Re-Import
+überschreibt ihn nicht** mehr (der Quell-Titel wird ignoriert, solange die Sperre besteht).
+Nur der **Titel** ist bearbeitbar — der Fließtext bleibt bewusst read-only (er käme sonst
+beim nächsten Import wieder aus der Quelle). Die Bearbeitung ist auf `admin` beschränkt, da
+BP-Knoten schulweit/global sind.
+
+---
+
 ## Rollback
 
 Erzeugte der Import fehlerhafte Daten, lassen sich alle Knoten eines Fachs gezielt

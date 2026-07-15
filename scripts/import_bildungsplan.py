@@ -283,7 +283,7 @@ def upsert_node(
             cur.execute(
                 """
                 UPDATE context_nodes
-                SET title      = %s,
+                SET title      = CASE WHEN title_locked THEN title ELSE %s END,
                     metadata   = %s,
                     subject_id = COALESCE(%s, subject_id),
                     min_grade  = COALESCE(%s, min_grade),
@@ -303,7 +303,7 @@ def upsert_node(
             """
             UPDATE context_nodes
             SET content = %s,
-                title = %s,
+                title = CASE WHEN title_locked THEN title ELSE %s END,
                 metadata = %s,
                 subject_id = %s,
                 min_grade = %s,

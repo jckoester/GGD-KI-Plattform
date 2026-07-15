@@ -603,6 +603,11 @@ class ContextNode(Base):
     category: Mapped[str] = mapped_column(Text, nullable=False)
     content_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    # Manuell gesperrter Titel: der BP-Import überschreibt ihn dann NICHT mehr, damit
+    # Admin-Korrekturen an fehlerhaften Quell-Titeln einen Re-Import überleben (C1).
+    title_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_: Mapped[dict] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=text("'{}'")

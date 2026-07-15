@@ -18,7 +18,7 @@ import sqlalchemy as sa
 
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.dependencies import get_current_user, require_any_role
+from app.auth.dependencies import get_current_user, require_any_role, require_role
 from app.auth.jwt import JwtPayload
 from app.context.schemas import (
     ContextAnchorCreate,
@@ -28,6 +28,7 @@ from app.context.schemas import (
     ContextNodeCreate,
     ContextNodeRead,
     ContextNodeUpdate,
+    ContextNodeTitleUpdate,
     NeighborhoodResponse,
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
@@ -535,6 +536,29 @@ async def update_node(
         attr = field if field != "metadata_" else "metadata_"
         setattr(node, attr, value)
 
+    # Manuelle Titeländerung sperrt den Titel gegen einen BP-Re-Import (C1).
+    if "title" in update_data:
+        node.title_locked = True
+
+    await db.commit()
+    await db.refresh(node)
+    return node
+
+
+@router.patch("/nodes/{node_id}/title", response_model=ContextNodeRead)
+async def update_node_title(
+    node_id: UUID,
+    payload: ContextNodeTitleUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(require_role("admin")),
+):
+    """Korrigiert NUR den Titel eines (importierten) BP-Knotens und sperrt ihn gegen den
+    Re-Import (C1). Admin-only — die BP-Curriculum-Daten sind schulweit/global."""
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.status == "deleted":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    node.title = payload.title
+    node.title_locked = True
     await db.commit()
     await db.refresh(node)
     return node

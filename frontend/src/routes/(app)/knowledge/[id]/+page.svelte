@@ -2,18 +2,54 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CATEGORY_LABELS, CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
-    import { getContextNode, getArchivedReferences } from "$lib/api.js";
+    import { getContextNode, getArchivedReferences, updateNodeTitle } from "$lib/api.js";
     import { renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
-    import { ArrowLeft, Pencil } from "lucide-svelte";
+    import { ArrowLeft, Pencil, Check, X } from "lucide-svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
 
     let node = $state(null);
     let loadingNode = $state(true);
     let error = $state(null);
     let archivedRefs = $state([]);
+
+    // C1: Inline-Titel-Korrektur importierter BP-Knoten (nur Admin).
+    let editingTitle = $state(false);
+    let titleDraft = $state("");
+    let savingTitle = $state(false);
+    let titleError = $state(null);
+
+    const isAdmin = $derived($user?.roles?.includes("admin") ?? false);
+    // Importierte BP-Knoten tragen metadata.bp_id; nur der Titel ist korrigierbar,
+    // der Inhalt bleibt read-only (die Voll-Bearbeiten-Ansicht entfällt für sie).
+    const isImported = $derived(!!node?.metadata?.bp_id);
+
+    function startTitleEdit() {
+        titleDraft = node.title;
+        titleError = null;
+        editingTitle = true;
+    }
+
+    async function saveTitle() {
+        const t = titleDraft.trim();
+        if (!t) {
+            titleError = "Titel darf nicht leer sein.";
+            return;
+        }
+        savingTitle = true;
+        titleError = null;
+        try {
+            const updated = await updateNodeTitle(node.id, t);
+            node = { ...node, title: updated.title, title_locked: updated.title_locked };
+            editingTitle = false;
+        } catch (e) {
+            titleError = e.message;
+        } finally {
+            savingTitle = false;
+        }
+    }
 
     const backUrl = $derived(
         $page.url.searchParams.get("back") ?? "/knowledge",
@@ -115,20 +151,67 @@
     {:else if node}
         <!-- Kopfzeile -->
         <div class="flex items-start justify-between gap-3 mb-2">
-            <div class="min-w-0">
-                <div class="flex items-center gap-3 flex-wrap">
-                    <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-                        {node.title}
-                    </h1>
-                    <span
-                        class="text-xs px-2 py-0.5 rounded-full
-                        {node.status === 'active'
-                            ? 'bg-light-gr/20 dark:bg-dark-gr/20 text-light-gr dark:text-dark-gr'
-                            : 'bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye'}"
-                    >
-                        {node.status === "active" ? "Aktiv" : "Archiviert"}
-                    </span>
-                </div>
+            <div class="min-w-0 flex-1">
+                {#if editingTitle}
+                    <!-- Inline-Titel-Korrektur (Admin, importierter BP-Knoten) -->
+                    <div class="flex items-center gap-2">
+                        <!-- svelte-ignore a11y_autofocus -->
+                        <input
+                            bind:value={titleDraft}
+                            autofocus
+                            onkeydown={(e) => {
+                                if (e.key === "Enter") saveTitle();
+                                if (e.key === "Escape") (editingTitle = false);
+                            }}
+                            class="flex-1 text-xl font-bold rounded-md px-2 py-1 border
+                                   border-light-ui-3 dark:border-dark-ui-3
+                                   bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx"
+                        />
+                        <button
+                            onclick={saveTitle}
+                            disabled={savingTitle}
+                            title="Speichern"
+                            class="shrink-0 p-2 rounded-md bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+                        >
+                            <Check class="w-4 h-4" />
+                        </button>
+                        <button
+                            onclick={() => (editingTitle = false)}
+                            title="Abbrechen"
+                            class="shrink-0 p-2 rounded-md border border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2"
+                        >
+                            <X class="w-4 h-4" />
+                        </button>
+                    </div>
+                    {#if titleError}
+                        <p class="text-sm text-light-re dark:text-dark-re mt-1">{titleError}</p>
+                    {/if}
+                {:else}
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
+                            {node.title}
+                        </h1>
+                        {#if isAdmin && isImported}
+                            <button
+                                onclick={startTitleEdit}
+                                title="Titel korrigieren"
+                                class="shrink-0 p-1.5 rounded-md text-light-tx-2 dark:text-dark-tx-2
+                                       hover:text-light-tx dark:hover:text-dark-tx
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                            >
+                                <Pencil class="w-4 h-4" />
+                            </button>
+                        {/if}
+                        <span
+                            class="text-xs px-2 py-0.5 rounded-full
+                            {node.status === 'active'
+                                ? 'bg-light-gr/20 dark:bg-dark-gr/20 text-light-gr dark:text-dark-gr'
+                                : 'bg-light-ye/20 dark:bg-dark-ye/20 text-light-ye dark:text-dark-ye'}"
+                        >
+                            {node.status === "active" ? "Aktiv" : "Archiviert"}
+                        </span>
+                    </div>
+                {/if}
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                     {CATEGORY_LABELS[node.category] ?? node.category}
                     {#if node.content_type}
@@ -137,7 +220,7 @@
                     {/if}
                 </p>
             </div>
-            {#if canEdit}
+            {#if canEdit && !isImported}
                 <a
                     href={editUrl}
                     class="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm rounded-md

@@ -373,3 +373,19 @@ def test_upsert_unchanged_hash_null_grade_keeps_existing():
     update_sql = cur.calls[1][0]
     # COALESCE(neu, alt): neu=NULL → alter DB-Wert bleibt.
     assert "COALESCE(%s, min_grade)" in update_sql
+
+
+def test_upsert_unchanged_hash_title_guarded_by_lock():
+    # Bei gleichem Hash schützt der Import den Titel per CASE WHEN title_locked (C1).
+    cur = _FakeCursor(("00000000-0000-0000-0000-000000000003", "HASH"))
+    upsert_node(cur, _ik_node(11, 12, "HASH"), dry_run=False, subject_id_lookup={})
+    update_sql = cur.calls[1][0]
+    assert "CASE WHEN title_locked THEN title ELSE %s END" in update_sql
+
+
+def test_upsert_changed_hash_title_guarded_by_lock():
+    # Auch im Hash-geändert-Zweig bleibt der gesperrte Titel geschützt.
+    cur = _FakeCursor(("00000000-0000-0000-0000-000000000004", "OLDHASH"))
+    upsert_node(cur, _ik_node(11, 12, "NEWHASH"), dry_run=False, subject_id_lookup={})
+    update_sql = cur.calls[1][0]
+    assert "CASE WHEN title_locked THEN title ELSE %s END" in update_sql

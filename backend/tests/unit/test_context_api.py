@@ -42,6 +42,7 @@ def make_node(
         category=category,
         content_type=content_type,
         title=title,
+        title_locked=False,
         content=None,
         metadata_={},
         embedding=None,
@@ -567,3 +568,77 @@ class TestGetSubjectByFachCode:
         client = TestClient(make_app(db, make_jwt(roles=["teacher"])))
         resp = client.get("/context/subjects/by-code/XYZ")
         assert resp.status_code == 404
+
+
+# ── C1: Titel-Korrektur importierter BP-Knoten (title_locked) ─────────────────
+
+class TestTitleLock:
+
+    def _db_with(self, node):
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock(side_effect=lambda n: None)
+        return db
+
+    def test_update_title_admin_sets_lock(self):
+        node = make_node(read_scope="global", write_scope="global", owner_pseudonym=None,
+                         title="Falscher Titel", content_type="ik_kompetenz")
+        db = self._db_with(node)
+        user = make_jwt(roles=["teacher", "admin"], sub="admin-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{node.id}/title", json={"title": "Korrigierter Titel"}
+        )
+        assert resp.status_code == 200
+        assert node.title == "Korrigierter Titel"
+        assert node.title_locked is True
+        assert resp.json()["title_locked"] is True
+
+    def test_update_title_non_admin_403(self):
+        node = make_node(read_scope="global", write_scope="global", owner_pseudonym=None)
+        db = self._db_with(node)
+        user = make_jwt(roles=["teacher"], sub="teacher-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{node.id}/title", json={"title": "X"}
+        )
+        assert resp.status_code == 403
+        assert node.title_locked is False
+
+    def test_update_title_missing_node_404(self):
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=None)
+        user = make_jwt(roles=["admin"], sub="admin-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{uuid4()}/title", json={"title": "X"}
+        )
+        assert resp.status_code == 404
+
+    def test_empty_title_rejected(self):
+        node = make_node(read_scope="global", write_scope="global", owner_pseudonym=None)
+        db = self._db_with(node)
+        user = make_jwt(roles=["admin"], sub="admin-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{node.id}/title", json={"title": ""}
+        )
+        assert resp.status_code == 422
+
+    def test_general_update_title_change_locks(self):
+        # Titeländerung über den generischen PATCH sperrt den Titel ebenfalls.
+        node = make_node(owner_pseudonym="teacher-1")  # eigener Knoten → write erlaubt
+        db = self._db_with(node)
+        user = make_jwt(roles=["teacher"], sub="teacher-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{node.id}", json={"title": "Neu"}
+        )
+        assert resp.status_code == 200
+        assert node.title_locked is True
+
+    def test_general_update_without_title_does_not_lock(self):
+        node = make_node(owner_pseudonym="teacher-1")
+        db = self._db_with(node)
+        user = make_jwt(roles=["teacher"], sub="teacher-1")
+        resp = TestClient(make_app(db, user)).patch(
+            f"/context/nodes/{node.id}", json={"content": "neuer Inhalt"}
+        )
+        assert resp.status_code == 200
+        assert node.title_locked is False

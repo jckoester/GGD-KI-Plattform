@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class ContextNodeCreate(BaseModel):
@@ -46,11 +46,17 @@ class ContextNodeUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ContextNodeTitleUpdate(BaseModel):
+    """Nur-Titel-Korrektur importierter BP-Knoten (C1, admin-only)."""
+    title: str = Field(min_length=1, max_length=500)
+
+
 class ContextNodeRead(BaseModel):
     id: UUID
     category: str
     content_type: str | None
     title: str
+    title_locked: bool = False  # manueller Titel gegen BP-Re-Import gesperrt (C1)
     content: str | None
     metadata_: dict[str, Any] = Field(
         validation_alias=AliasChoices("metadata_", "metadata"),
@@ -71,6 +77,13 @@ class ContextNodeRead(BaseModel):
     schuljahr: str | None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("title_locked", mode="before")
+    @classmethod
+    def _title_locked_default(cls, v):
+        # Frisch erzeugte Knoten haben den Server-Default (false) vor dem DB-Roundtrip
+        # noch nicht gesetzt → None. Als False behandeln.
+        return False if v is None else v
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
