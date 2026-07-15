@@ -10,6 +10,7 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.ratelimit.dependency import rate_limit
 from app.upload.extractor import extract_pdf, extract_plaintext
+from app.upload.sniff import content_matches
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["upload"])
@@ -78,6 +79,15 @@ async def upload_session(
         raise HTTPException(
             status_code=413,
             detail=f"Datei zu groß ({size // (1024*1024)} MB). Maximum: {limit_mb} MB.",
+        )
+
+    # Magic-Byte-Prüfung (Audit #14): Inhalt muss zur Endung passen — Defense-in-Depth gegen
+    # umbenannte/gefälschte Dateien. Die Endung allein legt den Typ nicht fest.
+    if not content_matches(file_type, data):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Der Dateiinhalt passt nicht zur Endung '{suffix}'. "
+                   "Bitte eine unveränderte Datei des angegebenen Typs hochladen.",
         )
 
     filename = file.filename or "datei"
