@@ -64,3 +64,9 @@ general_settings:
   # SEPARATE Datenbank, damit LiteLLMs Prisma-Schema nicht mit dem Alembic-Schema
   # der App kollidiert. Siehe LITELLM_DATABASE_URL in .env.example.
   database_url: os.environ/LITELLM_DATABASE_URL
+
+  # Über die Admin-UI angelegte Modelle/Credentials in die DB schreiben und beim
+  # Start neu laden. Ohne dies (Default False) leben sie nur im Speicher und sind
+  # nach einem Neustart WEG. Die model_list oben bleibt die statische Basis; die
+  # UI-Einträge kommen additiv aus der DB dazu.
+  store_model_in_db: true

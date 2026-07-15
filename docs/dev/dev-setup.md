@@ -199,6 +199,17 @@ Diese UI betrifft **nur** den Proxy. Der Login der GGD-KI-Plattform selbst
 (`http://localhost:5173`) läuft unabhängig davon über den `yaml_test`-Adapter
 (siehe [Test-Authentifizierung](#test-authentifizierung)).
 
+**Persistenz von UI-Einträgen:** Über die UI angelegte Modelle/Credentials
+überleben einen Neustart nur, wenn `store_model_in_db: true` in
+`general_settings` gesetzt ist (in der Dev-Config bereits aktiv). Ohne die
+Option leben sie nur im Speicher und sind nach dem Stopp weg. Die statische
+`model_list` in der Config bleibt davon unberührt; die UI-Einträge kommen
+additiv aus der DB dazu. Die api_keys der Credentials werden verschlüsselt
+gespeichert — der Schlüssel ist `LITELLM_SALT_KEY` (Fallback: `LITELLM_MASTER_KEY`).
+Wird der Master-Key rotiert, ohne dass ein fester `LITELLM_SALT_KEY` gesetzt ist,
+sind bereits gespeicherte Credentials nicht mehr entschlüsselbar — für stabile
+Dev-Umgebungen daher am besten einen festen `LITELLM_SALT_KEY` setzen.
+
 ## Frontend
 
 ```bash
