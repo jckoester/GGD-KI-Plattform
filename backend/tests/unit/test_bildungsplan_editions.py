@@ -389,3 +389,18 @@ def test_upsert_changed_hash_title_guarded_by_lock():
     upsert_node(cur, _ik_node(11, 12, "NEWHASH"), dry_run=False, subject_id_lookup={})
     update_sql = cur.calls[1][0]
     assert "CASE WHEN title_locked THEN title ELSE %s END" in update_sql
+
+
+def test_upsert_reactivates_archived_node_unchanged_hash():
+    # Ein wieder importierter (zuvor archivierter) Knoten wird bei gleichem Hash reaktiviert.
+    cur = _FakeCursor(("00000000-0000-0000-0000-000000000005", "HASH"))
+    upsert_node(cur, _ik_node(11, 12, "HASH"), dry_run=False, subject_id_lookup={})
+    sql = cur.calls[1][0]
+    assert "status      = 'active'" in sql and "archived_at = NULL" in sql
+
+
+def test_upsert_reactivates_archived_node_changed_hash():
+    cur = _FakeCursor(("00000000-0000-0000-0000-000000000006", "OLD"))
+    upsert_node(cur, _ik_node(11, 12, "NEW"), dry_run=False, subject_id_lookup={})
+    sql = cur.calls[1][0]
+    assert "status = 'active'" in sql and "archived_at = NULL" in sql

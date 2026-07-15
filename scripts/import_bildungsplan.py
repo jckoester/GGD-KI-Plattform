@@ -289,7 +289,9 @@ def upsert_node(
                     min_grade  = COALESCE(%s, min_grade),
                     max_grade  = COALESCE(%s, max_grade),
                     niveau     = %s,
-                    bp_version = %s
+                    bp_version = %s,
+                    status      = 'active',
+                    archived_at = NULL
                 WHERE id = %s
                 """,
                 (title, json.dumps(metadata), subject_id, min_grade, max_grade,
@@ -311,6 +313,8 @@ def upsert_node(
                 niveau = %s,
                 bp_version = %s,
                 embedding = NULL,
+                status = 'active',
+                archived_at = NULL,
                 updated_at = now()
             WHERE id = %s
         """,

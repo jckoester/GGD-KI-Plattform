@@ -156,6 +156,20 @@ docker compose run --rm \
     --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki"'
 ```
 
+> **⚠ Voll-Import archiviert Fächer ohne JSONL:** Zeigt `--input` auf ein **Verzeichnis**
+> (und **kein** `--fach` ist gesetzt), archiviert der Import **jeden** aktiven BP-Knoten,
+> dessen `bp_id` im aktuellen JSONL-Satz **fehlt** (`status = 'archived'`). Liegt also die
+> JSONL eines Fachs gerade nicht im Verzeichnis (z. B. gelöscht und noch nicht neu gescrapt),
+> wird **dieses ganze Fach archiviert**. Deshalb:
+> - **Voll-Import** nur ausführen, wenn **alle** Fach-JSONLs frisch im Verzeichnis liegen.
+> - Ein **einzelnes Fach nachziehen** → immer per **Einzeldatei** (`--input …/NWTBFO_<datum>.jsonl`)
+>   oder `--fach <CODE>`; dann bleibt der Rest unangetastet.
+>
+> **Wieder aktivieren:** Ein Re-Import reaktiviert archivierte Knoten automatisch — taucht ein
+> Knoten wieder im JSONL auf, setzt der Import `status` zurück auf `active`. Ein versehentlich
+> archiviertes Fach lässt sich also durch erneutes (vollständiges) Scrapen + Einzeldatei-Import
+> desselben Fachs zurückholen.
+
 Warnungen prüfen — das Import-Skript schreibt sie nach
 `data/import_logs/import_warnings_<datum>.log`. **Achtung:** Der Pfad ist **relativ
 zum Arbeitsverzeichnis** des Skripts (im Container `/app/data/…`). Damit das Log einen
