@@ -38,6 +38,30 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+> **Reproduzierbare Installs (`requirements.lock`):** `requirements.txt` enthält die direkten
+> Abhängigkeiten mit Ober-/Untergrenzen (menschlich gepflegt). Der daraus erzeugte
+> `requirements.lock` pinnt **alle** (auch transitiven) Pakete auf exakte, getestete Versionen
+> **mit Integritäts-Hashes** (inkl. des spaCy-Wheels). Für einen exakt reproduzierbaren Stand
+> (CI/Fehlersuche, gleiche Python-Version wie die Dev-venv):
+> ```bash
+> uv pip install --require-hashes -r requirements.lock
+> ```
+> Nach dem Ändern einer Grenze in `requirements.txt` den Lock neu erzeugen und die Tests laufen
+> lassen:
+> ```bash
+> uv pip compile requirements.txt --generate-hashes -o requirements.lock
+> pytest tests/unit -q
+> ```
+>
+> **Plattform-Hinweis:** Der Lock ist eine flache Auflösung ohne Environment-Marker — er gilt für
+> die Python-Version/Plattform, auf der er erzeugt wurde (Dev-venv). Der Prod-Container
+> (`backend/Dockerfile`, aktuell `python:3.12-slim`) installiert weiterhin aus `requirements.txt`
+> (mit Obergrenzen). Soll der Lock dort erzwungen werden, ihn zielgerichtet **universal** für die
+> Prod-Python-Version erzeugen und den Build als Validierung nutzen:
+> ```bash
+> uv pip compile --universal --python-version 3.12 requirements.txt --generate-hashes -o requirements.lock
+> ```
+
 > **Hinweis (PII-Modell):** Das deutsche NER-Modell `de_core_news_md` wird über eine
 > gepinnte Wheel-URL in `requirements.txt` mitinstalliert — **nicht** über
 > `python -m spacy download` (das scheitert in uv-/manchen Umgebungen). Schlägt der

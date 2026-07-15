@@ -80,15 +80,36 @@ docker compose restart litellm
 
 Die PII-Erkennung (Datensparsamkeit) nutzt das deutsche spaCy-Modell `de_core_news_md`,
 gepinnt in `backend/requirements.txt`. Zum Aktualisieren die Wheel-URL auf die neue
-Version anheben (muss zur `spacy`-Minor-Version passen) und das Backend-Image neu bauen:
+Version anheben (muss zur `spacy`-Minor-Version passen), den Lockfile neu erzeugen und das
+Backend-Image neu bauen:
 
 ```bash
 # requirements.txt: de_core_news_md-Wheel-URL auf neue Version setzen, dann:
+uv pip compile requirements.txt --generate-hashes -o requirements.lock
 docker compose build backend && docker compose up -d backend
 ```
 
 Ein Modell-Update ist selten nötig und betrifft nur die Treffergüte der PII-Warnung —
 keine Datenmigration. Es wird **nichts** extern aufgerufen; das Modell läuft lokal.
+
+## Python-Abhängigkeiten aktualisieren
+
+`backend/requirements.txt` listet die **direkten** Abhängigkeiten mit Ober-/Untergrenzen;
+`backend/requirements.lock` pinnt daraus **alle** (auch transitiven) Pakete auf exakte Versionen
+**mit Integritäts-Hashes** (Sicherheits-Audit #17 — reproduzierbare Installs, keine ungetesteten
+Majors). Produktion/CI installiert aus dem Lock:
+
+```bash
+uv pip install --require-hashes -r requirements.lock
+```
+
+Zum Aktualisieren: die gewünschte Grenze in `requirements.txt` anpassen, Lock neu erzeugen und
+die Tests laufen lassen — erst danach ausrollen:
+
+```bash
+uv pip compile requirements.txt --generate-hashes -o requirements.lock
+pytest tests/unit -q
+```
 
 ## Datenbank-Backup
 
