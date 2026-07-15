@@ -47,6 +47,11 @@ UploadResult = Annotated[
 ]
 
 
+# Hinweis: Dieser Endpoint ist zustandslos — eine Datei pro Request, kein Session-Tracking.
+# `settings.upload_max_files` (max. Anhänge pro Nachricht) wird deshalb dort erzwungen, wo es
+# semantisch greift: bei der Chat-Nachrichten-Annahme (app/chat/router.py, Audit #10). Gegen
+# Volumen-Missbrauch am Endpoint selbst wirken das Rate-Limit (`rate_limit("upload")`, Audit #2),
+# `upload_max_bytes` und `client_max_body_size` im Reverse-Proxy (Audit #5).
 @router.post("/upload/session", response_model=UploadResult)
 async def upload_session(
     file: UploadFile = File(...),

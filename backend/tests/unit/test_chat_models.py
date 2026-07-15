@@ -195,6 +195,7 @@ async def test_post_chat_new_conversation_uses_requested_model_id():
         mock_settings.title_model = ""
         mock_settings.litellm_proxy_url = "http://litellm:4000"
         mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
 
         await chat(request, current_user=_fake_payload(), db=db)
 
@@ -229,6 +230,7 @@ async def test_post_chat_new_conversation_without_model_uses_default():
         mock_settings.title_model = ""
         mock_settings.litellm_proxy_url = "http://litellm:4000"
         mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
 
         await chat(request, current_user=_fake_payload(), db=db)
 
@@ -273,6 +275,7 @@ async def test_post_chat_existing_conversation_without_model_uses_stored_model()
         mock_settings.title_model = ""
         mock_settings.litellm_proxy_url = "http://litellm:4000"
         mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
 
         await chat(request, current_user=_fake_payload(), db=db)
 

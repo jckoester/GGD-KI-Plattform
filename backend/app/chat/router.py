@@ -225,6 +225,21 @@ def _user_text(msg: ChatMessage) -> str:
     return " ".join(text_parts)
 
 
+def _count_message_files(msg: ChatMessage) -> int:
+    """Zählt die an eine Nachricht gehängten Dateien (Sicherheits-Audit #10).
+
+    Das Frontend spiegelt jede hochgeladene Datei (Text + Bild) in `attachments`; Bilder
+    landen zusätzlich als `image_url`-Part im Content. Ein Client, der das Frontend umgeht,
+    könnte Bilder ohne `attachments`-Metadaten direkt als Content-Parts senden — daher das
+    Maximum aus Metadaten-Anzahl und Bild-Parts, damit das Limit nicht umgangen werden kann.
+    """
+    n_meta = len(msg.attachments)
+    n_image_parts = 0
+    if isinstance(msg.content, list):
+        n_image_parts = sum(1 for part in msg.content if isinstance(part, ImageUrlPart))
+    return max(n_meta, n_image_parts)
+
+
 def _serialize_content(content: str | list) -> str | list:
     """Serialisiert Content für den LiteLLM-Payload (Pydantic-Modelle → dicts)."""
     if isinstance(content, str):
@@ -602,6 +617,17 @@ async def chat(
 ):
     model_used = request.model_id or settings.chat_default_model
     system_prompt_snapshot: Optional[str] = None
+
+    # Anhang-Limit serverseitig erzwingen (Sicherheits-Audit #10): das Frontend begrenzt auf
+    # settings.upload_max_files, der Server muss das unabhängig prüfen — pro Nutzernachricht des
+    # Requests (History inklusive, da alle Nachrichten an LiteLLM gehen).
+    for _msg in request.messages:
+        if _msg.role == "user" and _count_message_files(_msg) > settings.upload_max_files:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zu viele Anhänge: maximal {settings.upload_max_files} Datei(en) pro Nachricht.",
+            )
+
     litellm_payload = {
         "stream": True,
         "stream_options": {"include_usage": True},

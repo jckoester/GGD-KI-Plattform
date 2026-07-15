@@ -284,3 +284,76 @@ async def test_generate_title_skips_without_key():
     assert title is None
     mk.assert_not_called()
     assert captured == {}
+
+
+# --- Anhang-Limit serverseitig (Sicherheits-Audit #10) ---
+
+from app.chat.router import _count_message_files
+from app.chat.schemas import ChatRequest
+
+
+def _img_part(url="data:image/png;base64,abc"):
+    return ImageUrlPart(type="image_url", image_url=ImageUrlContent(url=url))
+
+
+def test_count_message_files_string_content_zero():
+    assert _count_message_files(ChatMessage(role="user", content="Hallo")) == 0
+
+
+def test_count_message_files_counts_attachment_metadata():
+    msg = ChatMessage(
+        role="user", content="x",
+        attachments=[AttachmentMeta(name=f"f{i}", type="text") for i in range(3)],
+    )
+    assert _count_message_files(msg) == 3
+
+
+def test_count_message_files_counts_image_parts_without_metadata():
+    # Client umgeht das Frontend → Bilder nur als Content-Part, keine attachments-Metadaten.
+    msg = ChatMessage(role="user", content=[
+        TextPart(type="text", text="Beschreibe:"),
+        _img_part(), _img_part(), _img_part(), _img_part(),
+    ])
+    assert _count_message_files(msg) == 4
+
+
+def test_count_message_files_takes_max_of_meta_and_parts():
+    msg = ChatMessage(role="user", content=[_img_part(), _img_part()],
+                      attachments=[AttachmentMeta(name="a", type="image")])
+    assert _count_message_files(msg) == 2
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_too_many_attachments():
+    """Der Chat-Endpoint lehnt Nachrichten über settings.upload_max_files ab (422)."""
+    from fastapi import HTTPException
+    from app.chat.router import chat
+
+    over = settings_upload_limit() + 1
+    msg = ChatMessage(
+        role="user", content="x",
+        attachments=[AttachmentMeta(name=f"f{i}", type="text") for i in range(over)],
+    )
+    req = ChatRequest(messages=[msg])
+    with pytest.raises(HTTPException) as exc:
+        await chat(req, current_user=None, db=None)
+    assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_too_many_image_parts_bypassing_metadata():
+    """Auch reine Content-Bild-Parts ohne attachments-Metadaten werden begrenzt."""
+    from fastapi import HTTPException
+    from app.chat.router import chat
+
+    over = settings_upload_limit() + 1
+    msg = ChatMessage(role="user", content=[_img_part() for _ in range(over)])
+    req = ChatRequest(messages=[msg])
+    with pytest.raises(HTTPException) as exc:
+        await chat(req, current_user=None, db=None)
+    assert exc.value.status_code == 422
+
+
+def settings_upload_limit() -> int:
+    from app.config import settings
+    return settings.upload_max_files
