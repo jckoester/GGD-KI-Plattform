@@ -90,6 +90,14 @@ Ergebnis sind die JSONL-Dateien in `scripts/scraper/output/`, z. B.:
 `CH_2026-06-06.jsonl`, `M_2026-06-06.jsonl`, `M_V2_2026-06-06.jsonl`,
 `leitperspektiven_2026-06-06.jsonl`.
 
+> **Fehler pro Fach werden isoliert:** Wirft ein einzelnes Fach beim Scrapen einen Fehler
+> (z. B. ungültiges Suffix/Quell-URL), wird **nur dieses Fach übersprungen** — der Lauf macht
+> mit den übrigen weiter (reihenfolge-unabhängig). Übersprungene Fächer erscheinen am Ende als
+> prominente Zusammenfassung im Log **und** in `scripts/scraper/output/scrape_skipped_<datum>.log`;
+> der Prozess endet dann mit **Exit-Code 1**. Nach einem solchen Lauf die Liste prüfen, die
+> Ursache (meist ein Config-Fehler in `subjects.yaml`) beheben und die betroffenen Fächer gezielt
+> mit `--fach <CODE>` nachziehen.
+
 **Variante B — fertige JSONL übernehmen.**
 Liegen die JSONL-Dateien bereits vor (z. B. vom Wartungsteam), genügt es, sie in
 das Output-Verzeichnis zu kopieren — Schritt »selbst scrapen« entfällt dann:

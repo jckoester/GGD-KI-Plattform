@@ -10,6 +10,7 @@ exakt wiederhergestellt.
 import importlib.util
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -58,6 +59,7 @@ _scraper = _load_isolated(
 validate_subjects_yaml = _import_bp.validate_subjects_yaml
 subject_editions = _scraper.subject_editions
 schedule_suffixes = _scraper.schedule_suffixes
+scraper_main = _scraper.main
 
 
 def _cfg(*subjects: dict) -> dict:
@@ -163,3 +165,82 @@ def test_schedule_suffixes_ordnung():
 def test_schedule_suffixes_fallback_ohne_fahrplan():
     assert schedule_suffixes({"suffix": ""}) == [""]
     assert schedule_suffixes({"suffix": ".V2"}) == [".V2"]
+
+
+# -- main(): Fehler pro Fach isolieren statt Batch-Abbruch (Todo A1) ------------
+
+def _async_client_cm():
+    """Async-Context-Manager-Mock für httpx.AsyncClient(...)."""
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=MagicMock(name="httpx_client"))
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cm
+
+
+_MIN_SUBJECTS_YAML = """\
+schulart: GYM
+schuljahr: "2026/27"
+bildungsplan_default:
+  bp_basis: BP2016BW
+  suffix: ""
+subjects:
+  - slug: bad
+    fach_code: BAD
+  - slug: good
+    fach_code: GOOD
+"""
+
+
+def _write_cfg(tmp_path) -> str:
+    p = tmp_path / "subjects.yaml"
+    p.write_text(_MIN_SUBJECTS_YAML, encoding="utf-8")
+    return str(p)
+
+
+@pytest.mark.asyncio
+async def test_main_isolates_failing_fach_and_continues(tmp_path):
+    """Ein Fach, das wirft, wird übersprungen; nachfolgende Fächer laufen weiter."""
+    def _sf(client, label, *a, **k):
+        if label == "BAD":
+            raise RuntimeError("ungültige Quell-URL")
+        return (1, 0, 0)
+
+    fake_scrape_fach = AsyncMock(side_effect=_sf)
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", fake_scrape_fach), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_client_cm()):
+        skipped = await scraper_main(_write_cfg(tmp_path), str(tmp_path))
+
+    # BAD übersprungen, GOOD trotzdem gescrapt (Reihenfolge-unabhängig).
+    assert [slug for slug, _ in skipped] == ["bad"]
+    assert "RuntimeError" in skipped[0][1]
+    called_labels = {c.args[1] for c in fake_scrape_fach.call_args_list}
+    assert called_labels == {"BAD", "GOOD"}
+
+
+@pytest.mark.asyncio
+async def test_main_writes_skip_summary_file(tmp_path):
+    """Übersprungene Fächer werden in eine scrape_skipped-Datei geschrieben."""
+    fake_scrape_fach = AsyncMock(side_effect=RuntimeError("kaputt"))
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", fake_scrape_fach), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_client_cm()):
+        skipped = await scraper_main(_write_cfg(tmp_path), str(tmp_path))
+
+    assert {slug for slug, _ in skipped} == {"bad", "good"}
+    skip_files = list(tmp_path.glob("scrape_skipped_*.log"))
+    assert len(skip_files) == 1
+    body = skip_files[0].read_text(encoding="utf-8")
+    assert "bad" in body and "good" in body
+
+
+@pytest.mark.asyncio
+async def test_main_no_skips_returns_empty(tmp_path):
+    """Läuft alles durch, ist die skipped-Liste leer und keine Datei entsteht."""
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", AsyncMock(return_value=(1, 0, 0))), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_client_cm()):
+        skipped = await scraper_main(_write_cfg(tmp_path), str(tmp_path))
+
+    assert skipped == []
+    assert list(tmp_path.glob("scrape_skipped_*.log")) == []

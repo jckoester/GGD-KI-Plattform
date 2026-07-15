@@ -295,7 +295,9 @@ def subject_editions(
     return editions
 
 
-async def main(subjects_path: str, output_dir: str, fach_filter: str | None = None, leitperspektiven_only: bool = False) -> None:
+async def main(subjects_path: str, output_dir: str, fach_filter: str | None = None, leitperspektiven_only: bool = False) -> list[tuple[str, str]]:
+    """Scrapt alle (bzw. das gefilterte) Fächer. Gibt die Liste übersprungener Fächer
+    (slug, Fehlergrund) zurück — leer, wenn alles durchlief."""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s %(message)s',
@@ -327,6 +329,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                     pass
 
     warnings: list[str] = []
+    skipped: list[tuple[str, str]] = []  # (fach-slug, Fehlergrund) — pro Fach isoliert
     total_neu = total_geaendert = total_unveraendert = 0
 
     async with httpx.AsyncClient(
@@ -344,7 +347,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
             logger.info(f"Leitperspektiven: {len(lp_nodes)} Knoten geschrieben")
 
         if leitperspektiven_only:
-            return
+            return skipped
 
         # Faeccher
         for fach in cfg['subjects']:
@@ -354,29 +357,42 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
             if fach_filter and fach_code.upper() != fach_filter.upper():
                 continue
 
-            bp_id_basis = f"{bp_basis_prefix}_ALLG_{schulart}_{fach_code}"
+            slug = fach.get('slug', fach_code)
+            # Fehler pro Fach isolieren: ein einzelnes Fach (z. B. ungültiges Suffix/URL)
+            # darf NICHT den ganzen Batch abbrechen — sonst würde jedes danach folgende Fach
+            # stillschweigend nie gescrapt (reihenfolge-abhängige Kaskade). Fehler überspringen,
+            # prominent loggen und weitermachen; Zusammenfassung am Ende.
+            try:
+                bp_id_basis = f"{bp_basis_prefix}_ALLG_{schulart}_{fach_code}"
 
-            # Alle Editionen des Fachs: Fach-Default-Edition + Zusatz-Editionen aus
-            # den Jahrgangsband-Overrides.
-            neu = geaendert = unveraendert = 0
-            for label, edition_suffix in subject_editions(fach, ordered_suffixes, default_suffix):
-                if label == fach_code:
-                    logger.info(
-                        f"Starte Scrape: {fach['slug']} "
-                        f"(bp_id_basis={bp_id_basis}, edition='{edition_suffix or 'Basis'}')"
+                # Alle Editionen des Fachs: Fach-Default-Edition + Zusatz-Editionen aus
+                # den Jahrgangsband-Overrides.
+                neu = geaendert = unveraendert = 0
+                for label, edition_suffix in subject_editions(fach, ordered_suffixes, default_suffix):
+                    if label == fach_code:
+                        logger.info(
+                            f"Starte Scrape: {slug} "
+                            f"(bp_id_basis={bp_id_basis}, edition='{edition_suffix or 'Basis'}')"
+                        )
+                    else:
+                        logger.info(
+                            f"  Zusatz-Edition '{edition_suffix or 'Basis'}' ({label})"
+                        )
+                    n, g, u = await scrape_fach(
+                        client, label, bp_id_basis, edition_suffix, output,
+                        existing_hashes, warnings,
                     )
-                else:
-                    logger.info(
-                        f"  Zusatz-Edition '{edition_suffix or 'Basis'}' ({label})"
-                    )
-                n, g, u = await scrape_fach(
-                    client, label, bp_id_basis, edition_suffix, output,
-                    existing_hashes, warnings,
+                    neu += n; geaendert += g; unveraendert += u
+            except Exception as exc:
+                logger.error(
+                    "!!! Fach '%s' (fach_code=%s) ÜBERSPRUNGEN — %s: %s",
+                    slug, fach_code, type(exc).__name__, exc,
                 )
-                neu += n; geaendert += g; unveraendert += u
+                skipped.append((slug, f"{type(exc).__name__}: {exc}"))
+                continue
 
             logger.info(
-                f"{fach['slug']}: {neu} neu, {geaendert} geaendert, "
+                f"{slug}: {neu} neu, {geaendert} geaendert, "
                 f"{unveraendert} unveraendert"
             )
             total_neu += neu
@@ -385,12 +401,26 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
 
     logger.info(
         f"Gesamt: {total_neu} neu, {total_geaendert} geaendert, "
-        f"{total_unveraendert} unveraendert, {len(warnings)} Warnungen"
+        f"{total_unveraendert} unveraendert, {len(warnings)} Warnungen, "
+        f"{len(skipped)} Fach/Fächer übersprungen"
     )
     if warnings:
         warn_file = output / f"scrape_warnings_{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.log"
         with warn_file.open('w', encoding='utf-8') as f:
             f.write('\n'.join(warnings) + '\n')
+
+    if skipped:
+        # Prominente Zusammenfassung, damit ausgefallene Fächer nicht untergehen.
+        logger.error("=" * 60)
+        logger.error("%d Fach/Fächer wegen Fehlern ÜBERSPRUNGEN (nicht gescrapt):", len(skipped))
+        for slug, reason in skipped:
+            logger.error("  - %s — %s", slug, reason)
+        logger.error("=" * 60)
+        skip_file = output / f"scrape_skipped_{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.log"
+        with skip_file.open('w', encoding='utf-8') as f:
+            f.write('\n'.join(f"{slug}\t{reason}" for slug, reason in skipped) + '\n')
+
+    return skipped
 
 
 if __name__ == '__main__':
@@ -402,4 +432,7 @@ if __name__ == '__main__':
     parser.add_argument('--leitperspektiven-only', action='store_true',
                         help='Nur Leitperspektiven scrapen, keine Fächer')
     args = parser.parse_args()
-    asyncio.run(main(args.subjects, args.output, args.fach, args.leitperspektiven_only))
+    _skipped = asyncio.run(main(args.subjects, args.output, args.fach, args.leitperspektiven_only))
+    if _skipped:
+        # Non-zero Exit-Code, damit der Ausfall in CI/Skripten nicht untergeht.
+        sys.exit(1)
