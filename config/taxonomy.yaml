@@ -74,6 +74,19 @@ categories:
         label_de: "Leitperspektive-Aspekt"
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
+      # Leitfaden Demokratiebildung (LFDB) — aus der KM-PDF importiert (3 Ebenen):
+      # Baustein (Container) → Themenblock (Leitperspektive) → Kompetenz (Leitfrage).
+      - key: lfdb_baustein
+        label_de: "LFDB-Baustein"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+      - key: lfdb_themenblock
+        label_de: "LFDB-Themenblock"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
+      - key: lfdb_kompetenz
+        label_de: "LFDB-Kompetenz"
+        scope_defaults: {read_scope: global,   write_scope: global  }
+        embedding: true
       - key: curriculum
         label_de: "Schulcurriculum"
         scope_defaults: {read_scope: school,   write_scope: subject }

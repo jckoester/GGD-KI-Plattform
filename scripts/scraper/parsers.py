@@ -620,20 +620,9 @@ def parse_leitperspektive(soup: BeautifulSoup, url: str, kuerzel: str) -> dict[s
         'scraped_at': _now_iso(),
     }
 
-    # Sonderfall LFDB (Leitfaden Demokratiebildung): Die BP-Seite enthält nur
-    # Einleitungstexte, keine Aspekt-Liste. Die konkreten Inhalte (Kompetenzen,
-    # Bausteine, Handlungsfelder) liegen ausschließlich in einer separaten
-    # PDF-Datei des Kultusministeriums und werden derzeit nicht importiert.
-    if kuerzel == 'LFDB':
-        import_hinweis = (
-            'Die konkreten Inhalte des Leitfadens Demokratiebildung '
-            '(Kompetenzen, Bausteine und Handlungsfelder) sind nur in einer '
-            'separaten PDF des Kultusministeriums hinterlegt und derzeit nicht '
-            'in den Wissensgraph importiert. Hier steht nur die '
-            'Übersichtsbeschreibung zur Verfügung.'
-        )
-        metadata['import_hinweis'] = import_hinweis
-        content = f"{content}\n\n> Hinweis: {import_hinweis}"
+    # (Früher: LFDB-Sonderfall mit import_hinweis, da die Inhalte nur als PDF vorlagen.
+    #  Seit dem PDF-Import [KS-Plan C4] werden Baustein/Themenblock/Kompetenz importiert →
+    #  Hinweis entfernt, Übersichtsknoten bleibt hinweisfrei.)
 
     return {
         'bp_id': bp_id,

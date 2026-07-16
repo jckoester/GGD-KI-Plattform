@@ -6,6 +6,7 @@
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+    import LfdbTree from '$lib/components/LfdbTree.svelte'
     import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
 
     // Auth-Prüfung: nur teacher/admin
@@ -29,7 +30,10 @@
         error = null
         try {
             const data = await getContextNodes({
-                content_type: ['leitperspektive', 'leitperspektive_aspekt']
+                content_type: [
+                    'leitperspektive', 'leitperspektive_aspekt',
+                    'lfdb_baustein', 'lfdb_themenblock', 'lfdb_kompetenz',
+                ]
             })
             // getContextNodes liefert ein Array (response_model=list[...]),
             // kein {items}-Objekt.
@@ -52,6 +56,27 @@
         ...lp,
         aspekte: groupedNodes.aspekte.filter(a => a.metadata?.kuerzel === lp.metadata?.kuerzel)
     })))
+
+    // LFDB: 3-Ebenen-Baum (Baustein → Themenblock → Kompetenz) aus den bp_ids ableiten.
+    // bp_id-Schema: …_LFDB_B<n> / …_B<n>_T<t> / …_B<n>_T<t>_K<k>; die _T/_K-Trenner
+    // verhindern Präfix-Kollisionen (B1 vs B10).
+    const _bpid = (n) => n.metadata?.bp_id ?? ''
+    const _numcmp = (a, b) => _bpid(a).localeCompare(_bpid(b), undefined, { numeric: true })
+    const lfdbTree = $derived(
+        nodes.filter(n => n.content_type === 'lfdb_baustein').sort(_numcmp).map(b => ({
+            ...b,
+            themenbloecke: nodes
+                .filter(t => t.content_type === 'lfdb_themenblock' && _bpid(t).startsWith(_bpid(b) + '_T'))
+                .sort(_numcmp)
+                .map(t => ({
+                    ...t,
+                    kompetenzen: nodes
+                        .filter(k => k.content_type === 'lfdb_kompetenz' && _bpid(k).startsWith(_bpid(t) + '_K'))
+                        .sort(_numcmp),
+                })),
+        }))
+    )
+    const isLfdb = (lp) => lp.metadata?.kuerzel === 'LFDB'
 
     // Einklapp-Zustand der Leitperspektiven (analog Leitideen im Fachplan,
     // standardmäßig eingeklappt für eine kompakte Übersicht)
@@ -135,7 +160,7 @@
                                        text-light-tx dark:text-dark-tx"
                             >
                                 <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    {lp.aspekte.length} Aspekte
+                                    {isLfdb(lp) ? `${lfdbTree.length} Bausteine` : `${lp.aspekte.length} Aspekte`}
                                 </span>
                                 {#if expandedLPs[lp.id]}
                                     <ChevronDown class="w-4 h-4 shrink-0" />
@@ -154,20 +179,24 @@
                             </div>
                         {/if}
 
-                        <!-- Aspekte-Liste (einklappbar) -->
-                        {#if expandedLPs[lp.id] && lp.aspekte.length > 0}
-                            <div class="p-3 space-y-2 border-t border-light-ui-3 dark:border-dark-ui-3">
-                                {#each lp.aspekte as aspekt (aspekt.id)}
-                                    <button
-                                        onclick={() => navigateToNode(aspekt.id)}
-                                        class="w-full flex items-center gap-3 p-2 rounded hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
-                                               text-light-tx dark:text-dark-tx text-sm transition-colors text-left"
-                                    >
-                                        <NodeTypeIcon contentType="leitperspektive_aspekt" size={16} />
-                                        <span class="flex-1">{aspekt.title}</span>
-                                    </button>
-                                {/each}
-                            </div>
+                        <!-- Aufgeklappter Inhalt: LFDB → 3-Ebenen-Baum, sonst flache Aspekte -->
+                        {#if expandedLPs[lp.id]}
+                            {#if isLfdb(lp)}
+                                <LfdbTree bausteine={lfdbTree} {nodeHref} />
+                            {:else if lp.aspekte.length > 0}
+                                <div class="p-3 space-y-2 border-t border-light-ui-3 dark:border-dark-ui-3">
+                                    {#each lp.aspekte as aspekt (aspekt.id)}
+                                        <button
+                                            onclick={() => navigateToNode(aspekt.id)}
+                                            class="w-full flex items-center gap-3 p-2 rounded hover:bg-light-bg-3 dark:hover:bg-dark-bg-3
+                                                   text-light-tx dark:text-dark-tx text-sm transition-colors text-left"
+                                        >
+                                            <NodeTypeIcon contentType="leitperspektive_aspekt" size={16} />
+                                            <span class="flex-1">{aspekt.title}</span>
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
                         {/if}
                     </div>
                 {/each}

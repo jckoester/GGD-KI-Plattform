@@ -53,6 +53,8 @@ Thumbs.db
 # Logs
 *.log
 scripts/scraper/output/*
+# PDF-Import-Artefakte (kuratiertes JSONL/Report/Struktur; BP-Inhalte → nicht committen, E1)
+scripts/pdf_import/output/*
 config/image_blocklist.yaml
 data/generated_images/*
 config/pedagogy.yaml

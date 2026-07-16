@@ -27,6 +27,9 @@
         methode: Presentation,
         sozialform: Users,
         operator: Zap,
+        lfdb_baustein: Layers,
+        lfdb_themenblock: BookOpen,
+        lfdb_kompetenz: Target,
     };
 
     // Fallback-Mapping für categories

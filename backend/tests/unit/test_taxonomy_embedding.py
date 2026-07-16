@@ -39,6 +39,8 @@ EXPECTED_EMBEDDING_TYPES = frozenset({
     'ik_kompetenz', 'pk_kompetenz', 'pk_gruppe', 'leitidee', 'leitperspektive_aspekt',
     'kapitel', 'themengebiet', 'funktion', 'bauteil', 'abstrakt', 'konvention',
     'operator',
+    # LFDB (aus PDF): Themenblock + Kompetenz sind inhaltstragend; Baustein ist Container.
+    'lfdb_themenblock', 'lfdb_kompetenz',
 })
 
 EXPECTED_ENRICHMENT_KEYS = {

@@ -44,12 +44,20 @@ BP_CONTENT_TYPES = {
     "leitperspektive",
     "leitperspektive_aspekt",
     "operator",
+    # Leitfaden Demokratiebildung (LFDB, aus PDF): Baustein → Themenblock → Kompetenz.
+    "lfdb_baustein",
+    "lfdb_themenblock",
+    "lfdb_kompetenz",
 }
 
 # Reihenfolge fuer INSERT (FK-sichere Topologie)
 IMPORT_ORDER = [
     "leitperspektive",
     "leitperspektive_aspekt",
+    # LFDB-Hierarchie hängt am leitperspektive-Übersichtsknoten:
+    "lfdb_baustein",
+    "lfdb_themenblock",
+    "lfdb_kompetenz",
     "fachplan",
     "leitidee",
     "pk_gruppe",

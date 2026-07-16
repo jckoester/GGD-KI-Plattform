@@ -8,14 +8,14 @@ Der Bildungsplan liefert die fachlichen Kontextdaten (Leitideen, Kompetenzen,
 Leitperspektiven), die Assistenten als Wissensbasis nutzen. Ohne diesen Import
 funktioniert die Plattform, der fachliche Kontext fehlt jedoch.
 
-> **Bekannte Lücke — Leitfaden Demokratiebildung (LFDB):** Der LFDB wird intern
-> wie eine Leitperspektive behandelt, auf den Seiten des Bildungsplans aber
-> anders dargestellt — er hat keine „Aspekte", sondern Kompetenzen, Bausteine
-> und Handlungsfelder, die **nur in einer separaten PDF** des Kultusministeriums
-> liegen und nicht auf der Webseite. Der Import erzeugt daher nur den
-> Übersichtsknoten **ohne Unterknoten** (0 Aspekte) und versieht ihn mit einem
-> sichtbaren Hinweis (`metadata.import_hinweis`). Das ist erwartetes Verhalten,
-> kein Importfehler.
+> **Leitfaden Demokratiebildung (LFDB):** Der LFDB wird intern wie eine
+> Leitperspektive behandelt, auf den Seiten des Bildungsplans aber anders
+> dargestellt — er hat keine „Aspekte", sondern Bausteine, Themenblöcke und
+> Kompetenzen, die **nur in einer separaten PDF** des Kultusministeriums liegen
+> und nicht auf der Webseite. Diese Inhalte werden über die separate
+> **PDF-Import-Pipeline** eingespielt (siehe Abschnitt
+> [PDF-Import (LFDB & Fremdsprachen)](#pdf-import-lfdb--fremdsprachen) weiter
+> unten), nicht über den regulären Web-Scraper.
 
 > **Wann ist dieser Schritt nötig?**
 > - Einmalig nach der Erstinstallation
@@ -281,6 +281,66 @@ Der korrigierte Titel wird mit `title_locked` markiert; ein **späterer Re-Impor
 Nur der **Titel** ist bearbeitbar — der Fließtext bleibt bewusst read-only (er käme sonst
 beim nächsten Import wieder aus der Quelle). Die Bearbeitung ist auf `admin` beschränkt, da
 BP-Knoten schulweit/global sind.
+
+---
+
+## PDF-Import (LFDB & Fremdsprachen)
+
+Einige Inhalte liegen **nicht** auf der Bildungsplan-Webseite, sondern nur als
+separate PDF des Kultusministeriums — der **Leitfaden Demokratiebildung (LFDB)**
+sowie die modernen Fremdsprachen (Englisch, Französisch). Für diese gibt es eine
+eigene Pipeline unter `scripts/pdf_import/`, die den PDF-Text zieht, per LLM in
+eine Struktur zerlegt und daraus **dasselbe JSONL-Format** erzeugt wie der
+Web-Scraper. Der eigentliche Import (Schritt 2–6 oben) ist danach identisch.
+
+> **Warum ein LLM?** Die Quell-PDFs sind zweispaltige Tabellen; `pdfminer`
+> verwürfelt die Spaltenreihenfolge. Das Modell rekonstruiert die Zuordnung
+> (z. B. Leitfrage ↔ Kompetenz ↔ Impulse). Die JSONL-Assemblierung selbst
+> (bp_ids, Kanten, Hashes) ist **deterministisch** — das LLM liefert nur die
+> neutrale Zwischenstruktur.
+
+**Voraussetzungen:**
+- Das Extraktionsmodell (Standard `claude-opus-4-8`) muss unter
+  `/settings/models` **freigeschaltet** sein.
+- Der LiteLLM-Proxy muss erreichbar sein. Die Pipeline liest
+  `LITELLM_PROXY_URL` (Default `http://localhost:4000`) und
+  `LITELLM_MASTER_KEY` aus der Umgebung.
+- Die PDFs sind öffentlich → datenschutzunkritisch. Es gehen nur die Roh-Texte
+  der Quellseiten an das Modell, keine personenbezogenen Daten.
+
+**Ablauf am Beispiel LFDB** (Seiten 24–33 der LFDB-PDF):
+
+```bash
+# 1) Struktur extrahieren + JSONL/Report erzeugen (ruft das LLM auf)
+python -m scripts.pdf_import --lfdb \
+    --source "https://.../BP2016BW_ALLG_LFDB_20190712.pdf" \
+    --pages "24-33"
+# → scripts/pdf_import/output/lfdb.jsonl        (Import-Datei)
+#   scripts/pdf_import/output/lfdb_report.md     (zum inhaltlichen Prüfen)
+#   scripts/pdf_import/output/lfdb_struktur.json (für Re-Runs ohne LLM)
+
+# 2) Review-Report sichten — Baustein/Themenblock/Kompetenz-Zählung
+#    und Stichproben gegen die PDF prüfen.
+
+# 3) Bei Bedarf JSONL ohne erneuten LLM-Aufruf neu bauen:
+python -m scripts.pdf_import --lfdb \
+    --structure-json scripts/pdf_import/output/lfdb_struktur.json \
+    --source "https://.../BP2016BW_ALLG_LFDB_20190712.pdf"
+
+# 4) Import wie ein reguläres Fach (Dry-Run → echt), dann Embeddings:
+python import_bildungsplan.py --dry-run --input scripts/pdf_import/output/lfdb.jsonl
+python import_bildungsplan.py --input scripts/pdf_import/output/lfdb.jsonl
+```
+
+Die erzeugten Knotentypen (`lfdb_baustein`, `lfdb_themenblock`, `lfdb_kompetenz`)
+sind idempotent über den Content-Hash — ein erneuter Lauf aktualisiert nur
+geänderte Knoten. Im Frontend erscheinen sie unter **Wissensdatenbank →
+Leitperspektiven** als dreistufig aufklappbarer Baum (Baustein → Themenblock →
+Kompetenz); der Import-Ort ist also derselbe wie bei den übrigen
+Leitperspektiven.
+
+> Ein Text-Dump zum Inspizieren der Quellseiten (ohne LLM) geht mit
+> `python -m scripts.pdf_import --source <url> --pages "24-33"`.
 
 ---
 
