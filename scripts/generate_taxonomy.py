@@ -31,6 +31,8 @@ def main():
         if ct.get("scope_anchor")
     ]
 
+    bp_curriculum_types = data.get("bp_curriculum_content_types", [])
+
     category_labels = {cat: info["label_de"] for cat, info in cats.items()}
 
     category_colors = {cat: info["color"] for cat, info in cats.items()}
@@ -59,6 +61,10 @@ def main():
         f"export const CONTENT_TYPES = {_js(content_types)}",
         "",
         f"export const SCOPE_ANCHOR_CONTENT_TYPES = new Set({_js(scope_anchor_types)})",
+        "",
+        "// Importierte Bildungsplan-/Curriculum-Knotentypen — aus der freien /knowledge-Liste",
+        "// serverseitig ausgeschlossen (exclude_content_type). Quelle: taxonomy.yaml (C2).",
+        f"export const BP_CURRICULUM_CONTENT_TYPES = {_js(bp_curriculum_types)}",
         "",
         f"export const CATEGORY_LABELS = {_js(category_labels)}",
         "",

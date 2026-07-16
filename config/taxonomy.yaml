@@ -187,3 +187,23 @@ categories:
         label_de: "Abstraktes Konzept"
         scope_defaults: {read_scope: school,   write_scope: school  }
         embedding: true
+
+# Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
+# Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und
+# verstopfen die UX) — werden serverseitig über exclude_content_type ausgeblendet (C2).
+# → generiert `BP_CURRICULUM_CONTENT_TYPES` in frontend/src/lib/taxonomy.js.
+bp_curriculum_content_types:
+  - curriculum
+  - fachplan
+  - leitidee
+  - ik_kompetenz
+  - pk_gruppe
+  - pk_kompetenz
+  - operator
+  - leitperspektive
+  - leitperspektive_aspekt
+  - lfdb_baustein
+  - lfdb_themenblock
+  - lfdb_kompetenz
+  - kapitel
+  - lernsequenz

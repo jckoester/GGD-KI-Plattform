@@ -23,6 +23,9 @@ export const CONTENT_TYPES = {
     "pk_kompetenz",
     "leitperspektive",
     "leitperspektive_aspekt",
+    "lfdb_baustein",
+    "lfdb_themenblock",
+    "lfdb_kompetenz",
     "curriculum",
     "kapitel",
     "lernsequenz",
@@ -65,10 +68,8 @@ export const SCOPE_ANCHOR_CONTENT_TYPES = new Set([
   "unterrichtsstunde"
 ])
 
-// Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die
-// BildungsplanTree-/Curricula-Ansichten, NICHT in die freie /knowledge-Liste
-// (dort kosten sie Ladezeit und verstopfen die UX) — C2. Werden serverseitig
-// über exclude_content_type ausgeblendet.
+// Importierte Bildungsplan-/Curriculum-Knotentypen — aus der freien /knowledge-Liste
+// serverseitig ausgeschlossen (exclude_content_type). Quelle: taxonomy.yaml (C2).
 export const BP_CURRICULUM_CONTENT_TYPES = [
   "curriculum",
   "fachplan",
@@ -83,7 +84,7 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
   "lfdb_themenblock",
   "lfdb_kompetenz",
   "kapitel",
-  "lernsequenz",
+  "lernsequenz"
 ]
 
 export const CATEGORY_LABELS = {
@@ -209,6 +210,18 @@ export const SCOPE_DEFAULTS = {
     "global"
   ],
   "leitperspektive_aspekt": [
+    "global",
+    "global"
+  ],
+  "lfdb_baustein": [
+    "global",
+    "global"
+  ],
+  "lfdb_themenblock": [
+    "global",
+    "global"
+  ],
+  "lfdb_kompetenz": [
     "global",
     "global"
   ],
