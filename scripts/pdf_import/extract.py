@@ -91,6 +91,12 @@ def _chat_completion_json(
     (b) Timeout/Netzwerkfehler (httpx.TransportError) — große Band-Calls dauern lange, ein
         einzelner Timeout/Verbindungsabriss soll den ganzen Lauf nicht abbrechen.
     HTTP-Statusfehler (z. B. 400 „credit balance too low") propagieren sofort (kein Retry)."""
+    if not api_key:
+        raise ValueError(
+            "LITELLM_MASTER_KEY ist leer/nicht gesetzt — der Authorization-Header wäre "
+            "'Bearer ' (ungültig). Umgebung vor dem Aufruf laden, z. B. "
+            "`set -a && source .env && set +a`."
+        )
     payload = {
         "model": model,
         "messages": [

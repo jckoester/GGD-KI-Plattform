@@ -302,34 +302,56 @@ Web-Scraper. Der eigentliche Import (Schritt 2–6 oben) ist danach identisch.
 **Voraussetzungen:**
 - Das Extraktionsmodell (Standard `claude-opus-4-8`) muss unter
   `/settings/models` **freigeschaltet** sein.
-- Der LiteLLM-Proxy muss erreichbar sein. Die Pipeline liest
-  `LITELLM_PROXY_URL` (Default `http://localhost:4000`) und
-  `LITELLM_MASTER_KEY` aus der Umgebung.
 - Die PDFs sind öffentlich → datenschutzunkritisch. Es gehen nur die Roh-Texte
   der Quellseiten an das Modell, keine personenbezogenen Daten.
+
+**Ausführung im Backend-Container (Produktivsystem).** Die Befehle laufen — wie
+Schritt 2/3 — im `backend`-Image, nicht auf dem Host:
+
+- Die Extraktion ruft den **LiteLLM-Proxy** auf. Im Container kommen
+  `LITELLM_PROXY_URL` und `LITELLM_MASTER_KEY` aus der `.env` (`env_file`) —
+  **dieselbe funktionierende Konfiguration wie das Backend**, kein manuelles Setzen
+  und keine Host-Erreichbarkeit des Proxys nötig.
+- `scripts/` liegt **nicht** im Image → wird eingehängt. Für die Extraktion
+  **schreibbar** unter `/app/pdf/scripts` (Ausgabe landet auf dem Host) mit
+  Arbeitsverzeichnis `/app/pdf`, damit `python -m scripts.pdf_import` das Paket findet.
+- `config/` ist im `backend`-Service bereits als `/app/config` eingehängt.
 
 **Ablauf am Beispiel LFDB** (Seiten 24–33 der LFDB-PDF):
 
 ```bash
 # 1) Struktur extrahieren + JSONL/Report erzeugen (ruft das LLM auf)
-python -m scripts.pdf_import --lfdb \
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/pdf/scripts" -w /app/pdf \
+  backend \
+  python -m scripts.pdf_import --lfdb \
     --source "https://.../BP2016BW_ALLG_LFDB_20190712.pdf" \
     --pages "24-33"
-# → scripts/pdf_import/output/lfdb.jsonl        (Import-Datei)
+# → scripts/pdf_import/output/lfdb.jsonl        (Import-Datei, auf dem Host)
 #   scripts/pdf_import/output/lfdb_report.md     (zum inhaltlichen Prüfen)
 #   scripts/pdf_import/output/lfdb_struktur.json (für Re-Runs ohne LLM)
 
-# 2) Review-Report sichten — Baustein/Themenblock/Kompetenz-Zählung
+# 2) Review-Report sichten (auf dem Host) — Baustein/Themenblock/Kompetenz-Zählung
 #    und Stichproben gegen die PDF prüfen.
 
-# 3) Bei Bedarf JSONL ohne erneuten LLM-Aufruf neu bauen:
-python -m scripts.pdf_import --lfdb \
+# 3) Bei Bedarf JSONL ohne erneuten LLM-Aufruf neu bauen (kein LiteLLM nötig):
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/pdf/scripts" -w /app/pdf \
+  backend \
+  python -m scripts.pdf_import --lfdb \
     --structure-json scripts/pdf_import/output/lfdb_struktur.json \
     --source "https://.../BP2016BW_ALLG_LFDB_20190712.pdf"
 
-# 4) Import wie ein reguläres Fach (Dry-Run → echt), dann Embeddings:
-python import_bildungsplan.py --dry-run --input scripts/pdf_import/output/lfdb.jsonl
-python import_bildungsplan.py --input scripts/pdf_import/output/lfdb.jsonl
+# 4) Import wie ein reguläres Fach (Dry-Run → echt), analog Schritt 2/3:
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/import-scripts:ro" \
+  backend \
+  sh -c 'python /app/import-scripts/import_bildungsplan.py \
+    --subjects /app/config/subjects.yaml \
+    --input /app/import-scripts/pdf_import/output/lfdb.jsonl \
+    --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki" \
+    --dry-run'
+# Sieht der Dry-Run gut aus: denselben Befehl OHNE --dry-run. Danach Embeddings (Schritt 4).
 ```
 
 Die erzeugten Knotentypen (`lfdb_baustein`, `lfdb_themenblock`, `lfdb_kompetenz`)
@@ -339,8 +361,14 @@ Leitperspektiven** als dreistufig aufklappbarer Baum (Baustein → Themenblock �
 Kompetenz); der Import-Ort ist also derselbe wie bei den übrigen
 Leitperspektiven.
 
-> Ein Text-Dump zum Inspizieren der Quellseiten (ohne LLM) geht mit
-> `python -m scripts.pdf_import --source <url> --pages "24-33"`.
+> Ein Text-Dump zum Inspizieren der Quellseiten (ohne LLM) geht mit demselben
+> `docker compose run … backend python -m scripts.pdf_import --source <url> --pages "24-33"`
+> (ohne `--lfdb`).
+
+> **Lokal/Dev:** Auf einer Entwicklungsmaschine mit Host-venv (siehe Schritt 1)
+> geht es direkt ohne Container — dann aber vorher die Umgebung laden, damit
+> `LITELLM_MASTER_KEY`/`LITELLM_PROXY_URL` gesetzt sind:
+> `set -a && source .env && set +a && python -m scripts.pdf_import --lfdb …`.
 
 ### Fremdsprachen (Englisch, Französisch)
 
@@ -356,21 +384,34 @@ Quelle und Fach-Edition stehen in `config/subjects.yaml` beim jeweiligen Fach
 überspringt Fächer mit `bildungsplan_pdf_url` automatisch.
 
 ```bash
-# 1) Struktur extrahieren + JSONL/Report erzeugen (URL/Suffix aus subjects.yaml)
-python -m scripts.pdf_import --fremdsprache --fach E1
-# → scripts/pdf_import/output/E1_V2.jsonl / _report.md / _struktur.json
+# 1) Struktur extrahieren (URL/Suffix aus subjects.yaml unter /app/config):
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/pdf/scripts" -w /app/pdf \
+  backend \
+  python -m scripts.pdf_import --fremdsprache --fach E1 \
+    --subjects /app/config/subjects.yaml
+# → scripts/pdf_import/output/E1_V2.jsonl / _report.md / _struktur.json (auf dem Host)
 #   Die PDF wird band-weise (je Jahrgangsstufe) extrahiert — ein LLM-Call pro
 #   Abschnitt statt eines Riesen-Calls (robuster gegen Auslassungen).
 
 # 2) Review-Report sichten: Anzahl Bereiche/Kompetenzen je Band gegen die PDF prüfen.
 
-# 3) Import wie ein reguläres Fach (Dry-Run → echt), dann Embeddings:
-python import_bildungsplan.py --dry-run --input scripts/pdf_import/output/E1_V2.jsonl
-python import_bildungsplan.py --input scripts/pdf_import/output/E1_V2.jsonl
+# 3) Import wie ein reguläres Fach (Dry-Run → echt), analog Schritt 2/3:
+docker compose run --rm \
+  -v "$(pwd)/scripts:/app/import-scripts:ro" \
+  backend \
+  sh -c 'python /app/import-scripts/import_bildungsplan.py \
+    --subjects /app/config/subjects.yaml \
+    --input /app/import-scripts/pdf_import/output/E1_V2.jsonl \
+    --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/ggd_ki" \
+    --dry-run'
+# Dry-Run ok → denselben Befehl OHNE --dry-run. Danach Embeddings (Schritt 4).
 ```
 
 Französisch analog mit `--fach F2`. Ein erneuter Lauf ohne LLM (aus der
-gespeicherten Struktur) geht mit `--structure-json .../E1_V2_struktur.json`.
+gespeicherten Struktur) geht mit
+`--structure-json scripts/pdf_import/output/E1_V2_struktur.json` (im selben
+`docker compose run … -w /app/pdf`-Aufruf).
 
 ---
 

@@ -236,6 +236,14 @@ def test_extract_invalid_json_raises():
             extract_lfdb_structure("t", proxy_url="http://p", api_key="k")
 
 
+def test_chat_completion_empty_key_raises_fast():
+    # Leerer LITELLM_MASTER_KEY → sofort klarer Fehler, KEIN Request/Retry.
+    with patch.object(_extract.httpx, "post") as mock_post:
+        with pytest.raises(ValueError, match="LITELLM_MASTER_KEY"):
+            _extract._chat_completion_json("t", system="s", model="m", proxy_url="http://p", api_key="")
+    mock_post.assert_not_called()
+
+
 def test_extract_retries_on_timeout():
     import json as _json
     calls = {"n": 0}

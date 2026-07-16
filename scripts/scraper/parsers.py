@@ -11,7 +11,14 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    # Der PDF-Import (scripts/pdf_import/) nutzt aus diesem Modul nur die bs4-freien Helfer
+    # (_content_hash, _now_iso, extract_bp_version, expand_operator_title) und läuft auch in
+    # Umgebungen ohne bs4 (z. B. dem Backend-Container). Die HTML-Parse-Funktionen brauchen
+    # BeautifulSoup; sie werden dort nicht aufgerufen.
+    BeautifulSoup = None  # type: ignore
 
 from scripts.scraper.references import classify_reference, strip_soft_hyphens
 
