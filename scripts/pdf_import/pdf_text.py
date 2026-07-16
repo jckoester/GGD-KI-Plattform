@@ -55,6 +55,21 @@ def load_pdf_bytes(source: str, *, timeout: float = 60.0) -> bytes:
     return Path(source).read_bytes()
 
 
+def split_pages(data: bytes) -> list[str]:
+    """Volltext, pro Seite getrennt (pdfminer trennt Seiten mit Form-Feed \\x0c).
+
+    Für das seiten-/abschnittsbewusste Chunking großer Bildungsplan-PDFs (Fremdsprachen):
+    Liste[i] = Text der (0-indexierten) Seite i. ValueError bei Lesefehler/leerem Ergebnis.
+    """
+    try:
+        text = _pdf_extract_text(io.BytesIO(data))
+    except Exception as exc:
+        raise ValueError(f"PDF konnte nicht gelesen werden: {exc}") from exc
+    if not text or not text.strip():
+        raise ValueError("PDF enthält keinen extrahierbaren Text (evtl. gescannt).")
+    return text.split("\x0c")
+
+
 def extract_text(data: bytes, pages: set[int] | None = None) -> str:
     """Extrahiert Text (optional nur die 0-indexierten `pages`). ValueError bei Lesefehler
     oder leerem Ergebnis (gescanntes PDF / falsche Seitenauswahl)."""

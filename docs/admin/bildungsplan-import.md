@@ -342,6 +342,36 @@ Leitperspektiven.
 > Ein Text-Dump zum Inspizieren der Quellseiten (ohne LLM) geht mit
 > `python -m scripts.pdf_import --source <url> --pages "24-33"`.
 
+### Fremdsprachen (Englisch, Französisch)
+
+Die modernen Fremdsprachen sind ebenfalls nur als PDF veröffentlicht. Ihr
+Inhaltsmodell ist aber **identisch zu den HTML-Fächern** (Fachplan → Leitidee →
+inhaltsbezogene Kompetenzen, prozessbezogene Kompetenzen je Jahrgangsband sowie
+die **Operatorenliste** aus Abschnitt 4) — sie erzeugen daher **dieselben
+Knotentypen** (inkl. `operator`) und erscheinen anschließend in der **normalen
+Bildungsplan-/Fachansicht** wie ein gescraptes Fach, kein Sonderweg in der UI.
+
+Quelle und Fach-Edition stehen in `config/subjects.yaml` beim jeweiligen Fach
+(`fach_code`, `bildungsplan_suffix`, `bildungsplan_pdf_url`); der HTML-Scraper
+überspringt Fächer mit `bildungsplan_pdf_url` automatisch.
+
+```bash
+# 1) Struktur extrahieren + JSONL/Report erzeugen (URL/Suffix aus subjects.yaml)
+python -m scripts.pdf_import --fremdsprache --fach E1
+# → scripts/pdf_import/output/E1_V2.jsonl / _report.md / _struktur.json
+#   Die PDF wird band-weise (je Jahrgangsstufe) extrahiert — ein LLM-Call pro
+#   Abschnitt statt eines Riesen-Calls (robuster gegen Auslassungen).
+
+# 2) Review-Report sichten: Anzahl Bereiche/Kompetenzen je Band gegen die PDF prüfen.
+
+# 3) Import wie ein reguläres Fach (Dry-Run → echt), dann Embeddings:
+python import_bildungsplan.py --dry-run --input scripts/pdf_import/output/E1_V2.jsonl
+python import_bildungsplan.py --input scripts/pdf_import/output/E1_V2.jsonl
+```
+
+Französisch analog mit `--fach F2`. Ein erneuter Lauf ohne LLM (aus der
+gespeicherten Struktur) geht mit `--structure-json .../E1_V2_struktur.json`.
+
 ---
 
 ## Rollback

@@ -230,9 +230,26 @@ def test_extract_calls_proxy_and_returns_structure():
 
 
 def test_extract_invalid_json_raises():
+    # Nach `retries` Wiederholungen (alle mit ungültigem JSON) → ValueError.
     with patch.object(_extract.httpx, "post", return_value=_mock_llm_response("kein json")):
-        with pytest.raises(ValueError, match="kein gültiges JSON"):
+        with pytest.raises(ValueError, match="fehlgeschlagen"):
             extract_lfdb_structure("t", proxy_url="http://p", api_key="k")
+
+
+def test_extract_retries_on_timeout():
+    import json as _json
+    calls = {"n": 0}
+
+    def _post(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise _extract.httpx.TimeoutException("langsam")   # 1. Versuch: Timeout
+        return _mock_llm_response(_json.dumps(_valid_structure()))
+
+    with patch.object(_extract.httpx, "post", side_effect=_post):
+        data = extract_lfdb_structure("t", proxy_url="http://p", api_key="k")
+    assert calls["n"] == 2                                     # 1× Timeout, 2. Versuch ok
+    assert data["bausteine"][0]["titel"] == "Identität und Pluralismus"
 
 
 def test_extract_structurally_invalid_raises():

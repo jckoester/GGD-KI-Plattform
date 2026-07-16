@@ -29,9 +29,13 @@ def build_node(
     extra_metadata: dict | None = None,
     visibility: str = "global",
     node_type: str = "knowledge",
+    hash_input: str | None = None,
 ) -> dict[str, Any]:
     """Ein Knoten im Scraper-JSONL-Format. `content_hash` = sha256 des `content`
-    (identisch zum Scraper → Idempotenz); `bp_version` aus der bp_id abgeleitet."""
+    (identisch zum Scraper → Idempotenz); `bp_version` aus der bp_id abgeleitet.
+
+    `hash_input` überschreibt die Hash-Basis (für Operatoren, deren Scraper-Hash ein
+    zusammengesetzter String `title|content|afb|aliase` ist statt nur `content`)."""
     metadata: dict[str, Any] = {
         "bp_id": bp_id,
         "source_url": source_url,
@@ -45,7 +49,7 @@ def build_node(
         "content_type": content_type,
         "title": title,
         "content": content,
-        "content_hash": _content_hash(content),
+        "content_hash": _content_hash(hash_input if hash_input is not None else content),
         "parent_bp_id": parent_bp_id,
         "relations": relations or [],
         "min_grade": min_grade,

@@ -377,6 +377,16 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
             fach_code = fach.get('fach_code')
             if not fach_code:
                 continue
+            # PDF-only-Fächer (Fremdsprachen) haben keine HTML-Fassung → der HTML-Scraper
+            # kann sie nicht ziehen. Sie werden über scripts/pdf_import/ eingespielt und
+            # hier bewusst übersprungen (sonst nur erfolglose HTTP-Versuche + Skip-Warnung).
+            if fach.get('bildungsplan_pdf_url'):
+                logger.info(
+                    "%s (fach_code=%s): nur als PDF veröffentlicht — HTML-Scrape übersprungen "
+                    "(Import via scripts/pdf_import/)",
+                    fach.get('slug', fach_code), fach_code,
+                )
+                continue
             if fach_filter and fach_code.upper() != fach_filter.upper():
                 continue
 
