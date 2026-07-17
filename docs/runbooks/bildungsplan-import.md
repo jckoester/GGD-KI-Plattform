@@ -6,7 +6,7 @@ Gilt für Erstimport und Re-Import bei aktualisiertem Bildungsplan oder erweiter
 ## Voraussetzungen
 
 - Python-venv aktiv mit `requirements-scripts.txt` installiert (deckt die
-  gesamte Host-Pipeline ab: Scrape, Import, Embedding):
+  gesamte Host-Pipeline ab: Scrape, PDF-Import, Import, Embedding):
   ```bash
   pip install -r requirements-scripts.txt
   ```
@@ -122,11 +122,14 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 
 > **Sonderfall LFDB (Leitfaden Demokratiebildung):** Der LFDB wird intern wie
 > eine Leitperspektive geführt, hat auf der BP-Webseite aber keine Aspekt-Liste —
-> seine Kompetenzen, Bausteine und Handlungsfelder stehen nur in einer separaten
-> PDF. Der Scraper erzeugt deshalb bewusst **0 `leitperspektive_aspekt`-Knoten**
-> für LFDB und setzt am Übersichtsknoten `metadata.import_hinweis`. 0 Aspekte bei
-> LFDB sind also **kein** Strukturfehler. Sollen die PDF-Inhalte künftig
-> importiert werden, ist ein eigener Parser nötig (siehe Todo).
+> seine Bausteine/Themenblöcke/Kompetenzen stehen nur in einer separaten PDF. Der
+> HTML-Scraper erzeugt für LFDB daher bewusst **0 `leitperspektive_aspekt`-Knoten**
+> (kein Strukturfehler) und setzt **keinen** `import_hinweis` mehr am
+> Übersichtsknoten. Die PDF-Inhalte werden über den separaten **PDF-Import**
+> eingespielt → Abschnitt [PDF-Import (LFDB & Fremdsprachen)](#pdf-import-lfdb--fremdsprachen).
+> **Bestandssystem:** Wurde LFDB vor dieser Umstellung importiert, trägt der
+> Übersichtsknoten evtl. noch einen alten `metadata.import_hinweis` — einmalig
+> entfernen (siehe PDF-Import-Abschnitt).
 
 > **Operatoren-Anhang:** Jeder Fach-Bildungsplan hat einen Anhang „Operatoren"
 > (handlungsleitende Verben wie *analysieren*, *erläutern*, gegliedert nach
@@ -135,8 +138,93 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 > Edition eigene, `bp_version`-getaggt) exportiert — **kein** separater Aufruf nötig.
 > Titel-Synonyme („ein-, zuordnen", „(be-)nennen", „analysieren/untersuchen") werden
 > zu einem kanonischen Titel + `metadata.aliase` normalisiert. Fächer ohne HTML-Anhang
-> (die nur als PDF veröffentlichten Fremdsprachen Englisch/Französisch) werden
-> übersprungen und im Log vermerkt (kein Fehler).
+> (die nur als PDF veröffentlichten Fremdsprachen Englisch/Französisch) werden vom
+> HTML-Scraper übersprungen; ihre Operatoren kommen über den **PDF-Import** mit
+> (identisches `operator`-Schema, siehe Abschnitt PDF-Import).
+
+---
+
+## PDF-Import (LFDB & Fremdsprachen)
+
+Manche Pläne liegen **nur als PDF** vor (kein HTML) und werden **nicht** vom
+Scraper (Schritt 3), sondern von der Pipeline `scripts/pdf_import/` erzeugt: der
+**Leitfaden Demokratiebildung (LFDB)** und die modernen **Fremdsprachen
+(Englisch `E1`, Französisch `F2`)**. Sie erzeugen **dasselbe JSONL-Format** — der
+Import (Schritt 4–8) läuft danach unverändert. Die PDF wird per LLM strukturiert
+(zweispaltige Tabellen, die `pdfminer` verwürfelt); die bp_id-/Node-Assemblierung
+ist deterministisch.
+
+> **Voraussetzungen:** LiteLLM erreichbar, `LITELLM_MASTER_KEY`/`LITELLM_PROXY_URL`
+> gesetzt (`set -a && source .env && set +a`); Extraktionsmodell (`claude-opus-4-8`)
+> unter `/settings/models` freigeschaltet. Die PDFs sind öffentlich → keine Personendaten.
+> **Produktiv (Docker):** dieselben Schritte laufen im `backend`-Container, wo
+> LiteLLM-Env/DB aus der Compose-Umgebung kommen — siehe
+> `docs/admin/bildungsplan-import.md`, Abschnitt „PDF-Import".
+
+### LFDB
+
+```bash
+# 1) Extraktion (LLM) → JSONL/Report/Struktur nach scripts/pdf_import/output/
+python -m scripts.pdf_import --lfdb \
+  --source "https://.../LeitfadenDemokratiebildung/BP2016BW_ALLG_LFDB_20190712.pdf" \
+  --pages "24-33"
+
+# 2) Review-Report sichten (Baustein/Themenblock/Kompetenz-Zählung gegen die PDF)
+
+# 3) Import mit dieser Datei (wie Schritt 4/5, aber --input auf die JSONL):
+python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
+  --input scripts/pdf_import/output/lfdb.jsonl --db-url $DATABASE_URL --dry-run
+python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
+  --input scripts/pdf_import/output/lfdb.jsonl --db-url $DATABASE_URL
+```
+
+Erzeugt 3 content_types: `lfdb_baustein` → `lfdb_themenblock` → `lfdb_kompetenz`
+(als Unterknoten am bestehenden LFDB-Übersichtsknoten). Im Frontend:
+Wissensdatenbank → Leitperspektiven (dreistufig aufklappbarer Baum).
+
+> **Alten `import_hinweis` entfernen (einmalig, Bestandssystem).** Der
+> Übersichtsknoten (`BP2016BW_ALLG_LP_LFDB`), der vor der Umstellung importiert
+> wurde, trägt evtl. noch den alten Hinweis „Inhalte nur als PDF". Der Scraper setzt
+> ihn nicht mehr; ein Re-Import überschreibt die Metadata aber nur bei einem erneuten
+> **Leitperspektiven-Scrape+Import** (der PDF-Import berührt den Übersichtsknoten
+> nicht). Ein „voller Run" ist dafür unnötig — am einfachsten direkt entfernen:
+> ```sql
+> UPDATE context_nodes
+> SET metadata = metadata - 'import_hinweis'
+> WHERE metadata->>'bp_id' = 'BP2016BW_ALLG_LP_LFDB' AND metadata ? 'import_hinweis';
+> ```
+> Produktiv im Container:
+> ```bash
+> docker compose exec db psql -U postgres -d ggd_ki \
+>   -c "UPDATE context_nodes SET metadata = metadata - 'import_hinweis' \
+>       WHERE metadata->>'bp_id' = 'BP2016BW_ALLG_LP_LFDB' AND metadata ? 'import_hinweis';"
+> ```
+
+### Fremdsprachen (Englisch `E1`, Französisch `F2`)
+
+Fach-Code, Edition und PDF-URL stehen pro Fach in `config/subjects.yaml`
+(`fach_code`, `bildungsplan_suffix`, `bildungsplan_pdf_url`); der HTML-Scraper
+überspringt Fächer mit `bildungsplan_pdf_url`. Das Inhaltsmodell ist **identisch**
+zu den HTML-Fächern (Fachplan/Leitidee/IK/PK + Operatoren aus Abschnitt 4) → sie
+erscheinen in der normalen Bildungsplan-Ansicht, **kein neues Frontend**.
+
+```bash
+# 1) Band-weise Extraktion (ein LLM-Call je Jahrgangsstufe + Abschnitt 2 + Operatoren):
+python -m scripts.pdf_import --fremdsprache --fach E1 --subjects config/subjects.yaml
+
+# 2) Review-Report sichten (Bereiche/Kompetenzen je Band gegen die PDF)
+
+# 3) Import (wie Schritt 4/5):
+python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
+  --input scripts/pdf_import/output/E1_V2.jsonl --db-url $DATABASE_URL --dry-run
+python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
+  --input scripts/pdf_import/output/E1_V2.jsonl --db-url $DATABASE_URL
+```
+
+Französisch analog mit `--fach F2` (→ `F2_V2.jsonl`). Re-Assemblierung **ohne**
+LLM aus der gespeicherten Struktur:
+`--structure-json scripts/pdf_import/output/E1_V2_struktur.json`.
+Anschließend Embeddings (Schritt 6) und ggf. HNSW-Rebuild (Schritt 7) wie üblich.
 
 ---
 
