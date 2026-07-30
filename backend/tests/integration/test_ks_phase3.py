@@ -6,12 +6,14 @@ import uuid as _uuid
 import pytest
 import psycopg2
 from pathlib import Path
+from app.config import settings
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
-def unit_vec(pos: int, dim: int = 1536) -> list[float]:
-    """Erzeugt einen Einheitsvektor an Position pos (1536 Dimensionen)."""
+def unit_vec(pos: int, dim: int | None = None) -> list[float]:
+    """Einheitsvektor an Position pos, in der konfigurierten Breite."""
+    dim = dim if dim is not None else settings.embedding_dimensions
     v = [0.0] * dim
     v[pos] = 1.0
     return v
@@ -363,7 +365,7 @@ class TestSemanticSearch:
         # Query-Embedding nah an node1 (pos 0 mit hohem Wert)
         # Mock von generate_embedding
         from unittest.mock import patch, AsyncMock
-        query_embedding = [0.9] + [0.01] * 1535
+        query_embedding = [0.9] + [0.01] * (settings.embedding_dimensions - 1)
         with patch(
             'app.context.retrieval.generate_embedding',
             new_callable=AsyncMock,

@@ -78,22 +78,37 @@ class TestMigration:
         conn.close()
 
     def test_embedding_column_is_vector_type(self, run_migrations, db_url):
-        """embedding-Spalte hat Typ vector(1536)."""
+        """embedding-Spalte ist ein vector in der konfigurierten Breite.
+
+        Prüft neben dem Typ auch die Breite: Sie muss zu EMBEDDING_DIMENSIONS passen, sonst
+        schlagen später alle Embedding-Schreibzugriffe fehl. Damit deckt der Test ab, dass
+        Migration 0043 die Konfiguration tatsächlich umsetzt.
+        """
+        from app.config import settings
+
         import psycopg2
         conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
         cur = conn.cursor()
         cur.execute("""
-            SELECT udt_name
-            FROM information_schema.columns
-            WHERE table_name = 'context_nodes'
-              AND column_name = 'embedding'
+            SELECT c.udt_name, format_type(a.atttypid, a.atttypmod)
+            FROM information_schema.columns c
+            JOIN pg_attribute a
+              ON a.attrelid = 'context_nodes'::regclass
+             AND a.attname = c.column_name
+            WHERE c.table_name = 'context_nodes'
+              AND c.column_name = 'embedding'
         """)
         row = cur.fetchone()
+        cur.close()
+        conn.close()
+
         assert row is not None and row[0] == "vector", (
             f"Erwartet 'vector', erhalten: {row}"
         )
-        cur.close()
-        conn.close()
+        assert row[1] == f"vector({settings.embedding_dimensions})", (
+            f"Spaltenbreite {row[1]} passt nicht zu "
+            f"EMBEDDING_DIMENSIONS={settings.embedding_dimensions}"
+        )
 
 
 # ── ContextNode CRUD ──────────────────────────────────────────────────────────

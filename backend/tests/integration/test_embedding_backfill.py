@@ -10,6 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.crons.embedding_backfill_service import backfill_embeddings
 from app.db.models import ContextNode
+from app.config import settings
+
+# Vektorbreite aus der Konfiguration statt als Literal — die Testdaten müssen zur
+# tatsächlich migrierten Spalte passen (EMBEDDING_DIMENSIONS).
+DIM = settings.embedding_dimensions
 
 
 # ── Session-Fixture (committed, kein Rollback-Isolation) ────────────────────
@@ -73,7 +78,7 @@ async def seed_nodes(session_factory):
 class TestBackfillEmbeddings:
     @pytest.mark.asyncio
     async def test_sets_embedding_for_whitelist_node(self, session_factory, seed_nodes):
-        fake = [0.1] * 1536
+        fake = [0.1] * DIM
         with patch(
             "app.crons.embedding_backfill_service.generate_embedding",
             new_callable=AsyncMock,
@@ -89,11 +94,11 @@ class TestBackfillEmbeddings:
         async with session_factory() as db:
             node = await db.get(ContextNode, seed_nodes["ik_id"])
             assert node.embedding is not None
-            assert len(node.embedding) == 1536
+            assert len(node.embedding) == DIM
 
     @pytest.mark.asyncio
     async def test_does_not_embed_non_whitelist_node(self, session_factory, seed_nodes):
-        fake = [0.2] * 1536
+        fake = [0.2] * DIM
         with patch(
             "app.crons.embedding_backfill_service.generate_embedding",
             new_callable=AsyncMock,
@@ -108,7 +113,7 @@ class TestBackfillEmbeddings:
 
     @pytest.mark.asyncio
     async def test_dry_run_does_not_write(self, session_factory, seed_nodes):
-        fake = [0.3] * 1536
+        fake = [0.3] * DIM
         with patch(
             "app.crons.embedding_backfill_service.generate_embedding",
             new_callable=AsyncMock,
@@ -142,7 +147,7 @@ class TestBackfillEmbeddings:
             await db.commit()
             node_id = node.id
 
-        mock = AsyncMock(return_value=[0.5] * 1536)
+        mock = AsyncMock(return_value=[0.5] * DIM)
         with patch("app.crons.embedding_backfill_service.generate_embedding", mock):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db)
@@ -181,11 +186,11 @@ class TestBackfillEmbeddings:
             await db.execute(
                 sa.update(ContextNode)
                 .where(ContextNode.id == seed_nodes["ik_id"])
-                .values(embedding=[0.9] * 1536)
+                .values(embedding=[0.9] * DIM)
             )
             await db.commit()
 
-        mock = AsyncMock(return_value=[0.5] * 1536)
+        mock = AsyncMock(return_value=[0.5] * DIM)
         with patch("app.crons.embedding_backfill_service.generate_embedding", mock):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db)
@@ -211,7 +216,7 @@ class TestBackfillEmbeddings:
                 ))
             await db.commit()
 
-        fake = [0.1] * 1536
+        fake = [0.1] * DIM
         with patch(
             "app.crons.embedding_backfill_service.generate_embedding",
             new_callable=AsyncMock,

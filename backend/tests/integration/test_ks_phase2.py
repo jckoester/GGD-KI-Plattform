@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import psycopg2
 import psycopg2.extras
 import pytest
+from app.config import settings
 
 FIXTURE_DIR = Path(__file__).parent / 'fixtures'
 _REPO_SCRIPTS = Path(__file__).parent.parent.parent.parent / 'scripts'
@@ -149,8 +150,8 @@ class TestImportHashUpdate:
         # Erst Basis importieren
         run_import(db_url, FIXTURE_DIR / 'bp_import_5nodes.jsonl')
 
-        # Manuell ein Fake-Embedding setzen (1536 Dimensionen wie text-embedding-3-small)
-        fake_vec = '[' + ','.join(['0.1'] * 1536) + ']'
+        # Manuell ein Fake-Embedding in der konfigurierten Breite setzen
+        fake_vec = '[' + ','.join(['0.1'] * settings.embedding_dimensions) + ']'
         conn = psycopg2.connect(get_sync_url(db_url))
         psycopg2.extras.register_uuid(conn)
         with conn.cursor() as cur:
@@ -344,7 +345,7 @@ class TestEmbeddingBatch:
         # Knoten importieren (psycopg2, committed)
         run_import(db_url, FIXTURE_DIR / 'bp_import_5nodes.jsonl')
 
-        fake_embedding = [0.1] * 1536
+        fake_embedding = [0.1] * settings.embedding_dimensions
 
         factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
         with patch(
