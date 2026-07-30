@@ -12,7 +12,11 @@ assistants:
     audience: teacher
     scope: teachers
     status: active
-    model: claude-sonnet-4-6          # tool-fähiges Modell erforderlich
+    # model: weglassen = schulweiter Standard (CHAT_DEFAULT_MODEL) — der Assistent folgt
+    # dann automatisch einem Modellwechsel. Nur setzen, wenn er bewusst an ein bestimmtes
+    # Modell gebunden sein soll; dann bricht er, wenn dieses aus der LiteLLM-Config fällt.
+    # Für Tool-Nutzung (planning, context_search, image_generation) muss das Modell
+    # Function-Calling beherrschen.
     tool_groups:
       - planning
     system_prompt_file: config/prompts/jahresplan_assistent.md

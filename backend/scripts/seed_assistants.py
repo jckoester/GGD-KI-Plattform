@@ -109,7 +109,9 @@ async def seed(config_path: Path, dry_run: bool = False) -> None:
                     name=name,
                     description=(entry.get("description") or "").strip() or None,
                     system_prompt=system_prompt,
-                    model=entry.get("model", ""),
+                    # Leer lassen heißt „schulweiter Standard" — der Chat-Flow setzt dann
+                    # CHAT_DEFAULT_MODEL ein. Kein Modellname im Seed = wechselfest.
+                    model=entry.get("model") or "",
                     audience=entry.get("audience", "teacher"),
                     scope=entry.get("scope", "teachers"),
                     status=entry.get("status", "active"),

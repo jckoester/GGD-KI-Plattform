@@ -234,8 +234,8 @@
       try {
         // Neuen Assistenten automatisch speichern, bevor das erste Dokument hochgeladen wird
         if (!form.id) {
-          if (!form.name.trim() || !form.system_prompt.trim() || !form.model) {
-            docError = "Bitte zuerst Name, System-Prompt und Modell ausfüllen.";
+          if (!form.name.trim() || !form.system_prompt.trim()) {
+            docError = "Bitte zuerst Name und System-Prompt ausfüllen.";
             return;
           }
           const result = await createAssistant(buildPayload());
@@ -513,9 +513,9 @@
         }
 
         // Pflichtfelder prüfen
-        if (!form.name.trim() || !form.system_prompt.trim() || !form.model) {
+        if (!form.name.trim() || !form.system_prompt.trim()) {
             error =
-                "Bitte füllen Sie alle Pflichtfelder aus (Name, System-Prompt, Modell).";
+                "Bitte füllen Sie alle Pflichtfelder aus (Name und System-Prompt).";
             return;
         }
 
@@ -843,8 +843,7 @@
                 disabled={saving ||
                     !dirty ||
                     !form.name.trim() ||
-                    !form.system_prompt.trim() ||
-                    !form.model}
+                    !form.system_prompt.trim()}
                 class="px-4 py-2 bg-primary dark:bg-primary-dark text-white rounded-lg
                hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
@@ -997,7 +996,7 @@
                             for="ae-model"
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx"
                         >
-                            Modell *
+                            Modell
                         </label>
                         {#if models.length > 0}
                             <select
@@ -1008,7 +1007,9 @@
                        bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                        px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <option value="">— Modell auswählen —</option>
+                                <option value=""
+                                    >Schulweiter Standard</option
+                                >
                                 {#each models as model}
                                     <option value={model.id}
                                         >{model.label || model.id}{model.supports_function_calling === true ? ' ⚙' : ''}</option
@@ -1021,12 +1022,20 @@
                                 bind:value={form.model}
                                 disabled={!canEdit}
                                 type="text"
-                                placeholder="openai/gpt-4o-mini"
+                                placeholder="leer = schulweiter Standard"
                                 class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                        bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                        px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         {/if}
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Ohne Auswahl nutzt der Assistent das schulweit eingestellte
+                            Standardmodell und folgt einem späteren Wechsel automatisch. Ein
+                            fest gewähltes Modell bindet ihn daran — er funktioniert dann
+                            nicht mehr, sobald es aus der Modell-Konfiguration entfällt.
+                            Für Werkzeuge (Wissensgraph, Unterrichtsplanung, Bilder) ist ein
+                            Modell mit ⚙ nötig.
+                        </p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -1604,7 +1613,7 @@
                         </h2>
                     </div>
                     <span class="text-xs text-light-tx-3 dark:text-dark-tx-3">
-                        Modell: {form.model || "—"}
+                        Modell: {form.model || "schulweiter Standard"}
                     </span>
                 </div>
 
@@ -1617,16 +1626,7 @@
                             Testchat zu nutzen.
                         </p>
                     </div>
-                {:else if !form.model}
-                    <div
-                        class="flex-1 flex items-center justify-center text-light-tx-2 dark:text-dark-tx-2"
-                    >
-                        <p>
-                            Wählen Sie ein Modell aus, um den Testchat zu
-                            nutzen.
-                        </p>
-                    </div>
-                {:else}
+{:else}
                     <!-- Nachrichtenbereich -->
                     <div class="flex-1 overflow-y-auto space-y-4 mb-4 min-h-0">
                         {#if testMessages.length === 0}

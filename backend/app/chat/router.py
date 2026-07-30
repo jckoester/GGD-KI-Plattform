@@ -893,7 +893,10 @@ async def chat(
                 await client.aclose()
                 raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
             system_prompt_snapshot = assistant.system_prompt
-            if not request.model_id:
+            # Leeres Assistenten-Modell = „schulweiter Standard" → `model_used` behält den
+            # Wert aus CHAT_DEFAULT_MODEL. Ohne die Leerprüfung ginge ein leerer Modellname
+            # an LiteLLM (der zweite Zweig weiter unten prüft bereits so).
+            if not request.model_id and assistant.model:
                 model_used = assistant.model
         active_assistant = assistant
 

@@ -119,7 +119,9 @@ class AssistantCreate(BaseModel):
     description: Optional[str] = None
     subject_id: Optional[int] = None
     system_prompt: str = Field(min_length=1)
-    model: str = Field(min_length=1)
+    # Leer/weggelassen = schulweiter Standard (CHAT_DEFAULT_MODEL). Ein gesetzter Wert
+    # bindet den Assistenten an dieses Modell — dann folgt er einem Modellwechsel nicht.
+    model: str = Field(default="")
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: str = Field(default="student")
@@ -142,7 +144,10 @@ class AssistantUpdate(BaseModel):
     description: Optional[str] = None
     subject_id: Optional[int] = None
     system_prompt: Optional[str] = Field(default=None, min_length=1)
-    model: Optional[str] = Field(default=None, min_length=1)
+    # Ohne `min_length`, damit ein gebundener Assistent per leerem String wieder auf den
+    # schulweiten Standard zurückgestellt werden kann. `None` = Feld nicht gesendet
+    # (unverändert) und wird unten herausgefiltert — die Spalte ist NOT NULL.
+    model: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=None, ge=1)
     audience: Optional[str] = None
@@ -273,7 +278,7 @@ def _yaml_to_assistant_fields(data: dict, subject_id: Optional[int]) -> dict:
         "description": meta.get("description"),
         "subject_id": subject_id,
         "system_prompt": config["system_prompt"].strip(),
-        "model": config["model"].strip(),
+        "model": (config.get("model") or "").strip(),
         "temperature": config.get("temperature"),
         "max_tokens": config.get("max_tokens"),
         "audience": meta["audience"],
@@ -647,6 +652,11 @@ async def update_assistant(
         # Wechsel von schulweit → privat/gruppe: reject_reason loeschen
         if new_status == "active" and assistant.reject_reason:
             update_data["reject_reason"] = None
+
+    # `model: null` würde die NOT-NULL-Spalte verletzen; zum Zurücksetzen auf den
+    # schulweiten Standard ist der leere String vorgesehen.
+    if update_data.get("model") is None:
+        update_data.pop("model", None)
 
     for field, value in update_data.items():
         setattr(assistant, field, value)

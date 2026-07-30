@@ -62,14 +62,19 @@ class TestAssistantCreate:
                 model="model",
             )
 
-    def test_model_empty_raises(self):
-        """AssistantCreate model leer — ValidationError."""
-        with pytest.raises(ValidationError):
-            AssistantCreate(
-                name="Name",
-                system_prompt="Prompt",
-                model="",
-            )
+    def test_model_empty_is_allowed(self):
+        """Leeres Modell = schulweiter Standard (CHAT_DEFAULT_MODEL), kein Fehler.
+
+        Der Chat-Flow setzt bei leerem Assistenten-Modell das Default-Modell ein; so folgt
+        ein Assistent einem Modellwechsel automatisch, statt an einen Namen gebunden zu sein.
+        """
+        assistant = AssistantCreate(name="Name", system_prompt="Prompt", model="")
+        assert assistant.model == ""
+
+    def test_model_may_be_omitted_entirely(self):
+        """Auch ganz weggelassen — dann greift ebenfalls der schulweite Standard."""
+        assistant = AssistantCreate(name="Name", system_prompt="Prompt")
+        assert assistant.model == ""
 
     def test_temperature_range(self):
         """temperature muss zwischen 0.0 und 2.0 liegen."""
@@ -722,3 +727,36 @@ class TestExportAssistant:
         """GET /assistants/{id}/export → 200 + Content-Disposition: attachment."""
         # Würde DB benötigen
         pass
+
+
+class TestAssistantModelOptional:
+    """Ein Assistent darf ohne eigenes Modell laufen (= schulweiter Standard)."""
+
+    def test_update_may_clear_the_model(self):
+        """Leerer String stellt einen gebundenen Assistenten auf den Standard zurück.
+
+        Mit dem früheren `min_length=1` war der Weg zurück versperrt: Wer einmal ein
+        konkretes Modell gewählt hatte, konnte es nicht mehr abwählen.
+        """
+        from app.api.assistants import AssistantUpdate
+
+        update = AssistantUpdate(model="")
+        assert update.model_dump(exclude_unset=True) == {"model": ""}
+
+    def test_update_without_model_leaves_it_untouched(self):
+        from app.api.assistants import AssistantUpdate
+
+        assert "model" not in AssistantUpdate(name="Neu").model_dump(exclude_unset=True)
+
+    def test_yaml_import_tolerates_missing_model(self):
+        """YAML ohne `config.model` → leeres Modell, kein KeyError."""
+        from app.api.assistants import _yaml_to_assistant_fields
+
+        fields = _yaml_to_assistant_fields(
+            {
+                "metadata": {"name": "Test", "audience": "teacher"},
+                "config": {"system_prompt": "Prompt"},
+            },
+            subject_id=None,
+        )
+        assert fields["model"] == ""

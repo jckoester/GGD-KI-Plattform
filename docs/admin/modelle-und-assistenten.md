@@ -101,7 +101,7 @@ oder Aufgabe. Admins und Lehrkräfte können Assistenten anlegen.
 | Name | Wird Nutzer:innen angezeigt |
 | Beschreibung | Kurze Erklärung des Zwecks |
 | System-Prompt | Anweisung an die KI — legt Verhalten und Rolle fest |
-| Modell | Leer: Nutzer wählt frei. Gesetzt: Modell ist fix für diesen Assistenten |
+| Modell | Leer („Schulweiter Standard"): nutzt `CHAT_DEFAULT_MODEL` und folgt einem Modellwechsel automatisch. Gesetzt: fix an dieses Modell gebunden |
 | Icon / Farbe | Optische Unterscheidung in der Übersicht |
 
 **Test-Chat:** Beim Bearbeiten eines Assistenten steht direkt ein Test-Chat
@@ -131,16 +131,19 @@ und legt alle darin definierten Assistenten an, sofern noch kein Assistent
 gleichen Namens existiert. Mit `--dry-run` kann man vorab prüfen, was angelegt
 würde.
 
-Danach muss der Admin nur noch das gewünschte LLM-Modell einstellen:
+Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodell
+(`CHAT_DEFAULT_MODEL`). Nur wenn er an ein **bestimmtes** Modell gebunden sein soll:
 
 1. `/assistants/manage` aufrufen.
 2. „Jahresplanung" in der Liste anklicken.
-3. Im Feld **Modell** ein tool-fähiges Modell eintragen, z. B. `claude-sonnet-4-6`.
+3. Im Feld **Modell** das gewünschte Modell wählen. Für die Planungswerkzeuge muss es
+   Function-Calling beherrschen (im Auswahlfeld mit ⚙ markiert).
 4. Speichern.
 
-> **Hinweis:** Das Skript setzt `model: claude-sonnet-4-6` aus der YAML-Datei
-> als Standardwert. Soll ein anderes Modell verwendet werden, einfach im
-> Assistenten-Editor ändern.
+> **Standard oder gebunden?** Bleibt das Feld auf „Schulweiter Standard", folgt der
+> Assistent einem späteren Modellwechsel automatisch. Ein fest gewähltes Modell bindet
+> ihn daran — er funktioniert nicht mehr, sobald dieses Modell aus der LiteLLM-Config
+> fällt. Für die meisten Assistenten ist der Standard die wartungsärmere Wahl.
 
 **Verhalten in der UI:** Öffnet eine Lehrkraft die Planungsansicht einer
 Unterrichtsgruppe und klickt auf „Assistent", wird der Chat mit diesem
@@ -171,7 +174,7 @@ wie der Jahresplan-Assistent, aber einen eigenen System-Prompt:
 1. Einen Assistenten anlegen (oder den bestehenden Planungs-Assistenten erweitern).
 2. `tool_groups` enthält **`planning`**.
 3. Als System-Prompt den Inhalt von `config/prompts/verschiebe_assistent.md` setzen.
-4. Ein tool-fähiges Modell wählen (z. B. `claude-sonnet-4-6`).
+4. Das Modell auf „Schulweiter Standard" belassen oder eines mit ⚙ (Function-Calling) wählen.
 
 Die Auslöser in der Planungs-UI (Ausfall-Banner, Drag & Drop einer geplanten Stunde,
 Halbjahres-Hinweis, Überhang-Hinweisleiste) öffnen jeweils einen Chat mit
