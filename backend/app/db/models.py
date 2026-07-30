@@ -83,6 +83,15 @@ class Subject(Base):
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
     )
 
+    __table_args__ = (
+        # Partiell-unique: Fächer ohne Bildungsplan-Code (fach_code IS NULL) dürfen
+        # mehrfach vorkommen, gesetzte Codes müssen eindeutig sein (Migration 0022).
+        Index(
+            "idx_subjects_fach_code", "fach_code", unique=True,
+            postgresql_where=text("fach_code IS NOT NULL"),
+        ),
+    )
+
 
 # 2. groups
 class Group(Base):
@@ -162,8 +171,8 @@ class Assistant(Base):
     max_tokens: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     status: Mapped[str] = mapped_column(default="draft", server_default=text("'draft'"))
-    audience: Mapped[str] = mapped_column(default="student", server_default=text("'student'"))
-    scope: Mapped[str] = mapped_column(default="private", server_default=text("'private'"))
+    audience: Mapped[str] = mapped_column(Text, default="student", server_default=text("'student'"))
+    scope: Mapped[str] = mapped_column(Text, default="private", server_default=text("'private'"))
     scope_pending: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     scope_group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
@@ -290,8 +299,8 @@ class Conversation(Base):
     last_message_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
-    title: Mapped[Optional[str]] = mapped_column(nullable=True)
-    model_used: Mapped[str] = mapped_column(nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_used: Mapped[str] = mapped_column(Text, nullable=False)
     is_test: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
@@ -307,6 +316,7 @@ class Conversation(Base):
     __table_args__ = (
         Index("idx_conversations_pseudonym", "pseudonym"),
         Index("idx_conversations_last_message_at", "last_message_at"),
+        Index("idx_conversations_group_id", "group_id"),
     )
 
 
@@ -321,7 +331,7 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(nullable=False)
     content: Mapped[str] = mapped_column(nullable=False)
-    model: Mapped[Optional[str]] = mapped_column(nullable=True)
+    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
     )
@@ -340,6 +350,7 @@ class Message(Base):
         ),
         Index("idx_messages_conversation_id", "conversation_id"),
         Index("idx_messages_assistant_id", "assistant_id"),
+        Index("idx_messages_created_at", "created_at"),
     )
 
 
@@ -355,16 +366,16 @@ class GeneratedImage(Base):
     __tablename__ = "generated_images"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
-    pseudonym: Mapped[str] = mapped_column(nullable=False)
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
     conversation_id: Mapped[UUID] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
     )
     message_id: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
     )
-    model: Mapped[str] = mapped_column(nullable=False)
-    size: Mapped[str] = mapped_column(nullable=False)
-    mime_type: Mapped[str] = mapped_column(nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    size: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)
     # Der (LLM-gebildete) Bild-Prompt — dient als „roher Quelltext" beim Promoten in die
     # Artefaktbibliothek (Phase 18). Nullable: Alt-Bilder vor Einführung der Spalte.
@@ -415,11 +426,11 @@ class Artifact(Base):
     __tablename__ = "artifacts"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
-    owner_pseudonym: Mapped[str] = mapped_column(nullable=False)
-    kind: Mapped[str] = mapped_column(nullable=False)  # image | circuit | plot | mermaid | ggb | (document …)
-    mime_type: Mapped[str] = mapped_column(nullable=False)
+    owner_pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)  # image | circuit | plot | mermaid | ggb | (document …)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)
-    title: Mapped[str] = mapped_column(nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Idempotenz-Schlüssel der Herkunft: `image:<image_id>` bzw. `<kind>:<quell-hash>`.
     # Zweimaliges „In Bibliothek speichern" desselben Inhalts liefert dasselbe Artefakt.
@@ -645,7 +656,7 @@ class StepupConsumed(Base):
 
     __tablename__ = "stepup_consumed"
 
-    jti: Mapped[str] = mapped_column(primary_key=True)
+    jti: Mapped[str] = mapped_column(Text, primary_key=True)
     expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     consumed_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
@@ -810,6 +821,18 @@ class ContextNode(Base):
         Index(
             "idx_context_nodes_valid_until", "valid_until",
             postgresql_where=text("valid_until IS NOT NULL"),
+        ),
+        Index(
+            "idx_context_nodes_subject_id", "subject_id",
+            postgresql_where=text("subject_id IS NOT NULL"),
+        ),
+        Index(
+            "idx_context_nodes_grade", "min_grade", "max_grade",
+            postgresql_where=text("min_grade IS NOT NULL"),
+        ),
+        Index(
+            "idx_context_nodes_band", "subject_id", "min_grade", "max_grade", "niveau",
+            postgresql_where=text("subject_id IS NOT NULL"),
         ),
         Index(
             "idx_context_nodes_embedding",

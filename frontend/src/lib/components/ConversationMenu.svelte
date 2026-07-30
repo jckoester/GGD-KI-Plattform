@@ -9,8 +9,6 @@
         updateConversationContext,
     } from "$lib/stores/conversations.js";
     import { pageTitle, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
-    import { subjectMap } from "$lib/stores/subjects.js";
-    import { myGroups } from "$lib/stores/myGroups.js";
     import { studentPickerItems, teacherPickerItems } from "$lib/stores/subjectPickerItems.js";
     import SubjectDot from "$lib/components/SubjectDot.svelte";
     import { user } from "$lib/stores/user.js";

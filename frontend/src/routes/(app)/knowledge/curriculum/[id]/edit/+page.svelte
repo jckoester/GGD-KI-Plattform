@@ -12,7 +12,6 @@
     } from "$lib/api.js";
     import { kapitelStd, curriculumStd } from "$lib/curriculum.js";
     import { extractNodeTargets } from "$lib/material.js";
-    import { user } from "$lib/stores/user.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

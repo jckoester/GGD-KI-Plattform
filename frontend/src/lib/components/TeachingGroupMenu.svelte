@@ -2,7 +2,7 @@
   import { MoreHorizontal } from 'lucide-svelte'
   import { deleteTeachingGroup } from '$lib/api.js'
 
-  let { groupId, className, onrefresh } = $props()
+  let { groupId, onrefresh } = $props()
   let open = $state(false)
   let loading = $state(false)
 
@@ -19,9 +19,6 @@
     open = !open
   }
 
-  function close() {
-    open = false
-  }
 </script>
 
 <div class="relative" onclick={(e) => e.stopPropagation()}>

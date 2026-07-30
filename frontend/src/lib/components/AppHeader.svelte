@@ -1,9 +1,7 @@
 <script>
-    import { PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-svelte";
+    import { PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
     import { page } from "$app/stores";
     import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
-    import { logout } from "$lib/api.js";
-    import { goto } from "$app/navigation";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -15,7 +13,6 @@
         bgClass = "bg-light-bg-2 dark:bg-dark-bg-2",
         textClass = "text-light-tx dark:text-dark-tx",
         borderClass = "border-light-ui-2 dark:border-dark-ui-2",
-        hoverClass = "hover:bg-light-ui-3 dark:hover:bg-dark-ui-3",
     } = $props();
 
     // Hintergrundfarbe
@@ -24,10 +21,6 @@
     // Abgeleiteter Titel
     let title = $derived($pageTitle || ($page.data.title ?? ""));
 
-    async function handleLogout() {
-        await logout();
-        goto("/");
-    }
 </script>
 
 <header

@@ -2,7 +2,7 @@
     import { goto } from '$app/navigation'
     import { page } from '$app/stores'
     import { user, userHasAnyRole } from '$lib/stores/user.js'
-    import { subjects, subjectMap } from '$lib/stores/subjects.js'
+    import { subjects } from '$lib/stores/subjects.js'
     import { myGroups, myTeachingGroups } from '$lib/stores/myGroups.js'
     import { getCurriculaBySubject } from '$lib/api.js'
     import CurriculumList from '$lib/components/CurriculumList.svelte'

@@ -17,12 +17,11 @@
         ChartColumn,
         ReceiptEuro,
         ShieldCheck,
-        BarChart2,
         PiggyBank,
         Bot,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
-    import { user, hasAnyRole } from "$lib/stores/user.js";
+    import { hasAnyRole } from "$lib/stores/user.js";
 
     const canSeeSettings   = hasAnyRole(['admin']);
     const canSeeStatistics = hasAnyRole(['statistics', 'admin']);
@@ -53,9 +52,6 @@
         }
     }
 
-    function setOpenSection(section) {
-        openSection = section;
-    }
 </script>
 
 <aside

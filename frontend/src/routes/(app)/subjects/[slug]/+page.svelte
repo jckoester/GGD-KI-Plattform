@@ -1,7 +1,7 @@
 <script>
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
-    import { subjects, subjectMap } from "$lib/stores/subjects.js";
+    import { subjects } from "$lib/stores/subjects.js";
     import { BP_CURRICULUM_CONTENT_TYPES } from "$lib/taxonomy.js";
     import { assistants } from "$lib/stores/assistants.js";
     import { myTeachingGroups } from "$lib/stores/myGroups.js";

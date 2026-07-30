@@ -1,7 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
-    import { PiggyBank, ArrowLeft, LoaderCircle, CircleX } from 'lucide-svelte';
+    import { PiggyBank, ArrowLeft, LoaderCircle } from 'lucide-svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 
     let data = $state(null);           // BudgetGradesResponse

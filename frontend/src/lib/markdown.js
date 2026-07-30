@@ -176,6 +176,9 @@ marked.use({ extensions: [katexBlockExt, katexInlineExt] });
 // Default-Verhalten zu vertrauen. Blockiert javascript:, data:, tel:, vbscript: usw. Es ist die
 // DOMPurify-Default-Regex mit auf `https?|mailto` verengter Schema-Liste; der zweite Zweig
 // (`[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$)`) lässt schema-lose relative Pfade und #Anker weiter zu.
+// Das `\-` ist wortgleich aus DOMPurify übernommen und dort so geschrieben. Nicht
+// "aufräumen" — die Regex soll gegen die Upstream-Fassung diffbar bleiben.
+// eslint-disable-next-line no-useless-escape
 const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
 export function renderMarkdown(text) {

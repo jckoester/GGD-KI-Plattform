@@ -17,7 +17,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     
-    let { subjectId = null, subjectSlug = null, subjectFachCode = null, showNewButton = true } = $props()
+    let { subjectId = null, subjectFachCode = null, showNewButton = true } = $props()
     
     let curricula = $state([])
     let loading = $state(true)

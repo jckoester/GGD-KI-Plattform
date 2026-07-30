@@ -43,11 +43,6 @@
     essverhalten: "Essverhalten",
     mobbing: "Mobbing",
   };
-  const SOURCE = {
-    auto_crisis: "Krise (automatisch)",
-    auto_guardrail: "Guardrail",
-    manual_admin: "Manuell",
-  };
 
   let rangeFrom = $derived(total === 0 ? 0 : offset + 1);
   let rangeTo = $derived(Math.min(offset + limit, total));

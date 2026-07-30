@@ -1,7 +1,7 @@
 <script>
   import { setWeekPattern, generateSlots } from '$lib/api.js'
 
-  const { open = false, groupId, patterns = [], schuljahr = '', onSaved, onGenerated, onClose } = $props()
+  const { open = false, groupId, patterns = [], onSaved, onGenerated, onClose } = $props()
 
   const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr']
   // Stundenraster der Schule — schulspezifisch, via Umgebungsvariable konfigurierbar.

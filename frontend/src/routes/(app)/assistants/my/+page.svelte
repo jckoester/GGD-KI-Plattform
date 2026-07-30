@@ -9,7 +9,6 @@
     Send,
     AlertCircle,
     Loader2,
-    ChevronDown,
     Play,
     Upload,
     X,
@@ -24,7 +23,6 @@
     importAssistant,
     exportAssistant,
     getModels,
-    ApiError,
   } from "$lib/api.js";
 
   // ── Konstanten ────────────────────────────────────────────────────────────

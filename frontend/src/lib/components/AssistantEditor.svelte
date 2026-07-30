@@ -44,9 +44,7 @@
         deleteContextAnchor,
         searchContextNodesLegacy,
         getAugmentations,
-        ApiError,
     } from "$lib/api.js";
-    import { user } from "$lib/stores/user.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
     // ── Props ─────────────────────────────────────────────────────────────────

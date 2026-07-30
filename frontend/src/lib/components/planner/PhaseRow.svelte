@@ -38,7 +38,6 @@
 
   let editDesc = $state(false)
   let prioOpen = $state(false)
-  let menuOpen = $state(false)
 
   const prioColor = $derived(PRIO_COLORS[phase.prio] ?? PRIO_COLORS.kern)
 </script>

@@ -1,5 +1,5 @@
 <script>
-  import { ueColor, UE_PALETTE } from '$lib/planner.js'
+  import { ueColor } from '$lib/planner.js'
 
   const {
     units = [],

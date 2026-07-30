@@ -1,19 +1,14 @@
 <script>
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
-  import { subjectMap } from '$lib/stores/subjects.js'
-  import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import {
     getLesson,
     patchLesson,
     exportLesson,
-    listSnapshots,
-    restoreSnapshot,
-    addChatContextNode,
     createReview,
     deleteReview,
   } from '$lib/api.js'
-  import { periodLabel, dateLabel, weekdayLabel, ueColorIndex } from '$lib/planner.js'
+  import { dateLabel, weekdayLabel, ueColorIndex } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
@@ -24,8 +19,6 @@
   const slug = $derived(data.slug)
   const groupId = $derived(data.groupId)
 
-  const group = $derived($myTeachingGroups.find(g => g.id === groupId) ?? null)
-  const subject = $derived(group ? ($subjectMap[group.subject_id] ?? null) : null)
 
   let lesson = $state(null)
   let loading = $state(true)
@@ -130,7 +123,7 @@
     scheduleSave()
   }
 
-  function onSuggestCompetences(linkedNodeId) {
+  function onSuggestCompetences(_linkedNodeId) {
     // Keine direkte Lookup-Möglichkeit im Frontend — Backend gibt Vorschläge beim PATCH zurück
     // Hier wird nur getriggert; tatsächliche Vorschläge kommen vom nächsten Save
   }

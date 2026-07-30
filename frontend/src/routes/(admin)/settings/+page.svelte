@@ -3,8 +3,6 @@
         Settings,
         CloudCog,
         ShieldCheck,
-        BarChart2,
-        PiggyBank,
         ArrowLeft,
         Bot,
         Users,

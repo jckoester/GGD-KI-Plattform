@@ -162,7 +162,6 @@
 
     // ── Rollen & Berechtigungen ────────────────────────────────────────────
     const isAdmin = $derived($user?.roles?.includes("admin") ?? false);
-    const isTeacher = $derived($user?.roles?.includes("teacher") ?? false);
 
     const canEdit = $derived(
         node && (isAdmin || node.owner_pseudonym === $user?.pseudonym),
@@ -209,7 +208,7 @@
         }
         if (contentType === "methode" || contentType === "sozialform") {
             // Übrige Metadaten erhalten, aliase aus dem Alias-Feld überschreiben.
-            let base = {};
+            let base;
             try {
                 base = JSON.parse(metadata);
             } catch {

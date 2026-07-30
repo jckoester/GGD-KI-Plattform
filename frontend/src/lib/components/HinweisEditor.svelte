@@ -18,7 +18,6 @@
     let dropdownOpen = $state(false);
     let dropdownItems = $state([]); // Array von {label, sublabel, kind:'lp'|'lpa'|'ik', node_id, serialized, indented?, isHead?}
     let dropdownIndex = $state(0);
-    let loading = $state(false);
 
     // Cache für LP+Aspekte (einmaliger Abruf pro Editor-Instanz)
     let lpCache = null; // { lps: Node[], aspekte: Node[] } | null
@@ -68,7 +67,6 @@
         if (trigger.kind === "lp") {
             // Alle LPs + Aspekte einmalig laden und cachen
             if (!lpCache) {
-                loading = true;
                 try {
                     const params = new URLSearchParams({ limit: "200" });
                     params.append("content_type", "leitperspektive");
@@ -84,8 +82,6 @@
                     };
                 } catch {
                     lpCache = { lps: [], aspekte: [] };
-                } finally {
-                    loading = false;
                 }
             }
 
@@ -167,32 +163,27 @@
         }
 
         // Schritt 2: IK im Zielfach suchen
-        loading = true;
-        try {
-            const params = new URLSearchParams({
-                content_type: "ik_kompetenz",
-                subject_id: resolvedSubjectId,
-                limit: "10",
-            });
-            if (trigger.query) params.set("q", trigger.query);
-            const res = await fetch(`/api/context/nodes?${params}`, {
-                credentials: "include",
-            });
-            const nodes = res.ok ? await res.json() : [];
-            dropdownItems = nodes.map((n) => {
-                const nr = extractNrFromTitle(n.title) || n.title;
-                return {
-                    node_id: n.id,
-                    label: `${trigger.fachCode} ${nr}`,
-                    sublabel: n.title,
-                    kind: "ik",
-                    serialized: `#[${trigger.fachCode} ${nr}](ik:${n.id})`,
-                };
-            });
-            dropdownOpen = dropdownItems.length > 0;
-        } finally {
-            loading = false;
-        }
+        const params = new URLSearchParams({
+            content_type: "ik_kompetenz",
+            subject_id: resolvedSubjectId,
+            limit: "10",
+        });
+        if (trigger.query) params.set("q", trigger.query);
+        const res = await fetch(`/api/context/nodes?${params}`, {
+            credentials: "include",
+        });
+        const nodes = res.ok ? await res.json() : [];
+        dropdownItems = nodes.map((n) => {
+            const nr = extractNrFromTitle(n.title) || n.title;
+            return {
+                node_id: n.id,
+                label: `${trigger.fachCode} ${nr}`,
+                sublabel: n.title,
+                kind: "ik",
+                serialized: `#[${trigger.fachCode} ${nr}](ik:${n.id})`,
+            };
+        });
+        dropdownOpen = dropdownItems.length > 0;
     }
 
     function extractNrFromTitle(title) {

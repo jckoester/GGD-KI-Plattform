@@ -9,7 +9,6 @@
 
   // ── Query-Param-Defaults ────────────────────────────────────────────────
   const preGroupId = $page.url.searchParams.get('group_id')
-  const preSubjectSlug = $page.url.searchParams.get('subject_slug')
   const preReadScope = $page.url.searchParams.get('read_scope') ?? 'school'
 
   // ── Formularfelder ──────────────────────────────────────────────────────
@@ -54,7 +53,6 @@
 
   // ── Rollen ──────────────────────────────────────────────────────────────
   const isAdmin = $derived($user?.roles?.includes('admin') ?? false)
-  const isTeacher = $derived($user?.roles?.includes('teacher') ?? false)
 
   // ── Content-Type-Optionen je Category ──────────────────────────────────
   const contentTypeOptions = $derived(

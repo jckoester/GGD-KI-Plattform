@@ -8,8 +8,6 @@
         ChevronRight,
         History,
         ShieldCheck,
-        BarChart2,
-        PiggyBank,
         Bot,
         Settings,
         BookOpen,

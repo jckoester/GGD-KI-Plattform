@@ -18,8 +18,13 @@ from app.db.models import Base
 config = context.config
 
 # Interpret the config file for Python logging.
+# `disable_existing_loggers=False` ist wichtig: der Default (True) deaktiviert JEDEN
+# Logger, der nicht in alembic.ini steht — also sämtliche `app.*`-Logger. In den
+# Integrationstests läuft `alembic upgrade head` im selben Prozess wie die übrigen
+# Tests; ohne dieses Flag bleiben danach alle App-Logger stumm und Tests, die
+# Logausgaben prüfen (z. B. test_oauth_adapter), schlagen im kombinierten Lauf fehl.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Set target_metadata to our Base metadata
 target_metadata = Base.metadata

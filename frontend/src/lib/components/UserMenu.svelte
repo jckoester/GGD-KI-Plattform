@@ -8,7 +8,6 @@
         Eye,
         PiggyBank,
         ChartNoAxesCombined,
-        Bot,
         Info,
         TriangleAlert,
     } from "lucide-svelte";

@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/adapter-auto": "^3.0.0",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.0.0",
@@ -22,8 +23,12 @@
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
+    "eslint": "^10.8.0",
+    "eslint-plugin-svelte": "^3.22.0",
+    "globals": "^17.8.0",
     "jsdom": "^29.1.1",
     "svelte": "^5.55.4",
+    "svelte-eslint-parser": "^1.8.0",
     "tailwindcss": "^4.2.2",
     "vite": "^5.0.0",
     "vitest": "^2.1.9"

@@ -76,17 +76,6 @@
         }
     }
 
-    function getActionLabel(item) {
-        return item.status === 'active' ? 'Deaktivieren' : 'Aktivieren'
-    }
-
-    function getActionButtonClass(item) {
-        if (item.status === 'active') {
-            return 'text-xs px-2 py-1 rounded border border-light-re dark:border-dark-re text-light-re dark:text-dark-re hover:bg-light-re/10 dark:hover:bg-dark-re/10'
-        }
-        return 'text-xs px-2 py-1 rounded border border-light-gr dark:border-dark-gr text-light-gr dark:text-dark-gr hover:bg-light-gr/10 dark:hover:bg-dark-gr/10'
-    }
-
     onMount(loadAllAssistants);
 </script>
 

@@ -18,7 +18,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
-    import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js";
+    import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import {
         getAdminAssistants,
         deleteAssistant,
@@ -28,7 +28,6 @@
         getModels,
         approveAssistant,
         rejectAssistant,
-        ApiError,
     } from "$lib/api.js";
 
     let availableModels = $state([]); // string[]
@@ -82,7 +81,6 @@
 
     // Pending Queue
     let pendingItems = $state([]);
-    let loadingPending = $state(false);
 
     // Reject Modal
     let rejectTarget = $state(null);
@@ -94,12 +92,6 @@
     const AUDIENCE_LABELS = {
         student: "Schüler:innen",
         teacher: "Lehrkräfte",
-        all: "Alle",
-    };
-    const SCOPE_LABELS = {
-        private: "Privat (Entwurf)",
-        teachers: "Lehrkräfte",
-        all_students: "Alle Schüler:innen",
         all: "Alle",
     };
 
@@ -138,14 +130,11 @@
     }
 
     async function loadPending() {
-        loadingPending = true;
         try {
             const result = await getAdminAssistants({ status: 'pending_review', limit: 100 });
             pendingItems = result.items;
         } catch (e) {
             // Fehler ignorieren - Pending-Queue ist optional
-        } finally {
-            loadingPending = false;
         }
     }
 

@@ -8,7 +8,6 @@
         relinkCurriculum,
     } from "$lib/api.js";
     import { curriculumStd } from "$lib/curriculum.js";
-    import { user } from "$lib/stores/user.js";
     import CurriculumTable from "$lib/components/CurriculumTable.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";

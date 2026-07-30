@@ -1,5 +1,5 @@
 <script>
-  import { ueColor, UE_PALETTE } from '$lib/planner.js'
+  import { UE_PALETTE } from '$lib/planner.js'
   import { createUnit, updateUnit, deleteUnit, getGroupCurriculumChapters } from '$lib/api.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'

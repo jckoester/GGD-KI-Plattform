@@ -2,7 +2,6 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { getRecentConversations } from "$lib/api.js";
-    import { user } from "$lib/stores/user.js";
     import { Loader2, Bot } from "lucide-svelte";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
     import { refreshConversations } from "$lib/stores/conversations.js";

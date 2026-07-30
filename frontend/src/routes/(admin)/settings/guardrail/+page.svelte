@@ -7,7 +7,6 @@
   let prompt = $state("");
   let edited = $state("");
   let updatedAt = $state(null);
-  let updatedBy = $state(null);
   let loading = $state(true);
   let saving = $state(false);
   let saveSuccess = $state(false);
@@ -34,7 +33,6 @@
       prompt = data.prompt ?? "";
       edited = data.prompt ?? "";
       updatedAt = data.updated_at;
-      updatedBy = data.updated_by;
     } else {
       error = promptResult.reason?.message ?? "Prompt konnte nicht geladen werden.";
     }
@@ -62,7 +60,6 @@
       prompt = data.prompt ?? "";
       edited = data.prompt ?? "";
       updatedAt = data.updated_at;
-      updatedBy = data.updated_by;
       saveSuccess = true;
       setTimeout(() => (saveSuccess = false), 3000);
     } catch (e) {
@@ -82,7 +79,6 @@
       prompt = "";
       edited = "";
       updatedAt = data.updated_at;
-      updatedBy = data.updated_by;
       saveSuccess = true;
       setTimeout(() => (saveSuccess = false), 3000);
     } catch (e) {

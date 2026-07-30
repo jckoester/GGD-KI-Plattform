@@ -14,7 +14,6 @@
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
-    import SubjectDot from "$lib/components/SubjectDot.svelte";
     import ContextChips from "$lib/components/ContextChips.svelte";
     import ContextSuggestions from "$lib/components/ContextSuggestions.svelte";
     import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
@@ -53,7 +52,6 @@
     let input = $state("");
     let textarea = $state(null);
     let isStreaming = $state(false);
-    let error = $state(null);
     let scrollAnchor = $state(null);
     let conversationId = $state(null);
     let loadingConversation = $state(false);
@@ -108,11 +106,6 @@
         conversationId ? contextNodes : pendingContextNodes,
     );
 
-    // Tool-Calling-Fähigkeit des aktuell gewählten Modells
-    const supportsToolCalling = $derived(
-        availableModels.find((m) => m.id === selectedModelId)
-            ?.supports_function_calling ?? null,
-    );
 
     async function handleRemoveContextNode(nodeId) {
         // Optimistisch entfernen
@@ -421,7 +414,7 @@
         // unbeabsichtigte Tippen personenbezogener Daten. Fail-open in scanForPii.
         if (shouldScanForPii({ text: userMessage, suppressed: piiWarningSuppressed })) {
             piiChecking = true;
-            let spans = [];
+            let spans;
             try {
                 spans = await scanForPii(userMessage);
             } finally {
@@ -491,7 +484,6 @@
         messages = [...messages, { role: "assistant", content: "" }];
 
         isStreaming = true;
-        error = null;
 
         try {
             // Neu: Content je User-Nachricht aufbauen

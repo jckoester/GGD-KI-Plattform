@@ -17,14 +17,9 @@
     import { parseMaterial } from "$lib/material.js";
     import MaterialEditor from "./MaterialEditor.svelte";
     import {
-        Plus,
         Trash2,
         MoreVertical,
         Move,
-        Check,
-        X,
-        Pencil,
-        Eye,
         ChevronRight,
     } from "lucide-svelte";
 
@@ -363,49 +358,6 @@
         draggedItem = null;
     }
 
-    /**
-     * Aktualisiere ein Feld in einem Eintrag
-     */
-    function updateField(path, index, field, value) {
-        if (!curriculum || !path || index === undefined) return;
-
-        // Pfad navigieren: kapitel[0].lernsequenzen[0].metadata.eintraege[0].ik
-        const parts = path.split(".");
-        let current = curriculum;
-
-        for (let i = 0; i < parts.length - 1; i++) {
-            const part = parts[i];
-            if (part.startsWith("kapitel[")) {
-                const idx = parseInt(part.match(/\[(\d+)\]/)[1]);
-                current = current.kapitel[idx];
-            } else if (part.startsWith("lernsequenzen[")) {
-                const idx = parseInt(part.match(/\[(\d+)\]/)[1]);
-                current = current.lernsequenzen[idx];
-            } else if (part === "metadata") {
-                current = current.metadata || {};
-            } else if (part === "eintraege") {
-                current = current.eintraege || [];
-            } else {
-                current = current[part];
-            }
-        }
-
-        // Letzten Teil setzen
-        const lastPart = parts[parts.length - 1];
-        if (lastPart.startsWith("[")) {
-            const idx = parseInt(lastPart.match(/\[(\d+)\]/)[1]);
-            current[idx] = { ...current[idx], [field]: value };
-        } else {
-            current[lastPart] = {
-                ...(current[lastPart] || {}),
-                [field]: value,
-            };
-        }
-
-        curriculum.kapitel = [...curriculum.kapitel];
-        onchange();
-    }
-
     // Link zu einem Wissensknoten (Read-only-Ansicht von PK/IK)
     function nodeLink(nodeId) {
         return `/knowledge/${nodeId}`;
@@ -428,13 +380,6 @@
         }));
     }
 
-    // Helper für Template-Strings
-    function pathString(kapIndex, lsIndex = null, entryIndex = null) {
-        let path = `kapitel[${kapIndex}]`;
-        if (lsIndex !== null) path += `.lernsequenzen[${lsIndex}]`;
-        if (entryIndex !== null) path += `.metadata.eintraege[${entryIndex}]`;
-        return path;
-    }
 </script>
 
 <!-- Kontextmenü -->

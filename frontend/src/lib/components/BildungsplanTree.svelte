@@ -10,7 +10,7 @@
     import InfoBanner from "./InfoBanner.svelte";
     import { ChevronDown, ChevronRight, ExternalLink } from "lucide-svelte";
 
-    let { subjectId, subjectSlug, initialBpVersion = null } = $props();
+    let { subjectId, initialBpVersion = null } = $props();
 
     let data = $state(null);
     let loading = $state(false);
