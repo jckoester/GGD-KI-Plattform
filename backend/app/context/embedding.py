@@ -1,6 +1,11 @@
 """Embedding-Generierung fuer Kontextspeicher-Knoten.
 
-Embedding-Modell: text-embedding-3-small (OpenAI, 1536 Dimensionen) via LiteLLM.
+Das Embedding-Modell ist nicht fest verdrahtet: Modellname, Vektorbreite und Input-Cap
+kommen aus den Settings (``EMBEDDING_MODEL``, ``EMBEDDING_DIMENSIONS``,
+``EMBEDDING_MAX_CHARS``). Angesprochen wird ausschliesslich der LiteLLM-Proxy, der den
+Namen auf den tatsaechlichen Anbieter aufloest. Ein Modellwechsel ist damit reine
+Konfiguration — erfordert aber Migration + Re-Embedding, wenn sich die Vektorbreite
+aendert (siehe docs/runbooks/modellwechsel.md).
 """
 
 import logging
@@ -90,31 +95,54 @@ def _build_embedding_input(node: ContextNode) -> str:
     return "\n".join(prefixes) + "\n" + base
 
 
-# text-embedding-3-small akzeptiert max. 8191 Tokens. Konservativer Zeichen-Cap
-# (sicher selbst bei dichter Tokenisierung) gegen 400er bei sehr langen Knoten —
-# für die semantische Einbettung genügt der Textanfang.
-_MAX_EMBED_CHARS = 16000
+class EmbeddingDimensionError(RuntimeError):
+    """Das Modell lieferte eine andere Vektorbreite als konfiguriert.
+
+    Eigener Typ, damit Aufrufer den Konfigurationsfehler von einem Netz-/HTTP-Fehler
+    unterscheiden koennen: Ein Retry hilft hier nicht, es braucht Migration + Settings.
+    """
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """Ruft text-embedding-3-small ueber den LiteLLM-Proxy auf (HTTP, OpenAI-kompatibel).
+    """Ruft das konfigurierte Embedding-Modell ueber den LiteLLM-Proxy auf.
 
     Konsistent mit dem Chat-Pfad: Das Backend spricht den LiteLLM-Proxy ausschliesslich
-    ueber HTTP an (kein litellm-SDK). Proxy-URL/Master-Key/SSL aus den Settings.
-    Sehr langer Input wird auf ``_MAX_EMBED_CHARS`` gekürzt (Token-Limit des Modells).
-    Wirft httpx.HTTPError bei Fehlern (Aufrufer behandelt).
+    ueber HTTP an (kein litellm-SDK), OpenAI-kompatibel. Modellname, Input-Cap und
+    erwartete Vektorbreite kommen aus den Settings; Proxy-URL/Master-Key/SSL ebenso.
+
+    Sehr langer Input wird auf ``EMBEDDING_MAX_CHARS`` gekuerzt — konservativer Zeichen-Cap
+    (Zeichen != Token, sicher selbst bei dichter Tokenisierung) gegen 400er bei sehr langen
+    Knoten; fuer die semantische Einbettung genuegt der Textanfang.
+
+    Wirft ``httpx.HTTPError`` bei Transportfehlern und ``EmbeddingDimensionError``, wenn die
+    gelieferte Vektorbreite nicht zu ``EMBEDDING_DIMENSIONS`` passt (Aufrufer behandeln).
     """
     from app.config import settings
-    text = text[:_MAX_EMBED_CHARS]
+    text = text[: settings.embedding_max_chars]
+    payload: dict = {"model": settings.embedding_model, "input": [text]}
+    # Nur fuer Modelle, die das Kuerzen unterstuetzen (OpenAI text-embedding-3-*);
+    # andere Anbieter quittieren den unbekannten Parameter mit 400.
+    if settings.embedding_send_dimensions:
+        payload["dimensions"] = settings.embedding_dimensions
     async with httpx.AsyncClient(timeout=30.0, verify=settings.litellm_verify_ssl) as client:
         response = await client.post(
             f"{settings.litellm_proxy_url}/embeddings",
             headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
-            json={"model": "text-embedding-3-small", "input": [text]},
+            json=payload,
         )
         response.raise_for_status()
         data = response.json()
-    return data["data"][0]["embedding"]
+    embedding = data["data"][0]["embedding"]
+    expected = settings.embedding_dimensions
+    if len(embedding) != expected:
+        # Frueh und mit klarer Ansage abbrechen. Ohne diese Pruefung scheitert erst der
+        # DB-Insert mit einer pgvector-Fehlermeldung, die die Ursache nicht nennt.
+        raise EmbeddingDimensionError(
+            f"Modell '{settings.embedding_model}' liefert {len(embedding)} Dimensionen, "
+            f"erwartet werden {expected}. EMBEDDING_DIMENSIONS und die Spaltenbreite von "
+            f"context_nodes.embedding pruefen (Migration + Re-Embedding noetig)."
+        )
+    return embedding
 
 
 async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:

@@ -33,6 +33,23 @@ class Settings(BaseSettings):
     # Inline-Embedding-Generierung beim Anlegen/Ändern von Knoten (enqueue_embedding_job).
     # In Tests deaktivierbar, da dort kein LiteLLM-Proxy läuft.
     embeddings_enabled: bool = True
+    # ── Embedding-Modell (Kontextspeicher) ────────────────────────────────────
+    # Der Name, unter dem der LiteLLM-Proxy das Embedding-Modell führt. Die Defaults
+    # entsprechen bewusst dem BISHERIGEN Stand (OpenAI text-embedding-3-small, 1536
+    # Dimensionen), damit bestehende Installationen ohne .env-Änderung weiterlaufen.
+    # Der Wechsel auf ein anderes Modell (z. B. BGE-M3 mit 1024 Dimensionen) läuft über
+    # .env + Migration + vollständiges Re-Embedding — siehe docs/runbooks/modellwechsel.md.
+    embedding_model: str = "text-embedding-3-small"
+    # Vektorbreite. MUSS zur Spalte `context_nodes.embedding` passen; ein Wechsel
+    # erfordert eine Migration und ein Re-Embedding aller Knoten (alte Vektoren eines
+    # anderen Modells sind semantisch wertlos, nicht nur formal inkompatibel).
+    embedding_dimensions: int = 1536
+    # Zeichen-Cap vor dem Embedding-Call (Token-Limit des Modells; konservativ, da
+    # Zeichen ≠ Token). text-embedding-3-small und BGE-M3 liegen beide bei ~8k Tokens.
+    embedding_max_chars: int = 16000
+    # `dimensions`-Parameter mitsenden. Nur für Modelle, die das Kürzen der Vektorbreite
+    # unterstützen (OpenAI text-embedding-3-*). BGE-M3 lehnt den Parameter ab.
+    embedding_send_dimensions: bool = False
     frontend_origin: str = "http://localhost:5173"
     environment: str = "development"
     auth_config_path: str = "config/auth.yaml"

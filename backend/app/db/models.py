@@ -12,6 +12,8 @@ from pgvector.sqlalchemy import Vector
 import enum
 from typing import Optional
 
+from app.config import settings
+
 
 class Base(DeclarativeBase):
     pass
@@ -722,7 +724,12 @@ class ContextNode(Base):
     metadata_: Mapped[dict] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=text("'{}'")
     )
-    embedding: Mapped[Optional[list]] = mapped_column(Vector(1536), nullable=True)
+    # Vektorbreite aus den Settings (EMBEDDING_DIMENSIONS) — muss zur tatsächlich in der
+    # DB angelegten Spalte passen. Ein Wechsel läuft über Migration + Re-Embedding, nicht
+    # über die .env allein; siehe docs/runbooks/modellwechsel.md.
+    embedding: Mapped[Optional[list]] = mapped_column(
+        Vector(settings.embedding_dimensions), nullable=True
+    )
 
     owner_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     read_scope: Mapped[str] = mapped_column(
