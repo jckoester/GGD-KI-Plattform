@@ -213,9 +213,11 @@ docker compose exec backend python scripts/embedding_backfill.py --dry-run
 docker compose exec backend python scripts/embedding_backfill.py --reindex
 ```
 
-> **LiteLLM muss erreichbar sein** (`text-embedding-3-small`). Das Skript nutzt
-> dieselbe LiteLLM-Konfiguration wie das Backend. Bei Fehlern den Eintrag
-> `metadata_['embedding_error']` der betroffenen Knoten prüfen.
+> **LiteLLM muss erreichbar sein** und das unter `EMBEDDING_MODEL` konfigurierte Modell
+> anbieten. Das Skript nutzt dieselbe LiteLLM-Konfiguration wie das Backend. Bei Fehlern den
+> Eintrag `metadata_['embedding_error']` der betroffenen Knoten prüfen — dort landet auch der
+> Hinweis, wenn die Vektorbreite des Modells nicht zu `EMBEDDING_DIMENSIONS` passt
+> (siehe [Runbook: Embedding-Modell wechseln](../runbooks/modellwechsel.md)).
 
 > **Automatik:** Der `cron`-Container füllt fehlende Embeddings ohnehin nächtlich
 > (03:15 Uhr) nach. Der manuelle Lauf ist nur sinnvoll, wenn die Daten sofort

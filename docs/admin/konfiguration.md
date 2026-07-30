@@ -20,6 +20,10 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `LITELLM_MASTER_KEY` | Zugangsschlüssel für LiteLLM-Admin-API | `sk-...` |
 | `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat | `gpt-4o-mini` |
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel | `gpt-4o-mini` |
+| `EMBEDDING_MODEL` | Modell für die Embeddings des Kontextspeichers | `text-embedding-3-small` |
+| `EMBEDDING_DIMENSIONS` | Vektorbreite — **muss zur Spalte passen**, s. u. | `1536` |
+| `EMBEDDING_MAX_CHARS` | Zeichen-Cap vor dem Embedding-Call | `16000` |
+| `EMBEDDING_SEND_DIMENSIONS` | `dimensions`-Parameter mitsenden (nur OpenAI `text-embedding-3-*`) | `false` |
 | `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (für CORS) | `https://ki.beispielschule.de` |
 | `ENVIRONMENT` | `development` oder `production` | `production` |
 | `NGINX_PORT` | Host-Port, auf dem nginx lauscht (Default `80`; höher setzen, wenn ein Reverse-Proxy davorliegt) | `8080` |
@@ -38,6 +42,29 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 > **Wichtig:** `SCHOOL_SECRET` darf nach der ersten Inbetriebnahme nie geändert
 > werden. Alle Pseudonyme würden sich dadurch ändern — bestehende Nutzerkonten
 > und Gesprächsverläufe wären nicht mehr zuordenbar.
+
+### Modelle wechseln
+
+Alle Modellnamen oben sind die Namen, unter denen der **LiteLLM-Proxy** die Modelle führt —
+nicht die IDs der Anbieter. Ein Modellwechsel ist damit Konfigurationsarbeit: Eintrag in der
+`model_list` des Proxys anpassen bzw. ergänzen, Variable in `.env` umstellen, Backend neu
+starten. Für Chat-, Titel- und Bildmodelle ist das alles.
+
+> ⚠️ **`EMBEDDING_DIMENSIONS` ist die Ausnahme.** Der Wert muss zur Spaltenbreite von
+> `context_nodes.embedding` passen. Ihn zu ändern heißt: Schema angleichen **und** alle
+> Knoten neu einbetten — Vektoren verschiedener Modelle sind nicht vergleichbar, es gibt
+> kein Umrechnen. Während der Umstellung liefert die semantische Suche keine Treffer.
+> Ablauf: **[Runbook: Embedding-Modell wechseln](../runbooks/modellwechsel.md)**.
+>
+> Passen Konfiguration und Spalte nicht zusammen, bricht die Embedding-Generierung mit einer
+> `EmbeddingDimensionError` ab, die beide Breiten und den Modellnamen nennt — das Anlegen von
+> Knoten schlägt dadurch aber nicht fehl (Embedding ist kein kritischer Pfad).
+
+Damit Kosten und Budgets greifen, braucht **jedes** Modell in der LiteLLM-Config
+`model_info.input_cost_per_token` / `output_cost_per_token`. Für Modelle, die LiteLLM nicht
+aus seiner eingebauten Preistabelle kennt (alles, was über `openai/<id>` mit eigener
+`api_base` läuft), bleibt der Spend sonst bei **0** — Budget-Tiers und Kostenstatistik
+laufen dann ins Leere.
 
 ---
 

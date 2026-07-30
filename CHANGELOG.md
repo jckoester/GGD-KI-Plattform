@@ -3,6 +3,39 @@
 Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/) (0.x = vor dem ersten Stable-Release).
 
+## [Unreleased]
+
+### Geändert
+- **Embedding-Modell ist konfigurierbar.** Modellname, Vektorbreite, Input-Cap und der
+  optionale `dimensions`-Parameter kommen aus der `.env` (`EMBEDDING_MODEL`,
+  `EMBEDDING_DIMENSIONS`, `EMBEDDING_MAX_CHARS`, `EMBEDDING_SEND_DIMENSIONS`) statt aus
+  Literalen im Code. Die Defaults entsprechen dem bisherigen Stand
+  (`text-embedding-3-small`, 1536) — **bestehende Installationen brauchen keine Änderung.**
+- Passt die Vektorbreite des Modells nicht zur Konfiguration, bricht die Embedding-Generierung
+  mit einer `EmbeddingDimensionError` ab, die beide Breiten und den Modellnamen nennt (vorher:
+  unverständlicher pgvector-Fehler beim Schreiben).
+- `alembic revision --autogenerate` erzeugt wieder brauchbare Migrationen: 21 Altlasten
+  zwischen Modellen und Schema beseitigt (fehlende `Text`-Typen und Indizes in
+  `app/db/models.py`, Migration `0042` für zwei DB-seitige Abweichungen). Vorher hätte
+  `--autogenerate` eine Migration erzeugt, die sechs Indizes löscht.
+- `pytest tests/` läuft wieder vollständig durch: `alembic/env.py` deaktivierte über
+  `fileConfig` sämtliche `app.*`-Logger, wodurch ein Test im kombinierten Lauf fehlschlug.
+
+### Neu
+- **Runbook [Embedding-Modell wechseln](docs/runbooks/modellwechsel.md)** — Schema angleichen,
+  Re-Embedding, Verifikation, Rollback.
+- `backend/scripts/resize_embedding_column.py` (`--dry-run` / Rückfrage / `--yes`) für den
+  Wechsel der Vektorbreite im laufenden Betrieb.
+- ESLint ist im Frontend erstmals einsatzfähig (`eslint.config.js` + lokale
+  devDependencies); `npm run lint` lief vorher ins Leere.
+
+### Migration
+- `alembic upgrade head` einspielen (`0042`, `0043`).
+- `0043` ist **idempotent**: Bei unverändertem `EMBEDDING_DIMENSIONS` passiert nichts und
+  vorhandene Embeddings bleiben erhalten. Nur wer die Breite ändert, braucht anschließend ein
+  vollständiges Re-Embedding (`scripts/embedding_backfill.py`) — bis dahin liefert die
+  semantische Suche keine Treffer. Ablauf im Runbook oben.
+
 ## [0.3.0] – 2026-07-16
 
 Schwerpunkte: Unterrichtsplanung, pädagogische und rechtliche Leitplanken

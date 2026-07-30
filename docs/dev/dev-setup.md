@@ -164,9 +164,13 @@ createdb -U postgres litellm
 cp infra/litellm_config.dev.example.yaml infra/litellm_config.dev.yaml
 ```
 
-Die Dev-Config exponiert die Modellnamen, die der Code erwartet: `gpt-4`
-(Chat/Titel), `text-embedding-3-small` (in `app/context/embedding.py`
-fest verdrahtet), `gpt-image-1.5` (Bild, optional) sowie `ollama-fallback`.
+Die Dev-Config exponiert die Modellnamen, die die `.env` anfragt: `gpt-4`
+(`CHAT_DEFAULT_MODEL` / `TITLE_MODEL`), `text-embedding-3-small` (`EMBEDDING_MODEL`),
+`gpt-image-1.5` (`IMAGE_DEFAULT_MODEL`, optional) sowie `ollama-fallback`.
+Kein Modellname steht im Code — wer andere Namen verwenden will, ändert `model_name`
+in dieser Config und die passende Variable in `.env`. Beim Embedding-Modell zusätzlich
+`EMBEDDING_DIMENSIONS` beachten, siehe
+[Runbook: Embedding-Modell wechseln](../runbooks/modellwechsel.md).
 Die Jugendschutz-Guardrails aus `infra/litellm_config.example.yaml` (Produktion)
 sind hier bewusst weggelassen.
 

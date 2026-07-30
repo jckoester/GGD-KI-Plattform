@@ -30,7 +30,9 @@ model_list:
       api_key: os.environ/OPENAI_API_KEY
 
   # ── Embeddings ──────────────────────────────────────────────────────────────
-  # Fest von app/context/embedding.py erwartet (Model-Name hardcodiert).
+  # model_name entspricht EMBEDDING_MODEL in .env (Default: text-embedding-3-small).
+  # Beim Tausch auch EMBEDDING_DIMENSIONS anpassen — die Vektorbreite hängt an einer
+  # Spalte und erfordert Migration + Re-Embedding: docs/runbooks/modellwechsel.md.
   - model_name: text-embedding-3-small
     litellm_params:
       model: openai/text-embedding-3-small

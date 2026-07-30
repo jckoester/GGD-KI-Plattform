@@ -24,7 +24,9 @@ Gilt für Erstimport und Re-Import bei aktualisiertem Bildungsplan oder erweiter
   ```bash
   cd backend && alembic upgrade head
   ```
-- LiteLLM für `text-embedding-3-small` erreichbar (erfordert `LITELLM_PROXY_URL` und `LITELLM_MASTER_KEY` in `.env`)
+- LiteLLM erreichbar und bietet das unter `EMBEDDING_MODEL` konfigurierte Modell an
+  (erfordert `LITELLM_PROXY_URL` und `LITELLM_MASTER_KEY` in `.env`). Zum Tauschen des
+  Modells siehe [Modellwechsel](modellwechsel.md)
 
 ---
 
