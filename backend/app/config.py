@@ -82,12 +82,33 @@ class Settings(BaseSettings):
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
-    # Bildgenerierung (Phase 16) — Default-Bildmodell, Standardgröße (nur abgerechnete
-    # Größen verwenden, sonst Spend=0-Risiko) und großzügigeres Timeout, da die
+    # ── Bildgenerierung (Phase 16) ────────────────────────────────────────────
+    # Default-Bildmodell (Name laut LiteLLM-Config) und großzügigeres Timeout, da die
     # Generierung Sekunden dauert und (anders als Chat) nicht gestreamt wird.
     image_default_model: str = "gpt-image-1"
-    image_default_size: str = "1024x1024"
     image_generation_timeout: float = 120.0
+    # `response_format` für /images/generations. `b64_json` erzwingt Base64 — nötig für
+    # Modelle, die sonst eine (extern gehostete) URL liefern würden; die verarbeitet der
+    # Client bewusst nicht (Datenschutzgrenze). **Leer** = Parameter weglassen, für Modelle,
+    # die ihn ablehnen und ohnehin nur Base64 liefern (gpt-image-1).
+    #
+    # Default leer, weil das dem bisherigen (hartcodierten) Verhalten entspricht: gpt-image-1
+    # würde den Parameter mit 400 quittieren. Für FLUX/SDXL auf `b64_json` setzen.
+    image_response_format: str = ""
+    # Benannte Bildformate: Name → Pixelgröße. Der Name ist das, was das Modell im
+    # `generate_image`-Tool wählt; die Pixelgröße geht an den Provider. Ein Anbieterwechsel
+    # ändert damit nur die rechte Seite — die Schnittstelle zum Modell bleibt gleich.
+    #
+    # ⚠️ Nur Größen eintragen, für die in der LiteLLM-Config ein Preis hinterlegt ist:
+    # sonst bleibt der Spend bei 0 und Budgets/Statistik greifen nicht. Die Defaults sind
+    # gpt-image-1-Größen; SDXL/FLUX kennen andere (z. B. 1152x896, 1344x768).
+    image_sizes: dict[str, str] = {
+        "quadratisch": "1024x1024",
+        "hoch": "1024x1536",
+        "quer": "1536x1024",
+    }
+    # Format, das gilt, wenn das Modell keines oder ein unbekanntes angibt.
+    image_default_format: str = "quadratisch"
     image_blocklist_path: str = "config/image_blocklist.yaml"
     # Ablage generierter Bilder (repo-root-relativ, falls nicht absolut) + harte
     # Maximal-Aufbewahrung als Backstop. Normalerweise stirbt ein Bild mit seiner
@@ -123,6 +144,27 @@ class Settings(BaseSettings):
     # In Docker absolut aufs ./data-Volume setzen (persistent), sonst repo-root-relativ.
     export_template_dir: str = "data/export_templates"
     export_reference_max_bytes: int = 5_242_880  # 5 MB
+
+    @model_validator(mode="after")
+    def _require_consistent_image_formats(self) -> "Settings":
+        """`IMAGE_DEFAULT_FORMAT` muss ein Schlüssel aus `IMAGE_SIZES` sein.
+
+        Bewusst ein harter Fehler statt einer stillen Korrektur: Eine falsche Größe wird
+        beim Provider unter Umständen erzeugt, aber nicht abgerechnet (Spend = 0) — das
+        fällt sonst erst auf, wenn die Budget-Statistik nicht mehr stimmt. Die Prüfung
+        kostet nichts und die Fehlermeldung nennt die gültigen Werte.
+        """
+        if not self.image_sizes:
+            raise ValueError(
+                "IMAGE_SIZES ist leer. Mindestens ein Format als Name→Pixelgröße angeben, "
+                'z. B. {"quadratisch": "1024x1024"}.'
+            )
+        if self.image_default_format not in self.image_sizes:
+            raise ValueError(
+                f"IMAGE_DEFAULT_FORMAT='{self.image_default_format}' ist kein Schlüssel aus "
+                f"IMAGE_SIZES. Gültig: {', '.join(sorted(self.image_sizes))}."
+            )
+        return self
 
     @model_validator(mode="after")
     def _require_strong_master_key_in_prod(self) -> "Settings":

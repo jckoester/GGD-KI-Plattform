@@ -314,18 +314,21 @@ async def test_generate_image_handler_happy_path():
     with patch.object(router, "LiteLLMClient", return_value=instance), \
          patch.object(router, "save_generated_image", new=AsyncMock(return_value=img_id)) as save:
         result = await router._exec_generate_image(
-            {"prompt": "ein roter Würfel", "size": "1024x1024"}, ctx,
+            {"prompt": "ein roter Würfel", "format": "quadratisch"}, ctx,
         )
 
     assert result["status"] == "ok"
-    assert result["size"] == "1024x1024"
+    assert result["format"] == "quadratisch"
+    assert result["size"] == settings.image_sizes["quadratisch"]
     assert result["image_id"] == str(img_id)
     assert result["cost_usd"] == 0.03  # Kosten fürs Buchen (Schritt 7)
     call = instance.generate_image.await_args
     assert call.kwargs["api_key"] == "sk-user"
     assert call.kwargs["user"] == "pseudo-9"
     assert call.kwargs["model"] == settings.image_default_model
-    assert call.kwargs["response_format"] is None  # gpt-image-1 lehnt den Param ab
+    # Aus der Konfiguration, nicht hartcodiert: leer = Parameter weglassen (gpt-image-1),
+    # 'b64_json' = Base64 erzwingen (FLUX/SDXL). Beide Fälle in test_image_formats.py.
+    assert call.kwargs["response_format"] == (settings.image_response_format or None)
     instance.close.assert_awaited_once()
     save_call = save.await_args
     assert save_call.kwargs["pseudonym"] == "pseudo-9"
@@ -334,7 +337,7 @@ async def test_generate_image_handler_happy_path():
 
 
 async def test_generate_image_invalid_size_falls_back_to_default():
-    """Nicht-Standard-Größe → settings.image_default_size (Spend=0-Schutz)."""
+    """Unbekanntes Format → Default-Format (Spend=0-Schutz)."""
     from app.chat import router
     instance = MagicMock()
     instance.generate_image = AsyncMock(
@@ -349,8 +352,10 @@ async def test_generate_image_invalid_size_falls_back_to_default():
          patch.object(router, "save_generated_image", new=AsyncMock(return_value=uuid4())):
         result = await router._exec_generate_image({"prompt": "x", "size": "999x999"}, ctx)
 
-    assert result["size"] == settings.image_default_size
-    assert instance.generate_image.await_args.kwargs["size"] == settings.image_default_size
+    expected = settings.image_sizes[settings.image_default_format]
+    assert result["size"] == expected
+    assert result["format"] == settings.image_default_format
+    assert instance.generate_image.await_args.kwargs["size"] == expected
 
 
 async def test_generate_image_handler_generation_error():

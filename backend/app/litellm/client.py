@@ -628,7 +628,9 @@ class LiteLLMClient:
             "model": model,
             "prompt": prompt,
             "n": n,
-            "size": size or settings.image_default_size,
+            # Ohne explizite Angabe die Pixelgröße des Default-Formats aus der Konfiguration.
+            # Der Aufrufer im Chat-Flow löst den Formatnamen bereits auf und übergibt sie.
+            "size": size or settings.image_sizes[settings.image_default_format],
             "user": user,
         }
         if response_format:

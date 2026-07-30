@@ -46,8 +46,45 @@ allgemeine Schalter für schulweites Teilen aus ist. Details in
 **Lokaler Bild-Fallback (sensibler Pfad):** Analog zum Ollama-Chat-Fallback kann ein
 lokaler, OpenAI-kompatibler Bild-Server (z. B. vLLM-Omni) als Bild-Modell in LiteLLM
 eingetragen werden (`infra/litellm_config.yaml`, `model_info.mode: image_generation`).
-Der Client fordert stets Base64 an — es werden **keine** extern gehosteten Bild-URLs
-verarbeitet, die Bytes bleiben im Schulnetz. Vor dem Produktivbetrieb end-to-end testen.
+Es werden **keine** extern gehosteten Bild-URLs verarbeitet, die Bytes bleiben im Schulnetz.
+Vor dem Produktivbetrieb end-to-end testen.
+
+### Bildformate festlegen (`IMAGE_SIZES`)
+
+Welche Formate zur Wahl stehen, bestimmt die `.env` — nicht der Code:
+
+```bash
+IMAGE_SIZES={"quadratisch":"1024x1024","hoch":"1024x1536","quer":"1536x1024"}
+IMAGE_DEFAULT_FORMAT=quadratisch
+```
+
+Links steht der **Name**, den das Modell im Chat wählt; rechts die Pixelgröße, die an den
+Anbieter geht. Tool-Schema, Auswahlliste und Beschreibungstext entstehen automatisch aus
+dieser Zuordnung — zusätzliche Formate lassen sich also frei ergänzen, z. B. ein
+`"panorama":"1344x768"` für Tafelbilder oder ein `"poster":"896x1152"`. Ein Anbieterwechsel
+ändert nur die rechte Seite: Die Namen bleiben, und damit bleibt auch das Vokabular stabil,
+das in Gesprächsverläufen steht.
+
+> ⚠️ **Nur Größen eintragen, für die in der LiteLLM-Config ein Preis hinterlegt ist.** Sonst
+> erzeugt der Anbieter das Bild, LiteLLM rechnet aber **0** ab — Budgets und Kostenstatistik
+> greifen dann nicht. Weil das Modell ausschließlich Namen aus dieser Liste wählen kann, ist
+> die Liste zugleich der Schutz dagegen. Ein `IMAGE_DEFAULT_FORMAT`, das nicht in
+> `IMAGE_SIZES` steht, verhindert den Start mit einer entsprechenden Meldung.
+
+Die Default-Größen oben sind **gpt-image-1-Größen**. SDXL und FLUX kennen andere (etwa
+`1152x896`, `1344x768`, `896x1152`) — bei einem Wechsel also mit anpassen.
+
+### Base64 erzwingen (`IMAGE_RESPONSE_FORMAT`)
+
+| Wert | Wann |
+|---|---|
+| *(leer, Default)* | Modelle, die den Parameter ablehnen und ohnehin nur Base64 liefern — **gpt-image-1** |
+| `b64_json` | Modelle, die sonst eine extern gehostete URL liefern würden — **FLUX, SDXL** |
+
+Der zweite Fall ist kein Feinschliff, sondern Voraussetzung: Liefert der Anbieter eine URL,
+bricht das Backend bewusst ab, statt die Bytes über einen zweiten Request beim Anbieter
+abzuholen. Wer auf FLUX/SDXL umstellt und diesen Wert nicht setzt, bekommt daher gar keine
+Bilder.
 
 **Kosten:** Bildgenerierung läuft über das **bestehende** USD-Budget der Nutzer:innen
 (kein separates Kontingent). Siehe [Budget-System → Bildgenerierung](budget.md).

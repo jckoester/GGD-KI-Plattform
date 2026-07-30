@@ -101,7 +101,7 @@ async def test_generate_image_uses_user_key_and_payload_shape():
 
 @pytest.mark.asyncio
 async def test_generate_image_size_defaults_from_settings():
-    """Ohne size-Argument greift settings.image_default_size."""
+    """Ohne size-Argument greift die Pixelgröße des Default-Formats."""
     client = LiteLLMClient()
     http_client = AsyncMock()
     http_client.post = AsyncMock(return_value=_mock_response(
@@ -113,7 +113,8 @@ async def test_generate_image_size_defaults_from_settings():
             "x", model="gpt-image-1", api_key="k", user="u",
         )
 
-    assert http_client.post.await_args.kwargs["json"]["size"] == settings.image_default_size
+    expected = settings.image_sizes[settings.image_default_format]
+    assert http_client.post.await_args.kwargs["json"]["size"] == expected
 
 
 @pytest.mark.asyncio

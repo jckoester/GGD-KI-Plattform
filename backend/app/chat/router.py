@@ -484,40 +484,98 @@ register_tool(ChatTool(
 
 # ── Bildgenerierung (Phase 16) ────────────────────────────────────────────────
 
-_GENERATE_IMAGE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "generate_image",
-        "description": (
-            "Erzeugt ein Bild aus einer natürlichsprachlichen Beschreibung "
-            "(Text-zu-Bild). Nutze dieses Tool, wenn die Nutzerin oder der Nutzer ein "
-            "Bild, eine Illustration, eine Skizze oder eine Grafik erzeugt haben "
-            "möchte. Formuliere einen klaren, beschreibenden Bild-Prompt. Verwende "
-            "keine echten Personennamen oder personenbezogenen Daten im Prompt."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "prompt": {
-                    "type": "string",
-                    "description": "Beschreibung des gewünschten Bildes.",
-                },
-                "size": {
-                    "type": "string",
-                    "enum": ["1024x1024", "1024x1536", "1536x1024"],
-                    "description": (
-                        "Bildformat: quadratisch (1024x1024), hoch (1024x1536) oder "
-                        "quer (1536x1024). Standard: quadratisch."
-                    ),
-                },
-            },
-            "required": ["prompt"],
-        },
-    },
-}
+def _format_hint(pixels: str) -> str:
+    """`'1344x768'` → `'1344x768, quer 7:4'`; beschreibt ein Format selbsterklärend.
 
-# Nur abgerechnete Standardgrößen zulassen (sonst Spend=0-Risiko bei LiteLLM).
-_ALLOWED_IMAGE_SIZES = {"1024x1024", "1024x1536", "1536x1024"}
+    Ohne diesen Zusatz müsste das Modell aus den nackten Pixelzahlen erschließen, ob ein
+    Format hoch oder quer ist — und ein Wunsch wie „in 16:9" träfe nur zufällig. Die
+    Ableitung macht die Beschreibung außerdem unabhängig davon, wie der Admin seine Formate
+    benennt: Auch bei `breitbild` oder `A4` steht die Orientierung dabei.
+
+    Unlesbare Verhältnisse (teilerfremde Kantenlängen wie 1000×619) werden weggelassen —
+    dann bleibt es bei der Orientierung. Nicht parsebare Werte gehen unverändert durch.
+    """
+    from math import gcd
+
+    try:
+        width, height = (int(part) for part in str(pixels).lower().split("x", 1))
+    except (ValueError, TypeError):
+        return str(pixels)
+    if width <= 0 or height <= 0:
+        return str(pixels)
+
+    if width == height:
+        return f"{pixels}, 1:1"
+
+    orientation = "quer" if width > height else "hochkant"
+    divisor = gcd(width, height)
+    ratio_w, ratio_h = width // divisor, height // divisor
+    # Nur „runde" Verhältnisse nennen — 1000:619 hilft niemandem.
+    if ratio_w <= 21 and ratio_h <= 21:
+        return f"{pixels}, {orientation} {ratio_w}:{ratio_h}"
+    return f"{pixels}, {orientation}"
+
+
+def _build_generate_image_tool() -> dict:
+    """Baut das Tool-Schema aus `settings.image_sizes`.
+
+    Das Modell wählt einen **Formatnamen**, keine Pixelgröße — die Zuordnung liegt in der
+    Konfiguration. Ein Anbieterwechsel (gpt-image-1 → FLUX/SDXL mit anderen Größen) ändert
+    damit nur die Konfiguration, nicht das Vokabular, das im Gesprächsverlauf landet. Und
+    das Modell kann keine Größe erfinden, für die kein Preis hinterlegt ist.
+
+    Wird beim Import einmal ausgewertet: Settings kommen aus der `.env` und ändern sich zur
+    Laufzeit nicht. Tests rufen die Funktion direkt auf, um andere Konfigurationen zu prüfen.
+    """
+    formats = settings.image_sizes
+    listing = "; ".join(f"{name} ({_format_hint(size)})" for name, size in formats.items())
+    return {
+        "type": "function",
+        "function": {
+            "name": "generate_image",
+            "description": (
+                "Erzeugt ein Bild aus einer natürlichsprachlichen Beschreibung "
+                "(Text-zu-Bild). Nutze dieses Tool, wenn die Nutzerin oder der Nutzer ein "
+                "Bild, eine Illustration, eine Skizze oder eine Grafik erzeugt haben "
+                "möchte. Formuliere einen klaren, beschreibenden Bild-Prompt. Verwende "
+                "keine echten Personennamen oder personenbezogenen Daten im Prompt."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "Beschreibung des gewünschten Bildes.",
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": list(formats),
+                        "description": (
+                            f"Bildformat, passend zum Einsatzzweck. Verfügbar: {listing}. "
+                            f"Standard: {settings.image_default_format}."
+                        ),
+                    },
+                },
+                "required": ["prompt"],
+            },
+        },
+    }
+
+
+_GENERATE_IMAGE_TOOL = _build_generate_image_tool()
+
+
+def _resolve_image_format(name: Optional[str]) -> tuple[str, str]:
+    """Formatname → (Name, Pixelgröße). Unbekanntes/fehlendes fällt auf den Default zurück.
+
+    Bewusst tolerant statt fehlerhaft: Ein Modell, das einen unpassenden Namen liefert, soll
+    ein Bild im Standardformat bekommen und nicht die ganze Anfrage verlieren. Die Rückgabe
+    ist immer eine konfigurierte — also abgerechnete — Größe.
+    """
+    formats = settings.image_sizes
+    if name not in formats:
+        name = settings.image_default_format
+    return name, formats[name]
 
 
 def _image_prompt_block_reason(prompt: str) -> Optional[str]:
@@ -557,9 +615,9 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         logger.error("generate_image: keine conversation_id im ToolContext")
         return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
 
-    size = args.get("size")
-    if size not in _ALLOWED_IMAGE_SIZES:
-        size = settings.image_default_size
+    # `format` ist das neue Feld; `size` bleibt als Fallback, falls ein Modell noch die alte
+    # Pixel-Schreibweise liefert — ein passender Name gewinnt, sonst greift der Default.
+    format_name, size = _resolve_image_format(args.get("format") or args.get("size"))
 
     client = LiteLLMClient()
     try:
@@ -569,7 +627,10 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             api_key=ctx.litellm_key,
             user=ctx.user.sub,
             size=size,
-            response_format=None,  # gpt-image-1 liefert immer Base64 und lehnt den Param ab
+            # Leer = Parameter weglassen (gpt-image-1 lehnt ihn ab und liefert ohnehin
+            # Base64). `b64_json` erzwingt Base64 bei Modellen, die sonst eine URL liefern —
+            # die verarbeitet der Client bewusst nicht.
+            response_format=settings.image_response_format or None,
         )
     except Exception:
         logger.exception("Bildgenerierung fehlgeschlagen")
@@ -597,6 +658,9 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     return {
         "status": "ok",
         "image_id": str(image_id),
+        # Beides zurückgeben: der Name ist das, was das Modell versteht, die Pixelgröße das,
+        # was tatsächlich erzeugt (und abgerechnet) wurde.
+        "format": format_name,
         "size": size,
         "cost_usd": result.cost_usd,
         "note": "Bild wurde erzeugt und gespeichert.",

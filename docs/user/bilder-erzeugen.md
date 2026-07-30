@@ -21,6 +21,21 @@ einen Chat damit.
    kannst du es **herunterladen** oder mit dem Lesezeichen-Symbol in deine
    [Bibliothek](bibliothek.md) übernehmen — sonst verschwindet es mit dem Chat.
 
+## Hoch, quer oder quadratisch?
+
+Es gibt kein Auswahlfeld für das Bildformat — **sag es einfach im Chat mit**:
+
+> „Zeichne mir ein Vulkan-Schema, **hochkant**."
+> „Das Ganze bitte **quer**, für eine Präsentationsfolie."
+
+Ohne Angabe kommt das Standardformat (meist quadratisch). Welche Formate zur Verfügung
+stehen, legt die Schule fest — neben quadratisch, hoch und quer kann es weitere geben,
+etwa ein breites Format für Tafelbilder. Wenn du unsicher bist, frag den Assistenten
+einfach: „Welche Bildformate kannst du?"
+
+> **Tipp für Lehrkräfte:** Soll ein Assistent *immer* dasselbe Format liefern, lässt sich
+> das in seinen Anweisungen festlegen — dann muss es niemand jedes Mal dazusagen.
+
 ## Grenzen
 
 - **KI-Bilder können fehlerhaft sein** und eignen sich **nicht** zur Darstellung
