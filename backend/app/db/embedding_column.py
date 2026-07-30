@@ -66,19 +66,31 @@ class ResizeResult:
     cleared: int = 0
 
 
-def current_dimension(conn) -> int | None:
-    """Aktuelle Vektorbreite der Spalte aus dem Katalog.
-
-    Gibt ``None`` zurück, wenn die Spalte fehlt oder keine Breitenangabe trägt
-    (``vector`` ohne Typmod) — beides wird von der Umstellung als „unbekannt" behandelt.
-    """
-    raw = conn.exec_driver_sql(_CURRENT_DIM_SQL).scalar()
+def _parse_dim(raw: str | None) -> int | None:
+    """``'vector(1536)'`` → ``1536``; ``None``/``'vector'`` → ``None``."""
     if not raw or "(" not in raw:
         return None
     try:
         return int(raw.split("(", 1)[1].rstrip(")"))
     except ValueError:
         return None
+
+
+def current_dimension(conn) -> int | None:
+    """Aktuelle Vektorbreite der Spalte aus dem Katalog (synchron).
+
+    Für Migration und Wartungsskript. Gibt ``None`` zurück, wenn die Spalte fehlt oder keine
+    Breitenangabe trägt (``vector`` ohne Typmod) — beides wird als „unbekannt" behandelt.
+    """
+    return _parse_dim(conn.exec_driver_sql(_CURRENT_DIM_SQL).scalar())
+
+
+async def current_dimension_async(session) -> int | None:
+    """Wie :func:`current_dimension`, aber für eine ``AsyncSession`` (Backend-Startup)."""
+    from sqlalchemy import text as sa_text
+
+    result = await session.execute(sa_text(_CURRENT_DIM_SQL))
+    return _parse_dim(result.scalar())
 
 
 def resize_embedding_column(conn, target: int, *, dry_run: bool = False) -> ResizeResult:

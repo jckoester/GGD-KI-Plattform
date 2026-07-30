@@ -47,12 +47,64 @@ from app.artifacts.router import router as artifacts_router
 logger = logging.getLogger(__name__)
 
 
+async def check_embedding_dimension() -> bool:
+    """Prüft, ob `EMBEDDING_DIMENSIONS` zur Spalte `context_nodes.embedding` passt.
+
+    Ohne diesen Check bleibt eine Fehlkonfiguration (Modell gewechselt, Migration vergessen)
+    lange unentdeckt: Die Embedding-Generierung ist bewusst kein kritischer Pfad, Fehler
+    landen nur pro Knoten in `metadata.embedding_error`. Nach außen sieht es dann nur so aus,
+    als fände die semantische Suche nichts.
+
+    **Kein Hard-Fail.** Ein Detail des Kontextspeichers darf nicht die gesamte Plattform am
+    Start hindern — Chat, Assistenten und Unterrichtsplanung funktionieren ohne Embeddings
+    weiter. Auch ein nicht ermittelbarer Wert (frische DB vor `alembic upgrade`, Tabelle noch
+    nicht da) ist kein Fehler, sondern wird nur vermerkt.
+
+    Gibt True zurück, wenn Konfiguration und Spalte übereinstimmen.
+    """
+    from app.db.embedding_column import current_dimension_async
+
+    expected = settings.embedding_dimensions
+    try:
+        async with AsyncSessionLocal() as db:
+            actual = await current_dimension_async(db)
+    except Exception:
+        logger.warning(
+            "Vektorbreite von context_nodes.embedding nicht prüfbar (Tabelle/DB noch nicht "
+            "bereit?). EMBEDDING_DIMENSIONS=%d wird ungeprüft verwendet.", expected,
+        )
+        return False
+
+    if actual is None:
+        logger.warning(
+            "Vektorbreite von context_nodes.embedding nicht ermittelbar — Migrationen "
+            "eingespielt? (`alembic upgrade head`)"
+        )
+        return False
+    if actual != expected:
+        logger.error(
+            "KONFIGURATIONSFEHLER: context_nodes.embedding ist vector(%d), "
+            "EMBEDDING_DIMENSIONS=%d. Alle Embedding-Aufrufe werden fehlschlagen und die "
+            "semantische Suche bleibt ohne Treffer. Entweder EMBEDDING_DIMENSIONS auf %d "
+            "korrigieren, oder Schema und Vektoren angleichen: "
+            "python scripts/resize_embedding_column.py && "
+            "python scripts/embedding_backfill.py (siehe docs/runbooks/modellwechsel.md).",
+            actual, expected, actual,
+        )
+        return False
+    logger.info(
+        "Embedding-Konfiguration konsistent: %s @ vector(%d)",
+        settings.embedding_model, expected,
+    )
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Adapter vorab instanziieren — Konfigurationsfehler früh sichtbar
     from app.auth.dependencies import get_auth_adapter
     get_auth_adapter()
-    
+
     # Startup-Check: Wechselkurs prüfen
     from sqlalchemy import select, func
     async with AsyncSessionLocal() as db:
@@ -65,7 +117,10 @@ async def lifespan(app: FastAPI):
                 "Initialkurs mit scripts/seed_exchange_rate.py eintragen.",
                 settings.exchange_rate_fallback,
             )
-    
+
+    # Startup-Check: Vektorbreite gegen EMBEDDING_DIMENSIONS
+    await check_embedding_dimension()
+
     yield
 
 
