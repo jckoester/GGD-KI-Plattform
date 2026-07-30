@@ -138,3 +138,42 @@ async def test_dimension_is_read_from_settings_not_hardcoded(monkeypatch, caplog
         ok = await check_embedding_dimension()
 
     assert ok is True
+
+
+# ── CHAT_DEFAULT_MODEL ───────────────────────────────────────────────────────
+
+async def test_missing_chat_default_model_is_logged(monkeypatch, caplog):
+    """Ohne CHAT_DEFAULT_MODEL ginge ein leerer Modellname an LiteLLM.
+
+    Der Code hat dafür bewusst keinen Fallback mehr — ein Modellname im Code wäre ein
+    verstecktes Routing-Ziel, das niemand konfiguriert hat. Also muss der Start es melden.
+    """
+    from app.main import lifespan
+
+    monkeypatch.setattr(settings, "chat_default_model", "")
+    with patch("app.auth.dependencies.get_auth_adapter", MagicMock()), \
+         patch("app.main.check_embedding_dimension", AsyncMock(return_value=True)), \
+         _patch_session(lambda: _session_yielding(1)), \
+         caplog.at_level("ERROR", logger="app.main"):
+        async with lifespan(MagicMock()):
+            pass
+
+    errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+    assert any("CHAT_DEFAULT_MODEL" in m for m in errors)
+
+
+async def test_configured_chat_default_model_is_not_flagged(monkeypatch, caplog):
+    from app.main import lifespan
+
+    monkeypatch.setattr(settings, "chat_default_model", "chat-standard")
+    with patch("app.auth.dependencies.get_auth_adapter", MagicMock()), \
+         patch("app.main.check_embedding_dimension", AsyncMock(return_value=True)), \
+         _patch_session(lambda: _session_yielding(1)), \
+         caplog.at_level("ERROR", logger="app.main"):
+        async with lifespan(MagicMock()):
+            pass
+
+    assert not [
+        r for r in caplog.records
+        if r.levelname == "ERROR" and "CHAT_DEFAULT_MODEL" in r.getMessage()
+    ]

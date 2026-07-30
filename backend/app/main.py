@@ -121,6 +121,15 @@ async def lifespan(app: FastAPI):
     # Startup-Check: Vektorbreite gegen EMBEDDING_DIMENSIONS
     await check_embedding_dimension()
 
+    # Startup-Check: Standard-Chatmodell gesetzt?
+    if not settings.chat_default_model:
+        logger.error(
+            "CHAT_DEFAULT_MODEL ist nicht gesetzt. Chats ohne ausdrückliche Modellwahl "
+            "(und Assistenten ohne eigenes Modell) schlagen fehl, weil ein leerer "
+            "Modellname an LiteLLM geht. Den `model_name` aus der LiteLLM-Config eintragen "
+            "(z. B. CHAT_DEFAULT_MODEL=chat-standard)."
+        )
+
     yield
 
 

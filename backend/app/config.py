@@ -17,6 +17,16 @@ _PLACEHOLDER_SECRETS = {
 }
 
 
+# Regel für Modell-Defaults in dieser Datei (IONOS-Plan, Schritt 8):
+#
+# * `chat_default_model` / `title_model` sind **leer**. Beide Variablen sind in jeder
+#   Installation gesetzt; ein Anbietername als Code-Default wäre ein verstecktes
+#   Routing-Ziel, das niemand konfiguriert hat und das der Proxy womöglich gar nicht kennt.
+#   Fehlt `CHAT_DEFAULT_MODEL`, meldet das der Startup-Check in `app/main.py`.
+# * `embedding_model` und `image_default_model` behalten dagegen einen konkreten Default —
+#   beide Variablen sind neu, ihr Default IST also das bisherige Verhalten. Ein leerer Wert
+#   würde bestehende Installationen brechen, die die Variable noch nicht kennen. Sie zu
+#   neutralisieren lohnt erst, wenn alle Installationen sie explizit setzen.
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file="../.env",
@@ -64,7 +74,14 @@ class Settings(BaseSettings):
     # aktivieren. Standard-Log (ohne Werte: Claim-Keys + Anzahl) läuft immer.
     auth_debug_userinfo: bool = False
     jwt_algorithm: str = "HS256"
-    chat_default_model: str = "openai/gpt-4o-mini"
+    # ── Chat-Modelle ──────────────────────────────────────────────────────────
+    # Beides sind die Namen, unter denen der LiteLLM-Proxy die Modelle führt — nicht die
+    # IDs der Anbieter. Bewusst OHNE Code-Default: Ein hier hinterlegter Anbietername wäre
+    # ein verstecktes Routing-Ziel, das niemand konfiguriert hat und das der Proxy womöglich
+    # gar nicht kennt (dann: unverständlicher 400er). Fehlt der Wert, meldet das der
+    # Startup-Check in app/main.py.
+    chat_default_model: str = ""
+    # Leer = keine automatische Titelgenerierung (der Chat-Flow prüft darauf).
     title_model: str = ""
     exchange_rate_fallback: float = 1.10
     student_grades: list[int] = Field(default=[5, 6, 7, 8, 9, 10, 11, 12], alias="public_student_grades")
