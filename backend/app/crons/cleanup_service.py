@@ -14,6 +14,11 @@ from app.db.models import (
     PseudonymAudit,
     UserPreference,
 )
+from app.chat.image_store import (
+    collect_conversation_image_paths,
+    collect_pseudonym_image_paths,
+    unlink_paths,
+)
 from app.litellm.client import LiteLLMClient
 
 logger = logging.getLogger(__name__)
@@ -166,6 +171,10 @@ async def cleanup_inactive_accounts(
                             exc,
                         )
 
+                # Bilddateien dieses Pseudonyms vor dem Row-Delete aufsammeln, nach
+                # erfolgreichem Commit von Disk räumen (die Rows gehen per Cascade mit
+                # den Konversationen).
+                image_paths = await collect_pseudonym_image_paths(db, pseudonym)
                 try:
                     # Atomare lokale Löschung pro Pseudonym.
                     async with db.begin_nested():
@@ -182,6 +191,7 @@ async def cleanup_inactive_accounts(
                             delete(PseudonymAudit).where(PseudonymAudit.pseudonym == pseudonym)
                         )
                     await db.commit()
+                    unlink_paths(image_paths)
                     stats.deleted_local += 1
                 except Exception:
                     await db.rollback()
@@ -255,10 +265,12 @@ async def cleanup_stale_conversations(
             break
 
         stats.found += len(ids)
+        image_paths = await collect_conversation_image_paths(db, ids)
         try:
             async with db.begin_nested():
                 await db.execute(delete(Conversation).where(Conversation.id.in_(ids)))
             await db.commit()
+            unlink_paths(image_paths)
             stats.deleted_local += len(ids)
         except Exception:
             await db.rollback()

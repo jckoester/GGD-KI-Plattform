@@ -19,6 +19,7 @@
     } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import {
         getModels,
@@ -1530,6 +1531,29 @@
                                     (Jahresplan, Slot-Zuweisung, Themen)
                                 </span>
                             </label>
+                            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.tool_groups.includes('image_generation')}
+                                    onchange={(e) => {
+                                        if (e.currentTarget.checked) {
+                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'image_generation'), 'image_generation']
+                                        } else {
+                                            form.tool_groups = form.tool_groups.filter(g => g !== 'image_generation')
+                                        }
+                                    }}
+                                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                />
+                                Bildgenerierung
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    (erzeugt Bilder im Chat; Bild-Modell muss fürs Team freigegeben sein)
+                                </span>
+                            </label>
+                            {#if form.tool_groups.includes('image_generation') && (form.audience === 'student' || form.audience === 'all')}
+                                <WarningBanner
+                                    message="Jugendschutz: Dieser Assistent erzeugt Bilder und ist für Schüler:innen sichtbar. Ein schulweiter Bild-Assistent für Schüler:innen wird erst nach Admin-Freigabe aktiv. Bitte Zielgruppe und Jahrgänge (min./max.) bewusst wählen und die Blockliste beachten."
+                                />
+                            {/if}
                         </div>
                     {/if}
 

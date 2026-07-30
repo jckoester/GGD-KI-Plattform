@@ -1,0 +1,187 @@
+import os
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
+os.environ.setdefault("SCHOOL_SECRET", "test-school-secret")
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
+
+import app.artifacts.limits as limits
+import app.artifacts.store as store
+
+_NOW = datetime(2026, 7, 7, tzinfo=timezone.utc)
+
+
+# ── Limits (role-/jahrgangsbasiert) ──────────────────────────────────────────
+
+def test_get_artifact_limits_teacher_student_fallback():
+    cfg = {
+        "roles": {"teacher": {"retention_days": 730, "quota_bytes": 999}},
+        "grades": {5: {"retention_days": 365, "quota_bytes": 50}},
+    }
+    with patch("app.artifacts.limits._load", return_value=cfg):
+        assert limits.get_artifact_limits(["teacher"], None) == (730, 999)
+        assert limits.get_artifact_limits(["teacher", "admin"], None) == (730, 999)  # admin=teacher
+        assert limits.get_artifact_limits(["student"], 5) == (365, 50)
+        # unbekannter Jahrgang → Default-Student
+        assert limits.get_artifact_limits(["student"], 99)[0] == 365
+        # keine Rolle → Fallback
+        assert limits.get_artifact_limits([], None)[0] == 365
+
+
+def test_limits_fallback_when_file_missing(monkeypatch):
+    monkeypatch.setattr(limits.settings, "artifact_limits_path", "/nichtvorhanden/x.yaml")
+    limits.invalidate_cache()
+    try:
+        assert limits.get_artifact_limits(["teacher"], None) == (730, 1073741824)  # Built-in-Default
+    finally:
+        limits.invalidate_cache()
+
+
+# ── Store ────────────────────────────────────────────────────────────────────
+
+async def test_save_artifact_roundtrip(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=0)
+    db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    art = await store.save_artifact(
+        db, owner_pseudonym="p", roles=["student"], grade=5, kind="image",
+        mime_type="image/png", data=b"PNG", title="Bild", now=_NOW,
+    )
+
+    assert art.byte_size == 3
+    assert art.expires_at == _NOW + timedelta(days=365)   # Aufbewahrung eingefroren
+    db.add.assert_called_once()
+    db.commit.assert_awaited_once()
+    rec = SimpleNamespace(id=art.id, mime_type="image/png")
+    assert store.read_artifact_bytes(rec) == b"PNG"
+
+
+async def test_save_artifact_quota_exceeded(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 100))
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=90)  # 90 belegt
+    db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    with pytest.raises(store.QuotaExceeded):
+        await store.save_artifact(
+            db, owner_pseudonym="p", roles=["student"], grade=5, kind="image",
+            mime_type="image/png", data=b"x" * 20, title="x",  # 90+20 > 100
+        )
+    db.add.assert_not_called()  # nichts gespeichert
+
+
+def test_read_missing_returns_none(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    assert store.read_artifact_bytes(SimpleNamespace(id=uuid4(), mime_type="image/png")) is None
+
+
+async def test_cleanup_removes_expired(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    aid = uuid4()
+    (tmp_path / f"{aid}.svg").write_bytes(b"svg")
+    art = SimpleNamespace(id=aid, mime_type="image/svg+xml")
+    sel = MagicMock(); sel.scalars.return_value.all.return_value = [art]
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(side_effect=[sel, MagicMock()])
+
+    stats = await store.cleanup_artifacts(db, now=_NOW)
+
+    assert stats.expired_removed == 1
+    assert not (tmp_path / f"{aid}.svg").exists()  # Datei mitgelöscht
+
+
+async def test_cleanup_dry_run_keeps_files(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    aid = uuid4()
+    (tmp_path / f"{aid}.svg").write_bytes(b"svg")
+    art = SimpleNamespace(id=aid, mime_type="image/svg+xml")
+    sel = MagicMock(); sel.scalars.return_value.all.return_value = [art]
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(side_effect=[sel])
+
+    stats = await store.cleanup_artifacts(db, now=_NOW, dry_run=True)
+
+    assert stats.scanned == 1 and stats.expired_removed == 1
+    assert (tmp_path / f"{aid}.svg").exists()  # dry-run löscht nichts
+    db.commit.assert_not_awaited()
+
+
+def test_storage_dir_relative_is_repo_root_based(monkeypatch, tmp_path):
+    # Relativer Pfad → aufgelöst gegen _REPO_ROOT (cwd-unabhängig, wichtig für den Cron).
+    monkeypatch.setattr(store, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", "data/artifacts")
+    assert store.storage_dir() == tmp_path / "data" / "artifacts"
+
+
+def test_storage_dir_absolute_used_verbatim(monkeypatch, tmp_path):
+    abspath = tmp_path / "abs"
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(abspath))
+    assert store.storage_dir() == abspath
+
+
+# ── Dokumente (Material-Werkstatt, Phase 19) ──────────────────────────────────
+
+async def test_create_document_delegates_to_save(monkeypatch):
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(store, "save_artifact", fake_save)
+    await store.create_document(
+        MagicMock(), owner_pseudonym="p", roles=["teacher"], grade=None,
+        title="  Arbeitsblatt  ", markdown="# Titel\n\nText",
+    )
+    assert captured["kind"] == "document"
+    assert captured["mime_type"] == "text/markdown"
+    assert captured["source"] == "# Titel\n\nText"
+    assert captured["data"] == b"# Titel\n\nText"
+    assert captured["origin_ref"] is None        # mutabel, nicht content-adressiert
+    assert captured["title"] == "Arbeitsblatt"    # getrimmt
+
+
+async def test_update_document_rewrites_and_refreshes(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 10_000))
+    aid = uuid4()
+    (tmp_path / f"{aid}.md").write_bytes(b"alt")
+    record = SimpleNamespace(
+        id=aid, owner_pseudonym="p", mime_type="text/markdown", byte_size=3,
+        title="Alt", source="alt", expires_at=None,
+    )
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=3)   # used=3 (nur dieses Dok)
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    out = await store.update_document(
+        db, record=record, roles=["teacher"], grade=None, title="Neu", markdown="viel mehr text", now=_NOW,
+    )
+    assert out.title == "Neu"
+    assert out.source == "viel mehr text"
+    assert out.byte_size == len(b"viel mehr text")
+    assert out.expires_at == _NOW + timedelta(days=365)     # Aufbewahrung erneuert
+    assert (tmp_path / f"{aid}.md").read_bytes() == b"viel mehr text"
+    db.commit.assert_awaited_once()
+
+
+async def test_update_document_quota_exceeded(monkeypatch, tmp_path):
+    monkeypatch.setattr(store.settings, "artifact_storage_dir", str(tmp_path))
+    monkeypatch.setattr(store, "get_artifact_limits", lambda roles, grade: (365, 100))
+    record = SimpleNamespace(
+        id=uuid4(), owner_pseudonym="p", mime_type="text/markdown", byte_size=10,
+        title="Alt", source="x", expires_at=None,
+    )
+    res = MagicMock(); res.scalar_one = MagicMock(return_value=90)  # used=90 (inkl. dieses 10)
+    db = MagicMock(); db.commit = AsyncMock(); db.execute = AsyncMock(return_value=res)
+
+    # 90 - 10 (alt) + 30 (neu) = 110 > 100 → Quota
+    with pytest.raises(store.QuotaExceeded):
+        await store.update_document(
+            db, record=record, roles=["teacher"], grade=None, title="Neu", markdown="x" * 30,
+        )
+    db.commit.assert_not_awaited()

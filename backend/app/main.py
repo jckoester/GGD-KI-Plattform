@@ -41,6 +41,8 @@ from app.planning.router import router as planning_router
 from app.api.review import router as review_router
 from app.api.pedagogy import router as pedagogy_router
 from app.api.pii import router as pii_router
+from app.render.router import router as render_router
+from app.artifacts.router import router as artifacts_router
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +120,5 @@ app.include_router(planning_router)
 app.include_router(review_router)
 app.include_router(pedagogy_router)
 app.include_router(pii_router)
+app.include_router(render_router)
+app.include_router(artifacts_router)

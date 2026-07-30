@@ -186,12 +186,21 @@ async def export_pdf(data: LessonExport) -> bytes:
             f"PDF-Export benötigt 'weasyprint' und 'jinja2' ({e})."
         ) from e
 
+    # Phase 17 (D5): Beschreibungen/Stundenziel als Inline-Markdown mit server-gerenderten
+    # Formeln ($…$ → eingebettetes SVG) vor-rendern (kompakte Tabellenzellen → inline).
+    from app.render.export import render_markdown_inline_for_pdf
+
+    beschreibungen = [await render_markdown_inline_for_pdf(p.beschreibung or "") for p in data.phasen]
+    stundenziel_html = await render_markdown_inline_for_pdf(data.stundenziel or "")
+
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATES_DIR)),
         autoescape=select_autoescape(["html"]),
     )
     template = env.get_template("lesson.html")
-    html_str = template.render(data=data)
+    html_str = template.render(
+        data=data, beschreibungen=beschreibungen, stundenziel_html=stundenziel_html
+    )
     return weasyprint.HTML(string=html_str, base_url=str(_TEMPLATES_DIR)).write_pdf()
 
 

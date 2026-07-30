@@ -20,6 +20,35 @@ model_list:
       model: ollama/llama3
       api_base: os.environ/OLLAMA_BASE_URL
 
+  # ── Bildgenerierung (Phase 16) ──────────────────────────────────────────────
+  # Bild-Modelle werden über `model_info.mode: image_generation` als solche markiert
+  # — für Health-Checks und um sie in der Bild-Freigabe-Matrix von Chat-Modellen zu
+  # trennen (Team-Allowlist bleibt gemeinsam).
+  # Datenschutz: Der Client fordert `response_format: b64_json` an bzw. nutzt Modelle,
+  # die ohnehin nur Base64 liefern (gpt-image-1). Es werden KEINE extern gehosteten
+  # Bild-URLs verarbeitet — die Bytes bleiben im Schulnetz.
+  - model_name: gpt-image-1
+    litellm_params:
+      model: openai/gpt-image-1
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: image_generation
+      # Kosten-Tracking: Für bekannte Modelle (gpt-image-*) liefert LiteLLM den
+      # `x-litellm-response-cost`-Header automatisch → das Backend bucht die Bild-
+      # Kosten mit (messages.cost_usd / total_cost_usd). Für Custom-/lokale Modelle
+      # ohne hinterlegtes Pricing hier `input_cost_per_image: <USD>` setzen, sonst
+      # zählt der Bild-Spend 0.
+  # Self-hosted Bild-Fallback (sensibler Pfad, analog Ollama) — OpenAI-kompatibler
+  # lokaler Server (z. B. vLLM-Omni), api_base im lokalen Netz. Auskommentiert lassen,
+  # bis der lokale Bild-Server steht (end-to-end testen, vgl. Plan §7).
+  # - model_name: local-image
+  #   litellm_params:
+  #     model: openai/<vom-server-bedientes-modell>
+  #     api_base: os.environ/LOCAL_IMAGE_BASE_URL
+  #     api_key: "sk-local-placeholder"
+  #   model_info:
+  #     mode: image_generation
+
 # ── Jugendschutz-Guardrails (proxy-global, ADR-008 Teil 1A) ───────────────────
 # Gelten für ALLE Modellanfragen, unabhängig von Assistent, Zielgruppe und Modell.
 # Sie greifen am Output (post_call) und blockieren harte Verstöße. Lernverhalten-
@@ -86,6 +115,20 @@ litellm_settings:
     #     mode: post_call
     #     action: block
     #     pattern_set: "./guardrails/explicit_sexual.txt"
+
+    # ── Bild-Prompt-Filter (Phase 16, Bildgenerierung, pre_call) ───────────────
+    # Defense-in-Depth für /images/generations: Der Backend-Handler moderiert den
+    # Bild-Prompt bereits lokal (Krisen-Scan + config/image_blocklist.yaml). Diese
+    # Guardrail prüft den Prompt zusätzlich am Proxy — `pre_call`, BEVOR der Provider
+    # ihn sieht (`async_moderation_hook` greift bei Bildern NICHT → Content-Filter
+    # im pre_call-Modus nutzen). Blockwörter kuratieren! Erst nach Test aktivieren.
+    # - guardrail_name: "image_prompt_filter"
+    #   litellm_params:
+    #     guardrail: litellm_content_filter
+    #     mode: pre_call
+    #     blocked_words:
+    #       - keyword: "..."
+    #         action: "BLOCK"
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

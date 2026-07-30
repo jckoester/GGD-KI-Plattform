@@ -505,6 +505,26 @@ Zielgruppe daher sichtbar (Badge in der „Offene Freigaben"-Liste) und verlangt
 Freigeben eines für Schüler:innen sichtbaren Assistenten eine **bewusste Bestätigung**;
 die Freigabe wird mit `audience` protokolliert.
 
+### Bild-Assistenten: verschärfter Jugendschutz-Prüfpunkt
+
+Assistenten mit der Werkzeug-Gruppe **Bildgenerierung** (`image_generation`) sind
+sensibler als reine Text-Assistenten. Daher gilt zusätzlich:
+
+- **Schulweite, für Schüler:innen sichtbare Bild-Assistenten** (Zielgruppe „Schüler:innen"
+  oder „Alle" mit schulweitem Geltungsbereich — `grade`, `all_students`, `all`) gehen
+  **immer** in `pending_review` und werden erst nach **Admin-Freigabe** aktiv —
+  **unabhängig** davon, ob der allgemeine Schalter „schulweites Teilen erfordert
+  Admin-Freigabe" gesetzt ist.
+- **Gruppen-/private Bild-Assistenten** bleiben selbst-freigebbar: Die Lehrkraft
+  verantwortet ihre eigene Gruppe.
+- Im Assistenten-Editor erscheint bei Bildgenerierung + Schüler-Zielgruppe eine
+  **Warnung** (Jugendschutz, bewusste Zielgruppen-/Jahrgangswahl, Blockliste beachten).
+- **Zwei-Schlüssel-Prinzip:** Bildgenerierung funktioniert nur, wenn (a) der Assistent die
+  Werkzeug-Gruppe führt **und** (b) das Bild-Modell für das Team freigeschaltet ist
+  (`/settings/models`, Abschnitt „Bild-Modelle").
+- Nutzerseitig steht unter jedem erzeugten Bild ein Hinweis, dass KI-Bilder fehlerhaft
+  sein können und sich nicht zur Darstellung realer Personen eignen.
+
 ### Pflege
 
 `pedagogy.yaml` ist **versioniert** — Änderungen erfordern Backend-Neustart (Deployment-
@@ -518,3 +538,29 @@ schulweiter Guardrail-Prompt  →  Assistenten-Dokumente  →
 [universal_base + Zielgruppen-Erweiterung + Wissens-Kontext + Assistenten-Prompt
  + (nur Schüler) Lernverhalten-Augmentierungen]  →  output_format  →  Nutzer-Nachrichten
 ```
+
+## G — Bild-Prompt-Moderation (Bildgenerierung)
+
+Bei einem Bild-Werkzeug wird der eigentliche Bild-Prompt **vom Modell** beim Werkzeug-Aufruf
+gebildet — er umgeht damit das Frontend-Gate (PII-Warnung), das nur die rohe Nutzernachricht
+prüft. Der Bild-Prompt wird deshalb **mehrschichtig** moderiert:
+
+1. **Backend-Tool-Handler (lokal, immer aktiv).** Vor jeder Bilderzeugung läuft der Prompt durch
+   - den **Krisen-Scan** — für Bilder **blockierend** (anders als im Text-Chat, der nicht
+     blockiert; das fürsorgliche Hilfe-Banner kommt weiterhin aus der Nutzernachricht), und
+   - eine **kuratierte Bild-Blockliste** `config/image_blocklist.yaml`
+     (Start-Kategorien: sexuelle Darstellung Minderjähriger, explizit sexuell, grafische Gewalt,
+     Waffenherstellung). Ein Treffer → **keine** Bilderzeugung, der Assistent formuliert eine
+     kurze Absage.
+2. **LiteLLM `pre_call`-Content-Filter (Proxy, optional).** Als Defense-in-Depth kann in
+   `infra/litellm_config.yaml` ein `litellm_content_filter` im `pre_call`-Modus für
+   `/images/generations` aktiviert werden (Vorlage auskommentiert in der Beispiel-Config).
+   Bei Bildern greift `async_moderation_hook` **nicht** → bewusst `pre_call` nutzen.
+3. **Provider-seitige Moderation.** Der Anbieter (z. B. `gpt-image-1`) lehnt unzulässige
+   Prompts zusätzlich selbst ab.
+
+**Blockliste pflegen.** `config/image_blocklist.yaml` ist — wie `crisis_triggers.yaml` — nicht im
+Repo (die Live-Datei ist gitignored); aus `config/image_blocklist.example.yaml` provisionieren.
+**Fehlt die Datei, startet das Backend nicht** (fail-closed). Die Begriffe mit der
+**Schulsozialarbeit** kuratieren. Änderungen an der Blockliste greifen sofort (Hot-Reload);
+Änderungen an den LiteLLM-Guardrails erfordern einen Neustart des LiteLLM-Containers.

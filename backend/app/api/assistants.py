@@ -304,16 +304,42 @@ GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 SCHOOLWIDE_SCOPES = {"grade", "all_students", "all"}
 
 
-def _initial_status(scope: str, creator_role: str) -> str:
+def _is_student_visible_image_assistant(
+    audience: Optional[str], tool_groups: Optional[list[str]]
+) -> bool:
+    """True, wenn der Assistent Bilder erzeugt UND Schüler:innen erreicht.
+
+    Jugendschutz-Prüfpunkt (Phase 16 Schritt 9): solche Assistenten sind sensibler
+    als reine Text-Assistenten und brauchen eine bewusste Admin-Freigabe.
+    """
+    return (
+        "image_generation" in (tool_groups or [])
+        and audience in {"student", "all"}
+    )
+
+
+def _initial_status(
+    scope: str,
+    creator_role: str,
+    audience: Optional[str] = None,
+    tool_groups: Optional[list[str]] = None,
+) -> str:
     """Bestimmt den initialen Status eines Assistenten bei Erstellung.
 
     Admins starten immer im Draft. Lehrkraefte erhalten sofort 'active' fuer
     private und gruppen-beschraenkte Scopes; schulweite Scopes koennen eine
     Admin-Freigabe erfordern (abhaengig von teacher_schoolwide_sharing_requires_admin).
+
+    Ausnahme (Jugendschutz-Prüfpunkt, Phase 16 Schritt 9): schulweite Bild-Assistenten,
+    die Schüler:innen erreichen, gehen IMMER in 'pending_review' — unabhaengig vom
+    teacher_schoolwide_sharing_requires_admin-Schalter. Gruppen-/private Bild-Assistenten
+    bleiben selbst-freigebbar (die Lehrkraft verantwortet ihre eigene Gruppe).
     """
     if creator_role == "admin":
         return "draft"
     if scope in SCHOOLWIDE_SCOPES:
+        if _is_student_visible_image_assistant(audience, tool_groups):
+            return "pending_review"
         return "pending_review" if settings.teacher_schoolwide_sharing_requires_admin else "active"
     return "active"
 
@@ -543,7 +569,9 @@ async def create_assistant(
     
     creator_role = "admin" if "admin" in current_user.roles else "teacher"
     sort_order = request.sort_order if "admin" in current_user.roles else 0
-    initial_status = _initial_status(request.scope, creator_role)
+    initial_status = _initial_status(
+        request.scope, creator_role, request.audience, request.tool_groups
+    )
 
     assistant = Assistant(
         name=request.name,
@@ -608,7 +636,11 @@ async def update_assistant(
     # Scope-Aenderung durch Lehrkraft: Status automatisch anpassen
     if not is_admin and "scope" in update_data:
         new_scope = update_data["scope"]
-        new_status = _initial_status(new_scope, "teacher")
+        # Effektive audience/tool_groups (geaenderte oder bestehende) fuer den
+        # Jugendschutz-Pruefpunkt bei Bild-Assistenten beruecksichtigen.
+        eff_audience = update_data.get("audience", assistant.audience)
+        eff_tool_groups = update_data.get("tool_groups", assistant.tool_groups)
+        new_status = _initial_status(new_scope, "teacher", eff_audience, eff_tool_groups)
         # Nur umschalten wenn der Assistent nicht bereits im Ziel-Status ist
         if assistant.status in ("active", "pending_review") and new_status != assistant.status:
             update_data["status"] = new_status

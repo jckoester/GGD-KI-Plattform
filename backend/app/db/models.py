@@ -343,6 +343,105 @@ class Message(Base):
     )
 
 
+# 6b. generated_images (Phase 16 — Bildgenerierung)
+class GeneratedImage(Base):
+    """Referenz auf ein generiertes Bild; die Bytes liegen auf Disk (image_store).
+
+    Stirbt per FK-Cascade mit seiner Konversation (93-Tage-Lifecycle) bzw. Nachricht.
+    `message_id` wird erst in Schritt 5 gesetzt — die Assistant-Nachricht existiert bei
+    der Generierung mid-Stream noch nicht.
+    """
+
+    __tablename__ = "generated_images"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    pseudonym: Mapped[str] = mapped_column(nullable=False)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    message_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
+    )
+    model: Mapped[str] = mapped_column(nullable=False)
+    size: Mapped[str] = mapped_column(nullable=False)
+    mime_type: Mapped[str] = mapped_column(nullable=False)
+    byte_size: Mapped[int] = mapped_column(nullable=False)
+    # Der (LLM-gebildete) Bild-Prompt — dient als „roher Quelltext" beim Promoten in die
+    # Artefaktbibliothek (Phase 18). Nullable: Alt-Bilder vor Einführung der Spalte.
+    prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_generated_images_conversation_id", "conversation_id"),
+        Index("idx_generated_images_pseudonym", "pseudonym"),
+    )
+
+
+class RenderedSvg(Base):
+    """Cache: Hash der Render-Quelle → fertiges SVG (Phase 17, Server-Rendering).
+
+    Rendern ist eine reine, deterministische Funktion (Quelle → SVG), daher
+    content-adressiert per Hash. Konversations-/nutzerunabhängig; altersbasiert
+    aufgeräumt (`app.render.cache.cleanup_rendered_svg`). Der Sidecar hält zusätzlich
+    einen eigenen In-Prozess-Cache; dies ist der persistente Haupt-Cache.
+    """
+
+    __tablename__ = "rendered_svg"
+
+    hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    svg: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_rendered_svg_created_at", "created_at"),
+    )
+
+
+class Artifact(Base):
+    """Persönliche Bibliothek: persistentes, konversationsübergreifendes Artefakt (Phase 18).
+
+    Anders als `generated_images` (konversationsgebunden, 90/93-Tage-Lifecycle) überlebt ein
+    Artefakt die Konversation. Bytes auf Disk (`app.artifacts.store`); `source` hält bei
+    code-generierten Artefakten den **rohen Quelltext** (kopier-/re-export-fähig).
+    `expires_at` wird beim Speichern aus der role-/jahrgangsbasierten Aufbewahrung eingefroren
+    (kein Rollen-Lookup im Cleanup nötig). `origin_conversation_id` ist nur Herkunfts-Notiz
+    (kein FK/CASCADE — das Artefakt überlebt die Konversation bewusst).
+    """
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+    owner_pseudonym: Mapped[str] = mapped_column(nullable=False)
+    kind: Mapped[str] = mapped_column(nullable=False)  # image | circuit | plot | mermaid | ggb | (document …)
+    mime_type: Mapped[str] = mapped_column(nullable=False)
+    byte_size: Mapped[int] = mapped_column(nullable=False)
+    title: Mapped[str] = mapped_column(nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Idempotenz-Schlüssel der Herkunft: `image:<image_id>` bzw. `<kind>:<quell-hash>`.
+    # Zweimaliges „In Bibliothek speichern" desselben Inhalts liefert dasselbe Artefakt.
+    origin_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    origin_conversation_id: Mapped[Optional[UUID]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("idx_artifacts_owner", "owner_pseudonym"),
+        Index("idx_artifacts_expires_at", "expires_at"),
+        # Idempotenz: pro Eigentümer:in höchstens ein Artefakt je Herkunft (partiell — nur
+        # wenn origin_ref gesetzt; manuell erzeugte Artefakte tragen keine Herkunft).
+        Index(
+            "uq_artifacts_owner_origin", "owner_pseudonym", "origin_ref",
+            unique=True, postgresql_where=text("origin_ref IS NOT NULL"),
+        ),
+    )
+
+
 # 6b. conversation_flags (ADR-008 Teil 5)
 # Automatisch (Phase 11: nur flag_source='auto_crisis') oder menschlich erzeugte Flags
 # auf Konversationen. Persistent bis zum Löschen der Konversation.

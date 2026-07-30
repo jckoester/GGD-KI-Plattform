@@ -3,6 +3,8 @@
 Reine Funktionen ohne DB/weasyprint: Volltext-Mapping und Markdown-Rendering.
 """
 
+import pytest
+
 from app.context.curriculum_export import _build_pdf_kapitel, _render_markdown
 
 
@@ -27,7 +29,8 @@ def _tree_with_entry(entry: dict, ik_refs=None, pk_refs=None) -> dict:
 
 
 class TestBuildPdfKapitel:
-    def test_ik_pk_volltext_from_refs(self):
+    @pytest.mark.asyncio
+    async def test_ik_pk_volltext_from_refs(self):
         """IK/PK werden über node_id auf den Knoten-Volltext (title) gemappt."""
         tree = _tree_with_entry(
             entry={
@@ -37,11 +40,12 @@ class TestBuildPdfKapitel:
             ik_refs=[{"node_id": "ik1", "title": "3.1.1 Zahlen vergleichen", "nr": "3.1.1"}],
             pk_refs=[{"node_id": "pk1", "title": "2.2.1 Begründen", "pk_id": "PK_05.1"}],
         )
-        e = _build_pdf_kapitel(tree)[0]["lernsequenzen"][0]["eintraege"][0]
+        e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
         assert e["ik_items"] == [{"text": "3.1.1 Zahlen vergleichen", "partiell": True}]
         assert e["pk_items"] == [{"text": "2.2.1 Begründen"}]
 
-    def test_fallback_to_nr_and_pk_id(self):
+    @pytest.mark.asyncio
+    async def test_fallback_to_nr_and_pk_id(self):
         """Ohne passenden Ref-Titel fällt der Text auf nr bzw. pk_id zurück."""
         tree = _tree_with_entry(
             entry={
@@ -49,7 +53,7 @@ class TestBuildPdfKapitel:
                 "pk": [{"node_id": "y", "pk_id": "PK_05.1"}],
             },
         )
-        e = _build_pdf_kapitel(tree)[0]["lernsequenzen"][0]["eintraege"][0]
+        e = (await _build_pdf_kapitel(tree))[0]["lernsequenzen"][0]["eintraege"][0]
         assert e["ik_items"] == [{"text": "3.1.1", "partiell": False}]
         assert e["pk_items"] == [{"text": "PK_05.1"}]
 

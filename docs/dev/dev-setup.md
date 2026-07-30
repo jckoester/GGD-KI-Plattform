@@ -11,6 +11,9 @@ direkt gestartet; der LiteLLM-Proxy läuft als Prozess in der backend-venv (sieh
 - PostgreSQL erreichbar (lokal installiert oder als einzelner Docker-Container)
 - LiteLLM-Proxy lokal in der backend-venv (Abschnitt unten)
 - Optional: Ollama für den self-hosted Fallback (`ollama serve`)
+- **Pandoc** — nur für den Office-Export (DOCX/ODT) der Material-Werkstatt (Phase 19):
+  `brew install pandoc` (macOS) bzw. `apt-get install pandoc` (Linux). Fehlt es, ist der
+  Office-Export deaktiviert (Feature-Flag) — der Rest läuft normal.
 
 PostgreSQL als Docker-Container (ohne Compose):
 ```bash
@@ -245,6 +248,22 @@ npm run dev
 # Frontend läuft auf http://localhost:5173
 # /api wird automatisch an http://localhost:8000 proxied (vite.config.js)
 ```
+
+## Render-Sidecar (für Schaltpläne & PDF-Mathe)
+
+Server-Rendering (CircuiTikZ, MathJax-Mathe im PDF) läuft über einen **eigenen Node-Dienst**,
+der — wie LiteLLM — lokal in einem separaten Terminal gestartet wird:
+
+```bash
+cd render-sidecar
+npm install          # einmalig (node-tikzjax + mathjax-full, ~5 MB WASM)
+npm start            # http://127.0.0.1:3200
+```
+
+Das Backend erreicht ihn per Default unter `http://127.0.0.1:3200` (`RENDER_SIDECAR_URL`).
+**Läuft er nicht**, zeigen Schaltpläne im Chat einen Fehler-Platzhalter und PDF-Formeln
+erscheinen als Quelltext — Funktionsgraphen (```plot) laufen dagegen in-process im Backend und
+brauchen den Sidecar nicht. Details: [Server-Rendering](server-rendering.md).
 
 ## Test-Authentifizierung
 

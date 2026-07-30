@@ -390,6 +390,15 @@ export async function* streamChat(
         continue;
       }
 
+      if (currentEventType === "image") {
+        try {
+          const { image_id, size } = JSON.parse(payload);
+          yield { type: "image", image_id, size };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;
@@ -413,6 +422,27 @@ export async function getModelMatrix() {
 
 export async function saveModelMatrix(allowlists) {
   const res = await fetch(`${BASE}/admin/models/matrix`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ allowlists }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
+export async function getImageModelMatrix() {
+  const res = await fetch(`${BASE}/admin/image-models/matrix`, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { models, teams, allowlists }
+}
+
+export async function saveImageModelMatrix(allowlists) {
+  const res = await fetch(`${BASE}/admin/image-models/matrix`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -481,6 +511,47 @@ export async function getBudgetGrades() {
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json();
   // { grades: [{key, label, grade, max_budget_eur, budget_duration, user_count}], eur_usd_rate }
+}
+
+// ── Export-Vorlagen (Admin, Phase 19) ──────────────────────────────────────────
+
+export async function getExportTemplates() {
+  const res = await fetch(`${BASE}/admin/export-templates`, { credentials: "include" });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+  // { css, css_updated_at, css_updated_by, has_docx_reference, has_odt_reference }
+}
+
+export async function updateExportCss(css) {
+  const res = await fetch(`${BASE}/admin/export-templates/css`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ css }),
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Speichern fehlgeschlagen");
+  return res.json();
+}
+
+export async function uploadExportReference(fmt, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/admin/export-templates/reference/${fmt}`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Upload fehlgeschlagen");
+  return res.json();
+}
+
+export async function deleteExportReference(fmt) {
+  const res = await fetch(`${BASE}/admin/export-templates/reference/${fmt}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? "Löschen fehlgeschlagen");
+  return res.json();
 }
 
 export async function saveBudgetGrades(grades) {
@@ -1688,4 +1759,114 @@ export async function revokeUserSessions(pseudonym) {
   if (!res.ok)
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json(); // { ok, pseudonym, revoked_all_before }
+}
+
+// ── Artefaktbibliothek (Phase 18) ──────────────────────────────────────────────
+
+// „In Bibliothek speichern": ein generiertes Bild dauerhaft ablegen.
+export async function saveImageToLibrary(imageId, title = null) {
+    const res = await fetch(`${BASE}/artifacts/from-image`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_id: imageId, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}
+
+// „In Bibliothek speichern": ein gerendertes Diagramm ablegen. `kind` ∈ circuit|plot|mermaid.
+// mermaid liefert zusätzlich das im Browser gerenderte SVG; circuit/plot werden serverseitig
+// aus `source` neu gerendert.
+export async function saveDiagramToLibrary(kind, source, { svg = null, title = null } = {}) {
+    const res = await fetch(`${BASE}/artifacts/from-diagram`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, source, svg, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}
+
+// Die eigene Bibliothek laden: { items: [...], used_bytes, quota_bytes }.
+export async function getLibrary() {
+    const res = await fetch(`${BASE}/artifacts`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bibliothek konnte nicht geladen werden')
+    return res.json()
+}
+
+// Ein Artefakt löschen (Row + Datei).
+export async function deleteArtifact(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Löschen fehlgeschlagen')
+    return res.json()
+}
+
+// ── Text-Dokumente / Material-Werkstatt (Phase 19) ─────────────────────────────
+
+// Neues Markdown-Dokument anlegen (leer oder aus dem Chat promotet). Gibt u. a. { id } zurück.
+export async function createDocument(title, markdown = '', { originConversationId = null } = {}) {
+    const res = await fetch(`${BASE}/artifacts/document`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, markdown, origin_conversation_id: originConversationId }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Dokument konnte nicht angelegt werden')
+    return res.json()
+}
+
+// Ein Dokument zum Bearbeiten laden: { id, title, source, kind, ... }.
+export async function getDocument(id) {
+    const res = await fetch(`${BASE}/artifacts/${id}/document`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Dokument konnte nicht geladen werden')
+    return res.json()
+}
+
+// Ein Dokument überschreiben (Titel + Markdown).
+export async function updateDocument(id, title, markdown) {
+    const res = await fetch(`${BASE}/artifacts/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, markdown }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
+    return res.json()
+}
+
+// Dokument exportieren und herunterladen (PDF/DOCX/ODT) — liefert einen Blob.
+export async function getDocumentExportBlob(id, format) {
+    const res = await fetch(`${BASE}/artifacts/${id}/export?format=${format}`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    return res.blob()
+}
+
+// Dokument exportieren und als Artefakt in der Bibliothek behalten — liefert die Metadaten.
+export async function saveDocumentExport(id, format) {
+    const res = await fetch(`${BASE}/artifacts/${id}/export?format=${format}&save=true`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Export fehlgeschlagen')
+    return res.json()
+}
+
+// Rohe Plot-Spec → `.ggb`-Datei (Blob) für den GeoGebra-Download direkt am Plot im Chat.
+export async function getPlotGgbBlob(source, title = null) {
+    const res = await fetch(`${BASE}/artifacts/ggb`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, title }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'GeoGebra-Export fehlgeschlagen')
+    return res.blob()
 }

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update, or_
@@ -23,6 +23,16 @@ from app.ratelimit.dependency import rate_limit
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
+from app.chat.image_moderation import image_prompt_block_reason
+from app.chat.image_store import (
+    collect_conversation_image_paths,
+    get_image_record,
+    link_images_to_message,
+    list_message_images,
+    read_image_bytes,
+    save_generated_image,
+    unlink_paths,
+)
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
@@ -55,6 +65,11 @@ class ConversationListResponse(BaseModel):
     offset: int
 
 
+class GeneratedImageRef(BaseModel):
+    image_id: str
+    size: Optional[str] = None
+
+
 class MessageItem(BaseModel):
     role: str
     content: str
@@ -64,6 +79,7 @@ class MessageItem(BaseModel):
     model: Optional[str] = None
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
+    images: list[GeneratedImageRef] = []
 
 
 class ConversationDetailResponse(BaseModel):
@@ -466,6 +482,140 @@ register_tool(ChatTool(
 ))
 
 
+# ── Bildgenerierung (Phase 16) ────────────────────────────────────────────────
+
+_GENERATE_IMAGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": (
+            "Erzeugt ein Bild aus einer natürlichsprachlichen Beschreibung "
+            "(Text-zu-Bild). Nutze dieses Tool, wenn die Nutzerin oder der Nutzer ein "
+            "Bild, eine Illustration, eine Skizze oder eine Grafik erzeugt haben "
+            "möchte. Formuliere einen klaren, beschreibenden Bild-Prompt. Verwende "
+            "keine echten Personennamen oder personenbezogenen Daten im Prompt."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Beschreibung des gewünschten Bildes.",
+                },
+                "size": {
+                    "type": "string",
+                    "enum": ["1024x1024", "1024x1536", "1536x1024"],
+                    "description": (
+                        "Bildformat: quadratisch (1024x1024), hoch (1024x1536) oder "
+                        "quer (1536x1024). Standard: quadratisch."
+                    ),
+                },
+            },
+            "required": ["prompt"],
+        },
+    },
+}
+
+# Nur abgerechnete Standardgrößen zulassen (sonst Spend=0-Risiko bei LiteLLM).
+_ALLOWED_IMAGE_SIZES = {"1024x1024", "1024x1536", "1536x1024"}
+
+
+def _image_prompt_block_reason(prompt: str) -> Optional[str]:
+    """Moderation des (LLM-gebildeten) Bild-Prompts vor dem Call.
+
+    Delegiert an ``app.chat.image_moderation``: Krisen-Scan (blockierend für Bilder)
+    + kuratierte Bild-Blockliste. Gibt einen Ablehnungsgrund (für den LLM) zurück
+    oder None (= erlaubt). Bleibt als Modul-Symbol bestehen (Test-Seam).
+    """
+    return image_prompt_block_reason(prompt)
+
+
+async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
+    """Erzeugt ein Bild über den LiteLLM-Bild-Endpoint (Schritt 2: roh, ohne Persistenz).
+
+    Moderiert den Bild-Prompt (Stub), generiert dann über den **User-Virtual-Key**
+    (Spend/Budget beim User). Die Bytes werden hier noch nicht persistiert/angezeigt
+    (→ Schritt 4/5/6); der LLM erhält eine knappe Bestätigung.
+    """
+    prompt = (args.get("prompt") or "").strip()
+    if not prompt:
+        return {"status": "error", "error": "Kein Bild-Prompt angegeben."}
+
+    reason = _image_prompt_block_reason(prompt)
+    if reason:
+        return {"status": "blocked", "error": reason}
+
+    if ctx.litellm_key is None:
+        logger.error(
+            "generate_image: kein LiteLLM-Key im ToolContext (pseudonym=%s)",
+            getattr(ctx.user, "sub", None),
+        )
+        return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
+
+    if ctx.conversation_id is None:
+        # Ohne Konversation kein Persistenzziel → gar nicht erst generieren (spart Budget).
+        logger.error("generate_image: keine conversation_id im ToolContext")
+        return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
+
+    size = args.get("size")
+    if size not in _ALLOWED_IMAGE_SIZES:
+        size = settings.image_default_size
+
+    client = LiteLLMClient()
+    try:
+        result = await client.generate_image(
+            prompt,
+            model=settings.image_default_model,
+            api_key=ctx.litellm_key,
+            user=ctx.user.sub,
+            size=size,
+            response_format=None,  # gpt-image-1 liefert immer Base64 und lehnt den Param ab
+        )
+    except Exception:
+        logger.exception("Bildgenerierung fehlgeschlagen")
+        return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
+    finally:
+        await client.close()
+
+    try:
+        image_id = await save_generated_image(
+            ctx.db,
+            pseudonym=ctx.user.sub,
+            conversation_id=ctx.conversation_id,
+            image_bytes=result.image_bytes,
+            model=settings.image_default_model,
+            size=size,
+            mime_type="image/png",
+            prompt=prompt,
+        )
+    except Exception:
+        logger.exception("Bild konnte nicht gespeichert werden")
+        return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
+
+    # image_id + cost_usd werden im Stream-Loop ausgewertet (SSE-Event bzw. Kosten-Buchung);
+    # cost_usd wird vor dem Senden an den LLM entfernt (§ Loop). None, wenn kein Header kam.
+    return {
+        "status": "ok",
+        "image_id": str(image_id),
+        "size": size,
+        "cost_usd": result.cost_usd,
+        "note": "Bild wurde erzeugt und gespeichert.",
+    }
+
+
+async def _generate_image_handler(args: dict, ctx: ToolContext) -> dict:
+    return await _exec_generate_image(args, ctx)
+
+
+register_tool(ChatTool(
+    name="generate_image",
+    group="image_generation",
+    writes=False,
+    definition=_GENERATE_IMAGE_TOOL,
+    handler=_generate_image_handler,
+))
+
+
 def _serialize_user_message(user_message: str, attachments: list[AttachmentMeta]) -> str:
     """Serialisiert die User-Nachricht für die DB (mit Anhang-Metadaten, falls vorhanden)."""
     if attachments:
@@ -489,6 +639,7 @@ async def _persist(
     assistant_id: Optional[int] = None,
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
     skip_user_message: bool = False,
+    generated_image_ids: Optional[list] = None,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
@@ -500,7 +651,7 @@ async def _persist(
             role="user",
             content=_serialize_user_message(user_message, user_attachments),
         ))
-    db.add(Message(
+    assistant_msg = Message(
         conversation_id=conversation_id,
         role="assistant",
         content=assistant_content,
@@ -509,7 +660,14 @@ async def _persist(
         tokens_input=tokens_input,
         tokens_output=tokens_output,
         cost_usd=cost_usd,
-    ))
+    )
+    db.add(assistant_msg)
+
+    # Mid-Stream erzeugte Bilder an diese Assistant-Nachricht hängen (Phase 16, Schritt 5).
+    # Flush macht die server-generierte message_id verfügbar.
+    if generated_image_ids:
+        await db.flush()
+        await link_images_to_message(db, generated_image_ids, assistant_msg.id)
 
     update_values: dict = {"last_message_at": func.now()}
     if cost_usd is not None:
@@ -936,6 +1094,8 @@ async def chat(
         usage: dict = {}
         chunk_id: str | None = None
         cost_usd: Optional[float] = None
+        _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
+        _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
 
         current_messages = list(llm_messages)
         current_response = response
@@ -1019,6 +1179,7 @@ async def chat(
                         user=current_user,
                         group_id=conversation_group_id,
                         conversation_id=conversation_id,
+                        litellm_key=litellm_key,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:
@@ -1032,6 +1193,21 @@ async def chat(
                         f"data: {json.dumps({'nodes': tool_result})}\n\n"
                     )
                     tool_result_str = json.dumps({"nodes": [n["title"] for n in tool_result]})
+                elif _tc_name == "generate_image" and isinstance(tool_result, dict):
+                    # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
+                    # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)
+                    # sammeln. Der LLM erhält eine bereinigte Bestätigung OHNE cost_usd/image_id.
+                    if tool_result.get("status") == "ok" and tool_result.get("image_id"):
+                        _generated_image_ids.append(UUID(tool_result["image_id"]))
+                        if tool_result.get("cost_usd") is not None:
+                            _image_cost_total += float(tool_result["cost_usd"])
+                        yield (
+                            f"event: image\n"
+                            f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size')})}\n\n"
+                        )
+                    tool_result_str = json.dumps({
+                        k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
+                    })
                 else:
                     tool_result_str = json.dumps(tool_result)
 
@@ -1092,6 +1268,11 @@ async def chat(
                 finally:
                     await litellm_client.close()
 
+            # Bild-Kosten (Phase 16, Schritt 7) zur Text-Summe addieren — dasselbe
+            # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).
+            if _image_cost_total > 0:
+                cost_usd = (cost_usd or 0.0) + _image_cost_total
+
             if cost_usd is not None:
                 yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
 
@@ -1113,6 +1294,7 @@ async def chat(
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
                 skip_user_message=crisis_record is not None,
+                generated_image_ids=_generated_image_ids,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
@@ -1295,11 +1477,35 @@ async def delete_conversation(
         await db.commit()
         return None
 
-    # Löschen (cascading delete für Nachrichten)
+    # Generierte Bilder dieser Konversation vor dem Löschen aufsammeln (die DB-Zeilen
+    # gehen per FK-Cascade mit; die Dateien nach erfolgreichem Commit von Disk räumen).
+    image_paths = await collect_conversation_image_paths(db, [conversation_id])
+
+    # Löschen (cascading delete für Nachrichten + generated_images)
     await db.delete(conversation)
     await db.commit()
+    unlink_paths(image_paths)
 
     return None
+
+
+@router.get("/images/{image_id}")
+async def get_generated_image(
+    image_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Liefert ein generiertes Bild aus — nur an die Eigentümer:in (Pseudonym-Autorisierung)."""
+    record = await get_image_record(db, image_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+    if record.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    data = read_image_bytes(record)
+    if data is None:
+        # Referenz existiert, Datei fehlt (bereits geräumt) — als nicht gefunden behandeln.
+        raise HTTPException(status_code=404, detail="Bilddatei nicht gefunden")
+    return Response(content=data, media_type=record.mime_type)
 
 
 @router.get("/conversations")
@@ -1429,6 +1635,9 @@ async def get_conversation_messages(
     )
     rows = messages_result.all()
 
+    # Generierte Bilder je Nachricht (Phase 16, Schritt 6: History-Rehydrierung).
+    img_map = await list_message_images(db, conversation_id)
+
     messages_list = []
     for row in rows:
         msg = row.Message
@@ -1444,6 +1653,7 @@ async def get_conversation_messages(
                 "model": None,
                 "assistant_id": None,
                 "assistant_name": None,
+                "images": [],
             })
         else:
             messages_list.append({
@@ -1455,6 +1665,7 @@ async def get_conversation_messages(
                 "model": msg.model,
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,
+                "images": img_map.get(msg.id, []),
             })
 
     assistant_name: Optional[str] = None

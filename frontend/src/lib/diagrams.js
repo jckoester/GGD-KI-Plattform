@@ -54,6 +54,7 @@ export function renderDiagrams(node) {
             block.setAttribute('data-processed', ''); // vor await: re-entrante process()-Läufe überspringen
             const source = (block.textContent ?? '').trim();
             if (!source) continue;
+            block.dataset.source = source; // Rohquelle für „In Bibliothek speichern" bewahren
             try {
                 const { svg } = await mermaid.render(`mermaid-svg-${_seq++}`, source);
                 block.innerHTML = svg;

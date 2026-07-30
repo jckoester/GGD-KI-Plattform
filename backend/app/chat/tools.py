@@ -11,6 +11,10 @@ Freischaltungslogik:
   student_planning — read-only (z. B. get_exam_scope): nur wenn
                             'student_planning' in assistant.tool_groups und
                             conversation.group_id gesetzt (auch für Schüler).
+  image_generation — nur wenn 'image_generation' in assistant.tool_groups.
+                            Die Bild-Modell-Freigabe je Team greift zusätzlich am
+                            LiteLLM-Proxy (Team-Allowlist), die Function-Calling-
+                            Fähigkeit des Chat-Modells prüft der Router global.
 """
 
 from __future__ import annotations
@@ -33,12 +37,15 @@ class ToolContext:
     user: JwtPayload
     group_id: int | None
     conversation_id: UUID | None
+    # Virtual Key des Users (für Tools, die selbst den LiteLLM-Proxy aufrufen —
+    # z. B. Bildgenerierung — damit Spend/Budget dem User zugerechnet werden).
+    litellm_key: str | None = None
 
 
 @dataclass
 class ChatTool:
     name: str
-    group: str                   # 'context_search' | 'planning'
+    group: str                   # 'context_search' | 'planning' | 'student_planning' | 'image_generation'
     definition: dict             # OpenAI-Function-Schema für LiteLLM
     handler: Callable[..., Awaitable[Any]]  # async (args: dict, ctx: ToolContext) -> JSON-serialisierbar
     writes: bool = False
@@ -76,6 +83,12 @@ def tools_for(
         elif tool.group == "student_planning":
             # Read-only Planungsdaten — kein Lehrkraft-Recht nötig, nur Gruppenbezug.
             if "student_planning" in asst_tool_groups and group_id is not None:
+                result.append(tool)
+        elif tool.group == "image_generation":
+            # Bildgenerierung — freigeschaltet, wenn der Assistent die Tool-Gruppe
+            # führt. Kein Gruppen-/Lehrkraft-Bezug nötig; die Bild-Modell-Freigabe je
+            # Team greift zusätzlich am LiteLLM-Proxy (Schritt 8).
+            if "image_generation" in asst_tool_groups:
                 result.append(tool)
 
     return result

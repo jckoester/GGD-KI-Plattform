@@ -49,8 +49,24 @@ renderer.code = function({ text, lang }) {
     // Mermaid: synchroner Platzhalter; das async Rendern macht die Svelte-Action
     // `renderDiagrams` (siehe diagrams.js). Quelle als (escaptes) Textinhalt — die
     // Action liest sie via textContent zurück.
-    if (lang === 'mermaid') {
+    // Fence-Tag normalisieren (case-insensitiv, getrimmt) — LLMs variieren die
+    // Schreibweise (CircuiTikZ, circuittikz-Tippfehler, …).
+    const langNorm = (lang || '').trim().toLowerCase();
+
+    if (langNorm === 'mermaid') {
         return `<div class="mermaid-block">${escapeHtml(text)}</div>`;
+    }
+    // Server-Render (Phase 17): synchroner Platzhalter; das async Rendern (POST an
+    // /render/circuit) übernimmt die Svelte-Action `renderServerBlocks` (serverRender.js).
+    // Quelle als escaptes textContent — die Action liest sie zurück. Gängige Tag-Varianten
+    // mitnehmen (nicht `latex`/`tex` — das wären auch Nicht-Schaltplan-Inhalte).
+    if (langNorm === 'circuitikz' || langNorm === 'circuittikz' || langNorm === 'circuit') {
+        return `<div class="circuit-block">${escapeHtml(text)}</div>`;
+    }
+    // Funktionsgraph (Phase 17, Schritt 6): ```plot-Block → Platzhalter; dieselbe
+    // renderServerBlocks-Action holt das SVG (POST /render/plot).
+    if (langNorm === 'plot') {
+        return `<div class="plot-block">${escapeHtml(text)}</div>`;
     }
     const language = lang && hljs.getLanguage(lang) ? lang : null;
     const highlighted = language

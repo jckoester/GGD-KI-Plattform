@@ -12,6 +12,7 @@ fastapi>=0.111.0,<1.0
 weasyprint>=62.0,<70.0
 jinja2>=3.1.0,<4.0
 markdown-it-py>=3.0.0,<5.0
+mdit-py-plugins>=0.4,<1.0  # dollarmath: $…$/$$…$$ als Math-Token für den PDF-Prärender (Phase 17, D5)
 uvicorn[standard]>=0.29.0,<1.0
 pydantic>=2.7.0,<3.0
 pydantic-settings>=2.3.0,<3.0
@@ -28,6 +29,14 @@ python-multipart>=0.0.9,<1.0
 # die exakte Version pinnt der Lockfile.
 pdfminer.six>=20221105
 pgvector>=0.3.0,<1.0
+
+# Runtime - Server-Rendering: Funktionsgraphen (Phase 17, ```plot)
+# matplotlib rendert die Plots in-process zu SVG (kein Sidecar); numpy wertet die
+# geparsten Ausdrücke vektorisiert aus; lark parst die Funktions-Terme über eine
+# Whitelist-Grammatik (eval-frei — kein sympy/parse_expr).
+numpy>=1.26,<3.0
+matplotlib>=3.8,<4.0
+lark>=1.1,<2.0
 
 # Dev / Test
 pytest>=8.0.0,<10.0

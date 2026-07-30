@@ -1,0 +1,23 @@
+# artifact_limits.yaml — Aufbewahrung + Quota der Artefaktbibliothek (Phase 18)
+#
+# Struktur wie budget_tiers.yaml: pro Jahrgang (`grades`) und pro Rolle (`roles`).
+#   retention_days: Aufbewahrung eines Artefakts (danach löscht der Cleanup-Cron).
+#   quota_bytes:    maximale Gesamtgröße der Bibliothek pro Nutzer:in (Speichern-Grenze).
+#
+# Wird selten geändert (kein UI). Fehlt die Datei, greifen konservative Built-in-Defaults.
+# Live-Datei ist gitignored; aus dieser .example provisionieren.
+
+grades:
+  5:  { retention_days: 365, quota_bytes: 52428800 }    # 50 MB
+  6:  { retention_days: 365, quota_bytes: 52428800 }
+  7:  { retention_days: 365, quota_bytes: 52428800 }
+  8:  { retention_days: 365, quota_bytes: 104857600 }   # 100 MB
+  9:  { retention_days: 365, quota_bytes: 104857600 }
+  10: { retention_days: 365, quota_bytes: 104857600 }
+  11: { retention_days: 365, quota_bytes: 157286400 }   # 150 MB
+  12: { retention_days: 365, quota_bytes: 157286400 }
+
+roles:
+  teacher:
+    retention_days: 730     # 2 Jahre
+    quota_bytes: 1073741824 # 1 GB

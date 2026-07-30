@@ -8,6 +8,7 @@
         ArrowLeft,
         Bot,
         Users,
+        FileText,
     } from "lucide-svelte";
 </script>
 
@@ -38,7 +39,7 @@
                 Modell-Freischaltung
             </div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                Welche Modelle für welche Gruppen verfügbar sind
+                Welche Modelle (Chat &amp; Bild) für welche Gruppen verfügbar sind
             </div>
         </a>
         <!-- Site-Texte (7f) -->
@@ -95,6 +96,19 @@
             <div class="font-medium text-light-tx dark:text-dark-tx">Nutzer & Sitzungen</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                 Rollen einsehen, Sitzungen nach Rollenentzug beenden
+            </div>
+        </a>
+        <!-- Export-Vorlagen (Phase 19) -->
+        <a
+            href="/settings/export"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <FileText class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Export-Vorlagen</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Schulweites Layout für PDF/Word/ODT der Material-Werkstatt
             </div>
         </a>
     </div>
