@@ -125,6 +125,7 @@ Deployment-Prozess mit Nachvollziehbarkeit (Git-History).
 | `openai_moderation` | OpenAI Moderation API — kategorisiert Inhalte nach Schäden |
 | `bedrock_guardrail` | AWS Bedrock Content Filtering |
 | `custom_plugin` | Eigene Python-Klasse — maximale Flexibilität |
+| `llm_moderation.LlmModerationGuardrail` | **LLM als Klassifikator** — anbieterunabhängiger Ersatz für `openai_moderation`, siehe unten |
 
 ### Empfohlene Konfiguration für den Schulbetrieb
 
@@ -216,6 +217,33 @@ general_settings:
 > OpenAI-API-Key und verursacht einen minimalen Latenz-Overhead. Für Schulen
 > ohne OpenAI-Vertrag steht `regex` als datenschutzfreundlichere Alternative
 > zur Verfügung, erfordert aber selbst gepflegte Muster.
+
+### Ohne OpenAI: LLM-Klassifikator statt `openai_moderation`
+
+Bei EU-Anbietern wie IONOS gibt es **keine** Moderation-API. Die drei Guardrails
+`explicit_sexual_content`, `graphic_violence` und `self_harm_instructions` lassen sich dort
+nicht betreiben. Ersatz ist ein eigener Guardrail, der ein LLM als Klassifikator befragt und
+alle drei Kategorien in **einem** Aufruf bewertet:
+
+- `infra/guardrails/llm_moderation.py` — die LiteLLM-Anbindung
+- `infra/guardrails/moderation_core.py` — Kategorien, Schwellen, Auswertung
+
+Konfiguration siehe `infra/litellm_config.ionos.example.yaml`. Beide Dateien müssen dort
+liegen, wo der Proxy läuft, und von seinem Arbeitsverzeichnis importierbar sein.
+
+**Verhalten bei Störungen: fail-open.** Timeout, Netzfehler oder eine unlesbare Antwort
+lassen den Text durch und schreiben eine Warnung ins Log. Ein fail-closed Guardrail würde bei
+einer Anbieterstörung die gesamte Plattform blockieren — für alle Fächer, den ganzen Tag. Das
+steht in keinem Verhältnis zum Risiko, das er abwehrt.
+
+> ⚠️ **Die fürsorgliche Krisenantwort darf nicht blockiert werden.** Sie *nennt*
+> Selbstverletzung, verweist aber auf Hilfe — genau die Antwort, die ADR-008 Teil 3 will. Die
+> Kategoriebeschreibung in `moderation_core.py` grenzt das ausdrücklich ab, und die
+> Unit-Tests halten es fest. Wer die Schwellen nachschärft, muss diesen Fall erneut prüfen.
+
+**Kosten:** Bei `default_on: true` läuft der Klassifikator bei **jeder** Antwort. Ein kleines,
+günstiges Modell wählen. Sein Spend läuft nicht über den Virtual Key der Nutzer:innen,
+erscheint also nicht im Nutzerbudget — bei wachsender Last getrennt beobachten.
 
 ### Nach Konfigurationsänderungen
 

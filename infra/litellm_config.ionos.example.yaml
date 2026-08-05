@@ -109,8 +109,10 @@ model_list:
       input_cost_per_token: 0.0             # TODO
       output_cost_per_token: 0.0            # TODO
 
-  # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es
-  # bei IONOS nicht gibt). Wird in Schritt 12 des Plans angebunden.
+  # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es bei
+  # IONOS nicht gibt). Angebunden unten unter `litellm_settings.guardrails`.
+  # Hinweis: Der Guardrail ruft litellm direkt auf, nicht den Proxy — er braucht das Modell
+  # also vollqualifiziert. Dieser Eintrag hier dient der Übersicht und der Freischaltung.
   - model_name: system-moderation
     litellm_params:
       model: openai/<IONOS-KLEIN-ID>         # TODO
@@ -183,15 +185,43 @@ model_list:
       output_cost_per_token: 0.0            # TODO
 
 # ── Jugendschutz-Guardrails ───────────────────────────────────────────────────────────
-# ⚠️ Die drei `openai_moderation`-Guardrails aus infra/litellm_config.example.yaml
-# funktionieren mit IONOS NICHT — die Moderation-API gibt es dort nicht. Ersatz durch
-# einen LLM-Klassifikator auf `system-moderation` ist **Schritt 12** des Plans und hier
-# bewusst noch nicht enthalten: Ein Proxy ohne Guardrails ist besser als einer mit
-# scheinbar aktiven, die nichts tun.
+# Die drei `openai_moderation`-Guardrails aus infra/litellm_config.example.yaml funktionieren
+# mit IONOS NICHT — die Moderation-API gibt es dort nicht. Sie sind hier durch **einen**
+# LLM-Klassifikator ersetzt, der alle drei Kategorien in einem Aufruf bewertet
+# (`infra/guardrails/llm_moderation.py`, Kategorien und Schwellen in `moderation_core.py`).
 #
-# Der Regex-Guardrail funktioniert dagegen anbieterunabhängig und kann übernommen werden:
+# ⚠️ Deployment: `llm_moderation.py` und `moderation_core.py` müssen dort liegen, wo der
+# Proxy läuft, und von seinem Arbeitsverzeichnis aus importierbar sein.
+#
+# Verhalten bei Störungen: **fail-open**. Timeout, Netzfehler oder eine unlesbare Antwort
+# lassen den Text durch und schreiben eine Warnung. Ein fail-closed Guardrail würde bei einer
+# Anbieterstörung die ganze Schule blockieren — unverhältnismäßig, und konsistent mit dem
+# PII-Gate (Phase 14) und ADR-008 Teil 3.
+#
+# ⚠️ Der Klassifikator läuft bei `default_on: true` bei JEDER Antwort. Ein kleines, günstiges
+# Modell wählen. Sein Spend läuft NICHT über den Virtual Key der Nutzer:innen, taucht also
+# nicht im Nutzerbudget auf.
 litellm_settings:
   guardrails:
+    - guardrail_name: "jugendschutz"
+      litellm_params:
+        guardrail: llm_moderation.LlmModerationGuardrail
+        mode: post_call
+        default_on: true
+        # Vollqualifiziert (Provider + api_base), NICHT der `model_name` aus der model_list:
+        # Der Guardrail ruft litellm direkt auf, nicht den Proxy.
+        classifier_model: openai/<IONOS-KLEIN-ID>   # TODO
+        classifier_api_base: os.environ/IONOS_API_BASE
+        classifier_api_key: os.environ/IONOS_API_KEY
+        timeout: 8.0
+        # Optional — ohne Angabe gelten die Defaults aus moderation_core.py
+        # (sexual 0.5, violence_graphic 0.7, self_harm_instructions 0.5).
+        thresholds:
+          sexual: 0.5
+          violence_graphic: 0.7
+          self_harm_instructions: 0.5
+
+    # Anbieterunabhängig, unverändert aus der bisherigen Konfiguration übernommen:
     - guardrail_name: "illegal_drugs_how_to"
       litellm_params:
         guardrail: regex
