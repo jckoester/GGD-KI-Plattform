@@ -233,3 +233,33 @@ dem schulweiten Standard folgt und künftige Wechsel automatisch mitmacht.
 >
 > Ist LiteLLM nicht erreichbar, erscheint **kein** Hinweis — dann ist der Zustand ungeprüft,
 > nicht unauffällig. Eine leere Liste bedeutet in dem Fall also keine Entwarnung.
+
+## Konfiguration prüfen (`check_litellm_config.py`)
+
+Mehrere Fehlkonfigurationen des Proxys brechen **still** — man merkt sie erst Wochen später
+an einer Kostenstatistik, die auf 0 steht, oder an Werkzeugen, die nicht mehr erscheinen.
+Das Skript gleicht den laufenden Proxy mit der `.env` ab:
+
+```bash
+cd backend && python scripts/check_litellm_config.py
+```
+
+Geprüft wird:
+
+| Fund | Warum es sonst unbemerkt bleibt |
+|---|---|
+| Modellname aus der `.env` existiert im Proxy nicht | 400er ohne erkennbare Ursache |
+| Kein `input_cost_per_token` / `output_cost_per_token` | SpendLog bleibt 0 → EUR-Budgets, 429-Enforcement, `/budget` und `/statistics/costs` laufen ins Leere |
+| `supports_function_calling` nicht gesetzt | Werkzeuge fallen stumm aus oder gehen an ein Modell, das sie nicht kann |
+| Bildmodell ohne `mode: image_generation` | erscheint nicht in der Bild-Freigabe-Matrix |
+| `TITLE_MODEL` im Modellwähler sichtbar | Schüler:innen sehen ein Modell, das nicht zur Auswahl gedacht ist |
+| Platzhalter aus der Vorlage (`<…>`, `TODO`) | die Config wurde nur halb ausgefüllt |
+
+> **Modelle, die LiteLLM kennt, brauchen keine eigenen Preise.** Der Proxy reichert
+> `/model/info` aus seiner eingebauten Preistabelle an (rund 2650 Einträge). Preise
+> eintragen muss man nur für Modelle, die als `openai/<id>` mit eigener `api_base` laufen —
+> also alles bei IONOS, OVH oder auf lokalen Servern.
+
+Exit-Code 0 heißt: alles in Ordnung, soweit sich das ohne echten Aufruf feststellen lässt.
+Offen bleibt danach nur der Praxistest — eine Chat-Antwort erzeugen und prüfen, dass die
+SpendLog-Zeile einen Betrag **> 0** trägt.

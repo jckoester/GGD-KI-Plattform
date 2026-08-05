@@ -1,0 +1,205 @@
+# litellm_config.ionos.example.yaml — LiteLLM-Proxy für den Betrieb mit EU-Anbietern
+#
+# VORLAGE für den IONOS-Betriebspfad (ADR-015). Alles, was hier `<…>` oder `TODO` heißt,
+# muss vor der Inbetriebnahme gefüllt werden — die übrige Struktur ist vollständig.
+#
+# Vollständigkeit prüfen (gegen den laufenden Proxy, findet fehlende Preise, fehlendes
+# `supports_function_calling`, unbekannte `.env`-Modellnamen):
+#
+#     cd backend && python scripts/check_litellm_config.py
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# ZWEI NAMENSEBENEN (Plan §5)
+#
+# Ebene 1 — **Aufgaben-Aliase** (`chat-standard`, `system-titel`, …). Das ist der
+#   Standardweg. Der Name beschreibt den Einsatzzweck, nicht das Produkt. Ein
+#   Anbieterwechsel ändert dann nur `litellm_params.model` in DIESER Datei; `.env`,
+#   Assistenten-Datensätze und Team-Allowlists bleiben unberührt.
+#
+# Ebene 2 — **explizite Modelle** unter Anbieter-Präfix (`ionos-…`). Für Lehrkräfte, die
+#   einen Assistenten bewusst an ein bestimmtes Modell binden wollen. Nur für das Team
+#   `lehrkraefte` freischalten — sonst stünden Alias und expliziter Name desselben
+#   Modells nebeneinander im Schüler-Dropdown.
+#
+# Das `system-`-Präfix blendet Modelle aus dem Chat-Modellwähler aus
+# (`MODEL_PICKER_HIDDEN_PREFIXES`). Rein kosmetisch: `system-titel` muss trotzdem in
+# JEDER Team-Allowlist stehen, weil die Titelgenerierung über den persönlichen Virtual
+# Key der Nutzer:innen läuft — nicht über den Master-Key.
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# PFLICHTFELDER unter `model_info` — ohne sie bricht Funktionalität STILL:
+#
+#   input_cost_per_token / output_cost_per_token
+#       LiteLLM kennt für `openai/<id>` mit eigener `api_base` KEINE Preise. Ohne diese
+#       Werte melden die SpendLogs 0 → EUR-Budgets, das 429-Enforcement, /budget und
+#       /statistics/costs laufen ins Leere. Umrechnung: Preis pro Mio ÷ 1_000_000,
+#       also 0,15 $/M → 0.00000015. (Ein Pro-Million-Feld gibt es nicht.)
+#
+#   supports_function_calling: true
+#       Das Backend liest die Tool-Fähigkeit aus /model/info. Fehlt der Wert, ist er
+#       unbestimmt — dann verschwinden Wissensgraph-, Planungs- und Bild-Werkzeuge
+#       entweder stumm, oder sie gehen an ein Modell, das sie nicht kann.
+#
+#   mode: image_generation | embedding
+#       Trennt die Modalitäten. Ohne `image_generation` taucht ein Bildmodell in der
+#       Bild-Freigabe-Matrix nicht auf.
+
+model_list:
+  # ══ Ebene 1: Aufgaben-Aliase ════════════════════════════════════════════════════════
+
+  # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
+  - model_name: chat-standard
+    litellm_params:
+      model: openai/<IONOS-CHAT-ID>          # TODO z. B. gpt-oss-120b laut IONOS-Katalog
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.0             # TODO aus der IONOS-Preisliste
+      output_cost_per_token: 0.0            # TODO
+
+  # Kurze Fragen, Vokabeln, Textvereinfachung. Deutlich günstiger — verlängert bei
+  # Jahrgangs-Budgets von 1–3,50 €/Monat spürbar die Reichweite.
+  - model_name: chat-schnell
+    litellm_params:
+      model: openai/<IONOS-KLEIN-ID>         # TODO z. B. Mistral NeMo 12B / Llama 3.1 8B
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true        # TODO prüfen — kleine Modelle können es oft nicht
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  # Programmieraufgaben. IONOS hat derzeit KEIN dediziertes Code-Modell (ADR-015 §5) —
+  # der Alias zeigt daher vorerst auf dasselbe Backend wie chat-standard. Der Name ist
+  # bewusst schon reserviert: Sobald ein Code-Modell verfügbar ist, ändert sich hier eine
+  # Zeile, und alle darauf gebundenen Assistenten ziehen mit.
+  - model_name: chat-code
+    litellm_params:
+      model: openai/<IONOS-CHAT-ID>          # TODO vorerst identisch zu chat-standard
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  # Analyse, lange Texte, Unterrichtsplanung. Teuer → NUR für `lehrkraefte` freischalten.
+  - model_name: chat-komplex
+    litellm_params:
+      model: openai/<IONOS-GROSS-ID>         # TODO z. B. Llama 3.1 405B / Qwen 3.5 397B
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  # ══ System-Modelle: nie im Modellwähler (MODEL_PICKER_HIDDEN_PREFIXES) ══════════════
+
+  # Gesprächstitel. Klein und günstig genügt — läuft bei JEDER neuen Konversation.
+  # ⚠️ Muss in jeder Team-Allowlist stehen (Aufruf über den Virtual Key der Nutzer:innen).
+  - model_name: system-titel
+    litellm_params:
+      model: openai/<IONOS-KLEIN-ID>         # TODO
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: false       # Titel brauchen keine Werkzeuge
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es
+  # bei IONOS nicht gibt). Wird in Schritt 12 des Plans angebunden.
+  - model_name: system-moderation
+    litellm_params:
+      model: openai/<IONOS-KLEIN-ID>         # TODO
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: false
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  # ══ Weitere Modalitäten ═════════════════════════════════════════════════════════════
+
+  # Embeddings des Kontextspeichers. ⚠️ Die Vektorbreite MUSS zu EMBEDDING_DIMENSIONS und
+  # zur Spalte context_nodes.embedding passen — BGE-M3 hat 1024, nicht 1536. Ein Wechsel
+  # erfordert Migration + vollständiges Re-Embedding: docs/runbooks/modellwechsel.md.
+  - model_name: embedding-standard
+    litellm_params:
+      model: openai/<IONOS-EMBEDDING-ID>     # TODO z. B. BGE-M3
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      mode: embedding
+      input_cost_per_token: 0.0             # TODO
+
+  # Bildgenerierung. Für FLUX/SDXL zusätzlich IMAGE_RESPONSE_FORMAT=b64_json setzen —
+  # sonst liefern sie eine extern gehostete URL, und die verarbeitet das Backend bewusst
+  # nicht (die Bytes sollen das Schulnetz nicht über einen zweiten Request verlassen).
+  # Die Größen in IMAGE_SIZES müssen zu den vom Anbieter abgerechneten passen.
+  - model_name: bild-standard
+    litellm_params:
+      model: openai/<IONOS-BILD-ID>          # TODO z. B. FLUX.1 [schnell] / SDXL
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      mode: image_generation
+      output_cost_per_image: 0.0            # TODO
+
+  # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md): greift bei erschöpftem Budget und
+  # für sensible Fälle. Läuft lokal — keine Kosten, daher keine Preisangaben nötig.
+  - model_name: ollama-fallback
+    litellm_params:
+      model: ollama/llama3
+      api_base: os.environ/OLLAMA_BASE_URL
+    model_info:
+      supports_function_calling: false
+
+  # ══ Ebene 2: explizite Modelle — Allowlist NUR `lehrkraefte` ════════════════════════
+  # Zeigen auf dieselben Backends wie die Aliase; der Unterschied ist allein die Bindung.
+  # Ein Assistent auf einem expliziten Namen folgt einem schulweiten Modellwechsel NICHT
+  # und bricht, wenn der Eintrag hier entfällt — `/admin/assistants/model-check` meldet das.
+
+  - model_name: ionos-<KLEIN>                # TODO benennen, z. B. ionos-mistral-nemo-12b
+    litellm_params:
+      model: openai/<IONOS-KLEIN-ID>         # TODO
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true        # TODO prüfen
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+  - model_name: ionos-<GROSS>                # TODO benennen, z. B. ionos-llama-3.1-405b
+    litellm_params:
+      model: openai/<IONOS-GROSS-ID>         # TODO
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.0             # TODO
+      output_cost_per_token: 0.0            # TODO
+
+# ── Jugendschutz-Guardrails ───────────────────────────────────────────────────────────
+# ⚠️ Die drei `openai_moderation`-Guardrails aus infra/litellm_config.example.yaml
+# funktionieren mit IONOS NICHT — die Moderation-API gibt es dort nicht. Ersatz durch
+# einen LLM-Klassifikator auf `system-moderation` ist **Schritt 12** des Plans und hier
+# bewusst noch nicht enthalten: Ein Proxy ohne Guardrails ist besser als einer mit
+# scheinbar aktiven, die nichts tun.
+#
+# Der Regex-Guardrail funktioniert dagegen anbieterunabhängig und kann übernommen werden:
+litellm_settings:
+  guardrails:
+    - guardrail_name: "illegal_drugs_how_to"
+      litellm_params:
+        guardrail: regex
+        mode: post_call
+        action: block
+        pattern_set: "./guardrails/drugs_how_to.txt"
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/LITELLM_DATABASE_URL
+  store_model_in_db: true
