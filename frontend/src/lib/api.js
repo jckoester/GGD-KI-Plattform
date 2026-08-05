@@ -846,6 +846,17 @@ export async function getAdminAssistants(params = {}) {
   return res.json(); // { items: AssistantResponse[], total: int }
 }
 
+// Assistenten, deren fest gewähltes Modell es in LiteLLM nicht mehr gibt.
+// `checked: false` heißt „Proxy nicht erreichbar" — NICHT „alles in Ordnung".
+export async function getAssistantModelCheck() {
+  const res = await fetch(`${BASE}/admin/assistants/model-check`, {
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // { checked: bool, orphaned: [{ id, name, model, status }] }
+}
+
 // Anlegen - jetzt gemeinsamer Endpunkt
 // Pädagogische Lernverhalten-Augmentierungen (Key + Label) für den Editor.
 export async function getAugmentations() {

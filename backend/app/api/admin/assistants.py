@@ -30,6 +30,25 @@ class RejectBody(BaseModel):
     reason: Optional[str] = None
 
 
+class OrphanedAssistant(BaseModel):
+    id: int
+    name: str
+    model: str
+    status: str
+
+
+class ModelCheckResponse(BaseModel):
+    """Assistenten, deren fest gewähltes Modell es in LiteLLM nicht (mehr) gibt.
+
+    `checked=False` heißt: LiteLLM war nicht erreichbar — dann ist `orphaned` leer und
+    bedeutet *nicht*, dass alles in Ordnung ist. Die UI muss beides unterscheiden können,
+    sonst suggeriert ein Ausfall fälschlich Unauffälligkeit.
+    """
+
+    checked: bool
+    orphaned: list[OrphanedAssistant]
+
+
 # ── Admin-only Endpoints ─────────────────────────────────────────────────────
 
 @router.get("", response_model=AssistantFullListResponse)
@@ -64,6 +83,57 @@ async def list_assistants(
         items=[AssistantResponse.model_validate(a) for a in assistants],
         total=total,
     )
+
+
+@router.get("/model-check", response_model=ModelCheckResponse)
+async def check_assistant_models(
+    _: JwtPayload = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
+) -> ModelCheckResponse:
+    """Meldet Assistenten, deren gewähltes Modell in LiteLLM nicht mehr existiert.
+
+    Ein Assistent, der auf einen konkreten Modellnamen gebunden ist, bricht **still**, sobald
+    dieser aus der `model_list` fällt (Anbieterwechsel, abgekündigtes Modell). Ein Hinweis im
+    Editor hilft nur dem, der ihn beim Anlegen liest — nicht dem, der ein Jahr später erbt.
+
+    Bewusst über **alle** Assistenten statt als Feld an der paginierten Liste: Sonst bliebe
+    ein defekter Assistent auf Seite 3 unsichtbar.
+
+    Assistenten ohne eigenes Modell sind kein Warnfall — sie folgen `CHAT_DEFAULT_MODEL`
+    (Schritt 7). Archivierte ebenfalls nicht: Sie laufen ohnehin nicht mehr.
+
+    Es wird nichts automatisch korrigiert — welches Modell fachlich passt, entscheidet der
+    Mensch.
+    """
+    from app.litellm.client import LiteLLMClient
+
+    client = LiteLLMClient()
+    try:
+        known = set(await client.list_models())
+    except Exception as exc:
+        logger.warning(
+            "Modell-Abgleich der Assistenten nicht möglich (%s): %s", type(exc).__name__, exc
+        )
+        return ModelCheckResponse(checked=False, orphaned=[])
+    finally:
+        await client.close()
+
+    result = await db.execute(
+        select(Assistant)
+        .where(Assistant.model != "", Assistant.status != "archived")
+        .order_by(Assistant.name.asc())
+    )
+    orphaned = [
+        OrphanedAssistant(id=a.id, name=a.name, model=a.model, status=a.status)
+        for a in result.scalars().all()
+        if a.model not in known
+    ]
+    if orphaned:
+        logger.warning(
+            "%d Assistent(en) verweisen auf unbekannte Modelle: %s",
+            len(orphaned), ", ".join(sorted({o.model for o in orphaned})),
+        )
+    return ModelCheckResponse(checked=True, orphaned=orphaned)
 
 
 @router.get("/pending", response_model=AssistantFullListResponse)

@@ -1,12 +1,29 @@
 <script>
+    import { onMount } from "svelte";
     import {
         getModelMatrix,
         saveModelMatrix,
         getImageModelMatrix,
         saveImageModelMatrix,
+        getAssistantModelCheck,
     } from "$lib/api.js";
     import { CloudCog } from "lucide-svelte";
     import ModelMatrixTable from "$lib/components/ModelMatrixTable.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
+
+    // Assistenten, die auf ein nicht mehr vorhandenes Modell verweisen (Schritt 11).
+    // Gerade hier relevant: Wer die Modell-Konfiguration ändert, verursacht das Problem.
+    let orphaned = $state([]);
+
+    onMount(async () => {
+        try {
+            const result = await getAssistantModelCheck();
+            // `checked: false` = Proxy nicht erreichbar → nichts behaupten.
+            if (result.checked) orphaned = result.orphaned;
+        } catch {
+            // Nur ein Zusatzhinweis — die Matrix bleibt ohne ihn benutzbar.
+        }
+    });
 </script>
 
 <div class="p-6 space-y-10">
@@ -15,6 +32,12 @@
         <CloudCog />
         <h1 class="text-2xl font-bold">Modell-Freischaltung</h1>
     </div>
+
+    {#if orphaned.length > 0}
+        <WarningBanner
+            message={`${orphaned.length === 1 ? "Ein Assistent ist" : `${orphaned.length} Assistenten sind`} an ein Modell gebunden, das hier nicht mehr auftaucht: ${orphaned.map((o) => `„${o.name}" (${o.model})`).join(", ")}. Solche Assistenten schlagen beim Chatten fehl — unter „Assistenten verwalten" ein verfügbares Modell wählen oder das Feld leeren (schulweiter Standard).`}
+        />
+    {/if}
 
     <!-- Chat-Modelle -->
     <ModelMatrixTable

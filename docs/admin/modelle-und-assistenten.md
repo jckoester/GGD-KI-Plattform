@@ -209,3 +209,27 @@ Freigabe erfolgt unter `/settings/assistants`:
 
 Die Sichtbarkeit kann pro Assistent gesteuert werden. Eine granulare
 Freigabe nach Rolle oder Jahrgang ist in einer späteren Version geplant.
+
+## Assistenten mit verschwundenem Modell
+
+Ein Assistent kann fest an ein Modell gebunden sein (Feld **Modell** gesetzt statt
+„Schulweiter Standard"). Fällt dieses Modell später aus der LiteLLM-Config — Anbieterwechsel,
+abgekündigtes Modell, Tippfehler beim Umbenennen — schlägt der Assistent beim Chatten fehl,
+**ohne dass die Ursache erkennbar wäre**.
+
+Die Plattform gleicht das daher automatisch ab und warnt an zwei Stellen:
+
+- **`/assistants/manage`** — ein Banner über der Liste nennt die betroffenen Assistenten, und
+  die jeweilige Zeile ist markiert.
+- **`/settings/models`** — derselbe Hinweis, weil hier die Ursache entsteht: Wer die
+  Freischaltung oder die LiteLLM-Config ändert, sieht sofort, was dadurch bricht.
+
+**Behebung:** Im Assistenten ein verfügbares Modell wählen — oder das Feld leeren, damit er
+dem schulweiten Standard folgt und künftige Wechsel automatisch mitmacht.
+
+> Es wird **nichts automatisch umgestellt.** Welches Modell fachlich passt, entscheidet die
+> Schule; ein stiller Austausch könnte einen Assistenten auf ein Modell ohne Function-Calling
+> setzen und seine Werkzeuge lahmlegen.
+>
+> Ist LiteLLM nicht erreichbar, erscheint **kein** Hinweis — dann ist der Zustand ungeprüft,
+> nicht unauffällig. Eine leere Liste bedeutet in dem Fall also keine Entwarnung.

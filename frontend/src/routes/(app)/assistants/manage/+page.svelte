@@ -18,6 +18,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
     import {
         getAdminAssistants,
@@ -28,9 +29,13 @@
         getModels,
         approveAssistant,
         rejectAssistant,
+        getAssistantModelCheck,
     } from "$lib/api.js";
 
     let availableModels = $state([]); // string[]
+    // Assistenten, deren fest gewähltes Modell in LiteLLM fehlt (Schritt 11).
+    let orphanedModels = $state([]); // [{ id, name, model, status }]
+    const orphanedIds = $derived(new Set(orphanedModels.map((o) => o.id)));
 
     // State-Variablen
     let assistants = $state([]);
@@ -316,13 +321,19 @@
 
     // Lebenszyklus
     onMount(async () => {
-        const [, , models] = await Promise.allSettled([
+        const [, , models, modelCheck] = await Promise.allSettled([
             reload(),
             loadPending(),
             getModels(),
+            getAssistantModelCheck(),
         ]);
         if (models.status === "fulfilled") {
             availableModels = models.value.models.map((m) => m.id);
+        }
+        // Bei nicht erreichbarem Proxy (checked: false) bewusst NICHTS anzeigen — eine
+        // leere Liste hieße dann „ungeprüft", nicht „unauffällig".
+        if (modelCheck.status === "fulfilled" && modelCheck.value.checked) {
+            orphanedModels = modelCheck.value.orphaned;
         }
     });
     $effect(() => {
@@ -482,6 +493,14 @@
         </div>
     {/if}
 
+    {#if orphanedModels.length > 0}
+        <div class="px-6 pt-4">
+            <WarningBanner
+                message={`${orphanedModels.length === 1 ? "Ein Assistent verweist" : `${orphanedModels.length} Assistenten verweisen`} auf ein Modell, das es in der Modell-Konfiguration nicht mehr gibt: ${orphanedModels.map((o) => `„${o.name}" (${o.model})`).join(", ")}. Diese Assistenten schlagen beim Chatten fehl. Im Assistenten ein verfügbares Modell wählen — oder das Feld leeren, damit er dem schulweiten Standard folgt.`}
+            />
+        </div>
+    {/if}
+
     {#if loading}
         <div class="p-6">
             <LoadingBanner />
@@ -526,10 +545,23 @@
                                 >
                                     <td class="py-3 pr-4">
                                         <div
-                                            class="font-medium text-light-tx dark:text-dark-tx"
+                                            class="font-medium text-light-tx dark:text-dark-tx flex items-center gap-1.5"
                                         >
                                             {assistant.name}
+                                            {#if orphanedIds.has(assistant.id)}
+                                                <AlertCircle
+                                                    class="w-4 h-4 text-light-or dark:text-dark-or shrink-0"
+                                                    aria-label="Modell nicht verfügbar"
+                                                />
+                                            {/if}
                                         </div>
+                                        {#if orphanedIds.has(assistant.id)}
+                                            <div
+                                                class="text-xs text-light-or dark:text-dark-or"
+                                            >
+                                                Modell „{assistant.model}" nicht verfügbar
+                                            </div>
+                                        {/if}
                                         {#if assistant.description}
                                             <div
                                                 class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate max-w-[200px]"
