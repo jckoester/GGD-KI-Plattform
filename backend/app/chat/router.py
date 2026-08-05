@@ -1377,6 +1377,19 @@ async def chat(
     )
 
 
+def _is_pickable_model(model_id: str) -> bool:
+    """Gehört das Modell in den Chat-Modellwähler?
+
+    Ausgeblendet werden interne Modelle (Titelgenerierung, Moderations-Klassifikator) und
+    andere Modalitäten — sie tragen ein Präfix aus `MODEL_PICKER_HIDDEN_PREFIXES`. Niemand
+    soll sie manuell wählen, aber `system-titel` **muss** in der Team-Allowlist bleiben:
+    Die Titelgenerierung läuft über den persönlichen Virtual Key, nicht über den Master-Key.
+    """
+    return not any(
+        model_id.startswith(prefix) for prefix in settings.model_picker_hidden_prefixes
+    )
+
+
 @router.get("/models")
 async def list_models(
     current_user: JwtPayload = Depends(get_current_user),
@@ -1408,6 +1421,14 @@ async def list_models(
                     filtered_models = [m for m in all_models if m in allowlist_set]
     else:
         filtered_models = all_models
+
+    # Interne Modelle ausblenden — NACH der Allowlist-Filterung und bewusst auch auf dem
+    # Admin-Zweig, sonst sieht ausgerechnet der Admin Embedding- und Bildmodelle im
+    # Chat-Wähler. Rein kosmetisch: Berechtigungen bleiben unberührt, `system-titel` ist
+    # weiterhin über den Virtual Key aufrufbar und muss in der Team-Allowlist stehen
+    # bleiben. Die Admin-Freischaltungsmatrix (`/admin/models/matrix`) filtert NICHT —
+    # dort muss der Admin genau diese Modelle ja freischalten können.
+    filtered_models = [m for m in filtered_models if _is_pickable_model(m)]
 
     await client.close()
 

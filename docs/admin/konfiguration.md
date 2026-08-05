@@ -28,6 +28,7 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `IMAGE_SIZES` | Bildformate als JSON-Objekt Name→Pixelgröße, s. [Modelle & Assistenten](modelle-und-assistenten.md#bildformate-festlegen-image_sizes) | `{"quadratisch":"1024x1024",…}` |
 | `IMAGE_DEFAULT_FORMAT` | Standardformat — muss ein Schlüssel aus `IMAGE_SIZES` sein | `quadratisch` |
 | `IMAGE_RESPONSE_FORMAT` | leer = Parameter weglassen (gpt-image-1); `b64_json` = Base64 erzwingen (FLUX/SDXL) | *(leer)* |
+| `MODEL_PICKER_HIDDEN_PREFIXES` | Modell-Präfixe, die nicht im Chat-Modellwähler erscheinen | `["system-","embedding-","bild-"]` |
 | `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (für CORS) | `https://ki.beispielschule.de` |
 | `ENVIRONMENT` | `development` oder `production` | `production` |
 | `NGINX_PORT` | Host-Port, auf dem nginx lauscht (Default `80`; höher setzen, wenn ein Reverse-Proxy davorliegt) | `8080` |

@@ -20,6 +20,23 @@ Als Einstiegspunkt empfiehlt es sich, zunächst ein einzelnes,
 kostengünstiges Modell für alle Gruppen freizuschalten und die Matrix
 später gezielt zu erweitern.
 
+### Interne Modelle aus dem Modellwähler ausblenden
+
+Neben den Chat-Modellen stehen in LiteLLM auch Modelle, die **niemand manuell wählen soll**:
+das Modell für die Gesprächstitel, ein etwaiger Moderations-Klassifikator sowie Embedding-
+und Bildmodelle. Ohne Filter erscheinen sie alle im Modellwähler, den Schüler:innen bei
+jedem freien Chat sehen.
+
+`MODEL_PICKER_HIDDEN_PREFIXES` (Default `["system-","embedding-","bild-"]`) blendet sie aus.
+Die Empfehlung ist daher, solche Modelle in der LiteLLM-Config entsprechend zu benennen —
+etwa `system-titel` statt `gpt-4o-mini`.
+
+> **Der Filter ist rein kosmetisch.** Er ändert **keine** Freigabe. Das Titelmodell muss
+> weiterhin in **jeder** Team-Allowlist stehen: Die Titelgenerierung läuft über den
+> persönlichen Virtual Key der Nutzer:innen, nicht über den Master-Key — LiteLLM prüft
+> also deren Allowlist. Genau deshalb filtert die Freischaltungsmatrix oben **nicht**;
+> dort muss das Modell sichtbar bleiben, damit es sich überhaupt freischalten lässt.
+
 ## Bildgenerierung: Bild-Modelle & Bild-Assistenten
 
 Bildgenerierung ist an **zwei Schlüssel** gebunden — beide müssen gesetzt sein, damit

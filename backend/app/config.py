@@ -83,6 +83,15 @@ class Settings(BaseSettings):
     chat_default_model: str = ""
     # Leer = keine automatische Titelgenerierung (der Chat-Flow prüft darauf).
     title_model: str = ""
+    # Präfixe, deren Modelle NICHT im Chat-Modellwähler erscheinen: interne Modelle
+    # (Titelgenerierung, Moderations-Klassifikator) und andere Modalitäten. Rein kosmetisch —
+    # die Team-Allowlist bleibt unberührt, `system-titel` muss dort sogar stehen bleiben
+    # (der Titel-Aufruf läuft über den Virtual Key der Nutzer:innen).
+    #
+    # Über Präfixe statt `model_info.mode`, weil Titel- und Moderationsmodell technisch
+    # ebenfalls `mode: chat` sind. Konfigurierbar, weil die Namen eine Konvention des Admins
+    # sind — wer anders benennt, passt die Liste an, statt dass der Filter stumm ins Leere greift.
+    model_picker_hidden_prefixes: list[str] = ["system-", "embedding-", "bild-"]
     exchange_rate_fallback: float = 1.10
     student_grades: list[int] = Field(default=[5, 6, 7, 8, 9, 10, 11, 12], alias="public_student_grades")
     # Host-Header-Allowlist für TrustedHostMiddleware (Audit #18). Default `*` (aus, wie bisher);
