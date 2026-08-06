@@ -987,11 +987,20 @@ class GroupWeekPattern(Base):
     weekday: Mapped[int] = mapped_column(nullable=False)   # 0=Montag … 4=Freitag
     start_period: Mapped[int] = mapped_column(nullable=False)
     periods: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
+    # 'woechentlich' | 'a_woche' | 'b_woche'; das Ankerdatum steht in school_year.yaml.
+    rhythmus: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'woechentlich'")
+    )
 
     __table_args__ = (
         CheckConstraint("halbjahr IN (1, 2)", name="check_gwp_halbjahr"),
         CheckConstraint("weekday BETWEEN 0 AND 4", name="check_gwp_weekday"),
         CheckConstraint("periods IN (1, 2)", name="check_gwp_periods"),
+        CheckConstraint(
+            "rhythmus IN ('woechentlich','a_woche','b_woche')", name="check_gwp_rhythmus"
+        ),
+        # Bewusst OHNE `rhythmus`: Eine Slot-Position gehört zu genau einem Rhythmus.
+        # Sonst wäre „wöchentlich UND A-Woche" möglich — und erzeugte doppelte Slots.
         Index(
             "idx_gwp_unique",
             "group_id", "halbjahr", "weekday", "start_period",
@@ -1037,6 +1046,16 @@ class LessonSlot(Base):
     nachbereitet_auto: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+    # Herkunft: 'pattern' (Generator aus dem Wochenmuster) | 'import' (Stundenplanquelle)
+    # | 'manual' (von Hand). Ein Slot, der einmal 'manual' war, wird vom Sync nur noch
+    # gemeldet, nie geändert (UP-8).
+    source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'pattern'")
+    )
+    # `lessonId` der Quelle — identifiziert die Unterrichts**reihe**, nicht diesen Slot.
+    # Mehrere Slots teilen sie sich (belegt: 5 Perioden je lessonId). Zeilenidentität ist
+    # und bleibt (group_id, date, start_period).
+    external_uid: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -1050,7 +1069,15 @@ class LessonSlot(Base):
             "kategorie IN ('unterricht','pruefung','ausfall','puffer','vertretung')",
             name="check_ls_kategorie",
         ),
+        CheckConstraint(
+            "source IN ('pattern','import','manual')", name="check_ls_source"
+        ),
         Index("idx_lesson_slots_group_date", "group_id", "date"),
+        Index(
+            "idx_lesson_slots_external",
+            "group_id", "external_uid",
+            postgresql_where=text("external_uid IS NOT NULL"),
+        ),
     )
 
 
