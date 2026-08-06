@@ -126,7 +126,7 @@ class WebUntisAdapter(CalendarAdapter):
         self._owns_client = client is None
         self._logged_in = False
         self._element_ids: dict[str, int] | None = None
-        self._timegrid: list[int] | None = None
+        self._timegrid: list[tuple[int, int]] | None = None
         # Der Schuljahresbezug hängt an der JSESSIONID, nicht am Konto — nach jeder
         # Neuanmeldung ist er weg. Hier eine Instanz = eine Sitzung, deshalb genügt ein
         # Merker; wer den Adapter je Lauf neu baut, setzt ihn ohnehin neu.
@@ -364,30 +364,41 @@ class WebUntisAdapter(CalendarAdapter):
         self._element_ids = mapping
         return mapping
 
-    async def _timegrid_starts(self, day: date | None = None) -> list[int]:
-        """Beginnzeiten der Stunden in Minuten, aufsteigend.
+    async def timegrid(self, day: date | None = None) -> list[tuple[int, int]]:
+        """Das Stundenraster als (Beginn, Ende) in Minuten, aufsteigend.
 
         Grundlage für `start_period`: WebUntis nennt Uhrzeiten, die Planung zählt Stunden.
         Ohne diese Abbildung wäre jede Stundennummer geraten.
+
+        Die **Endzeiten** trägt es mit, weil sich daran ablesen lässt, welche Stunden
+        lückenlos aneinandergrenzen — die Grundlage der Doppelstunden-Erkennung
+        (Schritt 6). Am GGD ist der Unterschied eindeutig: Doppelstunden haben Lücke 0,
+        jede Pause misst mindestens 5 Minuten.
 
         Braucht den Schuljahresbezug der Sitzung — sonst -8998.
         """
         if self._timegrid is not None:
             return self._timegrid
-        starts: set[int] = set()
+        einheiten: set[tuple[int, int]] = set()
         try:
             await self._set_year_context(day or date.today())
             units = await self._rpc("getTimegridUnits")
         except CalendarSourceError:
             logger.info("Zeitraster nicht abrufbar — Stundennummern bleiben offen")
             units = None
-        for day in units if isinstance(units, list) else []:
-            for unit in (day.get("timeUnits") or []) if isinstance(day, dict) else []:
-                minutes = _parse_untis_time(unit.get("startTime")) if isinstance(unit, dict) else None
-                if minutes is not None:
-                    starts.add(minutes)
-        self._timegrid = sorted(starts)
+        for tag in units if isinstance(units, list) else []:
+            for unit in (tag.get("timeUnits") or []) if isinstance(tag, dict) else []:
+                if not isinstance(unit, dict):
+                    continue
+                beginn = _parse_untis_time(unit.get("startTime"))
+                ende = _parse_untis_time(unit.get("endTime"))
+                if beginn is not None:
+                    einheiten.add((beginn, ende if ende is not None else beginn))
+        self._timegrid = sorted(einheiten)
         return self._timegrid
+
+    async def _timegrid_starts(self, day: date | None = None) -> list[int]:
+        return [beginn for beginn, _ in await self.timegrid(day)]
 
     async def fetch_week(self, element: str, week: date) -> FetchResult:
         """Stunden einer Kalenderwoche für ein Lehrkraft-Kürzel."""
