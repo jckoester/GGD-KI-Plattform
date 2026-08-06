@@ -79,12 +79,30 @@ export async function getPreferences() {
 }
 
 export async function patchPreferences(updates) {
-  await fetch(`${BASE}/preferences`, {
+  const res = await fetch(`${BASE}/preferences`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(updates),
   });
+  // Wirft bei Fehlschlag, statt ihn zu verschlucken: Seit dem WebUntis-Kürzel kann der
+  // Server eine Einstellung ablehnen (422 unbekanntes Kürzel, 503 Quelle nicht erreichbar).
+  // Stillschweigend zu tun, als sei gespeichert worden, wäre die schlechteste Auskunft.
+  // Die beiden bisherigen Aufrufer fangen bereits ab (theme.js, subjectVisibility.js).
+  if (!res.ok) {
+    const detail = await res
+      .json()
+      .then((body) => body?.detail)
+      .catch(() => null);
+    throw new Error(detail || `Einstellung konnte nicht gespeichert werden (${res.status})`);
+  }
+  return res.json().catch(() => ({}));
+}
+
+export async function getCalendarTeachers() {
+  const res = await fetch(`${BASE}/calendar/teachers`, { credentials: "include" });
+  if (!res.ok) return { configured: false, teachers: [], error: null };
+  return res.json();
 }
 
 export async function getRecentConversations(limit = 10, offset = 0) {

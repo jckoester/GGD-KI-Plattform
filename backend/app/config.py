@@ -74,6 +74,21 @@ class Settings(BaseSettings):
     # aktivieren. Standard-Log (ohne Werte: Claim-Keys + Anzahl) läuft immer.
     auth_debug_userinfo: bool = False
     jwt_algorithm: str = "HS256"
+    # ── Stundenplan-Quelle (UP-8) ─────────────────────────────────────────────
+    # Ein schulweites Dienstkonto, einmal gesetzt, selten geändert — also dieselbe
+    # Behandlung wie die übrigen Geheimnisse der Plattform. Bewusst KEINE Tabelle mit
+    # verschlüsselter Konfiguration: Die stammte aus dem verworfenen Entwurf, in dem
+    # jede Lehrkraft eine eigene Abo-URL gehabt hätte (75 Geheimnisse statt einem).
+    #
+    # `webuntis_server` leer = keine Stundenplan-Integration. Dann verschwinden die
+    # zugehörigen Bedienelemente, statt Fehler zu melden (Plan §0) — eine Schule ohne
+    # WebUntis soll davon nichts merken.
+    webuntis_server: str = ""
+    webuntis_user: str = ""
+    webuntis_password: str = ""
+    # NUR bei geteiltem Server nötig. Bei eigener Subdomain (z. B. ggd.webuntis.com) leer
+    # lassen — sonst antwortet WebUntis mit `invalid schoolname` (-8500).
+    webuntis_school: str = ""
     # ── Chat-Modelle ──────────────────────────────────────────────────────────
     # Beides sind die Namen, unter denen der LiteLLM-Proxy die Modelle führt — nicht die
     # IDs der Anbieter. Bewusst OHNE Code-Default: Ein hier hinterlegter Anbietername wäre

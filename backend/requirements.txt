@@ -23,10 +23,6 @@ alembic>=1.13.0,<2.0
 python-dotenv>=1.0.0,<2.0
 pyyaml>=6.0.1,<7.0
 python-jose[cryptography]>=3.3.0,<4.0
-# Direkt genutzt von app/calendar/secrets.py (Fernet + HKDF) — nicht nur als Beigabe von
-# python-jose. Explizit gelistet, damit die Kalender-Verschlüsselung nicht daran hängt,
-# welche Extras ein anderes Paket zufällig mitzieht.
-cryptography>=42.0,<50.0
 httpx>=0.27.0,<1.0
 python-multipart>=0.0.9,<1.0
 # pdfminer.six nutzt Datums-Versionen (YYYYMMDD) — eine semver-Obergrenze ist bedeutungslos;

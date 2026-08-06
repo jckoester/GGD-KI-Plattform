@@ -6,8 +6,10 @@
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { goto } from "$app/navigation";
-    import { patchPreferences, getPreferences } from "$lib/api.js";
+    import { patchPreferences, getPreferences, getCalendarTeachers } from "$lib/api.js";
     import { onMount } from "svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import SuccessBanner from "$lib/components/SuccessBanner.svelte";
 
     // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
     const membershipGroups = $derived([
@@ -48,6 +50,13 @@
         });
     }
 
+    // ── WebUntis-Kürzel (UP-8 Schritt 3) ──────────────────────────────────
+    // Auswahl aus der geladenen Liste statt Freitext: Ein Tippfehler führte sonst zu einem
+    // stillen Nicht-Abruf, den später niemand zuordnet.
+    let kuerzelListe = $state({ configured: false, teachers: [], error: null });
+    let kuerzelFehler = $state("");
+    let kuerzelGespeichert = $state(false);
+
     onMount(async () => {
         try {
             preferences = await getPreferences();
@@ -58,7 +67,27 @@
         }
         // Aufgelöste Mitgliedschaften für die Diagnose frisch laden
         refreshMyGroups();
+        // Ohne eingerichtete Stundenplanquelle bleibt der Abschnitt ausgeblendet —
+        // eine Schule ohne WebUntis soll hier nichts sehen, was sie nicht betrifft.
+        if ($user?.roles?.includes("teacher")) {
+            kuerzelListe = await getCalendarTeachers();
+        }
     });
+
+    async function updateKuerzel(event) {
+        const wert = event.target.value;
+        kuerzelFehler = "";
+        kuerzelGespeichert = false;
+        try {
+            await updatePreference("webuntis_kuerzel", wert);
+            kuerzelGespeichert = true;
+        } catch (err) {
+            kuerzelFehler = err.message;
+            // Anzeige auf den gespeicherten Stand zurücksetzen — sonst zeigt das Feld
+            // eine Auswahl, die der Server abgelehnt hat.
+            event.target.value = preferences?.webuntis_kuerzel ?? "";
+        }
+    }
 
     async function updatePreference(key, value) {
         await patchPreferences({ [key]: value });
@@ -195,6 +224,48 @@
                 <ChevronRight class="w-4 h-4 ml-auto" />
             </a>
         </section>
+
+        {#if kuerzelListe.configured}
+        <section class="mb-8">
+            <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
+                Stundenplan
+            </h2>
+            <label
+                for="webuntis-kuerzel"
+                class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
+            >
+                Ihr Kürzel im Stundenplan
+            </label>
+            <select
+                id="webuntis-kuerzel"
+                value={preferences?.webuntis_kuerzel ?? ""}
+                onchange={updateKuerzel}
+                class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
+                       focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+            >
+                <option value="">— nicht zugeordnet —</option>
+                {#each kuerzelListe.teachers as k}
+                    <option value={k}>{k}</option>
+                {/each}
+            </select>
+
+            <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
+                Ihr Kürzel wird ausschließlich verwendet, um Ihren Stundenplan abzurufen
+                (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
+                KI-Modelle übermittelt und erscheint in keinem Chat, keinem
+                Assistenten-Kontext und keinem Wissensknoten. Sie können es jederzeit
+                entfernen; dann entfällt die Stundenplan-Übernahme.
+            </p>
+
+            {#if kuerzelFehler}
+                <div class="mt-3"><ErrorBanner message={kuerzelFehler} /></div>
+            {:else if kuerzelGespeichert}
+                <div class="mt-3"><SuccessBanner message="Kürzel gespeichert." /></div>
+            {/if}
+        </section>
+        {/if}
         {/if}
 
         <section class="mb-8">

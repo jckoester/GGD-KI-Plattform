@@ -1,4 +1,4 @@
-"""UP-8 Schritt 1 — Adapter-Schnittstelle und Geheimnis-Behandlung."""
+"""UP-8 Schritt 1 — Adapter-Schnittstelle."""
 from datetime import date, datetime
 
 import pytest
@@ -13,14 +13,6 @@ from app.calendar import (
     LessonState,
     NoActiveSchoolYearError,
     Reschedule,
-)
-from app.calendar.secrets import (
-    SecretDecryptionError,
-    decrypt_config,
-    decrypt_value,
-    encrypt_config,
-    encrypt_value,
-    redact_config,
 )
 
 PASSWORD = "P@ss wort!mit'Sonder\"zeichen$§"
@@ -185,76 +177,23 @@ def test_fehlertypen_sind_unterscheidbar():
     assert not issubclass(NoActiveSchoolYearError, AuthenticationError)
 
 
-# ── Geheimnisse ───────────────────────────────────────────────────────────────
-
-
-def test_verschluesselung_ist_umkehrbar():
-    assert decrypt_value(encrypt_value(PASSWORD)) == PASSWORD
-
-
-def test_geheimtext_enthaelt_das_geheimnis_nicht():
-    token = encrypt_value(PASSWORD)
-    assert PASSWORD not in token
-    assert token.startswith("enc:v1:")
-
-
-def test_zweimal_verschluesseln_verpackt_nicht_doppelt():
-    once = encrypt_value(PASSWORD)
-    assert encrypt_value(once) == once
-    assert decrypt_value(once) == PASSWORD
-
-
-def test_nur_geheimnis_schluessel_werden_verschluesselt():
-    """Der Servername bleibt lesbar — sonst ist jede Fehlersuche blind."""
-    config = {"server": "ggd.webuntis.com", "user": "svc", "password": PASSWORD}
-    stored = encrypt_config(config)
-    assert stored["server"] == "ggd.webuntis.com"
-    assert stored["user"] == "svc"
-    assert stored["password"] != PASSWORD
-    assert decrypt_config(stored) == config
-
-
-def test_ics_abo_url_gilt_als_geheimnis():
-    """Wer die Abo-URL hat, liest den Plan — sie IST das Geheimnis."""
-    stored = encrypt_config({"url": "https://example.org/ics?token=geheim"})
-    assert "geheim" not in stored["url"]
-
-
-def test_klartext_wird_durchgereicht():
-    """Erlaubt eine bestehende Zeile zu lesen und beim Speichern zu verschlüsseln."""
-    assert decrypt_value("noch-nicht-verschluesselt") == "noch-nicht-verschluesselt"
-
-
-def test_fremder_geheimtext_meldet_sich_ohne_ihn_auszugeben():
-    fremd = "enc:v1:gAAAAABm" + "x" * 40
-    with pytest.raises(SecretDecryptionError) as exc:
-        decrypt_value(fremd)
-    assert "SCHOOL_SECRET" in str(exc.value)
-    assert fremd not in str(exc.value)
-
-
-def test_redact_zeigt_gesetzt_ohne_wert():
-    """Für API-Antworten und Logs: gesetzt/leer unterscheidbar, Wert unsichtbar."""
-    redacted = redact_config({"server": "ggd.webuntis.com", "password": PASSWORD, "token": ""})
-    assert redacted == {"server": "ggd.webuntis.com", "password": "<gesetzt>", "token": ""}
-
-
-# ── Die Abnahme aus dem Plan ──────────────────────────────────────────────────
+# ── Fehlermeldungen tragen keine Zugangsdaten ────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_last_error_enthaelt_keine_zugangsdaten():
-    """Abnahmekriterium Schritt 1.
+async def test_fehlermeldung_enthaelt_keine_zugangsdaten():
+    """Adapter-Meldungen werden angezeigt und protokolliert.
 
-    `last_error` wird dem Admin angezeigt und steht in der Datenbank. Ein Adapter, der
-    eine Bibliotheks-Ausnahme durchreicht, kann darin Zugangsdaten transportieren —
-    deshalb formulieren Adapter ihre Meldungen selbst.
+    Ein Adapter, der eine Bibliotheks-Ausnahme durchreicht, kann darin Zugangsdaten
+    transportieren — deshalb formulieren Adapter ihre Meldungen selbst. Bleibt auch nach
+    dem Wegfall der DB-Verschlüsselung wichtig: Das Passwort steht jetzt in der Umgebung,
+    ein Leck ginge über Logs und Fehleranzeigen.
     """
     with pytest.raises(CalendarSourceError) as exc:
         await FakeAdapter(password="falsch").check()
-    last_error = str(exc.value)
-    assert PASSWORD not in last_error
-    assert "falsch" not in last_error
+    meldung = str(exc.value)
+    assert PASSWORD not in meldung
+    assert "falsch" not in meldung
 
 
 @pytest.mark.asyncio

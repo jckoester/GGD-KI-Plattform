@@ -345,7 +345,16 @@ def find_keys(node: object, needles: tuple[str, ...], path: str = "",
 
 # Kurzbezeichner → durchnummerierter Platzhalter. Gleiche Eingabe ergibt gleichen
 # Platzhalter, damit Verweise zwischen Stammliste und Perioden erhalten bleiben.
-_LABEL_KEYS = ("name", "displayname", "longName", "studentGroup")
+#
+# `externKey`, `forename` und `title` stehen mit drin, weil `pageconfig` den vollen
+# Personendatensatz jeder Lehrkraft liefert — im Lauf vom 06.08.2026 standen dort zwei
+# **Anmeldenamen in Klarform** (`vorname.nachname`). Wer diese Liste aufzeichnet, zeichnet
+# das Kollegium auf; die Prüfung darf sich nicht auf die drei offensichtlichen Felder
+# beschränken.
+_LABEL_KEYS = (
+    "name", "displayname", "longName", "studentGroup",
+    "externKey", "forename", "title", "alternatename",
+)
 
 # Freitext → ersatzlos geleert. Diese Felder enthalten **Unterrichtsinhalte**: Aufgaben,
 # Absprachen, Vertretungshinweise, gelegentlich Namen von Kolleginnen und Kollegen. Ein
