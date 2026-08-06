@@ -1,0 +1,79 @@
+[
+  {
+    "id": 254,
+    "name": "E93",
+    "longName": "E94",
+    "startDate": 20251027,
+    "endDate": 20251102
+  },
+  {
+    "id": 257,
+    "name": "E95",
+    "longName": "E96",
+    "startDate": 20251222,
+    "endDate": 20260104
+  },
+  {
+    "id": 260,
+    "name": "E97",
+    "longName": "E98",
+    "startDate": 20260216,
+    "endDate": 20260222
+  },
+  {
+    "id": 263,
+    "name": "E99",
+    "longName": "E100",
+    "startDate": 20260330,
+    "endDate": 20260412
+  },
+  {
+    "id": 266,
+    "name": "E101",
+    "longName": "E102",
+    "startDate": 20260515,
+    "endDate": 20260515
+  },
+  {
+    "id": 269,
+    "name": "E103",
+    "longName": "E104",
+    "startDate": 20260525,
+    "endDate": 20260607
+  },
+  {
+    "id": 272,
+    "name": "E105",
+    "longName": "E106",
+    "startDate": 20251003,
+    "endDate": 20251003
+  },
+  {
+    "id": 275,
+    "name": "E107",
+    "longName": "E96",
+    "startDate": 20260105,
+    "endDate": 20260105
+  },
+  {
+    "id": 278,
+    "name": "E108",
+    "longName": "E109",
+    "startDate": 20260106,
+    "endDate": 20260106
+  },
+  {
+    "id": 281,
+    "name": "E110",
+    "longName": "E111",
+    "startDate": 20260501,
+    "endDate": 20260501
+  },
+  {
+    "id": 284,
+    "name": "E112",
+    "longName": "E113",
+    "startDate": 20260514,
+    "endDate": 20260514
+  }
+]

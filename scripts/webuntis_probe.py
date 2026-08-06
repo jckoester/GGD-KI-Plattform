@@ -343,6 +343,101 @@ def find_keys(node: object, needles: tuple[str, ...], path: str = "",
     return found
 
 
+# Kurzbezeichner → durchnummerierter Platzhalter. Gleiche Eingabe ergibt gleichen
+# Platzhalter, damit Verweise zwischen Stammliste und Perioden erhalten bleiben.
+_LABEL_KEYS = ("name", "displayname", "longName", "studentGroup")
+
+# Freitext → ersatzlos geleert. Diese Felder enthalten **Unterrichtsinhalte**: Aufgaben,
+# Absprachen, Vertretungshinweise, gelegentlich Namen von Kolleginnen und Kollegen. Ein
+# durchnummerierter Platzhalter wäre hier verkehrt — die Form „irgendein String" ist alles,
+# was eine Fixture davon braucht.
+_FREETEXT_KEYS = (
+    "lessonText", "periodText", "substText", "staffText", "periodInfo", "debugInfo",
+    "text", "info", "remark",
+)
+
+
+def anonymize(node: object, mapping: dict[str, str], depth: int = 0) -> object:
+    """Ersetzt Klartext durch Platzhalter, Struktur und IDs bleiben erhalten.
+
+    Für die Test-Fixture des Adapters (UP-8 Schritt 2): Getestet werden soll die **Form**
+    der Antwort, nicht ihr Inhalt.
+
+    Zwei Sorten, unterschiedlich behandelt:
+
+    * **Kurzbezeichner** (Kürzel, Klassennamen, Gruppenschlüssel) bekommen einen stabilen
+      Platzhalter — die Auflösung Element-ID → Name ist genau das, was geprüft wird, und
+      ginge ohne Wiedererkennbarkeit verloren.
+    * **Freitexte** werden geleert. Der Probelauf vom 06.08.2026 hat gezeigt, dass dort
+      vollständige Arbeitsaufträge und ein Kollegenname stehen — Inhalte, die in keinem
+      Repository etwas zu suchen haben und für die Prüfung ohne Belang sind.
+
+    IDs, Zeiten und Zustände bleiben unangetastet.
+    """
+    if isinstance(node, dict):
+        result = {}
+        for key, value in node.items():
+            if key in _LABEL_KEYS and isinstance(value, str) and value:
+                result[key] = mapping.setdefault(value, f"E{len(mapping) + 1:02d}")
+            elif key in _FREETEXT_KEYS and isinstance(value, str) and value:
+                result[key] = ""
+            else:
+                result[key] = anonymize(value, mapping, depth + 1)
+        return result
+    if isinstance(node, list):
+        return [anonymize(value, mapping, depth + 1) for value in node]
+    return node
+
+
+def dump_fixtures(api: "WebUntis", element_id: int, week: date, directory: str) -> None:
+    """Schreibt anonymisierte Test-Fixtures für den Adapter (UP-8 Schritt 2).
+
+    Vier Antworten, weil der Adapter alle vier auswertet und bisher nur zwei davon
+    beobachtet sind:
+
+    * **Woche** — die Nutzdaten. Struktur aus der Erhebung bekannt.
+    * **Zeitraster** (`getTimegridUnits`) — **ungeprüft**. Daran hängt `start_period`; die
+      Annahme über die Verschachtelung ist bislang aus der Dokumentation, nicht aus einer
+      Antwort. Zugleich die Probe auf die Frage, ob alle Wochentage dasselbe Raster haben.
+    * **Ferien** — für den Import (Schritt 4).
+    * **pageconfig** — Kürzel → `elementId`.
+    """
+    os.makedirs(directory, exist_ok=True)
+    mapping: dict[str, str] = {}
+    written: list[str] = []
+
+    def write(filename: str, payload: object) -> None:
+        path = os.path.join(directory, filename)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(anonymize(payload, mapping), fh, ensure_ascii=False, indent=2)
+        written.append(filename)
+
+    status, payload = api.weekly(ELEMENT_TEACHER, element_id, week)
+    if status == 200 and isinstance(payload, dict):
+        write("webuntis_week.json", payload)
+    else:
+        print(f"\n       Woche nicht geschrieben — Abruf ergab HTTP {status}.")
+
+    for filename, method in (
+        ("webuntis_timegrid.json", "getTimegridUnits"),
+        ("webuntis_holidays.json", "getHolidays"),
+    ):
+        ok, result = api.rpc(method)
+        if ok and result:
+            write(filename, result)
+        else:
+            print(f"\n       {method} nicht geschrieben: {str(result)[:80]}")
+
+    status, elements = api.pageconfig(ELEMENT_TEACHER)
+    if elements:
+        write("webuntis_pageconfig.json", {"data": {"elements": elements}})
+
+    print(f"\n       Fixtures nach {directory}: {', '.join(written)}")
+    print(f"       {len(mapping)} Namen durch Platzhalter ersetzt; IDs und Struktur")
+    print("       unverändert. Vor dem Einchecken durchsehen — Freitextfelder")
+    print("       (z. B. Stundentexte) sind NICHT anonymisiert.")
+
+
 def interpret_holiday_error(message: str) -> str | None:
     """Deutet einen `getHolidays`-Fehler, soweit er eindeutig ist.
 
@@ -414,6 +509,10 @@ def main() -> None:
                         help="Zusätzliche Wochen als YYYY-MM-DD (Default: Rückblick-Serie)")
     parser.add_argument("--no-surface", action="store_true",
                         help="Frage D (Datenoberfläche) auslassen")
+    parser.add_argument("--dump-fixture", metavar="VERZEICHNIS", default=None,
+                        help="Test-Fixtures für den Adapter nach VERZEICHNIS schreiben: "
+                             "Woche, Zeitraster, Ferien und pageconfig. Namen werden durch "
+                             "Platzhalter ersetzt, IDs und Struktur bleiben erhalten.")
     parser.add_argument("--schoolyear", default=None,
                         help="Schuljahr für die Ferienabfrage (Name oder id, z. B. "
                              "'2026/2027' oder '9'). Ohne Angabe werden die drei "
@@ -530,6 +629,9 @@ def main() -> None:
                 print("        UNGEPRÜFT, nicht abwesend. Woche mit SHIFT nachreichen.)")
         if not reference["has_orgid"] and not states.get("SUBSTITUTION"):
             print("       (Keine Vertretung in dieser Woche — orgId ebenfalls ungeprüft.)")
+
+        if args.dump_fixture:
+            dump_fixtures(api, element_id, reference["week"], args.dump_fixture)
 
     # ── C: Reichweite in die Vergangenheit ──────────────────────────────────────────
     _section("C — Wie weit reicht die Schnittstelle zurück? (löst das Ferien-Datenproblem)")

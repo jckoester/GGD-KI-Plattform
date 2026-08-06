@@ -52,7 +52,7 @@ class FakeAdapter(CalendarAdapter):
                     subject="M",
                     class_names=("8a",),
                     teacher_names=(element,),
-                    original_teacher="ABC",
+                    covered_by="ABC",
                 )
             ],
             warnings=["1 Eintrag ohne Datum übersprungen"],
@@ -83,7 +83,7 @@ async def test_fake_adapter_liefert_normalisierte_stunden():
     assert lesson.date == date(2026, 5, 18)  # Montag derselben Woche
     assert lesson.state is LessonState.SUBSTITUTION
     assert lesson.external_uid == "4711"
-    assert lesson.original_teacher == "ABC"
+    assert lesson.covered_by == "ABC"
     assert result.warnings == ["1 Eintrag ohne Datum übersprungen"]
 
 
@@ -91,6 +91,7 @@ async def test_fake_adapter_liefert_normalisierte_stunden():
     "state,expected",
     [
         (LessonState.REGULAR, True),
+        (LessonState.EXAM, True),
         (LessonState.CANCELLED, True),
         (LessonState.SUBSTITUTION, True),
         (LessonState.SHIFTED, True),
@@ -102,6 +103,52 @@ def test_creates_slot(state, expected):
     """Pausenaufsicht und Unbekanntes erzeugen keinen Slot — im Zweifel nichts anlegen."""
     lesson = Lesson(date=date(2026, 5, 18), start_period=1, periods=1, state=state)
     assert lesson.creates_slot is expected
+
+
+def test_uebernommene_aufsicht_erzeugt_keinen_slot():
+    """Fremder Unterricht gehört nicht in den eigenen Jahresplan — unabhängig vom Zustand."""
+    lesson = Lesson(
+        date=date(2026, 5, 18), start_period=1, periods=1,
+        state=LessonState.SUBSTITUTION, covering_for="XYZ",
+    )
+    assert not lesson.creates_slot
+    assert not lesson.delivers_planned_content
+
+
+@pytest.mark.parametrize(
+    "state,covered_by,expected",
+    [
+        (LessonState.REGULAR, None, True),
+        (LessonState.EXAM, None, True),
+        (LessonState.SHIFTED, None, True),      # Ziel einer Verlegung: findet statt
+        (LessonState.CANCELLED, None, False),
+        # Der Kern der Begriffsklärung: Vertretung = Aufsicht, kein Unterricht.
+        (LessonState.SUBSTITUTION, "XYZ", False),
+        (LessonState.NON_TEACHING, None, False),
+        (LessonState.UNKNOWN, None, False),
+    ],
+)
+def test_delivers_planned_content(state, covered_by, expected):
+    """Ob das geplante Stundenziel erreicht wurde — die Grundlage der Umplanung."""
+    lesson = Lesson(
+        date=date(2026, 5, 18), start_period=1, periods=1,
+        state=state, covered_by=covered_by,
+    )
+    assert lesson.delivers_planned_content is expected
+
+
+def test_vertretung_erzeugt_slot_aber_keinen_inhalt():
+    """Die eigene vertretene Stunde: Slot ja (sie stand im Plan), Inhalt nein.
+
+    Genau diese Kombination fordert die Umplanung an — ohne den Slot verschwände die
+    Stunde, ohne die Inhaltsaussage gälte sie als gehalten.
+    """
+    lesson = Lesson(
+        date=date(2026, 5, 18), start_period=1, periods=1,
+        state=LessonState.SUBSTITUTION, covered_by="XYZ",
+    )
+    assert lesson.creates_slot
+    assert not lesson.delivers_planned_content
 
 
 def test_holiday_einzeltag():

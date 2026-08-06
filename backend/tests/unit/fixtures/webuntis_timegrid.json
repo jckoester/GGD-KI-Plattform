@@ -1,0 +1,302 @@
+[
+  {
+    "day": 2,
+    "timeUnits": [
+      {
+        "name": "E82",
+        "startTime": 755,
+        "endTime": 840
+      },
+      {
+        "name": "E83",
+        "startTime": 840,
+        "endTime": 925
+      },
+      {
+        "name": "E84",
+        "startTime": 950,
+        "endTime": 1035
+      },
+      {
+        "name": "E85",
+        "startTime": 1035,
+        "endTime": 1120
+      },
+      {
+        "name": "E86",
+        "startTime": 1130,
+        "endTime": 1215
+      },
+      {
+        "name": "E87",
+        "startTime": 1215,
+        "endTime": 1300
+      },
+      {
+        "name": "E88",
+        "startTime": 1330,
+        "endTime": 1355
+      },
+      {
+        "name": "E89",
+        "startTime": 1400,
+        "endTime": 1445
+      },
+      {
+        "name": "E90",
+        "startTime": 1445,
+        "endTime": 1530
+      },
+      {
+        "name": "E91",
+        "startTime": 1540,
+        "endTime": 1625
+      },
+      {
+        "name": "E92",
+        "startTime": 1625,
+        "endTime": 1710
+      }
+    ]
+  },
+  {
+    "day": 3,
+    "timeUnits": [
+      {
+        "name": "E82",
+        "startTime": 755,
+        "endTime": 840
+      },
+      {
+        "name": "E83",
+        "startTime": 840,
+        "endTime": 925
+      },
+      {
+        "name": "E84",
+        "startTime": 950,
+        "endTime": 1035
+      },
+      {
+        "name": "E85",
+        "startTime": 1035,
+        "endTime": 1120
+      },
+      {
+        "name": "E86",
+        "startTime": 1130,
+        "endTime": 1215
+      },
+      {
+        "name": "E87",
+        "startTime": 1215,
+        "endTime": 1300
+      },
+      {
+        "name": "E88",
+        "startTime": 1330,
+        "endTime": 1355
+      },
+      {
+        "name": "E89",
+        "startTime": 1400,
+        "endTime": 1445
+      },
+      {
+        "name": "E90",
+        "startTime": 1445,
+        "endTime": 1530
+      },
+      {
+        "name": "E91",
+        "startTime": 1540,
+        "endTime": 1625
+      },
+      {
+        "name": "E92",
+        "startTime": 1625,
+        "endTime": 1710
+      }
+    ]
+  },
+  {
+    "day": 4,
+    "timeUnits": [
+      {
+        "name": "E82",
+        "startTime": 755,
+        "endTime": 840
+      },
+      {
+        "name": "E83",
+        "startTime": 840,
+        "endTime": 925
+      },
+      {
+        "name": "E84",
+        "startTime": 950,
+        "endTime": 1035
+      },
+      {
+        "name": "E85",
+        "startTime": 1035,
+        "endTime": 1120
+      },
+      {
+        "name": "E86",
+        "startTime": 1130,
+        "endTime": 1215
+      },
+      {
+        "name": "E87",
+        "startTime": 1215,
+        "endTime": 1300
+      },
+      {
+        "name": "E88",
+        "startTime": 1330,
+        "endTime": 1355
+      },
+      {
+        "name": "E89",
+        "startTime": 1400,
+        "endTime": 1445
+      },
+      {
+        "name": "E90",
+        "startTime": 1445,
+        "endTime": 1530
+      },
+      {
+        "name": "E91",
+        "startTime": 1540,
+        "endTime": 1625
+      },
+      {
+        "name": "E92",
+        "startTime": 1625,
+        "endTime": 1710
+      }
+    ]
+  },
+  {
+    "day": 5,
+    "timeUnits": [
+      {
+        "name": "E82",
+        "startTime": 755,
+        "endTime": 840
+      },
+      {
+        "name": "E83",
+        "startTime": 840,
+        "endTime": 925
+      },
+      {
+        "name": "E84",
+        "startTime": 950,
+        "endTime": 1035
+      },
+      {
+        "name": "E85",
+        "startTime": 1035,
+        "endTime": 1120
+      },
+      {
+        "name": "E86",
+        "startTime": 1130,
+        "endTime": 1215
+      },
+      {
+        "name": "E87",
+        "startTime": 1215,
+        "endTime": 1300
+      },
+      {
+        "name": "E88",
+        "startTime": 1330,
+        "endTime": 1355
+      },
+      {
+        "name": "E89",
+        "startTime": 1400,
+        "endTime": 1445
+      },
+      {
+        "name": "E90",
+        "startTime": 1445,
+        "endTime": 1530
+      },
+      {
+        "name": "E91",
+        "startTime": 1540,
+        "endTime": 1625
+      },
+      {
+        "name": "E92",
+        "startTime": 1625,
+        "endTime": 1710
+      }
+    ]
+  },
+  {
+    "day": 6,
+    "timeUnits": [
+      {
+        "name": "E82",
+        "startTime": 755,
+        "endTime": 840
+      },
+      {
+        "name": "E83",
+        "startTime": 840,
+        "endTime": 925
+      },
+      {
+        "name": "E84",
+        "startTime": 950,
+        "endTime": 1035
+      },
+      {
+        "name": "E85",
+        "startTime": 1035,
+        "endTime": 1120
+      },
+      {
+        "name": "E86",
+        "startTime": 1130,
+        "endTime": 1215
+      },
+      {
+        "name": "E87",
+        "startTime": 1215,
+        "endTime": 1300
+      },
+      {
+        "name": "E88",
+        "startTime": 1330,
+        "endTime": 1355
+      },
+      {
+        "name": "E89",
+        "startTime": 1400,
+        "endTime": 1445
+      },
+      {
+        "name": "E90",
+        "startTime": 1445,
+        "endTime": 1530
+      },
+      {
+        "name": "E91",
+        "startTime": 1540,
+        "endTime": 1625
+      },
+      {
+        "name": "E92",
+        "startTime": 1625,
+        "endTime": 1710
+      }
+    ]
+  }
+]
