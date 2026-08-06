@@ -179,6 +179,23 @@ class Lesson:
 
 
 @dataclass(frozen=True)
+class SchoolYear:
+    """Ein Schuljahr, wie die Quelle es kennt.
+
+    Enthält bewusst **keinen** Halbjahreswechsel: Die WebUntis-Schnittstelle kennt ihn
+    nicht (`getSchoolyears` liefert nur `id`, `name`, `startDate`, `endDate`). Er ist eine
+    Entscheidung der Schule und bleibt in `school_year.yaml`.
+    """
+
+    name: str
+    start: date
+    end: date
+
+    def contains(self, day: date) -> bool:
+        return self.start <= day <= self.end
+
+
+@dataclass(frozen=True)
 class Holiday:
     """Ein unterrichtsfreier Abschnitt (Datenstrom A).
 
@@ -256,14 +273,25 @@ class CalendarAdapter(ABC):
         damit die Sorte Fehler, die nur in Wochen mit Feiertag auffällt.
         """
 
-    async def fetch_holidays(self) -> list[Holiday]:
+    async def fetch_holidays(
+        self, within: tuple[date, date] | None = None
+    ) -> list[Holiday]:
         """Unterrichtsfreie Abschnitte (Datenstrom A).
 
-        Optional: Eine Quelle, die nur Stundenpläne kennt, überschreibt das nicht. Der
-        Ferien-Import fällt dann auf den eingetragenen ICS-Kalender oder die Handpflege
-        zurück.
+        `within` grenzt auf ein Schuljahr ein (Beginn, Ende). Quellen liefern gern den
+        Kalender **aller** Jahre; ohne Eingrenzung bekäme der Import Abschnitte, die er
+        anschließend sämtlich verwerfen müsste.
+
+        Optional: Eine Quelle, die nur Stundenpläne kennt, überschreibt das nicht.
         """
         raise NotImplementedError(f"{self.name} liefert keinen Ferienkalender")
+
+    async def fetch_school_years(self) -> list[SchoolYear]:
+        """Die Schuljahre, die die Quelle kennt — für Beginn und Ende.
+
+        Optional wie `fetch_holidays`.
+        """
+        raise NotImplementedError(f"{self.name} kennt keine Schuljahre")
 
     async def check(self) -> None:
         """Verbindung und Zugangsdaten prüfen, ohne Daten zu holen.

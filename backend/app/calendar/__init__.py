@@ -21,6 +21,7 @@ from app.calendar.base import (
     LessonState,
     NoActiveSchoolYearError,
     Reschedule,
+    SchoolYear,
 )
 
 __all__ = [
@@ -33,4 +34,5 @@ __all__ = [
     "LessonState",
     "NoActiveSchoolYearError",
     "Reschedule",
+    "SchoolYear",
 ]

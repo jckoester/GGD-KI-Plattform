@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
+@router.get("/status")
+async def calendar_status(
+    _user=Depends(require_any_role(["teacher", "admin"])),
+) -> dict:
+    """Ist eine Stundenplanquelle eingerichtet? — **ohne** sie zu kontaktieren.
+
+    Getrennt von `/teachers`, weil die Antwort die Navigation steuert und damit bei jedem
+    Seitenaufruf gebraucht wird. `/teachers` meldet dasselbe, kostet aber eine Anmeldung
+    samt Elementabruf — das wäre für ein Menü der falsche Preis.
+    """
+    return {"configured": is_configured()}
+
+
 @router.get("/teachers")
 async def list_teachers(
     _user=Depends(require_any_role(["teacher", "admin"])),

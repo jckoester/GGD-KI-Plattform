@@ -218,3 +218,23 @@ def test_anonymisierung_deckt_die_personenfelder_ab():
         and getattr(knoten.targets[0], "id", None) == "_LABEL_KEYS"
     )
     assert {"externKey", "forename", "name", "displayname", "longName"} <= label_keys
+
+
+# ── Navigationssteuerung ─────────────────────────────────────────────────────
+
+
+def test_status_fragt_die_quelle_nicht(monkeypatch):
+    """`is_configured()` darf WebUntis **nicht** kontaktieren.
+
+    Die Antwort steuert Sidebar und Einstellungskachel, wird also bei jedem Seitenaufruf
+    gebraucht. Eine Anmeldung samt Elementabruf wäre dafür der falsche Preis — und würde
+    das Menü von der Erreichbarkeit eines fremden Servers abhängig machen.
+    """
+    gerufen = []
+    monkeypatch.setattr(
+        "app.calendar.service.get_adapter",
+        lambda: gerufen.append("adapter"),
+    )
+    monkeypatch.setattr("app.calendar.service.settings.webuntis_server", "x.webuntis.com")
+    assert is_configured()
+    assert gerufen == []

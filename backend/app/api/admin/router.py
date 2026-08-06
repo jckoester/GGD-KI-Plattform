@@ -13,6 +13,7 @@ from app.api.admin.stats import router as stats_router
 from app.api.admin.site_texts import router as site_texts_router
 from app.api.admin.users import router as users_router
 from app.api.admin.export_templates import router as export_templates_router
+from app.api.admin.holidays import router as holidays_router
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -27,6 +28,7 @@ router.include_router(stats_router)
 router.include_router(site_texts_router)
 router.include_router(users_router)
 router.include_router(export_templates_router)
+router.include_router(holidays_router)
 
 
 @router.get("/ping")

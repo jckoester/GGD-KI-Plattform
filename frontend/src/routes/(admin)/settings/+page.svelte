@@ -7,7 +7,17 @@
         Bot,
         Users,
         FileText,
+        CalendarDays,
     } from "lucide-svelte";
+    import { onMount } from "svelte";
+    import {
+        calendarConfigured,
+        refreshCalendarStatus,
+    } from "$lib/stores/calendarStatus.js";
+
+    // Ohne eingerichtete Stundenplanquelle gibt es nichts zu tun — dann bleibt die Kachel
+    // weg statt eine Seite anzubieten, die nur mitteilen kann, dass sie nichts kann.
+    onMount(refreshCalendarStatus);
 </script>
 
 <button
@@ -109,5 +119,20 @@
                 Schulweites Layout für PDF/Word/ODT der Material-Werkstatt
             </div>
         </a>
+        <!-- Ferienkalender (UP-8 Schritt 4) -->
+        {#if $calendarConfigured}
+        <a
+            href="/settings/holidays"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <CalendarDays class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Ferienkalender</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Ferien und unterrichtsfreie Tage aus dem Stundenplan übernehmen
+            </div>
+        </a>
+        {/if}
     </div>
 </div>

@@ -19,9 +19,19 @@
         ShieldCheck,
         PiggyBank,
         Bot,
+        CalendarDays,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import { hasAnyRole } from "$lib/stores/user.js";
+    import { onMount } from "svelte";
+    import {
+        calendarConfigured,
+        refreshCalendarStatus,
+    } from "$lib/stores/calendarStatus.js";
+
+    // Der Ferienkalender erscheint nur, wenn eine Stundenplanquelle eingerichtet ist —
+    // eine Schule ohne WebUntis soll den Menüpunkt gar nicht sehen (Plan §0).
+    onMount(refreshCalendarStatus);
 
     const canSeeSettings   = hasAnyRole(['admin']);
     const canSeeStatistics = hasAnyRole(['statistics', 'admin']);
@@ -222,6 +232,18 @@
                         Guardrails
                     </span>
                 </button>
+                {#if $calendarConfigured}
+                <button
+                    onclick={() => goto('/settings/holidays')}
+                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                >
+                    <span class="flex items-center gap-2">
+                        <CalendarDays class="w-4 h-4" />
+                        Ferienkalender
+                    </span>
+                </button>
+                {/if}
                 <div
                     class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"

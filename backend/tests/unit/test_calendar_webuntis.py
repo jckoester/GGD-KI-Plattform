@@ -44,23 +44,57 @@ MONDAY = date(2026, 7, 6)
 PASSWORD = "P@ss wort!$geheim"
 
 
-def make_adapter(*, rpc_errors=None, week=WEEK, timegrid=TIMEGRID, holidays=HOLIDAYS):
+# Wie am GGD: das laufende und ein vorheriges Schuljahr.
+SCHOOLYEARS = [
+    {"id": 15, "name": "2024/2025", "startDate": 20240916, "endDate": 20250730},
+    {"id": 18, "name": "2025/2026", "startDate": 20250915, "endDate": 20260729},
+]
+
+# Ferien mehrerer Jahre — `getHolidays` ignoriert das gesetzte Schuljahr und liefert alle.
+FREMDJAHR = [
+    {"id": 200, "name": "Alt", "longName": "Herbstferien",
+     "startDate": 20241028, "endDate": 20241101},
+]
+
+
+def make_adapter(
+    *, rpc_errors=None, week=WEEK, timegrid=TIMEGRID, holidays=HOLIDAYS,
+    schoolyears=SCHOOLYEARS, needs_context=True,
+):
+    """Simuliert WebUntis samt Schuljahresbezug der Sitzung.
+
+    `needs_context=True` bildet das belegte Verhalten nach: Ohne vorherigen Aufruf mit
+    Datumsbereich scheitern `getHolidays` und `getTimegridUnits` mit -8998.
+    """
     rpc_errors = rpc_errors or {}
     calls: list[str] = []
+    zustand = {"context": False}
+    NPE = {"code": -8998, "message": 'Cannot invoke "…Schoolyear.getStartDate()" '
+                                     'because "sy" is null'}
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/WebUntis/jsonrpc.do":
-            method = json.loads(request.content)["method"]
+            body = json.loads(request.content)
+            method, params = body["method"], body.get("params") or {}
             calls.append(method)
             if method in rpc_errors:
                 return httpx.Response(200, json={"error": rpc_errors[method]})
             if method == "authenticate":
+                zustand["context"] = False       # Bezug hängt an der Sitzung
                 return httpx.Response(200, json={"result": {
                     "sessionId": "SESSION", "personType": 17, "personId": -1}})
-            if method == "getHolidays":
-                return httpx.Response(200, json={"result": holidays})
-            if method == "getTimegridUnits":
-                return httpx.Response(200, json={"result": timegrid})
+            if method == "getSchoolyears":
+                return httpx.Response(200, json={"result": schoolyears})
+            if method in ("getClassregEvents", "getTimetable", "getExams"):
+                zustand["context"] = True        # prägt das Jahr auf
+                return httpx.Response(200, json={"result": []})
+            if method in ("getHolidays", "getTimegridUnits", "getCurrentSchoolyear"):
+                if needs_context and not zustand["context"]:
+                    return httpx.Response(200, json={"error": NPE})
+                if method == "getHolidays":
+                    return httpx.Response(200, json={"result": holidays})
+                if method == "getTimegridUnits":
+                    return httpx.Response(200, json={"result": timegrid})
             return httpx.Response(200, json={"result": {}})
         if request.url.path.endswith("/weekly/pageconfig"):
             calls.append("pageconfig")
@@ -475,15 +509,103 @@ async def test_ferieneintrag_ohne_datum_wird_uebersprungen():
 
 
 @pytest.mark.asyncio
-async def test_ohne_aktives_schuljahr_eigener_fehlertyp():
-    """-8998 ist kein Defekt, sondern ein Zeitpunktproblem — genau so beobachtet."""
-    adapter, _ = make_adapter(rpc_errors={"getHolidays": {
-        "code": -8998,
-        "message": 'Cannot invoke "com.grupet.web.basic.Schoolyear.getStartDate()" '
-                   'because "sy" is null',
-    }})
+async def test_ferien_gehen_auch_ohne_laufendes_schuljahr():
+    """Der Kern des Befunds aus `BEFUND-Schuljahreskontext.md`.
+
+    Eine frische Sitzung hat **keinen** Schuljahresbezug; `getHolidays` scheitert dann mit
+    -8998. Das ist kein Zeitpunktproblem, das man aussitzen müsste: Ein Aufruf mit
+    Datumsbereich prägt der Sitzung das Jahr auf. Damit funktioniert der Abruf **auch in
+    den Sommerferien**.
+    """
+    adapter, calls = make_adapter(needs_context=True)
     async with adapter:
-        with pytest.raises(NoActiveSchoolYearError, match="kein Schuljahr aktiv"):
+        holidays = await adapter.fetch_holidays(
+            within=(date(2025, 9, 15), date(2026, 7, 29))
+        )
+    assert holidays
+    # Der Bezug wurde vor dem Ferienabruf gesetzt.
+    assert calls.index("getClassregEvents") < calls.index("getHolidays")
+
+
+@pytest.mark.asyncio
+async def test_zieljahr_kommt_aus_getschoolyears():
+    """Nicht aus `getCurrentSchoolyear` — genau die Methode fällt ohne Bezug aus, sie
+    taugt also nicht zur Bestimmung dessen, was sie voraussetzt."""
+    adapter, calls = make_adapter()
+    async with adapter:
+        await adapter.fetch_holidays(within=(date(2025, 9, 15), date(2026, 7, 29)))
+    assert "getSchoolyears" in calls
+    assert "getCurrentSchoolyear" not in calls
+
+
+@pytest.mark.asyncio
+async def test_rueckfall_auf_gettimetable_ohne_klassenbuchrecht():
+    """Ein Konto ohne Klassenbuch-Recht wird bei `getClassregEvents` mit -8509 abgewiesen.
+    Dann setzt `getTimetable` den Bezug — sonst bliebe der Ferienabruf unmöglich."""
+    adapter, calls = make_adapter(rpc_errors={
+        "getClassregEvents": {"code": -8509, "message": "no right for classregevents"},
+    })
+    async with adapter:
+        holidays = await adapter.fetch_holidays(
+            within=(date(2025, 9, 15), date(2026, 7, 29))
+        )
+    assert holidays
+    assert "getTimetable" in calls
+
+
+@pytest.mark.asyncio
+async def test_ferien_fremder_jahre_werden_ausgefiltert():
+    """`getHolidays` ignoriert das gesetzte Jahr und liefert alle (beobachtet: 72 Sätze
+    ab 2020). Ohne Eingrenzung bekäme der Import lauter Abschnitte zum Verwerfen."""
+    adapter, _ = make_adapter(holidays=[*HOLIDAYS, *FREMDJAHR])
+    async with adapter:
+        holidays = await adapter.fetch_holidays(
+            within=(date(2025, 9, 15), date(2026, 7, 29))
+        )
+    assert all(h.start >= date(2025, 9, 15) for h in holidays)
+    assert len(holidays) == len([h for h in HOLIDAYS if h.get("startDate")])
+
+
+@pytest.mark.asyncio
+async def test_ohne_eingrenzung_kommt_alles():
+    adapter, _ = make_adapter(holidays=[*HOLIDAYS, *FREMDJAHR])
+    async with adapter:
+        holidays = await adapter.fetch_holidays()
+    assert any(h.start.year == 2024 for h in holidays)
+
+
+@pytest.mark.asyncio
+async def test_zeitraster_braucht_ebenfalls_den_bezug():
+    """`getTimegridUnits` fällt ohne Jahresbezug genauso aus — sonst blieben alle
+    Stundennummern leer."""
+    adapter, calls = make_adapter(needs_context=True)
+    async with adapter:
+        result = await adapter.fetch_week(ELEMENT_NAME, MONDAY)
+    assert any(entry.start_period for entry in result.lessons)
+    assert "Zeitraster" not in " ".join(result.warnings)
+
+
+@pytest.mark.asyncio
+async def test_bezug_wird_nur_einmal_gesetzt():
+    """Ein Aufruf je Sitzung genügt — er überlebt beliebige weitere Aufrufe."""
+    adapter, calls = make_adapter()
+    async with adapter:
+        await adapter.fetch_week(ELEMENT_NAME, MONDAY)
+        await adapter.fetch_holidays(within=(date(2025, 9, 15), date(2026, 7, 29)))
+    assert calls.count("getClassregEvents") == 1
+
+
+@pytest.mark.asyncio
+async def test_unsetzbarer_bezug_meldet_sich_verstaendlich():
+    """Wenn beide Auslöser scheitern, ist das ein Rechteproblem — und wird so benannt,
+    nicht als „warte auf das Schuljahr"."""
+    adapter, _ = make_adapter(rpc_errors={
+        "getClassregEvents": {"code": -8509, "message": "no right"},
+        "getTimetable": {"code": -8509, "message": "no right"},
+        "getHolidays": {"code": -8998, "message": '"sy" is null'},
+    })
+    async with adapter:
+        with pytest.raises(CalendarSourceError, match="Berechtigung"):
             await adapter.fetch_holidays()
 
 

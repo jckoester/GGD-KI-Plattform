@@ -99,10 +99,41 @@ export async function patchPreferences(updates) {
   return res.json().catch(() => ({}));
 }
 
-export async function getCalendarTeachers() {
-  const res = await fetch(`${BASE}/calendar/teachers`, { credentials: "include" });
-  if (!res.ok) return { configured: false, teachers: [], error: null };
+export async function getCalendarStatus() {
+  const res = await fetch(`${BASE}/calendar/status`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Kalender-Status nicht abrufbar (${res.status})`);
   return res.json();
+}
+
+export async function getCalendarTeachers() {
+  // Unterscheidet drei Fälle, die sich sonst alle als „nicht eingerichtet" tarnen und
+  // das Feld kommentarlos verschwinden lassen:
+  //   nicht zuständig (403)  → Abschnitt ausblenden, richtig so
+  //   nicht erreichbar       → Abschnitt zeigen MIT Hinweis, sonst rätselt man
+  //   eingerichtet           → normal
+  let res;
+  try {
+    res = await fetch(`${BASE}/calendar/teachers`, { credentials: "include" });
+  } catch {
+    return {
+      configured: false,
+      teachers: [],
+      error: "Der Server ist nicht erreichbar.",
+      allowed: true,
+    };
+  }
+  if (res.status === 401 || res.status === 403) {
+    return { configured: false, teachers: [], error: null, allowed: false };
+  }
+  if (!res.ok) {
+    return {
+      configured: false,
+      teachers: [],
+      error: `Die Stundenplanquelle konnte nicht abgefragt werden (${res.status}).`,
+      allowed: true,
+    };
+  }
+  return { ...(await res.json()), allowed: true };
 }
 
 export async function getRecentConversations(limit = 10, offset = 0) {
@@ -1898,4 +1929,33 @@ export async function getPlotGgbBlob(source, title = null) {
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'GeoGebra-Export fehlgeschlagen')
     return res.blob()
+}
+
+export async function getHolidayProposal(schuljahr = null) {
+  const query = schuljahr ? `?schuljahr=${encodeURIComponent(schuljahr)}` : "";
+  const res = await fetch(`${BASE}/admin/holidays/proposal${query}`, {
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Abruf fehlgeschlagen (${res.status})`);
+  }
+  return body;
+}
+
+export async function applyHolidayProposal(boundsUebernehmen = true, schuljahr = null) {
+  const res = await fetch(`${BASE}/admin/holidays/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      bounds_uebernehmen: boundsUebernehmen,
+      schuljahr,
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Übernahme fehlgeschlagen (${res.status})`);
+  }
+  return body;
 }

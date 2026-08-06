@@ -10,9 +10,11 @@ Belegtes Verhalten des Dienstes, das hier hineinspielt:
   mitgeschickt, antwortet WebUntis mit `invalid schoolname` (-8500).
 * **Servicekonto ohne Personenbindung** (`personId = -1`) — Element-IDs kommen daher aus
   `weekly/pageconfig`, nicht aus dem eigenen Profil.
-* **`getHolidays` zieht das Schuljahr aus der Sitzung**, nicht aus Parametern. Ohne aktives
-  Schuljahr scheitert es mit -8998; das ist kein Defekt, sondern ein Zeitpunktproblem und
-  bekommt deshalb `NoActiveSchoolYearError`.
+* **Eine frische Sitzung hat keinen Schuljahresbezug.** Mehrere Methoden brechen deshalb
+  mit -8998 ab (`getHolidays`, `getTimegridUnits`, `getCurrentSchoolyear`). Das ist weder
+  ein Rechteproblem (-8509) noch ein Ferien-Sonderfall — **ein einziger Aufruf mit
+  Datumsbereich prägt der Sitzung das Jahr auf**, danach funktionieren sie. Siehe
+  `_set_year_context`; Belege in `webuntis-Tools/BEFUND-Schuljahreskontext.md`.
 * **Neu gegenüber der Juli-Erhebung:** der `cellState` `BREAKSUPERVISION` (Pausenaufsicht).
 
 **Pro Lauf wird neu angemeldet.** Wie lange eine Sitzung über Stunden trägt, ist unbekannt
@@ -37,6 +39,7 @@ from app.calendar.base import (
     LessonState,
     NoActiveSchoolYearError,
     Reschedule,
+    SchoolYear,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,6 +127,10 @@ class WebUntisAdapter(CalendarAdapter):
         self._logged_in = False
         self._element_ids: dict[str, int] | None = None
         self._timegrid: list[int] | None = None
+        # Der Schuljahresbezug hängt an der JSESSIONID, nicht am Konto — nach jeder
+        # Neuanmeldung ist er weg. Hier eine Instanz = eine Sitzung, deshalb genügt ein
+        # Merker; wer den Adapter je Lauf neu baut, setzt ihn ohnehin neu.
+        self._year_context: dict | None = None
 
     @property
     def name(self) -> str:
@@ -184,13 +191,29 @@ class WebUntisAdapter(CalendarAdapter):
                 "Anmeldung an WebUntis fehlgeschlagen — Benutzername oder Passwort falsch."
             )
         if code == -8998 or "schoolyear" in lowered or "sy is null" in lowered:
+            # Erreicht den Aufrufer nur noch, wenn `_set_year_context` selbst gescheitert
+            # ist — im Normalfall wird der Bezug vorher gesetzt und der Fehler tritt nicht
+            # auf. Deshalb hier kein Zeitpunkt-Rat mehr („warten bis das Schuljahr
+            # freigeschaltet ist"): Das war die falsche Deutung, die Sitzung braucht
+            # lediglich einen Jahresbezug.
             return NoActiveSchoolYearError(
-                "In WebUntis ist derzeit kein Schuljahr aktiv. Der Abruf ist erst möglich, "
-                "wenn das Schuljahr freigeschaltet ist."
+                f"Der Aufruf '{method}' braucht einen Schuljahresbezug, der sich nicht "
+                f"setzen ließ. Prüfen, ob das Konto Stundenplan- oder Klassenbuchdaten "
+                f"lesen darf."
+            )
+        if code == -8507:
+            return CalendarSourceError(
+                "Der angefragte Zeitraum überschreitet eine Schuljahresgrenze. "
+                "WebUntis beantwortet nur Bereiche innerhalb eines Schuljahres."
             )
         if code in (-8509, -8523) or "no right" in lowered or "not allowed" in lowered:
             return CalendarSourceError(
                 f"Dem WebUntis-Konto fehlt die Berechtigung für '{method}'."
+            )
+        if code == -32601:
+            return CalendarSourceError(
+                f"WebUntis kennt die Methode '{method}' nicht in dieser Form "
+                f"(falsche Parameter?)."
             )
         # Restfall: Code melden, Serviettentext nicht. Er könnte den Aufruf samt
         # Parametern enthalten — und die enthalten bei authenticate das Passwort.
@@ -229,6 +252,75 @@ class WebUntisAdapter(CalendarAdapter):
     async def check(self) -> None:
         """Zugangsdaten prüfen, ohne Daten zu holen."""
         await self._login()
+
+    # ── Schuljahresbezug der Sitzung ──────────────────────────────────────────
+
+    async def _set_year_context(self, day: date) -> dict | None:
+        """Der Sitzung das Schuljahr aufprägen, in dem `day` liegt.
+
+        Ohne diesen Schritt scheitern `getHolidays` und `getTimegridUnits` mit -8998 —
+        auch mitten im Schuljahr, nur fällt es dort seltener auf, weil WebUntis dann oft
+        das laufende Jahr unterstellt. In den Ferien scheitert es immer.
+
+        Aufgeprägt wird durch **einen Aufruf mit Datumsbereich**. Nicht jeder taugt dazu:
+        `getSubstitutions` hat ebenfalls einen Zeitraum und setzt trotzdem nichts. Belegt
+        sind `getClassregEvents`, `getTimetable` und `getExams`. Ein leerer Zeitraum
+        genügt — es muss kein Unterrichtstag gesucht werden.
+
+        Rückfall auf `getTimetable`, weil ein Konto ohne Klassenbuch-Recht bei
+        `getClassregEvents` mit -8509 abgewiesen wird.
+
+        Das Zieljahr kommt aus `getSchoolyears` — **nicht** aus `getCurrentSchoolyear`:
+        Genau die Methode fällt ohne Kontext aus, sie taugt also nicht zur Bestimmung
+        dessen, was sie voraussetzt.
+        """
+        stamp = int(day.strftime("%Y%m%d"))
+        if self._year_context and (
+            self._year_context["startDate"] <= stamp <= self._year_context["endDate"]
+        ):
+            return self._year_context
+
+        years = await self._rpc("getSchoolyears")
+        candidates = [
+            year
+            for year in (years if isinstance(years, list) else [])
+            if isinstance(year, dict) and year.get("startDate") and year.get("endDate")
+        ]
+        if not candidates:
+            logger.info("Keine Schuljahresliste erhalten — Kontext bleibt ungesetzt")
+            return None
+
+        target = next(
+            (y for y in candidates if y["startDate"] <= stamp <= y["endDate"]), None
+        )
+        if target is None:
+            # Der Tag liegt zwischen zwei Schuljahren (typisch: Sommerferien). Dann das
+            # zuletzt begonnene nehmen — es ist das, dessen Ferien gemeint sind.
+            target = max(candidates, key=lambda y: y["startDate"])
+
+        anchor = target["endDate"]
+        try:
+            await self._rpc(
+                "getClassregEvents", {"startDate": anchor, "endDate": anchor}
+            )
+        except CalendarSourceError:
+            ids = await self.element_ids()
+            if not ids:
+                logger.info("Schuljahresbezug nicht setzbar — kein Element für getTimetable")
+                return None
+            await self._rpc(
+                "getTimetable",
+                {
+                    "options": {
+                        "element": {"id": next(iter(ids.values())), "type": ELEMENT_TEACHER},
+                        "startDate": anchor,
+                        "endDate": anchor,
+                    }
+                },
+            )
+        self._year_context = target
+        logger.debug("Schuljahresbezug gesetzt: %s", target.get("name"))
+        return target
 
     # ── Stundenplan ───────────────────────────────────────────────────────────
 
@@ -272,16 +364,19 @@ class WebUntisAdapter(CalendarAdapter):
         self._element_ids = mapping
         return mapping
 
-    async def _timegrid_starts(self) -> list[int]:
+    async def _timegrid_starts(self, day: date | None = None) -> list[int]:
         """Beginnzeiten der Stunden in Minuten, aufsteigend.
 
         Grundlage für `start_period`: WebUntis nennt Uhrzeiten, die Planung zählt Stunden.
         Ohne diese Abbildung wäre jede Stundennummer geraten.
+
+        Braucht den Schuljahresbezug der Sitzung — sonst -8998.
         """
         if self._timegrid is not None:
             return self._timegrid
         starts: set[int] = set()
         try:
+            await self._set_year_context(day or date.today())
             units = await self._rpc("getTimegridUnits")
         except CalendarSourceError:
             logger.info("Zeitraster nicht abrufbar — Stundennummern bleiben offen")
@@ -314,7 +409,7 @@ class WebUntisAdapter(CalendarAdapter):
                 "formatId": 1,
             },
         )
-        starts = await self._timegrid_starts()
+        starts = await self._timegrid_starts(monday)
         # Umkehrung der pageconfig-Zuordnung: Die Stammliste einer Wochenantwort enthält
         # nur Elemente, die im Plan DIESER Lehrkraft vorkommen — die vertretene Kollegin
         # steht gerade nicht darin. Ohne diesen Rückgriff bliebe `original_teacher` bei
@@ -390,19 +485,48 @@ class WebUntisAdapter(CalendarAdapter):
 
     # ── Ferienkalender ────────────────────────────────────────────────────────
 
-    async def fetch_holidays(self) -> list[Holiday]:
-        """Unterrichtsfreie Abschnitte des **laufenden** Schuljahres.
+    async def fetch_school_years(self) -> list[SchoolYear]:
+        """Schuljahre samt Grenzen. Braucht **keinen** Jahresbezug — anders als fast alles
+        andere ist `getSchoolyears` immer aufrufbar (und deshalb die Grundlage, auf der der
+        Bezug überhaupt gesetzt wird)."""
+        await self._login()
+        result = await self._rpc("getSchoolyears")
+        years: list[SchoolYear] = []
+        for entry in result if isinstance(result, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            start = _parse_untis_date(entry.get("startDate"))
+            end = _parse_untis_date(entry.get("endDate"))
+            if start and end:
+                years.append(
+                    SchoolYear(name=str(entry.get("name") or "?"), start=start, end=end)
+                )
+        years.sort(key=lambda y: y.start)
+        return years
 
-        Ohne aktives Schuljahr wirft der Dienst -8998; das übersetzt `_translate_error` in
-        `NoActiveSchoolYearError`, damit die Oberfläche einen Zeitpunkt-Hinweis geben kann
-        statt einer Fehlermeldung.
+    async def fetch_holidays(
+        self, within: tuple[date, date] | None = None
+    ) -> list[Holiday]:
+        """Unterrichtsfreie Abschnitte, auf `within` eingegrenzt.
+
+        Zwei Eigenheiten des Dienstes bestimmen den Ablauf:
+
+        1. **Der Aufruf braucht den Schuljahresbezug der Sitzung** (sonst -8998). Der wird
+           vorher gesetzt — und zwar auf das Jahr, das `within` betrifft; ohne Angabe auf
+           heute. Damit funktioniert der Abruf **auch in den Ferien**, wenn kein Schuljahr
+           „läuft".
+        2. **`getHolidays` ignoriert das gesetzte Jahr** und liefert die Ferien *aller*
+           Jahre (beobachtet: 72 Sätze ab 2020). Ohne Eingrenzung bekäme der Import
+           Abschnitte, die er anschließend sämtlich verwerfen müsste.
 
         Zusammengeführt wird hier **nicht**: WebUntis zerlegt Abschnitte (am GGD stehen die
         Weihnachtsferien als Block plus Einzeltag mit demselben Namen), das Zusammenführen
         gehört aber zum Import (Schritt 4), damit der Adapter liefert, was dasteht.
         """
         await self._login()
+        await self._set_year_context(within[0] if within else date.today())
         result = await self._rpc("getHolidays")
+
         holidays: list[Holiday] = []
         for entry in result if isinstance(result, list) else []:
             if not isinstance(entry, dict):
@@ -410,11 +534,13 @@ class WebUntisAdapter(CalendarAdapter):
             start = _parse_untis_date(entry.get("startDate"))
             if start is None:
                 continue
-            end = _parse_untis_date(entry.get("endDate")) or start
+            end = max(start, _parse_untis_date(entry.get("endDate")) or start)
+            if within and (end < within[0] or start > within[1]):
+                continue
             holidays.append(
                 Holiday(
                     start=start,
-                    end=max(start, end),
+                    end=end,
                     name=str(entry.get("longName") or entry.get("name") or "Unterrichtsfrei"),
                 )
             )

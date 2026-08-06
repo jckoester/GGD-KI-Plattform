@@ -10,6 +10,7 @@
     import { onMount } from "svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
 
     // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
     const membershipGroups = $derived([
@@ -67,11 +68,11 @@
         }
         // Aufgelöste Mitgliedschaften für die Diagnose frisch laden
         refreshMyGroups();
-        // Ohne eingerichtete Stundenplanquelle bleibt der Abschnitt ausgeblendet —
-        // eine Schule ohne WebUntis soll hier nichts sehen, was sie nicht betrifft.
-        if ($user?.roles?.includes("teacher")) {
-            kuerzelListe = await getCalendarTeachers();
-        }
+        // Bewusst ohne Rollenprüfung: Der Nutzer-Store ist beim Einhängen nicht
+        // zwangsläufig schon befüllt — eine Abfrage von `roles` an dieser Stelle ist ein
+        // Wettlauf, der sich als „Feld fehlt" äußert. Der Server entscheidet (403 für
+        // Schüler:innen), die Antwort trägt das Ergebnis in `allowed`.
+        kuerzelListe = await getCalendarTeachers();
     });
 
     async function updateKuerzel(event) {
@@ -225,11 +226,25 @@
             </a>
         </section>
 
+        {#if kuerzelListe.allowed && kuerzelListe.error && !kuerzelListe.configured}
+        <!-- Sichtbar scheitern statt lautlos verschwinden: Ohne diesen Hinweis sieht ein
+             Serverfehler genauso aus wie „diese Schule nutzt kein WebUntis". -->
+        <section class="mb-8">
+            <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
+                Stundenplan
+            </h2>
+            <WarningBanner message={kuerzelListe.error} />
+        </section>
+        {/if}
+
         {#if kuerzelListe.configured}
         <section class="mb-8">
             <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
                 Stundenplan
             </h2>
+            {#if kuerzelListe.error}
+                <div class="mb-3"><WarningBanner message={kuerzelListe.error} /></div>
+            {/if}
             <label
                 for="webuntis-kuerzel"
                 class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
