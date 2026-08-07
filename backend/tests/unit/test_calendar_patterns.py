@@ -165,20 +165,42 @@ def test_luecken_werden_als_unsicher_gekennzeichnet():
     assert not ergebnis.proposals[0].sicher
 
 
-def test_block_ist_so_sicher_wie_seine_schwaechste_stunde():
+def test_stunden_ohne_gemeinsames_auftreten_verschmelzen_nicht():
     """Stunde 3 in allen vier Wochen, Stunde 4 nur in zweien.
 
-    Beide gelten als wöchentlich (zwei von vier ist kein 14-Tage-Takt), verschmelzen also
-    zur Doppelstunde. Deren Beobachtungszahl muss die **kleinere** sein — sonst sähe der
-    Block belastbarer aus als seine schwächere Hälfte und käme ungeprüft durch.
+    Das sind **zwei** Sachverhalte: eine verlässliche wöchentliche Stunde und eine
+    gelegentliche Verlängerung. Als Doppelstunde zusammengefasst wäre beides verloren —
+    die Länge wäre falsch (2 statt 1) und die sichere Stunde erbte die Unsicherheit der
+    unsicheren.
+
+    Aufgefallen bei der Abnahme an echten Daten (Schritt 13): Eine einmalige
+    Klassenarbeit, die in die Folgestunde hineinreichte, machte aus einer wöchentlichen
+    Deutschstunde eine „Doppelstunde, 1× gesehen".
     """
     lessons = [*jede_woche(1, 3), *[stunde(WOCHEN[i] + timedelta(days=1), 4) for i in (0, 1)]]
     ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
+
+    assert [(p.start_period, p.periods, p.gesehen) for p in ergebnis.proposals] == [
+        (3, 1, 4),
+        (4, 1, 2),
+    ]
+    assert ergebnis.proposals[0].sicher          # die wöchentliche bleibt sicher
+    assert not ergebnis.proposals[1].sicher      # die gelegentliche wird gemeldet
+
+
+def test_gemeinsam_aufgetretene_stunden_verschmelzen_weiterhin():
+    """Gegenprobe zur Regel oben — die echte Doppelstunde darf nicht zerfallen.
+
+    An echten Daten war das der Normalfall: 684 von 686 benachbarten Stundenpaaren
+    traten in denselben Wochen auf.
+    """
+    lessons = [*jede_woche(1, 3), *jede_woche(1, 4)]
+    ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
+
     assert len(ergebnis.proposals) == 1
     block = ergebnis.proposals[0]
-    assert (block.start_period, block.periods) == (3, 2)
-    assert block.gesehen == 2
-    assert not block.sicher
+    assert (block.start_period, block.periods, block.gesehen) == (3, 2, 4)
+    assert block.sicher
 
 
 def test_verschiedene_rhythmen_verschmelzen_nicht():

@@ -217,11 +217,15 @@ def derive_patterns(
 
     # Erst je Einzelstunde den Rhythmus bestimmen, dann benachbarte verschmelzen. Die
     # umgekehrte Reihenfolge verschmölze Stunden mit verschiedenen Rhythmen.
-    einzeln: dict[tuple[GroupKey, int], dict[int, tuple[str, int]]] = defaultdict(dict)
+    # Die **Wochenmenge** wird mitgeführt, nicht nur ihre Größe: `_bloecke` verschmilzt
+    # nur Stunden, die tatsächlich gemeinsam auftraten (siehe dort).
+    einzeln: dict[tuple[GroupKey, int], dict[int, tuple[str, frozenset[int]]]] = (
+        defaultdict(dict)
+    )
     for (key, weekday, stunde), indizes in beobachtung.items():
         einzeln[(key, weekday)][stunde] = (
             _rhythmus(indizes, wochen_index, anzahl_wochen),
-            len(indizes),
+            frozenset(indizes),
         )
 
     for (key, weekday), stunden in sorted(
@@ -269,12 +273,21 @@ def _rhythmus(indizes: set[int], alle: set[int], anzahl: int) -> str:
 
 
 def _bloecke(
-    stunden: dict[int, tuple[str, int]], zusammenhaengend: set[int]
+    stunden: dict[int, tuple[str, frozenset[int]]], zusammenhaengend: set[int]
 ) -> list[tuple[int, int, str, int]]:
     """Benachbarte Stunden zu Blöcken verschmelzen.
 
-    Verschmolzen wird nur, wenn die Stunden im Zeitraster lückenlos aneinandergrenzen
-    **und** denselben Rhythmus haben. Ergebnis: (Beginn, Länge, Rhythmus, gesehen).
+    Drei Bedingungen, alle notwendig: Die Stunden grenzen im Zeitraster lückenlos
+    aneinander, haben denselben Rhythmus **und traten in denselben Wochen auf**.
+
+    Die dritte kam aus der Abnahme an echten Daten (Schritt 13). Ohne sie zog eine
+    einmalige Klassenarbeit, die in die Folgestunde hineinreichte, die davorliegende
+    **wöchentliche** Stunde in einen Block — Ergebnis war „Doppelstunde, 1× gesehen"
+    statt „Einzelstunde, 4× gesehen". Aus einem sicheren Muster wurde so ein unsicheres
+    mit falscher Länge. Zwei von 686 benachbarten Stundenpaaren im Kollegium waren
+    betroffen; die übrigen 684 traten ohnehin gemeinsam auf und verschmelzen weiterhin.
+
+    Ergebnis: (Beginn, Länge, Rhythmus, gesehen).
     """
     bloecke: list[tuple[int, int, str, int]] = []
     offen: list[int] = []
@@ -285,6 +298,7 @@ def _bloecke(
                 stunde == vorher + 1
                 and vorher in zusammenhaengend
                 and stunden[stunde][0] == stunden[vorher][0]
+                and stunden[stunde][1] == stunden[vorher][1]
             )
             if not passt:
                 bloecke.append(_block(offen, stunden))
@@ -295,10 +309,10 @@ def _bloecke(
     return bloecke
 
 
-def _block(stunden_liste: list[int], stunden: dict[int, tuple[str, int]]):
+def _block(stunden_liste: list[int], stunden: dict[int, tuple[str, frozenset[int]]]):
     start = stunden_liste[0]
-    rhythmus, _ = stunden[start]
-    # Die vorsichtigere Zahl: Ein Block gilt nur so oft als gesehen, wie seine seltenste
-    # Stunde vorkam. Sonst sähe ein Block sicherer aus als sein schwächstes Glied.
-    gesehen = min(stunden[s][1] for s in stunden_liste)
-    return (start, len(stunden_liste), rhythmus, gesehen)
+    rhythmus, wochen = stunden[start]
+    # Alle Stunden des Blocks teilen dieselbe Wochenmenge — das ist die Bedingung, unter
+    # der überhaupt verschmolzen wurde. Ein `min` über die Glieder wäre jetzt ohne
+    # Wirkung und würde nur vortäuschen, sie könnten sich unterscheiden.
+    return (start, len(stunden_liste), rhythmus, len(wochen))
