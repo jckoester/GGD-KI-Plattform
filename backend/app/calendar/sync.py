@@ -65,10 +65,37 @@ class SyncConflict:
     beschreibung: str
 
 
+@dataclass(frozen=True)
+class ShiftSuggestion:
+    """Eine Verlegung, als Vorschlag für den Verschiebe-Dialog aus UP-6 (Schritt 9).
+
+    **Ein Paar ergibt genau einen Vorschlag.** Eine Verlegung steht zweimal in den Daten:
+    am Ursprung als `CANCEL` (`isSource = true`), am Ziel als `SHIFT` (`isSource = false`),
+    beide mit derselben `lessonId`. Anker ist die **Ursprungsseite** — die Zielseite ist
+    bereits das Ergebnis; sie erneut zum Verlegen anzubieten hieße, eine erledigte
+    Entscheidung noch einmal zu stellen.
+    """
+
+    group_id: int
+    slot_id: object | None        # Ursprungs-Slot, falls die Planung ihn kennt
+    von_datum: date
+    von_stunde: int
+    nach_datum: date
+    nach_stunde: int | None
+    periods: int = 1
+    external_uid: str | None = None
+
+    @property
+    def rueckwaerts(self) -> bool:
+        """Ob die Stunde vorgezogen wurde — kommt vor (beobachtet: 09.07. → 06.07.)."""
+        return self.nach_datum < self.von_datum
+
+
 @dataclass
 class SyncPlan:
     changes: list[SlotChange] = field(default_factory=list)
     conflicts: list[SyncConflict] = field(default_factory=list)
+    verlegungen: list[ShiftSuggestion] = field(default_factory=list)
     meldungen: list[str] = field(default_factory=list)
 
     @property
@@ -205,8 +232,94 @@ def plan_sync(
                 )
             )
 
-    plan.meldungen = _meldungen(plan.wirksame_changes)
+    plan.verlegungen = _verlegungen(lessons, nach_position, zeitraum)
+    plan.meldungen = _meldungen(plan.wirksame_changes) + _verlegungsmeldungen(
+        plan.verlegungen
+    )
     return plan
+
+
+def _verlegungen(
+    lessons: list[tuple[int, Lesson]],
+    nach_position: dict,
+    zeitraum: tuple[date, date] | None,
+) -> list[ShiftSuggestion]:
+    """Verlegungen als Vorschläge — einer je Paar, Blöcke zusammengefasst.
+
+    Zwei Filter machen die Liste brauchbar:
+
+    * **Nur die Ursprungsseite** (`is_source`). Die Zielseite trägt dieselbe Information
+      spiegelverkehrt; beide zu melden ergäbe doppelte Vorschläge, von denen einer in die
+      falsche Richtung zeigt.
+    * **Aufeinanderfolgende Stunden derselben Verlegung werden gebündelt.** Beobachtet:
+      Eine Doppelstunde wurde als zwei `CANCEL`-Einträge (15:40 und 16:25) mit je eigenem
+      `rescheduleInfo` verlegt. Zwei Vorschläge dafür wären zwei Entscheidungen für
+      denselben Sachverhalt.
+    """
+    roh: list[ShiftSuggestion] = []
+    for group_id, lesson in lessons:
+        info = lesson.reschedule
+        if info is None or not info.is_source or lesson.start_period is None:
+            continue
+        if zeitraum and not (zeitraum[0] <= lesson.date <= zeitraum[1]):
+            continue
+        slot = nach_position.get((group_id, lesson.date, lesson.start_period))
+        roh.append(
+            ShiftSuggestion(
+                group_id=group_id,
+                slot_id=slot.id if slot else None,
+                von_datum=lesson.date,
+                von_stunde=lesson.start_period,
+                nach_datum=info.date,
+                nach_stunde=info.start_period,
+                periods=max(1, lesson.periods),
+                external_uid=lesson.external_uid,
+            )
+        )
+
+    # Bündeln: gleiche Verlegung (Gruppe, Reihe, Tagespaar), anschließende Stunden.
+    roh.sort(key=lambda v: (v.group_id, v.external_uid or "", v.von_datum, v.von_stunde))
+    gebuendelt: list[ShiftSuggestion] = []
+    for vorschlag in roh:
+        if gebuendelt:
+            letzter = gebuendelt[-1]
+            passt = (
+                letzter.group_id == vorschlag.group_id
+                and letzter.external_uid == vorschlag.external_uid
+                and letzter.von_datum == vorschlag.von_datum
+                and letzter.nach_datum == vorschlag.nach_datum
+                and letzter.von_stunde + letzter.periods == vorschlag.von_stunde
+            )
+            if passt:
+                gebuendelt[-1] = ShiftSuggestion(
+                    group_id=letzter.group_id,
+                    slot_id=letzter.slot_id,
+                    von_datum=letzter.von_datum,
+                    von_stunde=letzter.von_stunde,
+                    nach_datum=letzter.nach_datum,
+                    nach_stunde=letzter.nach_stunde,
+                    periods=letzter.periods + vorschlag.periods,
+                    external_uid=letzter.external_uid,
+                )
+                continue
+        gebuendelt.append(vorschlag)
+    gebuendelt.sort(key=lambda v: (v.von_datum, v.von_stunde))
+    return gebuendelt
+
+
+def _verlegungsmeldungen(verlegungen: list[ShiftSuggestion]) -> list[str]:
+    meldungen = []
+    for v in verlegungen:
+        umfang = "Doppelstunde" if v.periods == 2 else f"{v.periods} Stunden"
+        was = "Stunde" if v.periods == 1 else umfang
+        ziel = f"{v.nach_datum}"
+        if v.nach_stunde:
+            ziel += f", {v.nach_stunde}. Stunde"
+        richtung = "vorgezogen auf" if v.rueckwaerts else "verlegt auf"
+        meldungen.append(
+            f"{v.von_datum}, {v.von_stunde}. Stunde: {was} {richtung} {ziel}."
+        )
+    return meldungen
 
 
 def _meldungen(changes: list[SlotChange]) -> list[str]:

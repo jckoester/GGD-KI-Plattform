@@ -251,3 +251,141 @@ async def test_apply_setzt_kategorie_und_anpassung():
 @pytest.mark.asyncio
 async def test_leerer_plan_bleibt_folgenlos():
     assert await apply_sync(object(), SyncPlan()) == 0
+
+
+# ── Verlegungen (Schritt 9) ──────────────────────────────────────────────────
+
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from app.calendar.base import Reschedule  # noqa: E402
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def verlegt(period, *, tag, ziel_tag, ziel_stunde, is_source, uid, periods=1):
+    """Eine Seite eines Verlegungspaares."""
+    return Lesson(
+        date=tag,
+        start_period=period,
+        periods=periods,
+        state=LessonState.CANCELLED if is_source else LessonState.SHIFTED,
+        external_uid=uid,
+        reschedule=Reschedule(date=ziel_tag, start_period=ziel_stunde, is_source=is_source),
+    )
+
+
+def test_paar_ergibt_genau_einen_vorschlag():
+    """Abnahme aus dem Plan.
+
+    Eine Verlegung steht zweimal in den Daten. Beide Seiten zu melden ergäbe zwei
+    Vorschläge, von denen einer in die falsche Richtung zeigt.
+    """
+    dienstag = MONTAG + timedelta(days=1)
+    ursprung = verlegt(3, tag=MONTAG, ziel_tag=dienstag, ziel_stunde=5,
+                       is_source=True, uid="500")
+    ziel = verlegt(5, tag=dienstag, ziel_tag=MONTAG, ziel_stunde=3,
+                   is_source=False, uid="500")
+    plan = plan_sync(
+        [(1, ursprung), (1, ziel)],
+        [slot(3), slot(5, tag=dienstag)],
+    )
+    assert len(plan.verlegungen) == 1
+    v = plan.verlegungen[0]
+    assert (v.von_datum, v.von_stunde) == (MONTAG, 3)
+    assert (v.nach_datum, v.nach_stunde) == (dienstag, 5)
+
+
+def test_zielseite_bleibt_unterricht():
+    """Als Ausfall verbucht verschwände die Stunde aus der Planung, obwohl sie stattfindet."""
+    dienstag = MONTAG + timedelta(days=1)
+    ziel = verlegt(5, tag=dienstag, ziel_tag=MONTAG, ziel_stunde=3,
+                   is_source=False, uid="500")
+    plan = plan_sync([(1, ziel)], [slot(5, tag=dienstag)])
+    assert plan.changes[0].nach_kategorie == "unterricht"
+    assert plan.verlegungen == []          # die Zielseite schlägt nichts vor
+
+
+def test_vorgezogene_stunde_wird_als_solche_benannt():
+    """Beobachtet: 09.07. → 06.07. — verlegt wird auch rückwärts."""
+    frueher = MONTAG - timedelta(days=3)
+    v = verlegt(10, tag=MONTAG, ziel_tag=frueher, ziel_stunde=10,
+                is_source=True, uid="600")
+    plan = plan_sync([(1, v)], [slot(10)], zeitraum=(frueher, MONTAG))
+    assert plan.verlegungen[0].rueckwaerts
+    assert any("vorgezogen" in m for m in plan.meldungen)
+
+
+def test_doppelstunde_ergibt_einen_vorschlag():
+    """Beobachtet: Eine Doppelstunde wurde als zwei CANCEL-Einträge verlegt.
+
+    Zwei Vorschläge dafür wären zwei Entscheidungen für denselben Sachverhalt.
+    """
+    ziel_tag = MONTAG - timedelta(days=3)
+    stunden = [
+        (1, verlegt(10, tag=MONTAG, ziel_tag=ziel_tag, ziel_stunde=10,
+                    is_source=True, uid="700")),
+        (1, verlegt(11, tag=MONTAG, ziel_tag=ziel_tag, ziel_stunde=11,
+                    is_source=True, uid="700")),
+    ]
+    plan = plan_sync(stunden, [slot(10), slot(11)], zeitraum=(ziel_tag, MONTAG))
+    assert len(plan.verlegungen) == 1
+    assert plan.verlegungen[0].periods == 2
+    assert "Doppelstunde" in " ".join(plan.meldungen)
+
+
+def test_verschiedene_reihen_werden_nicht_gebuendelt():
+    """Gleiche Tage, aber andere `lessonId` — zwei Sachverhalte."""
+    ziel_tag = MONTAG - timedelta(days=3)
+    stunden = [
+        (1, verlegt(10, tag=MONTAG, ziel_tag=ziel_tag, ziel_stunde=10,
+                    is_source=True, uid="700")),
+        (1, verlegt(11, tag=MONTAG, ziel_tag=ziel_tag, ziel_stunde=11,
+                    is_source=True, uid="800")),
+    ]
+    plan = plan_sync(stunden, [slot(10), slot(11)], zeitraum=(ziel_tag, MONTAG))
+    assert len(plan.verlegungen) == 2
+
+
+def test_vorschlag_nennt_den_ursprungsslot():
+    """Damit die Oberfläche den Verschiebe-Dialog aus UP-6 damit öffnen kann."""
+    dienstag = MONTAG + timedelta(days=1)
+    v = verlegt(3, tag=MONTAG, ziel_tag=dienstag, ziel_stunde=5, is_source=True, uid="900")
+    plan = plan_sync([(1, v)], [slot(3, sid="SLOT-3")])
+    assert plan.verlegungen[0].slot_id == "SLOT-3"
+
+
+def test_echtes_verlegungspaar_aus_der_aufzeichnung():
+    """Die Abnahme an echten Daten.
+
+    Aus der Woche ab 06.07.2026: lessonId 37973 wurde am 06.07. von der 3. in die
+    4. Stunde verlegt — `CANCEL` um 9:50, `SHIFT` um 10:35.
+    """
+    from app.calendar.webuntis import WebUntisAdapter, _parse_untis_time
+
+    woche = json.loads((FIXTURES / "webuntis_week.json").read_text(encoding="utf-8"))
+    raster = json.loads((FIXTURES / "webuntis_timegrid.json").read_text(encoding="utf-8"))
+    starts = sorted({_parse_untis_time(u["startTime"])
+                     for t in raster for u in t["timeUnits"]})
+
+    adapter = WebUntisAdapter.__new__(WebUntisAdapter)
+    ergebnis = adapter._parse_week(woche, starts)
+    verlegungen = [l for l in ergebnis.lessons if l.reschedule]
+    assert verlegungen, "Fixture enthält keine Verlegung"
+
+    plan = plan_sync(
+        [(1, l) for l in ergebnis.lessons],
+        [
+            SlotRef(id=f"s{l.date}-{l.start_period}", group_id=1, datum=l.date,
+                    start_period=l.start_period, kategorie="unterricht",
+                    pinned=False, source="pattern", note=None)
+            for l in ergebnis.lessons
+            if l.start_period is not None
+        ],
+    )
+    # Vier CANCEL mit isSource=true stehen in der Woche; zwei davon sind eine
+    # Doppelstunde (15:40 + 16:25) und werden gebündelt.
+    assert len(plan.verlegungen) == 3
+    doppelstunde = [v for v in plan.verlegungen if v.periods == 2]
+    assert len(doppelstunde) == 1
+    assert doppelstunde[0].rueckwaerts        # 09.07. → 06.07.

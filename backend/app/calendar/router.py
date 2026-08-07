@@ -338,6 +338,20 @@ def _plan_als_json(plan, kontext) -> dict:
             }
             for c in plan.wirksame_changes
         ],
+        # Für den Verschiebe-Dialog aus UP-6: `slot_id` als `slot_ids`, Trigger `ausfall`.
+        "verlegungen": [
+            {
+                "group_id": v.group_id,
+                "slot_id": str(v.slot_id) if v.slot_id else None,
+                "von_datum": v.von_datum.isoformat(),
+                "von_stunde": v.von_stunde,
+                "nach_datum": v.nach_datum.isoformat(),
+                "nach_stunde": v.nach_stunde,
+                "periods": v.periods,
+                "vorgezogen": v.rueckwaerts,
+            }
+            for v in plan.verlegungen
+        ],
         "konflikte": [
             {
                 "datum": k.datum.isoformat(),
