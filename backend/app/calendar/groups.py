@@ -189,6 +189,10 @@ class GroupMatchResult:
     fehlend: list[GroupSuggestion] = field(default_factory=list)
     unbekannte_faecher: list[UnresolvedSubject] = field(default_factory=list)
     ohne_klasse: list[str] = field(default_factory=list)
+    # Lerngruppen-Schlüssel → `groups.id` der vorhandenen Unterrichtsgruppe. Erst damit
+    # lassen sich Stunden auf Slots abbilden (Schritt 8) — ohne die ID ist „vorhanden"
+    # nur eine Feststellung.
+    zuordnung: dict[GroupKey, int] = field(default_factory=dict)
     # Kursstufen-Gruppen, bei denen sich Basis- und Leistungskurs nicht auseinanderhalten
     # lassen, weil der vorhandene Gruppenname die Kursart nicht nennt.
     mehrdeutig: list[str] = field(default_factory=list)
@@ -275,6 +279,8 @@ async def match_groups(db: AsyncSession, keys: list[GroupKey]) -> GroupMatchResu
             )
         if treffer is not None:
             ergebnis.vorhanden.extend(eintrag["keys"])
+            for k in eintrag["keys"]:
+                ergebnis.zuordnung[k] = treffer
             continue
 
         zusatz = KURSART_LABEL[art]

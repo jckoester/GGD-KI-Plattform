@@ -241,3 +241,160 @@ class _Leer:
 
 
 _leer = _Leer()
+
+
+async def _stundenplan_abgleich(
+    db: AsyncSession, pseudonym: str, wochen_anzahl: int, bis: date | None
+):
+    """Gemeinsame Vorarbeit von Vorschau und Ausführung (Schritt 8).
+
+    Beide brauchen dasselbe: Stunden abrufen, Lerngruppen zuordnen, Slots laden, Plan
+    rechnen. Getrennt implementiert liefe die Vorschau irgendwann etwas anderes vor als
+    die Ausführung tut — und genau darauf verlässt man sich.
+    """
+    from sqlalchemy import text
+
+    from app.calendar.groups import kein_unterricht_codes, match_groups
+    from app.calendar.sync import SlotRef, plan_sync
+
+    prefs = await get_preferences(db, pseudonym)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    if not kuerzel:
+        return None, None, "Im Profil ist kein Kürzel eingetragen."
+
+    kalenderwochen = _unterrichtswochen(bis or date.today(), wochen_anzahl)
+    if not kalenderwochen:
+        return None, None, "Im Schuljahr liegen vor diesem Datum keine Unterrichtswochen."
+
+    adapter = get_adapter()
+    async with adapter:  # type: ignore[attr-defined]
+        raster = await adapter.timegrid(kalenderwochen[-1])  # type: ignore[attr-defined]
+        stunden: list = []
+        for woche in kalenderwochen:
+            stunden.extend((await adapter.fetch_week(kuerzel, woche)).lessons)  # type: ignore[attr-defined]
+
+    muster = derive_patterns(
+        stunden,
+        wochen=kalenderwochen,
+        timegrid=raster,
+        kein_unterricht=kein_unterricht_codes(),
+    )
+    abgleich = await match_groups(db, [p.key for p in muster.proposals])
+
+    # Nur Stunden, deren Lerngruppe einer vorhandenen Unterrichtsgruppe entspricht —
+    # ohne `group_id` gibt es keinen Slot, den man ändern könnte.
+    from app.calendar.patterns import GroupKey
+
+    def schluessel(lesson) -> GroupKey:
+        return GroupKey(
+            student_group=lesson.student_group,
+            subject=lesson.subject,
+            class_names=lesson.class_names,
+        )
+
+    zugeordnet = [
+        (abgleich.zuordnung[schluessel(l)], l)
+        for l in stunden
+        if schluessel(l) in abgleich.zuordnung
+    ]
+
+    zeitraum = (kalenderwochen[0], kalenderwochen[-1] + timedelta(days=6))
+    gruppen = sorted({gid for gid, _ in zugeordnet})
+    slots: list[SlotRef] = []
+    if gruppen:
+        rows = await db.execute(
+            text(
+                "SELECT id, group_id, date, start_period, kategorie, pinned, source, note "
+                "FROM lesson_slots WHERE group_id = ANY(:gruppen) "
+                "AND date BETWEEN :von AND :bis"
+            ),
+            {"gruppen": gruppen, "von": zeitraum[0], "bis": zeitraum[1]},
+        )
+        slots = [
+            SlotRef(
+                id=r[0], group_id=r[1], datum=r[2], start_period=r[3] or 0,
+                kategorie=r[4], pinned=r[5], source=r[6], note=r[7],
+            )
+            for r in rows.fetchall()
+        ]
+
+    plan = plan_sync(zugeordnet, slots, zeitraum=zeitraum)
+    return plan, {"kuerzel": kuerzel, "wochen": kalenderwochen, "gruppen": gruppen}, None
+
+
+def _plan_als_json(plan, kontext) -> dict:
+    return {
+        "kuerzel": kontext["kuerzel"],
+        "wochen": [w.isoformat() for w in kontext["wochen"]],
+        "gruppen": len(kontext["gruppen"]),
+        "aenderungen": [
+            {
+                "datum": c.datum.isoformat(),
+                "stunde": c.start_period,
+                "von": c.von_kategorie,
+                "nach": c.nach_kategorie,
+                "anpassung_noetig": c.anpassung_noetig,
+                "notiz": c.notiz,
+            }
+            for c in plan.wirksame_changes
+        ],
+        "konflikte": [
+            {
+                "datum": k.datum.isoformat(),
+                "stunde": k.start_period,
+                "grund": k.grund,
+                "beschreibung": k.beschreibung,
+            }
+            for k in plan.conflicts
+        ],
+        "meldungen": plan.meldungen,
+    }
+
+
+@router.get("/sync/preview")
+async def sync_preview(
+    wochen: int = Query(4, ge=1, le=12),
+    bis: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Was der Abgleich ändern würde — **ohne** zu schreiben."""
+    if not is_configured():
+        return {"configured": False}
+    try:
+        plan, kontext, fehler = await _stundenplan_abgleich(db, _current.sub, wochen, bis)
+    except CalendarSourceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    if fehler:
+        return {"configured": True, "hinweis": fehler, "aenderungen": []}
+    return {"configured": True, **_plan_als_json(plan, kontext)}
+
+
+@router.post("/sync")
+async def sync_ausfuehren(
+    wochen: int = Query(4, ge=1, le=12),
+    bis: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Entfall und Vertretung übernehmen. Rechnet den Plan neu, statt ihn mitzuschicken.
+
+    Ein vom Client übergebener Plan wäre eine Einladung, fremde Slots zu ändern — und
+    zwischen Vorschau und Klick kann sich der Stundenplan ohnehin geändert haben.
+    """
+    from app.calendar.sync import apply_sync
+
+    if not is_configured():
+        raise HTTPException(status_code=409, detail="Keine Stundenplanquelle eingerichtet.")
+    try:
+        plan, kontext, fehler = await _stundenplan_abgleich(db, _current.sub, wochen, bis)
+    except CalendarSourceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    if fehler:
+        raise HTTPException(status_code=409, detail=fehler)
+
+    geaendert = await apply_sync(db, plan)
+    logger.info("Stundenplan-Abgleich für %s: %s Slots geändert", kontext["kuerzel"], geaendert)
+    return {"geaendert": geaendert, **_plan_als_json(plan, kontext)}
