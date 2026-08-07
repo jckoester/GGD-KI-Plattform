@@ -2,9 +2,29 @@
 # Felder: slug (eindeutig, Kleinbuchstaben), name (Anzeigename), icon (Lucide-Name),
 #         color (CSS-Farbe, z.B. #3b82f6), min_grade, max_grade, sort_order,
 #         fach_code (optional, Bildungsplan-Fachkürzel wie M/CH; wird in die
-#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf)
+#         subjects-Tabelle geseedet und löst #-Cross-Fach-Bezüge auf),
+#         untis_codes (optional, Liste der Fachkürzel des Stundenplans — ein DRITTES
+#         Vokabular neben slug und fach_code: der Bildungsplan kennt ETH und INFWFO,
+#         der Stundenplan ET und INF. Angehängte Ziffern für Parallelkurse (M1, bio2)
+#         müssen NICHT eingetragen werden, sie werden beim Abgleich abgeschnitten.
+#         GROSS- und Kleinschreibung sind bedeutungstragend: klein = Basiskurs der
+#         Kursstufe, groß = Leistungskurs bzw. regulärer Unterricht in Sek I.),
+#         sso_aliases (optional, Liste alternativer SSO-Gruppennamen für den
+#         Gruppenimport, z.B. [bildende.kunst] für die Gruppe fs.bildende.kunst)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
+
+# Stundenplan-Kürzel, die KEIN Unterricht sind (UP-8). Sie erzeugen weder Wochenmuster
+# noch Gruppenvorschläge und werden auch nicht als „Fach fehlt" gemeldet — sie werden
+# nie eines. Ohne diese Liste behelligt der Import jede Lehrkraft dauerhaft mit
+# Dienstterminen, die aussehen wie ein Konfigurationsmangel.
+#
+# Unterschied zu einem unbekannten Kürzel: Dort steht eine Ergänzung an; hier nicht.
+# Die Kürzel sind schulspezifisch — die Beispiele unten sind zu ersetzen.
+untis_kein_unterricht:
+  - PRÄS # Präsenzstunde / Vertretungsbereitschaft
+  - ÖPR # Örtlicher Personalrat
+  - SL # Erweiterte Schulleitung
 # aktuelles Schuljahr: Single Source of Truth ist config/school_year.yaml
 # (hier bewusst NICHT mehr gepflegt, um Doppelkonfig/Divergenz zu vermeiden).
 
@@ -30,6 +50,7 @@ bildungsplan_default: # gilt für alle Fächer ohne eigene Fach-Edition (bildung
 subjects:
   - slug: mathematik
     name: Mathematik
+    untis_codes: [M]
     icon: square-radical
     color: "#3b82f6"
     min_grade: 5
@@ -41,6 +62,7 @@ subjects:
 
   - slug: deutsch
     name: Deutsch
+    untis_codes: [D]
     icon: book-open
     color: "#ef4444"
     min_grade: 5
@@ -50,6 +72,7 @@ subjects:
 
   - slug: englisch
     name: Englisch
+    untis_codes: [E]
     icon: globe
     color: "#10b981"
     min_grade: 5
@@ -58,6 +81,7 @@ subjects:
 
   - slug: physik
     name: Physik
+    untis_codes: [PH]
     icon: atom
     color: "#8b5cf6"
     min_grade: 7
@@ -66,6 +90,7 @@ subjects:
 
   - slug: chemie
     name: Chemie
+    untis_codes: [CH]
     icon: flask-conical
     color: "#f59e0b"
     min_grade: 7
@@ -75,6 +100,7 @@ subjects:
 
   - slug: biologie
     name: Biologie
+    untis_codes: [BIO]
     icon: leaf
     color: "#22c55e"
     min_grade: 5
@@ -83,6 +109,7 @@ subjects:
 
   - slug: geschichte
     name: Geschichte
+    untis_codes: [G]
     icon: landmark
     color: "#a78bfa"
     min_grade: 6
@@ -91,6 +118,7 @@ subjects:
 
   - slug: geographie
     name: Geographie
+    untis_codes: [GEO]
     icon: map
     color: "#06b6d4"
     min_grade: 5
@@ -99,6 +127,7 @@ subjects:
 
   - slug: informatik
     name: Informatik
+    untis_codes: [INF]
     icon: code-2
     color: "#64748b"
     min_grade: 7
@@ -107,6 +136,7 @@ subjects:
 
   - slug: kunst
     name: Kunst
+    untis_codes: [BK]
     icon: palette
     color: "#ec4899"
     min_grade: 5
@@ -115,6 +145,7 @@ subjects:
 
   - slug: musik
     name: Musik
+    untis_codes: [MU]
     icon: music
     color: "#f97316"
     min_grade: 5
@@ -123,6 +154,9 @@ subjects:
 
   - slug: sport
     name: Sport
+    # Mehrere Kürzel je Fach sind üblich: koedukativ, männlich, weiblich — dasselbe
+    # Fach, verschiedene Lerngruppen. Die Unterscheidung trägt der Gruppenname.
+    untis_codes: [SP, SPM, SPW]
     icon: dumbbell
     color: "#14b8a6"
     min_grade: 5
@@ -131,6 +165,9 @@ subjects:
 
   - slug: religion
     name: Religion
+    # An Schulen mit getrennten Konfessionen sind das mehrere Fächer mit je eigenem
+    # Kürzel (REV, RRK, RISL) — dann je Fach ein eigener Eintrag statt einer Liste.
+    untis_codes: [REL]
     icon: sun
     color: "#fbbf24"
     min_grade: 5
@@ -139,6 +176,7 @@ subjects:
 
   - slug: ethik
     name: Ethik
+    untis_codes: [ET]
     icon: heart-handshake
     color: "#f43f5e"
     min_grade: 5
@@ -147,8 +185,16 @@ subjects:
 
   - slug: nwt
     name: NwT
+    untis_codes: [NWT]
     icon: microscope
     color: "#0ea5e9"
     min_grade: 8
     max_grade: 10
     sort_order: 150
+
+  - slug: klassenleitung
+    name: Klassenleitungsstunde
+    untis_codes: [KLS]
+    min_grade: 5
+    max_grade: 6
+    sort_order: 900

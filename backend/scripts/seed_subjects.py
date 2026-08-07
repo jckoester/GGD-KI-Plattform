@@ -91,6 +91,13 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
                 for a in (entry.get("sso_aliases") or [])
                 if a and str(a).strip()
             })
+            # Stundenplan-Kürzel: GROSS und ohne Umlaut-Normalisierung — sie sind
+            # Kürzel, keine Gruppennamen (PRÄS bleibt PRÄS).
+            untis_codes = sorted({
+                str(c).strip().upper()
+                for c in (entry.get("untis_codes") or [])
+                if c and str(c).strip()
+            })
             result = await db.execute(
                 select(Subject).where(Subject.slug == slug)
             )
@@ -105,6 +112,7 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
                 existing.max_grade = entry.get("max_grade")
                 existing.sort_order = entry.get("sort_order", 0)
                 existing.sso_aliases = sso_aliases
+                existing.untis_codes = untis_codes
                 updated += 1
             else:
                 db.add(
@@ -118,6 +126,7 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
                         max_grade=entry.get("max_grade"),
                         sort_order=entry.get("sort_order", 0),
                         sso_aliases=sso_aliases,
+                        untis_codes=untis_codes,
                     )
                 )
                 inserted += 1

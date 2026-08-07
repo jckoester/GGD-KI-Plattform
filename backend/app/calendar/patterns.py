@@ -147,12 +147,17 @@ def derive_patterns(
     wochen: list[date],
     timegrid: list[tuple[int, int]] | None = None,
     anker: date | None = None,
+    kein_unterricht: frozenset[str] | None = None,
 ) -> PatternResult:
     """Wochenmuster aus den Stunden mehrerer Wochen ableiten.
 
     `wochen` sind die abgerufenen Kalenderwochen (beliebiger Tag darin) — sie bestimmen
     den Nenner: Ohne sie ließe sich „kam in 2 von 4 Wochen vor" nicht von „kam zweimal
     vor" unterscheiden, und jede Rhythmus-Aussage wäre geraten.
+
+    `kein_unterricht` sind Fachkürzel, hinter denen kein Unterricht steht (Präsenzstunde,
+    Personalrats- oder Schulleitungssitzung). Sie erzeugen kein Muster — der Stundenplan
+    führt sie wie Unterricht, die Jahresplanung kennt sie nicht.
 
     `anker` legt fest, welche Woche A ist (Vorgabe: die früheste abgerufene). Der Plan
     sieht dafür ein Datum in `school_year.yaml` vor; solange es fehlt, ist die Zuordnung
@@ -169,12 +174,17 @@ def derive_patterns(
     zusammenhaengend = contiguous_periods(timegrid or [])
 
     # (Gruppe, Wochentag, Stunde) → in welchen Wochen gesehen
+    ausgeschlossen = kein_unterricht or frozenset()
     beobachtung: dict[tuple[GroupKey, int, int], set[int]] = defaultdict(set)
     ohne_stunde = 0
     ohne_gruppe = 0
+    dienstliches: set[str] = set()
 
     for lesson in lessons:
         if lesson.covering_for or lesson.state not in MUSTER_ZUSTAENDE:
+            continue
+        if lesson.subject and lesson.subject.strip().upper() in ausgeschlossen:
+            dienstliches.add(lesson.subject.strip().upper())
             continue
         if not _gruppe(lesson).identifizierbar:
             ohne_gruppe += 1
@@ -198,6 +208,11 @@ def derive_patterns(
         ergebnis.hinweise.append(
             f"{ohne_gruppe} Termine ohne Fach und Klasse übersprungen "
             f"(typisch: Pausenaufsicht)."
+        )
+    if dienstliches:
+        # Bewusst als schlichte Feststellung, nicht als Mangel: Hier ist nichts zu tun.
+        ergebnis.hinweise.append(
+            "Nicht als Unterricht gewertet: " + ", ".join(sorted(dienstliches)) + "."
         )
 
     # Erst je Einzelstunde den Rhythmus bestimmen, dann benachbarte verschmelzen. Die

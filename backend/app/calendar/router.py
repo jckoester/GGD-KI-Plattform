@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.calendar.base import CalendarSourceError
+from app.calendar.groups import kein_unterricht_codes, match_groups
 from app.calendar.patterns import derive_patterns
 from app.calendar.service import (
     KUERZEL_PREFERENCE_KEY,
@@ -157,7 +158,19 @@ async def week_patterns(
         logger.warning("Stundenplan-Abruf für %s fehlgeschlagen: %s", kuerzel, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from None
 
-    result = derive_patterns(stunden, wochen=kalenderwochen, timegrid=raster)
+    result = derive_patterns(
+        stunden,
+        wochen=kalenderwochen,
+        timegrid=raster,
+        kein_unterricht=kein_unterricht_codes(),
+    )
+    # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
+    # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
+    # hier fällt auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
+    abgleich = await match_groups(db, [p.key for p in result.proposals])
+    # Eine Gruppe kann mehrere Muster-Schlüssel bündeln (M + MD).
+    zuordnung = {k: s for s in abgleich.fehlend for k in s.keys}
+    vorhanden = set(abgleich.vorhanden)
     return {
         "configured": True,
         "kuerzel": kuerzel,
@@ -175,10 +188,56 @@ async def week_patterns(
                 "gesehen": p.gesehen,
                 "von_wochen": p.wochen,
                 "sicher": p.sicher,
+                # Ohne Fach-/Gruppenzuordnung lässt sich das Muster nicht speichern —
+                # `group_week_patterns` braucht eine `group_id`.
+                "subject_id": (zuordnung.get(p.key) or _leer).subject_id,
+                "subject_slug": (zuordnung.get(p.key) or _leer).subject_slug,
+                "gruppe_vorhanden": p.key in vorhanden,
+                "gruppe_vorschlag": (zuordnung.get(p.key) or _leer).vorschlag_name,
             }
             for p in result.proposals
         ],
+        "fehlende_gruppen": [
+            {
+                "name": s.vorschlag_name,
+                "subject_id": s.subject_id,
+                "subject_slug": s.subject_slug,
+                "klassen": list(s.class_names),
+                "gruppe": s.key.label,
+                "kursart": s.kursart,
+                # Mehrere Kürzel = eine Gruppe (Differenzierungsstunde).
+                "kuerzel": list(s.codes),
+            }
+            for s in abgleich.fehlend
+        ],
+        "unbekannte_faecher": [
+            {"code": u.code, "stunden": u.stunden, "klassen": list(u.klassen)}
+            for u in abgleich.unbekannte_faecher
+        ],
         # Doppelte Warnungen aus mehreren Wochen zusammenfassen — sonst steht dieselbe
         # Meldung viermal untereinander.
-        "hinweise": [*result.hinweise, *sorted(set(warnungen))],
+        "hinweise": [
+            *result.hinweise,
+            *sorted(set(warnungen)),
+            *(
+                [
+                    f"{len(abgleich.ohne_klasse)} Lerngruppen ohne Fach oder Klasse — "
+                    f"daraus lässt sich keine Unterrichtsgruppe ableiten."
+                ]
+                if abgleich.ohne_klasse
+                else []
+            ),
+            *abgleich.mehrdeutig,
+        ],
     }
+
+
+class _Leer:
+    """Platzhalter für Muster ohne Gruppenzuordnung — spart Fallunterscheidungen oben."""
+
+    subject_id = None
+    subject_slug = None
+    vorschlag_name = None
+
+
+_leer = _Leer()

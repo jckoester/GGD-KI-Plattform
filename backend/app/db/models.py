@@ -84,6 +84,11 @@ class Subject(Base):
     sso_aliases: Mapped[list[str]] = mapped_column(
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
     )
+    # Fachkürzel des Stundenplans (WebUntis). Drittes Vokabular neben Slug und
+    # `fach_code`: ETH≠ET, INFWFO≠INF — siehe Alembic 0045. Aus subjects.yaml geseedet.
+    untis_codes: Mapped[list[str]] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
 
     __table_args__ = (
         # Partiell-unique: Fächer ohne Bildungsplan-Code (fach_code IS NULL) dürfen
