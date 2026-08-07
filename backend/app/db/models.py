@@ -1126,3 +1126,34 @@ class ChatContextNode(Base):
     added_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+
+
+# 23. calendar_sync_status — Ergebnis des Stundenplan-Abgleichs (UP-8, Schritt 10a)
+class CalendarSyncStatus(Base):
+    """Eine Zeile je Lehrkraft. Zugangsdaten stehen in der Umgebung, der Status hier —
+    er ist veränderlicher Laufzeitzustand und lässt sich nicht in eine `.env` schreiben.
+    """
+
+    __tablename__ = "calendar_sync_status"
+
+    pseudonym: Mapped[str] = mapped_column(Text, primary_key=True)
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    # Kurzfassung für die Anzeige — OHNE Zugangsdaten (siehe CalendarSourceError).
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    changed: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+    conflicts: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+    shifts: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ok','kein_kuerzel','quelle_fehlt','nicht_erreichbar',"
+            "'anmeldung_fehlgeschlagen','fehler')",
+            name="check_css_status",
+        ),
+    )

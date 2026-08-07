@@ -104,6 +104,34 @@ def _unterrichtswochen(referenz: date, anzahl: int) -> list[date]:
     return sorted(lauf if len(lauf) > len(bester) else bester)
 
 
+def _abgleich_wochen(
+    referenz: date, rueckblick: int = 1, vorausschau: int = 2
+) -> list[date]:
+    """Kalenderwochen für den **Abgleich** — anderes Fenster als für die Musterableitung.
+
+    Zwei Unterschiede zu `_unterrichtswochen`, beide wesentlich:
+
+    * **Nach vorn.** Eine Verlegung zeigt fast immer in die Zukunft; ihr Ziel liegt in
+      einer kommenden Woche. Ein reiner Rückblick fände den Ursprung und nie das Ziel.
+    * **Lücken sind erlaubt.** Die Musterableitung braucht zusammenhängende Wochen, sonst
+      ist der A-/B-Takt nicht bestimmbar. Der Abgleich braucht das nicht — er braucht die
+      **jüngsten** Wochen. Mit der Zusammenhangs-Regel landete er nach jeden Ferien
+      wochenlang in der Vergangenheit statt in der Gegenwart.
+
+    Die laufende Woche ist immer dabei, sofern sie Unterricht enthält.
+    """
+    cfg = load_school_year()
+    montag = referenz - timedelta(days=referenz.weekday())
+    wochen: list[date] = []
+    for versatz in range(-rueckblick + 1, vorausschau + 1):
+        kandidat = montag + timedelta(weeks=versatz)
+        if kandidat < cfg.beginn or kandidat > cfg.ende:
+            continue
+        if any(is_schoolday(kandidat + timedelta(days=n), cfg) for n in range(5)):
+            wochen.append(kandidat)
+    return wochen
+
+
 @router.get("/week-patterns")
 async def week_patterns(
     wochen: int = Query(4, ge=1, le=12),
@@ -262,9 +290,11 @@ async def _stundenplan_abgleich(
     if not kuerzel:
         return None, None, "Im Profil ist kein Kürzel eingetragen."
 
-    kalenderwochen = _unterrichtswochen(bis or date.today(), wochen_anzahl)
+    # Abgleichfenster, nicht Musterfenster: jüngste Wochen inklusive der laufenden, plus
+    # zwei nach vorn für Verlegungsziele.
+    kalenderwochen = _abgleich_wochen(bis or date.today(), wochen_anzahl)
     if not kalenderwochen:
-        return None, None, "Im Schuljahr liegen vor diesem Datum keine Unterrichtswochen."
+        return None, None, "Im Schuljahr liegen um dieses Datum keine Unterrichtswochen."
 
     adapter = get_adapter()
     async with adapter:  # type: ignore[attr-defined]
@@ -367,7 +397,7 @@ def _plan_als_json(plan, kontext) -> dict:
 
 @router.get("/sync/preview")
 async def sync_preview(
-    wochen: int = Query(4, ge=1, le=12),
+    wochen: int = Query(1, ge=1, le=12),
     bis: date | None = None,
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_any_role(["teacher", "admin"])),
@@ -387,7 +417,7 @@ async def sync_preview(
 
 @router.post("/sync")
 async def sync_ausfuehren(
-    wochen: int = Query(4, ge=1, le=12),
+    wochen: int = Query(1, ge=1, le=12),
     bis: date | None = None,
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_any_role(["teacher", "admin"])),
@@ -410,5 +440,17 @@ async def sync_ausfuehren(
         raise HTTPException(status_code=409, detail=fehler)
 
     geaendert = await apply_sync(db, plan)
+    # Auch der Handabgleich zählt: Sonst zeigte die Statusanzeige den Stand des letzten
+    # Cron-Laufs, obwohl gerade eben abgeglichen wurde.
+    from app.crons.calendar_sync_service import _status_schreiben
+
+    await _status_schreiben(
+        db,
+        _current.sub,
+        "ok",
+        changed=geaendert,
+        conflicts=len(plan.conflicts),
+        shifts=len(plan.verlegungen),
+    )
     logger.info("Stundenplan-Abgleich für %s: %s Slots geändert", kontext["kuerzel"], geaendert)
     return {"geaendert": geaendert, **_plan_als_json(plan, kontext)}
