@@ -8,6 +8,7 @@ from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
+    CalendarSyncStatus,
     Conversation,
     ConversationFlag,
     JwtRevocation,
@@ -181,8 +182,19 @@ async def cleanup_inactive_accounts(
                         await db.execute(
                             delete(Conversation).where(Conversation.pseudonym == pseudonym)
                         )
+                        # Enthält u. a. das Stundenplan-Kürzel (UP-8): das einzige
+                        # Personenmerkmal der Kalenderanbindung, das die Schule speichert.
                         await db.execute(
                             delete(UserPreference).where(UserPreference.pseudonym == pseudonym)
+                        )
+                        # Abrufstatus des Stundenplan-Abgleichs (UP-8, Schritt 10a).
+                        # Eigene Tabelle, kein FK auf pseudonym_audit — ohne diese Zeile
+                        # bliebe je verlassenem Konto ein Pseudonym mit Zeitstempeln
+                        # zurück, den nichts mehr aufräumt.
+                        await db.execute(
+                            delete(CalendarSyncStatus).where(
+                                CalendarSyncStatus.pseudonym == pseudonym
+                            )
                         )
                         await db.execute(
                             delete(JwtRevocation).where(JwtRevocation.pseudonym == pseudonym)
