@@ -395,6 +395,31 @@ def _plan_als_json(plan, kontext) -> dict:
     }
 
 
+@router.get("/sync/status")
+async def sync_status(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Wann zuletzt abgeglichen wurde und mit welchem Ergebnis.
+
+    Billig — nur ein Datenbankzugriff, **keine** Verbindung zur Stundenplanquelle. Die
+    Anzeige begleitet den Jahresplan und darf nicht von einem fremden Server abhängen.
+    """
+    from app.crons.calendar_sync_service import letzter_status
+
+    if not is_configured():
+        return {"configured": False, "status": None}
+
+    prefs = await get_preferences(db, _current.sub)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    return {
+        "configured": True,
+        "kuerzel": kuerzel or None,
+        "letzter_lauf": await letzter_status(db, _current.sub),
+    }
+
+
 @router.get("/sync/preview")
 async def sync_preview(
     wochen: int = Query(1, ge=1, le=12),

@@ -11,6 +11,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import TimetableSyncButton from "$lib/components/TimetableSyncButton.svelte";
 
     // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
     const membershipGroups = $derived([
@@ -278,6 +279,23 @@
                 <div class="mt-3"><ErrorBanner message={kuerzelFehler} /></div>
             {:else if kuerzelGespeichert}
                 <div class="mt-3"><SuccessBanner message="Kürzel gespeichert." /></div>
+            {/if}
+
+            <!-- Handabgleich und Status. Der Hauptweg ist der Knopf im Jahresplan —
+                 hier steht er, weil hier auch der Zustand hingehört: wann zuletzt
+                 abgeglichen wurde und ob der nächtliche Lauf scheitert. -->
+            {#if preferences?.webuntis_kuerzel}
+                <div class="mt-6 pt-4 border-t border-light-ui-3 dark:border-dark-ui-3">
+                    <h3 class="text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-3">
+                        Abgleich
+                    </h3>
+                    <TimetableSyncButton />
+                    <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
+                        Ausfälle und Vertretungen werden nachts automatisch übernommen.
+                        Wer von einer kurzfristigen Änderung weiß — etwa einer verlegten
+                        Stunde —, gleicht hier oder im Jahresplan von Hand ab.
+                    </p>
+                </div>
             {/if}
         </section>
         {/if}

@@ -14,6 +14,7 @@
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import TimetableSyncButton from '$lib/components/TimetableSyncButton.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import PlannerTable from '$lib/components/planner/PlannerTable.svelte'
   import UnitLegend from '$lib/components/planner/UnitLegend.svelte'
@@ -348,6 +349,11 @@
         </svg>
         Wochenmuster
       </button>
+
+      <!-- Handabgleich mit dem Stundenplan (UP-8, Schritt 10b). Hier, weil hier
+           auffällt, dass etwas nicht stimmt: Der nächtliche Cron sieht die morgens
+           eingetragenen Änderungen erst am Folgetag. -->
+      <TimetableSyncButton kompakt onFertig={loadOverview} />
     </div>
   </div>
 </div>

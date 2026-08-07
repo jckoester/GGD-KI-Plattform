@@ -1959,3 +1959,21 @@ export async function applyHolidayProposal(boundsUebernehmen = true, schuljahr =
   }
   return body;
 }
+
+export async function getSyncStatus() {
+  const res = await fetch(`${BASE}/calendar/sync/status`, { credentials: "include" });
+  if (!res.ok) return { configured: false, kuerzel: null, letzter_lauf: null };
+  return res.json();
+}
+
+export async function runTimetableSync(wochen = 1) {
+  const res = await fetch(`${BASE}/calendar/sync?wochen=${wochen}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Abgleich fehlgeschlagen (${res.status})`);
+  }
+  return body;
+}
