@@ -1,5 +1,6 @@
 <script>
-  import { setWeekPattern, generateSlots } from '$lib/api.js'
+  import { setWeekPattern, generateSlots, getWeekPatternProposals } from '$lib/api.js'
+  import { calendarConfigured } from '$lib/stores/calendarStatus.js'
 
   const { open = false, groupId, patterns = [], onSaved, onGenerated, onClose } = $props()
 
@@ -31,11 +32,54 @@
   function syncRows() {
     rows = patterns
       .filter(p => p.halbjahr === halbjahr)
-      .map(p => ({ weekday: p.weekday, start_period: p.start_period, periods: p.periods }))
+      .map(p => ({
+        weekday: p.weekday,
+        start_period: p.start_period,
+        periods: p.periods,
+        rhythmus: p.rhythmus ?? 'woechentlich',
+      }))
+  }
+
+  // ── Übernahme aus dem Stundenplan (UP-8, Schritt 10b) ────────────────────
+  // Der Vorschlag füllt den Editor, statt direkt zu speichern: Die Lehrkraft sieht, was
+  // übernommen würde, kann korrigieren und speichert mit demselben Knopf wie sonst.
+  // Ein eigener Schreibpfad daneben wäre eine zweite Wahrheit.
+  let holeVorschlag = $state(false)
+  let vorschlagHinweis = $state(null)
+
+  async function ausStundenplan() {
+    holeVorschlag = true
+    error = null
+    vorschlagHinweis = null
+    try {
+      const data = await getWeekPatternProposals(4)
+      const eigene = (data.patterns ?? []).filter(p => p.group_id === groupId)
+      if (eigene.length === 0) {
+        vorschlagHinweis =
+          'Für diese Gruppe wurde im Stundenplan nichts gefunden. Möglich: Das Kürzel '
+          + 'fehlt im Profil, oder die Gruppe heißt im Stundenplan anders.'
+        return
+      }
+      halbjahr = data.halbjahr ?? halbjahr
+      rows = eigene.map(p => ({
+        weekday: p.weekday,
+        start_period: p.start_period,
+        periods: p.periods,
+        rhythmus: p.rhythmus,
+      }))
+      const unsicher = eigene.filter(p => !p.sicher).length
+      vorschlagHinweis =
+        `${eigene.length} Einträge aus ${data.wochen?.length ?? 0} Wochen übernommen`
+        + (unsicher ? ` — ${unsicher} davon unsicher, bitte prüfen.` : '. Bitte prüfen und speichern.')
+    } catch (e) {
+      error = e.message
+    } finally {
+      holeVorschlag = false
+    }
   }
 
   function addRow() {
-    rows = [...rows, { weekday: 0, start_period: 1, periods: 1 }]
+    rows = [...rows, { weekday: 0, start_period: 1, periods: 1, rhythmus: 'woechentlich' }]
   }
 
   function removeRow(i) {
@@ -43,7 +87,9 @@
   }
 
   function updateRow(i, key, value) {
-    rows = rows.map((r, idx) => idx === i ? { ...r, [key]: Number(value) } : r)
+    // `rhythmus` ist als einziges Feld Text — `Number()` machte daraus NaN.
+    const wert = key === 'rhythmus' ? value : Number(value)
+    rows = rows.map((r, idx) => idx === i ? { ...r, [key]: wert } : r)
   }
 
   async function save() {
@@ -110,6 +156,23 @@
         {/each}
       </div>
 
+      {#if $calendarConfigured}
+        <div class="mb-4">
+          <button
+            onclick={ausStundenplan}
+            disabled={holeVorschlag}
+            class="w-full px-3 py-2 text-sm rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                   text-light-tx dark:text-dark-tx hover:bg-light-bg-2 dark:hover:bg-dark-bg-2
+                   transition-colors disabled:opacity-50"
+          >
+            {holeVorschlag ? 'Stundenplan wird gelesen …' : 'Aus Stundenplan übernehmen'}
+          </button>
+          {#if vorschlagHinweis}
+            <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">{vorschlagHinweis}</p>
+          {/if}
+        </div>
+      {/if}
+
       <!-- Muster-Zeilen -->
       <div class="mb-3">
         {#if rows.length === 0}
@@ -150,6 +213,17 @@
                 >
                   <option value={1}>Einzelstunde</option>
                   <option value={2}>Doppelstunde</option>
+                </select>
+
+                <select
+                  value={row.rhythmus ?? 'woechentlich'}
+                  onchange={(e) => updateRow(i, 'rhythmus', e.currentTarget.value)}
+                  class="px-2 py-1 text-sm bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-3 dark:border-dark-ui-3 rounded-md
+                         text-light-tx dark:text-dark-tx outline-none focus:border-primary dark:focus:border-primary-dark"
+                >
+                  <option value="woechentlich">wöchentlich</option>
+                  <option value="a_woche">A-Woche</option>
+                  <option value="b_woche">B-Woche</option>
                 </select>
 
                 <button

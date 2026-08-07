@@ -1977,3 +1977,14 @@ export async function runTimetableSync(wochen = 1) {
   }
   return body;
 }
+
+export async function getWeekPatternProposals(wochen = 4) {
+  const res = await fetch(`${BASE}/calendar/week-patterns?wochen=${wochen}`, {
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Stundenplan nicht lesbar (${res.status})`);
+  }
+  return body;
+}

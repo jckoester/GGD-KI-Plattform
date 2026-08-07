@@ -192,6 +192,10 @@ async def week_patterns(
         timegrid=raster,
         kein_unterricht=kein_unterricht_codes(),
     )
+    # Aus welchem Halbjahr die Wochen stammen — der Editor schreibt je Halbjahr, und ein
+    # Muster ins falsche zu übernehmen wäre schwer zu bemerken.
+    cfg = load_school_year()
+    halbjahr = 1 if kalenderwochen[-1] < cfg.halbjahreswechsel else 2
     # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
     # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
     # hier fällt auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
@@ -202,6 +206,7 @@ async def week_patterns(
     return {
         "configured": True,
         "kuerzel": kuerzel,
+        "halbjahr": halbjahr,
         "wochen": [w.isoformat() for w in result.wochen],
         "patterns": [
             {
@@ -222,6 +227,8 @@ async def week_patterns(
                 "subject_slug": (zuordnung.get(p.key) or _leer).subject_slug,
                 "gruppe_vorhanden": p.key in vorhanden,
                 "gruppe_vorschlag": (zuordnung.get(p.key) or _leer).vorschlag_name,
+                # `group_id` nur bei vorhandener Gruppe — nur dorthin lässt sich schreiben.
+                "group_id": abgleich.zuordnung.get(p.key),
             }
             for p in result.proposals
         ],

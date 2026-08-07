@@ -15,6 +15,13 @@ class WeekPatternItem(BaseModel):
     weekday: int = Field(..., ge=0, le=4, description="0=Montag, 4=Freitag")
     start_period: int = Field(..., ge=1, description="Schulstunde im Tagesraster (1-basiert)")
     periods: int = Field(1, ge=1, le=2, description="1=Einzelstunde, 2=Doppelstunde")
+    # Vorgabe wöchentlich: Bestandsmuster kennen das Feld nicht und sind alle wöchentlich —
+    # ein anderer Default änderte stillschweigend den Stundenplan aller Gruppen (UP-8).
+    rhythmus: str = Field(
+        "woechentlich",
+        pattern="^(woechentlich|a_woche|b_woche)$",
+        description="14-tägige Termine: a_woche | b_woche",
+    )
 
 
 class WeekPatternSet(BaseModel):
@@ -29,6 +36,7 @@ class WeekPatternRead(BaseModel):
     weekday: int
     start_period: int
     periods: int
+    rhythmus: str = "woechentlich"
 
     class Config:
         from_attributes = True

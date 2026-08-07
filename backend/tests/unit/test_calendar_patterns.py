@@ -331,3 +331,100 @@ def test_wochenauswahl_bricht_am_schuljahresbeginn_ab(monkeypatch):
 
     wochen = kalender_router._unterrichtswochen(date(2025, 9, 20), 4)
     assert wochen == [date(2025, 9, 15)]
+
+
+# ── Übernahme in den Editor (Schritt 10b) ────────────────────────────────────
+
+
+def test_rhythmus_kommt_durch_das_schema():
+    """Der Editor schickt `rhythmus` mit — ohne Feld im Schema fiele er lautlos weg."""
+    from app.planning.schemas import WeekPatternItem, WeekPatternSet
+
+    gesetzt = WeekPatternSet(
+        halbjahr=2,
+        patterns=[
+            WeekPatternItem(weekday=0, start_period=1, periods=2, rhythmus="a_woche"),
+            WeekPatternItem(weekday=2, start_period=5, periods=1),
+        ],
+    )
+    assert gesetzt.patterns[0].rhythmus == "a_woche"
+    # Vorgabe wöchentlich: Bestandsmuster kennen das Feld nicht und sind alle wöchentlich.
+    assert gesetzt.patterns[1].rhythmus == "woechentlich"
+
+
+def test_unbekannter_rhythmus_wird_abgelehnt():
+    """Sonst landete ein Tippfehler in der Datenbank und verletzte dort den CHECK —
+    der Fehler käme erst beim Speichern und ohne Bezug zur Eingabe."""
+    import pydantic
+    import pytest as _pytest
+
+    from app.planning.schemas import WeekPatternItem
+
+    with _pytest.raises(pydantic.ValidationError):
+        WeekPatternItem(weekday=0, start_period=1, periods=1, rhythmus="c_woche")
+
+
+def test_vorschlag_traegt_alles_was_der_editor_braucht():
+    """Wochentag, Stunde, Dauer, Rhythmus — sonst müsste doch wieder abgetippt werden."""
+    lessons = jede_woche(1, 3)
+    ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
+    p = ergebnis.proposals[0]
+    assert (p.weekday, p.start_period, p.periods, p.rhythmus) == (1, 3, 1, WOECHENTLICH)
+    assert p.sicher is True
+
+
+@pytest.mark.asyncio
+async def test_router_schreibt_den_rhythmus_mit():
+    """Der Router baut `GroupWeekPattern` von Hand — ein vergessenes Feld fiele lautlos weg.
+
+    Ohne diesen Test überlebte die Mutation „`rhythmus=item.rhythmus` entfernen"
+    unbemerkt: Das Schema trägt das Feld, die Datenbank hat eine Vorgabe, und der Fehler
+    zeigte sich erst Monate später als „meine A-Wochen funktionieren nicht".
+    """
+    from app.db.models import Group, GroupMembership, GroupWeekPattern
+    from app.planning.router import set_week_pattern
+    from app.planning.schemas import WeekPatternItem, WeekPatternSet
+
+    class FakeDB:
+        def __init__(self):
+            self.hinzugefuegt: list[GroupWeekPattern] = []
+
+        async def get(self, modell, pk):
+            return Group(id=pk, name="Testgruppe", slug="tg", type="teaching_group")
+
+        async def execute(self, stmt):
+            class Result:
+                def scalar_one_or_none(self_):
+                    # Mitgliedschaft nur für die Berechtigungsprüfung vortäuschen.
+                    return GroupMembership(
+                        group_id=1, pseudonym="p1", role_in_group="teacher"
+                    ) if "group_memberships" in str(stmt) else None
+
+            return Result()
+
+        def add(self, obj):
+            self.hinzugefuegt.append(obj)
+
+        async def commit(self):
+            pass
+
+        async def refresh(self, obj):
+            pass
+
+    class User:
+        sub = "p1"
+
+    db = FakeDB()
+    await set_week_pattern(
+        1,
+        WeekPatternSet(
+            halbjahr=2,
+            patterns=[
+                WeekPatternItem(weekday=0, start_period=1, periods=2, rhythmus="a_woche"),
+                WeekPatternItem(weekday=2, start_period=5, periods=1),
+            ],
+        ),
+        db=db,
+        user=User(),
+    )
+    assert [p.rhythmus for p in db.hinzugefuegt] == ["a_woche", "woechentlich"]

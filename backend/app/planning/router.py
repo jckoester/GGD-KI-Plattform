@@ -256,6 +256,7 @@ async def set_week_pattern(
             weekday=item.weekday,
             start_period=item.start_period,
             periods=item.periods,
+            rhythmus=item.rhythmus,
         )
         db.add(p)
         new_patterns.append(p)
