@@ -33,6 +33,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Bibliothek](bibliothek.md) — Bilder & Diagramme dauerhaft speichern, herunterladen, GeoGebra-Export
 - [Material-Werkstatt](werkstatt.md) — Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
+- [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?

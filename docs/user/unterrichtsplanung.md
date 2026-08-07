@@ -35,6 +35,10 @@ Damit arbeiten Sie so:
   Unterricht hat, und erzeugen daraus die Slots eines Halbjahres.
 - Über **Verlauf** machen Sie Änderungen rückgängig (jede Änderung wird gesichert).
 
+> **Wenn Ihre Schule den Stundenplan angebunden hat**, können Sie das Wochenmuster
+> übernehmen statt eintippen, und Ausfall, Vertretung und Verlegungen kommen von selbst in
+> die Planung — siehe [Stundenplan übernehmen](stundenplan.md).
+
 ---
 
 ## Stundenentwurf

@@ -38,6 +38,10 @@ Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
 | `AUTH_ISERV_CLIENT_SECRET` | OAuth2-Client-Secret des SSO-Providers | *(vom Provider) |
+| `WEBUNTIS_SERVER` | Stundenplan-Server. **Leer = Integration aus**, s. [Stundenplan-Integration](stundenplan-integration.md) | `ggd.webuntis.com` |
+| `WEBUNTIS_USER` | Benutzername des technischen Servicekontos | *(vom Stundenplan-Admin)* |
+| `WEBUNTIS_PASSWORD` | Passwort des Servicekontos | *(vom Stundenplan-Admin)* |
+| `WEBUNTIS_SCHOOL` | Schulkürzel — **nur bei geteiltem Server**; bei eigener Subdomain leer lassen | *(leer)* |
 | `STUDENT_GRADES` | Jahrgangsstufen als JSON-Array | `[5,6,7,8,9,10,11,12]` |
 | `PUBLIC_SCHOOL_NAME` | Anzeigename der Plattform | `ki@beispielschule` |
 | `PUBLIC_SCHOOL_LOGO_URL` | Logo-URL (Fallback für beide Themes) | *(leer → Initialen)* |

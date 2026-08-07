@@ -26,13 +26,14 @@ Cron-Container (separat):
 | `chat/` | Chat-Endpunkte, SSE-Streaming, Konversations- und Nachrichtenverwaltung, Tool-Registry (`tools.py`: `planning` / `student_planning`) |
 | `context/` | Kontextspeicher: Knoten/Kanten, Curriculum-Import, Retrieval (semantisch + Engagement-UNION), Taxonomie |
 | `planning/` | Unterrichtsplanung (UP-Reihe): Slots/Snapshots, Jahresplan- und Stundenentwurfs-Logik, Assistenten-Tools. Verschiebe-Dialog: `reflow_service.py` (Reflow-Kontext + Überhang-Erkennung), `operations.py` (typisierte Plan-Operationen + atomarer Executor). Schüler-Kontext: `student_context.py` (aktuelles Thema, Klassenarbeits-Scope, Whitelist) |
+| `calendar/` | Stundenplan-Anbindung (UP-8): Adapter-Interface (`base.py`) + WebUntis-Implementierung, Ferien-Übernahme, Wochenmuster-Ableitung, Abgleich von Entfall/Vertretung/Verlegung (`sync.py`: `plan_sync` rein, `apply_sync` schreibend). Wie bei `auth/` ist das Interface der Erweiterungspunkt für andere Quellen |
 | `budget/` | Budget-Tiers aus YAML, ECB-Wechselkurs, Reconcile-Service |
 | `litellm/` | LiteLLM-HTTP-Client, Team-Anlage, User-Budget-Sync |
 | `upload/` | Dateiupload-Session, Text-Extraktion (PDF via pdfminer.six, Bilder via Base64) |
 | `db/` | SQLAlchemy-Modelle (async), Session-Factory |
 | `api/admin/` | Admin-only-Endpunkte: Modell-Allowlists, Assistenten, Statistiken, Site-Texte |
 | `api/assistants.py` | Öffentlicher Assistenten-Endpunkt (Sichtbarkeit nach Rolle) |
-| `crons/` | Cron-Logik (Cleanup Accounts/Konversationen, Embedding-Backfill) — wird von Skripten aufgerufen |
+| `crons/` | Cron-Logik (Cleanup Accounts/Konversationen, Embedding-Backfill, Stundenplan-Abgleich) — wird von Skripten aufgerufen |
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
