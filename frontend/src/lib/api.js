@@ -1471,6 +1471,26 @@ export async function getCurriculum(curriculumId) {
   return res.json()
 }
 
+export async function updateCurriculumMeta(curriculumId, { title, jahrgangsstufe } = {}) {
+  // Titel und Jahrgangsband ändern. Bewusst NICHT über updateContextNode: Das Band steht
+  // auch in min_grade/max_grade und in den import_keys des ganzen Baums — der eigene
+  // Endpunkt zieht beides nach. Die BP-Edition ist hier nicht änderbar (→ relink).
+  const body = {}
+  if (title !== undefined) body.title = title
+  if (jahrgangsstufe !== undefined) body.jahrgangsstufe = jahrgangsstufe
+  const res = await fetch(`${BASE}/context/curricula/${curriculumId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Änderung fehlgeschlagen')
+  }
+  return res.json()
+}
+
 export async function relinkCurriculum(curriculumId, apply = false) {
   // Curriculum auf die aktuelle BP-Edition aktualisieren.
   // apply=false → Vorschau-Plan; apply=true → anwenden (in-place bzw. Kopie bei Band-Split).

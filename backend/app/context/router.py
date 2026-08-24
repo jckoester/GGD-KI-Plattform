@@ -37,6 +37,7 @@ from app.context.schemas import (
     ContextSearchRequest,
     ContextSearchResult,
     CurriculumRead,
+    CurriculumMetaUpdate,
     CurriculumDraftConfirmed,
     CurriculumCreate,
     FachplanTreeRead,
@@ -175,6 +176,44 @@ def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
         if "student" in user.roles and "teacher" not in user.roles:
             if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
                 raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+
+async def _require_curriculum_write(
+    db: AsyncSession, curriculum_id: UUID, user: JwtPayload
+) -> ContextNode:
+    """Schreibrecht am Curriculum prüfen und den Knoten zurückgeben.
+
+    Admin darf immer, sonst muss die Person Mitglied der `write_scope_group` sein — das
+    ist die Fachschaft. Bis auf diese Stelle stand dieselbe Prüfung noch einmal wortgleich
+    im Relink-Endpunkt; zwei Kopien einer Rechteprüfung driften irgendwann auseinander,
+    und die Richtung, in die sie driften, merkt man erst zu spät.
+    """
+    if "teacher" not in user.roles and "admin" not in user.roles:
+        raise HTTPException(status_code=403, detail="Nur für Lehrkräfte/Admins")
+
+    node = await db.get(ContextNode, curriculum_id)
+    if node is None or node.content_type != "curriculum" or node.status != "active":
+        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
+
+    if "admin" in user.roles:
+        return node
+
+    allowed = False
+    if node.write_scope_group_id is not None:
+        r = await db.execute(
+            sa.select(1).where(
+                sa.exists().where(
+                    GroupMembership.group_id == node.write_scope_group_id,
+                    GroupMembership.pseudonym == user.sub,
+                )
+            )
+        )
+        allowed = r.scalar_one_or_none() is not None
+    if not allowed:
+        raise HTTPException(
+            status_code=403, detail="Keine Berechtigung zum Bearbeiten dieses Curriculums"
+        )
+    return node
 
 
 def _visibility_filter(query, user: JwtPayload, status_override: str | None = None):
@@ -550,6 +589,24 @@ async def update_node(
     await _check_write_permission(node, user, db)
 
     update_data = payload.model_dump(exclude_unset=True, by_alias=False)
+
+    # Die Bildungsplan-Edition eines Curriculums ist kein Etikett: Sie bestimmt, gegen
+    # welche Edition die IK-/PK-Verweise aufgelöst wurden. Über diesen generischen Weg
+    # ließe sie sich mitsamt dem ganzen Metadaten-Dict überschreiben — die Verweise zeigten
+    # danach still auf Knoten, die es in der neuen Edition anders oder gar nicht gibt.
+    # Der geprüfte Weg ist `POST /curricula/{id}/relink`.
+    if node.content_type == "curriculum" and "metadata_" in update_data:
+        alt = (node.metadata_ or {}).get("bp_version")
+        neu = (update_data["metadata_"] or {}).get("bp_version")
+        if neu != alt:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Die Bildungsplan-Edition eines Curriculums lässt sich hier nicht "
+                    "ändern. Nutzen Sie „Auf neue Edition aktualisieren“ (relink)."
+                ),
+            )
+
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
         attr = field if field != "metadata_" else "metadata_"
@@ -943,6 +1000,115 @@ async def get_curriculum(
     }
 
 
+@router.patch("/curricula/{curriculum_id}", response_model=CurriculumRead)
+async def update_curriculum_meta(
+    curriculum_id: UUID,
+    payload: CurriculumMetaUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Titel und Jahrgangsband eines Curriculums ändern.
+
+    Mehr geht hier bewusst nicht. Insbesondere bleibt `bp_version` unangetastet: Sie
+    entscheidet, gegen welche Bildungsplan-Edition die IK-/PK-Verweise aufgelöst wurden,
+    und ist deshalb kein Etikett, sondern Teil der Datenstruktur. Der geprüfte Weg auf eine
+    neue Edition ist `POST /curricula/{id}/relink`.
+    """
+    from app.context.grades import parse_grade_band
+
+    node = await _require_curriculum_write(db, curriculum_id, user)
+    aenderungen = payload.model_dump(exclude_unset=True)
+
+    if payload.title is not None:
+        node.title = payload.title.strip()
+
+    if payload.jahrgangsstufe is not None:
+        neu = payload.jahrgangsstufe.strip()
+        alt = (node.metadata_ or {}).get("jahrgangsstufe", "")
+        if neu != alt:
+            # Metadaten **zusammenführen**, nicht ersetzen: Ein neues Dict zuzuweisen
+            # verlöre fach_code, fachplan_id, schulart — und bp_version.
+            node.metadata_ = {**(node.metadata_ or {}), "jahrgangsstufe": neu}
+            # Das Band ist auch strukturell hinterlegt (Editionsauflösung, Fachfilter).
+            node.min_grade, node.max_grade = parse_grade_band(neu)
+            await _import_keys_umschreiben(db, node, alt, neu)
+
+    if aenderungen:
+        await db.commit()
+
+    from app.context.service import load_curriculum_tree
+
+    tree = await load_curriculum_tree(db, curriculum_id)
+    return {
+        "id": tree["id"],
+        "title": tree["title"],
+        "metadata": tree["metadata"],
+        "subject_id": tree["subject_id"],
+        "write_scope_group_id": tree["write_scope_group_id"],
+        "kapitel": tree["kapitel"],
+        "can_edit": True,
+    }
+
+
+async def _import_keys_umschreiben(
+    db: AsyncSession, node: ContextNode, alt: str, neu: str
+) -> None:
+    """`import_key` des Curriculums und seiner Kapitel/Lernsequenzen nachziehen.
+
+    Warum das sein muss: Der Schlüssel enthält das Jahrgangsband und dient dem Anlegepfad
+    als Idempotenz- bzw. Dublettenschlüssel. Bliebe er nach einer Umbenennung stehen,
+    entstünde ein stiller Konflikt — wer später ein Curriculum für das **alte** Band
+    anlegt, träfe auf dieses umbenannte hier und überschriebe es.
+
+    ⚠️ **Es gibt zwei Schlüsselformate**, weil es zwei Anlegepfade gibt:
+
+    * ``{fachplan_id}_{band}`` — `import_curriculum_from_draft` (YAML-/CLI-Import),
+      Kapitel und Lernsequenzen hängen ihre Nummern hinten an;
+    * ``new_{pseudonym}_{fach_code}_{band}_{bp_version}`` — `POST /curricula/new`, der Weg
+      der Oberfläche. Hier steht das Band **in der Mitte**, und die Kapitel entstehen erst
+      später im Editor und tragen gar keinen Schlüssel.
+
+    Deshalb wird das Band als ganzes Segment zwischen Unterstrichen ersetzt, statt einen
+    Präfix aus `fachplan_id` zu rekonstruieren: Das trägt beide Formate. Die Kinder werden
+    anschließend über den **alten Schlüssel des Curriculums** als Präfix gefunden.
+    """
+    alt_schluessel = (node.metadata_ or {}).get("import_key") or ""
+    if not alt_schluessel or not alt:
+        return
+
+    segmente = alt_schluessel.split("_")
+    if alt not in segmente:
+        # Unbekanntes Format — lieber nichts anfassen als etwas Falsches umschreiben.
+        logger.warning(
+            "import_key %r enthält das Band %r nicht als Segment — nicht umgeschrieben.",
+            alt_schluessel, alt,
+        )
+        return
+    neu_schluessel = "_".join(neu if s == alt else s for s in segmente)
+
+    node.metadata_ = {**(node.metadata_ or {}), "import_key": neu_schluessel}
+
+    # Kinder: bewusst in Python statt als UPDATE mit LIKE — `_` ist in LIKE ein
+    # Platzhalter für ein beliebiges Zeichen, und die Schlüssel stecken voller
+    # Unterstriche; ein LIKE-Präfix träfe damit auch fremde Curricula. Die Knotenzahl je
+    # Curriculum ist klein.
+    treffer = await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.content_type.in_(["kapitel", "lernsequenz"]),
+            ContextNode.status == "active",
+            ContextNode.metadata_["import_key"].isnot(None),
+        )
+    )
+    for kind in treffer.scalars().all():
+        schluessel = (kind.metadata_ or {}).get("import_key") or ""
+        if not schluessel.startswith(f"{alt_schluessel}_"):
+            continue
+        kind.metadata_ = {
+            **(kind.metadata_ or {}),
+            "import_key": neu_schluessel + schluessel[len(alt_schluessel) :],
+        }
+
+
 @router.post("/curricula/{curriculum_id}/relink")
 async def relink_curriculum_endpoint(
     curriculum_id: UUID,
@@ -959,25 +1125,7 @@ async def relink_curriculum_endpoint(
     """
     from app.context.relink import relink_curriculum
 
-    if "teacher" not in user.roles and "admin" not in user.roles:
-        raise HTTPException(status_code=403, detail="Nur für Lehrkräfte/Admins")
-
-    cur = await db.get(ContextNode, curriculum_id)
-    if cur is None or cur.content_type != "curriculum" or cur.status != "active":
-        raise HTTPException(status_code=404, detail="Curriculum nicht gefunden")
-
-    if "admin" not in user.roles:
-        allowed = False
-        if cur.write_scope_group_id is not None:
-            r = await db.execute(
-                sa.select(1).where(sa.exists().where(
-                    GroupMembership.group_id == cur.write_scope_group_id,
-                    GroupMembership.pseudonym == user.sub,
-                ))
-            )
-            allowed = r.scalar_one_or_none() is not None
-        if not allowed:
-            raise HTTPException(status_code=403, detail="Keine Berechtigung zum Bearbeiten dieses Curriculums")
+    await _require_curriculum_write(db, curriculum_id, user)
 
     result = await relink_curriculum(db, curriculum_id, apply)
     if result is None:

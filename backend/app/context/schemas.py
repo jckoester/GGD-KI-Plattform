@@ -304,6 +304,22 @@ class KapitelRead(BaseModel):
     lernsequenzen: list[LernsequenzRead]
 
 
+class CurriculumMetaUpdate(BaseModel):
+    """Die **einzigen** beiden Angaben eines Curriculums, die frei änderbar sind.
+
+    Bewusst ein eigenes, enges Schema statt `ContextNodeUpdate`: Dort ließe sich
+    `metadata_` als Ganzes überschreiben — und damit `bp_version`, die bestimmt, gegen
+    welche Bildungsplan-Edition die Kompetenzverweise aufgelöst wurden. Sie zu ändern
+    hieße, die Verweise stillschweigend auf eine andere Edition zeigen zu lassen; dafür
+    gibt es den geprüften Weg über `POST /curricula/{id}/relink`.
+
+    Nicht gesetzte Felder bleiben unberührt (`exclude_unset`).
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    jahrgangsstufe: str | None = Field(default=None, min_length=1, max_length=50)
+
+
 class CurriculumRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

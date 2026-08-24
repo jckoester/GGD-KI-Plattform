@@ -3,6 +3,7 @@
     import { goto } from "$app/navigation";
     import {
         getCurriculum,
+        updateCurriculumMeta,
         updateContextNode,
         createContextNode,
         deleteContextNode,
@@ -116,14 +117,27 @@
 
     // Speicher-Logik: Vergleicht draft mit original und führt API-Calls aus
     async function flushDraftToApi(draft, original) {
-        // 1. Curriculum-Knoten selbst aktualisieren
-        if (
-            draft.title !== original.title ||
-            JSON.stringify(draft.metadata) !== JSON.stringify(original.metadata)
-        ) {
+        // 1. Kopfdaten: Titel und Jahrgangsband über den eigenen Endpunkt.
+        // Nicht über updateContextNode — das Band steht auch in min_grade/max_grade und in
+        // den import_keys des ganzen Baums; nur der Curriculum-Endpunkt zieht beides nach.
+        const bandAlt = original.metadata?.jahrgangsstufe ?? "";
+        const bandNeu = draft.metadata?.jahrgangsstufe ?? "";
+        if (draft.title !== original.title || bandNeu !== bandAlt) {
+            await updateCurriculumMeta(draft.id, {
+                ...(draft.title !== original.title ? { title: draft.title } : {}),
+                ...(bandNeu !== bandAlt ? { jahrgangsstufe: bandNeu } : {}),
+            });
+        }
+
+        // Übrige Metadaten des Curriculum-Knotens (ohne die beiden Kopfdaten, die oben
+        // schon geschrieben wurden — sonst überschriebe der generische Weg sie wieder).
+        const restAlt = { ...original.metadata };
+        const restNeu = { ...draft.metadata };
+        delete restAlt.jahrgangsstufe;
+        delete restNeu.jahrgangsstufe;
+        if (JSON.stringify(restAlt) !== JSON.stringify(restNeu)) {
             await updateContextNode(draft.id, {
-                title: draft.title,
-                metadata: draft.metadata,
+                metadata: { ...draft.metadata, jahrgangsstufe: bandNeu },
             });
         }
 
@@ -487,12 +501,50 @@
                                focus:border-primary dark:focus:border-primary-dark
                                focus:outline-none transition-colors"
                     />
-                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-                        Bearbeitungsmodus
-                        {#if totalStd > 0}
-                            · Gesamt: {totalStd} Std.
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                        <label
+                            for="jahrgangsband"
+                            class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                        >
+                            Jahrgangsstufe
+                        </label>
+                        <input
+                            id="jahrgangsband"
+                            type="text"
+                            value={draft.metadata?.jahrgangsstufe ?? ""}
+                            oninput={(e) => {
+                                draft.metadata = {
+                                    ...draft.metadata,
+                                    jahrgangsstufe: e.currentTarget.value,
+                                };
+                                dirty = true;
+                            }}
+                            placeholder="z. B. 7 oder 7/8"
+                            class="w-28 px-2 py-1 text-sm rounded border
+                                   border-light-ui-3 dark:border-dark-ui-3
+                                   bg-light-bg dark:bg-dark-bg
+                                   text-light-tx dark:text-dark-tx
+                                   focus:outline-none focus:border-primary
+                                   dark:focus:border-primary-dark"
+                        />
+                        <!-- Die Edition ist kein Etikett: Sie entscheidet, gegen welchen
+                             Bildungsplan die Kompetenzverweise aufgelöst wurden. Änderbar
+                             nur über „Auf neue Edition aktualisieren“ (relink). -->
+                        {#if draft.metadata?.bp_version}
+                            <span
+                                class="text-sm text-light-tx-2 dark:text-dark-tx-2"
+                                title="Die Bildungsplan-Edition lässt sich hier nicht ändern — dafür gibt es „Auf neue Edition aktualisieren“."
+                            >
+                                · BP {draft.metadata.bp_version}
+                            </span>
                         {/if}
-                    </p>
+                        <span class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                            · Bearbeitungsmodus
+                            {#if totalStd > 0}
+                                · Gesamt: {totalStd} Std.
+                            {/if}
+                        </span>
+                    </div>
                 </div>
                 <div bind:this={topActionsEl} class="flex gap-2 items-center">
                     {#if dirty}
