@@ -742,30 +742,55 @@ async def create_edge(
 
 async def archive_orphaned_curriculum_nodes(
     db: AsyncSession,
+    import_key_base: str,
     import_keys: set[str],
 ) -> int:
-    """Archiviert Knoten mit content_type in ('curriculum', 'kapitel', 'lernsequenz') 
-    deren import_key NICHT in der gegebenen Menge ist."""
+    """Kapitel/Lernsequenzen archivieren, die dieser Import nicht mehr erzeugt.
+
+    Ohne das überlebt ein aus dem YAML **gelöschtes** Kapitel jeden Re-Import: Der Import
+    legt an und aktualisiert, aber räumt nicht ab — das entfernte Kapitel hängt weiter am
+    Curriculum und erscheint im Baum.
+
+    ⚠️ **Zweifach eingegrenzt**, und beides ist wesentlich:
+
+    1. Auf den **Schlüsselpräfix dieses Curriculums** (`import_key_base`). Die frühere
+       Fassung durchsuchte die **ganze Tabelle**: Jeder aktive Curriculum-, Kapitel- und
+       Lernsequenz-Knoten, dessen `import_key` nicht in der übergebenen Menge stand, wurde
+       archiviert — also **sämtliche anderen Curricula der Instanz**. Aufgerufen wurde sie
+       nie; als benannte, plausibel aussehende Funktion war sie eine Einladung. Genau
+       dieselbe Bauart hat beim Bildungsplan-Import zwei Fächer stillgelegt.
+    2. Auf Knoten, die **dieser Importpfad selbst angelegt hat**. Im Editor entstandene
+       Kapitel tragen `temp_<uuid>` als Schlüssel und passen nicht auf den Präfix — sie
+       bleiben unberührt. Ein YAML-Import darf die Handarbeit einer Lehrkraft nicht
+       stillschweigend abräumen, auch wenn das YAML sie nicht kennt.
+
+    Der Curriculum-Knoten selbst wird nie archiviert; er ist das Ziel des Imports.
+    """
+    if not import_key_base:
+        return 0
+
     result = await db.execute(
-        sa.select(ContextNode.id, ContextNode.metadata_["import_key"].label("import_key")).where(
-            ContextNode.content_type.in_(["curriculum", "kapitel", "lernsequenz"]),
+        sa.select(ContextNode.id, ContextNode.metadata_["import_key"].astext).where(
+            ContextNode.content_type.in_(["kapitel", "lernsequenz"]),
             ContextNode.status == "active",
             ContextNode.metadata_["import_key"].isnot(None),
-            sa.not_(ContextNode.metadata_["import_key"].astext.in_(import_keys)),
         )
     )
-    rows = result.all()
+
     archived = 0
-    
-    for row in rows:
-        logger.info(f"Archiviere Knoten mit import_key: {row.import_key}")
+    for node_id, schluessel in result.all():
+        if not schluessel or not schluessel.startswith(f"{import_key_base}_"):
+            continue                       # fremdes Curriculum oder Editor-Knoten
+        if schluessel in import_keys:
+            continue                       # kommt im Import weiterhin vor
+        logger.info("Archiviere verwaisten Curriculum-Knoten: %s", schluessel)
         await db.execute(
             sa.update(ContextNode)
-            .where(ContextNode.id == row.id)
+            .where(ContextNode.id == node_id)
             .values(status="archived", archived_at=datetime.now(timezone.utc))
         )
         archived += 1
-    
+
     return archived
 
 
@@ -1187,6 +1212,17 @@ async def import_curriculum_from_draft(
                 seen_edges.add(edge_key)
                 await create_edge(db, lernsequenz_id, to_id, relation, meta or None)
                 stats.edge_count += 1
+
+    # Was dieser Import früher angelegt hat und jetzt nicht mehr erzeugt, wird abgeräumt —
+    # sonst überlebt ein aus dem YAML gelöschtes Kapitel jeden Re-Import.
+    stats.archived_count = await archive_orphaned_curriculum_nodes(
+        db, import_key_base, all_import_keys
+    )
+    if stats.archived_count:
+        logger.info(
+            "%d verwaiste Kapitel/Lernsequenzen archiviert (nicht mehr im Import)",
+            stats.archived_count,
+        )
 
     return curriculum_id, stats
 

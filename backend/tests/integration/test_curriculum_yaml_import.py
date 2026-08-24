@@ -356,3 +356,97 @@ async def test_konverter_akzeptiert_fehlendes_fachplan_id(db):
     )
     assert draft.fachplan_id is None
     assert draft.bp_id == BP_ID
+
+
+# ── Verwaiste Kapitel abräumen (Punkt 2) ─────────────────────────────────────
+
+
+def _draft_mit_kapiteln(*titel) -> CurriculumDraftConfirmed:
+    return _draft(kapitel=[
+        CurriculumDraftKapitel(
+            titel=t, reihenfolge=i + 1, std="5",
+            lernsequenzen=[
+                CurriculumDraftLernsequenz(
+                    bp_titel=f"LS {t}", reihenfolge=1, std="5",
+                    eintraege=[
+                        CurriculumDraftEntry(
+                            ik=[], pk=[], konkretisierung="k", hinweise="", material="",
+                        )
+                    ],
+                )
+            ],
+        )
+        for i, t in enumerate(titel)
+    ])
+
+
+async def _kapiteltitel(db, cid) -> list[str]:
+    tree = await load_curriculum_tree(db, cid)
+    return [k["title"] for k in tree["kapitel"]]
+
+
+async def test_geloeschtes_kapitel_verschwindet_beim_reimport(db, welt):
+    """Der Import legte an und aktualisierte, räumte aber nie ab.
+
+    Ein aus dem YAML entferntes Kapitel überlebte damit jeden Re-Import und hing weiter
+    am Curriculum — sichtbar im Baum, obwohl die Quelle es nicht mehr kennt.
+    """
+    cid, _ = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A", "B"), "system")
+    assert await _kapiteltitel(db, cid) == ["A", "B"]
+
+    _, stats = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A"), "system")
+
+    assert await _kapiteltitel(db, cid) == ["A"]
+    assert stats.archived_count >= 1
+
+
+async def test_unveraenderter_reimport_archiviert_nichts(db, welt):
+    """Gegenprobe — sonst räumte jeder Lauf etwas ab und die Zahl wäre wertlos."""
+    cid, _ = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A", "B"), "system")
+    _, stats = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A", "B"), "system")
+    assert stats.archived_count == 0
+    assert await _kapiteltitel(db, cid) == ["A", "B"]
+
+
+async def test_fremdes_curriculum_bleibt_unberuehrt(db, welt):
+    """Die eigentliche Gefahr der alten Fassung: Sie durchsuchte die **ganze** Tabelle.
+
+    Jedes andere Curriculum der Instanz wäre bei jedem Import mit archiviert worden.
+    """
+    cid_8, _ = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A", "B"), "system")
+    fremd = _draft_mit_kapiteln("X", "Y")
+    fremd.jahrgangsstufe = "9"
+    cid_9, _ = await import_curriculum_from_draft(db, fremd, "system")
+
+    # Import für Band 8 mit weniger Kapiteln — Band 9 darf das nicht spüren.
+    await import_curriculum_from_draft(db, _draft_mit_kapiteln("A"), "system")
+
+    assert await _kapiteltitel(db, cid_8) == ["A"]
+    assert await _kapiteltitel(db, cid_9) == ["X", "Y"]
+
+
+async def test_editor_kapitel_wird_nicht_abgeraeumt(db, welt):
+    """Im Editor angelegte Kapitel tragen `temp_<uuid>` und gehören keinem Import.
+
+    Ein YAML-Import darf die Handarbeit einer Lehrkraft nicht stillschweigend
+    entfernen, nur weil das YAML sie nicht kennt.
+    """
+    from app.db.models import ContextEdge
+
+    cid, _ = await import_curriculum_from_draft(db, _draft_mit_kapiteln("A"), "system")
+
+    handarbeit = ContextNode(
+        id=uuid.uuid4(), category="knowledge", content_type="kapitel",
+        title="Von Hand ergänzt", status="active", owner_pseudonym="lehrkraft",
+        read_scope="school", write_scope="school",
+        metadata_={"import_key": f"temp_{uuid.uuid4()}", "reihenfolge": 2},
+    )
+    db.add(handarbeit)
+    await db.flush()
+    db.add(ContextEdge(from_node_id=handarbeit.id, to_node_id=cid, relation="part_of"))
+    await db.flush()
+
+    await import_curriculum_from_draft(db, _draft_mit_kapiteln("A"), "system")
+
+    assert (await db.get(ContextNode, handarbeit.id)).status == "active"
+    assert "Von Hand ergänzt" in await _kapiteltitel(db, cid)
