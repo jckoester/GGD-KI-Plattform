@@ -404,3 +404,108 @@ def test_upsert_reactivates_archived_node_changed_hash():
     upsert_node(cur, _ik_node(11, 12, "NEW"), dry_run=False, subject_id_lookup={})
     sql = cur.calls[1][0]
     assert "status = 'active'" in sql and "archived_at = NULL" in sql
+
+
+# ── Archivierung: Reichweite eingrenzen (2026-08-08) ─────────────────────────
+#
+# Auslöser: Ein Voll-Import über das Scraper-Verzeichnis legte Englisch und Französisch
+# vollständig still — 959 Knoten. Beide werden aus PDFs importiert und liegen in einem
+# anderen Ausgabeverzeichnis; für den Import sahen sie aus wie entfernte Knoten.
+
+archive_removed_nodes = _import_bp.archive_removed_nodes
+stillgelegte_faecher = _import_bp.stillgelegte_faecher
+
+
+class _ArchivCursor:
+    """Cursor-Ersatz, der die abgesetzten Abfragen mitschreibt."""
+
+    def __init__(self, rows=None):
+        self.rows = rows or []
+        self.calls = []
+        self.rowcount = 0
+
+    def execute(self, sql, params=None):
+        self.calls.append((sql, params))
+
+    def fetchall(self):
+        return self.rows
+
+
+def test_archivierung_ist_auf_die_importierten_faecher_begrenzt():
+    """Der Kern des Fixes: Fächer außerhalb des Imports dürfen nicht erfasst werden."""
+    cur = _ArchivCursor()
+    archive_removed_nodes(
+        cur, {"BP_A", "BP_B"}, dry_run=True, subject_ids={2, 7}, mit_fachlosen=False
+    )
+    sql, params = cur.calls[0]
+    assert "subject_id = ANY(%s)" in sql
+    fachlisten = [
+        p for p in params if isinstance(p, list) and p and isinstance(p[0], int)
+    ]
+    assert fachlisten == [[2, 7]] or fachlisten == [[7, 2]], fachlisten
+
+
+def test_fachlose_knoten_werden_nur_bei_bedarf_erfasst():
+    """Leitperspektiven hängen an keinem Fach.
+
+    Eine reine Fach-Einschränkung erwischte sie nie — enthält der Import aber
+    Leitperspektiven, sollen veraltete darunter sehr wohl archiviert werden.
+    """
+    for flag in (True, False):
+        cur = _ArchivCursor()
+        archive_removed_nodes(
+            cur, {"BP_A"}, dry_run=True, subject_ids={2}, mit_fachlosen=flag
+        )
+        sql, params = cur.calls[0]
+        assert "subject_id IS NULL AND %s" in sql
+        assert flag in params
+
+
+def test_ohne_fachliste_wird_nichts_fremdes_archiviert():
+    """Vorgabe ist die leere Menge — im Zweifel lieber zu wenig als zu viel."""
+    cur = _ArchivCursor()
+    archive_removed_nodes(cur, {"BP_A"}, dry_run=True)
+    _, params = cur.calls[0]
+    assert [] in params
+
+
+# ── Fach fällt aus subjects.yaml: melden, nur auf Ansage archivieren ─────────
+
+_CFG = {"subjects": [{"slug": "mathematik", "fach_code": "M"}]}
+
+
+def test_fehlendes_fach_wird_gemeldet_aber_nicht_archiviert():
+    """Ohne `--prune-subjects` passiert nichts — es wird nur berichtet.
+
+    `config/subjects.yaml` ist gitignored (kein Diff, kein `git blame`) und `--subjects`
+    ist ein Pfadparameter: Ein Fehlgriff auf `subjects.example.yaml` (2 statt 27 Fächer)
+    sähe aus wie „25 Fächer abgeschafft". Deshalb ist das Fehlen ein Signal, kein Befehl.
+    """
+    cur = _ArchivCursor(rows=[("L2", "Latein", 291)])
+    anzahl, betroffen = stillgelegte_faecher(cur, _CFG, prune=False, dry_run=False)
+    assert anzahl == 0
+    assert betroffen == [("L2", "Latein", 291)]
+    assert len(cur.calls) == 1, "Ohne prune darf kein UPDATE abgesetzt werden"
+
+
+def test_mit_prune_wird_archiviert():
+    cur = _ArchivCursor(rows=[("L2", "Latein", 291)])
+    cur.rowcount = 291
+    anzahl, _ = stillgelegte_faecher(cur, _CFG, prune=True, dry_run=False)
+    assert anzahl == 291
+    assert any("SET status = 'archived'" in sql for sql, _ in cur.calls)
+
+
+def test_prune_schreibt_im_dry_run_nicht():
+    cur = _ArchivCursor(rows=[("L2", "Latein", 291)])
+    anzahl, _ = stillgelegte_faecher(cur, _CFG, prune=True, dry_run=True)
+    assert anzahl == 291                      # gemeldet …
+    assert len(cur.calls) == 1                # … aber kein UPDATE
+
+
+def test_leere_konfiguration_legt_nichts_still():
+    """„Datei kaputt oder leer" darf nicht heißen „alle Fächer abgeschafft"."""
+    cur = _ArchivCursor(rows=[("L2", "Latein", 291)])
+    anzahl, betroffen = stillgelegte_faecher(cur, {"subjects": []}, prune=True, dry_run=False)
+    assert (anzahl, betroffen) == (0, [])
+    assert cur.calls == []

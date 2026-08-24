@@ -407,10 +407,37 @@ def resolve_edges(
     return edges_created
 
 
-def archive_removed_nodes(cur, known_bp_ids: set[str], dry_run: bool) -> int:
-    """Setzt status='archived' fuer Knoten die nicht mehr im JSONL vorkommen."""
+def archive_removed_nodes(
+    cur,
+    known_bp_ids: set[str],
+    dry_run: bool,
+    subject_ids: set[int] | None = None,
+    mit_fachlosen: bool = True,
+) -> int:
+    """Setzt status='archived' fuer Knoten die nicht mehr im JSONL vorkommen.
+
+    ⚠️ **Nur innerhalb der Fächer, die der Import gesehen hat** (`subject_ids`).
+
+    Vorher lief die Abfrage über die ganze Tabelle: Jeder aktive BP-Knoten, dessen `bp_id`
+    nicht in den gelesenen Dateien stand, wurde archiviert — auch der von Fächern, die gar
+    nicht Teil des Imports waren. Der vorhandene Schutz (`is_full_import and not
+    fach_filter`) deckte nur den Einzeldatei-Fall ab, nicht diesen: **Englisch und
+    Französisch werden aus PDFs importiert** und liegen in einem anderen
+    Ausgabeverzeichnis. Ein Voll-Import über das Scraper-Verzeichnis sah sie nie und legte
+    beide Fächer vollständig still — 959 Knoten, unbemerkt.
+
+    `mit_fachlosen` steuert dasselbe für Knoten **ohne** Fach (Leitperspektiven und ihre
+    Aspekte). Sie gehören zu keinem Fach und würden von einer reinen Fach-Einschränkung
+    nie erfasst; enthielt der Import solche Knoten, sollen veraltete darunter aber sehr
+    wohl archiviert werden.
+
+    Ein ganzes Fach stilllegen geht damit nicht mehr nebenbei — das ist Absicht und
+    passiert jetzt über das Fehlen in `subjects.yaml` plus `--prune-subjects`.
+    """
     if not known_bp_ids:
         return 0
+    if subject_ids is None:
+        subject_ids = set()
     placeholders = ",".join(["%s"] * len(known_bp_ids))
     cur.execute(
         f"""
@@ -420,8 +447,14 @@ def archive_removed_nodes(cur, known_bp_ids: set[str], dry_run: bool) -> int:
           AND content_type = ANY(%s)
           AND status = 'active'
           AND metadata->>'bp_id' NOT IN ({placeholders})
+          AND (subject_id = ANY(%s) OR (subject_id IS NULL AND %s))
     """,
-        ([ct for ct in BP_CONTENT_TYPES], *known_bp_ids),
+        (
+            [ct for ct in BP_CONTENT_TYPES],
+            *known_bp_ids,
+            list(subject_ids),
+            mit_fachlosen,
+        ),
     )
     rows = cur.fetchall()
     if not rows:
@@ -433,6 +466,88 @@ def archive_removed_nodes(cur, known_bp_ids: set[str], dry_run: bool) -> int:
             (ids,),
         )
     return len(rows)
+
+
+def stillgelegte_faecher(
+    cur, subjects_cfg: dict, prune: bool, dry_run: bool
+) -> tuple[int, list[tuple[str, str, int]]]:
+    """Fächer, die aus `subjects.yaml` verschwunden sind, aber noch einen aktiven BP haben.
+
+    Ein Fach aus der Konfiguration zu entfernen ist die Art, „dieses Fach gibt es nicht
+    mehr" auszudrücken — dort steht ohnehin, welche Fächer existieren. Das **Melden**
+    passiert deshalb immer; das **Archivieren** nur mit ``--prune-subjects``.
+
+    Warum nicht automatisch, obwohl das Signal eindeutig aussieht:
+
+    * ``config/subjects.yaml`` ist **gitignored**. Es gibt keinen Commit, kein Diff, kein
+      `git blame` — ein verrutschter Editiervorgang ist von einer Entscheidung nicht zu
+      unterscheiden.
+    * ``--subjects`` ist ein **Pfadparameter**. Zeigt er versehentlich auf
+      `subjects.example.yaml` (2 Fächer statt 27), fielen 25 Fächer auf einmal weg.
+
+    Beides sind stille Fehler mit großer Reichweite. Ein bestätigender Schalter kostet
+    einen Aufruf in einem Fall, der alle paar Jahre eintritt.
+
+    Rückgabe: (archivierte Knoten, [(fach_code, name, knotenzahl)])
+    """
+    konfigurierte = {
+        f["fach_code"] for f in subjects_cfg.get("subjects", []) if f.get("fach_code")
+    }
+    if not konfigurierte:
+        # Leere oder unlesbare Konfiguration: nichts folgern. Sonst wäre „Datei kaputt"
+        # gleichbedeutend mit „alle Fächer abgeschafft".
+        logger.warning("Keine Fächer in der Konfiguration — Stilllegungs-Prüfung übersprungen")
+        return 0, []
+
+    cur.execute(
+        """
+        SELECT s.fach_code, s.name, count(*)
+        FROM context_nodes n
+        JOIN subjects s ON s.id = n.subject_id
+        WHERE n.category = 'knowledge'
+          AND n.content_type = ANY(%s)
+          AND n.status = 'active'
+          AND s.fach_code IS NOT NULL
+          AND NOT (s.fach_code = ANY(%s))
+        GROUP BY 1, 2
+        ORDER BY 1
+        """,
+        ([ct for ct in BP_CONTENT_TYPES], list(konfigurierte)),
+    )
+    betroffen = [(r[0], r[1], r[2]) for r in cur.fetchall()]
+    if not betroffen:
+        return 0, []
+
+    for code, name, anzahl in betroffen:
+        logger.warning(
+            "Fach '%s' (%s) steht nicht mehr in subjects.yaml, hat aber %d aktive "
+            "Bildungsplan-Knoten.", code, name, anzahl,
+        )
+
+    if not prune:
+        logger.warning(
+            "Nicht archiviert. Mit --prune-subjects stilllegen, wenn das so gewollt ist."
+        )
+        return 0, betroffen
+
+    if dry_run:
+        return sum(a for _, _, a in betroffen), betroffen
+
+    cur.execute(
+        """
+        UPDATE context_nodes n
+        SET status = 'archived', archived_at = now()
+        FROM subjects s
+        WHERE s.id = n.subject_id
+          AND n.category = 'knowledge'
+          AND n.content_type = ANY(%s)
+          AND n.status = 'active'
+          AND s.fach_code IS NOT NULL
+          AND NOT (s.fach_code = ANY(%s))
+        """,
+        ([ct for ct in BP_CONTENT_TYPES], list(konfigurierte)),
+    )
+    return cur.rowcount, betroffen
 
 
 def archive_superseded_nodes(
@@ -567,6 +682,7 @@ def run_import(
     db_url: str,
     dry_run: bool = False,
     fach_filter: str | None = None,
+    prune_subjects: bool = False,
 ) -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -672,14 +788,40 @@ def run_import(
             # Entfernte Knoten archivieren (nur beim echten Voll-Import: Verzeichnis
             # ohne --fach-Filter). Bei einzelner Datei oder --fach würden sonst alle
             # anderen Fächer versehentlich archiviert.
+            #
+            # Zusätzlich eingegrenzt auf die Fächer, die in diesem Import überhaupt
+            # vorkamen — sonst legt ein Import aus dem Scraper-Verzeichnis die aus PDFs
+            # importierten Fächer (E1, F2) still, die dort nie auftauchen.
             if is_full_import and not fach_filter:
-                stats["archived"] = archive_removed_nodes(cur, known_bp_ids, dry_run)
+                import_subject_ids = {
+                    subject_id_lookup[slug]
+                    for slug in (n.get("fach_slug") for n in nodes)
+                    if slug and slug in subject_id_lookup
+                }
+                import_hat_fachlose = any(not n.get("fach_slug") for n in nodes)
+                logger.info(
+                    "Archivierung eingegrenzt auf %d Fach/Fächer%s",
+                    len(import_subject_ids),
+                    " + fachlose Knoten (Leitperspektiven)" if import_hat_fachlose else "",
+                )
+                stats["archived"] = archive_removed_nodes(
+                    cur, known_bp_ids, dry_run,
+                    subject_ids=import_subject_ids,
+                    mit_fachlosen=import_hat_fachlose,
+                )
 
             # Veraltete Knoten durch neuere BP-Version ersetzen
             superseded = archive_superseded_nodes(
                 cur, cfg, subject_id_lookup, dry_run
             )
             stats["archived"] += superseded
+
+            # Fächer, die aus subjects.yaml verschwunden sind: immer melden,
+            # nur mit --prune-subjects auch archivieren.
+            stillgelegt, _betroffen = stillgelegte_faecher(
+                cur, cfg, prune_subjects, dry_run
+            )
+            stats["archived"] += stillgelegt
 
             if not dry_run:
                 conn.commit()
@@ -718,13 +860,25 @@ def main() -> None:
     parser.add_argument(
         "--fach", default=None, help="Nur dieses Fach importieren (fach_code)"
     )
+    parser.add_argument(
+        "--prune-subjects",
+        action="store_true",
+        help=(
+            "Fächer, die nicht mehr in subjects.yaml stehen, stilllegen (BP-Knoten "
+            "archivieren). Ohne diesen Schalter werden sie nur gemeldet. Vorher mit "
+            "--dry-run prüfen — ein falscher --subjects-Pfad trifft sonst viele Fächer."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.db_url:
         logger.error("Kein --db-url und DATABASE_URL nicht gesetzt")
         sys.exit(1)
 
-    run_import(args.subjects, args.input, args.db_url, args.dry_run, args.fach)
+    run_import(
+        args.subjects, args.input, args.db_url, args.dry_run, args.fach,
+        args.prune_subjects,
+    )
 
 
 if __name__ == "__main__":
