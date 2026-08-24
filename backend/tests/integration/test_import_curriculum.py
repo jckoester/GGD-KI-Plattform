@@ -212,201 +212,17 @@ def curriculum_draft_confirmed(curriculum_yaml_format_a):
 # ============================================================================
 
 
-class TestCreateCurriculum:
-    """Tests für den Create-Endpunkt (Stufe 2)."""
-
-    @pytest.mark.asyncio
-    async def test_create_curriculum_success(
-        self,
-        test_client: TestClient,
-        auth_headers,
-        curriculum_draft_confirmed,
-        db_session: AsyncSession,
-    ):
-        """Test: Curriculum erfolgreich erstellen aus bestätigtem Draft."""
-        # Zuerst benötigen wir einen Fachplan-Knoten
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, status, metadata)
-                VALUES (:id, 'knowledge', 'fachplan', 'Test Fachplan', 'active', CAST(:metadata AS jsonb))
-                ON CONFLICT (id) DO NOTHING
-            """),
-            {
-                "id": str(uuid.uuid4()),
-                "metadata": json.dumps({"fachplan_id": "BP_2016_MA"}),
-            },
-        )
-        
-        # Subject erstellen
-        await db_session.execute(
-            text("""
-                INSERT INTO subjects (id, name, slug, fach_code)
-                VALUES (1, 'Mathematik', 'mathematik', 'MA')
-                ON CONFLICT (id) DO NOTHING
-            """),
-        )
-        
-        # IK- und PK-Knoten erstellen
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, subject_id, status, metadata)
-                VALUES
-                    (:id1, 'knowledge', 'ik_kompetenz', 'IK 3.1.1', 1, 'active', CAST(:meta1 AS jsonb)),
-                    (:id2, 'knowledge', 'ik_kompetenz', 'IK 3.1.2', 1, 'active', CAST(:meta2 AS jsonb)),
-                    (:id3, 'knowledge', 'ik_kompetenz', 'IK 3.1.3', 1, 'active', CAST(:meta3 AS jsonb))
-                ON CONFLICT (id) DO NOTHING
-            """),
-            {
-                "id1": str(uuid.uuid4()),
-                "id2": str(uuid.uuid4()),
-                "id3": str(uuid.uuid4()),
-                "meta1": json.dumps({"nr": "3.1.1"}),
-                "meta2": json.dumps({"nr": "3.1.2"}),
-                "meta3": json.dumps({"nr": "3.1.3"}),
-            },
-        )
-        
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, status, metadata)
-                VALUES
-                    (:id1, 'knowledge', 'pk_kompetenz', 'PK 05.1', 'active', CAST(:meta1 AS jsonb)),
-                    (:id2, 'knowledge', 'pk_kompetenz', 'PK 05.2', 'active', CAST(:meta2 AS jsonb)),
-                    (:id3, 'knowledge', 'pk_kompetenz', 'PK 05.3', 'active', CAST(:meta3 AS jsonb))
-                ON CONFLICT (id) DO NOTHING
-            """),
-            {
-                "id1": str(uuid.uuid4()),
-                "id2": str(uuid.uuid4()),
-                "id3": str(uuid.uuid4()),
-                "meta1": json.dumps({"pk_id": "PK_05.1"}),
-                "meta2": json.dumps({"pk_id": "PK_05.2"}),
-                "meta3": json.dumps({"pk_id": "PK_05.3"}),
-            },
-        )
-        
-        await db_session.commit()
-        
-        # Jetzt das Curriculum erstellen
-        response = await test_client.post(
-            "/context/curricula",
-            json=curriculum_draft_confirmed.model_dump(),
-            headers=auth_headers,
-        )
-        
-        assert response.status_code == 201
-        data = response.json()
-        
-        # Prüfe dass das Curriculum erstellt wurde
-        assert data["id"] is not None
-        assert "Mathematik" in data["title"]
-        assert data["kapitel"] is not None
-        assert len(data["kapitel"]) == 1
-        
-        # Prüfe dass Kapitel erstellt wurden
-        assert data["kapitel"][0]["title"] == "Zahlen und Operationen"
-        assert len(data["kapitel"][0]["lernsequenzen"]) == 2
-
-    @pytest.mark.asyncio
-    async def test_create_curriculum_missing_fachplan(
-        self,
-        test_client: TestClient,
-        auth_headers,
-        curriculum_draft_confirmed,
-    ):
-        """Test: Fehler wenn Fachplan nicht existiert."""
-        # Fachplan existiert nicht
-        draft = curriculum_draft_confirmed
-        draft.fachplan_id = "NONEXISTENT_FACHPLAN"
-        
-        response = await test_client.post(
-            "/context/curricula",
-            json=draft.model_dump(),
-            headers=auth_headers,
-        )
-        
-        assert response.status_code == 422
-        assert "Fachplan" in response.json()["detail"]
-
-    @pytest.mark.asyncio
-    async def test_create_curriculum_ik_not_found(
-        self,
-        test_client: TestClient,
-        auth_headers,
-        curriculum_draft_confirmed,
-        db_session: AsyncSession,
-    ):
-        """Test: Warnung wenn IK-Nummer nicht aufgelöst werden kann."""
-        # Fachplan erstellen
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, status, metadata)
-                VALUES (:id, 'knowledge', 'fachplan', 'Test Fachplan', 'active', CAST(:metadata AS jsonb))
-                ON CONFLICT DO NOTHING
-            """),
-            {
-                "id": str(uuid.uuid4()),
-                "metadata": json.dumps({"fachplan_id": "BP_2016_MA"}),
-            },
-        )
-        
-        # Subject erstellen
-        await db_session.execute(
-            text("""
-                INSERT INTO subjects (id, name, slug, fach_code)
-                VALUES (1, 'Mathematik', 'mathematik', 'MA')
-                ON CONFLICT DO NOTHING
-            """),
-        )
-        
-        # Nur einige IK-Knoten erstellen (nicht alle)
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, subject_id, status, metadata)
-                VALUES (:id1, 'knowledge', 'ik_kompetenz', 'IK 3.1.1', 1, 'active', CAST(:meta1 AS jsonb))
-            """),
-            {
-                "id1": str(uuid.uuid4()),
-                "meta1": json.dumps({"nr": "3.1.1"}),
-            },
-        )
-        
-        # PK-Knoten erstellen
-        await db_session.execute(
-            text("""
-                INSERT INTO context_nodes (id, category, content_type, title, status, metadata)
-                VALUES
-                    (:id1, 'knowledge', 'pk_kompetenz', 'PK 05.1', 'active', CAST(:meta1 AS jsonb)),
-                    (:id2, 'knowledge', 'pk_kompetenz', 'PK 05.2', 'active', CAST(:meta2 AS jsonb)),
-                    (:id3, 'knowledge', 'pk_kompetenz', 'PK 05.3', 'active', CAST(:meta3 AS jsonb))
-                ON CONFLICT DO NOTHING
-            """),
-            {
-                "id1": str(uuid.uuid4()),
-                "id2": str(uuid.uuid4()),
-                "id3": str(uuid.uuid4()),
-                "meta1": json.dumps({"pk_id": "PK_05.1"}),
-                "meta2": json.dumps({"pk_id": "PK_05.2"}),
-                "meta3": json.dumps({"pk_id": "PK_05.3"}),
-            },
-        )
-        
-        await db_session.commit()
-        
-        # Curriculum erstellen - IK 3.1.2 und 3.1.3 existieren nicht
-        response = await test_client.post(
-            "/context/curricula",
-            json=curriculum_draft_confirmed.model_dump(),
-            headers=auth_headers,
-        )
-        
-        # Sollte trotzdem erfolgreich sein, aber mit Warnungen
-        assert response.status_code == 201
-
-
-# ============================================================================
-# Test: Service-Funktionen
-# ============================================================================
+# `TestCreateCurriculum` stand hier — drei Tests für `POST /context/curricula`.
+# Endpunkt und Tests am 2026-08-08 entfernt.
+#
+# Lehrreich ist, WARUM die Tests grün waren, obwohl der Endpunkt nichts speicherte: Sie
+# prüften die **Antwort** (201, Titel, Kapitelzahl), nie die **Wirkung**. Ein zweiter,
+# frischer Lesevorgang hätte das fehlende Commit sofort gezeigt.
+#
+# Die geprüften Sachverhalte sind erhalten geblieben, nur eine Ebene tiefer — dort, wo sie
+# hingehören, weil sie nicht am HTTP-Rand entstehen:
+#   * Fachplan fehlt  -> test_curriculum_yaml_import.py::test_ohne_fachplan_klare_meldung
+#   * IK unauflösbar  -> test_curriculum_yaml_import.py::test_unaufloesbare_kompetenz_bricht_nicht_ab
 
 
 class TestCurriculumService:
@@ -432,23 +248,31 @@ class TestCurriculumService:
             },
         )
         
-        await db_session.execute(
-            text("""
-                INSERT INTO subjects (id, name, slug, fach_code)
-                VALUES (1, 'Mathematik', 'mathematik', 'MA')
-                ON CONFLICT DO NOTHING
-            """),
-        )
+        # Keine feste id beanspruchen: `VALUES (1, …) ON CONFLICT DO NOTHING` tat
+        # schlicht nichts, wenn 'mathematik' schon mit anderer id existierte — die
+        # folgenden Knoten liefen dann in eine Fremdschlüsselverletzung. Das trug nur,
+        # solange ein früherer Test im selben Lauf die id 1 zuerst belegte.
+        subject_id = (
+            await db_session.execute(
+                text(
+                    "INSERT INTO subjects (name, slug, fach_code) "
+                    "VALUES ('Mathematik', 'mathematik', 'MA') "
+                    "ON CONFLICT (slug) DO UPDATE SET fach_code = EXCLUDED.fach_code "
+                    "RETURNING id"
+                )
+            )
+        ).fetchone()[0]
         
         for ik_nr in ["3.1.1", "3.1.2", "3.1.3"]:
             await db_session.execute(
                 text("""
                     INSERT INTO context_nodes (id, category, content_type, title, subject_id, status, metadata)
-                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, 1, 'active', CAST(:metadata AS jsonb))
+                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, :subject_id, 'active', CAST(:metadata AS jsonb))
                 """),
                 {
                     "id": str(uuid.uuid4()),
                     "title": f"IK {ik_nr}",
+                    "subject_id": subject_id,
                     "metadata": json.dumps({"nr": ik_nr}),
                 },
             )
@@ -515,23 +339,31 @@ class TestCurriculumService:
             },
         )
         
-        await db_session.execute(
-            text("""
-                INSERT INTO subjects (id, name, slug, fach_code)
-                VALUES (1, 'Mathematik', 'mathematik', 'MA')
-                ON CONFLICT DO NOTHING
-            """),
-        )
+        # Keine feste id beanspruchen: `VALUES (1, …) ON CONFLICT DO NOTHING` tat
+        # schlicht nichts, wenn 'mathematik' schon mit anderer id existierte — die
+        # folgenden Knoten liefen dann in eine Fremdschlüsselverletzung. Das trug nur,
+        # solange ein früherer Test im selben Lauf die id 1 zuerst belegte.
+        subject_id = (
+            await db_session.execute(
+                text(
+                    "INSERT INTO subjects (name, slug, fach_code) "
+                    "VALUES ('Mathematik', 'mathematik', 'MA') "
+                    "ON CONFLICT (slug) DO UPDATE SET fach_code = EXCLUDED.fach_code "
+                    "RETURNING id"
+                )
+            )
+        ).fetchone()[0]
         
         for ik_nr in ["3.1.1", "3.1.2", "3.1.3"]:
             await db_session.execute(
                 text("""
                     INSERT INTO context_nodes (id, category, content_type, title, subject_id, status, metadata)
-                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, 1, 'active', CAST(:metadata AS jsonb))
+                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, :subject_id, 'active', CAST(:metadata AS jsonb))
                 """),
                 {
                     "id": str(uuid.uuid4()),
                     "title": f"IK {ik_nr}",
+                    "subject_id": subject_id,
                     "metadata": json.dumps({"nr": ik_nr}),
                 },
             )
@@ -599,15 +431,31 @@ class TestGetCurriculum:
     ):
         """Test: Curriculum erfolgreich abrufen."""
         known_curriculum_id = "a1b2c3d4-0001-0001-0001-000000000001"
+
+        # Eigenes Fach anlegen statt `subject_id = 1` anzunehmen. Diese Annahme trug
+        # bisher nur, weil die (inzwischen entfernten) Create-Endpunkt-Tests vorher
+        # liefen und dabei ein Fach anlegten — eine Kopplung über die Testreihenfolge,
+        # die niemand sehen konnte.
+        subject_id = (
+            await db_session.execute(
+                text(
+                    "INSERT INTO subjects (slug, name, fach_code) "
+                    "VALUES ('mathematik', 'Mathematik', 'MA') "
+                    "ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name RETURNING id"
+                )
+            )
+        ).fetchone()[0]
+
         # Curriculum erstellen mit bekannter ID
         await db_session.execute(
             text("""
                 INSERT INTO context_nodes (id, category, content_type, title, status, metadata, subject_id, read_scope, write_scope)
-                VALUES (:id, 'knowledge', 'curriculum', 'Test Curriculum', 'active', CAST(:metadata AS jsonb), 1, 'school', 'private')
+                VALUES (:id, 'knowledge', 'curriculum', 'Test Curriculum', 'active', CAST(:metadata AS jsonb), :subject_id, 'school', 'private')
                 ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title
             """),
             {
                 "id": known_curriculum_id,
+                "subject_id": subject_id,
                 "metadata": json.dumps({
                     "fachplan_id": "BP_2016_MA",
                     "bp_version": "2016",
@@ -737,23 +585,31 @@ class TestImportCurriculumCLI:
             },
         )
         
-        await db_session.execute(
-            text("""
-                INSERT INTO subjects (id, name, slug, fach_code)
-                VALUES (1, 'Mathematik', 'mathematik', 'MA')
-                ON CONFLICT DO NOTHING
-            """),
-        )
+        # Keine feste id beanspruchen: `VALUES (1, …) ON CONFLICT DO NOTHING` tat
+        # schlicht nichts, wenn 'mathematik' schon mit anderer id existierte — die
+        # folgenden Knoten liefen dann in eine Fremdschlüsselverletzung. Das trug nur,
+        # solange ein früherer Test im selben Lauf die id 1 zuerst belegte.
+        subject_id = (
+            await db_session.execute(
+                text(
+                    "INSERT INTO subjects (name, slug, fach_code) "
+                    "VALUES ('Mathematik', 'mathematik', 'MA') "
+                    "ON CONFLICT (slug) DO UPDATE SET fach_code = EXCLUDED.fach_code "
+                    "RETURNING id"
+                )
+            )
+        ).fetchone()[0]
         
         for ik_nr in ["3.1.1", "3.1.2", "3.1.3"]:
             await db_session.execute(
                 text("""
                     INSERT INTO context_nodes (id, category, content_type, title, subject_id, status, metadata)
-                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, 1, 'active', CAST(:metadata AS jsonb))
+                    VALUES (:id, 'knowledge', 'ik_kompetenz', :title, :subject_id, 'active', CAST(:metadata AS jsonb))
                 """),
                 {
                     "id": str(uuid.uuid4()),
                     "title": f"IK {ik_nr}",
+                    "subject_id": subject_id,
                     "metadata": json.dumps({"nr": ik_nr}),
                 },
             )

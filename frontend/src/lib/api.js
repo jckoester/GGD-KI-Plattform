@@ -1601,19 +1601,10 @@ export async function getFachplaene() {
     return res.json()
 }
 
-export async function createCurriculumFromDraft(draft) {
-    const res = await fetch(`${BASE}/context/curricula`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
-    })
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new ApiError(res.status, data.detail ?? 'Curriculum konnte nicht gespeichert werden')
-    }
-    return res.json()
-}
+// `createCurriculumFromDraft` stand hier und rief `POST /context/curricula` auf. Beides
+// am 2026-08-08 entfernt: Der Endpunkt committete nicht, wurde von keiner Seite benutzt
+// und doppelte den Admin-Weg über `scripts/import_curriculum.py`. Curricula entstehen in
+// der Oberfläche über `createCurriculum` (→ `/curricula/new`) und den Editor.
 
 /**
  * Lädt ein Curriculum als YAML oder PDF herunter.

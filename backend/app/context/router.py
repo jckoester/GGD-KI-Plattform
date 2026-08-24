@@ -1155,186 +1155,29 @@ async def list_curricula_by_subject(
     return curricula
 
 
-# ── KS-Phase-6 Curriculum Create (Stufe 2) ──────────────────────────────────
-
-@router.post("/curricula", response_model=CurriculumRead, status_code=201)
-async def create_curriculum(
-    payload: CurriculumDraftConfirmed,
-    db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
-):
-    """Speichert ein bestätigtes Curriculum aus dem Zwischenformat (Stufe 2).
-    
-    Nimmt das bestätigte Zwischenformat entgegen und erstellt alle Knoten und Kanten.
-    """
-    from app.context.service import import_curriculum_from_draft
-    
-    try:
-        curriculum_id, stats = await import_curriculum_from_draft(
-            db, payload, user.sub
-        )
-        
-        # Log warnings
-        for warning in stats.warnings:
-            logger.warning(f"Curriculum-Import Warnung: {warning}")
-        
-        # Lade das erstellte Curriculum für die Rückgabe
-        result = await db.execute(
-            sa.select(ContextNode).where(ContextNode.id == curriculum_id)
-        )
-        curriculum = result.scalar_one()
-        
-        # Baue die verschachtelte Struktur (wie in get_curriculum)
-        # Da wir gerade erstellt haben, können wir direkt die IDs verwenden
-        kapitel_list = []
-        for kap in payload.kapitel:
-            # Finde kapitel_id
-            kapitel_import_key = f"{payload.fachplan_id}_{payload.jahrgangsstufe}_kapitel_{kap.reihenfolge}"
-            kap_result = await db.execute(
-                sa.select(ContextNode.id).where(
-                    ContextNode.content_type == "kapitel",
-                    ContextNode.metadata_["import_key"].astext == kapitel_import_key
-                )
-            )
-            kap_id = kap_result.scalar_one_or_none()
-            
-            if not kap_id:
-                continue
-                
-            lernsequenzen_list = []
-            for ls in kap.lernsequenzen:
-                ls_reihenfolge = ls.reihenfolge if ls.reihenfolge is not None else 0
-                ls_import_key = f"{kapitel_import_key}_ls_{ls_reihenfolge}"
-                ls_result = await db.execute(
-                    sa.select(ContextNode).where(
-                        ContextNode.content_type == "lernsequenz",
-                        ContextNode.metadata_["import_key"].astext == ls_import_key
-                    )
-                )
-                ls_node = ls_result.scalar_one_or_none()
-                
-                if not ls_node:
-                    continue
-                
-                # IK-Referenzen laden
-                ik_result = await db.execute(
-                    sa.text("""
-                        SELECT n.id, n.title, e.metadata->>'partiell' as partiell
-                        FROM context_nodes n
-                        JOIN context_edges e ON e.to_node_id = n.id
-                        WHERE e.from_node_id = :ls_id
-                          AND e.relation = 'references'
-                          AND n.content_type = 'ik_kompetenz'
-                          AND n.status = 'active'
-                    """),
-                    {"ls_id": str(ls_node.id)},
-                )
-                ik_refs = [
-                    {"node_id": str(row.id), "title": row.title, "partiell": row.partiell == "true"}
-                    for row in ik_result.mappings().all()
-                ]
-
-                # PK-Referenzen laden
-                pk_result = await db.execute(
-                    sa.text("""
-                        SELECT n.id, n.title
-                        FROM context_nodes n
-                        JOIN context_edges e ON e.to_node_id = n.id
-                        WHERE e.from_node_id = :ls_id
-                          AND e.relation = 'develops'
-                          AND n.content_type = 'pk_kompetenz'
-                          AND n.status = 'active'
-                    """),
-                    {"ls_id": str(ls_node.id)},
-                )
-                pk_refs = [
-                    {"node_id": str(row.id), "title": row.title}
-                    for row in pk_result.mappings().all()
-                ]
-
-                # Leitperspektive-Referenzen laden
-                lp_result = await db.execute(
-                    sa.text("""
-                        SELECT n.id, n.title, n.metadata->>'code' as lp_code
-                        FROM context_nodes n
-                        JOIN context_edges e ON e.to_node_id = n.id
-                        WHERE e.from_node_id = :ls_id
-                          AND e.relation = 'references'
-                          AND n.content_type = 'leitperspektive'
-                          AND n.status = 'active'
-                    """),
-                    {"ls_id": str(ls_node.id)},
-                )
-                leitperspektive_refs = [
-                    {"node_id": str(row.id), "title": row.title, "lp_code": row.lp_code}
-                    for row in lp_result.mappings().all()
-                ]
-                
-                lernsequenzen_list.append({
-                    "id": ls_node.id,
-                    "title": ls_node.title,
-                    "metadata": ls_node.metadata_ or {},
-                    "ik_refs": ik_refs,
-                    "pk_refs": pk_refs,
-                    "leitperspektive_refs": leitperspektive_refs,
-                })
-            
-            kapitel_list.append({
-                "id": kap_id,
-                "title": kap_node.title if 'kap_node' in locals() else kap.titel,
-                "metadata": {},  # Wird unten korrigiert
-                "lernsequenzen": lernsequenzen_list,
-            })
-        
-        # Korrigiere Kapitel-Metadata
-        for kap in payload.kapitel:
-            kapitel_import_key = f"{payload.fachplan_id}_{payload.jahrgangsstufe}_kapitel_{kap.reihenfolge}"
-            kap_result = await db.execute(
-                sa.select(ContextNode).where(
-                    ContextNode.content_type == "kapitel",
-                    ContextNode.metadata_["import_key"].astext == kapitel_import_key
-                )
-            )
-            kap_node = kap_result.scalar_one_or_none()
-            if kap_node:
-                for k in kapitel_list:
-                    if str(k["id"]) == str(kap_node.id):
-                        k["metadata"] = kap_node.metadata_ or {}
-                        k["title"] = kap_node.title
-                        break
-        
-        # Prüfe can_edit
-        department_group_id = curriculum.write_scope_group_id
-        can_edit = False
-        if "admin" in user.roles:
-            can_edit = True
-        elif department_group_id:
-            result = await db.execute(
-                sa.select(1).where(
-                    sa.exists().where(
-                        GroupMembership.group_id == department_group_id,
-                        GroupMembership.pseudonym == user.sub,
-                    )
-                )
-            )
-            can_edit = result.scalar_one_or_none() is not None
-        
-        return {
-            "id": curriculum.id,
-            "title": curriculum.title,
-            "metadata": curriculum.metadata_ or {},
-            "subject_id": curriculum.subject_id,
-            "write_scope_group_id": curriculum.write_scope_group_id,
-            "kapitel": kapitel_list,
-            "can_edit": can_edit,
-        }
-        
-    except ValueError as e:
-        logger.error(f"Validierungsfehler beim Curriculum-Import: {e}")
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        logger.error(f"Fehler beim Curriculum-Import: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# ── Curriculum aus vollständigem Entwurf anlegen: ENTFERNT ──────────────────
+#
+# Hier stand `POST /curricula` (`create_curriculum`). Entfernt am 2026-08-08, weil der
+# Endpunkt drei Eigenschaften auf einmal hatte:
+#
+#  * **Er schrieb nichts.** Weder er noch `import_curriculum_from_draft` noch `get_db`
+#    haben committet — die Session wurde ohne Commit geschlossen, also verworfen. Der
+#    Aufrufer bekam eine 201 mit vollständigem Curriculum zurück, in der Datenbank stand
+#    nichts.
+#  * **Ihn rief niemand auf.** `createCurriculumFromDraft` in `api.js` gab es zwar, aber
+#    keine Seite benutzte sie, und kein Test deckte den Endpunkt ab. Deshalb ist das nie
+#    aufgefallen.
+#  * **Es gab ihn doppelt.** Denselben Weg — vollständiger Entwurf rein, Curriculum raus —
+#    geht `scripts/import_curriculum.py`, bewusst als Admin-Vorgang auf der Kommandozeile
+#    (`docs/runbooks/curriculum-transfer.md`).
+#
+# Ein Commit nachzureichen hätte einen ungenutzten Schreibpfad tief in den Wissensgraph
+# wiederbelebt, den jede Lehrkraft hätte aufrufen können. Wird ein Import über die
+# Oberfläche gewünscht, gehört er neu entworfen — mit Vorschau, Rechteprüfung und
+# Konfliktanzeige —, nicht aus diesem Stumpf wiederhergestellt.
+#
+# Unberührt: `POST /curricula/new` (leeres Curriculum) und danach der Editor — der Weg,
+# den die Oberfläche tatsächlich geht.
 
 
 # ── KS-Phase-6 Edge CRUD Endpoints ──────────────────────────────────────
