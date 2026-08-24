@@ -14,7 +14,16 @@ Modi:
       # PDF-URL/Suffix kommen aus config/subjects.yaml (Feld bildungsplan_pdf_url);
       # --source überschreibt die Quelle, --structure-json überspringt den LLM-Aufruf.
 
-Ausgabe standardmäßig nach scripts/pdf_import/output/ (gitignored, E1).
+Ausgabe, getrennt nach Zweck:
+
+* **JSONL** → ``scripts/scraper/output/`` (``--jsonl-dir``). Bewusst dasselbe Verzeichnis
+  wie beim HTML-Scraper: Ein Voll-Import läuft über **ein** Verzeichnis, und PDF-Fächer
+  lagen früher woanders. Sie fehlten dadurch in jedem Voll-Import — und wurden von der
+  Archivierung wie entfernte Knoten behandelt (Englisch und Französisch waren so über
+  Wochen vollständig stillgelegt).
+* **Review-Report und Struktur-JSON** → ``scripts/pdf_import/output/`` (``--output-dir``).
+  Arbeitsmaterial: Der Report ist zum Gegenlesen, die Struktur erspart bei einem erneuten
+  Lauf den LLM-Aufruf (``--structure-json``). Beides gehört nicht in die Importablage.
 """
 import argparse
 import json
@@ -55,13 +64,15 @@ def _run_lfdb(args) -> None:
     nodes = build_lfdb_nodes(structure, source_url=args.source)
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    write_jsonl(nodes, out / "lfdb.jsonl")
+    jsonl_dir = Path(args.jsonl_dir)
+    jsonl_dir.mkdir(parents=True, exist_ok=True)
+    write_jsonl(nodes, jsonl_dir / "lfdb.jsonl")
     (out / "lfdb_report.md").write_text(render_lfdb_report(structure), encoding="utf-8")
     (out / "lfdb_struktur.json").write_text(
         json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(
-        f"{len(nodes)} Knoten → {out / 'lfdb.jsonl'}\n"
+        f"{len(nodes)} Knoten → {jsonl_dir / 'lfdb.jsonl'}\n"
         f"Review-Report → {out / 'lfdb_report.md'}\n"
         f"Struktur (für Re-Runs) → {out / 'lfdb_struktur.json'}",
         file=sys.stderr,
@@ -109,14 +120,16 @@ def _run_fremdsprache(args) -> None:
     )
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    jsonl_dir = Path(args.jsonl_dir)
+    jsonl_dir.mkdir(parents=True, exist_ok=True)
     label = f"{fach_code}{suffix or ''}".replace(".", "_")   # z. B. E1_V2
-    write_jsonl(nodes, out / f"{label}.jsonl")
+    write_jsonl(nodes, jsonl_dir / f"{label}.jsonl")
     (out / f"{label}_report.md").write_text(render_fremdsprache_report(structure), encoding="utf-8")
     (out / f"{label}_struktur.json").write_text(
         json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(
-        f"{len(nodes)} Knoten → {out / f'{label}.jsonl'}\n"
+        f"{len(nodes)} Knoten → {jsonl_dir / f'{label}.jsonl'}\n"
         f"Review-Report → {out / f'{label}_report.md'}\n"
         f"Struktur (für Re-Runs) → {out / f'{label}_struktur.json'}",
         file=sys.stderr,
@@ -140,7 +153,14 @@ def main() -> None:
                         help="Vor-extrahierte Struktur (überspringt den LLM-Aufruf)")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="LLM-Modell für die Extraktion")
     parser.add_argument("--output-dir", default="scripts/pdf_import/output",
-                        help="Ausgabeverzeichnis (JSONL/Report/Struktur)")
+                        help="Arbeitsmaterial: Review-Report und Struktur-JSON (für Re-Runs)")
+    parser.add_argument("--jsonl-dir", default="scripts/scraper/output",
+                        help=(
+                            "Wohin die importierbare JSONL. Vorgabe ist das Verzeichnis "
+                            "des Scrapers, damit EIN Voll-Import alle Fächer erfasst — "
+                            "PDF-Fächer lagen früher woanders und wurden dadurch beim "
+                            "Import übersehen (und archiviert)."
+                        ))
     args = parser.parse_args()
 
     try:

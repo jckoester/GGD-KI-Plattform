@@ -166,7 +166,8 @@ ist deterministisch.
 ### LFDB
 
 ```bash
-# 1) Extraktion (LLM) → JSONL/Report/Struktur nach scripts/pdf_import/output/
+# 1) Extraktion (LLM) → JSONL nach scripts/scraper/output/,
+#    Report + Struktur nach scripts/pdf_import/output/
 python -m scripts.pdf_import --lfdb \
   --source "https://.../LeitfadenDemokratiebildung/BP2016BW_ALLG_LFDB_20190712.pdf" \
   --pages "24-33"
@@ -175,9 +176,9 @@ python -m scripts.pdf_import --lfdb \
 
 # 3) Import mit dieser Datei (wie Schritt 4/5, aber --input auf die JSONL):
 python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
-  --input scripts/pdf_import/output/lfdb.jsonl --db-url $DATABASE_URL --dry-run
+  --input scripts/scraper/output/lfdb.jsonl --db-url $DATABASE_URL --dry-run
 python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
-  --input scripts/pdf_import/output/lfdb.jsonl --db-url $DATABASE_URL
+  --input scripts/scraper/output/lfdb.jsonl --db-url $DATABASE_URL
 ```
 
 Erzeugt 3 content_types: `lfdb_baustein` → `lfdb_themenblock` → `lfdb_kompetenz`
@@ -218,14 +219,25 @@ python -m scripts.pdf_import --fremdsprache --fach E1 --subjects config/subjects
 
 # 3) Import (wie Schritt 4/5):
 python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
-  --input scripts/pdf_import/output/E1_V2.jsonl --db-url $DATABASE_URL --dry-run
+  --input scripts/scraper/output/E1_V2.jsonl --db-url $DATABASE_URL --dry-run
 python scripts/import_bildungsplan.py --subjects config/subjects.yaml \
-  --input scripts/pdf_import/output/E1_V2.jsonl --db-url $DATABASE_URL
+  --input scripts/scraper/output/E1_V2.jsonl --db-url $DATABASE_URL
 ```
 
 Französisch analog mit `--fach F2` (→ `F2_V2.jsonl`). Re-Assemblierung **ohne**
 LLM aus der gespeicherten Struktur:
 `--structure-json scripts/pdf_import/output/E1_V2_struktur.json`.
+
+> **Warum die JSONL im Scraper-Verzeichnis landet.** Ein Voll-Import läuft über **ein**
+> Verzeichnis. Solange die PDF-Fächer woanders lagen, fehlten sie in jedem Voll-Import —
+> und die Archivierung behandelte sie wie entfernte Knoten. Englisch und Französisch waren
+> dadurch über Wochen vollständig stillgelegt (959 Knoten), ohne dass es auffiel.
+> Seit 08.08.2026 schreibt der PDF-Import die JSONL nach `scripts/scraper/output/`
+> (`--jsonl-dir`), Report und Struktur bleiben als Arbeitsmaterial in
+> `scripts/pdf_import/output/` (`--output-dir`).
+>
+> Ein Schritt-4/5-Voll-Import erfasst damit **alle** Fächer; die Einzelaufrufe oben bleiben
+> für den gezielten Import nach einer Extraktion.
 Anschließend Embeddings (Schritt 6) und ggf. HNSW-Rebuild (Schritt 7) wie üblich.
 
 ---

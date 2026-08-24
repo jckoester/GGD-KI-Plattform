@@ -829,11 +829,18 @@ def run_import(
                 conn.rollback()
                 logger.info("[DRY RUN] — keine Aenderungen geschrieben")
 
-        # Zusammenfassung
+        # Zusammenfassung.
+        #
+        # „im Archiv" statt „archiviert": Die Zahl umfasst überwiegend Knoten, die schon
+        # vorher archiviert waren. Liegt ein Fach auf `.V2`, stehen seine Basis-Dateien
+        # weiterhin im Verzeichnis — `upsert_node` reaktiviert sie, direkt danach legt sie
+        # `archive_superseded_nodes` wieder ab. Netto ändert sich nichts; „1368 archiviert"
+        # las sich aber wie eine Stilllegung. Der Trockenlauf zeigt hier ohnehin 0, weil
+        # ohne Reaktivierung nichts zu archivieren ist.
         logger.info(
             f"{'[DRY RUN] ' if dry_run else ''}"
             f"{stats['inserted']} insertiert, {stats['updated']} aktualisiert, "
-            f"{stats['skipped']} unveraendert, {stats['archived']} archiviert, "
+            f"{stats['skipped']} unveraendert, {stats['archived']} im Archiv, "
             f"{stats['edges']} Kanten, {len(warnings)} Warnungen"
         )
 
