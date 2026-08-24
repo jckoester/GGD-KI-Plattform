@@ -278,6 +278,57 @@ async def resolve_fachplan(
     return None
 
 
+async def fachplan_diagnose(
+    db: AsyncSession, subject_id: int | None, bp_version: str | None
+) -> str:
+    """Beschreibt, **warum** kein Fachplan gefunden wurde — für die Fehlermeldung.
+
+    Die frühere Meldung fragte pauschal „Ist der Bildungsplan dieses Fachs importiert?"
+    und schickte damit in die falsche Richtung: Der häufigste Fall ist, dass der Plan sehr
+    wohl da ist, aber in einer **anderen Edition** aktiv — oder dass genau die gesuchte
+    Edition **archiviert** wurde, weil später eine andere importiert wurde. Beides sieht
+    man der Datenbank sofort an; man muss es nur sagen.
+    """
+    if subject_id is None:
+        return "Das Fach ist in dieser Instanz nicht angelegt."
+
+    rows = (
+        await db.execute(
+            sa.select(
+                ContextNode.metadata_["bp_version"].astext, ContextNode.status
+            ).where(
+                ContextNode.content_type == "fachplan",
+                ContextNode.subject_id == subject_id,
+            )
+        )
+    ).all()
+
+    if not rows:
+        return (
+            "Für dieses Fach ist überhaupt kein Bildungsplan importiert "
+            "(siehe docs/runbooks/bildungsplan-import.md)."
+        )
+
+    aktiv = sorted({v for v, s in rows if s == "active" and v})
+    archiviert = sorted({v for v, s in rows if s != "active" and v})
+
+    if bp_version and bp_version in archiviert:
+        return (
+            f"Die Edition '{bp_version}' ist in dieser Instanz vorhanden, aber "
+            f"**archiviert** — vermutlich, weil danach eine andere Edition importiert "
+            f"wurde. Aktiv ist derzeit: {', '.join(aktiv) or '(keine)'}. Entweder die "
+            f"passende Edition importieren (`bildungsplan_suffix` in subjects.yaml prüfen) "
+            f"oder den Import mit der aktiven Edition erzwingen."
+        )
+
+    return (
+        f"Für dieses Fach ist die Edition '{bp_version}' nicht aktiv. "
+        f"Aktiv ist: {', '.join(aktiv) or '(keine)'}"
+        + (f"; archiviert: {', '.join(archiviert)}" if archiviert else "")
+        + "."
+    )
+
+
 async def get_subject_department_group_id(db: AsyncSession, subject_id: int) -> int | None:
     """Lädt eine Fachschafts-Gruppen-ID für ein Fach (deterministisch: kleinste id).
 
@@ -889,12 +940,13 @@ async def import_curriculum_from_draft(
         bp_version=payload.bp_version,
     )
     if not fachplan:
+        diagnose = await fachplan_diagnose(db, subject_id, payload.bp_version)
         raise ValueError(
             f"Kein Fachplan für Fach '{payload.fach_code}' und Edition "
             f"'{payload.bp_version}' gefunden"
             + (f" (bp_id '{payload.bp_id}')" if payload.bp_id else "")
             + (f" (fachplan_id '{payload.fachplan_id}')" if payload.fachplan_id else "")
-            + ". Ist der Bildungsplan dieses Fachs in dieser Instanz importiert?"
+            + f". {diagnose}"
         )
     fachplan_id = fachplan.id
 
@@ -1042,15 +1094,32 @@ async def import_curriculum_from_draft(
                 hinweise_raw = entry.hinweise or ""
                 hinweise_uuid = await hinweise_code_to_uuid(hinweise_raw, db, stats.warnings, ls_label)
 
-                # LP-Kanten aus UUID-Token
-                for uid_str in re.findall(r'@\[[^\]]*\]\(lp:([0-9a-f-]{36})\)', hinweise_uuid):
-                    resolved_edges.append((None, UUID(uid_str), "references", {}))
-                # LPA-Kanten
-                for uid_str in re.findall(r'@\[[^\]]*\]\(lpa:([0-9a-f-]{36})\)', hinweise_uuid):
-                    resolved_edges.append((None, UUID(uid_str), "references", {}))
-                # Cross-IK-Kanten
-                for uid_str in re.findall(r'#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)', hinweise_uuid):
-                    resolved_edges.append((None, UUID(uid_str), "references", {}))
+                # Kanten aus UUID-Token (LP, LP-Aspekt, Cross-Fach-IK).
+                #
+                # ⚠️ Die UUIDs stammen aus dem Text und können auf Knoten einer **anderen
+                # Instanz** zeigen: Beim Export bleibt ein Token als rohe UUID stehen,
+                # wenn der Zielknoten keinen Code trägt. Ungeprüft eingefügt, brach der
+                # Fremdschlüssel und riss den **gesamten** Import mit — ein einzelner
+                # Verweis machte das ganze Curriculum unimportierbar. Deshalb wird die
+                # Existenz vorher geprüft und der Fall wie eine unauflösbare Nummer
+                # behandelt: melden, überspringen, weitermachen.
+                for muster, art in (
+                    (r'@\[[^\]]*\]\(lp:([0-9a-f-]{36})\)', "LP"),
+                    (r'@\[[^\]]*\]\(lpa:([0-9a-f-]{36})\)', "LP-Aspekt"),
+                    (r'#\[[^\]]*\]\(ik:([0-9a-f-]{36})\)', "Cross-Fach-IK"),
+                ):
+                    for uid_str in re.findall(muster, hinweise_uuid):
+                        ziel = UUID(uid_str)
+                        if await db.get(ContextNode, ziel) is None:
+                            w = (
+                                f"{art}-Verweis {uid_str} zeigt auf einen Knoten, den es "
+                                f"in dieser Instanz nicht gibt (LS {ls_label}) — "
+                                f"übersprungen."
+                            )
+                            if w not in stats.warnings:
+                                stats.warnings.append(w)
+                            continue
+                        resolved_edges.append((None, ziel, "references", {}))
 
                 # Legacy lp-Liste (dedupliziert mit Token-Kanten)
                 for lp_code in (entry.lp or []):

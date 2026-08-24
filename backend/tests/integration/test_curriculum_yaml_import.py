@@ -156,14 +156,19 @@ async def test_mehrdeutige_edition_liefert_keinen_treffer(db, welt):
 
 
 async def test_ohne_fachplan_klare_meldung(db, welt):
-    """Die alte Meldung nannte `fachplan_id` — ein Feld, das der Export gar nicht füllt."""
+    """Die Meldung muss handlungsfähig machen, nicht nur „nicht gefunden" sagen.
+
+    Frühere Fassungen nannten `fachplan_id` (ein Feld, das der Export nicht füllt) und
+    fragten pauschal, ob der Bildungsplan importiert sei. Jetzt nennt sie, welche Edition
+    **tatsächlich aktiv** ist — daraus ergibt sich der nächste Schritt von selbst.
+    """
     with pytest.raises(ValueError) as fehler:
         await import_curriculum_from_draft(
             db, _draft(bp_id="GIBTESNICHT", bp_version="9999"), "system"
         )
     text = str(fehler.value)
     assert "CH" in text and "9999" in text
-    assert "importiert" in text
+    assert BP_VERSION in text, "Die vorhandene, aktive Edition muss genannt werden"
 
 
 # ── Import ohne fachplan_id ──────────────────────────────────────────────────
@@ -248,6 +253,54 @@ async def test_roundtrip_ueber_yaml_datei(db, welt):
     cid2, stats = await import_curriculum_from_draft(db, draft, "system")
     assert cid2 == cid
     assert stats.warnings == []
+
+
+async def test_archivierte_edition_wird_benannt(db, welt):
+    """Der Fall aus dem ersten Produktiv-Export (24.08.2026).
+
+    Die Zielinstanz hatte den Plan der gesuchten Edition sehr wohl — nur **archiviert**,
+    weil danach eine andere importiert worden war. Die alte Meldung fragte pauschal „Ist
+    der Bildungsplan importiert?" und schickte damit in die falsche Richtung.
+    """
+    db.add(
+        ContextNode(
+            id=uuid.uuid4(), category="knowledge", content_type="fachplan",
+            title="Chemie (alte Edition)", status="archived", owner_pseudonym="system",
+            read_scope="global", write_scope="school", subject_id=welt["subject_id"],
+            metadata_={"bp_id": BP_ID + ".ALT", "bp_version": "2016"},
+        )
+    )
+    await db.flush()
+
+    with pytest.raises(ValueError) as fehler:
+        await import_curriculum_from_draft(
+            db, _draft(bp_id=None, bp_version="2016"), "system"
+        )
+
+    text = str(fehler.value)
+    assert "archiviert" in text
+    assert BP_VERSION in text, "Die aktive Edition muss genannt werden"
+
+
+async def test_verweis_auf_fremden_knoten_bricht_den_import_nicht_ab(db, welt):
+    """Ein einzelner Verweis machte das ganze Curriculum unimportierbar.
+
+    Bleibt beim Export ein Token als rohe UUID stehen (Zielknoten ohne Code), zeigt es in
+    der Zielinstanz ins Leere. Ungeprüft eingefügt brach der Fremdschlüssel — und riss
+    den **gesamten** Import mit, statt nur diesen Verweis zu verlieren. Am echten
+    Produktiv-Export aufgefallen.
+    """
+    fremd = uuid.uuid4()
+    draft = _draft()
+    draft.kapitel[0].lernsequenzen[0].eintraege[0].hinweise = (
+        f"Siehe #[Physik](ik:{fremd}) und @[BNE](lp:{uuid.uuid4()})"
+    )
+
+    cid, stats = await import_curriculum_from_draft(db, draft, "system")
+
+    assert cid is not None, "Der Import muss durchlaufen"
+    assert any(str(fremd) in w for w in stats.warnings)
+    assert all("übersprungen" in w for w in stats.warnings if str(fremd) in w)
 
 
 async def test_kompetenzen_werden_ueber_kompetenz_nr_gefunden(db, welt):

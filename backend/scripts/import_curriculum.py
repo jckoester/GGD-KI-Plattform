@@ -60,8 +60,16 @@ def load_yaml_file(file_path: str) -> dict:
     return data
 
 
-def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
-    """Konvertiert YAML-Daten in das CurriculumDraftConfirmed-Format."""
+def convert_yaml_to_draft(data: dict, bp_version_override: str | None = None) -> CurriculumDraftConfirmed:
+    """Konvertiert YAML-Daten in das CurriculumDraftConfirmed-Format.
+
+    `bp_version_override` setzt die Bildungsplan-Edition aus der Datei außer Kraft. Nötig,
+    wenn Quell- und Zielinstanz **verschiedene Editionen aktiv** haben — etwa beim
+    Einspielen eines Produktiv-Exports (V2) in eine Dev-Instanz, in der die Basisedition
+    aktiv ist. Bewusst ein ausdrücklicher Schalter und keine automatische Rückfallebene:
+    Kompetenznummern können sich zwischen Editionen unterscheiden, das Ergebnis muss also
+    jemand verantworten und die gemeldeten offenen Verweise ansehen.
+    """
     # Validierung der Pflichtfelder.
     # `fachplan_id` steht bewusst NICHT mehr darin: Exporte echter Curricula schreiben
     # dort `null`, weil gescrapte Fachplan-Knoten `bp_id` tragen statt `fachplan_id`.
@@ -120,8 +128,11 @@ def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
         schulart=data["schulart"],
         jahrgangsstufe=str(data["jahrgangsstufe"]),
         fachplan_id=data.get("fachplan_id") or None,
-        bp_id=data.get("bp_id") or None,
-        bp_version=data["bp_version"],
+        # Wird die Edition überschrieben, darf die bp_id NICHT mitgehen: Sie zeigt auf
+        # den Fachplan der ursprünglichen Edition und würde die Überschreibung wieder
+        # aushebeln (bp_id wird vor Fach+Edition ausgewertet).
+        bp_id=None if bp_version_override else (data.get("bp_id") or None),
+        bp_version=bp_version_override or data["bp_version"],
         vorwort=data.get("vorwort"),
         kapitel=kapitel_list,
     )
@@ -131,12 +142,13 @@ async def import_single_curriculum(
     db_session: AsyncSession,
     yaml_data: dict,
     owner_pseudonym: str = "system",
+    bp_version_override: str | None = None,
 ) -> tuple[str, int]:
     """Importiert ein einzelnes Curriculum.
     
     Rückgabe: (curriculum_import_key, node_count)
     """
-    draft = convert_yaml_to_draft(yaml_data)
+    draft = convert_yaml_to_draft(yaml_data, bp_version_override)
     curriculum_id, stats = await import_curriculum_from_draft(db_session, draft, owner_pseudonym)
 
     total_nodes = stats.curriculum_count + stats.kapitel_count + stats.lernsequenz_count
@@ -192,7 +204,7 @@ async def main(args: argparse.Namespace) -> int:
             try:
                 yaml_data = load_yaml_file(yaml_file)
                 import_key, node_count, stats = await import_single_curriculum(
-                    db, yaml_data, args.owner or "system"
+                    db, yaml_data, args.owner or "system", args.bp_version
                 )
                 total_curricula += 1
                 total_nodes += node_count
@@ -286,6 +298,18 @@ Umgebungsvariablen:
         "--continue-on-error",
         action="store_true",
         help="Fährt mit dem nächsten Import fort, falls ein Fehler auftritt",
+    )
+
+    parser.add_argument(
+        "--bp-version",
+        type=str,
+        default=None,
+        help=(
+            "Bildungsplan-Edition aus der Datei überschreiben (z. B. '2016'). "
+            "Für den Fall, dass Quell- und Zielinstanz verschiedene Editionen aktiv "
+            "haben. Die gemeldeten offenen Kompetenzverweise danach unbedingt ansehen — "
+            "Nummern können sich zwischen Editionen unterscheiden."
+        ),
     )
 
     parser.add_argument(

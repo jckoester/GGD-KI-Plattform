@@ -79,6 +79,31 @@ docker compose exec backend python -m scripts.import_curriculum \
 | `--directory` | Alle `.yaml`/`.yml` eines Verzeichnisses |
 | `--continue-on-error` | Nach einem Fehlschlag mit der nächsten Datei weitermachen (ohne ihn bricht der Lauf ab) |
 | `--owner` | Besitzer-Pseudonym der Knoten (Vorgabe `system`) |
+| `--bp-version` | Bildungsplan-Edition aus der Datei überschreiben — siehe unten |
+
+### Wenn die Editionen nicht zusammenpassen
+
+Häufigster Stolperstein beim Einspielen eines Produktiv-Exports in eine Testinstanz:
+
+```
+Kein Fachplan für Fach 'M' und Edition '2016.V2' gefunden. Die Edition '2016.V2' ist in
+dieser Instanz vorhanden, aber **archiviert** — vermutlich, weil danach eine andere
+Edition importiert wurde. Aktiv ist derzeit: 2016.
+```
+
+Die Meldung nennt beides: was die Datei verlangt und was die Instanz aktiv führt. Zwei
+Wege:
+
+1. **Sauber:** Die passende Edition in der Zielinstanz importieren
+   (`bildungsplan_suffix` in `subjects.yaml` prüfen, dann
+   [Bildungsplan-Import](bildungsplan-import.md)). Danach greift der Curriculum-Import
+   ohne Zutun.
+2. **Schnell:** Mit der aktiven Edition erzwingen —
+   `--bp-version 2016`. Das ist für Test- und Entwicklungsinstanzen gedacht.
+
+> ⚠️ **Bei `--bp-version` die Warnungen lesen.** Kompetenznummern können sich zwischen
+> Editionen unterscheiden; was nicht passt, bleibt unverknüpft und wird gemeldet. Für ein
+> Produktivsystem ist Weg 1 der richtige.
 
 Jede Datei wird **einzeln** festgeschrieben. Scheitert die dritte von fünf, bleiben die
 ersten beiden importiert.
@@ -106,6 +131,7 @@ Darüber steht je Fall eine Zeile:
 | `IK 3.2.2.1(1) nicht gefunden für LS …` | Die inhaltsbezogene Kompetenz gibt es in dieser Instanz nicht — meist eine andere Bildungsplan-Edition |
 | `PK 2.2.5 nicht gefunden für LS …` | dasselbe für prozessbezogene Kompetenzen |
 | `LP '…-…-…' nicht gefunden in …` | Ein Leitperspektiven-Verweis, der schon im Export nicht als Code aufgelöst werden konnte (siehe Grenzen unten) |
+| `Cross-Fach-IK-Verweis … zeigt auf einen Knoten, den es in dieser Instanz nicht gibt` | Ein Verweis aus den Hinweisen auf ein **anderes Fach**. Er steht als Knoten-ID im Text und lässt sich zwischen Instanzen nicht übersetzen — der Verweis entfällt, der Text bleibt |
 
 **Null Warnungen sind das Ziel, aber kein Muss.** Für eine Testinstanz ist ein Curriculum
 mit ein paar fehlenden Verweisen brauchbar; nur sollte man wissen, welche fehlen — sonst
