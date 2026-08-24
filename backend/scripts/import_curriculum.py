@@ -29,12 +29,19 @@ from sqlalchemy.orm import sessionmaker
 
 from app.context.schemas import CurriculumDraftConfirmed, CurriculumDraftKapitel, CurriculumDraftLernsequenz, CurriculumDraftEntry
 from app.context.service import import_curriculum_from_draft
+from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
 
 
-async def create_db_session(db_url: str) -> AsyncSession:
-    """Erstellt eine asynchrone DB-Session."""
+def create_db_session(db_url: str) -> AsyncSession:
+    """Erstellt eine asynchrone DB-Session.
+
+    Bewusst **nicht** `async def`: Die Funktion wird als `async with create_db_session(...)`
+    verwendet. Als Coroutine ergab das `'coroutine' object does not support the
+    asynchronous context manager protocol` — das Skript brach beim Start ab, noch bevor es
+    eine Datei ansah.
+    """
     engine = create_async_engine(db_url, echo=False)
     AsyncTestingSession = sessionmaker(
         engine, expire_on_commit=False, class_=AsyncSession
@@ -55,8 +62,11 @@ def load_yaml_file(file_path: str) -> dict:
 
 def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
     """Konvertiert YAML-Daten in das CurriculumDraftConfirmed-Format."""
-    # Validierung der Pflichtfelder
-    required_fields = ["schule", "fach_code", "schulart", "jahrgangsstufe", "fachplan_id", "bp_version"]
+    # Validierung der Pflichtfelder.
+    # `fachplan_id` steht bewusst NICHT mehr darin: Exporte echter Curricula schreiben
+    # dort `null`, weil gescrapte Fachplan-Knoten `bp_id` tragen statt `fachplan_id`.
+    # Verlangt wurde damit ein Feld, das die eigene Exportfunktion nicht füllen kann.
+    required_fields = ["schule", "fach_code", "schulart", "jahrgangsstufe", "bp_version"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ValueError(f"Fehlende Pflichtfelder im YAML: {', '.join(missing)}")
@@ -93,7 +103,10 @@ def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
         kapitel = CurriculumDraftKapitel(
             titel=kap_data["titel"],
             reihenfolge=kap_data["reihenfolge"],
-            std=kap_data.get("std"),
+            # YAML liefert `std: 4` als int zurück, das Zwischenformat erwartet Text.
+            # Bei den Lernsequenzen wurde schon gecastet, bei den Kapiteln nicht — der
+            # Wiederimport eines echten Exports scheiterte daran an der Validierung.
+            std=str(kap_data["std"]) if kap_data.get("std") is not None else None,
             hinweis=kap_data.get("hinweis"),
             konkretisierung=kap_data.get("konkretisierung", []),
             lernsequenzen=lernsequenzen,
@@ -105,8 +118,9 @@ def convert_yaml_to_draft(data: dict) -> CurriculumDraftConfirmed:
         fach_code=data["fach_code"],
         fach=data.get("fach"),
         schulart=data["schulart"],
-        jahrgangsstufe=data["jahrgangsstufe"],
-        fachplan_id=data["fachplan_id"],
+        jahrgangsstufe=str(data["jahrgangsstufe"]),
+        fachplan_id=data.get("fachplan_id") or None,
+        bp_id=data.get("bp_id") or None,
         bp_version=data["bp_version"],
         vorwort=data.get("vorwort"),
         kapitel=kapitel_list,
@@ -124,12 +138,15 @@ async def import_single_curriculum(
     """
     draft = convert_yaml_to_draft(yaml_data)
     curriculum_id, stats = await import_curriculum_from_draft(db_session, draft, owner_pseudonym)
-    
+
     total_nodes = stats.curriculum_count + stats.kapitel_count + stats.lernsequenz_count
-    
-    import_key = f"{draft.fachplan_id}_{draft.jahrgangsstufe}"
-    
-    return import_key, total_nodes
+
+    # Den **tatsächlich vergebenen** Schlüssel melden statt ihn nachzubauen: Er hängt
+    # davon ab, wie der Fachplan aufgelöst wurde (fachplan_id, sonst bp_id).
+    node = await db_session.get(ContextNode, curriculum_id)
+    import_key = (node.metadata_ or {}).get("import_key", "?") if node else "?"
+
+    return import_key, total_nodes, stats
 
 
 async def main(args: argparse.Namespace) -> int:
@@ -169,33 +186,58 @@ async def main(args: argparse.Namespace) -> int:
         total_nodes = 0
         errors = 0
         
+        offene_verweise = 0
         for yaml_file in yaml_files:
             logger.info(f"Verarbeite {yaml_file}...")
             try:
                 yaml_data = load_yaml_file(yaml_file)
-                import_key, node_count = await import_single_curriculum(
+                import_key, node_count, stats = await import_single_curriculum(
                     db, yaml_data, args.owner or "system"
                 )
                 total_curricula += 1
                 total_nodes += node_count
                 logger.info(f"  ✓ Importiert: {node_count} Knoten (Import-Key: {import_key})")
-                
-                # Warnungen ausgeben
-                if "warnings" in yaml_data:
-                    for warning in yaml_data["warnings"]:
-                        logger.warning(f"  ⚠ {warning}")
-                
+
+                # Warnungen des Imports ausgeben — NICHT die des YAML.
+                # Hier stehen die nicht auflösbaren Kompetenzverweise: In einer
+                # Ziel-Instanz mit anderem oder fehlendem Bildungsplan werden sie
+                # übersprungen, das Curriculum wird trotzdem angelegt. Ohne diese
+                # Ausgabe verschwänden sie lautlos — das Curriculum sähe vollständig
+                # aus und wäre es nicht.
+                for warnung in stats.warnings:
+                    logger.warning(f"  ⚠ {warnung}")
+                offene_verweise += len(stats.warnings)
+
+                # Je Datei festschreiben. Ohne dieses Commit schrieb das Skript nichts:
+                # `import_curriculum_from_draft` flusht nur, und die Session wird ohne
+                # Commit geschlossen — also verworfen. Je Datei statt am Ende, damit ein
+                # später scheiterndes Curriculum die zuvor gelungenen nicht mitreißt.
+                if args.dry_run:
+                    await db.rollback()
+                else:
+                    await db.commit()
+
             except Exception as e:
                 logger.error(f"  ✗ Fehler bei {yaml_file}: {e}")
+                await db.rollback()
                 errors += 1
                 if not args.continue_on_error:
                     logger.error("Abbruch wegen Fehlers (--continue-on-error zum Fortsetzen)")
                     return 1
-        
-        logger.info(f"\nFertig: {total_curricula} Curricula importiert, {total_nodes} Knoten erstellt")
+
+        was = "geprüft (nichts geschrieben)" if args.dry_run else "importiert"
+        logger.info(
+            f"\nFertig: {total_curricula} Curricula {was}, {total_nodes} Knoten"
+        )
+        if offene_verweise:
+            logger.warning(
+                f"  {offene_verweise} Kompetenzverweis(e) konnten nicht aufgelöst werden — "
+                f"die betroffenen Stellen bleiben ohne Verknüpfung. "
+                f"Fehlt der Bildungsplan dieses Fachs in dieser Instanz?"
+            )
         if errors > 0:
             logger.warning(f"  ({errors} Fehler aufgetreten)")
-        
+
         return 0 if errors == 0 else 1
 
 
@@ -244,6 +286,15 @@ Umgebungsvariablen:
         "--continue-on-error",
         action="store_true",
         help="Fährt mit dem nächsten Import fort, falls ein Fehler auftritt",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Nur prüfen: Auflösung und Warnungen melden, am Ende zurückrollen. "
+            "Empfehlenswert vor dem ersten Import in eine fremde Instanz."
+        ),
     )
     
     parser.add_argument(

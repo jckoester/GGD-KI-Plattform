@@ -269,7 +269,14 @@ class CurriculumDraftConfirmed(BaseModel):
     fach: str | None = None
     schulart: str
     jahrgangsstufe: str
-    fachplan_id: str
+    # Geschäftsschlüssel des Fachplans. In der Praxis **leer**: Vom Scraper importierte
+    # Fachplan-Knoten tragen `bp_id`, nicht `fachplan_id` (geprüft: alle 28 Knoten der
+    # Dev-Instanz). Deshalb optional — die Auflösung greift auf `bp_id` bzw. auf
+    # Fach + Edition zurück, siehe `resolve_fachplan`.
+    fachplan_id: str | None = None
+    # `bp_id` des Fachplans (z. B. `BP2016BW_ALLG_GYM_CH.V2`) — der belastbare
+    # Bezeichner beim Übertragen zwischen Instanzen.
+    bp_id: str | None = None
     bp_version: str
     vorwort: str | None = None
     kapitel: list[CurriculumDraftKapitel]

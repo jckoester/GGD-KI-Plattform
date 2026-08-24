@@ -365,6 +365,11 @@ git commit -m "chore: scraper_state.json nach Bildungsplan-Import aktualisiert"
 
 ---
 
+> **Curricula in eine andere Instanz übertragen** (promptLab, Dev) — dafür gibt es einen
+> eigenen Weg: [Curricula übertragen](curriculum-transfer.md). Dieser Bildungsplan-Import
+> hier ist die **Voraussetzung** dafür: Ohne den Plan des Fachs lassen sich die
+> Kompetenzverweise eines Curriculums in der Zielinstanz nicht auflösen.
+
 ## Nach Editions-Wechsel: Curricula aktualisieren (Lehrkraft-Aufgabe)
 
 Wird ein Fach durch Re-Import auf eine neue BP-Edition umgestellt, werden die alten

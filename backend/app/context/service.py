@@ -214,6 +214,70 @@ async def get_fachplan_node(db: AsyncSession, fachplan_id: str) -> ContextNode |
     return result.scalars().first()
 
 
+async def resolve_fachplan(
+    db: AsyncSession,
+    *,
+    fachplan_id: str | None = None,
+    bp_id: str | None = None,
+    subject_id: int | None = None,
+    bp_version: str | None = None,
+) -> ContextNode | None:
+    """Den Fachplan-Knoten über die belastbarste verfügbare Angabe finden.
+
+    Nötig, weil `fachplan_id` **in der Praxis leer ist**: Vom Scraper importierte
+    Fachplan-Knoten tragen `bp_id` (`BP2016BW_ALLG_GYM_CH.V2`) und `bp_version`, aber kein
+    `fachplan_id` — geprüft an allen 28 Knoten der Dev-Instanz. Ein Curriculum-Export
+    schrieb deshalb `fachplan_id: null`, und der Wiederimport scheiterte mit der
+    irreführenden Meldung „Bildungsplan-Import fehlt?", obwohl der Plan vorhanden war.
+
+    Reihenfolge — von der eindeutigsten zur schwächsten Angabe:
+
+    1. `fachplan_id` (Alt-/Testdaten, dort eindeutig),
+    2. `bp_id` (der Bezeichner echter Knoten, über Instanzen hinweg stabil),
+    3. Fach + Edition — die Rückfallebene für Exporte, die vor `bp_id` entstanden sind.
+
+    Stufe 3 ist bewusst die letzte: Sie ist nur eindeutig, solange ein Fach je Edition
+    genau einen Fachplan hat. Trifft sie mehrere, wird **keiner** gewählt (siehe unten) —
+    lieber ein klarer Fehler als das falsche Curriculum am falschen Plan.
+    """
+    if fachplan_id:
+        node = await get_fachplan_node(db, fachplan_id)
+        if node:
+            return node
+
+    if bp_id:
+        result = await db.execute(
+            sa.select(ContextNode).where(
+                ContextNode.content_type == "fachplan",
+                ContextNode.metadata_["bp_id"].astext == bp_id,
+                ContextNode.status == "active",
+            )
+        )
+        node = result.scalars().first()
+        if node:
+            return node
+
+    if subject_id is not None and bp_version:
+        result = await db.execute(
+            sa.select(ContextNode).where(
+                ContextNode.content_type == "fachplan",
+                ContextNode.subject_id == subject_id,
+                ContextNode.metadata_["bp_version"].astext == bp_version,
+                ContextNode.status == "active",
+            )
+        )
+        treffer = result.scalars().all()
+        if len(treffer) == 1:
+            return treffer[0]
+        if len(treffer) > 1:
+            logger.warning(
+                "Fach %s / Edition %s hat %d Fachpläne — nicht eindeutig auflösbar.",
+                subject_id, bp_version, len(treffer),
+            )
+
+    return None
+
+
 async def get_subject_department_group_id(db: AsyncSession, subject_id: int) -> int | None:
     """Lädt eine Fachschafts-Gruppen-ID für ein Fach (deterministisch: kleinste id).
 
@@ -280,23 +344,32 @@ def _normalize_ref(ref: str) -> str:
 
 
 async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | None:
-    """Löst IK-Nummer zu node_id auf (mit toleranter Normalisierung)."""
-    # Normalisierte Suche
+    """Löst eine IK-Nummer zu einer node_id auf (mit toleranter Normalisierung).
+
+    ⚠️ Wie bei :func:`resolve_pk_node` tragen **zwei Felder** dieselbe Nummer: Vom
+    Scraper importierte Knoten führen sie als `kompetenz_nr` (Dev-Instanz: 5141 Knoten),
+    `nr` benutzen nur Testdaten und Alt-Bestände (0 Knoten). Gesucht wurde bislang nur
+    `nr` — der Wiederimport eines exportierten Curriculums verlor dadurch seine
+    Kompetenzverweise, obwohl die Knoten vorhanden waren.
+    """
     normalized_nr = _normalize_ref(nr)
-    
-    # Erst: exakter Vergleich
+
+    # Erst: exakter Vergleich auf beiden Feldern
     result = await db.execute(
         sa.select(ContextNode.id).where(
             ContextNode.content_type == "ik_kompetenz",
             ContextNode.subject_id == subject_id,
-            ContextNode.metadata_["nr"].astext == nr,
+            sa.or_(
+                ContextNode.metadata_["nr"].astext == nr,
+                ContextNode.metadata_["kompetenz_nr"].astext == nr,
+            ),
             ContextNode.status == "active",
         )
     )
     row = result.fetchone()
     if row:
         return row[0]
-    
+
     # Fallback: normalisierter Vergleich
     result = await db.execute(
         sa.select(ContextNode).where(
@@ -306,30 +379,44 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
         )
     )
     for (node,) in result.fetchall():
-        node_nr = (node.metadata_ or {}).get("nr", "")
-        if _normalize_ref(node_nr) == normalized_nr:
-            return node.id
+        meta = node.metadata_ or {}
+        for feld in ("nr", "kompetenz_nr"):
+            if _normalize_ref(meta.get(feld, "")) == normalized_nr:
+                return node.id
 
     return None
 
 
 async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
-    """Löst PK-ID zu node_id auf (mit toleranter Normalisierung)."""
-    # Normalisierte Suche
+    """Löst eine PK-Nummer zu einer node_id auf (mit toleranter Normalisierung).
+
+    ⚠️ **Zwei Felder tragen dieselbe Nummer.** Vom Scraper importierte PK-Knoten führen
+    sie als `kompetenz_nr` (in der Dev-Instanz: 755 Knoten), `pk_id` benutzen nur
+    Testdaten und Alt-Bestände (0 Knoten). `load_curriculum_tree` liest bereits
+    `kompetenz_nr` — hier wurde bislang nur `pk_id` gesucht.
+
+    Folge dieser Asymmetrie: Der Export schrieb Nummern heraus, die der Wiederimport
+    nicht auflösen konnte. Ein echtes Curriculum verlor dabei **69 PK-Verweise** — beim
+    Re-Import in dieselbe Instanz, aus der es stammte. Deshalb werden jetzt beide Felder
+    berücksichtigt.
+    """
     normalized_pk = _normalize_ref(pk_id)
-    
-    # Erst: exakter Vergleich
+
+    # Erst: exakter Vergleich auf beiden Feldern
     result = await db.execute(
         sa.select(ContextNode.id).where(
             ContextNode.content_type == "pk_kompetenz",
-            ContextNode.metadata_["pk_id"].astext == pk_id,
+            sa.or_(
+                ContextNode.metadata_["pk_id"].astext == pk_id,
+                ContextNode.metadata_["kompetenz_nr"].astext == pk_id,
+            ),
             ContextNode.status == "active",
         )
     )
     row = result.fetchone()
     if row:
         return row[0]
-    
+
     # Fallback: normalisierter Vergleich
     result = await db.execute(
         sa.select(ContextNode).where(
@@ -338,9 +425,10 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
         )
     )
     for (node,) in result.fetchall():
-        node_pk = (node.metadata_ or {}).get("pk_id", "")
-        if _normalize_ref(node_pk) == normalized_pk:
-            return node.id
+        meta = node.metadata_ or {}
+        for feld in ("pk_id", "kompetenz_nr"):
+            if _normalize_ref(meta.get(feld, "")) == normalized_pk:
+                return node.id
 
     return None
 
@@ -792,20 +880,38 @@ async def import_curriculum_from_draft(
     if subject_id is None:
         raise ValueError(f"Fach mit fach_code '{payload.fach_code}' nicht gefunden")
     
-    # Fachplan laden
-    fachplan = await get_fachplan_node(db, payload.fachplan_id)
+    # Fachplan laden — über die belastbarste verfügbare Angabe, nicht nur fachplan_id
+    fachplan = await resolve_fachplan(
+        db,
+        fachplan_id=payload.fachplan_id,
+        bp_id=payload.bp_id,
+        subject_id=subject_id,
+        bp_version=payload.bp_version,
+    )
     if not fachplan:
         raise ValueError(
-            f"Fachplan mit fachplan_id '{payload.fachplan_id}' nicht gefunden. "
-            f"Bildungsplan-Import fehlt?"
+            f"Kein Fachplan für Fach '{payload.fach_code}' und Edition "
+            f"'{payload.bp_version}' gefunden"
+            + (f" (bp_id '{payload.bp_id}')" if payload.bp_id else "")
+            + (f" (fachplan_id '{payload.fachplan_id}')" if payload.fachplan_id else "")
+            + ". Ist der Bildungsplan dieses Fachs in dieser Instanz importiert?"
         )
     fachplan_id = fachplan.id
-    
+
     # Fachschafts-Gruppen-ID
     department_group_id = await get_subject_department_group_id(db, subject_id)
-    
-    # Import-Key Basis
-    import_key_base = f"{payload.fachplan_id}_{payload.jahrgangsstufe}"
+
+    # Import-Key Basis. `fachplan_id` bleibt führend, damit vorhandene Curricula ihren
+    # Schlüssel behalten und weiterhin idempotent aktualisiert werden. Fehlt sie — der
+    # Normalfall bei echten Daten —, tritt der `bp_id` des aufgelösten Fachplans an ihre
+    # Stelle. Ein leerer Präfix („_8") wäre für alle Fächer derselbe und würde beim
+    # zweiten Import ein fremdes Curriculum überschreiben.
+    schluessel_praefix = (
+        payload.fachplan_id
+        or (fachplan.metadata_ or {}).get("bp_id")
+        or f"fachplan-{fachplan.id}"
+    )
+    import_key_base = f"{schluessel_praefix}_{payload.jahrgangsstufe}"
     curriculum_import_key = import_key_base
     
     # Alle import_keys sammeln für späteres Archivieren

@@ -205,10 +205,38 @@ async def build_curriculum_export_dict(db: AsyncSession, tree: dict) -> dict:
         "schulart": meta.get("schulart", ""),
         "jahrgangsstufe": meta.get("jahrgangsstufe", ""),
         "fachplan_id": meta.get("fachplan_id", ""),
+        # Der Bezeichner, mit dem sich der Fachplan in einer **anderen** Instanz
+        # wiederfinden lässt. `fachplan_id` ist bei echten Daten leer — gescrapte
+        # Fachplan-Knoten tragen `bp_id`. Ohne dieses Feld war ein Export nicht
+        # wieder importierbar.
+        "bp_id": await _fachplan_bp_id(db, tree),
         "bp_version": meta.get("bp_version", ""),
         "vorwort": tree.get("content") or "",
         "kapitel": kapitel_out,
     }
+
+
+async def _fachplan_bp_id(db: AsyncSession, tree: dict) -> str:
+    """`bp_id` des Fachplans, an dem dieses Curriculum hängt.
+
+    Über die `part_of`-Kante, nicht über die Metadaten: Die Kante ist die tatsächliche
+    Verknüpfung, das Metadatenfeld `fachplan_id` ist bei echten Daten leer.
+    """
+    from app.db.models import ContextEdge, ContextNode
+
+    row = (
+        await db.execute(
+            sa.select(ContextNode.metadata_["bp_id"].astext)
+            .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+            .where(
+                ContextEdge.from_node_id == tree["id"],
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "fachplan",
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return row or ""
 
 
 # ── PDF-Export ────────────────────────────────────────────────────────────────

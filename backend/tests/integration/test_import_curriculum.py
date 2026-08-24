@@ -777,9 +777,15 @@ class TestImportCurriculumCLI:
         draft = convert_yaml_to_draft(yaml_data)
         
         # Import durchführen
-        import_key, node_count = await import_single_curriculum(
+        import_key, node_count, stats = await import_single_curriculum(
             db_session, yaml_data, "test_user"
         )
-        
+
         assert import_key == "BP_2016_MA_5"
         assert node_count > 0
+        # `stats` kam dazu, damit das CLI die nicht auflösbaren Verweise melden kann —
+        # vorher gab es dafür nur `yaml_data["warnings"]`, ein Feld, das der Export gar
+        # nicht schreibt; die Warnungen des Imports blieben unsichtbar. Diese Testdaten
+        # enthalten einen unauflösbaren LP-Verweis: Er muss beim Aufrufer ankommen,
+        # den Import aber nicht verhindern.
+        assert any("BO" in w for w in stats.warnings), stats.warnings
