@@ -5,6 +5,29 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.1] – 2026-08-25
+
+Fehlerbehebung: Der Bildungsplan-Import brach im Produktivsystem ab.
+
+### Behoben
+
+- **Bildungsplan-Import im Container abgebrochen** (`ModuleNotFoundError: No module
+  named 'app'`). Das Skript suchte das `app`-Paket nur unter `<Wurzel>/backend` — das
+  Repo-Layout. Im Betrieb ist `scripts/` aber nach `/app/import-scripts` gemountet und
+  das Paket liegt direkt unter `/app`; ein `backend/`-Verzeichnis gibt es dort nicht.
+  Statt zu raten, wird jetzt geprüft, wo `app/context/editions.py` tatsächlich liegt.
+  Nur der 0.5.0-Neuzugang „Archivierung nach Editions-Fahrplan" braucht das Paket,
+  darum trat der Fehler vorher nicht auf.
+- **Ein fehlendes `app`-Paket bricht den Import nicht mehr ab.** Die Archivierung
+  überholter Editionen ist der letzte Schritt vor dem Commit — eine Ausnahme dort
+  verwarf den vollständigen, bereits erledigten Import. Sie wird nun übersprungen und
+  protokolliert; der Hinweis erscheint zusätzlich zu Beginn des Laufs, nicht erst am
+  Ende. Überholte Knoten bleiben dann aktiv, was sich jederzeit nachholen lässt.
+
+> **Datenlage:** Der Abbruch geschah vor `conn.commit()`; die Transaktion wurde beim
+> Schließen der Verbindung verworfen. In der Datenbank ist nichts gelandet — der Import
+> muss lediglich wiederholt werden.
+
 ## [0.5.0] – 2026-08-25
 
 Schwerpunkt: **Curricula werden übertragbar.** Ein Schulcurriculum lässt sich exportieren
