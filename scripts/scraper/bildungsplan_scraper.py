@@ -35,6 +35,7 @@ from scripts.scraper.parsers import (
     parse_operator_list,
     resolve_grade_band,
 )
+from scripts.scraper.parsers_gen2x import parse_gen2x_dokument
 
 logger = logging.getLogger('bildungsplan_scraper')
 
@@ -44,6 +45,29 @@ _DATIERT_RE = re.compile(r'\d{4}-\d{2}-\d{2}\.jsonl')
 BASE_URL = 'https://www.bildungsplaene-bw.de/,Lde/'
 LP_KUERZEL = ['BNE', 'BTV', 'PG', 'BO', 'MB', 'VB', 'LFDB']
 MAX_RETRIES = 3
+
+# Adress-Praefix der neuen Seitengeneration (ab V3).
+GEN2X_PRAEFIX = 'DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_'
+
+
+def gen2x_url(bp_id_basis: str, quell_version: str) -> str:
+    """Adresse der neuen Seitengeneration aus altem Bezeichner + Fassungsangabe.
+
+    ``BP2016BW_ALLG_GYM_M`` + ``V3.0`` →
+    ``…/DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)``
+
+    Die Fassungsangabe steht in der Konfiguration und wird **nicht** aus dem Suffix
+    abgeleitet: `.V3` und `(V3.0)` sehen nur zufaellig verwandt aus, und eine
+    Folgefassung `(V3.1)` traege weiterhin das Suffix `.V3`.
+    """
+    teile = bp_id_basis.split('_')
+    if len(teile) < 4:
+        raise ValueError(
+            f"Unerwarteter Aufbau von bp_id_basis: {bp_id_basis!r} "
+            f"(erwartet <Praefix>_ALLG_<Schulart>_<Fach>)"
+        )
+    schulart, fach_code = teile[2], '_'.join(teile[3:])
+    return f"{BASE_URL}{GEN2X_PRAEFIX}{schulart}_{fach_code}({quell_version})"
 
 
 async def fetch(client: httpx.AsyncClient, url: str) -> str:
@@ -156,32 +180,23 @@ async def scrape_leitperspektiven(
     return nodes
 
 
-async def scrape_fach(
+async def _sammle_klassisch(
     client: httpx.AsyncClient,
-    fach_code: str,
+    soup: BeautifulSoup,
+    fach_url: str,
     bp_id_basis: str,
     suffix: str,
-    output_dir: Path,
-    existing_hashes: dict[str, str],
     warnings: list[str],
-    subject_min_grade: int | None = None,
-    subject_max_grade: int | None = None,
-) -> tuple[int, int, int]:
-    """
-    Scrapt ein Fach vollstaendig.
-    Gibt (neu, geaendert, unveraendert) zurueck.
-    """
-    fach_url = BASE_URL + bp_id_basis + suffix
-    html = await fetch(client, fach_url)
-    soup = BeautifulSoup(html, 'lxml')
+) -> list[dict]:
+    """Sammelt die Knoten der **alten** Seitengeneration: Übersichtsseite plus
+    Unterseiten je Leitidee, PK-Gruppe und Operatoren-Anhang.
 
-    # Erst prüfen, dann parsen. Eine unbekannte Edition liefert kein 404, sondern die
-    # Basisfassung — ohne diese Prüfung landen deren Knoten unter falschem Etikett, und
-    # zwar lautlos. Der Fehler fällt bis in die Aufrufebene durch: Das Fach wird
-    # übersprungen, für diese Edition wird **nichts** geschrieben.
-    pruefe_geladene_fassung(soup, fach_url, bp_id_basis + suffix)
+    Reiner Umzug aus ``scrape_fach``; unverändert bis auf die frühe Rückgabe, die
+    jetzt eine leere Liste ist. Der Aufrufer entscheidet daraus, ob nichts zu
+    schreiben ist.
+    """
+    nodes: list[dict] = []
 
-    nodes = []
 
     # Fachplan
     try:
@@ -189,7 +204,7 @@ async def scrape_fach(
     except ScraperParseError as e:
         warnings.append(str(e))
         logger.error(str(e))
-        return 0, 0, 0
+        return []
 
     # IK-Seiten entdecken (Leitideen + Standard-Seiten)
     ik_urls = _discover_all_ik_urls(soup, bp_id_basis)
@@ -242,6 +257,62 @@ async def scrape_fach(
         except Exception as e:
             warnings.append(f"Operatoren fuer {fach_bp_id} nicht abrufbar: {e}")
             logger.error(f"Operatoren fuer {fach_bp_id} ({op_url}): {e}")
+
+
+    return nodes
+
+
+async def scrape_fach(
+    client: httpx.AsyncClient,
+    fach_code: str,
+    bp_id_basis: str,
+    suffix: str,
+    output_dir: Path,
+    existing_hashes: dict[str, str],
+    warnings: list[str],
+    subject_min_grade: int | None = None,
+    subject_max_grade: int | None = None,
+    gen2x_version: str | None = None,
+) -> tuple[int, int, int]:
+    """
+    Scrapt ein Fach vollstaendig.
+    Gibt (neu, geaendert, unveraendert) zurueck.
+
+    ``gen2x_version`` (z. B. ``"V3.0"``) schaltet auf die neue Seitengeneration um: eine
+    Seite je Fach statt Übersichtsseite plus Dutzender Unterseiten. Die Ausgabe ist in
+    beiden Fällen dieselbe — ein vollstaendiger Schnappschuss im gewohnten JSONL-Schema.
+    """
+    fach_bp_id = bp_id_basis + suffix
+
+    # Zwei Seitengenerationen, zwei Adressschemata. Welches gilt, sagt der Fahrplan in
+    # `subjects.yaml` (`seitengeneration: gen2x`) — nicht das Suffix. Aus `.V3` auf die
+    # neue Generation zu schließen wäre geraten; eine spätere `.V4` könnte das alte
+    # Schema behalten, und ein `.V3` einer anderen Schulart ebenso.
+    if gen2x_version:
+        fach_url = gen2x_url(bp_id_basis, gen2x_version)
+        erwartete_kennung = fach_url.rsplit('/', 1)[-1]
+    else:
+        fach_url = BASE_URL + fach_bp_id
+        erwartete_kennung = fach_bp_id
+
+    html = await fetch(client, fach_url)
+    soup = BeautifulSoup(html, 'lxml')
+
+    # Erst prüfen, dann parsen. Eine unbekannte Edition liefert kein 404, sondern die
+    # Basisfassung — ohne diese Prüfung landen deren Knoten unter falschem Etikett, und
+    # zwar lautlos. Der Fehler fällt bis in die Aufrufebene durch: Das Fach wird
+    # übersprungen, für diese Edition wird **nichts** geschrieben.
+    pruefe_geladene_fassung(soup, fach_url, erwartete_kennung)
+
+    nodes = (
+        parse_gen2x_dokument(soup, fach_url, fach_bp_id)
+        if gen2x_version
+        else await _sammle_klassisch(
+            client, soup, fach_url, bp_id_basis, suffix, warnings
+        )
+    )
+    if not nodes:
+        return 0, 0, 0
 
     # Jahrgangsband korrigieren (Todo B1): Kursstufen-Basisfächer (z. B. NWTBFO) tragen
     # in der IK/PK-URL keine Stufen, sondern zero-padded Kompetenzbereichs-Nummern
@@ -315,6 +386,29 @@ def schedule_suffixes(bp_default: dict) -> list[str]:
     return [e.get('suffix', '') for e in sorted(editionen, key=_start)]
 
 
+def edition_quell_versionen(bp_default: dict) -> dict[str, str]:
+    """Suffix → Fassungsangabe für Editionen der **neuen** Seitengeneration.
+
+    Nur Fahrplan-Einträge mit ``seitengeneration: gen2x`` erscheinen; alle anderen
+    werden weiterhin über das alte Adressschema geholt. Fehlt bei einem gen2x-Eintrag
+    die ``quell_version``, ist das ein Konfigurationsfehler und kein Grund zum Raten —
+    ohne sie lässt sich die Adresse nicht bilden.
+    """
+    versionen: dict[str, str] = {}
+    for eintrag in bp_default.get('editionen') or []:
+        if str(eintrag.get('seitengeneration') or '').lower() != 'gen2x':
+            continue
+        suffix = eintrag.get('suffix', '')
+        quell_version = eintrag.get('quell_version')
+        if not quell_version:
+            raise ValueError(
+                f"Edition '{suffix or 'Basis'}' ist als seitengeneration: gen2x "
+                f"konfiguriert, aber ohne quell_version (z. B. 'V3.0')."
+            )
+        versionen[suffix] = str(quell_version)
+    return versionen
+
+
 def subject_editions(
     fach: dict, ordered_suffixes: list[str], default_suffix: str
 ) -> list[tuple[str, str]]:
@@ -364,6 +458,12 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
     bp_basis_prefix = bp_default.get('bp_basis', 'BP2016BW')
     default_suffix = bp_default.get('suffix', '')
     ordered_suffixes = schedule_suffixes(bp_default)
+    quell_versionen = edition_quell_versionen(bp_default)
+    if quell_versionen:
+        logger.info(
+            "Neue Seitengeneration (GEN2X) konfiguriert für Edition(en): %s",
+            ", ".join(f"{s or 'Basis'} → {v}" for s, v in sorted(quell_versionen.items())),
+        )
 
     # Bestehendes JSONL fuer Hash-Vergleich einlesen
     existing_hashes: dict[str, str] = {}
@@ -447,6 +547,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                         existing_hashes, warnings,
                         subject_min_grade=fach.get('min_grade'),
                         subject_max_grade=fach.get('max_grade'),
+                        gen2x_version=quell_versionen.get(edition_suffix),
                     )
                     neu += n; geaendert += g; unveraendert += u
             except ScraperFassungError as exc:

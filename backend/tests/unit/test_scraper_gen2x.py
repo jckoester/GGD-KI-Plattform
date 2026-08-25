@@ -10,8 +10,10 @@ Zum Modul-Laden siehe CLAUDE.md: `backend/scripts` und `scripts` (Repo-Wurzel) h
 beide `scripts`; der Zustand in `sys.modules` wird um den Import herum wiederhergestellt.
 """
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bs4 import BeautifulSoup
@@ -200,3 +202,170 @@ def test_keine_weichen_trennstriche(knoten):
 def test_alle_bp_ids_eindeutig(knoten):
     ids = [k["bp_id"] for k in knoten]
     assert len(ids) == len(set(ids))
+
+
+# ── Verdrahtung im Scraper (Schritt 3) ──────────────────────────────────────
+
+_scraper = _load("_scraper_fuer_gen2x_uut", "scripts/scraper/bildungsplan_scraper.py")
+
+
+def test_gen2x_url_aus_altem_bezeichner():
+    assert _scraper.gen2x_url("BP2016BW_ALLG_GYM_M", "V3.0") == (
+        "https://www.bildungsplaene-bw.de/,Lde/"
+        "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
+    )
+
+
+def test_gen2x_url_uebernimmt_schulart_und_fach():
+    """Schulart und Fachkürzel stammen aus dem Bezeichner, nicht aus einer zweiten Quelle."""
+    assert _scraper.gen2x_url("BP2016BW_ALLG_RS_INFWFO", "V3.1").endswith(
+        "GEN2X_BPBW_ALLG_RS_INFWFO(V3.1)"
+    )
+
+
+def test_gen2x_url_bei_unerwartetem_bezeichner():
+    with pytest.raises(ValueError, match="Unerwarteter Aufbau"):
+        _scraper.gen2x_url("kaputt", "V3.0")
+
+
+def test_quell_versionen_nur_fuer_gen2x_editionen():
+    """Nur ausdrücklich markierte Editionen wechseln das Adressschema."""
+    fahrplan = {
+        "editionen": [
+            {"suffix": ""},
+            {"suffix": ".V2", "ab_schuljahr": "2016/17"},
+            {"suffix": ".V3", "seitengeneration": "gen2x", "quell_version": "V3.0"},
+        ]
+    }
+    assert _scraper.edition_quell_versionen(fahrplan) == {".V3": "V3.0"}
+
+
+def test_quell_version_fehlt_ist_konfigurationsfehler():
+    """Aus `.V3` auf `(V3.0)` zu schließen wäre geraten — eine V3.1 trüge dasselbe Suffix."""
+    fahrplan = {"editionen": [{"suffix": ".V3", "seitengeneration": "gen2x"}]}
+    with pytest.raises(ValueError, match="quell_version"):
+        _scraper.edition_quell_versionen(fahrplan)
+
+
+def _fake_fetch(gesehen: list[str], antwort: str):
+    async def fetch(client, url):
+        gesehen.append(url)
+        return antwort
+    return fetch
+
+
+@pytest.mark.asyncio
+async def test_scrape_fach_gen2x_holt_genau_eine_seite(tmp_path):
+    """Der eigentliche Gewinn der neuen Generation: ein Abruf statt Dutzender.
+
+    Die alte Generation lud die Übersichtsseite und danach je Leitidee, PK-Gruppe und
+    Operatoren-Anhang eine eigene Unterseite.
+    """
+    gesehen: list[str] = []
+    with patch.object(_scraper, "fetch", _fake_fetch(gesehen, FIXTURE.read_text(encoding="utf-8"))):
+        neu, geaendert, unveraendert = await _scraper.scrape_fach(
+            MagicMock(), "M", "BP2016BW_ALLG_GYM_M", ".V3",
+            tmp_path, {}, [], gen2x_version="V3.0",
+        )
+
+    assert gesehen == [
+        "https://www.bildungsplaene-bw.de/,Lde/"
+        "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
+    ]
+    assert (neu, geaendert, unveraendert) == (62, 0, 0)
+
+    zeilen = (tmp_path / "M.jsonl").read_text(encoding="utf-8").strip().split("\n")
+    knoten = [json.loads(z) for z in zeilen]
+    assert len(knoten) == 62
+    assert {k["bp_version"] for k in knoten} == {"2016.V3"}
+
+
+@pytest.mark.asyncio
+async def test_scrape_fach_ohne_gen2x_nutzt_altes_schema(tmp_path):
+    """Regressionsschutz: Ohne Fassungsangabe bleibt alles beim Alten.
+
+    Die Fixture ist hier bewusst leer bis auf den Titel — geprüft wird die **Adresse**,
+    nicht das Ergebnis.
+    """
+    titel = (
+        "Mathematik vom 23. März 2016 in der Fassung vom 29. Februar 2024 (V2) "
+        "- Bildungsplan"
+    )
+    gesehen: list[str] = []
+    seite = f"<html><head><title>{titel}</title></head><body></body></html>"
+    with patch.object(_scraper, "fetch", _fake_fetch(gesehen, seite)):
+        ergebnis = await _scraper.scrape_fach(
+            MagicMock(), "M", "BP2016BW_ALLG_GYM_M", ".V2", tmp_path, {}, [],
+        )
+
+    assert gesehen == ["https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_M.V2"]
+    assert ergebnis == (0, 0, 0)
+    assert list(tmp_path.glob("*.jsonl")) == []
+
+
+@pytest.mark.asyncio
+async def test_fassungspruefung_gilt_auch_fuer_gen2x(tmp_path):
+    """Schritt 1 greift auch auf dem neuen Weg — sonst wäre die Falle nur halb zu."""
+    seite = (
+        "<html><head><title>Mathematik - Bildungsplan</title>"
+        '<link rel="canonical" href="https://www.bildungsplaene-bw.de/,Lde/'
+        'BP2016BW_ALLG_GYM_M"></head><body></body></html>'
+    )
+    with patch.object(_scraper, "fetch", _fake_fetch([], seite)):
+        with pytest.raises(_scraper.ScraperFassungError):
+            await _scraper.scrape_fach(
+                MagicMock(), "M", "BP2016BW_ALLG_GYM_M", ".V3",
+                tmp_path, {}, [], gen2x_version="V3.0",
+            )
+    assert list(tmp_path.glob("*.jsonl")) == []
+
+
+_SUBJECTS_MIT_GEN2X = """\
+schulart: GYM
+bildungsplan_default:
+  bp_basis: BP2016BW
+  suffix: ""
+  editionen:
+    - suffix: ""
+    - suffix: ".V2"
+      ab_schuljahr: "2016/17"
+    - suffix: ".V3"
+      ab_schuljahr: "2026/27"
+      seitengeneration: gen2x
+      quell_version: "V3.0"
+subjects:
+  - slug: mathematik
+    fach_code: M
+    bildungsplan_suffix: ".V3"
+"""
+
+
+@pytest.mark.asyncio
+async def test_main_reicht_fassungsangabe_aus_dem_fahrplan_durch(tmp_path):
+    """Die Angabe aus `subjects.yaml` muss bis in `scrape_fach` ankommen.
+
+    Ohne diesen Test bleibt die Verdrahtung ungeprüft: Die übrigen Tests rufen
+    `scrape_fach` direkt auf und würden auch dann grün bleiben, wenn `main()` die
+    Fassungsangabe gar nicht weiterreicht — das Fach liefe dann stillschweigend über
+    das alte Adressschema und fiele erst an der Fassungsprüfung auf.
+    """
+    cfg = tmp_path / "subjects.yaml"
+    cfg.write_text(_SUBJECTS_MIT_GEN2X, encoding="utf-8")
+
+    fake = AsyncMock(return_value=(0, 0, 0))
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", fake), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_cm()):
+        await _scraper.main(str(cfg), str(tmp_path / "out"))
+
+    # Ein Aufruf je Edition; nur die V3-Edition trägt die Fassungsangabe.
+    nach_suffix = {c.args[3]: c.kwargs.get("gen2x_version") for c in fake.call_args_list}
+    assert nach_suffix == {"": None, ".V2": None, ".V3": "V3.0"}
+
+
+def _async_cm():
+    """Async-Context-Manager-Mock für httpx.AsyncClient(...)."""
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=MagicMock(name="httpx_client"))
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cm

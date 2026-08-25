@@ -46,6 +46,12 @@ bildungsplan_default: # gilt für alle Fächer ohne eigene Fach-Edition (bildung
       ab_schuljahr: "2026/27"
       einstieg_stufen: [5, 7]
       wachstum: nach_oben
+      # Neue Seitengeneration: ein Dokument je Fach statt Übersichtsseite + Unterseiten.
+      # Adresse: …/DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_<Schulart>_<Fach>(<quell_version>)
+      # `quell_version` steht ausdrücklich hier und wird nicht aus dem Suffix geraten —
+      # eine Folgefassung (V3.1) trüge weiterhin das Suffix `.V3`.
+      seitengeneration: gen2x
+      quell_version: "V3.0"
 
 subjects:
   - slug: mathematik

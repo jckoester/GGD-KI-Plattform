@@ -109,6 +109,18 @@ def validate_subjects_yaml(cfg: dict) -> list[str]:
         errors.append(
             f"schuljahr '{sj}' hat falsches Format (erwartet: YYYY/YY)"
         )
+    # Editions-Fahrplan: Eine Edition der neuen Seitengeneration braucht die
+    # Fassungsangabe für die Adresse. Der Scraper wirft sonst erst beim Lauf; hier
+    # faellt es schon im Trockenlauf des Imports auf.
+    for eintrag in cfg.get("bildungsplan_default", {}).get("editionen") or []:
+        if str(eintrag.get("seitengeneration") or "").lower() != "gen2x":
+            continue
+        if not eintrag.get("quell_version"):
+            errors.append(
+                f"Edition '{eintrag.get('suffix') or 'Basis'}' hat "
+                f"seitengeneration: gen2x, aber keine quell_version (z. B. 'V3.0')"
+            )
+
     for fach in cfg.get("subjects", []):
         fach_code = fach.get("fach_code")
         suffix = fach.get("bildungsplan_suffix")
