@@ -996,3 +996,100 @@ async def test_eigene_edition_falsch_laesst_das_fach_ausfallen(tmp_path):
         skipped = await _scraper.main(str(cfg), str(tmp_path / "out"))
 
     assert [slug for slug, _ in skipped] == ["ethik"]
+
+
+# ── Verweisformen über Generationsgrenzen ───────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "href,fach,fassung",
+    [
+        # Neue Generation: Fassung in Klammern
+        ("DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_PH(V3.0)", "PH", "V3.0"),
+        # Alte Generation mit Edition — Fächer ohne V3 (Gemeinschaftskunde)
+        ("DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_GK.V2", "GK", ".V2"),
+        # Alte Generation, Basisfassung (Lutherisch, Wirtschaft, NwT)
+        ("DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_LUT", "LUT", ""),
+    ],
+)
+def test_fremdfach_erkennt_beide_generationen(href, fach, fassung):
+    """V3-Seiten verweisen auch auf **klassische** Seiten.
+
+    Nicht jedes Fach hat ein V3 — Gemeinschaftskunde steht auf `.V2`, NwT und Wirtschaft
+    auf der Basisfassung. Ein Muster, das nur `(V3.0)` kennt, hielt diese Verweise für
+    dokumentintern und meldete 295 unauflösbare Anker.
+    """
+    m = _gen2x._FREMDFACH.search(href)
+    assert m is not None
+    assert m.group(1) == fach
+    assert (m.group(2) or m.group(3) or "") == fassung
+
+
+@pytest.mark.parametrize(
+    "anker,erwartet",
+    [
+        ("3.1.1", "X.V3_IK_5-6_01"),
+        ("3.1.1(2)", "X.V3_IK_5-6_01_00_02"),
+        # Unterebene: Physik, Chemie und Geografie gliedern eine Stufe tiefer
+        ("3.3.1.1", "X.V3_IK_11_01_01"),
+        ("3.3.1.1(4)", "X.V3_IK_11_01_01_04"),
+        ("2.1(1)", "X.V3_PK_01_01"),
+    ],
+)
+def test_anker_mit_vier_stellen(anker, erwartet):
+    """753 dokumentinterne Verweise zeigten auf die vierte Ebene und liefen ins Leere."""
+    assert _gen2x._anker_zu_bp_id(anker, "X.V3", {"1": "5-6", "3": "11"}) == erwartet
+
+
+def test_verweis_ohne_sprungmarke_ist_kein_kompetenzbezug():
+    """Ein Link auf die **ganze** Fachseite hat kein Kompetenzziel.
+
+    Als unaufgelösten Verweis geführt, erzeugte er 500 Warnungen über etwas, das gar
+    nichts treffen kann — „siehe auch dieses Fach" ist kein Bezug auf eine Nummer.
+    """
+    html = """
+    <html><head><title>BPBW-ALLG-GYM-M(V3.0) - Bildungsplan</title></head><body>
+      <h1>Mathematik Überarbeitete Fassung vom 21. Mai 2026 (V3.0)</h1>
+      <h4 id="3.1">3.1 Klassen 5/6</h4>
+      <h5 id="3.1.1">3.1.1 Leitidee Zahl</h5>
+      <section class="table"><div><table><tbody>
+        <tr class="bp_allg_content_item_table_item_bpx" id="3.1.1(1)">
+          <td><div class="text-body"><p>Text</p></div></td>
+        </tr>
+        <tr class="bp_allg_content_item_table_level_bpx"><td>
+          <div class="references_boxes"><div class="box box--f">
+            <a class="link" href="DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_G">Geschichte</a>
+          </div></div>
+        </td></tr>
+      </tbody></table></div></section>
+    </body></html>
+    """
+    knoten = parse_gen2x_dokument(BeautifulSoup(html, "lxml"), QUELL_URL, BP_ID_FACH)
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_01_00_01")
+    assert "offene_verweise" not in k["metadata"]
+    assert k["relations"] == []
+
+
+def test_nummer_aus_titel_fuer_alte_seitengeneration():
+    """Die alte Generation hat kein `id`-Attribut — die Nummer steht nur im Titel.
+
+    Sie wird gebraucht, weil V3-Pläne auf Leitideen von Fächern verweisen, die noch auf
+    der Basisfassung oder V2 stehen (`…_GYM_GK.V2#3.1.1`). Ohne dieses Feld blieben 141
+    solcher Verweise unauflösbar, obwohl der Knoten vorhanden ist.
+    """
+    f = _parsers.nummer_aus_titel
+    assert f("3.1.1 Leitidee Zahl – Variable – Operation") == "3.1.1"
+    assert f("2.1 Mathematisch argumentieren und beweisen") == "2.1"
+    assert f("3.1.3.1 Teilbereich") == "3.1.3.1"
+    # Kein Zahlenpräfix, keine erfundene Nummer
+    assert f("Leitidee ohne Nummer") is None
+    assert f("") is None
+    assert f(None) is None
+    # Eine einzelne Zahl ist keine Gliederungsnummer
+    assert f("2026 war ein Jahr") is None
+    # Manche Seiten stellen den Fachnamen voran
+    assert f("Latein als zweite Fremdsprache - 3.3.2 Texte und Literatur") == "3.3.2"
+    assert f("Literatur und Theater - 3.1.1 Theaterpraktische Arbeit") == "3.1.1"
+    # …aber eine Nummer mitten im Fließtext ist keine Gliederungsnummer. Ohne diese
+    # Grenze würde aus jedem Satz mit einer Zahl ein Verweisziel.
+    assert f("Ein Satz, der irgendwo 3.1.1 erwähnt") is None

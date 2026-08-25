@@ -112,8 +112,13 @@ _REL_JE_BOX = {
 }
 # Anker einer Leitperspektive: `BNE(2)` → Token `BNE_02` (Form der alten Generation)
 _LP_ANKER = re.compile(r'^([A-Z]+)\((\d+)\)$')
-# Adresse eines anderen Fachs: …_ALLG_GYM_PH(V3.0)#3.2.7(2)
-_FREMDFACH = re.compile(r'_ALLG_[A-Z]+_([A-Z0-9]+)\(([^)]+)\)$')
+# Adresse eines anderen Fachs. GEN2X-Seiten verweisen auf **beide** Generationen:
+#   …_ALLG_GYM_PH(V3.0)   neue Generation, Fassung in Klammern
+#   …_ALLG_GYM_GK.V2      alte Generation, Edition als Suffix
+#   …_ALLG_GYM_LUT        alte Generation, Basisfassung
+# Die Fassungsangabe landet einheitlich in `quell_version`; der Import bildet beide
+# Formen auf `bp_version` ab.
+_FREMDFACH = re.compile(r'_ALLG_[A-Z]+_([A-Z0-9]+)(?:\(([^)]+)\)|(\.V\d+))?$')
 # Voreinstellung für `_knoten(bp_version=…)`: aus dem Bezeichner ableiten.
 _AUS_BEZEICHNER = object()
 
@@ -249,14 +254,22 @@ def _verweise(
                     continue
 
                 fremd = _FREMDFACH.search(href.split("#")[0])
-                if fremd:
+                nr_ziel = href.split("#", 1)[1] if "#" in href else ""
+                if fremd and nr_ziel:
                     offen.append({
                         "art": "cross_fach",
                         "fach_code": fremd.group(1),
-                        "quell_version": fremd.group(2),
-                        "nr": href.split("#", 1)[1] if "#" in href else "",
+                        # Klammer-Fassung (GEN2X), Suffix (alte Generation) oder "" (Basis)
+                        "quell_version": fremd.group(2) or fremd.group(3) or "",
+                        "nr": nr_ziel,
                         "type": relation,
                     })
+                elif fremd:
+                    # Verweis auf die **ganze** Fachseite, ohne Sprungmarke. Das ist kein
+                    # Kompetenzbezug, sondern ein „siehe auch dieses Fach". Ihn als
+                    # unaufgeloesten Kompetenzverweis zu fuehren, erzeugte 500 Warnungen
+                    # ueber etwas, das gar kein Ziel hat.
+                    continue
                 else:
                     # Alles, was hier landet, ist ein Anker, den dieses Dokument selbst
                     # nicht auflösen konnte — im vollständigen Fachplan darf das nicht
@@ -300,11 +313,16 @@ def _anker_zu_bp_id(anker: str, bp_id_fach: str, band_segmente: dict[str, str]) 
         basis = f"{bp_id_fach}_PK_{int(teile[1]):02d}"
         return basis if standard is None else f"{basis}_{standard:02d}"
 
-    if teile[0] == "3" and len(teile) == 3:
+    if teile[0] == "3" and len(teile) in (3, 4):
         segment = band_segmente.get(teile[1])
         if segment is None:
             return None
         basis = f"{bp_id_fach}_IK_{segment}_{int(teile[2]):02d}"
+        if len(teile) == 4:
+            # Unterebene (Physik, Chemie, Geografie): `3.2.1.3` bzw. `3.2.1.3(4)`.
+            # Ihr Index steht an der Stelle, die sonst der Platzhalter `00` fuellt.
+            basis = f"{basis}_{int(teile[3]):02d}"
+            return basis if standard is None else f"{basis}_{standard:02d}"
         return basis if standard is None else f"{basis}_00_{standard:02d}"
 
     return None

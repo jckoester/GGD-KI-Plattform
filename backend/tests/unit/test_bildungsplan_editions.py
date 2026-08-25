@@ -886,10 +886,15 @@ async def test_scrape_fach_schreibt_bei_falscher_fassung_nichts(tmp_path):
 
 
 def test_quellversion_zu_bp_version():
-    """`V3.0` in der Adresse ↔ `2016.V3` an unseren Knoten.
+    """Fassungsangabe aus einer Adresse ↔ `bp_version` an unseren Knoten.
 
     Die Zuordnung steht schon im Editions-Fahrplan und wird hier nur umgedreht — ein
     zweites Mal aufgeschrieben wäre sie eine Fehlerquelle.
+
+    Sie deckt **beide Seitengenerationen** ab, weil V3-Seiten auf beide verweisen:
+    `V3.0` in Klammern (neu), `.V2` als Suffix und `""` für die Basisfassung (alt).
+    Nicht jedes Fach hat ein V3 — Gemeinschaftskunde steht auf `.V2`, NwT und Wirtschaft
+    auf der Basis, und Verweise dorthin müssen ebenso auflösbar sein.
     """
     cfg = {
         "bildungsplan_default": {
@@ -901,7 +906,12 @@ def test_quellversion_zu_bp_version():
             ],
         }
     }
-    assert _import_bp.quellversion_zu_bp_version(cfg) == {"V3.0": "2016.V3"}
+    assert _import_bp.quellversion_zu_bp_version(cfg) == {
+        "V3.0": "2016.V3",   # neue Generation: Fassung in Klammern
+        ".V3": "2016.V3",    # alte Schreibweise derselben Edition
+        ".V2": "2016.V2",
+        "": "2016",          # Basisfassung
+    }
 
 
 class _CrossFachCursor:
@@ -918,7 +928,9 @@ class _CrossFachCursor:
             self._next = None
             return
         if "s.fach_code" in sql:
-            fach, bpv, nr, _nr2 = params
+            # (fach_code, bp_version, nr, nr, nr) — dieselbe Nummer wird gegen
+            # kompetenz_nr, nr und pk_id geprüft.
+            fach, bpv, nr = params[0], params[1], params[2]
             self._next = (self._treffer.get((fach, bpv, nr)),) if (fach, bpv, nr) in self._treffer else None
             return
         self._next = None

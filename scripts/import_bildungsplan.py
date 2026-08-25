@@ -185,9 +185,16 @@ def quellversion_zu_bp_version(cfg: dict) -> dict[str, str]:
     jahr = jahr_m.group(1) if jahr_m else ""
     zuordnung: dict[str, str] = {}
     for eintrag in bp_default.get("editionen") or []:
+        suffix = eintrag.get("suffix") or ""
+        bp_version = jahr + suffix
+        # Fassungsangabe der neuen Generation: `V3.0` → `2016.V3`.
         quell_version = eintrag.get("quell_version")
         if quell_version:
-            zuordnung[str(quell_version)] = jahr + (eintrag.get("suffix") or "")
+            zuordnung[str(quell_version)] = bp_version
+        # …und die der alten: GEN2X-Seiten verweisen auch auf klassische Seiten von
+        # Faechern ohne V3 (`…_GYM_GK.V2`, `…_GYM_LUT`). Dort steht die Edition als
+        # Suffix bzw. gar nicht — beides muss ebenso aufloesbar sein.
+        zuordnung[suffix] = bp_version
     return zuordnung
 
 
@@ -526,12 +533,17 @@ def lookup_cross_fach(
         JOIN subjects s ON s.id = n.subject_id
         WHERE s.fach_code = %s
           AND n.status = 'active'
-          AND n.content_type IN ('ik_kompetenz', 'leitidee')
+          -- Auch prozessbezogene Kompetenzen: V3-Plaene verweisen auf `D 2.1(9)`.
+          -- Ohne pk_kompetenz in dieser Liste blieben solche Verweise unaufgeloest,
+          -- obwohl der Knoten vorhanden ist.
+          AND n.content_type IN ('ik_kompetenz', 'leitidee', 'pk_kompetenz', 'pk_gruppe')
           AND n.metadata->>'bp_version' = %s
-          AND (n.metadata->>'kompetenz_nr' = %s OR n.metadata->>'nr' = %s)
+          AND (n.metadata->>'kompetenz_nr' = %s
+               OR n.metadata->>'nr' = %s
+               OR n.metadata->>'pk_id' = %s)
         LIMIT 1
         """,
-        (fach_code, bp_version, nr, nr),
+        (fach_code, bp_version, nr, nr, nr),
     )
     row = cur.fetchone()
     return UUID(str(row[0])) if row else None

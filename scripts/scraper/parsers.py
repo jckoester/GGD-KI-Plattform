@@ -108,6 +108,30 @@ def extract_bp_version(bp_id: str) -> str:
     return year
 
 
+# Gliederungsnummer am Titelanfang: „3.1.1 Leitidee Zahl …" → „3.1.1".
+#
+# Manche Seiten stellen den Fachnamen voran — „Latein als zweite Fremdsprache - 3.3.2
+# Texte und Literatur". Ein solcher Vorspann ist deshalb erlaubt, aber eng gefasst: kurz
+# und mit Gedankenstrich abgeschlossen. Sonst faende die Nummer sich irgendwo im
+# Fliesstext, und aus einer Jahreszahl wuerde eine Gliederungsnummer.
+_NR_IM_TITEL = re.compile(r'^\s*(?:.{1,60}?\s[-–]\s)?(\d+(?:\.\d+)+)\s')
+
+
+def nummer_aus_titel(title: str) -> str | None:
+    """Die Nummer, mit der andere Bildungsplaene auf diesen Knoten verweisen.
+
+    Die alte Seitengeneration hat kein `id`-Attribut, aus dem sich die Nummer ablesen
+    liesse — sie steht nur am Anfang des Titels. Fuer die neue Generation liefert
+    ``parsers_gen2x`` sie aus der Quelle; hier ist der Titel die einzige Quelle.
+
+    Gebraucht wird sie fuer Cross-Fach-Verweise: V3-Plaene verweisen auf Leitideen von
+    Faechern, die noch auf der Basisfassung oder V2 stehen (`…_GYM_GK.V2#3.1.1`). Ohne
+    dieses Feld blieben 141 solcher Verweise unaufloesbar, obwohl der Knoten da ist.
+    """
+    m = _NR_IM_TITEL.match(title or "")
+    return m.group(1) if m else None
+
+
 class ScraperParseError(Exception):
     """Wird geworfen wenn ein Parser auf einer Seite die erwartete Struktur nicht findet."""
     def __init__(self, url: str, reason: str):
@@ -472,6 +496,8 @@ def parse_leitidee(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'niveau': extract_niveau_from_bp_id(bp_id),
         'bp_version': extract_bp_version(bp_id),
         'metadata': {
+            **({'nr': nummer_aus_titel(title)}
+               if nummer_aus_titel(title) else {}),
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
             'source_url': url,
@@ -606,6 +632,8 @@ def parse_pk_gruppe(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         'niveau': extract_niveau_from_bp_id(bp_id),
         'bp_version': extract_bp_version(bp_id),
         'metadata': {
+            **({'nr': nummer_aus_titel(title)}
+               if nummer_aus_titel(title) else {}),
             'bp_id': bp_id,
             'breadcrumb': breadcrumb,
             'source_url': url,
