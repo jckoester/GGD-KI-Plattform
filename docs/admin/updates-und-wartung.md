@@ -18,6 +18,90 @@ Nach dem Update die Plattform kurz im Browser prüfen und die Logs beobachten:
 docker compose logs -f backend
 ```
 
+Läuft alles, kann anschließend der Platz der überholten Images freigegeben werden — jedes
+Update hinterlässt welche.
+
+## Speicherplatz freigeben
+
+Jedes `docker compose build --no-cache` schreibt vollständig neue Image-Schichten. Das
+bisherige Image verschwindet dabei nicht — es verliert nur seinen Namen und bleibt als
+`<none>` liegen. Dazu legt der Build-Vorgang einen eigenen Zwischenspeicher an; `--no-cache`
+verhindert nur, dass er *gelesen* wird, nicht dass er *wächst*. Nach einigen Updates
+summiert sich das auf mehrere Gigabyte.
+
+Erst nachsehen, wo der Platz liegt:
+
+```bash
+docker system df
+```
+
+Die Spalte `RECLAIMABLE` zeigt je Kategorie (Images, Containers, Local Volumes, Build
+Cache), wie viel davon freigegeben werden kann.
+
+**Aufräumen — beides fasst nur an, was nichts mehr braucht:**
+
+```bash
+# 1. Überholte Images (Tag <none>) — die Vorgänger der aktuellen Builds
+docker image prune -f
+
+# 2. Build-Zwischenspeicher — nach --no-cache-Builds meist der größte Posten
+docker builder prune -f
+```
+
+Laufende Container behalten ihr Image; die Plattform muss dafür nicht angehalten werden.
+
+> **Erst prüfen, dann aufräumen.** Das vorherige Image ist der schnellste Weg zurück, falls
+> ein Update Probleme macht. Deshalb gehört dieser Schritt ans **Ende** des Updates — nach
+> dem Blick in Browser und Logs, nicht davor.
+
+Reicht das nicht, lässt sich auch der noch verwendbare Build-Cache verwerfen. Der nächste
+Build dauert dann länger, ist aber unverändert korrekt:
+
+```bash
+docker builder prune -af
+```
+
+Wer regelmäßig aufräumt, aber die letzten Tage behalten will:
+
+```bash
+docker builder prune -f --filter until=168h   # alles älter als 7 Tage
+```
+
+### Was auf keinen Fall
+
+| Befehl | Wirkung |
+|---|---|
+| `docker volume prune` | Löscht das Volume `postgres_data` — **die gesamte Datenbank**: Konten, Konversationen, Budgets, Bildungsplan. |
+| `docker system prune --volumes` | Dasselbe, zusätzlich zum übrigen Aufräumen. Das `--volumes` ist der gefährliche Teil. |
+| `docker image prune -a` bei angehaltener Plattform | Entfernt auch die aktuell benötigten Images, weil ohne laufende Container nichts sie beansprucht. Keine Daten verloren, aber ein vollständiger Neubau nötig. |
+
+Ohne `--volumes` bzw. `docker volume prune` sind Datenbank und `./data` (generierte Bilder,
+Artefakte, Export-Vorlagen) nicht in Gefahr — `./data` ist ohnehin ein Verzeichnis des
+Servers, kein Docker-Volume. Vor größeren Aufräumaktionen trotzdem sicherheitshalber ein
+[Datenbank-Backup](#datenbank-backup) ziehen.
+
+### Container-Logs
+
+Neben den Builds wachsen die Logdateien der Container unbegrenzt — sie stehen nicht in
+`docker system df`. Prüfen und begrenzen:
+
+```bash
+sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail -5
+```
+
+Dauerhaft begrenzen lässt sich das je Dienst in `docker-compose.yml`:
+
+```yaml
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+Die Begrenzung greift erst für **neu erzeugte** Container, also nach dem nächsten
+`docker compose up -d`.
+
 ## Fächer ändern (`subjects.yaml`)
 
 `config/subjects.yaml` ist die einzige Quelle der Wahrheit für die Fächerliste.

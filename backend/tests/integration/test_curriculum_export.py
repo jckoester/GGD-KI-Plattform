@@ -14,7 +14,11 @@ from app.context.schemas import (
     CurriculumDraftKapitel,
     CurriculumDraftLernsequenz,
 )
-from app.context.service import import_curriculum_from_draft, load_curriculum_tree
+from app.context.service import (
+    hinweise_code_to_uuid,
+    import_curriculum_from_draft,
+    load_curriculum_tree,
+)
 from app.context.curriculum_export import build_curriculum_export_dict
 from app.db.models import ContextEdge, ContextNode
 
@@ -119,6 +123,23 @@ async def bp_nodes(db_session: AsyncSession):
         metadata_={"nr": "2.1.1"},
     )
 
+    # IK-Knoten ETH mit Klammer in der Nummer. In Mathematik und Physik ist diese
+    # Schreibweise der Normalfall (`3.4.3(2)`), und genau daran zerbrach die
+    # Token-Erkennung beim Re-Import — mit `2.1.1` allein fällt das nie auf.
+    ik_eth_paren_id = await _insert_node(
+        db_session,
+        id=uuid.uuid4(),
+        category="knowledge",
+        content_type="ik_kompetenz",
+        title="ETH IK 2.4.7(3)",
+        status="active",
+        owner_pseudonym="system",
+        read_scope="global",
+        write_scope="school",
+        subject_id=eth_subject_id,
+        metadata_={"nr": "2.4.7(3)"},
+    )
+
     # PK-Knoten
     pk_id_node = await _insert_node(
         db_session,
@@ -181,6 +202,7 @@ async def bp_nodes(db_session: AsyncSession):
         "fachplan_id": fachplan_id,
         "ik_ma_id": ik_ma_id,
         "ik_eth_id": ik_eth_id,
+        "ik_eth_paren_id": ik_eth_paren_id,
         "pk_id_node": pk_id_node,
         "lp_id_node": lp_id_node,
         "lpa_id_node": lpa_id_node,
@@ -458,6 +480,34 @@ class TestCurriculumRoundTrip:
                 found = True
                 break
         assert found, "Cross-IK references-Kante nach Re-Import aus Code-Token nicht gefunden"
+
+    @pytest.mark.asyncio
+    async def test_roundtrip_cross_ik_token_mit_klammer_in_nummer(
+        self, db_session: AsyncSession, bp_nodes: dict
+    ):
+        """Kompetenznummern mit Klammer (`2.4.7(3)`) überstehen den Re-Import.
+
+        Der Fehler, den dieser Test festhält: Die Token-Erkennung endete an der
+        **inneren** Klammer. Gesucht wurde `2.4.7(3`, gefunden nichts — und im Text
+        blieb eine verwaiste `)` stehen. Sichtbar wurde das erst an einem echten
+        Mathematik-Curriculum; Fächer mit klammerfreien Nummern verdeckten es.
+        """
+        ik_uuid = str(bp_nodes["ik_eth_paren_id"])
+        draft = _make_draft(bp_nodes, hinweise=f"#[ETH 2.4.7(3)](ik:{ik_uuid})")
+        curriculum_id, _ = await import_curriculum_from_draft(db_session, draft, "teacher1")
+
+        tree = await load_curriculum_tree(db_session, curriculum_id)
+        export = await build_curriculum_export_dict(db_session, tree)
+        hinweise = export["kapitel"][0]["lernsequenzen"][0]["eintraege"][0]["hinweise"]
+        assert "(ik:ETH:2.4.7(3))" in hinweise
+
+        # Re-Import: Die Nummer muss vollständig ankommen, sonst schlägt die Suche fehl.
+        warnings: list[str] = []
+        uebersetzt = await hinweise_code_to_uuid(hinweise, db_session, warnings, "Test")
+        assert warnings == [], f"Nummer mit Klammer nicht aufgelöst: {warnings}"
+        assert f"#[ETH 2.4.7(3)](ik:{ik_uuid})" == uebersetzt
+        # Keine verwaiste Klammer: Der Text ist exakt so lang wie das erzeugte Token.
+        assert not uebersetzt.endswith("))")
 
 
 class TestCurriculumImportWarnings:

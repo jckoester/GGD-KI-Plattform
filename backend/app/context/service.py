@@ -580,7 +580,16 @@ async def resolve_ik_node_by_fach_code(
 
 _LP_CODE_TOKEN  = re.compile(r'@\[([^\]]*)\]\(lp:([^)]+)\)')
 _LPA_CODE_TOKEN = re.compile(r'@\[([^\]]*)\]\(lpa:([^)]+)\)')
-_IK_CODE_TOKEN  = re.compile(r'#\[([^\]]*)\]\(ik:([^/:)]+):([^)]+)\)')
+
+# Die Kompetenznummer darf selbst Klammern enthalten — in Mathematik und Physik ist
+# `3.4.3(2)` die Regel, nicht die Ausnahme. Ein einfaches `[^)]+` endet dann an der
+# *inneren* Klammer: Gesucht wurde `3.4.3(2`, gefunden nichts, und im Text blieb eine
+# verwaiste `)` zurück. Deshalb erlaubt die Nummer eine Ebene ausgeglichener Klammern.
+# Fächer wie Ethik mit `2.1.1` haben den Fehler nie ausgelöst — daher fiel er erst an
+# einem echten Mathematik-Curriculum auf.
+_IK_CODE_TOKEN  = re.compile(
+    r'#\[([^\]]*)\]\(ik:([^/:()]+):((?:[^()]|\([^()]*\))*)\)'
+)
 _NODE_UUID_TOKEN = re.compile(r'@\[([^\]]*)\]\(node:[0-9a-f-]{36}\)')
 
 

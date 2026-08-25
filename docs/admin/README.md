@@ -58,7 +58,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Curricula übertragen](../runbooks/curriculum-transfer.md) — Runbook: Schulcurricula exportieren und in promptLab/Dev einspielen
 - [Stundenplan-Integration](stundenplan-integration.md) — WebUntis: Servicekonto, Fachkürzel, Ferien-Import, Abgleich-Cron
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen
-- [Updates & Wartung](updates-und-wartung.md) — Updates, Schuljahreswechsel, Troubleshooting
+- [Updates & Wartung](updates-und-wartung.md) — Updates, Speicherplatz freigeben, Schuljahreswechsel, Troubleshooting
 - [Content-Moderation & Guardrails](content-moderation.md) — Schulweiter Guardrail-Prompt, LiteLLM-Guardrails konfigurieren
 - [Server-Rendering-Sidecar](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Betrieb, Config, Cache-Cleanup
 - [Artefaktbibliothek](artefaktbibliothek.md) — Aufbewahrung/Quota, Ablage-Volume, Cleanup-Cron
