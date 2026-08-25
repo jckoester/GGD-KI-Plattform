@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.4] – 2026-08-25
+
+### Geändert
+
+- **Curriculum-Editor: „Fertig" statt „Abbrechen", sobald gespeichert ist.** Die
+  Schaltfläche führt immer zurück zur Leseansicht, bedeutet aber je nach Stand etwas
+  anderes. Nach dem Speichern gibt es nichts zu verwerfen — „Abbrechen" las sich dort, als
+  nähme man die eben gespeicherte Arbeit zurück, und es war nicht erkennbar, dass dies der
+  Weg aus dem Bearbeitungsmodus ist. Bei ungespeicherten Änderungen bleibt es
+  „Abbrechen"; der Tooltip benennt in dem Fall ausdrücklich, dass Änderungen verloren
+  gehen. Gilt für die obere Leiste und den mitlaufenden Fußbereich.
+
 ## [0.5.3] – 2026-08-25
 
 Fehlerbehebung: Kompetenz-Auswahl zeigte zwei Bildungsplan-Fassungen nebeneinander.
