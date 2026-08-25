@@ -38,6 +38,12 @@ logger = logging.getLogger("import_bildungsplan")
 # Arbeitsverzeichnis des Aufrufers abhängen dürfen.
 PROJEKT_WURZEL = Path(__file__).resolve().parent.parent
 
+# `app.context.editions` liefert den Editions-Fahrplan — dieselbe Logik, die auch
+# die Anzeige nutzt. Der Runbook setzt PYTHONPATH=backend voraus; das hier macht
+# das Skript davon unabhängig.
+if str(PROJEKT_WURZEL / "backend") not in sys.path:
+    sys.path.insert(0, str(PROJEKT_WURZEL / "backend"))
+
 # content_types die im Bildungsplan-Import verwendet werden
 BP_CONTENT_TYPES = {
     "fachplan",
@@ -574,6 +580,13 @@ def archive_superseded_nodes(
     total_archived = 0
     default_suffix = subjects_cfg.get("bildungsplan_default", {}).get("suffix", "")
 
+    # Das laufende Schuljahr entscheidet, welche Editionen noch gebraucht werden.
+    # Quelle ist `config/school_year.yaml` (bzw. SCHOOL_YEAR_PATH) — dieselbe, aus der
+    # auch die Anzeige ihre Frontier berechnet.
+    from app.context.editions import aktuelles_schuljahr_start
+
+    schuljahr_start = aktuelles_schuljahr_start()
+
     for fach in subjects_cfg.get("subjects", []):
         subject_suffix = fach.get("bildungsplan_suffix", default_suffix)
         # Nichts zu tun, wenn keine vom Basis-Default abweichende Fach-Edition konfiguriert ist.
@@ -593,9 +606,33 @@ def archive_superseded_nodes(
         # Fach-weite Edition (z.B. ganzes Fach auf '.V2')
         total_archived += _archive_subject_edition(
             cur, subject_id, fach_slug, fach_code, subject_suffix, dry_run,
+            cfg=subjects_cfg, fach=fach, schuljahr_start=schuljahr_start,
         )
 
     return total_archived
+
+
+def benoetigte_editionen(
+    cfg: dict, fach: dict, schuljahr_start: int, verfuegbar: set[str]
+) -> set[str]:
+    """Welche Editionen (``bp_version``) dieses Fach laut Fahrplan noch braucht.
+
+    Für jede Klassenstufe des Fachs die geltende Edition bestimmen und einsammeln. Mit
+    dem Editions-Fahrplan gilt in einem Fach **nicht mehr eine einzige Fassung**: Im
+    Schuljahr 2026/27 stehen die Stufen 5–7 auf V3, die Stufen 8–12 weiter auf V2 — beide
+    müssen aktiv bleiben.
+    """
+    from app.context.editions import aktive_edition, load_edition_schedule
+
+    editionen = load_edition_schedule(cfg)
+    von = fach.get("min_grade") or 5
+    bis = fach.get("max_grade") or 13
+    benoetigt = set()
+    for stufe in range(int(von), int(bis) + 1):
+        e = aktive_edition(editionen, stufe, schuljahr_start, verfuegbar)
+        if e:
+            benoetigt.add(e.bp_version)
+    return benoetigt
 
 
 def _archive_subject_edition(
@@ -605,15 +642,28 @@ def _archive_subject_edition(
     fach_code: str,
     subject_suffix: str,
     dry_run: bool,
+    cfg: dict | None = None,
+    fach: dict | None = None,
+    schuljahr_start: int | None = None,
 ) -> int:
-    """Archiviert veraltete Knoten eines ganzen Fachs, das auf eine neue Edition
-    (z.B. '.V2') umgestellt wurde.
+    """Archiviert Editionen eines Fachs, die **keine Klassenstufe mehr braucht**.
 
-    Der Fach-Suffix gilt für die gesamte Klassenstufen-Spanne.
+    ⚠️ **Früher galt „ein Fach steht als Ganzes auf einer Edition"** — archiviert wurde
+    alles ohne den aktuellen Editions-Marker. Diese Annahme stammt aus der Zeit vor dem
+    Editions-Fahrplan und trägt seither nicht mehr: Ab 2026/27 stehen die Stufen 5–7 auf
+    V3, die Stufen 8–12 weiterhin auf V2. Die alte Regel hätte beim Umstellen von
+    Mathematik auf `.V3` **778 V2-Knoten archiviert** — genau die, die die Klassen 8–12
+    noch brauchen.
 
-    Sicherheitsnetz: Es wird nur archiviert, wenn mindestens ein aktiver Knoten der
-    neuen Edition existiert — sonst würde ein Teil-Import (nur Basis-Edition) das
-    gerade Importierte sofort wieder archivieren.
+    Besonders tückisch daran: Fachplan-Knoten wären aktiv geblieben, die Frontier hätte
+    für Klasse 8 korrekt V2 gewählt und einen **leeren** Bildungsplan geladen. Kein
+    Fehler, keine Meldung — nur kein Inhalt.
+
+    Maßgeblich ist deshalb der Fahrplan: Welche Editionen für **irgendeine** Stufe des
+    Fachs gelten, bleiben aktiv; nur der Rest wird archiviert.
+
+    Sicherheitsnetz wie bisher: Ohne aktive Knoten der aktuellen Edition passiert nichts —
+    sonst würde ein Teil-Import das gerade Importierte sofort wieder ablegen.
     """
     marker = fach_code + subject_suffix
 
@@ -637,7 +687,36 @@ def _archive_subject_edition(
         )
         return 0
 
-    # Veraltete Knoten = aktive Wissensknoten ohne den Editions-Marker.
+    # Welche Editionen liegen für dieses Fach überhaupt aktiv vor?
+    cur.execute(
+        """
+        SELECT DISTINCT metadata->>'bp_version'
+        FROM context_nodes
+        WHERE subject_id = %s AND status = 'active' AND category = 'knowledge'
+          AND content_type = ANY(%s) AND metadata->>'bp_version' IS NOT NULL
+        """,
+        (subject_id, list(BP_CONTENT_TYPES)),
+    )
+    verfuegbar = {r[0] for r in cur.fetchall() if r[0]}
+
+    if cfg is None or fach is None or schuljahr_start is None:
+        # Ohne Fahrplan-Kontext nichts archivieren: lieber eine veraltete Edition zu
+        # viel als eine, die eine Klassenstufe noch braucht.
+        logger.info(
+            f"archive_superseded: {fach_slug} — kein Fahrplan-Kontext, nichts archiviert"
+        )
+        return 0
+
+    benoetigt = benoetigte_editionen(cfg, fach, schuljahr_start, verfuegbar)
+    ueberzaehlig = verfuegbar - benoetigt
+    if not ueberzaehlig:
+        logger.info(
+            f"archive_superseded: {fach_slug} (Edition {subject_suffix}) — "
+            f"alle vorhandenen Editionen werden noch gebraucht "
+            f"({', '.join(sorted(benoetigt)) or '—'}), nichts archiviert"
+        )
+        return 0
+
     cur.execute(
         """
         SELECT id, metadata->>'bp_id' AS bp_id
@@ -646,33 +725,28 @@ def _archive_subject_edition(
           AND status = 'active'
           AND category = 'knowledge'
           AND content_type = ANY(%s)
-          AND metadata->>'bp_id' NOT LIKE %s
+          AND metadata->>'bp_version' = ANY(%s)
         """,
-        (subject_id, list(BP_CONTENT_TYPES), f"%{marker}%"),
+        (subject_id, list(BP_CONTENT_TYPES), list(ueberzaehlig)),
     )
     rows = cur.fetchall()
     if not rows:
-        logger.info(
-            f"archive_superseded: {fach_slug} (Edition {subject_suffix}) — "
-            f"keine veralteten Knoten gefunden"
-        )
         return 0
 
-    bp_ids_preview = [r[1] for r in rows[:3]]
     logger.info(
         f"{'[DRY RUN] ' if dry_run else ''}"
-        f"archive_superseded: {fach_slug} (Edition {subject_suffix}) — "
-        f"{len(rows)} veraltete Knoten archivieren (z.B. {bp_ids_preview})"
+        f"archive_superseded: {fach_slug} — Edition(en) {', '.join(sorted(ueberzaehlig))} "
+        f"werden von keiner Klassenstufe mehr gebraucht, {len(rows)} Knoten archivieren "
+        f"(weiter aktiv: {', '.join(sorted(benoetigt))})"
     )
     if not dry_run:
-        ids = [row[0] for row in rows]
         cur.execute(
             """
             UPDATE context_nodes
             SET status = 'archived', archived_at = now()
             WHERE id = ANY(%s)
             """,
-            (ids,),
+            ([row[0] for row in rows],),
         )
     return len(rows)
 

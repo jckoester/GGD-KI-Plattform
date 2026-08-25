@@ -61,3 +61,4 @@ config/pedagogy.yaml
 config/artifact_limits.yaml
 data/artifacts/*
 infra/litellm_config.dev.yaml
+config/school_year.2026-27.yaml

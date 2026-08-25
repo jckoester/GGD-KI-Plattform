@@ -37,37 +37,81 @@ versehen. Fächer **ohne** Code werden beim Scrape/Import übersprungen (kein Fe
 
 ```yaml
 schulart: GYM
-schuljahr: "2026/27"
+
+# Welche Editionen es überhaupt gibt und ab wann sie gelten (Editions-Fahrplan).
+# Steuert die ANZEIGE: /fachplan/by-subject wählt je Jahrgang die geltende Fassung.
 bildungsplan_default:
   bp_basis: BP2016BW
-  suffix: ""              # globaler Fallback (siehe Editions-Kaskade)
+  suffix: ""                   # globaler Fallback, falls ein Fach nichts eigenes sagt
+  editionen:
+    - suffix: ""               # Basis/V1 — gilt immer als Rückfallebene
+    - suffix: ".V2"
+      ab_schuljahr: "2016/17"
+      einstieg_stufen: [5, 12]
+    - suffix: ".V3"
+      ab_schuljahr: "2026/27"
+      einstieg_stufen: [5, 7]
+      wachstum: nach_oben      # wandert jährlich eine Stufe nach oben
 
 subjects:
   - slug: chemie
-    fach_code: CH          # ein Code, Basisfassung
+    fach_code: CH              # keine Angabe → Basisfassung
   - slug: mathematik
     fach_code: M
-    bildungsplan_suffix: ".V2"   # ganzes Fach auf der überarbeiteten Fassung
+    bildungsplan_suffix: ".V3" # dieses Fach ist auf der dritten Fassung
 ```
 
-### Bildungsplan-Edition (Suffix)
+### Zwei Schalter mit verschiedenen Aufgaben
 
-Die Fassung (`""` = Basis, `.V2` = überarbeitet) wird in zwei Stufen aufgelöst,
-Präzedenz fallend:
+Das ist die häufigste Verwechslung, deshalb ausdrücklich:
 
-1. **`bildungsplan_suffix`** (pro Fach, ganze Klassenspanne) — wenn das **ganze
-   Fach** auf der Neufassung ist:
-   ```yaml
-   - slug: mathematik
-     fach_code: M
-     bildungsplan_suffix: ".V2"   # ganzes Fach auf der überarbeiteten Fassung
-   ```
-2. **`bildungsplan_default.suffix`** (global) — Fallback, üblicherweise `""`.
+| | steuert | Wirkung |
+|---|---|---|
+| **`bildungsplan_suffix`** (je Fach) | **Scrape und Import** | welche Fassungen des Fachs geholt und eingelesen werden |
+| **`editionen`** (Fahrplan) | **Anzeige** | welche Fassung in welchem Jahrgang und Schuljahr gilt |
 
-> Der **schuljahres-/stufenabhängige** Rollout (früher `bildungsplan_overrides` pro
-> Jahrgangsband) läuft jetzt über den **Editions-Fahrplan** (`bildungsplan_default.editionen`
-> mit `ab_schuljahr`/`einstieg_stufen`) — siehe Abschnitt Bildungsplan-Versionierung. Der
-> Scraper scrapt alle Editionen des Fachs; `/fachplan/by-subject` wählt je Stufe die geltende.
+Beide werden gebraucht. Steht ein Fach nicht auf `.V3`, wird die dritte Fassung gar nicht
+erst gescrapt — der Fahrplan könnte sie dann nicht anzeigen. Umgekehrt liegt sie ohne
+Fahrplan-Eintrag zwar in der Datenbank, wird aber keinem Jahrgang zugeordnet.
+
+### Ein Fach auf eine neue Fassung stellen
+
+Ein Feld, eine Zeile:
+
+```yaml
+  - slug: mathematik
+    fach_code: M
+    bildungsplan_suffix: ".V3"
+```
+
+Der Scraper holt daraufhin **alle Fassungen bis dahin**, weil ältere Jahrgänge noch auf der
+vorigen unterrichtet werden und Querverweise ins Leere liefen, wenn es die alte Fassung
+nicht mehr gäbe:
+
+| `bildungsplan_suffix` | gescrapte Dateien |
+|---|---|
+| *(nicht gesetzt)* | `M.jsonl` |
+| `".V2"` | `M_BASIS.jsonl`, `M.jsonl` |
+| `".V3"` | `M_BASIS.jsonl`, `M_V2.jsonl`, `M.jsonl` |
+
+**Die aktuelle Fassung trägt immer den schlichten Namen** (`M.jsonl`), ältere bekommen ein
+Kennzeichen. Wer wissen will, was gerade gilt, schaut also stets in dieselbe Datei.
+
+> **Prüfen statt raten:** Welche Dateien für ein Fach entstehen, lässt sich vorab
+> abfragen — nützlich, bevor ein Scrape über alle Fächer läuft:
+> ```bash
+> python -c "
+> import yaml, importlib.util as u
+> s=u.spec_from_file_location('sc','scripts/scraper/bildungsplan_scraper.py')
+> m=u.module_from_spec(s); s.loader.exec_module(m)
+> c=yaml.safe_load(open('config/subjects.yaml')); bp=c['bildungsplan_default']
+> f=[x for x in c['subjects'] if x.get('fach_code')=='M'][0]
+> print(m.subject_editions(f, m.schedule_suffixes(bp), bp.get('suffix','')))"
+> ```
+
+> **Zum Schuljahr:** Ob eine Fassung *gilt*, entscheidet der Fahrplan zusammen mit dem
+> laufenden Schuljahr aus `config/school_year.yaml`. Eine Edition mit
+> `ab_schuljahr: "2026/27"` bleibt wirkungslos, solange dort noch `2025/26` steht.
 
 > **Seed nach Code-Änderung:** Wird ein `fach_code` in `subjects.yaml` ergänzt oder
 > geändert, die `subjects`-Tabelle neu seeden (`python scripts/seed_subjects.py`),
