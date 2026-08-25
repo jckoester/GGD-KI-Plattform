@@ -917,3 +917,82 @@ async def test_scrape_fach_schreibt_bei_kollision_nichts(tmp_path):
             )
 
     assert list(tmp_path.glob("*.jsonl")) == [], "Bei Kollision darf nichts entstehen"
+
+
+# ── Fehlende Zwischeneditionen ──────────────────────────────────────────────
+
+
+_SUBJECTS_SPRUNG_AUF_V3 = """\
+schulart: GYM
+bildungsplan_default:
+  bp_basis: BP2016BW
+  suffix: ""
+  editionen:
+    - suffix: ""
+    - suffix: ".V2"
+      ab_schuljahr: "2016/17"
+    - suffix: ".V3"
+      ab_schuljahr: "2026/27"
+      seitengeneration: gen2x
+      quell_version: "V3.0"
+subjects:
+  - slug: ethik
+    fach_code: ETH
+    bildungsplan_suffix: ".V3"
+"""
+
+
+@pytest.mark.asyncio
+async def test_fehlende_zwischenedition_kostet_nicht_das_ganze_fach(tmp_path):
+    """Nicht jedes Fach hat jede Edition des Fahrplans.
+
+    Ethik, Geschichte, Musik und acht weitere sind von der Basisfassung **direkt** auf
+    V3 gegangen. Ihre `.V2`-Adresse liefert die Basisfassung; die Fassungsprüfung weist
+    das zu Recht ab. Ohne die Unterscheidung zwischen Zwischen- und eigener Edition riss
+    das am 25.08.2026 **11 von 17 Fächern** mitsamt ihrem V3-Plan mit.
+    """
+    cfg = tmp_path / "subjects.yaml"
+    cfg.write_text(_SUBJECTS_SPRUNG_AUF_V3, encoding="utf-8")
+
+    async def fake_scrape(client, label, bp_id_basis, suffix, *a, **kw):
+        if suffix == ".V2":
+            raise _scraper.ScraperFassungError(
+                "…/ETH.V2", "BP2016BW_ALLG_GYM_ETH.V2", "BP2016BW_ALLG_GYM_ETH", "Test"
+            )
+        return (1, 0, 0)
+
+    fake = AsyncMock(side_effect=fake_scrape)
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", fake), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_cm()):
+        skipped = await _scraper.main(str(cfg), str(tmp_path / "out"))
+
+    assert skipped == [], f"Fach fiel aus: {skipped}"
+    # Basis und V3 sind trotzdem gescrapt worden — nur V2 fehlt.
+    versucht = [c.args[3] for c in fake.call_args_list]
+    assert versucht == ["", ".V2", ".V3"]
+
+
+@pytest.mark.asyncio
+async def test_eigene_edition_falsch_laesst_das_fach_ausfallen(tmp_path):
+    """Die Gegenprobe: Fehlt die **aktuelle** Edition, ist das ein echter Ausfall.
+
+    Sonst entstünde ein Fach, dessen gelebter Bildungsplan schlicht fehlt — und der
+    Lauf meldete Erfolg.
+    """
+    cfg = tmp_path / "subjects.yaml"
+    cfg.write_text(_SUBJECTS_SPRUNG_AUF_V3, encoding="utf-8")
+
+    async def fake_scrape(client, label, bp_id_basis, suffix, *a, **kw):
+        if suffix == ".V3":
+            raise _scraper.ScraperFassungError(
+                "…/ETH(V3.0)", "…GEN2X…ETH(V3.0)", "BP2016BW_ALLG_GYM_ETH", "Test"
+            )
+        return (1, 0, 0)
+
+    with patch.object(_scraper, "scrape_leitperspektiven", AsyncMock(return_value=[])), \
+         patch.object(_scraper, "scrape_fach", AsyncMock(side_effect=fake_scrape)), \
+         patch.object(_scraper.httpx, "AsyncClient", return_value=_async_cm()):
+        skipped = await _scraper.main(str(cfg), str(tmp_path / "out"))
+
+    assert [slug for slug, _ in skipped] == ["ethik"]

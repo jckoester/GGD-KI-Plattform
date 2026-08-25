@@ -595,13 +595,36 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                         logger.info(
                             f"  Zusatz-Edition '{edition_suffix or 'Basis'}' ({label})"
                         )
-                    n, g, u = await scrape_fach(
-                        client, label, bp_id_basis, edition_suffix, output,
-                        existing_hashes, warnings,
-                        subject_min_grade=fach.get('min_grade'),
-                        subject_max_grade=fach.get('max_grade'),
-                        gen2x_version=quell_versionen.get(edition_suffix),
-                    )
+                    try:
+                        n, g, u = await scrape_fach(
+                            client, label, bp_id_basis, edition_suffix, output,
+                            existing_hashes, warnings,
+                            subject_min_grade=fach.get('min_grade'),
+                            subject_max_grade=fach.get('max_grade'),
+                            gen2x_version=quell_versionen.get(edition_suffix),
+                        )
+                    except ScraperFassungError:
+                        # **Nicht jedes Fach hat jede Zwischenedition.** Der Fahrplan
+                        # kennt Basis → V2 → V3; Ethik, Geschichte, Musik und andere sind
+                        # aber von der Basisfassung direkt auf V3 gegangen. Ihre
+                        # `.V2`-Adresse liefert die Basisfassung — richtig abgewiesen,
+                        # aber kein Grund, das Fach fallenzulassen: Seine **eigene**
+                        # Edition ist ja da.
+                        #
+                        # Ohne diese Unterscheidung riss eine fehlende Zwischenedition
+                        # 11 von 17 Fächern mitsamt ihrem V3-Plan mit.
+                        if label == fach_code:
+                            raise
+                        logger.warning(
+                            "  %s: Edition '%s' gibt es für dieses Fach nicht "
+                            "(Adresse liefert eine andere Fassung) — übersprungen",
+                            slug, edition_suffix or 'Basis',
+                        )
+                        warnings.append(
+                            f"{slug}: Zwischenedition '{edition_suffix or 'Basis'}' "
+                            f"nicht vorhanden"
+                        )
+                        continue
                     neu += n; geaendert += g; unveraendert += u
             except ScraperKollisionError as exc:
                 # Eigener Zweig wie bei der Fassung: Die Quelle hat geantwortet, der
