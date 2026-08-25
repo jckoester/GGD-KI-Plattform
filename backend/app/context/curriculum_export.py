@@ -46,12 +46,21 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
     if not text:
         return text
 
+    from app.context.service import leitperspektive_code
+
     async def replace_lp(m: re.Match) -> str:
         label, uid = m.group(1), m.group(2)
-        meta = await _resolve_node_meta(db, uid, "code")
-        if meta and meta.get("code"):
-            return f"@[{label}](lp:{meta['code']})"
-        logger.warning("LP-Knoten %s hat kein 'code'-Feld – Token bleibt als UUID", uid)
+        # `code` ist in echten Daten nie gesetzt — das Kürzel wird deshalb aus der
+        # `bp_id` abgeleitet (BP2016BW_ALLG_LP_PG → PG). Vorher blieb JEDER LP-Verweis
+        # als UUID im Export stehen und zeigte in einer anderen Instanz ins Leere.
+        meta = await _resolve_node_meta(db, uid, "code", "bp_id")
+        kuerzel = leitperspektive_code(meta) if meta else ""
+        if kuerzel:
+            return f"@[{label}](lp:{kuerzel})"
+        logger.warning(
+            "LP-Knoten %s: Kürzel weder in 'code' noch aus 'bp_id' ableitbar – "
+            "Token bleibt als UUID", uid,
+        )
         return m.group(0)
 
     async def replace_lpa(m: re.Match) -> str:
@@ -72,7 +81,11 @@ async def hinweise_uuid_to_code(text: str, db: AsyncSession) -> str:
         node = result.scalar_one_or_none()
         if node:
             meta = node.metadata_ or {}
-            nr = meta.get("nr")
+            # Wie bei den Resolvern: Vom Scraper importierte Knoten führen die Nummer
+            # als `kompetenz_nr`, `nr` benutzen nur Test- und Altbestände. Wurde hier
+            # nur `nr` gelesen, blieben Cross-Fach-Verweise als UUID im Export — und
+            # tauchten beim Import als „Knoten gibt es nicht" wieder auf.
+            nr = meta.get("nr") or meta.get("kompetenz_nr")
             # fach_code aus subject_id ableiten
             if nr and node.subject_id:
                 subj_result = await db.execute(

@@ -450,3 +450,77 @@ async def test_editor_kapitel_wird_nicht_abgeraeumt(db, welt):
 
     assert (await db.get(ContextNode, handarbeit.id)).status == "active"
     assert "Von Hand ergänzt" in await _kapiteltitel(db, cid)
+
+
+# ── Leitperspektiven und Cross-Fach-IK: Rundreise über Kürzel (Punkt 3) ──────
+
+
+@pytest_asyncio.fixture
+async def lp_welt(db, welt):
+    """Eine Leitperspektive **ohne** `code` — genau wie echte Daten."""
+    lp = ContextNode(
+        id=uuid.uuid4(), category="knowledge", content_type="leitperspektive",
+        title="Prävention und Gesundheitsförderung", status="active",
+        owner_pseudonym="system", read_scope="global", write_scope="school",
+        metadata_={"bp_id": "BP2016BW_ALLG_LP_PG"},      # kein 'code'!
+    )
+    db.add(lp)
+    await db.flush()
+    return {**welt, "lp": lp}
+
+
+async def test_lp_verweis_wird_portabel_exportiert(db, lp_welt):
+    """Vorher blieb **jeder** LP-Verweis als UUID stehen — in einer anderen Instanz wertlos."""
+    from app.context.curriculum_export import hinweise_uuid_to_code
+
+    roh = f"Vgl. @[PG](lp:{lp_welt['lp'].id})"
+    assert await hinweise_uuid_to_code(roh, db) == "Vgl. @[PG](lp:PG)"
+
+
+async def test_cross_fach_ik_wird_portabel_exportiert(db, lp_welt):
+    """Dieselbe Asymmetrie wie bei den Resolvern: der Export las nur `nr`.
+
+    Cross-Fach-Verweise blieben dadurch UUIDs und tauchten beim Import als
+    „Knoten gibt es nicht" wieder auf — die vier Warnungen beim ersten Produktiv-Import
+    hatten genau diese Ursache.
+    """
+    from app.context.curriculum_export import hinweise_uuid_to_code
+
+    ik = ContextNode(
+        id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
+        title="CH 3.2.2.1(1)", status="active", owner_pseudonym="system",
+        read_scope="global", write_scope="school", subject_id=lp_welt["subject_id"],
+        metadata_={"kompetenz_nr": "3.2.2.1(1)"},        # kein 'nr'!
+    )
+    db.add(ik)
+    await db.flush()
+
+    roh = f"Vgl. #[Chemie](ik:{ik.id})"
+    assert await hinweise_uuid_to_code(roh, db) == "Vgl. #[Chemie](ik:CH:3.2.2.1(1))"
+
+
+async def test_lp_kuerzel_wird_beim_import_wieder_aufgeloest(db, lp_welt):
+    """Die Rückrichtung — sonst ist der portable Export nur die halbe Miete."""
+    from app.context.service import resolve_leitperspektive_node
+
+    for schreibweise in ("PG", "L PG", "(L) PG", "pg"):
+        assert await resolve_leitperspektive_node(db, schreibweise) == lp_welt["lp"].id, schreibweise
+
+
+async def test_import_verknuepft_lp_ueber_kuerzel(db, lp_welt):
+    """Vollständige Rundreise: Kürzel im YAML → Kante im Graphen."""
+    from app.db.models import ContextEdge
+
+    draft = _draft()
+    draft.kapitel[0].lernsequenzen[0].eintraege[0].hinweise = "Vgl. @[PG](lp:PG)"
+    cid, stats = await import_curriculum_from_draft(db, draft, "system")
+
+    kanten = (
+        await db.execute(
+            sa.select(sa.func.count()).select_from(ContextEdge).where(
+                ContextEdge.to_node_id == lp_welt["lp"].id,
+                ContextEdge.relation == "references",
+            )
+        )
+    ).scalar_one()
+    assert kanten == 1, f"LP-Kante fehlt; Warnungen: {stats.warnings}"

@@ -377,6 +377,42 @@ async def is_subject_department_member(
     return result.scalar_one_or_none() is not None
 
 
+_LP_PRAEFIX = re.compile(r"^\(?L\)?\s+", re.IGNORECASE)
+
+
+def normalize_lp_code(value: str | None) -> str:
+    """Leitperspektiven-Kürzel vereinheitlichen: ``"(L) BO"``/``"L BO"`` → ``"BO"``.
+
+    Die Bildungsplan-Texte markieren Leitperspektiven als „(L) BO"; in Entwurfsdaten
+    taucht die Form mit vorangestelltem „L " auf. Das Leerzeichen im Muster ist wichtig:
+    Ohne es würde ``LFDB`` (Leitfaden Demokratiebildung) zu ``FDB`` verstümmelt.
+    """
+    if not value:
+        return ""
+    return _LP_PRAEFIX.sub("", str(value).strip()).strip().upper()
+
+
+def leitperspektive_code(metadata: dict | None) -> str:
+    """Kürzel einer Leitperspektive — aus ``code``, sonst aus der ``bp_id`` abgeleitet.
+
+    ⚠️ **`code` ist in echten Daten immer leer.** Der Scraper schreibt das Feld nicht;
+    geprüft an allen 7 Leitperspektiven und 48 Aspekten der Dev-Instanz: null Treffer.
+    Ein Export übersetzte LP-Verweise deshalb nie in portable Kürzel, und der Import löste
+    Kürzel nie zu Knoten auf — beides scheiterte an demselben nie gefüllten Feld.
+
+    Statt das Feld nachzupflegen (Re-Scrape, Re-Import, ein zweiter Ort für dieselbe
+    Wahrheit) wird es aus der ohnehin vorhandenen `bp_id` gewonnen:
+    ``BP2016BW_ALLG_LP_PG`` → ``PG``. Wirkt sofort auf Bestandsdaten.
+    """
+    meta = metadata or {}
+    if meta.get("code"):
+        return normalize_lp_code(meta["code"])
+    bp_id = meta.get("bp_id") or ""
+    if "_LP_" in bp_id:
+        return normalize_lp_code(bp_id.rsplit("_LP_", 1)[-1])
+    return ""
+
+
 def _normalize_ref(ref: str) -> str:
     """Normalisiert eine Referenz für toleranten Vergleich.
     
@@ -485,16 +521,29 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
 
 
 async def resolve_leitperspektive_node(db: AsyncSession, lp_code: str) -> UUID | None:
-    """Löst Leitperspektive-Code zu node_id auf."""
+    """Löst ein Leitperspektiven-Kürzel zu einer node_id auf.
+
+    Verglichen wird gegen :func:`leitperspektive_code` — also gegen `code` **oder** das
+    aus der `bp_id` abgeleitete Kürzel. Die frühere Fassung fragte ausschließlich
+    `metadata->>'code'` ab und traf damit nie (das Feld ist in echten Daten leer).
+
+    In Python statt in SQL, weil die Ableitung sonst als String-Operation in die Abfrage
+    müsste — bei sieben Zeilen ist das die falsche Sparsamkeit.
+    """
+    gesucht = normalize_lp_code(lp_code)
+    if not gesucht:
+        return None
+
     result = await db.execute(
-        sa.select(ContextNode.id).where(
+        sa.select(ContextNode).where(
             ContextNode.content_type == "leitperspektive",
-            ContextNode.metadata_["code"].astext == lp_code,
             ContextNode.status == "active",
         )
     )
-    row = result.fetchone()
-    return row[0] if row else None
+    for node in result.scalars().all():
+        if leitperspektive_code(node.metadata_) == gesucht:
+            return node.id
+    return None
 
 
 async def resolve_leitperspektive_aspekt_node(db: AsyncSession, bp_id: str) -> UUID | None:

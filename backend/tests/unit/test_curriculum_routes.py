@@ -72,3 +72,56 @@ def test_schreibende_endpunkte_committen():
             f"{funktion.__name__} schreibt, committet aber nicht — die Änderung ginge "
             f"beim Schließen der Session verloren."
         )
+
+
+# ── Leitperspektiven-Kürzel: aus bp_id ableiten (Punkt 3) ────────────────────
+#
+# `metadata.code` ist in echten Daten **nie** gesetzt — geprüft an allen 7
+# Leitperspektiven und 48 Aspekten der Dev-Instanz. Export und Import hingen beide an
+# diesem nie gefüllten Feld: Der Export ließ LP-Verweise als UUID stehen (in einer anderen
+# Instanz wertlos), der Import löste Kürzel nie zu Knoten auf.
+
+import pytest
+
+from app.context.service import leitperspektive_code, normalize_lp_code
+
+
+@pytest.mark.parametrize(
+    "eingabe,erwartet",
+    [
+        ("BO", "BO"),
+        ("L BO", "BO"),        # Schreibweise aus Entwurfsdaten
+        ("(L) BTV", "BTV"),    # Schreibweise der Bildungsplan-Texte
+        ("  l  mb ", "MB"),
+        ("LFDB", "LFDB"),      # ⚠ beginnt mit L, ist aber selbst das Kürzel
+        ("", ""),
+        (None, ""),
+    ],
+)
+def test_lp_kuerzel_normalisierung(eingabe, erwartet):
+    assert normalize_lp_code(eingabe) == erwartet
+
+
+def test_lfdb_wird_nicht_verstuemmelt():
+    """Das Leerzeichen im Muster ist der ganze Punkt.
+
+    Ohne es würde aus `LFDB` (Leitfaden Demokratiebildung) ein `FDB` — ein Kürzel, das
+    es nicht gibt, und der Verweis liefe künftig ins Leere.
+    """
+    assert normalize_lp_code("LFDB") == "LFDB"
+    assert leitperspektive_code({"bp_id": "BP2016BW_ALLG_LP_LFDB"}) == "LFDB"
+
+
+@pytest.mark.parametrize(
+    "metadata,erwartet",
+    [
+        ({"bp_id": "BP2016BW_ALLG_LP_PG"}, "PG"),          # der reale Fall: kein code
+        ({"code": "BO", "bp_id": "BP2016BW_ALLG_LP_BO"}, "BO"),
+        ({"code": "L BO"}, "BO"),                           # code gesetzt, aber unsauber
+        ({"bp_id": "BP2016BW_ALLG_GYM_M_IK_5-6_01"}, ""),   # kein LP-Knoten
+        ({}, ""),
+        (None, ""),
+    ],
+)
+def test_lp_kuerzel_aus_metadaten(metadata, erwartet):
+    assert leitperspektive_code(metadata) == erwartet
