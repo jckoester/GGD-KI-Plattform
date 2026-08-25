@@ -765,3 +765,155 @@ async def test_ausfall_der_neuen_lp_seite_bricht_den_lauf_nicht_ab():
         knoten = await _scraper.scrape_leitperspektiven(MagicMock(), {".V3": "V3.0"})
 
     assert knoten == [] or all("LDW" not in k["bp_id"] for k in knoten)
+
+
+# ── Fächer mit abweichender Gliederung (Physik) ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "ueberschrift,erwartet_segment",
+    [
+        ("3.4 Klassen 12/13 (Basisfach mit Schwerpunkt Quantenphysik)",
+         "12-13-BF-QUANTENPHYSIK"),
+        ("3.5 Klassen 12/13 (Basisfach mit Schwerpunkt Astrophysik)",
+         "12-13-BF-ASTROPHYSIK"),
+        ("3.6 Klassen 12/13 (Leistungsfach)", "12-13-LF"),
+    ],
+)
+def test_schwerpunkt_macht_das_band_eindeutig(ueberschrift, erwartet_segment):
+    """Stufen und Niveau reichen nicht — Physik führt **zwei** Basisfächer in 12/13.
+
+    Ohne den Schwerpunkt im Segment bekämen `3.4.1 Denk- und Arbeitsweisen` und
+    `3.5.1 Denk- und Arbeitsweisen` denselben Bezeichner. Im echten Physik-Scrape
+    waren es **39 doppelte bp_ids**; beim Import überschrieb einer den anderen.
+    """
+    assert band_aus_ueberschrift(ueberschrift)[0] == erwartet_segment
+
+
+def test_band_ohne_schwerpunkt_bleibt_unveraendert():
+    """Nur der Ausnahmefall trägt den Zusatz — sonst bliebe kein Bezeichner stabil."""
+    assert band_aus_ueberschrift("3.1 Klassen 5/6")[0] == "5-6"
+    assert band_aus_ueberschrift("3.4 Klasse 11")[0] == "11"
+
+
+_PH_MIT_UNTEREBENE = """
+<html><head><title>BPBW-ALLG-GYM-PH(V3.0) - Bildungsplan</title></head><body>
+  <h1>Physik Überarbeitete Fassung vom 21. Mai 2026 (V3.0)</h1>
+  <h4 id="3.3">3.3 Klasse 11</h4>
+  <h5 id="3.3.1">3.3.1 Mechanik</h5>
+  <div class="composedcontent-ls_bp_allg_content_block_bpx">Einleitung Mechanik.</div>
+  <h6 id="3.3.1.1">3.3.1.1 Kinematik</h6>
+  <div class="composedcontent-ls_bp_allg_content_block_bpx">Einleitung Kinematik.</div>
+  <section class="table"><div><table>
+    <thead><tr><th>Die Schülerinnen und Schüler können</th></tr></thead>
+    <tbody>
+      <tr class="bp_allg_content_item_table_item_bpx" id="3.3.1.1(1)">
+        <td><div class="text-container"><div class="text-number"><span>(1)</span></div>
+        <div class="text-body"><p>Bewegungen beschreiben</p></div></div></td>
+      </tr>
+    </tbody>
+  </table></div></section>
+</body></html>
+"""
+
+
+@pytest.fixture(scope="module")
+def ph_knoten() -> list[dict]:
+    return parse_gen2x_dokument(
+        BeautifulSoup(_PH_MIT_UNTEREBENE, "lxml"),
+        "https://…/DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_PH(V3.0)",
+        "BP2016BW_ALLG_GYM_PH.V3",
+    )
+
+
+def test_unterebene_wird_eigener_knoten(ph_knoten):
+    """Physik gliedert eine Ebene tiefer: `3.3.1.1 Kinematik` unter `3.3.1 Mechanik`.
+
+    Ohne diese Ebene fehlte der Knoten ganz — und Cross-Fach-Verweise auf `3.3.1.1`
+    (Mathematik hat drei davon) liefen ins Leere.
+    """
+    unter = _eines(ph_knoten, "BP2016BW_ALLG_GYM_PH.V3_IK_11_01_01")
+    assert unter["content_type"] == "leitidee"
+    assert unter["title"] == "3.3.1.1 Kinematik"
+    assert unter["metadata"]["nr"] == "3.3.1.1"
+    assert unter["parent_bp_id"] == "BP2016BW_ALLG_GYM_PH.V3_IK_11_01"
+
+
+def test_kompetenz_der_unterebene_haengt_richtig(ph_knoten):
+    """Der Index der Unterebene steht dort, wo sonst der Platzhalter `00` steht."""
+    k = _eines(ph_knoten, "BP2016BW_ALLG_GYM_PH.V3_IK_11_01_01_01")
+    assert k["content_type"] == "ik_kompetenz"
+    assert k["metadata"]["kompetenz_nr"] == "3.3.1.1(1)"
+    assert k["parent_bp_id"] == "BP2016BW_ALLG_GYM_PH.V3_IK_11_01_01"
+
+
+def test_leitidee_mit_unterebene_greift_deren_tabelle_nicht_ab(ph_knoten):
+    """Die Kompetenz gehört der Unterebene, nicht der Leitidee darüber.
+
+    Vorher las die Leitidee die erste Tabelle, die ihr folgte — auch über die
+    h6-Grenze hinweg. Die Kompetenzen hingen dann eine Ebene zu hoch.
+    """
+    kinder = [k for k in ph_knoten if k["parent_bp_id"] == "BP2016BW_ALLG_GYM_PH.V3_IK_11_01"]
+    assert [k["content_type"] for k in kinder] == ["leitidee"]
+
+
+# ── Kollisionsprüfung ───────────────────────────────────────────────────────
+
+
+def test_kollidierende_bp_ids_werden_abgewiesen():
+    """Zwei Knoten mit derselben bp_id: gar keine Datei ist besser als eine falsche.
+
+    Der Import erkennt Knoten an ihrer `bp_id`. Kommen zwei mit derselben, wird der
+    eine zum Update des anderen — ohne Fehler, ohne Warnung, mit Datenverlust. Genau
+    das geschah am 25.08.2026 mit Physik (39 Paare); aufgefallen ist es erst, als ein
+    Querverweis aus Mathematik ins Leere zeigte.
+    """
+    nodes = [
+        {"bp_id": "X_IK_12-13-BF_01", "title": "3.4.1 Denk- und Arbeitsweisen"},
+        {"bp_id": "X_IK_12-13-BF_01", "title": "3.5.1 Denk- und Arbeitsweisen"},
+        {"bp_id": "X_IK_12-13-BF_02", "title": "3.4.2 Felder"},
+    ]
+    with pytest.raises(_parsers.ScraperKollisionError) as exc:
+        _parsers.pruefe_eindeutige_bp_ids(nodes, "https://…/PH(V3.0)")
+
+    # Die Meldung muss den Bezeichner **und** beide Titel nennen — sonst ist nicht zu
+    # erkennen, welche zwei Stellen der Quelle zusammenfallen.
+    assert "X_IK_12-13-BF_01" in str(exc.value)
+    assert "3.4.1" in str(exc.value) and "3.5.1" in str(exc.value)
+    assert "3.4.2" not in str(exc.value), "Eindeutige Knoten gehören nicht in die Meldung"
+
+
+def test_eindeutige_bp_ids_gehen_durch(knoten):
+    """Der echte Mathematik-Ausschnitt — 287 Knoten, keine Kollision."""
+    _parsers.pruefe_eindeutige_bp_ids(knoten, QUELL_URL)
+
+
+def test_kollisionsfehler_ist_kein_parsefehler():
+    """Wie beim Fassungsfehler: Die bestehenden `except ScraperParseError`-Zweige
+    protokollieren und machen weiter — hier muss das Fach ausfallen."""
+    assert not issubclass(_parsers.ScraperKollisionError, _parsers.ScraperParseError)
+
+
+@pytest.mark.asyncio
+async def test_scrape_fach_schreibt_bei_kollision_nichts(tmp_path):
+    """Die Verdrahtung: Der Ausfall greift **vor** dem Schreiben."""
+    doppelt = """
+    <html><head><title>BPBW-ALLG-GYM-PH(V3.0) - Bildungsplan</title></head><body>
+      <h1>Physik Überarbeitete Fassung vom 21. Mai 2026 (V3.0)</h1>
+      <h4 id="3.4">3.4 Klassen 12/13 (Basisfach)</h4>
+      <h5 id="3.4.1">3.4.1 Denk- und Arbeitsweisen</h5>
+      <h4 id="3.5">3.5 Klassen 12/13 (Basisfach)</h4>
+      <h5 id="3.5.1">3.5.1 Denk- und Arbeitsweisen</h5>
+    </body></html>
+    """
+    async def fetch(client, url):
+        return doppelt
+
+    with patch.object(_scraper, "fetch", fetch):
+        with pytest.raises(_scraper.ScraperKollisionError):
+            await _scraper.scrape_fach(
+                MagicMock(), "PH", "BP2016BW_ALLG_GYM_PH", ".V3",
+                tmp_path, {}, [], gen2x_version="V3.0",
+            )
+
+    assert list(tmp_path.glob("*.jsonl")) == [], "Bei Kollision darf nichts entstehen"

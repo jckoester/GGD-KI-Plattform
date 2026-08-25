@@ -23,8 +23,10 @@ from bs4 import BeautifulSoup
 
 from scripts.scraper.parsers import (
     ScraperFassungError,
+    ScraperKollisionError,
     ScraperParseError,
     parse_fachplan,
+    pruefe_eindeutige_bp_ids,
     pruefe_geladene_fassung,
     parse_leitidee,
     parse_ik_kompetenz_list,
@@ -361,6 +363,10 @@ async def scrape_fach(
     if not nodes:
         return 0, 0, 0
 
+    # Zwei Knoten mit derselben bp_id heissen: Der Parser hat den Aufbau der Seite nicht
+    # verstanden. Der Import wuerde daraus lautlos einen machen — lieber gar keine Datei.
+    pruefe_eindeutige_bp_ids(nodes, fach_url)
+
     # Jahrgangsband korrigieren (Todo B1): Kursstufen-Basisfächer (z. B. NWTBFO) tragen
     # in der IK/PK-URL keine Stufen, sondern zero-padded Kompetenzbereichs-Nummern
     # (…_IK_03_…). Für unplausible URL-Bänder das Fach-Band aus subjects.yaml setzen;
@@ -597,6 +603,18 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                         gen2x_version=quell_versionen.get(edition_suffix),
                     )
                     neu += n; geaendert += g; unveraendert += u
+            except ScraperKollisionError as exc:
+                # Eigener Zweig wie bei der Fassung: Die Quelle hat geantwortet, der
+                # Parser hat sie nur falsch gelesen. Der Hinweis spart die Suche.
+                logger.error(
+                    "!!! Fach '%s' (fach_code=%s) ÜBERSPRUNGEN — %s\n"
+                    "    Der Parser bildet fuer verschiedene Knoten denselben Bezeichner. "
+                    "Meist fuehrt das Fach mehrere Jahrgangsbaender mit gleichen Stufen "
+                    "und gleichem Niveau (Physik: zwei Basisfaecher in 12/13).",
+                    slug, fach_code, exc,
+                )
+                skipped.append((slug, f"{type(exc).__name__}: {exc}"))
+                continue
             except ScraperFassungError as exc:
                 # Eigener Zweig, weil die Ursache eine andere ist als bei sonstigen
                 # Ausfällen: Die Quelle hat geantwortet, nur eben mit der falschen

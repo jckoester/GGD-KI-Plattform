@@ -134,6 +134,45 @@ class ScraperFassungError(Exception):
         )
 
 
+class ScraperKollisionError(Exception):
+    """Zwei Knoten tragen denselben Bezeichner — der Parser hat den Aufbau missverstanden.
+
+    Wie ``ScraperFassungError`` bewusst **keine** Unterklasse von ``ScraperParseError``:
+    Die Seite ist lesbar, das Ergebnis nur falsch. Und es faellt nirgends auf — der
+    Import identifiziert Knoten ueber ``bp_id`` und macht aus zwei Datensaetzen
+    stillschweigend einen.
+    """
+    def __init__(self, url: str, dubletten: dict[str, list[str]]):
+        self.dubletten = dubletten
+        beispiele = "; ".join(
+            f"{bp_id} ({' | '.join(t[:2])})" for bp_id, t in list(dubletten.items())[:3]
+        )
+        super().__init__(
+            f"{len(dubletten)} doppelte bp_id(s) bei {url}: {beispiele}"
+        )
+
+
+def pruefe_eindeutige_bp_ids(nodes: list[dict[str, Any]], url: str) -> None:
+    """Wirft, wenn zwei Knoten denselben Bezeichner tragen.
+
+    **Warum das eine eigene Pruefung braucht:** Der Import erkennt Knoten an ihrer
+    ``bp_id``. Kommen zwei mit derselben, wird der eine zum Update des anderen — ohne
+    Fehler, ohne Warnung, mit Datenverlust. Physik lieferte am 25.08.2026 **39 solcher
+    Paare**, weil zwei Jahrgangsbaender („Basisfach mit Schwerpunkt Quantenphysik" und
+    „… Astrophysik") dasselbe Segment ergaben. Aufgefallen ist es erst, als ein
+    Querverweis aus Mathematik ins Leere zeigte.
+
+    Eine Kollision heisst: Der Parser hat den Aufbau des Dokuments nicht verstanden.
+    Dann ist gar keine Datei besser als eine falsche.
+    """
+    gesehen: dict[str, list[str]] = {}
+    for node in nodes:
+        gesehen.setdefault(node["bp_id"], []).append(node.get("title", ""))
+    dubletten = {bp_id: titel for bp_id, titel in gesehen.items() if len(titel) > 1}
+    if dubletten:
+        raise ScraperKollisionError(url, dubletten)
+
+
 # Fassungsmarke am Ende eines Bezeichners: `…_M.V2` (alte Generation) oder
 # `…_M(V3.0)` (GEN2X). Ohne Marke = Basisfassung.
 _MARKE_IM_BEZEICHNER = re.compile(r'(?:\.(V\d+(?:\.\d+)?)|\((V\d+(?:\.\d+)?)\))$')

@@ -45,6 +45,8 @@ from scripts.scraper.references import strip_soft_hyphens
 # Überschriften-ids: "2.1" (Abschnitt.Unterabschnitt) und "3.1.1" (Leitidee)
 _ID_UNTERABSCHNITT = re.compile(r'^(\d+)\.(\d+)$')
 _ID_LEITIDEE = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
+# Physik gliedert eine Ebene tiefer: `3.3.1.1 Kinematik` unter `3.3.1 Mechanik`.
+_ID_UNTEREBENE = re.compile(r'^(\d+)\.(\d+)\.(\d+)\.(\d+)$')
 # Zeilen-ids der Kompetenzen: "2.1(1)" / "3.1.1(12)"
 _ID_KOMPETENZ = re.compile(r'^(\d+(?:\.\d+)+)\((\d+)\)$')
 
@@ -52,6 +54,9 @@ _ID_KOMPETENZ = re.compile(r'^(\d+(?:\.\d+)+)\((\d+)\)$')
 _BAND = re.compile(r'Klassen?\s+(\d+(?:\s*/\s*\d+)*)')
 _NIVEAU_IM_BAND = {"Leistungsfach": "leistung", "Basisfach": "basis"}
 _NIVEAU_KUERZEL = {"leistung": "LF", "basis": "BF"}
+# „Basisfach mit Schwerpunkt Astrophysik" → ASTROPHYSIK. Nur nötig, wo ein Fach
+# mehrere Bänder derselben Stufen und desselben Niveaus führt (Physik).
+_SCHWERPUNKT = re.compile(r'Schwerpunkt\s+([A-Za-zÄÖÜäöüß]+)')
 
 
 def band_aus_ueberschrift(text: str) -> tuple[str, int, int, str]:
@@ -67,6 +72,13 @@ def band_aus_ueberschrift(text: str) -> tuple[str, int, int, str]:
 
     Das erzeugte Segment ist so gebaut, dass die vorhandenen Helfer
     ``extract_grades_from_bp_id`` und ``extract_niveau_from_bp_id`` es unverändert lesen.
+
+    **Ein Band ist durch Stufen und Niveau nicht immer eindeutig.** Physik führt in
+    12/13 *zwei* Basisfächer — „Basisfach mit Schwerpunkt Quantenphysik" und
+    „… Astrophysik". Beide ergäben `12-13-BF`, und die Leitideen `3.4.1` und `3.5.1`
+    bekämen denselben Bezeichner. Steht ein Schwerpunkt in der Überschrift, wandert er
+    deshalb ins Segment: ``12-13-BF-ASTROPHYSIK``. Die übrigen Bänder bleiben, wie sie
+    waren — Mathematik merkt davon nichts.
     """
     sauber = strip_soft_hyphens(text)
     m = _BAND.search(sauber)
@@ -83,6 +95,9 @@ def band_aus_ueberschrift(text: str) -> tuple[str, int, int, str]:
     segment = "-".join(str(s) for s in stufen)
     if niveau != "regulär":
         segment += "-" + _NIVEAU_KUERZEL[niveau]
+    schwerpunkt = _SCHWERPUNKT.search(sauber)
+    if schwerpunkt:
+        segment += "-" + schwerpunkt.group(1).upper()
     return segment, min(stufen), max(stufen), niveau
 
 
@@ -168,7 +183,10 @@ def _kompetenzzeilen(ueberschrift) -> list[tuple[str, int, str, str, Any]]:
     """
     tabelle = None
     for sib in ueberschrift.find_next_siblings():
-        if sib.name in ("h3", "h4", "h5"):
+        # h6 mit abbrechen: Sonst griffe eine Leitidee mit Unterebenen die Tabelle der
+        # ersten Unterebene ab — die Kompetenzen hingen dann eine Ebene zu hoch, mit
+        # vierstelliger Nummer an einem dreistelligen Knoten.
+        if sib.name in ("h3", "h4", "h5", "h6"):
             break
         gefunden = sib.find("table") if sib.name == "section" else None
         if gefunden is not None:
@@ -292,6 +310,43 @@ def _anker_zu_bp_id(anker: str, bp_id_fach: str, band_segmente: dict[str, str]) 
     return None
 
 
+def _kompetenzen_anhaengen(
+    knoten: list[dict[str, Any]], ueberschrift, eltern_bp_id: str,
+    gruppen_segment: str, url: str, breadcrumb: list[str],
+    min_grade: int | None, max_grade: int | None, niveau: str,
+    bp_id_fach: str, band_segmente: dict[str, str],
+) -> None:
+    """Hängt die Kompetenzen unter einer Überschrift an die Knotenliste.
+
+    ``gruppen_segment`` ist die Stelle, die in der alten Generation immer ``00`` war
+    (326 von 326 Knoten). Bei Fächern mit einer Ebene mehr — Physik gliedert
+    `3.3.1.1 Kinematik` unter `3.3.1 Mechanik` — trägt sie den Index der Unterebene.
+    """
+    for kompetenz_nr, standard_nr, text, gruppe, zeile in _kompetenzzeilen(ueberschrift):
+        relations, offen = _verweise(zeile, bp_id_fach, band_segmente)
+        knoten.append(
+            _knoten(
+                # Unter einer Leitidee steht der Platzhalter `00` dazwischen, unter
+                # einer Unterebene nicht — deren Index steckt schon im Elternknoten.
+                bp_id=f"{eltern_bp_id}_{gruppen_segment}_{standard_nr:02d}"
+                if gruppen_segment == "00"
+                else f"{eltern_bp_id}_{standard_nr:02d}",
+                content_type="ik_kompetenz",
+                title=f"{kompetenz_nr} {text}",
+                content=f"({standard_nr}) {text}",
+                parent_bp_id=eltern_bp_id, url=url, breadcrumb=breadcrumb,
+                min_grade=min_grade, max_grade=max_grade, niveau=niveau,
+                relations=relations,
+                extra_metadata={
+                    "kompetenz_nr": kompetenz_nr,
+                    "standard_nr": standard_nr,
+                    "thematische_gruppe": gruppe,
+                    **({"offene_verweise": offen} if offen else {}),
+                },
+            )
+        )
+
+
 def parse_gen2x_leitperspektiven(
     soup: "BeautifulSoup", url: str, bp_id_basis: str = "BP2016BW_ALLG_LP"
 ) -> list[dict[str, Any]]:
@@ -395,7 +450,7 @@ def _operatoren(soup, url: str, bp_id_fach: str) -> list[dict[str, Any]]:
 def _intro(ueberschrift) -> str:
     """Einleitungstext direkt unter einer Überschrift (vor der Kompetenztabelle)."""
     for sib in ueberschrift.find_next_siblings():
-        if sib.name in ("h3", "h4", "h5"):
+        if sib.name in ("h3", "h4", "h5", "h6"):
             return ""
         if sib.name == "div":
             return _text(sib)
@@ -434,7 +489,7 @@ def parse_gen2x_dokument(
         )
     ]
 
-    ueberschriften = soup.find_all(["h3", "h4", "h5"])
+    ueberschriften = soup.find_all(["h3", "h4", "h5", "h6"])
 
     # Bandgliederung zuerst: Ein Verweis `#3.1.4(1)` nennt nur den **Index** des Bandes
     # (hier 1), nicht dessen Stufen. Ohne diese Zuordnung ließe sich der Bezeichner des
@@ -485,6 +540,8 @@ def parse_gen2x_dokument(
     # ── Abschnitt 3: inhaltsbezogene Kompetenzen, gegliedert nach Bändern ────
     band: tuple[str, int, int, str] | None = None
     band_titel = ""
+    # Zuletzt gesehene Leitidee — Bezugspunkt für eine etwaige Unterebene.
+    leitidee: tuple[str, list[str], tuple[str, int, int, str]] | None = None
     for h in ueberschriften:
         hid = h.get("id") or ""
 
@@ -492,6 +549,35 @@ def parse_gen2x_dokument(
         if m_band and m_band.group(1) == "3":
             band_titel = _text(h)
             band = band_aus_ueberschrift(band_titel)
+            continue
+
+        # Unterebene (`3.3.1.1 Kinematik`): eigener Knoten unter der Leitidee. Ihre
+        # Kompetenzen tragen den Unterebenen-Index dort, wo sonst der Platzhalter `00`
+        # steht — die Stelle war in der alten Generation für Gruppen vorgesehen und
+        # bekommt hier endlich einen Inhalt.
+        m_ue = _ID_UNTEREBENE.match(hid)
+        if m_ue and m_ue.group(1) == "3":
+            if leitidee is None:
+                raise ScraperParseError(url, f"Unterebene {hid} ohne Leitidee")
+            eltern_bp_id, eltern_bc, band_werte = leitidee
+            segment, min_grade, max_grade, niveau = band_werte
+            unter_nr = int(m_ue.group(4))
+            gruppen_segment = f"{unter_nr:02d}"
+            titel = _text(h)
+            bc = eltern_bc + [titel]
+            knoten.append(
+                _knoten(
+                    bp_id=f"{eltern_bp_id}_{unter_nr:02d}", content_type="leitidee",
+                    title=titel, content=_intro(h) or titel,
+                    parent_bp_id=eltern_bp_id, url=url, breadcrumb=bc,
+                    min_grade=min_grade, max_grade=max_grade, niveau=niveau,
+                    extra_metadata={"nr": hid},
+                )
+            )
+            _kompetenzen_anhaengen(
+                knoten, h, f"{eltern_bp_id}_{unter_nr:02d}", gruppen_segment,
+                url, bc, min_grade, max_grade, niveau, bp_id_fach, band_segmente,
+            )
             continue
 
         m_li = _ID_LEITIDEE.match(hid)
@@ -505,6 +591,7 @@ def parse_gen2x_dokument(
         li_bp_id = f"{bp_id_fach}_IK_{segment}_{li_nr:02d}"
         li_titel = _text(h)
         bc = breadcrumb_basis + [band_titel, li_titel]
+        leitidee = (li_bp_id, bc, band)
         knoten.append(
             _knoten(
                 bp_id=li_bp_id, content_type="leitidee",
@@ -518,28 +605,10 @@ def parse_gen2x_dokument(
                 extra_metadata={"nr": hid},
             )
         )
-        for kompetenz_nr, standard_nr, text, gruppe, zeile in _kompetenzzeilen(h):
-            relations, offen = _verweise(zeile, bp_id_fach, band_segmente)
-            knoten.append(
-                _knoten(
-                    # Das feste `00` ist das Gruppen-Segment der alten Generation. Es
-                    # trug dort nie einen anderen Wert (326 von 326 Knoten) und bleibt
-                    # als Platzhalter erhalten, damit die bp_ids vergleichbar bleiben.
-                    bp_id=f"{li_bp_id}_00_{standard_nr:02d}",
-                    content_type="ik_kompetenz",
-                    title=f"{kompetenz_nr} {text}",
-                    content=f"({standard_nr}) {text}",
-                    parent_bp_id=li_bp_id, url=url, breadcrumb=bc,
-                    min_grade=min_grade, max_grade=max_grade, niveau=niveau,
-                    relations=relations,
-                    extra_metadata={
-                        "kompetenz_nr": kompetenz_nr,
-                        "standard_nr": standard_nr,
-                        "thematische_gruppe": gruppe,
-                        **({"offene_verweise": offen} if offen else {}),
-                    },
-                )
-            )
+        _kompetenzen_anhaengen(
+            knoten, h, li_bp_id, "00",
+            url, bc, min_grade, max_grade, niveau, bp_id_fach, band_segmente,
+        )
 
     # ── Abschnitt 4: Operatoren ──────────────────────────────────────────────
     knoten.extend(_operatoren(soup, url, bp_id_fach))
