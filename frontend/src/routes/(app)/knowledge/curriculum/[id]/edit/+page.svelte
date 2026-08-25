@@ -464,6 +464,18 @@
     function goBack() {
         goto(`/knowledge/curriculum/${$page.params.id}`);
     }
+
+    // Beschriftung der Schließen-Schaltfläche. Sie tut immer dasselbe — zurück zur
+    // Leseansicht — bedeutet aber je nach Stand etwas anderes: Bei ungespeicherten
+    // Änderungen gehen die verloren, das ist ein Abbruch. Ist alles gespeichert, gibt
+    // es nichts zu verwerfen; „Abbrechen" liest sich dann, als nähme man die eben
+    // gespeicherte Arbeit zurück.
+    const closeLabel = $derived(dirty ? "Abbrechen" : "Fertig");
+    const closeTitle = $derived(
+        dirty
+            ? "Bearbeitung beenden — ungespeicherte Änderungen gehen verloren"
+            : "Bearbeitung beenden",
+    );
 </script>
 
 <div class="h-full flex flex-col relative">
@@ -554,12 +566,13 @@
                     {/if}
                     <button
                         onclick={goBack}
+                        title={closeTitle}
                         class="px-4 py-2 text-sm rounded-md
                            border border-light-ui-3 dark:border-dark-ui-3
                            text-light-tx dark:text-dark-tx
                            hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                     >
-                        Abbrechen
+                        {closeLabel}
                     </button>
                     <button
                         onclick={save}
@@ -613,11 +626,12 @@
             {/if}
             <button
                 onclick={goBack}
+                title={closeTitle}
                 class="px-4 py-1.5 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                        text-light-tx dark:text-dark-tx
                        hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
-                Abbrechen
+                {closeLabel}
             </button>
             <button
                 onclick={save}
