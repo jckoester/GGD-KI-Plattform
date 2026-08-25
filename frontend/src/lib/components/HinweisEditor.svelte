@@ -9,7 +9,7 @@
      *   value    — gebundener Textwert (zwei-Wege: bind:value)
      *   onchange — Callback bei Änderung
      */
-    import { parseHinweise } from "$lib/hinweise.js";
+    import { getActiveTrigger, parseHinweise } from "$lib/hinweise.js";
     import HinweisChip from "./HinweisChip.svelte";
 
     let { value = $bindable(""), onchange = () => {} } = $props();
@@ -31,31 +31,7 @@
     // Debounce-Handle
     let debounceTimer = null;
 
-    // ── Trigger-Erkennung ─────────────────────────────────────────────────────
-    function getActiveTrigger(text, cursorPos) {
-        const before = text.slice(0, cursorPos);
-
-        // @-Trigger: Leitperspektive
-        const lpMatch = before.match(/@([^\s@#]*)$/);
-        if (lpMatch)
-            return {
-                kind: "lp",
-                query: lpMatch[1],
-                matchStart: before.length - lpMatch[0].length,
-            };
-
-        // #-Trigger: erst Fach-Code, dann IK-Suche
-        const crossMatch = before.match(/#([A-ZÄÖÜ]{2,6})(?:\s+(\S*))?$/);
-        if (crossMatch) {
-            return {
-                kind: "ik",
-                fachCode: crossMatch[1],
-                query: crossMatch[2] ?? "",
-                matchStart: before.length - crossMatch[0].length,
-            };
-        }
-        return null;
-    }
+    // Trigger-Erkennung liegt in `$lib/hinweise.js` — reine Textlogik, dort testbar.
 
     // Kürzt einen Text auf maximal n Zeichen (mit …)
     function trunc(text, n) {
