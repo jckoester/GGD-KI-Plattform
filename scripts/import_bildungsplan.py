@@ -257,7 +257,10 @@ def build_metadata(node: dict) -> dict:
     meta = dict(node.get("metadata", {}))
     meta["bp_id"] = node["bp_id"]
     meta["content_hash"] = node.get("content_hash", "")
-    meta["bp_version"] = node.get("bp_version", "")
+    # `or ""` statt eines Standardwerts: Ein Knoten mit ausdruecklichem None
+    # brachte sonst den GANZEN Import zu Fall (NOT NULL). Fuer
+    # Leitperspektiven ist "keine Edition" ein gueltiger Zustand.
+    meta["bp_version"] = node.get("bp_version") or ""
     return meta
 
 
@@ -285,7 +288,7 @@ def upsert_node(
     max_grade = node.get("max_grade")
     niveau = node.get("niveau", "regulär")
     # Bildungsplan-Edition (z. B. "2016", "2016.V2") — maßgeblich vom Scraper.
-    bp_version = node.get("bp_version", "")
+    bp_version = node.get("bp_version") or ""
 
     # subject_id: aus fach_slug ableiten (nur für Bildungsplan-Knoten mit fach_slug)
     fach_slug = node.get("fach_slug")
@@ -1074,14 +1077,23 @@ def run_import(
         # (wenn `pytest` dort lief, gefüllt mit Testfixtures wie `GYM_TST`) und eine an
         # der Wurzel (echte Importe). Beim Auswerten haben Nutzer und Assistent
         # verschiedene Dateien angesehen und aneinander vorbeigeredet.
+        # Eine Datei **je Lauf**, mit Uhrzeit im Namen.
+        #
+        # Vorher lief alles eines Tages angehaengt in eine Datei. Die Zusammenfassung
+        # meldete dann „10 Warnungen", waehrend die Datei 1738 Zeilen hatte — die
+        # uebrigen stammten aus frueheren Laeufen. Wer sie auswertet, haelt alte
+        # Warnungen fuer aktuelle und sucht nach Fehlern, die laengst behoben sind.
+        # Der Name nennt jetzt den Lauf, nicht den Tag; alte Laeufe bleiben erhalten.
         if warnings:
             log_dir = Path(log_dir) if log_dir else (PROJEKT_WURZEL / "data" / "import_logs")
             log_dir.mkdir(parents=True, exist_ok=True)
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            log_file = log_dir / f"import_warnings_{date_str}.log"
-            with log_file.open("a", encoding="utf-8") as f:
+            lauf = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+            log_file = log_dir / f"import_warnings_{lauf}.log"
+            with log_file.open("w", encoding="utf-8") as f:
                 f.write("\n".join(warnings) + "\n")
-            logger.info(f"Warnungen geschrieben nach {log_file}")
+            logger.info(
+                "%d Warnung(en) dieses Laufs geschrieben nach %s", len(warnings), log_file
+            )
 
     finally:
         conn.close()

@@ -679,7 +679,9 @@ def test_leitperspektiven_tragen_keine_fassung(lp_knoten):
     Von den 37 Aspekten, die es in beiden Fassungen gibt, sind alle 37 textgleich
     (geprüft 25.08.2026). Es gibt schlicht nichts zu unterscheiden.
     """
-    assert {k["bp_version"] for k in lp_knoten} == {None}
+    # Nicht None: Die Spalte context_nodes.bp_version ist NOT NULL. Ein
+    # ausdrueckliches None brachte den ganzen Import zu Fall.
+    assert {k["bp_version"] for k in lp_knoten} == {""}
 
 
 def test_seite_ohne_leitperspektiven_wirft():
@@ -707,3 +709,59 @@ def test_prozentkodierte_kennung_im_canonical_wird_akzeptiert():
         BeautifulSoup(html, "lxml"), LP_URL,
         "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)",
     )
+
+
+@pytest.mark.asyncio
+async def test_lp_adresse_kommt_aus_der_fassungsangabe():
+    """Die Adresse muss `LP(V3.0)` lauten, nicht `LP(.V3)`.
+
+    Der Fehler, den dieser Test festhält: `edition_quell_versionen` liefert
+    ``{Suffix: Fassungsangabe}``. Wer über das Dict iteriert, bekommt die **Schlüssel**
+    — also `.V3` statt `V3.0` — und fragt eine Adresse ab, die es nicht gibt. Gemerkt
+    habe ich es erst im echten Lauf (404), weil meine Simulation dem Dict die falsche
+    Form gegeben hatte. Deshalb baut dieser Test die Zuordnung aus der **Konfiguration**
+    auf, statt sie von Hand hinzuschreiben.
+    """
+    fahrplan = {
+        "bp_basis": "BP2016BW",
+        "editionen": [
+            {"suffix": ""},
+            {"suffix": ".V3", "seitengeneration": "gen2x", "quell_version": "V3.0"},
+        ],
+    }
+    quell_versionen = _scraper.edition_quell_versionen(fahrplan)
+
+    gesehen: list[str] = []
+
+    async def fetch(client, url):
+        gesehen.append(url)
+        if "GEN2X" in url:
+            return LP_FIXTURE.read_text(encoding="utf-8")
+        raise RuntimeError("klassische Seite in diesem Test nicht nötig")
+
+    with patch.object(_scraper, "fetch", fetch):
+        knoten = await _scraper.scrape_leitperspektiven(MagicMock(), quell_versionen)
+
+    gen2x_adressen = [u for u in gesehen if "GEN2X" in u]
+    assert gen2x_adressen == [
+        "https://www.bildungsplaene-bw.de/,Lde/"
+        "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)"
+    ]
+    assert {k["metadata"]["kuerzel"] for k in knoten} == {"BNE", "LDW"}
+
+
+@pytest.mark.asyncio
+async def test_ausfall_der_neuen_lp_seite_bricht_den_lauf_nicht_ab():
+    """Die alte Fassung steht dann bereits — die Fächer können scrapen."""
+    async def fetch(client, url):
+        if "GEN2X" in url:
+            raise RuntimeError("nicht erreichbar")
+        return (
+            '<html><head><title>x</title></head><body>'
+            '<h1>Leitperspektive</h1></body></html>'
+        )
+
+    with patch.object(_scraper, "fetch", fetch):
+        knoten = await _scraper.scrape_leitperspektiven(MagicMock(), {".V3": "V3.0"})
+
+    assert knoten == [] or all("LDW" not in k["bp_id"] for k in knoten)

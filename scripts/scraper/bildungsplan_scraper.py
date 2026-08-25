@@ -204,7 +204,10 @@ async def scrape_leitperspektiven(
             logger.error(f"Fehler bei LP {kuerzel} ({url}): {e}")
 
     bekannt = {n['bp_id'] for n in nodes}
-    for quell_version in sorted(quell_versionen or {}):
+    # `edition_quell_versionen` liefert {Suffix: Fassungsangabe} — gebraucht wird hier
+    # die **Fassungsangabe** (`V3.0`), nicht das Suffix (`.V3`). Über das Dict zu
+    # iterieren gäbe die Schlüssel und damit die Adresse `…_LP(.V3)`.
+    for quell_version in sorted(set((quell_versionen or {}).values())):
         url = gen2x_lp_url(quell_version)
         try:
             soup = BeautifulSoup(await fetch(client, url), 'lxml')

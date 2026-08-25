@@ -320,9 +320,11 @@ python scripts/import_bildungsplan.py \
   --db-url $DATABASE_URL
 ```
 
-Warnungs-Log prüfen:
+Warnungs-Log prüfen — **eine Datei je Lauf**, die Uhrzeit steht im Namen. Den Pfad
+nennt die letzte Zeile der Import-Ausgabe; sonst die jüngste Datei:
+
 ```bash
-cat data/import_logs/import_warnings_$(date +%Y-%m-%d).log
+ls -t data/import_logs/import_warnings_*.log | head -1 | xargs cat
 ```
 
 Akzeptable Warnungen: Querverweise auf Fächer die nicht in `subjects.yaml` konfiguriert sind

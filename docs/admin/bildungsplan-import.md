@@ -171,7 +171,8 @@ docker compose run --rm \
 > desselben Fachs zurückholen.
 
 Warnungen prüfen — das Import-Skript schreibt sie nach
-`data/import_logs/import_warnings_<datum>.log`. **Achtung:** Der Pfad ist **relativ
+`data/import_logs/import_warnings_<datum>T<uhrzeit>.log` — **eine Datei je Lauf**.
+Die letzte Zeile der Import-Ausgabe nennt sie beim Namen. **Achtung:** Der Pfad ist **relativ
 zum Arbeitsverzeichnis** des Skripts (im Container `/app/data/…`). Damit das Log einen
 `docker compose run --rm`-Lauf überlebt, das `data/`-Verzeichnis mit einhängen
 (`-v "$(pwd)/data:/app/data"`) oder die Auswertung **im selben Container** ausführen —

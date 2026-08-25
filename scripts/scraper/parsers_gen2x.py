@@ -128,8 +128,10 @@ def _knoten(
     """Baut einen JSONL-Knoten im Schema der alten Generation.
 
     ``bp_version`` wird normalerweise aus dem Bezeichner abgeleitet. Leitperspektiven
-    setzen sie ausdrücklich auf ``None`` — sie gehören zu keiner Fachplan-Edition, und
-    die vorhandenen Knoten führen sie ebenso.
+    setzen sie auf ``""`` — sie gehören zu keiner Fachplan-Edition. **Nicht ``None``:**
+    Die Spalte `context_nodes.bp_version` ist NOT NULL. Der klassische Parser drückt
+    dasselbe aus, indem er den Schlüssel ganz weglässt und der Import seinen Standardwert
+    `""` einsetzt; hier steht er ausdrücklich da.
     """
     return {
         "bp_id": bp_id,
@@ -333,7 +335,7 @@ def parse_gen2x_leitperspektiven(
             _knoten(
                 bp_id=lp_bp_id, content_type="leitperspektive",
                 title=titel, content=_intro(h) or titel,
-                parent_bp_id=None, url=url, breadcrumb=bc, bp_version=None,
+                parent_bp_id=None, url=url, breadcrumb=bc, bp_version="",
                 extra_metadata={"kuerzel": kuerzel},
             )
         )
@@ -343,7 +345,7 @@ def parse_gen2x_leitperspektiven(
                     bp_id=f"{kuerzel}_{aspekt_nr:02d}",
                     content_type="leitperspektive_aspekt",
                     title=text, content=text,
-                    parent_bp_id=lp_bp_id, url=url, breadcrumb=bc, bp_version=None,
+                    parent_bp_id=lp_bp_id, url=url, breadcrumb=bc, bp_version="",
                     extra_metadata={"kuerzel": kuerzel, "aspekt_nr": aspekt_nr},
                 )
             )
