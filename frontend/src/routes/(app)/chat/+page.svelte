@@ -10,6 +10,7 @@
         Search,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
+    import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
@@ -86,6 +87,10 @@
     let mentionOpen = $state(false);
     let mentionSelectedIndex = $state(0);
     let mentionDebounceTimer = $state(null);
+    // Fassungshinweis nur dort, wo die Liste selbst mehrdeutig ist: Die Mention-Suche
+    // kennt keinen Jahrgang, also können zwei Kompetenzen mit gleicher Nummer und
+    // verschiedenem Text nebeneinander stehen.
+    const mentionFassungen = $derived(mehrdeutigeFassungen(mentionResults));
     // Kontext-Knoten für diese Konversation
     let contextNodes = $state([]); // ChatContextNodeRead[]
     let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
@@ -1279,6 +1284,16 @@
                                 {node.content_type ?? ""}
                             </span>
                             <span class="truncate">{node.title}</span>
+                            {#if mentionFassungen.get(node.id)}
+                                <span
+                                    class="text-xs shrink-0 rounded px-1.5 py-0.5
+                                           border border-light-ui-3 dark:border-dark-ui-3
+                                           text-light-tx-2 dark:text-dark-tx-2"
+                                    title="Bildungsplan-Fassung — dieselbe Nummer kommt in mehreren Fassungen vor"
+                                >
+                                    {mentionFassungen.get(node.id)}
+                                </span>
+                            {/if}
                         </button>
                     {/each}
                 </div>

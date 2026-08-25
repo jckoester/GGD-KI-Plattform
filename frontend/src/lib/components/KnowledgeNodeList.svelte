@@ -9,6 +9,7 @@
     } from "$lib/taxonomy.js";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
+    import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
     import { Anchor, Archive } from "lucide-svelte";
@@ -97,6 +98,11 @@
         });
         return arr;
     });
+
+    // Fassungshinweis nur, wo die angezeigte Liste selbst mehrdeutig ist —
+    // diese Ansicht sucht ohne Jahrgangsbezug, also können zwei Kompetenzen mit
+    // gleicher Nummer und verschiedenem Text nebeneinander stehen.
+    const fassungen = $derived(mehrdeutigeFassungen(sortedNodes));
 
     function toggleSort(col) {
         if (sortCol === col) {
@@ -432,6 +438,16 @@
                                     <Anchor name="anchor" size={16} />
                                 {/if}
                                 {node.title}
+                                {#if fassungen.get(node.id)}
+                                    <span
+                                        class="text-xs shrink-0 rounded px-1.5 py-0.5
+                                               border border-light-ui-3 dark:border-dark-ui-3
+                                               text-light-tx-2 dark:text-dark-tx-2"
+                                        title="Bildungsplan-Fassung — dieselbe Nummer kommt in mehreren Fassungen vor"
+                                    >
+                                        {fassungen.get(node.id)}
+                                    </span>
+                                {/if}
                             </div>
                         </td>
                         <!-- category / content_type -->
