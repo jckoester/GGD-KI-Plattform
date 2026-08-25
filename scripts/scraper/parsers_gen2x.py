@@ -99,6 +99,13 @@ _REL_JE_BOX = {
 _LP_ANKER = re.compile(r'^([A-Z]+)\((\d+)\)$')
 # Adresse eines anderen Fachs: …_ALLG_GYM_PH(V3.0)#3.2.7(2)
 _FREMDFACH = re.compile(r'_ALLG_[A-Z]+_([A-Z0-9]+)\(([^)]+)\)$')
+# Voreinstellung für `_knoten(bp_version=…)`: aus dem Bezeichner ableiten.
+_AUS_BEZEICHNER = object()
+
+# Kürzel einer Leitperspektive in der Überschrift: „… (LDW)"
+_LP_KUERZEL_IN_TITEL = re.compile(r'\(([A-ZÄÖÜ]{2,5})\)\s*$')
+# id eines Leitperspektiven-Aspekts: `BNE(1)`
+_ID_LP_ASPEKT = re.compile(r'^([A-Z]+)\((\d+)\)$')
 
 
 def _text(el) -> str:
@@ -115,9 +122,15 @@ def _knoten(
     parent_bp_id: str | None, url: str, breadcrumb: list[str],
     min_grade: int | None = None, max_grade: int | None = None,
     niveau: str = "regulär", relations: list[dict[str, str]] | None = None,
+    bp_version: Any = _AUS_BEZEICHNER,
     extra_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Baut einen JSONL-Knoten im Schema der alten Generation."""
+    """Baut einen JSONL-Knoten im Schema der alten Generation.
+
+    ``bp_version`` wird normalerweise aus dem Bezeichner abgeleitet. Leitperspektiven
+    setzen sie ausdrücklich auf ``None`` — sie gehören zu keiner Fachplan-Edition, und
+    die vorhandenen Knoten führen sie ebenso.
+    """
     return {
         "bp_id": bp_id,
         "type": "knowledge",
@@ -130,7 +143,9 @@ def _knoten(
         "min_grade": min_grade,
         "max_grade": max_grade,
         "niveau": niveau,
-        "bp_version": extract_bp_version(bp_id),
+        "bp_version": (
+            extract_bp_version(bp_id) if bp_version is _AUS_BEZEICHNER else bp_version
+        ),
         "metadata": {
             "bp_id": bp_id,
             "breadcrumb": breadcrumb,
@@ -273,6 +288,85 @@ def _anker_zu_bp_id(anker: str, bp_id_fach: str, band_segmente: dict[str, str]) 
         return basis if standard is None else f"{basis}_00_{standard:02d}"
 
     return None
+
+
+def parse_gen2x_leitperspektiven(
+    soup: "BeautifulSoup", url: str, bp_id_basis: str = "BP2016BW_ALLG_LP"
+) -> list[dict[str, Any]]:
+    """Zerlegt die GEN2X-Leitperspektivenseite in Knoten.
+
+    Auch hier gilt der Zuschnitt der neuen Generation: **eine** Seite für alle
+    Leitperspektiven statt einer je Stück. Die Überschriften nennen das Kürzel in
+    Klammern (`2.5 Leben und Lernen in einer digitalisierten Welt (LDW)`), die Aspekte
+    tragen es als `id` (`LDW(1)`).
+
+    Die Knoten folgen dem bestehenden Schema — `BP2016BW_ALLG_LP_BNE` für die
+    Leitperspektive, `BNE_01` für den Aspekt. Das ist die Form, in der Fachpläne beider
+    Generationen auf sie verweisen.
+
+    **Bewusst ohne `bp_version`:** Leitperspektiven gehören zu keinem Fach und keiner
+    Fachplan-Edition. Von den 37 Aspekten, die es in beiden Fassungen gibt, sind **alle
+    37 textgleich** — es gibt also nichts zu unterscheiden. Der einzige echte Unterschied
+    ist, dass die Medienbildung (MB) durch „Leben und Lernen in einer digitalisierten
+    Welt" (LDW) abgelöst wurde; beide bleiben nebeneinander bestehen, solange Fächer auf
+    beiden Fassungen unterrichtet werden.
+    """
+    breadcrumb_basis = [_text(b) for b in soup.select(".breadcrumb__item")]
+    knoten: list[dict[str, Any]] = []
+
+    for h in soup.find_all("h4"):
+        m = _ID_UNTERABSCHNITT.match(h.get("id") or "")
+        if not m or m.group(1) != "2":
+            continue
+        titel_roh = _text(h)
+        kuerzel_m = _LP_KUERZEL_IN_TITEL.search(titel_roh)
+        if not kuerzel_m:
+            continue
+        kuerzel = kuerzel_m.group(1)
+        # „2.5 Leben und Lernen … (LDW)" → „Leben und Lernen …"
+        titel = _LP_KUERZEL_IN_TITEL.sub("", titel_roh).strip()
+        titel = re.sub(r"^\d+(\.\d+)*\s+", "", titel).strip()
+
+        lp_bp_id = f"{bp_id_basis}_{kuerzel}"
+        bc = breadcrumb_basis + [titel]
+        knoten.append(
+            _knoten(
+                bp_id=lp_bp_id, content_type="leitperspektive",
+                title=titel, content=_intro(h) or titel,
+                parent_bp_id=None, url=url, breadcrumb=bc, bp_version=None,
+                extra_metadata={"kuerzel": kuerzel},
+            )
+        )
+        for aspekt_nr, text in _lp_aspekte(h, kuerzel):
+            knoten.append(
+                _knoten(
+                    bp_id=f"{kuerzel}_{aspekt_nr:02d}",
+                    content_type="leitperspektive_aspekt",
+                    title=text, content=text,
+                    parent_bp_id=lp_bp_id, url=url, breadcrumb=bc, bp_version=None,
+                    extra_metadata={"kuerzel": kuerzel, "aspekt_nr": aspekt_nr},
+                )
+            )
+
+    if not knoten:
+        raise ScraperParseError(url, "Keine Leitperspektiven gefunden")
+    return knoten
+
+
+def _lp_aspekte(ueberschrift, kuerzel: str) -> list[tuple[int, str]]:
+    """Aspekte einer Leitperspektive: (Nummer, Text), aus den Zeilen-ids `BNE(1)`."""
+    aspekte: list[tuple[int, str]] = []
+    for sib in ueberschrift.find_next_siblings():
+        if sib.name in ("h3", "h4"):
+            break
+        for el in sib.find_all(attrs={"id": True}):
+            m = _ID_LP_ASPEKT.match(el.get("id") or "")
+            if not m or m.group(1) != kuerzel:
+                continue
+            # Der sichtbare Text beginnt mit der Nummer („(1) …") — sie steht schon
+            # in `aspekt_nr` und würde den Titel nur doppeln.
+            aspekte.append((int(m.group(2)), re.sub(r"^\(\d+\)\s*", "", _text(el))))
+    return aspekte
 
 
 def _operatoren(soup, url: str, bp_id_fach: str) -> list[dict[str, Any]]:

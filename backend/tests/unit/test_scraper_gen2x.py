@@ -624,3 +624,86 @@ def test_fach_ohne_operatoren_liefert_keine(knoten):
     """
     ohne = parse_gen2x_dokument(BeautifulSoup(html, "lxml"), QUELL_URL, BP_ID_FACH)
     assert [k for k in ohne if k["content_type"] == "operator"] == []
+
+
+# ── Leitperspektiven (neue Seitengeneration) ────────────────────────────────
+
+LP_FIXTURE = Path(__file__).parent / "fixtures" / "bildungsplan_gen2x_lp_v3.html"
+LP_URL = (
+    "https://www.bildungsplaene-bw.de/,Lde/"
+    "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)"
+)
+
+
+@pytest.fixture(scope="module")
+def lp_knoten() -> list[dict]:
+    soup = BeautifulSoup(LP_FIXTURE.read_text(encoding="utf-8"), "lxml")
+    return _gen2x.parse_gen2x_leitperspektiven(soup, LP_URL)
+
+
+def test_leitperspektive_und_aspekte(lp_knoten):
+    """Der Ausschnitt enthält BNE (unverändert) und LDW (neu)."""
+    lps = {k["bp_id"]: k for k in lp_knoten if k["content_type"] == "leitperspektive"}
+    assert set(lps) == {"BP2016BW_ALLG_LP_BNE", "BP2016BW_ALLG_LP_LDW"}
+    assert lps["BP2016BW_ALLG_LP_LDW"]["title"] == (
+        "Leben und Lernen in einer digitalisierten Welt"
+    )
+    assert lps["BP2016BW_ALLG_LP_LDW"]["metadata"]["kuerzel"] == "LDW"
+
+
+def test_aspekt_folgt_dem_bestehenden_schema(lp_knoten):
+    """`BNE_01` — genau die Form, in der Fachpläne beider Generationen verweisen."""
+    aspekt = _eines(lp_knoten, "BNE_01")
+    assert aspekt["content_type"] == "leitperspektive_aspekt"
+    assert aspekt["parent_bp_id"] == "BP2016BW_ALLG_LP_BNE"
+    assert aspekt["metadata"] == {
+        **aspekt["metadata"],
+        "kuerzel": "BNE",
+        "aspekt_nr": 1,
+    }
+    # Der Titel trägt die Nummer nicht doppelt — sie steht in `aspekt_nr`.
+    assert not aspekt["title"].startswith("(1)")
+    assert aspekt["title"] == "Bedeutung und Gefährdungen einer nachhaltigen Entwicklung"
+
+
+def test_ldw_aspekte_sind_neu(lp_knoten):
+    """LDW löst die Medienbildung ab — sechs Aspekte, im Bestand bisher keiner."""
+    ldw = [k for k in lp_knoten if k["bp_id"].startswith("LDW_")]
+    assert len(ldw) == 6
+    assert [k["metadata"]["aspekt_nr"] for k in ldw] == [1, 2, 3, 4, 5, 6]
+
+
+def test_leitperspektiven_tragen_keine_fassung(lp_knoten):
+    """Verweise auf Leitperspektiven nennen keine Fassung — die Knoten also auch nicht.
+
+    Von den 37 Aspekten, die es in beiden Fassungen gibt, sind alle 37 textgleich
+    (geprüft 25.08.2026). Es gibt schlicht nichts zu unterscheiden.
+    """
+    assert {k["bp_version"] for k in lp_knoten} == {None}
+
+
+def test_seite_ohne_leitperspektiven_wirft():
+    html = "<html><head><title>x</title></head><body><h1>y</h1></body></html>"
+    # Die Klasse aus dem Modul, das sie wirft: `_parsers` ist eine zweite,
+    # unabhängig geladene Kopie — ihre Klassenobjekte sind nicht dieselben.
+    with pytest.raises(_gen2x.ScraperParseError, match="Keine Leitperspektiven"):
+        _gen2x.parse_gen2x_leitperspektiven(BeautifulSoup(html, "lxml"), LP_URL)
+
+
+def test_prozentkodierte_kennung_im_canonical_wird_akzeptiert():
+    """Die Leitperspektivenseite schreibt ihre Kennung als `…_LP%28V3.0%29`.
+
+    Wir bilden sie mit runden Klammern. Ein byte-genauer Vergleich wies die **richtige**
+    Seite ab — aufgefallen erst im Zusammenspiel, weil die Fachpläne gar kein
+    `canonical` tragen.
+    """
+    html = (
+        '<html><head><title>BPBW-ALLG-LP(V3.0) - Bildungsplan</title>'
+        '<link rel="canonical" href="https://www.bildungsplaene-bw.de/,Lde/'
+        'DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP%28V3.0%29">'
+        "</head><body></body></html>"
+    )
+    _parsers.pruefe_geladene_fassung(
+        BeautifulSoup(html, "lxml"), LP_URL,
+        "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)",
+    )

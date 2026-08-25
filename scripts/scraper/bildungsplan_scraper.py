@@ -35,7 +35,10 @@ from scripts.scraper.parsers import (
     parse_operator_list,
     resolve_grade_band,
 )
-from scripts.scraper.parsers_gen2x import parse_gen2x_dokument
+from scripts.scraper.parsers_gen2x import (
+    parse_gen2x_dokument,
+    parse_gen2x_leitperspektiven,
+)
 
 logger = logging.getLogger('bildungsplan_scraper')
 
@@ -160,10 +163,32 @@ def _discover_pk_gruppen(soup: BeautifulSoup, base_bp_id: str) -> list[tuple[str
     return result
 
 
+def gen2x_lp_url(quell_version: str) -> str:
+    """Adresse der Leitperspektiven in der neuen Seitengeneration.
+
+    Anders als die Fachplaene traegt sie **keine Schulart**:
+    `…/DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)`. Leitperspektiven gelten
+    schulartuebergreifend.
+    """
+    return f"{BASE_URL}{GEN2X_PRAEFIX}LP({quell_version})"
+
+
 async def scrape_leitperspektiven(
     client: httpx.AsyncClient,
+    quell_versionen: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Scrapt alle 7 Leitperspektiven inkl. Aspekt-Knoten."""
+    """Scrapt alle Leitperspektiven inkl. Aspekt-Knoten — aus **beiden** Generationen.
+
+    Die Ergebnisse werden **vereinigt**, nicht ersetzt. Grund: Mit der Ueberarbeitung
+    2026 loest „Leben und Lernen in einer digitalisierten Welt" (LDW) die Medienbildung
+    (MB) ab. Solange Faecher auf alten Fassungen unterrichtet werden, verweisen deren
+    Bildungsplaene weiter auf MB — ein reiner Austausch wuerde diese Verweise brechen.
+
+    Die 37 Aspekte, die es in beiden Fassungen gibt, sind **textgleich** (geprueft am
+    25.08.2026); die alte Fassung hat daher Vorrang und die neue steuert nur bei, was
+    fehlt. Verweise auf Leitperspektiven tragen keine Fassung, deshalb bleiben die
+    Knoten unversioniert.
+    """
     nodes = []
     for kuerzel in LP_KUERZEL:
         url = BASE_URL + f"BP2016BW_ALLG_LP_{kuerzel}"
@@ -177,6 +202,25 @@ async def scrape_leitperspektiven(
             logger.error(f"Parse-Fehler LP {kuerzel}: {e}")
         except Exception as e:
             logger.error(f"Fehler bei LP {kuerzel} ({url}): {e}")
+
+    bekannt = {n['bp_id'] for n in nodes}
+    for quell_version in sorted(quell_versionen or {}):
+        url = gen2x_lp_url(quell_version)
+        try:
+            soup = BeautifulSoup(await fetch(client, url), 'lxml')
+            pruefe_geladene_fassung(soup, url, url.rsplit('/', 1)[-1])
+            neue = [n for n in parse_gen2x_leitperspektiven(soup, url)
+                    if n['bp_id'] not in bekannt]
+            nodes.extend(neue)
+            bekannt.update(n['bp_id'] for n in neue)
+            logger.info(
+                "Leitperspektiven %s: %d Knoten neu (%s)",
+                quell_version, len(neue),
+                ", ".join(sorted({n['metadata']['kuerzel'] for n in neue})) or "keine",
+            )
+        except Exception as e:
+            # Kein Abbruch: Die alte Fassung steht bereits, die Faecher koennen scrapen.
+            logger.error("Leitperspektiven %s (%s) nicht abrufbar: %s", quell_version, url, e)
     return nodes
 
 
@@ -488,7 +532,7 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
         timeout=30,
     ) as client:
         # Leitperspektiven zuerst (werden von IK-Standards referenziert)
-        lp_nodes = await scrape_leitperspektiven(client)
+        lp_nodes = await scrape_leitperspektiven(client, quell_versionen)
         if lp_nodes:
             lp_file = output / "leitperspektiven.jsonl"
             with lp_file.open('w', encoding='utf-8') as f:

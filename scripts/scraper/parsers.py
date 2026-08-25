@@ -9,7 +9,7 @@ import hashlib
 import re
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 try:
     from bs4 import BeautifulSoup
@@ -170,8 +170,11 @@ def pruefe_geladene_fassung(soup: "BeautifulSoup", url: str, bp_id_erwartet: str
     """
     canonical = soup.find("link", rel="canonical")
     if canonical and canonical.get("href"):
-        gefunden = canonical["href"].rstrip("/").split("/")[-1]
-        if gefunden and gefunden != bp_id_erwartet:
+        # Prozentkodierung aufloesen: Die Leitperspektivenseite schreibt ihre eigene
+        # Kennung als `…_LP%28V3.0%29`, waehrend wir sie mit runden Klammern bilden.
+        # Ein byte-genauer Vergleich haette die richtige Seite abgewiesen.
+        gefunden = unquote(canonical["href"].rstrip("/").split("/")[-1])
+        if gefunden and gefunden != unquote(bp_id_erwartet):
             raise ScraperFassungError(url, bp_id_erwartet, gefunden, "laut canonical-Link")
 
     titel = soup.title.get_text(strip=True) if soup.title else ""
