@@ -11,6 +11,7 @@
    * Optionale „per Assistent erzeugen"-Aktion über onGenerate (klar getrennt).
    */
   import { CONTENT_TYPE_LABELS } from '$lib/taxonomy.js'
+  import { MATERIAL_CONTENT_TYPES } from '$lib/material.js'
 
   let { material = [], onChange, onGenerate = null } = $props()
 
@@ -65,6 +66,9 @@
     try {
       const params = new URLSearchParams({ limit: '8' })
       if (q) params.set('q', q)
+      // Dieselbe Eingrenzung wie im Curriculum-Editor (Dokument, Artefakt, Konzept).
+      // Zwei Material-Felder mit verschiedenen Trefferlisten wären schwer erklärbar.
+      for (const t of MATERIAL_CONTENT_TYPES) params.append('content_type', t)
       const res = await fetch(`/api/context/nodes?${params}`, { credentials: 'include' })
       const raw = res.ok ? await res.json() : []
       const nodes = Array.isArray(raw) ? raw : (raw.items ?? [])

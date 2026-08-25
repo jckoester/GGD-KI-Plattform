@@ -50,3 +50,40 @@ export function extractNodeTargets(text) {
     if (!text) return []
     return [...text.matchAll(/@\[[^\]]*\]\(node:([0-9a-f-]{36})\)/g)].map(m => m[1])
 }
+
+// ── Welche Knotentypen als Material auswählbar sind ──────────────────────────
+
+import { CONTENT_TYPES } from "$lib/taxonomy.js"
+
+/**
+ * Typen, die zwar in denselben Kategorien liegen, aber kein Material sind.
+ *
+ * `unterrichtsstunde`/`unterrichtseinheit`/`reflexion` sind **Planungsobjekte** — eine
+ * Unterrichtsstunde als „Material" einer Lernsequenz zu verlinken wäre begrifflich schief.
+ * `schuelertext`/`feedback_text` sind personenbezogen und haben im Curriculum nichts
+ * verloren, das dauerhaft und fachschaftsweit sichtbar ist.
+ */
+const KEIN_MATERIAL = new Set([
+    "unterrichtsstunde",
+    "unterrichtseinheit",
+    "reflexion",
+    "schuelertext",
+    "feedback_text",
+])
+
+/**
+ * Auswählbare Material-Typen für Curriculum-Editor und Stundenentwurf.
+ *
+ * Aus der generierten Taxonomie abgeleitet statt von Hand gepflegt: Ein neuer
+ * Dokument- oder Artefakt-Typ in `config/taxonomy.yaml` ist damit automatisch
+ * auswählbar, ohne dass jemand daran denken muss.
+ *
+ * **Nicht** dabei ist die Kategorie `knowledge` — Bildungsplan-Kompetenzen,
+ * Leitperspektiven, Methoden, Sozialformen und Operatoren haben eigene Auswahlfelder.
+ * Sie hier nochmals anzubieten, führte zu zwei Wegen für dieselbe Verknüpfung.
+ */
+export const MATERIAL_CONTENT_TYPES = [
+    ...(CONTENT_TYPES.document ?? []),
+    ...(CONTENT_TYPES.artifact ?? []),
+    ...(CONTENT_TYPES.concept ?? []),
+].filter((t) => !KEIN_MATERIAL.has(t))

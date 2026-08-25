@@ -2,18 +2,18 @@
     /**
      * MaterialEditor — Textarea mit @-Autocomplete für Knoten-Referenzen.
      *
-     * @ → generische Knotensuche (alle Typen)
+     * @ → Knotensuche, eingegrenzt auf MATERIAL_CONTENT_TYPES (Dokument, Artefakt,
+     *     Konzept). Bildungsplan-Kompetenzen, Leitperspektiven, Methoden, Sozialformen
+     *     und Operatoren haben eigene Auswahlfelder und erscheinen hier bewusst nicht —
+     *     zwei Wege zur selben Verknüpfung wären eine Fehlerquelle.
      * Token: @[<Titel>](node:<uuid>)
      * Freitext inkl. URLs erlaubt; URLs werden in der Vorschau verlinkt.
-     *
-     * TODO: Datentyp-Filter ergänzen, sobald relevante content_types festgelegt sind
-     *       (→ Plaene/Todo.md „Material-Knotensuche auf Datentypen eingrenzen").
      *
      * Props:
      *   value    — gebundener Textwert (bind:value)
      *   onchange — Callback bei Änderung
      */
-    import { parseMaterial } from "$lib/material.js";
+    import { parseMaterial, MATERIAL_CONTENT_TYPES } from "$lib/material.js";
     import { linkifyText } from "$lib/linkify.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import HinweisChip from "./HinweisChip.svelte";
@@ -42,7 +42,7 @@
         try {
             const params = new URLSearchParams({ limit: "10" });
             if (trigger.query) params.set("q", trigger.query);
-            // TODO: content_type-Filter ergänzen (→ Plaene/Todo.md)
+            for (const t of MATERIAL_CONTENT_TYPES) params.append("content_type", t);
             const res = await fetch(`/api/context/nodes?${params}`, {
                 credentials: "include",
             });
