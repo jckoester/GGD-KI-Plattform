@@ -748,3 +748,133 @@ def test_archivierung_uebersprungen_statt_abbruch_ohne_app_paket(caplog):
 
     assert archiviert == 0
     assert "UEBERSPRUNGEN" in caplog.text, "Der Ausfall muss im Log stehen"
+
+
+# ---------------------------------------------------------------------------
+# Fassungsprüfung: Liefert die Quelle wirklich die angeforderte Fassung?
+# (Fehlscrape vom 24.08.2026)
+# ---------------------------------------------------------------------------
+
+_parsers = _load_isolated(
+    "_bildungsplan_parsers_uut", "scripts/scraper/parsers.py", need_repo_on_path=True
+)
+pruefe_geladene_fassung = _parsers.pruefe_geladene_fassung
+fassungsmarke = _parsers.fassungsmarke
+ScraperFassungError = _parsers.ScraperFassungError
+ScraperParseError = _parsers.ScraperParseError
+
+
+def _seite(titel: str, canonical: str | None = None):
+    """Minimalseite mit den Kopfangaben, auf die die Prüfung schaut.
+
+    Die Titel sind **wörtlich** von bildungsplaene-bw.de übernommen (abgerufen
+    25.08.2026) — erfundene Titel würden hier nichts beweisen.
+    """
+    from bs4 import BeautifulSoup
+
+    link = f'<link rel="canonical" href="{canonical}">' if canonical else ""
+    return BeautifulSoup(
+        f"<html><head><title>{titel}</title>{link}</head><body></body></html>", "lxml"
+    )
+
+
+_TITEL_V2 = "Mathematik vom 23. März 2016 in der Fassung vom 29. Februar 2024 (V2) - Bildungsplan"
+_TITEL_BASIS = "Mathematik - Bildungsplan"
+_TITEL_V3 = "BPBW-ALLG-GYM-M(V3.0) - Bildungsplan"
+_BASIS_URL = "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_M"
+
+
+def test_fassung_korrekt_kein_fehler():
+    """V2 angefordert, V2 geliefert. Die richtige Seite trägt kein canonical."""
+    pruefe_geladene_fassung(_seite(_TITEL_V2), "…", "BP2016BW_ALLG_GYM_M.V2")
+
+
+def test_fassung_unbekannte_edition_liefert_basisfassung():
+    """Der Fehlerfall vom 24.08.2026 — und der Grund für diese ganze Prüfung.
+
+    Die Adresse mit `.V3` antwortet **nicht** mit 404, sondern mit HTTP 200 und der
+    Seite von 2016. Der Scraper holte so 409 Basis-Knoten und legte sie unter
+    V3-Etikett ab; aufgefallen wäre es erst 2026/27 an einem leeren Bildungsplan.
+    Die Seite verrät sich über ihren canonical-Link.
+    """
+    with pytest.raises(ScraperFassungError) as exc:
+        pruefe_geladene_fassung(
+            _seite(_TITEL_BASIS, canonical=_BASIS_URL), "…", "BP2016BW_ALLG_GYM_M.V3"
+        )
+    # Die Meldung muss beide Seiten nennen, sonst ist sie nicht handlungsleitend.
+    assert "BP2016BW_ALLG_GYM_M.V3" in str(exc.value)
+    assert "BP2016BW_ALLG_GYM_M" in str(exc.value)
+
+
+def test_fassung_basis_angefordert_basis_geliefert():
+    """Basisfassung ist ein gültiger Wunsch — canonical zeigt dann korrekt auf sie."""
+    pruefe_geladene_fassung(
+        _seite(_TITEL_BASIS, canonical=_BASIS_URL), "…", "BP2016BW_ALLG_GYM_M"
+    )
+
+
+def test_fassung_basis_angefordert_edition_geliefert():
+    """Auch die Gegenrichtung wird erkannt — hier über den Titel, kein canonical da."""
+    with pytest.raises(ScraperFassungError) as exc:
+        pruefe_geladene_fassung(_seite(_TITEL_V2), "…", "BP2016BW_ALLG_GYM_M")
+    assert "Basisfassung" in str(exc.value) and "V2" in str(exc.value)
+
+
+def test_fassung_gen2x_korrekt():
+    """Neue Seitengeneration: Marke steht im Bezeichner *und* im Titel."""
+    pruefe_geladene_fassung(
+        _seite(_TITEL_V3), "…", "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
+    )
+
+
+def test_fassung_gen2x_angefordert_alte_seite_geliefert():
+    """V3 (GEN2X) angefordert, alte Seite geliefert → Ausfall."""
+    with pytest.raises(ScraperFassungError):
+        pruefe_geladene_fassung(
+            _seite(_TITEL_V2), "…", "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
+        )
+
+
+@pytest.mark.parametrize(
+    "bezeichner,erwartet",
+    [
+        ("BP2016BW_ALLG_GYM_M.V2", "V2"),
+        ("BP2016BW_ALLG_GYM_M", None),
+        ("DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)", "V3.0"),
+    ],
+)
+def test_fassungsmarke_beide_generationen(bezeichner, erwartet):
+    assert fassungsmarke(bezeichner) == erwartet
+
+
+def test_fassungsfehler_ist_kein_parsefehler():
+    """Bewusste Trennung — dieser Test hält sie fest.
+
+    Wäre `ScraperFassungError` eine Unterklasse von `ScraperParseError`, würden die
+    bestehenden `except ScraperParseError`-Zweige im Scraper sie schlucken: Warnung
+    protokollieren, weitermachen, falsche Knoten schreiben. Genau das soll nicht
+    passieren — das Fach muss ausfallen.
+    """
+    assert not issubclass(ScraperFassungError, ScraperParseError)
+
+
+@pytest.mark.asyncio
+async def test_scrape_fach_schreibt_bei_falscher_fassung_nichts(tmp_path):
+    """Die Verdrahtung, nicht nur die Prüffunktion: kein JSONL bei falscher Fassung.
+
+    Der Ausfall muss **vor** dem Parsen greifen und bis zur Aufrufebene durchfallen —
+    dort isoliert `main()` je Fach. Bliebe eine halb geschriebene Datei liegen, wäre
+    der Schaden derselbe wie ohne Prüfung.
+    """
+    seite = (
+        f"<html><head><title>{_TITEL_BASIS}</title>"
+        f'<link rel="canonical" href="{_BASIS_URL}"></head><body></body></html>'
+    )
+    with patch.object(_scraper, "fetch", AsyncMock(return_value=seite)):
+        with pytest.raises(_scraper.ScraperFassungError):
+            await _scraper.scrape_fach(
+                MagicMock(), "M", "BP2016BW_ALLG_GYM_M", ".V3",
+                tmp_path, {}, [],
+            )
+
+    assert list(tmp_path.glob("*.jsonl")) == [], "Bei falscher Fassung darf nichts entstehen"

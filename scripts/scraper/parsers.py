@@ -116,6 +116,75 @@ class ScraperParseError(Exception):
         super().__init__(f"Parse-Fehler bei {url}: {reason}")
 
 
+class ScraperFassungError(Exception):
+    """Die geladene Seite ist nicht die angeforderte Bildungsplan-Fassung.
+
+    Bewusst **keine** Unterklasse von ``ScraperParseError``: Die Seite ist tadellos
+    aufgebaut und würde sich anstandslos parsen lassen — sie ist nur die falsche. Die
+    bestehenden ``except ScraperParseError``-Zweige protokollieren eine Warnung und machen
+    weiter; hier muss stattdessen das ganze Fach ausfallen.
+    """
+    def __init__(self, url: str, erwartet: str, gefunden: str, signal: str):
+        self.url = url
+        self.erwartet = erwartet
+        self.gefunden = gefunden
+        super().__init__(
+            f"Falsche Fassung bei {url}: erwartet '{erwartet}', geliefert wurde "
+            f"'{gefunden}' ({signal})"
+        )
+
+
+# Fassungsmarke am Ende eines Bezeichners: `…_M.V2` (alte Generation) oder
+# `…_M(V3.0)` (GEN2X). Ohne Marke = Basisfassung.
+_MARKE_IM_BEZEICHNER = re.compile(r'(?:\.(V\d+(?:\.\d+)?)|\((V\d+(?:\.\d+)?)\))$')
+# Fassungsmarke im Seitentitel: „… (V2) - Bildungsplan", „BPBW-ALLG-GYM-M(V3.0) - …"
+_MARKE_IM_TITEL = re.compile(r'\((V\d+(?:\.\d+)?)\)')
+
+
+def fassungsmarke(bezeichner: str) -> str | None:
+    """Fassungsmarke eines Bezeichners — ``'V2'``, ``'V3.0'`` oder ``None`` (Basisfassung)."""
+    m = _MARKE_IM_BEZEICHNER.search(bezeichner.strip())
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def pruefe_geladene_fassung(soup: "BeautifulSoup", url: str, bp_id_erwartet: str) -> None:
+    """Prüft, ob die geladene Seite die angeforderte Fassung ist. Sonst ``ScraperFassungError``.
+
+    **Warum das nötig ist:** Die Quelle beantwortet eine unbekannte Fassung nicht mit 404,
+    sondern liefert klaglos die Basisfassung — mit HTTP 200 und tadellosem Aufbau. Am
+    24.08.2026 holte der Scraper so 409 Knoten der Fassung von 2016, legte sie unter
+    V3-Etikett ab, und nichts schlug an: Die ``bp_id``s stimmten mit der Basisfassung
+    überein, nur der Fachplan-Knoten trug ``bp_version: 2016.V3``. Aufgefallen wäre das
+    erst 2026/27 an einem leeren Bildungsplan für die Klassen 5–7.
+
+    Zwei voneinander unabhängige Signale, beide am echten Fehlerfall geprüft:
+
+    1. **``<link rel="canonical">``** — die Seite nennt ihre eigene Kennung. Beim
+       Fehlgriff steht dort die Basisfassung statt der angeforderten Edition. Die
+       *richtige* Seite trägt gar kein ``canonical``; fehlt es, greift Signal 2.
+    2. **Fassungsmarke im ``<title>``** — „… (V2) - Bildungsplan" gegenüber schlichtem
+       „Mathematik - Bildungsplan". Fängt auch den umgekehrten Fall ab (Basisfassung
+       angefordert, Edition geliefert).
+
+    Gilt für beide Seitengenerationen: `…_M.V2` wie `…_M(V3.0)`.
+    """
+    canonical = soup.find("link", rel="canonical")
+    if canonical and canonical.get("href"):
+        gefunden = canonical["href"].rstrip("/").split("/")[-1]
+        if gefunden and gefunden != bp_id_erwartet:
+            raise ScraperFassungError(url, bp_id_erwartet, gefunden, "laut canonical-Link")
+
+    titel = soup.title.get_text(strip=True) if soup.title else ""
+    marke_titel = _MARKE_IM_TITEL.search(titel)
+    ist = marke_titel.group(1) if marke_titel else None
+    soll = fassungsmarke(bp_id_erwartet)
+    if ist != soll:
+        raise ScraperFassungError(
+            url, soll or "Basisfassung", ist or "Basisfassung",
+            f"laut Seitentitel {titel[:70]!r}",
+        )
+
+
 def _extract_bp_id_from_url(url: str) -> str:
     """Extrahiert die BP-ID aus dem URL-Pfad.
 

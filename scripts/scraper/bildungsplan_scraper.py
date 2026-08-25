@@ -22,8 +22,10 @@ import yaml
 from bs4 import BeautifulSoup
 
 from scripts.scraper.parsers import (
+    ScraperFassungError,
     ScraperParseError,
     parse_fachplan,
+    pruefe_geladene_fassung,
     parse_leitidee,
     parse_ik_kompetenz_list,
     parse_pk_gruppe,
@@ -172,6 +174,13 @@ async def scrape_fach(
     fach_url = BASE_URL + bp_id_basis + suffix
     html = await fetch(client, fach_url)
     soup = BeautifulSoup(html, 'lxml')
+
+    # Erst prüfen, dann parsen. Eine unbekannte Edition liefert kein 404, sondern die
+    # Basisfassung — ohne diese Prüfung landen deren Knoten unter falschem Etikett, und
+    # zwar lautlos. Der Fehler fällt bis in die Aufrufebene durch: Das Fach wird
+    # übersprungen, für diese Edition wird **nichts** geschrieben.
+    pruefe_geladene_fassung(soup, fach_url, bp_id_basis + suffix)
+
     nodes = []
 
     # Fachplan
@@ -440,6 +449,20 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
                         subject_max_grade=fach.get('max_grade'),
                     )
                     neu += n; geaendert += g; unveraendert += u
+            except ScraperFassungError as exc:
+                # Eigener Zweig, weil die Ursache eine andere ist als bei sonstigen
+                # Ausfällen: Die Quelle hat geantwortet, nur eben mit der falschen
+                # Fassung. Ohne den Hinweis sucht man den Fehler im Scraper statt in
+                # der Konfiguration.
+                logger.error(
+                    "!!! Fach '%s' (fach_code=%s) ÜBERSPRUNGEN — falsche Fassung: %s\n"
+                    "    Mögliche Ursachen: Edition noch nicht veröffentlicht, oder sie "
+                    "liegt unter dem neuen Adressschema (GEN2X). Konfiguriertes "
+                    "bildungsplan_suffix prüfen.",
+                    slug, fach_code, exc,
+                )
+                skipped.append((slug, f"{type(exc).__name__}: {exc}"))
+                continue
             except Exception as exc:
                 logger.error(
                     "!!! Fach '%s' (fach_code=%s) ÜBERSPRUNGEN — %s: %s",
