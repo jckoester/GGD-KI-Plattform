@@ -2,15 +2,17 @@
 
 Die Fixture ist ein **gekürzter Ausschnitt der echten Seite**
 `DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)` (abgerufen 25.08.2026): Kopfbereich,
-die PK-Gruppe 2.1 sowie die Bänder „Klassen 5/6", „Klasse 11" und „Klassen 12/13
-(Leistungsfach)". Gerade die letzten beiden sind der Grund für den Ausschnitt — sie
-kommen in V2 nicht vor. Erfundenes Markup würde hier nichts beweisen.
+alle sieben PK-Gruppen sowie die Bänder „Klassen 5/6", „Klasse 11" und „Klassen 12/13
+(Leistungsfach)" vollständig. Gerade die letzten beiden sind der Grund für den Ausschnitt —
+sie kommen in V2 nicht vor. Vollständige Bänder sind nötig, damit sich Verweise innerhalb
+des Ausschnitts überhaupt prüfen lassen. Erfundenes Markup würde hier nichts beweisen.
 
 Zum Modul-Laden siehe CLAUDE.md: `backend/scripts` und `scripts` (Repo-Wurzel) heißen
 beide `scripts`; der Zustand in `sys.modules` wird um den Import herum wiederhergestellt.
 """
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -71,16 +73,16 @@ def _eines(knoten: list[dict], bp_id: str) -> dict:
 
 
 def test_knotenzahl_je_typ(knoten):
-    """Der Ausschnitt enthält genau eine PK-Gruppe und drei Leitideen."""
+    """Der Ausschnitt enthält alle PK-Gruppen und drei vollständige Jahrgangsbänder."""
     aus_fixture = {}
     for k in knoten:
         aus_fixture[k["content_type"]] = aus_fixture.get(k["content_type"], 0) + 1
     assert aus_fixture == {
         "fachplan": 1,
-        "pk_gruppe": 1,
-        "pk_kompetenz": 13,
-        "leitidee": 3,
-        "ik_kompetenz": 44,
+        "pk_gruppe": 7,
+        "pk_kompetenz": 73,
+        "leitidee": 15,
+        "ik_kompetenz": 170,
     }
 
 
@@ -272,11 +274,11 @@ async def test_scrape_fach_gen2x_holt_genau_eine_seite(tmp_path):
         "https://www.bildungsplaene-bw.de/,Lde/"
         "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
     ]
-    assert (neu, geaendert, unveraendert) == (62, 0, 0)
+    assert (neu, geaendert, unveraendert) == (266, 0, 0)
 
     zeilen = (tmp_path / "M.jsonl").read_text(encoding="utf-8").strip().split("\n")
     knoten = [json.loads(z) for z in zeilen]
-    assert len(knoten) == 62
+    assert len(knoten) == 266
     assert {k["bp_version"] for k in knoten} == {"2016.V3"}
 
 
@@ -369,3 +371,195 @@ def _async_cm():
     cm.__aenter__ = AsyncMock(return_value=MagicMock(name="httpx_client"))
     cm.__aexit__ = AsyncMock(return_value=None)
     return cm
+
+
+# ── Verweise (Schritt 5) ────────────────────────────────────────────────────
+
+_LP_BASIS = "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_LP(V3.0)"
+
+
+def test_verweise_je_typ(knoten):
+    """Verweise stehen in einer eigenen Zeile hinter der Kompetenz, nach Art getrennt.
+
+    `box--p` → prozessbezogen (`develops`), `box--i` → inhaltsbezogen (`related_to`),
+    `box--l` → Leitperspektive (`references`), `box--f` → anderes Fach.
+    """
+    je_typ: dict[str, int] = {}
+    for k in knoten:
+        for r in k["relations"]:
+            je_typ[r["type"]] = je_typ.get(r["type"], 0) + 1
+    assert je_typ == {"develops": 131, "related_to": 46, "references": 10}
+
+
+def test_relations_eines_ik_feldweise(knoten):
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_01_00_03")
+    assert k["relations"] == [
+        {"target_bp_id": "BP2016BW_ALLG_GYM_M.V3_PK_01_01", "type": "develops"},
+        {"target_bp_id": "BP2016BW_ALLG_GYM_M.V3_PK_01_02", "type": "develops"},
+    ]
+
+
+def test_aufgeloeste_ziele_treffen_vorhandene_knoten(knoten):
+    """Erzeugte Bezeichner müssen Knoten treffen — geprüft, wo das entscheidbar ist.
+
+    Ein Verweis `#3.1.4(1)` nennt nur den **Index** des Jahrgangsbands, nicht dessen
+    Stufen; der Bezeichner wird also gebaut, nicht abgeschrieben. Trifft er daneben,
+    entsteht beim Import eine Kante ins Leere.
+
+    Die Fixture ist ein Ausschnitt, deshalb die Einschränkung: Geprüft wird jedes Ziel,
+    dessen **Elternknoten** (Leitidee bzw. PK-Gruppe) im Ausschnitt liegt — dort sind
+    alle Kompetenzen vollständig, ein Fehlgriff fiele also auf. Gegen den vollständigen
+    Fachplan gilt die Aussage ohne Einschränkung: 479 interne Ziele, keines daneben.
+    """
+    vorhanden = {k["bp_id"] for k in knoten}
+    geprueft = 0
+    for k in knoten:
+        for r in k["relations"]:
+            ziel = r["target_bp_id"]
+            if not ziel.startswith("BP2016BW"):
+                continue
+            eltern = ziel.rsplit("_00_", 1)[0] if "_00_" in ziel else ziel.rsplit("_", 1)[0]
+            if eltern not in vorhanden:
+                continue  # Elternknoten außerhalb des Ausschnitts
+            assert ziel in vorhanden, f"{ziel} zeigt ins Leere"
+            geprueft += 1
+    assert geprueft > 150, f"Nur {geprueft} Ziele geprüft — der Test liefe ins Leere"
+
+
+def test_lp_anker_wird_zur_tokenform(knoten):
+    """`BO(1)` → `BO_01` — die Form, die der Import seit jeher erwartet."""
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_02_00_08")
+    assert k["relations"] == [{"target_bp_id": "BO_01", "type": "references"}]
+    assert _gen2x._verweis_ziel(f"{_LP_BASIS}#BNE(2)", BP_ID_FACH, {}) == "BNE_02"
+
+
+def test_ldw_verweis_wird_erzeugt_obwohl_die_leitperspektive_fehlt(knoten):
+    """Die Leitperspektiven wurden 2026 überarbeitet: **LDW ersetzt MB**.
+
+    Fünf der sechs (BNE, BTV, PG, BO, VB) sind unverändert und treffen die vorhandenen
+    Knoten. „Leben und Lernen in einer digitalisierten Welt" ist neu und noch nicht
+    importiert. Der Verweis wird trotzdem erzeugt: Beim Import erscheint er als
+    unaufgelöstes Ziel — sichtbar und behebbar. Ihn wegzulassen hieße, die Lücke zu
+    verstecken.
+    """
+    assert _gen2x._verweis_ziel(f"{_LP_BASIS}#LDW(1)", BP_ID_FACH, {}) == "LDW_01"
+    # Und im Ausschnitt tatsächlich vorhanden — kein hypothetischer Fall.
+    ldw = {
+        r["target_bp_id"]
+        for k in knoten
+        for r in k["relations"]
+        if r["target_bp_id"].startswith("LDW_")
+    }
+    assert ldw == {"LDW_01", "LDW_02", "LDW_04"}
+
+
+def test_cross_fach_bleibt_offen(knoten):
+    """Der Bezeichner eines fremden Fachs lässt sich hier nicht bilden.
+
+    `PH(V3.0) 3.4.3` nennt Band **4** von Physik — welche Klassenstufen das sind, steht
+    im Physik-Dokument, nicht in diesem. Physik und Geografie gliedern zudem tiefer
+    (`3.3.1.1`). Aufgelöst wird das beim Import über (Fach, Fassung, Nummer) — Schritt 7.
+    """
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_11_01_00_03")
+    offen = k["metadata"]["offene_verweise"]
+    assert [o["nr"] for o in offen] == ["3.4.3", "3.5.3", "3.6.3"]
+    assert {o["fach_code"] for o in offen} == {"PH"}
+    assert {o["quell_version"] for o in offen} == {"V3.0"}
+    # Nicht in relations — ein Ziel, das nicht gebaut werden kann, gehört dort nicht hin.
+    # Die dokumentinternen Verweise derselben Zeile stehen dagegen sehr wohl dort.
+    assert all("PH" not in r["target_bp_id"] for r in k["relations"])
+    assert k["relations"], "Die Zeile hat auch auflösbare Verweise — sonst prüft das nichts"
+
+
+def test_unaufloesbarer_interner_anker_wird_erfasst_statt_verschluckt(knoten):
+    """Im Ausschnitt fehlen die Bänder 3.2 und 3.3 — Verweise dorthin bleiben offen.
+
+    Im vollständigen Fachplan darf das nicht vorkommen (dort sind alle Bänder da). Der
+    Fall wird trotzdem festgehalten: Ein stillschweigend verlorener Verweis wäre
+    nirgends zu sehen — weder in den Daten noch im Log.
+    """
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_01_00_26")
+    assert k["metadata"]["offene_verweise"] == [
+        {"art": "dokumentintern", "nr": "#3.2.1(1)", "type": "related_to"}
+    ]
+
+
+def test_ohne_verweise_kein_metadatenfeld(knoten):
+    """`offene_verweise` steht nur, wo es etwas zu vermerken gibt."""
+    k = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_01_00_01")
+    assert "offene_verweise" not in k["metadata"]
+
+
+# ── Nummer als Feld (Vorbereitung für Schritt 7) ────────────────────────────
+
+
+def test_leitidee_traegt_ihre_nummer_als_feld(knoten):
+    """Cross-Fach-Verweise nennen die Nummer, nicht den Bezeichner.
+
+    `PH(V3.0) 3.4.3` zeigt auf eine **Leitidee**. Damit Schritt 7 sie über
+    (Fach, Fassung, Nummer) findet, muss die Nummer ein Feld sein — im Titel steht sie
+    zwar auch, aber sie dort herauszuschneiden wäre genau die Textklauberei, die der
+    alte Parser zur Fehlerquelle gemacht hat. Die Quelle liefert sie im `id`-Attribut.
+    """
+    li = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_01")
+    assert li["metadata"]["nr"] == "3.1.1"
+
+    ks = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_12-13-LF_03")
+    assert ks["metadata"]["nr"] == "3.5.3"
+
+
+def test_pk_gruppe_traegt_ihre_nummer_als_feld(knoten):
+    """Gleiches Feld bei den PK-Gruppen — sonst wäre sie der einzige nummerierte
+    Knotentyp, dessen Nummer nur im Titel steht."""
+    assert _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_PK_01")["metadata"]["nr"] == "2.1"
+    assert _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_PK_07")["metadata"]["nr"] == "2.7"
+
+
+def test_nummer_und_titel_stimmen_ueberein(knoten):
+    """Das Feld stammt aus dem `id`-Attribut, der Titel aus dem Text — sie müssen
+    dasselbe sagen. Weichen sie ab, hat sich der Aufbau der Quelle geändert."""
+    for k in knoten:
+        if k["content_type"] not in ("leitidee", "pk_gruppe"):
+            continue
+        nr = k["metadata"]["nr"]
+        assert k["title"].startswith(f"{nr} "), f"{k['bp_id']}: {nr!r} vs {k['title'][:40]!r}"
+
+
+def test_offene_cross_fach_verweise_nennen_dieselbe_nummernform(knoten):
+    """Der Kreis schließt sich: Was als offener Verweis notiert ist, trägt genau die
+    Form, die in `nr` bzw. `kompetenz_nr` des Zielfachs steht."""
+    offen = [
+        o
+        for k in knoten
+        for o in (k["metadata"].get("offene_verweise") or [])
+        if o["art"] == "cross_fach"
+    ]
+    assert offen, "Ohne offene Verweise prüft dieser Test nichts"
+    for o in offen:
+        # Leitidee-Ebene wie `3.4.3`, Kompetenz-Ebene wie `3.3.2(14)`
+        assert re.fullmatch(r"\d+(\.\d+)+(\(\d+\))?", o["nr"]), o["nr"]
+
+
+def test_nummer_stammt_aus_dem_id_attribut_nicht_aus_dem_titel():
+    """Warum das `id`-Attribut und nicht das Titelpräfix?
+
+    In der echten Seite sagen beide dasselbe — die Wahl ist dort nicht zu erkennen.
+    Sie ist trotzdem keine Geschmacksfrage: Das `id`-Attribut ist die Kennung, mit der
+    die Quelle **selbst** verlinkt (`#3.1.2`); der Titel ist Fließtext und darf sich
+    ändern. Hier deshalb ein Dokument, in dem beide auseinanderfallen — nur so ist die
+    Entscheidung prüfbar.
+    """
+    html = """
+    <html><head><title>BPBW-ALLG-GYM-M(V3.0) - Bildungsplan</title></head><body>
+      <h1>Mathematik Überarbeitete Fassung vom 21. Mai 2026 (V3.0)</h1>
+      <h4 id="3.1">3.1 Klassen 5/6</h4>
+      <h5 id="3.1.2">Leitidee Messen</h5>
+      <div class="composedcontent-ls_bp_allg_content_block_bpx">Einleitung.</div>
+    </body></html>
+    """
+    knoten = parse_gen2x_dokument(
+        BeautifulSoup(html, "lxml"), QUELL_URL, BP_ID_FACH
+    )
+    li = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_02")
+    assert li["title"] == "Leitidee Messen"
+    assert li["metadata"]["nr"] == "3.1.2"

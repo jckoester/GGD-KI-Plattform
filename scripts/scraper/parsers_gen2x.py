@@ -85,6 +85,21 @@ def band_aus_ueberschrift(text: str) -> tuple[str, int, int, str]:
     return segment, min(stufen), max(stufen), niveau
 
 
+# Verweise stehen in einer **eigenen** Zeile hinter der Kompetenz
+# (`tr.bp_allg_content_item_table_level_bpx`), aufgeteilt in Kästen je Verweisart.
+_VERWEISZEILE = "level_bpx"
+_REL_JE_BOX = {
+    "box--p": "develops",    # prozessbezogene Kompetenz desselben Plans
+    "box--i": "related_to",  # inhaltsbezogene Kompetenz desselben Plans
+    "box--l": "references",  # Leitperspektive
+    "box--f": "related_to",  # Kompetenz eines anderen Fachs
+}
+# Anker einer Leitperspektive: `BNE(2)` → Token `BNE_02` (Form der alten Generation)
+_LP_ANKER = re.compile(r'^([A-Z]+)\((\d+)\)$')
+# Adresse eines anderen Fachs: …_ALLG_GYM_PH(V3.0)#3.2.7(2)
+_FREMDFACH = re.compile(r'_ALLG_[A-Z]+_([A-Z0-9]+)\(([^)]+)\)$')
+
+
 def _text(el) -> str:
     """Sichtbarer Text eines Elements, ohne weiche Trennstriche.
 
@@ -98,7 +113,8 @@ def _knoten(
     *, bp_id: str, content_type: str, title: str, content: str,
     parent_bp_id: str | None, url: str, breadcrumb: list[str],
     min_grade: int | None = None, max_grade: int | None = None,
-    niveau: str = "regulär", extra_metadata: dict[str, Any] | None = None,
+    niveau: str = "regulär", relations: list[dict[str, str]] | None = None,
+    extra_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Baut einen JSONL-Knoten im Schema der alten Generation."""
     return {
@@ -109,7 +125,7 @@ def _knoten(
         "content": content,
         "content_hash": _content_hash(content),
         "parent_bp_id": parent_bp_id,
-        "relations": [],
+        "relations": relations or [],
         "min_grade": min_grade,
         "max_grade": max_grade,
         "niveau": niveau,
@@ -125,8 +141,8 @@ def _knoten(
     }
 
 
-def _kompetenzzeilen(ueberschrift) -> list[tuple[str, int, str, str]]:
-    """Kompetenzen unter einer Überschrift: (kompetenz_nr, standard_nr, text, gruppe).
+def _kompetenzzeilen(ueberschrift) -> list[tuple[str, int, str, str, Any]]:
+    """Kompetenzen unter einer Überschrift: (kompetenz_nr, standard_nr, text, gruppe, zeile).
 
     Gelesen wird die auf die Überschrift folgende Tabelle. ``gruppe`` ist die fett
     gesetzte Zwischenzeile darüber („Zahlbereiche erkunden") — in V2 nur bei den
@@ -143,7 +159,7 @@ def _kompetenzzeilen(ueberschrift) -> list[tuple[str, int, str, str]]:
     if tabelle is None:
         return []
 
-    zeilen: list[tuple[str, int, str, str]] = []
+    zeilen: list[tuple[str, int, str, str, Any]] = []
     gruppe = ""
     for tr in tabelle.find_all("tr"):
         klassen = " ".join(tr.get("class") or [])
@@ -154,8 +170,108 @@ def _kompetenzzeilen(ueberschrift) -> list[tuple[str, int, str, str]]:
         if not m:
             continue
         koerper = tr.select_one(".text-body")
-        zeilen.append((tr["id"], int(m.group(2)), _text(koerper) if koerper else _text(tr), gruppe))
+        zeilen.append(
+            (tr["id"], int(m.group(2)), _text(koerper) if koerper else _text(tr), gruppe, tr)
+        )
     return zeilen
+
+
+def _verweise(
+    zeile, bp_id_fach: str, band_segmente: dict[str, str]
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Verweise einer Kompetenzzeile: (auflösbare ``relations``, offene Verweise).
+
+    **Auflösbar** ist, was im selben Dokument liegt — prozess- und inhaltsbezogene
+    Kompetenzen desselben Plans. Deren Bezeichner lässt sich vollständig bilden.
+
+    **Offen** bleibt, was den Bestand einer anderen Quelle braucht:
+
+    * *Cross-Fach* (`PH(V3.0) 3.2.7 (2)`) — der Bezeichner des Ziels hängt an der
+      Bandgliederung des **anderen** Fachs, die in diesem Dokument nicht steht. Physik
+      und Geografie gliedern zudem tiefer (``3.3.1.1``) als Mathematik. Aufgelöst wird
+      das beim Import über (Fach, Fassung, Nummer) — Schritt 7.
+
+    Offene Verweise landen in den Metadaten statt im Nirwana: Die Angabe ist damit
+    erfasst und muss später nicht neu geholt werden.
+    """
+    relations: list[dict[str, str]] = []
+    offen: list[dict[str, str]] = []
+
+    for verweiszeile in _verweiszeilen(zeile):
+        for box in verweiszeile.select("div.box"):
+            klassen = box.get("class") or []
+            relation = next(
+                (_REL_JE_BOX[k] for k in klassen if k in _REL_JE_BOX), None
+            )
+            if relation is None:
+                continue
+            for a in box.find_all("a", href=True):
+                href = a["href"]
+                ziel = _verweis_ziel(href, bp_id_fach, band_segmente)
+                if ziel is not None:
+                    relations.append({"target_bp_id": ziel, "type": relation})
+                    continue
+
+                fremd = _FREMDFACH.search(href.split("#")[0])
+                if fremd:
+                    offen.append({
+                        "art": "cross_fach",
+                        "fach_code": fremd.group(1),
+                        "quell_version": fremd.group(2),
+                        "nr": href.split("#", 1)[1] if "#" in href else "",
+                        "type": relation,
+                    })
+                else:
+                    # Alles, was hier landet, ist ein Anker, den dieses Dokument selbst
+                    # nicht auflösen konnte — im vollständigen Fachplan darf das nicht
+                    # vorkommen. Trotzdem erfassen statt verschlucken: Ein stillschweigend
+                    # verlorener Verweis wäre nirgends zu sehen.
+                    offen.append({"art": "dokumentintern", "nr": href, "type": relation})
+    return relations, offen
+
+
+def _verweiszeilen(zeile):
+    """Die Verweiszeile(n) direkt hinter einer Kompetenzzeile."""
+    for sib in zeile.find_next_siblings("tr"):
+        if _VERWEISZEILE not in " ".join(sib.get("class") or []):
+            return
+        yield sib
+
+
+def _verweis_ziel(href: str, bp_id_fach: str, band_segmente: dict[str, str]) -> str | None:
+    """bp_id des Verweisziels — oder ``None``, wenn es hier nicht bestimmbar ist."""
+    if href.startswith("#"):
+        return _anker_zu_bp_id(href[1:], bp_id_fach, band_segmente)
+
+    anker = href.split("#", 1)[1] if "#" in href else ""
+    lp = _LP_ANKER.match(anker)
+    if lp and "_ALLG_LP(" in href:
+        # Leitperspektiven tragen die Tokenform der alten Generation: `BNE(2)` → `BNE_02`.
+        # Fünf der sechs Leitperspektiven sind unverändert; die sechste (LDW) ersetzt die
+        # bisherige Medienbildung und ist noch nicht importiert — der Verweis wird
+        # trotzdem erzeugt, damit die Lücke beim Import **auffällt** statt zu verschwinden.
+        return f"{lp.group(1)}_{int(lp.group(2)):02d}"
+    return None
+
+
+def _anker_zu_bp_id(anker: str, bp_id_fach: str, band_segmente: dict[str, str]) -> str | None:
+    """Dokumentinterner Anker → bp_id. ``2.1(1)`` → ``…_PK_01_01``."""
+    m = _ID_KOMPETENZ.match(anker)
+    pfad, standard = (m.group(1), int(m.group(2))) if m else (anker, None)
+    teile = pfad.split(".")
+
+    if teile[0] == "2" and len(teile) == 2:
+        basis = f"{bp_id_fach}_PK_{int(teile[1]):02d}"
+        return basis if standard is None else f"{basis}_{standard:02d}"
+
+    if teile[0] == "3" and len(teile) == 3:
+        segment = band_segmente.get(teile[1])
+        if segment is None:
+            return None
+        basis = f"{bp_id_fach}_IK_{segment}_{int(teile[2]):02d}"
+        return basis if standard is None else f"{basis}_00_{standard:02d}"
+
+    return None
 
 
 def _intro(ueberschrift) -> str:
@@ -202,6 +318,16 @@ def parse_gen2x_dokument(
 
     ueberschriften = soup.find_all(["h3", "h4", "h5"])
 
+    # Bandgliederung zuerst: Ein Verweis `#3.1.4(1)` nennt nur den **Index** des Bandes
+    # (hier 1), nicht dessen Stufen. Ohne diese Zuordnung ließe sich der Bezeichner des
+    # Ziels nicht bilden — und Verweise stehen auch in Abschnitt 2, also vor der Stelle,
+    # an der die Bänder sonst gelesen würden.
+    band_segmente: dict[str, str] = {}
+    for h in ueberschriften:
+        m = _ID_UNTERABSCHNITT.match(h.get("id") or "")
+        if m and m.group(1) == "3":
+            band_segmente[m.group(2)] = band_aus_ueberschrift(_text(h))[0]
+
     # ── Abschnitt 2: prozessbezogene Kompetenzen ─────────────────────────────
     for h in ueberschriften:
         m = _ID_UNTERABSCHNITT.match(h.get("id") or "")
@@ -216,9 +342,11 @@ def parse_gen2x_dokument(
                 bp_id=gruppen_bp_id, content_type="pk_gruppe",
                 title=gruppen_titel, content=_intro(h) or gruppen_titel,
                 parent_bp_id=bp_id_fach, url=url, breadcrumb=bc,
+                extra_metadata={"nr": m.group(0)},
             )
         )
-        for kompetenz_nr, standard_nr, text, gruppe in _kompetenzzeilen(h):
+        for kompetenz_nr, standard_nr, text, gruppe, zeile in _kompetenzzeilen(h):
+            relations, offen = _verweise(zeile, bp_id_fach, band_segmente)
             knoten.append(
                 _knoten(
                     bp_id=f"{gruppen_bp_id}_{standard_nr:02d}",
@@ -226,10 +354,12 @@ def parse_gen2x_dokument(
                     title=f"{kompetenz_nr} {text}",
                     content=f"({standard_nr}) {text}",
                     parent_bp_id=gruppen_bp_id, url=url, breadcrumb=bc,
+                    relations=relations,
                     extra_metadata={
                         "kompetenz_nr": kompetenz_nr,
                         "standard_nr": standard_nr,
                         "thematische_gruppe": gruppe,
+                        **({"offene_verweise": offen} if offen else {}),
                     },
                 )
             )
@@ -263,9 +393,15 @@ def parse_gen2x_dokument(
                 title=li_titel, content=_intro(h) or li_titel,
                 parent_bp_id=bp_id_fach, url=url, breadcrumb=bc,
                 min_grade=min_grade, max_grade=max_grade, niveau=niveau,
+                # Die Nummer als eigenes Feld, nicht nur im Titel: Cross-Fach-Verweise
+                # anderer Fächer nennen genau sie (`PH(V3.0) 3.4.3`), und die Auflösung
+                # in Schritt 7 sucht danach. Sie stammt aus dem `id`-Attribut der
+                # Überschrift — also aus der Quelle, nicht aus dem Titeltext geklaubt.
+                extra_metadata={"nr": hid},
             )
         )
-        for kompetenz_nr, standard_nr, text, gruppe in _kompetenzzeilen(h):
+        for kompetenz_nr, standard_nr, text, gruppe, zeile in _kompetenzzeilen(h):
+            relations, offen = _verweise(zeile, bp_id_fach, band_segmente)
             knoten.append(
                 _knoten(
                     # Das feste `00` ist das Gruppen-Segment der alten Generation. Es
@@ -277,10 +413,12 @@ def parse_gen2x_dokument(
                     content=f"({standard_nr}) {text}",
                     parent_bp_id=li_bp_id, url=url, breadcrumb=bc,
                     min_grade=min_grade, max_grade=max_grade, niveau=niveau,
+                    relations=relations,
                     extra_metadata={
                         "kompetenz_nr": kompetenz_nr,
                         "standard_nr": standard_nr,
                         "thematische_gruppe": gruppe,
+                        **({"offene_verweise": offen} if offen else {}),
                     },
                 )
             )
