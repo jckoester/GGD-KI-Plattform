@@ -878,3 +878,144 @@ async def test_scrape_fach_schreibt_bei_falscher_fassung_nichts(tmp_path):
             )
 
     assert list(tmp_path.glob("*.jsonl")) == [], "Bei falscher Fassung darf nichts entstehen"
+
+
+# ---------------------------------------------------------------------------
+# Cross-Fach-Verweise der neuen Seitengeneration (Plan-Schritt 7)
+# ---------------------------------------------------------------------------
+
+
+def test_quellversion_zu_bp_version():
+    """`V3.0` in der Adresse ↔ `2016.V3` an unseren Knoten.
+
+    Die Zuordnung steht schon im Editions-Fahrplan und wird hier nur umgedreht — ein
+    zweites Mal aufgeschrieben wäre sie eine Fehlerquelle.
+    """
+    cfg = {
+        "bildungsplan_default": {
+            "bp_basis": "BP2016BW",
+            "editionen": [
+                {"suffix": ""},
+                {"suffix": ".V2"},
+                {"suffix": ".V3", "seitengeneration": "gen2x", "quell_version": "V3.0"},
+            ],
+        }
+    }
+    assert _import_bp.quellversion_zu_bp_version(cfg) == {"V3.0": "2016.V3"}
+
+
+class _CrossFachCursor:
+    """Cursor-Ersatz: kennt genau ein Ziel, gibt es nur bei passender Fassung heraus."""
+
+    def __init__(self, treffer: dict[tuple[str, str, str], int]):
+        self._treffer = treffer
+        self.inserts: list[tuple] = []
+        self._next = None
+
+    def execute(self, sql, params=None):
+        if "INSERT INTO context_edges" in sql:
+            self.inserts.append(params)
+            self._next = None
+            return
+        if "s.fach_code" in sql:
+            fach, bpv, nr, _nr2 = params
+            self._next = (self._treffer.get((fach, bpv, nr)),) if (fach, bpv, nr) in self._treffer else None
+            return
+        self._next = None
+
+    def fetchone(self):
+        return self._next
+
+    @property
+    def rowcount(self):
+        return 1
+
+
+_ZIEL = "11111111-1111-1111-1111-111111111111"
+_QUELL_VERSIONEN = {"V3.0": "2016.V3"}
+
+
+def _knoten_mit_verweisen(*verweise):
+    return {
+        "bp_id": "BP2016BW_ALLG_GYM_M.V3_IK_11_01_00_03",
+        "bp_version": "2016.V3",
+        "metadata": {"offene_verweise": list(verweise)},
+    }
+
+
+def _verweis(nr="3.4.3", quell_version="V3.0", fach="PH"):
+    return {
+        "art": "cross_fach", "fach_code": fach,
+        "quell_version": quell_version, "nr": nr, "type": "related_to",
+    }
+
+
+def test_cross_fach_verweis_wird_zur_kante():
+    """Beim Scrapen war das Ziel nicht bestimmbar — beim Import ist der ganze Bestand da.
+
+    Aufgelöst wird über (Fach, Fassung, Nummer); Bandwissen über das fremde Fach braucht
+    es dafür nicht. Das ist der Grund, warum der Scraper diese Verweise offen lässt,
+    statt einen Bezeichner zu raten.
+    """
+    cur = _CrossFachCursor({("PH", "2016.V3", "3.4.3"): _ZIEL})
+    warnungen: list[str] = []
+
+    n = _import_bp.resolve_edges(
+        cur, _knoten_mit_verweisen(_verweis()), _ZIEL, False, warnungen, _QUELL_VERSIONEN
+    )
+
+    assert n == 1
+    assert warnungen == []
+    assert len(cur.inserts) == 1
+    assert cur.inserts[0][2] == "related_to"
+
+
+def test_unbekannte_fassung_wird_nicht_ersetzt():
+    """Kein Rückfall auf die Fassung des verweisenden Knotens.
+
+    Ein erster Entwurf tat genau das: Ein Verweis auf `PH(V2.0)` landete auf dem
+    **V3**-Knoten von Physik — lautlos und falsch. Am echten Bestand aufgefallen, nicht
+    im Test; deshalb steht der Fall jetzt hier.
+    """
+    cur = _CrossFachCursor({("PH", "2016.V3", "3.4.3"): _ZIEL})
+    warnungen: list[str] = []
+
+    n = _import_bp.resolve_edges(
+        cur,
+        _knoten_mit_verweisen(_verweis(quell_version="V2.0")),
+        _ZIEL, False, warnungen, _QUELL_VERSIONEN,
+    )
+
+    assert n == 0
+    assert cur.inserts == []
+    assert len(warnungen) == 1
+    assert "Fassung im Fahrplan unbekannt" in warnungen[0]
+
+
+def test_fehlende_nummer_nennt_den_anderen_grund():
+    """Zwei Ausfallarten, zwei Meldungen — sonst sucht man an der falschen Stelle."""
+    cur = _CrossFachCursor({("PH", "2016.V3", "3.4.3"): _ZIEL})
+    warnungen: list[str] = []
+
+    _import_bp.resolve_edges(
+        cur, _knoten_mit_verweisen(_verweis(nr="9.9.9")), _ZIEL, False,
+        warnungen, _QUELL_VERSIONEN,
+    )
+
+    assert "Nummer in dieser Fassung nicht vorhanden" in warnungen[0]
+
+
+def test_dokumentinterner_restverweis_wird_gemeldet():
+    """Im vollständigen Fachplan darf das nicht vorkommen — also melden, nicht ignorieren."""
+    knoten = {
+        "bp_id": "TEST", "bp_version": "2016.V3",
+        "metadata": {"offene_verweise": [
+            {"art": "dokumentintern", "nr": "#3.2.1(1)", "type": "related_to"}
+        ]},
+    }
+    warnungen: list[str] = []
+    n = _import_bp.resolve_edges(
+        _CrossFachCursor({}), knoten, _ZIEL, False, warnungen, _QUELL_VERSIONEN
+    )
+    assert n == 0
+    assert "im eigenen Dokument nicht aufloesbar" in warnungen[0]

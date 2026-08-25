@@ -172,6 +172,25 @@ def preflight_check_migration(conn) -> None:
             )
 
 
+def quellversion_zu_bp_version(cfg: dict) -> dict[str, str]:
+    """Fassungsangabe der Quelle → unsere Kennung: ``'V3.0'`` → ``'2016.V3'``.
+
+    Cross-Fach-Verweise der neuen Seitengeneration nennen die Fassung so, wie sie in der
+    Adresse steht (`PH(V3.0) 3.4.3`). Unsere Knoten führen sie als ``bp_version``. Die
+    Zuordnung steht bereits im Editions-Fahrplan — sie wird hier nur umgedreht, statt
+    ein zweites Mal aufgeschrieben zu werden.
+    """
+    bp_default = cfg.get("bildungsplan_default", {}) or {}
+    jahr_m = re.match(r"^BP(\d{4})", str(bp_default.get("bp_basis", "")))
+    jahr = jahr_m.group(1) if jahr_m else ""
+    zuordnung: dict[str, str] = {}
+    for eintrag in bp_default.get("editionen") or []:
+        quell_version = eintrag.get("quell_version")
+        if quell_version:
+            zuordnung[str(quell_version)] = jahr + (eintrag.get("suffix") or "")
+    return zuordnung
+
+
 def build_subject_id_lookup(conn) -> dict[str, int]:
     """Gibt dict fach_slug -> subject_id aus der subjects-Tabelle zurück."""
     with conn.cursor() as cur:
@@ -374,9 +393,10 @@ def resolve_edges(
     node_id: UUID,
     dry_run: bool,
     warnings: list[str],
+    quell_versionen: dict[str, str] | None = None,
 ) -> int:
     """
-    Legt Kanten fuer einen Knoten an (parent_bp_id + relations[]).
+    Legt Kanten fuer einen Knoten an (parent_bp_id + relations[] + offene Verweise).
     Gibt Anzahl angelegter Kanten zurueck.
     """
     edges_created = 0
@@ -440,7 +460,78 @@ def resolve_edges(
         if insert_edge(node_id, target_id, relation_type):
             edges_created += 1
 
+    # Offene Verweise (neue Seitengeneration): Cross-Fach-Bezuege, deren Ziel-bp_id sich
+    # beim Scrapen NICHT bilden liess — die Bandgliederung des fremden Fachs steht in
+    # dessen eigenem Dokument. Hier ist der ganze Bestand da, also wird ueber die
+    # **Nummer** aufgeloest: (Fach, Fassung, Nummer). Das braucht kein Bandwissen und
+    # funktioniert auch fuer Faecher, die tiefer gliedern (GEO: 3.1.1.1).
+    for verweis in (node.get("metadata") or {}).get("offene_verweise") or []:
+        if verweis.get("art") != "cross_fach":
+            warnings.append(
+                f"{datetime.now(timezone.utc).isoformat()} WARN "
+                f"Verweis '{verweis.get('nr')}' im eigenen Dokument nicht aufloesbar "
+                f"(Knoten: {node['bp_id']})"
+            )
+            continue
+        target_id = lookup_cross_fach(cur, verweis, quell_versionen or {})
+        if not target_id:
+            quell_version = str(verweis.get("quell_version"))
+            grund = (
+                "Fassung im Fahrplan unbekannt"
+                if quell_version not in (quell_versionen or {})
+                else "Nummer in dieser Fassung nicht vorhanden"
+            )
+            warnings.append(
+                f"{datetime.now(timezone.utc).isoformat()} WARN "
+                f"Cross-Fach-Verweis nicht aufgeloest: {verweis.get('fach_code')} "
+                f"{verweis.get('nr')} (Fassung {quell_version} — {grund}, "
+                f"Knoten: {node['bp_id']})"
+            )
+            continue
+        if insert_edge(node_id, target_id, verweis.get("type") or "related_to"):
+            edges_created += 1
+
     return edges_created
+
+
+def lookup_cross_fach(
+    cur, verweis: dict, quell_versionen: dict[str, str]
+) -> UUID | None:
+    """Sucht das Ziel eines Cross-Fach-Verweises ueber (Fach, Fassung, Nummer).
+
+    Die Fassung stammt aus dem Verweis selbst (`PH(V3.0)`) — so hat es die Quelle
+    gemeint.
+
+    **Kein Rueckfall auf eine andere Fassung.** Ein erster Entwurf nahm bei unbekannter
+    Fassungsangabe die des verweisenden Knotens: Ein Verweis auf `PH(V2.0)` landete damit
+    auf dem V3-Knoten von Physik — lautlos und falsch. Kennt der Fahrplan die Angabe
+    nicht, ist das eine Luecke in der Konfiguration und gehoert gemeldet.
+    """
+    fach_code = (verweis.get("fach_code") or "").strip().upper()
+    nr = (verweis.get("nr") or "").strip()
+    if not fach_code or not nr:
+        return None
+
+    bp_version = quell_versionen.get(str(verweis.get("quell_version")))
+    if not bp_version:
+        return None
+
+    cur.execute(
+        """
+        SELECT n.id
+        FROM context_nodes n
+        JOIN subjects s ON s.id = n.subject_id
+        WHERE s.fach_code = %s
+          AND n.status = 'active'
+          AND n.content_type IN ('ik_kompetenz', 'leitidee')
+          AND n.metadata->>'bp_version' = %s
+          AND (n.metadata->>'kompetenz_nr' = %s OR n.metadata->>'nr' = %s)
+        LIMIT 1
+        """,
+        (fach_code, bp_version, nr, nr),
+    )
+    row = cur.fetchone()
+    return UUID(str(row[0])) if row else None
 
 
 def archive_removed_nodes(
@@ -906,12 +997,14 @@ def run_import(
                     if row:
                         node_id_map[node["bp_id"]] = UUID(str(row[0]))
 
-            # Kanten auflösen
+            # Kanten aufloesen. Erst hier, wenn ALLE Knoten stehen — Cross-Fach-Verweise
+            # zeigen auf Faecher, die womoeglich erst spaeter in der Schleife kamen.
+            quell_versionen = quellversion_zu_bp_version(cfg)
             for node in nodes:
                 node_id = node_id_map.get(node["bp_id"])
                 if node_id:
                     stats["edges"] += resolve_edges(
-                        cur, node, node_id, dry_run, warnings
+                        cur, node, node_id, dry_run, warnings, quell_versionen
                     )
 
             # Entfernte Knoten archivieren (nur beim echten Voll-Import: Verzeichnis
