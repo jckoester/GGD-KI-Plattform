@@ -591,6 +591,7 @@
                         editMode={true}
                         subjectId={curriculum?.subject_id ?? null}
                         grade={gradeInt}
+                        bpVersion={curriculum?.metadata?.bp_version ?? null}
                         onchange={() => {
                             dirty = true;
                         }}

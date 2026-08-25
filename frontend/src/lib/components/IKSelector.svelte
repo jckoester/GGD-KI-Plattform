@@ -10,6 +10,7 @@
 
     import { X, Search, Check } from "lucide-svelte";
     import { getActiveBpVersion } from "$lib/api";
+    import { editionLoadPlan } from "$lib/editions";
 
     let {
         subjectId = null,
@@ -26,8 +27,9 @@
     let warnings = $state([]); // Array von nicht gefundenen IK-Nummern
 
     // Aktive BP-Edition für (Fach, Stufe, Schuljahr) auflösen, wenn keine explizit
-    // übergeben ist (editionsbewusster Autocomplete; vor V3 ein No-Op = aktuelle V2).
-    let resolvedBpVersion = $state(null);
+    // übergeben ist (editionsbewusster Autocomplete).
+    // `undefined` heißt „steht noch aus", `null` heißt „nichts zu filtern".
+    let resolvedBpVersion = $state(undefined);
     $effect(() => {
         if (bpVersion || !subjectId || !grade) {
             resolvedBpVersion = null;
@@ -49,11 +51,15 @@
     // Lade IK-Knoten basierend auf der Suche
     $effect(() => {
         // synchron lesen → Suche reagiert, sobald die aktive Edition aufgelöst ist
-        const effectiveBp = bpVersion ?? resolvedBpVersion;
+        const plan = editionLoadPlan({ subjectId, bpVersion, grade, resolved: resolvedBpVersion });
+        const effectiveBp = plan.bpFilter;
         if (!searchQuery.trim() || searchQuery.length < 1) {
             searchResults = [];
             return;
         }
+        // Solange die Edition noch aufgelöst wird, nicht suchen — eine ungefilterte
+        // Trefferliste mischt zwei Fassungen derselben Kompetenznummer.
+        if (!plan.load) return;
 
         const timer = setTimeout(async () => {
             loading = true;

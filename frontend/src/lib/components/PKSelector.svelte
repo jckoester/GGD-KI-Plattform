@@ -10,6 +10,7 @@
 
     import { X, Search, Check, ChevronDown, ChevronRight } from 'lucide-svelte'
     import { getActiveBpVersion } from '$lib/api'
+    import { editionLoadPlan } from '$lib/editions'
 
     let { subjectId = null, grade = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
 
@@ -34,8 +35,9 @@
     }
 
     // Aktive BP-Edition für (Fach, Stufe, Schuljahr) auflösen, wenn keine explizit
-    // übergeben ist (editionsbewusst — PK variieren je BP-Edition). Vor V3 No-Op.
-    let resolvedBpVersion = $state(null)
+    // übergeben ist (editionsbewusst — PK variieren je BP-Edition).
+    // `undefined` heißt „steht noch aus", `null` heißt „nichts zu filtern".
+    let resolvedBpVersion = $state(undefined)
     $effect(() => {
         if (bpVersion || !subjectId || !grade) {
             resolvedBpVersion = null
@@ -48,11 +50,17 @@
         return () => { cancelled = true }
     })
 
+    // Laufnummer: Antworten aus einem überholten Ladevorgang dürfen einen neueren
+    // nicht überschreiben — sonst entscheidet die Netzlaufzeit über den Inhalt.
+    let ladeLauf = 0
+
     // Lade PK-Gruppen und -Kompetenzknoten
     $effect(() => {
-        if (!subjectId) return
         // synchron lesen → reaktiv, sobald die aktive Edition aufgelöst ist
-        const effectiveBp = bpVersion ?? resolvedBpVersion
+        const plan = editionLoadPlan({ subjectId, bpVersion, grade, resolved: resolvedBpVersion })
+        if (!plan.load) return
+        const effectiveBp = plan.bpFilter
+        const lauf = ++ladeLauf
 
         async function loadPkData() {
             loadingGruppen = true
@@ -76,6 +84,9 @@
 
                 const kompetenzRes = await fetch(`/api/context/nodes?${paramsKompetenzen}`, { credentials: 'include' })
                 const kompetenzData = kompetenzRes.ok ? await kompetenzRes.json() : []
+
+                // Inzwischen ein neuerer Lauf gestartet? Dann diese Antwort verwerfen.
+                if (lauf !== ladeLauf) return
 
                 allKompetenzen = kompetenzData
 
@@ -112,7 +123,7 @@
             } catch (e) {
                 console.error('Fehler beim Laden der PK-Daten:', e)
             } finally {
-                loadingGruppen = false
+                if (lauf === ladeLauf) loadingGruppen = false
             }
         }
 
