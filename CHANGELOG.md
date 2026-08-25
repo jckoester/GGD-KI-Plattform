@@ -5,6 +5,110 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.0] – 2026-08-25
+
+Schwerpunkt: **Curricula werden übertragbar.** Ein Schulcurriculum lässt sich exportieren
+und in einer anderen Instanz einspielen — für promptLab und Entwicklungsumgebungen bisher
+die größte Hürde, weil man dort realistische Curricula von Hand nachbauen musste.
+
+Auf dem Weg dorthin kamen mehrere Fehler zutage, die sich gegenseitig verdeckt hatten. Zwei
+davon betrafen **Bestandsdaten**: Englisch und Französisch waren im Wissensgraph
+vollständig stillgelegt, und Kompetenzverweise wurden in Export wie Import an einem Feld
+gesucht, das reale Daten nie tragen.
+
+Dazu mehrere Nacharbeiten am Bildungsplan-Import — und ein Befund aus dem V3-Test: Die
+dritte Bildungsplan-Fassung liegt unter einer **neuen Seitengeneration**, die der Scraper
+nicht lesen kann. Sie bekommt ein eigenes Release; hier ist vorbereitet, was dafür
+ohnehin richtig sein muss.
+
+### Neu
+
+**Curricula übertragen**
+- **Wiederimport exportierter Curricula** (`scripts/import_curriculum.py`) — ein
+  Admin-Vorgang auf der Kommandozeile, mit `--dry-run` zum Vorabprüfen und einem Bericht
+  über alles, was sich in der Zielinstanz nicht auflösen ließ.
+- Runbook [Curricula übertragen](docs/runbooks/curriculum-transfer.md): Export durch die
+  Lehrkraft, Voraussetzungen, Import, Deutung der Warnungen, Grenzen.
+- `--bp-version` überschreibt die Bildungsplan-Edition aus der Datei — für den Fall, dass
+  Quell- und Zielinstanz verschiedene Editionen aktiv haben.
+
+**Curriculum-Editor**
+- **Titel und Jahrgangsband sind änderbar.** Bisher bedeutete ein Vertipper: neu anlegen
+  und die Inhalte übertragen. Das Jahrgangsband zieht dabei die strukturellen Felder und
+  die Importschlüssel des ganzen Baums nach.
+- Die **Bildungsplan-Edition** bleibt ausdrücklich unveränderlich — an ihr hängen alle
+  Kompetenzverweise. Der geprüfte Weg ist „Bildungsplan aktualisieren".
+
+**Dokumentation**
+- [Schulcurriculum](docs/user/curriculum.md) — die erste Anleitung für Lehrkräfte zu einem
+  der zentralen Werkzeuge: Aufbau, Kompetenzen verknüpfen, Fassungswechsel, Export.
+
+### Behoben
+
+- **Die Editions-Archivierung hätte beim V3-Rollout die Vorgänger-Fassung gelöscht.** Sie
+  folgte der Regel „ein Fach steht als Ganzes auf einer Edition" — die stammt aus der Zeit
+  vor dem Editions-Fahrplan. Ab 2026/27 stehen die Klassen 5–7 auf der neuen Fassung, die
+  Klassen 8–12 weiter auf der vorigen; die alte Regel hätte in Mathematik **778 Knoten
+  archiviert**, die noch gebraucht werden. Besonders unauffällig wäre das gewesen, weil die
+  Fachplan-Knoten aktiv geblieben wären: Die Anzeige hätte für Klasse 8 korrekt die
+  Vorgänger-Fassung gewählt und einen **leeren** Bildungsplan geladen — ohne Fehlermeldung.
+  Archiviert wird jetzt nur, was **keine Klassenstufe mehr braucht**.
+- **Englisch und Französisch waren vollständig stillgelegt** (959 Knoten, kein einziger
+  aktiv). Beide werden aus PDFs importiert und lagen in einem anderen Ausgabeverzeichnis;
+  ein Voll-Import über das Scraper-Verzeichnis behandelte sie deshalb wie entfernte
+  Knoten. Die Archivierung greift jetzt nur noch innerhalb der Fächer, die der Import
+  tatsächlich gesehen hat; die JSONL beider Pipelines landen in derselben Ablage. Nach
+  einem erneuten Import sind beide Fächer wieder vollständig da.
+- **Kompetenzverweise wurden am falschen Feld gesucht.** Import und Export lasen `nr`
+  bzw. `pk_id`, reale Knoten führen die Nummer aber als `kompetenz_nr` (5141 gegen 0).
+  Ein Curriculum verlor dadurch beim Wiedereinspielen **in dieselbe Instanz** 69 Verweise.
+- **Leitperspektiven-Verweise waren nicht übertragbar.** Beide Seiten hingen an einem
+  `code`-Feld, das kein einziger der 55 Knoten trägt. Das Kürzel wird jetzt aus der
+  vorhandenen `bp_id` abgeleitet — das wirkt sofort auf Bestandsdaten, ohne erneutes
+  Scrapen. Schreibweisen wie „(L) BO" werden dabei vereinheitlicht.
+- **Aus dem YAML gelöschte Kapitel überlebten jeden Wiederimport.** Sie werden jetzt
+  abgeräumt — begrenzt auf das betroffene Curriculum und auf Knoten, die der Import selbst
+  angelegt hat. Im Editor erstellte Kapitel bleiben unberührt.
+- **Ein einzelner nicht übersetzbarer Verweis brach den gesamten Import ab.** Solche
+  Verweise werden übersprungen und gemeldet, statt das ganze Curriculum unimportierbar zu
+  machen.
+- Fehlt der passende Bildungsplan, nennt die Meldung jetzt, **welche Edition tatsächlich
+  aktiv ist** — statt pauschal zu fragen, ob der Plan importiert sei.
+
+### Geändert
+
+- **Material-Verknüpfung eingegrenzt.** Die `@`-Suche im Curriculum-Editor und im
+  Stundenentwurf bot bisher *alle* Knotentypen an. Auswählbar sind jetzt Dokumente,
+  Artefakte und fachliche Konzepte — ohne Planungsobjekte und ohne personenbezogene Texte.
+  Bildungsplan-Kompetenzen, Methoden, Sozialformen und Operatoren haben eigene
+  Auswahlfelder. Die Liste wird aus `config/taxonomy.yaml` abgeleitet, ein neuer Typ ist
+  also automatisch dabei.
+- **Ein Fach stilllegen ist jetzt eine benannte Aktion.** Fehlt es in `subjects.yaml`,
+  meldet der Import das; archiviert wird nur mit `--prune-subjects`. Vorher war es eine
+  Nebenwirkung („Datei weglassen") — genau die hatte Englisch und Französisch getroffen.
+- **Der Scraper legt vollständige Schnappschüsse ab.** Bisher schrieb er nur die
+  *geänderten* Knoten in eine datierte Datei — erst alle Dateien zusammen ergaben den Plan
+  (Physik lag vierfach im Verzeichnis, die jüngste mit zwei Knoten). Jetzt: **eine Datei je
+  Fach und Edition** mit allem darin; datierte Vorgänger räumt der Scraper selbst weg.
+  Damit entfällt die Regel, vor einem Re-Scrape erst alle alten Dateien zu löschen.
+- **Warnungs-Log an der Projektwurzel verankert** (`--log-dir` überschreibt). Vorher war der
+  Pfad arbeitsverzeichnis-relativ, sodass Testläufe und echte Importe in gleichnamige
+  Dateien an verschiedenen Orten schrieben — beim Auswerten eine sichere Quelle für
+  Missverständnisse.
+- `POST /context/curricula` **entfernt**: Der Endpunkt schrieb nichts (kein Commit), wurde
+  von keiner Seite aufgerufen und doppelte den Admin-Weg über das CLI.
+
+### Migration
+
+- Keine Datenbank-Migration nötig.
+- **Empfohlen:** Bildungsplan-Import einmal laufen lassen (`python
+  scripts/import_bildungsplan.py`) — er reaktiviert Fächer, die von der fehlerhaften
+  Archivierung betroffen waren. Vorher mit `--dry-run` prüfen.
+- Wer den PDF-Import nutzt: Die JSONL landen jetzt in `scripts/scraper/output/`. Alte
+  Kopien in `scripts/pdf_import/output/` können entfernt werden.
+- Die Scraper-Ablage darf gemischt sein (datierte Altbestände neben neuen Schnappschüssen);
+  ein vollständiger Scrape bereinigt sie. Bis dahin arbeitet der Import korrekt weiter.
+
 ## [0.4.0] – 2026-08-08
 
 Zwei Schwerpunkte: die Plattform wird **anbieterunabhängig** — kein Modellname steht mehr
