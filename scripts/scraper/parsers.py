@@ -888,11 +888,25 @@ def parse_operator_list(
     Mehrfachzuordnung möglich). Titel-Synonyme → ``metadata.aliase`` via
     ``expand_operator_title``. Keine Tabelle → leere Liste (Fach ohne Operatoren-Anhang).
     """
-    op_page_bp_id = _extract_bp_id_from_url(url)
     tbl = soup.find('table', attrs={'border': '1'})
     if tbl is None:
         return []
+    return operator_knoten_aus_tabelle(
+        tbl, url, parent_bp_id, _extract_bp_id_from_url(url)
+    )
 
+
+def operator_knoten_aus_tabelle(
+    tbl, url: str, parent_bp_id: str, op_basis_bp_id: str
+) -> list[dict[str, Any]]:
+    """Operator-Knoten aus einer Tabelle Operator | Beschreibung | AFB.
+
+    Von beiden Seitengenerationen genutzt: Die alte legt die Operatoren auf eine eigene
+    Anhangseite, die neue in Abschnitt 4 des Fachplans — der **Tabellenaufbau ist
+    derselbe** (Kopfzeile aus ``<th>``, Synonyme komma-getrennt in Spalte 1, AFB in
+    Spalte 3). Nur das Auffinden der Tabelle unterscheidet sich, deshalb wird sie
+    hereingereicht.
+    """
     nodes: list[dict[str, Any]] = []
     nr = 0
     for row in tbl.find_all('tr'):
@@ -907,7 +921,7 @@ def parse_operator_list(
         if not title or not content:
             continue
         nr += 1
-        bp_id = f"{op_page_bp_id}_{nr:02d}"
+        bp_id = f"{op_basis_bp_id}_{nr:02d}"
         hash_input = f"{title}|{content}|{','.join(afb)}|{','.join(aliase)}"
         nodes.append({
             'bp_id': bp_id,

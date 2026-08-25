@@ -3,7 +3,8 @@
 Die Fixture ist ein **gekürzter Ausschnitt der echten Seite**
 `DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)` (abgerufen 25.08.2026): Kopfbereich,
 alle sieben PK-Gruppen sowie die Bänder „Klassen 5/6", „Klasse 11" und „Klassen 12/13
-(Leistungsfach)" vollständig. Gerade die letzten beiden sind der Grund für den Ausschnitt —
+(Leistungsfach)" vollständig sowie Abschnitt 4 (Operatoren). Gerade die beiden neuen
+Bänder sind der Grund für den Ausschnitt —
 sie kommen in V2 nicht vor. Vollständige Bänder sind nötig, damit sich Verweise innerhalb
 des Ausschnitts überhaupt prüfen lassen. Erfundenes Markup würde hier nichts beweisen.
 
@@ -73,7 +74,7 @@ def _eines(knoten: list[dict], bp_id: str) -> dict:
 
 
 def test_knotenzahl_je_typ(knoten):
-    """Der Ausschnitt enthält alle PK-Gruppen und drei vollständige Jahrgangsbänder."""
+    """Der Ausschnitt enthält alle PK-Gruppen, drei vollständige Bänder und Abschnitt 4."""
     aus_fixture = {}
     for k in knoten:
         aus_fixture[k["content_type"]] = aus_fixture.get(k["content_type"], 0) + 1
@@ -83,6 +84,7 @@ def test_knotenzahl_je_typ(knoten):
         "pk_kompetenz": 73,
         "leitidee": 15,
         "ik_kompetenz": 170,
+        "operator": 21,
     }
 
 
@@ -274,11 +276,11 @@ async def test_scrape_fach_gen2x_holt_genau_eine_seite(tmp_path):
         "https://www.bildungsplaene-bw.de/,Lde/"
         "DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)"
     ]
-    assert (neu, geaendert, unveraendert) == (266, 0, 0)
+    assert (neu, geaendert, unveraendert) == (287, 0, 0)
 
     zeilen = (tmp_path / "M.jsonl").read_text(encoding="utf-8").strip().split("\n")
     knoten = [json.loads(z) for z in zeilen]
-    assert len(knoten) == 266
+    assert len(knoten) == 287
     assert {k["bp_version"] for k in knoten} == {"2016.V3"}
 
 
@@ -563,3 +565,62 @@ def test_nummer_stammt_aus_dem_id_attribut_nicht_aus_dem_titel():
     li = _eines(knoten, "BP2016BW_ALLG_GYM_M.V3_IK_5-6_02")
     assert li["title"] == "Leitidee Messen"
     assert li["metadata"]["nr"] == "3.1.2"
+
+
+# ── Operatoren (Schritt 6) ──────────────────────────────────────────────────
+
+
+def test_operatoren_aus_abschnitt_vier(knoten):
+    """V3 führt die Operatoren im Fachplan selbst, V2 auf einer eigenen Anhangseite.
+
+    Der Tabellenaufbau ist derselbe — deshalb teilen sich beide Generationen den
+    Zeilen-Parser. Die 21 Operatoren der Mathematik sind gegenüber V2 unverändert.
+    """
+    ops = [k for k in knoten if k["content_type"] == "operator"]
+    assert len(ops) == 21
+    assert {o["parent_bp_id"] for o in ops} == {BP_ID_FACH}
+    assert [o["bp_id"] for o in ops[:2]] == [
+        f"{BP_ID_FACH}_OP_01",
+        f"{BP_ID_FACH}_OP_02",
+    ]
+
+
+def test_operator_feldweise(knoten):
+    op = _eines(knoten, f"{BP_ID_FACH}_OP_01")
+    assert op["title"] == "angeben"
+    assert op["content"].startswith("Ergebnisse numerisch oder verbal formulieren")
+    assert op["metadata"]["afb"] == ["I"]
+    assert op["metadata"]["aliase"] == []
+    assert op["metadata"]["operator_nr"] == 1
+    assert (op["min_grade"], op["max_grade"]) == (None, None)
+
+
+def test_operator_synonyme_werden_zu_aliasen(knoten):
+    """„anwenden, durchführen" ist **ein** Operator mit einem Synonym, nicht zwei."""
+    op = _eines(knoten, f"{BP_ID_FACH}_OP_02")
+    assert op["title"] == "anwenden"
+    assert op["metadata"]["aliase"] == ["durchführen"]
+
+
+def test_afb_wird_erfasst(knoten):
+    """Die Anforderungsbereiche I–III sind der Grund, warum Operatoren Knoten sind."""
+    verteilung: dict[str, int] = {}
+    for k in knoten:
+        if k["content_type"] != "operator":
+            continue
+        for afb in k["metadata"]["afb"]:
+            verteilung[afb] = verteilung.get(afb, 0) + 1
+    assert verteilung == {"I": 5, "II": 12, "III": 4}
+
+
+def test_fach_ohne_operatoren_liefert_keine(knoten):
+    """Kein `op_table` im Dokument → keine Operator-Knoten, kein Fehler."""
+    html = """
+    <html><head><title>BPBW-ALLG-GYM-M(V3.0) - Bildungsplan</title></head><body>
+      <h1>Mathematik Überarbeitete Fassung vom 21. Mai 2026 (V3.0)</h1>
+      <h4 id="3.1">3.1 Klassen 5/6</h4>
+      <h5 id="3.1.1">3.1.1 Leitidee Zahl</h5>
+    </body></html>
+    """
+    ohne = parse_gen2x_dokument(BeautifulSoup(html, "lxml"), QUELL_URL, BP_ID_FACH)
+    assert [k for k in ohne if k["content_type"] == "operator"] == []

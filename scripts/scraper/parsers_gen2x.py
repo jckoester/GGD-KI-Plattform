@@ -38,6 +38,7 @@ from scripts.scraper.parsers import (
     _content_hash,
     _now_iso,
     extract_bp_version,
+    operator_knoten_aus_tabelle,
 )
 from scripts.scraper.references import strip_soft_hyphens
 
@@ -274,6 +275,27 @@ def _anker_zu_bp_id(anker: str, bp_id_fach: str, band_segmente: dict[str, str]) 
     return None
 
 
+def _operatoren(soup, url: str, bp_id_fach: str) -> list[dict[str, Any]]:
+    """Operatoren aus Abschnitt 4 desselben Dokuments.
+
+    Die alte Generation legte sie auf eine eigene Anhangseite (`…_OP`), die neue führt
+    sie im Fachplan selbst. Gefunden wird die Tabelle über die Klasse ``op_table`` an
+    ihren Zeilen — die setzt die Quelle ausdrücklich, und sie hält auch dann, wenn ein
+    anderes Fach den Abschnitt anders nummeriert. Ein Fach ohne Operatoren liefert
+    schlicht nichts.
+
+    Die bp_ids bleiben `…_OP_01` wie gehabt, damit Chat-Werkzeug und Anzeige nichts
+    davon merken.
+    """
+    zeile = soup.select_one("tr.op_table")
+    if zeile is None:
+        return []
+    tabelle = zeile.find_parent("table")
+    if tabelle is None:
+        return []
+    return operator_knoten_aus_tabelle(tabelle, url, bp_id_fach, f"{bp_id_fach}_OP")
+
+
 def _intro(ueberschrift) -> str:
     """Einleitungstext direkt unter einer Überschrift (vor der Kompetenztabelle)."""
     for sib in ueberschrift.find_next_siblings():
@@ -422,5 +444,8 @@ def parse_gen2x_dokument(
                     },
                 )
             )
+
+    # ── Abschnitt 4: Operatoren ──────────────────────────────────────────────
+    knoten.extend(_operatoren(soup, url, bp_id_fach))
 
     return knoten
