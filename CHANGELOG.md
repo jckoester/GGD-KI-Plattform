@@ -5,6 +5,36 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.5] – 2026-08-25
+
+Fehlerbehebung: Kompetenzverweise mit Klammer in der Nummer gingen beim Re-Import verloren.
+
+### Behoben
+
+- **Cross-Fach-Verweise auf Nummern wie `3.4.3(2)` wurden nicht aufgelöst.** Die
+  Token-Erkennung im Feld „Hinweise" endete an der **inneren** Klammer: Gesucht wurde
+  `3.4.3(2`, gefunden nichts — und im Text blieb eine verwaiste `)` stehen. Betroffen war
+  jeder Verweis auf Mathematik und Physik, wo diese Schreibweise der Normalfall ist; ein
+  Curriculum der Klassenstufe 10 verlor so sieben von sieben Querverweisen. Fächer mit
+  klammerfreien Nummern (Ethik, Geografie …) funktionierten unverändert und haben den
+  Fehler damit verdeckt.
+- Der Import meldete die Verweise zwar als „nicht gefunden", legte aber die Vermutung
+  nahe, der Bildungsplan des Zielfachs fehle in der Instanz. Tatsächlich war er
+  vorhanden — die Nummer kam nur unvollständig an.
+
+> Betrifft ausschließlich den **Re-Import** exportierter Curricula. In der Oberfläche
+> gesetzte Verweise arbeiten mit Knoten-IDs statt Nummern und waren nie betroffen.
+> Bereits importierte Curricula holen die Verweise beim nächsten Import nach.
+
+### Dokumentation
+
+- [Updates & Wartung](docs/admin/updates-und-wartung.md): neuer Abschnitt **Speicherplatz
+  freigeben**. Jedes `--no-cache`-Update lässt das vorherige Image als `<none>` zurück und
+  füllt den Build-Zwischenspeicher; nach einigen Updates sind das mehrere Gigabyte. Mit
+  Abgrenzung, was gefahrlos entfernt werden kann und welche Befehle das Volume
+  `postgres_data` — die gesamte Datenbank — mitnehmen würden. Dazu ein Hinweis auf die
+  unbegrenzt wachsenden Container-Logs.
+
 ## [0.5.4] – 2026-08-25
 
 ### Geändert
