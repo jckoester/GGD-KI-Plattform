@@ -430,7 +430,34 @@ def _normalize_ref(ref: str) -> str:
     return ref
 
 
-async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | None:
+def _fach_filter(subject_id: int | None):
+    """Zusatzbedingung für das Fach — oder nichts, wenn keines angegeben ist."""
+    if subject_id is None:
+        return sa.true()
+    return ContextNode.subject_id == subject_id
+
+
+def _editions_filter(bp_version: str | None):
+    """Zusatzbedingung für die Fassung — oder nichts, wenn keine gefordert ist.
+
+    Während eines Editionswechsels sind **mehrere Fassungen gleichzeitig aktiv**; das ist
+    der Normalfall, nicht die Ausnahme. Bei Mathematik kommen 316 von 319 IK-Nummern in
+    V2 *und* V3 vor. Ohne diese Bedingung entscheidet die Reihenfolge in der Datenbank,
+    welche Fassung getroffen wird — ein Curriculum für Klasse 9 könnte stillschweigend an
+    V3-Kompetenzen hängen.
+
+    Bewusst **ohne Rückfall** auf eine andere Fassung: Findet sich die Nummer in der
+    verlangten Fassung nicht, ist das eine Lücke, die der Aufrufer melden soll. Eine
+    Auflösung aus der falschen Fassung wäre nicht zu bemerken.
+    """
+    if not bp_version:
+        return sa.true()
+    return ContextNode.metadata_["bp_version"].astext == bp_version
+
+
+async def resolve_ik_node(
+    db: AsyncSession, subject_id: int, nr: str, bp_version: str | None = None
+) -> UUID | None:
     """Löst eine IK-Nummer zu einer node_id auf (mit toleranter Normalisierung).
 
     ⚠️ Wie bei :func:`resolve_pk_node` tragen **zwei Felder** dieselbe Nummer: Vom
@@ -451,6 +478,7 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
                 ContextNode.metadata_["kompetenz_nr"].astext == nr,
             ),
             ContextNode.status == "active",
+            _editions_filter(bp_version),
         )
     )
     row = result.fetchone()
@@ -463,6 +491,7 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
             ContextNode.content_type == "ik_kompetenz",
             ContextNode.subject_id == subject_id,
             ContextNode.status == "active",
+            _editions_filter(bp_version),
         )
     )
     for (node,) in result.fetchall():
@@ -474,8 +503,21 @@ async def resolve_ik_node(db: AsyncSession, subject_id: int, nr: str) -> UUID | 
     return None
 
 
-async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
+async def resolve_pk_node(
+    db: AsyncSession,
+    pk_id: str,
+    subject_id: int | None = None,
+    bp_version: str | None = None,
+) -> UUID | None:
     """Löst eine PK-Nummer zu einer node_id auf (mit toleranter Normalisierung).
+
+    ⚠️ **``subject_id`` angeben.** Prozessbezogene Kompetenzen sind je Fach von 2.1.1 an
+    durchnummeriert — ``2.1.1`` gibt es in 24 Fächern. Ohne Fachbezug entscheidet die
+    Reihenfolge in der Datenbank, welches getroffen wird. Beim Wiederimport eines echten
+    Mathematik-Curriculums landeten so **54 von 65 PK-Kanten in fremden Fächern**
+    (Gemeinschaftskunde, Musik, Informatik, Sport …), ohne jede Meldung. Der Parameter ist
+    aus Rücksicht auf Bestandsaufrufe optional — wer ihn wegläßt, bekommt weiterhin das
+    alte, unzuverlässige Verhalten.
 
     ⚠️ **Zwei Felder tragen dieselbe Nummer.** Vom Scraper importierte PK-Knoten führen
     sie als `kompetenz_nr` (in der Dev-Instanz: 755 Knoten), `pk_id` benutzen nur
@@ -498,6 +540,8 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
                 ContextNode.metadata_["kompetenz_nr"].astext == pk_id,
             ),
             ContextNode.status == "active",
+            _fach_filter(subject_id),
+            _editions_filter(bp_version),
         )
     )
     row = result.fetchone()
@@ -509,6 +553,8 @@ async def resolve_pk_node(db: AsyncSession, pk_id: str) -> UUID | None:
         sa.select(ContextNode).where(
             ContextNode.content_type == "pk_kompetenz",
             ContextNode.status == "active",
+            _fach_filter(subject_id),
+            _editions_filter(bp_version),
         )
     )
     for (node,) in result.fetchall():
@@ -560,9 +606,14 @@ async def resolve_leitperspektive_aspekt_node(db: AsyncSession, bp_id: str) -> U
 
 
 async def resolve_ik_node_by_fach_code(
-    db: AsyncSession, fach_code: str, nr: str
+    db: AsyncSession, fach_code: str, nr: str, bp_version: str | None = None
 ) -> UUID | None:
-    """Löst Cross-Fach-IK via (fach_code, nr) auf."""
+    """Löst Cross-Fach-IK via (fach_code, nr) auf — bei Bedarf fassungsgenau.
+
+    ``bp_version`` ist die Fassung des **verweisenden** Curriculums: Wer aus einem
+    V2-Curriculum auf Physik verweist, meint die Physik-Fassung, die derselbe Jahrgang
+    liest. Ohne Angabe bleibt es bei der alten, fassungsblinden Suche.
+    """
     # subject_id aus fach_code (Spalte heißt fach_code; Konvention: Großschreibung)
     if not fach_code:
         return None
@@ -573,7 +624,7 @@ async def resolve_ik_node_by_fach_code(
     row = result.fetchone()
     if not row:
         return None
-    return await resolve_ik_node(db, row[0], nr)
+    return await resolve_ik_node(db, row[0], nr, bp_version)
 
 
 # ── Code-Token → UUID-Token Übersetzer (für Re-Import) ───────────────────────
@@ -598,6 +649,7 @@ async def hinweise_code_to_uuid(
     db: AsyncSession,
     warnings: list[str],
     context_label: str = "",
+    bp_version: str | None = None,
 ) -> str:
     """Übersetzt Code-Token im Hinweise-Feld zurück in UUID-Token.
 
@@ -644,11 +696,15 @@ async def hinweise_code_to_uuid(
         elif kind == "ik":
             fach_code = m.group(2)
             nr = m.group(3)
-            uid = await resolve_ik_node_by_fach_code(db, fach_code, nr)
+            uid = await resolve_ik_node_by_fach_code(db, fach_code, nr, bp_version)
             if uid:
                 parts.append(f"#[{label}](ik:{uid})")
             else:
-                warnings.append(f"Cross-IK '{fach_code}:{nr}' nicht gefunden{' in ' + context_label if context_label else ''}")
+                fassung = f" in Fassung {bp_version}" if bp_version else ""
+                warnings.append(
+                    f"Cross-IK '{fach_code}:{nr}'{fassung} nicht gefunden"
+                    f"{' in ' + context_label if context_label else ''}"
+                )
                 parts.append(m.group(0))
         last = m.end()
     parts.append(text[last:])
@@ -1147,12 +1203,14 @@ async def import_curriculum_from_draft(
                 ik_pairs = _normalize_ik_input(entry.ik, entry.ik_partiell)
                 editor_ik = []
                 for ik_nr, partiell in ik_pairs:
-                    ik_node_id = await resolve_ik_node(db, subject_id, ik_nr)
+                    ik_node_id = await resolve_ik_node(
+                        db, subject_id, ik_nr, payload.bp_version
+                    )
                     if ik_node_id:
                         editor_ik.append({"node_id": str(ik_node_id), "nr": ik_nr, "partiell": partiell})
                         resolved_edges.append((None, ik_node_id, "references", {"partiell": str(partiell).lower()}))
                     else:
-                        w = f"IK {ik_nr} nicht gefunden für LS {ls_label}"
+                        w = f"IK {ik_nr} nicht gefunden für LS {ls_label} (Fassung {payload.bp_version})"
                         if w not in stats.warnings:
                             stats.warnings.append(w)
                         logger.warning(w)
@@ -1163,19 +1221,23 @@ async def import_curriculum_from_draft(
                 for pk_ref in pk_raw:
                     pk_id_str = pk_ref.get("id") if isinstance(pk_ref, dict) else str(pk_ref)
                     if pk_id_str:
-                        pk_node_id = await resolve_pk_node(db, pk_id_str)
+                        pk_node_id = await resolve_pk_node(
+                            db, pk_id_str, subject_id, payload.bp_version
+                        )
                         if pk_node_id:
                             editor_pk.append({"node_id": str(pk_node_id), "pk_id": pk_id_str})
                             resolved_edges.append((None, pk_node_id, "develops", {}))
                         else:
-                            w = f"PK {pk_id_str} nicht gefunden für LS {ls_label}"
+                            w = f"PK {pk_id_str} nicht gefunden für LS {ls_label} (Fassung {payload.bp_version})"
                             if w not in stats.warnings:
                                 stats.warnings.append(w)
                             logger.warning(w)
 
                 # ── Hinweise: Code-Token → UUID-Token rewrite + Kanten ───────
                 hinweise_raw = entry.hinweise or ""
-                hinweise_uuid = await hinweise_code_to_uuid(hinweise_raw, db, stats.warnings, ls_label)
+                hinweise_uuid = await hinweise_code_to_uuid(
+                    hinweise_raw, db, stats.warnings, ls_label, payload.bp_version
+                )
 
                 # Kanten aus UUID-Token (LP, LP-Aspekt, Cross-Fach-IK).
                 #

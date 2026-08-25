@@ -105,7 +105,7 @@ async def bp_nodes(db_session: AsyncSession):
         read_scope="global",
         write_scope="school",
         subject_id=ma_subject_id,
-        metadata_={"nr": "3.1.1"},
+        metadata_={"nr": "3.1.1", "bp_version": "2016"},
     )
 
     # IK-Knoten ETH (Cross-Fach)
@@ -120,7 +120,7 @@ async def bp_nodes(db_session: AsyncSession):
         read_scope="global",
         write_scope="school",
         subject_id=eth_subject_id,
-        metadata_={"nr": "2.1.1"},
+        metadata_={"nr": "2.1.1", "bp_version": "2016"},
     )
 
     # IK-Knoten ETH mit Klammer in der Nummer. In Mathematik und Physik ist diese
@@ -137,7 +137,7 @@ async def bp_nodes(db_session: AsyncSession):
         read_scope="global",
         write_scope="school",
         subject_id=eth_subject_id,
-        metadata_={"nr": "2.4.7(3)"},
+        metadata_={"nr": "2.4.7(3)", "bp_version": "2016"},
     )
 
     # PK-Knoten
@@ -151,7 +151,7 @@ async def bp_nodes(db_session: AsyncSession):
         owner_pseudonym="system",
         read_scope="global",
         write_scope="school",
-        metadata_={"pk_id": "PK_05.1"},
+        metadata_={"pk_id": "PK_05.1", "bp_version": "2016"},
     )
 
     # LP-Knoten

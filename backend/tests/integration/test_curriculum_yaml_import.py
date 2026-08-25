@@ -87,7 +87,7 @@ async def welt(db: AsyncSession):
         id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
         title="CH IK 3.1.1", status="active", owner_pseudonym="system",
         read_scope="global", write_scope="school", subject_id=subject_id,
-        metadata_={"nr": "3.1.1"},
+        metadata_={"nr": "3.1.1", "bp_version": BP_VERSION},
     )
     db.add_all([fachplan, ik])
     await db.flush()
@@ -318,13 +318,13 @@ async def test_kompetenzen_werden_ueber_kompetenz_nr_gefunden(db, welt):
             id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
             title="3.2.2.1(1) Metalle", status="active", owner_pseudonym="system",
             read_scope="global", write_scope="school", subject_id=welt["subject_id"],
-            metadata_={"kompetenz_nr": "3.2.2.1(1)"},
+            metadata_={"kompetenz_nr": "3.2.2.1(1)", "bp_version": BP_VERSION},
         ),
         ContextNode(
             id=uuid.uuid4(), category="knowledge", content_type="pk_kompetenz",
             title="2.2.5 Erkenntnisgewinnung", status="active", owner_pseudonym="system",
             read_scope="global", write_scope="school",
-            metadata_={"kompetenz_nr": "2.2.5"},
+            metadata_={"kompetenz_nr": "2.2.5", "bp_version": BP_VERSION},
         ),
     ])
     await db.flush()
@@ -490,7 +490,7 @@ async def test_cross_fach_ik_wird_portabel_exportiert(db, lp_welt):
         id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
         title="CH 3.2.2.1(1)", status="active", owner_pseudonym="system",
         read_scope="global", write_scope="school", subject_id=lp_welt["subject_id"],
-        metadata_={"kompetenz_nr": "3.2.2.1(1)"},        # kein 'nr'!
+        metadata_={"kompetenz_nr": "3.2.2.1(1)", "bp_version": BP_VERSION},        # kein 'nr'!
     )
     db.add(ik)
     await db.flush()
@@ -524,3 +524,144 @@ async def test_import_verknuepft_lp_ueber_kuerzel(db, lp_welt):
         )
     ).scalar_one()
     assert kanten == 1, f"LP-Kante fehlt; Warnungen: {stats.warnings}"
+
+
+# ── Auflösung nach Fach und Fassung (Schritt 7) ─────────────────────────────
+
+
+async def _kanten_ziele(db: AsyncSession, relation: str) -> list[ContextNode]:
+    """Zielknoten aller Kanten dieser Art, die von Lernsequenzen ausgehen."""
+    from app.db.models import ContextEdge
+
+    ergebnis = await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+        .join(
+            sa.orm.aliased(ContextNode, name="ls"),
+            sa.text("ls.id = context_edges.from_node_id"),
+        )
+        .where(ContextEdge.relation == relation, sa.text("ls.content_type = 'lernsequenz'"))
+    )
+    return list(ergebnis.scalars().all())
+
+
+@pytest.mark.asyncio
+async def test_pk_kante_trifft_das_eigene_fach(db: AsyncSession, welt):
+    """Prozessbezogene Kompetenzen sind **je Fach** von 2.1.1 an nummeriert.
+
+    Der Fehler, den dieser Test festhält: Die Auflösung filterte gar nicht nach Fach.
+    `2.1.1` gibt es in 24 Fächern; welches getroffen wurde, entschied die Reihenfolge in
+    der Datenbank. Beim Wiederimport eines echten Mathematik-Curriculums landeten so
+    **54 von 65 PK-Kanten in fremden Fächern** — Gemeinschaftskunde, Musik, Sport —
+    ohne eine einzige Warnung.
+    """
+    fremd_id = (
+        await db.execute(
+            sa.text(
+                "INSERT INTO subjects (slug, name, fach_code) "
+                "VALUES ('musik', 'Musik', 'MUS') ON CONFLICT (slug) DO UPDATE "
+                "SET fach_code = EXCLUDED.fach_code RETURNING id"
+            )
+        )
+    ).fetchone()[0]
+
+    # Dieselbe Nummer in zwei Fächern — das fremde zuerst, damit ein ungefilterter
+    # Zugriff mit hoher Wahrscheinlichkeit danebengreift.
+    for sid, titel in ((fremd_id, "MUS PK 2.1.1"), (welt["subject_id"], "CH PK 2.1.1")):
+        db.add(
+            ContextNode(
+                id=uuid.uuid4(), category="knowledge", content_type="pk_kompetenz",
+                title=titel, status="active", owner_pseudonym="system",
+                read_scope="global", write_scope="school", subject_id=sid,
+                metadata_={"kompetenz_nr": "2.1.1", "bp_version": BP_VERSION},
+            )
+        )
+    await db.flush()
+
+    entwurf = _draft()
+    entwurf.kapitel[0].lernsequenzen[0].eintraege[0].pk = [{"id": "2.1.1"}]
+    _, stats = await import_curriculum_from_draft(db, entwurf, "system")
+
+    assert stats.warnings == []
+    ziele = await _kanten_ziele(db, "develops")
+    assert len(ziele) == 1
+    assert ziele[0].subject_id == welt["subject_id"], (
+        f"PK-Kante zeigt auf Fach {ziele[0].subject_id} statt auf Chemie"
+    )
+
+
+@pytest.mark.asyncio
+async def test_ik_kante_trifft_die_eigene_fassung(db: AsyncSession, welt):
+    """Während eines Editionswechsels sind mehrere Fassungen gleichzeitig aktiv.
+
+    Bei Mathematik kommen 316 von 319 IK-Nummern in V2 *und* V3 vor. Ohne
+    Fassungsfilter entscheidet die Reihenfolge in der Datenbank — ein Curriculum für
+    Klasse 9 könnte stillschweigend an V3-Kompetenzen hängen.
+    """
+    ik_v3 = ContextNode(
+        id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
+        title="CH IK 3.1.1 (V3)", status="active", owner_pseudonym="system",
+        read_scope="global", write_scope="school", subject_id=welt["subject_id"],
+        metadata_={"nr": "3.1.1", "bp_version": "2016.V3"},
+    )
+    db.add_all([
+        ik_v3,
+        ContextNode(
+            id=uuid.uuid4(), category="knowledge", content_type="fachplan",
+            title="Gymnasium - Chemie (V3)", status="active", owner_pseudonym="system",
+            read_scope="global", write_scope="school", subject_id=welt["subject_id"],
+            metadata_={"bp_id": BP_ID + "_V3", "bp_version": "2016.V3"},
+        ),
+    ])
+    await db.flush()
+
+    # **Beide Richtungen**, sonst prüft der Test nur, ob die Datenbank zufällig die
+    # richtige Zeile zuerst liefert: Die eine Richtung entspricht der Einfügereihenfolge,
+    # die andere widerspricht ihr.
+    for fassung, bp_id, erwartet in (
+        (BP_VERSION, BP_ID, welt["ik"].id),
+        ("2016.V3", BP_ID + "_V3", ik_v3.id),
+    ):
+        _, stats = await import_curriculum_from_draft(
+            db, _draft(bp_version=fassung, bp_id=bp_id), "system"
+        )
+        assert stats.warnings == [], f"{fassung}: {stats.warnings}"
+        treffer = {
+            z.id
+            for z in await _kanten_ziele(db, "references")
+            if z.content_type == "ik_kompetenz" and z.metadata_["bp_version"] == fassung
+        }
+        assert treffer == {erwartet}, f"{fassung} traf {treffer}"
+
+
+@pytest.mark.asyncio
+async def test_fehlende_fassung_wird_gemeldet_statt_ersetzt(db: AsyncSession, welt):
+    """Kein Rückfall auf eine andere Fassung — die Lücke soll sichtbar sein.
+
+    Eine Auflösung aus der falschen Fassung wäre nicht zu bemerken; eine Warnung schon.
+    """
+    # Die neue Fassung ist da (Fachplan vorhanden), aber sie kennt die Nummer nicht:
+    # der einzige V3-Knoten trägt eine andere.
+    db.add_all([
+        ContextNode(
+            id=uuid.uuid4(), category="knowledge", content_type="fachplan",
+            title="Gymnasium - Chemie (V3)", status="active", owner_pseudonym="system",
+            read_scope="global", write_scope="school", subject_id=welt["subject_id"],
+            metadata_={"bp_id": BP_ID + "_V3", "bp_version": "2016.V3"},
+        ),
+        ContextNode(
+            id=uuid.uuid4(), category="knowledge", content_type="ik_kompetenz",
+            title="CH IK 3.9.9 (V3)", status="active", owner_pseudonym="system",
+            read_scope="global", write_scope="school", subject_id=welt["subject_id"],
+            metadata_={"nr": "3.9.9", "bp_version": "2016.V3"},
+        ),
+    ])
+    await db.flush()
+
+    _, stats = await import_curriculum_from_draft(
+        db, _draft(bp_version="2016.V3", bp_id=BP_ID + "_V3"), "system"
+    )
+
+    # `3.1.1` gibt es in V2, aber nicht in V3 — gemeldet, nicht ersatzweise aufgelöst.
+    assert any("3.1.1" in w and "2016.V3" in w for w in stats.warnings), stats.warnings
+    assert await _kanten_ziele(db, "references") == []
