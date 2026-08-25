@@ -5,6 +5,32 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.3] – 2026-08-25
+
+Fehlerbehebung: Kompetenz-Auswahl zeigte zwei Bildungsplan-Fassungen nebeneinander.
+
+### Behoben
+
+- **PK- und IK-Auswahl mischten zwei Editionen.** Gleiche Nummer, anderer Text, doppelt
+  in der Liste — ohne Hinweis, welcher Eintrag zu welcher Fassung gehört. Ursache war ein
+  Wettlauf: Steht die geltende Edition noch nicht fest, wurde zuerst **ungefiltert**
+  geladen und gleich darauf gefiltert nachgeladen. Welche der beiden Antworten zuletzt
+  eintraf, entschied über den Inhalt der Liste. Jetzt wird gewartet, bis die Edition
+  feststeht; überholte Antworten werden verworfen.
+- **Der Curriculum-Editor kennt jetzt die Edition seines Curriculums.** Er reichte
+  `bp_version` nicht an die Auswahlfelder weiter, obwohl ein Curriculum seit 0.5.0 fest an
+  seine Edition gebunden ist. Stattdessen wurde aus Fach und Klassenstufe neu abgeleitet,
+  was die geltende Fassung *heute* wäre — beim Bearbeiten eines älteren Curriculums also
+  womöglich eine andere als die, auf der es beruht. Der Umweg entfällt; die Edition steht
+  ohne Rückfrage beim Server fest.
+- Prozessbezogene Kompetenzen traf das besonders, weil sie **keine Klassenstufe** tragen:
+  Anders als bei den inhaltsbezogenen konnte auch der Stufenfilter die Fassungen nicht
+  auseinanderhalten.
+
+> Mehrere gleichzeitig aktive Editionen sind kein Fehlzustand, sondern der Normalfall
+> während eines Editionswechsels — der Fahrplan in `subjects.yaml` weist verschiedenen
+> Klassenstufen verschiedene Fassungen zu. Die Auswahl muss damit umgehen können.
+
 ## [0.5.2] – 2026-08-25
 
 Fehlerbehebung: Fachübergreifende Kompetenzverweise waren für ein knappes Drittel der
