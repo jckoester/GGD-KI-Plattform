@@ -124,6 +124,95 @@ Validierung:
 python -c "import yaml; yaml.safe_load(open('config/subjects.yaml')); print('YAML OK')"
 ```
 
+### Ab V3: eine neue Seitengeneration
+
+Die dritte Fassung liegt **nicht** unter dem gewohnten Adressschema. Sie gehört zu einer
+neuen Seitengeneration („GEN2X"): ein Dokument je Fach statt Übersichtsseite plus
+Unterseiten, Gliederung über Sprungmarken.
+
+```
+alt   …/BP2016BW_ALLG_GYM_M.V2                        + Dutzende Unterseiten
+neu   …/DE_BW_BILDUNGSPLAENE_GEN2X_BPBW_ALLG_GYM_M(V3.0)   eine Seite
+```
+
+Welcher Weg gilt, steht im Fahrplan — **nicht** im Suffix:
+
+```yaml
+    - suffix: ".V3"
+      ab_schuljahr: "2026/27"
+      einstieg_stufen: [5, 7]
+      wachstum: nach_oben
+      seitengeneration: gen2x
+      quell_version: "V3.0"      # Fassungsangabe in der Adresse
+```
+
+`quell_version` wird ausdrücklich angegeben und nicht aus dem Suffix abgeleitet: Eine
+Folgefassung `(V3.1)` trüge weiterhin `.V3`. Fehlt sie bei `seitengeneration: gen2x`,
+weist schon der Trockenlauf des Imports die Konfiguration ab.
+
+Für den Betrieb ändert sich sonst nichts — Dateinamen, JSONL-Schema, Bezeichner und
+Import bleiben, wie sie sind. Ein Scrape braucht für V3 allerdings **einen** Abruf je Fach
+statt Dutzender.
+
+### Zwei Prüfungen, die einen Lauf abbrechen können
+
+Beide melden sich als übersprungenes Fach am Ende der Zusammenfassung. In beiden Fällen
+wird für die betroffene Fassung **nichts** geschrieben — das ist Absicht.
+
+**1. Falsche Fassung.** Die Quelle beantwortet eine unbekannte Fassung nicht mit 404,
+sondern liefert klaglos die Basisfassung. Am 24.08.2026 holte der Scraper so 409
+Basis-Knoten und legte sie unter V3-Etikett ab; aufgefallen wäre das erst zwei Jahre
+später an einem leeren Bildungsplan.
+
+```
+!!! Fach 'mathematik' (fach_code=M) ÜBERSPRUNGEN — falsche Fassung:
+    erwartet 'BP2016BW_ALLG_GYM_M.V3', geliefert wurde 'BP2016BW_ALLG_GYM_M'
+```
+
+→ Meist ist die Edition für dieses Fach nicht veröffentlicht, oder sie liegt unter dem
+GEN2X-Schema. `bildungsplan_suffix` und den Fahrplan prüfen.
+
+**2. Doppelte Bezeichner.** Erzeugt der Parser für zwei Knoten dieselbe `bp_id`, hat er
+den Aufbau der Seite nicht verstanden. Der Import würde daraus lautlos einen Knoten
+machen — mit Datenverlust.
+
+```
+!!! Fach 'physik' (fach_code=PH) ÜBERSPRUNGEN — 39 doppelte bp_id(s)
+```
+
+→ Meist führt das Fach mehrere Jahrgangsbänder mit gleichen Stufen und gleichem Niveau.
+Physik hat in 12/13 **zwei** Basisfächer („Schwerpunkt Quantenphysik" und
+„… Astrophysik"); der Schwerpunkt wandert deshalb in den Bezeichner
+(`…_IK_12-13-BF-ASTROPHYSIK_…`).
+
+### Nicht jedes Fach hat jede Fassung
+
+Von 27 Fächern haben **17** ein V3, **eines** ein V2, die übrigen nur die Basisfassung.
+Elf der V3-Fächer sind von der Basis **direkt** auf V3 gegangen — ihre `.V2`-Adresse
+liefert die Basisfassung.
+
+Das ist kein Fehler und bricht den Lauf nicht ab:
+
+```
+ethik: Edition '.V2' gibt es für dieses Fach nicht
+       (Adresse liefert eine andere Fassung) — übersprungen
+```
+
+Nur wenn die **eigene** Fassung des Fachs fehlt, fällt das Fach aus — sonst entstünde ein
+Fach ohne den Plan, nach dem tatsächlich unterrichtet wird.
+
+### Geändertes Bandschema in V3
+
+V3 ist ein **G9-Plan**. Die Jahrgangsbänder unterscheiden sich von V2:
+
+| V2 | V3 |
+|---|---|
+| 5/6 · 7/8 · 9/10 · 11/12 (BF) · 11/12 (LF) | 5/6 · 7/8 · 9/10 · **11** · **12/13 (BF)** · **12/13 (LF)** |
+
+Klasse 11 steht allein, und die Kursstufe umfasst 12/13. Manche Fächer gliedern zudem
+eine Ebene tiefer (`3.3.1.1 Kinematik` unter `3.3.1 Mechanik`) — das betrifft Physik,
+Chemie und Geographie und wird als eigener Knoten abgebildet.
+
 ---
 
 ## Schritt 2 — Monitor: Änderungen prüfen (bei Re-Import)

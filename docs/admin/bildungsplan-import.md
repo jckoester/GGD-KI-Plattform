@@ -194,6 +194,17 @@ Die meisten Warnungen sind **erwartbar**, nicht jede ist ein Fehler:
   inzwischen auf `.V2` umgestellt ist (z. B. `…_GEO_…` statt `…_GEO.V2_…`), lösen nicht
   auf, weil nur die neue Edition importiert ist. Während der Übergangszeit erwartbar
   (siehe Versionierungs-Konzept).
+- **Cross-Fach-Verweis nicht aufgelöst (ab V3):** Die neuen Pläne verweisen
+  **fassungsgenau** — `PH(V3.0) 3.4.3`. Zwei Gründe stehen in der Meldung, und sie
+  bedeuten Verschiedenes:
+  - *„Nummer in dieser Fassung nicht vorhanden"* — das Zielfach ist in dieser Fassung
+    nicht importiert (steht z. B. noch auf `.V2`) oder die Quelle nennt eine Nummer, die
+    es dort nicht gibt. Löst sich auf, sobald das Zielfach nachzieht.
+  - *„Fassung im Fahrplan unbekannt"* — die Angabe aus der Adresse steht nicht in
+    `bildungsplan_default.editionen`. **Konfigurationslücke**, keine Datenfrage.
+
+  Ausdrücklich **kein** Rückfall auf eine andere Fassung: Ein Verweis, der auf die
+  falsche Fassung zeigt, wäre nicht zu bemerken — eine Warnung schon.
 - **Echter Fehler — untersuchen:** Verweis auf die **aktuelle** Edition eines
   konfigurierten, gescrapten Fachs, dessen Zielknoten fehlt (z. B. `…_CH.V2_…` ohne
   Treffer) → Scraper-/Importfehler.
@@ -417,6 +428,30 @@ gespeicherten Struktur) geht mit
 `docker compose run … -w /app/pdf`-Aufruf).
 
 ---
+
+## Mehrere Fassungen gleichzeitig — der Normalfall
+
+Während eines Editionswechsels stehen **zwei oder drei Fassungen desselben Fachs
+gleichzeitig aktiv** in der Datenbank. Das ist beabsichtigt und kein Zustand, den man
+bereinigen sollte.
+
+Der Grund: Der Editions-Fahrplan weist verschiedenen Klassenstufen verschiedene Fassungen
+zu. Im Schuljahr 2026/27 etwa lernen die Klassen 5–7 nach V3, die Klassen 8–12 weiter nach
+V2 — beide Bestände werden gebraucht, und beide müssen auffindbar bleiben, weil Curricula
+und Querverweise auf sie zeigen.
+
+Was daraus folgt:
+
+- **Die Archivierung richtet sich nach dem Fahrplan.** Stillgelegt wird nur, was *keine*
+  Klassenstufe mehr braucht. Die Meldung nennt das ausdrücklich:
+  `Edition(en) 2016 werden von keiner Klassenstufe mehr gebraucht`.
+- **Ein Fach kann seinen neuen Plan sofort wieder archiviert bekommen.** Chemie beginnt in
+  Klasse 8; solange V3 nur für 5–7 gilt, braucht ihn dort niemand. Der Plan bleibt
+  importiert und wird beim Import des Folgejahres automatisch reaktiviert.
+- **In Auswahllisten ohne Jahrgangsbezug** (Chat-Kontext, Knotensuche) stehen dann zwei
+  Kompetenzen mit gleicher Nummer und verschiedenem Text nebeneinander. Dort blendet die
+  Oberfläche die Fassung ein — aber nur bei tatsächlicher Mehrdeutigkeit, nicht an jedem
+  Treffer.
 
 ## Rollback
 
