@@ -34,6 +34,10 @@ import yaml
 
 logger = logging.getLogger("import_bildungsplan")
 
+# Projektwurzel (scripts/ liegt direkt darunter) — für Pfade, die nicht vom
+# Arbeitsverzeichnis des Aufrufers abhängen dürfen.
+PROJEKT_WURZEL = Path(__file__).resolve().parent.parent
+
 # content_types die im Bildungsplan-Import verwendet werden
 BP_CONTENT_TYPES = {
     "fachplan",
@@ -683,6 +687,7 @@ def run_import(
     dry_run: bool = False,
     fach_filter: str | None = None,
     prune_subjects: bool = False,
+    log_dir: str | None = None,
 ) -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -844,9 +849,16 @@ def run_import(
             f"{stats['edges']} Kanten, {len(warnings)} Warnungen"
         )
 
-        # Warnungs-Log schreiben
+        # Warnungs-Log schreiben.
+        #
+        # ⚠ Der Pfad ist an der **Projektwurzel** verankert, nicht am Arbeitsverzeichnis.
+        # Vorher stand hier `Path("data/import_logs")`, und es entstanden zwei
+        # gleichnamige Dateien mit völlig verschiedenem Inhalt: eine unter `backend/`
+        # (wenn `pytest` dort lief, gefüllt mit Testfixtures wie `GYM_TST`) und eine an
+        # der Wurzel (echte Importe). Beim Auswerten haben Nutzer und Assistent
+        # verschiedene Dateien angesehen und aneinander vorbeigeredet.
         if warnings:
-            log_dir = Path("data/import_logs")
+            log_dir = Path(log_dir) if log_dir else (PROJEKT_WURZEL / "data" / "import_logs")
             log_dir.mkdir(parents=True, exist_ok=True)
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             log_file = log_dir / f"import_warnings_{date_str}.log"
@@ -864,6 +876,14 @@ def main() -> None:
     parser.add_argument("--input", default="scripts/scraper/output")
     parser.add_argument("--db-url", default=os.environ.get("DATABASE_URL", ""))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--log-dir", default=None,
+        help=(
+            "Verzeichnis für das Warnungs-Log (Vorgabe: <Projektwurzel>/data/import_logs). "
+            "Im Container auf ein gemountetes Volume legen — sonst sind die Warnungen "
+            "nach einem `--rm`-Lauf verloren."
+        ),
+    )
     parser.add_argument(
         "--fach", default=None, help="Nur dieses Fach importieren (fach_code)"
     )
@@ -884,7 +904,7 @@ def main() -> None:
 
     run_import(
         args.subjects, args.input, args.db_url, args.dry_run, args.fach,
-        args.prune_subjects,
+        args.prune_subjects, args.log_dir,
     )
 
 

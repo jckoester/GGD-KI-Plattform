@@ -509,3 +509,124 @@ def test_leere_konfiguration_legt_nichts_still():
     anzahl, betroffen = stillgelegte_faecher(cur, {"subjects": []}, prune=True, dry_run=False)
     assert (anzahl, betroffen) == (0, [])
     assert cur.calls == []
+
+
+# ── Warnungs-Log: fester Pfad statt arbeitsverzeichnis-relativ (2026-08-08) ───
+
+
+def test_log_pfad_haengt_nicht_am_arbeitsverzeichnis():
+    """`Path("data/import_logs")` erzeugte zwei gleichnamige Dateien.
+
+    Lief `pytest` in `backend/`, landeten Testfixtures (`GYM_TST`, `DOES_NOT_EXIST`) in
+    `backend/data/import_logs/`; echte Importe schrieben an die Repo-Wurzel. Nutzer und
+    Assistent haben beim Auswerten **verschiedene Dateien** angesehen und aneinander
+    vorbeigeredet — deshalb ist der Pfad jetzt an der Projektwurzel verankert.
+    """
+    wurzel = _import_bp.PROJEKT_WURZEL
+
+    # Nicht den Quelltext auf eine Schreibweise absuchen — der Kommentar dort zitiert
+    # den alten Pfad und ließe eine solche Prüfung fälschlich anschlagen. Geprüft wird
+    # die Substanz: ein absoluter Pfad, verankert an der Projektwurzel.
+    assert wurzel.is_absolute()
+    assert wurzel.name != "scripts", "zeigt auf scripts/ statt auf die Projektwurzel"
+    assert (wurzel / "scripts").is_dir() and (wurzel / "config").is_dir()
+
+    vorgabe = wurzel / "data" / "import_logs"
+    assert vorgabe.is_absolute(), (
+        "Ein relativer Vorgabepfad erzeugt je Arbeitsverzeichnis eine eigene Logdatei."
+    )
+
+
+def test_log_verzeichnis_ist_ueberschreibbar():
+    """`--log-dir` — im Container muss das Log auf ein gemountetes Volume können.
+
+    Ohne das waren die Warnungen nach einem `--rm`-Lauf schlicht weg.
+    """
+    import inspect
+
+    assert "log_dir" in inspect.signature(_import_bp.run_import).parameters
+
+
+# ── Scraper-Ablage: vollständige Schnappschüsse statt Deltas (2026-08-08) ─────
+
+
+def _knoten(bp_id: str, content_hash: str) -> dict:
+    return {
+        "bp_id": bp_id, "content_hash": content_hash, "content_type": "ik_kompetenz",
+        "title": bp_id, "content": "x", "min_grade": 5, "max_grade": 6, "metadata": {},
+    }
+
+
+def _schreibe(tmp_path, label: str, knoten: list[dict], vorhandene_hashes: dict):
+    """Ruft den Schreibteil von `scrape_fach` nach — ohne Netzzugriff."""
+    import json
+
+    neu = geaendert = unveraendert = 0
+    for n in knoten:
+        alt = vorhandene_hashes.get(n["bp_id"])
+        if alt is None:
+            neu += 1
+        elif alt != n["content_hash"]:
+            geaendert += 1
+        else:
+            unveraendert += 1
+    out = tmp_path / f"{label}.jsonl"
+    out.write_text(
+        "".join(json.dumps(n, ensure_ascii=False) + "\n" for n in knoten), encoding="utf-8"
+    )
+    for alt_datei in tmp_path.glob(f"{label}_*.jsonl"):
+        if _scraper._DATIERT_RE.fullmatch(alt_datei.name[len(label) + 1:]):
+            alt_datei.unlink()
+    return neu, geaendert, unveraendert
+
+
+def test_datierte_vorgaenger_werden_entfernt(tmp_path):
+    """Der Kern der Umstellung.
+
+    Vorher enthielt jede datierte Datei nur die **geänderten** Knoten; erst alle
+    zusammen ergaben den Plan (Physik lag vierfach im Verzeichnis, die jüngste Datei mit
+    zwei Knoten). Jetzt ist eine Datei je Fach der vollständige Stand — die alten Deltas
+    müssen also weg, sonst würden sie mitgelesen.
+    """
+    (tmp_path / "CH_2026-06-27.jsonl").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "CH_2026-08-24.jsonl").write_text("{}\n", encoding="utf-8")
+
+    _schreibe(tmp_path, "CH", [_knoten("A", "h1"), _knoten("B", "h2")], {})
+
+    assert (tmp_path / "CH.jsonl").exists()
+    assert not list(tmp_path.glob("CH_2026-*.jsonl"))
+
+
+def test_fremdes_fach_mit_gleichem_praefix_bleibt(tmp_path):
+    """`CH_BASIS_2026-08-24.jsonl` darf beim Fach `CH` nicht mitgelöscht werden.
+
+    Ein reiner Präfixvergleich (`CH_*`) träfe es — deshalb muss auf das Datumsmuster
+    geprüft werden, nicht auf den Präfix allein.
+    """
+    (tmp_path / "CH_BASIS_2026-08-24.jsonl").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "CH_2026-08-24.jsonl").write_text("{}\n", encoding="utf-8")
+
+    _schreibe(tmp_path, "CH", [_knoten("A", "h1")], {})
+
+    assert (tmp_path / "CH_BASIS_2026-08-24.jsonl").exists()
+    assert not (tmp_path / "CH_2026-08-24.jsonl").exists()
+
+
+def test_datei_enthaelt_alle_knoten_nicht_nur_geaenderte(tmp_path):
+    """Auch unveränderte Knoten stehen in der Datei — sie ist der ganze Stand.
+
+    Genau hier lag der alte Fehler: Bei einem Re-Scrape mit einer Änderung entstand eine
+    Datei mit **einem** Knoten. Wer sie für den Plan hielt, hatte 169 Knoten zu wenig.
+    """
+    import json
+
+    vorhanden = {"A": "h1", "B": "h2"}
+    neu, geaendert, unveraendert = _schreibe(
+        tmp_path, "CH", [_knoten("A", "h1"), _knoten("B", "NEU")], vorhanden
+    )
+
+    zeilen = (tmp_path / "CH.jsonl").read_text(encoding="utf-8").strip().split("\n")
+    assert len(zeilen) == 2, "Auch der unveränderte Knoten muss in der Datei stehen"
+    assert {json.loads(z)["bp_id"] for z in zeilen} == {"A", "B"}
+    # Die Meldung unterscheidet weiterhin — nur die Ablage tut es nicht mehr.
+    assert (neu, geaendert, unveraendert) == (0, 1, 1)

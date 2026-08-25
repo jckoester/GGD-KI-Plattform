@@ -116,6 +116,14 @@ Erwartetes Log am Ende:
 N neu, M geändert, K unverändert, 0 Warnungen
 ```
 
+> **Eine Datei je Fach und Edition** (`CH.jsonl`, `CH_BASIS.jsonl`) mit dem
+> **vollständigen** Stand — ein Re-Scrape überschreibt sie. Die Zahlen oben sagen, wie
+> viel sich geändert hat; in die Datei kommt trotzdem alles.
+>
+> Bis 08.08.2026 wurden nur die geänderten Knoten in eine **datierte** Datei geschrieben,
+> sodass erst alle Dateien zusammen den Plan ergaben. Datierte Vorgänger desselben Fachs
+> räumt der Scraper beim nächsten Lauf selbst weg.
+
 Scrape-Warnungen prüfen:
 ```bash
 cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log

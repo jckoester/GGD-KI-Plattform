@@ -22,7 +22,8 @@ erscheinen als eigene, schraffierte Zeilen.
 
 Damit arbeiten Sie so:
 
-- **Unterrichtseinheiten (UE) anlegen** und mit Lehrplan-Kapiteln verknüpfen. Die
+- **Unterrichtseinheiten (UE) anlegen** und mit Kapiteln des
+  [Schulcurriculums](curriculum.md) verknüpfen. Die
   Leiste oben zeigt pro UE die **Stundenbilanz**: Soll-Stunden aus dem Lehrplan
   gegen die zugewiesenen Slots.
 - **Slots einer UE zuordnen**, Themen direkt eintragen, **Kategorie** ändern

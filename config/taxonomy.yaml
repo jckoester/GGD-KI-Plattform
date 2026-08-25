@@ -1,6 +1,28 @@
 # Jede category hat: label_de, color (Semantic-Token-Kürzel), content_types[]
 # Jeder content_type hat: key, label_de, scope_defaults (read_scope, write_scope),
 #   optional: scope_anchor (true/false)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ⚠ BEIM ERGÄNZEN EINES content_type MITPRÜFEN
+#
+# Die Material-Auswahl (Curriculum-Editor und Stundenentwurf) leitet ihre Liste aus
+# dieser Datei ab: alles aus `document`, `artifact` und `concept`, abzüglich einer
+# kurzen Ausnahmeliste in `frontend/src/lib/material.js` (MATERIAL_CONTENT_TYPES).
+#
+# Das heißt: Ein neuer Typ in einer dieser drei Kategorien ist **sofort als Material
+# auswählbar**, ohne dass jemand etwas dafür tut. Gewollt für Arbeitsblätter, Aufgaben
+# und dergleichen — nicht gewollt für
+#   * Planungsobjekte (wie unterrichtsstunde, unterrichtseinheit, reflexion) und
+#   * personenbezogene Inhalte (wie schuelertext, feedback_text).
+# Solche Typen gehören in KEIN_MATERIAL in `material.js`, sonst tauchen sie in der
+# Material-Suche von Lehrkräften auf.
+#
+# Typen der Kategorie `knowledge` sind nie Material (eigene Auswahlfelder für
+# Bildungsplan, Methode, Sozialform, Operator) — dort ist nichts zu tun.
+#
+# Die Entscheidung ist in `frontend/src/lib/material.test.js` festgehalten; wer die
+# Ausnahmeliste ändert, passt dort die Zusicherung mit an.
+# ─────────────────────────────────────────────────────────────────────────────
 
 categories:
 

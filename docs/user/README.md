@@ -32,6 +32,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Diagramme & Graphen](diagramme.md) — Diagramme, Schaltpläne, Funktionsgraphen im Chat
 - [Bibliothek](bibliothek.md) — Bilder & Diagramme dauerhaft speichern, herunterladen, GeoGebra-Export
 - [Material-Werkstatt](werkstatt.md) — Arbeitsblätter bearbeiten & als PDF/Word/ODT exportieren
+- [Schulcurriculum](curriculum.md) — *(Lehrkräfte)* Kapitel & Lernsequenzen, Kompetenzen verknüpfen, Fassungswechsel, Export
 - [Unterrichtsplanung](unterrichtsplanung.md) — *(Lehrkräfte)* Jahresplan, Stundenentwurf, Nachbereiten, Verschiebe-Assistent
 - [Stundenplan übernehmen](stundenplan.md) — *(Lehrkräfte)* Kürzel, Wochenmuster, Ausfall & Vertretung abgleichen
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden

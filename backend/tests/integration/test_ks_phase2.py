@@ -77,6 +77,10 @@ def run_import(db_url: str, jsonl_path: Path) -> None:
             input_dir=tmpdir,
             db_url=get_sync_url(db_url),
             dry_run=False,
+            # Warnungen ins Temp-Verzeichnis: Testfixtures (GYM_TST, DOES_NOT_EXIST)
+            # haben im Produktiv-Log nichts verloren — dort mischten sie sich unter
+            # echte Import-Warnungen und machten jede Auswertung zur Glückssache.
+            log_dir=tmpdir,
         )
 
 

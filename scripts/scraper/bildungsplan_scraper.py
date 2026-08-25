@@ -36,6 +36,9 @@ from scripts.scraper.parsers import (
 
 logger = logging.getLogger('bildungsplan_scraper')
 
+# Dateinamen der frueheren, datierten Ablage: `<fach>_JJJJ-MM-TT.jsonl`.
+_DATIERT_RE = re.compile(r'\d{4}-\d{2}-\d{2}\.jsonl')
+
 BASE_URL = 'https://www.bildungsplaene-bw.de/,Lde/'
 LP_KUERZEL = ['BNE', 'BTV', 'PG', 'BO', 'MB', 'VB', 'LFDB']
 MAX_RETRIES = 3
@@ -241,28 +244,44 @@ async def scrape_fach(
             subject_min_grade, subject_max_grade,
         )
 
-    # Idempotenz-Filter: nur neue/geaenderte Knoten schreiben
+    # Wie viel hat sich geaendert? (nur fuer die Meldung — geschrieben wird alles)
     neu, geaendert, unveraendert = 0, 0, 0
-    filtered = []
     for node in nodes:
-        bp_id = node['bp_id']
-        new_hash = node['content_hash']
-        old_hash = existing_hashes.get(bp_id)
+        old_hash = existing_hashes.get(node['bp_id'])
         if old_hash is None:
             neu += 1
-            filtered.append(node)
-        elif old_hash != new_hash:
+        elif old_hash != node['content_hash']:
             geaendert += 1
-            filtered.append(node)
         else:
             unveraendert += 1
 
-    if filtered:
-        date_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-        out_file = output_dir / f"{fach_code}_{date_str}.jsonl"
-        with out_file.open('w', encoding='utf-8') as f:
-            for node in filtered:
-                f.write(json.dumps(node, ensure_ascii=False) + '\n')
+    # Eine Datei je Fach/Edition, ohne Datum, mit dem **vollstaendigen** Stand.
+    #
+    # Frueher wurden nur die geaenderten Knoten in eine datierte Datei geschrieben. Die
+    # Ablage bestand damit aus Deltas, und erst alle Dateien zusammen ergaben den ganzen
+    # Plan — Physik lag vierfach im Verzeichnis, die juengste Datei mit zwei Knoten. Drei
+    # Folgen, die das hatte:
+    #   * Der Import liest per glob ALLE Dateien; welcher Stand gewinnt, entschied die
+    #     alphabetische Sortierung (bei ISO-Datumsnamen zufaellig die richtige).
+    #   * Aenderungen am Scraper schlugen nicht durch: Lag ein alter Knoten mit gleichem
+    #     content_hash, aber ohne ein neu hinzugekommenes Metadatenfeld vor, blieb das
+    #     Feld leer. CLAUDE.md verlangte deshalb, vorher alle alten Dateien zu loeschen.
+    #   * Alte Dateien hielten entfernte Knoten am Leben (im Verzeichnis lag noch ein
+    #     Fach, das es in subjects.yaml nicht mehr gibt).
+    # Ein vollstaendiger Schnappschuss je Fach macht die Ablage zu dem, wofuer der Import
+    # sie ohnehin haelt: dem aktuellen Stand.
+    out_file = output_dir / f"{fach_code}.jsonl"
+    with out_file.open('w', encoding='utf-8') as f:
+        for node in nodes:
+            f.write(json.dumps(node, ensure_ascii=False) + '\n')
+
+    # Datierte Vorgaenger desselben Fachs entfernen — sonst laege der alte Delta-Stand
+    # daneben und wuerde mitgelesen. Nur exakt `<fach>_JJJJ-MM-TT.jsonl`, damit
+    # `CH_BASIS_…` beim Fach `CH` unberuehrt bleibt.
+    for alt_datei in output_dir.glob(f"{fach_code}_*.jsonl"):
+        if _DATIERT_RE.fullmatch(alt_datei.name[len(fach_code) + 1:]):
+            alt_datei.unlink()
+            logger.info(f"Alte Delta-Datei entfernt: {alt_datei.name}")
 
     return neu, geaendert, unveraendert
 
@@ -362,11 +381,14 @@ async def main(subjects_path: str, output_dir: str, fach_filter: str | None = No
         # Leitperspektiven zuerst (werden von IK-Standards referenziert)
         lp_nodes = await scrape_leitperspektiven(client)
         if lp_nodes:
-            date_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-            lp_file = output / f"leitperspektiven_{date_str}.jsonl"
+            lp_file = output / "leitperspektiven.jsonl"
             with lp_file.open('w', encoding='utf-8') as f:
                 for node in lp_nodes:
                     f.write(json.dumps(node, ensure_ascii=False) + '\n')
+            for alt_datei in output.glob("leitperspektiven_*.jsonl"):
+                if _DATIERT_RE.fullmatch(alt_datei.name[len("leitperspektiven_"):]):
+                    alt_datei.unlink()
+                    logger.info(f"Alte Delta-Datei entfernt: {alt_datei.name}")
             logger.info(f"Leitperspektiven: {len(lp_nodes)} Knoten geschrieben")
 
         if leitperspektiven_only:
