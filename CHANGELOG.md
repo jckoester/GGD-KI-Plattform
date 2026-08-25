@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.5.2] – 2026-08-25
+
+Fehlerbehebung: Fachübergreifende Kompetenzverweise waren für ein knappes Drittel der
+Fächer nicht eingebbar.
+
+### Behoben
+
+- **`#`-Autovervollständigung übersprang 8 von 27 Fächern.** Im Feld „Hinweise" des
+  Curriculum-Editors erkannte die Eingabehilfe nur Fach-Kürzel aus zwei bis sechs
+  Großbuchstaben. Damit ließ sich auf **Deutsch (D), Geschichte (G), Mathematik (M)**
+  sowie **Englisch (E1), Französisch (F2), Latein (L2) und Spanisch (SPA3)** nicht
+  verweisen — einbuchstabige Kürzel und solche mit Ziffer fielen durch das Muster. Es
+  gab keine Fehlermeldung, das Auswahlfeld erschien schlicht nicht.
+- Die Trigger-Erkennung liegt jetzt als reine Textfunktion in `frontend/src/lib/hinweise.js`
+  und ist damit prüfbar; ein Test führt **jedes** vergebene Fach-Kürzel einzeln auf.
+  Welche Kürzel es wirklich gibt, entscheidet weiterhin der Server.
+
+> Bereits gespeicherte Hinweise sind nicht betroffen — die Einschränkung lag allein in
+> der Eingabehilfe, nicht in Speicherung, Export oder Anzeige.
+
 ## [0.5.1] – 2026-08-25
 
 Fehlerbehebung: Der Bildungsplan-Import brach im Produktivsystem ab.
