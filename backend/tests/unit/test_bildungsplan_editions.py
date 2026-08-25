@@ -8,6 +8,8 @@ bleiben, wird der ``scripts*``-Zustand in ``sys.modules`` um den Scraper-Import 
 exakt wiederhergestellt.
 """
 import importlib.util
+import logging
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -630,3 +632,119 @@ def test_datei_enthaelt_alle_knoten_nicht_nur_geaenderte(tmp_path):
     assert {json.loads(z)["bp_id"] for z in zeilen} == {"A", "B"}
     # Die Meldung unterscheidet weiterhin — nur die Ablage tut es nicht mehr.
     assert (neu, geaendert, unveraendert) == (0, 1, 1)
+
+
+# ---------------------------------------------------------------------------
+# Wo liegt das `app`-Paket? (Produktions-Absturz vom 25.08.2026)
+# ---------------------------------------------------------------------------
+
+
+def _lade_kopie(basis: Path, skript_rel: str, app_rel: str | None, name: str):
+    """Kopiert ``import_bildungsplan.py`` in einen nachgebauten Baum und lädt es dort.
+
+    Nur so ist die Pfad-Auflösung prüfbar: Sie hängt an ``__file__`` und läuft beim
+    Import — es gibt keine Funktion, die man mit einem anderen Pfad aufrufen könnte.
+
+    ``app_rel`` ist relativ zu ``basis`` (``""`` = ``basis`` selbst); ``None`` legt gar
+    kein ``app``-Paket an.
+    """
+    skript_dir = basis / skript_rel
+    skript_dir.mkdir(parents=True)
+    skript = skript_dir / "import_bildungsplan.py"
+    shutil.copy(REPO_ROOT / "scripts" / "import_bildungsplan.py", skript)
+
+    if app_rel is not None:
+        wurzel = basis / app_rel if app_rel else basis
+        editions = wurzel / "app" / "context" / "editions.py"
+        editions.parent.mkdir(parents=True, exist_ok=True)
+        editions.write_text("", encoding="utf-8")
+
+    pfad_vorher = list(sys.path)
+    try:
+        spec = importlib.util.spec_from_file_location(name, skript)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        # Das Skript trägt seine gefundene Wurzel selbst in sys.path ein.
+        sys.path[:] = pfad_vorher
+    return mod
+
+
+def test_backend_wurzel_repo_layout(tmp_path):
+    """Entwicklung: `scripts/` und `backend/` liegen nebeneinander."""
+    mod = _lade_kopie(tmp_path, "scripts", "backend", "_bp_repo_layout")
+
+    assert mod.BACKEND_WURZEL == tmp_path / "backend"
+
+
+def test_backend_wurzel_container_layout(tmp_path):
+    """Produktion: `scripts/` ist nach `/app/import-scripts` gemountet.
+
+    Genau hier brach der Import am 25.08.2026 ab — **nach** dem Schreiben aller
+    Knoten, mit `ModuleNotFoundError: No module named 'app'`. Im Image gibt es kein
+    `backend/`; WORKDIR ist `/app` und das Paket liegt direkt darunter (`/app/app`).
+    Beide Layouts haben dieselbe `PROJEKT_WURZEL`, brauchen aber verschiedene Pfade —
+    Raten reicht nicht, es muss nachgesehen werden.
+    """
+    basis = tmp_path / "app"
+    mod = _lade_kopie(basis, "import-scripts", "", "_bp_container_layout")
+
+    assert mod.BACKEND_WURZEL == basis
+
+
+def test_backend_wurzel_fehlt_bricht_import_nicht_ab(tmp_path):
+    """Kein `app`-Paket auffindbar → `None`, aber das Modul lädt.
+
+    Das Skript muss ohne Backend benutzbar bleiben; nur die Editions-Archivierung
+    hängt daran.
+    """
+    mod = _lade_kopie(tmp_path, "scripts", None, "_bp_ohne_app")
+
+    assert mod.BACKEND_WURZEL is None
+
+
+class _AppBlocker:
+    """Meta-Path-Finder, der jeden `app`-Import scheitern lässt.
+
+    Simuliert den Container, in dem das Paket nicht gefunden wird — `sys.modules`
+    allein genügt nicht, weil `app` im Testprozess längst geladen ist.
+    """
+
+    def find_spec(self, name, path=None, target=None):
+        if name == "app" or name.startswith("app."):
+            raise ModuleNotFoundError(f"No module named '{name}'")
+        return None
+
+
+def test_archivierung_uebersprungen_statt_abbruch_ohne_app_paket(caplog):
+    """Ohne `app` wird die Editions-Archivierung übersprungen, nicht abgebrochen.
+
+    Sie ist der **letzte** Schritt vor dem Commit: Eine Ausnahme verwirft den
+    vollständigen, gültigen Import. Nicht zu archivieren lässt dagegen nur überholte
+    Knoten aktiv — das verliert nichts und ist jederzeit nachholbar.
+    """
+    cfg = {
+        "subjects": [
+            {"slug": "mathematik", "fach_code": "M", "bildungsplan_suffix": ".V2"}
+        ]
+    }
+
+    entfernt = {
+        k: sys.modules.pop(k)
+        for k in list(sys.modules)
+        if k == "app" or k.startswith("app.")
+    }
+    blocker = _AppBlocker()
+    sys.meta_path.insert(0, blocker)
+    try:
+        with caplog.at_level(logging.ERROR):
+            # cur=None: Der Ausstieg erfolgt, bevor die Datenbank angefasst wird.
+            archiviert = _import_bp.archive_superseded_nodes(
+                None, cfg, {"mathematik": 1}, dry_run=False
+            )
+    finally:
+        sys.meta_path.remove(blocker)
+        sys.modules.update(entfernt)
+
+    assert archiviert == 0
+    assert "UEBERSPRUNGEN" in caplog.text, "Der Ausfall muss im Log stehen"

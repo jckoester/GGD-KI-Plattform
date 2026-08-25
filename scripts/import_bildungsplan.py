@@ -38,11 +38,25 @@ logger = logging.getLogger("import_bildungsplan")
 # Arbeitsverzeichnis des Aufrufers abhängen dürfen.
 PROJEKT_WURZEL = Path(__file__).resolve().parent.parent
 
-# `app.context.editions` liefert den Editions-Fahrplan — dieselbe Logik, die auch
-# die Anzeige nutzt. Der Runbook setzt PYTHONPATH=backend voraus; das hier macht
-# das Skript davon unabhängig.
-if str(PROJEKT_WURZEL / "backend") not in sys.path:
-    sys.path.insert(0, str(PROJEKT_WURZEL / "backend"))
+# Wo das `app`-Paket liegt, hängt vom Layout ab — es gibt zwei, und sie sind
+# unvereinbar:
+#
+#   Entwicklung  Repo-Klon, `scripts/` und `backend/` nebeneinander
+#                → das Paket liegt unter `<wurzel>/backend/app`
+#   Produktion   `scripts/` ist nach `/app/import-scripts` gemountet, das Image hat
+#                WORKDIR /app und das Paket direkt darunter (`/app/app`). Ein
+#                `backend/`-Verzeichnis existiert dort **nicht**.
+#
+# In beiden Fällen ist `PROJEKT_WURZEL` das Elternverzeichnis von `scripts/` — aber
+# einmal muss `backend/` angehängt werden und einmal nicht. Darum nicht raten,
+# sondern nachsehen, wo `app/context/editions.py` tatsächlich liegt.
+BACKEND_KANDIDATEN = (PROJEKT_WURZEL / "backend", PROJEKT_WURZEL)
+BACKEND_WURZEL = next(
+    (p for p in BACKEND_KANDIDATEN if (p / "app" / "context" / "editions.py").is_file()),
+    None,
+)
+if BACKEND_WURZEL is not None and str(BACKEND_WURZEL) not in sys.path:
+    sys.path.insert(0, str(BACKEND_WURZEL))
 
 # content_types die im Bildungsplan-Import verwendet werden
 BP_CONTENT_TYPES = {
@@ -583,7 +597,21 @@ def archive_superseded_nodes(
     # Das laufende Schuljahr entscheidet, welche Editionen noch gebraucht werden.
     # Quelle ist `config/school_year.yaml` (bzw. SCHOOL_YEAR_PATH) — dieselbe, aus der
     # auch die Anzeige ihre Frontier berechnet.
-    from app.context.editions import aktuelles_schuljahr_start
+    #
+    # Ohne das `app`-Paket ist der Fahrplan nicht bestimmbar. Dann wird dieser Schritt
+    # übersprungen statt den Import abzubrechen: Er läuft **nach** dem Schreiben der
+    # Knoten, ein Abbruch verwirft also den vollständigen, gültigen Import. Und
+    # „nicht archivieren" ist die harmlose Richtung — es verschwindet nichts, und der
+    # Schritt lässt sich jederzeit nachholen.
+    try:
+        from app.context.editions import aktuelles_schuljahr_start
+    except ModuleNotFoundError:
+        logger.error(
+            "archive_superseded UEBERSPRUNGEN — 'app'-Paket nicht gefunden (gesucht: %s). "
+            "Ueberholte Editionen bleiben aktiv; nach Behebung erneut importieren.",
+            ", ".join(str(p) for p in BACKEND_KANDIDATEN),
+        )
+        return 0
 
     schuljahr_start = aktuelles_schuljahr_start()
 
@@ -767,6 +795,16 @@ def run_import(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+    # Früh melden, nicht erst nach dem Import: Ohne `app`-Paket entfällt am Ende die
+    # Archivierung überholter Editionen. Wer das hier liest, kann abbrechen, statt den
+    # Lauf zu wiederholen.
+    if BACKEND_WURZEL is None:
+        logger.warning(
+            "'app'-Paket nicht gefunden (gesucht: %s) — die Archivierung ueberholter "
+            "Editionen wird am Ende uebersprungen.",
+            ", ".join(str(p) for p in BACKEND_KANDIDATEN),
+        )
 
     # subjects.yaml laden und validieren
     with open(subjects_path, encoding="utf-8") as f:
