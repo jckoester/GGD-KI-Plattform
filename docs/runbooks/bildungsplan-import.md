@@ -200,6 +200,21 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 
 ## PDF-Import (LFDB & Fremdsprachen)
 
+> **Ab V3 nicht mehr für die Fremdsprachen.** Englisch und Französisch lagen in den
+> Fassungen bis V2 **nur als PDF** vor; deshalb trugen sie `bildungsplan_pdf_url`, und
+> der HTML-Scraper übersprang sie. Für V3 (GEN2X) gibt es beide als reguläre Seite —
+> `bildungsplan_pdf_url` wurde deshalb aus `config/subjects.yaml` entfernt, sie laufen
+> jetzt über den normalen Scrape.
+>
+> **Die Falle dabei:** Solange `bildungsplan_pdf_url` gesetzt ist, überspringt der
+> Scraper das Fach — und zwar als INFO, nicht als Warnung. Ein `bildungsplan_suffix:
+> ".V3"` bleibt dann **wirkungslos**, ohne dass etwas darauf hinweist. Wer ein Fach vom
+> PDF- auf den HTML-Weg umstellt, muss die URL entfernen; wer sie stehen lässt, wundert
+> sich über einen fehlenden Bildungsplan.
+>
+> Für die **alten** Fassungen (Basis, V2) bleibt der PDF-Import nötig — die gibt es
+> weiterhin nur als PDF.
+
 Manche Pläne liegen **nur als PDF** vor (kein HTML) und werden **nicht** vom
 Scraper (Schritt 3), sondern von der Pipeline `scripts/pdf_import/` erzeugt: der
 **Leitfaden Demokratiebildung (LFDB)** und die modernen **Fremdsprachen

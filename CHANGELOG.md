@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Bildungsplan V3 (neue Seitengeneration GEN2X)
+
+*Noch nicht abgeschlossen — Notizen für die Release-Notes.*
+
+- **Englisch und Französisch laufen ab V3 über den normalen Scrape.** Bis einschließlich
+  V2 lagen ihre Bildungspläne **nur als PDF** vor; beide trugen deshalb
+  `bildungsplan_pdf_url`, und der HTML-Scraper übersprang sie. Für V3 gibt es reguläre
+  Seiten, die URL ist aus `config/subjects.yaml` entfernt.
+
+  > **Beim Umstellen zu beachten:** Solange `bildungsplan_pdf_url` gesetzt ist, wird das
+  > Fach übersprungen — als INFO, nicht als Warnung. Ein `bildungsplan_suffix: ".V3"`
+  > bleibt dann wirkungslos, ohne dass etwas darauf hinweist. Für die alten Fassungen
+  > (Basis, V2) bleibt der PDF-Import nötig.
+
 ## [0.5.5] – 2026-08-25
 
 Fehlerbehebung: Kompetenzverweise mit Klammer in der Nummer gingen beim Re-Import verloren.
