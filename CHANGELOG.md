@@ -5,19 +5,138 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
-### Bildungsplan V3 (neue Seitengeneration GEN2X)
+## [0.6.0] – 2026-08-26
 
-*Noch nicht abgeschlossen — Notizen für die Release-Notes.*
+Schwerpunkt: **der Bildungsplan in der Fassung V3.** Sie gilt ab August 2026 zunächst in
+den Klassen 5–7 und wächst dann jahrgangsweise nach oben — die Klassen darüber lernen
+weiter nach der Vorgängerfassung. Beide Fassungen müssen also **gleichzeitig** vorliegen,
+und zwar für Jahre.
+
+Das ist mehr als ein weiterer Import. Der V3-Plan liegt unter einer **neuen
+Seitengeneration** des Landesbildungsservers: eine Seite je Fach mit Sprungmarken statt
+Übersichtsseite plus Unterseiten. Der bisherige Scraper konnte sie nicht lesen. Dazu kommt,
+dass zwei aktive Fassungen überall dort auffallen, wo bisher eine Nummer eine Kompetenz
+eindeutig bezeichnete: in der Kompetenzauswahl, im Chat-Kontext, in der semantischen Suche.
+
+Der Produktiv-Rollout ist damit **möglich**, aber nicht Teil dieses Release — er ist ein
+eigener, geplanter Vorgang (siehe *Migration*).
+
+### Neu
+
+**Bildungsplan V3 lesen**
+- **Scraper und Import für die neue Seitengeneration.** Ein eigener Parser für das neue
+  Seitenformat; welche Generation ein Fach hat, steht in `config/subjects.yaml`
+  (`seitengeneration: gen2x`, `quell_version`). Der Scraper holt Basis-, V2- und
+  V3-Fassung in einem Lauf. Im Entwicklungssystem: 17 Fächer mit V3-Plan, rund 7000
+  Knoten — davon 6100 aktiv. Die übrigen gehören zu Fächern, die erst oberhalb der
+  V3-Klassen beginnen (Chemie, Spanisch als dritte Fremdsprache); sie sind importiert
+  und warten, siehe *Migration*.
+- **Operatoren** (handlungsleitende Verben mit Anforderungsbereich) werden aus den neuen
+  Seiten mitgelesen — dieselbe Darstellung wie bisher, nur eine andere Quelle.
+- **Leitperspektiven** liegen unter V3 an eigener Stelle und werden von dort geholt.
+- **Der Scraper prüft, welche Fassung er tatsächlich geladen hat.** Ein Link mit
+  V3-Kennung führt auf dem Bildungsserver stellenweise auf die alte Seite. Ohne Prüfung
+  wäre der alte Inhalt als V3 importiert worden — sichtbar erst Monate später.
+- **Doppelte Kennungen brechen den Import ab**, statt Knoten still zu überschreiben.
+
+**Zwei Fassungen nebeneinander**
+- **Die geltende Fassung wird berechnet, nicht gepflegt.** Aus Editions-Fahrplan
+  (`subjects.yaml`), Schuljahr (`school_year.yaml`) und dem tatsächlich importierten
+  Bestand ergibt sich je Fach und Klassenstufe die maßgebliche Fassung. Fehlt sie für ein
+  Fach noch, gilt die vorige weiter — und die Umstellung geschieht von selbst, sobald die
+  Knoten da sind.
+- **Die semantische Suche im Chat unterscheidet die Fassungen.** Bisher belegten zwei
+  fast gleichlautende Treffer je einen Platz und verdrängten anderes. Gehört die
+  Unterhaltung zu einer Unterrichtsgruppe, ergibt sich daraus die Klassenstufe, und es
+  gelangt je Fach nur die geltende Fassung in den Kontext; ohne Gruppenbezug bleibt von
+  zwei Fassungen derselben Kompetenz die inhaltlich näherliegende. Zum Ausmaß: Von 12713
+  Bildungsplan-Knoten haben 7669 eine Entsprechung in einer anderen Fassung.
+- **Auswahllisten ohne Jahrgangsbezug nennen die Fassung** — aber nur dort, wo dieselbe
+  Nummer wirklich mehrfach vorkommt. Ein Hinweis an jedem Treffer wäre Rauschen.
+
+**Kontextknoten im Chat**
+- **Die Vorschläge zeigen jetzt das Fach.** Bisher stand dort der Knotentyp — bei
+  Bildungsplan-Kompetenzen die falsche Hälfte: Dass `3.1.1(1)` eine inhaltsbezogene
+  Kompetenz ist, sagt die Nummer bereits; aus welchem Fach sie stammt, sagte nichts.
+  `2.1.1` gibt es in 24 Fächern. Der Knotentyp bleibt als Tooltip erreichbar und wird
+  weiter angezeigt, wo es kein Fach gibt (Dokumente, eigenes Material).
+- Die drei Stellen, an denen Kontextknoten auftauchen — Erwähnungsliste, Vorschläge des
+  Assistenten und die Chips des gesetzten Kontexts —, sehen jetzt gleich aus und lesen
+  denselben Fassungshinweis. Der rohe Schlüssel (`ik_kompetenz`) ist überall durch die
+  lesbare Bezeichnung ersetzt.
+
+### Geändert
 
 - **Englisch und Französisch laufen ab V3 über den normalen Scrape.** Bis einschließlich
   V2 lagen ihre Bildungspläne **nur als PDF** vor; beide trugen deshalb
   `bildungsplan_pdf_url`, und der HTML-Scraper übersprang sie. Für V3 gibt es reguläre
-  Seiten, die URL ist aus `config/subjects.yaml` entfernt.
+  Seiten.
 
   > **Beim Umstellen zu beachten:** Solange `bildungsplan_pdf_url` gesetzt ist, wird das
   > Fach übersprungen — als INFO, nicht als Warnung. Ein `bildungsplan_suffix: ".V3"`
   > bleibt dann wirkungslos, ohne dass etwas darauf hinweist. Für die alten Fassungen
   > (Basis, V2) bleibt der PDF-Import nötig.
+
+- **Der Import meldet Ausgabedateien zu unbekannten Fächern.** Eine JSONL zu einem Fach,
+  das nicht mehr in `subjects.yaml` steht, räumt kein Scrape je weg — und alles Gelesene
+  gilt als „bekannt", hält die Knoten also aktiv. Der Import warnt jetzt mit Dateinamen;
+  abgebrochen wird nicht, denn ein Altbestand darf keinen Import blockieren, und
+  wegwerfen soll der Mensch entscheiden.
+- **Das Warnungs-Log entsteht je Lauf** statt eines über den Tag wachsenden Anhangs. Damit
+  ist wieder abzählbar, was *dieser* Import gemeldet hat.
+- **Vier Fächer reichten bis Klasse 13**, obwohl der Bildungsplan als oberstes Band 11–12
+  kennt. Für Klasse 13 fiel die Fassungswahl deshalb auf die Ausgangsfassung zurück, die
+  dort keine Inhalte hat — und hielt sie damit schulweit am Leben, sodass nichts
+  archiviert wurde. Englisch, Musik, Sport und ev. Religion enden jetzt bei Klasse 12.
+
+### Behoben
+
+- **Vierstufige Kompetenznummern gingen verloren.** Physik, Chemie und Geographie führen
+  unter V3 eine vierte Gliederungsebene (`3.2.1.1`); Parser und Import kannten nur drei.
+- **Physik verlor die Hälfte seiner Kursstufe.** Beide Basisfach-Züge wurden auf dieselbe
+  Kennung abgebildet — 39 Knoten überschrieben einander. Der Schwerpunkt wird jetzt aus
+  der Überschrift abgeleitet und ist Teil der Kennung.
+- **Fächer ohne V2-Fassung wurden ganz übersprungen.** Nicht jedes Fach hat drei
+  Fassungen; scheiterte eine Zwischenfassung, brach der Lauf für das ganze Fach ab. Elf
+  Fächer waren betroffen. Eine fehlende Zwischenfassung ist jetzt eine Warnung.
+- **Querverweise zwischen Fächern liefen ins Leere.** Vier verschiedene Ursachen, die
+  einander verdeckten: Sprungmarken mit vier Bestandteilen, Verweise ganz ohne
+  Sprungmarke, als fachfremd fehlgedeutete Verweise und Verweise auf prozessbezogene
+  Kompetenzen. Im Entwicklungssystem sank die Zahl der Import-Warnungen von 2491 auf 967 —
+  der Rest sind Fächer, die die Schule nicht anbietet, Altbestand aus früheren Fassungen
+  und eine Handvoll Fehler in der Quelle selbst.
+- **Verweise auf prozessbezogene Kompetenzen zeigten auf das falsche Fach.** Die Auflösung
+  suchte die Nummer, ohne nach Fach zu filtern — und fand sie irgendwo. In den nach der
+  Korrektur eingelesenen V3-Daten führt keine dieser 6574 Verbindungen mehr aus ihrem Fach
+  heraus; im Altbestand aus früheren Importen sind es noch 227. Ein erneuter Import der
+  betroffenen Fassungen räumt das auf.
+
+### Dokumentation
+
+- [Bildungsplan-Import (Runbook)](docs/runbooks/bildungsplan-import.md): vier neue
+  Abschnitte zur neuen Seitengeneration, zum Log je Lauf und zu den Fremdsprachen.
+- [Bildungsplan-Import (Admin)](docs/admin/bildungsplan-import.md): **Mehrere Fassungen
+  gleichzeitig — der Normalfall.** Warum zwei bis drei aktive Fassungen kein zu
+  bereinigender Zustand sind, warum ein Fach seinen neuen Plan sofort wieder archiviert
+  bekommen kann, und wie sich das in Auswahllisten und im Chat auswirkt. Dazu die
+  möglichen Gründe für nicht auflösbare Querverweise.
+- `config/subjects.example.yaml` zeigt die V3-Konfiguration vollständig.
+
+### Migration
+
+- Keine Datenbank-Migration nötig.
+- **Der V3-Rollout ist ein eigener Vorgang** und geschieht nicht durch das Update. Nötig
+  sind: `config/subjects.yaml` um die V3-Angaben ergänzen (Vorlage:
+  `subjects.example.yaml`), `config/school_year.yaml` auf `2026/27`, danach Scrape und
+  Import. Vorher mit `--dry-run` prüfen.
+- **Erwartet und richtig:** Ein Fach, das erst oberhalb der V3-Klassen beginnt (etwa
+  Chemie ab Klasse 8), bekommt seinen frisch importierten V3-Plan sofort wieder
+  archiviert — dort braucht ihn 2026/27 noch niemand. Er kommt beim Import des
+  Folgejahres von selbst zurück.
+- Wer schon einmal gescrapt hat: Der Import meldet nun Dateien zu Fächern, die es nicht
+  mehr gibt. Die Meldung nennt den Dateinamen; die Datei kann gelöscht werden.
+- **Auch ohne V3-Rollout lohnt ein Neu-Import der bestehenden Fassungen**: Er korrigiert
+  die fachfremden Verweise auf prozessbezogene Kompetenzen im Altbestand.
 
 ## [0.5.5] – 2026-08-25
 
