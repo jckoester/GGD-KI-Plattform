@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.6.2] – 2026-08-26
+
+### Behoben
+
+- **Formeln in Kompetenztiteln blieben Quelltext.** Bildungsplan-Kompetenzen führen ihre
+  Formeln im Titel (`… die Zahl \(\pi\) …`); angezeigt wurde die TeX-Notation. Betrifft
+  Bildungsplanansicht, Knotenansicht, IK-/PK-Auswahl, Knotenliste und die
+  Kontextknoten im Chat.
+- **PDF-Export rendert `\(…\)` und `\[…\]`.** Die Export-Pipeline kannte nur `$…$`; bei
+  der Klammer-Notation verschwand zusätzlich der Backslash, sodass `(\pi)` im PDF stand.
+  Betrifft Curriculum-, Stunden- und Dokument-Export.
+- **Kompetenztitel im Curriculum- und Stunden-PDF** liefen am Formel-Rendering vorbei.
+
 ## [0.6.1] – 2026-08-26
 
 ### Behoben
