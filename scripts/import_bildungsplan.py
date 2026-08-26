@@ -208,8 +208,41 @@ def build_subject_id_lookup(conn) -> dict[str, int]:
 # -- Laden und Sortieren ---------------------------------------------------------
 
 
+def _melde_verwaiste_datei(
+    jsonl_file: Path, bekannte_fach_codes: set[str] | None
+) -> None:
+    """Meldet eine JSONL-Datei, deren Fach nicht (mehr) in subjects.yaml steht.
+
+    **Warum das eine Meldung wert ist:** Der Import liest per glob *alles*, was im
+    Verzeichnis liegt. Eine Datei zu einem entfernten Fach haelt dessen Knoten am Leben —
+    alles Gelesene gilt als „bekannt" und wird von ``archive_removed_nodes`` verschont.
+    Und kein Scrape raeumt sie je auf, weil das Fach nicht mehr gescrapt wird. So lag
+    `LIT_2026-06-27.jsonl` monatelang im Verzeichnis und hielt ein Fach am Leben, das es
+    in der Konfiguration nicht mehr gab.
+
+    Bewusst nur eine Warnung, kein Abbruch: Wegwerfen soll der Mensch entscheiden, und
+    ein Altbestand darf nicht den ganzen Import blockieren.
+    """
+    if not bekannte_fach_codes:
+        return
+    stem = jsonl_file.stem.upper()
+    if stem.startswith("LEITPERSPEKTIVEN"):
+        return
+    # `M_BASIS`, `M_V2` und `M` gehoeren alle zum Fach-Code `M`.
+    kandidat = stem.split("_")[0]
+    if kandidat in bekannte_fach_codes:
+        return
+    logger.warning(
+        "Datei %s gehoert zu keinem konfigurierten Fach (%s). Ihre Knoten werden "
+        "importiert und dadurch aktiv gehalten — pruefen und ggf. loeschen.",
+        jsonl_file.name, kandidat,
+    )
+
+
 def load_jsonl_files(
-    input_path: Path, fach_filter: str | None = None
+    input_path: Path,
+    fach_filter: str | None = None,
+    bekannte_fach_codes: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Laedt JSONL-Dateien aus einem Verzeichnis oder einer einzelnen Datei.
 
@@ -232,6 +265,7 @@ def load_jsonl_files(
         return nodes, False
 
     for jsonl_file in sorted(input_path.glob("*.jsonl")):
+        _melde_verwaiste_datei(jsonl_file, bekannte_fach_codes)
         if fach_filter:
             stem = jsonl_file.stem.upper()
             if not stem.startswith(fach_filter.upper()):
@@ -934,7 +968,12 @@ def run_import(
         sys.exit(1)
 
     # JSONL laden
-    nodes, is_full_import = load_jsonl_files(Path(input_dir), fach_filter)
+    bekannte_fach_codes = {
+        str(f["fach_code"]).upper() for f in cfg.get("subjects", []) if f.get("fach_code")
+    }
+    nodes, is_full_import = load_jsonl_files(
+        Path(input_dir), fach_filter, bekannte_fach_codes
+    )
     if not nodes:
         logger.warning(f"Keine JSONL-Dateien in {input_dir}")
         return

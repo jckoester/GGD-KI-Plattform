@@ -8,6 +8,7 @@ bleiben, wird der ``scripts*``-Zustand in ``sys.modules`` um den Scraper-Import 
 exakt wiederhergestellt.
 """
 import importlib.util
+import json
 import logging
 import shutil
 import sys
@@ -1031,3 +1032,68 @@ def test_dokumentinterner_restverweis_wird_gemeldet():
     )
     assert n == 0
     assert "im eigenen Dokument nicht aufloesbar" in warnungen[0]
+
+
+# ---------------------------------------------------------------------------
+# Verwaiste JSONL-Dateien im Ausgabeverzeichnis
+# ---------------------------------------------------------------------------
+
+
+def _jsonl(dir_: Path, name: str, bp_id: str = "BP2016BW_ALLG_GYM_X_IK_5-6_01") -> None:
+    dir_.mkdir(parents=True, exist_ok=True)
+    (dir_ / f"{name}.jsonl").write_text(
+        json.dumps({"bp_id": bp_id, "content_type": "ik_kompetenz", "title": "t"}) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_datei_ohne_konfiguriertes_fach_wird_gemeldet(tmp_path, caplog):
+    """Eine Datei zu einem entfernten Fach hält dessen Knoten am Leben.
+
+    Der Import liest per glob **alles** im Verzeichnis; alles Gelesene gilt als
+    „bekannt" und wird von `archive_removed_nodes` verschont. Und kein Scrape räumt die
+    Datei je auf, weil das Fach nicht mehr gescrapt wird. So lag `LIT_2026-06-27.jsonl`
+    zwei Monate im Verzeichnis und hielt 63 Knoten eines nicht angebotenen Fachs aktiv.
+    """
+    _jsonl(tmp_path, "LIT_2026-06-27")
+    _jsonl(tmp_path, "M")
+
+    with caplog.at_level(logging.WARNING):
+        nodes, voll = _import_bp.load_jsonl_files(tmp_path, None, {"M"})
+
+    assert "LIT_2026-06-27.jsonl" in caplog.text
+    assert "LIT" in caplog.text
+    assert "M.jsonl" not in caplog.text, "Konfigurierte Fächer gehören nicht in die Meldung"
+    # Gelesen wird trotzdem — ein Altbestand darf den Import nicht blockieren.
+    assert len(nodes) == 2 and voll is True
+
+
+def test_editionsdateien_gelten_als_dasselbe_fach(tmp_path, caplog):
+    """`M_BASIS`, `M_V2` und `M` gehören alle zum Fach-Code `M`."""
+    for name in ("M", "M_V2", "M_BASIS"):
+        _jsonl(tmp_path, name)
+
+    with caplog.at_level(logging.WARNING):
+        _import_bp.load_jsonl_files(tmp_path, None, {"M"})
+
+    assert "gehoert zu keinem konfigurierten Fach" not in caplog.text
+
+
+def test_leitperspektiven_gehoeren_zu_keinem_fach(tmp_path, caplog):
+    """Die LP-Datei ist fachlos und darf nicht als verwaist gelten."""
+    _jsonl(tmp_path, "leitperspektiven", bp_id="BNE_01")
+
+    with caplog.at_level(logging.WARNING):
+        _import_bp.load_jsonl_files(tmp_path, None, {"M"})
+
+    assert "gehoert zu keinem konfigurierten Fach" not in caplog.text
+
+
+def test_ohne_fachliste_keine_meldung(tmp_path, caplog):
+    """Ohne bekannte Fach-Codes wird nichts gemeldet — sonst warnte jeder Altaufruf."""
+    _jsonl(tmp_path, "LIT_2026-06-27")
+
+    with caplog.at_level(logging.WARNING):
+        _import_bp.load_jsonl_files(tmp_path, None, None)
+
+    assert "gehoert zu keinem konfigurierten Fach" not in caplog.text
