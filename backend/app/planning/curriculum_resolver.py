@@ -49,6 +49,16 @@ async def _group_grade(db: AsyncSession, group: Group) -> int | None:
     return parse_class_grade(cls.name) if cls else None
 
 
+async def group_grade(db: AsyncSession, group_id: int) -> int | None:
+    """Jahrgang einer Unterrichtsgruppe, ``None`` wenn nicht ableitbar.
+
+    Einstieg für Aufrufer außerhalb der Curriculum-Auflösung (etwa die
+    editionsbewusste Kontextsuche), die nur die Stufe brauchen.
+    """
+    group = await db.get(Group, group_id)
+    return await _group_grade(db, group) if group is not None else None
+
+
 async def _ue_titles_by_kapitel(db: AsyncSession, group_id: int) -> dict[UUID, list[str]]:
     """{kapitel_node_id: [ue_titel]} für alle UEs der Gruppe (references-Kanten)."""
     ues = (

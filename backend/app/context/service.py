@@ -121,8 +121,12 @@ async def get_context_for_query(
     semantic_nodes: list[ContextNode] = []
     engagement_entries: list[EngagementEntry] = []
     if anchor_ids:
+        # Der Jahrgang entscheidet, welche BP-Fassung gilt, solange eine neue
+        # Edition nach oben wächst. Ohne Gruppenbezug bleibt er None — die Suche
+        # fasst Fassungs-Dubletten dann nur zusammen, statt zu filtern.
+        grade = await _conversation_grade(db, chat_id)
         semantic_nodes, engagement_entries = await asyncio.gather(
-            get_semantic_context(anchor_ids, query_text, pseudonym, db),
+            get_semantic_context(anchor_ids, query_text, pseudonym, db, grade=grade),
             get_engagement_context(anchor_ids, pseudonym, db),
         )
 
@@ -133,6 +137,20 @@ async def get_context_for_query(
     if planning_block:
         return f"{planning_block}\n\n{base}" if base else planning_block
     return base
+
+
+async def _conversation_grade(db: AsyncSession, chat_id: UUID | None) -> int | None:
+    """Jahrgang der Konversation über ihre Unterrichtsgruppe — sonst ``None``."""
+    if chat_id is None:
+        return None
+    conv = await db.get(Conversation, chat_id)
+    if conv is None or not isinstance(conv.group_id, int):
+        return None
+
+    # Lokaler Import vermeidet eine Modul-Zyklus-Abhängigkeit context ↔ planning.
+    from app.planning.curriculum_resolver import group_grade
+
+    return await group_grade(db, conv.group_id)
 
 
 async def _group_label(db: AsyncSession, group_id: int) -> str:

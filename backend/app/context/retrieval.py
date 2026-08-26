@@ -6,6 +6,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.editions import aktive_bp_version
 from app.context.embedding import generate_embedding
 from app.db.models import ContextNode
 
@@ -48,16 +49,123 @@ scope AS (
 """
 
 
+# ── Editionsbewusstsein (zwei aktive BP-Fassungen gleichzeitig) ──────────────
+#
+# Solange eine neue Bildungsplan-Edition jahrgangsweise nach oben wächst, liegen
+# dieselben Kompetenzen doppelt im Speicher — in der alten und der neuen Fassung,
+# textlich oft nur in Nuancen verschieden. Ohne Gegenmaßnahme belegen beide je
+# einen der top_k-Plätze und verdrängen anderes.
+#
+# Zwei Stufen, absichtlich in dieser Reihenfolge:
+#   1. Filtern, wo ein Jahrgang bekannt ist — dann entscheidet der Fahrplan,
+#      welche Fassung gilt (fachweise, inkl. Inhalts-Fallback).
+#   2. Zusammenfassen, was danach noch doppelt ist — greift auch im freien Chat
+#      ohne Gruppenbezug, wählt aber nur nach Ähnlichkeit.
+
+# Nummernträger je Knotentyp: IK/PK führen 'kompetenz_nr', Leitidee/PK-Gruppe 'nr'.
+_NR_KEYS = ("kompetenz_nr", "nr")
+
+# Überhang beim Holen: Filter und Zusammenfassung entfernen Treffer, deshalb wird
+# ein Vielfaches von top_k geladen und erst danach gekürzt.
+_KANDIDATEN_FAKTOR = 3
+
+
+def _fassungs_schluessel(node: ContextNode) -> tuple | None:
+    """Identität einer BP-Kompetenz **über Fassungen hinweg**: Fach, Typ, Nummer.
+
+    ``None`` für alles ohne Nummer (Operatoren, Fachpläne, Nutzerknoten) und für
+    unversionierte Knoten — die werden nie zusammengefasst. Die Nummer genügt als
+    Schlüssel: Sie ist je Fach und Knotentyp innerhalb einer Fassung eindeutig,
+    das Stufenband steckt bereits in ihr.
+    """
+    if not node.bp_version or node.subject_id is None:
+        return None
+    meta = node.metadata_ or {}
+    nr = next((meta[k] for k in _NR_KEYS if meta.get(k)), None)
+    return (node.subject_id, node.content_type, nr) if nr else None
+
+
+async def _frontier_je_fach(
+    db: AsyncSession, subject_ids: set[int], grade: int
+) -> dict[int, str]:
+    """{subject_id: geltende bp_version} für diese Stufe im laufenden Schuljahr.
+
+    Fächer ohne bestimmbare Fassung fehlen im Ergebnis — für sie wird nicht
+    gefiltert. Der Editionsbestand kommt je Fach aus der DB, damit der
+    Inhalts-Fallback greift (neue Edition laut Fahrplan in Kraft, aber für dieses
+    Fach noch nicht importiert → vorige Edition gilt weiter).
+    """
+    if not subject_ids:
+        return {}
+
+    rows = await db.execute(
+        sa.select(ContextNode.subject_id, ContextNode.bp_version)
+        .where(
+            ContextNode.subject_id.in_(subject_ids),
+            ContextNode.status == "active",
+            ContextNode.bp_version != "",
+        )
+        .distinct()
+    )
+    bestand: dict[int, set[str]] = {}
+    for subject_id, bp_version in rows.all():
+        bestand.setdefault(subject_id, set()).add(bp_version)
+
+    frontier: dict[int, str] = {}
+    for subject_id, verfuegbar in bestand.items():
+        gilt = aktive_bp_version(grade, verfuegbar)
+        if gilt:
+            frontier[subject_id] = gilt
+    return frontier
+
+
+def _filtere_auf_frontier(
+    nodes: list[ContextNode], frontier: dict[int, str]
+) -> list[ContextNode]:
+    """Nur die geltende Fassung behalten — unversionierte Knoten bleiben immer.
+
+    Fächer ohne Eintrag in ``frontier`` werden nicht gefiltert; sonst bliebe von
+    einem Fach, dessen Fassung sich nicht bestimmen lässt, gar nichts übrig.
+    """
+    return [
+        n
+        for n in nodes
+        if not n.bp_version or frontier.get(n.subject_id) in (None, n.bp_version)
+    ]
+
+
+def _fasse_fassungen_zusammen(nodes: list[ContextNode]) -> list[ContextNode]:
+    """Je Kompetenz nur den bestbewerteten Treffer behalten (Reihenfolge bleibt)."""
+    gesehen: set[tuple] = set()
+    behalten: list[ContextNode] = []
+    for node in nodes:
+        schluessel = _fassungs_schluessel(node)
+        if schluessel is None:
+            behalten.append(node)
+            continue
+        if schluessel in gesehen:
+            continue
+        gesehen.add(schluessel)
+        behalten.append(node)
+    return behalten
+
+
 async def get_semantic_context(
     anchor_ids: list[UUID],
     query_text: str,
     pseudonym: str,
     db: AsyncSession,
     top_k: int = 10,
+    grade: int | None = None,
 ) -> list[ContextNode]:
     """Semantische Suche im durch anchor_ids definierten Scope-Subgraphen.
 
     Gibt leere Liste zurueck wenn keine Anker oder kein Embedding vorhanden.
+
+    ``grade`` = Jahrgangsstufe des Fragenden, falls ableitbar (Konversation mit
+    Gruppenbezug). Ist sie bekannt, bleibt je Fach nur die für diese Stufe
+    geltende BP-Fassung übrig; sonst werden Fassungs-Dubletten derselben
+    Kompetenz auf den ähnlichsten Treffer reduziert.
     """
     if not anchor_ids:
         return []
@@ -79,6 +187,7 @@ async def get_semantic_context(
                n.read_scope_group_id, n.write_scope_group_id,
                n.assistant_id, n.status, n.valid_until,
                n.archived_at, n.schuljahr,
+               n.subject_id, n.min_grade, n.max_grade, n.niveau, n.bp_version,
                n.created_at, n.updated_at
         FROM context_nodes n
         WHERE n.id IN (SELECT id FROM scope)
@@ -89,7 +198,7 @@ async def get_semantic_context(
               OR (n.read_scope = 'private' AND n.owner_pseudonym = :pseudonym)
           )
         ORDER BY n.embedding <=> CAST(:embedding AS vector)
-        LIMIT :top_k
+        LIMIT :fetch_k
         """
     )
 
@@ -99,7 +208,7 @@ async def get_semantic_context(
             "anchor_ids": anchor_id_strs,
             "pseudonym": pseudonym,
             "embedding": embedding_str,
-            "top_k": top_k,
+            "fetch_k": top_k * _KANDIDATEN_FAKTOR,
         },
     )
     rows = result.mappings().all()
@@ -110,7 +219,12 @@ async def get_semantic_context(
         if 'metadata' in row_dict:
             row_dict['metadata_'] = row_dict.pop('metadata')
         nodes.append(ContextNode(**row_dict))
-    return nodes
+
+    if grade is not None:
+        faecher = {n.subject_id for n in nodes if n.bp_version and n.subject_id}
+        nodes = _filtere_auf_frontier(nodes, await _frontier_je_fach(db, faecher, grade))
+
+    return _fasse_fassungen_zusammen(nodes)[:top_k]
 
 
 async def get_engagement_context(

@@ -20,7 +20,8 @@ def unit_vec(pos: int, dim: int | None = None) -> list[float]:
 
 
 def insert_node_sync(db_url: str, *, content_type: str, title: str, content: str,
-                      metadata: dict, embedding: list[float] | None = None) -> str:
+                      metadata: dict, embedding: list[float] | None = None,
+                      subject_id: int | None = None, bp_version: str = "") -> str:
     """Legt einen aktiven Knoten an, gibt seine UUID als String zurueck."""
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     node_id = str(_uuid.uuid4())
@@ -29,9 +30,11 @@ def insert_node_sync(db_url: str, *, content_type: str, title: str, content: str
         cur.execute("""
             INSERT INTO context_nodes
               (id, category, content_type, title, content, metadata,
-               read_scope, write_scope, status)
-            VALUES (%s, 'knowledge', %s, %s, %s, %s, 'global', 'global', 'active')
-        """, (node_id, content_type, title, content, json.dumps(metadata)))
+               read_scope, write_scope, status, subject_id, bp_version)
+            VALUES (%s, 'knowledge', %s, %s, %s, %s, 'global', 'global', 'active',
+                    %s, %s)
+        """, (node_id, content_type, title, content, json.dumps(metadata),
+              subject_id, bp_version))
         if emb_str:
             cur.execute(
                 f"UPDATE context_nodes SET embedding = '{emb_str}'::vector WHERE id = %s",
@@ -673,6 +676,185 @@ class TestSemanticSearch:
         assert node1 in result_ids
         assert anchor2 not in result_ids
         assert node2 not in result_ids
+
+
+# -----------------------------------------------------------------------------
+
+def insert_subject_sync(db_url: str, *, subject_id: int, slug: str,
+                        fach_code: str) -> int:
+    """Legt ein Fach an (idempotent) — noetig als FK-Ziel fuer context_nodes."""
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO subjects (id, slug, name, fach_code)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (subject_id, slug, slug.capitalize(), fach_code))
+    conn.commit()
+    conn.close()
+    return subject_id
+
+
+class TestSemanticSearchEditionen:
+    """Semantische Suche bei zwei gleichzeitig aktiven BP-Fassungen.
+
+    Waehrend eine neue Edition jahrgangsweise nach oben waechst, liegt dieselbe
+    Kompetenz doppelt im Speicher. Ohne Gegenmassnahme belegen beide Fassungen je
+    einen top_k-Platz — die Texte unterscheiden sich oft nur in Nuancen.
+    """
+
+    def _zwei_fassungen(self, db_url):
+        """Anker + dieselbe IK-Kompetenz 3.1.1(1) in V2 und V3.
+
+        Das V2-Embedding liegt naeher an der Suchanfrage — so faellt auf, wenn
+        statt des Fahrplans die blosse Aehnlichkeit entscheidet.
+        """
+        subject_id = insert_subject_sync(
+            db_url, subject_id=9401, slug="mathematik-ed", fach_code="MED"
+        )
+        anker = insert_node_sync(
+            db_url, content_type="fachplan", title="Fachplan",
+            content="Inhalt", metadata={}, embedding=unit_vec(0),
+            subject_id=subject_id,
+        )
+        v2 = insert_node_sync(
+            db_url, content_type="ik_kompetenz", title="IK 3.1.1(1) V2",
+            content="Zahlen und Operationen, alte Fassung",
+            metadata={"kompetenz_nr": "3.1.1(1)"}, embedding=unit_vec(1),
+            subject_id=subject_id, bp_version="2016.V2",
+        )
+        v3 = insert_node_sync(
+            db_url, content_type="ik_kompetenz", title="IK 3.1.1(1) V3",
+            content="Zahlen und Operationen, neue Fassung",
+            metadata={"kompetenz_nr": "3.1.1(1)"}, embedding=unit_vec(2),
+            subject_id=subject_id, bp_version="2016.V3",
+        )
+        for node in (v2, v3):
+            insert_edge_sync(db_url, from_id=node, to_id=anker, relation="part_of")
+        return anker, v2, v3
+
+    async def _suche(self, db_session, anker, *, grade=None, top_k=10, nahe=1):
+        """`nahe` = Position des Suchvektors: 1 trifft V2, 2 trifft V3."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.context.retrieval import get_semantic_context
+
+        with patch(
+            'app.context.retrieval.generate_embedding',
+            new_callable=AsyncMock,
+            return_value=unit_vec(nahe),
+        ), patch(
+            'app.context.editions.aktuelles_schuljahr_start',
+            return_value=2026,          # Schuljahr 2026/27: V3 gilt fuer Klasse 5-7
+        ):
+            return await get_semantic_context(
+                anchor_ids=[anker], query_text="Zahlen", pseudonym="test",
+                db=db_session, top_k=top_k, grade=grade,
+            )
+
+    @pytest.mark.asyncio
+    async def test_jahrgang_waehlt_die_geltende_fassung(self, db_session, db_url):
+        """Klasse 5 wird nach V3 unterrichtet -> nur die V3-Fassung im Ergebnis.
+
+        Und zwar entgegen der Aehnlichkeit: V2 liegt naeher an der Anfrage.
+        """
+        anker, v2, v3 = self._zwei_fassungen(db_url)
+
+        results = await self._suche(db_session, anker, grade=5)
+
+        ids = [str(r.id) for r in results]
+        assert v3 in ids
+        assert v2 not in ids
+
+    @pytest.mark.asyncio
+    async def test_hoehere_klasse_bleibt_bei_der_alten_fassung(self, db_session, db_url):
+        """Klasse 10 hat die V3-Frontier 2026/27 noch nicht erreicht -> V2.
+
+        Der Suchvektor trifft hier V3, damit nur der Fahrplan das Ergebnis
+        erklaeren kann — eine blosse Zusammenfassung wuerde V3 behalten.
+        """
+        anker, v2, v3 = self._zwei_fassungen(db_url)
+
+        results = await self._suche(db_session, anker, grade=10, nahe=2)
+
+        ids = [str(r.id) for r in results]
+        assert v2 in ids
+        assert v3 not in ids
+
+    @pytest.mark.asyncio
+    async def test_ohne_jahrgang_bleibt_nur_ein_treffer(self, db_session, db_url):
+        """Freier Chat ohne Gruppenbezug: zusammenfassen statt filtern.
+
+        Ohne Fahrplan-Anhalt entscheidet die Aehnlichkeit — hier also V2.
+        """
+        anker, v2, v3 = self._zwei_fassungen(db_url)
+
+        results = await self._suche(db_session, anker, grade=None)
+
+        ids = [str(r.id) for r in results]
+        assert v2 in ids
+        assert v3 not in ids
+
+    @pytest.mark.asyncio
+    async def test_verschiedene_nummern_bleiben_beide(self, db_session, db_url):
+        """Nur echte Fassungs-Dubletten verschwinden, nicht benachbarte Kompetenzen."""
+        anker, v2, _ = self._zwei_fassungen(db_url)
+        andere = insert_node_sync(
+            db_url, content_type="ik_kompetenz", title="IK 3.1.2(1) V2",
+            content="Groessen, alte Fassung",
+            metadata={"kompetenz_nr": "3.1.2(1)"}, embedding=unit_vec(3),
+            subject_id=9401, bp_version="2016.V2",
+        )
+        insert_edge_sync(db_url, from_id=andere, to_id=anker, relation="part_of")
+
+        results = await self._suche(db_session, anker, grade=None)
+
+        ids = [str(r.id) for r in results]
+        assert v2 in ids
+        assert andere in ids
+
+    @pytest.mark.asyncio
+    async def test_unversionierte_knoten_bleiben_unberuehrt(self, db_session, db_url):
+        """Curricula, Nutzerknoten & Co. haben keine bp_version — nie zusammenfassen.
+
+        Zwei davon teilen sich hier sogar eine Nummer; beide muessen bleiben.
+        """
+        anker, _, _ = self._zwei_fassungen(db_url)
+        eigene = [
+            insert_node_sync(
+                db_url, content_type="kapitel", title=f"Kapitel {i}",
+                content="Eigener Inhalt", metadata={"nr": "3.1.1"},
+                embedding=unit_vec(10 + i), subject_id=9401,
+            )
+            for i in (1, 2)
+        ]
+        for node in eigene:
+            insert_edge_sync(db_url, from_id=node, to_id=anker, relation="part_of")
+
+        results = await self._suche(db_session, anker, grade=5)
+
+        ids = {str(r.id) for r in results}
+        assert set(eigene) <= ids
+
+    @pytest.mark.asyncio
+    async def test_top_k_wird_eingehalten(self, db_session, db_url):
+        """Der Ueberhang beim Holen darf top_k nicht aufweichen.
+
+        Geladen wird ein Vielfaches von top_k; gekuerzt wird erst nach Filter
+        und Zusammenfassung. Acht Kandidaten bei top_k=2 zeigen das.
+        """
+        anker, _, _ = self._zwei_fassungen(db_url)
+        for i in range(5):
+            weiterer = insert_node_sync(
+                db_url, content_type="ik_kompetenz", title=f"IK 3.2.{i}(1)",
+                content="Weiterer Inhalt", metadata={"kompetenz_nr": f"3.2.{i}(1)"},
+                embedding=unit_vec(20 + i), subject_id=9401, bp_version="2016.V2",
+            )
+            insert_edge_sync(db_url, from_id=weiterer, to_id=anker, relation="part_of")
+
+        results = await self._suche(db_session, anker, grade=None, top_k=2)
+
+        assert len(results) == 2
 
 
 # -----------------------------------------------------------------------------

@@ -141,6 +141,13 @@ def seed_test_assistant(db_url, run_migrations):
                'active', 'all', 'all', %s, 'teacher')
             ON CONFLICT (id) DO UPDATE SET created_by = EXCLUDED.created_by
         """, (TEACHER1_PSEUDO,))
+        # Sequenz nachziehen: Der Seed setzt die ID explizit und laesst die
+        # Sequenz sonst auf 1 stehen — ein spaeteres INSERT ohne ID kollidiert
+        # dann mit genau diesem Datensatz.
+        cur.execute("""
+            SELECT setval(pg_get_serial_sequence('assistants', 'id'),
+                          (SELECT MAX(id) FROM assistants))
+        """)
     conn.commit()
     conn.close()
     return 1
@@ -156,6 +163,10 @@ def seed_test_group(db_url, run_migrations):
             INSERT INTO groups (id, name, slug, type)
             VALUES (1, 'Test-Gruppe', 'test-gruppe', 'teaching_group')
             ON CONFLICT (id) DO NOTHING
+        """)
+        cur.execute("""
+            SELECT setval(pg_get_serial_sequence('groups', 'id'),
+                          (SELECT MAX(id) FROM groups))
         """)
     conn.commit()
     conn.close()

@@ -452,6 +452,11 @@ Was daraus folgt:
   Kompetenzen mit gleicher Nummer und verschiedenem Text nebeneinander. Dort blendet die
   Oberfläche die Fassung ein — aber nur bei tatsächlicher Mehrdeutigkeit, nicht an jedem
   Treffer.
+- **Der Chat sucht editionsbewusst.** Gehört die Unterhaltung zu einer Unterrichtsgruppe,
+  ergibt sich daraus die Klassenstufe, und in den Kontext gelangt je Fach nur die dafür
+  geltende Fassung. Fehlt der Gruppenbezug — etwa im freien Chat —, bleibt von zwei
+  Fassungen derselben Kompetenz die inhaltlich näherliegende übrig. So belegt dieselbe
+  Kompetenz nicht zwei Plätze und verdrängt anderes aus dem Kontext.
 
 ## Rollback
 

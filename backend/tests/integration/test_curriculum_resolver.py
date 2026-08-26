@@ -146,3 +146,111 @@ async def test_verknuepfte_ue_erscheint_am_kapitel(db_session):
     cur5_res = next(c for c in res.curricula if c.titel == "Mathe Kl. 5")
     target = next(k for k in cur5_res.kapitel if k.id == kapitel_id)
     assert "Meine UE" in target.ues
+
+
+# ── group_grade: der Jahrgang allein, ohne Curriculum-Auflösung ──────────────
+# Einstieg für die editionsbewusste Kontextsuche: Der Jahrgang entscheidet dort,
+# welche BP-Fassung gilt.
+
+@pytest.mark.asyncio
+async def test_group_grade_liest_den_jahrgang_der_klassengruppe(db_session):
+    from app.planning.curriculum_resolver import group_grade
+
+    await _seed(db_session)
+
+    assert await group_grade(db_session, 920) == 5
+    assert await group_grade(db_session, 921) == 6
+
+
+@pytest.mark.asyncio
+async def test_group_grade_ohne_klassenbezug_ist_none(db_session):
+    """Oberstufenkurs ohne Klassengruppe — der Jahrgang bleibt unbekannt."""
+    from app.planning.curriculum_resolver import group_grade
+
+    await _seed(db_session)
+
+    assert await group_grade(db_session, 922) is None
+
+
+@pytest.mark.asyncio
+async def test_group_grade_unbekannte_gruppe_ist_none(db_session):
+    from app.planning.curriculum_resolver import group_grade
+
+    assert await group_grade(db_session, 99999) is None
+
+
+@pytest.mark.asyncio
+async def test_conversation_grade_folgt_der_unterrichtsgruppe(db_session):
+    """Konversation mit Gruppenbezug -> Jahrgang; ohne Bezug -> None."""
+    from app.context.service import _conversation_grade
+    from app.db.models import Conversation
+
+    await _seed(db_session)
+    mit_gruppe = Conversation(pseudonym="p1", model_used="gpt-4o-mini", group_id=921)
+    ohne_gruppe = Conversation(pseudonym="p1", model_used="gpt-4o-mini")
+    db_session.add_all([mit_gruppe, ohne_gruppe])
+    await db_session.flush()
+
+    assert await _conversation_grade(db_session, mit_gruppe.id) == 6
+    assert await _conversation_grade(db_session, ohne_gruppe.id) is None
+    assert await _conversation_grade(db_session, None) is None
+
+
+@pytest.mark.asyncio
+async def test_kontext_string_filtert_nach_der_fassung_der_gruppe(db_session):
+    """End-to-End über `get_context_for_query`: nur die geltende Fassung im Kontext.
+
+    Deckt zugleich den Pfad ab, auf dem die Fassungs-Abfrage **innerhalb** des
+    `asyncio.gather` mit dem Engagement-Retrieval auf derselben Session läuft.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from app.config import settings
+    from app.context.service import get_context_for_query
+    from app.db.models import Assistant, AssistantContextAnchor, Conversation
+
+    await _seed(db_session)
+
+    def vec(pos):
+        v = [0.0] * settings.embedding_dimensions
+        v[pos] = 1.0
+        return v
+
+    anker = ContextNode(category="knowledge", content_type="fachplan",
+                        title="Fachplan", subject_id=SUBJECT_ID, embedding=vec(0))
+    db_session.add(anker)
+    await db_session.flush()
+    for bp_version, pos in (("2016.V2", 1), ("2016.V3", 2)):
+        node = ContextNode(
+            category="knowledge", content_type="ik_kompetenz",
+            title=f"IK 3.1.1(1) {bp_version}",
+            content=f"Kennzeichen der Fassung {bp_version}",
+            subject_id=SUBJECT_ID, bp_version=bp_version,
+            metadata_={"kompetenz_nr": "3.1.1(1)"}, embedding=vec(pos),
+        )
+        db_session.add(node)
+        await db_session.flush()
+        db_session.add(ContextEdge(from_node_id=node.id, to_node_id=anker.id,
+                                   relation="part_of"))
+
+    assistant = Assistant(name="Mathe-Helfer", system_prompt="Hilf.",
+                          model="gpt-4o-mini", status="active")
+    db_session.add(assistant)
+    await db_session.flush()
+    db_session.add(AssistantContextAnchor(assistant_id=assistant.id, node_id=anker.id,
+                                          role="retrieval_scope"))
+    # Gruppe 920 haengt an Klasse 5a -> Jahrgang 5 -> im SJ 2026/27 gilt V3.
+    conv = Conversation(pseudonym="p1", model_used="gpt-4o-mini", group_id=920)
+    db_session.add(conv)
+    await db_session.flush()
+
+    with patch("app.context.retrieval.generate_embedding",
+               new=AsyncMock(return_value=vec(1))), \
+         patch("app.context.editions.aktuelles_schuljahr_start", return_value=2026):
+        kontext = await get_context_for_query(
+            assistant_id=assistant.id, pseudonym="p1",
+            query_text="Zahlen", chat_id=conv.id, db=db_session,
+        )
+
+    assert "Kennzeichen der Fassung 2016.V3" in kontext
+    assert "2016.V2" not in kontext
