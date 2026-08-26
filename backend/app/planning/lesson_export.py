@@ -193,13 +193,30 @@ async def export_pdf(data: LessonExport) -> bytes:
     beschreibungen = [await render_markdown_inline_for_pdf(p.beschreibung or "") for p in data.phasen]
     stundenziel_html = await render_markdown_inline_for_pdf(data.stundenziel or "")
 
+    # Kompetenzen: Meist steht die Nummer (`code`) da, aber ohne sie fällt die Anzeige auf
+    # den Titel zurück — und Bildungsplan-Titel tragen Formeln (`… die Zahl \(\pi\) …`).
+    # Deshalb derselbe Prärenderer. Der Markdown-Export bleibt bewusst bei der TeX-Quelle:
+    # Dort ist sie das richtige Format, nicht eingebettetes SVG.
+    refs_html = [
+        {
+            "html": await render_markdown_inline_for_pdf(
+                str(r.get("code") or r.get("titel") or "")
+            ),
+            "partiell": bool(r.get("partiell")),
+        }
+        for r in data.refs
+    ]
+
     env = Environment(
         loader=FileSystemLoader(str(_TEMPLATES_DIR)),
         autoescape=select_autoescape(["html"]),
     )
     template = env.get_template("lesson.html")
     html_str = template.render(
-        data=data, beschreibungen=beschreibungen, stundenziel_html=stundenziel_html
+        data=data,
+        beschreibungen=beschreibungen,
+        stundenziel_html=stundenziel_html,
+        refs_html=refs_html,
     )
     return weasyprint.HTML(string=html_str, base_url=str(_TEMPLATES_DIR)).write_pdf()
 

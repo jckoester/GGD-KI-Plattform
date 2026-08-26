@@ -200,3 +200,72 @@ async def test_export_pdf_returns_bytes():
     result = await export_pdf(_make_export())
     assert isinstance(result, bytes)
     assert result[:4] == b"%PDF"
+
+
+class TestFormelnImStundenPdf:
+    """Kompetenztitel koennen Formeln tragen (`… die Zahl \\(\\pi\\) …`).
+
+    Angezeigt wird sonst `r.code`; faellt die Anzeige auf den Titel zurueck, stuende
+    ohne Prärendern die TeX-Quelle im PDF.
+    """
+
+    async def _pdf_html(self, export) -> str:
+        """Erzeugt das PDF und gibt die HTML zurueck, die weasyprint bekommen haette."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from app.planning.lesson_export import export_pdf
+
+        gefangen = {}
+
+        def _html(string=None, base_url=None):
+            gefangen["html"] = string
+            doc = MagicMock()
+            doc.write_pdf = MagicMock(return_value=b"%PDF-fake")
+            return doc
+
+        with patch("weasyprint.HTML", new=_html), patch(
+            "app.render.sidecar.render_math",
+            new=AsyncMock(return_value='<svg class="mj"><path d="M0"/></svg>'),
+        ):
+            await export_pdf(export)
+        return gefangen["html"]
+
+    @pytest.mark.asyncio
+    async def test_titel_mit_formel_wird_gerendert(self):
+        html = await self._pdf_html(_make_export(refs=[
+            # Ohne `code` faellt die Anzeige auf den Titel zurueck — der reale Fall.
+            {"typ": "ik", "code": "", "titel": r"3.1.2(10) die Zahl \(\pi\) erklären",
+             "partiell": False},
+        ]))
+        assert '<svg class="mj">' in html
+        assert "\\(" not in html
+        assert "erklären" in html
+
+    @pytest.mark.asyncio
+    async def test_code_hat_weiterhin_vorrang(self):
+        html = await self._pdf_html(_make_export(refs=[
+            {"typ": "ik", "code": "3.1.2", "titel": "Langer Titel", "partiell": False},
+        ]))
+        assert "3.1.2" in html
+        assert "Langer Titel" not in html
+
+    @pytest.mark.asyncio
+    async def test_partiell_marker_bleibt(self):
+        html = await self._pdf_html(_make_export(refs=[
+            {"typ": "pk", "code": "K1", "titel": "Kommunikation", "partiell": True},
+        ]))
+        assert "[…]" in html
+
+    @pytest.mark.asyncio
+    async def test_titel_wird_escapet(self):
+        """Das Template gibt mit `| safe` aus."""
+        html = await self._pdf_html(_make_export(refs=[
+            {"typ": "ik", "code": "", "titel": "<script>alert(1)</script>", "partiell": False},
+        ]))
+        assert "<script>alert(1)</script>" not in html
+        assert "&lt;script&gt;" in html
+
+    @pytest.mark.asyncio
+    async def test_ohne_kompetenzen_kein_block(self):
+        html = await self._pdf_html(_make_export(refs=[]))
+        assert "Kompetenzen:" not in html

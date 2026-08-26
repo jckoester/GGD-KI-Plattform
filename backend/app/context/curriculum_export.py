@@ -316,7 +316,7 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
       (Phase 17, D5): `$…$`/```circuitikz/```plot → eingebettetes SVG
     - Hinweise/Material als vorgeparste Segment-Listen
     """
-    from app.render.export import render_markdown_for_pdf
+    from app.render.export import render_markdown_for_pdf, render_markdown_inline_for_pdf
 
     kapitel_out = []
     for kap in tree.get("kapitel", []):
@@ -329,23 +329,32 @@ async def _build_pdf_kapitel(tree: dict) -> list[dict]:
 
             eintraege_out = []
             for e in ls_meta.get("eintraege", []):
+                # Kompetenztitel tragen im Bildungsplan Formeln (`… die Zahl \(\pi\) …`),
+                # deshalb durch denselben Prärenderer wie die Konkretisierung — sonst
+                # steht die TeX-Quelle im PDF.
                 ik_items = []
                 for ik in (e.get("ik") or []):
                     if isinstance(ik, dict):
                         text = ik_title_by_id.get(ik.get("node_id")) or ik.get("nr") or ""
                         if text:
-                            ik_items.append({"text": text, "partiell": bool(ik.get("partiell"))})
+                            ik_items.append({
+                                "html": await render_markdown_inline_for_pdf(text),
+                                "partiell": bool(ik.get("partiell")),
+                            })
                     elif isinstance(ik, str) and ik:
-                        ik_items.append({"text": ik, "partiell": False})
+                        ik_items.append({
+                            "html": await render_markdown_inline_for_pdf(ik),
+                            "partiell": False,
+                        })
 
                 pk_items = []
                 for pk in (e.get("pk") or []):
                     if isinstance(pk, dict):
                         text = pk_title_by_id.get(pk.get("node_id")) or pk.get("pk_id") or ""
                         if text:
-                            pk_items.append({"text": text})
+                            pk_items.append({"html": await render_markdown_inline_for_pdf(text)})
                     elif isinstance(pk, str) and pk:
-                        pk_items.append({"text": pk})
+                        pk_items.append({"html": await render_markdown_inline_for_pdf(pk)})
 
                 eintraege_out.append({
                     "ik_items": ik_items,

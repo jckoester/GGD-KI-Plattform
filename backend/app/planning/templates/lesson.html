@@ -99,11 +99,11 @@
 </table>
 {% endif %}
 
-{% if data.refs %}
+{% if refs_html %}
 <div class="kompetenzen">
   <strong>Kompetenzen:</strong>
-  {% for r in data.refs %}
-    {{ r.code or r.titel }}{% if r.partiell %}[…]{% endif %}{% if not loop.last %}, {% endif %}
+  {% for r in refs_html %}
+    {{ r.html | safe }}{% if r.partiell %}[…]{% endif %}{% if not loop.last %}, {% endif %}
   {% endfor %}
 </div>
 {% endif %}

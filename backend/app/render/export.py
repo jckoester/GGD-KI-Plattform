@@ -106,11 +106,44 @@ async def _render_one(kind: str, content: str, display: bool) -> str:
 
 
 # ── markdown-it mit dollarmath + Render-Regeln, die aus env['_render_map'] lesen ──
+# TeX-Klammer-Notation `\(…\)` / `\[…\]`.
+#
+# `dollarmath` kennt nur `$…$`. Der Bildungsplan schreibt seine Formeln aber in
+# Klammer-Notation (`… die Zahl \(\pi\) als Verhältnis …`), und ohne eigene Regel passiert
+# das Schlimmstmögliche: Nicht nur bleibt die Formel ungerendert — die CommonMark-Escape-
+# Regel frisst den Backslash, und im PDF steht `(\pi)`. Die Regel muss deshalb **vor**
+# `escape` laufen.
+#
+# Das Frontend (`markdown.js`) versteht beide Notationen; hier wird gleichgezogen.
+_KLAMMER_MATHE = (
+    ("\\(", "\\)", "math_inline", False),
+    ("\\[", "\\]", "math_inline_double", True),
+)
+
+
+def _klammer_mathe_regel(state, silent: bool) -> bool:
+    src, pos = state.src, state.pos
+    for auf, zu, token_typ, _display in _KLAMMER_MATHE:
+        if not src.startswith(auf, pos):
+            continue
+        ende = src.find(zu, pos + len(auf))
+        if ende < 0:
+            return False  # unabgeschlossen → gewöhnlicher Text
+        if not silent:
+            token = state.push(token_typ, "math", 0)
+            token.content = src[pos + len(auf):ende]
+            token.markup = auf
+        state.pos = ende + len(zu)
+        return True
+    return False
+
+
 def _build_md() -> MarkdownIt:
     # commonmark + GFM-Tabellen/Strikethrough — nähert den PDF-Export an die Vorschau (marked,
     # GFM) an (Phase-19-Parität). Zusätzlich von curriculum-/lesson-PDF genutzt (additiv, sicher).
     md = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
     md.use(dollarmath_plugin, double_inline=True)
+    md.inline.ruler.before("escape", "klammer_mathe", _klammer_mathe_regel)
 
     def _from_map(self, tokens, idx, options, env):
         return env.get("_render_map", {}).get(id(tokens[idx]), "")

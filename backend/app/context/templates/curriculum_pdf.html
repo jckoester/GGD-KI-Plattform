@@ -165,7 +165,7 @@
     <td>
       {% if e.pk_items %}
       <ul class="komp-list">
-        {% for pk in e.pk_items %}<li>{{ pk.text }}</li>{% endfor %}
+        {% for pk in e.pk_items %}<li>{{ pk.html | safe }}</li>{% endfor %}
       </ul>
       {% endif %}
     </td>
@@ -175,7 +175,7 @@
       {% if e.ik_items %}
       <ul class="komp-list">
         {% for ik in e.ik_items %}
-        <li class="{{ 'ik-partiell' if ik.partiell else '' }}">{{ ik.text }}</li>
+        <li class="{{ 'ik-partiell' if ik.partiell else '' }}">{{ ik.html | safe }}</li>
         {% endfor %}
       </ul>
       {% endif %}
