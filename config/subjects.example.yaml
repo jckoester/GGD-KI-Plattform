@@ -56,53 +56,127 @@ bildungsplan_default: # gilt für alle Fächer ohne eigene Fach-Edition (bildung
 subjects:
   - slug: mathematik
     name: Mathematik
-    untis_codes: [M]
+    untis_codes: [M,MD]
     icon: square-radical
     color: "#3b82f6"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 10
     fach_code: M
-    # bildungsplan_suffix: ".V2"   # optional: dieses Fach fest auf EINE Edition pinnen.
-    #   Ohne Angabe greift der globale `editionen`-Fahrplan (oben) schuljahres-/stufenabhängig.
+    bildungsplan_suffix: ".V3"
+
 
   - slug: deutsch
     name: Deutsch
-    untis_codes: [D]
+    untis_codes: [D, DD]
     icon: book-open
     color: "#ef4444"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 20
-    # kein fach_code → BP-Import überspringt Deutsch
+    fach_code: D
+    bildungsplan_suffix: ".V3"
 
   - slug: englisch
     name: Englisch
-    untis_codes: [E]
+    untis_codes: [E, ED]
     icon: globe
     color: "#10b981"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 30
+    # BP nur als PDF (keine HTML-Fassung) → Import über scripts/pdf_import/ statt HTML-Scraper.
+    fach_code: E1 # 1. Fremdsprache
+    #bildungsplan_pdf_url: "https://bildungsplaene-bw.de/site/bildungsplan-rebrush2024/get/documents_E-732620168/lsbw/Bildungsplaene/BP-Fremdsprachen-V2/BP2016BW_ALLG_GYM_E1.V2.pdf"
+    bildungsplan_suffix: ".V3"
 
+  # 2. Fremdsprache
+  - slug: franzoesisch
+    name: Französisch
+    untis_codes: [F]
+    icon: globe
+    color: "#10b981"
+    min_grade: 6
+    max_grade: 12
+    sort_order: 31
+    # BP nur als PDF → Import über scripts/pdf_import/.
+    fach_code: F2 # 2. Fremdsprache
+    bildungsplan_suffix: ".V3"
+    #bildungsplan_pdf_url: "https://bildungsplaene-bw.de/site/bildungsplan-rebrush2024/get/documents_E-1869942812/lsbw/Bildungsplaene/BP-Fremdsprachen-V2/BP2016BW_ALLG_GYM_F2.V2.pdf"
+
+  - slug: latein
+    name: Latein
+    untis_codes: [L]
+    icon: landmark
+    color: "#10b981"
+    min_grade: 5
+    max_grade: 12
+    sort_order: 32
+    fach_code: L2
+    bildungsplan_suffix: ".V3"
+
+      # Profilfächer
+  - slug: spanisch
+    name: Spanisch
+    untis_codes: [SPA]
+    icon: globe
+    color: "#10b981"
+    fach_code: SPA3
+    min_grade: 8
+    max_grade: 12
+    bildungsplan_suffix: ".V3"
+
+  - slug: nwt
+    name: NwT
+    untis_codes: [NWT]
+    icon: circuit-board
+    color: "#0ea5e9"
+    min_grade: 8
+    max_grade: 12
+    sort_order: 150
+    fach_code: NWT
+
+  - slug: nwt-bf
+    name: NwT BF
+    untis_codes: [nwt]
+    icon: circuit-board
+    color: "#0ea5e9"
+    min_grade: 11
+    max_grade: 12
+    sort_order: 150
+    fach_code: NWTBFO
+    # AB Schukljahr 27/28 in Klasse 8
+    #  - slug: nit
+    #    name: NIT
+    #    icon: circuit-board
+    #    color: "#0284c7"
+    #    min_grade: 8
+    #    max_grade: 11
+    #    sort_order: 151
+    #    sso_aliases: [nwt]   # IServ: fs.nwt
+
+  # Naturwissenschaften
   - slug: physik
     name: Physik
     untis_codes: [PH]
     icon: atom
     color: "#8b5cf6"
     min_grade: 7
-    max_grade: 13
+    max_grade: 12
     sort_order: 40
+    fach_code: PH
+    bildungsplan_suffix: ".V3"
 
   - slug: chemie
     name: Chemie
     untis_codes: [CH]
     icon: flask-conical
     color: "#f59e0b"
-    min_grade: 7
-    max_grade: 13
+    min_grade: 8
+    max_grade: 12
     sort_order: 50
-    fach_code: CH # keine eigene Edition, Basisfassung für alle Stufen
+    fach_code: CH
+    bildungsplan_suffix: ".V3"
 
   - slug: biologie
     name: Biologie
@@ -110,17 +184,32 @@ subjects:
     icon: leaf
     color: "#22c55e"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 60
+    fach_code: BIO
+    bildungsplan_suffix: ".V3"
 
+  - slug: bnt
+    name: BNT
+    untis_codes: [BNT]
+    icon: leaf
+    color: "#22c55e"
+    min_grade: 5
+    max_grade: 6
+    sort_order: 60
+    fach_code: BNT
+
+    # Gesellschaftswissenschaften
   - slug: geschichte
     name: Geschichte
     untis_codes: [G]
-    icon: landmark
+    icon: scroll
     color: "#a78bfa"
     min_grade: 6
-    max_grade: 13
+    max_grade: 12
     sort_order: 70
+    fach_code: G
+    bildungsplan_suffix: ".V3"
 
   - slug: geographie
     name: Geographie
@@ -128,26 +217,70 @@ subjects:
     icon: map
     color: "#06b6d4"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 80
+    fach_code: GEO
+    bildungsplan_suffix: ".V3"
 
-  - slug: informatik
-    name: Informatik
-    untis_codes: [INF]
+  - slug: gemeinschaftskunde
+    name: Gemeinschaftskunde
+    untis_codes: [GK]
+    icon: chart-column
+    color: "#65a30d"
+    min_grade: 8
+    max_grade: 12
+    fach_code: GK
+    bildungsplan_suffix: ".V2"
+  # Fachschaft Wirtschaft (fs.wirtschaft) betreut zwei eigenständige Fächer mit je
+  # eigenem BP: WBS (Wirtschaft, Berufs- und Studienorientierung; Sek I) + Wirtschaft
+  # (Kursstufe). Wirtschaft direkt (Slug=wirtschaft), WBS per sso_aliases.
+  #
+  - slug: wbs
+    name: WBS
+    untis_codes: [WBS]
+    icon: trending-up
+    color: "#65a30d"
+    min_grade: 8
+    max_grade: 10
+    sort_order: 155
+    fach_code: WBS
+    sso_aliases: [wirtschaft] # IServ: fs.wirtschaft
+
+  - slug: wirtschaft
+    name: Wirtschaft
+    fach_code: WI
+    untis_codes: [WI]
+    icon: trending-up
+    color: "#4d7c0f"
+    min_grade: 11
+    max_grade: 12
+    sort_order: 160
+
+  # Fachschaft Informatik (fs.informatik) betreut ZWEI eigenständige Fächer mit
+  # je eigenem Bildungsplan: IuM (Sek I) + Informatik (Kursstufe). Beide werden über
+  # die Fachschaft aufgelöst — Informatik direkt (Slug=informatik), IuM per sso_aliases.
+  - slug: ium
+    name: IuM
+    untis_codes: [IUM]
     icon: code-2
     color: "#64748b"
-    min_grade: 7
-    max_grade: 13
-    sort_order: 90
+    min_grade: 5
+    max_grade: 10
+    sort_order: 88
+    sso_aliases: [informatik] # IServ: fs.informatik
 
-  - slug: kunst
-    name: Kunst
+    # KuMuTu
+  - slug: bildende-kunst
+    name: Bildende Kunst
     untis_codes: [BK]
     icon: palette
     color: "#ec4899"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 100
+    sso_aliases: [bildende.kunst] # IServ: fs.bildende.kunst
+    fach_code: BK
+    bildungsplan_suffix: ".V3"
 
   - slug: musik
     name: Musik
@@ -155,52 +288,100 @@ subjects:
     icon: music
     color: "#f97316"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 110
+    fach_code: MUS
+    bildungsplan_suffix: ".V3"
 
   - slug: sport
     name: Sport
-    # Mehrere Kürzel je Fach sind üblich: koedukativ, männlich, weiblich — dasselbe
-    # Fach, verschiedene Lerngruppen. Die Unterscheidung trägt der Gruppenname.
     untis_codes: [SP, SPM, SPW]
     icon: dumbbell
     color: "#14b8a6"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 120
+    fach_code: SPO
+    bildungsplan_suffix: ".V3"
 
-  - slug: religion
-    name: Religion
-    # An Schulen mit getrennten Konfessionen sind das mehrere Fächer mit je eigenem
-    # Kürzel (REV, RRK, RISL) — dann je Fach ein eigener Eintrag statt einer Liste.
-    untis_codes: [REL]
+  - slug: religion-ev
+    name: Evangelische Religion
     icon: sun
     color: "#fbbf24"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 130
-
+    sso_aliases: [religion.ev] # IServ: fs.religion.ev
+    fach_code: REV
+    bildungsplan_suffix: ".V3"
+  - slug: religion-kath
+    name: Katholische Religion
+    icon: sun
+    color: "#d97706"
+    min_grade: 5
+    max_grade: 12
+    sort_order: 131
+    sso_aliases: [religion.kath] # IServ: fs.religion.kath
+    fach_code: RRK
+    bildungsplan_suffix: ".V3"
+  # Vorbereitet für die künftige Fachschaft fs.religion.isl (Gruppe noch nicht angelegt).
+  - slug: religion-isl
+    name: Islamische Religion
+    icon: sun
+    color: "#0d9488"
+    min_grade: 5
+    max_grade: 12
+    sort_order: 132
+    sso_aliases: [religion.isl] # IServ: fs.religion.isl (künftig)
+    fach_code: RISL
   - slug: ethik
     name: Ethik
     untis_codes: [ET]
     icon: heart-handshake
     color: "#f43f5e"
     min_grade: 5
-    max_grade: 13
+    max_grade: 12
     sort_order: 140
+    fach_code: ETH
+    bildungsplan_suffix: ".V3"
+    # Wahlfächer
+  - slug: informatik
+    name: Informatik
+    untis_codes: [INF]
+    icon: code-2
+    color: "#475569"
+    min_grade: 11
+    max_grade: 12
+    sort_order: 90
+    fach_code: INFWFO
 
-  - slug: nwt
-    name: NwT
-    untis_codes: [NWT]
-    icon: microscope
-    color: "#0ea5e9"
-    min_grade: 8
-    max_grade: 10
-    sort_order: 150
+  - slug: lut
+    name: LuT
+    icon: theater
+    color: "#ef4444"
+    min_grade: 11
+    max_grade: 11
+    fach_code: LUT
+    sort_order: 999
 
+  - slug: psychologie
+    name: Psychologie
+    icon: sofa
+    color: "#ef4444"
+    min_grade: 11
+    max_grade: 11
+    fach_code: PSY
+    sort_order: 999
+
+  # Klassenleitungsstunde: kein Bildungsplan-Fach, aber mit eigenem, schulinternem
+  # Curriculum — deshalb ein reguläres Fach der Plattform und kein Sonderfall.
+  # Ohne fach_code: Es gibt keinen Landes-Bildungsplan, auf den sich Bezüge auflösen
+  # ließen; das Curriculum entsteht in der Plattform selbst.
   - slug: klassenleitung
     name: Klassenleitungsstunde
     untis_codes: [KLS]
+    icon: users-round
+    color: "#0891b2"
     min_grade: 5
     max_grade: 6
     sort_order: 900
