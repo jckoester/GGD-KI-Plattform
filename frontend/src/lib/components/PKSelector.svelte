@@ -11,6 +11,7 @@
     import { X, Search, Check, ChevronDown, ChevronRight } from 'lucide-svelte'
     import { getActiveBpVersion } from '$lib/api'
     import { editionLoadPlan } from '$lib/editions'
+    import { renderInlineMath } from '$lib/markdown.js'
 
     let { subjectId = null, grade = null, bpVersion = null, selected = $bindable([]), onchange = () => {} } = $props()
 
@@ -296,7 +297,7 @@
                             </div>
                             <div class="min-w-0 flex-1">
                                 <div class="font-medium text-light-tx dark:text-dark-tx">
-                                    {pk.title}
+                                    {@html renderInlineMath(pk.title)}
                                 </div>
                                 <div class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                                     {pkIdOf(pk)}
@@ -322,7 +323,7 @@
                                        flex items-center justify-between transition-colors"
                             >
                                 <span class="font-medium text-light-tx dark:text-dark-tx">
-                                    {gruppe.title}
+                                    {@html renderInlineMath(gruppe.title)}
                                 </span>
                                 {#if expandedGruppe === gruppe.id}
                                     <ChevronDown class="w-4 h-4 text-light-tx-2 dark:text-dark-tx-2" />
@@ -345,7 +346,7 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <div class="text-light-tx dark:text-dark-tx">
-                                                {pk.title}
+                                                {@html renderInlineMath(pk.title)}
                                             </div>
                                             <div class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                                                 {pkIdOf(pk)}

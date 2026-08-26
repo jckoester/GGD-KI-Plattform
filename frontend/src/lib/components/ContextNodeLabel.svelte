@@ -10,6 +10,7 @@
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { einordnung, kontextknotenAnsicht } from "$lib/context_node_view.js";
+    import { renderInlineMath } from "$lib/markdown.js";
 
     let {
         node,
@@ -39,7 +40,11 @@
     </span>
 {/if}
 
-<span class={titleClass} title={ansicht.title}>{ansicht.title}</span>
+<!-- Sichtbar mit gerenderten Formeln; das `title`-Attribut bleibt Rohtext — ein
+     Tooltip kann kein Markup tragen. -->
+<span class={titleClass} title={ansicht.title}>
+    {@html renderInlineMath(ansicht.title)}
+</span>
 
 {#if fassung}
     <span

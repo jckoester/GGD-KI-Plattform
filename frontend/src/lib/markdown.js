@@ -98,16 +98,24 @@ let _mathStore = {};
 let _mathCount = 0;
 let _mathNonce = '';
 
-function renderKatexPlaceholder(tex, display) {
-    let html;
+/** KaTeX-Ausgabe für eine Formel, oder ``null``, wenn selbst KaTeX aufgibt. */
+function katexHtml(tex, display) {
     try {
-        html = katex.renderToString(tex, {
+        return katex.renderToString(tex, {
             displayMode: !!display,
             throwOnError: false, // fehlerhafte/unvollständige Formeln (Streaming!) nicht werfen
             output: 'htmlAndMathml',
         });
     } catch {
-        // Sollte mit throwOnError:false praktisch nicht auftreten → Rohtext zurückgeben.
+        // Sollte mit throwOnError:false praktisch nicht auftreten.
+        return null;
+    }
+}
+
+function renderKatexPlaceholder(tex, display) {
+    const html = katexHtml(tex, display);
+    if (html === null) {
+        // Rohtext zurückgeben — DOMPurify escapet ihn im weiteren Verlauf.
         const d = display ? '$$' : '$';
         return d + tex + d;
     }
@@ -200,4 +208,45 @@ export function renderMarkdown(text) {
         new RegExp(`KMATH${_mathNonce}X(\\d+)X`, 'g'),
         (_, id) => _mathStore[id] ?? '',
     );
+}
+
+/**
+ * Nur Formeln rendern, kein Markdown — für Titel und andere einzeilige Felder.
+ *
+ * Bildungsplan-Kompetenzen führen ihre Formeln **im Titel**
+ * (`3.1.2(10) die Zahl \(\pi\) als Verhältnis …`), und Titel stehen in Listen, Bäumen und
+ * Auswahlfeldern, wo Markdown-Blockstruktur nichts zu suchen hat: `renderMarkdown` würde
+ * einen `<p>` erzeugen und ein `_` oder `*` im Titel als Kursivschrift deuten.
+ *
+ * Deshalb hier: Text außerhalb der Formeln wird nur escapet, die Formeln übernimmt
+ * KaTeX. Beides ist unbedenklich — escapeter Text kann kein Markup erzeugen, und die
+ * KaTeX-Ausgabe ist dieselbe vertrauenswürdige Quelle wie in `renderMarkdown`.
+ *
+ * @param {string} text
+ * @returns {string} HTML — als `{@html …}` einzusetzen
+ */
+export function renderInlineMath(text) {
+    if (!text) return '';
+    const quelle = String(text);
+    let rest = quelle;
+    let out = '';
+    let gefunden = false;
+
+    while (rest) {
+        const i = rest.search(/\$|\\[([]/);
+        if (i < 0) break;
+        const treffer = matchInlineMath(rest.slice(i));
+        if (!treffer) {
+            // Kein gültiger Formelanfang — das Zeichen ist gewöhnlicher Text.
+            out += escapeHtml(rest.slice(0, i + 1));
+            rest = rest.slice(i + 1);
+            continue;
+        }
+        const html = katexHtml(treffer.text, treffer.display);
+        out += escapeHtml(rest.slice(0, i)) + (html ?? escapeHtml(treffer.raw));
+        rest = rest.slice(i + treffer.raw.length);
+        gefunden = true;
+    }
+
+    return gefunden ? out + escapeHtml(rest) : escapeHtml(quelle);
 }

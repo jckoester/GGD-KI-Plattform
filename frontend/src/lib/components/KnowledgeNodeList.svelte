@@ -10,6 +10,7 @@
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
+    import { renderInlineMath } from "$lib/markdown.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
     import { Anchor, Archive } from "lucide-svelte";
@@ -437,7 +438,7 @@
                                 {#if SCOPE_ANCHOR_CONTENT_TYPES.has(node.content_type)}
                                     <Anchor name="anchor" size={16} />
                                 {/if}
-                                {node.title}
+                                {@html renderInlineMath(node.title)}
                                 {#if fassungen.get(node.id)}
                                     <span
                                         class="text-xs shrink-0 rounded px-1.5 py-0.5

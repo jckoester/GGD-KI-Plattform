@@ -3,7 +3,7 @@
     import { goto } from "$app/navigation";
     import { CATEGORY_LABELS, CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import { getContextNode, getArchivedReferences, updateNodeTitle } from "$lib/api.js";
-    import { renderMarkdown } from "$lib/markdown.js";
+    import { renderInlineMath, renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
     import { renderServerBlocks } from "$lib/serverRender.js";
     import { user } from "$lib/stores/user.js";
@@ -190,7 +190,7 @@
                 {:else}
                     <div class="flex items-center gap-3 flex-wrap">
                         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-                            {node.title}
+                            {@html renderInlineMath(node.title)}
                         </h1>
                         {#if isAdmin && isImported}
                             <button

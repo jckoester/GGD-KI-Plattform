@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // renderMarkdown nutzt DOMPurify → braucht im Test ein DOM (Produktion: Browser).
 import { describe, it, expect } from 'vitest'
-import { renderMarkdown } from './markdown.js'
+import { renderInlineMath, renderMarkdown } from './markdown.js'
 
 // KaTeX schreibt class="katex" in seine Ausgabe — verlässlicher Marker.
 const hasKatex = (html) => html.includes('katex')
@@ -174,5 +174,91 @@ describe('renderMarkdown — False-Positive-Disziplin & Robustheit', () => {
 
     it('fehlerhafte TeX in $…$ wirft nicht (throwOnError:false)', () => {
         expect(() => renderMarkdown('$\\frac{1}{$')).not.toThrow()
+    })
+})
+
+describe('renderInlineMath — Formeln in Titeln', () => {
+    // Bildungsplan-Kompetenzen tragen ihre Formeln im Titel; Titel stehen in Bäumen und
+    // Listen, wo Markdown-Blockstruktur nichts zu suchen hat.
+    const BP_TITEL = '3.1.2(10) die Zahl \\(\\pi\\) als Verhältnis von Umfang erklären'
+
+    it('rendert \\(…\\) aus einem echten Bildungsplan-Titel', () => {
+        expect(hasKatex(renderInlineMath(BP_TITEL))).toBe(true)
+    })
+
+    it('erzeugt keinen Absatz — anders als renderMarkdown', () => {
+        expect(renderInlineMath(BP_TITEL)).not.toContain('<p>')
+        expect(renderMarkdown(BP_TITEL)).toContain('<p>')
+    })
+
+    it('lässt Markdown-Zeichen Text bleiben', () => {
+        // Ein Titel wie „Wachstum a_1 * q^n" darf nicht kursiv werden.
+        const html = renderInlineMath('Der Wert _n_ und *m* bleiben Text')
+        expect(html).not.toContain('<em>')
+        expect(html).toContain('_n_')
+    })
+
+    it('escapet HTML im umgebenden Text', () => {
+        const html = renderInlineMath('<script>alert(1)</script> und \\(x\\)')
+        expect(html).not.toContain('<script>')
+        expect(html).toContain('&lt;script&gt;')
+        expect(hasKatex(html)).toBe(true)
+    })
+
+    it('escapet auch, wenn gar keine Formel vorkommt', () => {
+        expect(renderInlineMath('a < b & c')).toBe('a &lt; b &amp; c')
+    })
+
+    it('rendert mehrere Formeln in einem Titel', () => {
+        const html = renderInlineMath('\\(a^2\\) plus \\(b^2\\)')
+        expect(html.match(/class="katex"/g)?.length).toBe(2)
+        expect(html).toContain('plus')
+    })
+
+    it('beherrscht auch $…$', () => {
+        expect(hasKatex(renderInlineMath('Formel $x^2$ hier'))).toBe(true)
+    })
+
+    it('lässt ein einzelnes Dollarzeichen in Ruhe', () => {
+        const html = renderInlineMath('Das kostet 5 $ pro Stück')
+        expect(hasKatex(html)).toBe(false)
+        expect(html).toContain('5 $ pro')
+    })
+
+    it('leerer Text → ""', () => {
+        expect(renderInlineMath('')).toBe('')
+        expect(renderInlineMath(null)).toBe('')
+        expect(renderInlineMath(undefined)).toBe('')
+    })
+
+    it('kaputte Formel zerstört den Titel nicht', () => {
+        const html = renderInlineMath('Anfang \\(\\frac{1 offen und Text danach')
+        expect(html).toContain('Anfang')
+        expect(html).toContain('Text danach')
+    })
+})
+
+describe('renderInlineMath — echte Bildungsplan-Titel', () => {
+    // Wörtlich aus der Datenbank; sie decken die Makros ab, die im BP tatsächlich
+    // vorkommen (\frac, \cdot, \mathrm, Hoch-/Tiefstellung, mehrere Formeln je Titel).
+    const ECHT = [
+        '3.6.2.1(6) die Kapazität eines Kondensators erläutern ( \\(C = \\frac{Q}{U}\\) )',
+        '3.2.2(6) die Lageenergie berechnen ( \\(E_\\mathrm{Lage} = m \\cdot g \\cdot h\\) , Nullniveau)',
+        '3.4.4(3) charakteristische Eigenschaften der Funktion \\(f\\) mit \\(f(x)=e^{x}\\) beschreiben',
+        '3.3.3(4) die Beziehungen \\(sin^2(\\alpha) + cos^2(\\alpha) = 1\\) , \\(sin(90° - \\alpha) = cos(\\alpha)\\)',
+    ]
+
+    it.each(ECHT)('rendert: %s', (titel) => {
+        const html = renderInlineMath(titel)
+        expect(hasKatex(html)).toBe(true)
+        // Die Quell-Notation darf nicht mehr sichtbar sein …
+        expect(html).not.toContain('\\(')
+        // … und der umgebende Text bleibt erhalten.
+        expect(html).toContain(titel.slice(0, 10))
+    })
+
+    it('rendert jede Formel eines Titels einzeln', () => {
+        const html = renderInlineMath(ECHT[3])
+        expect(html.match(/class="katex"/g)?.length).toBe(2)
     })
 })

@@ -11,6 +11,7 @@
     import { X, Search, Check } from "lucide-svelte";
     import { getActiveBpVersion } from "$lib/api";
     import { editionLoadPlan } from "$lib/editions";
+    import { renderInlineMath } from "$lib/markdown.js";
 
     let {
         subjectId = null,
@@ -308,7 +309,7 @@
                                 <div
                                     class="font-medium text-light-tx dark:text-dark-tx"
                                 >
-                                    {node.title}
+                                    {@html renderInlineMath(node.title)}
                                 </div>
                                 <div
                                     class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate"

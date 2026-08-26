@@ -4,6 +4,9 @@
     import { page } from "$app/stores";
     import { getFachplanBySubject, getContextNodes } from "$lib/api.js";
     import { sortOperatorsByTitle, formatAfb } from "$lib/operators.js";
+    // Kompetenzen führen ihre Formeln im Titel (`… die Zahl \(\pi\) …`) — hier wird nur
+    // Mathematik gerendert, kein Markdown: Titel sind einzeilig, und ein `_` darin ist Text.
+    import { renderInlineMath } from "$lib/markdown.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import LoadingBanner from "./LoadingBanner.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
@@ -369,7 +372,7 @@
                                                    text-light-tx dark:text-dark-tx text-sm transition-colors"
                                         >
                                             <NodeTypeIcon contentType="pk_kompetenz" size={16} />
-                                            <span class="flex-1 text-left">{pk.title}</span>
+                                            <span class="flex-1 text-left">{@html renderInlineMath(pk.title)}</span>
                                         </button>
                                     {/each}
                                 </div>
@@ -411,7 +414,7 @@
                                                 class="font-medium text-light-tx dark:text-dark-tx
                                                        hover:text-primary dark:hover:text-dark-bl transition-colors"
                                             >
-                                                {op.title}
+                                                {@html renderInlineMath(op.title)}
                                             </a>
                                             {#if op.metadata?.aliase?.length}
                                                 <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
@@ -420,7 +423,7 @@
                                             {/if}
                                         </td>
                                         <td class="py-2 px-3 align-top text-light-tx dark:text-dark-tx">
-                                            {op.content}
+                                            {@html renderInlineMath(op.content)}
                                         </td>
                                         <td class="py-2 px-3 align-top text-center whitespace-nowrap
                                                    text-light-tx-2 dark:text-dark-tx-2">
@@ -454,7 +457,7 @@
                            text-light-tx dark:text-dark-tx"
                 >
                     <NodeTypeIcon contentType="leitidee" size={18} />
-                    <span class="font-medium truncate">{ld.title}</span>
+                    <span class="font-medium truncate">{@html renderInlineMath(ld.title)}</span>
                 </button>
                 <a
                     href={nodeHref(ld.id)}
@@ -489,7 +492,7 @@
             {#if ld.content}
                 <div class="px-3 pt-3 pb-1">
                     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 whitespace-pre-line leading-relaxed">
-                        {ld.content}
+                        {@html renderInlineMath(ld.content)}
                     </p>
                 </div>
             {/if}
@@ -504,7 +507,7 @@
                                    text-light-tx dark:text-dark-tx text-sm transition-colors"
                         >
                             <NodeTypeIcon contentType="ik_kompetenz" size={16} />
-                            <span class="flex-1 text-left">{ik.title}</span>
+                            <span class="flex-1 text-left">{@html renderInlineMath(ik.title)}</span>
                         </button>
                     {/each}
                 </div>
