@@ -155,7 +155,53 @@ class ChatContextNodeAdd(BaseModel):
     node_id: UUID
 
 
-class ChatContextNodeRead(BaseModel):
+# ── Einordnende Felder für Auswahl- und Kontextlisten ────────────────────
+#
+# Ein Knotentitel allein trägt in einer Liste nicht: Der Knotentyp steht bei
+# Bildungsplan-Kompetenzen ohnehin in der Nummer, das **Fach** dagegen nirgends —
+# `2.1.1` gibt es in 24 Fächern. Und solange zwei Editionen aktiv sind, stehen
+# gleiche Nummern mit verschiedenem Text nebeneinander. Beides muss mitreisen,
+# damit die Oberfläche einordnen kann, statt nur `ik_kompetenz` zu zeigen.
+
+
+class KontextKnotenAnzeige(BaseModel):
+    """Fach, Fassung und Nummer eines Knotens — die einordnenden Felder."""
+
+    subject_id: int | None = None
+    bp_version: str | None = None
+    nr: str | None = None
+
+
+def anzeige_felder(node) -> dict:
+    """Liest die einordnenden Felder aus einem ``ContextNode``.
+
+    Nimmt ORM-Objekte **und** ``RowMapping``s aus rohem SQL — beide Formen kommen
+    im Suchpfad vor, und beide erlauben Attributzugriff.
+
+    Die Nummer steht je nach Knotentyp unter verschiedenen Metadatenschlüsseln:
+    IK/PK führen ``kompetenz_nr``, Leitidee und PK-Gruppe ``nr``, PKs zusätzlich
+    ``pk_id``. Knoten ohne Nummer (Dokumente, Nutzerwissen) liefern ``None``.
+    """
+    def feld(name):
+        return getattr(node, name, None)
+
+    # Reihenfolge zwingend: Am ORM-Objekt ist `metadata` die SQLAlchemy-MetaData,
+    # nicht die JSON-Spalte — die heißt dort `metadata_`. Am RowMapping ist es
+    # umgekehrt: dort heißt die Spalte schlicht `metadata`.
+    md = feld("metadata_")
+    if md is None:
+        md = feld("metadata")
+    if not isinstance(md, dict):
+        md = {}
+
+    return {
+        "subject_id": feld("subject_id"),
+        "bp_version": feld("bp_version") or None,
+        "nr": md.get("kompetenz_nr") or md.get("nr") or md.get("pk_id"),
+    }
+
+
+class ChatContextNodeRead(KontextKnotenAnzeige):
     model_config = ConfigDict(from_attributes=True)
 
     node_id: UUID
@@ -172,7 +218,7 @@ class ContextSearchRequest(BaseModel):
     query: str
 
 
-class ContextSearchResult(BaseModel):
+class ContextSearchResult(KontextKnotenAnzeige):
     node_id: UUID
     title: str
     category: str

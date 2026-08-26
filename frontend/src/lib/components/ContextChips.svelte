@@ -1,7 +1,8 @@
 <script>
     import { X } from "lucide-svelte";
     import { CATEGORY_COLORS } from "$lib/taxonomy.js";
-    import NodeTypeIcon from "./NodeTypeIcon.svelte";
+    import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
+    import ContextNodeLabel from "./ContextNodeLabel.svelte";
 
     // Vollständige Tailwind-Klassen müssen literal im Quelltext stehen (kein Purging)
     const CHIP_ACCENT = {
@@ -12,6 +13,10 @@
     };
 
     let { nodes = $bindable([]), onremove, disabled = false } = $props();
+
+    // Zwei angeheftete Kompetenzen gleicher Nummer aus verschiedenen Fassungen
+    // wären sonst zwei identisch beschriftete Pillen.
+    const fassungen = $derived(mehrdeutigeFassungen(nodes));
 </script>
 
 {#if nodes.length > 0}
@@ -22,16 +27,12 @@
             <span
                 class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border text-light-tx-2 dark:text-dark-tx-2 bg-light-bg-2 dark:bg-dark-bg-2 {accentClass}"
             >
-                {#if node.content_type}
-                    <NodeTypeIcon
-                        category={node.category}
-                        contentType={node.content_type}
-                        size={12}
-                    />
-                {/if}
-                <span class="max-w-[200px] truncate" title={node.title}>
-                    {node.title}
-                </span>
+                <ContextNodeLabel
+                    {node}
+                    fassung={fassungen.get(node.node_id)}
+                    iconSize={12}
+                    titleClass="max-w-[200px] truncate"
+                />
                 {#if !disabled}
                     <button
                         type="button"

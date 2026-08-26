@@ -34,6 +34,7 @@ from app.context.schemas import (
     ContextNodeCopyRequest,
     ChatContextNodeAdd,
     ChatContextNodeRead,
+    anzeige_felder,
     ContextSearchRequest,
     ContextSearchResult,
     CurriculumRead,
@@ -810,22 +811,25 @@ async def list_chat_context_nodes(
     await _get_conversation_or_403(conversation_id, user.sub, db)
 
     result = await db.execute(
-        sa.select(
-            ChatContextNode.node_id,
-            ContextNode.category,
-            ContextNode.title,
-            ContextNode.content_type,
-            ChatContextNode.added_at,
-        )
-        .join(ContextNode, ContextNode.id == ChatContextNode.node_id)
+        sa.select(ContextNode, ChatContextNode.added_at)
+        .join(ChatContextNode, ChatContextNode.node_id == ContextNode.id)
         .where(
             ChatContextNode.chat_id == conversation_id,
             ContextNode.status == "active",
         )
         .order_by(ChatContextNode.added_at)
     )
-    rows = result.mappings().all()
-    return [ChatContextNodeRead(**dict(row)) for row in rows]
+    return [
+        ChatContextNodeRead(
+            node_id=node.id,
+            category=node.category,
+            title=node.title,
+            content_type=node.content_type,
+            added_at=added_at,
+            **anzeige_felder(node),
+        )
+        for node, added_at in result.all()
+    ]
 
 
 @router.post(
@@ -857,6 +861,7 @@ async def add_chat_context_node(
             title=node.title,
             content_type=node.content_type,
             added_at=existing.added_at,
+            **anzeige_felder(node),
         )
 
     entry = ChatContextNode(chat_id=conversation_id, node_id=payload.node_id)
@@ -870,6 +875,7 @@ async def add_chat_context_node(
         title=node.title,
         content_type=node.content_type,
         added_at=entry.added_at,
+        **anzeige_felder(node),
     )
 
 

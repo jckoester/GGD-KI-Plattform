@@ -15,22 +15,13 @@
  * nicht — dort steht die Fassung ohnehin fest.
  */
 
+import { kontextknotenAnsicht } from './context_node_view.js'
+
 /** `2016.V2` → `V2`, `2016.V3` → `V3`, `2016` → `Basis`. */
 export function fassungsLabel(bpVersion) {
     if (!bpVersion) return null
     const marke = /\.(V\d+(?:\.\d+)?)$/.exec(bpVersion)
     return marke ? marke[1] : 'Basis'
-}
-
-/** Die Kompetenznummer eines Knotens — aus den Metadaten, nicht aus dem Titel geraten. */
-function nummer(node) {
-    const md = node?.metadata ?? node?.metadata_ ?? {}
-    return md.kompetenz_nr || md.nr || md.pk_id || null
-}
-
-function fassung(node) {
-    const md = node?.metadata ?? node?.metadata_ ?? {}
-    return md.bp_version || null
 }
 
 /**
@@ -41,18 +32,20 @@ function fassung(node) {
  * Fächer mit gleicher Nummer stehen ohnehin nebeneinander, ohne einander zu erklären —
  * das ist kein Fassungsproblem und wird hier nicht behandelt.
  *
+ * Nimmt Knoten aus allen drei Quellen (siehe `context_node_view.js`); der Schlüssel der
+ * Rückgabe ist die ID, die der übergebene Knoten selbst trägt (`id` oder `node_id`).
+ *
  * @param {Array<object>} nodes
- * @returns {Map<string, string>} node.id → Fassungs-Label (nur für mehrdeutige)
+ * @returns {Map<string, string>} Knoten-ID → Fassungs-Label (nur für mehrdeutige)
  */
 export function mehrdeutigeFassungen(nodes) {
     const nachSchluessel = new Map()
     for (const node of nodes ?? []) {
-        const nr = nummer(node)
-        const bpv = fassung(node)
+        const { id, nr, bpVersion: bpv, subjectId } = kontextknotenAnsicht(node)
         if (!nr || !bpv) continue
-        const schluessel = `${node.subject_id ?? ''}|${nr}`
+        const schluessel = `${subjectId ?? ''}|${nr}`
         if (!nachSchluessel.has(schluessel)) nachSchluessel.set(schluessel, [])
-        nachSchluessel.get(schluessel).push({ id: node.id, bpv })
+        nachSchluessel.get(schluessel).push({ id, bpv })
     }
 
     const markiert = new Map()

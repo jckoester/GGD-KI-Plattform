@@ -1,9 +1,14 @@
 <script>
-    import NodeTypeIcon from "./NodeTypeIcon.svelte";
+    import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
+    import ContextNodeLabel from "./ContextNodeLabel.svelte";
 
     let { nodes = [], onconfirm, ondismiss } = $props();
 
     let selected = $state(new Set(nodes.map((n) => n.node_id)));
+
+    // Die Vorschlagssuche kennt keinen Jahrgang, kann also beide Fassungen
+    // derselben Kompetenz vorschlagen — dann muss die Fassung dabeistehen.
+    const fassungen = $derived(mehrdeutigeFassungen(nodes));
 
     function toggle(node_id) {
         const next = new Set(selected);
@@ -37,16 +42,11 @@
                         onchange={() => toggle(node.node_id)}
                         class="accent-primary"
                     />
-                    {#if node.content_type}
-                        <NodeTypeIcon
-                            category={node.category}
-                            contentType={node.content_type}
-                            size={14}
-                        />
-                    {/if}
-                    <span class="truncate text-light-tx dark:text-dark-tx">
-                        {node.title}
-                    </span>
+                    <ContextNodeLabel
+                        {node}
+                        fassung={fassungen.get(node.node_id)}
+                        titleClass="truncate text-light-tx dark:text-dark-tx"
+                    />
                 </label>
             </li>
         {/each}

@@ -38,6 +38,7 @@ from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
+from app.context.schemas import anzeige_felder
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -324,7 +325,8 @@ async def _exec_search_context_nodes(
         embedding_str = "[" + ",".join(f"{v:.10f}" for v in query_embedding) + "]"
 
         sql = sa.text("""
-            SELECT id, category, content_type, title
+            SELECT id, category, content_type, title,
+                   subject_id, bp_version, metadata
             FROM context_nodes
             WHERE status = 'active'
               AND embedding IS NOT NULL
@@ -347,6 +349,7 @@ async def _exec_search_context_nodes(
                     "title": row["title"],
                     "category": row["category"],
                     "content_type": row["content_type"],
+                    **anzeige_felder(row),
                 }
                 for row in rows
             ]
@@ -378,6 +381,7 @@ async def _exec_search_context_nodes(
             "title": n.title,
             "category": n.category,
             "content_type": n.content_type,
+            **anzeige_felder(n),
         }
         for n in result.scalars().all()
     ]

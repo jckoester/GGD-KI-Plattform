@@ -680,16 +680,19 @@ class TestSemanticSearch:
 
 # -----------------------------------------------------------------------------
 
-def insert_subject_sync(db_url: str, *, subject_id: int, slug: str,
-                        fach_code: str) -> int:
-    """Legt ein Fach an (idempotent) — noetig als FK-Ziel fuer context_nodes."""
+def insert_subject_sync(db_url: str, *, subject_id: int, slug: str) -> int:
+    """Legt ein Fach an (idempotent) — noetig als FK-Ziel fuer context_nodes.
+
+    Ohne fach_code: Die Spalte ist schulweit eindeutig, und dieser Helfer
+    committet — ein Kuerzel wuerde andere Tests derselben Sitzung brechen.
+    """
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO subjects (id, slug, name, fach_code)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO subjects (id, slug, name)
+            VALUES (%s, %s, %s)
             ON CONFLICT (id) DO NOTHING
-        """, (subject_id, slug, slug.capitalize(), fach_code))
+        """, (subject_id, slug, slug.capitalize()))
     conn.commit()
     conn.close()
     return subject_id
@@ -710,7 +713,7 @@ class TestSemanticSearchEditionen:
         statt des Fahrplans die blosse Aehnlichkeit entscheidet.
         """
         subject_id = insert_subject_sync(
-            db_url, subject_id=9401, slug="mathematik-ed", fach_code="MED"
+            db_url, subject_id=9401, slug="mathematik-ed"
         )
         anker = insert_node_sync(
             db_url, content_type="fachplan", title="Fachplan",

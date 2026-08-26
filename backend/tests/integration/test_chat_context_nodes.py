@@ -284,3 +284,206 @@ class TestChatContextNodes:
             headers=auth_headers,
         )
         assert response.status_code == 404
+
+
+class TestEinordnendeFelder:
+    """Fach, Fassung und Nummer reisen mit — sonst kann die Oberflaeche nicht einordnen.
+
+    Ohne Fach ist eine BP-Kompetenz in einer Liste nicht zu bestimmen: `2.1.1`
+    gibt es in 24 Faechern, und der Knotentyp steht ohnehin schon in der Nummer.
+    """
+
+    @pytest_asyncio.fixture
+    async def bp_knoten(self, test_client, auth_headers, db_url):
+        """IK-Kompetenz mit Fach, Fassung und Nummer — wie sie der Import anlegt."""
+        resp = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge",
+                "content_type": "ik_kompetenz",
+                "title": "Zahlen und Operationen",
+                "read_scope": "school",
+                "write_scope": "private",
+                "metadata": {"kompetenz_nr": "3.1.1(1)", "bp_version": "2016.V3"},
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        node = resp.json()
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                # fach_code bleibt NULL: Die Spalte ist schulweit eindeutig,
+                # und diese Fixture committet — ein Kuerzel wuerde andere Tests brechen.
+                "INSERT INTO subjects (id, slug, name) VALUES "
+                "(9501, 'mathe-anzeige', 'Mathematik') ON CONFLICT (id) DO NOTHING"
+            )
+            cur.execute(
+                "UPDATE context_nodes SET subject_id = 9501, bp_version = '2016.V3' "
+                "WHERE id = %s",
+                (node["id"],),
+            )
+        conn.commit()
+        conn.close()
+        return node
+
+    async def test_post_liefert_fach_fassung_und_nummer(
+        self, test_client, auth_headers, conversation, bp_knoten
+    ):
+        response = await test_client.post(
+            f"/context/conversations/{conversation}/nodes",
+            json={"node_id": bp_knoten["id"]},
+            headers=auth_headers,
+        )
+        assert response.status_code == 201, response.text
+        data = response.json()
+        assert data["subject_id"] == 9501
+        assert data["bp_version"] == "2016.V3"
+        assert data["nr"] == "3.1.1(1)"
+
+    async def test_get_liefert_dieselben_felder(
+        self, test_client, auth_headers, conversation, bp_knoten
+    ):
+        await test_client.post(
+            f"/context/conversations/{conversation}/nodes",
+            json={"node_id": bp_knoten["id"]},
+            headers=auth_headers,
+        )
+        response = await test_client.get(
+            f"/context/conversations/{conversation}/nodes",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        eintrag = response.json()[0]
+        assert eintrag["subject_id"] == 9501
+        assert eintrag["bp_version"] == "2016.V3"
+        assert eintrag["nr"] == "3.1.1(1)"
+
+    async def test_erneutes_anheften_liefert_die_felder_ebenfalls(
+        self, test_client, auth_headers, conversation, bp_knoten
+    ):
+        """Der Zweig fuer den bereits angehefteten Knoten baut die Antwort selbst."""
+        for _ in range(2):
+            response = await test_client.post(
+                f"/context/conversations/{conversation}/nodes",
+                json={"node_id": bp_knoten["id"]},
+                headers=auth_headers,
+            )
+        assert response.json()["subject_id"] == 9501
+        assert response.json()["nr"] == "3.1.1(1)"
+
+    async def test_knoten_ohne_bildungsplanbezug_bleibt_leer(
+        self, test_client, auth_headers, conversation, node
+    ):
+        """Nutzerknoten haben kein Fach und keine Nummer — dann eben `null`."""
+        response = await test_client.post(
+            f"/context/conversations/{conversation}/nodes",
+            json={"node_id": node["id"]},
+            headers=auth_headers,
+        )
+        data = response.json()
+        assert data["subject_id"] is None
+        assert data["bp_version"] is None
+        assert data["nr"] is None
+        # Der Knotentyp bleibt die Einordnung, wo es kein Fach gibt.
+        assert data["content_type"] == "funktion"
+
+
+class TestSuchergebnisFelder:
+    """`/context/search` speist die Vorschlagsliste und den SSE-Kanal im Chat.
+
+    Der Endpunkt hat **zwei** Pfade: die Embedding-Suche liefert Row-Mappings aus
+    rohem SQL, der ILIKE-Fallback ORM-Objekte. Am ORM-Objekt heisst die JSON-Spalte
+    `metadata_` — `metadata` waere dort die SQLAlchemy-MetaData. Beide Pfade muessen
+    dieselben einordnenden Felder tragen, deshalb wird jeder einzeln geprueft.
+    """
+
+    @pytest_asyncio.fixture
+    async def bp_knoten(self, test_client, auth_headers, db_url):
+        resp = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge",
+                "content_type": "ik_kompetenz",
+                "title": "Bruchrechnung im Suchtest",
+                "read_scope": "school",
+                "write_scope": "school",
+                "metadata": {"kompetenz_nr": "3.1.2(4)", "bp_version": "2016.V2"},
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        node = resp.json()
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO subjects (id, slug, name) VALUES "
+                "(9502, 'mathe-suche', 'Mathematik') ON CONFLICT (id) DO NOTHING"
+            )
+            cur.execute(
+                "UPDATE context_nodes SET subject_id = 9502, bp_version = '2016.V2' "
+                "WHERE id = %s",
+                (node["id"],),
+            )
+        conn.commit()
+        conn.close()
+        return node
+
+    def _treffer(self, daten, node):
+        return next(t for t in daten if t["node_id"] == node["id"])
+
+    async def test_ilike_fallback_traegt_die_felder(
+        self, test_client, auth_headers, bp_knoten
+    ):
+        """Ohne erreichbaren Embedding-Dienst faellt die Suche auf ILIKE zurueck."""
+        from unittest.mock import AsyncMock, patch
+
+        with patch(
+            "app.chat.router.generate_embedding",
+            new=AsyncMock(side_effect=RuntimeError("kein Embedding-Dienst")),
+        ):
+            response = await test_client.post(
+                "/context/search",
+                json={"query": "Bruchrechnung im Suchtest"},
+                headers=auth_headers,
+            )
+        assert response.status_code == 200, response.text
+        treffer = self._treffer(response.json(), bp_knoten)
+        assert treffer["subject_id"] == 9502
+        assert treffer["bp_version"] == "2016.V2"
+        assert treffer["nr"] == "3.1.2(4)"
+
+    async def test_embedding_pfad_traegt_dieselben_felder(
+        self, test_client, auth_headers, db_url, bp_knoten
+    ):
+        from unittest.mock import AsyncMock, patch
+
+        from app.config import settings
+
+        vec = [0.0] * settings.embedding_dimensions
+        vec[0] = 1.0
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE context_nodes SET embedding = %s::vector WHERE id = %s",
+                ("[" + ",".join(str(v) for v in vec) + "]", bp_knoten["id"]),
+            )
+        conn.commit()
+        conn.close()
+
+        with patch("app.chat.router.generate_embedding",
+                   new=AsyncMock(return_value=vec)):
+            response = await test_client.post(
+                "/context/search",
+                # Absichtlich ohne Titeltreffer: Findet die Suche den Knoten
+                # trotzdem, kann das nur der Embedding-Pfad gewesen sein.
+                json={"query": "zzz-kein-titeltreffer-zzz"},
+                headers=auth_headers,
+            )
+        assert response.status_code == 200, response.text
+        treffer = self._treffer(response.json(), bp_knoten)
+        assert treffer["subject_id"] == 9502
+        assert treffer["bp_version"] == "2016.V2"
+        assert treffer["nr"] == "3.1.2(4)"

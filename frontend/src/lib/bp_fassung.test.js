@@ -95,3 +95,30 @@ describe('mehrdeutigeFassungen', () => {
         expect(mehrdeutigeFassungen(undefined).size).toBe(0)
     })
 })
+
+describe('mehrdeutigeFassungen über Herkunftsformen hinweg', () => {
+    // Die Vorschlagssuche und die angehefteten Knoten liefern `node_id` und flache
+    // Felder statt `id` und Metadaten — auch dort müssen Fassungen auffallen.
+    const flach = (nodeId, nr, bpVersion, subjectId = 1) => ({
+        node_id: nodeId,
+        subject_id: subjectId,
+        nr,
+        bp_version: bpVersion,
+    })
+
+    it('erkennt Kollisionen auch in der flachen Form', () => {
+        const markiert = mehrdeutigeFassungen([
+            flach('a', '3.1.1(1)', '2016.V2'),
+            flach('b', '3.1.1(1)', '2016.V3'),
+        ])
+        expect(markiert).toEqual(new Map([['a', 'V2'], ['b', 'V3']]))
+    })
+
+    it('schlüsselt nach der ID, die der Knoten selbst trägt', () => {
+        const markiert = mehrdeutigeFassungen([
+            knoten('mit-id', '3.1.1(1)', '2016.V2'),
+            flach('mit-node-id', '3.1.1(1)', '2016.V3'),
+        ])
+        expect([...markiert.keys()].sort()).toEqual(['mit-id', 'mit-node-id'])
+    })
+})
