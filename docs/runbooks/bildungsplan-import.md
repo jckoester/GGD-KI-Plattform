@@ -280,10 +280,10 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 > mitgezogen** (Seite `…{FACHCODE}{suffix}_OP`) und als `operator`-Knoten (je
 > Edition eigene, `bp_version`-getaggt) exportiert — **kein** separater Aufruf nötig.
 > Titel-Synonyme („ein-, zuordnen", „(be-)nennen", „analysieren/untersuchen") werden
-> zu einem kanonischen Titel + `metadata.aliase` normalisiert. Fächer ohne HTML-Anhang
-> (die nur als PDF veröffentlichten Fremdsprachen Englisch/Französisch) werden vom
-> HTML-Scraper übersprungen; ihre Operatoren kommen über den **PDF-Import** mit
-> (identisches `operator`-Schema, siehe Abschnitt PDF-Import).
+> zu einem kanonischen Titel + `metadata.aliase` normalisiert. Wo es keinen HTML-Anhang
+> gibt — bei Englisch und Französisch in der **V2-Fassung** —, kommen die Operatoren über
+> den **PDF-Import** mit (identisches `operator`-Schema, siehe Abschnitt PDF-Import). Ab
+> V3 laufen beide Fächer über den normalen Scrape und bringen ihre Operatoren selbst mit.
 
 ---
 
@@ -301,13 +301,34 @@ cat scripts/scraper/output/scrape_warnings_$(date +%Y-%m-%d).log
 > PDF- auf den HTML-Weg umstellt, muss die URL entfernen; wer sie stehen lässt, wundert
 > sich über einen fehlenden Bildungsplan.
 >
-> Für die **alten** Fassungen (Basis, V2) bleibt der PDF-Import nötig — die gibt es
-> weiterhin nur als PDF.
+> **Nur die V2-Fassung braucht noch das PDF.** Die **Basisfassung** liegt als reguläre
+> Seite vor und kommt beim Scrape von selbst mit (`E1_BASIS.jsonl`, `F2_BASIS.jsonl`).
+> Die V2-Adresse dagegen liefert die Basisfassung — dafür gibt es keine HTML-Fassung.
+>
+> **Die vorhandenen `E1_V2.jsonl`/`F2_V2.jsonl` bleiben gültig; ein erneuter PDF-Lauf ist
+> nicht nötig.** Der Scraper überschreibt sie nicht: Er prüft vor dem Parsen, welche
+> Fassung die Adresse tatsächlich liefert, weist die V2-Adresse ab, und weil es eine
+> *Zwischen*edition ist, bleibt es bei einer Warnung, statt das Fach fallenzulassen —
+> geschrieben wird für diese Edition nichts. Erwartete Meldung, harmlos:
+>
+> ```
+> E1: Zwischenedition '.V2' nicht vorhanden
+> ```
+>
+> Dass beide Pipelines dieselbe Fassung gleich benennen, ist dabei der Grund, dass sie
+> einander ergänzen statt behindern. Zwei Bedingungen:
+>
+> - Die Dateien liegen in `scripts/scraper/output/` (die gemeinsame Ablage), nicht mehr
+>   unter `scripts/pdf_import/output/`.
+> - **Das Ausgabeverzeichnis vor dem Scrape nicht leeren.** Ein „sauberer" Neustart ist
+>   genau der Weg, auf dem diese Dateien verloren gehen — sie sind das einzige Exemplar
+>   der V2-Fassung. Ein Re-Scrape *ohne* Leeren ist unbedenklich.
 
 Manche Pläne liegen **nur als PDF** vor (kein HTML) und werden **nicht** vom
 Scraper (Schritt 3), sondern von der Pipeline `scripts/pdf_import/` erzeugt: der
-**Leitfaden Demokratiebildung (LFDB)** und die modernen **Fremdsprachen
-(Englisch `E1`, Französisch `F2`)**. Sie erzeugen **dasselbe JSONL-Format** — der
+**Leitfaden Demokratiebildung (LFDB)** und — nur noch in der **V2-Fassung** — die
+modernen **Fremdsprachen (Englisch `E1`, Französisch `F2`)**. Sie erzeugen
+**dasselbe JSONL-Format** — der
 Import (Schritt 4–8) läuft danach unverändert. Die PDF wird per LLM strukturiert
 (zweispaltige Tabellen, die `pdfminer` verwürfelt); die bp_id-/Node-Assemblierung
 ist deterministisch.

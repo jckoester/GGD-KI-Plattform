@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 _TOKENS_PER_SECOND = 3000
 _AVG_TOKENS_PER_NODE = 150
 
+# Abbruch nach so vielen Fehlschlägen **in Folge**.
+#
+# Scheitert es derart, liegt es nicht am einzelnen Knoten, sondern am Modellzugang — und
+# dann hilft Weitermachen nichts. Der reale Fall: Ein ungültiger Anbieter-Schlüssel
+# beantwortet LiteLLM mit 401, LiteLLM nimmt die Deployment daraufhin in den Cooldown
+# ("Cool down 401 Auth Errors"), und **alle** weiteren Anfragen bekommen
+# `429 No deployments available`. Ohne Abbruch arbeitet der Lauf tausende Knoten ab, jeden
+# mit vollem Wiederholungsbudget — Stunden Wartezeit für ein Ergebnis, das schon nach dem
+# zehnten Knoten feststand. Die Knoten bleiben unangetastet (`embedding IS NULL`) und
+# kommen im nächsten Lauf wieder dran.
+_MAX_FEHLER_IN_FOLGE = 10
+
 
 @dataclass
 class EmbeddingBackfillStats:
@@ -22,6 +34,8 @@ class EmbeddingBackfillStats:
     errors: int = 0
     skipped: int = 0  # Knoten ohne einbettbaren Text (leer) — übersprungen, kein Fehler
     duration_ms: int = 0
+    # True, wenn wegen Fehlerserie vorzeitig beendet — der Rest wurde nicht versucht.
+    abgebrochen: bool = False
 
 
 async def backfill_embeddings(
@@ -79,9 +93,13 @@ async def backfill_embeddings(
     logger.info("%s%d Knoten ohne Embedding", "[DRY RUN] " if dry_run else "", stats.found)
 
     num_batches = -(-stats.found // batch_size)  # ceiling division
+    fehler_in_folge = 0
     for batch_idx, i in enumerate(range(0, stats.found, batch_size), start=1):
         batch = nodes[i : i + batch_size]
         for node in batch:
+            if fehler_in_folge >= _MAX_FEHLER_IN_FOLGE:
+                stats.abgebrochen = True
+                break
             inp = _build_embedding_input(node)
             if not inp.strip():
                 # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.
@@ -98,8 +116,10 @@ async def backfill_embeddings(
                     .values(embedding=embedding)
                 )
                 stats.ok += 1
+                fehler_in_folge = 0
             except Exception as exc:
                 stats.errors += 1
+                fehler_in_folge += 1
                 # Bei HTTP-Fehlern den Response-Body (der eigentliche Grund, z. B.
                 # LiteLLM-400-Detail) festhalten, nicht nur die generische httpx-Meldung.
                 resp = getattr(exc, "response", None)
@@ -115,6 +135,20 @@ async def backfill_embeddings(
 
         if not dry_run:
             await db.commit()
+
+        if stats.abgebrochen:
+            logger.error(
+                "ABBRUCH: %d Fehler in Folge — das liegt am Modellzugang, nicht an den "
+                "Knoten. %d von %d Knoten wurden nicht versucht; sie bleiben ohne "
+                "Embedding und kommen im nächsten Lauf wieder dran. Ursache im "
+                "gespeicherten Fehlertext nachsehen: "
+                "SELECT metadata->>'embedding_error' FROM context_nodes "
+                "WHERE metadata ? 'embedding_error' LIMIT 1;",
+                _MAX_FEHLER_IN_FOLGE,
+                stats.found - stats.ok - stats.errors - stats.skipped,
+                stats.found,
+            )
+            break
 
         logger.info(
             "Batch %d/%d: ok=%d errors=%d (%d/%d Knoten)",

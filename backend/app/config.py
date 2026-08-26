@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     # `dimensions`-Parameter mitsenden. Nur für Modelle, die das Kürzen der Vektorbreite
     # unterstützen (OpenAI text-embedding-3-*). BGE-M3 lehnt den Parameter ab.
     embedding_send_dimensions: bool = False
+    # Wiederholversuche bei 429/503 (Rate-Limit bzw. vorübergehend nicht verfügbar).
+    # Ein Rate-Limit ist ausdrücklich ein *vorübergehender* Zustand — ohne Wiederholung
+    # bekommt der Knoten einen dauerhaften `embedding_error` und bleibt bis zum nächsten
+    # Backfill-Lauf ohne Vektor. Betrifft vor allem den Massenfall: Nach einem
+    # Bildungsplan-Import stehen Tausende Knoten ohne Embedding an.
+    # 0 = nicht wiederholen. Die Wartezeit folgt `Retry-After`, sonst exponentiell.
+    embedding_max_retries: int = 3
+    # Obergrenze je Wartezeit. Begrenzt, wie lange ein Knoten-Anlegen im Request hängt
+    # (enqueue_embedding_job läuft inline), auch wenn der Anbieter ein großes
+    # `Retry-After` schickt.
+    embedding_retry_max_wait_s: float = 5.0
     frontend_origin: str = "http://localhost:5173"
     environment: str = "development"
     auth_config_path: str = "config/auth.yaml"

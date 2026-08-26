@@ -247,6 +247,9 @@ erscheint also nicht im Nutzerbudget — bei wachsender Last getrennt beobachten
 
 ### Nach Konfigurationsänderungen
 
+> Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack** — dieser Befehl gehört ins
+> LiteLLM-Verzeichnis, nicht ins Anwendungsverzeichnis (dort: `no such service: litellm`).
+
 ```bash
 # LiteLLM-Container neu starten:
 docker compose restart litellm

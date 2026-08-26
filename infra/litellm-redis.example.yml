@@ -1,0 +1,80 @@
+# Redis für den LiteLLM-Proxy — Ergänzung zur LiteLLM-eigenen docker-compose.yml
+#
+# Der LiteLLM-Proxy läuft in einem **getrennten** Compose-Stack (eigene Postgres-DB,
+# eigenes Netz); die docker-compose.yml dieses Repos enthält ihn bewusst nicht. Diese
+# Datei ist deshalb kein lauffähiger Stack, sondern die Vorlage für zwei Eingriffe in
+# jene Datei.
+#
+# ── Warum überhaupt ───────────────────────────────────────────────────────────────────
+# Ohne Redis hält LiteLLM Zähler — Budgets, Rate-Limits, Router-Zustand — im
+# Arbeitsspeicher des jeweiligen Workers. Mit mehreren Workern zählt dann jeder für sich,
+# und nach jedem Neustart beginnt die Zählung von vorn. Die Proxy-UI weist darauf hin
+# („No Redis configured").
+#
+# ── Was NICHT genügt ──────────────────────────────────────────────────────────────────
+# `REDIS_HOST`/`REDIS_PORT` allein reichen nicht. LiteLLM legt seinen gemeinsamen
+# Zähler-Cache (`redis_usage_cache`) nur an, wenn `litellm_settings.cache` gesetzt ist
+# UND der Cache-Typ `redis` ist — nachzulesen in `proxy_server.py`, wo der Cache erst
+# nach `Cache(**cache_params)` und einer `isinstance(..., RedisCache)`-Prüfung gesetzt
+# wird. Beides ist also nötig: Dienst + Umgebung + Config-Block.
+
+# ══ 1. Dienst ergänzen (in services: der LiteLLM-Compose) ═════════════════════════════
+services:
+  redis:
+    image: redis:7-alpine
+    # KEIN `ports:` — Redis ist nur im Compose-Netz erreichbar und darf es auch bleiben:
+    # Der Dienst hat hier kein Passwort, weil er das Netz nicht verlässt.
+    command:
+      - redis-server
+      # Keine Persistenz: Der Inhalt sind Zähler und Cache-Einträge, keine Buchführung.
+      # Maßgeblich für den tatsächlichen Verbrauch bleibt die LiteLLM-Postgres — Redis
+      # verliert bei einem Neustart nur das laufende Zeitfenster.
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      # Deckel gegen unbegrenztes Wachstum; älteste Schlüssel fliegen zuerst.
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+# ══ 2. Am bestehenden `litellm`-Dienst ergänzen ═══════════════════════════════════════
+#
+#   environment:
+#     REDIS_HOST: redis
+#     REDIS_PORT: "6379"
+#
+#   depends_on:
+#     - db
+#     - redis        # ← diese Zeile
+#
+# (Die Kurzform der Liste beibehalten — Kurz- und Langform lassen sich in einem
+# `depends_on` nicht mischen. Ein Wartezwang ist hier entbehrlich: Redis ist in etwa
+# einer Sekunde bereit, LiteLLM räumt sich selbst 40s `start_period` ein, und der
+# Redis-Client verbindet ohnehin erst beim ersten Zugriff.)
+
+# ══ 3. In der LiteLLM-config.yaml ═════════════════════════════════════════════════════
+#
+#   litellm_settings:
+#     cache: true
+#     cache_params:
+#       type: redis
+#       # Redis NUR für Zähler, NICHT für Antworten. Ohne diese Zeile cacht LiteLLM auch
+#       # Modellantworten: Zwei identische Anfragen bekämen dieselbe Antwort, und die
+#       # zweite wäre kostenlos. Für eine Schulplattform ist das nicht gewollt —
+#       # Antworten sollen sich unterscheiden dürfen, und zwischengespeicherte Antworten
+#       # sind ein Datenschutzthema, sobald Prompts kollidieren.
+#       # Wer das Kosten-Argument höher gewichtet: Zeile weglassen und bewusst
+#       # entscheiden, welche Aufruftypen gecacht werden dürfen.
+#       supported_call_types: []
+#
+# Danach:  docker compose up -d redis && docker compose restart litellm
+# Prüfen:  Die Warnung in der Proxy-UI verschwindet.
+#          docker compose exec redis redis-cli dbsize   # > 0, sobald Anfragen laufen

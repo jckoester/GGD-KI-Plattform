@@ -134,6 +134,16 @@ bevor die alte Zeile entfernt werden kann.
 
 ## LiteLLM updaten
 
+> **Anderes Verzeichnis!** Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack** mit
+> eigener Postgres-Datenbank — die `docker-compose.yml` dieses Repos enthält ihn nicht.
+> Alle `docker compose …`-Befehle dieses Abschnitts sind aus dem **LiteLLM-Verzeichnis**
+> abzusetzen, nicht aus dem Anwendungsverzeichnis. Dort ausgeführt scheitern sie mit
+> `no such service: litellm` — was leicht als Deployment-Fehler missgedeutet wird.
+>
+> Umgekehrt gilt dasselbe: `docker compose exec db psql -d ggd_ki` gehört ins
+> **Anwendungs**verzeichnis. Beide Stacks haben einen Dienst namens `db`, und sie führen
+> verschiedene Datenbanken (`ggd_ki` bzw. `litellm`).
+
 LiteLLM verwaltet sein eigenes Datenbankschema über Prisma. Ein einfaches
 `pip install --upgrade litellm` genügt nicht — Schema und Prisma-Client müssen
 separat nachgezogen werden, sonst kann es zu Fehlern wie
@@ -158,6 +168,116 @@ docker compose exec litellm sh -c "
 
 # 4. LiteLLM neu starten
 docker compose restart litellm
+```
+
+## Redis für LiteLLM
+
+Meldet die Proxy-UI **„No Redis configured"**, hält LiteLLM seine Zähler — Budgets,
+Rate-Limits, Router-Zustand — im Arbeitsspeicher des jeweiligen Workers. Mit mehreren
+Workern zählt dann jeder für sich, und nach jedem Neustart beginnt die Zählung von vorn.
+
+Die vollständige Vorlage steht in **`infra/litellm-redis.example.yml`**. Kurzfassung —
+drei Eingriffe, alle im **LiteLLM-Verzeichnis**:
+
+1. Dienst `redis` ergänzen (ohne `ports:`, ohne Persistenz — der Inhalt sind Zähler).
+2. Am `litellm`-Dienst `REDIS_HOST: redis` / `REDIS_PORT: "6379"` setzen und `redis` in
+   `depends_on` aufnehmen.
+3. In der `config.yaml`:
+
+   ```yaml
+   litellm_settings:
+     cache: true
+     cache_params:
+       type: redis
+       supported_call_types: []
+   ```
+
+> **Die Umgebungsvariablen allein genügen nicht.** LiteLLM legt den gemeinsamen
+> Zähler-Cache erst an, wenn `litellm_settings.cache` gesetzt **und** der Cache-Typ
+> `redis` ist. Ohne den Config-Block bleibt Redis wirkungslos, obwohl der Container läuft.
+>
+> **`supported_call_types: []` ist Absicht.** `cache: true` schaltet sonst auch das
+> Zwischenspeichern von **Modellantworten** ein: Zwei identische Anfragen bekämen
+> dieselbe Antwort. Für eine Schulplattform ist das nicht gewollt — und sobald Prompts
+> kollidieren, ist es ein Datenschutzthema. Mit der leeren Liste entsteht der
+> Zähler-Cache, gecacht wird nichts.
+
+```bash
+docker compose up -d redis
+docker compose restart litellm
+docker compose exec redis redis-cli dbsize   # > 0, sobald Anfragen laufen
+```
+
+## Embeddings: Knoten ohne Vektor
+
+Fehlt einem Knoten das Embedding, taucht er in der semantischen Suche nicht auf. Der
+nächtliche Backfill (03:15) holt das nach; er wählt nach `embedding IS NULL`, eine
+Fehlermarke aus einem früheren Lauf hält ihn also **nicht** ab.
+
+Alle Befehle im **Anwendungsverzeichnis** (nicht im LiteLLM-Verzeichnis):
+
+```bash
+# Überblick: wie viele Knoten haben keinen Vektor, wie viele eine Fehlermarke?
+docker compose exec db psql -U postgres -d ggd_ki -c \
+  "SELECT count(*) FILTER (WHERE embedding IS NULL)              AS ohne_vektor,
+          count(*) FILTER (WHERE metadata ? 'embedding_error')   AS mit_fehlermarke,
+          count(*)                                               AS aktive_knoten
+     FROM context_nodes WHERE status = 'active';"
+```
+
+```bash
+# Der eigentliche Grund: LiteLLMs Antworttext, wie er beim Fehlschlag gespeichert wurde.
+# -x (erweiterte Ausgabe), weil die Meldungen lang sind.
+docker compose exec db psql -U postgres -d ggd_ki -x -c \
+  "SELECT count(*) AS knoten, left(metadata->>'embedding_error', 300) AS fehler
+     FROM context_nodes WHERE metadata ? 'embedding_error'
+    GROUP BY 2 ORDER BY 1 DESC LIMIT 5;"
+```
+
+Was der Text verrät:
+
+| Meldung enthält | Bedeutung | Abhilfe |
+|---|---|---|
+| `No deployments available` + `cooldown_list` | **Folgefehler, keine Ursache.** LiteLLM hat das Modell in den Cooldown genommen und weist seitdem alles mit `429` ab | Nicht die 429 behandeln, sondern den Grund des Cooldowns suchen — siehe Kasten unten |
+| `401` / `Incorrect API key` | Der Anbieter-Schlüssel in der LiteLLM-Config ist ungültig oder abgelaufen | Schlüssel erneuern, LiteLLM neu starten |
+| `401 Unauthorized` **für die LiteLLM-URL selbst** | Nicht der Anbieter — der Proxy weist das Backend ab: `LITELLM_MASTER_KEY` passt nicht zu LiteLLMs Master-Key | Beide `.env` abgleichen |
+| `429` / `rate limit` (ohne `cooldown_list`) | Echtes Kontingent überschritten — typisch nach einem Bildungsplan-Import, wenn der Backfill Tausende Knoten am Stück einbettet | Wird automatisch wiederholt (`EMBEDDING_MAX_RETRIES`, Vorgabe 3). Hält es an: `rpm`/`tpm` am Embedding-Modell setzen oder kleineres `--batch-size` |
+| `400` / `Invalid 'input'` | Der Knoteninhalt passt dem Modell nicht (leer, zu lang, Sonderzeichen) | `EMBEDDING_MAX_CHARS` prüfen; einzelne Knoten inhaltlich ansehen |
+| `dimensions` / Vektorbreite | Modell und Spaltenbreite passen nicht zusammen | `docs/runbooks/modellwechsel.md` — Migration + Re-Embedding |
+
+> **Der häufigste Irrweg: `429` als Rate-Limit lesen.** LiteLLM kühlt eine Deployment
+> ausdrücklich auch bei **401** ab („Cool down 401 Auth Errors"). Führt ein Modell nur
+> eine Deployment — bei Embeddings die Regel —, sieht danach *jede* Anfrage so aus:
+>
+> ```
+> {"code":"429","message":"No deployments available for selected model,
+>  Try again in 5 seconds. Passed model=text-embedding-3-small,
+>  cooldown_list=['19c8a004-…']"}
+> ```
+>
+> Der eigentliche Grund steht bei den *älteren*, selteneren Einträgen derselben Abfrage —
+> dort, wo noch `401 Incorrect API key` steht. Deshalb `LIMIT 5` und nicht `LIMIT 1`: Die
+> Massenmeldung ist die Folge, die Handvoll darunter die Ursache.
+>
+> Gegenprobe ohne Umweg über die Knoten:
+>
+> ```bash
+> # Im LiteLLM-Verzeichnis:
+> docker compose exec litellm sh -c \
+>   'curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:4000/embeddings \
+>      -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+>      -H "Content-Type: application/json" \
+>      -d "{\"model\":\"text-embedding-3-small\",\"input\":[\"Test\"]}"'
+> ```
+
+**Der Backfill bricht bei einer Fehlerserie ab.** Zehn Fehlschläge in Folge heißen: Es
+liegt am Modellzugang, nicht an den Knoten. Der Lauf endet dann mit `ABBRUCH:` im Log,
+statt Tausende Knoten mit vollem Wiederholungsbudget abzuarbeiten. Die nicht versuchten
+Knoten bleiben unangetastet und kommen im nächsten Lauf wieder dran.
+
+```bash
+# Nachziehen, ohne bis zur Nacht zu warten (klein anfangen):
+docker compose exec backend python scripts/embedding_backfill.py --limit 200
 ```
 
 ## PII-NER-Modell aktualisieren

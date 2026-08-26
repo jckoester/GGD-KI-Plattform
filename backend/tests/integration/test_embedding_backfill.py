@@ -227,3 +227,93 @@ class TestBackfillEmbeddings:
 
         assert stats.found == 2
         assert stats.ok == 2
+
+
+class TestAbbruchBeiFehlerserie:
+    """Ein kaputter Modellzugang darf den Lauf nicht stundenlang leerlaufen lassen.
+
+    Realfall: Ein ungueltiger Anbieter-Schluessel beantwortet LiteLLM mit 401; LiteLLM
+    nimmt die Deployment daraufhin in den Cooldown, und alle weiteren Anfragen bekommen
+    `429 No deployments available`. Jeder Knoten kostet dann sein volles
+    Wiederholungsbudget — bei tausenden Knoten Stunden fuer ein Ergebnis, das nach dem
+    zehnten feststand.
+    """
+
+    @pytest_asyncio.fixture
+    async def viele_knoten(self, session_factory):
+        """40 einbettbare Knoten — mehr als die Abbruchschwelle."""
+        async with session_factory() as db:
+            for i in range(40):
+                db.add(ContextNode(
+                    id=uuid.uuid4(), title=f"IK {i}", content=f"Inhalt {i}",
+                    category="knowledge", content_type="ik_kompetenz",
+                    status="active", read_scope="global", write_scope="global",
+                    metadata_={},
+                ))
+            await db.commit()
+
+    @pytest.mark.asyncio
+    async def test_bricht_nach_fehlerserie_ab(self, session_factory, viele_knoten):
+        from app.crons.embedding_backfill_service import _MAX_FEHLER_IN_FOLGE
+
+        with patch(
+            "app.crons.embedding_backfill_service.generate_embedding",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("429 No deployments available"),
+        ) as gen:
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db, batch_size=100)
+
+        assert stats.abgebrochen is True
+        # Genau bis zur Schwelle versucht, danach kein Aufruf mehr.
+        assert gen.await_count == _MAX_FEHLER_IN_FOLGE
+        assert stats.errors == _MAX_FEHLER_IN_FOLGE
+        assert stats.found == 40
+
+    @pytest.mark.asyncio
+    async def test_nicht_versuchte_knoten_bleiben_unberuehrt(
+        self, session_factory, viele_knoten
+    ):
+        """Sie behalten `embedding IS NULL` und werden im naechsten Lauf erneut geholt."""
+        with patch(
+            "app.crons.embedding_backfill_service.generate_embedding",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("429 No deployments available"),
+        ):
+            async with session_factory() as db:
+                await backfill_embeddings(db, batch_size=100)
+
+        async with session_factory() as db:
+            offen = (await db.execute(
+                sa.select(sa.func.count()).select_from(ContextNode)
+                .where(ContextNode.embedding.is_(None))
+            )).scalar()
+            markiert = (await db.execute(
+                sa.select(sa.func.count()).select_from(ContextNode)
+                .where(ContextNode.metadata_.has_key("embedding_error"))
+            )).scalar()
+        assert offen == 40           # keiner hat einen Vektor bekommen
+        assert markiert == 10        # nur die tatsaechlich versuchten sind markiert
+
+    @pytest.mark.asyncio
+    async def test_vereinzelte_fehler_brechen_nicht_ab(self, session_factory, viele_knoten):
+        """Nur eine *ununterbrochene* Serie zaehlt — ein Erfolg setzt sie zurueck."""
+        fake = [0.1] * DIM
+        aufrufe = {"n": 0}
+
+        async def _mal_so_mal_so(_text):
+            aufrufe["n"] += 1
+            if aufrufe["n"] % 2 == 0:
+                raise RuntimeError("400 Bad Request")
+            return fake
+
+        with patch(
+            "app.crons.embedding_backfill_service.generate_embedding",
+            new=_mal_so_mal_so,
+        ):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db, batch_size=100)
+
+        assert stats.abgebrochen is False
+        assert stats.ok == 20
+        assert stats.errors == 20
