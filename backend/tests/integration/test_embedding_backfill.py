@@ -1,6 +1,8 @@
 """Integrationstests für embedding_backfill_service (KS-Phase-7 Teil B)."""
 
 import uuid
+
+import httpx
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,6 +17,22 @@ from app.config import settings
 # Vektorbreite aus der Konfiguration statt als Literal — die Testdaten müssen zur
 # tatsächlich migrierten Spalte passen (EMBEDDING_DIMENSIONS).
 DIM = settings.embedding_dimensions
+
+# Ziel der Attrappen ist `generate_embeddings` (Plural): Der Backfill bettet im Stapel ein,
+# eine Anfrage je Knoten wäre bei ~14.000 Knoten ein mehrstündiger Lauf.
+STAPEL = "app.crons.embedding_backfill_service.generate_embeddings"
+
+
+def _liefert(vektor: list[float]) -> AsyncMock:
+    """Stapel-Attrappe: gibt je Eingabetext denselben Vektor zurück.
+
+    Die Länge muss zur Eingabe passen — der Aufrufer ordnet Vektoren den Knoten paarweise
+    zu, eine zu kurze Antwort ließe die überzähligen Knoten stillschweigend leer.
+    AsyncMock, damit Tests auch prüfen können, dass gar nicht aufgerufen wurde.
+    """
+    async def _f(texte: list[str]) -> list[list[float]]:
+        return [list(vektor) for _ in texte]
+    return AsyncMock(side_effect=_f)
 
 
 # ── Session-Fixture (committed, kein Rollback-Isolation) ────────────────────
@@ -79,11 +97,7 @@ class TestBackfillEmbeddings:
     @pytest.mark.asyncio
     async def test_sets_embedding_for_whitelist_node(self, session_factory, seed_nodes):
         fake = [0.1] * DIM
-        with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
-            new_callable=AsyncMock,
-            return_value=fake,
-        ):
+        with patch(STAPEL, new=_liefert(fake)):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db, batch_size=10)
 
@@ -99,11 +113,7 @@ class TestBackfillEmbeddings:
     @pytest.mark.asyncio
     async def test_does_not_embed_non_whitelist_node(self, session_factory, seed_nodes):
         fake = [0.2] * DIM
-        with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
-            new_callable=AsyncMock,
-            return_value=fake,
-        ):
+        with patch(STAPEL, new=_liefert(fake)):
             async with session_factory() as db:
                 await backfill_embeddings(db)
 
@@ -114,11 +124,7 @@ class TestBackfillEmbeddings:
     @pytest.mark.asyncio
     async def test_dry_run_does_not_write(self, session_factory, seed_nodes):
         fake = [0.3] * DIM
-        with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
-            new_callable=AsyncMock,
-            return_value=fake,
-        ):
+        with patch(STAPEL, new=_liefert(fake)):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db, dry_run=True)
 
@@ -147,8 +153,8 @@ class TestBackfillEmbeddings:
             await db.commit()
             node_id = node.id
 
-        mock = AsyncMock(return_value=[0.5] * DIM)
-        with patch("app.crons.embedding_backfill_service.generate_embedding", mock):
+        mock = _liefert([0.5] * DIM)
+        with patch(STAPEL, new=mock):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db)
 
@@ -164,7 +170,7 @@ class TestBackfillEmbeddings:
     @pytest.mark.asyncio
     async def test_error_sets_embedding_error_metadata(self, session_factory, seed_nodes):
         with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
+            STAPEL,
             new_callable=AsyncMock,
             side_effect=RuntimeError("LiteLLM nicht erreichbar"),
         ):
@@ -190,8 +196,8 @@ class TestBackfillEmbeddings:
             )
             await db.commit()
 
-        mock = AsyncMock(return_value=[0.5] * DIM)
-        with patch("app.crons.embedding_backfill_service.generate_embedding", mock):
+        mock = _liefert([0.5] * DIM)
+        with patch(STAPEL, new=mock):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db)
 
@@ -217,11 +223,7 @@ class TestBackfillEmbeddings:
             await db.commit()
 
         fake = [0.1] * DIM
-        with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
-            new_callable=AsyncMock,
-            return_value=fake,
-        ):
+        with patch(STAPEL, new=_liefert(fake)):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db, limit=2)
 
@@ -234,10 +236,26 @@ class TestAbbruchBeiFehlerserie:
 
     Realfall: Ein ungueltiger Anbieter-Schluessel beantwortet LiteLLM mit 401; LiteLLM
     nimmt die Deployment daraufhin in den Cooldown, und alle weiteren Anfragen bekommen
-    `429 No deployments available`. Jeder Knoten kostet dann sein volles
+    `429 No deployments available`. Jede Anfrage kostet dann ihr volles
     Wiederholungsbudget — bei tausenden Knoten Stunden fuer ein Ergebnis, das nach dem
-    zehnten feststand.
+    dritten Versuch feststand.
+
+    Gezaehlt werden seit der Stapelverarbeitung **Anfragen, nicht Knoten**: Ein Fehlschlag
+    betrifft bis zu EMBEDDING_BATCH_SIZE Knoten auf einmal, und die verschwendete Zeit
+    haengt an der Zahl der Anfragen.
     """
+
+    @pytest_asyncio.fixture(autouse=True)
+    def kleine_stapel(self):
+        """Stapelgroesse 5, damit 40 Knoten ueberhaupt mehrere Anfragen ergeben.
+
+        Mit dem Standard (64) waeren alle 40 Knoten eine einzige Anfrage — die
+        Abbruchschwelle liesse sich dann gar nicht erreichen.
+        """
+        alt = settings.embedding_batch_size
+        settings.embedding_batch_size = 5
+        yield
+        settings.embedding_batch_size = alt
 
     @pytest_asyncio.fixture
     async def viele_knoten(self, session_factory):
@@ -254,10 +272,10 @@ class TestAbbruchBeiFehlerserie:
 
     @pytest.mark.asyncio
     async def test_bricht_nach_fehlerserie_ab(self, session_factory, viele_knoten):
-        from app.crons.embedding_backfill_service import _MAX_FEHLER_IN_FOLGE
+        from app.crons.embedding_backfill_service import _MAX_STAPEL_FEHLER_IN_FOLGE
 
         with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
+            STAPEL,
             new_callable=AsyncMock,
             side_effect=RuntimeError("429 No deployments available"),
         ) as gen:
@@ -265,9 +283,10 @@ class TestAbbruchBeiFehlerserie:
                 stats = await backfill_embeddings(db, batch_size=100)
 
         assert stats.abgebrochen is True
-        # Genau bis zur Schwelle versucht, danach kein Aufruf mehr.
-        assert gen.await_count == _MAX_FEHLER_IN_FOLGE
-        assert stats.errors == _MAX_FEHLER_IN_FOLGE
+        # Genau bis zur Schwelle versucht, danach keine Anfrage mehr.
+        assert gen.await_count == _MAX_STAPEL_FEHLER_IN_FOLGE
+        # Jede gescheiterte Anfrage markiert ihre 5 Knoten.
+        assert stats.errors == _MAX_STAPEL_FEHLER_IN_FOLGE * 5
         assert stats.found == 40
 
     @pytest.mark.asyncio
@@ -276,7 +295,7 @@ class TestAbbruchBeiFehlerserie:
     ):
         """Sie behalten `embedding IS NULL` und werden im naechsten Lauf erneut geholt."""
         with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
+            STAPEL,
             new_callable=AsyncMock,
             side_effect=RuntimeError("429 No deployments available"),
         ):
@@ -293,7 +312,7 @@ class TestAbbruchBeiFehlerserie:
                 .where(ContextNode.metadata_.has_key("embedding_error"))
             )).scalar()
         assert offen == 40           # keiner hat einen Vektor bekommen
-        assert markiert == 10        # nur die tatsaechlich versuchten sind markiert
+        assert markiert == 15        # 3 gescheiterte Anfragen à 5 Knoten
 
     @pytest.mark.asyncio
     async def test_vereinzelte_fehler_brechen_nicht_ab(self, session_factory, viele_knoten):
@@ -301,19 +320,49 @@ class TestAbbruchBeiFehlerserie:
         fake = [0.1] * DIM
         aufrufe = {"n": 0}
 
-        async def _mal_so_mal_so(_text):
+        async def _mal_so_mal_so(texte):
             aufrufe["n"] += 1
             if aufrufe["n"] % 2 == 0:
-                raise RuntimeError("400 Bad Request")
-            return fake
+                raise RuntimeError("500 Internal Server Error")
+            return [list(fake) for _ in texte]
 
-        with patch(
-            "app.crons.embedding_backfill_service.generate_embedding",
-            new=_mal_so_mal_so,
-        ):
+        with patch(STAPEL, new=_mal_so_mal_so):
             async with session_factory() as db:
                 stats = await backfill_embeddings(db, batch_size=100)
 
         assert stats.abgebrochen is False
-        assert stats.ok == 20
-        assert stats.errors == 20
+        assert stats.ok == 20        # 4 gelungene Anfragen à 5 Knoten
+        assert stats.errors == 20    # 4 gescheiterte Anfragen à 5 Knoten
+
+    @pytest.mark.asyncio
+    async def test_ein_schlechter_text_reisst_den_stapel_nicht_mit(
+        self, session_factory, viele_knoten
+    ):
+        """400 = Inhaltsfehler → einzeln nachfassen, statt 4 gute Knoten mitzureissen.
+
+        Das ist der reale Fall aus dem IONOS-Umstieg: BGE-M3 lehnt einen leeren Text mit
+        400 ab, OpenAI nahm ihn an. Ohne Isolierung bekaeme der ganze Stapel einen
+        `embedding_error`.
+        """
+        fake = [0.1] * DIM
+
+        async def _einer_ist_schlecht(texte):
+            if len(texte) > 1 and any("IK 7 " in t or t.endswith("Inhalt 7") for t in texte):
+                antwort = httpx.Response(
+                    400, request=httpx.Request("POST", "http://x/embeddings")
+                )
+                raise httpx.HTTPStatusError("bad", request=antwort.request, response=antwort)
+            if len(texte) == 1 and ("IK 7 " in texte[0] or texte[0].endswith("Inhalt 7")):
+                antwort = httpx.Response(
+                    400, request=httpx.Request("POST", "http://x/embeddings")
+                )
+                raise httpx.HTTPStatusError("bad", request=antwort.request, response=antwort)
+            return [list(fake) for _ in texte]
+
+        with patch(STAPEL, new=_einer_ist_schlecht):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db, batch_size=100)
+
+        assert stats.abgebrochen is False
+        assert stats.errors == 1, "nur der schuldige Text scheitert"
+        assert stats.ok == 39, "die uebrigen 39 Knoten bekommen ihren Vektor"

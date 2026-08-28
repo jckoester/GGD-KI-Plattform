@@ -351,11 +351,15 @@ class TestEmbeddingBatch:
 
         fake_embedding = [0.1] * settings.embedding_dimensions
 
+        # Der Backfill bettet im Stapel ein — die Attrappe muss je Eingabetext einen
+        # Vektor liefern, sonst bleiben die überzähligen Knoten ohne Embedding.
+        async def _stapel(texte):
+            return [list(fake_embedding) for _ in texte]
+
         factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
         with patch(
-            'app.crons.embedding_backfill_service.generate_embedding',
-            new_callable=AsyncMock,
-            return_value=fake_embedding,
+            'app.crons.embedding_backfill_service.generate_embeddings',
+            new=_stapel,
         ):
             async with factory() as db:
                 await backfill_embeddings(db, batch_size=10, dry_run=False)

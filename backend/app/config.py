@@ -60,6 +60,16 @@ class Settings(BaseSettings):
     # `dimensions`-Parameter mitsenden. Nur für Modelle, die das Kürzen der Vektorbreite
     # unterstützen (OpenAI text-embedding-3-*). BGE-M3 lehnt den Parameter ab.
     embedding_send_dimensions: bool = False
+    # Wie viele Texte pro Embedding-Anfrage. Betrifft nur den Stapelbetrieb (Backfill,
+    # Import) — ein einzeln angelegter Knoten geht weiterhin allein raus.
+    # Der Hebel ist groß: Ein Aufruf je Knoten macht aus dem Re-Embedding des
+    # Bildungsplans (~14.000 Knoten) einen mehrstündigen Lauf, im Stapel sind es Minuten.
+    # Nach oben begrenzen ihn die Anfragegröße (batch × EMBEDDING_MAX_CHARS) und das
+    # Zeitbudget des Anbieters, nicht die Vektorbreite.
+    # 64 gemessen gegen BGE-M3 bei IONOS (28.08.2026): 1 → 0,8 Knoten/s · 8 → 11,5 ·
+    # 32 → 22,4 · 64 → 32,7 · 128 → 35,0. Ab 64 ist der Zugewinn klein, während eine
+    # fehlgeschlagene Anfrage immer mehr Knoten mitreißt.
+    embedding_batch_size: int = 64
     # Wiederholversuche bei 429/503 (Rate-Limit bzw. vorübergehend nicht verfügbar).
     # Ein Rate-Limit ist ausdrücklich ein *vorübergehender* Zustand — ohne Wiederholung
     # bekommt der Knoten einen dauerhaften `embedding_error` und bleibt bis zum nächsten

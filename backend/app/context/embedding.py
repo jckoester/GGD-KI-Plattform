@@ -108,6 +108,15 @@ class EmbeddingDimensionError(RuntimeError):
     """
 
 
+class EmbeddingResponseError(RuntimeError):
+    """Die Antwort passt nicht zur Anfrage — falsche Anzahl oder Indizes.
+
+    Betrifft nur den Stapelbetrieb. Eigener Typ, weil hier NICHTS uebernommen werden darf:
+    Ohne verlaessliche 1:1-Zuordnung bekaemen Knoten fremde Vektoren, und das faellt
+    danach nirgends mehr auf.
+    """
+
+
 def _wartezeit(response: httpx.Response, versuch: int, max_wait: float) -> float:
     """Wartezeit vor dem nächsten Versuch — ``Retry-After`` schlägt die Schätzung.
 
@@ -164,6 +173,95 @@ async def _post_mit_wiederholung(
     return letzte
 
 
+def _batch_timeout(anzahl: int) -> float:
+    """Zeitbudget fuer eine Anfrage mit ``anzahl`` Texten.
+
+    Ein fester 30s-Wert passt zum Einzelaufruf, nicht zu einem Stapel: Der Anbieter
+    rechnet laenger, und ein Timeout mitten im Stapel verwirft die Arbeit fuer ALLE
+    darin enthaltenen Texte. Deshalb waechst das Budget mit der Stapelgroesse.
+    """
+    return min(300.0, 30.0 + 1.5 * max(0, anzahl - 1))
+
+
+async def generate_embeddings(texts: list[str]) -> list[list[float]]:
+    """Bettet mehrere Texte in EINER Anfrage ein — Rueckgabe in Eingabereihenfolge.
+
+    Die OpenAI-kompatible API nimmt eine Liste entgegen. Ein Aufruf je Knoten macht aus
+    einem Re-Embedding des Bildungsplans (~14.000 Knoten) einen mehrstuendigen Lauf; im
+    Stapel sind es Minuten. Aufrufer, die genau einen Text haben, nutzen
+    ``generate_embedding``.
+
+    Sehr langer Input wird je Text auf ``EMBEDDING_MAX_CHARS`` gekuerzt — konservativer
+    Zeichen-Cap (Zeichen != Token, sicher selbst bei dichter Tokenisierung) gegen 400er bei
+    sehr langen Knoten; fuer die semantische Einbettung genuegt der Textanfang.
+
+    Wirft ``httpx.HTTPError`` bei Transportfehlern und ``EmbeddingDimensionError``, wenn die
+    gelieferte Vektorbreite nicht zu ``EMBEDDING_DIMENSIONS`` passt (Aufrufer behandeln).
+    """
+    if not texts:
+        return []
+
+    from app.config import settings
+    gekuerzt = [t[: settings.embedding_max_chars] for t in texts]
+    payload: dict = {"model": settings.embedding_model, "input": gekuerzt}
+    # Nur fuer Modelle, die das Kuerzen unterstuetzen (OpenAI text-embedding-3-*);
+    # andere Anbieter quittieren den unbekannten Parameter mit 400.
+    if settings.embedding_send_dimensions:
+        payload["dimensions"] = settings.embedding_dimensions
+
+    async with httpx.AsyncClient(
+        timeout=_batch_timeout(len(gekuerzt)), verify=settings.litellm_verify_ssl
+    ) as client:
+        response = await _post_mit_wiederholung(client, payload)
+        data = response.json()
+
+    eintraege = data.get("data") or []
+    if len(eintraege) != len(gekuerzt):
+        # Ein unvollstaendiger Stapel darf NICHT teilweise verarbeitet werden: Ohne
+        # 1:1-Zuordnung waere unklar, welcher Vektor zu welchem Knoten gehoert.
+        raise EmbeddingResponseError(
+            f"Modell '{settings.embedding_model}' lieferte {len(eintraege)} Vektoren fuer "
+            f"{len(gekuerzt)} Texte."
+        )
+
+    # NACH `index` sortieren, wo es ihn gibt — nicht auf die Listenreihenfolge vertrauen.
+    # Ein vertauschter Vektor faellt nirgends auf: Er wirft keinen Fehler, er macht die
+    # semantische Suche still schlechter.
+    indizes = [e.get("index") for e in eintraege]
+    if all(isinstance(i, int) for i in indizes):
+        if sorted(indizes) != list(range(len(gekuerzt))):
+            raise EmbeddingResponseError(
+                f"Modell '{settings.embedding_model}' lieferte unerwartete Indizes: "
+                f"{indizes!r} fuer {len(gekuerzt)} Texte."
+            )
+        eintraege = sorted(eintraege, key=lambda e: e["index"])
+    elif any(isinstance(i, int) for i in indizes):
+        # Teils mit, teils ohne — hier laesst sich nicht entscheiden, was gilt.
+        raise EmbeddingResponseError(
+            f"Modell '{settings.embedding_model}' lieferte teils indizierte, teils "
+            f"unindizierte Eintraege: {indizes!r}"
+        )
+    elif len(eintraege) > 1:
+        # Kein `index` vorhanden: Die Listenreihenfolge ist das einzig Verfuegbare.
+        logger.warning(
+            "Embedding-Antwort von '%s' ohne `index` — Zuordnung folgt der "
+            "Listenreihenfolge.", settings.embedding_model,
+        )
+
+    expected = settings.embedding_dimensions
+    vektoren = [e["embedding"] for e in eintraege]
+    for vektor in vektoren:
+        if len(vektor) != expected:
+            # Frueh und mit klarer Ansage abbrechen. Ohne diese Pruefung scheitert erst der
+            # DB-Insert mit einer pgvector-Fehlermeldung, die die Ursache nicht nennt.
+            raise EmbeddingDimensionError(
+                f"Modell '{settings.embedding_model}' liefert {len(vektor)} Dimensionen, "
+                f"erwartet werden {expected}. EMBEDDING_DIMENSIONS und die Spaltenbreite von "
+                f"context_nodes.embedding pruefen (Migration + Re-Embedding noetig)."
+            )
+    return vektoren
+
+
 async def generate_embedding(text: str) -> list[float]:
     """Ruft das konfigurierte Embedding-Modell ueber den LiteLLM-Proxy auf.
 
@@ -171,34 +269,9 @@ async def generate_embedding(text: str) -> list[float]:
     ueber HTTP an (kein litellm-SDK), OpenAI-kompatibel. Modellname, Input-Cap und
     erwartete Vektorbreite kommen aus den Settings; Proxy-URL/Master-Key/SSL ebenso.
 
-    Sehr langer Input wird auf ``EMBEDDING_MAX_CHARS`` gekuerzt — konservativer Zeichen-Cap
-    (Zeichen != Token, sicher selbst bei dichter Tokenisierung) gegen 400er bei sehr langen
-    Knoten; fuer die semantische Einbettung genuegt der Textanfang.
-
-    Wirft ``httpx.HTTPError`` bei Transportfehlern und ``EmbeddingDimensionError``, wenn die
-    gelieferte Vektorbreite nicht zu ``EMBEDDING_DIMENSIONS`` passt (Aufrufer behandeln).
+    Einzelaufruf — fuer mehrere Texte ``generate_embeddings`` verwenden.
     """
-    from app.config import settings
-    text = text[: settings.embedding_max_chars]
-    payload: dict = {"model": settings.embedding_model, "input": [text]}
-    # Nur fuer Modelle, die das Kuerzen unterstuetzen (OpenAI text-embedding-3-*);
-    # andere Anbieter quittieren den unbekannten Parameter mit 400.
-    if settings.embedding_send_dimensions:
-        payload["dimensions"] = settings.embedding_dimensions
-    async with httpx.AsyncClient(timeout=30.0, verify=settings.litellm_verify_ssl) as client:
-        response = await _post_mit_wiederholung(client, payload)
-        data = response.json()
-    embedding = data["data"][0]["embedding"]
-    expected = settings.embedding_dimensions
-    if len(embedding) != expected:
-        # Frueh und mit klarer Ansage abbrechen. Ohne diese Pruefung scheitert erst der
-        # DB-Insert mit einer pgvector-Fehlermeldung, die die Ursache nicht nennt.
-        raise EmbeddingDimensionError(
-            f"Modell '{settings.embedding_model}' liefert {len(embedding)} Dimensionen, "
-            f"erwartet werden {expected}. EMBEDDING_DIMENSIONS und die Spaltenbreite von "
-            f"context_nodes.embedding pruefen (Migration + Re-Embedding noetig)."
-        )
-    return embedding
+    return (await generate_embeddings([text]))[0]
 
 
 async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:

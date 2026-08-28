@@ -123,6 +123,21 @@ Bei großen Beständen in Tranchen fahren (`--limit`), um Last und Kosten zu ver
 Backfill nimmt sich alle Knoten mit `embedding IS NULL`, deren `content_type` einbettbar ist —
 ein abgebrochener Lauf lässt sich also einfach erneut starten.
 
+> **`--batch-size` ist nicht die Anfragegröße.** Es bestimmt, nach wie vielen Knoten die
+> Datenbank-Transaktion abgeschlossen wird. Wie viele Texte in *eine* Embedding-Anfrage
+> gehen, steht in `EMBEDDING_BATCH_SIZE` (Default 64). Das ist der Hebel für die Laufzeit:
+> gemessen gegen BGE-M3 bei IONOS liefert ein Text je Anfrage 0,8 Knoten/s, 64 Texte je
+> Anfrage 33 Knoten/s. Aus einem mehrstündigen Lauf werden damit Minuten.
+>
+> Antwortet der Anbieter mit `413`, `400 request too large` oder läuft in Timeouts, ist der
+> Wert zu hoch — die Anfragegröße ist `EMBEDDING_BATCH_SIZE × EMBEDDING_MAX_CHARS`.
+>
+> Scheitert eine Anfrage mit `400`, fasst der Backfill die enthaltenen Texte einzeln nach:
+> Ein unbrauchbarer Text (z. B. leer — BGE-M3 lehnt das ab, OpenAI nicht) bekommt dann
+> seinen `embedding_error`, ohne die übrigen 63 Knoten mitzureißen. Bei allen anderen
+> Fehlern (401, 429, Timeout) unterbleibt das: Die treffen jeden Text gleich, und nach
+> **drei** vollständig fehlgeschlagenen Anfragen in Folge bricht der Lauf ab.
+
 ## Schritt 5 — Verifikation
 
 ```sql

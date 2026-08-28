@@ -6,7 +6,13 @@ from time import perf_counter
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.context.embedding import EMBEDDING_CONTENT_TYPES, _build_embedding_input, generate_embedding
+import httpx
+
+from app.context.embedding import (
+    EMBEDDING_CONTENT_TYPES,
+    _build_embedding_input,
+    generate_embeddings,
+)
 from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
@@ -14,7 +20,7 @@ logger = logging.getLogger(__name__)
 _TOKENS_PER_SECOND = 3000
 _AVG_TOKENS_PER_NODE = 150
 
-# Abbruch nach so vielen Fehlschlägen **in Folge**.
+# Abbruch nach so vielen **vollständig** fehlgeschlagenen Stapeln in Folge.
 #
 # Scheitert es derart, liegt es nicht am einzelnen Knoten, sondern am Modellzugang — und
 # dann hilft Weitermachen nichts. Der reale Fall: Ein ungültiger Anbieter-Schlüssel
@@ -22,9 +28,27 @@ _AVG_TOKENS_PER_NODE = 150
 # ("Cool down 401 Auth Errors"), und **alle** weiteren Anfragen bekommen
 # `429 No deployments available`. Ohne Abbruch arbeitet der Lauf tausende Knoten ab, jeden
 # mit vollem Wiederholungsbudget — Stunden Wartezeit für ein Ergebnis, das schon nach dem
-# zehnten Knoten feststand. Die Knoten bleiben unangetastet (`embedding IS NULL`) und
+# dritten Versuch feststand. Die Knoten bleiben unangetastet (`embedding IS NULL`) und
 # kommen im nächsten Lauf wieder dran.
-_MAX_FEHLER_IN_FOLGE = 10
+#
+# Gezählt werden **Anfragen, nicht Knoten**: Seit der Stapelverarbeitung entspricht ein
+# Fehlschlag bis zu EMBEDDING_BATCH_SIZE Knoten, und die verschwendete Zeit hängt an der
+# Zahl der Anfragen (jede mit vollem Wiederholungsbudget), nicht an der Zahl der Knoten.
+# Ein Stapel gilt nur dann als fehlgeschlagen, wenn **kein** Knoten darin gelungen ist.
+_MAX_STAPEL_FEHLER_IN_FOLGE = 3
+
+
+def _ist_inhaltsfehler(exc: Exception) -> bool:
+    """Liegt es am Text — oder am Zugang?
+
+    Die Unterscheidung entscheidet, ob ein gescheiterter Stapel einzeln nachgefasst wird.
+    Ein 400 bemängelt die Eingabe (z. B. leerer Text: BGE-M3 lehnt ihn ab, OpenAI nicht),
+    dann lohnt das Isolieren des einen schuldigen Textes. Alles andere — 401, 429, Timeout —
+    trifft jeden Text gleich; einzeln nachzufassen würde daraus N sinnlose Anfragen machen,
+    genau die Verschwendung, gegen die `_MAX_FEHLER_IN_FOLGE` existiert.
+    """
+    resp = getattr(exc, "response", None)
+    return isinstance(exc, httpx.HTTPStatusError) and resp is not None and resp.status_code == 400
 
 
 @dataclass
@@ -92,59 +116,91 @@ async def backfill_embeddings(
 
     logger.info("%s%d Knoten ohne Embedding", "[DRY RUN] " if dry_run else "", stats.found)
 
+    from app.config import settings
+    stapel_groesse = max(1, settings.embedding_batch_size)
+
+    async def _fehler_vermerken(node: ContextNode, exc: Exception) -> None:
+        stats.errors += 1
+        # Bei HTTP-Fehlern den Response-Body (der eigentliche Grund, z. B.
+        # LiteLLM-400-Detail) festhalten, nicht nur die generische httpx-Meldung.
+        resp = getattr(exc, "response", None)
+        detail = (resp.text if resp is not None else str(exc))[:2000]
+        logger.error("Embedding-Fehler Knoten %s: %s", node.id, detail)
+        meta = dict(node.metadata_ or {})
+        meta["embedding_error"] = detail
+        await db.execute(
+            update(ContextNode).where(ContextNode.id == node.id).values(metadata_=meta)
+        )
+
+    async def _stapel_einbetten(stapel: list[tuple[ContextNode, str]]) -> int:
+        """Bettet einen Stapel in EINER Anfrage ein. Rueckgabe: Anzahl Fehlschlaege."""
+        try:
+            vektoren = await generate_embeddings([text for _, text in stapel])
+        except Exception as exc:
+            if len(stapel) > 1 and _ist_inhaltsfehler(exc):
+                logger.warning(
+                    "Stapel (%d Knoten) mit 400 abgelehnt — fasse einzeln nach, um den "
+                    "schuldigen Text zu finden.", len(stapel),
+                )
+                fehler = 0
+                for eintrag in stapel:
+                    fehler += await _stapel_einbetten([eintrag])
+                return fehler
+            for node, _ in stapel:
+                await _fehler_vermerken(node, exc)
+            return len(stapel)
+
+        for (node, _), vektor in zip(stapel, vektoren):
+            await db.execute(
+                update(ContextNode).where(ContextNode.id == node.id).values(embedding=vektor)
+            )
+            stats.ok += 1
+        return 0
+
     num_batches = -(-stats.found // batch_size)  # ceiling division
-    fehler_in_folge = 0
+    stapel_fehler_in_folge = 0
     for batch_idx, i in enumerate(range(0, stats.found, batch_size), start=1):
         batch = nodes[i : i + batch_size]
+
+        # Erst die Texte bauen, dann in Anfrage-Stapel schneiden. Leere Knoten fliegen
+        # vorher raus — sonst kippt ein einziger von ihnen den ganzen Stapel in den
+        # 400er-Sonderweg.
+        aufgaben: list[tuple[ContextNode, str]] = []
         for node in batch:
-            if fehler_in_folge >= _MAX_FEHLER_IN_FOLGE:
-                stats.abgebrochen = True
-                break
             inp = _build_embedding_input(node)
             if not inp.strip():
                 # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.
                 stats.skipped += 1
                 continue
-            if dry_run:
-                stats.ok += 1
-                continue
-            try:
-                embedding = await generate_embedding(inp)
-                await db.execute(
-                    update(ContextNode)
-                    .where(ContextNode.id == node.id)
-                    .values(embedding=embedding)
-                )
-                stats.ok += 1
-                fehler_in_folge = 0
-            except Exception as exc:
-                stats.errors += 1
-                fehler_in_folge += 1
-                # Bei HTTP-Fehlern den Response-Body (der eigentliche Grund, z. B.
-                # LiteLLM-400-Detail) festhalten, nicht nur die generische httpx-Meldung.
-                resp = getattr(exc, "response", None)
-                detail = (resp.text if resp is not None else str(exc))[:2000]
-                logger.error("Embedding-Fehler Knoten %s: %s", node.id, detail)
-                meta = dict(node.metadata_ or {})
-                meta["embedding_error"] = detail
-                await db.execute(
-                    update(ContextNode)
-                    .where(ContextNode.id == node.id)
-                    .values(metadata_=meta)
-                )
+            aufgaben.append((node, inp))
+
+        if dry_run:
+            stats.ok += len(aufgaben)
+        else:
+            for start in range(0, len(aufgaben), stapel_groesse):
+                if stapel_fehler_in_folge >= _MAX_STAPEL_FEHLER_IN_FOLGE:
+                    stats.abgebrochen = True
+                    break
+                ok_vorher = stats.ok
+                await _stapel_einbetten(aufgaben[start : start + stapel_groesse])
+                # Ein einziger Erfolg im Stapel beweist, dass der Zugang steht — dann ist
+                # ein begleitender Fehler ein Einzelfall und kein Grund zum Abbruch.
+                # (Auf „keine Fehler" zu prüfen wäre falsch: Beim Isolieren nach einem 400
+                # scheitert genau ein Text, während die übrigen gelingen.)
+                stapel_fehler_in_folge = 0 if stats.ok > ok_vorher else stapel_fehler_in_folge + 1
 
         if not dry_run:
             await db.commit()
 
         if stats.abgebrochen:
             logger.error(
-                "ABBRUCH: %d Fehler in Folge — das liegt am Modellzugang, nicht an den "
-                "Knoten. %d von %d Knoten wurden nicht versucht; sie bleiben ohne "
-                "Embedding und kommen im nächsten Lauf wieder dran. Ursache im "
-                "gespeicherten Fehlertext nachsehen: "
+                "ABBRUCH: %d Stapel in Folge vollständig fehlgeschlagen — das liegt am "
+                "Modellzugang, nicht an den Knoten. %d von %d Knoten wurden nicht versucht; "
+                "sie bleiben ohne Embedding und kommen im nächsten Lauf wieder dran. "
+                "Ursache im gespeicherten Fehlertext nachsehen: "
                 "SELECT metadata->>'embedding_error' FROM context_nodes "
                 "WHERE metadata ? 'embedding_error' LIMIT 1;",
-                _MAX_FEHLER_IN_FOLGE,
+                _MAX_STAPEL_FEHLER_IN_FOLGE,
                 stats.found - stats.ok - stats.errors - stats.skipped,
                 stats.found,
             )

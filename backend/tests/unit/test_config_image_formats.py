@@ -17,12 +17,27 @@ os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
 from app.config import Settings
 
 
+@pytest.fixture(autouse=True)
+def ohne_image_env(monkeypatch):
+    """Entfernt IMAGE_*-Variablen aus der Umgebung.
+
+    `_env_file=None` genügt hier NICHT: Läuft vorher ein Integrationstest, hat dessen
+    conftest per `load_dotenv()` die reale `.env` nach `os.environ` geschoben — und für
+    **Dict-Felder** mischt pydantic-settings den Umgebungswert in den explizit
+    übergebenen, statt ihn zu ersetzen. Ein `IMAGE_SIZES` in der Betreiber-`.env` machte
+    aus `image_sizes={}` dann ein nicht-leeres Dict, und die Tests scheiterten mit
+    „DID NOT RAISE" — abhängig von der Testreihenfolge und damit schwer zu finden.
+    """
+    monkeypatch.delenv("IMAGE_SIZES", raising=False)
+    monkeypatch.delenv("IMAGE_DEFAULT_FORMAT", raising=False)
+
+
 def _settings(**over):
     base = dict(
         database_url="postgresql+asyncpg://t:t@localhost/t",
         school_secret="s" * 32,
         jwt_secret="j" * 32,
-        _env_file=None,  # reale ../.env ignorieren → isolierter Test
+        _env_file=None,  # reale ../.env ignorieren (reicht allein nicht, s. ohne_image_env)
     )
     base.update(over)
     return Settings(**base)

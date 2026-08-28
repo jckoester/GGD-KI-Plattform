@@ -15,15 +15,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Kontextknoten im Chat.
 - **PDF-Export rendert `\(…\)` und `\[…\]`.** Die Export-Pipeline kannte nur `$…$`; bei
   der Klammer-Notation verschwand zusätzlich der Backslash, sodass `(\pi)` im PDF stand.
-  Betrifft Curriculum-, Stunden- und Dokument-Export.
-- **Kompetenztitel im Curriculum- und Stunden-PDF** liefen am Formel-Rendering vorbei.
-
-## [0.6.1] – 2026-08-26
-
-### Behoben
-
-- **Embeddings: `429` und `503` werden wiederholt** statt als endgültiger Fehler
-  behandelt. Wartezeit nach `Retry-After`, sonst exponentiell; begrenzt durch
+      Betrifft Curriculum-, Stunden- und Dokument-Export.
+    - **Kompetenztitel im Curriculum- und Stunden-PDF** liefen am Formel-Rendering vorbei.
+    
+    ## [0.6.1] – 2026-08-26
+    
+    ### Behoben
+    
+    - **Embeddings: `429` und `503` werden wiederholt** statt als endgültiger Fehler
+      behandelt. Wartezeit nach `Retry-After`, sonst exponentiell; begrenzt durch
   `EMBEDDING_MAX_RETRIES` und `EMBEDDING_RETRY_MAX_WAIT_S`. Andere Fehler werden
   weiterhin sofort gemeldet.
 - **Der Embedding-Backfill bricht nach zehn Fehlschlägen in Folge ab** (`ABBRUCH:` im
