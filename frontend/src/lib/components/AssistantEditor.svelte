@@ -44,6 +44,7 @@
         deleteContextAnchor,
         searchContextNodesLegacy,
         getAugmentations,
+        getImageKinds,
     } from "$lib/api.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
@@ -68,6 +69,10 @@
     let subjects = $state([]);
     let groups = $state([]);
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
+    let imageKinds = $state([]); // konfigurierte Bildarten (Modell + Formate)
+    // false = Proxy war nicht erreichbar. Dann NICHT warnen: Eine Falschwarnung bei
+    // jedem Speichern wird weggeklickt — und mit ihr die echten.
+    let imageKindsFreigabeBekannt = $state(true);
 
     // Augmentierungs-Abschnitt nur bei Schüler-Zielgruppen (student/all) zeigen.
     let showAugmentations = $derived(
@@ -83,6 +88,60 @@
         const without = form.disabled_augmentations.filter((k) => k !== key);
         form.disabled_augmentations = active ? without : [...without, key];
     }
+
+    // ── Bildarten ────────────────────────────────────────────────────────────
+    // Nur zeigen, wenn es überhaupt etwas zu wählen gibt: Bei genau einer
+    // konfigurierten Bildart wäre die Auswahl eine Frage ohne Alternative.
+    let showImageKinds = $derived(
+        form.tool_groups.includes("image_generation") && imageKinds.length > 1,
+    );
+
+    function toggleImageKind(id, on) {
+        const without = form.image_kinds.filter((k) => k !== id);
+        form.image_kinds = on ? [...without, id] : without;
+    }
+
+    /** Zielgruppen, für die das Modell dieser Bildart nicht freigeschaltet ist. */
+    function fehlendeFreigaben(kind) {
+        const treffer = [];
+        const trifftSchueler =
+            form.audience === "student" || form.audience === "all";
+        const trifftLehrkraefte =
+            form.audience === "teacher" || form.audience === "all";
+
+        if (trifftSchueler && kind.fehlt_fuer_jahrgaenge?.length) {
+            const min = form.min_grade ? parseInt(form.min_grade) : null;
+            const max = form.max_grade ? parseInt(form.max_grade) : null;
+            const betroffen = kind.fehlt_fuer_jahrgaenge.filter(
+                (g) => (min === null || g >= min) && (max === null || g <= max),
+            );
+            if (betroffen.length)
+                treffer.push(
+                    betroffen.length === 1
+                        ? `Jahrgang ${betroffen[0]}`
+                        : `die Jahrgänge ${betroffen.join(", ")}`,
+                );
+        }
+        if (trifftLehrkraefte && kind.fehlt_fuer_lehrkraefte)
+            treffer.push("Lehrkräfte");
+        return treffer;
+    }
+
+    // Warnung zur Konfigurationszeit statt Fehlermeldung im Gespräch: Ein Admin kann
+    // die Freigabe setzen, eine Schülerin kann es nicht.
+    let bildartWarnungen = $derived.by(() => {
+        if (!showImageKinds || !imageKindsFreigabeBekannt) return [];
+        const aktive = form.image_kinds.length
+            ? imageKinds.filter((k) => form.image_kinds.includes(k.id))
+            : imageKinds;
+        return aktive
+            .map((k) => ({ label: k.label, fehlt: fehlendeFreigaben(k) }))
+            .filter((e) => e.fehlt.length > 0)
+            .map(
+                (e) =>
+                    `Die Bildart „${e.label}“ ist für ${e.fehlt.join(" und ")} nicht freigeschaltet — dort bleibt sie wirkungslos. Freigabe unter Einstellungen → Modelle.`,
+            );
+    });
 
     // Testchat State
     let testConversationId = $state(null);
@@ -339,6 +398,7 @@
             sort_order: 0,
             tool_groups: [],
             disabled_augmentations: [],
+            image_kinds: [],
             status: "draft",
             reject_reason: null,
         };
@@ -396,6 +456,7 @@
             sort_order: a.sort_order ?? 0,
             tool_groups: a.tool_groups ?? [],
             disabled_augmentations: a.disabled_augmentations ?? [],
+            image_kinds: a.image_kinds ?? [],
             status: a.status || "draft",
             reject_reason: a.reject_reason || null,
         };
@@ -441,6 +502,8 @@
         if (isAdmin) {
             p.sort_order = parseInt(form.sort_order) || 0;
             p.tool_groups = form.tool_groups;
+            // Leer = alle konfigurierten Bildarten.
+            p.image_kinds = form.image_kinds;
         }
         return p;
     }
@@ -471,6 +534,16 @@
                 augmentations = (await getAugmentations()).augmentations ?? [];
             } catch {
                 augmentations = []; // Editor bleibt nutzbar, Abschnitt entfällt
+            }
+
+            // 3c. Bildarten (nur relevant bei aktiver Bildgenerierung)
+            try {
+                const ik = await getImageKinds();
+                imageKinds = ik.bildarten ?? [];
+                imageKindsFreigabeBekannt = ik.freigabe_bekannt !== false;
+            } catch {
+                imageKinds = []; // Abschnitt entfällt, Editor bleibt nutzbar
+                imageKindsFreigabeBekannt = false;
             }
 
             // 4. Assistenten-Daten laden (wenn nicht neu, oder Vorlage duplizieren)
@@ -1560,6 +1633,53 @@
                                 <WarningBanner
                                     message="Jugendschutz: Dieser Assistent erzeugt Bilder und ist für Schüler:innen sichtbar. Ein schulweiter Bild-Assistent für Schüler:innen wird erst nach Admin-Freigabe aktiv. Bitte Zielgruppe und Jahrgänge (min./max.) bewusst wählen und die Blockliste beachten."
                                 />
+                            {/if}
+
+                            {#if showImageKinds}
+                                <div class="ml-6 space-y-2 pt-1">
+                                    <span class="block text-sm font-medium text-light-tx dark:text-dark-tx">
+                                        Bildarten
+                                    </span>
+                                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                        Eine Bildart legt Modell und Formate fest — nicht den Stil;
+                                        der entsteht aus dem System-Prompt. <strong>Eine einzige
+                                        Bildart ist der Regelfall:</strong> Dann gibt es nichts zu
+                                        wählen und die Kosten sind vorhersagbar. Nichts ausgewählt =
+                                        alle.
+                                    </p>
+                                    {#each imageKinds as kind (kind.id)}
+                                        <label class="flex items-start gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={form.image_kinds.includes(kind.id)}
+                                                onchange={(e) => toggleImageKind(kind.id, e.currentTarget.checked)}
+                                                class="mt-1 rounded border-light-ui-3 dark:border-dark-ui-3"
+                                            />
+                                            <span>
+                                                {kind.label}
+                                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                                    ({kind.formate.join(', ')})
+                                                </span>
+                                                {#if kind.beschreibung}
+                                                    <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                                        {kind.beschreibung}
+                                                    </span>
+                                                {/if}
+                                            </span>
+                                        </label>
+                                    {/each}
+                                    {#if form.image_kinds.length > 1}
+                                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                            Mehrere Bildarten: Das Chat-Modell entscheidet anhand von
+                                            Bezeichnung und Beschreibung, welche es nutzt. Das ist nur
+                                            so verlässlich wie sein Function-Calling — bei
+                                            schwächeren Modellen lieber zwei Assistenten anlegen.
+                                        </p>
+                                    {/if}
+                                    {#each bildartWarnungen as warnung}
+                                        <WarningBanner message={warnung} />
+                                    {/each}
+                                </div>
                             {/if}
                         </div>
                     {/if}

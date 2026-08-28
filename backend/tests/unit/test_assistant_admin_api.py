@@ -182,6 +182,9 @@ class TestAssistantResponse:
             sort_order=0,
             tool_groups=[],
             disabled_augmentations=["socratic_preference"],
+            # Wie tool_groups: Der server_default greift erst beim INSERT, ein frisch
+            # konstruiertes ORM-Objekt hätte hier None.
+            image_kinds=[],
             created_by="pseudo-1",
             updated_by_pseudonym="pseudo-1",
             creator_role="teacher",

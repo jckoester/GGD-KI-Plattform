@@ -200,6 +200,14 @@ class Assistant(Base):
         JSONB, nullable=False, server_default=text("'[]'")
     )
 
+    # Bildarten (IDs aus config/image_models.yaml), die dieser Assistent führen darf.
+    # **Leer = alle konfigurierten** — so behalten Assistenten aus der Zeit vor der
+    # Mehrmodell-Fähigkeit ihr Verhalten ohne Datenmigration. Greift nur zusammen mit der
+    # Tool-Gruppe `image_generation`.
+    image_kinds: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+
     # Pädagogische Lernverhalten-Augmentierungen (pedagogy.yaml), die für diesen
     # Assistenten deaktiviert sind — Liste von Augmentierungs-Keys. Greift nur in der
     # Schüler-Behandlung (Phase 13).

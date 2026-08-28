@@ -928,6 +928,20 @@ export async function getAugmentations() {
   return res.json(); // { augmentations: [{ key, label }] }
 }
 
+/**
+ * Konfigurierte Bildarten samt Freischaltungsstand je Jahrgang.
+ * → { bildarten: [{ id, label, beschreibung, modell, formate,
+ *                   fehlt_fuer_jahrgaenge, fehlt_fuer_lehrkraefte }],
+ *     standard_bildart, freigabe_bekannt }
+ * `freigabe_bekannt: false` heißt: Proxy nicht erreichbar — dann NICHT warnen.
+ */
+export async function getImageKinds() {
+  const res = await fetch(`${BASE}/image-kinds`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
 export async function createAssistant(data) {
   const res = await fetch(`${BASE}/assistants`, {
     method: "POST",

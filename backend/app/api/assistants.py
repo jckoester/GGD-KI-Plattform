@@ -137,6 +137,8 @@ class AssistantCreate(BaseModel):
     sort_order: int = 0  # nur Admin wertet das aus; Lehrkraefte senden 0 oder nichts
     tool_groups: list[str] = []
     disabled_augmentations: list[str] = []
+    # Leer = alle konfigurierten Bildarten (siehe config/image_models.yaml).
+    image_kinds: list[str] = []
 
 
 class AssistantUpdate(BaseModel):
@@ -163,6 +165,7 @@ class AssistantUpdate(BaseModel):
     sort_order: Optional[int] = None
     tool_groups: Optional[list[str]] = None
     disabled_augmentations: Optional[list[str]] = None
+    image_kinds: Optional[list[str]] = None
 
 
 class AssistantResponse(BaseModel):
@@ -195,6 +198,7 @@ class AssistantResponse(BaseModel):
     updated_at: datetime
     tool_groups: list[str] = []
     disabled_augmentations: list[str] = []
+    image_kinds: list[str] = []
     documents: list[AssistantDocumentOut] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -599,6 +603,7 @@ async def create_assistant(
         available_until=request.available_until,
         tool_groups=request.tool_groups,
         disabled_augmentations=request.disabled_augmentations,
+        image_kinds=request.image_kinds,
         sort_order=sort_order,
         creator_role=creator_role,
         created_by=current_user.sub,

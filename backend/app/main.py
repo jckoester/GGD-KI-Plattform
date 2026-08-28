@@ -40,6 +40,7 @@ from app.context.router import router as context_router
 from app.planning.router import router as planning_router
 from app.api.review import router as review_router
 from app.api.pedagogy import router as pedagogy_router
+from app.api.image_kinds import router as image_kinds_router
 from app.api.pii import router as pii_router
 from app.render.router import router as render_router
 from app.artifacts.router import router as artifacts_router
@@ -192,6 +193,7 @@ app.include_router(context_router)
 app.include_router(planning_router)
 app.include_router(review_router)
 app.include_router(pedagogy_router)
+app.include_router(image_kinds_router)
 app.include_router(pii_router)
 app.include_router(render_router)
 app.include_router(artifacts_router)
