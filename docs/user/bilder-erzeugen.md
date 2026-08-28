@@ -21,6 +21,14 @@ einen Chat damit.
    kannst du es **herunterladen** oder mit dem Lesezeichen-Symbol in deine
    [Bibliothek](bibliothek.md) übernehmen — sonst verschwindet es mit dem Chat.
 
+## Noch einmal versuchen
+
+Gefällt dir ein Bild nicht ganz, brauchst du deine Beschreibung nicht zu wiederholen: Das
+**Wiederholen-Symbol** am Bild erzeugt einen neuen Versuch mit derselben Beschreibung. Das alte
+Bild bleibt stehen, du kannst also vergleichen.
+
+> Jeder Versuch kostet wie ein neues Bild. Wer zehnmal wiederholt, zahlt zehnmal.
+
 ## Hoch, quer oder quadratisch?
 
 Es gibt kein Auswahlfeld für das Bildformat — **sag es einfach im Chat mit**:

@@ -1,10 +1,11 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2 } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
-    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument } from '$lib/api.js';
+    import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
+    import { user } from '$lib/stores/user.js';
     import { deriveDocTitle } from '$lib/workshop.js';
     import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
@@ -14,6 +15,28 @@
     let renderedContent = $derived(
         message.role === 'assistant' ? renderMarkdown(message.content) : ''
     );
+
+    // Die verwendete Bildart interessiert Lehrkräfte (greift das Routing sinnvoll?);
+    // für Schüler:innen wäre sie nur Rauschen — sie wählen ohnehin nichts aus.
+    let zeigeBildart = $derived(!!$user?.roles?.includes('teacher'));
+
+    // „Variieren": derselbe Prompt, dieselbe Bildart, neuer Wurf. Läuft ohne Chat-Modell —
+    // es geht nicht darum, den Wunsch neu zu formulieren.
+    let variiereStatus = $state({});   // image_id → 'laeuft' | Fehlertext
+    async function variiere(imageId) {
+        if (variiereStatus[imageId] === 'laeuft') return;
+        variiereStatus = { ...variiereStatus, [imageId]: 'laeuft' };
+        try {
+            const neu = await variiereBild(imageId);
+            message.images = [...(message.images ?? []), neu];
+            variiereStatus = { ...variiereStatus, [imageId]: null };
+        } catch (e) {
+            variiereStatus = {
+                ...variiereStatus,
+                [imageId]: e?.message || 'Variieren fehlgeschlagen.',
+            };
+        }
+    }
 
     // Generierte Bilder (Phase 16): fehlgeschlagene Ladevorgänge je image_id merken.
     let failedImages = $state(new Set());
@@ -318,7 +341,37 @@
                                 >
                                     <Download class="w-4 h-4" />
                                 </a>
+                                {#if img.bildart}
+                                    <button
+                                        type="button"
+                                        onclick={() => variiere(img.image_id)}
+                                        disabled={variiereStatus[img.image_id] === 'laeuft'}
+                                        aria-label="Noch einmal erzeugen"
+                                        title="Noch einmal erzeugen — gleiche Beschreibung, neues Bild"
+                                        class="p-1.5 rounded-lg
+                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
+                                               disabled:opacity-60"
+                                    >
+                                        {#if variiereStatus[img.image_id] === 'laeuft'}
+                                            <Loader2 class="w-4 h-4 animate-spin" />
+                                        {:else}
+                                            <RefreshCw class="w-4 h-4" />
+                                        {/if}
+                                    </button>
+                                {/if}
                             </div>
+                            {#if zeigeBildart && img.bildart}
+                                <p class="mt-0.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    Bildart: {img.bildart}
+                                </p>
+                            {/if}
+                            {#if variiereStatus[img.image_id] && variiereStatus[img.image_id] !== 'laeuft'}
+                                <p class="mt-0.5 text-xs text-light-re dark:text-dark-re">
+                                    {variiereStatus[img.image_id]}
+                                </p>
+                            {/if}
                         </div>
                     {/if}
                 {/each}

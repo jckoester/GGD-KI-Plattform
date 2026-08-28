@@ -70,14 +70,14 @@ async def test_collect_empty_conversation_ids_shortcircuits():
 # ── message_id-Verknüpfung (Schritt 5) ─────────────────────────────────────────
 
 async def test_list_message_images_groups_by_message():
-    """Bilder werden nach message_id gruppiert, chronologisch, mit {image_id, size}."""
+    """Bilder nach message_id gruppiert, chronologisch, mit {image_id, size, bildart}."""
     m1, m2 = uuid4(), uuid4()
     i1, i2, i3 = uuid4(), uuid4(), uuid4()
     exec_result = MagicMock()
     exec_result.all.return_value = [
-        (i1, "1024x1024", m1),
-        (i2, "1024x1536", m1),
-        (i3, "1024x1024", m2),
+        (i1, "1024x1024", "standard", m1),
+        (i2, "1024x1536", "formatwahl", m1),
+        (i3, "1024x1024", None, m2),   # Bild von vor der Bildart-Spalte
     ]
     db = MagicMock()
     db.execute = AsyncMock(return_value=exec_result)
@@ -87,6 +87,8 @@ async def test_list_message_images_groups_by_message():
     assert set(out.keys()) == {m1, m2}
     assert [x["image_id"] for x in out[m1]] == [str(i1), str(i2)]
     assert out[m1][0]["size"] == "1024x1024"
+    assert out[m1][0]["bildart"] == "standard"
+    assert out[m2][0]["bildart"] is None
     assert [x["image_id"] for x in out[m2]] == [str(i3)]
 
 

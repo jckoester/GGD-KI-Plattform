@@ -57,6 +57,8 @@ async def save_generated_image(
     size: str,
     mime_type: str = "image/png",
     prompt: str | None = None,
+    bildart: str | None = None,
+    message_id: UUID | None = None,
 ) -> UUID:
     """Schreibt die Bytes auf Disk + legt die DB-Referenz an (committed). Gibt die ID zurück."""
     image_id = uuid4()
@@ -68,7 +70,11 @@ async def save_generated_image(
         id=image_id,
         pseudonym=pseudonym,
         conversation_id=conversation_id,
+        # Im Chat-Flow erst nachträglich gesetzt (die Assistant-Nachricht existiert
+        # mid-Stream noch nicht); beim Variieren steht sie bereits fest.
+        message_id=message_id,
         model=model,
+        bildart=bildart,
         size=size,
         mime_type=mime_type,
         byte_size=len(image_bytes),
@@ -87,9 +93,14 @@ async def list_message_images(db: AsyncSession, conversation_id: UUID) -> dict[U
     """Bilder einer Konversation nach `message_id` gruppiert (für die History-Rehydrierung).
 
     Nur an eine Nachricht verknüpfte Bilder (message_id gesetzt); je Eintrag
-    `{image_id, size}`, chronologisch."""
+    `{image_id, size, bildart}`, chronologisch."""
     rows = (await db.execute(
-        select(GeneratedImage.id, GeneratedImage.size, GeneratedImage.message_id)
+        select(
+            GeneratedImage.id,
+            GeneratedImage.size,
+            GeneratedImage.bildart,
+            GeneratedImage.message_id,
+        )
         .where(
             GeneratedImage.conversation_id == conversation_id,
             GeneratedImage.message_id.isnot(None),
@@ -97,8 +108,10 @@ async def list_message_images(db: AsyncSession, conversation_id: UUID) -> dict[U
         .order_by(GeneratedImage.created_at.asc())
     )).all()
     out: dict[UUID, list[dict]] = {}
-    for image_id, size, message_id in rows:
-        out.setdefault(message_id, []).append({"image_id": str(image_id), "size": size})
+    for image_id, size, bildart, message_id in rows:
+        out.setdefault(message_id, []).append(
+            {"image_id": str(image_id), "size": size, "bildart": bildart}
+        )
     return out
 
 

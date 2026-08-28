@@ -863,6 +863,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             # nachvollziehbar, womit ein Bild erzeugt wurde, wenn mehrere Bildarten im
             # Spiel sind (und für die Modell-Transparenz, siehe Todo).
             model=bildart.modell,
+            bildart=bildart.id,
             size=size,
             mime_type="image/png",
             prompt=prompt,
@@ -1508,7 +1509,7 @@ async def chat(
                             _image_cost_total += float(tool_result["cost_usd"])
                         yield (
                             f"event: image\n"
-                            f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size')})}\n\n"
+                            f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size'), 'bildart': tool_result.get('bildart')})}\n\n"
                         )
                     tool_result_str = json.dumps({
                         k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
@@ -1832,6 +1833,126 @@ async def get_generated_image(
         # Referenz existiert, Datei fehlt (bereits geräumt) — als nicht gefunden behandeln.
         raise HTTPException(status_code=404, detail="Bilddatei nicht gefunden")
     return Response(content=data, media_type=record.mime_type)
+
+
+class ImageVariationResponse(BaseModel):
+    image_id: str
+    size: str
+    bildart: Optional[str] = None   # Label, für die Anzeige
+
+
+@router.post("/images/{image_id}/variieren", response_model=ImageVariationResponse)
+async def variiere_generiertes_bild(
+    image_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ImageVariationResponse:
+    """Erzeugt ein zweites Bild aus demselben Prompt und derselben Bildart.
+
+    Bewusst **ohne** das Chat-Modell: Es geht nicht darum, den Wunsch neu zu formulieren,
+    sondern denselben Prompt noch einmal zu würfeln. Ein Umweg über den Chat kostete einen
+    zusätzlichen LLM-Aufruf und liefert womöglich einen abgewandelten Prompt.
+
+    Das neue Bild hängt an **derselben Nachricht** wie das Original — beim erneuten Laden
+    der Konversation stehen die Varianten also beieinander.
+    """
+    record = await get_image_record(db, image_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+    if record.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    if not record.prompt:
+        # Bilder von vor der Prompt-Spalte. Ohne Prompt gäbe es nichts zu wiederholen.
+        raise HTTPException(
+            status_code=409,
+            detail="Für dieses Bild ist kein Prompt gespeichert — Variieren nicht möglich.",
+        )
+
+    bildart = get_bildart(record.bildart) if record.bildart else None
+    if bildart is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Die Bildart dieses Bildes gibt es nicht mehr — "
+                "bitte im Chat ein neues Bild erzeugen."
+            ),
+        )
+
+    # Dieselbe Freigabeprüfung wie im Chat: Ein altes Bild darf kein Schlupfloch zu einem
+    # Modell sein, das für diesen Jahrgang inzwischen gesperrt ist.
+    erlaubt = await erlaubte_modelle_fuer(
+        current_user.roles, getattr(current_user, "grade", None)
+    )
+    if erlaubt is not None and bildart.modell not in erlaubt:
+        raise HTTPException(status_code=403, detail=_bild_fehlertext(403, bildart))
+
+    reason = _image_prompt_block_reason(record.prompt)
+    if reason:
+        # Die Blockliste kann sich seit dem ersten Bild geändert haben.
+        raise HTTPException(status_code=422, detail=reason)
+
+    key_result = await db.execute(
+        select(PseudonymAudit.litellm_key).where(
+            PseudonymAudit.pseudonym == current_user.sub
+        )
+    )
+    litellm_key = key_result.scalar_one_or_none()
+    if litellm_key is None:
+        raise HTTPException(status_code=503, detail="LiteLLM-Key nicht verfügbar")
+
+    # Größe des Originals, sofern die Bildart sie noch führt — sonst deren Standardformat.
+    formatname = next(
+        (n for n, groesse in bildart.formate.items() if groesse == record.size),
+        bildart.standardformat,
+    )
+    size = bildart.formate[formatname]
+
+    client = LiteLLMClient()
+    try:
+        result = await client.generate_image(
+            record.prompt,
+            model=bildart.modell,
+            api_key=litellm_key,
+            user=current_user.sub,
+            size=size,
+            response_format=bildart.response_format or None,
+        )
+    except ImageGenerationError as e:
+        logger.warning("Variieren abgelehnt: status=%s bildart=%s", e.status_code, bildart.id)
+        raise HTTPException(status_code=502, detail=_bild_fehlertext(e.status_code, bildart))
+    except Exception:
+        logger.exception("Variieren fehlgeschlagen (image_id=%s)", image_id)
+        raise HTTPException(status_code=502, detail="Bildgenerierung fehlgeschlagen.")
+    finally:
+        await client.close()
+
+    neue_id = await save_generated_image(
+        db,
+        pseudonym=current_user.sub,
+        conversation_id=record.conversation_id,
+        message_id=record.message_id,
+        image_bytes=result.image_bytes,
+        model=bildart.modell,
+        bildart=bildart.id,
+        size=size,
+        mime_type="image/png",
+        prompt=record.prompt,
+    )
+
+    # Kosten der Nachricht zuschlagen, an der das Bild hängt. Sonst zeigte der Chat einen
+    # Betrag, der unter dem liegt, was tatsächlich ausgegeben wurde — das Budget am Virtual
+    # Key stimmt zwar, die Anzeige aber nicht.
+    if result.cost_usd and record.message_id is not None:
+        await db.execute(
+            update(Message)
+            .where(Message.id == record.message_id)
+            .values(cost_usd=func.coalesce(Message.cost_usd, 0) + result.cost_usd)
+        )
+        await db.commit()
+
+    return ImageVariationResponse(
+        image_id=str(neue_id), size=size, bildart=bildart.label
+    )
 
 
 @router.get("/conversations")

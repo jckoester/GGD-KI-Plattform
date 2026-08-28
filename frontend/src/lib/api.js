@@ -935,6 +935,20 @@ export async function getAugmentations() {
  *     standard_bildart, freigabe_bekannt }
  * `freigabe_bekannt: false` heißt: Proxy nicht erreichbar — dann NICHT warnen.
  */
+/**
+ * Erzeugt ein zweites Bild aus demselben Prompt und derselben Bildart.
+ * → { image_id, size, bildart }
+ */
+export async function variiereBild(imageId) {
+  const res = await fetch(`${BASE}/images/${imageId}/variieren`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
 export async function getImageKinds() {
   const res = await fetch(`${BASE}/image-kinds`, { credentials: "include" });
   if (!res.ok)

@@ -389,6 +389,10 @@ class GeneratedImage(Base):
         ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
+    # Bildart-ID, mit der das Bild erzeugt wurde. Nullable: Bilder von vor der
+    # Mehrmodell-Fähigkeit haben keine, und aus Modell + Größe wäre sie nicht eindeutig
+    # rekonstruierbar (zwei Bildarten dürfen dasselbe Modell nutzen).
+    bildart: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     size: Mapped[str] = mapped_column(Text, nullable=False)
     mime_type: Mapped[str] = mapped_column(Text, nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)

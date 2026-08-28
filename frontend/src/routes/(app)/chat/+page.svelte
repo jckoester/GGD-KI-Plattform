@@ -657,7 +657,11 @@
                         ...messages[assistantIndex],
                         images: [
                             ...(messages[assistantIndex].images ?? []),
-                            { image_id: item.image_id, size: item.size },
+                            {
+                                image_id: item.image_id,
+                                size: item.size,
+                                bildart: item.bildart,
+                            },
                         ],
                     };
                     messages = messages;

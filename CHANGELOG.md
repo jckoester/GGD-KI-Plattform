@@ -43,6 +43,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
     Seitenverhältnis abgebildet statt abgelehnt; das Chat-Modell nennt die Abweichung.
   - Lehnt der Proxy ab, erscheint statt „Bildgenerierung fehlgeschlagen" ein Satz, der die
     Ursache nennt (nicht freigeschaltet / Budget aufgebraucht).
+  - **Noch einmal versuchen:** Ein Symbol am Bild erzeugt einen neuen Versuch mit derselben
+    Beschreibung und Bildart, ohne den Chat erneut zu bemühen. Lehrkräfte sehen zusätzlich,
+    welche Bildart verwendet wurde.
 
 - **Vorlage für den EU-Betrieb:** `infra/litellm_config.ionos.example.yaml` mit fünf
   Chat-Stufen, Systemmodellen, Embedding und Bild — Modell-IDs, Fähigkeiten und Preise
@@ -112,8 +115,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
-- **`alembic upgrade head`** — Migration `0047` ergänzt `assistants.image_kinds`.
-  Bestandsassistenten behalten mit dem Standardwert ihr bisheriges Verhalten.
+- **`alembic upgrade head`** — Migration `0047` ergänzt `assistants.image_kinds`,
+  `0048` ergänzt `generated_images.bildart`. Bestandsassistenten behalten mit dem
+  Standardwert ihr bisheriges Verhalten; bereits erzeugte Bilder lassen sich mangels
+  gespeicherter Bildart nicht variieren.
 
 - ⚠️ **Die eigene `infra/litellm_config.yaml` muss angepasst werden.** Drei Dinge, die
   bisher stillschweigend nicht griffen oder ab LiteLLM 1.83.7 den Proxy-Start verhindern:

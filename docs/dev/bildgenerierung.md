@@ -69,6 +69,32 @@ verteilen sich bis unendlich). Bei Gleichstand gewinnt das Standardformat. Ein n
 konfigurierter Name (oder eine rohe Pixelangabe aus der alten Schnittstelle) fällt stumm
 auf das Standardformat: Ohne erkennbare Absicht gibt es nichts zu nähern.
 
+## Variieren
+
+`POST /images/{id}/variieren` erzeugt ein zweites Bild aus **demselben Prompt** und
+derselben Bildart — bewusst ohne Chat-Modell: Es geht nicht darum, den Wunsch neu zu
+formulieren, und ein Umweg über den Chat kostete einen zusätzlichen LLM-Aufruf.
+
+Der zweite Versuch ist **keine Abkürzung** an den Prüfungen des ersten vorbei: Eigentümer-
+schaft (Pseudonym), Team-Freigabe des Modells und die Bild-Blockliste gelten erneut — die
+Blockliste kann sich seit dem ersten Bild geändert haben, die Freigabe auch.
+
+- Die Bildart kommt aus `generated_images.bildart` (Alembic `0048`, nullable). Fehlt sie
+  (Bild von vor der Spalte) oder gibt es die Bildart nicht mehr → `409` mit Klartext; die
+  Oberfläche blendet den Knopf ohne `bildart` gar nicht erst ein.
+- Die Größe des Originals gewinnt, sofern die Bildart sie noch führt — sonst deren
+  Standardformat. Nie eine unkonfigurierte (und damit unbepreiste) Größe.
+- Das neue Bild erbt `conversation_id` **und** `message_id`, steht beim erneuten Laden also
+  bei seinem Original.
+- Die Kosten werden der Nachricht zugeschlagen (`messages.cost_usd`). Sonst zeigte der Chat
+  weniger an, als tatsächlich ausgegeben wurde — das Budget am Virtual Key stimmt ohnehin,
+  die Anzeige aber nicht.
+
+Die verwendete Bildart steht im SSE-`image`-Event und in `list_message_images`; angezeigt
+wird sie **nur Lehrkräften** (`MessageBubble`, `zeigeBildart`) — sie sollen beurteilen
+können, ob das Routing bei mehreren Bildarten sinnvoll wählt. Für Schüler:innen wäre sie
+Rauschen, sie wählen ohnehin nichts aus.
+
 ## Client
 
 `LiteLLMClient.generate_image()` (`app/litellm/client.py`):
