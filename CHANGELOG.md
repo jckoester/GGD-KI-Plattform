@@ -30,6 +30,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **`scripts/ionos_probe.py`** fragt Katalog, Function-Calling, Vektorbreite und Bildformat
   direkt beim Anbieter ab — die vier Angaben, die sich nicht der Dokumentation entnehmen
   lassen.
+- **`scripts/bildpreis_probe.py`** misst über einen eigens angelegten Virtual Key, ob und
+  wie ein Bildmodell abgerechnet wird: gebuchter Betrag je Größe, Header gegen SpendLog,
+  Belastung des Budgets, Vergleich mit dem Tarif des Anbieters. Prüft zusätzlich anhand
+  der Bildbytes, ob die bestellte Größe geliefert wurde.
 - **Der Jugendschutz-Guardrail fällt nicht mehr blind offen aus.** Bei Störung des
   Klassifikators greift eine Staffel: Wiederholung (`classifier_retries`), optionaler
   zweiter Klassifikator (`fallback_classifier_model`), und wenn beides nichts liefert,
