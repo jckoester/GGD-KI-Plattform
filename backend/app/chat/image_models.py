@@ -28,6 +28,7 @@ abgelösten Umgebungsvariablen (``IMAGE_DEFAULT_MODEL`` & Co.) genau **eine** Bi
 from __future__ import annotations
 
 import logging
+import math
 import re
 from pathlib import Path
 
@@ -138,6 +139,34 @@ class Bildart(BaseModel):
         treffer = _GROESSE_MUSTER.match(self.formate[formatname])
         assert treffer is not None  # durch _formate_pruefen sichergestellt
         return int(treffer.group(1)), int(treffer.group(2))
+
+    def seitenverhaeltnis(self, formatname: str) -> float:
+        breite, hoehe = self.pixel(formatname)
+        return breite / hoehe
+
+    def naechstes_format(self, ziel_verhaeltnis: float) -> str:
+        """Das konfigurierte Format, dessen Seitenverhältnis dem Ziel am nächsten kommt.
+
+        Verglichen wird der Abstand der **Logarithmen**. Linear wäre der Vergleich
+        schief: Hochformate drängen sich zwischen 0 und 1, Querformate verteilen sich
+        von 1 bis unendlich — ein linearer Abstand bevorzugte deshalb systematisch das
+        Hochformat. Im Log-Maß sind 1:2 und 2:1 gleich weit von 1:1 entfernt, wie es
+        der Anschauung entspricht.
+
+        Bei Gleichstand gewinnt das Standardformat, sonst die Reihenfolge in der
+        Konfiguration — die Wahl ist damit in jedem Fall reproduzierbar.
+        """
+        ziel = math.log(ziel_verhaeltnis)
+        bester: str | None = None
+        bester_abstand: float | None = None
+        for name in self.formate:
+            abstand = abs(math.log(self.seitenverhaeltnis(name)) - ziel)
+            if bester_abstand is None or abstand < bester_abstand - 1e-9:
+                bester, bester_abstand = name, abstand
+            elif abs(abstand - bester_abstand) <= 1e-9 and name == self.standardformat:
+                bester = name
+        assert bester is not None  # formate ist nie leer (Validierung)
+        return bester
 
 
 class ImageModelsConfig(BaseModel):
@@ -264,6 +293,28 @@ def default_bildart() -> Bildart:
 
 def alle_bildarten() -> list[Bildart]:
     return list(load_image_models().bildarten)
+
+
+def bekanntes_seitenverhaeltnis(formatname: str | None) -> float | None:
+    """Seitenverhältnis eines Formatnamens, gesucht über **alle** Bildarten.
+
+    Damit lässt sich ein Wunsch übersetzen, den die gewählte Bildart selbst nicht kennt:
+    Fragt das Chat-Modell nach ``hoch``, die Bildart führt aber nur ``quadratisch``, dann
+    ist erst über diese Auskunft entscheidbar, dass ``quadratisch`` die bessere Näherung
+    ist als ``quer``. Der erste Treffer gewinnt; verschiedene Bildarten mögen ``quer``
+    leicht unterschiedlich schneiden, die Orientierung ist aber dieselbe — und mehr wird
+    für die Näherung nicht gebraucht.
+
+    Gibt None zurück, wenn der Name nirgends konfiguriert ist (auch bei einer rohen
+    Pixelangabe wie ``1024x1024`` — die ist kein Formatname und wird bewusst nicht
+    ausgewertet, sonst gäbe es zwei Schnittstellen zum Modell).
+    """
+    if not formatname:
+        return None
+    for b in load_image_models().bildarten:
+        if formatname in b.formate:
+            return b.seitenverhaeltnis(formatname)
+    return None
 
 
 def referenzierte_modelle() -> list[str]:

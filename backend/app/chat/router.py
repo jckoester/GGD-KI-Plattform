@@ -24,6 +24,12 @@ from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
 from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
 from app.chat.image_moderation import image_prompt_block_reason
+from app.chat.image_models import (
+    Bildart,
+    bekanntes_seitenverhaeltnis,
+    default_bildart,
+    get_bildart,
+)
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
@@ -569,17 +575,54 @@ def _build_generate_image_tool() -> dict:
 _GENERATE_IMAGE_TOOL = _build_generate_image_tool()
 
 
-def _resolve_image_format(name: Optional[str]) -> tuple[str, str]:
-    """Formatname → (Name, Pixelgröße). Unbekanntes/fehlendes fällt auf den Default zurück.
+def _resolve_bildart(name: Optional[str]) -> Bildart:
+    """Bildart-ID → Bildart. Unbekanntes/fehlendes fällt auf die Standard-Bildart zurück.
 
-    Bewusst tolerant statt fehlerhaft: Ein Modell, das einen unpassenden Namen liefert, soll
-    ein Bild im Standardformat bekommen und nicht die ganze Anfrage verlieren. Die Rückgabe
-    ist immer eine konfigurierte — also abgerechnete — Größe.
+    Tolerant statt fehlerhaft, aus demselben Grund wie bei den Formaten: Eine erfundene
+    ID soll ein Bild im Standard erzeugen, nicht die Anfrage verlieren. Die Rückgabe ist
+    immer eine **konfigurierte** Bildart — also ein Modell, für das ein Preis hinterlegt
+    sein kann.
     """
-    formats = settings.image_sizes
-    if name not in formats:
-        name = settings.image_default_format
-    return name, formats[name]
+    return get_bildart(name) or default_bildart()
+
+
+def _resolve_image_format(
+    bildart: Bildart, name: Optional[str]
+) -> tuple[str, str, Optional[str]]:
+    """Formatwunsch → (Formatname, Pixelgröße, Hinweis) **innerhalb** der Bildart.
+
+    Drei Fälle:
+
+    1. Die Bildart kennt das Format → exakt so.
+    2. Die Bildart kennt es nicht, aber eine andere → das **nächstliegende
+       Seitenverhältnis** dieser Bildart. „hoch" bei einem Modell, das nur quadratisch
+       kann, wird damit zu „quadratisch" und nicht zu „quer". Dazu ein Hinweis, damit das
+       Chat-Modell es der Nutzerin sagen kann — sonst bekäme sie stillschweigend etwas
+       anderes, als sie wollte.
+    3. Der Name ist nirgends konfiguriert (erfunden, oder eine rohe Pixelangabe aus der
+       alten Schnittstelle) → Standardformat, ohne Hinweis. Hier gibt es keine erkennbare
+       Absicht, die man näherungsweise erfüllen könnte.
+
+    Die Rückgabe ist in jedem Fall eine konfigurierte — also abgerechnete — Größe.
+    """
+    if name and name in bildart.formate:
+        return name, bildart.formate[name], None
+
+    ziel = bekanntes_seitenverhaeltnis(name)
+    if ziel is None:
+        gewaehlt = bildart.standardformat
+        return gewaehlt, bildart.formate[gewaehlt], None
+
+    gewaehlt = bildart.naechstes_format(ziel)
+    hinweis = (
+        f'Das Format „{name}“ ist mit dieser Bildart nicht möglich — '
+        f'erzeugt wurde „{gewaehlt}“.'
+    )
+    logger.info(
+        "Bildformat genähert: '%s' → '%s' (Bildart '%s', Modell '%s')",
+        name, gewaehlt, bildart.id, bildart.modell,
+    )
+    return gewaehlt, bildart.formate[gewaehlt], hinweis
 
 
 def _image_prompt_block_reason(prompt: str) -> Optional[str]:
@@ -619,22 +662,28 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         logger.error("generate_image: keine conversation_id im ToolContext")
         return {"status": "error", "error": "Bildgenerierung nicht verfügbar."}
 
+    # Auflösungskette: Bildart → Modell, Formate, response_format. Das Chat-Modell nennt
+    # eine Bildart-ID (ab Schritt 3 im Werkzeug-Schema angeboten); solange es das nicht
+    # tut, greift die Standard-Bildart — Verhalten wie zuvor.
+    bildart = _resolve_bildart(args.get("bildart"))
     # `format` ist das neue Feld; `size` bleibt als Fallback, falls ein Modell noch die alte
     # Pixel-Schreibweise liefert — ein passender Name gewinnt, sonst greift der Default.
-    format_name, size = _resolve_image_format(args.get("format") or args.get("size"))
+    format_name, size, format_hinweis = _resolve_image_format(
+        bildart, args.get("format") or args.get("size")
+    )
 
     client = LiteLLMClient()
     try:
         result = await client.generate_image(
             prompt,
-            model=settings.image_default_model,
+            model=bildart.modell,
             api_key=ctx.litellm_key,
             user=ctx.user.sub,
             size=size,
-            # Leer = Parameter weglassen (gpt-image-1 lehnt ihn ab und liefert ohnehin
-            # Base64). `b64_json` erzwingt Base64 bei Modellen, die sonst eine URL liefern —
-            # die verarbeitet der Client bewusst nicht.
-            response_format=settings.image_response_format or None,
+            # Leer = Parameter weglassen (gpt-image-1 und FLUX.1-schnell lehnen ihn ab und
+            # liefern ohnehin Base64). `b64_json` erzwingt Base64 bei Modellen, die sonst
+            # eine URL liefern — die verarbeitet der Client bewusst nicht.
+            response_format=bildart.response_format or None,
         )
     except Exception:
         logger.exception("Bildgenerierung fehlgeschlagen")
@@ -648,7 +697,10 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             pseudonym=ctx.user.sub,
             conversation_id=ctx.conversation_id,
             image_bytes=result.image_bytes,
-            model=settings.image_default_model,
+            # Das **tatsächlich** genutzte Modell, nicht der globale Default: Nur so bleibt
+            # nachvollziehbar, womit ein Bild erzeugt wurde, wenn mehrere Bildarten im
+            # Spiel sind (und für die Modell-Transparenz, siehe Todo).
+            model=bildart.modell,
             size=size,
             mime_type="image/png",
             prompt=prompt,
@@ -662,12 +714,19 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     return {
         "status": "ok",
         "image_id": str(image_id),
+        # Das Label, nicht die ID: Der Wert ist für die Erzählung des Chat-Modells da
+        # („Ich habe … verwendet"), nicht zur Weiterverarbeitung.
+        "bildart": bildart.label,
         # Beides zurückgeben: der Name ist das, was das Modell versteht, die Pixelgröße das,
         # was tatsächlich erzeugt (und abgerechnet) wurde.
         "format": format_name,
         "size": size,
         "cost_usd": result.cost_usd,
-        "note": "Bild wurde erzeugt und gespeichert.",
+        "note": (
+            f"Bild wurde erzeugt und gespeichert. {format_hinweis}"
+            if format_hinweis
+            else "Bild wurde erzeugt und gespeichert."
+        ),
     }
 
 
