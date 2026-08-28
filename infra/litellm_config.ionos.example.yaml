@@ -162,21 +162,26 @@ model_list:
 
   # ══ System-Modelle: nie im Modellwähler (MODEL_PICKER_HIDDEN_PREFIXES) ══════════════
 
-  # Gesprächstitel. Läuft bei JEDER neuen Konversation, deshalb das günstigste Modell —
-  # und zwingend ohne Denkspur: Qwen3.5-9B verbrauchte für einen Ein-Wort-Titel sonst
-  # mehrere hundert Ausgabe-Tokens (mit `reasoning_effort: none` sind es 4).
+  # Gesprächstitel. Läuft bei JEDER neuen Konversation.
+  #
+  # NICHT das billigste Modell: Der Titel-Prompt verlangt „maximal 6 Wörter", und daran
+  # scheitert Qwen3.5-9B reproduzierbar — es antwortet mit erklärenden Sätzen (gemessen:
+  # 15, 16 und 22 Wörter), die die Oberfläche dann mitten im Wort abschneidet. Mistral
+  # Small 24B schwankt (4 bis 13 Wörter). gpt-oss-120b hielt sich in 4 von 4 Proben daran.
+  # Der Aufpreis ist bei ~30 Ausgabe-Tokens je Titel bedeutungslos (0,000028 $ statt
+  # 0,000007 $); ein unbrauchbarer Titel steht dagegen dauerhaft in der Historie.
   # ⚠️ Muss in jeder Team-Allowlist stehen (Aufruf über den Virtual Key der Nutzer:innen).
   - model_name: system-titel
     litellm_params:
-      model: openai/Qwen/Qwen3.5-9B
+      model: openai/openai/gpt-oss-120b
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
-      reasoning_effort: none
+      reasoning_effort: low
       allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
       supports_function_calling: false        # Titel brauchen keine Werkzeuge
-      input_cost_per_token: 0.00000011        # 0,11 $/M
-      output_cost_per_token: 0.00000017       # 0,17 $/M
+      input_cost_per_token: 0.00000017        # 0,17 $/M
+      output_cost_per_token: 0.00000071       # 0,71 $/M
 
   # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es bei
   # IONOS nicht gibt). Angebunden unten unter `litellm_settings.guardrails`.

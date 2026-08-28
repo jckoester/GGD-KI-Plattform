@@ -30,6 +30,9 @@ ausschließlich anonyme Nutzer-IDs — nie Namen oder andere personenbezogene Da
 
 Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführen:
 
+- [ ] [Vorüberlegungen](vor-der-installation.md) klären — vor allem die **Modellwahl**:
+      Die Vektorbreite des Embedding-Modells lässt sich später nur mit Schemaänderung und
+      vollständigem Re-Embedding korrigieren.
 - [ ] Systemvoraussetzungen prüfen (Docker ≥ 24, Docker Compose ≥ 2.20)
 - [ ] Repository klonen
 - [ ] `.env` aus `.env.example` erstellen und befüllen
@@ -48,6 +51,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 
 ## Inhaltsverzeichnis
 
+- [Vor der Installation](vor-der-installation.md) — Schulspezifische Vorüberlegungen; bisher: Modellwahl mit Messwerten und Empfehlungen
 - [Installation](installation.md) — Docker Compose, Reverse Proxy, Ersteinrichtung
 - [Konfigurationsdateien](konfiguration.md) — Alle Konfigurationsdateien im Detail
 - [Nutzerverwaltung & Rollen](nutzerverwaltung.md) — SSO, Gruppen, Rollen, Jahrgänge
