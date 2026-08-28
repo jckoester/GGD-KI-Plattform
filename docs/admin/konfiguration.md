@@ -78,10 +78,17 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 |----------|-------------|---------|
 | `IMAGE_DEFAULT_MODEL` | Bildmodell laut LiteLLM-Config (braucht dort `model_info.mode: image_generation`) | `bild-standard` |
 | `IMAGE_GENERATION_TIMEOUT` | Zeitbudget je Bild in Sekunden | `120.0` |
-| `IMAGE_SIZES` | Benannte Formate als JSON-Objekt Name→Pixelgröße, s. [Modelle & Assistenten](modelle-und-assistenten.md#bildformate-festlegen-image_sizes) | `{"quadratisch":"1024x1024",…}` |
-| `IMAGE_DEFAULT_FORMAT` | Standardformat — muss ein Schlüssel aus `IMAGE_SIZES` sein (wird beim Start geprüft) | `quadratisch` |
-| `IMAGE_RESPONSE_FORMAT` | Leer = Parameter weglassen (gpt-image-1, FLUX); `b64_json` = Base64 erzwingen, wo sonst eine URL käme | *(leer)* |
-| `IMAGE_PRICES` | **Pflicht bei selbst eingetragenen Bildmodellen.** LiteLLM ignoriert für Bilder den Preis aus der Config — ohne diese Variable kostet jedes Bild 0,00 $ und läuft am Budget vorbei. In **einfachen** Anführungszeichen! | `'{"black-forest-labs/FLUX.1-schnell":0.032}'` |
+| `IMAGE_MODELS_PATH` | Pfad zur **Bildarten**-Datei. Wer mehr als ein Bildmodell nutzt, legt sie aus `config/image_models.example.yaml` an; s. [Modelle & Assistenten](modelle-und-assistenten.md#bildarten-festlegen-configimage_modelsyaml) | `config/image_models.yaml` |
+| `IMAGE_SIZES` | Benannte Formate als JSON-Objekt Name→Pixelgröße. **Nur wirksam, solange keine Bildarten-Datei existiert** | `{"quadratisch":"1024x1024",…}` |
+| `IMAGE_DEFAULT_FORMAT` | Standardformat — muss ein Schlüssel aus `IMAGE_SIZES` sein (wird beim Start geprüft). Von den Bildarten abgelöst | `quadratisch` |
+| `IMAGE_RESPONSE_FORMAT` | Leer = Parameter weglassen (gpt-image-1, FLUX); `b64_json` = Base64 erzwingen, wo sonst eine URL käme. Von den Bildarten abgelöst | *(leer)* |
+| `IMAGE_PRICES` | **Pflicht für jedes Modell, das eine Bildart nennt.** LiteLLM ignoriert für Bilder den Preis aus der Config — ohne diese Variable kostet jedes Bild 0,00 $ und läuft am Budget vorbei. In **einfachen** Anführungszeichen! | `'{"black-forest-labs/FLUX.1-schnell":0.032}'` |
+
+> Die vier Variablen `IMAGE_DEFAULT_MODEL`, `IMAGE_SIZES`, `IMAGE_DEFAULT_FORMAT` und
+> `IMAGE_RESPONSE_FORMAT` beschreiben **ein** Bildmodell. Sobald `config/image_models.yaml`
+> existiert, stammen diese Angaben aus den Bildarten und die Variablen bleiben ungenutzt.
+> Ohne die Datei wird aus ihnen genau eine Bildart gebildet — bestehende Installationen
+> ändern sich durch das Update also nicht.
 
 ### Jugendschutz-Klassifikator
 

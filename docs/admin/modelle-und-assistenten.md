@@ -104,42 +104,82 @@ eingetragen werden (`infra/litellm_config.yaml`, `model_info.mode: image_generat
 Es werden **keine** extern gehosteten Bild-URLs verarbeitet, die Bytes bleiben im Schulnetz.
 Vor dem Produktivbetrieb end-to-end testen.
 
-### Bildformate festlegen (`IMAGE_SIZES`)
+### Bildarten festlegen (`config/image_models.yaml`)
 
-Welche Formate zur Wahl stehen, bestimmt die `.env` — nicht der Code:
+Eine **Bildart** bündelt ein Bildmodell mit den Formaten, die es beherrscht, und einem
+Namen, den Menschen verstehen. Sie ist das, was ein Assistent anbietet und was das
+Chat-Modell wählt — der Modellname taucht in der Oberfläche nirgends auf.
 
-```bash
-IMAGE_SIZES={"quadratisch":"1024x1024","hoch":"1024x1536","quer":"1536x1024"}
-IMAGE_DEFAULT_FORMAT=quadratisch
+```yaml
+bildarten:
+  - id: standard
+    label: "Standard (quadratisch)"
+    beschreibung: >
+      Für alle üblichen Bilder. Schnell und speicherschonend; erzeugt
+      ausschließlich quadratische Bilder.
+    modell: bild-standard          # `model_name` aus der LiteLLM-Config
+    formate:
+      quadratisch: "1024x1024"     # Name → Pixelgröße
+    standardformat: quadratisch
+    response_format: ""            # leer = Parameter weglassen
+
+standard_bildart: standard
 ```
 
-Links steht der **Name**, den das Modell im Chat wählt; rechts die Pixelgröße, die an den
-Anbieter geht. Tool-Schema, Auswahlliste und Beschreibungstext entstehen automatisch aus
-dieser Zuordnung — zusätzliche Formate lassen sich also frei ergänzen, z. B. ein
-`"panorama":"1344x768"` für Tafelbilder oder ein `"poster":"896x1152"`. Ein Anbieterwechsel
-ändert nur die rechte Seite: Die Namen bleiben, und damit bleibt auch das Vokabular stabil,
-das in Gesprächsverläufen steht.
+Die Datei ist **optional**. Fehlt sie, entsteht aus `IMAGE_DEFAULT_MODEL`, `IMAGE_SIZES`,
+`IMAGE_DEFAULT_FORMAT` und `IMAGE_RESPONSE_FORMAT` genau eine Bildart `standard`, und alles
+verhält sich wie zuvor. Wer sie anlegt, löst diese vier Variablen ab. Vorlage:
+`config/image_models.example.yaml`.
 
-> ⚠️ **Nur Größen eintragen, für die in der LiteLLM-Config ein Preis hinterlegt ist.** Sonst
-> erzeugt der Anbieter das Bild, LiteLLM rechnet aber **0** ab — Budgets und Kostenstatistik
-> greifen dann nicht. Weil das Modell ausschließlich Namen aus dieser Liste wählen kann, ist
-> die Liste zugleich der Schutz dagegen. Ein `IMAGE_DEFAULT_FORMAT`, das nicht in
-> `IMAGE_SIZES` steht, verhindert den Start mit einer entsprechenden Meldung.
+> **Eine Bildart je Assistent ist der Regelfall.** Führt ein Assistent genau eine, hat das
+> Werkzeug **keinen** Auswahlparameter: Verhalten und Kosten sind vorhersagbar, und es gibt
+> nichts, was ein Chat-Modell falsch wählen könnte. Mehrere Bildarten sind die Ausbaustufe —
+> dann entscheidet das Chat-Modell anhand von `label` und `beschreibung`, und das ist nur so
+> verlässlich wie dessen Function-Calling. Bei schwächeren Modellen lieber zwei Assistenten
+> anlegen als eine Auswahl anbieten.
 
-Die Default-Größen oben sind **gpt-image-1-Größen**. SDXL und FLUX kennen andere (etwa
-`1152x896`, `1344x768`, `896x1152`) — bei einem Wechsel also mit anpassen.
+**Benennung.** Eine Bildart bestimmt Modell und Formate — **nicht den Stil**; der entsteht
+aus dem System-Prompt des Assistenten. Ein Stilname wie „Comic" ist deshalb nur ehrlich,
+wenn das *Modell* darauf spezialisiert ist. Unterscheiden sich zwei Modelle nur in
+Formatfähigkeit, Tempo oder Dateigröße, benennt man genau das.
 
-### Base64 erzwingen (`IMAGE_RESPONSE_FORMAT`)
+**Formate.** Links steht der Name, den das Chat-Modell wählt; rechts die Pixelgröße, die an
+den Anbieter geht. Ein Anbieterwechsel ändert nur die rechte Seite — die Namen bleiben, und
+damit bleibt auch das Vokabular stabil, das in Gesprächsverläufen steht. Zusätzliche
+Formate sind frei ergänzbar (`"panorama": "1344x768"` fürs Tafelbild).
+
+Kennt die gewählte Bildart ein gewünschtes Format nicht, wird auf das **nächstliegende
+Seitenverhältnis** ausgewichen statt abgelehnt: „hoch" bei einem Modell, das nur quadratisch
+kann, wird quadratisch — und das Chat-Modell nennt die Abweichung. Nur Größen eintragen, die
+das Modell wirklich beherrscht; sonst scheitert der Aufruf beim Anbieter.
+
+**Auswahl je Assistent.** Sind mehrere Bildarten konfiguriert, erscheint im
+Assistenten-Editor unter *Fähigkeiten → Bildgenerierung* eine Auswahl. Nichts angehakt =
+alle. Der Editor warnt, wenn eine gewählte Bildart für die Zielgruppe des Assistenten gar
+nicht freigeschaltet ist.
+
+**Zur Laufzeit** bietet das Werkzeug nur Bildarten an, deren Modell für den Jahrgang der
+Nutzer:in freigeschaltet ist — was der Proxy ohnehin abweisen würde, sieht das Chat-Modell
+gar nicht erst. Ist der Freigabestand nicht abrufbar, wird nicht gefiltert; die Durchsetzung
+bleibt beim Proxy, und dessen Ablehnung erscheint als lesbarer Satz statt als Fehlercode.
+
+> ⚠️ **Jedes in einer Bildart genannte Modell braucht einen Eintrag in `IMAGE_PRICES`.**
+> Ohne ihn kostet jedes Bild 0,00 $ und läuft am EUR-Budget vorbei, ohne dass etwas
+> fehlschlägt. `cd backend && python scripts/check_litellm_config.py` prüft das — zusammen
+> mit der Frage, ob das Modell im Proxy überhaupt existiert und `mode: image_generation`
+> trägt. Fehler in der Datei selbst (unbekanntes Standardformat, doppelte ID) verhindern
+> den Start des Backends mit einer Meldung, die die gültigen Werte nennt.
+
+### Base64 erzwingen (`response_format`)
 
 | Wert | Wann |
 |---|---|
-| *(leer, Default)* | Modelle, die den Parameter ablehnen und ohnehin nur Base64 liefern — **gpt-image-1** |
-| `b64_json` | Modelle, die sonst eine extern gehostete URL liefern würden — **FLUX, SDXL** |
+| *(leer)* | Modelle, die den Parameter ablehnen und ohnehin nur Base64 liefern — **gpt-image-1**, **FLUX.1-schnell**, **FLUX.2-klein** |
+| `b64_json` | Modelle, die sonst eine extern gehostete URL liefern würden |
 
 Der zweite Fall ist kein Feinschliff, sondern Voraussetzung: Liefert der Anbieter eine URL,
 bricht das Backend bewusst ab, statt die Bytes über einen zweiten Request beim Anbieter
-abzuholen. Wer auf FLUX/SDXL umstellt und diesen Wert nicht setzt, bekommt daher gar keine
-Bilder.
+abzuholen. `url` ist als Wert deshalb nicht zulässig und wird beim Start abgewiesen.
 
 **Kosten:** Bildgenerierung läuft über das **bestehende** USD-Budget der Nutzer:innen
 (kein separates Kontingent). Siehe [Budget-System → Bildgenerierung](budget.md).

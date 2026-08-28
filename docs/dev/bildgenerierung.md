@@ -15,15 +15,59 @@ LiteLLM-Proxy spricht mit Providern, und es werden **nur Base64-Bilder** verarbe
 - **Freischaltung:** `tools_for()` (`app/chat/tools.py`) nimmt das Tool nur auf, wenn
   `"image_generation"` in `assistant.tool_groups` steht. Kein Gruppen-/Lehrkraft-Bezug
   nötig; die Team-Bild-Freigabe greift zusätzlich am Proxy.
-- **Handler `_exec_generate_image`:** moderiert den Prompt (siehe unten), ruft
-  `LiteLLMClient.generate_image()` über den **User-Virtual-Key** aus
+- **Kontextabhängiges Schema:** `ChatTool.definition` darf ein **Callable** sein
+  (`(SchemaContext) -> dict`); `tools_for()` löst es auf und gibt fertige Dicts zurück, per
+  `dataclasses.replace` — die prozessweit geteilte Registry bleibt unverändert. Der
+  `SchemaContext` trägt Assistent **und** die Modell-Allowlist der Nutzer:in als *Daten*,
+  damit der Schema-Bau synchron und netzfrei bleibt (die Allowlist lädt der Router vorab).
+- **Handler `_exec_generate_image`:** moderiert den Prompt (siehe unten), löst die
+  **Bildart** auf, ruft `LiteLLMClient.generate_image()` über den **User-Virtual-Key** aus
   `ToolContext.litellm_key` (nicht Master-Key → Spend/Budget beim User), persistiert die
-  Bytes und gibt `{status, image_id, size, cost_usd, note}` zurück.
+  Bytes und gibt `{status, image_id, bildart, format, size, cost_usd, note}` zurück.
 - **Tool-Loop (`generate()`):** Der `elif _tc_name == "generate_image"`-Zweig sammelt die
   `image_id` und die Kosten, **entfernt `cost_usd`/`image_id` aus der LLM-sichtbaren**
   Tool-Antwort (der LLM soll Interna/Kosten nicht sehen) und sendet ein SSE-Event
   `event: image {image_id, size}`. Die Bild-Kosten werden vor dem finalen `cost`-Event zur
   Gesamtsumme addiert (`cost_usd += _image_cost_total`).
+
+## Bildarten (Mehrmodell)
+
+Eine **Bildart** ist die Nutzersicht auf „welches Bildmodell mit welchen Formaten".
+Konfiguration und Laden: `app/chat/image_models.py`, Datei `config/image_models.yaml`.
+Fehlt sie, wird aus den `IMAGE_*`-Variablen genau eine Bildart `standard` synthetisiert —
+Aufwärtspfad für Bestandsinstallationen, ohne Datenmigration.
+
+Die Datei wird **fail-closed** beim Start geladen (`main.py`-Lifespan): Ein Tippfehler
+bricht den Start, statt beim ersten Bildwunsch aufzufallen. `response_format: url` wird
+dabei abgewiesen — der Client verarbeitet ausschließlich Base64, die Datenschutzgrenze
+steht damit schon in der Konfigurationsprüfung.
+
+**Auflösungskette** (`bildarten_fuer` → `_resolve_bildart` → `_resolve_image_format`):
+
+1. Alle konfigurierten Bildarten
+2. ∩ Auswahl des Assistenten (`Assistant.image_kinds`, JSONB, Alembic `0047`;
+   **leer = alle**)
+3. ∩ Modell-Allowlist des Teams (`app/litellm/team_models.py`, TTL-Cache 300 s)
+4. Bildart-ID aus dem Werkzeugaufruf, sonst `standard_unter(...)`
+5. Formatname → Pixelgröße **innerhalb** der Bildart
+
+Schritt 3 liefert `None` bei nicht erreichbarem Proxy — das heißt **unbekannt**, nicht
+„nichts erlaubt", und filtert deshalb nicht. Ebenso, wenn nach dem Filter nichts übrig
+bliebe: Ein Werkzeug ohne wählbare Bildart wäre die schlechtere Auskunft als die Ablehnung
+des Proxys, die `_bild_fehlertext()` in einen lesbaren Satz übersetzt (401/403 → nicht
+freigeschaltet, 429 → Budget). Dafür trägt `ImageGenerationError` den HTTP-Status.
+
+Der Handler filtert mit denselben Regeln wie das Schema (`ToolContext.assistant` und
+`.erlaubte_modelle`) — was das Schema verbirgt, muss er auch ablehnen, sonst wäre die
+Beschränkung Kosmetik.
+
+**Formatnäherung** (§ `_resolve_image_format`): Exakter Treffer gewinnt. Kennt die Bildart
+den Namen nicht, aber eine andere, wird auf das nächstliegende Seitenverhältnis
+ausgewichen — verglichen wird der Abstand der **Logarithmen**, weil ein linearer Vergleich
+Hochformate systematisch bevorzugte (sie drängen sich zwischen 0 und 1, Querformate
+verteilen sich bis unendlich). Bei Gleichstand gewinnt das Standardformat. Ein nirgends
+konfigurierter Name (oder eine rohe Pixelangabe aus der alten Schnittstelle) fällt stumm
+auf das Standardformat: Ohne erkennbare Absicht gibt es nichts zu nähern.
 
 ## Client
 
@@ -101,7 +145,8 @@ die serverseitige Moderation im Handler ist die tragende Schicht.
 
 | Setting | Bedeutung |
 |---|---|
-| `image_default_model` (`IMAGE_DEFAULT_MODEL`) | Standard-Bild-Modell |
+| `image_models_path` (`IMAGE_MODELS_PATH`) | Bildarten-Datei; fehlt sie, greift die Synthese |
+| `image_default_model` (`IMAGE_DEFAULT_MODEL`) | Nur noch Quelle der Synthese — von den Bildarten abgelöst |
 | `image_default_size` | Standard-Bildgröße (abgerechnete Standardwerte erzwingen) |
 | `image_generation_timeout` | Timeout des Bild-Aufrufs (Sekunden) |
 | `image_blocklist_path` | Pfad zur Bild-Blockliste |

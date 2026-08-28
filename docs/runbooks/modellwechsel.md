@@ -7,6 +7,11 @@ z. B. von `text-embedding-3-small` (OpenAI) auf BGE-M3 (IONOS) oder zurück.
 > über `.env` bzw. die LiteLLM-Config und die Freischaltungsmatrix umstellen, ohne
 > Datenbankeingriff. Das Embedding-Modell ist der einzige Sonderfall: Es hängt an einer
 > Spaltenbreite und an bereits berechneten Vektoren.
+>
+> Bei **Bildmodellen** sind es drei Stellen, die zusammenpassen müssen: der Eintrag in der
+> LiteLLM-Config, die Bildart in `config/image_models.yaml` (Modellname **und** die Formate,
+> die das neue Modell wirklich beherrscht) und der Preis in `IMAGE_PRICES`. Danach
+> `cd backend && python scripts/check_litellm_config.py` — das prüft alle drei gegeneinander.
 
 ## Warum das nicht nur eine .env-Änderung ist
 

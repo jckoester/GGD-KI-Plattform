@@ -218,12 +218,25 @@ model_list:
       mode: embedding
       input_cost_per_token: 0.00000002        # 0,02 $/M
 
-  # Bildgenerierung. FLUX.1-schnell liefert Base64 **ohne** `response_format`-Parameter
-  # (gemessen) → IMAGE_RESPONSE_FORMAT bleibt leer. Fester Preis je Bild, damit sauber in
-  # LiteLLMs Kostenmodell abbildbar.
-  # (FLUX.2-klein-4B rechnet nach Megapixeln ab und liefert deutlich größere Bilder; es
-  # zusätzlich anzubieten braucht Backend-Arbeit — `generate_image` kennt nur ein globales
-  # IMAGE_DEFAULT_MODEL, und IMAGE_SIZES gilt ebenfalls global.)
+  # ── Bildgenerierung ─────────────────────────────────────────────────────────────────
+  # Beide Modelle liefern Base64 **ohne** `response_format`-Parameter (gemessen)
+  # → in der Bildart `response_format: ""` lassen.
+  #
+  # ⚠️ Bildpreise wirken NUR über `IMAGE_PRICES` (.env) + den Callback `bildpreise`
+  # (siehe litellm_settings unten), der beim Start `litellm.register_model()` aufruft.
+  # Gemessen am 28.08.2026 mit `scripts/bildpreis_probe.py` — alle drei anderen Wege
+  # buchen 0,00 $, ohne dass etwas fehlschlägt:
+  #     model_info.input_cost_per_image        ❌
+  #     litellm_params.input_cost_per_image    ❌
+  #     litellm_params.input_cost_per_pixel    ❌
+  # Der Wert unter `model_info` steht trotzdem hier: `check_litellm_config.py` gleicht ihn
+  # gegen IMAGE_PRICES ab und meldet ein Auseinanderlaufen. **Beide Stellen gleich halten.**
+  #
+  # Preise sind USD, die IONOS-Preisliste ist in EUR — umgerechnet mit ~1,111.
+  #
+  # Welches Modell wofür genutzt wird, entscheidet die **Bildart**
+  # (config/image_models.yaml). Ein Modell ohne Bildart lässt sich zwar freischalten, aber
+  # kein Assistent kann es nutzen; `/settings/models` weist darauf hin.
   - model_name: bild-standard
     litellm_params:
       model: openai/black-forest-labs/FLUX.1-schnell
@@ -231,13 +244,27 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       mode: image_generation
-      # ⚠️ Dieser Wert allein bleibt WIRKUNGSLOS: LiteLLMs Bild-Kostenrechner liest nur
-      # seine eingebaute Preistabelle, nicht das `model_info` des Deployments (anders als
-      # bei Chat und Embedding, wo die Preise hier greifen). Er steht trotzdem hier, weil
-      # `check_litellm_config.py` ihn prüft und er dokumentiert, was gilt.
-      # WIRKSAM wird der Preis über `IMAGE_PRICES` + den Callback `bildpreise`
-      # (siehe litellm_settings unten). Beide Stellen gleich halten!
-      input_cost_per_image: 0.032             # 0,032 $/Bild
+      # Kann NUR 1024x1024. Jede andere Größe → HTTP 400 `invalid-image-size` (gemessen);
+      # es stutzt nicht still zurecht. Schlanke Dateien: ~70–165 KB.
+      input_cost_per_image: 0.032             # 0,032 $/Bild (= 0,0288 €)
+
+  # Optional, für Hoch- und Querformat. Beherrscht 512² bis 1536² pixelgenau, liefert aber
+  # **rund vierzigmal größere Dateien** als FLUX.1 (1024²: 3,0 MB statt 73 KB) — das
+  # schlägt bei vielen Nutzer:innen auf den Speicherplatz durch. Nicht als Standard-Bildart
+  # setzen.
+  #
+  # Der IONOS-Tarif ist megapixelbasiert (0,013 € erstes MP, 0,001 € je weiteres), in der
+  # Wirkung aber fast flach: 0,0144 $ bei 0,26 MP gegen 0,0160 $ bei 2,36 MP. Ein fester
+  # Preis je Bild trifft die ganze Spanne auf ±5 %; `input_cost_per_pixel` wird nicht
+  # gebraucht (und von LiteLLM für Bilder ohnehin nicht aus dieser Config gelesen).
+  - model_name: bild-flux2
+    litellm_params:
+      model: openai/black-forest-labs/FLUX.2-klein-4B
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      mode: image_generation
+      input_cost_per_image: 0.0152            # Mittelwert über 0,26–2,36 MP
 
   # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md): greift bei erschöpftem Budget und
   # für sensible Fälle. Läuft lokal — keine Kosten, daher keine Preisangaben nötig.
@@ -336,7 +363,7 @@ model_list:
 # ohne Sonderweg im Backend.
 #
 # Preise stehen in der Umgebung, nicht hier — Modell-ID (ohne Provider-Präfix) → $/Bild:
-#     IMAGE_PRICES='{"black-forest-labs/FLUX.1-schnell":0.032}'
+#     IMAGE_PRICES='{"black-forest-labs/FLUX.1-schnell":0.032,"black-forest-labs/FLUX.2-klein-4B":0.0152}'
 # ⚠️ In einfachen Anführungszeichen! Das Startskript `source`t die .env, und die Shell
 # entfernt sonst die inneren Anführungszeichen — aus dem JSON würde Unsinn.
 litellm_settings:

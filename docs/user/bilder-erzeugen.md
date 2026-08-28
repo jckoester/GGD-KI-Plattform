@@ -28,6 +28,11 @@ Es gibt kein Auswahlfeld für das Bildformat — **sag es einfach im Chat mit**:
 > „Zeichne mir ein Vulkan-Schema, **hochkant**."
 > „Das Ganze bitte **quer**, für eine Präsentationsfolie."
 
+> Nicht jedes Werkzeug beherrscht jedes Format. Manche erzeugen ausschließlich
+> quadratische Bilder — dann bekommst du das nächstähnliche Format und einen kurzen
+> Hinweis dazu, statt einer Fehlermeldung. Welche Formate möglich sind, hängt am
+> Werkzeug, das du gewählt hast.
+
 Ohne Angabe kommt das Standardformat (meist quadratisch). Welche Formate zur Verfügung
 stehen, legt die Schule fest — neben quadratisch, hoch und quer kann es weitere geben,
 etwa ein breites Format für Tafelbilder. Wenn du unsicher bist, frag den Assistenten
