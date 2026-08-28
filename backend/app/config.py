@@ -185,6 +185,10 @@ class Settings(BaseSettings):
     }
     # Format, das gilt, wenn das Modell keines oder ein unbekanntes angibt.
     image_default_format: str = "quadratisch"
+    # Bildarten (Modell + Formate je Einsatzzweck). Fehlt die Datei, wird aus den vier
+    # `image_*`-Werten oben genau eine Bildart `standard` synthetisiert — das Verhalten
+    # bleibt dann exakt wie vor der Einführung. Damit sind jene vier Werte abgelöst.
+    image_models_path: str = "config/image_models.yaml"
     image_blocklist_path: str = "config/image_blocklist.yaml"
     # Zustandsbericht des Jugendschutz-Klassifikators. Geschrieben wird er vom Guardrail
     # IM LITELLM-PROXY (`health_file` in dessen Config), gelesen von

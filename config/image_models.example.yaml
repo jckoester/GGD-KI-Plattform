@@ -1,0 +1,106 @@
+# Bildarten — was ein Werkzeug-Assistent herstellen kann.
+#
+# Eine Bildart bündelt: ein Bildmodell, die Formate, die es beherrscht, und einen Namen,
+# den Menschen verstehen. Das Modell dahinter ist damit austauschbar, ohne dass sich für
+# Nutzer:innen etwas ändert — niemand wählt ein Modell, man wählt einen Assistenten.
+#
+# Diese Datei ist optional. Fehlt sie, wird aus IMAGE_DEFAULT_MODEL / IMAGE_SIZES /
+# IMAGE_DEFAULT_FORMAT / IMAGE_RESPONSE_FORMAT genau eine Bildart `standard` gebildet und
+# alles verhält sich wie zuvor. Wer sie anlegt, löst jene vier Variablen ab.
+#
+#   cp config/image_models.example.yaml config/image_models.yaml
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# EINE BILDART JE ASSISTENT IST DER REGELFALL.
+#
+# Führt ein Assistent genau eine Bildart, enthält das Werkzeug gar keinen Auswahl-
+# Parameter: Verhalten und Kosten sind vorhersagbar, und es gibt nichts, was ein Chat-
+# Modell falsch wählen könnte. Mehrere Bildarten an einem Assistenten sind die
+# Ausbaustufe — das Chat-Modell entscheidet dann anhand von `label` und `beschreibung`,
+# und das ist nur so verlässlich wie dessen Function-Calling. Bei schwächeren Modellen
+# lieber zwei Assistenten anlegen als eine Auswahl anbieten.
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# BENENNE EINE BILDART NACH DEM, WAS SIE VON DEN ANDEREN UNTERSCHEIDET.
+#
+# Eine Bildart bestimmt **Modell und Formate** — mehr nicht. Wie ein Bild aussieht
+# (Zeichnung, Foto, Comic), entsteht aus dem Prompt des Assistenten. Ein Stilname wie
+# „Illustration" oder „Comic" ist deshalb nur dann ehrlich, wenn das dahinterliegende
+# *Modell* auf diesen Stil spezialisiert ist. Sonst verspricht der Name etwas, das die
+# Konfiguration nicht einlöst: Das Chat-Modell wählt die Bildart „Comic" — und bekommt
+# ein Bild wie jedes andere.
+#
+# Unterscheiden sich zwei Modelle nur in Formatfähigkeit, Tempo, Dateigröße oder Preis,
+# dann benenne genau das. Wer einen Stil braucht, legt einen Assistenten dafür an.
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# Felder je Bildart:
+#
+#   id               Kleinbuchstaben, Ziffern, '-' und '_'. Steht im Werkzeug-Schema und
+#                    am Assistenten — später nur mit Bedacht ändern.
+#   label            Was Menschen sehen (Editor) und woran das Chat-Modell sich orientiert.
+#   beschreibung     Wofür diese Bildart gedacht ist. Formuliere sie als Entscheidungs-
+#                    hilfe („für …", „nur wenn …"), nicht als Werbetext — das Chat-Modell
+#                    wählt danach aus. Nenne auch die Nachteile: Ein Modell, das große
+#                    Dateien erzeugt, soll nicht versehentlich zum Normalfall werden.
+#   modell           Der `model_name` aus der LiteLLM-Config (der Aliasname, NICHT die
+#                    Anbieter-ID). Muss dort `model_info.mode: image_generation` tragen.
+#   formate          Formatname → Pixelgröße. Nur Größen eintragen, die das Modell
+#                    wirklich beherrscht — sonst scheitert der Aufruf beim Anbieter.
+#   standardformat   Muss ein Schlüssel aus `formate` sein.
+#   response_format  '' = Parameter weglassen (für Modelle, die ihn ablehnen und ohnehin
+#                    Base64 liefern — gpt-image-1, FLUX.1-schnell).
+#                    'b64_json' = Base64 erzwingen, für Modelle, die sonst eine URL
+#                    lieferten. 'url' ist NICHT zulässig: Es werden ausschließlich
+#                    Base64-Bilder verarbeitet, damit keine Bilder beim Anbieter liegen
+#                    bleiben und von Schüler-Browsern direkt dort geladen werden.
+#
+# ⚠️ Jedes hier genannte Modell braucht einen Preis in IMAGE_PRICES (.env). Fehlt er,
+#    kostet jedes Bild 0,00 $ — Budget, 429-Sperre und Kostenstatistik laufen dann ins
+#    Leere, ohne dass irgendetwas fehlschlägt.
+
+bildarten:
+  # Der Regelfall: eine Bildart, ein Modell.
+  - id: standard
+    label: "Standard (quadratisch)"
+    beschreibung: >
+      Für alle üblichen Bilder. Schnell und speicherschonend; erzeugt ausschließlich
+      quadratische Bilder.
+    modell: bild-standard
+    formate:
+      quadratisch: "1024x1024"
+    standardformat: quadratisch
+    response_format: ""
+
+  # Ausbaustufe A — zweites Modell, das sich nur in der FÄHIGKEIT unterscheidet.
+  # Der Name benennt genau die, und die Beschreibung nennt den Preis dafür.
+  # - id: formatwahl
+  #   label: "Mit Formatwahl (hoch/quer)"
+  #   beschreibung: >
+  #     Nur wählen, wenn das Bild ausdrücklich nicht quadratisch sein soll — etwa quer
+  #     für eine Folie oder hoch für ein Plakat. Erzeugt deutlich größere Dateien.
+  #   modell: bild-grossformat
+  #   formate:
+  #     quadratisch: "1024x1024"
+  #     hoch: "768x1344"
+  #     quer: "1344x768"
+  #   standardformat: quer
+  #   response_format: "b64_json"
+
+  # Ausbaustufe B — ein Stilname ist hier zulässig, WEIL das Modell selbst auf Comics
+  # spezialisiert ist. Mit einem allgemeinen Bildmodell wäre dieser Eintrag ein
+  # Versprechen ohne Deckung; der Stil gehörte dann in den Prompt des Assistenten.
+  # - id: comic
+  #   label: "Comic"
+  #   beschreibung: "Für Comic- und Cartoonbilder. Nutzt ein darauf trainiertes Modell."
+  #   modell: bild-comic
+  #   formate:
+  #     quadratisch: "1024x1024"
+  #     quer: "1344x768"
+  #   standardformat: quer
+  #   response_format: "b64_json"
+
+# Gilt, wenn ein Assistent keine Bildart festlegt oder das Chat-Modell eine unbekannte
+# nennt. Muss eine der oben konfigurierten IDs sein.
+standard_bildart: standard

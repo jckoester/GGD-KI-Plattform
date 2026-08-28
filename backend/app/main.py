@@ -122,6 +122,14 @@ async def lifespan(app: FastAPI):
     # Startup-Check: Vektorbreite gegen EMBEDDING_DIMENSIONS
     await check_embedding_dimension()
 
+    # Startup-Check: Bildarten. Bewusst früh und hart — eine fehlerhafte
+    # image_models.yaml würde sonst erst beim ersten Bildwunsch auffallen, und ein still
+    # falsch aufgelöstes Bildmodell kostet Geld und umgeht die Freigabematrix.
+    # Fehlt die Datei ganz, ist das kein Fehler: Dann greift die Synthese aus den
+    # abgelösten IMAGE_*-Variablen (Verhalten wie vor der Einführung).
+    from app.chat.image_models import load_image_models
+    load_image_models()
+
     # Startup-Check: Standard-Chatmodell gesetzt?
     if not settings.chat_default_model:
         logger.error(
