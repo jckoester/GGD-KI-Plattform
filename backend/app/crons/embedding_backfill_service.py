@@ -17,8 +17,6 @@ from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
 
-_TOKENS_PER_SECOND = 3000
-_AVG_TOKENS_PER_NODE = 150
 
 # Abbruch nach so vielen **vollständig** fehlgeschlagenen Stapeln in Folge.
 #
@@ -132,33 +130,41 @@ async def backfill_embeddings(
             update(ContextNode).where(ContextNode.id == node.id).values(metadata_=meta)
         )
 
-    async def _stapel_einbetten(stapel: list[tuple[ContextNode, str]]) -> int:
-        """Bettet einen Stapel in EINER Anfrage ein. Rueckgabe: Anzahl Fehlschlaege."""
+    async def _stapel_einbetten(stapel: list[tuple[ContextNode, str]]) -> tuple[int, int]:
+        """Bettet einen Stapel in EINER Anfrage ein.
+
+        Rueckgabe: (Anzahl Fehlschlaege, verbrauchte Tokens). Die Tokens stammen aus der
+        Abrechnung der Antwort und takten die naechste Anfrage.
+        """
         try:
-            vektoren = await generate_embeddings([text for _, text in stapel])
+            ergebnis = await generate_embeddings([text for _, text in stapel])
         except Exception as exc:
             if len(stapel) > 1 and _ist_inhaltsfehler(exc):
                 logger.warning(
                     "Stapel (%d Knoten) mit 400 abgelehnt — fasse einzeln nach, um den "
                     "schuldigen Text zu finden.", len(stapel),
                 )
-                fehler = 0
+                fehler, tokens = 0, 0
                 for eintrag in stapel:
-                    fehler += await _stapel_einbetten([eintrag])
-                return fehler
+                    f, t = await _stapel_einbetten([eintrag])
+                    fehler += f
+                    tokens += t
+                return fehler, tokens
             for node, _ in stapel:
                 await _fehler_vermerken(node, exc)
-            return len(stapel)
+            return len(stapel), 0
 
-        for (node, _), vektor in zip(stapel, vektoren):
+        for (node, _), vektor in zip(stapel, ergebnis.vektoren):
             await db.execute(
                 update(ContextNode).where(ContextNode.id == node.id).values(embedding=vektor)
             )
             stats.ok += 1
-        return 0
+        return 0, ergebnis.tokens
 
     num_batches = -(-stats.found // batch_size)  # ceiling division
     stapel_fehler_in_folge = 0
+    tempo = max(0.0, settings.embedding_tokens_per_second)  # 0 = keine Drosselung
+    letzte_tokens = 0
     for batch_idx, i in enumerate(range(0, stats.found, batch_size), start=1):
         batch = nodes[i : i + batch_size]
 
@@ -181,8 +187,15 @@ async def backfill_embeddings(
                 if stapel_fehler_in_folge >= _MAX_STAPEL_FEHLER_IN_FOLGE:
                     stats.abgebrochen = True
                     break
+                # VOR der Anfrage takten, nach dem Verbrauch der vorigen. So entsteht keine
+                # Wartezeit hinter der letzten Anfrage, und die Pause passt zur
+                # tatsaechlich abgerechneten Menge statt zu einer Schaetzung.
+                if letzte_tokens and tempo > 0:
+                    await asyncio.sleep(letzte_tokens / tempo)
                 ok_vorher = stats.ok
-                await _stapel_einbetten(aufgaben[start : start + stapel_groesse])
+                _, letzte_tokens = await _stapel_einbetten(
+                    aufgaben[start : start + stapel_groesse]
+                )
                 # Ein einziger Erfolg im Stapel beweist, dass der Zugang steht — dann ist
                 # ein begleitender Fehler ein Einzelfall und kein Grund zum Abbruch.
                 # (Auf „keine Fehler" zu prüfen wäre falsch: Beim Isolieren nach einem 400
@@ -216,10 +229,10 @@ async def backfill_embeddings(
             stats.found,
         )
 
-        estimated_tokens = len(batch) * _AVG_TOKENS_PER_NODE
-        wait = estimated_tokens / _TOKENS_PER_SECOND
-        if wait > 0.1 and not dry_run and batch_idx < num_batches:
-            await asyncio.sleep(wait)
+        # (Frueher stand hier eine zweite Pause je DB-Tranche, berechnet aus geschaetzten
+        # 150 Tokens je Knoten. Sie ist entfallen: Getaktet wird jetzt je Anfrage nach dem
+        # abgerechneten Verbrauch. Die Schaetzung lag bei langen Knoten um ein Vielfaches
+        # daneben — der Inhalt reicht bis EMBEDDING_MAX_CHARS.)
 
     if reindex and not dry_run:
         logger.info("REINDEX INDEX idx_context_nodes_embedding")

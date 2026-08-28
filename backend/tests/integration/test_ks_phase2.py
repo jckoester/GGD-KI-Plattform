@@ -353,8 +353,12 @@ class TestEmbeddingBatch:
 
         # Der Backfill bettet im Stapel ein — die Attrappe muss je Eingabetext einen
         # Vektor liefern, sonst bleiben die überzähligen Knoten ohne Embedding.
+        from app.context.embedding import EmbeddingStapel
+
         async def _stapel(texte):
-            return [list(fake_embedding) for _ in texte]
+            return EmbeddingStapel(
+                vektoren=[list(fake_embedding) for _ in texte], tokens=len(texte) * 10
+            )
 
         factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
         with patch(

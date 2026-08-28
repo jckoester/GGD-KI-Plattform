@@ -70,6 +70,20 @@ class Settings(BaseSettings):
     # 32 → 22,4 · 64 → 32,7 · 128 → 35,0. Ab 64 ist der Zugewinn klein, während eine
     # fehlgeschlagene Anfrage immer mehr Knoten mitreißt.
     embedding_batch_size: int = 64
+    # Obergrenze für den Tokendurchsatz im Stapelbetrieb; **0 = keine Drosselung**.
+    # Getaktet wird nach dem tatsächlich abgerechneten Verbrauch (`usage.total_tokens`),
+    # nicht nach einer Schätzung.
+    #
+    # Warum konfigurierbar und nicht einfach aus: Das passende Tempo hängt am Anbieter und
+    # am Tarif. 3000/s ≈ 180.000 Tokens/Minute ist ein vorsichtiger Wert, der auch auf
+    # kleinen Kontingenten trägt; wer Luft hat, setzt ihn hoch oder auf 0. Ohne Drosselung
+    # laufen wir bei Stapel 64 auf grob 300.000 Tokens/Minute.
+    #
+    # Sich allein auf die 429-Wiederholung zu verlassen genügt nicht: Sie greift dreimal
+    # und höchstens `EMBEDDING_RETRY_MAX_WAIT_S` lang. Bei anhaltender Drosselung ist das
+    # Budget erschöpft, die Knoten bekommen Fehlermarken, und nach drei gescheiterten
+    # Stapeln bricht der Lauf ab — aus „langsam, aber vollständig" würde „schnell abgebrochen".
+    embedding_tokens_per_second: float = 3000.0
     # Wiederholversuche bei 429/503 (Rate-Limit bzw. vorübergehend nicht verfügbar).
     # Ein Rate-Limit ist ausdrücklich ein *vorübergehender* Zustand — ohne Wiederholung
     # bekommt der Knoten einen dauerhaften `embedding_error` und bleibt bis zum nächsten

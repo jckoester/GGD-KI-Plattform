@@ -10,6 +10,8 @@ aendert (siehe docs/runbooks/modellwechsel.md).
 
 import asyncio
 import logging
+import re
+from dataclasses import dataclass
 from uuid import UUID
 
 import httpx
@@ -71,11 +73,40 @@ def _extract_metadata_field(metadata: dict, field_path: str) -> str:
     return str(value) if value else ""
 
 
+# Fuehrende Gliederungsnummer: "3.6.1(13) Text", "(13) Text", "2.1 Text".
+_GLIEDERUNGSNUMMER = re.compile(r"^\s*(?:\d+(?:\.\d+)*)?\s*(?:\(\d+\))?\s*")
+
+
+def _titel_traegt_eigene_information(titel: str, text: str) -> bool:
+    """Steht im Titel etwas, das der Text nicht ohnehin schon sagt?
+
+    Der Bildungsplan verhaelt sich hier je Knotenart voellig unterschiedlich (gemessen am
+    Gesamtbestand):
+
+    * Bei ``ik_kompetenz``, ``pk_kompetenz`` und ``leitperspektive_aspekt`` ist der Titel
+      **ausnahmslos** der Inhalt plus Gliederungsnummer (`3.6.1(13) … erlaeutern` gegen
+      `(13) … erlaeutern`). Ihn voranzustellen wuerde den Text nur verdoppeln und den
+      Vektor verzerren — ohne ein Byte neue Information.
+    * Bei ``leitidee``, ``pk_gruppe`` und ``kapitel`` benennt der Titel dagegen das Thema
+      (`3.1.2.2 Malerei`), das im beschreibenden Inhalt oft gar nicht vorkommt. Und wo der
+      Inhalt fehlt, ist der Titel das Einzige, was der Knoten hat: Ohne ihn wurde er
+      uebersprungen und war fuer die semantische Suche unsichtbar.
+
+    Die Gliederungsnummer wird vor dem Vergleich entfernt, sonst schlaegt er bei genau den
+    Kompetenzen fehl, um die es geht.
+    """
+    if not titel:
+        return False
+    kern = " ".join(_GLIEDERUNGSNUMMER.sub("", titel).lower().split())
+    return bool(kern) and kern not in " ".join((text or "").lower().split())
+
+
 def _build_embedding_input(node: ContextNode) -> str:
     """Erstellt den Embedding-Input fuer einen Knoten.
 
     Reichert `content` mit content_type-spezifischen metadata-Feldern an,
-    analog zur breadcrumb-Anreicherung fuer Bildungsplan-Knoten.
+    analog zur breadcrumb-Anreicherung fuer Bildungsplan-Knoten, und stellt den Titel
+    voran, wo er eigene Information traegt (siehe ``_titel_traegt_eigene_information``).
     """
     base = node.content or ""
 
@@ -89,15 +120,20 @@ def _build_embedding_input(node: ContextNode) -> str:
 
     enrichment_fields = EMBEDDING_ENRICHMENT.get((node.category, node.content_type), [])
 
-    prefixes: list[str] = []
+    teile: list[str] = []
     for field_path in enrichment_fields:
         value = _extract_metadata_field(node.metadata_ or {}, field_path)
         if value:
-            prefixes.append(value)
+            teile.append(value)
+    if base:
+        teile.append(base)
 
-    if not prefixes:
-        return base
-    return "\n".join(prefixes) + "\n" + base
+    # Gegen den bereits zusammengesetzten Text pruefen, nicht nur gegen `content`: Steht
+    # der Titel schon in einer Anreicherung (Breadcrumb), waere er sonst doppelt drin.
+    if _titel_traegt_eigene_information(node.title or "", "\n".join(teile)):
+        teile.insert(0, node.title)
+
+    return "\n".join(teile)
 
 
 class EmbeddingDimensionError(RuntimeError):
@@ -183,7 +219,26 @@ def _batch_timeout(anzahl: int) -> float:
     return min(300.0, 30.0 + 1.5 * max(0, anzahl - 1))
 
 
-async def generate_embeddings(texts: list[str]) -> list[list[float]]:
+@dataclass(frozen=True)
+class EmbeddingStapel:
+    """Vektoren einer Stapelanfrage plus deren tatsaechlicher Tokenverbrauch.
+
+    Der Verbrauch dient dem Aufrufer zum Takten (siehe
+    ``EMBEDDING_TOKENS_PER_SECOND``). Er kommt aus ``usage.total_tokens`` der Antwort;
+    liefert ein Anbieter das Feld nicht, wird aus der Zeichenzahl geschaetzt.
+    """
+
+    vektoren: list[list[float]]
+    tokens: int
+
+
+# Grobe Schaetzung, nur als Rueckfallebene. Bewusst niedrig angesetzt (deutscher Fachtext
+# tokenisiert dichter als englischer): Sie ueberschaetzt damit den Verbrauch, und eine zu
+# langsame Taktung ist harmloser als eine zu schnelle.
+_ZEICHEN_JE_TOKEN = 3
+
+
+async def generate_embeddings(texts: list[str]) -> EmbeddingStapel:
     """Bettet mehrere Texte in EINER Anfrage ein — Rueckgabe in Eingabereihenfolge.
 
     Die OpenAI-kompatible API nimmt eine Liste entgegen. Ein Aufruf je Knoten macht aus
@@ -199,7 +254,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
     gelieferte Vektorbreite nicht zu ``EMBEDDING_DIMENSIONS`` passt (Aufrufer behandeln).
     """
     if not texts:
-        return []
+        return EmbeddingStapel(vektoren=[], tokens=0)
 
     from app.config import settings
     gekuerzt = [t[: settings.embedding_max_chars] for t in texts]
@@ -259,7 +314,11 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
                 f"erwartet werden {expected}. EMBEDDING_DIMENSIONS und die Spaltenbreite von "
                 f"context_nodes.embedding pruefen (Migration + Re-Embedding noetig)."
             )
-    return vektoren
+
+    tokens = ((data.get("usage") or {}).get("total_tokens")) or 0
+    if not tokens:
+        tokens = sum(len(t) for t in gekuerzt) // _ZEICHEN_JE_TOKEN
+    return EmbeddingStapel(vektoren=vektoren, tokens=int(tokens))
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -271,7 +330,7 @@ async def generate_embedding(text: str) -> list[float]:
 
     Einzelaufruf — fuer mehrere Texte ``generate_embeddings`` verwenden.
     """
-    return (await generate_embeddings([text]))[0]
+    return (await generate_embeddings([text])).vektoren[0]
 
 
 async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:

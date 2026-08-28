@@ -31,11 +31,14 @@ def _vektor(fuell: float) -> list[float]:
     return [fuell] * DIM
 
 
-def _antwort(eintraege: list[dict], status: int = 200):
+def _antwort(eintraege: list[dict], status: int = 200, usage: dict | None = None):
     r = MagicMock()
     r.status_code = status
     r.headers = {}
-    r.json = MagicMock(return_value={"data": eintraege})
+    koerper = {"data": eintraege}
+    if usage is not None:
+        koerper["usage"] = usage
+    r.json = MagicMock(return_value=koerper)
     r.raise_for_status = MagicMock()
     return r
 
@@ -53,7 +56,8 @@ def _client(response):
 async def test_leere_liste_ohne_anfrage():
     """Kein Text → kein Aufruf. Ein leerer `input` wäre bei BGE-M3 ein 400."""
     with patch("httpx.AsyncClient") as ac:
-        assert await generate_embeddings([]) == []
+        leer = await generate_embeddings([])
+        assert leer.vektoren == [] and leer.tokens == 0
     ac.assert_not_called()
 
 
@@ -65,7 +69,7 @@ async def test_alle_texte_in_einer_anfrage():
         {"index": 2, "embedding": _vektor(0.3)},
     ]))
     with patch("httpx.AsyncClient", return_value=cm):
-        vektoren = await generate_embeddings(["a", "b", "c"])
+        vektoren = (await generate_embeddings(["a", "b", "c"])).vektoren
 
     assert client.post.await_count == 1, "drei Texte müssen EINE Anfrage sein"
     assert client.post.await_args.kwargs["json"]["input"] == ["a", "b", "c"]
@@ -81,7 +85,7 @@ async def test_reihenfolge_folgt_index_nicht_der_liste():
         {"index": 1, "embedding": _vektor(0.2)},
     ]))
     with patch("httpx.AsyncClient", return_value=cm):
-        vektoren = await generate_embeddings(["a", "b", "c"])
+        vektoren = (await generate_embeddings(["a", "b", "c"])).vektoren
 
     assert [v[0] for v in vektoren] == [0.1, 0.2, 0.3]
 
@@ -119,7 +123,7 @@ async def test_ohne_index_gilt_die_listenreihenfolge():
         {"embedding": _vektor(0.2)},
     ]))
     with patch("httpx.AsyncClient", return_value=cm):
-        vektoren = await generate_embeddings(["a", "b"])
+        vektoren = (await generate_embeddings(["a", "b"])).vektoren
 
     assert [v[0] for v in vektoren] == [0.1, 0.2]
 
@@ -172,6 +176,46 @@ async def test_texte_werden_je_einzeln_gekuerzt():
     gesendet = client.post.await_args.kwargs["json"]["input"]
     assert len(gesendet[0]) == settings.embedding_max_chars
     assert gesendet[1] == "kurz"
+
+
+# ── Tokenverbrauch: Grundlage der Taktung ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_tokens_kommen_aus_der_abrechnung():
+    """Getaktet wird nach dem, was der Anbieter berechnet — nicht nach einer Schätzung."""
+    cm, _ = _client(_antwort(
+        [{"index": 0, "embedding": _vektor(0.1)}],
+        usage={"prompt_tokens": 87, "total_tokens": 87},
+    ))
+    with patch("httpx.AsyncClient", return_value=cm):
+        ergebnis = await generate_embeddings(["ein Text"])
+
+    assert ergebnis.tokens == 87
+
+
+@pytest.mark.asyncio
+async def test_ohne_usage_wird_geschaetzt():
+    """Liefert ein Anbieter keine Abrechnung, darf die Taktung nicht auf 0 fallen.
+
+    Sonst liefe der Backfill ungebremst — ausgerechnet bei einem Anbieter, über dessen
+    Verbrauch wir nichts wissen.
+    """
+    cm, _ = _client(_antwort([{"index": 0, "embedding": _vektor(0.1)}]))  # kein usage
+    with patch("httpx.AsyncClient", return_value=cm):
+        ergebnis = await generate_embeddings(["x" * 300])
+
+    assert ergebnis.tokens == 100  # 300 Zeichen / 3
+
+
+@pytest.mark.asyncio
+async def test_schaetzung_rechnet_mit_dem_gekuerzten_text():
+    """Gesendet wird der gekürzte Text — die Schätzung muss denselben zugrunde legen."""
+    cm, _ = _client(_antwort([{"index": 0, "embedding": _vektor(0.1)}]))
+    with patch("httpx.AsyncClient", return_value=cm):
+        ergebnis = await generate_embeddings(["x" * (settings.embedding_max_chars * 3)])
+
+    assert ergebnis.tokens == settings.embedding_max_chars // 3
 
 
 def test_zeitbudget_waechst_mit_der_stapelgroesse():

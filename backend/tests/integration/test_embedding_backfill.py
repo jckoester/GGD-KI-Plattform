@@ -10,6 +10,7 @@ import pytest_asyncio
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.context.embedding import EmbeddingStapel
 from app.crons.embedding_backfill_service import backfill_embeddings
 from app.db.models import ContextNode
 from app.config import settings
@@ -30,8 +31,8 @@ def _liefert(vektor: list[float]) -> AsyncMock:
     zu, eine zu kurze Antwort ließe die überzähligen Knoten stillschweigend leer.
     AsyncMock, damit Tests auch prüfen können, dass gar nicht aufgerufen wurde.
     """
-    async def _f(texte: list[str]) -> list[list[float]]:
-        return [list(vektor) for _ in texte]
+    async def _f(texte: list[str]) -> EmbeddingStapel:
+        return EmbeddingStapel(vektoren=[list(vektor) for _ in texte], tokens=len(texte) * 10)
     return AsyncMock(side_effect=_f)
 
 
@@ -135,12 +136,48 @@ class TestBackfillEmbeddings:
             assert node.embedding is None  # nicht geschrieben
 
     @pytest.mark.asyncio
-    async def test_empty_content_node_is_skipped_not_errored(self, session_factory):
-        # Whitelist-Knoten ohne einbettbaren Text → überspringen statt 400/Fehler.
+    async def test_node_ohne_content_aber_mit_titel_wird_eingebettet(self, session_factory):
+        """Der Titel allein genügt — früher fiel so ein Knoten aus der Suche heraus.
+
+        Betraf im Bestand 125 Leitideen mit sprechendem Titel (`3.1.2.2 Malerei`) und
+        leerem Inhalt.
+        """
         async with session_factory() as db:
             node = ContextNode(
                 id=uuid.uuid4(),
-                title="Leerer Knoten",
+                title="3.1.2.2 Malerei",
+                content="",
+                category="knowledge",
+                content_type="ik_kompetenz",
+                status="active",
+                read_scope="global",
+                write_scope="global",
+                metadata_={},
+            )
+            db.add(node)
+            await db.commit()
+            node_id = node.id
+
+        mock = _liefert([0.5] * DIM)
+        with patch(STAPEL, new=mock):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db)
+
+        assert stats.ok == 1
+        assert stats.skipped == 0
+        # Eingebettet wurde der Titel — sonst nichts.
+        assert mock.await_args.args[0] == ["3.1.2.2 Malerei"]
+        async with session_factory() as db:
+            node = await db.get(ContextNode, node_id)
+            assert node.embedding is not None
+
+    @pytest.mark.asyncio
+    async def test_empty_content_node_is_skipped_not_errored(self, session_factory):
+        # Weder Titel noch Inhalt → überspringen statt 400/Fehler.
+        async with session_factory() as db:
+            node = ContextNode(
+                id=uuid.uuid4(),
+                title="",
                 content="",
                 category="knowledge",
                 content_type="ik_kompetenz",
@@ -229,6 +266,65 @@ class TestBackfillEmbeddings:
 
         assert stats.found == 2
         assert stats.ok == 2
+
+
+class TestTaktung:
+    """`EMBEDDING_TOKENS_PER_SECOND` begrenzt den Durchsatz — nach echtem Verbrauch.
+
+    Vorher rechnete die Pause mit fest verdrahteten 150 Tokens je Knoten. Das lag bei
+    langen Knoten um ein Vielfaches daneben (der Inhalt reicht bis EMBEDDING_MAX_CHARS)
+    und war zugleich nicht abschaltbar.
+    """
+
+    @pytest_asyncio.fixture
+    async def zwanzig_knoten(self, session_factory):
+        async with session_factory() as db:
+            for i in range(20):
+                db.add(ContextNode(
+                    id=uuid.uuid4(), title=f"IK {i}", content=f"Inhalt {i}",
+                    category="knowledge", content_type="ik_kompetenz",
+                    status="active", read_scope="global", write_scope="global",
+                    metadata_={},
+                ))
+            await db.commit()
+
+    @pytest_asyncio.fixture(autouse=True)
+    def stapel_zu_fuenft(self):
+        alt = settings.embedding_batch_size
+        settings.embedding_batch_size = 5
+        yield
+        settings.embedding_batch_size = alt
+
+    async def _lauf(self, session_factory, tempo: float) -> list[float]:
+        """Führt den Backfill mit gegebenem Tempo aus, gibt die Wartezeiten zurück."""
+        alt = settings.embedding_tokens_per_second
+        settings.embedding_tokens_per_second = tempo
+        pausen: list[float] = []
+
+        async def _merken(sekunden):
+            pausen.append(sekunden)
+
+        try:
+            with patch(STAPEL, new=_liefert([0.1] * DIM)), \
+                 patch("app.crons.embedding_backfill_service.asyncio.sleep", new=_merken):
+                async with session_factory() as db:
+                    await backfill_embeddings(db, batch_size=100)
+        finally:
+            settings.embedding_tokens_per_second = alt
+        return pausen
+
+    @pytest.mark.asyncio
+    async def test_pause_folgt_dem_verbrauch(self, session_factory, zwanzig_knoten):
+        # 20 Knoten / Stapel 5 = 4 Anfragen à 50 Tokens (Attrappe: 10 je Text).
+        pausen = await self._lauf(session_factory, tempo=25.0)
+
+        # Drei Pausen, nicht vier: Vor der ERSTEN Anfrage gibt es nichts zu takten, und
+        # hinter der letzten wäre Warten reine Verschwendung.
+        assert pausen == [2.0, 2.0, 2.0]  # 50 Tokens / 25 pro Sekunde
+
+    @pytest.mark.asyncio
+    async def test_null_schaltet_die_drosselung_ab(self, session_factory, zwanzig_knoten):
+        assert await self._lauf(session_factory, tempo=0.0) == []
 
 
 class TestAbbruchBeiFehlerserie:
@@ -324,7 +420,7 @@ class TestAbbruchBeiFehlerserie:
             aufrufe["n"] += 1
             if aufrufe["n"] % 2 == 0:
                 raise RuntimeError("500 Internal Server Error")
-            return [list(fake) for _ in texte]
+            return EmbeddingStapel(vektoren=[list(fake) for _ in texte], tokens=10)
 
         with patch(STAPEL, new=_mal_so_mal_so):
             async with session_factory() as db:
@@ -357,7 +453,7 @@ class TestAbbruchBeiFehlerserie:
                     400, request=httpx.Request("POST", "http://x/embeddings")
                 )
                 raise httpx.HTTPStatusError("bad", request=antwort.request, response=antwort)
-            return [list(fake) for _ in texte]
+            return EmbeddingStapel(vektoren=[list(fake) for _ in texte], tokens=10)
 
         with patch(STAPEL, new=_einer_ist_schlecht):
             async with session_factory() as db:

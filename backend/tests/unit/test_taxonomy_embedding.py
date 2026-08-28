@@ -182,8 +182,9 @@ class TestBuildEmbeddingInput:
             metadata={"schaltzeichen": {"beschreibung": "Diodensymbol mit Pfeilen"}},
         )
         result = _build_embedding_input(node)
-        assert result.startswith("Diodensymbol mit Pfeilen")
-        assert "LED - Leuchtdiode." in result
+        # Der Titel steht vorn, weil er weder im Inhalt noch in der Anreicherung vorkommt;
+        # die Anreicherung folgt direkt danach.
+        assert result == "Test\nDiodensymbol mit Pfeilen\nLED - Leuchtdiode."
 
     def test_build_embedding_input_funktion(self, make_node):
         """Funktion-Node: Signaturzeile wird vorangestellt."""
@@ -200,18 +201,29 @@ class TestBuildEmbeddingInput:
             },
         )
         result = _build_embedding_input(node)
-        assert result.startswith("digitalWrite(pin: int, value: int) -> void")
+        assert "digitalWrite(pin: int, value: int) -> void" in result
+        assert result.startswith("Test\n")  # Titel trägt eigene Information
 
     def test_build_embedding_input_fallback(self, make_node):
-        """Knoten ohne EMBEDDING_ENRICHMENT-Eintrag: nur content."""
+        """Knoten ohne EMBEDDING_ENRICHMENT-Eintrag: Titel + content."""
         node = make_node(category="concept", content_type="abstrakt",
                          content="PWM simuliert analoge Spannung.", metadata={})
-        assert _build_embedding_input(node) == "PWM simuliert analoge Spannung."
+        assert _build_embedding_input(node) == "Test\nPWM simuliert analoge Spannung."
+
+    def test_build_embedding_input_titel_im_content_nicht_doppelt(self, make_node):
+        """Steht der Titel schon im Inhalt, bleibt der Input unveraendert.
+
+        Das ist der Regelfall bei Bildungsplan-Kompetenzen (Titel = Inhalt + Nummer) und
+        der Grund, warum die Titel-Aufnahme kein Re-Embedding des Bestands erzwingt.
+        """
+        node = make_node(category="concept", content_type="abstrakt",
+                         content="Ein Test der Signalform.", metadata={})
+        assert _build_embedding_input(node) == "Ein Test der Signalform."
 
     def test_build_embedding_input_no_content(self, make_node):
-        """Knoten ohne content: leerer String."""
+        """Knoten ohne content: der Titel allein — frueher wurde er uebersprungen."""
         node = make_node(category="concept", content_type="abstrakt", content="")
-        assert _build_embedding_input(node) == ""
+        assert _build_embedding_input(node) == "Test"
 
     def test_build_embedding_input_bp_ik_kompetenz(self, make_node):
         """Bildungsplan IK-Kompetenz: breadcrumb wird vorangestellt."""

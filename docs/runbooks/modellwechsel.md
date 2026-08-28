@@ -132,6 +132,16 @@ ein abgebrochener Lauf lässt sich also einfach erneut starten.
 > Antwortet der Anbieter mit `413`, `400 request too large` oder läuft in Timeouts, ist der
 > Wert zu hoch — die Anfragegröße ist `EMBEDDING_BATCH_SIZE × EMBEDDING_MAX_CHARS`.
 >
+> **Tempo begrenzen** tut `EMBEDDING_TOKENS_PER_SECOND` (Default 3000 ≈ 180.000
+> Tokens/Minute; `0` schaltet ab). Getaktet wird nach dem abgerechneten Verbrauch aus
+> `usage.total_tokens`, nicht nach einer Schätzung — ein Knoten mit 15.000 Zeichen kostet
+> gemessen 4500 Tokens. Den passenden Wert gibt das Rate-Limit des eigenen Anbieterkontos
+> vor; ohne Drosselung läuft der Backfill auf grob 300.000 Tokens/Minute.
+>
+> Auf die 429-Wiederholung allein zu setzen genügt nicht: Sie greift dreimal und höchstens
+> `EMBEDDING_RETRY_MAX_WAIT_S` lang. Bei anhaltender Drosselung ist das Budget erschöpft,
+> die Knoten bekommen Fehlermarken, und nach drei gescheiterten Stapeln bricht der Lauf ab.
+>
 > Scheitert eine Anfrage mit `400`, fasst der Backfill die enthaltenen Texte einzeln nach:
 > Ein unbrauchbarer Text (z. B. leer — BGE-M3 lehnt das ab, OpenAI nicht) bekommt dann
 > seinen `embedding_error`, ohne die übrigen 63 Knoten mitzureißen. Bei allen anderen

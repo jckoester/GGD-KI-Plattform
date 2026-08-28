@@ -5,6 +5,41 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- **Embeddings werden im Stapel erzeugt** (`EMBEDDING_BATCH_SIZE`, Default 64) statt eine
+  Anfrage je Knoten. Gemessen gegen BGE-M3: 0,8 → 33 Knoten/s.
+- **Der Titel geht ins Embedding ein, wo er eigene Information trägt.** Knoten ohne
+  Inhalt wurden bisher übersprungen und waren für die semantische Suche unsichtbar
+  (im Bestand 125 Leitideen). Bei Kompetenzen, deren Titel nur der Inhalt plus
+  Gliederungsnummer ist, ändert sich nichts.
+- **Die Drosselung des Backfills ist konfigurierbar** (`EMBEDDING_TOKENS_PER_SECOND`,
+  Default 3000, `0` = aus) und taktet nach dem abgerechneten Verbrauch statt nach einer
+  festen Schätzung von 150 Tokens je Knoten. Die lag bei langen Knoten um Faktor 30
+  daneben (15.000 Zeichen = 4500 Tokens).
+- **Der Embedding-Backfill zählt Anfragen statt Knoten**, bevor er abbricht: drei
+  vollständig fehlgeschlagene Stapel in Folge statt zehn Knoten.
+- Scheitert ein Stapel mit `400`, fasst der Backfill die Texte einzeln nach — ein
+  unbrauchbarer Text reißt die übrigen nicht mehr mit.
+
+### Behoben
+
+- **Startskript des LiteLLM-Proxys** verlangte fest `OPENAI_API_KEY`. Es prüft jetzt die
+  Variablen, die die gewählte Config referenziert, und startet aus `infra/` — Guardrail-
+  Module und Pattern-Dateien werden relativ zum Arbeitsverzeichnis aufgelöst.
+
+### Migration
+
+- Keine Datenbank-Migration nötig.
+- **Nach dem Update einmal `python scripts/embedding_backfill.py` laufen lassen.** Die
+  Titel-Aufnahme betrifft Leitideen, Kapitel und PK-Gruppen; Kompetenzknoten behalten
+  ihren bisherigen Vektor. Betroffene Knoten neu einbetten:
+
+  ```sql
+  UPDATE context_nodes SET embedding = NULL
+   WHERE status = 'active' AND content_type IN ('leitidee', 'kapitel', 'pk_gruppe');
+  ```
+
 ## [0.6.2] – 2026-08-26
 
 ### Behoben
@@ -13,19 +48,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Formeln im Titel (`… die Zahl \(\pi\) …`); angezeigt wurde die TeX-Notation. Betrifft
   Bildungsplanansicht, Knotenansicht, IK-/PK-Auswahl, Knotenliste und die
   Kontextknoten im Chat.
-- **PDF-Export rendert `\(…\)` und `\[…\]`.** Die Export-Pipeline kannte nur `$…$`; bei
-  der Klammer-Notation verschwand zusätzlich der Backslash, sodass `(\pi)` im PDF stand.
-      Betrifft Curriculum-, Stunden- und Dokument-Export.
-    - **Kompetenztitel im Curriculum- und Stunden-PDF** liefen am Formel-Rendering vorbei.
+- **PDF-Export rendert `\(…\)` und `\[…\]`.** Die Export-Pipeline kannte nur `$…$`; bei der Klammer-Notation verschwand zusätzlich der Backslash, sodass `(\pi)` im PDF stand.
+  Betrifft Curriculum-, Stunden- und Dokument-Export.
+- **Kompetenztitel im Curriculum- und Stunden-PDF** liefen am Formel-Rendering vorbei.
     
-    ## [0.6.1] – 2026-08-26
+## [0.6.1] – 2026-08-26
     
-    ### Behoben
+### Behoben
     
-    - **Embeddings: `429` und `503` werden wiederholt** statt als endgültiger Fehler
-      behandelt. Wartezeit nach `Retry-After`, sonst exponentiell; begrenzt durch
-  `EMBEDDING_MAX_RETRIES` und `EMBEDDING_RETRY_MAX_WAIT_S`. Andere Fehler werden
-  weiterhin sofort gemeldet.
+- **Embeddings: `429` und `503` werden wiederholt** statt als endgültiger Fehler behandelt. Wartezeit nach `Retry-After`, sonst exponentiell; begrenzt durch `EMBEDDING_MAX_RETRIES` und `EMBEDDING_RETRY_MAX_WAIT_S`. Andere Fehler werden weiterhin sofort gemeldet.
 - **Der Embedding-Backfill bricht nach zehn Fehlschlägen in Folge ab** (`ABBRUCH:` im
   Log) statt bei gestörtem Modellzugang alle offenen Knoten durchzuarbeiten. Nicht
   versuchte Knoten bleiben ohne Vektor und kommen im nächsten Lauf wieder dran.
