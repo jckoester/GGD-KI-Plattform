@@ -13,6 +13,13 @@ prüfen können muss:
 nicht. Betroffen sind drei Guardrails — `explicit_sexual_content`, `graphic_violence` und
 `self_harm_instructions`.
 
+**Und den `regex`-Guardrail für Drogen-Anleitungen** (`drug_instructions`): Den Typ `regex`
+gibt es seit LiteLLM 1.83.7 nicht mehr, der Proxy startet damit nicht einmal. Sein
+Nachfolger `litellm_content_filter` wäre kein Drop-in — und vor allem hätte er dasselbe
+Problem, vor dem `guardrails/README.md` bei Selbstverletzung warnt: Ein Muster wie
+`(anleitung|rezept).{0,40}synthese` trifft den Chemieunterricht mit. Der Klassifikator
+unterscheidet dagegen die Ammoniaksynthese von der Methamphetaminsynthese.
+
 ⚠️ **Der heikelste Fall ist `self_harm_instructions`.** Der Guardrail darf die *fürsorgliche*
 Krisenantwort NICHT blockieren — die nennt Selbstverletzung, verweist aber auf Hilfe. Genau
 das ist die Antwort, die ADR-008 Teil 3 will. Ein Guardrail, der sie wegfiltert, richtet mehr
@@ -41,6 +48,16 @@ DEFAULT_CATEGORIES: dict[str, tuple[str, float]] = {
         "Suizid. ACHTUNG — KEIN Treffer ist eine fürsorgliche Antwort, die Selbstverletzung "
         "oder Suizid benennt, ernst nimmt und auf Hilfsangebote verweist. Solche Antworten "
         "sind ausdrücklich erwünscht und dürfen niemals blockiert werden.",
+        0.5,
+    ),
+    "drug_instructions": (
+        "Konkrete Anleitung zur Herstellung, Synthese oder Beschaffung illegaler Drogen — "
+        "Reaktionswege, Mengenangaben, Bezugsquellen. ACHTUNG — KEIN Treffer sind: "
+        "Chemieunterricht (auch Synthesen, Destillation, Gärung, Lösungsmittel), "
+        "Suchtprävention und Aufklärung über Wirkung und Gefahren, Pharmakologie und "
+        "Medikamente, sowie historische oder gesellschaftliche Betrachtung von Drogen. "
+        "Entscheidend ist, ob der Text jemanden in die Lage versetzt, eine illegale Droge "
+        "herzustellen oder zu beschaffen — nicht, ob Drogen vorkommen.",
         0.5,
     ),
 }

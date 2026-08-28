@@ -55,80 +55,81 @@ model_list:
 # Leitplanken (Schüler:innen) sind hier BEWUSST NICHT konfiguriert — die liegen
 # audience-abhängig im Backend (pedagogy.yaml), damit Lehrkräfte volle Antworten
 # behalten.
-litellm_settings:
-  guardrails:
-    # Explizit sexuelle Inhalte. Empfehlung: openai_moderation (kontextsensitiv,
-    # weniger Fehlalarme als reine Regex). Die Regex-Variante (pattern_set) ist als
-    # optionale Zusatzschicht gedacht — nur nach Kuratierung aktivieren.
-    - guardrail_name: "explicit_sexual_content"
-      litellm_params:
-        guardrail: openai_moderation
-        mode: post_call
-        default_on: true
-      guardrail_info:
-        params:
-          categories: ["sexual/minors", "sexual"]
-          threshold: 0.5
+#
+# ⚠️ Dieser Block gehört auf die OBERSTE Ebene, NICHT unter `litellm_settings`. Dort
+# erwartet LiteLLM das alte Guardrail-Format und quittiert diese Schreibweise beim Start
+# mit „GuardrailItem() argument after ** must be a mapping, not str" — der Proxy startet
+# dann gar nicht erst.
+#
+# ── Warum EIN Klassifikator statt vier Einzel-Guardrails ─────────────────────
+# Früher standen hier drei `openai_moderation`-Einträge plus ein `regex`-Eintrag für
+# Drogen-Anleitungen. Beides trägt nicht mehr:
+#
+#   * `openai_moderation` setzt ein OpenAI-Konto voraus. Bei EU-Anbietern (IONOS, Mistral)
+#     gibt es die Moderation-API nicht — der Jugendschutz fiele ersatzlos aus.
+#   * Den Typ `regex` gibt es seit LiteLLM 1.83.7 nicht mehr; der Proxy startet damit
+#     nicht („ValueError: Unsupported guardrail: regex").
+#   * Die damals konfigurierten Kategorien und Schwellen standen unter
+#     `guardrail_info.params` — die liest `openai_moderation` gar nicht. Sie waren also
+#     nie wirksam.
+#
+# Der Klassifikator bewertet stattdessen alle vier Kategorien in EINEM Aufruf, mit einem
+# beliebigen Chat-Modell des eigenen Anbieters. Seine Schwellen greifen tatsächlich.
+guardrails:
+  - guardrail_name: "jugendschutz"
+    litellm_params:
+      guardrail: guardrails.llm_moderation.LlmModerationGuardrail
+      mode: post_call
+      default_on: true
+      # Vollqualifiziert (Provider + ggf. api_base), NICHT der `model_name` aus der
+      # model_list: Der Guardrail ruft litellm direkt auf, nicht den Proxy.
+      # Ein kleines, günstiges Modell genügt — es läuft bei JEDER Antwort.
+      classifier_model: openai/gpt-4o-mini
+      # Bei eigenem Endpunkt zusätzlich setzen:
+      # classifier_api_base: os.environ/IONOS_API_BASE
+      classifier_api_key: os.environ/OPENAI_API_KEY
+      timeout: 8.0
+      # Optional — ohne Angabe gelten die Defaults aus moderation_core.py.
+      # violence_graphic liegt höher: Historische und literarische Gewaltdarstellung
+      # gehört zum Unterricht.
+      thresholds:
+        sexual: 0.5
+        violence_graphic: 0.7
+        self_harm_instructions: 0.5
+        drug_instructions: 0.5
 
-    # Grafische Gewalt — kontextsensitiv blocken, historisch/bildungsrelevante
-    # Darstellung zulassen → openai_moderation statt Regex (ADR-008 Teil 1A).
-    - guardrail_name: "graphic_violence"
-      litellm_params:
-        guardrail: openai_moderation
-        mode: post_call
-        default_on: true
-      guardrail_info:
-        params:
-          categories: ["violence/graphic"]
-          threshold: 0.7
+  # ── Bild-Prompt-Filter (Phase 16, Bildgenerierung, pre_call) ────────────────
+  # Defense-in-Depth für /images/generations: Der Backend-Handler moderiert den
+  # Bild-Prompt bereits lokal (Krisen-Scan + config/image_blocklist.yaml). Dieser
+  # Guardrail prüft ihn zusätzlich am Proxy — `pre_call`, BEVOR der Anbieter ihn sieht.
+  # Der Klassifikator oben greift hier NICHT: Er läuft `post_call` auf Chat-Antworten,
+  # und bei Bildern gibt es keine Textantwort zu bewerten.
+  # `litellm_content_filter` gibt es weiterhin (anders als `regex`).
+  # Blockwörter kuratieren! Erst nach Test aktivieren.
+  # - guardrail_name: "image_prompt_filter"
+  #   litellm_params:
+  #     guardrail: litellm_content_filter
+  #     mode: pre_call
+  #     blocked_words:
+  #       - keyword: "..."
+  #         action: "BLOCK"
 
-    # Anleitungen zu Selbstverletzung/Suizidmethoden — strenges Blocken.
-    # ⚠️ VORSICHT: Diese Guardrail darf NICHT die fürsorgliche Krisen-Antwort des
-    #    Modells blockieren (die Selbstverletzung NENNT, aber auf Hilfe verweist).
-    #    Daher openai_moderation (self-harm/instructions) bevorzugen; die optionale
-    #    Regex-Schicht (self_harm_instructions.txt) erst nach gründlichem Test
-    #    aktivieren — sonst riskiert man, Hilfe wegzufiltern.
-    - guardrail_name: "self_harm_instructions"
-      litellm_params:
-        guardrail: openai_moderation
-        mode: post_call
-        default_on: true
-      guardrail_info:
-        params:
-          categories: ["self-harm/instructions"]
-          threshold: 0.5
+# ⚠️ Deployment: `guardrails/llm_moderation.py` und `guardrails/moderation_core.py` müssen
+# dort liegen, wo der Proxy läuft, und von seinem Arbeitsverzeichnis aus importierbar sein
+# (PYTHONPATH auf das guardrails-Verzeichnis). Der Modulname wird als DATEIPFAD relativ zum
+# Arbeitsverzeichnis aufgelöst — läuft der Proxy in `infra/`, heißt er
+# `guardrails.llm_moderation.…`.
+#
+# Verhalten bei Störungen: **fail-open**. Timeout, Netzfehler oder eine unlesbare Antwort
+# lassen den Text durch und schreiben eine Warnung. Ein fail-closed Guardrail würde bei
+# einer Anbieterstörung die ganze Schule blockieren — unverhältnismäßig, und konsistent mit
+# dem PII-Gate (Phase 14) und ADR-008 Teil 3.
+#
+# Die Regex-Musterdateien unter guardrails/ bleiben als Ausgangspunkt liegen, falls später
+# eine deterministische zweite Schicht gewünscht ist (der Klassifikator ist fail-open).
+# Sie brauchen dafür das Format von `litellm_content_filter` und — wichtiger — Kuratierung:
+# Ein Muster wie `(anleitung|rezept).{0,40}synthese` trifft den Chemieunterricht mit.
 
-    # Konkrete Herstellungs-/Beschaffungsanleitungen für illegale Drogen blocken,
-    # Aufklärung zulassen. Regex-Pattern-Datei (kuratieren!).
-    - guardrail_name: "illegal_drugs_how_to"
-      litellm_params:
-        guardrail: regex
-        mode: post_call
-        action: block
-        pattern_set: "./guardrails/drugs_how_to.txt"
-
-    # Optional: Regex-Zusatzschicht für explizit sexuelle Inhalte (erst nach
-    # Kuratierung aktivieren — auskommentiert lassen, bis getestet).
-    # - guardrail_name: "explicit_sexual_content_regex"
-    #   litellm_params:
-    #     guardrail: regex
-    #     mode: post_call
-    #     action: block
-    #     pattern_set: "./guardrails/explicit_sexual.txt"
-
-    # ── Bild-Prompt-Filter (Phase 16, Bildgenerierung, pre_call) ───────────────
-    # Defense-in-Depth für /images/generations: Der Backend-Handler moderiert den
-    # Bild-Prompt bereits lokal (Krisen-Scan + config/image_blocklist.yaml). Diese
-    # Guardrail prüft den Prompt zusätzlich am Proxy — `pre_call`, BEVOR der Provider
-    # ihn sieht (`async_moderation_hook` greift bei Bildern NICHT → Content-Filter
-    # im pre_call-Modus nutzen). Blockwörter kuratieren! Erst nach Test aktivieren.
-    # - guardrail_name: "image_prompt_filter"
-    #   litellm_params:
-    #     guardrail: litellm_content_filter
-    #     mode: pre_call
-    #     blocked_words:
-    #       - keyword: "..."
-    #         action: "BLOCK"
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

@@ -11,6 +11,8 @@ mehr Schaden an als der Inhalt, den er verhindern soll.
 import importlib.util
 from pathlib import Path
 
+import json
+
 import pytest
 
 _CORE = (
@@ -67,27 +69,36 @@ def test_long_text_is_truncated(core):
 
 # ── Antwort lesen ────────────────────────────────────────────────────────────
 
+def _alle(core, **abweichungen) -> dict:
+    """Vollstaendige Bewertung: alle Kategorien auf 0.0, genannte ueberschrieben.
+
+    `parse_scores` verlangt bewusst JEDE Kategorie — eine fehlende bedeutet „ungeprueft".
+    Die Tests bauen ihre Eingabe deshalb aus `DEFAULT_CATEGORIES` statt sie zu tippen;
+    sonst bricht bei jeder neuen Kategorie die halbe Datei.
+    """
+    werte = {name: 0.0 for name in core.DEFAULT_CATEGORIES}
+    werte.update(abweichungen)
+    return werte
+
+
+
 def test_parses_plain_json(core):
-    scores = core.parse_scores(
-        '{"sexual": 0.1, "violence_graphic": 0.0, "self_harm_instructions": 0.9}'
-    )
+    scores = core.parse_scores(json.dumps(_alle(core, sexual=0.1, self_harm_instructions=0.9)))
 
     assert scores["self_harm_instructions"] == 0.9
 
 
 def test_parses_json_inside_a_fence(core):
     """LLMs legen gern ```json um ihre Antwort — das darf nicht am Parser scheitern."""
-    raw = '```json\n{"sexual": 0.2, "violence_graphic": 0.1, "self_harm_instructions": 0.0}\n```'
+    raw = f"```json\n{json.dumps(_alle(core, sexual=0.2, violence_graphic=0.1))}\n```"
 
     assert core.parse_scores(raw)["sexual"] == 0.2
 
 
 def test_parses_json_with_surrounding_prose(core):
-    raw = 'Hier meine Einschätzung:\n{"sexual": 0, "violence_graphic": 0, "self_harm_instructions": 0}\nViele Grüße'
+    raw = f"Hier meine Einschätzung:\n{json.dumps(_alle(core))}\nViele Grüße"
 
-    assert core.parse_scores(raw) == {
-        "sexual": 0.0, "violence_graphic": 0.0, "self_harm_instructions": 0.0
-    }
+    assert core.parse_scores(raw) == _alle(core)
 
 
 @pytest.mark.parametrize("raw", ["", "keine Ahnung", "{kaputt", None])
@@ -107,16 +118,14 @@ def test_missing_category_yields_none_instead_of_assuming_zero(core):
 
 def test_boolean_is_not_accepted_as_a_score(core):
     """`true` ist in Python 1.0 — das darf nicht versehentlich als Höchstwert durchgehen."""
-    assert core.parse_scores(
-        '{"sexual": true, "violence_graphic": 0.0, "self_harm_instructions": 0.0}'
-    ) is None
+    assert core.parse_scores(json.dumps(_alle(core, sexual=True))) is None
 
 
 # ── Entscheidung ─────────────────────────────────────────────────────────────
 
 def test_below_threshold_passes(core):
     hits = core.violated_categories(
-        {"sexual": 0.4, "violence_graphic": 0.6, "self_harm_instructions": 0.4}
+        _alle(core, sexual=0.4, violence_graphic=0.6, self_harm_instructions=0.4)
     )
 
     assert hits == []
@@ -125,7 +134,7 @@ def test_below_threshold_passes(core):
 def test_at_threshold_blocks(core):
     """Die Schwelle ist inklusiv — genau darauf zu liegen zählt als Treffer."""
     hits = core.violated_categories(
-        {"sexual": 0.5, "violence_graphic": 0.0, "self_harm_instructions": 0.0}
+        _alle(core, sexual=0.5)
     )
 
     assert hits == ["sexual"]
@@ -133,7 +142,7 @@ def test_at_threshold_blocks(core):
 
 def test_thresholds_can_be_overridden(core):
     """Die Schule soll nachschärfen können, ohne den Code anzufassen."""
-    scores = {"sexual": 0.3, "violence_graphic": 0.0, "self_harm_instructions": 0.0}
+    scores = _alle(core, sexual=0.3)
 
     assert core.violated_categories(scores) == []
     assert core.violated_categories(scores, thresholds={"sexual": 0.2}) == ["sexual"]
@@ -141,7 +150,7 @@ def test_thresholds_can_be_overridden(core):
 
 def test_multiple_hits_are_all_reported(core):
     hits = core.violated_categories(
-        {"sexual": 0.9, "violence_graphic": 0.9, "self_harm_instructions": 0.9}
+        {name: 0.9 for name in core.DEFAULT_CATEGORIES}
     )
 
     assert set(hits) == set(core.DEFAULT_CATEGORIES)
@@ -168,3 +177,43 @@ def test_violence_threshold_is_more_permissive_than_sexual(core):
     _, violence = core.DEFAULT_CATEGORIES["violence_graphic"]
 
     assert violence > sexual
+
+
+# ── Drogen-Anleitungen (ersetzt den entfallenen regex-Guardrail) ──────────────
+
+def test_drug_category_exists(core):
+    """Ohne sie prüft nach dem Wegfall von `regex` NICHTS mehr auf Herstellungsanleitungen."""
+    assert "drug_instructions" in core.DEFAULT_CATEGORIES
+
+
+def test_drug_prompt_carves_out_chemistry_lessons(core):
+    """Der Grund, warum es der Klassifikator und nicht wieder eine Regex ist.
+
+    Ein Muster wie `(anleitung|rezept).{0,40}synthese` trifft die Ammoniaksynthese mit.
+    Die Kategoriebeschreibung muss den Unterricht deshalb ausdrücklich ausnehmen —
+    sonst blockiert der Guardrail Chemie, Suchtprävention und Pharmakologie.
+    """
+    beschreibung, _ = core.DEFAULT_CATEGORIES["drug_instructions"]
+    kleingeschrieben = beschreibung.lower()
+
+    assert "kein treffer" in kleingeschrieben
+    for erlaubt in ("chemieunterricht", "suchtprävention", "pharmakologie"):
+        assert erlaubt in kleingeschrieben, f"{erlaubt} nicht ausgenommen"
+
+
+def test_drug_prompt_names_the_deciding_question(core):
+    """Nicht „kommen Drogen vor?", sondern „versetzt der Text jemanden in die Lage?"."""
+    beschreibung, _ = core.DEFAULT_CATEGORIES["drug_instructions"]
+
+    assert "herzustellen oder zu beschaffen" in beschreibung.lower()
+
+
+def test_drug_hit_blocks(core):
+    hits = core.violated_categories(_alle(core, drug_instructions=0.9))
+
+    assert hits == ["drug_instructions"]
+
+
+def test_chemistry_lesson_score_passes(core):
+    """Ein niedriger Wert muss folgenlos bleiben — auch wenn Drogen im Text vorkommen."""
+    assert core.violated_categories(_alle(core, drug_instructions=0.2)) == []

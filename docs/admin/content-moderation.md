@@ -111,21 +111,23 @@ Deployment-Prozess mit Nachvollziehbarkeit (Git-History).
 > vor der Aktivierung mit Schulleitung, Schulsozialarbeit und Fachschaften **kuratiert**
 > und getestet werden.
 >
-> **⚠ Wichtig zu Selbstverletzung:** Selbstverletzung und sexuelle Inhalte laufen in der
-> Vorlage über `openai_moderation` (kontextsensitiv), **nicht** über aktive Regex. Eine
-> Regex auf Selbstverletzungs-Begriffe würde sonst leicht die *fürsorgliche* Krisen-
-> Antwort des Modells wegfiltern (vgl. Abschnitt D / ADR-008 Teil 3). Die Regex-Dateien
-> dafür sind standardmäßig **ausgeschaltet**.
+> **⚠ Wichtig zu Selbstverletzung:** Alle vier Kategorien laufen über den
+> kontextsensitiven LLM-Klassifikator, **nicht** über Regex. Eine Regex auf
+> Selbstverletzungs-Begriffe würde sonst leicht die *fürsorgliche* Krisen-Antwort des
+> Modells wegfiltern (vgl. Abschnitt D / ADR-008 Teil 3). Die Regex-Dateien unter
+> `infra/guardrails/` sind standardmäßig **ausgeschaltet** und liegen nur als
+> Ausgangspunkt bereit, falls eine deterministische zweite Schicht gewünscht ist — der
+> Klassifikator ist fail-open.
 
 ### Guardrail-Typen
 
 | Typ | Beschreibung |
 |-----|-------------|
-| `regex` | Einfache Muster (Reguläre Ausdrücke) auf Eingabe oder Ausgabe |
-| `openai_moderation` | OpenAI Moderation API — kategorisiert Inhalte nach Schäden |
+| `guardrails.llm_moderation.LlmModerationGuardrail` | **LLM als Klassifikator — der empfohlene Weg.** Bewertet alle vier Kategorien in einem Aufruf, funktioniert mit jedem Anbieter. Siehe unten. |
+| `litellm_content_filter` | Strukturierte Wort-/Musterlisten mit Ausnahmen. Deterministisch, aber pflegeintensiv. |
+| `openai_moderation` | OpenAI Moderation API. Setzt ein OpenAI-Konto voraus — bei EU-Anbietern nicht verfügbar. |
 | `bedrock_guardrail` | AWS Bedrock Content Filtering |
-| `custom_plugin` | Eigene Python-Klasse — maximale Flexibilität |
-| `llm_moderation.LlmModerationGuardrail` | **LLM als Klassifikator** — anbieterunabhängiger Ersatz für `openai_moderation`, siehe unten |
+| ~~`regex`~~ | **Entfallen.** Seit LiteLLM 1.83.7 kein gültiger Typ mehr; der Proxy startet damit nicht („Unsupported guardrail: regex"). Nachfolger ist `litellm_content_filter` — mit anderem Format. |
 
 ### Empfohlene Konfiguration für den Schulbetrieb
 
@@ -145,91 +147,91 @@ Risikoeinschätzung der Schule ab.
 
 ```yaml
 model_list:
-  - model_name: gpt-4o-mini
+  - model_name: chat-standard
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
+# WICHTIG: oberste Ebene, NICHT unter `litellm_settings` — dort erwartet LiteLLM das
+# alte Guardrail-Format und der Proxy startet gar nicht erst.
 guardrails:
-  # Jugendschutz: explizit sexuelle Inhalte blockieren (pre_call + post_call)
-  - guardrail_name: explicit-sexual-content
+  # Ein Klassifikator für alle vier Kategorien. Läuft mit jedem Anbieter, weil er ein
+  # gewöhnliches Chat-Modell befragt statt einer anbietereigenen Moderations-API.
+  - guardrail_name: "jugendschutz"
     litellm_params:
-      guardrail: openai_moderation
-      mode: pre_call_and_post_call
-      default_on: true
-    guardrail_info:
-      params:
-        categories: ["sexual/minors", "sexual"]
-        threshold: 0.5
-
-  # Jugendschutz: grafische Gewalt blockieren
-  - guardrail_name: graphic-violence
-    litellm_params:
-      guardrail: openai_moderation
-      mode: pre_call_and_post_call
-      default_on: true
-    guardrail_info:
-      params:
-        categories: ["violence/graphic", "violence"]
-        threshold: 0.7
-
-  # Krisenprävention: Selbstverletzungsanleitungen blockieren
-  - guardrail_name: self-harm-instructions
-    litellm_params:
-      guardrail: openai_moderation
-      mode: pre_call_and_post_call
-      default_on: true
-    guardrail_info:
-      params:
-        categories: ["self-harm/instructions", "self-harm"]
-        threshold: 0.5
-
-  # Jugendschutz: Drogenanleitungen blockieren
-  - guardrail_name: illegal-drugs
-    litellm_params:
-      guardrail: openai_moderation
-      mode: pre_call_and_post_call
-      default_on: true
-    guardrail_info:
-      params:
-        categories: ["illicit/violent", "illicit"]
-        threshold: 0.6
-
-  # Datenschutz: Persönliche Daten im Output unterdrücken (nur post_call)
-  - guardrail_name: pii-output-filter
-    litellm_params:
-      guardrail: regex
+      guardrail: guardrails.llm_moderation.LlmModerationGuardrail
       mode: post_call
       default_on: true
-    guardrail_info:
-      params:
-        # Beispiel: deutsche Telefonnummern und IBAN im Output maskieren
-        pattern: "\\b(\\+49|0)[\\d\\s\\-\\/]{7,}\\b|\\bDE\\d{2}[\\s\\d]{18,}\\b"
-        mask_with: "[GEFILTERT]"
+      # Vollqualifiziert (Provider + ggf. api_base) — NICHT der `model_name` aus der
+      # model_list: Der Guardrail ruft litellm direkt auf, nicht den Proxy.
+      classifier_model: openai/gpt-4o-mini
+      classifier_api_key: os.environ/OPENAI_API_KEY
+      # Bei eigenem Endpunkt (IONOS, Mistral, lokal) zusätzlich:
+      # classifier_api_base: os.environ/IONOS_API_BASE
+      timeout: 8.0
+      thresholds:
+        sexual: 0.5
+        violence_graphic: 0.7   # höher: historische/literarische Gewalt gehört zum Unterricht
+        self_harm_instructions: 0.5
+        drug_instructions: 0.5
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   database_url: os.environ/DATABASE_URL
 ```
 
-> **Hinweis zu `openai_moderation`:** Dieser Guardrail-Typ sendet Anfragen und
-> Antworten zur Prüfung an die OpenAI Moderation API. Das erfordert einen
-> OpenAI-API-Key und verursacht einen minimalen Latenz-Overhead. Für Schulen
-> ohne OpenAI-Vertrag steht `regex` als datenschutzfreundlichere Alternative
-> zur Verfügung, erfordert aber selbst gepflegte Muster.
+> **Warum kein `pii-output-filter` mehr in diesem Beispiel:** Die frühere Fassung nutzte
+> dafür `guardrail: regex` mit `pattern`/`mask_with` unter `guardrail_info.params`. Beides
+> trägt nicht: `regex` gibt es nicht mehr, und `guardrail_info.params` wird von keinem
+> Guardrail-Typ gelesen — die dort eingetragenen Kategorien und Schwellen waren nie
+> wirksam. Für Maskierung im Output ist `litellm_content_filter` mit
+> `pattern_redaction_format` der aktuelle Weg; die Eingabeseite deckt ohnehin das
+> PII-Gate im Backend ab (Phase 14).
 
-### Ohne OpenAI: LLM-Klassifikator statt `openai_moderation`
 
-Bei EU-Anbietern wie IONOS gibt es **keine** Moderation-API. Die drei Guardrails
-`explicit_sexual_content`, `graphic_violence` und `self_harm_instructions` lassen sich dort
-nicht betreiben. Ersatz ist ein eigener Guardrail, der ein LLM als Klassifikator befragt und
-alle drei Kategorien in **einem** Aufruf bewertet:
+> **Hinweis zu `openai_moderation`:** Dieser Guardrail-Typ sendet Anfragen und Antworten
+> zur Prüfung an die OpenAI Moderation API. Das erfordert ein OpenAI-Konto — bei
+> EU-Anbietern wie IONOS oder Mistral steht er nicht zur Verfügung. Die mitgelieferten
+> Vorlagen nutzen deshalb den LLM-Klassifikator (siehe unten), der mit jedem Anbieter läuft.
+
+### Der LLM-Klassifikator (empfohlen, anbieterunabhängig)
+
+Ein eigener Guardrail befragt ein gewöhnliches Chat-Modell als Klassifikator und bewertet
+**vier Kategorien in einem Aufruf**:
+
+| Kategorie | Schwelle | Was KEIN Treffer ist |
+|---|---|---|
+| `sexual` | 0.5 | Sexualkunde, Aufklärung, Biologie, Literaturbesprechung |
+| `violence_graphic` | 0.7 | Historische, journalistische, literarische Gewaltschilderung |
+| `self_harm_instructions` | 0.5 | Die **fürsorgliche** Krisenantwort, die auf Hilfe verweist |
+| `drug_instructions` | 0.5 | Chemieunterricht (auch Synthesen), Suchtprävention, Pharmakologie, Geschichte |
+
+Die Schwelle für Gewaltdarstellung liegt höher, weil historische und literarische
+Schilderung zum Unterricht gehört.
+
+`drug_instructions` ersetzt den früheren `regex`-Guardrail auf
+`guardrails/drugs_how_to.txt`. Der Klassifikator ist hier nicht nur ein Ersatz, sondern die
+bessere Lösung: Ein Muster wie `(anleitung|rezept).{0,40}synthese` trifft die
+Ammoniaksynthese im Chemieunterricht mit — der Klassifikator unterscheidet sie von der
+Methamphetaminsynthese. Gegen echte Unterrichtstexte geprüft (Haber-Bosch, Gärung und
+Destillation, Suchtprävention, Pharmakologie, Opiumkriege): kein Fehlalarm.
+
+Zwei Dateien:
 
 - `infra/guardrails/llm_moderation.py` — die LiteLLM-Anbindung
 - `infra/guardrails/moderation_core.py` — Kategorien, Schwellen, Auswertung
 
-Konfiguration siehe `infra/litellm_config.ionos.example.yaml`. Beide Dateien müssen dort
-liegen, wo der Proxy läuft, und von seinem Arbeitsverzeichnis importierbar sein.
+Konfiguration siehe `infra/litellm_config.example.yaml` (allgemein) bzw.
+`infra/litellm_config.ionos.example.yaml` (EU-Betrieb). Beide Dateien müssen dort liegen,
+wo der Proxy läuft, und von seinem Arbeitsverzeichnis importierbar sein — der Modulname
+wird als **Dateipfad relativ zum Arbeitsverzeichnis** aufgelöst. Läuft der Proxy in
+`infra/`, lautet er `guardrails.llm_moderation.LlmModerationGuardrail`; zusätzlich muss
+`PYTHONPATH` das `guardrails`-Verzeichnis enthalten, weil `llm_moderation.py` seinerseits
+`moderation_core` importiert.
+
+⚠️ Der `guardrails:`-Block gehört auf die **oberste Ebene** der Config, nicht unter
+`litellm_settings`. Dort erwartet LiteLLM das alte Format und der Proxy startet gar nicht
+erst.
 
 **Verhalten bei Störungen: fail-open.** Timeout, Netzfehler oder eine unlesbare Antwort
 lassen den Text durch und schreiben eine Warnung ins Log. Ein fail-closed Guardrail würde bei

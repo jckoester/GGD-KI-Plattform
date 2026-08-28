@@ -352,27 +352,16 @@ guardrails:
         violence_graphic: 0.7
         self_harm_instructions: 0.5
 
-  # ⚠️ OFFEN — Regex-Guardrail muss umgeschrieben werden, bevor er wieder greift.
+  # Kein zweiter Guardrail-Eintrag für Drogen-Anleitungen: Die Kategorie
+  # `drug_instructions` steckt im Klassifikator oben und kostet dort keinen zweiten Aufruf.
   #
-  # Der Typ `regex` existiert in LiteLLM 1.83.7 NICHT mehr (40 Initializer, `regex` nicht
-  # darunter) — der Proxy startet mit ihm gar nicht erst: „ValueError: Unsupported
-  # guardrail: regex". Das gilt genauso für `infra/litellm_config.example.yaml`, wo dieser
-  # Eintrag bis heute steht.
-  #
-  # Nachfolger ist `litellm_content_filter`. Er nimmt statt `pattern_set` entweder
-  # `patterns` (Liste) oder `blocked_words_file` (Datei) — die kuratierten Muster aus
-  # guardrails/drugs_how_to.txt müssen also in eines dieser Formate überführt und gegen
-  # echte Unterrichtstexte gegengeprüft werden (Chemie, Suchtprävention).
-  #
-  # Bis dahin bleibt der Jugendschutz-Klassifikator oben die einzige Ausgabeprüfung. Er
-  # deckt Drogen-Anleitungen NICHT ab — seine Kategorien sind sexual, violence_graphic
-  # und self_harm_instructions.
-  #
-  # - guardrail_name: "illegal_drugs_how_to"
-  #   litellm_params:
-  #     guardrail: litellm_content_filter
-  #     mode: post_call
-  #     blocked_words_file: "./guardrails/drugs_how_to.txt"   # Format prüfen!
+  # Der frühere `regex`-Eintrag auf guardrails/drugs_how_to.txt ist entfallen — den Typ
+  # `regex` gibt es seit LiteLLM 1.83.7 nicht mehr, der Proxy startet damit nicht einmal
+  # („ValueError: Unsupported guardrail: regex"). Sein Nachfolger `litellm_content_filter`
+  # wäre kein Drop-in und hätte dasselbe Grundproblem: Ein Muster wie
+  # `(anleitung|rezept).{0,40}synthese` trifft den Chemieunterricht mit.
+  # Die Musterdatei bleibt als Ausgangspunkt liegen, falls später doch eine deterministische
+  # zweite Schicht gewünscht ist (der Klassifikator ist fail-open).
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

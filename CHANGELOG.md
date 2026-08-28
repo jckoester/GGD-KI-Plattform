@@ -24,6 +24,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Jugendschutz: Drogen-Anleitungen wurden von nichts geprüft.** Der zuständige Guardrail
+  nutzte den Typ `regex`, den es seit LiteLLM 1.83.7 nicht mehr gibt — der Proxy startete
+  damit nicht einmal. Ersetzt durch die Kategorie `drug_instructions` im LLM-Klassifikator;
+  Chemieunterricht, Suchtprävention und Pharmakologie bleiben unbeanstandet.
+- **Die Guardrail-Vorlagen starteten nicht.** Der `guardrails:`-Block stand unter
+  `litellm_settings`, wo LiteLLM das alte Format erwartet. Jetzt auf oberster Ebene.
+- **Kategorien und Schwellen der Guardrails waren wirkungslos.** Sie standen unter
+  `guardrail_info.params`, das kein Guardrail-Typ liest. Der Klassifikator liest sie aus
+  `litellm_params.thresholds`.
 - **Startskript des LiteLLM-Proxys** verlangte fest `OPENAI_API_KEY`. Es prüft jetzt die
   Variablen, die die gewählte Config referenziert, und startet aus `infra/` — Guardrail-
   Module und Pattern-Dateien werden relativ zum Arbeitsverzeichnis aufgelöst.
