@@ -49,25 +49,61 @@ def _has_price(info: dict, *keys: str) -> bool:
     return any(isinstance(info.get(k), (int, float)) and info[k] > 0 for k in keys)
 
 
-def _has_any_price(info: dict) -> bool:
-    """Irgendein positiver Kostenschlüssel — für Modalitäten mit uneinheitlichen Modellen.
+def _dokumentierter_bildpreis(info: dict) -> float | None:
+    """Der in `model_info` **notierte** Bildpreis, oder None.
 
-    Bildmodelle rechnen sehr unterschiedlich ab: DALL·E pro Bild (`output_cost_per_image`),
-    gpt-image-1 pro **Bild-Token** (`input_cost_per_image_token`), andere pro Pixel. Eine
-    feste Schlüsselliste erzeugt hier Fehlalarme; die einzig sinnvolle Frage ist, ob LiteLLM
-    überhaupt einen Preis kennt.
+    ``input_cost_per_image`` ist der einzige Schlüssel, den LiteLLMs Bild-Kostenrechner
+    kennt (neben ``input_cost_per_pixel``). Wirksam wird er dort ohnehin nicht — für Bilder
+    zählt allein ``IMAGE_PRICES``. Er steht in der Config als Dokumentation und wird nur
+    dagegen abgeglichen.
     """
-    return any(
-        "cost" in key and isinstance(value, (int, float)) and value > 0
-        for key, value in info.items()
-    )
+    wert = info.get("input_cost_per_image")
+    return float(wert) if isinstance(wert, (int, float)) and wert > 0 else None
 
 
-def check_config(model_infos: list[dict], settings: Any) -> list[Finding]:
+def _anbieter_id(entry: dict) -> str:
+    """`litellm_params.model` eines Eintrags, z. B. ``openai/black-forest-labs/FLUX.1-schnell``."""
+    return str((entry or {}).get("litellm_params", {}).get("model", ""))
+
+
+def _preis_aus_image_prices(entry: dict, image_prices: dict[str, Any]) -> float | None:
+    """Der für dieses Bildmodell **wirksame** Preis aus ``IMAGE_PRICES``, oder None.
+
+    Die Schlüssel dort sind Anbieter-IDs **ohne** Provider-Präfix
+    (``black-forest-labs/FLUX.1-schnell``), in der Config steht aber
+    ``openai/black-forest-labs/FLUX.1-schnell``. Statt eine Liste bekannter Provider zu
+    pflegen, werden beide Schreibweisen probiert — die Anbieter-ID enthält selbst häufig
+    einen Schrägstrich, eine Zerlegung nach dem ersten wäre also nicht eindeutig.
+    """
+    ziel = _anbieter_id(entry)
+    if not ziel:
+        return None
+    for schluessel in (ziel, ziel.partition("/")[2]):
+        if schluessel and schluessel in image_prices:
+            wert = image_prices[schluessel]
+            return float(wert) if isinstance(wert, (int, float)) else None
+    return None
+
+
+def check_config(
+    model_infos: list[dict],
+    settings: Any,
+    bildarten: Iterable[Any] | None = None,
+    image_prices: dict[str, Any] | None = None,
+) -> list[Finding]:
     """Gleicht die Proxy-Konfiguration gegen die `.env` und die Anforderungen ab.
 
     `model_infos` sind die Roh-Einträge aus `GET /model/info`. Gibt eine Liste von Funden
     zurück — leer heißt: alles, was ohne Live-Aufruf prüfbar ist, stimmt.
+
+    `bildarten` sind die konfigurierten Bildarten (aus ``config/image_models.yaml`` bzw. der
+    Synthese). Ohne Angabe werden sie geladen; Tests reichen sie durch, um ohne Datei zu
+    prüfen.
+
+    `image_prices` ist der geparste Inhalt von ``IMAGE_PRICES``, oder **None = unbekannt**.
+    Die Variable wird vom **Proxy** gelesen, nicht vom Backend — läuft er auf einem anderen
+    Host, ist sie hier nicht sichtbar, und das ist kein Fehler, sondern eine Prüfung, die
+    dort stattfinden muss.
     """
     entries = _entries_by_name(model_infos)
     findings: list[Finding] = []
@@ -75,12 +111,19 @@ def check_config(model_infos: list[dict], settings: Any) -> list[Finding]:
     if not entries:
         return [Finding(ERROR, "Der Proxy meldet keine Modelle (`model_list` leer?).")]
 
+    if bildarten is None:
+        from app.chat.image_models import alle_bildarten  # lokal: kein Import-Zyklus
+        bildarten = alle_bildarten()
+    bildarten = list(bildarten)
+    bildart_modelle = {b.modell for b in bildarten}
+
     # ── 1. Kennen wir die in der .env genannten Modelle überhaupt? ────────────────────
+    # IMAGE_DEFAULT_MODEL steht hier nicht mehr: Bildmodelle kommen aus den Bildarten
+    # (Prüfung 7) — ohne eigene Datei ist das genau eine Bildart aus ebendieser Variable.
     configured = [
         ("CHAT_DEFAULT_MODEL", settings.chat_default_model, True),
         ("TITLE_MODEL", settings.title_model, False),
         ("EMBEDDING_MODEL", settings.embedding_model, True),
-        ("IMAGE_DEFAULT_MODEL", settings.image_default_model, False),
     ]
     for var, name, required in configured:
         if not name:
@@ -99,23 +142,39 @@ def check_config(model_infos: list[dict], settings: Any) -> list[Finding]:
     # der `.env` ab. Sonst würde ein Embedding-Modell ohne `mode` zusätzlich für einen
     # fehlenden `output_cost_per_token` gerügt — den es gar nicht gibt. Das fehlende `mode`
     # selbst meldet Prüfung 4.
-    role_modes = {
-        settings.embedding_model: "embedding",
-        settings.image_default_model: "image_generation",
-    }
+    role_modes: dict[str, str] = {settings.embedding_model: "embedding"}
+    for modell in bildart_modelle:
+        role_modes[modell] = "image_generation"
     for name, entry in sorted(entries.items()):
         info = _info(entry)
         mode = info.get("mode") or role_modes.get(name)
         if name == "ollama-fallback" or str(info.get("litellm_provider", "")) == "ollama":
             continue  # lokal, kostenlos
         if mode == "image_generation":
-            if not _has_any_price(info):
+            # Ob überhaupt bepreist wird, entscheidet allein IMAGE_PRICES (Prüfung 7):
+            # LiteLLM löst Bildpreise über seine eingebaute Tabelle auf und liest das
+            # `model_info` des Deployments dabei nicht (gemessen 28.08.2026). Hier wird
+            # deshalb nur geprüft, dass beide Stellen dasselbe sagen — die Config-Vorlagen
+            # verlangen das ausdrücklich, und ein Auseinanderlaufen führt dazu, dass man
+            # den falschen Wert für bare Münze nimmt.
+            if info.get("output_cost_per_image") is not None and not info.get(
+                "input_cost_per_image"
+            ):
                 findings.append(Finding(
                     WARNING,
-                    f"'{name}': kein Bildpreis hinterlegt — erzeugte Bilder werden mit 0 "
-                    f"abgerechnet. Je nach Modell ist das `output_cost_per_image` (pro Bild) "
-                    f"oder `input_cost_per_image_token` (pro Bild-Token).",
+                    f"'{name}': `output_cost_per_image` kennt LiteLLMs Bild-Kostenrechner "
+                    f"nicht — er liest `input_cost_per_image` (bzw. `input_cost_per_pixel`).",
                 ))
+            dokumentiert = _dokumentierter_bildpreis(info)
+            if image_prices is not None and dokumentiert is not None:
+                wirksam = _preis_aus_image_prices(entry, image_prices)
+                if wirksam is not None and abs(wirksam - dokumentiert) > 1e-9:
+                    findings.append(Finding(
+                        WARNING,
+                        f"'{name}': model_info nennt {dokumentiert} $/Bild, IMAGE_PRICES "
+                        f"{wirksam} $/Bild. Gebucht wird IMAGE_PRICES — beide Stellen "
+                        f"gleich halten, sonst führt die Config in die Irre.",
+                    ))
             continue
         if mode == "embedding":
             if not _has_price(info, "input_cost_per_token"):
@@ -156,14 +215,6 @@ def check_config(model_infos: list[dict], settings: Any) -> list[Finding]:
             ))
 
     # ── 4. Modalitäten korrekt markiert ──────────────────────────────────────────────
-    image_name = settings.image_default_model
-    if image_name and image_name in entries:
-        if _info(entries[image_name]).get("mode") != "image_generation":
-            findings.append(Finding(
-                ERROR,
-                f"'{image_name}': model_info.mode ist nicht 'image_generation'. Das Modell "
-                f"taucht dadurch in der Bild-Freigabe-Matrix nicht auf.",
-            ))
     embed_name = settings.embedding_model
     if embed_name and embed_name in entries:
         if _info(entries[embed_name]).get("mode") != "embedding":
@@ -194,10 +245,62 @@ def check_config(model_infos: list[dict], settings: Any) -> list[Finding]:
 
     # ── 6. Platzhalter aus der Vorlage übrig? ────────────────────────────────────────
     for name, entry in sorted(entries.items()):
-        target = str((entry or {}).get("litellm_params", {}).get("model", ""))
+        target = _anbieter_id(entry)
         if "<" in name or "<" in target or "TODO" in target:
             findings.append(Finding(
                 ERROR, f"'{name}': Platzhalter aus der Vorlage nicht ersetzt ({target!r})."
             ))
+
+    # ── 7. Bildarten gegen die Proxy-Config ──────────────────────────────────────────
+    # Die Bildarten stehen in einer eigenen Datei; sie kann von der Proxy-Config
+    # abdriften, ohne dass es auffällt. Jeder Fund hier ist ein Fall, der erst im
+    # Gespräch scheitern würde.
+    bild_modelle_im_proxy = sorted(
+        n for n, e in entries.items() if _info(e).get("mode") == "image_generation"
+    )
+    for b in bildarten:
+        if b.modell not in entries:
+            findings.append(Finding(
+                ERROR,
+                f"Bildart '{b.id}' verweist auf '{b.modell}', das die LiteLLM-Config nicht "
+                f"kennt. Bildmodelle im Proxy: "
+                f"{', '.join(bild_modelle_im_proxy) or '— keine —'}",
+            ))
+            continue
+        eintrag = entries[b.modell]
+        if _info(eintrag).get("mode") != "image_generation":
+            findings.append(Finding(
+                ERROR,
+                f"Bildart '{b.id}': '{b.modell}' trägt kein model_info.mode = "
+                f"'image_generation'. Das Modell taucht dadurch in der Bild-Freigabe-Matrix "
+                f"nicht auf und lässt sich für kein Team freischalten.",
+            ))
+        if image_prices is None:
+            continue
+        if _preis_aus_image_prices(eintrag, image_prices) is None:
+            findings.append(Finding(
+                WARNING,
+                f"Bildart '{b.id}': '{_anbieter_id(eintrag) or b.modell}' fehlt in "
+                f"IMAGE_PRICES — jedes Bild dieser Bildart wird mit 0,00 $ gebucht und "
+                f"läuft am EUR-Budget vorbei. Für Bilder greift **nur** IMAGE_PRICES; "
+                f"ein Preis unter model_info bleibt wirkungslos.",
+            ))
+
+    if image_prices is None:
+        findings.append(Finding(
+            INFO,
+            "IMAGE_PRICES ist hier nicht lesbar — die Bildpreise wurden nicht geprüft. "
+            "Die Variable liest der LiteLLM-Proxy; läuft er auf einem anderen Host, dort "
+            "nachsehen.",
+        ))
+
+    verwaist = [n for n in bild_modelle_im_proxy if n not in bildart_modelle]
+    if verwaist:
+        findings.append(Finding(
+            INFO,
+            f"Bildmodelle ohne Bildart: {', '.join(verwaist)}. Sie lassen sich freischalten, "
+            f"werden aber von keinem Assistenten genutzt — Eintrag in "
+            f"config/image_models.yaml fehlt.",
+        ))
 
     return findings

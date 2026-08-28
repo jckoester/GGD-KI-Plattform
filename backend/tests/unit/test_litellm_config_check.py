@@ -39,9 +39,23 @@ def _healthy():
         _entry("system-titel", supports_function_calling=False,
                input_cost_per_token=1e-8, output_cost_per_token=2e-8),
         _entry("embedding-standard", mode="embedding", input_cost_per_token=1e-9),
-        _entry("bild-standard", mode="image_generation", output_cost_per_image=0.01),
+        _entry("bild-standard", mode="image_generation", input_cost_per_image=0.032),
         _entry("ollama-fallback", target="ollama/llama3", supports_function_calling=False),
     ]
+
+
+def _bildart(id="standard", modell="bild-standard"):
+    from app.chat.image_models import Bildart
+
+    return Bildart(
+        id=id, label=id, modell=modell,
+        formate={"quadratisch": "1024x1024"}, standardformat="quadratisch",
+    )
+
+
+# Explizit übergeben statt geladen: Sonst läse check_config die echte
+# config/image_models.yaml bzw. die echte .env — die Tests hingen dann an der Umgebung.
+_BILDARTEN = [_bildart()]
 
 
 def _levels(findings, level):
@@ -49,14 +63,14 @@ def _levels(findings, level):
 
 
 def test_healthy_config_has_no_errors_or_warnings():
-    findings = check_config(_healthy(), _settings())
+    findings = check_config(_healthy(), _settings(), bildarten=_BILDARTEN)
 
     assert _levels(findings, ERROR) == []
     assert _levels(findings, WARNING) == []
 
 
 def test_empty_proxy_is_an_error():
-    findings = check_config([], _settings())
+    findings = check_config([], _settings(), bildarten=_BILDARTEN)
 
     assert len(_levels(findings, ERROR)) == 1
 
@@ -68,7 +82,7 @@ def test_missing_token_prices_are_errors():
     entries = _healthy()
     entries[0] = _entry("chat-standard", supports_function_calling=True)
 
-    errors = _levels(check_config(entries, _settings()), ERROR)
+    errors = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), ERROR)
 
     assert any("input_cost_per_token" in m for m in errors)
     assert any("output_cost_per_token" in m for m in errors)
@@ -77,7 +91,7 @@ def test_missing_token_prices_are_errors():
 
 def test_ollama_needs_no_prices():
     """Der lokale Fallback kostet nichts — ihn zu bemängeln wäre Rauschen."""
-    findings = check_config(_healthy(), _settings())
+    findings = check_config(_healthy(), _settings(), bildarten=_BILDARTEN)
 
     assert not [m for m in _levels(findings, ERROR) if "ollama" in m]
 
@@ -95,20 +109,49 @@ def test_per_image_token_pricing_counts_as_priced():
         input_cost_per_image_token=1e-5, output_cost_per_image_token=4e-5,
     )
 
-    findings = check_config(entries, _settings())
+    findings = check_config(entries, _settings(), bildarten=_BILDARTEN)
 
     assert not [m for m in _levels(findings, WARNING) if "bild-standard" in m]
 
 
-def test_missing_image_price_is_only_a_warning():
-    """Bilder ohne Preis sind ärgerlich, aber blockieren den Betrieb nicht."""
+def test_fehlender_preis_in_model_info_ist_kein_fund():
+    """Für **Bilder** ist ein Preis unter `model_info` bedeutungslos.
+
+    LiteLLM löst Bildpreise über seine eingebaute Tabelle auf und liest das `model_info`
+    des Deployments dabei nicht (gemessen 28.08.2026). Ihn hier anzumahnen, hätte in die
+    falsche Richtung gewiesen: Wer ihn daraufhin einträgt, hält das Problem für gelöst und
+    bucht weiter 0,00 $. Gerügt wird deshalb nur ein fehlender Eintrag in IMAGE_PRICES.
+    """
     entries = _healthy()
-    entries[3] = _entry("bild-standard", mode="image_generation")
+    entries[3] = _entry("bild-standard", mode="image_generation")  # kein Preis
 
-    findings = check_config(entries, _settings())
+    findings = check_config(entries, _settings(), bildarten=_BILDARTEN)
 
-    assert any("bild-standard" in m for m in _levels(findings, WARNING))
+    assert not [m for m in _levels(findings, WARNING) if "bild-standard" in m]
     assert not [m for m in _levels(findings, ERROR) if "bild-standard" in m]
+
+
+def test_output_cost_per_image_ist_der_falsche_schluessel():
+    entries = _healthy()
+    entries[3] = _entry("bild-standard", mode="image_generation", output_cost_per_image=0.01)
+
+    warnings = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), WARNING)
+
+    assert any("output_cost_per_image" in m and "input_cost_per_image" in m for m in warnings)
+
+
+def test_abweichung_zwischen_model_info_und_image_prices():
+    """Die Config-Vorlagen verlangen, beide Stellen gleich zu halten."""
+    entries = _healthy()  # model_info: 0.032
+    warnings = _levels(
+        check_config(
+            entries, _settings(), bildarten=_BILDARTEN,
+            image_prices={"x": 0.05},  # _entry-Standardziel ist "openai/x"
+        ),
+        WARNING,
+    )
+
+    assert any("0.032" in m and "0.05" in m for m in warnings)
 
 
 # ── Werkzeug-Fähigkeit ───────────────────────────────────────────────────────
@@ -118,7 +161,7 @@ def test_unset_function_calling_is_an_error():
     entries = _healthy()
     entries[0] = _entry("chat-standard", input_cost_per_token=1e-7, output_cost_per_token=1e-7)
 
-    errors = _levels(check_config(entries, _settings()), ERROR)
+    errors = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), ERROR)
 
     assert any("supports_function_calling" in m for m in errors)
 
@@ -129,7 +172,7 @@ def test_explicit_false_is_only_a_warning():
     entries[0] = _entry("chat-standard", supports_function_calling=False,
                         input_cost_per_token=1e-7, output_cost_per_token=1e-7)
 
-    findings = check_config(entries, _settings())
+    findings = check_config(entries, _settings(), bildarten=_BILDARTEN)
 
     assert any("Function-Calling" in m for m in _levels(findings, WARNING))
     assert not [m for m in _levels(findings, ERROR) if "chat-standard" in m]
@@ -138,7 +181,7 @@ def test_explicit_false_is_only_a_warning():
 # ── .env ↔ Proxy ─────────────────────────────────────────────────────────────
 
 def test_unknown_model_name_in_env_is_an_error():
-    findings = check_config(_healthy(), _settings(chat_default_model="gibt-es-nicht"))
+    findings = check_config(_healthy(), _settings(chat_default_model="gibt-es-nicht"), bildarten=_BILDARTEN)
 
     errors = _levels(findings, ERROR)
     assert any("CHAT_DEFAULT_MODEL" in m and "gibt-es-nicht" in m for m in errors)
@@ -146,14 +189,14 @@ def test_unknown_model_name_in_env_is_an_error():
 
 
 def test_missing_required_env_var_is_an_error():
-    findings = check_config(_healthy(), _settings(chat_default_model=""))
+    findings = check_config(_healthy(), _settings(chat_default_model=""), bildarten=_BILDARTEN)
 
     assert any("CHAT_DEFAULT_MODEL ist nicht gesetzt" in m for m in _levels(findings, ERROR))
 
 
 def test_optional_title_model_may_be_empty():
     """Leeres TITLE_MODEL heißt schlicht „keine Titelgenerierung"."""
-    findings = check_config(_healthy(), _settings(title_model=""))
+    findings = check_config(_healthy(), _settings(title_model=""), bildarten=_BILDARTEN)
 
     assert not [m for m in _levels(findings, ERROR) if "TITLE_MODEL" in m]
 
@@ -165,7 +208,7 @@ def test_image_model_without_mode_is_an_error():
     entries = _healthy()
     entries[3] = _entry("bild-standard", output_cost_per_image=0.01)
 
-    errors = _levels(check_config(entries, _settings()), ERROR)
+    errors = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), ERROR)
 
     assert any("image_generation" in m for m in errors)
 
@@ -174,7 +217,7 @@ def test_embedding_model_without_mode_is_only_a_warning():
     entries = _healthy()
     entries[2] = _entry("embedding-standard", input_cost_per_token=1e-9)
 
-    findings = check_config(entries, _settings())
+    findings = check_config(entries, _settings(), bildarten=_BILDARTEN)
 
     assert any("embedding" in m for m in _levels(findings, WARNING))
     assert not [m for m in _levels(findings, ERROR) if "embedding-standard" in m]
@@ -183,7 +226,7 @@ def test_embedding_model_without_mode_is_only_a_warning():
 # ── Sichtbarkeit ─────────────────────────────────────────────────────────────
 
 def test_reports_which_models_are_pickable():
-    findings = check_config(_healthy(), _settings())
+    findings = check_config(_healthy(), _settings(), bildarten=_BILDARTEN)
     info = " ".join(_levels(findings, INFO))
 
     assert "chat-standard" in info
@@ -196,7 +239,7 @@ def test_title_model_visible_in_picker_is_a_warning():
     entries[1] = _entry("gpt-4o-mini", supports_function_calling=False,
                         input_cost_per_token=1e-8, output_cost_per_token=2e-8)
 
-    findings = check_config(entries, _settings(title_model="gpt-4o-mini"))
+    findings = check_config(entries, _settings(title_model="gpt-4o-mini"), bildarten=_BILDARTEN)
 
     warnings = _levels(findings, WARNING)
     assert any("TITLE_MODEL" in m and "Modellwähler" in m for m in warnings)
@@ -214,6 +257,90 @@ def test_title_model_visible_in_picker_is_a_warning():
 ])
 def test_unreplaced_placeholders_are_errors(name, target):
     """Die Vorlage ist voller `<…>` — wer eines übersieht, soll es hier erfahren."""
-    findings = check_config([_entry(name, target=target)], _settings())
+    findings = check_config([_entry(name, target=target)], _settings(), bildarten=_BILDARTEN)
 
     assert any("Platzhalter" in m for m in _levels(findings, ERROR))
+
+
+# ── Bildarten gegen die Proxy-Config ─────────────────────────────────────────
+#
+# Die Bildarten stehen in einer eigenen Datei; sie kann von der LiteLLM-Config abdriften,
+# ohne dass es jemandem auffällt. Jeder Fund hier ist ein Fall, der sonst erst mitten im
+# Gespräch scheitert.
+
+def test_bildart_auf_unbekanntes_modell_ist_ein_fehler():
+    errors = _levels(
+        check_config(_healthy(), _settings(),
+                     bildarten=[_bildart("comic", modell="bild-comic")]),
+        ERROR,
+    )
+
+    assert any("bild-comic" in m and "comic" in m for m in errors)
+    assert any("bild-standard" in m for m in errors), "Meldung soll die vorhandenen nennen"
+
+
+def test_bildmodell_ohne_mode_ist_ein_fehler():
+    """Ohne `mode: image_generation` taucht es in der Freigabe-Matrix nicht auf."""
+    entries = _healthy()
+    entries[3] = _entry("bild-standard", input_cost_per_image=0.032)  # mode fehlt
+
+    errors = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), ERROR)
+
+    assert any("image_generation" in m and "Freigabe-Matrix" in m for m in errors)
+
+
+def test_fehlender_eintrag_in_image_prices_ist_eine_warnung():
+    """Für Bilder greift NUR IMAGE_PRICES — ein Preis unter model_info bleibt wirkungslos."""
+    entries = _healthy()
+    entries[3] = _entry("bild-standard", target="openai/black-forest-labs/FLUX.1-schnell",
+                        mode="image_generation")
+
+    warnings = _levels(
+        check_config(entries, _settings(), bildarten=_BILDARTEN, image_prices={}), WARNING
+    )
+
+    assert any("IMAGE_PRICES" in m and "0,00" in m for m in warnings)
+
+
+def test_preis_wird_auch_ohne_provider_praefix_gefunden():
+    """Config: `openai/<id>`, IMAGE_PRICES: `<id>` — beide Schreibweisen zählen."""
+    entries = _healthy()
+    entries[3] = _entry("bild-standard", target="openai/black-forest-labs/FLUX.1-schnell",
+                        mode="image_generation")
+
+    findings = check_config(
+        entries, _settings(), bildarten=_BILDARTEN,
+        image_prices={"black-forest-labs/FLUX.1-schnell": 0.032},
+    )
+
+    assert _levels(findings, WARNING) == []
+
+
+def test_unbekannte_image_prices_melden_sich_als_ungeprueft():
+    """None heißt „nicht prüfbar" (Proxy auf anderem Host) — kein Fehlalarm."""
+    findings = check_config(_healthy(), _settings(), bildarten=_BILDARTEN, image_prices=None)
+
+    assert any("nicht lesbar" in m for m in _levels(findings, INFO))
+    assert _levels(findings, WARNING) == []
+
+
+def test_bildmodell_ohne_bildart_wird_gemeldet():
+    """Freischaltbar, aber von keinem Assistenten nutzbar — ein Eintrag fehlt."""
+    entries = _healthy()
+    entries.append(_entry("bild-flux2", mode="image_generation", input_cost_per_image=0.0152))
+
+    infos = _levels(check_config(entries, _settings(), bildarten=_BILDARTEN), INFO)
+
+    assert any("bild-flux2" in m and "ohne Bildart" in m for m in infos)
+
+
+def test_zwei_bildarten_auf_einem_modell_melden_es_nicht_als_verwaist():
+    entries = _healthy()
+
+    infos = _levels(
+        check_config(entries, _settings(),
+                     bildarten=[_bildart("a"), _bildart("b")]),
+        INFO,
+    )
+
+    assert not any("ohne Bildart" in m for m in infos)

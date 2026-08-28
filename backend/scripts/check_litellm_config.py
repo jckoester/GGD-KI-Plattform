@@ -16,7 +16,9 @@ Verwendung:
 Exit-Code 0 = keine Fehler (Warnungen möglich), 1 = mindestens ein Fehler.
 """
 import asyncio
+import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -43,6 +45,57 @@ async def _fetch_model_infos() -> list[dict]:
         return response.json().get("data", [])
 
 
+def _aus_env_datei(name: str) -> str | None:
+    """Liest einen Wert aus der `.env` im Repo-Wurzelverzeichnis.
+
+    `IMAGE_PRICES` ist bewusst **kein** Feld in `settings`: Die Variable liest im Betrieb
+    der Proxy, nicht das Backend. Ein Settings-Feld würde eine Zuständigkeit vortäuschen,
+    die es nicht gibt — hier wird sie nur zum Prüfen gesucht, wo sie zufällig liegt.
+    """
+    pfad = Path(__file__).resolve().parents[2] / ".env"
+    if not pfad.is_file():
+        return None
+    for zeile in pfad.read_text(encoding="utf-8").splitlines():
+        zeile = zeile.strip()
+        if not zeile or zeile.startswith("#") or "=" not in zeile:
+            continue
+        schluessel, _, wert = zeile.partition("=")
+        if schluessel.strip() == name:
+            return wert.strip().strip("'\"") or None
+    return None
+
+
+def _image_prices() -> dict | None:
+    """`IMAGE_PRICES` aus Umgebung oder `.env`, oder None (nicht vorhanden/unbrauchbar).
+
+    None heißt **nicht prüfbar**, nicht „keine Preise": Läuft der Proxy auf einem anderen
+    Host, fehlt die Variable hier zu Recht. Das wird gemeldet statt als Fehler gewertet.
+    """
+    roh = os.environ.get("IMAGE_PRICES") or _aus_env_datei("IMAGE_PRICES")
+    if not roh:
+        return None
+    try:
+        werte = json.loads(roh)
+    except json.JSONDecodeError as exc:
+        logger.warning("IMAGE_PRICES ist kein gültiges JSON (%s) — Prüfung übersprungen.", exc)
+        return None
+    if not isinstance(werte, dict):
+        logger.warning("IMAGE_PRICES ist kein Objekt — Prüfung übersprungen.")
+        return None
+    return werte
+
+
+def _bildarten() -> list:
+    """Konfigurierte Bildarten; bei fehlerhafter Datei bricht der Lauf mit Klartext ab."""
+    from app.chat.image_models import alle_bildarten
+
+    try:
+        return alle_bildarten()
+    except Exception as exc:
+        logger.error("Bildarten nicht ladbar: %s", exc)
+        sys.exit(1)
+
+
 def main() -> None:
     logger.info("Proxy: %s", settings.litellm_proxy_url)
     try:
@@ -55,7 +108,9 @@ def main() -> None:
         )
         sys.exit(1)
 
-    findings = check_config(model_infos, settings)
+    findings = check_config(
+        model_infos, settings, bildarten=_bildarten(), image_prices=_image_prices()
+    )
     logger.info("%d Modell(e) gemeldet\n", len(model_infos))
 
     for level in (ERROR, WARNING, INFO):
