@@ -107,6 +107,55 @@ Speicherplatz durchschlägt.
 > LiteLLM-Config eintragen — beides in den mitgelieferten Vorlagen vorbereitet. Danach
 > rechnet LiteLLM wieder selbst, und Budget, 429-Sperre und Statistik stimmen zusammen.
 
+### Mistral (eigene API)
+
+EU-Anbieter (Frankreich). Der wichtigste Unterschied zu IONOS ist **keine Frage der
+Modelle, sondern der Anbindung**: Mistral ist ein eigener LiteLLM-Provider. Der Eintrag
+lautet `model: mistral/<id>` ohne `api_base` — und damit kommen **Preise, Kontextfenster,
+Function-Calling und Vision aus LiteLLMs eingebauter Tabelle**. Bei IONOS (`openai/<id>`
+plus eigener `api_base`) muss all das von Hand gepflegt werden; ein vergessener Preis
+bedeutet dort Spend 0 und wirkungslose Budgets. Dieser Aufwand entfällt hier vollständig.
+
+> ⚠️ **Der Preis, den LiteLLM kennt, ist nicht zwingend der Preis, den Sie zahlen.** Die
+> eingebaute Tabelle wird mit der Bibliothek ausgeliefert und kann veralten. Bei der
+> Messung am 28.08.2026 wies sie `mistral-medium` (1,50/7,50 $/M) als **teurer** aus als
+> `mistral-large` (0,50/1,50 $/M) — unplausibel. Vor dem Produktivbetrieb gegen die
+> Preisliste des Anbieters prüfen. Die Bequemlichkeit hat also einen Preis: eine
+> Kostenquelle, die man nicht selbst kontrolliert.
+
+Gemessen am 28.08.2026 über den Proxy (Titeltreue: viermal der echte Titel-Prompt der
+Anwendung, „maximal 6 Wörter"):
+
+| Modell (`mistral/…`) | $/M ein | $/M aus | Funktionen | Titel | Erfahrung |
+|---|---|---|---|---|---|
+| `ministral-3b-latest` | 0,10 | 0,10 | ✅ | **2/4** (4–21 Wörter) | Billigstes Modell. **Hält knappe Vorgaben nicht ein** — als Titelmodell ungeeignet. |
+| `ministral-8b-latest` | 0,15 | 0,15 | ✅ | **0/4** (7–33 Wörter) | Trotz höherem Preis **schlechter** als das 3B bei Formatvorgaben. Nicht für Aufgaben mit Formatzwang. |
+| **`mistral-small-latest`** | 0,15 | 0,60 | ✅ | 4/4 (3–4) | **Empfehlung als Arbeitspferd.** Schnell (≈2,9 s), formattreu, Vision. |
+| `mistral-medium-latest` | 1,50 | 7,50 | ✅ | 4/4 (3–4) | Schnell (≈1,8 s). Preis vor dem Einsatz gegenprüfen (siehe Warnung oben). |
+| `mistral-large-latest` | 0,50 | 1,50 | ✅ | 4/4 (4–6) | Deutlich **langsamer** (≈9,4 s) — für eine Chat-Antwort spürbar. |
+| `magistral-small-latest` | 0,50 | 1,50 | ✅ | 4/4 (3–4) | Reasoning-Reihe, siehe unten. |
+| `magistral-medium-latest` | 2,00 | 5,00 | ✅ | 4/4 (3–4) | dito, teurer. |
+| `codestral-latest` | 0,30 | 0,90 | ✅ | 4/4 (3–5) | Für Programmieraufgaben. |
+| `mistral-embed` | 0,10 | — | — | — | **1024 Dimensionen** — dieselbe Breite wie BGE-M3. |
+
+**Alle acht Chat-Modelle riefen das Testwerkzeug korrekt auf.** Function-Calling ist bei
+Mistral also kein Auswahlkriterium — anders als bei IONOS, wo Mistral NeMo daran scheiterte.
+
+> **Reasoning verhält sich hier genau umgekehrt zu IONOS.** Die Qwen-Modelle bei IONOS
+> denken von sich aus und müssen über `reasoning_effort` gebremst werden, sonst kostet
+> jede Trivialität hunderte Ausgabe-Tokens. Die Magistral-Reihe denkt **nicht von allein**:
+> Auf „antworte knapp" kamen 5–12 Tokens und eine falsche Antwort, auf „denke Schritt für
+> Schritt" 386–461 Tokens und eine richtige. Ein separates `reasoning`-Feld liefert sie
+> nicht. Wer eine denkende Stufe (`chat-reasoning`) anbietet, muss das also im
+> **System-Prompt des Assistenten** verankern — der Modellname allein bewirkt nichts.
+>
+> *(Eine Rechenaufgabe ist kein Maßstab für Qualität; belastbar ist hier das Verhalten,
+> nicht die Trefferquote.)*
+
+> ⚠️ **Mistral hat kein Text-zu-Bild-Modell** (Katalog vom 28.08.2026: 56 Modelle, keines
+> mit Bildausgabe). Eine reine Mistral-Schule hat **keine Bildgenerierung** — wer sie will,
+> braucht einen zweiten Anbieter. Das ist beim Zuschnitt der Assistenten vorher zu klären.
+
 ### Andere Anbieter
 
 Hier steht nur, wofür es belastbare eigene Erfahrung gibt. **Für Anthropic liegen keine

@@ -243,11 +243,27 @@ def embedding(client: httpx.Client, modell: str) -> None:
     breite = len(vektoren[0].get("embedding") or [])
     print(f"  OK — {breite} Dimensionen")
     print(f"  → EMBEDDING_DIMENSIONS={breite}")
-    if breite != 1536:
+
+    # Gegen den **eingestellten** Wert vergleichen, nicht gegen eine Konstante: Ein fest
+    # verdrahtetes 1536 (aus der OpenAI-Zeit) warnt nach jedem Modellwechsel falsch — und
+    # eine Warnung, die immer erscheint, wird bald ignoriert.
+    roh = os.environ.get("EMBEDDING_DIMENSIONS") or _aus_env_datei("EMBEDDING_DIMENSIONS")
+    try:
+        eingestellt = int(roh) if roh else None
+    except ValueError:
+        eingestellt = None
+
+    if eingestellt is None:
         print(
-            "  ⚠️ Weicht von der heutigen Spaltenbreite (1536) ab: Spalte umstellen UND alles\n"
-            "     neu einbetten — docs/runbooks/modellwechsel.md."
+            "  (EMBEDDING_DIMENSIONS ist nicht gesetzt — kein Abgleich mit der Spaltenbreite.)"
         )
+    elif breite != eingestellt:
+        print(
+            f"  ⚠️ Weicht von der eingestellten Breite ({eingestellt}) ab: Spalte umstellen\n"
+            "     UND alles neu einbetten — docs/runbooks/modellwechsel.md."
+        )
+    else:
+        print("  ✅ Passt zur eingestellten Breite — kein Re-Embedding nötig.")
     print()
 
 

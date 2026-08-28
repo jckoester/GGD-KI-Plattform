@@ -237,6 +237,26 @@ def schluessel_spend(client: httpx.Client, master: str, key: str) -> float | Non
         return None
 
 
+def warte_auf_spend(
+    client: httpx.Client, master: str, key: str, vorher: float | None, geduld: float = 45.0
+) -> float | None:
+    """Wartet, bis der Spend sich bewegt — LiteLLM schreibt SpendLogs **verzögert**.
+
+    Gemessen am 28.08.2026: rund 10 Sekunden zwischen Antwort und sichtbarem Spend. Ohne
+    diese Warteschleife meldete die Probe „Das Budget wurde NICHT belastet" — der
+    alarmierendste Satz des ganzen Berichts, und schlicht falsch. Nach Ablauf der Geduld
+    wird der letzte gelesene Wert zurückgegeben; dann ist die Aussage wieder ehrlich.
+    """
+    ende = time.monotonic() + geduld
+    letzter = schluessel_spend(client, master, key)
+    while time.monotonic() < ende:
+        if letzter is not None and (vorher is None or letzter > vorher):
+            return letzter
+        time.sleep(2.0)
+        letzter = schluessel_spend(client, master, key)
+    return letzter
+
+
 def bild_erzeugen(client: httpx.Client, key: str, modell: str, groesse: str) -> Messung:
     """Ein Bild über den Proxy — derselbe Weg wie `LiteLLMClient.generate_image`."""
     beginn = time.monotonic()
@@ -590,7 +610,8 @@ def main() -> None:
                 if m.ok and m.request_id:
                     m.log_kosten = spendlog_abfragen(client, master, m.request_id)
 
-            spend_nachher = schluessel_spend(client, master, key)
+            # Nicht sofort lesen — der SpendLog erscheint mit Verzögerung.
+            spend_nachher = warte_auf_spend(client, master, key, spend_vorher)
 
             kennung = bericht(
                 messungen, args.tarif_erstes_mp, args.tarif_weitere_mp, args.tarif_kurs

@@ -111,6 +111,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`chat-schnell` … `chat-komplex`, `system-*`) mit Zweck und empfohlener Freigabe.
 - [Content-Moderation](docs/admin/content-moderation.md): Klassifikator statt
   `openai_moderation`, Verhalten bei Störungen, Überwachung, Ablage des Zustandsberichts.
+- [Vor der Installation](docs/admin/vor-der-installation.md): Abschnitt **Mistral** —
+  gemessene Preise, Funktionsaufrufe und Titeltreue über acht Modelle, dazu die drei
+  Unterschiede zu IONOS (Preise kommen aus LiteLLM, Reasoning nur auf Aufforderung,
+  kein Bildmodell).
 - [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
 
 ### Migration
