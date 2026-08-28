@@ -20,7 +20,7 @@ Freischaltungslogik:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
@@ -40,13 +40,26 @@ class ToolContext:
     # Virtual Key des Users (für Tools, die selbst den LiteLLM-Proxy aufrufen —
     # z. B. Bildgenerierung — damit Spend/Budget dem User zugerechnet werden).
     litellm_key: str | None = None
+    # Der aktive Assistent (oder None). Nötig, damit ein Handler dieselbe Einschränkung
+    # durchsetzen kann, die schon im Schema steckt: Das Schema bietet nur die Bildarten
+    # dieses Assistenten an — ohne den Assistenten im Kontext könnte ein Modell trotzdem
+    # eine andere nennen und die Auswahl des Admins umgehen.
+    assistant: Any = None
 
 
 @dataclass
 class ChatTool:
     name: str
     group: str                   # 'context_search' | 'planning' | 'student_planning' | 'image_generation'
-    definition: dict             # OpenAI-Function-Schema für LiteLLM
+    # OpenAI-Function-Schema für LiteLLM — entweder fest oder als Funktion des Assistenten.
+    #
+    # Ein Callable ist nötig, sobald das Schema von der Konfiguration des Assistenten
+    # abhängt: Die Bildgenerierung bietet nur die Bildarten an, die dieser Assistent führen
+    # darf, und nur deren Formate. Ein festes Dict könnte das nicht — es entsteht einmal
+    # beim Import, lange bevor bekannt ist, in welchem Chat es landet.
+    #
+    # `tools_for()` löst auf; alles danach sieht ausschließlich fertige Dicts.
+    definition: dict | Callable[[Any], dict]
     handler: Callable[..., Awaitable[Any]]  # async (args: dict, ctx: ToolContext) -> JSON-serialisierbar
     writes: bool = False
 
@@ -58,12 +71,25 @@ def register_tool(tool: ChatTool) -> None:
     TOOL_REGISTRY[tool.name] = tool
 
 
+def _mit_aufgeloestem_schema(tool: ChatTool, assistant: Any) -> ChatTool:
+    """Ersetzt ein Schema-Callable durch das fertige Dict für diesen Assistenten.
+
+    Kopiert den Eintrag, statt die Registry zu verändern — die ist prozessweit geteilt und
+    darf nicht vom letzten Chat abhängen, der zufällig durchlief.
+    """
+    if callable(tool.definition):
+        return replace(tool, definition=tool.definition(assistant))
+    return tool
+
+
 def tools_for(
     assistant: Any,
     group_id: int | None,
     is_group_teacher: bool,
 ) -> list[ChatTool]:
     """Gibt die für diese Konversation freigeschalteten Tools zurück.
+
+    Schema-Callables sind in der Rückgabe bereits aufgelöst (siehe ``ChatTool.definition``).
 
     assistant kann None sein (kein Assistent aktiv).
     """
@@ -91,4 +117,4 @@ def tools_for(
             if "image_generation" in asst_tool_groups:
                 result.append(tool)
 
-    return result
+    return [_mit_aufgeloestem_schema(t, assistant) for t in result]

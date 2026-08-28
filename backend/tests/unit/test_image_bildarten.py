@@ -232,3 +232,149 @@ def test_bekanntes_seitenverhaeltnis_sucht_ueber_alle_bildarten(bildarten):
 def test_bekanntes_seitenverhaeltnis_kennt_keine_pixelangaben(bildarten, wert):
     """Eine rohe Größe ist kein Formatname — sonst gäbe es zwei Schnittstellen zum Modell."""
     assert image_models.bekanntes_seitenverhaeltnis(wert) is None
+
+
+# ── Werkzeug-Schema je Assistent (Schritt 3) ────────────────────────────────────────
+
+
+def _assistent(tool_groups=("image_generation",), image_kinds=None):
+    return SimpleNamespace(tool_groups=list(tool_groups), image_kinds=image_kinds)
+
+
+def _schema(assistant):
+    from app.chat import router
+
+    return router._generate_image_definition(assistant)["function"]["parameters"][
+        "properties"
+    ]
+
+
+def test_mehrere_bildarten_erzeugen_ein_enum(bildarten):
+    props = _schema(_assistent())
+
+    assert props["bildart"]["enum"] == ["standard", "formatwahl"]
+    assert "Mit Formatwahl" in props["bildart"]["description"]
+
+
+def test_eine_einzige_bildart_erzeugt_keinen_parameter(bildarten):
+    """Der Regelfall: nichts zu wählen, also auch nichts falsch zu wählen."""
+    props = _schema(_assistent(image_kinds=["formatwahl"]))
+
+    assert "bildart" not in props
+    assert props["format"]["enum"] == ["quadratisch", "hoch", "quer"]
+    assert "Standard: quer" in props["format"]["description"]
+
+
+def test_formate_sind_die_vereinigung_nicht_der_schnitt(bildarten):
+    """Sonst verlöre ein Assistent genau die Formate, wegen derer die zweite Bildart da ist."""
+    props = _schema(_assistent())
+
+    assert props["format"]["enum"] == ["quadratisch", "hoch", "quer"]
+    assert "nächstliegende" in props["format"]["description"]
+
+
+def test_assistent_beschraenkt_die_auswahl(bildarten):
+    props = _schema(_assistent(image_kinds=["standard"]))
+
+    assert "bildart" not in props
+    assert props["format"]["enum"] == ["quadratisch"]
+
+
+def test_unbekannte_auswahl_faellt_auf_alle_zurueck(bildarten):
+    """Eine verwaiste ID (Bildart umbenannt) darf den Assistenten nicht stumm schalten."""
+    props = _schema(_assistent(image_kinds=["gibt-es-nicht-mehr"]))
+
+    assert props["bildart"]["enum"] == ["standard", "formatwahl"]
+
+
+def test_ohne_assistent_gelten_alle_bildarten(bildarten):
+    assert _schema(None)["bildart"]["enum"] == ["standard", "formatwahl"]
+
+
+# ── Durchsetzung im Handler ─────────────────────────────────────────────────────────
+
+
+async def test_nicht_freigegebene_bildart_wird_nicht_genutzt(bildarten):
+    """Das Schema bietet sie nicht an — ein Modell kann sie trotzdem nennen.
+
+    Ohne diese Prüfung ließe sich die Auswahl des Admins samt Kostenrahmen umgehen.
+    """
+    from app.chat import router
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        return_value=ImageGenerationResult(image_bytes=b"PNG", cost_usd=0.02)
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k",
+        assistant=_assistent(image_kinds=["standard"]),
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance), \
+         patch.object(router, "save_generated_image", new=AsyncMock(return_value=uuid4())):
+        result = await router._exec_generate_image(
+            {"prompt": "x", "bildart": "formatwahl"}, ctx
+        )
+
+    assert instance.generate_image.await_args.kwargs["model"] == "bild-standard"
+    assert result["bildart"] == "Standard (quadratisch)"
+
+
+async def test_freigegebene_bildart_wird_genutzt(bildarten):
+    from app.chat import router
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        return_value=ImageGenerationResult(image_bytes=b"PNG", cost_usd=0.02)
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k",
+        assistant=_assistent(image_kinds=["standard", "formatwahl"]),
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance), \
+         patch.object(router, "save_generated_image", new=AsyncMock(return_value=uuid4())):
+        await router._exec_generate_image({"prompt": "x", "bildart": "formatwahl"}, ctx)
+
+    assert instance.generate_image.await_args.kwargs["model"] == "bild-flux2"
+
+
+def test_standard_unter_faellt_auf_die_erste_zurueck(bildarten):
+    """Führt ein Assistent die globale Standard-Bildart nicht, gilt seine erste."""
+    from app.chat.image_models import alle_bildarten, standard_unter
+
+    nur_formatwahl = [b for b in alle_bildarten() if b.id == "formatwahl"]
+    assert standard_unter(nur_formatwahl).id == "formatwahl"
+    assert standard_unter(alle_bildarten()).id == "standard"
+
+
+# ── Auflösung des Schema-Callables in tools_for ─────────────────────────────────────
+
+
+def test_tools_for_liefert_fertige_dicts(bildarten):
+    """Alles hinter tools_for sieht nur noch Dicts — kein Aufrufer muss das wissen."""
+    from app.chat.tools import tools_for
+
+    tools = tools_for(_assistent(), group_id=None, is_group_teacher=False)
+    bild = [t for t in tools if t.name == "generate_image"]
+
+    assert len(bild) == 1
+    assert isinstance(bild[0].definition, dict)
+    assert bild[0].definition["function"]["name"] == "generate_image"
+
+
+def test_tools_for_veraendert_die_registry_nicht(bildarten):
+    """Sonst hinge das Schema am letzten Chat, der zufällig durchlief."""
+    from app.chat.tools import TOOL_REGISTRY, tools_for
+
+    tools_for(_assistent(image_kinds=["standard"]), group_id=None, is_group_teacher=False)
+
+    assert callable(TOOL_REGISTRY["generate_image"].definition)
+
+    props = tools_for(_assistent(), group_id=None, is_group_teacher=False)
+    bild = [t for t in props if t.name == "generate_image"][0]
+    assert bild.definition["function"]["parameters"]["properties"]["bildart"]["enum"] == [
+        "standard", "formatwahl",
+    ]

@@ -26,9 +26,11 @@ from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
 from app.chat.image_moderation import image_prompt_block_reason
 from app.chat.image_models import (
     Bildart,
+    alle_bildarten,
     bekanntes_seitenverhaeltnis,
     default_bildart,
     get_bildart,
+    standard_unter,
 )
 from app.chat.image_store import (
     collect_conversation_image_paths,
@@ -526,19 +528,84 @@ def _format_hint(pixels: str) -> str:
     return f"{pixels}, {orientation}"
 
 
-def _build_generate_image_tool() -> dict:
-    """Baut das Tool-Schema aus `settings.image_sizes`.
+def _einzeilig(text: str) -> str:
+    """Mehrzeiligen YAML-Text zu einer Zeile — Schema-Beschreibungen sind Fließtext."""
+    return " ".join(text.split())
+
+
+def _formate_vereinigt(bildarten: list[Bildart]) -> dict[str, str]:
+    """Alle Formatnamen der übergebenen Bildarten, erste Nennung gewinnt.
+
+    Bewusst die **Vereinigung**, nicht der Schnitt: Sonst verlöre ein Assistent mit zwei
+    Bildarten genau die Formate, wegen derer die zweite überhaupt konfiguriert wurde. Dass
+    nicht jede Bildart jedes Format kann, fängt die Näherung im Handler ab — und das
+    Schema sagt es dem Modell ausdrücklich.
+    """
+    vereinigt: dict[str, str] = {}
+    for b in bildarten:
+        for name, groesse in b.formate.items():
+            vereinigt.setdefault(name, groesse)
+    return vereinigt
+
+
+def _build_generate_image_tool(bildarten: list[Bildart]) -> dict:
+    """Baut das Werkzeug-Schema für **diese** Bildarten.
 
     Das Modell wählt einen **Formatnamen**, keine Pixelgröße — die Zuordnung liegt in der
-    Konfiguration. Ein Anbieterwechsel (gpt-image-1 → FLUX/SDXL mit anderen Größen) ändert
-    damit nur die Konfiguration, nicht das Vokabular, das im Gesprächsverlauf landet. Und
-    das Modell kann keine Größe erfinden, für die kein Preis hinterlegt ist.
+    Konfiguration. Ein Anbieterwechsel ändert damit nur die Konfiguration, nicht das
+    Vokabular, das im Gesprächsverlauf landet. Und das Modell kann keine Größe erfinden,
+    für die kein Preis hinterlegt ist.
 
-    Wird beim Import einmal ausgewertet: Settings kommen aus der `.env` und ändern sich zur
-    Laufzeit nicht. Tests rufen die Funktion direkt auf, um andere Konfigurationen zu prüfen.
+    **Bei genau einer Bildart entsteht kein `bildart`-Parameter.** Das ist der Regelfall
+    und zugleich der sichere: Es gibt dann nichts zu wählen, also auch nichts falsch zu
+    wählen, und die Kosten sind vorhersagbar. Erst mehrere Bildarten erzeugen ein Enum —
+    und damit eine Entscheidung, die nur so verlässlich ist wie das Function-Calling des
+    Chat-Modells.
     """
-    formats = settings.image_sizes
-    listing = "; ".join(f"{name} ({_format_hint(size)})" for name, size in formats.items())
+    formate = _formate_vereinigt(bildarten)
+    format_liste = "; ".join(
+        f"{name} ({_format_hint(groesse)})" for name, groesse in formate.items()
+    )
+    vorgabe = standard_unter(bildarten)
+
+    eigenschaften: dict[str, dict] = {
+        "prompt": {
+            "type": "string",
+            "description": "Beschreibung des gewünschten Bildes.",
+        },
+    }
+
+    if len(bildarten) > 1:
+        bildart_liste = "; ".join(
+            f"{b.id} = {b.label}"
+            + (f" — {_einzeilig(b.beschreibung)}" if b.beschreibung else "")
+            for b in bildarten
+        )
+        eigenschaften["bildart"] = {
+            "type": "string",
+            "enum": [b.id for b in bildarten],
+            "description": (
+                f"Art des Bildes, passend zum Wunsch. Verfügbar: {bildart_liste}. "
+                f"Im Zweifel: {vorgabe.id}."
+            ),
+        }
+        format_standard = (
+            "Ohne Angabe gilt das Standardformat der gewählten Bildart. "
+            "Nicht jede Bildart beherrscht jedes Format — ein unpassendes wird auf das "
+            "nächstliegende abgebildet, das ist kein Fehler."
+        )
+    else:
+        format_standard = f"Standard: {vorgabe.standardformat}."
+
+    eigenschaften["format"] = {
+        "type": "string",
+        "enum": list(formate),
+        "description": (
+            f"Bildformat, passend zum Einsatzzweck. Verfügbar: {format_liste}. "
+            f"{format_standard}"
+        ),
+    }
+
     return {
         "type": "function",
         "function": {
@@ -552,38 +619,63 @@ def _build_generate_image_tool() -> dict:
             ),
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "Beschreibung des gewünschten Bildes.",
-                    },
-                    "format": {
-                        "type": "string",
-                        "enum": list(formats),
-                        "description": (
-                            f"Bildformat, passend zum Einsatzzweck. Verfügbar: {listing}. "
-                            f"Standard: {settings.image_default_format}."
-                        ),
-                    },
-                },
+                "properties": eigenschaften,
                 "required": ["prompt"],
             },
         },
     }
 
 
-_GENERATE_IMAGE_TOOL = _build_generate_image_tool()
+def bildarten_fuer(assistant: Any) -> list[Bildart]:
+    """Die Bildarten, die dieser Assistent führen darf.
+
+    Leer oder nicht gesetzt heißt **alle konfigurierten** — so behalten Assistenten aus der
+    Zeit vor der Mehrmodell-Fähigkeit ihr Verhalten, ohne Datenmigration. IDs, die es nicht
+    (mehr) gibt, werden übergangen; bleibt dabei nichts übrig, gilt ebenfalls alles, damit
+    eine verwaiste Auswahl den Assistenten nicht stumm schaltet.
+    """
+    alle = alle_bildarten()
+    gewuenscht = getattr(assistant, "image_kinds", None) or []
+    if not gewuenscht:
+        return alle
+    ausgewaehlt = [b for b in alle if b.id in gewuenscht]
+    if not ausgewaehlt:
+        logger.warning(
+            "Assistent führt nur unbekannte Bildarten %s — es gelten alle konfigurierten.",
+            gewuenscht,
+        )
+        return alle
+    return ausgewaehlt
 
 
-def _resolve_bildart(name: Optional[str]) -> Bildart:
-    """Bildart-ID → Bildart. Unbekanntes/fehlendes fällt auf die Standard-Bildart zurück.
+def _generate_image_definition(assistant: Any) -> dict:
+    """Schema-Callable: wird je Chat mit dem aktiven Assistenten ausgewertet."""
+    return _build_generate_image_tool(bildarten_fuer(assistant))
+
+
+def _resolve_bildart(name: Optional[str], assistant: Any = None) -> Bildart:
+    """Bildart-ID → Bildart, **beschränkt auf die des Assistenten**.
 
     Tolerant statt fehlerhaft, aus demselben Grund wie bei den Formaten: Eine erfundene
     ID soll ein Bild im Standard erzeugen, nicht die Anfrage verlieren. Die Rückgabe ist
     immer eine **konfigurierte** Bildart — also ein Modell, für das ein Preis hinterlegt
     sein kann.
+
+    Die Beschränkung ist nicht bloß Kosmetik: Das Werkzeug-Schema bietet nur die Bildarten
+    dieses Assistenten an, aber ein Chat-Modell kann trotzdem eine andere nennen — ob aus
+    Verwirrung oder weil es sie aus dem Gesprächsverlauf kennt. Ohne diese Prüfung ließe
+    sich die Auswahl des Admins damit umgehen, samt Kostenrahmen.
     """
-    return get_bildart(name) or default_bildart()
+    erlaubt = bildarten_fuer(assistant)
+    for b in erlaubt:
+        if b.id == name:
+            return b
+    if name:
+        logger.info(
+            "Bildart '%s' ist für diesen Assistenten nicht freigegeben — es gilt '%s'.",
+            name, standard_unter(erlaubt).id,
+        )
+    return standard_unter(erlaubt)
 
 
 def _resolve_image_format(
@@ -665,7 +757,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     # Auflösungskette: Bildart → Modell, Formate, response_format. Das Chat-Modell nennt
     # eine Bildart-ID (ab Schritt 3 im Werkzeug-Schema angeboten); solange es das nicht
     # tut, greift die Standard-Bildart — Verhalten wie zuvor.
-    bildart = _resolve_bildart(args.get("bildart"))
+    bildart = _resolve_bildart(args.get("bildart"), ctx.assistant)
     # `format` ist das neue Feld; `size` bleibt als Fallback, falls ein Modell noch die alte
     # Pixel-Schreibweise liefert — ein passender Name gewinnt, sonst greift der Default.
     format_name, size, format_hinweis = _resolve_image_format(
@@ -738,7 +830,8 @@ register_tool(ChatTool(
     name="generate_image",
     group="image_generation",
     writes=False,
-    definition=_GENERATE_IMAGE_TOOL,
+    # Callable, nicht Dict: Das Schema hängt von den Bildarten des Assistenten ab.
+    definition=_generate_image_definition,
     handler=_generate_image_handler,
 ))
 
@@ -1310,6 +1403,7 @@ async def chat(
                         group_id=conversation_group_id,
                         conversation_id=conversation_id,
                         litellm_key=litellm_key,
+                        assistant=active_assistant,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:

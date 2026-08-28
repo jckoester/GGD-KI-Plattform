@@ -127,29 +127,36 @@ async def test_legacy_pixel_value_matching_a_format_name_is_ignored(exec_image):
 
 # ── Tool-Schema ──────────────────────────────────────────────────────────────
 
+def _schema_aus_settings(monkeypatch, sizes, default_format):
+    """Schema für die aus `settings` synthetisierte Bildart.
+
+    Ohne `config/image_models.yaml` (so laufen die Unit-Tests, siehe conftest) entsteht
+    genau eine Bildart aus den `IMAGE_*`-Werten — der Zustand einer Installation, die die
+    Bildarten-Datei noch nicht angelegt hat.
+    """
+    from app.chat import image_models, router
+
+    monkeypatch.setattr(settings, "image_sizes", sizes)
+    monkeypatch.setattr(settings, "image_default_format", default_format)
+    image_models.invalidate_image_models_cache()
+    return router._build_generate_image_tool(image_models.alle_bildarten())
+
+
 def test_tool_schema_enum_lists_configured_format_names(monkeypatch):
-    from app.chat import router
-
-    monkeypatch.setattr(settings, "image_sizes", CUSTOM_SIZES)
-    monkeypatch.setattr(settings, "image_default_format", "panorama")
-
-    schema = router._build_generate_image_tool()
-    params = schema["function"]["parameters"]["properties"]
+    params = _schema_aus_settings(monkeypatch, CUSTOM_SIZES, "panorama")[
+        "function"
+    ]["parameters"]["properties"]
 
     assert params["format"]["enum"] == ["quadratisch", "panorama", "poster"]
     assert "size" not in params, "Pixelgrößen gehören nicht mehr ins Modell-Vokabular"
+    assert "bildart" not in params, "Eine einzige Bildart → nichts zu wählen"
 
 
 def test_tool_schema_description_names_sizes_and_default(monkeypatch):
     """Das Modell soll die Zuordnung sehen, um passend zum Zweck zu wählen."""
-    from app.chat import router
-
-    monkeypatch.setattr(settings, "image_sizes", CUSTOM_SIZES)
-    monkeypatch.setattr(settings, "image_default_format", "poster")
-
-    description = router._build_generate_image_tool()["function"]["parameters"][
-        "properties"
-    ]["format"]["description"]
+    description = _schema_aus_settings(monkeypatch, CUSTOM_SIZES, "poster")[
+        "function"
+    ]["parameters"]["properties"]["format"]["description"]
 
     assert "panorama (1344x768, quer 7:4)" in description
     assert "Standard: poster" in description
@@ -189,14 +196,9 @@ def test_format_hint_passes_through_unparseable_values(value):
 
 def test_format_hint_makes_arbitrary_names_self_describing(monkeypatch):
     """Auch bei einem nichtssagenden Formatnamen steht die Orientierung in der Beschreibung."""
-    from app.chat import router
-
-    monkeypatch.setattr(settings, "image_sizes", {"A4": "896x1152", "breitbild": "1920x1080"})
-    monkeypatch.setattr(settings, "image_default_format", "A4")
-
-    description = router._build_generate_image_tool()["function"]["parameters"][
-        "properties"
-    ]["format"]["description"]
+    description = _schema_aus_settings(
+        monkeypatch, {"A4": "896x1152", "breitbild": "1920x1080"}, "A4"
+    )["function"]["parameters"]["properties"]["format"]["description"]
 
     assert "A4 (896x1152, hochkant 7:9)" in description
     assert "breitbild (1920x1080, quer 16:9)" in description
@@ -204,15 +206,10 @@ def test_format_hint_makes_arbitrary_names_self_describing(monkeypatch):
 
 def test_tool_schema_follows_a_provider_switch(monkeypatch):
     """Andere Pixelgrößen, gleiches Vokabular — der Kern des benannten Formats."""
-    from app.chat import router
-
-    monkeypatch.setattr(
-        settings, "image_sizes", {"quadratisch": "512x512", "quer": "768x512"}
+    schema = _schema_aus_settings(
+        monkeypatch, {"quadratisch": "512x512", "quer": "768x512"}, "quadratisch"
     )
-    monkeypatch.setattr(settings, "image_default_format", "quadratisch")
+    format_prop = schema["function"]["parameters"]["properties"]["format"]
 
-    schema = router._build_generate_image_tool()
-    enum = schema["function"]["parameters"]["properties"]["format"]["enum"]
-
-    assert enum == ["quadratisch", "quer"]
-    assert "512x512" in schema["function"]["parameters"]["properties"]["format"]["description"]
+    assert format_prop["enum"] == ["quadratisch", "quer"]
+    assert "512x512" in format_prop["description"]

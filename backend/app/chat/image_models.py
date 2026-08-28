@@ -295,6 +295,22 @@ def alle_bildarten() -> list[Bildart]:
     return list(load_image_models().bildarten)
 
 
+def standard_unter(bildarten: list[Bildart]) -> Bildart:
+    """Die Vorgabe innerhalb einer **Teilmenge** von Bildarten.
+
+    Die global konfigurierte Standard-Bildart gewinnt, wenn sie dabei ist; sonst die erste
+    der Liste. Nötig, weil ein Assistent nur einen Ausschnitt führen kann und die globale
+    Vorgabe dann womöglich gar nicht zu seiner Auswahl gehört.
+    """
+    if not bildarten:
+        raise ValueError("Leere Bildart-Liste hat keine Vorgabe.")
+    global_standard = load_image_models().standard_bildart
+    for b in bildarten:
+        if b.id == global_standard:
+            return b
+    return bildarten[0]
+
+
 def bekanntes_seitenverhaeltnis(formatname: str | None) -> float | None:
     """Seitenverhältnis eines Formatnamens, gesucht über **alle** Bildarten.
 
