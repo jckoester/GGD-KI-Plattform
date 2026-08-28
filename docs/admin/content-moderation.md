@@ -634,7 +634,7 @@ die Freigabe wird mit `audience` protokolliert.
 
 ### Bild-Assistenten: verschärfter Jugendschutz-Prüfpunkt
 
-Assistenten mit der Werkzeug-Gruppe **Bildgenerierung** (`image_generation`) sind
+Assistenten mit der Fähigkeit **Bildgenerierung** (`image_generation`) sind
 sensibler als reine Text-Assistenten. Daher gilt zusätzlich:
 
 - **Schulweite, für Schüler:innen sichtbare Bild-Assistenten** (Zielgruppe „Schüler:innen"
@@ -647,7 +647,7 @@ sensibler als reine Text-Assistenten. Daher gilt zusätzlich:
 - Im Assistenten-Editor erscheint bei Bildgenerierung + Schüler-Zielgruppe eine
   **Warnung** (Jugendschutz, bewusste Zielgruppen-/Jahrgangswahl, Blockliste beachten).
 - **Zwei-Schlüssel-Prinzip:** Bildgenerierung funktioniert nur, wenn (a) der Assistent die
-  Werkzeug-Gruppe führt **und** (b) das Bild-Modell für das Team freigeschaltet ist
+  Fähigkeit führt **und** (b) das Bild-Modell für das Team freigeschaltet ist
   (`/settings/models`, Abschnitt „Bild-Modelle").
 - Nutzerseitig steht unter jedem erzeugten Bild ein Hinweis, dass KI-Bilder fehlerhaft
   sein können und sich nicht zur Darstellung realer Personen eignen.
@@ -668,7 +668,7 @@ schulweiter Guardrail-Prompt  →  Assistenten-Dokumente  →
 
 ## G — Bild-Prompt-Moderation (Bildgenerierung)
 
-Bei einem Bild-Werkzeug wird der eigentliche Bild-Prompt **vom Modell** beim Werkzeug-Aufruf
+Bei einem Bild-Werkzeug wird der eigentliche Bild-Prompt **vom Modell** beim Funktionsaufruf
 gebildet — er umgeht damit das Frontend-Gate (PII-Warnung), das nur die rohe Nutzernachricht
 prüft. Der Bild-Prompt wird deshalb **mehrschichtig** moderiert:
 

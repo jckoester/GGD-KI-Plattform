@@ -1106,8 +1106,8 @@
                             Standardmodell und folgt einem späteren Wechsel automatisch. Ein
                             fest gewähltes Modell bindet ihn daran — er funktioniert dann
                             nicht mehr, sobald es aus der Modell-Konfiguration entfällt.
-                            Für Werkzeuge (Wissensgraph, Unterrichtsplanung, Bilder) ist ein
-                            Modell mit ⚙ nötig.
+                            Für die Fähigkeiten (Wissensgraph, Unterrichtsplanung, Bilder)
+                            ist ein Modell mit ⚙ nötig.
                         </p>
                     </div>
 
@@ -1569,7 +1569,7 @@
                         {availabilitySummary}
                     </p>
 
-                    <!-- Admin-only: Sortier-Reihenfolge + Werkzeuge -->
+                    <!-- Admin-only: Sortier-Reihenfolge + Fähigkeiten -->
                     {#if isAdmin}
                         <div class="space-y-2">
                             <label
@@ -1591,8 +1591,13 @@
 
                         <div class="space-y-2">
                             <span class="block text-sm font-medium text-light-tx dark:text-dark-tx">
-                                Werkzeuge
+                                Fähigkeiten
                             </span>
+                            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                Was dieser Assistent im Chat kann. Ein Assistent mit einer
+                                medienerzeugenden Fähigkeit erscheint zusätzlich unter
+                                <strong>Werkzeuge</strong> in der Seitenleiste.
+                            </p>
                             <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
                                 <input
                                     type="checkbox"

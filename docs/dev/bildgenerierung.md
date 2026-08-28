@@ -1,6 +1,6 @@
 # Bildgenerierung (Phase 16)
 
-Bildgenerierung ist als **Chat-Werkzeug** umgesetzt (`generate_image`, Gruppe
+Bildgenerierung ist als **Chat-Funktion** umgesetzt (`generate_image`, Fähigkeit
 `image_generation`) — **kein** eigener Bild-Modus und **kein** Bild-Modell im
 Modell-Selektor. Der Chat-Tool-Loop, SSE, Kosten und der Virtual-Key-Pfad werden
 unverändert mitgenutzt. Die Datenschutz-Invariante bleibt gewahrt: nur der
@@ -89,7 +89,8 @@ die serverseitige Moderation im Handler ist die tragende Schicht.
   LiteLLM-Team-Allowlist und **mergen** die jeweils andere Modell-Klasse beim Speichern
   (Chat-Matrix bewahrt Bild-Freigaben und umgekehrt). Frontend: zweiter Abschnitt auf
   `/settings/models` über die wiederverwendbare Komponente `ModelMatrixTable.svelte`.
-- **Werkzeug-Übersicht `/tools`:** rein Frontend (`lib/tools.js`, `MEDIA_TOOL_GROUPS`,
+- **Werkzeug-Übersicht `/tools`** (dort heißt „Werkzeug" der *Assistent*, nicht die
+  Funktion): rein Frontend (`lib/tools.js`, `MEDIA_TOOL_GROUPS`,
   `isToolAssistant()`) — filtert die bereits in `AssistantSummary` enthaltenen `tool_groups`.
 - **Prüfpunkt:** `_initial_status()` (`app/api/assistants.py`) zwingt schulweite,
   schülersichtbare Bild-Assistenten in `pending_review` (Helferin

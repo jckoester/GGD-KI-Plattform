@@ -33,7 +33,7 @@ stürzt ab, es passiert nur nicht das Gewünschte:
 
 1. **Function-Calling.** Ohne das fallen Wissensgraph, Unterrichtsplanung und
    Bildgenerierung ersatzlos aus. Das Modell antwortet freundlich, ruft aber nie ein
-   Werkzeug auf. Zu erkennen nur daran, dass Antworten auffällig allgemein bleiben.
+   Funktion auf. Zu erkennen nur daran, dass Antworten auffällig allgemein bleiben.
 2. **Ein Preis in der LiteLLM-Config.** Fehlt er, meldet der SpendLog 0 — Budgets,
    429-Sperre und Kostenstatistik laufen ins Leere, ohne Fehlermeldung.
 3. **Anweisungstreue bei kurzen Aufgaben.** Klingt nebensächlich, ist es nicht: Das
@@ -48,16 +48,16 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 
 #### Chat
 
-| Modell | $/M ein | $/M aus | Werkzeuge | Erfahrung |
+| Modell | $/M ein | $/M aus | Funktionen | Erfahrung |
 |---|---|---|---|---|
-| **gpt-oss-120b** | 0,17 | 0,71 | ✅ | **Empfehlung als Arbeitspferd.** Befolgte Anweisungen am zuverlässigsten (4/4 bei Titeln, 3/3 bei Werkzeugen). Denkt immer, Umfang über `reasoning_effort: low/medium/high` steuerbar — `none` lehnt es ab. |
+| **gpt-oss-120b** | 0,17 | 0,71 | ✅ | **Empfehlung als Arbeitspferd.** Befolgte Anweisungen am zuverlässigsten (4/4 bei Titeln, 3/3 bei Funktionsaufrufen). Denkt immer, Umfang über `reasoning_effort: low/medium/high` steuerbar — `none` lehnt es ab. |
 | Mistral Small 24B | 0,11 | 0,33 | ✅ | Günstig, antwortet ohne Denkspur sofort, versteht Bildeingaben. Bei knappen Vorgaben unbeständig (4 bis 13 Wörter). Gute Wahl für die schnelle Stufe. |
 | Qwen3-Coder-Next | 0,17 | 0,89 | ✅ | Für Programmieraufgaben. |
 | Qwen3.5-9B | 0,11 | 0,17 | ✅ | Billigstes Chat-Modell. **Hält knappe Vorgaben nicht ein** (15–22 Wörter statt 6). Für Aufgaben mit Formatvorgabe ungeeignet. |
 | Qwen3.8-27B | 0,45 | 2,70 | ✅ | Antwortet direkt. Die Ausgabe kostet das Vierfache von gpt-oss-120b — vor dem Einsatz rechnen. |
 | Qwen3.5-397B-A17B | 0,67 | 4,00 | ✅ | Stärkstes Modell, teuerste Ausgabe, denkt ausgiebig. Nur für Lehrkräfte freischalten. |
 | Llama 3.3 70B | 0,71 | 0,71 | ✅ | Nicht näher erprobt. |
-| ~~Mistral Nemo~~ | 0,17 | 0,17 | ❌ | **Nicht verwenden, wo Werkzeuge gebraucht werden.** Der Werkzeugaufruf zerfiel im Test in mehrsprachigen Textbrei statt in ein `tool_calls`-Feld. |
+| ~~Mistral Nemo~~ | 0,17 | 0,17 | ❌ | **Nicht verwenden, wo Funktionen gebraucht werden.** Der Funktionsaufruf zerfiel im Test in mehrsprachigen Textbrei statt in ein `tool_calls`-Feld. |
 | ~~Llama 3.1 8B / 405B~~ | — | — | ✅ | **Abgekündigt** (01.10. bzw. 15.09.2026) und in keiner Preisliste geführt. Ein Assistent darauf bricht binnen Wochen und läuft bis dahin mit Spend 0. |
 
 > **Reasoning kostet Ausgabe-Tokens, und zwar erheblich.** Die Qwen3.5-Modelle denken auch

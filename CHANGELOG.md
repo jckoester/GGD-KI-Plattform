@@ -7,6 +7,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Zu einem erzeugten Bild wird das tatsächlich genutzte Modell gespeichert**, nicht mehr
+  das global eingestellte.
+
 - **Embeddings werden im Stapel erzeugt** (`EMBEDDING_BATCH_SIZE`, Default 64) statt eine
   Anfrage je Knoten. Gemessen gegen BGE-M3: 0,8 → 33 Knoten/s.
 - **Der Titel geht ins Embedding ein, wo er eigene Information trägt.** Knoten ohne
@@ -23,6 +26,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   unbrauchbarer Text reißt die übrigen nicht mehr mit.
 
 ### Neu
+
+- **Mehrere Bildmodelle gleichzeitig nutzbar.** Eine **Bildart** (`config/image_models.yaml`)
+  bündelt ein Bildmodell mit den Formaten, die es beherrscht, und einem Namen, den Menschen
+  verstehen. Assistenten lassen sich im Editor auf einzelne Bildarten festlegen; ohne Auswahl
+  gelten alle. Fehlt die Datei, entsteht aus den bisherigen `IMAGE_*`-Variablen eine einzige
+  Bildart und nichts ändert sich.
+
+  - Führt ein Assistent genau eine Bildart, hat das Werkzeug **keinen** Auswahlparameter.
+    Bei mehreren wählt das Chat-Modell anhand von Bezeichnung und Beschreibung.
+  - Bildarten, deren Modell für den Jahrgang nicht freigeschaltet ist, erscheinen im Werkzeug
+    gar nicht erst. Ist der Freigabestand nicht abrufbar, wird nicht gefiltert.
+  - Der Assistenten-Editor warnt beim Bearbeiten, wenn eine gewählte Bildart für die
+    Zielgruppe nicht freigeschaltet ist.
+  - Ein Format, das die gewählte Bildart nicht kennt, wird auf das nächstliegende
+    Seitenverhältnis abgebildet statt abgelehnt; das Chat-Modell nennt die Abweichung.
+  - Lehnt der Proxy ab, erscheint statt „Bildgenerierung fehlgeschlagen" ein Satz, der die
+    Ursache nennt (nicht freigeschaltet / Budget aufgebraucht).
 
 - **Vorlage für den EU-Betrieb:** `infra/litellm_config.ionos.example.yaml` mit fünf
   Chat-Stufen, Systemmodellen, Embedding und Bild — Modell-IDs, Fähigkeiten und Preise
@@ -92,7 +112,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
-- Keine Datenbank-Migration nötig.
+- **`alembic upgrade head`** — Migration `0047` ergänzt `assistants.image_kinds`.
+  Bestandsassistenten behalten mit dem Standardwert ihr bisheriges Verhalten.
 
 - ⚠️ **Die eigene `infra/litellm_config.yaml` muss angepasst werden.** Drei Dinge, die
   bisher stillschweigend nicht griffen oder ab LiteLLM 1.83.7 den Proxy-Start verhindern:
@@ -112,6 +133,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
     **einfachen** Anführungszeichen setzen.
   - `GUARDRAIL_HEALTH_FILE` / `GUARDRAIL_HEALTH_MAX_AGE_H` — für die Zustandsanzeige. Muss
     auf dieselbe Datei zeigen wie `health_file` in der LiteLLM-Config.
+  - `IMAGE_MODELS_PATH` — nur nötig, wenn die Bildarten-Datei woanders liegt. Wer mehr als
+    ein Bildmodell nutzen will, legt sie aus `config/image_models.example.yaml` an; sie löst
+    `IMAGE_DEFAULT_MODEL`, `IMAGE_SIZES`, `IMAGE_DEFAULT_FORMAT` und `IMAGE_RESPONSE_FORMAT`
+    ab. Jedes dort genannte Modell braucht einen Eintrag in `IMAGE_PRICES`.
 
 - **Nach dem Update einmal `python scripts/embedding_backfill.py` laufen lassen.** Die
   Titel-Aufnahme betrifft Leitideen, Kapitel und PK-Gruppen; Kompetenzknoten behalten

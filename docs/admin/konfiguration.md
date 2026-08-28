@@ -366,7 +366,7 @@ model_list:
       api_base: os.environ/IONOS_API_BASE     # entfällt bei OpenAI
       api_key: os.environ/IONOS_API_KEY
     model_info:
-      supports_function_calling: true    # PFLICHT, sonst fallen alle Werkzeuge stumm aus
+      supports_function_calling: true    # PFLICHT, sonst fallen alle Funktionen stumm aus
       input_cost_per_token: 0.00000017   # PFLICHT, sonst bleibt der Spend 0
       output_cost_per_token: 0.00000071
 
@@ -385,7 +385,7 @@ Modellwähler ausblendet. Welche Modelle sich wofür eignen, steht in
 
 | | Folge, wenn es fehlt |
 |---|---|
-| `supports_function_calling: true` | Wissensgraph, Unterrichtsplanung und Bildgenerierung fallen ersatzlos aus. Das Modell antwortet freundlich und ruft nie ein Werkzeug auf. |
+| `supports_function_calling: true` | Wissensgraph, Unterrichtsplanung und Bildgenerierung fallen ersatzlos aus. Das Modell antwortet freundlich und ruft nie eine Funktion auf. |
 | `input_cost_per_token` / `output_cost_per_token` | Der SpendLog meldet 0. EUR-Budgets, die 429-Sperre und die Kostenstatistik laufen ins Leere. Betrifft **jedes** Modell mit eigener `api_base` — LiteLLM kennt dafür keine Preise. |
 | `IMAGE_PRICES` in der `.env` | Für **Bilder** ignoriert LiteLLM den Preis aus dieser Datei und liest nur seine eingebaute Tabelle. Ohne die Variable kostet jedes Bild 0,00 $. |
 

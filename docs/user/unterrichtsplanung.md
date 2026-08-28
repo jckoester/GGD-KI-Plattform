@@ -118,7 +118,7 @@ einem vorbefüllten Anliegen:
 Jede vom Assistenten übernommene Änderung landet im **Verlauf** und lässt sich dort
 oder per „Mach das rückgängig" im Chat **rückgängig** machen.
 
-> **Voraussetzung:** Es muss ein Assistent mit Planungs-Werkzeugen und dem
+> **Voraussetzung:** Es muss ein Assistent mit der Fähigkeit *Unterrichtsplanung* und dem
 > Verschiebe-Prompt freigeschaltet sein. Das richtet Ihre Schul-Administration ein
 > (siehe Admin-Doku „Modelle & Assistenten").
 

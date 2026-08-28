@@ -42,8 +42,9 @@
             <h1 class="text-2xl font-semibold">Werkzeuge</h1>
         </div>
         <p class="mb-6 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Assistenten, die Inhalte erzeugen — etwa Bilder. Wähle ein Werkzeug, um
-            einen Chat damit zu starten.
+            Ein Werkzeug ist ein Assistent, der etwas herstellt — derzeit Bilder.
+            Du beschreibst, was du brauchst; wählen musst du nichts weiter. Ein Klick
+            startet einen Chat damit.
         </p>
 
         {#if loading}

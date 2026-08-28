@@ -68,7 +68,7 @@
             Sie müssen in LiteLLM mit
             <code>model_info.mode: image_generation</code> konfiguriert sein. Damit
             im Chat tatsächlich Bilder erzeugt werden, muss zusätzlich ein Assistent
-            die Werkzeug-Gruppe <strong>Bildgenerierung</strong> führen.
+            die Fähigkeit <strong>Bildgenerierung</strong> haben.
         {/snippet}
     </ModelMatrixTable>
 </div>

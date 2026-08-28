@@ -85,8 +85,9 @@ im Chat tatsächlich Bilder entstehen:
    Beide Matrizen schreiben in dieselbe LiteLLM-Team-Allowlist — die Freigaben werden
    gegenseitig **bewahrt** (das Speichern der Chat-Matrix wischt Bild-Freigaben nicht weg
    und umgekehrt).
-2. **Assistent mit der Werkzeug-Gruppe `image_generation`.** Im Assistenten-Editor die
-   Checkbox **„Bildgenerierung"** aktivieren (siehe [Werkzeug-Gruppen](#werkzeug-gruppen-tool_groups)).
+2. **Assistent mit der Fähigkeit `image_generation`.** Im Assistenten-Editor unter
+   *Fähigkeiten* die Checkbox **„Bildgenerierung"** aktivieren
+   (siehe [Fähigkeiten](#fähigkeiten-tool_groups)).
 
 **Nutzerseitige Auffindbarkeit:** Assistenten mit Bildgenerierung erscheinen zusätzlich
 unter dem Seitenleisten-Menüpunkt **„Werkzeuge"** (`/tools`), der alle
@@ -205,24 +206,30 @@ Assistenten automatisch vorausgewählt. Existieren mehrere Assistenten mit
 aktivierter Unterrichtsplanung, wird der erste in der Sortierreihenfolge
 verwendet.
 
-### Werkzeug-Gruppen (`tool_groups`)
+### Fähigkeiten (`tool_groups`)
 
-Welche Planungs-Werkzeuge ein Assistent erhält, steuert das Feld `tool_groups`:
+Eine **Fähigkeit** ist das, was ein Assistent im Chat kann. Gesteuert wird sie über das
+Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
 
-| Gruppe | Werkzeuge | Freischaltung |
+> **Nicht verwechseln:** Ein **Werkzeug** ist ein *Assistent*, der etwas herstellt — die
+> Sammlung dieser Assistenten steht für Nutzer:innen unter `/tools`. Eine **Funktion**
+> ist die technische Schnittstelle, die das Chat-Modell aufruft (`generate_image`).
+> Diese drei Begriffe hießen früher alle „Werkzeug".
+
+| Fähigkeit | Funktionen | Freischaltung |
 |---|---|---|
 | `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
 | `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
-Schreibende Planungs-Werkzeuge bleiben damit strikt an die Lehrkraft-Rolle gebunden;
+Schreibende Planungs-Funktionen bleiben damit strikt an die Lehrkraft-Rolle gebunden;
 für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt
 `student_planning`.
 
 ### Verschiebe-Assistent einrichten
 
 Der Verschiebe-Assistent hilft Lehrkräften, den Plan bei Ausfall, Verschiebungen
-oder offenen Phasen neu zu ordnen. Er nutzt **dieselbe** Werkzeug-Gruppe `planning`
+oder offenen Phasen neu zu ordnen. Er nutzt **dieselbe** Fähigkeit `planning`
 wie der Jahresplan-Assistent, aber einen eigenen System-Prompt:
 
 1. Einen Assistenten anlegen (oder den bestehenden Planungs-Assistenten erweitern).
@@ -233,7 +240,7 @@ wie der Jahresplan-Assistent, aber einen eigenen System-Prompt:
 Die Auslöser in der Planungs-UI (Ausfall-Banner, Drag & Drop einer geplanten Stunde,
 Halbjahres-Hinweis, Überhang-Hinweisleiste) öffnen jeweils einen Chat mit
 Gruppenbezug und vorbefülltem Anliegen — ein freigeschalteter Assistent mit
-`planning` ist Voraussetzung, damit die Werkzeuge greifen.
+`planning` ist Voraussetzung, damit die Funktionen greifen.
 
 ## Assistenten freigeben (`/settings/assistants`)
 
@@ -266,7 +273,7 @@ dem schulweiten Standard folgt und künftige Wechsel automatisch mitmacht.
 
 > Es wird **nichts automatisch umgestellt.** Welches Modell fachlich passt, entscheidet die
 > Schule; ein stiller Austausch könnte einen Assistenten auf ein Modell ohne Function-Calling
-> setzen und seine Werkzeuge lahmlegen.
+> setzen und seine Funktionen lahmlegen.
 >
 > Ist LiteLLM nicht erreichbar, erscheint **kein** Hinweis — dann ist der Zustand ungeprüft,
 > nicht unauffällig. Eine leere Liste bedeutet in dem Fall also keine Entwarnung.
@@ -274,7 +281,7 @@ dem schulweiten Standard folgt und künftige Wechsel automatisch mitmacht.
 ## Konfiguration prüfen (`check_litellm_config.py`)
 
 Mehrere Fehlkonfigurationen des Proxys brechen **still** — man merkt sie erst Wochen später
-an einer Kostenstatistik, die auf 0 steht, oder an Werkzeugen, die nicht mehr erscheinen.
+an einer Kostenstatistik, die auf 0 steht, oder an Funktionen, die nicht mehr greifen.
 Das Skript gleicht den laufenden Proxy mit der `.env` ab:
 
 ```bash
@@ -287,7 +294,7 @@ Geprüft wird:
 |---|---|
 | Modellname aus der `.env` existiert im Proxy nicht | 400er ohne erkennbare Ursache |
 | Kein `input_cost_per_token` / `output_cost_per_token` | SpendLog bleibt 0 → EUR-Budgets, 429-Enforcement, `/budget` und `/statistics/costs` laufen ins Leere |
-| `supports_function_calling` nicht gesetzt | Werkzeuge fallen stumm aus oder gehen an ein Modell, das sie nicht kann |
+| `supports_function_calling` nicht gesetzt | Funktionen fallen stumm aus oder gehen an ein Modell, das sie nicht kann |
 | Bildmodell ohne `mode: image_generation` | erscheint nicht in der Bild-Freigabe-Matrix |
 | `TITLE_MODEL` im Modellwähler sichtbar | Schüler:innen sehen ein Modell, das nicht zur Auswahl gedacht ist |
 | Platzhalter aus der Vorlage (`<…>`, `TODO`) | die Config wurde nur halb ausgefüllt |
