@@ -77,6 +77,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Gesprächstitel war manchmal die Antwort statt der Titel.** Bei imperativ
+  formulierten Eingaben („Erkläre mir …", „Erzeuge ein Bild: …") befolgte das Titelmodell
+  die Anweisung, statt sie zu betiteln — im schlimmsten gemessenen Fall mit einer 168
+  Wörter langen Erklärung, die die Historie abschnitt. Die Nutzernachricht wird jetzt als
+  **Zitat** übergeben, nicht als Anweisung. Über vier Anbieter nachgemessen: drei Modelle
+  deutlich besser (Claude Haiku 1/4 → 4/4), keines schlechter.
+
 - **Bildgenerierung lief am EUR-Budget vorbei.** LiteLLM löst Bildpreise ausschließlich über
   seine eingebaute Preistabelle auf und ignoriert das `model_info` des Deployments — selbst
   eingetragene Bildmodelle wurden mit 0,00 $ abgerechnet. Der neue Callback

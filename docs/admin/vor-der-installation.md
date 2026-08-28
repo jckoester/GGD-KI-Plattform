@@ -51,9 +51,9 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 | Modell | $/M ein | $/M aus | Funktionen | Erfahrung |
 |---|---|---|---|---|
 | **gpt-oss-120b** | 0,17 | 0,71 | ✅ | **Empfehlung als Arbeitspferd.** Befolgte Anweisungen am zuverlässigsten (4/4 bei Titeln, 3/3 bei Funktionsaufrufen). Denkt immer, Umfang über `reasoning_effort: low/medium/high` steuerbar — `none` lehnt es ab. |
-| Mistral Small 24B | 0,11 | 0,33 | ✅ | Günstig, antwortet ohne Denkspur sofort, versteht Bildeingaben. Bei knappen Vorgaben unbeständig (4 bis 13 Wörter). Gute Wahl für die schnelle Stufe. |
+| Mistral Small 24B | 0,11 | 0,33 | ✅ | Günstig, antwortet ohne Denkspur sofort, versteht Bildeingaben. Bei knappen Vorgaben unbeständig (4 bis 13 Wörter, **alte Prompt-Fassung**). Gute Wahl für die schnelle Stufe. |
 | Qwen3-Coder-Next | 0,17 | 0,89 | ✅ | Für Programmieraufgaben. |
-| Qwen3.5-9B | 0,11 | 0,17 | ✅ | Billigstes Chat-Modell. **Hält knappe Vorgaben nicht ein** (15–22 Wörter statt 6). Für Aufgaben mit Formatvorgabe ungeeignet. |
+| Qwen3.5-9B | 0,11 | 0,17 | ✅ | Billigstes Chat-Modell. Hielt knappe Vorgaben nicht ein (15–22 Wörter statt 6) — **gemessen mit der alten Prompt-Fassung**, mit der heutigen nicht nachgeprüft. Vor dem Einsatz als Titelmodell selbst messen. |
 | Qwen3.8-27B | 0,45 | 2,70 | ✅ | Antwortet direkt. Die Ausgabe kostet das Vierfache von gpt-oss-120b — vor dem Einsatz rechnen. |
 | Qwen3.5-397B-A17B | 0,67 | 4,00 | ✅ | Stärkstes Modell, teuerste Ausgabe, denkt ausgiebig. Nur für Lehrkräfte freischalten. |
 | Llama 3.3 70B | 0,71 | 0,71 | ✅ | Nicht näher erprobt. |
@@ -66,6 +66,12 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 > gültigen Werte sind aber **modellabhängig** (Qwen versteht `none`, gpt-oss nur
 > `low`/`medium`/`high`). LiteLLM braucht dafür zusätzlich
 > `allowed_openai_params: ["reasoning_effort"]`, sonst weist es die Anfrage ganz ab.
+
+> **Zur Spalte „Titel".** Vier imperativ formulierte Eingaben („Erkläre mir …", „Erzeuge
+> ein Bild: …", „Fasse … zusammen", „Schreibe mir …") gegen den echten Titel-Prompt der
+> Anwendung; gezählt wird, wie oft die Antwort im 6-Wörter-Limit blieb. Gemessen mit der
+> **aktuellen** Prompt-Fassung, die den Nutzertext als Zitat übergibt — mit der früheren
+> Fassung fielen dieselben Modelle teils deutlich schlechter aus (Details unten).
 
 #### Embeddings
 
@@ -133,8 +139,8 @@ Anwendung, „maximal 6 Wörter"):
 
 | Modell (`mistral/…`) | $/M ein | $/M aus | Funktionen | Titel | Erfahrung |
 |---|---|---|---|---|---|
-| `ministral-3b-latest` | 0,10 | 0,10 | ✅ | **2/4** (4–21 Wörter) | Billigstes Modell. **Hält knappe Vorgaben nicht ein** — als Titelmodell ungeeignet. |
-| `ministral-8b-latest` | 0,15 | 0,15 | ✅ | **0/4** (7–33 Wörter) | Trotz höherem Preis **schlechter** als das 3B bei Formatvorgaben. Nicht für Aufgaben mit Formatzwang. |
+| `ministral-3b-latest` | 0,10 | 0,10 | ✅ | **3/4** (3–7) | Billigstes Modell, reißt die Grenze knapp. Als Titelmodell grenzwertig. |
+| `ministral-8b-latest` | 0,15 | 0,15 | ✅ | **2/4** (5–35) | Trotz höherem Preis **schlechter** als das 3B. Für Aufgaben mit Formatzwang ungeeignet — auch mit der verbesserten Prompt-Fassung. |
 | **`mistral-small-latest`** | 0,15 | 0,60 | ✅ | 4/4 (3–4) | **Empfehlung als Arbeitspferd.** Schnell (≈2,9 s), formattreu, Vision. |
 | `mistral-medium-latest` | 1,50 | 7,50 | ✅ | 4/4 (3–4) | Schnell (≈1,8 s), aber **das teuerste Modell der Reihe** — fünfmal `mistral-large`. |
 | `mistral-large-latest` | 0,50 | 1,50 | ✅ | 4/4 (4–6) | Deutlich **langsamer** (≈9,4 s) — für eine Chat-Antwort spürbar. |
@@ -181,10 +187,10 @@ Alle drei Modalitäten, in LiteLLM ohne Präfix ansprechbar, Preise eingebaut. G
 formattreu. Für die schnelle Stufe und das Titelmodell gleichermaßen geeignet.
 
 > **Die Regel „billige Modelle halten knappe Vorgaben nicht ein" gilt hier nicht.** Bei
-> IONOS (Qwen3.5-9B) und Mistral (ministral-8b) scheitert genau das billigste Modell an der
-> 6-Wörter-Grenze; bei OpenAI trafen **alle vier** Modelle sie. Die Anweisungstreue ist
-> also keine Frage des Preises, sondern des Modells — deshalb ist sie zu messen und nicht
-> zu schätzen.
+> Mistral (`ministral-8b`) reißt das günstige Modell die 6-Wörter-Grenze auch mit der
+> verbesserten Prompt-Fassung; bei OpenAI trafen **alle vier** Modelle sie. Die
+> Anweisungstreue ist also keine Frage des Preises, sondern des Modells — deshalb ist sie
+> zu messen und nicht zu schätzen.
 
 > Die beiden gpt-5-Modelle sind spürbar **langsamer** (5,9 bzw. 7,8 s gegen 2,0 s). Für
 > eine Chat-Antwort merkt man das; fürs Titelmodell, das im Hintergrund läuft, nicht.
@@ -215,7 +221,7 @@ Gemessen am 28.08.2026:
 
 | Modell | $/M ein | $/M aus | Funktionen | Titel | Antwortzeit |
 |---|---|---|---|---|---|
-| claude-haiku-4-5 | 1,00 | 5,00 | ✅ | **2/4** (4–168 Wörter) | 3,4 s |
+| claude-haiku-4-5 | 1,00 | 5,00 | ✅ | 4/4 (4–5) | 3,4 s |
 | **claude-sonnet-5** | 2,00 | 10,00 | ✅ | 4/4 (4–5) | 2,9 s |
 | claude-opus-5 | 5,00 | 25,00 | ✅ | 4/4 (4–6) | 3,2 s |
 
@@ -226,18 +232,20 @@ Alle drei beherrschen Funktionsaufrufe und Bildeingaben.
 > rund das Sechsfache von `gpt-4o-mini` (0,15/0,60). Für Stufen, die **alle** nutzen, ist
 > das schwer zu rechtfertigen; als `chat-komplex` für Lehrkräfte kann es sich lohnen.
 
-> **Haiku ist als Titelmodell ungeeignet — und zeigt dabei den lehrreichsten Fehler der
-> ganzen Messreihe.** Auf „Erkläre mir bitte den Wasserkreislauf für eine Klassenarbeit"
-> antwortete es mit einer **168 Wörter langen Erklärung samt Überschriften**, statt einen
-> Titel zu bilden; auf „Erzeuge ein Bild: …" mit „Ich kann keine Bilder generieren". Bei
-> den beiden neutral formulierten Fragen traf es dagegen 4 und 6 Wörter.
+> **Haiku war der lehrreichste Fund der ganzen Messreihe — und ist inzwischen behoben.**
+> Mit der **früheren** Prompt-Fassung antwortete es auf „Erkläre mir bitte den
+> Wasserkreislauf für eine Klassenarbeit" mit einer **168 Wörter langen Erklärung samt
+> Überschriften** statt eines Titels; auf „Erzeuge ein Bild: …" mit „Ich kann keine Bilder
+> generieren". Bei neutral formulierten Fragen traf es dagegen 4 und 6 Wörter.
 >
-> Das Muster ist also nicht „Modell hält sich nicht an Vorgaben", sondern präziser: **Eine
+> Das Muster war nicht „Modell hält sich nicht an Vorgaben", sondern präziser: **Eine
 > imperativ formulierte Nutzernachricht gewinnt gegen den System-Prompt.** Das Modell
-> befolgt die Anweisung der Schülerin, statt sie zu betiteln. Dasselbe wurde bei IONOS mit
-> gpt-oss-120b beobachtet — es ist kein Anbieterproblem, sondern eines der Prompt-Bauweise.
-> Die Gegenmaßnahme (Nutzertext als Zitat statt als Anweisung übergeben) ist gemessen und
-> in der Todo unter *Backend / Prompts* festgehalten.
+> befolgte die Anweisung der Schülerin, statt sie zu betiteln — dasselbe zuvor bei IONOS
+> mit gpt-oss-120b. Kein Anbieterproblem, sondern eines der Prompt-Bauweise.
+>
+> Seit dem 28.08.2026 übergibt die Anwendung den Nutzertext als **Zitat** statt als
+> Anweisung. Haiku liegt damit bei 4/4 (Wortzahlen von `[153, 58, 5, 228]` auf
+> `[4, 5, 4, 5]`).
 
 > **Ein Hinweis zum Schlüsseltyp:** Ein *identity-linked* API-Schlüssel weist **jeden**
 > Aufruf ab, solange der Header `anthropic-workspace-id` fehlt (HTTP 400, am 28.08.2026
