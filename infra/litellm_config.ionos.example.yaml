@@ -1,12 +1,19 @@
 # litellm_config.ionos.example.yaml — LiteLLM-Proxy für den Betrieb mit EU-Anbietern
 #
-# VORLAGE für den IONOS-Betriebspfad (ADR-015). Alles, was hier `<…>` oder `TODO` heißt,
-# muss vor der Inbetriebnahme gefüllt werden — die übrige Struktur ist vollständig.
+# Vorlage für den IONOS-Betriebspfad (ADR-015). Modell-IDs, Fähigkeiten und Preise sind am
+# 26.08.2026 gegen den laufenden AI Model Hub gemessen bzw. der Preisliste entnommen
+# (cloud.ionos.com/managed/ai-model-hub, **USD** — LiteLLM rechnet in USD, die EUR-Budgets
+# werden vom monatlichen Cron über den EZB-Kurs umgerechnet).
 #
-# Vollständigkeit prüfen (gegen den laufenden Proxy, findet fehlende Preise, fehlendes
-# `supports_function_calling`, unbekannte `.env`-Modellnamen):
+# Nachmessen, wenn IONOS den Katalog ändert:
 #
-#     cd backend && python scripts/check_litellm_config.py
+#     python scripts/ionos_probe.py                     # Katalog
+#     python scripts/ionos_probe.py --chat <id>         # Function-Calling + Reasoning
+#     cd backend && python scripts/check_litellm_config.py   # Config gegen den Proxy
+#
+# ⚠️ Preise ändern sich ohne Ankündigung an dieser Datei. Sie sind der einzige Weg, auf dem
+# Kosten in die SpendLogs kommen — stimmen sie nicht, stimmen Budgets und Statistik nicht,
+# ohne dass irgendetwas fehlschlägt.
 #
 # ─────────────────────────────────────────────────────────────────────────────────────
 # ZWEI NAMENSEBENEN (Plan §5)
@@ -33,7 +40,7 @@
 #       LiteLLM kennt für `openai/<id>` mit eigener `api_base` KEINE Preise. Ohne diese
 #       Werte melden die SpendLogs 0 → EUR-Budgets, das 429-Enforcement, /budget und
 #       /statistics/costs laufen ins Leere. Umrechnung: Preis pro Mio ÷ 1_000_000,
-#       also 0,15 $/M → 0.00000015. (Ein Pro-Million-Feld gibt es nicht.)
+#       also 0,17 $/M → 0.00000017. (Ein Pro-Million-Feld gibt es nicht.)
 #
 #   supports_function_calling: true
 #       Das Backend liest die Tool-Fähigkeit aus /model/info. Fehlt der Wert, ist er
@@ -43,112 +50,194 @@
 #   mode: image_generation | embedding
 #       Trennt die Modalitäten. Ohne `image_generation` taucht ein Bildmodell in der
 #       Bild-Freigabe-Matrix nicht auf.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# REASONING — der Kostenhebel (gemessen 26.08.2026)
+#
+# Die Qwen3.5-Modelle denken per Vorgabe, auch bei Trivialem: „Wiederhole ein Wort" kostete
+# 273–438 Ausgabe-Tokens Denkspur. Bei einer unglücklich formulierten Anweisung lief
+# Qwen3.5-9B in 4096 Tokens, ohne je zu antworten — `content: null`, alles steckte im Feld
+# `reasoning`, das die Oberfläche nicht anzeigt. Ein solches Modell wirkt im Chat stumm und
+# kostet trotzdem.
+#
+# Abschaltbar ist das genau auf einem Weg:
+#
+#   reasoning_effort: none      ✅ 438 → 4 Tokens
+#   chat_template_kwargs: {enable_thinking: false}   ❌ wirkungslos, denkt weiter
+#   "/no_think" im Prompt       ❌ macht es schlimmer (2018 Zeichen Denkspur)
+#
+# ⚠️ Die gültigen Werte sind modellabhängig. Qwen versteht `none`; gpt-oss-120b lehnt es mit
+# HTTP 400 ab („Harmony does not support reasoning_effort='none'") und kennt nur
+# `low`/`medium`/`high`. Beim Modellwechsel also nicht bloß die `model:`-Zeile tauschen,
+# sondern mit scripts/ionos_probe.py nachmessen, was das neue Modell akzeptiert.
+#
+# ⚠️ `reasoning_effort` allein genügt NICHT. LiteLLM prüft den Parameter gegen seine
+# Fähigkeitstabelle, kennt die IONOS-IDs dort nicht und bricht die Anfrage mit
+# `UnsupportedParamsError` ab — der Eintrag wäre komplett unbenutzbar. Deshalb steht
+# überall zusätzlich `allowed_openai_params: ["reasoning_effort"]`.
+# NICHT `drop_params: true` verwenden: Das entfernt den Parameter stillschweigend, das
+# Reasoning bliebe an, und man merkt es nur an der Rechnung.
+#
+# Deshalb steht `reasoning_effort: none` überall dort, wo NICHT gedacht werden soll — und
+# fehlt bewusst bei `chat-reasoning` und `chat-komplex`.
+# ─────────────────────────────────────────────────────────────────────────────────────
 
 model_list:
   # ══ Ebene 1: Aufgaben-Aliase ════════════════════════════════════════════════════════
 
-  # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
-  - model_name: chat-standard
-    litellm_params:
-      model: openai/<IONOS-CHAT-ID>          # TODO z. B. gpt-oss-120b laut IONOS-Katalog
-      api_base: os.environ/IONOS_API_BASE
-      api_key: os.environ/IONOS_API_KEY
-    model_info:
-      supports_function_calling: true
-      input_cost_per_token: 0.0             # TODO aus der IONOS-Preisliste
-      output_cost_per_token: 0.0            # TODO
-
-  # Kurze Fragen, Vokabeln, Textvereinfachung. Deutlich günstiger — verlängert bei
-  # Jahrgangs-Budgets von 1–3,50 €/Monat spürbar die Reichweite.
+  # Kurze Fragen, Vokabeln, Textvereinfachung. Für alle Teams.
+  # Mistral Small 24B ist hier bewusst gesetzt: Es ist das günstigste Modell, das Werkzeuge
+  # zuverlässig aufruft UND ohne Denkspur sofort antwortet — Schüler:innen sitzen sonst vor
+  # einem stillen Fenster. (Mistral NeMo 12B wäre billiger, zerlegt Werkzeugaufrufe aber in
+  # unbrauchbaren Text — gemessen, siehe scripts/ionos_probe.py.)
   - model_name: chat-schnell
     litellm_params:
-      model: openai/<IONOS-KLEIN-ID>         # TODO z. B. Mistral NeMo 12B / Llama 3.1 8B
+      model: openai/mistralai/Mistral-Small-24B-Instruct
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
-      supports_function_calling: true        # TODO prüfen — kleine Modelle können es oft nicht
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      supports_function_calling: true         # gemessen
+      input_cost_per_token: 0.00000011        # 0,11 $/M
+      output_cost_per_token: 0.00000033       # 0,33 $/M
 
-  # Programmieraufgaben. IONOS hat derzeit KEIN dediziertes Code-Modell (ADR-015 §5) —
-  # der Alias zeigt daher vorerst auf dasselbe Backend wie chat-standard. Der Name ist
-  # bewusst schon reserviert: Sobald ein Code-Modell verfügbar ist, ändert sich hier eine
-  # Zeile, und alle darauf gebundenen Assistenten ziehen mit.
+  # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
+  # Reasoning ausgeschaltet — wer eine denkende Antwort will, wählt `chat-reasoning`.
+  - model_name: chat-standard
+    litellm_params:
+      model: openai/openai/gpt-oss-120b       # doppeltes `openai/`: Provider + IONOS-ID
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+      # `low`, NICHT `none`: gpt-oss-120b lehnt `none` ab („Harmony does not support
+      # reasoning_effort='none'", HTTP 400) — es denkt immer, nur unterschiedlich lang.
+      # low = 28 Tokens, ohne Angabe 56, high 179 (gemessen).
+      reasoning_effort: low
+      allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
+    model_info:
+      supports_function_calling: true         # gemessen
+      input_cost_per_token: 0.00000017        # 0,17 $/M
+      output_cost_per_token: 0.00000071       # 0,71 $/M
+
+  # Programmieraufgaben. IONOS führt seit 2026 ein dediziertes Code-Modell — die Annahme des
+  # Plans (§5.2: „kein Code-Modell, zeigt vorerst auf chat-standard") ist überholt.
   - model_name: chat-code
     litellm_params:
-      model: openai/<IONOS-CHAT-ID>          # TODO vorerst identisch zu chat-standard
+      model: openai/Qwen/Qwen3-Coder-Next
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
-      supports_function_calling: true
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      supports_function_calling: true         # gemessen
+      input_cost_per_token: 0.00000017        # 0,17 $/M
+      output_cost_per_token: 0.00000089       # 0,89 $/M
 
-  # Analyse, lange Texte, Unterrichtsplanung. Teuer → NUR für `lehrkraefte` freischalten.
+  # Denkt vor der Antwort — für mehrschrittige Aufgaben, Herleitungen, Begründungen.
+  # Dasselbe Backend wie `chat-standard`, nur mit aktivem Reasoning: didaktisch als „derselbe
+  # Assistent, aber er denkt erst nach" erklärbar, und die Denkspur kostet nur Ausgabe-Tokens
+  # desselben günstigen Modells. Freigabe nach Jahrgang (höhere Klassen), nicht schulweit.
+  # Wechsel auf ein stärkeres Modell (z. B. Qwen3.5-397B) = eine Zeile `model:` hier.
+  - model_name: chat-reasoning
+    litellm_params:
+      model: openai/openai/gpt-oss-120b
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+      # Der Unterschied zu chat-standard ist allein diese Zeile: high statt low —
+      # 179 statt 28 Ausgabe-Tokens, 800 statt 22 Zeichen Denkspur (gemessen).
+      reasoning_effort: high
+      allowed_openai_params: ["reasoning_effort"]
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.00000017
+      output_cost_per_token: 0.00000071
+
+  # Analyse, lange Texte, Unterrichtsplanung. Mit Abstand am teuersten (4,00 $/M Ausgabe bei
+  # starkem Reasoning) → NUR für `lehrkraefte` freischalten.
   - model_name: chat-komplex
     litellm_params:
-      model: openai/<IONOS-GROSS-ID>         # TODO z. B. Llama 3.1 405B / Qwen 3.5 397B
+      model: openai/Qwen/Qwen3.5-397B-A17B
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
-      supports_function_calling: true
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      supports_function_calling: true         # gemessen
+      input_cost_per_token: 0.00000067        # 0,67 $/M
+      output_cost_per_token: 0.00000400       # 4,00 $/M
 
   # ══ System-Modelle: nie im Modellwähler (MODEL_PICKER_HIDDEN_PREFIXES) ══════════════
 
-  # Gesprächstitel. Klein und günstig genügt — läuft bei JEDER neuen Konversation.
+  # Gesprächstitel. Läuft bei JEDER neuen Konversation, deshalb das günstigste Modell —
+  # und zwingend ohne Denkspur: Qwen3.5-9B verbrauchte für einen Ein-Wort-Titel sonst
+  # mehrere hundert Ausgabe-Tokens (mit `reasoning_effort: none` sind es 4).
   # ⚠️ Muss in jeder Team-Allowlist stehen (Aufruf über den Virtual Key der Nutzer:innen).
   - model_name: system-titel
     litellm_params:
-      model: openai/<IONOS-KLEIN-ID>         # TODO
+      model: openai/Qwen/Qwen3.5-9B
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
+      reasoning_effort: none
+      allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
-      supports_function_calling: false       # Titel brauchen keine Werkzeuge
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      supports_function_calling: false        # Titel brauchen keine Werkzeuge
+      input_cost_per_token: 0.00000011        # 0,11 $/M
+      output_cost_per_token: 0.00000017       # 0,17 $/M
 
   # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es bei
   # IONOS nicht gibt). Angebunden unten unter `litellm_settings.guardrails`.
-  # Hinweis: Der Guardrail ruft litellm direkt auf, nicht den Proxy — er braucht das Modell
-  # also vollqualifiziert. Dieser Eintrag hier dient der Übersicht und der Freischaltung.
+  # Mistral Small 24B statt des noch günstigeren Qwen3.5-9B: Der Klassifikator muss die
+  # fürsorgliche Krisenantwort von der Anleitung zur Selbstverletzung unterscheiden — der
+  # Prüfstein aus ADR-008. Vor dem Produktivgang mit den Testfällen aus
+  # backend/tests/unit/test_moderation_core.py gegenprüfen.
   - model_name: system-moderation
     litellm_params:
-      model: openai/<IONOS-KLEIN-ID>         # TODO
+      model: openai/mistralai/Mistral-Small-24B-Instruct
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: false
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      input_cost_per_token: 0.00000011
+      output_cost_per_token: 0.00000033
 
   # ══ Weitere Modalitäten ═════════════════════════════════════════════════════════════
 
-  # Embeddings des Kontextspeichers. ⚠️ Die Vektorbreite MUSS zu EMBEDDING_DIMENSIONS und
-  # zur Spalte context_nodes.embedding passen — BGE-M3 hat 1024, nicht 1536. Ein Wechsel
-  # erfordert Migration + vollständiges Re-Embedding: docs/runbooks/modellwechsel.md.
+  # Embeddings des Kontextspeichers. BGE-M3 ist mehrsprachig und für Deutsch geeignet.
+  # ⚠️ Liefert **1024** Dimensionen (gemessen) — die heutige Spalte hat 1536. Umstellung
+  # heißt: EMBEDDING_DIMENSIONS=1024, Spalte umstellen UND alles neu einbetten.
+  # Ablauf: docs/runbooks/modellwechsel.md. Kein Schritt davon ist optional.
   - model_name: embedding-standard
     litellm_params:
-      model: openai/<IONOS-EMBEDDING-ID>     # TODO z. B. BGE-M3
+      model: openai/BAAI/bge-m3
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
+      # PFLICHT: LiteLLM schickt sonst `encoding_format: base64`, und daran scheitert IONOS
+      # (upstream 500 → als 422 durchgereicht). Ohne diese Zeile funktioniert der gesamte
+      # Kontextspeicher nicht — semantische Suche, Import, Backfill.
+      encoding_format: float
     model_info:
       mode: embedding
-      input_cost_per_token: 0.0             # TODO
+      input_cost_per_token: 0.00000002        # 0,02 $/M
 
-  # Bildgenerierung. Für FLUX/SDXL zusätzlich IMAGE_RESPONSE_FORMAT=b64_json setzen —
-  # sonst liefern sie eine extern gehostete URL, und die verarbeitet das Backend bewusst
-  # nicht (die Bytes sollen das Schulnetz nicht über einen zweiten Request verlassen).
-  # Die Größen in IMAGE_SIZES müssen zu den vom Anbieter abgerechneten passen.
+  # Bildgenerierung. FLUX.1-schnell liefert Base64 **ohne** `response_format`-Parameter
+  # (gemessen) → IMAGE_RESPONSE_FORMAT bleibt leer. Fester Preis je Bild, damit sauber in
+  # LiteLLMs Kostenmodell abbildbar.
+  # (FLUX.2-klein-4B rechnet nach Megapixeln ab und liefert deutlich größere Bilder; es
+  # zusätzlich anzubieten braucht Backend-Arbeit — `generate_image` kennt nur ein globales
+  # IMAGE_DEFAULT_MODEL, und IMAGE_SIZES gilt ebenfalls global.)
   - model_name: bild-standard
     litellm_params:
-      model: openai/<IONOS-BILD-ID>          # TODO z. B. FLUX.1 [schnell] / SDXL
+      model: openai/black-forest-labs/FLUX.1-schnell
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
       mode: image_generation
-      output_cost_per_image: 0.0            # TODO
+      # ⚠️ OFFEN — dieser Preis wird derzeit NICHT angewendet: Jedes Bild wird mit 0,00 $
+      # gebucht (gemessen). LiteLLM 1.83.7 löst Bildpreise ausschließlich über seine
+      # eingebaute Preistabelle `litellm.model_cost` auf (Namensmuster wie
+      # `1024-x-1024/dall-e-3`) und zieht `model_info` des Deployments dabei gar nicht heran —
+      # anders als bei Chat und Embedding, wo die Preise hier greifen (verifiziert).
+      # `output_cost_per_image` wäre erst recht falsch: Der Rechner kennt nur
+      # `input_cost_per_image` und `input_cost_per_pixel`.
+      # Folge: Bildgenerierung läuft am EUR-Budget vorbei. Begrenzt tragbar, weil die
+      # Bild-Freigabematrix und das Jugendschutz-Gate den Zugang ohnehin einschränken —
+      # aber vor breiter Freigabe zu lösen (eigener Kosten-Callback oder Eintrag in die
+      # Preistabelle).
+      input_cost_per_image: 0.032             # 0,032 $/Bild — vorgehalten, noch wirkungslos
 
   # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md): greift bei erschöpftem Budget und
   # für sensible Fälle. Läuft lokal — keine Kosten, daher keine Preisangaben nötig.
@@ -163,26 +252,60 @@ model_list:
   # Zeigen auf dieselben Backends wie die Aliase; der Unterschied ist allein die Bindung.
   # Ein Assistent auf einem expliziten Namen folgt einem schulweiten Modellwechsel NICHT
   # und bricht, wenn der Eintrag hier entfällt — `/admin/assistants/model-check` meldet das.
+  #
+  # ⚠️ NICHT aufgenommen: Llama 3.1 405B und Llama 3.1 8B. Beide stehen im Katalog, sind aber
+  # abgekündigt (15.09.2026 bzw. 01.10.2026) und in keiner Preisliste geführt — ein Assistent
+  # darauf wäre binnen Wochen kaputt und würde bis dahin mit Spend 0 laufen.
 
-  - model_name: ionos-<KLEIN>                # TODO benennen, z. B. ionos-mistral-nemo-12b
+  - model_name: ionos-mistral-small-24b
     litellm_params:
-      model: openai/<IONOS-KLEIN-ID>         # TODO
-      api_base: os.environ/IONOS_API_BASE
-      api_key: os.environ/IONOS_API_KEY
-    model_info:
-      supports_function_calling: true        # TODO prüfen
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
-
-  - model_name: ionos-<GROSS>                # TODO benennen, z. B. ionos-llama-3.1-405b
-    litellm_params:
-      model: openai/<IONOS-GROSS-ID>         # TODO
+      model: openai/mistralai/Mistral-Small-24B-Instruct
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.0             # TODO
-      output_cost_per_token: 0.0            # TODO
+      input_cost_per_token: 0.00000011
+      output_cost_per_token: 0.00000033
+
+  - model_name: ionos-gpt-oss-120b
+    litellm_params:
+      model: openai/openai/gpt-oss-120b
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.00000017
+      output_cost_per_token: 0.00000071
+
+  - model_name: ionos-qwen3-coder-next
+    litellm_params:
+      model: openai/Qwen/Qwen3-Coder-Next
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.00000017
+      output_cost_per_token: 0.00000089
+
+  - model_name: ionos-llama-3.3-70b
+    litellm_params:
+      model: openai/meta-llama/Llama-3.3-70B-Instruct
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.00000071        # 0,71 $/M
+      output_cost_per_token: 0.00000071       # 0,71 $/M
+
+  - model_name: ionos-qwen3.5-397b
+    litellm_params:
+      model: openai/Qwen/Qwen3.5-397B-A17B
+      api_base: os.environ/IONOS_API_BASE
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true
+      input_cost_per_token: 0.00000067
+      output_cost_per_token: 0.00000400
 
 # ── Jugendschutz-Guardrails ───────────────────────────────────────────────────────────
 # Die drei `openai_moderation`-Guardrails aus infra/litellm_config.example.yaml funktionieren
@@ -198,36 +321,53 @@ model_list:
 # Anbieterstörung die ganze Schule blockieren — unverhältnismäßig, und konsistent mit dem
 # PII-Gate (Phase 14) und ADR-008 Teil 3.
 #
-# ⚠️ Der Klassifikator läuft bei `default_on: true` bei JEDER Antwort. Ein kleines, günstiges
-# Modell wählen. Sein Spend läuft NICHT über den Virtual Key der Nutzer:innen, taucht also
-# nicht im Nutzerbudget auf.
-litellm_settings:
-  guardrails:
-    - guardrail_name: "jugendschutz"
-      litellm_params:
-        guardrail: llm_moderation.LlmModerationGuardrail
-        mode: post_call
-        default_on: true
-        # Vollqualifiziert (Provider + api_base), NICHT der `model_name` aus der model_list:
-        # Der Guardrail ruft litellm direkt auf, nicht den Proxy.
-        classifier_model: openai/<IONOS-KLEIN-ID>   # TODO
-        classifier_api_base: os.environ/IONOS_API_BASE
-        classifier_api_key: os.environ/IONOS_API_KEY
-        timeout: 8.0
-        # Optional — ohne Angabe gelten die Defaults aus moderation_core.py
-        # (sexual 0.5, violence_graphic 0.7, self_harm_instructions 0.5).
-        thresholds:
-          sexual: 0.5
-          violence_graphic: 0.7
-          self_harm_instructions: 0.5
+# ⚠️ Der Klassifikator läuft bei `default_on: true` bei JEDER Antwort. Sein Spend läuft NICHT
+# über den Virtual Key der Nutzer:innen, taucht also nicht im Nutzerbudget auf.
+#
+# ⚠️ Dieser Block gehört auf die OBERSTE Ebene, nicht unter `litellm_settings`. Dort erwartet
+# LiteLLM das alte Guardrail-Format und quittiert diese Schreibweise beim Start mit
+# „GuardrailItem() argument after ** must be a mapping, not str" — der Proxy startet dann gar
+# nicht erst.
+guardrails:
+  - guardrail_name: "jugendschutz"
+    litellm_params:
+      guardrail: guardrails.llm_moderation.LlmModerationGuardrail
+      mode: post_call
+      default_on: true
+      # Vollqualifiziert (Provider + api_base), NICHT der `model_name` aus der model_list:
+      # Der Guardrail ruft litellm direkt auf, nicht den Proxy.
+      classifier_model: openai/mistralai/Mistral-Small-24B-Instruct
+      classifier_api_base: os.environ/IONOS_API_BASE
+      classifier_api_key: os.environ/IONOS_API_KEY
+      timeout: 8.0
+      # Optional — ohne Angabe gelten die Defaults aus moderation_core.py
+      # (sexual 0.5, violence_graphic 0.7, self_harm_instructions 0.5).
+      thresholds:
+        sexual: 0.5
+        violence_graphic: 0.7
+        self_harm_instructions: 0.5
 
-    # Anbieterunabhängig, unverändert aus der bisherigen Konfiguration übernommen:
-    - guardrail_name: "illegal_drugs_how_to"
-      litellm_params:
-        guardrail: regex
-        mode: post_call
-        action: block
-        pattern_set: "./guardrails/drugs_how_to.txt"
+  # ⚠️ OFFEN — Regex-Guardrail muss umgeschrieben werden, bevor er wieder greift.
+  #
+  # Der Typ `regex` existiert in LiteLLM 1.83.7 NICHT mehr (40 Initializer, `regex` nicht
+  # darunter) — der Proxy startet mit ihm gar nicht erst: „ValueError: Unsupported
+  # guardrail: regex". Das gilt genauso für `infra/litellm_config.example.yaml`, wo dieser
+  # Eintrag bis heute steht.
+  #
+  # Nachfolger ist `litellm_content_filter`. Er nimmt statt `pattern_set` entweder
+  # `patterns` (Liste) oder `blocked_words_file` (Datei) — die kuratierten Muster aus
+  # guardrails/drugs_how_to.txt müssen also in eines dieser Formate überführt und gegen
+  # echte Unterrichtstexte gegengeprüft werden (Chemie, Suchtprävention).
+  #
+  # Bis dahin bleibt der Jugendschutz-Klassifikator oben die einzige Ausgabeprüfung. Er
+  # deckt Drogen-Anleitungen NICHT ab — seine Kategorien sind sexual, violence_graphic
+  # und self_harm_instructions.
+  #
+  # - guardrail_name: "illegal_drugs_how_to"
+  #   litellm_params:
+  #     guardrail: litellm_content_filter
+  #     mode: post_call
+  #     blocked_words_file: "./guardrails/drugs_how_to.txt"   # Format prüfen!
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

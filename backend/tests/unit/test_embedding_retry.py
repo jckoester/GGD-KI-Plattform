@@ -13,7 +13,11 @@ import pytest
 from app.config import settings
 from app.context.embedding import generate_embedding
 
-VEKTOR = [0.1] * 1536
+# Breite aus der Konfiguration, nicht fest verdrahtet: `generate_embedding` prüft die
+# gelieferte Dimension gegen EMBEDDING_DIMENSIONS. Eine feste 1536 hier ließe jeden dieser
+# Tests scheitern, sobald ein anderes Modell konfiguriert ist (BGE-M3: 1024) — und zwar mit
+# einem EmbeddingDimensionError, der nichts mit der geprüften Wiederholungslogik zu tun hat.
+VEKTOR = [0.1] * settings.embedding_dimensions
 
 
 def _antwort(status: int, *, retry_after: str | None = None):

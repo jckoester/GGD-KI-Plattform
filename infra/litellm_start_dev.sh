@@ -37,12 +37,20 @@ if [[ ! -f "$CONFIG" ]]; then
 fi
 
 # --- Pflicht-Variablen prüfen -------------------------------------------------
+# Die Anbieter-Schlüssel NICHT fest verdrahten: Welche gebraucht werden, steht in der
+# gewählten Config (`os.environ/NAME`). Ein fest geprüftes OPENAI_API_KEY würde den reinen
+# IONOS-Betrieb blockieren — und ein fehlendes IONOS_API_KEY unbemerkt durchlassen.
 missing=()
 [[ -z "${LITELLM_MASTER_KEY:-}"   ]] && missing+=("LITELLM_MASTER_KEY")
 [[ -z "${LITELLM_DATABASE_URL:-}" ]] && missing+=("LITELLM_DATABASE_URL")
-[[ -z "${OPENAI_API_KEY:-}"       ]] && missing+=("OPENAI_API_KEY")
+
+while read -r var; do
+  [[ -z "${!var:-}" ]] && missing+=("$var (von $CONFIG referenziert)")
+done < <(grep -oE 'os\.environ/[A-Z0-9_]+' "$CONFIG" | cut -d/ -f2 | sort -u)
+
 if (( ${#missing[@]} > 0 )); then
-  echo "FEHLER: Diese Variablen fehlen in $ENV_FILE: ${missing[*]}" >&2
+  echo "FEHLER: Diese Variablen fehlen in $ENV_FILE:" >&2
+  printf '  - %s\n' "${missing[@]}" >&2
   exit 1
 fi
 
@@ -77,5 +85,14 @@ if ! python -c "from prisma import Prisma" >/dev/null 2>&1; then
   prisma generate --schema="$SCHEMA"
 fi
 
+# --- aus infra/ starten -------------------------------------------------------
+# LiteLLM löst Guardrail-Module (`guardrails.llm_moderation.…`) und Pattern-Dateien als
+# Pfade relativ zum ARBEITSVERZEICHNIS auf. Von der Repo-Wurzel aus greifen beide ins
+# Leere; `infra/` entspricht zugleich dem Layout im Produktionscontainer.
+# PYTHONPATH zusätzlich, weil llm_moderation.py `from moderation_core import …` nutzt.
+CONFIG_ABS="$(cd "$(dirname "$CONFIG")" && pwd)/$(basename "$CONFIG")"
+export PYTHONPATH="$ROOT_DIR/infra/guardrails${PYTHONPATH:+:$PYTHONPATH}"
+cd "$ROOT_DIR/infra"
+
 echo "Starte LiteLLM-Proxy auf http://localhost:$PORT  (Config: $CONFIG)"
-exec litellm --config "$CONFIG" --port "$PORT"
+exec litellm --config "$CONFIG_ABS" --port "$PORT"
