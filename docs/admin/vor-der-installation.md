@@ -99,10 +99,13 @@ quadratisch — hoch- und Querformat entfallen. FLUX.2-klein beherrscht alle For
 liefert aber rund dreißigmal größere Dateien, was bei vielen Nutzer:innen auf den
 Speicherplatz durchschlägt.
 
-> ⚠️ **Bildkosten werden derzeit nicht erfasst.** LiteLLM 1.83.7 löst Bildpreise nur über
-> seine eingebaute Preistabelle auf und zieht die Preisangabe des eigenen Eintrags nicht
-> heran. Bildgenerierung läuft damit am EUR-Budget vorbei. Wer sie breit freigibt, sollte
-> das wissen und die Nutzung anderweitig begrenzen (Freigabematrix je Jahrgang).
+> ⚠️ **Bildpreise brauchen einen Extraschritt.** Für Chat und Embedding greift der Preis
+> aus der LiteLLM-Config; für **Bilder nicht** — LiteLLM 1.83.7 löst sie ausschließlich über
+> seine eingebaute Preistabelle auf. Ein selbst eingetragenes Bildmodell kostet dort 0,00 $
+> und läuft am EUR-Budget vorbei, ohne dass etwas fehlschlägt. Abhilfe: `IMAGE_PRICES` in
+> der `.env` setzen und den Callback `guardrails.bildpreise.registrierung` in der
+> LiteLLM-Config eintragen — beides in den mitgelieferten Vorlagen vorbereitet. Danach
+> rechnet LiteLLM wieder selbst, und Budget, 429-Sperre und Statistik stimmen zusammen.
 
 ### Andere Anbieter
 

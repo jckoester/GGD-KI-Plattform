@@ -75,6 +75,14 @@ model_list:
 #
 # Der Klassifikator bewertet stattdessen alle vier Kategorien in EINEM Aufruf, mit einem
 # beliebigen Chat-Modell des eigenen Anbieters. Seine Schwellen greifen tatsächlich.
+# ── Bildpreise ────────────────────────────────────────────────────────────────
+# Nur nötig, wenn Bildmodelle eingesetzt werden, die LiteLLM nicht aus seiner eingebauten
+# Preistabelle kennt (alles selbst Eingetragene). Für Bilder ignoriert LiteLLM den Preis
+# aus `model_info` — ohne diesen Callback kosten sie 0,00 $ und laufen am EUR-Budget
+# vorbei. Preise stehen in IMAGE_PRICES (siehe .env.example).
+litellm_settings:
+  callbacks: ["guardrails.bildpreise.registrierung"]
+
 guardrails:
   - guardrail_name: "jugendschutz"
     litellm_params:

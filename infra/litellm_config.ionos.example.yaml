@@ -242,7 +242,13 @@ model_list:
       # Bild-Freigabematrix und das Jugendschutz-Gate den Zugang ohnehin einschränken —
       # aber vor breiter Freigabe zu lösen (eigener Kosten-Callback oder Eintrag in die
       # Preistabelle).
-      input_cost_per_image: 0.032             # 0,032 $/Bild — vorgehalten, noch wirkungslos
+      # ⚠️ Dieser Wert allein bleibt WIRKUNGSLOS: LiteLLMs Bild-Kostenrechner liest nur
+      # seine eingebaute Preistabelle, nicht das `model_info` des Deployments (anders als
+      # bei Chat und Embedding, wo die Preise hier greifen). Er steht trotzdem hier, weil
+      # `check_litellm_config.py` ihn prüft und er dokumentiert, was gilt.
+      # WIRKSAM wird der Preis über `IMAGE_PRICES` + den Callback `bildpreise`
+      # (siehe litellm_settings unten). Beide Stellen gleich halten!
+      input_cost_per_image: 0.032             # 0,032 $/Bild
 
   # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md): greift bei erschöpftem Budget und
   # für sensible Fälle. Läuft lokal — keine Kosten, daher keine Preisangaben nötig.
@@ -333,6 +339,20 @@ model_list:
 # LiteLLM das alte Guardrail-Format und quittiert diese Schreibweise beim Start mit
 # „GuardrailItem() argument after ** must be a mapping, not str" — der Proxy startet dann gar
 # nicht erst.
+# ── Bildpreise: der Umweg, den LiteLLM erzwingt ───────────────────────────────────────
+# Für Bilder ignoriert LiteLLM den Preis aus `model_info` und rechnet nur über seine
+# eingebaute Tabelle — selbst eingetragene Bildmodelle kosten damit 0,00 $ und laufen am
+# EUR-Budget vorbei. Dieser Callback trägt die Preise beim Start in ebendiese Tabelle ein.
+# Danach rechnet LiteLLM wieder selbst: Header, SpendLog, Budget und Statistik stimmen
+# ohne Sonderweg im Backend.
+#
+# Preise stehen in der Umgebung, nicht hier — Modell-ID (ohne Provider-Präfix) → $/Bild:
+#     IMAGE_PRICES='{"black-forest-labs/FLUX.1-schnell":0.032}'
+# ⚠️ In einfachen Anführungszeichen! Das Startskript `source`t die .env, und die Shell
+# entfernt sonst die inneren Anführungszeichen — aus dem JSON würde Unsinn.
+litellm_settings:
+  callbacks: ["guardrails.bildpreise.registrierung"]
+
 guardrails:
   - guardrail_name: "jugendschutz"
     litellm_params:

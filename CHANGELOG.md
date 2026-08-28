@@ -44,6 +44,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Bildgenerierung lief am EUR-Budget vorbei.** LiteLLM löst Bildpreise ausschließlich über
+  seine eingebaute Preistabelle auf und ignoriert das `model_info` des Deployments — selbst
+  eingetragene Bildmodelle wurden mit 0,00 $ abgerechnet. Der neue Callback
+  `guardrails.bildpreise.registrierung` trägt die Preise aus `IMAGE_PRICES` beim Proxy-Start
+  in ebendiese Tabelle ein; danach rechnet LiteLLM selbst, und Kostenheader, SpendLog,
+  Budget-Durchsetzung und Statistik stimmen ohne Sonderweg im Backend zusammen.
 - **Jugendschutz: Drogen-Anleitungen wurden von nichts geprüft.** Der zuständige Guardrail
   nutzte den Typ `regex`, den es seit LiteLLM 1.83.7 nicht mehr gibt — der Proxy startete
   damit nicht einmal. Ersetzt durch die Kategorie `drug_instructions` im LLM-Klassifikator;
