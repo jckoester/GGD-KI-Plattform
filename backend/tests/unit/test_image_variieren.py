@@ -28,6 +28,7 @@ from app.chat import image_models, router as router_modul
 from app.config import settings
 from app.db.session import get_db
 from app.litellm.client import ImageGenerationError, ImageGenerationResult
+from app.ratelimit import store as ratelimit_store
 
 BILDARTEN = """\
 bildarten:
@@ -58,6 +59,14 @@ def _record(**over):
     )
     basis.update(over)
     return SimpleNamespace(**basis)
+
+
+@pytest.fixture(autouse=True)
+def _frischer_ratelimit():
+    """Der Zähler ist prozesslokal und überlebt sonst zwischen den Tests."""
+    ratelimit_store.reset()
+    yield
+    ratelimit_store.reset()
 
 
 @pytest.fixture
@@ -271,3 +280,45 @@ def test_fehlendes_bild_ist_404(umgebung):
     st.record = None
 
     assert _post(client).status_code == 404
+
+
+# ── Drosselung ──────────────────────────────────────────────────────────────────────
+
+
+def test_variieren_ist_gedrosselt_wie_der_chat(umgebung, monkeypatch):
+    """Sonst wäre der Knopf ein Schlupfloch.
+
+    Ein Bild im Chat anzufordern kostet einen gedrosselten Request; dasselbe Bild per Klick
+    zu wiederholen dürfte nicht billiger zu haben sein — die einzige verbleibende Bremse
+    wäre das EUR-Budget, und das merkt man erst, wenn es leer ist.
+    """
+    from app.ratelimit import config
+
+    client, st = umgebung
+    monkeypatch.setattr(config, "resolve", lambda bucket, roles: (2, 60.0))
+
+    assert _post(client).status_code == 200
+    assert _post(client).status_code == 200
+    dritter = _post(client)
+
+    assert dritter.status_code == 429
+    assert dritter.headers.get("Retry-After")
+    # Der abgewiesene Versuch hat kein Bild erzeugt.
+    assert st.client.generate_image.await_count == 2
+
+
+def test_drosselung_nutzt_den_chat_bucket(umgebung, monkeypatch):
+    """Damit Rollen-Overrides aus rate_limits.yaml greifen (Lehrkräfte großzügiger)."""
+    from app.ratelimit import config
+
+    client, _ = umgebung
+    gesehen = []
+    original = config.resolve
+    monkeypatch.setattr(
+        config, "resolve",
+        lambda bucket, roles: (gesehen.append(bucket), original(bucket, roles))[1],
+    )
+
+    _post(client)
+
+    assert gesehen == ["chat"]

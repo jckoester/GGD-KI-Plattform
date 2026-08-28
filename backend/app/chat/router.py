@@ -1844,7 +1844,11 @@ class ImageVariationResponse(BaseModel):
 @router.post("/images/{image_id}/variieren", response_model=ImageVariationResponse)
 async def variiere_generiertes_bild(
     image_id: UUID,
-    current_user: JwtPayload = Depends(get_current_user),
+    # Dieselbe Drosselung wie der Chat — sonst wäre der Knopf ein Schlupfloch: Ein Bild im
+    # Chat anzufordern kostet einen gedrosselten Request, dasselbe Bild per Klick zu
+    # wiederholen sonst keinen. Die einzige verbleibende Bremse wäre das EUR-Budget, und
+    # das merkt man erst, wenn es leer ist.
+    current_user: JwtPayload = Depends(rate_limit("chat")),
     db: AsyncSession = Depends(get_db),
 ) -> ImageVariationResponse:
     """Erzeugt ein zweites Bild aus demselben Prompt und derselben Bildart.

@@ -86,6 +86,14 @@ Blockliste kann sich seit dem ersten Bild geändert haben, die Freigabe auch.
   Standardformat. Nie eine unkonfigurierte (und damit unbepreiste) Größe.
 - Das neue Bild erbt `conversation_id` **und** `message_id`, steht beim erneuten Laden also
   bei seinem Original.
+- Der Endpunkt hängt am **selben Ratelimit-Bucket wie der Chat** (`rate_limit("chat")`),
+  damit Rollen-Overrides aus `rate_limits.yaml` greifen. Ohne das wäre der Knopf ein
+  Schlupfloch: Ein Bild im Chat anzufordern kostet einen gedrosselten Request, dasselbe
+  Bild per Klick zu wiederholen sonst keinen — die einzige Bremse wäre das EUR-Budget, und
+  das merkt man erst, wenn es leer ist.
+- **Keine Rollenbeschränkung.** Variieren ist dasselbe wie „mach nochmal eins" im Chat, nur
+  ohne LLM-Aufruf; Budget und Drosselung begrenzen es genauso. Nur die *Anzeige* der
+  verwendeten Bildart ist Lehrkräften vorbehalten.
 - Die Kosten werden der Nachricht zugeschlagen (`messages.cost_usd`). Sonst zeigte der Chat
   weniger an, als tatsächlich ausgegeben wurde — das Budget am Virtual Key stimmt ohnehin,
   die Anzeige aber nicht.

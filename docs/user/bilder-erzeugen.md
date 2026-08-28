@@ -27,7 +27,8 @@ Gefällt dir ein Bild nicht ganz, brauchst du deine Beschreibung nicht zu wieder
 **Wiederholen-Symbol** am Bild erzeugt einen neuen Versuch mit derselben Beschreibung. Das alte
 Bild bleibt stehen, du kannst also vergleichen.
 
-> Jeder Versuch kostet wie ein neues Bild. Wer zehnmal wiederholt, zahlt zehnmal.
+> Jeder Versuch kostet wie ein neues Bild. Wer zehnmal wiederholt, zahlt zehnmal —
+> und es gilt dieselbe Begrenzung an Anfragen pro Minute wie im Chat.
 
 ## Hoch, quer oder quadratisch?
 
