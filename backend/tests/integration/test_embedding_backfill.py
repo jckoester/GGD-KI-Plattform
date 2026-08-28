@@ -223,6 +223,28 @@ class TestBackfillEmbeddings:
             assert "embedding_error" in (node.metadata_ or {})
 
     @pytest.mark.asyncio
+    async def test_alte_fehlermarke_verschwindet_bei_erfolg(self, session_factory, seed_nodes):
+        """Sonst zählt die Diagnoseabfrage aus dem Runbook längst behobene Fälle mit."""
+        async with session_factory() as db:
+            await db.execute(
+                sa.update(ContextNode)
+                .where(ContextNode.id == seed_nodes["ik_id"])
+                .values(metadata_={"embedding_error": "400 von vorletzter Woche", "x": 1})
+            )
+            await db.commit()
+
+        with patch(STAPEL, new=_liefert([0.5] * DIM)):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db)
+
+        assert stats.ok == 1
+        async with session_factory() as db:
+            node = await db.get(ContextNode, seed_nodes["ik_id"])
+            assert node.embedding is not None
+            assert "embedding_error" not in node.metadata_
+            assert node.metadata_["x"] == 1, "übrige Metadaten bleiben unangetastet"
+
+    @pytest.mark.asyncio
     async def test_already_embedded_nodes_skipped(self, session_factory, seed_nodes):
         # Embedding vorab setzen
         async with session_factory() as db:

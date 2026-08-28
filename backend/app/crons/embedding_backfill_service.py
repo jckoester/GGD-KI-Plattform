@@ -155,8 +155,17 @@ async def backfill_embeddings(
             return len(stapel), 0
 
         for (node, _), vektor in zip(stapel, ergebnis.vektoren):
+            werte: dict = {"embedding": vektor}
+            # Eine alte Fehlermarke muss weg, sobald der Knoten eingebettet ist. Sonst
+            # bleibt sie ewig stehen und die Diagnoseabfrage aus dem Runbook
+            # ("wie viele Knoten tragen embedding_error?") zaehlt laengst behobene Faelle
+            # mit. Nur anfassen, wo tatsaechlich eine Marke liegt.
+            if (node.metadata_ or {}).get("embedding_error") is not None:
+                meta = dict(node.metadata_)
+                meta.pop("embedding_error", None)
+                werte["metadata_"] = meta
             await db.execute(
-                update(ContextNode).where(ContextNode.id == node.id).values(embedding=vektor)
+                update(ContextNode).where(ContextNode.id == node.id).values(**werte)
             )
             stats.ok += 1
         return 0, ergebnis.tokens
