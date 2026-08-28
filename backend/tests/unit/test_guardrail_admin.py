@@ -191,3 +191,156 @@ def test_get_litellm_guardrails_requires_admin():
     app = _make_app(_teacher(), AsyncMock())
     response = TestClient(app).get("/guardrail/litellm")
     assert response.status_code == 403
+
+
+# ── /guardrail/health ────────────────────────────────────────────────────────
+#
+# Der Guardrail läuft im LiteLLM-Proxy, nicht im Backend. Er legt seinen Zählerstand als
+# JSON ab; dieser Endpunkt reicht ihn durch. Der wichtigste Fall ist die FEHLENDE Datei:
+# Sie darf nicht als „alles in Ordnung" durchgehen — sonst meldet ein Monitoring grün,
+# obwohl der Guardrail womöglich gar nicht läuft.
+
+def _health_app(tmp_path, inhalt: str | None):
+    from app.config import settings
+    pfad = tmp_path / "guardrail_health.json"
+    if inhalt is not None:
+        pfad.write_text(inhalt, encoding="utf-8")
+    alt = settings.guardrail_health_file
+    settings.guardrail_health_file = str(pfad)
+    return _make_app(_admin(), MagicMock()), alt
+
+
+def test_health_missing_file_is_not_healthy(tmp_path):
+    from app.config import settings
+    app, alt = _health_app(tmp_path, None)
+    try:
+        r = TestClient(app).get("/guardrail/health")
+    finally:
+        settings.guardrail_health_file = alt
+
+    assert r.status_code == 200
+    d = r.json()
+    assert d["available"] is False
+    assert d["healthy"] is None, "kein Bericht heißt NICHT gesund"
+    assert "health_file" in d["hinweis"]
+
+
+def test_health_unreadable_file_is_not_healthy(tmp_path):
+    from app.config import settings
+    app, alt = _health_app(tmp_path, "{kaputt")
+    try:
+        r = TestClient(app).get("/guardrail/health")
+    finally:
+        settings.guardrail_health_file = alt
+
+    assert r.json()["available"] is False
+    assert r.json()["healthy"] is None
+
+
+def test_health_reports_the_counters(tmp_path):
+    from app.config import settings
+    bericht = (
+        '{"classifier_model": "openai/gpt-4o-mini", "fallback_model": null,'
+        ' "checked_at": "2026-08-28T10:00:00+00:00", "total": 100,'
+        ' "counters": {"primary_ok": 90, "retry_ok": 5, "fallback_ok": 0,'
+        ' "failed_open": 3, "failed_closed": 2, "blocked": 7},'
+        ' "failure_rate": 0.05, "healthy": false}'
+    )
+    app, alt = _health_app(tmp_path, bericht)
+    try:
+        r = TestClient(app).get("/guardrail/health")
+    finally:
+        settings.guardrail_health_file = alt
+
+    d = r.json()
+    assert d["available"] is True and d["healthy"] is False
+    assert d["failure_rate"] == 0.05
+    assert d["counters"]["retry_ok"] == 5
+    assert d["classifier_model"] == "openai/gpt-4o-mini"
+
+
+def test_health_requires_admin(tmp_path):
+    app = _make_app(_teacher(), MagicMock())
+
+    assert TestClient(app).get("/guardrail/health").status_code == 403
+
+
+def test_health_path_is_anchored_at_the_repo_root(tmp_path):
+    """Backend läuft aus `backend/`, der Proxy aus `infra/` — ein cwd-relativer Pfad
+    meinte damit zwei verschiedene Dateien, und der Endpunkt meldete „kein Bericht",
+    obwohl der Proxy einen schrieb."""
+    from app.api.admin.guardrail import _REPO_ROOT, _resolve
+
+    assert _resolve("data/x.json") == _REPO_ROOT / "data" / "x.json"
+    assert _resolve("/abs/x.json").as_posix() == "/abs/x.json"
+    assert (_REPO_ROOT / "backend").is_dir(), "Repo-Root falsch bestimmt"
+
+
+# ── Veralteter Bericht ───────────────────────────────────────────────────────
+#
+# Der gefährlichste Zustand überhaupt: Stoppt der Proxy — oder bricht die gemeinsam
+# gemountete Ablage weg, was bei getrennten Compose-Stacks realistisch ist —, bleibt die
+# Datei mit `healthy: true` liegen. Ohne Altersprüfung meldete ein Monitoring unbegrenzt
+# Entwarnung, obwohl seit Tagen nichts geprüft wird.
+
+def _bericht(checked_at: str | None, healthy: bool = True) -> str:
+    import json as _json
+    return _json.dumps({
+        "classifier_model": "m", "fallback_model": None, "checked_at": checked_at,
+        "total": 10, "counters": {"primary_ok": 10}, "failure_rate": 0.0,
+        "healthy": healthy,
+    })
+
+
+def _hole(tmp_path, inhalt):
+    from app.config import settings
+    app, alt = _health_app(tmp_path, inhalt)
+    try:
+        return TestClient(app).get("/guardrail/health").json()
+    finally:
+        settings.guardrail_health_file = alt
+
+
+def test_fresh_report_is_healthy(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    jetzt = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+
+    d = _hole(tmp_path, _bericht(jetzt))
+
+    assert d["available"] is True and d["healthy"] is True and d["stale"] is False
+
+
+def test_stale_report_is_not_healthy(tmp_path):
+    """Ein gestoppter Proxy darf nicht als gesund durchgehen."""
+    from datetime import datetime, timedelta, timezone
+    alt = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+
+    d = _hole(tmp_path, _bericht(alt))
+
+    assert d["available"] is True, "die Datei ist ja da"
+    assert d["stale"] is True
+    assert d["healthy"] is False, "trotz healthy:true im Bericht"
+    assert "Proxy" in d["hinweis"]
+
+
+def test_report_without_timestamp_is_not_healthy(tmp_path):
+    d = _hole(tmp_path, _bericht(None))
+
+    assert d["stale"] is True and d["healthy"] is False
+
+
+def test_report_with_unparsable_timestamp_is_not_healthy(tmp_path):
+    d = _hole(tmp_path, _bericht("neulich mal"))
+
+    assert d["stale"] is True and d["healthy"] is False
+
+
+def test_stale_beats_a_naive_timezone(tmp_path):
+    """Zeitstempel ohne Zonenangabe als UTC lesen — sonst wäre ein frischer Bericht
+    je nach Serverzone scheinbar Stunden alt und löste Fehlalarm aus."""
+    from datetime import datetime, timezone
+    ohne_zone = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+
+    d = _hole(tmp_path, _bericht(ohne_zone))
+
+    assert d["stale"] is False and d["healthy"] is True

@@ -22,6 +22,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Scheitert ein Stapel mit `400`, fasst der Backfill die Texte einzeln nach — ein
   unbrauchbarer Text reißt die übrigen nicht mehr mit.
 
+### Neu
+
+- **Der Jugendschutz-Guardrail fällt nicht mehr blind offen aus.** Bei Störung des
+  Klassifikators greift eine Staffel: Wiederholung (`CLASSIFIER_RETRIES`), optionaler
+  zweiter Klassifikator (`fallback_classifier_model`), und wenn beides nichts liefert,
+  entscheidet das Team — Lehrkräfte arbeiten weiter, Schüler:innen bekommen die Antwort
+  zurückgehalten (`fail_open_teams`). Ein unbekanntes Team gilt als schutzbedürftig.
+- **Betriebszustand des Klassifikators sichtbar.** Der Guardrail schreibt einen
+  Zählerstand (`health_file`), das Backend liefert ihn unter `/api/admin/guardrail/health`,
+  die Seite *Einstellungen → Guardrail* zeigt ihn an. Erfolgreiche Wiederholungen werden
+  getrennt gezählt und geloggt — sie deuten auf Latenz hin, nicht auf einen Ausfall.
+  Ein liegengebliebener Bericht (Proxy gestoppt, gemeinsame Ablage weg) gilt nach
+  `GUARDRAIL_HEALTH_MAX_AGE_H` als veraltet und **nicht** mehr als gesund.
+  **Benachrichtigungen verschickt die Plattform nicht**; der Endpunkt gehört in die
+  Server-Überwachung — auf `available: false`, `stale: true` und steigende Ausfallzahlen.
+
+  > Der Proxy läuft in einem eigenen Compose-Stack: Beide Seiten müssen dasselbe
+  > **Host**-Verzeichnis einbinden. Auf getrennten Hosts entfällt die Datei; dann über das
+  > Proxy-Log überwachen (siehe `docs/admin/content-moderation.md`).
+
 ### Behoben
 
 - **Jugendschutz: Drogen-Anleitungen wurden von nichts geprüft.** Der zuständige Guardrail

@@ -217,3 +217,71 @@ def test_drug_hit_blocks(core):
 def test_chemistry_lesson_score_passes(core):
     """Ein niedriger Wert muss folgenlos bleiben — auch wenn Drogen im Text vorkommen."""
     assert core.violated_categories(_alle(core, drug_instructions=0.2)) == []
+
+
+# ── Verhalten bei Ausfall des Klassifikators ─────────────────────────────────
+
+def test_teachers_keep_working_when_the_classifier_is_down(core):
+    """Sonst legte eine Anbieterstörung den Unterricht der ganzen Schule lahm."""
+    assert core.fail_closed("lehrkraefte") is False
+
+
+def test_students_are_blocked_when_the_classifier_is_down(core):
+    """Der eigentliche Zweck: Eine abgewiesene Antwort ist ärgerlich, eine ungefilterte
+    ist genau das, was der Guardrail verhindern soll."""
+    for team in ("jahrgang-5", "jahrgang-9", "jahrgang-12"):
+        assert core.fail_closed(team) is True, team
+
+
+def test_unknown_team_is_treated_as_protected(core):
+    """Ein kaputter Team-Bezug darf nicht dazu führen, dass alle als Lehrkraft gelten."""
+    assert core.fail_closed(None) is True
+    assert core.fail_closed("") is True
+
+
+def test_fail_open_teams_are_configurable(core):
+    """Die Schule soll den Kreis erweitern können, ohne den Code anzufassen."""
+    assert core.fail_closed("referendare", {"lehrkraefte", "referendare"}) is False
+    assert core.fail_closed("lehrkraefte", set()) is True, "leere Menge = niemand ausgenommen"
+
+
+# ── Zustandsbericht ──────────────────────────────────────────────────────────
+
+def _snapshot(core, **counters):
+    return core.build_health_snapshot(
+        counters, classifier="m", fallback=None, zeitstempel="2026-08-28T10:00:00+00:00"
+    )
+
+
+def test_snapshot_counts_every_outcome(core):
+    s = _snapshot(core, primary_ok=90, retry_ok=5, failed_open=3, failed_closed=2, blocked=7)
+
+    assert s["total"] == 100, "blocked zählt nicht mit — es ist ein Urteil, kein Ausfall"
+    assert s["failure_rate"] == 0.05
+    assert s["healthy"] is False
+
+
+def test_snapshot_separates_retries_from_first_attempts(core):
+    """Häufige, aber gelungene Wiederholungen deuten auf Latenz oder Überlast hin —
+    in einer gemeinsamen Erfolgsquote gingen sie unter."""
+    s = _snapshot(core, primary_ok=10, retry_ok=40)
+
+    assert s["counters"]["retry_ok"] == 40
+    assert s["healthy"] is True, "Wiederholungen sind kein Ausfall"
+    assert s["failure_rate"] == 0.0
+
+
+def test_snapshot_without_traffic_does_not_divide_by_zero(core):
+    s = _snapshot(core)
+
+    assert s["total"] == 0 and s["failure_rate"] == 0.0 and s["healthy"] is True
+
+
+def test_snapshot_reports_the_configured_models(core):
+    s = core.build_health_snapshot(
+        {}, classifier="openai/gpt-4o-mini", fallback="ollama/llama3",
+        zeitstempel="2026-08-28T10:00:00+00:00",
+    )
+
+    assert s["classifier_model"] == "openai/gpt-4o-mini"
+    assert s["fallback_model"] == "ollama/llama3"

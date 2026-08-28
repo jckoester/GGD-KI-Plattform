@@ -89,6 +89,23 @@ guardrails:
       # classifier_api_base: os.environ/IONOS_API_BASE
       classifier_api_key: os.environ/OPENAI_API_KEY
       timeout: 8.0
+      # Ein zweiter Anlauf deckt die häufigste Störung ab — die kurze.
+      classifier_retries: 1
+      # Optionaler zweiter Klassifikator (Entscheidung der Schule): dasselbe Modell bei
+      # einem anderen Anbieter gibt Ausfallsicherheit ohne erneute Prüfung der
+      # Abgrenzung; ein anderes Modell braucht sie.
+      # fallback_classifier_model: openai/mistralai/Mistral-Small-24B-Instruct
+      # fallback_classifier_api_base: os.environ/IONOS_API_BASE
+      # fallback_classifier_api_key: os.environ/IONOS_API_KEY
+      # Liefert auch der Rückfall nichts: Diese Teams arbeiten weiter, alle anderen
+      # bekommen die Antwort zurückgehalten (Jugendschutz vor Verfügbarkeit).
+      fail_open_teams: ["lehrkraefte"]
+      # Zählerstand für /admin/guardrail/health.
+      # ⚠️ Der Proxy läuft in einem EIGENEN Compose-Stack — `./data` des Anwendungs-Stacks
+      # ist für ihn nicht sichtbar. Beide müssen dasselbe HOST-Verzeichnis einbinden
+      # (Beispiel in infra/litellm_config.ionos.example.yaml). Auf getrennten Hosts ist
+      # eine gemeinsame Datei unmöglich: dann weglassen und über das Proxy-Log überwachen.
+      health_file: "/app/data/guardrail_health.json"   # lokal: ../data/guardrail_health.json
       # Optional — ohne Angabe gelten die Defaults aus moderation_core.py.
       # violence_graphic liegt höher: Historische und literarische Gewaltdarstellung
       # gehört zum Unterricht.
@@ -120,13 +137,15 @@ guardrails:
 # Arbeitsverzeichnis aufgelöst — läuft der Proxy in `infra/`, heißt er
 # `guardrails.llm_moderation.…`.
 #
-# Verhalten bei Störungen: **fail-open**. Timeout, Netzfehler oder eine unlesbare Antwort
-# lassen den Text durch und schreiben eine Warnung. Ein fail-closed Guardrail würde bei
-# einer Anbieterstörung die ganze Schule blockieren — unverhältnismäßig, und konsistent mit
-# dem PII-Gate (Phase 14) und ADR-008 Teil 3.
+# Verhalten bei Störungen: gestaffelt (siehe docs/admin/content-moderation.md).
+# Wiederholung → optionaler Rückfall-Klassifikator → publikumsabhängige Entscheidung:
+# Teams aus `fail_open_teams` arbeiten weiter, alle anderen bekommen die Antwort
+# zurückgehalten. Reines fail-open wäre zu riskant (dieser Guardrail ist die einzige
+# Ausgabeprüfung), reines fail-closed legte bei einer Anbieterstörung die ganze Schule
+# lahm — konsistent mit dem PII-Gate (Phase 14) und ADR-008 Teil 3.
 #
 # Die Regex-Musterdateien unter guardrails/ bleiben als Ausgangspunkt liegen, falls später
-# eine deterministische zweite Schicht gewünscht ist (der Klassifikator ist fail-open).
+# eine deterministische zweite Schicht gewünscht ist (der Klassifikator kann ausfallen).
 # Sie brauchen dafür das Format von `litellm_content_filter` und — wichtiger — Kuratierung:
 # Ein Muster wie `(anleitung|rezept).{0,40}synthese` trifft den Chemieunterricht mit.
 

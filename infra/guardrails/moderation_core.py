@@ -131,3 +131,60 @@ def violated_categories(
         if scores.get(name, 0.0) >= threshold:
             hits.append(name)
     return hits
+
+
+# ── Verhalten bei Ausfall des Klassifikators ─────────────────────────────────
+
+# Teams, die bei einem Ausfall weiterarbeiten dürfen. Alles andere wird blockiert.
+DEFAULT_FAIL_OPEN_TEAMS: frozenset[str] = frozenset({"lehrkraefte"})
+
+
+def fail_closed(team_id: str | None, fail_open_teams: set[str] | None = None) -> bool:
+    """Soll bei ausgefallenem Klassifikator blockiert werden?
+
+    Fail-open war die Reaktion auf eine berechtigte Sorge: Ein Guardrail, der bei
+    Anbieterstoerung alles blockiert, legt den Unterricht der ganzen Schule lahm. Aber das
+    Risiko ist nicht gleich verteilt — es geht um Jugendschutz. Deshalb faellt die
+    Entscheidung nach Publikum:
+
+    * **Lehrkraefte** arbeiten weiter. Eine ungeprueft durchgelassene Antwort ist hier
+      vertretbar; der Ausfall der Plattform waere es nicht.
+    * **Schueler:innen** werden blockiert. Eine abgewiesene Antwort ist aergerlich, eine
+      ungefilterte ist genau das, was der Guardrail verhindern soll.
+
+    Unbekanntes Team → blockieren. Wer nicht nachweislich zum ausgenommenen Kreis gehoert,
+    faellt in die schuetzende Variante; ein kaputter Team-Bezug darf nicht dazu fuehren,
+    dass alle als Lehrkraft behandelt werden.
+    """
+    erlaubt = DEFAULT_FAIL_OPEN_TEAMS if fail_open_teams is None else fail_open_teams
+    return (team_id or "") not in erlaubt
+
+
+# ── Betriebszustand (fuer Health-Endpunkt und Admin-Ansicht) ─────────────────
+
+def build_health_snapshot(counters: dict[str, int], *, classifier: str | None,
+                          fallback: str | None, zeitstempel: str) -> dict:
+    """Baut den Zustandsbericht, den der Proxy als JSON ablegt.
+
+    Warum ueberhaupt Zaehler: Fail-open ist nur zu verantworten, wenn man **weiss**, wie
+    oft es eintritt. Eine Warnung im Proxy-Log liest niemand. Die Zahlen hier sind das,
+    was ein Monitoring abfragen und woran es eine Benachrichtigung haengen kann.
+
+    `retry_ok` ist bewusst getrennt von `primary_ok`: Haeufige, aber erfolgreiche
+    Wiederholungen deuten auf etwas anderes hin (Latenz, Ueberlast, zu knappes Timeout) als
+    vollstaendige Ausfaelle — und wuerden in einer gemeinsamen Erfolgsquote untergehen.
+    """
+    gesamt = sum(counters.get(k, 0) for k in
+                 ("primary_ok", "retry_ok", "fallback_ok", "failed_open", "failed_closed"))
+    fehlgeschlagen = counters.get("failed_open", 0) + counters.get("failed_closed", 0)
+    return {
+        "classifier_model": classifier,
+        "fallback_model": fallback,
+        "checked_at": zeitstempel,
+        "total": gesamt,
+        "counters": {k: counters.get(k, 0) for k in (
+            "primary_ok", "retry_ok", "fallback_ok",
+            "failed_open", "failed_closed", "blocked")},
+        "failure_rate": round(fehlgeschlagen / gesamt, 4) if gesamt else 0.0,
+        "healthy": fehlgeschlagen == 0,
+    }

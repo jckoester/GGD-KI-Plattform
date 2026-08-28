@@ -671,6 +671,19 @@ export async function getLiteLLMGuardrails() {
   return res.json(); // { guardrails: [{ name, mode }], available: bool }
 }
 
+// Betriebszustand des Jugendschutz-Klassifikators. Die Zähler stammen aus dem
+// LiteLLM-Proxy; `available: false` heißt „kein Bericht vorhanden", NICHT „alles gut".
+export async function getGuardrailHealth() {
+  const res = await fetch(`${BASE}/admin/guardrail/health`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
 // Admin: Krisen-/Moderations-Flags (pseudonymisiert, ohne Chat-Inhalte)
 export async function getFlags({ status = null, severity = null, limit = 25, offset = 0 } = {}) {
   const params = new URLSearchParams({ limit, offset });

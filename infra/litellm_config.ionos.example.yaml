@@ -345,6 +345,46 @@ guardrails:
       classifier_api_base: os.environ/IONOS_API_BASE
       classifier_api_key: os.environ/IONOS_API_KEY
       timeout: 8.0
+      # Ein zweiter Anlauf deckt die häufigste Störung ab — die kurze. Gelingt er, steht
+      # das als WARNING im Log: Häufige Wiederholungen haben andere Ursachen (Latenz,
+      # Überlast, zu knappes Timeout) als vollständige Ausfälle.
+      classifier_retries: 1
+
+      # Optionaler zweiter Klassifikator — Entscheidung der Schule.
+      #   · GLEICHES Modell bei einem ANDEREN Anbieter: echte Ausfallsicherheit, ohne dass
+      #     die Abgrenzung gegen Unterrichtstexte neu geprüft werden muss. Lohnt sich,
+      #     sobald ohnehin ein zweiter Anbieterzugang besteht.
+      #   · ANDERES Modell: braucht dieselbe Prüfung wie das primäre — sonst tauscht man
+      #     im Störfall eine bekannte Größe gegen eine unbekannte. Nur sinnvoll, wenn es
+      #     tatsächlich häufiger zu Störungen kommt (siehe Zähler unten).
+      # fallback_classifier_model: openai/gpt-4o-mini
+      # fallback_classifier_api_key: os.environ/OPENAI_API_KEY
+
+      # Verhalten, wenn auch der Rückfall nichts liefert. Diese Teams arbeiten weiter,
+      # alle anderen bekommen die Antwort zurückgehalten. Ein unbekanntes Team gilt als
+      # schutzbedürftig — ein kaputter Team-Bezug darf nicht alle zu Lehrkräften machen.
+      fail_open_teams: ["lehrkraefte"]
+
+      # Zählerstand für /admin/guardrail/health. Fail-open ist nur zu verantworten, wenn
+      # man weiß, wie oft es eintritt — eine Warnung im Log liest niemand.
+      #
+      # ⚠️ DIESE DATEI MUSS DER ANWENDUNGS-STACK LESEN KÖNNEN. Der Proxy läuft in einem
+      # EIGENEN Compose-Stack, oft in einem anderen Verzeichnis — `./data` des
+      # Anwendungs-Stacks ist für ihn nicht sichtbar. Beide Seiten müssen dasselbe
+      # HOST-Verzeichnis einbinden:
+      #
+      #   LiteLLM-Stack:      - /srv/ggd-ki/data:/app/data
+      #   Anwendungs-Stack:   - ./data:/app/data          (bereits vorhanden)
+      #   Backend-.env:       GUARDRAIL_HEALTH_FILE=data/guardrail_health.json
+      #
+      # Laufen Proxy und Anwendung auf VERSCHIEDENEN Hosts, ist eine gemeinsame Datei
+      # nicht möglich — dann `health_file` weglassen und die Überwachung über das
+      # Proxy-Log führen (siehe docs/admin/content-moderation.md). Der Endpunkt meldet
+      # dann `available: false`, also ausdrücklich NICHT „alles in Ordnung".
+      #
+      # Ein liegengebliebener Bericht (Proxy gestoppt) gilt nach
+      # GUARDRAIL_HEALTH_MAX_AGE_H als veraltet und nicht mehr als gesund.
+      health_file: "/app/data/guardrail_health.json"   # lokal: ../data/guardrail_health.json
       # Optional — ohne Angabe gelten die Defaults aus moderation_core.py
       # (sexual 0.5, violence_graphic 0.7, self_harm_instructions 0.5).
       thresholds:

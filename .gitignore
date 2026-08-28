@@ -60,6 +60,8 @@ data/generated_images/*
 config/pedagogy.yaml
 config/artifact_limits.yaml
 data/artifacts/*
+# Laufzeitstand des Jugendschutz-Guardrails (Zähler), vom LiteLLM-Proxy geschrieben
+data/guardrail_health.json
 infra/litellm_config.dev.yaml
 config/school_year.2026-27.yaml
 infra/litellm_config.dev.openai.yaml.bak

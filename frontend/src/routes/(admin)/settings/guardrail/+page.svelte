@@ -1,8 +1,16 @@
 <script>
   import { onMount } from "svelte";
   import { ShieldCheck } from "lucide-svelte";
-  import { getGuardrailPrompt, saveGuardrailPrompt, getLiteLLMGuardrails } from "$lib/api.js";
+  import {
+    getGuardrailPrompt,
+    saveGuardrailPrompt,
+    getLiteLLMGuardrails,
+    getGuardrailHealth,
+  } from "$lib/api.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+  import InfoBanner from "$lib/components/InfoBanner.svelte";
+  import WarningBanner from "$lib/components/WarningBanner.svelte";
+  import SuccessBanner from "$lib/components/SuccessBanner.svelte";
 
   let prompt = $state("");
   let edited = $state("");
@@ -16,15 +24,18 @@
   let litellmGuardrails = $state([]);
   let litellmAvailable = $state(true);
   let litellmLoading = $state(true);
+  let health = $state(null);
+  let healthLoading = $state(true);
 
   let isChanged = $derived(edited !== prompt);
   let isActive = $derived(prompt.length > 0);
 
   onMount(async () => {
     // Beide Requests parallel starten
-    const [promptResult, guardrailsResult] = await Promise.allSettled([
+    const [promptResult, guardrailsResult, healthResult] = await Promise.allSettled([
       getGuardrailPrompt(),
       getLiteLLMGuardrails(),
+      getGuardrailHealth(),
     ]);
 
     // Prompt
@@ -48,6 +59,10 @@
       litellmAvailable = false;
     }
     litellmLoading = false;
+
+    // Betriebszustand des Klassifikators — Soft-Fail wie oben.
+    health = healthResult.status === "fulfilled" ? healthResult.value : null;
+    healthLoading = false;
   });
 
   async function handleSave() {
@@ -221,6 +236,83 @@
       {#if saveError}
         <span class="text-sm text-light-re dark:text-dark-re">{saveError}</span>
       {/if}
+    </div>
+
+    <!-- Betriebszustand des Jugendschutz-Klassifikators -->
+    <div class="mt-10 pt-8 border-t border-light-ui-3 dark:border-dark-ui-3">
+      <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx mb-1">
+        Jugendschutz-Klassifikator
+      </h2>
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
+        Prüft jede Antwort auf sexuelle Inhalte, Gewaltdarstellung, Anleitungen zu
+        Selbstverletzung und zur Drogenherstellung. Fällt er aus, arbeiten Lehrkräfte
+        weiter — für Schüler:innen wird die Antwort zurückgehalten.
+      </p>
+
+      {#if healthLoading}
+        <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">Laden…</p>
+      {:else if !health || !health.available}
+        <WarningBanner
+          message={health?.hinweis ??
+            "Kein Zustandsbericht verfügbar. Das heißt NICHT, dass alles in Ordnung ist — " +
+            "prüfen Sie, ob `health_file` in der LiteLLM-Konfiguration gesetzt ist."}
+        />
+      {:else}
+        {#if health.stale}
+          <WarningBanner
+            message={health.hinweis ??
+              "Der Zustandsbericht ist veraltet — der Proxy schreibt offenbar nicht mehr."}
+          />
+        {:else if health.healthy}
+          <SuccessBanner message="Keine Ausfälle seit dem Start des Proxys." />
+        {:else}
+          <WarningBanner
+            message={`Der Klassifikator war zeitweise ohne Urteil (${(health.failure_rate * 100).toFixed(1)} % der geprüften Antworten).`}
+          />
+        {/if}
+
+        <dl class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+          {#each [
+            ["Geprüfte Antworten", health.total],
+            ["Erster Versuch", health.counters.primary_ok ?? 0],
+            ["Erst nach Wiederholung", health.counters.retry_ok ?? 0],
+            ["Über Rückfall-Modell", health.counters.fallback_ok ?? 0],
+            ["Durchgelassen (Lehrkräfte)", health.counters.failed_open ?? 0],
+            ["Zurückgehalten (Ausfall)", health.counters.failed_closed ?? 0],
+            ["Blockiert (Verstoß)", health.counters.blocked ?? 0],
+          ] as [label, wert]}
+            <div>
+              <dt class="text-light-tx-2 dark:text-dark-tx-2">{label}</dt>
+              <dd class="font-mono text-light-tx dark:text-dark-tx">{wert}</dd>
+            </div>
+          {/each}
+        </dl>
+
+        <p class="mt-4 text-xs text-light-tx-2 dark:text-dark-tx-2">
+          Modell: <span class="font-mono">{health.classifier_model ?? "—"}</span>
+          {#if health.fallback_model}
+            · Rückfall: <span class="font-mono">{health.fallback_model}</span>
+          {/if}
+          {#if health.checked_at}
+            · Stand: {new Date(health.checked_at).toLocaleString("de-DE")}
+          {/if}
+        </p>
+
+        {#if (health.counters.retry_ok ?? 0) > (health.counters.primary_ok ?? 0) / 10}
+          <p class="mt-3 text-xs text-light-tx-2 dark:text-dark-tx-2">
+            Auffällig viele Wiederholungen. Das deutet eher auf Latenz oder Überlast hin
+            als auf einen Ausfall — ein höheres <span class="font-mono">timeout</span> in
+            der LiteLLM-Konfiguration kann helfen.
+          </p>
+        {/if}
+      {/if}
+
+      <InfoBanner
+        message="Diese Seite benachrichtigt nicht von sich aus. Empfehlung: den Endpunkt
+                 /api/admin/guardrail/health in die Server-Überwachung aufnehmen und dort
+                 eine Benachrichtigung hinterlegen — sowohl auf `available: false` als auch
+                 auf steigende Ausfallzahlen."
+      />
     </div>
 
     <!-- LiteLLM-Guardrail-Anzeige -->

@@ -233,10 +233,104 @@ wird als **Dateipfad relativ zum Arbeitsverzeichnis** aufgelöst. Läuft der Pro
 `litellm_settings`. Dort erwartet LiteLLM das alte Format und der Proxy startet gar nicht
 erst.
 
-**Verhalten bei Störungen: fail-open.** Timeout, Netzfehler oder eine unlesbare Antwort
-lassen den Text durch und schreiben eine Warnung ins Log. Ein fail-closed Guardrail würde bei
-einer Anbieterstörung die gesamte Plattform blockieren — für alle Fächer, den ganzen Tag. Das
-steht in keinem Verhältnis zum Risiko, das er abwehrt.
+### Verhalten bei Störungen
+
+Auf der Ausgabeseite ist dieser Guardrail die **einzige** automatische Prüfung: Die lokale
+Krisenerkennung im Backend scannt die *Eingabe* und blockiert nach ADR-008 Teil 3 bewusst
+nicht. Ein Ausfall ist also kein Randfall. Deshalb greift eine Staffel:
+
+1. **Wiederholung** (`classifier_retries`, Vorgabe 1). Deckt die häufigste Störung ab — die
+   kurze. Gelingt der zweite Versuch, steht das als Warnung im Log: Häufige, aber
+   erfolgreiche Wiederholungen deuten auf Latenz oder Überlast hin, nicht auf einen Ausfall,
+   und wären in einer reinen Erfolgsquote unsichtbar.
+2. **Rückfall-Klassifikator** (`fallback_classifier_model`, optional). Zwei sinnvolle
+   Spielarten: *dasselbe Modell bei einem anderen Anbieter* gibt echte Ausfallsicherheit,
+   ohne dass die Abgrenzung gegen Unterrichtstexte neu geprüft werden muss — lohnt sich,
+   sobald ohnehin ein zweiter Anbieterzugang besteht. *Ein anderes Modell* braucht dieselbe
+   Prüfung wie das primäre; sonst tauscht man im Störfall eine bekannte Größe gegen eine
+   unbekannte. Ob überhaupt, entscheidet die Schule.
+3. **Publikumsabhängige Entscheidung**, wenn beides nichts liefert. `fail_open_teams`
+   (Vorgabe `["lehrkraefte"]`) nennt die Teams, die weiterarbeiten; alle anderen bekommen
+   die Antwort zurückgehalten. Begründung: Reines fail-open wäre zu riskant, reines
+   fail-closed legte bei einer Anbieterstörung den Unterricht der ganzen Schule lahm. Das
+   Risiko ist aber nicht gleich verteilt — es geht um Jugendschutz. Eine abgewiesene Antwort
+   ist für Schüler:innen ärgerlich, eine ungefilterte ist das eigentliche Problem. Ein
+   **unbekanntes Team gilt als schutzbedürftig**: Ein kaputter Team-Bezug darf nicht dazu
+   führen, dass alle als Lehrkraft behandelt werden.
+
+### Überwachung
+
+Fail-open ist nur zu verantworten, wenn man weiß, wie oft es eintritt — eine Warnung im
+Proxy-Log liest niemand. Der Guardrail schreibt deshalb einen Zählerstand
+(`health_file` in der LiteLLM-Config), den das Backend unter
+**`/api/admin/guardrail/health`** ausliefert und die Seite **Einstellungen → Guardrail**
+anzeigt.
+
+#### Wo die Datei liegen muss
+
+Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack**, oft in einem anderen
+Verzeichnis, mitunter auf einem anderen Host. Das `./data`-Volume des Anwendungs-Stacks
+ist für ihn **nicht** sichtbar. Beide Seiten müssen dasselbe **Host**-Verzeichnis
+einbinden:
+
+```yaml
+# LiteLLM-Stack (docker-compose.yml im LiteLLM-Verzeichnis)
+services:
+  litellm:
+    volumes:
+      - /srv/ggd-ki/data:/app/data      # ← dasselbe Host-Verzeichnis
+```
+
+```yaml
+# Anwendungs-Stack — bereits vorhanden, nur der Host-Pfad muss übereinstimmen
+services:
+  backend:
+    volumes:
+      - ./data:/app/data
+```
+
+Dazu `health_file: "/app/data/guardrail_health.json"` in der LiteLLM-Config und
+`GUARDRAIL_HEALTH_FILE=data/guardrail_health.json` in der Backend-`.env`. Relative Pfade
+verankert das Backend am Repo-Root, nicht am Arbeitsverzeichnis.
+
+> **Proxy und Anwendung auf verschiedenen Hosts?** Dann ist eine gemeinsame Datei nicht
+> möglich. `health_file` weglassen und die Überwachung über das **Proxy-Log** führen:
+> Der Guardrail schreibt jeden Ausfall als `WARNING`/`ERROR` mit dem Logger
+> `litellm.guardrails.llm_moderation`. Der Endpunkt meldet dann dauerhaft
+> `available: false` — was korrekt ist und **nicht** mit „gesund" verwechselt werden darf.
+
+#### Ein liegengebliebener Bericht ist kein guter Bericht
+
+Stoppt der Proxy oder bricht die gemeinsame Ablage weg, bleibt die Datei mit ihrem letzten
+Stand liegen — im Zweifel mit `healthy: true`. Ohne Gegenmaßnahme meldete ein Monitoring
+unbegrenzt Entwarnung, obwohl seit Tagen nichts geprüft wird. Das Backend bewertet deshalb
+immer das **Alter** mit: Ist der Bericht älter als `GUARDRAIL_HEALTH_MAX_AGE_H` (Vorgabe
+24 h), gilt er als `stale: true` und **nicht** mehr als gesund.
+
+> ⚠️ **Die Plattform verschickt keine Benachrichtigungen.** Nehmen Sie den Endpunkt in Ihre
+> Server-Überwachung auf und hinterlegen Sie dort eine Benachrichtigung — auf zwei Zustände:
+>
+> * `available: false` — es liegt **kein** Bericht vor. Das ist ausdrücklich **nicht**
+>   „alles in Ordnung": Entweder ist `health_file` nicht gesetzt, die gemeinsame Ablage
+>   stimmt nicht, oder der Proxy prüft nichts. Alles drei sollte auffallen.
+> * `stale: true` — der Bericht ist zu alt. Der Proxy läuft vermutlich nicht mehr, oder
+>   die gemeinsame Ablage ist weggebrochen.
+> * steigende `failed_open`/`failed_closed` beziehungsweise `failure_rate` — der
+>   Klassifikator fällt aus.
+>
+> `health_file` (LiteLLM) und `GUARDRAIL_HEALTH_FILE` (Backend) müssen auf **dieselbe
+> Datei** zeigen; in Docker also auf ein gemeinsam gemountetes Verzeichnis.
+
+Die Zähler im Einzelnen:
+
+| Zähler | Bedeutung |
+|---|---|
+| `primary_ok` | Im ersten Versuch beurteilt — der Normalfall |
+| `retry_ok` | Erst die Wiederholung war erfolgreich → Latenz/Timeout prüfen |
+| `fallback_ok` | Über den zweiten Klassifikator beurteilt → der primäre ist gestört |
+| `failed_open` | Kein Urteil, Antwort durchgelassen (Lehrkräfte) |
+| `failed_closed` | Kein Urteil, Antwort zurückgehalten (Schüler:innen) |
+| `blocked` | Regulär blockiert — ein Urteil, **kein** Ausfall; zählt nicht in die Fehlerquote |
 
 > ⚠️ **Die fürsorgliche Krisenantwort darf nicht blockiert werden.** Sie *nennt*
 > Selbstverletzung, verweist aber auf Hilfe — genau die Antwort, die ADR-008 Teil 3 will. Die

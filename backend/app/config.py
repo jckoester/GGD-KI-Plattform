@@ -186,6 +186,17 @@ class Settings(BaseSettings):
     # Format, das gilt, wenn das Modell keines oder ein unbekanntes angibt.
     image_default_format: str = "quadratisch"
     image_blocklist_path: str = "config/image_blocklist.yaml"
+    # Zustandsbericht des Jugendschutz-Klassifikators. Geschrieben wird er vom Guardrail
+    # IM LITELLM-PROXY (`health_file` in dessen Config), gelesen von
+    # `/admin/guardrail/health`. Beide müssen auf dieselbe Datei zeigen — in Docker also
+    # auf einen gemeinsam gemounteten Pfad. Fehlt sie, meldet der Endpunkt „kein Bericht",
+    # nicht „alles in Ordnung".
+    guardrail_health_file: str = "data/guardrail_health.json"
+    # Ab diesem Alter gilt der Bericht als veraltet und NICHT mehr als gesund. Schützt
+    # gegen den gefährlichsten Zustand: Ein gestoppter Proxy (oder eine weggebrochene
+    # gemeinsame Ablage) hinterlässt eine Datei mit `healthy: true`, die sonst unbegrenzt
+    # Entwarnung gäbe. 24 h ist großzügig — der Proxy schreibt bei jeder geprüften Antwort.
+    guardrail_health_max_age_h: float = 24.0
     # Ablage generierter Bilder (repo-root-relativ, falls nicht absolut) + harte
     # Maximal-Aufbewahrung als Backstop. Normalerweise stirbt ein Bild mit seiner
     # Konversation (93-Tage-Lifecycle); der Max-Wert (>> 93+180) fängt Anomalien ab.
