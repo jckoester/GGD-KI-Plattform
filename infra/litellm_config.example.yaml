@@ -8,12 +8,75 @@
 # Hinweis zur Syntax: Die genaue Guardrail-Konfiguration hängt von der eingesetzten
 # LiteLLM-Version ab. Die hier gezeigte Form orientiert sich an ADR-008 Teil 1A;
 # beim Deployment gegen die LiteLLM-Doku der verwendeten Version abgleichen.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# MODELLNAMEN SIND AUFGABENNAMEN, KEINE PRODUKTNAMEN
+#
+# Die `model_name`-Werte unten (`chat-standard`, `system-titel`, `bild-standard` …) sind
+# die Namen, die die Anwendung kennt: Sie stehen in der `.env`, in Assistenten-Datensätzen
+# und in den Team-Allowlists. Welches Produkt dahinter liegt, sagt allein
+# `litellm_params.model` — ein Anbieterwechsel ist deshalb eine Zeile HIER und sonst
+# nirgends.
+#
+# ⚠️ Rohe Produktnamen als `model_name` (`gpt-4o-mini`, `gpt-image-1`) funktionieren zwar,
+# haben aber drei Folgen: Der Modellwähler-Filter `MODEL_PICKER_HIDDEN_PREFIXES` greift
+# nicht mehr (das Titelmodell steht dann sichtbar im Dropdown jeder Schüler:in), jeder
+# Anbieterwechsel fasst `.env` und Datenbank an, und im Gesprächsverlauf stehen dauerhaft
+# Produktnamen, die es in zwei Jahren nicht mehr gibt.
+#
+# Fertige `model_list`-Blöcke für IONOS, Mistral, OpenAI, Anthropic und den Mischbetrieb:
+# docs/admin/modell-szenarien.md. Die unten gezeigten Modelle sind ein BEISPIEL (OpenAI,
+# gemessen am 28.08.2026) — die Struktur ist der eigentliche Inhalt dieser Vorlage.
+# ─────────────────────────────────────────────────────────────────────────────────────
 
 model_list:
-  - model_name: gpt-4o-mini
+  # Kurze Fragen, Vokabeln, Textvereinfachung. Für alle Teams.
+  - model_name: chat-schnell
     litellm_params:
-      model: openai/gpt-4o-mini
+      model: gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
+
+  # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
+  - model_name: chat-standard
+    litellm_params:
+      model: gpt-4.1-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Analyse, lange Texte, Unterrichtsplanung. Deutlich teurer — nur Lehrkräfte.
+  - model_name: chat-komplex
+    litellm_params:
+      model: gpt-5
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Gesprächstitel. Läuft bei jedem neuen Chat, klein und günstig genügt.
+  # ⚠️ NICHT blind das billigste Modell nehmen: Der Prompt gibt „maximal 6 Wörter" vor,
+  # und manche günstigen Modelle halten das nicht ein (bei IONOS und Mistral gemessen).
+  # Ein zu langer Titel wird in der Historie mitten im Wort abgeschnitten.
+  # Das `system-`-Präfix hält es aus dem Chat-Modellwähler heraus — freigeschaltet muss
+  # es trotzdem in JEDEM Team sein, weil der Aufruf über den Virtual Key der Nutzer:innen
+  # läuft, nicht über den Master-Key.
+  - model_name: system-titel
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Klassifikator des Jugendschutz-Guardrails (siehe unten). Läuft bei JEDER Antwort.
+  - model_name: system-moderation
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Kontextspeicher / semantische Suche.
+  # ⚠️ Die Vektorbreite muss zu EMBEDDING_DIMENSIONS UND zur Datenbankspalte passen.
+  # Ein Wechsel verlangt Schemaänderung + vollständiges Re-Embedding aller Knoten
+  # (docs/runbooks/modellwechsel.md). Vor dem ersten Import entscheiden.
+  - model_name: embedding-standard
+    litellm_params:
+      model: text-embedding-3-small     # 1536 Dimensionen
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: embedding
+
   # Self-hosted Fallback (Pflicht laut Projektvorgabe — Ollama im lokalen Netz):
   - model_name: ollama-fallback
     litellm_params:
@@ -27,17 +90,20 @@ model_list:
   # Datenschutz: Der Client fordert `response_format: b64_json` an bzw. nutzt Modelle,
   # die ohnehin nur Base64 liefern (gpt-image-1). Es werden KEINE extern gehosteten
   # Bild-URLs verarbeitet — die Bytes bleiben im Schulnetz.
-  - model_name: gpt-image-1
+  #
+  # Welches Bildmodell wofür genutzt wird, entscheidet die **Bildart**
+  # (config/image_models.yaml) — dieser Eintrag stellt es nur bereit.
+  - model_name: bild-standard
     litellm_params:
-      model: openai/gpt-image-1
+      model: gpt-image-1
       api_key: os.environ/OPENAI_API_KEY
     model_info:
       mode: image_generation
-      # Kosten-Tracking: Für bekannte Modelle (gpt-image-*) liefert LiteLLM den
-      # `x-litellm-response-cost`-Header automatisch → das Backend bucht die Bild-
-      # Kosten mit (messages.cost_usd / total_cost_usd). Für Custom-/lokale Modelle
-      # ohne hinterlegtes Pricing hier `input_cost_per_image: <USD>` setzen, sonst
-      # zählt der Bild-Spend 0.
+      # ⚠️ Für BILDER ignoriert LiteLLM den Preis aus `model_info` — er ist hier reine
+      # Dokumentation. Wirksam wird er ausschließlich über IMAGE_PRICES (.env) plus den
+      # Callback `guardrails.bildpreise.registrierung` weiter unten. Ohne den kostet
+      # jedes Bild 0,00 $ und läuft am EUR-Budget vorbei, ohne dass etwas fehlschlägt.
+      # `check_litellm_config.py` gleicht beide Stellen gegeneinander ab.
   # Self-hosted Bild-Fallback (sensibler Pfad, analog Ollama) — OpenAI-kompatibler
   # lokaler Server (z. B. vLLM-Omni), api_base im lokalen Netz. Auskommentiert lassen,
   # bis der lokale Bild-Server steht (end-to-end testen, vgl. Plan §7).
@@ -90,7 +156,9 @@ guardrails:
       mode: post_call
       default_on: true
       # Vollqualifiziert (Provider + ggf. api_base), NICHT der `model_name` aus der
-      # model_list: Der Guardrail ruft litellm direkt auf, nicht den Proxy.
+      # model_list: Der Guardrail ruft litellm direkt auf, nicht den Proxy. Deshalb steht
+      # hier `openai/gpt-4o-mini` und nicht `system-moderation` — der Alias oben ist für
+      # die Anwendung da, nicht für diesen Aufruf.
       # Ein kleines, günstiges Modell genügt — es läuft bei JEDER Antwort.
       classifier_model: openai/gpt-4o-mini
       # Bei eigenem Endpunkt zusätzlich setzen:

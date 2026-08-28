@@ -53,6 +53,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 
 - [Vor der Installation](vor-der-installation.md) — Schulspezifische Vorüberlegungen; bisher: Modellwahl mit Messwerten und Empfehlungen
 - [Installation](installation.md) — Docker Compose, Reverse Proxy, Ersteinrichtung
+- [Modell-Szenarien](modell-szenarien.md) — Vollständige Konfigurationen je Anbieter (IONOS, Mistral, OpenAI, Anthropic, Mischbetrieb) und die anbieterspezifischen Fallen
 - [Konfigurationsdateien](konfiguration.md) — Alle Konfigurationsdateien im Detail
 - [Nutzerverwaltung & Rollen](nutzerverwaltung.md) — SSO, Gruppen, Rollen, Jahrgänge
 - [Budget-System](budget.md) — Tiers, ECB-Rate, Admin-UI

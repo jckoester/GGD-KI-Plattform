@@ -32,7 +32,7 @@ Drei Anforderungen sind nicht verhandelbar, und alle drei scheitern **still** �
 stürzt ab, es passiert nur nicht das Gewünschte:
 
 1. **Function-Calling.** Ohne das fallen Wissensgraph, Unterrichtsplanung und
-   Bildgenerierung ersatzlos aus. Das Modell antwortet freundlich, ruft aber nie ein
+   Bildgenerierung ersatzlos aus. Das Modell antwortet freundlich, ruft aber nie eine
    Funktion auf. Zu erkennen nur daran, dass Antworten auffällig allgemein bleiben.
 2. **Ein Preis in der LiteLLM-Config.** Fehlt er, meldet der SpendLog 0 — Budgets,
    429-Sperre und Kostenstatistik laufen ins Leere, ohne Fehlermeldung.
@@ -96,8 +96,8 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 
 FLUX.1-schnell hat den einfacheren Preis und schlanke Dateien, kann aber ausschließlich
 quadratisch — hoch- und Querformat entfallen. FLUX.2-klein beherrscht alle Formate,
-liefert aber rund dreißigmal größere Dateien, was bei vielen Nutzer:innen auf den
-Speicherplatz durchschlägt.
+liefert aber rund **vierzigmal** größere Dateien (1024²: 3,0 MB gegen 73 KB, gemessen
+28.08.2026), was bei vielen Nutzer:innen auf den Speicherplatz durchschlägt.
 
 > ⚠️ **Bildpreise brauchen einen Extraschritt.** Für Chat und Embedding greift der Preis
 > aus der LiteLLM-Config; für **Bilder nicht** — LiteLLM 1.83.7 löst sie ausschließlich über
@@ -116,12 +116,17 @@ Function-Calling und Vision aus LiteLLMs eingebauter Tabelle**. Bei IONOS (`open
 plus eigener `api_base`) muss all das von Hand gepflegt werden; ein vergessener Preis
 bedeutet dort Spend 0 und wirkungslose Budgets. Dieser Aufwand entfällt hier vollständig.
 
-> ⚠️ **Der Preis, den LiteLLM kennt, ist nicht zwingend der Preis, den Sie zahlen.** Die
-> eingebaute Tabelle wird mit der Bibliothek ausgeliefert und kann veralten. Bei der
-> Messung am 28.08.2026 wies sie `mistral-medium` (1,50/7,50 $/M) als **teurer** aus als
-> `mistral-large` (0,50/1,50 $/M) — unplausibel. Vor dem Produktivbetrieb gegen die
-> Preisliste des Anbieters prüfen. Die Bequemlichkeit hat also einen Preis: eine
-> Kostenquelle, die man nicht selbst kontrolliert.
+> **Die eingebauten Preise stimmten.** Am 28.08.2026 gegen
+> [mistral.ai/pricing/api](https://mistral.ai/pricing/api/) abgeglichen: Alle sieben dort
+> gelisteten Modelle deckten sich exakt mit LiteLLMs Tabelle. Trotzdem bleibt es eine
+> Kostenquelle, die man nicht selbst kontrolliert — sie wird mit der Bibliothek
+> ausgeliefert und kann bei einer Preisänderung des Anbieters altern. Beim Aufsetzen
+> einmal gegenprüfen.
+>
+> ⚠️ **`mistral-medium` ist tatsächlich rund fünfmal teurer als `mistral-large`** (1,50/7,50
+> gegen 0,50/1,50 $/M) — das sieht nach einem Fehler aus, ist aber der reguläre Tarif:
+> Medium ist das neuere Premium-Modell, „large" hier kein Hinweis auf den Preis. Wer nach
+> Namen statt nach Preisliste konfiguriert, greift hier fünffach daneben.
 
 Gemessen am 28.08.2026 über den Proxy (Titeltreue: viermal der echte Titel-Prompt der
 Anwendung, „maximal 6 Wörter"):
@@ -131,10 +136,13 @@ Anwendung, „maximal 6 Wörter"):
 | `ministral-3b-latest` | 0,10 | 0,10 | ✅ | **2/4** (4–21 Wörter) | Billigstes Modell. **Hält knappe Vorgaben nicht ein** — als Titelmodell ungeeignet. |
 | `ministral-8b-latest` | 0,15 | 0,15 | ✅ | **0/4** (7–33 Wörter) | Trotz höherem Preis **schlechter** als das 3B bei Formatvorgaben. Nicht für Aufgaben mit Formatzwang. |
 | **`mistral-small-latest`** | 0,15 | 0,60 | ✅ | 4/4 (3–4) | **Empfehlung als Arbeitspferd.** Schnell (≈2,9 s), formattreu, Vision. |
-| `mistral-medium-latest` | 1,50 | 7,50 | ✅ | 4/4 (3–4) | Schnell (≈1,8 s). Preis vor dem Einsatz gegenprüfen (siehe Warnung oben). |
+| `mistral-medium-latest` | 1,50 | 7,50 | ✅ | 4/4 (3–4) | Schnell (≈1,8 s), aber **das teuerste Modell der Reihe** — fünfmal `mistral-large`. |
 | `mistral-large-latest` | 0,50 | 1,50 | ✅ | 4/4 (4–6) | Deutlich **langsamer** (≈9,4 s) — für eine Chat-Antwort spürbar. |
-| `magistral-small-latest` | 0,50 | 1,50 | ✅ | 4/4 (3–4) | Reasoning-Reihe, siehe unten. |
-| `magistral-medium-latest` | 2,00 | 5,00 | ✅ | 4/4 (3–4) | dito, teurer. |
+| `magistral-small-latest` | 0,50* | 1,50* | ✅ | 4/4 (3–4) | Reasoning-Reihe, siehe unten. |
+| `magistral-medium-latest` | 2,00* | 5,00* | ✅ | 4/4 (3–4) | dito, teurer. |
+
+\* Von LiteLLM gemeldet, auf der öffentlichen Preisseite nicht gelistet — vor dem
+Einsatz beim Anbieter erfragen.
 | `codestral-latest` | 0,30 | 0,90 | ✅ | 4/4 (3–5) | Für Programmieraufgaben. |
 | `mistral-embed` | 0,10 | — | — | — | **1024 Dimensionen** — dieselbe Breite wie BGE-M3. |
 
@@ -156,17 +164,37 @@ Mistral also kein Auswahlkriterium — anders als bei IONOS, wo Mistral NeMo dar
 > mit Bildausgabe). Eine reine Mistral-Schule hat **keine Bildgenerierung** — wer sie will,
 > braucht einen zweiten Anbieter. Das ist beim Zuschnitt der Assistenten vorher zu klären.
 
-### Andere Anbieter
+### OpenAI
 
-Hier steht nur, wofür es belastbare eigene Erfahrung gibt. **Für Anthropic liegen keine
-eigenen Messungen vor**; LiteLLM bringt für die gängigen Modelle Preise mit, sodass die
-Kostenerfassung ohne eigene Einträge funktioniert.
+Alle drei Modalitäten, in LiteLLM ohne Präfix ansprechbar, Preise eingebaut. Gemessen am
+28.08.2026 mit demselben Titel-Prompt wie oben:
 
-**OpenAI** (bis August 2026 im Entwicklungsbetrieb genutzt):
+| Modell | $/M ein | $/M aus | Funktionen | Titel | Antwortzeit |
+|---|---|---|---|---|---|
+| **gpt-4o-mini** | 0,15 | 0,60 | ✅ | 4/4 (3–5) | 2,0 s |
+| gpt-4.1-mini | 0,40 | 1,60 | ✅ | 4/4 (5) | 2,2 s |
+| gpt-5-mini | 0,25 | 2,00 | ✅ | 4/4 (4–5) | 5,9 s |
+| gpt-5 | 1,25 | 10,00 | ✅ | 4/4 (4–5) | 7,8 s |
+| text-embedding-3-small | 0,02 | — | — | — | 1536 Dimensionen |
 
-- `text-embedding-3-small` liefert 1536 Dimensionen und unterstützt als eines der wenigen
+**`gpt-4o-mini` ist hier die auffällige Empfehlung:** das billigste, das schnellste **und**
+formattreu. Für die schnelle Stufe und das Titelmodell gleichermaßen geeignet.
+
+> **Die Regel „billige Modelle halten knappe Vorgaben nicht ein" gilt hier nicht.** Bei
+> IONOS (Qwen3.5-9B) und Mistral (ministral-8b) scheitert genau das billigste Modell an der
+> 6-Wörter-Grenze; bei OpenAI trafen **alle vier** Modelle sie. Die Anweisungstreue ist
+> also keine Frage des Preises, sondern des Modells — deshalb ist sie zu messen und nicht
+> zu schätzen.
+
+> Die beiden gpt-5-Modelle sind spürbar **langsamer** (5,9 bzw. 7,8 s gegen 2,0 s). Für
+> eine Chat-Antwort merkt man das; fürs Titelmodell, das im Hintergrund läuft, nicht.
+
+Weitere Eigenheiten aus dem Betrieb bis August 2026:
+
+- `text-embedding-3-small` unterstützt als eines der wenigen
   Modelle den `dimensions`-Parameter zum Kürzen (`EMBEDDING_SEND_DIMENSIONS=true`).
-  BGE-M3 lehnt diesen Parameter ab.
+  BGE-M3 und `mistral-embed` lehnen ihn ab. Nur hier ist die Vektorbreite also frei
+  wählbar — bei allen anderen Anbietern ist sie vorgegeben.
 - Leere Eingaben nimmt OpenAI beim Embedding klaglos an, BGE-M3 quittiert sie mit einem
   Fehler. Wer von OpenAI wechselt, sieht deshalb plötzlich Fehler an Knoten, die vorher
   unauffällig waren.
@@ -176,10 +204,52 @@ Kostenerfassung ohne eigene Einträge funktioniert.
   `EMBEDDING_TOKENS_PER_SECOND` einstellbar ist: Der passende Wert steht im eigenen Konto,
   nicht im Code.
 
+### Anthropic
+
+Nur Chat — **weder Embedding- noch Bildmodell**. Ein reiner Anthropic-Betrieb ist damit
+unmöglich: Ohne Embeddings gibt es keinen Kontextspeicher und keine semantische Suche.
+Anthropic kommt nur im Mischbetrieb infrage; siehe [Modell-Szenarien](modell-szenarien.md).
+LiteLLM bringt die Preise mit, eigene Einträge sind nicht nötig.
+
+Gemessen am 28.08.2026:
+
+| Modell | $/M ein | $/M aus | Funktionen | Titel | Antwortzeit |
+|---|---|---|---|---|---|
+| claude-haiku-4-5 | 1,00 | 5,00 | ✅ | **2/4** (4–168 Wörter) | 3,4 s |
+| **claude-sonnet-5** | 2,00 | 10,00 | ✅ | 4/4 (4–5) | 2,9 s |
+| claude-opus-5 | 5,00 | 25,00 | ✅ | 4/4 (4–6) | 3,2 s |
+
+Alle drei beherrschen Funktionsaufrufe und Bildeingaben.
+
+> ⚠️ **Anthropic ist mit Abstand der teuerste der vier geprüften Anbieter.** Schon das
+> kleinste Modell (Haiku, 1,00/5,00 $/M) kostet mehr als `mistral-large` (0,50/1,50) und
+> rund das Sechsfache von `gpt-4o-mini` (0,15/0,60). Für Stufen, die **alle** nutzen, ist
+> das schwer zu rechtfertigen; als `chat-komplex` für Lehrkräfte kann es sich lohnen.
+
+> **Haiku ist als Titelmodell ungeeignet — und zeigt dabei den lehrreichsten Fehler der
+> ganzen Messreihe.** Auf „Erkläre mir bitte den Wasserkreislauf für eine Klassenarbeit"
+> antwortete es mit einer **168 Wörter langen Erklärung samt Überschriften**, statt einen
+> Titel zu bilden; auf „Erzeuge ein Bild: …" mit „Ich kann keine Bilder generieren". Bei
+> den beiden neutral formulierten Fragen traf es dagegen 4 und 6 Wörter.
+>
+> Das Muster ist also nicht „Modell hält sich nicht an Vorgaben", sondern präziser: **Eine
+> imperativ formulierte Nutzernachricht gewinnt gegen den System-Prompt.** Das Modell
+> befolgt die Anweisung der Schülerin, statt sie zu betiteln. Dasselbe wurde bei IONOS mit
+> gpt-oss-120b beobachtet — es ist kein Anbieterproblem, sondern eines der Prompt-Bauweise.
+> Die Gegenmaßnahme (Nutzertext als Zitat statt als Anweisung übergeben) ist gemessen und
+> in der Todo unter *Backend / Prompts* festgehalten.
+
+> **Ein Hinweis zum Schlüsseltyp:** Ein *identity-linked* API-Schlüssel weist **jeden**
+> Aufruf ab, solange der Header `anthropic-workspace-id` fehlt (HTTP 400, am 28.08.2026
+> erlebt). Details und Konfiguration in
+> [Modell-Szenarien](modell-szenarien.md#szenario-d--anthropic).
+
 ---
 
 ## Weiter
 
+- [Modell-Szenarien](modell-szenarien.md) — fertige Konfigurationen je Anbieter und die
+  Fallen, die dabei still scheitern
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Freischaltung je Jahrgang, Assistenten
 - [Konfigurationsdateien](konfiguration.md) — `.env` und LiteLLM-Config im Detail
 - [Runbook Modellwechsel](../runbooks/modellwechsel.md) — Wechsel im laufenden Betrieb

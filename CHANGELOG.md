@@ -111,10 +111,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   (`chat-schnell` … `chat-komplex`, `system-*`) mit Zweck und empfohlener Freigabe.
 - [Content-Moderation](docs/admin/content-moderation.md): Klassifikator statt
   `openai_moderation`, Verhalten bei Störungen, Überwachung, Ablage des Zustandsberichts.
-- [Vor der Installation](docs/admin/vor-der-installation.md): Abschnitt **Mistral** —
-  gemessene Preise, Funktionsaufrufe und Titeltreue über acht Modelle, dazu die drei
-  Unterschiede zu IONOS (Preise kommen aus LiteLLM, Reasoning nur auf Aufforderung,
-  kein Bildmodell).
+- **`infra/litellm_config.example.yaml` auf das Aufgaben-Namensschema umgestellt.** Die
+  Vorlage führte rohe Produktnamen (`gpt-4o-mini`, `gpt-image-1`) als `model_name` —
+  wer sie kopierte, hatte `MODEL_PICKER_HIDDEN_PREFIXES` wirkungslos und das
+  Titelmodell sichtbar im Dropdown der Schüler:innen. Jetzt `chat-schnell` …
+  `system-titel`, `embedding-standard`, `bild-standard`, mit Begründung im Kopf.
+- Neues Kapitel [Modell-Szenarien](docs/admin/modell-szenarien.md) — vollständige
+  Konfigurationen für IONOS, Mistral, OpenAI, Anthropic und Mischbetrieb, dazu eine
+  Abdeckungsmatrix (welcher Anbieter kann Chat, Embedding, Bild) und die acht
+  anbieterspezifischen Fallen, die still scheitern.
+- [Vor der Installation](docs/admin/vor-der-installation.md): Messwerte für **Mistral**
+  (acht Modelle), **OpenAI** (vier) und **Anthropic** (drei) — Preise, Funktionsaufrufe,
+  Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
+  beruhen nirgends mehr auf Annahmen.
 - [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
 
 ### Migration
