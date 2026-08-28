@@ -10,43 +10,120 @@ und `infra/` (Infrastruktur). Beispieldateien enden auf `.example.yaml` bzw.
 
 Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen.
 
+Nicht jede Variable muss gesetzt sein — die meisten haben brauchbare Vorgabewerte.
+Zwingend sind nur die im Abschnitt *Basis*. Die vollständige, kommentierte Fassung steht in
+`.env.example`; hier stehen zusätzlich die Zusammenhänge.
+
+### Basis
+
 | Variable | Beschreibung | Beispiel |
 |----------|-------------|---------|
 | `POSTGRES_PASSWORD` | Datenbankpasswort | `openssl rand -base64 32` |
-| `DATABASE_URL` | Vollständige Datenbank-URL | `postgresql+asyncpg://postgres:<PW>@db:5432/ggd_ki` |
+| `DATABASE_URL` | Vollständige Datenbank-URL der Anwendung | `postgresql+asyncpg://postgres:<PW>@db:5432/ggd_ki` |
+| `TEST_DATABASE_URL` | Separate Test-DB mit pgvector — nur für Integrationstests | `…/ggd_ki_test` |
 | `SCHOOL_SECRET` | HMAC-Schlüssel für Pseudonymisierung — **niemals nach Inbetriebnahme ändern** | `openssl rand -base64 32` |
 | `JWT_SECRET` | Schlüssel für JWT-Session-Tokens | `openssl rand -base64 32` |
-| `LITELLM_PROXY_URL` | Interne URL des LiteLLM-Containers | `http://litellm:4000` |
-| `LITELLM_MASTER_KEY` | Zugangsschlüssel für LiteLLM-Admin-API | `sk-...` |
-| `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat | `gpt-4o-mini` |
-| `TITLE_MODEL` | Modell für automatische Gesprächstitel | `gpt-4o-mini` |
-| `EMBEDDING_MODEL` | Modell für die Embeddings des Kontextspeichers | `text-embedding-3-small` |
-| `EMBEDDING_DIMENSIONS` | Vektorbreite — **muss zur Spalte passen**, s. u. | `1536` |
-| `EMBEDDING_MAX_CHARS` | Zeichen-Cap vor dem Embedding-Call | `16000` |
-| `EMBEDDING_SEND_DIMENSIONS` | `dimensions`-Parameter mitsenden (nur OpenAI `text-embedding-3-*`) | `false` |
-| `IMAGE_DEFAULT_MODEL` | Modell für die Bildgenerierung | `gpt-image-1` |
-| `IMAGE_SIZES` | Bildformate als JSON-Objekt Name→Pixelgröße, s. [Modelle & Assistenten](modelle-und-assistenten.md#bildformate-festlegen-image_sizes) | `{"quadratisch":"1024x1024",…}` |
-| `IMAGE_DEFAULT_FORMAT` | Standardformat — muss ein Schlüssel aus `IMAGE_SIZES` sein | `quadratisch` |
-| `IMAGE_RESPONSE_FORMAT` | leer = Parameter weglassen (gpt-image-1); `b64_json` = Base64 erzwingen (FLUX/SDXL) | *(leer)* |
-| `MODEL_PICKER_HIDDEN_PREFIXES` | Modell-Präfixe, die nicht im Chat-Modellwähler erscheinen | `["system-","embedding-","bild-"]` |
+| `ENVIRONMENT` | `development` oder `production`. In Produktion werden schwache Secrets beim Start abgelehnt | `production` |
 | `FRONTEND_ORIGIN` | Öffentliche URL der Plattform (für CORS) | `https://ki.beispielschule.de` |
-| `ENVIRONMENT` | `development` oder `production` | `production` |
-| `NGINX_PORT` | Host-Port, auf dem nginx lauscht (Default `80`; höher setzen, wenn ein Reverse-Proxy davorliegt) | `8080` |
+| `ALLOWED_HOSTS` | Erlaubte `Host`-Header als JSON-Array | `["ki.beispielschule.de"]` |
+| `TRUSTED_PROXIES` | Reverse-Proxys, deren `X-Forwarded-For` vertraut wird | `["127.0.0.1","::1"]` |
+| `NGINX_PORT` | Host-Port, auf dem nginx lauscht | `8080` |
+
+### LiteLLM-Proxy und Anbieter-Zugänge
+
+Die Schlüssel braucht **nur der Proxy** — das Backend ruft nie direkt einen Anbieter auf.
+Es genügen die Zugänge der Anbieter, die in der LiteLLM-Config tatsächlich vorkommen.
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `LITELLM_PROXY_URL` | Interne URL des Proxys | `http://litellm:4000` |
+| `LITELLM_MASTER_KEY` | Zugangsschlüssel für die Admin-API. Muss mit `master_key` der Proxy-Config übereinstimmen | `openssl rand -base64 32` |
+| `LITELLM_DATABASE_URL` | **Eigene** Postgres-DB nur für den Proxy (Virtual Keys, Budgets, SpendLogs). Plain `postgresql://`, damit LiteLLMs Prisma-Schema nicht mit dem Alembic-Schema kollidiert | `postgresql://postgres:<PW>@db:5432/litellm` |
+| `LITELLM_SALT_KEY` | Verschlüsselt in der DB gespeicherte Credentials. Fest setzen, sonst macht ein späterer Master-Key-Wechsel sie unlesbar | `openssl rand -base64 32` |
+| `UI_USERNAME` / `UI_PASSWORD` | Login der Proxy-Admin-UI. Betrifft **nicht** das Schul-Frontend | `admin` |
+| `OPENAI_API_KEY` | OpenAI-Zugang | `sk-…` |
+| `IONOS_API_KEY` | IONOS-Zugang — der **Value** des Tokens aus dem Data Center Designer, nicht die ID | `eyJ…` |
+| `IONOS_API_BASE` | OpenAI-kompatibler Endpunkt von IONOS | `https://openai.inference.de-txl.ionos.com/v1` |
+| `OLLAMA_BASE_URL` | Self-hosted Fallback im lokalen Netz | `http://ollama:11434` |
+| `SPEND_LOG_DELAY` | Wartezeit nach Stream-Ende, bevor die Kosten abgefragt werden | `1.0` |
+
+### Modelle
+
+Die Werte sind die `model_name`s aus der **LiteLLM-Config**, nicht die Modell-IDs der
+Anbieter. Sprechende Namen halten einen Anbieterwechsel auf eine Zeile in der Proxy-Config
+beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl).
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat. Leer = Chats ohne ausdrückliche Wahl schlagen fehl. Muss Function-Calling beherrschen | `chat-standard` |
+| `TITLE_MODEL` | Modell für automatische Gesprächstitel. Leer = keine Titel. **Muss in JEDER Team-Allowlist stehen** — der Aufruf läuft über den Virtual Key der Nutzer:innen | `system-titel` |
+| `MODEL_PICKER_HIDDEN_PREFIXES` | Präfixe, die nicht im Chat-Modellwähler erscheinen. Rein kosmetisch, Freigaben bleiben unberührt | `["system-","embedding-","bild-"]` |
+
+### Embeddings (Kontextspeicher / semantische Suche)
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `EMBEDDING_MODEL` | Modell laut LiteLLM-Config | `embedding-standard` |
+| `EMBEDDING_DIMENSIONS` | Vektorbreite — **muss zur Datenbankspalte passen**, s. u. | `1024` |
+| `EMBEDDING_MAX_CHARS` | Zeichen-Cap je Text vor dem Aufruf | `16000` |
+| `EMBEDDING_SEND_DIMENSIONS` | `dimensions`-Parameter mitsenden. Nur OpenAI `text-embedding-3-*` versteht ihn; BGE-M3 lehnt ihn ab | `false` |
+| `EMBEDDING_BATCH_SIZE` | Texte je Anfrage im Stapelbetrieb (Backfill, Import). Der Hebel für die Laufzeit: ein Aufruf je Knoten macht aus einem Re-Embedding einen mehrstündigen Lauf | `64` |
+| `EMBEDDING_TOKENS_PER_SECOND` | Drosselung nach abgerechnetem Verbrauch; `0` = aus. Das passende Tempo steht im Rate-Limit des eigenen Anbieterkontos | `3000` |
+| `EMBEDDING_MAX_RETRIES` | Wiederholungen bei 429/503 | `3` |
+| `EMBEDDING_RETRY_MAX_WAIT_S` | Obergrenze je Wartezeit — begrenzt, wie lange ein Knoten-Anlegen im Request hängt | `5.0` |
+
+### Bildgenerierung
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `IMAGE_DEFAULT_MODEL` | Bildmodell laut LiteLLM-Config (braucht dort `model_info.mode: image_generation`) | `bild-standard` |
+| `IMAGE_GENERATION_TIMEOUT` | Zeitbudget je Bild in Sekunden | `120.0` |
+| `IMAGE_SIZES` | Benannte Formate als JSON-Objekt Name→Pixelgröße, s. [Modelle & Assistenten](modelle-und-assistenten.md#bildformate-festlegen-image_sizes) | `{"quadratisch":"1024x1024",…}` |
+| `IMAGE_DEFAULT_FORMAT` | Standardformat — muss ein Schlüssel aus `IMAGE_SIZES` sein (wird beim Start geprüft) | `quadratisch` |
+| `IMAGE_RESPONSE_FORMAT` | Leer = Parameter weglassen (gpt-image-1, FLUX); `b64_json` = Base64 erzwingen, wo sonst eine URL käme | *(leer)* |
+| `IMAGE_PRICES` | **Pflicht bei selbst eingetragenen Bildmodellen.** LiteLLM ignoriert für Bilder den Preis aus der Config — ohne diese Variable kostet jedes Bild 0,00 $ und läuft am Budget vorbei. In **einfachen** Anführungszeichen! | `'{"black-forest-labs/FLUX.1-schnell":0.032}'` |
+
+### Jugendschutz-Klassifikator
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `GUARDRAIL_HEALTH_FILE` | Zustandsbericht des Guardrails. Muss auf **dieselbe Datei** zeigen wie `health_file` in der LiteLLM-Config, s. [Content-Moderation](content-moderation.md) | `data/guardrail_health.json` |
+| `GUARDRAIL_HEALTH_MAX_AGE_H` | Ab diesem Alter gilt der Bericht als veraltet und nicht mehr als gesund | `24` |
+
+### Pfade zu Konfigurationsdateien
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
 | `AUTH_CONFIG_PATH` | Pfad zur auth.yaml | `config/auth.yaml` |
 | `BUDGET_TIERS_PATH` | Pfad zur budget_tiers.yaml | `config/budget_tiers.yaml` |
 | `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
-| `AUTH_ISERV_CLIENT_SECRET` | OAuth2-Client-Secret des SSO-Providers | *(vom Provider) |
-| `WEBUNTIS_SERVER` | Stundenplan-Server. **Leer = Integration aus**, s. [Stundenplan-Integration](stundenplan-integration.md) | `ggd.webuntis.com` |
-| `WEBUNTIS_USER` | Benutzername des technischen Servicekontos | *(vom Stundenplan-Admin)* |
-| `WEBUNTIS_PASSWORD` | Passwort des Servicekontos | *(vom Stundenplan-Admin)* |
-| `WEBUNTIS_SCHOOL` | Schulkürzel — **nur bei geteiltem Server**; bei eigener Subdomain leer lassen | *(leer)* |
-| `STUDENT_GRADES` | Jahrgangsstufen als JSON-Array | `[5,6,7,8,9,10,11,12]` |
+
+### Anmeldung, Schule, Darstellung
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `AUTH_ISERV_CLIENT_SECRET` | OAuth2-Client-Secret des SSO-Providers | *(vom Provider)* |
+| `AUTH_DEBUG_USERINFO` | Loggt die Claims des SSO-Providers beim Login — zur Diagnose fehlender Gruppen. **In Produktion aus** | `false` |
+| `PUBLIC_STUDENT_GRADES` | Jahrgangsstufen als JSON-Array | `[5,6,7,8,9,10,11,12]` |
+| `PUBLIC_PERIODS` | Stundenraster der Schule (Wochenmuster-Editor); ausgelassene Stunden weglassen | `[1,2,3,4,5,6,8,9]` |
+| `SCHULART` | Schulart — steuert die Auswahl der Bildungspläne | `GYM` |
+| `EXPORT_SCHOOL_NAME` | Schulname in PDF-/DOCX-Exporten. Leer = `PUBLIC_SCHOOL_NAME` | `Beispielschule` |
 | `PUBLIC_SCHOOL_NAME` | Anzeigename der Plattform | `ki@beispielschule` |
 | `PUBLIC_SCHOOL_LOGO_URL` | Logo-URL (Fallback für beide Themes) | *(leer → Initialen)* |
 | `PUBLIC_SCHOOL_LOGO_URL_LIGHT` | Logo für helles Theme | `/static/logo-light.png` |
 | `PUBLIC_SCHOOL_LOGO_URL_DARK` | Logo für dunkles Theme | `/static/logo-dark.png` |
+
+### Stundenplan (optional)
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `WEBUNTIS_SERVER` | Stundenplan-Server. **Leer = Integration aus**, s. [Stundenplan-Integration](stundenplan-integration.md) | `ggd.webuntis.com` |
+| `WEBUNTIS_USER` | Benutzername des technischen Servicekontos | *(vom Stundenplan-Admin)* |
+| `WEBUNTIS_PASSWORD` | Passwort des Servicekontos | *(vom Stundenplan-Admin)* |
+| `WEBUNTIS_SCHOOL` | Schulkürzel — **nur bei geteiltem Server**; bei eigener Subdomain leer lassen | *(leer)* |
+
 
 > **Wichtig:** `SCHOOL_SECRET` darf nach der ersten Inbetriebnahme nie geändert
 > werden. Alle Pseudonyme würden sich dadurch ändern — bestehende Nutzerkonten
@@ -267,36 +344,63 @@ Override über `PEDAGOGY_PATH`. Aufbau und Auswahl-Logik stehen in
 
 ## `infra/litellm_config.yaml`
 
-Konfiguriert den LiteLLM-Proxy: welche KI-Modelle verfügbar sind, über
-welche Anbieter sie geroutet werden und mit welchem Master Key der Proxy
-gesichert ist.
+Konfiguriert den LiteLLM-Proxy: welche Modelle verfügbar sind, über welche Anbieter sie
+laufen, was sie kosten und welche Guardrails greifen. **Zwei fertige Vorlagen** liegen bei:
+
+| Vorlage | Für wen |
+|---|---|
+| `infra/litellm_config.example.yaml` | Allgemein, mit OpenAI als Beispielanbieter |
+| `infra/litellm_config.ionos.example.yaml` | EU-Betrieb mit IONOS — vollständig ausgefüllt, Modell-IDs und Preise gemessen |
+
+### Das Namensschema
+
+Die `model_name`s sind das, was `.env`, Assistenten und Team-Allowlists ansprechen — und
+was Nutzer:innen im Modellwähler lesen. Deshalb **Aufgaben statt Produktnamen**: Ein
+Anbieterwechsel ändert dann nur `litellm_params.model` in dieser Datei.
 
 ```yaml
 model_list:
-  - model_name: gpt-4o-mini
+  - model_name: chat-standard            # = CHAT_DEFAULT_MODEL
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: sk-...
-
-  - model_name: claude-sonnet
-    litellm_params:
-      model: anthropic/claude-sonnet-4-6
-      api_key: sk-ant-...
-
-  - model_name: ollama/llama3
-    litellm_params:
-      model: ollama/llama3
-      api_base: http://ollama:11434
+      model: openai/<anbieter-modell-id>
+      api_base: os.environ/IONOS_API_BASE     # entfällt bei OpenAI
+      api_key: os.environ/IONOS_API_KEY
+    model_info:
+      supports_function_calling: true    # PFLICHT, sonst fallen alle Werkzeuge stumm aus
+      input_cost_per_token: 0.00000017   # PFLICHT, sonst bleibt der Spend 0
+      output_cost_per_token: 0.00000071
 
 general_settings:
-  master_key: sk-...   # muss mit LITELLM_MASTER_KEY in .env übereinstimmen
+  master_key: os.environ/LITELLM_MASTER_KEY   # = LITELLM_MASTER_KEY in .env
+  database_url: os.environ/LITELLM_DATABASE_URL
 ```
 
-Die vollständige Referenz für `model_list` und Anbieter-Konfigurationen
-findet sich in der [LiteLLM-Dokumentation](https://docs.litellm.ai).
+Bewährt hat sich eine Staffel nach Aufgabe — `chat-schnell`, `chat-standard`, `chat-code`,
+`chat-reasoning`, `chat-komplex` — plus interne Modelle unter dem Präfix `system-`
+(`system-titel`, `system-moderation`), die `MODEL_PICKER_HIDDEN_PREFIXES` aus dem
+Modellwähler ausblendet. Welche Modelle sich wofür eignen, steht in
+[Vor der Installation](vor-der-installation.md#modellwahl).
 
-Die **Jugendschutz-Guardrails** am Proxy (Block harter Ausgaben für alle Rollen) sowie
-die zugehörigen Pattern-Dateien (`infra/guardrails/`) sind als kuratierungsbedürftige
-Vorlage in `infra/litellm_config.example.yaml` enthalten — Details und die wichtige
-Warnung zu Selbstverletzungs-Mustern stehen in
-[Content-Moderation & Guardrails](content-moderation.md), Abschnitt B.
+### Drei Dinge, die still schiefgehen
+
+| | Folge, wenn es fehlt |
+|---|---|
+| `supports_function_calling: true` | Wissensgraph, Unterrichtsplanung und Bildgenerierung fallen ersatzlos aus. Das Modell antwortet freundlich und ruft nie ein Werkzeug auf. |
+| `input_cost_per_token` / `output_cost_per_token` | Der SpendLog meldet 0. EUR-Budgets, die 429-Sperre und die Kostenstatistik laufen ins Leere. Betrifft **jedes** Modell mit eigener `api_base` — LiteLLM kennt dafür keine Preise. |
+| `IMAGE_PRICES` in der `.env` | Für **Bilder** ignoriert LiteLLM den Preis aus dieser Datei und liest nur seine eingebaute Tabelle. Ohne die Variable kostet jedes Bild 0,00 $. |
+
+> **Prüfen statt hoffen:** `cd backend && python scripts/check_litellm_config.py` gleicht den
+> laufenden Proxy gegen die `.env` ab und meldet genau diese Fälle — fehlende Preise,
+> fehlendes `supports_function_calling`, falsche `mode`, unbekannte Modellnamen und nicht
+> ersetzte Platzhalter.
+
+### Guardrails
+
+Der `guardrails:`-Block gehört auf die **oberste Ebene** der Datei, nicht unter
+`litellm_settings` — dort erwartet LiteLLM ein älteres Format und der Proxy startet nicht.
+Die mitgelieferten Vorlagen nutzen einen LLM-Klassifikator, der vier Kategorien in einem
+Aufruf bewertet und mit jedem Anbieter funktioniert. Einzelheiten, Verhalten bei Störungen
+und die Überwachung: [Content-Moderation & Guardrails](content-moderation.md).
+
+Die vollständige Referenz für `model_list` und Anbieter-Konfigurationen findet sich in der
+[LiteLLM-Dokumentation](https://docs.litellm.ai).

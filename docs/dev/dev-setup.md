@@ -79,11 +79,16 @@ SCHOOL_SECRET=dev-school-secret-not-for-production
 JWT_SECRET=dev-jwt-secret-not-for-production
 LITELLM_PROXY_URL=http://localhost:4000
 LITELLM_MASTER_KEY=sk-dev
-OPENAI_API_KEY=sk-...               # Provider-Key, den der lokale Proxy nutzt
+# Provider-Key(s), die der lokale Proxy nutzt — nur die, die in der Dev-Config vorkommen.
+OPENAI_API_KEY=sk-...
+# oder für den EU-Pfad:
+# IONOS_API_KEY='eyJ...'
+# IONOS_API_BASE=https://openai.inference.de-txl.ionos.com/v1
 OLLAMA_BASE_URL=http://localhost:11434
 LITELLM_DATABASE_URL=postgresql://postgres:devpassword@localhost:5432/litellm
-CHAT_DEFAULT_MODEL=gpt-4o-mini
-TITLE_MODEL=gpt-4o-mini
+# Namen aus der LiteLLM-Config, NICHT Anbieter-Modell-IDs.
+CHAT_DEFAULT_MODEL=chat-standard
+TITLE_MODEL=system-titel
 FRONTEND_ORIGIN=http://localhost:5173
 ENVIRONMENT=development
 AUTH_CONFIG_PATH=config/auth.yaml
@@ -164,15 +169,25 @@ createdb -U postgres litellm
 cp infra/litellm_config.dev.example.yaml infra/litellm_config.dev.yaml
 ```
 
-Die Dev-Config exponiert die Modellnamen, die die `.env` anfragt: `gpt-4`
-(`CHAT_DEFAULT_MODEL` / `TITLE_MODEL`), `text-embedding-3-small` (`EMBEDDING_MODEL`),
-`gpt-image-1.5` (`IMAGE_DEFAULT_MODEL`, optional) sowie `ollama-fallback`.
-Kein Modellname steht im Code — wer andere Namen verwenden will, ändert `model_name`
-in dieser Config und die passende Variable in `.env`. Beim Embedding-Modell zusätzlich
-`EMBEDDING_DIMENSIONS` beachten, siehe
+Die Config bestimmt, unter welchen Namen die Modelle ansprechbar sind — die `.env` fragt
+genau diese Namen an. **Kein Modellname steht im Code.** Wer andere will, ändert
+`model_name` hier und die passende Variable in `.env`.
+
+Wer den EU-Pfad lokal nachstellen möchte, nimmt statt der Dev-Vorlage die vollständige
+IONOS-Fassung; sie bringt das Namensschema, Preise und den Jugendschutz-Klassifikator mit:
+
+```bash
+cp infra/litellm_config.ionos.example.yaml infra/litellm_config.dev.yaml
+# darin health_file auf einen lokalen Pfad setzen: ../data/guardrail_health.json
+```
+
+Beim Embedding-Modell zusätzlich `EMBEDDING_DIMENSIONS` beachten — der Wert muss zur
+Datenbankspalte passen, siehe
 [Runbook: Embedding-Modell wechseln](../runbooks/modellwechsel.md).
-Die Jugendschutz-Guardrails aus `infra/litellm_config.example.yaml` (Produktion)
-sind hier bewusst weggelassen.
+
+> Das Startskript prüft, welche `os.environ/…`-Variablen die **gewählte** Config
+> referenziert, und bricht ab, wenn eine davon fehlt. Es verlangt also keinen
+> OpenAI-Schlüssel, wenn die Config gar keinen braucht.
 
 ### 4. Proxy starten
 
@@ -202,7 +217,7 @@ curl -s http://localhost:4000/models -H "Authorization: Bearer $LITELLM_MASTER_K
 curl -s http://localhost:4000/chat/completions \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4","messages":[{"role":"user","content":"ping"}]}'
+  -d '{"model":"chat-standard","messages":[{"role":"user","content":"ping"}]}'
 ```
 
 Liefern beide Aufrufe eine sinnvolle Antwort, kann das Backend gestartet werden.

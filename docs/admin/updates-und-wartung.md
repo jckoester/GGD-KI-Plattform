@@ -267,7 +267,7 @@ Was der Text verrät:
 >   'curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:4000/embeddings \
 >      -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
 >      -H "Content-Type: application/json" \
->      -d "{\"model\":\"text-embedding-3-small\",\"input\":[\"Test\"]}"'
+>      -d "{\"model\":\"<EMBEDDING_MODEL aus der .env>\",\"input\":[\"Test\"]}"'
 > ```
 
 **Der Backfill bricht bei einer Fehlerserie ab.** Zehn Fehlschläge in Folge heißen: Es

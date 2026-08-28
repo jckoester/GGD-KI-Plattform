@@ -12,7 +12,7 @@ gibt eine `StreamingResponse` mit `Content-Type: text/event-stream` zurück.
     { "role": "user", "content": "Erkläre mir die Fotosynthese." }
   ],
   "conversation_id": "uuid-oder-null",
-  "model_id": "gpt-4o-mini",
+  "model_id": "chat-standard",   // Name aus der LiteLLM-Config, nicht die Anbieter-ID
   "assistant_id": 3
 }
 ```

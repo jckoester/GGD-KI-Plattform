@@ -1,5 +1,42 @@
 # Modelle & Assistenten
 
+## Welche Modelle es geben sollte
+
+Die Plattform schreibt keine Modelle vor, aber die Namen, unter denen sie in der
+LiteLLM-Config stehen, sind **Nutzertext**: Sie erscheinen im Modellwähler, auch bei
+Schüler:innen. Deshalb Aufgaben benennen statt Produkte — `chat-standard` statt
+`gpt-4o-mini`. Ein Anbieterwechsel bleibt dann eine Zeile in der Proxy-Config; `.env`,
+Assistenten und Freigaben bleiben unberührt.
+
+Bewährt hat sich diese Staffel:
+
+| Name | Wofür | Freigabe |
+|---|---|---|
+| `chat-schnell` | Kurze Fragen, Vokabeln, Textvereinfachung. Günstig, antwortet sofort | alle |
+| `chat-standard` | Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback | alle |
+| `chat-code` | Programmieraufgaben | alle |
+| `chat-reasoning` | Denkt vor der Antwort — mehrschrittige Aufgaben, Herleitungen | höhere Jahrgänge |
+| `chat-komplex` | Analyse, lange Texte, Unterrichtsplanung. Deutlich teurer | nur Lehrkräfte |
+| `system-titel` | Gesprächstitel — **muss in jeder Allowlist stehen**, s. u. | alle (ausgeblendet) |
+| `system-moderation` | Jugendschutz-Klassifikator | — (ausgeblendet) |
+| `embedding-standard` | Kontextspeicher, semantische Suche | — (ausgeblendet) |
+| `bild-standard` | Bildgenerierung | nach Bedarf |
+| `ollama-fallback` | Self-hosted Reserve | alle |
+
+`chat-standard` und `chat-reasoning` dürfen dasselbe Modell sein — bei Modellen mit
+regelbarer Denktiefe unterscheidet sie nur `reasoning_effort`. Didaktisch lässt sich das
+gut erklären: derselbe Assistent, aber er denkt erst nach.
+
+Wer **einzelne Modelle** namentlich anbieten will (etwa damit Lehrkräfte einen Assistenten
+bewusst binden können), stellt einen Anbieter-Präfix voran: `ionos-gpt-oss-120b`. Solche
+Einträge nur für Lehrkräfte freischalten — sonst stünden Alias und expliziter Name desselben
+Modells nebeneinander im Schüler-Dropdown. Und: Ein Assistent auf einem expliziten Namen
+folgt einem schulweiten Modellwechsel **nicht** und bricht, wenn der Eintrag entfällt (s.
+[Assistenten mit verschwundenem Modell](#assistenten-mit-verschwundenem-modell)).
+
+Welche Modelle sich wofür eignen — mit gemessenen Preisen und Fallstricken —, steht in
+[Vor der Installation](vor-der-installation.md#modellwahl).
+
 ## Modelle freischalten (`/settings/models`)
 
 Die Modell-Freischaltungsmatrix legt fest, welche KI-Modelle welchen
