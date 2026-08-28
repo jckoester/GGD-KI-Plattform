@@ -24,8 +24,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Vorlage für den EU-Betrieb:** `infra/litellm_config.ionos.example.yaml` mit fünf
+  Chat-Stufen, Systemmodellen, Embedding und Bild — Modell-IDs, Fähigkeiten und Preise
+  gegen den IONOS-Katalog gemessen.
+- **`scripts/ionos_probe.py`** fragt Katalog, Function-Calling, Vektorbreite und Bildformat
+  direkt beim Anbieter ab — die vier Angaben, die sich nicht der Dokumentation entnehmen
+  lassen.
 - **Der Jugendschutz-Guardrail fällt nicht mehr blind offen aus.** Bei Störung des
-  Klassifikators greift eine Staffel: Wiederholung (`CLASSIFIER_RETRIES`), optionaler
+  Klassifikators greift eine Staffel: Wiederholung (`classifier_retries`), optionaler
   zweiter Klassifikator (`fallback_classifier_model`), und wenn beides nichts liefert,
   entscheidet das Team — Lehrkräfte arbeiten weiter, Schüler:innen bekommen die Antwort
   zurückgehalten (`fail_open_teams`). Ein unbekanntes Team gilt als schutzbedürftig.
@@ -62,10 +68,47 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Startskript des LiteLLM-Proxys** verlangte fest `OPENAI_API_KEY`. Es prüft jetzt die
   Variablen, die die gewählte Config referenziert, und startet aus `infra/` — Guardrail-
   Module und Pattern-Dateien werden relativ zum Arbeitsverzeichnis aufgelöst.
+- **Eine einmal gesetzte `embedding_error`-Marke blieb stehen**, auch nachdem der Knoten
+  längst eingebettet war. Die Diagnoseabfrage zählte dadurch erledigte Fälle mit.
+
+### Dokumentation
+
+- Neues Kapitel [Vor der Installation](docs/admin/vor-der-installation.md) — schulische
+  Vorüberlegungen, bisher gefüllt mit **Modellempfehlungen**: gemessene Preise und
+  Fähigkeiten je IONOS-Modell, dazu die drei Anforderungen, die still scheitern
+  (Function-Calling, Preis in der Config, Anweisungstreue).
+- [Konfiguration](docs/admin/konfiguration.md): Env-Tabelle nach Themen gegliedert und
+  vervollständigt — 24 Variablen fehlten, `STUDENT_GRADES` hieß längst
+  `PUBLIC_STUDENT_GRADES`. LiteLLM-Abschnitt auf das Namensschema umgestellt.
+- [Modelle & Assistenten](docs/admin/modelle-und-assistenten.md): Stufenschema
+  (`chat-schnell` … `chat-komplex`, `system-*`) mit Zweck und empfohlener Freigabe.
+- [Content-Moderation](docs/admin/content-moderation.md): Klassifikator statt
+  `openai_moderation`, Verhalten bei Störungen, Überwachung, Ablage des Zustandsberichts.
+- [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
 
 ### Migration
 
 - Keine Datenbank-Migration nötig.
+
+- ⚠️ **Die eigene `infra/litellm_config.yaml` muss angepasst werden.** Drei Dinge, die
+  bisher stillschweigend nicht griffen oder ab LiteLLM 1.83.7 den Proxy-Start verhindern:
+
+  | Prüfen | Warum |
+  |---|---|
+  | `guardrails:` steht unter `litellm_settings:` | Proxy startet nicht (`GuardrailItem() argument after ** must be a mapping`) — Block auf die oberste Ebene heben |
+  | `guardrail: regex` | Typ existiert nicht mehr, Proxy startet nicht — Drogen-Anleitungen deckt jetzt die Kategorie `drug_instructions` des Klassifikators ab |
+  | Kategorien/Schwellen unter `guardrail_info.params` | Wurden nie gelesen — gehören unter `litellm_params.thresholds` |
+
+  Vorlagen: `infra/litellm_config.example.yaml` (allgemein) und
+  `infra/litellm_config.ionos.example.yaml` (EU-Betrieb).
+
+- **Neue Variablen in der `.env`** — beide optional, aber empfohlen:
+  - `IMAGE_PRICES` — **Pflicht**, sobald Bildmodelle im Einsatz sind, die LiteLLM nicht aus
+    seiner eingebauten Preistabelle kennt. Ohne sie kostet jedes Bild 0,00 $. In
+    **einfachen** Anführungszeichen setzen.
+  - `GUARDRAIL_HEALTH_FILE` / `GUARDRAIL_HEALTH_MAX_AGE_H` — für die Zustandsanzeige. Muss
+    auf dieselbe Datei zeigen wie `health_file` in der LiteLLM-Config.
+
 - **Nach dem Update einmal `python scripts/embedding_backfill.py` laufen lassen.** Die
   Titel-Aufnahme betrifft Leitideen, Kapitel und PK-Gruppen; Kompetenzknoten behalten
   ihren bisherigen Vektor. Betroffene Knoten neu einbetten:
@@ -74,6 +117,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   UPDATE context_nodes SET embedding = NULL
    WHERE status = 'active' AND content_type IN ('leitidee', 'kapitel', 'pk_gruppe');
   ```
+
+- **Nur bei Anbieterwechsel:** Ein anderes Embedding-Modell heißt fast immer eine andere
+  Vektorbreite — dann Spalte umstellen und **alle** Knoten neu einbetten.
+  Ablauf: [Runbook Modellwechsel](docs/runbooks/modellwechsel.md).
 
 ## [0.6.2] – 2026-08-26
 
