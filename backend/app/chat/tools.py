@@ -45,21 +45,40 @@ class ToolContext:
     # dieses Assistenten an — ohne den Assistenten im Kontext könnte ein Modell trotzdem
     # eine andere nennen und die Auswahl des Admins umgehen.
     assistant: Any = None
+    # Modell-Allowlist der Nutzer:in (None = unbekannt, dann nicht filtern). Derselbe
+    # Grund wie oben: Was das Schema verbirgt, muss der Handler auch ablehnen.
+    erlaubte_modelle: set[str] | None = None
+
+
+@dataclass
+class SchemaContext:
+    """Was ein Schema-Callable über den Chat wissen darf.
+
+    Bewusst **Daten statt Abhängigkeiten**: Die Modell-Freigaben werden vom Aufrufer
+    vorab geladen (das ist asynchron) und hier nur durchgereicht, damit der Schema-Bau
+    synchron und ohne Netz bleibt.
+    """
+
+    assistant: Any = None
+    # Für die Nutzer:in freigeschaltete LiteLLM-Modelle, oder None = **unbekannt**.
+    # None heißt „nicht filtern", nicht „nichts erlaubt" (vgl. app.litellm.team_models).
+    erlaubte_modelle: set[str] | None = None
 
 
 @dataclass
 class ChatTool:
     name: str
     group: str                   # 'context_search' | 'planning' | 'student_planning' | 'image_generation'
-    # OpenAI-Function-Schema für LiteLLM — entweder fest oder als Funktion des Assistenten.
+    # OpenAI-Function-Schema für LiteLLM — entweder fest oder als Funktion des Kontexts.
     #
-    # Ein Callable ist nötig, sobald das Schema von der Konfiguration des Assistenten
-    # abhängt: Die Bildgenerierung bietet nur die Bildarten an, die dieser Assistent führen
-    # darf, und nur deren Formate. Ein festes Dict könnte das nicht — es entsteht einmal
-    # beim Import, lange bevor bekannt ist, in welchem Chat es landet.
+    # Ein Callable ist nötig, sobald das Schema von der Konfiguration abhängt: Die
+    # Bildgenerierung bietet nur die Bildarten an, die dieser Assistent führen darf und
+    # deren Modell für diese Nutzer:in freigeschaltet ist. Ein festes Dict könnte das
+    # nicht — es entsteht einmal beim Import, lange bevor bekannt ist, in welchem Chat es
+    # landet.
     #
     # `tools_for()` löst auf; alles danach sieht ausschließlich fertige Dicts.
-    definition: dict | Callable[[Any], dict]
+    definition: dict | Callable[[SchemaContext], dict]
     handler: Callable[..., Awaitable[Any]]  # async (args: dict, ctx: ToolContext) -> JSON-serialisierbar
     writes: bool = False
 
@@ -71,14 +90,14 @@ def register_tool(tool: ChatTool) -> None:
     TOOL_REGISTRY[tool.name] = tool
 
 
-def _mit_aufgeloestem_schema(tool: ChatTool, assistant: Any) -> ChatTool:
-    """Ersetzt ein Schema-Callable durch das fertige Dict für diesen Assistenten.
+def _mit_aufgeloestem_schema(tool: ChatTool, ctx: SchemaContext) -> ChatTool:
+    """Ersetzt ein Schema-Callable durch das fertige Dict für diesen Kontext.
 
     Kopiert den Eintrag, statt die Registry zu verändern — die ist prozessweit geteilt und
     darf nicht vom letzten Chat abhängen, der zufällig durchlief.
     """
     if callable(tool.definition):
-        return replace(tool, definition=tool.definition(assistant))
+        return replace(tool, definition=tool.definition(ctx))
     return tool
 
 
@@ -86,12 +105,14 @@ def tools_for(
     assistant: Any,
     group_id: int | None,
     is_group_teacher: bool,
+    erlaubte_modelle: set[str] | None = None,
 ) -> list[ChatTool]:
     """Gibt die für diese Konversation freigeschalteten Tools zurück.
 
     Schema-Callables sind in der Rückgabe bereits aufgelöst (siehe ``ChatTool.definition``).
 
-    assistant kann None sein (kein Assistent aktiv).
+    ``assistant`` kann None sein (kein Assistent aktiv). ``erlaubte_modelle`` ist die
+    Modell-Allowlist der Nutzer:in oder None (unbekannt → es wird nicht gefiltert).
     """
     result: list[ChatTool] = []
     asst_tool_groups: list[str] = getattr(assistant, "tool_groups", None) or []
@@ -117,4 +138,5 @@ def tools_for(
             if "image_generation" in asst_tool_groups:
                 result.append(tool)
 
-    return [_mit_aufgeloestem_schema(t, assistant) for t in result]
+    schema_ctx = SchemaContext(assistant=assistant, erlaubte_modelle=erlaubte_modelle)
+    return [_mit_aufgeloestem_schema(t, schema_ctx) for t in result]

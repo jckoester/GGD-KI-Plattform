@@ -241,12 +241,12 @@ def _assistent(tool_groups=("image_generation",), image_kinds=None):
     return SimpleNamespace(tool_groups=list(tool_groups), image_kinds=image_kinds)
 
 
-def _schema(assistant):
+def _schema(assistant, erlaubte_modelle=None):
     from app.chat import router
+    from app.chat.tools import SchemaContext
 
-    return router._generate_image_definition(assistant)["function"]["parameters"][
-        "properties"
-    ]
+    ctx = SchemaContext(assistant=assistant, erlaubte_modelle=erlaubte_modelle)
+    return router._generate_image_definition(ctx)["function"]["parameters"]["properties"]
 
 
 def test_mehrere_bildarten_erzeugen_ein_enum(bildarten):
@@ -363,6 +363,121 @@ def test_tools_for_liefert_fertige_dicts(bildarten):
     assert len(bild) == 1
     assert isinstance(bild[0].definition, dict)
     assert bild[0].definition["function"]["name"] == "generate_image"
+
+
+# ── Team-Filter zur Laufzeit (Schritt 5) ────────────────────────────────────────────
+
+
+def test_nicht_freigeschaltete_bildart_erscheint_nicht_im_schema(bildarten):
+    """Was der Proxy mit 403 abwiese, soll das Chat-Modell gar nicht erst sehen."""
+    props = _schema(_assistent(), erlaubte_modelle={"bild-standard", "chat-standard"})
+
+    assert "bildart" not in props, "Nur eine übrig → kein Auswahlparameter"
+    assert props["format"]["enum"] == ["quadratisch"]
+
+
+def test_beide_freigeschaltet_ergibt_die_volle_auswahl(bildarten):
+    props = _schema(_assistent(), erlaubte_modelle={"bild-standard", "bild-flux2"})
+
+    assert props["bildart"]["enum"] == ["standard", "formatwahl"]
+
+
+def test_unbekannte_freigabe_filtert_nicht(bildarten):
+    """None heißt „Proxy nicht erreichbar" — nicht „nichts erlaubt".
+
+    Der wichtigste Fall des ganzen Schritts: Ein Filter, der bei einer Störung alles
+    wegnimmt, machte aus einem Anzeigeproblem einen Totalausfall.
+    """
+    props = _schema(_assistent(), erlaubte_modelle=None)
+
+    assert props["bildart"]["enum"] == ["standard", "formatwahl"]
+
+
+def test_leere_freigabe_filtert_ebenfalls_nicht(bildarten):
+    """Bliebe nichts übrig, wäre ein Werkzeug ohne Auswahl die schlechtere Auskunft.
+
+    Dann soll der Proxy antworten — seine Ablehnung wird in einen lesbaren Satz übersetzt.
+    """
+    props = _schema(_assistent(), erlaubte_modelle=set())
+
+    assert props["bildart"]["enum"] == ["standard", "formatwahl"]
+
+
+async def test_handler_nutzt_keine_gesperrte_bildart(bildarten):
+    """Was das Schema verbirgt, muss der Handler auch ablehnen."""
+    from app.chat import router
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        return_value=ImageGenerationResult(image_bytes=b"PNG", cost_usd=0.02)
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k", assistant=_assistent(),
+        erlaubte_modelle={"bild-standard"},
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance), \
+         patch.object(router, "save_generated_image", new=AsyncMock(return_value=uuid4())):
+        await router._exec_generate_image({"prompt": "x", "bildart": "formatwahl"}, ctx)
+
+    assert instance.generate_image.await_args.kwargs["model"] == "bild-standard"
+
+
+# ── Lesbare Fehlermeldungen statt 403 ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "status, erwartet",
+    [
+        (403, "nicht freigeschaltet"),
+        (401, "nicht freigeschaltet"),
+        (429, "Budget"),
+        (500, "fehlgeschlagen"),
+        (None, "fehlgeschlagen"),
+    ],
+)
+async def test_ablehnung_wird_uebersetzt(bildarten, status, erwartet):
+    """Ein durchgereichtes „HTTP 403" wäre für eine Schülerin wertlos."""
+    from app.chat import router
+    from app.litellm.client import ImageGenerationError
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        side_effect=ImageGenerationError("abgelehnt", status_code=status)
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k", assistant=_assistent(),
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+
+    assert result["status"] == "error"
+    assert erwartet in result["error"]
+    instance.close.assert_awaited_once()
+
+
+async def test_fehlertext_nennt_die_bildart(bildarten):
+    """Damit das Chat-Modell sagen kann, *was* gesperrt ist — nicht nur „ging nicht"."""
+    from app.chat import router
+    from app.litellm.client import ImageGenerationError
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        side_effect=ImageGenerationError("nope", status_code=403)
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k",
+        assistant=_assistent(image_kinds=["formatwahl"]),
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+
+    assert "Mit Formatwahl" in result["error"]
 
 
 def test_tools_for_veraendert_die_registry_nicht(bildarten):

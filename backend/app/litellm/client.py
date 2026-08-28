@@ -17,6 +17,21 @@ class ImageGenerationResult:
     cost_usd: Optional[float] = None
 
 
+class ImageGenerationError(RuntimeError):
+    """Fehlgeschlagener Bild-Call, mit HTTP-Status.
+
+    Der Status ist der Unterschied zwischen „das darfst du nicht" (403), „dein Budget ist
+    aufgebraucht" (429) und „da ist etwas kaputt" (alles andere). Ohne ihn müsste der
+    Aufrufer im Fehlertext des Anbieters herumraten und könnte der Nutzer:in nur ein
+    allgemeines „hat nicht geklappt" zeigen — bei den ersten beiden Fällen die schlechteste
+    Auskunft, weil sie beide eine klare, handhabbare Ursache haben.
+    """
+
+    def __init__(self, message: str, *, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class LiteLLMClient:
     """Schlanker Wrapper um die LiteLLM Management API."""
 
@@ -648,7 +663,10 @@ class LiteLLMClient:
                 "LiteLLM generate_image fehlerhaft: status=%d, model=%s, body=%s",
                 response.status_code, model, response.text[:500],
             )
-            raise RuntimeError(f"Failed to generate image: {response.text}")
+            raise ImageGenerationError(
+                f"Failed to generate image: {response.text}",
+                status_code=response.status_code,
+            )
 
         raw_cost = response.headers.get("x-litellm-response-cost")
         try:

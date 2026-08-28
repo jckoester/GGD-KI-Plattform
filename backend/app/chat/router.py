@@ -22,8 +22,15 @@ from app.auth.jwt import JwtPayload
 from app.ratelimit.dependency import rate_limit
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
-from app.chat.tools import ChatTool, ToolContext, register_tool, tools_for
+from app.chat.tools import (
+    ChatTool,
+    SchemaContext,
+    ToolContext,
+    register_tool,
+    tools_for,
+)
 from app.chat.image_moderation import image_prompt_block_reason
+from app.litellm.team_models import erlaubte_modelle_fuer
 from app.chat.image_models import (
     Bildart,
     alle_bildarten,
@@ -51,7 +58,7 @@ from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
 from app.pedagogy.compose import compose_system_content, is_student_treatment
-from app.litellm.client import LiteLLMClient
+from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 
@@ -626,34 +633,67 @@ def _build_generate_image_tool(bildarten: list[Bildart]) -> dict:
     }
 
 
-def bildarten_fuer(assistant: Any) -> list[Bildart]:
-    """Die Bildarten, die dieser Assistent führen darf.
+def bildarten_fuer(
+    assistant: Any, erlaubte_modelle: Optional[set[str]] = None
+) -> list[Bildart]:
+    """Die Bildarten, die dieser Assistent für diese Nutzer:in führen darf.
 
-    Leer oder nicht gesetzt heißt **alle konfigurierten** — so behalten Assistenten aus der
-    Zeit vor der Mehrmodell-Fähigkeit ihr Verhalten, ohne Datenmigration. IDs, die es nicht
-    (mehr) gibt, werden übergangen; bleibt dabei nichts übrig, gilt ebenfalls alles, damit
-    eine verwaiste Auswahl den Assistenten nicht stumm schaltet.
+    Zwei Filter nacheinander:
+
+    1. **Auswahl des Assistenten.** Leer oder nicht gesetzt heißt *alle konfigurierten* —
+       so behalten Assistenten aus der Zeit vor der Mehrmodell-Fähigkeit ihr Verhalten,
+       ohne Datenmigration. IDs, die es nicht (mehr) gibt, werden übergangen; bleibt dabei
+       nichts übrig, gilt ebenfalls alles, damit eine verwaiste Auswahl den Assistenten
+       nicht stumm schaltet.
+    2. **Freigabe des Modells für das Team der Nutzer:in.** Was der Proxy ohnehin mit 403
+       abweisen würde, soll das Chat-Modell gar nicht erst sehen — sonst steht im Gespräch
+       ein Fehler, den die Schülerin nicht auflösen kann.
+
+    ``erlaubte_modelle=None`` heißt **unbekannt** (Proxy nicht erreichbar) und filtert
+    nicht: Der Filter ist Ergonomie, die Durchsetzung bleibt beim Proxy. Ein Filter, der
+    bei einer Störung alles wegnimmt, machte aus einem Anzeigeproblem einen Totalausfall.
+
+    Bliebe nach Filter 2 nichts übrig, wird ebenfalls nicht gefiltert: Ein Bild-Assistent
+    ohne jede Bildart könnte gar nichts, und die Fehlermeldung des Proxys ist dann immer
+    noch aussagekräftiger als ein Werkzeug ohne Auswahl.
     """
     alle = alle_bildarten()
     gewuenscht = getattr(assistant, "image_kinds", None) or []
-    if not gewuenscht:
+    if gewuenscht:
+        ausgewaehlt = [b for b in alle if b.id in gewuenscht]
+        if ausgewaehlt:
+            alle = ausgewaehlt
+        else:
+            logger.warning(
+                "Assistent führt nur unbekannte Bildarten %s — es gelten alle konfigurierten.",
+                gewuenscht,
+            )
+
+    if erlaubte_modelle is None:
         return alle
-    ausgewaehlt = [b for b in alle if b.id in gewuenscht]
-    if not ausgewaehlt:
-        logger.warning(
-            "Assistent führt nur unbekannte Bildarten %s — es gelten alle konfigurierten.",
-            gewuenscht,
+    freigegeben = [b for b in alle if b.modell in erlaubte_modelle]
+    if not freigegeben:
+        logger.info(
+            "Keine Bildart dieses Assistenten ist freigeschaltet (Modelle: %s) — "
+            "es wird nicht gefiltert, der Proxy entscheidet.",
+            [b.modell for b in alle],
         )
         return alle
-    return ausgewaehlt
+    return freigegeben
 
 
-def _generate_image_definition(assistant: Any) -> dict:
-    """Schema-Callable: wird je Chat mit dem aktiven Assistenten ausgewertet."""
-    return _build_generate_image_tool(bildarten_fuer(assistant))
+def _generate_image_definition(ctx: SchemaContext) -> dict:
+    """Schema-Callable: wird je Chat mit Assistent und Modell-Freigaben ausgewertet."""
+    return _build_generate_image_tool(
+        bildarten_fuer(ctx.assistant, ctx.erlaubte_modelle)
+    )
 
 
-def _resolve_bildart(name: Optional[str], assistant: Any = None) -> Bildart:
+def _resolve_bildart(
+    name: Optional[str],
+    assistant: Any = None,
+    erlaubte_modelle: Optional[set[str]] = None,
+) -> Bildart:
     """Bildart-ID → Bildart, **beschränkt auf die des Assistenten**.
 
     Tolerant statt fehlerhaft, aus demselben Grund wie bei den Formaten: Eine erfundene
@@ -666,7 +706,7 @@ def _resolve_bildart(name: Optional[str], assistant: Any = None) -> Bildart:
     Verwirrung oder weil es sie aus dem Gesprächsverlauf kennt. Ohne diese Prüfung ließe
     sich die Auswahl des Admins damit umgehen, samt Kostenrahmen.
     """
-    erlaubt = bildarten_fuer(assistant)
+    erlaubt = bildarten_fuer(assistant, erlaubte_modelle)
     for b in erlaubt:
         if b.id == name:
             return b
@@ -727,6 +767,28 @@ def _image_prompt_block_reason(prompt: str) -> Optional[str]:
     return image_prompt_block_reason(prompt)
 
 
+def _bild_fehlertext(status_code: Optional[int], bildart: Bildart) -> str:
+    """Ablehnung des Proxys → ein Satz, den das Chat-Modell weitergeben kann.
+
+    Der Text geht an den LLM, nicht direkt an die Nutzer:in — er muss also erklären, **was
+    zu tun ist**, ohne Interna zu nennen. Ein durchgereichtes „HTTP 403" wäre für eine
+    Schülerin wertlos und für die Lehrkraft irreführend.
+    """
+    if status_code in (401, 403):
+        return (
+            f"Die Bildart „{bildart.label}“ ist für dieses Konto nicht freigeschaltet. "
+            "Sag der Nutzerin oder dem Nutzer, dass eine Lehrkraft oder die "
+            "Administration sie freischalten muss, und biete an, es mit einer anderen "
+            "Bildart zu versuchen."
+        )
+    if status_code == 429:
+        return (
+            "Das Budget für Bilder ist aufgebraucht oder es wurden zu viele Anfragen in "
+            "kurzer Zeit gestellt. Bitte später erneut versuchen."
+        )
+    return "Bildgenerierung fehlgeschlagen."
+
+
 async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     """Erzeugt ein Bild über den LiteLLM-Bild-Endpoint (Schritt 2: roh, ohne Persistenz).
 
@@ -757,7 +819,9 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     # Auflösungskette: Bildart → Modell, Formate, response_format. Das Chat-Modell nennt
     # eine Bildart-ID (ab Schritt 3 im Werkzeug-Schema angeboten); solange es das nicht
     # tut, greift die Standard-Bildart — Verhalten wie zuvor.
-    bildart = _resolve_bildart(args.get("bildart"), ctx.assistant)
+    bildart = _resolve_bildart(
+        args.get("bildart"), ctx.assistant, ctx.erlaubte_modelle
+    )
     # `format` ist das neue Feld; `size` bleibt als Fallback, falls ein Modell noch die alte
     # Pixel-Schreibweise liefert — ein passender Name gewinnt, sonst greift der Default.
     format_name, size, format_hinweis = _resolve_image_format(
@@ -777,6 +841,12 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             # eine URL liefern — die verarbeitet der Client bewusst nicht.
             response_format=bildart.response_format or None,
         )
+    except ImageGenerationError as e:
+        logger.warning(
+            "Bildgenerierung abgelehnt: status=%s bildart=%s modell=%s",
+            e.status_code, bildart.id, bildart.modell,
+        )
+        return {"status": "error", "error": _bild_fehlertext(e.status_code, bildart)}
     except Exception:
         logger.exception("Bildgenerierung fehlgeschlagen")
         return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
@@ -1243,7 +1313,17 @@ async def chat(
         )
         _is_group_teacher = _mbr.scalar_one_or_none() is not None
 
-    _active_tools = tools_for(active_assistant, conversation_group_id, _is_group_teacher)
+    # Modell-Freigaben der Nutzer:in — einmal je Anfrage, aus einem Cache mit kurzer TTL.
+    # Damit bietet das Werkzeug-Schema nur Bildarten an, deren Modell für diesen Jahrgang
+    # freigeschaltet ist. None = nicht zu erfahren → es wird nicht gefiltert; die
+    # Durchsetzung bleibt ohnehin beim Proxy.
+    _erlaubte_modelle = await erlaubte_modelle_fuer(
+        current_user.roles, getattr(current_user, "grade", None)
+    )
+
+    _active_tools = tools_for(
+        active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle
+    )
     _tool_defs = [t.definition for t in _active_tools]
     _tool_map = {t.name: t for t in _active_tools}
 
@@ -1404,6 +1484,7 @@ async def chat(
                         conversation_id=conversation_id,
                         litellm_key=litellm_key,
                         assistant=active_assistant,
+                        erlaubte_modelle=_erlaubte_modelle,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:
