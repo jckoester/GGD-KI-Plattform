@@ -231,17 +231,6 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       mode: image_generation
-      # ⚠️ OFFEN — dieser Preis wird derzeit NICHT angewendet: Jedes Bild wird mit 0,00 $
-      # gebucht (gemessen). LiteLLM 1.83.7 löst Bildpreise ausschließlich über seine
-      # eingebaute Preistabelle `litellm.model_cost` auf (Namensmuster wie
-      # `1024-x-1024/dall-e-3`) und zieht `model_info` des Deployments dabei gar nicht heran —
-      # anders als bei Chat und Embedding, wo die Preise hier greifen (verifiziert).
-      # `output_cost_per_image` wäre erst recht falsch: Der Rechner kennt nur
-      # `input_cost_per_image` und `input_cost_per_pixel`.
-      # Folge: Bildgenerierung läuft am EUR-Budget vorbei. Begrenzt tragbar, weil die
-      # Bild-Freigabematrix und das Jugendschutz-Gate den Zugang ohnehin einschränken —
-      # aber vor breiter Freigabe zu lösen (eigener Kosten-Callback oder Eintrag in die
-      # Preistabelle).
       # ⚠️ Dieser Wert allein bleibt WIRKUNGSLOS: LiteLLMs Bild-Kostenrechner liest nur
       # seine eingebaute Preistabelle, nicht das `model_info` des Deployments (anders als
       # bei Chat und Embedding, wo die Preise hier greifen). Er steht trotzdem hier, weil
