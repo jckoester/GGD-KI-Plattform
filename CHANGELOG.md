@@ -95,6 +95,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   > **Host**-Verzeichnis einbinden. Auf getrennten Hosts entfällt die Datei; dann über das
   > Proxy-Log überwachen (siehe `docs/admin/content-moderation.md`).
 
+### Geändert (Budget)
+
+- **Das Budget gilt jetzt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
+  persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
+  Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in dichten
+  Wochen zusätzlich zur Verfügung — Ferien und Klassenarbeitsphasen gleichen sich aus.
+
+  - Welche Wochen zählen, kommt aus `school_year.yaml`; **Ferienwochen bekommen keine
+    Zuteilung**. Die Jahressumme ist `Wochenbetrag × Unterrichtswochen` und steht beim
+    Eintragen in der Admin-Oberfläche — der Betrag, auf den sich die Schule festlegt.
+  - Der Vorsprung ist gedeckelt (`vorsprung_wochen`, Vorgabe 3): Wer lange nichts nutzt,
+    sammelt kein halbes Jahr an. Das ersetzt die Tempobegrenzung der Rücksetzung.
+  - Neuer Cron **montags 05:00** (`weekly_budget_accrual.py`), idempotent und mit Nachholen
+    ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
+    `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
+
 ### Entfernt
 
 - **Der lokale Ollama-Fallback entfällt — es gibt keinen Rückfall bei erschöpftem Budget.**
@@ -195,6 +211,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Fächer-Seed sie braucht. Schrittnummern durchgezählt (es gab keinen Schritt 6).
 
 ### Migration
+
+- ⚠️ **Budget: Umstellung aufs Wochenmodell — drei Schritte, in dieser Reihenfolge.**
+
+  1. `config/budget_tiers.yaml` auf `wochenbudget_eur` umstellen (Vorlage:
+     `config/budget_tiers.example.yaml`). **Das alte `max_budget_eur` wird nicht mehr
+     gelesen** — es als Wochenbetrag zu deuten wäre eine stille Kürzung auf ein Viertel.
+     Ohne Umstellung protokolliert der Start einen Fehler und es gibt kein Budget.
+  2. `python scripts/migrate_budget_duration.py --verbrauch-zuruecksetzen` — entfernt
+     `budget_duration: 1mo` aus der Proxy-Datenbank. Solange das steht, setzt LiteLLM den
+     Verbrauch weiter monatlich zurück, ohne dass etwas fehlschlägt.
+  3. `python scripts/weekly_budget_accrual.py --neuaufbau` — ersetzt die alten
+     Monats-Obergrenzen.
+
+  Die Reihenfolge ist nicht beliebig: `max_budget = NULL` *und* `= 0` bedeuten bei LiteLLM
+  gleichermaßen **kein Limit**. Deshalb lässt Schritt 2 die Grenzen stehen und erst
+  Schritt 3 ersetzt sie — so gibt es nie ein Konto ohne Limit.
+
+- **`alembic upgrade head`** — Migration `0051`: Tabelle `budget_accrual` (Merkposten der
+  wöchentlichen Zuteilung, wird mit dem Konto gelöscht).
 
 - **`alembic upgrade head`** — Migrationen `0047`–`0050`: `assistants.image_kinds`,
   `generated_images.bildart`, sowie `provider_model` an `messages`, `generated_images` und

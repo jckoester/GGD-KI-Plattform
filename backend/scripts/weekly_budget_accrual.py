@@ -17,6 +17,7 @@ Verwendung:
     python scripts/weekly_budget_accrual.py --dry-run
     python scripts/weekly_budget_accrual.py --stichtag 2026-11-10
     python scripts/weekly_budget_accrual.py --pseudonym <pseudonym>
+    python scripts/weekly_budget_accrual.py --neuaufbau   # einmalig nach der Umstellung
 """
 import argparse
 import asyncio
@@ -45,7 +46,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None) -> None:
+async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None,
+              neuaufbau: bool = False) -> None:
     cfg = load_school_year()
     counters: dict[str, int] = defaultdict(int)
 
@@ -85,6 +87,7 @@ async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None) ->
                         verbrauch_usd=info.get("spend") or 0.0,
                         stichtag=stichtag,
                         cfg=cfg,
+                        neuaufbau=neuaufbau,
                     )
                 except Exception:
                     logger.exception("Zuteilung nicht planbar pseudonym=%s", user.pseudonym)
@@ -144,12 +147,25 @@ def main() -> None:
     p.add_argument("--stichtag", type=date.fromisoformat, default=None,
                    help="Datum der Zuteilung (Default: heute)")
     p.add_argument("--pseudonym", default=None, help="nur diese Nutzerin")
+    p.add_argument(
+        "--neuaufbau", action="store_true",
+        help="Obergrenzen aus den Wochenbeträgen NEU setzen statt aufzustocken. "
+             "Einmalig nach der Umstellung vom Monatsmodell — verwirft dabei die alte "
+             "Grenze, die sonst als schützenswert gälte.",
+    )
     args = p.parse_args()
+
+    if args.neuaufbau:
+        logger.warning(
+            "NEUAUFBAU: bestehende Obergrenzen werden verworfen und aus den "
+            "Wochenbeträgen neu gesetzt. Nur nach der Umstellung vom Monatsmodell."
+        )
 
     asyncio.run(run(
         dry_run=args.dry_run,
         stichtag=args.stichtag or date.today(),
         pseudonym_filter=args.pseudonym,
+        neuaufbau=args.neuaufbau,
     ))
 
 

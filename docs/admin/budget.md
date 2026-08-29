@@ -2,14 +2,27 @@
 
 ## Konzept
 
-Jede Nutzerin und jeder Nutzer hat ein monatliches Budget in Euro. Günstigere
-Modelle verbrauchen das Budget langsamer; leistungsstärkere schneller.
+Jede Nutzerin und jeder Nutzer hat ein Budget in Euro **je Unterrichtswoche**. Günstigere
+Modelle verbrauchen es langsamer; leistungsstärkere schneller.
+
+**Es wird nichts zurückgesetzt.** Die persönliche Obergrenze wächst jede Unterrichtswoche
+um den eingetragenen Betrag, der Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen
+übrig bleibt, steht in dichten Wochen zusätzlich zur Verfügung — Ferien und
+Klassenarbeitsphasen gleichen sich dadurch von selbst aus.
+
+Damit daraus kein Ansparkonto wird, eilt die Obergrenze dem Verbrauch höchstens
+`vorsprung_wochen` Wochenbeträge voraus (Vorgabe: 3). Wer ein halbes Jahr nichts nutzt,
+sammelt kein halbes Jahr an. Das ist die Tempobegrenzung, die früher die monatliche
+Rücksetzung übernommen hat.
+
+Welche Wochen Unterrichtswochen sind, steht in `school_year.yaml`; Ferienwochen bekommen
+keine Zuteilung. Die **Jahressumme** ist `Wochenbetrag × Unterrichtswochen` — der Betrag,
+auf den sich die Schule festlegt. Die Admin-Oberfläche zeigt ihn beim Eintragen an.
 
 Intern arbeitet LiteLLM mit US-Dollar. Das Backend holt monatlich den aktuellen
-EUR→USD-Wechselkurs von der Europäischen Zentralbank (ECB) und berechnet daraus
-die USD-Limits, die LiteLLM als harte Grenzen durchsetzt. Überschreitungen lehnt der Proxy
-ab; die Plattform zeigt Nutzer:innen dann eine verständliche Meldung und den Hinweis, dass
-das Budget zum nächsten Abrechnungszeitraum wieder aufgefüllt wird.
+EUR→USD-Wechselkurs von der Europäischen Zentralbank (ECB); jede Wochenaufstockung wird mit
+dem dann gültigen Kurs umgerechnet. Überschreitungen lehnt der Proxy ab; die Plattform
+zeigt Nutzer:innen dann eine verständliche Meldung.
 
 > **Einen Rückfall auf ein anderes Modell gibt es nicht.** Budget aufgebraucht heißt:
 > keine Nutzung bis zum nächsten Zeitraum (siehe [Modell-Szenarien](modell-szenarien.md)).
@@ -76,14 +89,46 @@ Zwei automatische Jobs sorgen dafür, dass Budgets korrekt verwaltet werden:
 | Job | Zeitplan | Beschreibung |
 |-----|---------|-------------|
 | ECB-Wechselkurs abrufen | 1. des Monats, 06:00 Uhr | Holt den aktuellen EUR→USD-Kurs |
-| Budget-Reconcile | 1. des Monats, 07:00 Uhr | Berechnet USD-Limits neu und setzt sie in LiteLLM |
+| Team-Abgleich | 1. des Monats, 07:00 Uhr | Gleicht die LiteLLM-Team-Zugehörigkeit an (Jahrgang/Rolle) |
+| **Budget-Zuteilung** | **montags, 05:00 Uhr** | Hebt die Obergrenzen um einen Wochenbetrag an |
 
 Bei Bedarf manuell ausführen:
 
 ```bash
 docker compose exec backend python scripts/refresh_ecb_rate.py
 docker compose exec backend python scripts/monthly_team_reconcile.py
+docker compose exec backend python scripts/weekly_budget_accrual.py --dry-run
 ```
+
+> Der Zuteilungslauf ist **idempotent**: Zweimal in derselben Unterrichtswoche ausgeführt
+> bucht er einmal. Fällt er aus, holt der nächste die fehlenden Wochen nach — begrenzt
+> durch denselben Vorsprung, ein ausgefallener Cron ist also kein Freibrief. In
+> Ferienwochen tut er nichts.
+
+## Umstellung vom Monatsmodell (einmalig)
+
+Bis 08/2026 war das Budget monatlich und wurde von LiteLLM zurückgesetzt. Bestandsnutzer
+tragen dafür ein `budget_duration: 1mo`. **Solange das steht, setzt LiteLLM ihren Verbrauch
+weiterhin monatlich zurück** — der Wochenlauf liefe daneben her, ohne dass etwas
+fehlschlägt.
+
+```bash
+# 1. budget_tiers.yaml auf `wochenbudget_eur` umstellen (Vorlage: .example)
+# 2. Zeitraum entfernen (--verbrauch-zuruecksetzen zum Schuljahresbeginn)
+docker compose exec backend python scripts/migrate_budget_duration.py --dry-run
+docker compose exec backend python scripts/migrate_budget_duration.py --verbrauch-zuruecksetzen
+# 3. Obergrenzen aus den Wochenbeträgen neu aufbauen
+docker compose exec backend python scripts/weekly_budget_accrual.py --neuaufbau
+```
+
+> **Diese Reihenfolge einhalten.** Bei LiteLLM bedeutet `max_budget = NULL` *und*
+> `max_budget = 0` gleichermaßen **kein Limit** (gemessen). Die Migration lässt die
+> Obergrenzen deshalb bewusst stehen; erst der Neuaufbau ersetzt sie. So gibt es zu keinem
+> Zeitpunkt ein Konto ohne Limit.
+>
+> `--neuaufbau` ist der **einzige** Modus, der eine Obergrenze senkt. Er setzt sie auf
+> „bisheriger Verbrauch + ein Wochenbetrag", sperrt also niemanden aus. Im Regellauf wird
+> nie gekürzt.
 
 ## Admin-Übersicht (`/budget`)
 

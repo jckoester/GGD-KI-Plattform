@@ -332,3 +332,61 @@ async def test_dry_run_schreibt_nichts():
     client.update_user_budget.assert_not_awaited()
     db.commit.assert_not_awaited()
     assert not db.add.call_args_list
+
+
+# ── Neuaufbau nach der Umstellung ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_neuaufbau_verwirft_die_alte_monatsgrenze():
+    """Der einzige Fall, in dem gekürzt werden darf.
+
+    Nach der Umstellung trägt `max_budget` einen Monatsbetrag. Die Schutzregel „nie
+    kürzen" ließe ihn monatelang stehen — das Wochenmodell wirkte dann gar nicht.
+    """
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(), "p",
+        wochenbetrag_usd=1.0,
+        aktuelle_grenze_usd=30.0,     # alter Monatsbetrag
+        verbrauch_usd=0.0,
+        stichtag=date(2026, 9, 15),
+        cfg=_schuljahr(),
+        neuaufbau=True,
+    )
+
+    assert zuteilung.neue_grenze_usd == 1.0, "aus dem Wochenbetrag neu aufgebaut"
+
+
+@pytest.mark.asyncio
+async def test_regellauf_kuerzt_dieselbe_grenze_nicht():
+    """Gegenprobe — ohne das Flag bleibt die Zusicherung bestehen."""
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=30.0, verbrauch_usd=0.0,
+        stichtag=date(2026, 9, 15), cfg=_schuljahr(),
+    )
+
+    assert zuteilung.neue_grenze_usd == 30.0
+
+
+@pytest.mark.asyncio
+async def test_neuaufbau_sperrt_niemanden_aus():
+    """Wer schon verbraucht hat, darf durch den Neuaufbau nicht sofort gesperrt werden.
+
+    Bei null anzufangen ergäbe eine Grenze **unter** dem Verbrauch — und bei einem
+    Wochenbetrag von wenigen Cent bliebe das für den Rest des Schuljahres so.
+    """
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=30.0, verbrauch_usd=2.0,
+        stichtag=date(2026, 9, 15), cfg=_schuljahr(), neuaufbau=True,
+    )
+
+    assert zuteilung.neue_grenze_usd == 3.0, "Verbrauch + eine Woche"
+    assert zuteilung.neue_grenze_usd > 2.0, "nutzbar, nicht gesperrt"

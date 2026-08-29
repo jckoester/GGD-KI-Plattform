@@ -78,8 +78,15 @@ async def plane(
     verbrauch_usd: float,
     stichtag: date,
     cfg: Optional[SchoolYearConfig] = None,
+    neuaufbau: bool = False,
 ) -> Zuteilung:
-    """Ermittelt die Zuteilung für **eine** Nutzerin, ohne sie zu schreiben."""
+    """Ermittelt die Zuteilung für **eine** Nutzerin, ohne sie zu schreiben.
+
+    ``neuaufbau=True`` ist der einmalige Sonderfall nach der Umstellung vom Monatsmodell:
+    Die bestehende Grenze wird **ignoriert** statt geschützt, weil sie einen Monatsbetrag
+    trägt und die Schutzregel sie sonst monatelang stehen ließe. Nur so, nie im Regellauf —
+    sonst wäre die Zusicherung „es wird nie gekürzt" wertlos.
+    """
     if not wochenbetrag_usd:
         return Zuteilung(None, 0, None, "kein Wochenbetrag konfiguriert")
 
@@ -88,6 +95,24 @@ async def plane(
     if woche is None:
         # Ferien oder außerhalb des Schuljahres — es gibt nichts zuzuteilen.
         return Zuteilung(None, 0, None, "keine Unterrichtswoche")
+
+    if neuaufbau:
+        # Die alte Grenze wird verworfen — aber **auf dem Verbrauch aufgesetzt**, nicht
+        # bei null. Sonst läge die neue Grenze unter dem bereits Verbrauchten und die
+        # Nutzerin wäre ab sofort gesperrt; bei einem Wochenbetrag von wenigen Cent für
+        # den Rest des Schuljahres. Wer den Verbrauch mit zurücksetzt (Schuljahresbeginn),
+        # landet ohnehin bei genau einem Wochenbetrag.
+        return Zuteilung(
+            berechne(
+                wochenbetrag_usd=wochenbetrag_usd,
+                aktuelle_grenze_usd=verbrauch_usd,
+                verbrauch_usd=verbrauch_usd,
+                fehlende_wochen=1,
+                vorsprung=vorsprung_wochen(),
+            ),
+            1,
+            woche.index,
+        )
 
     stand = await db.get(BudgetAccrual, pseudonym)
 
