@@ -61,15 +61,13 @@ async def run(
 
             # Phase A: Budget
             try:
-                max_budget_eur, budget_duration = get_budget_for(roles, user.grade)
+                max_budget_eur = get_budget_for(roles, user.grade)
                 max_budget_usd = round(max_budget_eur * eur_usd, 2) if max_budget_eur else None
                 if not dry_run:
-                    await client.update_user_budget(
-                        user.pseudonym, max_budget_usd, budget_duration
-                    )
+                    await client.update_user_budget(user.pseudonym, max_budget_usd)
                     logger.debug(
-                        "Budget aktualisiert pseudonym=%s max_budget_usd=%s budget_duration=%s",
-                        user.pseudonym, max_budget_usd, budget_duration
+                        "Budget aktualisiert pseudonym=%s max_budget_usd=%s",
+                        user.pseudonym, max_budget_usd
                     )
                 counters["budget_updated"] += 1
             except Exception:

@@ -76,7 +76,7 @@ async def ensure_litellm_user(
         new_primary_role = get_primary_role(roles)
 
         # Budget-Ermittlung
-        max_budget_eur, budget_duration = get_budget_for(roles, grade_int)
+        max_budget_eur = get_budget_for(roles, grade_int)
         
         # Wechselkurs abrufen
         eur_usd = await get_current_rate(db)
@@ -92,18 +92,16 @@ async def ensure_litellm_user(
         try:
             existing = await client.get_user(pseudonym)
             if existing is None:
-                await client.create_user(pseudonym, max_budget_usd, budget_duration)
+                await client.create_user(pseudonym, max_budget_usd)
                 logger.info(
-                    "LiteLLM-User angelegt pseudonym=%s max_budget_usd=%s budget_duration=%s",
-                    pseudonym, max_budget_usd, budget_duration
+                    "LiteLLM-User angelegt pseudonym=%s max_budget_usd=%s (Wochenbetrag)",
+                    pseudonym, max_budget_usd
                 )
             else:
                 grade_changed = old_grade != grade_int
                 role_changed = old_role is not None and old_role != new_primary_role
                 if grade_changed or role_changed:
-                    await client.update_user_budget(
-                        pseudonym, max_budget_usd, budget_duration
-                    )
+                    await client.update_user_budget(pseudonym, max_budget_usd)
                     logger.info(
                         "LiteLLM-Budget aktualisiert pseudonym=%s old_role=%s new_role=%s "
                         "old_grade=%s new_grade=%s max_budget_usd=%s",

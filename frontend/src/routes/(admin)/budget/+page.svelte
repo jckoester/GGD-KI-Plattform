@@ -46,22 +46,31 @@
     );
 
     // Kostenschaetzung (client-seitig, keine Server-Runde)
-    function monthlyCost(key) {
+    function periodCost(key) {
         const budget = parseFloat(editedBudgets[key] || '0');
         const count = parseInt(estimatedCounts[key] || '0', 10);
         return isFinite(budget) && isFinite(count) ? budget * count : 0;
     }
 
+    // Zahl der Unterrichtswochen aus school_year.yaml (2026/27: 40). Ohne lesbare
+    // Datei liefert das Backend null — dann bleibt die Jahresspalte leer, statt eine
+    // erfundene Zahl zu zeigen.
+    let wochen = $derived(data?.unterrichtswochen);
+
     function annualCost(key) {
-        return monthlyCost(key) * 12;
+        return wochen ? periodCost(key) * wochen : null;
     }
 
-    function totalMonthly() {
-        return data?.grades.reduce((s, g) => s + monthlyCost(g.key), 0) ?? 0;
+    function totalPeriod() {
+        return data?.grades.reduce((s, g) => s + periodCost(g.key), 0) ?? 0;
     }
 
     function totalAnnual() {
-        return totalMonthly() * 12;
+        return wochen ? totalPeriod() * wochen : null;
+    }
+
+    function eur(betrag) {
+        return betrag == null ? '—' : `${betrag.toFixed(2)} €`;
     }
 
     // Speichern-Flow
@@ -124,11 +133,11 @@
                 <thead class="bg-light-ma dark:bg-dark-ma text-left">
                     <tr>
                         <th class="p-3 text-light-tx dark:text-dark-tx font-semibold">Jahrgang/Rolle</th>
-                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold">Monatl. Budget (€)</th>
+                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold">Budget je Unterrichtswoche (€)</th>
                         <th class="p-3 text-light-tx dark:text-dark-tx font-semibold text-center">Nutzer (DB)</th>
                         <th class="p-3 text-light-tx dark:text-dark-tx font-semibold">Geschätzte Nutzerzahl</th>
-                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold text-right">Monatl. Max-Kosten</th>
-                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold text-right">Jährl. Max-Kosten</th>
+                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold text-right">Max-Kosten je Woche</th>
+                        <th class="p-3 text-light-tx dark:text-dark-tx font-semibold text-right">Max-Kosten je Schuljahr</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -159,10 +168,10 @@
                                 />
                             </td>
                             <td class="p-3 text-right text-light-tx dark:text-dark-tx">
-                                {monthlyCost(grade.key).toFixed(2)} €
+                                {eur(periodCost(grade.key))}
                             </td>
                             <td class="p-3 text-right text-light-tx dark:text-dark-tx">
-                                {annualCost(grade.key).toFixed(2)} €
+                                {eur(annualCost(grade.key))}
                             </td>
                         </tr>
                     {/each}
@@ -174,10 +183,10 @@
                         <td class="p-3"></td>
                         <td class="p-3"></td>
                         <td class="p-3 text-right text-light-tx dark:text-dark-tx">
-                            {totalMonthly().toFixed(2)} €
+                            {eur(totalPeriod())}
                         </td>
                         <td class="p-3 text-right text-light-tx dark:text-dark-tx">
-                            {totalAnnual().toFixed(2)} €
+                            {eur(totalAnnual())}
                         </td>
                     </tr>
                 </tbody>
@@ -193,9 +202,36 @@
             <p><strong class="text-light-tx dark:text-dark-tx">Wirkung einer Budgetänderung:</strong></p>
             <ul class="list-disc list-inside space-y-0.5">
                 <li>Das neue Limit gilt sofort für alle bereits angemeldeten Nutzer des Jahrgangs.</li>
-                <li>Der bisher verbrauchte Betrag im laufenden Monat bleibt unverändert — nur die Obergrenze wird angepasst.</li>
+                <li>Der bisher verbrauchte Betrag bleibt unverändert — nur die Obergrenze wird angepasst.</li>
                 <li>Nutzer, die sich erstmals anmelden, erhalten automatisch das neue Budget.</li>
-                <li>Das Budget wird monatlich zurückgesetzt (Abrechnungszeitraum: 1 Monat ab Erstanmeldung).</li>
+                <li>
+                    Das Budget wird <strong>nicht zurückgesetzt.</strong> Die Obergrenze wächst
+                    jede Unterrichtswoche um den eingetragenen Betrag — was in ruhigen Wochen
+                    übrig bleibt, steht in dichten Wochen zusätzlich zur Verfügung.
+                </li>
+                <li>
+                    Der Vorsprung ist begrenzt: Die Obergrenze eilt dem Verbrauch höchstens
+                    wenige Wochen voraus (<code>vorsprung_wochen</code> in
+                    <code>budget_tiers.yaml</code>). Wer ein halbes Jahr nichts nutzt, sammelt
+                    kein halbes Jahr an.
+                </li>
+                {#if wochen}
+                    <li>
+                        Dieses Schuljahr hat <strong>{wochen} Unterrichtswochen</strong>
+                        (aus <code>school_year.yaml</code>). Ferienwochen bekommen keine
+                        Zuteilung — die Spalte „Max-Kosten je Schuljahr" ist der Betrag,
+                        auf den sich die Schule festlegt.
+                    </li>
+                {:else}
+                    <li class="text-light-re dark:text-dark-re">
+                        Die Zahl der Unterrichtswochen ist nicht ermittelbar —
+                        <code>school_year.yaml</code> prüfen. Ohne sie fehlt die Jahressumme.
+                    </li>
+                {/if}
+                <li>
+                    Zum Schuljahresbeginn startet die Zählung neu; Reste werden nicht
+                    ins nächste Schuljahr übernommen.
+                </li>
             </ul>
         </div>
 
@@ -236,10 +272,15 @@
             </ul>
 
             <p class="text-light-tx dark:text-dark-tx">
-                Geschätzte monatliche Maximalkosten gesamt: <strong>{totalMonthly().toFixed(2)} €</strong>
+                Geschätzte Maximalkosten je Unterrichtswoche: <strong>{eur(totalPeriod())}</strong>
             </p>
             <p class="text-light-tx dark:text-dark-tx">
-                Geschätzte jährliche Maximalkosten gesamt: <strong>{totalAnnual().toFixed(2)} €</strong>
+                Geschätzte Maximalkosten je Schuljahr: <strong>{eur(totalAnnual())}</strong>
+                {#if wochen}
+                    <span class="text-light-tx-2 dark:text-dark-tx-2">
+                        ({wochen} Unterrichtswochen)
+                    </span>
+                {/if}
             </p>
             <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
                 Änderungen werden sofort auf alle bestehenden Nutzer angewendet.

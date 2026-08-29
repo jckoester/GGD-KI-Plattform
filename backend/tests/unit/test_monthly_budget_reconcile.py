@@ -47,13 +47,13 @@ def _make_db_session(users):
 
 @pytest.mark.asyncio
 async def test_run_happy_path_single_student():
-    """1 Student, grade=7, rate=1.10, budget_eur=2.0 -> update_user_budget("p1", 2.2, "1mo") aufgerufen"""
+    """1 Student, grade=7, rate=1.10, budget_eur=2.0 -> update_user_budget("p1", 2.2) aufgerufen"""
     user = _make_user(pseudonym="p1", role="student", grade=7)
     session_factory = _make_db_session([user])
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=2.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team", new=AsyncMock(return_value={"unchanged": True, "added": [], "removed": []})), \
          patch("scripts.monthly_budget_reconcile._extract_current_team_ids", return_value=set()):
@@ -67,7 +67,7 @@ async def test_run_happy_path_single_student():
         await run(dry_run=False, limit=0, pseudonym_filter=None)
 
     # Budget wurde aktualisiert
-    mock_client.update_user_budget.assert_awaited_once_with("p1", 2.2, "1mo")
+    mock_client.update_user_budget.assert_awaited_once_with("p1", 2.2)
     mock_client.close.assert_awaited_once()
 
 
@@ -79,7 +79,7 @@ async def test_run_dry_run_skips_api_calls():
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=2.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team") as mock_reconcile, \
          patch("scripts.monthly_budget_reconcile._extract_current_team_ids", return_value=set()):
@@ -104,7 +104,7 @@ async def test_run_invalid_grade_skips_team_but_updates_budget():
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=2.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team") as mock_reconcile, \
          patch("scripts.monthly_budget_reconcile._extract_current_team_ids", return_value=set()):
@@ -118,7 +118,7 @@ async def test_run_invalid_grade_skips_team_but_updates_budget():
         await run(dry_run=False, limit=0, pseudonym_filter=None)
 
     # Budget wurde aktualisiert
-    mock_client.update_user_budget.assert_awaited_once_with("p1", 2.2, "1mo")
+    mock_client.update_user_budget.assert_awaited_once_with("p1", 2.2)
     # Team-Reconcile wurde NICHT aufgerufen
     mock_reconcile.assert_not_awaited()
     mock_client.close.assert_awaited_once()
@@ -133,7 +133,7 @@ async def test_run_budget_api_error_continues_to_next_user():
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=2.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team") as mock_reconcile, \
          patch("scripts.monthly_budget_reconcile._extract_current_team_ids", return_value=set()):
@@ -161,7 +161,7 @@ async def test_run_team_api_error_continues_to_next_user():
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(2.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=2.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team") as mock_reconcile, \
          patch("scripts.monthly_budget_reconcile._extract_current_team_ids", return_value=set()):
@@ -190,7 +190,7 @@ async def test_run_teacher_uses_lehrkraefte_team():
 
     with patch("scripts.monthly_budget_reconcile.AsyncSessionLocal", return_value=session_factory), \
          patch("scripts.monthly_budget_reconcile.get_current_rate", new=AsyncMock(return_value=1.10)), \
-         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=(8.0, "1mo")), \
+         patch("scripts.monthly_budget_reconcile.get_budget_for", return_value=8.0), \
          patch("scripts.monthly_budget_reconcile.LiteLLMClient") as mock_client_cls, \
          patch("scripts.monthly_budget_reconcile.reconcile_user_team", new=mock_reconcile):
 

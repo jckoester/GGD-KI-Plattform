@@ -172,12 +172,7 @@
 
                 <div class="flex items-center text-sm mb-2">
                     <span class="text-light-tx-2 dark:text-dark-tx-2">
-                        {#if $budget.budget_duration === "1mo"}
-                            Diesen Monat sind noch
-                        {:else}
-                            Noch
-                        {/if}
-                        {fmt($budget?.remaining_eur)} € von {fmt(
+                        Noch {fmt($budget?.remaining_eur)} € von {fmt(
                             $budget?.max_budget_eur,
                         )} € verfügbar.
                     </span>
@@ -188,13 +183,10 @@
                         >
                     {/if}
                 </div>
-                {#if $budget.budget_duration !== "1mo"}
-                    <div
-                        class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2"
-                    >
-                        Gültig für {fmt($budget.budget_duration)}.
-                    </div>
-                {/if}
+                <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">
+                    Dein Guthaben wächst in jeder Unterrichtswoche. Was du nicht
+                    verbrauchst, bleibt dir für spätere Wochen erhalten.
+                </div>
             {:else}
                 <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">
                     Budgetdaten können derzeit nicht angezeigt werden.

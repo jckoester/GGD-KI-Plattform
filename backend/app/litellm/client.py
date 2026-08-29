@@ -118,7 +118,6 @@ class LiteLLMClient:
         self,
         pseudonym: str,
         max_budget: Optional[float],
-        budget_duration: str,
     ) -> None:
         """
         POST /user/new
@@ -131,11 +130,14 @@ class LiteLLMClient:
         }
 
         # max_budget kann null sein (kein Limit)
-        payload = {
-            "user_id": pseudonym,
-            "max_budget": max_budget,
-            "budget_duration": budget_duration,
-        }
+        #
+        # ⚠️ `budget_duration` wird BEWUSST nicht mitgeschickt. Ohne den Schlüssel setzt
+        # LiteLLM weder Zeitraum noch `budget_reset_at` — der Verbrauch läuft das
+        # Schuljahr durch, und genau darauf baut das Wochenmodell auf (gemessen
+        # 29.08.2026, scripts/budget_reset_probe.py). `"budget_duration": None` würde
+        # einen bestehenden Zeitraum stehen lassen, `""` sogar einen Reset auf den
+        # Folgetag eintragen.
+        payload: dict = {"user_id": pseudonym, "max_budget": max_budget}
 
         response = await client.post(url, headers=headers, json=payload)
 
@@ -154,7 +156,6 @@ class LiteLLMClient:
         self,
         pseudonym: str,
         max_budget: Optional[float],
-        budget_duration: str,
     ) -> None:
         """
         POST /user/update
@@ -166,11 +167,11 @@ class LiteLLMClient:
             "Content-Type": "application/json",
         }
 
-        payload = {
-            "user_id": pseudonym,
-            "max_budget": max_budget,
-            "budget_duration": budget_duration,
-        }
+        # Ohne `budget_duration` (s. create_user). Achtung: Ein an einem BESTEHENDEN
+        # Nutzer bereits gesetzter Zeitraum bleibt dadurch stehen — über diesen Endpunkt
+        # lässt er sich ohnehin nicht entfernen (gemessen). Das erledigt der einmalige
+        # Umstellungslauf, nicht dieser Aufruf.
+        payload: dict = {"user_id": pseudonym, "max_budget": max_budget}
 
         response = await client.post(url, headers=headers, json=payload)
 

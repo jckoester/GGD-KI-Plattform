@@ -1,29 +1,51 @@
+# Budget je Jahrgang und Rolle, in Euro **pro Unterrichtswoche**.
+#
+# ⚠️ Diese Datei wird von der Admin-Oberfläche (/budget) neu geschrieben. Kommentare
+# gehen dabei verloren — inhaltliche Notizen gehören in die Doku, nicht hierher.
+#
+# ── Wie das Budget wirkt ────────────────────────────────────────────────────────────
+#
+# Es wird **nichts zurückgesetzt.** Die Obergrenze einer Nutzerin wächst jede
+# Unterrichtswoche um den hier eingetragenen Betrag; der Verbrauch läuft das Schuljahr
+# durch. Was in ruhigen Wochen übrig bleibt, steht in dichten Wochen zusätzlich zur
+# Verfügung — Ferien und Klassenarbeitsphasen gleichen sich dadurch von selbst aus.
+#
+# Welche Wochen Unterrichtswochen sind, steht in `school_year.yaml`. Ferienwochen
+# bekommen keine Zuteilung. Die Jahressumme ist damit
+#
+#     wochenbudget_eur × Anzahl Unterrichtswochen
+#
+# und genau die zeigt die Admin-Oberfläche beim Eintragen an. Sie ist der Betrag, auf den
+# sich die Schule festlegt.
+
+# Wie viele Wochenbeträge die Obergrenze dem Verbrauch vorauseilen darf.
+#
+# Drei Wochen decken Ferien (zwei Wochen) plus eine dichte Klassenarbeitsphase. Größer
+# heißt auch: mehr, das an einem einzigen Nachmittag verbraucht werden kann — ein Bild
+# kostet rund vierzig Chat-Nachrichten. Wer ein halbes Jahr nichts nutzt, sammelt so
+# kein halbes Jahr an.
+vorsprung_wochen: 3
+
+# Die Beträge unten sind ein BEISPIEL. Der eigene Wert ergibt sich aus dem Jahrestopf der
+# Schule, geteilt durch die Unterrichtswochen und verteilt auf die Stufen — nicht
+# umgekehrt. Die Oberfläche rechnet die Jahressumme beim Eintragen vor.
 grades:
   5:
-    budget_duration: 1mo
-    max_budget_eur: 1.0
+    wochenbudget_eur: 0.04
   6:
-    budget_duration: 1mo
-    max_budget_eur: 1.0
+    wochenbudget_eur: 0.04
   7:
-    budget_duration: 1mo
-    max_budget_eur: 1.0
+    wochenbudget_eur: 0.04
   8:
-    budget_duration: 1mo
-    max_budget_eur: 2.0
+    wochenbudget_eur: 0.06
   9:
-    budget_duration: 1mo
-    max_budget_eur: 1.5
+    wochenbudget_eur: 0.06
   10:
-    budget_duration: 1mo
-    max_budget_eur: 2.0
+    wochenbudget_eur: 0.08
   11:
-    budget_duration: 1mo
-    max_budget_eur: 3.5
+    wochenbudget_eur: 0.14
   12:
-    budget_duration: 1mo
-    max_budget_eur: 3.5
+    wochenbudget_eur: 0.14
 roles:
   teacher:
-    budget_duration: 1mo
-    max_budget_eur: 8.0
+    wochenbudget_eur: 0.31

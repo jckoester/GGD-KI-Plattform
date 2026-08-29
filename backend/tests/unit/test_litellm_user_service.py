@@ -13,7 +13,7 @@ async def test_ensure_litellm_user_first_login_creates_user_no_update():
     client = AsyncMock()
     client.get_user.return_value = None
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=2.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.1)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -25,7 +25,7 @@ async def test_ensure_litellm_user_first_login_creates_user_no_update():
             old_grade=None,
         )
 
-    client.create_user.assert_awaited_once_with("pseudo-1", 2.2, "1mo")
+    client.create_user.assert_awaited_once_with("pseudo-1", 2.2)
     client.update_user_budget.assert_not_awaited()
     client.close.assert_awaited_once()
 
@@ -36,7 +36,7 @@ async def test_ensure_litellm_user_existing_user_no_change_no_update():
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-2"}
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=2.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -59,7 +59,7 @@ async def test_ensure_litellm_user_existing_user_grade_change_updates_budget():
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-3"}
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(3.5, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=3.5), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -71,7 +71,7 @@ async def test_ensure_litellm_user_existing_user_grade_change_updates_budget():
             old_grade=10,
         )
 
-    client.update_user_budget.assert_awaited_once_with("pseudo-3", 3.5, "1mo")
+    client.update_user_budget.assert_awaited_once_with("pseudo-3", 3.5)
     client.close.assert_awaited_once()
 
 
@@ -81,7 +81,7 @@ async def test_ensure_litellm_user_teacher_plus_admin_keeps_teacher_budget():
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-4"}
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(8.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=8.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -132,7 +132,7 @@ async def test_ensure_litellm_user_generates_key_when_none_in_db():
     client.get_user.return_value = None
     client.generate_key = AsyncMock(return_value="sk-new-key")
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=2.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -156,7 +156,7 @@ async def test_ensure_litellm_user_skips_key_generation_when_key_exists():
     client = AsyncMock()
     client.get_user.return_value = {"user_id": "pseudo-has-key"}
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=2.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
@@ -178,7 +178,7 @@ async def test_ensure_litellm_user_api_error_is_logged_but_not_raised():
     client = AsyncMock()
     client.get_user.side_effect = RuntimeError("LiteLLM unreachable")
 
-    with patch("app.litellm.user_service.get_budget_for", return_value=(2.0, "1mo")), \
+    with patch("app.litellm.user_service.get_budget_for", return_value=2.0), \
          patch("app.litellm.user_service.get_current_rate", new=AsyncMock(return_value=1.0)), \
          patch("app.litellm.user_service.LiteLLMClient", return_value=client):
         await ensure_litellm_user(
