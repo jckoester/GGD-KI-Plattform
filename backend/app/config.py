@@ -158,6 +158,10 @@ class Settings(BaseSettings):
     teacher_schoolwide_sharing_requires_admin: bool = True
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
+    # Name der Plattform, wie ihn auch das Frontend anzeigt (`branding.name`). Wird in der
+    # Herkunftszeile exportierter Dokumente als **Werkzeug** genannt — das ist die Angabe,
+    # die eine Quellenangabe braucht. Leer = die Zeile nennt nur Modell und Datum.
+    public_school_name: str = ""
     # ── Bildgenerierung (Phase 16) ────────────────────────────────────────────
     # Default-Bildmodell (Name laut LiteLLM-Config) und großzügigeres Timeout, da die
     # Generierung Sekunden dauert und (anders als Chat) nicht gestreamt wird.

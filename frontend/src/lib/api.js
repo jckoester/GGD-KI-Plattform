@@ -582,6 +582,19 @@ export async function getExportTemplates() {
   // { css, css_updated_at, css_updated_by, has_docx_reference, has_odt_reference }
 }
 
+// Herkunftszeile am Ende exportierter Dokumente schulweit ein-/ausschalten.
+export async function updateExportProvenance(enabled) {
+  const res = await fetch(`${BASE}/admin/export-templates/provenance`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
 export async function updateExportCss(css) {
   const res = await fetch(`${BASE}/admin/export-templates/css`, {
     method: "PUT",

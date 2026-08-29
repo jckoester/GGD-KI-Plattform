@@ -26,10 +26,16 @@ class ExportTemplatesStatus(BaseModel):
     css_updated_by: str | None = None
     has_docx_reference: bool
     has_odt_reference: bool
+    # Herkunftszeile am Dokumentende (Werkzeug, Modell, Datum). Vorgabe: aus.
+    provenance: bool = False
 
 
 class CssUpdate(BaseModel):
     css: str = Field(default="", max_length=100_000)
+
+
+class ProvenanceUpdate(BaseModel):
+    enabled: bool
 
 
 @router.get("", response_model=ExportTemplatesStatus)
@@ -46,6 +52,7 @@ async def get_status(
         css_updated_by=row.updated_by if row else None,
         has_docx_reference=export_templates.has_reference("docx"),
         has_odt_reference=export_templates.has_reference("odt"),
+        provenance=await export_templates.get_export_provenance(db),
     )
 
 
@@ -56,6 +63,17 @@ async def update_css(
     current_user: JwtPayload = Depends(require_role("admin")),
 ) -> ExportTemplatesStatus:
     await export_templates.set_export_css(db, body.css, current_user.sub)
+    return await get_status(db=db, _=current_user)
+
+
+@router.put("/provenance", response_model=ExportTemplatesStatus)
+async def update_provenance(
+    body: ProvenanceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: JwtPayload = Depends(require_role("admin")),
+) -> ExportTemplatesStatus:
+    """Herkunftszeile an exportierten Dokumenten ein-/ausschalten (schulweit)."""
+    await export_templates.set_export_provenance(db, body.enabled, current_user.sub)
     return await get_status(db=db, _=current_user)
 
 

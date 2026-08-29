@@ -23,6 +23,10 @@ from app.config import settings
 from app.db.models import SiteConfig
 
 EXPORT_CSS_KEY = "export_css"
+# Herkunftszeile am Ende exportierter Dokumente. Vorgabe **aus**: Ein Update soll
+# das Aussehen bereits genutzter Vorlagen nicht von sich aus verändern; ob die
+# Angabe erscheinen soll, entscheidet die Schule.
+EXPORT_PROVENANCE_KEY = "export_provenance"
 REFERENCE_FORMATS = ("docx", "odt")
 
 # Repo-Root: backend/app/export/templates.py → parents[3] (cwd-unabhängig, analog store).
@@ -85,3 +89,30 @@ def delete_reference(fmt: str) -> bool:
         path.unlink()
         return True
     return False
+
+
+# ── Herkunftszeile (site_config) ──────────────────────────────────────────────
+
+async def get_export_provenance(db: AsyncSession) -> bool:
+    """Soll exportierten Dokumenten eine Herkunftszeile angehängt werden?"""
+    result = await db.execute(
+        select(SiteConfig.value).where(SiteConfig.key == EXPORT_PROVENANCE_KEY)
+    )
+    return (result.scalar_one_or_none() or "").strip().lower() in ("1", "true", "on", "an")
+
+
+async def set_export_provenance(
+    db: AsyncSession, aktiv: bool, updated_by: Optional[str]
+) -> None:
+    now = datetime.now(timezone.utc)
+    wert = "on" if aktiv else "off"
+    stmt = (
+        pg_insert(SiteConfig)
+        .values(key=EXPORT_PROVENANCE_KEY, value=wert, updated_at=now, updated_by=updated_by)
+        .on_conflict_do_update(
+            index_elements=["key"],
+            set_={"value": wert, "updated_at": now, "updated_by": updated_by},
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()

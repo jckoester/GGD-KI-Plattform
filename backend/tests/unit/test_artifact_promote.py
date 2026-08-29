@@ -30,6 +30,10 @@ def _stub_templates(monkeypatch):
     """Schulweite Vorlagen (Schritt 6) neutralisieren — kein DB/Filesystem im Export-Test."""
     monkeypatch.setattr(artifacts_router.export_templates, "get_export_css", AsyncMock(return_value=""))
     monkeypatch.setattr(artifacts_router.export_templates, "reference_path", lambda fmt: None)
+    # Vorgabe: Herkunftszeile aus — ein Update ändert bestehende Exporte nicht von selbst.
+    monkeypatch.setattr(
+        artifacts_router.export_templates, "get_export_provenance", AsyncMock(return_value=False)
+    )
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
 from app.db.session import get_db
@@ -533,6 +537,9 @@ def test_export_passes_school_templates(monkeypatch, tmp_path):
     # Schulweite Vorlagen (Schritt 6) müssen in export_document durchgereicht werden.
     import app.artifacts.router as artifacts_router
     monkeypatch.setattr(store_mod, "get_artifact", AsyncMock(return_value=_doc()))
+    monkeypatch.setattr(
+        artifacts_router.export_templates, "get_export_provenance", AsyncMock(return_value=False)
+    )
     monkeypatch.setattr(artifacts_router.export_templates, "get_export_css", AsyncMock(return_value="h1{color:navy}"))
     ref = tmp_path / "reference.docx"; ref.write_bytes(b"PK")
     monkeypatch.setattr(artifacts_router.export_templates, "reference_path", lambda fmt: ref if fmt == "docx" else None)
@@ -670,3 +677,49 @@ async def test_promote_diagram_ohne_nachricht_bleibt_ohne_herkunft(monkeypatch):
     )
 
     assert captured["provider_model"] is None
+
+
+# ── Herkunftszeile im Export (Modell-Transparenz, Schritt 6) ──────────────────
+
+def test_herkunftszeile_nennt_werkzeug_modell_und_datum():
+    from app.export.document import herkunftszeile
+
+    zeile = herkunftszeile(werkzeug="ki@ggd", modell="gpt-oss-120b", zeitpunkt="29.08.2026")
+
+    assert zeile == "Erstellt mit ki@ggd · Modell gpt-oss-120b · 29.08.2026"
+
+
+def test_ohne_modell_keine_herkunftszeile():
+    """Ein von Hand geschriebenes Dokument darf nicht „Erstellt mit …" tragen.
+
+    Die Werkstatt lässt sich auch ganz ohne KI benutzen — eine pauschale Zeile wäre dort
+    eine Falschangabe.
+    """
+    from app.export.document import herkunftszeile
+
+    assert herkunftszeile(werkzeug="ki@ggd", modell=None, zeitpunkt="29.08.2026") is None
+
+
+def test_herkunftszeile_wird_abgesetzt_angehaengt():
+    from app.export.document import _mit_herkunft
+
+    ergebnis = _mit_herkunft("# Titel\n\nInhalt", "Erstellt mit ki@ggd")
+
+    assert ergebnis.startswith("# Titel\n\nInhalt")
+    assert ergebnis.rstrip().endswith("*Erstellt mit ki@ggd*")
+    assert "---" in ergebnis          # sichtbar vom Inhalt getrennt
+
+
+def test_ohne_herkunft_bleibt_das_markdown_unveraendert():
+    from app.export.document import _mit_herkunft
+
+    assert _mit_herkunft("# Titel", None) == "# Titel"
+
+
+def test_ohne_werkzeugnamen_nur_modell_und_datum():
+    """„Erstellt mit dieser Plattform" hilft in einem exportierten Dokument niemandem."""
+    from app.export.document import herkunftszeile
+
+    assert herkunftszeile(werkzeug=None, modell="gpt-oss-120b", zeitpunkt="29.08.2026") == (
+        "Modell gpt-oss-120b · 29.08.2026"
+    )

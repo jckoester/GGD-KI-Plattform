@@ -3,6 +3,7 @@
     import { ArrowLeft, FileText, Upload, Trash2, Loader2 } from 'lucide-svelte';
     import {
         getExportTemplates, updateExportCss, uploadExportReference, deleteExportReference,
+        updateExportProvenance,
     } from '$lib/api.js';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
     import SuccessBanner from '$lib/components/SuccessBanner.svelte';
@@ -12,6 +13,7 @@
     let savedCss = $state('');
     let hasDocx = $state(false);
     let hasOdt = $state(false);
+    let herkunft = $state(false);
     let loading = $state(true);
     let saving = $state(false);
     let error = $state(null);
@@ -24,6 +26,7 @@
         savedCss = css;
         hasDocx = s.has_docx_reference;
         hasOdt = s.has_odt_reference;
+        herkunft = !!s.provenance;
     }
     function flash(msg) {
         success = msg;
@@ -42,6 +45,18 @@
         try { apply(await updateExportCss(css)); flash('CSS gespeichert.'); }
         catch (e) { error = e.message; }
         finally { saving = false; }
+    }
+
+    async function toggleHerkunft(ev) {
+        const ziel = ev.currentTarget.checked;
+        error = null; success = null;
+        try {
+            apply(await updateExportProvenance(ziel));
+            flash(ziel ? 'Herkunftszeile eingeschaltet.' : 'Herkunftszeile ausgeschaltet.');
+        } catch (e) {
+            error = e.message;
+            herkunft = !ziel;   // Anzeige zurückdrehen, sonst zeigt sie etwas Unwahres
+        }
     }
 
     async function upload(fmt, ev) {
@@ -93,8 +108,32 @@
             <Loader2 class="w-6 h-6 animate-spin" />
         </div>
     {:else}
-        <!-- PDF-CSS -->
+        <!-- Herkunftszeile -->
         <section class="mt-6">
+            <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">Herkunft am Dokumentende</h2>
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-2">
+                Hängt exportierten Dokumenten eine Zeile an, die Werkzeug, Modell und Datum
+                nennt — die Angaben, die für eine Quellenangabe in GFS, Seminarkurs oder
+                Facharbeit nötig sind. Sie erscheint <strong>nur</strong>, wenn das Dokument
+                aus einer KI-Antwort stammt; von Hand geschriebene Dokumente bleiben
+                unverändert.
+            </p>
+            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                <input
+                    type="checkbox"
+                    checked={herkunft}
+                    onchange={toggleHerkunft}
+                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                />
+                Herkunftszeile an PDF-, Word- und ODT-Exporte anhängen
+            </label>
+            <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-1">
+                Beispiel: <span class="font-mono">Erstellt mit ki@ggd · Modell gpt-oss-120b · 29.08.2026</span>
+            </p>
+        </section>
+
+        <!-- PDF-CSS -->
+        <section class="mt-8">
             <h2 class="font-medium text-light-tx dark:text-dark-tx mb-1">PDF: eigenes CSS</h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-2">
                 Ergänzt/überschreibt die Standard-Vorlage (z. B. Schriftart, Farben, Kopf-/Fußzeile).

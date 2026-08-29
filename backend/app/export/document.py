@@ -35,6 +35,39 @@ _jinja = Environment(
 )
 
 
+def herkunftszeile(
+    *, werkzeug: Optional[str], modell: Optional[str], zeitpunkt: Optional[str]
+) -> Optional[str]:
+    """Die Zeile, die exportierten Dokumenten ihre Herkunft ansieht — oder None.
+
+    **Nur wenn ein Modell bekannt ist.** Ein von Hand geschriebenes Dokument mit
+    „Erstellt mit …" zu versehen wäre eine Falschangabe; die Werkstatt kann auch ohne
+    jede KI benutzt werden.
+
+    Angehängt wird sie an das **Markdown**, nicht per CSS-Seitenfuß: So erscheint sie in
+    allen drei Formaten gleich. Ein `@page`-Fuß griffe nur im PDF, und für DOCX/ODT
+    bräuchte es eine eigene Lösung in der reference-doc — zwei Wege für dieselbe Angabe.
+    """
+    if not modell:
+        return None
+    teile = []
+    # Ohne konfigurierten Namen lieber gar kein Werkzeug nennen: „Erstellt mit dieser
+    # Plattform" hilft in einem Dokument, das die Plattform längst verlassen hat, niemandem.
+    if werkzeug:
+        teile.append(f"Erstellt mit {werkzeug}")
+    teile.append(f"Modell {modell}")
+    if zeitpunkt:
+        teile.append(zeitpunkt)
+    return " · ".join(teile)
+
+
+def _mit_herkunft(markdown: str, herkunft: Optional[str]) -> str:
+    """Hängt die Herkunftszeile als abgesetzten Absatz an."""
+    if not herkunft:
+        return markdown
+    return f"{markdown.rstrip()}\n\n---\n\n*{herkunft}*\n"
+
+
 async def _to_pdf(markdown: str, *, title: str, extra_css: str = "") -> bytes:
     """Markdown → PDF über weasyprint (Body via render_markdown_for_pdf, eigenes Template)."""
     import weasyprint  # lazy: Import kostet ~1 s
@@ -55,6 +88,7 @@ async def export_document(
     fmt: str,
     reference_doc: Optional[str] = None,
     extra_css: str = "",
+    herkunft: Optional[str] = None,
 ) -> tuple[bytes, str]:
     """Exportiert ein Dokument. Gibt (Bytes, MIME) zurück.
 
@@ -63,6 +97,8 @@ async def export_document(
     """
     if fmt not in EXPORT_MIME:
         raise ValueError(f"unbekanntes Exportformat: {fmt!r}")
+
+    markdown = _mit_herkunft(markdown, herkunft)
 
     if fmt == "pdf":
         data = await _to_pdf(markdown, title=title, extra_css=extra_css)
