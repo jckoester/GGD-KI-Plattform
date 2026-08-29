@@ -228,4 +228,11 @@ guardrails:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/DATABASE_URL
+  # ⚠️ LITELLM_DATABASE_URL, NICHT DATABASE_URL: Der Proxy legt sein eigenes Prisma-Schema
+  # an (Virtual Keys, Teams, Budgets, SpendLogs) und braucht dafür eine EIGENE Datenbank —
+  # sonst kollidiert es mit dem Alembic-Schema der Anwendung. Außerdem erwartet LiteLLM
+  # einen reinen `postgresql://`-DSN; der asyncpg-DSN aus DATABASE_URL funktioniert nicht.
+  database_url: os.environ/LITELLM_DATABASE_URL
+  # Über die Proxy-UI angelegte Modelle und Credentials überleben einen Neustart nur
+  # hiermit. Verschlüsselt werden sie mit LITELLM_SALT_KEY (siehe .env.example).
+  store_model_in_db: true

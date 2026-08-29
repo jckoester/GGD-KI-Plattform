@@ -124,6 +124,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Module und Pattern-Dateien werden relativ zum Arbeitsverzeichnis aufgelöst.
 - **Eine einmal gesetzte `embedding_error`-Marke blieb stehen**, auch nachdem der Knoten
   längst eingebettet war. Die Diagnoseabfrage zählte dadurch erledigte Fälle mit.
+- **`infra/litellm_config.example.yaml` verwies den Proxy auf die Datenbank der Anwendung**
+  (`DATABASE_URL` statt `LITELLM_DATABASE_URL`). Jetzt korrekt, dazu `store_model_in_db`.
+- **Die Modell-Vorgaben in `.env.example` passten nicht zur mitgelieferten LiteLLM-Vorlage:**
+  `EMBEDDING_MODEL` und `IMAGE_DEFAULT_MODEL` standen auf Produktnamen, die Vorlage führt
+  Aufgabennamen. Wer beide Dateien kopierte, bekam bei Einbettung und Bildgenerierung
+  „model not found".
 
 ### Dokumentation
 
@@ -156,6 +162,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
   beruhen nirgends mehr auf Annahmen.
 - [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
+- [Installation](docs/admin/installation.md) um die Modellkonfiguration ergänzt: neuer
+  **Schritt 3** (Anbieter wählen, `model_list` befüllen, Namen in die `.env`) und
+  **Schritt 9** (`check_litellm_config.py` gegen den laufenden Proxy). Die Kopierliste in
+  Schritt 2 nennt jetzt alle `config/*.yaml` — `subjects.yaml` fehlte, obwohl das
+  Fächer-Seed sie braucht. Schrittnummern durchgezählt (es gab keinen Schritt 6).
 
 ### Migration
 
@@ -164,6 +175,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `artifacts`. Bestandsassistenten behalten mit dem
   Standardwert ihr bisheriges Verhalten; bereits erzeugte Bilder lassen sich mangels
   gespeicherter Bildart nicht variieren.
+
+- ⚠️ **Modellnamen auf Aufgabennamen umstellen.** Wer in `infra/litellm_config.yaml` noch
+  rohe Produktnamen als `model_name` führt (`gpt-4o-mini`, `text-embedding-3-small`,
+  `gpt-image-1`), benennt sie um; anschließend die `.env` nachziehen:
+
+  | `.env` | Wert |
+  |---|---|
+  | `CHAT_DEFAULT_MODEL` | `chat-standard` |
+  | `TITLE_MODEL` | `system-titel` |
+  | `EMBEDDING_MODEL` | `embedding-standard` |
+  | `IMAGE_DEFAULT_MODEL` | `bild-standard` |
+
+  **Danach die Freigabematrix unter `/settings/models` neu setzen** — die Team-Allowlists
+  in LiteLLM enthalten die alten Namen und laufen sonst ins Leere. Ebenso prüfen:
+  Assistenten, die auf einen expliziten Modellnamen festgelegt sind. Ein reiner
+  Namenswechsel berührt die Embedding-Vektoren **nicht**, solange `litellm_params.model`
+  gleich bleibt.
+
+  Fertige `model_list`-Blöcke je Anbieter: [Modell-Szenarien](docs/admin/modell-szenarien.md).
+  Begründung und Stufenschema: [Modelle & Assistenten](docs/admin/modelle-und-assistenten.md).
+  Kontrolle: `python scripts/check_litellm_config.py`.
 
 - ⚠️ **Die eigene `infra/litellm_config.yaml` muss angepasst werden.** Drei Dinge, die
   bisher stillschweigend nicht griffen oder ab LiteLLM 1.83.7 den Proxy-Start verhindern:

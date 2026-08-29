@@ -117,7 +117,7 @@ Kennzeichen. Wer wissen will, was gerade gilt, schaut also stets in dieselbe Dat
 > geändert, die `subjects`-Tabelle neu seeden (`python scripts/seed_subjects.py`),
 > damit die Cross-Fach-`#`-Bezüge den Code kennen. Wurde ein Fach **umbenannt oder
 > entfernt**, zusätzlich mit `--prune` laufen lassen, um die verwaiste alte Zeile zu
-> entfernen (nur unreferenzierte; siehe `docs/admin/installation.md`, Schritt 5).
+> entfernen (nur unreferenzierte; siehe `docs/admin/installation.md`, Schritt 6).
 
 Validierung:
 ```bash

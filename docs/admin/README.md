@@ -36,14 +36,21 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [ ] Systemvoraussetzungen prüfen (Docker ≥ 24, Docker Compose ≥ 2.20)
 - [ ] Repository klonen
 - [ ] `.env` aus `.env.example` erstellen und befüllen
-- [ ] `config/auth.yaml` aus `config/auth.example.yaml` erstellen und befüllen
-- [ ] `config/budget_tiers.yaml` aus `config/budget_tiers.example.yaml` erstellen
-- [ ] `infra/litellm_config.yaml` aus `infra/litellm_config.example.yaml` erstellen
+- [ ] **Alle** `config/*.yaml` aus ihren `.example`-Fassungen erstellen — es gibt keinen
+      Rückfall auf die Beispieldatei ([Installation, Schritt 2](installation.md#schritt-2-konfiguration-anlegen))
+- [ ] `infra/litellm_config.yaml` erstellen und die **`model_list` befüllen** — fertige
+      Blöcke je Anbieter in [Modell-Szenarien](modell-szenarien.md)
+- [ ] Modellnamen und Anbieter-Schlüssel in die `.env` eintragen (`CHAT_DEFAULT_MODEL`,
+      `TITLE_MODEL`, `EMBEDDING_MODEL`) — Aufgabennamen, keine Produktnamen
 - [ ] `docker compose up -d` ausführen
 - [ ] Datenbank-Migration: `docker compose exec backend alembic upgrade head`
+- [ ] Fächer einspielen: `docker compose exec backend python scripts/seed_subjects.py`
+- [ ] Wechselkurs setzen: `docker compose exec backend python scripts/seed_exchange_rate.py --rate …`
 - [ ] LiteLLM-Teams anlegen: `docker compose exec backend python scripts/create_litellm_teams.py`
+- [ ] Konfiguration prüfen: `docker compose exec backend python scripts/check_litellm_config.py`
 - [ ] Als Admin einloggen
-- [ ] Modell-Freischaltungsmatrix unter `/settings/models` befüllen
+- [ ] Modell-Freischaltungsmatrix unter `/settings/models` befüllen — **inklusive
+      `TITLE_MODEL` in jeder Gruppe**
 - [ ] Texte (Impressum, Datenschutz, Nutzungsregeln) unter `/settings/texts` hinterlegen
 - [ ] Reverse Proxy einrichten und HTTPS aktivieren
 
