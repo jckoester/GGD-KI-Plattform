@@ -15,7 +15,7 @@ Browser
         └─▶ Backend   (FastAPI)
               ├─▶ PostgreSQL   (Nutzer, Konversationen, Budgets)
               └─▶ LiteLLM      (KI-Proxy, Budgetdurchsetzung)
-                    └─▶ KI-Anbieter  (OpenAI, Anthropic, Ollama, …)
+                    └─▶ KI-Anbieter  (IONOS, Mistral, OpenAI, Anthropic, …)
 ```
 
 Der **Cron-Container** läuft parallel und führt automatische Aufräumjobs sowie

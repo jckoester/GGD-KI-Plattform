@@ -33,7 +33,7 @@ async def test_get_image_model_ids_filters_by_mode():
         {"model_name": "gpt-4o-mini", "model_info": {"mode": "chat"}},
         {"model_name": "gpt-image-1", "model_info": {"mode": "image_generation"}},
         {"model_name": "gpt-image-1.5", "model_info": {"mode": "image_generation"}},
-        {"model_name": "ollama-fallback", "model_info": {}},
+        {"model_name": "chat-standard", "model_info": {}},
     ]}))
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         ids = await client.get_image_model_ids()

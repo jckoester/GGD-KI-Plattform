@@ -38,7 +38,7 @@ FULL_MODEL_LIST = [
     "chat-schnell", "chat-standard", "chat-code", "chat-komplex",
     "system-titel", "system-moderation",
     "embedding-standard", "bild-standard",
-    "ollama-fallback",
+    "chat-reasoning",
     "ionos-gpt-oss-120b",
 ]
 
@@ -72,7 +72,7 @@ def test_student_sees_only_chat_stages():
 
     assert ids == [
         "chat-schnell", "chat-standard", "chat-code", "chat-komplex",
-        "ollama-fallback", "ionos-gpt-oss-120b",
+        "chat-reasoning", "ionos-gpt-oss-120b",
     ]
     assert not [m for m in ids if m.startswith(("system-", "embedding-", "bild-"))]
 

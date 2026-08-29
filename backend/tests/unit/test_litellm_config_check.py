@@ -40,7 +40,8 @@ def _healthy():
                input_cost_per_token=1e-8, output_cost_per_token=2e-8),
         _entry("embedding-standard", mode="embedding", input_cost_per_token=1e-9),
         _entry("bild-standard", mode="image_generation", input_cost_per_image=0.032),
-        _entry("ollama-fallback", target="ollama/llama3", supports_function_calling=False),
+        _entry("lokal", target="ollama/llama3", litellm_provider="ollama",
+               supports_function_calling=False),
     ]
 
 
@@ -89,11 +90,33 @@ def test_missing_token_prices_are_errors():
     assert any("Umrechnung" in m for m in errors), "Meldung soll die Umrechnung nennen"
 
 
-def test_ollama_needs_no_prices():
-    """Der lokale Fallback kostet nichts — ihn zu bemängeln wäre Rauschen."""
+def test_lokales_modell_braucht_keine_preise():
+    """Ein lokal betriebenes Modell kostet nichts — es zu bemängeln wäre Rauschen.
+
+    Erkannt wird es am Anbieter, nicht am Namen: Die Plattform liefert keinen lokalen
+    Eintrag mehr mit, wer einen betreibt, benennt ihn wie er mag.
+    """
     findings = check_config(_healthy(), _settings(), bildarten=_BILDARTEN)
 
-    assert not [m for m in _levels(findings, ERROR) if "ollama" in m]
+    assert not [m for m in _levels(findings, ERROR) if "lokal" in m]
+
+
+def test_openai_kompatibler_anbieter_bleibt_preispflichtig():
+    """Gegenprobe: Ein Anbieter mit eigener api_base ist nicht automatisch kostenlos.
+
+    IONOS und Mistral laufen als OpenAI-kompatible Endpunkte. Würde die Ausnahme für
+    lokale Modelle auch sie erfassen, bliebe ihr fehlender Preis unbemerkt — und genau
+    daran hängen Budgets, Sperre und Kostenstatistik.
+    """
+    eintraege = _healthy() + [
+        _entry("chat-eu", target="openai/irgendwas", litellm_provider="openai",
+               supports_function_calling=True)
+    ]
+    findings = check_config(eintraege, _settings(), bildarten=_BILDARTEN)
+
+    assert [m for m in _levels(findings, ERROR) if "chat-eu" in m], (
+        "Fehlende Preise eines bezahlten Anbieters müssen gemeldet werden"
+    )
 
 
 def test_per_image_token_pricing_counts_as_priced():

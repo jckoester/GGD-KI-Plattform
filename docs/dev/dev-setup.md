@@ -10,7 +10,6 @@ direkt gestartet; der LiteLLM-Proxy läuft als Prozess in der backend-venv (sieh
 - Node.js 20+ (`node --version`)
 - PostgreSQL erreichbar (lokal installiert oder als einzelner Docker-Container)
 - LiteLLM-Proxy lokal in der backend-venv (Abschnitt unten)
-- Optional: Ollama für den self-hosted Fallback (`ollama serve`)
 - **Pandoc** — nur für den Office-Export (DOCX/ODT) der Material-Werkstatt (Phase 19):
   `brew install pandoc` (macOS) bzw. `apt-get install pandoc` (Linux). Fehlt es, ist der
   Office-Export deaktiviert (Feature-Flag) — der Rest läuft normal.
@@ -84,7 +83,6 @@ OPENAI_API_KEY=sk-...
 # oder für den EU-Pfad:
 # IONOS_API_KEY='eyJ...'
 # IONOS_API_BASE=https://openai.inference.de-txl.ionos.com/v1
-OLLAMA_BASE_URL=http://localhost:11434
 LITELLM_DATABASE_URL=postgresql://postgres:devpassword@localhost:5432/litellm
 # Namen aus der LiteLLM-Config, NICHT Anbieter-Modell-IDs.
 CHAT_DEFAULT_MODEL=chat-standard

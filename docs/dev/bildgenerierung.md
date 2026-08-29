@@ -188,4 +188,5 @@ die serverseitige Moderation im Handler ist die tragende Schicht.
 | `image_max_retention_days` | Max. Aufbewahrung (Aufräum-Cron) |
 
 LiteLLM-Config: Bild-Modelle mit `model_info.mode: image_generation` markieren
-(`infra/litellm_config.example.yaml`), lokaler Bild-Fallback analog Ollama.
+(`infra/litellm_config.example.yaml`). Ein lokaler Bild-Server ist als Datenschutz-Option
+vorgesehen (auskommentiert in der Vorlage), nicht als Rückfall bei erschöpftem Budget.

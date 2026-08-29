@@ -21,7 +21,6 @@ Bewährt hat sich diese Staffel:
 | `system-moderation` | Jugendschutz-Klassifikator | — (ausgeblendet) |
 | `embedding-standard` | Kontextspeicher, semantische Suche | — (ausgeblendet) |
 | `bild-standard` | Bildgenerierung | nach Bedarf |
-| `ollama-fallback` | Self-hosted Reserve | alle |
 
 `chat-standard` und `chat-reasoning` dürfen dasselbe Modell sein — bei Modellen mit
 regelbarer Denktiefe unterscheidet sie nur `reasoning_effort`. Didaktisch lässt sich das
@@ -98,11 +97,14 @@ Bild-Assistent geht **immer** in die Admin-Freigabe (`pending_review`) — auch 
 allgemeine Schalter für schulweites Teilen aus ist. Details in
 [Content-Moderation → Bild-Assistenten](content-moderation.md).
 
-**Lokaler Bild-Fallback (sensibler Pfad):** Analog zum Ollama-Chat-Fallback kann ein
-lokaler, OpenAI-kompatibler Bild-Server (z. B. vLLM-Omni) als Bild-Modell in LiteLLM
-eingetragen werden (`infra/litellm_config.yaml`, `model_info.mode: image_generation`).
-Es werden **keine** extern gehosteten Bild-URLs verarbeitet, die Bytes bleiben im Schulnetz.
-Vor dem Produktivbetrieb end-to-end testen.
+**Lokaler Bild-Server (sensibler Pfad):** Ein lokaler, OpenAI-kompatibler Bild-Server
+(z. B. vLLM-Omni) lässt sich als Bild-Modell in LiteLLM eintragen
+(`infra/litellm_config.yaml`, `model_info.mode: image_generation`). Es werden **keine**
+extern gehosteten Bild-URLs verarbeitet, die Bytes bleiben im Schulnetz.
+
+> Das ist eine **Datenschutz**-Option für Schulen, die die Hardware haben — kein Ersatz bei
+> erschöpftem Budget und keine Zusage der Plattform. Bildmodelle brauchen eine GPU; ohne sie
+> ist der Weg nicht gangbar. Vor dem Produktivbetrieb end-to-end testen.
 
 ### Bildarten festlegen (`config/image_models.yaml`)
 

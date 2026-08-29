@@ -9,7 +9,7 @@ Browser
         └─▶ /api/      → Backend (FastAPI, uvicorn)
                               ├─▶ PostgreSQL  (Nutzer, Konversationen, Budgets)
                               └─▶ LiteLLM     (KI-Proxy, Budget-Enforcement)
-                                    └─▶ KI-Anbieter  (OpenAI, Anthropic, Ollama, …)
+                                    └─▶ KI-Anbieter  (IONOS, Mistral, OpenAI, Anthropic, …)
 
 Cron-Container (separat):
   cleanup_inactive_accounts     täglich 02:00

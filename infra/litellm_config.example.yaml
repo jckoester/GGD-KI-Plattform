@@ -77,12 +77,6 @@ model_list:
     model_info:
       mode: embedding
 
-  # Self-hosted Fallback (Pflicht laut Projektvorgabe — Ollama im lokalen Netz):
-  - model_name: ollama-fallback
-    litellm_params:
-      model: ollama/llama3
-      api_base: os.environ/OLLAMA_BASE_URL
-
   # ── Bildgenerierung (Phase 16) ──────────────────────────────────────────────
   # Bild-Modelle werden über `model_info.mode: image_generation` als solche markiert
   # — für Health-Checks und um sie in der Bild-Freigabe-Matrix von Chat-Modellen zu
@@ -104,9 +98,10 @@ model_list:
       # Callback `guardrails.bildpreise.registrierung` weiter unten. Ohne den kostet
       # jedes Bild 0,00 $ und läuft am EUR-Budget vorbei, ohne dass etwas fehlschlägt.
       # `check_litellm_config.py` gleicht beide Stellen gegeneinander ab.
-  # Self-hosted Bild-Fallback (sensibler Pfad, analog Ollama) — OpenAI-kompatibler
-  # lokaler Server (z. B. vLLM-Omni), api_base im lokalen Netz. Auskommentiert lassen,
-  # bis der lokale Bild-Server steht (end-to-end testen, vgl. Plan §7).
+  # Lokaler Bild-Server (sensibler Pfad) — OpenAI-kompatibel, z. B. vLLM-Omni, api_base im
+  # lokalen Netz. Eine DATENSCHUTZ-Option für Schulen mit passender Hardware (GPU), kein
+  # Rückfall bei erschöpftem Budget: Ist das Budget aufgebraucht, ist es aufgebraucht.
+  # Auskommentiert lassen, bis der lokale Server steht (end-to-end testen).
   # - model_name: local-image
   #   litellm_params:
   #     model: openai/<vom-server-bedientes-modell>

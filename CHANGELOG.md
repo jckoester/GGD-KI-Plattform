@@ -95,6 +95,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   > **Host**-Verzeichnis einbinden. Auf getrennten Hosts entfällt die Datei; dann über das
   > Proxy-Log überwachen (siehe `docs/admin/content-moderation.md`).
 
+### Entfernt
+
+- **Der lokale Ollama-Fallback entfällt — es gibt keinen Rückfall bei erschöpftem Budget.**
+  Budget aufgebraucht heißt: keine Nutzung bis zum nächsten Zeitraum. Ein Klassensatz
+  gleichzeitiger Anfragen verlangt grob 800 Token/s, ein Server ohne GPU liefert für ein
+  8B-Modell 10–20 — als Zusage an alle Schulen war das nicht haltbar.
+
+  Entfallen sind `ollama-fallback` aus den LiteLLM-Vorlagen und `OLLAMA_BASE_URL` aus der
+  `.env`. **Bestehende Installationen müssen nichts tun:** Wer den Eintrag behalten will,
+  behält ihn, und die Preisprüfung nimmt lokale Modelle weiterhin von der Preispflicht aus —
+  jetzt anhand des Anbieters statt des Modellnamens. Schulen mit passender Hardware tragen
+  ein lokales Modell also weiterhin selbst ein; mitgeliefert und versprochen wird keins.
+
 ### Behoben
 
 - **Der Gesprächstitel war manchmal die Antwort statt der Titel.** Bei imperativ

@@ -266,15 +266,6 @@ model_list:
       mode: image_generation
       input_cost_per_image: 0.0152            # Mittelwert über 0,26–2,36 MP
 
-  # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md): greift bei erschöpftem Budget und
-  # für sensible Fälle. Läuft lokal — keine Kosten, daher keine Preisangaben nötig.
-  - model_name: ollama-fallback
-    litellm_params:
-      model: ollama/llama3
-      api_base: os.environ/OLLAMA_BASE_URL
-    model_info:
-      supports_function_calling: false
-
   # ══ Ebene 2: explizite Modelle — Allowlist NUR `lehrkraefte` ════════════════════════
   # Zeigen auf dieselben Backends wie die Aliase; der Unterschied ist allein die Bindung.
   # Ein Assistent auf einem expliziten Namen folgt einem schulweiten Modellwechsel NICHT

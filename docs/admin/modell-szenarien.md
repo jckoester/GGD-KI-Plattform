@@ -331,8 +331,21 @@ sein, weil die Menge klein und die Zielgruppe volljährig ist.
 
 **Wer fällt aus, wenn einer ausfällt.** Ein Anbieterausfall trifft nur die Stufen, die auf
 ihm liegen. Fällt `embedding-standard` aus, bleibt der Chat nutzbar, aber ohne
-Bildungsplan-Bezug; fällt `chat-standard` aus, steht der Kern still. Der lokale
-Ollama-Fallback ist die Antwort darauf — er gehört in jedes Szenario.
+Bildungsplan-Bezug; fällt `chat-standard` aus, steht der Kern still.
+
+Die Antwort darauf ist der **Mischbetrieb selbst**: Wer `chat-schnell` und `chat-standard`
+bei verschiedenen Anbietern führt, hat im Ausfall eine Stufe, auf die sich umhängen lässt —
+eine Zeile in dieser Datei plus Proxy-Neustart. Das ist kein automatischer Rückfall, sondern
+ein Handgriff der Administration; dafür ist es der einzige, der ohne zusätzliche Hardware
+auskommt.
+
+> **Einen lokalen Fallback liefert die Plattform bewusst nicht mehr mit.** Bis 08/2026 stand
+> hier ein Ollama-Eintrag als „Pflicht-Fallback". Er hielt nicht, was der Name versprach:
+> Ein Klassensatz gleichzeitiger Anfragen verlangt grob 800 Token/s, ein Server ohne GPU
+> liefert für ein 8B-Modell etwa 10–20 — die Warteschlange misst Viertelstunden, nicht
+> Sekunden. Wer die Hardware hat, trägt ein lokales Modell weiterhin selbst ein; die
+> Preisprüfung nimmt Ollama-Deployments automatisch aus. Als Zusage an alle Schulen war es
+> nicht haltbar.
 
 ---
 

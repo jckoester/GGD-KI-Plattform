@@ -46,15 +46,6 @@ model_list:
       model: openai/gpt-image-1
       api_key: os.environ/OPENAI_API_KEY
 
-  # ── Self-hosted Fallback (Ollama, im lokalen Netz) ──────────────────────────
-  # Pflicht-Fallback laut Projektvorgabe (CLAUDE.md „Key Constraints"): wenn
-  # Budget erschöpft ist oder für sensible Fälle. Voraussetzung: Ollama läuft
-  # (`ollama serve`) und das Modell ist gezogen (`ollama pull llama3`).
-  - model_name: ollama-fallback
-    litellm_params:
-      model: ollama/llama3
-      api_base: os.environ/OLLAMA_BASE_URL
-
 general_settings:
   # Voller Zugriff auf die Management-API (User/Teams/Keys/Budgets). Muss mit
   # LITELLM_MASTER_KEY in .env übereinstimmen — das Backend authentifiziert sich

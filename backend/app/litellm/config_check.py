@@ -148,8 +148,17 @@ def check_config(
     for name, entry in sorted(entries.items()):
         info = _info(entry)
         mode = info.get("mode") or role_modes.get(name)
-        if name == "ollama-fallback" or str(info.get("litellm_provider", "")) == "ollama":
-            continue  # lokal, kostenlos
+        # Lokal betriebene Modelle kosten nichts — fehlende Preise sind dort kein Fund,
+        # sondern der Normalfall. Erkannt am **Anbieter**, nicht am Modellnamen: Wie eine
+        # Schule ihren lokalen Eintrag nennt, ist ihre Sache. (Die Plattform liefert seit
+        # 08/2026 keinen lokalen Fallback mehr mit; wer einen betreibt, tut das selbst.)
+        #
+        # Bewusst eng gefasst: Ein OpenAI-**kompatibler** Anbieter ist nicht automatisch
+        # kostenlos — IONOS und Mistral laufen genau so. Sie hier mit auszunehmen hieße,
+        # ihre fehlenden Preise zu verschweigen; und das ist der Fehler, den diese
+        # Prüfung überhaupt finden soll.
+        if str(info.get("litellm_provider", "")) == "ollama":
+            continue
         if mode == "image_generation":
             # Ob überhaupt bepreist wird, entscheidet allein IMAGE_PRICES (Prüfung 7):
             # LiteLLM löst Bildpreise über seine eingebaute Tabelle auf und liest das

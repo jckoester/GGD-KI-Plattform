@@ -5,7 +5,7 @@
 - **Docker** ≥ 24
 - **Docker Compose** ≥ 2.20 (als Plugin: `docker compose`, nicht `docker-compose`)
 - Eine öffentlich erreichbare Domain (für HTTPS und den OAuth-Redirect des SSO-Providers)
-- Internetzugang zu mindestens einem KI-Anbieter — oder ein lokal laufendes Ollama
+- Internetzugang zu mindestens einem KI-Anbieter
 - Internetzugang **beim Build** (das Backend-Image lädt aus `requirements.txt` u. a. das
   deutsche NER-Modell `de_core_news_md` ~45 MB von GitHub für die PII-Erkennung)
 

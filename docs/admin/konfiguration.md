@@ -44,7 +44,6 @@ Es genügen die Zugänge der Anbieter, die in der LiteLLM-Config tatsächlich vo
 | `OPENAI_API_KEY` | OpenAI-Zugang | `sk-…` |
 | `IONOS_API_KEY` | IONOS-Zugang — der **Value** des Tokens aus dem Data Center Designer, nicht die ID | `eyJ…` |
 | `IONOS_API_BASE` | OpenAI-kompatibler Endpunkt von IONOS | `https://openai.inference.de-txl.ionos.com/v1` |
-| `OLLAMA_BASE_URL` | Self-hosted Fallback im lokalen Netz | `http://ollama:11434` |
 | `SPEND_LOG_DELAY` | Wartezeit nach Stream-Ende, bevor die Kosten abgefragt werden | `1.0` |
 
 ### Modelle

@@ -279,9 +279,10 @@ def test_snapshot_without_traffic_does_not_divide_by_zero(core):
 
 def test_snapshot_reports_the_configured_models(core):
     s = core.build_health_snapshot(
-        {}, classifier="openai/gpt-4o-mini", fallback="ollama/llama3",
+        {}, classifier="openai/gpt-4o-mini",
+        fallback="openai/mistralai/Mistral-Small-24B-Instruct",
         zeitstempel="2026-08-28T10:00:00+00:00",
     )
 
     assert s["classifier_model"] == "openai/gpt-4o-mini"
-    assert s["fallback_model"] == "ollama/llama3"
+    assert s["fallback_model"] == "openai/mistralai/Mistral-Small-24B-Instruct"
