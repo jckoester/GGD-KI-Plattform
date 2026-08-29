@@ -652,6 +652,16 @@
                 }
                 // Generiertes Bild (Phase 16): Referenz an die Assistenten-Nachricht heften
                 // (Anzeige folgt in Schritt 6 in der MessageBubble).
+                // Nachrichten-ID (kommt unmittelbar vor [DONE]): belegt später die
+                // Herkunft eines aus dieser Antwort gespeicherten Diagramms/Dokuments.
+                if (item.type === "message" && item.message_id) {
+                    messages[assistantIndex] = {
+                        ...messages[assistantIndex],
+                        id: item.message_id,
+                    };
+                    messages = messages;
+                    continue;
+                }
                 if (item.type === "image") {
                     messages[assistantIndex] = {
                         ...messages[assistantIndex],

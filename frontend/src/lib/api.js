@@ -441,8 +441,19 @@ export async function* streamChat(
 
       if (currentEventType === "image") {
         try {
-          const { image_id, size } = JSON.parse(payload);
-          yield { type: "image", image_id, size };
+          const { image_id, size, bildart } = JSON.parse(payload);
+          yield { type: "image", image_id, size, bildart };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
+      // Nachrichten-ID, unmittelbar vor [DONE]. Belegt später die Herkunft eines aus
+      // dieser Antwort gespeicherten Diagramms oder Dokuments.
+      if (currentEventType === "message") {
+        try {
+          const { message_id } = JSON.parse(payload);
+          yield { type: "message", message_id };
         } catch {}
         currentEventType = null;
         continue;
@@ -1890,12 +1901,15 @@ export async function saveImageToLibrary(imageId, title = null) {
 // „In Bibliothek speichern": ein gerendertes Diagramm ablegen. `kind` ∈ circuit|plot|mermaid.
 // mermaid liefert zusätzlich das im Browser gerenderte SVG; circuit/plot werden serverseitig
 // aus `source` neu gerendert.
-export async function saveDiagramToLibrary(kind, source, { svg = null, title = null } = {}) {
+// `messageId` belegt die Herkunft: Das Backend schlägt darüber das Anbietermodell nach.
+// Bewusst nur die ID — ein vom Browser behaupteter Modellname hätte in einer
+// Quellenangabe keinen Wert.
+export async function saveDiagramToLibrary(kind, source, { svg = null, title = null, messageId = null } = {}) {
     const res = await fetch(`${BASE}/artifacts/from-diagram`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, source, svg, title }),
+        body: JSON.stringify({ kind, source, svg, title, message_id: messageId }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Speichern fehlgeschlagen')
     return res.json()
@@ -1921,12 +1935,16 @@ export async function deleteArtifact(artifactId) {
 // ── Text-Dokumente / Material-Werkstatt (Phase 19) ─────────────────────────────
 
 // Neues Markdown-Dokument anlegen (leer oder aus dem Chat promotet). Gibt u. a. { id } zurück.
-export async function createDocument(title, markdown = '', { originConversationId = null } = {}) {
+export async function createDocument(title, markdown = '', { originConversationId = null, messageId = null } = {}) {
     const res = await fetch(`${BASE}/artifacts/document`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, markdown, origin_conversation_id: originConversationId }),
+        body: JSON.stringify({
+            title, markdown,
+            origin_conversation_id: originConversationId,
+            message_id: messageId,
+        }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Dokument konnte nicht angelegt werden')
     return res.json()

@@ -112,7 +112,7 @@
                     const src = block.dataset.source ?? '';
                     const svg = kind === 'mermaid' ? block.querySelector('svg')?.outerHTML ?? null : null;
                     try {
-                        const r = await saveDiagramToLibrary(kind, src, { svg });
+                        const r = await saveDiagramToLibrary(kind, src, { svg, messageId: message.id ?? null });
                         saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
                     } catch (e) {
                         saveBtn.textContent = e?.status === 409 ? 'Voll' : 'Fehler';
@@ -209,7 +209,9 @@
         openingWorkshop = true;
         workshopError = null;
         try {
-            const doc = await createDocument(deriveDocTitle(message.content), message.content ?? '');
+            const doc = await createDocument(deriveDocTitle(message.content), message.content ?? '', {
+                messageId: message.id ?? null,
+            });
             await goto(`/library/${doc.id}/edit`);
         } catch (e) {
             openingWorkshop = false;

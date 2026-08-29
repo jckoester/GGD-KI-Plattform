@@ -592,3 +592,81 @@ async def test_promote_image_ohne_herkunft_bleibt_leer(monkeypatch):
     await promote.promote_image(object(), user=_user(), image_id=uuid4())
 
     assert captured["provider_model"] is None
+
+
+# ── Herkunft über die Nachrichten-ID (Modell-Transparenz) ─────────────────────
+#
+# Diagramme und Dokumente entstehen aus dem Text einer Chat-Antwort. Das Modell dahinter
+# kennt nur das Backend — deshalb schickt der Client die Nachrichten-ID, nicht den
+# Modellnamen. Eine Client-Behauptung in einer Quellenangabe wäre wertlos.
+
+async def test_herkunft_wird_ueber_die_nachricht_ermittelt():
+    db = MagicMock()
+    ergebnis = MagicMock()
+    ergebnis.scalar_one_or_none.return_value = "openai/openai/gpt-oss-120b"
+    db.execute = AsyncMock(return_value=ergebnis)
+
+    treffer = await promote.herkunft_der_nachricht(db, message_id=uuid4(), pseudonym="p")
+
+    assert treffer == "openai/openai/gpt-oss-120b"
+    db.execute.assert_awaited_once()
+
+
+async def test_herkunft_ohne_id_fragt_die_datenbank_nicht():
+    db = MagicMock()
+    db.execute = AsyncMock()
+
+    assert await promote.herkunft_der_nachricht(db, message_id=None, pseudonym="p") is None
+    db.execute.assert_not_awaited()
+
+
+async def test_fremde_nachricht_liefert_keine_herkunft():
+    """Die Abfrage bindet an die Konversation der Nutzer:in.
+
+    Über eine fremde ID ließe sich sonst zwar kein Inhalt lesen, aber erraten, welches
+    Modell dort im Einsatz war.
+    """
+    db = MagicMock()
+    ergebnis = MagicMock()
+    ergebnis.scalar_one_or_none.return_value = None   # Join greift nicht
+    db.execute = AsyncMock(return_value=ergebnis)
+
+    assert await promote.herkunft_der_nachricht(db, message_id=uuid4(), pseudonym="p") is None
+
+
+async def test_promote_diagram_uebernimmt_die_herkunft(monkeypatch):
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        promote, "herkunft_der_nachricht", AsyncMock(return_value="mistral/mistral-small-latest")
+    )
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    await promote.promote_diagram(
+        object(), user=_user(), kind="mermaid", source="graph TD; A-->B",
+        svg="<svg>x</svg>", message_id=uuid4(),
+    )
+
+    assert captured["provider_model"] == "mistral/mistral-small-latest"
+
+
+async def test_promote_diagram_ohne_nachricht_bleibt_ohne_herkunft(monkeypatch):
+    """Etwa beim Speichern aus einer alten Konversation ohne Nachrichten-ID."""
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    monkeypatch.setattr(promote, "herkunft_der_nachricht", AsyncMock(return_value=None))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    await promote.promote_diagram(
+        object(), user=_user(), kind="mermaid", source="graph TD; A-->B", svg="<svg>x</svg>"
+    )
+
+    assert captured["provider_model"] is None

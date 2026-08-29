@@ -17,9 +17,11 @@ Idempotenz, Eigentümer-Bindung und Quota liegen in `store.save_artifact` bzw. h
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts import store
+from app.db.models import Conversation, Message
 from app.auth.jwt import JwtPayload
 from app.chat import image_store
 from app.render import service
@@ -28,6 +30,32 @@ from app.render.cache import svg_hash
 
 class PromotionError(Exception):
     """Promotion nicht möglich (Quelle fehlt, Render-Fehler, unbekannter Typ)."""
+
+
+async def herkunft_der_nachricht(
+    db: AsyncSession, *, message_id: Optional[UUID], pseudonym: str
+) -> Optional[str]:
+    """Anbietermodell der Nachricht, aus der ein Inhalt stammt — oder None.
+
+    **Warum über die ID und nicht über eine Angabe des Clients.** Diagramme und Dokumente
+    entstehen aus dem Text einer Chat-Antwort; das Modell dahinter kennt nur das Backend.
+    Ließe man den Browser den Modellnamen mitschicken, stünde in einer Quellenangabe eine
+    Behauptung — ausgerechnet dort, wo Verlässlichkeit der ganze Zweck ist. Deshalb kommt
+    nur die Nachrichten-ID vom Client, das Modell schlägt das Backend selbst nach.
+
+    Die Nachricht muss zu einer Konversation **dieser** Nutzer:in gehören; sonst ließe sich
+    über eine fremde ID zwar kein Inhalt lesen, aber immerhin erraten, welches Modell dort
+    im Einsatz war. Fremde oder unbekannte ID → None, kein Fehler: Die Herkunft ist dann
+    schlicht unbekannt, und das Speichern soll daran nicht scheitern.
+    """
+    if message_id is None:
+        return None
+    treffer = await db.execute(
+        select(Message.provider_model)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Message.id == message_id, Conversation.pseudonym == pseudonym)
+    )
+    return treffer.scalar_one_or_none()
 
 
 _DIAGRAM_DEFAULT_TITLE = {
@@ -90,6 +118,7 @@ async def promote_diagram(
     source: str,
     svg: Optional[str] = None,
     title: Optional[str] = None,
+    message_id: Optional[UUID] = None,
 ) -> tuple:
     """Promotet ein gerendertes Diagramm. Gibt (Artefakt, created) zurück.
 
@@ -126,5 +155,8 @@ async def promote_diagram(
         title=_title(title, _DIAGRAM_DEFAULT_TITLE.get(kind, "Diagramm")),
         source=source,
         origin_ref=origin_ref,
+        provider_model=await herkunft_der_nachricht(
+            db, message_id=message_id, pseudonym=user.sub
+        ),
     )
     return artifact, created

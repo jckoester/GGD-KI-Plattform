@@ -101,6 +101,9 @@ class FromDiagramRequest(BaseModel):
     source: str
     svg: str | None = None   # nur mermaid: bereits im Browser gerendertes SVG
     title: str | None = None
+    # Nachricht, aus der das Diagramm stammt. Das Backend schlägt darüber das
+    # Anbietermodell nach — der Client nennt nur die ID, nicht das Modell.
+    message_id: UUID | None = None
 
 
 class GgbRequest(BaseModel):
@@ -112,6 +115,8 @@ class DocumentCreateRequest(BaseModel):
     title: str | None = None
     markdown: str = ""
     origin_conversation_id: UUID | None = None
+    # Wie bei FromDiagramRequest: nur die ID, das Modell schlägt das Backend nach.
+    message_id: UUID | None = None
 
 
 class DocumentUpdateRequest(BaseModel):
@@ -179,7 +184,7 @@ async def save_diagram_to_library(
     try:
         artifact, created = await promote.promote_diagram(
             db, user=current_user, kind=req.kind, source=req.source,
-            svg=req.svg, title=req.title,
+            svg=req.svg, title=req.title, message_id=req.message_id,
         )
     except store.QuotaExceeded:
         raise HTTPException(
@@ -230,6 +235,9 @@ async def create_document(
             title=req.title,
             markdown=req.markdown,
             origin_conversation_id=req.origin_conversation_id,
+            provider_model=await promote.herkunft_der_nachricht(
+                db, message_id=req.message_id, pseudonym=current_user.sub
+            ),
         )
     except store.QuotaExceeded:
         raise HTTPException(

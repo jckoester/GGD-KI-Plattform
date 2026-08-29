@@ -88,12 +88,15 @@ class GeneratedImageRef(BaseModel):
 
 
 class MessageItem(BaseModel):
+    # Belegt die Herkunft eines aus dieser Antwort gespeicherten Diagramms/Dokuments.
+    id: Optional[UUID] = None
     role: str
     content: str
     created_at: datetime
     cost_usd: Optional[float] = None
     attachments: list[AttachmentMeta] = []
-    model: Optional[str] = None
+    model: Optional[str] = None            # Aliasname (`chat-standard`)
+    provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     images: list[GeneratedImageRef] = []
@@ -960,7 +963,10 @@ async def _persist(
     skip_user_message: bool = False,
     generated_image_ids: Optional[list] = None,
     provider_model: Optional[str] = None,
-) -> None:
+) -> Optional[UUID]:
+    """Schreibt Nachrichten + Konversations-Update. Gibt die ID der Assistant-Nachricht
+    zurück — das Frontend braucht sie, um später die Herkunft eines daraus gespeicherten
+    Diagramms oder Dokuments belegen zu können (Modell-Transparenz)."""
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
 
@@ -986,10 +992,10 @@ async def _persist(
     )
     db.add(assistant_msg)
 
-    # Mid-Stream erzeugte Bilder an diese Assistant-Nachricht hängen (Phase 16, Schritt 5).
-    # Flush macht die server-generierte message_id verfügbar.
+    # Flush macht die server-generierte ID verfügbar — für die Bild-Verknüpfung
+    # (Phase 16, Schritt 5) und für die Rückgabe an das Frontend.
+    await db.flush()
     if generated_image_ids:
-        await db.flush()
         await link_images_to_message(db, generated_image_ids, assistant_msg.id)
 
     update_values: dict = {"last_message_at": func.now()}
@@ -1007,6 +1013,7 @@ async def _persist(
         .values(**update_values)
     )
     await db.commit()
+    return assistant_msg.id
 
 
 @dataclass
@@ -1432,6 +1439,13 @@ async def chat(
     _extra_responses: list = []  # zusätzliche HTTP-Responses aus Tool-Runden
 
     async def generate():
+        # `_deployment_id` wird weiter unten im Werkzeug-Loop neu gesetzt. Ohne `nonlocal`
+        # gälte es dadurch als lokale Variable dieser Funktion — und das Lesen vor der
+        # ersten Zuweisung endete in einem UnboundLocalError, den das `except` beim
+        # Persistieren stillschweigend schluckte: Der Chat sähe normal aus, es würde nur
+        # nichts mehr gespeichert.
+        nonlocal _deployment_id
+
         full_content: list[str] = []
         usage: dict = {}
         chunk_id: str | None = None
@@ -1625,8 +1639,6 @@ async def chat(
             if cost_usd is not None:
                 yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
 
-            yield "data: [DONE]\n\n"
-
         finally:
             await response.aclose()
             for _r in _extra_responses:
@@ -1636,8 +1648,12 @@ async def chat(
                     pass
             await client.aclose()
 
+        # Erst speichern, dann `[DONE]`: Die Nachrichten-ID entsteht beim Schreiben, und
+        # das Frontend braucht sie, um die Herkunft eines später gespeicherten Diagramms
+        # belegen zu können. `[DONE]` heißt damit auch „alles ist abgelegt".
+        _nachricht_id = None
         try:
-            await _persist(
+            _nachricht_id = await _persist(
                 db, conversation_id, user_message, last_attachments,
                 "".join(full_content), usage, model_used, cost_usd=cost_usd,
                 assistant_id=active_assistant_id,
@@ -1648,6 +1664,13 @@ async def chat(
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
+
+        if _nachricht_id is not None:
+            yield (
+                "event: message\n"
+                f"data: {json.dumps({'message_id': str(_nachricht_id)})}\n\n"
+            )
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         generate(),
@@ -2141,6 +2164,7 @@ async def get_conversation_messages(
         if msg.role == "user":
             display_text, attachments = _parse_stored_content(msg.content)
             messages_list.append({
+                "id": msg.id,
                 "role": msg.role,
                 "content": display_text,
                 "created_at": msg.created_at,
@@ -2153,12 +2177,17 @@ async def get_conversation_messages(
             })
         else:
             messages_list.append({
+                # Die ID belegt später die Herkunft eines aus dieser Antwort gespeicherten
+                # Diagramms oder Dokuments — das Backend schlägt darüber das Anbietermodell
+                # nach, statt einer Client-Behauptung zu glauben.
+                "id": msg.id,
                 "role": msg.role,
                 "content": msg.content,
                 "created_at": msg.created_at,
                 "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
                 "attachments": [],
                 "model": msg.model,
+                "provider_model": msg.provider_model,
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,
                 "images": img_map.get(msg.id, []),

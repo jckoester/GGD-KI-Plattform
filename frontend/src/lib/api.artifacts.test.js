@@ -45,7 +45,22 @@ describe('saveDiagramToLibrary', () => {
             source: 'graph TD; A-->B',
             svg: '<svg>x</svg>',
             title: null,
+            message_id: null,   // ohne Nachrichtenbezug: Herkunft bleibt unbekannt
         });
+    });
+
+    it('gibt die Nachrichten-ID mit, damit das Backend die Herkunft nachschlagen kann', async () => {
+        global.fetch = mockFetch(200, { id: 'a', created: true });
+        await saveDiagramToLibrary('mermaid', 'graph TD; A-->B', {
+            svg: '<svg>x</svg>',
+            messageId: '11111111-2222-3333-4444-555555555555',
+        });
+        const [, opts] = global.fetch.mock.calls[0];
+        const body = JSON.parse(opts.body);
+        expect(body.message_id).toBe('11111111-2222-3333-4444-555555555555');
+        // Bewusst NUR die ID — ein vom Browser behaupteter Modellname hätte in einer
+        // Quellenangabe keinen Wert.
+        expect(body).not.toHaveProperty('provider_model');
     });
 
     it('lässt svg für server-gerenderte Diagramme weg (null)', async () => {

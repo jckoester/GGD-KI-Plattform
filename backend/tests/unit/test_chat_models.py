@@ -283,3 +283,89 @@ async def test_post_chat_existing_conversation_without_model_uses_stored_model()
         await chat(request, current_user=_fake_payload(), db=db)
 
     assert fake_http_client.last_json["model"] == "openai/gpt-4o-mini"
+
+
+# ── Der Stream muss auch WIRKLICH durchlaufen ─────────────────────────────────
+#
+# Die Tests oben rufen `chat(...)` auf, verbrauchen den Stream aber nie — `generate()`
+# läuft darin also gar nicht. Genau dadurch blieb ein UnboundLocalError beim Persistieren
+# unbemerkt: Der Chat sah normal aus, es wurde nur nichts mehr gespeichert (der Fehler
+# landet bewusst nur im Log, damit eine Speicherstörung nicht die Antwort zerreißt).
+#
+# Dieser Test verbraucht den Stream und prüft das beobachtbare Ergebnis: die
+# Nachrichten-ID kurz vor [DONE].
+
+async def _stream_text(response) -> str:
+    teile: list[str] = []
+    async for teil in response.body_iterator:
+        teile.append(teil.decode() if isinstance(teil, (bytes, bytearray)) else teil)
+    return "".join(teile)
+
+
+@pytest.mark.asyncio
+async def test_stream_meldet_die_nachrichten_id_vor_done():
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    nachricht_id = uuid4()
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=_FakeHttpClient()), \
+         patch("app.chat.router._persist", new=AsyncMock(return_value=nachricht_id)) as persist, \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value="openai/openai/gpt-oss-120b")), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        ausgabe = await _stream_text(response)
+
+    assert "event: message" in ausgabe, "ohne die ID kann das Frontend keine Herkunft belegen"
+    assert str(nachricht_id) in ausgabe
+    assert ausgabe.index("event: message") < ausgabe.index("[DONE]")
+    # Das aufgelöste Anbietermodell muss beim Schreiben ankommen.
+    assert persist.await_args.kwargs["provider_model"] == "openai/openai/gpt-oss-120b"
+
+
+@pytest.mark.asyncio
+async def test_stream_bleibt_heil_wenn_das_speichern_scheitert():
+    """Eine Speicherstörung darf die Antwort nicht zerreißen — nur die ID entfällt."""
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=_FakeHttpClient()), \
+         patch("app.chat.router._persist", new=AsyncMock(side_effect=RuntimeError("DB weg"))), \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value=None)), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        ausgabe = await _stream_text(response)
+
+    assert "[DONE]" in ausgabe
+    assert "event: message" not in ausgabe

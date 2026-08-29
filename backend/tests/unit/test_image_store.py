@@ -125,7 +125,13 @@ async def test_persist_links_generated_images():
     db.commit.assert_awaited_once()
 
 
-async def test_persist_without_images_does_not_link_or_flush():
+async def test_persist_without_images_does_not_link():
+    """Ohne Bilder wird nichts verknüpft — geflusht wird trotzdem.
+
+    Der Flush ist seit der Modell-Transparenz nicht mehr an die Bilder gebunden: Er macht
+    die server-generierte Nachrichten-ID verfügbar, die `_persist` zurückgibt und die das
+    Frontend braucht, um die Herkunft eines gespeicherten Diagramms belegen zu können.
+    """
     from app.chat import router
     db = MagicMock()
     db.add = MagicMock()
@@ -135,7 +141,7 @@ async def test_persist_without_images_does_not_link_or_flush():
     with patch.object(router, "link_images_to_message", new=AsyncMock()) as link:
         await router._persist(db, uuid4(), "hallo", [], "antwort", {}, "model-x")
     link.assert_not_awaited()
-    db.flush.assert_not_awaited()
+    db.flush.assert_awaited_once()
 
 
 # ── Backstop-Cron: verwaist + über-alt ──────────────────────────────────────────

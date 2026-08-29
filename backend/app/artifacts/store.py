@@ -171,6 +171,7 @@ async def create_document(
     title: str,
     markdown: str,
     origin_conversation_id: Optional[UUID] = None,
+    provider_model: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Legt ein Text-Dokument (`kind='document'`, Markdown) an — mutabel, **kein** `origin_ref`."""
@@ -186,6 +187,7 @@ async def create_document(
         source=markdown,
         origin_ref=None,          # Dokumente sind veränderbar, nicht content-adressiert
         origin_conversation_id=origin_conversation_id,
+        provider_model=provider_model,
         now=now,
     )
 
