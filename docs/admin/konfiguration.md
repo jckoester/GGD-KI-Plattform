@@ -44,6 +44,7 @@ Es genügen die Zugänge der Anbieter, die in der LiteLLM-Config tatsächlich vo
 | `OPENAI_API_KEY` | OpenAI-Zugang | `sk-…` |
 | `IONOS_API_KEY` | IONOS-Zugang — der **Value** des Tokens aus dem Data Center Designer, nicht die ID | `eyJ…` |
 | `IONOS_API_BASE` | OpenAI-kompatibler Endpunkt von IONOS | `https://openai.inference.de-txl.ionos.com/v1` |
+| `LITELLM_PRICE_CURRENCY` | Währung der Preise in der Proxy-Config: `EUR` = keine Umrechnung, `USD` = EUR-Budgets über den EZB-Kurs. **Falsch gesetzt liegt die Kostenrechnung dauerhaft um den Kurs daneben, ohne Fehler** — s. [Vor der Installation](vor-der-installation.md#in-welcher-währung-die-preise-eingetragen-werden) | `EUR` |
 | `SPEND_LOG_DELAY` | Wartezeit nach Stream-Ende, bevor die Kosten abgefragt werden | `1.0` |
 
 ### Modelle

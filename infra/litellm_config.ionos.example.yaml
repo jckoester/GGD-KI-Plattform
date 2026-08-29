@@ -2,8 +2,31 @@
 #
 # Vorlage für den IONOS-Betriebspfad (ADR-015). Modell-IDs, Fähigkeiten und Preise sind am
 # 26.08.2026 gegen den laufenden AI Model Hub gemessen bzw. der Preisliste entnommen
-# (cloud.ionos.com/managed/ai-model-hub, **USD** — LiteLLM rechnet in USD, die EUR-Budgets
-# werden vom monatlichen Cron über den EZB-Kurs umgerechnet).
+# (cloud.ionos.de/managed/ai-model-hub).
+#
+# ⚠️ ALLE PREISE HIER SIND **EURO** — so, wie IONOS sie listet. Dazu gehört zwingend
+#     LITELLM_PRICE_CURRENCY=EUR
+# in der `.env`; dann rechnet die Plattform nicht um und es gibt kein Kursrisiko.
+#
+# Bis 08/2026 stand hier eine Umrechnung nach USD (Faktor ~1,111). Das war ein Fehler: Der
+# Kurs war in dieser Datei eingefroren, das Budget rechnete aber mit dem aktuellen — wertet
+# der Euro auf, überschreitet die Schule ihr Budget dauerhaft um die Differenz, ohne dass
+# etwas fehlschlägt.
+#
+# STAND DER PREISE (29.08.2026, gegen die Preisliste abgeglichen):
+#   ✅ geprüft: Mistral-Small-24B (0,10/0,30) · gpt-oss-120b (0,15/0,65)
+#              Llama-3.3-70B (0,65/0,65) · Qwen3.5-397B-A17B (0,60/3,60)
+#      Qwen3-Coder-Next (0,15/0,80) · BAAI/bge-m3 (0,02) · FLUX.1-schnell (0,0288 €/Bild)
+#      FLUX.2-klein: **Megapixel-Staffel**, kein Pauschalpreis —
+#          0,013 € für das erste Megapixel, 0,001 € je weiterem, 0,001 €/MP für Eingabebilder.
+#      Für die drei angebotenen Formate (1024², 768×1344, 1344×768 — je ~1,03–1,05 MP)
+#      ergibt das 0,01303–0,01305 €. Eingetragen sind pauschal **0,0131** (0,4 % darüber,
+#      also auf der sicheren Seite). ⚠️ Wer größere Formate freigibt, muss nachrechnen:
+#      bei 1536² (2,36 MP) sind es 0,0144 €.
+#      Eingabebilder kosten hier nichts, weil `generate_image` nur Text→Bild nutzt.
+#
+# ⚠️ Zahlenformat: `1.0e-07` schreiben, NICHT `1e-07`. Ohne Dezimalpunkt vor dem `e` liest
+# YAML den Wert als Zeichenkette, und LiteLLM bekäme einen Text statt eines Preises.
 #
 # Nachmessen, wenn IONOS den Katalog ändert:
 #
@@ -40,7 +63,7 @@
 #       LiteLLM kennt für `openai/<id>` mit eigener `api_base` KEINE Preise. Ohne diese
 #       Werte melden die SpendLogs 0 → EUR-Budgets, das 429-Enforcement, /budget und
 #       /statistics/costs laufen ins Leere. Umrechnung: Preis pro Mio ÷ 1_000_000,
-#       also 0,17 $/M → 0.00000017. (Ein Pro-Million-Feld gibt es nicht.)
+#       also 0,15 €/M → 0.00000015. (Ein Pro-Million-Feld gibt es nicht.)
 #
 #   supports_function_calling: true
 #       Das Backend liest die Tool-Fähigkeit aus /model/info. Fehlt der Wert, ist er
@@ -97,8 +120,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true         # gemessen
-      input_cost_per_token: 0.00000011        # 0,11 $/M
-      output_cost_per_token: 0.00000033       # 0,33 $/M
+      input_cost_per_token: 1.0e-07        # 0,10 €/M
+      output_cost_per_token: 3.0e-07        # 0,30 €/M
 
   # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
   # Reasoning ausgeschaltet — wer eine denkende Antwort will, wählt `chat-reasoning`.
@@ -114,8 +137,8 @@ model_list:
       allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
       supports_function_calling: true         # gemessen
-      input_cost_per_token: 0.00000017        # 0,17 $/M
-      output_cost_per_token: 0.00000071       # 0,71 $/M
+      input_cost_per_token: 1.5e-07        # 0,15 €/M
+      output_cost_per_token: 6.5e-07        # 0,65 €/M
 
   # Programmieraufgaben. IONOS führt seit 2026 ein dediziertes Code-Modell — die Annahme des
   # Plans (§5.2: „kein Code-Modell, zeigt vorerst auf chat-standard") ist überholt.
@@ -126,8 +149,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true         # gemessen
-      input_cost_per_token: 0.00000017        # 0,17 $/M
-      output_cost_per_token: 0.00000089       # 0,89 $/M
+      input_cost_per_token: 1.5e-07        # 0,15 €/M
+      output_cost_per_token: 8.0e-07       # 0,80 €/M
 
   # Denkt vor der Antwort — für mehrschrittige Aufgaben, Herleitungen, Begründungen.
   # Dasselbe Backend wie `chat-standard`, nur mit aktivem Reasoning: didaktisch als „derselbe
@@ -145,8 +168,8 @@ model_list:
       allowed_openai_params: ["reasoning_effort"]
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000017
-      output_cost_per_token: 0.00000071
+      input_cost_per_token: 1.5e-07        # 0,15 €/M
+      output_cost_per_token: 6.5e-07        # 0,65 €/M
 
   # Analyse, lange Texte, Unterrichtsplanung. Mit Abstand am teuersten (4,00 $/M Ausgabe bei
   # starkem Reasoning) → NUR für `lehrkraefte` freischalten.
@@ -157,8 +180,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true         # gemessen
-      input_cost_per_token: 0.00000067        # 0,67 $/M
-      output_cost_per_token: 0.00000400       # 4,00 $/M
+      input_cost_per_token: 6.0e-07        # 0,60 €/M
+      output_cost_per_token: 3.6e-06        # 3,60 €/M
 
   # ══ System-Modelle: nie im Modellwähler (MODEL_PICKER_HIDDEN_PREFIXES) ══════════════
 
@@ -180,8 +203,8 @@ model_list:
       allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
       supports_function_calling: false        # Titel brauchen keine Werkzeuge
-      input_cost_per_token: 0.00000017        # 0,17 $/M
-      output_cost_per_token: 0.00000071       # 0,71 $/M
+      input_cost_per_token: 1.5e-07        # 0,15 €/M
+      output_cost_per_token: 6.5e-07        # 0,65 €/M
 
   # Klassifikator für die Jugendschutz-Guardrails (ersetzt `openai_moderation`, das es bei
   # IONOS nicht gibt). Angebunden unten unter `litellm_settings.guardrails`.
@@ -196,8 +219,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: false
-      input_cost_per_token: 0.00000011
-      output_cost_per_token: 0.00000033
+      input_cost_per_token: 1.0e-07        # 0,10 €/M
+      output_cost_per_token: 3.0e-07        # 0,30 €/M
 
   # ══ Weitere Modalitäten ═════════════════════════════════════════════════════════════
 
@@ -216,7 +239,7 @@ model_list:
       encoding_format: float
     model_info:
       mode: embedding
-      input_cost_per_token: 0.00000002        # 0,02 $/M
+      input_cost_per_token: 2.0e-08        # 0,02 €/M
 
   # ── Bildgenerierung ─────────────────────────────────────────────────────────────────
   # Beide Modelle liefern Base64 **ohne** `response_format`-Parameter (gemessen)
@@ -232,7 +255,7 @@ model_list:
   # Der Wert unter `model_info` steht trotzdem hier: `check_litellm_config.py` gleicht ihn
   # gegen IMAGE_PRICES ab und meldet ein Auseinanderlaufen. **Beide Stellen gleich halten.**
   #
-  # Preise sind USD, die IONOS-Preisliste ist in EUR — umgerechnet mit ~1,111.
+  # Preis in EUR laut Preisliste (s. Dateikopf). IMAGE_PRICES muss denselben Wert führen.
   #
   # Welches Modell wofür genutzt wird, entscheidet die **Bildart**
   # (config/image_models.yaml). Ein Modell ohne Bildart lässt sich zwar freischalten, aber
@@ -246,7 +269,7 @@ model_list:
       mode: image_generation
       # Kann NUR 1024x1024. Jede andere Größe → HTTP 400 `invalid-image-size` (gemessen);
       # es stutzt nicht still zurecht. Schlanke Dateien: ~70–165 KB.
-      input_cost_per_image: 0.032             # 0,032 $/Bild (= 0,0288 €)
+      input_cost_per_image: 0.0288           # 0,0288 €/Bild — fix, unabhängig von der Größe
 
   # Optional, für Hoch- und Querformat. Beherrscht 512² bis 1536² pixelgenau, liefert aber
   # **rund vierzigmal größere Dateien** als FLUX.1 (1024²: 3,0 MB statt 73 KB) — das
@@ -264,7 +287,7 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       mode: image_generation
-      input_cost_per_image: 0.0152            # Mittelwert über 0,26–2,36 MP
+      input_cost_per_image: 0.0131          # s. Staffelrechnung im Kommentar oben
 
   # ══ Ebene 2: explizite Modelle — Allowlist NUR `lehrkraefte` ════════════════════════
   # Zeigen auf dieselben Backends wie die Aliase; der Unterschied ist allein die Bindung.
@@ -282,8 +305,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000011
-      output_cost_per_token: 0.00000033
+      input_cost_per_token: 1.0e-07        # 0,10 €/M
+      output_cost_per_token: 3.0e-07        # 0,30 €/M
 
   - model_name: ionos-gpt-oss-120b
     litellm_params:
@@ -292,8 +315,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000017
-      output_cost_per_token: 0.00000071
+      input_cost_per_token: 1.5e-07        # 0,15 €/M
+      output_cost_per_token: 6.5e-07        # 0,65 €/M
 
   - model_name: ionos-qwen3-coder-next
     litellm_params:
@@ -302,8 +325,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000017
-      output_cost_per_token: 0.00000089
+      input_cost_per_token: 1.5e-07
+      output_cost_per_token: 8.0e-07
 
   - model_name: ionos-llama-3.3-70b
     litellm_params:
@@ -312,8 +335,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000071        # 0,71 $/M
-      output_cost_per_token: 0.00000071       # 0,71 $/M
+      input_cost_per_token: 6.5e-07        # 0,65 €/M
+      output_cost_per_token: 6.5e-07        # 0,65 €/M
 
   - model_name: ionos-qwen3.5-397b
     litellm_params:
@@ -322,8 +345,8 @@ model_list:
       api_key: os.environ/IONOS_API_KEY
     model_info:
       supports_function_calling: true
-      input_cost_per_token: 0.00000067
-      output_cost_per_token: 0.00000400
+      input_cost_per_token: 6.0e-07        # 0,60 €/M
+      output_cost_per_token: 3.6e-06        # 3,60 €/M
 
 # ── Jugendschutz-Guardrails ───────────────────────────────────────────────────────────
 # Die drei `openai_moderation`-Guardrails aus infra/litellm_config.example.yaml funktionieren

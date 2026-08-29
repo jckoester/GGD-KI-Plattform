@@ -312,4 +312,43 @@ def check_config(
             f"config/image_models.yaml fehlt.",
         ))
 
+    findings.extend(_pruefe_waehrung(entries, settings))
     return findings
+
+
+def _pruefe_waehrung(entries: dict, settings: Any) -> list[Finding]:
+    """Passen die Preise zur eingestellten Preiswährung?
+
+    Zu prüfen ist das, weil eine Verwechslung **nichts** zum Absturz bringt: Budgets
+    greifen weiter, Statistiken sehen plausibel aus — nur um den Kursfaktor daneben, und
+    zwar dauerhaft.
+
+    Erkennbar ist es an einem einzigen Merkmal: Ein Deployment **ohne eigene `api_base`**
+    spricht den Endpunkt des Anbieters an, und dafür bringt LiteLLM eigene Preise mit —
+    seine eingebaute Tabelle ist **durchgängig USD**. Steht die Plattform auf Euro-Preisen,
+    rechnen genau diese Einträge in der falschen Einheit.
+
+    Umgekehrt ist ein Eintrag **mit** `api_base` (IONOS, OVH, lokale Server) immer
+    selbst bepreist — dort gilt, was in der Config steht.
+    """
+    if str(getattr(settings, "litellm_price_currency", "USD")).strip().upper() != "EUR":
+        return []
+
+    fremdbepreist = sorted(
+        name for name, entry in entries.items()
+        if not (entry or {}).get("litellm_params", {}).get("api_base")
+        # Lokale Modelle kosten nichts — Währung ist dort gegenstandslos.
+        and str(_info(entry).get("litellm_provider", "")) != "ollama"
+    )
+    if not fremdbepreist:
+        return []
+
+    return [Finding(
+        WARNING,
+        f"LITELLM_PRICE_CURRENCY=EUR, aber diese Modelle haben keine eigene `api_base` und "
+        f"beziehen ihre Preise deshalb aus LiteLLMs eingebauter Tabelle, die in **USD** "
+        f"geführt wird: {', '.join(fremdbepreist)}. Entweder `input_cost_per_token` / "
+        f"`output_cost_per_token` dort ausdrücklich in Euro eintragen, oder die Plattform "
+        f"auf USD-Preise stellen. Sonst weicht die Kostenrechnung dauerhaft um den "
+        f"Wechselkurs ab, ohne dass etwas fehlschlägt.",
+    )]

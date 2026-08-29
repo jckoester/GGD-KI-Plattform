@@ -143,6 +143,23 @@ class Settings(BaseSettings):
     # sind — wer anders benennt, passt die Liste an, statt dass der Filter stumm ins Leere greift.
     model_picker_hidden_prefixes: list[str] = ["system-", "embedding-", "bild-"]
     exchange_rate_fallback: float = 1.10
+    # In welcher Währung die Preise in der LiteLLM-Config stehen (`input_cost_per_token`
+    # & Co.) — NICHT, worin der Anbieter Rechnungen stellt.
+    #
+    # LiteLLM ist die Währung gleichgültig; „USD" ist nur ein Etikett auf einer Zahl.
+    # Steht hier `EUR`, sind die eingetragenen Preise bereits Euro und es wird **nicht**
+    # umgerechnet (Kurs 1,0). Das ist der Regelfall für Anbieter, die in Euro abrechnen —
+    # IONOS listet ausschließlich Euro-Preise.
+    #
+    # Warum das mehr ist als Bequemlichkeit: Wer Euro-Preise zum Tageskurs in Dollar
+    # umrechnet und einträgt, friert diesen Kurs ein. Das Budget wird aber mit dem
+    # *aktuellen* EZB-Kurs umgerechnet — beide kürzen sich nur, solange die Kurse gleich
+    # sind. Wertet der Euro auf, überschreitet die Schule ihr Budget genau um diesen
+    # Faktor, jeden Monat, ohne dass etwas auffällt.
+    #
+    # `USD` bleibt der Vorgabewert: Anbieter wie OpenAI, Anthropic und Mistral rechnen in
+    # Dollar, und LiteLLMs eingebaute Preistabelle ist durchgängig USD.
+    litellm_price_currency: str = "USD"
     student_grades: list[int] = Field(default=[5, 6, 7, 8, 9, 10, 11, 12], alias="public_student_grades")
     # Host-Header-Allowlist für TrustedHostMiddleware (Audit #18). Default `*` (aus, wie bisher);
     # in Produktion die echten Hostnamen setzen, z. B. ["ki.example.de"]. Defense-in-Depth

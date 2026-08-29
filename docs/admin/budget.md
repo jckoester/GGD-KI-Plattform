@@ -19,10 +19,48 @@ Welche Wochen Unterrichtswochen sind, steht in `school_year.yaml`; Ferienwochen 
 keine Zuteilung. Die **Jahressumme** ist `Wochenbetrag × Unterrichtswochen` — der Betrag,
 auf den sich die Schule festlegt. Die Admin-Oberfläche zeigt ihn beim Eintragen an.
 
-Intern arbeitet LiteLLM mit US-Dollar. Das Backend holt monatlich den aktuellen
-EUR→USD-Wechselkurs von der Europäischen Zentralbank (ECB); jede Wochenaufstockung wird mit
-dem dann gültigen Kurs umgerechnet. Überschreitungen lehnt der Proxy ab; die Plattform
-zeigt Nutzer:innen dann eine verständliche Meldung.
+Überschreitungen lehnt der Proxy ab; die Plattform zeigt Nutzer:innen dann eine
+verständliche Meldung.
+
+### Währung — die Stelle, an der ein Budget still danebenliegt
+
+Budgets sind in Euro gedacht. Durchgesetzt werden sie gegen die Preise in der
+LiteLLM-Config, und **beide müssen dieselbe Einheit haben.** Welche das ist, sagt
+`LITELLM_PRICE_CURRENCY`:
+
+- **`EUR`** — die Preise sind bereits Euro, es wird **nicht umgerechnet** (Faktor 1,0).
+  Der Regelfall bei Anbietern, die in Euro abrechnen; IONOS listet ausschließlich
+  Euro-Preise.
+- **`USD`** *(Vorgabe)* — die Preise sind Dollar, EUR-Budgets werden mit dem monatlich
+  abgerufenen EZB-Kurs umgerechnet.
+
+> ⚠️ **Warum Euro-Preise nicht „mal eben" umgerechnet werden sollten.** Wer sie zum
+> Tageskurs in Dollar einträgt, friert diesen Kurs in der Config ein — das Budget rechnet
+> aber mit dem *aktuellen*. Beide kürzen sich nur, solange die Kurse gleich sind:
+>
+> ```
+> Anbieter berechnet:  N × P_eur
+> LiteLLM zählt:       N × P_eur × K_config     ← eingefroren
+> Budget erlaubt:      B_eur × K_jetzt          ← aktuell
+> ⇒ erlaubter Verbrauch = B_eur × (K_jetzt / K_config)
+> ```
+>
+> Wertet der Euro auf, überschreitet die Schule ihr Budget genau um diesen Faktor — Monat
+> für Monat. Nichts schlägt fehl, Statistiken sehen plausibel aus, die Rechnung ist
+> trotzdem zu hoch. Mit `EUR` entfällt die Umrechnung und damit das Risiko vollständig.
+
+**Kein pauschaler Sicherheitsabschlag.** Naheliegend wäre, die Budgets um einige Prozent zu
+kürzen. Das ist aber das falsche Werkzeug: Der Abschlag wirkt auf die *Zuteilung*, das
+Kursrisiko auf den *tatsächlichen Verbrauch* — er kostet also ein Vielfaches dessen, was er
+absichert, wirkt nur in eine Richtung, und macht jede angezeigte Zahl (auch die
+Jahressumme) falsch. Wer Sicherheit will, verteilt weniger als den vollen Jahrestopf; das
+ist transparent und tut dasselbe.
+
+**Im Mischbetrieb** bleibt für den umgerechneten Anteil ein Restrisiko. Es wird sichtbar
+statt überdeckt: `python scripts/check_litellm_config.py` meldet Modelle, deren Preise
+nicht zur eingestellten Währung passen können — erkennbar daran, dass sie **keine eigene
+`api_base`** haben und ihre Preise deshalb aus LiteLLMs eingebauter Tabelle beziehen, die
+durchgängig in **USD** geführt wird (bei Mistral nachgeprüft).
 
 > **Einen Rückfall auf ein anderes Modell gibt es nicht.** Budget aufgebraucht heißt:
 > keine Nutzung bis zum nächsten Zeitraum (siehe [Modell-Szenarien](modell-szenarien.md)).

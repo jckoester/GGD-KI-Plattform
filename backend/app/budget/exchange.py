@@ -11,11 +11,27 @@ from app.db.models import ExchangeRate
 logger = logging.getLogger(__name__)
 
 
+def preise_in_euro() -> bool:
+    """Stehen die Preise in der LiteLLM-Config bereits in Euro?"""
+    return str(getattr(settings, "litellm_price_currency", "USD")).strip().upper() == "EUR"
+
+
 async def get_current_rate(db: AsyncSession) -> float:
     """
-    Gibt den neuesten gültigen EUR/USD-Kurs zurück.
-    Fallback auf settings.exchange_rate_fallback (Default: 1.10) wenn kein Eintrag vorhanden.
+    Umrechnungsfaktor von der Budget-Währung (EUR) in die Einheit der LiteLLM-Preise.
+
+    Stehen die Preise bereits in Euro (``LITELLM_PRICE_CURRENCY=EUR``), ist der Faktor
+    **1,0** — es wird nicht gerechnet, und damit gibt es an dieser Stelle **kein
+    Kursrisiko**. Das ist kein Sonderfall, sondern der Regelfall bei Anbietern, die in
+    Euro abrechnen.
+
+    Sonst: der neueste gültige EUR/USD-Kurs, Fallback ``settings.exchange_rate_fallback``.
     """
+    if preise_in_euro():
+        # Bewusst ohne DB-Zugriff und ohne Log auf INFO: Das ist der Normalbetrieb einer
+        # Euro-Schule und soll nicht bei jedem Aufruf Rauschen erzeugen.
+        return 1.0
+
     try:
         now = datetime.now(timezone.utc)
         stmt = (

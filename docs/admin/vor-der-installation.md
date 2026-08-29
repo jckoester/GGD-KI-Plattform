@@ -41,23 +41,65 @@ stürzt ab, es passiert nur nicht das Gewünschte:
    Satz schreibt, produziert Gesprächstitel, die die Oberfläche mitten im Wort abschneidet
    — dauerhaft sichtbar in der Historie jeder Nutzerin.
 
+### In welcher Währung die Preise eingetragen werden
+
+**Das ist keine Formsache, sondern die Stelle, an der ein Budget dauerhaft danebenliegen
+kann — ohne dass irgendetwas fehlschlägt.**
+
+LiteLLM ist die Währung gleichgültig: `input_cost_per_token` ist eine Zahl, „USD" nur ein
+Etikett. Entscheidend ist, dass **Preise und Budget dieselbe Einheit** haben. Dafür gibt es
+die Variable `LITELLM_PRICE_CURRENCY`:
+
+| Wert | Bedeutung | Wann |
+|---|---|---|
+| `EUR` | Die Preise in der Proxy-Config sind Euro. **Es wird nicht umgerechnet** (Faktor 1,0). | Anbieter rechnet in Euro ab — z. B. IONOS |
+| `USD` *(Vorgabe)* | Die Preise sind Dollar. EUR-Budgets werden mit dem EZB-Kurs umgerechnet. | OpenAI, Anthropic, Mistral |
+
+> ⚠️ **Euro-Preise in Dollar umzurechnen und einzutragen ist der Fehler, den man nicht
+> sieht.** Dabei friert man den Tageskurs in der Config ein, während das Budget mit dem
+> *aktuellen* EZB-Kurs umgerechnet wird. Beide kürzen sich nur, solange die Kurse gleich
+> sind — wertet der Euro auf, überschreitet die Schule ihr Budget genau um diesen Faktor,
+> Monat für Monat. Budgets greifen weiter, Statistiken sehen plausibel aus, die Rechnung
+> ist trotzdem zu hoch.
+>
+> Mit `LITELLM_PRICE_CURRENCY=EUR` entfällt die Umrechnung ganz. Das Risiko ist dann nicht
+> abgepuffert, sondern **nicht vorhanden**.
+
+**Im Mischbetrieb ist eine Einheit zu wählen**, und die andere Seite muss umgerechnet
+werden — das Kursrisiko bleibt dann für diesen Anteil bestehen und ist beim Kurswechsel
+nachzuziehen. `python scripts/check_litellm_config.py` meldet Einträge, deren Preise nicht
+zur eingestellten Währung passen können.
+
+> **Woran der Check das erkennt:** Ein Deployment **ohne** eigene `api_base` spricht den
+> Endpunkt des Anbieters an — dafür bringt LiteLLM eigene Preise mit, und seine eingebaute
+> Tabelle ist durchgängig **USD** (bei Mistral nachgeprüft). Ein Eintrag **mit** `api_base`
+> (IONOS, OVH, lokale Server) ist immer selbst bepreist; dort gilt, was in der Config steht.
+
 ### IONOS AI Model Hub
 
-EU-Anbieter (Deutschland), OpenAI-kompatibel. Preise in **USD** eintragen — LiteLLM
-rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
+EU-Anbieter (Deutschland), OpenAI-kompatibel.
+
+> **IONOS listet ausschließlich Euro-Preise**
+> ([Preisübersicht](https://cloud.ionos.de/managed/ai-model-hub), geprüft 29.08.2026).
+> Die Werte also **unverändert in Euro** eintragen und `LITELLM_PRICE_CURRENCY=EUR` setzen —
+> nicht umrechnen.
+>
+> Alle Preise in diesem Abschnitt sind am **29.08.2026** gegen die Preisliste abgeglichen —
+> Chat, Code, Embedding und Bild.
+
 
 #### Chat
 
-| Modell | $/M ein | $/M aus | Funktionen | Erfahrung |
+| Modell | €/M ein | €/M aus | Funktionen | Erfahrung |
 |---|---|---|---|---|
-| **gpt-oss-120b** | 0,17 | 0,71 | ✅ | **Empfehlung als Arbeitspferd.** Befolgte Anweisungen am zuverlässigsten (4/4 bei Titeln, 3/3 bei Funktionsaufrufen). Denkt immer, Umfang über `reasoning_effort: low/medium/high` steuerbar — `none` lehnt es ab. |
-| Mistral Small 24B | 0,11 | 0,33 | ✅ | Günstig, antwortet ohne Denkspur sofort, versteht Bildeingaben. Bei knappen Vorgaben unbeständig (4 bis 13 Wörter, **alte Prompt-Fassung**). Gute Wahl für die schnelle Stufe. |
-| Qwen3-Coder-Next | 0,17 | 0,89 | ✅ | Für Programmieraufgaben. |
-| Qwen3.5-9B | 0,11 | 0,17 | ✅ | Billigstes Chat-Modell. Hielt knappe Vorgaben nicht ein (15–22 Wörter statt 6) — **gemessen mit der alten Prompt-Fassung**, mit der heutigen nicht nachgeprüft. Vor dem Einsatz als Titelmodell selbst messen. |
-| Qwen3.8-27B | 0,45 | 2,70 | ✅ | Antwortet direkt. Die Ausgabe kostet das Vierfache von gpt-oss-120b — vor dem Einsatz rechnen. |
-| Qwen3.5-397B-A17B | 0,67 | 4,00 | ✅ | Stärkstes Modell, teuerste Ausgabe, denkt ausgiebig. Nur für Lehrkräfte freischalten. |
-| Llama 3.3 70B | 0,71 | 0,71 | ✅ | Nicht näher erprobt. |
-| ~~Mistral Nemo~~ | 0,17 | 0,17 | ❌ | **Nicht verwenden, wo Funktionen gebraucht werden.** Der Funktionsaufruf zerfiel im Test in mehrsprachigen Textbrei statt in ein `tool_calls`-Feld. |
+| **gpt-oss-120b** | 0,15 | 0,65 | ✅ | **Empfehlung als Arbeitspferd.** Befolgte Anweisungen am zuverlässigsten (4/4 bei Titeln, 3/3 bei Funktionsaufrufen). Denkt immer, Umfang über `reasoning_effort: low/medium/high` steuerbar — `none` lehnt es ab. |
+| Mistral Small 24B | 0,10 | 0,30 | ✅ | Günstig, antwortet ohne Denkspur sofort, versteht Bildeingaben. Bei knappen Vorgaben unbeständig (4 bis 13 Wörter, **alte Prompt-Fassung**). Gute Wahl für die schnelle Stufe. |
+| Qwen3-Coder-Next | 0,15 | 0,80 | ✅ | Für Programmieraufgaben. |
+| Qwen3.5-9B | 0,10 | 0,15 | ✅ | Billigstes Chat-Modell. Hielt knappe Vorgaben nicht ein (15–22 Wörter statt 6) — **gemessen mit der alten Prompt-Fassung**, mit der heutigen nicht nachgeprüft. Vor dem Einsatz als Titelmodell selbst messen. |
+| Qwen3.8-27B | 0,40 | 2,70 | ✅ | Antwortet direkt. Die Ausgabe kostet das Vierfache von gpt-oss-120b — vor dem Einsatz rechnen. |
+| Qwen3.5-397B-A17B | 0,60 | 3,60 | ✅ | Stärkstes Modell, teuerste Ausgabe, denkt ausgiebig. Nur für Lehrkräfte freischalten. |
+| Llama 3.3 70B | 0,65 | 0,65 | ✅ | Nicht näher erprobt. |
+| ~~Mistral Nemo~~ | 0,15 | 0,15 | ❌ | **Nicht verwenden, wo Funktionen gebraucht werden.** Der Funktionsaufruf zerfiel im Test in mehrsprachigen Textbrei statt in ein `tool_calls`-Feld. |
 | ~~Llama 3.1 8B / 405B~~ | — | — | ✅ | **Abgekündigt** (01.10. bzw. 15.09.2026) und in keiner Preisliste geführt. Ein Assistent darauf bricht binnen Wochen und läuft bis dahin mit Spend 0. |
 
 > **Reasoning kostet Ausgabe-Tokens, und zwar erheblich.** Die Qwen3.5-Modelle denken auch
@@ -75,7 +117,7 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 
 #### Embeddings
 
-| Modell | Dimensionen | $/M | Erfahrung |
+| Modell | Dimensionen | €/M | Erfahrung |
 |---|---|---|---|
 | **BAAI/bge-m3** | 1024 | 0,02 | **Empfehlung.** Mehrsprachig, für deutsche Fachtexte geeignet. Braucht `encoding_format: float` — sonst schickt LiteLLM base64 und IONOS antwortet mit einem Fehler. |
 | paraphrase-multilingual-mpnet | 768 | 0,01 | Kleiner und billiger, nicht erprobt. |
@@ -97,8 +139,18 @@ rechnet in USD, die EUR-Budgets werden über den EZB-Kurs umgerechnet.
 
 | Modell | Preis | Formate | Dateigröße |
 |---|---|---|---|
-| **FLUX.1-schnell** | 0,032 $/Bild | **nur 1024×1024** | ~150 KB |
-| FLUX.2-klein-4B | pro Megapixel (0,014 $ erstes, 0,001 $ weitere) | alle | ~3–4,7 MB |
+| **FLUX.1-schnell** | **0,0288 €/Bild**, unabhängig von der Größe | **nur 1024×1024** | ~150 KB |
+| FLUX.2-klein-4B | **Megapixel-Staffel:** 0,013 € erstes MP, 0,001 € je weiterem | alle | ~3–4,7 MB |
+
+> **Was die Staffel praktisch bedeutet.** Die drei angebotenen Formate (1024², 768×1344,
+> 1344×768) liegen alle bei rund 1,03–1,05 MP und kosten damit **0,0130 €** — kaum mehr als
+> FLUX.1. Der Unterschied wächst erst mit der Größe: bei 1536² (2,36 MP) sind es 0,0144 €.
+> In `IMAGE_PRICES` steht deshalb ein Pauschalwert (0,0131 € — 0,4 % über dem tatsächlichen
+> Preis, also auf der sicheren Seite). **Wer größere Formate freigibt, muss ihn nachrechnen**;
+> `IMAGE_PRICES` kann auch je Größe geführt werden.
+>
+> Eingabebilder kosten zusätzlich 0,001 €/MP. Für die Plattform ohne Belang: Das Werkzeug
+> `generate_image` erzeugt Bilder aus Text, nicht aus Bildern.
 
 FLUX.1-schnell hat den einfacheren Preis und schlanke Dateien, kann aber ausschließlich
 quadratisch — hoch- und Querformat entfallen. FLUX.2-klein beherrscht alle Formate,
@@ -108,7 +160,7 @@ liefert aber rund **vierzigmal** größere Dateien (1024²: 3,0 MB gegen 73 KB, 
 > ⚠️ **Bildpreise brauchen einen Extraschritt.** Für Chat und Embedding greift der Preis
 > aus der LiteLLM-Config; für **Bilder nicht** — LiteLLM 1.83.7 löst sie ausschließlich über
 > seine eingebaute Preistabelle auf. Ein selbst eingetragenes Bildmodell kostet dort 0,00 $
-> und läuft am EUR-Budget vorbei, ohne dass etwas fehlschlägt. Abhilfe: `IMAGE_PRICES` in
+> und läuft am Budget vorbei, ohne dass etwas fehlschlägt. Abhilfe: `IMAGE_PRICES` in
 > der `.env` setzen und den Callback `guardrails.bildpreise.registrierung` in der
 > LiteLLM-Config eintragen — beides in den mitgelieferten Vorlagen vorbereitet. Danach
 > rechnet LiteLLM wieder selbst, und Budget, 429-Sperre und Statistik stimmen zusammen.

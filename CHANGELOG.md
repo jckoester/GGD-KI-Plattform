@@ -97,6 +97,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert (Budget)
 
+- **Preise können jetzt in Euro geführt werden** (`LITELLM_PRICE_CURRENCY=EUR`) — dann
+  rechnet die Plattform nicht um. Anbieter wie IONOS listen ausschließlich Euro-Preise;
+  sie zum Tageskurs in Dollar einzutragen fror diesen Kurs in der Config ein, während das
+  Budget mit dem aktuellen rechnete. Beide kürzen sich nur, solange die Kurse gleich sind —
+  wertet der Euro auf, überschreitet die Schule ihr Budget dauerhaft um die Differenz,
+  ohne dass etwas fehlschlägt.
+
+  - `infra/litellm_config.ionos.example.yaml` führt die Preise jetzt in **Euro**
+    (aus den bisherigen USD-Werten zurückgerechnet; vor Inbetriebnahme gegen die
+    Preisliste prüfen).
+  - `check_litellm_config.py` meldet Modelle, deren Preise nicht zur eingestellten Währung
+    passen können — erkennbar an fehlender eigener `api_base`: Sie beziehen ihre Preise aus
+    LiteLLMs eingebauter Tabelle, und die ist durchgängig USD.
+  - Vorgabe bleibt `USD`; bestehende Installationen ändern sich nicht.
+
 - **Das Budget gilt jetzt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
   persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
   Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in dichten

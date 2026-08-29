@@ -405,6 +405,7 @@ dass sie **still** scheitern.
 | *Identity-linked* API-Schlüssel ohne Workspace-Header | Anthropic | **Jeder** Aufruf endet mit HTTP 400 | `extra_headers: {"anthropic-workspace-id": "wrkspc_…"}` oder einen nicht identitätsgebundenen Schlüssel verwenden |
 | Eingebaute Preistabelle altert | Mistral, OpenAI, Anthropic | Kostenstatistik weicht von der Rechnung ab | Beim Aufsetzen und nach LiteLLM-Updates gegen die Preisliste prüfen (am 28.08.2026 stimmte sie) |
 | Modellname als Preishinweis gelesen | Mistral | Fünffache Kosten | `mistral-medium` ist teurer als `mistral-large` — Preisliste schlägt Intuition |
+| **Euro-Preise als Dollar eingetragen** | IONOS listet nur Euro. Umgerechnet eingetragen friert man den Tageskurs ein, während das Budget mit dem aktuellen rechnet — die Schule überschreitet ihr Budget dauerhaft um die Kursdifferenz. `LITELLM_PRICE_CURRENCY=EUR` setzen. |
 
 ---
 
