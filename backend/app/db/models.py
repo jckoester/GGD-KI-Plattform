@@ -463,6 +463,12 @@ class Artifact(Base):
     # Zweimaliges „In Bibliothek speichern" desselben Inhalts liefert dasselbe Artefakt.
     origin_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     origin_conversation_id: Mapped[Optional[UUID]] = mapped_column(nullable=True)
+    # Anbietermodell, mit dem der Inhalt erzeugt wurde — beim Promoten aus der Quelle
+    # übernommen. Muss hier stehen, weil das Artefakt die Konversation überlebt, die
+    # Quellzeile aber per CASCADE mit ihr stirbt: Ohne die Kopie ist die Herkunft nach
+    # spätestens 93 Tagen weg. Nullable, solange die Quelle keine kennt (Diagramme,
+    # Dokumente — siehe Alembic 0050).
+    provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )

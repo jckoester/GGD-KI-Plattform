@@ -79,6 +79,10 @@ class ArtifactItem(BaseModel):
     source: str | None
     created_at: datetime
     expires_at: datetime
+    # Anbietermodell, mit dem der Inhalt erzeugt wurde — Grundlage der Quellenangabe.
+    # None heißt „nicht bekannt": bei Diagrammen und Dokumenten, deren Herkunft heute
+    # nicht mitwandert, und bei Artefakten aus der Zeit vor Alembic 0050.
+    provider_model: str | None = None
 
 
 class LibraryResponse(BaseModel):
@@ -201,6 +205,7 @@ async def list_library(
             id=r.id, kind=r.kind, mime_type=r.mime_type, title=r.title,
             byte_size=r.byte_size, source=r.source,
             created_at=r.created_at, expires_at=r.expires_at,
+            provider_model=r.provider_model,
         )
         for r in records
     ]

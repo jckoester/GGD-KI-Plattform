@@ -46,7 +46,8 @@ async def test_promote_image_copies_bytes_and_prompt(monkeypatch):
     image_id = uuid4()
     conv_id = uuid4()
     record = SimpleNamespace(
-        pseudonym="p", mime_type="image/png", conversation_id=conv_id, prompt="ein roter Fuchs"
+        pseudonym="p", mime_type="image/png", conversation_id=conv_id,
+        prompt="ein roter Fuchs", provider_model="openai/black-forest-labs/FLUX.1-schnell",
     )
     monkeypatch.setattr(promote.image_store, "get_image_record", AsyncMock(return_value=record))
     monkeypatch.setattr(promote.image_store, "read_image_bytes", lambda r: b"PNGDATA")
@@ -73,7 +74,7 @@ async def test_promote_image_copies_bytes_and_prompt(monkeypatch):
 
 async def test_promote_image_foreign_owner_forbidden(monkeypatch):
     record = SimpleNamespace(pseudonym="jemand-anderes", mime_type="image/png",
-                             conversation_id=uuid4(), prompt=None)
+                             conversation_id=uuid4(), prompt=None, provider_model=None)
     monkeypatch.setattr(promote.image_store, "get_image_record", AsyncMock(return_value=record))
     with pytest.raises(PermissionError):
         await promote.promote_image(object(), user=_user(sub="p"), image_id=uuid4())
@@ -94,7 +95,8 @@ async def test_promote_image_missing_file(monkeypatch):
 
 
 async def test_promote_image_idempotent(monkeypatch):
-    record = SimpleNamespace(pseudonym="p", mime_type="image/png", conversation_id=uuid4(), prompt="x")
+    record = SimpleNamespace(pseudonym="p", mime_type="image/png",
+                             conversation_id=uuid4(), prompt="x", provider_model=None)
     existing = SimpleNamespace(id=uuid4())
     monkeypatch.setattr(promote.image_store, "get_image_record", AsyncMock(return_value=record))
     monkeypatch.setattr(promote.image_store, "read_image_bytes", lambda r: b"x")
@@ -294,6 +296,7 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     rec = SimpleNamespace(
         id=uuid4(), kind="plot", mime_type="image/svg+xml", title="Funktionsgraph",
         byte_size=1234, source="functions: []", created_at=ts, expires_at=ts,
+        provider_model=None,
     )
     monkeypatch.setattr(store_mod, "list_artifacts", AsyncMock(return_value=[rec]))
     monkeypatch.setattr(store_mod, "used_bytes", AsyncMock(return_value=1234))
@@ -545,3 +548,47 @@ def test_export_passes_school_templates(monkeypatch, tmp_path):
     assert captured["reference_doc"] == str(ref)
     # CSS wird nur für PDF gelesen — bei DOCX leer
     assert captured["extra_css"] == ""
+
+
+async def test_promote_image_kopiert_die_herkunft(monkeypatch):
+    """Der Kern von Alembic 0050: Das Artefakt überlebt die Konversation, die Bildzeile nicht.
+
+    Ohne diese Kopie wäre die Herkunft nach spätestens 93 Tagen weg — ausgerechnet bei den
+    Artefakten, die in Arbeitsblättern und Facharbeiten landen.
+    """
+    record = SimpleNamespace(
+        pseudonym="p", mime_type="image/png", conversation_id=uuid4(),
+        prompt="ein roter Fuchs", provider_model="mistral/mistral-small-latest",
+    )
+    monkeypatch.setattr(promote.image_store, "get_image_record", AsyncMock(return_value=record))
+    monkeypatch.setattr(promote.image_store, "read_image_bytes", lambda r: b"PNG")
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    await promote.promote_image(object(), user=_user(), image_id=uuid4())
+
+    assert captured["provider_model"] == "mistral/mistral-small-latest"
+
+
+async def test_promote_image_ohne_herkunft_bleibt_leer(monkeypatch):
+    """Alt-Bilder haben keine — ein geratener Wert wäre in einer Quellenangabe schlimmer."""
+    record = SimpleNamespace(pseudonym="p", mime_type="image/png",
+                             conversation_id=uuid4(), prompt="x", provider_model=None)
+    monkeypatch.setattr(promote.image_store, "get_image_record", AsyncMock(return_value=record))
+    monkeypatch.setattr(promote.image_store, "read_image_bytes", lambda r: b"PNG")
+    monkeypatch.setattr(promote.store, "find_by_origin_ref", AsyncMock(return_value=None))
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(promote.store, "save_artifact", fake_save)
+    await promote.promote_image(object(), user=_user(), image_id=uuid4())
+
+    assert captured["provider_model"] is None

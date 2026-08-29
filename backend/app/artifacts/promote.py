@@ -75,6 +75,9 @@ async def promote_image(
         source=record.prompt,
         origin_ref=origin_ref,
         origin_conversation_id=record.conversation_id,
+        # Herkunft mitkopieren: Die generated_images-Zeile stirbt mit der Konversation,
+        # das Artefakt nicht (Alembic 0050).
+        provider_model=record.provider_model,
     )
     return artifact, created
 

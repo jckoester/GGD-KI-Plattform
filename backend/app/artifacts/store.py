@@ -97,6 +97,7 @@ async def save_artifact(
     source: Optional[str] = None,
     origin_ref: Optional[str] = None,
     origin_conversation_id: Optional[UUID] = None,
+    provider_model: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
     """Speichert ein Artefakt: Quota prüfen → Bytes auf Disk → Row mit `expires_at`.
@@ -133,6 +134,7 @@ async def save_artifact(
         source=source,
         origin_ref=origin_ref,
         origin_conversation_id=origin_conversation_id,
+        provider_model=provider_model,
         created_at=ts,
         expires_at=ts + timedelta(days=retention_days),
     )
