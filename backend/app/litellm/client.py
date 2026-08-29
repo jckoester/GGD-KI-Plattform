@@ -6,6 +6,7 @@ from typing import Optional
 import httpx
 
 from app.config import settings
+from app.litellm.errors import ist_budget_erschoepft
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +22,28 @@ class ImageGenerationResult:
 
 
 class ImageGenerationError(RuntimeError):
-    """Fehlgeschlagener Bild-Call, mit HTTP-Status.
+    """Fehlgeschlagener Bild-Call, mit HTTP-Status und Budget-Merkmal.
 
-    Der Status ist der Unterschied zwischen „das darfst du nicht" (403), „dein Budget ist
-    aufgebraucht" (429) und „da ist etwas kaputt" (alles andere). Ohne ihn müsste der
-    Aufrufer im Fehlertext des Anbieters herumraten und könnte der Nutzer:in nur ein
-    allgemeines „hat nicht geklappt" zeigen — bei den ersten beiden Fällen die schlechteste
-    Auskunft, weil sie beide eine klare, handhabbare Ursache haben.
+    Der Status unterscheidet „das darfst du nicht" (401/403) von „da ist etwas kaputt".
+    Ohne ihn müsste der Aufrufer im Fehlertext des Anbieters herumraten und könnte der
+    Nutzer:in nur ein allgemeines „hat nicht geklappt" zeigen — die schlechteste Auskunft
+    dort, wo es eine klare, handhabbare Ursache gibt.
+
+    **Das erschöpfte Budget steht bewusst NICHT am Status**, sondern in ``budget_exceeded``:
+    LiteLLM meldet es je nach Fassung mit 400 oder 429, und ein 429 kann umgekehrt eine
+    bloße Ratenbegrenzung sein (siehe ``app.litellm.errors``).
     """
 
-    def __init__(self, message: str, *, status_code: Optional[int] = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: Optional[int] = None,
+        budget_exceeded: bool = False,
+    ):
         super().__init__(message)
         self.status_code = status_code
+        self.budget_exceeded = budget_exceeded
 
 
 class LiteLLMClient:
@@ -688,6 +699,7 @@ class LiteLLMClient:
             raise ImageGenerationError(
                 f"Failed to generate image: {response.text}",
                 status_code=response.status_code,
+                budget_exceeded=ist_budget_erschoepft(response.text),
             )
 
         raw_cost = response.headers.get("x-litellm-response-cost")

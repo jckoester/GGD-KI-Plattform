@@ -110,6 +110,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Ein aufgebrauchtes Budget wurde nicht als solches gemeldet.** Geprüft wurde auf HTTP
+  429 — LiteLLM meldet es aber je nach Fassung als 400 (1.83.7) oder 429. Beim echten
+  Budgetende sah die Nutzerin deshalb den rohen Fehlerkörper des Proxys: englisch, mit
+  Beträgen in wissenschaftlicher Notation. Umgekehrt bekam jede **Drosselung** wegen zu
+  vieler Anfragen „Dein Budget ist erschöpft" zu sehen, obwohl das Budget in Ordnung war.
+
+  Erkannt wird das Budgetende jetzt am Fehlertyp `budget_exceeded` im Antwortkörper statt
+  am Status — im Chat, bei der Bildgenerierung und beim Variieren. Die Meldung nennt den
+  nächsten Abrechnungszeitraum; technische Fehlerkörper bleiben im Log.
+- **Beim Variieren eines Bildes erschienen Anweisungen an das Chat-Modell.** Fehlertexte wie
+  „Sag der Nutzerin, dass …" sind für den Chat-Flow gedacht, wurden dort aber unverändert
+  angezeigt. Die direkt sichtbaren Stellen haben jetzt eigene Sätze.
+
 - **Der Gesprächstitel war manchmal die Antwort statt der Titel.** Bei imperativ
   formulierten Eingaben („Erkläre mir …", „Erzeuge ein Bild: …") befolgte das Titelmodell
   die Anweisung, statt sie zu betiteln — im schlimmsten gemessenen Fall mit einer 168

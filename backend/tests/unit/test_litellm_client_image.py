@@ -184,3 +184,54 @@ async def test_generate_image_missing_image_data_raises():
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         with pytest.raises(RuntimeError, match="missing image data"):
             await client.generate_image("x", model="gpt-image-1", api_key="k", user="u")
+
+
+# ── Budget-Merkmal am Fehler ────────────────────────────────────────────────────────
+#
+# Der Aufrufer darf nicht am Status ablesen müssen, ob das Budget aufgebraucht ist:
+# LiteLLM 1.83.7 meldet es als 400, ältere Fassungen als 429, und ein 429 kann auch eine
+# bloße Drosselung sein. Der Client liest deshalb den Fehlertyp aus dem Körper und hängt
+# ihn an die Ausnahme.
+
+_BUDGET_TEXT = (
+    '{"error":{"message":"Budget has been exceeded! Current cost: 2.6e-05, '
+    'Max budget: 2e-05","type":"budget_exceeded","code":"400"}}'
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 429])
+async def test_generate_image_markiert_erschoepftes_budget(status):
+    from app.litellm.client import ImageGenerationError
+
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    http_client.post = AsyncMock(
+        return_value=_mock_response(status_code=status, text=_BUDGET_TEXT)
+    )
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(ImageGenerationError) as exc:
+            await client.generate_image("x", model="bild-standard", api_key="k", user="u")
+
+    assert exc.value.budget_exceeded is True
+    assert exc.value.status_code == status
+
+
+@pytest.mark.asyncio
+async def test_generate_image_markiert_drosselung_nicht_als_budget():
+    """Gegenprobe: 429 allein ist kein Budgetproblem."""
+    from app.litellm.client import ImageGenerationError
+
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    http_client.post = AsyncMock(return_value=_mock_response(
+        status_code=429,
+        text='{"error":{"message":"Rate limit reached","type":"rate_limit_error"}}',
+    ))
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        with pytest.raises(ImageGenerationError) as exc:
+            await client.generate_image("x", model="bild-standard", api_key="k", user="u")
+
+    assert exc.value.budget_exceeded is False

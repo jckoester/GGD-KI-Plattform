@@ -265,14 +265,36 @@ def test_altes_bild_ohne_bildart(umgebung):
 
 
 def test_ablehnung_des_proxys_wird_uebersetzt(umgebung):
+    """429 vom Proxy heißt „gedrosselt" — und wird als 429 weitergereicht, nicht als 502.
+
+    502 hieße „der Dienst ist kaputt"; das stimmt hier nicht und lädt die Nutzerin ein,
+    es sofort noch einmal zu versuchen.
+    """
     client, st = umgebung
     st.fehler = ImageGenerationError("nope", status_code=429)
 
     resp = _post(client)
 
-    assert resp.status_code == 502
-    assert "Budget" in resp.json()["detail"]
+    assert resp.status_code == 429
+    assert "zu viele anfragen" in resp.json()["detail"].lower()
     st.client.close.assert_awaited_once()
+
+
+def test_erschoepftes_budget_wird_lesbar_gemeldet(umgebung):
+    """Der Text geht hier **direkt** in die Oberfläche, ohne Chat-Modell dazwischen.
+
+    Er darf deshalb keine Anweisung an ein Modell sein („Sag der Nutzerin, dass …") —
+    genau das stand hier bis 08/2026.
+    """
+    client, st = umgebung
+    st.fehler = ImageGenerationError("nope", status_code=400, budget_exceeded=True)
+
+    resp = _post(client)
+    detail = resp.json()["detail"]
+
+    assert resp.status_code == 429
+    assert "aufgebraucht" in detail
+    assert "Sag " not in detail, "Text ist an die Nutzerin gerichtet, nicht an das Modell"
 
 
 def test_fehlendes_bild_ist_404(umgebung):

@@ -60,6 +60,7 @@ from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
 from app.pedagogy.compose import compose_system_content, is_student_treatment
 from app.litellm.client import ImageGenerationError, LiteLLMClient
+from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
 import app.planning.assistant_tools  # noqa: F401 — registriert Planungs-Tools in TOOL_REGISTRY
 
@@ -224,8 +225,10 @@ async def _generate_title(
 
     Läuft über den persönlichen LiteLLM-Key des Nutzers (`Bearer {litellm_key}`, `user=sub`),
     nicht mehr über den Master-Key. So wird der Titel-Spend budgetiert und dem Nutzer
-    zugeordnet; ist das Budget erschöpft, schlägt der Aufruf mit 429 fehl → kein Titel
-    (graceful), aber kein unbudgetierter Master-Key-Spend.
+    zugeordnet; ist das Budget erschöpft, lehnt der Proxy ab → kein Titel (graceful), aber
+    kein unbudgetierter Master-Key-Spend. Der Status dieser Ablehnung ist nicht festgelegt
+    (LiteLLM 1.83.7: 400) — hier spielt er keine Rolle, weil jeder Fehler gleich behandelt
+    wird: Die Konversation behält ihren vorläufigen Titel.
     """
     logger.debug("Titelgenerierung gestartet für %s (model=%s)", conversation_id, settings.title_model)
     if not litellm_key:
@@ -800,13 +803,26 @@ def _image_prompt_block_reason(prompt: str) -> Optional[str]:
     return image_prompt_block_reason(prompt)
 
 
-def _bild_fehlertext(status_code: Optional[int], bildart: Bildart) -> str:
+def _bild_fehlertext(
+    status_code: Optional[int], bildart: Bildart, *, budget: bool = False
+) -> str:
     """Ablehnung des Proxys → ein Satz, den das Chat-Modell weitergeben kann.
 
     Der Text geht an den LLM, nicht direkt an die Nutzer:in — er muss also erklären, **was
     zu tun ist**, ohne Interna zu nennen. Ein durchgereichtes „HTTP 403" wäre für eine
     Schülerin wertlos und für die Lehrkraft irreführend.
+
+    ``budget`` kommt aus dem Fehlerkörper, nicht aus dem Status: Ein 429 allein bedeutet
+    „gedrosselt", ein aufgebrauchtes Budget kann auch als 400 kommen
+    (siehe ``app.litellm.errors``). Vorher wurden beide Fälle in einen Satz geworfen, der
+    für keinen von beiden stimmte.
     """
+    if budget:
+        return (
+            "Das Budget für diesen Zeitraum ist aufgebraucht — es wird zum nächsten "
+            "Abrechnungszeitraum wieder aufgefüllt. Sag das der Nutzerin oder dem Nutzer "
+            "und biete an, ohne Bild weiterzuarbeiten."
+        )
     if status_code in (401, 403):
         return (
             f"Die Bildart „{bildart.label}“ ist für dieses Konto nicht freigeschaltet. "
@@ -816,10 +832,32 @@ def _bild_fehlertext(status_code: Optional[int], bildart: Bildart) -> str:
         )
     if status_code == 429:
         return (
-            "Das Budget für Bilder ist aufgebraucht oder es wurden zu viele Anfragen in "
-            "kurzer Zeit gestellt. Bitte später erneut versuchen."
+            "Es wurden zu viele Anfragen in kurzer Zeit gestellt. "
+            "Bitte kurz warten und erneut versuchen."
         )
     return "Bildgenerierung fehlgeschlagen."
+
+
+def _bild_fehlertext_ui(
+    status_code: Optional[int], bildart: Bildart, *, budget: bool = False
+) -> str:
+    """Derselbe Anlass, andere Adressatin: Text, der **direkt** angezeigt wird.
+
+    `_bild_fehlertext` schreibt an das Chat-Modell („Sag der Nutzerin, dass …") — im
+    Chat-Flow richtig, in der Oberfläche unsinnig. Der Variieren-Knopf und die
+    Freigabeprüfung liefern ihren Text aber ohne Modell dazwischen; sie brauchen einen
+    Satz, den man lesen kann.
+    """
+    if budget:
+        return BUDGET_MELDUNG
+    if status_code in (401, 403):
+        return (
+            f"Die Bildart „{bildart.label}“ ist für dein Konto nicht freigeschaltet. "
+            "Eine Lehrkraft oder die Administration kann sie freischalten."
+        )
+    if status_code == 429:
+        return "Zu viele Anfragen in kurzer Zeit. Bitte kurz warten und erneut versuchen."
+    return "Das Bild konnte nicht erzeugt werden. Bitte später erneut versuchen."
 
 
 async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
@@ -876,10 +914,13 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         )
     except ImageGenerationError as e:
         logger.warning(
-            "Bildgenerierung abgelehnt: status=%s bildart=%s modell=%s",
-            e.status_code, bildart.id, bildart.modell,
+            "Bildgenerierung abgelehnt: status=%s budget=%s bildart=%s modell=%s",
+            e.status_code, e.budget_exceeded, bildart.id, bildart.modell,
         )
-        return {"status": "error", "error": _bild_fehlertext(e.status_code, bildart)}
+        return {
+            "status": "error",
+            "error": _bild_fehlertext(e.status_code, bildart, budget=e.budget_exceeded),
+        }
     except Exception:
         logger.exception("Bildgenerierung fehlgeschlagen")
         return {"status": "error", "error": "Bildgenerierung fehlgeschlagen."}
@@ -1413,6 +1454,16 @@ async def chat(
         error_body = await response.aread()
         await response.aclose()
         await client.aclose()
+        # Der volle Körper gehört ins Log, nicht in die Oberfläche: Er ist englisch und
+        # enthält Interna (Modell-IDs, Beträge in wissenschaftlicher Notation).
+        logger.warning(
+            "LiteLLM lehnte den Chat ab: status=%s body=%s",
+            response.status_code, error_body[:500].decode("utf-8", errors="replace"),
+        )
+        if ist_budget_erschoepft(error_body):
+            # 429 statt des LiteLLM-Status: Für die Oberfläche ist das die Kategorie
+            # „gedrosselt/aufgebraucht", und der Status ist versionsabhängig (s. errors.py).
+            raise HTTPException(status_code=429, detail=BUDGET_MELDUNG)
         raise HTTPException(
             status_code=response.status_code,
             detail=f"LiteLLM Fehler: {error_body.decode()}" if error_body else "LiteLLM Fehler",
@@ -1970,7 +2021,7 @@ async def variiere_generiertes_bild(
         current_user.roles, getattr(current_user, "grade", None)
     )
     if erlaubt is not None and bildart.modell not in erlaubt:
-        raise HTTPException(status_code=403, detail=_bild_fehlertext(403, bildart))
+        raise HTTPException(status_code=403, detail=_bild_fehlertext_ui(403, bildart))
 
     reason = _image_prompt_block_reason(record.prompt)
     if reason:
@@ -2004,8 +2055,16 @@ async def variiere_generiertes_bild(
             response_format=bildart.response_format or None,
         )
     except ImageGenerationError as e:
-        logger.warning("Variieren abgelehnt: status=%s bildart=%s", e.status_code, bildart.id)
-        raise HTTPException(status_code=502, detail=_bild_fehlertext(e.status_code, bildart))
+        logger.warning(
+            "Variieren abgelehnt: status=%s budget=%s bildart=%s",
+            e.status_code, e.budget_exceeded, bildart.id,
+        )
+        # 429 bei Budget/Drossel, sonst 502: Die Oberfläche unterscheidet „später wieder"
+        # von „gerade kaputt", und ein Budgetende ist kein Defekt des Dienstes.
+        raise HTTPException(
+            status_code=429 if (e.budget_exceeded or e.status_code == 429) else 502,
+            detail=_bild_fehlertext_ui(e.status_code, bildart, budget=e.budget_exceeded),
+        )
     except Exception:
         logger.exception("Variieren fehlgeschlagen (image_id=%s)", image_id)
         raise HTTPException(status_code=502, detail="Bildgenerierung fehlgeschlagen.")

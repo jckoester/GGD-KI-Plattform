@@ -20,6 +20,7 @@
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
     import PiiWarningDialog from "$lib/components/PiiWarningDialog.svelte";
     import { scanForPii, shouldScanForPii } from "$lib/pii_gate.js";
+    import { chatFehlertext } from "$lib/chat_errors.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { tick } from "svelte";
@@ -704,19 +705,10 @@
                 ];
             }
 
-            const knownErrors = {
-                0: "Verbindung zum Server fehlgeschlagen.",
-                429: "Dein Budget ist erschöpft.",
-                502: "Der KI-Dienst ist gerade nicht erreichbar.",
-                503: "Der KI-Dienst ist vorübergehend nicht verfügbar.",
-            };
-            const errorMessage =
-                err instanceof ApiError && knownErrors[err.status]
-                    ? knownErrors[err.status]
-                    : (err.message ??
-                      "Ein unbekannter Fehler ist aufgetreten.");
-
-            messages = [...messages, { role: "error", content: errorMessage }];
+            messages = [
+                ...messages,
+                { role: "error", content: chatFehlertext(err) },
+            ];
         } finally {
             isStreaming = false;
             // Konversationen in Sidebar neu laden

@@ -432,7 +432,10 @@ async def test_handler_nutzt_keine_gesperrte_bildart(bildarten):
     [
         (403, "nicht freigeschaltet"),
         (401, "nicht freigeschaltet"),
-        (429, "Budget"),
+        # 429 heißt **nur** „gedrosselt". Bis 08/2026 stand hier „Budget" — das war die
+        # Verwechslung, die dazu führte, dass eine bloße Drosselung als Budgetende
+        # gemeldet wurde und das echte Budgetende (HTTP 400) unbenannt blieb.
+        (429, "zu viele Anfragen"),
         (500, "fehlgeschlagen"),
         (None, "fehlgeschlagen"),
     ],
@@ -457,6 +460,37 @@ async def test_ablehnung_wird_uebersetzt(bildarten, status, erwartet):
     assert result["status"] == "error"
     assert erwartet in result["error"]
     instance.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("status", [400, 429])
+async def test_erschoepftes_budget_wird_als_solches_benannt(bildarten, status):
+    """Das Budget hängt am Fehlertyp, nicht am Status.
+
+    LiteLLM 1.83.7 meldet es als **400** — mit einer Prüfung auf 429 blieb es unerkannt und
+    die Nutzerin las „Bildgenerierung fehlgeschlagen", als wäre etwas kaputt. Beide Status
+    müssen zur selben Auskunft führen.
+    """
+    from app.chat import router
+    from app.litellm.client import ImageGenerationError
+
+    instance = MagicMock()
+    instance.generate_image = AsyncMock(
+        side_effect=ImageGenerationError(
+            "abgelehnt", status_code=status, budget_exceeded=True
+        )
+    )
+    instance.close = AsyncMock()
+    ctx = ToolContext(
+        db=MagicMock(), user=SimpleNamespace(sub="p"), group_id=None,
+        conversation_id=uuid4(), litellm_key="k", assistant=_assistent(),
+    )
+    with patch.object(router, "LiteLLMClient", return_value=instance):
+        result = await router._exec_generate_image({"prompt": "x"}, ctx)
+
+    assert result["status"] == "error"
+    assert "aufgebraucht" in result["error"]
+    # Kein Defekt-Vokabular: Ein Budgetende ist kein Fehler des Dienstes.
+    assert "fehlgeschlagen" not in result["error"]
 
 
 async def test_fehlertext_nennt_die_bildart(bildarten):

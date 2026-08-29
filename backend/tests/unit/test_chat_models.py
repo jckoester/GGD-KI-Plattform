@@ -369,3 +369,108 @@ async def test_stream_bleibt_heil_wenn_das_speichern_scheitert():
 
     assert "[DONE]" in ausgabe
     assert "event: message" not in ausgabe
+
+
+# ── Erschöpftes Budget im Chat ──────────────────────────────────────────────────────
+#
+# LiteLLM 1.83.7 meldet es als HTTP **400** mit `type: budget_exceeded` (gemessen
+# 29.08.2026). Der Router prüfte auf 429; die Ablehnung fiel deshalb in den allgemeinen
+# Zweig und die Nutzerin bekam den rohen Fehlerkörper als Fehlermeldung zu sehen —
+# englisch, mit Beträgen in wissenschaftlicher Notation.
+
+_BUDGET_KOERPER = (
+    b'{"error":{"message":"Budget has been exceeded! Current cost: '
+    b'2.6269999999999998e-05, Max budget: 2e-05","type":"budget_exceeded",'
+    b'"param":null,"code":"400"}}'
+)
+
+
+class _AblehnungsResponse:
+    """Antwort des Proxys mit frei wählbarem Status und Körper."""
+
+    headers: dict = {}
+
+    def __init__(self, status_code, koerper):
+        self.status_code = status_code
+        self._koerper = koerper
+
+    async def aiter_lines(self):
+        yield "data: [DONE]"
+
+    async def aclose(self):
+        return None
+
+    async def aread(self):
+        return self._koerper
+
+
+class _AblehnendeHttpClient(_FakeHttpClient):
+    def __init__(self, status_code, koerper):
+        super().__init__()
+        self._antwort = _AblehnungsResponse(status_code, koerper)
+
+    async def send(self, request, stream=False):
+        return self._antwort
+
+
+async def _chat_mit_ablehnung(status_code, koerper):
+    from fastapi import HTTPException
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    with patch("app.chat.router.httpx.AsyncClient",
+               return_value=_AblehnendeHttpClient(status_code, koerper)), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+
+        with pytest.raises(HTTPException) as exc:
+            await chat(request, current_user=_fake_payload(), db=db)
+    return exc.value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 429])
+async def test_erschoepftes_budget_wird_verstaendlich_gemeldet(status):
+    """Beide Status, dieselbe Auskunft — entscheidend ist der Fehlertyp im Körper."""
+    fehler = await _chat_mit_ablehnung(status, _BUDGET_KOERPER)
+
+    assert fehler.status_code == 429
+    assert "aufgebraucht" in fehler.detail
+    assert "nächsten Abrechnungszeitraum" in fehler.detail
+
+
+@pytest.mark.asyncio
+async def test_der_rohe_fehlerkoerper_erreicht_die_oberflaeche_nicht():
+    """Kein Englisch, keine Beträge, kein JSON — das gehört ins Log."""
+    fehler = await _chat_mit_ablehnung(400, _BUDGET_KOERPER)
+
+    assert "Budget has been exceeded" not in fehler.detail
+    assert "2e-05" not in fehler.detail
+    assert "{" not in fehler.detail
+
+
+@pytest.mark.asyncio
+async def test_drosselung_wird_nicht_als_budget_ausgegeben():
+    """Der Gegenfall: 429 ohne Budget-Typ darf keine Budgetmeldung erzeugen."""
+    koerper = (
+        b'{"error":{"message":"Rate limit reached","type":"rate_limit_error",'
+        b'"code":"429"}}'
+    )
+    fehler = await _chat_mit_ablehnung(429, koerper)
+
+    assert "aufgebraucht" not in fehler.detail

@@ -7,9 +7,17 @@ Modelle verbrauchen das Budget langsamer; leistungsstärkere schneller.
 
 Intern arbeitet LiteLLM mit US-Dollar. Das Backend holt monatlich den aktuellen
 EUR→USD-Wechselkurs von der Europäischen Zentralbank (ECB) und berechnet daraus
-die USD-Limits, die LiteLLM als harte Grenzen durchsetzt. Überschreitungen werden
-mit HTTP 429 abgelehnt — die Plattform zeigt Nutzer:innen dann eine verständliche
-Fehlermeldung.
+die USD-Limits, die LiteLLM als harte Grenzen durchsetzt. Überschreitungen lehnt der Proxy
+ab; die Plattform zeigt Nutzer:innen dann eine verständliche Meldung und den Hinweis, dass
+das Budget zum nächsten Abrechnungszeitraum wieder aufgefüllt wird.
+
+> **Einen Rückfall auf ein anderes Modell gibt es nicht.** Budget aufgebraucht heißt:
+> keine Nutzung bis zum nächsten Zeitraum (siehe [Modell-Szenarien](modell-szenarien.md)).
+>
+> **Hinweis für die Fehlersuche:** Der HTTP-Status dieser Ablehnung ist **nicht**
+> festgelegt — LiteLLM 1.83.7 antwortet mit `400`, ältere Fassungen mit `429`. Maßgeblich
+> ist `type: budget_exceeded` im Antwortkörper; danach sucht auch das Backend. Wer im
+> Proxy-Log nach `429` filtert, findet die Fälle nicht.
 
 ## Budget-Tiers konfigurieren
 
@@ -52,7 +60,8 @@ Bildgenerierung hat **kein separates Kontingent** — der Bild-Aufruf läuft üb
 Virtual Key der Nutzer:in und zählt gegen **dasselbe** monatliche USD-Budget wie
 Chat-Nachrichten. Ein Bild ist dabei in der Regel **teurer** als eine Textnachricht,
 verbraucht das Budget also schneller (bewusst so). Ist das Budget erschöpft, lehnt
-LiteLLM auch den Bild-Aufruf ab (429), und der Assistent formuliert eine Absage.
+LiteLLM auch den Bild-Aufruf ab, und der Assistent formuliert eine Absage — mit dem
+Hinweis auf den nächsten Abrechnungszeitraum, nicht als technischer Fehler.
 
 Die Bild-Kosten werden mitgebucht: Das Backend liest den `x-litellm-response-cost`-Header
 des Bild-Aufrufs und addiert ihn zu `messages.cost_usd` / `total_cost_usd`. Für bekannte
