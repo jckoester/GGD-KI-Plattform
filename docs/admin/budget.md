@@ -51,7 +51,7 @@ roles:
 beim nächsten Monats-Reconcile (1. des Monats). Um Änderungen sofort anzuwenden:
 
 ```bash
-docker compose exec backend python scripts/monthly_budget_reconcile.py
+docker compose exec backend python scripts/monthly_team_reconcile.py
 ```
 
 ## Bildgenerierung
@@ -82,7 +82,7 @@ Bei Bedarf manuell ausführen:
 
 ```bash
 docker compose exec backend python scripts/refresh_ecb_rate.py
-docker compose exec backend python scripts/monthly_budget_reconcile.py
+docker compose exec backend python scripts/monthly_team_reconcile.py
 ```
 
 ## Admin-Übersicht (`/budget`)

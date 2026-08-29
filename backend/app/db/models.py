@@ -636,6 +636,33 @@ class UserPreference(Base):
     )
 
 
+class BudgetAccrual(Base):
+    """Bis zu welcher Unterrichtswoche einer Nutzerin Budget zugeteilt wurde.
+
+    Das Budget wird nicht zurückgesetzt, sondern wöchentlich aufgestockt
+    (``Budget-Wochenmodell-Plan.md``). Diese Zeile ist der Merkposten dafür — ohne sie
+    wüsste ein zweiter Lauf in derselben Woche nicht, dass er nichts mehr zu tun hat.
+
+    Bei ~40 Läufen im Schuljahr über alle Nutzer fällt ein Teilabbruch nicht auf; deshalb
+    ist Idempotenz hier keine Feinheit, sondern die Voraussetzung dafür, dass man den Lauf
+    ohne Nachdenken wiederholen kann.
+
+    ``schuljahr`` erledigt den Jahreswechsel nebenbei: Steht dort ein anderes als das
+    aktuelle, beginnt die Zählung von vorn — es braucht keinen eigenen Rücksetzlauf.
+    """
+
+    __tablename__ = "budget_accrual"
+
+    pseudonym: Mapped[str] = mapped_column(primary_key=True)
+    # Aus school_year.yaml, z. B. "2026/27".
+    schuljahr: Mapped[str] = mapped_column(Text, nullable=False)
+    # `Unterrichtswoche.index` der zuletzt gebuchten Woche (1-basiert).
+    letzte_woche: Mapped[int] = mapped_column(nullable=False)
+    aktualisiert_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+
 # 8. pseudonym_audit
 class PseudonymAudit(Base):
     __tablename__ = "pseudonym_audit"

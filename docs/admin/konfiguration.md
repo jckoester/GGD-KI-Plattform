@@ -305,7 +305,7 @@ roles:
 (1. des Monats, 07:00 Uhr). Um Änderungen sofort anzuwenden:
 
 ```bash
-docker compose exec backend python scripts/monthly_budget_reconcile.py
+docker compose exec backend python scripts/monthly_team_reconcile.py
 ```
 
 ---

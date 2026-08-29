@@ -8,6 +8,7 @@ from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
+    BudgetAccrual,
     CalendarSyncStatus,
     Conversation,
     ConversationFlag,
@@ -195,6 +196,11 @@ async def cleanup_inactive_accounts(
                             delete(CalendarSyncStatus).where(
                                 CalendarSyncStatus.pseudonym == pseudonym
                             )
+                        )
+                        # Merkposten der wöchentlichen Budget-Zuteilung. Reine
+                        # Buchführung ohne Fremdbezug — sie hat ohne Konto keinen Zweck.
+                        await db.execute(
+                            delete(BudgetAccrual).where(BudgetAccrual.pseudonym == pseudonym)
                         )
                         await db.execute(
                             delete(JwtRevocation).where(JwtRevocation.pseudonym == pseudonym)

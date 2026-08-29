@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Monatliche Budget- und Team-Reconciliation für alle Nutzer.
+Monatlicher Abgleich der LiteLLM-Team-Zugehörigkeit für alle Nutzer.
+
+Hieß bis 08/2026 ``monthly_budget_reconcile`` und setzte zusätzlich die Budgets. Das tut
+er **nicht mehr**: Seit der Umstellung aufs Wochenmodell ist ``max_budget`` die kumulierte
+Zuteilung, die ``weekly_budget_accrual.py`` fortschreibt. Würde dieser Lauf sie weiterhin
+auf den Stufenbetrag setzen, machte er die Ansammlung mehrerer Wochen mit einem Schlag
+zunichte — ohne Fehler, ohne Hinweis.
 
 Verwendung:
-    python scripts/monthly_budget_reconcile.py
-    python scripts/monthly_budget_reconcile.py --dry-run
-    python scripts/monthly_budget_reconcile.py --limit 10
-    python scripts/monthly_budget_reconcile.py --pseudonym <pseudonym>
+    python scripts/monthly_team_reconcile.py
+    python scripts/monthly_team_reconcile.py --dry-run
+    python scripts/monthly_team_reconcile.py --limit 10
+    python scripts/monthly_team_reconcile.py --pseudonym <pseudonym>
 """
 import argparse
 import asyncio
@@ -20,8 +26,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
 
-from app.budget.exchange import get_current_rate
-from app.budget.tiers import get_budget_for
 from app.db.models import PseudonymAudit
 from app.db.session import AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
@@ -39,10 +43,8 @@ logger = logging.getLogger(__name__)
 async def run(
     *, dry_run: bool, limit: int, pseudonym_filter: str | None
 ) -> None:
-    """Hauptlogik: Alle Nutzer durchgehen, Budgets und Teams aktualisieren."""
+    """Hauptlogik: Alle Nutzer durchgehen und ihre Team-Zugehörigkeit angleichen."""
     async with AsyncSessionLocal() as db:
-        eur_usd = await get_current_rate(db)
-        logger.info("Wechselkurs: %.6f EUR/USD", eur_usd)
 
         stmt = select(PseudonymAudit)
         if pseudonym_filter:
@@ -59,22 +61,6 @@ async def run(
             counters["total"] += 1
             roles = [user.role]
 
-            # Phase A: Budget
-            try:
-                max_budget_eur = get_budget_for(roles, user.grade)
-                max_budget_usd = round(max_budget_eur * eur_usd, 2) if max_budget_eur else None
-                if not dry_run:
-                    await client.update_user_budget(user.pseudonym, max_budget_usd)
-                    logger.debug(
-                        "Budget aktualisiert pseudonym=%s max_budget_usd=%s",
-                        user.pseudonym, max_budget_usd
-                    )
-                counters["budget_updated"] += 1
-            except Exception:
-                logger.exception("Budget-Update fehlgeschlagen pseudonym=%s", user.pseudonym)
-                counters["budget_failed"] += 1
-
-            # Phase B: Team
             try:
                 target_team_id = get_target_team_id(roles, user.grade)
             except ValueError:
@@ -110,22 +96,19 @@ async def run(
         await client.close()
 
     logger.info(
-        "monthly_budget_reconcile done total=%d budget_updated=%d budget_failed=%d "
-        "team_updated=%d team_unchanged=%d team_failed=%d skipped=%d eur_usd=%.6f",
+        "monthly_team_reconcile done total=%d "
+        "team_updated=%d team_unchanged=%d team_failed=%d skipped=%d",
         counters["total"],
-        counters["budget_updated"],
-        counters["budget_failed"],
         counters["team_updated"],
         counters["team_unchanged"],
         counters["team_failed"],
         counters["skipped"],
-        eur_usd,
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Monatliche Budget- und Team-Reconciliation für alle Nutzer"
+        description="Monatlicher Abgleich der LiteLLM-Team-Zugehörigkeit"
     )
     parser.add_argument(
         "--dry-run",
@@ -155,7 +138,7 @@ def main() -> None:
             )
         )
     except Exception:
-        logger.exception("monthly_budget_reconcile fehlgeschlagen")
+        logger.exception("monthly_team_reconcile fehlgeschlagen")
         sys.exit(1)
 
     sys.exit(0)

@@ -84,7 +84,7 @@ docker compose exec backend python scripts/<skript>.py
 | Skript | Zweck | Flags |
 |--------|-------|-------|
 | `create_litellm_teams.py` | LiteLLM-Teams einmalig anlegen (idempotent) | — |
-| `monthly_budget_reconcile.py` | EUR-Budgets → USD-Limits in LiteLLM setzen | — |
+| `monthly_team_reconcile.py` | EUR-Budgets → USD-Limits in LiteLLM setzen | — |
 | `refresh_ecb_rate.py` | ECB-Wechselkurs abrufen und in DB speichern | — |
 | `seed_exchange_rate.py` | Wechselkurs für frische DB setzen (einmalig) | — |
 | `cleanup_inactive_accounts.py` | Konten ohne Login > 90 Tage löschen | `--dry-run`, `--now`, `--limit` |

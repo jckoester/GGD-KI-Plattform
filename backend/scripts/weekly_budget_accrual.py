@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""
+Wöchentliche Aufstockung der Budget-Obergrenzen (Wochenmodell, 08/2026).
+
+Hebt für jede Nutzerin ``max_budget`` am LiteLLM-User um den konfigurierten Wochenbetrag
+an — gedeckelt auf ``vorsprung_wochen`` Wochenbeträge über dem tatsächlichen Verbrauch.
+Der Verbrauch wird **nicht** zurückgesetzt; er läuft das Schuljahr durch.
+
+Der Lauf ist **idempotent**: Zweimal in derselben Unterrichtswoche ausgeführt bucht er
+einmal. Fällt er aus, holt der nächste Lauf die fehlenden Wochen nach — begrenzt durch
+denselben Vorsprung, ein ausgefallener Cron ist also kein Freibrief.
+
+In Ferienwochen tut er nichts. Zum Schuljahreswechsel beginnt die Zählung von vorn.
+
+Verwendung:
+    python scripts/weekly_budget_accrual.py
+    python scripts/weekly_budget_accrual.py --dry-run
+    python scripts/weekly_budget_accrual.py --stichtag 2026-11-10
+    python scripts/weekly_budget_accrual.py --pseudonym <pseudonym>
+"""
+import argparse
+import asyncio
+import logging
+import sys
+from collections import defaultdict
+from datetime import date
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sqlalchemy import select
+
+from app.budget.accrual import merke, plane
+from app.budget.exchange import get_current_rate
+from app.budget.tiers import get_budget_for, vorsprung_wochen
+from app.db.models import PseudonymAudit
+from app.db.session import AsyncSessionLocal
+from app.litellm.client import LiteLLMClient
+from app.planning.calendar import load_school_year
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None) -> None:
+    cfg = load_school_year()
+    counters: dict[str, int] = defaultdict(int)
+
+    async with AsyncSessionLocal() as db:
+        eur_usd = await get_current_rate(db)
+        stmt = select(PseudonymAudit)
+        if pseudonym_filter:
+            stmt = stmt.where(PseudonymAudit.pseudonym == pseudonym_filter)
+        users = (await db.execute(stmt)).scalars().all()
+
+        logger.info(
+            "Schuljahr %s · Stichtag %s · Kurs %.4f · Vorsprung %d Wochen · %d Nutzer",
+            cfg.schuljahr, stichtag, eur_usd, vorsprung_wochen(), len(users),
+        )
+
+        client = LiteLLMClient()
+        try:
+            for user in users:
+                counters["total"] += 1
+                roles = user.roles or [user.role]
+                betrag_eur = get_budget_for(roles, user.grade)
+                if not betrag_eur:
+                    counters["ohne_budget"] += 1
+                    continue
+                betrag_usd = betrag_eur * eur_usd
+
+                try:
+                    # Der Ist-Stand kommt vom Proxy, nicht aus unserer DB: Er ist die
+                    # Quelle für Verbrauch UND Grenze, und beide können sich zwischen
+                    # zwei Läufen geändert haben (Admin-Eingriff, Bild-Aufrufe).
+                    info = await client.get_user(user.pseudonym) or {}
+                    zuteilung = await plane(
+                        db,
+                        user.pseudonym,
+                        wochenbetrag_usd=betrag_usd,
+                        aktuelle_grenze_usd=info.get("max_budget"),
+                        verbrauch_usd=info.get("spend") or 0.0,
+                        stichtag=stichtag,
+                        cfg=cfg,
+                    )
+                except Exception:
+                    logger.exception("Zuteilung nicht planbar pseudonym=%s", user.pseudonym)
+                    counters["fehler"] += 1
+                    continue
+
+                if not zuteilung.zu_tun:
+                    counters[zuteilung.grund or "nichts zu tun"] += 1
+                    continue
+
+                if dry_run:
+                    logger.info(
+                        "[dry-run] %s: %.4f → %.4f USD (%d Woche(n), bis KW-Index %s)",
+                        user.pseudonym, info.get("max_budget") or 0.0,
+                        zuteilung.neue_grenze_usd, zuteilung.gebuchte_wochen,
+                        zuteilung.bis_woche,
+                    )
+                    counters["gebucht"] += 1
+                    continue
+
+                try:
+                    await client.update_user_budget(
+                        user.pseudonym, zuteilung.neue_grenze_usd
+                    )
+                except Exception:
+                    # Merkposten NICHT fortschreiben — sonst gilt die Woche als gebucht,
+                    # obwohl die Grenze unverändert ist, und niemand holt sie nach.
+                    logger.exception("Aufstockung fehlgeschlagen pseudonym=%s", user.pseudonym)
+                    counters["fehler"] += 1
+                    continue
+
+                await merke(
+                    db, user.pseudonym,
+                    bis_woche=zuteilung.bis_woche, schuljahr=cfg.schuljahr,
+                )
+                counters["gebucht"] += 1
+        finally:
+            await client.close()
+
+        if not dry_run:
+            await db.commit()
+
+    logger.info(
+        "weekly_budget_accrual done total=%d gebucht=%d ohne_budget=%d fehler=%d %s",
+        counters["total"], counters["gebucht"], counters["ohne_budget"],
+        counters["fehler"],
+        " ".join(
+            f"{k}={v}" for k, v in sorted(counters.items())
+            if k not in {"total", "gebucht", "ohne_budget", "fehler"}
+        ),
+    )
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--dry-run", action="store_true", help="nur zeigen, nichts schreiben")
+    p.add_argument("--stichtag", type=date.fromisoformat, default=None,
+                   help="Datum der Zuteilung (Default: heute)")
+    p.add_argument("--pseudonym", default=None, help="nur diese Nutzerin")
+    args = p.parse_args()
+
+    asyncio.run(run(
+        dry_run=args.dry_run,
+        stichtag=args.stichtag or date.today(),
+        pseudonym_filter=args.pseudonym,
+    ))
+
+
+if __name__ == "__main__":
+    main()

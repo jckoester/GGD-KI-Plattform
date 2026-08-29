@@ -73,6 +73,7 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
             MagicMock(),  # delete conversations
             MagicMock(),  # delete user_preferences
             MagicMock(),  # delete calendar_sync_status
+            MagicMock(),  # delete budget_accrual
             MagicMock(),  # delete jwt_revocations
             MagicMock(),  # delete pseudonym_audit
             _ResultList([]),  # nächste Runde leer

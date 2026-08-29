@@ -15,7 +15,7 @@ Cron-Container (separat):
   cleanup_inactive_accounts     täglich 02:00
   cleanup_stale_conversations   täglich 02:30
   refresh_ecb_rate              1. des Monats 06:00
-  monthly_budget_reconcile      1. des Monats 07:00
+  monthly_team_reconcile      1. des Monats 07:00
 ```
 
 ## Backend-Module (`backend/app/`)
