@@ -29,6 +29,34 @@ Fehlt eine Vorlage, greift die eingebaute Default-Optik. **PDF- und DOCX-Layout 
 prinzipiell nicht exakt angleichen** (verschiedene Layout-Systeme) — „ungefähr gleich" ist das
 erreichbare Ziel. Persönliche (nutzereigene) Vorlagen sind noch nicht vorgesehen.
 
+## Herkunftszeile am Dokumentende
+
+Auf `/settings/export` lässt sich schulweit einschalten, dass exportierte Dokumente eine
+Zeile mit Werkzeug, Modell und Datum tragen:
+
+```
+Erstellt mit ki@schule · Modell gpt-oss-120b · 29.08.2026
+```
+
+Sie erscheint in **allen drei Formaten** gleich (PDF, DOCX, ODT), weil sie an das Markdown
+angehängt wird und nicht per Seitenfuß gesetzt ist.
+
+**Vorgabe: aus.** Ein Update soll das Aussehen bereits genutzter Vorlagen nicht von sich aus
+verändern — ob die Angabe erscheint, entscheidet die Schule.
+
+Zwei Einschränkungen, die kein Fehler sind:
+
+- Die Zeile erscheint **nur bei Dokumenten aus einer KI-Antwort**. Ein von Hand
+  geschriebenes Dokument mit „Erstellt mit …" zu versehen wäre eine Falschangabe; die
+  Werkstatt lässt sich auch ganz ohne KI benutzen.
+- Als Werkzeugname dient `PUBLIC_SCHOOL_NAME` aus der `.env` (ersatzweise
+  `EXPORT_SCHOOL_NAME`). Ist keiner gesetzt, nennt die Zeile nur Modell und Datum —
+  ein Platzhalter wie „diese Plattform" hilft in einem Dokument, das die Plattform längst
+  verlassen hat, niemandem.
+
+Warum überhaupt: [KI-Ergebnisse zitieren](../user/zitieren.md) und
+[Modell-Szenarien → Was gespeichert wird](modell-szenarien.md#was-gespeichert-wird--und-was-zitierfähig-ist).
+
 ## Ablage & Persistenz
 
 Die Referenzdokumente liegen unter `EXPORT_TEMPLATE_DIR` (Default `data/export_templates`; in

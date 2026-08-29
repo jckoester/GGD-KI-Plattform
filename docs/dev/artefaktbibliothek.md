@@ -73,6 +73,33 @@ bewusst schmal (Funktionen/Punkte/Wertebereich) — kein Anspruch auf volle GeoG
 - Route `(app)/library/+page.svelte`: Grid, Belegungsbalken, Download/PNG/Code/ggb/Löschen.
   Vorschau via `<img src="/api/artifacts/{id}">` (kein `innerHTML` → SVG-XSS-neutral).
 
+## Herkunft (Modell-Transparenz, Alembic 0049/0050)
+
+`artifacts.provider_model` hält das Anbietermodell, mit dem der Inhalt erzeugt wurde. Die
+Spalte muss hier stehen und nicht nur an der Quelle: Ein Artefakt überlebt die Konversation
+bewusst (`origin_conversation_id` ist kein FK), die `generated_images`-Zeile stirbt aber per
+CASCADE mit ihr. Ohne Kopie wäre die Herkunft nach spätestens 93 Tagen weg — und zwar bei
+genau den Inhalten, die in Arbeitsblättern und Facharbeiten landen.
+
+Gefüllt wird sie je nach Herkunft unterschiedlich:
+
+| Quelle | Woher |
+|---|---|
+| Bild | `generated_images.provider_model` (beim Promoten kopiert) |
+| Diagramm | `promote.herkunft_der_nachricht(message_id)` |
+| Dokument | dieselbe Nachschlage-Funktion |
+
+**Der Client schickt nur die Nachrichten-ID, nie einen Modellnamen.** Ließe man den Browser
+das Modell behaupten, stünde in einer Quellenangabe eine Client-Angabe — ausgerechnet dort,
+wo Verlässlichkeit der ganze Zweck ist. Die Abfrage bindet zusätzlich an die Konversation
+der Nutzer:in; über eine fremde ID ließe sich sonst erraten, welches Modell dort im Einsatz
+war. Unbekannte oder fremde ID → `None`, kein Fehler: Das Speichern soll daran nicht
+scheitern.
+
+Damit das Frontend die ID überhaupt hat, gibt `_persist` sie zurück und der Chat-Stream
+meldet sie in einem `message`-Event **vor** `[DONE]`; beim Nachladen liefert sie
+`MessageItem.id`.
+
 ## Cleanup
 
 `store.cleanup_artifacts(db, now=?, dry_run=?)` löscht `expires_at < now` samt Dateien;

@@ -27,6 +27,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Nachvollziehbar, womit eine Antwort erzeugt wurde.** Bisher speicherte die Plattform nur
+  den schulinternen Aliasnamen (`chat-standard`) — für eine Quellenangabe in GFS,
+  Seminarkurs oder Facharbeit wertlos. Jetzt steht daneben das Anbietermodell
+  (`gpt-oss-120b`), aufgelöst **beim Schreiben**: Ein späteres Umhängen des Alias
+  verfälscht alte Antworten nicht mehr.
+
+  - Im Chat unter jeder Antwort der Knopf **„Herkunft"** — standardmäßig verborgen, für alle
+    erreichbar. Bilder haben eine eigene Angabe; sie stammen aus einem anderen Modell.
+  - **„Angaben zum Zitieren kopieren"** legt Werkzeug, Modell, Datum und die eigene Eingabe
+    als Textbaustein bereit. Der Bild-Prompt ist ausdrücklich als *vom Sprachmodell
+    formuliert* gekennzeichnet — als eigene Eingabe zitiert wäre er eine Falschangabe.
+  - In der **Bibliothek** dauerhaft sichtbar, mit eigenem „Zitieren"-Knopf. Die Angabe wandert
+    beim Speichern mit und überlebt die Konversation.
+  - Optional eine **Herkunftszeile am Ende exportierter Dokumente** (PDF/Word/ODT),
+    schulweit unter *Einstellungen → Export-Vorlagen* schaltbar. Vorgabe: aus.
+
+  Für Inhalte von vor diesem Update bleibt die Angabe leer — welcher Alias damals auf welches
+  Modell zeigte, ist nicht rekonstruierbar, und ein geratener Wert wäre in einer
+  Quellenangabe schlimmer als eine Lücke.
+
 - **Mehrere Bildmodelle gleichzeitig nutzbar.** Eine **Bildart** (`config/image_models.yaml`)
   bündelt ein Bildmodell mit den Formaten, die es beherrscht, und einem Namen, den Menschen
   verstehen. Assistenten lassen sich im Editor auf einzelne Bildarten festlegen; ohne Auswahl
@@ -127,6 +147,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Konfigurationen für IONOS, Mistral, OpenAI, Anthropic und Mischbetrieb, dazu eine
   Abdeckungsmatrix (welcher Anbieter kann Chat, Embedding, Bild) und die acht
   anbieterspezifischen Fallen, die still scheitern.
+- Neues Nutzerkapitel [KI-Ergebnisse zitieren](docs/user/zitieren.md) — welche Angaben eine
+  Quellenangabe braucht und wo sie in der Oberfläche stehen.
+- [Modell-Szenarien](docs/admin/modell-szenarien.md): Abschnitt *Was gespeichert wird — und
+  was zitierfähig ist* (Alias gegen Anbietermodell).
 - [Vor der Installation](docs/admin/vor-der-installation.md): Messwerte für **Mistral**
   (acht Modelle), **OpenAI** (vier) und **Anthropic** (drei) — Preise, Funktionsaufrufe,
   Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
@@ -135,8 +159,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
-- **`alembic upgrade head`** — Migration `0047` ergänzt `assistants.image_kinds`,
-  `0048` ergänzt `generated_images.bildart`. Bestandsassistenten behalten mit dem
+- **`alembic upgrade head`** — Migrationen `0047`–`0050`: `assistants.image_kinds`,
+  `generated_images.bildart`, sowie `provider_model` an `messages`, `generated_images` und
+  `artifacts`. Bestandsassistenten behalten mit dem
   Standardwert ihr bisheriges Verhalten; bereits erzeugte Bilder lassen sich mangels
   gespeicherter Bildart nicht variieren.
 

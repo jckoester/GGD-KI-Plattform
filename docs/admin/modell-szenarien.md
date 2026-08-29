@@ -336,6 +336,45 @@ Ollama-Fallback ist die Antwort darauf — er gehört in jedes Szenario.
 
 ---
 
+## Was gespeichert wird — und was zitierfähig ist
+
+Zu jeder Antwort werden **zwei** Modellnamen abgelegt, und die Unterscheidung ist der Grund
+für dieses Kapitel:
+
+| Feld | Beispiel | Wofür |
+|---|---|---|
+| `model` | `chat-standard` | Der **Aliasname**. Sagt, welche Aufgabe gemeint war. Nützlich für Betrieb, Statistik und Fehlersuche. |
+| `provider_model` | `openai/openai/gpt-oss-120b` | Das **Anbietermodell**, das tatsächlich geantwortet hat. Das ist die zitierfähige Angabe. |
+
+Der Alias allein genügt für eine Quellenangabe nicht: `chat-standard` ist ein Hausname, den
+außerhalb der Schule niemand kennt und der morgen auf ein anderes Modell zeigen kann.
+
+**Aufgelöst wird beim Schreiben, nicht bei der Anzeige.** Hängt jemand `chat-standard`
+später auf ein anderes Modell um, bleibt die Angabe an einer drei Monate alten Antwort
+korrekt. Die Auflösung nutzt den Antwort-Header `x-litellm-model-id`, der das konkrete
+Deployment benennt — genauer als der Alias, wenn dieser auf mehrere Deployments zeigt
+(Lastverteilung, Fallback).
+
+> **LiteLLM liefert das Anbietermodell nirgends von selbst mit** (gemessen 28.08.2026):
+> `response.model` und `x-litellm-model-group` geben beide den Alias zurück,
+> `x-litellm-model-id` ist ein Hash. Erst der Abgleich mit `/model/info` macht daraus einen
+> Namen.
+
+Gespeichert wird die Angabe an der Nachricht, am erzeugten Bild und — beim Übernehmen in
+die Bibliothek — am Artefakt. Letzteres ist kein Luxus: Ein Artefakt überlebt die
+Konversation bewusst, die Bildzeile stirbt mit ihr; ohne die Kopie wäre die Herkunft nach
+spätestens 93 Tagen weg.
+
+**Was nicht geht:** Für Inhalte von **vor** dem 29.08.2026 lässt sich die Angabe nicht
+nachtragen. Welcher Alias damals auf welches Modell zeigte, ist nicht rekonstruierbar.
+Deshalb gibt es dafür bewusst keinen Backfill — eine geratene Angabe wäre schlimmer als
+eine Leerstelle.
+
+Was Nutzer:innen davon sehen und wie sie es übernehmen:
+[KI-Ergebnisse zitieren](../user/zitieren.md).
+
+---
+
 ## Anbieterspezifische Fallen
 
 Alle folgenden Punkte sind an der eigenen Installation gemessen (27./28.08.2026). Sie eint,
