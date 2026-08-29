@@ -143,6 +143,9 @@ def test_get_models_returns_502_when_litellm_fails():
 
 class _FakeStreamResponse:
     status_code = 200
+    # Wie die echte httpx.Response: Der Router liest `x-litellm-model-id` daraus
+    # (Modell-Transparenz). Leer = Kennung unbekannt, dann greift der Alias-Rückfall.
+    headers: dict = {}
 
     async def aiter_lines(self):
         yield "data: [DONE]"

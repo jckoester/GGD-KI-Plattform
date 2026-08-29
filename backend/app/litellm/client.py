@@ -15,6 +15,9 @@ class ImageGenerationResult:
     """Ergebnis eines Bild-Calls: dekodierte Bytes + Kosten (aus dem LiteLLM-Header)."""
     image_bytes: bytes
     cost_usd: Optional[float] = None
+    # `x-litellm-model-id` — benennt das Deployment, das das Bild erzeugt hat. Wird beim
+    # Speichern zum Anbietermodell aufgelöst (Modell-Transparenz).
+    deployment_id: Optional[str] = None
 
 
 class ImageGenerationError(RuntimeError):
@@ -560,6 +563,25 @@ class LiteLLMClient:
             logger.exception("get_model_info Exception")
             return {}
 
+    async def get_model_deployments(self) -> list[dict]:
+        """GET /model/info → die Roh-Einträge (`model_name`, `litellm_params`, `model_info`).
+
+        Grundlage für die Auflösung Deployment-Kennung → Anbietermodell
+        (``app.litellm.deployments``). Wirft bei Fehler, damit der Aufrufer „unbekannt"
+        von „nichts konfiguriert" unterscheiden kann — anders als bei
+        ``get_image_model_ids``, wo eine leere Liste die gewünschte Degradierung ist.
+        """
+        client = await self._get_client()
+        response = await client.get(
+            f"{self.base_url}/model/info",
+            headers={"Authorization": f"Bearer {self.master_key}"},
+        )
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"get_model_deployments fehlgeschlagen: HTTP {response.status_code}"
+            )
+        return [e for e in response.json().get("data", []) if isinstance(e, dict)]
+
     async def get_image_model_ids(self) -> list[str]:
         """
         GET /model/info → Modell-IDs mit ``model_info.mode == "image_generation"``.
@@ -679,10 +701,16 @@ class LiteLLMClient:
             logger.error("LiteLLM generate_image: leere data-Liste (model=%s)", model)
             raise RuntimeError("Image generation returned no data")
 
+        deployment_id = response.headers.get("x-litellm-model-id")
+
         entry = data[0]
         b64 = entry.get("b64_json")
         if b64:
-            return ImageGenerationResult(image_bytes=base64.b64decode(b64), cost_usd=cost_usd)
+            return ImageGenerationResult(
+                image_bytes=base64.b64decode(b64),
+                cost_usd=cost_usd,
+                deployment_id=deployment_id,
+            )
 
         # Datenschutz-Grenze: keine extern gehosteten Bild-URLs verarbeiten.
         if entry.get("url"):

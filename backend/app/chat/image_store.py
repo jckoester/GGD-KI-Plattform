@@ -59,6 +59,7 @@ async def save_generated_image(
     prompt: str | None = None,
     bildart: str | None = None,
     message_id: UUID | None = None,
+    provider_model: str | None = None,
 ) -> UUID:
     """Schreibt die Bytes auf Disk + legt die DB-Referenz an (committed). Gibt die ID zurück."""
     image_id = uuid4()
@@ -75,6 +76,7 @@ async def save_generated_image(
         message_id=message_id,
         model=model,
         bildart=bildart,
+        provider_model=provider_model,
         size=size,
         mime_type=mime_type,
         byte_size=len(image_bytes),

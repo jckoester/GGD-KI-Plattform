@@ -346,7 +346,13 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(nullable=False)
     content: Mapped[str] = mapped_column(nullable=False)
+    # Der schulinterne Aliasname (`chat-standard`) — das, was an LiteLLM ging.
     model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Das Anbietermodell dahinter (`openai/openai/gpt-oss-120b`), beim Schreiben aufgelöst.
+    # Der Alias allein ist für eine Quellenangabe wertlos; zitierfähig ist dieser Wert.
+    # Nullable: bei nicht erreichbarem Proxy unbekannt, und für Bestandszeilen nicht
+    # rekonstruierbar.
+    provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL"), nullable=True
     )
@@ -393,6 +399,8 @@ class GeneratedImage(Base):
     # Mehrmodell-Fähigkeit haben keine, und aus Modell + Größe wäre sie nicht eindeutig
     # rekonstruierbar (zwei Bildarten dürfen dasselbe Modell nutzen).
     bildart: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Anbietermodell hinter `model` (siehe Message.provider_model).
+    provider_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     size: Mapped[str] = mapped_column(Text, nullable=False)
     mime_type: Mapped[str] = mapped_column(Text, nullable=False)
     byte_size: Mapped[int] = mapped_column(nullable=False)

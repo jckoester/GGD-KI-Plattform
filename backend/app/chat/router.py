@@ -31,6 +31,7 @@ from app.chat.tools import (
 )
 from app.chat.image_moderation import image_prompt_block_reason
 from app.litellm.team_models import erlaubte_modelle_fuer
+from app.litellm.deployments import anbietermodell
 from app.chat.image_models import (
     Bildart,
     alle_bildarten,
@@ -890,6 +891,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             # Spiel sind (und für die Modell-Transparenz, siehe Todo).
             model=bildart.modell,
             bildart=bildart.id,
+            provider_model=await anbietermodell(result.deployment_id, bildart.modell),
             size=size,
             mime_type="image/png",
             prompt=prompt,
@@ -957,6 +959,7 @@ async def _persist(
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
     skip_user_message: bool = False,
     generated_image_ids: Optional[list] = None,
+    provider_model: Optional[str] = None,
 ) -> None:
     tokens_input = usage.get("prompt_tokens")
     tokens_output = usage.get("completion_tokens")
@@ -973,6 +976,9 @@ async def _persist(
         role="assistant",
         content=assistant_content,
         model=model_used,
+        # Das tatsächlich befragte Anbietermodell — beim Schreiben aufgelöst, damit ein
+        # späteres Umhängen des Alias alte Antworten nicht rückwirkend verfälscht.
+        provider_model=provider_model,
         assistant_id=assistant_id,    # 2-3
         tokens_input=tokens_input,
         tokens_output=tokens_output,
@@ -1398,6 +1404,12 @@ async def chat(
             detail=f"LiteLLM Fehler: {error_body.decode()}" if error_body else "LiteLLM Fehler",
         )
 
+    # Deployment-Kennung für die Modell-Transparenz. LiteLLM gibt weder in `response.model`
+    # noch in `x-litellm-model-group` das Anbietermodell zurück — beide liefern den Alias
+    # (gemessen 28.08.2026). Nur dieser Header benennt das Deployment, das die Anfrage
+    # tatsächlich bedient hat; aufgelöst wird er beim Schreiben (siehe _persist).
+    _deployment_id = response.headers.get("x-litellm-model-id")
+
     # Anhänge der letzten Nachricht für Persistierung merken
     last_attachments = request.messages[-1].attachments if request.messages else []
 
@@ -1572,6 +1584,11 @@ async def chat(
                     json=next_payload,
                 )
                 current_response = await client.send(req_next, stream=True)
+                # Im Werkzeug-Loop kann ein anderes Deployment antworten (Fallback,
+                # Lastverteilung) — die letzte Antwort ist die, die den Text erzeugt.
+                _deployment_id = (
+                    current_response.headers.get("x-litellm-model-id") or _deployment_id
+                )
                 _extra_responses.append(current_response)
 
             # -- Title-Task abwarten --
@@ -1627,6 +1644,7 @@ async def chat(
                 conv_assistant_update=conv_assistant_update,
                 skip_user_message=crisis_record is not None,
                 generated_image_ids=_generated_image_ids,
+                provider_model=await anbietermodell(_deployment_id, model_used),
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
@@ -1964,6 +1982,7 @@ async def variiere_generiertes_bild(
         image_bytes=result.image_bytes,
         model=bildart.modell,
         bildart=bildart.id,
+        provider_model=await anbietermodell(result.deployment_id, bildart.modell),
         size=size,
         mime_type="image/png",
         prompt=record.prompt,
