@@ -1,17 +1,20 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
     import { user } from '$lib/stores/user.js';
-    import { zitiername } from '$lib/provenance.js';
+    import { zitiername, zitatText, zeitpunkt } from '$lib/provenance.js';
+    import { branding } from '$lib/branding.js';
     import { deriveDocTitle } from '$lib/workshop.js';
     import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
 
-    let { message, isStreaming = false, costEur = null } = $props();
+    // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
+    // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
+    let { message, isStreaming = false, costEur = null, userPrompt = null } = $props();
 
     let renderedContent = $derived(
         message.role === 'assistant' ? renderMarkdown(message.content) : ''
@@ -34,14 +37,27 @@
             .filter((b) => b.modell),
     );
     let hatHerkunftsangaben = $derived(!!antwortModell || bildHerkuenfte.length > 0);
-    let erzeugtAm = $derived(
-        message.created_at
-            ? new Date(message.created_at).toLocaleString('de-DE', {
-                  day: '2-digit', month: '2-digit', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-              })
-            : null,
+    let erzeugtAm = $derived(zeitpunkt(message.created_at));
+
+    let zitat = $derived(
+        zitatText({
+            werkzeug: branding.name,
+            modell: antwortModell,
+            zeitpunkt: erzeugtAm,
+            eingabe: userPrompt,
+            bilder: bildHerkuenfte.map((b) => ({ modell: b.modell, prompt: b.prompt })),
+        }),
     );
+    let zitatKopiert = $state(false);
+    async function zitatKopieren() {
+        try {
+            await navigator.clipboard.writeText(zitat);
+            zitatKopiert = true;
+            setTimeout(() => (zitatKopiert = false), 2200);
+        } catch {
+            zitatKopiert = false;
+        }
+    }
 
     // „Variieren": derselbe Prompt, dieselbe Bildart, neuer Wurf. Läuft ohne Chat-Modell —
     // es geht nicht darum, den Wunsch neu zu formulieren.
@@ -326,6 +342,19 @@
                         {#if erzeugtAm}
                             <p>Erzeugt am {erzeugtAm}</p>
                         {/if}
+                        <button
+                            type="button"
+                            onclick={zitatKopieren}
+                            class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded
+                                   bg-light-ui-2 dark:bg-dark-ui-2
+                                   hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+                        >
+                            {#if zitatKopiert}
+                                <Check class="w-3.5 h-3.5" /> Kopiert
+                            {:else}
+                                <Copy class="w-3.5 h-3.5" /> Angaben zum Zitieren kopieren
+                            {/if}
+                        </button>
                     </div>
                 {/if}
             {/if}

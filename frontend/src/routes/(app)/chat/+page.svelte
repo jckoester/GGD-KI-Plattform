@@ -672,6 +672,7 @@
                                 size: item.size,
                                 bildart: item.bildart,
                                 provider_model: item.provider_model,
+                                prompt: item.prompt,
                             },
                         ],
                     };
@@ -1157,6 +1158,9 @@
                 {#each messages as message, i}
                     <MessageBubble
                         {message}
+                        userPrompt={messages[i - 1]?.role === "user"
+                            ? messages[i - 1].content
+                            : null}
                         isStreaming={isStreaming && i === messages.length - 1}
                         costEur={granularity === "message" ||
                         granularity === "both"

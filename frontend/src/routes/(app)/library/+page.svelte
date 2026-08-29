@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import {
-        Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit,
+        Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
     } from 'lucide-svelte';
     import { getLibrary, deleteArtifact, createDocument } from '$lib/api.js';
     import { triggerDownload } from '$lib/download.js';
@@ -10,7 +10,8 @@
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
         isImageLike, isSvg, slugify,
     } from '$lib/library.js';
-    import { zitiername } from '$lib/provenance.js';
+    import { zitiername, zitatText, zeitpunkt } from '$lib/provenance.js';
+    import { branding } from '$lib/branding.js';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 
     let items = $state([]);
@@ -121,6 +122,28 @@
             error = err.message ?? 'PNG-Export fehlgeschlagen.';
         } finally {
             busyId = null;
+        }
+    }
+
+    // Quellenangabe zum Kopieren. Bei einem **Bild** ist `source` der Bild-Prompt und
+    // gehört als solcher ins Zitat; bei Dokumenten und Diagrammen ist `source` der Inhalt
+    // selbst — ihn als „Eingabe" auszugeben wäre eine Falschangabe.
+    let zitatKopiertId = $state(null);
+    async function copyZitat(item) {
+        const text = zitatText({
+            werkzeug: branding.name,
+            modell: zitiername(item.provider_model),
+            zeitpunkt: zeitpunkt(item.created_at),
+            bilder: item.kind === 'image'
+                ? [{ modell: zitiername(item.provider_model), prompt: item.source }]
+                : [],
+        });
+        try {
+            await navigator.clipboard.writeText(text);
+            zitatKopiertId = item.id;
+            setTimeout(() => { if (zitatKopiertId === item.id) zitatKopiertId = null; }, 1800);
+        } catch {
+            error = 'Kopieren in die Zwischenablage fehlgeschlagen.';
         }
     }
 
@@ -258,6 +281,22 @@
                             <!-- Aktionen -->
                             <div class="flex flex-wrap items-center gap-1 mt-3 pt-2
                                         border-t border-light-ui-3 dark:border-dark-ui-3">
+                                {#if zitiername(item.provider_model)}
+                                    <button
+                                        type="button"
+                                        onclick={() => copyZitat(item)}
+                                        title="Werkzeug, Modell und Datum als Textbaustein"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                    >
+                                        {#if zitatKopiertId === item.id}
+                                            <Check class="w-3.5 h-3.5" /> Kopiert
+                                        {:else}
+                                            <Quote class="w-3.5 h-3.5" /> Zitieren
+                                        {/if}
+                                    </button>
+                                {/if}
                                 {#if item.kind === 'document'}
                                     <a
                                         href="/library/{item.id}/edit"

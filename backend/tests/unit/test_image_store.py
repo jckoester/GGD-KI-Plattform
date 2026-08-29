@@ -70,14 +70,16 @@ async def test_collect_empty_conversation_ids_shortcircuits():
 # ── message_id-Verknüpfung (Schritt 5) ─────────────────────────────────────────
 
 async def test_list_message_images_groups_by_message():
-    """Bilder nach message_id gruppiert, mit {image_id, size, bildart, provider_model}."""
+    """Bilder nach message_id gruppiert, mit Größe, Bildart, Herkunft und Prompt."""
     m1, m2 = uuid4(), uuid4()
     i1, i2, i3 = uuid4(), uuid4(), uuid4()
     exec_result = MagicMock()
     exec_result.all.return_value = [
-        (i1, "1024x1024", "standard", "openai/black-forest-labs/FLUX.1-schnell", m1),
-        (i2, "1024x1536", "formatwahl", "openai/black-forest-labs/FLUX.2-klein-4B", m1),
-        (i3, "1024x1024", None, None, m2),   # Bild von vor den beiden Spalten
+        (i1, "1024x1024", "standard", "openai/black-forest-labs/FLUX.1-schnell",
+         "ein roter Fuchs", m1),
+        (i2, "1024x1536", "formatwahl", "openai/black-forest-labs/FLUX.2-klein-4B",
+         "ein blaues Haus", m1),
+        (i3, "1024x1024", None, None, None, m2),   # Bild von vor den neuen Spalten
     ]
     db = MagicMock()
     db.execute = AsyncMock(return_value=exec_result)
@@ -89,6 +91,7 @@ async def test_list_message_images_groups_by_message():
     assert out[m1][0]["size"] == "1024x1024"
     assert out[m1][0]["bildart"] == "standard"
     assert out[m1][0]["provider_model"] == "openai/black-forest-labs/FLUX.1-schnell"
+    assert out[m1][0]["prompt"] == "ein roter Fuchs"
     assert out[m2][0]["bildart"] is None
     assert out[m2][0]["provider_model"] is None
     assert [x["image_id"] for x in out[m2]] == [str(i3)]

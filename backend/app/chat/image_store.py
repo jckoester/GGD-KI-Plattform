@@ -95,13 +95,14 @@ async def list_message_images(db: AsyncSession, conversation_id: UUID) -> dict[U
     """Bilder einer Konversation nach `message_id` gruppiert (für die History-Rehydrierung).
 
     Nur an eine Nachricht verknüpfte Bilder (message_id gesetzt); je Eintrag
-    `{image_id, size, bildart, provider_model}`, chronologisch."""
+    `{image_id, size, bildart, provider_model, prompt}`, chronologisch."""
     rows = (await db.execute(
         select(
             GeneratedImage.id,
             GeneratedImage.size,
             GeneratedImage.bildart,
             GeneratedImage.provider_model,
+            GeneratedImage.prompt,
             GeneratedImage.message_id,
         )
         .where(
@@ -111,10 +112,13 @@ async def list_message_images(db: AsyncSession, conversation_id: UUID) -> dict[U
         .order_by(GeneratedImage.created_at.asc())
     )).all()
     out: dict[UUID, list[dict]] = {}
-    for image_id, size, bildart, provider_model, message_id in rows:
+    for image_id, size, bildart, provider_model, prompt, message_id in rows:
         out.setdefault(message_id, []).append({
             "image_id": str(image_id), "size": size,
             "bildart": bildart, "provider_model": provider_model,
+            # Der (vom Sprachmodell gebildete) Bild-Prompt — gehört in die Quellenangabe,
+            # dort aber ausdrücklich als nicht von der Nutzerin formuliert gekennzeichnet.
+            "prompt": prompt,
         })
     return out
 

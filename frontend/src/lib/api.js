@@ -441,8 +441,8 @@ export async function* streamChat(
 
       if (currentEventType === "image") {
         try {
-          const { image_id, size, bildart, provider_model } = JSON.parse(payload);
-          yield { type: "image", image_id, size, bildart, provider_model };
+          const { image_id, size, bildart, provider_model, prompt } = JSON.parse(payload);
+          yield { type: "image", image_id, size, bildart, provider_model, prompt };
         } catch {}
         currentEventType = null;
         continue;

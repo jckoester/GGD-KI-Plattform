@@ -87,6 +87,7 @@ class GeneratedImageRef(BaseModel):
     size: Optional[str] = None
     bildart: Optional[str] = None          # ID der Bildart (Anzeige nur für Lehrkräfte)
     provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
+    prompt: Optional[str] = None           # vom Sprachmodell gebildeter Bild-Prompt
 
 
 class MessageItem(BaseModel):
@@ -916,6 +917,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         "bildart": bildart.label,
         # Nur fürs SSE-Event und die Anzeige — wird vor dem Senden an den LLM entfernt.
         "provider_model": aufgeloest,
+        "bild_prompt": prompt,
         # Beides zurückgeben: der Name ist das, was das Modell versteht, die Pixelgröße das,
         # was tatsächlich erzeugt (und abgerechnet) wurde.
         "format": format_name,
@@ -1571,6 +1573,7 @@ async def chat(
                                 'size': tool_result.get('size'),
                                 'bildart': tool_result.get('bildart'),
                                 'provider_model': tool_result.get('provider_model'),
+                                'prompt': tool_result.get('bild_prompt'),
                             })}\n\n"
                         )
                     tool_result_str = json.dumps({
@@ -1915,7 +1918,9 @@ async def get_generated_image(
 class ImageVariationResponse(BaseModel):
     image_id: str
     size: str
-    bildart: Optional[str] = None   # Label, für die Anzeige
+    bildart: Optional[str] = None          # Label, für die Anzeige
+    provider_model: Optional[str] = None   # zitierfähig
+    prompt: Optional[str] = None
 
 
 @router.post("/images/{image_id}/variieren", response_model=ImageVariationResponse)
@@ -2033,7 +2038,9 @@ async def variiere_generiertes_bild(
         await db.commit()
 
     return ImageVariationResponse(
-        image_id=str(neue_id), size=size, bildart=bildart.label
+        image_id=str(neue_id), size=size, bildart=bildart.label,
+        provider_model=await anbietermodell(result.deployment_id, bildart.modell),
+        prompt=record.prompt,
     )
 
 
