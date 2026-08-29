@@ -1,11 +1,12 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2 } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
     import { user } from '$lib/stores/user.js';
+    import { zitiername } from '$lib/provenance.js';
     import { deriveDocTitle } from '$lib/workshop.js';
     import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
@@ -19,6 +20,28 @@
     // Die verwendete Bildart interessiert Lehrkräfte (greift das Routing sinnvoll?);
     // für Schüler:innen wäre sie nur Rauschen — sie wählen ohnehin nichts aus.
     let zeigeBildart = $derived(!!$user?.roles?.includes('teacher'));
+
+    // ── Herkunft (Modell-Transparenz) ────────────────────────────────────────
+    // Standardmäßig verborgen, per Klick einblendbar: Zum Arbeiten braucht die Angabe
+    // niemand, für eine Quellenangabe in GFS oder Facharbeit ist sie nötig — und dann
+    // von jedem erreichbar, nicht nur von Lehrkräften.
+    let herkunftOffen = $state(false);
+    let antwortModell = $derived(zitiername(message.provider_model));
+    // Auch Bilder haben eine eigene Herkunft; sie kann von der der Antwort abweichen.
+    let bildHerkuenfte = $derived(
+        (message.images ?? [])
+            .map((b) => ({ ...b, modell: zitiername(b.provider_model) }))
+            .filter((b) => b.modell),
+    );
+    let hatHerkunftsangaben = $derived(!!antwortModell || bildHerkuenfte.length > 0);
+    let erzeugtAm = $derived(
+        message.created_at
+            ? new Date(message.created_at).toLocaleString('de-DE', {
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+              })
+            : null,
+    );
 
     // „Variieren": derselbe Prompt, dieselbe Bildart, neuer Wurf. Läuft ohne Chat-Modell —
     // es geht nicht darum, den Wunsch neu zu formulieren.
@@ -266,11 +289,45 @@
             {#if isStreaming}
                 <span class="animate-pulse cursor-default text-light-tx-2 dark:text-dark-tx-2 text-sm ml-0.5">|</span>
             {/if}
-            {#if costEur !== null}
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-2 pt-1
-                           border-t border-light-ui-3 dark:border-dark-ui-3">
-                    {costEur} €
-                </p>
+            {#if costEur !== null || (hatHerkunftsangaben && !isStreaming)}
+                <div class="flex items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2
+                            mt-2 pt-1 border-t border-light-ui-3 dark:border-dark-ui-3">
+                    {#if costEur !== null}
+                        <span>{costEur} €</span>
+                    {/if}
+                    {#if hatHerkunftsangaben && !isStreaming}
+                        <button
+                            type="button"
+                            onclick={() => (herkunftOffen = !herkunftOffen)}
+                            aria-expanded={herkunftOffen}
+                            title="Womit wurde diese Antwort erzeugt?"
+                            class="inline-flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx"
+                        >
+                            <Info class="w-3.5 h-3.5" />
+                            Herkunft
+                        </button>
+                    {/if}
+                </div>
+                {#if herkunftOffen}
+                    <div class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2 space-y-0.5">
+                        {#if antwortModell}
+                            <p>Text: <span class="font-mono">{antwortModell}</span></p>
+                        {/if}
+                        {#each bildHerkuenfte as bild (bild.image_id)}
+                            <p>
+                                Bild: <span class="font-mono">{bild.modell}</span>
+                                {#if zeigeBildart && bild.bildart}
+                                    <span class="text-light-tx-3 dark:text-dark-tx-3">
+                                        (Bildart: {bild.bildart})
+                                    </span>
+                                {/if}
+                            </p>
+                        {/each}
+                        {#if erzeugtAm}
+                            <p>Erzeugt am {erzeugtAm}</p>
+                        {/if}
+                    </div>
+                {/if}
             {/if}
         </div>
         {/if}
@@ -364,11 +421,6 @@
                                     </button>
                                 {/if}
                             </div>
-                            {#if zeigeBildart && img.bildart}
-                                <p class="mt-0.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                                    Bildart: {img.bildart}
-                                </p>
-                            {/if}
                             {#if variiereStatus[img.image_id] && variiereStatus[img.image_id] !== 'laeuft'}
                                 <p class="mt-0.5 text-xs text-light-re dark:text-dark-re">
                                     {variiereStatus[img.image_id]}

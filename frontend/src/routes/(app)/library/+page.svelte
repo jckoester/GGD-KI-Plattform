@@ -10,6 +10,7 @@
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
         isImageLike, isSvg, slugify,
     } from '$lib/library.js';
+    import { zitiername } from '$lib/provenance.js';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
 
     let items = $state([]);
@@ -246,6 +247,13 @@
                             <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-0.5">
                                 Gespeichert {fmtDate(item.created_at)} · gültig bis {fmtDate(item.expires_at)}
                             </p>
+                            <!-- Hier dauerhaft sichtbar, anders als im Chat: Die Bibliothek
+                                 ist der Ort, an dem man nachsieht, was man zitieren muss. -->
+                            {#if zitiername(item.provider_model)}
+                                <p class="text-xs text-light-tx-3 dark:text-dark-tx-3">
+                                    Erzeugt mit <span class="font-mono">{zitiername(item.provider_model)}</span>
+                                </p>
+                            {/if}
 
                             <!-- Aktionen -->
                             <div class="flex flex-wrap items-center gap-1 mt-3 pt-2

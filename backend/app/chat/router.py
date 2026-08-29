@@ -85,6 +85,8 @@ class ConversationListResponse(BaseModel):
 class GeneratedImageRef(BaseModel):
     image_id: str
     size: Optional[str] = None
+    bildart: Optional[str] = None          # ID der Bildart (Anzeige nur für Lehrkräfte)
+    provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
 
 
 class MessageItem(BaseModel):
@@ -883,6 +885,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
     finally:
         await client.close()
 
+    aufgeloest = await anbietermodell(result.deployment_id, bildart.modell)
     try:
         image_id = await save_generated_image(
             ctx.db,
@@ -894,7 +897,7 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
             # Spiel sind (und für die Modell-Transparenz, siehe Todo).
             model=bildart.modell,
             bildart=bildart.id,
-            provider_model=await anbietermodell(result.deployment_id, bildart.modell),
+            provider_model=aufgeloest,
             size=size,
             mime_type="image/png",
             prompt=prompt,
@@ -911,6 +914,8 @@ async def _exec_generate_image(args: dict, ctx: ToolContext) -> dict:
         # Das Label, nicht die ID: Der Wert ist für die Erzählung des Chat-Modells da
         # („Ich habe … verwendet"), nicht zur Weiterverarbeitung.
         "bildart": bildart.label,
+        # Nur fürs SSE-Event und die Anzeige — wird vor dem Senden an den LLM entfernt.
+        "provider_model": aufgeloest,
         # Beides zurückgeben: der Name ist das, was das Modell versteht, die Pixelgröße das,
         # was tatsächlich erzeugt (und abgerechnet) wurde.
         "format": format_name,
@@ -1561,7 +1566,12 @@ async def chat(
                             _image_cost_total += float(tool_result["cost_usd"])
                         yield (
                             f"event: image\n"
-                            f"data: {json.dumps({'image_id': tool_result['image_id'], 'size': tool_result.get('size'), 'bildart': tool_result.get('bildart')})}\n\n"
+                            f"data: {json.dumps({
+                                'image_id': tool_result['image_id'],
+                                'size': tool_result.get('size'),
+                                'bildart': tool_result.get('bildart'),
+                                'provider_model': tool_result.get('provider_model'),
+                            })}\n\n"
                         )
                     tool_result_str = json.dumps({
                         k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")

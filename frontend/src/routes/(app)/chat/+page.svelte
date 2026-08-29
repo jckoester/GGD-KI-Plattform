@@ -671,6 +671,7 @@
                                 image_id: item.image_id,
                                 size: item.size,
                                 bildart: item.bildart,
+                                provider_model: item.provider_model,
                             },
                         ],
                     };
