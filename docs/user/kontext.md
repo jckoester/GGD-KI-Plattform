@@ -63,6 +63,10 @@ Das Vorschlagsfenster zeigt standardmäßig bis zu 8 Treffer. Wenn Sie häufig m
 
 Die Einstellung betrifft **nur die Anzeige**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Es kann also sein, dass ein Assistent mehr Bausteine gelesen hat, als Ihnen angezeigt werden.
 
+> ⚠️ **Trefferlisten sind gekürzt, und das steht nirgends dabei.** Gibt es zu einer Suche mehr passende Bausteine als Plätze, liefert die Suche nur die vordersten — ohne Hinweis darauf, dass etwas fehlt. Eine Liste sieht also immer vollständig aus.
+>
+> Das trifft besonders Fragen, die **alle** Vorkommen eines Begriffs wollen. Der Operator „nennen" etwa steht in 18 Fächern; eine Antwort darauf nennt derzeit 14 davon und wirkt dabei erschöpfend. Wenn Vollständigkeit für Sie zählt, prüfen Sie das Ergebnis gegen den Wissensgraphen — verlassen Sie sich nicht darauf, dass eine Liste alles enthält.
+
 ## Kontext und Datenschutz
 
 Kontextbausteine, die einer Unterhaltung hinzugefügt werden, werden zusammen mit Ihren Nachrichten an die KI übermittelt. Es gelten dieselben Datenschutzregeln wie für Chat-Nachrichten — lesen Sie dazu die [Datenschutzerklärung](datenschutz.md).
