@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import jsonschema
 import yaml
@@ -209,6 +209,16 @@ class AssistantFullListResponse(BaseModel):
     total: int
 
 
+class AssistantImportResponse(AssistantResponse):
+    """Wie ``AssistantResponse``, plus was beim Import nicht übernommen wurde.
+
+    Eigenes Modell statt eines Zusatzfeldes an ``AssistantResponse``: Der Hinweis gehört
+    zum Vorgang, nicht zum Assistenten — in jeder Liste mitgeführt wäre er sinnlos.
+    """
+
+    hinweise: list[str] = []
+
+
 # ── Import/Export Mapping ────────────────────────────────────────────────────
 
 
@@ -257,6 +267,12 @@ def _assistant_to_yaml(assistant: Assistant, subject_slug: Optional[str]) -> str
             "temperature": float(assistant.temperature) if assistant.temperature is not None else None,
             "max_tokens": assistant.max_tokens,
             "system_prompt": assistant.system_prompt,
+            # Fähigkeiten und Bildarten gehören zu `config`, nicht zu `metadata`: Sie
+            # beschreiben, was der Assistent kann, nicht woher er kommt. Ohne sie verlor
+            # ein Export-Import-Durchlauf still Unterrichtsplanung, Bildgenerierung und
+            # die Bildart-Auswahl — der Assistent sah identisch aus und konnte weniger.
+            "tool_groups": list(assistant.tool_groups or []) or None,
+            "image_kinds": list(assistant.image_kinds or []) or None,
         },
     }
     # None-Werte aus config entfernen
@@ -272,12 +288,64 @@ def _assistant_to_yaml(assistant: Assistant, subject_slug: Optional[str]) -> str
     return yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
-def _yaml_to_assistant_fields(data: dict, subject_id: Optional[int]) -> dict:
-    """Mappt YAML-Daten auf Assistenten-Felder."""
+def bekannte_faehigkeiten() -> set[str]:
+    """Fähigkeiten, die es gibt (`app.chat.tools.FAEHIGKEITEN`).
+
+    Bewusst **nicht** aus `TOOL_REGISTRY` abgeleitet: Die füllt sich erst beim Import der
+    Module mit den `register_tool`-Aufrufen. Hier gelesen käme je nach Importreihenfolge
+    eine leere Menge heraus — und dann verwürfe der Import jede Fähigkeit als unbekannt.
+    """
+    from app.chat.tools import FAEHIGKEITEN
+
+    return set(FAEHIGKEITEN)
+
+
+def bekannte_bildarten() -> set[str]:
+    """Bildart-IDs aus `config/image_models.yaml` dieser Installation."""
+    from app.chat.image_models import alle_bildarten
+
+    return {bildart.id for bildart in alle_bildarten()}
+
+
+def _uebernimm_bekannte(
+    werte: Any, bekannt: set[str], bezeichnung: str, hinweise: list[str]
+) -> list[str]:
+    """Behält, was hier existiert; nennt den Rest im Ergebnis.
+
+    Unbekanntes still zu schlucken wäre die schlechtere Wahl: Der Assistent erschiene
+    vollständig und wäre es nicht — genau der Fehler, den dieser Import gerade behebt.
+    Abzuweisen wäre die andere: Ein Assistent aus einer Schule mit einer Bildart „Comic"
+    ließe sich dann hier gar nicht importieren, obwohl alles Übrige passt.
+    """
+    if not isinstance(werte, list):
+        return []
+    behalten = [w for w in werte if w in bekannt]
+    verworfen = [str(w) for w in werte if w not in bekannt]
+    if verworfen:
+        hinweise.append(
+            f"{bezeichnung} übergangen (hier nicht vorhanden): {', '.join(sorted(verworfen))}"
+        )
+    return behalten
+
+
+def _yaml_to_assistant_fields(
+    data: dict, subject_id: Optional[int], hinweise: Optional[list[str]] = None
+) -> dict:
+    """Mappt YAML-Daten auf Assistenten-Felder.
+
+    ``hinweise`` sammelt, was übergangen wurde (unbekannte Fähigkeiten oder Bildarten).
+    """
     meta = data["metadata"]
     config = data["config"]
     grades = meta.get("grades") or []
+    gesammelt = hinweise if hinweise is not None else []
     return {
+        "tool_groups": _uebernimm_bekannte(
+            config.get("tool_groups") or [], bekannte_faehigkeiten(), "Fähigkeiten", gesammelt
+        ),
+        "image_kinds": _uebernimm_bekannte(
+            config.get("image_kinds") or [], bekannte_bildarten(), "Bildarten", gesammelt
+        ),
         "name": meta["name"].strip(),
         "description": meta.get("description"),
         "subject_id": subject_id,
@@ -850,13 +918,13 @@ async def delete_assistant_document(
     await db.commit()
 
 
-@router.post("/import", response_model=AssistantResponse, status_code=201)
+@router.post("/import", response_model=AssistantImportResponse, status_code=201)
 async def import_assistant(
     file: UploadFile = File(...),
     model_override: Optional[str] = None,
     current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
     db: AsyncSession = Depends(get_db),
-) -> AssistantResponse:
+) -> AssistantImportResponse:
     """Importiert einen Assistenten aus einer YAML-Datei."""
     # YAML parsen
     try:
@@ -894,7 +962,8 @@ async def import_assistant(
             subject_id = result.scalar_one_or_none()
     
     # Felder mappen
-    fields = _yaml_to_assistant_fields(data, subject_id)
+    hinweise: list[str] = []
+    fields = _yaml_to_assistant_fields(data, subject_id, hinweise)
     
     # model_override anwenden
     if model_override:
@@ -930,8 +999,14 @@ async def import_assistant(
     db.add(assistant)
     await db.commit()
     await db.refresh(assistant)
-    
-    return AssistantResponse.model_validate(assistant)
+
+    if hinweise:
+        logger.info(
+            "Assistenten-Import '%s': %s", assistant.name, " · ".join(hinweise)
+        )
+    return AssistantImportResponse(
+        **AssistantResponse.model_validate(assistant).model_dump(), hinweise=hinweise
+    )
 
 
 @router.get("/{assistant_id}/export")

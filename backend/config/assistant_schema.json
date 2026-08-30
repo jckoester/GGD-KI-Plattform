@@ -27,13 +27,16 @@
     },
     "config": {
       "type": "object",
-      "required": ["system_prompt", "model"],
+      "required": ["system_prompt"],
       "additionalProperties": false,
       "properties": {
         "model":         { "type": "string", "minLength": 1 },
         "temperature":   { "type": "number", "minimum": 0.0, "maximum": 2.0 },
         "max_tokens":    { "type": "integer", "minimum": 1 },
-        "system_prompt": { "type": "string", "minLength": 1 }
+        "system_prompt": { "type": "string", "minLength": 1 },
+
+        "tool_groups":   { "type": ["array", "null"], "items": { "type": "string" } },
+        "image_kinds":   { "type": ["array", "null"], "items": { "type": "string" } }
       }
     }
   }

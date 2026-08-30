@@ -7,6 +7,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der YAML-Export eines Assistenten verlor seine Fähigkeiten.** Weder `tool_groups` noch
+  `image_kinds` wurden geschrieben; ein exportierter und wieder importierter Assistent kam
+  ohne Unterrichtsplanung, Bildgenerierung und Bildart-Auswahl zurück — er sah identisch
+  aus und konnte weniger. Beide Felder stehen jetzt unter `config:`.
+
+  Beim Import werden Fähigkeiten und Bildarten, die es in dieser Installation nicht gibt,
+  **übergangen und benannt** (Hinweis in der Erfolgsmeldung) statt still verworfen.
+
+- **Der Re-Import eines Exports scheiterte an der Schema-Prüfung.** Der Export schrieb
+  `visibility`, das Schema kannte das Feld nicht — jeder Export ließ sich nur nach
+  Handarbeit wieder einlesen (`Additional properties are not allowed`).
+
 - **Konfigurationsdateien wurden im Container nicht gefunden** — Jugendschutz-Blockliste,
   Krisen-Trigger, Hilfe-Ressourcen, pädagogische Leitplanken, Bildarten und der
   Guardrail-Zustandsbericht. Neun Module berechneten ihre Wurzel selbst; im Image fehlt

@@ -448,3 +448,26 @@ async def test_generate_image_blocked_by_moderation(monkeypatch):
     assert result["status"] == "blocked"
     assert "unzulässig" in result["error"]
     cls.assert_not_called()
+
+
+def test_registrierte_gruppen_sind_erklaert():
+    """`FAEHIGKEITEN` und die Registry dürfen nicht auseinanderlaufen.
+
+    Die erklärte Liste ist die Prüfgrundlage des YAML-Imports (`api/assistants.py`); sie
+    kann nicht aus der Registry abgeleitet werden, weil die sich erst beim Import der
+    registrierenden Module füllt. Damit sie trotzdem vollständig bleibt, prüft dieser Test
+    die andere Richtung: Jede registrierte Gruppe muss erklärt sein.
+
+    Der Import von `app.chat.router` ist nötig — er ist es, der die Werkzeuge einträgt
+    (und über ihn `app.planning.assistant_tools`).
+    """
+    import app.chat.router  # noqa: F401 — füllt TOOL_REGISTRY
+    from app.chat.tools import FAEHIGKEITEN, TOOL_REGISTRY
+
+    assert TOOL_REGISTRY, "Registry leer — der Import hat die Werkzeuge nicht eingetragen."
+
+    nicht_erklaert = {t.group for t in TOOL_REGISTRY.values()} - set(FAEHIGKEITEN)
+    assert nicht_erklaert == set(), (
+        f"Diese Werkzeug-Gruppen fehlen in FAEHIGKEITEN: {sorted(nicht_erklaert)}. "
+        f"Ohne Eintrag verwirft der YAML-Import sie als unbekannt."
+    )

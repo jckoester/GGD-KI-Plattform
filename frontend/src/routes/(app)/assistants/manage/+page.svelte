@@ -291,9 +291,14 @@
         importing = true;
         importError = null;
         try {
-            await importAssistant(importFile, importModelOverride || null);
+            const importiert = await importAssistant(importFile, importModelOverride || null);
             importOpen = false;
-            successMessage = "Assistent wurde erfolgreich importiert.";
+            // Übergangene Fähigkeiten oder Bildarten benennen: Ein Assistent, der
+            // vollständig aussieht und weniger kann, ist genau der Fehler, den der
+            // Import gerade behebt.
+            successMessage = importiert?.hinweise?.length
+                ? `Assistent wurde importiert. ${importiert.hinweise.join(" · ")}`
+                : "Assistent wurde erfolgreich importiert.";
             await reload();
         } catch (e) {
             importError = e.message;

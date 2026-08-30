@@ -132,7 +132,11 @@
     try {
       const result = await importAssistant(importFile, importModelOverride || null);
       importOpen = false;
-      success = "Assistent wurde importiert.";
+      // Übergangene Fähigkeiten oder Bildarten benennen — sonst sieht der Assistent
+      // vollständig aus und kann weniger.
+      success = result?.hinweise?.length
+        ? `Assistent wurde importiert. ${result.hinweise.join(" · ")}`
+        : "Assistent wurde importiert.";
       await load();
       goto(`/assistants/my/${result.id}`);
     } catch (e) {

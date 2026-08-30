@@ -2,6 +2,7 @@
 import yaml
 import pytest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
@@ -763,3 +764,143 @@ class TestAssistantModelOptional:
             subject_id=None,
         )
         assert fields["model"] == ""
+
+
+# ── Fähigkeiten und Bildarten überstehen Export und Import (Punkt 10, 30.08.2026) ──
+
+
+class TestFaehigkeitenImRoundTrip:
+    """Ein exportierter und wieder importierter Assistent verlor still seine Fähigkeiten.
+
+    `_assistant_to_yaml` schrieb weder `tool_groups` noch `image_kinds`. Der Assistent sah
+    nach dem Import identisch aus und konnte weniger — keine Unterrichtsplanung, keine
+    Bildgenerierung, keine Bildart-Auswahl. Vorbestehend seit es `tool_groups` gibt, mit
+    den Bildarten fiel es stärker ins Gewicht.
+    """
+
+    @staticmethod
+    def _assistent(**over):
+        werte = dict(
+            name="Comic-Werkstatt",
+            description=None,
+            min_grade=None,
+            max_grade=None,
+            tags=[],
+            audience="teacher",
+            visibility="public",
+            available_from=None,
+            available_until=None,
+            updated_at=datetime(2026, 8, 30, tzinfo=timezone.utc),
+            model="chat-standard",
+            temperature=None,
+            max_tokens=None,
+            system_prompt="Zeichne im Stil einer Strichzeichnung.",
+            import_metadata=None,
+            tool_groups=["image_generation", "planning"],
+            image_kinds=["standard"],
+        )
+        werte.update(over)
+        return SimpleNamespace(**werte)
+
+    def test_export_schreibt_beide_felder(self):
+        yaml_text = _assistant_to_yaml(self._assistent(), subject_slug=None)
+        data = yaml.safe_load(yaml_text)
+
+        assert data["config"]["tool_groups"] == ["image_generation", "planning"]
+        assert data["config"]["image_kinds"] == ["standard"]
+
+    def test_export_laesst_leere_felder_weg(self):
+        """Ein Assistent ohne Fähigkeiten soll keine leeren Listen im YAML tragen."""
+        yaml_text = _assistant_to_yaml(
+            self._assistent(tool_groups=[], image_kinds=[]), subject_slug=None
+        )
+        data = yaml.safe_load(yaml_text)
+
+        assert "tool_groups" not in data["config"]
+        assert "image_kinds" not in data["config"]
+
+    def test_round_trip_erhaelt_die_faehigkeiten(self):
+        """Export → Import: derselbe Funktionsumfang, nicht nur dasselbe Aussehen."""
+        original = self._assistent()
+        data = yaml.safe_load(_assistant_to_yaml(original, subject_slug=None))
+
+        felder = _yaml_to_assistant_fields(data, subject_id=None)
+
+        assert felder["tool_groups"] == original.tool_groups
+        assert felder["image_kinds"] == original.image_kinds
+
+    def test_export_ist_schema_konform(self):
+        """Was der Export schreibt, muss der Import auch annehmen dürfen."""
+        import json
+        from pathlib import Path
+
+        import jsonschema
+
+        schema = json.loads(
+            (Path(__file__).resolve().parents[3] / "config" / "assistant_schema.json")
+            .read_text(encoding="utf-8")
+        )
+        data = yaml.safe_load(_assistant_to_yaml(self._assistent(), subject_slug=None))
+        jsonschema.validate(instance=data, schema=schema)
+
+
+class TestUnbekannteWerteBeimImport:
+    """Übergehen und melden — nicht schlucken, nicht abweisen.
+
+    Schlucken hieße: Der Assistent erscheint vollständig und ist es nicht. Abweisen hieße:
+    Ein Assistent aus einer Schule mit einer Bildart „comic" ließe sich hier gar nicht
+    importieren, obwohl alles Übrige passt.
+    """
+
+    @staticmethod
+    def _yaml(**config):
+        return {
+            "metadata": {"name": "Test", "audience": "teacher"},
+            "config": {"system_prompt": "Du bist ein Test.", **config},
+        }
+
+    def test_unbekannte_bildart_wird_uebergangen_und_genannt(self):
+        hinweise = []
+        felder = _yaml_to_assistant_fields(
+            self._yaml(image_kinds=["standard", "gibtshiernicht"]),
+            subject_id=None,
+            hinweise=hinweise,
+        )
+
+        assert "gibtshiernicht" not in felder["image_kinds"]
+        assert len(hinweise) == 1 and "gibtshiernicht" in hinweise[0]
+
+    def test_unbekannte_faehigkeit_wird_uebergangen_und_genannt(self):
+        hinweise = []
+        felder = _yaml_to_assistant_fields(
+            self._yaml(tool_groups=["image_generation", "zeitreise"]),
+            subject_id=None,
+            hinweise=hinweise,
+        )
+
+        assert felder["tool_groups"] == ["image_generation"]
+        assert len(hinweise) == 1 and "zeitreise" in hinweise[0]
+
+    def test_bekannte_werte_erzeugen_keinen_hinweis(self):
+        hinweise = []
+        _yaml_to_assistant_fields(
+            self._yaml(tool_groups=["image_generation"]), subject_id=None, hinweise=hinweise
+        )
+        assert hinweise == []
+
+    def test_fehlende_felder_sind_leere_listen(self):
+        """Ein Altbestand-YAML ohne die Felder muss unverändert importierbar bleiben."""
+        felder = _yaml_to_assistant_fields(self._yaml(), subject_id=None)
+        assert felder["tool_groups"] == [] and felder["image_kinds"] == []
+
+    def test_faehigkeiten_haengen_nicht_an_der_importreihenfolge(self):
+        """`TOOL_REGISTRY` füllt sich erst beim Import der registrierenden Module.
+
+        Würde die Prüfliste dort ausgelesen, käme je nach Importreihenfolge eine leere
+        Menge heraus — und der Import verwürfe **jede** Fähigkeit als unbekannt.
+        """
+        from app.api.assistants import bekannte_faehigkeiten
+        from app.chat.tools import FAEHIGKEITEN
+
+        assert bekannte_faehigkeiten() == set(FAEHIGKEITEN)
+        assert "image_generation" in bekannte_faehigkeiten()

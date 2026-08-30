@@ -83,6 +83,21 @@ class ChatTool:
     writes: bool = False
 
 
+# Die Fähigkeiten, die es gibt. Erklärt statt aus der Registry abgeleitet: Die füllt sich
+# erst, wenn die Module mit den `register_tool`-Aufrufen importiert wurden (`chat.router`,
+# `planning.assistant_tools`). Wer sie ohne diesen Import ausliest — etwa der
+# YAML-Import in `api/assistants.py` — bekäme eine leere Menge und verwürfe jede
+# Fähigkeit als unbekannt.
+#
+# `test_registrierte_gruppen_sind_erklaert` hält beides zusammen: Eine neue Gruppe ohne
+# Eintrag hier fällt im Test auf, nicht im Betrieb.
+FAEHIGKEITEN: frozenset[str] = frozenset({
+    "context_search",      # Wissensgraph — immer an, nicht am Assistenten schaltbar
+    "planning",            # Unterrichtsplanung (schreibend, nur Lehrkraft der Gruppe)
+    "student_planning",    # Planungsdaten lesen (Schüler:innen, mit Gruppenbezug)
+    "image_generation",    # Bildgenerierung
+})
+
 TOOL_REGISTRY: dict[str, ChatTool] = {}
 
 
