@@ -125,6 +125,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   - Neuer Cron **montags 05:00** (`weekly_budget_accrual.py`), idempotent und mit Nachholen
     ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
     `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
+  - **Hochrechnung aufs Schuljahr** auf `/budget`: „bisher X € in 12 von 40
+    Unterrichtswochen, bei diesem Tempo endet das Schuljahr bei Y von Z zugeteilt". Bei
+    niedriger Auslastung mit dem Hinweis, dass sich die Wochenbeträge **jetzt** noch
+    anheben lassen — am Jahresende ist der Rest nur noch zu verwalten. In den ersten
+    Wochen als unsicher gekennzeichnet, weil eine einzelne Projektwoche sie verdoppelt.
   - **Profil und Seitenleiste sagen, wann wieder Guthaben dazukommt** („Jede
     Unterrichtswoche kommen 0,04 € dazu — das nächste Mal am Mo., 21.09."). Ohne diese
     Angabe wirkt ein aufgebrauchtes Budget endgültig, obwohl am Montag wieder etwas da ist.

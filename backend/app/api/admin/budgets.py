@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -12,10 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.budget.exchange import get_current_rate
-from app.budget.schulwochen import anzahl_unterrichtswochen
+from app.budget.forecast import Hochrechnung, hochrechnen
+from app.budget.schulwochen import anzahl_unterrichtswochen, wochen_bis
 from app.budget.tiers import _load_budget_tiers, _stufe, invalidate_budget_tiers_cache
 from app.config import settings
 from app.db.session import get_db
+from app.planning.calendar import load_school_year
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID, VALID_GRADES
 
@@ -33,6 +36,18 @@ class GradeInfo(BaseModel):
     user_count: int  # Nutzer in pseudonym_audit
 
 
+class HochrechnungInfo(BaseModel):
+    """Läuft die Schule auf ihre Jahreszusage zu — und wie belastbar ist die Aussage?"""
+
+    verbraucht_eur: float
+    wochen_vergangen: int
+    wochen_gesamt: int
+    erwartet_eur: Optional[float]
+    zugeteilt_eur: Optional[float]
+    #: False in den ersten Wochen: Dann verdoppelt eine einzelne Projektwoche die Zahl.
+    belastbar: bool
+
+
 class BudgetGradesResponse(BaseModel):
     grades: list[GradeInfo]  # aufsteigend nach grade, Lehrkräfte am Ende
     eur_usd_rate: float
@@ -40,6 +55,7 @@ class BudgetGradesResponse(BaseModel):
     # `None`, wenn die Datei fehlt oder unlesbar ist — die Oberfläche lässt die
     # Jahressumme dann weg, statt eine erfundene Zahl zu zeigen.
     unterrichtswochen: Optional[int]
+    hochrechnung: Optional[HochrechnungInfo]
 
 
 class GradeUpdate(BaseModel):
@@ -106,8 +122,50 @@ async def get_budget_grades(
         logger.exception("Unterrichtswochen nicht ermittelbar")
 
     return BudgetGradesResponse(
-        grades=rows, eur_usd_rate=eur_usd_rate, unterrichtswochen=wochen
+        grades=rows, eur_usd_rate=eur_usd_rate, unterrichtswochen=wochen,
+        hochrechnung=await _hochrechnung(db, rows, wochen, eur_usd_rate),
     )
+
+
+async def _hochrechnung(
+    db: AsyncSession, rows: list[GradeInfo], wochen: Optional[int], eur_usd: float
+) -> Optional[HochrechnungInfo]:
+    """Bisheriger Verbrauch im laufenden Schuljahr, hochgerechnet aufs ganze Jahr.
+
+    Der Verbrauch kommt aus der **eigenen** Datenbank (`messages.cost_usd`), nicht vom
+    Proxy: Dort wäre er nur je Nutzer abrufbar, und 800 Einzelabfragen für eine
+    Übersichtsseite verbieten sich.
+
+    ⚠️ Die Spalte heißt historisch `cost_usd`, führt aber die Einheit der LiteLLM-Preise —
+    im Euro-Betrieb also Euro (siehe `LITELLM_PRICE_CURRENCY`). Deshalb wird hier **nicht**
+    umgerechnet: `get_current_rate` liefert dann 1,0, und eine zweite Division wäre falsch.
+    """
+    if not wochen:
+        return None
+    try:
+        cfg = load_school_year()
+        vergangen = len(wochen_bis(date.today(), cfg))
+        result = await db.execute(
+            text(
+                "SELECT COALESCE(SUM(m.cost_usd), 0)::float FROM messages m "
+                "WHERE m.cost_usd IS NOT NULL AND m.created_at >= :beginn"
+            ),
+            {"beginn": cfg.beginn},
+        )
+        verbraucht = float(result.scalar_one() or 0.0) / eur_usd
+        zugeteilt = sum(r.max_budget_eur * r.user_count for r in rows) * wochen
+        h: Hochrechnung = hochrechnen(
+            verbraucht_eur=verbraucht,
+            wochen_vergangen=vergangen,
+            wochen_gesamt=wochen,
+            zugeteilt_eur=zugeteilt or None,
+        )
+        return HochrechnungInfo(**h.__dict__)
+    except Exception:
+        # Die Budget-Seite muss ohne die Hochrechnung benutzbar bleiben — sie ist
+        # Zusatzinformation, nicht ihr Zweck.
+        logger.exception("Hochrechnung nicht ermittelbar")
+        return None
 
 
 @router.post("/grades", response_model=BudgetGradesUpdateResult)

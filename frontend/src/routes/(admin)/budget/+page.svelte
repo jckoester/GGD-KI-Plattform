@@ -73,6 +73,15 @@
         return betrag == null ? '—' : `${betrag.toFixed(2)} €`;
     }
 
+    // Hochrechnung: Der Sinn ist der Zeitpunkt. Im Juli weiß jeder, ob die Schule unter
+    // ihrer Zusage geblieben ist; im März kann sie die Wochenbeträge noch anheben.
+    let hr = $derived(data?.hochrechnung ?? null);
+    let auslastung = $derived(
+        hr?.erwartet_eur != null && hr?.zugeteilt_eur
+            ? Math.round((hr.erwartet_eur / hr.zugeteilt_eur) * 100)
+            : null,
+    );
+
     // Speichern-Flow
     async function confirmSave() {
         saving = true;
@@ -192,6 +201,52 @@
                 </tbody>
             </table>
         </div>
+
+        {#if hr}
+            <div class="mt-6 rounded border border-light-ui-3 dark:border-dark-ui-3
+                        bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-3">
+                <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2">
+                    Hochrechnung aufs Schuljahr
+                </h2>
+                {#if hr.erwartet_eur == null}
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                        Noch keine Unterrichtswoche vergangen — es gibt nichts fortzuschreiben.
+                    </p>
+                {:else}
+                    <p class="text-sm text-light-tx dark:text-dark-tx">
+                        Bisher verbraucht: <strong>{eur(hr.verbraucht_eur)}</strong> in
+                        {hr.wochen_vergangen} von {hr.wochen_gesamt} Unterrichtswochen.
+                        Bei diesem Tempo endet das Schuljahr bei
+                        <strong>{eur(hr.erwartet_eur)}</strong>{#if hr.zugeteilt_eur}
+                            von {eur(hr.zugeteilt_eur)} zugeteilt<!--
+                        -->{#if auslastung != null} ({auslastung} %){/if}{/if}.
+                    </p>
+                    {#if !hr.belastbar}
+                        <p class="text-sm mt-2 text-light-tx-2 dark:text-dark-tx-2">
+                            ⚠️ Erst {hr.wochen_vergangen} Woche(n) Grundlage — eine einzelne
+                            Projektwoche verschiebt die Zahl noch erheblich. Ab etwa vier
+                            Wochen wird sie belastbar.
+                        </p>
+                    {:else if auslastung != null && auslastung < 60}
+                        <p class="text-sm mt-2 text-light-tx-2 dark:text-dark-tx-2">
+                            Es zeichnet sich ab, dass ein erheblicher Teil nicht abfließt.
+                            Jetzt lassen sich die Wochenbeträge noch anheben — am
+                            Schuljahresende ist der Rest nur noch zu verwalten.
+                        </p>
+                    {:else if auslastung != null && auslastung > 100}
+                        <p class="text-sm mt-2 text-light-re dark:text-dark-re">
+                            Bei diesem Tempo wird die Zusage überschritten. Wochenbeträge
+                            senken oder den Nutzerkreis prüfen.
+                        </p>
+                    {/if}
+                    <p class="text-xs mt-2 text-light-tx-3 dark:text-dark-tx-3">
+                        Lineare Fortschreibung des bisherigen Verbrauchs. Sie kennt keine
+                        Saison — Klassenarbeitsphasen und Projekttage schlagen erst durch,
+                        wenn sie stattgefunden haben.
+                    </p>
+                {/if}
+            </div>
+        {/if}
 
         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-4">
             Spalte "Nutzer (DB)" zeigt nur Nutzer, die sich mindestens einmal angemeldet haben.

@@ -168,6 +168,33 @@ docker compose exec backend python scripts/weekly_budget_accrual.py --neuaufbau
 > „bisheriger Verbrauch + ein Wochenbetrag", sperrt also niemanden aus. Im Regellauf wird
 > nie gekürzt.
 
+## Hochrechnung aufs Schuljahr
+
+Über der Stufentabelle steht, wohin das Schuljahr läuft:
+
+> Bisher verbraucht: **143,20 €** in 12 von 40 Unterrichtswochen. Bei diesem Tempo endet
+> das Schuljahr bei **477,33 €** von 2.053,00 € zugeteilt (23 %).
+
+**Der Sinn ist der Zeitpunkt.** Im Juli weiß jeder, ob die Schule unter ihrer Zusage
+geblieben ist — dann ist der Rest nur noch zu verwalten. Im März lassen sich die
+Wochenbeträge fürs zweite Halbjahr noch anheben, und *das* ist die sinnvolle Verwendung
+nicht abgeflossener Mittel. Bei einer erwarteten Auslastung unter 60 % weist die Seite
+ausdrücklich darauf hin; bei über 100 % ebenso, dann in die andere Richtung.
+
+Der Verbrauch stammt aus der **eigenen** Datenbank (`messages.cost_usd`, Bildkosten
+eingeschlossen), nicht aus dem Proxy — dort wäre er nur je Nutzer abrufbar, und
+achthundert Einzelabfragen für eine Übersichtsseite verbieten sich.
+
+> **Was die Zahl nicht kann.** Sie schreibt den bisherigen Verbrauch **linear** fort und
+> kennt keine Saison: Klassenarbeitsphasen und Projekttage schlagen erst durch, wenn sie
+> stattgefunden haben. In den ersten Wochen ist sie deshalb Rauschen — eine einzelne
+> Projektwoche verdoppelt sie. Bis vier vergangene Wochen erreicht sind, kennzeichnet die
+> Seite sie als unsicher, zeigt sie aber trotzdem: Sie zu verschweigen hieße, die
+> Administration bis Weihnachten im Dunkeln zu lassen.
+>
+> Etwas Klügeres als eine lineare Fortschreibung wäre Scheingenauigkeit — es gibt keine
+> Vorjahresdaten, an denen sich ein Saisonmuster ablesen ließe.
+
 ## Admin-Übersicht (`/budget`)
 
 Im Admin-Bereich zeigt `/budget` eine aggregierte Übersicht der Ausgaben —
