@@ -359,7 +359,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
      `budget_duration: 1mo` aus der Proxy-Datenbank. Solange das steht, setzt LiteLLM den
      Verbrauch weiter monatlich zurück, ohne dass etwas fehlschlägt.
   3. `python scripts/weekly_budget_accrual.py --neuaufbau` — ersetzt die alten
-     Monats-Obergrenzen.
+     Monats-Obergrenzen. ⚠️ **Nur innerhalb einer Unterrichtswoche wirksam.** In den
+     Ferien oder außerhalb des Schuljahres aus `school_year.yaml` meldet der Lauf
+     `gebucht=0` / `keine Unterrichtswoche` und lässt die Monatsgrenzen stehen — ohne
+     Fehler. Dann zuerst das Schuljahr umstellen; die Grenzen setzt danach der erste
+     Montagslauf.
 
   Die Reihenfolge ist nicht beliebig: `max_budget = NULL` *und* `= 0` bedeuten bei LiteLLM
   gleichermaßen **kein Limit**. Deshalb lässt Schritt 2 die Grenzen stehen und erst

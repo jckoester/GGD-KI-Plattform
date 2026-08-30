@@ -195,6 +195,32 @@ docker compose exec backend python scripts/weekly_budget_accrual.py --neuaufbau
 > „bisheriger Verbrauch + ein Wochenbetrag", sperrt also niemanden aus. Im Regellauf wird
 > nie gekürzt.
 
+> ⚠️ **Schritt 3 schreibt nur innerhalb einer Unterrichtswoche.** Fällt der Stichtag in
+> die Ferien oder außerhalb des Schuljahres, das `config/school_year.yaml` führt, gibt es
+> nichts zuzuteilen — der Lauf endet mit `gebucht=0` und `keine Unterrichtswoche=<n>` und
+> **lässt die alten Monatsgrenzen stehen**. Das gilt auch für den wöchentlichen Cron.
+>
+> Das ist richtig so (in den Ferien wächst kein Budget), aber leicht zu übersehen: Der
+> Lauf meldet keinen Fehler, und die Konten sehen weiter versorgt aus — mit einem
+> Monatsbetrag, also je nach Stufe einem Vielfachen des vorgesehenen Wochenbetrags.
+>
+> Deshalb: Nach Schritt 3 den Kopf des Logs lesen. Dort steht das Schuljahr, das die
+> Konfiguration führt, und der Stichtag:
+>
+> ```
+> Schuljahr 2026/27 · Stichtag 2026-09-14 · Kurs 1.0000 · Vorsprung 3 Wochen · 7 Nutzer
+> ```
+>
+> Passen die beiden nicht zusammen, ist zuerst `school_year.yaml` an der Reihe
+> ([Schuljahreswechsel](../runbooks/schuljahreswechsel.md)) — sonst findet **nie** eine
+> Zuteilung statt, und der Jahreswechsel-Reset löst ebenfalls nicht aus: Er hängt daran,
+> dass die Konfiguration ein neues Schuljahr führt.
+>
+> Die Umstellung lässt sich in den Ferien vorbereiten; die Grenzen setzt dann der erste
+> Montagslauf der ersten Unterrichtswoche. `--neuaufbau` ist dafür nicht nötig — und im
+> Zweifel besser nicht zu wiederholen, weil er sich am jeweils aktuellen Verbrauch neu
+> verankert.
+
 ## Hochrechnung aufs Schuljahr
 
 Über der Stufentabelle steht, wohin das Schuljahr läuft:
