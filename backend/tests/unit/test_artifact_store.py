@@ -111,11 +111,19 @@ async def test_cleanup_dry_run_keeps_files(monkeypatch, tmp_path):
     db.commit.assert_not_awaited()
 
 
-def test_storage_dir_relative_is_repo_root_based(monkeypatch, tmp_path):
-    # Relativer Pfad → aufgelöst gegen _REPO_ROOT (cwd-unabhängig, wichtig für den Cron).
-    monkeypatch.setattr(store, "_REPO_ROOT", tmp_path)
+def test_storage_dir_relative_is_repo_root_based(monkeypatch):
+    """Relativer Pfad → an der Wurzel verankert, nicht am Arbeitsverzeichnis.
+
+    Wichtig für den Cron: Er startet aus einem anderen Verzeichnis als das Backend, muss
+    aber dieselbe Ablage treffen — sonst räumt er ins Leere. Welche Wurzel gilt,
+    entscheidet `app.core.paths.aufloesen` (dev: Repo-Wurzel, Container: `/app`); die
+    beiden Anordnungen prüft `test_container_pfade.py`.
+    """
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
     monkeypatch.setattr(store.settings, "artifact_storage_dir", "data/artifacts")
-    assert store.storage_dir() == tmp_path / "data" / "artifacts"
+    assert store.storage_dir() == repo / "data" / "artifacts"
 
 
 def test_storage_dir_absolute_used_verbatim(monkeypatch, tmp_path):

@@ -341,3 +341,33 @@ async def test_update_team_models_raises_on_unexpected_status():
     with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
         with pytest.raises(RuntimeError):
             await client.update_team_models("jahrgang-8", ["gpt-4"])
+
+
+@pytest.mark.asyncio
+async def test_create_user_verlangt_keinen_zweitschluessel():
+    """`/user/new` legt sonst zusätzlich einen Virtual Key an, den niemand kennt.
+
+    Die Vorgabe von `auto_create_key` ist bei LiteLLM `True`. Die Anwendung erzeugt den
+    Schlüssel aber selbst (`generate_key`) und speichert ihn in
+    `pseudonym_audit.litellm_key` — der automatisch erzeugte bliebe unverzeichnet und
+    damit unwiderrufbar. Auf Produktion gemessen (30.08.2026): 19 Tokens auf 7
+    Nutzerzeilen.
+    """
+    client = LiteLLMClient()
+    http_client = AsyncMock()
+    response = MagicMock()
+    response.status_code = 200
+    http_client.post = AsyncMock(return_value=response)
+
+    with patch.object(client, "_get_client", new=AsyncMock(return_value=http_client)):
+        await client.create_user("pseudo-1", 2.5)
+
+    payload = http_client.post.await_args.kwargs["json"]
+    assert payload["auto_create_key"] is False, (
+        "Ohne auto_create_key=False entsteht je Konto ein zweiter, unverzeichneter Zugang."
+    )
+    assert payload["user_id"] == "pseudo-1"
+    assert payload["max_budget"] == 2.5
+    # Der Zeitraum darf weiterhin NICHT mitgeschickt werden — sonst setzt LiteLLM den
+    # Verbrauch periodisch zurück und das Wochenmodell läuft daneben her.
+    assert "budget_duration" not in payload

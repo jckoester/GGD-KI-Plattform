@@ -132,6 +132,98 @@ keinem Assistenten usw. mehr referenziert wird. Referenzierte Fächer werden nie
 sondern mit Referenzzählung gemeldet — dann muss erst die Referenz umgehängt werden,
 bevor die alte Zeile entfernt werden kann.
 
+## Proxy-UI und Proxy-API erreichen
+
+Der Port des LiteLLM-Proxys ist **nur an `127.0.0.1` gebunden** (`docker-compose.yml`).
+Das ist Absicht: Wer die Proxy-UI erreicht, verwaltet mit dem Master-Key Schlüssel und
+Budgets der ganzen Schule. Vom Netz aus ist sie deshalb nicht erreichbar — auch nicht aus
+dem Schulnetz.
+
+> **`LITELLM_PORT` ändert nur den Port, nicht die Bindung.** Ein anderer Wert verschiebt
+> `127.0.0.1:4000` auf `127.0.0.1:<Port>`; öffentlich wird dadurch nichts.
+
+### Im Alltag genügt die eigene Verwaltung
+
+Vorher prüfen, ob es die Proxy-UI überhaupt braucht — das meiste steht in der Plattform
+selbst:
+
+| Aufgabe | Ort |
+|---|---|
+| Modelle je Nutzergruppe freischalten | `/settings/models` |
+| Verbrauch und Budgets | `/budget` |
+| Kosten- und Nutzungsstatistik | `/statistics` |
+| Zustand des Jugendschutz-Guardrails | `/settings/guardrail` |
+
+Modelle selbst kommen aus `infra/litellm_config.yaml`, nicht aus der Proxy-UI. Es bleiben
+Sonderfälle: einen Schlüssel nachsehen, eine Team-Zuordnung prüfen, eine Buchung
+nachvollziehen.
+
+### Ohne UI: die Management-API
+
+Aus dem `backend`-Container — er bringt `curl` mit und hat den Master-Key in der Umgebung.
+Für ein headless System der bequemere Weg, weil kein Tunnel nötig ist:
+
+```bash
+# Modelle, die der Proxy führt (mit Preisen und Fähigkeiten):
+docker compose exec backend sh -c \
+  'curl -s $LITELLM_PROXY_URL/model/info -H "Authorization: Bearer $LITELLM_MASTER_KEY"'
+
+# Eine Nutzerin samt Budget und Verbrauch (user_id = Pseudonym):
+docker compose exec backend sh -c \
+  'curl -s "$LITELLM_PROXY_URL/user/info?user_id=<pseudonym>" \
+     -H "Authorization: Bearer $LITELLM_MASTER_KEY"'
+
+# Team-Zuordnung und Modell-Allowlist:
+docker compose exec backend sh -c \
+  'curl -s "$LITELLM_PROXY_URL/team/info?team_id=lehrkraefte" \
+     -H "Authorization: Bearer $LITELLM_MASTER_KEY"'
+
+# Buchungen:
+docker compose exec backend sh -c \
+  'curl -s "$LITELLM_PROXY_URL/spend/logs" -H "Authorization: Bearer $LITELLM_MASTER_KEY"'
+```
+
+Ebenfalls verfügbar: `/key/info`, `/key/list`, `/global/spend/keys`.
+
+> Das LiteLLM-Image bringt **kein `curl`** mit (es baut auf wolfi-base) — solche Aufrufe
+> gehören deshalb in den `backend`-Container. Der prüft nebenbei den Weg, den die
+> Anwendung tatsächlich geht.
+
+### Mit UI: SSH-Tunnel
+
+Der Tunnel läuft auf der Maschine, die **den Browser hat** — nicht auf dem Server:
+
+```bash
+# auf dem Arbeitsplatzrechner:
+ssh -N -L 4000:127.0.0.1:4000 <nutzer>@<server>
+# solange das läuft, dort im Browser: http://localhost:4000/ui
+```
+
+Der Server braucht dafür weder Browser noch grafische Oberfläche — genau dafür ist ein
+Tunnel da. Führt der Weg über einen Sprungserver: zusätzlich `-J <sprungserver>`.
+
+Ist der Server von außen nicht per SSH erreichbar und nur über einen Fernwartungs-PC im
+Schulnetz, läuft der Tunnel **auf diesem PC** und der Browser ebenfalls dort.
+
+Anmeldung mit `UI_USERNAME` / `UI_PASSWORD` aus der `.env`; ohne diese Variablen ist es
+`admin` plus `LITELLM_MASTER_KEY`.
+
+### Bewusste Freigabe im Netz
+
+Wer die UI dauerhaft im Schulnetz erreichbar machen will, legt eine
+`docker-compose.override.yml` neben die `docker-compose.yml`:
+
+```yaml
+services:
+  litellm:
+    ports:
+      - "4000:4000"      # statt 127.0.0.1:4000
+```
+
+⚠️ Damit erreicht jedes Gerät im Netz eine Oberfläche, hinter der Schlüssel, Budgets und
+Anbieter-Zugänge liegen. Nur mit vorgelagerter Zugangskontrolle, und nie ins offene
+Internet.
+
 ## LiteLLM updaten
 
 Der Proxy ist ein Dienst **derselben** Compose (`litellm`); alle Befehle laufen im

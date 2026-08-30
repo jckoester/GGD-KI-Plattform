@@ -49,6 +49,36 @@ def _has_price(info: dict, *keys: str) -> bool:
     return any(isinstance(info.get(k), (int, float)) and info[k] > 0 for k in keys)
 
 
+def _waehrung(settings: Any) -> str:
+    """Die Einheit, in der die Preise der LiteLLM-Config stehen.
+
+    Ein fest verdrahtetes „$" hat am 30.08.2026 eine Fehlersuche in die Irre geführt: Die
+    Meldung behauptete Dollar, die Anlage lief auf Euro, und zwei abweichende Zahlen
+    wirkten dadurch wie derselbe Betrag in zwei Währungen.
+    """
+    roh = str(getattr(settings, "litellm_price_currency", "USD")).strip().upper()
+    return "€" if roh == "EUR" else "$"
+
+
+def _waehrungsverdacht(a: float, b: float) -> str:
+    """Zusatz, wenn zwei Preise sich ungefähr wie Euro und Dollar verhalten.
+
+    Genau dieser Fall ist auf Produktion aufgetreten (0,0131 gegen 0,0152 — Verhältnis
+    1,16). Ohne den Hinweis liegt die Deutung „ist doch dasselbe in zwei Währungen" nahe;
+    sie ist aber falsch, weil beide Stellen dieselbe Einheit führen müssen.
+    """
+    if a <= 0 or b <= 0:
+        return ""
+    verhaeltnis = max(a, b) / min(a, b)
+    if not 1.02 <= verhaeltnis <= 1.40:
+        return ""
+    return (
+        f" ⚠️ Das Verhältnis der beiden Zahlen ({verhaeltnis:.2f}) liegt im Bereich eines "
+        f"Wechselkurses — vermutlich steht eine der beiden in Euro und die andere in "
+        f"Dollar. Beide müssen die Einheit aus LITELLM_PRICE_CURRENCY führen."
+    )
+
+
 def _dokumentierter_bildpreis(info: dict) -> float | None:
     """Der in `model_info` **notierte** Bildpreis, oder None.
 
@@ -178,11 +208,14 @@ def check_config(
             if image_prices is not None and dokumentiert is not None:
                 wirksam = _preis_aus_image_prices(entry, image_prices)
                 if wirksam is not None and abs(wirksam - dokumentiert) > 1e-9:
+                    einheit = _waehrung(settings)
                     findings.append(Finding(
                         WARNING,
-                        f"'{name}': model_info nennt {dokumentiert} $/Bild, IMAGE_PRICES "
-                        f"{wirksam} $/Bild. Gebucht wird IMAGE_PRICES — beide Stellen "
-                        f"gleich halten, sonst führt die Config in die Irre.",
+                        f"'{name}': model_info nennt {dokumentiert} {einheit}/Bild, "
+                        f"IMAGE_PRICES {wirksam} {einheit}/Bild. Gebucht wird "
+                        f"IMAGE_PRICES — beide Stellen gleich halten, sonst führt die "
+                        f"Config in die Irre."
+                        + _waehrungsverdacht(dokumentiert, wirksam),
                     ))
             continue
         if mode == "embedding":

@@ -305,6 +305,10 @@ services:
 > `litellm.guardrails.llm_moderation`. Der Endpunkt meldet dann dauerhaft
 > `available: false` — was korrekt ist und **nicht** mit „gesund" verwechselt werden darf.
 
+Das Proxy-Log erreichen Sie mit `docker compose logs -f litellm`. Für einen Blick in die
+Proxy-Oberfläche oder deren API — der Port ist nur an `127.0.0.1` gebunden — siehe
+[Proxy-UI und Proxy-API erreichen](updates-und-wartung.md#proxy-ui-und-proxy-api-erreichen).
+
 #### Ein liegengebliebener Bericht ist kein guter Bericht
 
 Stoppt der Proxy oder bricht die gemeinsame Ablage weg, bleibt die Datei mit ihrem letzten

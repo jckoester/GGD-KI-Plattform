@@ -18,6 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
+from app.core.paths import aufloesen
 
 
 @dataclass(frozen=True)
@@ -172,9 +173,8 @@ def aktive_edition(
 
 # ── Laufzeit-Resolver (verdrahtet Fahrplan + Schuljahr + DB-Editionsbestand) ──
 
-_DEFAULT_SUBJECTS_PATH = Path(
-    os.environ.get("SUBJECTS_PATH", "")
-    or Path(__file__).resolve().parents[3] / "config" / "subjects.yaml"
+_DEFAULT_SUBJECTS_PATH = aufloesen(
+    os.environ.get("SUBJECTS_PATH", "") or "config/subjects.yaml"
 )
 
 

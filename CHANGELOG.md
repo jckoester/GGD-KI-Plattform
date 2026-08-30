@@ -7,6 +7,30 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Konfigurationsdateien wurden im Container nicht gefunden** — Jugendschutz-Blockliste,
+  Krisen-Trigger, Hilfe-Ressourcen, pädagogische Leitplanken, Bildarten und der
+  Guardrail-Zustandsbericht. Neun Module berechneten ihre Wurzel selbst; im Image fehlt
+  gegenüber dem Entwicklungsbaum die Ebene `backend/`, sodass die Rechnung bei `/` landete
+  und z. B. `/config/pedagogy.yaml` suchte. Die Dateien galten damit als nicht vorhanden —
+  **ohne Fehlermeldung**, die Schutzfunktionen fielen still aus.
+
+  Die Auflösung liegt jetzt zentral in `app/core/paths.py` und bestimmt die Anordnung
+  einmalig. Zusätzlich übergibt die `docker-compose.yml` die betroffenen Pfade absolut.
+
+- **Ein zweiter Lauf von `weekly_budget_accrual.py --neuaufbau` wird abgewiesen.** Der
+  Schalter ist der einmalige Umstellungsschritt; ein erneuter Lauf setzte die Obergrenze
+  wieder auf „Verbrauch + ein Wochenbetrag" und nahm den angesparten Vorsprung weg. Wer
+  es braucht: `--trotzdem`.
+
+- **`/user/new` legt keinen zweiten Schlüssel mehr an** (`auto_create_key: false`). Bisher
+  entstand je Konto neben dem gespeicherten Virtual Key ein weiterer, den die Plattform
+  nicht kannte. Bestehende Schlüssel bleiben; sie werden mit dem Konto gelöscht.
+
+- **Der Bildpreis-Abgleich nannte immer Dollar**, auch im Euro-Betrieb, und legte damit
+  die Fehldeutung nahe, zwei abweichende Preise seien derselbe Betrag in zwei Währungen.
+  Die Meldung nennt jetzt die Einheit aus `LITELLM_PRICE_CURRENCY` und weist auf einen
+  möglichen Währungsmix hin, wenn das Verhältnis der Zahlen einem Wechselkurs ähnelt.
+
 - **Das Backend startete im Container nicht** (`NameError: name 'Any' is not defined` in
   `app/chat/router.py`). Fehlender Import; die Entwicklungsumgebung läuft auf Python 3.14
   und wertet Annotationen erst bei Bedarf aus (PEP 649), das Container-Image auf 3.12

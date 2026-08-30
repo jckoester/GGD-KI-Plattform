@@ -19,12 +19,11 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.paths import aufloesen
 from app.db.models import GeneratedImage
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/chat/image_store.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 
@@ -36,7 +35,7 @@ _ORPHAN_GRACE = timedelta(hours=1)
 def storage_dir() -> Path:
     """Ablageverzeichnis (repo-root-relativ, falls nicht absolut) — cwd-unabhängig."""
     base = Path(settings.image_storage_dir)
-    return base if base.is_absolute() else _REPO_ROOT / base
+    return aufloesen(base)
 
 
 def _file_path(image_id: UUID, mime_type: str = "image/png") -> Path:

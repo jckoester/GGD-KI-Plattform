@@ -17,12 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts.limits import get_artifact_limits
 from app.config import settings
+from app.core.paths import aufloesen
 from app.db.models import Artifact
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/artifacts/store.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _EXT_BY_MIME = {
     "image/png": ".png",
@@ -48,7 +47,7 @@ def storage_dir() -> Path:
     Wichtig für den Cleanup-Cron: der läuft nicht aus dem Backend-Verzeichnis, muss aber
     denselben Pfad auflösen wie das Backend beim Speichern (analog `image_store`)."""
     base = Path(settings.artifact_storage_dir)
-    d = base if base.is_absolute() else _REPO_ROOT / base
+    d = aufloesen(base)
     d.mkdir(parents=True, exist_ok=True)
     return d
 

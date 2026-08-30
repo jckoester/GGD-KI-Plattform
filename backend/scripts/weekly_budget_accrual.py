@@ -40,7 +40,7 @@ from sqlalchemy import select
 from app.budget.accrual import merke, plane
 from app.budget.exchange import get_current_rate
 from app.budget.tiers import get_budget_for, vorsprung_wochen
-from app.db.models import PseudonymAudit
+from app.db.models import BudgetAccrual, PseudonymAudit
 from app.db.session import AsyncSessionLocal
 from app.litellm.client import LiteLLMClient
 from app.planning.calendar import load_school_year
@@ -155,6 +155,28 @@ async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None,
     )
 
 
+async def _umstellung_bereits_gelaufen() -> bool:
+    """Gibt es für das laufende Schuljahr schon Merkposten?
+
+    `merke()` schreibt je Nutzerin einen `budget_accrual`-Eintrag mit Schuljahr, sobald
+    der Proxy eine Zuteilung bestätigt hat. Existiert davon einer für das aktuelle
+    Schuljahr, hat die Umstellung stattgefunden — dann ist `--neuaufbau` nicht mehr der
+    einmalige Sonderfall, für den er gedacht ist.
+
+    Bewusst „irgendeiner", nicht „alle": Nach einem abgebrochenen Lauf wäre eine
+    Vollständigkeitsprüfung die falsche Frage. Wer nachziehen will, nimmt den Regellauf —
+    der holt fehlende Wochen von selbst nach.
+    """
+    async with AsyncSessionLocal() as db:
+        schuljahr = load_school_year().schuljahr
+        treffer = await db.scalar(
+            select(BudgetAccrual.pseudonym)
+            .where(BudgetAccrual.schuljahr == schuljahr)
+            .limit(1)
+        )
+    return treffer is not None
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dry-run", action="store_true", help="nur zeigen, nichts schreiben")
@@ -167,9 +189,27 @@ def main() -> None:
              "Einmalig nach der Umstellung vom Monatsmodell — verwirft dabei die alte "
              "Grenze, die sonst als schützenswert gälte.",
     )
+    p.add_argument(
+        "--trotzdem", action="store_true",
+        help="--neuaufbau auch dann ausführen, wenn die Umstellung bereits gelaufen ist.",
+    )
     args = p.parse_args()
 
     if args.neuaufbau:
+        if asyncio.run(_umstellung_bereits_gelaufen()) and not args.trotzdem:
+            logger.error(
+                "Die Umstellung ist für dieses Schuljahr bereits gelaufen — "
+                "--neuaufbau wird NICHT wiederholt.\n"
+                "\n"
+                "Ein zweiter Lauf setzt die Grenze auf `Verbrauch + 1 Wochenbetrag` und "
+                "verwirft dabei den angesparten Vorsprung. Der Verbrauch wächst, die "
+                "Grenze zieht nach — es sieht aus, als erhöhe sich das Budget von selbst.\n"
+                "\n"
+                "Im Regelbetrieb genügt der wöchentliche Lauf OHNE Schalter; er stockt auf "
+                "und kürzt nie. Wer es wirklich braucht: --neuaufbau --trotzdem."
+            )
+            raise SystemExit(1)
+
         logger.warning(
             "NEUAUFBAU: bestehende Obergrenzen werden verworfen und aus den "
             "Wochenbeträgen neu gesetzt. Nur nach der Umstellung vom Monatsmodell."

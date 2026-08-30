@@ -18,17 +18,15 @@ import yaml
 from pydantic import BaseModel
 
 from app.config import settings
+from app.core.paths import aufloesen
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/pedagogy/config.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve(path_str: str) -> Path:
-    """Absoluter Pfad bleibt unverändert; relativer wird am Repo-Root verankert."""
-    p = Path(path_str)
-    return p if p.is_absolute() else _REPO_ROOT / p
+    """Siehe app/core/paths.aufloesen — Wurzel je nach Layout (dev/Container)."""
+    return aufloesen(path_str)
 
 
 # ---------------------------------------------------------------------------

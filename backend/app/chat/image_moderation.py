@@ -28,19 +28,17 @@ import yaml
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from app.config import settings
+from app.core.paths import aufloesen
 from app.crisis.config import normalize
 from app.crisis.detector import scan as crisis_scan
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/chat/image_moderation.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve(path_str: str) -> Path:
-    """Absoluter Pfad bleibt; relativer wird am Repo-Root verankert (cwd-unabhängig)."""
-    p = Path(path_str)
-    return p if p.is_absolute() else _REPO_ROOT / p
+    """Siehe app/core/paths.aufloesen — Wurzel je nach Layout (dev/Container)."""
+    return aufloesen(path_str)
 
 
 class ImageBlockRule(BaseModel):

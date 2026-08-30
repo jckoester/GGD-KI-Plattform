@@ -137,7 +137,19 @@ class LiteLLMClient:
         # 29.08.2026, scripts/budget_reset_probe.py). `"budget_duration": None` würde
         # einen bestehenden Zeitraum stehen lassen, `""` sogar einen Reset auf den
         # Folgetag eintragen.
-        payload: dict = {"user_id": pseudonym, "max_budget": max_budget}
+        #
+        # ⚠️ `auto_create_key: False` ist nötig, nicht kosmetisch. `/user/new` legt sonst
+        # **zusätzlich** einen Virtual Key an (Vorgabe `True`, LiteLLM
+        # `internal_user_endpoints.py`). Den bekommt die Anwendung nie zu sehen: Sie
+        # erzeugt gleich darauf über `generate_key()` den Schlüssel, den
+        # `pseudonym_audit.litellm_key` speichert. Ohne diese Zeile trägt also jedes Konto
+        # mindestens einen gültigen Zugang, den niemand kennt und niemand widerrufen kann
+        # (gemessen 30.08.2026 auf Produktion: 19 Tokens auf 7 Nutzerzeilen).
+        payload: dict = {
+            "user_id": pseudonym,
+            "max_budget": max_budget,
+            "auto_create_key": False,
+        }
 
         response = await client.post(url, headers=headers, json=payload)
 

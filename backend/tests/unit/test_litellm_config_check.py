@@ -367,3 +367,49 @@ def test_zwei_bildarten_auf_einem_modell_melden_es_nicht_als_verwaist():
     )
 
     assert not any("ohne Bildart" in m for m in infos)
+
+
+# ── Währung in den Bildpreis-Meldungen (30.08.2026) ──────────────────────────
+
+def _bildmodell(preis: float) -> list[dict]:
+    return [{
+        "model_name": "bild-flux2",
+        "litellm_params": {"model": "black-forest-labs/FLUX.2-klein-4B",
+                           "api_base": "https://example.invalid/v1"},
+        "model_info": {"mode": "image_generation", "input_cost_per_image": preis},
+    }]
+
+
+def _bildpreis_meldung(*, waehrung: str, dokumentiert: float, wirksam: float) -> str:
+    findings = check_config(
+        _bildmodell(dokumentiert),
+        _settings(litellm_price_currency=waehrung, image_default_model="bild-flux2"),
+        bildarten=_BILDARTEN,
+        image_prices={"black-forest-labs/FLUX.2-klein-4B": wirksam},
+    )
+    passende = [f.message for f in findings if "IMAGE_PRICES" in f.message and "model_info" in f.message]
+    assert len(passende) == 1, findings
+    return passende[0]
+
+
+def test_bildpreis_meldung_nennt_euro_im_euro_betrieb():
+    """Ein fest verdrahtetes „$" hat die Fehlersuche am 30.08.2026 in die Irre geführt."""
+    meldung = _bildpreis_meldung(waehrung="EUR", dokumentiert=0.0131, wirksam=0.0152)
+    assert "€/Bild" in meldung and "$/Bild" not in meldung
+
+
+def test_bildpreis_meldung_nennt_dollar_im_dollar_betrieb():
+    meldung = _bildpreis_meldung(waehrung="USD", dokumentiert=0.0131, wirksam=0.0152)
+    assert "$/Bild" in meldung and "€/Bild" not in meldung
+
+
+def test_kursverdacht_wird_benannt():
+    """Der Produktivfall: 0,0131 gegen 0,0152 — Verhältnis 1,16."""
+    meldung = _bildpreis_meldung(waehrung="EUR", dokumentiert=0.0131, wirksam=0.0152)
+    assert "Wechselkurs" in meldung and "1.16" in meldung
+
+
+def test_kein_kursverdacht_bei_deutlich_anderen_zahlen():
+    """Ein Tippfehler um den Faktor 10 ist kein Währungsproblem — nicht falsch beraten."""
+    meldung = _bildpreis_meldung(waehrung="EUR", dokumentiert=0.0131, wirksam=0.131)
+    assert "Wechselkurs" not in meldung

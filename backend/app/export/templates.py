@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.paths import aufloesen
 from app.db.models import SiteConfig
 
 EXPORT_CSS_KEY = "export_css"
@@ -29,8 +30,6 @@ EXPORT_CSS_KEY = "export_css"
 EXPORT_PROVENANCE_KEY = "export_provenance"
 REFERENCE_FORMATS = ("docx", "odt")
 
-# Repo-Root: backend/app/export/templates.py → parents[3] (cwd-unabhängig, analog store).
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 # ── PDF-CSS (site_config) ─────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ async def set_export_css(db: AsyncSession, css: Optional[str], updated_by: Optio
 
 def template_dir() -> Path:
     base = Path(settings.export_template_dir)
-    d = base if base.is_absolute() else _REPO_ROOT / base
+    d = aufloesen(base)
     d.mkdir(parents=True, exist_ok=True)
     return d
 

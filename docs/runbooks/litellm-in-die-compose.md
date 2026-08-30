@@ -118,19 +118,36 @@ docker compose exec db psql -U postgres -c "CREATE DATABASE litellm"
 
 ```bash
 docker compose exec -T db psql -U postgres -d litellm < ~/litellm-JJJJ-MM-TT.sql
-docker compose exec db psql -U postgres -d litellm \
-  -c 'SELECT count(*) FROM "LiteLLM_VerificationToken"'
 ```
 
-Die Zahl muss zur Zahl der Nutzer:innen mit Schlüssel passen:
+Geprüft wird **nicht durch Zählen**, sondern durch Abgleich: Jedes Konto, auf das die
+Anwendung verweist, muss im Proxy einen Schlüssel besitzen.
 
 ```bash
-docker compose exec db psql -U postgres -d ggd_ki \
-  -c "SELECT count(*) FROM pseudonym_audit WHERE litellm_key IS NOT NULL"
+# Die Pseudonyme mit Schlüssel aus der Anwendungs-DB:
+docker compose exec db psql -U postgres -d ggd_ki -At \
+  -c "SELECT pseudonym FROM pseudonym_audit WHERE litellm_key IS NOT NULL"
+
+# Diese Pseudonyme müssen im Proxy als Token-Besitzer auftauchen — alle:
+docker compose exec db psql -U postgres -d litellm -c "
+  SELECT user_id, count(*) AS schluessel, bool_or(coalesce(blocked,false)) AS gesperrt
+    FROM \"LiteLLM_VerificationToken\"
+   WHERE user_id IN ('<pseudonym1>','<pseudonym2>', …)
+   GROUP BY user_id"
 ```
 
-Weichen sie stark ab, hier anhalten und die Ursache klären — nicht weitermachen und
-hoffen.
+> **Warum nicht einfach Zeilen zählen?** Die Zahlen stimmen normalerweise **nicht**
+> überein, und das ist in Ordnung:
+>
+> - **Mehrere Schlüssel je Person sind der Normalfall.** Bis 08/2026 legte `POST /user/new`
+>   zusätzlich zum eigens erzeugten Schlüssel einen weiteren an (`auto_create_key`
+>   war standardmäßig aktiv). Auf einer Bestandsinstallation stehen deshalb leicht
+>   doppelt so viele Tokens wie Konten. Neu angelegte Konten bekommen nur noch einen.
+> - **`proxy_admin` und Team-Schlüssel** haben ohnehin kein Gegenstück in der Anwendung.
+>
+> Aussagekräftig ist allein die **Gegenrichtung**: Fehlt ein Pseudonym aus der ersten
+> Abfrage in der zweiten, scheitert für diese Person jede Anfrage mit `401`. Dann hier
+> anhalten und die Ursache klären — nicht weitermachen und hoffen.
 
 ### 6. `.env` zusammenführen
 
@@ -142,13 +159,46 @@ Aus der alten Proxy-`.env` in die `.env` der Anwendung:
 | `LITELLM_SALT_KEY` | unverändert übernehmen; stand dort nichts → alten Master-Key eintragen |
 | Anbieter-Schlüssel (`OPENAI_API_KEY`, `IONOS_API_KEY` …) | übernehmen, soweit nicht schon vorhanden |
 | `UI_USERNAME` / `UI_PASSWORD` | übernehmen |
-| `LITELLM_DATABASE_URL` | auf `postgresql://postgres:<PASSWORT>@db:5432/litellm` ändern |
+| `LITELLM_DATABASE_URL` | neu bilden — Passwort **der Anwendungs-Postgres**, s. u. |
 | `LITELLM_PROXY_URL` | auf `http://litellm:4000` ändern |
 | `LITELLM_PORT` | `4000`, falls der Port auf dem Host frei ist |
 
 > ⚠️ **`LITELLM_PROXY_URL` nicht auf `localhost` stehen lassen.** Im Container ist das
 > das Backend selbst. Der Chat scheitert dann mit „Connection refused", während alles
 > andere normal aussieht.
+
+> ⚠️ **Bei `LITELLM_DATABASE_URL` nicht nur Host und Datenbank ändern.** Der Proxy spricht
+> jetzt die Postgres der **Anwendung** an, nicht mehr seine eigene — das Passwort ist also
+> ein anderes. Es ist dasselbe wie in `DATABASE_URL`:
+>
+> ```
+> postgresql://postgres:<Passwort aus DATABASE_URL>@db:5432/litellm
+> ```
+>
+> Bleibt das alte stehen, startet der Proxy nicht:
+>
+> ```
+> Error: P1000: Authentication failed against database server at `db`,
+> the provided database credentials for `postgres` are not valid.
+> ```
+>
+> Zum Vergleichen, ohne das Passwort auszugeben — zwei gleiche Kurz-Hashes heißt gleiches
+> Passwort:
+>
+> ```bash
+> grep -E '^(DATABASE_URL|LITELLM_DATABASE_URL)=' .env |
+>   sed -E 's#.*://[^:]+:([^@]*)@.*#\1#' |
+>   while read -r p; do printf '%s' "$p" | sha256sum | cut -c1-12; done
+> ```
+>
+> Stimmen sie überein und es scheitert trotzdem, ist es die **Kodierung**: Enthält das
+> Passwort `/`, `+`, `@`, `:`, `#`, `?` oder `%`, muss es prozent-kodiert werden — `/`
+> beendet sonst den Adressteil. Das trifft besonders Passwörter aus
+> `openssl rand -base64 32`, das genau `/` und `+` erzeugt.
+>
+> **Warum das erst hier auffällt:** Aufrufe wie `docker compose exec db psql -U postgres`
+> laufen über den lokalen Socket und prüfen **kein** Passwort. Benutzt wird es erst, wenn
+> sich ein anderer Container über TCP verbindet — also genau jetzt.
 
 ### 7. Config an ihren Platz
 
@@ -206,6 +256,16 @@ docker compose down          # OHNE -v
 Das Volume und der Dump bleiben bis mindestens zur nächsten Budgetabrechnung liegen.
 
 ---
+
+## Wenn der Proxy nicht startet
+
+| Meldung im Log | Ursache | Behebung |
+|---|---|---|
+| `P1000: Authentication failed against database server at 'db'` | `LITELLM_DATABASE_URL` trägt noch das Passwort der **alten** Proxy-Datenbank, oder ein Sonderzeichen ist nicht prozent-kodiert | Schritt 6 |
+| `httpx.ConnectError: All connection attempts failed` **oberhalb** eines `P1000` | **Folgefehler, keine Ursache.** Die Prisma-Query-Engine kommt ohne Anmeldung nicht hoch, der Proxy findet sie dann nicht | Das `P1000` weiter unten im Log behandeln, nicht das Netz |
+| Verbindungsfehler, Datenbank `litellm` unbekannt | Die zweite Datenbank fehlt — das Init-Verzeichnis greift nur bei leerem Datenverzeichnis | Schritt 4 |
+| `--config`-Datei ist ein Verzeichnis | `infra/litellm_config.yaml` fehlte beim Start; Docker legt für ein fehlendes Mount-Ziel ein leeres Verzeichnis an | Verzeichnis löschen, Datei anlegen (Schritt 7), neu starten |
+| `Prisma doesn't know which engines to download for the Linux distro "wolfi"` | **Nur eine Warnung.** wolfi ist glibc-basiert, die Debian-Engines laufen dort | Ignorieren |
 
 ## Wenn die Proxy-Datenbank doch verloren ist
 

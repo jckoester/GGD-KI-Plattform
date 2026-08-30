@@ -36,11 +36,10 @@ import yaml
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
 from app.config import settings
+from app.core.paths import aufloesen
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/chat/image_models.py → parents[3]
-_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # Bildart-IDs landen im `enum` des Werkzeug-Schemas und in einer DB-Liste am Assistenten.
 # Deshalb eng gefasst: kleingeschrieben, keine Leerzeichen, keine Sonderzeichen.
@@ -55,9 +54,8 @@ _ERLAUBTE_RESPONSE_FORMATE = {"", "b64_json"}
 
 
 def _resolve(path_str: str) -> Path:
-    """Absoluter Pfad bleibt unverändert; relativer wird am Repo-Root verankert."""
-    p = Path(path_str)
-    return p if p.is_absolute() else _REPO_ROOT / p
+    """Siehe app/core/paths.aufloesen — Wurzel je nach Layout (dev/Container)."""
+    return aufloesen(path_str)
 
 
 # ---------------------------------------------------------------------------

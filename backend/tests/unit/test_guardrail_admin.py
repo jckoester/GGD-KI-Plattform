@@ -265,15 +265,23 @@ def test_health_requires_admin(tmp_path):
     assert TestClient(app).get("/guardrail/health").status_code == 403
 
 
-def test_health_path_is_anchored_at_the_repo_root(tmp_path):
+def test_health_path_is_anchored_at_the_repo_root():
     """Backend läuft aus `backend/`, der Proxy aus `infra/` — ein cwd-relativer Pfad
     meinte damit zwei verschiedene Dateien, und der Endpunkt meldete „kein Bericht",
-    obwohl der Proxy einen schrieb."""
-    from app.api.admin.guardrail import _REPO_ROOT, _resolve
+    obwohl der Proxy einen schrieb.
 
-    assert _resolve("data/x.json") == _REPO_ROOT / "data" / "x.json"
+    Die Wurzel bestimmt seit 08/2026 `app.core.paths.aufloesen`. Dieses Modul liegt eine
+    Ebene tiefer als die übrigen Verwender und rechnete deshalb mit `parents[4]` statt
+    `parents[3]` — genau die Art Rechnung, die im Container um eins danebenging.
+    """
+    from pathlib import Path
+
+    from app.api.admin.guardrail import _resolve
+
+    repo = Path(__file__).resolve().parents[3]
+    assert _resolve("data/x.json") == repo / "data" / "x.json"
     assert _resolve("/abs/x.json").as_posix() == "/abs/x.json"
-    assert (_REPO_ROOT / "backend").is_dir(), "Repo-Root falsch bestimmt"
+    assert (repo / "backend").is_dir(), "Repo-Wurzel falsch bestimmt"
 
 
 # ── Veralteter Bericht ───────────────────────────────────────────────────────

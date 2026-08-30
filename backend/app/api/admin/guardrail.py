@@ -12,14 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
 from app.config import settings
+from app.core.paths import aufloesen
 from app.db.models import SiteConfig
 from app.db.session import get_db
 from app.litellm.client import LiteLLMClient
 
 logger = logging.getLogger(__name__)
 
-# Repo-Root: backend/app/api/admin/guardrail.py → parents[4]
-_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _alter_in_stunden(zeitstempel: str | None) -> float | None:
@@ -36,14 +35,17 @@ def _alter_in_stunden(zeitstempel: str | None) -> float | None:
 
 
 def _resolve(path_str: str) -> Path:
-    """Absoluter Pfad bleibt; relativer wird am Repo-Root verankert (cwd-unabhängig).
+    """Absoluter Pfad bleibt; relativer wird an der Wurzel verankert (cwd-unabhängig).
 
     Ohne das zeigt `data/guardrail_health.json` je nach Startverzeichnis woandershin —
     das Backend läuft aus `backend/`, der Proxy aus `infra/`. Beide müssen aber dieselbe
     Datei meinen, sonst meldet der Endpunkt „kein Bericht", obwohl es einen gibt.
+
+    Welche Wurzel gilt, entscheidet `app/core/paths.aufloesen` — dieses Modul liegt eine
+    Ebene tiefer als die übrigen Verwender, und die frühere Rechnung von Hand
+    (`parents[4]` statt `parents[3]`) war genau deshalb fehleranfällig.
     """
-    p = Path(path_str)
-    return p if p.is_absolute() else _REPO_ROOT / p
+    return aufloesen(path_str)
 
 
 router = APIRouter(prefix="/guardrail", tags=["admin-guardrail"])
