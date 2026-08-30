@@ -363,6 +363,63 @@ async def _get_model_info() -> dict[str, bool | None]:
     return info
 
 
+# Wie viel eines Knoteninhalts das Modell im Suchergebnis sieht. Bemessen am Bestand:
+# Kompetenzen liegen im Median bei 137 Zeichen, Leitideen bei 307, das 90. Perzentil
+# reicht bis 775. 800 deckt also fast alles vollständig ab, und selbst bei der größten
+# erlaubten Trefferzahl bleibt das Ergebnis im vierstelligen Tokenbereich.
+_INHALT_MAX_ZEICHEN = 800
+
+
+def _ist_knotenliste(treffer: list) -> bool:
+    """Sind das Wissensknoten — also etwas für die Vorschlagsliste im Chat?
+
+    Die Gruppe ``context_search`` enthält mehr als die Knotensuche: ``get_operatoren``
+    liefert Einträge mit ``operator``/``afb``/``bedeutung``. Wer die Form nicht prüft,
+    sondern annimmt, greift dort ins Leere — bis 08/2026 mit einem ``KeyError``, der den
+    laufenden Stream mitten in der Antwort abriss.
+
+    Die leere Liste zählt als Knotenliste: „nichts gefunden" soll die Vorschlagsliste
+    leeren, nicht die vorige Suche stehen lassen.
+    """
+    return all(isinstance(n, dict) and "node_id" in n for n in treffer)
+
+
+def _fuer_modell(treffer: list) -> list:
+    """Suchergebnis für den LLM-Kontext aufbereiten.
+
+    Bis 08/2026 bekam das Modell **nur die Titel**. Damit war jede Frage nach dem
+    *Inhalt* des Wissensgraphen unbeantwortbar: Die Suche fand die richtigen Knoten, das
+    Modell sah aber nur deren Überschriften und meldete, es gebe nichts. Deshalb geht der
+    Inhalt jetzt mit — gekürzt, nicht weggelassen.
+
+    Die interne ``node_id`` bleibt draußen: Sie nützt dem Modell nichts (kein Werkzeug
+    nimmt sie entgegen) und taucht sonst in Antworten auf. Ergebnisse anderer Werkzeuge
+    der Gruppe werden unverändert durchgereicht.
+    """
+    aufbereitet = []
+    for t in treffer:
+        if not isinstance(t, dict) or "node_id" not in t:
+            aufbereitet.append(t)          # fremde Form (z. B. get_operatoren)
+            continue
+        # `subject_id` ist eine interne Zahl — für das Modell wertlos und irreführend.
+        # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
+        eintrag = {
+            k: v for k, v in t.items()
+            if k not in ("node_id", "content", "subject_id", "fach")
+        }
+        if t.get("fach"):
+            eintrag["fach"] = t["fach"]
+        inhalt = (t.get("content") or "").strip()
+        if inhalt:
+            eintrag["content"] = (
+                inhalt[:_INHALT_MAX_ZEICHEN] + " …"
+                if len(inhalt) > _INHALT_MAX_ZEICHEN
+                else inhalt
+            )
+        aufbereitet.append(eintrag)
+    return aufbereitet
+
+
 # Wie viel Vorsprung ein Treffer aus dem Fach der Konversation bekommt — gerechnet in
 # Kosinus-Distanz, also derselben Einheit wie die Ähnlichkeit selbst.
 #
@@ -418,17 +475,18 @@ async def _exec_search_context_nodes(
         # Sortierung bleibt unverändert. Ohne Fehlermeldung: Die Abfrage läuft, sie tut
         # nur nichts.
         sql = sa.text("""
-            SELECT id, category, content_type, title,
-                   subject_id, bp_version, metadata
-            FROM context_nodes
-            WHERE status = 'active'
-              AND embedding IS NOT NULL
+            SELECT c.id, c.category, c.content_type, c.title, c.content,
+                   c.subject_id, s.name AS fach, c.bp_version, c.metadata
+            FROM context_nodes c
+            LEFT JOIN subjects s ON s.id = c.subject_id
+            WHERE c.status = 'active'
+              AND c.embedding IS NOT NULL
               AND (
-                  read_scope IN ('global', 'school', 'subject', 'group')
-                  OR owner_pseudonym = :pseudonym
+                  c.read_scope IN ('global', 'school', 'subject', 'group')
+                  OR c.owner_pseudonym = :pseudonym
               )
-            ORDER BY (embedding <=> CAST(:embedding AS vector))
-                   - CASE WHEN subject_id = :subject_id
+            ORDER BY (c.embedding <=> CAST(:embedding AS vector))
+                   - CASE WHEN c.subject_id = :subject_id
                           THEN CAST(:fachbonus AS double precision)
                           ELSE 0 END
             LIMIT :limit
@@ -451,6 +509,14 @@ async def _exec_search_context_nodes(
                     "title": row["title"],
                     "category": row["category"],
                     "content_type": row["content_type"],
+                    # Der Inhalt geht mit, damit das Modell die Knoten auch **lesen**
+                    # kann. `/context/search` streift ihn über sein response_model wieder
+                    # ab — die Vorschlagsliste im Chat zeigt nur Titel.
+                    "content": row["content"],
+                    # Der Fachname, nicht nur die interne `subject_id`: Auf die Frage
+                    # „… in den verschiedenen Fächern" konnte ein Modell mit `subject_id:
+                    # 13` nichts anfangen und meldete, es gebe keine Einträge je Fach.
+                    "fach": row["fach"],
                     **anzeige_felder(row),
                 }
                 for row in rows
@@ -463,7 +529,8 @@ async def _exec_search_context_nodes(
     # verhielte sich die Rückfallebene anders als der Normalfall, und das fiele erst auf,
     # wenn ohnehin schon etwas klemmt.
     result = await db.execute(
-        select(ContextNode)
+        select(ContextNode, Subject.name)
+        .outerjoin(Subject, Subject.id == ContextNode.subject_id)
         .where(
             or_(
                 ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
@@ -486,9 +553,11 @@ async def _exec_search_context_nodes(
             "title": n.title,
             "category": n.category,
             "content_type": n.content_type,
+            "content": n.content,
+            "fach": fach,
             **anzeige_felder(n),
         }
-        for n in result.scalars().all()
+        for n, fach in result.all()
     ]
 
 
@@ -559,15 +628,30 @@ async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
     return await subject_of_conversation(ctx.db, ctx.conversation_id, ctx.group_id)
 
 
-async def _exec_get_operatoren(ctx: ToolContext) -> list[dict]:
+async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
     """Operatoren des Konversations-Fachs (aktuelle Edition) für den Assistenten.
 
     Deterministisch (keine Top-k-Suche): liefert die vollständige Operatorenliste
     der neuesten importierten Edition (`bp_version`) des Fachs, alphabetisch.
+
+    Gedacht für die **Unterrichtsplanung**, wo das Fach feststeht. Kann es nicht
+    antworten — kein Fachbezug, kein Import —, gibt es statt einer leeren Liste einen
+    ``hinweis`` zurück, der den Grund nennt und auf ``search_context_nodes`` verweist.
     """
     subject_id = await _resolve_conversation_subject_id(ctx)
     if subject_id is None:
-        return []
+        # Kein `[]`: Eine leere Liste ist von „es gibt keine Operatoren" nicht zu
+        # unterscheiden, und genau so hat ein Modell sie einmal gedeutet — es meldete,
+        # der Kontextspeicher enthalte nichts, während 1.278 Operatoren darin lagen.
+        # Der Hinweis nennt den Grund und den Weg, der stattdessen trägt.
+        return {
+            "hinweis": (
+                "Diese Konversation hat keinen Fachbezug; dieses Werkzeug antwortet nur "
+                "für ein Fach. Die Operatoren sind im Wissensgraph vorhanden — für eine "
+                "fächerübergreifende Frage oder einen einzelnen Operator "
+                "`search_context_nodes` verwenden."
+            )
+        }
     rows = (await ctx.db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "operator",
@@ -576,7 +660,12 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict]:
         )
     )).scalars().all()
     if not rows:
-        return []
+        return {
+            "hinweis": (
+                "Für das Fach dieser Konversation sind keine Operatoren importiert. "
+                "Andere Fächer können welche führen — `search_context_nodes` prüft das."
+            )
+        }
     # Aktuelle Edition = neuestes bp_version (V1/V2/V3 koexistieren als Knoten).
     newest = max((n.metadata_ or {}).get("bp_version", "") for n in rows)
     current = [n for n in rows if (n.metadata_ or {}).get("bp_version", "") == newest]
@@ -596,7 +685,7 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict]:
     return out
 
 
-async def _get_operatoren_handler(args: dict, ctx: ToolContext) -> list[dict]:
+async def _get_operatoren_handler(args: dict, ctx: ToolContext) -> list[dict] | dict:
     return await _exec_get_operatoren(ctx)
 
 
@@ -1676,11 +1765,20 @@ async def chat(
 
                 # Rückwärtskompatibilität: context_suggestions SSE für context_search
                 if tool.group == "context_search" and isinstance(tool_result, list):
-                    yield (
-                        f"event: context_suggestions\n"
-                        f"data: {json.dumps({'nodes': tool_result})}\n\n"
+                    # ⚠️ Nur die **Knotensuche** liefert Knoten. Die Gruppe enthält aber
+                    # auch `get_operatoren`, dessen Einträge `operator`/`afb`/`bedeutung`
+                    # tragen und keinen `title`. Bis 08/2026 stand hier ein blindes
+                    # `n["title"]` — mit Fachbezug brach dadurch der Stream mitten in der
+                    # Antwort ab (`KeyError`, außerhalb der Fehlerbehandlung oben).
+                    # Deshalb wird die Form geprüft, statt sie anzunehmen.
+                    if _ist_knotenliste(tool_result):
+                        yield (
+                            f"event: context_suggestions\n"
+                            f"data: {json.dumps({'nodes': tool_result})}\n\n"
+                        )
+                    tool_result_str = json.dumps(
+                        {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False
                     )
-                    tool_result_str = json.dumps({"nodes": [n["title"] for n in tool_result]})
                 elif _tc_name == "generate_image" and isinstance(tool_result, dict):
                     # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
                     # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)

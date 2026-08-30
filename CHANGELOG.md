@@ -16,6 +16,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
   - Neuer Prüfsatz `config/search_eval.yaml` mit `scripts/search_eval.py`: misst je
     Anfrage Recall, Fach und Rang des erwarteten Treffers.
+  - **Assistenten können den Wissensgraph jetzt lesen, nicht nur auflisten.** Werkzeug-
+    Treffer trugen bisher nur den Titel; Fragen nach dem Inhalt eines Knotens waren damit
+    nicht zu beantworten, obwohl die Suche ihn fand. Inhalt **und Fachname** gehen jetzt
+    mit — das Fach stand zuvor nur als interne Nummer im Ergebnis.
+  - **Abbruch der Antwort behoben**, wenn ein Assistent in einem Chat **mit** Fachbezug
+    nach Operatoren fragte.
+  - **`get_operatoren` meldet keine Leere mehr, wo Inhalte vorliegen.** Ohne Fachbezug —
+    oder ohne importierte Operatoren — nennt es jetzt den Grund und verweist auf die
+    Suche, statt eine leere Liste zurückzugeben, die Assistenten als „nichts vorhanden"
+    gedeutet haben.
   - **Das Fach der Konversation zieht passende Treffer nach oben** — im Chat-Werkzeug wie
     in der Suche neben dem Textfeld. Gefiltert wird nicht: Fachfremde Treffer und Knoten
     ohne Fach (Leitperspektiven) bleiben in der Liste, und ein Chat ohne Fachbezug sucht

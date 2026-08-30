@@ -206,14 +206,24 @@ def test_get_operatoren_registered_as_context_search():
     assert tool.writes is False
 
 
-async def test_get_operatoren_no_subject_returns_empty():
-    """Ohne Fachbezug (kein group_id / keine conversation) → leere Liste, kein DB-Zugriff."""
+async def test_get_operatoren_ohne_fachbezug_nennt_den_grund():
+    """Ohne Fachbezug → begründeter Hinweis statt leerer Liste, kein DB-Zugriff.
+
+    Die frühere Fassung gab `[]` zurück, und ein Modell hat das erwartungsgemäß als
+    „es gibt nichts" gelesen: Auf die Frage nach Operatorendefinitionen antwortete es,
+    der Kontextspeicher enthalte keine — bei 1.278 vorhandenen Operatoren. Eine leere
+    Liste kann nicht zwischen „kann ich nicht beantworten" und „gibt es nicht"
+    unterscheiden; der Hinweis kann es.
+    """
     from app.chat import router
     db = MagicMock()
     db.get = AsyncMock()  # darf nicht aufgerufen werden
     ctx = ToolContext(db=db, user=None, group_id=None, conversation_id=None)
     result = await router._exec_get_operatoren(ctx)
-    assert result == []
+    assert isinstance(result, dict) and "hinweis" in result
+    assert "search_context_nodes" in result["hinweis"], (
+        "Der Hinweis muss den Weg nennen, der stattdessen trägt"
+    )
     db.get.assert_not_called()
 
 
