@@ -222,6 +222,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
   beruhen nirgends mehr auf Annahmen.
 - [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
+- [Nutzerverwaltung](docs/admin/nutzerverwaltung.md) und Troubleshooting: **„Anmeldung
+  fehlgeschlagen!" trotz richtigem Passwort** — die Meldung kommt vom Schulkonto-System und
+  bedeutet, dass der OAuth-Client für die Gruppe nicht freigegeben ist. In den Logs der
+  Plattform steht dazu nichts, weil die Anfrage sie nie erreicht.
 - Neues Runbook [Schuljahreswechsel](docs/runbooks/schuljahreswechsel.md) — `school_year.yaml`
   umstellen, **Zahl der Unterrichtswochen prüfen** (sie ist der Faktor der Jahreszusage),
   Budget-Rücksetzung verifizieren. Mit Fehlerbildern und ihren Ursachen.

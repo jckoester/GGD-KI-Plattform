@@ -405,18 +405,36 @@ Häufige Meldungen und ihre Bedeutung:
 
 ## Troubleshooting
 
-**Nutzer:innen können sich nicht einloggen**
+**Nutzer:innen können sich nicht einloggen — „Anmeldung fehlgeschlagen!" trotz
+richtigem Passwort**
+Häufigste Ursache: Der **OAuth-Client ist für die Gruppe der Person nicht freigegeben**.
+IServ bleibt dann auf der eigenen Login-Seite und zeigt diese Meldung, obwohl die Anmeldung
+*in IServ* erfolgreich war; gemeint ist „Die Anmeldung am gewünschten Dienst ist nicht
+möglich". **In den Logs der Plattform steht dazu nichts** — die Anfrage erreicht sie nie.
+Also die Client-Freigabe prüfen, nicht das Konto. Siehe
+[Nutzerverwaltung](nutzerverwaltung.md#wer-die-plattform-nutzen-darf).
+
+**Nutzer:innen kommen herein, haben aber die falsche Rolle**
 `config/auth.yaml` prüfen: Sind die Gruppen in `group_role_map` exakt so
-geschrieben wie im SSO-System? Groß-/Kleinschreibung beachten.
+geschrieben wie im SSO-System? Groß-/Kleinschreibung beachten. Zur Diagnose hilft
+`AUTH_DEBUG_USERINFO=true` (zeigt die rohen Claims — enthält Klarnamen, nur temporär).
 
 **Nutzer:innen sehen keine Modelle**
 Die Modell-Freischaltungsmatrix unter `/settings/models` ist noch leer.
 Für jede Nutzergruppe mindestens ein Modell aktivieren.
 
-**Budget wird nicht monatlich erneuert**
-Prüfen ob der `cron`-Container läuft: `docker compose ps cron`.
-Cron-Log prüfen: `docker compose logs cron`. Bei Bedarf Skripte manuell
-ausführen (siehe [Budget-System](budget.md)).
+**Budget wächst nicht**
+Das Guthaben wird je **Unterrichtswoche** aufgestockt (montags 05:00), nicht monatlich.
+In Ferienwochen passiert nichts — das ist kein Fehler. Sonst prüfen: Läuft der
+`cron`-Container (`docker compose ps cron`)? Was sagt `docker compose logs cron`?
+Trockenlauf zur Diagnose:
+
+```bash
+docker compose exec backend python scripts/weekly_budget_accrual.py --dry-run
+```
+
+Meldet er „kein Wochenbetrag konfiguriert", führt `budget_tiers.yaml` noch das alte
+Monatsschema — siehe [Budget-System](budget.md#umstellung-vom-monatsmodell-einmalig).
 
 **Pseudonyme haben sich geändert**
 `SCHOOL_SECRET` wurde in `.env` geändert. Dieser Vorgang ist nicht

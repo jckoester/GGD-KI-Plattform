@@ -28,6 +28,28 @@ manuell angelegt — Konten entstehen automatisch beim ersten Login.
 - Client-ID: frei wählbar, z. B. `ki-plattform`
 - Redirect-URI: `https://ki.beispielschule.de/auth/callback`
 - Benötigte Scopes: `openid`, `profile`, `groups` (o. ä. — Provider-abhängig)
+- **Freigabe für die Gruppen**, die die Plattform nutzen dürfen
+
+### Wer die Plattform nutzen darf
+
+**Der Nutzerkreis wird beim SSO-Provider bestimmt, nicht in der Plattform.** Maßgeblich ist,
+für welche Gruppen der OAuth-Client freigegeben ist; wer nicht dazugehört, kommt gar nicht
+erst bei der Plattform an. Bei lokalen Konten (Testbetrieb) existieren ohnehin nur Konten
+für Berechtigte.
+
+> Der Fallback auf die Rolle `student` in `group_role_map` ist **keine** Zugangsregel — er
+> bestimmt nur die Rolle für jemanden, der die Anmeldung bereits bestanden hat.
+
+> ⚠️ **„Anmeldung fehlgeschlagen!" trotz richtigem Passwort.** Ist der Client für die
+> Gruppe der Person **nicht** freigegeben, bleibt IServ auf der eigenen Login-Seite und
+> zeigt genau diese Meldung — obwohl die Anmeldung *in IServ* erfolgreich war. Gemeint ist
+> „Die Anmeldung am gewünschten Dienst ist nicht möglich"; der Text kommt von IServ und
+> lässt sich von hier aus nicht ändern.
+>
+> **Für die Fehlersuche heißt das:** Melden Nutzer:innen „Login geht nicht", obwohl die
+> Zugangsdaten stimmen, ist die **Client-Freigabe** zu prüfen — nicht das Konto, nicht die
+> Plattform. In den Logs der Plattform steht dazu nichts, weil die Anfrage sie nie
+> erreicht.
 - Client-Secret in `AUTH_ISERV_CLIENT_SECRET` in `.env` eintragen
 
 ## Gruppen → Rollen (`group_role_map`)
