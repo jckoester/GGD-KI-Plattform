@@ -241,6 +241,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Entfernt
 
+- **Die Redis-Vorlage für den Proxy** (`infra/litellm-redis.example.yml`) und der
+  zugehörige Doku-Abschnitt. Die Plattform setzt keine `tpm`/`rpm`-Limits in LiteLLM —
+  gedrosselt wird im Backend —, und der Verbrauch steht in der Proxy-Datenbank. Bei einem
+  Proxy-Worker, dem Normalfall, bringt ein gemeinsamer Zähler-Speicher damit nichts.
+  Die Meldung „No Redis configured" in der Proxy-UI ist der erwartete Zustand; das steht
+  jetzt so in [Updates & Wartung](docs/admin/updates-und-wartung.md).
+
 - **Der lokale Ollama-Fallback entfällt — es gibt keinen Rückfall bei erschöpftem Budget.**
   Budget aufgebraucht heißt: keine Nutzung bis zum nächsten Zeitraum. Ein Klassensatz
   gleichzeitiger Anfragen verlangt grob 800 Token/s, ein Server ohne GPU liefert für ein

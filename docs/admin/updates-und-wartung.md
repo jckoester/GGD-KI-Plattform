@@ -263,43 +263,18 @@ damit — sie stammen aus der Zeit selbstgebauter Proxy-Images.
 > in dem Fall bleiben `prisma migrate deploy` und `prisma generate` nötig. Zum Umstieg:
 > [Runbook LiteLLM-Umzug](../runbooks/litellm-in-die-compose.md).
 
-## Redis für LiteLLM
+## „No Redis configured" in der Proxy-UI
 
-Meldet die Proxy-UI **„No Redis configured"**, hält LiteLLM seine Zähler — Budgets,
-Rate-Limits, Router-Zustand — im Arbeitsspeicher des jeweiligen Workers. Mit mehreren
-Workern zählt dann jeder für sich, und nach jedem Neustart beginnt die Zählung von vorn.
+**Das ist der erwartete Zustand, kein Befund.** Der Proxy läuft mit einem Worker; seine
+Zähler liegen dann im Arbeitsspeicher dieses einen Prozesses und sind dort stimmig. Was
+tatsächlich zählt, liegt ohnehin woanders: Der **Verbrauch** steht in der Proxy-Postgres,
+und **gedrosselt** wird im Backend (`config/rate_limits.yaml`), nicht im Proxy — dessen
+`tpm`/`rpm`-Limits setzt die Plattform gar nicht.
 
-Die vollständige Vorlage steht in **`infra/litellm-redis.example.yml`**. Kurzfassung —
-drei Eingriffe:
-
-1. Dienst `redis` ergänzen (ohne `ports:`, ohne Persistenz — der Inhalt sind Zähler).
-2. Am `litellm`-Dienst `REDIS_HOST: redis` / `REDIS_PORT: "6379"` setzen und `redis` in
-   `depends_on` aufnehmen.
-3. In der `config.yaml`:
-
-   ```yaml
-   litellm_settings:
-     cache: true
-     cache_params:
-       type: redis
-       supported_call_types: []
-   ```
-
-> **Die Umgebungsvariablen allein genügen nicht.** LiteLLM legt den gemeinsamen
-> Zähler-Cache erst an, wenn `litellm_settings.cache` gesetzt **und** der Cache-Typ
-> `redis` ist. Ohne den Config-Block bleibt Redis wirkungslos, obwohl der Container läuft.
->
-> **`supported_call_types: []` ist Absicht.** `cache: true` schaltet sonst auch das
-> Zwischenspeichern von **Modellantworten** ein: Zwei identische Anfragen bekämen
-> dieselbe Antwort. Für eine Schulplattform ist das nicht gewollt — und sobald Prompts
-> kollidieren, ist es ein Datenschutzthema. Mit der leeren Liste entsteht der
-> Zähler-Cache, gecacht wird nichts.
-
-```bash
-docker compose up -d redis
-docker compose restart litellm
-docker compose exec redis redis-cli dbsize   # > 0, sobald Anfragen laufen
-```
+Ein gemeinsamer Zähler-Speicher wird erst nötig, wenn der Proxy mit **mehreren Workern**
+läuft. Das ist kein Schalter, sondern ein Ausbauschritt mit eigenen Folgen (Budgets können
+je Worker überzogen werden, Cooldowns wirken nur lokal) — er gehört gemessen, nicht
+vermutet.
 
 ## Embeddings: Knoten ohne Vektor
 
