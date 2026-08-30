@@ -7,6 +7,40 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Das Budget gilt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
+  persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
+  Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in
+  dichten Wochen zusätzlich zur Verfügung — gedeckelt auf `vorsprung_wochen`
+  Wochenbeträge (Vorgabe 3).
+
+  - Welche Wochen zählen, kommt aus `school_year.yaml`; **Ferienwochen bekommen keine
+    Zuteilung**. Die Jahressumme (`Wochenbetrag × Unterrichtswochen`) steht beim Eintragen
+    auf `/budget` — der Betrag, auf den sich die Schule festlegt.
+  - Neues Schema in `budget_tiers.yaml`: `wochenbudget_eur` statt `max_budget_eur` +
+    `budget_duration`, dazu global `vorsprung_wochen`.
+  - Neuer Cron `weekly_budget_accrual.py` (**montags 05:00**), idempotent und mit Nachholen
+    ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
+    `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
+  - **Zum Schuljahreswechsel** werden Obergrenze und Verbrauch zurückgesetzt — der einzige
+    Reset im Modell, ausgelöst durch das Schuljahr in `school_year.yaml`. Reste wandern
+    nicht ins nächste Schuljahr.
+  - `/budget` zeigt eine **Hochrechnung aufs Schuljahr** („bisher X € in 12 von 40
+    Wochen, bei diesem Tempo endet das Schuljahr bei Y von Z zugeteilt"), in den ersten
+    Wochen als unsicher gekennzeichnet.
+  - **Profil und Seitenleiste nennen Betrag und Termin der nächsten Aufstockung.** Ein
+    aufgebrauchtes Budget wirkte sonst endgültig.
+
+- **Preise können in Euro geführt werden** (`LITELLM_PRICE_CURRENCY=EUR`) — dann rechnet
+  die Plattform nicht um, und ein Kursrisiko entsteht gar nicht erst. Anbieter wie IONOS
+  listen ausschließlich Euro-Preise. Vorgabe bleibt `USD`; bestehende Installationen
+  ändern sich nicht.
+
+  - `infra/litellm_config.ionos.example.yaml` führt die Preise jetzt in **Euro**, gegen die
+    Preisliste abgeglichen (29.08.2026).
+  - `check_litellm_config.py` meldet Modelle, deren Preise nicht zur eingestellten Währung
+    passen können — erkennbar an fehlender eigener `api_base`: Sie beziehen ihre Preise aus
+    LiteLLMs eingebauter Tabelle, und die ist durchgängig USD.
+
 - **Zu einem erzeugten Bild wird das tatsächlich genutzte Modell gespeichert**, nicht mehr
   das global eingestellte.
 
@@ -94,50 +128,6 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   > Der Proxy läuft in einem eigenen Compose-Stack: Beide Seiten müssen dasselbe
   > **Host**-Verzeichnis einbinden. Auf getrennten Hosts entfällt die Datei; dann über das
   > Proxy-Log überwachen (siehe `docs/admin/content-moderation.md`).
-
-### Geändert (Budget)
-
-- **Preise können jetzt in Euro geführt werden** (`LITELLM_PRICE_CURRENCY=EUR`) — dann
-  rechnet die Plattform nicht um. Anbieter wie IONOS listen ausschließlich Euro-Preise;
-  sie zum Tageskurs in Dollar einzutragen fror diesen Kurs in der Config ein, während das
-  Budget mit dem aktuellen rechnete. Beide kürzen sich nur, solange die Kurse gleich sind —
-  wertet der Euro auf, überschreitet die Schule ihr Budget dauerhaft um die Differenz,
-  ohne dass etwas fehlschlägt.
-
-  - `infra/litellm_config.ionos.example.yaml` führt die Preise jetzt in **Euro**
-    (aus den bisherigen USD-Werten zurückgerechnet; vor Inbetriebnahme gegen die
-    Preisliste prüfen).
-  - `check_litellm_config.py` meldet Modelle, deren Preise nicht zur eingestellten Währung
-    passen können — erkennbar an fehlender eigener `api_base`: Sie beziehen ihre Preise aus
-    LiteLLMs eingebauter Tabelle, und die ist durchgängig USD.
-  - Vorgabe bleibt `USD`; bestehende Installationen ändern sich nicht.
-
-- **Das Budget gilt jetzt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
-  persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
-  Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in dichten
-  Wochen zusätzlich zur Verfügung — Ferien und Klassenarbeitsphasen gleichen sich aus.
-
-  - Welche Wochen zählen, kommt aus `school_year.yaml`; **Ferienwochen bekommen keine
-    Zuteilung**. Die Jahressumme ist `Wochenbetrag × Unterrichtswochen` und steht beim
-    Eintragen in der Admin-Oberfläche — der Betrag, auf den sich die Schule festlegt.
-  - Der Vorsprung ist gedeckelt (`vorsprung_wochen`, Vorgabe 3): Wer lange nichts nutzt,
-    sammelt kein halbes Jahr an. Das ersetzt die Tempobegrenzung der Rücksetzung.
-  - Neuer Cron **montags 05:00** (`weekly_budget_accrual.py`), idempotent und mit Nachholen
-    ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
-    `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
-  - **Schuljahreswechsel:** Beim ersten Zuteilungslauf eines neuen Schuljahres werden
-    Obergrenze **und** Verbrauch zurückgesetzt — erkannt am Schuljahr in
-    `config/school_year.yaml`, ohne eigenen Lauf. Reste wandern damit nicht ins nächste
-    Schuljahr. Es ist der einzige Reset im Modell.
-  - **Hochrechnung aufs Schuljahr** auf `/budget`: „bisher X € in 12 von 40
-    Unterrichtswochen, bei diesem Tempo endet das Schuljahr bei Y von Z zugeteilt". Bei
-    niedriger Auslastung mit dem Hinweis, dass sich die Wochenbeträge **jetzt** noch
-    anheben lassen — am Jahresende ist der Rest nur noch zu verwalten. In den ersten
-    Wochen als unsicher gekennzeichnet, weil eine einzelne Projektwoche sie verdoppelt.
-  - **Profil und Seitenleiste sagen, wann wieder Guthaben dazukommt** („Jede
-    Unterrichtswoche kommen 0,04 € dazu — das nächste Mal am Mo., 21.09."). Ohne diese
-    Angabe wirkt ein aufgebrauchtes Budget endgültig, obwohl am Montag wieder etwas da ist.
-    In den letzten Ferien des Schuljahres steht stattdessen, dass nichts mehr folgt.
 
 ### Entfernt
 
@@ -232,6 +222,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
   beruhen nirgends mehr auf Annahmen.
 - [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
+- Neues Runbook [Schuljahreswechsel](docs/runbooks/schuljahreswechsel.md) — `school_year.yaml`
+  umstellen, **Zahl der Unterrichtswochen prüfen** (sie ist der Faktor der Jahreszusage),
+  Budget-Rücksetzung verifizieren. Mit Fehlerbildern und ihren Ursachen.
+- [Budget-System](docs/admin/budget.md) neu geschrieben: Wochenmodell, Währung und
+  Kursrisiko, Hochrechnung, Schuljahreswechsel, einmalige Umstellung vom Monatsmodell.
+- [Konfiguration](docs/admin/konfiguration.md): `budget_tiers.yaml` auf `wochenbudget_eur`
+  + `vorsprung_wochen`; `LITELLM_PRICE_CURRENCY` ergänzt.
+- Nutzerdoku ([Profil](docs/user/profil.md), [Chat](docs/user/chat.md),
+  [Bilder](docs/user/bilder-erzeugen.md)): „monatliches Budget“ durchgängig ersetzt — das
+  Guthaben wächst je Unterrichtswoche, und ein Bild kostet rund vierzig Chat-Nachrichten.
 - [Installation](docs/admin/installation.md) um die Modellkonfiguration ergänzt: neuer
   **Schritt 3** (Anbieter wählen, `model_list` befüllen, Namen in die `.env`) und
   **Schritt 9** (`check_litellm_config.py` gegen den laufenden Proxy). Die Kopierliste in

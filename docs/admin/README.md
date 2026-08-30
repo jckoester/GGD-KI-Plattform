@@ -18,8 +18,8 @@ Browser
                     └─▶ KI-Anbieter  (IONOS, Mistral, OpenAI, Anthropic, …)
 ```
 
-Der **Cron-Container** läuft parallel und führt automatische Aufräumjobs sowie
-die monatliche Budgeterneuerung aus.
+Der **Cron-Container** läuft parallel: Aufräumjobs, der wöchentliche Zuteilungslauf
+fürs Budget und der monatliche Team-Abgleich.
 
 Die **Pseudonymisierung** findet im Backend statt: Externe KI-Anbieter erhalten
 ausschließlich anonyme Nutzer-IDs — nie Namen oder andere personenbezogene Daten.
@@ -63,10 +63,11 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Modell-Szenarien](modell-szenarien.md) — Vollständige Konfigurationen je Anbieter (IONOS, Mistral, OpenAI, Anthropic, Mischbetrieb) und die anbieterspezifischen Fallen
 - [Konfigurationsdateien](konfiguration.md) — Alle Konfigurationsdateien im Detail
 - [Nutzerverwaltung & Rollen](nutzerverwaltung.md) — SSO, Gruppen, Rollen, Jahrgänge
-- [Budget-System](budget.md) — Tiers, ECB-Rate, Admin-UI
+- [Budget-System](budget.md) — Wochenmodell, Währung, Hochrechnung, Schuljahreswechsel
 - [Modelle & Assistenten](modelle-und-assistenten.md) — Modelle freischalten, Assistenten verwalten
 - [Embedding-Modell wechseln](../runbooks/modellwechsel.md) — Runbook: Schema angleichen + Re-Embedding
 - [Bildungsplan-Import](bildungsplan-import.md) — Fachkontext in das Docker-Produktivsystem importieren
+- [Schuljahreswechsel](../runbooks/schuljahreswechsel.md) — Runbook: `school_year.yaml`, Unterrichtswochen prüfen, Budget-Rücksetzung
 - [Curricula übertragen](../runbooks/curriculum-transfer.md) — Runbook: Schulcurricula exportieren und in promptLab/Dev einspielen
 - [Stundenplan-Integration](stundenplan-integration.md) — WebUntis: Servicekonto, Fachkürzel, Ferien-Import, Abgleich-Cron
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen

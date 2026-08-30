@@ -83,7 +83,7 @@ Gespräche, die mit einem Assistenten geführt wurden, sind im Verlauf entsprech
 ## Wenn etwas schiefläuft
 
 **„Budget aufgebraucht"**
-Ihr monatliches Budget für KI-Anfragen ist erschöpft. Neue Anfragen werden erst wieder möglich, wenn das Budget zu Monatsbeginn erneuert wird. Den aktuellen Stand sehen Sie auf Ihrer [Profilseite](profil.md).
+Ihr Budget für KI-Anfragen ist erschöpft. In der nächsten Unterrichtswoche kommt wieder Guthaben dazu; den Termin und den Betrag nennt Ihre [Profilseite](profil.md). Ein Ausweichen auf ein anderes Modell gibt es nicht. Ältere Gespräche können Sie weiterhin lesen.
 
 **Die Antwort kommt nicht / der Chat hängt**
 Laden Sie die Seite neu. Ihr Gespräch bleibt im Verlauf erhalten — Sie können dort weitermachen.

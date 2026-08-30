@@ -48,7 +48,7 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 Die Anmeldung läuft über Ihr Schulkonto (SSO). Wenn die Anmeldung fehlschlägt, prüfen Sie zunächst, ob Sie sich in IServ normal einloggen können. Falls das Problem bestehen bleibt, wenden Sie sich an Ihre Lehrkraft oder den IT-Support der Schule.
 
 **Mein Budget ist aufgebraucht — was jetzt?**
-Jede Nutzerin und jeder Nutzer hat ein monatliches Budget für KI-Anfragen. Ist es aufgebraucht, werden neue Anfragen bis zur Monatserneuerung abgelehnt. Das aktuelle Budget sehen Sie auf Ihrer [Profilseite](profil.md).
+Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das **jede Unterrichtswoche wächst**. Ist es aufgebraucht, werden neue Anfragen abgelehnt, bis in der nächsten Unterrichtswoche wieder Guthaben dazukommt — die [Profilseite](profil.md) nennt den Termin.
 
 **Kann ich meine früheren Chats wiederfinden?**
 Ja — über „Letzte Chats" in der Seitenleiste. Gespräche bleiben bis zu 3 Monate nach der letzten Nachricht gespeichert, danach werden sie automatisch gelöscht.

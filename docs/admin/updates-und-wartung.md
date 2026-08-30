@@ -331,6 +331,9 @@ auch mit Backup nicht möglich.
 
 ## Schuljahreswechsel
 
+> Die vollständige Schritt-für-Schritt-Fassung mit Prüfpunkten steht im
+> [Runbook Schuljahreswechsel](../runbooks/schuljahreswechsel.md). Hier nur der Überblick.
+
 ### Was automatisch passiert
 
 - **Abgänger** (kein Login > 90 Tage) werden automatisch gelöscht. Nach dem

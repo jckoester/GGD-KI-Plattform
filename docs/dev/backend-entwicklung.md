@@ -84,8 +84,10 @@ docker compose exec backend python scripts/<skript>.py
 | Skript | Zweck | Flags |
 |--------|-------|-------|
 | `create_litellm_teams.py` | LiteLLM-Teams einmalig anlegen (idempotent) | — |
-| `monthly_team_reconcile.py` | EUR-Budgets → USD-Limits in LiteLLM setzen | — |
-| `refresh_ecb_rate.py` | ECB-Wechselkurs abrufen und in DB speichern | — |
+| `weekly_budget_accrual.py` | **Budget-Zuteilung je Unterrichtswoche.** Hebt `max_budget` um einen Wochenbetrag an, gedeckelt auf `vorsprung_wochen` über dem Verbrauch. Idempotent; holt ausgefallene Wochen nach. Setzt beim Schuljahreswechsel Grenze **und** Verbrauch zurück | `--dry-run`, `--stichtag`, `--pseudonym`, `--neuaufbau` |
+| `monthly_team_reconcile.py` | LiteLLM-Team-Zugehörigkeit angleichen (Jahrgang/Rolle). Rührt **keine** Budgets mehr an — hieß bis 08/2026 `monthly_budget_reconcile.py` | `--dry-run`, `--limit`, `--pseudonym` |
+| `migrate_budget_duration.py` | **Einmalig:** entfernt `budget_duration: 1mo` aus der Proxy-DB (Umstellung Monats- → Wochenmodell). Über die API nicht möglich | `--dry-run`, `--verbrauch-zuruecksetzen` |
+| `refresh_ecb_rate.py` | ECB-Wechselkurs abrufen und in DB speichern. Ohne Wirkung bei `LITELLM_PRICE_CURRENCY=EUR` | — |
 | `seed_exchange_rate.py` | Wechselkurs für frische DB setzen (einmalig) | — |
 | `cleanup_inactive_accounts.py` | Konten ohne Login > 90 Tage löschen | `--dry-run`, `--now`, `--limit` |
 | `cleanup_stale_conversations.py` | Konversationen ohne Nachrichten > 93 Tage löschen | `--dry-run`, `--now` |

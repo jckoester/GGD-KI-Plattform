@@ -63,7 +63,10 @@ einfach: „Welche Bildformate kannst du?"
 ## Kosten
 
 Bilder laufen über **dasselbe Budget** wie deine Chat-Nachrichten (es gibt kein
-separates Bild-Kontingent). Ein Bild kostet in der Regel **mehr** als eine
-Textnachricht — es verbraucht das Budget also schneller. Ist dein Budget
-aufgebraucht, wird die Bilderzeugung bis zur Monatserneuerung abgelehnt. Dein
-aktuelles Budget siehst du auf der [Profilseite](profil.md).
+separates Bild-Kontingent). Ein Bild kostet dabei ungefähr so viel wie **vierzig
+Chat-Nachrichten** — wer viel mit Bildern arbeitet, merkt das am Budget deutlich
+schneller.
+
+Ist dein Budget aufgebraucht, wird die Bilderzeugung abgelehnt, bis in der nächsten
+Unterrichtswoche wieder Guthaben dazukommt. Den Termin und den Betrag nennt deine
+[Profilseite](profil.md).

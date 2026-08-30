@@ -284,30 +284,44 @@ or state" fehl, loggt der Callback den vom Provider gemeldeten OAuth-`error`
 
 ## `config/budget_tiers.yaml`
 
-Legt die monatlichen Euro-Budgets pro Jahrgansstufe und Rolle fest.
+Legt die Euro-Budgets **je Unterrichtswoche** pro Jahrgangsstufe und Rolle fest.
 
 ```yaml
+# Wie viele Wochenbeträge die Obergrenze dem Verbrauch vorauseilen darf.
+# Nur hier global, nicht je Stufe. Vorgabe: 3.
+vorsprung_wochen: 3
+
 grades:
   5:
-    budget_duration: 1mo
-    max_budget_eur: 1.00
+    wochenbudget_eur: 0.04
   # … weitere Jahrgänge …
   12:
-    budget_duration: 1mo
-    max_budget_eur: 3.50
+    wochenbudget_eur: 0.14
 
 roles:
   teacher:
-    budget_duration: 1mo
-    max_budget_eur: 8.00
+    wochenbudget_eur: 0.31
 ```
 
-Änderungen an dieser Datei wirken erst beim nächsten Monats-Reconcile
-(1. des Monats, 07:00 Uhr). Um Änderungen sofort anzuwenden:
+Die **Jahressumme** ist `wochenbudget_eur × Anzahl Unterrichtswochen` (aus
+`school_year.yaml`) — der Betrag, auf den sich die Schule festlegt. `/budget` zeigt ihn
+beim Eintragen an; dort lassen sich die Beträge auch bearbeiten, ohne die Datei anzufassen.
+
+> ⚠️ **`max_budget_eur` + `budget_duration` wird nicht mehr gelesen.** Das war bis 08/2026
+> das Monatsmodell. Eine nicht umgestellte Datei liefert **kein** Budget und protokolliert
+> einen Fehler — den Monatsbetrag stillschweigend als Wochenbetrag zu deuten wäre eine
+> Kürzung auf etwa ein Viertel. Zur Umstellung siehe
+> [Budget-System](budget.md#umstellung-vom-monatsmodell-einmalig).
+
+Änderungen wirken beim nächsten Zuteilungslauf (montags 05:00). Sofort anwenden:
 
 ```bash
-docker compose exec backend python scripts/monthly_team_reconcile.py
+docker compose exec backend python scripts/weekly_budget_accrual.py --dry-run
+docker compose exec backend python scripts/weekly_budget_accrual.py
 ```
+
+Wer über `/budget` speichert, braucht das nicht: Dort werden die Obergrenzen der
+betroffenen Nutzer:innen unmittelbar mitgesetzt.
 
 ---
 

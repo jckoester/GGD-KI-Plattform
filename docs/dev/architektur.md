@@ -15,7 +15,8 @@ Cron-Container (separat):
   cleanup_inactive_accounts     täglich 02:00
   cleanup_stale_conversations   täglich 02:30
   refresh_ecb_rate              1. des Monats 06:00
-  monthly_team_reconcile      1. des Monats 07:00
+  monthly_team_reconcile        1. des Monats 07:00
+  weekly_budget_accrual         montags 05:00
 ```
 
 ## Backend-Module (`backend/app/`)
@@ -27,7 +28,7 @@ Cron-Container (separat):
 | `context/` | Kontextspeicher: Knoten/Kanten, Curriculum-Import, Retrieval (semantisch + Engagement-UNION), Taxonomie |
 | `planning/` | Unterrichtsplanung (UP-Reihe): Slots/Snapshots, Jahresplan- und Stundenentwurfs-Logik, Assistenten-Tools. Verschiebe-Dialog: `reflow_service.py` (Reflow-Kontext + Überhang-Erkennung), `operations.py` (typisierte Plan-Operationen + atomarer Executor). Schüler-Kontext: `student_context.py` (aktuelles Thema, Klassenarbeits-Scope, Whitelist) |
 | `calendar/` | Stundenplan-Anbindung (UP-8): Adapter-Interface (`base.py`) + WebUntis-Implementierung, Ferien-Übernahme, Wochenmuster-Ableitung, Abgleich von Entfall/Vertretung/Verlegung (`sync.py`: `plan_sync` rein, `apply_sync` schreibend). Wie bei `auth/` ist das Interface der Erweiterungspunkt für andere Quellen |
-| `budget/` | Budget-Tiers aus YAML, ECB-Wechselkurs, Reconcile-Service |
+| `budget/` | Wochenmodell: Stufen aus YAML (`tiers.py`), Unterrichtswochen aus `school_year.yaml` (`schulwochen.py`), Zuteilungslogik (`accrual.py`), Hochrechnung (`forecast.py`), Wechselkurs (`exchange.py`) |
 | `litellm/` | LiteLLM-HTTP-Client, Team-Anlage, User-Budget-Sync |
 | `upload/` | Dateiupload-Session, Text-Extraktion (PDF via pdfminer.six, Bilder via Base64) |
 | `db/` | SQLAlchemy-Modelle (async), Session-Factory |

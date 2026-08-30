@@ -155,7 +155,7 @@ das am Merkposten (`budget_accrual.schuljahr`) und setzt beim ersten Lauf des ne
 Admin-Oberfläche steht: Was im Juli übrig ist, ist im September nicht mehr da. Wer es
 verwenden will, hebt die Wochenbeträge rechtzeitig an — dafür ist die Hochrechnung da.
 
-Checkliste zum Wechsel:
+Checkliste zum Wechsel (ausführlich im [Runbook](../runbooks/schuljahreswechsel.md)):
 
 1. `config/school_year.yaml` auf das neue Schuljahr umstellen (Beginn, Ende, Ferien,
    Feiertage). Der Ferienimport hilft: `/settings` → Ferien übernehmen.
