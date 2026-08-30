@@ -7,6 +7,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Chats mit Werkzeugaufrufen wurden zu niedrig abgerechnet.** Ein Chat-Zug besteht aus
+  mehreren Anfragen an das Sprachmodell — je Werkzeugrunde eine, dazu die
+  Titelgenerierung. Abgerechnet wurde nur die letzte; in Zügen mit mehreren Runden fehlte
+  die Kostenangabe sogar ganz. Alle Anfragen eines Zuges werden jetzt zusammengezählt,
+  **einschließlich der Titelgenerierung**, die das Budget schon immer belastet hat, aber
+  in keiner Anzeige auftauchte.
+
+  - Die Zahlen stehen im Backend-Log (`Kosten des Zuges: 4 von 4 Anfragen abgerechnet`),
+    damit eine unvollständige Summe erkennbar ist statt still zu bleiben.
+  - Nachgefragt wird **gestaffelt** (nach 1, 2, 4 und 8 Sekunden, Abbruch sobald
+    vollständig) statt dreimal im festen Abstand. LiteLLM stellt die Buchung einer
+    Streaming-Anfrage nach 6–13 Sekunden bereit; das bisherige Fenster von 9 Sekunden
+    verfehlte regelmäßig die letzte — und teuerste — Anfrage eines Zuges. Der Normalfall
+    ist dafür jetzt nach 1 statt 3 Sekunden erledigt.
+  - Die Einstellung `SPEND_LOG_DELAY` entfällt; die Staffelung ersetzt sie.
+
 - **Die semantische Suche übersah rund die Hälfte der besten Treffer.** Der Vektorindex
   lieferte nicht die ähnlichsten Knoten, sondern eine Auswahl daraus — „Flächeninhalt
   eines Kreises" fand Geographie-Knoten statt der Mathematik-Kompetenz. Der Index ist
@@ -36,9 +52,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   - **Abbruch der Antwort behoben**, wenn ein Assistent in einem Chat **mit** Fachbezug
     nach Operatoren fragte.
   - **`get_operatoren` meldet keine Leere mehr, wo Inhalte vorliegen.** Ohne Fachbezug —
-    oder ohne importierte Operatoren — nennt es jetzt den Grund und verweist auf die
-    Suche, statt eine leere Liste zurückzugeben, die Assistenten als „nichts vorhanden"
-    gedeutet haben.
+    oder ohne importierte Operatoren — nennt es jetzt den Grund und weist den Assistenten
+    ausdrücklich zur Suche, statt eine leere Liste zurückzugeben, die als „nichts
+    vorhanden" gedeutet wurde. Fragt ein Assistent dennoch nach einem Fach, hilft ein
+    ausdrücklicher Suchauftrag (siehe [Kontextspeicher](docs/user/kontext.md)).
   - **Das Fach der Konversation zieht passende Treffer nach oben** — im Chat-Werkzeug wie
     in der Suche neben dem Textfeld. Gefiltert wird nicht: Fachfremde Treffer und Knoten
     ohne Fach (Leitperspektiven) bleiben in der Liste, und ein Chat ohne Fachbezug sucht

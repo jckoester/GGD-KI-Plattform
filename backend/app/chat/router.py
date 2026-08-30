@@ -141,7 +141,28 @@ router = APIRouter(tags=["chat"])
 
 _LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
-_SPEND_LOG_DELAY: float = settings.spend_log_delay
+# Wartezeiten vor den Abfragen der SpendLogs, gestaffelt. Abgebrochen wird, sobald alle
+# Anfragen des Zuges abgerechnet sind — die Staffel ist die Obergrenze, nicht die Regel.
+#
+# **Gemessen (30.08.2026), wann eine Buchung verfügbar ist:**
+#
+# ===========================  =========
+# Anfrageart                    verfügbar
+# ===========================  =========
+# ohne Streaming, kurz             3,0 s
+# mit Streaming, kurz             12,6 s
+# mit Streaming, lange Antwort     6,1 s
+# ===========================  =========
+#
+# Der Chat streamt immer, und die Streckung schwankt stark. Ein gleichmäßiges Fenster
+# müsste sich am schlechtesten Fall ausrichten und wartete dann auch im guten. Gestaffelt
+# ist der Normalfall nach 1 s erledigt (vorher: 3 s), der Ausreißer nach 15 s noch
+# erfasst.
+#
+# ⚠️ Die **letzte** Runde eines Zuges ist systematisch am gefährdetsten: Sie endet zuletzt,
+# hat also die wenigste Zeit — und trägt als Eingabe den ganzen gesammelten Kontext, ist
+# also die teuerste. Fehlt eine, fehlt meist die größte.
+_SPEND_LOG_WARTEZEITEN: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0)
 _MAX_TOOL_ROUNDS: int = 6
 
 # Guardrail-Prompt-Cache
@@ -219,9 +240,23 @@ def _titel_anfrage(prompt: str) -> str:
     )
 
 
+@dataclass(frozen=True)
+class Titelergebnis:
+    """Titel **und** Request-ID des Titel-Aufrufs.
+
+    Die ID wird gebraucht, weil die Titelgenerierung eine eigene LLM-Anfrage über den
+    Virtual Key der Nutzer:in ist: LiteLLM belastet sie deren Budget, in der
+    Kostenanzeige tauchte sie bis 08/2026 aber nicht auf. Anzeige und tatsächliche
+    Belastung gingen damit auseinander.
+    """
+
+    titel: str | None = None
+    request_id: str | None = None
+
+
 async def _generate_title(
     conversation_id: UUID, prompt: str, litellm_key: str, user_sub: str
-) -> str | None:
+) -> Titelergebnis:
     """Erzeugt einen Konversationstitel über den User-Virtual-Key (Audit #8).
 
     Läuft über den persönlichen LiteLLM-Key des Nutzers (`Bearer {litellm_key}`, `user=sub`),
@@ -234,7 +269,7 @@ async def _generate_title(
     logger.debug("Titelgenerierung gestartet für %s (model=%s)", conversation_id, settings.title_model)
     if not litellm_key:
         logger.debug("Titelgenerierung übersprungen (kein Virtual-Key für %s)", user_sub)
-        return None
+        return Titelergebnis()
     litellm_payload = {
         "model": settings.title_model,
         "messages": [
@@ -274,10 +309,10 @@ async def _generate_title(
             )
             await db.commit()
         logger.debug("Titelgenerierung: DB aktualisiert für %s", conversation_id)
-        return title
+        return Titelergebnis(titel=title, request_id=data.get("id"))
     except Exception as exc:
         logger.warning("Titelgenerierung fehlgeschlagen (%s): %s", type(exc).__name__, exc)
-        return None
+        return Titelergebnis()
     finally:
         await client.aclose()
 
@@ -369,6 +404,62 @@ async def _get_model_info() -> dict[str, bool | None]:
 # reicht bis 775. 800 deckt also fast alles vollständig ab, und selbst bei der größten
 # erlaubten Trefferzahl bleibt das Ergebnis im vierstelligen Tokenbereich.
 _INHALT_MAX_ZEICHEN = 800
+
+
+@dataclass(frozen=True)
+class Zugkosten:
+    """Kosten eines Chat-Zuges — Summe plus die Zahlen, die sie belegen.
+
+    ``gefunden``/``gesamt`` gehen ins Log: Eine Summe allein verrät nicht, ob sie
+    vollständig ist. Genau das war der blinde Fleck, an dem der Fehler acht Wochen
+    unbemerkt blieb.
+    """
+
+    summe: float | None
+    gefunden: int
+    gesamt: int
+
+
+async def _kosten_des_zuges(
+    client, request_ids: list[str], *, wartezeiten: tuple[float, ...]
+) -> Zugkosten:
+    """Summiert die Kosten **aller** LLM-Anfragen eines Zuges aus den SpendLogs.
+
+    Ein Zug besteht aus mehr als einer Anfrage: je Werkzeugrunde eine, dazu die
+    Titelgenerierung. Alle laufen über den Virtual Key der Nutzer:in und belasten deren
+    Budget — abgerechnet wurde bis 08/2026 nur die letzte.
+
+    ⚠️ **Versuche außen, IDs innen.** LiteLLM schreibt die SpendLogs verzögert, deshalb
+    wird wiederholt nachgefragt. Läge die Schleife andersherum, wartete ein Zug mit drei
+    Runden das Vielfache — die Wartezeit wüchse mit der Rundenzahl, statt von ihr
+    unabhängig zu bleiben.
+
+    Gibt eine **Teilsumme** zurück, wenn nur ein Teil auffindbar war; ``summe=None`` nur,
+    wenn gar nichts gefunden wurde (dann bleibt es wie bisher bei „keine Kostenangabe").
+    """
+    # Reihenfolge erhalten, Dubletten entfernen — dieselbe ID zweimal zu summieren wäre
+    # schlimmer als sie zu verlieren.
+    offen = list(dict.fromkeys(rid for rid in request_ids if rid))
+    gesamt = len(offen)
+    if not gesamt:
+        return Zugkosten(summe=None, gefunden=0, gesamt=0)
+
+    gefunden: dict[str, float] = {}
+    for pause in wartezeiten:
+        await asyncio.sleep(pause)
+        for rid in list(offen):
+            betrag = await client.get_spend_log(rid)
+            if betrag is not None:
+                gefunden[rid] = betrag
+                offen.remove(rid)
+        if not offen:
+            break
+
+    return Zugkosten(
+        summe=sum(gefunden.values()) if gefunden else None,
+        gefunden=len(gefunden),
+        gesamt=gesamt,
+    )
 
 
 def _ergebnis_umfang(ergebnis) -> str:
@@ -741,13 +832,21 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
         # Kein `[]`: Eine leere Liste ist von „es gibt keine Operatoren" nicht zu
         # unterscheiden, und genau so hat ein Modell sie einmal gedeutet — es meldete,
         # der Kontextspeicher enthalte nichts, während 1.278 Operatoren darin lagen.
-        # Der Hinweis nennt den Grund und den Weg, der stattdessen trägt.
+        #
+        # ⚠️ **Die Formulierung entscheidet, gemessen.** Die erste Fassung nannte die
+        # Einschränkung zuerst und den Ausweg als Empfehlung („… antwortet nur für ein
+        # Fach … `search_context_nodes` verwenden"). Ein Modell machte daraus „der
+        # Operator-Katalog **im System** kann nur fachspezifisch abgefragt werden" und
+        # fragte nach einem Fach, statt zu suchen. Deshalb jetzt drei Eigenschaften:
+        # die Verallgemeinerung ausdrücklich verneinen, direktiv statt empfehlend
+        # formulieren, und die Rückfrage ausschließen.
         return {
             "hinweis": (
-                "Diese Konversation hat keinen Fachbezug; dieses Werkzeug antwortet nur "
-                "für ein Fach. Die Operatoren sind im Wissensgraph vorhanden — für eine "
-                "fächerübergreifende Frage oder einen einzelnen Operator "
-                "`search_context_nodes` verwenden."
+                "Dieses Werkzeug konnte nicht antworten, weil die Konversation keinem "
+                "Fach zugeordnet ist. Das ist KEINE Einschränkung des Wissensgraphen: "
+                "Er enthält die Operatoren aller Fächer. Rufe jetzt "
+                "search_context_nodes mit dem gesuchten Begriff auf und frage NICHT "
+                "nach einem Fach."
             )
         }
     rows = (await ctx.db.execute(
@@ -761,7 +860,9 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
         return {
             "hinweis": (
                 "Für das Fach dieser Konversation sind keine Operatoren importiert. "
-                "Andere Fächer können welche führen — `search_context_nodes` prüft das."
+                "Andere Fächer können welche führen. Rufe search_context_nodes mit dem "
+                "gesuchten Begriff auf, bevor du antwortest, im Wissensgraph sei nichts "
+                "vorhanden."
             )
         }
     # Aktuelle Edition = neuestes bp_version (V1/V2/V3 koexistieren als Knoten).
@@ -1765,7 +1866,12 @@ async def chat(
 
         full_content: list[str] = []
         usage: dict = {}
-        chunk_id: str | None = None
+        # Eine Request-ID **je LLM-Anfrage dieses Zuges** — jede Werkzeugrunde ist eine
+        # eigene Anfrage, und die Titelgenerierung kommt später dazu. Bis 08/2026 stand
+        # hier eine einzelne ID, die jede Runde überschrieb: Abgerechnet wurde nur die
+        # letzte, ein Zug mit drei Runden belastete das Budget also um zwei Drittel zu
+        # wenig.
+        _request_ids: list[str] = []
         cost_usd: Optional[float] = None
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
         _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
@@ -1785,6 +1891,7 @@ async def chat(
                 _tc_name: str | None = None
                 _tc_args: list[str] = []
                 _finish_reason: str | None = None
+                _runden_id: str | None = None
 
                 async for line in current_response.aiter_lines():
                     if not line:
@@ -1797,6 +1904,13 @@ async def chat(
                         break
                     try:
                         chunk = json.loads(payload)
+                        # Jeder Chunk einer Anfrage trägt dieselbe `id`. Sie hier zu
+                        # nehmen — und nicht erst am `usage`-Chunk — macht die Erfassung
+                        # unabhängig davon, ob und wie der Anbieter `usage` mitschickt.
+                        # Genau daran scheiterte sie zuvor: `usage` war gespeichert, die
+                        # ID nicht, und der Zug blieb ohne Kosten.
+                        if not _runden_id and chunk.get("id"):
+                            _runden_id = chunk["id"]
                         choice = chunk.get("choices", [{}])[0]
                         delta = choice.get("delta", {})
                         fr = choice.get("finish_reason")
@@ -1814,7 +1928,6 @@ async def chat(
                                     _tc_args.append(fn["arguments"])
                             if "usage" in chunk:
                                 usage = chunk["usage"]
-                                chunk_id = chunk.get("id")
                             continue
 
                         token = delta.get("content") or ""
@@ -1823,9 +1936,11 @@ async def chat(
                             yield f"{line}\n\n"
                         if "usage" in chunk:
                             usage = chunk["usage"]
-                            chunk_id = chunk.get("id")
                     except (json.JSONDecodeError, IndexError, KeyError):
                         yield f"{line}\n\n"
+
+                if _runden_id:
+                    _request_ids.append(_runden_id)
 
                 # -- Tool-Call verarbeiten oder abbrechen --
                 if _finish_reason != "tool_calls" or not _tc_name:
@@ -1954,28 +2069,45 @@ async def chat(
             # -- Title-Task abwarten --
             if title_task:
                 try:
-                    title = await asyncio.wait_for(asyncio.shield(title_task), timeout=3.0)
-                    if title:
-                        logger.debug("Sende title-SSE-Event: %r", title)
-                        yield f"event: title\ndata: {json.dumps({'title': title})}\n\n"
+                    titel_ergebnis = await asyncio.wait_for(
+                        asyncio.shield(title_task), timeout=3.0
+                    )
+                    # Vor der Kostenabfrage: Die Titelgenerierung ist eine eigene
+                    # LLM-Anfrage über den Virtual Key der Nutzer:in und belastet deren
+                    # Budget. Läuft sie in den Timeout, geht ihre ID verloren — der
+                    # Betrag fehlt dann in der Anzeige, was dem Stand vor 08/2026
+                    # entspricht.
+                    if titel_ergebnis.request_id:
+                        _request_ids.append(titel_ergebnis.request_id)
+                    if titel_ergebnis.titel:
+                        logger.debug("Sende title-SSE-Event: %r", titel_ergebnis.titel)
+                        yield (
+                            f"event: title\n"
+                            f"data: {json.dumps({'title': titel_ergebnis.titel})}\n\n"
+                        )
                     else:
-                        logger.debug("Titel-Task lieferte None — kein SSE-Event")
+                        logger.debug("Titel-Task lieferte nichts — kein SSE-Event")
                 except asyncio.TimeoutError:
                     logger.warning("Titel-Task Timeout nach 3 s für %s", conversation_id)
                 except Exception:
                     logger.exception("Fehler beim Warten auf Titel-Task")
 
-            # -- Kosten aus SpendLogs holen --
-            if chunk_id:
+            # -- Kosten aus SpendLogs holen (alle Anfragen dieses Zuges) --
+            if _request_ids:
                 litellm_client = LiteLLMClient()
                 try:
-                    for attempt in range(3):
-                        await asyncio.sleep(_SPEND_LOG_DELAY)
-                        cost_usd = await litellm_client.get_spend_log(chunk_id)
-                        if cost_usd is not None:
-                            break
+                    kosten = await _kosten_des_zuges(
+                        litellm_client, _request_ids,
+                        wartezeiten=_SPEND_LOG_WARTEZEITEN,
+                    )
                 finally:
                     await litellm_client.close()
+                cost_usd = kosten.summe
+                logger.info(
+                    "Kosten des Zuges: %d von %d Anfragen abgerechnet, Summe %s",
+                    kosten.gefunden, kosten.gesamt,
+                    "—" if kosten.summe is None else f"{kosten.summe:.6f}",
+                )
 
             # Bild-Kosten (Phase 16, Schritt 7) zur Text-Summe addieren — dasselbe
             # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).

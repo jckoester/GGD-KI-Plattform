@@ -221,8 +221,20 @@ async def test_get_operatoren_ohne_fachbezug_nennt_den_grund():
     ctx = ToolContext(db=db, user=None, group_id=None, conversation_id=None)
     result = await router._exec_get_operatoren(ctx)
     assert isinstance(result, dict) and "hinweis" in result
-    assert "search_context_nodes" in result["hinweis"], (
+    hinweis = result["hinweis"]
+    assert "search_context_nodes" in hinweis, (
         "Der Hinweis muss den Weg nennen, der stattdessen trägt"
+    )
+    # Die Formulierung ist gemessen, nicht Geschmack: Eine Fassung, die nur die
+    # Einschränkung nannte und den Ausweg empfahl, führte dazu, dass ein Modell sie zur
+    # Einschränkung des ganzen Systems verallgemeinerte und nach einem Fach fragte,
+    # statt zu suchen.
+    assert "KEINE Einschränkung des Wissensgraphen" in hinweis, (
+        "Der Hinweis muss der Verallgemeinerung auf den ganzen Wissensgraph widersprechen"
+    )
+    assert "Rufe jetzt" in hinweis, "direktiv, nicht empfehlend"
+    assert "frage NICHT nach einem Fach" in hinweis, (
+        "Die Rückfrage nach dem Fach muss ausdrücklich ausgeschlossen sein"
     )
     db.get.assert_not_called()
 

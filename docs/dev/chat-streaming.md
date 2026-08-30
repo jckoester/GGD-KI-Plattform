@@ -89,13 +89,41 @@ sichtbar im UI als horizontale Linie mit Label).
 
 ## SpendLog-Timing
 
-LiteLLM schreibt Kosten asynchron nach dem Stream. Das Backend wartet nach
-dem `[DONE]`-Signal eine konfigurierbare Zeit (`SPEND_LOG_DELAY`, Default 1,0 s)
-und fragt dann bis zu dreimal das SpendLog ab. Liefert LiteLLM in diesem
-Zeitfenster keine Daten, wird `cost_usd = null` in der DB gespeichert.
+**Ein Chat-Zug besteht aus mehreren LLM-Anfragen:** je Werkzeugrunde eine, dazu die
+Titelgenerierung. Alle laufen über den Virtual Key der Nutzer:in und belasten deren
+Budget, also werden alle abgerechnet — `_kosten_des_zuges` sammelt eine Request-ID je
+Anfrage und summiert ihre SpendLogs.
 
-Dieses Verhalten ist ein bekannter Kompromiss zwischen Latenz und Vollständigkeit
-der Kostenerfassung.
+LiteLLM schreibt diese Logs asynchron. Gemessen am 30.08.2026, wann eine Buchung abrufbar
+ist:
+
+| Anfrageart | verfügbar nach |
+|---|---|
+| ohne Streaming, kurz | 3,0 s |
+| mit Streaming, kurz | 12,6 s |
+| mit Streaming, lange Antwort | 6,1 s |
+
+Der Chat streamt immer, und die Verzögerung schwankt stark. Deshalb wird **gestaffelt**
+nachgefragt — nach 1, 2, 4 und 8 Sekunden — und abgebrochen, sobald alle Anfragen des
+Zuges abgerechnet sind. Der Normalfall ist damit nach 1 s erledigt, ein Ausreißer nach
+15 s noch erfasst. Ein festes Fenster müsste sich am schlechtesten Fall ausrichten und
+wartete dann auch im guten.
+
+⚠️ Die **letzte** Runde ist systematisch am gefährdetsten: Sie endet zuletzt, hat also am
+wenigsten Zeit — und trägt als Eingabe den gesammelten Kontext, ist also die teuerste.
+Fehlt eine Buchung, fehlt meist die größte.
+
+Was gefunden wurde, steht im Log:
+
+```
+INFO Kosten des Zuges: 4 von 4 Anfragen abgerechnet, Summe 0.000951
+```
+
+Bleibt es bei einer Teilsumme, ist `3 von 4` der Hinweis darauf — eine Summe allein
+verrät nicht, ob sie vollständig ist. Wird gar nichts gefunden, bleibt `cost_usd = null`.
+
+Die Wartezeiten stehen in `_SPEND_LOG_WARTEZEITEN` (`app/chat/router.py`); die frühere
+Einstellung `SPEND_LOG_DELAY` ist damit entfallen.
 
 ## Konversationstitel
 

@@ -6,6 +6,8 @@ Der Kontextspeicher ist eine Sammlung von Wissensbausteinen, die Sie einer Chat-
 >
 > **Was das für Sie heißt:** Verlassen Sie sich bei wichtigen Inhalten nicht allein auf die Suche. Findet sie einen Baustein nicht, versuchen Sie es mit dem genauen Namen (siehe unten) oder heften Sie ihn über den `@`-Shortcode direkt an. Und prüfen Sie die Aussage eines Assistenten, im Kontextspeicher sei „nichts vorhanden", im Zweifel selbst nach.
 >
+> **Wenn der Assistent nach einem Fach fragt, obwohl Sie alle meinen:** Bitten Sie ihn ausdrücklich zu suchen — etwa „Bitte suche nach allen Vorkommen von ‚nennen' und erstelle daraus die Liste." Assistenten greifen bei fachbezogenen Fragen bevorzugt zum Fach-Werkzeug, das nur ein Fach kennt; der ausdrückliche Suchauftrag führt sie auf den richtigen Weg.
+>
 > Woran das liegt: Der Bestand besteht bislang fast nur aus Bildungsplan-Daten. Sobald Lehrkräfte in größerem Umfang eigene Bausteine anlegen — Begriffsdefinitionen, Methoden, Anleitungen —, muss die Suche neu bewertet werden. Wir arbeiten daran.
 
 ## Was sind Kontextbausteine?

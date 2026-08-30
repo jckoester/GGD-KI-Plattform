@@ -228,7 +228,12 @@ def _mock_title_client(content="Ein kurzer Titel"):
     captured = {}
     response = MagicMock()
     response.raise_for_status = MagicMock()
-    response.json = MagicMock(return_value={"choices": [{"message": {"content": content}}]})
+    # `id` gehört dazu: Die Antwort der Titelgenerierung liefert die Request-ID, über die
+    # ihre Kosten aus den SpendLogs geholt werden.
+    response.json = MagicMock(return_value={
+        "id": "chatcmpl-titel-1",
+        "choices": [{"message": {"content": content}}],
+    })
 
     def _build_request(method, url, headers=None, json=None):
         captured["method"] = method
@@ -262,9 +267,14 @@ async def test_generate_title_uses_virtual_key_and_user_sub():
         mock_settings.litellm_verify_ssl = True
         mock_settings.litellm_master_key = "sk-MASTER-should-not-be-used"
 
-        title = await _generate_title(uuid4(), "Erkläre mir Brüche", "sk-user-vkey", "pseudo-abc")
+        ergebnis = await _generate_title(
+            uuid4(), "Erkläre mir Brüche", "sk-user-vkey", "pseudo-abc"
+        )
 
-    assert title == "Bruchrechnung üben"
+    assert ergebnis.titel == "Bruchrechnung üben"
+    # Die Request-ID wird für die Kostenabrechnung gebraucht: Der Titel-Call läuft über
+    # den Virtual Key und belastet das Budget der Nutzer:in — er gehört in die Anzeige.
+    assert ergebnis.request_id is not None
     assert captured["headers"]["Authorization"] == "Bearer sk-user-vkey"
     assert "sk-MASTER-should-not-be-used" not in captured["headers"]["Authorization"]
     assert captured["json"]["user"] == "pseudo-abc"
@@ -279,9 +289,9 @@ async def test_generate_title_skips_without_key():
          patch("app.chat.router.settings") as mock_settings:
         mock_settings.title_model = "openai/gpt-4o-mini"
 
-        title = await _generate_title(uuid4(), "Prompt", "", "pseudo-abc")
+        ergebnis = await _generate_title(uuid4(), "Prompt", "", "pseudo-abc")
 
-    assert title is None
+    assert ergebnis.titel is None and ergebnis.request_id is None
     mk.assert_not_called()
     assert captured == {}
 
