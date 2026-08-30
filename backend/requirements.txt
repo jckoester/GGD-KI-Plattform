@@ -42,6 +42,12 @@ lark>=1.1,<2.0
 pytest>=8.0.0,<10.0
 pytest-asyncio>=0.23.0,<2.0
 pytest-httpx>=0.25.0,<1.0
+# Statische Prüfung auf undefinierte Namen (tests/unit/test_keine_undefinierten_namen.py).
+# Nötig, weil dev auf Python 3.14 läuft und der Container auf 3.12: Ein undefinierter Name
+# in einer Annotation fällt unter 3.14 nie auf (PEP 649), bricht unter 3.12 aber den
+# Import des Backends ab. Bewusst KEINE Skip-Bedingung im Test — eine still übersprungene
+# Prüfung wäre schlimmer als keine.
+pyflakes>=3.2,<4.0
 
 # Runtime - Auth
 bcrypt>=4.0.0,<5.0

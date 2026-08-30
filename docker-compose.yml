@@ -83,10 +83,25 @@ services:
     build: ./backend
     env_file: .env
     environment:
+      # ⚠️ ALLE Pfade absolut. Das Image legt den Code nach /app, wodurch gegenüber dem
+      # Entwicklungsbaum die Ebene `backend/` entfällt: Module, die ihre Repo-Wurzel als
+      # `Path(__file__).parents[3]` berechnen, landen im Container bei `/` statt bei /app
+      # und suchen dann in `/config/…`. Ein relativer Vorgabewert greift also daneben —
+      # ohne Absturz, nur mit „Datei nicht gefunden" an einer späteren Stelle.
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
       TAXONOMY_PATH: /app/config/taxonomy.yaml
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
+      # Diese fünf betrifft genau das (test_container_pfade.py hält die Liste aktuell).
+      # Sie tragen Jugendschutz, Krisenerkennung und Leitplanken — fällt einer aus, ist
+      # nicht die Anwendung kaputt, sondern eine Schutzfunktion still weg.
+      PEDAGOGY_PATH: /app/config/pedagogy.yaml
+      CRISIS_TRIGGERS_PATH: /app/config/crisis_triggers.yaml
+      HELP_RESOURCES_PATH: /app/config/help_resources.yaml
+      IMAGE_MODELS_PATH: /app/config/image_models.yaml
+      IMAGE_BLOCKLIST_PATH: /app/config/image_blocklist.yaml
+      # Gegenstück zu `health_file` in der LiteLLM-Config (dort /app/data/…).
+      GUARDRAIL_HEALTH_FILE: /app/data/guardrail_health.json
       # Server-Rendering (Phase 17): interner Sidecar für CircuiTikZ/Mathe (Chat + PDF).
       RENDER_SIDECAR_URL: http://render-sidecar:3200
       # matplotlib (Plot-Rendering) braucht ein schreibbares Verzeichnis für den Font-Cache.
@@ -171,10 +186,17 @@ services:
     build: ./backend
     env_file: .env
     environment:
+      # Absolut, aus demselben Grund wie beim backend-Dienst (siehe dort).
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
       TAXONOMY_PATH: /app/config/taxonomy.yaml
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
+      PEDAGOGY_PATH: /app/config/pedagogy.yaml
+      CRISIS_TRIGGERS_PATH: /app/config/crisis_triggers.yaml
+      HELP_RESOURCES_PATH: /app/config/help_resources.yaml
+      IMAGE_MODELS_PATH: /app/config/image_models.yaml
+      IMAGE_BLOCKLIST_PATH: /app/config/image_blocklist.yaml
+      GUARDRAIL_HEALTH_FILE: /app/data/guardrail_health.json
       # Muss zu backend passen (dasselbe ./data-Volume) — sonst räumt der Cron ins Leere.
       IMAGE_STORAGE_DIR: /app/data/generated_images
       ARTIFACT_STORAGE_DIR: /app/data/artifacts

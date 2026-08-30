@@ -7,6 +7,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Das Backend startete im Container nicht** (`NameError: name 'Any' is not defined` in
+  `app/chat/router.py`). Fehlender Import; die Entwicklungsumgebung läuft auf Python 3.14
+  und wertet Annotationen erst bei Bedarf aus (PEP 649), das Container-Image auf 3.12
+  wertet sie beim Import aus. Neuer Test `test_keine_undefinierten_namen.py` prüft
+  `app/`, `scripts/` und `infra/guardrails/` statisch auf undefinierte Namen — unabhängig
+  von der Python-Fassung.
+
 - **Chats mit Werkzeugaufrufen wurden zu niedrig abgerechnet.** Ein Chat-Zug besteht aus
   mehreren Anfragen an das Sprachmodell — je Werkzeugrunde eine, dazu die
   Titelgenerierung. Abgerechnet wurde nur die letzte; in Zügen mit mehreren Runden fehlte
