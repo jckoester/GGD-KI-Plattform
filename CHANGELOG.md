@@ -125,6 +125,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   - Neuer Cron **montags 05:00** (`weekly_budget_accrual.py`), idempotent und mit Nachholen
     ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
     `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
+  - **Schuljahreswechsel:** Beim ersten Zuteilungslauf eines neuen Schuljahres werden
+    Obergrenze **und** Verbrauch zurückgesetzt — erkannt am Schuljahr in
+    `config/school_year.yaml`, ohne eigenen Lauf. Reste wandern damit nicht ins nächste
+    Schuljahr. Es ist der einzige Reset im Modell.
   - **Hochrechnung aufs Schuljahr** auf `/budget`: „bisher X € in 12 von 40
     Unterrichtswochen, bei diesem Tempo endet das Schuljahr bei Y von Z zugeteilt". Bei
     niedriger Auslastung mit dem Hinweis, dass sich die Wochenbeträge **jetzt** noch

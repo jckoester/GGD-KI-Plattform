@@ -143,6 +143,33 @@ docker compose exec backend python scripts/weekly_budget_accrual.py --dry-run
 > durch denselben Vorsprung, ein ausgefallener Cron ist also kein Freibrief. In
 > Ferienwochen tut er nichts.
 
+## Schuljahreswechsel
+
+**Der einzige Reset im ganzen Modell — und er braucht keinen eigenen Lauf.**
+
+Sobald in `config/school_year.yaml` ein neues Schuljahr steht, erkennt der Zuteilungslauf
+das am Merkposten (`budget_accrual.schuljahr`) und setzt beim ersten Lauf des neuen Jahres
+**Obergrenze und Verbrauch** zurück. Die Nutzerin startet mit genau einem Wochenbetrag.
+
+**Reste wandern nicht ins nächste Schuljahr.** Das ist die Zusage, die auch in der
+Admin-Oberfläche steht: Was im Juli übrig ist, ist im September nicht mehr da. Wer es
+verwenden will, hebt die Wochenbeträge rechtzeitig an — dafür ist die Hochrechnung da.
+
+Checkliste zum Wechsel:
+
+1. `config/school_year.yaml` auf das neue Schuljahr umstellen (Beginn, Ende, Ferien,
+   Feiertage). Der Ferienimport hilft: `/settings` → Ferien übernehmen.
+2. **Die Zahl der Unterrichtswochen prüfen** — sie steht auf `/budget` und ist der Faktor
+   der Jahreszusage. Ein vergessener Ferienzeitraum erzeugt zusätzliche Wochen und damit
+   eine höhere Jahressumme, als beim Eintragen angezeigt wurde.
+3. Wochenbeträge je Stufe prüfen und ggf. anpassen.
+4. Den ersten Zuteilungslauf abwarten (montags) oder von Hand anstoßen:
+   `docker compose exec backend python scripts/weekly_budget_accrual.py --dry-run`
+
+> Der Lauf setzt **nur** beim erkannten Jahreswechsel zurück. Eine Nutzerin ohne
+> Merkposten — etwa direkt nach der Umstellung vom Monatsmodell — behält ihren Verbrauch;
+> ihn stillschweigend zu löschen wäre Datenverlust.
+
 ## Umstellung vom Monatsmodell (einmalig)
 
 Bis 08/2026 war das Budget monatlich und wurde von LiteLLM zurückgesetzt. Bestandsnutzer

@@ -10,7 +10,13 @@ Der Lauf ist **idempotent**: Zweimal in derselben Unterrichtswoche ausgeführt b
 einmal. Fällt er aus, holt der nächste Lauf die fehlenden Wochen nach — begrenzt durch
 denselben Vorsprung, ein ausgefallener Cron ist also kein Freibrief.
 
-In Ferienwochen tut er nichts. Zum Schuljahreswechsel beginnt die Zählung von vorn.
+In Ferienwochen tut er nichts.
+
+**Zum Schuljahreswechsel** beginnt die Zählung von vorn: Beim ersten Lauf eines neuen
+Schuljahres (erkannt am `schuljahr`-Feld des Merkpostens) werden Obergrenze **und
+Verbrauch** zurückgesetzt. Reste wandern also nicht ins nächste Schuljahr — das ist die
+Zusage, die auch in der Admin-Oberfläche steht. Es ist der einzige Reset im ganzen Modell
+und braucht keinen eigenen Lauf.
 
 Verwendung:
     python scripts/weekly_budget_accrual.py
@@ -100,17 +106,23 @@ async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None,
 
                 if dry_run:
                     logger.info(
-                        "[dry-run] %s: %.4f → %.4f USD (%d Woche(n), bis KW-Index %s)",
+                        "[dry-run] %s: %.4f → %.4f (%d Woche(n), bis KW-Index %s)%s",
                         user.pseudonym, info.get("max_budget") or 0.0,
                         zuteilung.neue_grenze_usd, zuteilung.gebuchte_wochen,
                         zuteilung.bis_woche,
+                        "  ⟲ Schuljahreswechsel, Verbrauch wird genullt"
+                        if zuteilung.jahreswechsel else "",
                     )
                     counters["gebucht"] += 1
+                    if zuteilung.jahreswechsel:
+                        counters["jahreswechsel"] += 1
                     continue
 
                 try:
                     await client.update_user_budget(
-                        user.pseudonym, zuteilung.neue_grenze_usd
+                        user.pseudonym, zuteilung.neue_grenze_usd,
+                        # Der einzige Anlass, den Verbrauchszähler anzufassen.
+                        spend=0.0 if zuteilung.jahreswechsel else None,
                     )
                 except Exception:
                     # Merkposten NICHT fortschreiben — sonst gilt die Woche als gebucht,
@@ -124,6 +136,8 @@ async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None,
                     bis_woche=zuteilung.bis_woche, schuljahr=cfg.schuljahr,
                 )
                 counters["gebucht"] += 1
+                if zuteilung.jahreswechsel:
+                    counters["jahreswechsel"] += 1
         finally:
             await client.close()
 

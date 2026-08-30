@@ -41,6 +41,10 @@ class Zuteilung:
     gebuchte_wochen: int
     bis_woche: Optional[int]
     grund: str = ""
+    #: Erste Zuteilung eines neuen Schuljahres. Dann wird der Verbrauch **mit**
+    #: zurückgesetzt — sonst zählte der des Vorjahres gegen das neue Budget, und die
+    #: angezeigte Obergrenze wüchse über die Jahre ins Sinnlose.
+    jahreswechsel: bool = False
 
     @property
     def zu_tun(self) -> bool:
@@ -115,13 +119,28 @@ async def plane(
         )
 
     stand = await db.get(BudgetAccrual, pseudonym)
+    jahreswechsel = stand is not None and stand.schuljahr != c.schuljahr
 
-    if stand is None or stand.schuljahr != c.schuljahr:
-        # Erstzuteilung — oder ein neues Schuljahr, das die Zählung neu beginnt.
+    if jahreswechsel:
+        # **Der einzige Reset, den es gibt.** Verbrauch und Obergrenze des Vorjahres
+        # gehen NICHT ein: Sonst zählte der alte Verbrauch gegen das neue Budget, die
+        # Schutzregel „nie kürzen" hielte die alte Grenze das ganze Jahr über fest, und
+        # nicht Verbrauchtes wanderte ins nächste Schuljahr — entgegen der Zusage, die
+        # in der Admin-Oberfläche steht.
         #
-        # Bewusst **kein** rückwirkendes Nachholen ab Woche 1: Wer im März dazukommt, hat
-        # nicht seit September Anspruch. Für den Ausfall eines Laufs braucht es das auch
-        # nicht — dafür gibt es unten den Vergleich mit `letzte_woche`.
+        # Der Verbrauch wird beim Schreiben genullt (`Zuteilung.jahreswechsel`), deshalb
+        # steht die neue Grenze bei genau einem Wochenbetrag.
+        return Zuteilung(
+            round(wochenbetrag_usd, 4), 1, woche.index, jahreswechsel=True
+        )
+
+    if stand is None:
+        # Erstzuteilung. Bewusst **kein** rückwirkendes Nachholen ab Woche 1: Wer im März
+        # dazukommt, hat nicht seit September Anspruch. Für den Ausfall eines Laufs
+        # braucht es das nicht — dafür gibt es den Vergleich mit `letzte_woche`.
+        #
+        # Und bewusst **ohne** Verbrauchs-Reset: Wer hier landet, kann aus der Umstellung
+        # vom Monatsmodell kommen und einen echten Verbrauch tragen.
         fehlende = 1
     else:
         offen = [w for w in wochen_bis(stichtag, c) if w.index > stand.letzte_woche]

@@ -215,21 +215,67 @@ async def test_ausgefallene_laeufe_werden_nachgeholt():
 
 
 @pytest.mark.asyncio
-async def test_neues_schuljahr_beginnt_die_zaehlung_neu():
-    """Der Jahreswechsel braucht keinen eigenen Rücksetzlauf."""
+async def test_neues_schuljahr_traegt_weder_grenze_noch_verbrauch_mit():
+    """Der einzige Reset im ganzen Modell — und er muss vollständig sein.
+
+    Ginge die Vorjahresgrenze in die Rechnung ein, hielte die Schutzregel „nie kürzen" sie
+    das ganze neue Jahr über fest: Nicht Verbrauchtes wanderte ins nächste Schuljahr,
+    entgegen der Zusage in der Admin-Oberfläche. Und der alte Verbrauch zählte gegen das
+    neue Budget.
+    """
     from app.budget.accrual import plane
     from app.db.models import BudgetAccrual
 
     alt = BudgetAccrual(pseudonym="p", schuljahr="2025/26", letzte_woche=38)
     zuteilung = await plane(
         _FakeDb(alt), "p",
-        wochenbetrag_usd=1.0, aktuelle_grenze_usd=40.0, verbrauch_usd=39.0,
+        wochenbetrag_usd=1.0,
+        aktuelle_grenze_usd=40.0,   # Vorjahresgrenze
+        verbrauch_usd=39.0,         # Vorjahresverbrauch
         stichtag=date(2026, 9, 15),
         cfg=_schuljahr(),
     )
 
+    assert zuteilung.jahreswechsel is True
+    assert zuteilung.neue_grenze_usd == 1.0, "genau ein Wochenbetrag, nicht 40 + 1"
     assert zuteilung.gebuchte_wochen == 1
     assert zuteilung.bis_woche == 1
+
+
+@pytest.mark.asyncio
+async def test_erstzuteilung_ist_kein_jahreswechsel():
+    """Ohne Merkposten wird der Verbrauch NICHT genullt.
+
+    Wer hier landet, kann aus der Umstellung vom Monatsmodell kommen und einen echten
+    Verbrauch tragen — den stillschweigend zu löschen wäre Datenverlust.
+    """
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(), "neu",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=None, verbrauch_usd=2.0,
+        stichtag=date(2026, 9, 15), cfg=_schuljahr(),
+    )
+
+    assert zuteilung.jahreswechsel is False
+
+
+@pytest.mark.asyncio
+async def test_gleiches_schuljahr_loest_keinen_reset_aus():
+    """Gegenprobe: Im laufenden Jahr darf nie zurückgesetzt werden."""
+    from app.budget.accrual import plane
+    from app.db.models import BudgetAccrual
+
+    stand = BudgetAccrual(pseudonym="p", schuljahr="2026/27", letzte_woche=1)
+    zuteilung = await plane(
+        _FakeDb(stand), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=5.0, verbrauch_usd=4.0,
+        stichtag=date(2026, 9, 22),   # 2. Woche, die 1. ist gebucht
+        cfg=_schuljahr(),
+    )
+
+    assert zuteilung.jahreswechsel is False
+    assert zuteilung.neue_grenze_usd == 6.0, "aufgestockt, nicht zurückgesetzt"
 
 
 @pytest.mark.asyncio
@@ -390,3 +436,41 @@ async def test_neuaufbau_sperrt_niemanden_aus():
 
     assert zuteilung.neue_grenze_usd == 3.0, "Verbrauch + eine Woche"
     assert zuteilung.neue_grenze_usd > 2.0, "nutzbar, nicht gesperrt"
+
+
+@pytest.mark.asyncio
+async def test_lauf_nullt_den_verbrauch_nur_beim_jahreswechsel():
+    """Die Schnittstelle zum Proxy: `spend=0` darf nur einmal im Jahr mitgehen.
+
+    Sonst wäre die Kostenrechnung manipulierbar, ohne dass es irgendwo auffiele.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from app.budget.accrual import Zuteilung
+    from scripts.weekly_budget_accrual import run
+
+    cm, _ = _mock_session([_nutzer("p1")])
+    client = AsyncMock()
+    client.close = AsyncMock()
+    client.get_user = AsyncMock(return_value={"max_budget": 40.0, "spend": 39.0})
+    client.update_user_budget = AsyncMock()
+
+    def lauf(zuteilung):
+        return patch.multiple(
+            "scripts.weekly_budget_accrual",
+            AsyncSessionLocal=lambda: cm,
+            get_current_rate=AsyncMock(return_value=1.0),
+            get_budget_for=lambda *a, **k: 1.0,
+            load_school_year=lambda: _schuljahr(),
+            LiteLLMClient=lambda: client,
+            plane=AsyncMock(return_value=zuteilung),
+        )
+
+    with lauf(Zuteilung(1.0, 1, 1, jahreswechsel=True)):
+        await run(dry_run=False, stichtag=date(2026, 9, 15), pseudonym_filter=None)
+    assert client.update_user_budget.await_args.kwargs["spend"] == 0.0
+
+    client.update_user_budget.reset_mock()
+    with lauf(Zuteilung(6.0, 1, 2, jahreswechsel=False)):
+        await run(dry_run=False, stichtag=date(2026, 9, 22), pseudonym_filter=None)
+    assert client.update_user_budget.await_args.kwargs["spend"] is None

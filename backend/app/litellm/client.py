@@ -156,9 +156,15 @@ class LiteLLMClient:
         self,
         pseudonym: str,
         max_budget: Optional[float],
+        *,
+        spend: Optional[float] = None,
     ) -> None:
         """
         POST /user/update
+
+        ``spend`` nur zum **Schuljahreswechsel** setzen (auf 0). Es ist der einzige
+        Anlass, den Verbrauchszähler anzufassen — sonst wäre die Kostenrechnung
+        manipulierbar, ohne dass es irgendwo auffiele.
         """
         client = await self._get_client()
         url = f"{self.base_url}/user/update"
@@ -172,6 +178,8 @@ class LiteLLMClient:
         # lässt er sich ohnehin nicht entfernen (gemessen). Das erledigt der einmalige
         # Umstellungslauf, nicht dieser Aufruf.
         payload: dict = {"user_id": pseudonym, "max_budget": max_budget}
+        if spend is not None:
+            payload["spend"] = spend
 
         response = await client.post(url, headers=headers, json=payload)
 

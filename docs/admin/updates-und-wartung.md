@@ -338,8 +338,13 @@ auch mit Backup nicht möglich.
 - **Neue Schüler:innen** erhalten beim ersten Login automatisch ein Konto und
   werden anhand ihrer SSO-Jahrgangsgruppe der richtigen Budget-Klasse zugeordnet.
 - **Jahrgangs­wechsel:** Wenn Schüler:innen im SSO-System in die nächste
-  Jahrgangsgruppe verschoben werden, zieht das neue Budget beim nächsten
-  Monats-Reconcile (1. des Monats) automatisch nach.
+  Jahrgangsgruppe verschoben werden, greift der neue Wochenbetrag beim nächsten
+  Zuteilungslauf (montags) automatisch; die Team-Zugehörigkeit zieht der
+  Monatslauf nach.
+- **Budget-Rücksetzung:** Sobald `config/school_year.yaml` das neue Schuljahr
+  führt, setzt der erste Zuteilungslauf Obergrenze **und** Verbrauch zurück.
+  Reste des Vorjahres wandern **nicht** mit — siehe
+  [Budget-System → Schuljahreswechsel](budget.md#schuljahreswechsel).
 
 ### Was manuell geprüft werden sollte
 
@@ -348,8 +353,13 @@ auch mit Backup nicht möglich.
 - Sind Abgänger aus den Schulgruppen entfernt?
 
 **In der Plattform:**
-- `config/budget_tiers.yaml`: Sollen sich Budget-Beträge für bestimmte
-  Jahrgänge ändern? Falls ja: Datei anpassen und Reconcile-Skript ausführen.
+- `config/school_year.yaml` auf das neue Schuljahr umstellen — Beginn, Ende, Ferien,
+  Feiertage. **Danach die Zahl der Unterrichtswochen auf `/budget` prüfen:** Sie ist der
+  Faktor der Jahreszusage, und ein vergessener Ferienzeitraum erzeugt zusätzliche Wochen
+  und damit eine höhere Jahressumme als angezeigt.
+- `config/budget_tiers.yaml`: Sollen sich die Wochenbeträge für bestimmte
+  Jahrgänge ändern? Die Anpassung geht auch über `/budget`; dort steht die
+  resultierende Jahressumme daneben.
 - `STUDENT_GRADES` in `.env`: Enthält die Liste noch alle relevanten Jahrgänge?
   (Relevant wenn ein neuer 5. Jahrgang hinzukommt oder der 12. endet.)
 - Assistenten: Sind alle Assistenten noch aktuell und für das neue Schuljahr passend?
