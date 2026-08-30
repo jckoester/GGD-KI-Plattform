@@ -15,4 +15,7 @@ async def read_my_budget(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    return await get_budget_info(db, current_user.sub)
+    return await get_budget_info(
+        db, current_user.sub,
+        roles=current_user.roles, grade=current_user.grade,
+    )

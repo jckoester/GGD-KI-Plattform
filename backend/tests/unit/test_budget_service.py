@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,9 +33,11 @@ def test_empty_budget():
     assert result["max_budget_usd"] is None
     assert result["spend_usd"] is None
     assert result["remaining_usd"] is None
-    assert result["budget_duration"] is None
-    assert result["budget_reset_at"] is None
     assert result["max_budget_eur"] is None
+    # Seit dem Wochenmodell gibt es keine Rücksetzung — die Felder wären eine
+    # Einladung, in der Oberfläche einen Zeitraum anzuzeigen, den es nicht gibt.
+    assert "budget_duration" not in result
+    assert "budget_reset_at" not in result
     assert result["spend_eur"] is None
     assert result["remaining_eur"] is None
     assert result["eur_usd_rate"] == 1.10
@@ -52,8 +55,6 @@ def test_build_response_all_fields_present():
     assert result["max_budget_usd"] == 2.75
     assert result["spend_usd"] == 0.42
     assert result["remaining_usd"] == 2.33
-    assert result["budget_duration"] == "1mo"
-    assert result["budget_reset_at"] == "2026-05-01T00:00:00Z"
     assert result["max_budget_eur"] == 2.5
     assert result["spend_eur"] == 0.38
     assert result["remaining_eur"] == 2.12
@@ -100,8 +101,6 @@ def test_build_response_all_fields_missing():
     assert result["max_budget_usd"] is None
     assert result["spend_usd"] is None
     assert result["remaining_usd"] is None
-    assert result["budget_duration"] is None
-    assert result["budget_reset_at"] is None
     assert result["max_budget_eur"] is None
     assert result["spend_eur"] is None
     assert result["remaining_eur"] is None
@@ -132,8 +131,6 @@ async def test_get_budget_info_normal_case():
     assert result["max_budget_usd"] == 2.75
     assert result["spend_usd"] == 0.42
     assert result["remaining_usd"] == 2.33
-    assert result["budget_duration"] == "1mo"
-    assert result["budget_reset_at"] == "2026-05-01T00:00:00Z"
     assert result["max_budget_eur"] == 2.5
     assert result["spend_eur"] == 0.38
     assert result["remaining_eur"] == 2.12
@@ -156,8 +153,6 @@ async def test_get_budget_info_user_not_in_litellm():
     assert result["max_budget_usd"] is None
     assert result["spend_usd"] is None
     assert result["remaining_usd"] is None
-    assert result["budget_duration"] is None
-    assert result["budget_reset_at"] is None
     assert result["max_budget_eur"] is None
     assert result["spend_eur"] is None
     assert result["remaining_eur"] is None
@@ -252,3 +247,65 @@ async def test_get_budget_info_eur_conversion_specific_rate():
     assert result["spend_eur"] == 0.5
     assert result["remaining_usd"] == 2.2
     assert result["remaining_eur"] == 2.0
+
+
+# ── Wochenmodell in der Nutzeransicht ───────────────────────────────────────────────
+#
+# Die Frage, die Nutzer:innen tatsächlich stellen, ist nicht „wie viel ist übrig", sondern
+# „wann kommt wieder etwas dazu". Ohne Antwort darauf wirkt ein leeres Budget endgültig.
+
+@pytest.mark.asyncio
+async def test_wochenbetrag_und_naechste_aufstockung_werden_geliefert():
+    from datetime import date
+
+    db = AsyncMock()
+    client = AsyncMock()
+    client.get_user = AsyncMock(return_value={"max_budget": 1.0, "spend": 0.25})
+    client.close = AsyncMock()
+    woche = SimpleNamespace(montag=date(2026, 9, 21), index=2, tage=5)
+
+    with patch("app.budget.service.LiteLLMClient", return_value=client), \
+         patch("app.budget.service.get_current_rate", new=AsyncMock(return_value=1.0)), \
+         patch("app.budget.service.get_budget_for", return_value=0.04), \
+         patch("app.budget.service.naechste_woche_nach", return_value=woche):
+        result = await get_budget_info(db, "p", roles=["student"], grade=7)
+
+    assert result["wochenbetrag_eur"] == 0.04
+    assert result["naechste_aufstockung"] == "2026-09-21"
+
+
+@pytest.mark.asyncio
+async def test_am_schuljahresende_gibt_es_keine_naechste_aufstockung():
+    """Dann kommt tatsächlich nichts mehr dazu — das darf die Oberfläche nicht verschweigen."""
+    db = AsyncMock()
+    client = AsyncMock()
+    client.get_user = AsyncMock(return_value={"max_budget": 1.0, "spend": 0.25})
+    client.close = AsyncMock()
+
+    with patch("app.budget.service.LiteLLMClient", return_value=client), \
+         patch("app.budget.service.get_current_rate", new=AsyncMock(return_value=1.0)), \
+         patch("app.budget.service.get_budget_for", return_value=0.04), \
+         patch("app.budget.service.naechste_woche_nach", return_value=None):
+        result = await get_budget_info(db, "p", roles=["student"], grade=7)
+
+    assert result["naechste_aufstockung"] is None
+    assert result["wochenbetrag_eur"] == 0.04
+
+
+@pytest.mark.asyncio
+async def test_kaputte_schuljahres_config_bricht_die_anzeige_nicht():
+    """Der verbleibende Betrag ist die wichtigere Auskunft — er muss durchkommen."""
+    db = AsyncMock()
+    client = AsyncMock()
+    client.get_user = AsyncMock(return_value={"max_budget": 1.0, "spend": 0.25})
+    client.close = AsyncMock()
+
+    with patch("app.budget.service.LiteLLMClient", return_value=client), \
+         patch("app.budget.service.get_current_rate", new=AsyncMock(return_value=1.0)), \
+         patch("app.budget.service.get_budget_for", side_effect=RuntimeError("kaputt")), \
+         patch("app.budget.service.naechste_woche_nach", side_effect=RuntimeError("kaputt")):
+        result = await get_budget_info(db, "p", roles=["student"], grade=7)
+
+    assert result["remaining_eur"] == 0.75
+    assert result["wochenbetrag_eur"] is None
+    assert result["naechste_aufstockung"] is None

@@ -1,6 +1,7 @@
 <script>
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
+    import { zuwachsKurz } from "$lib/budget_text.js";
     import { crisisAlertTotal } from "$lib/stores/crisisAlerts.js";
     import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
     import UserMenu from "./UserMenu.svelte";
@@ -33,6 +34,10 @@
         });
     }
 
+    // Kurzform („+0,04 € am Mo., 21.09."). Ohne sie liest sich ein niedriger Stand
+    // in der Seitenleiste wie ein endgültiger.
+    let zuwachs = $derived(zuwachsKurz($budget));
+
     let pct = $derived(
         $budget?.max_budget_eur && $budget?.spend_eur != null
             ? Math.min(
@@ -61,7 +66,7 @@
         {/if}
     </div>
     {#if pct != null}
-        <div class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 mb-3">
+        <div class="w-full h-1 rounded bg-light-ui-3 dark:bg-dark-ui-3 {zuwachs ? 'mb-1' : 'mb-3'}">
             <div
                 class="h-1 rounded transition-all {pct >= 80
                     ? 'bg-red-500'
@@ -69,6 +74,9 @@
                 style="width: {100 - pct}%"
             ></div>
         </div>
+    {/if}
+    {#if zuwachs}
+        <div class="text-xs mb-3 text-light-tx-3 dark:text-dark-tx-3">{zuwachs}</div>
     {/if}
 
     <!-- Benutzerbereich -->

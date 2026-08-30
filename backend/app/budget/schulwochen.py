@@ -102,6 +102,25 @@ def woche_am(d: date, cfg: Optional[SchoolYearConfig] = None) -> Optional[Unterr
     return None
 
 
+def naechste_woche_nach(
+    d: date, cfg: Optional[SchoolYearConfig] = None
+) -> Optional[Unterrichtswoche]:
+    """Die nächste Unterrichtswoche, die **nach** der Woche von ``d`` beginnt.
+
+    Beantwortet die Frage, die Nutzer:innen tatsächlich stellen: *Wann kommt wieder etwas
+    dazu?* In Ferien ist das die erste Woche danach, am Schuljahresende ``None``.
+
+    Bewusst allein aus dem Kalender, ohne den Buchungsstand: Die Aussage ist „an diesem Tag
+    stockt die Plattform auf", nicht „für dich persönlich". Wäre ein Lauf ausgefallen, käme
+    das Guthaben früher — eine zu späte Angabe enttäuscht niemanden, eine zu frühe schon.
+    """
+    montag = d - timedelta(days=d.weekday())
+    for w in unterrichtswochen(cfg):
+        if w.montag > montag:
+            return w
+    return None
+
+
 def wochen_bis(d: date, cfg: Optional[SchoolYearConfig] = None) -> list[Unterrichtswoche]:
     """Alle Unterrichtswochen, die am Stichtag begonnen haben (einschließlich seiner).
 

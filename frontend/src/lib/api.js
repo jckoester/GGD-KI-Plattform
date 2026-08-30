@@ -570,7 +570,8 @@ export async function getBudgetGrades() {
   if (!res.ok)
     throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
   return res.json();
-  // { grades: [{key, label, grade, max_budget_eur, budget_duration, user_count}], eur_usd_rate }
+  // { grades: [{key, label, grade, max_budget_eur, user_count}], eur_usd_rate,
+  //   unterrichtswochen } — max_budget_eur ist der Betrag je Unterrichtswoche
 }
 
 // ── Export-Vorlagen (Admin, Phase 19) ──────────────────────────────────────────

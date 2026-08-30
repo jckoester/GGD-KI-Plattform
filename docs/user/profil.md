@@ -4,20 +4,27 @@ Die Profilseite erreichen Sie über das User-Menü oben rechts → **„Profil"*
 
 ## Budget
 
-Jede Nutzerin und jeder Nutzer hat ein monatliches Budget für KI-Anfragen. Dieses Budget wird in Euro berechnet und spiegelt die tatsächlichen Kosten der genutzten KI-Modelle wider. Günstigere Modelle verbrauchen das Budget langsamer als leistungsstärkere.
+Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das in Euro gerechnet wird und die tatsächlichen Kosten der genutzten Modelle abbildet. Günstigere Modelle verbrauchen es langsamer als leistungsstärkere.
+
+**Das Budget wächst jede Unterrichtswoche.** Es wird nicht zurückgesetzt: Was Sie in einer ruhigen Woche nicht verbrauchen, bleibt Ihnen für dichtere Wochen erhalten. Ansammeln lässt sich allerdings höchstens der Betrag einiger Wochen — wie vieler, legt die Schule fest (`vorsprung_wochen`, Vorgabe drei); die Profilseite nennt die Zahl und den Betrag. In den Ferien kommt nichts dazu.
 
 Auf der Profilseite sehen Sie:
 - Wie viel Budget noch übrig ist
 - Wie viel insgesamt zur Verfügung steht
+- **Wann das nächste Mal etwas dazukommt und wie viel**
 - Einen Fortschrittsbalken, der sich rot färbt, wenn das Budget knapp wird
+
+Dieselben Angaben stehen verkürzt unten in der Seitenleiste, damit Sie nicht extra ins Profil wechseln müssen.
 
 > 📷 *Screenshot folgt: Budget-Anzeige mit Fortschrittsbalken auf der Profilseite.*
 <!-- Ersetzen durch: ![Budget-Anzeige](/help-images/profil/budget.png) -->
 
 **Was passiert, wenn das Budget aufgebraucht ist?**
-Neue Nachrichten werden abgelehnt, bis das Budget zu Monatsbeginn automatisch erneuert wird. Sie können weiterhin ältere Gespräche lesen, aber keine neuen Nachrichten senden.
+Neue Nachrichten werden abgelehnt. Ältere Gespräche können Sie weiterhin lesen. Zu Beginn der nächsten Unterrichtswoche kommt wieder Guthaben dazu — die Anzeige nennt den Termin. Ein Ausweichen auf ein anderes Modell gibt es nicht: Aufgebraucht ist aufgebraucht.
 
-Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüler:innen, Lehrkräfte) unterschiedlich hoch sein.
+Ein Bild kostet dabei ungefähr so viel wie vierzig Chat-Nachrichten. Wer viel mit Bildern arbeitet, merkt das am Budget deutlich schneller.
+
+Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüler:innen, Lehrkräfte) unterschiedlich hoch sein. Zu Beginn eines neuen Schuljahres beginnt die Zählung von vorn.
 
 ## Erscheinungsbild
 

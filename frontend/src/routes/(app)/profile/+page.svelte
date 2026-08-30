@@ -3,6 +3,7 @@
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
+    import { zuwachsText, uebertragText } from "$lib/budget_text.js";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { goto } from "$app/navigation";
@@ -129,6 +130,12 @@
               )
             : null,
     );
+
+    // „Wann kommt wieder etwas dazu?" — ohne die Antwort wirkt ein leeres Budget
+    // endgültig, obwohl am Montag wieder Guthaben da ist.
+    let zuwachs = $derived(zuwachsText($budget));
+    // Wie viel sich höchstens ansammelt — aus `vorsprung_wochen`, nicht geschätzt.
+    let uebertrag = $derived(uebertragText($budget));
 </script>
 
 <button
@@ -184,8 +191,13 @@
                     {/if}
                 </div>
                 <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">
-                    Dein Guthaben wächst in jeder Unterrichtswoche. Was du nicht
-                    verbrauchst, bleibt dir für spätere Wochen erhalten.
+                    {#if zuwachs}
+                        <p>{zuwachs}</p>
+                    {/if}
+                    {#if uebertrag}
+                        <p>{uebertrag}</p>
+                    {/if}
+                    <p>In den Ferien kommt nichts dazu.</p>
                 </div>
             {:else}
                 <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">
