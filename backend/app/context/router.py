@@ -908,14 +908,24 @@ async def search_context_nodes(
     user: JwtPayload = Depends(get_current_user),
 ):
     """Semantische Suche über sichtbare Knoten anhand eines Freitexts."""
-    from app.chat.router import _exec_search_context_nodes
+    from app.chat.router import _exec_search_context_nodes, subject_of_conversation
     prefs = await get_preferences(db, user.sub)
     try:
         limit = max(5, min(30, int(prefs.get("context_search_limit", 8))))
     except (TypeError, ValueError):
         limit = 8
-    results = await _exec_search_context_nodes(request.query, user.sub, db, limit=limit)
-    return results
+
+    # Fachbezug nur aus einer Konversation, die der/die Suchende auch sehen darf — sonst
+    # verriete die Trefferreihenfolge etwas über fremde Konversationen.
+    subject_id = None
+    if request.conversation_id is not None:
+        conv = await db.get(Conversation, request.conversation_id)
+        if conv is not None and conv.pseudonym == user.sub:
+            subject_id = await subject_of_conversation(db, request.conversation_id)
+
+    return await _exec_search_context_nodes(
+        request.query, user.sub, db, limit=limit, subject_id=subject_id
+    )
 
 
 # ── KS-Phase-6 Curriculum Endpoints ──────────────────────────────────────

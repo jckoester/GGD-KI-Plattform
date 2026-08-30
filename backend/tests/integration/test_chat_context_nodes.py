@@ -487,3 +487,162 @@ class TestSuchergebnisFelder:
         assert treffer["subject_id"] == 9502
         assert treffer["bp_version"] == "2016.V2"
         assert treffer["nr"] == "3.1.2(4)"
+
+
+class TestFachvorzugBeiDerSuche:
+    """`/context/search` zieht Treffer aus dem Fach der Konversation vor.
+
+    Vorgezogen, **nicht** gefiltert: Eine Mathematik-Kompetenz kann im Physik-Chat genau
+    das Gesuchte sein, und Knoten ganz ohne Fach (Leitperspektiven, schulweite Dokumente)
+    dürfen nicht verschwinden. Der Bonus ist deshalb endlich — die Tests prüfen beide
+    Seiten: Er muss innerhalb einer Trefferliste umsortieren und darf einen deutlich
+    besseren fachfremden Treffer nicht verdrängen.
+
+    Die Abstände sind absichtlich um `_FACHBONUS` (0,05) herum gelegt:
+
+    ==============  =========  ====================
+    Knoten          Distanz    mit Fachbonus
+    ==============  =========  ====================
+    fremd_stark        0,02    0,02  (kein Fach)
+    fremd              0,10    0,10  (anderes Fach)
+    fach               0,13    0,08
+    ==============  =========  ====================
+    """
+
+    FACH_ID = 9511
+    FREMD_ID = 9512
+
+    @pytest_asyncio.fixture
+    async def knoten(self, test_client, auth_headers, db_url):
+        """Drei Knoten mit gesetzten Abständen zur Suchanfrage."""
+        import math
+
+        from app.config import settings
+
+        def vektor(distanz: float) -> list[float]:
+            """Einheitsvektor mit genau dieser Kosinus-Distanz zu ``[1, 0, 0, …]``."""
+            v = [0.0] * settings.embedding_dimensions
+            v[0] = 1.0 - distanz
+            v[1] = math.sqrt(1.0 - v[0] ** 2)
+            return v
+
+        ids = {}
+        for name, titel in (
+            ("fach", "Fachvorzug Knoten im Fach"),
+            ("fremd", "Fachvorzug Knoten im anderen Fach"),
+            ("fremd_stark", "Fachvorzug Knoten deutlich naeher"),
+        ):
+            resp = await test_client.post(
+                "/context/nodes",
+                json={
+                    "category": "concept", "content_type": "funktion", "title": titel,
+                    "read_scope": "school", "write_scope": "school",
+                },
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, resp.text
+            ids[name] = resp.json()["id"]
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            for sid, slug in ((self.FACH_ID, "fachvorzug-fach"), (self.FREMD_ID, "fachvorzug-fremd")):
+                cur.execute(
+                    "INSERT INTO subjects (id, slug, name) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (id) DO NOTHING", (sid, slug, slug),
+                )
+            for name, distanz, sid in (
+                ("fach", 0.13, self.FACH_ID),
+                ("fremd", 0.10, self.FREMD_ID),
+                ("fremd_stark", 0.02, None),   # ganz ohne Fach
+            ):
+                cur.execute(
+                    "UPDATE context_nodes SET embedding = %s::vector, subject_id = %s "
+                    "WHERE id = %s",
+                    (str(vektor(distanz)), sid, ids[name]),
+                )
+        conn.commit()
+        conn.close()
+        yield ids
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM context_nodes WHERE id = ANY(%s::uuid[])", (list(ids.values()),))
+        conn.commit()
+        conn.close()
+
+    @pytest.fixture
+    def konversation_im_fach(self, db_url, run_migrations):
+        sync_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+        conv_id = str(uuid4())
+        conn = psycopg2.connect(sync_url)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO conversations (id, pseudonym, model_used, title, subject_id) "
+                "VALUES (%s, %s, 'gpt-4o', 'Fach-Chat', %s)",
+                (conv_id, TEACHER1_PSEUDO, self.FACH_ID),
+            )
+        conn.commit()
+        conn.close()
+        yield conv_id
+        conn = psycopg2.connect(sync_url)
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM conversations WHERE id = %s", (conv_id,))
+        conn.commit()
+        conn.close()
+
+    async def _reihenfolge(self, test_client, auth_headers, knoten, **body):
+        from unittest.mock import AsyncMock, patch
+
+        from app.config import settings
+
+        anfrage = [0.0] * settings.embedding_dimensions
+        anfrage[0] = 1.0
+        with patch("app.chat.router.generate_embedding",
+                   new=AsyncMock(return_value=anfrage)):
+            resp = await test_client.post(
+                "/context/search", json={"query": "Fachvorzug", **body},
+                headers=auth_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        nach_id = {v: k for k, v in knoten.items()}
+        return [nach_id[t["node_id"]] for t in resp.json() if t["node_id"] in nach_id]
+
+    async def test_ohne_fachbezug_entscheidet_allein_die_aehnlichkeit(
+        self, test_client, auth_headers, knoten
+    ):
+        """Der unveränderte Fall — und der häufigste: ein Chat ohne Fach."""
+        assert await self._reihenfolge(test_client, auth_headers, knoten) == [
+            "fremd_stark", "fremd", "fach",
+        ]
+
+    async def test_fach_der_konversation_wird_vorgezogen(
+        self, test_client, auth_headers, knoten, konversation_im_fach
+    ):
+        """0,03 Rückstand ist weniger als der Bonus — `fach` überholt `fremd`."""
+        assert await self._reihenfolge(
+            test_client, auth_headers, knoten, conversation_id=konversation_im_fach
+        ) == ["fremd_stark", "fach", "fremd"]
+
+    async def test_deutlich_besserer_fachfremder_treffer_bleibt_oben(
+        self, test_client, auth_headers, knoten, konversation_im_fach
+    ):
+        """Die Gegenprobe zum Filter: `fremd_stark` hat gar kein Fach und bleibt erster.
+
+        Ohne diese Zusage wäre der Bonus ein verkappter Filter — und Leitperspektiven,
+        die nie ein Fach tragen, fielen dauerhaft hinten herunter.
+        """
+        reihenfolge = await self._reihenfolge(
+            test_client, auth_headers, knoten, conversation_id=konversation_im_fach
+        )
+        assert reihenfolge[0] == "fremd_stark"
+        assert len(reihenfolge) == 3, "kein Knoten darf herausgefiltert werden"
+
+    async def test_fremde_konversation_gibt_keinen_fachbezug(
+        self, test_client, auth_headers_teacher2, knoten, konversation_im_fach
+    ):
+        """teacher2 nennt die Konversation von teacher1 — die Reihenfolge darf sich
+        dadurch nicht ändern, sonst verriete sie deren Fach."""
+        assert await self._reihenfolge(
+            test_client, auth_headers_teacher2, knoten,
+            conversation_id=konversation_im_fach,
+        ) == ["fremd_stark", "fremd", "fach"]

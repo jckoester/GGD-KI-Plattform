@@ -14,6 +14,13 @@
 #   knoten   Optional. Kompetenznummer (`3.3.2(1)`) oder ein Stück des Titels. Gemeldet
 #            wird der Rang des ersten passenden Treffers — so sieht man auch, wenn der
 #            erwartete Knoten zwar gefunden wird, aber auf Platz 9.
+#   chat_fach Optional. Das Fach der Konversation, in der gefragt wird — nicht zu
+#            verwechseln mit `fach` (dem Fach des erwarteten Treffers). Treffer aus
+#            `chat_fach` werden vorgezogen. Ohne Angabe wird ohne Fachbezug gesucht;
+#            das ist der Normalfall vieler Chats und muss mitgemessen werden.
+#            Fälle, in denen sich beide **unterscheiden**, sind die Wächter gegen einen
+#            zu starken Vorzug: Wer im Physik-Chat nach Pythagoras fragt, soll die
+#            Mathematik-Kompetenz bekommen.
 #   notiz    Optional. Wofür dieser Fall steht.
 #
 # ⚠️ Die Erwartungen sind am Bestand der Entwicklungsinstanz geprüft (Stand 30.08.2026,
@@ -123,3 +130,52 @@ faelle:
     notiz: >-
       Liefert zwei Leitperspektiven-Aspekte ohne Fachbezug vor der Informatik-Kompetenz.
       Prüft, ob fachlose Knoten die Liste verstopfen.
+
+  # ── Fachbezug: Gleichlauf (Chat-Fach = erwartetes Fach) ───────────────────────
+  #
+  # Diese Fälle prüfen, ob der Fachvorzug greift, wo er greifen soll. Alle drei sind
+  # ohne Fachbezug Fehlschläge — Operatoren aus anderen Fächern gewinnen.
+
+  - frage: Gedichte interpretieren und sprachliche Bilder deuten
+    fach: Deutsch
+    chat_fach: Deutsch
+    knoten: 3.4.1.1
+    notiz: Ohne Fachbezug dreimal der Operator „interpretieren" aus Physik/Biologie/Kunst.
+
+  - frage: unregelmäßige Verben im Simple Past
+    fach: Englisch
+    chat_fach: Englisch
+    knoten: 3.2.3.8(4)
+    notiz: Ohne Fachbezug viermal der Operator „nennen", kein Englisch-Knoten.
+
+  - frage: Wetter und Klima im Vergleich
+    fach: Geographie
+    chat_fach: Geographie
+    knoten: 3.1.2.1(3)
+    notiz: Ohne Fachbezug viermal der Operator „vergleichen".
+
+  # ── Fachbezug: Gegenfälle (Chat-Fach ≠ erwartetes Fach) ───────────────────────
+  #
+  # Sie begrenzen den Bonus nach oben. Fallen sie, ist aus dem Vorzug ein Filter
+  # geworden — dann ist der Wert in `_FACHBONUS` zu hoch.
+
+  - frage: Wie berechnet man den Flächeninhalt eines Kreises?
+    fach: Mathematik
+    chat_fach: Geographie
+    knoten: 3.3.2(1)
+    notiz: >-
+      Der schärfste Gegenfall: Im Geographie-Chat gefragt, und Geographie führt mit
+      „Wasserkreislauf" und „Kreislauf der Gesteine" ausgerechnet die Knoten, die sich
+      aufdrängen. Trotzdem muss Mathematik oben stehen.
+
+  - frage: Satz des Pythagoras am rechtwinkligen Dreieck
+    fach: Mathematik
+    chat_fach: Physik
+    knoten: Pythagoras
+    notiz: Fachfremde Frage im Physik-Chat — ein alltäglicher Fall, kein konstruierter.
+
+  - frage: Fotosynthese
+    fach: Biologie
+    chat_fach: Chemie
+    knoten: 3.2.3(1)
+    notiz: Chemie ist inhaltlich benachbart und damit ein realistischer Störfall.

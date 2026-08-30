@@ -852,7 +852,7 @@
         const query = input.trim();
         if (!query) return;
         try {
-            const results = await searchContextNodes(query);
+            const results = await searchContextNodes(query, conversationId);
             pendingSuggestions = results.map((n) => ({
                 node_id: n.node_id,
                 title: n.title,

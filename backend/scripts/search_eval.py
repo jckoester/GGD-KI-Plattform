@@ -43,6 +43,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.chat.router import _FACHBONUS as FACHBONUS
 from app.config import settings
 from app.context.embedding import generate_embedding
 
@@ -56,6 +57,11 @@ INDEXNAME = "idx_context_nodes_embedding"
 # werden soll die Suche, die Nutzer:innen bekommen, nicht eine idealisierte Variante. Der
 # `owner_pseudonym`-Zweig der Originalabfrage fehlt — private Knoten einzelner Personen
 # gehören nicht in einen Prüfsatz, der den gemeinsamen Bestand bewertet.
+#
+# ⚠️ Der Fachbonus muss hier **denselben** Cast tragen wie dort. Ohne
+# `CAST(... AS double precision)` leitet PostgreSQL den Parametertyp aus `ELSE 0` ab,
+# rundet den Bonus auf 0 — und der Prüfsatz bescheinigte einer Änderung, dass sie nichts
+# bewirkt, obwohl in Wahrheit nur die Messung kaputt wäre.
 _SQL = """
 SELECT c.id, c.title, c.content_type, s.name AS fach,
        coalesce(c.metadata->>'kompetenz_nr', c.metadata->>'nr', '') AS nr,
@@ -65,7 +71,10 @@ LEFT JOIN subjects s ON s.id = c.subject_id
 WHERE c.status = 'active'
   AND c.embedding IS NOT NULL
   AND c.read_scope IN ('global', 'school', 'subject', 'group')
-ORDER BY c.embedding <=> CAST($1 AS vector)
+ORDER BY (c.embedding <=> CAST($1 AS vector))
+       - CASE WHEN c.subject_id = $3
+              THEN CAST($4 AS double precision)
+              ELSE 0 END
 LIMIT $2
 """
 
@@ -73,7 +82,8 @@ LIMIT $2
 @dataclass
 class Fall:
     frage: str
-    fach: str | None = None
+    fach: str | None = None          # Fach, aus dem der beste Treffer kommen soll
+    chat_fach: str | None = None     # Fach der Konversation, in der gefragt wird
     knoten: str | None = None
     notiz: str | None = None
 
@@ -131,18 +141,21 @@ def _planart(plan: str) -> str:
     return "?"
 
 
-async def _suche(dsn: str, vektor: str, top_k: int, *, exakt: bool) -> Lauf:
+async def _suche(
+    dsn: str, vektor: str, top_k: int, *, exakt: bool, subject_id: int | None = None
+) -> Lauf:
     """Eine Messung auf einer **frischen** Verbindung, ohne Statement-Cache."""
     con = await asyncpg.connect(dsn, statement_cache_size=0)
     try:
         if exakt:
             await con.execute("SET enable_indexscan = off")
             await con.execute("SET enable_bitmapscan = off")
+        args = (vektor, top_k, subject_id, FACHBONUS)
         plan = "\n".join(
-            r[0] for r in await con.fetch("EXPLAIN (COSTS OFF) " + _SQL, vektor, top_k)
+            r[0] for r in await con.fetch("EXPLAIN (COSTS OFF) " + _SQL, *args)
         )
         t0 = time.perf_counter()
-        rows = await con.fetch(_SQL, vektor, top_k)
+        rows = await con.fetch(_SQL, *args)
         ms = (time.perf_counter() - t0) * 1000
     finally:
         await con.close()
@@ -226,13 +239,14 @@ def _r(rang: int | None) -> str:
 
 def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     print()
-    print(f"  {'Anfrage':<44}{'Recall':>7}  {'Fach@1':^9} {'Rang':^9} {'Spanne':>7}")
-    print(f"  {'':<44}{f'@{top_k}':>7}  {'Idx exakt':^9} {'Idx exakt':^9} {'exakt':>7}")
-    print("  " + "─" * 78)
+    print(f"  {'Anfrage':<38}{'Chat-Fach':<15}{'Recall':>7}  {'Fach@1':^9} {'Rang':^9} {'Spanne':>7}")
+    print(f"  {'':<38}{'':<15}{f'@{top_k}':>7}  {'Idx exakt':^9} {'Idx exakt':^9} {'exakt':>7}")
+    print("  " + "─" * 92)
     for e in ergebnisse:
-        frage = e.fall.frage if len(e.fall.frage) <= 43 else e.fall.frage[:42] + "…"
+        frage = e.fall.frage if len(e.fall.frage) <= 37 else e.fall.frage[:36] + "…"
+        chat = (e.fall.chat_fach or "—")[:14]
         print(
-            f"  {frage:<44}{e.recall*100:>6.0f}%  "
+            f"  {frage:<38}{chat:<15}{e.recall*100:>6.0f}%  "
             f"{_z(e.fach_ok_index):^4}{_z(e.fach_ok_exakt):^5} "
             f"{_r(e.rang_index):^4}{_r(e.rang_exakt):^5} "
             f"{_spanne(e.exakt):>7.3f}"
@@ -241,7 +255,7 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     n = len(ergebnisse)
     mit_fach = [e for e in ergebnisse if e.fall.fach]
     mit_knoten = [e for e in ergebnisse if e.fall.knoten]
-    print("  " + "─" * 78)
+    print("  " + "─" * 92)
     print(f"\n  {n} {'Fall' if n == 1 else 'Fälle'} · Recall@{top_k} im Mittel "
           f"{sum(e.recall for e in ergebnisse)/n*100:.0f} %")
     if mit_fach:
@@ -285,10 +299,18 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
                           f"{t.content_type:<14}{t.titel[:52]}")
 
 
+async def _fach_ids(dsn: str) -> dict[str, int]:
+    con = await asyncpg.connect(dsn, statement_cache_size=0)
+    try:
+        return {r["name"]: r["id"] for r in await con.fetch("SELECT id, name FROM subjects")}
+    finally:
+        await con.close()
+
+
 def _lade(pfad: Path) -> tuple[list[Fall], int]:
     daten = yaml.safe_load(pfad.read_text(encoding="utf-8")) or {}
     faelle = [
-        Fall(frage=f["frage"], fach=f.get("fach"), knoten=(
+        Fall(frage=f["frage"], fach=f.get("fach"), chat_fach=f.get("chat_fach"), knoten=(
             None if f.get("knoten") is None else str(f["knoten"])
         ), notiz=f.get("notiz"))
         for f in daten.get("faelle", [])
@@ -299,13 +321,20 @@ def _lade(pfad: Path) -> tuple[list[Fall], int]:
 async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | None) -> int:
     dsn = _dsn()
     ergebnisse: list[Ergebnis] = []
+    fach_ids = await _fach_ids(dsn)
+    unbekannt = {f.chat_fach for f in faelle if f.chat_fach and f.chat_fach not in fach_ids}
+    if unbekannt:
+        print(f"  ⚠️  Unbekanntes chat_fach im Prüfsatz: {sorted(unbekannt)} — "
+              f"diese Fälle laufen ohne Fachbezug.", file=sys.stderr)
+
     for fall in faelle:
         vektor_werte = await generate_embedding(fall.frage)
         vektor = "[" + ",".join(f"{v:.10f}" for v in vektor_werte) + "]"
+        subject_id = fach_ids.get(fall.chat_fach) if fall.chat_fach else None
         # Der Index-Lauf zuerst: Er soll den Plan sehen, den PostgreSQL im Normalbetrieb
         # wählt — unbeeinflusst von den Planer-Schaltern des exakten Laufs.
-        index = await _suche(dsn, vektor, top_k, exakt=False)
-        exakt = await _suche(dsn, vektor, top_k, exakt=True)
+        index = await _suche(dsn, vektor, top_k, exakt=False, subject_id=subject_id)
+        exakt = await _suche(dsn, vektor, top_k, exakt=True, subject_id=subject_id)
         if exakt.planart != "exakt":
             print(f"  ⚠️  '{fall.frage}': exakter Lauf verwendete Plan '{exakt.planart}' — "
                   f"die Messung ist wertlos. Abbruch.", file=sys.stderr)
@@ -317,7 +346,8 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
     if json_pfad:
         json_pfad.write_text(json.dumps([
             {
-                "frage": e.fall.frage, "fach": e.fall.fach, "knoten": e.fall.knoten,
+                "frage": e.fall.frage, "fach": e.fall.fach,
+                "chat_fach": e.fall.chat_fach, "knoten": e.fall.knoten,
                 "recall": e.recall, "fach_ok_index": e.fach_ok_index,
                 "fach_ok_exakt": e.fach_ok_exakt, "rang_index": e.rang_index,
                 "rang_exakt": e.rang_exakt, "operatoren_top3": e.operatoren_top3,
@@ -345,13 +375,16 @@ def main() -> None:
     p.add_argument("--frage", help="Einzelne Anfrage statt des Prüfsatzes")
     p.add_argument("--fach", help="Erwartetes Fach zu --frage")
     p.add_argument("--knoten", help="Erwartete Kompetenznummer oder Titelstück zu --frage")
+    p.add_argument("--chat-fach", dest="chat_fach",
+                   help="Fach der Konversation zu --frage (dessen Treffer werden vorgezogen)")
     p.add_argument("--top-k", type=int, help="Trefferzahl (Vorgabe aus dem Prüfsatz)")
     p.add_argument("--details", action="store_true", help="Trefferlisten mit ausgeben")
     p.add_argument("--json", type=Path, help="Ergebnisse zusätzlich als JSON schreiben")
     args = p.parse_args()
 
     if args.frage:
-        faelle = [Fall(frage=args.frage, fach=args.fach, knoten=args.knoten)]
+        faelle = [Fall(frage=args.frage, fach=args.fach, chat_fach=args.chat_fach,
+                       knoten=args.knoten)]
         top_k = args.top_k or 10
     else:
         if not args.pruefsatz.exists():

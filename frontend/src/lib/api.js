@@ -1379,12 +1379,19 @@ export async function getActiveBpVersion(subjectId, grade) {
   }
 }
 
-export async function searchContextNodes(query) {
+/**
+ * Semantische Suche über die sichtbaren Wissensknoten.
+ *
+ * `conversationId` ist optional und dient nur der Reihenfolge: Hat die Konversation ein
+ * Fach, werden dessen Treffer vorgezogen — gefiltert wird nicht, fachfremde Treffer
+ * bleiben in der Liste.
+ */
+export async function searchContextNodes(query, conversationId = null) {
   const res = await fetch(`${BASE}/context/search`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, conversation_id: conversationId }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

@@ -16,6 +16,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
   - Neuer Prüfsatz `config/search_eval.yaml` mit `scripts/search_eval.py`: misst je
     Anfrage Recall, Fach und Rang des erwarteten Treffers.
+  - **Das Fach der Konversation zieht passende Treffer nach oben** — im Chat-Werkzeug wie
+    in der Suche neben dem Textfeld. Gefiltert wird nicht: Fachfremde Treffer und Knoten
+    ohne Fach (Leitperspektiven) bleiben in der Liste, und ein Chat ohne Fachbezug sucht
+    unverändert. In den Prüffällen mit Fachbezug steht damit durchweg das richtige Fach
+    oben.
   - `embedding_backfill.py --reindex` ist entfallen, ebenso alle Index-Rebuild-Schritte
     in den Runbooks — nach Import und Re-Embedding gibt es nichts mehr nachzuziehen.
   - Embedding-Modelle mit mehr als 2000 Dimensionen sind jetzt nutzbar (die Grenze kam

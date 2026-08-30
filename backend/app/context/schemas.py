@@ -216,6 +216,10 @@ class ChatContextNodeRead(KontextKnotenAnzeige):
 
 class ContextSearchRequest(BaseModel):
     query: str
+    # Optional. Ist sie gesetzt und hat die Konversation ein Fach, werden Treffer aus
+    # diesem Fach vorgezogen (nicht gefiltert). Ohne Angabe entscheidet allein die
+    # Ähnlichkeit.
+    conversation_id: UUID | None = None
 
 
 class ContextSearchResult(KontextKnotenAnzeige):

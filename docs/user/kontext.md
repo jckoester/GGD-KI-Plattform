@@ -37,6 +37,8 @@ Neben dem Textfeld im Chat gibt es einen **Suche-Button** (Lupensymbol). Er ist 
 
 Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwörter treffen — auch ein vollständig formulierter Prompt liefert passende Treffer.
 
+**Das Fach des Chats zählt mit.** Führen Sie den Chat in einem Fach oder einer Unterrichtsgruppe, stehen dessen Bausteine weiter oben. Ausgeblendet wird dabei nichts: Wer im Physik-Chat nach dem Satz des Pythagoras fragt, bekommt weiterhin die Mathematik-Kompetenz — sie ist dort schließlich die richtige Antwort. In einem Chat ohne Fach entscheidet allein die Ähnlichkeit.
+
 ### Über den @-Shortcode
 
 Tippen Sie **`@`** in das Textfeld, um nach einem Baustein nach Name zu suchen. Wählen Sie einen Treffer aus der Liste — der Baustein wird sofort angeheftet.

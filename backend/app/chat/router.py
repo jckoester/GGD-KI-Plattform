@@ -363,10 +363,44 @@ async def _get_model_info() -> dict[str, bool | None]:
     return info
 
 
+# Wie viel Vorsprung ein Treffer aus dem Fach der Konversation bekommt — gerechnet in
+# Kosinus-Distanz, also derselben Einheit wie die Ähnlichkeit selbst.
+#
+# **0,05 ist gemessen, nicht geschätzt** (Prüfsatz, 30.08.2026). Zur Einordnung: Innerhalb
+# einer Zehnertrefferliste liegen zwischen Platz 1 und Platz 10 im Median 0,063. Der Bonus
+# sortiert also innerhalb dessen, was ohnehin zur Auswahl stand — er holt nichts Fernes
+# heran.
+#
+#   Bonus   richtiges Fach oben        fachfremder Treffer bleibt
+#           (15 Fälle im Fach-Chat)    (3 Gegenfälle)
+#   0,00              11/15                     3/3
+#   0,03              13/15                     3/3
+#   0,05              15/15                     3/3     ← gewählt
+#   0,08              15/15                     2/3
+#   0,15              15/15                     0/3
+#
+# Nach oben begrenzt ihn der Gegenfall: Wer im Physik-Chat nach dem Satz des Pythagoras
+# fragt, soll die Mathematik-Kompetenz bekommen. Ab 0,08 verdrängt das Fach der
+# Konversation genau solche Treffer — deshalb der Abstand zur Kippgrenze.
+_FACHBONUS = 0.05
+
+
 async def _exec_search_context_nodes(
-    query: str, pseudonym: str, db: AsyncSession, *, limit: int = 8
+    query: str,
+    pseudonym: str,
+    db: AsyncSession,
+    *,
+    limit: int = 8,
+    subject_id: int | None = None,
 ) -> list[dict]:
     """Semantische Suche über alle sichtbaren ContextNodes, max. limit Treffer.
+
+    ``subject_id`` = Fach der Konversation, falls bekannt. Treffer aus diesem Fach werden
+    **vorgezogen, nicht gefiltert**: Fachfremdes bleibt in der Liste, denn eine
+    Mathematik-Kompetenz kann im Physik-Chat genau das Gesuchte sein. Ohne Fachbezug
+    (``None``) entscheidet allein die Ähnlichkeit — dann ist das Ergebnis dasselbe wie
+    zuvor. Ein harter Filter schiede zusätzlich alle Knoten **ohne** Fach aus
+    (Leitperspektiven, schulweite Dokumente); auch deshalb nur ein Bonus.
 
     Fällt auf ILIKE zurück wenn kein Embedding generiert werden kann oder
     kein Knoten ein Embedding hat.
@@ -375,6 +409,14 @@ async def _exec_search_context_nodes(
         query_embedding = await generate_embedding(query)
         embedding_str = "[" + ",".join(f"{v:.10f}" for v in query_embedding) + "]"
 
+        # `subject_id = NULL` ist nie wahr — ohne Fachbezug fällt der Bonus also von
+        # selbst weg, ohne zweite Abfragevariante.
+        #
+        # ⚠️ `CAST(:fachbonus AS double precision)` ist Pflicht, nicht Zierde. Ohne den
+        # Cast leitet PostgreSQL den Typ des Parameters aus dem anderen CASE-Zweig ab —
+        # aus `ELSE 0`, also **integer**. Der Bonus wird dann auf 0 gerundet und die
+        # Sortierung bleibt unverändert. Ohne Fehlermeldung: Die Abfrage läuft, sie tut
+        # nur nichts.
         sql = sa.text("""
             SELECT id, category, content_type, title,
                    subject_id, bp_version, metadata
@@ -385,12 +427,21 @@ async def _exec_search_context_nodes(
                   read_scope IN ('global', 'school', 'subject', 'group')
                   OR owner_pseudonym = :pseudonym
               )
-            ORDER BY embedding <=> CAST(:embedding AS vector)
+            ORDER BY (embedding <=> CAST(:embedding AS vector))
+                   - CASE WHEN subject_id = :subject_id
+                          THEN CAST(:fachbonus AS double precision)
+                          ELSE 0 END
             LIMIT :limit
         """)
         result = await db.execute(
             sql,
-            {"pseudonym": pseudonym, "embedding": embedding_str, "limit": limit},
+            {
+                "pseudonym": pseudonym,
+                "embedding": embedding_str,
+                "limit": limit,
+                "subject_id": subject_id,
+                "fachbonus": _FACHBONUS,
+            },
         )
         rows = result.mappings().all()
         if rows:
@@ -408,7 +459,9 @@ async def _exec_search_context_nodes(
     except Exception:
         logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
 
-    # Fallback: ILIKE-Suche auf Titel und Inhalt
+    # Fallback: ILIKE-Suche auf Titel und Inhalt — mit demselben Fachvorzug. Ohne ihn
+    # verhielte sich die Rückfallebene anders als der Normalfall, und das fiele erst auf,
+    # wenn ohnehin schon etwas klemmt.
     result = await db.execute(
         select(ContextNode)
         .where(
@@ -424,6 +477,7 @@ async def _exec_search_context_nodes(
                 ContextNode.content.ilike(f"%{query}%"),
             )
         )
+        .order_by(sa.case((ContextNode.subject_id == subject_id, 0), else_=1))
         .limit(limit)
     )
     return [
@@ -439,7 +493,12 @@ async def _exec_search_context_nodes(
 
 
 async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> list[dict]:
-    return await _exec_search_context_nodes(args.get("query", ""), ctx.user.sub, ctx.db)
+    return await _exec_search_context_nodes(
+        args.get("query", ""),
+        ctx.user.sub,
+        ctx.db,
+        subject_id=await _resolve_conversation_subject_id(ctx),
+    )
 
 
 register_tool(ChatTool(
@@ -468,23 +527,36 @@ _GET_OPERATOREN_TOOL = {
 }
 
 
-async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
-    """Leitet das Fach (subject_id) der Konversation ab: Gruppe → Fach, sonst
-    conversation.subject_id (bzw. deren Gruppe). None wenn kein Fachbezug."""
-    if ctx.group_id is not None:
-        grp = await ctx.db.get(Group, ctx.group_id)
+async def subject_of_conversation(
+    db: AsyncSession, conversation_id: UUID | None, group_id: int | None = None
+) -> Optional[int]:
+    """Fach (``subject_id``) einer Konversation: Gruppe → Fach, sonst
+    ``conversation.subject_id`` (bzw. deren Gruppe). ``None`` heißt: kein Fachbezug.
+
+    Öffentlich, weil zwei Wege dieselbe Ableitung brauchen: das Chat-Werkzeug (über den
+    ``ToolContext``) und der Suchendpunkt ``/context/search`` (über die Konversations-ID
+    aus dem Frontend). Liefen sie auseinander, bekämen dieselbe Frage im selben Chat je
+    nach Weg eine andere Trefferliste.
+    """
+    if group_id is not None:
+        grp = await db.get(Group, group_id)
         if grp and grp.subject_id is not None:
             return grp.subject_id
-    if ctx.conversation_id is not None:
-        conv = await ctx.db.get(Conversation, ctx.conversation_id)
+    if conversation_id is not None:
+        conv = await db.get(Conversation, conversation_id)
         if conv is not None:
             if conv.subject_id is not None:
                 return conv.subject_id
             if conv.group_id is not None:
-                grp = await ctx.db.get(Group, conv.group_id)
+                grp = await db.get(Group, conv.group_id)
                 if grp:
                     return grp.subject_id
     return None
+
+
+async def _resolve_conversation_subject_id(ctx: ToolContext) -> Optional[int]:
+    """Wie :func:`subject_of_conversation`, aber aus dem ``ToolContext``."""
+    return await subject_of_conversation(ctx.db, ctx.conversation_id, ctx.group_id)
 
 
 async def _exec_get_operatoren(ctx: ToolContext) -> list[dict]:
