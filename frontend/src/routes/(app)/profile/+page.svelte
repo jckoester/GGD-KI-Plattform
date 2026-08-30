@@ -394,7 +394,7 @@
                 <label
                     class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
                 >
-                    Maximale Trefferzahl beim Kontext-Lookup
+                    Angezeigte Treffer im Vorschlagsfenster
                 </label>
                 <select
                     value={preferences?.context_search_limit ?? 8}

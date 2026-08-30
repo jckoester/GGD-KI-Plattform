@@ -59,13 +59,18 @@ def test_kuerzel_erreicht_kein_sprachmodell():
     )
 
 
-def test_preferences_werden_nur_an_einer_stelle_ausserhalb_gelesen():
+def test_preferences_werden_ausserhalb_gar_nicht_mehr_gelesen():
     """Absicherung der Aussagekraft des Tests oben.
 
     `get_preferences` liefert **alle** Einstellungen als Dict — ein Aufruf in einem
-    Chat-Modul könnte das Kürzel mitschleifen, ohne es beim Namen zu nennen. Solange es
-    außerhalb des Preferences-Moduls nur an bekannten Stellen gelesen wird, greift die
-    Namensprüfung. Kommt eine Stelle hinzu, ist zu prüfen, was dort weitergereicht wird.
+    Chat-Modul könnte das Kürzel mitschleifen, ohne es beim Namen zu nennen. Die
+    Namensprüfung oben griffe dann ins Leere.
+
+    Seit 08/2026 ist die Zusage schärfer als „nur an bekannten Stellen": Wer eine
+    Einstellung braucht, holt sie über eine Funktion, die **genau diesen einen Wert** als
+    Zahl oder Text zurückgibt (z. B. `anzeige_limit`). Das Dict verlässt das
+    Preferences-Modul gar nicht mehr. Kommt hier ein Leser hinzu, ist entweder eine
+    solche Funktion zu ergänzen — oder zu prüfen, was dort Richtung Sprachmodell geht.
     """
     leser = {
         str(path.relative_to(APP))
@@ -73,9 +78,9 @@ def test_preferences_werden_nur_an_einer_stelle_ausserhalb_gelesen():
         if not str(path.relative_to(APP)).startswith(("preferences/", "calendar/"))
         and "get_preferences" in path.read_text(encoding="utf-8")
     }
-    assert leser == {"context/router.py"}, (
-        f"Neue Leser von get_preferences: {leser - {'context/router.py'}}. "
-        f"Prüfen, ob dort Einstellungen Richtung Sprachmodell weitergereicht werden."
+    assert leser == set(), (
+        f"Neue Leser von get_preferences: {sorted(leser)}. Stattdessen eine Funktion in "
+        f"app/preferences/service.py ergänzen, die nur den gebrauchten Wert liefert."
     )
 
 

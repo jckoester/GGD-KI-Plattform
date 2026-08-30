@@ -47,9 +47,11 @@ Sie können einstellen, ob und wie die anfallenden Kosten pro Anfrage angezeigt 
 
 Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen können Sie diesen Wert erhöhen:
 
-- Öffnen Sie die Profilseite und wählen Sie unter **„Kontext-Suche"** die gewünschte maximale Trefferzahl.
+- Öffnen Sie die Profilseite und wählen Sie unter **„Kontext-Suche"** die gewünschte Zahl angezeigter Treffer.
 
 Verfügbare Werte: 5, 8, 10, 15, 20, 30.
+
+Die Einstellung betrifft **nur, was Ihnen angezeigt wird**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche liest, legt die Schule zentral fest.
 
 ## Accountdaten
 

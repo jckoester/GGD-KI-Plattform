@@ -53,7 +53,7 @@ from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
-from app.preferences.service import get_preferences
+from app.preferences.service import anzeige_limit
 from app.db.models import (
     Assistant,
     AssistantContextAnchor,
@@ -909,11 +909,8 @@ async def search_context_nodes(
 ):
     """Semantische Suche über sichtbare Knoten anhand eines Freitexts."""
     from app.chat.router import _exec_search_context_nodes, subject_of_conversation
-    prefs = await get_preferences(db, user.sub)
-    try:
-        limit = max(5, min(30, int(prefs.get("context_search_limit", 8))))
-    except (TypeError, ValueError):
-        limit = 8
+    # Der Suchknopf füllt das Vorschlagsfenster — hier zählt die Anzeigezahl.
+    limit = await anzeige_limit(db, user.sub)
 
     # Fachbezug nur aus einer Konversation, die der/die Suchende auch sehen darf — sonst
     # verriete die Trefferreihenfolge etwas über fremde Konversationen.

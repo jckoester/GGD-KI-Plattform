@@ -57,9 +57,11 @@ Tippen Sie **`@`** in das Textfeld, um nach einem Baustein nach Name zu suchen. 
 
 Angeheftete Bausteine werden als beschriftete Chips oberhalb des Textfelds angezeigt. Ein Klick auf das **×** rechts am Chip entfernt ihn wieder aus dem Kontext.
 
-## Maximale Trefferzahl einstellen
+## Angezeigte Trefferzahl einstellen
 
-Die Suche liefert standardmäßig bis zu 8 Treffer. Wenn Sie häufig mit komplexen Themen arbeiten und mehr Auswahlmöglichkeiten wünschen, können Sie den Wert auf Ihrer [Profilseite](profil.md) erhöhen.
+Das Vorschlagsfenster zeigt standardmäßig bis zu 8 Treffer. Wenn Sie häufig mit komplexen Themen arbeiten und mehr Auswahlmöglichkeiten wünschen, können Sie den Wert auf Ihrer [Profilseite](profil.md) erhöhen.
+
+Die Einstellung betrifft **nur die Anzeige**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Es kann also sein, dass ein Assistent mehr Bausteine gelesen hat, als Ihnen angezeigt werden.
 
 ## Kontext und Datenschutz
 

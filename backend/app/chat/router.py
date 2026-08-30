@@ -19,6 +19,7 @@ import httpx
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
+from app.preferences.service import anzeige_limit
 from app.ratelimit.dependency import rate_limit
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
@@ -476,6 +477,17 @@ def _ergebnis_umfang(ergebnis) -> str:
     return type(ergebnis).__name__
 
 
+def _fuer_vorschlagsliste(treffer: list, anzeige_limit: int) -> list:
+    """Was von einem Suchergebnis im Vorschlagsfenster erscheint.
+
+    Der Assistent sucht tiefer, als die Oberfläche zeigen soll: Für ihn ist die
+    Trefferzahl eine Kostenfrage, für das Fenster über dem Eingabefeld eine Platzfrage.
+    Ohne diese Kürzung deckte eine Suche mit 20 Treffern das Eingabefeld zu — genau der
+    Grund, aus dem die Anzeige einmal auf 8 begrenzt wurde.
+    """
+    return treffer[:anzeige_limit]
+
+
 def _ist_knotenliste(treffer: list) -> bool:
     """Sind das Wissensknoten — also etwas für die Vorschlagsliste im Chat?
 
@@ -751,10 +763,14 @@ async def _exec_search_context_nodes(
 
 
 async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> list[dict]:
+    # Zentrale Suchtiefe, **nicht** die Anzeigezahl aus dem Profil: Für den Assistenten
+    # ist die Trefferzahl eine Kostenfrage, für das Vorschlagsfenster eine Platzfrage.
+    # Beides an derselben Zahl aufzuhängen hieß, die eine über die andere zu deckeln.
     return await _exec_search_context_nodes(
         args.get("query", ""),
         ctx.user.sub,
         ctx.db,
+        limit=settings.assistant_context_limit,
         subject_id=await _resolve_conversation_subject_id(ctx),
     )
 
@@ -1769,6 +1785,10 @@ async def chat(
         current_user.roles, getattr(current_user, "grade", None)
     )
 
+    # Nur für die Vorschlagsliste im Chat. Einmal je Anfrage geholt statt im Stream —
+    # dort liefe die Abfrage sonst je Werkzeugrunde erneut.
+    _anzeige_limit = await anzeige_limit(db, current_user.sub)
+
     _active_tools = tools_for(
         active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle
     )
@@ -1999,9 +2019,13 @@ async def chat(
                     # Antwort ab (`KeyError`, außerhalb der Fehlerbehandlung oben).
                     # Deshalb wird die Form geprüft, statt sie anzunehmen.
                     if _ist_knotenliste(tool_result):
+                        # Auf die Anzeigezahl gekürzt. Das Modell bekommt unten die
+                        # vollständige Liste — die Oberfläche soll davon nur so viel
+                        # zeigen, wie ins Vorschlagsfenster passt. Ohne diese Kürzung
+                        # deckte eine tiefere Assistentensuche das Eingabefeld zu.
                         yield (
                             f"event: context_suggestions\n"
-                            f"data: {json.dumps({'nodes': tool_result})}\n\n"
+                            f"data: {json.dumps({'nodes': _fuer_vorschlagsliste(tool_result, _anzeige_limit)})}\n\n"
                         )
                     tool_result_str = json.dumps(
                         {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False

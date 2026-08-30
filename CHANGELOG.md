@@ -56,6 +56,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
     ausdrücklich zur Suche, statt eine leere Liste zurückzugeben, die als „nichts
     vorhanden" gedeutet wurde. Fragt ein Assistent dennoch nach einem Fach, hilft ein
     ausdrücklicher Suchauftrag (siehe [Kontextspeicher](docs/user/kontext.md)).
+  - **Such- und Anzeigetiefe sind getrennt.** Die Profil-Einstellung „Angezeigte Treffer
+    im Vorschlagsfenster" (Vorgabe 8) galt bisher auch für die Suche, die ein Assistent
+    selbst auslöst — dort ist die Trefferzahl aber keine Platz-, sondern eine Kostenfrage.
+    Assistenten durchsuchen jetzt `ASSISTANT_CONTEXT_LIMIT` Knoten (Vorgabe 20,
+    schulweit einstellbar); das Vorschlagsfenster zeigt davon weiterhin nur so viele, wie
+    im Profil eingestellt sind.
   - **Das Fach der Konversation zieht passende Treffer nach oben** — im Chat-Werkzeug wie
     in der Suche neben dem Textfeld. Gefiltert wird nicht: Fachfremde Treffer und Knoten
     ohne Fach (Leitperspektiven) bleiben in der Liste, und ein Chat ohne Fachbezug sucht

@@ -55,6 +55,7 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | Variable | Beschreibung | Beispiel |
 |----------|-------------|---------|
 | `CHAT_DEFAULT_MODEL` | Vorausgewähltes Modell im Chat. Leer = Chats ohne ausdrückliche Wahl schlagen fehl. Muss Function-Calling beherrschen | `chat-standard` |
+| `ASSISTANT_CONTEXT_LIMIT` | Wissensknoten, die die Suche eines Assistenten liefert. **Nicht** die Trefferzahl im Vorschlagsfenster — die stellt jede Nutzer:in im Profil ein (Vorgabe 8). Hier geht es um Kosten und Trefferabdeckung: Jeder Treffer wiegt grob 75–100 Token | `20` |
 | `TITLE_MODEL` | Modell für automatische Gesprächstitel. Leer = keine Titel. **Muss in JEDER Team-Allowlist stehen** — der Aufruf läuft über den Virtual Key der Nutzer:innen | `system-titel` |
 | `MODEL_PICKER_HIDDEN_PREFIXES` | Präfixe, die nicht im Chat-Modellwähler erscheinen. Rein kosmetisch, Freigaben bleiben unberührt | `["system-","embedding-","bild-"]` |
 

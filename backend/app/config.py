@@ -168,6 +168,12 @@ class Settings(BaseSettings):
     # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
     # der direkte TCP-Peer hier gelistet ist, wird `X-Forwarded-For` ausgewertet — sonst spoofbar.
     trusted_proxies: list[str] = ["127.0.0.1", "::1"]
+    # Wie viele Wissensknoten die Suche eines Assistenten zurückgibt. Getrennt von der
+    # Anzeigezahl im Vorschlagsfenster (Profil, Vorgabe 8): Dort ging es um Platz, hier um
+    # Kosten und Trefferabdeckung. Im Prüfsatz steht der erwartete Knoten in einem Fall
+    # auf Rang 9 — mit 8 Plätzen wäre er unsichtbar. Jeder Treffer wiegt grob 75–100
+    # Token, 20 also rund 2.000.
+    assistant_context_limit: int = 20
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3
     assistant_schema_path: str = "config/assistant_schema.json"
