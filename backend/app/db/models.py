@@ -899,14 +899,12 @@ class ContextNode(Base):
             "idx_context_nodes_band", "subject_id", "min_grade", "max_grade", "niveau",
             postgresql_where=text("subject_id IS NOT NULL"),
         ),
-        Index(
-            "idx_context_nodes_embedding",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_with={"m": 16, "ef_construction": 64},
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-            postgresql_where=text("embedding IS NOT NULL"),
-        ),
+        # ⚠️ **Kein Index auf `embedding`.** Die semantische Suche läuft absichtlich als
+        # vollständiger Durchlauf. Der frühere HNSW-Index lieferte nur rund die Hälfte der
+        # ähnlichsten Knoten und ließ sich weder durch Neuaufbau noch durch stärkere
+        # Parameter darüber hinaus bringen — Begründung und Messwerte in Migration 0052.
+        # Wer hier wieder einen Index einträgt, bekommt ihn beim nächsten `autogenerate`
+        # zurück; der Prüfsatz (`scripts/search_eval.py`) schlägt dann an.
     )
 
 

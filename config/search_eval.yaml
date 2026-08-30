@@ -1,0 +1,125 @@
+# Prüfsatz für die semantische Suche
+#
+# Feste Liste „Frage → erwarteter Treffer". Ohne sie ist jede Änderung an der Suche ein
+# Blindflug: Ob eine Umstellung die Treffer verbessert oder verschlechtert, lässt sich am
+# Einzelfall nicht beurteilen — die Unterschiede liegen oft im Hundertstelbereich.
+#
+# Ausgeführt von `backend/scripts/search_eval.py`. Kein pytest-Test: Die Frage ergibt nur
+# gegen den echten Wissensgraph und ein echtes Embedding-Modell Sinn.
+#
+# Felder je Fall:
+#   frage    Der Suchtext, so wie ihn jemand eingeben würde.
+#   fach     Das Fach, aus dem der beste Treffer kommen sollte. Wird gegen den Treffer
+#            auf Platz 1 geprüft.
+#   knoten   Optional. Kompetenznummer (`3.3.2(1)`) oder ein Stück des Titels. Gemeldet
+#            wird der Rang des ersten passenden Treffers — so sieht man auch, wenn der
+#            erwartete Knoten zwar gefunden wird, aber auf Platz 9.
+#   notiz    Optional. Wofür dieser Fall steht.
+#
+# ⚠️ Die Erwartungen sind am Bestand der Entwicklungsinstanz geprüft (Stand 30.08.2026,
+# Bildungsplan BW, 14.244 Vektoren). Wer einen anderen Bestand hat — andere Fächer,
+# andere Editionen —, muss sie anpassen; ein Fall, dessen erwarteter Knoten gar nicht
+# importiert ist, misst nichts.
+
+top_k: 10
+
+faelle:
+  # ── Fälle, die den Anlass gaben ───────────────────────────────────────────────
+  - frage: Wie berechnet man den Flächeninhalt eines Kreises?
+    fach: Mathematik
+    knoten: 3.3.2(1)
+    notiz: >-
+      Der Ausgangsfall. Lieferte bis 30.08.2026 ausschließlich Geographie-Knoten
+      (Wasserkreislauf, Kreislauf der Gesteine), obwohl der Mathematik-Knoten mit 0.581
+      gegen 0.495 deutlich ähnlicher ist.
+
+  - frage: Gedichte interpretieren und sprachliche Bilder deuten
+    fach: Deutsch
+    knoten: 3.4.1.1
+    notiz: >-
+      Operatorfalle. Die Frage enthält das Operatorverb „interpretieren"; die kurzen
+      Operator-Knoten schlagen die längeren Kompetenztexte. Erwartet wird die Leitidee
+      „Literarische Texte".
+
+  - frage: Raum und Zeit in der bildenden Kunst
+    fach: Bildende Kunst
+    knoten: 3.1.4
+    notiz: >-
+      Zeigte scheinbar, dass die Ähnlichkeitswerte kaum trennen (vier Treffer im Band
+      0.601–0.603). Exakt gesucht steht die Leitidee „Zeit" mit 0.775 klar oben.
+
+  # ── Fälle, die schon funktionierten (Kontrollen) ──────────────────────────────
+  - frage: Fotosynthese
+    fach: Biologie
+    knoten: 3.2.3(1)
+    notiz: Kontrolle. Kurze, eindeutige Fachfrage ohne Operatorverb.
+
+  - frage: Elektronen abgeben und aufnehmen bei der Redoxreaktion
+    fach: Chemie
+    knoten: 3.4.7
+    notiz: Kontrolle. Umschreibung ohne Fachwort im Titel; funktionierte bereits.
+
+  - frage: Was ist ein kategorischer Imperativ?
+    fach: Ethik
+    knoten: 3.3.3.3(3)
+    notiz: Kontrolle. Benannter Fachbegriff.
+
+  - frage: Ursachen des Ersten Weltkriegs
+    fach: Geschichte
+    knoten: 3.2.6(2)
+    notiz: Kontrolle. Die Kompetenz trägt die Frage fast wörtlich im Titel.
+
+  # ── Weitere Fächer, Operatorverben, Umschreibungen ────────────────────────────
+  - frage: Satz des Pythagoras am rechtwinkligen Dreieck
+    fach: Mathematik
+    knoten: Pythagoras
+    notiz: >-
+      Prüft, ob ein Schulcurriculum-Kapitel („Beziehungen am rechtwinkligen Dreieck")
+      und die Bildungsplan-Kompetenz beide gefunden werden.
+
+  - frage: Textaufgaben zu linearen Gleichungssystemen
+    fach: Mathematik
+    knoten: 3.2.1(23)
+    notiz: >-
+      Knapp. Direkt hinter dem richtigen Treffer folgen eine Deutsch-Leitidee, der
+      Operator „lösen" und eine Latein-Leitidee — ein Fachbezug entscheidet hier.
+
+  - frage: unregelmäßige Verben im Simple Past
+    fach: Englisch
+    knoten: 3.2.3.8(4)
+    notiz: >-
+      Härtester Operatorfall: liefert viermal den Operator „nennen", kein Englisch.
+      Kein Operatorverb in der Frage — die Ähnlichkeit entsteht allein aus der Kürze
+      der Operator-Knoten.
+
+  - frage: Wetter und Klima im Vergleich
+    fach: Geographie
+    knoten: 3.1.2.1(3)
+    notiz: >-
+      Operatorfalle über die Wortform „Vergleich" → Operator „vergleichen" (0.629)
+      schlägt die passgenaue Kompetenz (0.612).
+
+  - frage: Passé composé und Imparfait unterscheiden
+    fach: Französisch
+    knoten: 3.2.3.8(4)
+    notiz: Fremdsprache mit Akzenten; prüft die Tokenisierung nicht-deutscher Begriffe.
+
+  - frage: Aufbau und Funktion des menschlichen Auges
+    fach: Biologie
+    knoten: 3.3.1(2)
+    notiz: Trifft, aber ein Operator („wahrnehmen") drängt sich auf Platz 3.
+
+  - frage: Wie funktioniert ein Transistor?
+    fach: NwT
+    knoten: 3.2.4.4(1)
+    notiz: >-
+      Das erwartete Fach ist NwT, nicht Physik — im Bildungsplan stehen elektronische
+      Schaltungen dort. Der Fall hält fest, dass die Erwartung aus dem Bestand kommt
+      und nicht aus dem Bauchgefühl.
+
+  - frage: Programmschleifen und Verzweigungen
+    fach: Informatik
+    knoten: 3.1.2(1)
+    notiz: >-
+      Liefert zwei Leitperspektiven-Aspekte ohne Fachbezug vor der Informatik-Kompetenz.
+      Prüft, ob fachlose Knoten die Liste verstopfen.

@@ -16,7 +16,7 @@ Ablauf (siehe docs/runbooks/modellwechsel.md):
     2. python scripts/resize_embedding_column.py --dry-run    # was würde passieren?
     3. python scripts/resize_embedding_column.py --yes
     4. python scripts/embedding_backfill.py --batch-size 100
-    5. python scripts/embedding_backfill.py --reindex
+    5. python scripts/search_eval.py                          # trifft das neue Modell?
 
 Verwendung:
     python scripts/resize_embedding_column.py --dry-run
@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy import create_engine
 
 from app.config import settings
-from app.db.embedding_column import HNSW_MAX_DIM, current_dimension, resize_embedding_column
+from app.db.embedding_column import VECTOR_MAX_DIM, current_dimension, resize_embedding_column
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,10 +65,10 @@ def main() -> None:
     args = parser.parse_args()
 
     target = settings.embedding_dimensions
-    if target > HNSW_MAX_DIM:
+    if target > VECTOR_MAX_DIM:
         logger.error(
-            "EMBEDDING_DIMENSIONS=%d überschreitet das HNSW-Limit von %d (pgvector).",
-            target, HNSW_MAX_DIM,
+            "EMBEDDING_DIMENSIONS=%d überschreitet die Grenze des pgvector-Typs von %d.",
+            target, VECTOR_MAX_DIM,
         )
         sys.exit(1)
 
@@ -111,7 +111,7 @@ def main() -> None:
         logger.info(
             "Fertig: vector(%s) → vector(%d), %d Embeddings verworfen. "
             "Jetzt neu einbetten: python scripts/embedding_backfill.py --batch-size 100 "
-            "&& python scripts/embedding_backfill.py --reindex",
+            "&& python scripts/search_eval.py",
             result.previous, result.target, result.cleared,
         )
     except Exception:

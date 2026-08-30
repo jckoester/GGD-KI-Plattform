@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Die semantische Suche übersah rund die Hälfte der besten Treffer.** Der Vektorindex
+  lieferte nicht die ähnlichsten Knoten, sondern eine Auswahl daraus — „Flächeninhalt
+  eines Kreises" fand Geographie-Knoten statt der Mathematik-Kompetenz. Der Index ist
+  entfernt (Migration 0052); die Suche durchläuft jetzt alle Vektoren. Das richtige Fach
+  steht damit in 11 von 15 Prüffällen oben statt in 8, der erwartete Knoten wird in 13
+  statt 6 Fällen gefunden.
+
+  - Neuer Prüfsatz `config/search_eval.yaml` mit `scripts/search_eval.py`: misst je
+    Anfrage Recall, Fach und Rang des erwarteten Treffers.
+  - `embedding_backfill.py --reindex` ist entfallen, ebenso alle Index-Rebuild-Schritte
+    in den Runbooks — nach Import und Re-Embedding gibt es nichts mehr nachzuziehen.
+  - Embedding-Modelle mit mehr als 2000 Dimensionen sind jetzt nutzbar (die Grenze kam
+    vom Index). Sie kosten linear mehr Suchzeit — siehe
+    [Vor der Installation](docs/admin/vor-der-installation.md).
+
 ### Geändert
 
 - **Das Budget gilt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die

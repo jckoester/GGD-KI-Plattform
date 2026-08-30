@@ -415,7 +415,7 @@ LLM aus der gespeicherten Struktur:
 >
 > Ein Schritt-4/5-Voll-Import erfasst damit **alle** Fächer; die Einzelaufrufe oben bleiben
 > für den gezielten Import nach einer Extraktion.
-Anschließend Embeddings (Schritt 6) und ggf. HNSW-Rebuild (Schritt 7) wie üblich.
+Anschließend Embeddings (Schritt 6) und die Suchprüfung (Schritt 7) wie üblich.
 
 ---
 
@@ -466,8 +466,8 @@ Nicht akzeptabel: Warnungen mit `bp_id`-Präfixen der konfigurierten Fächer
 # Dry-Run: zeigt Anzahl Knoten ohne Embedding
 cd backend && python scripts/embedding_backfill.py --dry-run
 
-# Echter Lauf (nach großem Erstimport: --reindex ergänzen)
-cd backend && python scripts/embedding_backfill.py --reindex
+# Echter Lauf
+cd backend && python scripts/embedding_backfill.py
 ```
 
 `DATABASE_URL` muss in der `.env` oder als Umgebungsvariable gesetzt sein.
@@ -497,19 +497,20 @@ GROUP BY content_type;
 
 ---
 
-## Schritt 7 — HNSW-Index-Rebuild
+## Schritt 7 — Suche prüfen
 
-Nach dem ersten vollständigen Batch-Import oder nach größeren Bulk-Updates:
-
-```sql
--- Entwicklungs-DB (direkte Verbindung, single-user)
-REINDEX INDEX idx_context_nodes_embedding;
-
--- Produktions-DB (concurrent, kein Table-Lock)
-REINDEX INDEX CONCURRENTLY idx_context_nodes_embedding;
+```bash
+cd backend && python scripts/search_eval.py
 ```
 
-Im laufenden Betrieb mit kleinen inkrementellen Updates ist kein REINDEX nötig.
+Der Prüfsatz (`config/search_eval.yaml`) stellt feste Fragen und meldet je Fall, ob der
+erwartete Knoten gefunden wird und ob das richtige Fach oben steht. Nach einem Import ist
+das die schnellste Antwort auf „ist der Bestand brauchbar?" — deutlich aussagekräftiger
+als eine Knotenzählung.
+
+> **Kein Index-Rebuild mehr.** Hier stand bis 08/2026 ein `REINDEX` des Vektorindex. Der
+> Index ist mit Migration 0052 entfallen: Er lieferte nur rund die Hälfte der ähnlichsten
+> Knoten, und weder Neuaufbau noch stärkere Parameter brachten ihn darüber hinaus.
 
 ---
 
@@ -542,7 +543,7 @@ FROM context_nodes n,
 WHERE n.embedding IS NOT NULL AND n.status = 'active'
 ORDER BY n.embedding <=> ref.embedding
 LIMIT 5;
--- Erwartet: HNSW Index Scan, Execution Time < 100 ms
+-- Erwartet: Seq Scan (so ist es gewollt, siehe Schritt 7), Execution Time < 100 ms
 ```
 
 ---
@@ -619,4 +620,4 @@ python -m scripts.scraper.monitor --subjects config/subjects.yaml
 | `0 Knoten` nach Import | Kein `fach_code` in `subjects.yaml` | `fach_code` für gewünschte Fächer setzen (Schritt 1) |
 | Viele Warnungen zu konfigurierten Fächern | Scraper-Parsing-Fehler | Scraper-Log + HTML-Struktur prüfen |
 | `embedding IS NULL` nach Batch | LiteLLM nicht erreichbar | `metadata_['embedding_error']` pro Knoten prüfen |
-| Sequential Scan statt HNSW | Index nicht aktuell | `REINDEX INDEX idx_context_nodes_embedding` |
+| Suche liefert fachfremde Treffer | Erwartung, Bestand oder Embedding-Modell | `python scripts/search_eval.py` — er nennt Recall, Fach und Rang je Prüffall |

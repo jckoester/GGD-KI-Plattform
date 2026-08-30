@@ -16,7 +16,6 @@ Revisionen oberhalb von 0042 mit aus- und wieder einbauen. Für den Wechsel im B
 
     python scripts/resize_embedding_column.py --yes
     python scripts/embedding_backfill.py --batch-size 100
-    python scripts/embedding_backfill.py --reindex
 
 Beide Pfade teilen die Implementierung in ``app/db/embedding_column.py``, damit sie nicht
 auseinanderlaufen. Siehe docs/runbooks/modellwechsel.md.

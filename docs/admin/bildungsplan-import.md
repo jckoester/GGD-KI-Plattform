@@ -221,8 +221,8 @@ Backend-Image und läuft direkt im laufenden Container:
 # Dry-Run: zeigt Anzahl Knoten ohne Embedding
 docker compose exec backend python scripts/embedding_backfill.py --dry-run
 
-# Echter Lauf (nach großem Erstimport: --reindex ergänzen)
-docker compose exec backend python scripts/embedding_backfill.py --reindex
+# Echter Lauf
+docker compose exec backend python scripts/embedding_backfill.py
 ```
 
 > **LiteLLM muss erreichbar sein** und das unter `EMBEDDING_MODEL` konfigurierte Modell
@@ -244,17 +244,21 @@ docker compose exec backend python scripts/embedding_backfill.py --reindex
 
 ---
 
-## Schritt 5: HNSW-Index neu aufbauen
+## Schritt 5: Suche prüfen
 
-Nach dem ersten vollständigen Import oder größeren Bulk-Updates den Vektor-Index
-neu aufbauen (im Produktivbetrieb ohne Tabellen-Sperre):
+Nach dem Import einen Blick auf die Trefferqualität werfen:
 
 ```bash
-docker compose exec db psql -U postgres -d ggd_ki \
-  -c "REINDEX INDEX CONCURRENTLY idx_context_nodes_embedding;"
+docker compose exec backend python scripts/search_eval.py
 ```
 
-Bei kleinen inkrementellen Updates im laufenden Betrieb ist kein REINDEX nötig.
+Der Prüfsatz (`config/search_eval.yaml`) stellt feste Fragen und meldet, ob der erwartete
+Knoten gefunden wird. Erwartungen, die auf nicht importierte Fächer zeigen, melden sich
+als Hinweis — dann fehlt entweder das Fach oder die Erwartung ist für diese Schule falsch.
+
+> **Kein Index-Rebuild mehr nötig.** Hier stand bis 08/2026 ein `REINDEX` des
+> Vektorindex. Der Index ist entfallen (Migration 0052), weil er nur rund die Hälfte der
+> ähnlichsten Knoten lieferte; die Suche durchläuft jetzt alle Vektoren.
 
 ---
 

@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass
 from time import perf_counter
 
-from sqlalchemy import select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import httpx
@@ -66,7 +66,6 @@ async def backfill_embeddings(
     batch_size: int = 100,
     limit: int | None = None,
     dry_run: bool = False,
-    reindex: bool = False,
     content_types: list[str] | None = None,
 ) -> EmbeddingBackfillStats:
     stats = EmbeddingBackfillStats()
@@ -83,11 +82,10 @@ async def backfill_embeddings(
             logger.warning("backfill_embeddings: nicht einbettbare content_types ignoriert: %s", ignored)
 
     logger.info(
-        "backfill_embeddings gestartet batch_size=%d limit=%s dry_run=%s reindex=%s content_types=%s",
+        "backfill_embeddings gestartet batch_size=%d limit=%s dry_run=%s content_types=%s",
         batch_size,
         limit,
         dry_run,
-        reindex,
         content_types or "alle",
     )
 
@@ -243,10 +241,9 @@ async def backfill_embeddings(
         # abgerechneten Verbrauch. Die Schaetzung lag bei langen Knoten um ein Vielfaches
         # daneben — der Inhalt reicht bis EMBEDDING_MAX_CHARS.)
 
-    if reindex and not dry_run:
-        logger.info("REINDEX INDEX idx_context_nodes_embedding")
-        await db.execute(text("REINDEX INDEX idx_context_nodes_embedding"))
-        await db.commit()
+    # Hier stand bis 08/2026 ein optionaler REINDEX des Vektorindex. Der Index ist mit
+    # Migration 0052 entfallen — die semantische Suche läuft als vollständiger Durchlauf
+    # und braucht nach einem Backfill keine Nacharbeit mehr.
 
     stats.duration_ms = int((perf_counter() - started) * 1000)
     logger.info(

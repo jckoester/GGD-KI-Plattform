@@ -122,18 +122,43 @@ EU-Anbieter (Deutschland), OpenAI-kompatibel.
 | **BAAI/bge-m3** | 1024 | 0,02 | **Empfehlung.** Mehrsprachig, für deutsche Fachtexte geeignet. Braucht `encoding_format: float` — sonst schickt LiteLLM base64 und IONOS antwortet mit einem Fehler. |
 | paraphrase-multilingual-mpnet | 768 | 0,01 | Kleiner und billiger, nicht erprobt. |
 | bge-large-en-v1.5 | 1024 | 0,015 | Englisch — für einen deutschen Bildungsplan die falsche Wahl. |
-| Qwen3-VL-Embedding-8B | 4096 | 0,11 | **Nicht nutzbar:** 4096 Dimensionen überschreiten die Obergrenze des HNSW-Index (2000). |
+| Qwen3-VL-Embedding-8B | 4096 | 0,11 | Technisch nutzbar, aber teuer in doppelter Hinsicht: fünfeinhalbfacher Preis und **viermal so lange Suchzeiten** wie bei 1024 Dimensionen (siehe unten). Nicht erprobt. |
 
 > ⚠️ **Die Vektorbreite ist keine Einstellung, die man später ändert.** Sie muss zu
 > `EMBEDDING_DIMENSIONS` *und* zur Datenbankspalte passen; ein Wechsel verlangt eine
 > Schemaänderung und ein vollständiges Re-Embedding aller Knoten. Deshalb vor dem ersten
 > Import entscheiden. Ablauf: [Runbook Modellwechsel](../runbooks/modellwechsel.md).
 
-> **Zur Trefferqualität:** BGE-M3 liefert bei Naturwissenschaften gute Treffer, greift aber
-> auch schon mal auf Wortformen statt Bedeutung zu („Flächeninhalt eines **Kreis**es"
-> findet den Wasser**kreis**lauf). Wer die semantische Suche intensiv nutzt, sollte sie an
-> eigenen Beispielen gegenprüfen und einen Reranker erwägen (IONOS führt
-> `Qwen3-VL-Reranker-8B`, 0,045 $/M).
+> **Zur Trefferqualität:** BGE-M3 trennt Bedeutungen zuverlässiger, als es lange den
+> Anschein hatte. Hier stand bis 08/2026 der Vorwurf, es verwechsle Wortformen mit
+> Bedeutung („Flächeninhalt eines **Kreis**es" finde den Wasser**kreis**lauf). Das war
+> falsch: Der Mathematik-Treffer war die ganze Zeit der ähnlichere (0,581 gegen 0,495) —
+> nur lieferte ihn der damalige Vektorindex nicht aus. Er ist inzwischen entfernt.
+>
+> Wer die Suche intensiv nutzt, prüft sie trotzdem an eigenen Beispielen gegen:
+> `python scripts/search_eval.py` mit eigenen Fällen in `config/search_eval.yaml`.
+
+#### Wie viele Knoten trägt die Suche?
+
+Die semantische Suche durchläuft **alle** Vektoren; einen Index gibt es bewusst nicht (er
+lieferte nur rund die Hälfte der ähnlichsten Knoten — Begründung in Migration 0052).
+Gemessen an 14.244 Knoten mit 1024 Dimensionen:
+
+| | Zeit je Suche | Durchsatz (4-Kern-Server) |
+|---|---|---|
+| 14.000 Knoten | 35–55 ms | ~110/s |
+| 50.000 Knoten (hochgerechnet) | ~120 ms | ~30/s |
+
+Zum Vergleich: 100 gleichzeitig aktive Nutzer:innen erzeugen etwa 2–3 Suchen/s. Die Suche
+trägt damit bis grob **150.000 Knoten**; ein vollständiger Bildungsplan liegt bei rund
+14.000. Drei Dinge sind zu beachten:
+
+- **Die Zeit wächst linear mit der Vektorbreite.** Ein Modell mit 4096 statt 1024
+  Dimensionen sucht viermal so lange.
+- **`shared_buffers` muss zum Bestand passen.** Bei 50.000 Knoten liegen rund 370 MB
+  Vektordaten im Umlauf; die PostgreSQL-Vorgabe von 128 MB reicht dafür nicht.
+- **PostgreSQL parallelisiert diese Abfrage nicht** — der Durchsatz entspricht der
+  Kernzahl.
 
 #### Bildgenerierung
 

@@ -109,11 +109,12 @@ Automation/Runbook-Skripte: `--yes` statt der interaktiven Rückfrage.
 Beide Wege nutzen dieselbe Implementierung (`app/db/embedding_column.py`) und führen
 dieselben Schritte aus:
 
-1. HNSW-Index `idx_context_nodes_embedding` löschen (er blockiert sonst den Typwechsel).
+1. Einen etwaigen Vektorindex löschen (er würde den Typwechsel blockieren).
 2. `embedding = NULL` für alle Knoten — die Anzahl wird geloggt.
 3. `ALTER COLUMN embedding TYPE vector(N)`.
-4. HNSW-Index neu anlegen (`m=16, ef_construction=64, vector_cosine_ops`, partiell auf
-   `embedding IS NOT NULL`). Billig, weil der Index nach Schritt 2 leer ist.
+
+Ein Index wird **nicht** wieder angelegt: Die semantische Suche läuft seit Migration 0052
+als vollständiger Durchlauf (Begründung dort).
 
 ## Schritt 4 — Re-Embedding
 
@@ -121,7 +122,13 @@ dieselben Schritte aus:
 cd backend
 python scripts/embedding_backfill.py --dry-run                 # Anzahl prüfen
 python scripts/embedding_backfill.py --batch-size 100          # eigentlicher Lauf
-python scripts/embedding_backfill.py --reindex                 # HNSW-Index abschließend neu aufbauen
+```
+
+Danach den Prüfsatz laufen lassen — er zeigt, ob das neue Modell die erwarteten Treffer
+liefert, und ist der eigentliche Grund, einen Modellwechsel überhaupt bewerten zu können:
+
+```bash
+python scripts/search_eval.py
 ```
 
 Bei großen Beständen in Tranchen fahren (`--limit`), um Last und Kosten zu verteilen. Der
@@ -185,7 +192,6 @@ Zusätzlich fachlich stichprobenartig prüfen:
 cd backend && python scripts/resize_embedding_column.py --yes
 # 3. Erneut einbetten — auch der Rückweg braucht ein vollständiges Re-Embedding
 python scripts/embedding_backfill.py --batch-size 100
-python scripts/embedding_backfill.py --reindex
 ```
 
 Es gibt keinen Weg, die alten Vektoren zu retten: Sie wurden in Schritt 3 verworfen. Der

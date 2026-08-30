@@ -5,15 +5,16 @@ darf nichts passieren. Ohne sie würde jeder Aufruf — ob per Migration 0043 od
 scripts/resize_embedding_column.py — sämtliche Embeddings verwerfen, obwohl sich das Modell
 nicht geändert hat, und ein stundenlanges Re-Embedding erzwingen.
 
-Ergänzend: die zwingende Statement-Reihenfolge (der HNSW-Index blockiert sonst den
-Typwechsel) und die Index-Definition, die zu models.py / Migration 0018 passen muss.
+Ergänzend: die zwingende Statement-Reihenfolge (ein vorhandener Index blockiert sonst den
+Typwechsel) und die Zusage, dass **kein** Vektorindex neu angelegt wird — die semantische
+Suche läuft seit Migration 0052 absichtlich als vollständiger Durchlauf.
 """
 from unittest.mock import MagicMock
 
 import pytest
 
 from app.db.embedding_column import (
-    HNSW_MAX_DIM,
+    VECTOR_MAX_DIM,
     current_dimension,
     resize_embedding_column,
 )
@@ -81,28 +82,48 @@ def test_resizes_and_clears_when_dimension_differs():
 
 
 def test_statement_order_is_mandatory():
-    """Index weg → NULL → ALTER → Index neu.
+    """Index weg → NULL → ALTER. Danach wird **kein** Index mehr angelegt.
 
-    Der HNSW-Index blockiert den Typwechsel, und ein ALTER auf Vektoren fremder Breite
-    schlägt fehl — die Reihenfolge ist also keine Stilfrage.
+    Ein vorhandener Index blockiert den Typwechsel, und ein ALTER auf Vektoren fremder
+    Breite schlägt fehl — die Reihenfolge ist also keine Stilfrage. Das abschließende
+    CREATE ist mit Migration 0052 entfallen.
     """
     conn, executed = _fake_conn("vector(1536)", rowcount=1)
 
     resize_embedding_column(conn, 768)
 
-    assert _writes(executed) == ["DROP", "UPDATE", "ALTER", "CREATE"]
+    assert _writes(executed) == ["DROP", "UPDATE", "ALTER"]
 
 
-def test_recreated_index_matches_original_definition():
-    """Der neue Index muss dem aus Migration 0018 / models.py entsprechen."""
+def test_modell_deklariert_keinen_vektorindex():
+    """Zweite Hälfte der Zusage aus Migration 0052 — die für `autogenerate`.
+
+    Migration und Modell müssen zusammenpassen: Stünde der Index weiter in
+    ``ContextNode.__table_args__``, würde die nächste generierte Migration ihn
+    kommentarlos wieder anlegen und die Suchgüte still halbieren.
+    """
+    from app.db.models import ContextNode
+
+    verdaechtig = [
+        i.name for i in ContextNode.__table__.indexes
+        if "embedding" in (i.name or "") or "embedding" in {c.name for c in i.columns}
+    ]
+    assert verdaechtig == [], f"Vektorindex im Modell wieder aufgetaucht: {verdaechtig}"
+
+
+def test_legt_keinen_vektorindex_an():
+    """Gegenprobe zu Migration 0052: Die Umstellung darf keinen Index zurückbringen.
+
+    Der frühere HNSW-Index lieferte nur rund die Hälfte der ähnlichsten Knoten. Käme er
+    über diesen Weg zurück, fiele das nirgends auf — er wirft keinen Fehler, er liefert
+    stillschweigend schlechtere Treffer.
+    """
     conn, executed = _fake_conn("vector(1536)")
 
     resize_embedding_column(conn, 1024)
 
-    create = next(s for s in executed if "CREATE INDEX" in s)
-    assert "USING hnsw (embedding vector_cosine_ops)" in create
-    assert "m = 16" in create and "ef_construction = 64" in create
-    assert "WHERE embedding IS NOT NULL" in create
+    assert not [s for s in executed if "CREATE INDEX" in s]
+    assert not [s for s in executed if "hnsw" in s.lower()]
 
 
 def test_handles_column_without_typmod():
@@ -123,14 +144,19 @@ def test_handles_missing_column():
 
 # ── Schutzgrenzen ────────────────────────────────────────────────────────────
 
-def test_rejects_dimension_above_hnsw_limit():
-    """pgvector indiziert HNSW nur bis 2000 Dim. — früh und verständlich abbrechen."""
+def test_rejects_dimension_above_vector_limit():
+    """Der pgvector-Typ speichert bis 16.000 Dim. — früh und verständlich abbrechen.
+
+    Bis 08/2026 lag die Grenze bei 2000: der Indexgrenze von HNSW. Mit dem Index
+    (Migration 0052) ist sie entfallen — breitere Modelle sind seither nutzbar, kosten
+    ohne Index aber linear mehr Suchzeit.
+    """
     conn, executed = _fake_conn("vector(1536)")
 
     with pytest.raises(ValueError) as exc:
-        resize_embedding_column(conn, HNSW_MAX_DIM + 1)
+        resize_embedding_column(conn, VECTOR_MAX_DIM + 1)
 
-    assert str(HNSW_MAX_DIM) in str(exc.value)
+    assert str(VECTOR_MAX_DIM) in str(exc.value)
     assert _writes(executed) == [], "bei Abbruch darf nichts geschrieben worden sein"
 
 

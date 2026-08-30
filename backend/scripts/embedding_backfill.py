@@ -6,7 +6,6 @@ Verwendung:
     python scripts/embedding_backfill.py
     python scripts/embedding_backfill.py --dry-run
     python scripts/embedding_backfill.py --batch-size 50 --limit 500
-    python scripts/embedding_backfill.py --reindex
 """
 import argparse
 import asyncio
@@ -31,7 +30,6 @@ async def run(
     batch_size: int,
     limit: int | None,
     dry_run: bool,
-    reindex: bool,
     content_types: list[str] | None,
 ) -> int:
     async with AsyncSessionLocal() as db:
@@ -40,7 +38,6 @@ async def run(
             batch_size=batch_size,
             limit=limit,
             dry_run=dry_run,
-            reindex=reindex,
             content_types=content_types,
         )
     logger.info(
@@ -62,11 +59,6 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=100, help="Batch-Größe (Default: 100)")
     parser.add_argument("--limit", type=int, default=None, help="Maximale Anzahl Knoten")
     parser.add_argument(
-        "--reindex",
-        action="store_true",
-        help="Nach dem Lauf REINDEX INDEX idx_context_nodes_embedding ausführen",
-    )
-    parser.add_argument(
         "--content-type",
         action="append",
         default=None,
@@ -85,7 +77,6 @@ def main() -> None:
                 batch_size=args.batch_size,
                 limit=args.limit,
                 dry_run=args.dry_run,
-                reindex=args.reindex,
                 content_types=args.content_types,
             )
         )

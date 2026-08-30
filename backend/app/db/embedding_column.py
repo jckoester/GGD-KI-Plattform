@@ -25,9 +25,15 @@ der Umstellung ist ein vollständiges Re-Embedding nötig
 
 from dataclasses import dataclass
 
-# pgvector indiziert HNSW bis 2000 Dimensionen. Darüber schlägt erst die Index-Anlage fehl —
-# mit einer Meldung, die den Zusammenhang zur Konfiguration nicht nennt.
-HNSW_MAX_DIM = 2000
+# Speichergrenze des pgvector-Typs ``vector``. Darüber schlägt erst der ``ALTER TABLE``
+# fehl — mit einer Meldung, die den Zusammenhang zur Konfiguration nicht nennt.
+#
+# Hier stand bis 08/2026 die weit engere Indexgrenze von 2000 (HNSW). Sie ist mit dem
+# Vektorindex entfallen (Migration 0052); Modelle mit breiteren Vektoren sind seither
+# nutzbar. **Ohne Index kostet Breite aber unmittelbar Suchzeit:** Der vollständige
+# Durchlauf ist linear in der Dimensionszahl, 4096 Dimensionen suchen also viermal so
+# lange wie 1024. Siehe docs/admin/vor-der-installation.md.
+VECTOR_MAX_DIM = 16000
 
 _CURRENT_DIM_SQL = """
     SELECT format_type(a.atttypid, a.atttypmod)
@@ -40,17 +46,6 @@ _CURRENT_DIM_SQL = """
       AND a.attnum > 0
       AND NOT a.attisdropped
 """
-
-# Muss der Definition in models.py (ContextNode.__table_args__) und Migration 0018
-# entsprechen — sonst weicht der Index nach einer Umstellung stillschweigend ab.
-_CREATE_INDEX_SQL = """
-    CREATE INDEX idx_context_nodes_embedding
-    ON context_nodes
-    USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64)
-    WHERE embedding IS NOT NULL
-"""
-
 
 @dataclass(frozen=True)
 class ResizeResult:
@@ -100,20 +95,22 @@ def resize_embedding_column(conn, target: int, *, dry_run: bool = False) -> Resi
     würde jeder Aufruf sämtliche Embeddings verwerfen, obwohl sich nichts geändert hat —
     und ein stundenlanges Re-Embedding erzwingen.
 
-    Reihenfolge ist zwingend: Der HNSW-Index blockiert den Typwechsel, und ein ``ALTER`` auf
-    Vektoren fremder Breite schlägt fehl. Also Index weg → Vektoren auf NULL → ``ALTER`` →
-    Index neu. Die Neuanlage ist billig, weil der partielle Index durch die NULL-Setzung
-    leer ist.
+    Reihenfolge ist zwingend: Ein ``ALTER`` auf Vektoren fremder Breite schlägt fehl, also
+    Vektoren auf NULL → ``ALTER``. Das vorangestellte ``DROP INDEX IF EXISTS`` bleibt
+    stehen, obwohl seit Migration 0052 kein Vektorindex mehr angelegt wird: Ein Index
+    blockiert den Typwechsel, und auf einer Datenbank, die aus welchem Grund auch immer
+    noch einen trägt, würde die Umstellung sonst scheitern. **Neu angelegt wird keiner** —
+    die Suche läuft absichtlich als vollständiger Durchlauf.
 
     ``dry_run=True`` ermittelt nur, was passieren würde (inkl. Anzahl betroffener Zeilen),
     und schreibt nichts.
 
-    Wirft ``ValueError``, wenn ``target`` das HNSW-Limit überschreitet.
+    Wirft ``ValueError``, wenn ``target`` die Speichergrenze des Typs überschreitet.
     """
-    if target > HNSW_MAX_DIM:
+    if target > VECTOR_MAX_DIM:
         raise ValueError(
-            f"{target} Dimensionen überschreiten das HNSW-Limit von {HNSW_MAX_DIM} "
-            f"(pgvector). Ein Modell mit schmaleren Vektoren wählen."
+            f"{target} Dimensionen überschreiten die Grenze des pgvector-Typs "
+            f"von {VECTOR_MAX_DIM}. Ein Modell mit schmaleren Vektoren wählen."
         )
 
     previous = current_dimension(conn)
@@ -135,7 +132,6 @@ def resize_embedding_column(conn, target: int, *, dry_run: bool = False) -> Resi
     conn.exec_driver_sql(
         f"ALTER TABLE context_nodes ALTER COLUMN embedding TYPE vector({target})"
     )
-    conn.exec_driver_sql(_CREATE_INDEX_SQL)
 
     return ResizeResult(
         changed=True, previous=previous, target=target, cleared=int(cleared or 0)
