@@ -268,10 +268,20 @@ anzeigt.
 
 #### Wo die Datei liegen muss
 
-Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack**, oft in einem anderen
-Verzeichnis, mitunter auf einem anderen Host. Das `./data`-Volume des Anwendungs-Stacks
-ist für ihn **nicht** sichtbar. Beide Seiten müssen dasselbe **Host**-Verzeichnis
-einbinden:
+**Im Normalfall ist das erledigt.** Der Proxy ist ein Dienst derselben Compose;
+`litellm`, `backend` und `cron` binden alle `./data` ein. Nötig sind nur die beiden
+Angaben, die aufeinander zeigen:
+
+- `health_file: "/app/data/guardrail_health.json"` in der LiteLLM-Config,
+- `GUARDRAIL_HEALTH_FILE=data/guardrail_health.json` in der `.env`.
+
+Relative Pfade verankert das Backend am Repo-Root, nicht am Arbeitsverzeichnis. Ein
+Unit-Test hält beide Angaben gegeneinander (`test_compose_litellm.py`) — sie können nicht
+unbemerkt auseinanderlaufen.
+
+**Nur bei getrenntem Betrieb** ist Handarbeit nötig. Läuft der Proxy in einem eigenen
+Stack, ist das `./data`-Volume des Anwendungs-Stacks für ihn **nicht** sichtbar; beide
+Seiten müssen dann dasselbe **Host**-Verzeichnis einbinden:
 
 ```yaml
 # LiteLLM-Stack (docker-compose.yml im LiteLLM-Verzeichnis)
@@ -288,10 +298,6 @@ services:
     volumes:
       - ./data:/app/data
 ```
-
-Dazu `health_file: "/app/data/guardrail_health.json"` in der LiteLLM-Config und
-`GUARDRAIL_HEALTH_FILE=data/guardrail_health.json` in der Backend-`.env`. Relative Pfade
-verankert das Backend am Repo-Root, nicht am Arbeitsverzeichnis.
 
 > **Proxy und Anwendung auf verschiedenen Hosts?** Dann ist eine gemeinsame Datei nicht
 > möglich. `health_file` weglassen und die Überwachung über das **Proxy-Log** führen:
@@ -343,11 +349,12 @@ erscheint also nicht im Nutzerbudget — bei wachsender Last getrennt beobachten
 
 ### Nach Konfigurationsänderungen
 
-> Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack** — dieser Befehl gehört ins
-> LiteLLM-Verzeichnis, nicht ins Anwendungsverzeichnis (dort: `no such service: litellm`).
+> Der Proxy ist ein Dienst derselben Compose wie die Anwendung — der Befehl läuft im
+> Anwendungsverzeichnis. Wer ihn weiterhin getrennt betreibt, setzt ihn im
+> LiteLLM-Verzeichnis ab (hier sonst: `no such service: litellm`).
 
 ```bash
-# LiteLLM-Container neu starten:
+# LiteLLM-Container neu starten (die Config wird nur beim Start gelesen):
 docker compose restart litellm
 
 # Aktive Guardrails im Admin-Dashboard prüfen:

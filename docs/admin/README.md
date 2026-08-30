@@ -69,6 +69,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [Bildungsplan-Import](bildungsplan-import.md) — Fachkontext in das Docker-Produktivsystem importieren
 - [Schuljahreswechsel](../runbooks/schuljahreswechsel.md) — Runbook: `school_year.yaml`, Unterrichtswochen prüfen, Budget-Rücksetzung
 - [Curricula übertragen](../runbooks/curriculum-transfer.md) — Runbook: Schulcurricula exportieren und in promptLab/Dev einspielen
+- [LiteLLM-Umzug](../runbooks/litellm-in-die-compose.md) — Runbook: einen bisher getrennt betriebenen Proxy in die Compose der Anwendung übernehmen
 - [Stundenplan-Integration](stundenplan-integration.md) — WebUntis: Servicekonto, Fachkürzel, Ferien-Import, Abgleich-Cron
 - [Datenschutz & Betrieb](datenschutz-betrieb.md) — Pseudonymisierung, Crons, Löschfristen
 - [Updates & Wartung](updates-und-wartung.md) — Updates, Speicherplatz freigeben, Schuljahreswechsel, Troubleshooting

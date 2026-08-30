@@ -418,14 +418,17 @@ guardrails:
       # Zählerstand für /admin/guardrail/health. Fail-open ist nur zu verantworten, wenn
       # man weiß, wie oft es eintritt — eine Warnung im Log liest niemand.
       #
-      # ⚠️ DIESE DATEI MUSS DER ANWENDUNGS-STACK LESEN KÖNNEN. Der Proxy läuft in einem
-      # EIGENEN Compose-Stack, oft in einem anderen Verzeichnis — `./data` des
-      # Anwendungs-Stacks ist für ihn nicht sichtbar. Beide Seiten müssen dasselbe
-      # HOST-Verzeichnis einbinden:
+      # ⚠️ DIESE DATEI MUSS DER ANWENDUNGS-STACK LESEN KÖNNEN.
+      #
+      # Läuft der Proxy als Dienst `litellm` in der mitgelieferten docker-compose.yml,
+      # ist das erledigt: `litellm`, `backend` und `cron` binden alle ./data ein.
+      # Gegenstück in der .env: GUARDRAIL_HEALTH_FILE=data/guardrail_health.json
+      #
+      # Nur bei GETRENNTEM Betrieb ist Handarbeit nötig — dann sieht der Proxy ./data des
+      # Anwendungs-Stacks nicht, und beide müssen dasselbe HOST-Verzeichnis einbinden:
       #
       #   LiteLLM-Stack:      - /srv/ggd-ki/data:/app/data
       #   Anwendungs-Stack:   - ./data:/app/data          (bereits vorhanden)
-      #   Backend-.env:       GUARDRAIL_HEALTH_FILE=data/guardrail_health.json
       #
       # Laufen Proxy und Anwendung auf VERSCHIEDENEN Hosts, ist eine gemeinsame Datei
       # nicht möglich — dann `health_file` weglassen und die Überwachung über das

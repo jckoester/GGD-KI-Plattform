@@ -1,9 +1,13 @@
-# Redis für den LiteLLM-Proxy — Ergänzung zur LiteLLM-eigenen docker-compose.yml
+# Redis für den LiteLLM-Proxy — Ergänzung zur docker-compose.yml
 #
-# Der LiteLLM-Proxy läuft in einem **getrennten** Compose-Stack (eigene Postgres-DB,
-# eigenes Netz); die docker-compose.yml dieses Repos enthält ihn bewusst nicht. Diese
-# Datei ist deshalb kein lauffähiger Stack, sondern die Vorlage für zwei Eingriffe in
-# jene Datei.
+# Diese Datei ist kein lauffähiger Stack, sondern die Vorlage für zwei Eingriffe in die
+# `docker-compose.yml` des Repos (dort steht der Dienst `litellm`) plus einen in der
+# LiteLLM-Config. Wer den Proxy weiterhin getrennt betreibt, nimmt dieselben Eingriffe
+# in jener Compose vor.
+#
+# Redis ist eine OPTION, keine Vorgabe: Bei einem Proxy-Worker — dem Normalfall einer
+# Schule — hält LiteLLM seine Zähler auch ohne ihn korrekt. Nötig wird er, sobald mehrere
+# Worker parallel zählen.
 #
 # ── Warum überhaupt ───────────────────────────────────────────────────────────────────
 # Ohne Redis hält LiteLLM Zähler — Budgets, Rate-Limits, Router-Zustand — im
@@ -18,7 +22,7 @@
 # nach `Cache(**cache_params)` und einer `isinstance(..., RedisCache)`-Prüfung gesetzt
 # wird. Beides ist also nötig: Dienst + Umgebung + Config-Block.
 
-# ══ 1. Dienst ergänzen (in services: der LiteLLM-Compose) ═════════════════════════════
+# ══ 1. Dienst ergänzen (in services: der docker-compose.yml) ══════════════════════════
 services:
   redis:
     image: redis:7-alpine
@@ -52,13 +56,15 @@ services:
 #     REDIS_PORT: "6379"
 #
 #   depends_on:
-#     - db
-#     - redis        # ← diese Zeile
+#     db:
+#       condition: service_healthy     # bereits vorhanden
+#     redis:
+#       condition: service_started     # ← diese zwei Zeilen
 #
-# (Die Kurzform der Liste beibehalten — Kurz- und Langform lassen sich in einem
-# `depends_on` nicht mischen. Ein Wartezwang ist hier entbehrlich: Redis ist in etwa
-# einer Sekunde bereit, LiteLLM räumt sich selbst 40s `start_period` ein, und der
-# Redis-Client verbindet ohnehin erst beim ersten Zugriff.)
+# (Die LANGform beibehalten — Kurz- und Langform lassen sich in einem `depends_on` nicht
+# mischen, und der Eintrag für `db` steht dort bereits als Langform. `service_started`
+# genügt: Redis ist in etwa einer Sekunde bereit, der Proxy räumt sich selbst eine
+# `start_period` ein, und der Redis-Client verbindet ohnehin erst beim ersten Zugriff.)
 
 # ══ 3. In der LiteLLM-config.yaml ═════════════════════════════════════════════════════
 #

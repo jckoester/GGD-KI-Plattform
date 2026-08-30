@@ -75,6 +75,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Der LiteLLM-Proxy läuft als Dienst derselben `docker-compose.yml`.** Ein
+  `docker compose up -d` startet ihn mit; Config (`infra/litellm_config.yaml`),
+  Guardrail-Module und das `./data`-Volume für den Guardrail-Zählerstand sind eingehängt.
+  Die Proxy-Oberfläche ist nur auf `127.0.0.1` veröffentlicht (Port über `LITELLM_PORT`).
+
+  - Die zweite Datenbank (`litellm`, getrennt vom Alembic-Schema) legt
+    `infra/db-init/` beim ersten Start des `db`-Containers an.
+  - Das LiteLLM-Update besteht jetzt aus Tag-Wechsel und `docker compose up -d litellm`;
+    `prisma migrate deploy` und `prisma generate` entfallen.
+  - Der getrennte Betrieb bleibt unterstützt.
+
 - **Das Budget gilt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
   persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
   Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in
@@ -311,6 +322,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Fächer-Seed sie braucht. Schrittnummern durchgezählt (es gab keinen Schritt 6).
 
 ### Migration
+
+- ⚠️ **LiteLLM-Proxy aus dem eigenen Stack übernehmen.** Wer den Proxy bisher getrennt
+  betreibt, folgt dem [Runbook](docs/runbooks/litellm-in-die-compose.md). Kern: Der
+  Datenbestand des Proxys muss mitgenommen werden — er enthält die Virtual Keys, auf die
+  `pseudonym_audit.litellm_key` verweist, sowie Budgets und Verbrauch. `LITELLM_SALT_KEY`
+  und `LITELLM_MASTER_KEY` unverändert übernehmen; war der Salt-Key nie gesetzt, gehört
+  dort der alte Master-Key hinein.
+
+  In der `.env` außerdem `LITELLM_PROXY_URL=http://litellm:4000` und
+  `LITELLM_DATABASE_URL=…@db:5432/litellm` setzen. Die Datenbank `litellm` auf einer
+  bestehenden Installation einmalig anlegen — das Init-Verzeichnis greift nur bei leerem
+  Datenverzeichnis:
+
+  ```bash
+  docker compose exec db psql -U postgres -c "CREATE DATABASE litellm"
+  ```
+
+  Wer beim getrennten Betrieb bleibt, schaltet den neuen Dienst über eine
+  `docker-compose.override.yml` ab (Snippet im Runbook).
 
 - ⚠️ **Budget: Umstellung aufs Wochenmodell — drei Schritte, in dieser Reihenfolge.**
 

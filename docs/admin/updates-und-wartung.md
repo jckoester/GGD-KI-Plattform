@@ -134,41 +134,42 @@ bevor die alte Zeile entfernt werden kann.
 
 ## LiteLLM updaten
 
-> **Anderes Verzeichnis!** Der LiteLLM-Proxy läuft in einem **eigenen Compose-Stack** mit
-> eigener Postgres-Datenbank — die `docker-compose.yml` dieses Repos enthält ihn nicht.
-> Alle `docker compose …`-Befehle dieses Abschnitts sind aus dem **LiteLLM-Verzeichnis**
-> abzusetzen, nicht aus dem Anwendungsverzeichnis. Dort ausgeführt scheitern sie mit
-> `no such service: litellm` — was leicht als Deployment-Fehler missgedeutet wird.
->
-> Umgekehrt gilt dasselbe: `docker compose exec db psql -d ggd_ki` gehört ins
-> **Anwendungs**verzeichnis. Beide Stacks haben einen Dienst namens `db`, und sie führen
-> verschiedene Datenbanken (`ggd_ki` bzw. `litellm`).
+Der Proxy ist ein Dienst **derselben** Compose (`litellm`); alle Befehle laufen im
+Anwendungsverzeichnis.
 
-LiteLLM verwaltet sein eigenes Datenbankschema über Prisma. Ein einfaches
-`pip install --upgrade litellm` genügt nicht — Schema und Prisma-Client müssen
-separat nachgezogen werden, sonst kann es zu Fehlern wie
-`'LiteLLM_TeamTable' object has no attribute '...'` kommen.
+Die Version steht an zwei Stellen, und beide gehören zusammen geändert:
 
-**Reihenfolge beim LiteLLM-Update:**
+| Stelle | Wofür |
+|---|---|
+| `image:` am Dienst `litellm` in `docker-compose.yml` | Produktion |
+| `litellm[proxy]==…` in `infra/litellm-requirements.txt` | der lokale Dev-Proxy |
+
+Ein Unit-Test (`test_compose_litellm.py`) hält beide gegeneinander — wer nur eine ändert,
+merkt es beim nächsten Testlauf statt erst im Betrieb.
 
 ```bash
-# 1. LiteLLM-Container neu bauen (zieht neue Version)
-docker compose build --no-cache litellm
+# 1. Version in docker-compose.yml und infra/litellm-requirements.txt anheben
+# 2. Neues Image ziehen und starten
+docker compose pull litellm
 docker compose up -d litellm
 
-# 2. DB-Schema aktualisieren
-docker compose exec litellm prisma migrate deploy
-
-# 3. Prisma-Python-Client neu generieren
-docker compose exec litellm sh -c "
-  LITELLM_DIR=\$(python3 -c 'import litellm, os; print(os.path.dirname(litellm.__file__))')
-  cd \"\$LITELLM_DIR/proxy\"
-  prisma generate --schema=schema.prisma
-"
-
-# 4. LiteLLM neu starten
-docker compose restart litellm
+# 3. Warten, bis der Proxy wieder gesund ist
+docker compose ps litellm
 ```
+
+Das Schema aktualisiert der Proxy beim Start selbst; das Image bringt den Prisma-Client
+mit. Die früher nötigen Schritte `prisma migrate deploy` und `prisma generate` entfallen
+damit — sie stammen aus der Zeit selbstgebauter Proxy-Images.
+
+> **Nach einem Versionssprung die Guardrail-Syntax prüfen.** Sie hat sich schon geändert:
+> Den Typ `regex` gibt es seit 1.83.7 nicht mehr, und ein Proxy, der die Config nicht
+> liest, startet gar nicht erst. Der erste Blick nach dem Update gehört deshalb
+> `docker compose logs litellm`, der zweite `/settings/guardrail`.
+
+> **Betreiben Sie den Proxy weiterhin als eigenen Stack?** Dann gelten die Befehle dieses
+> Abschnitts für **jenes** Verzeichnis, und das Image dort baut sich womöglich selbst —
+> in dem Fall bleiben `prisma migrate deploy` und `prisma generate` nötig. Zum Umstieg:
+> [Runbook LiteLLM-Umzug](../runbooks/litellm-in-die-compose.md).
 
 ## Redis für LiteLLM
 
@@ -177,7 +178,7 @@ Rate-Limits, Router-Zustand — im Arbeitsspeicher des jeweiligen Workers. Mit m
 Workern zählt dann jeder für sich, und nach jedem Neustart beginnt die Zählung von vorn.
 
 Die vollständige Vorlage steht in **`infra/litellm-redis.example.yml`**. Kurzfassung —
-drei Eingriffe, alle im **LiteLLM-Verzeichnis**:
+drei Eingriffe:
 
 1. Dienst `redis` ergänzen (ohne `ports:`, ohne Persistenz — der Inhalt sind Zähler).
 2. Am `litellm`-Dienst `REDIS_HOST: redis` / `REDIS_PORT: "6379"` setzen und `redis` in
@@ -214,7 +215,7 @@ Fehlt einem Knoten das Embedding, taucht er in der semantischen Suche nicht auf.
 nächtliche Backfill (03:15) holt das nach; er wählt nach `embedding IS NULL`, eine
 Fehlermarke aus einem früheren Lauf hält ihn also **nicht** ab.
 
-Alle Befehle im **Anwendungsverzeichnis** (nicht im LiteLLM-Verzeichnis):
+Alle Befehle im Anwendungsverzeichnis:
 
 ```bash
 # Überblick: wie viele Knoten haben keinen Vektor, wie viele eine Fehlermarke?
@@ -262,12 +263,13 @@ Was der Text verrät:
 > Gegenprobe ohne Umweg über die Knoten:
 >
 > ```bash
-> # Im LiteLLM-Verzeichnis:
-> docker compose exec litellm sh -c \
->   'curl -s -o /dev/null -w "%{http_code}\n" -X POST localhost:4000/embeddings \
+> # Aus dem backend-Container heraus — das LiteLLM-Image bringt kein curl mit,
+> # und so wird zugleich der Weg geprüft, den die Anwendung tatsächlich geht:
+> docker compose exec backend sh -c \
+>   'curl -s -o /dev/null -w "%{http_code}\n" -X POST $LITELLM_PROXY_URL/embeddings \
 >      -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
 >      -H "Content-Type: application/json" \
->      -d "{\"model\":\"<EMBEDDING_MODEL aus der .env>\",\"input\":[\"Test\"]}"'
+>      -d "{\"model\":\"$EMBEDDING_MODEL\",\"input\":[\"Test\"]}"'
 > ```
 
 **Der Backfill bricht bei einer Fehlerserie ab.** Zehn Fehlschläge in Folge heißen: Es

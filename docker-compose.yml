@@ -8,11 +8,75 @@ services:
       POSTGRES_USER: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Legt beim ERSTEN Start die zweite Datenbank für den LiteLLM-Proxy an.
+      # ⚠️ Nur bei leerem Datenverzeichnis — auf einer bestehenden Installation wird
+      # dieses Verzeichnis ignoriert. Dort einmalig von Hand:
+      #   docker compose exec db psql -U postgres -c "CREATE DATABASE litellm"
+      # (Prisma migriert in eine vorhandene Datenbank, es legt keine an.)
+      - ./infra/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  # LiteLLM-Proxy — der EINZIGE Dienst, der externe KI-Anbieter kontaktiert.
+  #
+  # Er lief früher in einem eigenen Compose-Stack. Das kostete ein Bind-Mount auf ein
+  # gemeinsames Host-Verzeichnis (Guardrail-Zählerstand), zwei Update-Zeitpunkte für
+  # Dinge, die zusammengehören, und dieselben Variablen in zwei .env-Dateien.
+  # Wer den getrennten Betrieb behält: docs/runbooks/litellm-in-die-compose.md.
+  litellm:
+    # Version an infra/litellm-requirements.txt gebunden (dort litellm[proxy]==1.83.7),
+    # damit der lokale Dev-Proxy und Produktion dieselbe Fassung fahren. Ein Upgrade
+    # ändert BEIDE Stellen — und verlangt einen Blick auf die Guardrail-Syntax.
+    image: ghcr.io/berriai/litellm:v1.83.7-stable
+    env_file: .env
+    environment:
+      # ⚠️ Überschreibt DATABASE_URL aus der .env — das ist der asyncpg-DSN der
+      # ANWENDUNG. Der Proxy legt sein Prisma-Schema in eine eigene Datenbank; erbte er
+      # die Adresse der Anwendung, migrierte er im schlechtesten Fall in `ggd_ki`.
+      # `general_settings.database_url` in der Config gewinnt zwar im Normalpfad, aber
+      # nicht jeder Startpfad liest die Config (litellm/proxy/prisma_migration.py).
+      DATABASE_URL: ${LITELLM_DATABASE_URL}
+      # Über die Proxy-UI angelegte Modelle überleben einen Neustart nur hiermit;
+      # verschlüsselt werden sie mit LITELLM_SALT_KEY.
+      STORE_MODEL_IN_DB: "True"
+      # LiteLLM löst `guardrails.llm_moderation.…` als DATEIPFAD ab dem Arbeits-
+      # verzeichnis (/app) auf — daher der Mount nach /app/guardrails. Der PYTHONPATH
+      # ist zusätzlich nötig, weil llm_moderation.py seinerseits `moderation_core`
+      # importiert. Beides zusammen ergibt denselben Modulpfad wie lokal in infra/,
+      # sodass die Config-Vorlagen für dev und Produktion wortgleich bleiben.
+      PYTHONPATH: /app/guardrails
+    volumes:
+      # ⚠️ Fehlt diese Datei auf dem Host, legt Docker ein leeres VERZEICHNIS an und der
+      # Proxy startet nicht. Aus infra/litellm_config.example.yaml kopieren.
+      - ./infra/litellm_config.yaml:/app/config.yaml:ro
+      - ./infra/guardrails:/app/guardrails:ro
+      # Gemeinsam mit backend + cron: hierhin schreibt der Guardrail seinen Zählerstand
+      # (health_file), von hier liest ihn /admin/guardrail/health.
+      - ./data:/app/data
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      # NUR an localhost. Wer die Proxy-UI erreicht, hat mit dem Master-Key Zugriff auf
+      # Schlüssel und Budgets — sie gehört nicht ins Netz. Zugriff über SSH-Tunnel.
+      # Das Backend spricht den Proxy ohnehin unter http://litellm:4000 im Compose-Netz an.
+      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # /health/readiness ist unauthentifiziert, /health nicht.
+      # ⚠️ `python3`, nicht `python`, und kein curl: Das Image baut auf wolfi-base und
+      # bringt beides nicht mit. Ein Fehlgriff hier fällt nicht als Fehler auf — der
+      # Dienst bliebe nur dauerhaft `unhealthy`, obwohl der Proxy einwandfrei läuft.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/readiness').getcode()==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Beim ersten Start legt der Proxy sein Prisma-Schema an; das dauert.
+      start_period: 60s
     restart: unless-stopped
 
   backend:
@@ -42,6 +106,9 @@ services:
         condition: service_healthy
       render-sidecar:
         condition: service_started
+      # BEWUSST kein Eintrag für `litellm`: Der Proxy wird zur Laufzeit gebraucht, nicht
+      # beim Start. Ein Wartezwang hieße, dass ein gestörter Anbieterzugang auch
+      # Anmeldung, Historie und Verwaltung stumm legt.
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

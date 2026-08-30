@@ -64,5 +64,11 @@ data/artifacts/*
 # Laufzeitstand des Jugendschutz-Guardrails (Zähler), vom LiteLLM-Proxy geschrieben
 data/guardrail_health.json
 infra/litellm_config.dev.yaml
+# Produktiv-Config des Proxys (aus litellm_config.example.yaml kopiert) — enthält die
+# Modellauswahl der Schule und wird als Datei in den litellm-Container eingehängt.
+infra/litellm_config.yaml
+# Standortbezogene Compose-Ergänzungen (docker compose liest sie automatisch mit),
+# z.B. um den mitgelieferten litellm-Dienst bei getrenntem Betrieb abzuschalten.
+docker-compose.override.yml
 config/school_year.2026-27.yaml
 infra/litellm_config.dev.openai.yaml.bak

@@ -37,6 +37,11 @@ done
 > `image_blocklist` brechen ohne ihre Datei mit `FileNotFoundError` ab;
 > `rate_limits` und `artifact_limits` starten mit eingebauten Vorgaben und einer Warnung
 > im Log — was leicht übersehen wird. `config/subjects.yaml` braucht spätestens Schritt 6.
+>
+> **`infra/litellm_config.yaml` ist besonders empfindlich:** Sie wird als Datei in den
+> Proxy-Container eingehängt. Fehlt sie, legt Docker an ihrer Stelle ein leeres
+> **Verzeichnis** an, und der Proxy startet nicht — mit einer Fehlermeldung, die auf
+> alles Mögliche hindeutet, nur nicht auf eine vergessene Kopie.
 
 Anschließend `.env` mit einem Texteditor öffnen und mindestens diese
 Pflichtfelder befüllen:
@@ -54,9 +59,20 @@ JWT_SECRET=$(openssl rand -base64 32)
 # LiteLLM-Zugangsschlüssel (frei wählbar, muss mit litellm_config.yaml übereinstimmen):
 LITELLM_MASTER_KEY=sk-$(openssl rand -hex 16)
 
+# Verschlüsselt die in der Proxy-DB abgelegten Anbieter-Zugänge. JETZT setzen und nie
+# mehr ändern — sonst sind gespeicherte Credentials später nicht mehr lesbar:
+LITELLM_SALT_KEY=sk-$(openssl rand -hex 16)
+
+# Der Proxy läuft als Dienst `litellm` derselben Compose — NICHT localhost:
+LITELLM_PROXY_URL=http://litellm:4000
+
 # EIGENE Datenbank für den Proxy — plain postgresql://, nicht der asyncpg-DSN der App:
 LITELLM_DATABASE_URL=postgresql://postgres:<POSTGRES_PASSWORD>@db:5432/litellm
 ```
+
+> **`localhost` ist im Container das Backend selbst.** Bleibt `LITELLM_PROXY_URL` auf
+> dem Vorgabewert aus `.env.example` (der für die lokale Entwicklung gilt), startet alles
+> normal — nur jeder Chat scheitert mit „Connection refused".
 
 Die Modell-Variablen (`CHAT_DEFAULT_MODEL`, `TITLE_MODEL`, `EMBEDDING_MODEL`) und den
 Zugang zum KI-Anbieter füllt der nächste Schritt — sie hängen davon ab, welche Modelle
@@ -124,6 +140,31 @@ Alle Services sollten den Status `healthy` bzw. `running` erreichen. Der
 `db`-Container muss healthy sein, bevor `backend` startet — das wird durch
 den `depends_on`-Healthcheck im `docker-compose.yml` sichergestellt.
 
+**Der LiteLLM-Proxy startet mit.** Er ist ein Dienst dieser Compose (`litellm`), kein
+eigener Stack. Beim ersten Start legt er sein Datenbankschema an; bis er `healthy` meldet,
+vergeht bis zu eine Minute. Die Datenbank dafür — `litellm`, getrennt von `ggd_ki` —
+erzeugt `infra/db-init/` beim allerersten Hochlauf des `db`-Containers.
+
+> **Nur bei einer bestehenden Installation:** Postgres führt das Init-Verzeichnis
+> ausschließlich bei leerem Datenverzeichnis aus. Wer eine schon laufende Datenbank hat,
+> legt die zweite Datenbank einmalig selbst an — sonst bleibt `litellm` in einer
+> Neustartschleife:
+>
+> ```bash
+> docker compose exec db psql -U postgres -c "CREATE DATABASE litellm"
+> ```
+>
+> Kommt der Proxy aus einem bisher getrennten Stack, ist das nur der erste von mehreren
+> Schritten: [Runbook LiteLLM-Umzug](../runbooks/litellm-in-die-compose.md).
+
+Die Proxy-Oberfläche (`/ui`) ist absichtlich **nur auf `127.0.0.1`** veröffentlicht: Wer
+sie erreicht, hat mit dem Master-Key Zugriff auf Schlüssel und Budgets. Zugriff von einem
+Arbeitsplatz aus über einen SSH-Tunnel:
+
+```bash
+ssh -L 4000:127.0.0.1:4000 admin@ki.beispielschule.de
+```
+
 ## Schritt 5: Datenbank-Migration
 
 ```bash
@@ -183,7 +224,12 @@ bricht ab, wenn bereits ein Eintrag vorhanden ist.
 
 ## Schritt 8: LiteLLM-Teams anlegen
 
-Einmalig nach der Erstinstallation:
+Einmalig nach der Erstinstallation. **Zuerst prüfen, dass der Proxy bereit ist** — dieser
+Schritt und der nächste sprechen ihn an:
+
+```bash
+docker compose ps litellm      # STATUS muss (healthy) zeigen
+```
 
 ```bash
 docker compose exec backend python scripts/create_litellm_teams.py

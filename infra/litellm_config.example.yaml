@@ -171,11 +171,15 @@ guardrails:
       # Liefert auch der Rückfall nichts: Diese Teams arbeiten weiter, alle anderen
       # bekommen die Antwort zurückgehalten (Jugendschutz vor Verfügbarkeit).
       fail_open_teams: ["lehrkraefte"]
-      # Zählerstand für /admin/guardrail/health.
-      # ⚠️ Der Proxy läuft in einem EIGENEN Compose-Stack — `./data` des Anwendungs-Stacks
-      # ist für ihn nicht sichtbar. Beide müssen dasselbe HOST-Verzeichnis einbinden
-      # (Beispiel in infra/litellm_config.ionos.example.yaml). Auf getrennten Hosts ist
-      # eine gemeinsame Datei unmöglich: dann weglassen und über das Proxy-Log überwachen.
+      # Zählerstand für /admin/guardrail/health. Der Proxy schreibt die Datei, das
+      # Backend liest sie — beide müssen dieselbe meinen.
+      # In der mitgelieferten docker-compose.yml ist das ohne Zutun der Fall: `litellm`,
+      # `backend` und `cron` binden alle ./data ein. Gegenstück: GUARDRAIL_HEALTH_FILE
+      # in der .env (dort `data/…`, hier `/app/data/…`).
+      # ⚠️ Nur bei getrenntem Betrieb: Läuft der Proxy in einem eigenen Stack, sieht er
+      # ./data des Anwendungs-Stacks nicht — dann müssen beide dasselbe HOST-Verzeichnis
+      # einbinden (docs/admin/content-moderation.md). Auf getrennten Hosts ist eine
+      # gemeinsame Datei unmöglich: dann weglassen und über das Proxy-Log überwachen.
       health_file: "/app/data/guardrail_health.json"   # lokal: ../data/guardrail_health.json
       # Optional — ohne Angabe gelten die Defaults aus moderation_core.py.
       # violence_graphic liegt höher: Historische und literarische Gewaltdarstellung
@@ -207,6 +211,11 @@ guardrails:
 # (PYTHONPATH auf das guardrails-Verzeichnis). Der Modulname wird als DATEIPFAD relativ zum
 # Arbeitsverzeichnis aufgelöst — läuft der Proxy in `infra/`, heißt er
 # `guardrails.llm_moderation.…`.
+#
+# In der mitgelieferten docker-compose.yml erledigt das der Dienst `litellm`: Er bindet
+# ./infra/guardrails nach /app/guardrails ein (Arbeitsverzeichnis des Images ist /app) und
+# setzt PYTHONPATH=/app/guardrails. Der Modulpfad ist dadurch derselbe wie lokal — diese
+# Vorlage gilt unverändert für dev und Produktion.
 #
 # Verhalten bei Störungen: gestaffelt (siehe docs/admin/content-moderation.md).
 # Wiederholung → optionaler Rückfall-Klassifikator → publikumsabhängige Entscheidung:

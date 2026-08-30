@@ -113,6 +113,12 @@ den Proxy sowohl über die Management-API (User/Teams/Keys/Budgets/SpendLogs) al
 auch über die OpenAI-kompatiblen Endpunkte (`/chat/completions`, `/embeddings`)
 an — beides braucht einen **DB-gestützten** Proxy.
 
+> **In Produktion läuft er als Dienst `litellm` der `docker-compose.yml`** (dort
+> `http://litellm:4000`). Die Fassung ist dieselbe: `infra/litellm-requirements.txt` und
+> das `image:` in der Compose sind aneinander gebunden, ein Unit-Test hält sie zusammen.
+> Auch der Guardrail-Modulpfad ist absichtlich derselbe — der Container bindet
+> `infra/guardrails` so ein, dass die Config-Vorlagen hier wie dort unverändert gelten.
+
 ### 1. Proxy-Abhängigkeiten installieren
 
 Das Backend importiert `litellm` nicht (nur HTTP), daher steht es nicht in
