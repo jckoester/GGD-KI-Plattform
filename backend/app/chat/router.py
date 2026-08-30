@@ -54,6 +54,7 @@ from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
 from app.context.embedding import generate_embedding
+from app.context.lookup import nachschlage_begriff, titel_normalisiert_sql
 from app.context.schemas import anzeige_felder
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
@@ -370,6 +371,20 @@ async def _get_model_info() -> dict[str, bool | None]:
 _INHALT_MAX_ZEICHEN = 800
 
 
+def _ergebnis_umfang(ergebnis) -> str:
+    """Kurzbeschreibung eines Werkzeug-Ergebnisses fürs Log — **ohne dessen Inhalt**.
+
+    Genannt werden Anzahl beziehungsweise Feldnamen, nie Werte: Ein Werkzeug-Ergebnis
+    kann Knoteninhalte tragen, und Logs unterliegen anderen Aufbewahrungsregeln als die
+    Konversation selbst.
+    """
+    if isinstance(ergebnis, list):
+        return f"{len(ergebnis)} Einträge"
+    if isinstance(ergebnis, dict):
+        return f"Felder {sorted(ergebnis)}"
+    return type(ergebnis).__name__
+
+
 def _ist_knotenliste(treffer: list) -> bool:
     """Sind das Wissensknoten — also etwas für die Vorschlagsliste im Chat?
 
@@ -442,6 +457,96 @@ def _fuer_modell(treffer: list) -> list:
 _FACHBONUS = 0.05
 
 
+def _treffer(row) -> dict:
+    """Eine Trefferzeile in die Form bringen, die Aufrufer und Modell erwarten.
+
+    Gemeinsam für Vektorsuche und Nachschlagen — liefen die beiden auseinander, trüge
+    dieselbe Trefferliste je nach Herkunft unterschiedliche Felder.
+    """
+    return {
+        "node_id": str(row["id"]),
+        "title": row["title"],
+        "category": row["category"],
+        "content_type": row["content_type"],
+        # Der Inhalt geht mit, damit das Modell die Knoten auch **lesen** kann.
+        # `/context/search` streift ihn über sein response_model wieder ab — die
+        # Vorschlagsliste im Chat zeigt nur Titel.
+        "content": row["content"],
+        # Der Fachname, nicht nur die interne `subject_id`: Auf die Frage „… in den
+        # verschiedenen Fächern" konnte ein Modell mit `subject_id: 13` nichts anfangen
+        # und meldete, es gebe keine Einträge je Fach.
+        "fach": row["fach"],
+        **anzeige_felder(row),
+    }
+
+
+def _vereine(nachschlag: list[dict], semantisch: list[dict], limit: int) -> list[dict]:
+    """Nachschlage-Treffer nach vorn, dann semantisch auffüllen — ohne Dubletten.
+
+    **Vorgezogen, nicht ersetzt:** Wer „vergleichen" sucht, meint vermutlich den Operator,
+    kann aber ebenso gut Kompetenzen zum Vergleichen brauchen. Die semantischen Treffer
+    verschwinden deshalb nicht, sie rücken nach.
+    """
+    gesehen = {t["node_id"] for t in nachschlag}
+    return (nachschlag + [t for t in semantisch if t["node_id"] not in gesehen])[:limit]
+
+
+# Nachschlagen: exakter Abgleich des normalisierten Titels. Bewusst auf Knoten **mit**
+# Embedding begrenzt — dieselbe Grundmenge wie die semantische Suche. Sie auf Knoten ohne
+# Embedding auszuweiten (Leitperspektiven, Curricula, Methoden) würde die Suche um Knoten
+# erweitern, die sie noch nie geliefert hat; das ist eine eigene Entscheidung.
+_NACHSCHLAGE_SQL = sa.text(f"""
+    SELECT c.id, c.category, c.content_type, c.title, c.content,
+           c.subject_id, s.name AS fach, c.bp_version, c.metadata
+    FROM context_nodes c
+    LEFT JOIN subjects s ON s.id = c.subject_id
+    WHERE c.status = 'active'
+      AND c.embedding IS NOT NULL
+      AND (
+          c.read_scope IN ('global', 'school', 'subject', 'group')
+          OR c.owner_pseudonym = :pseudonym
+      )
+      AND {titel_normalisiert_sql('c.title')} = :begriff
+    -- Ohne Fachbezug ist `c.subject_id = :subject_id` durchweg NULL und damit für alle
+    -- Zeilen gleich — es braucht keine zusätzliche `IS NOT NULL`-Prüfung. Sie wäre sogar
+    -- schädlich: Ein Parameter, der nur in `IS NOT NULL` vorkommt, lässt sich nicht
+    -- typisieren, und die Abfrage schlägt mit `AmbiguousParameterError` fehl.
+    ORDER BY CASE WHEN c.subject_id = :subject_id THEN 0 ELSE 1 END,
+             s.name NULLS LAST, c.id
+    LIMIT :limit
+""")
+
+
+async def _nachschlagen(
+    query: str,
+    pseudonym: str,
+    db: AsyncSession,
+    *,
+    limit: int,
+    subject_id: int | None,
+) -> list[dict]:
+    """Knoten, deren Titel der gesuchte Name **ist** — leer, wenn kein Name gemeint ist.
+
+    Die Erkennung steht in :mod:`app.context.lookup`; ob es einen Knoten dieses Namens
+    gibt, entscheidet erst diese Abfrage. Innerhalb der Treffer steht das Fach der
+    Konversation vorn, danach alphabetisch nach Fach — eine stabile Reihenfolge, damit
+    dieselbe Frage nicht bei jedem Aufruf anders sortiert erscheint.
+    """
+    begriff = nachschlage_begriff(query)
+    if not begriff:
+        return []
+    result = await db.execute(
+        _NACHSCHLAGE_SQL,
+        {
+            "pseudonym": pseudonym,
+            "begriff": begriff,
+            "subject_id": subject_id,
+            "limit": limit,
+        },
+    )
+    return [_treffer(row) for row in result.mappings().all()]
+
+
 async def _exec_search_context_nodes(
     query: str,
     pseudonym: str,
@@ -462,6 +567,12 @@ async def _exec_search_context_nodes(
     Fällt auf ILIKE zurück wenn kein Embedding generiert werden kann oder
     kein Knoten ein Embedding hat.
     """
+    # Erst nachschlagen: Ist ein Name gemeint, findet ihn kein Ähnlichkeitsmaß
+    # zuverlässig (gemessen: 5 von 8). Die Treffer stehen anschließend vorn.
+    nachschlag = await _nachschlagen(
+        query, pseudonym, db, limit=limit, subject_id=subject_id
+    )
+
     try:
         query_embedding = await generate_embedding(query)
         embedding_str = "[" + ",".join(f"{v:.10f}" for v in query_embedding) + "]"
@@ -501,26 +612,9 @@ async def _exec_search_context_nodes(
                 "fachbonus": _FACHBONUS,
             },
         )
-        rows = result.mappings().all()
-        if rows:
-            return [
-                {
-                    "node_id": str(row["id"]),
-                    "title": row["title"],
-                    "category": row["category"],
-                    "content_type": row["content_type"],
-                    # Der Inhalt geht mit, damit das Modell die Knoten auch **lesen**
-                    # kann. `/context/search` streift ihn über sein response_model wieder
-                    # ab — die Vorschlagsliste im Chat zeigt nur Titel.
-                    "content": row["content"],
-                    # Der Fachname, nicht nur die interne `subject_id`: Auf die Frage
-                    # „… in den verschiedenen Fächern" konnte ein Modell mit `subject_id:
-                    # 13` nichts anfangen und meldete, es gebe keine Einträge je Fach.
-                    "fach": row["fach"],
-                    **anzeige_felder(row),
-                }
-                for row in rows
-            ]
+        semantisch = [_treffer(row) for row in result.mappings().all()]
+        if semantisch or nachschlag:
+            return _vereine(nachschlag, semantisch, limit)
         # Kein Knoten hat ein Embedding → Fallback
     except Exception:
         logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
@@ -547,18 +641,22 @@ async def _exec_search_context_nodes(
         .order_by(sa.case((ContextNode.subject_id == subject_id, 0), else_=1))
         .limit(limit)
     )
-    return [
-        {
-            "node_id": str(n.id),
-            "title": n.title,
-            "category": n.category,
-            "content_type": n.content_type,
-            "content": n.content,
-            "fach": fach,
-            **anzeige_felder(n),
-        }
-        for n, fach in result.all()
-    ]
+    return _vereine(
+        nachschlag,
+        [
+            {
+                "node_id": str(n.id),
+                "title": n.title,
+                "category": n.category,
+                "content_type": n.content_type,
+                "content": n.content,
+                "fach": fach,
+                **anzeige_felder(n),
+            }
+            for n, fach in result.all()
+        ],
+        limit,
+    )
 
 
 async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> list[dict]:
@@ -1762,6 +1860,20 @@ async def chat(
                 except Exception:
                     logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
                     tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
+
+                # Welches Werkzeug gegriffen hat, ließ sich bisher nirgends ablesen: Das
+                # SSE-Ereignis `tool_status` trägt den Namen, wird im Frontend aber von
+                # niemandem ausgewertet. Damit war nicht zu klären, warum ein Assistent
+                # meldete, der Wissensgraph enthalte nichts — ob er gesucht oder das
+                # falsche Werkzeug gegriffen hatte.
+                #
+                # ⚠️ **Ohne die Argumente.** Sie enthalten den Suchtext, also Nutzereingabe:
+                # genau das, wovor die PII-Warnung schützt. Für die Frage „welches Werkzeug
+                # lief?" genügen Name und Umfang des Ergebnisses.
+                logger.info(
+                    "Tool '%s' (Runde %d) → %s",
+                    _tc_name, _round + 1, _ergebnis_umfang(tool_result),
+                )
 
                 # Rückwärtskompatibilität: context_suggestions SSE für context_search
                 if tool.group == "context_search" and isinstance(tool_result, list):

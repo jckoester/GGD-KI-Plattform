@@ -92,7 +92,7 @@ docker compose exec backend python scripts/<skript>.py
 | `cleanup_inactive_accounts.py` | Konten ohne Login > 90 Tage löschen | `--dry-run`, `--now`, `--limit` |
 | `cleanup_stale_conversations.py` | Konversationen ohne Nachrichten > 93 Tage löschen | `--dry-run`, `--now` |
 | `embedding_backfill.py` | Embeddings für Knoten ohne Embedding nachgenerieren | `--dry-run`, `--batch-size`, `--limit`, `--content-type` |
-| `search_eval.py` | **Prüfsatz für die semantische Suche.** Misst je Anfrage aus `config/search_eval.yaml`, ob die Suche im Normalbetrieb dieselben Treffer liefert wie ein vollständiger Durchlauf (Recall), ob das richtige Fach oben steht und auf welchem Platz der erwartete Knoten landet | `--details`, `--frage`, `--fach`, `--knoten`, `--top-k`, `--json`, `--pruefsatz` |
+| `search_eval.py` | **Prüfsatz für die semantische Suche.** Misst je Anfrage aus `config/search_eval.yaml`, ob das richtige Fach oben steht, auf welchem Platz der erwartete Knoten landet und ob das Nachschlagen ausgelöst hat. Ruft die **echte** Suchfunktion auf; der Recall-Vergleich gegen einen erzwungenen vollständigen Durchlauf bleibt als Wächter gegen einen wiederkehrenden Vektorindex | `--details`, `--frage`, `--fach`, `--knoten`, `--top-k`, `--json`, `--pruefsatz` |
 
 `--dry-run` gibt aus, was gelöscht würde, ohne etwas zu löschen.
 `--now <ISO-Timestamp>` simuliert einen anderen „Jetzt"-Zeitpunkt —

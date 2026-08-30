@@ -16,6 +16,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
   - Neuer Prüfsatz `config/search_eval.yaml` mit `scripts/search_eval.py`: misst je
     Anfrage Recall, Fach und Rang des erwarteten Treffers.
+  - ⚠️ **Die Suche im Kontextspeicher ist als experimentell gekennzeichnet.** Sie ist
+    besser geworden, aber nicht verlässlich — und der bisherige Bestand besteht fast nur
+    aus Bildungsplan-Daten. Sobald Lehrkräfte in größerem Umfang eigene Bausteine
+    anlegen, ist sie neu zu bewerten. Hinweis in
+    [Kontextspeicher](docs/user/kontext.md).
+  - **Welches Werkzeug ein Assistent gegriffen hat, steht jetzt im Backend-Log** — ohne
+    den Suchtext, der Nutzereingabe ist. Bis dahin war nicht zu klären, ob ein Assistent
+    gesucht oder zum falschen Werkzeug gegriffen hatte.
+  - **Benannte Bausteine werden nachgeschlagen statt geschätzt.** Wer nach einem
+    Operator, einer Leitidee oder einem Fachbegriff sucht, bekommt ihn — bisher lieferte
+    „Operator nennen" die Operatoren *erkennen* und *korrigieren*, weil ein
+    Ähnlichkeitsmaß keine Namen nachschlagen kann. Die Frageform ist dabei gleichgültig.
+    Vorgezogen, nicht gefiltert: thematisch passende Treffer rücken nach.
   - **Assistenten können den Wissensgraph jetzt lesen, nicht nur auflisten.** Werkzeug-
     Treffer trugen bisher nur den Titel; Fragen nach dem Inhalt eines Knotens waren damit
     nicht zu beantworten, obwohl die Suche ihn fand. Inhalt **und Fachname** gehen jetzt

@@ -79,3 +79,35 @@ class TestFuerModell:
     def test_hinweis_dict_wird_nicht_angefasst(self):
         """`get_operatoren` ohne Fachbezug liefert einen Hinweis statt einer Liste."""
         assert _fuer_modell([{"hinweis": "kein Fachbezug"}]) == [{"hinweis": "kein Fachbezug"}]
+
+
+class TestErgebnisUmfangFuersLog:
+    """Die Logzeile sagt, **welches** Werkzeug lief und wie viel es lieferte — nie *was*.
+
+    Ein Werkzeug-Ergebnis kann Knoteninhalte tragen, und die Argumente enthalten den
+    Suchtext der Nutzer:in. Beides gehört nicht ins Log: Logs unterliegen anderen
+    Aufbewahrungsregeln als die Konversation, und der Suchtext ist genau die Eingabe, vor
+    deren unbedachter Weitergabe die PII-Warnung schützt.
+    """
+
+    def test_liste_nennt_nur_die_anzahl(self):
+        from app.chat.router import _ergebnis_umfang
+
+        assert _ergebnis_umfang([_knoten(content="geheim"), _knoten()]) == "2 Einträge"
+
+    def test_dict_nennt_nur_die_feldnamen(self):
+        from app.chat.router import _ergebnis_umfang
+
+        assert _ergebnis_umfang({"hinweis": "kein Fachbezug"}) == "Felder ['hinweis']"
+
+    def test_kein_inhalt_im_logtext(self):
+        """Gegenprobe: Nichts vom Ergebnis darf durchsickern."""
+        from app.chat.router import _ergebnis_umfang
+
+        text = _ergebnis_umfang([_knoten(title="Streng geheim", content="auch geheim")])
+        assert "geheim" not in text.lower()
+
+    def test_unerwartete_form_stuerzt_nicht_ab(self):
+        from app.chat.router import _ergebnis_umfang
+
+        assert _ergebnis_umfang(None) == "NoneType"

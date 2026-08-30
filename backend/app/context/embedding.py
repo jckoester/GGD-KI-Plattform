@@ -10,7 +10,6 @@ aendert (siehe docs/runbooks/modellwechsel.md).
 
 import asyncio
 import logging
-import re
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -19,6 +18,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode
+from app.context.lookup import normalisiere_titel
 from app.context.taxonomy import EMBEDDING_CONTENT_TYPES, EMBEDDING_ENRICHMENT
 
 logger = logging.getLogger(__name__)
@@ -73,10 +73,6 @@ def _extract_metadata_field(metadata: dict, field_path: str) -> str:
     return str(value) if value else ""
 
 
-# Fuehrende Gliederungsnummer: "3.6.1(13) Text", "(13) Text", "2.1 Text".
-_GLIEDERUNGSNUMMER = re.compile(r"^\s*(?:\d+(?:\.\d+)*)?\s*(?:\(\d+\))?\s*")
-
-
 def _titel_traegt_eigene_information(titel: str, text: str) -> bool:
     """Steht im Titel etwas, das der Text nicht ohnehin schon sagt?
 
@@ -93,11 +89,13 @@ def _titel_traegt_eigene_information(titel: str, text: str) -> bool:
       uebersprungen und war fuer die semantische Suche unsichtbar.
 
     Die Gliederungsnummer wird vor dem Vergleich entfernt, sonst schlaegt er bei genau den
-    Kompetenzen fehl, um die es geht.
+    Kompetenzen fehl, um die es geht. Dieselbe Normalisierung nutzt das Nachschlagen
+    (``app/context/lookup.py``) — was hier vom Titel uebrig bleibt, muss dort auffindbar
+    sein.
     """
     if not titel:
         return False
-    kern = " ".join(_GLIEDERUNGSNUMMER.sub("", titel).lower().split())
+    kern = normalisiere_titel(titel)
     return bool(kern) and kern not in " ".join((text or "").lower().split())
 
 

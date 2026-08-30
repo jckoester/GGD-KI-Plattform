@@ -2,6 +2,12 @@
 
 Der Kontextspeicher ist eine Sammlung von Wissensbausteinen, die Sie einer Chat-Unterhaltung gezielt hinzufügen können. Die KI liest diese Bausteine beim Antworten mit und kann so präzisere, inhaltlich passendere Antworten geben.
 
+> ⚠️ **Die Suche im Kontextspeicher ist noch experimentell.** Sie findet oft das Richtige, aber nicht verlässlich — je nach Formulierung liefert sie auch einmal thematisch benachbarte Bausteine statt der gesuchten, oder sie übersieht etwas, das vorhanden ist. Auch der Assistent kann sich davon täuschen lassen und antworten, es gebe zu einem Thema nichts, obwohl Bausteine dazu vorliegen.
+>
+> **Was das für Sie heißt:** Verlassen Sie sich bei wichtigen Inhalten nicht allein auf die Suche. Findet sie einen Baustein nicht, versuchen Sie es mit dem genauen Namen (siehe unten) oder heften Sie ihn über den `@`-Shortcode direkt an. Und prüfen Sie die Aussage eines Assistenten, im Kontextspeicher sei „nichts vorhanden", im Zweifel selbst nach.
+>
+> Woran das liegt: Der Bestand besteht bislang fast nur aus Bildungsplan-Daten. Sobald Lehrkräfte in größerem Umfang eigene Bausteine anlegen — Begriffsdefinitionen, Methoden, Anleitungen —, muss die Suche neu bewertet werden. Wir arbeiten daran.
+
 ## Was sind Kontextbausteine?
 
 Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
@@ -36,6 +42,8 @@ Neben dem Textfeld im Chat gibt es einen **Suche-Button** (Lupensymbol). Er ist 
 <!-- Ersetzen durch: ![Kontext-Chips](/help-images/kontext/kontext-chips.png) -->
 
 Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwörter treffen — auch ein vollständig formulierter Prompt liefert passende Treffer.
+
+**Namen werden direkt nachgeschlagen.** Suchen Sie nach einem Begriff, den es als Baustein gibt — einem Operator wie „nennen", einer Leitidee, einem Fachbegriff —, steht er oben, auch wenn andere Bausteine thematisch näher liegen. Die Frageform ist dabei egal: „nennen", „Operator nennen" und „Was bedeutet der Operator nennen?" führen zum selben Ergebnis. Wo derselbe Name in mehreren Fächern vorkommt, erscheinen die Fächer nacheinander.
 
 **Das Fach des Chats zählt mit.** Führen Sie den Chat in einem Fach oder einer Unterrichtsgruppe, stehen dessen Bausteine weiter oben. Ausgeblendet wird dabei nichts: Wer im Physik-Chat nach dem Satz des Pythagoras fragt, bekommt weiterhin die Mathematik-Kompetenz — sie ist dort schließlich die richtige Antwort. In einem Chat ohne Fach entscheidet allein die Ähnlichkeit.
 

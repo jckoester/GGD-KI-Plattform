@@ -7,15 +7,19 @@ Verwendung:
     python scripts/search_eval.py --frage "Fotosynthese" --fach Biologie
     python scripts/search_eval.py --json vorher.json     # für Vorher/Nachher-Vergleich
 
-Gemessen wird gegen zwei Läufe derselben Anfrage:
+Gemessen wird gegen drei Läufe derselben Anfrage:
 
-* **exakt** — vollständiger Durchlauf aller Vektoren. Das ist die Wahrheit: die
-  tatsächlich ähnlichsten Knoten.
-* **Index** — was die Suche im Normalbetrieb liefert, also mit dem Ausführungsplan, den
-  PostgreSQL von sich aus wählt.
+* **produktiv** — die Suche, die Nutzer:innen tatsächlich bekommen
+  (``_exec_search_context_nodes``, also mit Fachvorzug und Nachschlagen). Daraus stammen
+  Fach@1 und der Rang des erwarteten Knotens. Aufgerufen wird die **echte Funktion**,
+  nicht eine Nachbildung: Was hier gemessen wird, ist damit zwangsläufig das, was läuft.
+* **exakt** — vollständiger Durchlauf aller Vektoren, rein semantisch. Die Wahrheit über
+  die Ähnlichkeit, und die Bezugsgröße für den Recall.
+* **Index** — dieselbe semantische Abfrage mit dem Ausführungsplan, den PostgreSQL von
+  sich aus wählt.
 
-Die Abweichung zwischen beiden ist der Recall. Er ist die wichtigste Kennzahl, weil sein
-Ausfall **still** ist: Ein Index, der die besten Treffer übergeht, wirft keinen Fehler,
+Die Abweichung zwischen den letzten beiden ist der Recall. Er ist der Wächter gegen einen
+wiederkehrenden Vektorindex, weil dessen Ausfall **still** ist: Er wirft keinen Fehler,
 er liefert nur schlechtere Ergebnisse.
 
 Kein pytest-Test, sondern ein Skript: Die Frage ergibt nur gegen den echten Wissensgraph
@@ -110,11 +114,11 @@ class Ergebnis:
     fall: Fall
     index: Lauf
     exakt: Lauf
+    produktiv: list[Treffer]
+    nachschlagen: bool
     recall: float
-    fach_ok_index: bool | None
-    fach_ok_exakt: bool | None
-    rang_index: int | None
-    rang_exakt: int | None
+    fach_ok: bool | None
+    rang: int | None
     operatoren_top3: int = 0
     warnungen: list[str] = field(default_factory=list)
 
@@ -188,32 +192,29 @@ def _rang(treffer: list[Treffer], knoten: str | None) -> int | None:
     return None
 
 
-def _bewerte(fall: Fall, index: Lauf, exakt: Lauf) -> Ergebnis:
+def _bewerte(
+    fall: Fall, index: Lauf, exakt: Lauf, produktiv: list[Treffer], nachschlagen: bool
+) -> Ergebnis:
     ids_exakt = {t.id for t in exakt.treffer}
     ids_index = {t.id for t in index.treffer}
     recall = len(ids_index & ids_exakt) / len(ids_exakt) if ids_exakt else 0.0
 
-    def fach_ok(lauf: Lauf) -> bool | None:
-        if not fall.fach or not lauf.treffer:
-            return None
-        return lauf.treffer[0].fach == fall.fach
-
     warnungen: list[str] = []
-    if fall.knoten and _rang(exakt.treffer, fall.knoten) is None:
+    if fall.knoten and _rang(produktiv, fall.knoten) is None:
         warnungen.append(
-            f"erwarteter Knoten '{fall.knoten}' auch exakt nicht in der Trefferliste — "
-            f"entweder von ähnlicheren Knoten verdrängt (dann ist der Fall echt) oder "
-            f"nicht im Bestand (dann stimmt die Erwartung nicht)"
+            f"erwarteter Knoten '{fall.knoten}' nicht in der Trefferliste — entweder von "
+            f"ähnlicheren Knoten verdrängt (dann ist der Fall echt) oder nicht im Bestand "
+            f"(dann stimmt die Erwartung nicht)"
         )
     if index.planart == exakt.planart == "exakt":
         warnungen.append("kein Vektorindex im Einsatz — beide Läufe sind identisch")
 
     return Ergebnis(
-        fall=fall, index=index, exakt=exakt, recall=recall,
-        fach_ok_index=fach_ok(index), fach_ok_exakt=fach_ok(exakt),
-        rang_index=_rang(index.treffer, fall.knoten),
-        rang_exakt=_rang(exakt.treffer, fall.knoten),
-        operatoren_top3=sum(1 for t in exakt.treffer[:3] if t.content_type == "operator"),
+        fall=fall, index=index, exakt=exakt, produktiv=produktiv,
+        nachschlagen=nachschlagen, recall=recall,
+        fach_ok=(produktiv[0].fach == fall.fach) if (fall.fach and produktiv) else None,
+        rang=_rang(produktiv, fall.knoten),
+        operatoren_top3=sum(1 for t in produktiv[:3] if t.content_type == "operator"),
         warnungen=warnungen,
     )
 
@@ -239,33 +240,33 @@ def _r(rang: int | None) -> str:
 
 def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     print()
-    print(f"  {'Anfrage':<38}{'Chat-Fach':<15}{'Recall':>7}  {'Fach@1':^9} {'Rang':^9} {'Spanne':>7}")
-    print(f"  {'':<38}{'':<15}{f'@{top_k}':>7}  {'Idx exakt':^9} {'Idx exakt':^9} {'exakt':>7}")
-    print("  " + "─" * 92)
+    print(f"  {'Anfrage':<40}{'Chat-Fach':<14}{'Recall':>7}{'Nach':>6}"
+          f"{'Fach@1':>8}{'Rang':>6}{'Spanne':>8}")
+    print("  " + "─" * 89)
     for e in ergebnisse:
-        frage = e.fall.frage if len(e.fall.frage) <= 37 else e.fall.frage[:36] + "…"
-        chat = (e.fall.chat_fach or "—")[:14]
+        frage = e.fall.frage if len(e.fall.frage) <= 39 else e.fall.frage[:38] + "…"
+        chat = (e.fall.chat_fach or "—")[:13]
         print(
-            f"  {frage:<38}{chat:<15}{e.recall*100:>6.0f}%  "
-            f"{_z(e.fach_ok_index):^4}{_z(e.fach_ok_exakt):^5} "
-            f"{_r(e.rang_index):^4}{_r(e.rang_exakt):^5} "
-            f"{_spanne(e.exakt):>7.3f}"
+            f"  {frage:<40}{chat:<14}{e.recall*100:>6.0f}%"
+            f"{('▪' if e.nachschlagen else '·'):>6}"
+            f"{_z(e.fach_ok):>8}{_r(e.rang):>6}{_spanne(e.exakt):>8.3f}"
         )
 
     n = len(ergebnisse)
     mit_fach = [e for e in ergebnisse if e.fall.fach]
     mit_knoten = [e for e in ergebnisse if e.fall.knoten]
-    print("  " + "─" * 92)
+    print("  " + "─" * 89)
     print(f"\n  {n} {'Fall' if n == 1 else 'Fälle'} · Recall@{top_k} im Mittel "
           f"{sum(e.recall for e in ergebnisse)/n*100:.0f} %")
     if mit_fach:
         print(f"  Richtiges Fach auf Platz 1:   "
-              f"Index {sum(1 for e in mit_fach if e.fach_ok_index):>2}/{len(mit_fach)}   ·   "
-              f"exakt {sum(1 for e in mit_fach if e.fach_ok_exakt):>2}/{len(mit_fach)}")
+              f"{sum(1 for e in mit_fach if e.fach_ok):>2}/{len(mit_fach)}")
     if mit_knoten:
-        print(f"  Erwarteter Knoten gefunden:   "
-              f"Index {sum(1 for e in mit_knoten if e.rang_index):>2}/{len(mit_knoten)}   ·   "
-              f"exakt {sum(1 for e in mit_knoten if e.rang_exakt):>2}/{len(mit_knoten)}")
+        raenge = [e.rang for e in mit_knoten if e.rang]
+        print(f"  Erwarteter Knoten gefunden:   {len(raenge):>2}/{len(mit_knoten)}"
+              + (f"   (mittlerer Rang {sum(raenge)/len(raenge):.1f})" if raenge else ""))
+    print(f"  Nachschlagen ausgelöst (▪):   "
+          f"{sum(1 for e in ergebnisse if e.nachschlagen):>2}/{n}")
     mit_op = [e for e in ergebnisse if e.operatoren_top3]
     print(f"  Operatoren unter den Top-3 (exakt): {sum(e.operatoren_top3 for e in ergebnisse)} "
           f"in {len(mit_op)} von {n} Fällen")
@@ -292,11 +293,45 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     if details:
         for e in ergebnisse:
             print(f"\n  ── {e.fall.frage}")
+            print(f"     produktiv{' (Nachschlagen)' if e.nachschlagen else ''}")
+            for i, t in enumerate(e.produktiv[:5], 1):
+                print(f"       {i}. {str(t.fach or '—'):<18}{t.content_type:<14}"
+                      f"{t.titel[:52]}")
             for name, lauf in (("Index", e.index), ("exakt", e.exakt)):
                 print(f"     {name} [{lauf.planart}], {lauf.ms:.0f} ms")
                 for i, t in enumerate(lauf.treffer[:5], 1):
                     print(f"       {i}. {t.sim:.3f}  {str(t.fach or '—'):<18}"
                           f"{t.content_type:<14}{t.titel[:52]}")
+
+
+async def _produktiv(
+    frage: str, top_k: int, subject_id: int | None
+) -> tuple[list[Treffer], bool]:
+    """Die echte Suchfunktion — keine Nachbildung.
+
+    Der Prüfsatz spiegelt für den Recall-Vergleich rohes SQL (er braucht Kontrolle über
+    den Ausführungsplan). Für die inhaltliche Bewertung wäre eine zweite Nachbildung
+    gefährlich: Sie würde beim nächsten Umbau der Suche stillschweigend etwas anderes
+    messen als das, was läuft.
+    """
+    from app.chat.router import _exec_search_context_nodes, _nachschlagen
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        treffer = await _exec_search_context_nodes(
+            frage, "pruefsatz", db, limit=top_k, subject_id=subject_id
+        )
+        # Direkt gefragt statt aus der Trefferliste erschlossen: Ob nachgeschlagen wurde,
+        # weiß die Suche selbst — aus dem Ergebnis wäre es nur zu erraten.
+        nachschlag = await _nachschlagen(
+            frage, "pruefsatz", db, limit=top_k, subject_id=subject_id
+        )
+    return [
+        Treffer(id=t["node_id"], titel=t.get("title") or "",
+                content_type=t.get("content_type") or "", fach=t.get("fach"),
+                nr=t.get("nr") or "", sim=0.0)
+        for t in treffer
+    ], bool(nachschlag)
 
 
 async def _fach_ids(dsn: str) -> dict[str, int]:
@@ -339,7 +374,8 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
             print(f"  ⚠️  '{fall.frage}': exakter Lauf verwendete Plan '{exakt.planart}' — "
                   f"die Messung ist wertlos. Abbruch.", file=sys.stderr)
             return 2
-        ergebnisse.append(_bewerte(fall, index, exakt))
+        produktiv, nachschlagen = await _produktiv(fall.frage, top_k, subject_id)
+        ergebnisse.append(_bewerte(fall, index, exakt, produktiv, nachschlagen))
 
     _ausgabe(ergebnisse, top_k, details)
 
@@ -348,9 +384,8 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
             {
                 "frage": e.fall.frage, "fach": e.fall.fach,
                 "chat_fach": e.fall.chat_fach, "knoten": e.fall.knoten,
-                "recall": e.recall, "fach_ok_index": e.fach_ok_index,
-                "fach_ok_exakt": e.fach_ok_exakt, "rang_index": e.rang_index,
-                "rang_exakt": e.rang_exakt, "operatoren_top3": e.operatoren_top3,
+                "recall": e.recall, "fach_ok": e.fach_ok, "rang": e.rang,
+                "nachschlagen": e.nachschlagen, "operatoren_top3": e.operatoren_top3,
                 "planart_index": e.index.planart, "ms_index": e.index.ms,
                 "ms_exakt": e.exakt.ms, "spanne_exakt": _spanne(e.exakt),
                 "top_exakt": [

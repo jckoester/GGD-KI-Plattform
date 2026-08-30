@@ -405,6 +405,28 @@ Häufige Meldungen und ihre Bedeutung:
 
 ## Troubleshooting
 
+**Ein Assistent sagt, im Wissensgraph sei nichts zu einem Thema — obwohl Bausteine
+vorhanden sind**
+Die **Suche im Kontextspeicher ist experimentell** (siehe
+[Kontextspeicher](../user/kontext.md)); je nach Formulierung findet sie das Gesuchte
+nicht, und ein Modell deutet ein leeres Ergebnis erwartungsgemäß als „gibt es nicht".
+
+Welches Werkzeug der Assistent überhaupt gegriffen hat, steht seit 08/2026 im
+Backend-Log:
+
+```bash
+docker compose logs backend | grep "^.*Tool '"
+# INFO Tool 'search_context_nodes' (Runde 1) → 8 Einträge
+# INFO Tool 'get_operatoren' (Runde 1) → Felder ['hinweis']
+```
+
+Damit lässt sich unterscheiden, ob gesucht wurde und nichts kam (`0 Einträge`) oder ob
+ein anderes Werkzeug gegriffen hat. `get_operatoren` etwa beantwortet nur Fragen zum Fach
+der Konversation und meldet ohne Fachbezug einen `hinweis` statt einer Liste.
+
+Der Suchtext selbst wird **nicht** protokolliert — er ist Nutzereingabe und gehört nicht
+in Logs.
+
 **Nutzer:innen können sich nicht einloggen — „Anmeldung fehlgeschlagen!" trotz
 richtigem Passwort**
 Häufigste Ursache: Der **OAuth-Client ist für die Gruppe der Person nicht freigegeben**.

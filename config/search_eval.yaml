@@ -179,3 +179,45 @@ faelle:
     chat_fach: Chemie
     knoten: 3.2.3(1)
     notiz: Chemie ist inhaltlich benachbart und damit ein realistischer Störfall.
+
+  # ── Nachschlagen: benannte Knoten ─────────────────────────────────────────────
+  #
+  # Die semantische Suche findet Bedeutung, aber keine Namen: „Operator nennen" lieferte
+  # *erkennen*, *korrigieren*, *berichten*. Diese Fälle prüfen den lexikalischen Weg.
+  # `fach` bleibt bewusst leer — denselben Operator führen zwei Dutzend Fächer, welches
+  # oben steht, ist ohne Fachbezug beliebig und darf nicht geprüft werden.
+
+  - frage: Operator nennen
+    knoten: nennen
+    notiz: >-
+      Die Anfrage, die das Modell im Chat tatsächlich stellt. Rein semantisch nicht
+      auffindbar — „Operator" beherrscht den Vektor, das Verb geht darin unter.
+
+  - frage: Was bedeutet der Operator nennen?
+    knoten: nennen
+    notiz: Ausformulierte Frageform; die Füllwörter dürfen nichts ändern.
+
+  - frage: >-
+      Erstelle eine Übersicht über die Operatorendefinitionen für "nennen" in den
+      verschiedenen Fächern. Nutze dazu die Operatorendefinitionen aus dem Kontextspeicher.
+    knoten: nennen
+    notiz: >-
+      Der Original-Prompt aus dem Praxistest vom 30.08.2026. Er scheiterte zusätzlich an
+      der Zusammensetzung „Operatorendefinitionen" — deshalb steht er als eigener Fall.
+
+  - frage: Definition des Operators analysieren
+    knoten: analysieren
+
+  - frage: Bedeutung von beurteilen als Operator
+    knoten: beurteilen
+    notiz: Semantisch lieferte diese Form *einschätzen* statt *beurteilen*.
+
+  - frage: Was ist die Leitidee Messen?
+    knoten: Leitidee Messen
+    notiz: >-
+      Mehrwortiger Name, und der Titel trägt eine Gliederungsnummer („3.3.2 Leitidee
+      Messen"). Prüft beides: die Wortfolge-Form und die Nummern-Normalisierung.
+
+  - frage: Elektrochemie
+    knoten: Elektrochemie
+    notiz: Einzelwort ohne Rahmen — die einfachste Form des Nachschlagens.

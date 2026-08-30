@@ -646,3 +646,132 @@ class TestFachvorzugBeiDerSuche:
             test_client, auth_headers_teacher2, knoten,
             conversation_id=konversation_im_fach,
         ) == ["fremd_stark", "fremd", "fach"]
+
+
+class TestNachschlagenInDerSuche:
+    """Ein benannter Knoten steht vorn — auch wenn ein anderer semantisch näher liegt.
+
+    Die semantische Suche kann Bedeutung finden, aber keine Namen nachschlagen: „Operator
+    nennen" lieferte *erkennen*, *korrigieren*, *berichten*. Vorgezogen wird der exakte
+    Titeltreffer deshalb **ohne** die semantischen Treffer zu verdrängen — wer
+    „vergleichen" sucht, kann ebenso gut Kompetenzen zum Vergleichen brauchen.
+    """
+
+    @pytest_asyncio.fixture
+    async def knoten(self, test_client, auth_headers, db_url):
+        """Ein Knoten mit dem gesuchten *Namen*, ein anderer semantisch viel näher."""
+        from app.config import settings
+
+        def vektor(distanz: float) -> list[float]:
+            import math
+            v = [0.0] * settings.embedding_dimensions
+            v[0] = 1.0 - distanz
+            v[1] = math.sqrt(1.0 - v[0] ** 2)
+            return v
+
+        ids = {}
+        for name, titel in (
+            ("benannt", "Zwirbeln"),                     # der gesuchte Name
+            ("naeher", "3.1.1(9) etwas ganz anderes"),   # semantisch viel näher
+        ):
+            resp = await test_client.post(
+                "/context/nodes",
+                json={"category": "concept", "content_type": "funktion", "title": titel,
+                      "read_scope": "school", "write_scope": "school"},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, resp.text
+            ids[name] = resp.json()["id"]
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            for name, distanz in (("benannt", 0.40), ("naeher", 0.02)):
+                cur.execute("UPDATE context_nodes SET embedding = %s::vector WHERE id = %s",
+                            (str(vektor(distanz)), ids[name]))
+        conn.commit()
+        conn.close()
+        yield ids
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM context_nodes WHERE id = ANY(%s::uuid[])",
+                        (list(ids.values()),))
+        conn.commit()
+        conn.close()
+
+    async def _reihenfolge(self, test_client, auth_headers, knoten, frage):
+        from unittest.mock import AsyncMock, patch
+
+        from app.config import settings
+
+        anfrage = [0.0] * settings.embedding_dimensions
+        anfrage[0] = 1.0
+        with patch("app.chat.router.generate_embedding",
+                   new=AsyncMock(return_value=anfrage)):
+            resp = await test_client.post("/context/search", json={"query": frage},
+                                          headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        nach_id = {v: k for k, v in knoten.items()}
+        return [nach_id[t["node_id"]] for t in resp.json() if t["node_id"] in nach_id]
+
+    async def test_benannter_knoten_steht_vorn(self, test_client, auth_headers, knoten):
+        """Trotz 0,40 gegen 0,02 Distanz — der Name schlägt die Ähnlichkeit."""
+        assert await self._reihenfolge(
+            test_client, auth_headers, knoten, "Zwirbeln"
+        ) == ["benannt", "naeher"]
+
+    async def test_frageform_aendert_nichts(self, test_client, auth_headers, knoten):
+        """Füllwörter dürfen das Nachschlagen nicht verhindern."""
+        assert await self._reihenfolge(
+            test_client, auth_headers, knoten, "Was bedeutet der Operator Zwirbeln?"
+        ) == ["benannt", "naeher"]
+
+    async def test_semantische_treffer_bleiben_erhalten(
+        self, test_client, auth_headers, knoten
+    ):
+        """Vorgezogen, nicht gefiltert: Der nähere Knoten verschwindet nicht."""
+        reihenfolge = await self._reihenfolge(
+            test_client, auth_headers, knoten, "Zwirbeln"
+        )
+        assert "naeher" in reihenfolge
+
+    async def test_thematische_anfrage_loest_kein_nachschlagen_aus(
+        self, test_client, auth_headers, knoten
+    ):
+        """Die Gegenprobe: Enthält die Anfrage den Namen nur nebenbei, bleibt es bei der
+        Ähnlichkeit — sonst zöge jedes zufällig getroffene Wort einen Knoten nach vorn."""
+        assert await self._reihenfolge(
+            test_client, auth_headers, knoten,
+            "Zwirbeln und Flechten als gestalterische Verfahren im Textilunterricht",
+        ) == ["naeher", "benannt"]
+
+
+class TestNachschlageIndexWirdBenutzt:
+    """Der Ausdrucksindex aus Migration 0053 muss tatsächlich greifen.
+
+    Sein Ausfall ist still: Weicht der Ausdruck der Abfrage auch nur in einem Zeichen ab,
+    fällt PostgreSQL auf einen vollständigen Durchlauf zurück — dasselbe Ergebnis, aber
+    rund 70 statt 0,3 ms, und das bei **jeder** Suche.
+    """
+
+    async def test_explain_zeigt_indexnutzung(self, db_url, run_migrations):
+        import sqlalchemy as sa
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        from app.chat.router import _NACHSCHLAGE_SQL
+
+        engine = create_async_engine(db_url)
+        try:
+            async with engine.connect() as con:
+                plan = "\n".join(
+                    r[0] for r in (await con.execute(
+                        sa.text("EXPLAIN " + str(_NACHSCHLAGE_SQL)),
+                        {"pseudonym": "p", "begriff": "nennen",
+                         "subject_id": None, "limit": 8},
+                    )).all()
+                )
+        finally:
+            await engine.dispose()
+
+        assert "idx_context_nodes_titel_nachschlagen" in plan, (
+            f"Der Nachschlage-Index wird nicht benutzt. Plan:\n{plan}"
+        )
