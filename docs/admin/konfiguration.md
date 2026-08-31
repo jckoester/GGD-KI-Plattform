@@ -6,6 +6,57 @@ und `infra/` (Infrastruktur). Beispieldateien enden auf `.example.yaml` bzw.
 
 ---
 
+## Wann Änderungen wirken
+
+⚠️ **Zuerst lesen.** Eine geänderte Konfiguration wirkt nicht dadurch, dass die Datei
+gespeichert ist — und der nötige Befehl ist ein anderer, als man erwartet:
+
+| Geändert | Nötig | Warum |
+|---|---|---|
+| **`.env`** | `docker compose up -d` | Umgebungsvariablen werden beim **Erzeugen** des Containers gesetzt. `restart` startet nur den Prozess neu — mit der alten Umgebung. |
+| **`config/*.yaml`** | `docker compose restart backend cron` | Der **Inhalt** einer eingehängten Datei ist für Compose unsichtbar; `up -d` erzeugt den Container nicht neu, und der laufende Prozess behält seine einmal gelesene Fassung. |
+| **`infra/litellm_config.yaml`** | `docker compose restart litellm` | Der Proxy liest seine Config nur beim Start. |
+
+Beide Male passiert bei falschem Befehl **nichts Sichtbares**: kein Fehler, keine Warnung,
+die alte Konfiguration bleibt in Kraft.
+
+> **Warum `cron` mit muss:** Er lädt dieselben Dateien wie das Backend — Budget-Stufen,
+> Schuljahr, Krisen-Trigger. Bleibt er stehen, arbeiten die nächtlichen Läufe mit einem
+> anderen Stand als die Anwendung, und der Unterschied fällt frühestens am Ergebnis auf.
+
+**Alle Dateien unter `config/` verhalten sich so** — `auth.yaml`, `budget_tiers.yaml`,
+`crisis_triggers.yaml`, `help_resources.yaml`, `pedagogy.yaml`, `rate_limits.yaml`,
+`image_models.yaml`, `image_blocklist.yaml`, `artifact_limits.yaml`, `school_year.yaml`,
+`subjects.yaml`, `taxonomy.yaml`. Jede wird einmal beim Start gelesen und danach im
+Speicher gehalten.
+
+**Zwei Ausnahmen — Änderungen über die Oberfläche wirken sofort:**
+
+- **Budget-Stufen** über `/budget`,
+- **Schuljahr und Ferien** über `/settings` → Ferienkalender.
+
+Beide schreiben die YAML-Datei *und* verwerfen den Zwischenspeicher. Wer dieselben Dateien
+von Hand im Editor ändert, braucht trotzdem den Neustart.
+
+> **`subjects.yaml` braucht zusätzlich einen Seed-Lauf.** Der Neustart macht die Datei nur
+> für die Editionslogik wirksam; die Fächer-Tabelle der Datenbank füllt
+> `python scripts/seed_subjects.py` (siehe [Updates & Wartung](updates-und-wartung.md#fächer-ändern-subjectsyaml)).
+
+**Woran man einen vergessenen Neustart erkennt:** Die Anwendung verhält sich wie vor der
+Änderung. Bei `auth.yaml` ist das besonders tückisch — ohne Treffer in `group_role_map`
+greift der Rückfall auf `student`, ohne Fehlermeldung. Der Login protokolliert, was
+tatsächlich ankam:
+
+```bash
+docker compose logs backend | grep "OAuth-Login:"
+```
+
+⚠️ **Ein Neustart genügt nicht immer:** Rollen stehen im Sitzungs-Token, das **30 Tage**
+gilt. Nach einer Korrektur an `auth.yaml` müssen betroffene Personen sich **ab- und wieder
+anmelden**, sonst tragen sie ihre alten Rollen weiter.
+
+---
+
 ## `.env`
 
 Umgebungsvariablen für Backend und Frontend. Wird von Docker Compose eingelesen.

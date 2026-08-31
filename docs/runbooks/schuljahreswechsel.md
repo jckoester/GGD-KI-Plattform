@@ -28,6 +28,32 @@ Der Ferienimport nimmt Arbeit ab (`/settings` → Ferien übernehmen). Er **erg�
 ersetzt nicht**: Von der Schule selbst gelegte Tage (Reisewoche, letzter Schultag) stehen
 in keinem Ferienkalender und würden sonst verschwinden.
 
+> ⚠️ **Der Ferienimport funktioniert erst, wenn das neue Schuljahr in der
+> Stundenplanquelle steht — und zwar veröffentlicht.** Solange dort nur der alte Plan
+> liegt, hat der Import nichts zu holen. Das ist der häufigste Grund, warum er im August
+> „nicht geht": Nicht die Plattform ist das Problem, sondern der Zeitpunkt.
+>
+> Zwei Stufen, an der Meldung unterscheidbar:
+>
+> | Was die Seite sagt | Bedeutung |
+> |---|---|
+> | `Die Quelle kennt kein Schuljahr '2026/27'. Bekannt: 2025/26, …` | Das neue Jahr ist dort noch **nicht angelegt**. Warten, bis die Stundenplanung es veröffentlicht. |
+> | Das Jahr erscheint, aber es kommen **keine oder zu wenige** Ferienabschnitte | Das Jahr ist angelegt, die Ferien sind dort noch **nicht gepflegt**. Später erneut abrufen. |
+>
+> Die Liste der bekannten Schuljahre steht in der Fehlermeldung — daran sieht man sofort,
+> ob es am Zeitpunkt liegt. Ein Blick in WebUntis genügt sonst auch.
+>
+> **Warten ist nicht nötig, um weiterzukommen:** Beginn, Ende und Halbjahreswechsel lassen
+> sich von Hand eintragen (Vorlage: `config/school_year.example.yaml`), die Ferien später
+> ergänzen — der Import ergänzt ja, statt zu ersetzen. **Wichtig ist nur, dass die Ferien
+> stehen, bevor der erste Zuteilungslauf greift**: Ein fehlender Ferienzeitraum erzeugt
+> zusätzliche Unterrichtswochen und damit ein zu großes Jahresbudget (Schritt 2).
+>
+> ⚠️ Von Hand geänderte Dateien brauchen einen Neustart:
+> `docker compose restart backend cron`. Der Import über die Oberfläche wirkt dagegen
+> sofort — er verwirft den Zwischenspeicher selbst
+> ([Wann Änderungen wirken](../admin/konfiguration.md#wann-änderungen-wirken)).
+
 ### 2. ⚠️ Die Zahl der Unterrichtswochen prüfen
 
 **Der wichtigste Schritt.** Auf `/budget` steht sie unter der Stufentabelle:
@@ -97,7 +123,9 @@ gekennzeichnet sein (unter vier vergangenen Wochen).
 | Zu viele Unterrichtswochen | Ferienzeitraum fehlt in `school_year.yaml` | Ergänzen; die Zahl auf `/budget` prüfen. Bereits gebuchte Wochen bleiben — die Grenze wird nie gekürzt |
 | Nutzer:innen ohne Budget | `budget_tiers.yaml` führt noch `max_budget_eur` | Auf `wochenbudget_eur` umstellen, Fehler steht im Log |
 | Verbrauch nicht zurückgesetzt | Erster Lauf lief noch mit dem alten `school_year.yaml` | `school_year.yaml` korrigieren; der nächste Lauf erkennt den Wechsel dann |
-| „keine Unterrichtswoche" bei allen | Stichtag in den Ferien oder außerhalb des Schuljahres | Kein Fehler — vor dem ersten Schultag erwartet |
+| „keine Unterrichtswoche" bei allen | Stichtag in den Ferien oder außerhalb des Schuljahres | Kein Fehler — vor dem ersten Schultag erwartet. **Aber prüfen, welches Schuljahr die Datei führt:** Steht dort noch das vergangene, findet der Lauf *nie* eine Unterrichtswoche |
+| Ferienimport: „Die Quelle kennt kein Schuljahr …" | Das neue Jahr ist in der Stundenplanquelle noch nicht veröffentlicht | Warten oder Grenzen von Hand eintragen, Ferien später ergänzen (Schritt 1) |
+| Von Hand geänderte `school_year.yaml` wirkt nicht | Der Prozess hält die beim Start gelesene Fassung | `docker compose restart backend cron` |
 
 ## Weiter
 

@@ -9,6 +9,12 @@ docker compose up -d
 docker compose exec backend alembic upgrade head
 ```
 
+> **Nur die Konfiguration geändert?** Dann ist `up -d` der **falsche** Befehl: Der Inhalt
+> einer eingehängten Datei ist für Compose unsichtbar, der Container wird nicht neu
+> erzeugt, und die Änderung bleibt wirkungslos — ohne Fehlermeldung. Welcher Befehl wofür
+> gilt (und die beiden Ausnahmen, die sofort wirken), steht in
+> [Konfigurationsdateien → Wann Änderungen wirken](konfiguration.md#wann-änderungen-wirken).
+
 `alembic upgrade head` ist immer auszuführen — er ist idempotent und schadet
 nicht, wenn keine neuen Migrationen vorliegen.
 

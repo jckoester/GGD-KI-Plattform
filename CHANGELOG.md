@@ -322,6 +322,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Dokumentation
 
+- [Konfiguration](docs/admin/konfiguration.md): neuer Abschnitt **Wann Änderungen
+  wirken**. `.env` braucht `docker compose up -d`, `config/*.yaml` dagegen
+  `docker compose restart backend cron` — der Inhalt einer eingehängten Datei ist für
+  Compose unsichtbar, `up -d` erzeugt den Container nicht neu und die Änderung bleibt
+  wirkungslos, ohne Fehlermeldung. Dazu die beiden Ausnahmen, die über die Oberfläche
+  sofort wirken (Budget-Stufen, Ferienkalender), und der Hinweis, dass Rollen im
+  30-Tage-Token stehen: Nach einer Korrektur an `auth.yaml` ist eine Neuanmeldung nötig.
+
 - Neues Kapitel [Vor der Installation](docs/admin/vor-der-installation.md) — schulische
   Vorüberlegungen, bisher gefüllt mit **Modellempfehlungen**: gemessene Preise und
   Fähigkeiten je IONOS-Modell, dazu die drei Anforderungen, die still scheitern
