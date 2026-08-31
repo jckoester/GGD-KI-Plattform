@@ -83,6 +83,8 @@ docker compose exec backend python scripts/<skript>.py
 
 | Skript | Zweck | Flags |
 |--------|-------|-------|
+| `check_production.py` | **Betriebsprüfung vor der Inbetriebnahme.** Secrets, `ALLOWED_HOSTS`, `TRUSTED_PROXIES`, Auth-Adapter/`jwks_url`, `AUTH_DEBUG_USERINFO`, Proxy-Adresse, laufendes Schuljahr — die Einstellungen aus dem Sicherheits-Audit, deren Fehlen **nichts auslöst**. Rein lokal: kein Netz, keine DB. Exit 1 bei Fehlern | — |
+| `check_litellm_config.py` | Modelle, Preise, `mode`, Function-Calling gegen den laufenden Proxy prüfen. Ergänzt `check_production.py` um die Modellseite | — |
 | `create_litellm_teams.py` | LiteLLM-Teams einmalig anlegen (idempotent) | — |
 | `weekly_budget_accrual.py` | **Budget-Zuteilung je Unterrichtswoche.** Hebt `max_budget` um einen Wochenbetrag an, gedeckelt auf `vorsprung_wochen` über dem Verbrauch. Idempotent; holt ausgefallene Wochen nach. Setzt beim Schuljahreswechsel Grenze **und** Verbrauch zurück | `--dry-run`, `--stichtag`, `--pseudonym`, `--neuaufbau` |
 | `monthly_team_reconcile.py` | LiteLLM-Team-Zugehörigkeit angleichen (Jahrgang/Rolle). Rührt **keine** Budgets mehr an — hieß bis 08/2026 `monthly_budget_reconcile.py` | `--dry-run`, `--limit`, `--pseudonym` |

@@ -97,8 +97,26 @@ async def plane(
     c = cfg or load_school_year()
     woche: Optional[Unterrichtswoche] = woche_am(stichtag, c)
     if woche is None:
-        # Ferien oder außerhalb des Schuljahres — es gibt nichts zuzuteilen.
-        return Zuteilung(None, 0, None, "keine Unterrichtswoche")
+        # Zwei sehr verschiedene Fälle, die sich hier gleich anfühlen:
+        #
+        # * **Ferien** — erwartet. In den Ferien wächst kein Budget, der Lauf hat nichts
+        #   zu tun, und das ist richtig so.
+        # * **Außerhalb des Schuljahres** — fast immer ein Konfigurationsfehler: Die
+        #   `school_year.yaml` führt noch das vergangene Jahr. Dann findet der Lauf
+        #   **nie** eine Unterrichtswoche, die Wochenbeträge kommen nie an, und der
+        #   Jahreswechsel-Reset löst auch nicht aus (er hängt am Wechsel des
+        #   Config-Jahres). Die Konten behalten stillschweigend ihre alten Grenzen.
+        #
+        # Beide unter derselben Meldung zu zählen, hat am 30.08.2026 auf Produktion
+        # genau diesen Fehler verdeckt. Deshalb getrennte Gründe — der Aufrufer zählt
+        # sie einzeln und kann den zweiten Fall melden.
+        if stichtag < c.beginn or stichtag > c.ende:
+            return Zuteilung(
+                None, 0, None,
+                f"Stichtag außerhalb des Schuljahres {c.schuljahr} "
+                f"({c.beginn} – {c.ende})",
+            )
+        return Zuteilung(None, 0, None, "keine Unterrichtswoche (Ferien)")
 
     if neuaufbau:
         # Die alte Grenze wird verworfen — aber **auf dem Verbrauch aufgesetzt**, nicht

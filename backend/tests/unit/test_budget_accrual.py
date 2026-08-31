@@ -177,7 +177,50 @@ async def test_in_ferien_wird_nichts_gebucht():
     )
 
     assert not zuteilung.zu_tun
-    assert "Unterrichtswoche" in zuteilung.grund
+    assert zuteilung.grund == "keine Unterrichtswoche (Ferien)"
+
+
+@pytest.mark.asyncio
+async def test_stichtag_ausserhalb_des_schuljahres_wird_benannt():
+    """Ferien und „falsches Schuljahr in der Config" dürfen nicht gleich klingen.
+
+    Beides liefert keine Unterrichtswoche, aber das eine ist erwartet und das andere ein
+    Konfigurationsfehler, nach dem **nie** wieder zugeteilt wird: Die Wochenbeträge kommen
+    nicht an, und der Jahreswechsel-Reset löst auch nicht aus — er hängt am Wechsel des
+    Config-Jahres. Auf Produktion hat die gemeinsame Zählung
+    (`keine Unterrichtswoche=7`) genau das am 30.08.2026 verdeckt.
+    """
+    from app.budget.accrual import plane
+
+    cfg = _schuljahr()                       # 2026/27, 14.09. – 16.10.2026
+    zuteilung = await plane(
+        _FakeDb(), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=5.0, verbrauch_usd=0.0,
+        stichtag=date(2026, 8, 30),          # davor — die Config führt noch das Vorjahr
+        cfg=cfg,
+    )
+
+    assert not zuteilung.zu_tun
+    assert "außerhalb des Schuljahres" in zuteilung.grund
+    # Die Meldung muss zeigen, WAS konfiguriert ist — sonst sucht man an der falschen Stelle.
+    assert "2026/27" in zuteilung.grund
+    assert "2026-09-14" in zuteilung.grund and "2026-10-16" in zuteilung.grund
+    assert "Ferien" not in zuteilung.grund
+
+
+@pytest.mark.asyncio
+async def test_nach_dem_schuljahresende_ebenso():
+    """Der Fall, der auf Produktion auftrat: Config auf dem vergangenen Jahr."""
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=5.0, verbrauch_usd=0.0,
+        stichtag=date(2026, 11, 2),          # nach dem Ende
+        cfg=_schuljahr(),
+    )
+
+    assert "außerhalb des Schuljahres" in zuteilung.grund
 
 
 @pytest.mark.asyncio

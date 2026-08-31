@@ -69,6 +69,19 @@ async def run(*, dry_run: bool, stichtag: date, pseudonym_filter: str | None,
             cfg.schuljahr, stichtag, eur_usd, vorsprung_wochen(), len(users),
         )
 
+        # Einmal je Lauf, nicht je Nutzer:in: Bei sieben Konten wären es sieben gleiche
+        # Zeilen, und die Warnung ginge in der eigenen Wiederholung unter.
+        if stichtag < cfg.beginn or stichtag > cfg.ende:
+            logger.warning(
+                "Der Stichtag %s liegt AUSSERHALB des konfigurierten Schuljahres %s "
+                "(%s – %s). Es wird nichts zugeteilt — und zwar bei jedem Lauf, bis "
+                "config/school_year.yaml das laufende Schuljahr führt. Die Konten "
+                "behalten so lange ihre bisherigen Obergrenzen, und der "
+                "Jahreswechsel-Reset löst nicht aus (er hängt am Wechsel des "
+                "Config-Jahres). Vorgehen: docs/runbooks/schuljahreswechsel.md",
+                stichtag, cfg.schuljahr, cfg.beginn, cfg.ende,
+            )
+
         client = LiteLLMClient()
         try:
             for user in users:

@@ -256,6 +256,23 @@ Was es **nicht** prüfen kann, ist der Praxistest: eine Chat-Antwort erzeugen un
 nachsehen, dass die zugehörige SpendLog-Zeile einen Betrag **größer als 0** trägt. Steht
 dort 0, greifen weder Budgets noch die 429-Sperre noch die Kostenstatistik.
 
+Die zweite Hälfte der Prüfung betrifft den Betrieb — Secrets, Host-Schutz, Audit-IP,
+Anmeldung, Schuljahr:
+
+```bash
+docker compose exec backend python scripts/check_production.py
+```
+
+Sie kommt ohne Netz und Datenbank aus und meldet die Einstellungen, deren Fehlen
+**nichts auslöst**: `ALLOWED_HOSTS` auf `*` heißt Host-Schutz aus, ein
+Loopback-`TRUSTED_PROXIES` hinter dem nginx-Container heißt, dass im Audit-Log für jede
+Anfrage die Adresse des Proxys statt der Nutzer:in steht. Beides läuft sonst jahrelang
+unbemerkt.
+
+Was auch dieses Skript nicht sehen kann, sagt es am Ende selbst — allen voran, ob die
+Rolle `review` tatsächlich an Personen vergeben ist. Ohne sie kann kein Einsicht-Antrag
+zweitfreigegeben werden; nachsehen unter `/settings/users` mit dem Rollenfilter.
+
 ## Schritt 10: Reverse Proxy einrichten
 
 Der nginx-Container hört auf Port 80 und leitet Anfragen intern an Backend und
