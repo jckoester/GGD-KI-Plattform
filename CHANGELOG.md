@@ -3,488 +3,299 @@
 Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/) (0.x = vor dem ersten Stable-Release).
 
-## [Unreleased]
+## [0.7.0] – 2026-08-31
 
-### Behoben
-
-- **Der YAML-Export eines Assistenten verlor seine Fähigkeiten.** Weder `tool_groups` noch
-  `image_kinds` wurden geschrieben; ein exportierter und wieder importierter Assistent kam
-  ohne Unterrichtsplanung, Bildgenerierung und Bildart-Auswahl zurück — er sah identisch
-  aus und konnte weniger. Beide Felder stehen jetzt unter `config:`.
-
-  Beim Import werden Fähigkeiten und Bildarten, die es in dieser Installation nicht gibt,
-  **übergangen und benannt** (Hinweis in der Erfolgsmeldung) statt still verworfen.
-
-- **Der Re-Import eines Exports scheiterte an der Schema-Prüfung.** Der Export schrieb
-  `visibility`, das Schema kannte das Feld nicht — jeder Export ließ sich nur nach
-  Handarbeit wieder einlesen (`Additional properties are not allowed`).
-
-- **Konfigurationsdateien wurden im Container nicht gefunden** — Jugendschutz-Blockliste,
-  Krisen-Trigger, Hilfe-Ressourcen, pädagogische Leitplanken, Bildarten und der
-  Guardrail-Zustandsbericht. Neun Module berechneten ihre Wurzel selbst; im Image fehlt
-  gegenüber dem Entwicklungsbaum die Ebene `backend/`, sodass die Rechnung bei `/` landete
-  und z. B. `/config/pedagogy.yaml` suchte. Die Dateien galten damit als nicht vorhanden —
-  **ohne Fehlermeldung**, die Schutzfunktionen fielen still aus.
-
-  Die Auflösung liegt jetzt zentral in `app/core/paths.py` und bestimmt die Anordnung
-  einmalig. Zusätzlich übergibt die `docker-compose.yml` die betroffenen Pfade absolut.
-
-- **Ein zweiter Lauf von `weekly_budget_accrual.py --neuaufbau` wird abgewiesen.** Der
-  Schalter ist der einmalige Umstellungsschritt; ein erneuter Lauf setzte die Obergrenze
-  wieder auf „Verbrauch + ein Wochenbetrag" und nahm den angesparten Vorsprung weg. Wer
-  es braucht: `--trotzdem`.
-
-- **`/user/new` legt keinen zweiten Schlüssel mehr an** (`auto_create_key: false`). Bisher
-  entstand je Konto neben dem gespeicherten Virtual Key ein weiterer, den die Plattform
-  nicht kannte. Bestehende Schlüssel bleiben; sie werden mit dem Konto gelöscht.
-
-- **Der Bildpreis-Abgleich nannte immer Dollar**, auch im Euro-Betrieb, und legte damit
-  die Fehldeutung nahe, zwei abweichende Preise seien derselbe Betrag in zwei Währungen.
-  Die Meldung nennt jetzt die Einheit aus `LITELLM_PRICE_CURRENCY` und weist auf einen
-  möglichen Währungsmix hin, wenn das Verhältnis der Zahlen einem Wechselkurs ähnelt.
-
-- **Das Backend startete im Container nicht** (`NameError: name 'Any' is not defined` in
-  `app/chat/router.py`). Fehlender Import; die Entwicklungsumgebung läuft auf Python 3.14
-  und wertet Annotationen erst bei Bedarf aus (PEP 649), das Container-Image auf 3.12
-  wertet sie beim Import aus. Neuer Test `test_keine_undefinierten_namen.py` prüft
-  `app/`, `scripts/` und `infra/guardrails/` statisch auf undefinierte Namen — unabhängig
-  von der Python-Fassung.
-
-- **Chats mit Werkzeugaufrufen wurden zu niedrig abgerechnet.** Ein Chat-Zug besteht aus
-  mehreren Anfragen an das Sprachmodell — je Werkzeugrunde eine, dazu die
-  Titelgenerierung. Abgerechnet wurde nur die letzte; in Zügen mit mehreren Runden fehlte
-  die Kostenangabe sogar ganz. Alle Anfragen eines Zuges werden jetzt zusammengezählt,
-  **einschließlich der Titelgenerierung**, die das Budget schon immer belastet hat, aber
-  in keiner Anzeige auftauchte.
-
-  - Die Zahlen stehen im Backend-Log (`Kosten des Zuges: 4 von 4 Anfragen abgerechnet`),
-    damit eine unvollständige Summe erkennbar ist statt still zu bleiben.
-  - Nachgefragt wird **gestaffelt** (nach 1, 2, 4 und 8 Sekunden, Abbruch sobald
-    vollständig) statt dreimal im festen Abstand. LiteLLM stellt die Buchung einer
-    Streaming-Anfrage nach 6–13 Sekunden bereit; das bisherige Fenster von 9 Sekunden
-    verfehlte regelmäßig die letzte — und teuerste — Anfrage eines Zuges. Der Normalfall
-    ist dafür jetzt nach 1 statt 3 Sekunden erledigt.
-  - Die Einstellung `SPEND_LOG_DELAY` entfällt; die Staffelung ersetzt sie.
-
-- **Die semantische Suche übersah rund die Hälfte der besten Treffer.** Der Vektorindex
-  lieferte nicht die ähnlichsten Knoten, sondern eine Auswahl daraus — „Flächeninhalt
-  eines Kreises" fand Geographie-Knoten statt der Mathematik-Kompetenz. Der Index ist
-  entfernt (Migration 0052); die Suche durchläuft jetzt alle Vektoren. Das richtige Fach
-  steht damit in 11 von 15 Prüffällen oben statt in 8, der erwartete Knoten wird in 13
-  statt 6 Fällen gefunden.
-
-  - Neuer Prüfsatz `config/search_eval.yaml` mit `scripts/search_eval.py`: misst je
-    Anfrage Recall, Fach und Rang des erwarteten Treffers.
-  - ⚠️ **Die Suche im Kontextspeicher ist als experimentell gekennzeichnet.** Sie ist
-    besser geworden, aber nicht verlässlich — und der bisherige Bestand besteht fast nur
-    aus Bildungsplan-Daten. Sobald Lehrkräfte in größerem Umfang eigene Bausteine
-    anlegen, ist sie neu zu bewerten. Hinweis in
-    [Kontextspeicher](docs/user/kontext.md).
-  - **Welches Werkzeug ein Assistent gegriffen hat, steht jetzt im Backend-Log** — ohne
-    den Suchtext, der Nutzereingabe ist. Bis dahin war nicht zu klären, ob ein Assistent
-    gesucht oder zum falschen Werkzeug gegriffen hatte.
-  - **Benannte Bausteine werden nachgeschlagen statt geschätzt.** Wer nach einem
-    Operator, einer Leitidee oder einem Fachbegriff sucht, bekommt ihn — bisher lieferte
-    „Operator nennen" die Operatoren *erkennen* und *korrigieren*, weil ein
-    Ähnlichkeitsmaß keine Namen nachschlagen kann. Die Frageform ist dabei gleichgültig.
-    Vorgezogen, nicht gefiltert: thematisch passende Treffer rücken nach.
-  - **Assistenten können den Wissensgraph jetzt lesen, nicht nur auflisten.** Werkzeug-
-    Treffer trugen bisher nur den Titel; Fragen nach dem Inhalt eines Knotens waren damit
-    nicht zu beantworten, obwohl die Suche ihn fand. Inhalt **und Fachname** gehen jetzt
-    mit — das Fach stand zuvor nur als interne Nummer im Ergebnis.
-  - **Abbruch der Antwort behoben**, wenn ein Assistent in einem Chat **mit** Fachbezug
-    nach Operatoren fragte.
-  - **`get_operatoren` meldet keine Leere mehr, wo Inhalte vorliegen.** Ohne Fachbezug —
-    oder ohne importierte Operatoren — nennt es jetzt den Grund und weist den Assistenten
-    ausdrücklich zur Suche, statt eine leere Liste zurückzugeben, die als „nichts
-    vorhanden" gedeutet wurde. Fragt ein Assistent dennoch nach einem Fach, hilft ein
-    ausdrücklicher Suchauftrag (siehe [Kontextspeicher](docs/user/kontext.md)).
-  - **Such- und Anzeigetiefe sind getrennt.** Die Profil-Einstellung „Angezeigte Treffer
-    im Vorschlagsfenster" (Vorgabe 8) galt bisher auch für die Suche, die ein Assistent
-    selbst auslöst — dort ist die Trefferzahl aber keine Platz-, sondern eine Kostenfrage.
-    Assistenten durchsuchen jetzt `ASSISTANT_CONTEXT_LIMIT` Knoten (Vorgabe 20,
-    schulweit einstellbar); das Vorschlagsfenster zeigt davon weiterhin nur so viele, wie
-    im Profil eingestellt sind.
-  - **Das Fach der Konversation zieht passende Treffer nach oben** — im Chat-Werkzeug wie
-    in der Suche neben dem Textfeld. Gefiltert wird nicht: Fachfremde Treffer und Knoten
-    ohne Fach (Leitperspektiven) bleiben in der Liste, und ein Chat ohne Fachbezug sucht
-    unverändert. In den Prüffällen mit Fachbezug steht damit durchweg das richtige Fach
-    oben.
-  - `embedding_backfill.py --reindex` ist entfallen, ebenso alle Index-Rebuild-Schritte
-    in den Runbooks — nach Import und Re-Embedding gibt es nichts mehr nachzuziehen.
-  - Embedding-Modelle mit mehr als 2000 Dimensionen sind jetzt nutzbar (die Grenze kam
-    vom Index). Sie kosten linear mehr Suchzeit — siehe
-    [Vor der Installation](docs/admin/vor-der-installation.md).
-
-### Geändert
-
-- **Der LiteLLM-Proxy läuft als Dienst derselben `docker-compose.yml`.** Ein
-  `docker compose up -d` startet ihn mit; Config (`infra/litellm_config.yaml`),
-  Guardrail-Module und das `./data`-Volume für den Guardrail-Zählerstand sind eingehängt.
-  Die Proxy-Oberfläche ist nur auf `127.0.0.1` veröffentlicht (Port über `LITELLM_PORT`).
-
-  - Die zweite Datenbank (`litellm`, getrennt vom Alembic-Schema) legt
-    `infra/db-init/` beim ersten Start des `db`-Containers an.
-  - Das LiteLLM-Update besteht jetzt aus Tag-Wechsel und `docker compose up -d litellm`;
-    `prisma migrate deploy` und `prisma generate` entfallen.
-  - Der getrennte Betrieb bleibt unterstützt.
-
-- **Das Budget gilt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
-  persönliche Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag; der
-  Verbrauch läuft das Schuljahr durch. Was in ruhigen Wochen übrig bleibt, steht in
-  dichten Wochen zusätzlich zur Verfügung — gedeckelt auf `vorsprung_wochen`
-  Wochenbeträge (Vorgabe 3).
-
-  - Welche Wochen zählen, kommt aus `school_year.yaml`; **Ferienwochen bekommen keine
-    Zuteilung**. Die Jahressumme (`Wochenbetrag × Unterrichtswochen`) steht beim Eintragen
-    auf `/budget` — der Betrag, auf den sich die Schule festlegt.
-  - Neues Schema in `budget_tiers.yaml`: `wochenbudget_eur` statt `max_budget_eur` +
-    `budget_duration`, dazu global `vorsprung_wochen`.
-  - Neuer Cron `weekly_budget_accrual.py` (**montags 05:00**), idempotent und mit Nachholen
-    ausgefallener Wochen. `monthly_budget_reconcile.py` heißt jetzt
-    `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
-  - **Zum Schuljahreswechsel** werden Obergrenze und Verbrauch zurückgesetzt — der einzige
-    Reset im Modell, ausgelöst durch das Schuljahr in `school_year.yaml`. Reste wandern
-    nicht ins nächste Schuljahr.
-  - `/budget` zeigt eine **Hochrechnung aufs Schuljahr** („bisher X € in 12 von 40
-    Wochen, bei diesem Tempo endet das Schuljahr bei Y von Z zugeteilt"), in den ersten
-    Wochen als unsicher gekennzeichnet.
-  - **Profil und Seitenleiste nennen Betrag und Termin der nächsten Aufstockung.** Ein
-    aufgebrauchtes Budget wirkte sonst endgültig.
-
-- **Preise können in Euro geführt werden** (`LITELLM_PRICE_CURRENCY=EUR`) — dann rechnet
-  die Plattform nicht um, und ein Kursrisiko entsteht gar nicht erst. Anbieter wie IONOS
-  listen ausschließlich Euro-Preise. Vorgabe bleibt `USD`; bestehende Installationen
-  ändern sich nicht.
-
-  - `infra/litellm_config.ionos.example.yaml` führt die Preise jetzt in **Euro**, gegen die
-    Preisliste abgeglichen (29.08.2026).
-  - `check_litellm_config.py` meldet Modelle, deren Preise nicht zur eingestellten Währung
-    passen können — erkennbar an fehlender eigener `api_base`: Sie beziehen ihre Preise aus
-    LiteLLMs eingebauter Tabelle, und die ist durchgängig USD.
-
-- **Zu einem erzeugten Bild wird das tatsächlich genutzte Modell gespeichert**, nicht mehr
-  das global eingestellte.
-
-- **Embeddings werden im Stapel erzeugt** (`EMBEDDING_BATCH_SIZE`, Default 64) statt eine
-  Anfrage je Knoten. Gemessen gegen BGE-M3: 0,8 → 33 Knoten/s.
-- **Der Titel geht ins Embedding ein, wo er eigene Information trägt.** Knoten ohne
-  Inhalt wurden bisher übersprungen und waren für die semantische Suche unsichtbar
-  (im Bestand 125 Leitideen). Bei Kompetenzen, deren Titel nur der Inhalt plus
-  Gliederungsnummer ist, ändert sich nichts.
-- **Die Drosselung des Backfills ist konfigurierbar** (`EMBEDDING_TOKENS_PER_SECOND`,
-  Default 3000, `0` = aus) und taktet nach dem abgerechneten Verbrauch statt nach einer
-  festen Schätzung von 150 Tokens je Knoten. Die lag bei langen Knoten um Faktor 30
-  daneben (15.000 Zeichen = 4500 Tokens).
-- **Der Embedding-Backfill zählt Anfragen statt Knoten**, bevor er abbricht: drei
-  vollständig fehlgeschlagene Stapel in Folge statt zehn Knoten.
-- Scheitert ein Stapel mit `400`, fasst der Backfill die Texte einzeln nach — ein
-  unbrauchbarer Text reißt die übrigen nicht mehr mit.
+Schwerpunkt: **Anbieterunabhängigkeit**. Modelle heißen nach ihrer Aufgabe statt nach
+Produkt, Preise dürfen in Euro geführt werden, der LiteLLM-Proxy gehört zum Stack. Dazu
+das Budget-Wochenmodell und ein verbesserter Kontextspeicher.
 
 ### Neu
 
-- **Nachvollziehbar, womit eine Antwort erzeugt wurde.** Bisher speicherte die Plattform nur
-  den schulinternen Aliasnamen (`chat-standard`) — für eine Quellenangabe in GFS,
-  Seminarkurs oder Facharbeit wertlos. Jetzt steht daneben das Anbietermodell
-  (`gpt-oss-120b`), aufgelöst **beim Schreiben**: Ein späteres Umhängen des Alias
-  verfälscht alte Antworten nicht mehr.
+- **Nachvollziehbar, womit eine Antwort erzeugt wurde.** Neben dem schulinternen Alias
+  (`chat-standard`) steht jetzt das Anbietermodell (`gpt-oss-120b`), aufgelöst beim
+  Schreiben — ein späteres Umhängen des Alias verfälscht alte Antworten nicht.
+  Im Chat über den Knopf **„Herkunft"**, in der Bibliothek dauerhaft, für Bilder mit
+  eigener Angabe. **„Angaben zum Zitieren kopieren"** legt Werkzeug, Modell, Datum und die
+  eigene Eingabe als Textbaustein bereit; der Bild-Prompt ist als *vom Sprachmodell
+  formuliert* gekennzeichnet. Optional eine Herkunftszeile in exportierten Dokumenten
+  (*Einstellungen → Export-Vorlagen*, Vorgabe aus).
+  Für Inhalte von vor diesem Update bleibt die Angabe leer — sie ist nicht rekonstruierbar.
 
-  - Im Chat unter jeder Antwort der Knopf **„Herkunft"** — standardmäßig verborgen, für alle
-    erreichbar. Bilder haben eine eigene Angabe; sie stammen aus einem anderen Modell.
-  - **„Angaben zum Zitieren kopieren"** legt Werkzeug, Modell, Datum und die eigene Eingabe
-    als Textbaustein bereit. Der Bild-Prompt ist ausdrücklich als *vom Sprachmodell
-    formuliert* gekennzeichnet — als eigene Eingabe zitiert wäre er eine Falschangabe.
-  - In der **Bibliothek** dauerhaft sichtbar, mit eigenem „Zitieren"-Knopf. Die Angabe wandert
-    beim Speichern mit und überlebt die Konversation.
-  - Optional eine **Herkunftszeile am Ende exportierter Dokumente** (PDF/Word/ODT),
-    schulweit unter *Einstellungen → Export-Vorlagen* schaltbar. Vorgabe: aus.
+- **Mehrere Bildmodelle gleichzeitig nutzbar.** Eine **Bildart**
+  (`config/image_models.yaml`) bündelt Modell, Formate und einen verständlichen Namen;
+  Assistenten lassen sich im Editor darauf festlegen. Ohne die Datei entsteht aus den
+  bisherigen `IMAGE_*`-Variablen eine einzige Bildart, und nichts ändert sich.
+  Bildarten, deren Modell für den Jahrgang nicht freigeschaltet ist, erscheinen gar nicht
+  erst; unbekannte Formate werden auf das nächstliegende Seitenverhältnis abgebildet statt
+  abgelehnt. Neu am Bild: **noch einmal versuchen** mit derselben Beschreibung.
 
-  Für Inhalte von vor diesem Update bleibt die Angabe leer — welcher Alias damals auf welches
-  Modell zeigte, ist nicht rekonstruierbar, und ein geratener Wert wäre in einer
-  Quellenangabe schlimmer als eine Lücke.
-
-- **Mehrere Bildmodelle gleichzeitig nutzbar.** Eine **Bildart** (`config/image_models.yaml`)
-  bündelt ein Bildmodell mit den Formaten, die es beherrscht, und einem Namen, den Menschen
-  verstehen. Assistenten lassen sich im Editor auf einzelne Bildarten festlegen; ohne Auswahl
-  gelten alle. Fehlt die Datei, entsteht aus den bisherigen `IMAGE_*`-Variablen eine einzige
-  Bildart und nichts ändert sich.
-
-  - Führt ein Assistent genau eine Bildart, hat das Werkzeug **keinen** Auswahlparameter.
-    Bei mehreren wählt das Chat-Modell anhand von Bezeichnung und Beschreibung.
-  - Bildarten, deren Modell für den Jahrgang nicht freigeschaltet ist, erscheinen im Werkzeug
-    gar nicht erst. Ist der Freigabestand nicht abrufbar, wird nicht gefiltert.
-  - Der Assistenten-Editor warnt beim Bearbeiten, wenn eine gewählte Bildart für die
-    Zielgruppe nicht freigeschaltet ist.
-  - Ein Format, das die gewählte Bildart nicht kennt, wird auf das nächstliegende
-    Seitenverhältnis abgebildet statt abgelehnt; das Chat-Modell nennt die Abweichung.
-  - Lehnt der Proxy ab, erscheint statt „Bildgenerierung fehlgeschlagen" ein Satz, der die
-    Ursache nennt (nicht freigeschaltet / Budget aufgebraucht).
-  - **Noch einmal versuchen:** Ein Symbol am Bild erzeugt einen neuen Versuch mit derselben
-    Beschreibung und Bildart, ohne den Chat erneut zu bemühen. Lehrkräfte sehen zusätzlich,
-    welche Bildart verwendet wurde.
-
-- **Vorlage für den EU-Betrieb:** `infra/litellm_config.ionos.example.yaml` mit fünf
-  Chat-Stufen, Systemmodellen, Embedding und Bild — Modell-IDs, Fähigkeiten und Preise
-  gegen den IONOS-Katalog gemessen.
-- **`scripts/ionos_probe.py`** fragt Katalog, Function-Calling, Vektorbreite und Bildformat
-  direkt beim Anbieter ab — die vier Angaben, die sich nicht der Dokumentation entnehmen
-  lassen.
-- **`scripts/bildpreis_probe.py`** misst über einen eigens angelegten Virtual Key, ob und
-  wie ein Bildmodell abgerechnet wird: gebuchter Betrag je Größe, Header gegen SpendLog,
-  Belastung des Budgets, Vergleich mit dem Tarif des Anbieters. Prüft zusätzlich anhand
-  der Bildbytes, ob die bestellte Größe geliefert wurde.
 - **Der Jugendschutz-Guardrail fällt nicht mehr blind offen aus.** Bei Störung des
-  Klassifikators greift eine Staffel: Wiederholung (`classifier_retries`), optionaler
-  zweiter Klassifikator (`fallback_classifier_model`), und wenn beides nichts liefert,
-  entscheidet das Team — Lehrkräfte arbeiten weiter, Schüler:innen bekommen die Antwort
-  zurückgehalten (`fail_open_teams`). Ein unbekanntes Team gilt als schutzbedürftig.
-- **Betriebszustand des Klassifikators sichtbar.** Der Guardrail schreibt einen
-  Zählerstand (`health_file`), das Backend liefert ihn unter `/api/admin/guardrail/health`,
-  die Seite *Einstellungen → Guardrail* zeigt ihn an. Erfolgreiche Wiederholungen werden
-  getrennt gezählt und geloggt — sie deuten auf Latenz hin, nicht auf einen Ausfall.
-  Ein liegengebliebener Bericht (Proxy gestoppt, gemeinsame Ablage weg) gilt nach
-  `GUARDRAIL_HEALTH_MAX_AGE_H` als veraltet und **nicht** mehr als gesund.
-  **Benachrichtigungen verschickt die Plattform nicht**; der Endpunkt gehört in die
-  Server-Überwachung — auf `available: false`, `stale: true` und steigende Ausfallzahlen.
+  Klassifikators greift eine Staffel: Wiederholung, optionaler zweiter Klassifikator, und
+  wenn beides nichts liefert, entscheidet das Team (`fail_open_teams`) — Lehrkräfte
+  arbeiten weiter, Schüler:innen bekommen die Antwort zurückgehalten. Ein unbekanntes Team
+  gilt als schutzbedürftig.
+  Sein Betriebszustand steht unter *Einstellungen → Guardrail*; ein liegengebliebener
+  Bericht gilt nach `GUARDRAIL_HEALTH_MAX_AGE_H` als veraltet und **nicht** als gesund.
+  Benachrichtigungen verschickt die Plattform nicht — `/api/admin/guardrail/health` gehört
+  in die Server-Überwachung.
 
-  > Der Proxy läuft in einem eigenen Compose-Stack: Beide Seiten müssen dasselbe
-  > **Host**-Verzeichnis einbinden. Auf getrennten Hosts entfällt die Datei; dann über das
-  > Proxy-Log überwachen (siehe `docs/admin/content-moderation.md`).
+- **`scripts/check_production.py`** prüft die Betriebswerte vor der Inbetriebnahme:
+  Secrets, `ALLOWED_HOSTS`, `TRUSTED_PROXIES`, Auth-Adapter und `jwks_url`,
+  `AUTH_DEBUG_USERINFO`, Proxy-Adresse, laufendes Schuljahr. Ohne Netz und Datenbank
+  ausführbar; nennt am Ende, was es nicht prüfen kann.
 
-### Entfernt
+- **Vorlage für den EU-Betrieb** (`infra/litellm_config.ionos.example.yaml`) mit fünf
+  Chat-Stufen, Systemmodellen, Embedding und Bild — Modell-IDs, Fähigkeiten und Preise
+  gegen den IONOS-Katalog gemessen. Dazu zwei Messwerkzeuge: **`scripts/ionos_probe.py`**
+  (Katalog, Function-Calling, Vektorbreite, Bildformat) und **`scripts/bildpreis_probe.py`**
+  (ob und wie ein Bildmodell abgerechnet wird, inklusive Prüfung der gelieferten Größe).
 
-- **Die Redis-Vorlage für den Proxy** (`infra/litellm-redis.example.yml`) und der
-  zugehörige Doku-Abschnitt. Die Plattform setzt keine `tpm`/`rpm`-Limits in LiteLLM —
-  gedrosselt wird im Backend —, und der Verbrauch steht in der Proxy-Datenbank. Bei einem
-  Proxy-Worker, dem Normalfall, bringt ein gemeinsamer Zähler-Speicher damit nichts.
-  Die Meldung „No Redis configured" in der Proxy-UI ist der erwartete Zustand; das steht
-  jetzt so in [Updates & Wartung](docs/admin/updates-und-wartung.md).
+### Geändert
 
-- **Der lokale Ollama-Fallback entfällt — es gibt keinen Rückfall bei erschöpftem Budget.**
-  Budget aufgebraucht heißt: keine Nutzung bis zum nächsten Zeitraum. Ein Klassensatz
-  gleichzeitiger Anfragen verlangt grob 800 Token/s, ein Server ohne GPU liefert für ein
-  8B-Modell 10–20 — als Zusage an alle Schulen war das nicht haltbar.
+- **Der LiteLLM-Proxy läuft als Dienst derselben `docker-compose.yml`.** `docker compose
+  up -d` startet ihn mit; Config, Guardrail-Module und das `./data`-Volume sind eingehängt,
+  die Proxy-Oberfläche nur auf `127.0.0.1` (Port über `LITELLM_PORT`). Die zweite Datenbank
+  legt `infra/db-init/` beim ersten Start an. Ein LiteLLM-Update ist jetzt Tag-Wechsel plus
+  `docker compose up -d litellm`. Der getrennte Betrieb bleibt unterstützt.
 
-  Entfallen sind `ollama-fallback` aus den LiteLLM-Vorlagen und `OLLAMA_BASE_URL` aus der
-  `.env`. **Bestehende Installationen müssen nichts tun:** Wer den Eintrag behalten will,
-  behält ihn, und die Preisprüfung nimmt lokale Modelle weiterhin von der Preispflicht aus —
-  jetzt anhand des Anbieters statt des Modellnamens. Schulen mit passender Hardware tragen
-  ein lokales Modell also weiterhin selbst ein; mitgeliefert und versprochen wird keins.
+- **Das Budget gilt je Unterrichtswoche und wird nicht mehr zurückgesetzt.** Die
+  Obergrenze wächst jede Unterrichtswoche um den eingetragenen Betrag, der Verbrauch läuft
+  das Schuljahr durch; Ungenutztes wandert mit, gedeckelt auf `vorsprung_wochen` (Vorgabe 3).
+  Welche Wochen zählen, kommt aus `school_year.yaml` — Ferienwochen bekommen nichts.
+  Neues Schema in `budget_tiers.yaml`: `wochenbudget_eur`. Neuer Cron
+  `weekly_budget_accrual.py` (montags 05:00), `monthly_budget_reconcile.py` heißt jetzt
+  `monthly_team_reconcile.py` und gleicht nur noch Teams ab.
+  `/budget` zeigt Jahressumme und Hochrechnung; Profil und Seitenleiste nennen Betrag und
+  Termin der nächsten Aufstockung. Zurückgesetzt wird allein zum Schuljahreswechsel.
+
+- **Preise können in Euro geführt werden** (`LITELLM_PRICE_CURRENCY=EUR`) — dann rechnet
+  die Plattform nicht um, und ein Kursrisiko entsteht nicht. Vorgabe bleibt `USD`.
+  `check_litellm_config.py` meldet Modelle, deren Preise nicht zur eingestellten Währung
+  passen können.
+
+- **Embeddings entstehen im Stapel** (`EMBEDDING_BATCH_SIZE`, Vorgabe 64) statt einzeln:
+  gemessen 0,8 → 33 Knoten/s. Die Drosselung ist konfigurierbar
+  (`EMBEDDING_TOKENS_PER_SECOND`, Vorgabe 3000, `0` = aus) und taktet nach abgerechnetem
+  Verbrauch. Der **Titel geht ins Embedding ein**, wo er eigene Information trägt — Knoten
+  ohne Inhalt (im Bestand 125 Leitideen) waren für die Suche bisher unsichtbar. Ein
+  fehlgeschlagener Stapel wird einzeln nachgefasst, statt die übrigen Texte mitzureißen.
 
 ### Behoben
 
+- **Die semantische Suche übersah rund die Hälfte der besten Treffer.** Der Vektorindex
+  lieferte nicht die ähnlichsten Knoten, sondern eine Auswahl daraus. Er ist entfernt
+  (Migration 0052); die Suche durchläuft alle Vektoren. Das richtige Fach steht damit in
+  11 von 15 Prüffällen oben statt in 8, der erwartete Knoten wird in 13 statt 6 Fällen
+  gefunden. Neuer Prüfsatz: `config/search_eval.yaml` mit `scripts/search_eval.py`.
+
+  - **Benannte Bausteine werden nachgeschlagen statt geschätzt** — wer einen Operator, eine
+    Leitidee oder einen Fachbegriff sucht, bekommt ihn, unabhängig von der Frageform.
+  - **Das Fach der Konversation zieht passende Treffer nach oben**, ohne fachfremde zu
+    filtern.
+  - **Assistenten lesen den Wissensgraphen, statt ihn nur aufzulisten:** Treffer tragen
+    jetzt Inhalt und Fachnamen. `get_operatoren` nennt bei leerem Ergebnis den Grund,
+    statt eine leere Liste zu liefern, die als „nichts vorhanden" gedeutet wurde.
+  - **Such- und Anzeigetiefe sind getrennt:** Assistenten durchsuchen
+    `ASSISTANT_CONTEXT_LIMIT` Knoten (Vorgabe 20), das Vorschlagsfenster zeigt weiterhin so
+    viele, wie im Profil eingestellt sind.
+  - Embedding-Modelle mit mehr als 2000 Dimensionen sind nutzbar (die Grenze kam vom
+    Index); `--reindex` und alle Index-Rebuild-Schritte entfallen.
+  - ⚠️ **Die Suche ist als experimentell gekennzeichnet.** Sie ist besser geworden, aber
+    nicht verlässlich, und der Bestand besteht fast nur aus Bildungsplan-Daten
+    ([Kontextspeicher](docs/user/kontext.md)).
+
+- **Kosten wurden zu niedrig ausgewiesen.** Ein Chat-Zug besteht aus mehreren Anfragen — je
+  Werkzeugrunde eine, dazu die Titelgenerierung. Abgerechnet wurde nur die letzte; bei
+  mehreren Runden fehlte die Angabe ganz. Jetzt werden alle Anfragen zusammengezählt,
+  **einschließlich der Titelgenerierung**. Nachgefragt wird gestaffelt (1, 2, 4, 8 s);
+  `SPEND_LOG_DELAY` entfällt. Vollständigkeit steht im Log
+  (`Kosten des Zuges: 4 von 4 Anfragen abgerechnet`).
+
+- **Bildgenerierung lief am Budget vorbei.** LiteLLM löst Bildpreise ausschließlich über
+  seine eingebaute Tabelle auf; selbst eingetragene Modelle wurden mit 0,00 abgerechnet.
+  Der Callback `guardrails.bildpreise.registrierung` trägt die Preise aus `IMAGE_PRICES`
+  beim Proxy-Start dort ein — danach stimmen Kostenheader, SpendLog, Budget und Statistik
+  ohne Sonderweg.
+
 - **Ein aufgebrauchtes Budget wurde nicht als solches gemeldet.** Geprüft wurde auf HTTP
-  429 — LiteLLM meldet es aber je nach Fassung als 400 (1.83.7) oder 429. Beim echten
-  Budgetende sah die Nutzerin deshalb den rohen Fehlerkörper des Proxys: englisch, mit
-  Beträgen in wissenschaftlicher Notation. Umgekehrt bekam jede **Drosselung** wegen zu
-  vieler Anfragen „Dein Budget ist erschöpft" zu sehen, obwohl das Budget in Ordnung war.
+  429, LiteLLM meldet je nach Fassung 400 oder 429. Beim echten Budgetende sah die
+  Nutzerin den rohen Fehlerkörper, umgekehrt bekam jede Drosselung „Budget erschöpft" zu
+  sehen. Erkannt wird es jetzt am Fehlertyp `budget_exceeded` — im Chat, bei der
+  Bildgenerierung und beim Variieren.
 
-  Erkannt wird das Budgetende jetzt am Fehlertyp `budget_exceeded` im Antwortkörper statt
-  am Status — im Chat, bei der Bildgenerierung und beim Variieren. Die Meldung nennt den
-  nächsten Abrechnungszeitraum; technische Fehlerkörper bleiben im Log.
-- **Beim Variieren eines Bildes erschienen Anweisungen an das Chat-Modell.** Fehlertexte wie
-  „Sag der Nutzerin, dass …" sind für den Chat-Flow gedacht, wurden dort aber unverändert
-  angezeigt. Die direkt sichtbaren Stellen haben jetzt eigene Sätze.
+- **Jugendschutz und Guardrail-Vorlagen:** Der `guardrails:`-Block stand unter
+  `litellm_settings`, wo LiteLLM das alte Format erwartet — der Proxy startete damit nicht.
+  Kategorien und Schwellen standen unter `guardrail_info.params` und wurden nie gelesen.
+  Drogen-Anleitungen prüfte gar nichts, weil der zuständige Guardrail den Typ `regex`
+  nutzte, den es seit LiteLLM 1.83.7 nicht mehr gibt; die Kategorie steckt jetzt im
+  Klassifikator.
 
-- **Der Gesprächstitel war manchmal die Antwort statt der Titel.** Bei imperativ
-  formulierten Eingaben („Erkläre mir …", „Erzeuge ein Bild: …") befolgte das Titelmodell
-  die Anweisung, statt sie zu betiteln — im schlimmsten gemessenen Fall mit einer 168
-  Wörter langen Erklärung, die die Historie abschnitt. Die Nutzernachricht wird jetzt als
-  **Zitat** übergeben, nicht als Anweisung. Über vier Anbieter nachgemessen: drei Modelle
-  deutlich besser (Claude Haiku 1/4 → 4/4), keines schlechter.
+- **Konfigurationsdateien wurden im Container nicht gefunden** — Bild-Blockliste,
+  Krisen-Trigger, Hilfe-Ressourcen, pädagogische Leitplanken, Bildarten und der
+  Guardrail-Zustandsbericht. Neun Module berechneten ihre Wurzel selbst und landeten im
+  Image bei `/` statt `/app`; die Dateien galten als nicht vorhanden, die Schutzfunktionen
+  fielen **still** aus. Die Auflösung liegt jetzt zentral in `app/core/paths.py`.
 
-- **Bildgenerierung lief am EUR-Budget vorbei.** LiteLLM löst Bildpreise ausschließlich über
-  seine eingebaute Preistabelle auf und ignoriert das `model_info` des Deployments — selbst
-  eingetragene Bildmodelle wurden mit 0,00 $ abgerechnet. Der neue Callback
-  `guardrails.bildpreise.registrierung` trägt die Preise aus `IMAGE_PRICES` beim Proxy-Start
-  in ebendiese Tabelle ein; danach rechnet LiteLLM selbst, und Kostenheader, SpendLog,
-  Budget-Durchsetzung und Statistik stimmen ohne Sonderweg im Backend zusammen.
-- **Jugendschutz: Drogen-Anleitungen wurden von nichts geprüft.** Der zuständige Guardrail
-  nutzte den Typ `regex`, den es seit LiteLLM 1.83.7 nicht mehr gibt — der Proxy startete
-  damit nicht einmal. Ersetzt durch die Kategorie `drug_instructions` im LLM-Klassifikator;
-  Chemieunterricht, Suchtprävention und Pharmakologie bleiben unbeanstandet.
-- **Die Guardrail-Vorlagen starteten nicht.** Der `guardrails:`-Block stand unter
-  `litellm_settings`, wo LiteLLM das alte Format erwartet. Jetzt auf oberster Ebene.
-- **Kategorien und Schwellen der Guardrails waren wirkungslos.** Sie standen unter
-  `guardrail_info.params`, das kein Guardrail-Typ liest. Der Klassifikator liest sie aus
-  `litellm_params.thresholds`.
-- **Startskript des LiteLLM-Proxys** verlangte fest `OPENAI_API_KEY`. Es prüft jetzt die
-  Variablen, die die gewählte Config referenziert, und startet aus `infra/` — Guardrail-
-  Module und Pattern-Dateien werden relativ zum Arbeitsverzeichnis aufgelöst.
-- **Eine einmal gesetzte `embedding_error`-Marke blieb stehen**, auch nachdem der Knoten
-  längst eingebettet war. Die Diagnoseabfrage zählte dadurch erledigte Fälle mit.
-- **`infra/litellm_config.example.yaml` verwies den Proxy auf die Datenbank der Anwendung**
-  (`DATABASE_URL` statt `LITELLM_DATABASE_URL`). Jetzt korrekt, dazu `store_model_in_db`.
-- **Die Modell-Vorgaben in `.env.example` passten nicht zur mitgelieferten LiteLLM-Vorlage:**
-  `EMBEDDING_MODEL` und `IMAGE_DEFAULT_MODEL` standen auf Produktnamen, die Vorlage führt
-  Aufgabennamen. Wer beide Dateien kopierte, bekam bei Einbettung und Bildgenerierung
-  „model not found".
+- **Das Backend startete im Container nicht** (`NameError: name 'Any' is not defined`).
+  Ein neuer Test prüft `app/`, `scripts/` und `infra/guardrails/` statisch auf undefinierte
+  Namen — die Entwicklungsumgebung läuft auf Python 3.14 und wertet Annotationen erst bei
+  Bedarf aus, das Container-Image auf 3.12 nicht.
+
+- **Der Gesprächstitel war manchmal die Antwort statt der Titel.** Bei imperativen
+  Eingaben befolgte das Titelmodell die Anweisung. Die Nutzernachricht wird jetzt als
+  **Zitat** übergeben; über vier Anbieter nachgemessen.
+
+- **Der YAML-Export eines Assistenten verlor seine Fähigkeiten** — weder `tool_groups` noch
+  `image_kinds` wurden geschrieben; ein Re-Import kam ohne Unterrichtsplanung,
+  Bildgenerierung und Bildart-Auswahl zurück. Zudem scheiterte der Re-Import an der
+  Schema-Prüfung (`visibility` war dort nicht vorgesehen). Unbekannte Fähigkeiten und
+  Bildarten werden beim Import übergangen und benannt.
+
+- **Der wöchentliche Budgetlauf meldet einen Stichtag außerhalb des Schuljahres.** Bisher
+  zählte er ihn wie Ferien — ohne Zuteilung, ohne Hinweis. Führt `school_year.yaml` das
+  falsche Jahr, wird nie zugeteilt, und der Jahreswechsel-Reset löst nicht aus.
+  `--neuaufbau` weist einen zweiten Lauf ab (`--trotzdem` erzwingt ihn): Er hätte den
+  angesparten Vorsprung wieder weggenommen.
+
+- Kleinere Korrekturen: Der Bildpreis-Abgleich nennt die Einheit aus
+  `LITELLM_PRICE_CURRENCY` statt immer Dollar und weist auf einen möglichen Währungsmix
+  hin · beim Variieren eines Bildes erschienen Fehlertexte, die an das Chat-Modell
+  gerichtet waren · `/user/new` legt keinen zweiten, unverzeichneten Virtual Key mehr an ·
+  eine gesetzte `embedding_error`-Marke blieb nach erfolgreicher Einbettung stehen · das
+  Startskript des Proxys verlangte fest `OPENAI_API_KEY` · auf der Seite *Ferienkalender*
+  war die Beschriftung der Knöpfe im Dunkelmodus unlesbar ·
+  `infra/litellm_config.example.yaml` verwies auf die Datenbank der Anwendung, und die
+  Modellnamen in `.env.example` passten nicht zur mitgelieferten Vorlage.
+
+### Entfernt
+
+- **Der lokale Ollama-Fallback — es gibt keinen Rückfall bei erschöpftem Budget.** Budget
+  aufgebraucht heißt: keine Nutzung bis zum nächsten Zeitraum. Entfallen sind
+  `ollama-fallback` aus den Vorlagen und `OLLAMA_BASE_URL`. **Bestehende Installationen
+  müssen nichts tun**; die Preisprüfung nimmt lokale Modelle weiterhin aus, jetzt anhand
+  des Anbieters statt des Modellnamens.
+
+- **Die Redis-Vorlage für den Proxy** (`infra/litellm-redis.example.yml`) samt Doku. Die
+  Plattform setzt keine `tpm`/`rpm`-Limits in LiteLLM, und der Verbrauch steht in dessen
+  Datenbank — bei einem Proxy-Worker bringt ein gemeinsamer Zähler-Speicher nichts. Die
+  Meldung „No Redis configured" ist der erwartete Zustand.
 
 ### Dokumentation
 
-- [Konfiguration](docs/admin/konfiguration.md): neuer Abschnitt **Wann Änderungen
-  wirken**. `.env` braucht `docker compose up -d`, `config/*.yaml` dagegen
-  `docker compose restart backend cron` — der Inhalt einer eingehängten Datei ist für
-  Compose unsichtbar, `up -d` erzeugt den Container nicht neu und die Änderung bleibt
-  wirkungslos, ohne Fehlermeldung. Dazu die beiden Ausnahmen, die über die Oberfläche
-  sofort wirken (Budget-Stufen, Ferienkalender), und der Hinweis, dass Rollen im
-  30-Tage-Token stehen: Nach einer Korrektur an `auth.yaml` ist eine Neuanmeldung nötig.
-
-- Neues Kapitel [Vor der Installation](docs/admin/vor-der-installation.md) — schulische
-  Vorüberlegungen, bisher gefüllt mit **Modellempfehlungen**: gemessene Preise und
-  Fähigkeiten je IONOS-Modell, dazu die drei Anforderungen, die still scheitern
-  (Function-Calling, Preis in der Config, Anweisungstreue).
-- [Konfiguration](docs/admin/konfiguration.md): Env-Tabelle nach Themen gegliedert und
-  vervollständigt — 24 Variablen fehlten, `STUDENT_GRADES` hieß längst
-  `PUBLIC_STUDENT_GRADES`. LiteLLM-Abschnitt auf das Namensschema umgestellt.
-- [Modelle & Assistenten](docs/admin/modelle-und-assistenten.md): Stufenschema
-  (`chat-schnell` … `chat-komplex`, `system-*`) mit Zweck und empfohlener Freigabe.
-- [Content-Moderation](docs/admin/content-moderation.md): Klassifikator statt
-  `openai_moderation`, Verhalten bei Störungen, Überwachung, Ablage des Zustandsberichts.
-- **`infra/litellm_config.example.yaml` auf das Aufgaben-Namensschema umgestellt.** Die
-  Vorlage führte rohe Produktnamen (`gpt-4o-mini`, `gpt-image-1`) als `model_name` —
-  wer sie kopierte, hatte `MODEL_PICKER_HIDDEN_PREFIXES` wirkungslos und das
-  Titelmodell sichtbar im Dropdown der Schüler:innen. Jetzt `chat-schnell` …
-  `system-titel`, `embedding-standard`, `bild-standard`, mit Begründung im Kopf.
-- Neues Kapitel [Modell-Szenarien](docs/admin/modell-szenarien.md) — vollständige
-  Konfigurationen für IONOS, Mistral, OpenAI, Anthropic und Mischbetrieb, dazu eine
-  Abdeckungsmatrix (welcher Anbieter kann Chat, Embedding, Bild) und die acht
-  anbieterspezifischen Fallen, die still scheitern.
-- Neues Nutzerkapitel [KI-Ergebnisse zitieren](docs/user/zitieren.md) — welche Angaben eine
-  Quellenangabe braucht und wo sie in der Oberfläche stehen.
-- [Modell-Szenarien](docs/admin/modell-szenarien.md): Abschnitt *Was gespeichert wird — und
-  was zitierfähig ist* (Alias gegen Anbietermodell).
-- [Vor der Installation](docs/admin/vor-der-installation.md): Messwerte für **Mistral**
-  (acht Modelle), **OpenAI** (vier) und **Anthropic** (drei) — Preise, Funktionsaufrufe,
-  Titeltreue und Antwortzeiten. Damit sind alle vier Anbieter geprüft; die Empfehlungen
-  beruhen nirgends mehr auf Annahmen.
-- [Dev-Setup](docs/dev/dev-setup.md): Beispiel-`.env` und `curl` auf Aufgaben-Namen.
-- [Nutzerverwaltung](docs/admin/nutzerverwaltung.md) und Troubleshooting: **„Anmeldung
-  fehlgeschlagen!" trotz richtigem Passwort** — die Meldung kommt vom Schulkonto-System und
-  bedeutet, dass der OAuth-Client für die Gruppe nicht freigegeben ist. In den Logs der
-  Plattform steht dazu nichts, weil die Anfrage sie nie erreicht.
-- Neues Runbook [Schuljahreswechsel](docs/runbooks/schuljahreswechsel.md) — `school_year.yaml`
-  umstellen, **Zahl der Unterrichtswochen prüfen** (sie ist der Faktor der Jahreszusage),
-  Budget-Rücksetzung verifizieren. Mit Fehlerbildern und ihren Ursachen.
-- [Budget-System](docs/admin/budget.md) neu geschrieben: Wochenmodell, Währung und
-  Kursrisiko, Hochrechnung, Schuljahreswechsel, einmalige Umstellung vom Monatsmodell.
-- [Konfiguration](docs/admin/konfiguration.md): `budget_tiers.yaml` auf `wochenbudget_eur`
-  + `vorsprung_wochen`; `LITELLM_PRICE_CURRENCY` ergänzt.
-- Nutzerdoku ([Profil](docs/user/profil.md), [Chat](docs/user/chat.md),
-  [Bilder](docs/user/bilder-erzeugen.md)): „monatliches Budget“ durchgängig ersetzt — das
-  Guthaben wächst je Unterrichtswoche, und ein Bild kostet rund vierzig Chat-Nachrichten.
-- [Installation](docs/admin/installation.md) um die Modellkonfiguration ergänzt: neuer
-  **Schritt 3** (Anbieter wählen, `model_list` befüllen, Namen in die `.env`) und
-  **Schritt 9** (`check_litellm_config.py` gegen den laufenden Proxy). Die Kopierliste in
-  Schritt 2 nennt jetzt alle `config/*.yaml` — `subjects.yaml` fehlte, obwohl das
-  Fächer-Seed sie braucht. Schrittnummern durchgezählt (es gab keinen Schritt 6).
-
+- Neue Kapitel: [Vor der Installation](docs/admin/vor-der-installation.md) (gemessene
+  Preise, Fähigkeiten und Fallstricke aller vier Anbieter),
+  [Modell-Szenarien](docs/admin/modell-szenarien.md) (vollständige Konfigurationen je
+  Anbieter samt Abdeckungsmatrix) und [KI-Ergebnisse zitieren](docs/user/zitieren.md).
+- Neue Runbooks: [Schuljahreswechsel](docs/runbooks/schuljahreswechsel.md) und
+  [LiteLLM-Umzug](docs/runbooks/litellm-in-die-compose.md).
+- [Konfiguration](docs/admin/konfiguration.md): neuer Abschnitt **Wann Änderungen wirken**
+  — `.env` braucht `docker compose up -d`, `config/*.yaml` dagegen
+  `docker compose restart backend cron`; bei falschem Befehl passiert nichts Sichtbares.
+  Env-Tabelle vervollständigt (24 Variablen fehlten).
+- Neu geschrieben: [Budget-System](docs/admin/budget.md) (Wochenmodell, Währung,
+  Hochrechnung) und [Content-Moderation](docs/admin/content-moderation.md) (Klassifikator,
+  Verhalten bei Störungen, Überwachung).
+- [Installation](docs/admin/installation.md) um Modellkonfiguration und die beiden
+  Prüfschritte ergänzt; [Nutzerverwaltung](docs/admin/nutzerverwaltung.md) um „Anmeldung
+  fehlgeschlagen!" trotz richtigem Passwort (der OAuth-Client ist für die Gruppe nicht
+  freigegeben — in den Logs der Plattform steht dazu nichts).
+- Nutzerdoku: „monatliches Budget" durchgängig ersetzt.
 ### Migration
 
-- ⚠️ **LiteLLM-Proxy aus dem eigenen Stack übernehmen.** Wer den Proxy bisher getrennt
-  betreibt, folgt dem [Runbook](docs/runbooks/litellm-in-die-compose.md). Kern: Der
-  Datenbestand des Proxys muss mitgenommen werden — er enthält die Virtual Keys, auf die
-  `pseudonym_audit.litellm_key` verweist, sowie Budgets und Verbrauch. `LITELLM_SALT_KEY`
-  und `LITELLM_MASTER_KEY` unverändert übernehmen; war der Salt-Key nie gesetzt, gehört
-  dort der alte Master-Key hinein.
+Reihenfolge: erst Modellnamen und Proxy-Config, dann `.env`, dann Datenbank, dann Budget.
 
-  In der `.env` außerdem `LITELLM_PROXY_URL=http://litellm:4000` und
-  `LITELLM_DATABASE_URL=…@db:5432/litellm` setzen. Die Datenbank `litellm` auf einer
-  bestehenden Installation einmalig anlegen — das Init-Verzeichnis greift nur bei leerem
-  Datenverzeichnis:
+- ⚠️ **Modellnamen auf Aufgabennamen umstellen.** Wer in `infra/litellm_config.yaml` noch
+  Produktnamen als `model_name` führt (`gpt-4o-mini`, `text-embedding-3-small`,
+  `gpt-image-1`), benennt sie um und zieht die `.env` nach: `CHAT_DEFAULT_MODEL=chat-standard`,
+  `TITLE_MODEL=system-titel`, `EMBEDDING_MODEL=embedding-standard`,
+  `IMAGE_DEFAULT_MODEL=bild-standard`. Danach prüfen, ob
+  `MODEL_PICKER_HIDDEN_PREFIXES` noch zu den neuen Namen passt — sonst steht das
+  Titelmodell sichtbar im Modellwähler.
+
+  **Danach die Freigabematrix unter `/settings/models` neu setzen** — die Team-Allowlists
+  enthalten die alten Namen und laufen sonst ins Leere. Ebenso Assistenten prüfen, die auf
+  einen Modellnamen festgelegt sind. Die Embedding-Vektoren bleiben unberührt, solange
+  `litellm_params.model` gleich bleibt. Vorlagen:
+  [Modell-Szenarien](docs/admin/modell-szenarien.md). Kontrolle:
+  `python scripts/check_litellm_config.py`.
+
+- ⚠️ **Die eigene `infra/litellm_config.yaml` anpassen** — drei Dinge, die nicht griffen
+  oder ab LiteLLM 1.83.7 den Start verhindern:
+
+  | Prüfen | Warum |
+  |---|---|
+  | `guardrails:` steht unter `litellm_settings:` | Proxy startet nicht — Block auf die oberste Ebene heben |
+  | `guardrail: regex` | Typ existiert nicht mehr; Drogen-Anleitungen deckt die Kategorie `drug_instructions` ab |
+  | Schwellen unter `guardrail_info.params` | Wurden nie gelesen — gehören unter `litellm_params.thresholds` |
+
+- ⚠️ **LiteLLM-Proxy aus dem eigenen Stack übernehmen** —
+  [Runbook](docs/runbooks/litellm-in-die-compose.md). Kern: Der Datenbestand des Proxys
+  muss mitgenommen werden (Virtual Keys, auf die `pseudonym_audit.litellm_key` verweist,
+  dazu Budgets und Verbrauch). `LITELLM_MASTER_KEY` und `LITELLM_SALT_KEY` unverändert
+  übernehmen — war der Salt-Key nie gesetzt, gehört dort der alte Master-Key hinein.
+  In der `.env` `LITELLM_PROXY_URL=http://litellm:4000` und
+  `LITELLM_DATABASE_URL=…@db:5432/litellm`; die Datenbank auf Bestandsinstallationen
+  einmalig anlegen:
 
   ```bash
   docker compose exec db psql -U postgres -c "CREATE DATABASE litellm"
   ```
 
-  Wer beim getrennten Betrieb bleibt, schaltet den neuen Dienst über eine
+  Wer getrennt weiterbetreibt, schaltet den neuen Dienst über eine
   `docker-compose.override.yml` ab (Snippet im Runbook).
+
+- **Neue Variablen in der `.env`:**
+  - `IMAGE_PRICES` — **Pflicht**, sobald Bildmodelle laufen, die LiteLLM nicht aus seiner
+    eingebauten Tabelle kennt; ohne sie kostet jedes Bild 0,00. In **einfachen**
+    Anführungszeichen setzen.
+  - `GUARDRAIL_HEALTH_FILE` / `GUARDRAIL_HEALTH_MAX_AGE_H` — für die Zustandsanzeige; muss
+    auf dieselbe Datei zeigen wie `health_file` in der LiteLLM-Config.
+  - `IMAGE_MODELS_PATH` — nur, wenn die Bildarten-Datei woanders liegt; anzulegen aus
+    `config/image_models.example.yaml`. Sie löst
+    `IMAGE_DEFAULT_MODEL`, `IMAGE_SIZES`, `IMAGE_DEFAULT_FORMAT` und
+    `IMAGE_RESPONSE_FORMAT` ab; jedes dort genannte Modell braucht einen Eintrag in
+    `IMAGE_PRICES`.
+
+- **`alembic upgrade head`** — Migrationen `0047`–`0052`: `assistants.image_kinds`,
+  `generated_images.bildart`, `provider_model` an `messages`, `generated_images` und
+  `artifacts`, Tabelle `budget_accrual`, Entfernen des Vektorindex. Bestandsassistenten
+  behalten ihr Verhalten; bereits erzeugte Bilder lassen sich mangels gespeicherter Bildart
+  nicht variieren.
 
 - ⚠️ **Budget: Umstellung aufs Wochenmodell — drei Schritte, in dieser Reihenfolge.**
 
   1. `config/budget_tiers.yaml` auf `wochenbudget_eur` umstellen (Vorlage:
-     `config/budget_tiers.example.yaml`). **Das alte `max_budget_eur` wird nicht mehr
-     gelesen** — es als Wochenbetrag zu deuten wäre eine stille Kürzung auf ein Viertel.
-     Ohne Umstellung protokolliert der Start einen Fehler und es gibt kein Budget.
+     `config/budget_tiers.example.yaml`). Das alte `max_budget_eur` wird nicht mehr gelesen; ohne Umstellung
+     gibt es kein Budget.
   2. `python scripts/migrate_budget_duration.py --verbrauch-zuruecksetzen` — entfernt
      `budget_duration: 1mo` aus der Proxy-Datenbank. Solange das steht, setzt LiteLLM den
-     Verbrauch weiter monatlich zurück, ohne dass etwas fehlschlägt.
-  3. `python scripts/weekly_budget_accrual.py --neuaufbau` — ersetzt die alten
-     Monats-Obergrenzen. ⚠️ **Nur innerhalb einer Unterrichtswoche wirksam.** In den
-     Ferien oder außerhalb des Schuljahres aus `school_year.yaml` meldet der Lauf
-     `gebucht=0` / `keine Unterrichtswoche` und lässt die Monatsgrenzen stehen — ohne
-     Fehler. Dann zuerst das Schuljahr umstellen; die Grenzen setzt danach der erste
-     Montagslauf.
+     Verbrauch weiter monatlich zurück.
+  3. `python scripts/weekly_budget_accrual.py --neuaufbau` — ersetzt die Monats-Obergrenzen.
 
-  Die Reihenfolge ist nicht beliebig: `max_budget = NULL` *und* `= 0` bedeuten bei LiteLLM
-  gleichermaßen **kein Limit**. Deshalb lässt Schritt 2 die Grenzen stehen und erst
-  Schritt 3 ersetzt sie — so gibt es nie ein Konto ohne Limit.
+  Die Reihenfolge ist nicht beliebig: `max_budget = NULL` **und** `= 0` bedeuten bei
+  LiteLLM *kein Limit*. Deshalb lässt Schritt 2 die Grenzen stehen und erst Schritt 3
+  ersetzt sie.
 
-- **`alembic upgrade head`** — Migration `0051`: Tabelle `budget_accrual` (Merkposten der
-  wöchentlichen Zuteilung, wird mit dem Konto gelöscht).
+  ⚠️ Schritt 3 wirkt **nur innerhalb einer Unterrichtswoche**. In den Ferien oder außerhalb
+  des Schuljahres aus `school_year.yaml` meldet der Lauf `keine Unterrichtswoche` und lässt
+  die Monatsgrenzen stehen. Dann zuerst das Schuljahr umstellen
+  ([Runbook](docs/runbooks/schuljahreswechsel.md)); die Grenzen setzt der erste
+  Montagslauf.
 
-- **`alembic upgrade head`** — Migrationen `0047`–`0050`: `assistants.image_kinds`,
-  `generated_images.bildart`, sowie `provider_model` an `messages`, `generated_images` und
-  `artifacts`. Bestandsassistenten behalten mit dem
-  Standardwert ihr bisheriges Verhalten; bereits erzeugte Bilder lassen sich mangels
-  gespeicherter Bildart nicht variieren.
-
-- ⚠️ **Modellnamen auf Aufgabennamen umstellen.** Wer in `infra/litellm_config.yaml` noch
-  rohe Produktnamen als `model_name` führt (`gpt-4o-mini`, `text-embedding-3-small`,
-  `gpt-image-1`), benennt sie um; anschließend die `.env` nachziehen:
-
-  | `.env` | Wert |
-  |---|---|
-  | `CHAT_DEFAULT_MODEL` | `chat-standard` |
-  | `TITLE_MODEL` | `system-titel` |
-  | `EMBEDDING_MODEL` | `embedding-standard` |
-  | `IMAGE_DEFAULT_MODEL` | `bild-standard` |
-
-  **Danach die Freigabematrix unter `/settings/models` neu setzen** — die Team-Allowlists
-  in LiteLLM enthalten die alten Namen und laufen sonst ins Leere. Ebenso prüfen:
-  Assistenten, die auf einen expliziten Modellnamen festgelegt sind. Ein reiner
-  Namenswechsel berührt die Embedding-Vektoren **nicht**, solange `litellm_params.model`
-  gleich bleibt.
-
-  Fertige `model_list`-Blöcke je Anbieter: [Modell-Szenarien](docs/admin/modell-szenarien.md).
-  Begründung und Stufenschema: [Modelle & Assistenten](docs/admin/modelle-und-assistenten.md).
-  Kontrolle: `python scripts/check_litellm_config.py`.
-
-- ⚠️ **Die eigene `infra/litellm_config.yaml` muss angepasst werden.** Drei Dinge, die
-  bisher stillschweigend nicht griffen oder ab LiteLLM 1.83.7 den Proxy-Start verhindern:
-
-  | Prüfen | Warum |
-  |---|---|
-  | `guardrails:` steht unter `litellm_settings:` | Proxy startet nicht (`GuardrailItem() argument after ** must be a mapping`) — Block auf die oberste Ebene heben |
-  | `guardrail: regex` | Typ existiert nicht mehr, Proxy startet nicht — Drogen-Anleitungen deckt jetzt die Kategorie `drug_instructions` des Klassifikators ab |
-  | Kategorien/Schwellen unter `guardrail_info.params` | Wurden nie gelesen — gehören unter `litellm_params.thresholds` |
-
-  Vorlagen: `infra/litellm_config.example.yaml` (allgemein) und
-  `infra/litellm_config.ionos.example.yaml` (EU-Betrieb).
-
-- **Neue Variablen in der `.env`** — beide optional, aber empfohlen:
-  - `IMAGE_PRICES` — **Pflicht**, sobald Bildmodelle im Einsatz sind, die LiteLLM nicht aus
-    seiner eingebauten Preistabelle kennt. Ohne sie kostet jedes Bild 0,00 $. In
-    **einfachen** Anführungszeichen setzen.
-  - `GUARDRAIL_HEALTH_FILE` / `GUARDRAIL_HEALTH_MAX_AGE_H` — für die Zustandsanzeige. Muss
-    auf dieselbe Datei zeigen wie `health_file` in der LiteLLM-Config.
-  - `IMAGE_MODELS_PATH` — nur nötig, wenn die Bildarten-Datei woanders liegt. Wer mehr als
-    ein Bildmodell nutzen will, legt sie aus `config/image_models.example.yaml` an; sie löst
-    `IMAGE_DEFAULT_MODEL`, `IMAGE_SIZES`, `IMAGE_DEFAULT_FORMAT` und `IMAGE_RESPONSE_FORMAT`
-    ab. Jedes dort genannte Modell braucht einen Eintrag in `IMAGE_PRICES`.
-
-- **Nach dem Update einmal `python scripts/embedding_backfill.py` laufen lassen.** Die
-  Titel-Aufnahme betrifft Leitideen, Kapitel und PK-Gruppen; Kompetenzknoten behalten
-  ihren bisherigen Vektor. Betroffene Knoten neu einbetten:
+- **Nach dem Update einmal `python scripts/embedding_backfill.py`** — die Titel-Aufnahme
+  betrifft Leitideen, Kapitel und PK-Gruppen:
 
   ```sql
   UPDATE context_nodes SET embedding = NULL
    WHERE status = 'active' AND content_type IN ('leitidee', 'kapitel', 'pk_gruppe');
   ```
 
+- **Zum Schluss `python scripts/check_production.py`** — Secrets, Host-Schutz, Audit-IP,
+  Anmeldung und Schuljahr auf einen Blick.
+
 - **Nur bei Anbieterwechsel:** Ein anderes Embedding-Modell heißt fast immer eine andere
-  Vektorbreite — dann Spalte umstellen und **alle** Knoten neu einbetten.
-  Ablauf: [Runbook Modellwechsel](docs/runbooks/modellwechsel.md).
+  Vektorbreite — dann Spalte umstellen und **alle** Knoten neu einbetten
+  ([Runbook Modellwechsel](docs/runbooks/modellwechsel.md)).
 
 ## [0.6.2] – 2026-08-26
 
