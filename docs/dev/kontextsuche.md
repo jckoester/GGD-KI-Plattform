@@ -135,6 +135,36 @@ Exit-Code 1, wenn eine Zusage bricht:
 opfert, begründet das im Code-Kommentar neben dem geänderten Wert — so wie es die
 bestehenden Konstanten vormachen.
 
+### Wo die Zeit hingeht
+
+Gemessen am Entwicklungsbestand (01.09.2026, LiteLLM lokal):
+
+| Schritt | Dauer |
+|---|---:|
+| **Embedding der Anfrage** (Netzaufruf zum Modell) | **~370 ms** |
+| Identifikation (exakter Abgleich + Trigramm) | ~50 ms |
+| Thematische Auswahl (nur Datenbank) | ~30 ms |
+| Aufzählung | ~15 ms |
+
+Die Datenbank ist nicht der Engpass. Wer eine Suche schneller machen will, muss den
+Netzaufruf **vermeiden**, nicht die Abfragen optimieren.
+
+Zwei Dinge tun das bereits:
+
+- **Der Netzaufruf überlappt die Identifikation.** `suche()` stößt das Embedding als
+  Task an und lässt die Titelabfragen laufen, während es unterwegs ist — spart rund
+  50 ms bei Nachschlage-Anfragen (484 → 431 ms, deterministisch gemessen).
+- **Die Suchseite merkt sich ihr Ergebnis** für die Dauer der Sitzung
+  (`frontend/src/lib/suche_cache.js`). Wer einen Treffer öffnet und zurückkommt,
+  wartet nicht erneut.
+
+⚠️ **Nur der Netzaufruf darf überlappen, nie zwei Datenbankabfragen.** Eine
+`AsyncSession` verträgt das nicht und endet in `IllegalStateChangeError`. Ein `gather`
+über zwei DB-Aufrufe kann trotzdem lange gutgehen — nämlich solange einer von beiden
+zuerst auf das Netz wartet und dem anderen die Verbindung überlässt. Genau so stand es
+bis 09/2026 im Anker-Weg; ein schnelleres Embedding hätte es umgeworfen. Ein Unit-Test
+hält beide Module jetzt frei von `asyncio.gather`.
+
 ### Messfalle
 
 Wer Ausführungspläne oder Laufzeiten vergleicht, braucht **je Messung eine frische

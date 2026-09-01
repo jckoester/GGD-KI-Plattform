@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context
-from app.context.search import Suchprofil, thematisch
+from app.context.search import Suchprofil, thematisch, vektor_oder_none
 from app.context.schemas import CurriculumDraftConfirmed
 from app.db.models import (
     AssistantContextAnchor,
@@ -162,9 +162,23 @@ async def get_context_for_query(
             thematisch=_ANKER_TOP_K,
             mit_metadaten=True,
         )
-        thematisch_abschnitt, engagement_entries = await asyncio.gather(
-            thematisch(query_text, profil, db),
-            get_engagement_context(anchor_ids, pseudonym, db),
+        # ⚠️ **Kein `gather` über zwei Datenbankaufrufe.** Bis 09/2026 liefen thematische
+        # Suche und Lernstand hier nebenläufig auf **derselben** `AsyncSession` — das
+        # ging nur gut, weil die Suche zuerst auf das Embedding wartete und dem
+        # Lernstand damit die Datenbank überließ. Ein schnelleres Embedding (Cache,
+        # anderer Anbieter) hätte beide gleichzeitig auf die Session gelassen, und die
+        # Anfrage wäre mit `IllegalStateChangeError` gescheitert.
+        #
+        # Überlappt wird stattdessen ausdrücklich das, was überlappt werden darf: der
+        # Netzaufruf. Er startet zuerst und läuft, während der Lernstand abgefragt wird.
+        vektor_task = asyncio.create_task(vektor_oder_none(query_text))
+        try:
+            engagement_entries = await get_engagement_context(anchor_ids, pseudonym, db)
+        except BaseException:
+            vektor_task.cancel()
+            raise
+        thematisch_abschnitt = await thematisch(
+            query_text, profil, db, vektor=await vektor_task
         )
         semantic_treffer = thematisch_abschnitt.treffer
 

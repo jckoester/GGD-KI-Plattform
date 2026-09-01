@@ -806,3 +806,81 @@ class TestZeitraumAufzaehlung:
             )
         assert "Unterrichtsgruppe" in antwort["hinweis"]
         gezaehlt.assert_not_awaited()
+
+
+class TestUeberlappterNetzaufruf:
+    """Das Embedding läuft, während die Identifikation die Datenbank befragt."""
+
+    async def test_embedding_startet_vor_der_identifikation(self):
+        """Gemessen: Embedding ~370 ms, Identifikation ~50 ms. Nacheinander sind das
+        420 ms, überlappt 370. Die Reihenfolge ist deshalb kein Zufall."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from app.context import search
+
+        reihenfolge = []
+
+        async def embedding(text):
+            reihenfolge.append("embedding-start")
+            return [0.1]
+
+        async def ident(frage, profil, db):
+            # Eine echte Identifikation fragt die Datenbank und gibt dabei die
+            # Kontrolle ab — erst dann kommt der angestoßene Netzaufruf zum Zug.
+            # `create_task` startet nicht sofort, sondern am nächsten Await-Punkt.
+            await asyncio.sleep(0)
+            reihenfolge.append("identifikation")
+            return search.Abschnitt()
+
+        with patch.object(search, "generate_embedding", new=embedding), \
+             patch.object(search, "identifikation", new=ident), \
+             patch.object(search, "thematisch",
+                          new=AsyncMock(return_value=search.Abschnitt())):
+            await search.suche("x", search.Suchprofil(pseudonym="p"), object())
+
+        assert reihenfolge[0] == "embedding-start"
+
+    async def test_vektor_wird_durchgereicht_statt_zweimal_geholt(self):
+        """Sonst liefe der teure Netzaufruf zweimal — und die Ersparnis wäre dahin."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.context import search
+
+        embedding = AsyncMock(return_value=[0.1])
+        with patch.object(search, "generate_embedding", new=embedding), \
+             patch.object(search, "identifikation",
+                          new=AsyncMock(return_value=search.Abschnitt())), \
+             patch.object(search, "thematisch",
+                          new=AsyncMock(return_value=search.Abschnitt())) as thema:
+            await search.suche("x", search.Suchprofil(pseudonym="p"), object())
+
+        assert embedding.await_count == 1
+        assert thema.await_args.kwargs["vektor"] == [0.1]
+
+    async def test_gescheitertes_embedding_wird_zu_none(self):
+        """Der ILIKE-Rückfall hängt daran: `None` heißt „es gibt keinen Vektor“ —
+        eine durchgereichte Ausnahme würde die ganze Suche abbrechen."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.context import search
+
+        with patch.object(search, "generate_embedding",
+                          new=AsyncMock(side_effect=RuntimeError("Dienst weg"))):
+            assert await search.vektor_oder_none("x") is None
+
+    async def test_datenbankabfragen_bleiben_nacheinander(self):
+        """⚠️ Eine `AsyncSession` verträgt keine nebenläufigen Abfragen
+        (`IllegalStateChangeError`). Überlappt wird der Netzaufruf, nie die Datenbank —
+        deshalb darf hier kein `gather` über zwei DB-Aufrufe stehen.
+        """
+        from pathlib import Path
+
+        from app.context import search, service
+
+        for modul in (search, service):
+            quelle = Path(modul.__file__).read_text(encoding="utf-8")
+            assert "asyncio.gather(" not in quelle, (
+                f"{modul.__name__} lässt Aufrufe nebenläufig laufen — auf einer "
+                f"gemeinsamen Session endet das in IllegalStateChangeError."
+            )

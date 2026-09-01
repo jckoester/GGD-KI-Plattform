@@ -25,6 +25,7 @@ Jede Konstante hier ist gemessen; wer eine ändert, misst neu
 (``python scripts/search_eval.py``).
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Sequence
@@ -719,12 +720,36 @@ async def identifikation(
 # ── Verfahren 2: Thematische Auswahl ─────────────────────────────────────────
 
 
+# Sentinel: „hol den Vektor selbst" — zu unterscheiden von `None` (= es gibt keinen,
+# also ILIKE-Rückfall). Ein blosses `None` als Vorgabe könnte beides bedeuten.
+_SELBST_HOLEN = object()
+
+
+async def vektor_oder_none(frage: str) -> list[float] | None:
+    """Das Anfrage-Embedding — oder ``None``, wenn es nicht zu haben ist.
+
+    Ausgelagert, damit Aufrufer den Netzaufruf **vorziehen** können: Er dauert rund
+    370 ms und ist damit der weitaus teuerste Teil einer Suche (die Datenbank braucht
+    zusammen rund 70 ms, gemessen 01.09.2026). Wer ihn als Task startet, kann in der
+    Zwischenzeit die Identifikation über die Datenbank laufen lassen.
+
+    ⚠️ Nebenläufig laufen darf nur der **Netzaufruf**, nie zwei Datenbankabfragen: Eine
+    ``AsyncSession`` verträgt das nicht und wirft ``IllegalStateChangeError``.
+    """
+    try:
+        return await generate_embedding(frage)
+    except Exception:
+        logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
+        return None
+
+
 async def thematisch(
     frage: str,
     profil: Suchprofil,
     db: AsyncSession,
     *,
     ausschluss: set[str] | None = None,
+    vektor=_SELBST_HOLEN,
 ) -> Abschnitt:
     """Semantische Suche über alle sichtbaren Knoten mit Embedding.
 
@@ -760,10 +785,10 @@ async def thematisch(
         return Abschnitt(treffer=treffer[: profil.thematisch], gesamt=None, vollstaendig=False)
 
     aus_dem_fach = _aus_dem_fach(profil)
+    if vektor is _SELBST_HOLEN:
+        vektor = await vektor_oder_none(frage)
 
-    try:
-        vektor = await generate_embedding(frage)
-
+    if vektor is not None:
         naehe = ContextNode.embedding.cosine_distance(vektor)
         # ⚠️ Die Boni müssen als **Fließkommazahl** in die Abfrage. Werden sie als ganze
         # Zahl typisiert — was PostgreSQL aus dem anderen CASE-Zweig ableiten kann —,
@@ -787,8 +812,6 @@ async def thematisch(
         if zeilen:
             return await fertig(zeilen)
         # Kein Knoten hat ein Embedding → Fallback
-    except Exception:
-        logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
 
     # Fallback: ILIKE auf Titel und Inhalt — mit demselben Fachvorzug. Ohne ihn verhielte
     # sich die Rückfallebene anders als der Normalfall, und das fiele erst auf, wenn
@@ -858,9 +881,27 @@ async def suche(frage: str, profil: Suchprofil, db: AsyncSession) -> Suchergebni
     Die Identifikation läuft zuerst: Ihre Treffer werden aus der thematischen Auswahl
     ausgeschlossen, damit kein Knoten zweimal im selben Umschlag steht.
     """
-    ident = await identifikation(frage, profil, db)
+    # Das Embedding zuerst **anstoßen**, aber noch nicht abwarten: Es dauert rund 370 ms
+    # (Netzaufruf zum Modell), die Identifikation rund 70 ms (Datenbank). Nacheinander
+    # sind das 440 ms, überlappt 370 — die Titelabfragen laufen, während der Vektor
+    # unterwegs ist.
+    #
+    # ⚠️ Überlappt wird der **Netzaufruf**, nicht die Datenbankarbeit. Zwei Abfragen
+    # gleichzeitig auf derselben `AsyncSession` enden in `IllegalStateChangeError`; die
+    # Identifikation ist deshalb `await`, nicht Teil eines `gather`.
+    vektor_task = asyncio.create_task(vektor_oder_none(frage))
+    try:
+        ident = await identifikation(frage, profil, db)
+    except BaseException:
+        vektor_task.cancel()
+        raise
+
     thema = await thematisch(
-        frage, profil, db, ausschluss={t["node_id"] for t in ident.treffer}
+        frage,
+        profil,
+        db,
+        ausschluss={t["node_id"] for t in ident.treffer},
+        vektor=await vektor_task,
     )
     return Suchergebnis(
         identifikation=ident, thematisch=thema, hinweise=_hinweise(frage, ident)

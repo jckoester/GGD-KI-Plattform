@@ -26,6 +26,7 @@
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { addChatContextNode, searchContextNodes } from "$lib/api.js";
     import { fuerNeuenChat } from "$lib/context_handover.js";
+    import { holen, merken, suchSchluessel } from "$lib/suche_cache.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { activeConversationId, pageTitle } from "$lib/stores/pageTitle.js";
@@ -107,10 +108,22 @@
         goto(url, { replaceState: true, keepFocus: true, noScroll: true });
     }
 
+    /** Anfrage und Facetten — beide bestimmen das Ergebnis, beide gehören in den Schlüssel. */
+    const cacheSchluessel = () =>
+        suchSchluessel({ q: frage, typ, fach: fachId, stufe });
+
     onMount(() => {
-        // Rückkehr aus der Detail- oder Graphansicht: Die Suche steht in der URL und
-        // wird wiederholt, statt den Nutzer erneut tippen zu lassen.
-        if (frage.trim()) suchen();
+        if (!frage.trim()) return;
+        // Rückkehr aus der Detail- oder Graphansicht: Das Ergebnis liegt noch vor, der
+        // Wissensgraph hat sich in der Zwischenzeit nicht geändert. Erneut zu suchen
+        // hieße, rund 400 ms für dasselbe Ergebnis zu warten.
+        const gemerkt = holen(cacheSchluessel());
+        if (gemerkt) {
+            umschlag = gemerkt;
+            gesucht = frage.trim();
+            return;
+        }
+        suchen();
     });
 
     async function suchen() {
@@ -126,6 +139,7 @@
                 subject_id: fachId ? Number(fachId) : null,
                 grade: stufe ? Number(stufe) : null,
             });
+            merken(cacheSchluessel(), umschlag);
             gesucht = q;
             auswahl = new Set();
         } catch (err) {
