@@ -5,7 +5,9 @@ Assistenten ist die Trefferzahl dagegen keine Platz-, sondern eine Kostenfrage �
 sind dort zu wenig: Im Prüfsatz steht der erwartete Knoten in einem Fall auf Rang 9.
 
 Beide hingen bis 08/2026 an derselben Einstellung; die tiefere Suche hätte deshalb das
-Vorschlagsfenster geflutet.
+Vorschlagsfenster geflutet. Seit 09/2026 berühren sie einander gar nicht mehr: Die
+Anzeigezahl gilt nur noch für den Suchknopf (``POST /context/search``), weil eine Suche
+des Assistenten kein Vorschlagsfenster mehr öffnet (ADR-017, Befund 7).
 """
 
 from unittest.mock import AsyncMock, patch
@@ -70,24 +72,28 @@ class TestSuchtiefeDesAssistenten:
         assert settings.assistant_context_limit >= 10
 
 
-class TestVorschlagsliste:
-    """Was der Assistent findet, ist nicht, was die Oberfläche zeigt."""
+class TestKeineVorschlagsliste:
+    """Der Werkzeugpfad kennt die Anzeigezahl nicht mehr (ADR-017, AP1).
 
-    def test_wird_auf_die_anzeigezahl_gekuerzt(self):
-        from app.chat.router import _fuer_vorschlagsliste
+    Bis 09/2026 kürzte er sein Ergebnis auf die Anzeigezahl und schickte es als
+    SSE-Ereignis `context_suggestions` ins Vorschlagsfenster. Das Fenster ist aber ein
+    Angebot an die Nutzer:in, Bausteine anzuheften — der Assistent hat sie längst
+    gelesen. Wer nur eine Frage stellte, bekam ungefragt eine Auswahlliste über sein
+    Eingabefeld gelegt.
+    """
 
-        treffer = [{"node_id": str(i)} for i in range(20)]
-        assert len(_fuer_vorschlagsliste(treffer, 8)) == 8
+    def test_chat_router_kennt_die_anzeigezahl_nicht(self):
+        import app.chat.router as router
 
-    def test_kuerzere_liste_bleibt_unangetastet(self):
-        from app.chat.router import _fuer_vorschlagsliste
+        assert not hasattr(router, "anzeige_limit")
+        assert not hasattr(router, "_fuer_vorschlagsliste")
 
-        treffer = [{"node_id": "a"}, {"node_id": "b"}]
-        assert _fuer_vorschlagsliste(treffer, 8) == treffer
+    def test_kein_sse_ereignis_mehr(self):
+        """Gegenprobe an der Quelle: Das Ereignis wird nirgends mehr erzeugt."""
+        from pathlib import Path
 
-    def test_reihenfolge_bleibt(self):
-        """Gekürzt wird am Ende — die besten Treffer stehen vorn und müssen bleiben."""
-        from app.chat.router import _fuer_vorschlagsliste
+        import app.chat.router as router
 
-        treffer = [{"node_id": str(i)} for i in range(20)]
-        assert [t["node_id"] for t in _fuer_vorschlagsliste(treffer, 3)] == ["0", "1", "2"]
+        assert "context_suggestions" not in Path(router.__file__).read_text(
+            encoding="utf-8"
+        )

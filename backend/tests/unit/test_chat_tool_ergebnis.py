@@ -1,38 +1,23 @@
 """Was der Chat aus einem Werkzeug-Ergebnis macht (app/chat/router.py).
 
-Zwei Wege gehen von hier aus auseinander, und beide waren fehlerhaft:
+Übrig ist ein Weg: der **Text ans Modell**. Er trug bis 08/2026 ausschließlich Titel,
+womit jede Frage nach dem *Inhalt* des Wissensgraphen unbeantwortbar war.
 
-* die **Vorschlagsliste** im Chat (SSE `context_suggestions`) — sie darf nur Knoten
-  bekommen, und die Gruppe `context_search` liefert nicht nur Knoten;
-* der **Text ans Modell** — er trug bis 08/2026 ausschließlich Titel, womit jede Frage
-  nach dem *Inhalt* des Wissensgraphen unbeantwortbar war.
+Der zweite Weg — die Vorschlagsliste im Chat (SSE `context_suggestions`) — ist mit
+ADR-017/AP1 entfallen. Die Form**prüfung**, die er brauchte, ist damit ebenfalls weg;
+`_fuer_modell` prüft ohnehin je Eintrag und reicht fremde Formen durch (siehe
+``TestFuerModell``). Genau daran war der Stream einmal abgerissen: Die Gruppe
+`context_search` enthält auch `get_operatoren`, dessen Einträge `operator`/`afb`/
+`bedeutung` tragen und keinen `title`.
 """
 
-from app.chat.router import _INHALT_MAX_ZEICHEN, _fuer_modell, _ist_knotenliste
+from app.chat.router import _INHALT_MAX_ZEICHEN, _fuer_modell
 
 
 def _knoten(**felder):
     return {"node_id": "abc", "title": "Titel", "category": "knowledge",
             "content_type": "ik_kompetenz", "subject_id": 13, "fach": "Mathematik",
             **felder}
-
-
-class TestIstKnotenliste:
-    def test_knotensuche_ja(self):
-        assert _ist_knotenliste([_knoten(), _knoten()])
-
-    def test_operatoren_nein(self):
-        """Der Fall, der den Stream abriss: `get_operatoren` liefert keine Knoten."""
-        assert not _ist_knotenliste(
-            [{"operator": "nennen", "afb": "I", "bedeutung": "…"}]
-        )
-
-    def test_gemischt_nein(self):
-        assert not _ist_knotenliste([_knoten(), {"operator": "nennen"}])
-
-    def test_leere_liste_ja(self):
-        """„Nichts gefunden" soll die Vorschlagsliste leeren, nicht die alte stehenlassen."""
-        assert _ist_knotenliste([])
 
 
 class TestFuerModell:
@@ -72,9 +57,20 @@ class TestFuerModell:
         assert "fach" not in e and "subject_id" not in e
 
     def test_fremde_form_wird_durchgereicht(self):
-        """Operatoren behalten ihre Felder — sonst verlöre das Modell die Definition."""
+        """Operatoren behalten ihre Felder — sonst verlöre das Modell die Definition.
+
+        Zugleich der Beleg, dass es keine vorgeschaltete Formprüfung braucht: Die
+        Unterscheidung fällt je Eintrag, nicht für die Liste als Ganzes.
+        """
         eintrag = {"operator": "nennen", "afb": "I", "bedeutung": "knapp anführen"}
         assert _fuer_modell([eintrag]) == [eintrag]
+
+    def test_gemischte_liste(self):
+        """Knoten und fremde Form nebeneinander — beide überstehen die Aufbereitung."""
+        fremd = {"operator": "nennen", "afb": "I"}
+        knoten, durchgereicht = _fuer_modell([_knoten(content="x"), fremd])
+        assert durchgereicht == fremd
+        assert knoten["title"] == "Titel" and "node_id" not in knoten
 
     def test_hinweis_dict_wird_nicht_angefasst(self):
         """`get_operatoren` ohne Fachbezug liefert einen Hinweis statt einer Liste."""

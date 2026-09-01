@@ -422,15 +422,6 @@ export async function* streamChat(
         continue;
       }
 
-      if (currentEventType === "context_suggestions") {
-        try {
-          const { nodes } = JSON.parse(payload);
-          yield { type: "context_suggestions", nodes };
-        } catch {}
-        currentEventType = null;
-        continue;
-      }
-
       if (currentEventType === "crisis") {
         try {
           yield { type: "crisis", crisis: JSON.parse(payload) };

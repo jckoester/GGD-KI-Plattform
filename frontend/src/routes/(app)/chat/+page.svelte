@@ -97,7 +97,8 @@
     let contextNodes = $state([]); // ChatContextNodeRead[]
     let pendingContextNodes = $state([]); // gepufferte Knoten für neue Konversation
 
-    // Vorschläge aus LLM-Tool-Call (warten auf Bestätigung durch Nutzer)
+    // Treffer des Suchknopfs, die auf Bestätigung warten. Kommen **nur** von dort:
+    // Eine Suche des Assistenten öffnet kein Fenster mehr (ADR-017, Befund 7).
     let pendingSuggestions = $state(null); // null | Array<{node_id, title, category, content_type}>
 
     // PII-Eingabe-Gate (Phase 14): blockierender Bestätigungsdialog vor dem Senden
@@ -635,11 +636,6 @@
                     if (item.cost_usd != null) {
                         totalCostUsd = (totalCostUsd ?? 0) + item.cost_usd;
                     }
-                    continue;
-                }
-                // Kontext-Vorschläge aus LLM-Tool-Call
-                if (item.type === "context_suggestions") {
-                    pendingSuggestions = item.nodes;
                     continue;
                 }
                 // Krisen-Hilfe-Banner (ADR-008): an die Assistenten-Nachricht heften

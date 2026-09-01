@@ -19,7 +19,6 @@ import httpx
 
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
-from app.preferences.service import anzeige_limit
 from app.ratelimit.dependency import rate_limit
 from app.config import settings
 from app.chat.schemas import AttachmentMeta, ChatMessage, ChatRequest, TextPart, ImageUrlPart
@@ -475,31 +474,6 @@ def _ergebnis_umfang(ergebnis) -> str:
     if isinstance(ergebnis, dict):
         return f"Felder {sorted(ergebnis)}"
     return type(ergebnis).__name__
-
-
-def _fuer_vorschlagsliste(treffer: list, anzeige_limit: int) -> list:
-    """Was von einem Suchergebnis im Vorschlagsfenster erscheint.
-
-    Der Assistent sucht tiefer, als die Oberfläche zeigen soll: Für ihn ist die
-    Trefferzahl eine Kostenfrage, für das Fenster über dem Eingabefeld eine Platzfrage.
-    Ohne diese Kürzung deckte eine Suche mit 20 Treffern das Eingabefeld zu — genau der
-    Grund, aus dem die Anzeige einmal auf 8 begrenzt wurde.
-    """
-    return treffer[:anzeige_limit]
-
-
-def _ist_knotenliste(treffer: list) -> bool:
-    """Sind das Wissensknoten — also etwas für die Vorschlagsliste im Chat?
-
-    Die Gruppe ``context_search`` enthält mehr als die Knotensuche: ``get_operatoren``
-    liefert Einträge mit ``operator``/``afb``/``bedeutung``. Wer die Form nicht prüft,
-    sondern annimmt, greift dort ins Leere — bis 08/2026 mit einem ``KeyError``, der den
-    laufenden Stream mitten in der Antwort abriss.
-
-    Die leere Liste zählt als Knotenliste: „nichts gefunden" soll die Vorschlagsliste
-    leeren, nicht die vorige Suche stehen lassen.
-    """
-    return all(isinstance(n, dict) and "node_id" in n for n in treffer)
 
 
 def _fuer_modell(treffer: list) -> list:
@@ -1785,10 +1759,6 @@ async def chat(
         current_user.roles, getattr(current_user, "grade", None)
     )
 
-    # Nur für die Vorschlagsliste im Chat. Einmal je Anfrage geholt statt im Stream —
-    # dort liefe die Abfrage sonst je Werkzeugrunde erneut.
-    _anzeige_limit = await anzeige_limit(db, current_user.sub)
-
     _active_tools = tools_for(
         active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle
     )
@@ -2010,23 +1980,14 @@ async def chat(
                     _tc_name, _round + 1, _ergebnis_umfang(tool_result),
                 )
 
-                # Rückwärtskompatibilität: context_suggestions SSE für context_search
+                # Eine Suche des Assistenten öffnet **kein** Vorschlagsfenster mehr
+                # (ADR-017, Befund 7). Das Fenster ist ein Angebot an die Nutzer:in,
+                # Bausteine anzuheften; der Assistent hat sie bereits gelesen. Beides
+                # über denselben Kanal zu bedienen, hieß: Wer nur eine Frage stellte,
+                # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
+                # Befüllt wird das Fenster jetzt allein vom Suchknopf über
+                # `POST /context/search`.
                 if tool.group == "context_search" and isinstance(tool_result, list):
-                    # ⚠️ Nur die **Knotensuche** liefert Knoten. Die Gruppe enthält aber
-                    # auch `get_operatoren`, dessen Einträge `operator`/`afb`/`bedeutung`
-                    # tragen und keinen `title`. Bis 08/2026 stand hier ein blindes
-                    # `n["title"]` — mit Fachbezug brach dadurch der Stream mitten in der
-                    # Antwort ab (`KeyError`, außerhalb der Fehlerbehandlung oben).
-                    # Deshalb wird die Form geprüft, statt sie anzunehmen.
-                    if _ist_knotenliste(tool_result):
-                        # Auf die Anzeigezahl gekürzt. Das Modell bekommt unten die
-                        # vollständige Liste — die Oberfläche soll davon nur so viel
-                        # zeigen, wie ins Vorschlagsfenster passt. Ohne diese Kürzung
-                        # deckte eine tiefere Assistentensuche das Eingabefeld zu.
-                        yield (
-                            f"event: context_suggestions\n"
-                            f"data: {json.dumps({'nodes': _fuer_vorschlagsliste(tool_result, _anzeige_limit)})}\n\n"
-                        )
                     tool_result_str = json.dumps(
                         {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False
                     )

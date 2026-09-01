@@ -3,6 +3,14 @@
 Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 [Semantic Versioning](https://semver.org/lang/de/) (0.x = vor dem ersten Stable-Release).
 
+## [Unreleased]
+
+### Geändert
+
+- **Sucht ein Assistent im Kontextspeicher, öffnet sich kein Vorschlagsfenster mehr.**
+  Die Liste zum Anheften erscheint nur noch, wenn man selbst über den Suchknopf sucht.
+  Der Assistent liest die gefundenen Bausteine wie bisher.
+
 ## [0.7.0] – 2026-08-31
 
 Schwerpunkt: **Anbieterunabhängigkeit**. Modelle heißen nach ihrer Aufgabe statt nach

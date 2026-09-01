@@ -61,7 +61,7 @@ Angeheftete Bausteine werden als beschriftete Chips oberhalb des Textfelds angez
 
 Das Vorschlagsfenster zeigt standardmäßig bis zu 8 Treffer. Wenn Sie häufig mit komplexen Themen arbeiten und mehr Auswahlmöglichkeiten wünschen, können Sie den Wert auf Ihrer [Profilseite](profil.md) erhöhen.
 
-Die Einstellung betrifft **nur die Anzeige**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Es kann also sein, dass ein Assistent mehr Bausteine gelesen hat, als Ihnen angezeigt werden.
+Die Einstellung betrifft **nur Ihre eigene Suche** über den Suche-Button. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Diese Suche läuft im Hintergrund: Der Assistent liest die gefundenen Bausteine, ohne dass Ihnen dazu eine Auswahlliste angeboten wird. Das Vorschlagsfenster erscheint also nur, wenn Sie selbst gesucht haben.
 
 > ⚠️ **Trefferlisten sind gekürzt, und das steht nirgends dabei.** Gibt es zu einer Suche mehr passende Bausteine als Plätze, liefert die Suche nur die vordersten — ohne Hinweis darauf, dass etwas fehlt. Eine Liste sieht also immer vollständig aus.
 >
