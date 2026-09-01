@@ -74,6 +74,14 @@ Zehnerliste liegen im Median 0,063.
 | `_KANDIDATEN_FAKTOR` = 3 | `context/search.py` | Überhang beim Holen. Fassungs-Filter und -Zusammenfassung entfernen Treffer **nach** der Abfrage; ohne Überhang lieferte eine Suche mit Budget 10 am Ende womöglich vier |
 | `_ANKER_TOP_K` = 10 | `context/service.py` | Wie viele Bausteine ein Assistent mit Wissensbereich in seinen Prompt bekommt. Begrenzt die Prompt-Länge, nicht die Suchgüte |
 | `_INHALT_MAX_ZEICHEN` | `chat/router.py` | Auf wie viele Zeichen der Knoteninhalt fürs Modell gekürzt wird |
+| `PRO_ABSCHNITT_VORAUSGEWAEHLT` = 5 | `frontend/src/lib/umschlag.js` | Wie viele Treffer je Abschnitt im Vorschlagsfenster **vorausgewählt** sind (ähnlich benannte: keine). Betrifft nicht, was gefunden wird, sondern was ohne Zutun im Prompt landet |
+
+Zur letzten Zeile: Bis 09/2026 war **alles** vorausgewählt. Gemessen mit „nennen" bei
+Anzeigelimit 30 waren das 59 Bausteine — der Operator steht in jedem Fach und in
+mehreren Bildungsplan-Fassungen. Viele Gleichnamige heißen nicht „alle gemeint", sondern
+„der Name war mehrdeutig"; deshalb ist auch der Namensträger-Abschnitt gedeckelt. Die
+Reihenfolge innerhalb des Abschnitts entscheidet dabei mit — Fach- und Rollenbonus
+stellen nach vorne, was zum Fach der Konversation gehört.
 
 ### Was gefunden werden kann
 

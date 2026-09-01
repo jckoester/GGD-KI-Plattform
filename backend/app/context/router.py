@@ -847,10 +847,14 @@ async def search_context_nodes(
         if conv is not None and conv.pseudonym == user.sub:
             subject_id = await subject_of_conversation(db, request.conversation_id)
 
+    # Reihenfolge der Quellen: die Facette (sie filtert ohnehin), dann die gespeicherte
+    # Konversation, zuletzt das Fach eines noch ungespeicherten Chats. Der letzte Fall
+    # braucht keine Rechteprüfung — die Zahl kommt aus dem eigenen Browser und wirkt nur
+    # auf die Sortierung; sichtbar wird dadurch kein Knoten, der es nicht ohnehin wäre.
     profil = Suchprofil(
         pseudonym=user.sub,
         rollen=user.roles,
-        subject_id=request.subject_id or subject_id,
+        subject_id=request.subject_id or subject_id or request.conversation_subject_id,
         identifikation=limit,
         thematisch=limit,
         aufzaehlung=limit,

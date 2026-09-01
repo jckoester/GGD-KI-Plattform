@@ -27,6 +27,9 @@
     import { addChatContextNode, searchContextNodes } from "$lib/api.js";
     import { fuerNeuenChat } from "$lib/context_handover.js";
     import { holen, merken, suchSchluessel } from "$lib/suche_cache.js";
+    // Dieselben Abschnittstitel wie im Vorschlagsfenster des Chats: Derselbe Umschlag
+    // darf an zwei Stellen nicht verschieden heißen.
+    import { ABSCHNITT_TITEL } from "$lib/umschlag.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { activeConversationId, pageTitle } from "$lib/stores/pageTitle.js";
@@ -323,7 +326,7 @@
                 <!-- Abschnitt 1: exakte Namensträger -->
                 {#if exakte.length}
                     {@render abschnitt(
-                        "Bausteine mit diesem Namen",
+                        ABSCHNITT_TITEL.exakt,
                         exakte,
                         umschlag.identifikation.vollstaendig
                             ? `${umschlag.identifikation.gesamt} gefunden`
@@ -334,7 +337,7 @@
                 <!-- Abschnitt 2: ähnlich benannte -->
                 {#if aehnlich.length}
                     {@render abschnitt(
-                        "Ähnlich benannte Bausteine",
+                        ABSCHNITT_TITEL.aehnlich,
                         aehnlich,
                         "Prüfe am Titel, ob einer gemeint ist — sie belegen nicht, dass es den gesuchten Namen gibt.",
                     )}
@@ -343,7 +346,7 @@
                 <!-- Abschnitt 3: Aufzählung (nur bei gesetzten Facetten) -->
                 {#if aufzaehlung}
                     {@render abschnitt(
-                        "Alle passenden Bausteine",
+                        ABSCHNITT_TITEL.aufzaehlung,
                         aufzaehlung.treffer,
                         aufzaehlung.vollstaendig
                             ? `${aufzaehlung.gesamt} insgesamt`
@@ -373,7 +376,7 @@
                 <!-- Abschnitt 4: thematische Nachbarn. Nie als vollständig dargestellt. -->
                 {#if thematisch.length}
                     {@render abschnitt(
-                        "Nächstliegende Bausteine",
+                        ABSCHNITT_TITEL.thematisch,
                         thematisch,
                         "Nach Ähnlichkeit sortiert. Diese Liste ist nie vollständig.",
                     )}

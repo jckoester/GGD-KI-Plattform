@@ -37,8 +37,10 @@ Neben dem Textfeld im Chat gibt es einen **Suche-Button** (Lupensymbol). Er ist 
 
 1. Tippen Sie Ihre Frage oder einen beschreibenden Text ins Textfeld.
 2. Klicken Sie den Suche-Button — die Plattform sucht automatisch nach passenden Kontextbausteinen.
-3. Eine Auswahlliste erscheint über dem Eingabefeld. Alle Treffer sind vorausgewählt; Sie können einzelne abwählen.
+3. Eine Auswahlliste erscheint über dem Eingabefeld, nach Abschnitten geordnet: **Bausteine mit diesem Namen**, **Ähnlich benannte Bausteine** und **Nächstliegende Bausteine**. Vorausgewählt sind höchstens fünf je Abschnitt, ähnlich benannte keine — Sie können einzeln zu- und abwählen oder oben rechts **„Alle"** klicken.
 4. Klicken Sie **„Hinzufügen"** — die gewählten Bausteine werden als Chips über dem Textfeld angeheftet.
+
+Warum nicht alles vorausgewählt ist: Ein Name kann vielen Bausteinen gehören — „nennen" etwa steht als Operator in jedem Fach und in mehreren Bildungsplan-Fassungen. Jeder angeheftete Baustein geht als Text an das Sprachmodell; vorausgewählt ist deshalb nur, was oben steht. Wurde die Liste gekürzt, führt ein Verweis am Abschnittsende zur Suchseite (Menüpunkt **Wissensgraph**), die alle Treffer zeigt.
 
 > 📷 *Screenshot folgt: Angeheftete Kontextbausteine als Chips über dem Eingabefeld.*
 <!-- Ersetzen durch: ![Kontext-Chips](/help-images/kontext/kontext-chips.png) -->

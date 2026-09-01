@@ -221,6 +221,18 @@ class ContextSearchRequest(BaseModel):
     # Ähnlichkeit.
     conversation_id: UUID | None = None
 
+    # Das Fach eines Chats, den es als Konversation **noch nicht gibt**: Wer einen neuen
+    # Chat per `#` einem Fach zuordnet und sofort sucht, hat noch keine
+    # `conversation_id` — die entsteht erst beim ersten Senden. Ohne dieses Feld wäre die
+    # Zuordnung für die Suche unsichtbar, und „nennen" lieferte Operatoren quer durch
+    # alle Fächer statt das eigene zuerst.
+    #
+    # ⚠️ **Nicht durch `subject_id` ersetzen.** Das ist die Facette: Sie *filtert* und
+    # schaltet zusätzlich die Aufzählung ein. Das Fach der Konversation ist ein
+    # **Vorzug** — es sortiert, blendet aber nichts aus (ADR-017; wer im Physik-Chat nach
+    # Pythagoras fragt, soll die Mathematik-Kompetenz weiter bekommen).
+    conversation_subject_id: int | None = None
+
     # ── Facetten der Suchseite ────────────────────────────────────────────────
     #
     # Sie **verfeinern das Ergebnis**, sie sind keine Vorbedingung: Ohne Facette liefert

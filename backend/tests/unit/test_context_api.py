@@ -642,3 +642,57 @@ class TestTitleLock:
         )
         assert resp.status_code == 200
         assert node.title_locked is False
+
+
+class TestFachDesUngespeichertenChats:
+    """`#` im neuen Chat: Das Fach steht fest, die Konversation gibt es noch nicht.
+
+    Sie entsteht erst beim ersten Senden. Bis dahin kennt das Frontend nur ein
+    `pendingSubjectId` — ohne einen eigenen Weg dafür suchte man im zugeordneten Fach
+    wie ohne Zuordnung, und „nennen" lieferte Operatoren quer durch alle Fächer.
+
+    Aufgerufen wird die Endpunktfunktion direkt: In diesem Zweig fasst sie die Datenbank
+    nicht an (kein `conversation_id`, `limit` gesetzt), ein TestClient bräuchte also nur
+    Attrappen für Abhängigkeiten, die nie zum Zug kommen.
+    """
+
+    async def _profil_und_aufzaehlung(self, **felder):
+        from unittest.mock import patch
+
+        from app.context import router as context_router_modul
+        from app.context.schemas import ContextSearchRequest
+        from app.context.search import Abschnitt, Suchergebnis
+
+        anfrage = ContextSearchRequest(query="nennen", limit=8, **felder)
+        with patch("app.context.search.suche",
+                   new=AsyncMock(return_value=Suchergebnis())) as gesucht, \
+             patch("app.context.search.aufzaehlung",
+                   new=AsyncMock(return_value=Abschnitt())) as gezaehlt:
+            await context_router_modul.search_context_nodes(
+                anfrage, db=object(), user=make_jwt(roles=["teacher"], sub="p")
+            )
+        return gesucht.await_args.args[1], gezaehlt
+
+    async def test_fach_des_neuen_chats_sortiert_mit(self):
+        profil, _ = await self._profil_und_aufzaehlung(conversation_subject_id=6)
+        assert profil.subject_id == 6
+
+    async def test_fach_des_neuen_chats_ist_keine_facette(self):
+        """Der Unterschied, um den es geht: Ein Vorzug sortiert, eine Facette filtert.
+
+        Schaltete das Fach der Konversation die Aufzählung ein, verwandelte sich die
+        Frage „was passt dazu?" unbemerkt in „alle, die …" — und fachfremde Treffer, die
+        richtig sein können, verschwänden (ADR-017: Physik-Chat, Frage nach Pythagoras).
+        """
+        _, gezaehlt = await self._profil_und_aufzaehlung(conversation_subject_id=6)
+        gezaehlt.assert_not_awaited()
+
+    async def test_facette_bleibt_facette(self):
+        profil, gezaehlt = await self._profil_und_aufzaehlung(subject_id=6)
+        assert profil.subject_id == 6
+        gezaehlt.assert_awaited()
+
+    async def test_ohne_jede_angabe_kein_fachvorzug(self):
+        profil, gezaehlt = await self._profil_und_aufzaehlung()
+        assert profil.subject_id is None
+        gezaehlt.assert_not_awaited()

@@ -38,7 +38,6 @@
         removeChatContextNode,
         getContextNodes,
         searchContextNodes,
-        umschlagAlsListe,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
@@ -101,7 +100,10 @@
 
     // Treffer des Suchknopfs, die auf Bestätigung warten. Kommen **nur** von dort:
     // Eine Suche des Assistenten öffnet kein Fenster mehr (ADR-017, Befund 7).
-    let pendingSuggestions = $state(null); // null | Array<{node_id, title, category, content_type}>
+    // Der **ganze Umschlag**, nicht eine Liste: Das Fenster zeigt seine Abschnitte
+    // getrennt, und ob ein Treffer den Namen trägt oder ihm nur ähnelt, steht an ihm.
+    let pendingSuggestions = $state(null); // null | SearchEnvelope
+    let suggestionQuery = $state(""); // wonach gesucht wurde — für den Verweis auf die Suchseite
 
     // PII-Eingabe-Gate (Phase 14): blockierender Bestätigungsdialog vor dem Senden
     let piiDialogOpen = $state(false);
@@ -850,15 +852,15 @@
         const query = input.trim();
         if (!query) return;
         try {
-            const umschlag = await searchContextNodes(query, conversationId);
-            // Namensträger zuerst, dann die nächstliegenden Bausteine. Die Abschnitte
-            // getrennt darzustellen ist Sache von AP8; hier zählt die Reihenfolge.
-            pendingSuggestions = umschlagAlsListe(umschlag).map((n) => ({
-                node_id: n.node_id,
-                title: n.title,
-                category: n.category,
-                content_type: n.content_type,
-            }));
+            // `activeSubjectId` statt nur der Konversations-ID: Wer einen **neuen** Chat
+            // per `#` einem Fach zuordnet, hat noch keine Konversation — die entsteht
+            // erst beim ersten Senden. Ohne die Angabe wäre die Zuordnung für die Suche
+            // unsichtbar und „nennen" lieferte Operatoren quer durch alle Fächer.
+            const umschlag = await searchContextNodes(query, conversationId, {
+                conversation_subject_id: activeSubjectId,
+            });
+            suggestionQuery = query;
+            pendingSuggestions = umschlag;
         } catch (err) {
             console.error("Kontext-Suche fehlgeschlagen:", err);
         }
@@ -1267,7 +1269,8 @@
             <!-- Kontext-Vorschläge aus LLM-Tool-Call -->
             {#if pendingSuggestions !== null}
                 <ContextSuggestions
-                    nodes={pendingSuggestions}
+                    umschlag={pendingSuggestions}
+                    frage={suggestionQuery}
                     onconfirm={handleSuggestionsConfirm}
                     ondismiss={handleSuggestionsDismiss}
                 />
