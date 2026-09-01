@@ -72,10 +72,16 @@ export function vorschlagsAbschnitte(umschlag) {
       return true
     })
 
+  // ⚠️ Auf `=== 'exakt'` prüfen, nicht auf `!== 'teilweise'`. Die Identifikation kennt
+  // seit AP9 eine dritte Stufe (`praefix`, nur für den `@`-Shortcode); eine
+  // Ausschlussprüfung ließe sie als Namensträger durchgehen und damit die
+  // Existenzaussage falsch werden. So landet alles Unbekannte bei den ähnlich benannten
+  // — die schwächere Aussage ist der sichere Rückfall.
+  //
   // Reihenfolge zwingend: Die exakten zuerst, damit ein Treffer, den beide Stufen
   // liefern, als Namensträger stehenbleibt und nicht als bloße Ähnlichkeit.
-  const exakt = neu(identTreffer.filter((t) => t.treffer_art !== 'teilweise'))
-  const aehnlich = neu(identTreffer.filter((t) => t.treffer_art === 'teilweise'))
+  const exakt = neu(identTreffer.filter((t) => t.treffer_art === 'exakt'))
+  const aehnlich = neu(identTreffer.filter((t) => t.treffer_art !== 'exakt'))
   const thematisch = neu(umschlag?.thematisch?.treffer ?? [])
 
   const abschnitte = []

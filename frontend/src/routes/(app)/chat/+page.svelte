@@ -11,6 +11,7 @@
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
+    import { mentionAnfrage, ohneMentionFragment } from "$lib/mention.js";
     import { uebernehmen } from "$lib/context_handover.js";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
@@ -36,7 +37,6 @@
         getChatContextNodes,
         addChatContextNode,
         removeChatContextNode,
-        getContextNodes,
         searchContextNodes,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
@@ -769,12 +769,14 @@
             return;
         }
 
-        // @-Trigger: suche @ am oder vor der aktuellen Cursor-Position
-        const cursorPos = e.target.selectionStart ?? input.length;
-        const textBeforeCursor = input.slice(0, cursorPos);
-        const match = textBeforeCursor.match(/@(\S*)$/);
-        if (match) {
-            mentionQuery = match[1];
+        // @-Trigger: suche @ links vom Cursor. ⚠️ `e.target.value`, nicht `input` —
+        // aus demselben Grund wie oben. Mit dem gebundenen `input` hinkte die Anfrage
+        // dem Getippten um ein Zeichen hinterher, und `selectionStart` (aktuell) zeigte
+        // in einen veralteten Text.
+        const cursorPos = e.target.selectionStart ?? e.target.value.length;
+        const anfrage = mentionAnfrage(e.target.value.slice(0, cursorPos));
+        if (anfrage !== null) {
+            mentionQuery = anfrage;
             mentionOpen = true;
             mentionSelectedIndex = 0;
             clearTimeout(mentionDebounceTimer);
@@ -788,29 +790,46 @@
         }
     }
 
+    // Laufende Nummer gegen überholende Antworten: Bei mehrwortigen Anfragen tippt man
+    // schnell, und eine langsamere frühere Antwort dürfte die neuere nicht überschreiben.
+    let mentionLauf = 0;
+
     async function fetchMentionResults(q) {
+        const lauf = ++mentionLauf;
         try {
-            const data = await getContextNodes({ q, status: "active" });
-            mentionResults = data.items?.slice(0, 8) ?? data.slice(0, 8);
+            // Namensnachschlag: nur die Identifikation. Die thematische Auswahl kostete
+            // je Tastendruck einen Embedding-Netzaufruf für Treffer, die hier weder
+            // gezeigt noch gewollt sind.
+            const umschlag = await searchContextNodes(q, conversationId, {
+                identification_only: true,
+                conversation_subject_id: activeSubjectId,
+            });
+            if (lauf !== mentionLauf) return;
+            mentionResults = (umschlag?.identifikation?.treffer ?? []).slice(0, 8);
         } catch {
+            if (lauf !== mentionLauf) return;
             mentionResults = [];
         }
+        // Abbruchregel: Ohne Treffer schließt das Dropdown. Nicht nur der Optik wegen —
+        // solange `mentionOpen` gilt, fängt `handleKeydown` die Eingabetaste ab; ein
+        // offenes, leeres Dropdown ließe die Nachricht nicht mehr abschicken.
+        if (mentionResults.length === 0) mentionOpen = false;
     }
 
     async function selectMention(node) {
         mentionOpen = false;
         mentionResults = [];
 
-        // @-Fragment im Eingabefeld durch Knoten-Titel ersetzen
+        // @-Fragment im Eingabefeld entfernen — mit derselben Regel, die es erkannt hat.
         const cursorPos = textarea?.selectionStart ?? input.length;
-        const textBeforeCursor = input.slice(0, cursorPos);
-        const replaced = textBeforeCursor.replace(/@\S*$/, "");
+        const replaced = ohneMentionFragment(input.slice(0, cursorPos));
         input = replaced + input.slice(cursorPos);
 
-        // Knoten zum Kontext hinzufügen
+        // Knoten zum Kontext hinzufügen. Der Ergebnisumschlag führt `node_id`, die
+        // frühere Auflistung führte `id` — hier hängt die richtige Kennung dran.
         if (conversationId) {
             try {
-                const added = await addChatContextNode(conversationId, node.id);
+                const added = await addChatContextNode(conversationId, node.node_id);
                 if (!contextNodes.some((n) => n.node_id === added.node_id)) {
                     contextNodes = [...contextNodes, added];
                 }
@@ -823,13 +842,13 @@
         } else {
             // Neue Konversation: puffern — nach erstem Send wird conversationId bekannt
             const alreadyPending = pendingContextNodes.some(
-                (n) => n.node_id === node.id,
+                (n) => n.node_id === node.node_id,
             );
             if (!alreadyPending) {
                 pendingContextNodes = [
                     ...pendingContextNodes,
                     {
-                        node_id: node.id,
+                        node_id: node.node_id,
                         category: node.category,
                         title: node.title,
                         content_type: node.content_type,
@@ -1298,7 +1317,7 @@
                         >
                             <ContextNodeLabel
                                 {node}
-                                fassung={mentionFassungen.get(node.id)}
+                                fassung={mentionFassungen.get(node.node_id)}
                             />
                         </button>
                     {/each}

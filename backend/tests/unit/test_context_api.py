@@ -696,3 +696,37 @@ class TestFachDesUngespeichertenChats:
         profil, gezaehlt = await self._profil_und_aufzaehlung()
         assert profil.subject_id is None
         gezaehlt.assert_not_awaited()
+
+    async def test_identification_only_wird_durchgereicht(self):
+        """Das `@`-Dropdown schaltet die thematische Auswahl ab (AP9)."""
+        from unittest.mock import patch
+
+        from app.context import router as context_router_modul
+        from app.context.schemas import ContextSearchRequest
+        from app.context.search import Suchergebnis
+
+        anfrage = ContextSearchRequest(
+            query="nennen", limit=8, identification_only=True
+        )
+        with patch("app.context.search.suche",
+                   new=AsyncMock(return_value=Suchergebnis())) as gesucht:
+            await context_router_modul.search_context_nodes(
+                anfrage, db=object(), user=make_jwt(roles=["teacher"], sub="p")
+            )
+        assert gesucht.await_args.kwargs["nur_identifikation"] is True
+
+    async def test_normale_suche_laesst_beide_verfahren_laufen(self):
+        profil_ruf = None
+        from unittest.mock import patch
+
+        from app.context import router as context_router_modul
+        from app.context.schemas import ContextSearchRequest
+        from app.context.search import Suchergebnis
+
+        with patch("app.context.search.suche",
+                   new=AsyncMock(return_value=Suchergebnis())) as gesucht:
+            await context_router_modul.search_context_nodes(
+                ContextSearchRequest(query="nennen", limit=8),
+                db=object(), user=make_jwt(roles=["teacher"], sub="p"),
+            )
+        assert gesucht.await_args.kwargs["nur_identifikation"] is False

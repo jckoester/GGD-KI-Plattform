@@ -242,6 +242,12 @@ class ContextSearchRequest(BaseModel):
     content_type: list[str] | None = None
     subject_id: int | None = None
     grade: int | None = Field(default=None, ge=1, le=13)
+
+    # Nur die Namensträger, ohne thematische Auswahl. Für das `@`-Dropdown: Dort wird ein
+    # **bekannter Titel** nachgeschlagen, und die thematische Auswahl kostete bei jedem
+    # Tastendruck einen Embedding-Netzaufruf (rund 370 ms, aufs Systembudget) für
+    # Treffer, die das Dropdown gar nicht zeigt.
+    identification_only: bool = False
     # Wie viele Treffer je Abschnitt. Die Suchseite darf großzügiger sein als das
     # Vorschlagsfenster im Chat — dort ist die Trefferzahl eine Platzfrage, hier nicht.
     limit: int | None = Field(default=None, ge=1, le=200)

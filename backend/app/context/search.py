@@ -646,6 +646,38 @@ def teiltreffer_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
     return stmt
 
 
+def praefix_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
+    """Titel, die mit dem Getippten **anfangen** — für die Namensvervollständigung.
+
+    ⚠️ **Warum die Trigramm-Stufe das nicht abdeckt.** Ihre Ähnlichkeit ist
+    längennormiert: Ein kurzer Anfang gegen einen langen Titel fällt unter die Schwelle.
+    Gemessen am 01.09.2026 liefert „Satz" gegen „Satz des Pythagoras" **keinen** Treffer
+    (rund 0,25 gegen eine Schwelle von 0,50) — wer einen bekannten Titel von vorne
+    tippt, sähe also bis zum letzten Wort nichts. Genau dieser Fall ist der Anlass des
+    `@`-Shortcodes.
+
+    Der GIN-Trigramm-Index aus Migration 0054 trägt auch das ``LIKE 'x%'``; eine eigene
+    Migration braucht es nicht.
+
+    Sortiert wird nach **Titellänge**: Bei „Satz" steht „Satz des Pythagoras" vor einem
+    Kompetenztext, der genauso anfängt und drei Zeilen weitergeht. Für eine
+    Vervollständigung ist der kürzeste passende Titel der wahrscheinlich gemeinte.
+    """
+    stmt = (
+        _grundabfrage(profil)
+        .where(_TITEL_NORMALISIERT.like(sa.literal(roh + "%")))
+        .order_by(
+            *_vorrang(profil),
+            sa.func.length(_TITEL_NORMALISIERT),
+            ContextNode.id,
+        )
+        .limit(profil.identifikation + len(ausschluss))
+    )
+    if ausschluss:
+        stmt = stmt.where(ContextNode.id.notin_([UUID(i) for i in ausschluss]))
+    return stmt
+
+
 async def _setze_schwelle(db: AsyncSession) -> None:
     """Die Trigramm-Schwelle für **diese Transaktion** setzen.
 
@@ -669,13 +701,19 @@ async def _setze_schwelle(db: AsyncSession) -> None:
 
 
 async def identifikation(
-    frage: str, profil: Suchprofil, db: AsyncSession
+    frage: str, profil: Suchprofil, db: AsyncSession, *, praefix: bool = False
 ) -> Abschnitt:
     """Knoten, deren Titel der gesuchte Name **ist** — oder ihm nahekommt.
 
     Zwei Stufen, und die Reihenfolge ist die Aussage: erst die exakten Namensträger,
     dahinter die ähnlich benannten. Nur die erste Stufe trägt die Zählung und damit die
     Existenzaussage; welcher Stufe ein Treffer entstammt, steht an ihm (``treffer_art``).
+
+    ``praefix`` schiebt eine dritte Stufe dazwischen: Titel, die mit dem Getippten
+    **anfangen**. Sie gilt nur für die Namensvervollständigung des `@`-Shortcodes —
+    dort tippt man einen bekannten Titel von vorne, und ohne sie sähe man bis zum
+    letzten Wort nichts (Begründung und Messung: :func:`praefix_abfrage`). Für alle
+    anderen Aufrufer bleibt sie aus, damit der Prüfsatz vergleichbar bleibt.
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
     verglichen, nicht eingebettet — und 30 der 44 Knotentypen tragen laut
@@ -694,21 +732,32 @@ async def identifikation(
     gesamt = zeilen[0]["gesamt"] if zeilen else 0
     exakt = [_treffer(z) | {"treffer_art": "exakt"} for z in zeilen]
 
-    # Die zweite Stufe füllt nur auf, was die erste offen gelassen hat.
+    # Die weiteren Stufen füllen nur auf, was die erste offen gelassen hat.
     rest = profil.identifikation - len(exakt)
-    teilweise: list[dict] = []
+    roh = normalisiere_titel(frage)
+    gesehen = {t["node_id"] for t in exakt}
+    weitere: list[dict] = []
+
+    if praefix and rest > 0:
+        zeilen_p = (await db.execute(
+            praefix_abfrage(roh, profil, ausschluss=gesehen)
+        )).mappings().all()
+        neu = [_treffer(z) | {"treffer_art": "praefix"} for z in zeilen_p[:rest]]
+        weitere += neu
+        gesehen |= {t["node_id"] for t in neu}
+        rest -= len(neu)
+
     if rest > 0:
         await _setze_schwelle(db)
-        roh = normalisiere_titel(frage)
         zeilen_t = (await db.execute(
-            teiltreffer_abfrage(roh, profil, ausschluss={t["node_id"] for t in exakt})
+            teiltreffer_abfrage(roh, profil, ausschluss=gesehen)
         )).mappings().all()
-        teilweise = [
+        weitere += [
             _treffer(z) | {"treffer_art": "teilweise"} for z in zeilen_t[:rest]
         ]
 
     return Abschnitt(
-        treffer=exakt + teilweise,
+        treffer=exakt + weitere,
         # `gesamt` zählt die **exakten** Namensträger. Für die Teiltreffer gibt es keine
         # verteidigbare Gesamtmenge — sie hängt an einer Schwelle, und eine Zahl daraus
         # zu machen hieße, die Schwelle als Wahrheit auszugeben.
@@ -875,12 +924,31 @@ def _hinweise(frage: str, ident: Abschnitt) -> list[str]:
     ]
 
 
-async def suche(frage: str, profil: Suchprofil, db: AsyncSession) -> Suchergebnis:
+async def suche(
+    frage: str,
+    profil: Suchprofil,
+    db: AsyncSession,
+    *,
+    nur_identifikation: bool = False,
+) -> Suchergebnis:
     """Beide Verfahren, ein Umschlag.
 
     Die Identifikation läuft zuerst: Ihre Treffer werden aus der thematischen Auswahl
     ausgeschlossen, damit kein Knoten zweimal im selben Umschlag steht.
+
+    ``nur_identifikation`` lässt die thematische Auswahl aus. Das ist keine
+    Sparmaßnahme am Rand: Sie kostet einen **Netzaufruf zum Embedding-Modell** (rund
+    370 ms, gemessen 01.09.2026), und das `@`-Dropdown fragt bei jedem Tastendruck neu.
+    Wer dort einen Titel nachschlägt, will Namensträger — thematische Nachbarn wären
+    weder gezeigt noch gewollt, nur bezahlt (der Aufruf läuft über den Master-Key, also
+    aufs Systembudget).
     """
+    if nur_identifikation:
+        # Mit Präfix-Stufe: Der einzige Aufrufer ist die Namensvervollständigung des
+        # `@`-Shortcodes, und dort wird ein bekannter Titel von vorne getippt.
+        ident = await identifikation(frage, profil, db, praefix=True)
+        return Suchergebnis(identifikation=ident, hinweise=_hinweise(frage, ident))
+
     # Das Embedding zuerst **anstoßen**, aber noch nicht abwarten: Es dauert rund 370 ms
     # (Netzaufruf zum Modell), die Identifikation rund 70 ms (Datenbank). Nacheinander
     # sind das 440 ms, überlappt 370 — die Titelabfragen laufen, während der Vektor

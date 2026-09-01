@@ -79,14 +79,17 @@
 
     // Die Identifikation führt zwei Stufen in einem Abschnitt. Getrennt anzeigen:
     // Nur die exakten Namensträger tragen die Aussage, dass es den Namen gibt.
+    // ⚠️ `=== "exakt"`, nicht `!== "teilweise"`: Die Identifikation kennt seit AP9 eine
+    // dritte Stufe (`praefix`). Eine Ausschlussprüfung ließe sie als Namensträger
+    // durchgehen — und „n Bausteine heißen so" wäre dann keine belastbare Auskunft mehr.
     const exakte = $derived(
         (umschlag?.identifikation?.treffer ?? []).filter(
-            (t) => t.treffer_art !== "teilweise",
+            (t) => t.treffer_art === "exakt",
         ),
     );
     const aehnlich = $derived(
         (umschlag?.identifikation?.treffer ?? []).filter(
-            (t) => t.treffer_art === "teilweise",
+            (t) => t.treffer_art !== "exakt",
         ),
     );
     const thematisch = $derived(umschlag?.thematisch?.treffer ?? []);

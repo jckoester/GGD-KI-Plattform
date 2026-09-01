@@ -860,7 +860,9 @@ async def search_context_nodes(
         aufzaehlung=limit,
         grade=request.grade,
     )
-    ergebnis = await suche(request.query, profil, db)
+    ergebnis = await suche(
+        request.query, profil, db, nur_identifikation=request.identification_only
+    )
 
     facetten = Knotenfilter(
         content_type=tuple(request.content_type or ()),

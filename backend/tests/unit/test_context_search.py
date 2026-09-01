@@ -14,6 +14,7 @@ from app.context.search import (
     Suchprofil,
     _aus_dem_fach,
     identifikations_abfrage,
+    praefix_abfrage,
 )
 from app.context.visibility import read_scope_clause
 
@@ -884,3 +885,102 @@ class TestUeberlappterNetzaufruf:
                 f"{modul.__name__} lässt Aufrufe nebenläufig laufen — auf einer "
                 f"gemeinsamen Session endet das in IllegalStateChangeError."
             )
+
+
+class TestNurIdentifikation:
+    """Der Namensnachschlag des `@`-Dropdowns läuft ohne thematische Auswahl.
+
+    Nicht als Sparmaßnahme am Rand: Die thematische Auswahl kostet einen Netzaufruf zum
+    Embedding-Modell (rund 370 ms, gemessen 01.09.2026, über den Master-Key also aufs
+    Systembudget). Das Dropdown fragt bei **jedem Tastendruck** neu und zeigt von den
+    thematischen Treffern keinen einzigen — sie wären weder gewollt noch sichtbar, nur
+    bezahlt.
+    """
+
+    async def _suche(self, **kwargs):
+        from unittest.mock import AsyncMock, patch
+
+        from app.context import search as modul
+
+        with patch.object(modul, "identifikation",
+                          new=AsyncMock(return_value=Abschnitt(gesamt=0, vollstaendig=True))), \
+             patch.object(modul, "thematisch",
+                          new=AsyncMock(return_value=Abschnitt())) as thema, \
+             patch.object(modul, "vektor_oder_none", new=AsyncMock()) as vektor:
+            ergebnis = await modul.suche(
+                "nennen", Suchprofil(pseudonym="p"), object(), **kwargs
+            )
+        return ergebnis, thema, vektor
+
+    async def test_kein_embedding_aufruf(self):
+        _, _, vektor = await self._suche(nur_identifikation=True)
+        vektor.assert_not_awaited()
+
+    async def test_keine_thematische_auswahl(self):
+        ergebnis, thema, _ = await self._suche(nur_identifikation=True)
+        thema.assert_not_awaited()
+        assert ergebnis.thematisch.treffer == []
+        # Und der leere Abschnitt behauptet nichts (vgl. TestUmschlag).
+        assert ergebnis.thematisch.vollstaendig is False
+
+    async def test_der_normalfall_bleibt_beides(self):
+        """Der Schalter ist eine Ausnahme für einen Aufrufer, keine neue Vorgabe."""
+        _, thema, vektor = await self._suche()
+        thema.assert_awaited()
+        vektor.assert_awaited()
+
+
+class TestPraefixStufe:
+    """Die Namensvervollständigung des `@`-Shortcodes (AP9).
+
+    ⚠️ **Warum es sie überhaupt gibt.** Die Trigramm-Ähnlichkeit ist längennormiert:
+    „Satz" gegen „Satz des Pythagoras" liegt bei rund 0,25 und damit unter der Schwelle
+    von 0,50. Ohne diese Stufe sähe man beim Tippen eines bekannten Titels bis zum
+    letzten Wort nichts — gemessen am 01.09.2026, und genau das ist der Fall, für den
+    der `@`-Shortcode da ist.
+    """
+
+    def test_sucht_den_titelanfang(self):
+        sql = _sql(praefix_abfrage("satz", Suchprofil(pseudonym="p"), ausschluss=set()))
+        assert "LIKE 'satz%'" in sql
+
+    def test_kuerzeste_titel_zuerst(self):
+        """Bei „Satz" steht „Satz des Pythagoras" vor einem Kompetenztext, der genauso
+        anfängt und drei Zeilen weitergeht — für eine Vervollständigung ist der kürzeste
+        passende Titel der wahrscheinlich gemeinte."""
+        sql = _sql(praefix_abfrage("satz", Suchprofil(pseudonym="p"), ausschluss=set()))
+        assert "length" in sql.lower()
+
+    def test_bereits_gefundene_bleiben_draussen(self):
+        """Sonst stünde ein exakter Namensträger gleich noch einmal als Präfixtreffer da.
+
+        Verglichen wird die **bindestrichlose** Form: SQLAlchemy rendert UUIDs als
+        Hex-Kette (`dabf4812353e…`), nicht in der Schreibweise mit Bindestrichen.
+        """
+        from uuid import uuid4
+
+        schon = uuid4()
+        sql = _sql(praefix_abfrage(
+            "satz", Suchprofil(pseudonym="p"), ausschluss={str(schon)}
+        ))
+        assert "NOT IN" in sql.upper()
+        assert schon.hex in sql
+
+    async def test_nur_der_shortcode_bekommt_die_stufe(self):
+        """Alle anderen Aufrufer bleiben ohne — sonst wäre der Prüfsatz nicht mehr
+        vergleichbar."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.context import search as modul
+
+        async def ruf(**kwargs):
+            with patch.object(modul, "identifikation",
+                              new=AsyncMock(return_value=Abschnitt(gesamt=0, vollstaendig=True))) as ident, \
+                 patch.object(modul, "thematisch",
+                              new=AsyncMock(return_value=Abschnitt())), \
+                 patch.object(modul, "vektor_oder_none", new=AsyncMock()):
+                await modul.suche("satz", Suchprofil(pseudonym="p"), object(), **kwargs)
+            return ident.await_args.kwargs.get("praefix", False)
+
+        assert await ruf(nur_identifikation=True) is True
+        assert await ruf() is False

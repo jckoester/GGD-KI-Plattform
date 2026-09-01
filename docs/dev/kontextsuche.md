@@ -26,7 +26,9 @@ verrechnet werden:
 
 - **Identifikation** — „diesen Baustein". Titelabgleich in zwei Stufen: exakt über den
   normalisierten Titel, dann Trigramm-Teiltreffer. Nur sie zählt (`gesamt`) und trägt
-  damit die Auskunft, ob es einen Baustein dieses Namens gibt.
+  damit die Auskunft, ob es einen Baustein dieses Namens gibt. Für den `@`-Shortcode
+  kommt eine dritte Stufe dazwischen (`praefix=True`): Titel, die mit dem Getippten
+  **anfangen** — siehe „Warum der `@`-Weg anders ist" unten.
 - **Thematische Auswahl** — „was passt dazu". Vektorsuche, **nie** vollständig, ohne
   Gesamtzahl.
 - **Aufzählung** — „alle, die …". Deterministische Filterabfrage mit Zählung vor dem
@@ -42,6 +44,7 @@ die Neukonzeption ausgelöst hat.
 |---|---|---|
 | Suchseite (`/knowledge/search`) | alle drei; Aufzählung, sobald eine Facette gesetzt ist | 25 |
 | Vorschlagsfenster (Suchknopf im Chat) | Identifikation + thematisch | Anzeigezahl aus dem Nutzerprofil |
+| `@`-Shortcode im Chat | **nur** Identifikation, mit Präfix-Stufe (`identification_only`) | Anzeigezahl, clientseitig auf 8 gekürzt |
 | Werkzeug `search_context_nodes` | Identifikation + thematisch | `ASSISTANT_CONTEXT_LIMIT` |
 | Werkzeug `list_context_nodes` | Aufzählung | `ASSISTANT_CONTEXT_LIMIT` |
 | Assistent mit Wissensbereich | thematisch im Teilgraphen | `_ANKER_TOP_K` |
@@ -98,6 +101,55 @@ Vorbedingung.** `config/taxonomy.yaml` markiert 14 von 44 content_types mit
 (Arbeitsblätter, Klausuren, Stundenentwürfe) können in der thematischen Auswahl deshalb
 gar nicht auftauchen — und ein Bonus auf etwas, das nie erscheint, tut nichts. Wer daran
 etwas ändern will, ändert zuerst die Taxonomie und lässt den Embedding-Backfill laufen.
+
+---
+
+## Warum der `@`-Weg anders ist
+
+Der `@`-Shortcode im Chat ist **Namensvervollständigung**, nicht Suche: Man tippt einen
+Titel, den man kennt. Zwei Abweichungen folgen daraus, beide gemessen am 01.09.2026.
+
+**Keine thematische Auswahl** (`identification_only`). Sie kostet einen Netzaufruf zum
+Embedding-Modell — rund 370 ms, über den Master-Key aufs Systembudget. Das Dropdown fragt
+bei jedem Tastendruck neu und zeigt von den thematischen Treffern keinen einzigen; sie
+wären weder gewollt noch sichtbar, nur bezahlt.
+
+**Eine Präfix-Stufe** zwischen exaktem Abgleich und Trigramm (`identifikation(…,
+praefix=True)`). ⚠️ **Ohne sie wäre der Umbau ein Rückschritt** — die Trigramm-Ähnlichkeit
+ist längennormiert, ein kurzer Titelanfang gegen einen langen Titel fällt unter
+`_TEILTREFFER_SCHWELLE`:
+
+```
+„Satz"                → ohne Präfix-Stufe: 0 Treffer   (similarity ≈ 0,25 < 0,50)
+„Satz des"            → ohne Präfix-Stufe: 0 Treffer
+„Satz des Pythagoras" → [exakt] Satz des Pythagoras
+```
+
+Wer einen bekannten Titel von vorne tippt, sähe also bis zum letzten Wort nichts. Mit der
+Stufe greift jeder Zwischenstand. Sortiert wird darin nach **Titellänge**: Bei „Satz"
+steht der kurze Titel vor dem Kompetenztext, der genauso anfängt und drei Zeilen
+weitergeht.
+
+Die drei Stufen decken zusammen ab, was der frühere `ILIKE`-Weg konnte, und ordnen es
+besser:
+
+| Getippt | Stufe | Ergebnis |
+|---|---|---|
+| `Satz des Pythagoras` | exakt | der Namensträger, mit Existenzaussage |
+| `Satz` | präfix | Titel, die so anfangen — kürzeste zuerst |
+| `Pythagoras` | trigramm | Wort mitten im Titel: „Satz des Pythagoras" |
+
+**Was dabei schwächer wird:** ein **kurzes** Wort in einem **langen** Titel. Gemessen
+liegt „zwirbeln" gegen „Anleitung zum Zwirbeln von Draht" bei 0,28 — der frühere
+Teilstring-Abgleich fand das, die drei Stufen finden es nicht. Zeigt sich das als
+Problem, wäre eine vierte, deutlich nachrangige Teilstring-Stufe **nur für `@`** der
+Ausweg; sie holt aber auch die Treffer zurück, die den Begriff bloß erwähnen (`@Pythagoras`
+lieferte früher zwei Kompetenztexte vor dem gesuchten Knoten).
+
+Die Auslöser-Regel steht im Frontend (`frontend/src/lib/mention.js`): Leerzeichen sind
+erlaubt — Titel sind mehrwortig —, und das Dropdown schließt bei `esc`, bei der Auswahl
+und wenn nichts mehr trifft. Der letzte Fall ist Pflicht, nicht Kosmetik: Solange das
+Dropdown offen gilt, fängt der Chat die Eingabetaste ab.
 
 ---
 

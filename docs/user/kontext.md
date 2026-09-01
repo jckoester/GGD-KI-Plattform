@@ -53,7 +53,11 @@ Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwö
 
 ### Über den @-Shortcode
 
-Tippen Sie **`@`** in das Textfeld, um nach einem Baustein nach Name zu suchen. Wählen Sie einen Treffer aus der Liste — der Baustein wird sofort angeheftet.
+Tippen Sie **`@`** in das Textfeld, um einen Baustein über seinen Namen zu finden. Wählen Sie einen Treffer aus der Liste — der Baustein wird sofort angeheftet.
+
+**Mehrwortige Titel dürfen Sie ausschreiben.** Tippen Sie ruhig `@Satz des Pythagoras` — die Liste engt sich mit jedem Wort weiter ein. Es genügt aber auch der Anfang (`@Satz`) oder ein Wort aus der Mitte (`@Pythagoras`). Ganz oben steht, was **genau** so heißt, dahinter, was so anfängt, dann Ähnliches. Bausteine aus dem Fach des Chats stehen weiter vorn.
+
+Die Liste schließt sich mit **Esc**, sobald Sie einen Treffer wählen — und wenn nichts mehr passt. Ein `@` mitten im Satz stört also nicht.
 
 ### Kontext wieder entfernen
 
