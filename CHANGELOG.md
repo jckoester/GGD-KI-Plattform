@@ -18,6 +18,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Assistenten wird ausdrücklich untersagt, aus thematischer Nähe zu schließen, dass es
   etwas nicht gibt.
 
+- **Eigenes Material ist thematisch auffindbar.** Bisher konnte die Ähnlichkeitssuche
+  nur Bildungsplan-Inhalte finden — Arbeitsblätter, Klausuren, Methoden und
+  Stundenentwürfe waren dort strukturell unsichtbar. 15 weitere Bausteinarten werden
+  jetzt für die Suche erschlossen, dazu die neue Art **Fachbegriff**. Für
+  Stundenentwürfe zählt dabei das **Thema**, nicht der Verlaufsplan: „Einstieg,
+  Erarbeitung, Sicherung" steht in jeder Stunde und machte alle einander ähnlich.
+
+- **Die Suche ordnet Treffer nach Rolle.** Schüler:innen bekommen Lernmaterial etwas
+  weiter oben, Lehrkräfte Klausuren und Stundenentwürfe. Ein Vorzug, kein Filter — wer
+  was sehen darf, entscheidet unverändert die Freigabe.
+
+- **„Was haben wir letzte Woche gemacht?"** beantwortet der Assistent jetzt aus dem
+  Stundenplan statt über Ähnlichkeit: Zeitraum und Unterrichtsgruppe sind Filter der
+  Aufzählung geworden.
+
 - **Bausteine ohne Embedding sind über ihren Namen auffindbar.** Fachpläne, Curricula,
   Methoden und Leitperspektiven waren über die Suche bisher gar nicht erreichbar.
 

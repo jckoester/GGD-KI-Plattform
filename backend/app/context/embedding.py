@@ -19,7 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode
 from app.context.lookup import normalisiere_titel
-from app.context.taxonomy import EMBEDDING_CONTENT_TYPES, EMBEDDING_ENRICHMENT
+from app.context.taxonomy import (
+    EMBEDDING_CONTENT_TYPES,
+    EMBEDDING_ENRICHMENT,
+    EMBEDDING_INPUT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +32,7 @@ logger = logging.getLogger(__name__)
 _RETRY_STATUS = frozenset({429, 503})
 
 # Re-Export für Fremdimporte: from app.context.embedding import EMBEDDING_CONTENT_TYPES
-__all__ = ["EMBEDDING_CONTENT_TYPES", "EMBEDDING_ENRICHMENT"]
+__all__ = ["EMBEDDING_CONTENT_TYPES", "EMBEDDING_ENRICHMENT", "EMBEDDING_INPUT"]
 
 
 def _build_signature_line(signatur: dict) -> str:
@@ -99,14 +103,81 @@ def _titel_traegt_eigene_information(titel: str, text: str) -> bool:
     return bool(kern) and kern not in " ".join((text or "").lower().split())
 
 
+def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
+    """Einen Baustein des Embedding-Inputs aufloesen.
+
+    ``title``, ``content`` oder ein Metadatenpfad (``metadata.aliase``). Fuer Listen von
+    Objekten laesst sich ein Feld herausgreifen: ``metadata.refs[].titel`` ergibt die
+    Titel aller Kompetenz-Verweise, ohne die uebrigen Felder mitzuschleppen.
+    """
+    if quelle == "title":
+        return node.title or ""
+    if quelle == "content":
+        return node.content or ""
+
+    pfad = quelle.removeprefix("metadata.")
+    if "[]." in pfad:
+        liste_pfad, feld = pfad.split("[].", 1)
+        eintraege = (node.metadata_ or {}).get(liste_pfad) or []
+        if not isinstance(eintraege, list):
+            return ""
+        werte = [
+            str(e.get(feld)) for e in eintraege
+            if isinstance(e, dict) and e.get(feld)
+        ]
+        return ", ".join(werte)
+    return _extract_metadata_field(node.metadata_ or {}, quelle)
+
+
+def traegt_substanz(node: ContextNode) -> bool:
+    """Lohnt sich ein Vektor fuer diesen Knoten — oder waere es nur sein Titel?
+
+    Ein Embedding, das allein aus dem Titel besteht, ist eine unscharfe Titelsuche im
+    Vektorraum. Die gehoert in die Identifikation (Trigramm-Teilsuche, Migration 0054),
+    nicht in die thematische Auswahl, wo sie nur verwaessert.
+
+    ⚠️ **Die Regel gilt nur fuer Typen mit erklaertem ``embedding_input``.** Bei allen
+    anderen ist der Titel als alleiniger Input **Absicht**: Bei ``leitidee``,
+    ``pk_gruppe`` und ``kapitel`` benennt er das Thema, das im beschreibenden Inhalt oft
+    gar nicht vorkommt — und wo der Inhalt fehlt, ist er das Einzige, was der Knoten hat
+    (siehe ``_titel_traegt_eigene_information``). Wuerde die Regel dort greifen, verloeren
+    Tausende Bildungsplan-Knoten ihr Embedding.
+
+    Wo sie greift, ist sie kein Ausschluss auf Dauer, sondern eine Vertagung: Sobald die
+    Methode ihre Beschreibung bekommt oder die Stunde ihre Kompetenzen, traegt der Knoten
+    Substanz und wird beim naechsten Lauf eingebettet.
+    """
+    if (node.category, node.content_type) not in EMBEDDING_INPUT:
+        return True
+    eingabe = _build_embedding_input(node).strip()
+    return bool(eingabe) and eingabe != (node.title or "").strip()
+
+
 def _build_embedding_input(node: ContextNode) -> str:
     """Erstellt den Embedding-Input fuer einen Knoten.
 
-    Reichert `content` mit content_type-spezifischen metadata-Feldern an,
-    analog zur breadcrumb-Anreicherung fuer Bildungsplan-Knoten, und stellt den Titel
-    voran, wo er eigene Information traegt (siehe ``_titel_traegt_eigene_information``).
+    Zwei Wege, und der erste hat Vorrang:
+
+    1. **``embedding_input`` aus ``taxonomy.yaml``** — eine ausdrueckliche Liste von
+       Quellen je Typ. Sie *ersetzt* den Standardaufbau und ist der einzige Weg, etwas
+       gezielt **wegzulassen**: Ein Stundenentwurf soll ueber sein Thema gefunden werden,
+       nicht ueber seinen Verlaufsplan. „Einstieg, Erarbeitung, Sicherung" steht in jeder
+       Stunde und macht alle einander aehnlich statt ihrem Gegenstand — dieselbe Falle
+       wie das dominierende Wort „Operator" bei den Operator-Knoten
+       (ADR-017, Nachtrag 01.09.2026: *das Thema, nicht der Ablauf*).
+    2. **Standardaufbau** — ``embedding_enrichment`` + ``content``, Titel davor, wo er
+       eigene Information traegt (siehe ``_titel_traegt_eigene_information``).
+
+    ⚠️ Wer den Input eines Typs **aendert**, entwertet dessen bestehende Vektoren: Sie
+    wurden aus etwas anderem gebildet und sind mit neuen nicht mehr vergleichbar. Eine
+    solche Aenderung verlangt einen Re-Embed dieses Typs, kein blosses Nachziehen.
     """
     base = node.content or ""
+
+    quellen = EMBEDDING_INPUT.get((node.category, node.content_type))
+    if quellen:
+        teile = [t for t in (_teil_aus_quelle(node, q) for q in quellen) if t]
+        return "\n".join(teile)
 
     # Operatoren: das Verb (Titel) trägt die zentrale Semantik und steht NICHT im
     # content (= Definition/Erwartungshorizont). Titel + Synonyme (metadata.aliase)
@@ -344,6 +415,9 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
     if node is None:
         return
     if node.content_type not in EMBEDDING_CONTENT_TYPES:
+        return
+    if not traegt_substanz(node):
+        # Noch nichts einzubetten außer dem Titel — beim nächsten Backfill erneut prüfen.
         return
     try:
         text = _build_embedding_input(node)

@@ -13,6 +13,7 @@
         Users,
         Presentation,
         Zap,
+        BookMarked,
     } from "lucide-svelte";
 
     let { category, contentType = undefined, size = 16 } = $props();
@@ -24,6 +25,7 @@
         themengebiet: Layers,
         bauteil: Cpu,
         abstrakt: Lightbulb,
+        begriff: BookMarked,
         methode: Presentation,
         sozialform: Users,
         operator: Zap,

@@ -539,6 +539,12 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
             {
                 "frage": e.fall.frage, "fach": e.fall.fach,
                 "chat_fach": e.fall.chat_fach, "knoten": e.fall.knoten,
+                # Gehört in den Export, weil Fälle sich sonst nicht unterscheiden lassen:
+                # Dieselbe Frage kommt mehrfach vor — ohne Fachbezug, mit Chat-Fach und
+                # mit Anker. Ein Vergleich über die Frage allein wirft sie zusammen und
+                # meldet Unterschiede, die keine sind.
+                "anker": e.fall.anker,
+                "ident_n": e.ident_n, "thema_n": e.thema_n,
                 "recall": e.recall, "fach_ok": e.fach_ok, "rang": e.rang,
                 "nachschlagen": e.nachschlagen, "operatoren_top3": e.operatoren_top3,
                 "planart_index": e.index.planart, "ms_index": e.index.ms,

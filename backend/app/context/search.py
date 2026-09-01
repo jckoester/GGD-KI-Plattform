@@ -40,6 +40,7 @@ from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
 from app.context.filters import Knotenfilter, wende_an
 from app.context.lookup import nachschlage_begriff, normalisiere_titel
 from app.context.schemas import anzeige_felder
+from app.context.taxonomy import rollen_typ_bonus
 from app.context.visibility import read_scope_clause
 from app.db.models import ContextEdge, ContextNode, Subject
 
@@ -220,6 +221,28 @@ def _bonus(bedingung, wert: float):
     """Additiver Vorsprung in der Sortierung — ``CASE WHEN … THEN wert ELSE 0``."""
     return sa.case(
         (bedingung, sa.cast(sa.literal(wert), sa.Float)),
+        else_=sa.cast(sa.literal(0.0), sa.Float),
+    )
+
+
+def _typ_bonus(profil: Suchprofil):
+    """Rollenabhängiger Vorsprung je Knotenart — oder ``None``, wenn keiner gilt.
+
+    Dieselbe Anfrage meint je nach Rolle etwas anderes: Wer als Schüler:in nach
+    „Bruchrechnung" sucht, will lernen; wer als Lehrkraft danach sucht, will
+    unterrichten oder prüfen. Beide finden dasselbe, nur in anderer Reihenfolge.
+
+    Die Tabelle steht in :data:`app.context.taxonomy.ROLLEN_TYP_BONUS` — dort auch die
+    Begründung je Typ und die Zusage, dass Bildungsplan-Typen bei 0 bleiben.
+    """
+    tabelle = rollen_typ_bonus(profil.rollen)
+    if not tabelle:
+        return None
+    return sa.case(
+        *[
+            (ContextNode.content_type == typ, sa.cast(sa.literal(wert), sa.Float))
+            for typ, wert in tabelle.items()
+        ],
         else_=sa.cast(sa.literal(0.0), sa.Float),
     )
 
@@ -737,6 +760,9 @@ async def thematisch(
         naehe = naehe - _bonus(
             ContextNode.owner_pseudonym == profil.pseudonym, _EIGENTUEMER_BONUS
         )
+        typ_bonus = _typ_bonus(profil)
+        if typ_bonus is not None:
+            naehe = naehe - typ_bonus
         stmt = (
             _grundabfrage(profil)
             .where(ContextNode.embedding.is_not(None))

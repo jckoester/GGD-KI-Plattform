@@ -54,7 +54,8 @@ export const CONTENT_TYPES = {
     "funktion",
     "bauteil",
     "operator_math",
-    "abstrakt"
+    "abstrakt",
+    "begriff"
   ]
 }
 
@@ -145,7 +146,8 @@ export const CONTENT_TYPE_LABELS = {
   "funktion": "Funktion",
   "bauteil": "Bauteil",
   "operator_math": "Mathematischer Operator",
-  "abstrakt": "Abstraktes Konzept"
+  "abstrakt": "Abstraktes Konzept",
+  "begriff": "Fachbegriff"
 }
 
 export const SCOPE_DEFAULTS = {
@@ -324,5 +326,9 @@ export const SCOPE_DEFAULTS = {
   "abstrakt": [
     "school",
     "school"
+  ],
+  "begriff": [
+    "school",
+    "subject"
   ]
 }

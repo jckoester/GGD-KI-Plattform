@@ -640,3 +640,169 @@ class TestKontextRouterTeiltDieRegel:
 
         nutzer = type("U", (), {"sub": "p", "roles": ["student"]})()
         assert _sql(_read_scope_clause(nutzer)) == _sql(read_scope_clause("p", ["student"]))
+
+
+class TestRollenGewichtung:
+    """AP6: Dieselbe Anfrage, je nach Rolle andere Reihenfolge — nie andere Rechte."""
+
+    def _sortierung_sql(self, rollen):
+        """Der Sortierausdruck der thematischen Suche, ohne Datenbank."""
+        from app.context.search import Suchprofil, _typ_bonus
+
+        ausdruck = _typ_bonus(Suchprofil(pseudonym="p", rollen=rollen))
+        return _sql(ausdruck) if ausdruck is not None else ""
+
+    def test_bildungsplan_typen_bleiben_neutral(self):
+        """Das Abnahmekriterium der Tabelle: Auf reinem BP-Bestand ändert sie nichts,
+        und deshalb bewegt sich der Prüfsatz nicht."""
+        from app.context.taxonomy import ROLLEN_TYP_BONUS
+
+        bp_typen = {
+            "ik_kompetenz", "pk_kompetenz", "pk_gruppe", "leitidee",
+            "leitperspektive_aspekt", "kapitel", "operator", "themengebiet",
+            "lfdb_themenblock", "lfdb_kompetenz",
+        }
+        for rolle, tabelle in ROLLEN_TYP_BONUS.items():
+            assert not (set(tabelle) & bp_typen), f"{rolle} gewichtet BP-Typen"
+
+    def test_nur_eingebettete_typen_werden_gewichtet(self):
+        """Ein Bonus auf einen Typ ohne Embedding tut nichts — er könnte in der
+        thematischen Auswahl gar nicht auftauchen. Genau daran wäre AP6 vor der
+        Embedding-Entscheidung gescheitert."""
+        from app.context.taxonomy import EMBEDDING_CONTENT_TYPES, ROLLEN_TYP_BONUS
+
+        gewichtet = set().union(*(set(t) for t in ROLLEN_TYP_BONUS.values()))
+        assert gewichtet <= set(EMBEDDING_CONTENT_TYPES)
+
+    def test_werte_bleiben_klein(self):
+        """Sie sollen innerhalb dessen sortieren, was ohnehin zur Auswahl stand —
+        nicht Fernes heranholen. Obergrenze ist der gemessene Fachbonus."""
+        from app.context.search import _FACHBONUS
+        from app.context.taxonomy import ROLLEN_TYP_BONUS
+
+        for tabelle in ROLLEN_TYP_BONUS.values():
+            for typ, wert in tabelle.items():
+                assert 0 < wert <= _FACHBONUS, f"{typ}: {wert}"
+
+    def test_admin_zaehlt_als_lehrkraft(self):
+        """`admin` ist eine Erweiterung der Lehrkraft-Rolle, kein eigener Nutzertyp
+        (CLAUDE.md)."""
+        from app.context.taxonomy import ROLLEN_TYP_BONUS, rollen_typ_bonus
+
+        assert rollen_typ_bonus(["admin"]) is ROLLEN_TYP_BONUS["teacher"]
+        assert rollen_typ_bonus(["teacher", "admin"]) is ROLLEN_TYP_BONUS["teacher"]
+
+    def test_lehrkraft_schlaegt_schueler_bei_doppelrolle(self):
+        from app.context.taxonomy import ROLLEN_TYP_BONUS, rollen_typ_bonus
+
+        assert rollen_typ_bonus(["student", "teacher"]) is ROLLEN_TYP_BONUS["teacher"]
+
+    def test_ohne_rolle_keine_gewichtung(self):
+        """Cron-Jobs und der Prüfsatz suchen ohne Rolle — dann gilt allein die
+        Ähnlichkeit."""
+        assert self._sortierung_sql([]) == ""
+
+    def test_rollen_unterscheiden_sich(self):
+        schueler, lehrkraft = self._sortierung_sql(["student"]), self._sortierung_sql(["teacher"])
+        assert schueler and lehrkraft and schueler != lehrkraft
+        assert "klausur" in lehrkraft and "klausur" not in schueler
+        assert "methodenblatt" in schueler and "methodenblatt" not in lehrkraft
+
+    def test_bonus_ist_fliesskomma(self):
+        """⚠️ Als ganze Zahl typisiert rundet PostgreSQL den Bonus auf 0 — die Abfrage
+        läuft, sie tut nur nichts."""
+        sql = self._sortierung_sql(["teacher"]).upper()
+        assert "AS FLOAT" in sql or "DOUBLE PRECISION" in sql
+
+    def test_gewichtung_ist_kein_filter(self):
+        """Eine Klausur verschwindet für Schüler:innen nicht durch diese Tabelle —
+        dafür sorgt der Sichtbarkeits-Scope. Wer beides verwechselt, baut den
+        Rechteschutz an die falsche Stelle."""
+        sql = self._sortierung_sql(["student"])
+        assert "WHERE" not in sql.upper()
+
+
+class TestZeitraumAufzaehlung:
+    """„Was haben wir letzte Woche gemacht?" — eine Aufzählungs-, keine Ähnlichkeitsfrage."""
+
+    def test_grenzen_letzte_woche(self):
+        from datetime import date
+
+        from app.chat.router import _zeitraum_grenzen
+
+        # Mittwoch, 02.09.2026
+        assert _zeitraum_grenzen("letzte_woche", date(2026, 9, 2)) == (
+            date(2026, 8, 24), date(2026, 8, 30)
+        )
+
+    def test_grenzen_diese_woche_am_montag(self):
+        from datetime import date
+
+        from app.chat.router import _zeitraum_grenzen
+
+        assert _zeitraum_grenzen("diese_woche", date(2026, 8, 31)) == (
+            date(2026, 8, 31), date(2026, 9, 6)
+        )
+
+    def test_monatsgrenzen_ueber_den_jahreswechsel(self):
+        from datetime import date
+
+        from app.chat.router import _zeitraum_grenzen
+
+        assert _zeitraum_grenzen("letzter_monat", date(2027, 1, 15)) == (
+            date(2026, 12, 1), date(2026, 12, 31)
+        )
+
+    def test_unbekannter_zeitraum(self):
+        from datetime import date
+
+        from app.chat.router import _zeitraum_grenzen
+
+        assert _zeitraum_grenzen("neulich", date(2026, 9, 2)) is None
+
+    def test_filter_geht_ueber_den_stundenplan(self):
+        """Der Termin eines Bausteins steht in `lesson_slots`, nirgends sonst — und dort
+        an **beiden** Spalten: Einheit und Stundenentwurf."""
+        from datetime import date
+
+        import sqlalchemy as sa
+
+        from app.context.filters import Knotenfilter, wende_an
+        from app.db.models import ContextNode
+
+        sql = _sql(wende_an(sa.select(ContextNode.id), Knotenfilter(
+            unterrichtet_ab=date(2026, 8, 24), unterrichtet_bis=date(2026, 8, 30),
+            unterrichtet_in_gruppe=7,
+        )))
+        assert "lesson_slots" in sql
+        assert "ue_node_id" in sql and "stunde_node_id" in sql
+        assert "group_id = 7" in sql
+
+    def test_ohne_zeitangaben_kein_stundenplan_join(self):
+        """Der Normalfall darf nicht teurer werden, nur weil es den Filter gibt."""
+        import sqlalchemy as sa
+
+        from app.context.filters import Knotenfilter, wende_an
+        from app.db.models import ContextNode
+
+        sql = _sql(wende_an(sa.select(ContextNode.id), Knotenfilter(titel="nennen")))
+        assert "lesson_slots" not in sql
+
+    async def test_zeitraum_ohne_gruppe_wird_abgelehnt(self):
+        """Ohne Unterrichtsgruppe gibt es keinen Stundenplan, auf den sich ein Zeitraum
+        beziehen könnte. Ein stillschweigend ignorierter Filter lieferte eine Antwort
+        über **fremden** Unterricht, die vollständig aussieht."""
+        from unittest.mock import AsyncMock, patch
+
+        from app.chat import router
+
+        with patch.object(router, "aufzaehlung", new=AsyncMock()) as gezaehlt:
+            ctx = router.ToolContext(
+                db=object(), user=type("U", (), {"sub": "p", "roles": []})(),
+                group_id=None, conversation_id=None,
+            )
+            antwort = await router._list_context_nodes_handler(
+                {"zeitraum": "letzte_woche"}, ctx
+            )
+        assert "Unterrichtsgruppe" in antwort["hinweis"]
+        gezaehlt.assert_not_awaited()

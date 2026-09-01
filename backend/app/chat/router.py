@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Optional
 from uuid import UUID
 
@@ -576,6 +576,32 @@ register_tool(ChatTool(
 ))
 
 
+# Zeiträume, die das Werkzeug versteht — **serverseitig** aufgelöst.
+#
+# ⚠️ Nicht das Modell rechnen lassen. „Letzte Woche" verlangt das heutige Datum, und das
+# steht in keinem Prompt zuverlässig; ein Modell, das es schätzt, liefert eine Antwort,
+# die vollständig aussieht und den falschen Zeitraum meint. Die Plattform weiß, welcher
+# Tag heute ist.
+_ZEITRAEUME = ("diese_woche", "letzte_woche", "dieser_monat", "letzter_monat")
+
+
+def _zeitraum_grenzen(name: str, heute: date) -> tuple[date, date] | None:
+    """``"letzte_woche"`` → (Montag, Sonntag) der Vorwoche. Unbekannt → ``None``."""
+    montag = heute - timedelta(days=heute.weekday())
+    if name == "diese_woche":
+        return montag, montag + timedelta(days=6)
+    if name == "letzte_woche":
+        vorige = montag - timedelta(days=7)
+        return vorige, vorige + timedelta(days=6)
+    if name == "dieser_monat":
+        erster = heute.replace(day=1)
+        return erster, (erster + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    if name == "letzter_monat":
+        letzter = heute.replace(day=1) - timedelta(days=1)
+        return letzter.replace(day=1), letzter
+    return None
+
+
 _LIST_CONTEXT_NODES_TOOL = {
     "type": "function",
     "function": {
@@ -628,6 +654,17 @@ _LIST_CONTEXT_NODES_TOOL = {
                         "Zählung zusätzlich je Fach oder je Bausteinart aufschlüsseln."
                     ),
                 },
+                "zeitraum": {
+                    "type": "string",
+                    "enum": list(_ZEITRAEUME),
+                    "description": (
+                        "Nur Bausteine, die in diesem Zeitraum auf dem Stundenplan "
+                        "standen — für Fragen wie 'Was haben wir letzte Woche "
+                        "gemacht?'. Bezieht sich standardmäßig auf die Unterrichts"
+                        "gruppe dieser Konversation. Das Datum löst die Plattform "
+                        "auf; gib nie selbst eines an."
+                    ),
+                },
             },
         },
     },
@@ -672,6 +709,30 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
                 )
             }
 
+    # Zeitraum: nur Bausteine, die laut Stundenplan dran waren. Ohne Gruppenbezug der
+    # Konversation bliebe das eine Frage über fremden Unterricht — dann kein Filter.
+    ab = bis = None
+    zeitraum = (args.get("zeitraum") or "").strip()
+    if zeitraum:
+        grenzen = _zeitraum_grenzen(zeitraum, date.today())
+        if grenzen is None:
+            return {
+                "hinweis": (
+                    f"„{zeitraum}“ ist kein bekannter Zeitraum. Möglich sind: "
+                    f"{', '.join(_ZEITRAEUME)}."
+                )
+            }
+        if ctx.group_id is None:
+            return {
+                "hinweis": (
+                    "Diese Konversation gehört zu keiner Unterrichtsgruppe — ohne sie "
+                    "gibt es keinen Stundenplan, auf den sich ein Zeitraum beziehen "
+                    "könnte. Frage ohne Zeitraum erneut."
+                )
+            }
+        ab, bis = grenzen
+        hinweise.append(f"Zeitraum {zeitraum}: {ab.isoformat()} bis {bis.isoformat()}.")
+
     titel = (args.get("titel") or "").strip()
     content_type = (args.get("content_type") or "").strip()
     abschnitt = await aufzaehlung(
@@ -680,6 +741,9 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             content_type=(content_type,) if content_type else (),
             subject_id=subject_id,
             grade=args.get("grade"),
+            unterrichtet_ab=ab,
+            unterrichtet_bis=bis,
+            unterrichtet_in_gruppe=ctx.group_id if ab else None,
         ),
         Suchprofil(
             pseudonym=ctx.user.sub,

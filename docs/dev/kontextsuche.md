@@ -69,7 +69,9 @@ Zehnerliste liegen im Median 0,063.
 
 | Ort | Wirkung |
 |---|---|
-| `config/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf |
+| `config/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 30 von 45 Typen |
+| `config/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
+| `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
 
 ⚠️ **Der Eigentümer-Bonus und die rollenbasierte Gewichtung hängen an derselben

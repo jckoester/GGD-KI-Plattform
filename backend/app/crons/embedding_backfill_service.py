@@ -11,6 +11,7 @@ import httpx
 from app.context.embedding import (
     EMBEDDING_CONTENT_TYPES,
     _build_embedding_input,
+    traegt_substanz,
     generate_embeddings,
 )
 from app.db.models import ContextNode
@@ -180,6 +181,13 @@ async def backfill_embeddings(
         # 400er-Sonderweg.
         aufgaben: list[tuple[ContextNode, str]] = []
         for node in batch:
+            if not traegt_substanz(node):
+                # Nur der Titel — das wäre eine unscharfe Titelsuche im Vektorraum und
+                # gehört in die Identifikation, nicht hierher. Vertagt, nicht verworfen:
+                # Sobald der Knoten Inhalt oder Kompetenzbezüge bekommt, greift der
+                # nächste Lauf (siehe `traegt_substanz`).
+                stats.skipped += 1
+                continue
             inp = _build_embedding_input(node)
             if not inp.strip():
                 # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.

@@ -3,7 +3,13 @@ import pytest
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from app.context.embedding import _build_signature_line, _extract_metadata_field, _build_embedding_input, EMBEDDING_CONTENT_TYPES
+from app.context.embedding import (
+    EMBEDDING_CONTENT_TYPES,
+    _build_embedding_input,
+    _build_signature_line,
+    _extract_metadata_field,
+    traegt_substanz,
+)
 from app.context.taxonomy import EMBEDDING_ENRICHMENT, EMBEDDING_CONTENT_TYPES as TAXONOMY_EMBEDDING_CONTENT_TYPES, get_scope_defaults, validate_content_type
 
 
@@ -35,13 +41,33 @@ def make_node():
 
 # ── Embedding-Ableitung aus taxonomy.yaml ───────────────────────────────────
 
+# Die Liste ist eine **Entscheidung**, keine Ableitung — deshalb steht sie hier ausgeschrieben
+# und nicht aus `taxonomy.yaml` gelesen. Kriterium und Begründung je Typ: ADR-017, Nachtrag
+# 31.08./01.09.2026. Wer einen Typ hinzunimmt, ändert beides.
 EXPECTED_EMBEDDING_TYPES = frozenset({
+    # Bildungsplan und Struktur (Bestand bis 09/2026)
     'ik_kompetenz', 'pk_kompetenz', 'pk_gruppe', 'leitidee', 'leitperspektive_aspekt',
     'kapitel', 'themengebiet', 'funktion', 'bauteil', 'abstrakt', 'konvention',
     'operator',
     # LFDB (aus PDF): Themenblock + Kompetenz sind inhaltstragend; Baustein ist Container.
     'lfdb_themenblock', 'lfdb_kompetenz',
+    # Nutzererzeugte Inhalte. Ohne sie konnte thematisch nur der Bildungsplan gefunden
+    # werden — und jede Gewichtung nach Rolle lief ins Leere, weil die gewichteten Typen
+    # in der Ähnlichkeitssuche gar nicht vorkamen.
+    'aufgabenblatt', 'quelltext', 'methodenblatt', 'operatorenblatt', 'praesentation',
+    'methode', 'pruefungsanforderung', 'unterrichtsstunde', 'unterrichtseinheit',
+    'reflexion', 'arbeitsblatt', 'aufgabe', 'klausur', 'code_beispiel', 'lerntext',
+    # Fachbegriffe mit Definition (neuer Typ, ADR-017-Nachtrag).
+    'begriff',
 })
+
+# Typen, deren Embedding-Input ausdrücklich festgelegt ist, statt sich aus `content` plus
+# Anreicherung zu ergeben. Nur hier lässt sich etwas gezielt **weglassen**.
+EXPECTED_INPUT_KEYS = {
+    ('knowledge', 'methode'),
+    ('artifact', 'unterrichtsstunde'),
+    ('artifact', 'unterrichtseinheit'),
+}
 
 EXPECTED_ENRICHMENT_KEYS = {
     ('concept', 'funktion'),
@@ -55,6 +81,28 @@ EXPECTED_ENRICHMENT_KEYS = {
 class TestEmbeddingDerivation:
     def test_embedding_content_types_exact(self):
         assert TAXONOMY_EMBEDDING_CONTENT_TYPES == EXPECTED_EMBEDDING_TYPES
+
+    def test_embedding_input_nur_wo_beabsichtigt(self):
+        """`embedding_input` ersetzt den Standardaufbau und ist damit die einzige Stelle,
+        an der etwas aus dem Vektor **herausgehalten** wird. Ein versehentlicher Eintrag
+        würde `content` stillschweigend ausschließen."""
+        from app.context.taxonomy import EMBEDDING_INPUT
+
+        assert set(EMBEDDING_INPUT) == EXPECTED_INPUT_KEYS
+
+    def test_verlaufsplan_bleibt_draussen(self):
+        """⚠️ Das Thema, nicht der Ablauf (ADR-017, Nachtrag 01.09.2026).
+
+        „Einstieg, Erarbeitung, Sicherung" steht in jedem Stundenentwurf und machte alle
+        einander ähnlich statt ihrem Gegenstand — dieselbe Falle wie das dominierende
+        Wort „Operator" bei den Operator-Knoten.
+        """
+        from app.context.taxonomy import EMBEDDING_INPUT
+
+        for schluessel in (("artifact", "unterrichtsstunde"), ("artifact", "unterrichtseinheit")):
+            quellen = EMBEDDING_INPUT[schluessel]
+            assert not any("phasen" in q for q in quellen), quellen
+            assert "title" in quellen
 
     def test_embedding_re_export_matches_taxonomy(self):
         assert EMBEDDING_CONTENT_TYPES == TAXONOMY_EMBEDDING_CONTENT_TYPES
@@ -261,3 +309,77 @@ class TestBuildEmbeddingInput:
         )
         result = _build_embedding_input(node)
         assert result == "nennen\nElemente ohne Erlaeuterung wiedergeben"
+
+
+class TestEmbeddingInputJeTyp:
+    """`embedding_input` aus `taxonomy.yaml` — der Weg, etwas gezielt wegzulassen."""
+
+    def test_methode_traegt_titel_aliase_und_content(self, make_node):
+        """Beschluss vom 01.09.2026: Methoden sollen über Titel, Aliase **und** Inhalt
+        gefunden werden. Der Inhalt fehlt im Dev-Bestand noch — die Reihenfolge steht."""
+        node = make_node(
+            "knowledge", "methode", content="Zuerst allein, dann zu zweit, dann im Plenum.",
+            metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share",
+        )
+        assert _build_embedding_input(node) == (
+            "Think-Pair-Share\nIch-Du-Wir\nZuerst allein, dann zu zweit, dann im Plenum."
+        )
+
+    def test_stunde_traegt_kompetenztitel_statt_verlaufsplan(self, make_node):
+        node = make_node(
+            "artifact", "unterrichtsstunde", content="",
+            metadata={
+                "refs": [
+                    {"node_id": "x", "titel": "Bruchteile von Größen bestimmen", "code": "3.1"},
+                    {"node_id": "y", "titel": "Anteile vergleichen", "code": "3.2"},
+                ],
+                "phasen": [{"name": "Einstieg"}, {"name": "Erarbeitung"}, {"name": "Sicherung"}],
+            },
+            title="Brüche einführen",
+        )
+        eingabe = _build_embedding_input(node)
+        assert eingabe == (
+            "Brüche einführen\nBruchteile von Größen bestimmen, Anteile vergleichen"
+        )
+        for wort in ("Einstieg", "Erarbeitung", "Sicherung"):
+            assert wort not in eingabe
+
+    def test_leere_refs_lassen_nur_den_titel(self, make_node):
+        node = make_node("artifact", "unterrichtsstunde", metadata={"refs": []},
+                         title="Projektauftrag")
+        assert _build_embedding_input(node) == "Projektauftrag"
+
+
+class TestBackfillRegel:
+    """Kein Vektor, der nur aus dem Titel besteht — aber nur, wo das gemeint ist."""
+
+    def test_stunde_ohne_kompetenzen_wird_vertagt(self, make_node):
+        node = make_node("artifact", "unterrichtsstunde", metadata={"refs": []},
+                         title="Projektauftrag")
+        assert traegt_substanz(node) is False
+
+    def test_stunde_mit_kompetenzen_wird_eingebettet(self, make_node):
+        node = make_node(
+            "artifact", "unterrichtsstunde",
+            metadata={"refs": [{"titel": "Anteile vergleichen"}]}, title="Brüche",
+        )
+        assert traegt_substanz(node) is True
+
+    def test_bildungsplan_knoten_bleiben_unberuehrt(self, make_node):
+        """⚠️ Der Fall, der die Regel begrenzt: Bei `leitidee`, `pk_gruppe` und `kapitel`
+        ist der Titel als alleiniger Input **Absicht** — er benennt das Thema, das im
+        Inhalt oft gar nicht vorkommt. Griffe die Regel dort, verlören Tausende
+        Bildungsplan-Knoten ihr Embedding."""
+        node = make_node("knowledge", "leitidee", content="", title="3.1.2 Malerei")
+        assert traegt_substanz(node) is True
+        assert _build_embedding_input(node) == "3.1.2 Malerei"
+
+    def test_methode_ohne_alles_wird_vertagt(self, make_node):
+        node = make_node("knowledge", "methode", content="", metadata={"aliase": []},
+                         title="Placemat")
+        assert traegt_substanz(node) is False
+
+    def test_methode_mit_aliasen_genuegt(self, make_node):
+        node = make_node("knowledge", "methode", content="",
+                         metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share")
+        assert traegt_substanz(node) is True

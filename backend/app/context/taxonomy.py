@@ -213,6 +213,21 @@ EMBEDDING_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
     if ct.get("embedding")
 )
 
+# Woraus der Embedding-Input eines Typs **vollständig** besteht — die Liste ersetzt den
+# Standardaufbau. Key: (category, content_type), abgeleitet aus taxonomy.yaml
+# (embedding_input: [...]). Quellen: `title`, `content`, `metadata.<pfad>` und
+# `metadata.<liste>[].<feld>`.
+#
+# Der Unterschied zu `embedding_enrichment` ist die Richtung: Anreicherung **ergänzt**
+# `content`, dieser Eintrag **bestimmt** den Input und kann damit als einziger etwas
+# gezielt weglassen (ADR-017, Nachtrag 01.09.2026: das Thema, nicht der Ablauf).
+EMBEDDING_INPUT: Final[dict[tuple[str, str], list[str]]] = {
+    (cat, ct["key"]): ct["embedding_input"]
+    for cat, cat_info in _data["categories"].items()
+    for ct in cat_info["content_types"]
+    if ct.get("embedding_input")
+}
+
 # Welche metadata-Felder der Embedding-Job zusätzlich zu `content` einbezieht.
 # Key: (category, content_type) — abgeleitet aus taxonomy.yaml (embedding_enrichment: [...])
 EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
@@ -221,3 +236,70 @@ EMBEDDING_ENRICHMENT: Final[dict[tuple[str, str], list[str]]] = {
     for ct in cat_info["content_types"]
     if ct.get("embedding_enrichment")
 }
+
+
+# ── Rollenbasierte Typ-Gewichtung (ADR-017, AP6) ─────────────────────────────
+#
+# Dieselbe Anfrage meint je nach Rolle etwas anderes. Wer als Schüler:in nach
+# „Bruchrechnung" sucht, will lernen; wer als Lehrkraft danach sucht, will unterrichten
+# oder prüfen. Beide sollen dieselben Bausteine finden — nur in anderer Reihenfolge.
+#
+# **Additiv und klein**, in Kosinus-Distanz wie der Fachbonus (0,05). Sie sortieren
+# innerhalb dessen, was ohnehin zur Auswahl stand; zwischen Platz 1 und Platz 10 einer
+# Zehnerliste liegen im Median 0,063.
+#
+# ⚠️ **Bildungsplan-Typen bleiben bei 0.** Sie sind für beide Rollen gleich richtig, und
+# nur so bleibt der Prüfsatz auf reinem BP-Bestand unverändert — das ist zugleich das
+# Abnahmekriterium dieser Tabelle.
+#
+# ⚠️ **Kein Filter.** Eine Klausur verschwindet für Schüler:innen nicht durch diese
+# Tabelle — dafür sorgt der Sichtbarkeits-Scope (`visibility.py`). Wer beides verwechselt,
+# baut einen Rechteschutz an die falsche Stelle.
+#
+# Assistentenbasierte Gewichtung wird ausdrücklich **nicht** gebaut (ADR-017,
+# Entscheidung 3): Sie verlagert eine Suchentscheidung in die Assistentenpflege, wo sie
+# niemand nachvollziehen kann.
+#
+# Die Werte sind bewusst noch nicht am Prüfsatz gemessen — messbar werden sie erst mit
+# einem heterogenen Bestand nutzererzeugter Inhalte. Bis dahin gilt: so klein, dass sie
+# im Zweifel nichts kaputtmachen.
+_SCHUELER_BONUS: Final[dict[str, float]] = {
+    # Material, das zum Lernen gedacht ist.
+    "methodenblatt": 0.03,
+    "operatorenblatt": 0.03,
+    "lerntext": 0.03,
+    "arbeitsblatt": 0.02,
+    "aufgabenblatt": 0.02,
+    "aufgabe": 0.02,
+    "begriff": 0.02,
+}
+
+_LEHRKRAFT_BONUS: Final[dict[str, float]] = {
+    # Material, mit dem unterrichtet und geprüft wird.
+    "unterrichtsstunde": 0.03,
+    "unterrichtseinheit": 0.03,
+    "klausur": 0.03,
+    "pruefungsanforderung": 0.03,
+    "methode": 0.02,
+    "reflexion": 0.02,
+}
+
+ROLLEN_TYP_BONUS: Final[dict[str, dict[str, float]]] = {
+    "student": _SCHUELER_BONUS,
+    "teacher": _LEHRKRAFT_BONUS,
+}
+
+
+def rollen_typ_bonus(rollen) -> dict[str, float]:
+    """Die Gewichtungstabelle für diese Rollenliste.
+
+    ``admin`` ist eine **Erweiterung** der Lehrkraft-Rolle, kein eigener Nutzertyp
+    (CLAUDE.md) — er bekommt dieselbe Tabelle. Wer beides ist, zählt als Lehrkraft: Die
+    Rolle bestimmt, wonach gesucht wird, und Lehrkräfte suchen Unterrichtsmaterial.
+    """
+    rollen = set(rollen or ())
+    if rollen & {"teacher", "admin"}:
+        return ROLLEN_TYP_BONUS["teacher"]
+    if "student" in rollen:
+        return ROLLEN_TYP_BONUS["student"]
+    return {}

@@ -11,12 +11,13 @@ bleibt draußen, damit ein vergessener Filter hier nie zu einem Rechteproblem wi
 """
 
 from dataclasses import dataclass
+from datetime import date
 
 import sqlalchemy as sa
 from sqlalchemy import and_, or_
 
 from app.context.lookup import titel_normalisiert_sql
-from app.db.models import ContextNode, Group, Subject
+from app.db.models import ContextNode, Group, LessonSlot, Subject
 
 # Der normalisierte Titel als SQL-Ausdruck — dieselbe Quelle wie der Ausdrucksindex aus
 # Migration 0053.
@@ -48,6 +49,40 @@ class Knotenfilter:
     grade: int | None = None
     bp_version: str | None = None
     owner_pseudonym: str | None = None
+    # Unterrichts-Artefakte über den Stundenplan: „Was haben wir letzte Woche gemacht?"
+    # ist eine Aufzählungs-, keine Ähnlichkeitsfrage. Verknüpft wird über `lesson_slots`
+    # (Datum + Gruppe), das ist die einzige Stelle, an der ein Baustein einen Termin hat.
+    unterrichtet_ab: date | None = None
+    unterrichtet_bis: date | None = None
+    unterrichtet_in_gruppe: int | None = None
+
+
+def _verplante_knoten(f: Knotenfilter):
+    """Knoten, die in diesem Zeitraum bzw. dieser Gruppe **auf dem Stundenplan standen**.
+
+    Ein Stundenplan-Eintrag (``lesson_slots``) verweist auf die Unterrichtseinheit
+    (``ue_node_id``) und den Stundenentwurf (``stunde_node_id``). Beide zählen: Wer
+    fragt, was letzte Woche dran war, meint beides.
+
+    Diese Filter greifen deshalb **nur** bei Bausteinen mit Termin. Ein Arbeitsblatt ohne
+    Stundenzuordnung fällt heraus — was richtig ist: Es hat kein Datum, über das man es
+    finden könnte.
+    """
+    bedingungen = []
+    if f.unterrichtet_in_gruppe is not None:
+        bedingungen.append(LessonSlot.group_id == f.unterrichtet_in_gruppe)
+    if f.unterrichtet_ab:
+        bedingungen.append(LessonSlot.date >= f.unterrichtet_ab)
+    if f.unterrichtet_bis:
+        bedingungen.append(LessonSlot.date <= f.unterrichtet_bis)
+
+    def knoten_spalte(spalte):
+        return sa.select(spalte).where(spalte.is_not(None), *bedingungen)
+
+    return sa.union(
+        knoten_spalte(LessonSlot.ue_node_id),
+        knoten_spalte(LessonSlot.stunde_node_id),
+    )
 
 
 def wende_an(stmt, f: Knotenfilter):
@@ -92,6 +127,9 @@ def wende_an(stmt, f: Knotenfilter):
 
     if f.group_id is not None:
         stmt = stmt.where(ContextNode.read_scope_group_id == f.group_id)
+
+    if f.unterrichtet_ab or f.unterrichtet_bis or f.unterrichtet_in_gruppe is not None:
+        stmt = stmt.where(ContextNode.id.in_(_verplante_knoten(f)))
 
     if f.grade is not None:
         stmt = stmt.where(

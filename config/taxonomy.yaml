@@ -39,9 +39,13 @@ categories:
       - key: aufgabenblatt
         label_de: "Aufgabenblatt"
         scope_defaults: {read_scope: group,    write_scope: private }
+        # „Gibt es schon ein Blatt zu Brüchen?“ — der Musterfall für Material.
+        embedding: true
       - key: quelltext
         label_de: "Quelltext"
         scope_defaults: {read_scope: group,    write_scope: private }
+        # Primärquellen zu einem Thema sind klassisches Suchgut.
+        embedding: true
       - key: konvention
         label_de: "Konvention"
         scope_defaults: {read_scope: school,   write_scope: school  }
@@ -49,12 +53,18 @@ categories:
       - key: methodenblatt
         label_de: "Methodenblatt"
         scope_defaults: {read_scope: school,   write_scope: subject }
+        # Schülermaterial soll thematisch auftauchen, nicht nur unter seinem Namen.
+        embedding: true
       - key: operatorenblatt
         label_de: "Operatorenblatt"
         scope_defaults: {read_scope: school,   write_scope: subject }
+        # Der Leitfall der Titel-Teilsuche („Anleitung Operator nennen“).
+        embedding: true
       - key: praesentation
         label_de: "Präsentation"
         scope_defaults: {read_scope: school,   write_scope: subject }
+        # Material zum Thema — trägt nur, soweit `content` Text enthält.
+        embedding: true
 
   knowledge:
     label_de: "Wissen"
@@ -126,6 +136,9 @@ categories:
       - key: methode
         label_de: "Methode"
         scope_defaults: {read_scope: school,   write_scope: subject }
+        # Methoden sollen gefunden werden, ohne ihren Namen zu kennen.
+        embedding: true
+        embedding_input: ["title", "metadata.aliase", "content"]
       - key: sozialform
         label_de: "Sozialform"
         scope_defaults: {read_scope: school,   write_scope: subject }
@@ -139,6 +152,8 @@ categories:
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        # „Was verlangt das Abitur zu X?“ ist eine thematische Frage.
+        embedding: true
 
   artifact:
     label_de: "Artefakt"
@@ -149,29 +164,47 @@ categories:
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: true
         valid_until_default: schuljahresende
+        # Thema, nicht Ablauf: Verlaufsplan (`phasen`) bleibt draußen.
+        embedding: true
+        embedding_input: ["title", "metadata.refs[].titel"]
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: false
         valid_until_default: schuljahresende
+        # Thema, nicht Ablauf — wie die Stunde.
+        embedding: true
+        embedding_input: ["title", "metadata.refs[].titel"]
       - key: reflexion
         label_de: "Reflexion"
         scope_defaults: {read_scope: private,  write_scope: private }
+        # „Was habe ich mir zu X notiert?“ — privat, aber thematisch.
+        embedding: true
       - key: arbeitsblatt
         label_de: "Arbeitsblatt"
         scope_defaults: {read_scope: group,    write_scope: private }
+        # Wiederverwendung ist der Zweck des Typs.
+        embedding: true
       - key: aufgabe
         label_de: "Aufgabe"
         scope_defaults: {read_scope: group,    write_scope: private }
+        # Laut ADR-013 permanent wiederverwendbar.
+        embedding: true
       - key: klausur
         label_de: "Klausur"
         scope_defaults: {read_scope: private,  write_scope: private }
+        # Wiederverwendung; der teacher-only-Scope schützt.
+        embedding: true
       - key: code_beispiel
         label_de: "Code-Beispiel"
         scope_defaults: {read_scope: school,   write_scope: private }
+        # Die Werkstatt-Abfrage in ADR-013 setzt es voraus.
+        embedding: true
       - key: lerntext
         label_de: "Lerntext"
         scope_defaults: {read_scope: school,   write_scope: private }
+        # Vereinfachte Texte sollen je Thema wiedergefunden werden.
+        embedding: true
       - key: gliederung
         label_de: "Gliederung"
         scope_defaults: {read_scope: private,  write_scope: private }
@@ -208,6 +241,17 @@ categories:
       - key: abstrakt
         label_de: "Abstraktes Konzept"
         scope_defaults: {read_scope: school,   write_scope: school  }
+        embedding: true
+      # Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der Normalfall
+      # („Energie" in Physik ≠ Biologie ≠ Ethik) — genau der Fall, den Identifikation
+      # und Aufzählung tragen. Die Fachschaft pflegt, alle lesen.
+      # Abgrenzung: `vokabelliste` ist die Sprachen-Wortliste (Listenform, kein
+      # Einzelbegriff), `abstrakt` das Konzept im Werkstatt-Wissensgraphen.
+      - key: begriff
+        label_de: "Fachbegriff"
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        # Kernfall des Kriteriums: „sprachliche Bilder" soll die Metapher finden, ohne
+        # dass man den Begriff schon kennt.
         embedding: true
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
