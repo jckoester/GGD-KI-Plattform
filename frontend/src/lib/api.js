@@ -1388,7 +1388,29 @@ export async function searchContextNodes(query, conversationId = null) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Fehler bei der Kontext-Suche')
   }
-  return res.json() // ContextSearchResult[]
+  return res.json() // SearchEnvelope
+}
+
+/**
+ * Den Ergebnisumschlag in eine Liste bringen: erst die Namensträger, dann die
+ * nächstliegenden Bausteine.
+ *
+ * Übergangslösung für das Vorschlagsfenster, das die Abschnitte noch nicht getrennt
+ * darstellt (AP8 holt das nach). Die Reihenfolge ist die des Umschlags — was den
+ * gesuchten Namen **trägt**, steht vor dem, was ihm nur ähnelt.
+ */
+export function umschlagAlsListe(umschlag) {
+  const abschnitte = [umschlag?.identifikation, umschlag?.thematisch]
+  const gesehen = new Set()
+  const liste = []
+  for (const abschnitt of abschnitte) {
+    for (const treffer of abschnitt?.treffer ?? []) {
+      if (gesehen.has(treffer.node_id)) continue
+      gesehen.add(treffer.node_id)
+      liste.push(treffer)
+    }
+  }
+  return liste
 }
 
 export async function getContextNode(nodeId) {

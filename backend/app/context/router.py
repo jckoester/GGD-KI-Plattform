@@ -36,7 +36,7 @@ from app.context.schemas import (
     ChatContextNodeRead,
     anzeige_felder,
     ContextSearchRequest,
-    ContextSearchResult,
+    SearchEnvelope,
     CurriculumRead,
     CurriculumMetaUpdate,
     CurriculumDraftConfirmed,
@@ -53,6 +53,7 @@ from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
+from app.context.visibility import read_scope_clause
 from app.preferences.service import anzeige_limit
 from app.db.models import (
     Assistant,
@@ -145,26 +146,12 @@ async def _check_read_permission(
 
 
 def _read_scope_clause(user: JwtPayload):
-    """SQL-Klausel für die lesbaren Knoten (Liste/Nachbarschaft). Für Nicht-Admins werden
-    `group`-Knoten auf die eigenen Gruppenmitgliedschaften eingeschränkt (Audit #1)."""
-    if "admin" in user.roles:
-        return or_(
-            ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
-            ContextNode.owner_pseudonym == user.sub,
-        )
-    my_group_ids = (
-        sa.select(GroupMembership.group_id)
-        .where(GroupMembership.pseudonym == user.sub)
-        .scalar_subquery()
-    )
-    return or_(
-        ContextNode.read_scope.in_(["global", "school", "subject"]),
-        ContextNode.owner_pseudonym == user.sub,
-        and_(
-            ContextNode.read_scope == "group",
-            ContextNode.read_scope_group_id.in_(my_group_ids),
-        ),
-    )
+    """SQL-Klausel für die lesbaren Knoten (Liste/Nachbarschaft).
+
+    Die Regel selbst steht in :mod:`app.context.visibility` — sie gilt auch für die
+    Suchschicht, und zwei Kopien einer Rechteprüfung driften auseinander (siehe dort).
+    """
+    return read_scope_clause(user.sub, user.roles)
 
 
 def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
@@ -901,14 +888,22 @@ async def remove_chat_context_node(
 # ── KS-Phase-5 Semantic Search ──────────────────────────────────────────
 
 
-@router.post("/search", response_model=list[ContextSearchResult])
+@router.post("/search", response_model=SearchEnvelope)
 async def search_context_nodes(
     request: ContextSearchRequest,
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(get_current_user),
 ):
-    """Semantische Suche über sichtbare Knoten anhand eines Freitexts."""
-    from app.chat.router import _exec_search_context_nodes, subject_of_conversation
+    """Suche über sichtbare Knoten anhand eines Freitexts — als Ergebnisumschlag.
+
+    Profil „Vorschlagsfenster": Identifikation und thematische Auswahl, je mit der
+    Anzeigezahl aus dem Nutzerprofil. Getrennte Budgets, damit Namenstreffer die
+    thematischen nicht verdrängen; die Aufzählung bleibt diesem Weg vorbehalten
+    (AP3).
+    """
+    from app.chat.router import subject_of_conversation
+    from app.context.search import Suchprofil, suche
+
     # Der Suchknopf füllt das Vorschlagsfenster — hier zählt die Anzeigezahl.
     limit = await anzeige_limit(db, user.sub)
 
@@ -920,8 +915,16 @@ async def search_context_nodes(
         if conv is not None and conv.pseudonym == user.sub:
             subject_id = await subject_of_conversation(db, request.conversation_id)
 
-    return await _exec_search_context_nodes(
-        request.query, user.sub, db, limit=limit, subject_id=subject_id
+    return await suche(
+        request.query,
+        Suchprofil(
+            pseudonym=user.sub,
+            rollen=user.roles,
+            subject_id=subject_id,
+            identifikation=limit,
+            thematisch=limit,
+        ),
+        db,
     )
 
 

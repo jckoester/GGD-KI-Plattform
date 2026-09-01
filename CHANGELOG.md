@@ -11,6 +11,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Die Liste zum Anheften erscheint nur noch, wenn man selbst über den Suchknopf sucht.
   Der Assistent liest die gefundenen Bausteine wie bisher.
 
+- **Die Suche trennt jetzt Namenstreffer von thematischen Treffern.** Bausteine, die
+  den gesuchten Namen *tragen*, standen bisher in derselben Liste wie Bausteine, die
+  ihm nur ähneln — und teilten sich mit ihnen ein Limit. Beide Gruppen haben jetzt
+  eigene Plätze; ist die Liste der Namensträger gekürzt, steht die Gesamtzahl dabei.
+  Assistenten wird ausdrücklich untersagt, aus thematischer Nähe zu schließen, dass es
+  etwas nicht gibt.
+
+- **Bausteine ohne Embedding sind über ihren Namen auffindbar.** Fachpläne, Curricula,
+  Methoden und Leitperspektiven waren über die Suche bisher gar nicht erreichbar.
+
+### Behoben
+
+- **Gruppenfreigaben wurden bei der Suche nicht geprüft.** Ein Baustein, den eine
+  Lehrkraft für ihre Lerngruppe freigegeben hatte, konnte über die Kontextsuche auch
+  außerhalb dieser Gruppe erscheinen und ging über den Assistenten mitsamt Inhalt ins
+  Modell. Suche und Wissensgraph verwenden jetzt dieselbe Sichtbarkeitsregel.
+
 ## [0.7.0] – 2026-08-31
 
 Schwerpunkt: **Anbieterunabhängigkeit**. Modelle heißen nach ihrer Aufgabe statt nach

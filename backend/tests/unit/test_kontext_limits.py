@@ -49,19 +49,29 @@ class TestAnzeigelimit:
 
 class TestSuchtiefeDesAssistenten:
     async def test_werkzeug_nutzt_die_zentrale_zahl(self):
-        """Nicht die Anzeigezahl aus dem Profil — sonst deckelte die Oberfläche die Suche."""
+        """Nicht die Anzeigezahl aus dem Profil — sonst deckelte die Oberfläche die Suche.
+
+        Geprüft wird das Budget **beider** Abschnitte: Seit ADR-017 hat jeder sein
+        eigenes, damit Namenstreffer die thematischen nicht verdrängen.
+        """
         from app.chat import router
+        from app.context.search import Suchergebnis
 
         with patch.object(router.settings, "assistant_context_limit", 20), \
              patch.object(router, "_resolve_conversation_subject_id",
                           new=AsyncMock(return_value=None)), \
-             patch.object(router, "_exec_search_context_nodes",
-                          new=AsyncMock(return_value=[])) as suche:
-            ctx = router.ToolContext(db=object(), user=type("U", (), {"sub": "p"})(),
-                                     group_id=None, conversation_id=None)
+             patch.object(router, "suche",
+                          new=AsyncMock(return_value=Suchergebnis())) as gesucht:
+            ctx = router.ToolContext(
+                db=object(),
+                user=type("U", (), {"sub": "p", "roles": ["student"]})(),
+                group_id=None, conversation_id=None,
+            )
             await router._search_context_nodes_handler({"query": "x"}, ctx)
 
-        assert suche.await_args.kwargs["limit"] == 20
+        profil = gesucht.await_args.args[1]
+        assert profil.identifikation == 20
+        assert profil.thematisch == 20
 
     def test_vorgabe_deckt_den_pruefsatz_ab(self):
         """Im Prüfsatz steht der erwartete Knoten in einem Fall auf Rang 9 — mit der

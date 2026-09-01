@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update, or_
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
@@ -53,9 +53,7 @@ from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudi
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
-from app.context.embedding import generate_embedding
-from app.context.lookup import nachschlage_begriff, titel_normalisiert_sql
-from app.context.schemas import anzeige_felder
+from app.context.search import Suchprofil, suche
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -178,9 +176,18 @@ _SEARCH_CONTEXT_NODES_TOOL = {
     "function": {
         "name": "search_context_nodes",
         "description": (
-            "Sucht Wissensknoten im Kontextspeicher der Plattform anhand einer "
-            "Suchanfrage. Nutze dieses Tool, wenn du gezielt thematisch passende "
-            "Inhalte finden sollst."
+            "Sucht Bausteine im Kontextspeicher der Plattform. Die Antwort hat zwei "
+            "getrennte Abschnitte, die du unterschiedlich behandeln musst:\n"
+            "- 'exakte_namenstraeger': Bausteine, die genau so HEISSEN. Dazu gehört "
+            "'gesamt' (wie viele es insgesamt gibt) und 'vollstaendig' (ob alle davon "
+            "hier stehen). Nur dieser Abschnitt trägt eine Aussage darüber, ob es "
+            "einen Baustein dieses Namens gibt.\n"
+            "- 'naechstliegende_bausteine': thematisch ähnliche Bausteine, nach "
+            "Ähnlichkeit sortiert. Diese Liste ist NIE vollständig und sagt NICHTS "
+            "darüber aus, was es gibt oder nicht gibt. Antworte niemals 'dazu gibt es "
+            "nichts', nur weil dieser Abschnitt leer ist oder unpassend wirkt.\n"
+            "Ist 'vollstaendig' false, sag die Gesamtzahl dazu, statt die gezeigten "
+            "Treffer als vollständige Liste auszugeben."
         ),
         "parameters": {
             "type": "object",
@@ -512,241 +519,41 @@ def _fuer_modell(treffer: list) -> list:
     return aufbereitet
 
 
-# Wie viel Vorsprung ein Treffer aus dem Fach der Konversation bekommt — gerechnet in
-# Kosinus-Distanz, also derselben Einheit wie die Ähnlichkeit selbst.
-#
-# **0,05 ist gemessen, nicht geschätzt** (Prüfsatz, 30.08.2026). Zur Einordnung: Innerhalb
-# einer Zehnertrefferliste liegen zwischen Platz 1 und Platz 10 im Median 0,063. Der Bonus
-# sortiert also innerhalb dessen, was ohnehin zur Auswahl stand — er holt nichts Fernes
-# heran.
-#
-#   Bonus   richtiges Fach oben        fachfremder Treffer bleibt
-#           (15 Fälle im Fach-Chat)    (3 Gegenfälle)
-#   0,00              11/15                     3/3
-#   0,03              13/15                     3/3
-#   0,05              15/15                     3/3     ← gewählt
-#   0,08              15/15                     2/3
-#   0,15              15/15                     0/3
-#
-# Nach oben begrenzt ihn der Gegenfall: Wer im Physik-Chat nach dem Satz des Pythagoras
-# fragt, soll die Mathematik-Kompetenz bekommen. Ab 0,08 verdrängt das Fach der
-# Konversation genau solche Treffer — deshalb der Abstand zur Kippgrenze.
-_FACHBONUS = 0.05
+async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
+    """Die Suche für das Modell — beschriftete Abschnitte statt einer flachen Liste.
 
+    Das Modell konnte bisher nicht unterscheiden, ob ein Treffer den gesuchten Baustein
+    **ist** oder ihm nur ähnelt; entsprechend gab es Antworten wie „dazu gibt es nichts"
+    auf eine Liste thematischer Nachbarn hin. Die Abschnittsnamen und die
+    Vollständigkeitsangabe machen den Unterschied lesbar, die Werkzeugbeschreibung
+    verpflichtet darauf.
 
-def _treffer(row) -> dict:
-    """Eine Trefferzeile in die Form bringen, die Aufrufer und Modell erwarten.
-
-    Gemeinsam für Vektorsuche und Nachschlagen — liefen die beiden auseinander, trüge
-    dieselbe Trefferliste je nach Herkunft unterschiedliche Felder.
+    Die Suchtiefe ist die zentrale Zahl, **nicht** die Anzeigezahl aus dem Profil: Für
+    den Assistenten ist die Trefferzahl eine Kostenfrage, für das Vorschlagsfenster eine
+    Platzfrage. Beides an derselben Zahl aufzuhängen hieß, die eine über die andere zu
+    deckeln.
     """
-    return {
-        "node_id": str(row["id"]),
-        "title": row["title"],
-        "category": row["category"],
-        "content_type": row["content_type"],
-        # Der Inhalt geht mit, damit das Modell die Knoten auch **lesen** kann.
-        # `/context/search` streift ihn über sein response_model wieder ab — die
-        # Vorschlagsliste im Chat zeigt nur Titel.
-        "content": row["content"],
-        # Der Fachname, nicht nur die interne `subject_id`: Auf die Frage „… in den
-        # verschiedenen Fächern" konnte ein Modell mit `subject_id: 13` nichts anfangen
-        # und meldete, es gebe keine Einträge je Fach.
-        "fach": row["fach"],
-        **anzeige_felder(row),
-    }
-
-
-def _vereine(nachschlag: list[dict], semantisch: list[dict], limit: int) -> list[dict]:
-    """Nachschlage-Treffer nach vorn, dann semantisch auffüllen — ohne Dubletten.
-
-    **Vorgezogen, nicht ersetzt:** Wer „vergleichen" sucht, meint vermutlich den Operator,
-    kann aber ebenso gut Kompetenzen zum Vergleichen brauchen. Die semantischen Treffer
-    verschwinden deshalb nicht, sie rücken nach.
-    """
-    gesehen = {t["node_id"] for t in nachschlag}
-    return (nachschlag + [t for t in semantisch if t["node_id"] not in gesehen])[:limit]
-
-
-# Nachschlagen: exakter Abgleich des normalisierten Titels. Bewusst auf Knoten **mit**
-# Embedding begrenzt — dieselbe Grundmenge wie die semantische Suche. Sie auf Knoten ohne
-# Embedding auszuweiten (Leitperspektiven, Curricula, Methoden) würde die Suche um Knoten
-# erweitern, die sie noch nie geliefert hat; das ist eine eigene Entscheidung.
-_NACHSCHLAGE_SQL = sa.text(f"""
-    SELECT c.id, c.category, c.content_type, c.title, c.content,
-           c.subject_id, s.name AS fach, c.bp_version, c.metadata
-    FROM context_nodes c
-    LEFT JOIN subjects s ON s.id = c.subject_id
-    WHERE c.status = 'active'
-      AND c.embedding IS NOT NULL
-      AND (
-          c.read_scope IN ('global', 'school', 'subject', 'group')
-          OR c.owner_pseudonym = :pseudonym
-      )
-      AND {titel_normalisiert_sql('c.title')} = :begriff
-    -- Ohne Fachbezug ist `c.subject_id = :subject_id` durchweg NULL und damit für alle
-    -- Zeilen gleich — es braucht keine zusätzliche `IS NOT NULL`-Prüfung. Sie wäre sogar
-    -- schädlich: Ein Parameter, der nur in `IS NOT NULL` vorkommt, lässt sich nicht
-    -- typisieren, und die Abfrage schlägt mit `AmbiguousParameterError` fehl.
-    ORDER BY CASE WHEN c.subject_id = :subject_id THEN 0 ELSE 1 END,
-             s.name NULLS LAST, c.id
-    LIMIT :limit
-""")
-
-
-async def _nachschlagen(
-    query: str,
-    pseudonym: str,
-    db: AsyncSession,
-    *,
-    limit: int,
-    subject_id: int | None,
-) -> list[dict]:
-    """Knoten, deren Titel der gesuchte Name **ist** — leer, wenn kein Name gemeint ist.
-
-    Die Erkennung steht in :mod:`app.context.lookup`; ob es einen Knoten dieses Namens
-    gibt, entscheidet erst diese Abfrage. Innerhalb der Treffer steht das Fach der
-    Konversation vorn, danach alphabetisch nach Fach — eine stabile Reihenfolge, damit
-    dieselbe Frage nicht bei jedem Aufruf anders sortiert erscheint.
-    """
-    begriff = nachschlage_begriff(query)
-    if not begriff:
-        return []
-    result = await db.execute(
-        _NACHSCHLAGE_SQL,
-        {
-            "pseudonym": pseudonym,
-            "begriff": begriff,
-            "subject_id": subject_id,
-            "limit": limit,
-        },
-    )
-    return [_treffer(row) for row in result.mappings().all()]
-
-
-async def _exec_search_context_nodes(
-    query: str,
-    pseudonym: str,
-    db: AsyncSession,
-    *,
-    limit: int = 8,
-    subject_id: int | None = None,
-) -> list[dict]:
-    """Semantische Suche über alle sichtbaren ContextNodes, max. limit Treffer.
-
-    ``subject_id`` = Fach der Konversation, falls bekannt. Treffer aus diesem Fach werden
-    **vorgezogen, nicht gefiltert**: Fachfremdes bleibt in der Liste, denn eine
-    Mathematik-Kompetenz kann im Physik-Chat genau das Gesuchte sein. Ohne Fachbezug
-    (``None``) entscheidet allein die Ähnlichkeit — dann ist das Ergebnis dasselbe wie
-    zuvor. Ein harter Filter schiede zusätzlich alle Knoten **ohne** Fach aus
-    (Leitperspektiven, schulweite Dokumente); auch deshalb nur ein Bonus.
-
-    Fällt auf ILIKE zurück wenn kein Embedding generiert werden kann oder
-    kein Knoten ein Embedding hat.
-    """
-    # Erst nachschlagen: Ist ein Name gemeint, findet ihn kein Ähnlichkeitsmaß
-    # zuverlässig (gemessen: 5 von 8). Die Treffer stehen anschließend vorn.
-    nachschlag = await _nachschlagen(
-        query, pseudonym, db, limit=limit, subject_id=subject_id
-    )
-
-    try:
-        query_embedding = await generate_embedding(query)
-        embedding_str = "[" + ",".join(f"{v:.10f}" for v in query_embedding) + "]"
-
-        # `subject_id = NULL` ist nie wahr — ohne Fachbezug fällt der Bonus also von
-        # selbst weg, ohne zweite Abfragevariante.
-        #
-        # ⚠️ `CAST(:fachbonus AS double precision)` ist Pflicht, nicht Zierde. Ohne den
-        # Cast leitet PostgreSQL den Typ des Parameters aus dem anderen CASE-Zweig ab —
-        # aus `ELSE 0`, also **integer**. Der Bonus wird dann auf 0 gerundet und die
-        # Sortierung bleibt unverändert. Ohne Fehlermeldung: Die Abfrage läuft, sie tut
-        # nur nichts.
-        sql = sa.text("""
-            SELECT c.id, c.category, c.content_type, c.title, c.content,
-                   c.subject_id, s.name AS fach, c.bp_version, c.metadata
-            FROM context_nodes c
-            LEFT JOIN subjects s ON s.id = c.subject_id
-            WHERE c.status = 'active'
-              AND c.embedding IS NOT NULL
-              AND (
-                  c.read_scope IN ('global', 'school', 'subject', 'group')
-                  OR c.owner_pseudonym = :pseudonym
-              )
-            ORDER BY (c.embedding <=> CAST(:embedding AS vector))
-                   - CASE WHEN c.subject_id = :subject_id
-                          THEN CAST(:fachbonus AS double precision)
-                          ELSE 0 END
-            LIMIT :limit
-        """)
-        result = await db.execute(
-            sql,
-            {
-                "pseudonym": pseudonym,
-                "embedding": embedding_str,
-                "limit": limit,
-                "subject_id": subject_id,
-                "fachbonus": _FACHBONUS,
-            },
-        )
-        semantisch = [_treffer(row) for row in result.mappings().all()]
-        if semantisch or nachschlag:
-            return _vereine(nachschlag, semantisch, limit)
-        # Kein Knoten hat ein Embedding → Fallback
-    except Exception:
-        logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
-
-    # Fallback: ILIKE-Suche auf Titel und Inhalt — mit demselben Fachvorzug. Ohne ihn
-    # verhielte sich die Rückfallebene anders als der Normalfall, und das fiele erst auf,
-    # wenn ohnehin schon etwas klemmt.
-    result = await db.execute(
-        select(ContextNode, Subject.name)
-        .outerjoin(Subject, Subject.id == ContextNode.subject_id)
-        .where(
-            or_(
-                ContextNode.read_scope.in_(["global", "school", "subject", "group"]),
-                ContextNode.owner_pseudonym == pseudonym,
-            )
-        )
-        .where(ContextNode.status == "active")
-        .where(
-            or_(
-                ContextNode.title.ilike(f"%{query}%"),
-                ContextNode.content.ilike(f"%{query}%"),
-            )
-        )
-        .order_by(sa.case((ContextNode.subject_id == subject_id, 0), else_=1))
-        .limit(limit)
-    )
-    return _vereine(
-        nachschlag,
-        [
-            {
-                "node_id": str(n.id),
-                "title": n.title,
-                "category": n.category,
-                "content_type": n.content_type,
-                "content": n.content,
-                "fach": fach,
-                **anzeige_felder(n),
-            }
-            for n, fach in result.all()
-        ],
-        limit,
-    )
-
-
-async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> list[dict]:
-    # Zentrale Suchtiefe, **nicht** die Anzeigezahl aus dem Profil: Für den Assistenten
-    # ist die Trefferzahl eine Kostenfrage, für das Vorschlagsfenster eine Platzfrage.
-    # Beides an derselben Zahl aufzuhängen hieß, die eine über die andere zu deckeln.
-    return await _exec_search_context_nodes(
+    tiefe = settings.assistant_context_limit
+    ergebnis = await suche(
         args.get("query", ""),
-        ctx.user.sub,
+        Suchprofil(
+            pseudonym=ctx.user.sub,
+            rollen=ctx.user.roles,
+            subject_id=await _resolve_conversation_subject_id(ctx),
+            identifikation=tiefe,
+            thematisch=tiefe,
+        ),
         ctx.db,
-        limit=settings.assistant_context_limit,
-        subject_id=await _resolve_conversation_subject_id(ctx),
     )
+    antwort: dict = {
+        "exakte_namenstraeger": _fuer_modell(ergebnis.identifikation.treffer),
+        "gesamt": ergebnis.identifikation.gesamt,
+        "vollstaendig": ergebnis.identifikation.vollstaendig,
+        "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer),
+    }
+    if ergebnis.hinweise:
+        antwort["hinweise"] = ergebnis.hinweise
+    return antwort
 
 
 register_tool(ChatTool(
@@ -1987,7 +1794,13 @@ async def chat(
                 # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
                 # Befüllt wird das Fenster jetzt allein vom Suchknopf über
                 # `POST /context/search`.
-                if tool.group == "context_search" and isinstance(tool_result, list):
+                if tool.group == "context_search" and isinstance(tool_result, dict):
+                    # Umschlag der Suchschicht: Die Abschnitte sind bereits fürs Modell
+                    # aufbereitet, hier bleibt nur die Serialisierung.
+                    tool_result_str = json.dumps(tool_result, ensure_ascii=False)
+                elif tool.group == "context_search" and isinstance(tool_result, list):
+                    # `get_operatoren`, das noch eine flache Liste liefert (AP3 macht
+                    # daraus ein Alias auf die Aufzählung).
                     tool_result_str = json.dumps(
                         {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False
                     )

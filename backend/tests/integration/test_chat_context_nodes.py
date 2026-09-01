@@ -103,6 +103,19 @@ def conversation(db_url, run_migrations):
 # ── Tests ────────────────────────────────────────────────────────────────────
 
 
+def _als_liste(umschlag: dict) -> list[dict]:
+    """Den Ergebnisumschlag in Lesereihenfolge flach machen.
+
+    ``/context/search`` liefert seit ADR-017 getrennte Abschnitte statt einer Liste.
+    Was diese Tests prüfen — Feldbestand und Reihenfolge —, gilt über die Abschnitte
+    hinweg: Namensträger stehen vor den nächstliegenden Bausteinen.
+    """
+    return [
+        *umschlag["identifikation"]["treffer"],
+        *umschlag["thematisch"]["treffer"],
+    ]
+
+
 class TestChatContextNodes:
     """Testsuite für /api/context/conversations/{id}/nodes Endpunkte."""
 
@@ -431,8 +444,8 @@ class TestSuchergebnisFelder:
         conn.close()
         return node
 
-    def _treffer(self, daten, node):
-        return next(t for t in daten if t["node_id"] == node["id"])
+    def _treffer(self, umschlag, node):
+        return next(t for t in _als_liste(umschlag) if t["node_id"] == node["id"])
 
     async def test_ilike_fallback_traegt_die_felder(
         self, test_client, auth_headers, bp_knoten
@@ -441,7 +454,7 @@ class TestSuchergebnisFelder:
         from unittest.mock import AsyncMock, patch
 
         with patch(
-            "app.chat.router.generate_embedding",
+            "app.context.search.generate_embedding",
             new=AsyncMock(side_effect=RuntimeError("kein Embedding-Dienst")),
         ):
             response = await test_client.post(
@@ -473,7 +486,7 @@ class TestSuchergebnisFelder:
         conn.commit()
         conn.close()
 
-        with patch("app.chat.router.generate_embedding",
+        with patch("app.context.search.generate_embedding",
                    new=AsyncMock(return_value=vec)):
             response = await test_client.post(
                 "/context/search",
@@ -597,7 +610,7 @@ class TestFachvorzugBeiDerSuche:
 
         anfrage = [0.0] * settings.embedding_dimensions
         anfrage[0] = 1.0
-        with patch("app.chat.router.generate_embedding",
+        with patch("app.context.search.generate_embedding",
                    new=AsyncMock(return_value=anfrage)):
             resp = await test_client.post(
                 "/context/search", json={"query": "Fachvorzug", **body},
@@ -605,7 +618,11 @@ class TestFachvorzugBeiDerSuche:
             )
         assert resp.status_code == 200, resp.text
         nach_id = {v: k for k, v in knoten.items()}
-        return [nach_id[t["node_id"]] for t in resp.json() if t["node_id"] in nach_id]
+        return [
+            nach_id[t["node_id"]]
+            for t in _als_liste(resp.json())
+            if t["node_id"] in nach_id
+        ]
 
     async def test_ohne_fachbezug_entscheidet_allein_die_aehnlichkeit(
         self, test_client, auth_headers, knoten
@@ -705,13 +722,17 @@ class TestNachschlagenInDerSuche:
 
         anfrage = [0.0] * settings.embedding_dimensions
         anfrage[0] = 1.0
-        with patch("app.chat.router.generate_embedding",
+        with patch("app.context.search.generate_embedding",
                    new=AsyncMock(return_value=anfrage)):
             resp = await test_client.post("/context/search", json={"query": frage},
                                           headers=auth_headers)
         assert resp.status_code == 200, resp.text
         nach_id = {v: k for k, v in knoten.items()}
-        return [nach_id[t["node_id"]] for t in resp.json() if t["node_id"] in nach_id]
+        return [
+            nach_id[t["node_id"]]
+            for t in _als_liste(resp.json())
+            if t["node_id"] in nach_id
+        ]
 
     async def test_benannter_knoten_steht_vorn(self, test_client, auth_headers, knoten):
         """Trotz 0,40 gegen 0,02 Distanz — der Name schlägt die Ähnlichkeit."""
@@ -757,17 +778,18 @@ class TestNachschlageIndexWirdBenutzt:
         import sqlalchemy as sa
         from sqlalchemy.ext.asyncio import create_async_engine
 
-        from app.chat.router import _NACHSCHLAGE_SQL
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        abfrage = identifikations_abfrage("nennen", Suchprofil(pseudonym="p"))
+        # `literal_binds`, weil EXPLAIN die Werte braucht: Ein Platzhalter ohne Wert
+        # lässt den Planer generisch planen — dann sagt der Plan nichts über den Fall.
+        roh = str(abfrage.compile(compile_kwargs={"literal_binds": True}))
 
         engine = create_async_engine(db_url)
         try:
             async with engine.connect() as con:
                 plan = "\n".join(
-                    r[0] for r in (await con.execute(
-                        sa.text("EXPLAIN " + str(_NACHSCHLAGE_SQL)),
-                        {"pseudonym": "p", "begriff": "nennen",
-                         "subject_id": None, "limit": 8},
-                    )).all()
+                    r[0] for r in (await con.execute(sa.text("EXPLAIN " + roh))).all()
                 )
         finally:
             await engine.dispose()

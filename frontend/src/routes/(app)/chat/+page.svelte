@@ -37,6 +37,7 @@
         removeChatContextNode,
         getContextNodes,
         searchContextNodes,
+        umschlagAlsListe,
     } from "$lib/api.js";
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
@@ -848,8 +849,10 @@
         const query = input.trim();
         if (!query) return;
         try {
-            const results = await searchContextNodes(query, conversationId);
-            pendingSuggestions = results.map((n) => ({
+            const umschlag = await searchContextNodes(query, conversationId);
+            // Namensträger zuerst, dann die nächstliegenden Bausteine. Die Abschnitte
+            // getrennt darzustellen ist Sache von AP8; hier zählt die Reihenfolge.
+            pendingSuggestions = umschlagAlsListe(umschlag).map((n) => ({
                 node_id: n.node_id,
                 title: n.title,
                 category: n.category,

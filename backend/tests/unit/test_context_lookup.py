@@ -77,10 +77,10 @@ class TestIndexUndAbfrageBleibenGleich:
     ohne Fehler, nur rund 70 ms langsamer je Suche."""
 
     def test_abfrage_nutzt_die_gemeinsame_funktion(self):
-        from app.chat.router import _NACHSCHLAGE_SQL
         from app.context.lookup import titel_normalisiert_sql
+        from app.context.search import _TITEL_NORMALISIERT
 
-        assert titel_normalisiert_sql("c.title") in str(_NACHSCHLAGE_SQL)
+        assert str(_TITEL_NORMALISIERT) == titel_normalisiert_sql("context_nodes.title")
 
     def test_migration_nutzt_die_gemeinsame_funktion(self):
         """Migrationen sind sonst eingefrorene Artefakte — hier ist die Kopplung gewollt,

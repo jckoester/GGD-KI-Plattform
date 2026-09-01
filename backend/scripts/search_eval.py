@@ -10,7 +10,8 @@ Verwendung:
 Gemessen wird gegen drei Läufe derselben Anfrage:
 
 * **produktiv** — die Suche, die Nutzer:innen tatsächlich bekommen
-  (``_exec_search_context_nodes``, also mit Fachvorzug und Nachschlagen). Daraus stammen
+  (``app.context.search.suche``, also Identifikation **und** thematische Auswahl in der
+  Reihenfolge des Ergebnisumschlags). Daraus stammen
   Fach@1 und der Rang des erwarteten Knotens. Aufgerufen wird die **echte Funktion**,
   nicht eine Nachbildung: Was hier gemessen wird, ist damit zwangsläufig das, was läuft.
 * **exakt** — vollständiger Durchlauf aller Vektoren, rein semantisch. Die Wahrheit über
@@ -47,7 +48,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.chat.router import _FACHBONUS as FACHBONUS
+from app.context.search import _FACHBONUS as FACHBONUS
 from app.config import settings
 from app.context.embedding import generate_embedding
 
@@ -57,7 +58,7 @@ PRUEFSATZ_VORGABE = (
 
 INDEXNAME = "idx_context_nodes_embedding"
 
-# Bewusst so nah wie möglich an `_exec_search_context_nodes` (app/chat/router.py): Gemessen
+# Bewusst so nah wie möglich an der thematischen Auswahl der Suchschicht: Gemessen
 # werden soll die Suche, die Nutzer:innen bekommen, nicht eine idealisierte Variante. Der
 # `owner_pseudonym`-Zweig der Originalabfrage fehlt — private Knoten einzelner Personen
 # gehören nicht in einen Prüfsatz, der den gemeinsamen Bestand bewertet.
@@ -119,6 +120,10 @@ class Ergebnis:
     recall: float
     fach_ok: bool | None
     rang: int | None
+    # Abschnittsgrößen des Umschlags (ADR-017). AP4 und AP6 messen daran, ob eine
+    # Änderung am Matching thematische Anfragen mit Namensträgern überschwemmt.
+    ident_n: int = 0
+    thema_n: int = 0
     operatoren_top3: int = 0
     warnungen: list[str] = field(default_factory=list)
 
@@ -193,8 +198,10 @@ def _rang(treffer: list[Treffer], knoten: str | None) -> int | None:
 
 
 def _bewerte(
-    fall: Fall, index: Lauf, exakt: Lauf, produktiv: list[Treffer], nachschlagen: bool
+    fall: Fall, index: Lauf, exakt: Lauf, produktiv: list[Treffer],
+    ident_n: int, thema_n: int,
 ) -> Ergebnis:
+    nachschlagen = ident_n > 0
     ids_exakt = {t.id for t in exakt.treffer}
     ids_index = {t.id for t in index.treffer}
     recall = len(ids_index & ids_exakt) / len(ids_exakt) if ids_exakt else 0.0
@@ -212,6 +219,7 @@ def _bewerte(
     return Ergebnis(
         fall=fall, index=index, exakt=exakt, produktiv=produktiv,
         nachschlagen=nachschlagen, recall=recall,
+        ident_n=ident_n, thema_n=thema_n,
         fach_ok=(produktiv[0].fach == fall.fach) if (fall.fach and produktiv) else None,
         rang=_rang(produktiv, fall.knoten),
         operatoren_top3=sum(1 for t in produktiv[:3] if t.content_type == "operator"),
@@ -240,22 +248,22 @@ def _r(rang: int | None) -> str:
 
 def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     print()
-    print(f"  {'Anfrage':<40}{'Chat-Fach':<14}{'Recall':>7}{'Nach':>6}"
+    print(f"  {'Anfrage':<40}{'Chat-Fach':<14}{'Recall':>7}{'Name':>6}{'Thema':>6}"
           f"{'Fach@1':>8}{'Rang':>6}{'Spanne':>8}")
-    print("  " + "─" * 89)
+    print("  " + "─" * 95)
     for e in ergebnisse:
         frage = e.fall.frage if len(e.fall.frage) <= 39 else e.fall.frage[:38] + "…"
         chat = (e.fall.chat_fach or "—")[:13]
         print(
             f"  {frage:<40}{chat:<14}{e.recall*100:>6.0f}%"
-            f"{('▪' if e.nachschlagen else '·'):>6}"
+            f"{(str(e.ident_n) if e.ident_n else '·'):>6}{e.thema_n:>6}"
             f"{_z(e.fach_ok):>8}{_r(e.rang):>6}{_spanne(e.exakt):>8.3f}"
         )
 
     n = len(ergebnisse)
     mit_fach = [e for e in ergebnisse if e.fall.fach]
     mit_knoten = [e for e in ergebnisse if e.fall.knoten]
-    print("  " + "─" * 89)
+    print("  " + "─" * 95)
     print(f"\n  {n} {'Fall' if n == 1 else 'Fälle'} · Recall@{top_k} im Mittel "
           f"{sum(e.recall for e in ergebnisse)/n*100:.0f} %")
     if mit_fach:
@@ -265,8 +273,15 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
         raenge = [e.rang for e in mit_knoten if e.rang]
         print(f"  Erwarteter Knoten gefunden:   {len(raenge):>2}/{len(mit_knoten)}"
               + (f"   (mittlerer Rang {sum(raenge)/len(raenge):.1f})" if raenge else ""))
-    print(f"  Nachschlagen ausgelöst (▪):   "
-          f"{sum(1 for e in ergebnisse if e.nachschlagen):>2}/{n}")
+    print(f"  Namensträger gefunden:        "
+          f"{sum(1 for e in ergebnisse if e.ident_n):>2}/{n}"
+          f"   (größter Abschnitt: {max((e.ident_n for e in ergebnisse), default=0)})")
+    # Wächter für AP4: Eine thematische Anfrage soll keinen großen Namensträger-Block
+    # bekommen. „Thematisch" heißt hier: Der Prüfsatz erwartet einen Fachtreffer.
+    thematische = [e for e in ergebnisse if e.fall.fach and e.ident_n]
+    if thematische:
+        print(f"  davon thematische Fälle:      {len(thematische):>2}"
+              f"   (größter Abschnitt: {max(e.ident_n for e in thematische)})")
     mit_op = [e for e in ergebnisse if e.operatoren_top3]
     print(f"  Operatoren unter den Top-3 (exakt): {sum(e.operatoren_top3 for e in ergebnisse)} "
           f"in {len(mit_op)} von {n} Fällen")
@@ -306,32 +321,37 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
 
 async def _produktiv(
     frage: str, top_k: int, subject_id: int | None
-) -> tuple[list[Treffer], bool]:
+) -> tuple[list[Treffer], int, int]:
     """Die echte Suchfunktion — keine Nachbildung.
 
     Der Prüfsatz spiegelt für den Recall-Vergleich rohes SQL (er braucht Kontrolle über
     den Ausführungsplan). Für die inhaltliche Bewertung wäre eine zweite Nachbildung
     gefährlich: Sie würde beim nächsten Umbau der Suche stillschweigend etwas anderes
     messen als das, was läuft.
+
+    Bewertet wird der Umschlag in Lesereihenfolge: erst die Namensträger, dann die
+    nächstliegenden Bausteine — die Reihenfolge, in der auch Modell und Oberfläche sie
+    sehen. Zurück kommen zusätzlich die beiden Abschnittsgrößen.
     """
-    from app.chat.router import _exec_search_context_nodes, _nachschlagen
+    from app.context.search import Suchprofil, suche
     from app.db.session import AsyncSessionLocal
 
+    profil = Suchprofil(
+        pseudonym="pruefsatz",
+        subject_id=subject_id,
+        identifikation=top_k,
+        thematisch=top_k,
+    )
     async with AsyncSessionLocal() as db:
-        treffer = await _exec_search_context_nodes(
-            frage, "pruefsatz", db, limit=top_k, subject_id=subject_id
-        )
-        # Direkt gefragt statt aus der Trefferliste erschlossen: Ob nachgeschlagen wurde,
-        # weiß die Suche selbst — aus dem Ergebnis wäre es nur zu erraten.
-        nachschlag = await _nachschlagen(
-            frage, "pruefsatz", db, limit=top_k, subject_id=subject_id
-        )
+        ergebnis = await suche(frage, profil, db)
+
+    treffer = ergebnis.identifikation.treffer + ergebnis.thematisch.treffer
     return [
         Treffer(id=t["node_id"], titel=t.get("title") or "",
                 content_type=t.get("content_type") or "", fach=t.get("fach"),
                 nr=t.get("nr") or "", sim=0.0)
         for t in treffer
-    ], bool(nachschlag)
+    ], ergebnis.identifikation.geliefert, ergebnis.thematisch.geliefert
 
 
 async def _fach_ids(dsn: str) -> dict[str, int]:
@@ -374,8 +394,8 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
             print(f"  ⚠️  '{fall.frage}': exakter Lauf verwendete Plan '{exakt.planart}' — "
                   f"die Messung ist wertlos. Abbruch.", file=sys.stderr)
             return 2
-        produktiv, nachschlagen = await _produktiv(fall.frage, top_k, subject_id)
-        ergebnisse.append(_bewerte(fall, index, exakt, produktiv, nachschlagen))
+        produktiv, ident_n, thema_n = await _produktiv(fall.frage, top_k, subject_id)
+        ergebnisse.append(_bewerte(fall, index, exakt, produktiv, ident_n, thema_n))
 
     _ausgabe(ergebnisse, top_k, details)
 

@@ -229,6 +229,34 @@ class ContextSearchResult(KontextKnotenAnzeige):
     content_type: str | None
 
 
+class SucheAbschnitt(BaseModel):
+    """Ein beschrifteter Teil des Suchergebnisses samt Vollständigkeitsauskunft.
+
+    ``gesamt`` ist die Zahl aller passenden Bausteine, soweit bestimmbar — bei den
+    Namensträgern die Zahl der Gleichnamigen, bei den nächstliegenden Bausteinen
+    ``None``: Dort gibt es keine Gesamtmenge, nur eine Rangfolge nach Ähnlichkeit.
+    """
+
+    treffer: list[ContextSearchResult] = Field(default_factory=list)
+    gesamt: int | None = None
+    vollstaendig: bool = False
+
+
+class SearchEnvelope(BaseModel):
+    """Antwort der Suchschicht (ADR-017): getrennte Abschnitte statt einer Liste.
+
+    Warum nicht eine Liste: Sie kann nicht sagen, ob ein Treffer der gesuchte Baustein
+    **ist** oder ihm nur ähnelt — und ob etwas fehlt. Beides braucht man, um „gibt es
+    das?" zu beantworten, und beides ging in der gemeinsamen Liste verloren.
+    """
+
+    identifikation: SucheAbschnitt = Field(default_factory=SucheAbschnitt)
+    thematisch: SucheAbschnitt = Field(default_factory=SucheAbschnitt)
+    # Erst mit AP3 belegt (Filterabfrage „alle, die …").
+    aufzaehlung: SucheAbschnitt | None = None
+    hinweise: list[str] = Field(default_factory=list)
+
+
 # ── KS-Phase-6 Edge Schemas ─────────────────────────────────────────────
 
 
