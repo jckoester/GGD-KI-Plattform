@@ -244,7 +244,7 @@ async def test_kontext_string_filtert_nach_der_fassung_der_gruppe(db_session):
     db_session.add(conv)
     await db_session.flush()
 
-    with patch("app.context.retrieval.generate_embedding",
+    with patch("app.context.search.generate_embedding",
                new=AsyncMock(return_value=vec(1))), \
          patch("app.context.editions.aktuelles_schuljahr_start", return_value=2026):
         kontext = await get_context_for_query(

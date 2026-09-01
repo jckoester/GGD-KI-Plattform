@@ -23,6 +23,9 @@
 #            Fälle, in denen sich beide **unterscheiden**, sind die Wächter gegen einen
 #            zu starken Vorzug: Wer im Physik-Chat nach Pythagoras fragt, soll die
 #            Mathematik-Kompetenz bekommen.
+#   anker    Optional. Titel eines Ankerknotens (`retrieval_scope`). Gesetzt heißt: Der
+#            Fall misst das Profil eines Anker-Assistenten — gesucht wird nur im
+#            Teilgraphen darunter. Fehlt der Knoten im Bestand, bricht der Lauf ab.
 #   notiz    Optional. Wofür dieser Fall steht.
 #
 # ⚠️ Die Erwartungen sind am Bestand der Entwicklungsinstanz geprüft (Stand 30.08.2026,
@@ -247,6 +250,31 @@ faelle:
       Zweiter Typ (methodenblatt) und zugleich Wächter: Der Knoten liegt thematisch
       neben dem Bestandsfall zur Gedichtinterpretation und darf ihn dort nicht
       verdrängen.
+
+  # ── S7: Anker-Assistenten (retrieval_scope) ─────────────────────────────────
+  #
+  # Erstmals gemessen. Bis 09/2026 lief dieser Weg über eine eigene Funktion, die der
+  # Prüfsatz nie berührt hat — er war der zweite, ungeprüfte Suchweg.
+  #
+  # `anker` nennt den Titel eines Ankerknotens; gesucht wird nur im Teilgraphen
+  # darunter. Fehlt der Knoten im Bestand, bricht der Lauf ab, statt still nichts zu
+  # messen.
+
+  - frage: Wie berechnet man den Flächeninhalt eines Kreises?
+    anker: M Kl. 9
+    knoten: Kreise und Körper
+    notiz: >-
+      Curriculum-Anker: Dieselbe Anfrage wie der Ausgangsfall, aber im Teilgraphen eines
+      Schulcurriculums. Erwartet wird das Kapitel, nicht die BP-Kompetenz — der Anker
+      entscheidet, was überhaupt in Frage kommt.
+
+  - frage: Oxidation und Reduktion
+    anker: CH Gymnasium Kl. 8
+    knoten: Redoxreaktionen
+    notiz: >-
+      Zweiter Curriculum-Anker in einem anderen Fach. Wächter gegen einen Teilgraphen,
+      der stillschweigend zu weit greift: Ein Mathematik-Kapitel darf hier nicht
+      auftauchen.
 
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #

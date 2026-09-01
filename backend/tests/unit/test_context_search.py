@@ -95,6 +95,92 @@ class TestIdentifikationsAbfrage:
         assert "LIMIT 3" in sql
 
 
+class TestAnkerProfil:
+    """Der Anker-Weg ist seit AP5 eine Profilvariante, kein zweiter Suchweg."""
+
+    def test_ohne_anker_kein_teilgraph_filter(self):
+        """Der freie Chat sucht im ganzen Graphen — ein leerer Anker darf nicht
+        versehentlich zu „nirgends" werden."""
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        sql = _sql(identifikations_abfrage(["x"], Suchprofil(pseudonym="p")))
+        assert "abstammung" not in sql.lower()
+
+    def test_mit_anker_wird_eingeschraenkt(self):
+        from uuid import uuid4
+
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        anker = uuid4()
+        sql = _sql(identifikations_abfrage(
+            ["x"], Suchprofil(pseudonym="p", anchor_ids=(anker,))
+        ))
+        assert "RECURSIVE" in sql.upper()
+        assert "context_edges" in sql
+        # PostgreSQL erhält die UUID ohne Bindestriche — deshalb hier so verglichen.
+        assert anker.hex in sql
+
+    def test_teilgraph_folgt_beiden_wegen(self):
+        """Abstammung über `part_of` **und** Verweise über `references`/`develops` —
+        beide aus ADR-013. Fiele einer weg, verlöre ein Anker die Hälfte seines
+        Gegenstands."""
+        from uuid import uuid4
+
+        from app.context.search import teilgraph
+
+        sql = _sql(teilgraph([uuid4()]))
+        assert "'part_of'" in sql
+        assert "'references'" in sql and "'develops'" in sql
+
+    def test_anker_erben_die_gemeinsame_sichtbarkeitsregel(self):
+        """⚠️ **Bewusste Verhaltensänderung.** Der Ankerweg las bis 09/2026 nur
+        `global`/`school` plus eigene private Knoten. Jetzt gilt dieselbe Regel wie
+        überall — Anker-Assistenten sehen damit auch `subject`-Knoten und
+        mitgliedschaftsgeprüfte `group`-Knoten in ihrem Teilgraphen."""
+        from uuid import uuid4
+
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        sql = _sql(identifikations_abfrage(
+            ["x"], Suchprofil(pseudonym="p", anchor_ids=(uuid4(),))
+        ))
+        assert "group_memberships" in sql
+        assert "'subject'" in sql
+
+
+class TestEditionen:
+    """Fassungs-Bereinigung — seit AP5 für alle Profile, nicht nur für Anker."""
+
+    def test_frontier_behaelt_unversionierte(self):
+        """Ein Knoten ohne BP-Fassung ist keine Fassung von irgendetwas und bleibt."""
+        from app.context.search import _filtere_auf_frontier
+
+        treffer = [{"bp_version": None, "subject_id": 1, "title": "Notiz"}]
+        assert _filtere_auf_frontier(treffer, {1: "2016.V3"}) == treffer
+
+    def test_frontier_filtert_die_alte_fassung(self):
+        from app.context.search import _filtere_auf_frontier
+
+        alt = {"bp_version": "2016", "subject_id": 1}
+        neu = {"bp_version": "2016.V3", "subject_id": 1}
+        assert _filtere_auf_frontier([alt, neu], {1: "2016.V3"}) == [neu]
+
+    def test_fach_ohne_bestimmbare_fassung_bleibt_ungefiltert(self):
+        """Sonst bliebe von einem Fach, dessen Fassung sich nicht bestimmen lässt,
+        gar nichts übrig."""
+        from app.context.search import _filtere_auf_frontier
+
+        treffer = [{"bp_version": "2016", "subject_id": 9}]
+        assert _filtere_auf_frontier(treffer, {1: "2016.V3"}) == treffer
+
+    def test_ueberhang_deckt_die_bereinigung(self):
+        """Filter und Zusammenfassung entfernen Treffer **nach** der Abfrage. Ohne
+        Überhang lieferte eine Suche mit Budget 10 am Ende womöglich vier."""
+        from app.context.search import _KANDIDATEN_FAKTOR
+
+        assert _KANDIDATEN_FAKTOR >= 2
+
+
 class TestKandidaten:
     """Wonach die Identifikation sucht — und warum es zwei Formen braucht."""
 
@@ -266,19 +352,20 @@ class TestFassungen:
         a = {"subject_id": 1, "content_type": "aufgabe", "nr": "1", "bp_version": None}
         assert len(fasse_fassungen_zusammen([a, dict(a)], _treffer_schluessel)) == 2
 
-    def test_eine_regel_fuer_beide_wege(self):
-        """Der Anker-Weg (`retrieval.py`) benutzt dieselbe Entscheidung wie die
-        Aufzählung — sonst zählte die eine Seite, was die andere zusammenfasst."""
-        from app.context.retrieval import _fassungs_schluessel
-        from app.context.search import fassungs_schluessel
+    def test_gilt_fuer_alle_profile(self):
+        """Seit AP5 gibt es nur noch **einen** Weg, auf dem Fassungen zusammenfallen.
 
-        knoten = type("N", (), {
-            "bp_version": "2016.V2", "subject_id": 1, "content_type": "ik_kompetenz",
-            "metadata_": {"kompetenz_nr": "3.1.2(4)"},
-        })()
-        assert _fassungs_schluessel(knoten) == fassungs_schluessel(
-            1, "ik_kompetenz", "3.1.2(4)"
-        )
+        Bis dahin lag die Regel im Anker-Weg (`retrieval.py`); der freie Chat bekam
+        Fassungs-Dubletten ungefiltert. `retrieval.py` hat davon nichts mehr — es trägt
+        nur noch den Lernstand, und der ist Traversierung, keine Suche.
+        """
+        import app.context.retrieval as retrieval
+
+        for name in ("get_semantic_context", "_fasse_fassungen_zusammen",
+                     "_frontier_je_fach", "_fassungs_schluessel"):
+            assert not hasattr(retrieval, name), (
+                f"`{name}` lebt wieder in retrieval.py — damit gibt es zwei Wege."
+            )
 
 
 class TestAufzaehlungsWerkzeug:

@@ -34,13 +34,14 @@ import sqlalchemy as sa
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.editions import aktive_bp_version
 from app.context.embedding import generate_embedding
 from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
 from app.context.filters import Knotenfilter, wende_an
 from app.context.lookup import nachschlage_begriff, normalisiere_titel
 from app.context.schemas import anzeige_felder
 from app.context.visibility import read_scope_clause
-from app.db.models import ContextNode, Subject
+from app.db.models import ContextEdge, ContextNode, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,16 @@ class Suchprofil:
     # Antwort mit acht von vierundzwanzig hilft dort niemandem. Die Zählung selbst ist
     # ohnehin vollständig, unabhängig davon, wie viele Treffer mitgeliefert werden.
     aufzaehlung: int = 50
+    # Anker eines Assistenten (`retrieval_scope`). Sind sie gesetzt, sucht die
+    # thematische Auswahl **nur** im Teilgraphen darunter — der frühere zweite Suchweg
+    # ist damit eine Profilvariante und kein eigener Code mehr.
+    anchor_ids: tuple[UUID, ...] = ()
+    # Jahrgangsstufe der/des Fragenden, falls ableitbar. Entscheidet, welche
+    # Bildungsplan-Fassung gilt, solange eine neue Edition nach oben wächst.
+    grade: int | None = None
+    # Rohe Metadaten an den Treffern (Breadcrumb, `afb`, `aliase`). Standardmäßig aus:
+    # Sie kosten im Modellkontext Platz, den Import-Interna nicht wert sind.
+    mit_metadaten: bool = False
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────
@@ -189,13 +200,20 @@ _SPALTEN = (
 
 
 def _grundabfrage(profil: Suchprofil):
-    """Sichtbare, aktive Knoten mit Fachnamen — die gemeinsame Basis aller Verfahren."""
-    return (
+    """Sichtbare, aktive Knoten mit Fachnamen — die gemeinsame Basis aller Verfahren.
+
+    Sind Anker gesetzt, wird zusätzlich auf deren Teilgraphen eingeschränkt: Ein
+    Assistent mit ``retrieval_scope`` soll nur finden, was zu seinem Gegenstand gehört.
+    """
+    stmt = (
         select(*_SPALTEN)
         .outerjoin(Subject, Subject.id == ContextNode.subject_id)
         .where(ContextNode.status == "active")
         .where(read_scope_clause(profil.pseudonym, profil.rollen))
     )
+    if profil.anchor_ids:
+        stmt = stmt.where(ContextNode.id.in_(teilgraph(profil.anchor_ids)))
+    return stmt
 
 
 def _bonus(bedingung, wert: float):
@@ -220,6 +238,131 @@ def _aus_dem_fach(profil: Suchprofil):
     if profil.subject_id is None:
         return None
     return ContextNode.subject_id == profil.subject_id
+
+
+# ── Teilgraph unter Ankern (Profil `anchor_ids`) ─────────────────────────────
+
+
+def teilgraph(anchor_ids: Sequence[UUID]):
+    """Die Knoten unter den Ankern eines Assistenten — als Unterabfrage.
+
+    Zwei Wege führen hinein, beide aus ADR-013:
+
+    * **Abstammung** — alles, was über ``part_of`` unter einem Anker hängt, rekursiv.
+      Ein Curriculum-Anker erfasst so seine Kapitel und deren Lernsequenzen.
+    * **Verweise** — was der Anker selbst über ``references`` oder ``develops``
+      benennt. Eine Lernsequenz zieht damit die Kompetenzen herein, die sie entwickelt,
+      ohne dass sie unter ihr hängen.
+
+    Bis 09/2026 stand diese Abfrage als roher SQL-Text in ``retrieval.py`` und war der
+    einzige Ort mit einer zweiten Vektorsuche. Jetzt ist sie ein Vorfilter der Schicht:
+    Anker-Assistenten erben damit Nachschlagen, Boni und Prüfsatz.
+    """
+    kanten = ContextEdge.__table__
+    knoten = ContextNode.__table__
+    ids = list(anchor_ids)
+
+    abstammung = (
+        sa.select(knoten.c.id)
+        .where(knoten.c.id.in_(ids), knoten.c.status == "active")
+        .cte("abstammung", recursive=True)
+    )
+    abstammung = abstammung.union_all(
+        sa.select(kanten.c.from_node_id)
+        .select_from(kanten.join(abstammung, kanten.c.to_node_id == abstammung.c.id))
+        .where(kanten.c.relation == "part_of")
+    )
+    verwiesen = sa.select(kanten.c.to_node_id).where(
+        kanten.c.from_node_id.in_(ids),
+        kanten.c.relation.in_(["references", "develops"]),
+    )
+    return sa.union(sa.select(abstammung.c.id), verwiesen)
+
+
+# ── Editionen: zwei gültige BP-Fassungen gleichzeitig ────────────────────────
+#
+# Solange eine neue Bildungsplan-Edition jahrgangsweise nach oben wächst, liegen dieselben
+# Kompetenzen doppelt im Speicher — in der alten und der neuen Fassung, textlich oft nur
+# in Nuancen verschieden. Ohne Gegenmaßnahme belegen beide je einen der Plätze und
+# verdrängen anderes.
+#
+# Zwei Stufen, absichtlich in dieser Reihenfolge:
+#   1. Filtern, wo ein Jahrgang bekannt ist — dann entscheidet der Fahrplan, welche
+#      Fassung gilt (fachweise, inkl. Inhalts-Fallback).
+#   2. Zusammenfassen, was danach noch doppelt ist — greift auch im freien Chat ohne
+#      Gruppenbezug, wählt aber nur nach Ähnlichkeit.
+#
+# Seit 09/2026 gilt beides für **alle** Profile. Bis dahin lag es allein im Anker-Weg;
+# der freie Chat bekam Fassungs-Dubletten ungefiltert.
+
+# Überhang beim Holen: Filter und Zusammenfassung entfernen Treffer, deshalb wird ein
+# Vielfaches des Budgets geladen und erst danach gekürzt.
+_KANDIDATEN_FAKTOR = 3
+
+
+async def _frontier_je_fach(
+    db: AsyncSession, subject_ids: set[int], grade: int
+) -> dict[int, str]:
+    """{subject_id: geltende bp_version} für diese Stufe im laufenden Schuljahr.
+
+    Fächer ohne bestimmbare Fassung fehlen im Ergebnis — für sie wird nicht gefiltert.
+    Der Editionsbestand kommt je Fach aus der DB, damit der Inhalts-Fallback greift (neue
+    Edition laut Fahrplan in Kraft, aber für dieses Fach noch nicht importiert → vorige
+    Edition gilt weiter).
+    """
+    if not subject_ids:
+        return {}
+
+    zeilen = await db.execute(
+        sa.select(ContextNode.subject_id, ContextNode.bp_version)
+        .where(
+            ContextNode.subject_id.in_(subject_ids),
+            ContextNode.status == "active",
+            ContextNode.bp_version != "",
+        )
+        .distinct()
+    )
+    bestand: dict[int, set[str]] = {}
+    for subject_id, bp_version in zeilen.all():
+        bestand.setdefault(subject_id, set()).add(bp_version)
+
+    frontier: dict[int, str] = {}
+    for subject_id, verfuegbar in bestand.items():
+        gilt = aktive_bp_version(grade, verfuegbar)
+        if gilt:
+            frontier[subject_id] = gilt
+    return frontier
+
+
+def _filtere_auf_frontier(treffer: list[dict], frontier: dict[int, str]) -> list[dict]:
+    """Nur die geltende Fassung behalten — unversionierte Knoten bleiben immer.
+
+    Fächer ohne Eintrag in ``frontier`` werden nicht gefiltert; sonst bliebe von einem
+    Fach, dessen Fassung sich nicht bestimmen lässt, gar nichts übrig.
+    """
+    return [
+        t
+        for t in treffer
+        if not t.get("bp_version")
+        or frontier.get(t.get("subject_id")) in (None, t.get("bp_version"))
+    ]
+
+
+async def _auf_geltende_fassung(
+    treffer: list[dict], profil: Suchprofil, db: AsyncSession
+) -> list[dict]:
+    """Beide Editionsstufen anwenden: erst filtern (wenn ein Jahrgang bekannt ist),
+    dann zusammenfassen, was noch doppelt ist."""
+    if profil.grade is not None:
+        faecher = {
+            t["subject_id"]
+            for t in treffer
+            if t.get("bp_version") and t.get("subject_id")
+        }
+        treffer = _filtere_auf_frontier(
+            treffer, await _frontier_je_fach(db, faecher, profil.grade)
+        )
+    return fasse_fassungen_zusammen(treffer, _treffer_schluessel)
 
 
 # ── Fassungen derselben Kompetenz ────────────────────────────────────────────
@@ -557,16 +700,24 @@ async def thematisch(
     ``ausschluss`` sind bereits in der Identifikation gelieferte Knoten — sie sollen
     nicht zweimal im selben Umschlag stehen.
 
+    Sind ``profil.anchor_ids`` gesetzt, läuft dieselbe Suche im Teilgraphen unter den
+    Ankern — das ist der frühere ``get_semantic_context``.
+
     Fällt auf ILIKE zurück, wenn kein Embedding erzeugt werden kann oder kein Knoten ein
     Embedding hat.
     """
     ausschluss = ausschluss or set()
-    # Überhang holen, damit der Ausschluss der Identifikations-Treffer das Budget nicht
-    # von unten aufzehrt.
-    hole = profil.thematisch + len(ausschluss)
+    # Überhang holen: Der Ausschluss der Identifikations-Treffer und die
+    # Editionsbereinigung entfernen Zeilen, und beides erst nach der Abfrage.
+    hole = (profil.thematisch + len(ausschluss)) * _KANDIDATEN_FAKTOR
 
-    def fertig(zeilen) -> Abschnitt:
-        treffer = [t for t in (_treffer(z) for z in zeilen) if t["node_id"] not in ausschluss]
+    async def fertig(zeilen) -> Abschnitt:
+        treffer = [
+            t
+            for t in (_treffer(z, mit_metadaten=profil.mit_metadaten) for z in zeilen)
+            if t["node_id"] not in ausschluss
+        ]
+        treffer = await _auf_geltende_fassung(treffer, profil, db)
         # Die thematische Auswahl ist **nie** vollständig: Zu „ähnlich genug" gibt es
         # keine Grenze, die sich verteidigen ließe (in der Bestandsaufnahme widerlegt).
         return Abschnitt(treffer=treffer[: profil.thematisch], gesamt=None, vollstaendig=False)
@@ -594,7 +745,7 @@ async def thematisch(
         )
         zeilen = (await db.execute(stmt)).mappings().all()
         if zeilen:
-            return fertig(zeilen)
+            return await fertig(zeilen)
         # Kein Knoten hat ein Embedding → Fallback
     except Exception:
         logger.warning("Embedding-Suche fehlgeschlagen, Fallback auf ILIKE")
@@ -614,7 +765,7 @@ async def thematisch(
     )
     if aus_dem_fach is not None:
         stmt = stmt.order_by(sa.case((aus_dem_fach, 0), else_=1))
-    return fertig((await db.execute(stmt)).mappings().all())
+    return await fertig((await db.execute(stmt)).mappings().all())
 
 
 # ── Einstiegspunkt ───────────────────────────────────────────────────────────

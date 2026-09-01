@@ -114,6 +114,33 @@ def truncate_ks3_tables(db_url, run_migrations, seed_test_group):
     yield
 
 
+
+async def anker_suche(
+    db, anchor_ids, query_text="irgendwas", pseudonym="test", top_k=10, grade=None
+):
+    """Die Anker-Suche, wie sie seit ADR-017/AP5 läuft: ein Profil der Suchschicht.
+
+    Bis dahin war sie eine eigene Funktion (`retrieval.get_semantic_context`) mit
+    eigener Vektorabfrage — und der einzige Suchweg, den der Prüfsatz nie gemessen hat.
+    Zurück kommen jetzt Treffer-Dicts statt ORM-Knoten; die Tests greifen entsprechend
+    auf `["node_id"]` statt `.id` zu.
+    """
+    from app.context.search import Suchprofil, thematisch
+
+    abschnitt = await thematisch(
+        query_text,
+        Suchprofil(
+            pseudonym=pseudonym,
+            anchor_ids=tuple(anchor_ids),
+            grade=grade,
+            thematisch=top_k,
+            mit_metadaten=True,
+        ),
+        db,
+    )
+    return abschnitt.treffer
+
+
 class TestContextAnchorsAPI:
     """Integrationstests fuer die Context Anchor API."""
 
@@ -337,7 +364,6 @@ class TestSemanticSearch:
     @pytest.mark.asyncio
     async def test_semantic_search_finds_relevant_node(self, db_session, db_url):
         """Anlegen von 3 Knoten mit verschiedenen Embeddings; Query-Embedding ahnlich zu Knoten 1 -> Knoten 1 ist erstes Ergebnis."""
-        from app.context.retrieval import get_semantic_context
 
         # 3 Knoten mit unterschiedlichen Embeddings anlegen
         node1 = insert_node_sync(
@@ -370,40 +396,40 @@ class TestSemanticSearch:
         from unittest.mock import patch, AsyncMock
         query_embedding = [0.9] + [0.01] * (settings.embedding_dimensions - 1)
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=query_embedding,
         ):
-            results = await get_semantic_context(
-                anchor_ids=[node1, node2, node3],
-                query_text="irgendwas",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [node1, node2, node3], query_text="irgendwas", top_k=10)
 
         # node1 sollte erstes Ergebnis sein (kleinstes Cosinus-Distance)
         assert len(results) == 3
-        assert str(results[0].id) == node1
+        assert results[0]["node_id"] == node1
 
     @pytest.mark.asyncio
-    async def test_no_anchors_returns_empty(self, db_session):
-        """anchor_ids=[] -> leere Liste, kein Fehler."""
-        from app.context.retrieval import get_semantic_context
+    async def test_ohne_anker_entscheidet_der_dienst(self, db_session, seed_test_assistant):
+        """Ohne Anker sucht die Schicht **im ganzen Graphen** — nicht nirgends.
 
-        results = await get_semantic_context(
-            anchor_ids=[],
+        Bis AP5 gab `get_semantic_context` bei leeren Ankern eine leere Liste zurück; das
+        war die einzige Bremse. Jetzt ist `anchor_ids` ein Vorfilter wie jeder andere,
+        und wer keinen Teilgraphen setzt, sucht überall — genau das braucht der freie
+        Chat. Die Entscheidung „ohne Anker gar nicht suchen" liegt deshalb dort, wo sie
+        hingehört: im Dienst, der den Assistentenkontext zusammenstellt.
+        """
+        from app.context.service import get_context_for_query
+
+        ergebnis = await get_context_for_query(
+            assistant_id=None,
+            pseudonym="test_user",
             query_text="irgendwas",
-            pseudonym="test",
+            chat_id=None,
             db=db_session,
-            top_k=10,
         )
-        assert results == []
+        assert "## Relevante Lerninhalte" not in ergebnis
 
     @pytest.mark.asyncio
     async def test_archived_nodes_excluded(self, db_session, db_url):
         """Archivierter Knoten im Scope -> nicht im Ergebnis."""
-        from app.context.retrieval import get_semantic_context
 
         node1 = insert_node_sync(
             db_url,
@@ -431,26 +457,19 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(0),
         ):
-            results = await get_semantic_context(
-                anchor_ids=[node1, node2],
-                query_text="test",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [node1, node2], query_text="test", top_k=10)
 
         # Nur node1 sollte zurueckgegeben werden
         assert len(results) == 1
-        assert str(results[0].id) == node1
+        assert results[0]["node_id"] == node1
 
     @pytest.mark.asyncio
     async def test_node_without_embedding_excluded(self, db_session, db_url):
         """Knoten ohne Embedding im Scope -> nicht im Ergebnis."""
-        from app.context.retrieval import get_semantic_context
 
         node1 = insert_node_sync(
             db_url,
@@ -471,25 +490,18 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(0),
         ):
-            results = await get_semantic_context(
-                anchor_ids=[node1, node2],
-                query_text="test",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [node1, node2], query_text="test", top_k=10)
 
         assert len(results) == 1
-        assert str(results[0].id) == node1
+        assert results[0]["node_id"] == node1
 
     @pytest.mark.asyncio
     async def test_scope_cte_follows_part_of(self, db_session, db_url):
         """Anker = Leitidee-Knoten; ik_kompetenz-Knoten mit part_of-Kante -> im Ergebnis."""
-        from app.context.retrieval import get_semantic_context
 
         leitidee = insert_node_sync(
             db_url,
@@ -513,27 +525,20 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(100),
         ):
-            results = await get_semantic_context(
-                anchor_ids=[leitidee],
-                query_text="test",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [leitidee], query_text="test", top_k=10)
 
         # Beide Knoten sollten im Ergebnis sein
-        result_ids = {str(r.id) for r in results}
+        result_ids = {r["node_id"] for r in results}
         assert leitidee in result_ids
         assert ik in result_ids
 
     @pytest.mark.asyncio
     async def test_scope_cte_follows_references(self, db_session, db_url):
         """Anker = UE-Knoten; ik_kompetenz mit references-Kante vom Anker -> im Ergebnis."""
-        from app.context.retrieval import get_semantic_context
 
         ue = insert_node_sync(
             db_url,
@@ -557,26 +562,19 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(100),
         ):
-            results = await get_semantic_context(
-                anchor_ids=[ue],
-                query_text="test",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [ue], query_text="test", top_k=10)
 
-        result_ids = {str(r.id) for r in results}
+        result_ids = {r["node_id"] for r in results}
         assert ue in result_ids
         assert ik in result_ids
 
     @pytest.mark.asyncio
     async def test_read_scope_private_excluded_for_other_user(self, db_session, db_url):
         """Knoten mit read_scope='private', owner='anderes-pseudonym' -> nicht im Ergebnis fuer aktuelles Pseudonym."""
-        from app.context.retrieval import get_semantic_context
 
         node1 = insert_node_sync(
             db_url,
@@ -599,16 +597,12 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(0),
         ):
-            results = await get_semantic_context(
-                anchor_ids=[node1],
-                query_text="test",
-                pseudonym="current_user",
-                db=db_session,
-                top_k=10,
+            results = await anker_suche(
+                db_session, [node1], query_text="test", pseudonym="current_user"
             )
 
         assert len(results) == 0
@@ -616,7 +610,6 @@ class TestSemanticSearch:
     @pytest.mark.asyncio
     async def test_scope_filter_excludes_out_of_scope(self, db_session, db_url):
         """Zwei Anker-Subgraphen; Knoten ausserhalb des Scope werden nicht zurueckgegeben."""
-        from app.context.retrieval import get_semantic_context
 
         # Anker 1 mit seinem Subgraphen
         anchor1 = insert_node_sync(
@@ -658,20 +651,14 @@ class TestSemanticSearch:
 
         from unittest.mock import patch, AsyncMock
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(1),
         ):
             # Suche nur im Scope von anchor1
-            results = await get_semantic_context(
-                anchor_ids=[anchor1],
-                query_text="test",
-                pseudonym="test",
-                db=db_session,
-                top_k=10,
-            )
+            results = await anker_suche(db_session, [anchor1], query_text="test", top_k=10)
 
-        result_ids = {str(r.id) for r in results}
+        result_ids = {r["node_id"] for r in results}
         assert anchor1 in result_ids
         assert node1 in result_ids
         assert anchor2 not in result_ids
@@ -740,20 +727,16 @@ class TestSemanticSearchEditionen:
         """`nahe` = Position des Suchvektors: 1 trifft V2, 2 trifft V3."""
         from unittest.mock import AsyncMock, patch
 
-        from app.context.retrieval import get_semantic_context
 
         with patch(
-            'app.context.retrieval.generate_embedding',
+            'app.context.search.generate_embedding',
             new_callable=AsyncMock,
             return_value=unit_vec(nahe),
         ), patch(
             'app.context.editions.aktuelles_schuljahr_start',
             return_value=2026,          # Schuljahr 2026/27: V3 gilt fuer Klasse 5-7
         ):
-            return await get_semantic_context(
-                anchor_ids=[anker], query_text="Zahlen", pseudonym="test",
-                db=db_session, top_k=top_k, grade=grade,
-            )
+            return await anker_suche(db_session, [anker], query_text="Zahlen", top_k=top_k, grade=grade)
 
     @pytest.mark.asyncio
     async def test_jahrgang_waehlt_die_geltende_fassung(self, db_session, db_url):
@@ -765,7 +748,7 @@ class TestSemanticSearchEditionen:
 
         results = await self._suche(db_session, anker, grade=5)
 
-        ids = [str(r.id) for r in results]
+        ids = [r["node_id"] for r in results]
         assert v3 in ids
         assert v2 not in ids
 
@@ -780,7 +763,7 @@ class TestSemanticSearchEditionen:
 
         results = await self._suche(db_session, anker, grade=10, nahe=2)
 
-        ids = [str(r.id) for r in results]
+        ids = [r["node_id"] for r in results]
         assert v2 in ids
         assert v3 not in ids
 
@@ -794,7 +777,7 @@ class TestSemanticSearchEditionen:
 
         results = await self._suche(db_session, anker, grade=None)
 
-        ids = [str(r.id) for r in results]
+        ids = [r["node_id"] for r in results]
         assert v2 in ids
         assert v3 not in ids
 
@@ -812,7 +795,7 @@ class TestSemanticSearchEditionen:
 
         results = await self._suche(db_session, anker, grade=None)
 
-        ids = [str(r.id) for r in results]
+        ids = [r["node_id"] for r in results]
         assert v2 in ids
         assert andere in ids
 
@@ -836,7 +819,7 @@ class TestSemanticSearchEditionen:
 
         results = await self._suche(db_session, anker, grade=5)
 
-        ids = {str(r.id) for r in results}
+        ids = {r["node_id"] for r in results}
         assert set(eigene) <= ids
 
     @pytest.mark.asyncio
@@ -1201,7 +1184,7 @@ class TestContextAssembly:
         insert_edge_sync(db_url, from_id=child, to_id=anchor, relation="part_of")
         insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
 
-        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
+        with patch("app.context.search.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
             result = await get_context_for_query(
                 assistant_id=seed_test_assistant,
                 pseudonym="test_user",
@@ -1238,7 +1221,7 @@ class TestContextAssembly:
         insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
         insert_engagement_sync(db_url, node_id=kompetenz, pseudonym="test_user", relation="knows")
 
-        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(1))):
+        with patch("app.context.search.generate_embedding", new=AsyncMock(return_value=unit_vec(1))):
             result = await get_context_for_query(
                 assistant_id=seed_test_assistant,
                 pseudonym="test_user",
@@ -1274,7 +1257,7 @@ class TestContextAssembly:
         insert_edge_sync(db_url, from_id=child, to_id=anchor, relation="part_of")
         insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
 
-        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(2))):
+        with patch("app.context.search.generate_embedding", new=AsyncMock(return_value=unit_vec(2))):
             result = await get_context_for_query(
                 assistant_id=seed_test_assistant,
                 pseudonym="test_user",
@@ -1311,7 +1294,7 @@ class TestContextAssembly:
         insert_anchor_sync(db_url, assistant_id=seed_test_assistant, node_id=anchor, role="retrieval_scope")
         insert_engagement_sync(db_url, node_id=kompetenz, pseudonym="test_user", relation="mastered")
 
-        with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(3))):
+        with patch("app.context.search.generate_embedding", new=AsyncMock(return_value=unit_vec(3))):
             result = await get_context_for_query(
                 assistant_id=seed_test_assistant,
                 pseudonym="test_user",
@@ -1478,7 +1461,7 @@ class TestArduinoE2E:
             await db.flush()
 
             # Mock für Embedding-Generierung
-            with patch("app.context.retrieval.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
+            with patch("app.context.search.generate_embedding", new=AsyncMock(return_value=unit_vec(0))):
                 # Assistent mit Retrieval-Scope Kontext erstellen
                 assistant_result = await db.execute(
                     text("""

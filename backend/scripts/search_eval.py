@@ -104,6 +104,9 @@ class Fall:
     fach: str | None = None          # Fach, aus dem der beste Treffer kommen soll
     chat_fach: str | None = None     # Fach der Konversation, in der gefragt wird
     knoten: str | None = None
+    # Titel eines Ankerknotens (`retrieval_scope`). Gesetzt heißt: Der Fall misst das
+    # Profil eines Anker-Assistenten — gesucht wird nur im Teilgraphen darunter.
+    anker: str | None = None
     notiz: str | None = None
 
 
@@ -286,7 +289,7 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> int:
     print("  " + "─" * 95)
     for e in ergebnisse:
         frage = e.fall.frage if len(e.fall.frage) <= 39 else e.fall.frage[:38] + "…"
-        chat = (e.fall.chat_fach or "—")[:13]
+        chat = (f"⚓ {e.fall.anker}" if e.fall.anker else (e.fall.chat_fach or "—"))[:13]
         print(
             f"  {frage:<40}{chat:<14}{e.recall*100:>6.0f}%"
             f"{(str(e.ident_n) if e.ident_n else '·'):>6}{e.thema_n:>6}"
@@ -360,8 +363,25 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> int:
     return ueber_deckel
 
 
+async def _anker_id(titel: str) -> str | None:
+    """Titel eines Ankerknotens → seine ID. ``None``, wenn es ihn nicht gibt."""
+    import sqlalchemy as sa
+
+    from app.db.models import ContextNode
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        treffer = await db.execute(
+            sa.select(ContextNode.id).where(
+                ContextNode.title == titel, ContextNode.status == "active"
+            ).limit(1)
+        )
+        knoten_id = treffer.scalars().first()
+    return str(knoten_id) if knoten_id else None
+
+
 async def _produktiv(
-    frage: str, top_k: int, subject_id: int | None
+    frage: str, top_k: int, subject_id: int | None, anker: str | None = None
 ) -> tuple[list[Treffer], int, int]:
     """Die echte Suchfunktion — keine Nachbildung.
 
@@ -377,11 +397,21 @@ async def _produktiv(
     from app.context.search import Suchprofil, suche
     from app.db.session import AsyncSessionLocal
 
+    anchor_ids: tuple = ()
+    if anker:
+        knoten_id = await _anker_id(anker)
+        if knoten_id is None:
+            raise SystemExit(
+                f"Ankerknoten '{anker}' steht nicht im Bestand — der Fall misst nichts."
+            )
+        anchor_ids = (knoten_id,)
+
     profil = Suchprofil(
         pseudonym="pruefsatz",
         subject_id=subject_id,
         identifikation=top_k,
         thematisch=top_k,
+        anchor_ids=anchor_ids,
     )
     async with AsyncSessionLocal() as db:
         ergebnis = await suche(frage, profil, db)
@@ -408,7 +438,7 @@ def _lade(pfad: Path) -> tuple[list[Fall], int, list["Aufzaehlfall"]]:
     faelle = [
         Fall(frage=f["frage"], fach=f.get("fach"), chat_fach=f.get("chat_fach"), knoten=(
             None if f.get("knoten") is None else str(f["knoten"])
-        ), notiz=f.get("notiz"))
+        ), anker=f.get("anker"), notiz=f.get("notiz"))
         for f in daten.get("faelle", [])
     ]
     aufzaehlungen = [
@@ -496,7 +526,9 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
             print(f"  ⚠️  '{fall.frage}': exakter Lauf verwendete Plan '{exakt.planart}' — "
                   f"die Messung ist wertlos. Abbruch.", file=sys.stderr)
             return 2
-        produktiv, ident_n, thema_n = await _produktiv(fall.frage, top_k, subject_id)
+        produktiv, ident_n, thema_n = await _produktiv(
+            fall.frage, top_k, subject_id, fall.anker
+        )
         ergebnisse.append(_bewerte(fall, index, exakt, produktiv, ident_n, thema_n))
 
     ueber_deckel = _ausgabe(ergebnisse, top_k, details)

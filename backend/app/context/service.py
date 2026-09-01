@@ -9,6 +9,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
-from app.context.retrieval import EngagementEntry, get_engagement_context, get_semantic_context
+from app.context.retrieval import EngagementEntry, get_engagement_context
+from app.context.search import Suchprofil, thematisch
 from app.context.schemas import CurriculumDraftConfirmed
 from app.db.models import (
     AssistantContextAnchor,
@@ -33,6 +35,12 @@ from app.db.models import (
 logger = logging.getLogger(__name__)
 
 
+# Wie viele Bausteine ein Anker-Assistent aus seinem Teilgraphen in den Prompt bekommt.
+# Der Wert stammt aus dem früheren `get_semantic_context(top_k=10)` und ist mit der
+# Vereinheitlichung unverändert übernommen worden — er begrenzt die Prompt-Länge, nicht
+# die Suchgüte.
+_ANKER_TOP_K = 10
+
 _RELATION_LABELS: dict[str, str] = {
     "introduced": "eingeführt",
     "knows": "bekannt",
@@ -42,20 +50,27 @@ _RELATION_LABELS: dict[str, str] = {
 
 
 def _assemble_context(
-    semantic_nodes: list[ContextNode],
+    semantic_treffer: list[dict],
     engagement_entries: list[EngagementEntry],
     pinned_nodes: list[ContextNode],
 ) -> str:
+    """Den Kontext-Block für den Prompt bauen.
+
+    ``semantic_treffer`` sind Treffer der Suchschicht (Dicts), keine ORM-Knoten: Seit
+    ADR-017/AP5 liefert der Anker-Weg dasselbe wie jede andere Suche. Gepinnte Knoten
+    kommen weiterhin als ORM-Objekte — sie werden direkt geladen, nicht gesucht.
+    """
     sections: list[str] = []
 
-    if semantic_nodes:
+    if semantic_treffer:
         lines = ["## Relevante Lerninhalte\n"]
-        for node in semantic_nodes:
+        for treffer in semantic_treffer:
+            meta = treffer.get("metadata") or {}
             breadcrumb = ""
-            if node.metadata_ and "breadcrumb" in node.metadata_:
-                breadcrumb = " | ".join(node.metadata_["breadcrumb"]) + "\n"
-            content = node.content or ""
-            lines.append(f"### {node.title}\n{breadcrumb}{content}\n")
+            if "breadcrumb" in meta:
+                breadcrumb = " | ".join(meta["breadcrumb"]) + "\n"
+            content = treffer.get("content") or ""
+            lines.append(f"### {treffer['title']}\n{breadcrumb}{content}\n")
         sections.append("\n".join(lines))
 
     if engagement_entries:
@@ -86,11 +101,15 @@ async def get_context_for_query(
     query_text: str,
     chat_id: UUID | None,
     db: AsyncSession,
+    rollen: Sequence[str] = (),
 ) -> str:
     """Assembliert den Kontext-String für einen Chat-Prompt.
 
     Kombiniert semantische Suche, Engagement-Retrieval und explizit gepinnte Knoten.
     Pinned nodes werden unabhängig von einem Assistenten oder retrieval_scope geladen.
+
+    ``rollen`` geht in die Sichtbarkeitsprüfung der Suchschicht ein. Ohne Angabe gilt die
+    strengere Nicht-Admin-Regel — im Zweifel weniger zu zeigen ist die richtige Richtung.
     """
     # Retrieval-Scope-Anker nur laden wenn ein Assistent aktiv ist
     anchor_ids: list[UUID] = []
@@ -118,19 +137,38 @@ async def get_context_for_query(
         pinned_nodes = list(pinned_result.scalars().all())
 
     # Semantische Suche nur wenn retrieval_scope-Anker vorhanden
-    semantic_nodes: list[ContextNode] = []
+    semantic_treffer: list[dict] = []
     engagement_entries: list[EngagementEntry] = []
     if anchor_ids:
         # Der Jahrgang entscheidet, welche BP-Fassung gilt, solange eine neue
         # Edition nach oben wächst. Ohne Gruppenbezug bleibt er None — die Suche
         # fasst Fassungs-Dubletten dann nur zusammen, statt zu filtern.
         grade = await _conversation_grade(db, chat_id)
-        semantic_nodes, engagement_entries = await asyncio.gather(
-            get_semantic_context(anchor_ids, query_text, pseudonym, db, grade=grade),
+        # Profil „Anker-Assistent": dieselbe Schicht wie überall, nur mit Teilgraph.
+        #
+        # Aufgerufen wird `thematisch()` direkt, nicht `suche()`: Dieser Kontext wandert
+        # **ungefragt** in den Prompt, nicht in eine Antwort an das Modell. Ein
+        # Ergebnisumschlag mit beschrifteten Abschnitten hätte hier niemanden, der ihn
+        # liest — und die Identifikation trüge im Teilgraphen wenig bei, wo ohnehin
+        # jeder Knoten zum Gegenstand des Assistenten gehört.
+        #
+        # `mit_metadaten`, weil der Breadcrumb in den Prompt gehört: Er ordnet eine
+        # Kompetenz in ihren Bildungsplan ein.
+        profil = Suchprofil(
+            pseudonym=pseudonym,
+            rollen=rollen,
+            anchor_ids=tuple(anchor_ids),
+            grade=grade,
+            thematisch=_ANKER_TOP_K,
+            mit_metadaten=True,
+        )
+        thematisch_abschnitt, engagement_entries = await asyncio.gather(
+            thematisch(query_text, profil, db),
             get_engagement_context(anchor_ids, pseudonym, db),
         )
+        semantic_treffer = thematisch_abschnitt.treffer
 
-    base = _assemble_context(semantic_nodes, engagement_entries, pinned_nodes)
+    base = _assemble_context(semantic_treffer, engagement_entries, pinned_nodes)
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
     planning_block = await _planning_block(db, chat_id)

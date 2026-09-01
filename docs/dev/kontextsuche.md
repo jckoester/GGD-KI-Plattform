@@ -18,6 +18,7 @@ Eine Schicht, drei Verfahren, ein Ergebnisumschlag.
 | `visibility.py` | **Eine** Sichtbarkeitsregel für alle Abfragewege über `context_nodes` |
 | `filters.py` | **Eine** Übersetzung der Feldfilter (Fach, Typ, Stufe, Titel …) — genutzt von der Aufzählung *und* von `GET /context/nodes` |
 | `lookup.py` | Normalisierung von Titeln und Bildung des Nachschlage-Begriffs |
+| `retrieval.py` | Nur noch der **Lernstand** (`node_engagement`). Er ist Traversierung, keine Suche — die frühere zweite Vektorsuche für Anker-Assistenten ist in `search.py` aufgegangen |
 | `embedding.py` | Einbettung der Knoten (welche Typen, siehe `config/taxonomy.yaml`) |
 
 **Die drei Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
@@ -60,6 +61,8 @@ Zehnerliste liegen im Median 0,063.
 | `ASSISTANT_CONTEXT_LIMIT` = 20 | `.env` / `config.py` | Wie viele Treffer **je Abschnitt** ein Assistent bekommt. Eine Kostenfrage: Jeder Treffer geht mit gekürztem Inhalt in den Modellkontext |
 | `ANZEIGE_MIN` / `ANZEIGE_MAX` / `ANZEIGE_VORGABE` = 5 / 30 / 8 | `preferences/service.py` | Grenzen der persönlichen Einstellung „angezeigte Trefferzahl" (Suchknopf) |
 | `_AUFZAEHLUNG_MAX` = 500 | `context/search.py` | Wie viele Zeilen die Aufzählung zum Zählen und Gruppieren höchstens holt. Die Zählung selbst (`COUNT(*) OVER ()`) ist unabhängig davon exakt |
+| `_KANDIDATEN_FAKTOR` = 3 | `context/search.py` | Überhang beim Holen. Fassungs-Filter und -Zusammenfassung entfernen Treffer **nach** der Abfrage; ohne Überhang lieferte eine Suche mit Budget 10 am Ende womöglich vier |
+| `_ANKER_TOP_K` = 10 | `context/service.py` | Wie viele Bausteine ein Assistent mit Wissensbereich in seinen Prompt bekommt. Begrenzt die Prompt-Länge, nicht die Suchgüte |
 | `_INHALT_MAX_ZEICHEN` | `chat/router.py` | Auf wie viele Zeichen der Knoteninhalt fürs Modell gekürzt wird |
 
 ### Was gefunden werden kann
@@ -110,9 +113,10 @@ Exit-Code 1, wenn eine Zusage bricht:
 | Kennzahl | Bedeutung | Ausgangswert |
 |---|---|---|
 | Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 17/21 |
-| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 28/31 |
+| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 30/33 |
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
+| Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten — erstmals gemessen | 2/2 auf Rang 1 |
 | Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | derzeit 0 |
 
 **Unterschreiten ist ein Fehlschlag, kein Kompromiss.** Wer eine Kennzahl bewusst

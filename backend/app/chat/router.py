@@ -1658,6 +1658,7 @@ async def chat(
         query_text=user_message,
         chat_id=conversation_id,
         db=db,
+        rollen=current_user.roles,
     )
 
     llm_messages: list[dict] = []

@@ -28,6 +28,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   dahinter. **Eigene Bausteine stehen vor fremden** — sichtbar, nicht filternd: Die
   Handreichung der Fachschaft bleibt in der Liste.
 
+- **Assistenten mit festem Wissensbereich suchen jetzt genauso wie alle anderen.**
+  Der eigene Suchweg für Assistenten mit Anker-Knoten ist entfallen; sie erben damit
+  Namens-Nachschlagen, Fachvorzug und den Prüfsatz. Zugleich gilt die Bereinigung der
+  Bildungsplan-Fassungen jetzt **überall**: Auch im freien Chat erscheint eine Kompetenz
+  nur noch einmal statt in zwei Editionen, und wo ein Jahrgang bekannt ist, in der für
+  ihn geltenden Fassung.
+
 - **Assistenten können den Kontextspeicher jetzt auszählen.** Auf Fragen wie „In welchen
   Fächern gibt es den Operator *nennen*?" antwortet die Plattform mit einer vollständigen,
   gezählten Liste statt mit den ähnlichsten Treffern — inklusive Aufschlüsselung nach Fach
@@ -42,6 +49,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   gewohnt.
 
 ### Behoben
+
+- **Assistenten mit Wissensbereich sahen keine fach- oder gruppenweit freigegebenen
+  Bausteine.** Ihr Suchweg kannte nur schulweite und eigene Knoten. Jetzt gilt für sie
+  dieselbe Sichtbarkeitsregel wie überall — Gruppenfreigaben allerdings weiterhin nur
+  für Mitglieder der Gruppe.
 
 - **Gruppenfreigaben wurden bei der Suche nicht geprüft.** Ein Baustein, den eine
   Lehrkraft für ihre Lerngruppe freigegeben hatte, konnte über die Kontextsuche auch
