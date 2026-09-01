@@ -482,9 +482,13 @@ Häufige Meldungen und ihre Bedeutung:
 
 **Ein Assistent sagt, im Wissensgraph sei nichts zu einem Thema — obwohl Bausteine
 vorhanden sind**
-Die **Suche im Kontextspeicher ist experimentell** (siehe
-[Kontextspeicher](../user/kontext.md)); je nach Formulierung findet sie das Gesuchte
-nicht, und ein Modell deutet ein leeres Ergebnis erwartungsgemäß als „gibt es nicht".
+Seit 09/2026 antwortet die Suche in getrennten Abschnitten mit Zählung (siehe
+[Kontextspeicher](../user/kontext.md)): Namensträger und Aufzählung sind vollständig, die
+thematische Auswahl ist es ausdrücklich nie. Bleibt ein Baustein trotzdem ungenannt,
+lohnen zwei Fragen: Hat das Modell **thematisch** gesucht, wo eine Aufzählung nötig
+gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 15 der 45 Typen sind
+bewusst nur über Name und Aufzählung erreichbar
+([neuer-knotentyp.md](../dev/neuer-knotentyp.md)).
 
 Welches Werkzeug der Assistent überhaupt gegriffen hat, steht seit 08/2026 im
 Backend-Log:
@@ -508,6 +512,21 @@ Greift ein Modell für eine „alle …"-Frage zu `search_context_nodes` statt z
 `list_context_nodes`, bekommt es eine nach Ähnlichkeit gekürzte Liste und antwortet
 womöglich unvollständig. Solche Fehlgriffe sind hier sichtbar — und der Grund, aus dem
 `get_operatoren` vorerst bestehen bleibt.
+
+**Wann `get_operatoren` entfällt.** Das Werkzeug ist seit 09/2026 nur noch ein Preset der
+Aufzählung (Typ = `operator`, Fach = Konversationsfach); es tut nichts, was
+`list_context_nodes` nicht könnte. Es bleibt allein deshalb, weil Modelle bei
+fachbezogenen Fragen erwiesenermaßen dorthin greifen. Entfernt wird es, wenn **beides**
+zutrifft:
+
+1. Alle Aufzählungsfälle des Prüfsatzes (`config/search_eval.yaml`, Abschnitt
+   `aufzaehlungen`) wählen in einem Werkzeugwahl-Durchlauf `list_context_nodes`.
+2. **Zwei Wochen** Produktivbetrieb ohne einen Fehlgriff auf `get_operatoren` im Log —
+   also ohne eine Zeile `Tool 'get_operatoren' … → Felder ['hinweis']`, die auf eine Frage
+   folgte, die kein einzelnes Fach meinte.
+
+Beobachtet wird mit dem `grep` oben. Punkt 2 ist der eigentliche Nachweis: Punkt 1 misst
+eine Laborsituation, Punkt 2 den echten Gebrauch.
 
 Der Suchtext selbst wird **nicht** protokolliert — er ist Nutzereingabe und gehört nicht
 in Logs.

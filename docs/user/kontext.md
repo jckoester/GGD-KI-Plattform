@@ -2,13 +2,24 @@
 
 Der Kontextspeicher ist eine Sammlung von Wissensbausteinen, die Sie einer Chat-Unterhaltung gezielt hinzufügen können. Die KI liest diese Bausteine beim Antworten mit und kann so präzisere, inhaltlich passendere Antworten geben.
 
-> ⚠️ **Die Suche im Kontextspeicher ist noch experimentell.** Sie findet oft das Richtige, aber nicht verlässlich — je nach Formulierung liefert sie auch einmal thematisch benachbarte Bausteine statt der gesuchten, oder sie übersieht etwas, das vorhanden ist. Auch der Assistent kann sich davon täuschen lassen und antworten, es gebe zu einem Thema nichts, obwohl Bausteine dazu vorliegen.
+> **Was die Suche zusagt — und was nicht.** Sie antwortet in getrennten Abschnitten, und
+> der Unterschied ist wichtig:
 >
-> **Was das für Sie heißt:** Verlassen Sie sich bei wichtigen Inhalten nicht allein auf die Suche. Findet sie einen Baustein nicht, versuchen Sie es mit dem genauen Namen (siehe unten) oder heften Sie ihn über den `@`-Shortcode direkt an. Und prüfen Sie die Aussage eines Assistenten, im Kontextspeicher sei „nichts vorhanden", im Zweifel selbst nach.
+> - **Bausteine mit diesem Namen** und **Alle passenden Bausteine** sind
+>   vollständig — mit Zahl. Steht dort „24 gefunden", gibt es 24; steht dort „8 von 24
+>   angezeigt", wissen Sie, dass mehr da ist. Wird ein Name nicht gefunden, heißt das
+>   verlässlich: Es gibt keinen Baustein dieses Namens.
+> - **Nächstliegende Bausteine** sind eine Empfehlung nach Ähnlichkeit und **nie
+>   vollständig**. Dass dort etwas fehlt, heißt nicht, dass es das nicht gibt.
 >
-> **Wenn der Assistent nach einem Fach fragt, obwohl Sie alle meinen:** Bitten Sie ihn ausdrücklich zu suchen — etwa „Bitte suche nach allen Vorkommen von ‚nennen' und erstelle daraus die Liste." Assistenten greifen bei fachbezogenen Fragen bevorzugt zum Fach-Werkzeug, das nur ein Fach kennt; der ausdrückliche Suchauftrag führt sie auf den richtigen Weg.
+> Was daraus folgt: Suchen Sie nach etwas Bestimmtem, nehmen Sie den Namen — über die
+> Suchseite oder den `@`-Shortcode. Für „was gibt es zu diesem Thema?" ist die
+> Ähnlichkeitssuche gedacht, und die bleibt eine Heuristik: Sie schlägt vor, sie zählt
+> nicht.
 >
-> Woran das liegt: Der Bestand besteht bislang fast nur aus Bildungsplan-Daten. Sobald Lehrkräfte in größerem Umfang eigene Bausteine anlegen — Begriffsdefinitionen, Methoden, Anleitungen —, muss die Suche neu bewertet werden. Wir arbeiten daran.
+> Der Bestand besteht bislang fast nur aus Bildungsplan-Daten. Sobald Lehrkräfte in
+> größerem Umfang eigene Bausteine anlegen — Begriffsdefinitionen, Methoden, Anleitungen
+> —, ist die thematische Suche neu zu bewerten.
 
 ## Was sind Kontextbausteine?
 

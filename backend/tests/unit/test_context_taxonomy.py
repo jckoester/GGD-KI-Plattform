@@ -128,3 +128,30 @@ class TestGetScopeDefaults:
             assert scope_order[write] <= scope_order[read], (
                 f"{ct}: write_scope={write!r} ist permissiver als read_scope={read!r}"
             )
+
+
+class TestLifecycleVollstaendigkeit:
+    """Jeder content_type braucht einen **ausdrücklichen** Lifecycle-Eintrag.
+
+    ⚠️ Der Grund, warum das ein Test sein muss: `get_valid_until_offset` liest die
+    Handliste mit `.get()`, und ein fehlender Eintrag liefert `None` — was hier „läuft
+    nie ab" bedeutet. Ein Typ, der eigentlich verfallen sollte, bliebe damit
+    stillschweigend für immer stehen. Am 01.09.2026 fehlten vier Typen unbemerkt
+    (`begriff`, die drei LFDB-Typen); bei ihnen war „permanent" zufällig richtig.
+    """
+
+    def test_jeder_typ_hat_einen_eintrag(self):
+        from app.context.taxonomy import SCOPE_DEFAULTS, VALID_UNTIL_DEFAULTS_DAYS
+
+        fehlend = sorted(set(SCOPE_DEFAULTS) - set(VALID_UNTIL_DEFAULTS_DAYS))
+        assert not fehlend, (
+            f"Ohne Lifecycle-Eintrag: {fehlend}. Bitte in "
+            "VALID_UNTIL_DEFAULTS_DAYS ergänzen — auch wenn der Wert None lautet."
+        )
+
+    def test_keine_karteileichen(self):
+        """Umgekehrt: kein Eintrag für einen Typ, den es nicht mehr gibt."""
+        from app.context.taxonomy import SCOPE_DEFAULTS, VALID_UNTIL_DEFAULTS_DAYS
+
+        verwaist = sorted(set(VALID_UNTIL_DEFAULTS_DAYS) - set(SCOPE_DEFAULTS))
+        assert not verwaist, f"Lifecycle-Eintrag ohne content_type: {verwaist}"

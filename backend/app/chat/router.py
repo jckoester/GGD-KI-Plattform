@@ -847,9 +847,15 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
     **Seit ADR-017/AP3 nur noch ein Preset der Aufzählung** (Typ = ``operator``,
     Fach = Konversationsfach). Nach außen ändert sich nichts: dieselbe Antwortform,
     dieselbe Werkzeugbeschreibung. Damit hängt die Operatorenliste an derselben
-    Sichtbarkeits- und Filterlogik wie alles andere; entfernt wird das Werkzeug erst,
-    wenn nachgewiesen ist, dass Modelle Aufzählungsfragen zuverlässig an
-    ``list_context_nodes`` richten (AP9).
+    Sichtbarkeits- und Filterlogik wie alles andere.
+
+    **Es tut nichts, was ``list_context_nodes`` nicht könnte** — es bleibt allein, weil
+    Modelle bei fachbezogenen Fragen erwiesenermaßen hierher greifen. Das Kriterium für
+    die Entfernung steht in ``docs/admin/updates-und-wartung.md`` (Abschnitt „Wann
+    `get_operatoren` entfällt"): alle Aufzählungsfälle des Prüfsatzes wählen im
+    Werkzeugwahl-Durchlauf ``list_context_nodes``, **und** zwei Wochen Produktivbetrieb
+    ohne Fehlgriff im Log. Der zweite Teil ist der eigentliche Nachweis; bis er vorliegt,
+    bleibt das Werkzeug.
     """
     subject_id = await _resolve_conversation_subject_id(ctx)
     if subject_id is None:

@@ -77,6 +77,9 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "operator": None,
     "jahresplan": None,
     "pruefungsanforderung": None,
+    "lfdb_baustein": None,
+    "lfdb_themenblock": None,
+    "lfdb_kompetenz": None,
     # artifact — zeitlich begrenzte Inhalte
     "unterrichtseinheit": None,   # Lehrkraft setzt manuell
     "unterrichtsstunde": None,    # Lehrkraft setzt manuell
@@ -96,7 +99,14 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "bauteil": None,
     "operator_math": None,
     "abstrakt": None,
+    "begriff": None,
 }
+# ⚠️ **Diese Liste wird von Hand gepflegt und deckt jeden content_type ab.** Ein
+# fehlender Eintrag fällt sonst nicht auf: `get_valid_until_offset` liefert über
+# `.get()` ein `None`, und `None` heißt hier „läuft nie ab" — ein Typ, der eigentlich
+# verfallen sollte, bliebe also stillschweigend für immer stehen. Vier Typen fehlten aus
+# genau diesem Grund unbemerkt (`begriff`, die drei LFDB-Typen; bei ihnen war „permanent"
+# zufällig richtig). `test_context_taxonomy.py` hält die Vollständigkeit jetzt fest.
 
 
 # Typische read_scope/write_scope-Defaults pro content_type.

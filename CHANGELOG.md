@@ -66,6 +66,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   oder Bausteinart. Die Fähigkeit „Kontextsuche" bringt das neue Werkzeug automatisch mit;
   `get_operatoren` bleibt unverändert nutzbar.
 
+- **Das Vorschlagsfenster im Chat zeigt die Abschnitte getrennt** und passt auf kleine
+  Bildschirme: eigene Höhe mit Scrollbereich, „Hinzufügen" immer erreichbar.
+  Vorausgewählt sind höchstens fünf Treffer je Abschnitt statt aller; ein „Alle"-Knopf
+  wählt weiterhin die ganze Liste. Angeheftete Bausteine klappen ab sechs Stück ein.
+
+- **Der `@`-Shortcode findet mehrwortige Titel.** „@Satz des Pythagoras" lässt sich
+  ausschreiben; es genügen auch der Anfang oder ein Wort aus der Mitte. Die Liste ordnet
+  nach exaktem Namen, Titelanfang und Ähnlichkeit und bevorzugt das Fach des Chats. Sie
+  schließt mit `esc`, bei der Auswahl und wenn nichts mehr passt.
+
+- **Die Suche ist nicht mehr als experimentell gekennzeichnet.** Namenstreffer und
+  Aufzählung sind vollständig und gezählt; die thematische Auswahl bleibt ausdrücklich
+  eine Empfehlung.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt
@@ -84,6 +98,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Lehrkraft für ihre Lerngruppe freigegeben hatte, konnte über die Kontextsuche auch
   außerhalb dieser Gruppe erscheinen und ging über den Assistenten mitsamt Inhalt ins
   Modell. Suche und Wissensgraph verwenden jetzt dieselbe Sichtbarkeitsregel.
+
+- **Die Fachzuordnung eines neuen Chats wirkte sich nicht auf die Suche aus.** Wer einen
+  Chat über `#` einem Fach zuordnete und sofort suchte, bekam Treffer ohne Fachvorzug —
+  die Zuordnung war erst nach der ersten Nachricht wirksam.
 
 ## [0.7.0] – 2026-08-31
 
