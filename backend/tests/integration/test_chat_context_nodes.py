@@ -1155,3 +1155,91 @@ class TestIdentifikationZweistufig:
             sa.text("SHOW pg_trgm.similarity_threshold")
         )).scalar_one()
         assert float(wert) == _TEILTREFFER_SCHWELLE
+
+
+class TestSuchseitenProfil:
+    """`POST /context/search` bedient zwei Profile: Vorschlagsfenster und Suchseite."""
+
+    @pytest_asyncio.fixture
+    async def bausteine(self, test_client, auth_headers, db_url):
+        angelegt = []
+        for titel, typ in (
+            ("Suchseite Alpha", "methode"),
+            ("Suchseite Beta", "methode"),
+            ("Suchseite Gamma", "konvention"),
+        ):
+            resp = await test_client.post(
+                "/context/nodes",
+                json={
+                    "category": "knowledge" if typ == "methode" else "document",
+                    "content_type": typ,
+                    "title": titel,
+                    "content": "Inhalt zur Suchseite",
+                    "read_scope": "school",
+                    "write_scope": "school",
+                },
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, resp.text
+            angelegt.append(resp.json())
+
+        yield angelegt
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM context_nodes WHERE id = ANY(%s::uuid[])",
+                ([n["id"] for n in angelegt],),
+            )
+        conn.commit()
+        conn.close()
+
+    async def _suche(self, test_client, auth_headers, **koerper):
+        from unittest.mock import AsyncMock, patch
+
+        from app.config import settings
+
+        vektor = [0.0] * settings.embedding_dimensions
+        vektor[0] = 1.0
+        with patch("app.context.search.generate_embedding",
+                   new=AsyncMock(return_value=vektor)):
+            resp = await test_client.post(
+                "/context/search", json={"query": "Suchseite Alpha", **koerper},
+                headers=auth_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    async def test_ohne_facette_keine_aufzaehlung(
+        self, test_client, auth_headers, bausteine
+    ):
+        """Ohne Filterbedingung ist die Frage keine Aufzählungsfrage — dann gibt es auch
+        keinen Abschnitt, der eine Gesamtzahl behauptet."""
+        umschlag = await self._suche(test_client, auth_headers)
+        assert umschlag["aufzaehlung"] is None
+
+    async def test_facette_bringt_die_gezaehlte_aufzaehlung(
+        self, test_client, auth_headers, bausteine
+    ):
+        umschlag = await self._suche(
+            test_client, auth_headers, content_type=["methode"], limit=25
+        )
+        aufzaehlung = umschlag["aufzaehlung"]
+        assert aufzaehlung is not None
+        titel = {t["title"] for t in aufzaehlung["treffer"]}
+        assert {"Suchseite Alpha", "Suchseite Beta"} <= titel
+        assert "Suchseite Gamma" not in titel, "der Typfilter greift nicht"
+        assert aufzaehlung["gesamt"] >= 2
+        assert aufzaehlung["gruppen"] is not None
+
+    async def test_trefferart_reist_mit(self, test_client, auth_headers, bausteine):
+        """Die Suchseite trennt exakte Namensträger von ähnlich benannten — dafür muss
+        sie am Treffer ablesen können, welcher Stufe er entstammt."""
+        umschlag = await self._suche(test_client, auth_headers)
+        arten = {t["treffer_art"] for t in umschlag["identifikation"]["treffer"]}
+        assert arten <= {"exakt", "teilweise"}
+        assert "exakt" in arten, "der gleichnamige Knoten fehlt"
+
+    async def test_limit_gilt_je_abschnitt(self, test_client, auth_headers, bausteine):
+        umschlag = await self._suche(test_client, auth_headers, limit=1)
+        assert len(umschlag["thematisch"]["treffer"]) <= 1

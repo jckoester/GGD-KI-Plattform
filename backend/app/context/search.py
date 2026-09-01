@@ -113,6 +113,9 @@ class Abschnitt:
     gesamt: int | None = None
     vollstaendig: bool = False
     gruppen: list[Gruppe] | None = None
+    # Was dieser Abschnitt über sich selbst sagen muss — etwa dass die Zählung an eine
+    # Obergrenze gestoßen ist. Nie stumm kürzen.
+    hinweis: str | None = None
 
     @property
     def geliefert(self) -> int:
@@ -486,13 +489,24 @@ async def aufzaehlung(
     )
     gruppen = _gruppiere(treffer, gruppierung) if gruppierung else None
 
+    # ⚠️ Beim Deckel ist die Zählung **nicht** `len(treffer)`. Sonst meldete eine Suche
+    # über alle Operatoren „500 von 500" — der Deckel als Gesamtzahl ausgegeben, was
+    # vollständig aussieht und um mehr als das Doppelte danebenliegt (1 278 sind es).
+    # Über dem Deckel gilt die rohe Zählung aus der Datenbank; sie ist exakt, nur eben
+    # vor der Fassungs-Zusammenfassung, die auf den geholten Zeilen arbeitet.
+    gedeckelt = roh_gesamt > _AUFZAEHLUNG_MAX
     return Abschnitt(
         treffer=treffer[: profil.aufzaehlung],
-        gesamt=len(treffer),
-        vollstaendig=(
-            len(treffer) <= profil.aufzaehlung and roh_gesamt <= _AUFZAEHLUNG_MAX
-        ),
+        gesamt=roh_gesamt if gedeckelt else len(treffer),
+        vollstaendig=not gedeckelt and len(treffer) <= profil.aufzaehlung,
         gruppen=gruppen,
+        hinweis=(
+            f"Mehr als {_AUFZAEHLUNG_MAX} Treffer: Gezählt ist der Bestand, gruppiert "
+            f"und um Fassungs-Dubletten bereinigt sind nur die ersten "
+            f"{_AUFZAEHLUNG_MAX}. Grenze die Suche ein."
+            if gedeckelt
+            else None
+        ),
     )
 
 

@@ -821,16 +821,23 @@ async def search_context_nodes(
 ):
     """Suche über sichtbare Knoten anhand eines Freitexts — als Ergebnisumschlag.
 
-    Profil „Vorschlagsfenster": Identifikation und thematische Auswahl, je mit der
-    Anzeigezahl aus dem Nutzerprofil. Getrennte Budgets, damit Namenstreffer die
-    thematischen nicht verdrängen; die Aufzählung bleibt diesem Weg vorbehalten
-    (AP3).
+    Zwei Aufruferprofile teilen sich diesen Endpunkt:
+
+    * **Vorschlagsfenster** (Suchknopf im Chat) — Identifikation und thematische Auswahl
+      mit der Anzeigezahl aus dem Nutzerprofil. Dort ist die Trefferzahl eine Platzfrage.
+    * **Suchseite** — dieselben Abschnitte großzügiger, plus die **Aufzählung**, sobald
+      eine Facette gesetzt ist. Dann lautet die Frage „alle, die …", und darauf gehört
+      eine Zahl statt einer stillschweigend gekürzten Liste.
+
+    Die Facetten verfeinern das Ergebnis, sie sind keine Vorbedingung: Ohne sie liefert
+    die Suchseite dasselbe wie der Suchknopf.
     """
     from app.chat.router import subject_of_conversation
-    from app.context.search import Suchprofil, suche
+    from app.context.filters import Knotenfilter
+    from app.context.search import Suchprofil, aufzaehlung, suche
 
-    # Der Suchknopf füllt das Vorschlagsfenster — hier zählt die Anzeigezahl.
-    limit = await anzeige_limit(db, user.sub)
+    # Ohne eigene Angabe die Anzeigezahl aus dem Nutzerprofil (Vorschlagsfenster).
+    limit = request.limit or await anzeige_limit(db, user.sub)
 
     # Fachbezug nur aus einer Konversation, die der/die Suchende auch sehen darf — sonst
     # verriete die Trefferreihenfolge etwas über fremde Konversationen.
@@ -840,17 +847,28 @@ async def search_context_nodes(
         if conv is not None and conv.pseudonym == user.sub:
             subject_id = await subject_of_conversation(db, request.conversation_id)
 
-    return await suche(
-        request.query,
-        Suchprofil(
-            pseudonym=user.sub,
-            rollen=user.roles,
-            subject_id=subject_id,
-            identifikation=limit,
-            thematisch=limit,
-        ),
-        db,
+    profil = Suchprofil(
+        pseudonym=user.sub,
+        rollen=user.roles,
+        subject_id=request.subject_id or subject_id,
+        identifikation=limit,
+        thematisch=limit,
+        aufzaehlung=limit,
+        grade=request.grade,
     )
+    ergebnis = await suche(request.query, profil, db)
+
+    facetten = Knotenfilter(
+        content_type=tuple(request.content_type or ()),
+        subject_id=request.subject_id,
+        grade=request.grade,
+    )
+    if request.content_type or request.subject_id or request.grade:
+        ergebnis.aufzaehlung = await aufzaehlung(
+            facetten, profil, db, gruppierung="fach"
+        )
+
+    return ergebnis
 
 
 # ── KS-Phase-6 Curriculum Endpoints ──────────────────────────────────────

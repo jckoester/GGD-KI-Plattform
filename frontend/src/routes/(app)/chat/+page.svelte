@@ -11,6 +11,7 @@
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
+    import { uebernehmen } from "$lib/context_handover.js";
     import AttachmentChip from "$lib/components/AttachmentChip.svelte";
     import AssistantPicker from "$lib/components/AssistantPicker.svelte";
     import SubjectPicker from "$lib/components/SubjectPicker.svelte";
@@ -1018,7 +1019,10 @@
             pendingSubjectId = null;
             pendingGroupId = null;
             contextNodes = [];
-            pendingContextNodes = [];
+            // Bausteine, die von der Suchseite mitgegeben wurden („Neuen Chat damit
+            // starten"). Einmalig — `uebernehmen()` verbraucht die Übergabe, sonst
+            // tauchten sie beim nächsten neuen Chat ungefragt wieder auf.
+            pendingContextNodes = uebernehmen();
             // selectedAssistant nur zurücksetzen, wenn kein assistant_id-Parameter
             if (!$page.url.searchParams.get("assistant_id")) {
                 selectedAssistant = null;

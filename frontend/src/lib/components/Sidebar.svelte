@@ -62,6 +62,11 @@
         }
     })
 
+    // Admins sind Lehrkräfte mit zusätzlichen Rechten, kein eigener Nutzertyp (CLAUDE.md).
+    const istLehrkraft = $derived(
+        $user?.roles.includes('teacher') || $user?.roles.includes('admin'),
+    );
+
     // Wissensgraph-Sektion beim Navigieren auf /knowledge/* auto-öffnen
     $effect(() => {
         if ($page.url.pathname.startsWith('/knowledge/')) {
@@ -273,29 +278,46 @@
             </button>
         </div>
 
-        <!-- Wissensgraph (nur Lehrkräfte/Admins) -->
-        {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
+        <!-- Wissensgraph. Der Menüpunkt selbst steht allen offen: Seine Landeseite ist
+             die Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
+             Suchknopf im Chat ohnehin erreichen. Die Unterpunkte (Curricula,
+             Bildungspläne, Leitperspektiven) bleiben Lehrkraft-Sache — die Schüler-Sicht
+             auf Knotenlisten steht in ADR-019 für 0.9. -->
           <div class="mt-2">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
             >
-                <button onclick={() => { toggle('knowledge'); goto('/knowledge') }}>
+                <button onclick={() => { if (istLehrkraft) toggle('knowledge'); goto('/knowledge/search') }}>
                     <span class="flex items-center gap-2">
                         <Database class="w-4 h-4" />
                         Wissensgraph
                     </span>
                 </button>
-                <button onclick={() => toggle('knowledge')}>
-                    {#if openSection === 'knowledge'}
-                        <ChevronDown class="w-4 h-4" />
-                    {:else}
-                        <ChevronRight class="w-4 h-4" />
-                    {/if}
-                </button>
+                {#if istLehrkraft}
+                    <button onclick={() => toggle('knowledge')}>
+                        {#if openSection === 'knowledge'}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </button>
+                {/if}
             </div>
-            {#if openSection === 'knowledge'}
+            {#if openSection === 'knowledge' && istLehrkraft}
                 <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    <button
+                        onclick={() => goto('/knowledge')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <Database class="w-4 h-4" />
+                            Alle Bausteine
+                        </span>
+                    </button>
                     <button
                         onclick={() => goto('/knowledge/curricula')}
                         class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -335,7 +357,6 @@
                 </div>
             {/if}
           </div>
-        {/if}
 
         {#if $visibleSidebarSubjectSections.length > 0}
           <div class="mt-2">

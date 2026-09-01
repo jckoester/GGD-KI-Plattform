@@ -25,12 +25,28 @@ export function fassungsLabel(bpVersion) {
 }
 
 /**
+ * Was zwei Knoten zu Fassungen **desselben** Gegenstands macht.
+ *
+ * Die Nummer, wo es eine gibt — sie ist je Fach eindeutig. Wo es keine gibt, der Titel:
+ * **Operatoren tragen keine Kompetenznummer**, und genau sie stehen mehrfach im selben
+ * Fach. „nennen" gibt es in Englisch in drei Editionen, in vier weiteren Fächern in
+ * zweien. Vor 09/2026 verlangte diese Funktion eine Nummer und übersprang die Operatoren
+ * deshalb — in einer Trefferliste standen dann drei identische Zeilen „Englisch ·
+ * nennen" ohne jedes Unterscheidungsmerkmal.
+ *
+ * Das Fach gehört in den Schlüssel: Zwei Fächer mit gleicher Nummer stehen ohnehin
+ * nebeneinander, ohne einander zu erklären — das ist kein Fassungsproblem.
+ */
+function fassungsSchluessel({ nr, subjectId, title }) {
+    const kern = nr || (title || '').trim().toLowerCase()
+    return kern ? `${subjectId ?? ''}|${kern}` : null
+}
+
+/**
  * Ermittelt, welche Knoten der Liste einen Fassungshinweis brauchen.
  *
- * Mehrdeutig ist ein Knoten, wenn ein **anderer** Knoten derselben Liste dieselbe Nummer
- * trägt, aber eine andere Fassung. Fach und Nummer allein genügen als Schlüssel: Zwei
- * Fächer mit gleicher Nummer stehen ohnehin nebeneinander, ohne einander zu erklären —
- * das ist kein Fassungsproblem und wird hier nicht behandelt.
+ * Mehrdeutig ist ein Knoten, wenn ein **anderer** Knoten derselben Liste denselben
+ * Gegenstand meint (siehe `fassungsSchluessel`), aber eine andere Fassung trägt.
  *
  * Nimmt Knoten aus allen drei Quellen (siehe `context_node_view.js`); der Schlüssel der
  * Rückgabe ist die ID, die der übergebene Knoten selbst trägt (`id` oder `node_id`).
@@ -41,9 +57,12 @@ export function fassungsLabel(bpVersion) {
 export function mehrdeutigeFassungen(nodes) {
     const nachSchluessel = new Map()
     for (const node of nodes ?? []) {
-        const { id, nr, bpVersion: bpv, subjectId } = kontextknotenAnsicht(node)
-        if (!nr || !bpv) continue
-        const schluessel = `${subjectId ?? ''}|${nr}`
+        const ansicht = kontextknotenAnsicht(node)
+        const { id, bpVersion: bpv } = ansicht
+        // Ohne Fassung ist ein Knoten keine Fassung von irgendetwas.
+        if (!bpv) continue
+        const schluessel = fassungsSchluessel(ansicht)
+        if (!schluessel) continue
         if (!nachSchluessel.has(schluessel)) nachSchluessel.set(schluessel, [])
         nachSchluessel.get(schluessel).push({ id, bpv })
     }

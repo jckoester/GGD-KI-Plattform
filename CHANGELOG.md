@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Suchseite für den Kontextspeicher** unter *Wissensgraph → Suche*, für alle Rollen.
+  Sie zeigt getrennt, was den gesuchten **Namen trägt**, was ihm nur **ähnlich heißt**
+  und was thematisch danebenliegt — dazu bei gesetzten Filtern eine gezählte Liste
+  („24 insgesamt", aufgeschlüsselt nach Fach). Gibt es keinen Baustein dieses Namens,
+  sagt die Seite das ausdrücklich, statt thematische Nachbarn als Ergebnis auszugeben.
+  Treffer lassen sich auswählen und an den offenen Chat anheften oder als Grundlage
+  eines neuen Chats mitnehmen.
+
 ### Geändert
 
 - **Sucht ein Assistent im Kontextspeicher, öffnet sich kein Vorschlagsfenster mehr.**

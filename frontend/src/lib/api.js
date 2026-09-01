@@ -1377,12 +1377,18 @@ export async function getActiveBpVersion(subjectId, grade) {
  * Fach, werden dessen Treffer vorgezogen — gefiltert wird nicht, fachfremde Treffer
  * bleiben in der Liste.
  */
-export async function searchContextNodes(query, conversationId = null) {
+export async function searchContextNodes(query, conversationId = null, facetten = {}) {
   const res = await fetch(`${BASE}/context/search`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, conversation_id: conversationId }),
+    body: JSON.stringify({
+      query,
+      conversation_id: conversationId,
+      // Facetten verfeinern das Ergebnis, sie sind keine Vorbedingung. Ist eine
+      // gesetzt, liefert der Umschlag zusätzlich den gezählten Aufzählungs-Abschnitt.
+      ...facetten,
+    }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

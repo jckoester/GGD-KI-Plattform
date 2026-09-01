@@ -36,6 +36,16 @@ Jeder Abschnitt hat sein **eigenes Budget** (`Suchprofil`). Das ist keine Kosmet
 gemeinsames Limit hieße, dass Namenstreffer die thematischen verdrängen — der Fehler, der
 die Neukonzeption ausgelöst hat.
 
+**Aufruferprofile** statt getrennter Suchwege — alle über dieselbe Schicht:
+
+| Profil | Verfahren | Budget je Abschnitt |
+|---|---|---|
+| Suchseite (`/knowledge/search`) | alle drei; Aufzählung, sobald eine Facette gesetzt ist | 25 |
+| Vorschlagsfenster (Suchknopf im Chat) | Identifikation + thematisch | Anzeigezahl aus dem Nutzerprofil |
+| Werkzeug `search_context_nodes` | Identifikation + thematisch | `ASSISTANT_CONTEXT_LIMIT` |
+| Werkzeug `list_context_nodes` | Aufzählung | `ASSISTANT_CONTEXT_LIMIT` |
+| Assistent mit Wissensbereich | thematisch im Teilgraphen | `_ANKER_TOP_K` |
+
 ---
 
 ## Die Stellschrauben

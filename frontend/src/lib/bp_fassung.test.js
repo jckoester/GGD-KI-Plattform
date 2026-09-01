@@ -122,3 +122,66 @@ describe('mehrdeutigeFassungen über Herkunftsformen hinweg', () => {
         expect([...markiert.keys()].sort()).toEqual(['mit-id', 'mit-node-id'])
     })
 })
+
+describe('Knoten ohne Kompetenznummer (Operatoren)', () => {
+    // ⚠️ Der Fall, an dem die alte Fassung scheiterte: Operatoren tragen keine
+    // Kompetenznummer. „nennen" gibt es in Englisch in drei Editionen — in einer
+    // Trefferliste standen drei identische Zeilen „Englisch · nennen" untereinander,
+    // ohne jedes Unterscheidungsmerkmal.
+    const operator = (id, bp) => ({
+        node_id: id,
+        title: 'nennen',
+        content_type: 'operator',
+        subject_id: 7,
+        bp_version: bp,
+    })
+
+    it('markiert gleichnamige Operatoren desselben Fachs', () => {
+        const markiert = mehrdeutigeFassungen([
+            operator('a', '2016'),
+            operator('b', '2016.V2'),
+            operator('c', '2016.V3'),
+        ])
+        expect([...markiert.values()]).toEqual(['Basis', 'V2', 'V3'])
+    })
+
+    it('lässt einen einzelnen Operator unmarkiert', () => {
+        expect(mehrdeutigeFassungen([operator('a', '2016.V3')]).size).toBe(0)
+    })
+
+    it('trennt nach Fach', () => {
+        // Dasselbe Verb in zwei Fächern ist kein Fassungsproblem — die Fächer stehen
+        // ohnehin nebeneinander und erklären einander nicht.
+        const markiert = mehrdeutigeFassungen([
+            operator('a', '2016'),
+            { ...operator('b', '2016.V3'), subject_id: 9 },
+        ])
+        expect(markiert.size).toBe(0)
+    })
+
+    it('unterscheidet verschiedene Titel im selben Fach', () => {
+        const markiert = mehrdeutigeFassungen([
+            operator('a', '2016'),
+            { ...operator('b', '2016.V3'), title: 'beurteilen' },
+        ])
+        expect(markiert.size).toBe(0)
+    })
+
+    it('ignoriert Groß-/Kleinschreibung und Randleerzeichen', () => {
+        const markiert = mehrdeutigeFassungen([
+            operator('a', '2016'),
+            { ...operator('b', '2016.V3'), title: '  Nennen ' },
+        ])
+        expect(markiert.size).toBe(2)
+    })
+
+    it('ohne Fassung bleibt alles unmarkiert', () => {
+        // Nutzerknoten tragen keine BP-Fassung — sie sind keine Editionen voneinander,
+        // auch wenn sie zufällig gleich heißen.
+        const markiert = mehrdeutigeFassungen([
+            { node_id: 'a', title: 'Merkblatt', subject_id: 7 },
+            { node_id: 'b', title: 'Merkblatt', subject_id: 7 },
+        ])
+        expect(markiert.size).toBe(0)
+    })
+})

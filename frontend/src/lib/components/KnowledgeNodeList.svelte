@@ -7,6 +7,7 @@
         CONTENT_TYPE_LABELS,
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
+    import { STUDENT_GRADES as studentGrades } from "$lib/grades.js";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
@@ -45,7 +46,6 @@
     let selectedGrade = $state(initialGrade);
 
     // Sortierung
-    const studentGrades = JSON.parse(import.meta.env.PUBLIC_STUDENT_GRADES || "[5,6,7,8,9,10,11,12]");
 
     let sortCol = $state("subject_id"); // Default: Fach-Knoten vor Leitperspektiven
     let sortDir = $state("asc");

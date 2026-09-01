@@ -221,6 +221,19 @@ class ContextSearchRequest(BaseModel):
     # Ähnlichkeit.
     conversation_id: UUID | None = None
 
+    # ── Facetten der Suchseite ────────────────────────────────────────────────
+    #
+    # Sie **verfeinern das Ergebnis**, sie sind keine Vorbedingung: Ohne Facette liefert
+    # die Suche dasselbe wie der Suchknopf im Chat. Ist mindestens eine gesetzt, kommt
+    # der Aufzählungs-Abschnitt hinzu — dann ist die Frage „alle, die …", und darauf
+    # gehört eine Zahl.
+    content_type: list[str] | None = None
+    subject_id: int | None = None
+    grade: int | None = Field(default=None, ge=1, le=13)
+    # Wie viele Treffer je Abschnitt. Die Suchseite darf großzügiger sein als das
+    # Vorschlagsfenster im Chat — dort ist die Trefferzahl eine Platzfrage, hier nicht.
+    limit: int | None = Field(default=None, ge=1, le=200)
+
 
 class ContextSearchResult(KontextKnotenAnzeige):
     node_id: UUID
@@ -234,6 +247,13 @@ class ContextSearchResult(KontextKnotenAnzeige):
     treffer_art: str | None = None
 
 
+class SucheGruppe(BaseModel):
+    """„Mathematik: 3" — eine Zeile der Gruppierung einer Aufzählung."""
+
+    name: str
+    anzahl: int
+
+
 class SucheAbschnitt(BaseModel):
     """Ein beschrifteter Teil des Suchergebnisses samt Vollständigkeitsauskunft.
 
@@ -245,6 +265,10 @@ class SucheAbschnitt(BaseModel):
     treffer: list[ContextSearchResult] = Field(default_factory=list)
     gesamt: int | None = None
     vollstaendig: bool = False
+    # Zählung je Fach bzw. Bausteinart — nur bei der Aufzählung belegt. Gezählt wird über
+    # **alle** Treffer, nicht nur die mitgelieferten.
+    gruppen: list[SucheGruppe] | None = None
+    hinweis: str | None = None
 
 
 class SearchEnvelope(BaseModel):
