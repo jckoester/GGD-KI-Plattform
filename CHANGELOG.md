@@ -21,11 +21,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Bausteine ohne Embedding sind über ihren Namen auffindbar.** Fachpläne, Curricula,
   Methoden und Leitperspektiven waren über die Suche bisher gar nicht erreichbar.
 
+- **Bausteine sind über einen Teil ihres Namens auffindbar.** „Anleitung Operator
+  nennen" findet jetzt das Blatt „Anleitung zur Verwendung des Operators ‚nennen'".
+  Exakte Namensträger stehen weiterhin vorn und tragen als einzige die Auskunft, ob es
+  einen Baustein dieses Namens gibt; ähnlich benannte stehen als eigener Abschnitt
+  dahinter. **Eigene Bausteine stehen vor fremden** — sichtbar, nicht filternd: Die
+  Handreichung der Fachschaft bleibt in der Liste.
+
 - **Assistenten können den Kontextspeicher jetzt auszählen.** Auf Fragen wie „In welchen
   Fächern gibt es den Operator *nennen*?" antwortet die Plattform mit einer vollständigen,
   gezählten Liste statt mit den ähnlichsten Treffern — inklusive Aufschlüsselung nach Fach
   oder Bausteinart. Die Fähigkeit „Kontextsuche" bringt das neue Werkzeug automatisch mit;
   `get_operatoren` bleibt unverändert nutzbar.
+
+### Migration
+
+- **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt
+  die PostgreSQL-Erweiterung `pg_trgm` an; bei einer verwalteten Datenbank ohne
+  Superuser-Rechte muss der Betreiber sie vorab freischalten. `alembic upgrade head` wie
+  gewohnt.
 
 ### Behoben
 

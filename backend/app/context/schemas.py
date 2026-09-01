@@ -227,6 +227,11 @@ class ContextSearchResult(KontextKnotenAnzeige):
     title: str
     category: str
     content_type: str | None
+    # Nur in der Identifikation gesetzt: `exakt` heißt „trägt genau diesen Namen",
+    # `teilweise` heißt „hat einen ähnlichen Titel". Der Unterschied entscheidet, ob
+    # ein Treffer eine Existenzaussage stützt — er darf in der Oberfläche nicht
+    # verlorengehen.
+    treffer_art: str | None = None
 
 
 class SucheAbschnitt(BaseModel):

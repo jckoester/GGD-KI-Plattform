@@ -17,12 +17,18 @@ Aufzählung („alle, die …") kommt als dritter Abschnitt hinzu (AP3).
 Namensträger es gibt, und sagt es auch, wenn sie nur einen Teil liefert. Die thematische
 Auswahl weiß es prinzipiell nicht — sie ist deshalb **nie** vollständig und trägt keine
 Gesamtzahl. Aussagen darüber, ob es etwas gibt, stützen sich nur auf die Identifikation
-(und später die Aufzählung), nie auf thematische Nähe.
+und die Aufzählung, nie auf thematische Nähe.
+
+📖 **Feintuning:** Welche Zahlen sich verstellen lassen, was sie bewirken und wie man
+misst, ob eine Änderung etwas verbessert hat, steht in ``docs/dev/kontextsuche.md``.
+Jede Konstante hier ist gemessen; wer eine ändert, misst neu
+(``python scripts/search_eval.py``).
 """
 
 import logging
 from dataclasses import dataclass, field
 from typing import Sequence
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy import or_, select
@@ -31,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context.embedding import generate_embedding
 from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
 from app.context.filters import Knotenfilter, wende_an
-from app.context.lookup import nachschlage_begriff
+from app.context.lookup import nachschlage_begriff, normalisiere_titel
 from app.context.schemas import anzeige_felder
 from app.context.visibility import read_scope_clause
 from app.db.models import ContextNode, Subject
@@ -192,6 +198,14 @@ def _grundabfrage(profil: Suchprofil):
     )
 
 
+def _bonus(bedingung, wert: float):
+    """Additiver Vorsprung in der Sortierung — ``CASE WHEN … THEN wert ELSE 0``."""
+    return sa.case(
+        (bedingung, sa.cast(sa.literal(wert), sa.Float)),
+        else_=sa.cast(sa.literal(0.0), sa.Float),
+    )
+
+
 def _aus_dem_fach(profil: Suchprofil):
     """„Stammt dieser Knoten aus dem Fach der Konversation?" — oder ``None``.
 
@@ -336,33 +350,151 @@ def _gruppiere(treffer: list[dict], nach: str) -> list[Gruppe]:
 
 # ── Verfahren 1: Identifikation ──────────────────────────────────────────────
 
-def identifikations_abfrage(begriff: str, profil: Suchprofil):
-    """Die Abfrage hinter der Identifikation — eigenständig, damit sie prüfbar ist.
+# Ab welcher Trigramm-Ähnlichkeit ein Titel als teilweise getroffen gilt.
+#
+# **0,50 ist gemessen** (01.09.2026, an den Testknoten aus
+# `scripts/seed_search_eval_nodes.py` und den 21 thematischen Prüfsatzfällen):
+#
+#   Schwelle   S2-Fälle gefunden   thematische Fälle mit Namensträger-Block
+#     0,30           4/4                        13 von 21
+#     0,40           4/4                         6
+#     0,45           4/4                         3
+#     0,50           4/4                         0        ← gewählt
+#     0,55           2/4                         0
+#     0,60           2/4                         0
+#
+# Der Kipppunkt liegt genau dort: volle Trefferquote bei null Störung. Ab 0,55 fällt der
+# Leitfall „Anleitung Operator nennen" durch — die Anfrage, um die es geht.
+#
+# Das ist **kein Gütesignal** im Sinne der verworfenen Ähnlichkeitsschwellen
+# (Bestandsaufnahme): Es entscheidet nicht, ob ein Treffer gut ist, sondern ob zwei
+# Zeichenketten einander ähnlich genug sind, um denselben Namen zu meinen.
+_TEILTREFFER_SCHWELLE = 0.50
+
+# Wie viel Vorsprung eigenes Material in der thematischen Auswahl bekommt — dieselbe
+# Einheit und Größenordnung wie `_FACHBONUS`.
+#
+# ⚠️ **Heute nicht am Prüfsatz messbar, und das hat einen Grund.** Von 26 Knoten mit
+# Eigentümer tragen 6 ein Embedding; keiner davon gehört dem Prüfsatz-Pseudonym. Wirksam
+# wird der Bonus erst, wenn nutzererzeugte Typen eingebettet werden — dieselbe
+# Vorbedingung, an der auch die rollenbasierte Typ-Gewichtung hängt (ADR-017-Nachtrag,
+# AP6 Schritt 0). Bis dahin ist er nachweislich wirkungslos, nicht ungeprüft: Der
+# Prüfsatz bleibt mit und ohne ihn unverändert.
+_EIGENTUEMER_BONUS = 0.05
+
+
+def _kandidaten(frage: str) -> list[str]:
+    """Wonach die Identifikation sucht: reduzierter Begriff **und** Rohanfrage.
+
+    Bis 09/2026 war die Wortlisten-Reduktion ein **Tor**: Sprach sie nicht an, fand die
+    Identifikation gar nicht erst statt. Jetzt ist sie nur noch eine Kandidatenquelle,
+    und eine verpasste Erkennung kostet Reihenfolge statt Treffer (ADR-017).
+
+    Beide Formen sind nötig, und zwar für verschiedene Stufen: Der reduzierte Begriff
+    isoliert den Namen aus der Frageform („Was bedeutet der Operator nennen?" →
+    ``nennen``) und trägt damit den **exakten** Abgleich. Für die **Teilsuche** wäre er
+    schädlich — sie vergleicht ganze Titel, und `reduziere()` wirft mit „Operator" genau
+    das Wort weg, das „Anleitung zur Verwendung des Operators nennen" ausmacht. Gemessen:
+    Mit dem reduzierten Begriff wird der Leitfall bei **keiner** Schwelle gefunden, mit
+    der Rohanfrage bei jeder bis 0,50.
+    """
+    roh = normalisiere_titel(frage)
+    begriff = nachschlage_begriff(frage)
+    return [k for k in dict.fromkeys([begriff, roh]) if k]
+
+
+def _vorrang(profil: Suchprofil) -> list:
+    """Eigenes zuerst, dann das Fach der Konversation.
+
+    Der Eigentümer-Vorrang ist eine **Sortierstufe, kein Filter**: Fremde gleichnamige
+    Bausteine verschwinden nicht, sie rücken nach. Wer nach „seinem" Merkblatt sucht,
+    soll es oben finden, ohne dass die Handreichung der Fachschaft unauffindbar wird.
+    """
+    stufen = [sa.case((ContextNode.owner_pseudonym == profil.pseudonym, 0), else_=1)]
+    aus_dem_fach = _aus_dem_fach(profil)
+    if aus_dem_fach is not None:
+        stufen.append(sa.case((aus_dem_fach, 0), else_=1))
+    return stufen
+
+
+def _sortierung(profil: Suchprofil) -> list:
+    """Vorrangstufen, dann stabil nach Fach und ID — damit dieselbe Frage nicht bei
+    jedem Aufruf anders sortiert erscheint."""
+    return [*_vorrang(profil), Subject.name.nulls_last(), ContextNode.id]
+
+
+def identifikations_abfrage(begriffe: list[str] | str, profil: Suchprofil):
+    """Die Abfrage hinter dem **exakten** Namensabgleich — eigenständig, damit prüfbar.
 
     Der Integrationstest lässt sie von PostgreSQL erklären (``EXPLAIN``) und stellt so
     sicher, dass der Ausdrucksindex aus Migration 0053 tatsächlich greift. Sein Ausfall
     ist still: dasselbe Ergebnis, nur rund 70 statt 0,3 ms — bei **jeder** Suche.
     """
-    aus_dem_fach = _aus_dem_fach(profil)
-    sortierung = [Subject.name.nulls_last(), ContextNode.id]
-    if aus_dem_fach is not None:
-        sortierung.insert(0, sa.case((aus_dem_fach, 0), else_=1))
-
+    if isinstance(begriffe, str):
+        begriffe = [begriffe]
     return (
         _grundabfrage(profil)
         # Die Gesamtzahl **vor** dem Limit: Sonst wäre nicht zu sagen, ob die gelieferten
         # Namensträger alle sind. Genau diese Auskunft trägt die Existenzaussage.
         .add_columns(sa.func.count().over().label("gesamt"))
-        .where(_TITEL_NORMALISIERT == begriff)
-        .order_by(*sortierung)
+        .where(_TITEL_NORMALISIERT.in_(begriffe))
+        .order_by(*_sortierung(profil))
         .limit(profil.identifikation)
+    )
+
+
+def teiltreffer_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
+    """Die zweite Stufe: Titel, die dem Gesuchten **ähneln**.
+
+    Nutzt den GIN-Trigramm-Index aus Migration 0054 über den ``%``-Operator. Die Schwelle
+    ist eine Sitzungseinstellung (siehe :func:`_setze_schwelle`) — deshalb steht sie hier
+    nicht im SQL.
+    """
+    stmt = (
+        _grundabfrage(profil)
+        .where(sa.literal(roh).op("%")(_TITEL_NORMALISIERT))
+        .order_by(
+            *_vorrang(profil),
+            sa.func.similarity(sa.literal(roh), _TITEL_NORMALISIERT).desc(),
+            ContextNode.id,
+        )
+        .limit(profil.identifikation + len(ausschluss))
+    )
+    if ausschluss:
+        stmt = stmt.where(ContextNode.id.notin_([UUID(i) for i in ausschluss]))
+    return stmt
+
+
+async def _setze_schwelle(db: AsyncSession) -> None:
+    """Die Trigramm-Schwelle für **diese Transaktion** setzen.
+
+    ⚠️ **Transaktionslokal**, nicht sitzungsweit. Die pg_trgm-Schwellen sind
+    Sitzungseinstellungen; im gepoolten Async-Betrieb wanderte ein einfaches ``SET`` mit
+    der Verbindung zum nächsten Request und veränderte dort eine Suche, die nie darum
+    gebeten hat.
+
+    ``set_config(…, true)`` statt ``SET LOCAL``, weil ``SET`` keine Parameter annimmt
+    („syntax error at or near $1"). Die Alternative wäre, den Wert in die Anweisung zu
+    schreiben — das geht hier nur um eine Modulkonstante, aber eine Abfrage ohne
+    Parameterbindung ist eine Gewohnheit, die man sich nicht angewöhnt.
+    """
+    await db.execute(
+        sa.select(
+            sa.func.set_config(
+                "pg_trgm.similarity_threshold", str(_TEILTREFFER_SCHWELLE), True
+            )
+        )
     )
 
 
 async def identifikation(
     frage: str, profil: Suchprofil, db: AsyncSession
 ) -> Abschnitt:
-    """Knoten, deren Titel der gesuchte Name **ist**.
+    """Knoten, deren Titel der gesuchte Name **ist** — oder ihm nahekommt.
+
+    Zwei Stufen, und die Reihenfolge ist die Aussage: erst die exakten Namensträger,
+    dahinter die ähnlich benannten. Nur die erste Stufe trägt die Zählung und damit die
+    Existenzaussage; welcher Stufe ein Treffer entstammt, steht an ihm (``treffer_art``).
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
     verglichen, nicht eingebettet — und 30 der 44 Knotentypen tragen laut
@@ -370,25 +502,37 @@ async def identifikation(
     Leitperspektiven …). Bliebe der Filter hier stehen, wären diese Knoten unter ihrem
     eigenen Namen unauffindbar, während die Aufzählung sie zählt: zwei Grundmengen in
     einem Umschlag, und die Existenzaussage wäre gebrochen.
-
-    Innerhalb der Treffer steht das Fach der Konversation vorn, danach alphabetisch nach
-    Fach — eine stabile Reihenfolge, damit dieselbe Frage nicht bei jedem Aufruf anders
-    sortiert erscheint.
     """
-    begriff = nachschlage_begriff(frage)
-    if not begriff:
-        # Kein Name gemeint. Der Abschnitt bleibt leer, ist damit aber **nicht**
-        # „nichts vorhanden" — der Hinweis in `suche()` sagt das ausdrücklich.
+    kandidaten = _kandidaten(frage)
+    if not kandidaten:
         return Abschnitt(gesamt=0, vollstaendig=True)
 
     zeilen = (
-        await db.execute(identifikations_abfrage(begriff, profil))
+        await db.execute(identifikations_abfrage(kandidaten, profil))
     ).mappings().all()
     gesamt = zeilen[0]["gesamt"] if zeilen else 0
+    exakt = [_treffer(z) | {"treffer_art": "exakt"} for z in zeilen]
+
+    # Die zweite Stufe füllt nur auf, was die erste offen gelassen hat.
+    rest = profil.identifikation - len(exakt)
+    teilweise: list[dict] = []
+    if rest > 0:
+        await _setze_schwelle(db)
+        roh = normalisiere_titel(frage)
+        zeilen_t = (await db.execute(
+            teiltreffer_abfrage(roh, profil, ausschluss={t["node_id"] for t in exakt})
+        )).mappings().all()
+        teilweise = [
+            _treffer(z) | {"treffer_art": "teilweise"} for z in zeilen_t[:rest]
+        ]
+
     return Abschnitt(
-        treffer=[_treffer(z) for z in zeilen],
+        treffer=exakt + teilweise,
+        # `gesamt` zählt die **exakten** Namensträger. Für die Teiltreffer gibt es keine
+        # verteidigbare Gesamtmenge — sie hängt an einer Schwelle, und eine Zahl daraus
+        # zu machen hieße, die Schwelle als Wahrheit auszugeben.
         gesamt=gesamt,
-        vollstaendig=len(zeilen) >= gesamt,
+        vollstaendig=len(exakt) >= gesamt,
     )
 
 
@@ -433,15 +577,15 @@ async def thematisch(
         vektor = await generate_embedding(frage)
 
         naehe = ContextNode.embedding.cosine_distance(vektor)
+        # ⚠️ Die Boni müssen als **Fließkommazahl** in die Abfrage. Werden sie als ganze
+        # Zahl typisiert — was PostgreSQL aus dem anderen CASE-Zweig ableiten kann —,
+        # runden sie auf 0 und die Sortierung bleibt unverändert. Ohne Fehlermeldung:
+        # Die Abfrage läuft, sie tut nur nichts.
         if aus_dem_fach is not None:
-            # ⚠️ Der Bonus muss als **Fließkommazahl** in die Abfrage. Wird er als ganze
-            # Zahl typisiert — was PostgreSQL aus dem anderen CASE-Zweig ableiten kann —,
-            # rundet er auf 0 und die Sortierung bleibt unverändert. Ohne Fehlermeldung:
-            # Die Abfrage läuft, sie tut nur nichts.
-            naehe = naehe - sa.case(
-                (aus_dem_fach, sa.cast(sa.literal(_FACHBONUS), sa.Float)),
-                else_=sa.cast(sa.literal(0.0), sa.Float),
-            )
+            naehe = naehe - _bonus(aus_dem_fach, _FACHBONUS)
+        naehe = naehe - _bonus(
+            ContextNode.owner_pseudonym == profil.pseudonym, _EIGENTUEMER_BONUS
+        )
         stmt = (
             _grundabfrage(profil)
             .where(ContextNode.embedding.is_not(None))
@@ -490,20 +634,30 @@ def _hinweise(frage: str, ident: Abschnitt) -> list[str]:
     nicht gibt (dann ist er eine belastbare Auskunft — aber nur über den **Namen**,
     nicht über das Thema).
     """
-    if ident.treffer:
+    if ident.gesamt:
         if ident.vollstaendig:
             return []
+        exakt = sum(1 for t in ident.treffer if t.get("treffer_art") == "exakt")
         return [
-            f"{ident.gesamt} Bausteine tragen diesen Namen, {ident.geliefert} davon "
-            f"stehen hier."
+            f"{ident.gesamt} Bausteine tragen diesen Namen, {exakt} davon stehen hier."
         ]
 
+    # Keine exakten Namensträger. Ähnlich benannte gelten ausdrücklich **nicht** als
+    # Beleg dafür, dass es den gesuchten Namen gibt — sonst führte die Teilsuche genau
+    # die Verwechslung wieder ein, die der Umschlag auflösen soll.
+    teilweise = sum(1 for t in ident.treffer if t.get("treffer_art") == "teilweise")
     begriff = nachschlage_begriff(frage)
     if not begriff:
         return [_HINWEIS_KEIN_NAME]
+    kern = f"Kein Baustein heißt genau „{begriff}“."
+    if teilweise:
+        return [
+            f"{kern} {teilweise} ähnlich benannte stehen hier — prüfe am Titel, ob "
+            f"einer davon gemeint ist."
+        ]
     return [
-        f"Kein Baustein heißt „{begriff}“. Über Bausteine zu diesem Thema sagt das "
-        f"nichts — dafür stehen die nächstliegenden Bausteine da."
+        f"{kern} Über Bausteine zu diesem Thema sagt das nichts — dafür stehen die "
+        f"nächstliegenden Bausteine da."
     ]
 
 

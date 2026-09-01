@@ -25,7 +25,10 @@ er liefert nur schlechtere Ergebnisse.
 
 Kein pytest-Test, sondern ein Skript: Die Frage ergibt nur gegen den echten Wissensgraph
 und ein echtes Embedding-Modell Sinn — ohne Bildungsplan-Import und laufenden
-LiteLLM-Proxy misst sie nichts.
+LiteLLM-Proxy misst sie nichts. Für die S2-Fälle (Titel-Teilsuche) braucht es zusätzlich
+die Testknoten aus ``scripts/seed_search_eval_nodes.py``.
+
+Welche Zahlen die Suche steuern und was sie bewirken: ``docs/dev/kontextsuche.md``.
 
 ⚠️ **Je Messung eine frische Verbindung, und der Plan wird verifiziert.** Beides ist
 nicht Vorsicht, sondern Notwendigkeit: Verwendet man dieselbe Verbindung weiter, hält
@@ -57,6 +60,17 @@ PRUEFSATZ_VORGABE = (
 )
 
 INDEXNAME = "idx_context_nodes_embedding"
+
+# Wie viele Identifikationstreffer ein **thematischer** Fall höchstens erzeugen darf.
+#
+# Der Wächter für AP4: Die Teilsuche in Titeln (Trigramm, Schwelle 0,50) darf eine
+# thematische Anfrage nicht mit Namensträgern überschwemmen. Gemessen sind es bei dieser
+# Schwelle aktuell **null**; der Deckel lässt Luft für neue Inhalte im Wissensgraphen und
+# schlägt an, bevor ein Block in der Oberfläche spürbar wird.
+#
+# „Thematisch" heißt hier: Der Fall erwartet einen Fachtreffer (`fach:`), fragt also nach
+# einem Thema und nicht nach einem Namen.
+IDENT_DECKEL = 3
 
 # Bewusst so nah wie möglich an der thematischen Auswahl der Suchschicht: Gemessen
 # werden soll die Suche, die Nutzer:innen bekommen, nicht eine idealisierte Variante. Der
@@ -264,7 +278,8 @@ def _r(rang: int | None) -> str:
     return "—" if rang is None else str(rang)
 
 
-def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
+def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> int:
+    """Gibt die Zahl der Fälle zurück, die den Identifikations-Deckel reißen."""
     print()
     print(f"  {'Anfrage':<40}{'Chat-Fach':<14}{'Recall':>7}{'Name':>6}{'Thema':>6}"
           f"{'Fach@1':>8}{'Rang':>6}{'Spanne':>8}")
@@ -298,8 +313,10 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     # bekommen. „Thematisch" heißt hier: Der Prüfsatz erwartet einen Fachtreffer.
     thematische = [e for e in ergebnisse if e.fall.fach and e.ident_n]
     if thematische:
+        groesster = max(e.ident_n for e in thematische)
+        marke = "  ⚠️ Deckel gerissen" if groesster > IDENT_DECKEL else ""
         print(f"  davon thematische Fälle:      {len(thematische):>2}"
-              f"   (größter Abschnitt: {max(e.ident_n for e in thematische)})")
+              f"   (größter Abschnitt: {groesster}, Deckel {IDENT_DECKEL}){marke}")
     mit_op = [e for e in ergebnisse if e.operatoren_top3]
     print(f"  Operatoren unter den Top-3 (exakt): {sum(e.operatoren_top3 for e in ergebnisse)} "
           f"in {len(mit_op)} von {n} Fällen")
@@ -309,6 +326,10 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
     print(f"  Laufzeit im Mittel (inkl. Planung):  Index "
           f"{sum(e.index.ms for e in ergebnisse)/n:.0f} ms  ·  "
           f"exakt {sum(e.exakt.ms for e in ergebnisse)/n:.0f} ms")
+
+    ueber_deckel = sum(
+        1 for e in ergebnisse if e.fall.fach and e.ident_n > IDENT_DECKEL
+    )
 
     warnungen = [(e.fall.frage, w) for e in ergebnisse for w in e.warnungen]
     if warnungen:
@@ -335,6 +356,8 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> None:
                 for i, t in enumerate(lauf.treffer[:5], 1):
                     print(f"       {i}. {t.sim:.3f}  {str(t.fach or '—'):<18}"
                           f"{t.content_type:<14}{t.titel[:52]}")
+
+    return ueber_deckel
 
 
 async def _produktiv(
@@ -476,7 +499,7 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
         produktiv, ident_n, thema_n = await _produktiv(fall.frage, top_k, subject_id)
         ergebnisse.append(_bewerte(fall, index, exakt, produktiv, ident_n, thema_n))
 
-    _ausgabe(ergebnisse, top_k, details)
+    ueber_deckel = _ausgabe(ergebnisse, top_k, details)
     aufzaehl_fehler = await _pruefe_aufzaehlungen(aufzaehlungen or [], fach_ids)
 
     if json_pfad:
@@ -498,7 +521,7 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
         ], ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"\n  Ergebnisse geschrieben: {json_pfad}")
 
-    return 1 if aufzaehl_fehler else 0
+    return 1 if (aufzaehl_fehler or ueber_deckel) else 0
 
 
 def main() -> None:

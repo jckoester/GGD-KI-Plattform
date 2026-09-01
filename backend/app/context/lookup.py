@@ -7,7 +7,20 @@ beieinander — das gesuchte Verb geht darin unter. Gemessen am 30.08.2026 fande
 8 Nachschlage-Anfragen ihren Begriff überhaupt, und zwar unberechenbar: „Operator
 vergleichen" traf, „Operator nennen" nicht.
 
-Dieses Modul erkennt solche Anfragen, damit die Suche sie anders behandeln kann.
+Dieses Modul bildet aus einer Anfrage den **Begriff**, gegen den Titel verglichen werden.
+
+⚠️ **Seit 09/2026 ist das keine Torwächter-Rolle mehr** (ADR-017). Bis dahin entschied
+`nachschlage_begriff`, *ob* überhaupt nachgeschlagen wird: Sprach die Wortliste nicht an,
+fand die Identifikation gar nicht statt, und eine verpasste Erkennung kostete Treffer.
+Jetzt läuft die Identifikation immer, und dieses Modul liefert nur einen von zwei
+Kandidaten — der andere ist die normalisierte Rohanfrage. Eine verpasste Erkennung kostet
+damit **Reihenfolge, keine Treffer**, und der Pflegeaufwand der Wortliste entschärft sich
+entsprechend (Befund 9).
+
+Für die **Teilsuche** ist der reduzierte Begriff sogar schädlich: Sie vergleicht ganze
+Titel, und `reduziere()` wirft mit „Operator" genau das Wort weg, das „Anleitung zur
+Verwendung des Operators nennen" ausmacht. Sie bekommt deshalb die Rohanfrage
+(`app.context.search._kandidaten`).
 
 **Die Regel.** Eine Nachschlage-Anfrage unterscheidet sich von einer thematischen daran,
 dass nach Abzug der Füllwörter ein *Name* übrig bleibt:

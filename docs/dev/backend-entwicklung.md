@@ -94,6 +94,7 @@ docker compose exec backend python scripts/<skript>.py
 | `cleanup_inactive_accounts.py` | Konten ohne Login > 90 Tage löschen | `--dry-run`, `--now`, `--limit` |
 | `cleanup_stale_conversations.py` | Konversationen ohne Nachrichten > 93 Tage löschen | `--dry-run`, `--now` |
 | `embedding_backfill.py` | Embeddings für Knoten ohne Embedding nachgenerieren | `--dry-run`, `--batch-size`, `--limit`, `--content-type` |
+| `seed_search_eval_nodes.py` | **Testknoten für die S2-Fälle des Prüfsatzes** (beschreibende Titel, wie sie der Bildungsplan nicht kennt). Ohne sie messen diese Fälle nichts. Weigert sich bei `ENVIRONMENT=production` | `--entfernen` |
 | `search_eval.py` | **Prüfsatz für die semantische Suche.** Misst je Anfrage aus `config/search_eval.yaml`, ob das richtige Fach oben steht, auf welchem Platz der erwartete Knoten landet und ob das Nachschlagen ausgelöst hat. Ruft die **echte** Suchfunktion auf; der Recall-Vergleich gegen einen erzwungenen vollständigen Durchlauf bleibt als Wächter gegen einen wiederkehrenden Vektorindex | `--details`, `--frage`, `--fach`, `--knoten`, `--top-k`, `--json`, `--pruefsatz` |
 
 `--dry-run` gibt aus, was gelöscht würde, ohne etwas zu löschen.

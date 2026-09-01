@@ -95,6 +95,100 @@ class TestIdentifikationsAbfrage:
         assert "LIMIT 3" in sql
 
 
+class TestKandidaten:
+    """Wonach die Identifikation sucht — und warum es zwei Formen braucht."""
+
+    def test_reduzierter_begriff_und_rohanfrage(self):
+        from app.context.search import _kandidaten
+
+        assert _kandidaten("Was bedeutet der Operator nennen?") == [
+            "nennen", "was bedeutet der operator nennen?",
+        ]
+
+    def test_kein_tor_mehr(self):
+        """⚠️ Bis 09/2026 entschied die Wortliste, **ob** identifiziert wird. Sprach sie
+        nicht an, fand gar keine Identifikation statt — eine verpasste Erkennung kostete
+        Treffer. Jetzt bleibt die Rohanfrage als Kandidat, und sie kostet nur
+        Reihenfolge (ADR-017, Befund 9)."""
+        from app.context.lookup import nachschlage_begriff
+        from app.context.search import _kandidaten
+
+        frage = "Gedichte interpretieren und sprachliche Bilder deuten"
+        assert _kandidaten(frage), "ohne Kandidaten liefe die Identifikation nie"
+        assert nachschlage_begriff(frage) in _kandidaten(frage)
+
+    def test_gleiche_formen_werden_nicht_doppelt_gesucht(self):
+        from app.context.search import _kandidaten
+
+        assert _kandidaten("Elektrochemie") == ["elektrochemie"]
+
+    def test_leere_anfrage_ergibt_keine_kandidaten(self):
+        from app.context.search import _kandidaten
+
+        assert _kandidaten("   ") == []
+
+
+class TestTeilsuche:
+    """Die zweite Identifikationsstufe (Trigramm, Migration 0054)."""
+
+    def test_schwelle_ist_gemessen_und_dokumentiert(self):
+        """0,50 ist der Kipppunkt: alle vier S2-Fälle gefunden, kein thematischer Fall
+        gestört. Ab 0,55 fällt der Leitfall durch (Messung 01.09.2026)."""
+        from app.context.search import _TEILTREFFER_SCHWELLE
+
+        assert _TEILTREFFER_SCHWELLE == 0.50
+
+    def test_nutzt_den_trigramm_operator(self):
+        from app.context.search import Suchprofil, teiltreffer_abfrage
+
+        sql = _sql(teiltreffer_abfrage("anleitung nennen", Suchprofil(pseudonym="p"),
+                                       ausschluss=set()))
+        assert " %% " in sql or " % " in sql, sql
+        assert "similarity(" in sql
+
+    def test_eigenes_zuerst(self):
+        """Der Eigentümer-Vorrang ist eine Sortierstufe, kein Filter: Fremde
+        gleichnamige Bausteine verschwinden nicht, sie rücken nach."""
+        from app.context.search import Suchprofil, teiltreffer_abfrage
+
+        sql = _sql(teiltreffer_abfrage("x", Suchprofil(pseudonym="lehrer-7"),
+                                       ausschluss=set()))
+        ordnung = sql.split("ORDER BY", 1)[1]
+        assert ordnung.index("owner_pseudonym = 'lehrer-7'") < ordnung.index("similarity")
+
+    def test_exakte_stufe_sortiert_ebenso(self):
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        sql = _sql(identifikations_abfrage(["x"], Suchprofil(pseudonym="lehrer-7")))
+        assert "owner_pseudonym = 'lehrer-7'" in sql.split("ORDER BY", 1)[1]
+
+    def test_beide_kandidaten_im_exakten_abgleich(self):
+        from app.context.search import Suchprofil, identifikations_abfrage
+
+        sql = _sql(identifikations_abfrage(["nennen", "operator nennen"],
+                                           Suchprofil(pseudonym="p")))
+        assert "'nennen'" in sql and "'operator nennen'" in sql
+
+
+class TestEigentuemerBonus:
+    def test_bonus_ist_fliesskomma(self):
+        """⚠️ Wird der Bonus als ganze Zahl typisiert, rundet PostgreSQL ihn auf 0 —
+        die Abfrage läuft, sie tut nur nichts."""
+        import sqlalchemy as sa
+
+        from app.context.search import _EIGENTUEMER_BONUS, _bonus
+        from app.db.models import ContextNode
+
+        sql = _sql(_bonus(ContextNode.owner_pseudonym == "p", _EIGENTUEMER_BONUS))
+        assert "AS FLOAT" in sql.upper() or "DOUBLE PRECISION" in sql.upper()
+        assert str(_EIGENTUEMER_BONUS) in sql
+
+    def test_groessenordnung_wie_der_fachbonus(self):
+        from app.context.search import _EIGENTUEMER_BONUS, _FACHBONUS
+
+        assert 0 < _EIGENTUEMER_BONUS <= _FACHBONUS
+
+
 class TestAufzaehlung:
     """„Alle, die …" — Vollständigkeit ist der Anspruch, nicht Ähnlichkeit."""
 
@@ -351,10 +445,41 @@ class TestZusammensetzung:
         """Nie stumm kürzen: Wenn nicht alle Namensträger passen, steht die Zahl dabei —
         der Musterfall aus Befund 1 („nennen" gibt es in 18 Fächern)."""
         ident = Abschnitt(
-            treffer=[{"node_id": str(i)} for i in range(8)], gesamt=24, vollstaendig=False
+            treffer=[{"node_id": str(i), "treffer_art": "exakt"} for i in range(8)],
+            gesamt=24, vollstaendig=False,
         )
         ergebnis, _ = await self._suche("nennen", ident, Abschnitt())
         assert any("24" in h and "8" in h for h in ergebnis.hinweise)
+
+    async def test_teiltreffer_zaehlen_nicht_als_namenstraeger(self):
+        """⚠️ Die Zahl im Hinweis meint die **exakten** Namensträger.
+
+        Zählte sie die ähnlich benannten mit, stünde dort eine Zahl, die keine Frage
+        beantwortet — und die Existenzaussage hinge wieder an einer Ähnlichkeit.
+        """
+        ident = Abschnitt(
+            treffer=[
+                {"node_id": "a", "treffer_art": "exakt"},
+                {"node_id": "b", "treffer_art": "teilweise"},
+                {"node_id": "c", "treffer_art": "teilweise"},
+            ],
+            gesamt=24, vollstaendig=False,
+        )
+        ergebnis, _ = await self._suche("nennen", ident, Abschnitt())
+        [hinweis] = ergebnis.hinweise
+        assert "24 Bausteine tragen diesen Namen, 1 davon" in hinweis
+
+    async def test_aehnlich_benannte_belegen_keinen_namen(self):
+        """Ohne exakten Treffer bleibt es dabei: Der Name existiert nicht — die
+        ähnlich benannten sind ein Angebot zum Nachsehen, kein Beleg."""
+        ident = Abschnitt(
+            treffer=[{"node_id": "a", "treffer_art": "teilweise"}],
+            gesamt=0, vollstaendig=True,
+        )
+        ergebnis, _ = await self._suche("Zwirbeln", ident, Abschnitt())
+        [hinweis] = ergebnis.hinweise
+        assert "Kein Baustein heißt genau" in hinweis
+        assert "1 ähnlich benannte" in hinweis
 
     async def test_vollstaendige_identifikation_ohne_hinweis(self):
         ident = Abschnitt(treffer=[{"node_id": "a"}], gesamt=1, vollstaendig=True)

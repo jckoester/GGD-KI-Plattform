@@ -7,6 +7,8 @@
 # Ausgeführt von `backend/scripts/search_eval.py`. Kein pytest-Test: Die Frage ergibt nur
 # gegen den echten Wissensgraph und ein echtes Embedding-Modell Sinn.
 #
+# Die Stellschrauben der Suche und das Vorgehen beim Ändern: `docs/dev/kontextsuche.md`.
+#
 # Felder je Fall:
 #   frage    Der Suchtext, so wie ihn jemand eingeben würde.
 #   fach     Das Fach, aus dem der beste Treffer kommen sollte. Wird gegen den Treffer
@@ -221,6 +223,30 @@ faelle:
   - frage: Elektrochemie
     knoten: Elektrochemie
     notiz: Einzelwort ohne Rahmen — die einfachste Form des Nachschlagens.
+
+  # ── S2: Teilsuche in beschreibenden Titeln ──────────────────────────────────
+  #
+  # Diese Fälle brauchen die Testknoten aus `backend/scripts/seed_search_eval_nodes.py`
+  # — sie gibt es im Bildungsplan nicht. Ohne sie messen die Fälle nichts; der Runner
+  # meldet dann den erwarteten Knoten als „nicht in der Trefferliste".
+
+  - frage: Anleitung Operator nennen
+    knoten: Anleitung zur Verwendung
+    notiz: >-
+      Der S2-Leitfall: kurze Anfrage, langer beschreibender Titel. Scheitert an der
+      Wortlisten-Reduktion, wenn die Teilsuche den reduzierten Begriff statt der
+      Rohanfrage bekommt — „Operator" ist ein generisches Wort und fällt weg.
+
+  - frage: Verwendung des Operators nennen
+    knoten: Anleitung zur Verwendung
+    notiz: Zusammenhängender Ausschnitt des Titels, ohne das erste Wort.
+
+  - frage: Merkblatt Gedichtanalyse
+    knoten: Merkblatt zur Gedicht
+    notiz: >-
+      Zweiter Typ (methodenblatt) und zugleich Wächter: Der Knoten liegt thematisch
+      neben dem Bestandsfall zur Gedichtinterpretation und darf ihn dort nicht
+      verdrängen.
 
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #

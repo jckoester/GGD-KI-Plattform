@@ -612,15 +612,23 @@ class TestFachvorzugBeiDerSuche:
         anfrage[0] = 1.0
         with patch("app.context.search.generate_embedding",
                    new=AsyncMock(return_value=anfrage)):
+            # ⚠️ Die Anfrage darf keinem der Titel **ähneln**. „Fachvorzug" tat es
+            # (0,50 gegen „Fachvorzug Knoten im Fach") — der Knoten landete dann als
+            # Namensträger in der Identifikation und fehlte im thematischen Abschnitt.
+            # Das Embedding ist ohnehin fest vorgegeben; der Text zählt hier nicht.
             resp = await test_client.post(
-                "/context/search", json={"query": "Fachvorzug", **body},
+                "/context/search", json={"query": "beliebige Frage", **body},
                 headers=auth_headers,
             )
         assert resp.status_code == 200, resp.text
         nach_id = {v: k for k, v in knoten.items()}
+        # Bewusst **nur** der thematische Abschnitt: Dort wirkt der Fachbonus. Über den
+        # ganzen Umschlag gemessen schlüge hier die Titel-Teilsuche durch — „Fachvorzug"
+        # ähnelt dem Titel „Fachvorzug Knoten im Fach" mit 0,50 und stünde dann als
+        # Namensträger vorn. Das ist richtig so, aber es ist eine andere Aussage.
         return [
             nach_id[t["node_id"]]
-            for t in _als_liste(resp.json())
+            for t in resp.json()["thematisch"]["treffer"]
             if t["node_id"] in nach_id
         ]
 
@@ -959,3 +967,191 @@ class TestAufzaehlung:
         )
         assert fremd.gesamt == 0
         assert eigen.gesamt == 1
+
+
+class TestTeilsucheIndexWirdBenutzt:
+    """Der Trigramm-Index aus Migration 0054 muss zur Abfrage passen.
+
+    Sein Ausfall ist **still**: Weicht der Indexausdruck auch nur in einem Zeichen vom
+    Ausdruck der Abfrage ab, benutzt PostgreSQL ihn nicht — dasselbe Ergebnis, nur als
+    vollständiger Durchlauf über alle Titel, und das bei jeder Suche, weil die
+    Identifikation seit AP4 immer läuft.
+
+    ⚠️ **Geprüft wird die Passung, nicht die Planerwahl.** Ob der Planer den Index
+    *wählt*, hängt an der Tabellengröße: In der fast leeren Testdatenbank ist ein
+    vollständiger Durchlauf billiger als jeder Index, und selbst 3 000 Füllzeilen ändern
+    daran nichts. Auf dem Entwicklungsbestand (14 244 Knoten) greift er nachweislich —
+    dort steht im Plan `Bitmap Index Scan on idx_context_nodes_titel_trigramm`, 14 ms.
+    Deshalb prüft dieser Test das, was reproduzierbar **und** brüchig ist: dass der
+    Ausdruck überhaupt indexfähig ist.
+    """
+
+    async def test_index_passt_zum_abfrageausdruck(self, db_url, run_migrations):
+        import sqlalchemy as sa
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        from app.context.filters import TITEL_NORMALISIERT
+        from app.context.search import _TEILTREFFER_SCHWELLE
+
+        # Nur die Trigramm-Bedingung, ohne Sichtbarkeit und Status: Für diese eine
+        # Bedingung ist der Trigramm-Index der einzige, der überhaupt in Frage kommt.
+        # Passt der Ausdruck, muss PostgreSQL ihn nehmen, sobald der vollständige
+        # Durchlauf verboten ist.
+        abfrage = sa.select(sa.literal_column("id")).select_from(
+            sa.table("context_nodes")
+        ).where(sa.literal("anleitung zur verwendung des operators nennen").op("%")(
+            TITEL_NORMALISIERT
+        ))
+        roh = str(abfrage.compile(compile_kwargs={"literal_binds": True}))
+
+        engine = create_async_engine(db_url)
+        try:
+            async with engine.begin() as con:
+                await con.execute(sa.text(
+                    f"SET LOCAL pg_trgm.similarity_threshold = {_TEILTREFFER_SCHWELLE}"
+                ))
+                await con.execute(sa.text("SET LOCAL enable_seqscan = off"))
+                plan = "\n".join(
+                    r[0] for r in (await con.execute(sa.text("EXPLAIN " + roh))).all()
+                )
+        finally:
+            await engine.dispose()
+
+        assert "idx_context_nodes_titel_trigramm" in plan, (
+            "Der Trigramm-Index ist für diese Abfrage nicht verwendbar — vermutlich "
+            f"weicht sein Ausdruck von `titel_normalisiert_sql` ab. Plan:\n{plan}"
+        )
+
+
+class TestIdentifikationZweistufig:
+    """Exakte Namensträger und ähnlich benannte Bausteine, sauber getrennt (AP4)."""
+
+    @pytest_asyncio.fixture
+    async def bausteine(self, test_client, auth_headers, auth_headers_teacher2, db_url):
+        """Ein exakt benannter Knoten, zwei beschreibend benannte in fremder Hand."""
+        angelegt = {}
+        # ⚠️ Die Titel sind so gewählt, dass sie einander **überlappen**. Ein bloß
+        # gemeinsames Wort genügt nicht: `similarity('zwirbeln', 'anleitung zum
+        # zwirbeln von draht')` ist 0,28 und damit unter der Schwelle — genau deshalb
+        # überschwemmt die Teilsuche thematische Anfragen nicht.
+        vorgaben = [
+            ("exakt_eigen", "Anleitung zum Zwirbeln von Draht", auth_headers),
+            ("exakt_fremd", "Anleitung zum Zwirbeln von Draht", auth_headers_teacher2),
+            ("beschreibend", "Anleitung zum Zwirbeln von Draht mit der Zange",
+             auth_headers_teacher2),
+        ]
+        for name, titel, header in vorgaben:
+            resp = await test_client.post(
+                "/context/nodes",
+                json={
+                    "category": "document",
+                    "content_type": "methodenblatt",
+                    "title": titel,
+                    "read_scope": "school",
+                    "write_scope": "private",
+                },
+                headers=header,
+            )
+            assert resp.status_code == 201, resp.text
+            angelegt[name] = resp.json()
+
+        yield angelegt
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM context_nodes WHERE id = ANY(%s::uuid[])",
+                ([n["id"] for n in angelegt.values()],),
+            )
+        conn.commit()
+        conn.close()
+
+    async def _identifiziere(self, db_session, frage, pseudonym):
+        from app.context.search import Suchprofil, identifikation
+
+        return await identifikation(
+            frage, Suchprofil(pseudonym=pseudonym, identifikation=8), db_session
+        )
+
+    async def test_exakter_treffer_steht_vor_dem_teiltreffer(
+        self, bausteine, db_session
+    ):
+        """Die Reihenfolge ist die Aussage: Was so **heißt**, steht vor dem, was so
+        ähnlich heißt."""
+        abschnitt = await self._identifiziere(
+            db_session, "Anleitung zum Zwirbeln von Draht", TEACHER1_PSEUDO
+        )
+        arten = [t["treffer_art"] for t in abschnitt.treffer]
+        assert arten[0] == "exakt"
+        assert "teilweise" in arten, "der längere Titel fehlt"
+        assert arten.index("teilweise") > max(
+            i for i, a in enumerate(arten) if a == "exakt"
+        )
+
+    async def test_nur_exakte_treffer_zaehlen_als_namenstraeger(
+        self, bausteine, db_session
+    ):
+        """Die Zählung trägt die Existenzaussage — Ähnlichkeit darf nicht hineinzählen."""
+        abschnitt = await self._identifiziere(
+            db_session, "Anleitung zum Zwirbeln von Draht", TEACHER1_PSEUDO
+        )
+        assert abschnitt.gesamt == 2, "zwei Bausteine tragen diesen Namen"
+        assert abschnitt.geliefert == 3, "der ähnlich benannte kommt hinzu"
+
+    async def test_kurze_anfrage_holt_keinen_langen_titel_heran(
+        self, bausteine, db_session
+    ):
+        """Die Gegenprobe zur Schwelle 0,50: Ein einzelnes gemeinsames Wort reicht
+        nicht. Ohne diese Grenze bekäme jede thematische Anfrage einen Block
+        ähnlich benannter Bausteine vorangestellt."""
+        abschnitt = await self._identifiziere(db_session, "Zwirbeln", TEACHER1_PSEUDO)
+        assert abschnitt.treffer == []
+
+    async def test_beschreibender_titel_wird_ueber_teilwortlaut_gefunden(
+        self, bausteine, db_session
+    ):
+        """Der S2-Leitfall: verkürzte Anfrage, längerer Titel, kein exakter Name."""
+        abschnitt = await self._identifiziere(
+            db_session, "Anleitung Zwirbeln Draht Zange", TEACHER1_PSEUDO
+        )
+        assert abschnitt.gesamt == 0, "das ist kein exakter Name"
+        assert bausteine["beschreibend"]["id"] in [t["node_id"] for t in abschnitt.treffer]
+
+    async def test_eigenes_steht_vor_fremdem(self, bausteine, db_session):
+        """Zwei gleichnamige Handreichungen — die eigene zuerst, die fremde bleibt."""
+        abschnitt = await self._identifiziere(
+            db_session, "Anleitung zum Zwirbeln von Draht", TEACHER1_PSEUDO
+        )
+        ids = [t["node_id"] for t in abschnitt.treffer]
+        eigen, fremd = bausteine["exakt_eigen"]["id"], bausteine["exakt_fremd"]["id"]
+        assert eigen in ids and fremd in ids, "kein Knoten darf herausfallen"
+        assert ids.index(eigen) < ids.index(fremd)
+
+    async def test_umgekehrt_fuer_die_andere_lehrkraft(self, bausteine, db_session):
+        """Die Gegenprobe — sonst wäre es kein Vorrang, sondern eine feste Reihenfolge."""
+        abschnitt = await self._identifiziere(
+            db_session, "Anleitung zum Zwirbeln von Draht", TEACHER2_PSEUDO
+        )
+        ids = [t["node_id"] for t in abschnitt.treffer]
+        assert ids.index(bausteine["exakt_fremd"]["id"]) < ids.index(
+            bausteine["exakt_eigen"]["id"]
+        )
+
+    async def test_schwelle_gilt_in_der_transaktion(self, bausteine, db_session):
+        """⚠️ Die pg_trgm-Schwelle ist eine Sitzungseinstellung.
+
+        Gesetzt wird sie über ``set_config(…, is_local := true)`` und gilt damit nur bis
+        zum Ende der Transaktion; ein einfaches ``SET`` wanderte im gepoolten Betrieb mit
+        der Verbindung zum nächsten Request und veränderte dort eine Suche, die nie darum
+        gebeten hat. Hier wird geprüft, dass sie überhaupt ankommt — die Transaktions-
+        bindung selbst ist eine Zusage von PostgreSQL.
+        """
+        import sqlalchemy as sa
+
+        from app.context.search import _TEILTREFFER_SCHWELLE
+
+        await self._identifiziere(db_session, "Anleitung zum Zwirbeln", TEACHER1_PSEUDO)
+        wert = (await db_session.execute(
+            sa.text("SHOW pg_trgm.similarity_threshold")
+        )).scalar_one()
+        assert float(wert) == _TEILTREFFER_SCHWELLE

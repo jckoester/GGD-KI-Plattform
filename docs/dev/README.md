@@ -58,6 +58,7 @@ cd frontend && npm install && npm run dev
 - [Systemarchitektur](architektur.md) — Komponenten, Datenfluss, Privacy-Invariante
 - [Auth-Flow & Pseudonymisierung](auth-flow.md) — Adapter-Interface, JWT, Pseudonymisierung
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
+- [Kontextsuche](kontextsuche.md) — Suchschicht, Stellschrauben fürs Feintuning, Prüfsatz
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
 - [Artefaktbibliothek](artefaktbibliothek.md) — `artifacts`-Modell, Promotion/Idempotenz, ggb-Export

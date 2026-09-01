@@ -178,12 +178,15 @@ _SEARCH_CONTEXT_NODES_TOOL = {
     "function": {
         "name": "search_context_nodes",
         "description": (
-            "Sucht Bausteine im Kontextspeicher der Plattform. Die Antwort hat zwei "
+            "Sucht Bausteine im Kontextspeicher der Plattform. Die Antwort hat drei "
             "getrennte Abschnitte, die du unterschiedlich behandeln musst:\n"
             "- 'exakte_namenstraeger': Bausteine, die genau so HEISSEN. Dazu gehört "
             "'gesamt' (wie viele es insgesamt gibt) und 'vollstaendig' (ob alle davon "
             "hier stehen). Nur dieser Abschnitt trägt eine Aussage darüber, ob es "
             "einen Baustein dieses Namens gibt.\n"
+            "- 'aehnlich_benannte_bausteine': Bausteine mit ähnlichem Titel, z. B. "
+            "einem längeren, der den gesuchten Namen enthält. Prüfe am Titel, ob einer "
+            "gemeint ist. Sie belegen NICHT, dass es den gesuchten Namen gibt.\n"
             "- 'naechstliegende_bausteine': thematisch ähnliche Bausteine, nach "
             "Ähnlichkeit sortiert. Diese Liste ist NIE vollständig und sagt NICHTS "
             "darüber aus, was es gibt oder nicht gibt. Antworte niemals 'dazu gibt es "
@@ -547,10 +550,16 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         ),
         ctx.db,
     )
+    ident = ergebnis.identifikation
+    nach_art = {"exakt": [], "teilweise": []}
+    for t in ident.treffer:
+        nach_art[t.get("treffer_art", "exakt")].append(t)
+
     antwort: dict = {
-        "exakte_namenstraeger": _fuer_modell(ergebnis.identifikation.treffer),
-        "gesamt": ergebnis.identifikation.gesamt,
-        "vollstaendig": ergebnis.identifikation.vollstaendig,
+        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"]),
+        "gesamt": ident.gesamt,
+        "vollstaendig": ident.vollstaendig,
+        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"]),
         "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer),
     }
     if ergebnis.hinweise:
