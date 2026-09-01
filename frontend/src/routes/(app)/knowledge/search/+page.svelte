@@ -16,6 +16,8 @@
         Waypoints,
     } from "lucide-svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
+    import { onMount } from "svelte";
 
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
@@ -36,16 +38,26 @@
     // Dort ist die Trefferzahl eine Platzfrage, hier nicht.
     const PRO_ABSCHNITT = 25;
 
-    let frage = $state("");
+    // Wozu die Häkchen da sind. Steht als Tooltip an jeder Checkbox **und** als Zeile
+    // über der ersten Trefferliste: Die Aktionsleiste, die es sonst erklären würde,
+    // erscheint erst, wenn man bereits ausgewählt hat.
+    const AUSWAHL_ZWECK =
+        "Bausteine auswählen, um sie einem Chat als Kontext mitzugeben.";
+
+    // ⚠️ **Der Suchzustand gehört in die URL, nicht nur in die Komponente.** Wer einen
+    // Treffer öffnet und zurückkommt, bekommt sonst eine leere Suchseite: Beim Verlassen
+    // der Route wird die Komponente abgebaut, ihr Zustand mit. Über die URL überlebt die
+    // Suche den Ausflug — und lässt sich nebenbei weitergeben.
+    let frage = $state($page.url.searchParams.get("q") ?? "");
     let umschlag = $state(null);
     let laeuft = $state(false);
     let fehler = $state(null);
     let gesucht = $state(""); // wonach der angezeigte Umschlag gesucht wurde
 
     // Facetten — Verfeinerung des Ergebnisses, keine Vorbedingung.
-    let typ = $state("");
-    let fachId = $state("");
-    let stufe = $state("");
+    let typ = $state($page.url.searchParams.get("typ") ?? "");
+    let fachId = $state($page.url.searchParams.get("fach") ?? "");
+    let stufe = $state($page.url.searchParams.get("stufe") ?? "");
 
     let auswahl = $state(new Set());
 
@@ -84,9 +96,27 @@
             (aufzaehlung?.gesamt ?? 0) === 0,
     );
 
+    /** Den Suchzustand in die Adresszeile spiegeln — ohne History-Eintrag je Tastendruck. */
+    function inDieUrl(q) {
+        const url = new URL($page.url);
+        for (const [name, wert] of [
+            ["q", q], ["typ", typ], ["fach", fachId], ["stufe", stufe],
+        ]) {
+            wert ? url.searchParams.set(name, String(wert)) : url.searchParams.delete(name);
+        }
+        goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+    }
+
+    onMount(() => {
+        // Rückkehr aus der Detail- oder Graphansicht: Die Suche steht in der URL und
+        // wird wiederholt, statt den Nutzer erneut tippen zu lassen.
+        if (frage.trim()) suchen();
+    });
+
     async function suchen() {
         const q = frage.trim();
         if (!q) return;
+        inDieUrl(q);
         laeuft = true;
         fehler = null;
         try {
@@ -105,6 +135,12 @@
             laeuft = false;
         }
     }
+
+    // Wohin die Detailansicht zurückführt. Konvention im Wissensgraphen: `?back=` mit
+    // Pfad **und** Query — nur so kommt der Suchzustand mit zurück.
+    const rueckweg = $derived(
+        encodeURIComponent($page.url.pathname + $page.url.search),
+    );
 
     function umschalten(nodeId) {
         const naechste = new Set(auswahl);
@@ -249,6 +285,12 @@
                 <div class="mt-4"><LoadingBanner message="Sucht…" /></div>
             {/if}
 
+            {#if umschlag && !nichtsGefunden}
+                <p class="mt-5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    {AUSWAHL_ZWECK}
+                </p>
+            {/if}
+
             {#if umschlag}
                 {#if nichtsGefunden}
                     <!-- Ehrlich: kein Baustein dieses Namens. Über das Thema sagt das nichts —
@@ -386,7 +428,8 @@
                         type="checkbox"
                         checked={auswahl.has(knoten.node_id)}
                         onchange={() => umschalten(knoten.node_id)}
-                        aria-label={`„${knoten.title}“ auswählen`}
+                        title={AUSWAHL_ZWECK}
+                        aria-label={`„${knoten.title}“ für einen Chat auswählen`}
                         class="mt-1 accent-primary"
                     />
                     <!-- Symbol, Fach und Typ kommen aus `ContextNodeLabel` — die
@@ -402,7 +445,7 @@
                     </div>
                     {#if istLehrkraft}
                         <a
-                            href={`/knowledge/${knoten.node_id}/graph`}
+                            href={`/knowledge/${knoten.node_id}/graph?back=${rueckweg}`}
                             title="Graphansicht öffnen"
                             class="shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2
                                    hover:text-light-bl dark:hover:text-dark-bl"
@@ -410,7 +453,7 @@
                             <Waypoints class="w-4 h-4" />
                         </a>
                         <a
-                            href={`/knowledge/${knoten.node_id}`}
+                            href={`/knowledge/${knoten.node_id}?back=${rueckweg}`}
                             class="shrink-0 text-xs flex items-center gap-1
                                    text-light-bl dark:text-dark-bl hover:underline"
                         >

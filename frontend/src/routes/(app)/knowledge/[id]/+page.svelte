@@ -56,6 +56,15 @@
         $page.url.searchParams.get("back") ?? "/knowledge",
     );
 
+    // Die Graphansicht ebenso: Von dort führt „Zurück zum Knoten" hierher, und von hier
+    // muss der Weg zur Ausgangsliste offen bleiben.
+    const graphUrl = $derived(
+        `/knowledge/${$page.params.id}/graph` +
+            ($page.url.searchParams.get("back")
+                ? `?back=${encodeURIComponent($page.url.searchParams.get("back"))}`
+                : ""),
+    );
+
     // Bearbeiten-Link trägt den back-Parameter weiter, damit die Edit-Seite
     // wieder hierher (und von hier zurück zur Ausgangsliste) navigieren kann.
     const editUrl = $derived(
@@ -240,7 +249,7 @@
             {/if}
         </p>
         <a
-            href="/knowledge/{$page.params.id}/graph"
+            href={graphUrl}
             class="text-sm text-primary dark:text-dark-bl underline mb-4 inline-block"
         >
             Graphansicht öffnen →
