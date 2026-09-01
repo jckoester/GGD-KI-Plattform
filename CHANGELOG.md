@@ -21,6 +21,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Bausteine ohne Embedding sind über ihren Namen auffindbar.** Fachpläne, Curricula,
   Methoden und Leitperspektiven waren über die Suche bisher gar nicht erreichbar.
 
+- **Assistenten können den Kontextspeicher jetzt auszählen.** Auf Fragen wie „In welchen
+  Fächern gibt es den Operator *nennen*?" antwortet die Plattform mit einer vollständigen,
+  gezählten Liste statt mit den ähnlichsten Treffern — inklusive Aufschlüsselung nach Fach
+  oder Bausteinart. Die Fähigkeit „Kontextsuche" bringt das neue Werkzeug automatisch mit;
+  `get_operatoren` bleibt unverändert nutzbar.
+
 ### Behoben
 
 - **Gruppenfreigaben wurden bei der Suche nicht geprüft.** Ein Baustein, den eine

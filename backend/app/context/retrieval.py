@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.editions import aktive_bp_version
 from app.context.embedding import generate_embedding
+from app.context.search import fasse_fassungen_zusammen, fassungs_schluessel
 from app.db.models import ContextNode
 
 
@@ -71,18 +72,17 @@ _KANDIDATEN_FAKTOR = 3
 
 
 def _fassungs_schluessel(node: ContextNode) -> tuple | None:
-    """Identität einer BP-Kompetenz **über Fassungen hinweg**: Fach, Typ, Nummer.
+    """Der Fassungsschlüssel eines ORM-Knotens.
 
-    ``None`` für alles ohne Nummer (Operatoren, Fachpläne, Nutzerknoten) und für
-    unversionierte Knoten — die werden nie zusammengefasst. Die Nummer genügt als
-    Schlüssel: Sie ist je Fach und Knotentyp innerhalb einer Fassung eindeutig,
-    das Stufenband steckt bereits in ihr.
+    Die Regel selbst steht in :func:`app.context.search.fassungs_schluessel` — dort
+    gilt sie auch für die Aufzählung. Hier bleibt nur das Herauslesen der Felder aus
+    dem ORM-Objekt; AP5 führt beide Wege ohnehin zusammen.
     """
-    if not node.bp_version or node.subject_id is None:
+    if not node.bp_version:
         return None
     meta = node.metadata_ or {}
     nr = next((meta[k] for k in _NR_KEYS if meta.get(k)), None)
-    return (node.subject_id, node.content_type, nr) if nr else None
+    return fassungs_schluessel(node.subject_id, node.content_type, nr)
 
 
 async def _frontier_je_fach(
@@ -136,18 +136,7 @@ def _filtere_auf_frontier(
 
 def _fasse_fassungen_zusammen(nodes: list[ContextNode]) -> list[ContextNode]:
     """Je Kompetenz nur den bestbewerteten Treffer behalten (Reihenfolge bleibt)."""
-    gesehen: set[tuple] = set()
-    behalten: list[ContextNode] = []
-    for node in nodes:
-        schluessel = _fassungs_schluessel(node)
-        if schluessel is None:
-            behalten.append(node)
-            continue
-        if schluessel in gesehen:
-            continue
-        gesehen.add(schluessel)
-        behalten.append(node)
-    return behalten
+    return fasse_fassungen_zusammen(nodes, _fassungs_schluessel)
 
 
 async def get_semantic_context(

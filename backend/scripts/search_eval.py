@@ -94,6 +94,24 @@ class Fall:
 
 
 @dataclass
+class Aufzaehlfall:
+    """Ein Fall der Frageklasse „alle, die …" — geprüft wird eine Zahl, kein Rang."""
+
+    titel: str | None = None
+    content_type: str | None = None
+    fach: str | None = None
+    gesamt: int | None = None
+    faecher: int | None = None
+    notiz: str | None = None
+
+    def beschreibung(self) -> str:
+        teile = [f"Titel „{self.titel}“" if self.titel else None,
+                 f"Typ {self.content_type}" if self.content_type else None,
+                 f"Fach {self.fach}" if self.fach else None]
+        return ", ".join(t for t in teile if t) or "ohne Bedingung"
+
+
+@dataclass
 class Treffer:
     id: str
     titel: str
@@ -362,7 +380,7 @@ async def _fach_ids(dsn: str) -> dict[str, int]:
         await con.close()
 
 
-def _lade(pfad: Path) -> tuple[list[Fall], int]:
+def _lade(pfad: Path) -> tuple[list[Fall], int, list["Aufzaehlfall"]]:
     daten = yaml.safe_load(pfad.read_text(encoding="utf-8")) or {}
     faelle = [
         Fall(frage=f["frage"], fach=f.get("fach"), chat_fach=f.get("chat_fach"), knoten=(
@@ -370,10 +388,71 @@ def _lade(pfad: Path) -> tuple[list[Fall], int]:
         ), notiz=f.get("notiz"))
         for f in daten.get("faelle", [])
     ]
-    return faelle, int(daten.get("top_k", 10))
+    aufzaehlungen = [
+        Aufzaehlfall(
+            titel=a.get("titel"), content_type=a.get("content_type"), fach=a.get("fach"),
+            gesamt=a.get("gesamt"), faecher=a.get("faecher"), notiz=a.get("notiz"),
+        )
+        for a in daten.get("aufzaehlungen", [])
+    ]
+    return faelle, int(daten.get("top_k", 10)), aufzaehlungen
 
 
-async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | None) -> int:
+async def _pruefe_aufzaehlungen(faelle: list[Aufzaehlfall], fach_ids: dict[str, int]) -> int:
+    """Die Frageklasse „alle, die …" prüfen: Zahl gegen Erwartung, nicht Rang.
+
+    Gemessen wird die **echte** Schichtfunktion, nicht eine Nachbildung — dieselbe, die
+    hinter dem Werkzeug ``list_context_nodes`` und der Suchseite steht.
+    """
+    if not faelle:
+        return 0
+
+    from app.context.filters import Knotenfilter
+    from app.context.search import Suchprofil, aufzaehlung
+    from app.db.session import AsyncSessionLocal
+
+    print()
+    print(f"  {'Aufzählung':<52}{'gesamt':>10}{'Fächer':>10}")
+    print("  " + "─" * 72)
+
+    fehler = 0
+    async with AsyncSessionLocal() as db:
+        for fall in faelle:
+            abschnitt = await aufzaehlung(
+                Knotenfilter(
+                    titel=fall.titel,
+                    content_type=(fall.content_type,) if fall.content_type else (),
+                    subject_id=fach_ids.get(fall.fach) if fall.fach else None,
+                ),
+                # Großzügiges Budget: Hier zählt die Zahl, nicht die Anzeige.
+                Suchprofil(pseudonym="pruefsatz", aufzaehlung=500),
+                db,
+                gruppierung="fach",
+            )
+            ist_faecher = len(abschnitt.gruppen or [])
+            ok_gesamt = fall.gesamt is None or abschnitt.gesamt == fall.gesamt
+            ok_faecher = fall.faecher is None or ist_faecher == fall.faecher
+            fehler += not (ok_gesamt and ok_faecher)
+            print(
+                f"  {fall.beschreibung()[:51]:<52}"
+                f"{_erwartung(abschnitt.gesamt, fall.gesamt):>10}"
+                f"{_erwartung(ist_faecher, fall.faecher):>10}"
+            )
+    print("  " + "─" * 72)
+    print(f"\n  {len(faelle)} Aufzählung{'' if len(faelle) == 1 else 'en'} · "
+          f"{len(faelle) - fehler}/{len(faelle)} wie erwartet")
+    return fehler
+
+
+def _erwartung(ist: int, soll: int | None) -> str:
+    """`24` wenn es passt, sonst `24≠18` — der Sollwert steht nur da, wo er abweicht."""
+    if soll is None or ist == soll:
+        return str(ist)
+    return f"{ist}≠{soll}"
+
+
+async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | None,
+              aufzaehlungen: list[Aufzaehlfall] | None = None) -> int:
     dsn = _dsn()
     ergebnisse: list[Ergebnis] = []
     fach_ids = await _fach_ids(dsn)
@@ -398,6 +477,7 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
         ergebnisse.append(_bewerte(fall, index, exakt, produktiv, ident_n, thema_n))
 
     _ausgabe(ergebnisse, top_k, details)
+    aufzaehl_fehler = await _pruefe_aufzaehlungen(aufzaehlungen or [], fach_ids)
 
     if json_pfad:
         json_pfad.write_text(json.dumps([
@@ -418,7 +498,7 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
         ], ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"\n  Ergebnisse geschrieben: {json_pfad}")
 
-    return 0
+    return 1 if aufzaehl_fehler else 0
 
 
 def main() -> None:
@@ -437,19 +517,22 @@ def main() -> None:
     p.add_argument("--json", type=Path, help="Ergebnisse zusätzlich als JSON schreiben")
     args = p.parse_args()
 
+    aufzaehlungen: list[Aufzaehlfall] = []
     if args.frage:
+        # Einzelanfrage: nur die thematische/Nachschlage-Seite, keine Aufzählungen —
+        # die hängen an Bedingungen, nicht an einer Frage.
         faelle = [Fall(frage=args.frage, fach=args.fach, chat_fach=args.chat_fach,
                        knoten=args.knoten)]
         top_k = args.top_k or 10
     else:
         if not args.pruefsatz.exists():
             p.error(f"Prüfsatz nicht gefunden: {args.pruefsatz}")
-        faelle, top_k = _lade(args.pruefsatz)
+        faelle, top_k, aufzaehlungen = _lade(args.pruefsatz)
         if not faelle:
             p.error(f"Prüfsatz enthält keine Fälle: {args.pruefsatz}")
         top_k = args.top_k or top_k
 
-    sys.exit(asyncio.run(run(faelle, top_k, args.details, args.json)))
+    sys.exit(asyncio.run(run(faelle, top_k, args.details, args.json, aufzaehlungen)))
 
 
 if __name__ == "__main__":

@@ -240,26 +240,43 @@ async def test_get_operatoren_ohne_fachbezug_nennt_den_grund():
 
 
 async def test_get_operatoren_current_edition_only_and_mapping():
-    """Liefert nur die neueste Edition, alphabetisch, mit operator/afb/bedeutung/synonyme."""
-    from app.chat import router
+    """Liefert nur die neueste Edition, alphabetisch, mit operator/afb/bedeutung/synonyme.
 
-    nodes = [
-        SimpleNamespace(title="anwenden", content="alte Fassung",
-                        metadata_={"bp_version": "2016", "afb": ["II"], "aliase": []}),
-        SimpleNamespace(title="beurteilen", content="def-b",
-                        metadata_={"bp_version": "2016.V2", "afb": ["III"], "aliase": ["bewerten"]}),
-        SimpleNamespace(title="analysieren", content="def-a",
-                        metadata_={"bp_version": "2016.V2", "afb": ["II", "III"]}),
+    Seit ADR-017/AP3 holt das Werkzeug seine Knoten über die Aufzählung der Suchschicht
+    (Preset: Typ `operator`, Fach der Konversation). Die **Antwortform** ist die Zusage
+    nach außen und bleibt unverändert — deshalb prüft dieser Test sie weiter unverändert.
+    """
+    from unittest.mock import patch
+
+    from app.chat import router
+    from app.context.search import Abschnitt
+
+    treffer = [
+        {"title": "anwenden", "content": "alte Fassung", "bp_version": "2016",
+         "metadata": {"afb": ["II"], "aliase": []}},
+        {"title": "beurteilen", "content": "def-b", "bp_version": "2016.V2",
+         "metadata": {"afb": ["III"], "aliase": ["bewerten"]}},
+        {"title": "analysieren", "content": "def-a", "bp_version": "2016.V2",
+         "metadata": {"afb": ["II", "III"]}},
     ]
-    exec_result = MagicMock()
-    exec_result.scalars.return_value.all.return_value = nodes
 
     db = MagicMock()
     db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))  # Group → Fach
-    db.execute = AsyncMock(return_value=exec_result)
 
-    ctx = ToolContext(db=db, user=None, group_id=2, conversation_id=None)
-    result = await router._exec_get_operatoren(ctx)
+    ctx = ToolContext(
+        db=db, user=SimpleNamespace(sub="p", roles=["teacher"]),
+        group_id=2, conversation_id=None,
+    )
+    with patch.object(
+        router, "aufzaehlung",
+        new=AsyncMock(return_value=Abschnitt(treffer=treffer, gesamt=3, vollstaendig=True)),
+    ) as gezaehlt:
+        result = await router._exec_get_operatoren(ctx)
+
+    # Das Preset: nur Operatoren, nur das Fach der Konversation, mit Metadaten (afb).
+    filter_ = gezaehlt.await_args.args[0]
+    assert filter_.content_type == ("operator",) and filter_.subject_id == 6
+    assert gezaehlt.await_args.kwargs["mit_metadaten"] is True
 
     # Nur 2016.V2-Operatoren, alphabetisch nach Titel
     assert [r["operator"] for r in result] == ["analysieren", "beurteilen"]

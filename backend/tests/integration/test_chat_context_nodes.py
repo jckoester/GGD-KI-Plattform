@@ -797,3 +797,165 @@ class TestNachschlageIndexWirdBenutzt:
         assert "idx_context_nodes_titel_nachschlagen" in plan, (
             f"Der Nachschlage-Index wird nicht benutzt. Plan:\n{plan}"
         )
+
+
+class TestAufzaehlung:
+    """Die Frageklasse „alle, die …" (ADR-017, AP3) gegen eine echte Datenbank.
+
+    Drei Zusagen, die sich nur hier prüfen lassen: dass **vor** dem Limit gezählt wird,
+    dass Fassungen derselben Kompetenz einmal zählen, und dass die Zählung niemandem
+    verrät, was er nicht sehen darf.
+    """
+
+    @pytest_asyncio.fixture
+    async def bausteine(self, test_client, auth_headers, db_url):
+        """Fünf Knoten desselben Namens: drei sichtbare, zwei Sonderfälle."""
+        angelegt = []
+        for i in range(3):
+            resp = await test_client.post(
+                "/context/nodes",
+                json={
+                    "category": "knowledge",
+                    "content_type": "operator",
+                    # Gliederungsnummer in BP-Form — sie wird wegnormalisiert, alle
+                    # drei Knoten heißen für die Aufzählung „zwirbeln".
+                    "title": f"9.9.{i + 1} Zwirbeln",
+                    "read_scope": "school",
+                    "write_scope": "school",
+                },
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, resp.text
+            angelegt.append(resp.json())
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO subjects (id, slug, name) VALUES "
+                "(9503, 'zwirbel-a', 'Zwirbelkunde'), (9504, 'zwirbel-b', 'Zwirbeltechnik') "
+                "ON CONFLICT (id) DO NOTHING"
+            )
+            for node, fach in zip(angelegt, (9503, 9504, 9504)):
+                cur.execute(
+                    "UPDATE context_nodes SET subject_id = %s WHERE id = %s",
+                    (fach, node["id"]),
+                )
+        conn.commit()
+        conn.close()
+
+        yield angelegt
+
+        # Aufräumen ist hier Pflicht, nicht Kosmetik: Die Tests prüfen **Zahlen**.
+        # Bleiben die Knoten des einen Falls liegen, zählt der nächste sie mit — und
+        # der Fehlschlag zeigt sich nur im Gesamtlauf, nie beim einzelnen Test.
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM context_nodes WHERE id = ANY(%s::uuid[])",
+                ([n["id"] for n in angelegt],),
+            )
+        conn.commit()
+        conn.close()
+
+    async def _zaehle(self, db_session, pseudonym, **filter_felder):
+        from app.context.filters import Knotenfilter
+        from app.context.search import Suchprofil, aufzaehlung
+
+        return await aufzaehlung(
+            Knotenfilter(titel="zwirbeln", **filter_felder),
+            Suchprofil(pseudonym=pseudonym, aufzaehlung=1),
+            db_session,
+            gruppierung="fach",
+        )
+
+    async def test_zaehlt_vor_dem_limit(self, bausteine, db_session):
+        """Das Budget begrenzt die Lieferung, nicht die Zählung — sonst wäre „x von y"
+        nicht zu haben, und genau daran scheiterte die alte Suche (Befund 1)."""
+        abschnitt = await self._zaehle(db_session, TEACHER1_PSEUDO)
+        assert abschnitt.gesamt == 3
+        assert abschnitt.geliefert == 1
+        assert abschnitt.vollstaendig is False
+
+    async def test_gruppierung_zaehlt_alle_faecher(self, bausteine, db_session):
+        abschnitt = await self._zaehle(db_session, TEACHER1_PSEUDO)
+        assert {(g.name, g.anzahl) for g in abschnitt.gruppen} == {
+            ("Zwirbelkunde", 1), ("Zwirbeltechnik", 2),
+        }
+
+    async def test_fassungen_derselben_kompetenz_zaehlen_einmal(
+        self, test_client, auth_headers, db_url, db_session
+    ):
+        """Zwei BP-Editionen derselben Kompetenz sind ein Baustein, nicht zwei."""
+        ids = []
+        for fassung in ("2016", "2016.V2"):
+            resp = await test_client.post(
+                "/context/nodes",
+                json={
+                    "category": "knowledge",
+                    "content_type": "ik_kompetenz",
+                    "title": "Doppelte Fassung",
+                    "read_scope": "school",
+                    "write_scope": "school",
+                    "metadata": {"kompetenz_nr": "9.9.9(1)", "bp_version": fassung},
+                },
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, resp.text
+            ids.append(resp.json()["id"])
+
+        conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        with conn.cursor() as cur:
+            for node_id, fassung in zip(ids, ("2016", "2016.V2")):
+                cur.execute(
+                    "UPDATE context_nodes SET subject_id = 9503, bp_version = %s "
+                    "WHERE id = %s",
+                    (fassung, node_id),
+                )
+        conn.commit()
+        conn.close()
+
+        from app.context.filters import Knotenfilter
+        from app.context.search import Suchprofil, aufzaehlung
+
+        abschnitt = await aufzaehlung(
+            Knotenfilter(titel="doppelte fassung"),
+            Suchprofil(pseudonym=TEACHER1_PSEUDO),
+            db_session,
+        )
+        assert abschnitt.gesamt == 1, "beide Fassungen wurden gezählt"
+
+    async def test_fremder_privater_knoten_zaehlt_nicht_mit(
+        self, test_client, auth_headers_teacher2, db_session
+    ):
+        """Die Zählung ist eine Auskunft über den **sichtbaren** Bestand.
+
+        Zählte sie mit, was man nicht lesen darf, verriete schon die Zahl die Existenz
+        fremder privater Bausteine — eine Auskunft, die kein Rechtefilter je wieder
+        einfängt.
+        """
+        resp = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "artifact",
+                "content_type": "aufgabe",
+                "title": "Heimlich",
+                "read_scope": "private",
+                "write_scope": "private",
+            },
+            headers=auth_headers_teacher2,
+        )
+        assert resp.status_code == 201, resp.text
+
+        from app.context.filters import Knotenfilter
+        from app.context.search import Suchprofil, aufzaehlung
+
+        fremd = await aufzaehlung(
+            Knotenfilter(titel="heimlich"),
+            Suchprofil(pseudonym=TEACHER1_PSEUDO), db_session,
+        )
+        eigen = await aufzaehlung(
+            Knotenfilter(titel="heimlich"),
+            Suchprofil(pseudonym=TEACHER2_PSEUDO), db_session,
+        )
+        assert fremd.gesamt == 0
+        assert eigen.gesamt == 1

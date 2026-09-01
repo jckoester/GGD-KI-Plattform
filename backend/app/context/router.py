@@ -53,6 +53,7 @@ from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
+from app.context.filters import Knotenfilter, wende_an
 from app.context.visibility import read_scope_clause
 from app.preferences.service import anzeige_limit
 from app.db.models import (
@@ -243,102 +244,26 @@ async def list_nodes(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    query = select(ContextNode)
-    query = _visibility_filter(query, user, status_override=status)
+    if owner is not None and owner != "me":
+        raise HTTPException(status_code=400, detail="owner muss 'me' sein")
 
-    # subject_id: direkte Filterung nach Subject-ID
-    if subject_id is not None:
-        query = query.where(ContextNode.subject_id == subject_id)
-
-    # subject_id_or_global: dieses Fach plus fach­unabhängige Knoten (z. B. Vokabular)
-    if subject_id_or_global is not None:
-        query = query.where(
-            or_(
-                ContextNode.subject_id == subject_id_or_global,
-                ContextNode.subject_id.is_(None),
-            )
-        )
-
-    # subject_slug: Knoten deren Scope-Gruppe zu diesem Fach gehört,
-    # plus schulweite/globale knowledge-Knoten mit passendem Fach oder fächerübergreifend
-    if subject_slug:
-        subquery_group_ids = (
-            sa.select(Group.id)
-            .join(Subject, Subject.id == Group.subject_id)
-            .where(Subject.slug == subject_slug)
-            .scalar_subquery()
-        )
-        # subject_id der Ziel-Slug nachschlagen
-        subject_id_subq = (
-            sa.select(Subject.id)
-            .where(Subject.slug == subject_slug)
-            .scalar_subquery()
-        )
-        query = query.where(
-            or_(
-                ContextNode.read_scope_group_id.in_(subquery_group_ids),
-                and_(
-                    ContextNode.read_scope.in_(["global", "school"]),
-                    ContextNode.category == "knowledge",
-                    or_(
-                        ContextNode.subject_id == subject_id_subq,
-                        ContextNode.subject_id.is_(None),
-                    ),
-                ),
-            )
-        )
-
-    # group_id: nur Knoten mit exakt dieser read_scope_group_id
-    if group_id is not None:
-        query = query.where(ContextNode.read_scope_group_id == group_id)
-
-    # grade: Jahrgangsstufen-Filter
-    if grade is not None:
-        query = query.where(
-            or_(
-                ContextNode.min_grade.is_(None),  # keine Stufenangabe = für alle
-                and_(
-                    ContextNode.min_grade <= grade,
-                    ContextNode.max_grade >= grade,
-                ),
-            )
-        )
-
-    # bp_version: Bildungsplan-Versionsfilter (JSONB-Feld)
-    if bp_version is not None:
-        query = query.where(
-            ContextNode.metadata_["bp_version"].astext == bp_version
-        )
-
-    # owner=me: nur eigene Knoten
-    if owner is not None:
-        if owner != "me":
-            raise HTTPException(status_code=400, detail="owner muss 'me' sein")
-        query = query.where(ContextNode.owner_pseudonym == user.sub)
-
-    if q:
-        like = f"%{q}%"
-        # Titel ODER ein Synonym aus metadata_.aliase (JSONB-Textmatch). So sind
-        # Aliase systemweit suchbar (Krücke bis zum echten Alias-Feld an Knoten).
-        query = query.where(
-            or_(
-                ContextNode.title.ilike(like),
-                ContextNode.metadata_["aliase"].astext.ilike(like),
-            )
-        )
-    if category:
-        query = query.where(ContextNode.category == category)
-    if content_type:
-        query = query.where(ContextNode.content_type.in_(content_type))
-    if exclude_content_type:
-        # BP-Curriculum-Typen aus der freien Liste heraushalten (C2). Knoten ohne
-        # content_type (NULL) bleiben erhalten — `NOT IN` würde sie sonst verwerfen.
-        query = query.where(
-            or_(
-                ContextNode.content_type.is_(None),
-                ContextNode.content_type.notin_(exclude_content_type),
-            )
-        )
+    # Die Feldfilter stehen in `app.context.filters` — dieselbe Übersetzung benutzt die
+    # Aufzählung der Suchschicht (ADR-017). Zwei Fassungen derselben Bedingungen gäben
+    # irgendwann verschiedene Antworten auf dieselbe Frage.
+    query = _visibility_filter(select(ContextNode), user, status_override=status)
+    query = wende_an(query, Knotenfilter(
+        q=q,
+        category=category,
+        content_type=tuple(content_type or ()),
+        exclude_content_type=tuple(exclude_content_type or ()),
+        subject_id=subject_id,
+        subject_id_or_global=subject_id_or_global,
+        subject_slug=subject_slug,
+        group_id=group_id,
+        grade=grade,
+        bp_version=bp_version,
+        owner_pseudonym=user.sub if owner == "me" else None,
+    ))
 
     # id als stabiler Tiebreaker → deterministische Reihenfolge für Pagination
     # (created_at allein hat bei gleichzeitig importierten/geseedeten Knoten viele Ties).

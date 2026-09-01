@@ -95,6 +95,182 @@ class TestIdentifikationsAbfrage:
         assert "LIMIT 3" in sql
 
 
+class TestAufzaehlung:
+    """„Alle, die …" — Vollständigkeit ist der Anspruch, nicht Ähnlichkeit."""
+
+    def _abschnitt(self, treffer, gesamt=None, budget=50):
+        from app.context.search import Abschnitt, _gruppiere
+
+        return Abschnitt(
+            treffer=treffer[:budget],
+            gesamt=gesamt if gesamt is not None else len(treffer),
+            vollstaendig=len(treffer) <= budget,
+            gruppen=_gruppiere(treffer, "fach"),
+        )
+
+    def test_gruppierung_zaehlt_alle_treffer(self):
+        """Nicht nur die mitgelieferten: „In welchen Fächern gibt es das?" ist eine Frage
+        nach dem Bestand, nicht nach dem Ausschnitt, der ins Budget passte."""
+        from app.context.search import _gruppiere
+
+        treffer = [{"fach": "Mathematik"}] * 3 + [{"fach": "Physik"}]
+        gruppen = _gruppiere(treffer, "fach")
+        assert [(g.name, g.anzahl) for g in gruppen] == [("Mathematik", 3), ("Physik", 1)]
+
+    def test_gruppierung_nach_typ(self):
+        from app.context.search import _gruppiere
+
+        treffer = [{"content_type": "operator"}, {"content_type": "leitidee"}]
+        assert {g.name for g in _gruppiere(treffer, "typ")} == {"operator", "leitidee"}
+
+    def test_knoten_ohne_fach_verschwinden_nicht(self):
+        """Leitperspektiven und schulweite Dokumente tragen kein Fach — sie dürfen aus
+        der Zählung nicht herausfallen, sonst stimmt die Gesamtzahl nicht mehr."""
+        from app.context.search import _gruppiere
+
+        gruppen = _gruppiere([{"fach": None}, {"fach": "Mathematik"}], "fach")
+        assert sum(g.anzahl for g in gruppen) == 2
+        assert any(g.name == "ohne Angabe" for g in gruppen)
+
+    def test_unbekannte_gruppierung_ist_kein_absturz(self):
+        from app.context.search import _gruppiere
+
+        assert _gruppiere([{"fach": "Mathematik"}], "sternzeichen") == []
+
+    def test_gekuerzte_liste_ist_nicht_vollstaendig(self):
+        a = self._abschnitt([{"fach": "M"} for _ in range(24)], budget=8)
+        assert a.gesamt == 24 and a.geliefert == 8 and a.vollstaendig is False
+
+
+class TestFassungen:
+    """Dieselbe Kompetenz in zwei BP-Editionen ist **ein** Treffer, nicht zwei."""
+
+    def test_gleiche_nummer_wird_zusammengefasst(self):
+        from app.context.search import _treffer_schluessel, fasse_fassungen_zusammen
+
+        alt = {"subject_id": 1, "content_type": "ik_kompetenz", "nr": "3.1.2(4)",
+               "bp_version": "2016", "title": "alt"}
+        neu = {**alt, "bp_version": "2016.V2", "title": "neu"}
+        behalten = fasse_fassungen_zusammen([alt, neu], _treffer_schluessel)
+        assert [t["title"] for t in behalten] == ["alt"]
+
+    def test_ohne_nummer_wird_nie_zusammengefasst(self):
+        """Operatoren tragen keine Kompetenznummer — „nennen" in Mathematik und „nennen"
+        in Physik sind zwei Bausteine und müssen zwei bleiben."""
+        from app.context.search import _treffer_schluessel, fasse_fassungen_zusammen
+
+        a = {"subject_id": 1, "content_type": "operator", "nr": None,
+             "bp_version": "2016", "title": "nennen"}
+        b = {**a, "subject_id": 2}
+        assert len(fasse_fassungen_zusammen([a, b], _treffer_schluessel)) == 2
+
+    def test_unversionierte_knoten_bleiben_getrennt(self):
+        """Zwei Nutzerknoten mit zufällig gleicher Nummer sind keine Fassungen
+        voneinander."""
+        from app.context.search import _treffer_schluessel, fasse_fassungen_zusammen
+
+        a = {"subject_id": 1, "content_type": "aufgabe", "nr": "1", "bp_version": None}
+        assert len(fasse_fassungen_zusammen([a, dict(a)], _treffer_schluessel)) == 2
+
+    def test_eine_regel_fuer_beide_wege(self):
+        """Der Anker-Weg (`retrieval.py`) benutzt dieselbe Entscheidung wie die
+        Aufzählung — sonst zählte die eine Seite, was die andere zusammenfasst."""
+        from app.context.retrieval import _fassungs_schluessel
+        from app.context.search import fassungs_schluessel
+
+        knoten = type("N", (), {
+            "bp_version": "2016.V2", "subject_id": 1, "content_type": "ik_kompetenz",
+            "metadata_": {"kompetenz_nr": "3.1.2(4)"},
+        })()
+        assert _fassungs_schluessel(knoten) == fassungs_schluessel(
+            1, "ik_kompetenz", "3.1.2(4)"
+        )
+
+
+class TestAufzaehlungsWerkzeug:
+    """`list_context_nodes` — die Aufzählung für das Modell."""
+
+    async def _antwort(self, args, abschnitt, subject_id=None):
+        from unittest.mock import AsyncMock, patch
+
+        from app.chat import router
+
+        with patch.object(router, "aufzaehlung", new=AsyncMock(return_value=abschnitt)) as gez, \
+             patch.object(router, "_subject_id_aus_name",
+                          new=AsyncMock(return_value=subject_id)):
+            ctx = router.ToolContext(
+                db=object(), user=type("U", (), {"sub": "p", "roles": []})(),
+                group_id=None, conversation_id=None,
+            )
+            return await router._list_context_nodes_handler(args, ctx), gez
+
+    async def test_ohne_fachangabe_ueber_alle_faecher(self):
+        """⚠️ Der Musterfall lautet „in welchen Fächern gibt es ‚nennen'?". Ein stiller
+        Fachfilter machte daraus die falsche Antwort — und zwar eine, die vollständig
+        aussieht."""
+        from app.context.search import Abschnitt
+
+        _, gezaehlt = await self._antwort({"titel": "nennen"}, Abschnitt(gesamt=0))
+        assert gezaehlt.await_args.args[0].subject_id is None
+
+    async def test_titel_wird_normalisiert(self):
+        """Gliederungsnummern und Großschreibung dürfen kein Hindernis sein."""
+        from app.context.search import Abschnitt
+
+        _, gezaehlt = await self._antwort(
+            {"titel": "3.3.2 Leitidee Messen"}, Abschnitt(gesamt=0)
+        )
+        assert gezaehlt.await_args.args[0].titel == "leitidee messen"
+
+    async def test_unbekanntes_fach_wird_benannt(self):
+        antwort, _ = await self._antwort(
+            {"titel": "nennen", "subject": "Klingonisch"}, None, subject_id=None
+        )
+        assert "Klingonisch" in antwort["hinweis"]
+
+    async def test_zaehlung_und_gruppen_gehen_mit(self):
+        from app.context.search import Abschnitt, Gruppe
+
+        antwort, _ = await self._antwort(
+            {"titel": "nennen", "gruppierung": "fach"},
+            Abschnitt(
+                treffer=[{"node_id": "a", "title": "nennen"}],
+                gesamt=24, vollstaendig=False,
+                gruppen=[Gruppe("Mathematik", 1), Gruppe("Physik", 1)],
+            ),
+        )
+        assert antwort["gesamt"] == 24 and antwort["geliefert"] == 1
+        assert antwort["gruppen"] == [
+            {"name": "Mathematik", "anzahl": 1}, {"name": "Physik", "anzahl": 1}
+        ]
+        assert any("24" in h for h in antwort["hinweise"])
+
+    async def test_vollstaendige_liste_ohne_hinweis(self):
+        from app.context.search import Abschnitt
+
+        antwort, _ = await self._antwort(
+            {"titel": "nennen"},
+            Abschnitt(treffer=[{"node_id": "a"}], gesamt=1, vollstaendig=True),
+        )
+        assert "hinweise" not in antwort
+
+    def test_werkzeug_grenzt_sich_von_der_thematischen_suche_ab(self):
+        """Die fragile Werkzeugwahl (Befund 8) wird über die Beschreibung gesteuert —
+        das Modell muss lesen können, wann es welches nimmt."""
+        from app.chat.router import _LIST_CONTEXT_NODES_TOOL
+
+        text = _LIST_CONTEXT_NODES_TOOL["function"]["description"]
+        assert "search_context_nodes" in text
+        assert "gesamt" in text
+
+    def test_registriert_in_der_gruppe_context_search(self):
+        from app.chat import router  # noqa: F401 — registriert das Werkzeug
+        from app.chat.tools import TOOL_REGISTRY
+
+        werkzeug = TOOL_REGISTRY["list_context_nodes"]
+        assert werkzeug.group == "context_search" and werkzeug.writes is False
+
+
 class TestEineSichtbarkeitsregel:
     """Die Suche prüft Gruppenmitgliedschaft — bis 09/2026 tat sie das nicht.
 

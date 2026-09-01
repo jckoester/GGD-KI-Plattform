@@ -491,13 +491,23 @@ Backend-Log:
 
 ```bash
 docker compose logs backend | grep "^.*Tool '"
-# INFO Tool 'search_context_nodes' (Runde 1) → 8 Einträge
+# INFO Tool 'search_context_nodes' (Runde 1) → Felder ['exakte_namenstraeger', …]
+# INFO Tool 'list_context_nodes' (Runde 1) → Felder ['bausteine', 'gesamt', …]
 # INFO Tool 'get_operatoren' (Runde 1) → Felder ['hinweis']
 ```
 
-Damit lässt sich unterscheiden, ob gesucht wurde und nichts kam (`0 Einträge`) oder ob
-ein anderes Werkzeug gegriffen hat. `get_operatoren` etwa beantwortet nur Fragen zum Fach
-der Konversation und meldet ohne Fachbezug einen `hinweis` statt einer Liste.
+Damit lässt sich unterscheiden, welches der drei Werkzeuge gegriffen hat:
+
+| Werkzeug | wofür |
+|---|---|
+| `search_context_nodes` | „Was gibt es zu diesem Thema?" — Namensträger und nächstliegende Bausteine |
+| `list_context_nodes` | „Alle, die …" / „Wie viele?" — vollständige, gezählte Liste |
+| `get_operatoren` | Operatoren des Konversationsfachs; ohne Fachbezug ein `hinweis` statt einer Liste |
+
+Greift ein Modell für eine „alle …"-Frage zu `search_context_nodes` statt zu
+`list_context_nodes`, bekommt es eine nach Ähnlichkeit gekürzte Liste und antwortet
+womöglich unvollständig. Solche Fehlgriffe sind hier sichtbar — und der Grund, aus dem
+`get_operatoren` vorerst bestehen bleibt.
 
 Der Suchtext selbst wird **nicht** protokolliert — er ist Nutzereingabe und gehört nicht
 in Logs.

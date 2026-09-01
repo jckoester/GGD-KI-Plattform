@@ -29,7 +29,9 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.embedding import generate_embedding
-from app.context.lookup import nachschlage_begriff, titel_normalisiert_sql
+from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
+from app.context.filters import Knotenfilter, wende_an
+from app.context.lookup import nachschlage_begriff
 from app.context.schemas import anzeige_felder
 from app.context.visibility import read_scope_clause
 from app.db.models import ContextNode, Subject
@@ -58,23 +60,41 @@ class Suchprofil:
     subject_id: int | None = None
     identifikation: int = 8
     thematisch: int = 8
+    # Die Aufzählung darf großzügiger sein: Sie beantwortet „alle, die …", und eine
+    # Antwort mit acht von vierundzwanzig hilft dort niemandem. Die Zählung selbst ist
+    # ohnehin vollständig, unabhängig davon, wie viele Treffer mitgeliefert werden.
+    aufzaehlung: int = 50
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────
 
 
 @dataclass
+class Gruppe:
+    """„Mathematik: 3" — eine Zeile der Gruppierung einer Aufzählung.
+
+    Gezählt wird über **alle** Treffer, nicht nur die mitgelieferten: Die Frage „in
+    welchen Fächern gibt es das?" ist eine Frage nach dem Bestand, nicht nach dem
+    Ausschnitt, der gerade ins Budget passte.
+    """
+
+    name: str
+    anzahl: int
+
+
+@dataclass
 class Abschnitt:
     """Ein beschrifteter Teil des Ergebnisses samt Auskunft über seine Vollständigkeit.
 
-    ``gesamt`` ist die Anzahl **aller** passenden Knoten, soweit bestimmbar — bei der
-    Identifikation die Zahl der Namensträger, bei der thematischen Auswahl ``None``:
-    Dort gibt es keine Gesamtmenge, nur eine Rangfolge nach Ähnlichkeit.
+    ``gesamt`` ist die Anzahl **aller** passenden Knoten, soweit bestimmbar — bei
+    Identifikation und Aufzählung eine echte Zahl, bei der thematischen Auswahl
+    ``None``: Dort gibt es keine Gesamtmenge, nur eine Rangfolge nach Ähnlichkeit.
     """
 
     treffer: list[dict] = field(default_factory=list)
     gesamt: int | None = None
     vollstaendig: bool = False
+    gruppen: list[Gruppe] | None = None
 
     @property
     def geliefert(self) -> int:
@@ -119,13 +139,17 @@ _FACHBONUS = 0.05
 # ── Trefferform ──────────────────────────────────────────────────────────────
 
 
-def _treffer(row) -> dict:
+def _treffer(row, *, mit_metadaten: bool = False) -> dict:
     """Eine Trefferzeile in die Form bringen, die Aufrufer und Modell erwarten.
 
     Gemeinsam für alle Verfahren — liefen sie auseinander, trüge dieselbe Trefferliste
     je nach Abschnitt unterschiedliche Felder.
+
+    ``mit_metadaten`` hängt die rohe JSON-Spalte an. Standardmäßig bleibt sie **draußen**:
+    Sie enthält Import-Interna, die im Modellkontext nur Platz kosten. Wer sie braucht
+    (die Operatorenliste braucht ``afb`` und ``aliase``), fordert sie ausdrücklich an.
     """
-    return {
+    treffer = {
         "node_id": str(row["id"]),
         "title": row["title"],
         "category": row["category"],
@@ -140,6 +164,9 @@ def _treffer(row) -> dict:
         "fach": row["fach"],
         **anzeige_felder(row),
     }
+    if mit_metadaten:
+        treffer["metadata"] = row["metadata"] or {}
+    return treffer
 
 
 _SPALTEN = (
@@ -181,17 +208,133 @@ def _aus_dem_fach(profil: Suchprofil):
     return ContextNode.subject_id == profil.subject_id
 
 
-# ── Verfahren 1: Identifikation ──────────────────────────────────────────────
-
-# Der normalisierte Titel als SQL-Ausdruck — dieselbe Quelle wie der Ausdrucksindex aus
-# Migration 0053. Weichen beide voneinander ab, benutzt PostgreSQL den Index
-# stillschweigend nicht (siehe Docstring in `lookup.py`).
+# ── Fassungen derselben Kompetenz ────────────────────────────────────────────
 #
-# ⚠️ `literal_column`, nicht `text`: Ein `TextClause` ist kein Spaltenausdruck. `==`
-# darauf ergibt keine SQL-Bedingung, sondern einen Python-Vergleich mit dem Ergebnis
-# `False` — die Abfrage läuft dann fehlerfrei und liefert **nichts**.
-_TITEL_NORMALISIERT = sa.literal_column(titel_normalisiert_sql("context_nodes.title"))
+# Solange eine neue Bildungsplan-Edition jahrgangsweise nach oben wächst, liegen dieselben
+# Kompetenzen doppelt im Speicher — in der alten und der neuen Fassung, textlich oft nur
+# in Nuancen verschieden. Ohne Gegenmaßnahme belegen beide je einen Platz und verdrängen
+# anderes; in einer Aufzählung verfälschen sie zusätzlich die Zählung.
 
+
+def fassungs_schluessel(subject_id, content_type, nr) -> tuple | None:
+    """Identität einer BP-Kompetenz **über Fassungen hinweg**: Fach, Typ, Nummer.
+
+    ``None`` für alles ohne Nummer (Operatoren, Fachpläne, Nutzerknoten) — das wird nie
+    zusammengefasst. Die Nummer genügt als Schlüssel: Sie ist je Fach und Knotentyp
+    innerhalb einer Fassung eindeutig, das Stufenband steckt bereits in ihr.
+
+    Eine Regel, zwei Aufrufer: die Aufzählung hier (auf Schicht-Treffern) und der
+    Anker-Weg in :mod:`app.context.retrieval` (auf ORM-Objekten). AP5 führt beide
+    zusammen; bis dahin teilen sie wenigstens die Entscheidung.
+    """
+    if subject_id is None or not nr:
+        return None
+    return (subject_id, content_type, nr)
+
+
+def fasse_fassungen_zusammen(eintraege: list, schluessel) -> list:
+    """Je Kompetenz nur den erstbesten Eintrag behalten (Reihenfolge bleibt).
+
+    ``schluessel`` liefert je Eintrag den Fassungsschlüssel oder ``None``; Einträge ohne
+    Schlüssel bleiben immer erhalten.
+    """
+    gesehen: set[tuple] = set()
+    behalten: list = []
+    for eintrag in eintraege:
+        s = schluessel(eintrag)
+        if s is None:
+            behalten.append(eintrag)
+            continue
+        if s in gesehen:
+            continue
+        gesehen.add(s)
+        behalten.append(eintrag)
+    return behalten
+
+
+def _treffer_schluessel(t: dict) -> tuple | None:
+    """Der Fassungsschlüssel eines Schicht-Treffers.
+
+    ``bp_version`` muss gesetzt sein: Unversionierte Knoten sind keine Fassungen
+    voneinander, auch wenn sie zufällig dieselbe Nummer tragen.
+    """
+    if not t.get("bp_version"):
+        return None
+    return fassungs_schluessel(t.get("subject_id"), t.get("content_type"), t.get("nr"))
+
+
+# ── Verfahren 3: Aufzählung ──────────────────────────────────────────────────
+
+# Wie viele Zeilen die Aufzählung höchstens holt, um zu zählen und zu gruppieren. Die
+# Zählung selbst ist unabhängig davon exakt (`COUNT(*) OVER ()`); die Obergrenze schützt
+# nur davor, für eine allzu weite Bedingung den halben Wissensgraphen in den Speicher zu
+# ziehen. Wird sie erreicht, sagt der Umschlag es.
+_AUFZAEHLUNG_MAX = 500
+
+
+async def aufzaehlung(
+    filter_: Knotenfilter,
+    profil: Suchprofil,
+    db: AsyncSession,
+    *,
+    gruppierung: str | None = None,
+    mit_metadaten: bool = False,
+) -> Abschnitt:
+    """„Alle Bausteine, die …" — deterministisch, gezählt, ohne Ähnlichkeitsmaß.
+
+    Der Unterschied zur Identifikation ist der **Vollständigkeitsanspruch**, nicht das
+    Matching: Beide können denselben Namen suchen (über dieselbe Normalisierung), aber
+    die Identifikation liefert Anheft-Kandidaten im Budget der Oberfläche, die Aufzählung
+    die gezählte Gesamtliste. Deshalb steht hier ``gesamt`` immer, auch wenn nur ein Teil
+    mitgeliefert wird — „14 von 24" ist eine Antwort, 14 kommentarlos gelieferte Treffer
+    sind eine Falle.
+
+    ``gruppierung``: ``"fach"`` oder ``"typ"``; ohne Angabe wird nicht gruppiert.
+    """
+    stmt = (
+        wende_an(_grundabfrage(profil), filter_)
+        # ⚠️ Die Zählung **vor** dem Limit. Sie ist der Grund für dieses Verfahren.
+        .add_columns(sa.func.count().over().label("gesamt"))
+        .order_by(Subject.name.nulls_last(), ContextNode.title, ContextNode.id)
+        .limit(_AUFZAEHLUNG_MAX)
+    )
+    zeilen = (await db.execute(stmt)).mappings().all()
+    roh_gesamt = zeilen[0]["gesamt"] if zeilen else 0
+
+    treffer = fasse_fassungen_zusammen(
+        [_treffer(z, mit_metadaten=mit_metadaten) for z in zeilen], _treffer_schluessel
+    )
+    gruppen = _gruppiere(treffer, gruppierung) if gruppierung else None
+
+    return Abschnitt(
+        treffer=treffer[: profil.aufzaehlung],
+        gesamt=len(treffer),
+        vollstaendig=(
+            len(treffer) <= profil.aufzaehlung and roh_gesamt <= _AUFZAEHLUNG_MAX
+        ),
+        gruppen=gruppen,
+    )
+
+
+_GRUPPIERUNG_FELD = {"fach": "fach", "typ": "content_type"}
+
+
+def _gruppiere(treffer: list[dict], nach: str) -> list[Gruppe]:
+    """Nach Fach oder Typ zählen, absteigend nach Anzahl, dann alphabetisch."""
+    feld = _GRUPPIERUNG_FELD.get(nach)
+    if feld is None:
+        return []
+    zaehler: dict[str, int] = {}
+    for t in treffer:
+        name = t.get(feld) or "ohne Angabe"
+        zaehler[name] = zaehler.get(name, 0) + 1
+    return [
+        Gruppe(name=name, anzahl=anzahl)
+        for name, anzahl in sorted(zaehler.items(), key=lambda p: (-p[1], p[0]))
+    ]
+
+
+# ── Verfahren 1: Identifikation ──────────────────────────────────────────────
 
 def identifikations_abfrage(begriff: str, profil: Suchprofil):
     """Die Abfrage hinter der Identifikation — eigenständig, damit sie prüfbar ist.

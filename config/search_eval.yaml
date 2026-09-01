@@ -221,3 +221,38 @@ faelle:
   - frage: Elektrochemie
     knoten: Elektrochemie
     notiz: Einzelwort ohne Rahmen — die einfachste Form des Nachschlagens.
+
+# ── Aufzählungen ──────────────────────────────────────────────────────────────
+#
+# Eine andere Frageklasse und deshalb ein eigener Abschnitt: „alle, die …" verlangt
+# **Vollständigkeit**, nicht Ähnlichkeit. Geprüft wird die deterministische
+# Filterabfrage der Suchschicht (`app.context.search.aufzaehlung`) — kein Embedding,
+# kein Rang, sondern eine Zahl.
+#
+# Felder je Fall:
+#   titel         Exakter Name (normalisiert, ohne Gliederungsnummer). Optional.
+#   content_type  Knotenart. Optional.
+#   fach          Fachname zum Einschränken. Optional; ohne Angabe über alle Fächer.
+#   gesamt        Erwartete Gesamtzahl nach Fassungs-Zusammenfassung.
+#   faecher       Erwartete Zahl verschiedener Fächer.
+#   notiz         Optional. Wofür dieser Fall steht.
+#
+# ⚠️ Die Erwartungen stammen aus dem **Bildungsplan**, nicht aus zufälligem Dev-Bestand:
+# Der BP ist in jeder Instanz identisch importiert, die Zahlen sind also übertragbar.
+# Wer eine Instanz ohne vollständigen BP-Import prüft, bekommt hier Abweichungen.
+
+aufzaehlungen:
+  - titel: nennen
+    content_type: operator
+    gesamt: 24
+    faecher: 18
+    notiz: >-
+      Der Musterfall aus Befund 1. Bis 08/2026 beantwortete die Plattform ihn über die
+      Ähnlichkeitssuche mit einem Limit: Sie nannte 14 der 24 Vorkommen und wirkte dabei
+      erschöpfend. Die Aufzählung zählt vor dem Limit und sagt „x von y".
+
+  - titel: beurteilen
+    content_type: operator
+    gesamt: 25
+    faecher: 16
+    notiz: Gegenprobe mit einem zweiten Operator — stellt sicher, dass 24/18 kein Zufall ist.

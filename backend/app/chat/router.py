@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
@@ -53,7 +53,9 @@ from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudi
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
-from app.context.search import Suchprofil, suche
+from app.context.filters import Knotenfilter
+from app.context.lookup import normalisiere_titel
+from app.context.search import _AUFZAEHLUNG_MAX, Suchprofil, aufzaehlung, suche
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -565,6 +567,151 @@ register_tool(ChatTool(
 ))
 
 
+_LIST_CONTEXT_NODES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_context_nodes",
+        "description": (
+            "Zählt und listet ALLE Bausteine, die bestimmte Bedingungen erfüllen — "
+            "unabhängig von Ähnlichkeit. Nimm dieses Werkzeug für jede Frage nach "
+            "Vollständigkeit oder Anzahl: 'Welche … gibt es?', 'In welchen Fächern "
+            "kommt … vor?', 'Wie viele …?', 'Liste alle …'.\n"
+            "Abgrenzung zu search_context_nodes: Dort suchst du nach Bedeutung und "
+            "bekommst die nächstliegenden Treffer; hier filterst du nach Feldern und "
+            "bekommst eine vollständige, gezählte Liste.\n"
+            "Die Antwort enthält 'gesamt' (wie viele es gibt), 'geliefert' (wie viele "
+            "hier stehen) und optional 'gruppen'. Nenne 'gesamt' in deiner Antwort, "
+            "wenn nicht alle mitgeliefert wurden."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "titel": {
+                    "type": "string",
+                    "description": (
+                        "Exakter Name des Bausteins, z. B. 'nennen'. Gliederungsnummern "
+                        "und Groß-/Kleinschreibung spielen keine Rolle."
+                    ),
+                },
+                "content_type": {
+                    "type": "string",
+                    "description": (
+                        "Art des Bausteins, z. B. 'operator', 'ik_kompetenz', "
+                        "'leitidee', 'methode', 'themengebiet'."
+                    ),
+                },
+                "subject": {
+                    "type": "string",
+                    "description": (
+                        "Fachname, z. B. 'Mathematik'. Weglassen heißt: über ALLE "
+                        "Fächer zählen — das ist der Normalfall für 'in welchen "
+                        "Fächern'-Fragen."
+                    ),
+                },
+                "grade": {
+                    "type": "integer",
+                    "description": "Jahrgangsstufe, für die der Baustein gilt.",
+                },
+                "gruppierung": {
+                    "type": "string",
+                    "enum": ["fach", "typ"],
+                    "description": (
+                        "Zählung zusätzlich je Fach oder je Bausteinart aufschlüsseln."
+                    ),
+                },
+            },
+        },
+    },
+}
+
+
+async def _subject_id_aus_name(db: AsyncSession, name: str) -> int | None:
+    """Fachname → ``subject_id``; ``None``, wenn es das Fach nicht gibt.
+
+    Verglichen wird ohne Rücksicht auf Groß-/Kleinschreibung und zusätzlich gegen den
+    Slug — ein Modell schreibt „mathematik" so gut wie „Mathematik".
+    """
+    treffer = await db.execute(
+        select(Subject.id).where(
+            or_(
+                sa.func.lower(Subject.name) == name.strip().lower(),
+                sa.func.lower(Subject.slug) == name.strip().lower(),
+            )
+        ).limit(1)
+    )
+    return treffer.scalar_one_or_none()
+
+
+async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
+    """Die Aufzählung für das Modell.
+
+    ⚠️ **Ohne Fachangabe wird über alle Fächer gezählt**, nicht über das Fach der
+    Konversation. Der Musterfall dieses Werkzeugs ist „in welchen Fächern gibt es
+    ‚nennen'?"; ein stiller Fachfilter machte daraus die falsche Antwort, und zwar eine,
+    die vollständig aussieht.
+    """
+    subject_name = (args.get("subject") or "").strip()
+    subject_id = None
+    hinweise: list[str] = []
+    if subject_name and subject_name.lower() not in ("alle", "all"):
+        subject_id = await _subject_id_aus_name(ctx.db, subject_name)
+        if subject_id is None:
+            return {
+                "hinweis": (
+                    f"Es gibt kein Fach namens „{subject_name}“. Lasse den Parameter "
+                    f"weg, um über alle Fächer zu zählen."
+                )
+            }
+
+    titel = (args.get("titel") or "").strip()
+    content_type = (args.get("content_type") or "").strip()
+    abschnitt = await aufzaehlung(
+        Knotenfilter(
+            titel=normalisiere_titel(titel) if titel else None,
+            content_type=(content_type,) if content_type else (),
+            subject_id=subject_id,
+            grade=args.get("grade"),
+        ),
+        Suchprofil(
+            pseudonym=ctx.user.sub,
+            rollen=ctx.user.roles,
+            subject_id=subject_id,
+            aufzaehlung=settings.assistant_context_limit,
+        ),
+        ctx.db,
+        gruppierung=args.get("gruppierung"),
+    )
+
+    antwort: dict = {
+        "gesamt": abschnitt.gesamt,
+        "geliefert": abschnitt.geliefert,
+        "vollstaendig": abschnitt.vollstaendig,
+        "bausteine": _fuer_modell(abschnitt.treffer),
+    }
+    if abschnitt.gruppen is not None:
+        antwort["gruppen"] = [
+            {"name": g.name, "anzahl": g.anzahl} for g in abschnitt.gruppen
+        ]
+    if not abschnitt.vollstaendig:
+        hinweise.append(
+            f"Es gibt {abschnitt.gesamt} passende Bausteine; hier stehen "
+            f"{abschnitt.geliefert}. Nenne die Gesamtzahl, statt die gezeigten als "
+            f"vollständige Liste auszugeben."
+        )
+    if hinweise:
+        antwort["hinweise"] = hinweise
+    return antwort
+
+
+register_tool(ChatTool(
+    name="list_context_nodes",
+    group="context_search",
+    writes=False,
+    definition=_LIST_CONTEXT_NODES_TOOL,
+    handler=_list_context_nodes_handler,
+))
+
+
 _GET_OPERATOREN_TOOL = {
     "type": "function",
     "function": {
@@ -623,6 +770,13 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
     Gedacht für die **Unterrichtsplanung**, wo das Fach feststeht. Kann es nicht
     antworten — kein Fachbezug, kein Import —, gibt es statt einer leeren Liste einen
     ``hinweis`` zurück, der den Grund nennt und auf ``search_context_nodes`` verweist.
+
+    **Seit ADR-017/AP3 nur noch ein Preset der Aufzählung** (Typ = ``operator``,
+    Fach = Konversationsfach). Nach außen ändert sich nichts: dieselbe Antwortform,
+    dieselbe Werkzeugbeschreibung. Damit hängt die Operatorenliste an derselben
+    Sichtbarkeits- und Filterlogik wie alles andere; entfernt wird das Werkzeug erst,
+    wenn nachgewiesen ist, dass Modelle Aufzählungsfragen zuverlässig an
+    ``list_context_nodes`` richten (AP9).
     """
     subject_id = await _resolve_conversation_subject_id(ctx)
     if subject_id is None:
@@ -646,13 +800,20 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
                 "nach einem Fach."
             )
         }
-    rows = (await ctx.db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.content_type == "operator",
-            ContextNode.subject_id == subject_id,
-            ContextNode.status == "active",
-        )
-    )).scalars().all()
+    abschnitt = await aufzaehlung(
+        Knotenfilter(content_type=("operator",), subject_id=subject_id),
+        Suchprofil(
+            pseudonym=ctx.user.sub,
+            rollen=ctx.user.roles,
+            subject_id=subject_id,
+            # Die Operatorenliste eines Fachs ist vollständig zu liefern — sie ist der
+            # Zweck dieses Werkzeugs. Ein Fach führt selten mehr als 40 Operatoren.
+            aufzaehlung=_AUFZAEHLUNG_MAX,
+        ),
+        ctx.db,
+        mit_metadaten=True,
+    )
+    rows = abschnitt.treffer
     if not rows:
         return {
             "hinweis": (
@@ -663,17 +824,19 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
             )
         }
     # Aktuelle Edition = neuestes bp_version (V1/V2/V3 koexistieren als Knoten).
-    newest = max((n.metadata_ or {}).get("bp_version", "") for n in rows)
-    current = [n for n in rows if (n.metadata_ or {}).get("bp_version", "") == newest]
-    current.sort(key=lambda n: (n.title or "").lower())
+    # Operatoren tragen keine Kompetenznummer, werden von der Fassungs-Deduplizierung
+    # der Aufzählung also nicht erfasst — die Auswahl der Edition bleibt hier.
+    newest = max(n.get("bp_version") or "" for n in rows)
+    current = [n for n in rows if (n.get("bp_version") or "") == newest]
+    current.sort(key=lambda n: (n.get("title") or "").lower())
     out: list[dict] = []
     for n in current:
-        md = n.metadata_ or {}
+        md = n.get("metadata") or {}
         afb = md.get("afb") or []
         entry = {
-            "operator": n.title,
+            "operator": n.get("title"),
             "afb": ", ".join(afb) if isinstance(afb, list) else str(afb),
-            "bedeutung": n.content or "",
+            "bedeutung": n.get("content") or "",
         }
         if md.get("aliase"):
             entry["synonyme"] = md["aliase"]
