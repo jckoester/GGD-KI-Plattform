@@ -1,4 +1,6 @@
 <script>
+    import { alleSammlungen } from '$lib/collections.js';
+    import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte';
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
     import { goto } from "$app/navigation";
@@ -318,6 +320,28 @@
                             Alle Bausteine
                         </span>
                     </button>
+                    <!-- Sammlungen: gepflegte Bestände je Bausteinart. Die Liste
+                         kommt aus der Taxonomie (`collection:`-Block) — eine neue
+                         Sammlung erscheint hier ohne Code-Änderung. -->
+                    <div class="pl-3 pt-1 pb-0.5 text-xs uppercase tracking-wide
+                                text-light-tx-3 dark:text-dark-tx-3">
+                        Sammlungen
+                    </div>
+                    {#each alleSammlungen() as s}
+                        <button
+                            onclick={() => goto(`/knowledge/collections/${s.typ}`)}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === `/knowledge/collections/${s.typ}`
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <NodeTypeIcon contentType={s.typ} size={16} />
+                                {s.label}
+                            </span>
+                        </button>
+                    {/each}
+
                     <button
                         onclick={() => goto('/knowledge/curricula')}
                         class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx

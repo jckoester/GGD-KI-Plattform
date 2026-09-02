@@ -97,6 +97,143 @@ export const RUHENDE_CONTENT_TYPES = new Set([
   "feedback_text"
 ])
 
+// Typen mit gepflegter Sammlungsansicht (/knowledge/collections/<typ>).
+// Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.
+export const COLLECTIONS = {
+  "methodenblatt": {
+    "beschreibung": "Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und worauf es ankommt. Die Fachschaft pflegt sie.",
+    "spalten": [
+      "titel",
+      "fach",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Inhalt des Blattes",
+      "pflicht": false
+    }
+  },
+  "operatorenblatt": {
+    "beschreibung": "Erklärungen zu den Operatoren eines Fachs — was „nennen\", „erläutern\" oder „beurteilen\" dort konkret verlangt.",
+    "spalten": [
+      "titel",
+      "fach",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Inhalt des Blattes",
+      "pflicht": false
+    }
+  },
+  "methode": {
+    "beschreibung": "Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge pflegt die Administration, fachspezifische die jeweilige Fachschaft.",
+    "spalten": [
+      "titel",
+      "fach",
+      "aliase",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Kurzbeschreibung",
+      "pflicht": true,
+      "hinweis": "Macht den Eintrag thematisch auffindbar — auch für Suchende, die den Namen nicht kennen."
+    }
+  },
+  "sozialform": {
+    "beschreibung": "In welcher Form gearbeitet wird — Einzel-, Partner-, Gruppenarbeit und dergleichen. Eine kleine, schulweit gepflegte Menge; kein Fachbezug.",
+    "spalten": [
+      "titel",
+      "aliase",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Kurzbeschreibung",
+      "pflicht": false
+    }
+  },
+  "begriff": {
+    "beschreibung": "Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der Normalfall — „Energie\" heißt in Physik etwas anderes als in Ethik.",
+    "spalten": [
+      "titel",
+      "fach",
+      "ab_klasse",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "ab_klasse",
+      "status",
+      "titel"
+    ],
+    "content": {
+      "label": "Definition",
+      "pflicht": true,
+      "hinweis": "Macht den Eintrag thematisch auffindbar — auch für Suchende, die den Begriff nicht kennen."
+    }
+  }
+}
+
+// Metadaten-Feldschema je Typ — dieselbe Beschreibung, aus der das Backend prüft
+// (app/context/metadata.py). Der Editor baut sein Formular daraus.
+export const FELD_SCHEMATA = {
+  "methode": {
+    "aliase": {
+      "typ": "liste",
+      "label": "Andere Bezeichnungen",
+      "hinweis": "z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“"
+    }
+  },
+  "sozialform": {
+    "aliase": {
+      "typ": "liste",
+      "label": "Andere Bezeichnungen"
+    }
+  },
+  "strukturierung": {
+    "form": {
+      "typ": "auswahl",
+      "label": "Form",
+      "werte": [
+        "gliederung",
+        "mindmap"
+      ],
+      "hinweis": "Löst die früheren Einzeltypen `gliederung` und `mindmap` ab (V2)"
+    }
+  },
+  "begriff": {
+    "ab_klasse": {
+      "typ": "int",
+      "label": "Ab Klassenstufe",
+      "min": 1,
+      "max": 13,
+      "hinweis": "Für welche Stufe diese Fassung gemeint ist. „Energie\" in Klasse 6 verlangt eine andere Definition als in Klasse 11; zwei Einträge mit verschiedener Stufe sind der vorgesehene Weg dahin."
+    }
+  }
+}
+
 export const CATEGORY_LABELS = {
   "document": "Dokument",
   "knowledge": "Wissen",

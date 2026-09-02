@@ -1,4 +1,5 @@
 <script>
+    import { sammlung } from "$lib/collections.js";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CATEGORY_LABELS, CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
@@ -67,12 +68,18 @@
 
     // Bearbeiten-Link trägt den back-Parameter weiter, damit die Edit-Seite
     // wieder hierher (und von hier zurück zur Ausgangsliste) navigieren kann.
-    const editUrl = $derived(
-        `/knowledge/${$page.params.id}/edit` +
-            ($page.url.searchParams.get("back")
-                ? `?back=${encodeURIComponent($page.url.searchParams.get("back"))}`
-                : ""),
-    );
+    //
+    // Gehört der Knoten zu einer Sammlung, führt er in **deren** Editor: Der baut sein
+    // Formular aus dem Feldschema, während der allgemeine Editor `metadata` als rohes
+    // JSON zeigt. Wer aus der Sammlung kommt, bekäme sonst zwei verschiedene Masken für
+    // denselben Baustein.
+    const editUrl = $derived.by(() => {
+        const rueckweg = $page.url.searchParams.get("back");
+        const query = rueckweg ? `?back=${encodeURIComponent(rueckweg)}` : "";
+        return sammlung(node?.content_type)
+            ? `/knowledge/collections/${node.content_type}/${$page.params.id}/edit${query}`
+            : `/knowledge/${$page.params.id}/edit${query}`;
+    });
 
     const canEdit = $derived(
         node &&

@@ -53,7 +53,7 @@ from app.context.schemas import (
 from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
-from app.context.metadata import validate_node_metadata
+from app.context.metadata import validate_node_content, validate_node_metadata
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.context.filters import Knotenfilter, wende_an
@@ -507,8 +507,31 @@ async def create_node(
     try:
         validate_content_type(payload.category, payload.content_type)
         validate_node_metadata(payload.content_type, payload.metadata_)
+        validate_node_content(payload.content_type, payload.content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+    # Ein `write_scope` von `subject` oder `group` **verlangt** die zugehörige Gruppe
+    # (DB-CHECK `check_context_nodes_write_group_id`). Fehlt sie, schlug das INSERT bisher
+    # als IntegrityError durch und die Oberfläche bekam einen 500 ohne Hinweis, was fehlt —
+    # beim Bau des Sammlungs-Editors genau so aufgetreten.
+    if payload.write_scope in ("subject", "group") and payload.write_scope_group_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Bei `write_scope = {payload.write_scope}` muss die zuständige Gruppe "
+                "mitgegeben werden (`write_scope_group_id`) — sonst wäre nicht bestimmt, "
+                "wer den Baustein pflegen darf."
+            ),
+        )
+    if payload.read_scope in ("subject", "group") and payload.read_scope_group_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Bei `read_scope = {payload.read_scope}` muss die zuständige Gruppe "
+                "mitgegeben werden (`read_scope_group_id`)."
+            ),
+        )
 
     node = ContextNode(
         category=payload.category,
@@ -573,14 +596,14 @@ async def update_node(
             )
 
     # Der Typ kann im selben Aufruf mitgeändert werden — dann gilt der neue.
-    if "metadata_" in update_data:
-        try:
-            validate_node_metadata(
-                update_data.get("content_type", node.content_type),
-                update_data["metadata_"],
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
+    typ_danach = update_data.get("content_type", node.content_type)
+    try:
+        if "metadata_" in update_data:
+            validate_node_metadata(typ_danach, update_data["metadata_"])
+        if "content" in update_data:
+            validate_node_content(typ_danach, update_data["content"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     # `archived_at` gehört zum Status und wird nicht vom Client gesetzt. Ohne dieses
     # Mitführen blieb die Spalte beim Archivieren **leer**: Die Archivansicht zeigte kein
@@ -605,6 +628,16 @@ async def update_node(
 
     await db.commit()
     await db.refresh(node)
+
+    # ⚠️ Der Vektor muss der Änderung folgen. Bis AP5a wurde `enqueue_embedding_job` nur
+    # beim **Anlegen** und Kopieren gerufen: Wer eine Definition überarbeitete, änderte
+    # den Text, nicht den Vektor — der Baustein blieb thematisch unter seiner alten
+    # Fassung auffindbar, ohne jeden Hinweis. Betroffen sind nur die Felder, aus denen
+    # der Input gebildet wird (`_build_embedding_input`); ein geänderter Scope oder ein
+    # neues `valid_until` ändern ihn nicht und kosten deshalb keinen Modellaufruf.
+    if {"content", "title", "metadata_"} & set(update_data):
+        await enqueue_embedding_job(node.id, db)
+
     return node
 
 

@@ -1,4 +1,6 @@
 <script>
+    import { alleSammlungen } from "$lib/collections.js";
+    import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { subjects } from "$lib/stores/subjects.js";
@@ -20,6 +22,7 @@
 
     // ── Rolle ─────────────────────────────────────────────────────────────────
     const isTeacher = $derived($user?.roles?.includes("teacher") ?? false);
+
 
     // ── Tab-Zustand (URL-basiert, damit Zurück-Navigation den Tab erhält) ──────
     const activeTab = $derived(
@@ -322,6 +325,35 @@
                 subjectSlug={subject?.slug}
             />
         {:else if activeTab === "kontext" && isTeacher}
+            <!-- Fachschaft: Absprünge in die gepflegten Sammlungen, aufs Fach
+                 vorgefiltert (UI-Notiz A7). Sie stehen über der freien Liste, weil
+                 gepflegte Bestände der häufigere Einstieg sind. Sichtbar nur für
+                 Lehrkräfte — für Schüler:innen ist die Fachseite der spätere Ort
+                 (Todo „Schülermaterial auf der Fachseite anbieten"). -->
+            <div class="mb-6">
+                <h2
+                    class="text-sm font-semibold text-light-tx-2 dark:text-dark-tx-2
+                           uppercase tracking-wide mb-2"
+                >
+                    Fachschaft
+                </h2>
+                <div class="flex flex-wrap gap-2">
+                    {#each alleSammlungen() as s}
+                        <a
+                            href="/knowledge/collections/{s.typ}?subject_id={subject?.id}"
+                            title={s.beschreibung}
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm
+                                   rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                                   text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                        >
+                            <NodeTypeIcon contentType={s.typ} size={16} />
+                            {s.label}
+                        </a>
+                    {/each}
+                </div>
+            </div>
+
             <KnowledgeNodeList
                 fixedSubjectSlug={subject?.slug}
                 showSubjectFilter={false}

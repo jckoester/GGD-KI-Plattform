@@ -44,6 +44,21 @@ def main():
         if ct.get("ui_status") == "ruhend"
     ]
 
+    # Sammlungs-Ansichten und Feldschemata (AP5a). Reihenfolge = Reihenfolge in der
+    # YAML; die Sidebar zeigt die Sammlungen in genau dieser Folge.
+    collections = {
+        ct["key"]: ct["collection"]
+        for info in cats.values()
+        for ct in info["content_types"]
+        if ct.get("collection")
+    }
+    feld_schemata = {
+        ct["key"]: ct["felder"]
+        for info in cats.values()
+        for ct in info["content_types"]
+        if ct.get("felder")
+    }
+
     category_labels = {cat: info["label_de"] for cat, info in cats.items()}
 
     category_colors = {cat: info["color"] for cat, info in cats.items()}
@@ -81,6 +96,14 @@ def main():
         "// keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;",
         "// zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.",
         f"export const RUHENDE_CONTENT_TYPES = new Set({_js(ruhende_types)})",
+        "",
+        "// Typen mit gepflegter Sammlungsansicht (/knowledge/collections/<typ>).",
+        "// Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.",
+        f"export const COLLECTIONS = {_js(collections)}",
+        "",
+        "// Metadaten-Feldschema je Typ — dieselbe Beschreibung, aus der das Backend prüft",
+        "// (app/context/metadata.py). Der Editor baut sein Formular daraus.",
+        f"export const FELD_SCHEMATA = {_js(feld_schemata)}",
         "",
         f"export const CATEGORY_LABELS = {_js(category_labels)}",
         "",

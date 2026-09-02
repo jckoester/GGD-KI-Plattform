@@ -31,6 +31,40 @@
 #   optional: scope_anchor (true/false)
 #
 # ─────────────────────────────────────────────────────────────────────────────
+# `collection:` — ein Typ bekommt eine gepflegte Sammlungsansicht
+#
+# Trägt ein Typ diesen Block, entsteht daraus die Ansicht
+# `/knowledge/collections/<typ>`: Liste, Filter und Formular-Editor. Ohne ihn gibt es
+# keine — der Typ bleibt über Suche, freie Liste und Auswahlfelder erreichbar.
+#
+#   beschreibung  Ein Satz über dem Bestand; er beantwortet „was gehört hier hinein".
+#   spalten       Tabellenspalten: `titel`, `fach`, `status`, `geaendert` oder der
+#                 Name eines Feldes aus `felder` (dann steht dessen Wert dort).
+#   filter        Angebotene Filter: `fach`, `status`, `titel` oder ein Feldname.
+#   content       Label und Pflicht des Knotentexts. Ein Eintrag ohne Text ist nur
+#                 über seinen Namen auffindbar — bei `methode` und `begriff` ist er
+#                 deshalb Pflicht.
+#
+# `felder:` — das Metadaten-Schema eines Typs
+#
+# Es beschreibt die Felder **einmal**: Der Editor baut daraus sein Formular, das
+# Backend prüft damit (`app/context/metadata.py`), und die Sammlungs-Konfiguration
+# nimmt die Namen als Spalten und Filter. Zwei Orte für dieselbe Regel wären genau die
+# Drift, die AP1 bei den Ankertypen vorgefunden hat.
+#
+# Es steht **neben** `collection:`, nicht darin: Ein Typ kann Felder haben, ohne eine
+# Sammlungsansicht zu haben — `strukturierung` etwa ruht bis 0.9, seine Regel
+# `form: gliederung | mindmap` gilt trotzdem. Wäre das Schema unter `collection:`
+# eingehängt, verlöre jeder ruhende Typ seine Feldprüfung, ohne dass es auffiele.
+#
+# Je Feld: `typ` (`int` | `text` | `auswahl` | `liste`), `label`, optional `min`/`max`
+# (int), `werte` (auswahl), `hinweis`.
+#
+# Nicht jedes Metadatum gehört hierher: `metadata` bleibt ein freies JSON-Feld, und
+# geprüft wird nur, was eine Bedeutung für die Anwendung trägt.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # ⚠ BEIM ERGÄNZEN EINES content_type MITPRÜFEN
 #
 # Die Material-Auswahl (Curriculum-Editor und Stundenentwurf) leitet ihre Liste aus
@@ -80,11 +114,25 @@ categories:
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Schülermaterial soll thematisch auftauchen, nicht nur unter seinem Namen.
         embedding: true
+        collection:
+          beschreibung: >-
+            Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und
+            worauf es ankommt. Die Fachschaft pflegt sie.
+          spalten: [titel, fach, status, geaendert]
+          filter: [fach, status, titel]
+          content: {label: "Inhalt des Blattes", pflicht: false}
       - key: operatorenblatt
         label_de: "Operatorenblatt"
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Der Leitfall der Titel-Teilsuche („Anleitung Operator nennen“).
         embedding: true
+        collection:
+          beschreibung: >-
+            Erklärungen zu den Operatoren eines Fachs — was „nennen", „erläutern"
+            oder „beurteilen" dort konkret verlangt.
+          spalten: [titel, fach, status, geaendert]
+          filter: [fach, status, titel]
+          content: {label: "Inhalt des Blattes", pflicht: false}
       - key: praesentation
         label_de: "Präsentation"
         # Lerngruppen-Material, kein Fachschaftsgut: Eine Präsentation entsteht für
@@ -167,11 +215,42 @@ categories:
         # Methoden sollen gefunden werden, ohne ihren Namen zu kennen.
         embedding: true
         embedding_input: ["title", "metadata.aliase", "content"]
+        collection:
+          beschreibung: >-
+            Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge
+            pflegt die Administration, fachspezifische die jeweilige Fachschaft.
+          spalten: [titel, fach, aliase, status, geaendert]
+          filter: [fach, status, titel]
+          # Pflicht: Ohne Beschreibung ist die Methode nur unter ihrem Namen zu
+          # finden — der Embedding-Input bestünde faktisch aus dem Titel.
+          content:
+            label: "Kurzbeschreibung"
+            pflicht: true
+            hinweis: >-
+              Macht den Eintrag thematisch auffindbar — auch für Suchende, die den
+              Namen nicht kennen.
+        felder:
+          aliase:
+            typ: liste
+            label: "Andere Bezeichnungen"
+            hinweis: 'z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“'
+
       - key: sozialform
         label_de: "Sozialform"
         # Geschlossene Kleinstmenge (Einzel-, Partner-, Gruppenarbeit …), fachneutral
         # und schulweit gepflegt — nicht je Fachschaft eigene Sozialformen.
         scope_defaults: {read_scope: school,   write_scope: school  }
+        collection:
+          beschreibung: >-
+            In welcher Form gearbeitet wird — Einzel-, Partner-, Gruppenarbeit und
+            dergleichen. Eine kleine, schulweit gepflegte Menge; kein Fachbezug.
+          spalten: [titel, aliase, status, geaendert]
+          filter: [status, titel]
+          content: {label: "Kurzbeschreibung", pflicht: false}
+        felder:
+          aliase:
+            typ: liste
+            label: "Andere Bezeichnungen"
       - key: operator
         label_de: "Operator"
         scope_defaults: {read_scope: global,   write_scope: global  }
@@ -272,12 +351,17 @@ categories:
         label_de: "Gliederung/Mindmap"
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
-        # metadata.form (Pflicht): `gliederung` oder `mindmap` — eine Form, ein Typ.
-        # Löst die beiden Einzeltypen darüber ab (V2, AP3).
         # Kein Embedding: wie `schuelerpraesentation`.
         # Rollenoffen: Eine Lehrkraft darf read_scope auf `group` heben, damit die
         # Klasse eine gemeinsame Mindmap sieht — an der Rolle hängt keine Mechanik.
         ui_status: ruhend
+        # Noch keine Sammlung (der Typ ruht bis 0.9) — das Feldschema gilt trotzdem.
+        felder:
+          form:
+            typ: auswahl
+            label: "Form"
+            werte: [gliederung, mindmap]
+            hinweis: "Löst die früheren Einzeltypen `gliederung` und `mindmap` ab (V2)"
       - key: feedback_text
         label_de: "Feedback-Text"
         scope_defaults: {read_scope: private,  write_scope: private }
@@ -309,13 +393,32 @@ categories:
       - key: begriff
         label_de: "Fachbegriff"
         scope_defaults: {read_scope: school,   write_scope: subject }
-        # metadata.ab_klasse (int, optional): ab welcher Klassenstufe die Definition
-        # gemeint ist. „Energie" heißt in Klasse 6 etwas anderes als in Klasse 11;
-        # zwei Knoten mit verschiedenem `ab_klasse` sind der vorgesehene Weg dahin.
-        # Geprüft beim Anlegen/Ändern (app/context/metadata.py).
         # Kernfall des Kriteriums: „sprachliche Bilder" soll die Metapher finden, ohne
         # dass man den Begriff schon kennt.
         embedding: true
+        collection:
+          beschreibung: >-
+            Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der
+            Normalfall — „Energie" heißt in Physik etwas anderes als in Ethik.
+          spalten: [titel, fach, ab_klasse, status, geaendert]
+          filter: [fach, ab_klasse, status, titel]
+          # Pflicht: Ein Begriff ohne Definition ist ein Titel, kein Baustein.
+          content:
+            label: "Definition"
+            pflicht: true
+            hinweis: >-
+              Macht den Eintrag thematisch auffindbar — auch für Suchende, die den
+              Begriff nicht kennen.
+        felder:
+          ab_klasse:
+            typ: int
+            label: "Ab Klassenstufe"
+            min: 1
+            max: 13
+            hinweis: >-
+              Für welche Stufe diese Fassung gemeint ist. „Energie" in Klasse 6
+              verlangt eine andere Definition als in Klasse 11; zwei Einträge mit
+              verschiedener Stufe sind der vorgesehene Weg dahin.
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und

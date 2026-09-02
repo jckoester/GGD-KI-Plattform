@@ -182,6 +182,21 @@ def pruefe_taxonomie() -> list[str]:
                 "Quelle: app/context/taxonomy.yaml"
             )
 
+    # ── Sammlungs-Konfiguration und Feldschema (AP5a) ─────────────────────────
+    from app.context.metadata import pruefe_schema_konsistenz
+
+    befunde += pruefe_schema_konsistenz()
+
+    # Eine Sammlung an einem ruhenden Typ wäre eine Ansicht, in der man nichts anlegen
+    # kann — der Typ steht ja in keiner Auswahl.
+    ruhende_sammlungen = sorted(set(taxonomy.COLLECTIONS) & taxonomy.RUHENDE_CONTENT_TYPES)
+    if ruhende_sammlungen:
+        befunde.append(
+            f"Diese Typen haben eine Sammlung, ruhen aber: {ruhende_sammlungen}. "
+            "Entweder `ui_status: aktiv` setzen oder die Sammlung entfernen. "
+            "Quelle: app/context/taxonomy.yaml"
+        )
+
     # ── Weitere Typ-Listen ────────────────────────────────────────────────────
     unbekannt_bp = sorted(set(taxonomy.BP_CURRICULUM_CONTENT_TYPES) - typen)
     if unbekannt_bp:

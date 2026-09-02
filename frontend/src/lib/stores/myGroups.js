@@ -23,6 +23,20 @@ export const myTeachingGroups = derived(_myGroups, $g =>
     })
 )
 
+/**
+ * Nur eigene Fachschaften (`subject_department`), nach Fachname sortierbar über
+ * `subject_id`.
+ *
+ * Sie sind der Träger von `write_scope = 'subject'`: Ein Baustein mit diesem Scope
+ * **muss** die Gruppe mitführen (DB-CHECK), sonst schlägt das Anlegen fehl. Wo also ein
+ * Fach gewählt wird, ist in Wahrheit die Fachschaft gemeint.
+ */
+export const myFachschaften = derived(_myGroups, $g =>
+  $g
+    .filter(g => g.type === 'subject_department' && g.subject_id != null)
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+)
+
 export async function refreshMyGroups() {
   try {
     const data = await getMyGroups()

@@ -207,6 +207,61 @@ def ist_ruhend(content_type: str | None) -> bool:
     return content_type in RUHENDE_CONTENT_TYPES
 
 
+# ── Sammlungen (AP5a) ────────────────────────────────────────────────────────
+#
+# Ein Typ mit `collection:`-Block bekommt eine gepflegte Ansicht unter
+# `/knowledge/collections/<typ>`. Der Block beschreibt Liste, Filter **und das
+# Metadaten-Feldschema** — Letzteres bewusst an derselben Stelle: Der Editor baut sein
+# Formular daraus, das Backend prüft damit. Zwei Orte für dieselbe Regel wären genau die
+# Drift, die AP1 bei den Ankertypen vorgefunden hat (drei Listen, zwei Meinungen).
+COLLECTIONS: Final[dict[str, dict]] = {
+    ct["key"]: ct["collection"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if ct.get("collection")
+}
+
+# Das Metadaten-Feldschema je Typ. Es steht **neben** `collection:`, nicht darin: Ein Typ
+# kann Felder haben, ohne eine Sammlungsansicht zu haben. `strukturierung` ruht bis 0.9,
+# seine Regel `form: gliederung | mindmap` gilt trotzdem — wäre das Schema unter
+# `collection:` eingehängt, verlöre jeder ruhende Typ seine Feldprüfung, ohne dass es
+# auffiele. (Beim Bau von AP5a genau so passiert und von zwei Tests gefangen.)
+FELD_SCHEMATA: Final[dict[str, dict]] = {
+    ct["key"]: ct["felder"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if ct.get("felder")
+}
+
+# Feldtypen, die das Schema kennt. Bewusst wenige: Jeder weitere braucht eine Eingabe im
+# Editor **und** eine Prüfung im Backend — eine Erweiterung ist kein Konfigurationsakt.
+GUELTIGE_FELDTYPEN: Final[frozenset[str]] = frozenset({"int", "text", "auswahl", "liste"})
+
+# Spalten- und Filternamen, die nicht aus `felder` kommen, sondern am Knoten selbst
+# hängen. Alles andere muss ein Feld sein — sonst zeigte die Liste eine leere Spalte.
+FESTE_SPALTEN: Final[frozenset[str]] = frozenset({"titel", "fach", "status", "geaendert"})
+
+
+def collection_config(content_type: str | None) -> dict | None:
+    """Die Sammlungs-Konfiguration eines Typs, oder ``None``."""
+    return COLLECTIONS.get(content_type or "")
+
+
+def feld_schema(content_type: str | None) -> dict[str, dict]:
+    """Das Metadaten-Feldschema eines Typs (leer, wenn er keins hat)."""
+    return FELD_SCHEMATA.get(content_type or "") or {}
+
+
+def content_ist_pflicht(content_type: str | None) -> bool:
+    """Verlangt dieser Typ einen Knotentext?
+
+    Bei `methode` und `begriff` ja: Ohne Text ist der Eintrag nur unter seinem Namen
+    auffindbar — sein Embedding-Input bestünde faktisch aus dem Titel, und genau das
+    weist `traegt_substanz()` ab.
+    """
+    return bool(((collection_config(content_type) or {}).get("content") or {}).get("pflicht"))
+
+
 # content_types mit valid_until_default: schuljahresende — Lifecycle endet am Schuljahresende
 SCHULJAHRESENDE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
     ct["key"]

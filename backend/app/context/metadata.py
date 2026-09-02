@@ -1,61 +1,156 @@
-"""Typgebundene Prüfung einzelner `metadata`-Felder beim Anlegen und Ändern von Knoten.
+"""Prüfung von `metadata` und `content` beim Anlegen und Ändern von Knoten.
 
-**Was hier steht und was nicht.** `metadata` ist bewusst ein freies JSON-Feld — der
+**Woher die Regeln kommen.** Seit AP5a steht das Feldschema als `felder:` am Typ in der
+Taxonomie — an **einer** Stelle für Editor und Backend. Der Editor baut sein Formular
+daraus, diese Datei prüft dieselbe Beschreibung. Bis AP2 gab es die Regeln zweimal
+(einmal als Formularfeld, einmal als handgeschriebene Prüfung); die Drift, die daraus
+entsteht, hat AP1 bei den Ankertypen vorgefunden — drei Listen, zwei Meinungen, sichtbar
+nur an einem falschen Badge.
+
+Das Schema steht **neben** `collection:`, nicht darin: Ein Typ kann Felder haben, ohne
+eine Sammlungsansicht zu haben. Der erste Entwurf hängte es unter `collection:` — damit
+verlor `strukturierung` (ruhend bis 0.9, aber mit der Regel `form: gliederung | mindmap`)
+seine Prüfung, und zwei Tests fielen um. Genau dafür sind sie da.
+
+**Was hier bewusst nicht geprüft wird.** `metadata` bleibt ein freies JSON-Feld: Der
 Kontextspeicher soll neue Felder aufnehmen können, ohne dass jedes eine Migration
-braucht. Geprüft wird deshalb nur, was eine **Bedeutung für die Anwendung** trägt und
-falsch nicht auffiele:
+braucht. Geprüft wird nur, was im Schema steht — also was eine Bedeutung für die
+Anwendung trägt und falsch nicht auffiele. Unbekannte Schlüssel gehen durch.
 
-- `begriff.ab_klasse` — die Klassenstufe, ab der eine Definition gemeint ist. Steht dort
-  ein String oder eine 99, sortiert und filtert die Sammlung (AP5) still falsch.
-- `strukturierung.form` — `gliederung` oder `mindmap`. Der Wert entscheidet, als was der
-  Knoten dargestellt wird; ein Tippfehler macht ihn zu keinem von beidem.
-
-Alles Übrige bleibt ungeprüft. Das ist Absicht: Eine Prüfung, die jedes Feld kennt,
-müsste bei jedem neuen Feld nachgezogen werden, und niemand würde daran denken.
-
-⚠️ **Das hier ist die schlanke Fassung.** Ein generisches Schema je Typ ist offen und
-gehört zu AP5, wo der Sammlungs-Editor sein Formular ohnehin aus einer Feldbeschreibung
-baut — zwei Schema-Orte nebeneinander wären der schlechtere Zustand. Zu dem Zeitpunkt ist
-auch zu entscheiden, ob `validate_unterrichtsstunde_metadata` (der einzige weitere
-Validator, aufgerufen nur vom Planner-Router) darin aufgeht.
+⚠️ **`validate_unterrichtsstunde_metadata` bleibt daneben.** Sein Phasen-Schema ist
+verschachtelt (Liste von Objekten mit eigenen Pflichtfeldern und Enums) und passt in
+keine Feldliste. Es abzulösen wäre ein eigener Schritt, kein Nebenbei.
 """
 from __future__ import annotations
 
-# Untergrenze 1, Obergrenze 13: Grundschule bis Kursstufe. Bewusst weit — welche Stufen
-# eine Schule führt, steht in `subjects.yaml`/`school_year.yaml` und ist nicht Sache
-# eines Fachbegriffs.
-_MIN_KLASSE = 1
-_MAX_KLASSE = 13
+from app.context.taxonomy import (
+    GUELTIGE_FELDTYPEN,
+    content_ist_pflicht,
+    feld_schema,
+)
 
-_STRUKTURIERUNG_FORMEN = ("gliederung", "mindmap")
+
+def _pruefe_feld(name: str, feld: dict, wert) -> None:
+    """Ein einzelner Wert gegen seine Feldbeschreibung. Wirft ``ValueError``."""
+    label = feld.get("label", name)
+    typ = feld.get("typ")
+
+    if typ == "int":
+        # `bool` ist in Python ein `int` — `True` ginge sonst als 1 durch.
+        if isinstance(wert, bool) or not isinstance(wert, int):
+            raise ValueError(f"„{label}“ muss eine ganze Zahl sein (war: {wert!r})")
+        unten, oben = feld.get("min"), feld.get("max")
+        if unten is not None and wert < unten:
+            raise ValueError(f"„{label}“ muss mindestens {unten} sein (war: {wert})")
+        if oben is not None and wert > oben:
+            raise ValueError(f"„{label}“ darf höchstens {oben} sein (war: {wert})")
+
+    elif typ == "text":
+        if not isinstance(wert, str):
+            raise ValueError(f"„{label}“ muss Text sein (war: {type(wert).__name__})")
+
+    elif typ == "auswahl":
+        werte = feld.get("werte") or []
+        if wert not in werte:
+            raise ValueError(
+                f"„{label}“ muss einer dieser Werte sein: {', '.join(map(str, werte))} "
+                f"(war: {wert!r})"
+            )
+
+    elif typ == "liste":
+        if not isinstance(wert, list) or not all(isinstance(e, str) for e in wert):
+            raise ValueError(f"„{label}“ muss eine Liste von Texten sein")
 
 
 def validate_node_metadata(content_type: str | None, metadata: dict | None) -> None:
-    """Wirft ``ValueError`` bei einem unbrauchbaren Wert. Fehlende Felder sind erlaubt.
+    """Prüft die im Schema beschriebenen Felder. Fehlende Felder sind erlaubt.
 
-    ``metadata`` darf ``None`` sein; geprüft wird nur, was tatsächlich dasteht.
+    Pflichtfelder erzwingt :func:`validate_node_content` bzw. der Editor — hier geht es
+    nur darum, dass ein **vorhandener** Wert brauchbar ist. Ein leeres Feld ist ein
+    unvollständiger Eintrag, kein kaputter.
     """
-    if not metadata or content_type is None:
+    schema = feld_schema(content_type)
+    if not schema or not metadata:
         return
 
-    if content_type == "begriff" and "ab_klasse" in metadata:
-        wert = metadata["ab_klasse"]
-        if wert is not None:
-            # `bool` ist in Python ein `int` — `True` würde sonst als Klasse 1 durchgehen.
-            if isinstance(wert, bool) or not isinstance(wert, int):
-                raise ValueError(
-                    f"metadata.ab_klasse muss eine ganze Zahl sein (war: {wert!r})"
+    for name, feld in schema.items():
+        if name not in metadata:
+            continue
+        wert = metadata[name]
+        if wert is None or wert == "":
+            continue   # ausdrücklich leer gelassen
+        _pruefe_feld(name, feld, wert)
+
+
+def validate_node_content(content_type: str | None, content: str | None) -> None:
+    """Erzwingt den Knotentext, wo die Sammlung ihn als Pflicht führt.
+
+    Der Grund steht in der Taxonomie: Ein Eintrag ohne Text ist nur unter seinem Namen
+    auffindbar. Bei `methode` und `begriff` — beide mit Embedding — bestünde der
+    Vektor faktisch aus dem Titel, und genau solche Knoten weist `traegt_substanz()`
+    ab. Der Eintrag wäre also thematisch unsichtbar, ohne dass es jemandem auffiele.
+    """
+    if content_ist_pflicht(content_type) and not (content or "").strip():
+        from app.context.taxonomy import collection_config
+
+        label = ((collection_config(content_type) or {}).get("content") or {}).get(
+            "label", "Inhalt"
+        )
+        raise ValueError(f"„{label}“ ist bei diesem Bausteintyp ein Pflichtfeld.")
+
+
+def pruefe_schema_konsistenz() -> list[str]:
+    """Prüft die Sammlungs-Konfigurationen selbst — für die Startprüfung (ADR-018).
+
+    Eine Sammlung, deren Spalte auf ein nicht existierendes Feld zeigt, zeigte eine
+    leere Spalte; ein unbekannter Feldtyp würde vom Editor nicht dargestellt und vom
+    Backend nicht geprüft. Beides fiele erst am fertigen Bestand auf.
+    """
+    from app.context.taxonomy import (
+        COLLECTIONS,
+        FELD_SCHEMATA,
+        FESTE_SPALTEN,
+        GUELTIGE_FELDTYPEN,
+    )
+
+    befunde: list[str] = []
+
+    # Feldschemata — auch die von Typen ohne Sammlung (z. B. ruhende).
+    for typ, felder in sorted(FELD_SCHEMATA.items()):
+        for name, feld in felder.items():
+            if feld.get("typ") not in GUELTIGE_FELDTYPEN:
+                befunde.append(
+                    f"Typ {typ!r}, Feld {name!r}: unbekannter Feldtyp "
+                    f"{feld.get('typ')!r} — erlaubt: {sorted(GUELTIGE_FELDTYPEN)}. "
+                    "Quelle: app/context/taxonomy.yaml"
                 )
-            if not _MIN_KLASSE <= wert <= _MAX_KLASSE:
-                raise ValueError(
-                    f"metadata.ab_klasse muss zwischen {_MIN_KLASSE} und {_MAX_KLASSE} "
-                    f"liegen (war: {wert})"
+            if feld.get("typ") == "auswahl" and not feld.get("werte"):
+                befunde.append(
+                    f"Typ {typ!r}, Feld {name!r}: Auswahlfeld ohne `werte`. "
+                    "Quelle: app/context/taxonomy.yaml"
+                )
+            if not feld.get("label"):
+                befunde.append(
+                    f"Typ {typ!r}, Feld {name!r}: kein `label` — der Editor hätte "
+                    "eine unbeschriftete Eingabe. Quelle: app/context/taxonomy.yaml"
                 )
 
-    if content_type == "strukturierung" and "form" in metadata:
-        wert = metadata["form"]
-        if wert not in _STRUKTURIERUNG_FORMEN:
-            raise ValueError(
-                f"metadata.form muss {' oder '.join(_STRUKTURIERUNG_FORMEN)} sein "
-                f"(war: {wert!r})"
+    # Sammlungen — Spalten und Filter müssen auf feste Spalten oder Felder zeigen.
+    for typ, config in sorted(COLLECTIONS.items()):
+        bekannt = FESTE_SPALTEN | set(FELD_SCHEMATA.get(typ) or {})
+        for schluessel, werte in (("spalten", config.get("spalten") or []),
+                                  ("filter", config.get("filter") or [])):
+            unbekannt = sorted(set(werte) - bekannt - {"titel"})
+            if unbekannt:
+                befunde.append(
+                    f"Sammlung {typ!r}: {schluessel} nennt {unbekannt}, aber weder feste "
+                    f"Spalte noch Feld. Quelle: app/context/taxonomy.yaml"
+                )
+
+        if not (config.get("beschreibung") or "").strip():
+            befunde.append(
+                f"Sammlung {typ!r}: keine `beschreibung` — die Liste hätte keinen Satz, "
+                "der sagt, was hineingehört. Quelle: app/context/taxonomy.yaml"
             )
+
+    return befunde

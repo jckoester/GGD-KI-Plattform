@@ -133,6 +133,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **„Reaktivieren" im Archiv** holt einen abgelaufenen Baustein zurück und setzt zugleich
   ein neues Ablaufdatum; ohne das wäre er in derselben Nacht wieder archiviert worden.
 
+- **Gepflegte Sammlungen für fünf Bausteinarten** — Methodenblatt, Operatorenblatt,
+  Methode, Sozialform und Fachbegriff. Jede hat eine eigene Ansicht unter *Wissensgraph →
+  Sammlungen* mit passenden Spalten und Filtern, einem Formular statt eines
+  JSON-Feldes und einem Satz darüber, was hineingehört. Von der Fachseite führen
+  Absprünge in die aufs Fach gefilterte Sammlung.
+
+- **Methode und Fachbegriff verlangen jetzt eine Beschreibung.** Ohne sie ist ein Eintrag
+  nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,
+  fiele weg.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss
@@ -173,6 +183,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Archivierte Bausteine trugen kein Archivierungsdatum.** Die Archivansicht zeigte
   „—", und eine Aufbewahrungsfrist ließ sich darauf nicht berechnen.
+
+- **Ein überarbeiteter Baustein blieb thematisch unter seiner alten Fassung auffindbar.**
+  Beim Ändern von Titel, Text oder Metadaten wurde die Suchaufbereitung nicht erneuert —
+  nur beim Anlegen. Ohne jeden Hinweis.
+
+- **Ein Baustein ohne zuständige Gruppe verursachte einen Serverfehler** statt einer
+  Meldung, was fehlt.
+
+- **Aus einer Sammlung geöffnet, führte „Zurück" nicht dorthin zurück**, sondern in die
+  allgemeine Bausteinliste — die gesetzten Filter waren verloren. Der Filterzustand
+  steht jetzt in der Adresszeile: Der Rückweg trifft den Ausschnitt, aus dem man kam, und
+  eine Sammlungsansicht lässt sich verschicken und neu laden.
 
 ## [0.7.0] – 2026-08-31
 
