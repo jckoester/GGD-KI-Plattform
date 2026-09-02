@@ -435,6 +435,138 @@ class TestF7ArchivierenVorLoeschen:
         assert resp.status_code == 403
         db.delete.assert_not_called()
 
+    def test_kinder_werden_mitgeloescht(self):
+        """Die `part_of`-Kaskade: Ein Curriculum nimmt Kapitel und Lernsequenzen mit.
+
+        Sonst blieben Kinder ohne Elternteil zurück — sichtbar in keiner Baumansicht und
+        über keinen Filter mehr erreichbar.
+        """
+        eltern = make_node(owner_pseudonym="pseudo-teacher", title="Curriculum")
+        kind = make_node(owner_pseudonym="pseudo-teacher", title="Kapitel")
+        enkel = make_node(owner_pseudonym="pseudo-teacher", title="Lernsequenz")
+
+        db = AsyncMock()
+        db.get = AsyncMock(side_effect=lambda _modell, nid: {
+            eltern.id: eltern, kind.id: kind, enkel.id: enkel,
+        }.get(nid))
+        db.delete = AsyncMock()
+        db.commit = AsyncMock()
+
+        keine_referenzen = MagicMock()
+        keine_referenzen.all.return_value = []
+
+        def _kinder(*ids):
+            m = MagicMock()
+            m.__iter__ = lambda self: iter([(i,) for i in ids])
+            return m
+
+        # Referenzabfrage, dann je Ebene die Kinder: Eltern → Kind → Enkel → nichts
+        db.execute = AsyncMock(side_effect=[
+            keine_referenzen, _kinder(kind.id), _kinder(enkel.id), _kinder(),
+        ])
+
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        resp = TestClient(make_app(db, user)).delete(f"/context/nodes/{eltern.id}")
+
+        assert resp.status_code == 204
+        geloescht = {c.args[0].title for c in db.delete.await_args_list}
+        assert geloescht == {"Curriculum", "Kapitel", "Lernsequenz"}
+
+
+class TestReaktivieren:
+    """Zurückholen heißt auch: ein neues Ablaufdatum (AP4).
+
+    ⚠️ Der Grund für einen eigenen Endpunkt statt `PATCH {status: "active"}`: Ein wegen
+    Ablauf archivierter Baustein trüge sonst weiter sein altes Datum — der nächtliche
+    Lauf holte ihn noch in derselben Nacht zurück ins Archiv, und die Reaktivierung sähe
+    aus, als hätte sie nicht funktioniert.
+    """
+
+    def _db(self, node):
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        db.execute = AsyncMock()
+        return db
+
+    def _schuljahr(self, monkeypatch, ende):
+        from types import SimpleNamespace as NS
+        import app.planning.calendar as kalender
+
+        monkeypatch.setattr(
+            kalender, "load_school_year", lambda *a, **k: NS(ende=ende), raising=True
+        )
+
+    def test_setzt_status_und_neues_ablaufdatum(self, monkeypatch):
+        from datetime import date, timedelta
+
+        ende = date.today() + timedelta(days=200)
+        self._schuljahr(monkeypatch, ende)
+
+        node = make_node(
+            category="artifact", content_type="unterrichtsstunde", status="archived",
+        )
+        node.valid_until = date(2020, 1, 1)
+        node.archived_at = "irgendwann"
+
+        resp = TestClient(make_app(self._db(node), make_jwt())).post(
+            f"/context/nodes/{node.id}/reaktivieren"
+        )
+
+        assert resp.status_code == 200
+        assert node.status == "active"
+        assert node.archived_at is None
+        assert node.valid_until == ende
+
+    def test_vergangenes_schuljahresende_ergibt_kein_datum(self, monkeypatch):
+        """`school_year.yaml` nicht umgestellt — dann lieber gar kein Ablaufdatum.
+
+        Am 02.09.2026 im Live-Test aufgetreten: Die Konfiguration stand auf 2025/26
+        (Ende 29.07.2026), das vorgeschlagene Datum lag also in der Vergangenheit.
+        """
+        from datetime import date, timedelta
+
+        self._schuljahr(monkeypatch, date.today() - timedelta(days=30))
+
+        node = make_node(
+            category="artifact", content_type="unterrichtsstunde", status="archived",
+        )
+        resp = TestClient(make_app(self._db(node), make_jwt())).post(
+            f"/context/nodes/{node.id}/reaktivieren"
+        )
+
+        assert resp.status_code == 200
+        assert node.status == "active"
+        assert node.valid_until is None
+
+    def test_permanenter_typ_bekommt_kein_datum(self):
+        node = make_node(
+            category="knowledge", content_type="methode", status="archived",
+        )
+        resp = TestClient(make_app(self._db(node), make_jwt())).post(
+            f"/context/nodes/{node.id}/reaktivieren"
+        )
+
+        assert resp.status_code == 200
+        assert node.valid_until is None
+
+    def test_aktiver_knoten_wird_abgelehnt(self):
+        node = make_node(status="active")
+        resp = TestClient(make_app(self._db(node), make_jwt())).post(
+            f"/context/nodes/{node.id}/reaktivieren"
+        )
+
+        assert resp.status_code == 409
+
+    def test_fremder_knoten_bleibt_gesperrt(self):
+        node = make_node(status="archived", owner_pseudonym="jemand-anders")
+        resp = TestClient(make_app(self._db(node), make_jwt())).post(
+            f"/context/nodes/{node.id}/reaktivieren"
+        )
+
+        assert resp.status_code == 403
+
 
 # ── POST /context/curricula/new ──────────────────────────────────────────────
 
