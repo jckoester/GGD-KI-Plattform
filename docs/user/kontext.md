@@ -84,6 +84,29 @@ Die Einstellung betrifft **nur Ihre eigene Suche** über den Suche-Button. Wie v
 
 Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden Bausteine**; die **Nächstliegenden** sind eine Auswahl nach Ähnlichkeit und tragen deshalb keine Gesamtzahl (siehe oben).
 
+## Archivieren statt löschen
+
+Bausteine, die Sie selbst angelegt haben, können Sie im Wissensgraphen **archivieren**
+oder **löschen**. Der Unterschied ist größer, als die beiden Wörter vermuten lassen:
+
+- **Archiviert** heißt: aus Suche und Assistenten heraus, aber nicht weg. Der Baustein
+  bleibt in Ihrem Archiv, alle Verknüpfungen bleiben, und Sie können ihn jederzeit
+  zurückholen.
+- **Gelöscht** heißt: endgültig fort, samt seiner Verknüpfungen.
+
+Deshalb greift eine Regel: **Verweisen aktive Bausteine anderer auf Ihren, lässt er sich
+nicht löschen.** Die Plattform zeigt Ihnen dann, wer darauf aufbaut, und bietet
+Archivieren an. Ihre eigenen Verweise halten Sie nicht auf.
+
+Bei fremden Bausteinen — schulweiten Vorlagen, dem Bildungsplan, Material der Fachschaft —
+erscheinen die beiden Knöpfe gar nicht erst: Sie pflegt, wem sie gehören.
+
+**Abgelaufene Bausteine.** Trägt ein Baustein ein Ablaufdatum, wandert er danach von
+selbst ins Archiv; im Archiv steht dann „abgelaufen am …". **Reaktivieren** holt ihn
+zurück und setzt zugleich ein neues Ablaufdatum — sonst wäre er noch in derselben Nacht
+wieder verschwunden. Nach drei Schuljahren im Archiv werden eigene Bausteine endgültig
+gelöscht; Bildungsplan und importierte Inhalte nie.
+
 ## Kontext und Datenschutz
 
 Kontextbausteine, die einer Unterhaltung hinzugefügt werden, werden zusammen mit Ihren Nachrichten an die KI übermittelt. Es gelten dieselben Datenschutzregeln wie für Chat-Nachrichten — lesen Sie dazu die [Datenschutzerklärung](datenschutz.md).

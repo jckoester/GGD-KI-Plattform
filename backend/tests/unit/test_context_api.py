@@ -326,16 +326,43 @@ class TestReadPermissionAudit1:
 
 # ── DELETE /context/nodes/{id} ───────────────────────────────────────────
 
+def _referenz(titel="Fremdes Curriculum", owner="jemand-anders", relation="references"):
+    """Eine Zeile, wie sie die Referenzabfrage des Löschpfads liefert."""
+    zeile = MagicMock()
+    zeile.id = uuid4()
+    zeile.title = titel
+    zeile.content_type = "curriculum"
+    zeile.relation = relation
+    zeile.owner_pseudonym = owner
+    return zeile
+
+
+def _delete_db(node, *, referenzen=(), kinder=()):
+    """DB-Attrappe für den Löschpfad: erst die Referenzabfrage, dann die Kinder.
+
+    Der Pfad fragt zuerst nach eingehenden Kanten aktiver Knoten (F7), danach je Ebene
+    nach `part_of`-Kindern. Beides geht über `db.execute`, deshalb die Reihenfolge.
+    """
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=node)
+    db.delete = AsyncMock()
+    db.commit = AsyncMock()
+
+    ref_result = MagicMock()
+    ref_result.all.return_value = list(referenzen)
+    kind_result = MagicMock()
+    kind_result.__iter__ = lambda self: iter(kinder)
+
+    db.execute = AsyncMock(side_effect=[ref_result] + [kind_result] * 8)
+    return db
+
+
 class TestDeleteNode:
 
     def test_owner_can_delete(self):
         node = make_node(owner_pseudonym="pseudo-teacher")
-        db = AsyncMock()
-        db.get = AsyncMock(return_value=node)
-        db.delete = AsyncMock()
-        db.commit = AsyncMock()
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
-        client = TestClient(make_app(db, user))
+        client = TestClient(make_app(_delete_db(node), user))
         resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204
 
@@ -350,14 +377,63 @@ class TestDeleteNode:
 
     def test_admin_can_delete_any(self):
         node = make_node(owner_pseudonym="other-user")
-        db = AsyncMock()
-        db.get = AsyncMock(return_value=node)
-        db.delete = AsyncMock()
-        db.commit = AsyncMock()
         user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
-        client = TestClient(make_app(db, user))
+        client = TestClient(make_app(_delete_db(node), user))
         resp = client.delete(f"/context/nodes/{node.id}")
         assert resp.status_code == 204
+
+
+class TestF7ArchivierenVorLoeschen:
+    """Fremde aktive Verweise machen aus dem Löschen ein Archivieren (ADR-019 F7).
+
+    Der Grund ist nicht Vorsicht, sondern Zurechenbarkeit: Ein gelöschter Knoten reißt in
+    fremde Curricula und Stundenentwürfe ein Loch, das dort niemand erklären kann.
+    """
+
+    def test_fremde_referenz_blockiert_mit_409(self):
+        node = make_node(owner_pseudonym="pseudo-teacher")
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        db = _delete_db(node, referenzen=[_referenz()])
+        resp = TestClient(make_app(db, user)).delete(f"/context/nodes/{node.id}")
+
+        assert resp.status_code == 409
+        detail = resp.json()["detail"]
+        assert detail["grund"] == "referenziert"
+        assert len(detail["referenzen"]) == 1
+        assert detail["referenzen"][0]["title"] == "Fremdes Curriculum"
+        assert detail["referenzen"][0]["fremd"] is True
+        db.delete.assert_not_called()
+
+    def test_eigene_referenz_blockiert_nicht(self):
+        """Wer sein Curriculum und das darin verlinkte Blatt löscht, weiß, was er tut."""
+        node = make_node(owner_pseudonym="pseudo-teacher")
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        db = _delete_db(node, referenzen=[_referenz(owner="pseudo-teacher")])
+        resp = TestClient(make_app(db, user)).delete(f"/context/nodes/{node.id}")
+
+        assert resp.status_code == 204
+
+    def test_admin_override_mit_force(self):
+        node = make_node(owner_pseudonym="other-user")
+        user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
+        db = _delete_db(node, referenzen=[_referenz()])
+        resp = TestClient(make_app(db, user)).delete(
+            f"/context/nodes/{node.id}?force=true"
+        )
+
+        assert resp.status_code == 204
+        db.delete.assert_awaited()
+
+    def test_force_ist_admins_vorbehalten(self):
+        node = make_node(owner_pseudonym="pseudo-teacher")
+        user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
+        db = _delete_db(node, referenzen=[_referenz()])
+        resp = TestClient(make_app(db, user)).delete(
+            f"/context/nodes/{node.id}?force=true"
+        )
+
+        assert resp.status_code == 403
+        db.delete.assert_not_called()
 
 
 # ── POST /context/curricula/new ──────────────────────────────────────────────

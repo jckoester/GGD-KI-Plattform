@@ -9,13 +9,18 @@
     } from "$lib/taxonomy.js";
     import { auswaehlbareTypen } from "$lib/knotentypen.js";
     import { STUDENT_GRADES as studentGrades } from "$lib/grades.js";
-    import { getContextNodes, updateContextNode } from "$lib/api.js";
+    import {
+        getContextNodes,
+        updateContextNode,
+        deleteContextNode,
+    } from "$lib/api.js";
+    import ErrorBanner from "./ErrorBanner.svelte";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { renderInlineMath } from "$lib/markdown.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
-    import { Anchor, Archive } from "lucide-svelte";
+    import { Anchor, Archive, Trash2 } from "lucide-svelte";
 
     let {
         fixedSubjectSlug = null, // gesetzt im Subject-Kontext-Tab
@@ -195,9 +200,65 @@
         searchTimer = setTimeout(load, 300);
     }
 
+    // ── Archivieren und Löschen ──────────────────────────────────────────────
+    //
+    // ⚠️ Hier lag der gemeldete Ausfall („Archivieren/Löschen funktioniert nicht",
+    // Roadmap M1): Der Aufruf lief ohne `try`, und bei einem 403 — jeder Baustein, den
+    // man nicht selbst angelegt hat — brach er still ab. Kein Fehler, keine Meldung,
+    // die Zeile blieb stehen. Von außen sah es aus, als täte der Knopf nichts.
+    //
+    // Zwei Konsequenzen: Fehler werden gezeigt, und Aktionen erscheinen nur dort, wo das
+    // Backend sie zulässt (`darf_schreiben` aus der Antwort — dieselbe Regel, nicht eine
+    // nachgebaute).
+    let aktionsfehler = $state(null);
+    let loeschKandidat = $state(null);
+    let loeschLaeuft = $state(false);
+    let blockiertVon = $state(null);
+
+    function darfAendern(node) {
+        // `undefined` heißt „nicht geprüft" — dann anbieten und den Fehler melden,
+        // statt eine Aktion zu verstecken, die vielleicht erlaubt wäre.
+        return node.darf_schreiben !== false;
+    }
+
     async function archiveNode(node) {
-        await updateContextNode(node.id, { status: "archived" });
-        nodes = nodes.filter((n) => n.id !== node.id);
+        aktionsfehler = null;
+        try {
+            await updateContextNode(node.id, { status: "archived" });
+            nodes = nodes.filter((n) => n.id !== node.id);
+        } catch (e) {
+            aktionsfehler = e.message;
+        }
+    }
+
+    async function deleteNode(node) {
+        loeschLaeuft = true;
+        aktionsfehler = null;
+        blockiertVon = null;
+        try {
+            await deleteContextNode(node.id);
+            nodes = nodes.filter((n) => n.id !== node.id);
+            loeschKandidat = null;
+        } catch (e) {
+            if (e.status === 409 && e.detail?.referenzen) {
+                blockiertVon = {
+                    node,
+                    referenzen: e.detail.referenzen,
+                    nachricht: e.message,
+                };
+                loeschKandidat = null;
+            } else {
+                aktionsfehler = e.message;
+            }
+        } finally {
+            loeschLaeuft = false;
+        }
+    }
+
+    async function archiviereStattdessen() {
+        const node = blockiertVon?.node;
+        blockiertVon = null;
+        if (node) await archiveNode(node);
     }
 </script>
 
@@ -316,12 +377,47 @@
 </div>
 
 <!-- Tabelle -->
+{#if aktionsfehler}
+    <div class="mb-3"><ErrorBanner message={aktionsfehler} /></div>
+{/if}
+
+{#if blockiertVon}
+    <div
+        class="mb-3 p-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+               bg-light-bg-2 dark:bg-dark-bg-2 text-sm"
+    >
+        <p class="text-light-tx dark:text-dark-tx mb-2">{blockiertVon.nachricht}</p>
+        <ul class="mb-2 space-y-0.5 text-light-tx-2 dark:text-dark-tx-2">
+            {#each blockiertVon.referenzen as ref}
+                <li>
+                    <a href="/knowledge/{ref.id}" class="hover:underline">{ref.title}</a>
+                    <span class="opacity-60 text-xs"> — {ref.relation}</span>
+                </li>
+            {/each}
+        </ul>
+        <div class="flex gap-3">
+            <button
+                onclick={archiviereStattdessen}
+                class="text-xs text-light-bl dark:text-dark-bl hover:underline"
+            >
+                Stattdessen archivieren
+            </button>
+            <button
+                onclick={() => (blockiertVon = null)}
+                class="text-xs text-light-tx-2 dark:text-dark-tx-2 hover:underline"
+            >
+                Abbrechen
+            </button>
+        </div>
+    </div>
+{/if}
+
 {#if loading}
     <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
         Wird geladen…
     </div>
 {:else if error}
-    <div class="py-4 text-sm text-light-re dark:text-dark-re">{error}</div>
+    <ErrorBanner message={error} />
 {:else if nodes.length === 0}
     <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">
         Keine Knoten gefunden.
@@ -517,20 +613,58 @@
                             class="px-3 py-2"
                             onclick={(e) => e.stopPropagation()}
                         >
-                            {#if node.status === "active"}
-                                <button
-                                    onclick={() => archiveNode(node)}
-                                    title="Archivieren"
-                                    class="text-xs text-light-tx-2 dark:text-dark-tx-2
-                         hover:text-light-re dark:hover:text-dark-re transition-colors"
-                                >
-                                    <Archive size="16" />
-                                </button>
-                            {:else}
+                            {#if node.status !== "active"}
                                 <span
                                     class="text-xs text-light-tx-3 dark:text-dark-tx-3 italic"
                                     >archiviert</span
                                 >
+                            {:else if !darfAendern(node)}
+                                <!-- Kein Knopf statt eines Knopfes, der 403 antwortet:
+                                     Schulweite und importierte Bausteine pflegt, wem sie
+                                     gehören (Leitplanke 4 — die UI blendet nur aus, was
+                                     das Backend ohnehin verweigert). -->
+                                <span
+                                    class="text-xs text-light-tx-3 dark:text-dark-tx-3"
+                                    title="Nur die Eigentümerin oder ein Admin kann diesen Baustein ändern"
+                                    >—</span
+                                >
+                            {:else if loeschKandidat === node.id}
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                    >Endgültig löschen?</span
+                                >
+                                <button
+                                    onclick={() => deleteNode(node)}
+                                    disabled={loeschLaeuft}
+                                    class="ml-2 text-xs text-light-re dark:text-dark-re
+                                           hover:underline disabled:opacity-50"
+                                >
+                                    Ja
+                                </button>
+                                <button
+                                    onclick={() => (loeschKandidat = null)}
+                                    class="ml-2 text-xs text-light-tx-2 dark:text-dark-tx-2 hover:underline"
+                                >
+                                    Abbrechen
+                                </button>
+                            {:else}
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        onclick={() => archiveNode(node)}
+                                        title="Archivieren — bleibt im Archiv auffindbar"
+                                        class="text-xs text-light-tx-2 dark:text-dark-tx-2
+                             hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                                    >
+                                        <Archive size="16" />
+                                    </button>
+                                    <button
+                                        onclick={() => (loeschKandidat = node.id)}
+                                        title="Endgültig löschen"
+                                        class="text-xs text-light-tx-2 dark:text-dark-tx-2
+                             hover:text-light-re dark:hover:text-dark-re transition-colors"
+                                    >
+                                        <Trash2 size="16" />
+                                    </button>
+                                </div>
                             {/if}
                         </td>
                     </tr>

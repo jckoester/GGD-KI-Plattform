@@ -117,6 +117,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Die Nachbereitung einer Stunde ist jetzt thematisch auffindbar.** „Was habe ich mir
   zu Bindungsenergie notiert?" findet die Stunde über ihre Reflexion.
 
+- **Bausteine, auf die andere aufbauen, lassen sich nicht mehr löschen.** Verweisen
+  aktive Bausteine anderer darauf, zeigt die Plattform, wer das ist, und bietet
+  Archivieren an — das erhält die Verweise. Eigene Verweise halten nicht auf; Admins
+  können sich darüber hinwegsetzen.
+
+- **Der Wissensgraph bietet Archivieren und Löschen nur noch dort an, wo es erlaubt ist.**
+  Bei fremden und schulweiten Bausteinen erscheinen die Knöpfe nicht mehr.
+
+- **Das Ablaufdatum eines Bausteins wirkt jetzt.** Ein neuer nächtlicher Lauf archiviert
+  abgelaufene Bausteine und löscht nach drei Schuljahren im Archiv endgültig —
+  Bildungsplan und importierte Inhalte ausgenommen. Bisher wurde das Datum erfasst und
+  nie ausgewertet.
+
+- **„Reaktivieren" im Archiv** holt einen abgelaufenen Baustein zurück und setzt zugleich
+  ein neues Ablaufdatum; ohne das wäre er in derselben Nacht wieder archiviert worden.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss
@@ -150,6 +166,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Curriculum-Kapitel lassen sich als Wissensbereich eines Assistenten wählen.** Sie
   waren im Assistenten-Editor nicht angeboten, während die Knotenliste sie als
   Einstiegspunkt auswies; Unterrichtseinheiten war es umgekehrt.
+
+- **Archivieren im Wissensgraphen tat bei fremden Bausteinen nichts** — ohne Meldung.
+  Die Ablehnung des Servers wurde verschluckt; der Knopf sah funktionslos aus. Fehler
+  werden jetzt angezeigt, und die Aktion erscheint nur, wo sie erlaubt ist.
+
+- **Archivierte Bausteine trugen kein Archivierungsdatum.** Die Archivansicht zeigte
+  „—", und eine Aufbewahrungsfrist ließ sich darauf nicht berechnen.
 
 ## [0.7.0] – 2026-08-31
 

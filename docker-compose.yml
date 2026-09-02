@@ -218,6 +218,10 @@ services:
              echo '0 4 * * * root python /app/scripts/cleanup_rendered_svg.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '30 4 * * * root python /app/scripts/cleanup_generated_images.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              echo '45 4 * * * root python /app/scripts/cleanup_artifacts.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
+             # Knoten-Lebenszyklus (ADR-013): abgelaufene archivieren, lange archivierte
+             # löschen. Nach den übrigen Aufräumläufen und VOR dem Embedding-Lauf des
+             # Folgetages — was archiviert wird, braucht keinen frischen Vektor mehr.
+             echo '0 5 * * * root python /app/scripts/node_lifecycle.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&
              # Stundenplan-Abgleich (UP-8): morgens vor Unterrichtsbeginn, damit
              # über Nacht eingetragene Vertretungen im Tagesplan stehen.
              echo '30 5 * * 1-5 root python /app/scripts/sync_timetable.py >> /proc/1/fd/1 2>&1' >> /etc/cron.d/ggd-ki &&

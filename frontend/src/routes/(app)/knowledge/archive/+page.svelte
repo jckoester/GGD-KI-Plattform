@@ -1,7 +1,9 @@
 <script>
-  import { getContextNodes, updateContextNode, deleteContextNode } from '$lib/api.js'
+  import { getContextNodes, deleteContextNode, reactivateContextNode } from '$lib/api.js'
   import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_ANCHOR_CONTENT_TYPES } from '$lib/taxonomy.js'
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
+  import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import SuccessBanner from '$lib/components/SuccessBanner.svelte'
 
   let nodes = $state([])
   let loading = $state(false)
@@ -16,6 +18,22 @@
   // Löschen-Bestätigung
   let confirmDeleteId = $state(null)
   let deleteLoading = $state(false)
+  // Referenzen aus einer 409-Antwort: Wer verweist noch auf den Baustein?
+  let blockiertVon = $state(null)
+  let hinweis = $state(null)
+
+  const heute = new Date().toISOString().slice(0, 10)
+
+  /** Wurde der Baustein automatisch archiviert, weil sein Datum verstrichen ist? */
+  function abgelaufenAm(node) {
+    return node.valid_until && node.valid_until < heute ? node.valid_until : null
+  }
+
+  function alsDatum(iso) {
+    return new Date(iso).toLocaleDateString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    })
+  }
 
   async function load() {
     loading = true
@@ -53,18 +71,38 @@
   )
 
   async function restore(node) {
-    await updateContextNode(node.id, { status: 'active' })
-    nodes = nodes.filter(n => n.id !== node.id)
+    error = null
+    hinweis = null
+    try {
+      // Nicht bloß den Status setzen: Ein abgelaufener Baustein trüge sonst weiter sein
+      // altes Datum und wäre in derselben Nacht wieder archiviert. Das neue Datum
+      // bestimmt der Server aus der Bausteinart.
+      const zurueck = await reactivateContextNode(node.id)
+      nodes = nodes.filter(n => n.id !== node.id)
+      hinweis = zurueck.valid_until
+        ? `„${zurueck.title}" ist wieder aktiv — gültig bis ${alsDatum(zurueck.valid_until)}.`
+        : `„${zurueck.title}" ist wieder aktiv und läuft nicht ab.`
+    } catch (e) {
+      error = e.message
+    }
   }
 
   async function confirmDelete(nodeId) {
     deleteLoading = true
+    error = null
+    blockiertVon = null
     try {
       await deleteContextNode(nodeId)
       nodes = nodes.filter(n => n.id !== nodeId)
       confirmDeleteId = null
     } catch (e) {
-      error = e.message
+      if (e.status === 409 && e.detail?.referenzen) {
+        // Andere bauen auf diesem Baustein auf — Löschen bricht ihre Verweise.
+        blockiertVon = { nodeId, referenzen: e.detail.referenzen, nachricht: e.message }
+        confirmDeleteId = null
+      } else {
+        error = e.message
+      }
     } finally {
       deleteLoading = false
     }
@@ -82,6 +120,35 @@
       <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">Archiv</h1>
     </div>
   </div>
+
+  {#if hinweis}
+    <div class="mb-4"><SuccessBanner message={hinweis} /></div>
+  {/if}
+
+  {#if blockiertVon}
+    <div class="mb-4 p-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                bg-light-bg-2 dark:bg-dark-bg-2 text-sm">
+      <p class="text-light-tx dark:text-dark-tx mb-2">{blockiertVon.nachricht}</p>
+      <ul class="mb-2 space-y-0.5 text-light-tx-2 dark:text-dark-tx-2">
+        {#each blockiertVon.referenzen as ref}
+          <li>
+            <a href="/knowledge/{ref.id}" class="hover:underline">{ref.title}</a>
+            <span class="opacity-60 text-xs"> — {ref.relation}</span>
+          </li>
+        {/each}
+      </ul>
+      <p class="text-light-tx-2 dark:text-dark-tx-2 text-xs">
+        Der Baustein bleibt archiviert: Er ist damit aus Suche und Assistenten heraus,
+        die Verweise bleiben aber heil.
+      </p>
+      <button
+        onclick={() => { blockiertVon = null }}
+        class="mt-2 text-xs text-light-bl dark:text-dark-bl hover:underline"
+      >
+        Verstanden
+      </button>
+    </div>
+  {/if}
 
   <!-- Filterleiste -->
   <div class="flex flex-wrap gap-2 mb-4">
@@ -124,7 +191,7 @@
   {#if loading}
     <div class="py-8 text-center text-sm text-light-tx-2 dark:text-dark-tx-2">Wird geladen…</div>
   {:else if error}
-    <div class="py-4 text-sm text-light-re dark:text-dark-re">{error}</div>
+    <ErrorBanner message={error} />
   {:else if filteredNodes.length === 0}
     <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 py-8 text-center">
       Keine archivierten Knoten{schuljahr ? ` aus ${schuljahr}` : ''}.
@@ -163,18 +230,24 @@
                 {node.schuljahr ?? '—'}
               </td>
               <td class="px-3 py-2 text-light-tx-3 dark:text-dark-tx-3 text-xs whitespace-nowrap">
-                {node.archived_at
-                  ? new Date(node.archived_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                  : '—'}
+                {node.archived_at ? alsDatum(node.archived_at) : '—'}
+                {#if abgelaufenAm(node)}
+                  <span class="block text-light-tx-2 dark:text-dark-tx-2">
+                    abgelaufen am {alsDatum(abgelaufenAm(node))}
+                  </span>
+                {/if}
               </td>
               <td class="px-3 py-2" onclick={e => e.stopPropagation()}>
                 <div class="flex gap-2 items-center">
                   <button
                     onclick={() => restore(node)}
-                    class="text-xs text-primary dark:text-dark-bl
+                    title={abgelaufenAm(node)
+                      ? 'Holt den Baustein zurück und setzt ein neues Ablaufdatum'
+                      : 'Holt den Baustein zurück'}
+                    class="text-xs text-light-bl dark:text-dark-bl
                            hover:underline transition-colors"
                   >
-                    Wiederherstellen
+                    {abgelaufenAm(node) ? 'Reaktivieren' : 'Wiederherstellen'}
                   </button>
 
                   {#if confirmDeleteId === node.id}

@@ -78,6 +78,14 @@ class ContextNodeRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Darf die anfragende Person diesen Knoten ändern, archivieren, löschen?
+    #
+    # `None` heißt **nicht geprüft**, nicht „nein": Gesetzt wird das Feld nur dort, wo die
+    # Oberfläche Aktionen anbietet (Liste und Einzelabruf). Wo es fehlt, zeigt die UI die
+    # Aktion und meldet einen abgelehnten Versuch — das ist der ehrlichere Zustand als
+    # eine Rechteauskunft, die niemand berechnet hat.
+    darf_schreiben: bool | None = None
+
     @field_validator("title_locked", mode="before")
     @classmethod
     def _title_locked_default(cls, v):
@@ -129,6 +137,15 @@ class ContextEdgeRead(BaseModel):
 class NeighborhoodResponse(BaseModel):
     nodes: list[ContextNodeRead]
     edges: list[ContextEdgeRead]
+
+
+class NodeReferenzRead(BaseModel):
+    """Ein Knoten, der auf den zu löschenden zeigt — Begründung einer 409-Antwort."""
+    id: UUID
+    title: str
+    content_type: str | None
+    relation: str
+    fremd: bool   # gehört jemand anderem — nur solche Referenzen blockieren
 
 
 class ArchivedReferenceRead(BaseModel):

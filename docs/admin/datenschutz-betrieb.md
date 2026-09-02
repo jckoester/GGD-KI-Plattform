@@ -108,15 +108,50 @@ Person nichts ab.
 
 ## Automatische Datenlöschung (Cron-Jobs)
 
-Drei automatische Cron-Jobs laufen täglich. Zwei davon löschen veraltete Daten, der dritte ergänzt fehlende Embeddings:
+Vier automatische Cron-Jobs laufen täglich. Drei davon räumen veraltete Daten ab, einer
+ergänzt fehlende Embeddings:
 
 | Job | Zeitplan | Was wird ausgeführt |
 |-----|---------|-----------------|
 | `cleanup_inactive_accounts` | täglich 02:00 Uhr | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
 | `cleanup_stale_conversations` | täglich 02:30 Uhr | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
 | `embedding_backfill` | täglich 03:15 Uhr | Embeddings für Knoten ohne Embedding nachgenerieren |
+| `node_lifecycle` | täglich 05:00 Uhr | Abgelaufene Bausteine archivieren, lange archivierte löschen |
 
 Die Löschung ist unwiederbringlich. Es gibt keine Wiederherstellungsfunktion.
+
+### Was `node_lifecycle` tut — und was nicht
+
+Zwei Schritte in einem Lauf (ADR-013), seit 0.8 überhaupt vorhanden: Bis dahin wurde ein
+Ablaufdatum zwar erfasst und gespeichert, aber **nie ausgewertet**.
+
+1. **Archivieren.** Bausteine mit überschrittenem Ablaufdatum wechseln auf „archiviert":
+   raus aus Suche und Assistenten, für die Eigentümerin über das Archiv weiter
+   erreichbar, Verknüpfungen bleiben. Kein Datenverlust — das ist eine Sichtbarkeits-,
+   keine Löschentscheidung.
+2. **Löschen.** Archivierte Bausteine verschwinden **nach drei Schuljahren** (1095 Tagen)
+   endgültig. Drei Ausnahmen schützen davor:
+   - **Importiertes bleibt.** Bildungsplan und Leitperspektiven (`write_scope = global`)
+     werden nie automatisch gelöscht — sie werden beim Editionswechsel jahrgangsweise
+     archiviert, und Curricula verweisen weiter darauf.
+   - **Einzelne Bausteine lassen sich ausnehmen** (`metadata.loeschung_ausgesetzt: true`).
+   - **Ohne Archivdatum keine Frist.** Was vor 0.8 archiviert wurde, trägt kein
+     Archivierungsdatum und wird nicht angefasst.
+
+Was der Lauf ausgerichtet hat, steht im Protokoll — mit Zahlen, auch für das
+Übersprungene:
+
+```bash
+docker compose logs cron | grep node_lifecycle
+# node_lifecycle archivieren: faellig=3 archiviert=3 dry_run=False
+# node_lifecycle loeschen: faellig=4770 geloescht=0 geschuetzt_global=4770 …
+```
+
+Vorher ansehen, was er tun würde:
+
+```bash
+docker compose exec backend python scripts/node_lifecycle.py --dry-run
+```
 
 ### Was die Kontolöschung abräumt
 

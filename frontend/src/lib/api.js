@@ -1,9 +1,20 @@
 const BASE = "/api";
 
 export class ApiError extends Error {
+  /**
+   * @param {number} status
+   * @param {string|object} detail — FastAPI liefert bei manchen Fehlern ein Objekt
+   *   statt eines Satzes (z. B. 409 beim Löschen: Grund, Nachricht, Referenzliste).
+   *   `message` bleibt in jedem Fall lesbar, das Objekt steht in `detail`.
+   */
   constructor(status, detail) {
-    super(detail ?? `Fehler ${status}`);
+    const text =
+      typeof detail === "string"
+        ? detail
+        : (detail?.nachricht ?? detail?.detail ?? `Fehler ${status}`);
+    super(text);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -1450,8 +1461,16 @@ export async function updateNodeTitle(nodeId, title) {
   return res.json()
 }
 
-export async function deleteContextNode(nodeId) {
-  const res = await fetch(`${BASE}/context/nodes/${nodeId}`, {
+/**
+ * Löscht einen Baustein.
+ *
+ * Wirft bei **409** einen `ApiError`, dessen `detail.referenzen` die aktiven Bausteine
+ * anderer nennt, die darauf verweisen (F7-Regel: archivieren statt löschen).
+ * `force` ist Admins vorbehalten und löscht trotzdem — mitsamt Kaskade.
+ */
+export async function deleteContextNode(nodeId, { force = false } = {}) {
+  const query = force ? '?force=true' : ''
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}${query}`, {
     method: 'DELETE',
     credentials: 'include',
   })
@@ -1459,6 +1478,25 @@ export async function deleteContextNode(nodeId) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Fehler beim Löschen')
   }
+}
+
+/**
+ * Holt einen archivierten Baustein zurück und setzt sein Ablaufdatum neu.
+ *
+ * Nicht dasselbe wie `updateContextNode(id, {status:'active'})`: Ein wegen Ablauf
+ * archivierter Baustein trüge sonst weiter sein altes Datum und wäre in derselben Nacht
+ * wieder weg. Das neue Datum bestimmt der Server aus der Bausteinart.
+ */
+export async function reactivateContextNode(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/reaktivieren`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Reaktivieren')
+  }
+  return res.json()
 }
 
 export async function getArchivedReferences(nodeId) {

@@ -8,6 +8,7 @@ import io
 import logging
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -32,6 +33,7 @@ from app.context.schemas import (
     NeighborhoodResponse,
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
+    NodeReferenzRead,
     ChatContextNodeAdd,
     ChatContextNodeRead,
     anzeige_felder,
@@ -216,6 +218,51 @@ def _visibility_filter(query, user: JwtPayload, status_override: str | None = No
     return q
 
 
+async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> None:
+    """Setzt ``darf_schreiben`` auf jedem Knoten — dieselbe Regel wie ``_check_write_permission``.
+
+    **Warum überhaupt.** Ohne die Auskunft bot die Oberfläche „Archivieren" und „Löschen"
+    an jedem Knoten an; beim Klick antwortete das Backend mit 403, und die Liste verschluckte
+    ihn. Von außen sah das aus, als täte der Knopf nichts (Roadmap M1, „Archivieren/Löschen
+    funktioniert nicht"). Die Regel gehört ins Backend — die UI blendet nur aus, was ohnehin
+    verweigert würde (Leitplanke 4 des Umsetzungsplans).
+
+    **Warum als Sammelabfrage.** Der Gruppenfall braucht die Lehrkraft-Mitgliedschaften; sie
+    einmal je Liste zu laden ist eine Abfrage, sie je Knoten zu prüfen wären hundert.
+    """
+    nodes = list(nodes)
+    if not nodes:
+        return
+
+    ist_admin = "admin" in user.roles
+    braucht_gruppen = not ist_admin and any(
+        n.owner_pseudonym != user.sub
+        and n.write_scope == "group"
+        and n.write_scope_group_id is not None
+        for n in nodes
+    )
+
+    eigene_gruppen: set[int] = set()
+    if braucht_gruppen and "teacher" in user.roles:
+        rows = await db.execute(
+            sa.select(GroupMembership.group_id).where(
+                GroupMembership.pseudonym == user.sub,
+                GroupMembership.role_in_group == "teacher",
+            )
+        )
+        eigene_gruppen = {gid for (gid,) in rows}
+
+    for node in nodes:
+        node.darf_schreiben = (
+            ist_admin
+            or node.owner_pseudonym == user.sub
+            or (
+                node.write_scope == "group"
+                and node.write_scope_group_id in eigene_gruppen
+            )
+        )
+
+
 # ── GET /api/context/nodes ────────────────────────────────────────────────────
 
 
@@ -275,7 +322,9 @@ async def list_nodes(
         query = query.limit(limit)
 
     result = await db.execute(query)
-    return result.scalars().all()
+    nodes = result.scalars().all()
+    await _schreibrechte_setzen(nodes, user, db)
+    return nodes
 
 
 # ── GET /api/context/nodes/{id}/neighborhood ────────────────────────────────
@@ -443,6 +492,7 @@ async def get_node(
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     await _check_read_permission(node, user, db)
+    await _schreibrechte_setzen([node], user, db)
     return node
 
 
@@ -532,6 +582,18 @@ async def update_node(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
+    # `archived_at` gehört zum Status und wird nicht vom Client gesetzt. Ohne dieses
+    # Mitführen blieb die Spalte beim Archivieren **leer**: Die Archivansicht zeigte kein
+    # Datum, und der Löschfrist-Lauf (ADR-013) hätte nie eine Frist berechnen können —
+    # ein Knoten ohne `archived_at` wird von ihm bewusst nie angefasst.
+    if "status" in update_data and update_data["status"] != node.status:
+        if update_data["status"] == "archived":
+            node.archived_at = datetime.now(timezone.utc)
+        elif update_data["status"] == "active":
+            # Reaktiviert: Die Uhr der Aufbewahrungsfrist beginnt beim nächsten
+            # Archivieren neu, sie läuft nicht im Hintergrund weiter.
+            node.archived_at = None
+
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
         attr = field if field != "metadata_" else "metadata_"
@@ -565,18 +627,143 @@ async def update_node_title(
     return node
 
 
+# ── POST /api/context/nodes/{id}/reaktivieren ─────────────────────────────────
+
+
+def _vorgeschlagenes_ablaufdatum(content_type: str | None):
+    """Das `valid_until`, das die Taxonomie für diesen Typ vorsieht (None = permanent).
+
+    Bis AP4 hatten `get_valid_until_offset` und `get_valid_until_schuljahresende`
+    **keinen einzigen Aufrufer** — die Vorgaben standen in der Taxonomie und wirkten
+    nirgends. Hier bekommen sie ihren ersten: Wer einen abgelaufenen Baustein
+    reaktiviert, soll nicht raten müssen, wie lange er diesmal gilt.
+    """
+    from app.context.taxonomy import (
+        get_valid_until_offset,
+        get_valid_until_schuljahresende,
+    )
+
+    heute = datetime.now(timezone.utc).date()
+
+    if get_valid_until_schuljahresende(content_type):
+        from app.planning.calendar import load_school_year
+        ende = load_school_year().ende
+        # ⚠️ Ein Schuljahresende in der Vergangenheit heißt: `school_year.yaml` ist nicht
+        # umgestellt. Diesen Wert zu setzen wäre schlimmer als keiner — der nächtliche
+        # Lauf holte den Baustein noch in derselben Nacht zurück ins Archiv, und die
+        # Reaktivierung sähe aus, als hätte sie nicht funktioniert. Am Live-Test am
+        # 02.09.2026 genau so aufgetreten (Config stand auf 2025/26, Ende 29.07.2026).
+        if ende <= heute:
+            logger.warning(
+                "Schuljahresende %s liegt nicht in der Zukunft — Baustein wird ohne "
+                "Ablaufdatum reaktiviert. config/school_year.yaml umstellen "
+                "(docs/runbooks/schuljahreswechsel.md).", ende,
+            )
+            return None
+        return ende
+
+    tage = get_valid_until_offset(content_type)
+    return (heute + timedelta(days=tage)) if tage else None
+
+
+@router.post("/nodes/{node_id}/reaktivieren", response_model=ContextNodeRead)
+async def reaktiviere_node(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Holt einen archivierten Knoten zurück und setzt sein Ablaufdatum neu.
+
+    Der Unterschied zu `PATCH {status: "active"}`: Ein Knoten, der wegen abgelaufenem
+    `valid_until` automatisch archiviert wurde, hätte danach **immer noch** ein Datum in
+    der Vergangenheit — der nächtliche Lauf würde ihn in derselben Nacht wieder
+    einsammeln. Das Ablaufdatum gehört deshalb zur Reaktivierung, nicht daneben.
+    """
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.status == "deleted":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    await _check_write_permission(node, user, db)
+
+    if node.status != "archived":
+        raise HTTPException(status_code=409, detail="Der Baustein ist nicht archiviert.")
+
+    node.status = "active"
+    node.archived_at = None
+    node.valid_until = _vorgeschlagenes_ablaufdatum(node.content_type)
+    await db.commit()
+    await db.refresh(node)
+    await _schreibrechte_setzen([node], user, db)
+    return node
+
+
 # ── DELETE /api/context/nodes/{id} ────────────────────────────────────────────
 
 @router.delete("/nodes/{node_id}", status_code=204)
 async def delete_node(
     node_id: UUID,
+    force: bool = Query(
+        default=False,
+        description="Admin-Override: löscht trotz fremder Referenzen (Kaskade!).",
+    ),
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
+    """Löscht einen Knoten samt seiner `part_of`-Kinder.
+
+    Gibt **409** zurück, wenn aktive Knoten **anderer** Eigentümer darauf verweisen
+    (F7-Regel, ADR-019) — mit der Referenzliste im `detail`, damit die Oberfläche sie
+    zeigen und Archivieren anbieten kann.
+    """
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     await _check_write_permission(node, user, db)
+
+    # ── F7: Archivieren vor Löschen (ADR-019) ────────────────────────────────
+    # Zeigen **aktive Knoten anderer Eigentümer** auf diesen, ist Löschen die falsche
+    # Aktion: Es reißt in fremde Planungen ein Loch, das dort niemand erklären kann.
+    # Archivieren erhält die Kanten und ist reversibel — deshalb 409 statt 204, mit der
+    # Liste der Referenzen als Begründung.
+    #
+    # Eigene Referenzen blockieren nicht: Wer sein Curriculum und das darin verlinkte
+    # Blatt löscht, weiß, was er tut. Admins können mit `force=true` durchgreifen — dann
+    # gilt wieder die Kaskade unten.
+    if not force:
+        referenzen = (await db.execute(
+            sa.select(ContextNode.id, ContextNode.title, ContextNode.content_type,
+                      ContextEdge.relation, ContextNode.owner_pseudonym)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == node_id,
+                ContextNode.status == "active",
+                ContextNode.id != node_id,
+            )
+            .limit(50)
+        )).all()
+        fremde = [r for r in referenzen if r.owner_pseudonym != user.sub]
+        if fremde:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "grund": "referenziert",
+                    "nachricht": (
+                        f"{len(fremde)} aktive Bausteine anderer verweisen auf diesen. "
+                        "Archivieren erhält die Verweise; Löschen würde sie brechen."
+                    ),
+                    "referenzen": [
+                        NodeReferenzRead(
+                            id=r.id, title=r.title, content_type=r.content_type,
+                            relation=r.relation, fremd=True,
+                        ).model_dump(mode="json")
+                        for r in fremde
+                    ],
+                },
+            )
+    elif "admin" not in user.roles:
+        raise HTTPException(
+            status_code=403,
+            detail="`force` ist Admins vorbehalten — sonst archivieren.",
+        )
 
     # Rekursiv alle untergeordneten Knoten einsammeln: Kinder zeigen per
     # 'part_of'-Kante (from_node = Kind, to_node = Elternteil) auf ihr Elternteil.
