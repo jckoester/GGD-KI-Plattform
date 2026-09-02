@@ -80,9 +80,9 @@ Das Vorschlagsfenster zeigt standardmäßig bis zu 8 Treffer. Wenn Sie häufig m
 
 Die Einstellung betrifft **nur Ihre eigene Suche** über den Suche-Button. Wie viele Bausteine ein Assistent bei seiner eigenen Suche heranzieht, legt die Schule zentral fest — dort geht es nicht um Platz auf dem Bildschirm, sondern um Kosten. Diese Suche läuft im Hintergrund: Der Assistent liest die gefundenen Bausteine, ohne dass Ihnen dazu eine Auswahlliste angeboten wird. Das Vorschlagsfenster erscheint also nur, wenn Sie selbst gesucht haben.
 
-> ⚠️ **Trefferlisten sind gekürzt, und das steht nirgends dabei.** Gibt es zu einer Suche mehr passende Bausteine als Plätze, liefert die Suche nur die vordersten — ohne Hinweis darauf, dass etwas fehlt. Eine Liste sieht also immer vollständig aus.
->
-> Das trifft besonders Fragen, die **alle** Vorkommen eines Begriffs wollen. Der Operator „nennen" etwa steht in 18 Fächern; eine Antwort darauf nennt derzeit 14 davon und wirkt dabei erschöpfend. Wenn Vollständigkeit für Sie zählt, prüfen Sie das Ergebnis gegen den Wissensgraphen — verlassen Sie sich nicht darauf, dass eine Liste alles enthält.
+**Eine gekürzte Liste sagt es Ihnen.** Reicht der Platz nicht, steht am Abschnittsende, wie viel fehlt — „5 von 24 angezeigt" — und ein Verweis führt zur Suchseite mit allen Treffern. Sie müssen also nicht raten, ob eine Liste vollständig ist.
+
+Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden Bausteine**; die **Nächstliegenden** sind eine Auswahl nach Ähnlichkeit und tragen deshalb keine Gesamtzahl (siehe oben).
 
 ## Kontext und Datenschutz
 
