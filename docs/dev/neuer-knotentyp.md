@@ -19,14 +19,41 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 >    besteht, ist keine thematische Suche, sondern eine unscharfe Titelsuche im
 >    Vektorraum — mit Kosten und ohne Gewinn. Schritt 3 prüft genau das.
 
+## `taxonomy.yaml` ist eine Systemdatei
+
+Sie liegt in `backend/app/context/`, neben ihrem Lader, und **nicht** in `config/`
+(ADR-018 samt Nachtrag vom 02.09.2026). Der Ort ist die Aussage: `config/` wird im
+Betrieb als ganzes Verzeichnis in den Container gemountet — eine Datei dort ist die
+Datei auf dem Host und damit Sache der Schule. Diese ist es nicht; sie steckt im Abbild.
+Geändert wird sie hier, im Entwicklungsprozess, und zwar so:
+
+- **YAML-Änderung und Datenmigration gehören in denselben Merge.** Ein Typ, der aus der
+  Taxonomie verschwindet, während seine Knoten noch in der Datenbank stehen, ist kein
+  Übergangszustand, sondern ein Bestand ohne Zuständigkeit.
+- **Jede Typ-Entscheidung bekommt eine Begründung als YAML-Kommentar** — ein Einzeiler
+  genügt, aber er muss dastehen. Warum dieser Typ ein Embedding trägt (oder keins),
+  warum diese Scopes, warum ruhend.
+- **Das Backend prüft beim Start** (`app/context/taxonomy_check.py`) und **startet bei
+  einer Abweichung nicht.** Geprüft wird gegen den Datenbestand (kommt jeder vorhandene
+  `content_type` in der Taxonomie vor, und in der richtigen Kategorie?) und gegen die
+  handgepflegten Tabellen in `app/context/taxonomy.py`. Der datenbankfreie Teil läuft
+  zusätzlich in `scripts/check_production.py`; ein Test hält fest, dass das generierte
+  `frontend/src/lib/taxonomy.js` zur YAML passt.
+
+Der Abbruch ist Absicht und nicht bequem: Er nimmt die ganze Plattform mit, auch Chat und
+Unterrichtsplanung. Die Alternative wäre ein stiller Betrieb mit Knoten, die kein Filter
+mehr findet und keine Ansicht mehr einordnet — und das fällt erst Wochen später auf,
+wenn niemand mehr weiß, welches Update es war.
+
 ---
 
 ## Checkliste
 
 ### 1. Kategorie wählen
 
-`config/taxonomy.yaml`, unterhalb von `categories`. Vier Kategorien, und die Wahl ist
-keine Geschmacksfrage — sie bestimmt Farbe, Vorgaben und die Erwartung an den Inhalt:
+`backend/app/context/taxonomy.yaml`, unterhalb von `categories`. Vier Kategorien, und die
+Wahl ist keine Geschmacksfrage — sie bestimmt Farbe, Vorgaben und die Erwartung an den
+Inhalt:
 
 | Kategorie | Was hineingehört |
 |---|---|
@@ -111,6 +138,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 | Änderung | Migration? |
 |---|---|
 | neuer `content_type` | **nein** (freier Text in der DB) |
+| `content_type` entfernt oder umbenannt | **ja** — Daten-Update, im selben Merge wie die YAML. Sonst verweigert die Startprüfung den Start (und das zu Recht) |
 | neue Relation | **ja** (CHECK-Constraint erweitern) |
 | neuer Index | ja, wenn eine Abfrage ihn braucht |
 | Backfill der Embeddings | kein Schema, aber ein Lauf (`scripts/`) |

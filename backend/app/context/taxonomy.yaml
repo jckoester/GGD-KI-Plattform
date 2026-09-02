@@ -1,3 +1,31 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# SYSTEMDATEI — keine Betreiber-Konfiguration.
+#
+# Diese Datei gehört zum System wie der Code selbst. Geändert wird sie ausschließlich im
+# Entwicklungsprozess (Prozess „Neuer Knotentyp", `docs/dev/neuer-knotentyp.md`) — nicht
+# von der betreibenden Schule. Grund: Am content_type hängen Datenbank-Bestand,
+# Embedding-Strategie, Suchgewichtung, Werkzeug-Presets, Prüfsatz und UI-Bausteine. Wer
+# hier einen Typ entfernt oder umbenennt, hinterlässt verwaiste Knoten; wer ein
+# `embedding`-Flag umlegt, ändert stillschweigend die Suchergebnisse. Beides kann eine
+# Schule nicht nachziehen.
+#
+# Deshalb liegt sie **hier neben ihrem Lader** und nicht mehr in `config/` (Umzug
+# 02.09.2026): Dort wird das ganze Verzeichnis in den Container gemountet, die wirksame
+# Fassung wäre also die Datei auf dem Host — neben `auth.yaml` und `subjects.yaml`, die
+# tatsächlich der Schule gehören. Jetzt steckt sie im Abbild und ist im Betrieb gar
+# nicht erreichbar.
+#
+# ⚠ Das Backend prüft beim Start, ob diese Datei zum Datenbestand und zu den
+# Handtabellen in `app/context/taxonomy.py` passt (`app/context/taxonomy_check.py`).
+# Eine veränderte Datei führt zum **Startfehler**, nicht zu stillem Weiterlaufen.
+#
+# Schulspezifischer Bedarf wird auf der **Datenebene** bedient: `themengebiet` als frei
+# definierbare Wissensraum-Wurzel, `metadata`/Tags, eigene Knoten in allen Typen.
+# Wer wirklich einen neuen Typ braucht, bringt ihn ins Projekt ein.
+#
+# Begründung und Abwägung: ADR-018 (Taxonomie-Governance).
+# ═════════════════════════════════════════════════════════════════════════════
+#
 # Jede category hat: label_de, color (Semantic-Token-Kürzel), content_types[]
 # Jeder content_type hat: key, label_de, scope_defaults (read_scope, write_scope),
 #   optional: scope_anchor (true/false)
@@ -170,7 +198,11 @@ categories:
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         scope_defaults: {read_scope: private,  write_scope: private }
-        scope_anchor: false
+        # Anker: Ein Assistent für genau eine Einheit ist der Regelfall — die Stunde
+        # darunter ist es ohnehin. Bis 02.09.2026 stand hier `false`, während der
+        # Assistenten-Editor den Typ längst anbot (Drift, von der AP1-Startprüfung
+        # aufgedeckt).
+        scope_anchor: true
         valid_until_default: schuljahresende
         # Thema, nicht Ablauf — wie die Stunde.
         embedding: true

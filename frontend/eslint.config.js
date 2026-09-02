@@ -19,7 +19,7 @@ export default [
             'dist/',
             '.svelte-kit/',
             'node_modules/',
-            // Generiert aus config/taxonomy.yaml (npm run generate:taxonomy) — nicht handgepflegt.
+            // Generiert aus backend/app/context/taxonomy.yaml (npm run generate:taxonomy) — nicht handgepflegt.
             'src/lib/taxonomy.js',
         ],
     },

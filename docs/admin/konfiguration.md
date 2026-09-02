@@ -27,8 +27,7 @@ die alte Konfiguration bleibt in Kraft.
 **Alle Dateien unter `config/` verhalten sich so** — `auth.yaml`, `budget_tiers.yaml`,
 `crisis_triggers.yaml`, `help_resources.yaml`, `pedagogy.yaml`, `rate_limits.yaml`,
 `image_models.yaml`, `image_blocklist.yaml`, `artifact_limits.yaml`, `school_year.yaml`,
-`subjects.yaml`, `taxonomy.yaml`. Jede wird einmal beim Start gelesen und danach im
-Speicher gehalten.
+`subjects.yaml`. Jede wird einmal beim Start gelesen und danach im Speicher gehalten.
 
 **Zwei Ausnahmen — Änderungen über die Oberfläche wirken sofort:**
 
@@ -54,6 +53,48 @@ docker compose logs backend | grep "OAuth-Login:"
 ⚠️ **Ein Neustart genügt nicht immer:** Rollen stehen im Sitzungs-Token, das **30 Tage**
 gilt. Nach einer Korrektur an `auth.yaml` müssen betroffene Personen sich **ab- und wieder
 anmelden**, sonst tragen sie ihre alten Rollen weiter.
+
+---
+
+## Was ist Betreiber-Konfiguration, was Systemdatei?
+
+Nicht alles unter `config/` gehört Ihnen. Zwei Arten von Dateien liegen dort
+nebeneinander, und die Unterscheidung ist praktisch wichtig:
+
+**Betreiber-Konfiguration — für Ihre Schule gedacht.** Hier variiert die Wirklichkeit von
+Schule zu Schule, und die Datei ist genau dafür da: `auth.yaml` (welches Anmeldesystem,
+welche Gruppe wird welche Rolle), `subjects.yaml` (welche Fächer Sie führen),
+`budget_tiers.yaml` (was eine Klassenstufe im Monat ausgeben darf), `school_year.yaml`,
+`crisis_triggers.yaml` und `help_resources.yaml` (Ihre Ansprechpartner:innen),
+`pedagogy.yaml`, `rate_limits.yaml`, `image_models.yaml`, `image_blocklist.yaml`,
+`artifact_limits.yaml`. Diese Dateien dürfen — und sollen — Sie anpassen.
+
+**Systemdatei — gehört zur Software, nicht zu Ihrer Installation.** Das betrifft derzeit
+**eine** Datei: die Liste der Bausteinarten des Kontextspeichers (Kompetenz, Methode,
+Arbeitsblatt, Operator …). Sie liegt **nicht** in `config/`, sondern im Programmcode
+unter `backend/app/context/taxonomy.yaml` und wird mit dem Anwendungsabbild
+ausgeliefert. Im laufenden Betrieb gibt es sie auf dem Host also gar nicht.
+
+> **Warum das so ist:** An jeder Bausteinart hängen der Datenbestand, die
+> Suchgewichtung, die Auswahlfelder der Oberfläche und die Werkzeuge des Chats. Wer dort
+> einen Eintrag entfernt, hinterlässt Bausteine, die keine Ansicht mehr einordnen kann;
+> wer ein `embedding`-Flag umlegt, ändert stillschweigend die Suchergebnisse. Diese
+> Folgen kann eine Installation nicht selbst nachziehen — sie gehören in ein Release.
+> Das Backend prüft die Datei beim Start und startet bei einer Abweichung nicht. Der
+> Hintergrund steht in ADR-018.
+
+> ⚠️ **Bis Version 0.7 lag die Datei als `config/taxonomy.yaml` auf dem Host.** Nach dem
+> Update auf 0.8 ist die dort liegende Datei **wirkungslos** — sie kann gelöscht werden.
+> Der Start weist darauf hin, solange sie da ist. Siehe
+> [Updates & Wartung](updates-und-wartung.md).
+
+Ihr eigener Bedarf ist auf der **Datenebene** vorgesehen und braucht die Datei nicht:
+eigene Themengebiete als Wurzeln des Wissensgraphen, eigene Bausteine in jeder Art,
+eigene Schlagworte. Fehlt Ihnen wirklich eine Bausteinart, ist das ein Anliegen ans
+Projekt — dann bekommen alle Schulen sie.
+
+Was die Startprüfung meldet und was dann zu tun ist, steht in
+[Updates & Wartung](updates-und-wartung.md).
 
 ---
 

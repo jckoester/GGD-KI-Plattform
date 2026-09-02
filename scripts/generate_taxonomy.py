@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Generates frontend/src/lib/taxonomy.js from config/taxonomy.yaml.
+Generates frontend/src/lib/taxonomy.js from backend/app/context/taxonomy.yaml.
 Run: python scripts/generate_taxonomy.py
 Called automatically by: npm run prebuild
+
+Die Quelle liegt seit 02.09.2026 im Backend statt in `config/` — sie ist Systemdatei,
+keine Betreiber-Konfiguration (ADR-018). Wer diesen Pfad ändert, denkt an
+`frontend/Dockerfile`: Der Frontend-Build kopiert die Datei einzeln in seinen Kontext.
 """
 
 from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).parent.parent
-YAML_PATH = ROOT / "config" / "taxonomy.yaml"
+YAML_PATH = ROOT / "backend" / "app" / "context" / "taxonomy.yaml"
 OUT_PATH = ROOT / "frontend" / "src" / "lib" / "taxonomy.js"
 
 
@@ -54,7 +58,7 @@ def main():
 
     lines = [
         "// GENERATED FILE — do not edit manually.",
-        "// Source:      config/taxonomy.yaml",
+        "// Source:      backend/app/context/taxonomy.yaml",
         "// Regenerate:  python scripts/generate_taxonomy.py",
         "//              (runs automatically via npm run prebuild / npm run dev)",
         "",

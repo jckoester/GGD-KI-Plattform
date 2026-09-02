@@ -123,6 +123,14 @@ async def lifespan(app: FastAPI):
     # Startup-Check: Vektorbreite gegen EMBEDDING_DIMENSIONS
     await check_embedding_dimension()
 
+    # Startup-Check: Knotentyp-Taxonomie. Bewusst **hart** — anders als die
+    # Vektorbreite darüber. `taxonomy.yaml` ist Systemdatei (ADR-018): Passt sie nicht
+    # zum Bestand, sind Knoten ohne Zuständigkeit in der Datenbank, und das äußert sich
+    # nur in fehlenden Treffern und leeren Filtern. Ein Start mit dieser Abweichung
+    # verbirgt sie; der Abbruch nennt sie beim Namen.
+    from app.context.taxonomy_check import pruefe_beim_start
+    await pruefe_beim_start(AsyncSessionLocal)
+
     # Startup-Check: Bildarten. Bewusst früh und hart — eine fehlerhafte
     # image_models.yaml würde sonst erst beim ersten Bildwunsch auffallen, und ein still
     # falsch aufgelöstes Bildmodell kostet Geld und umgeht die Freigabematrix.

@@ -3,7 +3,7 @@ FROM node:22-slim AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml git && rm -rf /var/lib/apt/lists/*
 
 # Repo-Struktur spiegeln: ROOT in generate_taxonomy.py = /repo
-# Skript erwartet /repo/frontend/, /repo/scripts/, /repo/config/
+# Skript erwartet /repo/frontend/, /repo/scripts/ und die Taxonomie im Backend
 WORKDIR /repo/frontend
 
 COPY frontend/package*.json ./
@@ -13,7 +13,8 @@ COPY frontend/ .
 # docs/user/ muss beim Vite-Build erreichbar sein (Alias $docs → /docs/user)
 COPY docs/user/ /repo/docs/user/
 COPY scripts/ /repo/scripts/
-COPY config/taxonomy.yaml /repo/config/taxonomy.yaml
+# Quelle der generierten taxonomy.js — Systemdatei im Backend, nicht in config/ (ADR-018)
+COPY backend/app/context/taxonomy.yaml /repo/backend/app/context/taxonomy.yaml
 
 ARG PUBLIC_SCHOOL_NAME=ki@schule
 ARG PUBLIC_SCHOOL_LOGO_URL=

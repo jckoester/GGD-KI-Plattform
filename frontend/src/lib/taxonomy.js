@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit manually.
-// Source:      config/taxonomy.yaml
+// Source:      backend/app/context/taxonomy.yaml
 // Regenerate:  python scripts/generate_taxonomy.py
 //              (runs automatically via npm run prebuild / npm run dev)
 
@@ -66,7 +66,8 @@ export const SCOPE_ANCHOR_CONTENT_TYPES = new Set([
   "pk_gruppe",
   "curriculum",
   "kapitel",
-  "unterrichtsstunde"
+  "unterrichtsstunde",
+  "unterrichtseinheit"
 ])
 
 // Importierte Bildungsplan-/Curriculum-Knotentypen — aus der freien /knowledge-Liste

@@ -90,7 +90,6 @@ services:
       # ohne Absturz, nur mit „Datei nicht gefunden" an einer späteren Stelle.
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
-      TAXONOMY_PATH: /app/config/taxonomy.yaml
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
       # Diese fünf betrifft genau das (test_container_pfade.py hält die Liste aktuell).
       # Sie tragen Jugendschutz, Krisenerkennung und Leitplanken — fällt einer aus, ist
@@ -189,7 +188,6 @@ services:
       # Absolut, aus demselben Grund wie beim backend-Dienst (siehe dort).
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml
-      TAXONOMY_PATH: /app/config/taxonomy.yaml
       SCHOOL_YEAR_PATH: /app/config/school_year.yaml
       PEDAGOGY_PATH: /app/config/pedagogy.yaml
       CRISIS_TRIGGERS_PATH: /app/config/crisis_triggers.yaml

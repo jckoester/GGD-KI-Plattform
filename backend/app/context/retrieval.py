@@ -8,6 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode
 
+# Nur strukturell sinnvolle Einstiegspunkte als retrieval_scope zulässig. Weiterhin von
+# hier importierbar (`router.py`), die Liste selbst kommt aber aus der Taxonomie.
+#
+# Bis 02.09.2026 stand sie hier als Literal — und wich von `scope_anchor: true` in
+# `taxonomy.yaml` ab: dort `kapitel`, hier stattdessen `unterrichtseinheit`, und
+# der Assistenten-Editor hielt eine dritte Kopie. Sichtbar war davon nur ein falsches
+# Badge in der Knotenliste. Jetzt gibt es eine Quelle, und die Startprüfung
+# (`taxonomy_check.py`) hält sie fest.
+from app.context.taxonomy import VALID_SCOPE_ANCHOR_TYPES  # noqa: F401 — Re-Export
+
 
 @dataclass
 class EngagementEntry:
@@ -15,12 +25,6 @@ class EngagementEntry:
     relations: list[str]   # z.B. ['knows', 'introduced']
     strength: float | None
     origins: list[str]     # z.B. ['user', 'group']
-
-# Nur strukturell sinnvolle Einstiegspunkte als retrieval_scope zulässig
-VALID_SCOPE_ANCHOR_TYPES: frozenset[str] = frozenset({
-    "fachplan", "leitidee", "pk_gruppe", "curriculum", "themengebiet",
-    "unterrichtseinheit", "unterrichtsstunde",
-})
 
 
 _SCOPE_CTE = """

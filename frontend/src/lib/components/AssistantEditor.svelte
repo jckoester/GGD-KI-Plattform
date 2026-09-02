@@ -46,6 +46,7 @@
         getAugmentations,
         getImageKinds,
     } from "$lib/api.js";
+    import { SCOPE_ANCHOR_CONTENT_TYPES } from "$lib/taxonomy.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
     // ── Props ─────────────────────────────────────────────────────────────────
@@ -170,11 +171,9 @@
     let anchorSearchLoading = $state(false);
     let anchorError = $state(null);
 
-    // Content-Types für Retrieval-Scope
-    const SCOPE_CONTENT_TYPES = [
-        "fachplan", "leitidee", "pk_gruppe", "curriculum", "themengebiet",
-        "unterrichtseinheit", "unterrichtsstunde",
-    ];
+    // Content-Types für Retrieval-Scope — aus der Taxonomie, nicht von Hand. Die
+    // frühere Kopie hier wich vom Backend ab (siehe taxonomy.yaml, `scope_anchor`).
+    const SCOPE_CONTENT_TYPES = [...SCOPE_ANCHOR_CONTENT_TYPES];
 
     const MAX_DOCS = 3;
     const MAX_TOTAL_TOKENS = 15_000;

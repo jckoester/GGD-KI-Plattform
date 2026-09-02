@@ -75,7 +75,7 @@ const KEIN_MATERIAL = new Set([
  * Auswählbare Material-Typen für Curriculum-Editor und Stundenentwurf.
  *
  * Aus der generierten Taxonomie abgeleitet statt von Hand gepflegt: Ein neuer
- * Dokument- oder Artefakt-Typ in `config/taxonomy.yaml` ist damit automatisch
+ * Dokument- oder Artefakt-Typ in der Taxonomie ist damit automatisch
  * auswählbar, ohne dass jemand daran denken muss.
  *
  * **Nicht** dabei ist die Kategorie `knowledge` — Bildungsplan-Kompetenzen,

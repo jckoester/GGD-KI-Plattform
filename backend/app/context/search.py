@@ -717,7 +717,7 @@ async def identifikation(
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
     verglichen, nicht eingebettet — und 30 der 44 Knotentypen tragen laut
-    ``config/taxonomy.yaml`` bewusst kein Embedding (Fachpläne, Curricula, Methoden,
+    ``taxonomy.yaml`` bewusst kein Embedding (Fachpläne, Curricula, Methoden,
     Leitperspektiven …). Bliebe der Filter hier stehen, wären diese Knoten unter ihrem
     eigenen Namen unauffindbar, während die Aufzählung sie zählt: zwei Grundmengen in
     einem Umschlag, und die Existenzaussage wäre gebrochen.

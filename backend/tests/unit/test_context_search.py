@@ -69,7 +69,7 @@ class TestIdentifikationsAbfrage:
     def test_ohne_embedding_filter(self):
         """Ein Titel wird verglichen, nicht eingebettet.
 
-        30 der 44 Knotentypen tragen laut `config/taxonomy.yaml` bewusst kein Embedding.
+        30 der 45 Knotentypen tragen laut `app/context/taxonomy.yaml` bewusst kein Embedding.
         Bliebe der Filter hier stehen, wären Fachpläne, Curricula und Methoden unter
         ihrem **eigenen Namen** unauffindbar, während die Aufzählung sie zählt — und die
         Existenzaussage des Umschlags wäre gebrochen.

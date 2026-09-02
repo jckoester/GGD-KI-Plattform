@@ -80,6 +80,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Aufzählung sind vollständig und gezählt; die thematische Auswahl bleibt ausdrücklich
   eine Empfehlung.
 
+- **Die Liste der Bausteinarten ist keine Betreiber-Konfiguration mehr.** Sie ist von
+  `config/taxonomy.yaml` nach `backend/app/context/taxonomy.yaml` gewandert und gehört
+  damit zum Anwendungsabbild. Das Backend prüft sie beim Start gegen den Datenbestand
+  und startet bei einer Abweichung nicht; `scripts/check_production.py` prüft den
+  datenbankfreien Teil vorab.
+
+  ⚠️ **Für Bestandsinstallationen:** Die alte `config/taxonomy.yaml` auf dem Host ist
+  nach dem Update wirkungslos und kann gelöscht werden. Der Start weist darauf hin,
+  solange sie da ist.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt
@@ -102,6 +112,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Die Fachzuordnung eines neuen Chats wirkte sich nicht auf die Suche aus.** Wer einen
   Chat über `#` einem Fach zuordnete und sofort suchte, bekam Treffer ohne Fachvorzug —
   die Zuordnung war erst nach der ersten Nachricht wirksam.
+
+- **Curriculum-Kapitel lassen sich als Wissensbereich eines Assistenten wählen.** Sie
+  waren im Assistenten-Editor nicht angeboten, während die Knotenliste sie als
+  Einstiegspunkt auswies; Unterrichtseinheiten war es umgekehrt.
 
 ## [0.7.0] – 2026-08-31
 

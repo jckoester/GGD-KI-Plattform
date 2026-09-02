@@ -149,6 +149,23 @@ def pruefe_produktion(
                 f"→ docs/runbooks/schuljahreswechsel.md",
             ))
 
+    # ── Knotentyp-Taxonomie (ADR-018) ────────────────────────────────────────
+    # Nur der datenbankfreie Teil — die Prüfung gegen den Bestand braucht eine
+    # Verbindung und läuft deshalb beim Start des Backends (`taxonomy_check.py`),
+    # nicht hier. Was hier auffällt, verhindert dort ohnehin den Start; diese Ausgabe
+    # nimmt den Befund nur vor.
+    from app.context.taxonomy_check import pruefe_altlast, pruefe_taxonomie
+
+    for satz in pruefe_taxonomie():
+        befunde.append(Befund(
+            ERROR,
+            f"Taxonomie (app/context/taxonomy.yaml ist Systemdatei, ADR-018): {satz}",
+        ))
+
+    altlast = pruefe_altlast()
+    if altlast:
+        befunde.append(Befund(WARNING, altlast))
+
     return befunde
 
 

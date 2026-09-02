@@ -1,6 +1,17 @@
 """Knoten-Taxonomie: valide category × content_type-Kombinationen und Lifecycle-Defaults.
 
-Lädt aus config/taxonomy.yaml als Single Source of Truth.
+Lädt aus `taxonomy.yaml` **neben dieser Datei** als Single Source of Truth.
+
+⚠️ **`taxonomy.yaml` ist eine Systemdatei, keine Betreiber-Konfiguration** (ADR-018,
+Nachtrag 02.09.2026). Sie lag bis dahin in `config/` — dort wird sie im Betrieb als
+ganzes Verzeichnis in den Container gemountet, war also die Datei auf dem Host und
+neben `auth.yaml` zum Bearbeiten eingeladen. Hier gehört sie zum Abbild und ist im
+Betrieb nicht mehr erreichbar.
+
+Ein Teil der Tabellen hier wird aus ihr abgeleitet und kann gar nicht abweichen; ein
+anderer Teil (`VALID_UNTIL_DEFAULTS_DAYS`, die Rollenboni) wird **von Hand** gepflegt
+und driftet lautlos, wenn ein Typ dazukommt oder verschwindet. Gegen genau diese Drift
+läuft beim Start `taxonomy_check.py`.
 """
 
 from datetime import date
@@ -9,9 +20,12 @@ from typing import Final
 import yaml
 import os
 
+# `TAXONOMY_PATH` bleibt als Override bestehen — Tests laden damit eine abgewandelte
+# Fassung. In `docker-compose.yml` steht die Variable bewusst **nicht** mehr: Ein
+# gemounteter Pfad wäre genau die Hintertür, die der Umzug schließt.
 _taxonomy_path = Path(
     os.environ.get("TAXONOMY_PATH")
-    or Path(__file__).resolve().parent.parent.parent.parent / "config" / "taxonomy.yaml"
+    or Path(__file__).resolve().parent / "taxonomy.yaml"
 )
 
 
@@ -48,6 +62,14 @@ CATEGORY_COLORS: Final[dict[str, str]] = {
     cat: info["color"]
     for cat, info in _data["categories"].items()
 }
+
+# Importierte Bildungsplan-/Curriculum-Typen — aus der freien /knowledge-Liste
+# ausgeschlossen (C2). Verwendet wird die Liste bislang nur im Frontend
+# (`generate_taxonomy.py` → `BP_CURRICULUM_CONTENT_TYPES`); hier steht sie, damit die
+# Startprüfung sie gegen die Typenliste halten kann.
+BP_CURRICULUM_CONTENT_TYPES: Final[tuple[str, ...]] = tuple(
+    _data.get("bp_curriculum_content_types") or ()
+)
 
 # Voreinstellung für valid_until-Offset in Tagen ab heute (None = permanent).
 VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {

@@ -480,6 +480,37 @@ Häufige Meldungen und ihre Bedeutung:
 
 ## Troubleshooting
 
+**Das Backend startet nicht: „Die Knotentyp-Taxonomie passt nicht zum System (ADR-018)"**
+Der Start bricht ab, und das Log nennt jede Abweichung einzeln — welcher Typ, welche
+Quelle. Die Meldung ist gewollt: Die Bausteinarten sind eine **Systemdatei** (siehe
+[Konfigurationsdateien](konfiguration.md#was-ist-betreiber-konfiguration-was-systemdatei)),
+und ohne diesen Abbruch liefe die Plattform mit Bausteinen weiter, für die sich keine
+Ansicht mehr zuständig fühlt. Praktisch bedeutet die Meldung fast immer: **Migration
+vergessen.** Steht dort „N Knoten tragen den content_type …, den die Taxonomie nicht
+(mehr) kennt", fehlt der Datenbankteil des Updates:
+
+```bash
+docker compose exec backend alembic upgrade head
+docker compose up -d backend
+```
+
+Vor einem Update lässt sich der datenbankfreie Teil vorab prüfen:
+
+```bash
+docker compose exec backend python scripts/check_production.py
+```
+
+**Beim Start steht „`…/config/taxonomy.yaml` ist eine Altlast und wird nicht gelesen"**
+Kein Fehler. Bis Version 0.7 lag die Liste der Bausteinarten als `config/taxonomy.yaml`
+auf dem Host; seit 0.8 gehört sie zum Anwendungsabbild
+(`backend/app/context/taxonomy.yaml`) und wird von dort gelesen. Die alte Datei auf dem
+Host wirkt nicht mehr — löschen Sie sie, sonst sieht sie bei der nächsten Fehlersuche
+aus wie eine gültige Einstellung:
+
+```bash
+rm config/taxonomy.yaml
+```
+
 **Ein Assistent sagt, im Wissensgraph sei nichts zu einem Thema — obwohl Bausteine
 vorhanden sind**
 Seit 09/2026 antwortet die Suche in getrennten Abschnitten mit Zählung (siehe

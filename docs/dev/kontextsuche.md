@@ -19,7 +19,7 @@ Eine Schicht, drei Verfahren, ein Ergebnisumschlag.
 | `filters.py` | **Eine** Übersetzung der Feldfilter (Fach, Typ, Stufe, Titel …) — genutzt von der Aufzählung *und* von `GET /context/nodes` |
 | `lookup.py` | Normalisierung von Titeln und Bildung des Nachschlage-Begriffs |
 | `retrieval.py` | Nur noch der **Lernstand** (`node_engagement`). Er ist Traversierung, keine Suche — die frühere zweite Vektorsuche für Anker-Assistenten ist in `search.py` aufgegangen |
-| `embedding.py` | Einbettung der Knoten (welche Typen, siehe `config/taxonomy.yaml`) |
+| `embedding.py` | Einbettung der Knoten (welche Typen, siehe `app/context/taxonomy.yaml`) |
 
 **Die drei Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
 verrechnet werden:
@@ -90,13 +90,13 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 
 | Ort | Wirkung |
 |---|---|
-| `config/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 30 von 45 Typen |
-| `config/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
+| `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 30 von 45 Typen |
+| `app/context/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
 | `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
 
 ⚠️ **Der Eigentümer-Bonus und die rollenbasierte Gewichtung hängen an derselben
-Vorbedingung.** `config/taxonomy.yaml` markiert 14 von 44 content_types mit
+Vorbedingung.** `app/context/taxonomy.yaml` markiert 14 von 45 content_types mit
 `embedding: true`, ausnahmslos Bildungsplan- und Strukturtypen. Nutzererzeugte Bausteine
 (Arbeitsblätter, Klausuren, Stundenentwürfe) können in der thematischen Auswahl deshalb
 gar nicht auftauchen — und ein Bonus auf etwas, das nie erscheint, tut nichts. Wer daran
