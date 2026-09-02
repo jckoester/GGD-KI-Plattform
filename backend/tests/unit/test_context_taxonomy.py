@@ -73,14 +73,20 @@ class TestGetValidUntilOffset:
     def test_schueler_artefakte_laufen_zum_schuljahresende_ab(self):
         """Seit 02.09.2026 kein Tages-Offset mehr, sondern Schuljahresende.
 
-        Die fünf Typen trugen vorher 42 Tage — ein aus **einem** ADR-013-Beispiel
+        Die Typen trugen vorher 42 Tage — ein aus **einem** ADR-013-Beispiel
         (`artifact.lernplan` → ~6 Wochen) verallgemeinerter Wert. Der Offset ist damit
         `None`; die Frist steht als `valid_until_default: schuljahresende` in der
-        Taxonomie.
+        Taxonomie. (`gliederung`/`mindmap` sind seit AP3 in `strukturierung` aufgegangen.)
         """
         from app.context.taxonomy import get_valid_until_schuljahresende
 
-        for ct in ["lernplan", "gliederung", "mindmap", "schuelertext", "feedback_text"]:
+        for ct in [
+            "lernplan",
+            "schuelertext",
+            "schuelerpraesentation",
+            "strukturierung",
+            "feedback_text",
+        ]:
             assert get_valid_until_offset(ct) is None, ct
             assert get_valid_until_schuljahresende(ct), ct
 

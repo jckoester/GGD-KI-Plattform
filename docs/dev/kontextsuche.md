@@ -90,7 +90,7 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 
 | Ort | Wirkung |
 |---|---|
-| `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 30 von 47 Typen |
+| `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 27 von 41 Typen |
 | `app/context/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
 | `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
@@ -100,7 +100,7 @@ Vorbedingung: Der Typ muss überhaupt ein Embedding tragen.** Ein Bonus auf etwa
 der thematischen Auswahl nie erscheint, tut nichts. Bis zur Embedding-Ausweitung
 (ADR-017) galt das für **alle** nutzererzeugten Bausteine — Arbeitsblätter, Klausuren und
 Stundenentwürfe waren dort strukturell unsichtbar, und die Gewichtung lief leer. Heute
-tragen 30 der 47 Typen ein Embedding; die 17 übrigen bleiben bewusst draußen und sind
+tragen 27 der 41 Typen ein Embedding; die 14 übrigen bleiben bewusst draußen und sind
 über Name und Aufzählung erreichbar. Wer daran etwas ändern will, ändert zuerst die
 Taxonomie und lässt den Embedding-Backfill laufen.
 

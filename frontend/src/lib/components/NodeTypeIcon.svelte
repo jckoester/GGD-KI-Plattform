@@ -24,7 +24,6 @@
         aufgabe: ClipboardList,
         themengebiet: Layers,
         bauteil: Cpu,
-        abstrakt: Lightbulb,
         begriff: BookMarked,
         methode: Presentation,
         sozialform: Users,

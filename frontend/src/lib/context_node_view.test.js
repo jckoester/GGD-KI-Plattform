@@ -66,10 +66,10 @@ describe('einordnung', () => {
 
     it('zeigt ohne Fach den Knotentyp — dort ist er die einzige Einordnung', () => {
         const e = einordnung(
-            kontextknotenAnsicht({ content_type: 'aufgabenblatt' }),
+            kontextknotenAnsicht({ content_type: 'arbeitsblatt' }),
             FAECHER,
         )
-        expect(e.label).toBe('Aufgabenblatt')
+        expect(e.label).toBe('Arbeitsblatt')
     })
 
     it('nennt den Knotentyp lesbar, nicht als Schlüssel', () => {

@@ -59,7 +59,7 @@ import { auswaehlbareTypen } from "$lib/knotentypen.js"
 /**
  * Typen, die zwar in denselben Kategorien liegen, aber kein Material sind.
  *
- * `unterrichtsstunde`/`unterrichtseinheit`/`reflexion` sind **Planungsobjekte** — eine
+ * `unterrichtsstunde`/`unterrichtseinheit` sind **Planungsobjekte** — eine
  * Unterrichtsstunde als „Material" einer Lernsequenz zu verlinken wäre begrifflich schief.
  * `schuelertext`/`schuelerpraesentation`/`feedback_text` sind personenbezogen und haben
  * im Curriculum nichts verloren, das dauerhaft und fachschaftsweit sichtbar ist.
@@ -71,7 +71,6 @@ import { auswaehlbareTypen } from "$lib/knotentypen.js"
 const KEIN_MATERIAL = new Set([
     "unterrichtsstunde",
     "unterrichtseinheit",
-    "reflexion",
     "schuelertext",
     "schuelerpraesentation",
     "feedback_text",

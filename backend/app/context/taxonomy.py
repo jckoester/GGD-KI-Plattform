@@ -76,7 +76,6 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # document
     "formatierungsvorlage": None,
     "vokabelliste": None,
-    "aufgabenblatt": None,
     "quelltext": None,
     "konvention": None,
     "methodenblatt": None,
@@ -105,7 +104,6 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # artifact — zeitlich begrenzte Inhalte
     "unterrichtseinheit": None,   # Lehrkraft setzt manuell
     "unterrichtsstunde": None,    # Lehrkraft setzt manuell
-    "reflexion": None,
     "arbeitsblatt": None,         # permanent wiederverwendbar
     "aufgabe": None,              # permanent wiederverwendbar
     "klausur": None,
@@ -116,8 +114,6 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # Bis 02.09.2026 standen hier 42 Tage; die Zahl war ein auf fünf Typen
     # verallgemeinertes Beispiel aus ADR-013 („artifact.lernplan → ~6 Wochen") und
     # nie begründet. Sie ist vorläufig — siehe Todo „valid_until-Defaults prüfen".
-    "gliederung": None,
-    "mindmap": None,
     "lernplan": None,
     "schuelertext": None,
     "schuelerpraesentation": None,
@@ -126,8 +122,6 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     # concept
     "funktion": None,
     "bauteil": None,
-    "operator_math": None,
-    "abstrakt": None,
     "begriff": None,
 }
 # ⚠️ **Diese Liste wird von Hand gepflegt und deckt jeden content_type ab.** Ein
@@ -337,7 +331,6 @@ _SCHUELER_BONUS: Final[dict[str, float]] = {
     "operatorenblatt": 0.03,
     "lerntext": 0.03,
     "arbeitsblatt": 0.02,
-    "aufgabenblatt": 0.02,
     "aufgabe": 0.02,
     "begriff": 0.02,
 }
@@ -349,7 +342,6 @@ _LEHRKRAFT_BONUS: Final[dict[str, float]] = {
     "klausur": 0.03,
     "pruefungsanforderung": 0.03,
     "methode": 0.02,
-    "reflexion": 0.02,
 }
 
 ROLLEN_TYP_BONUS: Final[dict[str, dict[str, float]]] = {

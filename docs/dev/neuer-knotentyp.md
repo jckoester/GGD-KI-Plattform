@@ -59,7 +59,7 @@ Inhalt:
 |---|---|
 | `document` | Ein Dokument, das jemand bereitstellt (Vorlage, Blatt, Quelltext) |
 | `knowledge` | Curricular Gesetztes: Bildungsplan, Curriculum, Methode, Operator |
-| `artifact` | Etwas Hergestelltes: Arbeitsblatt, Klausur, Stundenentwurf, Reflexion |
+| `artifact` | Etwas Hergestelltes: Arbeitsblatt, Klausur, Stundenentwurf, Lernplan |
 | `concept` | Ein Begriff oder Baustein einer Sache (Funktion, Bauteil, Fachbegriff) |
 
 Die Kategorie ist das **einzige** Feld mit DB-Constraint
@@ -81,7 +81,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 09/2026: 30 von 47 Typen mit Embedding.
+`taxonomy.yaml`. Stand 09/2026: 27 von 41 Typen mit Embedding.
 
 ### 3. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -172,7 +172,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 ### 10. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
-  deckt heute alle 47 Typen ab, das soll so bleiben). Bei importierten
+  deckt heute alle 41 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
 - `frontend/src/lib/components/NodeTypeIcon.svelte` — Symbol. Ohne Eintrag erscheint das
@@ -245,7 +245,6 @@ flowchart LR
     jahresplan[jahresplan]:::plain
     ue["unterrichtseinheit ◆"]:::emb
     stunde["unterrichtsstunde ◆"]:::emb
-    reflexion["reflexion ◆"]:::emb
   end
 
   subgraph MAT["Material (document/artifact)"]
@@ -263,16 +262,16 @@ flowchart LR
     themengebiet["themengebiet ◆"]:::emb
     funktion["funktion ◆"]:::emb
     bauteil["bauteil ◆"]:::emb
-    abstrakt["abstrakt ◆"]:::emb
     begriff["begriff ◆"]:::emb
     code["code_beispiel ◆"]:::emb
   end
 
-  subgraph SUS["Schüler-Artefakte (private)"]
+  subgraph SUS["Schüler-Artefakte (private, alle ruhend bis 0.9)"]
     schuelertext[schuelertext]:::plain
     feedback[feedback_text]:::plain
     lernplan[lernplan]:::plain
-    gliederung[gliederung]:::plain
+    strukturierung[strukturierung]:::plain
+    schuelerpraesentation[schuelerpraesentation]:::plain
   end
 
   %% Bildungsplan-Hierarchie (scripts/import_bildungsplan.py)
@@ -295,7 +294,6 @@ flowchart LR
   ue -->|references| kapitel
   stunde -->|part_of| ue
   stunde -->|follows| stunde
-  reflexion -.->|reflects_on| stunde
 
   %% Material (Konvention; Erzeuger folgen mit Material-Werkstatt/manuellem Verknüpfen)
   lerntext -.->|derived_from| quelltext
@@ -312,7 +310,6 @@ flowchart LR
   %% Werkstatt (Konvention aus ADR-013, Arduino-Beispiel)
   funktion -.->|part_of| themengebiet
   bauteil -.->|part_of| themengebiet
-  abstrakt -.->|part_of| themengebiet
   begriff -.->|part_of| themengebiet
   begriff -.->|related_to| begriff
   bauteil -.->|used_with| funktion
@@ -321,16 +318,16 @@ flowchart LR
   %% Schüler-Artefakte (Konvention)
   feedback -.->|references| schuelertext
   lernplan -.->|derived_from| aufgabe
-  gliederung -.->|references| ik
+  strukturierung -.->|references| ik
 ```
 
 ### Nicht im Graphen
 
 - **Typen ohne typische Kanten** — sie werden angeheftet oder gefunden, aber (noch) nicht
-  verknüpft: `formatierungsvorlage`, `vokabelliste`, `aufgabenblatt` ◆, `praesentation` ◆,
-  `konvention` ◆, `sozialform`, `pruefungsanforderung` ◆, `operator_math`, `mindmap`. Wer
-  einem von ihnen Kanten gibt, trägt ihn in den Graphen ein. (Vier davon tragen ein
-  Embedding — auffindbar sind sie also, nur nicht verknüpft.)
+  verknüpft: `formatierungsvorlage`, `vokabelliste`, `praesentation` ◆, `konvention` ◆,
+  `sozialform`, `pruefungsanforderung` ◆. Wer einem von ihnen Kanten gibt, trägt ihn in
+  den Graphen ein. (Drei davon tragen ein Embedding — auffindbar sind sie also, nur nicht
+  verknüpft.)
 - **`supersedes`** verbindet Fassungen **desselben** Typs (Bildungsplan-Editionen) und ist
   deshalb keine Typ-zu-Typ-Kante.
 - **`requires`** (kuratierte didaktische Voraussetzung, Kompetenz → Kompetenz) hat laut
@@ -341,14 +338,16 @@ flowchart LR
 
 ### Stand der Prüfung
 
-Gegen den Code geprüft am 01.09.2026 (Vorlage: Entwurf vom 31.08.2026). Drei Korrekturen
-gegenüber dem Entwurf, alle in dieselbe Richtung — im Zweifel war eine Kante als „im Code
-erzeugt" gezeichnet, obwohl sie Konvention ist:
+Gegen den Code geprüft am 01.09.2026 (Vorlage: Entwurf vom 31.08.2026), nachgezogen am
+02.09.2026 auf die Bereinigung V1–V5 (41 Typen). Drei Korrekturen gegenüber dem Entwurf,
+alle in dieselbe Richtung — im Zweifel war eine Kante als „im Code erzeugt" gezeichnet,
+obwohl sie Konvention ist:
 
-- `reflexion --reflects_on--> stunde` ist **gestrichelt**: Es gibt keinen Erzeuger, und es
-  gibt auch keine `reflexion`-Knoten — die Nachbereitung liegt als Metadatum an der Stunde
-  (`planning/review_service.py`), nicht als eigener Knoten. Der Typ existiert in der
-  Taxonomie und trägt ein Embedding; erzeugt wird er von nichts.
+- `reflexion --reflects_on--> stunde` war **gestrichelt**: Es gab keinen Erzeuger und
+  keine `reflexion`-Knoten — die Nachbereitung liegt als Metadatum an der Stunde
+  (`planning/review_service.py`). **Der Typ ist mit AP3 entfallen** (V3), die Kante mit
+  ihm; `metadata.reflexion` steht seither im `embedding_input` der Stunde, damit „Was
+  habe ich mir zu X notiert?" beantwortbar bleibt.
 - `ik --related_to--> ik` ist **durchgezogen**: Der Bildungsplan-Import legt die Kante an
   (`scripts/import_bildungsplan.py`, Vorgabe-Relation für Querverweise).
 - Die `part_of`-Kanten des Werkstatt-Teilgraphen sind **gestrichelt**: `themengebiet`

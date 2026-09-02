@@ -47,17 +47,19 @@ def make_node():
 EXPECTED_EMBEDDING_TYPES = frozenset({
     # Bildungsplan und Struktur (Bestand bis 09/2026)
     'ik_kompetenz', 'pk_kompetenz', 'pk_gruppe', 'leitidee', 'leitperspektive_aspekt',
-    'kapitel', 'themengebiet', 'funktion', 'bauteil', 'abstrakt', 'konvention',
+    'kapitel', 'themengebiet', 'funktion', 'bauteil', 'konvention',
     'operator',
     # LFDB (aus PDF): Themenblock + Kompetenz sind inhaltstragend; Baustein ist Container.
     'lfdb_themenblock', 'lfdb_kompetenz',
     # Nutzererzeugte Inhalte. Ohne sie konnte thematisch nur der Bildungsplan gefunden
     # werden — und jede Gewichtung nach Rolle lief ins Leere, weil die gewichteten Typen
     # in der Ähnlichkeitssuche gar nicht vorkamen.
-    'aufgabenblatt', 'quelltext', 'methodenblatt', 'operatorenblatt', 'praesentation',
+    'quelltext', 'methodenblatt', 'operatorenblatt', 'praesentation',
     'methode', 'pruefungsanforderung', 'unterrichtsstunde', 'unterrichtseinheit',
-    'reflexion', 'arbeitsblatt', 'aufgabe', 'klausur', 'code_beispiel', 'lerntext',
-    # Fachbegriffe mit Definition (neuer Typ, ADR-017-Nachtrag).
+    'arbeitsblatt', 'aufgabe', 'klausur', 'code_beispiel', 'lerntext',
+    # Fachbegriffe mit Definition. `abstrakt` ist mit AP3 hierin aufgegangen (V5),
+    # `aufgabenblatt` in `arbeitsblatt` (V1), `reflexion` in `metadata.reflexion` der
+    # Stunde (V3) — deshalb stehen die drei hier nicht mehr.
     'begriff',
 })
 
@@ -119,6 +121,42 @@ class TestEmbeddingDerivation:
 
     def test_enrichment_count(self):
         assert len(EMBEDDING_ENRICHMENT) == 5
+
+
+class TestReflexionImStundenvektor:
+    """V3-Folge (AP3): Der Typ `reflexion` ist entfallen, die Notiz lebt an der Stunde.
+
+    ⚠️ **Sie musste in `embedding_input`, nicht in `embedding_enrichment`.** Wo eine
+    Input-Liste gesetzt ist — und die Stunde hat eine —, ersetzt sie den Standardaufbau,
+    und `EMBEDDING_ENRICHMENT` wird gar nicht erst gelesen (`_build_embedding_input`).
+    Ein Eintrag dort wäre wirkungslos gewesen, ohne Fehlermeldung: genau die stumme
+    Falle, gegen die dieser Test steht.
+    """
+
+    def _stunde(self, make_node, **meta):
+        return make_node(
+            "artifact", "unterrichtsstunde",
+            content="Einstieg, Erarbeitung, Sicherung",
+            metadata={"refs": [{"titel": "Kernbausteine benennen"}], **meta},
+            title="Bindungsenergie im Atomkern",
+        )
+
+    def test_reflexion_landet_im_vektor(self, make_node):
+        notiz = "Die Rechnung mit dem Massendefekt hat zu lange gedauert."
+        eingabe = _build_embedding_input(self._stunde(make_node, reflexion=notiz))
+        assert notiz in eingabe
+
+    def test_ohne_reflexion_bleibt_der_input_unveraendert(self, make_node):
+        """Der Grund, warum die Migration nur Stunden **mit** Reflexion neu einbettet:
+        Bei den übrigen fällt die leere Quelle heraus, der Input ist Zeichen für Zeichen
+        derselbe — ein Re-Embedding wäre ein bezahlter Modellaufruf ohne Wirkung."""
+        assert _build_embedding_input(self._stunde(make_node)) == (
+            "Bindungsenergie im Atomkern\nKernbausteine benennen"
+        )
+
+    def test_verlaufsplan_bleibt_auch_mit_reflexion_draussen(self, make_node):
+        eingabe = _build_embedding_input(self._stunde(make_node, reflexion="Notiz"))
+        assert "Erarbeitung" not in eingabe
 
 
 # ── Taxonomie-Tests ─────────────────────────────────────────────────────────

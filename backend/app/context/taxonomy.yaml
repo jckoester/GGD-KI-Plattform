@@ -40,7 +40,7 @@
 # Das heißt: Ein neuer Typ in einer dieser drei Kategorien ist **sofort als Material
 # auswählbar**, ohne dass jemand etwas dafür tut. Gewollt für Arbeitsblätter, Aufgaben
 # und dergleichen — nicht gewollt für
-#   * Planungsobjekte (wie unterrichtsstunde, unterrichtseinheit, reflexion) und
+#   * Planungsobjekte (wie unterrichtsstunde, unterrichtseinheit) und
 #   * personenbezogene Inhalte (wie schuelertext, feedback_text).
 # Solche Typen gehören in KEIN_MATERIAL in `material.js`, sonst tauchen sie in der
 # Material-Suche von Lehrkräften auf.
@@ -64,11 +64,6 @@ categories:
       - key: vokabelliste
         label_de: "Vokabelliste"
         scope_defaults: {read_scope: group,    write_scope: private }
-      - key: aufgabenblatt
-        label_de: "Aufgabenblatt"
-        scope_defaults: {read_scope: group,    write_scope: private }
-        # „Gibt es schon ein Blatt zu Brüchen?“ — der Musterfall für Material.
-        embedding: true
       - key: quelltext
         label_de: "Quelltext"
         scope_defaults: {read_scope: group,    write_scope: private }
@@ -204,8 +199,15 @@ categories:
         scope_anchor: true
         valid_until_default: schuljahresende
         # Thema, nicht Ablauf: Verlaufsplan (`phasen`) bleibt draußen.
+        #
+        # `metadata.reflexion` ist seit AP3 dabei (V3): Der eigene Typ `reflexion` ist
+        # entfallen, die Notiz lebt am Stunden-Knoten. Sie gehört in den Vektor, sonst
+        # bleibt „Was habe ich mir zu X notiert?“ unbeantwortbar.
+        # ⚠️ Sie muss in **embedding_input** stehen, nicht in `embedding_enrichment`:
+        # Wo eine Input-Liste gesetzt ist, ersetzt sie den Standardaufbau, und die
+        # Anreicherung wird gar nicht erst gelesen (`_build_embedding_input`).
         embedding: true
-        embedding_input: ["title", "metadata.refs[].titel"]
+        embedding_input: ["title", "metadata.refs[].titel", "metadata.reflexion"]
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         scope_defaults: {read_scope: private,  write_scope: private }
@@ -218,11 +220,6 @@ categories:
         # Thema, nicht Ablauf — wie die Stunde.
         embedding: true
         embedding_input: ["title", "metadata.refs[].titel"]
-      - key: reflexion
-        label_de: "Reflexion"
-        scope_defaults: {read_scope: private,  write_scope: private }
-        # „Was habe ich mir zu X notiert?“ — privat, aber thematisch.
-        embedding: true
       - key: arbeitsblatt
         label_de: "Arbeitsblatt"
         scope_defaults: {read_scope: group,    write_scope: private }
@@ -254,18 +251,6 @@ categories:
       # Auswahlliste. Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei
       # Stunde und Einheit; die früheren 42 Tage waren ein verallgemeinertes
       # Beispiel aus ADR-013 und nie begründet (Todo: Defaults prüfen).
-      # gliederung/mindmap sind durch `strukturierung` abgelöst (V2) und werden in
-      # AP3 entfernt; bis dahin ruhend, damit sie in keiner Auswahl mehr auftauchen.
-      - key: gliederung
-        label_de: "Gliederung"
-        scope_defaults: {read_scope: private,  write_scope: private }
-        valid_until_default: schuljahresende
-        ui_status: ruhend
-      - key: mindmap
-        label_de: "Mindmap"
-        scope_defaults: {read_scope: private,  write_scope: private }
-        valid_until_default: schuljahresende
-        ui_status: ruhend
       - key: lernplan
         label_de: "Lernplan"
         scope_defaults: {read_scope: private,  write_scope: private }
@@ -316,13 +301,6 @@ categories:
         scope_defaults: {read_scope: school,   write_scope: subject }
         embedding: true
         embedding_enrichment: ["metadata.schaltzeichen.beschreibung"]
-      - key: operator_math
-        label_de: "Mathematischer Operator"
-        scope_defaults: {read_scope: school,   write_scope: school  }
-      - key: abstrakt
-        label_de: "Abstraktes Konzept"
-        scope_defaults: {read_scope: school,   write_scope: school  }
-        embedding: true
       # Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der Normalfall
       # („Energie" in Physik ≠ Biologie ≠ Ethik) — genau der Fall, den Identifikation
       # und Aufzählung tragen. Die Fachschaft pflegt, alle lesen.

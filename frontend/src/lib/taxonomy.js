@@ -7,7 +7,6 @@ export const CONTENT_TYPES = {
   "document": [
     "formatierungsvorlage",
     "vokabelliste",
-    "aufgabenblatt",
     "quelltext",
     "konvention",
     "methodenblatt",
@@ -38,14 +37,11 @@ export const CONTENT_TYPES = {
   "artifact": [
     "unterrichtsstunde",
     "unterrichtseinheit",
-    "reflexion",
     "arbeitsblatt",
     "aufgabe",
     "klausur",
     "code_beispiel",
     "lerntext",
-    "gliederung",
-    "mindmap",
     "lernplan",
     "schuelertext",
     "schuelerpraesentation",
@@ -55,8 +51,6 @@ export const CONTENT_TYPES = {
   "concept": [
     "funktion",
     "bauteil",
-    "operator_math",
-    "abstrakt",
     "begriff"
   ]
 }
@@ -96,8 +90,6 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
 export const RUHENDE_CONTENT_TYPES = new Set([
   "pruefungsanforderung",
-  "gliederung",
-  "mindmap",
   "lernplan",
   "schuelertext",
   "schuelerpraesentation",
@@ -122,7 +114,6 @@ export const CATEGORY_COLORS = {
 export const CONTENT_TYPE_LABELS = {
   "formatierungsvorlage": "Formatierungsvorlage",
   "vokabelliste": "Vokabelliste",
-  "aufgabenblatt": "Aufgabenblatt",
   "quelltext": "Quelltext",
   "konvention": "Konvention",
   "methodenblatt": "Methodenblatt",
@@ -149,14 +140,11 @@ export const CONTENT_TYPE_LABELS = {
   "pruefungsanforderung": "Prüfungsanforderung",
   "unterrichtsstunde": "Unterrichtsstunde",
   "unterrichtseinheit": "Unterrichtseinheit",
-  "reflexion": "Reflexion",
   "arbeitsblatt": "Arbeitsblatt",
   "aufgabe": "Aufgabe",
   "klausur": "Klausur",
   "code_beispiel": "Code-Beispiel",
   "lerntext": "Lerntext",
-  "gliederung": "Gliederung",
-  "mindmap": "Mindmap",
   "lernplan": "Lernplan",
   "schuelertext": "Schülertext",
   "schuelerpraesentation": "Schülerpräsentation",
@@ -164,8 +152,6 @@ export const CONTENT_TYPE_LABELS = {
   "feedback_text": "Feedback-Text",
   "funktion": "Funktion",
   "bauteil": "Bauteil",
-  "operator_math": "Mathematischer Operator",
-  "abstrakt": "Abstraktes Konzept",
   "begriff": "Fachbegriff"
 }
 
@@ -175,10 +161,6 @@ export const SCOPE_DEFAULTS = {
     "school"
   ],
   "vokabelliste": [
-    "group",
-    "private"
-  ],
-  "aufgabenblatt": [
     "group",
     "private"
   ],
@@ -286,10 +268,6 @@ export const SCOPE_DEFAULTS = {
     "private",
     "private"
   ],
-  "reflexion": [
-    "private",
-    "private"
-  ],
   "arbeitsblatt": [
     "group",
     "private"
@@ -308,14 +286,6 @@ export const SCOPE_DEFAULTS = {
   ],
   "lerntext": [
     "school",
-    "private"
-  ],
-  "gliederung": [
-    "private",
-    "private"
-  ],
-  "mindmap": [
-    "private",
     "private"
   ],
   "lernplan": [
@@ -345,14 +315,6 @@ export const SCOPE_DEFAULTS = {
   "bauteil": [
     "school",
     "subject"
-  ],
-  "operator_math": [
-    "school",
-    "school"
-  ],
-  "abstrakt": [
-    "school",
-    "school"
   ],
   "begriff": [
     "school",

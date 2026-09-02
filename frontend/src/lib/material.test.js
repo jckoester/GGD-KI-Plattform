@@ -49,7 +49,9 @@ describe('MATERIAL_CONTENT_TYPES', () => {
   // was drin sein soll.
 
   it('enthält die typischen Unterrichtsmaterialien', () => {
-    for (const typ of ['arbeitsblatt', 'aufgabe', 'aufgabenblatt', 'praesentation',
+    // `aufgabenblatt` ist mit AP3 in `arbeitsblatt` aufgegangen (V1) — beide waren
+    // Material, die Liste ändert sich dadurch inhaltlich nicht.
+    for (const typ of ['arbeitsblatt', 'aufgabe', 'praesentation',
                        'methodenblatt', 'klausur', 'lerntext', 'vokabelliste']) {
       expect(MATERIAL_CONTENT_TYPES).toContain(typ)
     }
@@ -65,7 +67,7 @@ describe('MATERIAL_CONTENT_TYPES', () => {
   it('enthält keine Planungsobjekte', () => {
     // Eine Unterrichtsstunde als „Material" einer Lernsequenz zu verlinken wäre
     // begrifflich schief — sie ist das Ergebnis der Planung, nicht ihr Zubehör.
-    for (const typ of ['unterrichtsstunde', 'unterrichtseinheit', 'reflexion']) {
+    for (const typ of ['unterrichtsstunde', 'unterrichtseinheit']) {
       expect(MATERIAL_CONTENT_TYPES).not.toContain(typ)
     }
   })

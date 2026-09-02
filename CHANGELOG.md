@@ -108,7 +108,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Zwei neue Bausteinarten vorbereitet:** Schülerpräsentation und Gliederung/Mindmap.
   Beide ruhen noch — sie werden mit der Chat-Übernahme in 0.9 nutzbar.
 
+- **Sechs Bausteinarten sind in vier anderen aufgegangen** (41 statt 47):
+  *Aufgabenblatt* → **Arbeitsblatt**, *Gliederung* und *Mindmap* →
+  **Gliederung/Mindmap**, *Mathematischer Operator* und *Abstraktes Konzept* →
+  **Fachbegriff**, *Reflexion* entfällt. Bestehende Bausteine werden von der Migration
+  umgestellt und bleiben mit Inhalt, Verknüpfungen und Verlaufsdaten erhalten.
+
+- **Die Nachbereitung einer Stunde ist jetzt thematisch auffindbar.** „Was habe ich mir
+  zu Bindungsenergie notiert?" findet die Stunde über ihre Reflexion.
+
 ### Migration
+
+- **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss
+  **zusammen mit** diesem Release eingespielt werden: Das Backend startet nicht, solange
+  Bausteine eine Art tragen, die es nicht mehr gibt. `alembic upgrade head` wie gewohnt.
+
+  Stunden mit Nachbereitung werden zum Neu-Einbetten vorgemerkt; der nächtliche
+  Embedding-Lauf holt sie ab.
 
 - **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt
   die PostgreSQL-Erweiterung `pg_trgm` an; bei einer verwalteten Datenbank ohne
