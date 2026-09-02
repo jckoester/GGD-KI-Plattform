@@ -111,11 +111,18 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "klausur": None,
     "code_beispiel": None,
     "lerntext": None,
-    "gliederung": 42,             # ~6 Wochen
-    "mindmap": 42,
-    "lernplan": 42,
-    "schuelertext": 42,
-    "feedback_text": 42,
+    # Schüler-Artefakte: kein Tages-Offset, sondern `valid_until_default:
+    # schuljahresende` in der YAML — dieselbe Grenze wie bei Stunde und Einheit.
+    # Bis 02.09.2026 standen hier 42 Tage; die Zahl war ein auf fünf Typen
+    # verallgemeinertes Beispiel aus ADR-013 („artifact.lernplan → ~6 Wochen") und
+    # nie begründet. Sie ist vorläufig — siehe Todo „valid_until-Defaults prüfen".
+    "gliederung": None,
+    "mindmap": None,
+    "lernplan": None,
+    "schuelertext": None,
+    "schuelerpraesentation": None,
+    "strukturierung": None,
+    "feedback_text": None,
     # concept
     "funktion": None,
     "bauteil": None,
@@ -175,6 +182,35 @@ def get_scope_defaults(content_type: str | None) -> tuple[str, str]:
     if content_type is None:
         return ("school", "private")
     return SCOPE_DEFAULTS.get(content_type, ("school", "private"))
+
+
+# ── ui_status (ADR-019 F6) ───────────────────────────────────────────────────
+#
+# `ruhend` heißt: Der Typ erscheint in **keiner** Auswahl — kein Formular, kein Filter,
+# keine Such-Facette, keine Material-Liste. Vorhandene Knoten bleiben les-, such- und
+# traversierbar; die Schnittstelle nimmt sie weiterhin an. Es ist eine Aussage über die
+# Oberfläche, keine Rechteprüfung.
+#
+# Warum es das braucht: Mehrere Typen stehen seit dem ersten Entwurf in der Taxonomie,
+# ohne dass es einen Weg gäbe, so einen Knoten anzulegen. In einer Auswahlliste sind sie
+# ein Versprechen, das die Anwendung nicht einlöst. Der Wechsel `ruhend → aktiv` gehört
+# zu dem Arbeitspaket, das den Erzeugungsweg baut, und wird in der YAML begründet.
+UI_STATUS: Final[dict[str, str]] = {
+    ct["key"]: ct.get("ui_status", "aktiv")
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+}
+
+GUELTIGE_UI_STATUS: Final[frozenset[str]] = frozenset({"aktiv", "ruhend"})
+
+RUHENDE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    key for key, status in UI_STATUS.items() if status == "ruhend"
+)
+
+
+def ist_ruhend(content_type: str | None) -> bool:
+    """True, wenn der Typ in keiner Auswahlfläche erscheinen soll."""
+    return content_type in RUHENDE_CONTENT_TYPES
 
 
 # content_types mit valid_until_default: schuljahresende — Lifecycle endet am Schuljahresende

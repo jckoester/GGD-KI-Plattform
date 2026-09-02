@@ -517,7 +517,7 @@ Seit 09/2026 antwortet die Suche in getrennten Abschnitten mit Zählung (siehe
 [Kontextspeicher](../user/kontext.md)): Namensträger und Aufzählung sind vollständig, die
 thematische Auswahl ist es ausdrücklich nie. Bleibt ein Baustein trotzdem ungenannt,
 lohnen zwei Fragen: Hat das Modell **thematisch** gesucht, wo eine Aufzählung nötig
-gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 15 der 45 Typen sind
+gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 17 der 47 Typen sind
 bewusst nur über Name und Aufzählung erreichbar
 ([neuer-knotentyp.md](../dev/neuer-knotentyp.md)).
 

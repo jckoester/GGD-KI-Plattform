@@ -48,6 +48,8 @@ export const CONTENT_TYPES = {
     "mindmap",
     "lernplan",
     "schuelertext",
+    "schuelerpraesentation",
+    "strukturierung",
     "feedback_text"
   ],
   "concept": [
@@ -88,6 +90,20 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
   "kapitel",
   "lernsequenz"
 ]
+
+// Typen mit `ui_status: ruhend` — erscheinen in keiner Auswahl, keinem Filter und
+// keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;
+// zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
+export const RUHENDE_CONTENT_TYPES = new Set([
+  "pruefungsanforderung",
+  "gliederung",
+  "mindmap",
+  "lernplan",
+  "schuelertext",
+  "schuelerpraesentation",
+  "strukturierung",
+  "feedback_text"
+])
 
 export const CATEGORY_LABELS = {
   "document": "Dokument",
@@ -143,6 +159,8 @@ export const CONTENT_TYPE_LABELS = {
   "mindmap": "Mindmap",
   "lernplan": "Lernplan",
   "schuelertext": "Schülertext",
+  "schuelerpraesentation": "Schülerpräsentation",
+  "strukturierung": "Gliederung/Mindmap",
   "feedback_text": "Feedback-Text",
   "funktion": "Funktion",
   "bauteil": "Bauteil",
@@ -170,7 +188,7 @@ export const SCOPE_DEFAULTS = {
   ],
   "konvention": [
     "school",
-    "school"
+    "subject"
   ],
   "methodenblatt": [
     "school",
@@ -181,8 +199,8 @@ export const SCOPE_DEFAULTS = {
     "subject"
   ],
   "praesentation": [
-    "school",
-    "subject"
+    "group",
+    "private"
   ],
   "fachplan": [
     "global",
@@ -190,7 +208,7 @@ export const SCOPE_DEFAULTS = {
   ],
   "themengebiet": [
     "school",
-    "school"
+    "subject"
   ],
   "leitidee": [
     "global",
@@ -246,7 +264,7 @@ export const SCOPE_DEFAULTS = {
   ],
   "sozialform": [
     "school",
-    "subject"
+    "school"
   ],
   "operator": [
     "global",
@@ -258,7 +276,7 @@ export const SCOPE_DEFAULTS = {
   ],
   "pruefungsanforderung": [
     "school",
-    "school"
+    "subject"
   ],
   "unterrichtsstunde": [
     "private",
@@ -308,17 +326,25 @@ export const SCOPE_DEFAULTS = {
     "private",
     "private"
   ],
+  "schuelerpraesentation": [
+    "private",
+    "private"
+  ],
+  "strukturierung": [
+    "private",
+    "private"
+  ],
   "feedback_text": [
     "private",
     "private"
   ],
   "funktion": [
     "school",
-    "school"
+    "subject"
   ],
   "bauteil": [
     "school",
-    "school"
+    "subject"
   ],
   "operator_math": [
     "school",

@@ -128,9 +128,11 @@ class TestTaxonomyThemengebiet:
         validate_content_type("knowledge", "themengebiet")  # darf nicht werfen
 
     def test_themengebiet_scope_default(self):
+        """Seit AP2 (02.09.2026) pflegt die Fachschaft die Wurzeln, nicht der Admin —
+        lesbar bleibt es schulweit (ADR-019 K3)."""
         read, write = get_scope_defaults("themengebiet")
         assert read == "school"
-        assert write == "school"
+        assert write == "subject"
 
 
 # ── Embedding Enrichment Config ──────────────────────────────────────────────

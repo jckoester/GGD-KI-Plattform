@@ -81,7 +81,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 09/2026: 30 von 45 Typen mit Embedding.
+`taxonomy.yaml`. Stand 09/2026: 30 von 47 Typen mit Embedding.
 
 ### 3. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -116,14 +116,40 @@ Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`.
 wenn der Wert `None` lautet** (siehe Falle 1 oben). Läuft der Typ zum Schuljahresende ab,
 gehört er zusätzlich in `valid_until_default: schuljahresende` in der `taxonomy.yaml`.
 
-### 6. Rollen-Gewichtung
+**Beides zugleich geht nicht.** Ein Tages-Offset *und* Schuljahresende an demselben Typ
+wäre eine Frage der Aufrufreihenfolge, und die steht nirgends geschrieben — die
+Startprüfung weist es ab. Stand 09/2026 trägt **kein** Typ einen Tages-Offset; wer den
+ersten einführt, begründet ihn (die früheren 42 Tage waren ein verallgemeinertes Beispiel
+aus ADR-013 und nie abgestimmt).
+
+### 6. `ui_status`: erscheint der Typ in Auswahlflächen?
+
+`ui_status: aktiv | ruhend` in der `taxonomy.yaml` (fehlt das Feld, gilt `aktiv`).
+
+**`ruhend` heißt: kein Formular, kein Filter, keine Such-Facette, keine Material-Liste.**
+Vorhandene Knoten bleiben les-, such- und traversierbar, und die Schnittstelle nimmt sie
+weiterhin an — es ist eine Aussage über die Oberfläche, keine Rechteprüfung (die steht in
+`visibility.py`).
+
+Die Frage dahinter ist einfach: **Gibt es einen Weg, so einen Knoten anzulegen?** Wenn
+nein, gehört der Typ nicht in eine Auswahlliste — dort wäre er ein Versprechen, das die
+Anwendung nicht einlöst. Der Wechsel `ruhend → aktiv` gehört in dasselbe Arbeitspaket wie
+der Erzeugungsweg und bekommt eine Einzeiler-Begründung in der YAML.
+
+Im Frontend filtern die Helfer in `frontend/src/lib/knotentypen.js` — **nicht**
+`RUHENDE_CONTENT_TYPES` direkt verwenden. Sie kennen die Ausnahme, die man sonst
+übersieht: Im Editor eines bestehenden Knotens bleibt **sein eigener Typ wählbar**, auch
+wenn er ruht. Sonst stünde dort ein leeres Auswahlfeld, und das Speichern schriebe
+stillschweigend etwas anderes.
+
+### 7. Rollen-Gewichtung
 
 `_SCHUELER_BONUS` / `_LEHRKRAFT_BONUS` in `backend/app/context/taxonomy.py`. Ein
 **Vorzug, kein Filter**, und klein (≤ 0,05). Bildungsplan-Typen bleiben neutral (0), damit
 der Prüfsatz auf reinem BP-Bestand vergleichbar bleibt. Kein Eintrag heißt neutral — das
 ist ein zulässiges Ergebnis, aber eine bewusste Entscheidung.
 
-### 7. Kanten festlegen
+### 8. Kanten festlegen
 
 Mit welchen Typen steht der neue in Beziehung, über welche Relation? Der
 [Netzwerkgraph](#netzwerkgraph-der-kontexttypen) unten zeigt den Bestand — **er ist
@@ -133,7 +159,7 @@ Eine **neue Relation** (nicht bloß eine neue Kante zwischen bestehenden Typen) 
 sehr wohl eine Migration: Sie ist per CHECK gebunden
 (`check_context_edges_relation`, `app/db/models.py`).
 
-### 8. Migration — was wirklich nötig ist
+### 9. Migration — was wirklich nötig ist
 
 | Änderung | Migration? |
 |---|---|
@@ -143,28 +169,28 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 | neuer Index | ja, wenn eine Abfrage ihn braucht |
 | Backfill der Embeddings | kein Schema, aber ein Lauf (`scripts/`) |
 
-### 9. Oberfläche
+### 10. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
-  deckt heute alle 45 Typen ab, das soll so bleiben). Bei importierten
+  deckt heute alle 47 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
 - `frontend/src/lib/components/NodeTypeIcon.svelte` — Symbol. Ohne Eintrag erscheint das
   Kategorie-Symbol; das ist zulässig, aber meist nicht gewollt.
 
-### 10. Werkzeuge
+### 11. Werkzeuge
 
 Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/router.py`,
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 11. Prüfsatz
+### 12. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 12. Dokumentation
+### 13. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.

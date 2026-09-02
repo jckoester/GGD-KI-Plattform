@@ -30,7 +30,7 @@
     // Dieselben Abschnittstitel wie im Vorschlagsfenster des Chats: Derselbe Umschlag
     // darf an zwei Stellen nicht verschieden heißen.
     import { ABSCHNITT_TITEL } from "$lib/umschlag.js";
-    import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
+    import { auswaehlbareTypLabels } from "$lib/knotentypen.js";
     import { STUDENT_GRADES } from "$lib/grades.js";
     import { activeConversationId, pageTitle } from "$lib/stores/pageTitle.js";
     import { subjects } from "$lib/stores/subjects.js";
@@ -262,7 +262,7 @@
                                bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
                     >
                         <option value="">Alle Bausteinarten</option>
-                        {#each Object.entries(CONTENT_TYPE_LABELS) as [wert, label]}
+                        {#each auswaehlbareTypLabels(typ) as [wert, label]}
                             <option value={wert}>{label}</option>
                         {/each}
                     </select>

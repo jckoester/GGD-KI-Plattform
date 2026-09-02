@@ -7,6 +7,7 @@
         CONTENT_TYPE_LABELS,
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
+    import { auswaehlbareTypen } from "$lib/knotentypen.js";
     import { STUDENT_GRADES as studentGrades } from "$lib/grades.js";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
@@ -118,9 +119,10 @@
     let searchTimer = null;
 
     const contentTypeOptions = $derived(
-        (selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : []).filter(
-            (ct) => !excludeContentTypes.includes(ct),
-        ),
+        auswaehlbareTypen(
+            selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : [],
+            selectedContentType,
+        ).filter((ct) => !excludeContentTypes.includes(ct)),
     );
 
     function buildParams() {

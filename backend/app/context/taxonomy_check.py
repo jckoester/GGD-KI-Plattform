@@ -115,7 +115,30 @@ def pruefe_taxonomie() -> list[str]:
                 "Quelle: app/context/taxonomy.yaml"
             )
 
+    # ── ui_status ─────────────────────────────────────────────────────────────
+    for key, status in sorted(taxonomy.UI_STATUS.items()):
+        if status not in taxonomy.GUELTIGE_UI_STATUS:
+            befunde.append(
+                f"content_type {key!r} hat ui_status {status!r} — erlaubt: "
+                f"{sorted(taxonomy.GUELTIGE_UI_STATUS)}. "
+                "Quelle: app/context/taxonomy.yaml"
+            )
+
     # ── Lifecycle-Handtabelle ─────────────────────────────────────────────────
+    # Zwei Mechanismen, die sich ausschließen: ein Tages-Offset **oder** das
+    # Schuljahresende. Stünde beides an einem Typ, entschiede die Aufrufreihenfolge —
+    # und die steht nirgends geschrieben.
+    doppelt = sorted(
+        key for key in taxonomy.SCHULJAHRESENDE_CONTENT_TYPES
+        if taxonomy.VALID_UNTIL_DEFAULTS_DAYS.get(key) is not None
+    )
+    if doppelt:
+        befunde.append(
+            f"Diese Typen tragen zugleich einen Tages-Offset und "
+            f"`valid_until_default: schuljahresende`: {doppelt}. Es gilt eins von "
+            "beidem — bei Schuljahresende gehört in VALID_UNTIL_DEFAULTS_DAYS ein None."
+        )
+
     fehlend = sorted(typen - set(taxonomy.VALID_UNTIL_DEFAULTS_DAYS))
     if fehlend:
         befunde.append(

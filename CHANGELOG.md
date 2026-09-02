@@ -90,6 +90,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nach dem Update wirkungslos und kann gelöscht werden. Der Start weist darauf hin,
   solange sie da ist.
 
+- **Bausteinarten ohne Anlege-Weg erscheinen in keiner Auswahl mehr.** Lernplan,
+  Schülertext, Feedback-Text und Prüfungsanforderung standen in Formularen, Filtern und
+  der Bausteinart-Facette der Suche, obwohl es keinen Weg gibt, so einen Baustein
+  anzulegen. Vorhandene Bausteine bleiben unverändert sicht- und durchsuchbar, und wer
+  einen bearbeitet, kann seine Art beibehalten.
+
+- **Zuständigkeiten für neue Bausteine korrigiert.** Prüfungsanforderung, Konvention,
+  Themengebiet, Funktion und Bauteil legt künftig die Fachschaft an statt der Schule;
+  Sozialformen pflegt die Schule; eine Präsentation gehört zur Lerngruppe. Das betrifft
+  nur die **Vorauswahl beim Anlegen** — bestehende Bausteine ändern sich nicht.
+
+- **Schülerartefakte laufen zum Schuljahresende ab statt nach sechs Wochen.** Die alte
+  Frist war nie abgestimmt; das Schuljahr ist dieselbe Grenze wie bei Stunde und
+  Unterrichtseinheit.
+
+- **Zwei neue Bausteinarten vorbereitet:** Schülerpräsentation und Gliederung/Mindmap.
+  Beide ruhen noch — sie werden mit der Chat-Übernahme in 0.9 nutzbar.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt

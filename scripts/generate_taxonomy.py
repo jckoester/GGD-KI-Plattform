@@ -37,6 +37,13 @@ def main():
 
     bp_curriculum_types = data.get("bp_curriculum_content_types", [])
 
+    ruhende_types = [
+        ct["key"]
+        for info in cats.values()
+        for ct in info["content_types"]
+        if ct.get("ui_status") == "ruhend"
+    ]
+
     category_labels = {cat: info["label_de"] for cat, info in cats.items()}
 
     category_colors = {cat: info["color"] for cat, info in cats.items()}
@@ -69,6 +76,11 @@ def main():
         "// Importierte Bildungsplan-/Curriculum-Knotentypen — aus der freien /knowledge-Liste",
         "// serverseitig ausgeschlossen (exclude_content_type). Quelle: taxonomy.yaml (C2).",
         f"export const BP_CURRICULUM_CONTENT_TYPES = {_js(bp_curriculum_types)}",
+        "",
+        "// Typen mit `ui_status: ruhend` — erscheinen in keiner Auswahl, keinem Filter und",
+        "// keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;",
+        "// zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.",
+        f"export const RUHENDE_CONTENT_TYPES = new Set({_js(ruhende_types)})",
         "",
         f"export const CATEGORY_LABELS = {_js(category_labels)}",
         "",

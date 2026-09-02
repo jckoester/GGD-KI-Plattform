@@ -54,20 +54,26 @@ export function extractNodeTargets(text) {
 // ── Welche Knotentypen als Material auswählbar sind ──────────────────────────
 
 import { CONTENT_TYPES } from "$lib/taxonomy.js"
+import { auswaehlbareTypen } from "$lib/knotentypen.js"
 
 /**
  * Typen, die zwar in denselben Kategorien liegen, aber kein Material sind.
  *
  * `unterrichtsstunde`/`unterrichtseinheit`/`reflexion` sind **Planungsobjekte** — eine
  * Unterrichtsstunde als „Material" einer Lernsequenz zu verlinken wäre begrifflich schief.
- * `schuelertext`/`feedback_text` sind personenbezogen und haben im Curriculum nichts
- * verloren, das dauerhaft und fachschaftsweit sichtbar ist.
+ * `schuelertext`/`schuelerpraesentation`/`feedback_text` sind personenbezogen und haben
+ * im Curriculum nichts verloren, das dauerhaft und fachschaftsweit sichtbar ist.
+ *
+ * `strukturierung` steht bewusst **nicht** hier: Der Typ ist rollenoffen — eine Lehrkraft
+ * darf eine Mindmap für ihre Klasse anlegen, und die ist dann legitimes Material.
+ * Solange er ruht, hält ihn `auswaehlbareTypen` ohnehin aus der Liste.
  */
 const KEIN_MATERIAL = new Set([
     "unterrichtsstunde",
     "unterrichtseinheit",
     "reflexion",
     "schuelertext",
+    "schuelerpraesentation",
     "feedback_text",
 ])
 
@@ -82,8 +88,8 @@ const KEIN_MATERIAL = new Set([
  * Leitperspektiven, Methoden, Sozialformen und Operatoren haben eigene Auswahlfelder.
  * Sie hier nochmals anzubieten, führte zu zwei Wegen für dieselbe Verknüpfung.
  */
-export const MATERIAL_CONTENT_TYPES = [
+export const MATERIAL_CONTENT_TYPES = auswaehlbareTypen([
     ...(CONTENT_TYPES.document ?? []),
     ...(CONTENT_TYPES.artifact ?? []),
     ...(CONTENT_TYPES.concept ?? []),
-].filter((t) => !KEIN_MATERIAL.has(t))
+]).filter((t) => !KEIN_MATERIAL.has(t))

@@ -51,6 +51,7 @@ from app.context.schemas import (
 from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
+from app.context.metadata import validate_node_metadata
 from app.context.taxonomy import validate_content_type
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.context.filters import Knotenfilter, wende_an
@@ -455,6 +456,7 @@ async def create_node(
 ):
     try:
         validate_content_type(payload.category, payload.content_type)
+        validate_node_metadata(payload.content_type, payload.metadata_)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -519,6 +521,16 @@ async def update_node(
                     "ändern. Nutzen Sie „Auf neue Edition aktualisieren“ (relink)."
                 ),
             )
+
+    # Der Typ kann im selben Aufruf mitgeändert werden — dann gilt der neue.
+    if "metadata_" in update_data:
+        try:
+            validate_node_metadata(
+                update_data.get("content_type", node.content_type),
+                update_data["metadata_"],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'

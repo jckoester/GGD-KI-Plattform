@@ -2,6 +2,7 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CONTENT_TYPES, CATEGORY_LABELS } from "$lib/taxonomy.js";
+    import { auswaehlbareTypen } from "$lib/knotentypen.js";
     import {
         getContextNode,
         updateContextNode,
@@ -169,7 +170,7 @@
 
     // ── Content-Type-Optionen je Category ──────────────────────────────────
     const contentTypeOptions = $derived(
-        category ? (CONTENT_TYPES[category] ?? []) : [],
+        auswaehlbareTypen(category ? (CONTENT_TYPES[category] ?? []) : [], contentType),
     );
 
     // Kontrolliertes Vokabular (Methode/Sozialform) → eigenes Alias-Feld statt JSON.
