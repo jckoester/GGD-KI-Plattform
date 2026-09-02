@@ -6,7 +6,9 @@
      * `collections.js` und damit aus der Taxonomie. Eine neue Sammlung braucht deshalb
      * keinen Code, nur einen `collection:`-Block.
      */
+    import { untrack } from "svelte";
     import { page } from "$app/stores";
+    import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
     import { Plus, Archive, Pencil } from "lucide-svelte";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
@@ -38,35 +40,46 @@
     let suchTimer = null;
 
     /**
-     * Den Filterzustand in die Adresszeile spiegeln (Muster der Suchseite).
+     * Die Adresse, die diesen Filterzustand beschreibt.
      *
-     * Nicht Kosmetik: Die Adresse **ist** der Rückweg. Die Detailansicht kennt einen
-     * `?back=`-Parameter, und nur wenn die Filter in der URL stehen, führt „Zurück" in
-     * die **gefilterte** Sammlung statt an ihren Anfang (UI-Notiz A3). Nebenbei
-     * überlebt der Zustand einen Reload und lässt sich verschicken.
+     * Sie **ist** der Rückweg: Die Detailansicht kennt einen `?back=`-Parameter, und nur
+     * wenn die Filter darin stehen, führt „Zurück" in den gefilterten Ausschnitt statt an
+     * den Anfang der Sammlung (UI-Notiz A3). Nebenbei übersteht der Zustand einen Reload.
+     *
+     * ⚠️ **Baut die Adresse aus dem Zustand, liest nicht `$page.url`.** Ein Lesen wäre
+     * eine reaktive Abhängigkeit — und weil `goto()` die Adresse ändert, liefe jede
+     * Reaktion darauf im Kreis. Genau das ist am 02.09.2026 passiert: Der Aufruf stand im
+     * `$effect`, der `$page.url` las, und die Seite lud sekündlich neu.
+     */
+    const rueckweg = $derived.by(() => {
+        const params = new URLSearchParams();
+        for (const [name, wert] of [
+            ["subject_id", fachId], ["status", status === "active" ? "" : status],
+            ["q", q.trim()], ["wert", feldwert],
+        ]) {
+            if (wert) params.set(name, String(wert));
+        }
+        const query = params.toString();
+        return `/knowledge/collections/${typ}${query ? `?${query}` : ""}`;
+    });
+
+    /**
+     * Den Zustand in die Adresszeile spiegeln — **nur aus Bedienhandlungen heraus**,
+     * nie aus einem Effekt (siehe oben). `replaceState`, damit nicht jeder Tastendruck
+     * einen History-Eintrag hinterlässt.
      */
     function inDieUrl() {
-        const url = new URL($page.url);
-        for (const [name, wert] of [
-            ["subject_id", fachId], ["status", status === "active" ? "" : status],
-            ["q", q.trim()], ["wert", feldwert],
-        ]) {
-            wert ? url.searchParams.set(name, String(wert)) : url.searchParams.delete(name);
-        }
-        goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+        if (!browser) return;
+        const ziel = rueckweg;
+        if (ziel === location.pathname + location.search) return;
+        goto(ziel, { replaceState: true, keepFocus: true, noScroll: true });
     }
 
-    /** Die aktuelle Adresse als Rückweg für Detail- und Bearbeiten-Ansicht. */
-    const rueckweg = $derived.by(() => {
-        const url = new URL($page.url);
-        for (const [name, wert] of [
-            ["subject_id", fachId], ["status", status === "active" ? "" : status],
-            ["q", q.trim()], ["wert", feldwert],
-        ]) {
-            wert ? url.searchParams.set(name, String(wert)) : url.searchParams.delete(name);
-        }
-        return url.pathname + url.search;
-    });
+    /** Filteränderung: Adresse spiegeln und neu laden. */
+    function filterGeaendert() {
+        inDieUrl();
+        load();
+    }
 
     // Das Feld, nach dem zusätzlich gefiltert werden kann (z. B. `ab_klasse`).
     const feldFilter = $derived(
@@ -77,13 +90,21 @@
     );
 
     async function load() {
-        if (!config) return;
+        // ⚠️ `untrack`: Alles, was hier **vor** dem ersten `await` gelesen wird, würde
+        // sonst zur Abhängigkeit des aufrufenden Effekts. Über `q` hinge dann jeder
+        // Tastendruck am Effekt — die Entprellung darüber liefe ins Leere, und die Seite
+        // schickte je Zeichen eine Anfrage.
+        const params = untrack(() => {
+            const p = { content_type: typ, status };
+            if (fachId) p.subject_id = Number(fachId);
+            if (q.trim().length >= 2) p.q = q.trim();
+            return p;
+        });
+        if (!untrack(() => config)) return;
+
         loading = true;
         error = null;
         try {
-            const params = { content_type: typ, status };
-            if (fachId) params.subject_id = Number(fachId);
-            if (q.trim().length >= 2) params.q = q.trim();
             nodes = await getContextNodes(params);
         } catch (e) {
             error = e.message;
@@ -92,21 +113,19 @@
         }
     }
 
+    // Lädt bei Typwechsel und geänderten Serverfiltern. **Kein `goto` hier** — die
+    // Adresse schreiben die Bedienhandlungen, sonst entsteht der Zyklus von oben.
     $effect(() => {
         typ;
         fachId;
         status;
-        inDieUrl();
         load();
     });
 
     function onSuche(e) {
         q = e.target.value;
         clearTimeout(suchTimer);
-        suchTimer = setTimeout(() => {
-            inDieUrl();
-            load();
-        }, 300);
+        suchTimer = setTimeout(filterGeaendert, 300);
     }
 
     // Feldfilter clientseitig: Die Werte stehen in `metadata`, wofür es keinen
@@ -212,6 +231,7 @@
             {#if angeboteneFilter.includes("fach")}
                 <select
                     bind:value={fachId}
+                    onchange={inDieUrl}
                     aria-label="Fach"
                     class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3
                            dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
@@ -241,6 +261,7 @@
             {#if angeboteneFilter.includes("status")}
                 <select
                     bind:value={status}
+                    onchange={inDieUrl}
                     aria-label="Status"
                     class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3
                            dark:border-dark-ui-3 bg-light-bg dark:bg-dark-bg
