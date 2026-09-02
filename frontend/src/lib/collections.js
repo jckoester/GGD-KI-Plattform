@@ -33,13 +33,38 @@ export function kategorieVon(typ) {
   return null
 }
 
-/** Alle Sammlungen in Konfigurationsreihenfolge — so zeigt sie auch die Sidebar. */
+/** Alle Sammlungen in Konfigurationsreihenfolge. */
 export function alleSammlungen() {
   return Object.keys(COLLECTIONS).map((typ) => ({
     typ,
     label: CONTENT_TYPE_LABELS[typ] ?? typ,
     beschreibung: COLLECTIONS[typ].beschreibung ?? "",
   }))
+}
+
+/**
+ * Die Sammlungen mit Einstieg in der Sidebar (`sidebar: true`).
+ *
+ * Dort gehört nur hin, was **situationsunabhängig** interessiert. Ein Operatorenblatt
+ * sucht man, wenn eine Aufgabe vorliegt — und hat das Fach dann längst im Kopf; eine
+ * globale Liste nach Fach zu filtern dreht den Weg um. Solche Sammlungen führt die
+ * Fachseite (siehe `fachSammlungen`).
+ */
+export function sidebarSammlungen() {
+  return alleSammlungen().filter((s) => COLLECTIONS[s.typ].sidebar === true)
+}
+
+/**
+ * Die fachgebundenen Sammlungen — für den Fachschafts-Abschnitt der Fachseite.
+ *
+ * **Abgeleitet, nicht konfiguriert:** Eine Sammlung ist fachgebunden, wenn sie einen
+ * Fachfilter anbietet. Ein eigenes Feld dafür wäre eine zweite Aussage über dieselbe
+ * Sache — und damit etwas, das auseinanderlaufen kann.
+ */
+export function fachSammlungen() {
+  return alleSammlungen().filter((s) =>
+    (COLLECTIONS[s.typ].filter ?? []).includes("fach"),
+  )
 }
 
 /** Die Konfiguration eines Typs, oder `null` — für unbekannte Typen und 404-Fälle. */

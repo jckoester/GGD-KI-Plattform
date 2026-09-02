@@ -134,10 +134,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   ein neues Ablaufdatum; ohne das wäre er in derselben Nacht wieder archiviert worden.
 
 - **Gepflegte Sammlungen für fünf Bausteinarten** — Methodenblatt, Operatorenblatt,
-  Methode, Sozialform und Fachbegriff. Jede hat eine eigene Ansicht unter *Wissensgraph →
-  Sammlungen* mit passenden Spalten und Filtern, einem Formular statt eines
-  JSON-Feldes und einem Satz darüber, was hineingehört. Von der Fachseite führen
-  Absprünge in die aufs Fach gefilterte Sammlung.
+  Methode, Sozialform und Fachbegriff. Jede hat eine eigene Ansicht mit passenden
+  Spalten und Filtern, einem Formular statt eines JSON-Feldes und einem Satz darüber,
+  was hineingehört.
+
+  **Wo sie stehen, richtet sich danach, wie man sie sucht.** In der Sidebar unter
+  *Wissensgraph → Sammlungen* nur, was ohne Fach im Kopf interessiert: Methoden,
+  Sozialformen und Fachbegriffe. Methodenblätter und Operatorenblätter sucht man mit
+  einem Fach vor Augen — sie stehen im Fachschafts-Abschnitt der Fachseite, aufs Fach
+  vorgefiltert.
 
 - **Methode und Fachbegriff verlangen jetzt eine Beschreibung.** Ohne sie ist ein Eintrag
   nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,

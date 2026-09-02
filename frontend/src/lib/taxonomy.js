@@ -150,6 +150,7 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "sidebar": true,
     "content": {
       "label": "Kurzbeschreibung",
       "pflicht": true,
@@ -168,6 +169,7 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "sidebar": true,
     "content": {
       "label": "Kurzbeschreibung",
       "pflicht": false
@@ -188,6 +190,7 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "sidebar": true,
     "content": {
       "label": "Definition",
       "pflicht": true,

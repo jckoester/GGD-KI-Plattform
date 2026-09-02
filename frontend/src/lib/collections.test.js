@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest"
 import {
   alleSammlungen,
+  fachSammlungen,
   kategorieVon,
+  sidebarSammlungen,
   contentFeld,
   feldSchema,
   filter,
@@ -217,5 +219,55 @@ describe("kategorieVon", () => {
 
   it("gibt null für einen unbekannten Typ", () => {
     expect(kategorieVon("gibt_es_nicht")).toBeNull()
+  })
+})
+
+describe("sidebarSammlungen", () => {
+  it("führt nur, was situationsunabhängig interessiert", () => {
+    // Entscheidung Jan, 02.09.2026: Methode und Sozialform sind fachneutral bzw. teils
+    // fachübergreifend; Fachbegriffe anderer Fächer sind ebenfalls von Interesse
+    // („was heißt Energie in Biologie?").
+    expect(sidebarSammlungen().map((s) => s.typ)).toEqual([
+      "methode",
+      "sozialform",
+      "begriff",
+    ])
+  })
+
+  it("lässt die Blätter draußen — die sucht man mit einem Fach im Kopf", () => {
+    const typen = sidebarSammlungen().map((s) => s.typ)
+    expect(typen).not.toContain("methodenblatt")
+    expect(typen).not.toContain("operatorenblatt")
+  })
+
+  it("nimmt nur ausdrücklich markierte Sammlungen auf", () => {
+    // Vorgabe ist `false`: Eine neue Sammlung nistet sich nicht von selbst in der
+    // Navigation ein.
+    expect(sidebarSammlungen().length).toBeLessThan(alleSammlungen().length)
+  })
+})
+
+describe("fachSammlungen", () => {
+  it("sind die mit Fachfilter — abgeleitet, nicht konfiguriert", () => {
+    expect(fachSammlungen().map((s) => s.typ)).toEqual([
+      "methodenblatt",
+      "operatorenblatt",
+      "methode",
+      "begriff",
+    ])
+  })
+
+  it("lässt die fachneutrale Sozialform draußen", () => {
+    // Sie stand bis 02.09.2026 fälschlich im Fachschafts-Abschnitt, obwohl der Typ
+    // gar kein Fach kennt.
+    expect(fachSammlungen().map((s) => s.typ)).not.toContain("sozialform")
+  })
+
+  it("überschneidet sich absichtlich mit der Sidebar", () => {
+    // `methode` ist Mischtyp, `begriff` fachgebunden und trotzdem global interessant.
+    const beides = fachSammlungen()
+      .map((s) => s.typ)
+      .filter((typ) => sidebarSammlungen().some((s) => s.typ === typ))
+    expect(beides).toEqual(["methode", "begriff"])
   })
 })

@@ -1,5 +1,5 @@
 <script>
-    import { alleSammlungen } from "$lib/collections.js";
+    import { fachSammlungen } from "$lib/collections.js";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -338,7 +338,7 @@
                     Fachschaft
                 </h2>
                 <div class="flex flex-wrap gap-2">
-                    {#each alleSammlungen() as s}
+                    {#each fachSammlungen() as s}
                         <a
                             href="/knowledge/collections/{s.typ}?subject_id={subject?.id}"
                             title={s.beschreibung}

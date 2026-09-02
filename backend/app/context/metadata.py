@@ -147,6 +147,12 @@ def pruefe_schema_konsistenz() -> list[str]:
                     f"Spalte noch Feld. Quelle: app/context/taxonomy.yaml"
                 )
 
+        if "sidebar" in config and not isinstance(config["sidebar"], bool):
+            befunde.append(
+                f"Sammlung {typ!r}: `sidebar` muss true oder false sein (war: "
+                f"{config['sidebar']!r}). Quelle: app/context/taxonomy.yaml"
+            )
+
         if not (config.get("beschreibung") or "").strip():
             befunde.append(
                 f"Sammlung {typ!r}: keine `beschreibung` — die Liste hätte keinen Satz, "

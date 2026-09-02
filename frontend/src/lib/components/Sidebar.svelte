@@ -1,5 +1,5 @@
 <script>
-    import { alleSammlungen } from '$lib/collections.js';
+    import { sidebarSammlungen } from '$lib/collections.js';
     import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte';
     import { branding } from "$lib/branding.js";
     import { slide } from "svelte/transition";
@@ -327,7 +327,7 @@
                                 text-light-tx-3 dark:text-dark-tx-3">
                         Sammlungen
                     </div>
-                    {#each alleSammlungen() as s}
+                    {#each sidebarSammlungen() as s}
                         <button
                             onclick={() => goto(`/knowledge/collections/${s.typ}`)}
                             class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx

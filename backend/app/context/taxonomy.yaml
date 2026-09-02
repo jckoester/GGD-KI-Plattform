@@ -41,6 +41,14 @@
 #   spalten       Tabellenspalten: `titel`, `fach`, `status`, `geaendert` oder der
 #                 Name eines Feldes aus `felder` (dann steht dessen Wert dort).
 #   filter        Angebotene Filter: `fach`, `status`, `titel` oder ein Feldname.
+#                 Enthält die Liste `fach`, gilt die Sammlung als **fachgebunden** und
+#                 erscheint im Fachschafts-Abschnitt der Fachseite — dafür braucht es
+#                 kein eigenes Feld.
+#   sidebar       Einstieg in der Sidebar? **Vorgabe: nein.** Dort gehört nur hin, was
+#                 situationsunabhängig interessiert. Ein Operatorenblatt sucht man,
+#                 wenn man eine Aufgabe vor sich hat — und hat das Fach dann längst im
+#                 Kopf; eine globale Liste nach Fach zu filtern dreht den Weg um. Wer
+#                 einen Eintrag in der Navigation will, sagt es hier und begründet es.
 #   content       Label und Pflicht des Knotentexts. Ein Eintrag ohne Text ist nur
 #                 über seinen Namen auffindbar — bei `methode` und `begriff` ist er
 #                 deshalb Pflicht.
@@ -221,6 +229,9 @@ categories:
             pflegt die Administration, fachspezifische die jeweilige Fachschaft.
           spalten: [titel, fach, aliase, status, geaendert]
           filter: [fach, status, titel]
+          # Mischtyp: Ein Teil der Methoden gilt fachübergreifend — „welche Methoden
+          # gibt es überhaupt?" ist eine Frage ohne Fach im Kopf.
+          sidebar: true
           # Pflicht: Ohne Beschreibung ist die Methode nur unter ihrem Namen zu
           # finden — der Embedding-Input bestünde faktisch aus dem Titel.
           content:
@@ -246,6 +257,8 @@ categories:
             dergleichen. Eine kleine, schulweit gepflegte Menge; kein Fachbezug.
           spalten: [titel, aliase, status, geaendert]
           filter: [status, titel]
+          # Fachneutral und winzig — die Liste ist der einzige Weg dorthin.
+          sidebar: true
           content: {label: "Kurzbeschreibung", pflicht: false}
         felder:
           aliase:
@@ -402,6 +415,10 @@ categories:
             Normalfall — „Energie" heißt in Physik etwas anderes als in Ethik.
           spalten: [titel, fach, ab_klasse, status, geaendert]
           filter: [fach, ab_klasse, status, titel]
+          # Fachgebunden, aber trotzdem in der Sidebar (Entscheidung Jan, 02.09.2026):
+          # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
+          # Biologie?" fragt man ohne das eigene Fach im Kopf.
+          sidebar: true
           # Pflicht: Ein Begriff ohne Definition ist ein Titel, kein Baustein.
           content:
             label: "Definition"
