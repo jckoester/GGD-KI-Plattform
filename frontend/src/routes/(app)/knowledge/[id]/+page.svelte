@@ -141,7 +141,14 @@
         );
         const nach = {};
         for (const kante of nachbarschaft.edges ?? []) {
+            // ⚠️ Die Nachbarschaft liefert **alle** Kanten zwischen den sichtbaren
+            // Knoten — auch solche, die zwei Nachbarn untereinander verbinden und diesen
+            // Knoten gar nicht berühren. Ohne diese Prüfung stünden sie in der Liste, als
+            // gingen sie von hier aus. Eine Liste kann sie nicht sinnvoll zeigen; ein
+            // Graph könnte es (siehe Todo zur Graph-Vorschau).
             const raus = kante.from_node_id === node.id;
+            const rein = kante.to_node_id === node.id;
+            if (!raus && !rein) continue;
             const gegen = knoten[raus ? kante.to_node_id : kante.from_node_id];
             if (!gegen || gegen.id === node.id) continue;
             (nach[kante.relation] ??= []).push({ kante, gegen, raus });
@@ -238,7 +245,11 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-2xl">
+<!-- Breite wie bei den Geschwisterseiten (Suche, Archiv): `max-w-2xl` war schmaler als
+     jede Liste und ließ die Seite gedrängt wirken. Der **Fließtext** bleibt trotzdem
+     schmal — dafür sorgt unten die Vorgabe des Typografie-Plugins (65 Zeichen), denn
+     eine Definition über die volle Breite zu lesen ist mühsamer, nicht leichter. -->
+<div class="h-full overflow-y-auto p-6 max-w-4xl">
     <a
         href={backUrl}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
@@ -339,12 +350,65 @@
             {/if}
         </div>
 
-        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1">
-            Erstellt: {formatDate(node.created_at)}
-            {#if node.updated_at !== node.created_at}
-                · Aktualisiert: {formatDate(node.updated_at)}
-            {/if}
-        </p>
+        <!-- Banner: Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
+        {#if node.metadata?.import_hinweis}
+            <WarningBanner message={node.metadata.import_hinweis} />
+        {/if}
+
+        <!-- Banner für archivierte Referenzen -->
+        {#if archivedRefs.length > 0}
+            <div
+                class="mb-4 px-4 py-3 rounded-md border border-light-ye dark:border-dark-ye
+                  bg-light-ye/10 dark:bg-dark-ye/10 text-sm text-light-tx dark:text-dark-tx"
+            >
+                <p class="font-medium mb-1">
+                    ⚠️ Dieser Knoten verweist auf archivierte Inhalte:
+                </p>
+                <ul class="space-y-1 ml-2">
+                    {#each archivedRefs as ref (ref.id)}
+                        <li>
+                            <span class="text-light-tx-2 dark:text-dark-tx-2"
+                                >{ref.relation}:</span
+                            >
+                            <a
+                                href="/knowledge/{ref.id}"
+                                class="underline text-light-tx dark:text-dark-tx hover:text-primary dark:hover:text-primary-dark"
+                            >
+                                {ref.title}
+                            </a>
+                        </li>
+                    {/each}
+                </ul>
+            </div>
+        {/if}
+
+        <!-- Inhalt -->
+        {#if contentHtml}
+            <div
+                class="prose dark:prose-invert
+                       prose-p:text-light-tx dark:prose-p:text-dark-tx
+                       prose-headings:text-light-tx dark:prose-headings:text-dark-tx
+                       prose-strong:text-light-tx dark:prose-strong:text-dark-tx
+                       prose-li:text-light-tx dark:prose-li:text-dark-tx
+                       prose-a:text-light-bl dark:prose-a:text-dark-bl"
+                use:renderDiagrams use:renderServerBlocks
+            >
+                {@html contentHtml}
+            </div>
+        {:else}
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 italic">
+                Kein Inhalt hinterlegt.
+            </p>
+        {/if}
+
+        <!-- Hinweis für strukturierte Typen (MVP: Details im Bearbeiten-Modus) -->
+        {#if isStructured}
+            <p class="mt-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                Strukturierte Details ({node.content_type === "funktion"
+                    ? "Funktionssignatur"
+                    : "Schaltzeichen"}) sind im Bearbeiten-Modus sichtbar.
+            </p>
+        {/if}
         <!-- ── Nachbarschaft (A3) + Verknüpfen (A8) ───────────────────────── -->
         <section class="mb-5 mt-2">
             <div class="flex items-center justify-between gap-3 mb-2">
@@ -457,107 +521,68 @@
             {/if}
         </section>
 
-        <!-- Banner: Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
-        {#if node.metadata?.import_hinweis}
-            <WarningBanner message={node.metadata.import_hinweis} />
-        {/if}
-
-        <!-- Banner für archivierte Referenzen -->
-        {#if archivedRefs.length > 0}
-            <div
-                class="mb-4 px-4 py-3 rounded-md border border-light-ye dark:border-dark-ye
-                  bg-light-ye/10 dark:bg-dark-ye/10 text-sm text-light-tx dark:text-dark-tx"
+        <!-- Metadaten: einklappbar. Sie beantworten Rückfragen (Wer darf das sehen?
+             Bis wann gilt es?), sind aber nicht der Grund, warum jemand die Seite
+             öffnet — deshalb hinter einem Griff statt über dem Inhalt. -->
+        <details class="mb-6 group">
+            <summary
+                class="cursor-pointer text-sm font-semibold text-light-tx dark:text-dark-tx
+                       mb-2 select-none"
             >
-                <p class="font-medium mb-1">
-                    ⚠️ Dieser Knoten verweist auf archivierte Inhalte:
-                </p>
-                <ul class="space-y-1 ml-2">
-                    {#each archivedRefs as ref (ref.id)}
-                        <li>
-                            <span class="text-light-tx-2 dark:text-dark-tx-2"
-                                >{ref.relation}:</span
-                            >
-                            <a
-                                href="/knowledge/{ref.id}"
-                                class="underline text-light-tx dark:text-dark-tx hover:text-primary dark:hover:text-primary-dark"
-                            >
-                                {ref.title}
-                            </a>
-                        </li>
-                    {/each}
-                </ul>
-            </div>
-        {/if}
-
-        <!-- Metadaten -->
-        <dl
-            class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm mb-6
-                   border border-light-ui-3 dark:border-dark-ui-3 rounded-lg p-4
-                   bg-light-bg-2 dark:bg-dark-bg-2"
-        >
-            <dt class="text-light-tx-2 dark:text-dark-tx-2">Fach</dt>
-            <dd class="text-light-tx dark:text-dark-tx">
-                {subjectName ?? "fächerübergreifend"}
-            </dd>
-
-            <dt class="text-light-tx-2 dark:text-dark-tx-2">Jahrgangsstufe</dt>
-            <dd class="text-light-tx dark:text-dark-tx">
-                {#if node.min_grade && node.max_grade}
-                    Klasse {node.min_grade}–{node.max_grade}
-                {:else if node.min_grade}
-                    ab Klasse {node.min_grade}
-                {:else if node.max_grade}
-                    bis Klasse {node.max_grade}
-                {:else}
-                    alle Jahrgangsstufen
-                {/if}
-            </dd>
-
-            <dt class="text-light-tx-2 dark:text-dark-tx-2">Sichtbarkeit</dt>
-            <dd class="text-light-tx dark:text-dark-tx">
-                {SCOPE_LABELS[node.read_scope] ?? node.read_scope}
-            </dd>
-
-            {#if node.schuljahr}
-                <dt class="text-light-tx-2 dark:text-dark-tx-2">Schuljahr</dt>
-                <dd class="text-light-tx dark:text-dark-tx">{node.schuljahr}</dd>
-            {/if}
-
-            {#if node.valid_until}
-                <dt class="text-light-tx-2 dark:text-dark-tx-2">Gültig bis</dt>
+                Eigenschaften
+            </summary>
+            <dl
+                class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm
+                       border border-light-ui-3 dark:border-dark-ui-3 rounded-lg p-4
+                       bg-light-bg-2 dark:bg-dark-bg-2"
+            >
+                <dt class="text-light-tx-2 dark:text-dark-tx-2">Fach</dt>
                 <dd class="text-light-tx dark:text-dark-tx">
-                    {formatDate(node.valid_until)}
+                    {subjectName ?? "fächerübergreifend"}
                 </dd>
+
+                <dt class="text-light-tx-2 dark:text-dark-tx-2">Jahrgangsstufe</dt>
+                <dd class="text-light-tx dark:text-dark-tx">
+                    {#if node.min_grade && node.max_grade}
+                        Klasse {node.min_grade}–{node.max_grade}
+                    {:else if node.min_grade}
+                        ab Klasse {node.min_grade}
+                    {:else if node.max_grade}
+                        bis Klasse {node.max_grade}
+                    {:else}
+                        alle Jahrgangsstufen
+                    {/if}
+                </dd>
+
+                <dt class="text-light-tx-2 dark:text-dark-tx-2">Sichtbarkeit</dt>
+                <dd class="text-light-tx dark:text-dark-tx">
+                    {SCOPE_LABELS[node.read_scope] ?? node.read_scope}
+                </dd>
+
+                {#if node.schuljahr}
+                    <dt class="text-light-tx-2 dark:text-dark-tx-2">Schuljahr</dt>
+                    <dd class="text-light-tx dark:text-dark-tx">{node.schuljahr}</dd>
+                {/if}
+
+                {#if node.valid_until}
+                    <dt class="text-light-tx-2 dark:text-dark-tx-2">Gültig bis</dt>
+                    <dd class="text-light-tx dark:text-dark-tx">
+                        {formatDate(node.valid_until)}
+                    </dd>
+                {/if}
+            </dl>
+        </details>
+
+        <!-- Zeitstempel als Fußzeile: nützlich, aber nie der Grund für den Besuch. -->
+        <p
+            class="text-xs text-light-tx-3 dark:text-dark-tx-3 pt-4 mt-6
+                   border-t border-light-ui-3 dark:border-dark-ui-3"
+        >
+            Erstellt: {formatDate(node.created_at)}
+            {#if node.updated_at !== node.created_at}
+                · Aktualisiert: {formatDate(node.updated_at)}
             {/if}
-        </dl>
-
-        <!-- Inhalt -->
-        {#if contentHtml}
-            <div
-                class="prose dark:prose-invert max-w-none
-                       prose-p:text-light-tx dark:prose-p:text-dark-tx
-                       prose-headings:text-light-tx dark:prose-headings:text-dark-tx
-                       prose-strong:text-light-tx dark:prose-strong:text-dark-tx
-                       prose-li:text-light-tx dark:prose-li:text-dark-tx
-                       prose-a:text-light-bl dark:prose-a:text-dark-bl"
-                use:renderDiagrams use:renderServerBlocks
-            >
-                {@html contentHtml}
-            </div>
-        {:else}
-            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 italic">
-                Kein Inhalt hinterlegt.
-            </p>
-        {/if}
-
-        <!-- Hinweis für strukturierte Typen (MVP: Details im Bearbeiten-Modus) -->
-        {#if isStructured}
-            <p class="mt-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-                Strukturierte Details ({node.content_type === "funktion"
-                    ? "Funktionssignatur"
-                    : "Schaltzeichen"}) sind im Bearbeiten-Modus sichtbar.
-            </p>
-        {/if}
+        </p>
     {:else}
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
             Knoten nicht gefunden.
