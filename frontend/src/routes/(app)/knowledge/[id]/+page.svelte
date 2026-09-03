@@ -2,21 +2,9 @@
     import { untrack } from "svelte";
     import { getNeighborhood, deleteContextEdge } from "$lib/api.js";
     import { kannVerknuepfen, istStub } from "$lib/collections.js";
+    import { gruppiereKanten } from "$lib/vernetzung.js";
     import VerknuepfenDialog from "$lib/components/VerknuepfenDialog.svelte";
 
-    /** Die Kantenarten in der Sprache der Sache statt als Relationsname. */
-    const RELATION_LABEL = {
-        related_to: "Steht in Beziehung zu",
-        part_of: "Gehört zu",
-        references: "Verweist auf",
-        develops: "Entwickelt",
-        requires: "Setzt voraus",
-        used_with: "Wird verwendet mit",
-        supersedes: "Löst ab",
-        follows: "Folgt auf",
-        derived_from: "Abgeleitet aus",
-        reflects_on: "Reflektiert",
-    };
 
     import { sammlung } from "$lib/collections.js";
     import { page } from "$app/stores";
@@ -31,6 +19,7 @@
     import { ArrowLeft, Pencil, Check, X } from "lucide-svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
 
     let node = $state(null);
     let loadingNode = $state(true);
@@ -106,7 +95,6 @@
     // Ego-Graph der Tiefe 1, nach Relationstyp gruppiert. Die Leitplanke aus ADR-013
     // gilt: nie „alle Kanten" auf einmal — ab `KAPPUNG` Nachbarn je Relationstyp steht
     // „+ n weitere" und der Weg in die große Ansicht.
-    const KAPPUNG = 20;
 
     let nachbarschaft = $state(null);
     let nachbarnFehler = $state(null);
@@ -127,42 +115,7 @@
         untrack(() => ladeNachbarschaft(id));
     });
 
-    /**
-     * Die Kanten nach Relationstyp gruppieren — mit Richtung und Gegenknoten.
-     *
-     * Der Sichtbarkeitsfilter greift dabei von selbst: Die Nachbarschaft liefert nur
-     * lesbare Knoten. Eine Kante, deren Gegenstück fehlt, wird deshalb ausgelassen —
-     * nicht anonymisiert angedeutet.
-     */
-    const gruppen = $derived.by(() => {
-        if (!nachbarschaft || !node) return [];
-        const knoten = Object.fromEntries(
-            (nachbarschaft.nodes ?? []).map((n) => [n.id, n]),
-        );
-        const nach = {};
-        for (const kante of nachbarschaft.edges ?? []) {
-            // ⚠️ Die Nachbarschaft liefert **alle** Kanten zwischen den sichtbaren
-            // Knoten — auch solche, die zwei Nachbarn untereinander verbinden und diesen
-            // Knoten gar nicht berühren. Ohne diese Prüfung stünden sie in der Liste, als
-            // gingen sie von hier aus. Eine Liste kann sie nicht sinnvoll zeigen; ein
-            // Graph könnte es (siehe Todo zur Graph-Vorschau).
-            const raus = kante.from_node_id === node.id;
-            const rein = kante.to_node_id === node.id;
-            if (!raus && !rein) continue;
-            const gegen = knoten[raus ? kante.to_node_id : kante.from_node_id];
-            if (!gegen || gegen.id === node.id) continue;
-            (nach[kante.relation] ??= []).push({ kante, gegen, raus });
-        }
-        return Object.entries(nach)
-            .map(([relation, eintraege]) => ({
-                relation,
-                label: RELATION_LABEL[relation] ?? relation,
-                gesamt: eintraege.length,
-                sichtbar: eintraege.slice(0, KAPPUNG),
-                weitere: Math.max(0, eintraege.length - KAPPUNG),
-            }))
-            .sort((a, b) => b.gesamt - a.gesamt);
-    });
+    const gruppen = $derived(gruppiereKanten(node, nachbarschaft));
 
     const kannVerknuepfenJetzt = $derived(
         Boolean(node) && kannVerknuepfen(node.content_type) && canEdit,
@@ -428,7 +381,7 @@
                         href={graphUrl}
                         class="text-sm text-light-bl dark:text-dark-bl hover:underline"
                     >
-                        Große Graphansicht →
+                        Graphansicht
                     </a>
                 </div>
             </div>
@@ -459,61 +412,78 @@
                     {/if}
                 </p>
             {:else}
-                <div class="space-y-3">
-                    {#each gruppen as gruppe (gruppe.relation)}
-                        <div>
+                <!-- Mehrspaltig, sobald Platz ist: Die Gruppen sind kurz und stehen
+                     sonst als schmale Säule untereinander. Grid statt CSS-Spalten,
+                     damit keine Gruppe über den Spaltenumbruch zerrissen wird. -->
+                <div class="grid gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
+                    {#each gruppen as gruppe (gruppe.schluessel)}
+                        <div class="min-w-0">
                             <p
-                                class="text-xs uppercase tracking-wide text-light-tx-3
-                                       dark:text-dark-tx-3 mb-1"
+                                class="text-xs uppercase tracking-wide font-medium
+                                       text-light-tx-2 dark:text-dark-tx-2 mb-1"
                             >
                                 {gruppe.label} · {gruppe.gesamt}
                             </p>
-                            <ul class="space-y-0.5">
-                                {#each gruppe.sichtbar as eintrag (eintrag.kante.id)}
-                                    <li class="flex items-center gap-2 text-sm">
-                                        {#if !eintrag.raus}
-                                            <span
-                                                title="Verweist auf diesen Baustein"
-                                                class="text-light-tx-3 dark:text-dark-tx-3"
-                                                >←</span
-                                            >
-                                        {/if}
-                                        <a
-                                            href="/knowledge/{eintrag.gegen.id}"
-                                            class="text-light-tx dark:text-dark-tx hover:underline"
-                                        >
-                                            {eintrag.gegen.title}
-                                        </a>
-                                        {#if istStub(eintrag.gegen)}
-                                            <span
-                                                title="Angelegt, aber noch ohne Inhalt"
-                                                class="text-xs px-1.5 py-0.5 rounded-full
-                                                       border border-light-ui-3
-                                                       dark:border-dark-ui-3
-                                                       text-light-tx-2 dark:text-dark-tx-2"
-                                                >unvollständig</span
-                                            >
-                                        {/if}
-                                        {#if canEdit && eintrag.raus}
-                                            <button
-                                                onclick={() => entferneKante(eintrag.kante.id)}
-                                                title="Verknüpfung entfernen — der Baustein bleibt"
-                                                class="text-xs text-light-tx-3 dark:text-dark-tx-3
-                                                       hover:text-light-re dark:hover:text-dark-re"
-                                            >
-                                                ×
-                                            </button>
-                                        {/if}
-                                    </li>
-                                {/each}
-                            </ul>
-                            {#if gruppe.weitere > 0}
+
+                            {#if gruppe.nurZahl}
+                                <!-- Zu viele für eine Liste: Zwanzig Titel aus 940 wären
+                                     eine willkürliche Stichprobe, die nach Auswahl
+                                     aussieht. -->
                                 <a
                                     href={graphUrl}
-                                    class="text-xs text-light-bl dark:text-dark-bl hover:underline"
+                                    class="text-sm text-light-bl dark:text-dark-bl hover:underline"
                                 >
-                                    + {gruppe.weitere} weitere
+                                    {gruppe.gesamt} Bausteine — in der Graphansicht
                                 </a>
+                            {:else}
+                                <ul class="space-y-0.5">
+                                    {#each gruppe.sichtbar as eintrag (eintrag.kante.id)}
+                                        <li class="flex items-center gap-1.5 text-sm min-w-0">
+                                            <NodeTypeIcon
+                                                category={eintrag.gegen.category}
+                                                contentType={eintrag.gegen.content_type}
+                                                size={16}
+                                            />
+                                            <a
+                                                href="/knowledge/{eintrag.gegen.id}"
+                                                title={eintrag.gegen.title}
+                                                class="text-light-tx dark:text-dark-tx
+                                                       hover:underline truncate"
+                                            >
+                                                {eintrag.gegen.title}
+                                            </a>
+                                            {#if istStub(eintrag.gegen)}
+                                                <span
+                                                    title="Angelegt, aber noch ohne Inhalt"
+                                                    class="shrink-0 text-xs px-1.5 py-0.5
+                                                           rounded-full border
+                                                           border-light-ui-3 dark:border-dark-ui-3
+                                                           text-light-tx-2 dark:text-dark-tx-2"
+                                                    >unvollständig</span
+                                                >
+                                            {/if}
+                                            {#if canEdit && eintrag.raus}
+                                                <button
+                                                    onclick={() => entferneKante(eintrag.kante.id)}
+                                                    title="Verknüpfung entfernen — der Baustein bleibt"
+                                                    class="shrink-0 text-xs text-light-tx-3
+                                                           dark:text-dark-tx-3
+                                                           hover:text-light-re dark:hover:text-dark-re"
+                                                >
+                                                    ×
+                                                </button>
+                                            {/if}
+                                        </li>
+                                    {/each}
+                                </ul>
+                                {#if gruppe.weitere > 0}
+                                    <a
+                                        href={graphUrl}
+                                        class="text-xs text-light-bl dark:text-dark-bl hover:underline"
+                                    >
+                                        + {gruppe.weitere} weitere
+                                    </a>
+                                {/if}
                             {/if}
                         </div>
                     {/each}
