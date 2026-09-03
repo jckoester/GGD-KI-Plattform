@@ -423,3 +423,24 @@ class TestBackfillRegel:
         node = make_node("knowledge", "methode", content="",
                          metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share")
         assert traegt_substanz(node) is True
+
+
+class TestStubBekommtKeinenVektor:
+    """Ein Stub aus dem Verknüpfen-Dialog bleibt ohne Embedding (UI-Notiz A8).
+
+    ⚠️ Ohne diese Regel greift die Ausnahme in `traegt_substanz` nicht: `begriff` hat
+    keinen erklärten `embedding_input`, also läuft er über den Standardaufbau — und der
+    hätte aus dem blanken Titel einen Vektor gebildet. Genau die unscharfe Titelsuche im
+    Vektorraum, die die Funktion verhindern soll. Im Live-Test am 03.09.2026 zunächst so
+    passiert.
+    """
+
+    def test_stub_traegt_keine_substanz(self, make_node):
+        stub = make_node("concept", "begriff", content="", title="Reduktion",
+                         metadata={"unvollstaendig": True})
+        assert traegt_substanz(stub) is False
+
+    def test_nach_dem_nachtragen_wieder_ja(self, make_node):
+        fertig = make_node("concept", "begriff", content="Aufnahme von Elektronen.",
+                           title="Reduktion", metadata={})
+        assert traegt_substanz(fertig) is True

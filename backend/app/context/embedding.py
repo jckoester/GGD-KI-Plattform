@@ -147,6 +147,16 @@ def traegt_substanz(node: ContextNode) -> bool:
     Methode ihre Beschreibung bekommt oder die Stunde ihre Kompetenzen, traegt der Knoten
     Substanz und wird beim naechsten Lauf eingebettet.
     """
+    # Ein Stub aus dem Verknüpfen-Dialog hat noch keinen Inhalt (UI-Notiz A8): Der
+    # Vektor bestuende aus seinem Titel und waere damit die unscharfe Titelsuche im
+    # Vektorraum, die diese Funktion gerade verhindern soll. Ueber Name und Aufzaehlung
+    # bleibt er erreichbar; sobald der Inhalt nachgetragen ist, faellt die Markierung weg
+    # und der naechste Lauf bettet ihn ein.
+    from app.context.metadata import ist_stub
+
+    if ist_stub(node.metadata_):
+        return False
+
     if (node.category, node.content_type) not in EMBEDDING_INPUT:
         return True
     eingabe = _build_embedding_input(node).strip()

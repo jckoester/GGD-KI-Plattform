@@ -44,6 +44,13 @@
 #                 Enthält die Liste `fach`, gilt die Sammlung als **fachgebunden** und
 #                 erscheint im Fachschafts-Abschnitt der Fachseite — dafür braucht es
 #                 kein eigenes Feld.
+#   relationen    Welche Kanten der Verknüpfen-Dialog anbietet — eine **kuratierte**
+#                 Teilmenge, keine Liste aller möglichen. `references` etwa entsteht am
+#                 Material, das einen Begriff nutzt, nicht am Begriff selbst; sie hier
+#                 anzubieten lüde zur falschen Richtung ein. Ohne diesen Eintrag hat der
+#                 Typ keinen Verknüpfen-Dialog.
+#                 Je Relation: `label` (der Satz, den die Oberfläche zeigt) und
+#                 optional `ziel` (auf welche Typen verwiesen werden darf).
 #   sidebar       Einstieg in der Sidebar? **Vorgabe: nein.** Dort gehört nur hin, was
 #                 situationsunabhängig interessiert. Ein Operatorenblatt sucht man,
 #                 wenn man eine Aufgabe vor sich hat — und hat das Fach dann längst im
@@ -232,6 +239,10 @@ categories:
           # Mischtyp: Ein Teil der Methoden gilt fachübergreifend — „welche Methoden
           # gibt es überhaupt?" ist eine Frage ohne Fach im Kopf.
           sidebar: true
+          relationen:
+            related_to:
+              label: "steht in Beziehung zu"
+              ziel: [methode]
           # Pflicht: Ohne Beschreibung ist die Methode nur unter ihrem Namen zu
           # finden — der Embedding-Input bestünde faktisch aus dem Titel.
           content:
@@ -419,6 +430,13 @@ categories:
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
           # Biologie?" fragt man ohne das eigene Fach im Kopf.
           sidebar: true
+          relationen:
+            related_to:
+              label: "steht in Beziehung zu"
+              ziel: [begriff]
+            part_of:
+              label: "gehört zum Themengebiet"
+              ziel: [themengebiet]
           # Pflicht: Ein Begriff ohne Definition ist ein Titel, kein Baustein.
           content:
             label: "Definition"

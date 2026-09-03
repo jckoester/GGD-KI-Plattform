@@ -1,4 +1,23 @@
 <script>
+    import { untrack } from "svelte";
+    import { getNeighborhood, deleteContextEdge } from "$lib/api.js";
+    import { kannVerknuepfen, istStub } from "$lib/collections.js";
+    import VerknuepfenDialog from "$lib/components/VerknuepfenDialog.svelte";
+
+    /** Die Kantenarten in der Sprache der Sache statt als Relationsname. */
+    const RELATION_LABEL = {
+        related_to: "Steht in Beziehung zu",
+        part_of: "Gehört zu",
+        references: "Verweist auf",
+        develops: "Entwickelt",
+        requires: "Setzt voraus",
+        used_with: "Wird verwendet mit",
+        supersedes: "Löst ab",
+        follows: "Folgt auf",
+        derived_from: "Abgeleitet aus",
+        reflects_on: "Reflektiert",
+    };
+
     import { sammlung } from "$lib/collections.js";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -11,6 +30,7 @@
     import { subjectMap } from "$lib/stores/subjects.js";
     import { ArrowLeft, Pencil, Check, X } from "lucide-svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
     let node = $state(null);
     let loadingNode = $state(true);
@@ -80,6 +100,76 @@
             ? `/knowledge/collections/${node.content_type}/${$page.params.id}/edit${query}`
             : `/knowledge/${$page.params.id}/edit${query}`;
     });
+
+    // ── Nachbarschaft (UI-Notiz A3) ──────────────────────────────────────────
+    //
+    // Ego-Graph der Tiefe 1, nach Relationstyp gruppiert. Die Leitplanke aus ADR-013
+    // gilt: nie „alle Kanten" auf einmal — ab `KAPPUNG` Nachbarn je Relationstyp steht
+    // „+ n weitere" und der Weg in die große Ansicht.
+    const KAPPUNG = 20;
+
+    let nachbarschaft = $state(null);
+    let nachbarnFehler = $state(null);
+    let dialogOffen = $state(false);
+
+    async function ladeNachbarschaft(id) {
+        nachbarnFehler = null;
+        try {
+            nachbarschaft = await getNeighborhood(id, { depth: 1 });
+        } catch (e) {
+            nachbarnFehler = e.message;
+            nachbarschaft = null;
+        }
+    }
+
+    $effect(() => {
+        const id = $page.params.id;
+        untrack(() => ladeNachbarschaft(id));
+    });
+
+    /**
+     * Die Kanten nach Relationstyp gruppieren — mit Richtung und Gegenknoten.
+     *
+     * Der Sichtbarkeitsfilter greift dabei von selbst: Die Nachbarschaft liefert nur
+     * lesbare Knoten. Eine Kante, deren Gegenstück fehlt, wird deshalb ausgelassen —
+     * nicht anonymisiert angedeutet.
+     */
+    const gruppen = $derived.by(() => {
+        if (!nachbarschaft || !node) return [];
+        const knoten = Object.fromEntries(
+            (nachbarschaft.nodes ?? []).map((n) => [n.id, n]),
+        );
+        const nach = {};
+        for (const kante of nachbarschaft.edges ?? []) {
+            const raus = kante.from_node_id === node.id;
+            const gegen = knoten[raus ? kante.to_node_id : kante.from_node_id];
+            if (!gegen || gegen.id === node.id) continue;
+            (nach[kante.relation] ??= []).push({ kante, gegen, raus });
+        }
+        return Object.entries(nach)
+            .map(([relation, eintraege]) => ({
+                relation,
+                label: RELATION_LABEL[relation] ?? relation,
+                gesamt: eintraege.length,
+                sichtbar: eintraege.slice(0, KAPPUNG),
+                weitere: Math.max(0, eintraege.length - KAPPUNG),
+            }))
+            .sort((a, b) => b.gesamt - a.gesamt);
+    });
+
+    const kannVerknuepfenJetzt = $derived(
+        Boolean(node) && kannVerknuepfen(node.content_type) && canEdit,
+    );
+
+    async function entferneKante(kanteId) {
+        nachbarnFehler = null;
+        try {
+            await deleteContextEdge(kanteId);
+            await ladeNachbarschaft($page.params.id);
+        } catch (e) {
+            nachbarnFehler = e.message;
+        }
+    }
 
     const canEdit = $derived(
         node &&
@@ -255,12 +345,117 @@
                 · Aktualisiert: {formatDate(node.updated_at)}
             {/if}
         </p>
-        <a
-            href={graphUrl}
-            class="text-sm text-primary dark:text-dark-bl underline mb-4 inline-block"
-        >
-            Graphansicht öffnen →
-        </a>
+        <!-- ── Nachbarschaft (A3) + Verknüpfen (A8) ───────────────────────── -->
+        <section class="mb-5 mt-2">
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <h2 class="text-sm font-semibold text-light-tx dark:text-dark-tx">
+                    Vernetzung
+                </h2>
+                <div class="flex items-center gap-3">
+                    {#if kannVerknuepfenJetzt}
+                        <button
+                            onclick={() => (dialogOffen = !dialogOffen)}
+                            class="text-sm text-light-bl dark:text-dark-bl hover:underline"
+                        >
+                            Verknüpfen
+                        </button>
+                    {/if}
+                    <a
+                        href={graphUrl}
+                        class="text-sm text-light-bl dark:text-dark-bl hover:underline"
+                    >
+                        Große Graphansicht →
+                    </a>
+                </div>
+            </div>
+
+            {#if nachbarnFehler}
+                <ErrorBanner message={nachbarnFehler} />
+            {/if}
+
+            {#if dialogOffen}
+                <div class="mb-3">
+                    <VerknuepfenDialog
+                        {node}
+                        onclose={() => (dialogOffen = false)}
+                        onverknuepft={() => ladeNachbarschaft($page.params.id)}
+                    />
+                </div>
+            {/if}
+
+            {#if gruppen.length === 0}
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    Noch nicht vernetzt.
+                    {#if kannVerknuepfenJetzt}
+                        Über „Verknüpfen“ lassen sich Beziehungen zu anderen Bausteinen
+                        anlegen — etwa zu verwandten Begriffen oder zum Themengebiet.
+                    {:else}
+                        Verknüpfungen entstehen beim Import, im Curriculum-Editor und über
+                        den Verknüpfen-Dialog der zuständigen Fachschaft.
+                    {/if}
+                </p>
+            {:else}
+                <div class="space-y-3">
+                    {#each gruppen as gruppe (gruppe.relation)}
+                        <div>
+                            <p
+                                class="text-xs uppercase tracking-wide text-light-tx-3
+                                       dark:text-dark-tx-3 mb-1"
+                            >
+                                {gruppe.label} · {gruppe.gesamt}
+                            </p>
+                            <ul class="space-y-0.5">
+                                {#each gruppe.sichtbar as eintrag (eintrag.kante.id)}
+                                    <li class="flex items-center gap-2 text-sm">
+                                        {#if !eintrag.raus}
+                                            <span
+                                                title="Verweist auf diesen Baustein"
+                                                class="text-light-tx-3 dark:text-dark-tx-3"
+                                                >←</span
+                                            >
+                                        {/if}
+                                        <a
+                                            href="/knowledge/{eintrag.gegen.id}"
+                                            class="text-light-tx dark:text-dark-tx hover:underline"
+                                        >
+                                            {eintrag.gegen.title}
+                                        </a>
+                                        {#if istStub(eintrag.gegen)}
+                                            <span
+                                                title="Angelegt, aber noch ohne Inhalt"
+                                                class="text-xs px-1.5 py-0.5 rounded-full
+                                                       border border-light-ui-3
+                                                       dark:border-dark-ui-3
+                                                       text-light-tx-2 dark:text-dark-tx-2"
+                                                >unvollständig</span
+                                            >
+                                        {/if}
+                                        {#if canEdit && eintrag.raus}
+                                            <button
+                                                onclick={() => entferneKante(eintrag.kante.id)}
+                                                title="Verknüpfung entfernen — der Baustein bleibt"
+                                                class="text-xs text-light-tx-3 dark:text-dark-tx-3
+                                                       hover:text-light-re dark:hover:text-dark-re"
+                                            >
+                                                ×
+                                            </button>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                            {#if gruppe.weitere > 0}
+                                <a
+                                    href={graphUrl}
+                                    class="text-xs text-light-bl dark:text-dark-bl hover:underline"
+                                >
+                                    + {gruppe.weitere} weitere
+                                </a>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </section>
 
         <!-- Banner: Import-Hinweis (z. B. LFDB — Inhalte nur als PDF) -->
         {#if node.metadata?.import_hinweis}

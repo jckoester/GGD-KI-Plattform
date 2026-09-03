@@ -507,7 +507,7 @@ async def create_node(
     try:
         validate_content_type(payload.category, payload.content_type)
         validate_node_metadata(payload.content_type, payload.metadata_)
-        validate_node_content(payload.content_type, payload.content)
+        validate_node_content(payload.content_type, payload.content, payload.metadata_)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -601,7 +601,11 @@ async def update_node(
         if "metadata_" in update_data:
             validate_node_metadata(typ_danach, update_data["metadata_"])
         if "content" in update_data:
-            validate_node_content(typ_danach, update_data["content"])
+            validate_node_content(
+                typ_danach,
+                update_data["content"],
+                update_data.get("metadata_", node.metadata_),
+            )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -1386,33 +1390,29 @@ async def create_edge(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    """Erstellt eine neue Kante zwischen zwei Knoten."""
+    """Erstellt eine neue Kante zwischen zwei Knoten.
+
+    **Berechtigung (UI-Notiz A8):** Wer den **Ausgangsknoten schreiben** darf und den
+    **Zielknoten lesen** kann. Beides über dieselben Prüfungen wie überall sonst.
+
+    ⚠️ Bis AP5b stand hier eine **eigene** Fassung der Schreibprüfung, und sie wich in
+    drei Punkten ab: Admins kamen nicht durch, jede Gruppenmitgliedschaft genügte statt
+    der Lehrkraft-Rolle, und die Lesbarkeit des Ziels wurde gar nicht geprüft. Genau die
+    Sorte Doppelung, die AP1 bei den Ankertypen vorgefunden hat.
+    """
     from app.db.models import ContextNode
-    
-    # Prüfe ob beide Knoten existieren
+
     from_node = await db.get(ContextNode, payload.from_node_id)
     to_node = await db.get(ContextNode, payload.to_node_id)
-    
+
     if not from_node or from_node.status != "active":
         raise HTTPException(status_code=404, detail=f"Startknoten {payload.from_node_id} nicht gefunden")
     if not to_node or to_node.status != "active":
         raise HTTPException(status_code=404, detail=f"Zielknoten {payload.to_node_id} nicht gefunden")
-    
-    # Prüfe Schreibrecht auf from_node
-    if from_node.write_scope == "private" and from_node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
-    if from_node.write_scope == "subject" or from_node.write_scope == "group":
-        if from_node.write_scope_group_id:
-            # Prüfe ob User Mitglied der Gruppe ist
-            is_member = await db.execute(
-                sa.select(1).where(
-                    GroupMembership.group_id == from_node.write_scope_group_id,
-                    GroupMembership.pseudonym == user.sub,
-                )
-            )
-            if not is_member.scalar_one_or_none():
-                raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
-    
+
+    await _check_write_permission(from_node, user, db)
+    await _check_read_permission(to_node, user, db)
+
     # Prüfe ob Kante bereits existiert (idempotent)
     existing = await db.execute(
         sa.select(ContextEdge).where(
@@ -1444,29 +1444,17 @@ async def delete_edge(
     db: AsyncSession = Depends(get_db),
     user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
 ):
-    """Löscht eine Kante."""
+    """Löscht eine Kante — nur die Kante, nie einen Knoten (UI-Notiz A8)."""
     edge = await db.get(ContextEdge, edge_id)
     if not edge:
         raise HTTPException(status_code=404, detail="Kante nicht gefunden")
-    
-    # Prüfe Schreibrecht auf from_node
+
     from_node = await db.get(ContextNode, edge.from_node_id)
     if not from_node or from_node.status != "active":
         raise HTTPException(status_code=404, detail="Startknoten nicht gefunden")
-    
-    if from_node.write_scope == "private" and from_node.owner_pseudonym != user.sub:
-        raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
-    if from_node.write_scope == "subject" or from_node.write_scope == "group":
-        if from_node.write_scope_group_id:
-            is_member = await db.execute(
-                sa.select(1).where(
-                    GroupMembership.group_id == from_node.write_scope_group_id,
-                    GroupMembership.pseudonym == user.sub,
-                )
-            )
-            if not is_member.scalar_one_or_none():
-                raise HTTPException(status_code=403, detail="Keine Schreibberechtigung auf Startknoten")
-    
+
+    await _check_write_permission(from_node, user, db)
+
     await db.delete(edge)
     await db.commit()
 

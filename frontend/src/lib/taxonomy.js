@@ -151,6 +151,14 @@ export const COLLECTIONS = {
       "titel"
     ],
     "sidebar": true,
+    "relationen": {
+      "related_to": {
+        "label": "steht in Beziehung zu",
+        "ziel": [
+          "methode"
+        ]
+      }
+    },
     "content": {
       "label": "Kurzbeschreibung",
       "pflicht": true,
@@ -191,6 +199,20 @@ export const COLLECTIONS = {
       "titel"
     ],
     "sidebar": true,
+    "relationen": {
+      "related_to": {
+        "label": "steht in Beziehung zu",
+        "ziel": [
+          "begriff"
+        ]
+      },
+      "part_of": {
+        "label": "gehört zum Themengebiet",
+        "ziel": [
+          "themengebiet"
+        ]
+      }
+    },
     "content": {
       "label": "Definition",
       "pflicht": true,

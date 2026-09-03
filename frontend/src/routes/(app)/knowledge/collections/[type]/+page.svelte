@@ -13,7 +13,13 @@
     import { Plus, Archive, Pencil } from "lucide-svelte";
     import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
-    import { sammlung, spalten, filter, zellenwert } from "$lib/collections.js";
+    import {
+        sammlung,
+        spalten,
+        filter,
+        zellenwert,
+        istStub,
+    } from "$lib/collections.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { user } from "$lib/stores/user.js";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
@@ -37,6 +43,9 @@
     let status = $state($page.url.searchParams.get("status") ?? "active");
     let q = $state($page.url.searchParams.get("q") ?? "");
     let feldwert = $state($page.url.searchParams.get("wert") ?? "");
+    // Stubs aus dem Verknüpfen-Dialog: angelegt, um das Netz aufzuspannen, Inhalt folgt.
+    // Der Filter ist der Weg zurück zu ihnen — ohne ihn wären sie nur unauffällig leer.
+    let nurUnvollstaendig = $state($page.url.searchParams.get("unvollstaendig") === "1");
     let suchTimer = null;
 
     /**
@@ -56,6 +65,7 @@
         for (const [name, wert] of [
             ["subject_id", fachId], ["status", status === "active" ? "" : status],
             ["q", q.trim()], ["wert", feldwert],
+            ["unvollstaendig", nurUnvollstaendig ? "1" : ""],
         ]) {
             if (wert) params.set(name, String(wert));
         }
@@ -131,11 +141,12 @@
     // Feldfilter clientseitig: Die Werte stehen in `metadata`, wofür es keinen
     // Serverfilter gibt — und die Sammlungen sind klein genug, dass das nichts kostet.
     const sichtbar = $derived.by(() => {
-        const gefiltert = feldFilter && feldwert
+        let gefiltert = feldFilter && feldwert
             ? nodes.filter(
                   (n) => String((n.metadata ?? {})[feldFilter] ?? "") === feldwert,
               )
             : nodes;
+        if (nurUnvollstaendig) gefiltert = gefiltert.filter(istStub);
         // Eigenes zuerst — dieselbe Sortierstufe wie in der Suche.
         return [...gefiltert].sort((a, b) => {
             const meins = (n) => (n.owner_pseudonym === $user?.pseudonym ? 0 : 1);
@@ -156,6 +167,7 @@
     );
 
     const darfAnlegen = $derived(nodes.some((n) => n.darf_schreiben) || nodes.length === 0);
+    const unvollstaendige = $derived(nodes.filter(istStub).length);
 
     async function archivieren(node) {
         aktionsfehler = null;
@@ -196,6 +208,20 @@
                     {sichtbar.length}
                     {sichtbar.length === 1 ? "Eintrag" : "Einträge"}
                     {status === "archived" ? " im Archiv" : ""}
+                    {#if unvollstaendige > 0}
+                        ·
+                        <button
+                            onclick={() => {
+                                nurUnvollstaendig = !nurUnvollstaendig;
+                                inDieUrl();
+                            }}
+                            class="underline hover:text-light-tx dark:hover:text-dark-tx"
+                        >
+                            {unvollstaendige} ohne Inhalt{nurUnvollstaendig
+                                ? " (Filter aktiv)"
+                                : ""}
+                        </button>
+                    {/if}
                 </p>
             </div>
             {#if darfAnlegen}
@@ -321,6 +347,15 @@
                                                 ? ($subjectMap[node.subject_id]?.name ?? null)
                                                 : null,
                                         })}
+                                        {#if spalte.name === "titel" && istStub(node)}
+                                            <span
+                                                title="Aus einer Verknüpfung entstanden — Inhalt fehlt noch"
+                                                class="ml-2 text-xs px-1.5 py-0.5 rounded-full
+                                                       border border-light-ui-3 dark:border-dark-ui-3
+                                                       text-light-tx-2 dark:text-dark-tx-2 font-normal"
+                                                >unvollständig</span
+                                            >
+                                        {/if}
                                     </td>
                                 {/each}
                                 <td class="px-3 py-2" onclick={(e) => e.stopPropagation()}>

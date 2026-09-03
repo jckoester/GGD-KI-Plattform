@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest"
 import {
   alleSammlungen,
   fachSammlungen,
+  istStub,
+  kannVerknuepfen,
+  relationen,
   kategorieVon,
   sidebarSammlungen,
   contentFeld,
@@ -269,5 +272,53 @@ describe("fachSammlungen", () => {
       .map((s) => s.typ)
       .filter((typ) => sidebarSammlungen().some((s) => s.typ === typ))
     expect(beides).toEqual(["methode", "begriff"])
+  })
+})
+
+describe("relationen", () => {
+  it("bietet bei Fachbegriffen eine kuratierte Teilmenge", () => {
+    const r = relationen("begriff")
+    expect(r.map((x) => x.relation)).toEqual(["related_to", "part_of"])
+    // Die Richtung wird als Satz gezeigt, nicht als Pfeil-Abstraktion.
+    expect(r[0].label).toBe("steht in Beziehung zu")
+  })
+
+  it("lässt `references` bewusst weg", () => {
+    // Sie entsteht am Material, das den Begriff nutzt — nicht am Begriff selbst.
+    expect(relationen("begriff").map((r) => r.relation)).not.toContain("references")
+  })
+
+  it("schränkt die Zieltypen ein", () => {
+    const partOf = relationen("begriff").find((r) => r.relation === "part_of")
+    expect(partOf.ziel).toEqual(["themengebiet"])
+  })
+
+  it("gibt für Sammlungen ohne Dialog nichts", () => {
+    expect(relationen("sozialform")).toEqual([])
+    expect(kannVerknuepfen("sozialform")).toBe(false)
+    expect(kannVerknuepfen("begriff")).toBe(true)
+  })
+
+  it("nennt nur Relationen, die die Datenbank zulässt", () => {
+    const erlaubt = new Set([
+      "requires", "used_with", "part_of", "develops", "supersedes",
+      "references", "follows", "reflects_on", "derived_from", "related_to",
+    ])
+    for (const s of alleSammlungen()) {
+      for (const r of relationen(s.typ)) expect(erlaubt.has(r.relation)).toBe(true)
+    }
+  })
+})
+
+describe("istStub", () => {
+  it("erkennt die Markierung aus dem Verknüpfen-Dialog", () => {
+    expect(istStub({ metadata: { unvollstaendig: true } })).toBe(true)
+  })
+
+  it("hält einen bloß leeren Eintrag nicht für einen Stub", () => {
+    // Der Unterschied ist der Punkt: Ein Stub ist zählbar und filterbar.
+    expect(istStub({ metadata: {}, content: "" })).toBe(false)
+    expect(istStub({})).toBe(false)
+    expect(istStub(null)).toBe(false)
   })
 })

@@ -144,6 +144,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   einem Fach vor Augen — sie stehen im Fachschafts-Abschnitt der Fachseite, aufs Fach
   vorgefiltert.
 
+- **Bausteine lassen sich von Hand verknüpfen.** Die Detailansicht zeigt die
+  Vernetzung nach Beziehungsart gruppiert und bietet einen **Verknüpfen**-Dialog: Die
+  Richtung steht als Satz da („‚Oxidation‘ steht in Beziehung zu …"), das Ziel findet
+  dieselbe Namenssuche wie der `@`-Shortcode im Chat. Entfernen betrifft immer nur die
+  Verknüpfung, nie den Baustein.
+
+- **Fehlende Bausteine entstehen aus dem Dialog heraus.** Findet die Suche nichts
+  Passendes, legt der Dialog den Baustein an und verknüpft ihn sofort — ohne die Seite
+  zu verlassen. Er trägt dann das Kennzeichen **„unvollständig"**; die Sammlung zählt
+  diese Einträge und lässt nach ihnen filtern. So kann eine Fachschaft erst das Netz
+  aufspannen und später definieren.
+
 - **Methode und Fachbegriff verlangen jetzt eine Beschreibung.** Ohne sie ist ein Eintrag
   nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,
   fiele weg.
@@ -195,6 +207,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Ein Baustein ohne zuständige Gruppe verursachte einen Serverfehler** statt einer
   Meldung, was fehlt.
+
+- **Verknüpfungen ließen sich als Administrator nicht anlegen.** Der Kanten-Endpunkt
+  hatte eine eigene Fassung der Rechteprüfung, die Admins nicht kannte, jede
+  Gruppenmitgliedschaft genügen ließ und nicht prüfte, ob der Zielbaustein überhaupt
+  lesbar ist. Jetzt gilt dieselbe Regel wie überall.
 
 - **Aus einer Sammlung geöffnet, führte „Zurück" nicht dorthin zurück**, sondern in die
   allgemeine Bausteinliste — die gesetzten Filter waren verloren. Der Filterzustand

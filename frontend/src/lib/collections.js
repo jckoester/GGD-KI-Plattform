@@ -138,6 +138,40 @@ export function zellenwert(node, spalte, { fachname = null } = {}) {
   }
 }
 
+/**
+ * Die Relationen, die der Verknüpfen-Dialog für diesen Typ anbietet.
+ *
+ * Eine **kuratierte** Teilmenge, keine Liste aller möglichen: `references` etwa entsteht
+ * am Material, das einen Begriff nutzt, nicht am Begriff selbst — sie hier anzubieten
+ * lüde zur falschen Richtung ein. Ohne Eintrag hat der Typ keinen Dialog.
+ *
+ * @returns {Array<{relation: string, label: string, ziel: string[]}>}
+ */
+export function relationen(typ) {
+  const konfiguriert = sammlung(typ)?.relationen ?? {}
+  return Object.entries(konfiguriert).map(([relation, b]) => ({
+    relation,
+    label: b.label ?? relation,
+    ziel: b.ziel ?? [],
+  }))
+}
+
+export function kannVerknuepfen(typ) {
+  return relationen(typ).length > 0
+}
+
+/**
+ * Ein Knoten, dem noch der Inhalt fehlt — aus dem Verknüpfen-Dialog entstanden.
+ *
+ * Die Markierung ist der Unterschied zwischen „unfertig" und „stillschweigend leer":
+ * Stubs sind zählbar und filterbar, und genau deshalb findet die Fachschaft sie wieder.
+ */
+export const STUB_MARKIERUNG = "unvollstaendig"
+
+export function istStub(node) {
+  return Boolean((node?.metadata ?? {})[STUB_MARKIERUNG])
+}
+
 /** Label und Pflicht des Knotentexts — bei `begriff` heißt er „Definition". */
 export function contentFeld(typ) {
   const c = sammlung(typ)?.content ?? {}

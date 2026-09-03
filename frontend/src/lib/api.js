@@ -1681,6 +1681,33 @@ export async function getNodeEdges(nodeId, relation = null) {
   return res.json()
 }
 
+/** Legt eine Kante an. Idempotent — dieselbe Kante zweimal ergibt dieselbe. */
+export async function createContextEdge(payload) {
+  const res = await fetch(`${BASE}/context/edges`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Verknüpfen')
+  }
+  return res.json()
+}
+
+/** Entfernt eine Kante — **nur** die Kante, nie einen Knoten. */
+export async function deleteContextEdge(edgeId) {
+  const res = await fetch(`${BASE}/context/edges/${edgeId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Entfernen der Verknüpfung')
+  }
+}
+
 // Curriculum Create
 export async function createCurriculum(payload) {
   const res = await fetch(`${BASE}/context/curricula/new`, {

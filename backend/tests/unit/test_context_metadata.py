@@ -8,6 +8,7 @@ die sorgt die Startprüfung (`pruefe_schema_konsistenz`).
 import pytest
 
 from app.context.metadata import (
+    ist_stub,
     pruefe_schema_konsistenz,
     validate_node_content,
     validate_node_metadata,
@@ -163,3 +164,66 @@ class TestSchemaKonsistenz:
             taxonomy, "COLLECTIONS", {"begriff": {"spalten": ["titel"]}},
         )
         assert any("keine `beschreibung`" in b for b in pruefe_schema_konsistenz())
+
+
+class TestStubs:
+    """Der Verknüpfen-Dialog legt Bausteine ohne Inhalt an (UI-Notiz A8).
+
+    Das ist die eine Ausnahme von der Inhaltspflicht — und sie ist **markiert**. Genau
+    darin liegt der Unterschied zu einem stillschweigend leeren Eintrag: Ein Stub ist
+    zählbar und filterbar, die Fachschaft findet ihn wieder.
+    """
+
+    def test_markierter_stub_darf_ohne_inhalt(self):
+        validate_node_content("begriff", None, {"unvollstaendig": True})
+        validate_node_content("methode", "", {"unvollstaendig": True})
+
+    def test_ohne_markierung_gilt_die_pflicht(self):
+        with pytest.raises(ValueError, match="Pflichtfeld"):
+            validate_node_content("begriff", None, {})
+
+    def test_markierung_hebelt_die_feldpruefung_nicht_aus(self):
+        """Ein Stub darf unvollständig sein, nicht falsch."""
+        with pytest.raises(ValueError, match="höchstens 13"):
+            validate_node_metadata("begriff", {"unvollstaendig": True, "ab_klasse": 99})
+
+    def test_ist_stub(self):
+        assert ist_stub({"unvollstaendig": True})
+        assert not ist_stub({"unvollstaendig": False})
+        assert not ist_stub({})
+        assert not ist_stub(None)
+
+
+class TestRelationsKonfiguration:
+    """Der Verknüpfen-Dialog darf nur Relationen anbieten, die die Datenbank kennt."""
+
+    def test_auslieferungsstand_ist_gueltig(self):
+        assert pruefe_schema_konsistenz() == []
+
+    def test_unbekannte_relation_faellt_auf(self, monkeypatch):
+        from app.context import taxonomy
+
+        monkeypatch.setattr(
+            taxonomy, "COLLECTIONS",
+            {"begriff": {
+                "beschreibung": "x", "spalten": ["titel"],
+                "relationen": {"gehoert_irgendwie_zu": {"label": "…"}},
+            }},
+        )
+        monkeypatch.setattr(taxonomy, "FELD_SCHEMATA", {})
+        befunde = pruefe_schema_konsistenz()
+        assert any("unbekannte Relation" in b for b in befunde)
+
+    def test_relation_ohne_label(self, monkeypatch):
+        """Die Oberfläche zeigt die Richtung als Satz — dafür braucht sie einen."""
+        from app.context import taxonomy
+
+        monkeypatch.setattr(
+            taxonomy, "COLLECTIONS",
+            {"begriff": {
+                "beschreibung": "x", "spalten": ["titel"],
+                "relationen": {"related_to": {}},
+            }},
+        )
+        monkeypatch.setattr(taxonomy, "FELD_SCHEMATA", {})
+        assert any("kein `label`" in b for b in pruefe_schema_konsistenz())

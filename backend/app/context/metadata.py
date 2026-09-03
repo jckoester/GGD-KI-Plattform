@@ -29,6 +29,13 @@ from app.context.taxonomy import (
     feld_schema,
 )
 
+# Die Relationen, die der CHECK-Constraint `check_context_edges_relation` zulässt.
+# Eine Sammlung darf nur daraus anbieten — sonst schlüge das Anlegen der Kante fehl.
+ERLAUBTE_RELATIONEN = frozenset({
+    "requires", "used_with", "part_of", "develops", "supersedes",
+    "references", "follows", "reflects_on", "derived_from", "related_to",
+})
+
 
 def _pruefe_feld(name: str, feld: dict, wert) -> None:
     """Ein einzelner Wert gegen seine Feldbeschreibung. Wirft ``ValueError``."""
@@ -82,14 +89,33 @@ def validate_node_metadata(content_type: str | None, metadata: dict | None) -> N
         _pruefe_feld(name, feld, wert)
 
 
-def validate_node_content(content_type: str | None, content: str | None) -> None:
+# Ein Knoten, der aus dem Verknüpfen-Dialog entstanden ist: Titel und Fach stehen, der
+# Inhalt fehlt noch (UI-Notiz A8, Wiki-Muster).
+STUB_MARKIERUNG = "unvollstaendig"
+
+
+def ist_stub(metadata: dict | None) -> bool:
+    return bool((metadata or {}).get(STUB_MARKIERUNG))
+
+
+def validate_node_content(
+    content_type: str | None, content: str | None, metadata: dict | None = None
+) -> None:
     """Erzwingt den Knotentext, wo die Sammlung ihn als Pflicht führt.
 
     Der Grund steht in der Taxonomie: Ein Eintrag ohne Text ist nur unter seinem Namen
     auffindbar. Bei `methode` und `begriff` — beide mit Embedding — bestünde der
     Vektor faktisch aus dem Titel, und genau solche Knoten weist `traegt_substanz()`
     ab. Der Eintrag wäre also thematisch unsichtbar, ohne dass es jemandem auffiele.
+
+    ⚠️ **Ausnahme: ausdrücklich als unvollständig markierte Knoten.** Der
+    Verknüpfen-Dialog legt fehlende Begriffe im Hintergrund an, damit eine Fachschaft
+    erst das Netz aufspannen und dann definieren kann (A8). Diese Stubs tragen
+    `metadata.unvollstaendig` und sind damit **gezählt und filterbar** — der Unterschied
+    zu einem stillschweigend leeren Eintrag ist genau der: Man sieht, dass etwas fehlt.
     """
+    if ist_stub(metadata):
+        return
     if content_ist_pflicht(content_type) and not (content or "").strip():
         from app.context.taxonomy import collection_config
 
@@ -145,6 +171,20 @@ def pruefe_schema_konsistenz() -> list[str]:
                 befunde.append(
                     f"Sammlung {typ!r}: {schluessel} nennt {unbekannt}, aber weder feste "
                     f"Spalte noch Feld. Quelle: app/context/taxonomy.yaml"
+                )
+
+        for relation, beschreibung in (config.get("relationen") or {}).items():
+            if relation not in ERLAUBTE_RELATIONEN:
+                befunde.append(
+                    f"Sammlung {typ!r}: unbekannte Relation {relation!r} — erlaubt sind "
+                    f"{sorted(ERLAUBTE_RELATIONEN)} (CHECK-Constraint "
+                    "`check_context_edges_relation`). Quelle: app/context/taxonomy.yaml"
+                )
+            if not (beschreibung or {}).get("label"):
+                befunde.append(
+                    f"Sammlung {typ!r}, Relation {relation!r}: kein `label` — der Dialog "
+                    "zeigt die Richtung als Satz, dafür braucht er einen. "
+                    "Quelle: app/context/taxonomy.yaml"
                 )
 
         if "sidebar" in config and not isinstance(config["sidebar"], bool):
