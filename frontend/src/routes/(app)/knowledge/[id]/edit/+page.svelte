@@ -1,4 +1,6 @@
 <script>
+    import { bearbeitenZiel } from "$lib/bearbeiten.js";
+    import { subjectMap } from "$lib/stores/subjects.js";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CONTENT_TYPES, CATEGORY_LABELS } from "$lib/taxonomy.js";
@@ -36,6 +38,19 @@
                 // Weiterleitung wenn content_type === 'curriculum'
                 if (n.content_type === "curriculum") {
                     goto(`/knowledge/curriculum/${id}`, { replaceState: true });
+                    return;
+                }
+                // Hat der Typ einen **eigenen** Editor, führt diese Adresse ins Leere:
+                // Ein Stundenentwurf zeigt hier seine Phasen als rohes JSON, eine
+                // Sammlung ihre Felder gar nicht. Wer die Adresse direkt aufruft (Lesezeichen,
+                // alter Link), soll dort landen, wo die Änderung möglich ist.
+                const ziel = bearbeitenZiel(
+                    n,
+                    n.subject_id ? ($subjectMap[n.subject_id] ?? null) : null,
+                    backParam,
+                );
+                if (ziel.art !== "allgemein") {
+                    goto(ziel.url ?? `/knowledge/${id}`, { replaceState: true });
                     return;
                 }
                 // Ohne Schreibrecht zur Leseansicht weiterleiten

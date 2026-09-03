@@ -3,10 +3,10 @@
     import { getNeighborhood, deleteContextEdge } from "$lib/api.js";
     import { kannVerknuepfen, istStub } from "$lib/collections.js";
     import { gruppiereKanten } from "$lib/vernetzung.js";
+    import { bearbeitenZiel } from "$lib/bearbeiten.js";
     import VerknuepfenDialog from "$lib/components/VerknuepfenDialog.svelte";
 
 
-    import { sammlung } from "$lib/collections.js";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CATEGORY_LABELS, CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
@@ -75,20 +75,17 @@
                 : ""),
     );
 
-    // Bearbeiten-Link trägt den back-Parameter weiter, damit die Edit-Seite
-    // wieder hierher (und von hier zurück zur Ausgangsliste) navigieren kann.
-    //
-    // Gehört der Knoten zu einer Sammlung, führt er in **deren** Editor: Der baut sein
-    // Formular aus dem Feldschema, während der allgemeine Editor `metadata` als rohes
-    // JSON zeigt. Wer aus der Sammlung kommt, bekäme sonst zwei verschiedene Masken für
-    // denselben Baustein.
-    const editUrl = $derived.by(() => {
-        const rueckweg = $page.url.searchParams.get("back");
-        const query = rueckweg ? `?back=${encodeURIComponent(rueckweg)}` : "";
-        return sammlung(node?.content_type)
-            ? `/knowledge/collections/${node.content_type}/${$page.params.id}/edit${query}`
-            : `/knowledge/${$page.params.id}/edit${query}`;
-    });
+    // Wohin „Bearbeiten" führt, entscheidet der Typ: Sammlungen haben ihren
+    // Formular-Editor, Planungsobjekte gehören in den Planer, alles Übrige in den
+    // allgemeinen Editor. Die Regel steht in `bearbeiten.js` — sie ist zu verzweigt für
+    // eine Komponente und ohne Browser sonst nicht prüfbar.
+    const ziel = $derived(
+        bearbeitenZiel(
+            node,
+            node?.subject_id ? ($subjectMap[node.subject_id] ?? null) : null,
+            $page.url.searchParams.get("back"),
+        ),
+    );
 
     // ── Nachbarschaft (UI-Notiz A3) ──────────────────────────────────────────
     //
@@ -291,15 +288,23 @@
                     {/if}
                 </p>
             </div>
-            {#if canEdit && !isImported}
+            {#if canEdit && !isImported && ziel.url}
                 <a
-                    href={editUrl}
+                    href={ziel.url}
                     class="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm rounded-md
                            bg-primary dark:bg-primary-dark text-white font-medium
                            hover:opacity-90 transition-opacity"
                 >
-                    <Pencil class="w-4 h-4" /> Bearbeiten
+                    <Pencil class="w-4 h-4" /> {ziel.label}
                 </a>
+            {:else if canEdit && !isImported && ziel.hinweis}
+                <!-- Kein Knopf ins Leere: Der eigene Editor braucht Angaben, die an
+                     diesem Knoten nicht stehen. Dann lieber sagen, wo es hingehört. -->
+                <p
+                    class="shrink-0 max-w-56 text-xs text-light-tx-2 dark:text-dark-tx-2"
+                >
+                    {ziel.hinweis}
+                </p>
             {/if}
         </div>
 

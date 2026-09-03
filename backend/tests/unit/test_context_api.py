@@ -938,3 +938,64 @@ class TestFachDesUngespeichertenChats:
                 db=object(), user=make_jwt(roles=["teacher"], sub="p"),
             )
         assert gesucht.await_args.kwargs["nur_identifikation"] is False
+
+
+class TestStundenschemaAuchAllgemein:
+    """Der Verlaufsplan wird jetzt auf **jedem** Schreibweg geprüft.
+
+    ⚠️ `validate_unterrichtsstunde_metadata` hing bis 03.09.2026 allein am
+    Planner-Router. Über `PATCH /context/nodes/{id}` — den der allgemeine Editor benutzt
+    — ließ sich ein kaputter Verlaufsplan schreiben, den der Planner danach nicht mehr
+    darstellen kann.
+    """
+
+    def _db(self, node):
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=node)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        db.execute = AsyncMock()
+        return db
+
+    def _stunde(self):
+        return make_node(category="artifact", content_type="unterrichtsstunde")
+
+    def test_kaputte_phase_wird_abgewiesen(self):
+        node = self._stunde()
+        resp = TestClient(make_app(self._db(node), make_jwt())).patch(
+            f"/context/nodes/{node.id}",
+            json={"metadata": {"phasen": [{"titel": "Einstieg"}]}},
+        )
+        assert resp.status_code == 422
+        assert "Pflichtfeld" in resp.json()["detail"]
+
+    def test_ungueltige_prio_wird_abgewiesen(self):
+        node = self._stunde()
+        resp = TestClient(make_app(self._db(node), make_jwt())).patch(
+            f"/context/nodes/{node.id}",
+            json={"metadata": {"phasen": [{
+                "id": "p1", "titel": "Einstieg", "dauer_min": 10,
+                "prio": "wichtig", "status": "geplant",
+            }]}},
+        )
+        assert resp.status_code == 422
+        assert "prio" in resp.json()["detail"]
+
+    def test_gueltige_phase_geht_durch(self):
+        node = self._stunde()
+        resp = TestClient(make_app(self._db(node), make_jwt())).patch(
+            f"/context/nodes/{node.id}",
+            json={"metadata": {"phasen": [{
+                "id": "p1", "titel": "Einstieg", "dauer_min": 10,
+                "prio": "kern", "status": "geplant",
+            }]}},
+        )
+        assert resp.status_code == 200
+
+    def test_andere_typen_bleiben_unberuehrt(self):
+        node = make_node(category="artifact", content_type="arbeitsblatt")
+        resp = TestClient(make_app(self._db(node), make_jwt())).patch(
+            f"/context/nodes/{node.id}",
+            json={"metadata": {"phasen": "was auch immer"}},
+        )
+        assert resp.status_code == 200

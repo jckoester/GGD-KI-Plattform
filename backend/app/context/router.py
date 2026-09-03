@@ -54,7 +54,10 @@ from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.metadata import validate_node_content, validate_node_metadata
-from app.context.taxonomy import validate_content_type
+from app.context.taxonomy import (
+    validate_content_type,
+    validate_unterrichtsstunde_metadata,
+)
 from app.context.retrieval import VALID_SCOPE_ANCHOR_TYPES
 from app.context.filters import Knotenfilter, wende_an
 from app.context.visibility import read_scope_clause
@@ -600,6 +603,12 @@ async def update_node(
     try:
         if "metadata_" in update_data:
             validate_node_metadata(typ_danach, update_data["metadata_"])
+            # ⚠️ Der Stundenentwurf hat ein verschachteltes Phasen-Schema, das die
+            # Feldliste nicht abbildet — geprüft hat es bislang **nur** der Planner.
+            # Über diesen allgemeinen Weg ließ sich ein kaputter Verlaufsplan schreiben,
+            # den der Planner danach nicht mehr darstellen kann.
+            if typ_danach == "unterrichtsstunde":
+                validate_unterrichtsstunde_metadata(update_data["metadata_"] or {})
         if "content" in update_data:
             validate_node_content(
                 typ_danach,

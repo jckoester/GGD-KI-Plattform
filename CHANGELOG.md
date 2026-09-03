@@ -208,6 +208,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Ein Baustein ohne zuständige Gruppe verursachte einen Serverfehler** statt einer
   Meldung, was fehlt.
 
+- **Bausteine mit eigenem Editor führten trotzdem in den allgemeinen.** Ein
+  Stundenentwurf, eine Unterrichtseinheit oder ein Jahresplan öffnete eine Maske, in der
+  der Verlaufsplan als rohes JSON stand — die beabsichtigte Änderung war dort gar nicht
+  möglich. „Bearbeiten" führt jetzt in den Planer; wer die alte Adresse aufruft, wird
+  dorthin weitergeleitet. Fehlt die Zuordnung zu einer Unterrichtsgruppe, erscheint
+  statt eines Knopfes der Hinweis, wo der Baustein gepflegt wird.
+
+- **Über den allgemeinen Editor ließ sich ein kaputter Verlaufsplan speichern.** Das
+  Phasen-Schema prüfte nur der Planer; jetzt gilt es auf jedem Schreibweg.
+
 - **Verknüpfungen ließen sich als Administrator nicht anlegen.** Der Kanten-Endpunkt
   hatte eine eigene Fassung der Rechteprüfung, die Admins nicht kannte, jede
   Gruppenmitgliedschaft genügen ließ und nicht prüfte, ob der Zielbaustein überhaupt
