@@ -8,6 +8,7 @@
     SCOPE_DEFAULTS,
   } from '$lib/taxonomy.js'
   import { auswaehlbareTypOptionen } from '$lib/knotentypen.js'
+  import { alsTagMonat, ladeSchuljahr, schuljahresEnde } from '$lib/stores/schoolYear.js'
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
@@ -87,10 +88,9 @@
     return now.getMonth() >= 7 ? `${year}/${year + 1}` : `${year - 1}/${year}`
   }
 
-  function schuljahresEnde() {
-    const year = parseInt(schuljahr.split('/')[1] ?? new Date().getFullYear() + 1)
-    return `${year}-07-31`
-  }
+  // Das Schuljahresende kommt aus `config/school_year.yaml`, nicht aus einer Annahme
+  // über den 31.07. — dieselbe Quelle, aus der der Server das Ablaufdatum vorbelegt.
+  ladeSchuljahr()
 
   // ── Metadata zusammenbauen ──────────────────────────────────────────────
   function buildMetadata() {
@@ -536,14 +536,16 @@
               class="px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
             />
-            <button
-              type="button"
-              onclick={() => { validUntil = schuljahresEnde() }}
-              class="text-xs px-2 py-1.5 rounded-md bg-light-ui-2 dark:bg-dark-ui-2
-                     text-light-tx dark:text-dark-tx hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
-            >
-              Schuljahresende (31.07.)
-            </button>
+            {#if $schuljahresEnde}
+              <button
+                type="button"
+                onclick={() => { validUntil = $schuljahresEnde }}
+                class="text-xs px-2 py-1.5 rounded-md bg-light-ui-2 dark:bg-dark-ui-2
+                       text-light-tx dark:text-dark-tx hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+              >
+                Schuljahresende ({alsTagMonat($schuljahresEnde)})
+              </button>
+            {/if}
           </div>
           <!-- Ein leeres Feld heißt bei diesen Arten nicht „läuft nie ab": Der Server
                trägt das Schuljahresende ein (Regel in app/db/models.py). Ohne diesen

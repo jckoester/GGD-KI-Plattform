@@ -116,6 +116,12 @@ export async function getCalendarStatus() {
   return res.json();
 }
 
+export async function getSchoolYear() {
+  const res = await fetch(`${BASE}/calendar/school-year`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Schuljahr nicht abrufbar (${res.status})`);
+  return res.json();
+}
+
 export async function getCalendarTeachers() {
   // Unterscheidet drei Fälle, die sich sonst alle als „nicht eingerichtet" tarnen und
   // das Feld kommentarlos verschwinden lassen:

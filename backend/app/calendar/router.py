@@ -42,6 +42,35 @@ async def calendar_status(
     return {"configured": is_configured()}
 
 
+@router.get("/school-year")
+async def school_year(
+    _user=Depends(require_any_role(["teacher", "admin"])),
+) -> dict:
+    """Das laufende Schuljahr aus `config/school_year.yaml`.
+
+    Damit die Oberfläche kein zweites Mal rechnet. Der Knopf „Schuljahresende" im
+    Baustein-Formular leitete das Datum bis 04.09.2026 aus dem eingetippten Schuljahr ab
+    und nahm dafür **fest den 31.07.** an — in der Config steht der 29.07.2026 bzw. der
+    28.07.2027. Zwei Tage daneben fällt niemandem auf, und genau deshalb bleibt es
+    stehen.
+
+    Wichtiger als die zwei Tage ist der Gleichlauf: Dasselbe Datum trägt der Server ein,
+    wenn beim Anlegen kein Ablaufdatum angegeben wird
+    (`_ablaufdatum_vorbelegen` in `app/db/models.py`). Knopf und Automatik müssen
+    dieselbe Antwort geben, sonst wirkt eines von beidem falsch.
+
+    Bewusst schmal — nur die vier Eckdaten. Ferien und Feiertage liefert der
+    Planer-Endpunkt, der sie auch braucht.
+    """
+    cfg = load_school_year()
+    return {
+        "schuljahr": cfg.schuljahr,
+        "beginn": cfg.beginn.isoformat(),
+        "ende": cfg.ende.isoformat(),
+        "halbjahreswechsel": cfg.halbjahreswechsel.isoformat(),
+    }
+
+
 @router.get("/teachers")
 async def list_teachers(
     _user=Depends(require_any_role(["teacher", "admin"])),

@@ -197,6 +197,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Knopf „Schuljahresende" trug ein falsches Datum.** Er setzte immer den 31.07.,
+  unabhängig vom hinterlegten Schuljahr — dieses Jahr endet es am 29.07. Jetzt kommt das
+  Datum aus der Schuljahres-Einstellung und steht auch auf dem Knopf.
+
 - **Auswahlfelder für Bausteinarten zeigten den technischen Schlüssel.** Statt
   „Schülerpräsentation" stand dort `schuelerpraesentation` — im Filter des
   Wissensgraphen, im Anlege-Formular und im Editor. Überall stehen jetzt die deutschen
