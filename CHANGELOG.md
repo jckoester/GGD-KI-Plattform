@@ -160,6 +160,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,
   fiele weg.
 
+- **Die mitgelieferten Methoden tragen das Kennzeichen „unvollständig", bis eine
+  Beschreibung vorliegt.** In den Auswahllisten des Stundenentwurfs stehen sie
+  unverändert; thematisch auffindbar werden sie mit der Beschreibung.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss

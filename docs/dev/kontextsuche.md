@@ -187,7 +187,7 @@ Exit-Code 1, wenn eine Zusage bricht:
 | Kennzahl | Bedeutung | Ausgangswert |
 |---|---|---|
 | Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 17/21 |
-| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 30/33 |
+| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 30/39 |
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
 | Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten — erstmals gemessen | 2/2 auf Rang 1 |
@@ -196,6 +196,12 @@ Exit-Code 1, wenn eine Zusage bricht:
 **Unterschreiten ist ein Fehlschlag, kein Kompromiss.** Wer eine Kennzahl bewusst
 opfert, begründet das im Code-Kommentar neben dem geänderten Wert — so wie es die
 bestehenden Konstanten vormachen.
+
+⚠️ **Sechs Fälle schlagen absichtlich fehl.** Der Abschnitt **S8** („Methoden thematisch
+finden, ohne den Namen zu kennen") misst gegen Knoten, deren Kurzbeschreibung noch
+aussteht (AP6, Zulieferung 1). Ohne Beschreibung sind sie als `unvollstaendig` markiert
+und haben gar keinen Vektor — die Fälle sind die **Abnahme** dieser Zulieferung, nicht
+ihr Ergebnis. Deshalb steht in der Tabelle 30/39 und nicht 36/39.
 
 ### Wo die Zeit hingeht
 

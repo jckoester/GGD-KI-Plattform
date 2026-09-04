@@ -276,6 +276,54 @@ faelle:
       der stillschweigend zu weit greift: Ein Mathematik-Kapitel darf hier nicht
       auftauchen.
 
+  # ── S8: Methoden thematisch finden, ohne den Namen zu kennen ────────────────
+  #
+  # Die Gegenprobe zum Nachschlagen: Dort ist der Name bekannt und gesucht wird der
+  # Knoten, hier ist der Ablauf bekannt und gesucht wird der Name. Genau das ist der
+  # Grund, warum `content` bei `methode` ein Pflichtfeld ist — ohne Beschreibung besteht
+  # der Vektor aus Titel und Aliasen, und wer „Ich-Du-Wir" nicht kennt, findet nichts.
+  #
+  # `fach` bleibt leer: Die geseedeten Methoden sind fachübergreifend und tragen kein
+  # Fach; welches auf Platz 1 steht, ist beliebig und darf nicht geprüft werden.
+  #
+  # ⚠️ Diese Fälle brauchen die Kurzbeschreibungen aus
+  # `backend/scripts/seed_methodik.py` (AP6, Zulieferung 1). Solange sie fehlen, sind
+  # die Knoten als unvollständig markiert und haben **gar keinen** Vektor — der Runner
+  # meldet sie dann als „nicht in der Trefferliste". Das ist kein Rückschritt, sondern
+  # der Zustand, den diese Fälle sichtbar machen sollen.
+
+  - frage: Erst allein nachdenken, dann zu zweit austauschen, dann der Klasse vorstellen
+    knoten: Think-Pair-Share
+    notiz: >-
+      Der Leitfall: Der Ablauf ist der Name. Ohne Beschreibung im Knoten führt an
+      „Think-Pair-Share" oder „Ich-Du-Wir" kein Weg vorbei.
+
+  - frage: Jede Gruppe erarbeitet ein Teilthema und unterrichtet danach die anderen
+    knoten: Gruppenpuzzle
+    notiz: Umschreibung ohne jedes Stichwort aus Titel oder Aliasen.
+
+  - frage: Die Ergebnisse hängen im Raum aus und alle gehen herum und schauen sie an
+    knoten: Galeriegang
+    notiz: >-
+      Wächter gegen Wortgleichheit: „Galerie" steht in der Frage nicht, „Gallery Walk"
+      erst recht nicht.
+
+  - frage: An mehreren Plätzen liegen Aufgaben, die in eigener Reihenfolge bearbeitet werden
+    knoten: Stationenlernen
+    notiz: >-
+      Liegt inhaltlich neben „Lernzirkel" und „Lerntheke" — der Fall hält fest, welcher
+      der drei oben steht, wenn alle drei eine Beschreibung haben.
+
+  - frage: Zwei Kreise stehen sich gegenüber, nach jedem Durchgang wechseln die Partner
+    knoten: Kugellager
+    notiz: Der Alias („Innen-Außen-Kreis") beschreibt die Anordnung, die Frage auch.
+
+  - frage: Eine kleine Gruppe diskutiert in der Mitte, die übrigen beobachten von außen
+    knoten: Fishbowl
+    notiz: >-
+      Zweiter Fall mit derselben räumlichen Anordnung wie Kugellager — die beiden
+      dürfen sich nicht verwechseln lassen.
+
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #
 # Eine andere Frageklasse und deshalb ein eigener Abschnitt: „alle, die …" verlangt
