@@ -7,7 +7,7 @@
         CONTENT_TYPE_LABELS,
         SCOPE_ANCHOR_CONTENT_TYPES,
     } from "$lib/taxonomy.js";
-    import { auswaehlbareTypen } from "$lib/knotentypen.js";
+    import { auswaehlbareTypOptionen } from "$lib/knotentypen.js";
     import { STUDENT_GRADES as studentGrades } from "$lib/grades.js";
     import {
         getContextNodes,
@@ -124,10 +124,12 @@
     let searchTimer = null;
 
     const contentTypeOptions = $derived(
-        auswaehlbareTypen(
-            selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : [],
+        auswaehlbareTypOptionen(
+            (selectedCategory ? (CONTENT_TYPES[selectedCategory] ?? []) : []).filter(
+                (ct) => !excludeContentTypes.includes(ct),
+            ),
             selectedContentType,
-        ).filter((ct) => !excludeContentTypes.includes(ct)),
+        ),
     );
 
     function buildParams() {
@@ -330,7 +332,7 @@
             >
                 <option value="">Alle Untertypen</option>
                 {#each contentTypeOptions as ct}
-                    <option value={ct}>{ct}</option>
+                    <option value={ct.key}>{ct.label}</option>
                 {/each}
             </select>
         {/if}

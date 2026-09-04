@@ -43,3 +43,24 @@ export function auswaehlbareTypLabels(aktuellerTyp = null) {
     ([key]) => !RUHENDE_CONTENT_TYPES.has(key) || key === aktuellerTyp,
   )
 }
+
+/**
+ * Fertige Auswahlfeld-Einträge: gefiltert, beschriftet, alphabetisch.
+ *
+ * Drei Auswahlfelder — Filter der Knotenliste, Anlege-Formular, allgemeiner Editor —
+ * zeigten den rohen `content_type` (`schuelerpraesentation`, `leitperspektive_aspekt`).
+ * Der Wert eines `<option>` bleibt der Schlüssel, sichtbar ist das deutsche Label.
+ *
+ * **Sortiert wird nach dem Label, nicht nach dem Schlüssel.** Die Reihenfolge der
+ * Taxonomie folgt der Herkunft der Typen (Bildungsplan, dann Eigenes) — eine Ordnung,
+ * die für Lesende unsichtbar ist, sobald nicht mehr der Schlüssel dasteht.
+ *
+ * @param {string[]} typen
+ * @param {string|null|undefined} aktuellerTyp
+ * @returns {Array<{key: string, label: string}>}
+ */
+export function auswaehlbareTypOptionen(typen, aktuellerTyp = null) {
+  return auswaehlbareTypen(typen, aktuellerTyp)
+    .map((key) => ({ key, label: CONTENT_TYPE_LABELS[key] ?? key }))
+    .sort((a, b) => a.label.localeCompare(b.label, "de"))
+}

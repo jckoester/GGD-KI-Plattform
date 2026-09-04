@@ -33,7 +33,7 @@ from app.context.taxonomy import (
 # Eine Sammlung darf nur daraus anbieten — sonst schlüge das Anlegen der Kante fehl.
 ERLAUBTE_RELATIONEN = frozenset({
     "requires", "used_with", "part_of", "develops", "supersedes",
-    "references", "follows", "reflects_on", "derived_from", "related_to",
+    "references", "follows", "derived_from", "related_to",
 })
 
 

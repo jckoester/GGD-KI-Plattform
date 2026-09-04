@@ -931,8 +931,10 @@ class ContextEdge(Base):
 
     __table_args__ = (
         CheckConstraint(
+            # `reflects_on` fiel mit Migration 0056 weg — die Relation gehörte zum
+            # in 0055 gestrichenen Knotentyp `reflexion`.
             "relation IN ('requires','used_with','part_of','develops',"
-            "             'supersedes','references','follows','reflects_on','derived_from',"
+            "             'supersedes','references','follows','derived_from',"
             "             'related_to')",
             name="check_context_edges_relation",
         ),

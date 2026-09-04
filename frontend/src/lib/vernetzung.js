@@ -28,7 +28,6 @@ export const RELATION_LABEL = {
   supersedes: { raus: "Löst ab", rein: "Abgelöst durch" },
   follows: { raus: "Folgt auf", rein: "Gefolgt von" },
   derived_from: { raus: "Abgeleitet aus", rein: "Grundlage für" },
-  reflects_on: { raus: "Reflektiert", rein: "Reflektiert durch" },
 }
 
 /** Ab hier wird gekappt und „+ n weitere" gezeigt (ADR-013-Leitplanke). */

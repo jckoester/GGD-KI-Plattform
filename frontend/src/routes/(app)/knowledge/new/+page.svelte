@@ -2,7 +2,7 @@
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
   import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_DEFAULTS } from '$lib/taxonomy.js'
-  import { auswaehlbareTypen } from '$lib/knotentypen.js'
+  import { auswaehlbareTypOptionen } from '$lib/knotentypen.js'
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
@@ -57,7 +57,7 @@
 
   // ── Content-Type-Optionen je Category ──────────────────────────────────
   const contentTypeOptions = $derived(
-    auswaehlbareTypen(category ? (CONTENT_TYPES[category] ?? []) : [])
+    auswaehlbareTypOptionen(category ? (CONTENT_TYPES[category] ?? []) : [])
   )
 
   // ── Scope-Defaults bei Category-/Typ-Wechsel setzen ────────────────────
@@ -222,7 +222,7 @@
         >
           <option value="">-- Bitte wählen --</option>
           {#each contentTypeOptions as ct}
-            <option value={ct}>{ct}</option>
+            <option value={ct.key}>{ct.label}</option>
           {/each}
         </select>
         {#if errors.contentType}

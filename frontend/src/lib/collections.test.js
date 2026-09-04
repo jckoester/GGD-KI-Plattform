@@ -300,9 +300,10 @@ describe("relationen", () => {
   })
 
   it("nennt nur Relationen, die die Datenbank zulässt", () => {
+    // Neun, nicht zehn: `reflects_on` fiel mit Migration 0056 weg.
     const erlaubt = new Set([
       "requires", "used_with", "part_of", "develops", "supersedes",
-      "references", "follows", "reflects_on", "derived_from", "related_to",
+      "references", "follows", "derived_from", "related_to",
     ])
     for (const s of alleSammlungen()) {
       for (const r of relationen(s.typ)) expect(erlaubt.has(r.relation)).toBe(true)

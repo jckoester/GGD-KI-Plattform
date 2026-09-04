@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest"
-import { auswaehlbareTypen, auswaehlbareTypLabels } from "./knotentypen.js"
-import { CONTENT_TYPES, RUHENDE_CONTENT_TYPES } from "./taxonomy.js"
+import {
+  auswaehlbareTypen,
+  auswaehlbareTypLabels,
+  auswaehlbareTypOptionen,
+} from "./knotentypen.js"
+import {
+  CONTENT_TYPES,
+  CONTENT_TYPE_LABELS,
+  RUHENDE_CONTENT_TYPES,
+} from "./taxonomy.js"
 
 describe("auswaehlbareTypen", () => {
   it("entfernt ruhende Typen", () => {
@@ -54,6 +62,45 @@ describe("auswaehlbareTypLabels", () => {
     const ruhend = [...RUHENDE_CONTENT_TYPES][0]
     const paare = auswaehlbareTypLabels(ruhend)
     expect(paare.map(([key]) => key)).toContain(ruhend)
+  })
+})
+
+describe("auswaehlbareTypOptionen", () => {
+  it("beschriftet deutsch und behält den Schlüssel als Wert", () => {
+    const optionen = auswaehlbareTypOptionen(["arbeitsblatt", "klausur"])
+    expect(optionen).toEqual([
+      { key: "arbeitsblatt", label: CONTENT_TYPE_LABELS.arbeitsblatt },
+      { key: "klausur", label: CONTENT_TYPE_LABELS.klausur },
+    ])
+  })
+
+  it("zeigt nie einen rohen content_type", () => {
+    // Der gemeldete Fehler: `schuelerpraesentation` statt „Schülerpräsentation" —
+    // in drei Auswahlfeldern gleichzeitig.
+    for (const typen of Object.values(CONTENT_TYPES)) {
+      for (const { key, label } of auswaehlbareTypOptionen(typen)) {
+        expect(label).not.toBe(key)
+      }
+    }
+  })
+
+  it("sortiert nach Label, nicht nach Schlüssel", () => {
+    const labels = auswaehlbareTypOptionen(CONTENT_TYPES.knowledge).map((o) => o.label)
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, "de")))
+  })
+
+  it("erbt die Ruhend-Regel samt Ausnahme", () => {
+    expect(auswaehlbareTypOptionen(["arbeitsblatt", "lernplan"]).map((o) => o.key)).toEqual(
+      ["arbeitsblatt"],
+    )
+    expect(
+      auswaehlbareTypOptionen(["arbeitsblatt", "lernplan"], "lernplan").map((o) => o.key),
+    ).toContain("lernplan")
+  })
+
+  it("verträgt null und undefined", () => {
+    expect(auswaehlbareTypOptionen(null)).toEqual([])
+    expect(auswaehlbareTypOptionen(undefined)).toEqual([])
   })
 })
 

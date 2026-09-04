@@ -172,6 +172,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
+- **Neue Datenbank-Migration `0056`** (Verknüpfungsart „reflektiert" entfernt). Sie
+  gehörte zur in `0055` gestrichenen Bausteinart *Reflexion*. `alembic upgrade head` wie
+  gewohnt; der Lauf bricht ab, falls im Bestand entgegen der Erwartung noch solche
+  Verknüpfungen liegen.
+
 - **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss
   **zusammen mit** diesem Release eingespielt werden: Das Backend startet nicht, solange
   Bausteine eine Art tragen, die es nicht mehr gibt. `alembic upgrade head` wie gewohnt.
@@ -185,6 +190,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   gewohnt.
 
 ### Behoben
+
+- **Auswahlfelder für Bausteinarten zeigten den technischen Schlüssel.** Statt
+  „Schülerpräsentation" stand dort `schuelerpraesentation` — im Filter des
+  Wissensgraphen, im Anlege-Formular und im Editor. Überall stehen jetzt die deutschen
+  Bezeichnungen, alphabetisch sortiert.
 
 - **Assistenten mit Wissensbereich sahen keine fach- oder gruppenweit freigegebenen
   Bausteine.** Ihr Suchweg kannte nur schulweite und eigene Knoten. Jetzt gilt für sie

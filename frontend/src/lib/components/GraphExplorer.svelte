@@ -45,7 +45,6 @@
     references:   '#6b7280',
     related_to:   '#6b7280',
     follows:      '#14b8a6',
-    reflects_on:  '#f59e0b',
     derived_from: '#8b5cf6',
   }
 
