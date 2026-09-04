@@ -187,7 +187,7 @@ Exit-Code 1, wenn eine Zusage bricht:
 | Kennzahl | Bedeutung | Ausgangswert |
 |---|---|---|
 | Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 17/21 |
-| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 30/39 |
+| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 36/39 |
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
 | Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten — erstmals gemessen | 2/2 auf Rang 1 |
@@ -197,11 +197,18 @@ Exit-Code 1, wenn eine Zusage bricht:
 opfert, begründet das im Code-Kommentar neben dem geänderten Wert — so wie es die
 bestehenden Konstanten vormachen.
 
-⚠️ **Sechs Fälle schlagen absichtlich fehl.** Der Abschnitt **S8** („Methoden thematisch
-finden, ohne den Namen zu kennen") misst gegen Knoten, deren Kurzbeschreibung noch
-aussteht (AP6, Zulieferung 1). Ohne Beschreibung sind sie als `unvollstaendig` markiert
-und haben gar keinen Vektor — die Fälle sind die **Abnahme** dieser Zulieferung, nicht
-ihr Ergebnis. Deshalb steht in der Tabelle 30/39 und nicht 36/39.
+**Der Abschnitt S8 misst die Beschreibungen selbst, nicht die Suchschicht.** „Methoden
+thematisch finden, ohne den Namen zu kennen" fragt Methoden über ihren Ablauf ab
+(„Erst allein nachdenken, dann zu zweit austauschen …" → Think-Pair-Share). Fällt einer
+dieser Fälle, liegt es an der Kurzbeschreibung des Knotens (`scripts/seed_methodik.py`),
+nicht an der Suche — ohne Beschreibung ist der Knoten als `unvollstaendig` markiert und
+hat gar keinen Vektor.
+
+⚠️ **Positiv beschreiben, nicht abgrenzen.** Ein Satz wie „Anders als beim Lernzirkel
+gibt es keine feste Reihenfolge" trägt den fremden Namen und den verneinten Begriff in
+die Eingabe und zieht den Knoten an den heran, von dem er sich abgrenzen soll —
+Verneinungen kennt ein Embedding nicht. Am S8-Fall zum Stationenlernen kostete das den
+ersten Platz (Lernzirkel 0,733 gegen 0,701).
 
 ### Wo die Zeit hingeht
 

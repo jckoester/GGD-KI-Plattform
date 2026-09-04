@@ -89,42 +89,174 @@ class Baustein:
 # ─────────────────────────────────────────────────────────────────────────────
 # Das Grundvokabular.
 #
-# ⚠️ Die Kurzbeschreibungen stehen noch aus (AP6, Zulieferung 1). Bis dahin legt der
-# Seed die Einträge als unvollständig markiert an: Sie sind über Namen und Aliase
-# auffindbar und stehen in den Auswahllisten des Stundenentwurfs, bekommen aber keinen
-# Vektor — siehe Modulkopf. Der Lauf meldet, wie viele Texte noch fehlen.
+# **Was ein Text leisten muss.** Er beschreibt den *Ablauf* in Alltagssprache, so dass
+# jemand die Methode wiedererkennt, der ihren Namen nicht kennt — zwei bis vier Sätze,
+# keine Handreichung. Das ist keine Stilfrage: Der Text ist der Vektor (siehe
+# `embedding_input` in `taxonomy.yaml`), und die Prüfsatz-Fälle des Abschnitts S8 in
+# `config/search_eval.yaml` fragen genau so danach („Erst allein nachdenken, dann zu
+# zweit austauschen …"). Wo zwei Methoden einander ähneln — Stationenlernen, Lernzirkel
+# und Lerntheke; Kugellager und Fishbowl —, muss der Text den Unterschied tragen, sonst
+# sind die Vektoren kaum zu trennen.
 #
-# Ein Text ersetzt keine Handreichung: zwei bis vier Sätze, die den Ablauf so
-# beschreiben, dass jemand die Methode wiedererkennt, der ihren Namen nicht kennt.
+# ⚠️ **Abgrenzen, aber positiv.** Der erste Entwurf schloss mit Sätzen wie „Anders als
+# beim Lernzirkel gibt es keine feste Reihenfolge". Das hilft beim Lesen und schadet dem
+# Vektor: Der fremde Name und der verneinte Begriff stehen danach in der Eingabe und
+# ziehen den Knoten an den heran, von dem er sich abgrenzen soll — Verneinungen kennt ein
+# Embedding nicht. Gemessen am Prüfsatz-Fall „… in eigener Reihenfolge …" stand mit dem
+# Abgrenzungssatz der **Lernzirkel** vorn (0,733 zu 0,701); positiv formuliert („suchen
+# sich selbst aus, womit sie anfangen" gegen „rücken gemeinsam weiter, der Takt ist
+# vorgegeben") kehrt sich die Reihenfolge um.
+#
+# ⚠️ Die Texte sind ein **Entwurf** (AP6, Zulieferung 1) und warten auf die
+# fachdidaktische Durchsicht. Ein leeres Feld ist erlaubt: Der Seed markiert den Eintrag
+# dann als unvollständig, und er bekommt keinen Vektor — siehe Modulkopf.
 # ─────────────────────────────────────────────────────────────────────────────
 
 SOZIALFORMEN: list[Baustein] = [
     Baustein(
         "Plenum",
         ("Frontalunterricht", "Unterrichtsgespräch", "Lehrgespräch"),
-        content="",
+        content=(
+            "Die ganze Klasse arbeitet gemeinsam an einer Sache, geführt von der "
+            "Lehrkraft. Alle hören dasselbe und sprechen nacheinander. Typisch für Einstieg, Sicherung und gemeinsame Auswertung: Ergebnisse werden vorgestellt, verglichen, ggf. diskutiert und festgehalten."
+        ),
     ),
-    Baustein("Einzelarbeit", ("Stillarbeit",), content=""),
-    Baustein("Partnerarbeit", (), content=""),
-    Baustein("Gruppenarbeit", ("Teamarbeit",), content=""),
+    Baustein(
+        "Einzelarbeit",
+        ("Stillarbeit",),
+        content=(
+            "Jede und jeder arbeitet für sich, still und im eigenen Tempo. Sinnvoll vor allem zur Erbeitung von Texten, Übungen und anderen Aufgaben, bei denen die eigenständige Denkleistung des Einzelnen im Vordergrund steht."
+        ),
+    ),
+    Baustein(
+        "Partnerarbeit",
+        (),
+        content=(
+            "Zwei bearbeiten eine Aufgabe gemeinsam. Weil man dem Gegenüber erklären muss, was man meint, treten Lücken hervor, die in der Einzelarbeit unbemerkt bleiben. Zugleich kommt jede Person oft zu Wort — mehr als in jeder größeren Runde. Gut geeignet für die Erarbeitung von Texten, Übungen und komplexeren Aufgaben, Problemlöseaufgaben und Aufgaben die kooperatives Vorgehen erfordern."
+        ),
+    ),
+    Baustein(
+        "Gruppenarbeit",
+        ("Teamarbeit",),
+        content=(
+            "Drei bis fünf Lernende bearbeiten zusammen eine Aufgabe und stellen ihr Ergebnis anschließend vor. Ideal für Aufgaben, die kooperativ gelöst werden müssen, Projektarbeiten oder Aufgaben, die arbeitsteilig gelöst werden können. Eine klare Absprache über die Rollen und Verantwortlichkeiten sowie die Zusammenführung der Ergebnisse ist wichtig."
+        ),
+    ),
 ]
 
 METHODEN: list[Baustein] = [
-    Baustein("Think-Pair-Share", ("Ich-Du-Wir", "Prinzip der wachsenden Gruppe"), content=""),
-    Baustein("Placemat", (), content=""),
-    Baustein("Gruppenpuzzle", ("Jigsaw", "Expertenpuzzle"), content=""),
-    Baustein("Stationenlernen", ("Stationenarbeit",), content=""),
-    Baustein("Lernzirkel", (), content=""),
-    Baustein("Kugellager", ("Innen-Außen-Kreis",), content=""),
-    Baustein("Galeriegang", ("Gallery Walk", "Museumsrundgang"), content=""),
-    Baustein("Brainstorming", (), content=""),
-    Baustein("Mindmap", (), content=""),
-    Baustein("Fishbowl", ("Innenkreis-Außenkreis-Diskussion",), content=""),
-    Baustein("Fragend-entwickelndes Gespräch", (), content=""),
-    Baustein("Lerntempoduett", (), content=""),
-    Baustein("Lerntheke", (), content=""),
-    Baustein("Debatte", ("Pro-Contra-Debatte", "Streitgespräch"), content=""),
-    Baustein("Rollenspiel", (), content=""),
+    Baustein(
+        "Think-Pair-Share",
+        ("Ich-Du-Wir", "Prinzip der wachsenden Gruppe"),
+        content=(
+            "Drei Schritte in fester Reihenfolge: Zuerst denkt jede Person allein über die Frage nach und hält etwas fest. Dann tauschen sich zwei darüber aus und einigen sich auf ein gemeinsames Ergebnis. Zuletzt wird es in der ganzen Klasse diskutiert. Der erste Schritt sorgt dafür, dass niemand mit leeren Händen kommt, der zweite dafür, dass jede Person einmal die Frage diskutiert hat."
+        ),
+    ),
+    Baustein(
+        "Placemat",
+        (),
+        content=(
+            "Ein großes Blatt liegt in der Mitte der Gruppe, aufgeteilt in ein Randfeld je Person und ein gemeinsames Feld in der Mitte. Zuerst schreibt jede Person still in ihr eigenes Randfeld. Dann werden die Beiträge reihum gelesen, und in die Mitte kommt nur, worauf sich die Gruppe einigt."
+        ),
+    ),
+    Baustein(
+        "Gruppenpuzzle",
+        ("Jigsaw", "Expertenpuzzle"),
+        content=(
+            "Der Stoff wird in Teilthemen zerlegt. Zuerst arbeitet sich jede 'Expertengruppe' in genau ein Teilthema ein. Dann werden die Gruppen neu gemischt, so dass in jeder neuen Gruppe zu jedem Teilthema eine Person sitzt und es den anderen erklärt. Idealerweise erstellt jede Gruppe eine gemeinsame Sicherung des Gesamtthemas."
+        ),
+    ),
+    Baustein(
+        "Stationenlernen",
+        ("Stationenarbeit",),
+        content=(
+            "An mehreren Plätzen im Raum liegen Aufgaben zu einem Thema bereit. Die Lernenden wandern zwischen ihnen und suchen sich selbst aus, womit sie anfangen und wie lange sie an einer Stationbleiben; ein Laufzettel hält fest, was erledigt ist. Pflicht- und Wahlstationen lassen sich mischen. Ein große Herausforderung ist das Zeitmanagement durch die Lernenden, sodass am Ende der vorgesehen Zeit alle Pflichtstationen bearbeitet sind."
+        ),
+    ),
+    Baustein(
+        "Lernzirkel",
+        (),
+        content=(
+            "Aufgaben liegen an mehreren Plätzen aus, und alle Gruppen sind gleichzeitig unterwegs: Jede beginnt an einer anderen Station und rückt nach einer abgesprochenen Zeit gemeinsam mit den übrigen weiter."
+        ),
+    ),
+    Baustein(
+        "Kugellager",
+        ("Innen-Außen-Kreis",),
+        content=(
+            "Die Klasse bildet zwei Kreise, einen inneren und einen äußeren, mit Blick zueinander. Je zwei Gegenüberstehende tauschen sich kurz zu einer Frage aus. Dann rückt ein Kreis um einen Platz weiter, und es geht mit einem neuen Gegenüber weiter. In kurzer Zeit spricht so jede Person mit vielen anderen — alle reden gleichzeitig, niemand schaut nur zu. Ziel ist nie, dass alle mit allen gesprochen haben."
+        ),
+    ),
+    Baustein(
+        "Galeriegang",
+        ("Gallery Walk", "Museumsrundgang"),
+        content=(
+            "Die Ergebnisse — Plakate, Skizzen, Texte — hängen im Raum aus. Die Klasse geht herum, sieht sie sich an und gibt Rückmeldung, oft schriftlich auf Klebezetteln. Statt einer Reihe von Vorträgen entsteht ein Rundgang, bei dem alle gleichzeitig in Bewegung sind. Als Variante bleibt ein Gruppenmitglied beim Plakat der Gruppe stehen und erklärt es den 'Besuchern'."
+        ),
+    ),
+    Baustein(
+        "Brainstorming",
+        (),
+        content=(
+            "In kurzer Zeit werden möglichst viele Einfälle zu einer Frage gesammelt, ohne sie zu bewerten. Kritik und Auswahl kommen erst danach. Geeignet als Einstieg, um Vorwissen und erste Vermutungen sichtbar zu machen. Die Einfälle werden entweder auf Zettel geschrieben und an die Tafel gehängt oder auf eine Tafel direkt geschrieben."
+        ),
+    ),
+    Baustein(
+        "Mindmap",
+        ("Concept Map"),
+        content=(
+            "Das Thema steht in der Mitte, von ihm gehen Äste zu Teilaspekten oder verwandten Themen aus, die sich weiter verzweigen. Die Darstellung zeigt Zusammenhänge, die eine Liste verbirgt, und lässt sich jederzeit ergänzen. Nützlich zum Ordnen von Gesammeltem, zum Strukturieren von Gelerntem und zum Wiederholen eines Themas."
+        ),
+    ),
+    Baustein(
+        "Fishbowl",
+        ("Innenkreis-Außenkreis-Diskussion",),
+        content=(
+            "Eine kleine Gruppe diskutiert in der Mitte, die übrigen sitzen außen herum und beobachten, ohne einzugreifen. Ein freier Stuhl im Innenkreis erlaubt es, dazuzukommen und nach dem Beitrag wieder zu gehen. So bleibt die Diskussion überschaubar, und trotzdem kann sich die ganze Klasse beteiligen."
+        ),
+    ),
+    Baustein(
+        "Fragend-entwickelndes Gespräch",
+        (),
+        content=(
+            "Die Lehrkraft führt mit einer Kette von Fragen auf eine Einsicht hin; die Klasse antwortet Schritt für Schritt. Geeignet, um an Vorwissen anzuknüpfen und einen Gedankengang gemeinsam aufzubauen. Der Verlauf liegt dabei weitgehend bei der Lehrkraft — die Klasse geht einen Weg mit, den sie nicht selbst gewählt hat."
+        ),
+    ),
+    Baustein(
+        "Lerntempoduett",
+        (),
+        content=(
+            "Alle bearbeiten dieselbe Aufgabe zunächst allein. Wer fertig ist, meldet sich und arbeitet mit der nächsten fertigen Person weiter — es finden sich also Paare mit ähnlichem Arbeitstempo. Wartezeiten entfallen, und niemand wird zum Weitermachen gedrängt."
+        ),
+    ),
+    Baustein(
+        "Lerntheke",
+        (),
+        content=(
+            "An einer Stelle im Raum liegen Aufgaben und Hilfen unterschiedlicher Schwierigkeit aus, meist gestuft. Die Lernenden holen sich von dort, was sie brauchen, arbeiten an ihrem Sitzplatz und legen es zurück. Was zum eigenen Stand passt, entscheidet jede Person selbst. Besonders geeignet für selbstdifferenzierende Übungsphasen am Ende einer Unterrichtseinheit."
+        ),
+    ),
+    Baustein(
+        "Debatte",
+        ("Pro-Contra-Debatte", "Streitgespräch"),
+        content=(
+            "Zu einer strittigen Frage vertreten zwei Seiten gegensätzliche Positionen nach festen Regeln: Redezeit, Reihenfolge und Rollen sind vorher vereinbart. Die zugeteilte Seite muss nicht die eigene Meinung sein - gerade das schult das Abwägen von Argumenten. Eine solche Debatte kann sowohl als Partner- oder Gruppenarbeit gestaltet werden, als auch als 'Posiumsdiksussion' mit der ganzen Klasse."
+        ),
+    ),
+    Baustein(
+        "Rollenspiel",
+        (),
+        content=(
+            "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation und handeln sie miteinander aus. Anschließend wird ausgewertet, was im Spiel geschehen ist und woran es lag. Die Auswertung ist oft der eigentliche Lernschritt, nicht die Aufführung."
+        ),
+    ),
+    Baustein(
+        "Planspiel",
+        ("Simulation"),
+        content=(
+            "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation und agieren entsprechend. Die Situation ist oft komplex und die Folgen der Handlungen nicht vorhersehbar. Die Rollen und ihre Interesse müssen entsprechend klar definiert sein. Geeignet z.B. zur Simulation von Konflikten, Wirtschaftsprozessen oder politischen Entscheidungen. "
+        ),
+    ),
 ]
 
 BESTAND: list[tuple[str, list[Baustein]]] = [

@@ -160,9 +160,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,
   fiele weg.
 
-- **Die mitgelieferten Methoden tragen das Kennzeichen „unvollständig", bis eine
-  Beschreibung vorliegt.** In den Auswahllisten des Stundenentwurfs stehen sie
-  unverändert; thematisch auffindbar werden sie mit der Beschreibung.
+- **Die mitgelieferten Methoden und Sozialformen haben eine Kurzbeschreibung.** Wer den
+  Ablauf beschreibt („erst allein nachdenken, dann zu zweit austauschen"), findet die
+  Methode jetzt, ohne ihren Namen zu kennen. Einträge ohne Beschreibung tragen das
+  Kennzeichen **„unvollständig"**.
 
 ### Migration
 
