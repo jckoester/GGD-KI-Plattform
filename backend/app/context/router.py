@@ -676,40 +676,11 @@ async def update_node_title(
 # ── POST /api/context/nodes/{id}/reaktivieren ─────────────────────────────────
 
 
-def _vorgeschlagenes_ablaufdatum(content_type: str | None):
-    """Das `valid_until`, das die Taxonomie für diesen Typ vorsieht (None = permanent).
-
-    Bis AP4 hatten `get_valid_until_offset` und `get_valid_until_schuljahresende`
-    **keinen einzigen Aufrufer** — die Vorgaben standen in der Taxonomie und wirkten
-    nirgends. Hier bekommen sie ihren ersten: Wer einen abgelaufenen Baustein
-    reaktiviert, soll nicht raten müssen, wie lange er diesmal gilt.
-    """
-    from app.context.taxonomy import (
-        get_valid_until_offset,
-        get_valid_until_schuljahresende,
-    )
-
-    heute = datetime.now(timezone.utc).date()
-
-    if get_valid_until_schuljahresende(content_type):
-        from app.planning.calendar import load_school_year
-        ende = load_school_year().ende
-        # ⚠️ Ein Schuljahresende in der Vergangenheit heißt: `school_year.yaml` ist nicht
-        # umgestellt. Diesen Wert zu setzen wäre schlimmer als keiner — der nächtliche
-        # Lauf holte den Baustein noch in derselben Nacht zurück ins Archiv, und die
-        # Reaktivierung sähe aus, als hätte sie nicht funktioniert. Am Live-Test am
-        # 02.09.2026 genau so aufgetreten (Config stand auf 2025/26, Ende 29.07.2026).
-        if ende <= heute:
-            logger.warning(
-                "Schuljahresende %s liegt nicht in der Zukunft — Baustein wird ohne "
-                "Ablaufdatum reaktiviert. config/school_year.yaml umstellen "
-                "(docs/runbooks/schuljahreswechsel.md).", ende,
-            )
-            return None
-        return ende
-
-    tage = get_valid_until_offset(content_type)
-    return (heute + timedelta(days=tage)) if tage else None
+# Die Vorgabe steht in `app/context/ablauf.py` und wird beim Anlegen als
+# `before_insert`-Regel am Modell angewandt (04.09.2026). Die Reaktivierung ist der
+# zweite Aufrufer: Ein wegen abgelaufenem `valid_until` archivierter Knoten hätte
+# sonst weiterhin ein Datum in der Vergangenheit.
+from app.context.ablauf import vorgeschlagenes_ablaufdatum
 
 
 @router.post("/nodes/{node_id}/reaktivieren", response_model=ContextNodeRead)
@@ -735,7 +706,7 @@ async def reaktiviere_node(
 
     node.status = "active"
     node.archived_at = None
-    node.valid_until = _vorgeschlagenes_ablaufdatum(node.content_type)
+    node.valid_until = vorgeschlagenes_ablaufdatum(node.content_type)
     await db.commit()
     await db.refresh(node)
     await _schreibrechte_setzen([node], user, db)

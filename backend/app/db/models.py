@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from uuid import UUID, UUID as UUIDType
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, text, TIMESTAMP, Text, ARRAY
+from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
 from sqlalchemy import Numeric, Boolean
@@ -906,6 +906,30 @@ class ContextNode(Base):
         # Wer hier wieder einen Index einträgt, bekommt ihn beim nächsten `autogenerate`
         # zurück; der Prüfsatz (`scripts/search_eval.py`) schlägt dann an.
     )
+
+
+@event.listens_for(ContextNode, "before_insert")
+def _ablaufdatum_vorbelegen(mapper, connection, target: ContextNode) -> None:
+    """Setzt `valid_until` aus der Taxonomie, wo der Erzeuger keins mitbringt.
+
+    **Warum am Modell und nicht an den Aufrufern.** Knoten entstehen an fünf Stellen, und
+    keine geht durch die andere: der allgemeine Anlege-Endpunkt, das Kopieren, die
+    Unterrichtseinheit, die Stunde aus dem Planer und die Stunde aus dem
+    Planungsassistenten. Bis 04.09.2026 wandte **keine** davon die Vorgabe an — sie stand
+    in `taxonomy.yaml` und wirkte allein beim Reaktivieren. Gemessen: null von 19 134
+    Knoten trugen ein Ablaufdatum, der nächtliche Lebenszyklus-Lauf archivierte also nie
+    etwas. Die Regel fünfmal einzutragen hieße, fünf Gelegenheiten zu schaffen, sie beim
+    sechsten Erzeuger zu vergessen.
+
+    ⚠️ **Nur füllen, nie überschreiben.** Ein ausdrücklich gesetztes Datum — auch eines
+    aus einem Import oder einer Migration — bleibt, wie es ist. Für die meisten Typen
+    liefert die Taxonomie ohnehin `None`; dann tut die Regel nichts.
+    """
+    if target.valid_until is not None:
+        return
+    from app.context.ablauf import vorgeschlagenes_ablaufdatum
+
+    target.valid_until = vorgeschlagenes_ablaufdatum(target.content_type)
 
 
 # 13. context_edges

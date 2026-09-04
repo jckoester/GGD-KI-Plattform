@@ -1,7 +1,12 @@
 <script>
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
-  import { CONTENT_TYPES, CATEGORY_LABELS, SCOPE_DEFAULTS } from '$lib/taxonomy.js'
+  import {
+    CONTENT_TYPES,
+    CATEGORY_LABELS,
+    SCHULJAHRESENDE_CONTENT_TYPES,
+    SCOPE_DEFAULTS,
+  } from '$lib/taxonomy.js'
   import { auswaehlbareTypOptionen } from '$lib/knotentypen.js'
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
@@ -540,6 +545,15 @@
               Schuljahresende (31.07.)
             </button>
           </div>
+          <!-- Ein leeres Feld heißt bei diesen Arten nicht „läuft nie ab": Der Server
+               trägt das Schuljahresende ein (Regel in app/db/models.py). Ohne diesen
+               Satz bekäme man ein Ablaufdatum, das man nicht gewählt hat. -->
+          {#if !validUntil && SCHULJAHRESENDE_CONTENT_TYPES.has(contentType)}
+            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">
+              Ohne Angabe gilt dieser Baustein bis zum Ende des Schuljahres und wandert
+              danach ins Archiv.
+            </p>
+          {/if}
         </div>
 
         <!-- Schuljahr -->

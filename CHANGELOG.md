@@ -125,6 +125,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Der Wissensgraph bietet Archivieren und Löschen nur noch dort an, wo es erlaubt ist.**
   Bei fremden und schulweiten Bausteinen erscheinen die Knöpfe nicht mehr.
 
+- **Stundenentwürfe, Unterrichtseinheiten und Schülermaterial bekommen beim Anlegen ein
+  Ablaufdatum.** Es ist das Ende des laufenden Schuljahres; danach wandern sie ins
+  Archiv und lassen sich von dort zurückholen. Wer ein anderes oder gar kein Ablaufdatum
+  will, trägt es beim Anlegen ein oder entfernt es später. Bisher blieben diese
+  Bausteine unbegrenzt liegen, obwohl die Fristen seit Langem festgelegt waren.
+
 - **Das Ablaufdatum eines Bausteins wirkt jetzt.** Ein neuer nächtlicher Lauf archiviert
   abgelaufene Bausteine und löscht nach drei Schuljahren im Archiv endgültig —
   Bildungsplan und importierte Inhalte ausgenommen. Bisher wurde das Datum erfasst und

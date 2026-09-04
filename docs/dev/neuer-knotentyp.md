@@ -134,6 +134,16 @@ Startprüfung weist es ab. Stand 09/2026 trägt **kein** Typ einen Tages-Offset;
 ersten einführt, begründet ihn (die früheren 42 Tage waren ein verallgemeinertes Beispiel
 aus ADR-013 und nie abgestimmt).
 
+**Wo die Vorgabe wirkt:** als `before_insert`-Regel am Modell
+(`_ablaufdatum_vorbelegen` in `app/db/models.py`, Ableitung in `app/context/ablauf.py`) —
+nicht an den Aufrufern. Knoten entstehen an fünf Stellen, und keine geht durch die
+andere; bis 04.09.2026 wandte **keine** davon die Vorgabe an, weshalb null von 19 134
+Knoten ein Ablaufdatum trugen und der nächtliche Lauf nie etwas archivierte. Ein
+ausdrücklich gesetztes Datum bleibt unangetastet, und beim **Ändern** gilt der übergebene
+Wert unverändert — auch `null`. Wer einen ablaufenden Typ neu einführt, ergänzt ihn im
+Formular-Hinweis (`SCHULJAHRESENDE_CONTENT_TYPES` in der erzeugten `taxonomy.js`); sonst
+bekäme man beim Anlegen stillschweigend ein Datum, das man nicht gewählt hat.
+
 ### 6. `ui_status`: erscheint der Typ in Auswahlflächen?
 
 `ui_status: aktiv | ruhend` in der `taxonomy.yaml` (fehlt das Feld, gilt `aktiv`).

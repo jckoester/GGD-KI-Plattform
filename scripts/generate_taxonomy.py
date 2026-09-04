@@ -44,6 +44,13 @@ def main():
         if ct.get("ui_status") == "ruhend"
     ]
 
+    schuljahresende_types = [
+        ct["key"]
+        for info in cats.values()
+        for ct in info["content_types"]
+        if ct.get("valid_until_default") == "schuljahresende"
+    ]
+
     # Sammlungs-Ansichten und Feldschemata (AP5a). Reihenfolge = Reihenfolge in der
     # YAML; die Sidebar zeigt die Sammlungen in genau dieser Folge.
     collections = {
@@ -96,6 +103,11 @@ def main():
         "// keiner Such-Facette (ADR-019 F6). Vorhandene Knoten bleiben sicht- und suchbar;",
         "// zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.",
         f"export const RUHENDE_CONTENT_TYPES = new Set({_js(ruhende_types)})",
+        "",
+        "// Typen, deren `valid_until` beim Anlegen aufs Schuljahresende vorbelegt wird",
+        "// (`before_insert`-Regel in app/db/models.py). Das Formular sagt das dazu — ein",
+        "// leeres Feld heißt hier nicht „läuft nie ab\".",
+        f"export const SCHULJAHRESENDE_CONTENT_TYPES = new Set({_js(schuljahresende_types)})",
         "",
         "// Typen mit gepflegter Sammlungsansicht (/knowledge/collections/<typ>).",
         "// Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.",

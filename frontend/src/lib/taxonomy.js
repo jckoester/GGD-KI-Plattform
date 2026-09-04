@@ -97,6 +97,19 @@ export const RUHENDE_CONTENT_TYPES = new Set([
   "feedback_text"
 ])
 
+// Typen, deren `valid_until` beim Anlegen aufs Schuljahresende vorbelegt wird
+// (`before_insert`-Regel in app/db/models.py). Das Formular sagt das dazu — ein
+// leeres Feld heißt hier nicht „läuft nie ab".
+export const SCHULJAHRESENDE_CONTENT_TYPES = new Set([
+  "unterrichtsstunde",
+  "unterrichtseinheit",
+  "lernplan",
+  "schuelertext",
+  "schuelerpraesentation",
+  "strukturierung",
+  "feedback_text"
+])
+
 // Typen mit gepflegter Sammlungsansicht (/knowledge/collections/<typ>).
 // Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.
 export const COLLECTIONS = {
