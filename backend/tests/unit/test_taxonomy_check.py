@@ -147,6 +147,21 @@ class TestLookupDrift:
         befunde = pruefe_taxonomie()
         assert any("embedding_input" in b and "unterrichtsstunde" in b for b in befunde)
 
+    def test_embedding_input_mit_erfundener_quelle(self, monkeypatch):
+        """Eine Quelle, die es nicht gibt, liefert stumm nichts.
+
+        Der Knoten bekommt dann einen Vektor aus dem Rest — kleiner, schlechter, ohne
+        Fehlermeldung. Ein Tippfehler in `taxonomy.yaml` fiele erst am Suchergebnis auf.
+        """
+        erfunden = dict(taxonomy.EMBEDDING_INPUT)
+        erfunden[("knowledge", "methode")] = ["title", "metadata.ablaufsatz|inhalt"]
+        monkeypatch.setattr(taxonomy, "EMBEDDING_INPUT", erfunden)
+
+        befunde = pruefe_taxonomie()
+        assert any("'inhalt'" in b for b in befunde)
+        # Die erste Alternative ist ein gültiger Metadatenpfad und darf nicht anschlagen.
+        assert not any("ablaufsatz" in b for b in befunde)
+
     def test_bp_curriculum_liste_mit_unbekanntem_typ(self, monkeypatch):
         monkeypatch.setattr(
             taxonomy, "BP_CURRICULUM_CONTENT_TYPES", ("curriculum", "gibt_es_nicht")

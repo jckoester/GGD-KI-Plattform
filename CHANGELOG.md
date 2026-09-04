@@ -165,6 +165,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Methode jetzt, ohne ihren Namen zu kennen. Einträge ohne Beschreibung tragen das
   Kennzeichen **„unvollständig"**.
 
+- **Methoden haben ein eigenes Feld „Ablauf in einem Satz".** Es entscheidet allein
+  darüber, ob die Methode thematisch gefunden wird — die Kurzbeschreibung darf dadurch
+  ausführlich werden, ohne die Suche zu verwässern. Das Feld steht im Editor der
+  Sammlung; ohne Eintrag zählt weiterhin die Kurzbeschreibung.
+
 ### Migration
 
 - **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss

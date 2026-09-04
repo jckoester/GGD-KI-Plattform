@@ -41,6 +41,7 @@ def _ist(**abweichungen):
     """Ein vorhandener Knoten im Zielzustand — Abweichungen werden übergeben."""
     zustand = {
         "content": "Bestehender Text.",
+        "ablauf": "",
         "aliase": [],
         "metadata": {},
         "read_scope": "school",
@@ -50,8 +51,11 @@ def _ist(**abweichungen):
         "embedding_vorhanden": True,
     }
     zustand.update(abweichungen)
-    if "aliase" in abweichungen:
-        zustand["metadata"] = {**zustand["metadata"], "aliase": abweichungen["aliase"]}
+    # `aliase` und `ablauf` stehen in Wahrheit in den Metadaten — hier genauso, sonst
+    # prüfte der Test einen Zustand, den `_ist_zustand()` nie erzeugt.
+    for feld in ("aliase", "ablauf"):
+        if feld in abweichungen:
+            zustand["metadata"] = {**zustand["metadata"], feld: abweichungen[feld]}
     return zustand
 
 
@@ -62,6 +66,7 @@ def _anwenden(ist, aenderung):
         if name == "metadata_":
             neu["metadata"] = wert
             neu["aliase"] = list(wert.get("aliase") or [])
+            neu["ablauf"] = wert.get("ablauf") or ""
         else:
             neu[name] = wert
     if aenderung.embedding_verwerfen:
@@ -89,6 +94,27 @@ class TestNeuerKnoten:
         """`content` ist bei `sozialform` kein Pflichtfeld — die Taxonomie entscheidet das."""
         a = seed.plane_aenderung({}, seed.Baustein("Plenum"), "sozialform")
         assert STUB_MARKIERUNG not in a.metadata
+
+
+class TestAliasSchreibweise:
+    """`("Concept Map")` ist ein String, kein Tupel — das Komma fehlt.
+
+    Ohne Normalisierung wird er Zeichen für Zeichen durchlaufen und landet als
+    `["C", "o", "n", …]` in den Aliasen, in der Datenbank und im Vektor. Nichts daran
+    schlägt fehl. Am 04.09.2026 ist das beim Ergänzen zweier Einträge zweimal passiert.
+    """
+
+    def test_einzelner_alias_ohne_komma(self, seed):
+        assert seed.Baustein("Mindmap", ("Concept Map")).aliase == ("Concept Map",)
+
+    def test_liste_wird_zum_tupel(self, seed):
+        assert seed.Baustein("Debatte", ["Streitgespräch"]).aliase == ("Streitgespräch",)
+
+    def test_der_ausgelieferte_bestand_ist_sauber(self, seed):
+        """Wächter gegen die nächste Ergänzung — ein Alias ist nie ein einzelnes Zeichen."""
+        for baustein in seed.SOZIALFORMEN + seed.METHODEN:
+            for alias in baustein.aliase:
+                assert len(alias) > 1, f"{baustein.titel}: Alias {alias!r}"
 
 
 class TestSchulbearbeitungBleibt:
@@ -125,6 +151,41 @@ class TestSchulbearbeitungBleibt:
         a = seed.plane_aenderung(_ist(aliase=[]), baustein, "methode")
 
         assert a.metadata["aliase"] == ["Platzdeckchen"]
+
+
+class TestAblaufsatz:
+    """Der Satz, aus dem der Vektor entsteht — getrennt von der Kurzbeschreibung.
+
+    Er folgt derselben Eigentumsregel wie der Text: Was die Schule geschrieben hat,
+    bleibt stehen. Und er ist der Grund, warum eine Änderung daran den Vektor verwirft —
+    er *ist* der Vektor.
+    """
+
+    def test_wird_in_die_metadaten_geschrieben(self, seed):
+        baustein = seed.Baustein("Galeriegang", (), content="Lang.", ablauf="Kurz.")
+        a = seed.plane_aenderung({}, baustein, "methode")
+
+        assert a.metadata["ablauf"] == "Kurz."
+        assert a.felder["content"] == "Lang."
+
+    def test_aenderung_verwirft_den_vektor(self, seed):
+        baustein = seed.Baustein("Galeriegang", (), ablauf="Neu.")
+        a = seed.plane_aenderung(_ist(ablauf="Alt."), baustein, "methode", ueberschreiben=True)
+
+        assert a.metadata["ablauf"] == "Neu."
+        assert a.embedding_verwerfen is True
+
+    def test_satz_der_schule_bleibt(self, seed):
+        baustein = seed.Baustein("Galeriegang", (), ablauf="Seed-Fassung.")
+        a = seed.plane_aenderung(_ist(ablauf="Von der Fachschaft."), baustein, "methode")
+
+        assert "ablauf" not in a.felder.get("metadata_", {})
+        assert "Ablaufsatz" in a.behalten
+
+    def test_leerer_satz_loescht_nichts(self, seed):
+        """Ein Eintrag ohne `ablauf` im Skript heißt „noch keiner", nicht „weg damit"."""
+        a = seed.plane_aenderung(_ist(ablauf="Vorhanden."), seed.Baustein("X"), "methode")
+        assert a.wirkt is False
 
 
 class TestMarkierung:

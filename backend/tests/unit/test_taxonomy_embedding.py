@@ -365,6 +365,46 @@ class TestEmbeddingInputJeTyp:
             "Think-Pair-Share\nIch-Du-Wir\nZuerst allein, dann zu zweit, dann im Plenum."
         )
 
+    def test_ablaufsatz_verdraengt_die_kurzbeschreibung(self, make_node):
+        """Der Vektor einer Methode bildet sich aus dem Ablaufsatz, nicht aus allem.
+
+        Gemessen am 04.09.2026: Ein ergaenzter Variantensatz beim Galeriegang („ein
+        Gruppenmitglied bleibt stehen und erklaert es den Besuchern") zog den Knoten zu
+        den Operatoren *praesentieren*/*demonstrieren* — von Rang 1 auf 7. Was den
+        Eintrag fuer Lesende reicher macht, macht seinen Vektor unschaerfer.
+        """
+        node = make_node(
+            "knowledge", "methode",
+            content="Die Ergebnisse haengen aus. Als Variante erklaert jemand sie den Besuchern.",
+            metadata={"aliase": ["Gallery Walk"], "ablauf": "Die Ergebnisse haengen im Raum aus."},
+            title="Galeriegang",
+        )
+        eingabe = _build_embedding_input(node)
+        assert eingabe == "Galeriegang\nGallery Walk\nDie Ergebnisse haengen im Raum aus."
+        assert "Variante" not in eingabe
+
+    def test_ohne_ablaufsatz_zaehlt_die_kurzbeschreibung(self, make_node):
+        """Die Ausweichquelle (`metadata.ablauf|content`).
+
+        Ohne sie haette das Nachruesten des Suchfelds jeden Bestandsknoten still
+        entwertet: Sein Vektor bestuende ploetzlich nur noch aus Titel und Aliasen.
+        """
+        node = make_node(
+            "knowledge", "methode", content="Zuerst allein, dann zu zweit.",
+            metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share",
+        )
+        assert _build_embedding_input(node) == (
+            "Think-Pair-Share\nIch-Du-Wir\nZuerst allein, dann zu zweit."
+        )
+
+    def test_leerer_ablaufsatz_zaehlt_wie_ein_fehlender(self, make_node):
+        """Ein im Editor geleertes Feld ist ein leerer String, kein fehlender Schluessel."""
+        node = make_node(
+            "knowledge", "methode", content="Zuerst allein, dann zu zweit.",
+            metadata={"ablauf": "   "}, title="Think-Pair-Share",
+        )
+        assert _build_embedding_input(node).endswith("Zuerst allein, dann zu zweit.")
+
     def test_stunde_traegt_kompetenztitel_statt_verlaufsplan(self, make_node):
         node = make_node(
             "artifact", "unterrichtsstunde", content="",

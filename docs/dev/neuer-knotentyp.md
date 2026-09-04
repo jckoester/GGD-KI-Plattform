@@ -94,6 +94,18 @@ tatsächlich?
 - `embedding_enrichment` — Felder, die zusätzlich hineinwandern.
 - sonst der Vorgabeaufbau in `backend/app/context/embedding.py`.
 
+**Ausweichquellen:** `"metadata.ablauf|content"` heißt *ablauf, sonst content* — der erste
+nicht leere Teil gewinnt. Dafür gibt es einen Grund: Rüstet man einem bestehenden Typ ein
+eigenes Suchfeld nach, verlören alle Bestandsknoten sonst still ihren Inhalt aus dem
+Vektor. Mit der Ausweichquelle wird kein Knoten durch ein neues Feld schlechter
+auffindbar; er wird nur besser, sobald es gefüllt ist.
+
+**Ein eigenes Suchfeld statt des ganzen Textes** ist die Antwort auf einen Zielkonflikt,
+der bei `methode` gemessen wurde (04.09.2026): Was einen Eintrag für Lesende reicher
+macht, macht seinen Vektor unschärfer — ein ergänzter Variantensatz warf den Galeriegang
+von Rang 1 auf 7. Wo ein Typ sowohl gelesen als auch gefunden werden soll, trennt man
+beides: ein Feld für Menschen, ein Satz für die Suche.
+
 Bleibt am Ende **nur der Titel** übrig, lautet die Entscheidung aus Schritt 2 „nein". Das
 ist Identifikationsstoff, keine thematische Auffindbarkeit — `traegt_substanz()` in
 `embedding.py` weist solche Knoten ab.

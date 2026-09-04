@@ -182,6 +182,20 @@ def pruefe_taxonomie() -> list[str]:
                 "Quelle: app/context/taxonomy.yaml"
             )
 
+    # Eine Quelle, die es nicht gibt, liefert stumm einen leeren String: Der Knoten
+    # bekommt dann einen Vektor aus dem Rest — kleiner, schlechter, ohne Fehlermeldung.
+    # Geprüft werden auch die Alternativen (`metadata.ablauf|content`) einzeln.
+    for (_cat, key), quellen in sorted(taxonomy.EMBEDDING_INPUT.items()):
+        for quelle in quellen:
+            for teil in (t.strip() for t in quelle.split("|")):
+                if teil in ("title", "content") or teil.startswith("metadata."):
+                    continue
+                befunde.append(
+                    f"embedding_input von {key!r} nennt die Quelle {teil!r} — erlaubt "
+                    "sind 'title', 'content' und 'metadata.<pfad>'. Sie liefert sonst "
+                    "stumm nichts. Quelle: app/context/taxonomy.yaml"
+                )
+
     # ── Sammlungs-Konfiguration und Feldschema (AP5a) ─────────────────────────
     from app.context.metadata import pruefe_schema_konsistenz
 

@@ -109,7 +109,20 @@ def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
     ``title``, ``content`` oder ein Metadatenpfad (``metadata.aliase``). Fuer Listen von
     Objekten laesst sich ein Feld herausgreifen: ``metadata.refs[].titel`` ergibt die
     Titel aller Kompetenz-Verweise, ohne die uebrigen Felder mitzuschleppen.
+
+    **Alternativen** trennt ein ``|``: ``metadata.ablauf|content`` nimmt den Ablaufsatz,
+    und wo er fehlt, die Kurzbeschreibung. Ohne diese Ausweichmoeglichkeit haette das
+    Nachruesten eines Suchfelds jeden Bestandsknoten stillschweigend entwertet — sein
+    Vektor bestuende ploetzlich nur noch aus Titel und Aliasen. Der erste **nicht leere**
+    Teil gewinnt; leere Alternativen sind kein Fehler, sondern der Normalfall.
     """
+    if "|" in quelle:
+        for alternative in quelle.split("|"):
+            wert = _teil_aus_quelle(node, alternative.strip())
+            if wert.strip():
+                return wert
+        return ""
+
     if quelle == "title":
         return node.title or ""
     if quelle == "content":

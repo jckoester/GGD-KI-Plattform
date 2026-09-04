@@ -204,6 +204,15 @@ dieser Fälle, liegt es an der Kurzbeschreibung des Knotens (`scripts/seed_metho
 nicht an der Suche — ohne Beschreibung ist der Knoten als `unvollstaendig` markiert und
 hat gar keinen Vektor.
 
+Bei `methode` bildet sich der Vektor aus dem **Ablaufsatz** (`metadata.ablauf`), nicht aus
+der ganzen Kurzbeschreibung — ein Feld für Lesende, ein Satz für die Suche. Zwei Regeln
+dafür, beide gemessen:
+
+⚠️ **Kein Beiwerk.** Was einen Eintrag für Lesende reicher macht, macht seinen Vektor
+unschärfer. Ein ergänzter Variantensatz („ein Gruppenmitglied bleibt stehen und erklärt es
+den Besuchern") warf den Galeriegang von Rang 1 auf 7, verdrängt von den Operatoren
+*präsentieren*, *demonstrieren*, *erbringen*. Genau deshalb gibt es das eigene Feld.
+
 ⚠️ **Positiv beschreiben, nicht abgrenzen.** Ein Satz wie „Anders als beim Lernzirkel
 gibt es keine feste Reihenfolge" trägt den fremden Namen und den verneinten Begriff in
 die Eingabe und zieht den Knoten an den heran, von dem er sich abgrenzen soll —

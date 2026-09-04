@@ -311,8 +311,13 @@ faelle:
   - frage: An mehreren Plätzen liegen Aufgaben, die in eigener Reihenfolge bearbeitet werden
     knoten: Stationenlernen
     notiz: >-
-      Liegt inhaltlich neben „Lernzirkel" und „Lerntheke" — der Fall hält fest, welcher
-      der drei oben steht, wenn alle drei eine Beschreibung haben.
+      Der einzige Fall, der nicht auf Rang 1 steht — Lernzirkel liegt davor (Stand
+      04.09.2026). Beide Ablaufsätze beginnen fast wortgleich („Aufgaben liegen an
+      mehreren Plätzen aus"); das Unterscheidende — eigene gegen gemeinsam getaktete
+      Reihenfolge — steht erst danach und wiegt im Vektor weniger. Zwei Umformulierungen
+      haben daran nichts geändert. Bewusst so belassen: Die Frage passt sachlich auf
+      beide, und beide stehen unter den ersten zwei. Wer sie durch Umschreiben des
+      Knotens auf Rang 1 zwingt, passt die Daten an die Messung an.
 
   - frage: Zwei Kreise stehen sich gegenüber, nach jedem Durchgang wechseln die Partner
     knoten: Kugellager

@@ -229,7 +229,17 @@ categories:
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Methoden sollen gefunden werden, ohne ihren Namen zu kennen.
         embedding: true
-        embedding_input: ["title", "metadata.aliase", "content"]
+        # ⚠️ Der Vektor bildet sich aus dem **Ablaufsatz**, nicht aus der ganzen
+        # Kurzbeschreibung. Grund ist ein gemessener Zielkonflikt (04.09.2026): Was den
+        # Eintrag für Lesende reicher macht, macht seinen Vektor unschärfer. Ein
+        # ergänzter Variantensatz beim Galeriegang („ein Gruppenmitglied bleibt stehen
+        # und erklärt es den Besuchern") zog ihn zu den Operatoren *präsentieren*,
+        # *demonstrieren*, *erbringen* — von Rang 1 auf 7. Der Ablaufsatz hält den
+        # Suchtext von der Handreichung getrennt; beide bleiben pflegbar.
+        #
+        # `a|b` heißt: a, sonst b. Ohne Ablaufsatz zählt die Kurzbeschreibung wie
+        # bisher — ein Eintrag wird durch das neue Feld nie schlechter auffindbar.
+        embedding_input: ["title", "metadata.aliase", "metadata.ablauf|content"]
         collection:
           beschreibung: >-
             Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge
@@ -256,6 +266,14 @@ categories:
             typ: liste
             label: "Andere Bezeichnungen"
             hinweis: 'z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“'
+          ablauf:
+            typ: text
+            label: "Ablauf in einem Satz"
+            hinweis: >-
+              Woran man die Methode erkennt, ohne ihren Namen zu kennen — nur der
+              Ablauf, keine Hinweise zum Einsatz. Dieser Satz allein entscheidet
+              darüber, ob die Methode thematisch gefunden wird. Ohne ihn zählt die
+              Kurzbeschreibung.
 
       - key: sozialform
         label_de: "Sozialform"

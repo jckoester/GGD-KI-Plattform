@@ -22,11 +22,11 @@ ADR-019, und werden bei jedem Lauf nachgezogen.
 ⚠️ **Einträge ohne Kurzbeschreibung werden als unvollständig markiert**
 (`metadata.unvollstaendig`, dieselbe Markierung wie beim Verknüpfen-Dialog, UI-Notiz A8).
 Der Grund ist nicht Ordnungsliebe: Bei `methode` bildet sich der Vektor aus Titel,
-Aliasen und Text (`embedding_input` in `taxonomy.yaml`). Fehlt der Text, besteht er aus
-dem Namen — eine unscharfe Titelsuche im Vektorraum, die die thematische Suche nur
-verwässert. `traegt_substanz()` weist genau solche Knoten ab, und die Markierung sorgt
-dafür, dass ein bereits gebildeter Vektor auch wieder verschwindet. Sobald die
-Beschreibung nachgetragen ist, fällt die Markierung weg.
+Aliasen und dem **Ablaufsatz** (`embedding_input` in `taxonomy.yaml`; ohne ihn aus der
+Kurzbeschreibung). Fehlt beides, besteht er aus dem Namen — eine unscharfe Titelsuche im
+Vektorraum, die die thematische Suche nur verwässert. `traegt_substanz()` weist genau
+solche Knoten ab, und die Markierung sorgt dafür, dass ein bereits gebildeter Vektor auch
+wieder verschwindet. Sobald die Beschreibung nachgetragen ist, fällt die Markierung weg.
 
 Geänderte Knoten verlieren ihr Embedding (`embedding = NULL`) und bekommen beim nächsten
 Backfill ein neues — der Seed selbst braucht dafür keinen laufenden LiteLLM-Proxy:
@@ -70,46 +70,65 @@ ZIEL_SCOPES: dict[str, Any] = {
 
 @dataclass(frozen=True)
 class Baustein:
-    """Ein Vokabeleintrag: kanonischer Titel, andere Bezeichnungen, Kurzbeschreibung.
+    """Ein Vokabeleintrag: Titel, andere Bezeichnungen, Kurzbeschreibung, Ablaufsatz.
 
-    Die Aliase tragen den Vektor mit (`embedding_input: [title, metadata.aliase,
-    content]`) und sind zugleich der lexikalische Weg: Wer „Ich-Du-Wir" sucht, soll
-    „Think-Pair-Share" finden.
+    Die Aliase tragen den Vektor mit und sind zugleich der lexikalische Weg: Wer
+    „Ich-Du-Wir" sucht, soll „Think-Pair-Share" finden. Was `content` von `ablauf`
+    unterscheidet, steht am Grundvokabular weiter unten.
     """
 
     titel: str
-    aliase: tuple[str, ...] = ()
+    aliase: tuple[str, ...] | str = ()
     content: str = ""
+    ablauf: str = ""
+
+    def __post_init__(self) -> None:
+        # ⚠️ `("Concept Map")` ist in Python **kein** Tupel, sondern ein String — das
+        # Komma fehlt. Ohne diese Zeile wird er Zeichen für Zeichen durchlaufen und
+        # landet als `["C", "o", "n", …]` in den Aliasen, in der Datenbank und im
+        # Vektor. Nichts daran schlägt fehl; sichtbar wird es erst in der Sammlung.
+        # Am 04.09.2026 ist genau das zweimal passiert.
+        if isinstance(self.aliase, str):
+            object.__setattr__(self, "aliase", (self.aliase,))
+        else:
+            object.__setattr__(self, "aliase", tuple(self.aliase))
 
     @property
     def text(self) -> str:
         return textwrap.dedent(self.content).strip()
 
+    @property
+    def ablaufsatz(self) -> str:
+        return textwrap.dedent(self.ablauf).strip()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Das Grundvokabular.
+# Das Grundvokabular. Zwei Textfelder mit verschiedenen Aufgaben:
 #
-# **Was ein Text leisten muss.** Er beschreibt den *Ablauf* in Alltagssprache, so dass
-# jemand die Methode wiedererkennt, der ihren Namen nicht kennt — zwei bis vier Sätze,
-# keine Handreichung. Das ist keine Stilfrage: Der Text ist der Vektor (siehe
-# `embedding_input` in `taxonomy.yaml`), und die Prüfsatz-Fälle des Abschnitts S8 in
-# `config/search_eval.yaml` fragen genau so danach („Erst allein nachdenken, dann zu
-# zweit austauschen …"). Wo zwei Methoden einander ähneln — Stationenlernen, Lernzirkel
-# und Lerntheke; Kugellager und Fishbowl —, muss der Text den Unterschied tragen, sonst
-# sind die Vektoren kaum zu trennen.
+# **`content` — die Kurzbeschreibung.** Was eine Lehrkraft liest: Ablauf *und* Hinweise
+# zum Einsatz, Varianten, Fallstricke. Darf wachsen.
 #
-# ⚠️ **Abgrenzen, aber positiv.** Der erste Entwurf schloss mit Sätzen wie „Anders als
-# beim Lernzirkel gibt es keine feste Reihenfolge". Das hilft beim Lesen und schadet dem
-# Vektor: Der fremde Name und der verneinte Begriff stehen danach in der Eingabe und
-# ziehen den Knoten an den heran, von dem er sich abgrenzen soll — Verneinungen kennt ein
-# Embedding nicht. Gemessen am Prüfsatz-Fall „… in eigener Reihenfolge …" stand mit dem
-# Abgrenzungssatz der **Lernzirkel** vorn (0,733 zu 0,701); positiv formuliert („suchen
-# sich selbst aus, womit sie anfangen" gegen „rücken gemeinsam weiter, der Takt ist
-# vorgegeben") kehrt sich die Reihenfolge um.
+# **`ablauf` — ein Satz, und nur der Ablauf.** Er allein bildet den Vektor
+# (`embedding_input` in `taxonomy.yaml`) und beantwortet die Prüfsatz-Fälle des
+# Abschnitts S8 in `config/search_eval.yaml` („Erst allein nachdenken, dann zu zweit
+# austauschen …"). Zwei Regeln, beide gemessen:
 #
-# ⚠️ Die Texte sind ein **Entwurf** (AP6, Zulieferung 1) und warten auf die
-# fachdidaktische Durchsicht. Ein leeres Feld ist erlaubt: Der Seed markiert den Eintrag
-# dann als unvollständig, und er bekommt keinen Vektor — siehe Modulkopf.
+# 1. **Kein Beiwerk.** Am 04.09.2026 lag der Galeriegang auf Rang 1, bis ein
+#    Variantensatz dazukam („ein Gruppenmitglied bleibt stehen und erklärt es den
+#    Besuchern"). Danach Rang 7, verdrängt von den Operatoren *präsentieren*,
+#    *demonstrieren*, *erbringen*. Was den Eintrag für Lesende reicher macht, macht
+#    seinen Vektor unschärfer — deshalb die Trennung.
+# 2. **Abgrenzen, aber positiv.** „Anders als beim Lernzirkel gibt es keine feste
+#    Reihenfolge" trägt den fremden Namen und den verneinten Begriff in die Eingabe und
+#    zieht den Knoten an den heran, von dem er sich abgrenzen soll — Verneinungen kennt
+#    ein Embedding nicht. Mit diesem Satz stand der **Lernzirkel** vor Stationenlernen
+#    (0,733 zu 0,701); positiv formuliert kehrt sich die Reihenfolge um.
+#
+# Wo zwei Methoden einander ähneln — Stationenlernen, Lernzirkel und Lerntheke;
+# Kugellager und Fishbowl; Rollen- und Planspiel —, muss der Ablaufsatz den Unterschied
+# tragen. Fehlt er, zählt `content` wie bisher; ein leeres Feld macht nichts kaputt.
+#
+# `sozialform` hat kein Embedding und deshalb auch kein `ablauf`-Feld.
 # ─────────────────────────────────────────────────────────────────────────────
 
 SOZIALFORMEN: list[Baustein] = [
@@ -125,14 +144,14 @@ SOZIALFORMEN: list[Baustein] = [
         "Einzelarbeit",
         ("Stillarbeit",),
         content=(
-            "Jede und jeder arbeitet für sich, still und im eigenen Tempo. Sinnvoll vor allem zur Erbeitung von Texten, Übungen und anderen Aufgaben, bei denen die eigenständige Denkleistung des Einzelnen im Vordergrund steht."
+            "Jede und jeder arbeitet für sich, still und im eigenen Tempo. Sinnvoll vor allem zur Erarbeitung von Texten, Übungen und anderen Aufgaben, bei denen die eigenständige Denkleistung des Einzelnen im Vordergrund steht."
         ),
     ),
     Baustein(
         "Partnerarbeit",
         (),
         content=(
-            "Zwei bearbeiten eine Aufgabe gemeinsam. Weil man dem Gegenüber erklären muss, was man meint, treten Lücken hervor, die in der Einzelarbeit unbemerkt bleiben. Zugleich kommt jede Person oft zu Wort — mehr als in jeder größeren Runde. Gut geeignet für die Erarbeitung von Texten, Übungen und komplexeren Aufgaben, Problemlöseaufgaben und Aufgaben die kooperatives Vorgehen erfordern."
+            "Zwei bearbeiten eine Aufgabe gemeinsam. Weil man dem Gegenüber erklären muss, was man meint, treten Lücken hervor, die in der Einzelarbeit unbemerkt bleiben. Zugleich kommt jede Person oft zu Wort — mehr als in jeder größeren Runde. Gut geeignet für die Erarbeitung von Texten, Übungen und komplexeren Aufgaben, Problemlöseaufgaben und Aufgaben, die kooperatives Vorgehen erfordern."
         ),
     ),
     Baustein(
@@ -151,6 +170,10 @@ METHODEN: list[Baustein] = [
         content=(
             "Drei Schritte in fester Reihenfolge: Zuerst denkt jede Person allein über die Frage nach und hält etwas fest. Dann tauschen sich zwei darüber aus und einigen sich auf ein gemeinsames Ergebnis. Zuletzt wird es in der ganzen Klasse diskutiert. Der erste Schritt sorgt dafür, dass niemand mit leeren Händen kommt, der zweite dafür, dass jede Person einmal die Frage diskutiert hat."
         ),
+        ablauf=(
+            "Zuerst denkt jede Person allein über die Frage nach, dann tauschen sich zwei darüber "
+            "aus, zuletzt wird das Ergebnis in der ganzen Klasse besprochen."
+        ),
     ),
     Baustein(
         "Placemat",
@@ -158,19 +181,31 @@ METHODEN: list[Baustein] = [
         content=(
             "Ein großes Blatt liegt in der Mitte der Gruppe, aufgeteilt in ein Randfeld je Person und ein gemeinsames Feld in der Mitte. Zuerst schreibt jede Person still in ihr eigenes Randfeld. Dann werden die Beiträge reihum gelesen, und in die Mitte kommt nur, worauf sich die Gruppe einigt."
         ),
+        ablauf=(
+            "Ein großes Blatt liegt in der Mitte der Gruppe: Jede Person schreibt still in ihr "
+            "eigenes Randfeld, danach kommt in die Mitte, worauf sich die Gruppe einigt."
+        ),
     ),
     Baustein(
         "Gruppenpuzzle",
         ("Jigsaw", "Expertenpuzzle"),
         content=(
-            "Der Stoff wird in Teilthemen zerlegt. Zuerst arbeitet sich jede 'Expertengruppe' in genau ein Teilthema ein. Dann werden die Gruppen neu gemischt, so dass in jeder neuen Gruppe zu jedem Teilthema eine Person sitzt und es den anderen erklärt. Idealerweise erstellt jede Gruppe eine gemeinsame Sicherung des Gesamtthemas."
+            "Der Stoff wird in Teilthemen zerlegt. Zuerst arbeitet sich jede „Expertengruppe“ in genau ein Teilthema ein. Dann werden die Gruppen neu gemischt, so dass in jeder neuen Gruppe zu jedem Teilthema eine Person sitzt und es den anderen erklärt. Idealerweise erstellt jede Gruppe eine gemeinsame Sicherung des Gesamtthemas."
+        ),
+        ablauf=(
+            "Jede Gruppe arbeitet sich in ein Teilthema ein; danach werden die Gruppen so neu "
+            "gemischt, dass jede Person ihr Teilthema den anderen erklärt."
         ),
     ),
     Baustein(
         "Stationenlernen",
         ("Stationenarbeit",),
         content=(
-            "An mehreren Plätzen im Raum liegen Aufgaben zu einem Thema bereit. Die Lernenden wandern zwischen ihnen und suchen sich selbst aus, womit sie anfangen und wie lange sie an einer Stationbleiben; ein Laufzettel hält fest, was erledigt ist. Pflicht- und Wahlstationen lassen sich mischen. Ein große Herausforderung ist das Zeitmanagement durch die Lernenden, sodass am Ende der vorgesehen Zeit alle Pflichtstationen bearbeitet sind."
+            "An mehreren Plätzen im Raum liegen Aufgaben zu einem Thema bereit. Die Lernenden wandern zwischen ihnen und suchen sich selbst aus, womit sie anfangen und wie lange sie an einer Station bleiben; ein Laufzettel hält fest, was erledigt ist. Pflicht- und Wahlstationen lassen sich mischen. Eine große Herausforderung ist das Zeitmanagement durch die Lernenden, sodass am Ende der vorgesehenen Zeit alle Pflichtstationen bearbeitet sind."
+        ),
+        ablauf=(
+            "An mehreren Plätzen im Raum liegen Aufgaben, zwischen denen die Lernenden "
+            "wandern; Reihenfolge und Verweildauer bestimmen sie selbst."
         ),
     ),
     Baustein(
@@ -179,6 +214,10 @@ METHODEN: list[Baustein] = [
         content=(
             "Aufgaben liegen an mehreren Plätzen aus, und alle Gruppen sind gleichzeitig unterwegs: Jede beginnt an einer anderen Station und rückt nach einer abgesprochenen Zeit gemeinsam mit den übrigen weiter."
         ),
+        ablauf=(
+            "Aufgaben liegen an mehreren Plätzen aus; jede Gruppe beginnt an einer anderen "
+            "Station und rückt nach einer abgesprochenen Zeit gemeinsam mit den übrigen weiter."
+        ),
     ),
     Baustein(
         "Kugellager",
@@ -186,12 +225,20 @@ METHODEN: list[Baustein] = [
         content=(
             "Die Klasse bildet zwei Kreise, einen inneren und einen äußeren, mit Blick zueinander. Je zwei Gegenüberstehende tauschen sich kurz zu einer Frage aus. Dann rückt ein Kreis um einen Platz weiter, und es geht mit einem neuen Gegenüber weiter. In kurzer Zeit spricht so jede Person mit vielen anderen — alle reden gleichzeitig, niemand schaut nur zu. Ziel ist nie, dass alle mit allen gesprochen haben."
         ),
+        ablauf=(
+            "Zwei Kreise stehen sich gegenüber; je zwei Gegenüberstehende sprechen kurz "
+            "miteinander, dann rückt ein Kreis weiter und alle haben ein neues Gegenüber."
+        ),
     ),
     Baustein(
         "Galeriegang",
         ("Gallery Walk", "Museumsrundgang"),
         content=(
-            "Die Ergebnisse — Plakate, Skizzen, Texte — hängen im Raum aus. Die Klasse geht herum, sieht sie sich an und gibt Rückmeldung, oft schriftlich auf Klebezetteln. Statt einer Reihe von Vorträgen entsteht ein Rundgang, bei dem alle gleichzeitig in Bewegung sind. Als Variante bleibt ein Gruppenmitglied beim Plakat der Gruppe stehen und erklärt es den 'Besuchern'."
+            "Die Ergebnisse — Plakate, Skizzen, Texte — hängen im Raum aus. Die Klasse geht herum, sieht sie sich an und gibt Rückmeldung, oft schriftlich auf Klebezetteln. Statt einer Reihe von Vorträgen entsteht ein Rundgang, bei dem alle gleichzeitig in Bewegung sind. Als Variante bleibt ein Gruppenmitglied beim Plakat der Gruppe stehen und erklärt es den „Besuchern“."
+        ),
+        ablauf=(
+            "Die Ergebnisse hängen im Raum aus, und die Klasse geht herum, sieht sie sich an und "
+            "gibt Rückmeldung."
         ),
     ),
     Baustein(
@@ -200,12 +247,20 @@ METHODEN: list[Baustein] = [
         content=(
             "In kurzer Zeit werden möglichst viele Einfälle zu einer Frage gesammelt, ohne sie zu bewerten. Kritik und Auswahl kommen erst danach. Geeignet als Einstieg, um Vorwissen und erste Vermutungen sichtbar zu machen. Die Einfälle werden entweder auf Zettel geschrieben und an die Tafel gehängt oder auf eine Tafel direkt geschrieben."
         ),
+        ablauf=(
+            "In kurzer Zeit werden möglichst viele Einfälle zu einer Frage gesammelt, ohne sie "
+            "dabei zu bewerten."
+        ),
     ),
     Baustein(
         "Mindmap",
         ("Concept Map"),
         content=(
             "Das Thema steht in der Mitte, von ihm gehen Äste zu Teilaspekten oder verwandten Themen aus, die sich weiter verzweigen. Die Darstellung zeigt Zusammenhänge, die eine Liste verbirgt, und lässt sich jederzeit ergänzen. Nützlich zum Ordnen von Gesammeltem, zum Strukturieren von Gelerntem und zum Wiederholen eines Themas."
+        ),
+        ablauf=(
+            "Das Thema steht in der Mitte, von ihm gehen Äste zu Teilaspekten aus, die sich "
+            "weiter verzweigen."
         ),
     ),
     Baustein(
@@ -214,12 +269,20 @@ METHODEN: list[Baustein] = [
         content=(
             "Eine kleine Gruppe diskutiert in der Mitte, die übrigen sitzen außen herum und beobachten, ohne einzugreifen. Ein freier Stuhl im Innenkreis erlaubt es, dazuzukommen und nach dem Beitrag wieder zu gehen. So bleibt die Diskussion überschaubar, und trotzdem kann sich die ganze Klasse beteiligen."
         ),
+        ablauf=(
+            "Eine kleine Gruppe diskutiert in der Mitte, während die übrigen außen herum sitzen "
+            "und beobachten."
+        ),
     ),
     Baustein(
         "Fragend-entwickelndes Gespräch",
         (),
         content=(
             "Die Lehrkraft führt mit einer Kette von Fragen auf eine Einsicht hin; die Klasse antwortet Schritt für Schritt. Geeignet, um an Vorwissen anzuknüpfen und einen Gedankengang gemeinsam aufzubauen. Der Verlauf liegt dabei weitgehend bei der Lehrkraft — die Klasse geht einen Weg mit, den sie nicht selbst gewählt hat."
+        ),
+        ablauf=(
+            "Die Lehrkraft führt mit einer Kette von Fragen auf eine Einsicht hin, und die Klasse "
+            "antwortet Schritt für Schritt."
         ),
     ),
     Baustein(
@@ -228,6 +291,10 @@ METHODEN: list[Baustein] = [
         content=(
             "Alle bearbeiten dieselbe Aufgabe zunächst allein. Wer fertig ist, meldet sich und arbeitet mit der nächsten fertigen Person weiter — es finden sich also Paare mit ähnlichem Arbeitstempo. Wartezeiten entfallen, und niemand wird zum Weitermachen gedrängt."
         ),
+        ablauf=(
+            "Alle bearbeiten dieselbe Aufgabe zunächst allein; wer fertig ist, arbeitet mit der "
+            "nächsten fertigen Person weiter."
+        ),
     ),
     Baustein(
         "Lerntheke",
@@ -235,12 +302,20 @@ METHODEN: list[Baustein] = [
         content=(
             "An einer Stelle im Raum liegen Aufgaben und Hilfen unterschiedlicher Schwierigkeit aus, meist gestuft. Die Lernenden holen sich von dort, was sie brauchen, arbeiten an ihrem Sitzplatz und legen es zurück. Was zum eigenen Stand passt, entscheidet jede Person selbst. Besonders geeignet für selbstdifferenzierende Übungsphasen am Ende einer Unterrichtseinheit."
         ),
+        ablauf=(
+            "An einer Stelle im Raum liegen gestufte Aufgaben und Hilfen aus, von denen sich die "
+            "Lernenden holen, was sie brauchen, und am Sitzplatz bearbeiten."
+        ),
     ),
     Baustein(
         "Debatte",
         ("Pro-Contra-Debatte", "Streitgespräch"),
         content=(
-            "Zu einer strittigen Frage vertreten zwei Seiten gegensätzliche Positionen nach festen Regeln: Redezeit, Reihenfolge und Rollen sind vorher vereinbart. Die zugeteilte Seite muss nicht die eigene Meinung sein - gerade das schult das Abwägen von Argumenten. Eine solche Debatte kann sowohl als Partner- oder Gruppenarbeit gestaltet werden, als auch als 'Posiumsdiksussion' mit der ganzen Klasse."
+            "Zu einer strittigen Frage vertreten zwei Seiten gegensätzliche Positionen nach festen Regeln: Redezeit, Reihenfolge und Rollen sind vorher vereinbart. Die zugeteilte Seite muss nicht die eigene Meinung sein — gerade das schult das Abwägen von Argumenten. Eine solche Debatte kann sowohl als Partner- oder Gruppenarbeit gestaltet werden, als auch als „Podiumsdiskussion“ mit der ganzen Klasse."
+        ),
+        ablauf=(
+            "Zwei Seiten vertreten zu einer strittigen Frage gegensätzliche Positionen nach "
+            "vorher vereinbarten Regeln für Redezeit, Reihenfolge und Rollen."
         ),
     ),
     Baustein(
@@ -249,12 +324,20 @@ METHODEN: list[Baustein] = [
         content=(
             "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation und handeln sie miteinander aus. Anschließend wird ausgewertet, was im Spiel geschehen ist und woran es lag. Die Auswertung ist oft der eigentliche Lernschritt, nicht die Aufführung."
         ),
+        ablauf=(
+            "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation, handeln sie "
+            "miteinander aus und werten anschließend aus, was geschehen ist."
+        ),
     ),
     Baustein(
         "Planspiel",
         ("Simulation"),
         content=(
-            "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation und agieren entsprechend. Die Situation ist oft komplex und die Folgen der Handlungen nicht vorhersehbar. Die Rollen und ihre Interesse müssen entsprechend klar definiert sein. Geeignet z.B. zur Simulation von Konflikten, Wirtschaftsprozessen oder politischen Entscheidungen. "
+            "Die Lernenden übernehmen Rollen in einer vorgegebenen Situation und agieren entsprechend. Die Situation ist oft komplex und die Folgen der Handlungen nicht vorhersehbar. Die Rollen und ihre Interessen müssen entsprechend klar definiert sein. Geeignet z. B. zur Simulation von Konflikten, Wirtschaftsprozessen oder politischen Entscheidungen. "
+        ),
+        ablauf=(
+            "Die Lernenden übernehmen klar umrissene Rollen in einer komplexen Situation und "
+            "handeln darin, ohne dass die Folgen ihrer Entscheidungen vorhersehbar sind."
         ),
     ),
 ]
@@ -290,7 +373,7 @@ def plane_aenderung(
     """Vergleicht Ist und Soll und beschreibt den Unterschied.
 
     ``ist`` ist der Zustand des vorhandenen Knotens (leer für einen neuen): ``content``,
-    ``aliase``, die vier Scope-Felder und ``embedding_vorhanden``.
+    ``ablauf``, ``aliase``, die vier Scope-Felder und ``embedding_vorhanden``.
 
     Eine Regel für Anlegen und Aktualisieren — ein neuer Knoten ist hier nur der Fall,
     in dem alles fehlt. Zwei getrennte Wege wären zwei Gelegenheiten, auseinanderzulaufen.
@@ -306,6 +389,19 @@ def plane_aenderung(
         else:
             aenderung.felder["content"] = soll_text
             aenderung.geaendert.append("Text")
+            aenderung.embedding_verwerfen = True
+
+    # ── Ablaufsatz ────────────────────────────────────────────────────────────
+    # Dieselbe Regel wie beim Text — und aus demselben Grund getrennt von ihm: Der
+    # Ablaufsatz ist der Vektor, die Kurzbeschreibung die Handreichung.
+    ist_ablauf = (ist.get("ablauf") or "").strip()
+    soll_ablauf = baustein.ablaufsatz
+    if soll_ablauf and soll_ablauf != ist_ablauf:
+        if ist_ablauf and not ueberschreiben:
+            aenderung.behalten.append("Ablaufsatz")
+        else:
+            aenderung.metadata["ablauf"] = soll_ablauf
+            aenderung.geaendert.append("Ablaufsatz")
             aenderung.embedding_verwerfen = True
 
     # ── Aliase ────────────────────────────────────────────────────────────────
@@ -359,6 +455,7 @@ def _ist_zustand(node: ContextNode) -> dict[str, Any]:
     metadata = dict(node.metadata_ or {})
     return {
         "content": node.content,
+        "ablauf": metadata.get("ablauf") or "",
         "aliase": list(metadata.get("aliase") or []),
         "metadata": metadata,
         "read_scope": node.read_scope,
