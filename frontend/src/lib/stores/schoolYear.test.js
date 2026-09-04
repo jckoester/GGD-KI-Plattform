@@ -34,6 +34,40 @@ describe("alsTagMonat", () => {
   })
 })
 
+describe("passtZumSchuljahr", () => {
+  it("gleiches Jahr — der Knopf erscheint", async () => {
+    const { passtZumSchuljahr } = await frisch()
+    expect(passtZumSchuljahr("2026/27", ANTWORT)).toBe(true)
+  })
+
+  it("verträgt beide Schreibweisen", async () => {
+    // ⚠️ Der Fall, an dem ein Stringvergleich stillschweigend scheiterte: Die Config
+    // schreibt `2026/27`, die Formularvorgabe `2026/2027`. Der Knopf verschwände dann
+    // auf Dauer, ohne dass jemand den Grund sähe.
+    const { passtZumSchuljahr } = await frisch()
+    expect(passtZumSchuljahr("2026/2027", ANTWORT)).toBe(true)
+  })
+
+  it("anderes Jahr — der Knopf verschwindet", async () => {
+    const { passtZumSchuljahr } = await frisch()
+    expect(passtZumSchuljahr("2028/29", ANTWORT)).toBe(false)
+    expect(passtZumSchuljahr("2025/26", ANTWORT)).toBe(false)
+  })
+
+  it("leeres Feld ist kein Widerspruch", async () => {
+    const { passtZumSchuljahr } = await frisch()
+    expect(passtZumSchuljahr("", ANTWORT)).toBe(true)
+    expect(passtZumSchuljahr(null, ANTWORT)).toBe(true)
+    expect(passtZumSchuljahr("keine Ahnung", ANTWORT)).toBe(true)
+  })
+
+  it("ohne geladenes Schuljahr kein Knopf", async () => {
+    const { passtZumSchuljahr } = await frisch()
+    expect(passtZumSchuljahr("2026/27", null)).toBe(false)
+    expect(passtZumSchuljahr("2026/27", {})).toBe(false)
+  })
+})
+
 describe("ladeSchuljahr", () => {
   it("füllt den Store aus der Antwort", async () => {
     vi.mocked(getSchoolYear).mockResolvedValue(ANTWORT)

@@ -8,6 +8,8 @@
     import {
         alsTagMonat,
         ladeSchuljahr,
+        passtZumSchuljahr,
+        schoolYear,
         schuljahresEnde,
     } from "$lib/stores/schoolYear.js";
     import {
@@ -991,7 +993,7 @@
                        bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
                        disabled:opacity-50 disabled:cursor-not-allowed"
                             />
-                            {#if canEdit && $schuljahresEnde}
+                            {#if canEdit && $schuljahresEnde && passtZumSchuljahr(schuljahr, $schoolYear)}
                                 <button
                                     type="button"
                                     onclick={() => {

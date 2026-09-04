@@ -8,7 +8,13 @@
     SCOPE_DEFAULTS,
   } from '$lib/taxonomy.js'
   import { auswaehlbareTypOptionen } from '$lib/knotentypen.js'
-  import { alsTagMonat, ladeSchuljahr, schuljahresEnde } from '$lib/stores/schoolYear.js'
+  import {
+    alsTagMonat,
+    ladeSchuljahr,
+    passtZumSchuljahr,
+    schoolYear,
+    schuljahresEnde,
+  } from '$lib/stores/schoolYear.js'
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
@@ -536,7 +542,7 @@
               class="px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
             />
-            {#if $schuljahresEnde}
+            {#if $schuljahresEnde && passtZumSchuljahr(schuljahr, $schoolYear)}
               <button
                 type="button"
                 onclick={() => { validUntil = $schuljahresEnde }}

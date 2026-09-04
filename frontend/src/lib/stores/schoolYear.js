@@ -50,3 +50,37 @@ export function alsTagMonat(iso) {
   const [, monat, tag] = iso.split("-")
   return `${tag}.${monat}.`
 }
+
+/**
+ * Das Anfangsjahr einer Schuljahresangabe, oder `null`.
+ *
+ * ⚠️ **Zwei Schreibweisen im Umlauf, und sie sind nicht gleich.** Die Config schreibt
+ * `2025/26`, die Formularvorgabe `2026/2027`. Ein Stringvergleich wäre also immer
+ * ungleich — und der Knopf verschwände auf Dauer, ohne dass jemand den Grund sähe. Das
+ * Anfangsjahr ist in beiden Formen dasselbe und das Einzige, was sich vergleichen lässt.
+ */
+function startjahr(angabe) {
+  const treffer = /^(\d{4})/.exec((angabe ?? "").trim())
+  return treffer ? Number(treffer[1]) : null
+}
+
+/**
+ * Bezieht sich der Knopf auf dasselbe Schuljahr wie das Formular?
+ *
+ * Der Knopf liefert immer das Ende des **laufenden** Schuljahres — die Config kennt nur
+ * eines. Trägt das Formularfeld „Schuljahr" ein anderes, setzte er kommentarlos ein
+ * Datum aus einem fremden Jahr; dann erscheint er gar nicht erst.
+ *
+ * Aus dem eingetippten Jahr ein Datum zu rechnen wäre **kein** Ausweg: Das Ende eines
+ * künftigen Schuljahres hängt an den Sommerferien und steht nirgends fest (29.07.2026,
+ * 28.07.2027). Es zu berechnen hieße, den Tag zu raten — derselbe Fehler wie der früher
+ * fest angenommene 31.07., nur mit einer anderen Konstante.
+ *
+ * Ein **leeres** Feld ist kein Widerspruch: Wer kein Schuljahr angibt, bekommt den Knopf.
+ */
+export function passtZumSchuljahr(feldwert, sj) {
+  const config = startjahr(sj?.schuljahr)
+  if (config === null) return false
+  const eingetragen = startjahr(feldwert)
+  return eingetragen === null || eingetragen === config
+}
