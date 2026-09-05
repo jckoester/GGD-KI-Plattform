@@ -845,7 +845,8 @@ class TestLifecycleRoundtrip:
             "/context/nodes",
             json={
                 "category": "concept",
-                "content_type": "abstrakt",
+                # `abstrakt` ist in AP3 in `begriff` aufgegangen (Migration 0055).
+                "content_type": "begriff",
                 "title": "Test Lifecycle",
                 "content": "Test Inhalt",
             },
