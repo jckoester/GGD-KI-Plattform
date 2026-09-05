@@ -69,14 +69,34 @@ jobs:
             requirements-scripts.txt
 
       # weasyprint (PDF-Export) bindet Pango zur Laufzeit; ohne diese Pakete
-      # scheitert schon der Import. Pandoc brauchen die DOCX-/ODT-Tests: Fehlt es,
-      # überspringen sie sich per `skipif` — und ein Prüflauf, der stillschweigend
-      # nichts prüft, ist genau das, was hier abgestellt werden soll.
+      # scheitert schon der Import.
       - name: Systempakete
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 pandoc
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+
+      # Pandoc brauchen die DOCX-/ODT-Tests; fehlt es, überspringen sie sich per
+      # `skipif` — ein Prüflauf, der stillschweigend nichts prüft, ist das Problem.
+      #
+      # ⚠️ Bewusst NICHT `apt-get install pandoc`: Der Distributionsbau bettet die
+      # Datendateien nicht ein, sondern legt sie unter /usr/share/pandoc/data/ ab.
+      # `--sandbox` (app/export/pandoc.py) verbietet genau solche Lesezugriffe, und
+      # jede Konvertierung scheitert mit "Could not find data file
+      # docx/[Content_Types].xml". Das offizielle .deb bettet sie ein — und ist
+      # dieselbe Fassung wie in der Entwicklung.
+      - name: Pandoc (offizielles Release, mit eingebetteten Datendateien)
+        env:
+          PANDOC_VERSION: "3.11"
+        run: |
+          curl -fsSL -o /tmp/pandoc.deb \
+            "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb"
+          sudo dpkg -i /tmp/pandoc.deb
+          pandoc --version | head -1
+          # Beweis, dass --sandbox mit dieser Fassung trägt — schlägt das fehl,
+          # steht es hier und nicht erst in dreizehn Testfehlern.
+          printf '# Titel\n\nText.\n' | pandoc -f commonmark_x -t docx --sandbox -o /tmp/probe.docx
+          test -s /tmp/probe.docx && echo "Sandbox-Probe: DOCX erzeugt ($(stat -c%s /tmp/probe.docx) Bytes)"
 
       # Zwei Dateien, und beide sind nötig: `tests/unit` prüft nicht nur das Backend,
       # sondern lädt über importlib auch den Bildungsplan-Scraper aus scripts/

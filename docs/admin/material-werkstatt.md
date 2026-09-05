@@ -15,6 +15,18 @@ exportieren.
 Pandoc läuft mit `--sandbox` (kein Datei-/Netzzugriff), der Reader ist `commonmark_x` **ohne**
 `raw_tex` — nutzereditierbares Markdown kann also kein LaTeX ausführen oder Dateien einbinden.
 
+> ⚠️ **Pandoc muss die Fassung mit eingebetteten Datendateien sein.** Das Image installiert
+> deshalb das **offizielle `.deb`** von `jgm/pandoc` (Version über `--build-arg PANDOC_VERSION`),
+> nicht das Debian-Paket: Letzteres legt die Datendateien unter `/usr/share/pandoc/data/` ab, und
+> `--sandbox` verbietet genau solche Lesezugriffe. Jede Konvertierung schlüge dann fehl mit
+> `Could not find data file docx/[Content_Types].xml`. Der Build prüft das selbst — er konvertiert
+> ein Testdokument und bricht ab, wenn es nicht klappt. Wer Pandoc auf einem eigenen Weg
+> installiert, prüft es von Hand:
+>
+> ```bash
+> printf '# Titel\n\nText.\n' | pandoc -f commonmark_x -t docx --sandbox -o /tmp/probe.docx
+> ```
+
 ## Export-Vorlagen (schulweites Layout)
 
 Unter **Einstellungen → Export-Vorlagen** (`/settings/export`, nur Admin):
