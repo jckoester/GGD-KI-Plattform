@@ -5,260 +5,197 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.8.0] – 2026-09-05
+
+Schwerpunkt: **der Wissensgraph**. Die Suche trennt Namenstreffer von thematischen
+Treffern und erschließt erstmals eigenes Material. Fünf Bausteinarten bekommen eine
+gepflegte Sammlung mit Editor und Verknüpfen-Dialog. Ablaufdatum, Archivieren und Löschen
+wirken jetzt tatsächlich. Dazu eine aufgeräumte Taxonomie: 41 statt 47 Bausteinarten.
+
 ### Neu
 
 - **Suchseite für den Kontextspeicher** unter *Wissensgraph → Suche*, für alle Rollen.
-  Sie zeigt getrennt, was den gesuchten **Namen trägt**, was ihm nur **ähnlich heißt**
-  und was thematisch danebenliegt — dazu bei gesetzten Filtern eine gezählte Liste
-  („24 insgesamt", aufgeschlüsselt nach Fach). Gibt es keinen Baustein dieses Namens,
-  sagt die Seite das ausdrücklich, statt thematische Nachbarn als Ergebnis auszugeben.
-  Treffer lassen sich auswählen und an den offenen Chat anheften oder als Grundlage
-  eines neuen Chats mitnehmen.
+  Sie trennt Namensträger, ähnlich benannte und thematische Treffer und zählt bei
+  gesetzten Filtern („24 insgesamt", nach Fach aufgeschlüsselt). Gibt es keinen Baustein
+  dieses Namens, sagt die Seite das ausdrücklich. Treffer lassen sich an den offenen Chat
+  anheften oder als Grundlage eines neuen mitnehmen.
 
 ### Geändert
 
 - **Sucht ein Assistent im Kontextspeicher, öffnet sich kein Vorschlagsfenster mehr.**
-  Die Liste zum Anheften erscheint nur noch, wenn man selbst über den Suchknopf sucht.
-  Der Assistent liest die gefundenen Bausteine wie bisher.
+  Die Liste zum Anheften erscheint nur noch bei eigener Suche.
 
-- **Die Suche trennt jetzt Namenstreffer von thematischen Treffern.** Bausteine, die
-  den gesuchten Namen *tragen*, standen bisher in derselben Liste wie Bausteine, die
-  ihm nur ähneln — und teilten sich mit ihnen ein Limit. Beide Gruppen haben jetzt
+- **Die Suche trennt Namenstreffer von thematischen Treffern.** Beide Gruppen haben
   eigene Plätze; ist die Liste der Namensträger gekürzt, steht die Gesamtzahl dabei.
-  Assistenten wird ausdrücklich untersagt, aus thematischer Nähe zu schließen, dass es
-  etwas nicht gibt.
 
-- **Eigenes Material ist thematisch auffindbar.** Bisher konnte die Ähnlichkeitssuche
-  nur Bildungsplan-Inhalte finden — Arbeitsblätter, Klausuren, Methoden und
-  Stundenentwürfe waren dort strukturell unsichtbar. 15 weitere Bausteinarten werden
-  jetzt für die Suche erschlossen, dazu die neue Art **Fachbegriff**. Für
-  Stundenentwürfe zählt dabei das **Thema**, nicht der Verlaufsplan: „Einstieg,
-  Erarbeitung, Sicherung" steht in jeder Stunde und machte alle einander ähnlich.
+- **Eigenes Material ist thematisch auffindbar.** 15 weitere Bausteinarten sind für die
+  Suche erschlossen, dazu die neue Art **Fachbegriff**. Bei Stundenentwürfen zählt das
+  Thema, nicht der Verlaufsplan.
 
 - **Die Suche ordnet Treffer nach Rolle.** Schüler:innen bekommen Lernmaterial etwas
-  weiter oben, Lehrkräfte Klausuren und Stundenentwürfe. Ein Vorzug, kein Filter — wer
-  was sehen darf, entscheidet unverändert die Freigabe.
+  weiter oben, Lehrkräfte Klausuren und Stundenentwürfe — ein Vorzug, kein Filter.
 
-- **„Was haben wir letzte Woche gemacht?"** beantwortet der Assistent jetzt aus dem
-  Stundenplan statt über Ähnlichkeit: Zeitraum und Unterrichtsgruppe sind Filter der
-  Aufzählung geworden.
+- **„Was haben wir letzte Woche gemacht?"** beantwortet der Assistent aus dem
+  Stundenplan: Zeitraum und Unterrichtsgruppe sind Filter der Aufzählung.
 
-- **Bausteine ohne Embedding sind über ihren Namen auffindbar.** Fachpläne, Curricula,
-  Methoden und Leitperspektiven waren über die Suche bisher gar nicht erreichbar.
+- **Bausteine ohne Embedding sind über ihren Namen auffindbar** — Fachpläne, Curricula,
+  Methoden, Leitperspektiven.
 
-- **Bausteine sind über einen Teil ihres Namens auffindbar.** „Anleitung Operator
-  nennen" findet jetzt das Blatt „Anleitung zur Verwendung des Operators ‚nennen'".
-  Exakte Namensträger stehen weiterhin vorn und tragen als einzige die Auskunft, ob es
-  einen Baustein dieses Namens gibt; ähnlich benannte stehen als eigener Abschnitt
-  dahinter. **Eigene Bausteine stehen vor fremden** — sichtbar, nicht filternd: Die
-  Handreichung der Fachschaft bleibt in der Liste.
+- **Bausteine sind über einen Teil ihres Namens auffindbar.** „Anleitung Operator nennen"
+  findet „Anleitung zur Verwendung des Operators ‚nennen'". Exakte Namensträger stehen
+  vorn, ähnlich benannte in einem eigenen Abschnitt dahinter, eigene vor fremden.
 
-- **Assistenten mit festem Wissensbereich suchen jetzt genauso wie alle anderen.**
-  Der eigene Suchweg für Assistenten mit Anker-Knoten ist entfallen; sie erben damit
-  Namens-Nachschlagen, Fachvorzug und den Prüfsatz. Zugleich gilt die Bereinigung der
-  Bildungsplan-Fassungen jetzt **überall**: Auch im freien Chat erscheint eine Kompetenz
-  nur noch einmal statt in zwei Editionen, und wo ein Jahrgang bekannt ist, in der für
-  ihn geltenden Fassung.
+- **Assistenten mit festem Wissensbereich suchen wie alle anderen** und erben damit
+  Namens-Nachschlagen und Fachvorzug. Die Bereinigung der Bildungsplan-Fassungen gilt
+  jetzt überall: Eine Kompetenz erscheint einmal, bei bekanntem Jahrgang in der für ihn
+  geltenden Fassung.
 
-- **Assistenten können den Kontextspeicher jetzt auszählen.** Auf Fragen wie „In welchen
-  Fächern gibt es den Operator *nennen*?" antwortet die Plattform mit einer vollständigen,
-  gezählten Liste statt mit den ähnlichsten Treffern — inklusive Aufschlüsselung nach Fach
-  oder Bausteinart. Die Fähigkeit „Kontextsuche" bringt das neue Werkzeug automatisch mit;
-  `get_operatoren` bleibt unverändert nutzbar.
+- **Assistenten können den Kontextspeicher auszählen.** „In welchen Fächern gibt es den
+  Operator *nennen*?" beantwortet die Plattform mit einer vollständigen, gezählten Liste,
+  wahlweise nach Fach oder Bausteinart aufgeschlüsselt. Die Fähigkeit „Kontextsuche"
+  bringt das Werkzeug mit; `get_operatoren` bleibt nutzbar.
 
 - **Das Vorschlagsfenster im Chat zeigt die Abschnitte getrennt** und passt auf kleine
-  Bildschirme: eigene Höhe mit Scrollbereich, „Hinzufügen" immer erreichbar.
-  Vorausgewählt sind höchstens fünf Treffer je Abschnitt statt aller; ein „Alle"-Knopf
-  wählt weiterhin die ganze Liste. Angeheftete Bausteine klappen ab sechs Stück ein.
+  Bildschirme. Vorausgewählt sind höchstens fünf Treffer je Abschnitt; „Alle" wählt die
+  ganze Liste. Angeheftete Bausteine klappen ab sechs Stück ein.
 
-- **Der `@`-Shortcode findet mehrwortige Titel.** „@Satz des Pythagoras" lässt sich
-  ausschreiben; es genügen auch der Anfang oder ein Wort aus der Mitte. Die Liste ordnet
-  nach exaktem Namen, Titelanfang und Ähnlichkeit und bevorzugt das Fach des Chats. Sie
-  schließt mit `esc`, bei der Auswahl und wenn nichts mehr passt.
+- **Der `@`-Shortcode findet mehrwortige Titel.** Anfang oder ein Wort aus der Mitte
+  genügen; die Liste bevorzugt das Fach des Chats und schließt mit `esc`.
 
-- **Die Suche ist nicht mehr als experimentell gekennzeichnet.** Namenstreffer und
-  Aufzählung sind vollständig und gezählt; die thematische Auswahl bleibt ausdrücklich
-  eine Empfehlung.
+- **Die Suche ist nicht mehr als experimentell gekennzeichnet.**
 
-- **Die Liste der Bausteinarten ist keine Betreiber-Konfiguration mehr.** Sie ist von
-  `config/taxonomy.yaml` nach `backend/app/context/taxonomy.yaml` gewandert und gehört
-  damit zum Anwendungsabbild. Das Backend prüft sie beim Start gegen den Datenbestand
-  und startet bei einer Abweichung nicht; `scripts/check_production.py` prüft den
-  datenbankfreien Teil vorab.
+- **Die Liste der Bausteinarten ist keine Betreiber-Konfiguration mehr.** Sie gehört zum
+  Anwendungsabbild; das Backend prüft sie beim Start gegen den Datenbestand und startet
+  bei einer Abweichung nicht.
 
   ⚠️ **Für Bestandsinstallationen:** Die alte `config/taxonomy.yaml` auf dem Host ist
-  nach dem Update wirkungslos und kann gelöscht werden. Der Start weist darauf hin,
-  solange sie da ist.
+  wirkungslos und kann gelöscht werden.
 
-- **Bausteinarten ohne Anlege-Weg erscheinen in keiner Auswahl mehr.** Lernplan,
-  Schülertext, Feedback-Text und Prüfungsanforderung standen in Formularen, Filtern und
-  der Bausteinart-Facette der Suche, obwohl es keinen Weg gibt, so einen Baustein
-  anzulegen. Vorhandene Bausteine bleiben unverändert sicht- und durchsuchbar, und wer
-  einen bearbeitet, kann seine Art beibehalten.
+- **Bausteinarten ohne Anlege-Weg erscheinen in keiner Auswahl mehr** — Lernplan,
+  Schülertext, Feedback-Text, Prüfungsanforderung. Vorhandene bleiben sicht- und
+  durchsuchbar, und wer einen bearbeitet, behält seine Art.
 
 - **Zuständigkeiten für neue Bausteine korrigiert.** Prüfungsanforderung, Konvention,
-  Themengebiet, Funktion und Bauteil legt künftig die Fachschaft an statt der Schule;
-  Sozialformen pflegt die Schule; eine Präsentation gehört zur Lerngruppe. Das betrifft
-  nur die **Vorauswahl beim Anlegen** — bestehende Bausteine ändern sich nicht.
+  Themengebiet, Funktion und Bauteil legt die Fachschaft an, Sozialformen die Schule;
+  eine Präsentation gehört zur Lerngruppe. Betrifft nur die Vorauswahl beim Anlegen.
 
-- **Schülerartefakte laufen zum Schuljahresende ab statt nach sechs Wochen.** Die alte
-  Frist war nie abgestimmt; das Schuljahr ist dieselbe Grenze wie bei Stunde und
-  Unterrichtseinheit.
+- **Schülerartefakte laufen zum Schuljahresende ab statt nach sechs Wochen.**
 
 - **Zwei neue Bausteinarten vorbereitet:** Schülerpräsentation und Gliederung/Mindmap.
-  Beide ruhen noch — sie werden mit der Chat-Übernahme in 0.9 nutzbar.
+  Beide ruhen bis 0.9.
 
 - **Sechs Bausteinarten sind in vier anderen aufgegangen** (41 statt 47):
   *Aufgabenblatt* → **Arbeitsblatt**, *Gliederung* und *Mindmap* →
   **Gliederung/Mindmap**, *Mathematischer Operator* und *Abstraktes Konzept* →
-  **Fachbegriff**, *Reflexion* entfällt. Bestehende Bausteine werden von der Migration
-  umgestellt und bleiben mit Inhalt, Verknüpfungen und Verlaufsdaten erhalten.
+  **Fachbegriff**, *Reflexion* entfällt. Die Migration stellt bestehende Bausteine um;
+  Inhalt, Verknüpfungen und Verlaufsdaten bleiben.
 
-- **Die Nachbereitung einer Stunde ist jetzt thematisch auffindbar.** „Was habe ich mir
-  zu Bindungsenergie notiert?" findet die Stunde über ihre Reflexion.
+- **Die Nachbereitung einer Stunde ist thematisch auffindbar.** „Was habe ich mir zu
+  Bindungsenergie notiert?" findet die Stunde über ihre Reflexion.
 
-- **Bausteine, auf die andere aufbauen, lassen sich nicht mehr löschen.** Verweisen
-  aktive Bausteine anderer darauf, zeigt die Plattform, wer das ist, und bietet
-  Archivieren an — das erhält die Verweise. Eigene Verweise halten nicht auf; Admins
-  können sich darüber hinwegsetzen.
+- **Bausteine, auf die andere aufbauen, lassen sich nicht mehr löschen.** Die Plattform
+  zeigt, wer darauf verweist, und bietet Archivieren an. Eigene Verweise halten nicht
+  auf; Admins können sich darüber hinwegsetzen.
 
 - **Der Wissensgraph bietet Archivieren und Löschen nur noch dort an, wo es erlaubt ist.**
-  Bei fremden und schulweiten Bausteinen erscheinen die Knöpfe nicht mehr.
 
 - **Stundenentwürfe, Unterrichtseinheiten und Schülermaterial bekommen beim Anlegen ein
-  Ablaufdatum.** Es ist das Ende des laufenden Schuljahres; danach wandern sie ins
-  Archiv und lassen sich von dort zurückholen. Wer ein anderes oder gar kein Ablaufdatum
-  will, trägt es beim Anlegen ein oder entfernt es später. Bisher blieben diese
-  Bausteine unbegrenzt liegen, obwohl die Fristen seit Langem festgelegt waren.
+  Ablaufdatum** — das Ende des laufenden Schuljahres. Ein anderes oder gar keins trägt
+  man beim Anlegen ein oder entfernt es später.
 
-- **Das Ablaufdatum eines Bausteins wirkt jetzt.** Ein neuer nächtlicher Lauf archiviert
-  abgelaufene Bausteine und löscht nach drei Schuljahren im Archiv endgültig —
-  Bildungsplan und importierte Inhalte ausgenommen. Bisher wurde das Datum erfasst und
-  nie ausgewertet.
+- **Das Ablaufdatum wirkt jetzt.** Ein nächtlicher Lauf archiviert abgelaufene Bausteine
+  und löscht nach drei Schuljahren im Archiv endgültig — Bildungsplan und importierte
+  Inhalte ausgenommen.
 
-- **„Reaktivieren" im Archiv** holt einen abgelaufenen Baustein zurück und setzt zugleich
-  ein neues Ablaufdatum; ohne das wäre er in derselben Nacht wieder archiviert worden.
+- **„Reaktivieren" im Archiv** holt einen abgelaufenen Baustein zurück und setzt ein
+  neues Ablaufdatum.
 
 - **Gepflegte Sammlungen für fünf Bausteinarten** — Methodenblatt, Operatorenblatt,
-  Methode, Sozialform und Fachbegriff. Jede hat eine eigene Ansicht mit passenden
-  Spalten und Filtern, einem Formular statt eines JSON-Feldes und einem Satz darüber,
-  was hineingehört.
-
-  **Wo sie stehen, richtet sich danach, wie man sie sucht.** In der Sidebar unter
-  *Wissensgraph → Sammlungen* nur, was ohne Fach im Kopf interessiert: Methoden,
-  Sozialformen und Fachbegriffe. Methodenblätter und Operatorenblätter sucht man mit
-  einem Fach vor Augen — sie stehen im Fachschafts-Abschnitt der Fachseite, aufs Fach
+  Methode, Sozialform und Fachbegriff. Jede mit eigenen Spalten und Filtern, einem
+  Formular statt eines JSON-Feldes und einem Satz darüber, was hineingehört. In der
+  Sidebar unter *Wissensgraph → Sammlungen* stehen Methode, Sozialform und Fachbegriff;
+  Methodenblatt und Operatorenblatt im Fachschafts-Abschnitt der Fachseite, aufs Fach
   vorgefiltert.
 
-- **Bausteine lassen sich von Hand verknüpfen.** Die Detailansicht zeigt die
-  Vernetzung nach Beziehungsart gruppiert und bietet einen **Verknüpfen**-Dialog: Die
-  Richtung steht als Satz da („‚Oxidation‘ steht in Beziehung zu …"), das Ziel findet
-  dieselbe Namenssuche wie der `@`-Shortcode im Chat. Entfernen betrifft immer nur die
+- **Bausteine lassen sich von Hand verknüpfen.** Die Detailansicht gruppiert die
+  Vernetzung nach Beziehungsart und bietet einen **Verknüpfen**-Dialog; die Richtung
+  steht als Satz da („‚Oxidation‘ steht in Beziehung zu …"). Entfernen betrifft nur die
   Verknüpfung, nie den Baustein.
 
 - **Fehlende Bausteine entstehen aus dem Dialog heraus.** Findet die Suche nichts
-  Passendes, legt der Dialog den Baustein an und verknüpft ihn sofort — ohne die Seite
-  zu verlassen. Er trägt dann das Kennzeichen **„unvollständig"**; die Sammlung zählt
-  diese Einträge und lässt nach ihnen filtern. So kann eine Fachschaft erst das Netz
-  aufspannen und später definieren.
+  Passendes, legt der Dialog den Baustein an und verknüpft ihn sofort. Er trägt dann das
+  Kennzeichen **„unvollständig"**; die Sammlung zählt und filtert danach.
 
-- **Methode und Fachbegriff verlangen jetzt eine Beschreibung.** Ohne sie ist ein Eintrag
-  nur unter seinem Namen zu finden — genau das, was die thematische Suche leisten soll,
-  fiele weg.
+- **Methode und Fachbegriff verlangen eine Beschreibung.**
 
 - **Die mitgelieferten Methoden und Sozialformen haben eine Kurzbeschreibung.** Wer den
   Ablauf beschreibt („erst allein nachdenken, dann zu zweit austauschen"), findet die
-  Methode jetzt, ohne ihren Namen zu kennen. Einträge ohne Beschreibung tragen das
-  Kennzeichen **„unvollständig"**.
+  Methode, ohne ihren Namen zu kennen.
 
-- **Methoden haben ein eigenes Feld „Ablauf in einem Satz".** Es entscheidet allein
-  darüber, ob die Methode thematisch gefunden wird — die Kurzbeschreibung darf dadurch
-  ausführlich werden, ohne die Suche zu verwässern. Das Feld steht im Editor der
-  Sammlung; ohne Eintrag zählt weiterhin die Kurzbeschreibung.
+- **Methoden haben ein eigenes Feld „Ablauf in einem Satz".** Es allein entscheidet über
+  die thematische Auffindbarkeit; ohne Eintrag zählt die Kurzbeschreibung.
 
 ### Migration
 
-- **Neue Datenbank-Migration `0056`** (Verknüpfungsart „reflektiert" entfernt). Sie
-  gehörte zur in `0055` gestrichenen Bausteinart *Reflexion*. `alembic upgrade head` wie
-  gewohnt; der Lauf bricht ab, falls im Bestand entgegen der Erwartung noch solche
-  Verknüpfungen liegen.
+`alembic upgrade head` wie gewohnt — die drei Migrationen laufen in einem Zug.
 
-- **Neue Datenbank-Migration `0055`** (Zusammenlegung der Bausteinarten). Sie muss
-  **zusammen mit** diesem Release eingespielt werden: Das Backend startet nicht, solange
-  Bausteine eine Art tragen, die es nicht mehr gibt. `alembic upgrade head` wie gewohnt.
+- **`0056`** — Verknüpfungsart „reflektiert" entfernt. Der Lauf bricht ab, falls noch
+  solche Verknüpfungen im Bestand liegen.
 
-  Stunden mit Nachbereitung werden zum Neu-Einbetten vorgemerkt; der nächtliche
-  Embedding-Lauf holt sie ab.
+- **`0055`** — Zusammenlegung der Bausteinarten. Muss **zusammen mit** diesem Release
+  eingespielt werden: Das Backend startet nicht, solange Bausteine eine abgeschaffte Art
+  tragen. Stunden mit Nachbereitung werden zum Neu-Einbetten vorgemerkt.
 
-- **Neue Datenbank-Migration `0054`** (Trigramm-Index für die Namens-Teilsuche). Sie legt
-  die PostgreSQL-Erweiterung `pg_trgm` an; bei einer verwalteten Datenbank ohne
-  Superuser-Rechte muss der Betreiber sie vorab freischalten. `alembic upgrade head` wie
-  gewohnt.
+- **`0054`** — Trigramm-Index für die Namens-Teilsuche. Legt die PostgreSQL-Erweiterung
+  `pg_trgm` an; ohne Superuser-Rechte muss der Betreiber sie vorab freischalten.
 
 ### Behoben
 
-- **Der Knopf „Schuljahresende" trug ein falsches Datum.** Er setzte immer den 31.07.,
-  unabhängig vom hinterlegten Schuljahr — dieses Jahr endet es am 29.07. Das Datum kommt
-  jetzt aus der Schuljahres-Einstellung. Trägt der Baustein ein anderes Schuljahr als das
-  laufende, erscheint der Knopf nicht mehr — er hätte dort ein Datum aus einem fremden
-  Jahr gesetzt.
+- **Der Knopf „Schuljahresende" setzte immer den 31.07.** Das Datum kommt jetzt aus der
+  Schuljahres-Einstellung; trägt der Baustein ein anderes Schuljahr als das laufende,
+  erscheint der Knopf nicht.
 
-- **Auswahlfelder für Bausteinarten zeigten den technischen Schlüssel.** Statt
-  „Schülerpräsentation" stand dort `schuelerpraesentation` — im Filter des
-  Wissensgraphen, im Anlege-Formular und im Editor. Überall stehen jetzt die deutschen
-  Bezeichnungen, alphabetisch sortiert.
+- **Auswahlfelder für Bausteinarten zeigten den technischen Schlüssel**
+  (`schuelerpraesentation` statt „Schülerpräsentation") — im Filter des Wissensgraphen,
+  im Anlege-Formular und im Editor. Jetzt deutsche Bezeichnungen, alphabetisch sortiert.
 
 - **Assistenten mit Wissensbereich sahen keine fach- oder gruppenweit freigegebenen
-  Bausteine.** Ihr Suchweg kannte nur schulweite und eigene Knoten. Jetzt gilt für sie
-  dieselbe Sichtbarkeitsregel wie überall — Gruppenfreigaben allerdings weiterhin nur
-  für Mitglieder der Gruppe.
+  Bausteine.** Gruppenfreigaben gelten weiterhin nur für Mitglieder der Gruppe.
 
-- **Gruppenfreigaben wurden bei der Suche nicht geprüft.** Ein Baustein, den eine
-  Lehrkraft für ihre Lerngruppe freigegeben hatte, konnte über die Kontextsuche auch
-  außerhalb dieser Gruppe erscheinen und ging über den Assistenten mitsamt Inhalt ins
-  Modell. Suche und Wissensgraph verwenden jetzt dieselbe Sichtbarkeitsregel.
+- **Gruppenfreigaben wurden bei der Suche nicht geprüft.** Ein für eine Lerngruppe
+  freigegebener Baustein konnte außerhalb erscheinen und ging mitsamt Inhalt ins Modell.
 
-- **Die Fachzuordnung eines neuen Chats wirkte sich nicht auf die Suche aus.** Wer einen
-  Chat über `#` einem Fach zuordnete und sofort suchte, bekam Treffer ohne Fachvorzug —
-  die Zuordnung war erst nach der ersten Nachricht wirksam.
+- **Die Fachzuordnung eines neuen Chats wirkte sich erst nach der ersten Nachricht auf
+  die Suche aus.**
 
 - **Curriculum-Kapitel lassen sich als Wissensbereich eines Assistenten wählen.** Sie
-  waren im Assistenten-Editor nicht angeboten, während die Knotenliste sie als
-  Einstiegspunkt auswies; Unterrichtseinheiten war es umgekehrt.
+  fehlten im Assistenten-Editor, während die Knotenliste sie als Einstiegspunkt auswies;
+  bei Unterrichtseinheiten war es umgekehrt.
 
-- **Archivieren im Wissensgraphen tat bei fremden Bausteinen nichts** — ohne Meldung.
-  Die Ablehnung des Servers wurde verschluckt; der Knopf sah funktionslos aus. Fehler
-  werden jetzt angezeigt, und die Aktion erscheint nur, wo sie erlaubt ist.
+- **Archivieren tat bei fremden Bausteinen nichts, ohne Meldung.** Fehler werden jetzt
+  angezeigt, und die Aktion erscheint nur, wo sie erlaubt ist.
 
-- **Archivierte Bausteine trugen kein Archivierungsdatum.** Die Archivansicht zeigte
-  „—", und eine Aufbewahrungsfrist ließ sich darauf nicht berechnen.
+- **Archivierte Bausteine trugen kein Archivierungsdatum.**
 
 - **Ein überarbeiteter Baustein blieb thematisch unter seiner alten Fassung auffindbar.**
-  Beim Ändern von Titel, Text oder Metadaten wurde die Suchaufbereitung nicht erneuert —
-  nur beim Anlegen. Ohne jeden Hinweis.
+  Die Suchaufbereitung wird jetzt auch beim Ändern erneuert.
 
 - **Ein Baustein ohne zuständige Gruppe verursachte einen Serverfehler** statt einer
   Meldung, was fehlt.
 
-- **Bausteine mit eigenem Editor führten trotzdem in den allgemeinen.** Ein
-  Stundenentwurf, eine Unterrichtseinheit oder ein Jahresplan öffnete eine Maske, in der
-  der Verlaufsplan als rohes JSON stand — die beabsichtigte Änderung war dort gar nicht
-  möglich. „Bearbeiten" führt jetzt in den Planer; wer die alte Adresse aufruft, wird
-  dorthin weitergeleitet. Fehlt die Zuordnung zu einer Unterrichtsgruppe, erscheint
-  statt eines Knopfes der Hinweis, wo der Baustein gepflegt wird.
+- **Bausteine mit eigenem Editor führten trotzdem in den allgemeinen.** „Bearbeiten"
+  führt bei Stundenentwurf, Unterrichtseinheit und Jahresplan jetzt in den Planer; die
+  alte Adresse leitet dorthin weiter. Fehlt die Unterrichtsgruppe, erscheint statt des
+  Knopfes ein Hinweis, wo der Baustein gepflegt wird.
 
 - **Über den allgemeinen Editor ließ sich ein kaputter Verlaufsplan speichern.** Das
-  Phasen-Schema prüfte nur der Planer; jetzt gilt es auf jedem Schreibweg.
+  Phasen-Schema gilt jetzt auf jedem Schreibweg.
 
-- **Verknüpfungen ließen sich als Administrator nicht anlegen.** Der Kanten-Endpunkt
-  hatte eine eigene Fassung der Rechteprüfung, die Admins nicht kannte, jede
-  Gruppenmitgliedschaft genügen ließ und nicht prüfte, ob der Zielbaustein überhaupt
-  lesbar ist. Jetzt gilt dieselbe Regel wie überall.
+- **Verknüpfungen ließen sich als Administrator nicht anlegen.**
 
-- **Aus einer Sammlung geöffnet, führte „Zurück" nicht dorthin zurück**, sondern in die
-  allgemeine Bausteinliste — die gesetzten Filter waren verloren. Der Filterzustand
-  steht jetzt in der Adresszeile: Der Rückweg trifft den Ausschnitt, aus dem man kam, und
-  eine Sammlungsansicht lässt sich verschicken und neu laden.
+- **Aus einer Sammlung geöffnet, führte „Zurück" in die allgemeine Bausteinliste** und
+  verlor die gesetzten Filter. Der Filterzustand steht jetzt in der Adresszeile; eine
+  Sammlungsansicht lässt sich verschicken und neu laden.
 
 ## [0.7.0] – 2026-08-31
 
