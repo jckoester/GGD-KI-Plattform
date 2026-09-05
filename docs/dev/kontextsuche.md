@@ -155,6 +155,96 @@ Dropdown offen gilt, fängt der Chat die Eingabetaste ab.
 
 ---
 
+## Materialkanten — der Rückweg von der Stunde zum Baustein
+
+Keine Suche, sondern Traversierung: die Frage „**wo** wird dieser Baustein eingesetzt?"
+— und damit „kann ich ihn gefahrlos ändern oder löschen?". Sie steht hier, weil sie
+sonst mit der thematischen Auswahl verwechselt wird; Embeddings sind daran unbeteiligt.
+
+Eine Stunde führt ihr Material **je Phase** in `metadata.phasen[].material[]`, jeder
+Eintrag entweder Freitext oder eine Knotenreferenz (`LessonLinkedItem`:
+`{typ: "text"|"node", wert, node_id, titel}`). Die Phase ist der richtige Ort dafür —
+ein Arbeitsblatt gehört zur Erarbeitung, nicht zur ganzen Stunde. Für den Rückweg taugt
+das nicht: Man müsste alle Stunden der Schule durchsehen.
+
+Deshalb entsteht beim Speichern zusätzlich eine **`used_with`-Kante von der Stunde auf
+den Baustein**, mit den Phasen als Angabe an der Kante
+(`{"via": "material", "phasen": [...]}`). Die Ableitung liegt in
+`app/planning/material_edges.py`; dasselbe Muster nutzt der Curriculum-Editor
+(`context/service.py`, Material-Token → `used_with`).
+
+### Die Regel: Abhängigkeit, nicht Nennung
+
+| Feld einer Phase | Kante? | Warum |
+|---|---|---|
+| `material[]` | **ja** | Inhalt, den die Stunde benutzt. Verschwindet er, fehlt er |
+| `methode` | nein | Beschreibt die Phase. `LessonLinkedItem` hält `titel` redundant — verschwindet der Knoten „Gruppenpuzzle", steht in der Stunde weiterhin „Gruppenpuzzle" |
+| `sozialform` | nein | wie `methode` |
+
+Die Regel ist **am Feld ablesbar** und braucht keine Typprüfung: `material` ist eine
+Liste von Inhalten, `methode`/`sozialform` sind beschreibende Einzelfelder. Sie gilt auch
+für Ziele, die niemandem persönlich gehören — ein `begriff` der Fachschaft kann ebenso
+geändert oder archiviert werden.
+
+⚠️ **Methoden und Sozialformen zu verkanten wäre aktiv schädlich**, nicht nur überflüssig:
+Die Aufmerksamkeits-Warnung in „Meine Bausteine" zählt archivierte Referenzen — archiviert
+jemand eine Sozialform, meldeten sich schlagartig hunderte Stunden. Und im Graphen würden
+zwanzig Vokabelknoten mit je hunderten Kanten zu Naben, die alles Interessante überdecken.
+
+Bleibt die Frage „welche Methoden nutzen wir tatsächlich?", ist das eine JSONB-Abfrage
+über `phasen[].methode.node_id` — dafür braucht es keine Kanten, und man baut sie, wenn
+die Frage gestellt wird.
+
+Welche Typen überhaupt als Material wählbar sind, leitet
+`frontend/src/lib/material.js` aus der Taxonomie ab: alle Dokument-, Artefakt- und
+Konzepttypen außer `unterrichtsstunde`, `unterrichtseinheit`, `schuelertext`,
+`schuelerpraesentation`, `feedback_text`.
+
+### Abgeleiteter Index, kein zweiter Speicherort
+
+Die Phasen sind die Wahrheit; die Kante wird bei jedem Speichern neu daraus bestimmt.
+
+⚠️ **Der Abgleich muss löschen, nicht nur anlegen.** `create_edge` in
+`context/service.py` ist über `(from, to, relation)` idempotent — es legt keine Dublette
+an, entfernt aber nichts. Wer nur anlegt, hinterlässt beim Herausnehmen von Material eine
+Kante, die einen Einsatz behauptet, den es nicht mehr gibt.
+
+⚠️ **`via: "material"` grenzt den Abgleich ein.** Ohne die Marke fasste er auch von Hand
+gezogene `used_with`-Verbindungen an und löschte sie beim nächsten Speichern.
+
+Dasselbe Material in zwei Phasen ergibt **eine** Kante mit zwei Phasen in den Metadaten —
+nicht zwei Kanten. Wegen der Idempotenz fiele die zweite ohnehin stumm unter den Tisch.
+
+**Aufgerufen wird an jeder Stelle, die Phasen schreibt** — Editor (`planning/router.py`),
+Planungsassistent (`assistant_tools.py`), Verschiebe-/Übertragungslogik (`operations.py`,
+für *alle* beteiligten Stunden: eine Übertragung betrifft zwei Knoten) und der
+Snapshot-Rückweg (`snapshots.py`). `review_service.py` ist ausgenommen: Es setzt nur den
+Phasen-Status. Ein Unit-Test wacht darüber, dass keine neue Schreibstelle den Aufruf
+vergisst (`test_material_edges_abdeckung.py`) — die Vorlage dafür ist die
+`valid_until`-Vorbelegung, die gebaut war, an fünf Anlegestellen keinen Eingang hatte und
+deshalb bei **null von 19 134 Knoten** wirkte.
+
+### Phasen-Kennungen
+
+`LessonPhaseItem.id` ist `Optional`, aber es hängt mehr daran, als der Typ verrät:
+`phasen_status` schlüsselt danach, die Phasen-Übertragung wählt darüber aus, und die
+Materialkanten vermerken sie. Fehlt sie, fällt nichts aus — es wird still ungenau.
+
+Sie wird deshalb **beim Speichern** vergeben (`app/planning/phasen.py`), nicht in der
+Oberfläche: Der Planungsassistent schreibt Roh-Dicts aus den Werkzeug-Argumenten und geht
+nicht durch `LessonPhaseItem`. Vorhandene Kennungen bleiben unangetastet — sie neu zu
+vergeben zerschnitte genau die Verweise, um die es geht.
+
+⚠️ **Im Frontend kommt es auf die Reihenfolge des Spreads an.** Bis 09/2026 stand in der
+Stundenseite `{ id: p.id ?? crypto.randomUUID(), ...p }`. Bringt der Server eine Phase
+mit `id: null` mit — und das tut er, `patch_lesson` speichert mit
+`model_dump(exclude_none=False)` —, überschreibt der Spread die eben erzeugte Kennung
+wieder mit `null`. Nur wenn der Schlüssel ganz fehlte, überlebte sie. Der Fehler ist
+selbsterhaltend: Jedes Laden verwirft die neue Kennung, jedes Speichern schreibt `null`
+zurück. Jetzt als `mitPhasenKennungen()` in `frontend/src/lib/planner.js`, mit Test.
+
+---
+
 ## Ändern und messen
 
 **Der Prüfsatz ist verbindlich, nicht empfohlen.** Ohne ihn ist jede Änderung an der
