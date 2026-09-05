@@ -20,6 +20,7 @@ from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
+from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.permissions import require_group_teacher
 from app.planning.reflow_service import build_reflow_context
 from app.planning.snapshots import restore_snapshot
@@ -812,6 +813,11 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     await create_snapshot(db, group_id, reason="assistant", created_by=ctx.user.sub)
 
     meta = dict(node.metadata_ or {})
+    # Der Assistent liefert Roh-Dicts aus den Werkzeug-Argumenten und geht nicht
+    # durch `LessonPhaseItem` — ohne diesen Schritt hätten seine Phasen nie eine
+    # Kennung, und `phasen_status`, Übertragung und Materialkanten liefen still
+    # ins Leere.
+    phasen = sichere_phasen_kennungen(phasen)
     meta["phasen"] = phasen
     stundenziel = args.get("stundenziel")
     if stundenziel is not None:

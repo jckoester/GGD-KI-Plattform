@@ -67,6 +67,33 @@ def test_jede_schreibstelle_zieht_die_kanten_nach():
     )
 
 
+#: Schreibstellen, die Phasen **neu hereinnehmen** und deshalb Kennungen vergeben
+#: müssen. `operations.py` und `snapshots.py` fehlen bewusst: Sie schieben
+#: vorhandene Phasen um bzw. spielen einen früheren Stand zurück — beide arbeiten
+#: mit Phasen, die ihre Kennung schon haben, und eine neue zu vergeben zerschnitte
+#: genau die Verweise, um die es geht.
+_NIMMT_PHASEN_HEREIN = {"router.py", "assistant_tools.py"}
+
+
+def test_eingangsstellen_vergeben_kennungen():
+    """Wer Phasen von außen entgegennimmt, sorgt für stabile `id`s.
+
+    Ohne sie laufen `phasen_status`, die Phasen-Übertragung und die Phasenangabe
+    an den Materialkanten still ins Leere — nichts schlägt fehl, es wird nur
+    ungenau. Der Planungsassistent hatte genau diese Lücke: Er schreibt Roh-Dicts
+    aus den Werkzeug-Argumenten und geht nicht durch `LessonPhaseItem`.
+    """
+    fehlend = [
+        name
+        for name in sorted(_NIMMT_PHASEN_HEREIN)
+        if "sichere_phasen_kennungen" not in (PLANNING / name).read_text(encoding="utf-8")
+    ]
+    assert not fehlend, (
+        "Diese Eingangsstellen vergeben keine Phasen-Kennungen: "
+        + ", ".join(fehlend)
+    )
+
+
 def test_der_waechter_findet_die_bekannten_schreibstellen():
     """Gegenprobe: Ein Muster, das nichts mehr findet, wäre ein stiller Totalausfall.
 

@@ -238,3 +238,29 @@ export function groupSlotsByWeek(
 
     return items
 }
+
+/**
+ * Ergänzt fehlende Phasen-Kennungen, ohne vorhandene anzutasten.
+ *
+ * Die Kennung ist Referenz, kein Beiwerk: `phasen_status` schlüsselt danach, die
+ * Übertragung wählt Phasen darüber aus, und die Materialkanten vermerken, in
+ * welchen Phasen ein Baustein vorkommt. Eine neu vergebene Kennung ließe diese
+ * Verweise ins Leere laufen — deshalb wird nur ergänzt, nie ersetzt.
+ *
+ * ⚠️ **Auf die Reihenfolge kommt es an.** Bis 09/2026 stand hier
+ * `{ id: p.id ?? crypto.randomUUID(), ...p }` — der Spread *hinter* der Zuweisung.
+ * Bringt der Server eine Phase mit `id: null` mit (und das tut er:
+ * `patch_lesson` speichert mit `exclude_none=False`), überschreibt der Spread die
+ * eben erzeugte Kennung wieder mit `null`. Nur wenn der Schlüssel ganz fehlte,
+ * überlebte sie. Der Fehler ist still: Es sieht aus, als würden Kennungen
+ * vergeben.
+ *
+ * @param {Array<object>} phasen
+ * @returns {Array<object>}
+ */
+export function mitPhasenKennungen(phasen) {
+    return (phasen ?? []).map((p) => ({
+        ...p,
+        id: typeof p?.id === 'string' && p.id.trim() ? p.id : crypto.randomUUID(),
+    }))
+}

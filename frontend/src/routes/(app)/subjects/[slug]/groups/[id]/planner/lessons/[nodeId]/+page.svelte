@@ -8,7 +8,7 @@
     createReview,
     deleteReview,
   } from '$lib/api.js'
-  import { dateLabel, weekdayLabel, ueColorIndex } from '$lib/planner.js'
+  import { dateLabel, weekdayLabel, ueColorIndex, mitPhasenKennungen } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
@@ -52,7 +52,7 @@
     error = null
     try {
       lesson = await getLesson(nodeId)
-      phasen = lesson.phasen.map(p => ({ id: p.id ?? crypto.randomUUID(), ...p }))
+      phasen = mitPhasenKennungen(lesson.phasen)
       refs = lesson.refs ?? []
       refsDismissed = lesson.refs_dismissed ?? []
       stundenziel = lesson.stundenziel ?? ''

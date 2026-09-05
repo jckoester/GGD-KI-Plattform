@@ -34,6 +34,7 @@ from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.permissions import require_group_teacher
+from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     BalanceRead,
     CurriculumKapitelOption,
@@ -877,9 +878,12 @@ async def patch_lesson(
     if payload.stundenziel is not None:
         meta["stundenziel"] = payload.stundenziel
     if payload.phasen is not None:
-        meta["phasen"] = [
-            p.model_dump(exclude_none=False, mode="json") for p in payload.phasen
-        ]
+        # `exclude_none=False` schreibt eine fehlende Kennung als `"id": null` in
+        # die Metadaten — deshalb wird sie hier vergeben und nicht erst dort
+        # bemerkt, wo etwas auf sie zeigt.
+        meta["phasen"] = sichere_phasen_kennungen(
+            [p.model_dump(exclude_none=False, mode="json") for p in payload.phasen]
+        )
     if payload.refs is not None:
         meta["refs"] = [r.model_dump(mode="json") for r in payload.refs]
     if payload.refs_dismissed is not None:
