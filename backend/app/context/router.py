@@ -34,6 +34,10 @@ from app.context.schemas import (
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
     NodeReferenzRead,
+    AufmerksamkeitRead,
+    FachabschnittRead,
+    MeinBausteinRead,
+    MeineBausteineRead,
     ChatContextNodeAdd,
     ChatContextNodeRead,
     anzeige_felder,
@@ -53,6 +57,11 @@ from app.context.schemas import (
 from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
+from app.context.meine_bausteine import (
+    herkunft,
+    lade_meine_bausteine,
+    zaehle_aufmerksamkeit,
+)
 from app.context.metadata import validate_node_content, validate_node_metadata
 from app.context.taxonomy import (
     validate_content_type,
@@ -481,6 +490,86 @@ async def copy_node(
     await db.refresh(new_node)
     await enqueue_embedding_job(new_node.id, db)
     return new_node
+
+
+# ── „Meine Bausteine" (AP7) ──────────────────────────────────────────────────
+#
+# ⚠️ **Diese beiden Routen müssen vor `/nodes/{node_id}` stehen.** FastAPI prüft in
+# Deklarationsreihenfolge; stünden sie danach, versuchte `/nodes/mine` zuerst,
+# „mine" als UUID zu lesen, und antwortete mit 422 statt mit der Liste. Der Test
+# `test_meine_bausteine.py` hält die Reihenfolge fest.
+#
+# Rollenoffen (`get_current_user` statt `_TEACHER_OR_ADMIN`): Der eigene Bestand
+# ist für alle Rollen einsehbar — für Schüler:innen ist die Seite neben der Suche
+# die einzige Wissensgraph-Fläche (ADR-019 F8, Notiz-Knotentyp-UI A4). Die
+# Sichtbarkeitsregel ist hier allein der Eigentümer; `visibility.py` braucht es
+# nicht, weil niemand Fremdes zu sehen bekommt.
+
+
+@router.get("/nodes/mine", response_model=MeineBausteineRead)
+async def list_meine_bausteine(
+    content_type: str | None = Query(default=None, description="Typ-Filter"),
+    nur_aufmerksamkeit: bool = Query(
+        default=False, description="Nur Bausteine, die Aufmerksamkeit brauchen"
+    ),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    ist_lehrkraft = "teacher" in user.roles
+    abschnitte = await lade_meine_bausteine(
+        db,
+        user.sub,
+        ist_lehrkraft=ist_lehrkraft,
+        content_type=content_type,
+        nur_aufmerksamkeit=nur_aufmerksamkeit,
+    )
+    return MeineBausteineRead(
+        abschnitte=[
+            FachabschnittRead(
+                subject_id=a.subject_id,
+                fach=a.fach,
+                anzahl=len(a.bausteine),
+                bausteine=[
+                    MeinBausteinRead(
+                        id=b.node.id,
+                        title=b.node.title,
+                        category=b.node.category,
+                        content_type=b.node.content_type,
+                        status=b.node.status,
+                        valid_until=b.node.valid_until,
+                        updated_at=b.node.updated_at,
+                        kategorien=b.kategorien,
+                        herkunft=herkunft(b.node),
+                    )
+                    for b in a.bausteine
+                ],
+            )
+            for a in abschnitte
+        ],
+        gesamt=sum(len(a.bausteine) for a in abschnitte),
+        aufmerksamkeit=AufmerksamkeitRead(
+            **vars(
+                await zaehle_aufmerksamkeit(db, user.sub, ist_lehrkraft=ist_lehrkraft)
+            )
+        ),
+    )
+
+
+@router.get("/nodes/mine/zaehlung", response_model=AufmerksamkeitRead)
+async def zaehle_meine_bausteine(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Nur die Zählwerte — für den Sidebar-Zähler, der auf jeder Seite hängt.
+
+    Dieselbe Funktion wie oben: Der Banner und der Zähler zeigen dieselbe Zahl,
+    weil sie aus derselben Abfrage stammen, nicht weil zwei Wege zufällig
+    übereinstimmen.
+    """
+    zahlen = await zaehle_aufmerksamkeit(
+        db, user.sub, ist_lehrkraft="teacher" in user.roles
+    )
+    return AufmerksamkeitRead(**vars(zahlen))
 
 
 # ── GET /api/context/nodes/{id} ─────────────────────────────────────────────────

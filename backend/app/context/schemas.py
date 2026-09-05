@@ -573,3 +573,56 @@ class FachplanTreeRead(BaseModel):
     selected_band: BandRead | None = None
     bp_version: str = ""
     available_versions: list[str] = Field(default_factory=list)
+
+
+# ── „Meine Bausteine" (AP7) ──────────────────────────────────────────────────
+
+
+class AufmerksamkeitRead(BaseModel):
+    """Zählwerte für Warnbanner und Sidebar — aus **einer** Abfrage.
+
+    `gesamt` ist nicht die Summe der Kategorien: Ein Baustein kann in mehreren
+    zugleich stecken und wird nur einmal gezählt.
+    """
+
+    gesamt: int = 0
+    laeuft_bald_ab: int = 0
+    abgelaufen: int = 0
+    archivierte_referenzen: int = 0
+    unvollstaendig: int = 0
+
+
+class MeinBausteinRead(BaseModel):
+    """Eine Zeile in „Meine Bausteine" — was A4 je Zeile verlangt, nicht mehr.
+
+    Bewusst **nicht** `ContextNodeRead`: Der Inhalt gehört nicht in eine Liste
+    (er kann sehr lang sein), und das Embedding schon gar nicht.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    category: str
+    content_type: str | None
+    status: str
+    valid_until: date | None
+    updated_at: datetime
+    #: Welche Aufmerksamkeits-Kategorien zutreffen — trägt Warnfarbe und Filter.
+    kategorien: list[str] = Field(default_factory=list)
+    #: Ursprungs-Artefakt oder Assistent, falls bekannt (Herkunfts-Chip).
+    herkunft: dict[str, Any] | None = None
+
+
+class FachabschnittRead(BaseModel):
+    """Ein einklappbarer Abschnitt der Liste. `fach = None` → „Ohne Fach"."""
+
+    subject_id: int | None = None
+    fach: str | None = None
+    anzahl: int = 0
+    bausteine: list[MeinBausteinRead] = Field(default_factory=list)
+
+
+class MeineBausteineRead(BaseModel):
+    abschnitte: list[FachabschnittRead] = Field(default_factory=list)
+    gesamt: int = 0
+    aufmerksamkeit: AufmerksamkeitRead = Field(default_factory=AufmerksamkeitRead)
