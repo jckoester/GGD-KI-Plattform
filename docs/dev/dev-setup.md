@@ -319,3 +319,57 @@ cd frontend && npm run lint
 
 # Backend: keine automatische Typ-Prüfung konfiguriert (mypy optional)
 ```
+
+## Prüflauf und Commit-Hook
+
+`scripts/test.sh` führt alles zusammen aus — Backend-Unit- und Integrationstests,
+Frontend-Tests, Svelte-Typprüfung und ESLint. Der Rückgabewert ist nur bei
+durchweg grünem Lauf 0.
+
+```bash
+scripts/test.sh              # alles, ~40 s
+scripts/test.sh --schnell    # ohne Integrationstests (wenn PostgreSQL nicht läuft)
+```
+
+Bei Erfolg steht je Schritt eine Zeile da; schlägt einer fehl, erscheinen die
+letzten Ausgabezeilen und der Befehl zum Nachstellen. Die übrigen Schritte laufen
+trotzdem weiter — ein Lauf, der beim ersten Fehler abbricht, verschweigt den Rest.
+
+**Als Commit-Hook aktivieren** (einmalig je Arbeitskopie — `.git/hooks/` ist nicht
+versioniert, `core.hooksPath` zeigt deshalb auf ein Verzeichnis im Repo):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Danach läuft die Prüfung vor jedem Commit. Bewusst umgehen — etwa für einen
+Commit, der nur Doku anfasst — geht mit `git commit --no-verify`; rückgängig
+machen mit `git config --unset core.hooksPath`.
+
+> **Warum das eingerichtet wurde:** Bis 09/2026 lief die Suite nur von Hand, und
+> zwar meist nur `tests/unit`. Drei Integrationstests standen dadurch wochenlang
+> rot, ohne dass es auffiel. Bei 40 Sekunden Gesamtlaufzeit ist ein Hook billiger
+> als das Nachvollziehen, seit wann etwas kaputt ist.
+
+### Auf GitHub
+
+`.github/workflows/tests.yml` fährt bei jedem Push denselben Umfang wie
+`scripts/test.sh --schnell` — Frontend-Tests, `check`, `lint` und die
+Backend-Unit-Tests, in zwei parallelen Jobs auf Linux. Der Hook ist eine lokale
+Leitplanke (umgehbar, nur in dieser Arbeitskopie); der Workflow ist die Instanz,
+die unabhängig von der eigenen Maschine urteilt.
+
+**Die Integrationstests laufen dort noch nicht.** Sie brauchen einen
+Service-Container mit pgvector; das ist die nächste Stufe.
+
+⚠️ **Die Suite ist nicht aus sich heraus lauffähig.** In einem frischen Klon
+fallen 110 der 2478 Unit-Tests, weil sie `config/*.yaml` lesen — Dateien, die
+zu Recht gitignored sind und nur als `.example` im Repo liegen. Der Workflow
+kopiert die Beispiele deshalb vor dem Lauf. Das ist ein Notnagel: Tests sollten
+Betreiber-Konfiguration nicht lesen, sondern ihren Loader mit einem Literal
+patchen (Vorbild: `test_budget_tiers.py`). Wer eine dieser Testdateien anfasst,
+räumt am besten gleich mit auf.
+
+Ein zweiter Punkt derselben Art: `budget_tiers_path` hat einen cwd-relativen
+Vorgabewert, der aus `backend/` heraus ins Leere trifft — lokal rettet das ein
+`.env`-Eintrag, im Workflow eine gesetzte `BUDGET_TIERS_PATH`.
