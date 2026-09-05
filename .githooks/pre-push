@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Führt vor jedem Push scripts/test.sh aus (~45 s) und bricht bei Fehlern ab.
+#
+# Aktivieren (einmalig, pro Arbeitskopie):
+#   git config core.hooksPath .githooks
+#
+# Bewusst umgehen:
+#   git push --no-verify
+#
+# Warum pre-push und nicht pre-commit: Bei rund neun Commits am Tag (Spitzen über
+# dreißig) kostet ein Lauf je Commit spürbar Zeit, ohne mehr zu schützen —
+# ungepushter Code stört niemanden. Ein Push bündelt viele Commits, der Schutz
+# bleibt derselbe.
+#
+# Der eigenständige Beitrag dieses Laufs sind die **Integrationstests**: Der
+# GitHub-Workflow (.github/workflows/tests.yml) fährt bisher nur Frontend und
+# Backend-Unit; tests/integration braucht dort einen pgvector-Dienst und fehlt noch.
+# Steht diese Stufe, kann der Hook ersatzlos weg.
+#
+# Git reicht Remote-Name und URL als Argumente und die zu pushenden Refs über
+# stdin herein. Beides braucht der Prüflauf nicht — er prüft den Arbeitsbaum.
+
+exec "$(git rev-parse --show-toplevel)/scripts/test.sh"

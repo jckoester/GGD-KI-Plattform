@@ -7,7 +7,7 @@
 #   scripts/test.sh --schnell    ohne Integrationstests (ohne laufende PostgreSQL-Instanz)
 #
 # Der Rückgabewert ist nur dann 0, wenn jeder Schritt durchläuft. Dadurch ist das
-# Skript als Git-Hook verwendbar — siehe .githooks/pre-commit.
+# Skript als Git-Hook verwendbar — siehe .githooks/pre-push.
 #
 # Kein `set -e`: Es sollen *alle* Schritte laufen, auch wenn einer fehlschlägt.
 # Ein Lauf, der beim ersten Fehler abbricht, verschweigt die übrigen.

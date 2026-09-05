@@ -320,7 +320,7 @@ cd frontend && npm run lint
 # Backend: keine automatische Typ-Prüfung konfiguriert (mypy optional)
 ```
 
-## Prüflauf und Commit-Hook
+## Prüflauf und Push-Hook
 
 `scripts/test.sh` führt alles zusammen aus — Backend-Unit- und Integrationstests,
 Frontend-Tests, Svelte-Typprüfung und ESLint. Der Rückgabewert ist nur bei
@@ -335,21 +335,30 @@ Bei Erfolg steht je Schritt eine Zeile da; schlägt einer fehl, erscheinen die
 letzten Ausgabezeilen und der Befehl zum Nachstellen. Die übrigen Schritte laufen
 trotzdem weiter — ein Lauf, der beim ersten Fehler abbricht, verschweigt den Rest.
 
-**Als Commit-Hook aktivieren** (einmalig je Arbeitskopie — `.git/hooks/` ist nicht
+**Als Push-Hook aktivieren** (einmalig je Arbeitskopie — `.git/hooks/` ist nicht
 versioniert, `core.hooksPath` zeigt deshalb auf ein Verzeichnis im Repo):
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Danach läuft die Prüfung vor jedem Commit. Bewusst umgehen — etwa für einen
-Commit, der nur Doku anfasst — geht mit `git commit --no-verify`; rückgängig
-machen mit `git config --unset core.hooksPath`.
+Danach läuft die Prüfung vor jedem `git push`. Bewusst umgehen geht mit
+`git push --no-verify`; rückgängig machen mit `git config --unset core.hooksPath`.
 
-> **Warum das eingerichtet wurde:** Bis 09/2026 lief die Suite nur von Hand, und
+> **Warum vor dem Push und nicht vor jedem Commit:** Zuerst hing der Lauf am
+> Commit. Bei rund neun Commits am Tag (Spitzen über dreißig) summierte sich das
+> auf über zwei Stunden Wartezeit in zwei Monaten, ohne mehr zu schützen —
+> ungepushter Code stört niemanden. Ein Pre-Commit-Hook prüft zudem den
+> Arbeitsbaum, nicht den Index: Er kann grün sein, während der Commit kaputt ist,
+> und rot wegen einer unbeteiligten Baustelle.
+>
+> **Der eigenständige Beitrag dieses Laufs sind die Integrationstests** — der
+> GitHub-Workflow fährt sie noch nicht (siehe unten). Steht diese Stufe, kann der
+> Hook ersatzlos weg.
+
+> **Warum es das überhaupt gibt:** Bis 09/2026 lief die Suite nur von Hand, und
 > zwar meist nur `tests/unit`. Drei Integrationstests standen dadurch wochenlang
-> rot, ohne dass es auffiel. Bei 40 Sekunden Gesamtlaufzeit ist ein Hook billiger
-> als das Nachvollziehen, seit wann etwas kaputt ist.
+> rot, ohne dass es auffiel.
 
 ### Auf GitHub
 
