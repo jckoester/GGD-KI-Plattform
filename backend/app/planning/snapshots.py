@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
 from app.db.models import ContextNode, LessonSlot, SlotPlanSnapshot
+from app.planning.material_edges import synchronisiere_materialkanten
 
 SNAPSHOT_LIMIT = 50
 
@@ -139,6 +140,10 @@ async def restore_snapshot(
             meta = dict(node.metadata_ or {})
             meta["phasen"] = phasen
             node.metadata_ = meta
+            # Ein Rückweg tauscht die Phasen vollständig aus — mit ihnen das
+            # Material. Ohne diesen Aufruf zeigten die Kanten auf den Stand vor
+            # der Wiederherstellung.
+            await synchronisiere_materialkanten(db, node.id, meta)
 
     await db.commit()
     return {"restored": True, "skipped_slot_ids": skipped}

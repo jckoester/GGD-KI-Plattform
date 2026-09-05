@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
+from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.permissions import require_group_teacher
 from app.planning.reflow_service import build_reflow_context
@@ -821,6 +822,7 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
 
     node.metadata_ = meta
     node.updated_at = datetime.now(timezone.utc)
+    await synchronisiere_materialkanten(db, node.id, meta)
     await db.commit()
 
     # Kompetenz-Sog: nur aus verknüpften Material-Knoten. Methode/Sozialform sind

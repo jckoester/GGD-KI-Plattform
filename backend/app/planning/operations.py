@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode, LessonSlot
+from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 
 VALID_KATEGORIEN: frozenset[str] = frozenset(
@@ -308,6 +309,14 @@ async def apply_operations(
                         p["status"], p["kuerzung"] = "gestrichen", True
                 return phasen
             _mutate_phases(lessons[op.lesson_id], _strike)
+
+    # Materialkanten für **alle** beteiligten Stunden nachziehen, nicht nur für die
+    # der phasenverändernden Operationen. `TransferPhases` betrifft zwei Knoten
+    # (Quelle verliert, Ziel gewinnt), und eine künftige Operation, die Material
+    # anfasst, ist damit von vornherein abgedeckt — der Abgleich ist ohnehin
+    # ein No-op, wenn sich nichts geändert hat.
+    for lesson in lessons.values():
+        await synchronisiere_materialkanten(db, lesson.id, lesson.metadata_)
 
     await db.commit()
     return ExecutionResult(applied=len(ops), errors=[], snapshot_id=str(snap.id))

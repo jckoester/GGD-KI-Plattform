@@ -32,6 +32,7 @@ from app.db.models import (
 )
 from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
+from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.permissions import require_group_teacher
 from app.planning.schemas import (
     BalanceRead,
@@ -886,6 +887,7 @@ async def patch_lesson(
 
     lesson.metadata_ = meta
     lesson.updated_at = now
+    await synchronisiere_materialkanten(db, lesson.id, meta)
     await db.commit()
 
     return {"ok": True}
