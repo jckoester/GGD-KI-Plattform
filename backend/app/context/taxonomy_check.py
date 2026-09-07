@@ -115,6 +115,26 @@ def pruefe_taxonomie() -> list[str]:
                 "Quelle: app/context/taxonomy.yaml"
             )
 
+    # ── Symbole ───────────────────────────────────────────────────────────────
+    # Geprüft wird nur die **Vollständigkeit**. Ob der Name eine echte
+    # lucide-Komponente ist, entscheidet der Frontend-Build: `generate_taxonomy.py`
+    # schreibt daraus statische Importe, ein Tippfehler bricht ihn. Hier fällt der
+    # Fall auf, der sonst niemandem auffiele — ein neuer Typ ohne Symbol, der still
+    # auf das Kategorie-Symbol zurückfällt.
+    for key, icon in sorted(taxonomy.ICONS.items()):
+        if not icon:
+            befunde.append(
+                f"content_type {key!r} hat kein `icon` — es fiele auf das "
+                "Kategorie-Symbol zurück und wäre in Listen nicht zu unterscheiden. "
+                "Quelle: app/context/taxonomy.yaml"
+            )
+    for kategorie, icon in sorted(taxonomy.CATEGORY_ICONS.items()):
+        if not icon:
+            befunde.append(
+                f"category {kategorie!r} hat kein `icon` (Rückfall für Knoten ohne "
+                "content_type). Quelle: app/context/taxonomy.yaml"
+            )
+
     # ── ui_status ─────────────────────────────────────────────────────────────
     for key, status in sorted(taxonomy.UI_STATUS.items()):
         if status not in taxonomy.GUELTIGE_UI_STATUS:

@@ -15,6 +15,10 @@ import yaml
 ROOT = Path(__file__).parent.parent
 YAML_PATH = ROOT / "backend" / "app" / "context" / "taxonomy.yaml"
 OUT_PATH = ROOT / "frontend" / "src" / "lib" / "taxonomy.js"
+#: Zweite Ausgabe: die Symbol-Zuordnung. Eigene Datei, damit `taxonomy.js` frei von
+#: Komponenten-Importen bleibt — es wird auch dort eingebunden, wo lucide nichts zu
+#: suchen hat (Tests, reine Datenmodule).
+ICONS_OUT_PATH = ROOT / "frontend" / "src" / "lib" / "node_icons.js"
 
 
 def main():
@@ -129,6 +133,63 @@ def main():
 
     OUT_PATH.write_text("\n".join(lines), encoding="utf-8")
     print(f"Written: {OUT_PATH}")
+
+    _schreibe_icons(cats)
+
+
+def _schreibe_icons(cats: dict) -> None:
+    """Erzeugt `node_icons.js` aus den `icon:`-Angaben der Taxonomie.
+
+    **Warum erzeugt statt gepflegt.** Bis 09/2026 stand die Zuordnung von Hand im
+    Frontend und deckte 11 von 41 Typen ab; der Rest fiel still auf das
+    Kategorie-Symbol zurück, sodass in artefakt-lastigen Listen fast jede Zeile
+    dasselbe Paket trug. Zwei Orte für dieselbe Typangabe laufen auseinander —
+    hier steht sie einmal, in der Taxonomie.
+
+    **Warum statische Importe.** `lucide-svelte` bringt 1686 Komponenten mit. Einen
+    Namen zur Laufzeit aufzulösen (`import * as icons`) zöge sie alle ins Bundle.
+    Deshalb erzeugt der Generator die Importliste — ein Name, den es nicht gibt,
+    bricht dann den Build, statt still auf ein Ersatzsymbol zu fallen.
+    """
+    typ_icons = {
+        ct["key"]: ct["icon"]
+        for info in cats.values()
+        for ct in info["content_types"]
+    }
+    kat_icons = {name: info["icon"] for name, info in cats.items()}
+
+    # Sortiert und dedupliziert: Der Import ist reine Technik, seine Reihenfolge
+    # soll nicht davon abhängen, in welcher Reihenfolge die Typen in der YAML stehen.
+    komponenten = sorted({*typ_icons.values(), *kat_icons.values(), "Circle"})
+
+    zeilen = [
+        "// GENERIERT aus backend/app/context/taxonomy.yaml — nicht von Hand ändern.",
+        "// Neu erzeugen: python scripts/generate_taxonomy.py",
+        "//",
+        "// Ein eigenes Symbol je Knotentyp: Die Form unterscheidet den Typ, die Farbe",
+        "// die Kategorie (`CATEGORY_COLORS` in taxonomy.js). Gepflegt wird das Symbol",
+        "// am Typ in der Taxonomie, nicht hier.",
+        "",
+        "import {",
+        *(f"    {name}," for name in komponenten),
+        "} from 'lucide-svelte'",
+        "",
+        "/** content_type → Symbol. Vollständig über alle Typen der Taxonomie. */",
+        "export const NODE_ICONS = {",
+        *(f"    {typ}: {icon}," for typ, icon in typ_icons.items()),
+        "}",
+        "",
+        "/** Rückfall je Kategorie — greift nur, wenn ein Knoten keinen content_type hat. */",
+        "export const CATEGORY_ICONS = {",
+        *(f"    {kat}: {icon}," for kat, icon in kat_icons.items()),
+        "}",
+        "",
+        "/** Letzter Rückfall, wenn auch die Kategorie fehlt. */",
+        "export const FALLBACK_ICON = Circle",
+        "",
+    ]
+    ICONS_OUT_PATH.write_text("\n".join(zeilen), encoding="utf-8")
+    print(f"Written: {ICONS_OUT_PATH}  ({len(typ_icons)} Typen, {len(komponenten)} Symbole)")
 
 
 def _js(obj, indent=2) -> str:

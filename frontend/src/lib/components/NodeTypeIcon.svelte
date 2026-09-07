@@ -1,47 +1,19 @@
 <script>
+    /**
+     * Symbol eines Knotens: Form aus dem content_type, Farbe aus der Kategorie.
+     *
+     * Die Zuordnung wird aus `taxonomy.yaml` erzeugt (`node_icons.js`) — das Symbol
+     * wird am Typ gepflegt, nicht hier. Vorher stand sie von Hand in dieser Datei
+     * und deckte 11 von 41 Typen ab; der Rest fiel auf das Kategorie-Symbol
+     * zurück, sodass in artefakt-lastigen Listen fast jede Zeile dasselbe Paket trug.
+     */
     import { CATEGORY_COLORS } from "$lib/taxonomy.js";
-    import {
-        Target,
-        ClipboardList,
-        Layers,
-        Cpu,
-        Lightbulb,
-        FileText,
-        BookOpen,
-        Package,
-        Circle,
-        Users,
-        Presentation,
-        Zap,
-        BookMarked,
-    } from "lucide-svelte";
+    import { CATEGORY_ICONS, FALLBACK_ICON, NODE_ICONS } from "$lib/node_icons.js";
 
-    let { category, contentType = undefined, size = 16 } = $props();
+    let { category = undefined, contentType = undefined, size = 16 } = $props();
 
-    // Icon-Mapping für content_types
-    const CONTENT_TYPE_ICON_MAP = {
-        lernziel: Target,
-        aufgabe: ClipboardList,
-        themengebiet: Layers,
-        bauteil: Cpu,
-        begriff: BookMarked,
-        methode: Presentation,
-        sozialform: Users,
-        operator: Zap,
-        lfdb_baustein: Layers,
-        lfdb_themenblock: BookOpen,
-        lfdb_kompetenz: Target,
-    };
-
-    // Fallback-Mapping für categories
-    const CATEGORY_FALLBACK = {
-        document: FileText,
-        knowledge: BookOpen,
-        artifact: Package,
-        concept: Lightbulb,
-    };
-
-    // Statische Klassen-Map — alle Strings müssen literal im Quelltext stehen damit Tailwind sie nicht purgt
+    // Statische Klassen-Map — alle Strings müssen literal im Quelltext stehen,
+    // damit Tailwind sie nicht wegputzt.
     const COLOR_CLASSES = {
         bl: "text-light-bl dark:text-dark-bl",
         gr: "text-light-gr dark:text-dark-gr",
@@ -56,11 +28,7 @@
     );
 
     const IconComponent = $derived(
-        contentType && CONTENT_TYPE_ICON_MAP[contentType]
-            ? CONTENT_TYPE_ICON_MAP[contentType]
-            : CATEGORY_FALLBACK[category]
-              ? CATEGORY_FALLBACK[category]
-              : Circle,
+        NODE_ICONS[contentType] ?? CATEGORY_ICONS[category] ?? FALLBACK_ICON,
     );
 </script>
 

@@ -144,6 +144,25 @@ SCOPE_DEFAULTS: Final[dict[str, tuple[str, str]]] = {
 }
 
 
+#: content_type → Name der lucide-Komponente.
+#:
+#: Das Backend benutzt sie nicht — es prüft nur, dass **jeder** Typ eine hat. Ohne
+#: diese Prüfung fiele ein neuer Typ im Frontend still auf das Kategorie-Symbol
+#: zurück; in artefakt-lastigen Listen trüge dann wieder jede Zeile dasselbe.
+#: Ob der Name eine echte Komponente ist, entscheidet der Frontend-Build: Der
+#: Generator schreibt daraus statische Importe, ein Tippfehler bricht ihn.
+ICONS: Final[dict[str, str]] = {
+    ct["key"]: ct.get("icon", "")
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+}
+
+#: category → Name der lucide-Komponente (Rückfall für Knoten ohne content_type).
+CATEGORY_ICONS: Final[dict[str, str]] = {
+    name: info.get("icon", "") for name, info in _data["categories"].items()
+}
+
+
 def validate_content_type(category: str, content_type: str | None) -> None:
     """Wirft ValueError wenn content_type zur category nicht passt.
 
