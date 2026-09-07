@@ -84,10 +84,49 @@ Die Einstellung betrifft **nur Ihre eigene Suche** über den Suche-Button. Wie v
 
 Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden Bausteine**; die **Nächstliegenden** sind eine Auswahl nach Ähnlichkeit und tragen deshalb keine Gesamtzahl (siehe oben).
 
+## Meine Bausteine
+
+Unter **Wissensgraph → Meine Bausteine** steht alles, was unter Ihrem Konto
+gespeichert ist — über alle Fächer und Entstehungswege hinweg. Die Seite ist für vier
+Dinge da:
+
+- **Nachsehen, was da ist.** Der einzige Ort, der Ihren Gesamtbestand zeigt, egal ob
+  ein Baustein aus einer Sammlung, einem Upload, dem Unterrichtsplaner oder einem Chat
+  stammt.
+- **Aufräumen.** Umbenennen, archivieren, löschen — alles direkt in der Zeile.
+- **Den Lebenszyklus im Blick behalten.** Ablaufdaten, automatisch archivierte
+  Bausteine und Verweise auf Archiviertes laufen nur hier zusammen. Der übliche
+  Anlass ist der Schuljahreswechsel.
+- **Herkunft nachvollziehen.** Woher kam der Baustein, und gibt es im Chat eine neuere
+  Fassung?
+
+**Wonach die Seite sortiert:** nach Fach, innerhalb nach zuletzt geändert. Bausteine
+ohne Fach stehen am Ende. Über der Liste filtern Sie nach Bausteinart.
+
+**Der Zähler in der Seitenleiste** zeigt, wie viele Bausteine Aufmerksamkeit brauchen —
+etwas läuft demnächst ab, ist abgelaufen, verweist auf Archiviertes, oder es fehlt noch
+der Inhalt. Oben auf der Seite steht dann derselbe Hinweis mit einem Knopf **„Nur diese
+anzeigen"**.
+
+**Für Lehrkräfte** zeigt jede Zeile zusätzlich, in welcher Einheit oder Stunde der
+Baustein steckt. Ein Klick darauf filtert die Liste. Trägt ein Baustein hier nichts,
+nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
+
+> **Die Seite bearbeitet nichts.** Sie verwaltet: umbenennen, archivieren, löschen.
+> Zum Ändern des Inhalts führt sie Sie dorthin, wo er hingehört — ein Stundenentwurf
+> in den Unterrichtsplaner, ein Sammlungseintrag in seinen Editor. Wer gezielt etwas
+> zum Bearbeiten sucht, ist über Fachseite, Sammlung oder Planer schneller: Die
+> filtern bereits vor.
+
+**Für Schüler:innen** ist es die einzige Stelle neben der Suche, an der sie den
+Wissensgraphen sehen. Dort stehen nur ihre eigenen Bausteine — niemand sonst kann sie
+lesen.
+
 ## Archivieren statt löschen
 
-Bausteine, die Sie selbst angelegt haben, können Sie im Wissensgraphen **archivieren**
-oder **löschen**. Der Unterschied ist größer, als die beiden Wörter vermuten lassen:
+Bausteine, die Sie selbst angelegt haben, können Sie unter **Meine Bausteine**
+**archivieren** oder **löschen**. Der Unterschied ist größer, als die beiden Wörter
+vermuten lassen:
 
 - **Archiviert** heißt: aus Suche und Assistenten heraus, aber nicht weg. Der Baustein
   bleibt in Ihrem Archiv, alle Verknüpfungen bleiben, und Sie können ihn jederzeit

@@ -155,6 +155,67 @@ Dropdown offen gilt, fängt der Chat die Eingabetaste ab.
 
 ---
 
+## „Meine Bausteine" — was „eigen" heißt, und wer was darf
+
+`/knowledge/mine` (Abfrageschicht: `app/context/meine_bausteine.py`) ist die einzige
+Wissensgraph-Fläche, die **allen Rollen** offensteht. Zwei Entscheidungen dahinter sind
+nicht offensichtlich.
+
+### Der Bestand: Pseudonym **und** Typ
+
+Gefiltert wird nicht nur nach `owner_pseudonym`. Das Pseudonym steht auch auf Dingen,
+die niemandem einzeln gehören — ein Curriculum beschließt die Fachschaft gemeinsam, das
+Änderungsrecht liegt bei `write_scope = subject`; das Pseudonym daran ist
+**Urheberschaft, nicht Eigentum**. Solche Knoten auf einer persönlichen Seite zu führen
+(und dort zur Aufmerksamkeit zu mahnen) legte eine Zuständigkeit nahe, die es nicht gibt.
+
+Die Typmenge dafür ist **abgeleitet, nicht gepflegt**:
+`PERSOENLICHE_CONTENT_TYPES` in `taxonomy.py` ist genau die Menge mit
+`scope_defaults.write_scope == "private"` — 16 von 41 Typen, deckungsgleich mit
+Lehrkraft-Material, Lehrkraft-Planung und Schüler-Artefakten.
+
+⚠️ **Der Vorgabewert des Typs, nicht der Scope des Knotens.** Letzterer ist eine
+Nutzerentscheidung — das Anlegeformular bietet `private`/`group`/`subject` zur Wahl — und
+beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding ist das". Wer
+sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der eigenen Seite; ein
+privat gesetzter Fachbegriff erschiene dort fälschlich.
+
+### Die Rechte: Rollenriegel gefallen, Rechteriegel nicht
+
+Vier Endpunkte sind rollenoffen (`get_current_user` statt `_TEACHER_OR_ADMIN`):
+`GET /nodes/{id}`, `POST /nodes/{id}/reaktivieren`, `DELETE /nodes/{id}` und
+`PATCH /nodes/{id}/verwalten`. Abgesichert sind sie durch `_check_read_permission` bzw.
+`_check_write_permission` — beide rollenblind und im Zweifel strenger: eigene Knoten
+immer, `private` von Fremden nie (auch für Admins nicht), `group` nur mit
+Mitgliedschaft.
+
+Der Grund für die Öffnung ist Konsistenz, nicht Bequemlichkeit: **Dieselbe Knotenmenge
+liefert die Suche Schüler:innen ohnehin schon.** Dass ausgerechnet die Detailansicht
+403 gab, war die Unstimmigkeit.
+
+⚠️ **`PATCH /nodes/{id}/verwalten` ist bewusst schmal** — `title`, `status`,
+`valid_until`, sonst nichts. Der generische `PATCH /nodes/{id}` bleibt teacher/admin. Ihn
+zu öffnen hätte auch Scopes, Inhalt und Metadaten freigegeben; ein versehentlich auf
+`school` gestelltes `read_scope` veröffentlicht einen Text, den jemand für sich
+geschrieben hat. Das ist Leitprinzip 5 der UI-Notiz von der technischen Seite:
+*Verwalten ist nicht Bearbeiten.*
+
+`valid_until` braucht dabei das Begleitflag `valid_until_gesetzt`: Ohne es ließe sich
+„auf `null` setzen" (= gilt dauerhaft) nicht von „Feld weggelassen" unterscheiden.
+
+### „Eingesetzt in": zwei Kantenrichtungen, eine Frage
+
+- **Material** trägt *eingehende* `used_with`-Kanten von den Stunden, die es benutzen
+  (siehe Abschnitt unten).
+- **Planungsknoten** hängen andersherum: Eine Stunde zeigt per *ausgehendem* `part_of`
+  auf ihre Einheit, die Einheit auf ihren Jahresplan.
+
+Beides beantwortet „wo steckt das drin?", deshalb eine Funktion und ein Feld — aber zwei
+Abfragen, gesammelt für alle Knoten auf einmal. Je Knoten wären es bei 200 eigenen
+Bausteinen 400 Rundreisen.
+
+---
+
 ## Materialkanten — der Rückweg von der Stunde zum Baustein
 
 Keine Suche, sondern Traversierung: die Frage „**wo** wird dieser Baustein eingesetzt?"
