@@ -178,27 +178,59 @@ def pruefe(artifact: Artifact, content_type: str, roles: list[str]) -> None:
         )
 
 
-async def vorhandener_baustein(
-    db: AsyncSession, *, artifact_id: UUID, pseudonym: str
-) -> ContextNode | None:
-    """Der aktive Baustein dieser Person zu diesem Artefakt — oder ``None``.
+_HERKUNFT = ContextNode.metadata_["source_artifact_id"].astext
+
+
+def _eigene_uebernahmen(pseudonym: str):
+    """Die aktiven Bausteine dieser Person, die aus einem Artefakt stammen.
 
     Über `metadata.source_artifact_id` statt über eine eigene Spalte: Die Herkunft ist
     eine Notiz am Knoten, kein Fremdschlüssel. Ein gelöschtes Artefakt soll den Baustein
     nicht mitreißen — er hat dann eine Herkunft, die es nicht mehr gibt, und das ist der
     richtige Zustand.
+
+    **Nur `active`.** Abgelöste Fassungen tragen dieselbe Herkunft; sie mitzuzählen hieße,
+    für ein Artefakt mehrere „aktuelle" Bausteine zu behaupten.
     """
+    return sa.select(ContextNode).where(
+        ContextNode.owner_pseudonym == pseudonym,
+        ContextNode.status == "active",
+        _HERKUNFT.isnot(None),
+    )
+
+
+async def vorhandener_baustein(
+    db: AsyncSession, *, artifact_id: UUID, pseudonym: str
+) -> ContextNode | None:
+    """Der aktive Baustein dieser Person zu diesem Artefakt — oder ``None``."""
     treffer = await db.execute(
-        sa.select(ContextNode)
-        .where(
-            ContextNode.owner_pseudonym == pseudonym,
-            ContextNode.status == "active",
-            ContextNode.metadata_["source_artifact_id"].astext == str(artifact_id),
-        )
+        _eigene_uebernahmen(pseudonym)
+        .where(_HERKUNFT == str(artifact_id))
         .order_by(ContextNode.created_at.desc())
         .limit(1)
     )
-    return treffer.scalar_one_or_none()
+    return treffer.scalars().first()
+
+
+async def bausteine_zu_artefakten(
+    db: AsyncSession, *, artifact_ids: list[UUID], pseudonym: str
+) -> dict[str, ContextNode]:
+    """Dasselbe für eine ganze Bibliothek — Artefakt-ID (als Text) → Baustein.
+
+    Eine Abfrage statt einer je Karte: Die Bibliothek zeigt alle Einträge auf einmal,
+    und eine Schleife über Einzelabfragen wäre genau das N+1, das man später nicht mehr
+    findet, weil es nur bei vollen Bibliotheken weh tut.
+    """
+    if not artifact_ids:
+        return {}
+    treffer = await db.execute(
+        _eigene_uebernahmen(pseudonym)
+        .where(_HERKUNFT.in_([str(a) for a in artifact_ids]))
+        .order_by(ContextNode.created_at.asc())
+    )
+    # Aufsteigend sortiert, damit bei einem (nicht vorgesehenen) Doppel der jüngste
+    # gewinnt — dieselbe Wahl wie in `vorhandener_baustein`.
+    return {n.metadata_["source_artifact_id"]: n for n in treffer.scalars()}
 
 
 def _unveraendert(node: ContextNode, *, titel: str, content_type: str, inhalt: str) -> bool:

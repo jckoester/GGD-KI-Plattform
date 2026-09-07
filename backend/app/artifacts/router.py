@@ -89,6 +89,10 @@ class ArtifactItem(BaseModel):
     # Lässt sich daraus ein Baustein machen (AP8)? Die Antwort kommt vom Server, damit
     # der Knopf in der Bibliothek nicht nach eigener Rechnung erscheint.
     uebernehmbar: bool = False
+    # Der Baustein, der daraus geworden ist — Grundlage des Badges „als Baustein
+    # übernommen →". None heißt: noch keiner, oder der letzte wurde gelöscht.
+    baustein_id: UUID | None = None
+    baustein_titel: str | None = None
 
 
 class LibraryResponse(BaseModel):
@@ -211,17 +215,26 @@ async def list_library(
     records = await store.list_artifacts(db, current_user.sub)
     used = await store.used_bytes(db, current_user.sub)
     _, quota_bytes = get_artifact_limits(current_user.roles, current_user.grade)
-    items = [
-        ArtifactItem(
+    # Eine Abfrage für alle Karten, nicht eine je Karte.
+    bausteine = await uebernahme.bausteine_zu_artefakten(
+        db, artifact_ids=[r.id for r in records], pseudonym=current_user.sub
+    )
+
+    def _item(r: Artifact) -> ArtifactItem:
+        baustein = bausteine.get(str(r.id))
+        return ArtifactItem(
             id=r.id, kind=r.kind, mime_type=r.mime_type, title=r.title,
             byte_size=r.byte_size, source=r.source,
             created_at=r.created_at, expires_at=r.expires_at,
             provider_model=r.provider_model,
             uebernehmbar=uebernahme.ist_uebernehmbar(r),
+            baustein_id=baustein.id if baustein else None,
+            baustein_titel=baustein.title if baustein else None,
         )
-        for r in records
-    ]
-    return LibraryResponse(items=items, used_bytes=used, quota_bytes=quota_bytes)
+
+    return LibraryResponse(
+        items=[_item(r) for r in records], used_bytes=used, quota_bytes=quota_bytes
+    )
 
 
 # ── Text-Dokumente (Material-Werkstatt, Phase 19) ─────────────────────────────

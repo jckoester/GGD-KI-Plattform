@@ -99,6 +99,70 @@ class TestBibliotheksliste:
         assert nach_id[dokument["id"]]["uebernehmbar"] is True
         assert nach_id[str(bild.id)]["uebernehmbar"] is False
 
+    async def test_badge_zeigt_den_uebernommenen_baustein(
+        self, test_client, auth_headers, db_session, dokument
+    ):
+        """Die Verknüpfung in die Gegenrichtung — sonst wäre die Übernahme eine
+        Einbahnstraße und man wüsste beim zweiten Mal nicht, dass es sie schon gab."""
+        vorher = await test_client.get("/artifacts", headers=auth_headers)
+        eintrag = next(
+            e for e in vorher.json()["items"] if e["id"] == dokument["id"]
+        )
+        assert eintrag["baustein_id"] is None
+
+        angelegt = await test_client.post(
+            f"/artifacts/{dokument['id']}/baustein",
+            json={"content_type": "lerntext", "title": "Sätze am Kreis"},
+            headers=auth_headers,
+        )
+        node_id = uuid.UUID(angelegt.json()["node_id"])
+
+        nachher = await test_client.get("/artifacts", headers=auth_headers)
+        eintrag = next(
+            e for e in nachher.json()["items"] if e["id"] == dokument["id"]
+        )
+        assert eintrag["baustein_id"] == str(node_id)
+        assert eintrag["baustein_titel"] == "Sätze am Kreis"
+        await _aufraeumen(db_session, [node_id])
+
+    async def test_badge_zeigt_die_neue_fassung_nach_dem_aktualisieren(
+        self, test_client, auth_headers, db_session, dokument
+    ):
+        """Die archivierte Vorgängerin trägt dieselbe Herkunft — sie darf das Badge
+        nicht kapern, sonst zeigte die Bibliothek auf eine überholte Fassung."""
+        erst = await test_client.post(
+            f"/artifacts/{dokument['id']}/baustein",
+            json={"content_type": "lerntext", "title": "Erste Fassung"},
+            headers=auth_headers,
+        )
+        zweit = await test_client.post(
+            f"/artifacts/{dokument['id']}/baustein",
+            json={"content_type": "lerntext", "title": "Zweite Fassung"},
+            headers=auth_headers,
+        )
+
+        liste = await test_client.get("/artifacts", headers=auth_headers)
+        eintrag = next(e for e in liste.json()["items"] if e["id"] == dokument["id"])
+        assert eintrag["baustein_id"] == zweit.json()["node_id"]
+        assert eintrag["baustein_titel"] == "Zweite Fassung"
+        await _aufraeumen(
+            db_session,
+            [uuid.UUID(zweit.json()["node_id"]), uuid.UUID(erst.json()["node_id"])],
+        )
+
+    async def test_fremde_uebernahme_taucht_nicht_auf(
+        self, test_client, auth_headers, auth_headers_teacher2, db_session, dokument
+    ):
+        """Gegenprobe zur Eigentümerbindung der Sammelabfrage."""
+        angelegt = await test_client.post(
+            f"/artifacts/{dokument['id']}/baustein",
+            json={"content_type": "lerntext"},
+            headers=auth_headers,
+        )
+        fremd = await test_client.get("/artifacts", headers=auth_headers_teacher2)
+        assert all(e["baustein_id"] is None for e in fremd.json()["items"])
+        await _aufraeumen(db_session, [uuid.UUID(angelegt.json()["node_id"])])
+
 
 class TestUebernahme:
     async def test_dokument_wird_baustein(

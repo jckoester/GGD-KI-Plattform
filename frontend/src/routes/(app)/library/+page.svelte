@@ -275,6 +275,25 @@
                             <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-0.5">
                                 Gespeichert {fmtDate(item.created_at)} · gültig bis {fmtDate(item.expires_at)}
                             </p>
+                            <!-- Die Verknüpfung in die Gegenrichtung (AP8): Von hier
+                                 aus sieht man, dass aus dem Artefakt schon ein Baustein
+                                 geworden ist — und kommt hin. Ohne das wäre die
+                                 Übernahme eine Einbahnstraße, und beim zweiten Mal
+                                 wüsste niemand, ob es sie schon gab. -->
+                            {#if item.baustein_id}
+                                <a
+                                    href="/knowledge/{item.baustein_id}"
+                                    title="Zum Baustein „{item.baustein_titel}“"
+                                    class="mt-1 inline-flex items-center gap-1 self-start max-w-full
+                                           text-xs px-1.5 py-0.5 rounded-full
+                                           border border-light-ui-3 dark:border-dark-ui-3
+                                           text-light-bl dark:text-dark-bl
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                >
+                                    <Share2 class="w-3 h-3 shrink-0" />
+                                    <span class="truncate">als Baustein übernommen →</span>
+                                </a>
+                            {/if}
                             <!-- Hier dauerhaft sichtbar, anders als im Chat: Die Bibliothek
                                  ist der Ort, an dem man nachsieht, was man zitieren muss. -->
                             {#if zitiername(item.provider_model)}
