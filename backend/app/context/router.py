@@ -63,6 +63,7 @@ from app.context.meine_bausteine import (
     zaehle_aufmerksamkeit,
 )
 from app.context.metadata import validate_node_content, validate_node_metadata
+from app.context.scope_gruppen import pruefe_scopes
 from app.context.taxonomy import (
     validate_content_type,
     validate_unterrichtsstunde_metadata,
@@ -603,27 +604,19 @@ async def create_node(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # Ein `write_scope` von `subject` oder `group` **verlangt** die zugehörige Gruppe
-    # (DB-CHECK `check_context_nodes_write_group_id`). Fehlt sie, schlug das INSERT bisher
-    # als IntegrityError durch und die Oberfläche bekam einen 500 ohne Hinweis, was fehlt —
-    # beim Bau des Sammlungs-Editors genau so aufgetreten.
-    if payload.write_scope in ("subject", "group") and payload.write_scope_group_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Bei `write_scope = {payload.write_scope}` muss die zuständige Gruppe "
-                "mitgegeben werden (`write_scope_group_id`) — sonst wäre nicht bestimmt, "
-                "wer den Baustein pflegen darf."
-            ),
+    # Scope und Trägergruppe müssen zusammenpassen — Pflicht **und** Art. Die Regel
+    # steht in `scope_gruppen.py`, weil sie hier und beim Ändern gilt; bis 09/2026
+    # stand nur die Pflichtprüfung hier und fehlte beim Ändern ganz.
+    try:
+        await pruefe_scopes(
+            db,
+            read_scope=payload.read_scope,
+            read_gruppen_id=payload.read_scope_group_id,
+            write_scope=payload.write_scope,
+            write_gruppen_id=payload.write_scope_group_id,
         )
-    if payload.read_scope in ("subject", "group") and payload.read_scope_group_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Bei `read_scope = {payload.read_scope}` muss die zuständige Gruppe "
-                "mitgegeben werden (`read_scope_group_id`)."
-            ),
-        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     node = ContextNode(
         category=payload.category,
@@ -704,6 +697,26 @@ async def update_node(
                 update_data["content"],
                 update_data.get("metadata_", node.metadata_),
             )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    # Scope und Trägergruppe müssen auch nach einer Teiländerung zusammenpassen.
+    # Maßgeblich ist der Stand **danach**: Wer nur den Scope schickt, behält die
+    # bisherige Gruppe — und genau diese Paarung war bis 09/2026 ungeprüft. Die
+    # Pflichtprüfung gab es nur beim Anlegen; hier schlug ein fehlender Gruppen-Bezug
+    # als IntegrityError durch, also als 500 ohne Hinweis.
+    try:
+        await pruefe_scopes(
+            db,
+            read_scope=update_data.get("read_scope", node.read_scope),
+            read_gruppen_id=update_data.get(
+                "read_scope_group_id", node.read_scope_group_id
+            ),
+            write_scope=update_data.get("write_scope", node.write_scope),
+            write_gruppen_id=update_data.get(
+                "write_scope_group_id", node.write_scope_group_id
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
