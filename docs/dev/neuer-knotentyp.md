@@ -178,20 +178,51 @@ nein, gehört der Typ nicht in eine Auswahlliste — dort wäre er ein Versprech
 Anwendung nicht einlöst. Der Wechsel `ruhend → aktiv` gehört in dasselbe Arbeitspaket wie
 der Erzeugungsweg und bekommt eine Einzeiler-Begründung in der YAML.
 
+Für die meisten Artefakt-Typen ist dieser Weg die **Übernahme aus der Bibliothek**
+(Schritt 8) — sie bietet ruhende Arten selbst nicht an, sonst unterliefe sie den
+`ui_status`, statt ihn einzulösen.
+
 Im Frontend filtern die Helfer in `frontend/src/lib/knotentypen.js` — **nicht**
 `RUHENDE_CONTENT_TYPES` direkt verwenden. Sie kennen die Ausnahme, die man sonst
 übersieht: Im Editor eines bestehenden Knotens bleibt **sein eigener Typ wählbar**, auch
 wenn er ruht. Sonst stünde dort ein leeres Auswahlfeld, und das Speichern schriebe
 stillschweigend etwas anderes.
 
-### 8. Rollen-Gewichtung
+### 8. Übernahme aus der Bibliothek: erlaubt oder nicht?
+
+`backend/app/artifacts/uebernahme.py`. „Als Baustein speichern" macht aus einem
+Bibliotheks-Artefakt einen Knoten (AP8) — für viele Typen **der** Erzeugungsweg und damit
+die Voraussetzung dafür, dass Schritt 7 `aktiv` sagen darf.
+
+Jeder Typ der Kategorien `document` und `artifact` gehört in genau eine von drei Listen:
+
+| Liste | Bedeutung |
+|---|---|
+| `LEHRKRAFT_TYPEN` | Lehrkräfte und Admins dürfen ihn aus einem Artefakt anlegen |
+| `SCHUELER_TYPEN` | Schüler:innen ebenfalls — dann **erzwungen** `private`/`private` |
+| `NICHT_UEBERNEHMBAR` | nicht übernehmbar, mit Begründung als Wert |
+
+Ein Typ darf in beiden Rollenlisten stehen (`strukturierung` ist rollenoffen), aber nie
+gleichzeitig in einer Rollenliste und in `NICHT_UEBERNEHMBAR`.
+
+**Der Wächtertest zwingt zur Entscheidung.** `test_uebernahme_typen_vollstaendig` in
+`tests/unit/test_uebernahme.py` fällt um, sobald ein Typ in keiner Liste steht. Das ist
+Absicht: Ohne ihn fiele ein neuer Typ stillschweigend aus der Übernahme heraus — nicht
+als Ablehnung, sondern als Lücke, die niemandem auffiele.
+
+Zu klären ist außerdem, aus welcher **Artefaktart** er entstehen kann
+(`UEBERNEHMBARE_KINDS`, heute `document` und `mermaid`) und ob der Knotentext daraus
+etwas Lesbares wird — ein Knoten, der außer dem Titel nichts trägt, ist derselbe Fehler
+wie in Schritt 4.
+
+### 9. Rollen-Gewichtung
 
 `_SCHUELER_BONUS` / `_LEHRKRAFT_BONUS` in `backend/app/context/taxonomy.py`. Ein
 **Vorzug, kein Filter**, und klein (≤ 0,05). Bildungsplan-Typen bleiben neutral (0), damit
 der Prüfsatz auf reinem BP-Bestand vergleichbar bleibt. Kein Eintrag heißt neutral — das
 ist ein zulässiges Ergebnis, aber eine bewusste Entscheidung.
 
-### 9. Kanten festlegen
+### 10. Kanten festlegen
 
 Mit welchen Typen steht der neue in Beziehung, über welche Relation? Der
 [Netzwerkgraph](#netzwerkgraph-der-kontexttypen) unten zeigt den Bestand — **er ist
@@ -201,7 +232,7 @@ Eine **neue Relation** (nicht bloß eine neue Kante zwischen bestehenden Typen) 
 sehr wohl eine Migration: Sie ist per CHECK gebunden
 (`check_context_edges_relation`, `app/db/models.py`).
 
-### 10. Migration — was wirklich nötig ist
+### 11. Migration — was wirklich nötig ist
 
 | Änderung | Migration? |
 |---|---|
@@ -211,28 +242,29 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 | neuer Index | ja, wenn eine Abfrage ihn braucht |
 | Backfill der Embeddings | kein Schema, aber ein Lauf (`scripts/`) |
 
-### 11. Oberfläche
+### 12. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
   deckt heute alle 41 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
-- `frontend/src/lib/components/NodeTypeIcon.svelte` — Symbol. Ohne Eintrag erscheint das
-  Kategorie-Symbol; das ist zulässig, aber meist nicht gewollt.
+- Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
+  in der Taxonomie (Schritt 2), und `NodeTypeIcon.svelte` liest nur noch die daraus
+  erzeugte `node_icons.js`.
 
-### 12. Werkzeuge
+### 13. Werkzeuge
 
 Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/router.py`,
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 13. Prüfsatz
+### 14. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 14. Dokumentation
+### 15. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.

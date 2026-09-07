@@ -30,6 +30,11 @@ Zu jedem Eintrag gibt es:
   Bildern ist das die Bildbeschreibung, mit der das Bild erzeugt wurde.
 - **GeoGebra** — bei Funktionsgraphen eine `.ggb`-Datei, die du in GeoGebra öffnen und dort
   weiterbearbeiten kannst (Funktionen, Punkte, Wertebereich werden übernommen).
+- **Als Baustein** — bei Dokumenten und Flussdiagrammen: übernimmt den Inhalt in den
+  [Kontextspeicher](kontext.md#aus-einem-chat-ergebnis-einen-baustein-machen), damit er
+  über die Suche wiederauffindbar ist und im Unterricht als Material verwendet werden
+  kann. Ist das geschehen, trägt die Karte das Kennzeichen
+  **„als Baustein übernommen →"** mit einem Link dorthin.
 - **Löschen** — entfernt den Eintrag (mit Rückfrage).
 
 ## Gut zu wissen

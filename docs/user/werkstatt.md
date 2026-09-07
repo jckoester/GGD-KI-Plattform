@@ -14,6 +14,12 @@ Zwei Wege:
   öffnet sich. (Rahmensätze wie „Hier ist dein Arbeitsblatt:" kannst du im Editor löschen.)
 - **Leer:** In der [Bibliothek](bibliothek.md) oben rechts auf **„Neues Dokument"**.
 
+> **Der Knopf daneben heißt „Als Baustein speichern" und macht etwas anderes.** Die
+> Werkstatt ist zum Weiterschreiben da, ein Baustein zum Wiederfinden: Er bekommt eine
+> Bausteinart, eine Sichtbarkeit und einen Platz im
+> [Kontextspeicher](kontext.md#aus-einem-chat-ergebnis-einen-baustein-machen). Beides
+> schließt sich nicht aus — erst schreiben, dann übernehmen, ist der übliche Weg.
+
 ## Bearbeiten
 
 Der Editor ist zweigeteilt: links schreibst du in **Markdown**, rechts siehst du sofort die

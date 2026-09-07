@@ -28,6 +28,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   am Verlaufsplan ziehen die Verknüpfungen nach. Von Hand angelegte Verknüpfungen
   bleiben davon unberührt.
 
+- **„Als Baustein speichern"** — aus einem Dokument oder Flussdiagramm der Bibliothek
+  wird ein Baustein im Wissensgraphen, mit Bausteinart, Sichtbarkeit und Ablaufdatum.
+  Zwei Einstiege, ein Formular: unter der Chat-Antwort neben „In Werkstatt öffnen" und
+  an jeder Karte der Bibliothek. Bilder, Schaltpläne, Funktionsgraphen und
+  GeoGebra-Dateien bleiben in der Bibliothek.
+
+- **Erneutes Speichern legt eine neue Fassung an, keinen zweiten Baustein.** Die
+  bisherige wandert ins Archiv und bleibt von der neuen aus erreichbar; wer die alte
+  Fassung als Material führt, bekommt die neue vorgeschlagen. Hat sich nichts geändert,
+  passiert nichts.
+
+- **Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen** — als
+  Schülertext, Lernplan, Schülerpräsentation oder Gliederung/Mindmap. Diese Bausteine
+  sind ausnahmslos privat; die Sichtbarkeit steht nicht zur Wahl.
+
+- **Der Bibliothekseintrag zeigt, was aus ihm geworden ist** — „als Baustein
+  übernommen →" mit Link auf den Baustein.
+
 ### Geändert
 
 - **Schüler:innen können ihre eigenen Bausteine verwalten** — Detailansicht, Umbenennen,
@@ -35,6 +53,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Jede Bausteinart hat ein eigenes Symbol** in Listen und Detailansichten; bisher
   trugen bis auf eine alle dasselbe.
+
+- **Vier Bausteinarten stehen erstmals zur Verfügung** — Schülertext, Lernplan,
+  Schülerpräsentation und Gliederung/Mindmap. Sie waren angelegt, aber ohne Weg, einen
+  solchen Baustein zu erzeugen. Eine Mindmap ist damit auch als Unterrichtsmaterial
+  wählbar; persönliche Texte und Lernpläne bleiben aus der Material-Auswahl heraus.
 
 - **Einheitliche Seitenbreiten.** Listen nutzen die volle Breite, Formulare und
   Textseiten eine lesbare Spalte — quer durch Assistenten, Bibliothek, Verlauf, Profil,

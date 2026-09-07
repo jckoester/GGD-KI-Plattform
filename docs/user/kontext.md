@@ -29,7 +29,7 @@ Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
 - ein schultypisches Konzept, das an Ihrer Schule besonders behandelt wird
 - ein Thema oder eine Funktion aus dem Unterrichtsmaterial
 
-Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen.
+Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
 
 ## Wozu ist das nützlich?
 
@@ -121,6 +121,50 @@ nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
 **Für Schüler:innen** ist es die einzige Stelle neben der Suche, an der sie den
 Wissensgraphen sehen. Dort stehen nur ihre eigenen Bausteine — niemand sonst kann sie
 lesen.
+
+## Aus einem Chat-Ergebnis einen Baustein machen
+
+Was im Chat entsteht, ist zunächst flüchtig: Nach drei Monaten ohne neue Nachricht wird
+das Gespräch gelöscht. Ein gelungenes Arbeitsblatt, eine Mindmap, eine Zusammenfassung —
+das soll bleiben und wiederauffindbar sein. Dafür gibt es **„Als Baustein speichern"**.
+
+Zwei Wege führen zum selben Formular:
+
+- **Im Chat**, unter der Antwort neben „In Werkstatt öffnen".
+- **In der [Bibliothek](bibliothek.md)**, an jedem Dokument und jedem Flussdiagramm.
+
+Im Formular legen Sie fest:
+
+| Feld | Bedeutung |
+|---|---|
+| **Bausteinart** | Was ist das — ein Arbeitsblatt, ein Lerntext, eine Gliederung? Danach wird später gefiltert und gesucht. |
+| **Titel** | Vorbelegt aus der ersten Überschrift; ändern Sie ihn zu dem, wonach Sie suchen würden. |
+| **Sichtbarkeit** | Wer lesen und wer ändern darf. |
+| **Ablauf und Schuljahr** | Aufklappbar. Ohne Angabe gilt bei den meisten Arten das Ende des laufenden Schuljahres. |
+
+**Für Schüler:innen ist die Sichtbarkeit nicht wählbar:** Ihre Bausteine sind immer
+privat — niemand sonst kann sie sehen, auch keine Lehrkraft. Statt eines Auswahlfelds
+steht dort ein Satz, der das sagt.
+
+**Das Ergebnis steht danach in [Meine Bausteine](#meine-bausteine)** und ist über die
+Suche auffindbar. In der Bibliothek trägt der Eintrag ein Kennzeichen
+**„als Baustein übernommen →"**, das dorthin führt.
+
+### Wenn Sie etwas überarbeiten
+
+Speichern Sie dasselbe Dokument ein zweites Mal, entsteht **kein zweiter Baustein**,
+sondern eine **neue Fassung**: Der Knopf heißt dann „Baustein aktualisieren", die
+bisherige Fassung wandert ins Archiv und bleibt von der neuen aus erreichbar. Das ist
+wichtig für alle, die auf den Baustein verweisen — eine Unterrichtsstunde, die die alte
+Fassung als Material führt, bekommt dort die neue vorgeschlagen, statt ins Leere zu
+zeigen.
+
+Hat sich nichts geändert, sagt die Plattform das und legt nichts an.
+
+> **Das Artefakt bleibt liegen.** Der Baustein ist eine Kopie mit eigenem Leben — Titel,
+> Sichtbarkeit, Verknüpfungen. Das Dokument in der Bibliothek bearbeiten Sie weiterhin
+> in der [Material-Werkstatt](werkstatt.md); dorthin gehen Änderungen am Text. Erst ein
+> erneutes „Baustein aktualisieren" holt sie in den Wissensgraphen.
 
 ## Archivieren statt löschen
 
