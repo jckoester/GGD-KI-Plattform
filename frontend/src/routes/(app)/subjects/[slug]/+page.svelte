@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { fachSammlungen } from "$lib/collections.js";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
     import { page } from "$app/stores";
@@ -89,7 +90,7 @@
     });
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-3xl">
+<PageBody>
         <!-- Kopfzeile -->
         {#if subject}
             <div class="flex items-center gap-3 mb-6">
@@ -361,4 +362,4 @@
                 excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
             />
         {/if}
-</div>
+</PageBody>

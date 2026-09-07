@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import {
@@ -177,7 +178,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6">
+<PageBody breit>
     <div class="max-w-5xl mx-auto">
         <div class="flex items-center justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
@@ -416,4 +417,4 @@
             </div>
         {/if}
     </div>
-</div>
+</PageBody>

@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { branding } from "$lib/branding.js";
     import {
         ExternalLink,
@@ -44,8 +45,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto">
-    <div class="max-w-2xl mx-auto py-8 px-4">
+<PageBody>
         <!-- Header -->
         <div class="mb-8">
             <div class="flex items-center gap-3 mb-2">
@@ -324,5 +324,5 @@
                 </a>
             </div>
         </section>
-    </div>
-</div>
+    
+</PageBody>

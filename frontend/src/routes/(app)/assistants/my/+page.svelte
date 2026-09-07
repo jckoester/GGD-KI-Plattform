@@ -1,4 +1,5 @@
 <script>
+  import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import yaml from 'js-yaml';
@@ -234,7 +235,7 @@
   }
 </script>
 
-<div class="h-full overflow-y-auto p-6">
+<PageBody breit>
   <!-- Kopfzeile -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">
@@ -548,7 +549,7 @@
       </div>
     </div>
   {/if}
-</div>
+</PageBody>
 
 <!-- Import-Dialog -->
 {#if importOpen}

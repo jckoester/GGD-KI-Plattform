@@ -1,4 +1,5 @@
 <script>
+  import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
@@ -144,8 +145,7 @@
   onMount(loadView);
 </script>
 
-<div class="h-full overflow-y-auto">
-  <div class="max-w-3xl mx-auto py-8 px-4">
+<PageBody>
     <button
       onclick={() => history.back()}
       class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
@@ -205,8 +205,8 @@
         {/each}
       </div>
     {/if}
-  </div>
-</div>
+  
+</PageBody>
 
 {#if showStepUp}
   <StepUpDialog

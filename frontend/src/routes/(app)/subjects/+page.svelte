@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { conversationCountsBySubject } from "$lib/stores/conversationCounts.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
@@ -32,7 +33,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6">
+<PageBody breit>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">
@@ -154,4 +155,4 @@
             {/each}
         </div>
     {/if}
-</div>
+</PageBody>

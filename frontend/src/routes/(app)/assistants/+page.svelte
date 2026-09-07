@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { getAssistants } from "$lib/api.js";
@@ -41,7 +42,7 @@
     })
 </script>
 
-<div class="h-full overflow-y-auto p-6">
+<PageBody breit>
     <div class="max-w-4xl mx-auto">
         <div class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx">
             <Bot class="w-6 h-6" />
@@ -156,4 +157,4 @@
             </div>
         {/if}
     </div>
-</div>
+</PageBody>

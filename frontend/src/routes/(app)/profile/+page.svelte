@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
@@ -145,8 +146,7 @@
     <ArrowLeft class="w-4 h-4" /> Zurück
 </button>
 
-<div class="h-full overflow-y-auto">
-    <div class="max-w-2xl mx-auto p-6">
+<PageBody>
         <div
             class="flex items-center gap-2 mb-6 text-light-tx dark:text-dark-tx"
         >
@@ -545,5 +545,5 @@
                 <Save class="w-4 h-4 inline-block mr-1 mb-1" /> Speichern
             </button>
         </section>
-    </div>
-</div>
+    
+</PageBody>
