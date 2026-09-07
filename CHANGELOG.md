@@ -5,6 +5,57 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **„Meine Bausteine"** unter *Wissensgraph → Meine Bausteine*, für alle Rollen. Die
+  Seite zeigt den eigenen Gesamtbestand über alle Fächer und Entstehungswege hinweg,
+  nach Fach gruppiert und innerhalb nach zuletzt geändert; ein Filter engt auf eine
+  Bausteinart ein. Umbenennen, Ablauf verlängern, Archivieren und Löschen geschehen
+  direkt in der Zeile — Archivieren mit Rückgängig-Streifen, Löschen mit Nachfrage, die
+  sich bei fremden Verweisen in „Stattdessen archivieren" verwandelt und die Verweise
+  zeigt. Inhalte ändert die Seite nicht: Dafür führt sie in den Planer oder den Editor
+  der Sammlung.
+
+- **Ein Zähler in der Seitenleiste nennt, was Aufmerksamkeit braucht** — abgelaufen,
+  läuft demnächst ab, verweist auf Archiviertes oder hat noch keinen Inhalt. Auf der
+  Seite steht derselbe Hinweis mit „Nur diese anzeigen".
+
+- **Jede Zeile zeigt Lehrkräften, in welcher Einheit oder Stunde der Baustein steckt.**
+  Ein Klick darauf filtert die Liste. Steht dort nichts, nutzt ihn keine Einheit mehr.
+
+- **Der Unterrichtsplaner verknüpft eingesetztes Material mit der Stunde.** Was im
+  Verlaufsplan als Material steht, erscheint am Baustein als „Eingesetzt in"; Änderungen
+  am Verlaufsplan ziehen die Verknüpfungen nach. Von Hand angelegte Verknüpfungen
+  bleiben davon unberührt.
+
+### Geändert
+
+- **Schüler:innen können ihre eigenen Bausteine verwalten** — Detailansicht, Umbenennen,
+  Archivieren, Löschen. Bisher endete jeder dieser Wege mit einer Rechte-Meldung.
+
+- **Jede Bausteinart hat ein eigenes Symbol** in Listen und Detailansichten; bisher
+  trugen bis auf eine alle dasselbe.
+
+- **Einheitliche Seitenbreiten.** Listen nutzen die volle Breite, Formulare und
+  Textseiten eine lesbare Spalte — quer durch Assistenten, Bibliothek, Verlauf, Profil,
+  Fächer und Werkzeuge.
+
+- **Beim Löschen eines Kontos entscheidet die Sichtbarkeit über die eigenen Bausteine:**
+  Was nur die Person selbst sehen konnte, wird mitgelöscht; was mit einer Gruppe, einer
+  Fachschaft oder der Schule geteilt war, bleibt bestehen und verliert den Namen.
+
+### Behoben
+
+- **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten Öffnen
+  ließen sie sich nicht mehr eindeutig zuordnen.
+
+- **Wer einen Baustein fachweit freigab, bekam Unterrichtsgruppen statt Fachschaften zur
+  Auswahl.** Die angebotene Gruppe konnte gar nicht zum gewählten Umfang passen.
+
+- **Beim Ändern eines Bausteins wurde die zuständige Gruppe nicht geprüft.** Die
+  Prüfung galt bisher nur beim Anlegen; so ließ sich ein Baustein nachträglich auf einen
+  Umfang setzen, für den ihm die Gruppe fehlte.
+
 ## [0.8.0] – 2026-09-05
 
 Schwerpunkt: **der Wissensgraph**. Die Suche trennt Namenstreffer von thematischen
