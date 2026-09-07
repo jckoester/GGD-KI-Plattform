@@ -162,6 +162,9 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 - den Stundenplan-Abrufstatus (`calendar_sync_status`)
 - zurückgezogene Sitzungen (`jwt_revocations`) und den Audit-Eintrag selbst
 - **private Bausteine** (`read_scope = private`) — siehe unten
+- die **persönliche Bibliothek** (`artifacts`), Datenbankzeilen **und** Dateien
+- den **persönlichen Lernzustand** (`node_engagement`) — der Zustand je Gruppe bleibt
+- **Gruppenmitgliedschaften** und die persönlichen **Fach-Ausblendungen**
 
 > **Ausnahme Krisen-Aufbewahrung:** Hat das Konto eine geflaggte Konversation, die noch
 > aufzubewahren ist (offen, in Prüfung, oder abgeschlossen vor weniger als 180 Tagen),
@@ -186,11 +189,27 @@ gehört der Schule, der Personenbezug nicht.
 > keine Eigentümerin mehr — nur noch Admins können ihn ändern. Der `write_scope` wird
 > bewusst **nicht** angehoben, weil das eine stille Rechteausweitung wäre.
 
-**Nicht** mitgelöscht werden derzeit der Lernzustand, Gruppenmitgliedschaften und
-Fach-Ausblendungen. Das ist eine offene Aufbewahrungsfrage, kein Versehen — sie ist im
-Projekt-Backlog festgehalten. Ein Test
-(`backend/tests/unit/test_pseudonym_deletion_coverage.py`) hält den Stand fest und
-verlangt für jede **neue** Tabelle mit Pseudonym-Spalte eine ausdrückliche Entscheidung.
+#### Die Bibliothek geht mit dem Konto
+
+Artefakte haben eine **eigene** Frist (`expires_at`, bei Lehrkräften bis zu zwei Jahre).
+Trotzdem gewinnt die Kontolöschung: Die Bibliothek ist strikt privat — die Liste filtert
+auf die Eigentümerin, der Abruf einer fremden Datei wird abgewiesen. Damit gilt dieselbe
+Regel wie für einen privaten Baustein. Bis 09/2026 überlebten Artefakte das Konto samt
+Pseudonym bis zum Fristende.
+
+Gelöscht werden Zeile **und Datei**. Die Dateien fallen erst nach einem erfolgreichen
+Commit; bricht die Löschung ab, bleiben sie liegen und der nächste Lauf nimmt sie mit.
+
+> **Folge für übernommene Bausteine:** Ein Baustein, der aus einem Artefakt entstanden
+> ist, trägt dessen ID als Herkunftsnotiz. Ist der Baustein geteilt, bleibt er (ohne
+> Namen) bestehen und verweist dann auf ein Artefakt, das es nicht mehr gibt. Das ist
+> beabsichtigt — die Herkunft ist eine Notiz, kein Fremdschlüssel.
+
+**Seit 09/2026 gibt es keine ungeklärten Fälle mehr.** Jede Tabelle mit Pseudonym-Spalte
+hat eine getroffene Entscheidung; ein Test
+(`backend/tests/unit/test_pseudonym_deletion_coverage.py`) hält den Stand fest, verlangt
+für jede **neue** Tabelle eine ausdrückliche Entscheidung und schlägt an, sobald wieder
+ein Fall als „offen" markiert wird.
 
 Manuell ausführen (z. B. zur Überprüfung mit `--dry-run`):
 

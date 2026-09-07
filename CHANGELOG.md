@@ -67,6 +67,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Was nur die Person selbst sehen konnte, wird mitgelöscht; was mit einer Gruppe, einer
   Fachschaft oder der Schule geteilt war, bleibt bestehen und verliert den Namen.
 
+- **Die Kontolöschung räumt vier weitere Bereiche ab:** die persönliche Bibliothek
+  (Datenbankzeilen und Dateien, auch wenn ihre eigene Aufbewahrungsfrist noch läuft), den
+  persönlichen Lernstand, die Gruppenmitgliedschaften und die eigenen
+  Fach-Ausblendungen. Ehemalige verschwinden damit aus Gruppenlisten und Zählungen —
+  bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
+  werden. Der Lernstand einer Gruppe bleibt erhalten.
+
 ### Behoben
 
 - **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten Öffnen

@@ -238,6 +238,24 @@ def read_artifact_bytes(record: Artifact) -> Optional[bytes]:
     return path.read_bytes()
 
 
+async def collect_pseudonym_artifact_paths(
+    db: AsyncSession, pseudonym: str
+) -> list[Path]:
+    """Dateipfade aller Artefakte einer Person — für die Kontolöschung.
+
+    Getrennt vom Löschen, weil die Reihenfolge zählt: Die Pfade werden **vor** der
+    Transaktion gesammelt und die Dateien erst **nach** einem erfolgreichen Commit
+    entfernt. Andersherum — wie in `delete_artifact` und `cleanup_artifacts`, wo es
+    wegen der einzelnen Zeile folgenlos bleibt — stünde bei einem Rollback eine Zeile
+    ohne ihre Datei in der Datenbank.
+    """
+    zeilen = (await db.execute(
+        select(Artifact.id, Artifact.mime_type)
+        .where(Artifact.owner_pseudonym == pseudonym)
+    )).all()
+    return [_file_path(artifact_id, mime_type) for artifact_id, mime_type in zeilen]
+
+
 async def delete_artifact(db: AsyncSession, record: Artifact) -> None:
     path = _file_path(record.id, record.mime_type)
     try:

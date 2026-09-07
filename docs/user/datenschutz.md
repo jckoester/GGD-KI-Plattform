@@ -93,6 +93,8 @@ und wird nur in diesen geregelten Verfahren — und außerhalb der Software — 
 | Gesamter Account | 3 Monate nach dem letzten Login |
 | Eigene Bausteine, die nur Sie sehen | mit dem Account |
 | Eigene Bausteine, die Sie geteilt haben | bleiben — ohne Ihren Namen |
+| Ihre Bibliothek (Bilder, Diagramme, Dokumente) | mit dem Account |
+| Gruppenmitgliedschaften, Lernstand, eigene Einstellungen | mit dem Account |
 
 Die Löschung erfolgt automatisch. Es gibt keine manuelle Wiederherstellung gelöschter Daten.
 

@@ -47,6 +47,11 @@ Zu jedem Eintrag gibt es:
 - Läuft die **Aufbewahrungsfrist** eines Elements ab, wird es automatisch entfernt — das
   Ablaufdatum steht an jeder Karte. Möchtest du etwas dauerhaft behalten, lade es rechtzeitig
   herunter.
+- **Mit deinem Konto verschwindet auch deine Bibliothek.** Wird ein Konto nach drei Monaten
+  ohne Anmeldung gelöscht, gehen die gespeicherten Elemente mit — auch solche, deren eigene
+  Frist noch läuft. Sie waren ohnehin nur für dich sichtbar. Was erhalten bleiben soll,
+  gehört als [Baustein](kontext.md#aus-einem-chat-ergebnis-einen-baustein-machen) mit einer
+  geteilten Sichtbarkeit in den Wissensgraphen.
 
 Auch **Text-Dokumente** (Arbeitsblätter) liegen in der Bibliothek — sie bearbeitest du im Editor
 der [Material-Werkstatt](werkstatt.md) und exportierst sie als PDF/Word/ODT.

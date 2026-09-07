@@ -8,15 +8,20 @@ from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
+    Artifact,
     BudgetAccrual,
     CalendarSyncStatus,
     ContextNode,
     Conversation,
     ConversationFlag,
+    GroupMembership,
     JwtRevocation,
+    NodeEngagement,
     PseudonymAudit,
+    TeacherGroupExclusion,
     UserPreference,
 )
+from app.artifacts.store import collect_pseudonym_artifact_paths
 from app.chat.image_store import (
     collect_conversation_image_paths,
     collect_pseudonym_image_paths,
@@ -178,6 +183,9 @@ async def cleanup_inactive_accounts(
                 # erfolgreichem Commit von Disk räumen (die Rows gehen per Cascade mit
                 # den Konversationen).
                 image_paths = await collect_pseudonym_image_paths(db, pseudonym)
+                # Dasselbe für die Bibliothek — dort liegen die Bytes ebenfalls auf
+                # Disk, ohne Cascade, das sie mitnähme.
+                artifact_paths = await collect_pseudonym_artifact_paths(db, pseudonym)
                 try:
                     # Atomare lokale Löschung pro Pseudonym.
                     async with db.begin_nested():
@@ -234,6 +242,57 @@ async def cleanup_inactive_accounts(
                             .where(ContextNode.owner_pseudonym == pseudonym)
                             .values(owner_pseudonym=None)
                         )
+                        # ── Bibliothek (Entscheidung 08.09.2026) ──────────────
+                        #
+                        # Artefakte haben zwar eine eigene Frist (`expires_at`),
+                        # aber die Bibliothek ist **strikt privat**: `list_artifacts`
+                        # filtert auf die Eigentümerin, `GET /artifacts/{id}` weist
+                        # Fremde mit 403 ab. Damit fällt sie unter dieselbe Regel wie
+                        # ein privater Baustein — was nie jemand anders sehen konnte,
+                        # geht mit dem Konto. Bis hierher überlebten Artefakte das
+                        # Konto samt Pseudonym bis zum Fristende, bei Lehrkräften
+                        # zwei Jahre.
+                        #
+                        # ⚠️ Ein übernommener Baustein (`metadata.source_artifact_id`,
+                        # AP8) verweist danach auf ein Artefakt, das es nicht mehr
+                        # gibt. Das ist der vorgesehene Zustand: Die Herkunft ist eine
+                        # Notiz, kein Fremdschlüssel — siehe `uebernahme.py`.
+                        await db.execute(
+                            delete(Artifact).where(Artifact.owner_pseudonym == pseudonym)
+                        )
+                        # ── Lernzustand (Entscheidung 08.09.2026) ─────────────
+                        #
+                        # Je Knoten „eingeführt/kennt/beherrscht/tut sich schwer".
+                        # Heute schreibt der einzige Erzeuger (`complete_review`) nur
+                        # die **Gruppen**-Zeile; die Personenspalte ist in der Praxis
+                        # leer. Die Regel steht trotzdem schon hier — sie soll gelten,
+                        # bevor es die Daten gibt, nicht danach.
+                        await db.execute(
+                            delete(NodeEngagement).where(
+                                NodeEngagement.pseudonym == pseudonym
+                            )
+                        )
+                        # ── Gruppenmitgliedschaften (Entscheidung 08.09.2026) ──
+                        #
+                        # `sync_groups` schreibt sie **beim Login** fort. Wer die
+                        # Schule verlässt, loggt sich nie wieder ein — die
+                        # Synchronisierung fasst also strukturell genau die Zeilen
+                        # nicht an, um die es geht. Ohne diese Zeile bleiben
+                        # Ehemalige Mitglied ihrer Klassen und Kurse, und
+                        # Gruppenlisten und Zählungen sind falsch.
+                        await db.execute(
+                            delete(GroupMembership).where(
+                                GroupMembership.pseudonym == pseudonym
+                            )
+                        )
+                        # Welche Klassen-/Fach-Kombination eine Lehrkraft ausgeblendet
+                        # hat — rein persönliche Ansichtseinstellung ohne Fremdbezug,
+                        # dieselbe Kategorie wie `user_preferences`.
+                        await db.execute(
+                            delete(TeacherGroupExclusion).where(
+                                TeacherGroupExclusion.pseudonym == pseudonym
+                            )
+                        )
                         await db.execute(
                             delete(JwtRevocation).where(JwtRevocation.pseudonym == pseudonym)
                         )
@@ -242,6 +301,7 @@ async def cleanup_inactive_accounts(
                         )
                     await db.commit()
                     unlink_paths(image_paths)
+                    unlink_paths(artifact_paths)
                     stats.deleted_local += 1
                 except Exception:
                     await db.rollback()
