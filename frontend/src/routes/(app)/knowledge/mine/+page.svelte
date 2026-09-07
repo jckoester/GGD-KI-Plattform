@@ -28,6 +28,7 @@
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import { AlertTriangle, Bot, ChevronDown, ChevronRight, Package } from 'lucide-svelte'
+  import PageBody from '$lib/components/PageBody.svelte'
 
   let daten = $state(null)
   let laedt = $state(true)
@@ -96,12 +97,7 @@
 
 <svelte:head><title>Meine Bausteine</title></svelte:head>
 
-<!-- Eigener Scroll-Rahmen: Das `(app)`-Layout gibt `<main>` ein
-     `flex-1 overflow-hidden` — eine Seite ohne `h-full overflow-y-auto` wird
-     unten abgeschnitten, statt zu scrollen. Dieselbe Bauart wie `/knowledge`
-     und die Sammlungs-Listen. -->
-<div class="h-full overflow-y-auto">
- <div class="max-w-4xl mx-auto px-4 py-6">
+<PageBody>
   <h1 class="text-2xl font-semibold text-light-tx dark:text-dark-tx">Meine Bausteine</h1>
 
   <!-- Kopfzeile je Rolle. Für Schüler:innen in einfacher Sprache und mit der
@@ -264,5 +260,4 @@
       {/each}
     </div>
   {/if}
- </div>
-</div>
+</PageBody>

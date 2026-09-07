@@ -29,6 +29,7 @@
     import { ArrowLeft } from "lucide-svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
@@ -393,7 +394,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-2xl">
+<PageBody>
     <a
         href={readUrl}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
@@ -1335,4 +1336,4 @@
             {/if}
         </form>
     {/if}
-</div>
+</PageBody>

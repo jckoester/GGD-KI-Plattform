@@ -19,6 +19,7 @@
     import { myFachschaften } from "$lib/stores/myGroups.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     let { typ, node = null, vorgabeFachId = null, back = null } = $props();
 
@@ -125,7 +126,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-2xl">
+<PageBody>
     <a
         href={zurueck}
         class="text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx
@@ -337,4 +338,4 @@
             </a>
         </div>
     </div>
-</div>
+</PageBody>

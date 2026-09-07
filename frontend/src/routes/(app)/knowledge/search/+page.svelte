@@ -214,7 +214,7 @@
      sichtbar — sonst müsste man zum Bestätigen erst ans Listenende scrollen. -->
 <div class="h-full flex flex-col">
     <div class="flex-1 overflow-y-auto">
-        <div class="max-w-4xl mx-auto px-4 py-6">
+        <div class="px-6 py-6">
             <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-1">
                 Bausteine suchen
             </h1>
@@ -395,7 +395,7 @@
             class="shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg px-4 py-3"
         >
-            <div class="max-w-4xl mx-auto flex items-center gap-3 text-sm">
+            <div class="flex items-center gap-3 text-sm">
                 <span class="text-light-tx-2 dark:text-dark-tx-2">
                     {gewaehlt.length}
                     {gewaehlt.length === 1 ? "Baustein" : "Bausteine"} gewählt
@@ -438,10 +438,14 @@
             </h2>
             <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">{zeile}</span>
         </div>
-        <ul class="space-y-1">
+        <!-- Trennlinien statt Abstand: Bei voller Breite laufen die Zeilen sonst
+             ineinander, weil zwischen Titel links und Aktionen rechts viel Leere
+             steht. `/knowledge` trennt seine Tabellenzeilen genauso. -->
+        <ul class="divide-y divide-light-ui-2 dark:divide-dark-ui-2
+                   border-y border-light-ui-2 dark:border-dark-ui-2">
             {#each treffer as knoten (knoten.node_id)}
                 <li
-                    class="flex items-start gap-2 px-2 py-1.5 rounded-lg
+                    class="flex items-start gap-2 px-2 py-2
                            hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
                 >
                     <input

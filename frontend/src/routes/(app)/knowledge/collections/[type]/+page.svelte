@@ -26,6 +26,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     const typ = $derived($page.params.type);
     const config = $derived(sammlung(typ));
@@ -180,7 +181,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-5xl">
+<PageBody breit>
     {#if !config}
         <ErrorBanner message="Für „{typ}“ gibt es keine Sammlung." />
     {:else}
@@ -399,4 +400,4 @@
             </div>
         {/if}
     {/if}
-</div>
+</PageBody>

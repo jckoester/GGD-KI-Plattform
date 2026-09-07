@@ -24,6 +24,7 @@
     gueltigeGruppenwahl,
   } from '$lib/stores/myGroups.js'
   import { subjects } from '$lib/stores/subjects.js'
+  import PageBody from '$lib/components/PageBody.svelte'
 
   // ── Query-Param-Defaults ────────────────────────────────────────────────
   const preGroupId = $page.url.searchParams.get('group_id')
@@ -197,7 +198,7 @@
   }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-2xl">
+<PageBody>
   <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx mb-6">Neuen Knoten anlegen</h1>
 
   <form onsubmit={e => { e.preventDefault(); save() }} class="space-y-6">
@@ -680,4 +681,4 @@
       </div>
     {/if}
   </form>
-</div>
+</PageBody>

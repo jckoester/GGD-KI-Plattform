@@ -8,6 +8,7 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import LfdbTree from '$lib/components/LfdbTree.svelte'
     import { ArrowLeft, TriangleAlert, ChevronDown, ChevronRight, ExternalLink } from 'lucide-svelte'
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -95,7 +96,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-4xl">
+<PageBody>
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>
@@ -202,4 +203,4 @@
                 {/each}
             </div>
         {/if}
-</div>
+</PageBody>

@@ -6,6 +6,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import InfoBanner from '$lib/components/InfoBanner.svelte'
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Guard
     $effect(() => {
@@ -142,7 +143,7 @@
     }
 </script>
 
-<div class="max-w-2xl mx-auto px-4 py-8">
+<PageBody>
     <div class="mb-6">
         <a
             href="/knowledge/curricula"
@@ -254,4 +255,4 @@
             </div>
         </form>
     {/if}
-</div>
+</PageBody>

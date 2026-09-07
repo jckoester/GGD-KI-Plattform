@@ -7,6 +7,7 @@
     import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import { ArrowLeft } from 'lucide-svelte'
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -62,7 +63,7 @@
     })
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-6xl">
+<PageBody>
     <!-- Kopfzeile -->
     <div class="flex items-center justify-between mb-6">
         <div>
@@ -132,4 +133,4 @@
             </div>
         {/if}
     {/if}
-</div>
+</PageBody>

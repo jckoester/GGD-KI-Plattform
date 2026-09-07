@@ -4,6 +4,7 @@
   import NodeTypeIcon from '$lib/components/NodeTypeIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
+  import PageBody from '$lib/components/PageBody.svelte'
 
   let nodes = $state([])
   let loading = $state(false)
@@ -109,7 +110,7 @@
   }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-4xl">
+<PageBody breit>
   <div class="flex items-center justify-between mb-6">
     <div>
       <a href="/knowledge"
@@ -282,4 +283,4 @@
       </table>
     </div>
   {/if}
-</div>
+</PageBody>
