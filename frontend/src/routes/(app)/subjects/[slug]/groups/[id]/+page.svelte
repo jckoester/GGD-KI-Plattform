@@ -127,7 +127,7 @@
 </div>
 
 <!-- Tab-Inhalt -->
-<div class="flex-1 overflow-y-auto p-6 max-w-3xl">
+<div class="flex-1 overflow-y-auto px-4 py-6 max-w-4xl mx-auto w-full">
 
   <!-- Tab: Vorbereitung -->
   {#if activeTab === 'vorbereitung'}

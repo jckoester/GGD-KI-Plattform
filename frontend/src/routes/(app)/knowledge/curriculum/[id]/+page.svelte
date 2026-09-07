@@ -151,7 +151,7 @@
     <!-- Scrollbarer Inhaltsbereich -->
     <div
         bind:this={scrollEl}
-        class="flex-1 overflow-y-auto p-6 pb-16 max-w-4xl"
+        class="flex-1 overflow-y-auto p-6 pb-16 max-w-4xl mx-auto w-full"
     >
         {#if loading}
             <LoadingBanner />
