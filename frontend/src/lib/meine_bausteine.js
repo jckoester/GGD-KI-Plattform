@@ -136,6 +136,81 @@ export function aufmerksamkeitsText(zahlen) {
     return teile.length ? `${kopf}: ${teile.join(', ')}` : kopf
 }
 
+/** Wie viele Einsatzort-Chips eine Zeile trägt, bevor gekappt wird. */
+export const CHIPS_JE_ZEILE = 3
+
+/** Wie viele Einsatzorte die Filterleiste als Chips zeigt. */
+export const ORTE_ALS_CHIPS = 10
+
+/**
+ * Die Einsatzorte, die im Bestand vorkommen — für den Filter.
+ *
+ * Wie beim Typ-Filter aus dem geladenen Bestand abgeleitet, nicht aus einer
+ * Gesamtliste: Ein Filter, der Einheiten anbietet, in denen nichts von einem
+ * steckt, führt in leere Listen.
+ *
+ * **Sortiert nach Häufigkeit**, nicht alphabetisch. Eine Lehrkraft plant über ein
+ * Schuljahr hunderte Stunden; alphabetisch stünde vorn, was mit „A" anfängt.
+ * Nützlich ist die Einheit, in der zwanzig Bausteine stecken — „Stunde 47" mit
+ * einem ist Rauschen. Bei gleicher Zahl entscheidet der Titel, damit die
+ * Reihenfolge zwischen zwei Aufrufen stabil bleibt.
+ *
+ * @returns {Array<{id: string, titel: string, anzahl: number}>}
+ */
+export function vorkommendeEinsatzorte(daten) {
+    const zaehler = new Map()
+    for (const abschnitt of daten?.abschnitte ?? []) {
+        for (const baustein of abschnitt.bausteine ?? []) {
+            for (const ort of baustein.eingesetzt_in ?? []) {
+                const vorhanden = zaehler.get(ort.id)
+                if (vorhanden) vorhanden.anzahl += 1
+                else zaehler.set(ort.id, { id: ort.id, titel: ort.titel, anzahl: 1 })
+            }
+        }
+    }
+    return [...zaehler.values()].sort(
+        (a, b) => b.anzahl - a.anzahl || a.titel.localeCompare(b.titel, 'de'),
+    )
+}
+
+/**
+ * Kappt eine Liste und sagt, wie viel übrig bleibt.
+ *
+ * Dasselbe Muster wie `vernetzung.js` bei den Kanten (ADR-013-Leitplanke: nie alles
+ * auf einmal) und Leitprinzip 3 der UI-Notiz: Gekürzt wird, aber nicht stumm — der
+ * Rest wird gezählt und genannt.
+ *
+ * @returns {{sichtbar: Array, weitere: number, rest: Array}}
+ */
+export function gekappt(eintraege, deckel) {
+    const alle = eintraege ?? []
+    return {
+        sichtbar: alle.slice(0, deckel),
+        rest: alle.slice(deckel),
+        weitere: Math.max(0, alle.length - deckel),
+    }
+}
+
+/** Filtert auf einen Einsatzort und wirft leer gewordene Abschnitte weg. */
+export function nachEinsatzortGefiltert(daten, ortId) {
+    if (!ortId) return daten
+    const abschnitte = (daten?.abschnitte ?? [])
+        .map((a) => ({
+            ...a,
+            bausteine: (a.bausteine ?? []).filter((b) =>
+                (b.eingesetzt_in ?? []).some((o) => o.id === ortId),
+            ),
+        }))
+        .filter((a) => a.bausteine.length > 0)
+        .map((a) => ({ ...a, anzahl: a.bausteine.length }))
+
+    return {
+        ...daten,
+        abschnitte,
+        gesamt: abschnitte.reduce((summe, a) => summe + a.bausteine.length, 0),
+    }
+}
+
 /**
  * Was an einer Zeile angeboten wird.
  *

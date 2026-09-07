@@ -35,6 +35,7 @@ from app.context.schemas import (
     ContextNodeCopyRequest,
     NodeReferenzRead,
     BausteinVerwalten,
+    EinsatzortRead,
     AufmerksamkeitRead,
     FachabschnittRead,
     MeinBausteinRead,
@@ -60,6 +61,7 @@ from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.meine_bausteine import (
     herkunft,
+    lade_einsatzorte,
     lade_meine_bausteine,
     zaehle_aufmerksamkeit,
 )
@@ -525,6 +527,15 @@ async def list_meine_bausteine(
         content_type=content_type,
         nur_aufmerksamkeit=nur_aufmerksamkeit,
     )
+
+    # „Eingesetzt in" ist Lehrkraft-Sache (A4): Bei Schüler:innen gibt es keine
+    # Unterrichtsplanung, die etwas einsetzen könnte — die Abfrage liefe leer.
+    einsatzorte = {}
+    if ist_lehrkraft:
+        einsatzorte = await lade_einsatzorte(
+            db, [b.node.id for a in abschnitte for b in a.bausteine]
+        )
+
     return MeineBausteineRead(
         abschnitte=[
             FachabschnittRead(
@@ -542,6 +553,10 @@ async def list_meine_bausteine(
                         updated_at=b.node.updated_at,
                         kategorien=b.kategorien,
                         herkunft=herkunft(b.node),
+                        eingesetzt_in=[
+                            EinsatzortRead(id=o.id, titel=o.titel, content_type=o.content_type)
+                            for o in einsatzorte.get(b.node.id, ())
+                        ],
                     )
                     for b in a.bausteine
                 ],

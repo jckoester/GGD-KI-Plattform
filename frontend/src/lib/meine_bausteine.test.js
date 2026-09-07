@@ -3,7 +3,12 @@ import {
   aktionenFuer,
   aufmerksamkeitsText,
   loeschHindernis,
+  nachEinsatzortGefiltert,
   nurAufmerksamkeit,
+  CHIPS_JE_ZEILE,
+  ORTE_ALS_CHIPS,
+  gekappt,
+  vorkommendeEinsatzorte,
   ablaufAnzeige,
   abschnittsTitel,
   nachTypGefiltert,
@@ -290,5 +295,101 @@ describe("loeschHindernis", () => {
   it("verträgt einen Fehler ganz ohne detail", () => {
     expect(loeschHindernis(new Error("kaputt")).nachricht).toBe("kaputt")
     expect(loeschHindernis({}).nachricht).toContain("lässt sich nicht löschen")
+  })
+})
+
+const MIT_EINSATZ = {
+  abschnitte: [
+    {
+      fach: "Mathematik", subject_id: 1, anzahl: 3,
+      bausteine: [
+        { id: "a", title: "Blatt A", eingesetzt_in: [{ id: "s1", titel: "Stunde 1" }] },
+        { id: "b", title: "Blatt B", eingesetzt_in: [
+            { id: "s1", titel: "Stunde 1" }, { id: "s2", titel: "Stunde 2" }] },
+        { id: "c", title: "Blatt C", eingesetzt_in: [] },
+      ],
+    },
+  ],
+  gesamt: 3,
+}
+
+describe("vorkommendeEinsatzorte", () => {
+  it("zählt, in wie vielen Bausteinen ein Ort vorkommt", () => {
+    expect(vorkommendeEinsatzorte(MIT_EINSATZ)).toEqual([
+      { id: "s1", titel: "Stunde 1", anzahl: 2 },
+      { id: "s2", titel: "Stunde 2", anzahl: 1 },
+    ])
+  })
+
+  it("sortiert nach Häufigkeit, nicht alphabetisch", () => {
+    // Bei hunderten Stunden im Jahr stünde alphabetisch vorn, was mit „A" anfängt.
+    // Nützlich ist die Einheit, in der viel steckt.
+    const daten = {
+      abschnitte: [{ bausteine: [
+        { id: "1", eingesetzt_in: [{ id: "z", titel: "Zwischenprüfung" }] },
+        { id: "2", eingesetzt_in: [{ id: "z", titel: "Zwischenprüfung" }] },
+        { id: "3", eingesetzt_in: [{ id: "a", titel: "Auftakt" }] },
+      ] }],
+    }
+    expect(vorkommendeEinsatzorte(daten).map((o) => o.titel)).toEqual([
+      "Zwischenprüfung", "Auftakt",
+    ])
+  })
+
+  it("bei gleicher Zahl entscheidet der Titel — sonst springt die Reihenfolge", () => {
+    const daten = {
+      abschnitte: [{ bausteine: [
+        { id: "1", eingesetzt_in: [{ id: "b", titel: "Beta" }] },
+        { id: "2", eingesetzt_in: [{ id: "a", titel: "Alpha" }] },
+      ] }],
+    }
+    expect(vorkommendeEinsatzorte(daten).map((o) => o.titel)).toEqual(["Alpha", "Beta"])
+  })
+
+  it("verträgt Bausteine ohne Einsatzort und leere Daten", () => {
+    expect(vorkommendeEinsatzorte({ abschnitte: [{ bausteine: [{ id: "x" }] }] })).toEqual([])
+    expect(vorkommendeEinsatzorte(null)).toEqual([])
+  })
+})
+
+describe("nachEinsatzortGefiltert", () => {
+  it("behält nur Bausteine dieses Orts", () => {
+    const g = nachEinsatzortGefiltert(MIT_EINSATZ, "s2")
+    expect(g.abschnitte[0].bausteine.map((b) => b.title)).toEqual(["Blatt B"])
+    expect(g.gesamt).toBe(1)
+  })
+
+  it("ohne Ort bleibt alles", () => {
+    expect(nachEinsatzortGefiltert(MIT_EINSATZ, null)).toBe(MIT_EINSATZ)
+  })
+
+  it("zieht den Abschnittszähler nach und lässt die Vorlage unberührt", () => {
+    const g = nachEinsatzortGefiltert(MIT_EINSATZ, "s1")
+    expect(g.abschnitte[0].anzahl).toBe(2)
+    expect(MIT_EINSATZ.abschnitte[0].bausteine).toHaveLength(3)
+  })
+})
+
+describe("gekappt", () => {
+  const liste = ["a", "b", "c", "d", "e"]
+
+  it("zeigt bis zum Deckel und zählt den Rest", () => {
+    expect(gekappt(liste, 3)).toEqual({
+      sichtbar: ["a", "b", "c"], rest: ["d", "e"], weitere: 2,
+    })
+  })
+
+  it("unter dem Deckel bleibt alles sichtbar", () => {
+    expect(gekappt(["a"], 3)).toEqual({ sichtbar: ["a"], rest: [], weitere: 0 })
+  })
+
+  it("verträgt leere und fehlende Listen", () => {
+    expect(gekappt([], 3).weitere).toBe(0)
+    expect(gekappt(null, 3)).toEqual({ sichtbar: [], rest: [], weitere: 0 })
+  })
+
+  it("die Deckel sind bewusst verschieden gewählt", () => {
+    // Eine Tabellenzeile ist schmal, die Filterleiste hat eine ganze Breite.
+    expect(CHIPS_JE_ZEILE).toBeLessThan(ORTE_ALS_CHIPS)
   })
 })

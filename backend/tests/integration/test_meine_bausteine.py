@@ -385,3 +385,93 @@ async def test_die_typmenge_kommt_aus_der_taxonomie(test_client, lehrer_headers,
     daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
     typen = {b["content_type"] for a in daten["abschnitte"] for b in a["bausteine"]}
     assert typen <= PERSOENLICHE_CONTENT_TYPES
+
+
+# ── „Eingesetzt in" (A4, Lehrkraft-Sicht) ────────────────────────────────────
+
+@pytest.fixture
+def einsatz(sync_conn, faecher):
+    """Ein Arbeitsblatt in einer Stunde, die Stunde in ihrer Einheit.
+
+    Die beiden Fälle laufen über **verschiedene Kantenrichtungen**: Material trägt
+    eingehende `used_with`-Kanten von der Stunde (AP6b), eine Stunde zeigt per
+    ausgehendem `part_of` auf ihre Einheit.
+    """
+    with sync_conn.cursor() as cur:
+        einheit = _node(cur, "Einheit Bruchrechnung", owner=TEACHER,
+                        content_type="unterrichtseinheit")
+        stunde = _node(cur, "Stunde 3: Kürzen", owner=TEACHER,
+                       content_type="unterrichtsstunde")
+        blatt = _node(cur, "Übungsblatt Kürzen", owner=TEACHER)
+        cur.execute(
+            "INSERT INTO context_edges (from_node_id, to_node_id, relation, metadata)"
+            " VALUES (%s,%s,'used_with',%s), (%s,%s,'part_of','{}')",
+            (str(stunde), str(blatt), json.dumps({"via": "material"}),
+             str(stunde), str(einheit)),
+        )
+        ids = {"einheit": einheit, "stunde": stunde, "blatt": blatt}
+    sync_conn.commit()
+    yield ids
+    sync_conn.rollback()
+    with sync_conn.cursor() as cur:
+        for nid in ids.values():
+            cur.execute("DELETE FROM context_edges WHERE from_node_id = %s OR to_node_id = %s",
+                        (str(nid), str(nid)))
+            cur.execute("DELETE FROM context_nodes WHERE id = %s", (str(nid),))
+    sync_conn.commit()
+
+
+def _nach_titel(daten):
+    return {b["title"]: b for a in daten["abschnitte"] for b in a["bausteine"]}
+
+
+@pytest.mark.asyncio
+async def test_material_zeigt_die_stunde_die_es_benutzt(
+    test_client, lehrer_headers, einsatz
+):
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    blatt = _nach_titel(daten)["Übungsblatt Kürzen"]
+    assert [o["titel"] for o in blatt["eingesetzt_in"]] == ["Stunde 3: Kürzen"]
+    assert blatt["eingesetzt_in"][0]["content_type"] == "unterrichtsstunde"
+
+
+@pytest.mark.asyncio
+async def test_stunde_zeigt_ihre_einheit(test_client, lehrer_headers, einsatz):
+    """Die andere Kantenrichtung — hier ist das Gefäß der Einsatzort."""
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    stunde = _nach_titel(daten)["Stunde 3: Kürzen"]
+    assert [o["titel"] for o in stunde["eingesetzt_in"]] == ["Einheit Bruchrechnung"]
+
+
+@pytest.mark.asyncio
+async def test_ohne_einsatz_bleibt_die_liste_leer(test_client, lehrer_headers, einsatz):
+    """Ein Baustein, den keine Einheit mehr nutzt, ist der natürliche
+    Archiv-Kandidat (A4) — er trägt schlicht keine Chips."""
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    assert _nach_titel(daten)["Einheit Bruchrechnung"]["eingesetzt_in"] == []
+
+
+@pytest.mark.asyncio
+async def test_schuelerin_bekommt_keine_einsatzorte(
+    test_client, schueler_headers, einsatz
+):
+    """Bei Schüler:innen gibt es keine Unterrichtsplanung, die etwas einsetzt."""
+    daten = (await test_client.get("/context/nodes/mine", headers=schueler_headers)).json()
+    for a in daten["abschnitte"]:
+        for b in a["bausteine"]:
+            assert b["eingesetzt_in"] == []
+
+
+@pytest.mark.asyncio
+async def test_archivierte_einsatzorte_zaehlen_nicht(
+    test_client, lehrer_headers, sync_conn, einsatz
+):
+    """Eine archivierte Stunde setzt nichts mehr ein — sonst sähe ein Baustein
+    beschäftigt aus, den in Wahrheit niemand mehr braucht."""
+    with sync_conn.cursor() as cur:
+        cur.execute("UPDATE context_nodes SET status='archived' WHERE id = %s",
+                    (str(einsatz["stunde"]),))
+    sync_conn.commit()
+
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    assert _nach_titel(daten)["Übungsblatt Kürzen"]["eingesetzt_in"] == []

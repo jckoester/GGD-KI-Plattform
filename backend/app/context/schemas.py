@@ -611,6 +611,9 @@ class MeinBausteinRead(BaseModel):
     kategorien: list[str] = Field(default_factory=list)
     #: Ursprungs-Artefakt oder Assistent, falls bekannt (Herkunfts-Chip).
     herkunft: dict[str, Any] | None = None
+    #: Einheiten und Stunden, in denen der Baustein steckt. Nur für Lehrkräfte
+    #: gefüllt; leer heißt „nirgends eingesetzt" und damit Archiv-Kandidat (A4).
+    eingesetzt_in: list["EinsatzortRead"] = Field(default_factory=list)
 
 
 class FachabschnittRead(BaseModel):
@@ -649,3 +652,11 @@ class BausteinVerwalten(BaseModel):
             "ließe sich `null` nicht von „Feld weggelassen“ unterscheiden."
         ),
     )
+
+
+class EinsatzortRead(BaseModel):
+    """Wo ein Baustein im Unterricht steckt — Chip in „Meine Bausteine" (A4)."""
+
+    id: UUID
+    titel: str
+    content_type: str

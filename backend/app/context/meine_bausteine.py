@@ -36,6 +36,9 @@ from app.db.models import ContextEdge, ContextNode, Subject
 #: Ab wann ein Ablaufdatum als „läuft bald ab" gilt (A4).
 VORLAUF_TAGE = 14
 
+#: Relation, mit der die Stundenplanung ihr Material verknüpft (AP6b).
+RELATION_MATERIAL = "used_with"
+
 
 def _eigener_bestand(pseudonym: str):
     """Was auf die Seite gehört: **von mir** und **von mir zu pflegen**.
@@ -269,6 +272,81 @@ async def lade_meine_bausteine(
         abschnitte[-1].bausteine.append(Baustein(node=node, kategorien=kategorien))
 
     return abschnitte
+
+
+# ── „Eingesetzt in" (A4, nur für Lehrkräfte) ─────────────────────────────────
+
+#: Knotenarten, die einen Einsatzort darstellen können.
+PLANUNGSTYPEN = ("jahresplan", "unterrichtseinheit", "unterrichtsstunde")
+
+
+@dataclass(frozen=True)
+class Einsatzort:
+    """Wo ein Baustein im Unterricht steckt — ein Chip in der Zeile."""
+
+    id: UUID
+    titel: str
+    content_type: str
+
+
+async def lade_einsatzorte(
+    db: AsyncSession, node_ids: list[UUID]
+) -> dict[UUID, list[Einsatzort]]:
+    """Baustein → die Einheiten und Stunden, in denen er vorkommt.
+
+    ⚠️ **Die Kantenrichtung ist nicht einheitlich**, und A4 nennt nur die eine:
+
+    - **Material** (Arbeitsblatt, Begriff …) trägt *eingehende* ``used_with``-Kanten
+      von den Stunden, die es benutzen (AP6b). Das ist der Fall, an den A4 dachte.
+    - **Planungsknoten** hängen andersherum: Eine Stunde zeigt per ``part_of`` auf
+      *ihre* Einheit, die Einheit auf ihren Jahresplan. Hier ist die *ausgehende*
+      Kante der Einsatzort.
+
+    Beides ist dieselbe Frage — „wo steckt das drin?" —, deshalb eine Funktion und
+    ein Feld. Zwei Abfragen statt einer je Knoten: Bei 200 eigenen Bausteinen wären
+    das sonst 400 Rundreisen.
+
+    Ein Baustein ohne Einsatzort ist der natürliche Archiv-Kandidat (A4) — deshalb
+    fehlt der Eintrag hier schlicht, statt als leere Liste zu erscheinen.
+    """
+    if not node_ids:
+        return {}
+
+    ergebnis: dict[UUID, list[Einsatzort]] = {}
+    ort = sa.orm.aliased(ContextNode)
+
+    # 1. Material ← Stunde/Einheit, die es benutzt
+    eingehend = await db.execute(
+        sa.select(ContextEdge.to_node_id, ort.id, ort.title, ort.content_type)
+        .join(ort, ort.id == ContextEdge.from_node_id)
+        .where(
+            ContextEdge.to_node_id.in_(node_ids),
+            ContextEdge.relation == RELATION_MATERIAL,
+            ort.content_type.in_(PLANUNGSTYPEN),
+            ort.status == "active",
+        )
+    )
+    for baustein_id, ort_id, titel, typ in eingehend:
+        ergebnis.setdefault(baustein_id, []).append(Einsatzort(ort_id, titel, typ))
+
+    # 2. Stunde/Einheit → das Gefäß darüber
+    ausgehend = await db.execute(
+        sa.select(ContextEdge.from_node_id, ort.id, ort.title, ort.content_type)
+        .join(ort, ort.id == ContextEdge.to_node_id)
+        .where(
+            ContextEdge.from_node_id.in_(node_ids),
+            ContextEdge.relation == "part_of",
+            ort.content_type.in_(PLANUNGSTYPEN),
+            ort.status == "active",
+        )
+    )
+    for baustein_id, ort_id, titel, typ in ausgehend:
+        ergebnis.setdefault(baustein_id, []).append(Einsatzort(ort_id, titel, typ))
+
+    # Titel-Sortierung, damit die Chips nicht bei jedem Laden die Plätze tauschen.
+    for orte in ergebnis.values():
+        orte.sort(key=lambda o: o.titel)
+    return ergebnis
 
 
 def herkunft(node: ContextNode) -> dict[str, Any] | None:

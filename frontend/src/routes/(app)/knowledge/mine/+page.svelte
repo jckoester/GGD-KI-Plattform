@@ -26,6 +26,11 @@
     abschnittsTitel,
     aktionenFuer,
     loeschHindernis,
+    CHIPS_JE_ZEILE,
+    ORTE_ALS_CHIPS,
+    gekappt,
+    nachEinsatzortGefiltert,
+    vorkommendeEinsatzorte,
     aufmerksamkeitsText,
     nachTypGefiltert,
     nurAufmerksamkeit,
@@ -42,6 +47,7 @@
     Check,
     ChevronDown,
     ChevronRight,
+    MapPin,
     Package,
     Pencil,
     RotateCcw,
@@ -54,6 +60,7 @@
   let laedt = $state(true)
   let fehler = $state(null)
   let typFilter = $state('')
+  let ortFilter = $state('')
   let nurWarnungen = $state(false)
   let zugeklappt = $state(new Set())
 
@@ -71,10 +78,15 @@
   const typen = $derived(
     vorkommendeTypen(basis, (t) => CONTENT_TYPE_LABELS[t] ?? t ?? 'Ohne Typ'),
   )
-  const sichtbar = $derived(nachTypGefiltert(basis, typFilter))
+  const einsatzorte = $derived(vorkommendeEinsatzorte(basis))
+  const orteLeiste = $derived(gekappt(einsatzorte, ORTE_ALS_CHIPS))
+  const sichtbar = $derived(
+    nachEinsatzortGefiltert(nachTypGefiltert(basis, typFilter), ortFilter),
+  )
 
   function warnFilterUmschalten() {
     nurWarnungen = !nurWarnungen
+    ortFilter = ''
     // Der zuvor gewählte Typ kommt im neuen Bestand womöglich nicht vor — dann
     // stünde man ohne Zutun vor einer leeren Liste.
     typFilter = ''
@@ -298,6 +310,52 @@
       </div>
     {/if}
 
+    {#if istLehrkraft && einsatzorte.length}
+      <!-- Zweiter Filter: „was steckt in dieser Einheit/Stunde?". Nur für
+           Lehrkräfte — bei Schüler:innen gibt es keine Unterrichtsplanung, die
+           etwas einsetzt, die Leiste bliebe leer. -->
+      <div class="mt-3 flex flex-wrap gap-2 items-center">
+        <span class="text-xs text-light-tx-3 dark:text-dark-tx-3">Eingesetzt in:</span>
+        {#each orteLeiste.sichtbar as o (o.id)}
+          <button
+            onclick={() => (ortFilter = ortFilter === o.id ? '' : o.id)}
+            class="px-2.5 py-1 text-xs rounded-full border transition-colors flex items-center gap-1
+                   {ortFilter === o.id
+                     ? 'bg-primary dark:bg-primary-dark text-white border-transparent'
+                     : 'border-light-ui-3 dark:border-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+          >
+            <MapPin class="w-3 h-3" />
+            {o.titel} ({o.anzahl})
+          </button>
+        {/each}
+        {#if orteLeiste.weitere}
+          <!-- Der Rest als Auswahlfeld statt weiterer Chips: Nach einem Schuljahr
+               sind es hunderte Stunden, und eine Wand aus Chips filtert nichts,
+               sie verdeckt. Gekürzt wird trotzdem nicht stumm — die Zahl steht
+               dran (Leitprinzip 3). -->
+          <select
+            value={orteLeiste.rest.some((o) => o.id === ortFilter) ? ortFilter : ''}
+            onchange={(e) => (ortFilter = e.currentTarget.value)}
+            aria-label="Weitere Einsatzorte"
+            class="px-2 py-1 text-xs rounded-full border
+                   border-light-ui-3 dark:border-dark-ui-3
+                   bg-light-bg dark:bg-dark-bg text-light-tx-2 dark:text-dark-tx-2"
+          >
+            <option value="">+{orteLeiste.weitere} weitere …</option>
+            {#each orteLeiste.rest as o (o.id)}
+              <option value={o.id}>{o.titel} ({o.anzahl})</option>
+            {/each}
+          </select>
+        {/if}
+        {#if ortFilter}
+          <button onclick={() => (ortFilter = '')}
+                  class="text-xs text-light-tx-3 dark:text-dark-tx-3 hover:underline">
+            Filter aufheben
+          </button>
+        {/if}
+      </div>
+    {/if}
+
     <div class="mt-5 space-y-4">
       {#each sichtbar.abschnitte as abschnitt (schluessel(abschnitt))}
         {@const zu = zugeklappt.has(schluessel(abschnitt))}
@@ -324,6 +382,7 @@
               {#each abschnitt.bausteine as b (b.id)}
                 {@const ablauf = ablaufAnzeige(b.valid_until)}
                 {@const kann = aktionenFuer(b)}
+                {@const orte = gekappt(b.eingesetzt_in, CHIPS_JE_ZEILE)}
                 <li class="px-4 py-3 flex items-start gap-3">
                   <NodeTypeIcon contentType={b.content_type} size={18} />
                   <div class="min-w-0 flex-1">
@@ -391,6 +450,25 @@
                                       ? ''
                                       : 'text-light-ye dark:text-dark-ye font-medium'}>
                           {ablauf.text}
+                        </span>
+                      {/if}
+                      {#each orte.sichtbar as o (o.id)}
+                        <!-- Wo der Baustein im Unterricht steckt. Klick filtert die
+                             Liste darauf. Ein Baustein ohne Chip ist der natürliche
+                             Archiv-Kandidat (A4) — deshalb steht hier nichts statt
+                             eines „nirgends". -->
+                        <button
+                          onclick={() => (ortFilter = ortFilter === o.id ? '' : o.id)}
+                          class="flex items-center gap-1 hover:text-light-bl dark:hover:text-dark-bl"
+                          title="Nur Bausteine aus {o.titel} zeigen"
+                        >
+                          <MapPin class="w-3 h-3" />{o.titel}
+                        </button>
+                      {/each}
+                      {#if orte.weitere}
+                        <span title={orte.rest.map((o) => o.titel).join(', ')}
+                              class="text-light-tx-3 dark:text-dark-tx-3">
+                          +{orte.weitere}
                         </span>
                       {/if}
                     </div>
