@@ -17,7 +17,12 @@
   } from '$lib/stores/schoolYear.js'
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
-  import { myTeachingGroups } from '$lib/stores/myGroups.js'
+  import {
+    myTeachingGroups,
+    myFachschaften,
+    gruppenFuerScope,
+    gueltigeGruppenwahl,
+  } from '$lib/stores/myGroups.js'
   import { subjects } from '$lib/stores/subjects.js'
 
   // ── Query-Param-Defaults ────────────────────────────────────────────────
@@ -172,9 +177,24 @@
   }
 
   // ── Group-Optionen für Selects ────────────────────────────────────────
-  const groupOptions = $derived(
-    $myTeachingGroups.map(g => ({ id: g.id, name: g.name, subject_id: g.subject_id }))
-  )
+  //
+  // Je Scope eine andere Liste: `subject` meint die **Fachschaft**, `group` die
+  // Unterrichtsgruppe. Bis 09/2026 stand hier für beides dieselbe Liste mit
+  // Unterrichtsgruppen — die falsche Wahl wurde stumm gespeichert, weil das
+  // Backend den Gruppentyp nicht prüft.
+  const gruppen = $derived({ unterricht: $myTeachingGroups, fachschaften: $myFachschaften })
+  const readGroupOptions = $derived(gruppenFuerScope(readScope, gruppen))
+  const writeGroupOptions = $derived(gruppenFuerScope(writeScope, gruppen))
+
+  // Zurückgesetzt wird **beim Umschalten**, nicht in einem Effekt: Ein Effekt
+  // liefe auch beim Laden und leerte dann die Gruppe eines bestehenden Knotens,
+  // die nicht in den eigenen Listen steht — etwa bei einer fremden Fachschaft.
+  function readScopeGewechselt() {
+    readScopeGroupId = gueltigeGruppenwahl(readScopeGroupId, gruppenFuerScope(readScope, gruppen))
+  }
+  function writeScopeGewechselt() {
+    writeScopeGroupId = gueltigeGruppenwahl(writeScopeGroupId, gruppenFuerScope(writeScope, gruppen))
+  }
 </script>
 
 <div class="h-full overflow-y-auto p-6 max-w-2xl">
@@ -466,6 +486,7 @@
           </label>
           <select
             bind:value={readScope}
+            onchange={readScopeGewechselt}
             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
           >
@@ -488,7 +509,7 @@
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
             >
               <option value={null}>-- Keine Auswahl --</option>
-              {#each groupOptions as group}
+              {#each readGroupOptions as group}
                 <option value={group.id}>{group.name}</option>
               {/each}
             </select>
@@ -502,6 +523,7 @@
           </label>
           <select
             bind:value={writeScope}
+            onchange={writeScopeGewechselt}
             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                    bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
           >
@@ -523,7 +545,7 @@
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx"
             >
               <option value={null}>-- Keine Auswahl --</option>
-              {#each groupOptions as group}
+              {#each writeGroupOptions as group}
                 <option value={group.id}>{group.name}</option>
               {/each}
             </select>

@@ -37,6 +37,37 @@ export const myFachschaften = derived(_myGroups, $g =>
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 )
 
+/**
+ * Welche Gruppen zu einem Scope gehören.
+ *
+ * **Der Fehler, den das behebt:** Beide Knotenformulare boten unter „Fachgruppe"
+ * ausschließlich **Unterrichtsgruppen** an — auch bei `write_scope = subject`, wo
+ * eine **Fachschaft** gemeint ist. `myFachschaften` gab es bereits, benutzt hat es
+ * niemand. Das Backend prüft den Gruppentyp nicht, die falsche Wahl wurde also
+ * stumm gespeichert: ein Baustein, der laut Scope der Fachschaft gehört, aber an
+ * einer Klasse hängt.
+ *
+ * @param {string} scope  `read_scope` oder `write_scope`
+ * @param {{unterricht?: Array, fachschaften?: Array}} gruppen
+ * @returns {Array} leer, wenn der Scope gar keine Gruppe braucht
+ */
+export function gruppenFuerScope(scope, { unterricht = [], fachschaften = [] } = {}) {
+    if (scope === 'subject') return fachschaften
+    if (scope === 'group') return unterricht
+    return []
+}
+
+/**
+ * Behält die Auswahl nur, wenn sie in der Liste vorkommt — sonst `null`.
+ *
+ * Nötig beim Wechsel des Scopes: Die zuvor gewählte Unterrichtsgruppe steht nicht
+ * mehr zur Wahl, ihre Id aber noch im Formular. Ohne das Zurücksetzen ginge sie
+ * mit `write_scope = subject` an den Server, wo nichts sie ablehnt.
+ */
+export function gueltigeGruppenwahl(id, gruppen) {
+    return (gruppen ?? []).some((g) => g.id === id) ? id : null
+}
+
 export async function refreshMyGroups() {
   try {
     const data = await getMyGroups()
