@@ -86,6 +86,9 @@ class ArtifactItem(BaseModel):
     # None heißt „nicht bekannt": bei Diagrammen und Dokumenten, deren Herkunft heute
     # nicht mitwandert, und bei Artefakten aus der Zeit vor Alembic 0050.
     provider_model: str | None = None
+    # Lässt sich daraus ein Baustein machen (AP8)? Die Antwort kommt vom Server, damit
+    # der Knopf in der Bibliothek nicht nach eigener Rechnung erscheint.
+    uebernehmbar: bool = False
 
 
 class LibraryResponse(BaseModel):
@@ -214,6 +217,7 @@ async def list_library(
             byte_size=r.byte_size, source=r.source,
             created_at=r.created_at, expires_at=r.expires_at,
             provider_model=r.provider_model,
+            uebernehmbar=uebernahme.ist_uebernehmbar(r),
         )
         for r in records
     ]
@@ -431,23 +435,13 @@ async def baustein_vorschlag(
     record = await _eigenes_artefakt(db, artifact_id, current_user)
 
     typen = list(uebernahme.angebotene_typen(current_user.roles))
-    uebernehmbar = record.kind in uebernahme.UEBERNEHMBARE_KINDS
-    grund = None
-    if not uebernehmbar:
-        grund = (
-            "Aus dieser Artefaktart lässt sich kein Baustein machen — übernehmbar "
-            "sind Dokumente und Mermaid-Diagramme."
-        )
-    elif not (record.source or "").strip():
-        uebernehmbar, grund = False, "Das Artefakt hat keinen Inhalt zum Übernehmen."
-
     vorhanden = await uebernahme.vorhandener_baustein(
         db, artifact_id=artifact_id, pseudonym=current_user.sub
     )
     return BausteinVorschlag(
         kind=record.kind,
-        uebernehmbar=uebernehmbar,
-        grund=grund,
+        uebernehmbar=uebernahme.ist_uebernehmbar(record),
+        grund=uebernahme.ablehnungsgrund(record),
         typen=typen,
         # Beim zweiten Mal die Art des vorhandenen Bausteins, sonst die erste der Liste:
         # Wer aktualisiert, will fast nie die Art wechseln.

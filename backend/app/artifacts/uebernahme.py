@@ -137,6 +137,28 @@ def inhalt_aus_artefakt(artifact: Artifact) -> str:
     return quelle
 
 
+def ist_uebernehmbar(artifact: Artifact) -> bool:
+    """Taugt dieses Artefakt überhaupt als Baustein?
+
+    Die Bibliothek fragt das je Eintrag, um den Knopf nur dort zu zeigen, wo er etwas
+    tut. Damit steht die Antwort an **einer** Stelle: Ein Knopf, dessen Bedingung der
+    Browser für sich nachbaut, zeigt irgendwann etwas anderes an als der Server erlaubt.
+    """
+    return artifact.kind in UEBERNEHMBARE_KINDS and bool((artifact.source or "").strip())
+
+
+def ablehnungsgrund(artifact: Artifact) -> str | None:
+    """Warum nicht — in einem Satz für die Oberfläche. ``None``, wenn es geht."""
+    if artifact.kind not in UEBERNEHMBARE_KINDS:
+        return (
+            "Aus dieser Artefaktart lässt sich kein Baustein machen — übernehmbar sind "
+            "Dokumente und Mermaid-Diagramme."
+        )
+    if not (artifact.source or "").strip():
+        return "Das Artefakt hat keinen Inhalt zum Übernehmen."
+    return None
+
+
 def pruefe(artifact: Artifact, content_type: str, roles: list[str]) -> None:
     """Artefaktart und Bausteinart gegen die Rolle. Wirft ``UebernahmeFehler``."""
     if artifact.kind not in UEBERNEHMBARE_KINDS:

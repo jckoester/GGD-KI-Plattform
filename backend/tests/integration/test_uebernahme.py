@@ -77,6 +77,29 @@ class TestVorschlag:
         assert resp.status_code == 403
 
 
+class TestBibliotheksliste:
+    async def test_eintrag_sagt_ob_er_uebernehmbar_ist(
+        self, test_client, auth_headers, db_session, dokument
+    ):
+        """Der Knopf „Als Baustein" erscheint nach dieser Angabe — nicht nach eigener
+        Rechnung des Browsers, die irgendwann von der Serverregel abwiche."""
+        bild = await store.save_artifact(
+            db_session,
+            owner_pseudonym=TEACHER1_PSEUDO,
+            roles=["teacher"],
+            grade=None,
+            kind="image",
+            mime_type="image/png",
+            data=b"PNG",
+            title="Würfel",
+        )
+        resp = await test_client.get("/artifacts", headers=auth_headers)
+        assert resp.status_code == 200
+        nach_id = {e["id"]: e for e in resp.json()["items"]}
+        assert nach_id[dokument["id"]]["uebernehmbar"] is True
+        assert nach_id[str(bild.id)]["uebernehmbar"] is False
+
+
 class TestUebernahme:
     async def test_dokument_wird_baustein(
         self, test_client, auth_headers, db_session, dokument

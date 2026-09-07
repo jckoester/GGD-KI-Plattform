@@ -2077,6 +2077,29 @@ export async function deleteArtifact(artifactId) {
     return res.json()
 }
 
+// ── Übernahme in den Wissensgraphen (AP8) ──────────────────────────────────────
+
+// Vorbelegung des Übernahme-Formulars: welche Bausteinarten diese Rolle wählen darf,
+// ob die Sichtbarkeit festliegt, und ob es den Baustein schon gibt.
+export async function getBausteinVorschlag(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/baustein`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Vorschlag konnte nicht geladen werden')
+    return res.json()
+}
+
+// „Als Baustein speichern". Gibt es den Baustein schon und hat sich etwas geändert,
+// entsteht eine neue Fassung; der alte wandert ins Archiv (`ersetzt_node_id`).
+export async function bausteinAusArtefakt(artifactId, payload) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/baustein`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Übernahme fehlgeschlagen')
+    return res.json()
+}
+
 // ── Text-Dokumente / Material-Werkstatt (Phase 19) ─────────────────────────────
 
 // Neues Markdown-Dokument anlegen (leer oder aus dem Chat promotet). Gibt u. a. { id } zurück.

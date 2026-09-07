@@ -4,8 +4,10 @@
     import { goto } from '$app/navigation';
     import {
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
+        Share2,
     } from 'lucide-svelte';
     import { getLibrary, deleteArtifact, createDocument } from '$lib/api.js';
+    import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
     import { triggerDownload } from '$lib/download.js';
     import {
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
@@ -24,6 +26,8 @@
     let confirmDeleteId = $state(null);
     let copiedId = $state(null);
     let busyId = $state(null);
+    // Das Artefakt, das gerade in den Wissensgraphen übernommen wird (AP8).
+    let uebernahmeItem = $state(null);
 
     let usage = $derived(usagePercent(usedBytes, quotaBytes));
 
@@ -308,6 +312,21 @@
                                         <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
                                     </a>
                                 {/if}
+                                <!-- Ob das geht, sagt der Server (`uebernehmbar`) — sonst
+                                     zeigte der Knopf irgendwann etwas anderes an, als der
+                                     Endpunkt erlaubt. -->
+                                {#if item.uebernehmbar}
+                                    <button
+                                        type="button"
+                                        onclick={() => (uebernahmeItem = item)}
+                                        title="Als Baustein in den Wissensgraphen übernehmen"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                    >
+                                        <Share2 class="w-3.5 h-3.5" /> Als Baustein
+                                    </button>
+                                {/if}
                                 <button
                                     type="button"
                                     onclick={() => downloadOriginal(item)}
@@ -418,3 +437,11 @@
         {/if}
     </div>
 </PageBody>
+
+{#if uebernahmeItem}
+    <UebernahmeDialog
+        artefakt={uebernahmeItem}
+        onclose={() => (uebernahmeItem = null)}
+        ongespeichert={load}
+    />
+{/if}
