@@ -161,14 +161,34 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 - die Nutzereinstellungen (`user_preferences`) — darin auch das Stundenplan-Kürzel
 - den Stundenplan-Abrufstatus (`calendar_sync_status`)
 - zurückgezogene Sitzungen (`jwt_revocations`) und den Audit-Eintrag selbst
+- **private Bausteine** (`read_scope = private`) — siehe unten
 
 > **Ausnahme Krisen-Aufbewahrung:** Hat das Konto eine geflaggte Konversation, die noch
 > aufzubewahren ist (offen, in Prüfung, oder abgeschlossen vor weniger als 180 Tagen),
 > wird das **gesamte** Konto übersprungen, bis die Frist endet.
 
-**Nicht** mitgelöscht werden derzeit persönliche Wissensknoten, der Lernzustand,
-Gruppenmitgliedschaften und Fach-Ausblendungen. Das ist eine offene Aufbewahrungsfrage,
-kein Versehen — sie ist im Projekt-Backlog festgehalten. Ein Test
+#### Bausteine: gelöscht oder anonymisiert
+
+Bei den eigenen Wissensbausteinen entscheidet die **Sichtbarkeit**, nicht das Eigentum:
+
+| `read_scope` | Was geschieht |
+|---|---|
+| `private` | wird mit dem Konto **gelöscht** |
+| alles andere (`group`, `subject`, `school`, `global`) | bleibt bestehen, `owner_pseudonym` wird auf `NULL` gesetzt |
+
+Was nie jemand anders sehen konnte, verschwindet: Löschen zerstört dort nichts
+Gemeinsames. Ein Arbeitsblatt dagegen, das eine Klasse liest, oder ein Methodenblatt der
+Fachschaft verschwinden zu lassen, risse in fremde Planungen Löcher, die niemand mehr
+erklären kann. Diese Bausteine bleiben und verlieren nur den Namen — das Arbeitsergebnis
+gehört der Schule, der Personenbezug nicht.
+
+> **Folge für die Pflege:** Ein anonymisierter Baustein mit `write_scope = private` hat
+> keine Eigentümerin mehr — nur noch Admins können ihn ändern. Der `write_scope` wird
+> bewusst **nicht** angehoben, weil das eine stille Rechteausweitung wäre.
+
+**Nicht** mitgelöscht werden derzeit der Lernzustand, Gruppenmitgliedschaften und
+Fach-Ausblendungen. Das ist eine offene Aufbewahrungsfrage, kein Versehen — sie ist im
+Projekt-Backlog festgehalten. Ein Test
 (`backend/tests/unit/test_pseudonym_deletion_coverage.py`) hält den Stand fest und
 verlangt für jede **neue** Tabelle mit Pseudonym-Spalte eine ausdrückliche Entscheidung.
 

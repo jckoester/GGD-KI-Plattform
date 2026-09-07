@@ -34,7 +34,6 @@ _AUSGENOMMEN = {
     # Eigene Aufbewahrungsfrist (expires_at) — Artefakte verfallen ohnehin.
     "artifacts": "eigene Frist über expires_at",
     # OFFEN — Altfälle, in dieser Phase nicht entschieden:
-    "context_nodes": "OFFEN: persönliche Wissensknoten überleben das Konto",
     "node_engagement": "OFFEN: Lernzustand überlebt das Konto",
     "group_memberships": "OFFEN: Mitgliedschaft wird beim Login synchronisiert, nicht gelöscht",
     "teacher_group_exclusions": "OFFEN: Ausblendungen überleben das Konto",

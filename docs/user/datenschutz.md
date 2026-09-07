@@ -91,8 +91,14 @@ und wird nur in diesen geregelten Verfahren — und außerhalb der Software — 
 |-----|---------|
 | Einzelne Konversation | 3 Monate nach der letzten Nachricht |
 | Gesamter Account | 3 Monate nach dem letzten Login |
+| Eigene Bausteine, die nur Sie sehen | mit dem Account |
+| Eigene Bausteine, die Sie geteilt haben | bleiben — ohne Ihren Namen |
 
 Die Löschung erfolgt automatisch. Es gibt keine manuelle Wiederherstellung gelöschter Daten.
+
+Was Sie mit einer Klasse, einer Fachschaft oder der Schule geteilt haben, wird beim
+Löschen Ihres Accounts **nicht** mitgelöscht — sonst fehlte es plötzlich in den
+Planungen anderer. Der Baustein bleibt, die Verbindung zu Ihnen wird entfernt.
 
 > **Ausnahme bei Krisen-Hinweisen:** Wird ein Gespräch wegen eines möglichen
 > Krisen-Hinweises markiert, bleibt es länger erhalten — solange die Schule den Fall

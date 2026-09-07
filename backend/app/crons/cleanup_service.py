@@ -4,12 +4,13 @@ from datetime import datetime, timedelta, timezone
 from time import perf_counter
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     BudgetAccrual,
     CalendarSyncStatus,
+    ContextNode,
     Conversation,
     ConversationFlag,
     JwtRevocation,
@@ -201,6 +202,37 @@ async def cleanup_inactive_accounts(
                         # Buchführung ohne Fremdbezug — sie hat ohne Konto keinen Zweck.
                         await db.execute(
                             delete(BudgetAccrual).where(BudgetAccrual.pseudonym == pseudonym)
+                        )
+                        # ── Eigene Wissensbausteine (M2, Entscheidung 07.09.2026) ──
+                        #
+                        # Getrennt nach `read_scope`, nicht nach Eigentum: Das
+                        # Pseudonym steht auf Privatem **und** auf Geteiltem.
+                        #
+                        # `private` konnte nie jemand anders sehen — Löschen
+                        # zerstört dort nichts Gemeinsames. Alles Übrige bleibt
+                        # stehen und verliert nur den Namen: Ein Arbeitsblatt, das
+                        # eine Klasse liest, oder ein Methodenblatt der Fachschaft
+                        # verschwinden zu lassen, risse in fremde Planungen Löcher,
+                        # die niemand mehr erklären kann. Das Arbeitsergebnis
+                        # gehört der Schule, der Personenbezug nicht.
+                        #
+                        # ⚠️ Anonymisierte Knoten mit `write_scope = private` haben
+                        # danach **keine Eigentümerin mehr** — nur Admins können sie
+                        # noch ändern (`_check_write_permission`). Das ist bewusst
+                        # so: Der `write_scope` bleibt unangetastet, weil ihn
+                        # anzuheben eine stille Rechteausweitung wäre. Verwaiste
+                        # Knoten sichtbar zu machen ist Sache der Oberfläche
+                        # (Todo: Filter „verwaist" in /knowledge).
+                        await db.execute(
+                            delete(ContextNode).where(
+                                ContextNode.owner_pseudonym == pseudonym,
+                                ContextNode.read_scope == "private",
+                            )
+                        )
+                        await db.execute(
+                            update(ContextNode)
+                            .where(ContextNode.owner_pseudonym == pseudonym)
+                            .values(owner_pseudonym=None)
                         )
                         await db.execute(
                             delete(JwtRevocation).where(JwtRevocation.pseudonym == pseudonym)

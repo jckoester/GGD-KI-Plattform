@@ -66,6 +66,9 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
     db = AsyncMock()
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.scalar = AsyncMock(return_value=None)  # keine Krisen-Schutz-Konversation
+    # Die Liste ist *positionsgebunden*: Sie bildet die Reihenfolge der db.execute-Aufrufe
+    # nach. Kommt in cleanup_inactive_accounts ein Statement hinzu, muss hier eine Zeile an
+    # derselben Stelle dazu — sonst endet der Lauf in StopAsyncIteration.
     db.execute = AsyncMock(
         side_effect=[
             _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
@@ -74,6 +77,8 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
             MagicMock(),  # delete user_preferences
             MagicMock(),  # delete calendar_sync_status
             MagicMock(),  # delete budget_accrual
+            MagicMock(),  # delete context_nodes (read_scope = private)
+            MagicMock(),  # update context_nodes (owner_pseudonym = NULL)
             MagicMock(),  # delete jwt_revocations
             MagicMock(),  # delete pseudonym_audit
             _ResultList([]),  # nächste Runde leer
