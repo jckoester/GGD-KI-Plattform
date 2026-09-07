@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest"
 import {
+  aktionenFuer,
   aufmerksamkeitsText,
+  loeschHindernis,
   nurAufmerksamkeit,
   ablaufAnzeige,
   abschnittsTitel,
@@ -242,5 +244,51 @@ describe("nurAufmerksamkeit", () => {
   it("verträgt fehlende kategorien", () => {
     const g = nurAufmerksamkeit({ abschnitte: [{ bausteine: [{ id: "x" }] }] })
     expect(g.abschnitte).toEqual([])
+  })
+})
+
+describe("aktionenFuer", () => {
+  it("aktiver Baustein: archivieren und Ablauf, kein Reaktivieren", () => {
+    expect(aktionenFuer({ status: "active" })).toEqual({
+      archivieren: true, reaktivieren: false, ablauf: true,
+    })
+  })
+
+  it("archivierter Baustein: nur reaktivieren", () => {
+    // Das Ablaufdatum am Archivierten zu ändern hilft nicht — er ist schon weg.
+    expect(aktionenFuer({ status: "archived" })).toEqual({
+      archivieren: false, reaktivieren: true, ablauf: false,
+    })
+  })
+
+  it("verträgt fehlende Angaben", () => {
+    expect(aktionenFuer(null).archivieren).toBe(true)
+  })
+})
+
+describe("loeschHindernis", () => {
+  it("liest die F7-Antwort des Servers", () => {
+    const fehler = {
+      detail: {
+        grund: "referenziert",
+        nachricht: "2 aktive Bausteine anderer verweisen auf diesen.",
+        referenzen: [{ id: "a", title: "Curriculum" }, { id: "b", title: "Einheit" }],
+      },
+    }
+    const h = loeschHindernis(fehler)
+    expect(h.nachricht).toContain("2 aktive Bausteine")
+    expect(h.referenzen).toHaveLength(2)
+  })
+
+  it("verträgt schlichten Fehlertext", () => {
+    // Sonst stünde im Dialog „[object Object]" — oder gar nichts.
+    const h = loeschHindernis({ detail: "Keine Berechtigung" })
+    expect(h.nachricht).toBe("Keine Berechtigung")
+    expect(h.referenzen).toEqual([])
+  })
+
+  it("verträgt einen Fehler ganz ohne detail", () => {
+    expect(loeschHindernis(new Error("kaputt")).nachricht).toBe("kaputt")
+    expect(loeschHindernis({}).nachricht).toContain("lässt sich nicht löschen")
   })
 })

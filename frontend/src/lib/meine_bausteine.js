@@ -137,6 +137,53 @@ export function aufmerksamkeitsText(zahlen) {
 }
 
 /**
+ * Was an einer Zeile angeboten wird.
+ *
+ * **Archivieren und Reaktivieren sind nicht symmetrisch.** Ein Baustein, der wegen
+ * abgelaufenem Datum eingesammelt wurde, trüge nach einem bloßen „wieder aktiv"
+ * weiterhin sein altes Datum — der nächtliche Lauf holte ihn in derselben Nacht
+ * zurück. Deshalb gibt es dafür den eigenen Weg, der ein neues Datum setzt.
+ *
+ * Das **Rückgängig** nach dem Archivieren ist wiederum *kein* Reaktivieren: Es soll
+ * den Zustand von davor herstellen, also ohne neues Ablaufdatum.
+ *
+ * @returns {{archivieren: boolean, reaktivieren: boolean, ablauf: boolean}}
+ */
+export function aktionenFuer(baustein) {
+    const archiviert = baustein?.status === 'archived'
+    return {
+        archivieren: !archiviert,
+        reaktivieren: archiviert,
+        // Ein Ablaufdatum am archivierten Baustein zu ändern hilft nicht — er ist
+        // schon weg. Der Weg zurück ist Reaktivieren, das eins vorschlägt.
+        ablauf: !archiviert,
+    }
+}
+
+/**
+ * Lesbare Begründung, wenn das Löschen an fremden Verweisen scheitert (F7, ADR-019).
+ *
+ * Der Server antwortet mit 409 und einem Objekt aus `nachricht` und `referenzen`.
+ * Ältere Fehler (und alle anderen Endpunkte) liefern schlichten Text — beides muss
+ * hier ankommen, sonst steht im Dialog `[object Object]`.
+ *
+ * @returns {{nachricht: string, referenzen: Array}}
+ */
+export function loeschHindernis(fehler) {
+    const detail = fehler?.detail ?? fehler?.message
+    if (detail && typeof detail === 'object') {
+        return {
+            nachricht: detail.nachricht ?? 'Der Baustein lässt sich nicht löschen.',
+            referenzen: detail.referenzen ?? [],
+        }
+    }
+    return {
+        nachricht: typeof detail === 'string' && detail ? detail : 'Der Baustein lässt sich nicht löschen.',
+        referenzen: [],
+    }
+}
+
+/**
  * Filtert auf die Bausteine, die Aufmerksamkeit brauchen — der Knopf am Banner.
  *
  * Clientseitig wie der Typ-Filter: Der Bestand einer Person ist klein, und ein

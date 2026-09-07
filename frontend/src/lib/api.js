@@ -1495,6 +1495,35 @@ export async function updateNodeTitle(nodeId, title) {
 }
 
 /**
+ * Umbenennen, archivieren, Ablaufdatum setzen — die Aktionen aus „Meine Bausteine".
+ *
+ * Bewusst **nicht** `updateContextNode`: Der generische Weg ändert auch Scopes,
+ * Inhalt und Metadaten und bleibt Lehrkräften vorbehalten. Dieser Endpunkt steht
+ * allen Rollen offen, weil Selbstverwaltung ein Betroffenenrecht ist — und trägt
+ * deshalb einen schmalen Vertrag.
+ *
+ * `valid_until` braucht das Begleitflag: Ohne es wäre „auf null setzen"
+ * (= gilt dauerhaft) nicht von „Feld weggelassen" zu unterscheiden.
+ *
+ * @param {string} nodeId
+ * @param {{title?: string, status?: 'active'|'archived', valid_until?: string|null,
+ *          valid_until_gesetzt?: boolean}} aenderung
+ */
+export async function verwalteBaustein(nodeId, aenderung) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/verwalten`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(aenderung),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Die Änderung ist fehlgeschlagen')
+  }
+  return res.json()
+}
+
+/**
  * Löscht einen Baustein.
  *
  * Wirft bei **409** einen `ApiError`, dessen `detail.referenzen` die aktiven Bausteine
