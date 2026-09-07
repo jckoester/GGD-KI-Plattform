@@ -23,6 +23,7 @@ FREMD = "fremd-meine-bausteine"
 
 SUBJECT_A = 620  # kleinere sort_order → steht vorn
 SUBJECT_B = 621
+FACHSCHAFT_ID = 622
 
 
 @pytest.fixture(scope="module")
@@ -34,6 +35,12 @@ def sync_conn(db_url, run_migrations):
 
 @pytest.fixture(scope="module")
 def faecher(sync_conn):
+    """Zwei Fächer und eine Fachschaftsgruppe.
+
+    Die Gruppe braucht es für das Curriculum: `check_context_nodes_write_group_id`
+    verlangt bei `write_scope='subject'` eine Trägergruppe — das Änderungsrecht
+    liegt eben bei einem Gremium, nicht bei einer Person.
+    """
     with sync_conn.cursor() as cur:
         cur.execute(
             "INSERT INTO subjects (id, slug, name, sort_order) VALUES "
@@ -41,24 +48,40 @@ def faecher(sync_conn):
             "ON CONFLICT (id) DO NOTHING",
             (SUBJECT_A, SUBJECT_B),
         )
+        cur.execute(
+            "INSERT INTO groups (id, name, slug, type, subject_id) "
+            "VALUES (%s,'Fachschaft Alpha','mb-fs-alpha','subject_department',%s) "
+            "ON CONFLICT (id) DO NOTHING",
+            (FACHSCHAFT_ID, SUBJECT_A),
+        )
     sync_conn.commit()
     yield
     sync_conn.rollback()
     with sync_conn.cursor() as cur:
+        cur.execute("DELETE FROM groups WHERE id = %s", (FACHSCHAFT_ID,))
         cur.execute("DELETE FROM subjects WHERE id IN (%s,%s)", (SUBJECT_A, SUBJECT_B))
     sync_conn.commit()
 
 
-def _node(cur, titel, *, owner, subject=None, status="active",
-          valid_until=None, metadata=None, updated=None):
+def _node(cur, titel, *, owner, subject=None, status="active", valid_until=None,
+          metadata=None, updated=None, content_type="arbeitsblatt",
+          category="artifact", read_scope="private", write_scope="private",
+          write_group=None):
+    """Legt einen Knoten an.
+
+    ⚠️ `check_context_nodes_scope_restrictivity` verlangt, dass das Schreibrecht
+    nicht weiter reicht als das Leserecht — `read=private, write=subject` wird
+    abgelehnt. Ein echtes Curriculum steht deshalb auf `school`/`subject`.
+    """
     nid = uuid.uuid4()
     cur.execute(
         "INSERT INTO context_nodes (id, category, content_type, title, owner_pseudonym,"
-        " subject_id, read_scope, write_scope, status, valid_until, metadata, updated_at)"
-        " VALUES (%s,'artifact','arbeitsblatt',%s,%s,%s,'private','private',%s,%s,%s,"
+        " subject_id, read_scope, write_scope, write_scope_group_id, status, valid_until,"
+        " metadata, updated_at)"
+        " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"
         " coalesce(%s, now()))",
-        (str(nid), titel, owner, subject, status, valid_until,
-         json.dumps(metadata or {}), updated),
+        (str(nid), category, content_type, titel, owner, subject, read_scope,
+         write_scope, write_group, status, valid_until, json.dumps(metadata or {}), updated),
     )
     return nid
 
@@ -103,6 +126,21 @@ def bestand(sync_conn, faecher):
             (str(ids["verweist"]), str(archiviert)),
         )
         ids["archiviert_ziel"] = archiviert
+
+        # Ein Curriculum unter demselben Pseudonym: angelegt von der Lehrkraft,
+        # aber von der Fachschaft beschlossen und gepflegt (`write_scope=subject`).
+        # Es darf **weder** in der Liste **noch** in der Zählung auftauchen — auch
+        # nicht, wenn es auf einen archivierten Knoten verweist.
+        ids["curriculum"] = _node(
+            cur, "Fachschafts-Curriculum", owner=TEACHER, subject=SUBJECT_A,
+            content_type="curriculum", category="knowledge",
+            read_scope="school", write_scope="subject", write_group=FACHSCHAFT_ID,
+        )
+        cur.execute(
+            "INSERT INTO context_edges (from_node_id, to_node_id, relation, metadata)"
+            " VALUES (%s,%s,'part_of','{}')",
+            (str(ids["curriculum"]), str(archiviert)),
+        )
     sync_conn.commit()
     yield ids
     sync_conn.rollback()
@@ -296,3 +334,54 @@ async def test_mine_wird_nicht_als_knoten_id_gelesen(test_client, lehrer_headers
     resp = await test_client.get("/context/nodes/mine", headers=lehrer_headers)
     assert resp.status_code == 200, "422 hieße: als node_id gelesen"
     assert "abschnitte" in resp.json()
+
+
+# ── Abgrenzung: was ist „meins"? ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fachschaftsdokumente_stehen_nicht_in_meinen_bausteinen(
+    test_client, lehrer_headers, bestand
+):
+    """Ein Curriculum trägt das Pseudonym seiner Urheberin, gehört aber der Fachschaft.
+
+    Die Anlage setzt beides zugleich: `owner_pseudonym=user.sub` **und**
+    `write_scope="subject"` mit der Fachschaftsgruppe. Das Pseudonym ist dort
+    Urheberschaft, nicht Eigentum — Fachschaftsdokumente werden gemeinsam
+    beschlossen und berühren keine Betroffenenrechte einer einzelnen Person.
+    """
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    assert "Fachschafts-Curriculum" not in _titel(daten)
+
+
+@pytest.mark.asyncio
+async def test_fachschaftsdokumente_loesen_keine_aufmerksamkeit_aus(
+    test_client, lehrer_headers, bestand
+):
+    """Der Fall aus der Praxis: Ein Curriculum verweist auf einen abgelösten
+    Bildungsplan-Knoten. Das ist eine Fachschaftsaufgabe für den Curriculum-Editor,
+    keine persönliche Aufgabe — und eine Warnung, die eine Zuständigkeit nahelegt,
+    die es nicht gibt, ist schlimmer als keine.
+
+    Ohne diese Abgrenzung stand im Sidebar-Zähler eine 1, für die sich auf der
+    Seite nichts finden ließ.
+    """
+    a = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()["aufmerksamkeit"]
+    # Nur der eigene Baustein „Verweist auf Archiviertes" zählt, nicht das Curriculum.
+    assert a["archivierte_referenzen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_die_typmenge_kommt_aus_der_taxonomie(test_client, lehrer_headers, bestand):
+    """Abgeleitet, nicht gepflegt: Der Vorgabewert `write_scope` sagt bereits, wo
+    die Pflege liegt. Eine zweite Liste daneben liefe auseinander."""
+    from app.context.taxonomy import PERSOENLICHE_CONTENT_TYPES
+
+    assert "arbeitsblatt" in PERSOENLICHE_CONTENT_TYPES
+    assert "unterrichtsstunde" in PERSOENLICHE_CONTENT_TYPES  # K5, trotz group-Scope im Bestand
+    assert "schuelertext" in PERSOENLICHE_CONTENT_TYPES
+    for fremd in ("curriculum", "kapitel", "lernsequenz", "begriff", "methode", "fachplan"):
+        assert fremd not in PERSOENLICHE_CONTENT_TYPES, fremd
+
+    daten = (await test_client.get("/context/nodes/mine", headers=lehrer_headers)).json()
+    typen = {b["content_type"] for a in daten["abschnitte"] for b in a["bausteine"]}
+    assert typen <= PERSOENLICHE_CONTENT_TYPES

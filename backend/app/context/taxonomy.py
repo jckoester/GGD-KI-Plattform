@@ -276,6 +276,38 @@ def get_valid_until_schuljahresende(content_type: str | None) -> bool:
     return content_type in SCHULJAHRESENDE_CONTENT_TYPES
 
 
+# ── Persönliche Bausteinarten (AP7) ──────────────────────────────────────────
+#
+# Was eine Person **selbst pflegt** — im Gegensatz zu dem, was Fachschaft, Schule
+# oder ein Import verantworten. Trägt die Abgrenzung von „Meine Bausteine"
+# (`/knowledge/mine`).
+#
+# **Abgeleitet, nicht gepflegt.** Der Vorgabewert `write_scope` sagt bereits, wo die
+# Pflege liegt; eine zweite Liste daneben liefe irgendwann auseinander. Die
+# Ableitung deckt sich ausnahmslos mit der Einteilung in `KS-Knotentyp-Referenz.md`:
+# 16 Typen mit Vorgabe `private` = Lehrkraft-Material (K4), Lehrkraft-Planung (K5)
+# und Schüler-Artefakte (K6); `global` ist Import (K1), `subject`/`school` sind
+# Fachschaft und Schule (K2/K3).
+#
+# ⚠️ **Der Vorgabewert des Typs, nicht der Scope des Knotens.** Letzterer ist eine
+# Nutzerentscheidung — das Anlegeformular bietet `private`/`group`/`subject` zur
+# Wahl — und beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding
+# ist das". Wer sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der
+# eigenen Seite; ein privat gesetzter Fachbegriff erschiene dort fälschlich.
+PERSOENLICHE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write == "private"
+)
+
+
+def ist_persoenlich(content_type: str | None) -> bool:
+    """Ob dieser Typ von der einzelnen Person gepflegt wird.
+
+    `None` ist nicht persönlich: Strukturknoten ohne fachliche Rolle gehören
+    niemandem im hier gemeinten Sinn.
+    """
+    return content_type in PERSOENLICHE_CONTENT_TYPES
+
+
 _VALID_PRIOS = frozenset({"kern", "uebung", "vertiefung"})
 _VALID_PHASEN_STATUS = frozenset({"geplant", "erledigt", "offen", "gestrichen"})
 

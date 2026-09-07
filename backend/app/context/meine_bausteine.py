@@ -8,9 +8,11 @@ der einzige Ort, an dem der Lebenszyklus quer über die Fächer zusammenläuft
 
 **Warum eine eigene Abfrageschicht und nicht `GET /context/nodes?owner=me`:** Jener
 Weg ist auf teacher/admin beschränkt, liefert eine flache Liste ohne Fachgruppen
-und kennt die Aufmerksamkeits-Kategorien nicht. Hier ist der Eigentümer die einzige
-Sichtbarkeitsregel — `owner_pseudonym = ich` —, deshalb braucht es
-`visibility.py` nicht: Wer den eigenen Bestand sieht, sieht nichts Fremdes.
+und kennt die Aufmerksamkeits-Kategorien nicht.
+
+**Was „eigen" heißt, steht in `_eigener_bestand`** — und es ist mehr als das
+Pseudonym. `visibility.py` braucht es hier trotzdem nicht: Wer nur den eigenen
+Bestand sieht, sieht nichts Fremdes.
 
 **Eine Zählung für zwei Stellen.** Warnbanner und Sidebar-Zähler zeigen dieselbe
 Gesamtzahl. Sie stammt aus derselben Funktion; zwei Zählwege gäben irgendwann zwei
@@ -28,10 +30,34 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.metadata import STUB_MARKIERUNG
+from app.context.taxonomy import PERSOENLICHE_CONTENT_TYPES
 from app.db.models import ContextEdge, ContextNode, Subject
 
 #: Ab wann ein Ablaufdatum als „läuft bald ab" gilt (A4).
 VORLAUF_TAGE = 14
+
+
+def _eigener_bestand(pseudonym: str):
+    """Was auf die Seite gehört: **von mir** und **von mir zu pflegen**.
+
+    Das Pseudonym allein genügt nicht. Es steht auch auf Dingen, die eine Person
+    zwar angelegt hat, die aber niemandem einzeln gehören — ein Curriculum etwa
+    beschließt die Fachschaft gemeinsam; das Pseudonym daran ist Urheberschaft,
+    das Änderungsrecht liegt bei `write_scope = subject`. Solche Knoten auf einer
+    persönlichen Seite zu führen (und dort zur Aufmerksamkeit zu mahnen) legt eine
+    Zuständigkeit nahe, die es nicht gibt.
+
+    Die Typmenge kommt aus der Taxonomie (`PERSOENLICHE_CONTENT_TYPES`) und ist
+    dort aus dem Vorgabewert `write_scope` abgeleitet — nicht aus dem Scope des
+    einzelnen Knotens, der eine Teilen-Entscheidung ist.
+
+    Was mit dem Pseudonym auf fremdbesessenen Dokumenten geschieht, ist eine andere
+    Frage (Kontolöschung, M2) und wird nicht hier beantwortet.
+    """
+    return sa.and_(
+        ContextNode.owner_pseudonym == pseudonym,
+        ContextNode.content_type.in_(PERSOENLICHE_CONTENT_TYPES),
+    )
 
 
 # ── Die vier Kategorien, als SQL-Bedingungen an einer Stelle ─────────────────
@@ -144,7 +170,6 @@ async def zaehle_aufmerksamkeit(
 ) -> Aufmerksamkeit:
     """Eine Abfrage für Banner und Sidebar-Zähler."""
     heute = stichtag or date.today()
-    eigen = ContextNode.owner_pseudonym == pseudonym
 
     zeilen = await db.execute(
         sa.select(
@@ -153,7 +178,7 @@ async def zaehle_aufmerksamkeit(
             sa.func.count().filter(_abgelaufen_archiviert(heute)),
             sa.func.count().filter(_verweist_auf_archiviertes()),
             sa.func.count().filter(_unvollstaendig()) if ist_lehrkraft else sa.literal(0),
-        ).select_from(ContextNode).where(eigen)
+        ).select_from(ContextNode).where(_eigener_bestand(pseudonym))
     )
     gesamt, bald, abgelaufen, referenzen, unvollstaendig = zeilen.one()
     return Aufmerksamkeit(
@@ -211,7 +236,7 @@ async def lade_meine_bausteine(
             _unvollstaendig().label("unvollstaendig"),
         )
         .outerjoin(Subject, Subject.id == ContextNode.subject_id)
-        .where(ContextNode.owner_pseudonym == pseudonym)
+        .where(_eigener_bestand(pseudonym))
     )
     if content_type:
         query = query.where(ContextNode.content_type == content_type)
