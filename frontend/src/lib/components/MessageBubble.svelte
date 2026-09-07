@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2 } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
@@ -11,6 +11,7 @@
     import { deriveDocTitle } from '$lib/workshop.js';
     import { triggerDownload } from '$lib/download.js';
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
+    import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
 
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
@@ -259,6 +260,41 @@
                 : 'Konnte nicht in die Werkstatt übernommen werden.';
         }
     }
+
+    // „Als Baustein speichern" (AP8): derselbe Redaktionsakt wie in der Bibliothek,
+    // nur im Moment der Antwort. Der Weg führt über die Bibliothek, weil ein Baustein
+    // seine Herkunft trägt (`metadata.source_artifact_id`) — es muss also erst ein
+    // Artefakt geben. Sichtbar ist davon nur ein Knopf und derselbe Dialog.
+    //
+    // ⚠️ Das angelegte Dokument wird **gemerkt**: `createDocument` ist bewusst nicht
+    // idempotent (Dokumente sind veränderbar), ein zweiter Klick legte sonst ein
+    // zweites Artefakt an — und damit einen Zweitknoten statt einer neuen Fassung.
+    // Nach einem Neuladen der Seite ist die Merknotiz weg; wer dann aktualisieren
+    // will, geht über die Bibliothek, wo das Badge den Baustein zeigt.
+    let bausteinArtefakt = $state(null);
+    let bausteinDialogOffen = $state(false);
+    let bausteinLaeuft = $state(false);
+    let bausteinFehler = $state(null);
+
+    async function alsBausteinSpeichern() {
+        if (bausteinLaeuft) return;
+        if (bausteinArtefakt) { bausteinDialogOffen = true; return; }
+        bausteinLaeuft = true;
+        bausteinFehler = null;
+        try {
+            bausteinArtefakt = await createDocument(
+                deriveDocTitle(message.content), message.content ?? '',
+                { messageId: message.id ?? null },
+            );
+            bausteinDialogOffen = true;
+        } catch (e) {
+            bausteinFehler = e?.status === 409
+                ? 'Bibliothek voll — bitte zuerst aufräumen.'
+                : 'Konnte nicht als Baustein gespeichert werden.';
+        } finally {
+            bausteinLaeuft = false;
+        }
+    }
 </script>
 
 {#if message.role === 'user'}
@@ -361,7 +397,7 @@
         </div>
         {/if}
         {#if message.content && !isStreaming}
-            <div class="mt-1 max-w-[80%]">
+            <div class="mt-1 max-w-[80%] flex flex-wrap items-center gap-1">
                 <button
                     type="button"
                     onclick={openInWorkshop}
@@ -374,8 +410,26 @@
                     <FileEdit class="w-3.5 h-3.5" />
                     {openingWorkshop ? 'Wird geöffnet…' : 'In Werkstatt öffnen'}
                 </button>
+                <!-- Der zweite Einstieg in dasselbe Formular (AP8). Die Werkstatt ist
+                     zum Weiterschreiben da, der Baustein zum Wiederfinden — zwei
+                     verschiedene Absichten, deshalb zwei Knöpfe. -->
+                <button
+                    type="button"
+                    onclick={alsBausteinSpeichern}
+                    disabled={bausteinLaeuft}
+                    class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                           text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           disabled:opacity-50"
+                >
+                    <Share2 class="w-3.5 h-3.5" />
+                    {bausteinLaeuft ? 'Wird vorbereitet…' : 'Als Baustein speichern'}
+                </button>
                 {#if workshopError}
-                    <p class="text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
+                    <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
+                {/if}
+                {#if bausteinFehler}
+                    <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{bausteinFehler}</p>
                 {/if}
             </div>
         {/if}
@@ -491,4 +545,11 @@
             <span class="flex-1 border-t border-light-ui-3 dark:border-dark-ui-3"></span>
         </div>
     </div>
+{/if}
+
+{#if bausteinDialogOffen && bausteinArtefakt}
+    <UebernahmeDialog
+        artefakt={bausteinArtefakt}
+        onclose={() => (bausteinDialogOffen = false)}
+    />
 {/if}
