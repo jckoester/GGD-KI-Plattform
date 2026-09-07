@@ -15,6 +15,8 @@
         BookOpen,
         Pencil,
         Database,
+        FolderHeart,
+        Search,
         Wrench,
         Library,
     } from "lucide-svelte";
@@ -30,6 +32,7 @@
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
     import { pendingCount, refreshPendingCount } from "$lib/stores/pendingAssistants.js"
+    import { aufmerksamkeit, refreshAufmerksamkeit } from "$lib/stores/meineBausteine.js"
     import SidebarSubjectItem from "./SidebarSubjectItem.svelte"
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
 
@@ -137,6 +140,7 @@
         refreshConversations(limit);
         refreshConversationCounts();
         refreshPotentialTeachingGroups();
+        refreshAufmerksamkeit();
     });
 
     // Fächer-Container offen wenn ein Fach oder der Container selbst aktiv ist
@@ -280,34 +284,73 @@
             </button>
         </div>
 
-        <!-- Wissensgraph. Der Menüpunkt selbst steht allen offen: Seine Landeseite ist
-             die Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
-             Suchknopf im Chat ohnehin erreichen. Die Unterpunkte (Curricula,
-             Bildungspläne, Leitperspektiven) bleiben Lehrkraft-Sache — die Schüler-Sicht
-             auf Knotenlisten steht in ADR-019 für 0.9. -->
+        <!-- Wissensgraph. Der Menüpunkt steht allen offen: Seine Landeseite ist die
+             Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
+             Suchknopf im Chat ohnehin erreichen.
+
+             Seit AP7 ist die Sektion **für alle Rollen** aufklappbar. Schüler:innen
+             sehen darin Suche und „Meine Bausteine" — neben der Suche ihre einzige
+             Wissensgraph-Fläche (Notiz-Knotentyp-UI A4). Die übrigen Unterpunkte
+             (Alle Bausteine, Sammlungen, Curricula, Bildungspläne,
+             Leitperspektiven) bleiben Lehrkraft-Sache. -->
           <div class="mt-2">
             <div
                 class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
                        {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
             >
-                <button onclick={() => { if (istLehrkraft) toggle('knowledge'); goto('/knowledge/search') }}>
+                <button onclick={() => { toggle('knowledge'); goto('/knowledge/search') }}>
                     <span class="flex items-center gap-2">
                         <Database class="w-4 h-4" />
                         Wissensgraph
                     </span>
                 </button>
-                {#if istLehrkraft}
-                    <button onclick={() => toggle('knowledge')}>
-                        {#if openSection === 'knowledge'}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </button>
-                {/if}
+                <button onclick={() => toggle('knowledge')} aria-label="Wissensgraph auf- oder zuklappen">
+                    {#if openSection === 'knowledge'}
+                        <ChevronDown class="w-4 h-4" />
+                    {:else}
+                        <ChevronRight class="w-4 h-4" />
+                    {/if}
+                </button>
             </div>
-            {#if openSection === 'knowledge' && istLehrkraft}
+            {#if openSection === 'knowledge'}
                 <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                    <!-- Für alle Rollen: Suche und der eigene Bestand. -->
+                    <button
+                        onclick={() => goto('/knowledge/search')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge/search'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <Search class="w-4 h-4" />
+                            Suche
+                        </span>
+                    </button>
+                    <button
+                        onclick={() => goto('/knowledge/mine')}
+                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               {$page.url.pathname === '/knowledge/mine'
+                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                    >
+                        <span class="flex items-center gap-2">
+                            <FolderHeart class="w-4 h-4" />
+                            Meine Bausteine
+                            {#if $aufmerksamkeit.gesamt > 0}
+                                <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                     bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye"
+                                     title="{$aufmerksamkeit.gesamt} Bausteine brauchen Aufmerksamkeit">
+                                    {$aufmerksamkeit.gesamt}
+                                </span>
+                            {/if}
+                        </span>
+                    </button>
+
+                    <!-- Ab hier Lehrkraft-Sache. Bewusst im selben Aufklapp-Container:
+                         Zwei `transition:slide` nebeneinander liefen als zwei
+                         Animationen ab und ruckelten sichtbar. -->
+                    {#if istLehrkraft}
                     <button
                         onclick={() => goto('/knowledge')}
                         class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
@@ -378,6 +421,7 @@
                             Leitperspektiven
                         </span>
                     </button>
+                    {/if}
                 </div>
             {/if}
           </div>

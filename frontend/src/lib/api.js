@@ -1372,6 +1372,33 @@ export async function getContextNodes(params = {}) {
   return res.json()
 }
 
+/**
+ * „Meine Bausteine": eigener Bestand, nach Fach gruppiert, mit Zählwerten.
+ *
+ * Rollenoffen — anders als `getContextNodes`, das Schüler:innen mit 403 abweist.
+ */
+export async function getMeineBausteine(params = {}) {
+  const p = new URLSearchParams()
+  if (params.content_type) p.set('content_type', params.content_type)
+  if (params.nur_aufmerksamkeit) p.set('nur_aufmerksamkeit', 'true')
+  const res = await fetch(`${BASE}/context/nodes/mine?${p}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der eigenen Bausteine')
+  }
+  return res.json()
+}
+
+/** Nur die Zählwerte — für den Sidebar-Zähler auf jeder Seite. */
+export async function getMeineBausteineZaehlung() {
+  const res = await fetch(`${BASE}/context/nodes/mine/zaehlung`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Zählung')
+  }
+  return res.json()
+}
+
 export async function getActiveBpVersion(subjectId, grade) {
   // Aktive BP-Edition für (Fach, Stufe, Schuljahr) — für editionsbewusste Filter
   // (z. B. IK-Autocomplete). Fail-soft: bei Fehler kein Filter (bp_version null).
