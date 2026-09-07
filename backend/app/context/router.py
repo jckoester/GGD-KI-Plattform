@@ -34,6 +34,7 @@ from app.context.schemas import (
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
     NodeReferenzRead,
+    BausteinVerwalten,
     AufmerksamkeitRead,
     FachabschnittRead,
     MeinBausteinRead,
@@ -579,7 +580,13 @@ async def zaehle_meine_bausteine(
 async def get_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen (AP7): Der Riegel ist `_check_read_permission`, nicht die Rolle.
+    # Sie erlaubt zuerst den eigenen Knoten, weist `private` von Fremden ab — auch
+    # Admins — und verlangt bei `group` die Mitgliedschaft. Dieselbe Menge liefert
+    # die Suche Schüler:innen ohnehin schon; dass ausgerechnet die Detailansicht
+    # 403 gab, war die Unstimmigkeit. Ohne sie führt der Zeilenklick in „Meine
+    # Bausteine" für Schüler:innen ins Leere (Notiz-Knotentyp-UI A4).
+    user: JwtPayload = Depends(get_current_user),
 ):
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
@@ -789,7 +796,10 @@ from app.context.ablauf import vorgeschlagenes_ablaufdatum
 async def reaktiviere_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen: `_check_write_permission` lässt die Eigentümerin durch, egal
+    # welche Rolle sie hat. Wer seinen Baustein archivieren darf, darf ihn auch
+    # zurückholen — sonst wäre das Archivieren eine Einbahnstraße.
+    user: JwtPayload = Depends(get_current_user),
 ):
     """Holt einen archivierten Knoten zurück und setzt sein Ablaufdatum neu.
 
@@ -815,6 +825,56 @@ async def reaktiviere_node(
     return node
 
 
+# ── PATCH /api/context/nodes/{id}/verwalten ──────────────────────────────────
+
+
+@router.patch("/nodes/{node_id}/verwalten", response_model=ContextNodeRead)
+async def verwalte_node(
+    node_id: UUID,
+    payload: BausteinVerwalten,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Umbenennen, archivieren, Ablaufdatum setzen — die Aktionen aus „Meine Bausteine".
+
+    **Warum ein eigener Endpunkt statt `PATCH /nodes/{id}`.** Der generische Weg
+    ändert auch Scopes, Inhalt und Metadaten. Diese Seite steht allen Rollen offen;
+    eine versehentlich auf `school` gestellte Sichtbarkeit veröffentlichte einen Text,
+    den jemand für sich geschrieben hat. Der schmale Vertrag macht sichtbar, was
+    Selbstverwaltung heißt, und kann sich nicht unbemerkt weiten — der generische
+    Endpunkt bleibt unverändert teacher/admin.
+
+    Der Rollenriegel entfällt, der Rechteriegel nicht: `_check_write_permission`
+    lässt die Eigentümerin durch, sonst niemanden.
+    """
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.status == "deleted":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    await _check_write_permission(node, user, db)
+
+    if payload.title is not None:
+        node.title = payload.title
+        # Wie im generischen Editor: Ein von Hand gesetzter Titel wird gegen den
+        # BP-Re-Import gesperrt (C1).
+        node.title_locked = True
+
+    if payload.status is not None and payload.status != node.status:
+        node.status = payload.status
+        # `archived_at` trägt die Aufbewahrungsfrist (ADR-013). Ohne das Mitführen
+        # bliebe die Spalte leer, und der Löschlauf fasste den Knoten nie an.
+        node.archived_at = (
+            datetime.now(timezone.utc) if payload.status == "archived" else None
+        )
+
+    if payload.valid_until_gesetzt:
+        node.valid_until = payload.valid_until
+
+    await db.commit()
+    await db.refresh(node)
+    await _schreibrechte_setzen([node], user, db)
+    return node
+
+
 # ── DELETE /api/context/nodes/{id} ────────────────────────────────────────────
 
 @router.delete("/nodes/{node_id}", status_code=204)
@@ -825,7 +885,10 @@ async def delete_node(
         description="Admin-Override: löscht trotz fremder Referenzen (Kaskade!).",
     ),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen: Löschen des Eigenen ist Betroffenenrecht (ADR-019). Geschützt
+    # bleibt es doppelt — `_check_write_permission` (nur Eigentümerin) und die
+    # F7-Regel unten (fremde Verweise blockieren). `force` bleibt Admins vorbehalten.
+    user: JwtPayload = Depends(get_current_user),
 ):
     """Löscht einen Knoten samt seiner `part_of`-Kinder.
 

@@ -626,3 +626,26 @@ class MeineBausteineRead(BaseModel):
     abschnitte: list[FachabschnittRead] = Field(default_factory=list)
     gesamt: int = 0
     aufmerksamkeit: AufmerksamkeitRead = Field(default_factory=AufmerksamkeitRead)
+
+
+class BausteinVerwalten(BaseModel):
+    """Was Selbstverwaltung in „Meine Bausteine" umfasst — und nicht mehr.
+
+    Bewusst **nicht** `ContextNodeUpdate`: Der generische Weg öffnet Scopes, Inhalt
+    und Metadaten. Für eine Seite, die auch Schüler:innen offensteht, wäre das zu
+    breit — eine versehentlich auf `school` gestellte Sichtbarkeit veröffentlicht
+    einen Text, den jemand für sich geschrieben hat. Leitprinzip 5 der UI-Notiz sagt
+    dasselbe von der anderen Seite: „Verwalten ist nicht Bearbeiten."
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    status: Literal["active", "archived"] | None = None
+    #: Ausdrücklich `null` setzbar — das ist der Weg zu „gilt dauerhaft".
+    valid_until: date | None = None
+    valid_until_gesetzt: bool = Field(
+        default=False,
+        description=(
+            "True, wenn `valid_until` bewusst mitgeschickt wurde. Ohne das Flag "
+            "ließe sich `null` nicht von „Feld weggelassen“ unterscheiden."
+        ),
+    )
