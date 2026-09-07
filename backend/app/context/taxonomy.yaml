@@ -403,23 +403,23 @@ categories:
         # Vereinfachte Texte sollen je Thema wiedergefunden werden.
         embedding: true
       # ── Schüler-Artefakte ────────────────────────────────────────────────
-      # Entstehen ausschließlich durch Übernahme aus dem Chat, mit Bestätigung
-      # (AP8). Bis dahin ruhend: Ein Typ ohne Erzeugungsweg gehört in keine
-      # Auswahlliste. Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei
-      # Stunde und Einheit; die früheren 42 Tage waren ein verallgemeinertes
-      # Beispiel aus ADR-013 und nie begründet (Todo: Defaults prüfen).
+      # Entstehen durch Übernahme aus der Bibliothek, mit Bestätigung — seit AP8
+      # Schritt 1 gibt es diesen Weg (`POST /artifacts/{id}/baustein`), deshalb
+      # ruhen sie nicht mehr. `feedback_text` ruht weiter: Den Feedback-Flow, der
+      # solche Knoten erzeugte, gibt es nicht.
+      # Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei Stunde und
+      # Einheit; die früheren 42 Tage waren ein verallgemeinertes Beispiel aus
+      # ADR-013 und nie begründet (Todo: Defaults prüfen).
       - key: lernplan
         label_de: "Lernplan"
         icon: ListChecks
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
-        ui_status: ruhend
       - key: schuelertext
         label_de: "Schülertext"
         icon: NotebookPen
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
-        ui_status: ruhend
       - key: schuelerpraesentation
         label_de: "Schülerpräsentation"
         icon: Album
@@ -427,7 +427,6 @@ categories:
         valid_until_default: schuljahresende
         # Kein Embedding: fremdes Eigentum ohne Suchnutzen (Ausschlussgrund 3).
         # Was eine Schüler:in für sich ablegt, gehört nicht in den Suchraum anderer.
-        ui_status: ruhend
       - key: strukturierung
         label_de: "Gliederung/Mindmap"
         icon: Network
@@ -436,8 +435,7 @@ categories:
         # Kein Embedding: wie `schuelerpraesentation`.
         # Rollenoffen: Eine Lehrkraft darf read_scope auf `group` heben, damit die
         # Klasse eine gemeinsame Mindmap sieht — an der Rolle hängt keine Mechanik.
-        ui_status: ruhend
-        # Noch keine Sammlung (der Typ ruht bis 0.9) — das Feldschema gilt trotzdem.
+        # Noch keine Sammlung — das Feldschema gilt trotzdem.
         felder:
           form:
             typ: auswahl

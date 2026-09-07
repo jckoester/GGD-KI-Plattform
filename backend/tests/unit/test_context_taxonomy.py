@@ -217,17 +217,22 @@ class TestUiStatus:
         assert set(UI_STATUS) == set(SCOPE_DEFAULTS)
 
     def test_typen_ohne_erzeugungsweg_ruhen(self):
+        """Ruhend heißt: Es gibt keinen Weg, so einen Knoten anzulegen.
+
+        `pruefungsanforderung` wartet auf seine Sammlung (AP9), `feedback_text` auf den
+        Feedback-Flow. Die vier Schüler-Artefakte standen bis AP8 daneben — sie sind
+        wach, seit die Übernahme aus der Bibliothek sie erzeugen kann.
+        """
         from app.context.taxonomy import ist_ruhend
 
-        for ct in (
-            "pruefungsanforderung",
-            "lernplan",
-            "schuelertext",
-            "schuelerpraesentation",
-            "strukturierung",
-            "feedback_text",
-        ):
+        for ct in ("pruefungsanforderung", "feedback_text"):
             assert ist_ruhend(ct), f"{ct} sollte ruhen"
+
+    def test_schueler_artefakte_sind_seit_ap8_wach(self):
+        from app.context.taxonomy import ist_ruhend
+
+        for ct in ("lernplan", "schuelertext", "schuelerpraesentation", "strukturierung"):
+            assert not ist_ruhend(ct), f"{ct} braucht seit AP8 keinen Ruhestand mehr"
 
     def test_tragende_typen_ruhen_nicht(self):
         from app.context.taxonomy import ist_ruhend

@@ -61,18 +61,22 @@ import { auswaehlbareTypen } from "$lib/knotentypen.js"
  *
  * `unterrichtsstunde`/`unterrichtseinheit` sind **Planungsobjekte** — eine
  * Unterrichtsstunde als „Material" einer Lernsequenz zu verlinken wäre begrifflich schief.
- * `schuelertext`/`schuelerpraesentation`/`feedback_text` sind personenbezogen und haben
- * im Curriculum nichts verloren, das dauerhaft und fachschaftsweit sichtbar ist.
+ * `schuelertext`/`schuelerpraesentation`/`lernplan`/`feedback_text` sind personenbezogen
+ * und haben im Curriculum nichts verloren, das dauerhaft und fachschaftsweit sichtbar ist.
+ *
+ * ⚠️ `lernplan` kam mit AP8 dazu — nicht weil sich die Einordnung geändert hätte, sondern
+ * weil der Typ bis dahin ruhte und `auswaehlbareTypen` ihn ohnehin aussortierte. Das
+ * Wecken der vier Schüler-Artefakte hätte ihn sonst stillschweigend zum Material gemacht.
  *
  * `strukturierung` steht bewusst **nicht** hier: Der Typ ist rollenoffen — eine Lehrkraft
  * darf eine Mindmap für ihre Klasse anlegen, und die ist dann legitimes Material.
- * Solange er ruht, hält ihn `auswaehlbareTypen` ohnehin aus der Liste.
  */
 const KEIN_MATERIAL = new Set([
     "unterrichtsstunde",
     "unterrichtseinheit",
     "schuelertext",
     "schuelerpraesentation",
+    "lernplan",
     "feedback_text",
 ])
 

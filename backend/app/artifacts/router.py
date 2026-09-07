@@ -4,7 +4,7 @@ Schritt 1: Auslieferung der Artefakt-Bytes (Pseudonym-Auth, analog `GET /images/
 Schritt 2: „In Bibliothek speichern" — Promotion von Chat-Inhalten (Bild/Diagramm).
 Liste/Löschen/Download-Varianten kommen in Schritt 3.
 """
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -15,10 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import re
 
-from app.artifacts import geogebra, promote, store
+from app.artifacts import geogebra, promote, store, uebernahme
 from app.artifacts.limits import get_artifact_limits
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import JwtPayload
+from app.context.embedding import enqueue_embedding_job
 from app.db.models import Artifact
 from app.db.session import get_db
 from app.export import document as doc_export
@@ -367,6 +368,146 @@ async def export_document(
         content=data,
         media_type=mime,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Übernahme in den Wissensgraphen (AP8) ────────────────────────────────────
+
+
+class BausteinVorschlag(BaseModel):
+    """Was sich aus diesem Artefakt machen lässt — Grundlage des Übernahme-Formulars."""
+
+    kind: str
+    uebernehmbar: bool
+    grund: str | None = None            # gesetzt, wenn `uebernehmbar` false ist
+    typen: list[str]                    # Bausteinarten, die diese Rolle wählen darf
+    vorgabe_typ: str | None = None
+    scopes_erzwungen: list[str] | None = None   # [read, write] bei Schüler:innen
+    # Der bereits übernommene Baustein — dann heißt der Knopf „Baustein aktualisieren".
+    vorhandener_baustein_id: UUID | None = None
+    vorhandener_baustein_titel: str | None = None
+
+
+class BausteinRequest(BaseModel):
+    content_type: str
+    title: str | None = None
+    read_scope: str | None = None
+    write_scope: str | None = None
+    read_scope_group_id: int | None = None
+    write_scope_group_id: int | None = None
+    subject_id: int | None = None
+    valid_until: date | None = None
+    schuljahr: str | None = None
+
+
+class BausteinAntwort(BaseModel):
+    node_id: UUID
+    title: str
+    content_type: str
+    # Die abgelöste Fassung: archiviert und per `supersedes` mit der neuen verbunden.
+    ersetzt_node_id: UUID | None = None
+    # False ⇒ es gab den Baustein schon und nichts hat sich geändert (idempotent).
+    created: bool
+
+
+async def _eigenes_artefakt(
+    db: AsyncSession, artifact_id: UUID, current_user: JwtPayload
+) -> Artifact:
+    record = await store.get_artifact(db, artifact_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Artefakt nicht gefunden")
+    if record.owner_pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+    return record
+
+
+@router.get("/{artifact_id}/baustein", response_model=BausteinVorschlag)
+async def baustein_vorschlag(
+    artifact_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Vorbelegung des Übernahme-Formulars — ohne etwas anzulegen."""
+    record = await _eigenes_artefakt(db, artifact_id, current_user)
+
+    typen = list(uebernahme.angebotene_typen(current_user.roles))
+    uebernehmbar = record.kind in uebernahme.UEBERNEHMBARE_KINDS
+    grund = None
+    if not uebernehmbar:
+        grund = (
+            "Aus dieser Artefaktart lässt sich kein Baustein machen — übernehmbar "
+            "sind Dokumente und Mermaid-Diagramme."
+        )
+    elif not (record.source or "").strip():
+        uebernehmbar, grund = False, "Das Artefakt hat keinen Inhalt zum Übernehmen."
+
+    vorhanden = await uebernahme.vorhandener_baustein(
+        db, artifact_id=artifact_id, pseudonym=current_user.sub
+    )
+    return BausteinVorschlag(
+        kind=record.kind,
+        uebernehmbar=uebernehmbar,
+        grund=grund,
+        typen=typen,
+        # Beim zweiten Mal die Art des vorhandenen Bausteins, sonst die erste der Liste:
+        # Wer aktualisiert, will fast nie die Art wechseln.
+        vorgabe_typ=(vorhanden.content_type if vorhanden else (typen[0] if typen else None)),
+        scopes_erzwungen=(
+            list(erzwungen)
+            if (erzwungen := uebernahme.erzwungene_scopes(current_user.roles))
+            else None
+        ),
+        vorhandener_baustein_id=vorhanden.id if vorhanden else None,
+        vorhandener_baustein_titel=vorhanden.title if vorhanden else None,
+    )
+
+
+@router.post("/{artifact_id}/baustein", response_model=BausteinAntwort, status_code=201)
+async def baustein_aus_artefakt(
+    artifact_id: UUID,
+    req: BausteinRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """„Als Baustein speichern" — der Redaktionsakt aus Bibliothek und Chat (AP8).
+
+    **Warum ein eigener Endpunkt statt `POST /context/nodes`.** Der generische Weg ist
+    teacher/admin und nimmt jede Bausteinart und jede Sichtbarkeit entgegen. Schüler:innen
+    sollen hier durchkommen — aber nur mit ihren vier Arten und nur `private`. Denselben
+    Endpunkt dafür zu öffnen hieße, den Rollenriegel gegen eine Sammlung von
+    Sonderfällen einzutauschen; derselbe Schnitt wie bei `PATCH /nodes/{id}/verwalten`.
+    """
+    record = await _eigenes_artefakt(db, artifact_id, current_user)
+
+    try:
+        node, ersetzt, angelegt = await uebernahme.uebernimm(
+            db,
+            user=current_user,
+            artifact=record,
+            content_type=req.content_type,
+            title=req.title,
+            read_scope=req.read_scope,
+            write_scope=req.write_scope,
+            read_scope_group_id=req.read_scope_group_id,
+            write_scope_group_id=req.write_scope_group_id,
+            subject_id=req.subject_id,
+            valid_until=req.valid_until,
+            schuljahr=req.schuljahr,
+        )
+    except uebernahme.UebernahmeFehler as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    await db.commit()
+    await db.refresh(node)
+    await enqueue_embedding_job(node.id, db)
+
+    return BausteinAntwort(
+        node_id=node.id,
+        title=node.title,
+        content_type=node.content_type,
+        ersetzt_node_id=ersetzt.id if ersetzt else None,
+        created=angelegt,
     )
 
 
