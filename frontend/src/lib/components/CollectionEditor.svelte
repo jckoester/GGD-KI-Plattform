@@ -20,6 +20,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import PageBody from '$lib/components/PageBody.svelte'
+    import AliasFeld from "$lib/components/AliasFeld.svelte";
 
     let { typ, node = null, vorgabeFachId = null, back = null } = $props();
 
@@ -61,6 +62,9 @@
         ),
     );
     let listenEingabe = $state({});
+    // Aliase sind seit Migration 0057 kein Metadatenfeld mehr, sondern eine
+    // Eigenschaft jedes Knotens — deshalb neben `felder`, nicht darin.
+    let aliase = $state([...(node?.aliase ?? [])]);
 
     let speichert = $state(false);
     let fehler = $state({});
@@ -97,6 +101,7 @@
                 title: title.trim(),
                 content: content.trim() || null,
                 metadata: metadatenAusFormular(typ, felder, node?.metadata ?? {}),
+                aliase,
                 subject_id: gewaehlteFachschaft?.subject_id ?? null,
             };
             const gespeichert = node
@@ -188,6 +193,12 @@
                 <p class="text-xs text-light-re dark:text-dark-re mt-1">{fehler.content}</p>
             {/if}
         </div>
+
+        <!-- Weitere Namen: eigene Tabelle, deshalb neben dem Schema statt darin -->
+        <AliasFeld
+            bind:aliase
+            hinweis="z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“"
+        />
 
         <!-- Typspezifische Felder aus dem Schema -->
         {#each Object.entries(schema) as [name, feld]}

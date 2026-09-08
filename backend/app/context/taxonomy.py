@@ -258,7 +258,13 @@ GUELTIGE_FELDTYPEN: Final[frozenset[str]] = frozenset({"int", "text", "auswahl",
 
 # Spalten- und Filternamen, die nicht aus `felder` kommen, sondern am Knoten selbst
 # hängen. Alles andere muss ein Feld sein — sonst zeigte die Liste eine leere Spalte.
-FESTE_SPALTEN: Final[frozenset[str]] = frozenset({"titel", "fach", "status", "geaendert"})
+# `aliase` steht seit Migration 0057 hier statt in `felder`: Die weiteren Namen sind
+# keine Metadaten eines einzelnen Typs mehr, sondern eine Eigenschaft **jedes** Knotens —
+# wie Titel oder Status. Die Sammlungen von `methode` und `sozialform` nennen die Spalte
+# weiter, sie wird nur woanders herbezogen.
+FESTE_SPALTEN: Final[frozenset[str]] = frozenset(
+    {"titel", "fach", "status", "geaendert", "aliase"}
+)
 
 
 def collection_config(content_type: str | None) -> dict | None:

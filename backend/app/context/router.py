@@ -56,6 +56,7 @@ from app.context.schemas import (
     PkGruppeRead,
     PkKompetenzRead,
 )
+from app.context import aliase as aliase_modul
 from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
@@ -234,6 +235,25 @@ def _visibility_filter(query, user: JwtPayload, status_override: str | None = No
     return q
 
 
+async def _aliase_setzen(nodes, db: AsyncSession) -> None:
+    """Hängt die weiteren Namen an die Knoten — für `ContextNodeRead.aliase`.
+
+    Dasselbe Muster wie ``_schreibrechte_setzen``: eine Sammelabfrage, das Ergebnis als
+    Attribut am ORM-Objekt, von dem Pydantic es liest.
+
+    **Warum nicht als Beziehung mit `lazy="selectin"`.** Die läge auf *jeder*
+    ContextNode-Abfrage — auch in Planer, Curriculum und Suche, wo Aliase niemanden
+    interessieren. Hier zahlt nur, wer sie anzeigt: die Detailansicht und die
+    Sammlungsliste.
+    """
+    nodes = list(nodes)
+    if not nodes:
+        return
+    je_knoten = await aliase_modul.lade_viele(db, [n.id for n in nodes])
+    for node in nodes:
+        node.aliase = je_knoten.get(node.id, [])
+
+
 async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> None:
     """Setzt ``darf_schreiben`` auf jedem Knoten — dieselbe Regel wie ``_check_write_permission``.
 
@@ -340,6 +360,9 @@ async def list_nodes(
     result = await db.execute(query)
     nodes = result.scalars().all()
     await _schreibrechte_setzen(nodes, user, db)
+    # Die Sammlungen von `methode` und `sozialform` zeigen die Spalte „Andere
+    # Bezeichnungen"; seit Migration 0057 kommt sie nicht mehr aus den Metadaten.
+    await _aliase_setzen(nodes, db)
     return nodes
 
 
@@ -608,6 +631,7 @@ async def get_node(
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     await _check_read_permission(node, user, db)
     await _schreibrechte_setzen([node], user, db)
+    await _aliase_setzen([node], db)
     return node
 
 
@@ -660,12 +684,18 @@ async def create_node(
         schuljahr=payload.schuljahr,
     )
     db.add(node)
+    await db.flush()
+    # Vor dem Commit **und** vor dem Embedding-Job: Der baut seinen Eingabetext bei
+    # `methode` und `operator` aus den Aliasen; stünden sie noch nicht da, entstünde ein
+    # Vektor ohne sie und niemand merkte es.
+    await aliase_modul.setze(db, node.id, payload.aliase)
     await db.commit()
     await db.refresh(node)
 
     # Embedding-Job
     await enqueue_embedding_job(node.id, db)
 
+    await _aliase_setzen([node], db)
     return node
 
 
@@ -754,10 +784,17 @@ async def update_node(
             # Archivieren neu, sie läuft nicht im Hintergrund weiter.
             node.archived_at = None
 
+    # Die Aliase liegen in einer eigenen Tabelle — sie dürfen nicht als Attribut auf
+    # den Knoten gesetzt werden. `None` heißt „nicht angefasst", `[]` heißt „alle weg".
+    neue_aliase = update_data.pop("aliase", None)
+
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
         attr = field if field != "metadata_" else "metadata_"
         setattr(node, attr, value)
+
+    if neue_aliase is not None:
+        await aliase_modul.setze(db, node.id, neue_aliase)
 
     # Manuelle Titeländerung sperrt den Titel gegen einen BP-Re-Import (C1).
     if "title" in update_data:
@@ -772,8 +809,11 @@ async def update_node(
     # Fassung auffindbar, ohne jeden Hinweis. Betroffen sind nur die Felder, aus denen
     # der Input gebildet wird (`_build_embedding_input`); ein geänderter Scope oder ein
     # neues `valid_until` ändern ihn nicht und kosten deshalb keinen Modellaufruf.
-    if {"content", "title", "metadata_"} & set(update_data):
+    # `aliase` gehört dazu: Bei `methode` und `operator` stehen sie im Eingabetext.
+    if {"content", "title", "metadata_"} & set(update_data) or neue_aliase is not None:
         await enqueue_embedding_job(node.id, db)
+
+    await _aliase_setzen([node], db)
 
     return node
 

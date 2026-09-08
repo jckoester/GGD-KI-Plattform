@@ -289,10 +289,6 @@ categories:
               Macht den Eintrag thematisch auffindbar — auch für Suchende, die den
               Namen nicht kennen.
         felder:
-          aliase:
-            typ: liste
-            label: "Andere Bezeichnungen"
-            hinweis: 'z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“'
           ablauf:
             typ: text
             label: "Ablauf in einem Satz"
@@ -317,10 +313,6 @@ categories:
           # Fachneutral und winzig — die Liste ist der einzige Weg dorthin.
           sidebar: true
           content: {label: "Kurzbeschreibung", pflicht: false}
-        felder:
-          aliase:
-            typ: liste
-            label: "Andere Bezeichnungen"
       - key: operator
         label_de: "Operator"
         icon: Zap

@@ -176,3 +176,126 @@ class TestOhneAliase:
         ergebnis = await identifikation("Placemat solo", profil, db_session)
         treffer = next(t for t in ergebnis.treffer if t["title"] == "Placemat solo")
         assert "aliase" not in treffer
+
+
+# ── Pflege über die Schnittstelle (Schritt 4) ────────────────────────────────
+
+
+class TestPflege:
+    """Anlegen, Ändern, Anzeigen — der Weg, auf dem Aliase überhaupt entstehen."""
+
+    async def test_anlegen_speichert_aliase(self, test_client, auth_headers):
+        resp = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Placemat", "content": "Erst allein, dann gemeinsam.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Platzdeckchen", "  Platzdeckchen  ", ""],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        # Leeres und normalisiert Doppeltes fallen weg — dieselbe Regel wie im Backfill.
+        assert resp.json()["aliase"] == ["Platzdeckchen"]
+
+    async def test_einzelabruf_liefert_die_aliase(self, test_client, auth_headers):
+        angelegt = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Kugellager", "content": "Innen- und Außenkreis.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Zwiebelring"],
+            },
+            headers=auth_headers,
+        )
+        node_id = angelegt.json()["id"]
+        resp = await test_client.get(f"/context/nodes/{node_id}", headers=auth_headers)
+        assert resp.json()["aliase"] == ["Zwiebelring"]
+
+    async def test_aendern_ersetzt_die_liste(self, test_client, auth_headers):
+        angelegt = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Blitzlicht", "content": "Kurze Runde.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Stimmungsbild"],
+            },
+            headers=auth_headers,
+        )
+        node_id = angelegt.json()["id"]
+        resp = await test_client.patch(
+            f"/context/nodes/{node_id}",
+            json={"aliase": ["Rundfrage", "Stimmungsbild"]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["aliase"] == ["Rundfrage", "Stimmungsbild"]
+
+    async def test_ohne_feld_bleiben_die_aliase_stehen(self, test_client, auth_headers):
+        """Der Unterschied zwischen `None` und `[]`.
+
+        Ein Formular ohne Aliasfeld — etwa der Verwalten-Weg oder ein Teil-Update —
+        schickt den Schlüssel gar nicht. Würde das als „alle entfernen" gelesen,
+        löschte jede Titeländerung stillschweigend die weiteren Namen.
+        """
+        angelegt = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Museumsgang", "content": "Ergebnisse hängen aus.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Galeriegang"],
+            },
+            headers=auth_headers,
+        )
+        node_id = angelegt.json()["id"]
+        resp = await test_client.patch(
+            f"/context/nodes/{node_id}", json={"title": "Museumsrundgang"},
+            headers=auth_headers,
+        )
+        assert resp.json()["aliase"] == ["Galeriegang"]
+
+    async def test_leere_liste_entfernt_alle(self, test_client, auth_headers):
+        angelegt = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Standbild", "content": "Eine Szene einfrieren.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Freeze"],
+            },
+            headers=auth_headers,
+        )
+        node_id = angelegt.json()["id"]
+        resp = await test_client.patch(
+            f"/context/nodes/{node_id}", json={"aliase": []}, headers=auth_headers
+        )
+        assert resp.json()["aliase"] == []
+
+    async def test_geloeschter_knoten_nimmt_seine_aliase_mit(
+        self, test_client, auth_headers, db_session
+    ):
+        """Der Fremdschlüssel steht auf CASCADE — sonst blieben Namen ohne Knoten."""
+        angelegt = await test_client.post(
+            "/context/nodes",
+            json={
+                "category": "knowledge", "content_type": "methode",
+                "title": "Fishbowl", "content": "Innenkreis diskutiert.",
+                "read_scope": "school", "write_scope": "school",
+                "aliase": ["Aquarium"],
+            },
+            headers=auth_headers,
+        )
+        node_id = uuid.UUID(angelegt.json()["id"])
+        await test_client.delete(f"/context/nodes/{node_id}", headers=auth_headers)
+
+        db_session.expire_all()
+        uebrig = await db_session.execute(
+            sa.select(sa.func.count()).select_from(NodeAlias).where(
+                NodeAlias.node_id == node_id
+            )
+        )
+        assert uebrig.scalar_one() == 0

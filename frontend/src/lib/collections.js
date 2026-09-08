@@ -122,6 +122,10 @@ export function zellenwert(node, spalte, { fachname = null } = {}) {
       return fachname ?? "—"
     case "status":
       return node.status === "archived" ? "archiviert" : "aktiv"
+    // Seit Migration 0057 eine eigene Tabelle, kein Metadatenfeld mehr — sonst stünde
+    // in der Spalte „Andere Bezeichnungen" seither überall ein Strich.
+    case "aliase":
+      return (node.aliase ?? []).length ? node.aliase.join(", ") : "—"
     case "geaendert":
       return node.updated_at
         ? new Date(node.updated_at).toLocaleDateString("de-DE", {

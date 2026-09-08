@@ -24,6 +24,8 @@ class ContextNodeCreate(BaseModel):
     max_grade: int | None = None
     valid_until: date | None = None
     schuljahr: str | None = None
+    # Weitere Namen (Migration 0057). Eigene Tabelle, deshalb kein Metadatenfeld.
+    aliase: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -42,6 +44,9 @@ class ContextNodeUpdate(BaseModel):
     valid_until: date | None = None
     schuljahr: str | None = None
     status: str | None = None
+    # `None` heißt „nicht angefasst", `[]` heißt „alle entfernen" — der Unterschied
+    # entscheidet, ob ein Formular ohne Aliasfeld die vorhandenen löscht.
+    aliase: list[str] | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -77,6 +82,9 @@ class ContextNodeRead(BaseModel):
     schuljahr: str | None
     created_at: datetime
     updated_at: datetime
+    # Weitere Namen des Knotens. Leer, wo der Endpunkt sie nicht nachlädt — sie stehen
+    # in einer eigenen Tabelle und werden nur dort geholt, wo die Oberfläche sie zeigt.
+    aliase: list[str] = Field(default_factory=list)
 
     # Darf die anfragende Person diesen Knoten ändern, archivieren, löschen?
     #

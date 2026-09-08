@@ -234,21 +234,10 @@ export const COLLECTIONS = {
 // (app/context/metadata.py). Der Editor baut sein Formular daraus.
 export const FELD_SCHEMATA = {
   "methode": {
-    "aliase": {
-      "typ": "liste",
-      "label": "Andere Bezeichnungen",
-      "hinweis": "z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“"
-    },
     "ablauf": {
       "typ": "text",
       "label": "Ablauf in einem Satz",
       "hinweis": "Woran man die Methode erkennt, ohne ihren Namen zu kennen — nur der Ablauf, keine Hinweise zum Einsatz. Dieser Satz allein entscheidet darüber, ob die Methode thematisch gefunden wird. Ohne ihn zählt die Kurzbeschreibung."
-    }
-  },
-  "sozialform": {
-    "aliase": {
-      "typ": "liste",
-      "label": "Andere Bezeichnungen"
     }
   },
   "strukturierung": {

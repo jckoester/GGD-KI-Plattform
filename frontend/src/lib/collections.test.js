@@ -115,7 +115,15 @@ describe("zellenwert", () => {
 
   it("fügt Listen zusammen", () => {
     const [, , aliase] = spalten("methode")
-    expect(zellenwert({ metadata: { aliase: ["A", "B"] } }, aliase)).toBe("A, B")
+    expect(zellenwert({ metadata: { ab_klasse: 7 } }, aliase)).toBe("—")
+  })
+
+  it("liest die Aliase aus dem eigenen Feld, nicht aus den Metadaten", () => {
+    // Seit Migration 0057 stehen sie in `node_aliases`. Käme die Spalte weiter aus
+    // `metadata`, stünde in der Sammlung seither überall ein Strich.
+    const [, , aliase] = spalten("methode")
+    expect(zellenwert({ aliase: ["A", "B"] }, aliase)).toBe("A, B")
+    expect(zellenwert({ metadata: { aliase: ["Alt"] } }, aliase)).toBe("—")
   })
 
   it("zeigt leere Metadaten als Gedankenstrich", () => {
