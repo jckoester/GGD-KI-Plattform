@@ -917,8 +917,10 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
             "afb": ", ".join(afb) if isinstance(afb, list) else str(afb),
             "bedeutung": n.get("content") or "",
         }
-        if md.get("aliase"):
-            entry["synonyme"] = md["aliase"]
+        # Seit Migration 0057 stehen die Synonyme in `node_aliases` und kommen als
+        # eigenes Trefferfeld, nicht mehr aus den rohen Metadaten.
+        if n.get("aliase"):
+            entry["synonyme"] = n["aliase"]
         out.append(entry)
     return out
 
