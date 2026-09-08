@@ -66,7 +66,7 @@ def test_vergleich_ignoriert_gross_klein_und_umbrueche():
 
 def test_leerer_knoten_wird_einbettbar():
     """Vorher leer → übersprungen → unsichtbar. Das war der Anlass."""
-    inp = _build_embedding_input(_knoten(title="Bildende Kunst - 3.1.3 Raum", content=""))
+    inp = _build_embedding_input(_knoten(title="Bildende Kunst - 3.1.3 Raum", content=""), [])
     assert inp.strip() == "Bildende Kunst - 3.1.3 Raum"
 
 
@@ -78,12 +78,12 @@ def test_kompetenz_bleibt_unveraendert():
         content=inhalt,
         content_type="ik_kompetenz",
     )
-    assert _build_embedding_input(node) == inhalt
+    assert _build_embedding_input(node, []) == inhalt
 
 
 def test_leitidee_bekommt_ihren_titel_vorangestellt():
     node = _knoten(title="3.1.2.2 Malerei", content="Farbe intuitiv einsetzen.")
-    assert _build_embedding_input(node) == "3.1.2.2 Malerei\nFarbe intuitiv einsetzen."
+    assert _build_embedding_input(node, []) == "3.1.2.2 Malerei\nFarbe intuitiv einsetzen."
 
 
 def test_operator_behaelt_seinen_eigenen_weg():
@@ -92,8 +92,7 @@ def test_operator_behaelt_seinen_eigenen_weg():
         title="interpretieren",
         content="Zusammenhänge deuten und begründen.",
         content_type="operator",
-        metadata={"aliase": ["deuten"]},
     )
-    inp = _build_embedding_input(node)
+    inp = _build_embedding_input(node, ["deuten"])
     assert inp.startswith("interpretieren, deuten\n")
     assert inp.count("interpretieren") == 1

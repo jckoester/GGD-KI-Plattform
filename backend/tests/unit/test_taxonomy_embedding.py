@@ -8,6 +8,7 @@ from app.context.embedding import (
     _build_embedding_input,
     _build_signature_line,
     _extract_metadata_field,
+    braucht_aliase,
     traegt_substanz,
 )
 from app.context.taxonomy import EMBEDDING_ENRICHMENT, EMBEDDING_CONTENT_TYPES as TAXONOMY_EMBEDDING_CONTENT_TYPES, get_scope_defaults, validate_content_type
@@ -143,19 +144,19 @@ class TestReflexionImStundenvektor:
 
     def test_reflexion_landet_im_vektor(self, make_node):
         notiz = "Die Rechnung mit dem Massendefekt hat zu lange gedauert."
-        eingabe = _build_embedding_input(self._stunde(make_node, reflexion=notiz))
+        eingabe = _build_embedding_input(self._stunde(make_node, reflexion=notiz), [])
         assert notiz in eingabe
 
     def test_ohne_reflexion_bleibt_der_input_unveraendert(self, make_node):
         """Der Grund, warum die Migration nur Stunden **mit** Reflexion neu einbettet:
         Bei den übrigen fällt die leere Quelle heraus, der Input ist Zeichen für Zeichen
         derselbe — ein Re-Embedding wäre ein bezahlter Modellaufruf ohne Wirkung."""
-        assert _build_embedding_input(self._stunde(make_node)) == (
+        assert _build_embedding_input(self._stunde(make_node), []) == (
             "Bindungsenergie im Atomkern\nKernbausteine benennen"
         )
 
     def test_verlaufsplan_bleibt_auch_mit_reflexion_draussen(self, make_node):
-        eingabe = _build_embedding_input(self._stunde(make_node, reflexion="Notiz"))
+        eingabe = _build_embedding_input(self._stunde(make_node, reflexion="Notiz"), [])
         assert "Erarbeitung" not in eingabe
 
 
@@ -269,7 +270,7 @@ class TestBuildEmbeddingInput:
             content="LED - Leuchtdiode.",
             metadata={"schaltzeichen": {"beschreibung": "Diodensymbol mit Pfeilen"}},
         )
-        result = _build_embedding_input(node)
+        result = _build_embedding_input(node, [])
         # Der Titel steht vorn, weil er weder im Inhalt noch in der Anreicherung vorkommt;
         # die Anreicherung folgt direkt danach.
         assert result == "Test\nDiodensymbol mit Pfeilen\nLED - Leuchtdiode."
@@ -288,7 +289,7 @@ class TestBuildEmbeddingInput:
                 }
             },
         )
-        result = _build_embedding_input(node)
+        result = _build_embedding_input(node, [])
         assert "digitalWrite(pin: int, value: int) -> void" in result
         assert result.startswith("Test\n")  # Titel trägt eigene Information
 
@@ -296,7 +297,7 @@ class TestBuildEmbeddingInput:
         """Knoten ohne EMBEDDING_ENRICHMENT-Eintrag: Titel + content."""
         node = make_node(category="concept", content_type="abstrakt",
                          content="PWM simuliert analoge Spannung.", metadata={})
-        assert _build_embedding_input(node) == "Test\nPWM simuliert analoge Spannung."
+        assert _build_embedding_input(node, []) == "Test\nPWM simuliert analoge Spannung."
 
     def test_build_embedding_input_titel_im_content_nicht_doppelt(self, make_node):
         """Steht der Titel schon im Inhalt, bleibt der Input unveraendert.
@@ -306,12 +307,12 @@ class TestBuildEmbeddingInput:
         """
         node = make_node(category="concept", content_type="abstrakt",
                          content="Ein Test der Signalform.", metadata={})
-        assert _build_embedding_input(node) == "Ein Test der Signalform."
+        assert _build_embedding_input(node, []) == "Ein Test der Signalform."
 
     def test_build_embedding_input_no_content(self, make_node):
         """Knoten ohne content: der Titel allein — frueher wurde er uebersprungen."""
         node = make_node(category="concept", content_type="abstrakt", content="")
-        assert _build_embedding_input(node) == "Test"
+        assert _build_embedding_input(node, []) == "Test"
 
     def test_build_embedding_input_bp_ik_kompetenz(self, make_node):
         """Bildungsplan IK-Kompetenz: breadcrumb wird vorangestellt."""
@@ -321,7 +322,7 @@ class TestBuildEmbeddingInput:
             content="Die Schuelerinnen und Schueler koennen...",
             metadata={"breadcrumb": ["Gymnasium", "Mathematik", "Klasse 7/8", "Algebra"]},
         )
-        result = _build_embedding_input(node)
+        result = _build_embedding_input(node, [])
         assert "Gymnasium | Mathematik | Klasse 7/8 | Algebra" in result
         assert "Die Schuelerinnen und Schueler koennen..." in result
 
@@ -331,10 +332,10 @@ class TestBuildEmbeddingInput:
             category="knowledge",
             content_type="operator",
             content="Sachverhalte auf Regeln zurueckfuehren",
-            metadata={"afb": ["III"], "aliase": ["begruenden"]},
+            metadata={"afb": ["III"]},
             title="begründen",
         )
-        result = _build_embedding_input(node)
+        result = _build_embedding_input(node, ["begruenden"])
         assert result.startswith("begründen, begruenden")
         assert "Sachverhalte auf Regeln zurueckfuehren" in result
 
@@ -344,11 +345,73 @@ class TestBuildEmbeddingInput:
             category="knowledge",
             content_type="operator",
             content="Elemente ohne Erlaeuterung wiedergeben",
-            metadata={"afb": ["I"], "aliase": []},
+            metadata={"afb": ["I"]},
             title="nennen",
         )
-        result = _build_embedding_input(node)
+        result = _build_embedding_input(node, [])
         assert result == "nennen\nElemente ohne Erlaeuterung wiedergeben"
+
+
+class TestAliasQuelle:
+    """Die Quelle `aliases` (Migration 0057) — vorher `metadata.aliase`.
+
+    Der Umzug in eine eigene Tabelle darf den **Eingabetext** nicht verändern: Bestehende
+    Vektoren wurden aus dem alten Text gebildet und wären mit neuen nicht mehr
+    vergleichbar. Das fiele nirgends auf — nur die Treffer würden schlechter.
+    """
+
+    def test_mehrere_aliase_werden_mit_pipe_verbunden(self, make_node):
+        """`" | "`, nicht `", "` — so verband `_extract_metadata_field` eine Liste.
+
+        Beim Umstellen war `", "` der naheliegende Griff und wäre eine stille
+        Entwertung aller Methoden-Vektoren gewesen.
+        """
+        node = make_node(
+            "knowledge", "methode", content="Zuerst allein, dann zu zweit.",
+            metadata={}, title="Think-Pair-Share",
+        )
+        assert _build_embedding_input(node, ["Ich-Du-Wir", "Murmelphase"]) == (
+            "Think-Pair-Share\nIch-Du-Wir | Murmelphase\nZuerst allein, dann zu zweit."
+        )
+
+    def test_operator_verbindet_mit_komma(self, make_node):
+        """Der Operator-Sonderweg baut seine Zeile selbst — dort war es immer `", "`."""
+        node = make_node(
+            "knowledge", "operator", content="Sachverhalte zurückführen.",
+            metadata={"afb": ["III"]}, title="begründen",
+        )
+        assert _build_embedding_input(node, ["begruenden", "erklären"]).startswith(
+            "begründen, begruenden, erklären\n"
+        )
+
+    def test_leere_aliase_erzeugen_keine_leerzeile(self, make_node):
+        node = make_node(
+            "knowledge", "methode", content="Zuerst allein.",
+            metadata={}, title="Think-Pair-Share",
+        )
+        assert _build_embedding_input(node, []) == "Think-Pair-Share\nZuerst allein."
+
+
+class TestBrauchtAliase:
+    """Wer die Aliase gar nicht verwendet, soll sie auch nicht laden."""
+
+    def test_methode_und_operator_brauchen_sie(self, make_node):
+        assert braucht_aliase(make_node("knowledge", "methode", title="x"))
+        assert braucht_aliase(make_node("knowledge", "operator", title="x"))
+
+    def test_ein_arbeitsblatt_nicht(self, make_node):
+        assert not braucht_aliase(make_node("artifact", "arbeitsblatt", title="x"))
+
+    def test_folgt_der_taxonomie_nicht_einer_liste(self, make_node):
+        """Ein Typ, der `aliases` in seinen `embedding_input` aufnimmt, ist damit
+        versorgt — ohne dass jemand eine zweite Liste im Code nachzieht."""
+        from app.context.embedding import EMBEDDING_INPUT
+
+        typen = {
+            key for (_cat, key), quellen in EMBEDDING_INPUT.items()
+            if any(t.strip() == "aliases" for q in quellen for t in q.split("|"))
+        }
+        assert "methode" in typen
 
 
 class TestEmbeddingInputJeTyp:
@@ -359,9 +422,9 @@ class TestEmbeddingInputJeTyp:
         gefunden werden. Der Inhalt fehlt im Dev-Bestand noch — die Reihenfolge steht."""
         node = make_node(
             "knowledge", "methode", content="Zuerst allein, dann zu zweit, dann im Plenum.",
-            metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share",
+            metadata={}, title="Think-Pair-Share",
         )
-        assert _build_embedding_input(node) == (
+        assert _build_embedding_input(node, ["Ich-Du-Wir"]) == (
             "Think-Pair-Share\nIch-Du-Wir\nZuerst allein, dann zu zweit, dann im Plenum."
         )
 
@@ -376,10 +439,10 @@ class TestEmbeddingInputJeTyp:
         node = make_node(
             "knowledge", "methode",
             content="Die Ergebnisse haengen aus. Als Variante erklaert jemand sie den Besuchern.",
-            metadata={"aliase": ["Gallery Walk"], "ablauf": "Die Ergebnisse haengen im Raum aus."},
+            metadata={"ablauf": "Die Ergebnisse haengen im Raum aus."},
             title="Galeriegang",
         )
-        eingabe = _build_embedding_input(node)
+        eingabe = _build_embedding_input(node, ["Gallery Walk"])
         assert eingabe == "Galeriegang\nGallery Walk\nDie Ergebnisse haengen im Raum aus."
         assert "Variante" not in eingabe
 
@@ -391,9 +454,9 @@ class TestEmbeddingInputJeTyp:
         """
         node = make_node(
             "knowledge", "methode", content="Zuerst allein, dann zu zweit.",
-            metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share",
+            metadata={}, title="Think-Pair-Share",
         )
-        assert _build_embedding_input(node) == (
+        assert _build_embedding_input(node, ["Ich-Du-Wir"]) == (
             "Think-Pair-Share\nIch-Du-Wir\nZuerst allein, dann zu zweit."
         )
 
@@ -403,7 +466,7 @@ class TestEmbeddingInputJeTyp:
             "knowledge", "methode", content="Zuerst allein, dann zu zweit.",
             metadata={"ablauf": "   "}, title="Think-Pair-Share",
         )
-        assert _build_embedding_input(node).endswith("Zuerst allein, dann zu zweit.")
+        assert _build_embedding_input(node, []).endswith("Zuerst allein, dann zu zweit.")
 
     def test_stunde_traegt_kompetenztitel_statt_verlaufsplan(self, make_node):
         node = make_node(
@@ -417,7 +480,7 @@ class TestEmbeddingInputJeTyp:
             },
             title="Brüche einführen",
         )
-        eingabe = _build_embedding_input(node)
+        eingabe = _build_embedding_input(node, [])
         assert eingabe == (
             "Brüche einführen\nBruchteile von Größen bestimmen, Anteile vergleichen"
         )
@@ -427,7 +490,7 @@ class TestEmbeddingInputJeTyp:
     def test_leere_refs_lassen_nur_den_titel(self, make_node):
         node = make_node("artifact", "unterrichtsstunde", metadata={"refs": []},
                          title="Projektauftrag")
-        assert _build_embedding_input(node) == "Projektauftrag"
+        assert _build_embedding_input(node, []) == "Projektauftrag"
 
 
 class TestBackfillRegel:
@@ -436,14 +499,14 @@ class TestBackfillRegel:
     def test_stunde_ohne_kompetenzen_wird_vertagt(self, make_node):
         node = make_node("artifact", "unterrichtsstunde", metadata={"refs": []},
                          title="Projektauftrag")
-        assert traegt_substanz(node) is False
+        assert traegt_substanz(node, []) is False
 
     def test_stunde_mit_kompetenzen_wird_eingebettet(self, make_node):
         node = make_node(
             "artifact", "unterrichtsstunde",
             metadata={"refs": [{"titel": "Anteile vergleichen"}]}, title="Brüche",
         )
-        assert traegt_substanz(node) is True
+        assert traegt_substanz(node, []) is True
 
     def test_bildungsplan_knoten_bleiben_unberuehrt(self, make_node):
         """⚠️ Der Fall, der die Regel begrenzt: Bei `leitidee`, `pk_gruppe` und `kapitel`
@@ -451,18 +514,18 @@ class TestBackfillRegel:
         Inhalt oft gar nicht vorkommt. Griffe die Regel dort, verlören Tausende
         Bildungsplan-Knoten ihr Embedding."""
         node = make_node("knowledge", "leitidee", content="", title="3.1.2 Malerei")
-        assert traegt_substanz(node) is True
-        assert _build_embedding_input(node) == "3.1.2 Malerei"
+        assert traegt_substanz(node, []) is True
+        assert _build_embedding_input(node, []) == "3.1.2 Malerei"
 
     def test_methode_ohne_alles_wird_vertagt(self, make_node):
-        node = make_node("knowledge", "methode", content="", metadata={"aliase": []},
+        node = make_node("knowledge", "methode", content="", metadata={},
                          title="Placemat")
-        assert traegt_substanz(node) is False
+        assert traegt_substanz(node, []) is False
 
     def test_methode_mit_aliasen_genuegt(self, make_node):
         node = make_node("knowledge", "methode", content="",
-                         metadata={"aliase": ["Ich-Du-Wir"]}, title="Think-Pair-Share")
-        assert traegt_substanz(node) is True
+                         metadata={}, title="Think-Pair-Share")
+        assert traegt_substanz(node, ["Ich-Du-Wir"]) is True
 
 
 class TestStubBekommtKeinenVektor:
@@ -478,9 +541,9 @@ class TestStubBekommtKeinenVektor:
     def test_stub_traegt_keine_substanz(self, make_node):
         stub = make_node("concept", "begriff", content="", title="Reduktion",
                          metadata={"unvollstaendig": True})
-        assert traegt_substanz(stub) is False
+        assert traegt_substanz(stub, []) is False
 
     def test_nach_dem_nachtragen_wieder_ja(self, make_node):
         fertig = make_node("concept", "begriff", content="Aufnahme von Elektronen.",
                            title="Reduktion", metadata={})
-        assert traegt_substanz(fertig) is True
+        assert traegt_substanz(fertig, []) is True

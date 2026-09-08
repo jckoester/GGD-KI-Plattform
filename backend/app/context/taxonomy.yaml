@@ -263,7 +263,10 @@ categories:
         #
         # `a|b` heißt: a, sonst b. Ohne Ablaufsatz zählt die Kurzbeschreibung wie
         # bisher — ein Eintrag wird durch das neue Feld nie schlechter auffindbar.
-        embedding_input: ["title", "metadata.aliase", "metadata.ablauf|content"]
+        # `aliases` = die Tabelle `node_aliases` (Migration 0057), vorher
+        # `metadata.aliase`. Verbunden weiterhin mit " | " — der Eingabetext bleibt
+        # zeichengleich, sonst wären die bestehenden Vektoren still entwertet.
+        embedding_input: ["title", "aliases", "metadata.ablauf|content"]
         collection:
           beschreibung: >-
             Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge

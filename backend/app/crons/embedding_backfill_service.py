@@ -11,9 +11,11 @@ import httpx
 from app.context.embedding import (
     EMBEDDING_CONTENT_TYPES,
     _build_embedding_input,
+    braucht_aliase,
     traegt_substanz,
     generate_embeddings,
 )
+from app.context import aliase as aliase_modul
 from app.db.models import ContextNode
 
 logger = logging.getLogger(__name__)
@@ -179,16 +181,24 @@ async def backfill_embeddings(
         # Erst die Texte bauen, dann in Anfrage-Stapel schneiden. Leere Knoten fliegen
         # vorher raus — sonst kippt ein einziger von ihnen den ganzen Stapel in den
         # 400er-Sonderweg.
+        # Aliase des ganzen Stapels in **einer** Abfrage, und nur für die Typen, die sie
+        # verwenden — je Knoten einzeln wäre das bei Tausenden Knoten die teuerste Zeile
+        # des Laufs.
+        aliase_je_knoten = await aliase_modul.lade_viele(
+            db, [n.id for n in batch if braucht_aliase(n)]
+        )
+
         aufgaben: list[tuple[ContextNode, str]] = []
         for node in batch:
-            if not traegt_substanz(node):
+            node_aliase = aliase_je_knoten.get(node.id, [])
+            if not traegt_substanz(node, node_aliase):
                 # Nur der Titel — das wäre eine unscharfe Titelsuche im Vektorraum und
                 # gehört in die Identifikation, nicht hierher. Vertagt, nicht verworfen:
                 # Sobald der Knoten Inhalt oder Kompetenzbezüge bekommt, greift der
                 # nächste Lauf (siehe `traegt_substanz`).
                 stats.skipped += 1
                 continue
-            inp = _build_embedding_input(node)
+            inp = _build_embedding_input(node, node_aliase)
             if not inp.strip():
                 # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.
                 stats.skipped += 1

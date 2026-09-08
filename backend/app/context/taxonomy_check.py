@@ -208,12 +208,14 @@ def pruefe_taxonomie() -> list[str]:
     for (_cat, key), quellen in sorted(taxonomy.EMBEDDING_INPUT.items()):
         for quelle in quellen:
             for teil in (t.strip() for t in quelle.split("|")):
-                if teil in ("title", "content") or teil.startswith("metadata."):
+                # `aliases` = Tabelle `node_aliases` (Migration 0057); die drei Namen
+                # sind genau die Zweige in `_teil_aus_quelle`.
+                if teil in ("title", "content", "aliases") or teil.startswith("metadata."):
                     continue
                 befunde.append(
                     f"embedding_input von {key!r} nennt die Quelle {teil!r} — erlaubt "
-                    "sind 'title', 'content' und 'metadata.<pfad>'. Sie liefert sonst "
-                    "stumm nichts. Quelle: app/context/taxonomy.yaml"
+                    "sind 'title', 'content', 'aliases' und 'metadata.<pfad>'. Sie "
+                    "liefert sonst stumm nichts. Quelle: app/context/taxonomy.yaml"
                 )
 
     # ── Sammlungs-Konfiguration und Feldschema (AP5a) ─────────────────────────
