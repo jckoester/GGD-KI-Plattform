@@ -106,6 +106,49 @@ Taxonomie und lässt den Embedding-Backfill laufen.
 
 ---
 
+## Aliase — ein zweiter Titel, kein Metadatenfeld
+
+Seit Migration **0057** liegen weitere Namen in der Tabelle `node_aliases`, vorher als
+JSON-Liste in `metadata.aliase`. Der Umzug hat einen Grund und eine Falle.
+
+**Der Grund:** Als Metadatenfeld trugen Aliase nur das Embedding von `methode` und
+`operator`. Die **Namenssuche sah sie nie** — wer „Ich-Du-Wir" tippte, fand
+„Think-Pair-Share" nicht, obwohl der Alias gepflegt war. Ein Feld, das man pflegen kann
+und das nichts bewirkt.
+
+Jetzt greift ein Alias in **allen drei Namensstufen**: exakter Abgleich, Ähnlichkeit,
+Präfix-Vervollständigung. Verglichen wird über dieselbe Normalisierung wie bei Titeln —
+klein, ohne Gliederungsnummer, ein Leerraum. **Bindestriche werden nicht gefaltet:**
+„Think-Pair-Share" und „Think Pair Share" sind zwei Namen, genau wie bei Titeln. Diese
+Lücke schließt die Ähnlichkeitsstufe, nicht die Normalisierung; hätte sie eine eigene
+Regel, verhielten sich Aliase anders als Titel.
+
+⚠️ **Die Falle: kein `EXISTS` in der Hauptabfrage.** Der naheliegende Weg — ein
+korreliertes `EXISTS` per `OR` an die Identifikation — ist fachlich richtig und macht
+aus dem Index-Scan auf dem Titelausdruck einen vollständigen Durchlauf. Ein `OR` über
+zwei Tabellen kostet den Plan. Stattdessen löst `knoten_mit_alias()` die Treffer in einer
+eigenen, kurzen Abfrage auf, und die Hauptabfrage bekommt eine **ID-Liste**. Gibt es
+keine Aliastreffer — der Normalfall —, ist die Bedingung zeichengleich zu vorher.
+
+Das ist genau der stille Ausfall, vor dem der Abschnitt *Indexe* warnt; gefangen hat ihn
+der `EXPLAIN`-Test, nicht das Auge.
+
+**Sortierung:** In der Ähnlichkeitsstufe entscheidet `greatest(Titel-Ähnlichkeit, beste
+Alias-Ähnlichkeit)`. Ohne das stünde ein Knoten, der nur über seinen Alias trifft, hinter
+jedem schwachen Titeltreffer.
+
+**Reihenfolge ist Teil der Daten.** Bei `methode` und `operator` gehen die Aliase in den
+Embedding-Input ein (`embedding_input: [… "aliases" …]` bzw. der Operator-Sonderweg).
+Eine andere Reihenfolge ergäbe einen anderen Eingabetext und damit Vektoren, die mit den
+bestehenden nicht mehr vergleichbar sind. Deshalb hat `node_aliases` eine aufsteigende
+`id` statt einer UUID, und überall wird danach sortiert — nie alphabetisch. Aus demselben
+Grund verbindet die Quelle `aliases` mit `" | "` und nicht mit `", "`: So verband der
+alte Metadaten-Weg eine Liste.
+
+Gelesen und geschrieben wird ausschließlich über `app/context/aliase.py`.
+
+---
+
 ## Warum der `@`-Weg anders ist
 
 Der `@`-Shortcode im Chat ist **Namensvervollständigung**, nicht Suche: Man tippt einen
@@ -432,9 +475,13 @@ In der Bestandsaufnahme widerlegt. Nicht wieder einbauen, auch nicht „zur Sich
 |---|---|---|
 | `idx_context_nodes_titel_nachschlagen` | 0053 | Exakter Titelabgleich (Ausdrucksindex) |
 | `idx_context_nodes_titel_trigramm` | 0054 | Teilsuche (GIN, `gin_trgm_ops`) |
+| `idx_node_aliases_norm` | 0057 | Exakter Alias-Abgleich |
+| `idx_node_aliases_trigramm` | 0057 | Teilsuche über Aliase |
+| `uq_node_aliases_node_norm` | 0057 | Ein Alias je Knoten nur einmal |
 
-Beide liegen auf **demselben** normalisierten Titelausdruck, und beide beziehen ihn aus
-derselben Funktion wie die Abfrage: `app.context.lookup.titel_normalisiert_sql`.
+Alle liegen auf **demselben** normalisierten Ausdruck — für Titel wie für Aliase —, und
+alle beziehen ihn aus derselben Funktion wie die Abfrage:
+`app.context.lookup.titel_normalisiert_sql`.
 
 ⚠️ Weicht der Ausdruck des Index auch nur in einem Zeichen von dem der Abfrage ab,
 benutzt PostgreSQL ihn **nicht** — ohne Fehler, ohne Warnung, nur langsamer. Deshalb wird

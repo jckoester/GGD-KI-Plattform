@@ -46,6 +46,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Der Bibliothekseintrag zeigt, was aus ihm geworden ist** — „als Baustein
   übernommen →" mit Link auf den Baustein.
 
+- **Bausteine lassen sich unter weiteren Namen finden.** Jeder Baustein kann
+  „Andere Bezeichnungen" tragen; wer danach sucht, findet ihn — exakt wie über den
+  Titel, ähnlich geschrieben, und bei der Vervollständigung mit `@`. Der Treffer zeigt
+  die weiteren Namen mit. Bisher gab es das Feld nur bei Methoden und Sozialformen, und
+  es wirkte allein auf die thematische Suche, nicht auf die Namenssuche.
+
 ### Geändert
 
 - **Schüler:innen können ihre eigenen Bausteine verwalten** — Detailansicht, Umbenennen,
@@ -73,6 +79,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Fach-Ausblendungen. Ehemalige verschwinden damit aus Gruppenlisten und Zählungen —
   bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
   werden. Der Lernstand einer Gruppe bleibt erhalten.
+
+### Migration
+
+- **`0057`** — Aliase bekommen eine eigene Tabelle. Der Lauf übernimmt vorhandene
+  Bezeichnungen aus den Metadaten und entfernt sie dort; die Reihenfolge bleibt erhalten,
+  ein Neu-Einbetten ist nicht nötig. Legt die PostgreSQL-Erweiterung `pg_trgm` an, falls
+  sie fehlt (seit 0054 in der Regel vorhanden).
 
 ### Behoben
 

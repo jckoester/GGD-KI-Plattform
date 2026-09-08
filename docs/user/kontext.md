@@ -60,6 +60,8 @@ Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwö
 
 **Namen werden direkt nachgeschlagen.** Suchen Sie nach einem Begriff, den es als Baustein gibt — einem Operator wie „nennen", einer Leitidee, einem Fachbegriff —, steht er oben, auch wenn andere Bausteine thematisch näher liegen. Die Frageform ist dabei egal: „nennen", „Operator nennen" und „Was bedeutet der Operator nennen?" führen zum selben Ergebnis. Wo derselbe Name in mehreren Fächern vorkommt, erscheinen die Fächer nacheinander.
 
+**Auch weitere Namen führen zum Ziel.** Ein Baustein kann mehrere Bezeichnungen tragen — „Ich-Du-Wir" und „Think-Pair-Share" meinen dieselbe Methode. Suchen Sie nach einer davon, finden Sie den Baustein, und der Treffer zeigt die anderen Namen mit, damit erkennbar bleibt, warum er dasteht. Weitere Bezeichnungen tragen Sie beim Bearbeiten unter **„Andere Bezeichnungen"** ein; sie gelten bei der Suche wie der Titel selbst.
+
 **Das Fach des Chats zählt mit.** Führen Sie den Chat in einem Fach oder einer Unterrichtsgruppe, stehen dessen Bausteine weiter oben. Ausgeblendet wird dabei nichts: Wer im Physik-Chat nach dem Satz des Pythagoras fragt, bekommt weiterhin die Mathematik-Kompetenz — sie ist dort schließlich die richtige Antwort. In einem Chat ohne Fach entscheidet allein die Ähnlichkeit.
 
 ### Über den @-Shortcode

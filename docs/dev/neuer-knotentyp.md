@@ -251,6 +251,11 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
   in der Taxonomie (Schritt 2), und `NodeTypeIcon.svelte` liest nur noch die daraus
   erzeugte `node_icons.js`.
+- **Aliase sind ebenfalls kein Punkt:** Weitere Namen hat seit Migration 0057 *jeder*
+  Knoten (Tabelle `node_aliases`, Pflege über `AliasFeld.svelte` in beiden Editoren).
+  Ein neuer Typ bekommt sie geschenkt. Nur wenn sie in seinen **Embedding-Input** sollen,
+  gehört `aliases` in sein `embedding_input` — dann lädt `braucht_aliase()` sie
+  automatisch nach.
 
 ### 13. Werkzeuge
 
