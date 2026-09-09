@@ -7,6 +7,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Fachseite und Unterrichtsgruppe sind eine Übersicht geworden.** Sie beantwortet
+  „Wo war ich stehengeblieben?": letzte Chats, Assistenten der Gruppe, zuletzt
+  Entstandenes und Absprünge zum Nachschlagen. Schüler:innen landen direkt in ihrer
+  Unterrichtsgruppe; die Fachseite bündelt für Lehrkräfte die Gruppen und trägt, was
+  Fachbezug ohne Gruppenbezug hat.
+
+- **Der Block „Jetzt"** zeigt Lehrkräften die laufende und nächste Unterrichtseinheit
+  samt Stand sowie die zuletzt gehaltene und die nächsten Stunden — mit Entwurfs- und
+  Nachbereitungsstand. Fehlt ein Entwurf, lässt er sich von dort anlegen.
+
+- **Archiv früherer Schuljahre.** Unterrichtsgruppen vergangener Jahre verschwinden mit
+  dem Schuljahreswechsel aus der Oberfläche; der Reiter „Archiv" macht die eigenen Chats
+  und Bausteine daraus wieder zugänglich. Die Jahresplanung einer früheren Gruppe bleibt
+  geschlossen.
+
+- **Schüler:innen erreichen die fachgebundenen Sammlungen.** Fachbegriffe,
+  Methodenblätter und Operatorenblätter stehen unter „Nachschlagen" auf der
+  Fachübersicht; die Lesepfade des Kontextspeichers sind für alle Rollen offen.
+
+- **Die Bibliothek lässt sich auf ein Fach eingrenzen** (`/library?subject_id=…`).
+
 - **„Meine Bausteine"** unter *Wissensgraph → Meine Bausteine*, für alle Rollen. Die
   Seite zeigt den eigenen Gesamtbestand über alle Fächer und Entstehungswege hinweg,
   nach Fach gruppiert und innerhalb nach zuletzt geändert; ein Filter engt auf eine
@@ -88,6 +109,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   sie fehlt (seit 0054 in der Regel vorhanden).
 
 ### Behoben
+
+- **Die Fachseite zeigte Schüler:innen nie einen Chat.** Sie fragte nach Chats ohne
+  Unterrichtsgruppe; Schülerchats haben aber immer eine.
+
+- **Zwei Unterrichtsgruppen im selben Fach führten in der Seitenleiste auf dieselbe
+  Seite** und wurden beide als aktiv markiert.
+
+- **In einer leeren Sammlung erschien für Schüler:innen „Neu anlegen"**, obwohl das
+  Anlegen abgelehnt wird.
 
 - **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten Öffnen
   ließen sie sich nicht mehr eindeutig zuordnen.
