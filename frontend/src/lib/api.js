@@ -1835,6 +1835,15 @@ export async function getFormerGroups(subjectId = null) {
     return res.json()
 }
 
+// Die nachgetragenen Kosten einer Konversation. Der Chat wartet beim Streamende
+// nicht mehr auf die SpendLogs — der Betrag kommt per Hintergrundaufgabe und wird
+// hiermit abgeholt. Bewusst schlank: Diese Abfrage läuft nach jeder Antwort.
+export async function getConversationCosts(conversationId) {
+    const res = await fetch(`${BASE}/conversations/${conversationId}/costs`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Kosten konnten nicht geladen werden')
+    return res.json()
+}
+
 // ── Unterrichtsplanung ────────────────────────────────────────────────────────
 
 export async function getPlanningOverview(groupId) {

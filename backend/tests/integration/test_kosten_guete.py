@@ -110,3 +110,22 @@ async def test_statistik_weist_die_guete_aus(test_client, auth_headers, zug):
     # Tests tragen. Geprüft wird, dass *diese* mitgezählt werden.
     assert daten["unvollstaendige_nachrichten"] >= 1
     assert daten["ausstehende_nachrichten"] >= 1
+
+
+async def test_kosten_endpunkt_liefert_betrag_und_zustand(test_client, auth_headers, zug):
+    """Der Nachschlag (AP3) — schlank, damit er nach jeder Antwort laufen darf."""
+    resp = await test_client.get(f"/conversations/{zug}/costs", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    daten = resp.json()
+    zustaende = sorted(m["cost_status"] for m in daten["messages"])
+    assert zustaende == ["ausstehend", "unvollstaendig", "vollstaendig"]
+    # Der Endpunkt trägt keine Inhalte — sonst wäre er die falsche Größenordnung
+    # für eine Zahl unter der Blase.
+    assert all("content" not in m for m in daten["messages"])
+
+
+async def test_kosten_endpunkt_schuetzt_fremde_konversationen(
+    test_client, auth_headers_teacher2, zug
+):
+    resp = await test_client.get(f"/conversations/{zug}/costs", headers=auth_headers_teacher2)
+    assert resp.status_code == 403

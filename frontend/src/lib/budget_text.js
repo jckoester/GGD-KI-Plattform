@@ -80,3 +80,47 @@ export function zuwachsKurz(b) {
     const tag = b?.naechste_aufstockung ? wochentag(b.naechste_aufstockung) : null;
     return tag ? `+${wochenbetrag} € am ${tag}` : null;
 }
+
+// ── Kostenangabe an einer Chat-Antwort ──────────────────────────────────────
+//
+// Der Betrag steht beim Ende des Streams **nicht** fest: LiteLLM schreibt seine
+// SpendLogs verzögert, und der Chat wartet darauf seit 09/2026 nicht mehr (er hing
+// dafür bis zu 15 s). Nachgetragen wird im Hintergrund — und solange das läuft,
+// muss die Anzeige sagen, dass sie noch nichts weiß.
+//
+// ⚠️ Der Fehler, den das vermeidet: Ein noch nicht ermittelter Betrag als „—" oder
+// als nichts zu zeigen, ist von „hat nichts gekostet" nicht zu unterscheiden.
+
+/**
+ * Was unter der Antwortblase steht.
+ *
+ * @param {string|null} betrag  formatierter Euro-Betrag oder `null`
+ * @param {string|null} status  `ausstehend` | `vollstaendig` | `unvollstaendig` | `null`
+ * @returns {{text: string, unsicher: boolean}|null} `null` = gar nichts anzeigen
+ */
+export function kostenAnzeige(betrag, status = null) {
+    if (status === "ausstehend") {
+        return { text: "Kosten werden ermittelt …", unsicher: true };
+    }
+    if (betrag === null || betrag === undefined) return null;
+    if (status === "unvollstaendig") {
+        // „mindestens", weil mindestens ein SpendLog fehlt: Der echte Betrag ist
+        // höher, nie niedriger.
+        return { text: `mindestens ${betrag} €`, unsicher: true };
+    }
+    return { text: `${betrag} €`, unsicher: false };
+}
+
+/** Erklärung zum unsicheren Zustand — als Titel-Attribut, nicht als Dauertext. */
+export function kostenErklaerung(status) {
+    if (status === "ausstehend") {
+        return "Der Abrechnungsdienst meldet den Betrag mit kurzer Verzögerung.";
+    }
+    if (status === "unvollstaendig") {
+        return (
+            "Für mindestens eine Teilanfrage dieser Antwort liegt keine Abrechnung " +
+            "vor. Der tatsächliche Betrag ist höher."
+        );
+    }
+    return null;
+}

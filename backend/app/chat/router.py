@@ -100,6 +100,10 @@ class MessageItem(BaseModel):
     content: str
     created_at: datetime
     cost_usd: Optional[float] = None
+    # Wie belastbar `cost_usd` ist — `ausstehend` | `vollstaendig` | `unvollstaendig`.
+    # `None` heißt keine Aussage (User-Nachrichten, Bestand vor Migration 0058).
+    # Ohne dieses Feld sähe ein noch nicht ermittelter Betrag aus wie „kostet nichts".
+    cost_status: Optional[str] = None
     attachments: list[AttachmentMeta] = []
     model: Optional[str] = None            # Aliasname (`chat-standard`)
     provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
@@ -2695,6 +2699,62 @@ async def get_conversation_counts(
     return ConversationCountsResponse(by_subject=by_subject, by_group=by_group)
 
 
+class KostenPosten(BaseModel):
+    id: UUID
+    cost_usd: Optional[float] = None
+    cost_status: Optional[str] = None
+
+
+class KostenAntwort(BaseModel):
+    """Nur die Kostenangaben einer Konversation — für den Nachschlag.
+
+    Eigener Endpunkt statt `…/messages`: Der liefert alle Nachrichteninhalte samt
+    Anhängen und Bildern. Für eine Zahl unter der Blase ist das die falsche
+    Größenordnung, und der Nachschlag läuft nach **jeder** Antwort.
+    """
+    messages: list[KostenPosten]
+    total_cost_usd: Optional[float] = None
+
+
+@router.get("/conversations/{conversation_id}/costs", response_model=KostenAntwort)
+async def get_conversation_costs(
+    conversation_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> KostenAntwort:
+    """Die nachgetragenen Kosten abholen (AP3).
+
+    Der Chat wartet seit 09/2026 nicht mehr auf die SpendLogs; der Betrag kommt per
+    Hintergrundaufgabe. Diese Abfrage holt ihn nach, ohne die Konversation neu zu
+    laden.
+    """
+    conv = (await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )).scalar_one_or_none()
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+    if conv.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+
+    zeilen = (await db.execute(
+        select(Message.id, Message.cost_usd, Message.cost_status)
+        .where(Message.conversation_id == conversation_id,
+               Message.role == "assistant")
+    )).all()
+
+    return KostenAntwort(
+        messages=[
+            KostenPosten(
+                id=z[0],
+                cost_usd=float(z[1]) if z[1] is not None else None,
+                cost_status=z[2],
+            )
+            for z in zeilen
+        ],
+        total_cost_usd=float(conv.total_cost_usd) if conv.total_cost_usd else None,
+    )
+
+
 @router.get("/conversations/{conversation_id}/messages")
 async def get_conversation_messages(
     conversation_id: UUID,
@@ -2754,6 +2814,7 @@ async def get_conversation_messages(
                 "content": msg.content,
                 "created_at": msg.created_at,
                 "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
+                "cost_status": msg.cost_status,
                 "attachments": [],
                 "model": msg.model,
                 "provider_model": msg.provider_model,

@@ -14,10 +14,29 @@
     import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
 
     import { istLeereAntwort, leereAntwortText } from '$lib/chat_errors.js';
+    import { kostenAnzeige, kostenErklaerung } from '$lib/budget_text.js';
     import WarningBanner from './WarningBanner.svelte';
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
-    let { message, isStreaming = false, costEur = null, userPrompt = null } = $props();
+    let {
+        message,
+        isStreaming = false,
+        costEur = null,
+        userPrompt = null,
+        // Zeigt diese Nutzer:in Kosten je Nachricht? `costEur === null` allein
+        // taugt als Antwort nicht: Es heißt sowohl „abgeschaltet" als auch „noch
+        // nicht ermittelt" — und im zweiten Fall gehört ein Hinweis hin, im ersten
+        // nicht.
+        kostenSichtbar = true,
+    } = $props();
+
+    // Was unter der Blase steht — Betrag, Untergrenze oder Hinweis.
+    // Während des Streams gar nichts: Da steht noch nicht einmal die Antwort.
+    const kosten = $derived(
+        !kostenSichtbar || isStreaming
+            ? null
+            : kostenAnzeige(costEur, message.cost_status),
+    );
 
     let renderedContent = $derived(
         message.role === 'assistant' ? renderMarkdown(message.content) : ''
@@ -351,11 +370,18 @@
             {#if isStreaming}
                 <span class="animate-pulse cursor-default text-light-tx-2 dark:text-dark-tx-2 text-sm ml-0.5">|</span>
             {/if}
-            {#if costEur !== null || (hatHerkunftsangaben && !isStreaming)}
+            {#if kosten !== null || (hatHerkunftsangaben && !isStreaming)}
                 <div class="flex items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2
                             mt-2 pt-1 border-t border-light-ui-3 dark:border-dark-ui-3">
-                    {#if costEur !== null}
-                        <span>{costEur} €</span>
+                    {#if kosten !== null}
+                        <!-- „Kosten werden ermittelt" statt Schweigen: Der Betrag
+                             kommt seit 09/2026 im Hintergrund nach, und eine leere
+                             Zeile wäre von „hat nichts gekostet" nicht zu
+                             unterscheiden. -->
+                        <span
+                            class={kosten.unsicher ? 'italic' : ''}
+                            title={kostenErklaerung(message.cost_status) ?? undefined}
+                        >{kosten.text}</span>
                     {/if}
                     {#if hatHerkunftsangaben && !isStreaming}
                         <button

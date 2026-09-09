@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { zuwachsText, zuwachsKurz, uebertragText } from "./budget_text.js";
+import { zuwachsText, zuwachsKurz, uebertragText, kostenAnzeige, kostenErklaerung } from "./budget_text.js";
 
 describe("zuwachsText", () => {
     it("nennt Betrag und Termin", () => {
@@ -75,5 +75,57 @@ describe("uebertragText", () => {
         expect(uebertragText({ wochenbetrag_eur: 0.04 })).toBeNull();
         expect(uebertragText({ vorsprung_wochen: 0 })).toBeNull();
         expect(uebertragText(null)).toBeNull();
+    });
+});
+
+describe("kostenAnzeige", () => {
+    it("meldet den ausstehenden Zustand statt zu schweigen", () => {
+        // Nichts anzuzeigen wäre von „hat nichts gekostet" nicht zu unterscheiden.
+        expect(kostenAnzeige(null, "ausstehend")).toEqual({
+            text: "Kosten werden ermittelt …",
+            unsicher: true,
+        });
+    });
+
+    it("meldet ausstehend auch dann, wenn schon ein Teilbetrag dasteht", () => {
+        // Bildkosten sind sofort bekannt, die Textkosten noch nicht.
+        expect(kostenAnzeige("0,04", "ausstehend").unsicher).toBe(true);
+    });
+
+    it("kennzeichnet eine Teilsumme als Untergrenze", () => {
+        expect(kostenAnzeige("0,01", "unvollstaendig")).toEqual({
+            text: "mindestens 0,01 €",
+            unsicher: true,
+        });
+    });
+
+    it("zeigt den belastbaren Betrag schlicht", () => {
+        expect(kostenAnzeige("0,02", "vollstaendig")).toEqual({
+            text: "0,02 €",
+            unsicher: false,
+        });
+    });
+
+    it("behandelt fehlenden Zustand wie belastbar", () => {
+        // Bestandszeilen vor Migration 0058 tragen `null` — für sie gab es die
+        // Unterscheidung nicht, und eine Warnung wäre eine erfundene Aussage.
+        expect(kostenAnzeige("0,02", null)).toEqual({ text: "0,02 €", unsicher: false });
+    });
+
+    it("zeigt ohne Betrag und ohne Zustand gar nichts", () => {
+        expect(kostenAnzeige(null, null)).toBeNull();
+        expect(kostenAnzeige(undefined)).toBeNull();
+    });
+});
+
+describe("kostenErklaerung", () => {
+    it("erklärt beide unsicheren Zustände", () => {
+        expect(kostenErklaerung("ausstehend")).toContain("Verzögerung");
+        expect(kostenErklaerung("unvollstaendig")).toContain("höher");
+    });
+
+    it("erklärt nichts, wo es nichts zu erklären gibt", () => {
+        expect(kostenErklaerung("vollstaendig")).toBeNull();
+        expect(kostenErklaerung(null)).toBeNull();
     });
 });
