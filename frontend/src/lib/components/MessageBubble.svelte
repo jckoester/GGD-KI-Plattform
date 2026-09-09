@@ -15,6 +15,7 @@
 
     import { istLeereAntwort, leereAntwortText } from '$lib/chat_errors.js';
     import { kostenAnzeige, kostenErklaerung } from '$lib/budget_text.js';
+    import { nurTextHinweis } from '$lib/workshop.js';
     import WarningBanner from './WarningBanner.svelte';
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
@@ -29,6 +30,10 @@
         // nicht.
         kostenSichtbar = true,
     } = $props();
+
+    // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
+    // Ist ein Bild dabei, bliebe es wortlos zurück — der Hinweis sagt es.
+    const textHinweis = $derived(nurTextHinweis(message));
 
     // Was unter der Blase steht — Betrag, Untergrenze oder Hinweis.
     // Während des Streams gar nichts: Da steht noch nicht einmal die Antwort.
@@ -417,6 +422,7 @@
                                         href="/api/images/{img.image_id}"
                                         download="bild-{img.image_id}.png"
                                         aria-label="Bild herunterladen"
+                                        title="Bild herunterladen"
                                         class="p-1.5 rounded-lg
                                                bg-light-bg-2/80 dark:bg-dark-bg-2/80
                                                text-light-tx-2 dark:text-dark-tx-2
@@ -466,6 +472,7 @@
                         type="button"
                         onclick={openInWorkshop}
                         disabled={openingWorkshop}
+                        title={textHinweis ?? undefined}
                         class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                text-light-tx-2 dark:text-dark-tx-2
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
@@ -481,6 +488,7 @@
                         type="button"
                         onclick={alsBausteinSpeichern}
                         disabled={bausteinLaeuft}
+                        title={textHinweis ?? undefined}
                         class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
                                text-light-tx-2 dark:text-dark-tx-2
                                hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
@@ -489,6 +497,11 @@
                         <Share2 class="w-3.5 h-3.5" />
                         {bausteinLaeuft ? 'Wird vorbereitet…' : 'Als Baustein speichern'}
                     </button>
+                    {#if textHinweis}
+                        <p class="w-full text-xs text-light-tx-2 dark:text-dark-tx-2 mt-0.5">
+                            {textHinweis}
+                        </p>
+                    {/if}
                     {#if workshopError}
                         <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
                     {/if}

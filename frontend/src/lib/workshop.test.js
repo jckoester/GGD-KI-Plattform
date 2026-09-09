@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveDocTitle } from './workshop.js';
+import { deriveDocTitle, nurTextHinweis } from './workshop.js'
 
 describe('deriveDocTitle', () => {
     it('nimmt die erste Überschrift', () => {
@@ -21,5 +21,28 @@ describe('deriveDocTitle', () => {
     it('kürzt auf 80 Zeichen', () => {
         const long = '# ' + 'a'.repeat(200);
         expect(deriveDocTitle(long).length).toBe(80);
+    });
+});
+
+describe("nurTextHinweis", () => {
+    it("warnt, wenn ein Bild zurückbliebe", () => {
+        expect(nurTextHinweis({ content: "Hier ist dein Bild:", images: [{ image_id: "x" }] }))
+            .toContain("nur den Text");
+    });
+
+    it("verweist auf den Weg, das Bild zu behalten", () => {
+        // Ohne den Verweis wüsste niemand, was stattdessen zu tun ist.
+        expect(nurTextHinweis({ images: [{ image_id: "x" }] })).toContain("Knopf am Bild");
+    });
+
+    it("schweigt bei einer reinen Textantwort", () => {
+        // Dort gibt es nichts zu verlieren — ein Hinweis wäre nur Rauschen.
+        expect(nurTextHinweis({ content: "Ein langer Text" })).toBeNull();
+        expect(nurTextHinweis({ content: "x", images: [] })).toBeNull();
+    });
+
+    it("verträgt eine fehlende Nachricht", () => {
+        expect(nurTextHinweis(null)).toBeNull();
+        expect(nurTextHinweis(undefined)).toBeNull();
     });
 });

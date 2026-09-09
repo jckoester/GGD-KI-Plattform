@@ -115,6 +115,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   in der Antwortblase**, nicht mehr darunter. Sie gehören zur selben Antwort wie der
   Text und die Kostenzeile.
 
+- **Bei einer Antwort mit Bild steht am Übernehmen-Knopf, dass nur der Text mitgeht** —
+  und wo sich das Bild speichern lässt. Der Knopf zum Herunterladen eines Bildes hat
+  jetzt ebenfalls einen Tooltip.
+
 ### Behoben
 
 - **Die Fachseite zeigte Schüler:innen nie einen Chat.** Sie fragte nach Chats ohne
