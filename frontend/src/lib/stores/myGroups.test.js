@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
+import { get } from "svelte/store"
 import { gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
@@ -50,5 +51,42 @@ describe("gueltigeGruppenwahl", () => {
     expect(gueltigeGruppenwahl(null, UNTERRICHT)).toBeNull()
     expect(gueltigeGruppenwahl(1, [])).toBeNull()
     expect(gueltigeGruppenwahl(1, undefined)).toBeNull()
+  })
+})
+
+// ── Ladezustand ─────────────────────────────────────────────────────────────
+// `myGroupsGeladen` trennt „noch nicht geladen" von „keine Gruppen". Ohne diese
+// Unterscheidung zeigt die Schüler-Weiche auf `/subjects/[slug]` beim Aufbau kurz
+// „dieses Fach ist dir nicht zugeordnet", bevor die Daten da sind.
+describe("myGroupsGeladen", () => {
+  it("steht auch nach einem Fehlschlag auf true", async () => {
+    // Sonst bliebe die Oberfläche bei einem Netzfehler ewig im Ladezustand —
+    // ein stiller Ausfall, der wie eine hängende Seite aussieht.
+    vi.resetModules()
+    vi.doMock("$lib/api.js", () => ({
+      getMyGroups: () => Promise.reject(new Error("Netz weg")),
+    }))
+    const { myGroupsGeladen, refreshMyGroups, myGroups } = await import("./myGroups.js")
+    expect(get(myGroupsGeladen)).toBe(false)
+
+    await refreshMyGroups()
+
+    expect(get(myGroupsGeladen)).toBe(true)
+    expect(get(myGroups)).toEqual([])
+    vi.doUnmock("$lib/api.js")
+  })
+
+  it("steht nach erfolgreichem Abruf auf true und trägt die Gruppen", async () => {
+    vi.resetModules()
+    vi.doMock("$lib/api.js", () => ({
+      getMyGroups: () => Promise.resolve({ items: UNTERRICHT }),
+    }))
+    const { myGroupsGeladen, refreshMyGroups, myTeachingGroups } = await import("./myGroups.js")
+
+    await refreshMyGroups()
+
+    expect(get(myGroupsGeladen)).toBe(true)
+    expect(get(myTeachingGroups).map((g) => g.id)).toEqual([1, 2])
+    vi.doUnmock("$lib/api.js")
   })
 })

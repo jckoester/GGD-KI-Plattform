@@ -56,3 +56,53 @@ export function aktiverReiter(roh) {
   const uebersetzt = ALTE_KENNUNGEN[roh] ?? roh
   return GUELTIG.has(uebersetzt) ? uebersetzt : 'uebersicht'
 }
+
+// ── Die Schüler-Weiche ──────────────────────────────────────────────────────
+
+/**
+ * Die eigenen Unterrichtsgruppen eines Fachs.
+ *
+ * @param {Array<{id:number, subject_id:number|null}>} gruppen  aus `myTeachingGroups`
+ * @param {number|null|undefined} subjectId
+ */
+export function gruppenImFach(gruppen, subjectId) {
+  if (subjectId == null) return []
+  return (gruppen ?? []).filter((g) => g.subject_id === subjectId)
+}
+
+/**
+ * Was `/subjects/<slug>` für eine Schüler:in tun soll.
+ *
+ * Für Schüler:innen gibt es **keine** Fach-Ebene: Jeder ihrer Chats, jeder ihrer
+ * Bausteine hängt an einer Unterrichtsgruppe. Die Fachseite hat für sie deshalb
+ * keinen eigenen Inhalt — sie ist eine Weiche.
+ *
+ * Zwei Gruppen im selben Fach *sollten* bei Schüler:innen nicht vorkommen. Der Fall
+ * wird trotzdem behandelt: Stillschweigend die erste zu nehmen hieße, die andere
+ * unerreichbar zu machen, ohne dass jemand es merkt.
+ *
+ * @returns {{art:'keine'}|{art:'weiterleiten', gruppe:object}|{art:'auswahl', gruppen:Array}}
+ */
+export function schuelerWeiche(gruppen, subjectId) {
+  const eigene = gruppenImFach(gruppen, subjectId)
+  if (eigene.length === 0) return { art: 'keine' }
+  if (eigene.length === 1) return { art: 'weiterleiten', gruppe: eigene[0] }
+  return { art: 'auswahl', gruppen: eigene }
+}
+
+/**
+ * Wohin ein Fach-Eintrag der Übersicht `/subjects` für Schüler:innen führt.
+ *
+ * Bei genau einer Gruppe direkt dorthin — der Zwischenschritt über die Weiche wäre
+ * eine Seite, die nur weiterleitet. Bei mehreren auf die Weiche, die dann fragt.
+ *
+ * @param {string|null} slug
+ * @param {Array} gruppen  die eigenen Gruppen **dieses** Fachs
+ */
+export function fachZielSchueler(slug, gruppen) {
+  if (!slug) return '/history'
+  const eigene = gruppen ?? []
+  return eigene.length === 1
+    ? `/subjects/${slug}/groups/${eigene[0].id}`
+    : `/subjects/${slug}`
+}

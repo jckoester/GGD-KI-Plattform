@@ -2,6 +2,8 @@
     import PageBody from '$lib/components/PageBody.svelte'
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { conversationCountsBySubject } from "$lib/stores/conversationCounts.js";
+    import { myTeachingGroups } from "$lib/stores/myGroups.js";
+    import { gruppenImFach, fachZielSchueler } from "$lib/gruppenseite.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { LayoutGrid, List } from "lucide-svelte";
 
@@ -26,6 +28,22 @@
 
     function chatCount(section) {
         return $conversationCountsBySubject[String(section.subjectId)] ?? 0;
+    }
+
+    /**
+     * Wohin eine Fach-Kachel führt.
+     *
+     * Für Lehrkräfte auf die Fachseite — sie bündelt dort mehrere Gruppen.
+     * Für Schüler:innen direkt in ihre Unterrichtsgruppe: Die Fachseite hätte für
+     * sie keinen eigenen Inhalt, sie leitete nur weiter. Nur bei mehreren Gruppen
+     * im selben Fach führt der Weg über die Fachseite, die dann fragt.
+     */
+    function ziel(section) {
+        if (section.type === "teacher") return `/subjects/${section.slug}`;
+        return fachZielSchueler(
+            section.slug,
+            gruppenImFach($myTeachingGroups, section.subjectId),
+        );
     }
 
     function chatLabel(n) {
@@ -76,7 +94,7 @@
                 <div class="flex flex-col gap-2 p-4 rounded-xl border border-light-ui-3 dark:border-dark-ui-3
                            bg-light-bg dark:bg-dark-bg-2 transition-colors
                            hover:border-primary dark:hover:border-primary-dark">
-                    <a href="/subjects/{section.slug}" class="flex items-center gap-2 min-w-0">
+                    <a href={ziel(section)} class="flex items-center gap-2 min-w-0">
                         <SubjectIcon
                             name={section.icon}
                             size={20}
@@ -126,7 +144,7 @@
                     />
                     <div class="flex-1 min-w-0">
                         <a
-                            href="/subjects/{section.slug}"
+                            href={ziel(section)}
                             class="block text-sm font-medium text-light-tx dark:text-dark-tx truncate
                                    hover:text-primary dark:hover:text-primary-dark transition-colors"
                         >

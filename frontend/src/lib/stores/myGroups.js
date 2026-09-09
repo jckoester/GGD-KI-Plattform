@@ -2,9 +2,23 @@ import { writable, derived } from 'svelte/store'
 import { getMyGroups } from '$lib/api.js'
 
 const _myGroups = writable([])
+const _geladen = writable(false)
 
 /** Alle eigenen Gruppen (ungefiltert). */
 export const myGroups = derived(_myGroups, $g => $g)
+
+/**
+ * Ob der erste Abruf durch ist — unabhängig davon, ob er etwas fand.
+ *
+ * **Wofür:** Eine leere Liste heißt zweierlei — „noch nicht geladen" und „keine
+ * Gruppen". Wer beides gleich behandelt, zeigt beim Seitenaufbau kurz die Aussage
+ * „dir ist nichts zugeordnet", bevor die Daten da sind. Die Schüler-Weiche auf
+ * `/subjects/[slug]` würde sogar auf eine Erklärseite laufen, statt weiterzuleiten.
+ *
+ * Auch nach einem Fehlschlag `true`: Die Oberfläche degradiert dann bewusst zur
+ * ehrlichen Aussage „keine Gruppen", statt endlos zu laden.
+ */
+export const myGroupsGeladen = derived(_geladen, $g => $g)
 
 /**
  * Nur eigene teaching_groups, nach subject_id und name sortiert.
@@ -74,5 +88,7 @@ export async function refreshMyGroups() {
     _myGroups.set(data.items)
   } catch {
     // Gruppen sind nicht kritisch — UI degradiert graceful
+  } finally {
+    _geladen.set(true)
   }
 }
