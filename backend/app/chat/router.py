@@ -431,6 +431,17 @@ class Zugkosten:
     gefunden: int
     gesamt: int
 
+    @property
+    def zustand(self) -> str:
+        """Der Wert für ``messages.cost_status``.
+
+        `gefunden == gesamt` ist die einzige Lage, in der die Summe die ganze
+        Wahrheit ist. Alles darunter — auch „gar nichts gefunden" — ist
+        unvollständig; die Anzeige sagt das dann und behauptet keine Genauigkeit,
+        die es nicht gibt.
+        """
+        return "vollstaendig" if self.gefunden == self.gesamt else "unvollstaendig"
+
 
 async def _kosten_des_zuges(
     client, request_ids: list[str], *, wartezeiten: tuple[float, ...]
@@ -1407,6 +1418,7 @@ async def _persist(
     usage: dict,
     model_used: str,
     cost_usd: Optional[float] = None,
+    cost_status: Optional[str] = None,
     assistant_id: Optional[int] = None,
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
     skip_user_message: bool = False,
@@ -1438,6 +1450,7 @@ async def _persist(
         tokens_input=tokens_input,
         tokens_output=tokens_output,
         cost_usd=cost_usd,
+        cost_status=cost_status,
     )
     db.add(assistant_msg)
 
@@ -1915,6 +1928,9 @@ async def chat(
         # wenig.
         _request_ids: list[str] = []
         cost_usd: Optional[float] = None
+        # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
+        # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
+        cost_status: Optional[str] = None
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
         _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
 
@@ -2146,6 +2162,7 @@ async def chat(
                 finally:
                     await litellm_client.close()
                 cost_usd = kosten.summe
+                cost_status = kosten.zustand
                 logger.info(
                     "Kosten des Zuges: %d von %d Anfragen abgerechnet, Summe %s",
                     kosten.gefunden, kosten.gesamt,
@@ -2156,6 +2173,12 @@ async def chat(
             # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).
             if _image_cost_total > 0:
                 cost_usd = (cost_usd or 0.0) + _image_cost_total
+                # Bildkosten stehen im Antwortkopf, nicht in den SpendLogs — sie sind
+                # exakt. Ein Zug *nur* aus Bildern ist damit vollständig abgerechnet.
+                # Stand schon `unvollstaendig` (weil ein Text-SpendLog fehlte), bleibt
+                # es dabei: Ein exakter Summand macht eine lückenhafte Summe nicht ganz.
+                if cost_status is None:
+                    cost_status = "vollstaendig"
 
             if cost_usd is not None:
                 yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
@@ -2190,6 +2213,7 @@ async def chat(
             _nachricht_id = await _persist(
                 db, conversation_id, user_message, last_attachments,
                 "".join(full_content), usage, model_used, cost_usd=cost_usd,
+                cost_status=cost_status,
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
                 skip_user_message=crisis_record is not None,

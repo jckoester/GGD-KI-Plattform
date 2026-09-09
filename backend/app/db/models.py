@@ -358,6 +358,15 @@ class Message(Base):
     )
     # cost/token fields - nullable, only for assistant
     cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
+    # Wie belastbar `cost_usd` ist: `ausstehend` (wird im Hintergrund nachgetragen),
+    # `vollstaendig` (alle Anfragen des Zuges abgerechnet), `unvollstaendig`
+    # (Teilsumme — mindestens ein SpendLog blieb aus).
+    #
+    # `NULL` heißt **keine Aussage**, nicht „vollständig": So stehen alle Zeilen von
+    # vor Migration 0058 da, und unter deren Beträgen sind Teilsummen, die niemand
+    # mehr auseinanderhalten kann. Ebenso jede User-Nachricht, die gar keine Kosten
+    # trägt.
+    cost_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tokens_input: Mapped[Optional[int]] = mapped_column(nullable=True)
     tokens_output: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -368,6 +377,11 @@ class Message(Base):
         CheckConstraint(
             "role IN ('user', 'assistant')",
             name="check_message_role"
+        ),
+        CheckConstraint(
+            "cost_status IS NULL OR cost_status IN "
+            "('ausstehend', 'vollstaendig', 'unvollstaendig')",
+            name="check_messages_cost_status",
         ),
         Index("idx_messages_conversation_id", "conversation_id"),
         Index("idx_messages_assistant_id", "assistant_id"),

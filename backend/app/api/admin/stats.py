@@ -48,6 +48,13 @@ class SpendResponse(BaseModel):
     eur_usd_rate: float
     team_id: str | None
     model: str | None
+    # Wie belastbar die Summe ist. Ein Chat-Zug besteht aus mehreren LLM-Anfragen;
+    # findet die Abrechnung nicht alle SpendLogs, geht eine **Teilsumme** in die
+    # Nachricht — und damit auch hierher. Ohne diese beiden Zahlen sähe eine zu
+    # niedrige Summe genauso aus wie eine richtige, und das war der Zustand, in dem
+    # der Fehler unbemerkt blieb.
+    unvollstaendige_nachrichten: int = 0
+    ausstehende_nachrichten: int = 0
 
 
 class TeamOption(BaseModel):
@@ -255,6 +262,30 @@ async def get_spend(
             eur=round(total_eur, 6),
         ))
 
+    # Wie viele Nachrichten desselben Zeitraums tragen eine Teilsumme, wie viele
+    # warten noch auf ihren Betrag? Dieselben Filter wie oben — eine Kennzahl über
+    # einen anderen Ausschnitt wäre irreführend. `cost_status IS NULL` (Bestand vor
+    # Migration 0058, User-Nachrichten) zählt bei keiner von beiden mit: Dort ist
+    # nichts bekannt, und Unwissen ist kein Befund.
+    guete_sql = f"""
+        SELECT
+            COUNT(*) FILTER (WHERE m.cost_status = 'unvollstaendig') AS unvollstaendig,
+            COUNT(*) FILTER (WHERE m.cost_status = 'ausstehend')     AS ausstehend
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        JOIN pseudonym_audit pa ON c.pseudonym = pa.pseudonym
+        WHERE m.role = 'assistant'
+          AND m.created_at >= :from_utc
+          AND m.created_at <= :to_utc
+          {team_where}
+          {model_where}
+    """
+    try:
+        guete = (await db.execute(text(guete_sql), params)).one()
+    except Exception:
+        logger.exception("Fehler beim Laden der Kosten-Güte")
+        raise HTTPException(status_code=500, detail="Interner Serverfehler")
+
     total_usd = sum(e.usd for e in entries)
     total_eur = sum(e.eur for e in entries)
     return SpendResponse(
@@ -264,4 +295,6 @@ async def get_spend(
         eur_usd_rate=rate,
         team_id=team_id,
         model=model,
+        unvollstaendige_nachrichten=int(guete[0] or 0),
+        ausstehende_nachrichten=int(guete[1] or 0),
     )
