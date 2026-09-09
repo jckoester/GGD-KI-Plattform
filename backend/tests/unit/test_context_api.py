@@ -107,11 +107,30 @@ class TestListNodes:
         resp = client.get("/context/nodes")
         assert resp.status_code in (401, 422)  # je nach FastAPI-Version
 
-    def test_student_role_denied(self):
+    def test_student_role_allowed(self):
+        """Seit 09/2026 rollenoffen (ADR-019 F8) — vorher 403.
+
+        Die Schranke ist nicht ersatzlos gefallen: Sie ist von der Rolle auf den
+        Scope gewandert (`read_scope_clause`). Dass die Regel greift, prüft
+        `tests/integration/test_context_schueler_lesepfad.py` gegen echtes
+        Postgres — hier steht nur, dass die *Tür* offen ist. Ein Mock kann eine
+        SQL-Bedingung nicht widerlegen; ihn so tun zu lassen, als könnte er es,
+        wäre die gefährlichere Zusage.
+        """
         db = make_mock_db()
         user = make_jwt(roles=["student"])
         client = TestClient(make_app(db, user))
         resp = client.get("/context/nodes")
+        assert resp.status_code == 200
+
+    def test_student_darf_weiterhin_nicht_anlegen(self):
+        """Geöffnet wurde das Lesen — die Schreibpfade blieben, wo sie waren."""
+        db = make_mock_db()
+        user = make_jwt(roles=["student"])
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/nodes", json={
+            "category": "concept", "content_type": "begriff", "title": "verboten",
+        })
         assert resp.status_code == 403
 
 

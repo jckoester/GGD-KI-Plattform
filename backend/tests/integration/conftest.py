@@ -29,6 +29,7 @@ _settings.embeddings_enabled = False
 # Pseudonyme der Test-Nutzer
 TEACHER1_PSEUDO = "teacher1-pseudo"
 TEACHER2_PSEUDO = "teacher2-pseudo"
+STUDENT_PSEUDO = "student1-pseudo"
 
 
 def _get_test_db_url() -> str:
@@ -123,6 +124,20 @@ def auth_headers(jwt_service):
 def auth_headers_teacher2(jwt_service):
     """HTTP-Cookie-Header für teacher2-pseudo (fremde Lehrkraft)."""
     token, _ = jwt_service.issue(pseudonym=TEACHER2_PSEUDO, roles=["teacher"], grade=None)
+    return {"Cookie": f"session={token}"}
+
+
+@pytest.fixture
+def auth_headers_student(jwt_service):
+    """HTTP-Cookie-Header für student1-pseudo (Schüler:in, Klasse 8).
+
+    Seit 09/2026 sind die Lesepfade des Kontextspeichers rollenoffen (ADR-019 F8);
+    was sichtbar ist, entscheidet `read_scope_clause`. Dafür braucht es einen Token
+    **ohne** Lehrkraft-Rolle — mit `teacher` liefen die Tests an der Regel vorbei.
+    """
+    # `grade` ist im JWT eine **Zeichenkette** (`JwtPayload`), nicht eine Zahl —
+    # eine 8 statt "8" scheitert erst beim Verifizieren, nicht beim Ausstellen.
+    token, _ = jwt_service.issue(pseudonym=STUDENT_PSEUDO, roles=["student"], grade="8")
     return {"Cookie": f"session={token}"}
 
 

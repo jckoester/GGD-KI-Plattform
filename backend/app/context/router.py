@@ -300,6 +300,18 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
 
 
 # ── GET /api/context/nodes ────────────────────────────────────────────────────
+#
+# Rollenoffen seit 09/2026 (ADR-019 F8). Wer was sehen darf, entscheidet allein
+# `read_scope_clause` in `app.context.visibility` — dieselbe Regel, die Suche,
+# Nachbarschaft und Detailansicht benutzen. Eine zweite, rollenbasierte Schranke
+# hier wäre genau die Kopie, die dort im Modulkopf beschrieben ist: Sie driftet,
+# und die Richtung merkt man erst, wenn sie wirkt.
+#
+# Nachgemessen beim Öffnen (09.09.2026): Bildungsplan und Curricula sind für
+# Schüler:innen **schon vorher** lesbar gewesen — `/context/curricula/{id}`,
+# `/curricula/by-subject/{id}` und `/fachplan/by-subject/{id}` hängen seit jeher an
+# `get_current_user`, und die Knoten tragen `read_scope` `school`/`global`. Diese
+# Öffnung legt also nichts frei, was verschlossen war.
 
 
 @router.get("/nodes", response_model=list[ContextNodeRead])
@@ -326,7 +338,7 @@ async def list_nodes(
     limit: int | None = Query(default=None, ge=1, le=500, description="Maximale Anzahl Ergebnisse"),
     offset: int | None = Query(default=None, ge=0, description="Versatz für Pagination"),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     if owner is not None and owner != "me":
         raise HTTPException(status_code=400, detail="owner muss 'me' sein")
@@ -376,7 +388,7 @@ async def get_neighborhood(
     relation: list[str] | None = Query(default=None),
     category: list[str] | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     # Startknoten laden und prüfen
     node = await db.get(ContextNode, node_id)
@@ -441,7 +453,7 @@ async def get_neighborhood(
 async def get_archived_references(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     # Startknoten laden
     node = await db.get(ContextNode, node_id)

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   alleSammlungen,
   fachSammlungen,
+  schuelerSammlungen,
   istStub,
   kannVerknuepfen,
   relationen,
@@ -280,6 +281,35 @@ describe("fachSammlungen", () => {
       .map((s) => s.typ)
       .filter((typ) => sidebarSammlungen().some((s) => s.typ === typ))
     expect(beides).toEqual(["methode", "begriff"])
+  })
+})
+
+describe("schuelerSammlungen", () => {
+  it("sind Fachbegriffe, Methoden- und Operatorenblätter", () => {
+    // Was Schüler:innen im Unterricht in die Hand bekommen. Reihenfolge = YAML.
+    expect(schuelerSammlungen().map((s) => s.typ)).toEqual([
+      "methodenblatt",
+      "operatorenblatt",
+      "begriff",
+    ])
+  })
+
+  it("lässt das Planungsvokabular der Lehrkraft draußen", () => {
+    // `methode` führt *Unterrichts*methoden (Placemat, Galeriegang) — das
+    // Vokabular des Stundenentwurfs, keine Frage, die Schüler:innen stellen.
+    // `sozialform` ebenso, und sie kennt zudem kein Fach.
+    const typen = schuelerSammlungen().map((s) => s.typ)
+    expect(typen).not.toContain("methode")
+    expect(typen).not.toContain("sozialform")
+  })
+
+  it("ist eine Teilmenge der fachgebundenen Sammlungen", () => {
+    // Der Abschnitt „Nachschlagen" filtert aufs Fach der Gruppe — eine Sammlung
+    // ohne Fachfilter stünde dort ungefiltert und wäre eine andere Ansicht.
+    const fach = fachSammlungen().map((s) => s.typ)
+    for (const s of schuelerSammlungen()) {
+      expect(fach, s.typ).toContain(s.typ)
+    }
   })
 })
 

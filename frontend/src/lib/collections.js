@@ -67,6 +67,22 @@ export function fachSammlungen() {
   )
 }
 
+/**
+ * Die Sammlungen, für die Schüler:innen einen Einstieg bekommen (`schueler: true`).
+ *
+ * **Keine Rechteangabe.** Alle Sammlungen sind `read_scope: school` und damit für
+ * jede angemeldete Person lesbar; wer was sehen darf, entscheidet allein
+ * `read_scope_clause` im Backend. Hier steht nur, wofür es einen *sichtbaren Weg*
+ * gibt — ein Einstieg zum Planungsvokabular der Lehrkraft (`methode`, `sozialform`)
+ * beantwortet keine Frage, die Schüler:innen haben.
+ *
+ * Konfiguriert, nicht im Code aufgezählt: Eine Liste hier wäre eine zweite Aussage
+ * über dieselbe Sache und liefe mit der Taxonomie auseinander.
+ */
+export function schuelerSammlungen() {
+  return alleSammlungen().filter((s) => COLLECTIONS[s.typ].schueler === true)
+}
+
 /** Die Konfiguration eines Typs, oder `null` — für unbekannte Typen und 404-Fälle. */
 export function sammlung(typ) {
   return COLLECTIONS[typ] ?? null

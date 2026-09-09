@@ -25,7 +25,7 @@
   import { assistants } from '$lib/stores/assistants.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { refreshConversationCounts } from '$lib/stores/conversationCounts.js'
-  import { fachSammlungen } from '$lib/collections.js'
+  import { fachSammlungen, schuelerSammlungen } from '$lib/collections.js'
   import AssistantCard from './AssistantCard.svelte'
   import ConversationMenu from './ConversationMenu.svelte'
   import NodeTypeIcon from './NodeTypeIcon.svelte'
@@ -192,28 +192,29 @@
      `node_engagement` gibt es heute keinen Schreiber, der Personen erfasst. -->
 
 <!-- ── 5. Nachschlagen ───────────────────────────────────────────────────────
-     Für Schüler:innen füllt AP4 die Sammlungen (`schuelerSammlungen`); bis dahin
-     bleibt der Abschnitt für sie bei der Suche. -->
+     Ein Abschnitt für beide Rollen, verschieden gefüllt: Lehrkräfte sehen alle
+     fachgebundenen Sammlungen (das schließt ihr Planungsvokabular ein),
+     Schüler:innen die, die für sie geschrieben sind (`schueler: true`).
+     Das ist **keine** Rechteregel — alle sind `read_scope: school` und ohnehin
+     lesbar; es geht allein darum, wofür es einen sichtbaren Weg gibt. -->
 <section class="py-6 first:pt-0 last:pb-0">
   <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2 mb-4">
     Nachschlagen
   </h2>
   <div class="flex flex-wrap gap-2">
-    {#if istLehrkraft}
-      {#each fachSammlungen() as sammlung (sammlung.typ)}
-        <a
-          href="/knowledge/collections/{sammlung.typ}?subject_id={subject?.id}"
-          title={sammlung.beschreibung}
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md
-                 border border-light-ui-3 dark:border-dark-ui-3
-                 text-light-tx dark:text-dark-tx
-                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-        >
-          <NodeTypeIcon contentType={sammlung.typ} size={16} />
-          {sammlung.label}
-        </a>
-      {/each}
-    {/if}
+    {#each istLehrkraft ? fachSammlungen() : schuelerSammlungen() as sammlung (sammlung.typ)}
+      <a
+        href="/knowledge/collections/{sammlung.typ}?subject_id={subject?.id}"
+        title={sammlung.beschreibung}
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md
+               border border-light-ui-3 dark:border-dark-ui-3
+               text-light-tx dark:text-dark-tx
+               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+      >
+        <NodeTypeIcon contentType={sammlung.typ} size={16} />
+        {sammlung.label}
+      </a>
+    {/each}
     <a
       href="/knowledge/search"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md

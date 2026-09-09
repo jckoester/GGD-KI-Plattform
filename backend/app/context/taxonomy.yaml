@@ -56,6 +56,14 @@
 #                 wenn man eine Aufgabe vor sich hat — und hat das Fach dann längst im
 #                 Kopf; eine globale Liste nach Fach zu filtern dreht den Weg um. Wer
 #                 einen Eintrag in der Navigation will, sagt es hier und begründet es.
+#   schueler      Erscheint die Sammlung im Abschnitt „Nachschlagen" der
+#                 Unterrichtsgruppen-Seite auch für **Schüler:innen**? **Vorgabe: nein.**
+#                 Es ist keine Rechteangabe — alle Sammlungen sind `read_scope: school`
+#                 und damit ohnehin lesbar; die Regel dafür steht allein in
+#                 `app/context/visibility.py`. Hier wird nur entschieden, wofür es einen
+#                 sichtbaren Einstieg gibt. Ja bei dem, was Schüler:innen im Unterricht
+#                 in die Hand bekommen (Fachbegriffe, Methoden- und Operatorenblätter);
+#                 nein bei Planungsvokabular der Lehrkraft (`methode`, `sozialform`).
 #   content       Label und Pflicht des Knotentexts. Ein Eintrag ohne Text ist nur
 #                 über seinen Namen auffindbar — bei `methode` und `begriff` ist er
 #                 deshalb Pflicht.
@@ -136,11 +144,21 @@ categories:
         # Schülermaterial soll thematisch auftauchen, nicht nur unter seinem Namen.
         embedding: true
         collection:
+          # ⚠️ „Methode" heißt hier **nicht** der Knotentyp `methode`. Ein
+          # Methodenblatt erklärt in aller Regel eine *Fachmethode* — ein fachliches
+          # Verfahren, das Schüler:innen beherrschen sollen (eine Quelle analysieren,
+          # ein Gedicht deuten, titrieren). `methode` führt dagegen
+          # *Unterrichts*methoden, das Planungsvokabular der Lehrkraft. Bis 09/2026
+          # verwies dieser Satz auf den falschen Typ. Ein eigener Typ `fachmethode`
+          # wurde geprüft und verworfen (die PK-Knoten des Bildungsplans leisten das
+          # bereits) — Begründung und Wiederaufnahme-Bedingungen im `Konzept/Parkplatz.md`.
           beschreibung: >-
-            Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und
-            worauf es ankommt. Die Fachschaft pflegt sie.
+            Handreichungen für Schüler:innen zu einem fachlichen Verfahren — was zu
+            tun ist und worauf es ankommt. Die Fachschaft pflegt sie.
           spalten: [titel, fach, status, geaendert]
           filter: [fach, status, titel]
+          # Schülermaterial im Wortsinn: Es ist für sie geschrieben.
+          schueler: true
           content: {label: "Inhalt des Blattes", pflicht: false}
       - key: operatorenblatt
         label_de: "Operatorenblatt"
@@ -154,6 +172,8 @@ categories:
             oder „beurteilen" dort konkret verlangt.
           spalten: [titel, fach, status, geaendert]
           filter: [fach, status, titel]
+          # Wer eine Aufgabe vor sich hat, muss wissen, was der Operator verlangt.
+          schueler: true
           content: {label: "Inhalt des Blattes", pflicht: false}
       - key: praesentation
         label_de: "Präsentation"
@@ -248,7 +268,11 @@ categories:
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: false
       - key: methode
-        label_de: "Methode"
+        # „Unterrichtsmethode", nicht „Methode": Das kürzere Wort trägt im Schulalltag
+        # zwei Bedeutungen — das didaktische Arrangement (Placemat, Galeriegang) und
+        # das fachliche Verfahren (Gedichtanalyse, Titration). Dieser Typ meint das
+        # erste; für das zweite gibt es das `methodenblatt`.
+        label_de: "Unterrichtsmethode"
         icon: Sparkles
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Methoden sollen gefunden werden, ohne ihren Namen zu kennen.
@@ -269,7 +293,9 @@ categories:
         embedding_input: ["title", "aliases", "metadata.ablauf|content"]
         collection:
           beschreibung: >-
-            Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge
+            Didaktische Arrangements für den Unterricht — Placemat, Galeriegang,
+            Think-Pair-Share. Nicht gemeint sind fachliche Verfahren wie die
+            Gedichtanalyse; die erklärt ein Methodenblatt. Fachübergreifende Einträge
             pflegt die Administration, fachspezifische die jeweilige Fachschaft.
           spalten: [titel, fach, aliase, status, geaendert]
           filter: [fach, status, titel]
@@ -486,6 +512,8 @@ categories:
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
           # Biologie?" fragt man ohne das eigene Fach im Kopf.
           sidebar: true
+          # Der Kernfall von Nachschlagen im Unterricht.
+          schueler: true
           relationen:
             related_to:
               label: "steht in Beziehung zu"

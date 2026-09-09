@@ -110,7 +110,7 @@ export const SCHULJAHRESENDE_CONTENT_TYPES = new Set([
 // Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.
 export const COLLECTIONS = {
   "methodenblatt": {
-    "beschreibung": "Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und worauf es ankommt. Die Fachschaft pflegt sie.",
+    "beschreibung": "Handreichungen für Schüler:innen zu einem fachlichen Verfahren — was zu tun ist und worauf es ankommt. Die Fachschaft pflegt sie.",
     "spalten": [
       "titel",
       "fach",
@@ -122,6 +122,7 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "schueler": true,
     "content": {
       "label": "Inhalt des Blattes",
       "pflicht": false
@@ -140,13 +141,14 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "schueler": true,
     "content": {
       "label": "Inhalt des Blattes",
       "pflicht": false
     }
   },
   "methode": {
-    "beschreibung": "Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge pflegt die Administration, fachspezifische die jeweilige Fachschaft.",
+    "beschreibung": "Didaktische Arrangements für den Unterricht — Placemat, Galeriegang, Think-Pair-Share. Nicht gemeint sind fachliche Verfahren wie die Gedichtanalyse; die erklärt ein Methodenblatt. Fachübergreifende Einträge pflegt die Administration, fachspezifische die jeweilige Fachschaft.",
     "spalten": [
       "titel",
       "fach",
@@ -208,6 +210,7 @@ export const COLLECTIONS = {
       "titel"
     ],
     "sidebar": true,
+    "schueler": true,
     "relationen": {
       "related_to": {
         "label": "steht in Beziehung zu",
@@ -298,7 +301,7 @@ export const CONTENT_TYPE_LABELS = {
   "curriculum": "Schulcurriculum",
   "kapitel": "Kapitel",
   "lernsequenz": "Lernsequenz",
-  "methode": "Methode",
+  "methode": "Unterrichtsmethode",
   "sozialform": "Sozialform",
   "operator": "Operator",
   "jahresplan": "Jahresplan",
