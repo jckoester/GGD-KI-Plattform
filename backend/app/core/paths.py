@@ -55,6 +55,12 @@ def _basis() -> Path:
 
 BASIS = _basis()
 
+# Das Verzeichnis, in dem das `app`-Paket liegt: `backend/` im Entwicklungsbaum,
+# `/app` im Container. Dort liegen die Dinge, die zur **Anwendung** gehören statt
+# zum Repo — allen voran `alembic.ini` samt `alembic/`. Für sie ist `BASIS` falsch:
+# Die zeigt im Entwicklungsbaum eine Ebene höher, auf die Repo-Wurzel.
+ANWENDUNGSWURZEL = _APP_PAKET.parent
+
 
 def aufloesen(pfad: Union[str, Path]) -> Path:
     """Absoluter Pfad bleibt unverändert; relativer wird an :data:`BASIS` verankert.

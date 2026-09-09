@@ -18,9 +18,18 @@ from app.main import check_embedding_dimension
 
 @asynccontextmanager
 async def _session_yielding(value):
-    """AsyncSessionLocal-Ersatz, dessen execute().scalar() `value` liefert."""
+    """AsyncSessionLocal-Ersatz, dessen execute().scalar() `value` liefert.
+
+    `.all()` beantwortet zusätzlich die Migrationsstands-Abfrage der Lifespan mit dem
+    **echten** Kopf aus den Migrationsdateien. Ohne diese Zeile sähe die Prüfung eine
+    leere `alembic_version` und bräche den Start ab — die Lifespan-Tests hier prüfen
+    aber etwas anderes, und ein Mock ist keine unmigrierte Datenbank.
+    """
+    from app.db.schema_check import kopf_revisionen
+
     result = MagicMock()
     result.scalar = MagicMock(return_value=value)
+    result.all = MagicMock(return_value=[(r,) for r in kopf_revisionen()])
     session = MagicMock()
     session.execute = AsyncMock(return_value=result)
     yield session

@@ -121,6 +121,13 @@ async def lifespan(app: FastAPI):
                 settings.exchange_rate_fallback,
             )
 
+    # Startup-Check: Migrationsstand. Zuerst, weil jede folgende Prüfung ein Schema
+    # voraussetzt — und weil eine Datenbank hinter dem Code sich sonst erst beim
+    # Anklicken zeigt, als fehlende *Tabelle* statt als fehlende *Migration*
+    # (aufgetreten 09.09.2026 mit `node_aliases`).
+    from app.db.schema_check import pruefe_beim_start as pruefe_migrationsstand
+    await pruefe_migrationsstand(AsyncSessionLocal)
+
     # Startup-Check: Vektorbreite gegen EMBEDDING_DIMENSIONS
     await check_embedding_dimension()
 

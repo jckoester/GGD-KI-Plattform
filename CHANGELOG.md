@@ -120,6 +120,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **In einer leeren Sammlung erschien für Schüler:innen „Neu anlegen"**, obwohl das
   Anlegen abgelehnt wird.
 
+- **Das Backend startet nicht mehr mit veralteter Datenbank.** Eine fehlende Migration
+  zeigte sich vorher erst beim Anklicken, als fehlende Tabelle statt als fehlende
+  Migration; jetzt nennt eine Startprüfung beide Stände und den nötigen Befehl.
+
 - **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten Öffnen
   ließen sie sich nicht mehr eindeutig zuordnen.
 
