@@ -64,6 +64,9 @@ describe("istLeereAntwort", () => {
     it("hält eine Antwort mit Bild nicht für leer", () => {
         // Ein erzeugtes Bild ohne Begleittext ist eine Antwort — nur eben keine
         // aus Buchstaben. Ohne diesen Fall bekäme jedes Bild einen Fehlalarm.
+        //
+        // Seit die Bilder **in** der Blase sitzen (09.09.2026) trägt der Fall
+        // doppelt: Er entscheidet auch, ob die Blase überhaupt gerendert wird.
         expect(istLeereAntwort({ content: "", images: [{ image_id: "x" }] }, false))
             .toBe(false);
     });

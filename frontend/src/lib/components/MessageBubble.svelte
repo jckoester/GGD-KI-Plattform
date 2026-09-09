@@ -352,7 +352,7 @@
             <div class="max-w-[80%]">
                 <WarningBanner message={leereAntwortText(costEur)} />
             </div>
-        {:else if message.content || isStreaming}
+        {:else if message.content || isStreaming || message.images?.length}
         <div class="bg-light-secondary dark:bg-dark-secondary rounded-xl rounded-bl-none px-4 py-3 max-w-[80%]">
             <div class="prose dark:prose-invert max-w-none
                         prose-p:my-1 prose-headings:mt-3 prose-headings:mb-1
@@ -369,6 +369,133 @@
             </div>
             {#if isStreaming}
                 <span class="animate-pulse cursor-default text-light-tx-2 dark:text-dark-tx-2 text-sm ml-0.5">|</span>
+            {/if}
+            <!-- Bild und Aktionen gehören **in** die Blase: Sie sind Teil
+                 derselben Antwort. Außerhalb wirkten sie wie eigene Beiträge,
+                 und die Kostenzeile darunter bezog sich sichtbar auf etwas
+                 anderes als das, was darüber stand. -->
+            {#if message.images?.length}
+                <div class="flex flex-col gap-2 mt-3">
+                    {#each message.images as img (img.image_id)}
+                        {#if failedImages.has(img.image_id)}
+                            <div class="flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2
+                                        border border-light-ui-3 dark:border-dark-ui-3 rounded-xl px-4 py-3">
+                                <AlertCircle class="w-4 h-4 shrink-0" />
+                                Bild konnte nicht geladen werden.
+                            </div>
+                        {:else}
+                            <div class="group relative inline-block">
+                                <img
+                                    src="/api/images/{img.image_id}"
+                                    alt="Generiertes Bild"
+                                    loading="lazy"
+                                    class="rounded-xl max-w-full h-auto border border-light-ui-3 dark:border-dark-ui-3"
+                                    onerror={() => onImageError(img.image_id)}
+                                />
+                                <div class="absolute top-1.5 right-1.5 flex gap-1
+                                            opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        type="button"
+                                        onclick={() => saveImage(img.image_id)}
+                                        disabled={imageSaveState[img.image_id] === 'saving'}
+                                        aria-label={imageSaveTitle(imageSaveState[img.image_id])}
+                                        title={imageSaveTitle(imageSaveState[img.image_id])}
+                                        class="p-1.5 rounded-lg
+                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+                                    >
+                                        {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
+                                            <Check class="w-4 h-4" />
+                                        {:else if imageSaveState[img.image_id] === 'full' || imageSaveState[img.image_id] === 'error'}
+                                            <AlertCircle class="w-4 h-4" />
+                                        {:else}
+                                            <BookmarkPlus class="w-4 h-4" />
+                                        {/if}
+                                    </button>
+                                    <a
+                                        href="/api/images/{img.image_id}"
+                                        download="bild-{img.image_id}.png"
+                                        aria-label="Bild herunterladen"
+                                        class="p-1.5 rounded-lg
+                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
+                                    >
+                                        <Download class="w-4 h-4" />
+                                    </a>
+                                    {#if img.bildart}
+                                        <button
+                                            type="button"
+                                            onclick={() => variiere(img.image_id)}
+                                            disabled={variiereStatus[img.image_id] === 'laeuft'}
+                                            aria-label="Noch einmal erzeugen"
+                                            title="Noch einmal erzeugen — gleiche Beschreibung, neues Bild"
+                                            class="p-1.5 rounded-lg
+                                                   bg-light-bg-2/80 dark:bg-dark-bg-2/80
+                                                   text-light-tx-2 dark:text-dark-tx-2
+                                                   hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
+                                                   disabled:opacity-60"
+                                        >
+                                            {#if variiereStatus[img.image_id] === 'laeuft'}
+                                                <Loader2 class="w-4 h-4 animate-spin" />
+                                            {:else}
+                                                <RefreshCw class="w-4 h-4" />
+                                            {/if}
+                                        </button>
+                                    {/if}
+                                </div>
+                                {#if variiereStatus[img.image_id] && variiereStatus[img.image_id] !== 'laeuft'}
+                                    <p class="mt-0.5 text-xs text-light-re dark:text-dark-re">
+                                        {variiereStatus[img.image_id]}
+                                    </p>
+                                {/if}
+                            </div>
+                        {/if}
+                    {/each}
+                    <!-- Jugendschutz-/Qualitätshinweis zu KI-Bildern (Phase 16 Schritt 9) -->
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        KI-erzeugte Bilder können fehlerhaft sein und eignen sich nicht
+                        zur Darstellung realer Personen.
+                    </p>
+                </div>
+            {/if}
+            {#if message.content && !isStreaming}
+                <div class="mt-3 flex flex-wrap items-center gap-1">
+                    <button
+                        type="button"
+                        onclick={openInWorkshop}
+                        disabled={openingWorkshop}
+                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                               text-light-tx-2 dark:text-dark-tx-2
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50"
+                    >
+                        <FileEdit class="w-3.5 h-3.5" />
+                        {openingWorkshop ? 'Wird geöffnet…' : 'In Werkstatt öffnen'}
+                    </button>
+                    <!-- Der zweite Einstieg in dasselbe Formular (AP8). Die Werkstatt ist
+                         zum Weiterschreiben da, der Baustein zum Wiederfinden — zwei
+                         verschiedene Absichten, deshalb zwei Knöpfe. -->
+                    <button
+                        type="button"
+                        onclick={alsBausteinSpeichern}
+                        disabled={bausteinLaeuft}
+                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                               text-light-tx-2 dark:text-dark-tx-2
+                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                               disabled:opacity-50"
+                    >
+                        <Share2 class="w-3.5 h-3.5" />
+                        {bausteinLaeuft ? 'Wird vorbereitet…' : 'Als Baustein speichern'}
+                    </button>
+                    {#if workshopError}
+                        <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
+                    {/if}
+                    {#if bausteinFehler}
+                        <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{bausteinFehler}</p>
+                    {/if}
+                </div>
             {/if}
             {#if kosten !== null || (hatHerkunftsangaben && !isStreaming)}
                 <div class="flex items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2
@@ -431,129 +558,6 @@
                 {/if}
             {/if}
         </div>
-        {/if}
-        {#if message.content && !isStreaming}
-            <div class="mt-1 max-w-[80%] flex flex-wrap items-center gap-1">
-                <button
-                    type="button"
-                    onclick={openInWorkshop}
-                    disabled={openingWorkshop}
-                    class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                           text-light-tx-2 dark:text-dark-tx-2
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           disabled:opacity-50"
-                >
-                    <FileEdit class="w-3.5 h-3.5" />
-                    {openingWorkshop ? 'Wird geöffnet…' : 'In Werkstatt öffnen'}
-                </button>
-                <!-- Der zweite Einstieg in dasselbe Formular (AP8). Die Werkstatt ist
-                     zum Weiterschreiben da, der Baustein zum Wiederfinden — zwei
-                     verschiedene Absichten, deshalb zwei Knöpfe. -->
-                <button
-                    type="button"
-                    onclick={alsBausteinSpeichern}
-                    disabled={bausteinLaeuft}
-                    class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
-                           text-light-tx-2 dark:text-dark-tx-2
-                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                           disabled:opacity-50"
-                >
-                    <Share2 class="w-3.5 h-3.5" />
-                    {bausteinLaeuft ? 'Wird vorbereitet…' : 'Als Baustein speichern'}
-                </button>
-                {#if workshopError}
-                    <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{workshopError}</p>
-                {/if}
-                {#if bausteinFehler}
-                    <p class="w-full text-xs text-light-re dark:text-dark-re mt-0.5">{bausteinFehler}</p>
-                {/if}
-            </div>
-        {/if}
-        {#if message.images?.length}
-            <div class="flex flex-col gap-2 mt-2 max-w-[80%]">
-                {#each message.images as img (img.image_id)}
-                    {#if failedImages.has(img.image_id)}
-                        <div class="flex items-center gap-2 text-sm text-light-tx-2 dark:text-dark-tx-2
-                                    border border-light-ui-3 dark:border-dark-ui-3 rounded-xl px-4 py-3">
-                            <AlertCircle class="w-4 h-4 shrink-0" />
-                            Bild konnte nicht geladen werden.
-                        </div>
-                    {:else}
-                        <div class="group relative inline-block">
-                            <img
-                                src="/api/images/{img.image_id}"
-                                alt="Generiertes Bild"
-                                loading="lazy"
-                                class="rounded-xl max-w-full h-auto border border-light-ui-3 dark:border-dark-ui-3"
-                                onerror={() => onImageError(img.image_id)}
-                            />
-                            <div class="absolute top-1.5 right-1.5 flex gap-1
-                                        opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    type="button"
-                                    onclick={() => saveImage(img.image_id)}
-                                    disabled={imageSaveState[img.image_id] === 'saving'}
-                                    aria-label={imageSaveTitle(imageSaveState[img.image_id])}
-                                    title={imageSaveTitle(imageSaveState[img.image_id])}
-                                    class="p-1.5 rounded-lg
-                                           bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                           text-light-tx-2 dark:text-dark-tx-2
-                                           hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
-                                >
-                                    {#if imageSaveState[img.image_id] === 'saved' || imageSaveState[img.image_id] === 'exists'}
-                                        <Check class="w-4 h-4" />
-                                    {:else if imageSaveState[img.image_id] === 'full' || imageSaveState[img.image_id] === 'error'}
-                                        <AlertCircle class="w-4 h-4" />
-                                    {:else}
-                                        <BookmarkPlus class="w-4 h-4" />
-                                    {/if}
-                                </button>
-                                <a
-                                    href="/api/images/{img.image_id}"
-                                    download="bild-{img.image_id}.png"
-                                    aria-label="Bild herunterladen"
-                                    class="p-1.5 rounded-lg
-                                           bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                           text-light-tx-2 dark:text-dark-tx-2
-                                           hover:bg-light-ui-3 dark:hover:bg-dark-ui-3"
-                                >
-                                    <Download class="w-4 h-4" />
-                                </a>
-                                {#if img.bildart}
-                                    <button
-                                        type="button"
-                                        onclick={() => variiere(img.image_id)}
-                                        disabled={variiereStatus[img.image_id] === 'laeuft'}
-                                        aria-label="Noch einmal erzeugen"
-                                        title="Noch einmal erzeugen — gleiche Beschreibung, neues Bild"
-                                        class="p-1.5 rounded-lg
-                                               bg-light-bg-2/80 dark:bg-dark-bg-2/80
-                                               text-light-tx-2 dark:text-dark-tx-2
-                                               hover:bg-light-ui-3 dark:hover:bg-dark-ui-3
-                                               disabled:opacity-60"
-                                    >
-                                        {#if variiereStatus[img.image_id] === 'laeuft'}
-                                            <Loader2 class="w-4 h-4 animate-spin" />
-                                        {:else}
-                                            <RefreshCw class="w-4 h-4" />
-                                        {/if}
-                                    </button>
-                                {/if}
-                            </div>
-                            {#if variiereStatus[img.image_id] && variiereStatus[img.image_id] !== 'laeuft'}
-                                <p class="mt-0.5 text-xs text-light-re dark:text-dark-re">
-                                    {variiereStatus[img.image_id]}
-                                </p>
-                            {/if}
-                        </div>
-                    {/if}
-                {/each}
-                <!-- Jugendschutz-/Qualitätshinweis zu KI-Bildern (Phase 16 Schritt 9) -->
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    KI-erzeugte Bilder können fehlerhaft sein und eignen sich nicht
-                    zur Darstellung realer Personen.
-                </p>
-            </div>
         {/if}
         {#if message.crisis}
             <div class="max-w-[80%] w-full">

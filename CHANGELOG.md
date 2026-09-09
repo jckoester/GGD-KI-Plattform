@@ -109,6 +109,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   ein Neu-Einbetten ist nicht nötig. Legt die PostgreSQL-Erweiterung `pg_trgm` an, falls
   sie fehlt (seit 0054 in der Regel vorhanden).
 
+### Geändert
+
+- **Bild und die Knöpfe „In Werkstatt öffnen" / „Als Baustein speichern" stehen jetzt
+  in der Antwortblase**, nicht mehr darunter. Sie gehören zur selben Antwort wie der
+  Text und die Kostenzeile.
+
 ### Behoben
 
 - **Die Fachseite zeigte Schüler:innen nie einen Chat.** Sie fragte nach Chats ohne
