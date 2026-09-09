@@ -106,3 +106,76 @@ export function fachZielSchueler(slug, gruppen) {
     ? `/subjects/${slug}/groups/${eigene[0].id}`
     : `/subjects/${slug}`
 }
+
+// ── Der Block „Jetzt" ───────────────────────────────────────────────────────
+
+/**
+ * Der Fortschritt einer Unterrichtseinheit als Satz.
+ *
+ * @param {{stunden_gehalten:number, stunden_gesamt:number}|null|undefined} einheit
+ */
+export function fortschritt(einheit) {
+  if (!einheit) return ''
+  const { stunden_gehalten: gehalten, stunden_gesamt: gesamt } = einheit
+  if (!gesamt) return 'noch keine Stunden verplant'
+  return `${gehalten} von ${gesamt} ${gesamt === 1 ? 'Stunde' : 'Stunden'}`
+}
+
+/**
+ * Die Stundenzeilen des Blocks mit ihrer Beschriftung.
+ *
+ * Die Beschriftung ist keine Eigenschaft der Stunde, sondern ihrer **Stellung**:
+ * Dieselbe Stunde heißt „heute", solange sie ansteht, und „zuletzt", sobald eine
+ * spätere existiert. Sie deshalb hier zu vergeben und nicht im Markup hält die
+ * Regel an einem Ort — und prüfbar.
+ *
+ * Genau eine Zeile trägt „als Nächstes": die erste, die **nicht** heute ist. Eine
+ * heutige Stunde ist nicht das Nächste, sie ist das Jetzige; wäre sie so
+ * beschriftet, verschwiege die Ansicht, dass sie ansteht.
+ *
+ * @param {{zuletzt:object|null, kommende:object[]}|null} jetzt
+ * @returns {Array<object & {rolle: 'zuletzt'|'heute'|'naechste'|'weitere'}>}
+ */
+export function stundenReihen(jetzt) {
+  if (!jetzt) return []
+  const reihen = []
+  if (jetzt.zuletzt) reihen.push({ ...jetzt.zuletzt, rolle: 'zuletzt' })
+
+  let naechsteVergeben = false
+  for (const stunde of jetzt.kommende ?? []) {
+    let rolle
+    if (stunde.ist_heute) {
+      rolle = 'heute'
+    } else if (!naechsteVergeben) {
+      rolle = 'naechste'
+      naechsteVergeben = true
+    } else {
+      rolle = 'weitere'
+    }
+    reihen.push({ ...stunde, rolle })
+  }
+  return reihen
+}
+
+/** Beschriftung je Rolle — leer für die Folgezeilen. */
+export const ROLLEN_LABEL = {
+  zuletzt: 'zuletzt',
+  heute: 'heute',
+  naechste: 'als Nächstes',
+  weitere: '',
+}
+
+/**
+ * Datum einer Stunde, kurz: „Do 04.09.".
+ *
+ * Mit Wochentag, weil Unterricht in Wochentagen gedacht wird — „Do" sagt einer
+ * Lehrkraft mehr über die Stunde als der 4.
+ */
+export function stundenDatum(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const wochentag = d.toLocaleDateString('de-DE', { weekday: 'short' })
+  const rest = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  return `${wochentag} ${rest}`
+}

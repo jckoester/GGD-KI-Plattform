@@ -12,7 +12,7 @@ lösen jeweils einen Snapshot aus.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -33,10 +33,14 @@ from app.db.models import (
 from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
+from app.planning import jetzt as jetzt_modul
 from app.planning.permissions import require_group_teacher
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     BalanceRead,
+    JetztEinheit,
+    JetztRead,
+    JetztStunde,
     CurriculumKapitelOption,
     CurriculumOption,
     FerienItem,
@@ -229,6 +233,71 @@ async def get_overview(
         unterrichtsfreie_tage=[
             SondertagItem(name=t.name, datum=t.datum) for t in cfg.unterrichtsfreie_tage
         ],
+    )
+
+
+# ── GET /planning/groups/{group_id}/jetzt ─────────────────────────────────────
+
+
+@router.get("/groups/{group_id}/jetzt", response_model=JetztRead)
+async def get_jetzt(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Wo die Gruppe gerade steht — für den ersten Block der Gruppenübersicht.
+
+    Bewusst **nicht** `…/overview`: Der liefert dieselben Slots, dazu aber
+    Wochenmuster, alle Einheiten, die Stundenbilanz und den kompletten
+    Schuljahreskalender mit Ferien und Feiertagen — für fünf Zeilen.
+
+    Die Slots des ganzen Schuljahres zu laden ist trotzdem richtig: Es sind je
+    Gruppe rund hundert Zeilen, und die Stundenzahl einer Einheit („6 von 12")
+    braucht sie ohnehin alle. Die Auswahl selbst steht in `app.planning.jetzt` —
+    ohne Datenbank, damit ihre Grenzfälle prüfbar bleiben.
+    """
+    await require_group_teacher(group_id, user, db)
+
+    result = await db.execute(
+        sa.select(LessonSlot)
+        .where(LessonSlot.group_id == group_id)
+        .order_by(LessonSlot.date, LessonSlot.start_period)
+    )
+    slots = list(result.scalars().all())
+
+    auswahl = jetzt_modul.waehle(slots, date.today())
+
+    # Titel der beiden Einheiten in einer Abfrage, nicht in zweien.
+    ue_ids = [
+        e.node_id
+        for e in (auswahl.laufende_einheit, auswahl.naechste_einheit)
+        if e is not None
+    ]
+    titel: dict[UUID, str] = {}
+    if ue_ids:
+        res = await db.execute(
+            sa.select(ContextNode.id, ContextNode.title).where(ContextNode.id.in_(ue_ids))
+        )
+        titel = {row[0]: row[1] for row in res.all()}
+
+    def _einheit(e) -> JetztEinheit | None:
+        if e is None:
+            return None
+        return JetztEinheit(
+            node_id=e.node_id,
+            # Eine Einheit ohne Knoten sollte es nicht geben (Fremdschlüssel mit
+            # SET NULL); falls doch, ist ein Platzhalter besser als ein 500er.
+            titel=titel.get(e.node_id, "Unbenannte Einheit"),
+            stunden_gesamt=e.stunden_gesamt,
+            stunden_gehalten=e.stunden_gehalten,
+        )
+
+    return JetztRead(
+        hat_plan=bool(slots),
+        laufende_einheit=_einheit(auswahl.laufende_einheit),
+        naechste_einheit=_einheit(auswahl.naechste_einheit),
+        zuletzt=JetztStunde(**vars(auswahl.zuletzt)) if auswahl.zuletzt else None,
+        kommende=[JetztStunde(**vars(s)) for s in auswahl.kommende],
     )
 
 

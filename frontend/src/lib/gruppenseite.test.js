@@ -5,6 +5,9 @@ import {
   gruppenImFach,
   schuelerWeiche,
   fachZielSchueler,
+  fortschritt,
+  stundenReihen,
+  stundenDatum,
 } from './gruppenseite.js'
 
 const MATHE = { id: 7, subject_id: 1, name: 'Klasse 8c' }
@@ -118,5 +121,86 @@ describe('fachZielSchueler', () => {
     // Ein Fach ohne Slug ist nicht adressierbar; die Sidebar hielt es bisher
     // ebenso (`section.slug ? … : "/history"`).
     expect(fachZielSchueler(null, [MATHE])).toBe('/history')
+  })
+})
+
+// ── Der Block „Jetzt" ───────────────────────────────────────────────────────
+
+describe('fortschritt', () => {
+  it('nennt gehaltene und geplante Stunden', () => {
+    expect(fortschritt({ stunden_gehalten: 6, stunden_gesamt: 12 })).toBe('6 von 12 Stunden')
+  })
+
+  it('beugt den Singular', () => {
+    expect(fortschritt({ stunden_gehalten: 0, stunden_gesamt: 1 })).toBe('0 von 1 Stunde')
+  })
+
+  it('sagt bei null geplanten Stunden, was Sache ist', () => {
+    // „0 von 0 Stunden" wäre eine Zahl, die nichts erklärt.
+    expect(fortschritt({ stunden_gehalten: 0, stunden_gesamt: 0 }))
+      .toBe('noch keine Stunden verplant')
+  })
+
+  it('verträgt eine fehlende Einheit', () => {
+    expect(fortschritt(null)).toBe('')
+    expect(fortschritt(undefined)).toBe('')
+  })
+})
+
+describe('stundenReihen', () => {
+  const stunde = (tag, extra = {}) => ({
+    slot_id: `s${tag}`, datum: `2026-09-${tag}`, ist_heute: false, ...extra,
+  })
+
+  it('setzt zuletzt nach vorn und beschriftet die erste kommende als Nächstes', () => {
+    const reihen = stundenReihen({
+      zuletzt: stunde('04'),
+      kommende: [stunde('11'), stunde('14')],
+    })
+    expect(reihen.map((r) => r.rolle)).toEqual(['zuletzt', 'naechste', 'weitere'])
+  })
+
+  it('nennt eine heutige Stunde „heute", nicht „als Nächstes"', () => {
+    // Sonst verschwiege die Ansicht, dass sie heute ansteht.
+    const reihen = stundenReihen({
+      zuletzt: stunde('04'),
+      kommende: [stunde('09', { ist_heute: true }), stunde('11')],
+    })
+    expect(reihen.map((r) => r.rolle)).toEqual(['zuletzt', 'heute', 'naechste'])
+  })
+
+  it('vergibt „als Nächstes" genau einmal', () => {
+    const reihen = stundenReihen({
+      zuletzt: null,
+      kommende: [stunde('09', { ist_heute: true }), stunde('11'), stunde('14')],
+    })
+    expect(reihen.filter((r) => r.rolle === 'naechste')).toHaveLength(1)
+  })
+
+  it('kommt ohne zuletzt aus (Schuljahresanfang)', () => {
+    const reihen = stundenReihen({ zuletzt: null, kommende: [stunde('14')] })
+    expect(reihen.map((r) => r.rolle)).toEqual(['naechste'])
+  })
+
+  it('kommt ohne kommende aus (Schuljahresende)', () => {
+    const reihen = stundenReihen({ zuletzt: stunde('04'), kommende: [] })
+    expect(reihen.map((r) => r.rolle)).toEqual(['zuletzt'])
+  })
+
+  it('verträgt eine fehlende Antwort', () => {
+    expect(stundenReihen(null)).toEqual([])
+    expect(stundenReihen({ zuletzt: null })).toEqual([])
+  })
+})
+
+describe('stundenDatum', () => {
+  it('nennt Wochentag und Datum', () => {
+    // Unterricht wird in Wochentagen gedacht.
+    expect(stundenDatum('2026-09-04')).toBe('Fr 04.09.')
+  })
+
+  it('bleibt bei fehlendem oder unsinnigem Datum leer', () => {
+    expect(stundenDatum(null)).toBe('')
+    expect(stundenDatum('kein Datum')).toBe('')
   })
 })

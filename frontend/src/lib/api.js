@@ -1832,6 +1832,15 @@ export async function getPlanningOverview(groupId) {
     return res.json()
 }
 
+// Wo die Gruppe gerade steht — laufende/nächste Einheit, letzte und nächste Stunden.
+// Eigener, schlanker Endpunkt: `overview` lädt für dieselbe Auskunft zusätzlich
+// Wochenmuster, alle Einheiten, die Bilanz und den ganzen Schuljahreskalender.
+export async function getPlanningJetzt(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/jetzt`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsstand konnte nicht geladen werden')
+    return res.json()
+}
+
 export async function getPlanningOverhang(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overhang`, { credentials: 'include' })
     if (!res.ok) return []

@@ -21,7 +21,13 @@
    * genau das, was diese Seite loswerden soll.
    */
   import { goto } from '$app/navigation'
-  import { getConversations } from '$lib/api.js'
+  import { getConversations, getPlanningJetzt } from '$lib/api.js'
+  import {
+    fortschritt,
+    stundenReihen,
+    stundenDatum,
+    ROLLEN_LABEL,
+  } from '$lib/gruppenseite.js'
   import { assistants } from '$lib/stores/assistants.js'
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { refreshConversationCounts } from '$lib/stores/conversationCounts.js'
@@ -45,6 +51,30 @@
         )
       : [],
   )
+
+  // ── Jetzt (nur Lehrkraft) ─────────────────────────────────────────────────
+  // Der Endpunkt hängt an `require_group_teacher`; für Schüler:innen wird er gar
+  // nicht erst gerufen, statt einen 403 wegzuwerfen.
+  let jetzt = $state(null)
+  let jetztFehler = $state(false)
+
+  $effect(() => {
+    if (!group || !istLehrkraft) return
+    const id = group.id
+    getPlanningJetzt(id)
+      .then((daten) => {
+        // Nach einem Gruppenwechsel könnte eine ältere Antwort später eintreffen.
+        if (group?.id === id) {
+          jetzt = daten
+          jetztFehler = false
+        }
+      })
+      .catch(() => {
+        if (group?.id === id) jetztFehler = true
+      })
+  })
+
+  const reihen = $derived(stundenReihen(jetzt))
 
   // ── Chats dieser Gruppe ───────────────────────────────────────────────────
   // 25 statt 5: Die Liste ist scrollbar, fünf Zeilen sind nur die sichtbare Höhe.
@@ -105,9 +135,103 @@
 -->
 <div class="divide-y divide-light-ui-2 dark:divide-dark-ui-2">
 
-<!-- ── 1. Jetzt (nur Lehrkraft) — AP5 ───────────────────────────────────────
-     Laufende/nächste Unterrichtseinheit, letzte und nächste Stunden.
-     Kommt aus `GET /planning/groups/{id}/aktuell`. -->
+<!-- ── 1. Jetzt (nur Lehrkraft) ────────────────────────────────────────────── -->
+{#if istLehrkraft && jetzt && !jetztFehler}
+  <section class="py-6 first:pt-0 last:pb-0">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2">
+        Jetzt
+      </h2>
+      {#if group}
+        <a
+          href="/subjects/{subject?.slug}/groups/{group.id}/planner"
+          class="text-sm text-light-bl dark:text-dark-bl hover:underline"
+        >
+          Jahresplan →
+        </a>
+      {/if}
+    </div>
+
+    {#if !jetzt.hat_plan}
+      <!-- Kein Wochenmuster: Ohne den Weg zur Planung stünde hier nur eine
+           leere Fläche, und die sagt nicht, was zu tun ist. -->
+      <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+        Für diese Gruppe sind noch keine Stunden verplant.
+        <a
+          href="/subjects/{subject?.slug}/groups/{group?.id}/planner"
+          class="text-light-bl dark:text-dark-bl hover:underline"
+        >
+          Zur Planung
+        </a>
+      </p>
+    {:else}
+      {#if jetzt.laufende_einheit || jetzt.naechste_einheit}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          {#each [{ e: jetzt.laufende_einheit, label: 'Laufende Einheit' }, { e: jetzt.naechste_einheit, label: 'Nächste Einheit' }] as karte (karte.label)}
+            {#if karte.e}
+              <div
+                class="p-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-bg-2 dark:bg-dark-bg-2"
+              >
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-1">
+                  {karte.label}
+                </p>
+                <p class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                  {karte.e.titel}
+                </p>
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-0.5">
+                  {fortschritt(karte.e)}
+                </p>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      {/if}
+
+      {#if reihen.length > 0}
+        <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
+          {#each reihen as stunde (stunde.slot_id)}
+            <div
+              class="flex items-center gap-3 px-4 py-2
+                     border-b last:border-b-0 border-light-ui-2 dark:border-dark-ui-2"
+            >
+              <span
+                class="w-24 shrink-0 text-xs
+                       {stunde.rolle === 'heute'
+                         ? 'font-medium text-light-tx dark:text-dark-tx'
+                         : 'text-light-tx-2 dark:text-dark-tx-2'}"
+              >
+                {ROLLEN_LABEL[stunde.rolle]}
+              </span>
+              <span class="w-20 shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                {stundenDatum(stunde.datum)}
+              </span>
+              <span class="flex-1 min-w-0 truncate text-sm text-light-tx dark:text-dark-tx">
+                {#if stunde.hat_entwurf && stunde.stunde_node_id}
+                  <a
+                    href="/subjects/{subject?.slug}/groups/{group?.id}/planner/lessons/{stunde.stunde_node_id}"
+                    class="hover:underline"
+                  >
+                    {stunde.thema || 'Ohne Thema'}
+                  </a>
+                {:else}
+                  {stunde.thema || 'Ohne Thema'}
+                {/if}
+              </span>
+              <span class="shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                {#if stunde.nachbereitet}
+                  nachbereitet
+                {:else if !stunde.hat_entwurf}
+                  kein Entwurf
+                {/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+{/if}
 
 <!-- ── 2. Weiterarbeiten ──────────────────────────────────────────────────── -->
 <section class="py-6 first:pt-0 last:pb-0">

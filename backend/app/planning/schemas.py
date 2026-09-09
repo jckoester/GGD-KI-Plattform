@@ -314,3 +314,38 @@ class OverviewRead(BaseModel):
     ferien: list[FerienItem] = []
     feiertage: list[SondertagItem] = []
     unterrichtsfreie_tage: list[SondertagItem] = []
+
+
+# ── Jetzt (Gruppenübersicht, AP5) ─────────────────────────────────────────────
+
+class JetztStunde(BaseModel):
+    slot_id: UUID
+    datum: date
+    thema: Optional[str] = None
+    kategorie: str
+    hat_entwurf: bool
+    nachbereitet: bool
+    ist_heute: bool
+    stunde_node_id: Optional[UUID] = None
+
+
+class JetztEinheit(BaseModel):
+    node_id: UUID
+    titel: str
+    stunden_gesamt: int
+    stunden_gehalten: int
+
+
+class JetztRead(BaseModel):
+    """Wo die Gruppe gerade steht — der erste Block der Übersicht.
+
+    `hat_plan` unterscheidet „noch nichts geplant" von „geplant, aber gerade nichts
+    anstehend": Ohne die Angabe sähe eine Gruppe ohne Wochenmuster genauso aus wie
+    eine am Schuljahresende, und der Weg zur Planung fehlte genau dort, wo er
+    gebraucht wird.
+    """
+    hat_plan: bool
+    laufende_einheit: Optional[JetztEinheit] = None
+    naechste_einheit: Optional[JetztEinheit] = None
+    zuletzt: Optional[JetztStunde] = None
+    kommende: list[JetztStunde] = []
