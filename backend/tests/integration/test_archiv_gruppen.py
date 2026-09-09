@@ -165,3 +165,69 @@ async def test_fremder_baustein_der_frueheren_gruppe_bleibt_verborgen(
     )
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# ── Stundenentwurf einer früheren Gruppe ─────────────────────────────────────
+
+@pytest_asyncio.fixture
+async def stunde_ids(async_engine, welt):
+    """Merkt sich die Knoten-Ids der beiden angelegten Stundenentwürfe."""
+    from sqlalchemy import select
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as s:
+        res = await s.execute(
+            select(ContextNode.write_scope_group_id, ContextNode.id).where(
+                ContextNode.content_type == "unterrichtsstunde",
+                ContextNode.write_scope_group_id.in_(
+                    [welt["frueher"], welt["aktuell"], welt["fremd"]]
+                ),
+            )
+        )
+        return {gid: str(nid) for gid, nid in res.all()}
+
+
+async def test_eigener_stundenentwurf_bleibt_lesbar_ohne_mitgliedschaft(
+    test_client, auth_headers, welt, stunde_ids
+):
+    """Der Archiv-Fall: Die Mitgliedschaft ist weg, der eigene Entwurf bleibt.
+
+    Vor dem 09.09.2026 antwortete der Endpunkt hier 403 — als einziger Weg zu einem
+    Knoten, den `GET /context/nodes/{id}` längst herausgab.
+    """
+    resp = await test_client.get(
+        f"/planning/lessons/{stunde_ids[welt['frueher']]}", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    # …aber nur lesend.
+    assert resp.json()["darf_bearbeiten"] is False
+
+
+async def test_mitgliedschaft_erlaubt_weiterhin_das_bearbeiten(
+    test_client, auth_headers, welt, stunde_ids
+):
+    resp = await test_client.get(
+        f"/planning/lessons/{stunde_ids[welt['aktuell']]}", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["darf_bearbeiten"] is True
+
+
+async def test_fremder_stundenentwurf_bleibt_verschlossen(
+    test_client, auth_headers_teacher2, welt, stunde_ids
+):
+    """Weder Mitglied noch Eigentümerin — geöffnet wurde nur der zweite Weg."""
+    resp = await test_client.get(
+        f"/planning/lessons/{stunde_ids[welt['frueher']]}", headers=auth_headers_teacher2
+    )
+    assert resp.status_code == 403
+
+
+async def test_aendern_bleibt_der_mitgliedschaft_vorbehalten(
+    test_client, auth_headers, welt, stunde_ids
+):
+    """Geöffnet wurde das Lesen. Der Schreibpfad prüft weiter die Mitgliedschaft."""
+    resp = await test_client.patch(
+        f"/planning/lessons/{stunde_ids[welt['frueher']]}",
+        headers=auth_headers, json={"titel": "umbenannt"},
+    )
+    assert resp.status_code == 403

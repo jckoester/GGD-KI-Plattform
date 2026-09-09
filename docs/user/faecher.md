@@ -83,9 +83,11 @@ alten verschwinden aus der Oberfläche. Ihre Arbeit darin ist deshalb nicht verl
 Das **Archiv** listet Gruppen vergangener Schuljahre und gibt Ihnen Ihre Chats und
 Bausteine daraus zurück.
 
+Ihre **Stundenentwürfe** öffnen sich dabei wie gewohnt, mit Verlaufsplan — nur eben
+schreibgeschützt; ein Hinweis am Kopf sagt das.
+
 > **Was das Archiv nicht kann:** Die Jahresplanung einer früheren Gruppe — das
-> Stundenraster mit Bilanz — lässt sich nicht mehr öffnen. Ein Stundenentwurf ist als
-> Baustein lesbar, aber ohne die gewohnte Phasentabelle.
+> Stundenraster mit der Stundenbilanz — lässt sich nicht mehr öffnen.
 
 Gibt es zu einem Fach frühere Gruppen, weist die Fachseite darauf hin.
 

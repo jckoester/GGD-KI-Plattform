@@ -148,8 +148,15 @@
               <div class="px-4 py-3"><ErrorBanner message={dabei.fehler} /></div>
             {:else}
               {#each dabei?.bausteine ?? [] as knoten (knoten.id)}
+                <!-- Ein Stundenentwurf öffnet im Planer (seit 09/2026 auch ohne
+                     Mitgliedschaft lesbar) — dort steht der Verlaufsplan. Alles
+                     andere in der Knotenansicht. -->
+                {@const ziel =
+                  knoten.content_type === 'unterrichtsstunde'
+                    ? `/subjects/${$subjectMap[knoten.subject_id]?.slug ?? ''}/groups/${gruppe.group_id}/planner/lessons/${knoten.id}`
+                    : `/knowledge/${knoten.id}`}
                 <a
-                  href="/knowledge/{knoten.id}"
+                  href={ziel}
                   class="flex items-center gap-2 px-4 py-2 text-sm
                          border-b last:border-b-0 border-light-ui-2 dark:border-dark-ui-2
                          text-light-tx dark:text-dark-tx

@@ -34,7 +34,7 @@ from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning import jetzt as jetzt_modul
-from app.planning.permissions import require_group_teacher
+from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     BalanceRead,
@@ -851,7 +851,8 @@ async def get_lesson(
     group_id = lesson.write_scope_group_id
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    await require_group_teacher(group_id, user, db)
+    # Mitgliedschaft **oder** Eigentum; Letzteres nur lesend (Archiv-Fall).
+    darf_bearbeiten = await zugang_zur_stunde(lesson, user, db)
 
     # Übergeordnete UE
     ue_edge_result = await db.execute(
@@ -908,6 +909,7 @@ async def get_lesson(
         group_id=group_id,
         subject_id=lesson.subject_id,
         grade=resolved_curricula.grade,
+        darf_bearbeiten=darf_bearbeiten,
     )
 
 

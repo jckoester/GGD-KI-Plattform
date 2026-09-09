@@ -19,7 +19,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Archiv früherer Schuljahre.** Unterrichtsgruppen vergangener Jahre verschwinden mit
   dem Schuljahreswechsel aus der Oberfläche; der Reiter „Archiv" macht die eigenen Chats
-  und Bausteine daraus wieder zugänglich. Die Jahresplanung einer früheren Gruppe bleibt
+  und Bausteine daraus wieder zugänglich. Eigene Stundenentwürfe öffnen sich mit
+  Verlaufsplan, schreibgeschützt. Die Jahresplanung einer früheren Gruppe bleibt
   geschlossen.
 
 - **Schüler:innen erreichen die fachgebundenen Sammlungen.** Fachbegriffe,

@@ -226,6 +226,10 @@ class LessonRead(BaseModel):
     group_id: int
     subject_id: Optional[int]
     grade: Optional[int] = None  # Jahrgang der Gruppe (für editionsbewusste Kompetenz-Auswahl)
+    # `False` heißt: gelesen wird über das Eigentum, nicht über die Mitgliedschaft —
+    # der Archiv-Fall. Die Oberfläche schaltet dann in den Lesezustand, statt einen
+    # Editor anzubieten, dessen Speichern mit 403 endet.
+    darf_bearbeiten: bool = True
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────
