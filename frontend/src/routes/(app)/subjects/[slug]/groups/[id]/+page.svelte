@@ -53,26 +53,34 @@
   <!-- Reiter nur für Lehrkräfte: Schüler:innen sehen allein die Übersicht -->
   {#if istLehrkraft}
     <nav class="flex gap-1 border-b border-light-ui-2 dark:border-dark-ui-2 mb-6 mt-3">
+      <!-- Ein Durchlauf für alle Einträge: Die Reihenfolge steht in `REITER`, nicht
+           halb dort und halb hier. `extern` führt auf eine eigene Route (Planung) —
+           das ist ein Link, kein Reiter, und muss auch einer bleiben. -->
       {#each REITER as tab (tab.id)}
-        <button
-          onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition-colors
-                 {activeTab === tab.id
-                   ? 'border-primary text-light-bl dark:text-dark-bl dark:border-primary-dark'
-                   : 'border-transparent text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx'}"
-        >
-          {tab.label}
-        </button>
+        {@const gemeinsam =
+          'px-4 py-2 text-sm font-medium border-b-2 transition-colors'}
+        {#if tab.extern}
+          {#if group}
+            <a
+              href={`/subjects/${subject?.slug ?? $page.params.slug}/groups/${group.id}/planner`}
+              class="{gemeinsam} border-transparent
+                     text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
+            >
+              {tab.label}
+            </a>
+          {/if}
+        {:else}
+          <button
+            onclick={() => goto(`?tab=${tab.id}`, { replaceState: true, keepFocus: true })}
+            class="{gemeinsam}
+                   {activeTab === tab.id
+                     ? 'border-primary text-light-bl dark:text-dark-bl dark:border-primary-dark'
+                     : 'border-transparent text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx'}"
+          >
+            {tab.label}
+          </button>
+        {/if}
       {/each}
-      {#if group}
-        <a
-          href={`/subjects/${subject?.slug ?? $page.params.slug}/groups/${group.id}/planner`}
-          class="px-4 py-2 text-sm font-medium border-b-2 border-transparent
-                 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
-        >
-          Planung
-        </a>
-      {/if}
     </nav>
   {:else}
     <div class="mb-6"></div>

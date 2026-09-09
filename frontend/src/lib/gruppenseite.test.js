@@ -17,8 +17,21 @@ const MATHE_2 = { id: 9, subject_id: 1, name: 'Klasse 8c Förder' }
 const DEUTSCH = { id: 12, subject_id: 2, name: 'Klasse 8c' }
 
 describe('REITER', () => {
-  it('führt die Übersicht an erster Stelle', () => {
-    expect(REITER[0].id).toBe('uebersicht')
+  it('steht in der vereinbarten Reihenfolge', () => {
+    expect(REITER.map((r) => r.id)).toEqual([
+      'uebersicht',
+      'planung',
+      'curriculum',
+      'bildungsplan',
+      'kontext',
+      'archiv',
+    ])
+  })
+
+  it('kennzeichnet die Planung als eigene Route', () => {
+    // Sie steht in der Leiste, hat aber keinen Reiter-Inhalt auf dieser Seite.
+    expect(REITER.find((r) => r.id === 'planung').extern).toBe(true)
+    expect(REITER.filter((r) => r.extern)).toHaveLength(1)
   })
 
   it('kennt „klasse" nicht mehr', () => {
@@ -44,9 +57,15 @@ describe('aktiverReiter', () => {
   })
 
   it('reicht bekannte Kennungen durch', () => {
-    for (const { id } of REITER) {
+    for (const { id, extern } of REITER) {
+      if (extern) continue
       expect(aktiverReiter(id)).toBe(id)
     }
+  })
+
+  it('fällt bei der Planung auf die Übersicht zurück', () => {
+    // `?tab=planung` träfe keinen Zweig — die Planung ist eine eigene Route.
+    expect(aktiverReiter('planung')).toBe('uebersicht')
   })
 
   it('übersetzt die alte Kennung „vorbereitung" auf die Übersicht', () => {

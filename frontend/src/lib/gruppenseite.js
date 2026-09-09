@@ -21,10 +21,15 @@
  */
 export const REITER = [
   { id: 'uebersicht', label: 'Übersicht' },
+  // `extern` heißt: eigene Route, kein Reiter-Inhalt auf dieser Seite. Die
+  // Planung steht trotzdem hier, weil sie in der Leiste an dieser Stelle
+  // erwartet wird — die Reihenfolge gehört an *einen* Ort, sonst pflegt man
+  // sie im Markup und vergisst sie hier.
+  { id: 'planung', label: 'Planung', extern: true },
   { id: 'curriculum', label: 'Curriculum' },
   { id: 'bildungsplan', label: 'Bildungsplan' },
-  { id: 'archiv', label: 'Archiv' },
   { id: 'kontext', label: 'weiterer Kontext' },
+  { id: 'archiv', label: 'Archiv' },
 ]
 
 /**
@@ -39,7 +44,9 @@ const ALTE_KENNUNGEN = {
   vorbereitung: 'uebersicht',
 }
 
-const GUELTIG = new Set(REITER.map((r) => r.id))
+// Nur die Reiter mit eigenem Inhalt. `planung` gehört nicht dazu: `?tab=planung`
+// träfe sonst keinen Zweig und zeigte eine Seite ohne Inhalt unter dem Kopf.
+const GUELTIG = new Set(REITER.filter((r) => !r.extern).map((r) => r.id))
 
 /**
  * Welcher Reiter zu einem `?tab=`-Wert gehört.
