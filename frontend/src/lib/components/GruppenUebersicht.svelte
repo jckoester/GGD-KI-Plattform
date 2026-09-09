@@ -21,12 +21,19 @@
    * genau das, was diese Seite loswerden soll.
    */
   import { goto } from '$app/navigation'
-  import { getConversations, getPlanningJetzt, createLesson } from '$lib/api.js'
+  import {
+    getConversations,
+    getPlanningJetzt,
+    createLesson,
+    getContextNodes,
+    getLibrary,
+  } from '$lib/api.js'
   import {
     fortschritt,
     stundenReihen,
     stundenDatum,
     stundenAktion,
+    zuletztEntstanden,
     ROLLEN_LABEL,
   } from '$lib/gruppenseite.js'
   import { assistants } from '$lib/stores/assistants.js'
@@ -131,6 +138,23 @@
   $effect(() => {
     // Läuft bei Mount und bei Gruppenwechsel
     if (group) ladeChats()
+  })
+
+  // ── Zuletzt entstanden ────────────────────────────────────────────────────
+  // Zwei Quellen, eine Liste: eigene Bausteine dieser Gruppe und eigene Artefakte
+  // aus Chats dieser Gruppe. Beide Abfragen holen bewusst nur Eigenes — Artefakte
+  // sind ohnehin privat, und eine halb persönliche, halb geteilte Liste wäre keine.
+  let entstanden = $state([])
+
+  $effect(() => {
+    if (!group) return
+    const id = group.id
+    Promise.all([
+      getContextNodes({ group_id: id, owner: 'me', limit: 20 }).catch(() => []),
+      getLibrary({ groupId: id, limit: 20 }).then((d) => d.items ?? []).catch(() => []),
+    ]).then(([bausteine, artefakte]) => {
+      if (group?.id === id) entstanden = zuletztEntstanden(bausteine, artefakte)
+    })
   })
 
   function datum(wert) {
@@ -353,10 +377,53 @@
   </section>
 {/if}
 
-<!-- ── 4. Zuletzt entstanden — AP7 ───────────────────────────────────────────
-     Bausteine (`/context/nodes?group_id=`) und Artefakte (Chat-Join) in *einer*
-     nach Datum sortierten Liste. „Entstanden", nicht „verwendet": Für
-     `node_engagement` gibt es heute keinen Schreiber, der Personen erfasst. -->
+<!-- ── 4. Zuletzt entstanden ─────────────────────────────────────────────────
+     „Entstanden", nicht „verwendet": Für `node_engagement` gibt es heute keinen
+     Schreiber, der Personen erfasst — eine Nutzungsspur zu versprechen, die
+     niemand füllt, wäre ein leeres Versprechen. -->
+{#if entstanden.length > 0}
+  <section class="py-6 first:pt-0 last:pb-0">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-semibold text-light-tx-2 dark:text-dark-tx-2">
+        Zuletzt entstanden
+      </h2>
+      <div class="flex items-center gap-3 text-sm">
+        <a href="/knowledge/mine" class="text-light-bl dark:text-dark-bl hover:underline">
+          meine Bausteine →
+        </a>
+        <a
+          href="/library?subject_id={subject?.id}"
+          class="text-light-bl dark:text-dark-bl hover:underline"
+        >
+          {subject ? `Artefakte in ${subject.name}` : 'Bibliothek'} →
+        </a>
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
+      {#each entstanden as eintrag (eintrag.art + eintrag.id)}
+        <a
+          href={eintrag.href}
+          class="flex items-center gap-3 px-4 py-2.5
+                 border-b last:border-b-0 border-light-ui-2 dark:border-dark-ui-2
+                 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+        >
+          <NodeTypeIcon contentType={eintrag.typ} size={16} />
+          <span class="flex-1 min-w-0 truncate text-sm text-light-tx dark:text-dark-tx">
+            {eintrag.titel}
+          </span>
+          <!-- Die Herkunft verschwindet nicht, sie teilt nur nicht mehr die Liste. -->
+          <span class="shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
+            {eintrag.art === 'artefakt' ? 'Artefakt' : 'Baustein'}
+          </span>
+          <span class="shrink-0 w-20 text-right text-xs text-light-tx-2 dark:text-dark-tx-2">
+            {datum(eintrag.datum)}
+          </span>
+        </a>
+      {/each}
+    </div>
+  </section>
+{/if}
 
 <!-- ── 5. Nachschlagen ───────────────────────────────────────────────────────
      Ein Abschnitt für beide Rollen, verschieden gefüllt: Lehrkräfte sehen alle

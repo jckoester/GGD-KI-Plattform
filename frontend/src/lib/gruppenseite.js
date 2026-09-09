@@ -201,3 +201,49 @@ export function stundenAktion(stunde) {
   }
   return { art: 'ohne_einheit' }
 }
+
+// ── Der Abschnitt „Zuletzt entstanden" ──────────────────────────────────────
+
+/**
+ * Bausteine und Artefakte in **einer** nach Datum sortierten Liste.
+ *
+ * **Warum gemischt.** Für die Nutzerin ist „was ich gemacht habe" eine Sorte. Ob
+ * etwas als Baustein im Wissensgraphen oder als Artefakt in der Bibliothek liegt,
+ * ist eine Unterscheidung des Systems — sie bleibt am Typ-Icon und an der
+ * Herkunftsangabe sichtbar, teilt die Liste aber nicht.
+ *
+ * **Warum nur Eigenes.** Artefakte sind ohnehin strikt privat; Bausteine der Gruppe
+ * dazuzumischen ergäbe eine Liste, deren eine Hälfte persönlich und deren andere
+ * geteilt wäre. Die Aufrufer holen die Bausteine deshalb mit `owner=me`.
+ *
+ * Sortiert wird nach `created_at` — „entstanden", nicht „zuletzt geändert". Ein
+ * Baustein, der heute umbenannt wurde, ist nicht heute entstanden.
+ *
+ * @param {Array} bausteine  aus `GET /context/nodes`
+ * @param {Array} artefakte  aus `GET /artifacts`
+ * @param {number} limit
+ */
+export function zuletztEntstanden(bausteine = [], artefakte = [], limit = 6) {
+  const eintraege = [
+    ...(bausteine ?? []).map((b) => ({
+      art: 'baustein',
+      id: b.id,
+      titel: b.title,
+      typ: b.content_type,
+      datum: b.created_at,
+      href: `/knowledge/${b.id}`,
+    })),
+    ...(artefakte ?? []).map((a) => ({
+      art: 'artefakt',
+      id: a.id,
+      titel: a.title,
+      typ: a.kind,
+      datum: a.created_at,
+      href: `/library`,
+    })),
+  ]
+  return eintraege
+    .filter((e) => e.datum)
+    .sort((a, b) => new Date(b.datum) - new Date(a.datum))
+    .slice(0, limit)
+}

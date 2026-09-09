@@ -9,6 +9,7 @@ import {
   stundenReihen,
   stundenDatum,
   stundenAktion,
+  zuletztEntstanden,
 } from './gruppenseite.js'
 
 const MATHE = { id: 7, subject_id: 1, name: 'Klasse 8c' }
@@ -232,5 +233,56 @@ describe('stundenAktion', () => {
 
   it('verträgt eine fehlende Stunde', () => {
     expect(stundenAktion(null)).toEqual({ art: 'ohne_einheit' })
+  })
+})
+
+describe('zuletztEntstanden', () => {
+  const baustein = (id, datum, typ = 'lernzettel') => ({
+    id, title: `B${id}`, content_type: typ, created_at: datum,
+  })
+  const artefakt = (id, datum, kind = 'plot') => ({
+    id, title: `A${id}`, kind, created_at: datum,
+  })
+
+  it('mischt beide Herkünfte und sortiert neueste zuerst', () => {
+    const liste = zuletztEntstanden(
+      [baustein('b1', '2026-09-01T10:00:00Z'), baustein('b2', '2026-09-05T10:00:00Z')],
+      [artefakt('a1', '2026-09-03T10:00:00Z')],
+    )
+    expect(liste.map((e) => e.id)).toEqual(['b2', 'a1', 'b1'])
+  })
+
+  it('behält die Herkunft je Eintrag', () => {
+    // Sie verschwindet nicht, sie teilt nur nicht mehr die Liste.
+    const liste = zuletztEntstanden([baustein('b1', '2026-09-01T10:00:00Z')],
+                                    [artefakt('a1', '2026-09-02T10:00:00Z')])
+    expect(liste[0].art).toBe('artefakt')
+    expect(liste[1].art).toBe('baustein')
+  })
+
+  it('führt zum jeweils richtigen Ort', () => {
+    const liste = zuletztEntstanden([baustein('b1', '2026-09-01T10:00:00Z')],
+                                    [artefakt('a1', '2026-09-02T10:00:00Z')])
+    expect(liste.find((e) => e.art === 'baustein').href).toBe('/knowledge/b1')
+    expect(liste.find((e) => e.art === 'artefakt').href).toBe('/library')
+  })
+
+  it('kappt auf die gewünschte Länge', () => {
+    const viele = Array.from({ length: 10 }, (_, i) =>
+      baustein(`b${i}`, `2026-09-${String(i + 1).padStart(2, '0')}T10:00:00Z`))
+    expect(zuletztEntstanden(viele, [], 3)).toHaveLength(3)
+  })
+
+  it('lässt Einträge ohne Datum weg, statt sie ans Ende zu sortieren', () => {
+    // Ein `Invalid Date` im Vergleich macht die ganze Sortierung unbestimmt.
+    const liste = zuletztEntstanden(
+      [baustein('ohne', null), baustein('mit', '2026-09-01T10:00:00Z')], [],
+    )
+    expect(liste.map((e) => e.id)).toEqual(['mit'])
+  })
+
+  it('verträgt fehlende Listen', () => {
+    expect(zuletztEntstanden()).toEqual([])
+    expect(zuletztEntstanden(null, null)).toEqual([])
   })
 })
