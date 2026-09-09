@@ -474,3 +474,87 @@ async def test_drosselung_wird_nicht_als_budget_ausgegeben():
     fehler = await _chat_mit_ablehnung(429, koerper)
 
     assert "aufgebraucht" not in fehler.detail
+
+
+# ── Der Stream wartet nicht mehr auf die Kosten ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_stream_haelt_nicht_fuer_die_kostenermittlung_an(monkeypatch):
+    """Der eigentliche Punkt von AP2: `[DONE]` kommt, wenn der Text steht.
+
+    Bis 09/2026 lief `_kosten_des_zuges` **im** Generator und hielt ihn gestaffelt
+    bis zu 15 s auf, nachdem das letzte Zeichen der Antwort da war. Hier wird eine
+    Wartezeit gesetzt, die deutlich über allem liegt, was ein Test dulden würde —
+    kommt `[DONE]` trotzdem sofort, wird sie nicht mehr abgewartet.
+    """
+    import asyncio
+    import time
+
+    from app.chat import kosten_nachtrag
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    # ⚠️ Ohne eine Chunk-Id sammelt der Router keine `_request_ids`, und der ganze
+    # Kostenpfad wird übersprungen — der Test liefe dann grün, ohne je durch die
+    # geprüfte Stelle zu kommen. (Genau so gebaut und von der Gegenprobe
+    # widerlegt, 09.09.2026.)
+    class _MitRequestId(_FakeStreamResponse):
+        async def aiter_lines(self):
+            yield 'data: {"id": "req-1", "choices": [{"delta": {"content": "Hi"}, ' \
+                  '"finish_reason": "stop"}]}'
+            yield "data: [DONE]"
+
+    class _ClientMitRequestId(_FakeHttpClient):
+        async def send(self, *a, **kw):
+            return _MitRequestId()
+
+    gestartet: list = []
+    monkeypatch.setattr(
+        kosten_nachtrag, "nachtragen",
+        lambda *a, **kw: gestartet.append(kw) or MagicMock(),
+    )
+    # 60 s je Stufe: Würde noch gewartet, liefe der Test in seinen Timeout.
+    monkeypatch.setattr("app.chat.router._SPEND_LOG_WARTEZEITEN", (60.0, 60.0))
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=_ClientMitRequestId()), \
+         patch("app.chat.router._persist", new=AsyncMock(return_value=uuid4())), \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value=None)), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        start = time.monotonic()
+        # Frist statt bloßer Messung: Bei einer Rückkehr der Staffel liefe der Test
+        # sonst 120 s und **hinge**, statt zu scheitern. Ein hängender Test ist
+        # schlechter als ein fallender — er sieht nach Infrastruktur aus.
+        try:
+            ausgabe = await asyncio.wait_for(_stream_text(response), timeout=5.0)
+        except asyncio.TimeoutError:
+            pytest.fail(
+                "Der Stream war nach 5 s nicht fertig — die Kostenstaffel wird "
+                "wieder im Generator abgewartet."
+            )
+        dauer = time.monotonic() - start
+
+    assert "[DONE]" in ausgabe
+    assert dauer < 5.0, f"Der Stream hat {dauer:.1f}s gewartet — die Staffel läuft noch mit"
+    # Und das alte Kosten-Ereignis ist weg: Der Betrag steht beim Streamende nicht fest.
+    assert "event: cost" not in ausgabe
+    # Der Nachtrag wurde beauftragt — sonst käme der Betrag nie an.
+    assert gestartet, "kein Kosten-Nachtrag gestartet"
+    assert gestartet[0]["request_ids"] == ["req-1"]

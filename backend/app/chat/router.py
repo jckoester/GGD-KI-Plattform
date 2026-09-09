@@ -40,6 +40,7 @@ from app.chat.image_models import (
     get_bildart,
     standard_unter,
 )
+from app.chat import kosten_nachtrag
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
@@ -2151,37 +2152,21 @@ async def chat(
                 except Exception:
                     logger.exception("Fehler beim Warten auf Titel-Task")
 
-            # -- Kosten aus SpendLogs holen (alle Anfragen dieses Zuges) --
-            if _request_ids:
-                litellm_client = LiteLLMClient()
-                try:
-                    kosten = await _kosten_des_zuges(
-                        litellm_client, _request_ids,
-                        wartezeiten=_SPEND_LOG_WARTEZEITEN,
-                    )
-                finally:
-                    await litellm_client.close()
-                cost_usd = kosten.summe
-                cost_status = kosten.zustand
-                logger.info(
-                    "Kosten des Zuges: %d von %d Anfragen abgerechnet, Summe %s",
-                    kosten.gefunden, kosten.gesamt,
-                    "—" if kosten.summe is None else f"{kosten.summe:.6f}",
-                )
-
-            # Bild-Kosten (Phase 16, Schritt 7) zur Text-Summe addieren — dasselbe
-            # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).
+            # -- Kosten: hier wird nicht mehr gewartet --
+            #
+            # Die SpendLogs kommen verzögert; bis 09/2026 hielt diese Stelle den
+            # Stream dafür bis zu 15 s offen, nachdem der Antworttext längst
+            # dastand. Jetzt trägt eine Aufgabe sie nach (`kosten_nachtrag`), und
+            # die Nachricht startet mit `cost_status = 'ausstehend'`.
+            #
+            # Bildkosten sind die Ausnahme: Sie stehen im Antwortkopf, sind also
+            # sofort und exakt bekannt und gehen gleich mit in die Nachricht.
             if _image_cost_total > 0:
-                cost_usd = (cost_usd or 0.0) + _image_cost_total
-                # Bildkosten stehen im Antwortkopf, nicht in den SpendLogs — sie sind
-                # exakt. Ein Zug *nur* aus Bildern ist damit vollständig abgerechnet.
-                # Stand schon `unvollstaendig` (weil ein Text-SpendLog fehlte), bleibt
-                # es dabei: Ein exakter Summand macht eine lückenhafte Summe nicht ganz.
-                if cost_status is None:
-                    cost_status = "vollstaendig"
-
-            if cost_usd is not None:
-                yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
+                cost_usd = _image_cost_total
+            if _request_ids:
+                cost_status = "ausstehend"
+            elif _image_cost_total > 0:
+                cost_status = "vollstaendig"
 
         finally:
             await response.aclose()
@@ -2228,6 +2213,20 @@ async def chat(
                 "event: message\n"
                 f"data: {json.dumps({'message_id': str(_nachricht_id)})}\n\n"
             )
+
+            # Kosten nachtragen — **nach** dem Schreiben, weil die Aufgabe die
+            # Nachrichten-Id braucht, und **vor** `[DONE]` gestartet, damit sie
+            # sicher noch aus diesem Kontext heraus entsteht. Gewartet wird auf sie
+            # nicht: Das war der ganze Punkt.
+            if _request_ids:
+                kosten_nachtrag.nachtragen(
+                    AsyncSessionLocal,
+                    message_id=_nachricht_id,
+                    conversation_id=conversation_id,
+                    request_ids=list(_request_ids),
+                    wartezeiten=_SPEND_LOG_WARTEZEITEN,
+                )
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(

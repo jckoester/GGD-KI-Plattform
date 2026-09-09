@@ -158,6 +158,13 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # ── Herunterfahren ────────────────────────────────────────────────────────
+    # Offene Kosten-Nachträge zu Ende bringen lassen. Ohne das verlöre jeder
+    # Neustart die Beträge der gerade laufenden Züge — still, und die Nachrichten
+    # blieben auf `ausstehend` stehen.
+    from app.chat import kosten_nachtrag
+    await kosten_nachtrag.warte_auf_abschluss()
+
 
 def configure_host_guard(app: FastAPI) -> bool:
     """Host-Header-Schutz als Defense-in-Depth (Audit #18).
