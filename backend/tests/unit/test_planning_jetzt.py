@@ -199,3 +199,12 @@ def test_fehlendes_stundenraster_kippt_die_sortierung_nicht():
     mit = tag(11, start_period=3, thema="mit Raster")
     jetzt = waehle([mit, ohne], HEUTE)
     assert [s.thema for s in jetzt.kommende] == ["ohne Raster", "mit Raster"]
+
+
+def test_einheit_wird_je_stunde_mitgeliefert():
+    """Ohne sie kann die Oberfläche keinen Entwurf anlegen — der Endpunkt dafür
+    hängt an der Einheit (`POST /planning/units/{node_id}/lessons`)."""
+    jetzt = waehle([tag(11, ue_node_id=UE_A), tag(14)], HEUTE)
+    assert jetzt.kommende[0].ue_node_id == UE_A
+    # Ein Slot ohne Einheit meldet das ehrlich, statt eine zu erfinden.
+    assert jetzt.kommende[1].ue_node_id is None

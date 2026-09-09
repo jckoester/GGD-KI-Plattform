@@ -327,6 +327,7 @@ class JetztStunde(BaseModel):
     nachbereitet: bool
     ist_heute: bool
     stunde_node_id: Optional[UUID] = None
+    ue_node_id: Optional[UUID] = None
 
 
 class JetztEinheit(BaseModel):

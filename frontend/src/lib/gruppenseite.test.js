@@ -8,6 +8,7 @@ import {
   fortschritt,
   stundenReihen,
   stundenDatum,
+  stundenAktion,
 } from './gruppenseite.js'
 
 const MATHE = { id: 7, subject_id: 1, name: 'Klasse 8c' }
@@ -202,5 +203,34 @@ describe('stundenDatum', () => {
   it('bleibt bei fehlendem oder unsinnigem Datum leer', () => {
     expect(stundenDatum(null)).toBe('')
     expect(stundenDatum('kein Datum')).toBe('')
+  })
+})
+
+describe('stundenAktion', () => {
+  it('öffnet einen vorhandenen Entwurf', () => {
+    expect(stundenAktion({ hat_entwurf: true, stunde_node_id: 'n1', ue_node_id: 'u1' }))
+      .toEqual({ art: 'oeffnen', nodeId: 'n1' })
+  })
+
+  it('bietet das Anlegen an, wenn eine Einheit da ist', () => {
+    expect(stundenAktion({ hat_entwurf: false, stunde_node_id: null, ue_node_id: 'u1' }))
+      .toEqual({ art: 'anlegen', ueNodeId: 'u1' })
+  })
+
+  it('bietet ohne Einheit nichts an', () => {
+    // Ein Entwurf entsteht an der Einheit; ohne sie antwortet der Endpunkt 404.
+    expect(stundenAktion({ hat_entwurf: false, stunde_node_id: null, ue_node_id: null }))
+      .toEqual({ art: 'ohne_einheit' })
+  })
+
+  it('traut `hat_entwurf` nicht allein', () => {
+    // Wäre die Kennung gesetzt, der Knoten aber weg (Fremdschlüssel SET NULL),
+    // führte der Link ins Leere.
+    expect(stundenAktion({ hat_entwurf: true, stunde_node_id: null, ue_node_id: 'u1' }))
+      .toEqual({ art: 'anlegen', ueNodeId: 'u1' })
+  })
+
+  it('verträgt eine fehlende Stunde', () => {
+    expect(stundenAktion(null)).toEqual({ art: 'ohne_einheit' })
   })
 })

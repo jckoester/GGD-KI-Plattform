@@ -51,6 +51,10 @@ class StundeRef:
     nachbereitet: bool
     ist_heute: bool
     stunde_node_id: Optional[UUID]
+    # Ohne Einheit lässt sich kein Entwurf anlegen: Der Endpunkt dafür heißt
+    # `POST /planning/units/{node_id}/lessons`. Die Oberfläche muss den Fall
+    # unterscheiden können, sonst bietet sie eine Aktion an, die 404 antwortet.
+    ue_node_id: Optional[UUID]
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,7 @@ def _als_stunde(slot: SlotArtig, heute: date) -> StundeRef:
         nachbereitet=slot.nachbereitet_at is not None,
         ist_heute=slot.date == heute,
         stunde_node_id=slot.stunde_node_id,
+        ue_node_id=slot.ue_node_id,
     )
 
 

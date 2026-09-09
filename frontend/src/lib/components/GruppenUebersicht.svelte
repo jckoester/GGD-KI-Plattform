@@ -21,11 +21,12 @@
    * genau das, was diese Seite loswerden soll.
    */
   import { goto } from '$app/navigation'
-  import { getConversations, getPlanningJetzt } from '$lib/api.js'
+  import { getConversations, getPlanningJetzt, createLesson } from '$lib/api.js'
   import {
     fortschritt,
     stundenReihen,
     stundenDatum,
+    stundenAktion,
     ROLLEN_LABEL,
   } from '$lib/gruppenseite.js'
   import { assistants } from '$lib/stores/assistants.js'
@@ -35,6 +36,7 @@
   import AssistantCard from './AssistantCard.svelte'
   import ConversationMenu from './ConversationMenu.svelte'
   import NodeTypeIcon from './NodeTypeIcon.svelte'
+  import ErrorBanner from './ErrorBanner.svelte'
   import { Search } from 'lucide-svelte'
 
   let { group, subject = null, istLehrkraft = false } = $props()
@@ -75,6 +77,30 @@
   })
 
   const reihen = $derived(stundenReihen(jetzt))
+
+  // Entwurf anlegen und öffnen — derselbe Weg wie im Jahresplan
+  // (`planner/+page.svelte`, `handleEditLesson`): Der Entwurf entsteht an der
+  // Unterrichtseinheit, mit dem Slot als Bezug und dem Thema als Titel.
+  let legtAn = $state(null)
+  let entwurfFehler = $state(null)
+
+  async function entwurfAnlegen(stunde) {
+    if (legtAn) return
+    legtAn = stunde.slot_id
+    entwurfFehler = null
+    try {
+      const neu = await createLesson(stunde.ue_node_id, {
+        titel: stunde.thema || 'Neue Stunde',
+        slot_id: stunde.slot_id,
+      })
+      await goto(
+        `/subjects/${subject?.slug}/groups/${group?.id}/planner/lessons/${neu.id}`,
+      )
+    } catch (e) {
+      entwurfFehler = e.message ?? 'Der Entwurf konnte nicht angelegt werden.'
+      legtAn = null
+    }
+  }
 
   // ── Chats dieser Gruppe ───────────────────────────────────────────────────
   // 25 statt 5: Die Liste ist scrollbar, fünf Zeilen sind nur die sichtbare Höhe.
@@ -188,9 +214,14 @@
         </div>
       {/if}
 
+      {#if entwurfFehler}
+        <div class="mb-3"><ErrorBanner message={entwurfFehler} /></div>
+      {/if}
+
       {#if reihen.length > 0}
         <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
           {#each reihen as stunde (stunde.slot_id)}
+            {@const aktion = stundenAktion(stunde)}
             <div
               class="flex items-center gap-3 px-4 py-2
                      border-b last:border-b-0 border-light-ui-2 dark:border-dark-ui-2"
@@ -207,9 +238,9 @@
                 {stundenDatum(stunde.datum)}
               </span>
               <span class="flex-1 min-w-0 truncate text-sm text-light-tx dark:text-dark-tx">
-                {#if stunde.hat_entwurf && stunde.stunde_node_id}
+                {#if aktion.art === 'oeffnen'}
                   <a
-                    href="/subjects/{subject?.slug}/groups/{group?.id}/planner/lessons/{stunde.stunde_node_id}"
+                    href="/subjects/{subject?.slug}/groups/{group?.id}/planner/lessons/{aktion.nodeId}"
                     class="hover:underline"
                   >
                     {stunde.thema || 'Ohne Thema'}
@@ -219,10 +250,22 @@
                 {/if}
               </span>
               <span class="shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                {#if stunde.nachbereitet}
+                {#if aktion.art === 'anlegen'}
+                  <!-- „kein Entwurf" war eine Feststellung; hier ist der Ort, an
+                       dem man etwas dagegen tut. -->
+                  <button
+                    onclick={() => entwurfAnlegen(stunde)}
+                    disabled={legtAn !== null}
+                    class="text-light-bl dark:text-dark-bl hover:underline disabled:opacity-50"
+                  >
+                    {legtAn === stunde.slot_id ? 'wird angelegt…' : 'Entwurf anlegen'}
+                  </button>
+                {:else if aktion.art === 'ohne_einheit'}
+                  <span title="Ein Entwurf entsteht an der Unterrichtseinheit.">
+                    keiner Einheit zugeordnet
+                  </span>
+                {:else if stunde.nachbereitet}
                   nachbereitet
-                {:else if !stunde.hat_entwurf}
-                  kein Entwurf
                 {/if}
               </span>
             </div>

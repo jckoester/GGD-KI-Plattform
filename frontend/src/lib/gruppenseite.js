@@ -179,3 +179,25 @@ export function stundenDatum(iso) {
   const rest = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
   return `${wochentag} ${rest}`
 }
+
+/**
+ * Was an einer Stundenzeile zu tun ist.
+ *
+ * Drei Zustände, drei verschiedene Angebote — und einer davon ist **kein**
+ * Angebot: Ein Entwurf entsteht über `POST /planning/units/{node_id}/lessons`,
+ * hängt also an der Unterrichtseinheit. Ein Slot ohne Einheit kann keinen
+ * bekommen; ihm trotzdem „Entwurf anlegen" anzubieten hieße, einen Knopf zu
+ * zeigen, der mit 404 antwortet.
+ *
+ * @param {{hat_entwurf:boolean, stunde_node_id:string|null, ue_node_id:string|null}} stunde
+ * @returns {{art:'oeffnen', nodeId:string}|{art:'anlegen', ueNodeId:string}|{art:'ohne_einheit'}}
+ */
+export function stundenAktion(stunde) {
+  if (stunde?.hat_entwurf && stunde.stunde_node_id) {
+    return { art: 'oeffnen', nodeId: stunde.stunde_node_id }
+  }
+  if (stunde?.ue_node_id) {
+    return { art: 'anlegen', ueNodeId: stunde.ue_node_id }
+  }
+  return { art: 'ohne_einheit' }
+}
