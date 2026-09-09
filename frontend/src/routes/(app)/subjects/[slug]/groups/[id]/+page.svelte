@@ -9,6 +9,7 @@
   import { REITER, aktiverReiter } from '$lib/gruppenseite.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
+  import GruppenArchiv from '$lib/components/GruppenArchiv.svelte'
   import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
   import CurriculumList from '$lib/components/CurriculumList.svelte'
   import BildungsplanTree from '$lib/components/BildungsplanTree.svelte'
@@ -102,15 +103,8 @@
       </p>
     {/if}
 
-  <!-- Archiv: wird in AP6 mit den Gruppen früherer Schuljahre gefüllt -->
   {:else if activeTab === 'archiv'}
-    <div class="py-8 text-center text-light-tx-2 dark:text-dark-tx-2">
-      <p class="font-medium mb-2 text-light-tx dark:text-dark-tx">Archiv</p>
-      <p class="text-sm max-w-md mx-auto">
-        Hier werden die Unterrichtsgruppen vergangener Schuljahre zugänglich —
-        mit ihren Jahresplänen, Stundenentwürfen und Chats.
-      </p>
-    </div>
+    <GruppenArchiv subjectId={subject?.id} />
 
   {:else if activeTab === 'kontext'}
     <KnowledgeNodeList

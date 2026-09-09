@@ -1824,6 +1824,17 @@ export async function exportCurriculum(curriculumId, filename, format = 'yaml') 
     URL.revokeObjectURL(url)
 }
 
+// ── Archiv: frühere Unterrichtsgruppen ────────────────────────────────────────
+
+// Gruppen, in denen ich Eigenes habe, ohne noch Mitglied zu sein. Anker ist der
+// Inhalt, nicht die Mitgliedschaft — die ist mit dem Schuljahreswechsel weg.
+export async function getFormerGroups(subjectId = null) {
+    const query = subjectId != null ? `?subject_id=${subjectId}` : ''
+    const res = await fetch(`${BASE}/archive/groups${query}`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Archiv konnte nicht geladen werden')
+    return res.json()
+}
+
 // ── Unterrichtsplanung ────────────────────────────────────────────────────────
 
 export async function getPlanningOverview(groupId) {

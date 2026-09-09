@@ -24,7 +24,7 @@
     import { myTeachingGroups, myGroupsGeladen } from "$lib/stores/myGroups.js";
     import { conversationCountsByGroup, refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
-    import { getConversations } from "$lib/api.js";
+    import { getConversations, getFormerGroups } from "$lib/api.js";
     import { gruppenImFach, schuelerWeiche } from "$lib/gruppenseite.js";
     import AssistantCard from "$lib/components/AssistantCard.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
@@ -68,6 +68,20 @@
     const subjectAssistants = $derived(
         subject ? $assistants.filter((a) => a.subject_id === subject.id) : [],
     );
+
+    // ── Frühere Gruppen dieses Fachs (nur die Zahl, für den Hinweis) ──────────
+    let fruehereGruppen = $state(0);
+
+    $effect(() => {
+        if (!subject || !isTeacher) return;
+        const fach = subject.id;
+        getFormerGroups(fach)
+            .then((daten) => {
+                if (subject?.id === fach) fruehereGruppen = daten.items?.length ?? 0;
+            })
+            // Das Archiv ist eine Zugabe; scheitert es, bleibt der Hinweis weg.
+            .catch(() => {});
+    });
 
     // ── Chats ohne Gruppenbezug ───────────────────────────────────────────────
     // `excludeGroups` ist **hier** richtig: Für Lehrkräfte gibt es persönliche
@@ -221,6 +235,25 @@
                                 </a>
                             {/each}
                         </div>
+                    {/if}
+
+                    <!-- Ohne diesen Hinweis fände den Archiv-Reiter niemand: Er sitzt
+                         auf der Gruppenseite, und wer dorthin will, hat die alte
+                         Gruppe gerade nicht mehr in der Navigation. -->
+                    {#if fruehereGruppen > 0 && myGroupsForSubject.length > 0}
+                        <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                            Aus vergangenen Schuljahren
+                            {fruehereGruppen === 1
+                                ? "liegt eine Gruppe"
+                                : `liegen ${fruehereGruppen} Gruppen`}
+                            im
+                            <a
+                                href="/subjects/{subject.slug}/groups/{myGroupsForSubject[0].id}?tab=archiv"
+                                class="text-light-bl dark:text-dark-bl hover:underline"
+                            >
+                                Archiv
+                            </a>.
+                        </p>
                     {/if}
                 </section>
 
