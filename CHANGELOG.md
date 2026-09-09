@@ -120,6 +120,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **In einer leeren Sammlung erschien für Schüler:innen „Neu anlegen"**, obwohl das
   Anlegen abgelehnt wird.
 
+- **Der Chat wartet nicht mehr auf die Kostenabrechnung.** Bisher blieb die
+  Verbindung nach der fertigen Antwort bis zu 15 Sekunden offen, nur um den Betrag
+  abzuwarten; er wird jetzt im Hintergrund nachgetragen. Solange er fehlt, steht
+  „Kosten werden ermittelt …" statt einer leeren Zeile.
+
+- **Unvollständige Kostenangaben sind als solche erkennbar.** Besteht eine Antwort aus
+  mehreren Teilanfragen und fehlt für eine die Abrechnung, wird der Betrag als
+  Untergrenze gekennzeichnet („mindestens 0,01 €"). Die Statistik weist zusätzlich aus,
+  wie viele Nachrichten eines Zeitraums betroffen sind.
+
 - **Das Backend startet nicht mehr mit veralteter Datenbank.** Eine fehlende Migration
   zeigte sich vorher erst beim Anklicken, als fehlende Tabelle statt als fehlende
   Migration; jetzt nennt eine Startprüfung beide Stände und den nötigen Befehl.

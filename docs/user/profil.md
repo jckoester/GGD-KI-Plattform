@@ -43,6 +43,23 @@ Sie können einstellen, ob und wie die anfallenden Kosten pro Anfrage angezeigt 
 - **Pro Konversation** — Gesamtkosten des aktuellen Gesprächs werden angezeigt
 - **Beides** — Kosten pro Nachricht und pro Konversation
 
+### „Kosten werden ermittelt …"
+
+Der Betrag steht nicht sofort fest: Der Abrechnungsdienst meldet ihn mit ein paar
+Sekunden Verzögerung. Damit die Antwort nicht darauf warten muss, erscheint sie
+zuerst — und der Betrag wird nachgetragen. Bleibt der Hinweis stehen, sehen Sie den
+Betrag beim nächsten Öffnen des Gesprächs.
+
+### „mindestens 0,01 €"
+
+Eine KI-Antwort besteht manchmal aus mehreren Teilanfragen — etwa wenn ein Werkzeug
+benutzt oder ein Gesprächstitel erzeugt wird. Liegt für eine davon keine Abrechnung
+vor, zeigt die Anzeige den bekannten Teil und kennzeichnet ihn als Untergrenze. Der
+tatsächliche Betrag ist dann **höher**, nie niedriger.
+
+> Ihr Budget ist davon unberührt: Die Grenze zieht der Abrechnungsdienst selbst,
+> nicht diese Anzeige.
+
 ## Kontext-Suche
 
 Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen können Sie diesen Wert erhöhen:
