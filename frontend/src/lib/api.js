@@ -2061,8 +2061,16 @@ export async function saveDiagramToLibrary(kind, source, { svg = null, title = n
 }
 
 // Die eigene Bibliothek laden: { items: [...], used_bytes, quota_bytes }.
-export async function getLibrary() {
-    const res = await fetch(`${BASE}/artifacts`, { credentials: 'include' })
+// Die eigene Bibliothek. `groupId`/`subjectId` verengen auf den Unterrichtsbezug —
+// hergeleitet über den Chat, in dem das Artefakt entstand. `usedBytes`/`quotaBytes`
+// in der Antwort beziehen sich immer auf die **ganze** Bibliothek, nie auf den Auszug.
+export async function getLibrary({ groupId = null, subjectId = null, limit = null } = {}) {
+    const params = new URLSearchParams()
+    if (groupId != null) params.set('group_id', String(groupId))
+    if (subjectId != null) params.set('subject_id', String(subjectId))
+    if (limit != null) params.set('limit', String(limit))
+    const query = params.toString()
+    const res = await fetch(`${BASE}/artifacts${query ? `?${query}` : ''}`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bibliothek konnte nicht geladen werden')
     return res.json()
 }

@@ -1,7 +1,8 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
-    import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+    import { subjectMap } from '$lib/stores/subjects.js';
     import {
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
         Share2,
@@ -31,11 +32,25 @@
 
     let usage = $derived(usagePercent(usedBytes, quotaBytes));
 
+    // ── Fachfilter ────────────────────────────────────────────────────────────
+    // Einstieg von der Fach-/Gruppenseite: „alle Artefakte in Mathematik". Der
+    // Bezug kommt aus dem Chat, in dem das Artefakt entstand — ein Artefakt ohne
+    // Herkunfts-Chat erscheint deshalb nur in der vollen Liste. Das steht als
+    // Hinweis am gefilterten Zustand, sonst wirkt die Lücke wie ein Fehler.
+    const filterSubjectId = $derived.by(() => {
+        const roh = $page.url.searchParams.get('subject_id');
+        const zahl = roh == null ? NaN : Number(roh);
+        return Number.isInteger(zahl) ? zahl : null;
+    });
+    const filterFach = $derived(
+        filterSubjectId == null ? null : ($subjectMap[filterSubjectId] ?? null),
+    );
+
     async function load() {
         loading = true;
         error = null;
         try {
-            const data = await getLibrary();
+            const data = await getLibrary({ subjectId: filterSubjectId });
             items = data.items ?? [];
             usedBytes = data.used_bytes ?? 0;
             quotaBytes = data.quota_bytes ?? 0;
@@ -46,7 +61,12 @@
         }
     }
 
-    onMount(load);
+    // Kein `onMount`: Der Filter steht in der Adresszeile, und ein Wechsel
+    // zwischen „alle" und einem Fach ist eine Navigation ohne Neuaufbau der Seite.
+    $effect(() => {
+        filterSubjectId;
+        load();
+    });
 
     let creatingDoc = $state(false);
     async function newDocument() {
@@ -200,10 +220,27 @@
                 <FilePlus class="w-4 h-4" /> Neues Dokument
             </button>
         </div>
-        <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
-            erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
-        </p>
+        {#if filterSubjectId != null}
+            <div class="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    Nur Artefakte aus Chats
+                    {#if filterFach}
+                        im Fach <span class="font-medium text-light-tx dark:text-dark-tx">{filterFach.name}</span>.
+                    {:else}
+                        eines Fachs.
+                    {/if}
+                    Was ohne Chat entstanden ist, steht nur in der vollen Liste.
+                </p>
+                <a href="/library" class="text-sm text-light-bl dark:text-dark-bl hover:underline">
+                    alle anzeigen
+                </a>
+            </div>
+        {:else}
+            <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
+                erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
+            </p>
+        {/if}
 
         {#if !loading && quotaBytes > 0}
             <div class="mb-6">
@@ -233,11 +270,24 @@
             </div>
         {:else if items.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
-                <p class="text-lg">Deine Bibliothek ist noch leer.</p>
-                <p class="text-sm mt-1">
-                    Speichere Bilder oder Diagramme aus dem Chat über
-                    „In Bibliothek speichern“.
-                </p>
+                {#if filterSubjectId != null}
+                    <!-- Nicht „deine Bibliothek ist leer" sagen, wenn nur der Auszug
+                         leer ist — das wäre eine falsche Auskunft über den Bestand. -->
+                    <p class="text-lg">
+                        Hier ist noch nichts{filterFach ? ` aus ${filterFach.name}` : ''}.
+                    </p>
+                    <p class="text-sm mt-1">
+                        <a href="/library" class="text-light-bl dark:text-dark-bl hover:underline">
+                            Alle Artefakte anzeigen
+                        </a>
+                    </p>
+                {:else}
+                    <p class="text-lg">Deine Bibliothek ist noch leer.</p>
+                    <p class="text-sm mt-1">
+                        Speichere Bilder oder Diagramme aus dem Chat über
+                        „In Bibliothek speichern“.
+                    </p>
+                {/if}
             </div>
         {:else}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

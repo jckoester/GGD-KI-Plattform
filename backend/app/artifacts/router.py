@@ -208,11 +208,29 @@ async def save_diagram_to_library(
 
 @router.get("", response_model=LibraryResponse)
 async def list_library(
+    group_id: int | None = Query(
+        default=None, description="nur Artefakte aus Chats dieser Unterrichtsgruppe"
+    ),
+    subject_id: int | None = Query(
+        default=None, description="nur Artefakte aus Chats dieses Fachs"
+    ),
+    limit: int | None = Query(default=None, ge=1, le=200),
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> LibraryResponse:
-    """Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige."""
-    records = await store.list_artifacts(db, current_user.sub)
+    """Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige.
+
+    `group_id`/`subject_id` verengen auf den Unterrichtsbezug — hergeleitet über den
+    Herkunfts-Chat, siehe :func:`app.artifacts.store.list_artifacts`.
+
+    **`used_bytes` und `quota_bytes` bleiben dabei unverfiltert.** Sie beschreiben die
+    Belegung der *ganzen* Bibliothek, nicht die des Auszugs; eine mitgefilterte
+    Belegungsanzeige beantwortete eine Frage, die niemand stellt („wie viel Platz
+    belegen meine Mathe-Artefakte?"), und verwirrte bei der, die zählt.
+    """
+    records = await store.list_artifacts(
+        db, current_user.sub, group_id=group_id, subject_id=subject_id, limit=limit
+    )
     used = await store.used_bytes(db, current_user.sub)
     _, quota_bytes = get_artifact_limits(current_user.roles, current_user.grade)
     # Eine Abfrage für alle Karten, nicht eine je Karte.
