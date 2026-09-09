@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chatFehlertext } from "./chat_errors.js";
+import { chatFehlertext, istLeereAntwort, leereAntwortText } from "./chat_errors.js";
 import { ApiError } from "./api.js";
 
 describe("chatFehlertext", () => {
@@ -48,5 +48,51 @@ describe("chatFehlertext", () => {
         expect(chatFehlertext(new ApiError(400, "Assistent nicht verfügbar"))).toBe(
             "Assistent nicht verfügbar",
         );
+    });
+});
+
+describe("istLeereAntwort", () => {
+    it("erkennt die fertige Antwort ohne Inhalt", () => {
+        expect(istLeereAntwort({ content: "" }, false)).toBe(true);
+        expect(istLeereAntwort({ content: null }, false)).toBe(true);
+    });
+
+    it("hält eine Antwort mit Text nicht für leer", () => {
+        expect(istLeereAntwort({ content: "Hallo" }, false)).toBe(false);
+    });
+
+    it("hält eine Antwort mit Bild nicht für leer", () => {
+        // Ein erzeugtes Bild ohne Begleittext ist eine Antwort — nur eben keine
+        // aus Buchstaben. Ohne diesen Fall bekäme jedes Bild einen Fehlalarm.
+        expect(istLeereAntwort({ content: "", images: [{ image_id: "x" }] }, false))
+            .toBe(false);
+    });
+
+    it("meldet während des Streams nichts", () => {
+        // Da ist der Inhalt nur noch nicht da.
+        expect(istLeereAntwort({ content: "" }, true)).toBe(false);
+    });
+
+    it("verträgt eine fehlende Nachricht", () => {
+        expect(istLeereAntwort(null, false)).toBe(false);
+        expect(istLeereAntwort(undefined)).toBe(false);
+    });
+});
+
+describe("leereAntwortText", () => {
+    it("erklärt und schlägt das Wiederholen vor", () => {
+        const text = leereAntwortText();
+        expect(text).toContain("nichts geantwortet");
+        expect(text).toContain("noch einmal");
+    });
+
+    it("nennt die Kosten, wenn welche gebucht wurden", () => {
+        // Sie zu verschweigen wäre die zweite Hälfte desselben Fehlers.
+        expect(leereAntwortText("0,01")).toContain("0,01 €");
+        expect(leereAntwortText("0,01")).toContain("trotzdem berechnet");
+    });
+
+    it("erfindet keine Kosten, wenn keine bekannt sind", () => {
+        expect(leereAntwortText(null)).not.toContain("€");
     });
 });

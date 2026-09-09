@@ -2172,6 +2172,19 @@ async def chat(
         # Erst speichern, dann `[DONE]`: Die Nachrichten-ID entsteht beim Schreiben, und
         # das Frontend braucht sie, um die Herkunft eines später gespeicherten Diagramms
         # belegen zu können. `[DONE]` heißt damit auch „alles ist abgelegt".
+        # Leere Antwort: Sie wird gespeichert wie jede andere — die Nachricht *ist*
+        # der wahrheitsgemäße Vermerk, dass eine Anfrage lief, Kosten anfielen und
+        # nichts zurückkam. Erfundener Ersatztext ginge später als Kontext ans
+        # Modell zurück. Sichtbar macht sie die Oberfläche (`istLeereAntwort`);
+        # zählbar wird sie hier, sonst bliebe die Häufigkeit unbekannt.
+        if not "".join(full_content) and not _generated_image_ids:
+            logger.warning(
+                "Leere Modellantwort: Konversation %s, Modell %s, %d Werkzeugrunden, "
+                "Kosten %s",
+                conversation_id, model_used, len(_request_ids),
+                "—" if cost_usd is None else f"{cost_usd:.6f}",
+            )
+
         _nachricht_id = None
         try:
             _nachricht_id = await _persist(

@@ -13,6 +13,8 @@
     import HelpResourcesBanner from '$lib/components/HelpResourcesBanner.svelte';
     import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
 
+    import { istLeereAntwort, leereAntwortText } from '$lib/chat_errors.js';
+    import WarningBanner from './WarningBanner.svelte';
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
     let { message, isStreaming = false, costEur = null, userPrompt = null } = $props();
@@ -323,7 +325,15 @@
 
 {:else if message.role === 'assistant'}
     <div class="flex flex-col items-start">
-        {#if message.content || isStreaming}
+        {#if istLeereAntwort(message, isStreaming)}
+            <!-- Antwort ohne Inhalt: Bis 09/2026 rendert die Blase hier gar nichts —
+                 die Frage verschwand scheinbar spurlos, das Budget war gebucht.
+                 Die Regel dazu (inklusive „Bilder sind eine Antwort") steht in
+                 `$lib/chat_errors.js`, wo sie sich prüfen lässt. -->
+            <div class="max-w-[80%]">
+                <WarningBanner message={leereAntwortText(costEur)} />
+            </div>
+        {:else if message.content || isStreaming}
         <div class="bg-light-secondary dark:bg-dark-secondary rounded-xl rounded-bl-none px-4 py-3 max-w-[80%]">
             <div class="prose dark:prose-invert max-w-none
                         prose-p:my-1 prose-headings:mt-3 prose-headings:mb-1
