@@ -346,6 +346,14 @@
             {/if}
         </div>
     </div>
+    <!-- Das Hilfe-Banner (ADR-008) folgt der Nachricht, die es ausgelöst hat:
+         **unter** der eigenen Eingabe, **über** der Modellantwort. Vorher hing es
+         an der Antwort und war bei langem Text erst nach dem Scrollen zu sehen. -->
+    {#if message.crisis}
+        <div class="w-full">
+            <HelpResourcesBanner topic={message.crisis} />
+        </div>
+    {/if}
 
 {:else if message.role === 'assistant'}
     <div class="flex flex-col items-start">
@@ -572,11 +580,7 @@
             {/if}
         </div>
         {/if}
-        {#if message.crisis}
-            <div class="max-w-[80%] w-full">
-                <HelpResourcesBanner topic={message.crisis} />
-            </div>
-        {/if}
+
     </div>
 
 {:else if message.role === 'error'}

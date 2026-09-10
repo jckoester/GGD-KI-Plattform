@@ -687,13 +687,23 @@
                     }
                     continue;
                 }
-                // Krisen-Hilfe-Banner (ADR-008): an die Assistenten-Nachricht heften
+                // Krisen-Hilfe-Banner (ADR-008): an die **auslösende** Nachricht
+                // heften, nicht an die Antwort.
+                //
+                // Zwei Gründe. Erstens Sichtbarkeit: Eine lange Modellantwort schob
+                // das Banner unter den Rand, man musste erst scrollen. Zweitens
+                // Übereinstimmung: Beim Neuladen baut das Backend es aus dem Flag
+                // wieder auf, und das zeigt auf die Nutzer-Nachricht. Hinge es live
+                // woanders, sprängen die Banner beim Neuladen um.
                 if (item.type === "crisis") {
-                    messages[assistantIndex] = {
-                        ...messages[assistantIndex],
-                        crisis: item.crisis,
-                    };
-                    messages = messages;
+                    const ausloeser = assistantIndex - 1;
+                    if (ausloeser >= 0 && messages[ausloeser]?.role === "user") {
+                        messages[ausloeser] = {
+                            ...messages[ausloeser],
+                            crisis: item.crisis,
+                        };
+                        messages = messages;
+                    }
                     continue;
                 }
                 // Generiertes Bild (Phase 16): Referenz an die Assistenten-Nachricht heften
@@ -743,12 +753,13 @@
                 return;
             }
 
-            // Leeren Assistent-Placeholder entfernen, falls kein Token ankam
-            // (aber behalten, wenn ein Krisen-Hilfe-Banner daran hängt)
-            if (
-                messages[assistantIndex]?.content === "" &&
-                !messages[assistantIndex]?.crisis
-            ) {
+            // Leeren Assistent-Platzhalter entfernen, falls kein Token ankam.
+            //
+            // Die frühere Ausnahme („behalten, wenn ein Krisen-Banner daran hängt")
+            // ist entfallen: Das Banner hängt seit 09/2026 an der auslösenden
+            // Nutzer-Nachricht, nicht an der Antwort. Sie stehen zu lassen hieße,
+            // eine leere Blase gegen ein Banner zu verteidigen, das woanders sitzt.
+            if (messages[assistantIndex]?.content === "") {
                 messages = [
                     ...messages.slice(0, assistantIndex),
                     ...messages.slice(assistantIndex + 1),
@@ -1015,6 +1026,7 @@
                     content: m.content,
                     cost_usd: m.cost_usd ?? null,
                     cost_status: m.cost_status ?? null,
+                    crisis: m.crisis ?? null,
                     uploadedAttachments: m.attachments?.length
                         ? m.attachments.map((a) => ({
                               filename: a.name,

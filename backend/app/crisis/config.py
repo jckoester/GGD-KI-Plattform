@@ -181,3 +181,17 @@ def resolve_help_topic(topic_key: str) -> dict | None:
         "internal": [c.model_dump(exclude_none=True) for c in topic.internal],
         "external": [c.model_dump(exclude_none=True) for c in topic.external],
     }
+
+
+def help_topic_fuer_kategorie(category: str) -> str | None:
+    """Zu welchem Hilfe-Thema gehört eine Flag-Kategorie?
+
+    Gebraucht beim **Nachladen** einer Konversation: Das Flag speichert die
+    Kategorie (`flag_category`), nicht das Thema. Bis 09/2026 war das egal — das
+    Banner kam nur einmal live über SSE und war nach dem Neuladen weg. Seit es aus
+    dem Flag rekonstruiert wird, braucht es den Rückweg.
+    """
+    for regel in load_crisis_triggers().triggers:
+        if regel.category == category:
+            return regel.help_topic
+    return None

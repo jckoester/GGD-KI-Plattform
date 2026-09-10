@@ -43,6 +43,7 @@ from app.chat.image_models import (
 from app.chat import kosten_nachtrag
 from app.core.hintergrund import im_hintergrund
 from app.crisis.benachrichtigung import benachrichtige
+from app.crisis.config import help_topic_fuer_kategorie
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
@@ -112,6 +113,10 @@ class MessageItem(BaseModel):
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     images: list[GeneratedImageRef] = []
+    # Hilfe-Ressourcen zu einem Krisenhinweis (ADR-008 Teil 3/4). Hängt an der
+    # **auslösenden** Nachricht — dorthin zeigt auch das Flag. Bis 09/2026 kam das
+    # Banner nur live über SSE und war nach dem Neuladen weg.
+    crisis: Optional[dict] = None
 
 
 class ConversationDetailResponse(BaseModel):
@@ -2797,6 +2802,42 @@ async def get_conversation_messages(
     # Generierte Bilder je Nachricht (Phase 16, Schritt 6: History-Rehydrierung).
     img_map = await list_message_images(db, conversation_id)
 
+    # Hilfe-Banner je Nachricht rekonstruieren (ADR-008 Teil 3/4).
+    #
+    # Es braucht dafür **keine** eigene Speicherung: Das Krisen-Flag zeigt mit
+    # `message_id` bereits auf die auslösende Nachricht. Gezeigt wird — wie live —
+    # nur der **erste** Treffer je Kategorie; die Flags kommen nach `flagged_at`
+    # sortiert, das erste gewinnt.
+    crisis_map: dict = {}
+    gesehene_kategorien: set[str] = set()
+    flag_rows = (await db.execute(
+        select(ConversationFlag)
+        .where(
+            ConversationFlag.conversation_id == conversation_id,
+            ConversationFlag.message_id.is_not(None),
+            ConversationFlag.flag_source == "auto_crisis",
+        )
+        .order_by(ConversationFlag.flagged_at.asc())
+    )).scalars().all()
+    for flag in flag_rows:
+        if flag.flag_category in gesehene_kategorien:
+            continue
+        gesehene_kategorien.add(flag.flag_category)
+        thema = help_topic_fuer_kategorie(flag.flag_category)
+        if thema is None:
+            # Die Kategorie steht nicht mehr in `crisis_triggers.yaml`. Kein Grund
+            # für einen Fehler — die Kuratierung darf Regeln streichen; der alte
+            # Fall bleibt geflaggt, nur ohne Kontaktliste.
+            #
+            # Die Prüfung unten (`payload is not None`) fängt denselben Ausgang noch
+            # einmal ab, meint aber etwas anderes: dort fehlt das *Thema* in
+            # `help_resources.yaml`. Zwei Konfigurationsdateien, zwei Lücken — dass
+            # beide hier zusammenlaufen, ist Zufall der Reihenfolge.
+            continue
+        payload = resolve_help_topic(thema)
+        if payload is not None:
+            crisis_map[flag.message_id] = payload
+
     messages_list = []
     for row in rows:
         msg = row.Message
@@ -2809,6 +2850,7 @@ async def get_conversation_messages(
                 "content": display_text,
                 "created_at": msg.created_at,
                 "cost_usd": None,
+                "crisis": crisis_map.get(msg.id),
                 "attachments": attachments,
                 "model": None,
                 "assistant_id": None,
@@ -2826,6 +2868,7 @@ async def get_conversation_messages(
                 "created_at": msg.created_at,
                 "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
                 "cost_status": msg.cost_status,
+                "crisis": crisis_map.get(msg.id),
                 "attachments": [],
                 "model": msg.model,
                 "provider_model": msg.provider_model,

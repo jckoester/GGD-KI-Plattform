@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Das Hilfe-Banner bleibt erhalten und steht dort, wo es hingehört.** Es erscheint
+  jetzt direkt unter der Nachricht, die es ausgelöst hat — also über der Antwort statt
+  darunter — und ist nach dem Neuladen des Gesprächs wieder da.
+
 - **Krisenfälle melden sich per E-Mail.** Ein neuer Hinweis löst eine Nachricht an ein
   konfiguriertes Postfach aus; unerledigte Fälle werden nach sieben Tagen erinnert,
   danach wöchentlich. Die Nachricht nennt Zahl, Alter und den Weg zur Übersicht —
@@ -142,6 +146,11 @@ in der `docker-compose.yml`.
   jetzt ebenfalls einen Tooltip.
 
 ### Behoben
+
+- **Die Kontaktangaben im Hilfe-Banner waren im hellen Erscheinungsbild nicht lesbar.**
+  Grauer Text auf mittelblauem Grund ergab ein Kontrastverhältnis von 1,3:1 bei einer
+  Untergrenze von 4,5:1. Der Kasten liegt jetzt auf heller Fläche mit grüner Kante und
+  hebt sich damit auch von den Chat-Blasen ab, die dieselbe Blaufamilie nutzten.
 
 - **Die Fachseite zeigte Schüler:innen nie einen Chat.** Sie fragte nach Chats ohne
   Unterrichtsgruppe; Schülerchats haben aber immer eine.
