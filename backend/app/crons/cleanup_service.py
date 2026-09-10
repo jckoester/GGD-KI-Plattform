@@ -27,6 +27,7 @@ from app.chat.image_store import (
     collect_pseudonym_image_paths,
     unlink_paths,
 )
+from app.config import settings
 from app.litellm.client import LiteLLMClient
 
 logger = logging.getLogger(__name__)
@@ -41,12 +42,31 @@ _FLAG_RETENTION_DAYS = 180
 def _protecting_flag_condition(now: datetime):
     """Bedingung auf ConversationFlag: schützt das Flag (noch) vor Löschung?
 
-    Schützend ist ein Flag, das offen/in Prüfung ist ODER nach Resolution noch innerhalb
-    der 180-Tage-Aufbewahrung liegt (bzw. ohne resolved_at — konservativ geschützt).
+    Drei Lagen:
+
+    * **offen / in Prüfung** — geschützt, aber seit 09/2026 **nicht mehr unbefristet**.
+      Der Schutz endet nach `crisis_max_open_days` (Vorgabe 365) ab `flagged_at`.
+      Vorher schützte ein Flag, das niemand bearbeitete, die Konversation für immer;
+      genau das ließ 1.0-Kriterium 3 offen.
+    * **abgeschlossen** — noch 180 Tage ab `resolved_at` (ADR-008 Teil 7); ohne
+      `resolved_at` konservativ geschützt.
+
+    ⚠️ **Der Schutz endet nur, wenn erinnert wurde.** `last_reminder_at IS NULL`
+    heißt: Der Erinnerungslauf hat diesen Fall nie gesehen — dann wurde auch nie
+    gewarnt, und es wird nicht gelöscht. Läuft der Lauf gar nicht, bleibt alles
+    liegen. Das ist die sichere Richtung: Ungefragt zu löschen wäre der schlechtere
+    Ausfall als zu lange aufzubewahren.
     """
     cutoff = now - timedelta(days=_FLAG_RETENTION_DAYS)
+    offen_cutoff = now - timedelta(days=settings.crisis_max_open_days)
     return or_(
-        ConversationFlag.status.in_(("open", "under_review")),
+        and_(
+            ConversationFlag.status.in_(("open", "under_review")),
+            or_(
+                ConversationFlag.flagged_at > offen_cutoff,
+                ConversationFlag.last_reminder_at.is_(None),
+            ),
+        ),
         and_(
             ConversationFlag.status.in_(("resolved", "dismissed")),
             or_(

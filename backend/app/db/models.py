@@ -530,6 +530,13 @@ class ConversationFlag(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # Wann zuletzt an diesen offenen Fall erinnert wurde (Migration 0059).
+    # `NULL` = noch nie. Zwei Aufgaben: den täglichen Lauf davon abhalten, täglich
+    # dieselbe Liste zu schicken — und die Obergrenze davon abhängig machen, dass
+    # überhaupt gewarnt wurde. Ungefragt zu löschen wäre der schlechtere Ausfall.
+    last_reminder_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

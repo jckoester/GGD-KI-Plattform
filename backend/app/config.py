@@ -183,6 +183,16 @@ class Settings(BaseSettings):
     # Wer über neue Krisenfälle informiert wird. Liste, weil ein einzelnes Postfach
     # in den Ferien niemanden erreicht (Entscheidung Jan, 10.09.2026).
     crisis_notify_to: list[str] = []
+    # ── Fristen des Krisenprozesses (ADR-008 Teil 7) ──────────────────────────
+    # Ab wann an einen unerledigten Fall erinnert wird — und danach höchstens
+    # wöchentlich erneut.
+    crisis_reminder_days: int = 7
+    # Wie lange ein Fall offen bleiben darf, bevor die Konversation wie jede andere
+    # gelöscht wird. 365 Tage: Kürzer träfe Ferien und Krankheit, länger widerspräche
+    # der Zusage, dass nichts unbegrenzt liegt (Entscheidung Jan, 10.09.2026).
+    crisis_max_open_days: int = 365
+    # Vorlauf der letzten Warnung vor dieser Grenze.
+    crisis_final_warning_days: int = 14
 
     allowed_hosts: list[str] = ["*"]
     # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
