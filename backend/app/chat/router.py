@@ -41,6 +41,8 @@ from app.chat.image_models import (
     standard_unter,
 )
 from app.chat import kosten_nachtrag
+from app.core.hintergrund import im_hintergrund
+from app.crisis.benachrichtigung import benachrichtige
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
@@ -1547,6 +1549,15 @@ async def _record_crisis(
         "Krisen-Flag angelegt: kategorie=%s severity=%s pseudonym=%s conv=%s",
         hit.category, hit.severity, pseudonym, conversation_id,
     )
+
+    # Benachrichtigung im Hintergrund: Ein Mailserver darf einen Chat nicht
+    # aufhalten — und schon gar nicht diesen. Ob überhaupt versendet wird,
+    # entscheidet die Dämpfung in `app.crisis.benachrichtigung`.
+    im_hintergrund(
+        lambda: benachrichtige(AsyncSessionLocal),
+        was="Krisen-Benachrichtigung",
+    )
+
     return _CrisisRecord(hit=hit, show_banner=show_banner)
 
 

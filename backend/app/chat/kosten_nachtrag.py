@@ -13,36 +13,19 @@ hinterher und schreibt sie nach.
 Key, nicht diese Datenbank. Ein später geschriebener Betrag verändert **keine**
 Freigabeentscheidung — er betrifft Anzeige und Statistik.
 
-⚠️ **Drei Fallen, alle drei still:**
-
-* *Die Sitzung des Requests ist zu.* Wenn die Aufgabe läuft, hat FastAPI die
-  Request-Sitzung längst geschlossen. Die Aufgabe öffnet eine eigene.
-* *Eine Aufgabe ohne Referenz verschwindet.* `asyncio.create_task` allein genügt
-  nicht; ohne festgehaltene Referenz darf der Garbage Collector sie einsammeln.
-  Deshalb `_OFFEN`.
-* *Ein Neustart verlöre die laufenden Züge.* Deshalb wartet das Herunterfahren
-  kurz (:func:`warte_auf_abschluss`).
+Das Gerüst dafür — Aufgabe festhalten, Fehler protokollieren, beim Herunterfahren
+abwarten — steht in :mod:`app.core.hintergrund`.
 """
-import asyncio
+import asyncio  # nur für die Typangabe `asyncio.Task` — unter Python 3.12
+                # wird sie beim Import ausgewertet (PEP 649 erst ab 3.14)
 import logging
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from app.core.hintergrund import im_hintergrund
+
 logger = logging.getLogger(__name__)
-
-# Starke Referenzen auf die laufenden Aufgaben — siehe Modulkopf.
-_OFFEN: set[asyncio.Task] = set()
-
-# Wie lange das Herunterfahren auf offene Nachträge wartet. Länger hielte einen
-# Neustart auf, kürzer verlöre die meisten gerade laufenden Züge.
-ABSCHLUSSFRIST = 5.0
-
-
-def offene_anzahl() -> int:
-    """Wie viele Nachträge gerade laufen — für Diagnose und Tests."""
-    return len(_OFFEN)
-
 
 async def _schreibe(session_factory, message_id: UUID, conversation_id: UUID,
                     betrag: float | None, zustand: str) -> None:
@@ -104,36 +87,8 @@ def nachtragen(session_factory, *, message_id: UUID, conversation_id: UUID,
     Zustand bleibt dann `ausstehend` — sichtbar als „wird ermittelt", statt als
     stille Null.
     """
-    async def _sicher():
-        try:
-            await _lauf(session_factory, message_id, conversation_id,
-                        request_ids, wartezeiten)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Kosten-Nachtrag für Nachricht %s fehlgeschlagen", message_id)
-
-    aufgabe = asyncio.create_task(_sicher())
-    _OFFEN.add(aufgabe)
-    aufgabe.add_done_callback(_OFFEN.discard)
-    return aufgabe
-
-
-async def warte_auf_abschluss(frist: float = ABSCHLUSSFRIST) -> None:
-    """Beim Herunterfahren: offene Nachträge zu Ende bringen lassen.
-
-    Was die Frist nicht schafft, geht verloren — dann bleibt die Nachricht auf
-    `ausstehend` stehen. Das ist die ehrlichere Spur als ein Betrag, der nie kam,
-    sich aber wie ein endgültiger liest.
-    """
-    if not _OFFEN:
-        return
-    logger.info("Warte auf %d offene Kosten-Nachträge…", len(_OFFEN))
-    erledigt, offen = await asyncio.wait(set(_OFFEN), timeout=frist)
-    if offen:
-        logger.warning(
-            "%d Kosten-Nachträge beim Herunterfahren abgebrochen — die Nachrichten "
-            "bleiben auf 'ausstehend'.", len(offen),
-        )
-        for aufgabe in offen:
-            aufgabe.cancel()
+    return im_hintergrund(
+        lambda: _lauf(session_factory, message_id, conversation_id,
+                      request_ids, wartezeiten),
+        was=f"Kosten-Nachtrag für Nachricht {message_id}",
+    )

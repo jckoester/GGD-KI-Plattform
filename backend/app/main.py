@@ -166,11 +166,11 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Herunterfahren ────────────────────────────────────────────────────────
-    # Offene Kosten-Nachträge zu Ende bringen lassen. Ohne das verlöre jeder
-    # Neustart die Beträge der gerade laufenden Züge — still, und die Nachrichten
-    # blieben auf `ausstehend` stehen.
-    from app.chat import kosten_nachtrag
-    await kosten_nachtrag.warte_auf_abschluss()
+    # Laufende Hintergrundaufgaben zu Ende bringen lassen: Kosten-Nachträge und
+    # Krisen-Benachrichtigungen. Ohne das verlöre jeder Neustart die Beträge der
+    # gerade laufenden Züge — still — und eine Benachrichtigung ginge nie raus.
+    from app.core.hintergrund import warte_auf_abschluss
+    await warte_auf_abschluss()
 
 
 def configure_host_guard(app: FastAPI) -> bool:

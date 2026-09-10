@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from app.chat import kosten_nachtrag
+from app.core import hintergrund
 
 
 class _Sitzung:
@@ -108,15 +109,15 @@ async def test_aufgabe_wird_festgehalten_und_wieder_freigegeben(monkeypatch):
     monkeypatch.setattr("app.chat.router._kosten_des_zuges", langsam)
     monkeypatch.setattr("app.litellm.client.LiteLLMClient", _KeinClient)
 
-    vorher = kosten_nachtrag.offene_anzahl()
+    vorher = hintergrund.offene_anzahl()
     aufgabe = kosten_nachtrag.nachtragen(
         _factory([]), message_id=uuid4(), conversation_id=uuid4(),
         request_ids=["a"], wartezeiten=(0.0,),
     )
-    assert kosten_nachtrag.offene_anzahl() == vorher + 1
+    assert hintergrund.offene_anzahl() == vorher + 1
     await aufgabe
     await asyncio.sleep(0)  # Callback laufen lassen
-    assert kosten_nachtrag.offene_anzahl() == vorher
+    assert hintergrund.offene_anzahl() == vorher
 
 
 @pytest.mark.asyncio
@@ -135,11 +136,11 @@ async def test_herunterfahren_wartet_auf_offene_nachtraege(monkeypatch):
         _factory(protokoll), message_id=uuid4(), conversation_id=uuid4(),
         request_ids=["a"], wartezeiten=(0.0,),
     )
-    await kosten_nachtrag.warte_auf_abschluss(frist=2.0)
+    await hintergrund.warte_auf_abschluss(frist=2.0)
 
     # Der Nachtrag ist durch — nicht abgeschnitten.
     assert "commit" in protokoll
-    assert kosten_nachtrag.offene_anzahl() == 0
+    assert hintergrund.offene_anzahl() == 0
 
 
 @pytest.mark.asyncio
@@ -157,7 +158,7 @@ async def test_herunterfahren_gibt_nach_der_frist_auf(monkeypatch, caplog):
         request_ids=["a"], wartezeiten=(0.0,),
     )
     with caplog.at_level("WARNING", logger="app.chat.kosten_nachtrag"):
-        await kosten_nachtrag.warte_auf_abschluss(frist=0.05)
+        await hintergrund.warte_auf_abschluss(frist=0.05)
 
     assert any("abgebrochen" in r.getMessage() for r in caplog.records)
 
