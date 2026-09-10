@@ -164,6 +164,26 @@ class Settings(BaseSettings):
     # Host-Header-Allowlist für TrustedHostMiddleware (Audit #18). Default `*` (aus, wie bisher);
     # in Produktion die echten Hostnamen setzen, z. B. ["ki.example.de"]. Defense-in-Depth
     # zusätzlich zum Reverse-Proxy.
+    # ── Mailversand (Krisen-Benachrichtigung, ADR-008) ────────────────────────
+    #
+    # **Standardmäßig aus.** Ohne `SMTP_HOST` wird nichts versendet, sondern geloggt —
+    # eine Entwicklungsumgebung braucht keine Konfiguration. Im Produktivsystem ist
+    # ein fehlender Wert dagegen ein Befund: Benachrichtigungen zu Krisenfällen
+    # verschwänden still. Die Startprüfung sagt es deshalb (`app/mail`).
+    #
+    # ⚠️ Die Empfänger stehen **hier**, nicht in der Datenbank: Die Plattform kennt
+    # keine E-Mail-Adressen. Nur Pseudonyme verlassen die Anmeldung; es gibt niemanden
+    # nachzuschlagen. Adressiert wird ein gemeinsames Postfach der Zuständigen.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    # Wer über neue Krisenfälle informiert wird. Liste, weil ein einzelnes Postfach
+    # in den Ferien niemanden erreicht (Entscheidung Jan, 10.09.2026).
+    crisis_notify_to: list[str] = []
+
     allowed_hosts: list[str] = ["*"]
     # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
     # der direkte TCP-Peer hier gelistet ist, wird `X-Forwarded-For` ausgewertet — sonst spoofbar.

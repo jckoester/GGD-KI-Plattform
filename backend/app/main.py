@@ -147,6 +147,13 @@ async def lifespan(app: FastAPI):
     from app.chat.image_models import load_image_models
     load_image_models()
 
+    # Startup-Check: Mailversand. Bewusst **weich** — Mail ist nicht der Zweck dieser
+    # Anwendung, und ein Tippfehler in der Absenderadresse soll den Chat nicht
+    # abschalten. Eine halbe Konfiguration meldet sich trotzdem, statt erst bei der
+    # ersten Krise aufzufallen.
+    from app.mail import pruefe_beim_start as pruefe_mail
+    pruefe_mail()
+
     # Startup-Check: Standard-Chatmodell gesetzt?
     if not settings.chat_default_model:
         logger.error(

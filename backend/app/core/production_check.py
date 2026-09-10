@@ -166,6 +166,35 @@ def pruefe_produktion(
     if altlast:
         befunde.append(Befund(WARNING, altlast))
 
+    # ── Krisen-Benachrichtigung ──────────────────────────────────────────────
+    #
+    # Ohne diese Werte verschwindet jede Benachrichtigung zu einem Krisenfall still
+    # im Log. Das ist genau die Sorte Ausfall, die niemand bemerkt, bis sie zählt —
+    # deshalb steht sie hier und nicht nur in der Doku.
+    smtp_host = getattr(settings, "smtp_host", "")
+    smtp_from = getattr(settings, "smtp_from", "")
+    empfaenger = getattr(settings, "crisis_notify_to", []) or []
+
+    if not smtp_host or not smtp_from:
+        befunde.append(Befund(
+            ERROR,
+            "SMTP ist nicht vollständig konfiguriert (SMTP_HOST/SMTP_FROM). "
+            "Benachrichtigungen zu Krisenfällen werden dann nur ins Log geschrieben "
+            "— gesehen hat sie damit niemand.",
+        ))
+    elif not empfaenger:
+        befunde.append(Befund(
+            ERROR,
+            "CRISIS_NOTIFY_TO ist leer. Der Versand ist eingerichtet, aber es gibt "
+            "niemanden, an den er ginge.",
+        ))
+    elif len(empfaenger) == 1:
+        befunde.append(Befund(
+            WARNING,
+            "CRISIS_NOTIFY_TO nennt nur eine Adresse. Ein einzelnes Postfach "
+            "erreicht in den Ferien oder bei Krankheit niemanden.",
+        ))
+
     return befunde
 
 
