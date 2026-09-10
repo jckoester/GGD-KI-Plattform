@@ -7,6 +7,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Krisenfälle melden sich per E-Mail.** Ein neuer Hinweis löst eine Nachricht an ein
+  konfiguriertes Postfach aus; unerledigte Fälle werden nach sieben Tagen erinnert,
+  danach wöchentlich. Die Nachricht nennt Zahl, Alter und den Weg zur Übersicht —
+  weder Person noch Kategorie noch Inhalt.
+
+- **Offene Krisenfälle haben eine Aufbewahrungs-Obergrenze.** Bisher schützte ein
+  unbearbeiteter Fall die Konversation unbefristet. Jetzt endet der Schutz nach 365
+  Tagen, mit einer letzten Warnung 14 Tage vorher — und nur, wenn zuvor erinnert
+  wurde. Alle drei Fristen sind einstellbar.
+
 - **Fachseite und Unterrichtsgruppe sind eine Übersicht geworden.** Sie beantwortet
   „Wo war ich stehengeblieben?": letzte Chats, Assistenten der Gruppe, zuletzt
   Entstandenes und Absprünge zum Nachschlagen. Schüler:innen landen direkt in ihrer
@@ -108,6 +118,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Bezeichnungen aus den Metadaten und entfernt sie dort; die Reihenfolge bleibt erhalten,
   ein Neu-Einbetten ist nicht nötig. Legt die PostgreSQL-Erweiterung `pg_trgm` an, falls
   sie fehlt (seit 0054 in der Regel vorhanden).
+
+- **`0058`** — `messages.cost_status`: wie belastbar ein gespeicherter Kostenbetrag ist.
+  Bestandszeilen bleiben leer (= keine Aussage); keine Nacharbeit nötig.
+
+- **`0059`** — `conversation_flags.last_reminder_at`: wann zuletzt an einen offenen
+  Krisenfall erinnert wurde. Bestandszeilen bleiben leer und gelten damit als „nie
+  erinnert" — sie werden **nicht** gelöscht, bis der Erinnerungslauf sie erfasst hat.
+
+**Neu einzutragen:** `SMTP_*` und `CRISIS_NOTIFY_TO` (siehe `.env.example`). Ohne sie
+werden Krisen-Benachrichtigungen nur ins Log geschrieben; `scripts/check_production.py`
+meldet das als Fehler. Der Cron-Eintrag für `scripts/crisis_reminders.py` steht bereits
+in der `docker-compose.yml`.
 
 ### Geändert
 

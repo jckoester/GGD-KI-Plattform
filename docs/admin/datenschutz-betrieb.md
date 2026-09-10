@@ -170,6 +170,62 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 > aufzubewahren ist (offen, in Prüfung, oder abgeschlossen vor weniger als 180 Tagen),
 > wird das **gesamte** Konto übersprungen, bis die Frist endet.
 
+### Krisenfälle: Erinnerung und Obergrenze
+
+Ein **offener** Fall schützte die Konversation früher unbefristet. Seit 09/2026 gilt
+eine Obergrenze — mit Vorwarnung:
+
+| Frist | Vorgabe | Einstellung |
+|---|---|---|
+| Erinnerung an unerledigte Fälle | nach 7 Tagen, danach wöchentlich | `CRISIS_REMINDER_DAYS` |
+| Letzte Warnung vor der Löschung | 14 Tage vorher | `CRISIS_FINAL_WARNING_DAYS` |
+| Obergrenze für offene Fälle | 365 Tage ab Eingang | `CRISIS_MAX_OPEN_DAYS` |
+
+Den Ablauf steuert `scripts/crisis_reminders.py` (täglich, in der Compose bereits
+eingetragen). Ein Probelauf zeigt, was verschickt würde, ohne etwas zu ändern:
+
+```bash
+docker compose exec backend python scripts/crisis_reminders.py --dry-run
+```
+
+> ⚠️ **Läuft dieser Cron nicht, wird nichts gelöscht.** Der Schutz eines offenen
+> Flags endet nur, wenn mindestens einmal erinnert wurde — sonst würde ohne jede
+> Vorwarnung gelöscht. Die sichere Richtung, aber sie heißt auch: Ein vergessener
+> Cron-Eintrag führt still zu wachsendem Bestand. Der Probelauf oben zeigt, ob der
+> Lauf greift.
+
+### Benachrichtigung per E-Mail
+
+Ohne Konfiguration wird **nichts versendet**; der Inhalt landet im Log. Für den
+Produktivbetrieb ist das zu wenig — `scripts/check_production.py` meldet es deshalb
+als Fehler.
+
+```
+SMTP_HOST=mail.schule.de
+SMTP_PORT=587
+SMTP_USER=…
+SMTP_PASSWORD=…
+SMTP_FROM=ki@schule.de
+SMTP_STARTTLS=true
+CRISIS_NOTIFY_TO=["krisenteam@schule.de","schulleitung@schule.de"]
+```
+
+**Warum die Empfänger in der Konfiguration stehen und nicht in der Datenbank:** Die
+Plattform kennt keine E-Mail-Adressen. Nur Pseudonyme verlassen die Anmeldung — es
+gibt niemanden nachzuschlagen. Adressiert wird ein gemeinsames Postfach der
+Zuständigen; mehrere Adressen, weil ein einzelnes Postfach in den Ferien oder bei
+Krankheit niemanden erreicht.
+
+**Was in der Mail steht:** die Zahl der unerledigten Fälle, das Alter des ältesten und
+ein Link auf `/flags`. **Nicht** Person, Kategorie oder Inhalt — ein Postfach kennt
+keine Zweitfreigabe, und eine weitergeleitete Mail liefe am Vier-Augen-Verfahren
+vorbei. Die Adressen stehen in `Bcc`, damit eine Weiterleitung nicht verrät, wer
+sonst noch zuständig ist.
+
+Bei vielen Treffern in kurzer Zeit verschickt nur der **erste** eine Nachricht
+(Fenster: eine Stunde). Zwanzig Mails an dasselbe Postfach sind keine zwanzigfache
+Aufmerksamkeit.
+
 #### Bausteine: gelöscht oder anonymisiert
 
 Bei den eigenen Wissensbausteinen entscheidet die **Sichtbarkeit**, nicht das Eigentum:
