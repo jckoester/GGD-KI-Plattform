@@ -115,3 +115,74 @@ async def benachrichtige(session_factory, *, sender=None, jetzt: datetime | None
 
     ergebnis = await sender(BETREFF, text(offen, tage), list(settings.crisis_notify_to))
     return ergebnis.versendet
+
+
+# ── Einsicht-Anträge: die andere Hälfte des Prozesses ────────────────────────────
+#
+# Ein Antrag auf Einsicht wartet auf die Zweitfreigabe einer `review`-Person. Bis dahin
+# steht die Bearbeitung des Falls still. Bisher erfuhren die Zuständigen davon **nur**
+# über den Zähler am Avatar (`crisisAlerts.js`) — den sieht, wer sich anmeldet. Bei
+# einer Rolle, die zwei bis drei Personen tragen und die pro Schuljahr vielleicht
+# fünfmal gebraucht wird, ist das der Fall, der am längsten liegen bleibt.
+#
+# **Keine Dämpfung.** Anders als bei den Flags kann es hier keine Flut geben: Je Flag
+# lässt `create_access_request` nur **einen** aktiven Antrag zu (409 sonst), und
+# Anträge stellt allein die Admin-Rolle. Eine Dämpfung verschluckte hier echte Fälle,
+# statt Lärm zu vermeiden.
+
+BETREFF_ANTRAG = "Krisen-Einsicht: Antrag wartet auf Freigabe"
+
+
+def _review_url() -> str:
+    return f"{settings.frontend_origin.rstrip('/')}/review"
+
+
+def antragstext(wartend: int) -> str:
+    """Der Mailtext für einen neuen Einsicht-Antrag.
+
+    Rein und mit **einer** Zahl als Eingabe — damit prüfbar ist, was *nicht* drinsteht:
+    weder wer beantragt hat noch um welchen Fall es geht. Beides steht hinter der
+    Anmeldung, und die Freigabe soll aus der Plattform heraus erfolgen, nicht aus einem
+    Postfach, dessen Inhalt weiterleitbar ist.
+    """
+    return "\n".join([
+        "In der KI-Plattform wartet ein Antrag auf Einsicht in einen geflaggten Chat",
+        "auf die Zweitfreigabe.",
+        "",
+        f"Wartende Anträge insgesamt: {wartend}",
+        "",
+        f"Zur Freigabe: {_review_url()}",
+        "",
+        "Diese Nachricht nennt bewusst weder die antragstellende Person noch den Fall.",
+        "Beides steht in der Plattform; die Freigabe verlangt eine erneute Anmeldung.",
+    ])
+
+
+async def _wartende_antraege(db) -> int:
+    from app.db.models import ConversationAccessRequest
+
+    zahl = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(ConversationAccessRequest)
+        .where(ConversationAccessRequest.status == "pending")
+    )
+    return int(zahl or 0)
+
+
+async def benachrichtige_antrag(session_factory, *, sender=None) -> bool:
+    """Meldet den `review`-Personen, dass ein Antrag auf Freigabe wartet.
+
+    :param sender: einspeisbar für Tests; sonst :func:`app.mail.sende`.
+    :returns: ob versendet wurde.
+    """
+    from app.mail import sende
+
+    sender = sender or sende
+
+    async with session_factory() as db:
+        wartend = await _wartende_antraege(db)
+
+    ergebnis = await sender(
+        BETREFF_ANTRAG, antragstext(wartend), list(settings.crisis_review_notify_to)
+    )
+    return ergebnis.versendet

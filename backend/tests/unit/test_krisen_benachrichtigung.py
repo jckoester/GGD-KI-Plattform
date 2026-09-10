@@ -148,3 +148,97 @@ class TestInhaltDerLage:
         naiv = (JETZT - timedelta(days=3)).replace(tzinfo=None)
         await b.benachrichtige(_factory(1, 1, naiv), sender=sender, jetzt=JETZT)
         assert "3 Tagen" in gesendet["text"]
+
+
+# ── Einsicht-Anträge ────────────────────────────────────────────────────────────
+
+
+def _antrags_factory(wartend):
+    return lambda: _Sitzung([wartend])
+
+
+class TestAntragstext:
+
+    def test_nennt_zahl_und_weg_zur_freigabe(self):
+        text = b.antragstext(wartend=2)
+        assert "2" in text
+        assert "/review" in text
+
+    def test_kann_gar_nichts_verraten(self):
+        """Wie bei `text`: geprüft wird die **Signatur**, nicht der Wortlaut.
+
+        Wer hier `requested_by` oder die Kategorie ergänzt, bricht diesen Test —
+        und genau das soll er. Eine Wortsuche im Ergebnis stolperte über den
+        eigenen Erklärsatz.
+        """
+        import inspect
+        assert list(inspect.signature(b.antragstext).parameters) == ["wartend"]
+
+    def test_keine_kategorie_aus_der_konfiguration_taucht_auf(self):
+        from app.crisis.config import load_crisis_triggers
+
+        text = b.antragstext(wartend=1).lower()
+        for regel in load_crisis_triggers().triggers:
+            assert regel.category.lower() not in text, regel.category
+
+    def test_sagt_ausdruecklich_was_fehlt(self):
+        assert "weder die antragstellende Person noch den Fall" in b.antragstext(1)
+
+
+class TestAntragsbenachrichtigung:
+
+    @pytest.mark.asyncio
+    async def test_geht_an_die_review_liste_nicht_an_die_flag_liste(self, monkeypatch):
+        """Die Zusage, an der alles hängt.
+
+        Antrag und Zweitfreigabe im selben Postfach machen aus dem
+        Vier-Augen-Prinzip (ADR-008 Teil 6) zwei Klicks derselben Person. Ein
+        Rückfall auf `crisis_notify_to`, wenn die review-Liste leer ist, wäre
+        deshalb bequem und falsch — er stünde nirgends und fiele niemandem auf.
+        """
+        monkeypatch.setattr(settings, "crisis_notify_to", ["flags@example.org"])
+        monkeypatch.setattr(settings, "crisis_review_notify_to", ["review@example.org"])
+        gesehen = {}
+
+        async def sender(betreff, text, empfaenger):
+            gesehen["empfaenger"] = empfaenger
+            return Versandergebnis(True)
+
+        ok = await b.benachrichtige_antrag(_antrags_factory(1), sender=sender)
+        assert ok is True
+        assert gesehen["empfaenger"] == ["review@example.org"]
+        assert "flags@example.org" not in gesehen["empfaenger"]
+
+    @pytest.mark.asyncio
+    async def test_leere_review_liste_faellt_nicht_auf_die_flag_liste_zurueck(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "crisis_notify_to", ["flags@example.org"])
+        monkeypatch.setattr(settings, "crisis_review_notify_to", [])
+        gesehen = {}
+
+        async def sender(betreff, text, empfaenger):
+            gesehen["empfaenger"] = empfaenger
+            return Versandergebnis(False, "keine Empfänger")
+
+        await b.benachrichtige_antrag(_antrags_factory(1), sender=sender)
+        assert gesehen["empfaenger"] == []
+
+    @pytest.mark.asyncio
+    async def test_jeder_antrag_verschickt_keine_daempfung(self, monkeypatch):
+        """Anders als bei Flags kann es hier keine Flut geben.
+
+        Je Flag lässt `create_access_request` nur **einen** aktiven Antrag zu (sonst
+        409), und beantragen darf allein die Admin-Rolle. Eine Dämpfung verschluckte
+        hier echte Fälle, statt Lärm zu vermeiden.
+        """
+        monkeypatch.setattr(settings, "crisis_review_notify_to", ["r@example.org"])
+        versendet = []
+
+        async def sender(betreff, text, empfaenger):
+            versendet.append(betreff)
+            return Versandergebnis(True)
+
+        for wartend in (1, 2, 3):
+            await b.benachrichtige_antrag(_antrags_factory(wartend), sender=sender)
+        assert len(versendet) == 3

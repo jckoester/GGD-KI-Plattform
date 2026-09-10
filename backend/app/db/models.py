@@ -599,6 +599,14 @@ class ConversationAccessRequest(Base):
         Text, nullable=False, default="pending", server_default=text("'pending'")
     )
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Wann zuletzt an diesen wartenden Antrag erinnert wurde (Migration 0060).
+    # `NULL` = noch nie. Eigene Spalte trotz `flag_id`, weil die beiden Erinnerungen
+    # an verschiedene Postfächer gehen: die des Flags an die Krisen-Zuständigen, diese
+    # an die `review`-Personen. Steuert **nur** den Rhythmus, keine Löschfrist — ein
+    # Antrag verfällt per Cascade mit seinem Flag.
+    last_reminder_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

@@ -183,6 +183,17 @@ class Settings(BaseSettings):
     # Wer über neue Krisenfälle informiert wird. Liste, weil ein einzelnes Postfach
     # in den Ferien niemanden erreicht (Entscheidung Jan, 10.09.2026).
     crisis_notify_to: list[str] = []
+    # Wer über wartende **Einsicht-Anträge** informiert wird — die `review`-Personen,
+    # die zweitfreigeben.
+    #
+    # ⚠️ **Bewusst getrennt von `crisis_notify_to`, und ohne Rückfall darauf.** Das
+    # Vier-Augen-Prinzip (ADR-008 Teil 6) verlangt, dass beantragende und freigebende
+    # Person verschieden sind; ein gemeinsames Postfach für beide Rollen hebelte das
+    # aus, ohne dass es jemandem auffiele. Wer beides in derselben Hand hat, trägt
+    # denselben Wert bewusst zweimal ein — das ist eine Entscheidung der Schule, kein
+    # stiller Vorgabewert. Bleibt die Liste leer, wird nicht versendet, sondern
+    # geloggt (`app/mail`), und `check_production.py` sagt es beim Start.
+    crisis_review_notify_to: list[str] = []
     # ── Fristen des Krisenprozesses (ADR-008 Teil 7) ──────────────────────────
     # Ab wann an einen unerledigten Fall erinnert wird — und danach höchstens
     # wöchentlich erneut.

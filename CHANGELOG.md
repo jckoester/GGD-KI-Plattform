@@ -116,6 +116,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
   werden. Der Lernstand einer Gruppe bleibt erhalten.
 
+- **Einsicht-Anträge melden sich per E-Mail.** Ein neuer Antrag auf Einsicht in einen
+  geflaggten Chat benachrichtigt die Personen mit der Rolle „review"; wartet er länger
+  als sieben Tage, wird wöchentlich erinnert. Empfänger ist die neue Einstellung
+  `CRISIS_REVIEW_NOTIFY_TO` — getrennt von `CRISIS_NOTIFY_TO`, damit Antrag und
+  Zweitfreigabe nicht im selben Postfach landen.
+
 ### Behoben
 
 - **Die Schweregrad-Chips in den Krisen-Meldungen und -Freigaben waren nicht lesbar.**
@@ -137,10 +143,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Krisenfall erinnert wurde. Bestandszeilen bleiben leer und gelten damit als „nie
   erinnert" — sie werden **nicht** gelöscht, bis der Erinnerungslauf sie erfasst hat.
 
-**Neu einzutragen:** `SMTP_*` und `CRISIS_NOTIFY_TO` (siehe `.env.example`). Ohne sie
-werden Krisen-Benachrichtigungen nur ins Log geschrieben; `scripts/check_production.py`
-meldet das als Fehler. Der Cron-Eintrag für `scripts/crisis_reminders.py` steht bereits
-in der `docker-compose.yml`.
+- **`0060`** — `conversation_access_requests.last_reminder_at`: dasselbe für wartende
+  Einsicht-Anträge. Bestandszeilen bleiben leer; keine Nacharbeit nötig.
+
+**Neu einzutragen:** `SMTP_*`, `CRISIS_NOTIFY_TO` und `CRISIS_REVIEW_NOTIFY_TO` (siehe
+`.env.example`). Ohne sie werden Krisen-Benachrichtigungen nur ins Log geschrieben;
+`scripts/check_production.py` meldet das als Fehler. Der Cron-Eintrag für
+`scripts/crisis_reminders.py` steht bereits in der `docker-compose.yml`.
 
 ### Geändert
 

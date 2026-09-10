@@ -208,6 +208,7 @@ SMTP_PASSWORD=…
 SMTP_FROM=ki@schule.de
 SMTP_STARTTLS=true
 CRISIS_NOTIFY_TO=["krisenteam@schule.de","schulleitung@schule.de"]
+CRISIS_REVIEW_NOTIFY_TO=["schulsozialarbeit@schule.de"]
 ```
 
 **Warum die Empfänger in der Konfiguration stehen und nicht in der Datenbank:** Die
@@ -225,6 +226,32 @@ sonst noch zuständig ist.
 Bei vielen Treffern in kurzer Zeit verschickt nur der **erste** eine Nachricht
 (Fenster: eine Stunde). Zwanzig Mails an dasselbe Postfach sind keine zwanzigfache
 Aufmerksamkeit.
+
+#### Zwei Listen, und warum sie verschieden sein sollten
+
+`CRISIS_NOTIFY_TO` erreicht, wer **Fälle bearbeitet**. `CRISIS_REVIEW_NOTIFY_TO`
+erreicht, wer eine Einsicht **zweitfreigibt** — die Personen mit der Rolle `review`.
+
+| Anlass | Geht an | Rhythmus |
+|---|---|---|
+| neuer Krisenhinweis | `CRISIS_NOTIFY_TO` | höchstens eine je Stunde |
+| unerledigte Fälle | `CRISIS_NOTIFY_TO` | ab 7 Tagen, danach wöchentlich |
+| Fälle vor der Löschgrenze | `CRISIS_NOTIFY_TO` | 14 Tage vorher |
+| neuer Einsicht-Antrag | `CRISIS_REVIEW_NOTIFY_TO` | jeder Antrag |
+| wartende Anträge | `CRISIS_REVIEW_NOTIFY_TO` | ab 7 Tagen, danach wöchentlich |
+
+Das Vier-Augen-Prinzip (ADR-008 Teil 6) lebt davon, dass beantragende und freigebende
+Person verschieden sind. Landen beide Mails im selben Postfach, ist das technisch
+erlaubt — die Startprüfung **warnt** dann, lehnt es aber nicht ab, weil es an einer
+kleinen Schule die einzige Möglichkeit sein kann. Bleibt
+`CRISIS_REVIEW_NOTIFY_TO` leer, gibt es **keinen** stillen Rückfall auf die andere
+Liste; stattdessen meldet `check_production.py` einen Fehler. Ein wartender Antrag
+blockiert die Bearbeitung des Falls, und die Zuständigen sähen ihn sonst nur, wenn
+sie sich anmelden (Zähler am Avatar).
+
+Der Antrag löst die Mail **ohne** Dämpfung aus: Je Flag lässt die Plattform nur einen
+aktiven Antrag zu, und beantragen darf allein die Admin-Rolle — eine Flut kann hier
+nicht entstehen, eine Dämpfung verschlucke also echte Fälle.
 
 #### Bausteine: gelöscht oder anonymisiert
 

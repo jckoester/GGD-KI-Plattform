@@ -33,6 +33,9 @@ def _settings(**over):
         smtp_host="mail.beispielschule.de",
         smtp_from="ki@beispielschule.de",
         crisis_notify_to=["krisenteam@beispielschule.de", "leitung@beispielschule.de"],
+        # Getrennt von der Liste darüber — beantragen und zweitfreigeben sind
+        # verschiedene Personen (ADR-008 Teil 6).
+        crisis_review_notify_to=["sozialarbeit@beispielschule.de"],
     )
     basis.update(over)
     return SimpleNamespace(**basis)
@@ -204,8 +207,11 @@ def test_ohne_optionale_quellen_laeuft_die_pruefung_durch():
 def _mail_befunde(**over):
     befunde = pruefe_produktion(_settings(**over), _auth(), _schuljahr(),
                                 heute=date(2026, 9, 20))
-    return [b for b in befunde
-            if "SMTP" in b.message or "CRISIS_NOTIFY_TO" in b.message]
+    # `CRISIS_NOTIFY_TO` ist **kein** Teilstring von `CRISIS_REVIEW_NOTIFY_TO`; beide
+    # müssen deshalb einzeln genannt werden, sonst rutschen die Antragsbefunde durch
+    # und die Prüfungen unten wären grün, ohne etwas zu sehen.
+    schluessel = ("SMTP", "CRISIS_NOTIFY_TO", "CRISIS_REVIEW_NOTIFY_TO")
+    return [b for b in befunde if any(s in b.message for s in schluessel)]
 
 
 def test_fehlendes_smtp_ist_ein_fehler():
@@ -228,3 +234,45 @@ def test_ein_einzelner_empfaenger_ist_eine_warnung():
 
 def test_vollstaendige_konfiguration_meldet_nichts():
     assert _mail_befunde() == []
+
+
+# ── Zweitfreigabe: eigenes Postfach ──────────────────────────────────────────
+#
+# Ein wartender Einsicht-Antrag blockiert die Bearbeitung eines Krisenfalls. Ohne
+# eigene Empfänger erfahren die review-Personen davon nur über den Zähler in der
+# Oberfläche — den sieht, wer sich anmeldet.
+
+def test_fehlende_review_empfaenger_sind_ein_fehler():
+    befunde = _mail_befunde(crisis_review_notify_to=[])
+    assert [b.level for b in befunde] == ["error"]
+    assert "CRISIS_REVIEW_NOTIFY_TO" in befunde[0].message
+
+
+def test_ohne_smtp_wird_die_review_liste_nicht_zusaetzlich_gemeldet():
+    """Ein Befund je Ursache. Wer gar kein SMTP hat, braucht nicht zwei Zeilen."""
+    befunde = _mail_befunde(smtp_host="", smtp_from="",
+                            crisis_notify_to=[], crisis_review_notify_to=[])
+    assert len(befunde) == 1
+    assert "SMTP" in befunde[0].message
+
+
+def test_identische_listen_sind_eine_warnung():
+    """Erlaubt, aber eine Entscheidung, die man getroffen haben sollte.
+
+    Antrag und Zweitfreigabe im selben Postfach machen aus dem Vier-Augen-Prinzip
+    zwei Klicks derselben Person — deshalb Warnung statt Schweigen, aber kein
+    Fehler: Es kann an einer kleinen Schule die einzige Möglichkeit sein.
+    """
+    gleiche = ["krisenteam@beispielschule.de"]
+    befunde = _mail_befunde(crisis_notify_to=gleiche, crisis_review_notify_to=gleiche)
+    stufen = [b.level for b in befunde]
+    assert "warning" in stufen
+    assert "error" not in stufen
+    assert any("Vier-Augen-Prinzip" in b.message for b in befunde)
+
+
+def test_verschiedene_listen_melden_nichts():
+    assert _mail_befunde(
+        crisis_notify_to=["a@beispielschule.de", "b@beispielschule.de"],
+        crisis_review_notify_to=["c@beispielschule.de"],
+    ) == []

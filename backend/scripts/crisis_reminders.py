@@ -2,8 +2,10 @@
 """
 Erinnert an unerledigte Krisenfälle und warnt vor der Aufbewahrungsgrenze.
 
-Täglich laufen lassen. Verschickt höchstens **zwei** Mails je Lauf (eine Erinnerung,
-eine letzte Warnung) — nicht eine je Fall.
+Täglich laufen lassen. Verschickt höchstens **drei** Mails je Lauf — nicht eine je
+Fall: eine Erinnerung und eine letzte Warnung an `CRISIS_NOTIFY_TO`, dazu eine
+Erinnerung an wartende Einsicht-Anträge an `CRISIS_REVIEW_NOTIFY_TO`. Die letzte geht
+bewusst an ein anderes Postfach — freigeben soll, wer nicht beantragt hat.
 
 ⚠️ Dieser Lauf setzt `conversation_flags.last_reminder_at`, und **nur** ein Flag mit
 diesem Vermerk verliert später seinen Löschschutz. Läuft er nicht, bleiben geflaggte
@@ -56,20 +58,31 @@ async def main() -> None:
     if args.dry_run:
         # Der Probelauf darf **nicht** vermerken: Ein gesetzter `last_reminder_at`
         # startete die Löschfrist, ohne dass jemand gewarnt wurde.
+        #
+        # ⚠️ **Beide** Vermerk-Funktionen stilllegen. Seit den Anträgen (Migration
+        # 0060) gibt es zwei; wer nur die erste ersetzt, schiebt mit einem Probelauf
+        # still die Antrags-Erinnerung um eine Woche nach hinten — ein Trockenlauf,
+        # der etwas verändert, ist keiner. Ein Test hält das fest
+        # (`test_krisen_erinnerung.py`).
         from app.crisis import erinnerung
 
-        async def _kein_vermerk(db, _jetzt):
-            logger.info("[Probelauf] `last_reminder_at` wird nicht gesetzt.")
-            return 0
+        def _kein_vermerk(was: str):
+            async def _still(db, _jetzt):
+                logger.info("[Probelauf] `%s.last_reminder_at` wird nicht gesetzt.", was)
+                return 0
+            return _still
 
-        erinnerung._vermerke = _kein_vermerk
+        erinnerung._vermerke = _kein_vermerk("conversation_flags")
+        erinnerung._vermerke_antraege = _kein_vermerk("conversation_access_requests")
         lage = await lauf(AsyncSessionLocal, sender=_trockenlauf_sender, jetzt=jetzt)
     else:
         lage = await lauf(AsyncSessionLocal, jetzt=jetzt)
 
     logger.info(
-        "Krisen-Erinnerungslauf: %d offen, davon %d erinnerungsreif, %d vor der Grenze.",
+        "Krisen-Erinnerungslauf: %d offen, davon %d erinnerungsreif, %d vor der Grenze; "
+        "%d Anträge wartend, davon %d erinnerungsreif.",
         lage.offen_gesamt, lage.faellig, lage.vor_loeschung,
+        lage.antraege_gesamt, lage.antraege_faellig,
     )
 
 
