@@ -116,6 +116,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
   werden. Der Lernstand einer Gruppe bleibt erhalten.
 
+### Behoben
+
+- **Die Schweregrad-Chips in den Krisen-Meldungen und -Freigaben waren nicht lesbar.**
+  „Alarm", „Warnung" und „Hinweis" standen in beiden Modi auf einer Fläche derselben
+  Farbfamilie. Fläche und Rand tragen jetzt die Farbe, die Beschriftung die gewohnte
+  Textfarbe.
+
 ### Migration
 
 - **`0057`** — Aliase bekommen eine eigene Tabelle. Der Lauf übernimmt vorhandene

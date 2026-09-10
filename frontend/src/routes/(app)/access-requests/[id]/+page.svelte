@@ -10,6 +10,7 @@
     resolveAccessRequest,
   } from "$lib/api.js";
   import { user } from "$lib/stores/user.js";
+  import { severityLabel, categoryLabel } from "$lib/crisis_labels.js";
   import MessageBubble from "$lib/components/MessageBubble.svelte";
   import StepUpDialog from "$lib/components/StepUpDialog.svelte";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -59,15 +60,6 @@
     }
   }
 
-  const SEVERITY = { alert: "Alarm", warning: "Warnung", info: "Hinweis" };
-  const CATEGORY = {
-    suizidalitaet: "Suizidalität",
-    selbstverletzung: "Selbstverletzung",
-    haeusliche_gewalt: "Häusliche Gewalt",
-    essverhalten: "Essverhalten",
-    mobbing: "Mobbing",
-  };
-
   async function loadView() {
     loading = true;
     error = null;
@@ -105,10 +97,10 @@
 
   function downloadMarkdown(payload) {
     const lines = [
-      `# Einsicht — ${CATEGORY[payload.flag_category] ?? payload.flag_category}`,
+      `# Einsicht — ${categoryLabel(payload.flag_category)}`,
       "",
       `Konversation: ${payload.subject_pseudonym}`,
-      `Schweregrad: ${SEVERITY[payload.severity] ?? payload.severity}`,
+      `Schweregrad: ${severityLabel(payload.severity)}`,
       "",
       "---",
       "",
@@ -162,7 +154,7 @@
       <div class="flex items-start justify-between gap-4 mb-2">
         <div>
           <h1 class="text-2xl font-semibold text-light-tx dark:text-dark-tx">
-            {CATEGORY[data.flag_category] ?? data.flag_category}
+            {categoryLabel(data.flag_category)}
           </h1>
           <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
             Konversation <span class="font-mono">{data.subject_pseudonym.slice(0, 12)}…</span>

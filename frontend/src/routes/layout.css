@@ -194,8 +194,6 @@
     --color-light-pu-2: var(--color-purple-400);
     --color-light-ma-2: var(--color-magenta-400);
     --color-dark-re-2: var(--color-red-600);
-    --color-light-re-bg: var(--color-red-50);
-    --color-dark-re-bg: var(--color-red-950);
     --color-dark-or-2: var(--color-orange-600);
     --color-dark-ye-2: var(--color-yellow-600);
     --color-dark-gr-2: var(--color-green-600);
@@ -203,6 +201,25 @@
     --color-dark-bl-2: var(--color-blue-600);
     --color-dark-pu-2: var(--color-purple-600);
     --color-dark-ma-2: var(--color-magenta-600);
+
+    /* ── Getönte Flächen (`-bg`) ──────────────────────────────────────────────
+     * Für farbige Chips, Kästen und Hinweisflächen. Darauf steht die **gewohnte**
+     * Textfarbe (`text-light-tx` / `dark:text-dark-tx`, 11–16:1), die Farbe tragen
+     * Fläche und Rand — der Rand in `-re`/`-or`/`-bl` liegt bei 4,0–5,4:1 gegen
+     * seine Tönung und ist damit deutlich sichtbar.
+     *
+     * ⚠️ **Nicht `-2` als Fläche unter `-1` als Schrift verwenden.** Die
+     * `-2`-Token sind der Akzent des *jeweils anderen* Modus (`light-re-2` =
+     * `dark-re` = red-400), liegen also eine Palettenstufe neben dem Akzent
+     * selbst. `bg-light-or-2` + `text-light-or` ergab 1,45:1 — die Schrift war
+     * unlesbar (aufgetreten in den Schweregrad-Chips von `/flags` und `/review`,
+     * behoben 10.09.2026). Wer eine farbige Fläche braucht, nimmt `-bg`. */
+    --color-light-re-bg: var(--color-red-50);
+    --color-dark-re-bg: var(--color-red-950);
+    --color-light-or-bg: var(--color-orange-50);
+    --color-dark-or-bg: var(--color-orange-950);
+    --color-light-bl-bg: var(--color-blue-50);
+    --color-dark-bl-bg: var(--color-blue-950);
 }
 
 /* ── Unterrichtsplaner: schulintern überschreibbar via CSS-Variablen ─────── */
