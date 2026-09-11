@@ -125,19 +125,8 @@ class TestIndexBleibtInBenutzung:
     """Der Grund, warum die Aliase **nicht** als korreliertes EXISTS in der Hauptabfrage
     stehen. Der erste Entwurf tat genau das und verdrängte den Index aus Migration 0053."""
 
-    async def test_ohne_aliastreffer_ist_die_abfrage_unveraendert(self, db_url, run_migrations):
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        abfrage = identifikations_abfrage("nennen", Suchprofil(pseudonym="p"))
-        roh = str(abfrage.compile(compile_kwargs={"literal_binds": True}))
-        engine = create_async_engine(db_url)
-        try:
-            async with engine.connect() as con:
-                plan = "\n".join(
-                    r[0] for r in (await con.execute(sa.text("EXPLAIN " + roh))).all()
-                )
-        finally:
-            await engine.dispose()
+    async def test_ohne_aliastreffer_ist_die_abfrage_unveraendert(self, erklaerplan):
+        plan = await erklaerplan(identifikations_abfrage("nennen", Suchprofil(pseudonym="p")))
         assert "idx_context_nodes_titel_nachschlagen" in plan, plan
 
     async def test_mit_aliastreffern_wird_die_id_liste_angehaengt(self, db_session, methode):

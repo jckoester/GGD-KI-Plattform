@@ -780,27 +780,15 @@ class TestNachschlageIndexWirdBenutzt:
     Sein Ausfall ist still: Weicht der Ausdruck der Abfrage auch nur in einem Zeichen ab,
     fällt PostgreSQL auf einen vollständigen Durchlauf zurück — dasselbe Ergebnis, aber
     rund 70 statt 0,3 ms, und das bei **jeder** Suche.
+
+    Geprüft wird die **Benutzbarkeit** des Index, nicht die Wahl des Planers; warum das
+    ein Unterschied ist, steht bei der Fixture `erklaerplan`.
     """
 
-    async def test_explain_zeigt_indexnutzung(self, db_url, run_migrations):
-        import sqlalchemy as sa
-        from sqlalchemy.ext.asyncio import create_async_engine
-
+    async def test_explain_zeigt_indexnutzung(self, erklaerplan):
         from app.context.search import Suchprofil, identifikations_abfrage
 
-        abfrage = identifikations_abfrage("nennen", Suchprofil(pseudonym="p"))
-        # `literal_binds`, weil EXPLAIN die Werte braucht: Ein Platzhalter ohne Wert
-        # lässt den Planer generisch planen — dann sagt der Plan nichts über den Fall.
-        roh = str(abfrage.compile(compile_kwargs={"literal_binds": True}))
-
-        engine = create_async_engine(db_url)
-        try:
-            async with engine.connect() as con:
-                plan = "\n".join(
-                    r[0] for r in (await con.execute(sa.text("EXPLAIN " + roh))).all()
-                )
-        finally:
-            await engine.dispose()
+        plan = await erklaerplan(identifikations_abfrage("nennen", Suchprofil(pseudonym="p")))
 
         assert "idx_context_nodes_titel_nachschlagen" in plan, (
             f"Der Nachschlage-Index wird nicht benutzt. Plan:\n{plan}"

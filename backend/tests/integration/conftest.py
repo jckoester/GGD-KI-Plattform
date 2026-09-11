@@ -104,6 +104,42 @@ async def db_session(async_engine) -> AsyncIterator[AsyncSession]:
             await session.rollback()
 
 
+@pytest_asyncio.fixture
+async def erklaerplan(db_url, run_migrations):
+    """Liefert den EXPLAIN-Plan einer Abfrage — mit abgeschaltetem Seq Scan.
+
+    Gegenstand solcher Prüfungen ist, ob ein Index **benutzbar** ist: ob der Ausdruck der
+    Abfrage zeichengenau dem des Index entspricht. Weicht er ab, kann PostgreSQL den Index
+    nicht verwenden — still, ohne Fehler, nur langsamer (Migration 0053).
+
+    Ob der Planer ihn dann auch *wählt*, ist eine andere Frage und hängt an der Tabelle:
+    Unter rund 40 Zeilen ist der vollständige Durchlauf wirklich billiger, und der Planer
+    entscheidet richtig. Genau daran hing dieser Wächter bis 11.09.2026 — er wurde rot,
+    wenn Autoanalyze zufällig lief, während wenige Testzeilen in `context_nodes` standen.
+
+    `enable_seqscan = off` trennt beides: Passt der Ausdruck, greift der Index bei jeder
+    Tabellengröße. Passt er nicht, bleibt nur der Durchlauf, und die Prüfung wird rot —
+    nachgemessen mit `btrim` → `rtrim` bei 0, 5 und 41 Zeilen.
+    """
+    import sqlalchemy as sa
+
+    engine = create_async_engine(db_url)
+
+    async def plan(abfrage) -> str:
+        # `literal_binds`, weil EXPLAIN die Werte braucht: Ein Platzhalter ohne Wert lässt
+        # den Planer generisch planen — dann sagt der Plan nichts über den Fall.
+        roh = str(abfrage.compile(compile_kwargs={"literal_binds": True}))
+        # `begin()`, nicht `connect()`: `SET LOCAL` außerhalb einer Transaktion verpufft
+        # mit einer bloßen Warnung — die Prüfung wäre wieder von der Tabellengröße abhängig.
+        async with engine.begin() as con:
+            await con.execute(sa.text("SET LOCAL enable_seqscan = off"))
+            zeilen = (await con.execute(sa.text("EXPLAIN " + roh))).all()
+        return "\n".join(r[0] for r in zeilen)
+
+    yield plan
+    await engine.dispose()
+
+
 # ── HTTP-TestClient und Auth-Fixtures ─────────────────────────────────────────
 
 @pytest.fixture(scope="session")
