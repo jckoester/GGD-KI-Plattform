@@ -116,6 +116,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
   werden. Der Lernstand einer Gruppe bleibt erhalten.
 
+- **Die Jahresplanung zeigt „Idee" an noch leeren Stundenentwürfen.** Ein angelegter
+  Entwurf ohne Phasen war bisher nicht von einem ausgearbeiteten zu unterscheiden.
+
 - **Einsicht-Anträge melden sich per E-Mail.** Ein neuer Antrag auf Einsicht in einen
   geflaggten Chat benachrichtigt die Personen mit der Rolle „review"; wartet er länger
   als sieben Tage, wird wöchentlich erinnert. Empfänger ist die neue Einstellung

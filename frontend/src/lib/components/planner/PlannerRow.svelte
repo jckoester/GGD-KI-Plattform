@@ -1,5 +1,5 @@
 <script>
-  import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS } from '$lib/planner.js'
+  import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS, entwurfsStand } from '$lib/planner.js'
 
   const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson, onReview = null } = $props()
 
@@ -236,6 +236,17 @@
       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
                    bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-200">
         Fixpunkt
+      </span>
+    {/if}
+    <!-- „Idee": Entwurf angelegt, aber noch ohne Phasen. Ohne diesen Hinweis sieht die
+         Zeile aus wie eine fertig geplante Stunde — Thema fett und verlinkt.
+         Nach der Nachbereitung entfällt er: Dann ist die Stunde gehalten, und der
+         Ausarbeitungsstand ist keine offene Aufgabe mehr. -->
+    {#if entwurfsStand(slot) === 'idee' && !slot.nachbereitet_at}
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                   bg-light-ui-2 text-light-tx dark:bg-dark-ui-2 dark:text-dark-tx"
+            title="Stundenentwurf ist angelegt, enthält aber noch keine Phasen">
+        Idee
       </span>
     {/if}
     {#if slot.nachbereitet_at}

@@ -93,6 +93,31 @@ export const KATEGORIE_LABELS = {
 }
 
 /**
+ * Wie weit der Stundenentwurf einer Slot-Zeile gediehen ist.
+ *
+ * **Warum es die Stufe „Idee" braucht.** Ein angelegter, aber noch leerer Entwurf
+ * sah in der Jahresplanung genauso aus wie ein ausgearbeiteter: Thema fett,
+ * verlinkt, anklickbar. Erst beim Öffnen zeigte sich, dass nichts drinsteht. Von den
+ * drei Stufen des Todo-Eintrags waren die anderen beiden längst sichtbar —
+ * „nachbereitet" als eigenes Abzeichen, „kein Entwurf" am kursiven Thema und am
+ * Knopf „Stundenentwurf anlegen". Diese eine fehlte.
+ *
+ * **Die Nachbereitung steht bewusst nicht hier drin.** Sie ist keine Stufe des
+ * Entwurfs, sondern eine Aussage über die gehaltene Stunde, und das Abzeichen dafür
+ * gibt es schon. Sie zusätzlich als Rückgabewert zu führen hieße, dieselbe Tatsache
+ * an zwei Stellen zu kennen — die Fehlerquelle, die dieses Projekt am häufigsten
+ * einholt. Ob der Hinweis trotz Nachbereitung erscheint, entscheidet deshalb die
+ * aufrufende Zeile.
+ *
+ * @param {{stunde_node_id?: string|null, hat_phasen?: boolean}|null} slot
+ * @returns {'keiner'|'idee'|'entwurf'}
+ */
+export function entwurfsStand(slot) {
+    if (!slot?.stunde_node_id) return 'keiner'
+    return slot.hat_phasen ? 'entwurf' : 'idee'
+}
+
+/**
  * Gruppiert Slots nach Kalenderwochen und fügt Ferien- und Halbjahresbänder ein.
  *
  * Feiertage und unterrichtsfreie Tage werden als Sondertag-Zeilen eingefügt —

@@ -1,5 +1,41 @@
 import { describe, it, expect } from "vitest"
-import { mitPhasenKennungen } from "./planner.js"
+import { mitPhasenKennungen, entwurfsStand } from "./planner.js"
+
+describe("entwurfsStand", () => {
+  it("ohne verknüpften Entwurf: keiner", () => {
+    expect(entwurfsStand({ stunde_node_id: null, hat_phasen: false })).toBe("keiner")
+  })
+
+  it("mit Entwurf, aber ohne Phasen: Idee", () => {
+    // Der Fall, den die Jahresplanung bis 11.09.2026 verschwieg — die Zeile sah
+    // aus wie eine fertig geplante Stunde.
+    expect(entwurfsStand({ stunde_node_id: "n-1", hat_phasen: false })).toBe("idee")
+  })
+
+  it("mit Phasen: Entwurf", () => {
+    expect(entwurfsStand({ stunde_node_id: "n-1", hat_phasen: true })).toBe("entwurf")
+  })
+
+  it("`hat_phasen` fehlt ganz: Idee, nicht Entwurf", () => {
+    // Ältere Antworten und andere Endpunkte liefern das Feld nicht. Dann lieber
+    // „noch nichts drin" annehmen als Fertigstellung behaupten — ein falsches
+    // „Idee" kostet einen Blick, ein falsches „fertig" eine Unterrichtsstunde.
+    expect(entwurfsStand({ stunde_node_id: "n-1" })).toBe("idee")
+  })
+
+  it("verträgt null und leeres Objekt", () => {
+    expect(entwurfsStand(null)).toBe("keiner")
+    expect(entwurfsStand(undefined)).toBe("keiner")
+    expect(entwurfsStand({})).toBe("keiner")
+  })
+
+  it("kennt die Nachbereitung nicht", () => {
+    // Sie ist keine Stufe des Entwurfs, und es gibt bereits ein Abzeichen dafür.
+    // Sie hier mitzuführen hieße, dieselbe Tatsache an zwei Stellen zu kennen.
+    expect(entwurfsStand({ stunde_node_id: "n-1", hat_phasen: false, nachbereitet_at: "2026-09-01T08:00:00Z" }))
+      .toBe("idee")
+  })
+})
 
 describe("mitPhasenKennungen", () => {
   it("ergänzt eine fehlende Kennung", () => {

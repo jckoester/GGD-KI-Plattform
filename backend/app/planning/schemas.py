@@ -73,6 +73,18 @@ class SlotRead(BaseModel):
     nachbereitet_auto: bool
     created_at: datetime
     updated_at: datetime
+    # Ob der verknüpfte Stundenentwurf schon Phasen hat.
+    #
+    # ⚠️ **Kein Feld des Slots**, sondern eine Auskunft über den Knoten dahinter
+    # (`context_nodes.metadata->'phasen'`) — deshalb setzt `get_overview` es
+    # nachträglich und `from_attributes` füllt es nicht. Ohne diese Angabe sieht ein
+    # angelegter, aber leerer Entwurf in der Jahresplanung genauso aus wie ein
+    # ausgearbeiteter: Thema fett, verlinkt, fertig.
+    #
+    # `False` heißt „keine Phasen" **oder** „gar kein Entwurf" — welcher von beiden,
+    # sagt `stunde_node_id`. Die Unterscheidung trifft das Frontend
+    # (`entwurfsStand` in `lib/planner.js`), damit sie an einem Ort steht.
+    hat_phasen: bool = False
 
     class Config:
         from_attributes = True

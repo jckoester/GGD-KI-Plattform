@@ -178,6 +178,32 @@ async def _load_units(db: AsyncSession, group_id: int) -> list[ContextNode]:
 # ── GET /planning/groups/{group_id}/overview ──────────────────────────────────
 
 
+async def _stunden_mit_phasen(db: AsyncSession, slots) -> set[UUID]:
+    """Welche der verknüpften Stundenentwürfe schon Phasen haben.
+
+    **Eine Abfrage für alle Slots**, nicht eine je Slot: Ein Schuljahr einer Gruppe
+    bringt rund 40 bis 120 Slots mit, und die Jahresübersicht lädt sie in einem Zug.
+
+    Gefiltert wird in der Datenbank (`jsonb_array_length > 0`) statt im Python — so
+    wandern nur die Treffer über die Leitung, und die Regel „leer heißt Idee" steht
+    an einer Stelle.
+    """
+    ids = {s.stunde_node_id for s in slots if s.stunde_node_id}
+    if not ids:
+        return set()
+
+    phasen = sa.func.coalesce(
+        ContextNode.metadata_["phasen"], sa.text("'[]'::jsonb")
+    )
+    treffer = await db.execute(
+        sa.select(ContextNode.id).where(
+            ContextNode.id.in_(ids),
+            sa.func.jsonb_array_length(phasen) > 0,
+        )
+    )
+    return set(treffer.scalars())
+
+
 @router.get("/groups/{group_id}/overview", response_model=OverviewRead)
 async def get_overview(
     group_id: int,
@@ -200,6 +226,8 @@ async def get_overview(
     )
     patterns = patterns_result.scalars().all()
 
+    ausgearbeitet = await _stunden_mit_phasen(db, slots)
+
     units = await _load_units(db, group_id)
     balance = await _build_balance(db, group_id, units, slots)
 
@@ -220,7 +248,12 @@ async def get_overview(
     cfg = load_school_year()
 
     return OverviewRead(
-        slots=[SlotRead.model_validate(s) for s in slots],
+        slots=[
+            SlotRead.model_validate(s).model_copy(
+                update={"hat_phasen": s.stunde_node_id in ausgearbeitet}
+            )
+            for s in slots
+        ],
         patterns=[WeekPatternRead.model_validate(p) for p in patterns],
         units=unit_reads,
         balance=balance,

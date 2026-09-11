@@ -757,3 +757,133 @@ async def test_context_nodes_subject_id_or_global(
     ).json()
     ids_other = {n["id"] for n in res_other}
     assert generic in ids_other and fach not in ids_other
+
+
+# ── Entwurfsstand in der Jahresplanung (11.09.2026) ──────────────────────────
+#
+# Ein angelegter, aber leerer Stundenentwurf sah in der Jahresplanung genauso aus wie
+# ein ausgearbeiteter: Thema fett, verlinkt, anklickbar. `hat_phasen` macht den
+# Unterschied sichtbar; die Beschriftung leitet das Frontend daraus ab
+# (`entwurfsStand` in `lib/planner.js`).
+
+
+@pytest.mark.asyncio
+async def test_hat_phasen_unterscheidet_idee_von_entwurf(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    # Eine eigene UE, damit der Test nicht an den Stunden der übrigen Tests hängt.
+    ue = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Entwurfsstand-Test", "farbe": 3},
+            headers=auth_headers,
+        )
+    ).json()
+
+    # ⚠️ Nur Slots **ohne** Entwurf nehmen. Die Fixtures dieses Moduls haben
+    # `scope="module"`, frühere Tests hängen also schon Stunden an die vorderen
+    # Slots — `slots[0]` war prompt belegt.
+    ov = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    frei = [s for s in ov.json()["slots"] if s["stunde_node_id"] is None]
+    assert len(frei) >= 3, "zu wenige freie Slots für den Test"
+    ohne_entwurf, fuer_idee, fuer_entwurf = frei[0], frei[1], frei[2]
+
+    # Zwei Stundenentwürfe anlegen — beide zunächst ohne Phasen.
+    stunde_idee = (
+        await test_client.post(
+            f"/planning/units/{ue['id']}/lessons",
+            json={"titel": "Nur eine Idee", "slot_id": fuer_idee["id"]},
+            headers=auth_headers,
+        )
+    ).json()
+    stunde_entwurf = (
+        await test_client.post(
+            f"/planning/units/{ue['id']}/lessons",
+            json={"titel": "Ausgearbeitet", "slot_id": fuer_entwurf["id"]},
+            headers=auth_headers,
+        )
+    ).json()
+
+    # Nur einer bekommt Phasen.
+    resp = await test_client.patch(
+        f"/planning/lessons/{stunde_entwurf['id']}",
+        json={"phasen": [{"name": "Erarbeitung", "dauer_min": 30, "prio": "kern"}]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    stand = {
+        s["id"]: s
+        for s in (
+            await test_client.get(
+                "/planning/groups/100/overview", headers=auth_headers
+            )
+        ).json()["slots"]
+    }
+
+    # Ohne Entwurf: kein Knoten, keine Phasen.
+    assert stand[ohne_entwurf["id"]]["stunde_node_id"] is None
+    assert stand[ohne_entwurf["id"]]["hat_phasen"] is False
+
+    # ⚠️ Der Kern: Beide haben einen Entwurf — nur einer ist ausgearbeitet.
+    assert stand[fuer_idee["id"]]["stunde_node_id"] == stunde_idee["id"]
+    assert stand[fuer_idee["id"]]["hat_phasen"] is False
+
+    assert stand[fuer_entwurf["id"]]["stunde_node_id"] == stunde_entwurf["id"]
+    assert stand[fuer_entwurf["id"]]["hat_phasen"] is True
+
+
+@pytest.mark.asyncio
+async def test_geleerte_phasen_fallen_auf_idee_zurueck(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Wer alle Phasen löscht, hat wieder eine Idee — nicht weiter einen Entwurf.
+
+    Der Rückweg ist der unangenehmere Fall: Ein einmal gesetztes `hat_phasen`, das
+    hängen bliebe, behauptete Arbeit, die es nicht mehr gibt.
+    """
+    ue = (
+        await test_client.post(
+            "/planning/groups/100/units",
+            json={"titel": "Rueckweg-Test", "farbe": 4},
+            headers=auth_headers,
+        )
+    ).json()
+    slots = (
+        await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    ).json()["slots"]
+    frei = [s for s in slots if s["stunde_node_id"] is None]
+    assert frei, "kein freier Slot für den Test"
+    ziel = frei[-1]
+
+    stunde = (
+        await test_client.post(
+            f"/planning/units/{ue['id']}/lessons",
+            json={"titel": "Hin und zurück", "slot_id": ziel["id"]},
+            headers=auth_headers,
+        )
+    ).json()
+
+    async def hat_phasen() -> bool:
+        daten = (
+            await test_client.get(
+                "/planning/groups/100/overview", headers=auth_headers
+            )
+        ).json()["slots"]
+        return next(s for s in daten if s["id"] == ziel["id"])["hat_phasen"]
+
+    assert await hat_phasen() is False
+
+    await test_client.patch(
+        f"/planning/lessons/{stunde['id']}",
+        json={"phasen": [{"name": "Einstieg", "dauer_min": 10, "prio": "kern"}]},
+        headers=auth_headers,
+    )
+    assert await hat_phasen() is True
+
+    await test_client.patch(
+        f"/planning/lessons/{stunde['id']}",
+        json={"phasen": []},
+        headers=auth_headers,
+    )
+    assert await hat_phasen() is False
