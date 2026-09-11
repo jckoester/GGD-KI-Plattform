@@ -307,6 +307,10 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     monkeypatch.setattr(
         "app.artifacts.router.get_artifact_limits", lambda roles, grade: (365, 52428800)
     )
+    # Die Übernahme-Zuordnung (AP8) fragt die DB; hier steht nur ein MagicMock.
+    monkeypatch.setattr(
+        "app.artifacts.uebernahme.bausteine_zu_artefakten", AsyncMock(return_value={})
+    )
     client = _client(monkeypatch)
     resp = client.get("/artifacts")
     assert resp.status_code == 200
@@ -316,6 +320,9 @@ def test_list_library_returns_items_and_usage(monkeypatch):
     assert len(body["items"]) == 1
     assert body["items"][0]["source"] == "functions: []"
     assert body["items"][0]["kind"] == "plot"
+    # Ein Funktionsgraph lässt sich nicht übernehmen (AP8) und hat keinen Baustein.
+    assert body["items"][0]["uebernehmbar"] is False
+    assert body["items"][0]["baustein_id"] is None
 
 
 def test_delete_artifact_owner_ok(monkeypatch):

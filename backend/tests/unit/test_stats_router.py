@@ -60,13 +60,35 @@ def _mock_heatmap_db(rows) -> AsyncMock:
     return session
 
 
-def _mock_spend_db(rate, rows) -> AsyncMock:
+def _mock_spend_db(rate, rows, guete=(0, 0)) -> AsyncMock:
+    """Antwortet nach der **Frage**, nicht nach der Reihenfolge.
+
+    ⚠️ Vorher stand hier eine Liste (`side_effect=[rate_result, spend_result]`).
+    Sie brach in dem Moment, in dem der Endpunkt eine dritte Abfrage stellte — mit
+    einem 500er, der nach einem Fehler im Endpunkt aussah statt nach einem
+    erschöpften Mock. Ein Mock, der die Aufrufreihenfolge festschreibt, prüft die
+    Reihenfolge mit, ohne dass das jemand behauptet hätte.
+    """
     session = AsyncMock()
+
     rate_result = MagicMock()
     rate_result.scalar_one_or_none.return_value = rate
+
     spend_result = MagicMock()
     spend_result.fetchall.return_value = rows
-    session.execute.side_effect = [rate_result, spend_result]
+
+    guete_result = MagicMock()
+    guete_result.one.return_value = guete
+
+    async def antwort(statement, *args, **kwargs):
+        sql = str(statement)
+        if "cost_status" in sql:
+            return guete_result
+        if "DATE_TRUNC" in sql:
+            return spend_result
+        return rate_result
+
+    session.execute.side_effect = antwort
     return session
 
 
@@ -279,3 +301,28 @@ def test_get_spend_model_filter_is_passed_to_sql():
     assert response.status_code == 200
     # Prüfe dass model-Parameter in wenigstens einem der SQL-Aufrufe war
     assert "model" in captured_params
+
+
+def test_get_spend_meldet_die_guete_der_summe():
+    """Eine Summe, die nicht sagt, wie vollständig sie ist, war der Fehler.
+
+    Ein Chat-Zug besteht aus mehreren LLM-Anfragen; fehlt ein SpendLog, geht eine
+    Teilsumme in die Nachricht und von dort in diese Summe.
+    """
+    mock_db = _mock_spend_db(1.0, [(datetime(2026, 4, 1), 1.0)], guete=(7, 2))
+    app = _make_stats_app(_fake_stats_payload(), mock_db)
+    client = TestClient(app)
+    response = client.get("/stats/spend")
+    assert response.status_code == 200
+    daten = response.json()
+    assert daten["unvollstaendige_nachrichten"] == 7
+    assert daten["ausstehende_nachrichten"] == 2
+
+
+def test_get_spend_meldet_null_wenn_alles_belastbar_ist():
+    mock_db = _mock_spend_db(1.0, [(datetime(2026, 4, 1), 1.0)])
+    app = _make_stats_app(_fake_stats_payload(), mock_db)
+    client = TestClient(app)
+    daten = client.get("/stats/spend").json()
+    assert daten["unvollstaendige_nachrichten"] == 0
+    assert daten["ausstehende_nachrichten"] == 0

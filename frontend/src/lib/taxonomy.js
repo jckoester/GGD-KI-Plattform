@@ -90,10 +90,6 @@ export const BP_CURRICULUM_CONTENT_TYPES = [
 // zum Filtern die Helfer in `knotentypen.js` verwenden, nicht diese Menge direkt.
 export const RUHENDE_CONTENT_TYPES = new Set([
   "pruefungsanforderung",
-  "lernplan",
-  "schuelertext",
-  "schuelerpraesentation",
-  "strukturierung",
   "feedback_text"
 ])
 
@@ -114,7 +110,7 @@ export const SCHULJAHRESENDE_CONTENT_TYPES = new Set([
 // Beschreibung, Spalten, Filter und Content-Label je Typ; Reihenfolge = YAML.
 export const COLLECTIONS = {
   "methodenblatt": {
-    "beschreibung": "Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und worauf es ankommt. Die Fachschaft pflegt sie.",
+    "beschreibung": "Handreichungen für Schüler:innen zu einem fachlichen Verfahren — was zu tun ist und worauf es ankommt. Die Fachschaft pflegt sie.",
     "spalten": [
       "titel",
       "fach",
@@ -126,6 +122,7 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "schueler": true,
     "content": {
       "label": "Inhalt des Blattes",
       "pflicht": false
@@ -144,13 +141,14 @@ export const COLLECTIONS = {
       "status",
       "titel"
     ],
+    "schueler": true,
     "content": {
       "label": "Inhalt des Blattes",
       "pflicht": false
     }
   },
   "methode": {
-    "beschreibung": "Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge pflegt die Administration, fachspezifische die jeweilige Fachschaft.",
+    "beschreibung": "Didaktische Arrangements für den Unterricht — Placemat, Galeriegang, Think-Pair-Share. Nicht gemeint sind fachliche Verfahren wie die Gedichtanalyse; die erklärt ein Methodenblatt. Fachübergreifende Einträge pflegt die Administration, fachspezifische die jeweilige Fachschaft.",
     "spalten": [
       "titel",
       "fach",
@@ -212,6 +210,7 @@ export const COLLECTIONS = {
       "titel"
     ],
     "sidebar": true,
+    "schueler": true,
     "relationen": {
       "related_to": {
         "label": "steht in Beziehung zu",
@@ -238,21 +237,10 @@ export const COLLECTIONS = {
 // (app/context/metadata.py). Der Editor baut sein Formular daraus.
 export const FELD_SCHEMATA = {
   "methode": {
-    "aliase": {
-      "typ": "liste",
-      "label": "Andere Bezeichnungen",
-      "hinweis": "z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“"
-    },
     "ablauf": {
       "typ": "text",
       "label": "Ablauf in einem Satz",
       "hinweis": "Woran man die Methode erkennt, ohne ihren Namen zu kennen — nur der Ablauf, keine Hinweise zum Einsatz. Dieser Satz allein entscheidet darüber, ob die Methode thematisch gefunden wird. Ohne ihn zählt die Kurzbeschreibung."
-    }
-  },
-  "sozialform": {
-    "aliase": {
-      "typ": "liste",
-      "label": "Andere Bezeichnungen"
     }
   },
   "strukturierung": {
@@ -313,7 +301,7 @@ export const CONTENT_TYPE_LABELS = {
   "curriculum": "Schulcurriculum",
   "kapitel": "Kapitel",
   "lernsequenz": "Lernsequenz",
-  "methode": "Methode",
+  "methode": "Unterrichtsmethode",
   "sozialform": "Sozialform",
   "operator": "Operator",
   "jahresplan": "Jahresplan",

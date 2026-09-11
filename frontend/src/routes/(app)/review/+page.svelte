@@ -1,4 +1,5 @@
 <script>
+  import PageBody from '$lib/components/PageBody.svelte'
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { ShieldCheck } from "lucide-svelte";
@@ -8,6 +9,11 @@
     denyAccessRequest,
   } from "$lib/api.js";
   import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
+  import {
+    severityLabel,
+    severityClass,
+    categoryLabel,
+  } from "$lib/crisis_labels.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
   import StepUpDialog from "$lib/components/StepUpDialog.svelte";
 
@@ -19,19 +25,6 @@
 
   let pendingAction = $state(null); // { id, action } für Wiederholung nach Step-up
   let showStepUp = $state(false);
-
-  const SEVERITY = {
-    alert: { label: "Alarm", cls: "bg-light-re-2 dark:bg-dark-re-2 text-light-re dark:text-dark-re" },
-    warning: { label: "Warnung", cls: "bg-light-or-2 dark:bg-dark-or-2 text-light-or dark:text-dark-or" },
-    info: { label: "Hinweis", cls: "bg-light-bl-2 dark:bg-dark-bl-2 text-light-bl dark:text-dark-bl" },
-  };
-  const CATEGORY = {
-    suizidalitaet: "Suizidalität",
-    selbstverletzung: "Selbstverletzung",
-    haeusliche_gewalt: "Häusliche Gewalt",
-    essverhalten: "Essverhalten",
-    mobbing: "Mobbing",
-  };
 
   async function load() {
     loading = true;
@@ -97,8 +90,7 @@
   onMount(load);
 </script>
 
-<div class="h-full overflow-y-auto">
-  <div class="max-w-3xl mx-auto py-8 px-4">
+<PageBody>
     <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
       <ShieldCheck class="w-6 h-6" />
       <h1 class="text-2xl font-semibold">Krisen-Freigaben</h1>
@@ -126,11 +118,12 @@
                       bg-light-ui dark:bg-dark-ui">
             <div class="flex items-center gap-2 mb-2">
               <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium
-                           {SEVERITY[req.severity]?.cls ?? 'bg-light-ui-2 dark:bg-dark-ui-2'}">
-                {SEVERITY[req.severity]?.label ?? req.severity}
+                           text-light-tx dark:text-dark-tx
+                           {severityClass(req.severity)}">
+                {severityLabel(req.severity)}
               </span>
               <span class="font-medium text-light-tx dark:text-dark-tx">
-                {CATEGORY[req.flag_category] ?? req.flag_category}
+                {categoryLabel(req.flag_category)}
               </span>
             </div>
             <dl class="text-sm text-light-tx-2 dark:text-dark-tx-2 space-y-1 mb-3">
@@ -194,7 +187,7 @@
             <div class="flex items-center justify-between gap-4 border border-light-ui-3 dark:border-dark-ui-3
                         rounded-lg px-4 py-3 bg-light-ui dark:bg-dark-ui">
               <div class="text-sm text-light-tx dark:text-dark-tx">
-                {CATEGORY[req.flag_category] ?? req.flag_category}
+                {categoryLabel(req.flag_category)}
                 <span class="text-light-tx-2 dark:text-dark-tx-2 font-mono text-xs ml-1">
                   {req.subject_pseudonym.slice(0, 10)}…
                 </span>
@@ -211,8 +204,8 @@
         </div>
       </div>
     {/if}
-  </div>
-</div>
+  
+</PageBody>
 
 {#if showStepUp}
   <StepUpDialog

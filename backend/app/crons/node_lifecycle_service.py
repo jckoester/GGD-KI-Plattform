@@ -70,7 +70,15 @@ async def archiviere_abgelaufene(
 
     Idempotent: Ein zweiter Lauf findet nichts mehr, weil der Status schon gewechselt hat.
     """
-    stichtag = heute or datetime.now(timezone.utc).date()
+    # ⚠️ **Lokales Kalenderdatum** (korrigiert 11.09.2026, zusammen mit
+    # `app.context.ablauf`). `valid_until` ist ein Datum im Schulkalender; wer es
+    # setzt und wer es auswertet, müssen dieselbe Rechnung verwenden. Vorher stand
+    # hier `datetime.now(timezone.utc).date()` — dieselbe Ausnahme wie dort, und die
+    # beiden Stellen waren die einzigen im Projekt (12 andere nehmen `date.today()`).
+    #
+    # Der Zeitstempel `archived_at` unten bleibt UTC: Das ist ein Zeitpunkt, kein
+    # Kalendertag, und er wird gegen andere Zeitstempel verglichen.
+    stichtag = heute or date.today()
 
     faellig = sa.and_(
         ContextNode.status == "active",

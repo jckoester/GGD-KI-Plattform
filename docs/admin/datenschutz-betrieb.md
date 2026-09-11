@@ -161,16 +161,138 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 - die Nutzereinstellungen (`user_preferences`) — darin auch das Stundenplan-Kürzel
 - den Stundenplan-Abrufstatus (`calendar_sync_status`)
 - zurückgezogene Sitzungen (`jwt_revocations`) und den Audit-Eintrag selbst
+- **private Bausteine** (`read_scope = private`) — siehe unten
+- die **persönliche Bibliothek** (`artifacts`), Datenbankzeilen **und** Dateien
+- den **persönlichen Lernzustand** (`node_engagement`) — der Zustand je Gruppe bleibt
+- **Gruppenmitgliedschaften** und die persönlichen **Fach-Ausblendungen**
 
 > **Ausnahme Krisen-Aufbewahrung:** Hat das Konto eine geflaggte Konversation, die noch
 > aufzubewahren ist (offen, in Prüfung, oder abgeschlossen vor weniger als 180 Tagen),
 > wird das **gesamte** Konto übersprungen, bis die Frist endet.
 
-**Nicht** mitgelöscht werden derzeit persönliche Wissensknoten, der Lernzustand,
-Gruppenmitgliedschaften und Fach-Ausblendungen. Das ist eine offene Aufbewahrungsfrage,
-kein Versehen — sie ist im Projekt-Backlog festgehalten. Ein Test
-(`backend/tests/unit/test_pseudonym_deletion_coverage.py`) hält den Stand fest und
-verlangt für jede **neue** Tabelle mit Pseudonym-Spalte eine ausdrückliche Entscheidung.
+### Krisenfälle: Erinnerung und Obergrenze
+
+Ein **offener** Fall schützte die Konversation früher unbefristet. Seit 09/2026 gilt
+eine Obergrenze — mit Vorwarnung:
+
+| Frist | Vorgabe | Einstellung |
+|---|---|---|
+| Erinnerung an unerledigte Fälle | nach 7 Tagen, danach wöchentlich | `CRISIS_REMINDER_DAYS` |
+| Letzte Warnung vor der Löschung | 14 Tage vorher | `CRISIS_FINAL_WARNING_DAYS` |
+| Obergrenze für offene Fälle | 365 Tage ab Eingang | `CRISIS_MAX_OPEN_DAYS` |
+
+Den Ablauf steuert `scripts/crisis_reminders.py` (täglich, in der Compose bereits
+eingetragen). Ein Probelauf zeigt, was verschickt würde, ohne etwas zu ändern:
+
+```bash
+docker compose exec backend python scripts/crisis_reminders.py --dry-run
+```
+
+> ⚠️ **Läuft dieser Cron nicht, wird nichts gelöscht.** Der Schutz eines offenen
+> Flags endet nur, wenn mindestens einmal erinnert wurde — sonst würde ohne jede
+> Vorwarnung gelöscht. Die sichere Richtung, aber sie heißt auch: Ein vergessener
+> Cron-Eintrag führt still zu wachsendem Bestand. Der Probelauf oben zeigt, ob der
+> Lauf greift.
+
+### Benachrichtigung per E-Mail
+
+Ohne Konfiguration wird **nichts versendet**; der Inhalt landet im Log. Für den
+Produktivbetrieb ist das zu wenig — `scripts/check_production.py` meldet es deshalb
+als Fehler.
+
+```
+SMTP_HOST=mail.schule.de
+SMTP_PORT=587
+SMTP_USER=…
+SMTP_PASSWORD=…
+SMTP_FROM=ki@schule.de
+SMTP_STARTTLS=true
+CRISIS_NOTIFY_TO=["krisenteam@schule.de","schulleitung@schule.de"]
+CRISIS_REVIEW_NOTIFY_TO=["schulsozialarbeit@schule.de"]
+```
+
+**Warum die Empfänger in der Konfiguration stehen und nicht in der Datenbank:** Die
+Plattform kennt keine E-Mail-Adressen. Nur Pseudonyme verlassen die Anmeldung — es
+gibt niemanden nachzuschlagen. Adressiert wird ein gemeinsames Postfach der
+Zuständigen; mehrere Adressen, weil ein einzelnes Postfach in den Ferien oder bei
+Krankheit niemanden erreicht.
+
+**Was in der Mail steht:** die Zahl der unerledigten Fälle, das Alter des ältesten und
+ein Link auf `/flags`. **Nicht** Person, Kategorie oder Inhalt — ein Postfach kennt
+keine Zweitfreigabe, und eine weitergeleitete Mail liefe am Vier-Augen-Verfahren
+vorbei. Die Adressen stehen in `Bcc`, damit eine Weiterleitung nicht verrät, wer
+sonst noch zuständig ist.
+
+Bei vielen Treffern in kurzer Zeit verschickt nur der **erste** eine Nachricht
+(Fenster: eine Stunde). Zwanzig Mails an dasselbe Postfach sind keine zwanzigfache
+Aufmerksamkeit.
+
+#### Zwei Listen, und warum sie verschieden sein sollten
+
+`CRISIS_NOTIFY_TO` erreicht, wer **Fälle bearbeitet**. `CRISIS_REVIEW_NOTIFY_TO`
+erreicht, wer eine Einsicht **zweitfreigibt** — die Personen mit der Rolle `review`.
+
+| Anlass | Geht an | Rhythmus |
+|---|---|---|
+| neuer Krisenhinweis | `CRISIS_NOTIFY_TO` | höchstens eine je Stunde |
+| unerledigte Fälle | `CRISIS_NOTIFY_TO` | ab 7 Tagen, danach wöchentlich |
+| Fälle vor der Löschgrenze | `CRISIS_NOTIFY_TO` | 14 Tage vorher |
+| neuer Einsicht-Antrag | `CRISIS_REVIEW_NOTIFY_TO` | jeder Antrag |
+| wartende Anträge | `CRISIS_REVIEW_NOTIFY_TO` | ab 7 Tagen, danach wöchentlich |
+
+Das Vier-Augen-Prinzip (ADR-008 Teil 6) lebt davon, dass beantragende und freigebende
+Person verschieden sind. Landen beide Mails im selben Postfach, ist das technisch
+erlaubt — die Startprüfung **warnt** dann, lehnt es aber nicht ab, weil es an einer
+kleinen Schule die einzige Möglichkeit sein kann. Bleibt
+`CRISIS_REVIEW_NOTIFY_TO` leer, gibt es **keinen** stillen Rückfall auf die andere
+Liste; stattdessen meldet `check_production.py` einen Fehler. Ein wartender Antrag
+blockiert die Bearbeitung des Falls, und die Zuständigen sähen ihn sonst nur, wenn
+sie sich anmelden (Zähler am Avatar).
+
+Der Antrag löst die Mail **ohne** Dämpfung aus: Je Flag lässt die Plattform nur einen
+aktiven Antrag zu, und beantragen darf allein die Admin-Rolle — eine Flut kann hier
+nicht entstehen, eine Dämpfung verschlucke also echte Fälle.
+
+#### Bausteine: gelöscht oder anonymisiert
+
+Bei den eigenen Wissensbausteinen entscheidet die **Sichtbarkeit**, nicht das Eigentum:
+
+| `read_scope` | Was geschieht |
+|---|---|
+| `private` | wird mit dem Konto **gelöscht** |
+| alles andere (`group`, `subject`, `school`, `global`) | bleibt bestehen, `owner_pseudonym` wird auf `NULL` gesetzt |
+
+Was nie jemand anders sehen konnte, verschwindet: Löschen zerstört dort nichts
+Gemeinsames. Ein Arbeitsblatt dagegen, das eine Klasse liest, oder ein Methodenblatt der
+Fachschaft verschwinden zu lassen, risse in fremde Planungen Löcher, die niemand mehr
+erklären kann. Diese Bausteine bleiben und verlieren nur den Namen — das Arbeitsergebnis
+gehört der Schule, der Personenbezug nicht.
+
+> **Folge für die Pflege:** Ein anonymisierter Baustein mit `write_scope = private` hat
+> keine Eigentümerin mehr — nur noch Admins können ihn ändern. Der `write_scope` wird
+> bewusst **nicht** angehoben, weil das eine stille Rechteausweitung wäre.
+
+#### Die Bibliothek geht mit dem Konto
+
+Artefakte haben eine **eigene** Frist (`expires_at`, bei Lehrkräften bis zu zwei Jahre).
+Trotzdem gewinnt die Kontolöschung: Die Bibliothek ist strikt privat — die Liste filtert
+auf die Eigentümerin, der Abruf einer fremden Datei wird abgewiesen. Damit gilt dieselbe
+Regel wie für einen privaten Baustein. Bis 09/2026 überlebten Artefakte das Konto samt
+Pseudonym bis zum Fristende.
+
+Gelöscht werden Zeile **und Datei**. Die Dateien fallen erst nach einem erfolgreichen
+Commit; bricht die Löschung ab, bleiben sie liegen und der nächste Lauf nimmt sie mit.
+
+> **Folge für übernommene Bausteine:** Ein Baustein, der aus einem Artefakt entstanden
+> ist, trägt dessen ID als Herkunftsnotiz. Ist der Baustein geteilt, bleibt er (ohne
+> Namen) bestehen und verweist dann auf ein Artefakt, das es nicht mehr gibt. Das ist
+> beabsichtigt — die Herkunft ist eine Notiz, kein Fremdschlüssel.
+
+**Seit 09/2026 gibt es keine ungeklärten Fälle mehr.** Jede Tabelle mit Pseudonym-Spalte
+hat eine getroffene Entscheidung; ein Test
+(`backend/tests/unit/test_pseudonym_deletion_coverage.py`) hält den Stand fest, verlangt
+für jede **neue** Tabelle eine ausdrückliche Entscheidung und schlägt an, sobald wieder
+ein Fall als „offen" markiert wird.
 
 Manuell ausführen (z. B. zur Überprüfung mit `--dry-run`):
 

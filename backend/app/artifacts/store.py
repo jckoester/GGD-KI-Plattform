@@ -222,12 +222,56 @@ async def update_document(
     return record
 
 
-async def list_artifacts(db: AsyncSession, owner_pseudonym: str) -> list[Artifact]:
-    result = await db.execute(
-        select(Artifact)
-        .where(Artifact.owner_pseudonym == owner_pseudonym)
-        .order_by(Artifact.created_at.desc())
-    )
+async def list_artifacts(
+    db: AsyncSession,
+    owner_pseudonym: str,
+    *,
+    group_id: int | None = None,
+    subject_id: int | None = None,
+    limit: int | None = None,
+) -> list[Artifact]:
+    """Die eigene Bibliothek, neueste zuerst — wahlweise auf einen Unterrichtsbezug verengt.
+
+    **Woher der Fach-/Gruppenbezug kommt.** `artifacts` trägt weder `subject_id` noch
+    `group_id`, und das ist richtig so: Die Bibliothek ist strikt privat, ein
+    Gruppenbesitz wäre eine falsche Aussage. Der Bezug entsteht über den Chat, in dem
+    das Artefakt entstand (`origin_conversation_id`). Die Übersicht einer Gruppe zeigt
+    damit *einen Auszug meiner Artefakte mit Bezug zu dieser Gruppe* — so, wie sie
+    einen Auszug meiner Chats zeigt.
+
+    ⚠️ **Zwei Grenzen dieses Wegs, beide beabsichtigt:**
+
+    * Ein Artefakt ohne Herkunfts-Chat — etwa ein in der Werkstatt aus dem Nichts
+      angelegtes Dokument — erscheint in **keinem** Auszug. Ausgeschlossen wird es
+      von der Bedingung auf der Chat-Spalte, nicht vom Join-Typ: `NULL = 42` ist
+      unbekannt, also kein Treffer, und ein `outerjoin` änderte daran nichts
+      (nachgemessen 09.09.2026). Der Inner Join sagt nur deutlicher, was gemeint
+      ist. Erreichbar bleibt das Artefakt über die volle Bibliothek.
+    * Wird der Herkunfts-Chat später einem anderen Fach zugeordnet, wandert das
+      Artefakt mit. Es hat keinen eigenen Fachbezug, den es behalten könnte.
+
+    Der Eigentümerfilter steht **vor** dem Join und wird von ihm nicht berührt: Der
+    Join verengt nur, er kann nichts hinzufügen. Fremde Artefakte sind auch dann
+    unerreichbar, wenn ihr Herkunfts-Chat in der gefragten Gruppe liegt.
+    """
+    # Lokaler Import: `Conversation` wird nur hier gebraucht, und `store` soll nicht
+    # bei jedem Import die halbe Chat-Welt mitziehen.
+    from app.db.models import Conversation
+
+    stmt = select(Artifact).where(Artifact.owner_pseudonym == owner_pseudonym)
+
+    if group_id is not None or subject_id is not None:
+        stmt = stmt.join(Conversation, Conversation.id == Artifact.origin_conversation_id)
+        if group_id is not None:
+            stmt = stmt.where(Conversation.group_id == group_id)
+        if subject_id is not None:
+            stmt = stmt.where(Conversation.subject_id == subject_id)
+
+    stmt = stmt.order_by(Artifact.created_at.desc())
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
@@ -236,6 +280,24 @@ def read_artifact_bytes(record: Artifact) -> Optional[bytes]:
     if not path.exists():
         return None
     return path.read_bytes()
+
+
+async def collect_pseudonym_artifact_paths(
+    db: AsyncSession, pseudonym: str
+) -> list[Path]:
+    """Dateipfade aller Artefakte einer Person — für die Kontolöschung.
+
+    Getrennt vom Löschen, weil die Reihenfolge zählt: Die Pfade werden **vor** der
+    Transaktion gesammelt und die Dateien erst **nach** einem erfolgreichen Commit
+    entfernt. Andersherum — wie in `delete_artifact` und `cleanup_artifacts`, wo es
+    wegen der einzelnen Zeile folgenlos bleibt — stünde bei einem Rollback eine Zeile
+    ohne ihre Datei in der Datenbank.
+    """
+    zeilen = (await db.execute(
+        select(Artifact.id, Artifact.mime_type)
+        .where(Artifact.owner_pseudonym == pseudonym)
+    )).all()
+    return [_file_path(artifact_id, mime_type) for artifact_id, mime_type in zeilen]
 
 
 async def delete_artifact(db: AsyncSession, record: Artifact) -> None:

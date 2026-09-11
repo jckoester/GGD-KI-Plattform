@@ -212,3 +212,89 @@ def test_create_access_request_duplicate_409():
         f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
     )
     assert r.status_code == 409
+
+
+# ========== Benachrichtigung der review-Personen ==========
+#
+# Ein wartender Antrag blockiert die Bearbeitung eines Krisenfalls; ohne Mail erfahren
+# die Zuständigen davon nur über den Zähler am Avatar — den sieht, wer sich anmeldet.
+
+def _db_fuer_erfolg(protokoll: list):
+    """Wie `_db_for_create`, aber der Antrag bekommt beim `refresh` echte Werte.
+
+    Ohne sie scheitert schon die Antwortserialisierung (`id` ist `None`), und der
+    Test käme nie bis zur Benachrichtigung.
+    """
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=_flag_obj())
+    session.scalar = AsyncMock(return_value=None)
+
+    async def _commit():
+        protokoll.append("commit")
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+        obj.requested_at = datetime.now(timezone.utc)
+
+    session.commit = AsyncMock(side_effect=_commit)
+    session.refresh = AsyncMock(side_effect=_refresh)
+    return session
+
+
+def test_create_access_request_loest_die_benachrichtigung_aus(monkeypatch):
+    from app.api.admin import flags as flags_modul
+
+    protokoll: list[str] = []
+    monkeypatch.setattr(
+        flags_modul, "im_hintergrund",
+        lambda aufgabe, was="": protokoll.append("hintergrund"),
+    )
+
+    app = _make_app(_admin(), _db_fuer_erfolg(protokoll))
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert r.status_code == 201
+    assert "hintergrund" in protokoll
+
+
+def test_die_benachrichtigung_startet_erst_nach_dem_commit(monkeypatch):
+    """Die Reihenfolge ist der Punkt, nicht der Aufruf.
+
+    `benachrichtige_antrag` zählt die wartenden Anträge in einer **eigenen**
+    Sitzung. Startet sie vor dem Commit, sieht sie den soeben angelegten Antrag
+    nicht — die Mail meldete dann eine Zahl zu wenig, im ersten Fall überhaupt
+    „0 wartende Anträge".
+    """
+    from app.api.admin import flags as flags_modul
+
+    protokoll: list[str] = []
+    monkeypatch.setattr(
+        flags_modul, "im_hintergrund",
+        lambda aufgabe, was="": protokoll.append("hintergrund"),
+    )
+
+    app = _make_app(_admin(), _db_fuer_erfolg(protokoll))
+    TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert protokoll.index("commit") < protokoll.index("hintergrund")
+
+
+def test_ein_abgelehnter_antrag_benachrichtigt_niemanden(monkeypatch):
+    """409/404 dürfen keine Mail auslösen — sonst mahnt die Plattform zu Fällen,
+    die es nicht gibt."""
+    from app.api.admin import flags as flags_modul
+
+    protokoll: list[str] = []
+    monkeypatch.setattr(
+        flags_modul, "im_hintergrund",
+        lambda aufgabe, was="": protokoll.append("hintergrund"),
+    )
+
+    app = _make_app(_admin(), _db_for_create(_flag_obj(), existing="existing-id"))
+    r = TestClient(app).post(
+        f"/flags/{_FLAG_ID}/access-requests", json={"reason": _VALID_REASON}
+    )
+    assert r.status_code == 409
+    assert protokoll == []

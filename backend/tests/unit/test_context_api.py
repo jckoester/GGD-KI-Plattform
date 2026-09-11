@@ -107,11 +107,30 @@ class TestListNodes:
         resp = client.get("/context/nodes")
         assert resp.status_code in (401, 422)  # je nach FastAPI-Version
 
-    def test_student_role_denied(self):
+    def test_student_role_allowed(self):
+        """Seit 09/2026 rollenoffen (ADR-019 F8) — vorher 403.
+
+        Die Schranke ist nicht ersatzlos gefallen: Sie ist von der Rolle auf den
+        Scope gewandert (`read_scope_clause`). Dass die Regel greift, prüft
+        `tests/integration/test_context_schueler_lesepfad.py` gegen echtes
+        Postgres — hier steht nur, dass die *Tür* offen ist. Ein Mock kann eine
+        SQL-Bedingung nicht widerlegen; ihn so tun zu lassen, als könnte er es,
+        wäre die gefährlichere Zusage.
+        """
         db = make_mock_db()
         user = make_jwt(roles=["student"])
         client = TestClient(make_app(db, user))
         resp = client.get("/context/nodes")
+        assert resp.status_code == 200
+
+    def test_student_darf_weiterhin_nicht_anlegen(self):
+        """Geöffnet wurde das Lesen — die Schreibpfade blieben, wo sie waren."""
+        db = make_mock_db()
+        user = make_jwt(roles=["student"])
+        client = TestClient(make_app(db, user))
+        resp = client.post("/context/nodes", json={
+            "category": "concept", "content_type": "begriff", "title": "verboten",
+        })
         assert resp.status_code == 403
 
 
@@ -214,6 +233,25 @@ class TestGetNode:
 
 # ── Sicherheits-Audit #1: Lese-Berechtigung für fremde group-Knoten ───────────
 
+def _keine_mitgliedspruefung(grund: str):
+    """`db.execute`-Ersatz, der **nur** bei der Mitgliedsprüfung anschlägt.
+
+    ⚠️ Vorher warf der Mock bei *jeder* Abfrage. Das war gleichbedeutend mit „dieser
+    Endpunkt stellt genau eine Frage an die Datenbank" — eine Zusage, die niemand
+    treffen wollte und die beim ersten zusätzlichen Ladevorgang brach (die Aliase,
+    Migration 0057). Geprüft wird jetzt, was gemeint war.
+    """
+    def antwort(statement, *args, **kwargs):
+        if "group_memberships" in str(statement):
+            raise AssertionError(grund)
+        ergebnis = MagicMock()
+        ergebnis.scalars.return_value.all.return_value = []
+        ergebnis.__iter__ = lambda self: iter(())
+        return ergebnis
+
+    return antwort
+
+
 def _group_node(group_id=7, owner="other-user"):
     node = make_node(read_scope="group", owner_pseudonym=owner)
     node.read_scope_group_id = group_id
@@ -244,7 +282,9 @@ class TestReadPermissionAudit1:
         node = _group_node()
         db = AsyncMock()
         db.get = AsyncMock(return_value=node)
-        db.execute = AsyncMock(side_effect=AssertionError("Admin darf keine Mitgliedsprüfung auslösen"))
+        db.execute = AsyncMock(
+            side_effect=_keine_mitgliedspruefung("Admin darf keine Mitgliedsprüfung auslösen")
+        )
         user = make_jwt(roles=["teacher", "admin"], sub="pseudo-admin")
         resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
         assert resp.status_code == 200
@@ -272,7 +312,9 @@ class TestReadPermissionAudit1:
         node = make_node(read_scope="school", owner_pseudonym="other-user")
         db = AsyncMock()
         db.get = AsyncMock(return_value=node)
-        db.execute = AsyncMock(side_effect=AssertionError("school braucht keine Mitgliedsprüfung"))
+        db.execute = AsyncMock(
+            side_effect=_keine_mitgliedspruefung("school braucht keine Mitgliedsprüfung")
+        )
         user = make_jwt(roles=["teacher"], sub="pseudo-teacher")
         resp = TestClient(make_app(db, user)).get(f"/context/nodes/{node.id}")
         assert resp.status_code == 200

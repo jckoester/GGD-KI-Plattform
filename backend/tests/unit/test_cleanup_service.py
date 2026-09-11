@@ -49,6 +49,37 @@ class _ResultCount:
         return self._value
 
 
+def _antworten(kandidaten, *, fehler_beim_ersten_delete=False):
+    """`db.execute`-Ersatz, der nach **Art** des Statements antwortet, nicht nach Position.
+
+    ⚠️ Vorher stand hier eine positionsgebundene `side_effect`-Liste — eine Zeile je
+    erwartetem Aufruf, in genau der Reihenfolge. Sie ist innerhalb von zwei Tagen zweimal
+    gebrochen, als die Kontolöschung neue Statements bekam (Wissensbausteine 07.09.,
+    Bibliothek/Lernzustand/Mitgliedschaften 08.09.) — beide Male mit einem
+    `StopAsyncIteration` mitten im Lauf, das mit der geprüften Zusage nichts zu tun hat.
+
+    Diese Fassung koppelt nur an das, worum es geht: SELECTs liefern Ergebnislisten
+    (die erste die Kandidaten, jede weitere leer), alles andere quittiert. Ein neues
+    DELETE in `cleanup_inactive_accounts` lässt diese Tests künftig in Ruhe.
+    """
+    from sqlalchemy import Select
+
+    zustand = {"selects": 0, "deletes": 0}
+
+    def antwort(statement, *args, **kwargs):
+        if isinstance(statement, Select):
+            zustand["selects"] += 1
+            # 1. SELECT = Kandidatenabfrage, danach: Bildpfade, Artefaktpfade, und beim
+            # zweiten Schleifendurchlauf wieder die Kandidaten — dann leer.
+            return _ResultList(kandidaten if zustand["selects"] == 1 else [])
+        zustand["deletes"] += 1
+        if fehler_beim_ersten_delete and zustand["deletes"] == 1:
+            raise RuntimeError("delete failed")
+        return MagicMock()
+
+    return antwort
+
+
 @pytest.mark.asyncio
 async def test_cleanup_inactive_accounts_dry_run_counts_only():
     db = AsyncMock()
@@ -66,19 +97,7 @@ async def test_cleanup_inactive_accounts_litellm_error_does_not_block_local_dele
     db = AsyncMock()
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.scalar = AsyncMock(return_value=None)  # keine Krisen-Schutz-Konversation
-    db.execute = AsyncMock(
-        side_effect=[
-            _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
-            _ResultList([]),  # collect_pseudonym_image_paths (keine Bilder)
-            MagicMock(),  # delete conversations
-            MagicMock(),  # delete user_preferences
-            MagicMock(),  # delete calendar_sync_status
-            MagicMock(),  # delete budget_accrual
-            MagicMock(),  # delete jwt_revocations
-            MagicMock(),  # delete pseudonym_audit
-            _ResultList([]),  # nächste Runde leer
-        ]
-    )
+    db.execute = AsyncMock(side_effect=_antworten([_audit_entry("pseudo-1")]))
 
     with patch("app.crons.cleanup_service.LiteLLMClient") as client_cls:
         client = AsyncMock()
@@ -101,13 +120,7 @@ async def test_cleanup_inactive_accounts_rolls_back_single_pseudonym_on_local_er
     db.begin_nested = MagicMock(return_value=_FakeAsyncContext())
     db.scalar = AsyncMock(return_value=None)  # keine Krisen-Schutz-Konversation
     db.execute = AsyncMock(
-        side_effect=[
-            _ResultList([_audit_entry("pseudo-1")]),  # Kandidaten
-            _ResultList([]),  # collect_pseudonym_image_paths (keine Bilder)
-            MagicMock(),  # delete conversations
-            RuntimeError("delete failed"),  # delete user_preferences
-            _ResultList([]),  # nächste Runde durch Exclusion leer
-        ]
+        side_effect=_antworten([_audit_entry("pseudo-1")], fehler_beim_ersten_delete=True)
     )
 
     with patch("app.crons.cleanup_service.LiteLLMClient") as client_cls:

@@ -73,10 +73,19 @@ describe('MATERIAL_CONTENT_TYPES', () => {
   })
 
   it('enthält keine personenbezogenen Texte', () => {
-    // Schülertexte und Feedback gehören nicht in ein Curriculum, das dauerhaft und
-    // fachschaftsweit sichtbar ist.
-    expect(MATERIAL_CONTENT_TYPES).not.toContain('schuelertext')
-    expect(MATERIAL_CONTENT_TYPES).not.toContain('feedback_text')
+    // Schülertexte, Lernpläne und Feedback gehören nicht in ein Curriculum, das
+    // dauerhaft und fachschaftsweit sichtbar ist. Seit AP8 sind diese Typen aktiv —
+    // die Ausnahmeliste ist damit das Einzige, was sie aus dem Material hält.
+    for (const typ of ['schuelertext', 'schuelerpraesentation', 'lernplan',
+                       'feedback_text']) {
+      expect(MATERIAL_CONTENT_TYPES).not.toContain(typ)
+    }
+  })
+
+  it('enthält Gliederung/Mindmap (rollenoffener Typ)', () => {
+    // Eine Lehrkraft darf eine Mindmap für ihre Klasse anlegen; die ist dann
+    // legitimes Material. Vor AP8 hielt der ruhende `ui_status` sie aus der Liste.
+    expect(MATERIAL_CONTENT_TYPES).toContain('strukturierung')
   })
 
   it('enthält nichts aus der Kategorie Wissen', () => {

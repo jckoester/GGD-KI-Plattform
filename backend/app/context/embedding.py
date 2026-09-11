@@ -103,7 +103,7 @@ def _titel_traegt_eigene_information(titel: str, text: str) -> bool:
     return bool(kern) and kern not in " ".join((text or "").lower().split())
 
 
-def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
+def _teil_aus_quelle(node: ContextNode, quelle: str, aliase: list[str]) -> str:
     """Einen Baustein des Embedding-Inputs aufloesen.
 
     ``title``, ``content`` oder ein Metadatenpfad (``metadata.aliase``). Fuer Listen von
@@ -118,7 +118,7 @@ def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
     """
     if "|" in quelle:
         for alternative in quelle.split("|"):
-            wert = _teil_aus_quelle(node, alternative.strip())
+            wert = _teil_aus_quelle(node, alternative.strip(), aliase)
             if wert.strip():
                 return wert
         return ""
@@ -127,6 +127,15 @@ def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
         return node.title or ""
     if quelle == "content":
         return node.content or ""
+    # Seit Migration 0057 eine eigene Tabelle statt `metadata.aliase`.
+    #
+    # ⚠️ **`" | "`, nicht `", "`.** Der alte Weg lief ueber `_extract_metadata_field`,
+    # und das verband eine Liste mit `" | "`. Ein anderes Trennzeichen ergaebe einen
+    # anderen Eingabetext und damit Vektoren, die mit den bestehenden nicht mehr
+    # vergleichbar sind — ohne Fehler, ohne Meldung, nur mit schlechteren Treffern.
+    # `test_embedding_input.py` haelt die Zeichengleichheit fest.
+    if quelle == "aliases":
+        return " | ".join(a for a in aliase if a)
 
     pfad = quelle.removeprefix("metadata.")
     if "[]." in pfad:
@@ -142,7 +151,27 @@ def _teil_aus_quelle(node: ContextNode, quelle: str) -> str:
     return _extract_metadata_field(node.metadata_ or {}, quelle)
 
 
-def traegt_substanz(node: ContextNode) -> bool:
+def braucht_aliase(node: ContextNode) -> bool:
+    """Verwendet dieser Typ überhaupt Aliase im Embedding-Input?
+
+    Nur `methode` (über `embedding_input: [… "aliases" …]`) und `operator` (Sonderweg
+    unten) tun das. Für alle anderen wäre das Nachladen eine Abfrage je Knoten ohne
+    jeden Effekt — und beim Backfill über Tausende Knoten die teuerste Zeile des Laufs.
+
+    Abgeleitet aus der Taxonomie statt als Liste im Code: Ein Typ, der `aliases` in
+    seinen `embedding_input` aufnimmt, ist damit sofort versorgt.
+    """
+    if node.content_type == "operator":
+        return True
+    quellen = EMBEDDING_INPUT.get((node.category, node.content_type)) or ()
+    return any(
+        teil.strip() == "aliases"
+        for quelle in quellen
+        for teil in quelle.split("|")
+    )
+
+
+def traegt_substanz(node: ContextNode, aliase: list[str]) -> bool:
     """Lohnt sich ein Vektor fuer diesen Knoten — oder waere es nur sein Titel?
 
     Ein Embedding, das allein aus dem Titel besteht, ist eine unscharfe Titelsuche im
@@ -172,11 +201,11 @@ def traegt_substanz(node: ContextNode) -> bool:
 
     if (node.category, node.content_type) not in EMBEDDING_INPUT:
         return True
-    eingabe = _build_embedding_input(node).strip()
+    eingabe = _build_embedding_input(node, aliase).strip()
     return bool(eingabe) and eingabe != (node.title or "").strip()
 
 
-def _build_embedding_input(node: ContextNode) -> str:
+def _build_embedding_input(node: ContextNode, aliase: list[str]) -> str:
     """Erstellt den Embedding-Input fuer einen Knoten.
 
     Zwei Wege, und der erste hat Vorrang:
@@ -199,14 +228,14 @@ def _build_embedding_input(node: ContextNode) -> str:
 
     quellen = EMBEDDING_INPUT.get((node.category, node.content_type))
     if quellen:
-        teile = [t for t in (_teil_aus_quelle(node, q) for q in quellen) if t]
+        teile = [t for t in (_teil_aus_quelle(node, q, aliase) for q in quellen) if t]
         return "\n".join(teile)
 
     # Operatoren: das Verb (Titel) trägt die zentrale Semantik und steht NICHT im
-    # content (= Definition/Erwartungshorizont). Titel + Synonyme (metadata.aliase)
-    # voranstellen, damit die semantische Suche den Operator über sein Verb findet.
+    # content (= Definition/Erwartungshorizont). Titel + Synonyme voranstellen, damit die
+    # semantische Suche den Operator über sein Verb findet.
     if node.content_type == "operator":
-        verbs = [node.title or ""] + list((node.metadata_ or {}).get("aliase", []) or [])
+        verbs = [node.title or ""] + list(aliase)
         prefix = ", ".join(v for v in verbs if v)
         return f"{prefix}\n{base}" if base else prefix
 
@@ -439,11 +468,14 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
         return
     if node.content_type not in EMBEDDING_CONTENT_TYPES:
         return
-    if not traegt_substanz(node):
+    from app.context import aliase as aliase_modul
+
+    node_aliase = await aliase_modul.lade(db, node_id) if braucht_aliase(node) else []
+    if not traegt_substanz(node, node_aliase):
         # Noch nichts einzubetten außer dem Titel — beim nächsten Backfill erneut prüfen.
         return
     try:
-        text = _build_embedding_input(node)
+        text = _build_embedding_input(node, node_aliase)
         embedding = await generate_embedding(text)
         await db.execute(
             update(ContextNode)

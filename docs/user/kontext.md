@@ -29,7 +29,7 @@ Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
 - ein schultypisches Konzept, das an Ihrer Schule besonders behandelt wird
 - ein Thema oder eine Funktion aus dem Unterrichtsmaterial
 
-Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen.
+Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
 
 ## Wozu ist das nützlich?
 
@@ -60,6 +60,8 @@ Die Suche verwendet semantische Ähnlichkeit: Sie müssen nicht exakte Schlagwö
 
 **Namen werden direkt nachgeschlagen.** Suchen Sie nach einem Begriff, den es als Baustein gibt — einem Operator wie „nennen", einer Leitidee, einem Fachbegriff —, steht er oben, auch wenn andere Bausteine thematisch näher liegen. Die Frageform ist dabei egal: „nennen", „Operator nennen" und „Was bedeutet der Operator nennen?" führen zum selben Ergebnis. Wo derselbe Name in mehreren Fächern vorkommt, erscheinen die Fächer nacheinander.
 
+**Auch weitere Namen führen zum Ziel.** Ein Baustein kann mehrere Bezeichnungen tragen — „Ich-Du-Wir" und „Think-Pair-Share" meinen dieselbe Methode. Suchen Sie nach einer davon, finden Sie den Baustein, und der Treffer zeigt die anderen Namen mit, damit erkennbar bleibt, warum er dasteht. Weitere Bezeichnungen tragen Sie beim Bearbeiten unter **„Andere Bezeichnungen"** ein; sie gelten bei der Suche wie der Titel selbst.
+
 **Das Fach des Chats zählt mit.** Führen Sie den Chat in einem Fach oder einer Unterrichtsgruppe, stehen dessen Bausteine weiter oben. Ausgeblendet wird dabei nichts: Wer im Physik-Chat nach dem Satz des Pythagoras fragt, bekommt weiterhin die Mathematik-Kompetenz — sie ist dort schließlich die richtige Antwort. In einem Chat ohne Fach entscheidet allein die Ähnlichkeit.
 
 ### Über den @-Shortcode
@@ -84,10 +86,93 @@ Die Einstellung betrifft **nur Ihre eigene Suche** über den Suche-Button. Wie v
 
 Das gilt für die Abschnitte **Bausteine mit diesem Namen** und **Alle passenden Bausteine**; die **Nächstliegenden** sind eine Auswahl nach Ähnlichkeit und tragen deshalb keine Gesamtzahl (siehe oben).
 
+## Meine Bausteine
+
+Unter **Wissensgraph → Meine Bausteine** steht alles, was unter Ihrem Konto
+gespeichert ist — über alle Fächer und Entstehungswege hinweg. Die Seite ist für vier
+Dinge da:
+
+- **Nachsehen, was da ist.** Der einzige Ort, der Ihren Gesamtbestand zeigt, egal ob
+  ein Baustein aus einer Sammlung, einem Upload, dem Unterrichtsplaner oder einem Chat
+  stammt.
+- **Aufräumen.** Umbenennen, archivieren, löschen — alles direkt in der Zeile.
+- **Den Lebenszyklus im Blick behalten.** Ablaufdaten, automatisch archivierte
+  Bausteine und Verweise auf Archiviertes laufen nur hier zusammen. Der übliche
+  Anlass ist der Schuljahreswechsel.
+- **Herkunft nachvollziehen.** Woher kam der Baustein, und gibt es im Chat eine neuere
+  Fassung?
+
+**Wonach die Seite sortiert:** nach Fach, innerhalb nach zuletzt geändert. Bausteine
+ohne Fach stehen am Ende. Über der Liste filtern Sie nach Bausteinart.
+
+**Der Zähler in der Seitenleiste** zeigt, wie viele Bausteine Aufmerksamkeit brauchen —
+etwas läuft demnächst ab, ist abgelaufen, verweist auf Archiviertes, oder es fehlt noch
+der Inhalt. Oben auf der Seite steht dann derselbe Hinweis mit einem Knopf **„Nur diese
+anzeigen"**.
+
+**Für Lehrkräfte** zeigt jede Zeile zusätzlich, in welcher Einheit oder Stunde der
+Baustein steckt. Ein Klick darauf filtert die Liste. Trägt ein Baustein hier nichts,
+nutzt ihn keine Einheit mehr — dann ist er ein guter Kandidat fürs Archiv.
+
+> **Die Seite bearbeitet nichts.** Sie verwaltet: umbenennen, archivieren, löschen.
+> Zum Ändern des Inhalts führt sie Sie dorthin, wo er hingehört — ein Stundenentwurf
+> in den Unterrichtsplaner, ein Sammlungseintrag in seinen Editor. Wer gezielt etwas
+> zum Bearbeiten sucht, ist über Fachseite, Sammlung oder Planer schneller: Die
+> filtern bereits vor.
+
+**Für Schüler:innen** ist es die einzige Stelle neben der Suche, an der sie den
+Wissensgraphen sehen. Dort stehen nur ihre eigenen Bausteine — niemand sonst kann sie
+lesen.
+
+## Aus einem Chat-Ergebnis einen Baustein machen
+
+Was im Chat entsteht, ist zunächst flüchtig: Nach drei Monaten ohne neue Nachricht wird
+das Gespräch gelöscht. Ein gelungenes Arbeitsblatt, eine Mindmap, eine Zusammenfassung —
+das soll bleiben und wiederauffindbar sein. Dafür gibt es **„Als Baustein speichern"**.
+
+Zwei Wege führen zum selben Formular:
+
+- **Im Chat**, unter der Antwort neben „In Werkstatt öffnen".
+- **In der [Bibliothek](bibliothek.md)**, an jedem Dokument und jedem Flussdiagramm.
+
+Im Formular legen Sie fest:
+
+| Feld | Bedeutung |
+|---|---|
+| **Bausteinart** | Was ist das — ein Arbeitsblatt, ein Lerntext, eine Gliederung? Danach wird später gefiltert und gesucht. |
+| **Titel** | Vorbelegt aus der ersten Überschrift; ändern Sie ihn zu dem, wonach Sie suchen würden. |
+| **Sichtbarkeit** | Wer lesen und wer ändern darf. |
+| **Ablauf und Schuljahr** | Aufklappbar. Ohne Angabe gilt bei den meisten Arten das Ende des laufenden Schuljahres. |
+
+**Für Schüler:innen ist die Sichtbarkeit nicht wählbar:** Ihre Bausteine sind immer
+privat — niemand sonst kann sie sehen, auch keine Lehrkraft. Statt eines Auswahlfelds
+steht dort ein Satz, der das sagt.
+
+**Das Ergebnis steht danach in [Meine Bausteine](#meine-bausteine)** und ist über die
+Suche auffindbar. In der Bibliothek trägt der Eintrag ein Kennzeichen
+**„als Baustein übernommen →"**, das dorthin führt.
+
+### Wenn Sie etwas überarbeiten
+
+Speichern Sie dasselbe Dokument ein zweites Mal, entsteht **kein zweiter Baustein**,
+sondern eine **neue Fassung**: Der Knopf heißt dann „Baustein aktualisieren", die
+bisherige Fassung wandert ins Archiv und bleibt von der neuen aus erreichbar. Das ist
+wichtig für alle, die auf den Baustein verweisen — eine Unterrichtsstunde, die die alte
+Fassung als Material führt, bekommt dort die neue vorgeschlagen, statt ins Leere zu
+zeigen.
+
+Hat sich nichts geändert, sagt die Plattform das und legt nichts an.
+
+> **Das Artefakt bleibt liegen.** Der Baustein ist eine Kopie mit eigenem Leben — Titel,
+> Sichtbarkeit, Verknüpfungen. Das Dokument in der Bibliothek bearbeiten Sie weiterhin
+> in der [Material-Werkstatt](werkstatt.md); dorthin gehen Änderungen am Text. Erst ein
+> erneutes „Baustein aktualisieren" holt sie in den Wissensgraphen.
+
 ## Archivieren statt löschen
 
-Bausteine, die Sie selbst angelegt haben, können Sie im Wissensgraphen **archivieren**
-oder **löschen**. Der Unterschied ist größer, als die beiden Wörter vermuten lassen:
+Bausteine, die Sie selbst angelegt haben, können Sie unter **Meine Bausteine**
+**archivieren** oder **löschen**. Der Unterschied ist größer, als die beiden Wörter
+vermuten lassen:
 
 - **Archiviert** heißt: aus Suche und Assistenten heraus, aber nicht weg. Der Baustein
   bleibt in Ihrem Archiv, alle Verknüpfungen bleiben, und Sie können ihn jederzeit

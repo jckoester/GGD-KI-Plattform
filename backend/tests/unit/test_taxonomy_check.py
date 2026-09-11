@@ -245,16 +245,41 @@ class TestFrontendAbleitung:
         spec.loader.exec_module(modul)
         return modul, wurzel
 
-    def test_taxonomy_js_ist_aktuell(self, tmp_path, monkeypatch):
-        modul, wurzel = self._generator()
-        erzeugt = tmp_path / "taxonomy.js"
-        monkeypatch.setattr(modul, "OUT_PATH", erzeugt)
-        modul.main()
+    def _erzeuge_nach(self, tmp_path, monkeypatch):
+        """Lässt den Generator in ein Wegwerfverzeichnis schreiben.
 
+        ⚠️ **Beide Ausgaben umbiegen.** Der Generator schreibt seit 09/2026 zwei
+        Dateien. Wer nur `OUT_PATH` patcht, lässt ihn in den echten Repo-Pfad der
+        zweiten schreiben — der Test *repariert* die Datei dann still, statt den
+        vergessenen Lauf zu melden. Genau umgekehrt, als er gedacht ist.
+        """
+        modul, wurzel = self._generator()
+        monkeypatch.setattr(modul, "OUT_PATH", tmp_path / "taxonomy.js")
+        monkeypatch.setattr(modul, "ICONS_OUT_PATH", tmp_path / "node_icons.js")
+        modul.main()
+        return wurzel
+
+    def test_taxonomy_js_ist_aktuell(self, tmp_path, monkeypatch):
+        wurzel = self._erzeuge_nach(tmp_path, monkeypatch)
         im_repo = (wurzel / "frontend" / "src" / "lib" / "taxonomy.js").read_text(
             encoding="utf-8"
         )
-        assert erzeugt.read_text(encoding="utf-8") == im_repo, (
+        assert (tmp_path / "taxonomy.js").read_text(encoding="utf-8") == im_repo, (
             "frontend/src/lib/taxonomy.js passt nicht zu app/context/taxonomy.yaml. "
+            "Neu erzeugen: python scripts/generate_taxonomy.py"
+        )
+
+    def test_node_icons_js_ist_aktuell(self, tmp_path, monkeypatch):
+        """Zweite erzeugte Datei: die Symbol-Zuordnung.
+
+        Veraltet sie, trägt ein neuer Typ in jeder Liste das Kategorie-Symbol —
+        sichtbar erst, wenn jemand die Oberfläche anschaut.
+        """
+        wurzel = self._erzeuge_nach(tmp_path, monkeypatch)
+        im_repo = (wurzel / "frontend" / "src" / "lib" / "node_icons.js").read_text(
+            encoding="utf-8"
+        )
+        assert (tmp_path / "node_icons.js").read_text(encoding="utf-8") == im_repo, (
+            "frontend/src/lib/node_icons.js passt nicht zu app/context/taxonomy.yaml. "
             "Neu erzeugen: python scripts/generate_taxonomy.py"
         )

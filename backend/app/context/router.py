@@ -34,6 +34,12 @@ from app.context.schemas import (
     ArchivedReferenceRead,
     ContextNodeCopyRequest,
     NodeReferenzRead,
+    BausteinVerwalten,
+    EinsatzortRead,
+    AufmerksamkeitRead,
+    FachabschnittRead,
+    MeinBausteinRead,
+    MeineBausteineRead,
     ChatContextNodeAdd,
     ChatContextNodeRead,
     anzeige_felder,
@@ -50,10 +56,18 @@ from app.context.schemas import (
     PkGruppeRead,
     PkKompetenzRead,
 )
+from app.context import aliase as aliase_modul
 from app.context.editions import aktive_bp_version
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
+from app.context.meine_bausteine import (
+    herkunft,
+    lade_einsatzorte,
+    lade_meine_bausteine,
+    zaehle_aufmerksamkeit,
+)
 from app.context.metadata import validate_node_content, validate_node_metadata
+from app.context.scope_gruppen import pruefe_scopes
 from app.context.taxonomy import (
     validate_content_type,
     validate_unterrichtsstunde_metadata,
@@ -221,6 +235,25 @@ def _visibility_filter(query, user: JwtPayload, status_override: str | None = No
     return q
 
 
+async def _aliase_setzen(nodes, db: AsyncSession) -> None:
+    """Hängt die weiteren Namen an die Knoten — für `ContextNodeRead.aliase`.
+
+    Dasselbe Muster wie ``_schreibrechte_setzen``: eine Sammelabfrage, das Ergebnis als
+    Attribut am ORM-Objekt, von dem Pydantic es liest.
+
+    **Warum nicht als Beziehung mit `lazy="selectin"`.** Die läge auf *jeder*
+    ContextNode-Abfrage — auch in Planer, Curriculum und Suche, wo Aliase niemanden
+    interessieren. Hier zahlt nur, wer sie anzeigt: die Detailansicht und die
+    Sammlungsliste.
+    """
+    nodes = list(nodes)
+    if not nodes:
+        return
+    je_knoten = await aliase_modul.lade_viele(db, [n.id for n in nodes])
+    for node in nodes:
+        node.aliase = je_knoten.get(node.id, [])
+
+
 async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> None:
     """Setzt ``darf_schreiben`` auf jedem Knoten — dieselbe Regel wie ``_check_write_permission``.
 
@@ -267,6 +300,18 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
 
 
 # ── GET /api/context/nodes ────────────────────────────────────────────────────
+#
+# Rollenoffen seit 09/2026 (ADR-019 F8). Wer was sehen darf, entscheidet allein
+# `read_scope_clause` in `app.context.visibility` — dieselbe Regel, die Suche,
+# Nachbarschaft und Detailansicht benutzen. Eine zweite, rollenbasierte Schranke
+# hier wäre genau die Kopie, die dort im Modulkopf beschrieben ist: Sie driftet,
+# und die Richtung merkt man erst, wenn sie wirkt.
+#
+# Nachgemessen beim Öffnen (09.09.2026): Bildungsplan und Curricula sind für
+# Schüler:innen **schon vorher** lesbar gewesen — `/context/curricula/{id}`,
+# `/curricula/by-subject/{id}` und `/fachplan/by-subject/{id}` hängen seit jeher an
+# `get_current_user`, und die Knoten tragen `read_scope` `school`/`global`. Diese
+# Öffnung legt also nichts frei, was verschlossen war.
 
 
 @router.get("/nodes", response_model=list[ContextNodeRead])
@@ -293,7 +338,7 @@ async def list_nodes(
     limit: int | None = Query(default=None, ge=1, le=500, description="Maximale Anzahl Ergebnisse"),
     offset: int | None = Query(default=None, ge=0, description="Versatz für Pagination"),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     if owner is not None and owner != "me":
         raise HTTPException(status_code=400, detail="owner muss 'me' sein")
@@ -327,6 +372,9 @@ async def list_nodes(
     result = await db.execute(query)
     nodes = result.scalars().all()
     await _schreibrechte_setzen(nodes, user, db)
+    # Die Sammlungen von `methode` und `sozialform` zeigen die Spalte „Andere
+    # Bezeichnungen"; seit Migration 0057 kommt sie nicht mehr aus den Metadaten.
+    await _aliase_setzen(nodes, db)
     return nodes
 
 
@@ -340,7 +388,7 @@ async def get_neighborhood(
     relation: list[str] | None = Query(default=None),
     category: list[str] | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     # Startknoten laden und prüfen
     node = await db.get(ContextNode, node_id)
@@ -405,7 +453,7 @@ async def get_neighborhood(
 async def get_archived_references(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    user: JwtPayload = Depends(get_current_user),
 ):
     # Startknoten laden
     node = await db.get(ContextNode, node_id)
@@ -483,19 +531,119 @@ async def copy_node(
     return new_node
 
 
+# ── „Meine Bausteine" (AP7) ──────────────────────────────────────────────────
+#
+# ⚠️ **Diese beiden Routen müssen vor `/nodes/{node_id}` stehen.** FastAPI prüft in
+# Deklarationsreihenfolge; stünden sie danach, versuchte `/nodes/mine` zuerst,
+# „mine" als UUID zu lesen, und antwortete mit 422 statt mit der Liste. Der Test
+# `test_meine_bausteine.py` hält die Reihenfolge fest.
+#
+# Rollenoffen (`get_current_user` statt `_TEACHER_OR_ADMIN`): Der eigene Bestand
+# ist für alle Rollen einsehbar — für Schüler:innen ist die Seite neben der Suche
+# die einzige Wissensgraph-Fläche (ADR-019 F8, Notiz-Knotentyp-UI A4). Die
+# Sichtbarkeitsregel ist hier allein der Eigentümer; `visibility.py` braucht es
+# nicht, weil niemand Fremdes zu sehen bekommt.
+
+
+@router.get("/nodes/mine", response_model=MeineBausteineRead)
+async def list_meine_bausteine(
+    content_type: str | None = Query(default=None, description="Typ-Filter"),
+    nur_aufmerksamkeit: bool = Query(
+        default=False, description="Nur Bausteine, die Aufmerksamkeit brauchen"
+    ),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    ist_lehrkraft = "teacher" in user.roles
+    abschnitte = await lade_meine_bausteine(
+        db,
+        user.sub,
+        ist_lehrkraft=ist_lehrkraft,
+        content_type=content_type,
+        nur_aufmerksamkeit=nur_aufmerksamkeit,
+    )
+
+    # „Eingesetzt in" ist Lehrkraft-Sache (A4): Bei Schüler:innen gibt es keine
+    # Unterrichtsplanung, die etwas einsetzen könnte — die Abfrage liefe leer.
+    einsatzorte = {}
+    if ist_lehrkraft:
+        einsatzorte = await lade_einsatzorte(
+            db, [b.node.id for a in abschnitte for b in a.bausteine]
+        )
+
+    return MeineBausteineRead(
+        abschnitte=[
+            FachabschnittRead(
+                subject_id=a.subject_id,
+                fach=a.fach,
+                anzahl=len(a.bausteine),
+                bausteine=[
+                    MeinBausteinRead(
+                        id=b.node.id,
+                        title=b.node.title,
+                        category=b.node.category,
+                        content_type=b.node.content_type,
+                        status=b.node.status,
+                        valid_until=b.node.valid_until,
+                        updated_at=b.node.updated_at,
+                        kategorien=b.kategorien,
+                        herkunft=herkunft(b.node),
+                        eingesetzt_in=[
+                            EinsatzortRead(id=o.id, titel=o.titel, content_type=o.content_type)
+                            for o in einsatzorte.get(b.node.id, ())
+                        ],
+                    )
+                    for b in a.bausteine
+                ],
+            )
+            for a in abschnitte
+        ],
+        gesamt=sum(len(a.bausteine) for a in abschnitte),
+        aufmerksamkeit=AufmerksamkeitRead(
+            **vars(
+                await zaehle_aufmerksamkeit(db, user.sub, ist_lehrkraft=ist_lehrkraft)
+            )
+        ),
+    )
+
+
+@router.get("/nodes/mine/zaehlung", response_model=AufmerksamkeitRead)
+async def zaehle_meine_bausteine(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Nur die Zählwerte — für den Sidebar-Zähler, der auf jeder Seite hängt.
+
+    Dieselbe Funktion wie oben: Der Banner und der Zähler zeigen dieselbe Zahl,
+    weil sie aus derselben Abfrage stammen, nicht weil zwei Wege zufällig
+    übereinstimmen.
+    """
+    zahlen = await zaehle_aufmerksamkeit(
+        db, user.sub, ist_lehrkraft="teacher" in user.roles
+    )
+    return AufmerksamkeitRead(**vars(zahlen))
+
+
 # ── GET /api/context/nodes/{id} ─────────────────────────────────────────────────
 
 @router.get("/nodes/{node_id}", response_model=ContextNodeRead)
 async def get_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen (AP7): Der Riegel ist `_check_read_permission`, nicht die Rolle.
+    # Sie erlaubt zuerst den eigenen Knoten, weist `private` von Fremden ab — auch
+    # Admins — und verlangt bei `group` die Mitgliedschaft. Dieselbe Menge liefert
+    # die Suche Schüler:innen ohnehin schon; dass ausgerechnet die Detailansicht
+    # 403 gab, war die Unstimmigkeit. Ohne sie führt der Zeilenklick in „Meine
+    # Bausteine" für Schüler:innen ins Leere (Notiz-Knotentyp-UI A4).
+    user: JwtPayload = Depends(get_current_user),
 ):
     node = await db.get(ContextNode, node_id)
     if node is None or node.status == "deleted":
         raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
     await _check_read_permission(node, user, db)
     await _schreibrechte_setzen([node], user, db)
+    await _aliase_setzen([node], db)
     return node
 
 
@@ -514,27 +662,19 @@ async def create_node(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # Ein `write_scope` von `subject` oder `group` **verlangt** die zugehörige Gruppe
-    # (DB-CHECK `check_context_nodes_write_group_id`). Fehlt sie, schlug das INSERT bisher
-    # als IntegrityError durch und die Oberfläche bekam einen 500 ohne Hinweis, was fehlt —
-    # beim Bau des Sammlungs-Editors genau so aufgetreten.
-    if payload.write_scope in ("subject", "group") and payload.write_scope_group_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Bei `write_scope = {payload.write_scope}` muss die zuständige Gruppe "
-                "mitgegeben werden (`write_scope_group_id`) — sonst wäre nicht bestimmt, "
-                "wer den Baustein pflegen darf."
-            ),
+    # Scope und Trägergruppe müssen zusammenpassen — Pflicht **und** Art. Die Regel
+    # steht in `scope_gruppen.py`, weil sie hier und beim Ändern gilt; bis 09/2026
+    # stand nur die Pflichtprüfung hier und fehlte beim Ändern ganz.
+    try:
+        await pruefe_scopes(
+            db,
+            read_scope=payload.read_scope,
+            read_gruppen_id=payload.read_scope_group_id,
+            write_scope=payload.write_scope,
+            write_gruppen_id=payload.write_scope_group_id,
         )
-    if payload.read_scope in ("subject", "group") and payload.read_scope_group_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Bei `read_scope = {payload.read_scope}` muss die zuständige Gruppe "
-                "mitgegeben werden (`read_scope_group_id`)."
-            ),
-        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     node = ContextNode(
         category=payload.category,
@@ -556,12 +696,18 @@ async def create_node(
         schuljahr=payload.schuljahr,
     )
     db.add(node)
+    await db.flush()
+    # Vor dem Commit **und** vor dem Embedding-Job: Der baut seinen Eingabetext bei
+    # `methode` und `operator` aus den Aliasen; stünden sie noch nicht da, entstünde ein
+    # Vektor ohne sie und niemand merkte es.
+    await aliase_modul.setze(db, node.id, payload.aliase)
     await db.commit()
     await db.refresh(node)
 
     # Embedding-Job
     await enqueue_embedding_job(node.id, db)
 
+    await _aliase_setzen([node], db)
     return node
 
 
@@ -618,6 +764,26 @@ async def update_node(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
+    # Scope und Trägergruppe müssen auch nach einer Teiländerung zusammenpassen.
+    # Maßgeblich ist der Stand **danach**: Wer nur den Scope schickt, behält die
+    # bisherige Gruppe — und genau diese Paarung war bis 09/2026 ungeprüft. Die
+    # Pflichtprüfung gab es nur beim Anlegen; hier schlug ein fehlender Gruppen-Bezug
+    # als IntegrityError durch, also als 500 ohne Hinweis.
+    try:
+        await pruefe_scopes(
+            db,
+            read_scope=update_data.get("read_scope", node.read_scope),
+            read_gruppen_id=update_data.get(
+                "read_scope_group_id", node.read_scope_group_id
+            ),
+            write_scope=update_data.get("write_scope", node.write_scope),
+            write_gruppen_id=update_data.get(
+                "write_scope_group_id", node.write_scope_group_id
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
     # `archived_at` gehört zum Status und wird nicht vom Client gesetzt. Ohne dieses
     # Mitführen blieb die Spalte beim Archivieren **leer**: Die Archivansicht zeigte kein
     # Datum, und der Löschfrist-Lauf (ADR-013) hätte nie eine Frist berechnen können —
@@ -630,10 +796,17 @@ async def update_node(
             # Archivieren neu, sie läuft nicht im Hintergrund weiter.
             node.archived_at = None
 
+    # Die Aliase liegen in einer eigenen Tabelle — sie dürfen nicht als Attribut auf
+    # den Knoten gesetzt werden. `None` heißt „nicht angefasst", `[]` heißt „alle weg".
+    neue_aliase = update_data.pop("aliase", None)
+
     for field, value in update_data.items():
         # metadata_ → DB-Spalte 'metadata'
         attr = field if field != "metadata_" else "metadata_"
         setattr(node, attr, value)
+
+    if neue_aliase is not None:
+        await aliase_modul.setze(db, node.id, neue_aliase)
 
     # Manuelle Titeländerung sperrt den Titel gegen einen BP-Re-Import (C1).
     if "title" in update_data:
@@ -648,8 +821,11 @@ async def update_node(
     # Fassung auffindbar, ohne jeden Hinweis. Betroffen sind nur die Felder, aus denen
     # der Input gebildet wird (`_build_embedding_input`); ein geänderter Scope oder ein
     # neues `valid_until` ändern ihn nicht und kosten deshalb keinen Modellaufruf.
-    if {"content", "title", "metadata_"} & set(update_data):
+    # `aliase` gehört dazu: Bei `methode` und `operator` stehen sie im Eingabetext.
+    if {"content", "title", "metadata_"} & set(update_data) or neue_aliase is not None:
         await enqueue_embedding_job(node.id, db)
+
+    await _aliase_setzen([node], db)
 
     return node
 
@@ -687,7 +863,10 @@ from app.context.ablauf import vorgeschlagenes_ablaufdatum
 async def reaktiviere_node(
     node_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen: `_check_write_permission` lässt die Eigentümerin durch, egal
+    # welche Rolle sie hat. Wer seinen Baustein archivieren darf, darf ihn auch
+    # zurückholen — sonst wäre das Archivieren eine Einbahnstraße.
+    user: JwtPayload = Depends(get_current_user),
 ):
     """Holt einen archivierten Knoten zurück und setzt sein Ablaufdatum neu.
 
@@ -713,6 +892,56 @@ async def reaktiviere_node(
     return node
 
 
+# ── PATCH /api/context/nodes/{id}/verwalten ──────────────────────────────────
+
+
+@router.patch("/nodes/{node_id}/verwalten", response_model=ContextNodeRead)
+async def verwalte_node(
+    node_id: UUID,
+    payload: BausteinVerwalten,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Umbenennen, archivieren, Ablaufdatum setzen — die Aktionen aus „Meine Bausteine".
+
+    **Warum ein eigener Endpunkt statt `PATCH /nodes/{id}`.** Der generische Weg
+    ändert auch Scopes, Inhalt und Metadaten. Diese Seite steht allen Rollen offen;
+    eine versehentlich auf `school` gestellte Sichtbarkeit veröffentlichte einen Text,
+    den jemand für sich geschrieben hat. Der schmale Vertrag macht sichtbar, was
+    Selbstverwaltung heißt, und kann sich nicht unbemerkt weiten — der generische
+    Endpunkt bleibt unverändert teacher/admin.
+
+    Der Rollenriegel entfällt, der Rechteriegel nicht: `_check_write_permission`
+    lässt die Eigentümerin durch, sonst niemanden.
+    """
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.status == "deleted":
+        raise HTTPException(status_code=404, detail="Knoten nicht gefunden")
+    await _check_write_permission(node, user, db)
+
+    if payload.title is not None:
+        node.title = payload.title
+        # Wie im generischen Editor: Ein von Hand gesetzter Titel wird gegen den
+        # BP-Re-Import gesperrt (C1).
+        node.title_locked = True
+
+    if payload.status is not None and payload.status != node.status:
+        node.status = payload.status
+        # `archived_at` trägt die Aufbewahrungsfrist (ADR-013). Ohne das Mitführen
+        # bliebe die Spalte leer, und der Löschlauf fasste den Knoten nie an.
+        node.archived_at = (
+            datetime.now(timezone.utc) if payload.status == "archived" else None
+        )
+
+    if payload.valid_until_gesetzt:
+        node.valid_until = payload.valid_until
+
+    await db.commit()
+    await db.refresh(node)
+    await _schreibrechte_setzen([node], user, db)
+    return node
+
+
 # ── DELETE /api/context/nodes/{id} ────────────────────────────────────────────
 
 @router.delete("/nodes/{node_id}", status_code=204)
@@ -723,7 +952,10 @@ async def delete_node(
         description="Admin-Override: löscht trotz fremder Referenzen (Kaskade!).",
     ),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+    # Rollenoffen: Löschen des Eigenen ist Betroffenenrecht (ADR-019). Geschützt
+    # bleibt es doppelt — `_check_write_permission` (nur Eigentümerin) und die
+    # F7-Regel unten (fremde Verweise blockieren). `force` bleibt Admins vorbehalten.
+    user: JwtPayload = Depends(get_current_user),
 ):
     """Löscht einen Knoten samt seiner `part_of`-Kinder.
 

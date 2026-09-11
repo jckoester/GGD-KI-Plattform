@@ -26,6 +26,7 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     const typ = $derived($page.params.type);
     const config = $derived(sammlung(typ));
@@ -166,7 +167,25 @@
             : [],
     );
 
-    const darfAnlegen = $derived(nodes.some((n) => n.darf_schreiben) || nodes.length === 0);
+    // Admin ist eine Erweiterung der Lehrkraft-Rolle (CLAUDE.md, Rollenmodell).
+    const istLehrkraft = $derived($user?.roles?.includes("teacher") ?? false);
+
+    /**
+     * Darf hier angelegt werden?
+     *
+     * Abgeleitet aus den Schreibrechten der vorhandenen Knoten — das Backend liefert
+     * sie je Zeile mit, und die UI blendet nur aus, was es ohnehin verweigern würde.
+     *
+     * ⚠️ **Der Rückfall bei leerer Liste ist eine Vermutung.** Ohne Knoten gibt es
+     * nichts abzuleiten; „ja" ist für Lehrkräfte die richtige Annahme (sie sind in
+     * einer Fachschaft), für Schüler:innen die falsche: Sammlungen haben
+     * `write_scope: subject`, und niemand ohne Fachschaft schreibt dort. Seit die
+     * Sammlungen für Schüler:innen offen sind (09/2026), hätte die Vermutung ihnen
+     * einen Knopf gezeigt, der mit 403 antwortet.
+     */
+    const darfAnlegen = $derived(
+        nodes.some((n) => n.darf_schreiben) || (nodes.length === 0 && istLehrkraft),
+    );
     const unvollstaendige = $derived(nodes.filter(istStub).length);
 
     async function archivieren(node) {
@@ -180,7 +199,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-5xl">
+<PageBody breit>
     {#if !config}
         <ErrorBanner message="Für „{typ}“ gibt es keine Sammlung." />
     {:else}
@@ -399,4 +418,4 @@
             </div>
         {/if}
     {/if}
-</div>
+</PageBody>

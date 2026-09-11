@@ -24,6 +24,8 @@ class ContextNodeCreate(BaseModel):
     max_grade: int | None = None
     valid_until: date | None = None
     schuljahr: str | None = None
+    # Weitere Namen (Migration 0057). Eigene Tabelle, deshalb kein Metadatenfeld.
+    aliase: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -42,6 +44,9 @@ class ContextNodeUpdate(BaseModel):
     valid_until: date | None = None
     schuljahr: str | None = None
     status: str | None = None
+    # `None` heißt „nicht angefasst", `[]` heißt „alle entfernen" — der Unterschied
+    # entscheidet, ob ein Formular ohne Aliasfeld die vorhandenen löscht.
+    aliase: list[str] | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -77,6 +82,9 @@ class ContextNodeRead(BaseModel):
     schuljahr: str | None
     created_at: datetime
     updated_at: datetime
+    # Weitere Namen des Knotens. Leer, wo der Endpunkt sie nicht nachlädt — sie stehen
+    # in einer eigenen Tabelle und werden nur dort geholt, wo die Oberfläche sie zeigt.
+    aliase: list[str] = Field(default_factory=list)
 
     # Darf die anfragende Person diesen Knoten ändern, archivieren, löschen?
     #
@@ -573,3 +581,90 @@ class FachplanTreeRead(BaseModel):
     selected_band: BandRead | None = None
     bp_version: str = ""
     available_versions: list[str] = Field(default_factory=list)
+
+
+# ── „Meine Bausteine" (AP7) ──────────────────────────────────────────────────
+
+
+class AufmerksamkeitRead(BaseModel):
+    """Zählwerte für Warnbanner und Sidebar — aus **einer** Abfrage.
+
+    `gesamt` ist nicht die Summe der Kategorien: Ein Baustein kann in mehreren
+    zugleich stecken und wird nur einmal gezählt.
+    """
+
+    gesamt: int = 0
+    laeuft_bald_ab: int = 0
+    abgelaufen: int = 0
+    archivierte_referenzen: int = 0
+    unvollstaendig: int = 0
+
+
+class MeinBausteinRead(BaseModel):
+    """Eine Zeile in „Meine Bausteine" — was A4 je Zeile verlangt, nicht mehr.
+
+    Bewusst **nicht** `ContextNodeRead`: Der Inhalt gehört nicht in eine Liste
+    (er kann sehr lang sein), und das Embedding schon gar nicht.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    category: str
+    content_type: str | None
+    status: str
+    valid_until: date | None
+    updated_at: datetime
+    #: Welche Aufmerksamkeits-Kategorien zutreffen — trägt Warnfarbe und Filter.
+    kategorien: list[str] = Field(default_factory=list)
+    #: Ursprungs-Artefakt oder Assistent, falls bekannt (Herkunfts-Chip).
+    herkunft: dict[str, Any] | None = None
+    #: Einheiten und Stunden, in denen der Baustein steckt. Nur für Lehrkräfte
+    #: gefüllt; leer heißt „nirgends eingesetzt" und damit Archiv-Kandidat (A4).
+    eingesetzt_in: list["EinsatzortRead"] = Field(default_factory=list)
+
+
+class FachabschnittRead(BaseModel):
+    """Ein einklappbarer Abschnitt der Liste. `fach = None` → „Ohne Fach"."""
+
+    subject_id: int | None = None
+    fach: str | None = None
+    anzahl: int = 0
+    bausteine: list[MeinBausteinRead] = Field(default_factory=list)
+
+
+class MeineBausteineRead(BaseModel):
+    abschnitte: list[FachabschnittRead] = Field(default_factory=list)
+    gesamt: int = 0
+    aufmerksamkeit: AufmerksamkeitRead = Field(default_factory=AufmerksamkeitRead)
+
+
+class BausteinVerwalten(BaseModel):
+    """Was Selbstverwaltung in „Meine Bausteine" umfasst — und nicht mehr.
+
+    Bewusst **nicht** `ContextNodeUpdate`: Der generische Weg öffnet Scopes, Inhalt
+    und Metadaten. Für eine Seite, die auch Schüler:innen offensteht, wäre das zu
+    breit — eine versehentlich auf `school` gestellte Sichtbarkeit veröffentlicht
+    einen Text, den jemand für sich geschrieben hat. Leitprinzip 5 der UI-Notiz sagt
+    dasselbe von der anderen Seite: „Verwalten ist nicht Bearbeiten."
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    status: Literal["active", "archived"] | None = None
+    #: Ausdrücklich `null` setzbar — das ist der Weg zu „gilt dauerhaft".
+    valid_until: date | None = None
+    valid_until_gesetzt: bool = Field(
+        default=False,
+        description=(
+            "True, wenn `valid_until` bewusst mitgeschickt wurde. Ohne das Flag "
+            "ließe sich `null` nicht von „Feld weggelassen“ unterscheiden."
+        ),
+    )
+
+
+class EinsatzortRead(BaseModel):
+    """Wo ein Baustein im Unterricht steckt — Chip in „Meine Bausteine" (A4)."""
+
+    id: UUID
+    titel: str
+    content_type: str

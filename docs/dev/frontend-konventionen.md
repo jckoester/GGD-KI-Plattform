@@ -42,6 +42,39 @@ on:click={fn}             → onclick={fn}
 <slot />                  → {@render children()}
 ```
 
+## Seitenrahmen: `PageBody`
+
+Jede Seite unter `(app)` bekommt ihren Rahmen von `$lib/components/PageBody.svelte` —
+zwei Muster, eine Stelle:
+
+```svelte
+<PageBody breit>   <!-- Listen über die volle Breite (Vorbild /knowledge) -->
+<PageBody>         <!-- Detail, Editoren, gruppierte Listen (Vorbild /knowledge/mine) -->
+```
+
+⚠️ **Der Scroll-Rahmen ist Pflicht.** Das `(app)`-Layout gibt `<main>` ein
+`flex-1 overflow-hidden`; eine Seite ohne `h-full overflow-y-auto` wird unten
+**abgeschnitten**, statt zu scrollen. Der Fehler sieht nicht kaputt aus — er fällt erst
+auf, wenn der Inhalt lang wird, und ist mehrfach passiert. In der Komponente kann er
+einer Seite nicht mehr unterlaufen.
+
+**Wann breit, wann schmal?** Listen und Tabellen brauchen den Platz — alles, was gelesen
+oder ausgefüllt wird, nicht. Eine Textspalte am linken Rand eines breiten Schirms ist
+unangenehm zu lesen, deshalb zentriert die schmale Variante (`max-w-4xl mx-auto`).
+
+**Ausnahmen — Seiten mit eigener Flex-Struktur.** Chat, Graph, Suche, Curriculum-Ansicht
+und -Editor, Planer, Material-Werkstatt und der Assistenten-Editor verwalten ihren
+Scrollbereich selbst; sie haben feste Kopf- oder Fußleisten, die nicht mitscrollen
+dürfen. Dort gilt `PageBody` **nicht** — wohl aber dieselbe Inhaltsbreite: `max-w-4xl
+mx-auto w-full` für Lesbares, volle Breite für Tabellen und Zeichenflächen.
+
+> **Der `(admin)`-Bereich hat einen anderen Rahmenvertrag.** Dort scrollt das *Layout*
+> (`<main class="flex-1 overflow-y-auto px-4 py-4">`), nicht die Seite. `PageBody` würde
+> einen zweiten Scrollbereich hineinschieben und gehört deshalb nicht dorthin.
+
+**Die `help/*`-Seiten bleiben bei `max-w-2xl`** — sie sind Fließtext, und für den ist die
+schmalere Spalte die bessere Lesbreite. Sie sind untereinander einheitlich.
+
 ## CSS: Semantische Farb-Tokens
 
 `frontend/src/routes/layout.css` definiert zwei Abstraktionsebenen:

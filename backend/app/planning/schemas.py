@@ -73,6 +73,18 @@ class SlotRead(BaseModel):
     nachbereitet_auto: bool
     created_at: datetime
     updated_at: datetime
+    # Ob der verknüpfte Stundenentwurf schon Phasen hat.
+    #
+    # ⚠️ **Kein Feld des Slots**, sondern eine Auskunft über den Knoten dahinter
+    # (`context_nodes.metadata->'phasen'`) — deshalb setzt `get_overview` es
+    # nachträglich und `from_attributes` füllt es nicht. Ohne diese Angabe sieht ein
+    # angelegter, aber leerer Entwurf in der Jahresplanung genauso aus wie ein
+    # ausgearbeiteter: Thema fett, verlinkt, fertig.
+    #
+    # `False` heißt „keine Phasen" **oder** „gar kein Entwurf" — welcher von beiden,
+    # sagt `stunde_node_id`. Die Unterscheidung trifft das Frontend
+    # (`entwurfsStand` in `lib/planner.js`), damit sie an einem Ort steht.
+    hat_phasen: bool = False
 
     class Config:
         from_attributes = True
@@ -226,6 +238,10 @@ class LessonRead(BaseModel):
     group_id: int
     subject_id: Optional[int]
     grade: Optional[int] = None  # Jahrgang der Gruppe (für editionsbewusste Kompetenz-Auswahl)
+    # `False` heißt: gelesen wird über das Eigentum, nicht über die Mitgliedschaft —
+    # der Archiv-Fall. Die Oberfläche schaltet dann in den Lesezustand, statt einen
+    # Editor anzubieten, dessen Speichern mit 403 endet.
+    darf_bearbeiten: bool = True
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────
@@ -314,3 +330,39 @@ class OverviewRead(BaseModel):
     ferien: list[FerienItem] = []
     feiertage: list[SondertagItem] = []
     unterrichtsfreie_tage: list[SondertagItem] = []
+
+
+# ── Jetzt (Gruppenübersicht, AP5) ─────────────────────────────────────────────
+
+class JetztStunde(BaseModel):
+    slot_id: UUID
+    datum: date
+    thema: Optional[str] = None
+    kategorie: str
+    hat_entwurf: bool
+    nachbereitet: bool
+    ist_heute: bool
+    stunde_node_id: Optional[UUID] = None
+    ue_node_id: Optional[UUID] = None
+
+
+class JetztEinheit(BaseModel):
+    node_id: UUID
+    titel: str
+    stunden_gesamt: int
+    stunden_gehalten: int
+
+
+class JetztRead(BaseModel):
+    """Wo die Gruppe gerade steht — der erste Block der Übersicht.
+
+    `hat_plan` unterscheidet „noch nichts geplant" von „geplant, aber gerade nichts
+    anstehend": Ohne die Angabe sähe eine Gruppe ohne Wochenmuster genauso aus wie
+    eine am Schuljahresende, und der Weg zur Planung fehlte genau dort, wo er
+    gebraucht wird.
+    """
+    hat_plan: bool
+    laufende_einheit: Optional[JetztEinheit] = None
+    naechste_einheit: Optional[JetztEinheit] = None
+    zuletzt: Optional[JetztStunde] = None
+    kommende: list[JetztStunde] = []

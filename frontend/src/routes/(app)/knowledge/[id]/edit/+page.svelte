@@ -19,11 +19,18 @@
         copyContextNode,
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
-    import { myTeachingGroups } from "$lib/stores/myGroups.js";
+    import {
+        myTeachingGroups,
+        myFachschaften,
+        gruppenFuerScope,
+        gueltigeGruppenwahl,
+    } from "$lib/stores/myGroups.js";
     import { subjects } from "$lib/stores/subjects.js";
     import { ArrowLeft } from "lucide-svelte";
+    import AliasFeld from "$lib/components/AliasFeld.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // ── Knoten laden und ggf. weiterleiten ──────────────────────────────────
     let node = $state(null);
@@ -105,13 +112,8 @@
                     schaltzeichen = n.metadata.schaltzeichen;
                 } else {
                     metadata = JSON.stringify(n.metadata ?? {}, null, 2);
-                    if (
-                        n.content_type === "methode" ||
-                        n.content_type === "sozialform"
-                    ) {
-                        aliasInput = (n.metadata?.aliase ?? []).join(", ");
-                    }
                 }
+                aliase = [...(n.aliase ?? [])];
                 // Archivierte Referenzen laden
                 if (n.status === "active") {
                     getArchivedReferences(n.id).then((refs) => {
@@ -142,7 +144,9 @@
     let minGrade = $state(null);
     let maxGrade = $state(null);
     let metadata = $state("{}");
-    let aliasInput = $state(""); // kommagetrennte Aliase für methode/sozialform
+    // Seit Migration 0057 an **jedem** Knoten pflegbar, nicht nur bei
+    // methode/sozialform: Ein zweiter Name ist keine Eigenheit zweier Typen.
+    let aliase = $state([]);
 
     // Strukturierte Metadaten
     let signatur = $state({
@@ -196,7 +200,6 @@
     );
 
     // Kontrolliertes Vokabular (Methode/Sozialform) → eigenes Alias-Feld statt JSON.
-    const isVocab = $derived(["methode", "sozialform"].includes(contentType));
 
     // ── Zulässige write_scope-Optionen je Rolle ─────────────────────────────
     const writeScopes = $derived.by(() => {
@@ -225,20 +228,6 @@
         }
         if (category === "concept" && contentType === "bauteil") {
             return { schaltzeichen };
-        }
-        if (contentType === "methode" || contentType === "sozialform") {
-            // Übrige Metadaten erhalten, aliase aus dem Alias-Feld überschreiben.
-            let base;
-            try {
-                base = JSON.parse(metadata);
-            } catch {
-                base = {};
-            }
-            const aliase = aliasInput
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
-            return { ...base, aliase };
         }
         try {
             return JSON.parse(metadata);
@@ -285,6 +274,7 @@
                 content_type: contentType,
                 content: content.trim() || null,
                 metadata: buildMetadata(),
+                aliase,
                 read_scope: readScope,
                 write_scope: writeScope,
                 read_scope_group_id: ["subject", "group"].includes(readScope)
@@ -314,13 +304,33 @@
     }
 
     // ── Group-Optionen für Selects ────────────────────────────────────────
-    const groupOptions = $derived(
-        $myTeachingGroups.map((g) => ({
-            id: g.id,
-            name: g.name,
-            subject_id: g.subject_id,
-        })),
-    );
+    //
+    // Je Scope eine andere Liste: `subject` meint die **Fachschaft**, `group` die
+    // Unterrichtsgruppe. Bis 09/2026 stand hier für beides dieselbe Liste mit
+    // Unterrichtsgruppen — die falsche Wahl wurde stumm gespeichert, weil das
+    // Backend den Gruppentyp nicht prüft.
+    const gruppen = $derived({
+        unterricht: $myTeachingGroups,
+        fachschaften: $myFachschaften,
+    });
+    const readGroupOptions = $derived(gruppenFuerScope(readScope, gruppen));
+    const writeGroupOptions = $derived(gruppenFuerScope(writeScope, gruppen));
+
+    // Zurückgesetzt wird **beim Umschalten**, nicht in einem Effekt: Ein Effekt
+    // liefe auch beim Laden und leerte dann die Gruppe eines bestehenden Knotens,
+    // die nicht in den eigenen Listen steht — etwa bei einer fremden Fachschaft.
+    function readScopeGewechselt() {
+        readScopeGroupId = gueltigeGruppenwahl(
+            readScopeGroupId,
+            gruppenFuerScope(readScope, gruppen),
+        );
+    }
+    function writeScopeGewechselt() {
+        writeScopeGroupId = gueltigeGruppenwahl(
+            writeScopeGroupId,
+            gruppenFuerScope(writeScope, gruppen),
+        );
+    }
 
     // ── Formatierungsfunktionen ─────────────────────────────────────────────
     function formatDate(dateString) {
@@ -368,7 +378,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-2xl">
+<PageBody>
     <a
         href={readUrl}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
@@ -826,29 +836,12 @@
                 </div>
             {/if}
 
-            <!-- Alias-Feld für kontrolliertes Vokabular (Methode/Sozialform) -->
-            {#if isVocab}
-                <div>
-                    <label
-                        class="block text-sm font-medium text-light-tx dark:text-dark-tx mb-1"
-                    >
-                        Aliase / Synonyme
-                    </label>
-                    <input
-                        type="text"
-                        bind:value={aliasInput}
-                        disabled={!canEdit}
-                        placeholder="z. B. Ich-Du-Wir, Prinzip der wachsenden Gruppe"
-                        class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
-                   bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
-                   disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                    <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                        Kommagetrennt. Diese Begriffe gelten bei der Suche als Treffer für
-                        diesen Knoten.
-                    </p>
-                </div>
-            {/if}
+            <!-- Weitere Namen — an jedem Knoten, nicht nur bei methode/sozialform -->
+            <AliasFeld
+                bind:aliase
+                disabled={!canEdit}
+                hinweis="Unter diesen Namen wird der Baustein ebenfalls gefunden."
+            />
 
             <!-- Generisches JSON-Feld für andere Typen -->
             {#if category && contentType && !["funktion", "bauteil", "methode", "sozialform"].includes(contentType)}
@@ -889,6 +882,7 @@
                         </label>
                         <select
                             bind:value={readScope}
+                                onchange={readScopeGewechselt}
                             disabled={!canEdit}
                             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
@@ -920,7 +914,7 @@
                             >
                                 <option value={null}>-- Keine Auswahl --</option
                                 >
-                                {#each groupOptions as group}
+                                {#each readGroupOptions as group}
                                     <option value={group.id}
                                         >{group.name}</option
                                     >
@@ -938,6 +932,7 @@
                         </label>
                         <select
                             bind:value={writeScope}
+                                onchange={writeScopeGewechselt}
                             disabled={!canEdit}
                             class="w-full px-3 py-2 text-sm rounded-md border border-light-ui-3 dark:border-dark-ui-3
                      bg-light-bg dark:bg-dark-bg text-light-tx dark:text-dark-tx
@@ -968,7 +963,7 @@
                             >
                                 <option value={null}>-- Keine Auswahl --</option
                                 >
-                                {#each groupOptions as group}
+                                {#each writeGroupOptions as group}
                                     <option value={group.id}
                                         >{group.name}</option
                                     >
@@ -1308,4 +1303,4 @@
             {/if}
         </form>
     {/if}
-</div>
+</PageBody>

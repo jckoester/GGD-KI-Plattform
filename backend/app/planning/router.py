@@ -12,7 +12,7 @@ lösen jeweils einen Snapshot aus.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -32,9 +32,15 @@ from app.db.models import (
 )
 from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
-from app.planning.permissions import require_group_teacher
+from app.planning.material_edges import synchronisiere_materialkanten
+from app.planning import jetzt as jetzt_modul
+from app.planning.permissions import require_group_teacher, zugang_zur_stunde
+from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     BalanceRead,
+    JetztEinheit,
+    JetztRead,
+    JetztStunde,
     CurriculumKapitelOption,
     CurriculumOption,
     FerienItem,
@@ -172,6 +178,32 @@ async def _load_units(db: AsyncSession, group_id: int) -> list[ContextNode]:
 # ── GET /planning/groups/{group_id}/overview ──────────────────────────────────
 
 
+async def _stunden_mit_phasen(db: AsyncSession, slots) -> set[UUID]:
+    """Welche der verknüpften Stundenentwürfe schon Phasen haben.
+
+    **Eine Abfrage für alle Slots**, nicht eine je Slot: Ein Schuljahr einer Gruppe
+    bringt rund 40 bis 120 Slots mit, und die Jahresübersicht lädt sie in einem Zug.
+
+    Gefiltert wird in der Datenbank (`jsonb_array_length > 0`) statt im Python — so
+    wandern nur die Treffer über die Leitung, und die Regel „leer heißt Idee" steht
+    an einer Stelle.
+    """
+    ids = {s.stunde_node_id for s in slots if s.stunde_node_id}
+    if not ids:
+        return set()
+
+    phasen = sa.func.coalesce(
+        ContextNode.metadata_["phasen"], sa.text("'[]'::jsonb")
+    )
+    treffer = await db.execute(
+        sa.select(ContextNode.id).where(
+            ContextNode.id.in_(ids),
+            sa.func.jsonb_array_length(phasen) > 0,
+        )
+    )
+    return set(treffer.scalars())
+
+
 @router.get("/groups/{group_id}/overview", response_model=OverviewRead)
 async def get_overview(
     group_id: int,
@@ -194,6 +226,8 @@ async def get_overview(
     )
     patterns = patterns_result.scalars().all()
 
+    ausgearbeitet = await _stunden_mit_phasen(db, slots)
+
     units = await _load_units(db, group_id)
     balance = await _build_balance(db, group_id, units, slots)
 
@@ -214,7 +248,12 @@ async def get_overview(
     cfg = load_school_year()
 
     return OverviewRead(
-        slots=[SlotRead.model_validate(s) for s in slots],
+        slots=[
+            SlotRead.model_validate(s).model_copy(
+                update={"hat_phasen": s.stunde_node_id in ausgearbeitet}
+            )
+            for s in slots
+        ],
         patterns=[WeekPatternRead.model_validate(p) for p in patterns],
         units=unit_reads,
         balance=balance,
@@ -227,6 +266,71 @@ async def get_overview(
         unterrichtsfreie_tage=[
             SondertagItem(name=t.name, datum=t.datum) for t in cfg.unterrichtsfreie_tage
         ],
+    )
+
+
+# ── GET /planning/groups/{group_id}/jetzt ─────────────────────────────────────
+
+
+@router.get("/groups/{group_id}/jetzt", response_model=JetztRead)
+async def get_jetzt(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Wo die Gruppe gerade steht — für den ersten Block der Gruppenübersicht.
+
+    Bewusst **nicht** `…/overview`: Der liefert dieselben Slots, dazu aber
+    Wochenmuster, alle Einheiten, die Stundenbilanz und den kompletten
+    Schuljahreskalender mit Ferien und Feiertagen — für fünf Zeilen.
+
+    Die Slots des ganzen Schuljahres zu laden ist trotzdem richtig: Es sind je
+    Gruppe rund hundert Zeilen, und die Stundenzahl einer Einheit („6 von 12")
+    braucht sie ohnehin alle. Die Auswahl selbst steht in `app.planning.jetzt` —
+    ohne Datenbank, damit ihre Grenzfälle prüfbar bleiben.
+    """
+    await require_group_teacher(group_id, user, db)
+
+    result = await db.execute(
+        sa.select(LessonSlot)
+        .where(LessonSlot.group_id == group_id)
+        .order_by(LessonSlot.date, LessonSlot.start_period)
+    )
+    slots = list(result.scalars().all())
+
+    auswahl = jetzt_modul.waehle(slots, date.today())
+
+    # Titel der beiden Einheiten in einer Abfrage, nicht in zweien.
+    ue_ids = [
+        e.node_id
+        for e in (auswahl.laufende_einheit, auswahl.naechste_einheit)
+        if e is not None
+    ]
+    titel: dict[UUID, str] = {}
+    if ue_ids:
+        res = await db.execute(
+            sa.select(ContextNode.id, ContextNode.title).where(ContextNode.id.in_(ue_ids))
+        )
+        titel = {row[0]: row[1] for row in res.all()}
+
+    def _einheit(e) -> JetztEinheit | None:
+        if e is None:
+            return None
+        return JetztEinheit(
+            node_id=e.node_id,
+            # Eine Einheit ohne Knoten sollte es nicht geben (Fremdschlüssel mit
+            # SET NULL); falls doch, ist ein Platzhalter besser als ein 500er.
+            titel=titel.get(e.node_id, "Unbenannte Einheit"),
+            stunden_gesamt=e.stunden_gesamt,
+            stunden_gehalten=e.stunden_gehalten,
+        )
+
+    return JetztRead(
+        hat_plan=bool(slots),
+        laufende_einheit=_einheit(auswahl.laufende_einheit),
+        naechste_einheit=_einheit(auswahl.naechste_einheit),
+        zuletzt=JetztStunde(**vars(auswahl.zuletzt)) if auswahl.zuletzt else None,
+        kommende=[JetztStunde(**vars(s)) for s in auswahl.kommende],
     )
 
 
@@ -780,7 +884,8 @@ async def get_lesson(
     group_id = lesson.write_scope_group_id
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
-    await require_group_teacher(group_id, user, db)
+    # Mitgliedschaft **oder** Eigentum; Letzteres nur lesend (Archiv-Fall).
+    darf_bearbeiten = await zugang_zur_stunde(lesson, user, db)
 
     # Übergeordnete UE
     ue_edge_result = await db.execute(
@@ -837,6 +942,7 @@ async def get_lesson(
         group_id=group_id,
         subject_id=lesson.subject_id,
         grade=resolved_curricula.grade,
+        darf_bearbeiten=darf_bearbeiten,
     )
 
 
@@ -876,9 +982,12 @@ async def patch_lesson(
     if payload.stundenziel is not None:
         meta["stundenziel"] = payload.stundenziel
     if payload.phasen is not None:
-        meta["phasen"] = [
-            p.model_dump(exclude_none=False, mode="json") for p in payload.phasen
-        ]
+        # `exclude_none=False` schreibt eine fehlende Kennung als `"id": null` in
+        # die Metadaten — deshalb wird sie hier vergeben und nicht erst dort
+        # bemerkt, wo etwas auf sie zeigt.
+        meta["phasen"] = sichere_phasen_kennungen(
+            [p.model_dump(exclude_none=False, mode="json") for p in payload.phasen]
+        )
     if payload.refs is not None:
         meta["refs"] = [r.model_dump(mode="json") for r in payload.refs]
     if payload.refs_dismissed is not None:
@@ -886,6 +995,7 @@ async def patch_lesson(
 
     lesson.metadata_ = meta
     lesson.updated_at = now
+    await synchronisiere_materialkanten(db, lesson.id, meta)
     await db.commit()
 
     return {"ok": True}

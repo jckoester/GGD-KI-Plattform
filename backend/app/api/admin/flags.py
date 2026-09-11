@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_role
 from app.auth.jwt import JwtPayload
+from app.core.hintergrund import im_hintergrund
+from app.crisis.benachrichtigung import benachrichtige_antrag
 from app.db.models import Conversation, ConversationAccessRequest, ConversationFlag
-from app.db.session import get_db
+from app.db.session import AsyncSessionLocal, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +223,15 @@ async def create_access_request(
         flag.conversation_id,
         req.access_window_hours,
     )
+
+    # Die `review`-Personen erfahren davon sonst nur über den Zähler am Avatar — und
+    # den sieht, wer sich anmeldet. Im Hintergrund, weil ein Mailserver die Antwort
+    # auf den Antrag nicht aufhalten soll; Fehler landen im Log (`app.core.hintergrund`).
+    im_hintergrund(
+        lambda: benachrichtige_antrag(AsyncSessionLocal),
+        was=f"Benachrichtigung über Einsicht-Antrag {req.id}",
+    )
+
     return AccessRequestResponse(
         id=req.id,
         flag_id=req.flag_id,

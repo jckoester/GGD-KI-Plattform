@@ -56,6 +56,14 @@
 #                 wenn man eine Aufgabe vor sich hat — und hat das Fach dann längst im
 #                 Kopf; eine globale Liste nach Fach zu filtern dreht den Weg um. Wer
 #                 einen Eintrag in der Navigation will, sagt es hier und begründet es.
+#   schueler      Erscheint die Sammlung im Abschnitt „Nachschlagen" der
+#                 Unterrichtsgruppen-Seite auch für **Schüler:innen**? **Vorgabe: nein.**
+#                 Es ist keine Rechteangabe — alle Sammlungen sind `read_scope: school`
+#                 und damit ohnehin lesbar; die Regel dafür steht allein in
+#                 `app/context/visibility.py`. Hier wird nur entschieden, wofür es einen
+#                 sichtbaren Einstieg gibt. Ja bei dem, was Schüler:innen im Unterricht
+#                 in die Hand bekommen (Fachbegriffe, Methoden- und Operatorenblätter);
+#                 nein bei Planungsvokabular der Lehrkraft (`methode`, `sozialform`).
 #   content       Label und Pflicht des Knotentexts. Ein Eintrag ohne Text ist nur
 #                 über seinen Namen auffindbar — bei `methode` und `begriff` ist er
 #                 deshalb Pflicht.
@@ -106,38 +114,55 @@ categories:
   document:
     label_de: "Dokument"
     color: "bl"
+    icon: FileType
     content_types:
       - key: formatierungsvorlage
         label_de: "Formatierungsvorlage"
+        icon: LayoutTemplate
         scope_defaults: {read_scope: school,   write_scope: school  }
       - key: vokabelliste
         label_de: "Vokabelliste"
+        icon: Languages
         scope_defaults: {read_scope: group,    write_scope: private }
       - key: quelltext
         label_de: "Quelltext"
+        icon: FileCode
         scope_defaults: {read_scope: group,    write_scope: private }
         # Primärquellen zu einem Thema sind klassisches Suchgut.
         embedding: true
       - key: konvention
         label_de: "Konvention"
+        icon: FileSignature
         # Fachschaft statt Schule: Zitierweise, Protokollform und Bezeichnungen sind
         # fachlich. Schulweite Konventionen legt der Admin mit write_scope=school an.
         scope_defaults: {read_scope: school,   write_scope: subject }
         embedding: true
       - key: methodenblatt
         label_de: "Methodenblatt"
+        icon: ScrollText
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Schülermaterial soll thematisch auftauchen, nicht nur unter seinem Namen.
         embedding: true
         collection:
+          # ⚠️ „Methode" heißt hier **nicht** der Knotentyp `methode`. Ein
+          # Methodenblatt erklärt in aller Regel eine *Fachmethode* — ein fachliches
+          # Verfahren, das Schüler:innen beherrschen sollen (eine Quelle analysieren,
+          # ein Gedicht deuten, titrieren). `methode` führt dagegen
+          # *Unterrichts*methoden, das Planungsvokabular der Lehrkraft. Bis 09/2026
+          # verwies dieser Satz auf den falschen Typ. Ein eigener Typ `fachmethode`
+          # wurde geprüft und verworfen (die PK-Knoten des Bildungsplans leisten das
+          # bereits) — Begründung und Wiederaufnahme-Bedingungen im `Konzept/Parkplatz.md`.
           beschreibung: >-
-            Handreichungen für Schüler:innen zu einer Methode — was zu tun ist und
-            worauf es ankommt. Die Fachschaft pflegt sie.
+            Handreichungen für Schüler:innen zu einem fachlichen Verfahren — was zu
+            tun ist und worauf es ankommt. Die Fachschaft pflegt sie.
           spalten: [titel, fach, status, geaendert]
           filter: [fach, status, titel]
+          # Schülermaterial im Wortsinn: Es ist für sie geschrieben.
+          schueler: true
           content: {label: "Inhalt des Blattes", pflicht: false}
       - key: operatorenblatt
         label_de: "Operatorenblatt"
+        icon: Zap
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Der Leitfall der Titel-Teilsuche („Anleitung Operator nennen“).
         embedding: true
@@ -147,9 +172,12 @@ categories:
             oder „beurteilen" dort konkret verlangt.
           spalten: [titel, fach, status, geaendert]
           filter: [fach, status, titel]
+          # Wer eine Aufgabe vor sich hat, muss wissen, was der Operator verlangt.
+          schueler: true
           content: {label: "Inhalt des Blattes", pflicht: false}
       - key: praesentation
         label_de: "Präsentation"
+        icon: Presentation
         # Lerngruppen-Material, kein Fachschaftsgut: Eine Präsentation entsteht für
         # den eigenen Unterricht. Der Schüler-Fall ist `schuelerpraesentation`.
         scope_defaults: {read_scope: group,    write_scope: private }
@@ -159,73 +187,93 @@ categories:
   knowledge:
     label_de: "Wissen"
     color: "gr"
+    icon: BookOpen
     content_types:
       - key: fachplan
         label_de: "Fachplan"
+        icon: Compass
         scope_defaults: {read_scope: global,   write_scope: global  }
         scope_anchor: true
       - key: themengebiet
         label_de: "Themengebiet"
+        icon: Layers
         # Wurzel eines Wissensraums — den schneidet die Fachschaft, nicht der Admin.
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
         embedding: true
       - key: leitidee
         label_de: "Leitidee"
+        icon: Lightbulb
         scope_defaults: {read_scope: global,   write_scope: global  }
         scope_anchor: true
         embedding: true
       - key: ik_kompetenz
         label_de: "IK-Kompetenz"
+        icon: Target
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
         embedding_enrichment: ["metadata.breadcrumb"]
       - key: pk_gruppe
         label_de: "Prozessbezogene Kompetenzgruppe"
+        icon: Boxes
         scope_defaults: {read_scope: global,   write_scope: global  }
         scope_anchor: true
         embedding: true
       - key: pk_kompetenz
         label_de: "Prozessbezogene Kompetenz"
+        icon: Target
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
         embedding_enrichment: ["metadata.breadcrumb"]
       - key: leitperspektive
         label_de: "Leitperspektive"
+        icon: ShieldCheck
         scope_defaults: {read_scope: global,   write_scope: global  }
       - key: leitperspektive_aspekt
         label_de: "Leitperspektive-Aspekt"
+        icon: ShieldCheck
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
       # Leitfaden Demokratiebildung (LFDB) — aus der KM-PDF importiert (3 Ebenen):
       # Baustein (Container) → Themenblock (Leitperspektive) → Kompetenz (Leitfrage).
       - key: lfdb_baustein
         label_de: "LFDB-Baustein"
+        icon: Package
         scope_defaults: {read_scope: global,   write_scope: global  }
       - key: lfdb_themenblock
         label_de: "LFDB-Themenblock"
+        icon: BookOpen
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
       - key: lfdb_kompetenz
         label_de: "LFDB-Kompetenz"
+        icon: Target
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
       - key: curriculum
         label_de: "Schulcurriculum"
+        icon: Library
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
       - key: kapitel
         label_de: "Kapitel"
+        icon: BookText
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: true
         embedding: true
         embedding_enrichment: ["metadata.breadcrumb"]
       - key: lernsequenz
         label_de: "Lernsequenz"
+        icon: Waypoints
         scope_defaults: {read_scope: school,   write_scope: subject }
         scope_anchor: false
       - key: methode
-        label_de: "Methode"
+        # „Unterrichtsmethode", nicht „Methode": Das kürzere Wort trägt im Schulalltag
+        # zwei Bedeutungen — das didaktische Arrangement (Placemat, Galeriegang) und
+        # das fachliche Verfahren (Gedichtanalyse, Titration). Dieser Typ meint das
+        # erste; für das zweite gibt es das `methodenblatt`.
+        label_de: "Unterrichtsmethode"
+        icon: Sparkles
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Methoden sollen gefunden werden, ohne ihren Namen zu kennen.
         embedding: true
@@ -239,10 +287,15 @@ categories:
         #
         # `a|b` heißt: a, sonst b. Ohne Ablaufsatz zählt die Kurzbeschreibung wie
         # bisher — ein Eintrag wird durch das neue Feld nie schlechter auffindbar.
-        embedding_input: ["title", "metadata.aliase", "metadata.ablauf|content"]
+        # `aliases` = die Tabelle `node_aliases` (Migration 0057), vorher
+        # `metadata.aliase`. Verbunden weiterhin mit " | " — der Eingabetext bleibt
+        # zeichengleich, sonst wären die bestehenden Vektoren still entwertet.
+        embedding_input: ["title", "aliases", "metadata.ablauf|content"]
         collection:
           beschreibung: >-
-            Unterrichtsmethoden mit Kurzbeschreibung. Fachübergreifende Einträge
+            Didaktische Arrangements für den Unterricht — Placemat, Galeriegang,
+            Think-Pair-Share. Nicht gemeint sind fachliche Verfahren wie die
+            Gedichtanalyse; die erklärt ein Methodenblatt. Fachübergreifende Einträge
             pflegt die Administration, fachspezifische die jeweilige Fachschaft.
           spalten: [titel, fach, aliase, status, geaendert]
           filter: [fach, status, titel]
@@ -262,10 +315,6 @@ categories:
               Macht den Eintrag thematisch auffindbar — auch für Suchende, die den
               Namen nicht kennen.
         felder:
-          aliase:
-            typ: liste
-            label: "Andere Bezeichnungen"
-            hinweis: 'z. B. „Think-Pair-Share“ für „Denken – Austauschen – Vorstellen“'
           ablauf:
             typ: text
             label: "Ablauf in einem Satz"
@@ -277,6 +326,7 @@ categories:
 
       - key: sozialform
         label_de: "Sozialform"
+        icon: Users
         # Geschlossene Kleinstmenge (Einzel-, Partner-, Gruppenarbeit …), fachneutral
         # und schulweit gepflegt — nicht je Fachschaft eigene Sozialformen.
         scope_defaults: {read_scope: school,   write_scope: school  }
@@ -289,19 +339,18 @@ categories:
           # Fachneutral und winzig — die Liste ist der einzige Weg dorthin.
           sidebar: true
           content: {label: "Kurzbeschreibung", pflicht: false}
-        felder:
-          aliase:
-            typ: liste
-            label: "Andere Bezeichnungen"
       - key: operator
         label_de: "Operator"
+        icon: Zap
         scope_defaults: {read_scope: global,   write_scope: global  }
         embedding: true
       - key: jahresplan
         label_de: "Jahresplan"
+        icon: CalendarRange
         scope_defaults: {read_scope: private,  write_scope: private }
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
+        icon: ClipboardCheck
         # Abiturvorgaben sind je Fach verschieden — die Fachschaft pflegt sie.
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Ruhend bis 0.10: Es gibt noch keinen Weg, so einen Knoten anzulegen; die
@@ -313,9 +362,11 @@ categories:
   artifact:
     label_de: "Artefakt"
     color: "or"
+    icon: Package
     content_types:
       - key: unterrichtsstunde
         label_de: "Unterrichtsstunde"
+        icon: SquareChartGantt
         scope_defaults: {read_scope: private,  write_scope: private }
         scope_anchor: true
         valid_until_default: schuljahresende
@@ -331,6 +382,7 @@ categories:
         embedding_input: ["title", "metadata.refs[].titel", "metadata.reflexion"]
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
+        icon: Map
         scope_defaults: {read_scope: private,  write_scope: private }
         # Anker: Ein Assistent für genau eine Einheit ist der Regelfall — die Stunde
         # darunter ist es ohnehin. Bis 02.09.2026 stand hier `false`, während der
@@ -343,61 +395,68 @@ categories:
         embedding_input: ["title", "metadata.refs[].titel"]
       - key: arbeitsblatt
         label_de: "Arbeitsblatt"
+        icon: PencilRuler
         scope_defaults: {read_scope: group,    write_scope: private }
         # Wiederverwendung ist der Zweck des Typs.
         embedding: true
       - key: aufgabe
         label_de: "Aufgabe"
+        icon: ClipboardList
         scope_defaults: {read_scope: group,    write_scope: private }
         # Laut ADR-013 permanent wiederverwendbar.
         embedding: true
       - key: klausur
         label_de: "Klausur"
+        icon: GraduationCap
         scope_defaults: {read_scope: private,  write_scope: private }
         # Wiederverwendung; der teacher-only-Scope schützt.
         embedding: true
       - key: code_beispiel
         label_de: "Code-Beispiel"
+        icon: Braces
         scope_defaults: {read_scope: school,   write_scope: private }
         # Die Werkstatt-Abfrage in ADR-013 setzt es voraus.
         embedding: true
       - key: lerntext
         label_de: "Lerntext"
+        icon: FileText
         scope_defaults: {read_scope: school,   write_scope: private }
         # Vereinfachte Texte sollen je Thema wiedergefunden werden.
         embedding: true
       # ── Schüler-Artefakte ────────────────────────────────────────────────
-      # Entstehen ausschließlich durch Übernahme aus dem Chat, mit Bestätigung
-      # (AP8). Bis dahin ruhend: Ein Typ ohne Erzeugungsweg gehört in keine
-      # Auswahlliste. Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei
-      # Stunde und Einheit; die früheren 42 Tage waren ein verallgemeinertes
-      # Beispiel aus ADR-013 und nie begründet (Todo: Defaults prüfen).
+      # Entstehen durch Übernahme aus der Bibliothek, mit Bestätigung — seit AP8
+      # Schritt 1 gibt es diesen Weg (`POST /artifacts/{id}/baustein`), deshalb
+      # ruhen sie nicht mehr. `feedback_text` ruht weiter: Den Feedback-Flow, der
+      # solche Knoten erzeugte, gibt es nicht.
+      # Sie laufen zum Schuljahresende ab — dieselbe Grenze wie bei Stunde und
+      # Einheit; die früheren 42 Tage waren ein verallgemeinertes Beispiel aus
+      # ADR-013 und nie begründet (Todo: Defaults prüfen).
       - key: lernplan
         label_de: "Lernplan"
+        icon: ListChecks
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
-        ui_status: ruhend
       - key: schuelertext
         label_de: "Schülertext"
+        icon: NotebookPen
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
-        ui_status: ruhend
       - key: schuelerpraesentation
         label_de: "Schülerpräsentation"
+        icon: Album
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
         # Kein Embedding: fremdes Eigentum ohne Suchnutzen (Ausschlussgrund 3).
         # Was eine Schüler:in für sich ablegt, gehört nicht in den Suchraum anderer.
-        ui_status: ruhend
       - key: strukturierung
         label_de: "Gliederung/Mindmap"
+        icon: Network
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
         # Kein Embedding: wie `schuelerpraesentation`.
         # Rollenoffen: Eine Lehrkraft darf read_scope auf `group` heben, damit die
         # Klasse eine gemeinsame Mindmap sieht — an der Rolle hängt keine Mechanik.
-        ui_status: ruhend
-        # Noch keine Sammlung (der Typ ruht bis 0.9) — das Feldschema gilt trotzdem.
+        # Noch keine Sammlung — das Feldschema gilt trotzdem.
         felder:
           form:
             typ: auswahl
@@ -406,6 +465,7 @@ categories:
             hinweis: "Löst die früheren Einzeltypen `gliederung` und `mindmap` ab (V2)"
       - key: feedback_text
         label_de: "Feedback-Text"
+        icon: MessageSquareQuote
         scope_defaults: {read_scope: private,  write_scope: private }
         valid_until_default: schuljahresende
         # Ruhend, bis es den Feedback-Flow gibt, der diese Knoten erzeugt.
@@ -414,15 +474,18 @@ categories:
   concept:
     label_de: "Konzept"
     color: "pu"
+    icon: Beaker
     content_types:
       - key: funktion
         label_de: "Funktion"
+        icon: Braces
         # Werkstatt-Wissen gehört der Fachschaft (NwT/Informatik), nicht der Verwaltung.
         scope_defaults: {read_scope: school,   write_scope: subject }
         embedding: true
         embedding_enrichment: ["metadata.signatur"]
       - key: bauteil
         label_de: "Bauteil"
+        icon: Cpu
         # Wie `funktion`: Fachschaftsgut.
         scope_defaults: {read_scope: school,   write_scope: subject }
         embedding: true
@@ -434,6 +497,7 @@ categories:
       # Einzelbegriff), `abstrakt` das Konzept im Werkstatt-Wissensgraphen.
       - key: begriff
         label_de: "Fachbegriff"
+        icon: BookMarked
         scope_defaults: {read_scope: school,   write_scope: subject }
         # Kernfall des Kriteriums: „sprachliche Bilder" soll die Metapher finden, ohne
         # dass man den Begriff schon kennt.
@@ -448,6 +512,8 @@ categories:
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
           # Biologie?" fragt man ohne das eigene Fach im Kopf.
           sidebar: true
+          # Der Kernfall von Nachschlagen im Unterricht.
+          schueler: true
           relationen:
             related_to:
               label: "steht in Beziehung zu"

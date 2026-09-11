@@ -9,6 +9,7 @@
     import LoadingBanner from '$lib/components/LoadingBanner.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import { ArrowLeft } from 'lucide-svelte'
+    import PageBody from '$lib/components/PageBody.svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -80,7 +81,7 @@
         .reduce((sum, curr) => sum + (curr?.length || 0), 0))
 </script>
 
-<div class="h-full overflow-y-auto p-6 max-w-6xl">
+<PageBody breit>
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>
@@ -159,4 +160,4 @@
                 </div>
             {/if}
         {/if}
-</div>
+</PageBody>

@@ -164,6 +164,47 @@ class Settings(BaseSettings):
     # Host-Header-Allowlist für TrustedHostMiddleware (Audit #18). Default `*` (aus, wie bisher);
     # in Produktion die echten Hostnamen setzen, z. B. ["ki.example.de"]. Defense-in-Depth
     # zusätzlich zum Reverse-Proxy.
+    # ── Mailversand (Krisen-Benachrichtigung, ADR-008) ────────────────────────
+    #
+    # **Standardmäßig aus.** Ohne `SMTP_HOST` wird nichts versendet, sondern geloggt —
+    # eine Entwicklungsumgebung braucht keine Konfiguration. Im Produktivsystem ist
+    # ein fehlender Wert dagegen ein Befund: Benachrichtigungen zu Krisenfällen
+    # verschwänden still. Die Startprüfung sagt es deshalb (`app/mail`).
+    #
+    # ⚠️ Die Empfänger stehen **hier**, nicht in der Datenbank: Die Plattform kennt
+    # keine E-Mail-Adressen. Nur Pseudonyme verlassen die Anmeldung; es gibt niemanden
+    # nachzuschlagen. Adressiert wird ein gemeinsames Postfach der Zuständigen.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    # Wer über neue Krisenfälle informiert wird. Liste, weil ein einzelnes Postfach
+    # in den Ferien niemanden erreicht (Entscheidung Jan, 10.09.2026).
+    crisis_notify_to: list[str] = []
+    # Wer über wartende **Einsicht-Anträge** informiert wird — die `review`-Personen,
+    # die zweitfreigeben.
+    #
+    # ⚠️ **Bewusst getrennt von `crisis_notify_to`, und ohne Rückfall darauf.** Das
+    # Vier-Augen-Prinzip (ADR-008 Teil 6) verlangt, dass beantragende und freigebende
+    # Person verschieden sind; ein gemeinsames Postfach für beide Rollen hebelte das
+    # aus, ohne dass es jemandem auffiele. Wer beides in derselben Hand hat, trägt
+    # denselben Wert bewusst zweimal ein — das ist eine Entscheidung der Schule, kein
+    # stiller Vorgabewert. Bleibt die Liste leer, wird nicht versendet, sondern
+    # geloggt (`app/mail`), und `check_production.py` sagt es beim Start.
+    crisis_review_notify_to: list[str] = []
+    # ── Fristen des Krisenprozesses (ADR-008 Teil 7) ──────────────────────────
+    # Ab wann an einen unerledigten Fall erinnert wird — und danach höchstens
+    # wöchentlich erneut.
+    crisis_reminder_days: int = 7
+    # Wie lange ein Fall offen bleiben darf, bevor die Konversation wie jede andere
+    # gelöscht wird. 365 Tage: Kürzer träfe Ferien und Krankheit, länger widerspräche
+    # der Zusage, dass nichts unbegrenzt liegt (Entscheidung Jan, 10.09.2026).
+    crisis_max_open_days: int = 365
+    # Vorlauf der letzten Warnung vor dieser Grenze.
+    crisis_final_warning_days: int = 14
+
     allowed_hosts: list[str] = ["*"]
     # Vertrauenswürdige Reverse-Proxy-Adressen für die Audit-IP-Ableitung (Audit #13). Nur wenn
     # der direkte TCP-Peer hier gelistet ist, wird `X-Forwarded-For` ausgewertet — sonst spoofbar.

@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
     import { ArrowLeft, Check, Trash2, X } from "lucide-svelte";
     import { myTeachingGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
@@ -86,8 +87,7 @@
     });
 </script>
 
-<div class="h-full overflow-y-auto">
-    <div class="max-w-2xl p-6">
+<PageBody>
     <button
         onclick={() => history.back()}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
@@ -341,5 +341,5 @@
             Gruppen (ohne SSO-Verknüpfung) können gelöscht werden.
         </p>
     </section>
-    </div>
-</div>
+    
+</PageBody>

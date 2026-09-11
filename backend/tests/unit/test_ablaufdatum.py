@@ -53,6 +53,14 @@ class TestAbleitung:
             assert vorgeschlagenes_ablaufdatum("unterrichtsstunde") is None
 
     def test_heute_zaehlt_noch_nicht_als_zukunft(self):
+        """⚠️ Dieser Test kippte am 11.09.2026 um 01:26, ohne Codeänderung.
+
+        Er leitet „heute" lokal ab (`date.today()`), die Funktion tat es damals in
+        UTC — zwischen Mitternacht und 02:00 MESZ laufen die auseinander. Der
+        Befund war kein Testfehler: Ein Schuljahresende ist ein Datum im Kalender
+        der Schule. Die Funktion rechnet seitdem ebenfalls lokal, festgehalten von
+        `test_kalendertage_sind_lokal.py`.
+        """
         with _mit_schuljahresende(date.today()):
             assert vorgeschlagenes_ablaufdatum("unterrichtsstunde") is None
 

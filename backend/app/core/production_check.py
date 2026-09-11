@@ -166,6 +166,61 @@ def pruefe_produktion(
     if altlast:
         befunde.append(Befund(WARNING, altlast))
 
+    # ── Krisen-Benachrichtigung ──────────────────────────────────────────────
+    #
+    # Ohne diese Werte verschwindet jede Benachrichtigung zu einem Krisenfall still
+    # im Log. Das ist genau die Sorte Ausfall, die niemand bemerkt, bis sie zählt —
+    # deshalb steht sie hier und nicht nur in der Doku.
+    smtp_host = getattr(settings, "smtp_host", "")
+    smtp_from = getattr(settings, "smtp_from", "")
+    empfaenger = getattr(settings, "crisis_notify_to", []) or []
+
+    if not smtp_host or not smtp_from:
+        befunde.append(Befund(
+            ERROR,
+            "SMTP ist nicht vollständig konfiguriert (SMTP_HOST/SMTP_FROM). "
+            "Benachrichtigungen zu Krisenfällen werden dann nur ins Log geschrieben "
+            "— gesehen hat sie damit niemand.",
+        ))
+    elif not empfaenger:
+        befunde.append(Befund(
+            ERROR,
+            "CRISIS_NOTIFY_TO ist leer. Der Versand ist eingerichtet, aber es gibt "
+            "niemanden, an den er ginge.",
+        ))
+    elif len(empfaenger) == 1:
+        befunde.append(Befund(
+            WARNING,
+            "CRISIS_NOTIFY_TO nennt nur eine Adresse. Ein einzelnes Postfach "
+            "erreicht in den Ferien oder bei Krankheit niemanden.",
+        ))
+
+    # ── Zweitfreigabe: eigene Empfänger, eigener Befund ──────────────────────
+    #
+    # Ein wartender Einsicht-Antrag blockiert die Bearbeitung eines Krisenfalls. Ohne
+    # diesen Wert erfahren die `review`-Personen davon nur über den Zähler in der
+    # Oberfläche — den sieht, wer sich anmeldet.
+    review_empfaenger = getattr(settings, "crisis_review_notify_to", []) or []
+
+    if smtp_host and smtp_from and not review_empfaenger:
+        befunde.append(Befund(
+            ERROR,
+            "CRISIS_REVIEW_NOTIFY_TO ist leer. Wartende Einsicht-Anträge lösen dann "
+            "keine Mail an die review-Personen aus; ein Antrag kann unbemerkt liegen "
+            "bleiben und blockiert solange den Fall.",
+        ))
+    elif review_empfaenger and set(review_empfaenger) == set(empfaenger):
+        # Kein Fehler — es kann eine bewusste Entscheidung sein. Aber eine, die man
+        # getroffen haben sollte: Beantragen und Freigeben sind das Vier-Augen-Prinzip
+        # (ADR-008 Teil 6), und ein gemeinsames Postfach macht daraus zwei Klicks
+        # derselben Person.
+        befunde.append(Befund(
+            WARNING,
+            "CRISIS_REVIEW_NOTIFY_TO und CRISIS_NOTIFY_TO nennen dieselben Adressen. "
+            "Antrag und Zweitfreigabe landen damit im selben Postfach — technisch "
+            "erlaubt, aber das Vier-Augen-Prinzip lebt von der Trennung.",
+        ))
+
     return befunde
 
 

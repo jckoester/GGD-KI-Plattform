@@ -6,7 +6,7 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean
+from sqlalchemy import Numeric, Boolean, BigInteger
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -358,6 +358,15 @@ class Message(Base):
     )
     # cost/token fields - nullable, only for assistant
     cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6), nullable=True)
+    # Wie belastbar `cost_usd` ist: `ausstehend` (wird im Hintergrund nachgetragen),
+    # `vollstaendig` (alle Anfragen des Zuges abgerechnet), `unvollstaendig`
+    # (Teilsumme — mindestens ein SpendLog blieb aus).
+    #
+    # `NULL` heißt **keine Aussage**, nicht „vollständig": So stehen alle Zeilen von
+    # vor Migration 0058 da, und unter deren Beträgen sind Teilsummen, die niemand
+    # mehr auseinanderhalten kann. Ebenso jede User-Nachricht, die gar keine Kosten
+    # trägt.
+    cost_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tokens_input: Mapped[Optional[int]] = mapped_column(nullable=True)
     tokens_output: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -368,6 +377,11 @@ class Message(Base):
         CheckConstraint(
             "role IN ('user', 'assistant')",
             name="check_message_role"
+        ),
+        CheckConstraint(
+            "cost_status IS NULL OR cost_status IN "
+            "('ausstehend', 'vollstaendig', 'unvollstaendig')",
+            name="check_messages_cost_status",
         ),
         Index("idx_messages_conversation_id", "conversation_id"),
         Index("idx_messages_assistant_id", "assistant_id"),
@@ -516,6 +530,13 @@ class ConversationFlag(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    # Wann zuletzt an diesen offenen Fall erinnert wurde (Migration 0059).
+    # `NULL` = noch nie. Zwei Aufgaben: den täglichen Lauf davon abhalten, täglich
+    # dieselbe Liste zu schicken — und die Obergrenze davon abhängig machen, dass
+    # überhaupt gewarnt wurde. Ungefragt zu löschen wäre der schlechtere Ausfall.
+    last_reminder_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -578,6 +599,14 @@ class ConversationAccessRequest(Base):
         Text, nullable=False, default="pending", server_default=text("'pending'")
     )
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Wann zuletzt an diesen wartenden Antrag erinnert wurde (Migration 0060).
+    # `NULL` = noch nie. Eigene Spalte trotz `flag_id`, weil die beiden Erinnerungen
+    # an verschiedene Postfächer gehen: die des Flags an die Krisen-Zuständigen, diese
+    # an die `review`-Personen. Steuert **nur** den Rhythmus, keine Löschfrist — ein
+    # Antrag verfällt per Cascade mit seinem Flag.
+    last_reminder_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -930,6 +959,45 @@ def _ablaufdatum_vorbelegen(mapper, connection, target: ContextNode) -> None:
     from app.context.ablauf import vorgeschlagenes_ablaufdatum
 
     target.valid_until = vorgeschlagenes_ablaufdatum(target.content_type)
+
+
+class NodeAlias(Base):
+    """Weitere Namen eines Bausteins — „Think-Pair-Share" neben „Ich-Du-Wir".
+
+    **Warum eine Tabelle und nicht `metadata.aliase`.** Bis 09/2026 lagen Aliase als
+    JSON-Liste in den Metadaten. Das trug für die zwei Typen, die sie pflegen
+    (`methode`, `sozialform`), reichte aber nur fürs Embedding: Die Namenssuche sah sie
+    nie. Ein Alias soll sich verhalten wie ein zweiter Titel — exakter Treffer **und**
+    Ähnlichkeit —, und die Ähnlichkeitsstufe hängt am Trigramm-Index. Der greift nur auf
+    einer Textspalte; über Elemente eines JSON-Arrays gibt es ihn nicht.
+
+    ⚠️ **Die Reihenfolge trägt Bedeutung.** Für `methode` und `operator` gehen die Aliase
+    in den Embedding-Input ein. Ändert sich ihre Reihenfolge, ändert sich der Eingabetext
+    und damit der Vektor — bestehende Embeddings wären nicht mehr vergleichbar, ohne dass
+    es jemandem auffiele. Deshalb ein aufsteigender `id` statt einer UUID: Er hält die
+    Einfügereihenfolge fest, und danach wird gelesen.
+
+    Die drei Indizes liegen auf **demselben** normalisierten Ausdruck wie bei den Titeln
+    (`titel_normalisiert_sql`, Migrationen 0053/0054). Weicht die Abfrage davon ab,
+    benutzt PostgreSQL sie stillschweigend nicht.
+    """
+
+    __tablename__ = "node_aliases"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=False
+    )
+    # Wie eingegeben — die Anzeige zeigt den Alias so, wie ihn jemand geschrieben hat.
+    # Verglichen wird über den normalisierten Ausdruck, nicht über diese Spalte.
+    alias: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_node_aliases_node", "node_id"),
+    )
 
 
 # 13. context_edges

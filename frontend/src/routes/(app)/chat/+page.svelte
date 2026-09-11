@@ -1,4 +1,5 @@
 <script>
+    import { onDestroy, onMount } from "svelte";
     import {
         Send,
         Loader2,
@@ -30,6 +31,7 @@
         streamChat,
         ApiError,
         getConversationMessages,
+        getConversationCosts,
         getModels,
         uploadFile,
         getAssistants,
@@ -234,6 +236,51 @@
 
     let textAreaRows = $state(1);
 
+    // ── Kosten nachschlagen ───────────────────────────────────────────────────
+    //
+    // Der Chat wartet beim Streamende nicht mehr auf die SpendLogs (sie kamen mit
+    // bis zu 15 s Verzögerung und hielten die Verbindung offen). Der Betrag wird
+    // im Hintergrund nachgetragen; hier wird er zweimal abgeholt.
+    //
+    // **Zweimal, nicht dauernd.** Der Betrag ist eine Randnotiz unter der Blase,
+    // keine Auskunft, auf die jemand wartet. Was nach dem zweiten Versuch noch
+    // fehlt, steht beim nächsten Öffnen der Konversation da.
+    const NACHSCHLAG_MS = [3000, 10000];
+    let nachschlagTimer = [];
+
+    function kostenNachschlagen(convId) {
+        if (!convId) return;
+        nachschlagTimer.forEach(clearTimeout);
+        nachschlagTimer = NACHSCHLAG_MS.map((verzoegerung) =>
+            setTimeout(() => holeKosten(convId), verzoegerung),
+        );
+    }
+
+    async function holeKosten(convId) {
+        // Zwischenzeitlicher Konversationswechsel: Die Antwort gehört dann zu
+        // einer anderen Seite und darf die aktuelle nicht überschreiben.
+        if (convId !== conversationId) return;
+        try {
+            const daten = await getConversationCosts(convId);
+            const nach = new Map(daten.messages.map((m) => [m.id, m]));
+            messages = messages.map((m) =>
+                m.id && nach.has(m.id)
+                    ? {
+                          ...m,
+                          cost_usd: nach.get(m.id).cost_usd,
+                          cost_status: nach.get(m.id).cost_status,
+                      }
+                    : m,
+            );
+            totalCostUsd = daten.total_cost_usd ?? totalCostUsd;
+        } catch {
+            // Stumm: Der Chat ist fertig, und eine fehlende Randnotiz ist kein
+            // Grund, ihn nachträglich mit einer Fehlermeldung zu stören.
+        }
+    }
+
+    onDestroy(() => nachschlagTimer.forEach(clearTimeout));
+
     // Hilfsfunktion zur Kostenformatierung
     function formatCostEur(costUsd, rate) {
         if (costUsd == null || !rate) return null;
@@ -258,8 +305,6 @@
     }
 
     import { updateConversationTitle } from "$lib/stores/conversations.js";
-    import { onDestroy, onMount } from "svelte";
-
     async function loadModels() {
         modelsLoading = true;
         modelsError = null;
@@ -642,13 +687,23 @@
                     }
                     continue;
                 }
-                // Krisen-Hilfe-Banner (ADR-008): an die Assistenten-Nachricht heften
+                // Krisen-Hilfe-Banner (ADR-008): an die **auslösende** Nachricht
+                // heften, nicht an die Antwort.
+                //
+                // Zwei Gründe. Erstens Sichtbarkeit: Eine lange Modellantwort schob
+                // das Banner unter den Rand, man musste erst scrollen. Zweitens
+                // Übereinstimmung: Beim Neuladen baut das Backend es aus dem Flag
+                // wieder auf, und das zeigt auf die Nutzer-Nachricht. Hinge es live
+                // woanders, sprängen die Banner beim Neuladen um.
                 if (item.type === "crisis") {
-                    messages[assistantIndex] = {
-                        ...messages[assistantIndex],
-                        crisis: item.crisis,
-                    };
-                    messages = messages;
+                    const ausloeser = assistantIndex - 1;
+                    if (ausloeser >= 0 && messages[ausloeser]?.role === "user") {
+                        messages[ausloeser] = {
+                            ...messages[ausloeser],
+                            crisis: item.crisis,
+                        };
+                        messages = messages;
+                    }
                     continue;
                 }
                 // Generiertes Bild (Phase 16): Referenz an die Assistenten-Nachricht heften
@@ -659,8 +714,13 @@
                     messages[assistantIndex] = {
                         ...messages[assistantIndex],
                         id: item.message_id,
+                        // Der Betrag steht beim Streamende nicht fest — er wird
+                        // im Hintergrund nachgetragen. Ohne diesen Zustand sähe
+                        // die Blase aus, als hätte die Antwort nichts gekostet.
+                        cost_status: "ausstehend",
                     };
                     messages = messages;
+                    kostenNachschlagen(conversationId);
                     continue;
                 }
                 if (item.type === "image") {
@@ -693,12 +753,13 @@
                 return;
             }
 
-            // Leeren Assistent-Placeholder entfernen, falls kein Token ankam
-            // (aber behalten, wenn ein Krisen-Hilfe-Banner daran hängt)
-            if (
-                messages[assistantIndex]?.content === "" &&
-                !messages[assistantIndex]?.crisis
-            ) {
+            // Leeren Assistent-Platzhalter entfernen, falls kein Token ankam.
+            //
+            // Die frühere Ausnahme („behalten, wenn ein Krisen-Banner daran hängt")
+            // ist entfallen: Das Banner hängt seit 09/2026 an der auslösenden
+            // Nutzer-Nachricht, nicht an der Antwort. Sie stehen zu lassen hieße,
+            // eine leere Blase gegen ein Banner zu verteidigen, das woanders sitzt.
+            if (messages[assistantIndex]?.content === "") {
                 messages = [
                     ...messages.slice(0, assistantIndex),
                     ...messages.slice(assistantIndex + 1),
@@ -960,9 +1021,12 @@
                 const data = await getConversationMessages(id);
                 // Map messages mit model, assistantId, assistantName
                 const rawMessages = data.messages.map((m) => ({
+                    id: m.id ?? null,
                     role: m.role,
                     content: m.content,
                     cost_usd: m.cost_usd ?? null,
+                    cost_status: m.cost_status ?? null,
+                    crisis: m.crisis ?? null,
                     uploadedAttachments: m.attachments?.length
                         ? m.attachments.map((a) => ({
                               filename: a.name,
@@ -1178,6 +1242,8 @@
                             ? messages[i - 1].content
                             : null}
                         isStreaming={isStreaming && i === messages.length - 1}
+                        kostenSichtbar={granularity === "message" ||
+                            granularity === "both"}
                         costEur={granularity === "message" ||
                         granularity === "both"
                             ? formatCostEur(

@@ -23,21 +23,19 @@ _CLEANUP = Path(__file__).resolve().parents[2] / "app" / "crons" / "cleanup_serv
 
 # Tabellen, die die Kontolöschung bewusst **nicht** anfasst.
 #
-# ⚠️ Diese Liste ist eine Bestandsaufnahme, keine Freigabe. Die mit „OFFEN" markierten
-# Einträge sind ungeklärte Altfälle aus früheren Phasen — sie stehen hier, damit sie
-# sichtbar sind, nicht weil sie entschieden wären.
+# ⚠️ Diese Liste ist eine Bestandsaufnahme, keine Freigabe.
+#
+# Seit dem 08.09.2026 steht hier **kein „OFFEN" mehr** — die vier Altfälle aus früheren
+# Phasen sind entschieden und werden gelöscht: `context_nodes` (nach `read_scope`
+# getrennt, 07.09.), `artifacts`, `node_engagement`, `group_memberships` und
+# `teacher_group_exclusions` (alle 08.09.). Damit ist Kriterium 3 der 1.0-Roadmap
+# erfüllt. Wer hier einen neuen Eintrag ergänzt, begründet ihn — „später" ist keine
+# Begründung, sondern der Zustand, aus dem dieser Test herausführen sollte.
 _AUSGENOMMEN = {
     # Cascade über conversations.id (ondelete="CASCADE") — geht mit den Konversationen.
     "generated_images": "Cascade über conversations",
     # Kein Personenmerkmal des Kontos, sondern Bearbeitungsspur an einem geteilten Objekt.
     "assistants": "updated_by_pseudonym ist Bearbeitungsspur, nicht Kontodatum",
-    # Eigene Aufbewahrungsfrist (expires_at) — Artefakte verfallen ohnehin.
-    "artifacts": "eigene Frist über expires_at",
-    # OFFEN — Altfälle, in dieser Phase nicht entschieden:
-    "context_nodes": "OFFEN: persönliche Wissensknoten überleben das Konto",
-    "node_engagement": "OFFEN: Lernzustand überlebt das Konto",
-    "group_memberships": "OFFEN: Mitgliedschaft wird beim Login synchronisiert, nicht gelöscht",
-    "teacher_group_exclusions": "OFFEN: Ausblendungen überleben das Konto",
 }
 
 
@@ -101,6 +99,29 @@ def test_stundenplan_kuerzel_und_abrufstatus_werden_geloescht():
     geloescht = _geloeschte_modelle()
     assert "UserPreference" in geloescht      # trägt das Kürzel
     assert "CalendarSyncStatus" in geloescht  # trägt den Abrufstatus
+
+
+def test_die_vier_entschiedenen_altfaelle_werden_geloescht():
+    """08.09.2026 — namentlich festgehalten, damit die Entscheidung nicht still zurückfällt.
+
+    Die allgemeine Prüfung oben ließe sich durch einen Eintrag in `_AUSGENOMMEN`
+    stilllegen; diese hier nicht. Jede Zeile stand vorher als „OFFEN" in der
+    Ausnahmeliste bzw. — bei `artifacts` — als Beschreibung des Status quo.
+    """
+    geloescht = _geloeschte_modelle()
+    assert "Artifact" in geloescht               # Bibliothek ist strikt privat
+    assert "NodeEngagement" in geloescht         # Lernzustand je Person
+    assert "GroupMembership" in geloescht        # sonst bleiben Ehemalige Mitglied
+    assert "TeacherGroupExclusion" in geloescht  # persönliche Ansichtseinstellung
+
+
+def test_keine_offenen_faelle_mehr():
+    """1.0-Kriterium 3 der Roadmap: Der Wächtertest kennt kein `OFFEN` mehr."""
+    offen = {t: g for t, g in _AUSGENOMMEN.items() if "OFFEN" in g}
+    assert not offen, (
+        f"Wieder ungeklärte Ausnahmen: {sorted(offen)}. Kriterium 3 der 1.0-Roadmap "
+        "verlangt für jede Tabelle mit Pseudonym-Spalte eine getroffene Entscheidung."
+    )
 
 
 def test_ausnahmeliste_bleibt_aktuell():

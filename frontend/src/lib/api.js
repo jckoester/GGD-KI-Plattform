@@ -1372,6 +1372,33 @@ export async function getContextNodes(params = {}) {
   return res.json()
 }
 
+/**
+ * „Meine Bausteine": eigener Bestand, nach Fach gruppiert, mit Zählwerten.
+ *
+ * Rollenoffen — anders als `getContextNodes`, das Schüler:innen mit 403 abweist.
+ */
+export async function getMeineBausteine(params = {}) {
+  const p = new URLSearchParams()
+  if (params.content_type) p.set('content_type', params.content_type)
+  if (params.nur_aufmerksamkeit) p.set('nur_aufmerksamkeit', 'true')
+  const res = await fetch(`${BASE}/context/nodes/mine?${p}`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der eigenen Bausteine')
+  }
+  return res.json()
+}
+
+/** Nur die Zählwerte — für den Sidebar-Zähler auf jeder Seite. */
+export async function getMeineBausteineZaehlung() {
+  const res = await fetch(`${BASE}/context/nodes/mine/zaehlung`, { credentials: 'include' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Fehler beim Laden der Zählung')
+  }
+  return res.json()
+}
+
 export async function getActiveBpVersion(subjectId, grade) {
   // Aktive BP-Edition für (Fach, Stufe, Schuljahr) — für editionsbewusste Filter
   // (z. B. IK-Autocomplete). Fail-soft: bei Fehler kein Filter (bp_version null).
@@ -1463,6 +1490,35 @@ export async function updateNodeTitle(nodeId, title) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new ApiError(res.status, data.detail ?? 'Titel konnte nicht gespeichert werden')
+  }
+  return res.json()
+}
+
+/**
+ * Umbenennen, archivieren, Ablaufdatum setzen — die Aktionen aus „Meine Bausteine".
+ *
+ * Bewusst **nicht** `updateContextNode`: Der generische Weg ändert auch Scopes,
+ * Inhalt und Metadaten und bleibt Lehrkräften vorbehalten. Dieser Endpunkt steht
+ * allen Rollen offen, weil Selbstverwaltung ein Betroffenenrecht ist — und trägt
+ * deshalb einen schmalen Vertrag.
+ *
+ * `valid_until` braucht das Begleitflag: Ohne es wäre „auf null setzen"
+ * (= gilt dauerhaft) nicht von „Feld weggelassen" zu unterscheiden.
+ *
+ * @param {string} nodeId
+ * @param {{title?: string, status?: 'active'|'archived', valid_until?: string|null,
+ *          valid_until_gesetzt?: boolean}} aenderung
+ */
+export async function verwalteBaustein(nodeId, aenderung) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/verwalten`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(aenderung),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.detail ?? 'Die Änderung ist fehlgeschlagen')
   }
   return res.json()
 }
@@ -1768,11 +1824,40 @@ export async function exportCurriculum(curriculumId, filename, format = 'yaml') 
     URL.revokeObjectURL(url)
 }
 
+// ── Archiv: frühere Unterrichtsgruppen ────────────────────────────────────────
+
+// Gruppen, in denen ich Eigenes habe, ohne noch Mitglied zu sein. Anker ist der
+// Inhalt, nicht die Mitgliedschaft — die ist mit dem Schuljahreswechsel weg.
+export async function getFormerGroups(subjectId = null) {
+    const query = subjectId != null ? `?subject_id=${subjectId}` : ''
+    const res = await fetch(`${BASE}/archive/groups${query}`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Archiv konnte nicht geladen werden')
+    return res.json()
+}
+
+// Die nachgetragenen Kosten einer Konversation. Der Chat wartet beim Streamende
+// nicht mehr auf die SpendLogs — der Betrag kommt per Hintergrundaufgabe und wird
+// hiermit abgeholt. Bewusst schlank: Diese Abfrage läuft nach jeder Antwort.
+export async function getConversationCosts(conversationId) {
+    const res = await fetch(`${BASE}/conversations/${conversationId}/costs`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Kosten konnten nicht geladen werden')
+    return res.json()
+}
+
 // ── Unterrichtsplanung ────────────────────────────────────────────────────────
 
 export async function getPlanningOverview(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/overview`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsübersicht konnte nicht geladen werden')
+    return res.json()
+}
+
+// Wo die Gruppe gerade steht — laufende/nächste Einheit, letzte und nächste Stunden.
+// Eigener, schlanker Endpunkt: `overview` lädt für dieselbe Auskunft zusätzlich
+// Wochenmuster, alle Einheiten, die Bilanz und den ganzen Schuljahreskalender.
+export async function getPlanningJetzt(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/jetzt`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Planungsstand konnte nicht geladen werden')
     return res.json()
 }
 
@@ -2005,8 +2090,16 @@ export async function saveDiagramToLibrary(kind, source, { svg = null, title = n
 }
 
 // Die eigene Bibliothek laden: { items: [...], used_bytes, quota_bytes }.
-export async function getLibrary() {
-    const res = await fetch(`${BASE}/artifacts`, { credentials: 'include' })
+// Die eigene Bibliothek. `groupId`/`subjectId` verengen auf den Unterrichtsbezug —
+// hergeleitet über den Chat, in dem das Artefakt entstand. `usedBytes`/`quotaBytes`
+// in der Antwort beziehen sich immer auf die **ganze** Bibliothek, nie auf den Auszug.
+export async function getLibrary({ groupId = null, subjectId = null, limit = null } = {}) {
+    const params = new URLSearchParams()
+    if (groupId != null) params.set('group_id', String(groupId))
+    if (subjectId != null) params.set('subject_id', String(subjectId))
+    if (limit != null) params.set('limit', String(limit))
+    const query = params.toString()
+    const res = await fetch(`${BASE}/artifacts${query ? `?${query}` : ''}`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bibliothek konnte nicht geladen werden')
     return res.json()
 }
@@ -2018,6 +2111,29 @@ export async function deleteArtifact(artifactId) {
         credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Löschen fehlgeschlagen')
+    return res.json()
+}
+
+// ── Übernahme in den Wissensgraphen (AP8) ──────────────────────────────────────
+
+// Vorbelegung des Übernahme-Formulars: welche Bausteinarten diese Rolle wählen darf,
+// ob die Sichtbarkeit festliegt, und ob es den Baustein schon gibt.
+export async function getBausteinVorschlag(artifactId) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/baustein`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Vorschlag konnte nicht geladen werden')
+    return res.json()
+}
+
+// „Als Baustein speichern". Gibt es den Baustein schon und hat sich etwas geändert,
+// entsteht eine neue Fassung; der alte wandert ins Archiv (`ersetzt_node_id`).
+export async function bausteinAusArtefakt(artifactId, payload) {
+    const res = await fetch(`${BASE}/artifacts/${artifactId}/baustein`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Übernahme fehlgeschlagen')
     return res.json()
 }
 

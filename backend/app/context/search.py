@@ -33,8 +33,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy import or_, select
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.aliase import ALIAS_NORMALISIERT
 from app.context.editions import aktive_bp_version
 from app.context.embedding import generate_embedding
 from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
@@ -43,7 +45,7 @@ from app.context.lookup import nachschlage_begriff, normalisiere_titel
 from app.context.schemas import anzeige_felder
 from app.context.taxonomy import rollen_typ_bonus
 from app.context.visibility import read_scope_clause
-from app.db.models import ContextEdge, ContextNode, Subject
+from app.db.models import ContextEdge, ContextNode, NodeAlias, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -186,9 +188,78 @@ def _treffer(row, *, mit_metadaten: bool = False) -> dict:
         "fach": row["fach"],
         **anzeige_felder(row),
     }
+    # Nur wenn vorhanden: Für die allermeisten Knoten wäre `"aliase": []` an jedem
+    # Treffer Rauschen im Modellkontext, das nichts aussagt.
+    if row["aliase"]:
+        treffer["aliase"] = list(row["aliase"])
     if mit_metadaten:
         treffer["metadata"] = row["metadata"] or {}
     return treffer
+
+
+# Die weiteren Namen eines Treffers, in Einfügereihenfolge (Migration 0057).
+#
+# Als korrelierte Unterabfrage statt als Join: Ein Join vervielfachte die Zeilen und
+# machte `count() over()` — die Gesamtzahl, die die Existenzaussage trägt — falsch.
+_ALIASE = (
+    sa.select(
+        sa.func.coalesce(
+            sa.func.array_agg(aggregate_order_by(NodeAlias.alias, NodeAlias.id)),
+            sa.text("'{}'::text[]"),
+        )
+    )
+    .where(NodeAlias.node_id == ContextNode.id)
+    .scalar_subquery()
+    .label("aliase")
+)
+
+
+def _namens_bedingung(titel_bedingung, alias_ids: set[UUID]):
+    """Titeltreffer — und, falls es welche gibt, die vorab gefundenen Aliastreffer.
+
+    Ohne Aliastreffer bleibt die Bedingung **zeichengleich** zu der von vorher. Das ist
+    kein Zufall, sondern die Bedingung dafür, dass der Planer weiter den Ausdrucksindex
+    wählt: Ein leeres ``IN ()`` als zweiter OR-Zweig genügte ihm schon, um umzuschwenken.
+    """
+    if not alias_ids:
+        return titel_bedingung
+    return or_(titel_bedingung, ContextNode.id.in_(alias_ids))
+
+
+async def knoten_mit_alias(db: AsyncSession, bedingung) -> set[UUID]:
+    """Welche Knoten haben einen Alias, auf den ``bedingung`` passt?
+
+    ⚠️ **Eine eigene Abfrage, absichtlich — kein ``EXISTS`` in der Hauptabfrage.** Der
+    erste Entwurf hängte ein korreliertes ``EXISTS`` per ``OR`` an die Identifikation.
+    Das ist richtig und war trotzdem falsch: Ein ``OR`` über zwei Tabellen macht aus dem
+    Index-Scan auf dem Titelausdruck einen vollständigen Durchlauf. Der EXPLAIN-Test aus
+    AP-Kontextsuche hat es gefangen — sonst wäre es die stille Verlangsamung **jeder**
+    Suche geworden, vor der Migration 0053 ausdrücklich warnt.
+
+    So bleibt die Hauptabfrage unverändert, solange kein Alias trifft (der Normalfall):
+    Die zusätzliche Bedingung entfällt dann ganz. Die Vorabfrage selbst läuft über die
+    Indizes aus 0057 und liefert eine kurze Liste.
+    """
+    treffer = await db.execute(
+        sa.select(NodeAlias.node_id).where(bedingung).distinct()
+    )
+    return set(treffer.scalars().all())
+
+
+def alias_aehnlichkeit(roh: str):
+    """Die beste Trigramm-Ähnlichkeit unter den Aliasen — 0, wenn es keine gibt.
+
+    Nötig für die Sortierung: Ein Knoten, der **nur** über einen Alias trifft, hat eine
+    Titel-Ähnlichkeit nahe null und stünde sonst hinter jedem schwachen Titeltreffer.
+    Ein Alias soll sich aber verhalten wie ein zweiter Titel.
+    """
+    return sa.func.coalesce(
+        sa.select(sa.func.max(sa.func.similarity(sa.literal(roh), ALIAS_NORMALISIERT)))
+        .select_from(NodeAlias)
+        .where(NodeAlias.node_id == ContextNode.id)
+        .scalar_subquery(),
+        sa.cast(sa.literal(0.0), sa.Float),
+    )
 
 
 _SPALTEN = (
@@ -201,6 +272,7 @@ _SPALTEN = (
     ContextNode.bp_version,
     ContextNode.metadata_.label("metadata"),
     Subject.name.label("fach"),
+    _ALIASE,
 )
 
 
@@ -604,7 +676,9 @@ def _sortierung(profil: Suchprofil) -> list:
     return [*_vorrang(profil), Subject.name.nulls_last(), ContextNode.id]
 
 
-def identifikations_abfrage(begriffe: list[str] | str, profil: Suchprofil):
+def identifikations_abfrage(
+    begriffe: list[str] | str, profil: Suchprofil, *, alias_ids: set[UUID] = frozenset()
+):
     """Die Abfrage hinter dem **exakten** Namensabgleich — eigenständig, damit prüfbar.
 
     Der Integrationstest lässt sie von PostgreSQL erklären (``EXPLAIN``) und stellt so
@@ -618,13 +692,16 @@ def identifikations_abfrage(begriffe: list[str] | str, profil: Suchprofil):
         # Die Gesamtzahl **vor** dem Limit: Sonst wäre nicht zu sagen, ob die gelieferten
         # Namensträger alle sind. Genau diese Auskunft trägt die Existenzaussage.
         .add_columns(sa.func.count().over().label("gesamt"))
-        .where(_TITEL_NORMALISIERT.in_(begriffe))
+        .where(_namens_bedingung(_TITEL_NORMALISIERT.in_(begriffe), alias_ids))
         .order_by(*_sortierung(profil))
         .limit(profil.identifikation)
     )
 
 
-def teiltreffer_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
+def teiltreffer_abfrage(
+    roh: str, profil: Suchprofil, *, ausschluss: set[str],
+    alias_ids: set[UUID] = frozenset(),
+):
     """Die zweite Stufe: Titel, die dem Gesuchten **ähneln**.
 
     Nutzt den GIN-Trigramm-Index aus Migration 0054 über den ``%``-Operator. Die Schwelle
@@ -633,10 +710,15 @@ def teiltreffer_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
     """
     stmt = (
         _grundabfrage(profil)
-        .where(sa.literal(roh).op("%")(_TITEL_NORMALISIERT))
+        .where(_namens_bedingung(sa.literal(roh).op("%")(_TITEL_NORMALISIERT), alias_ids))
         .order_by(
             *_vorrang(profil),
-            sa.func.similarity(sa.literal(roh), _TITEL_NORMALISIERT).desc(),
+            # Der bessere der beiden Namen entscheidet. Ohne das `greatest` stünde ein
+            # reiner Aliastreffer hinter jedem schwachen Titeltreffer.
+            sa.func.greatest(
+                sa.func.similarity(sa.literal(roh), _TITEL_NORMALISIERT),
+                alias_aehnlichkeit(roh),
+            ).desc(),
             ContextNode.id,
         )
         .limit(profil.identifikation + len(ausschluss))
@@ -646,7 +728,10 @@ def teiltreffer_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
     return stmt
 
 
-def praefix_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
+def praefix_abfrage(
+    roh: str, profil: Suchprofil, *, ausschluss: set[str],
+    alias_ids: set[UUID] = frozenset(),
+):
     """Titel, die mit dem Getippten **anfangen** — für die Namensvervollständigung.
 
     ⚠️ **Warum die Trigramm-Stufe das nicht abdeckt.** Ihre Ähnlichkeit ist
@@ -665,9 +750,11 @@ def praefix_abfrage(roh: str, profil: Suchprofil, *, ausschluss: set[str]):
     """
     stmt = (
         _grundabfrage(profil)
-        .where(_TITEL_NORMALISIERT.like(sa.literal(roh + "%")))
+        .where(_namens_bedingung(_TITEL_NORMALISIERT.like(sa.literal(roh + "%")), alias_ids))
         .order_by(
             *_vorrang(profil),
+            # Bewusst weiter die **Titel**länge, auch bei einem Aliastreffer: Die
+            # Vervollständigung zeigt den Titel, und danach soll sie sortieren.
             sa.func.length(_TITEL_NORMALISIERT),
             ContextNode.id,
         )
@@ -726,8 +813,14 @@ async def identifikation(
     if not kandidaten:
         return Abschnitt(gesamt=0, vollstaendig=True)
 
+    # Aliastreffer vorab auflösen — je Stufe eine kurze, indexgestützte Abfrage.
+    # Warum nicht als EXISTS in der Hauptabfrage: siehe `knoten_mit_alias`.
+    alias_exakt = await knoten_mit_alias(db, ALIAS_NORMALISIERT.in_(kandidaten))
+
     zeilen = (
-        await db.execute(identifikations_abfrage(kandidaten, profil))
+        await db.execute(
+            identifikations_abfrage(kandidaten, profil, alias_ids=alias_exakt)
+        )
     ).mappings().all()
     gesamt = zeilen[0]["gesamt"] if zeilen else 0
     exakt = [_treffer(z) | {"treffer_art": "exakt"} for z in zeilen]
@@ -739,8 +832,11 @@ async def identifikation(
     weitere: list[dict] = []
 
     if praefix and rest > 0:
+        alias_praefix = await knoten_mit_alias(
+            db, ALIAS_NORMALISIERT.like(roh + "%")
+        )
         zeilen_p = (await db.execute(
-            praefix_abfrage(roh, profil, ausschluss=gesehen)
+            praefix_abfrage(roh, profil, ausschluss=gesehen, alias_ids=alias_praefix)
         )).mappings().all()
         neu = [_treffer(z) | {"treffer_art": "praefix"} for z in zeilen_p[:rest]]
         weitere += neu
@@ -748,9 +844,16 @@ async def identifikation(
         rest -= len(neu)
 
     if rest > 0:
+        # Die Schwelle **vor** der Alias-Vorabfrage: Auch dort entscheidet `%` über die
+        # Ähnlichkeit, und ohne gesetzte Schwelle gälte die Voreinstellung von 0,3.
         await _setze_schwelle(db)
+        alias_teil = await knoten_mit_alias(
+            db, sa.literal(roh).op("%")(ALIAS_NORMALISIERT)
+        )
         zeilen_t = (await db.execute(
-            teiltreffer_abfrage(roh, profil, ausschluss=gesehen)
+            teiltreffer_abfrage(
+                roh, profil, ausschluss=gesehen, alias_ids=alias_teil
+            )
         )).mappings().all()
         weitere += [
             _treffer(z) | {"treffer_art": "teilweise"} for z in zeilen_t[:rest]

@@ -1,10 +1,14 @@
 <script>
-    import { onMount } from 'svelte';
+    import PageBody from '$lib/components/PageBody.svelte'
     import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+    import { subjectMap } from '$lib/stores/subjects.js';
     import {
         Library, Download, FileDown, Copy, Check, Trash2, Loader2, FileText, FilePlus, FileEdit, Quote,
+        Share2,
     } from 'lucide-svelte';
     import { getLibrary, deleteArtifact, createDocument } from '$lib/api.js';
+    import UebernahmeDialog from '$lib/components/UebernahmeDialog.svelte';
     import { triggerDownload } from '$lib/download.js';
     import {
         kindLabel, mimeExt, codeExt, formatBytes, usagePercent,
@@ -23,14 +27,30 @@
     let confirmDeleteId = $state(null);
     let copiedId = $state(null);
     let busyId = $state(null);
+    // Das Artefakt, das gerade in den Wissensgraphen übernommen wird (AP8).
+    let uebernahmeItem = $state(null);
 
     let usage = $derived(usagePercent(usedBytes, quotaBytes));
+
+    // ── Fachfilter ────────────────────────────────────────────────────────────
+    // Einstieg von der Fach-/Gruppenseite: „alle Artefakte in Mathematik". Der
+    // Bezug kommt aus dem Chat, in dem das Artefakt entstand — ein Artefakt ohne
+    // Herkunfts-Chat erscheint deshalb nur in der vollen Liste. Das steht als
+    // Hinweis am gefilterten Zustand, sonst wirkt die Lücke wie ein Fehler.
+    const filterSubjectId = $derived.by(() => {
+        const roh = $page.url.searchParams.get('subject_id');
+        const zahl = roh == null ? NaN : Number(roh);
+        return Number.isInteger(zahl) ? zahl : null;
+    });
+    const filterFach = $derived(
+        filterSubjectId == null ? null : ($subjectMap[filterSubjectId] ?? null),
+    );
 
     async function load() {
         loading = true;
         error = null;
         try {
-            const data = await getLibrary();
+            const data = await getLibrary({ subjectId: filterSubjectId });
             items = data.items ?? [];
             usedBytes = data.used_bytes ?? 0;
             quotaBytes = data.quota_bytes ?? 0;
@@ -41,7 +61,12 @@
         }
     }
 
-    onMount(load);
+    // Kein `onMount`: Der Filter steht in der Adresszeile, und ein Wechsel
+    // zwischen „alle" und einem Fach ist eine Navigation ohne Neuaufbau der Seite.
+    $effect(() => {
+        filterSubjectId;
+        load();
+    });
 
     let creatingDoc = $state(false);
     async function newDocument() {
@@ -177,7 +202,7 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto p-6">
+<PageBody breit>
     <div class="max-w-5xl mx-auto">
         <div class="flex items-center justify-between gap-2 mb-2">
             <div class="flex items-center gap-2 text-light-tx dark:text-dark-tx">
@@ -195,10 +220,27 @@
                 <FilePlus class="w-4 h-4" /> Neues Dokument
             </button>
         </div>
-        <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
-            erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
-        </p>
+        {#if filterSubjectId != null}
+            <div class="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+                    Nur Artefakte aus Chats
+                    {#if filterFach}
+                        im Fach <span class="font-medium text-light-tx dark:text-dark-tx">{filterFach.name}</span>.
+                    {:else}
+                        eines Fachs.
+                    {/if}
+                    Was ohne Chat entstanden ist, steht nur in der vollen Liste.
+                </p>
+                <a href="/library" class="text-sm text-light-bl dark:text-dark-bl hover:underline">
+                    alle anzeigen
+                </a>
+            </div>
+        {:else}
+            <p class="mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                Deine gespeicherten Bilder, Diagramme und Dokumente. Sie bleiben unabhängig vom Chat
+                erhalten, bis du sie löschst oder die Aufbewahrungsfrist abläuft.
+            </p>
+        {/if}
 
         {#if !loading && quotaBytes > 0}
             <div class="mb-6">
@@ -228,11 +270,24 @@
             </div>
         {:else if items.length === 0}
             <div class="text-center py-12 text-light-tx-3 dark:text-dark-tx-3">
-                <p class="text-lg">Deine Bibliothek ist noch leer.</p>
-                <p class="text-sm mt-1">
-                    Speichere Bilder oder Diagramme aus dem Chat über
-                    „In Bibliothek speichern“.
-                </p>
+                {#if filterSubjectId != null}
+                    <!-- Nicht „deine Bibliothek ist leer" sagen, wenn nur der Auszug
+                         leer ist — das wäre eine falsche Auskunft über den Bestand. -->
+                    <p class="text-lg">
+                        Hier ist noch nichts{filterFach ? ` aus ${filterFach.name}` : ''}.
+                    </p>
+                    <p class="text-sm mt-1">
+                        <a href="/library" class="text-light-bl dark:text-dark-bl hover:underline">
+                            Alle Artefakte anzeigen
+                        </a>
+                    </p>
+                {:else}
+                    <p class="text-lg">Deine Bibliothek ist noch leer.</p>
+                    <p class="text-sm mt-1">
+                        Speichere Bilder oder Diagramme aus dem Chat über
+                        „In Bibliothek speichern“.
+                    </p>
+                {/if}
             </div>
         {:else}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -270,6 +325,25 @@
                             <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mt-0.5">
                                 Gespeichert {fmtDate(item.created_at)} · gültig bis {fmtDate(item.expires_at)}
                             </p>
+                            <!-- Die Verknüpfung in die Gegenrichtung (AP8): Von hier
+                                 aus sieht man, dass aus dem Artefakt schon ein Baustein
+                                 geworden ist — und kommt hin. Ohne das wäre die
+                                 Übernahme eine Einbahnstraße, und beim zweiten Mal
+                                 wüsste niemand, ob es sie schon gab. -->
+                            {#if item.baustein_id}
+                                <a
+                                    href="/knowledge/{item.baustein_id}"
+                                    title="Zum Baustein „{item.baustein_titel}“"
+                                    class="mt-1 inline-flex items-center gap-1 self-start max-w-full
+                                           text-xs px-1.5 py-0.5 rounded-full
+                                           border border-light-ui-3 dark:border-dark-ui-3
+                                           text-light-bl dark:text-dark-bl
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                >
+                                    <Share2 class="w-3 h-3 shrink-0" />
+                                    <span class="truncate">als Baustein übernommen →</span>
+                                </a>
+                            {/if}
                             <!-- Hier dauerhaft sichtbar, anders als im Chat: Die Bibliothek
                                  ist der Ort, an dem man nachsieht, was man zitieren muss. -->
                             {#if zitiername(item.provider_model)}
@@ -306,6 +380,21 @@
                                     >
                                         <FileEdit class="w-3.5 h-3.5" /> Bearbeiten
                                     </a>
+                                {/if}
+                                <!-- Ob das geht, sagt der Server (`uebernehmbar`) — sonst
+                                     zeigte der Knopf irgendwann etwas anderes an, als der
+                                     Endpunkt erlaubt. -->
+                                {#if item.uebernehmbar}
+                                    <button
+                                        type="button"
+                                        onclick={() => (uebernahmeItem = item)}
+                                        title="Als Baustein in den Wissensgraphen übernehmen"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded
+                                               text-light-tx-2 dark:text-dark-tx-2
+                                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+                                    >
+                                        <Share2 class="w-3.5 h-3.5" /> Als Baustein
+                                    </button>
                                 {/if}
                                 <button
                                     type="button"
@@ -416,4 +505,12 @@
             </div>
         {/if}
     </div>
-</div>
+</PageBody>
+
+{#if uebernahmeItem}
+    <UebernahmeDialog
+        artefakt={uebernahmeItem}
+        onclose={() => (uebernahmeItem = null)}
+        ongespeichert={load}
+    />
+{/if}

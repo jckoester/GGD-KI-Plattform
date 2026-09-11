@@ -18,12 +18,19 @@
 </script>
 
 {#if section.type === "student"}
-    <!-- Schüler-Zeile: Fachname, Anzahl, Link -->
+    <!-- Schüler-Zeile: Fachname, Anzahl, Link.
+         Das Ziel ist die **Unterrichtsgruppe**, nicht das Fach: Jeder Eintrag hier
+         *ist* eine Gruppe (`sidebarSubjectSections` bildet für Schüler:innen eine
+         Zeile je `teaching_group`). Der Umweg über `/subjects/<slug>` war zudem
+         mehrdeutig — zwei Gruppen desselben Fachs zeigten auf dieselbe Adresse. -->
+    {@const ziel = section.slug
+        ? `/subjects/${section.slug}/groups/${section.groupId}`
+        : "/history"}
     <a
-        href={section.slug ? `/subjects/${section.slug}` : "/history"}
+        href={ziel}
         class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors
                text-light-tx dark:text-dark-tx
-               {section.slug && $page.url.pathname.startsWith(`/subjects/${section.slug}`)
+               {section.slug && $page.url.pathname === ziel
                  ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium'
                  : 'hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
     >

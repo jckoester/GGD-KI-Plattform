@@ -20,6 +20,7 @@
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
+    import PageBody from '$lib/components/PageBody.svelte'
 
     let node = $state(null);
     let loadingNode = $state(true);
@@ -195,11 +196,11 @@
     }
 </script>
 
-<!-- Breite wie bei den Geschwisterseiten (Suche, Archiv): `max-w-2xl` war schmaler als
-     jede Liste und ließ die Seite gedrängt wirken. Der **Fließtext** bleibt trotzdem
-     schmal — dafür sorgt unten die Vorgabe des Typografie-Plugins (65 Zeichen), denn
-     eine Definition über die volle Breite zu lesen ist mühsamer, nicht leichter. -->
-<div class="h-full overflow-y-auto p-6 max-w-4xl">
+<!-- Schmales Muster (`PageBody`): eine Detailseite wird gelesen, nicht überflogen.
+     Der **Fließtext** darin bleibt noch schmaler — dafür sorgt unten die Vorgabe des
+     Typografie-Plugins (65 Zeichen); eine Definition über die volle Breite zu lesen
+     ist mühsamer, nicht leichter. -->
+<PageBody>
     <a
         href={backUrl}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2
@@ -563,4 +564,4 @@
             Knoten nicht gefunden.
         </p>
     {/if}
-</div>
+</PageBody>

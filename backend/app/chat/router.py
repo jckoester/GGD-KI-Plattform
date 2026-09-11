@@ -40,6 +40,10 @@ from app.chat.image_models import (
     get_bildart,
     standard_unter,
 )
+from app.chat import kosten_nachtrag
+from app.core.hintergrund import im_hintergrund
+from app.crisis.benachrichtigung import benachrichtige
+from app.crisis.config import help_topic_fuer_kategorie
 from app.chat.image_store import (
     collect_conversation_image_paths,
     get_image_record,
@@ -99,12 +103,20 @@ class MessageItem(BaseModel):
     content: str
     created_at: datetime
     cost_usd: Optional[float] = None
+    # Wie belastbar `cost_usd` ist — `ausstehend` | `vollstaendig` | `unvollstaendig`.
+    # `None` heißt keine Aussage (User-Nachrichten, Bestand vor Migration 0058).
+    # Ohne dieses Feld sähe ein noch nicht ermittelter Betrag aus wie „kostet nichts".
+    cost_status: Optional[str] = None
     attachments: list[AttachmentMeta] = []
     model: Optional[str] = None            # Aliasname (`chat-standard`)
     provider_model: Optional[str] = None   # Anbietermodell, zitierfähig
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     images: list[GeneratedImageRef] = []
+    # Hilfe-Ressourcen zu einem Krisenhinweis (ADR-008 Teil 3/4). Hängt an der
+    # **auslösenden** Nachricht — dorthin zeigt auch das Flag. Bis 09/2026 kam das
+    # Banner nur live über SSE und war nach dem Neuladen weg.
+    crisis: Optional[dict] = None
 
 
 class ConversationDetailResponse(BaseModel):
@@ -430,6 +442,17 @@ class Zugkosten:
     summe: float | None
     gefunden: int
     gesamt: int
+
+    @property
+    def zustand(self) -> str:
+        """Der Wert für ``messages.cost_status``.
+
+        `gefunden == gesamt` ist die einzige Lage, in der die Summe die ganze
+        Wahrheit ist. Alles darunter — auch „gar nichts gefunden" — ist
+        unvollständig; die Anzeige sagt das dann und behauptet keine Genauigkeit,
+        die es nicht gibt.
+        """
+        return "vollstaendig" if self.gefunden == self.gesamt else "unvollstaendig"
 
 
 async def _kosten_des_zuges(
@@ -917,8 +940,10 @@ async def _exec_get_operatoren(ctx: ToolContext) -> list[dict] | dict:
             "afb": ", ".join(afb) if isinstance(afb, list) else str(afb),
             "bedeutung": n.get("content") or "",
         }
-        if md.get("aliase"):
-            entry["synonyme"] = md["aliase"]
+        # Seit Migration 0057 stehen die Synonyme in `node_aliases` und kommen als
+        # eigenes Trefferfeld, nicht mehr aus den rohen Metadaten.
+        if n.get("aliase"):
+            entry["synonyme"] = n["aliase"]
         out.append(entry)
     return out
 
@@ -1405,6 +1430,7 @@ async def _persist(
     usage: dict,
     model_used: str,
     cost_usd: Optional[float] = None,
+    cost_status: Optional[str] = None,
     assistant_id: Optional[int] = None,
     conv_assistant_update: Optional[tuple[int, Optional[str]]] = None,
     skip_user_message: bool = False,
@@ -1436,6 +1462,7 @@ async def _persist(
         tokens_input=tokens_input,
         tokens_output=tokens_output,
         cost_usd=cost_usd,
+        cost_status=cost_status,
     )
     db.add(assistant_msg)
 
@@ -1527,6 +1554,15 @@ async def _record_crisis(
         "Krisen-Flag angelegt: kategorie=%s severity=%s pseudonym=%s conv=%s",
         hit.category, hit.severity, pseudonym, conversation_id,
     )
+
+    # Benachrichtigung im Hintergrund: Ein Mailserver darf einen Chat nicht
+    # aufhalten — und schon gar nicht diesen. Ob überhaupt versendet wird,
+    # entscheidet die Dämpfung in `app.crisis.benachrichtigung`.
+    im_hintergrund(
+        lambda: benachrichtige(AsyncSessionLocal),
+        was="Krisen-Benachrichtigung",
+    )
+
     return _CrisisRecord(hit=hit, show_banner=show_banner)
 
 
@@ -1913,6 +1949,9 @@ async def chat(
         # wenig.
         _request_ids: list[str] = []
         cost_usd: Optional[float] = None
+        # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
+        # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
+        cost_status: Optional[str] = None
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
         _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
 
@@ -2133,30 +2172,21 @@ async def chat(
                 except Exception:
                     logger.exception("Fehler beim Warten auf Titel-Task")
 
-            # -- Kosten aus SpendLogs holen (alle Anfragen dieses Zuges) --
-            if _request_ids:
-                litellm_client = LiteLLMClient()
-                try:
-                    kosten = await _kosten_des_zuges(
-                        litellm_client, _request_ids,
-                        wartezeiten=_SPEND_LOG_WARTEZEITEN,
-                    )
-                finally:
-                    await litellm_client.close()
-                cost_usd = kosten.summe
-                logger.info(
-                    "Kosten des Zuges: %d von %d Anfragen abgerechnet, Summe %s",
-                    kosten.gefunden, kosten.gesamt,
-                    "—" if kosten.summe is None else f"{kosten.summe:.6f}",
-                )
-
-            # Bild-Kosten (Phase 16, Schritt 7) zur Text-Summe addieren — dasselbe
-            # per-User-USD-Budget am Virtual Key (E5: kein separates Bild-Kontingent).
+            # -- Kosten: hier wird nicht mehr gewartet --
+            #
+            # Die SpendLogs kommen verzögert; bis 09/2026 hielt diese Stelle den
+            # Stream dafür bis zu 15 s offen, nachdem der Antworttext längst
+            # dastand. Jetzt trägt eine Aufgabe sie nach (`kosten_nachtrag`), und
+            # die Nachricht startet mit `cost_status = 'ausstehend'`.
+            #
+            # Bildkosten sind die Ausnahme: Sie stehen im Antwortkopf, sind also
+            # sofort und exakt bekannt und gehen gleich mit in die Nachricht.
             if _image_cost_total > 0:
-                cost_usd = (cost_usd or 0.0) + _image_cost_total
-
-            if cost_usd is not None:
-                yield f"event: cost\ndata: {json.dumps({'cost_usd': cost_usd})}\n\n"
+                cost_usd = _image_cost_total
+            if _request_ids:
+                cost_status = "ausstehend"
+            elif _image_cost_total > 0:
+                cost_status = "vollstaendig"
 
         finally:
             await response.aclose()
@@ -2170,11 +2200,25 @@ async def chat(
         # Erst speichern, dann `[DONE]`: Die Nachrichten-ID entsteht beim Schreiben, und
         # das Frontend braucht sie, um die Herkunft eines später gespeicherten Diagramms
         # belegen zu können. `[DONE]` heißt damit auch „alles ist abgelegt".
+        # Leere Antwort: Sie wird gespeichert wie jede andere — die Nachricht *ist*
+        # der wahrheitsgemäße Vermerk, dass eine Anfrage lief, Kosten anfielen und
+        # nichts zurückkam. Erfundener Ersatztext ginge später als Kontext ans
+        # Modell zurück. Sichtbar macht sie die Oberfläche (`istLeereAntwort`);
+        # zählbar wird sie hier, sonst bliebe die Häufigkeit unbekannt.
+        if not "".join(full_content) and not _generated_image_ids:
+            logger.warning(
+                "Leere Modellantwort: Konversation %s, Modell %s, %d Werkzeugrunden, "
+                "Kosten %s",
+                conversation_id, model_used, len(_request_ids),
+                "—" if cost_usd is None else f"{cost_usd:.6f}",
+            )
+
         _nachricht_id = None
         try:
             _nachricht_id = await _persist(
                 db, conversation_id, user_message, last_attachments,
                 "".join(full_content), usage, model_used, cost_usd=cost_usd,
+                cost_status=cost_status,
                 assistant_id=active_assistant_id,
                 conv_assistant_update=conv_assistant_update,
                 skip_user_message=crisis_record is not None,
@@ -2189,6 +2233,20 @@ async def chat(
                 "event: message\n"
                 f"data: {json.dumps({'message_id': str(_nachricht_id)})}\n\n"
             )
+
+            # Kosten nachtragen — **nach** dem Schreiben, weil die Aufgabe die
+            # Nachrichten-Id braucht, und **vor** `[DONE]` gestartet, damit sie
+            # sicher noch aus diesem Kontext heraus entsteht. Gewartet wird auf sie
+            # nicht: Das war der ganze Punkt.
+            if _request_ids:
+                kosten_nachtrag.nachtragen(
+                    AsyncSessionLocal,
+                    message_id=_nachricht_id,
+                    conversation_id=conversation_id,
+                    request_ids=list(_request_ids),
+                    wartezeiten=_SPEND_LOG_WARTEZEITEN,
+                )
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
@@ -2657,6 +2715,62 @@ async def get_conversation_counts(
     return ConversationCountsResponse(by_subject=by_subject, by_group=by_group)
 
 
+class KostenPosten(BaseModel):
+    id: UUID
+    cost_usd: Optional[float] = None
+    cost_status: Optional[str] = None
+
+
+class KostenAntwort(BaseModel):
+    """Nur die Kostenangaben einer Konversation — für den Nachschlag.
+
+    Eigener Endpunkt statt `…/messages`: Der liefert alle Nachrichteninhalte samt
+    Anhängen und Bildern. Für eine Zahl unter der Blase ist das die falsche
+    Größenordnung, und der Nachschlag läuft nach **jeder** Antwort.
+    """
+    messages: list[KostenPosten]
+    total_cost_usd: Optional[float] = None
+
+
+@router.get("/conversations/{conversation_id}/costs", response_model=KostenAntwort)
+async def get_conversation_costs(
+    conversation_id: UUID,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> KostenAntwort:
+    """Die nachgetragenen Kosten abholen (AP3).
+
+    Der Chat wartet seit 09/2026 nicht mehr auf die SpendLogs; der Betrag kommt per
+    Hintergrundaufgabe. Diese Abfrage holt ihn nach, ohne die Konversation neu zu
+    laden.
+    """
+    conv = (await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )).scalar_one_or_none()
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Konversation nicht gefunden")
+    if conv.pseudonym != current_user.sub:
+        raise HTTPException(status_code=403, detail="Zugriff verweigert")
+
+    zeilen = (await db.execute(
+        select(Message.id, Message.cost_usd, Message.cost_status)
+        .where(Message.conversation_id == conversation_id,
+               Message.role == "assistant")
+    )).all()
+
+    return KostenAntwort(
+        messages=[
+            KostenPosten(
+                id=z[0],
+                cost_usd=float(z[1]) if z[1] is not None else None,
+                cost_status=z[2],
+            )
+            for z in zeilen
+        ],
+        total_cost_usd=float(conv.total_cost_usd) if conv.total_cost_usd else None,
+    )
+
+
 @router.get("/conversations/{conversation_id}/messages")
 async def get_conversation_messages(
     conversation_id: UUID,
@@ -2688,6 +2802,42 @@ async def get_conversation_messages(
     # Generierte Bilder je Nachricht (Phase 16, Schritt 6: History-Rehydrierung).
     img_map = await list_message_images(db, conversation_id)
 
+    # Hilfe-Banner je Nachricht rekonstruieren (ADR-008 Teil 3/4).
+    #
+    # Es braucht dafür **keine** eigene Speicherung: Das Krisen-Flag zeigt mit
+    # `message_id` bereits auf die auslösende Nachricht. Gezeigt wird — wie live —
+    # nur der **erste** Treffer je Kategorie; die Flags kommen nach `flagged_at`
+    # sortiert, das erste gewinnt.
+    crisis_map: dict = {}
+    gesehene_kategorien: set[str] = set()
+    flag_rows = (await db.execute(
+        select(ConversationFlag)
+        .where(
+            ConversationFlag.conversation_id == conversation_id,
+            ConversationFlag.message_id.is_not(None),
+            ConversationFlag.flag_source == "auto_crisis",
+        )
+        .order_by(ConversationFlag.flagged_at.asc())
+    )).scalars().all()
+    for flag in flag_rows:
+        if flag.flag_category in gesehene_kategorien:
+            continue
+        gesehene_kategorien.add(flag.flag_category)
+        thema = help_topic_fuer_kategorie(flag.flag_category)
+        if thema is None:
+            # Die Kategorie steht nicht mehr in `crisis_triggers.yaml`. Kein Grund
+            # für einen Fehler — die Kuratierung darf Regeln streichen; der alte
+            # Fall bleibt geflaggt, nur ohne Kontaktliste.
+            #
+            # Die Prüfung unten (`payload is not None`) fängt denselben Ausgang noch
+            # einmal ab, meint aber etwas anderes: dort fehlt das *Thema* in
+            # `help_resources.yaml`. Zwei Konfigurationsdateien, zwei Lücken — dass
+            # beide hier zusammenlaufen, ist Zufall der Reihenfolge.
+            continue
+        payload = resolve_help_topic(thema)
+        if payload is not None:
+            crisis_map[flag.message_id] = payload
+
     messages_list = []
     for row in rows:
         msg = row.Message
@@ -2700,6 +2850,7 @@ async def get_conversation_messages(
                 "content": display_text,
                 "created_at": msg.created_at,
                 "cost_usd": None,
+                "crisis": crisis_map.get(msg.id),
                 "attachments": attachments,
                 "model": None,
                 "assistant_id": None,
@@ -2716,6 +2867,8 @@ async def get_conversation_messages(
                 "content": msg.content,
                 "created_at": msg.created_at,
                 "cost_usd": float(msg.cost_usd) if msg.cost_usd is not None else None,
+                "cost_status": msg.cost_status,
+                "crisis": crisis_map.get(msg.id),
                 "attachments": [],
                 "model": msg.model,
                 "provider_model": msg.provider_model,

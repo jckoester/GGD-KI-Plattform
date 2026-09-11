@@ -106,6 +106,49 @@ Taxonomie und lässt den Embedding-Backfill laufen.
 
 ---
 
+## Aliase — ein zweiter Titel, kein Metadatenfeld
+
+Seit Migration **0057** liegen weitere Namen in der Tabelle `node_aliases`, vorher als
+JSON-Liste in `metadata.aliase`. Der Umzug hat einen Grund und eine Falle.
+
+**Der Grund:** Als Metadatenfeld trugen Aliase nur das Embedding von `methode` und
+`operator`. Die **Namenssuche sah sie nie** — wer „Ich-Du-Wir" tippte, fand
+„Think-Pair-Share" nicht, obwohl der Alias gepflegt war. Ein Feld, das man pflegen kann
+und das nichts bewirkt.
+
+Jetzt greift ein Alias in **allen drei Namensstufen**: exakter Abgleich, Ähnlichkeit,
+Präfix-Vervollständigung. Verglichen wird über dieselbe Normalisierung wie bei Titeln —
+klein, ohne Gliederungsnummer, ein Leerraum. **Bindestriche werden nicht gefaltet:**
+„Think-Pair-Share" und „Think Pair Share" sind zwei Namen, genau wie bei Titeln. Diese
+Lücke schließt die Ähnlichkeitsstufe, nicht die Normalisierung; hätte sie eine eigene
+Regel, verhielten sich Aliase anders als Titel.
+
+⚠️ **Die Falle: kein `EXISTS` in der Hauptabfrage.** Der naheliegende Weg — ein
+korreliertes `EXISTS` per `OR` an die Identifikation — ist fachlich richtig und macht
+aus dem Index-Scan auf dem Titelausdruck einen vollständigen Durchlauf. Ein `OR` über
+zwei Tabellen kostet den Plan. Stattdessen löst `knoten_mit_alias()` die Treffer in einer
+eigenen, kurzen Abfrage auf, und die Hauptabfrage bekommt eine **ID-Liste**. Gibt es
+keine Aliastreffer — der Normalfall —, ist die Bedingung zeichengleich zu vorher.
+
+Das ist genau der stille Ausfall, vor dem der Abschnitt *Indexe* warnt; gefangen hat ihn
+der `EXPLAIN`-Test, nicht das Auge.
+
+**Sortierung:** In der Ähnlichkeitsstufe entscheidet `greatest(Titel-Ähnlichkeit, beste
+Alias-Ähnlichkeit)`. Ohne das stünde ein Knoten, der nur über seinen Alias trifft, hinter
+jedem schwachen Titeltreffer.
+
+**Reihenfolge ist Teil der Daten.** Bei `methode` und `operator` gehen die Aliase in den
+Embedding-Input ein (`embedding_input: [… "aliases" …]` bzw. der Operator-Sonderweg).
+Eine andere Reihenfolge ergäbe einen anderen Eingabetext und damit Vektoren, die mit den
+bestehenden nicht mehr vergleichbar sind. Deshalb hat `node_aliases` eine aufsteigende
+`id` statt einer UUID, und überall wird danach sortiert — nie alphabetisch. Aus demselben
+Grund verbindet die Quelle `aliases` mit `" | "` und nicht mit `", "`: So verband der
+alte Metadaten-Weg eine Liste.
+
+Gelesen und geschrieben wird ausschließlich über `app/context/aliase.py`.
+
+---
+
 ## Warum der `@`-Weg anders ist
 
 Der `@`-Shortcode im Chat ist **Namensvervollständigung**, nicht Suche: Man tippt einen
@@ -152,6 +195,157 @@ Die Auslöser-Regel steht im Frontend (`frontend/src/lib/mention.js`): Leerzeich
 erlaubt — Titel sind mehrwortig —, und das Dropdown schließt bei `esc`, bei der Auswahl
 und wenn nichts mehr trifft. Der letzte Fall ist Pflicht, nicht Kosmetik: Solange das
 Dropdown offen gilt, fängt der Chat die Eingabetaste ab.
+
+---
+
+## „Meine Bausteine" — was „eigen" heißt, und wer was darf
+
+`/knowledge/mine` (Abfrageschicht: `app/context/meine_bausteine.py`) ist die einzige
+Wissensgraph-Fläche, die **allen Rollen** offensteht. Zwei Entscheidungen dahinter sind
+nicht offensichtlich.
+
+### Der Bestand: Pseudonym **und** Typ
+
+Gefiltert wird nicht nur nach `owner_pseudonym`. Das Pseudonym steht auch auf Dingen,
+die niemandem einzeln gehören — ein Curriculum beschließt die Fachschaft gemeinsam, das
+Änderungsrecht liegt bei `write_scope = subject`; das Pseudonym daran ist
+**Urheberschaft, nicht Eigentum**. Solche Knoten auf einer persönlichen Seite zu führen
+(und dort zur Aufmerksamkeit zu mahnen) legte eine Zuständigkeit nahe, die es nicht gibt.
+
+Die Typmenge dafür ist **abgeleitet, nicht gepflegt**:
+`PERSOENLICHE_CONTENT_TYPES` in `taxonomy.py` ist genau die Menge mit
+`scope_defaults.write_scope == "private"` — 16 von 41 Typen, deckungsgleich mit
+Lehrkraft-Material, Lehrkraft-Planung und Schüler-Artefakten.
+
+⚠️ **Der Vorgabewert des Typs, nicht der Scope des Knotens.** Letzterer ist eine
+Nutzerentscheidung — das Anlegeformular bietet `private`/`group`/`subject` zur Wahl — und
+beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding ist das". Wer
+sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der eigenen Seite; ein
+privat gesetzter Fachbegriff erschiene dort fälschlich.
+
+### Die Rechte: Rollenriegel gefallen, Rechteriegel nicht
+
+Vier Endpunkte sind rollenoffen (`get_current_user` statt `_TEACHER_OR_ADMIN`):
+`GET /nodes/{id}`, `POST /nodes/{id}/reaktivieren`, `DELETE /nodes/{id}` und
+`PATCH /nodes/{id}/verwalten`. Abgesichert sind sie durch `_check_read_permission` bzw.
+`_check_write_permission` — beide rollenblind und im Zweifel strenger: eigene Knoten
+immer, `private` von Fremden nie (auch für Admins nicht), `group` nur mit
+Mitgliedschaft.
+
+Der Grund für die Öffnung ist Konsistenz, nicht Bequemlichkeit: **Dieselbe Knotenmenge
+liefert die Suche Schüler:innen ohnehin schon.** Dass ausgerechnet die Detailansicht
+403 gab, war die Unstimmigkeit.
+
+⚠️ **`PATCH /nodes/{id}/verwalten` ist bewusst schmal** — `title`, `status`,
+`valid_until`, sonst nichts. Der generische `PATCH /nodes/{id}` bleibt teacher/admin. Ihn
+zu öffnen hätte auch Scopes, Inhalt und Metadaten freigegeben; ein versehentlich auf
+`school` gestelltes `read_scope` veröffentlicht einen Text, den jemand für sich
+geschrieben hat. Das ist Leitprinzip 5 der UI-Notiz von der technischen Seite:
+*Verwalten ist nicht Bearbeiten.*
+
+`valid_until` braucht dabei das Begleitflag `valid_until_gesetzt`: Ohne es ließe sich
+„auf `null` setzen" (= gilt dauerhaft) nicht von „Feld weggelassen" unterscheiden.
+
+### „Eingesetzt in": zwei Kantenrichtungen, eine Frage
+
+- **Material** trägt *eingehende* `used_with`-Kanten von den Stunden, die es benutzen
+  (siehe Abschnitt unten).
+- **Planungsknoten** hängen andersherum: Eine Stunde zeigt per *ausgehendem* `part_of`
+  auf ihre Einheit, die Einheit auf ihren Jahresplan.
+
+Beides beantwortet „wo steckt das drin?", deshalb eine Funktion und ein Feld — aber zwei
+Abfragen, gesammelt für alle Knoten auf einmal. Je Knoten wären es bei 200 eigenen
+Bausteinen 400 Rundreisen.
+
+---
+
+## Materialkanten — der Rückweg von der Stunde zum Baustein
+
+Keine Suche, sondern Traversierung: die Frage „**wo** wird dieser Baustein eingesetzt?"
+— und damit „kann ich ihn gefahrlos ändern oder löschen?". Sie steht hier, weil sie
+sonst mit der thematischen Auswahl verwechselt wird; Embeddings sind daran unbeteiligt.
+
+Eine Stunde führt ihr Material **je Phase** in `metadata.phasen[].material[]`, jeder
+Eintrag entweder Freitext oder eine Knotenreferenz (`LessonLinkedItem`:
+`{typ: "text"|"node", wert, node_id, titel}`). Die Phase ist der richtige Ort dafür —
+ein Arbeitsblatt gehört zur Erarbeitung, nicht zur ganzen Stunde. Für den Rückweg taugt
+das nicht: Man müsste alle Stunden der Schule durchsehen.
+
+Deshalb entsteht beim Speichern zusätzlich eine **`used_with`-Kante von der Stunde auf
+den Baustein**, mit den Phasen als Angabe an der Kante
+(`{"via": "material", "phasen": [...]}`). Die Ableitung liegt in
+`app/planning/material_edges.py`; dasselbe Muster nutzt der Curriculum-Editor
+(`context/service.py`, Material-Token → `used_with`).
+
+### Die Regel: Abhängigkeit, nicht Nennung
+
+| Feld einer Phase | Kante? | Warum |
+|---|---|---|
+| `material[]` | **ja** | Inhalt, den die Stunde benutzt. Verschwindet er, fehlt er |
+| `methode` | nein | Beschreibt die Phase. `LessonLinkedItem` hält `titel` redundant — verschwindet der Knoten „Gruppenpuzzle", steht in der Stunde weiterhin „Gruppenpuzzle" |
+| `sozialform` | nein | wie `methode` |
+
+Die Regel ist **am Feld ablesbar** und braucht keine Typprüfung: `material` ist eine
+Liste von Inhalten, `methode`/`sozialform` sind beschreibende Einzelfelder. Sie gilt auch
+für Ziele, die niemandem persönlich gehören — ein `begriff` der Fachschaft kann ebenso
+geändert oder archiviert werden.
+
+⚠️ **Methoden und Sozialformen zu verkanten wäre aktiv schädlich**, nicht nur überflüssig:
+Die Aufmerksamkeits-Warnung in „Meine Bausteine" zählt archivierte Referenzen — archiviert
+jemand eine Sozialform, meldeten sich schlagartig hunderte Stunden. Und im Graphen würden
+zwanzig Vokabelknoten mit je hunderten Kanten zu Naben, die alles Interessante überdecken.
+
+Bleibt die Frage „welche Methoden nutzen wir tatsächlich?", ist das eine JSONB-Abfrage
+über `phasen[].methode.node_id` — dafür braucht es keine Kanten, und man baut sie, wenn
+die Frage gestellt wird.
+
+Welche Typen überhaupt als Material wählbar sind, leitet
+`frontend/src/lib/material.js` aus der Taxonomie ab: alle Dokument-, Artefakt- und
+Konzepttypen außer `unterrichtsstunde`, `unterrichtseinheit`, `schuelertext`,
+`schuelerpraesentation`, `feedback_text`.
+
+### Abgeleiteter Index, kein zweiter Speicherort
+
+Die Phasen sind die Wahrheit; die Kante wird bei jedem Speichern neu daraus bestimmt.
+
+⚠️ **Der Abgleich muss löschen, nicht nur anlegen.** `create_edge` in
+`context/service.py` ist über `(from, to, relation)` idempotent — es legt keine Dublette
+an, entfernt aber nichts. Wer nur anlegt, hinterlässt beim Herausnehmen von Material eine
+Kante, die einen Einsatz behauptet, den es nicht mehr gibt.
+
+⚠️ **`via: "material"` grenzt den Abgleich ein.** Ohne die Marke fasste er auch von Hand
+gezogene `used_with`-Verbindungen an und löschte sie beim nächsten Speichern.
+
+Dasselbe Material in zwei Phasen ergibt **eine** Kante mit zwei Phasen in den Metadaten —
+nicht zwei Kanten. Wegen der Idempotenz fiele die zweite ohnehin stumm unter den Tisch.
+
+**Aufgerufen wird an jeder Stelle, die Phasen schreibt** — Editor (`planning/router.py`),
+Planungsassistent (`assistant_tools.py`), Verschiebe-/Übertragungslogik (`operations.py`,
+für *alle* beteiligten Stunden: eine Übertragung betrifft zwei Knoten) und der
+Snapshot-Rückweg (`snapshots.py`). `review_service.py` ist ausgenommen: Es setzt nur den
+Phasen-Status. Ein Unit-Test wacht darüber, dass keine neue Schreibstelle den Aufruf
+vergisst (`test_material_edges_abdeckung.py`) — die Vorlage dafür ist die
+`valid_until`-Vorbelegung, die gebaut war, an fünf Anlegestellen keinen Eingang hatte und
+deshalb bei **null von 19 134 Knoten** wirkte.
+
+### Phasen-Kennungen
+
+`LessonPhaseItem.id` ist `Optional`, aber es hängt mehr daran, als der Typ verrät:
+`phasen_status` schlüsselt danach, die Phasen-Übertragung wählt darüber aus, und die
+Materialkanten vermerken sie. Fehlt sie, fällt nichts aus — es wird still ungenau.
+
+Sie wird deshalb **beim Speichern** vergeben (`app/planning/phasen.py`), nicht in der
+Oberfläche: Der Planungsassistent schreibt Roh-Dicts aus den Werkzeug-Argumenten und geht
+nicht durch `LessonPhaseItem`. Vorhandene Kennungen bleiben unangetastet — sie neu zu
+vergeben zerschnitte genau die Verweise, um die es geht.
+
+⚠️ **Im Frontend kommt es auf die Reihenfolge des Spreads an.** Bis 09/2026 stand in der
+Stundenseite `{ id: p.id ?? crypto.randomUUID(), ...p }`. Bringt der Server eine Phase
+mit `id: null` mit — und das tut er, `patch_lesson` speichert mit
+`model_dump(exclude_none=False)` —, überschreibt der Spread die eben erzeugte Kennung
+wieder mit `null`. Nur wenn der Schlüssel ganz fehlte, überlebte sie. Der Fehler ist
+selbsterhaltend: Jedes Laden verwirft die neue Kennung, jedes Speichern schreibt `null`
+zurück. Jetzt als `mitPhasenKennungen()` in `frontend/src/lib/planner.js`, mit Test.
 
 ---
 
@@ -281,9 +475,13 @@ In der Bestandsaufnahme widerlegt. Nicht wieder einbauen, auch nicht „zur Sich
 |---|---|---|
 | `idx_context_nodes_titel_nachschlagen` | 0053 | Exakter Titelabgleich (Ausdrucksindex) |
 | `idx_context_nodes_titel_trigramm` | 0054 | Teilsuche (GIN, `gin_trgm_ops`) |
+| `idx_node_aliases_norm` | 0057 | Exakter Alias-Abgleich |
+| `idx_node_aliases_trigramm` | 0057 | Teilsuche über Aliase |
+| `uq_node_aliases_node_norm` | 0057 | Ein Alias je Knoten nur einmal |
 
-Beide liegen auf **demselben** normalisierten Titelausdruck, und beide beziehen ihn aus
-derselben Funktion wie die Abfrage: `app.context.lookup.titel_normalisiert_sql`.
+Alle liegen auf **demselben** normalisierten Ausdruck — für Titel wie für Aliase —, und
+alle beziehen ihn aus derselben Funktion wie die Abfrage:
+`app.context.lookup.titel_normalisiert_sql`.
 
 ⚠️ Weicht der Ausdruck des Index auch nur in einem Zeichen von dem der Abfrage ab,
 benutzt PostgreSQL ihn **nicht** — ohne Fehler, ohne Warnung, nur langsamer. Deshalb wird

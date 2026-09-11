@@ -8,7 +8,7 @@
     createReview,
     deleteReview,
   } from '$lib/api.js'
-  import { dateLabel, weekdayLabel, ueColorIndex } from '$lib/planner.js'
+  import { dateLabel, weekdayLabel, ueColorIndex, mitPhasenKennungen } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
@@ -24,6 +24,9 @@
   let loading = $state(true)
   let error = $state(null)
   let saveError = $state(null)
+  // Gelesen über das Eigentum statt über die Mitgliedschaft — der Archiv-Fall.
+  // Das Backend sagt es (`darf_bearbeiten`); die Oberfläche rät es nicht.
+  const nurLesen = $derived(lesson ? lesson.darf_bearbeiten === false : false)
   let saving = $state(false)
 
   // Lokale Arbeitskopie der Phasen + refs
@@ -52,7 +55,7 @@
     error = null
     try {
       lesson = await getLesson(nodeId)
-      phasen = lesson.phasen.map(p => ({ id: p.id ?? crypto.randomUUID(), ...p }))
+      phasen = mitPhasenKennungen(lesson.phasen)
       refs = lesson.refs ?? []
       refsDismissed = lesson.refs_dismissed ?? []
       stundenziel = lesson.stundenziel ?? ''
@@ -81,6 +84,9 @@
 
   async function doSave() {
     if (!lesson) return
+    // Doppelt gesichert: Der Lesezustand bietet keine Eingaben an, aber ein
+    // Zeitgeber aus der Zeit davor liefe sonst noch einmal ins 403.
+    if (nurLesen) return
     saving = true
     saveError = null
     try {
@@ -302,11 +308,12 @@
             </div>
           {/if}
 
-          <!-- Titel (editable) -->
+          <!-- Titel (editable, außer im Lesezustand) -->
           <input
             type="text"
             bind:value={titel}
             onchange={scheduleSave}
+            readonly={nurLesen}
             class="text-xl font-bold text-light-tx dark:text-dark-tx bg-transparent
                    border-b border-transparent focus:border-primary dark:focus:border-primary-dark
                    outline-none w-full"
@@ -407,6 +414,7 @@
           type="text"
           bind:value={stundenziel}
           onchange={scheduleSave}
+          readonly={nurLesen}
           placeholder="Stundenziel eingeben …"
           class="w-full text-sm text-light-tx dark:text-dark-tx bg-transparent
                  border-b border-transparent focus:border-primary dark:focus:border-primary-dark
@@ -414,6 +422,12 @@
         />
       </div>
 
+      {#if nurLesen}
+        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-2">
+          Diese Stunde gehört zu einer früheren Unterrichtsgruppe. Sie lässt sich
+          lesen, aber nicht mehr ändern.
+        </p>
+      {/if}
       {#if saveError}
         <p class="text-xs text-light-re dark:text-dark-re mt-1">{saveError}</p>
       {/if}
@@ -448,17 +462,53 @@
             </span>
           {/if}
         </div>
-        <PhaseTable
-          {phasen}
-          verfuegbareMin={lesson.slot?.verfuegbare_min ?? 45}
-          subjectId={lesson.subject_id}
-          onChange={reviewMode ? () => {} : onPhasenChange}
-          onSuggestCompetences={onSuggestCompetences}
-          onMaterialCreate={openMaterialCreate}
-          {reviewMode}
-          {reviewStatus}
-          onReviewStatusChange={(s) => { reviewStatus = s }}
-        />
+        {#if nurLesen}
+          <!-- Statisch statt halb deaktiviert: Ein Editor, dessen Eingaben
+               verworfen werden, ist schlimmer als gar keiner. -->
+          <div class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3">
+            {#each phasen as phase (phase.id)}
+              <div class="flex gap-3 px-4 py-3 border-b last:border-b-0
+                          border-light-ui-2 dark:border-dark-ui-2">
+                <span class="w-16 shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  {phase.dauer_min ? `${phase.dauer_min} min` : ''}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-light-tx dark:text-dark-tx">
+                    {phase.name || 'Ohne Titel'}
+                  </p>
+                  {#if phase.beschreibung}
+                    <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 whitespace-pre-wrap">
+                      {phase.beschreibung}
+                    </p>
+                  {/if}
+                  {#if phase.sozialform || phase.methode}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                      {[phase.sozialform?.titel ?? phase.sozialform,
+                        phase.methode?.titel ?? phase.methode]
+                        .filter(Boolean).join(' · ')}
+                    </p>
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <p class="px-4 py-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                Kein Verlaufsplan hinterlegt.
+              </p>
+            {/each}
+          </div>
+        {:else}
+          <PhaseTable
+            {phasen}
+            verfuegbareMin={lesson.slot?.verfuegbare_min ?? 45}
+            subjectId={lesson.subject_id}
+            onChange={reviewMode ? () => {} : onPhasenChange}
+            onSuggestCompetences={onSuggestCompetences}
+            onMaterialCreate={openMaterialCreate}
+            {reviewMode}
+            {reviewStatus}
+            onReviewStatusChange={(s) => { reviewStatus = s }}
+          />
+        {/if}
       </section>
 
       <!-- Review-Footer: Phasen-Schritt -->

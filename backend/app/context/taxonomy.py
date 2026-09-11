@@ -144,6 +144,25 @@ SCOPE_DEFAULTS: Final[dict[str, tuple[str, str]]] = {
 }
 
 
+#: content_type → Name der lucide-Komponente.
+#:
+#: Das Backend benutzt sie nicht — es prüft nur, dass **jeder** Typ eine hat. Ohne
+#: diese Prüfung fiele ein neuer Typ im Frontend still auf das Kategorie-Symbol
+#: zurück; in artefakt-lastigen Listen trüge dann wieder jede Zeile dasselbe.
+#: Ob der Name eine echte Komponente ist, entscheidet der Frontend-Build: Der
+#: Generator schreibt daraus statische Importe, ein Tippfehler bricht ihn.
+ICONS: Final[dict[str, str]] = {
+    ct["key"]: ct.get("icon", "")
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+}
+
+#: category → Name der lucide-Komponente (Rückfall für Knoten ohne content_type).
+CATEGORY_ICONS: Final[dict[str, str]] = {
+    name: info.get("icon", "") for name, info in _data["categories"].items()
+}
+
+
 def validate_content_type(category: str, content_type: str | None) -> None:
     """Wirft ValueError wenn content_type zur category nicht passt.
 
@@ -239,7 +258,13 @@ GUELTIGE_FELDTYPEN: Final[frozenset[str]] = frozenset({"int", "text", "auswahl",
 
 # Spalten- und Filternamen, die nicht aus `felder` kommen, sondern am Knoten selbst
 # hängen. Alles andere muss ein Feld sein — sonst zeigte die Liste eine leere Spalte.
-FESTE_SPALTEN: Final[frozenset[str]] = frozenset({"titel", "fach", "status", "geaendert"})
+# `aliase` steht seit Migration 0057 hier statt in `felder`: Die weiteren Namen sind
+# keine Metadaten eines einzelnen Typs mehr, sondern eine Eigenschaft **jedes** Knotens —
+# wie Titel oder Status. Die Sammlungen von `methode` und `sozialform` nennen die Spalte
+# weiter, sie wird nur woanders herbezogen.
+FESTE_SPALTEN: Final[frozenset[str]] = frozenset(
+    {"titel", "fach", "status", "geaendert", "aliase"}
+)
 
 
 def collection_config(content_type: str | None) -> dict | None:
@@ -274,6 +299,38 @@ SCHULJAHRESENDE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
 def get_valid_until_schuljahresende(content_type: str | None) -> bool:
     """True wenn der content_type einen Schuljahresende-Lifecycle hat."""
     return content_type in SCHULJAHRESENDE_CONTENT_TYPES
+
+
+# ── Persönliche Bausteinarten (AP7) ──────────────────────────────────────────
+#
+# Was eine Person **selbst pflegt** — im Gegensatz zu dem, was Fachschaft, Schule
+# oder ein Import verantworten. Trägt die Abgrenzung von „Meine Bausteine"
+# (`/knowledge/mine`).
+#
+# **Abgeleitet, nicht gepflegt.** Der Vorgabewert `write_scope` sagt bereits, wo die
+# Pflege liegt; eine zweite Liste daneben liefe irgendwann auseinander. Die
+# Ableitung deckt sich ausnahmslos mit der Einteilung in `KS-Knotentyp-Referenz.md`:
+# 16 Typen mit Vorgabe `private` = Lehrkraft-Material (K4), Lehrkraft-Planung (K5)
+# und Schüler-Artefakte (K6); `global` ist Import (K1), `subject`/`school` sind
+# Fachschaft und Schule (K2/K3).
+#
+# ⚠️ **Der Vorgabewert des Typs, nicht der Scope des Knotens.** Letzterer ist eine
+# Nutzerentscheidung — das Anlegeformular bietet `private`/`group`/`subject` zur
+# Wahl — und beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding
+# ist das". Wer sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der
+# eigenen Seite; ein privat gesetzter Fachbegriff erschiene dort fälschlich.
+PERSOENLICHE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
+    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write == "private"
+)
+
+
+def ist_persoenlich(content_type: str | None) -> bool:
+    """Ob dieser Typ von der einzelnen Person gepflegt wird.
+
+    `None` ist nicht persönlich: Strukturknoten ohne fachliche Rolle gehören
+    niemandem im hier gemeinten Sinn.
+    """
+    return content_type in PERSOENLICHE_CONTENT_TYPES
 
 
 _VALID_PRIOS = frozenset({"kern", "uebung", "vertiefung"})

@@ -12,7 +12,7 @@ import {
 
 describe("auswaehlbareTypen", () => {
   it("entfernt ruhende Typen", () => {
-    const typen = ["arbeitsblatt", "lernplan", "klausur"]
+    const typen = ["arbeitsblatt", "feedback_text", "klausur"]
     expect(auswaehlbareTypen(typen)).toEqual(["arbeitsblatt", "klausur"])
   })
 
@@ -24,14 +24,14 @@ describe("auswaehlbareTypen", () => {
   it("behält den aktuellen Typ, auch wenn er ruht", () => {
     // Der Fall, der sonst still Daten verändert: Wer einen ruhenden Knoten
     // bearbeitet, fände ein leeres Auswahlfeld vor und speicherte einen anderen Typ.
-    expect(auswaehlbareTypen(["arbeitsblatt", "lernplan"], "lernplan")).toEqual([
+    expect(auswaehlbareTypen(["arbeitsblatt", "feedback_text"], "feedback_text")).toEqual([
       "arbeitsblatt",
-      "lernplan",
+      "feedback_text",
     ])
   })
 
   it("behält den aktuellen Typ nur, wenn er in der Liste steht", () => {
-    expect(auswaehlbareTypen(["arbeitsblatt"], "lernplan")).toEqual(["arbeitsblatt"])
+    expect(auswaehlbareTypen(["arbeitsblatt"], "feedback_text")).toEqual(["arbeitsblatt"])
   })
 
   it("verträgt null und undefined", () => {
@@ -90,12 +90,14 @@ describe("auswaehlbareTypOptionen", () => {
   })
 
   it("erbt die Ruhend-Regel samt Ausnahme", () => {
-    expect(auswaehlbareTypOptionen(["arbeitsblatt", "lernplan"]).map((o) => o.key)).toEqual(
-      ["arbeitsblatt"],
-    )
     expect(
-      auswaehlbareTypOptionen(["arbeitsblatt", "lernplan"], "lernplan").map((o) => o.key),
-    ).toContain("lernplan")
+      auswaehlbareTypOptionen(["arbeitsblatt", "feedback_text"]).map((o) => o.key),
+    ).toEqual(["arbeitsblatt"])
+    expect(
+      auswaehlbareTypOptionen(["arbeitsblatt", "feedback_text"], "feedback_text").map(
+        (o) => o.key,
+      ),
+    ).toContain("feedback_text")
   })
 
   it("verträgt null und undefined", () => {
@@ -105,16 +107,21 @@ describe("auswaehlbareTypOptionen", () => {
 })
 
 describe("Taxonomie-Zusicherungen", () => {
-  it("die Schüler-Artefakte ruhen, bis es einen Übernahme-Weg gibt", () => {
+  it("die Schüler-Artefakte sind seit AP8 wach", () => {
+    // Sie ruhten, solange es keinen Weg gab, so einen Knoten anzulegen. Den gibt es
+    // seit der Übernahme aus der Bibliothek (`POST /artifacts/{id}/baustein`).
     for (const typ of [
       "lernplan",
       "schuelertext",
       "schuelerpraesentation",
       "strukturierung",
-      "feedback_text",
     ]) {
-      expect(RUHENDE_CONTENT_TYPES.has(typ)).toBe(true)
+      expect(RUHENDE_CONTENT_TYPES.has(typ)).toBe(false)
     }
+  })
+
+  it("Feedback-Text ruht weiter — den Flow, der ihn erzeugte, gibt es nicht", () => {
+    expect(RUHENDE_CONTENT_TYPES.has("feedback_text")).toBe(true)
   })
 
   it("die tragenden Typen ruhen nicht", () => {

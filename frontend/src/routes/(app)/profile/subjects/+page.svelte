@@ -1,4 +1,5 @@
 <script>
+    import PageBody from '$lib/components/PageBody.svelte'
     import { sidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { hiddenSubjectIds, setSubjectHidden } from "$lib/stores/subjectVisibility.js";
     import { user } from "$lib/stores/user.js";
@@ -18,8 +19,7 @@
     });
 </script>
 
-<div class="h-full overflow-y-auto">
-    <div class="max-w-2xl p-6">
+<PageBody>
     <button
         onclick={() => history.back()}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
@@ -89,5 +89,5 @@
             {/each}
         </ul>
     {/if}
-    </div>
-</div>
+    
+</PageBody>

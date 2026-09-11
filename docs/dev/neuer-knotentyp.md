@@ -17,7 +17,7 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 >    verfallen sollte, bliebe für immer stehen. (Ein Test hält die Vollständigkeit fest.)
 > 2. Ein Typ mit `embedding: true`, dessen Embedding-Input am Ende **nur aus dem Titel**
 >    besteht, ist keine thematische Suche, sondern eine unscharfe Titelsuche im
->    Vektorraum — mit Kosten und ohne Gewinn. Schritt 3 prüft genau das.
+>    Vektorraum — mit Kosten und ohne Gewinn. Schritt 4 prüft genau das.
 
 ## `taxonomy.yaml` ist eine Systemdatei
 
@@ -66,7 +66,27 @@ Die Kategorie ist das **einzige** Feld mit DB-Constraint
 (`check_context_nodes_category`). Der `content_type` selbst ist in der Datenbank freier
 Text — für ihn allein braucht es **keine Migration**.
 
-### 2. Embedding: ja oder nein?
+### 2. Symbol wählen
+
+`icon:` am Typ, der Name einer [lucide](https://lucide.dev)-Komponente in
+PascalCase (`icon: PencilRuler`). **Pflichtangabe** — die Startprüfung lehnt einen Typ
+ohne Symbol ab.
+
+Der Grund für die Strenge: Fehlt das Symbol, fällt der Typ auf das der Kategorie
+zurück. Das sieht nicht kaputt aus, macht die Listen aber nutzlos — bis 09/2026 hatten
+30 der 41 Typen kein eigenes Symbol, und in „Meine Bausteine" (fast nur `artifact`) trug
+dadurch **jede** Zeile dasselbe Paket.
+
+Wähle so, dass die *Sorte* unterscheidbar wird, nicht so, dass der Inhalt illustriert
+wird. Verwandtes darf sich ähneln: Die drei Kompetenzebenen teilen `Target`, weil sie
+Stufen desselben Gegenstands sind und in ihren Ansichten ohnehin eingerückt stehen.
+Innerhalb von `artifact` prüft ein Test dagegen auf **durchweg** eigene Symbole.
+
+`frontend/src/lib/node_icons.js` wird daraus **erzeugt** — nie von Hand ändern. Der
+Generator schreibt daraus statische Importe; ein Name, den lucide nicht kennt, bricht
+den Build, statt still auf ein Ersatzsymbol zu fallen.
+
+### 3. Embedding: ja oder nein?
 
 Das Kriterium aus dem ADR-017-Nachtrag lautet: **Soll dieser Baustein auffindbar sein,
 ohne dass man weiß, dass es ihn gibt?** Nur dann `embedding: true`.
@@ -83,7 +103,7 @@ Drei Gründe sprechen dagegen:
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
 `taxonomy.yaml`. Stand 09/2026: 27 von 41 Typen mit Embedding.
 
-### 3. Bei „ja": den Embedding-Input gegenprüfen
+### 4. Bei „ja": den Embedding-Input gegenprüfen
 
 ⚠️ **Der Schritt, der am ehesten übersprungen wird.** Woraus besteht der Vektor
 tatsächlich?
@@ -106,14 +126,14 @@ macht, macht seinen Vektor unschärfer — ein ergänzter Variantensatz warf den
 von Rang 1 auf 7. Wo ein Typ sowohl gelesen als auch gefunden werden soll, trennt man
 beides: ein Feld für Menschen, ein Satz für die Suche.
 
-Bleibt am Ende **nur der Titel** übrig, lautet die Entscheidung aus Schritt 2 „nein". Das
+Bleibt am Ende **nur der Titel** übrig, lautet die Entscheidung aus Schritt 3 „nein". Das
 ist Identifikationsstoff, keine thematische Auffindbarkeit — `traegt_substanz()` in
 `embedding.py` weist solche Knoten ab.
 
 Ein bestehender Typ, dessen `embedding_input` sich ändert, braucht einen **Re-Embed**:
 Die alten Vektoren sind dann aus etwas anderem gebildet und nicht mehr vergleichbar.
 
-### 4. Sichtbarkeit: `scope_defaults`
+### 5. Sichtbarkeit: `scope_defaults`
 
 `read_scope`/`write_scope` je Typ in `taxonomy.yaml`. Sie sind **Vorgaben für neue
 Knoten**, keine Rechteprüfung — die liegt in `app/context/visibility.py` und gilt
@@ -122,7 +142,7 @@ einheitlich für alle Abfragewege.
 Faustregel: Bildungsplan `global/global`, Fachschaftsmaterial `school/subject`,
 Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`.
 
-### 5. Lifecycle
+### 6. Lifecycle
 
 `VALID_UNTIL_DEFAULTS_DAYS` in `backend/app/context/taxonomy.py` — **auch dann eintragen,
 wenn der Wert `None` lautet** (siehe Falle 1 oben). Läuft der Typ zum Schuljahresende ab,
@@ -144,7 +164,7 @@ Wert unverändert — auch `null`. Wer einen ablaufenden Typ neu einführt, erg�
 Formular-Hinweis (`SCHULJAHRESENDE_CONTENT_TYPES` in der erzeugten `taxonomy.js`); sonst
 bekäme man beim Anlegen stillschweigend ein Datum, das man nicht gewählt hat.
 
-### 6. `ui_status`: erscheint der Typ in Auswahlflächen?
+### 7. `ui_status`: erscheint der Typ in Auswahlflächen?
 
 `ui_status: aktiv | ruhend` in der `taxonomy.yaml` (fehlt das Feld, gilt `aktiv`).
 
@@ -158,20 +178,51 @@ nein, gehört der Typ nicht in eine Auswahlliste — dort wäre er ein Versprech
 Anwendung nicht einlöst. Der Wechsel `ruhend → aktiv` gehört in dasselbe Arbeitspaket wie
 der Erzeugungsweg und bekommt eine Einzeiler-Begründung in der YAML.
 
+Für die meisten Artefakt-Typen ist dieser Weg die **Übernahme aus der Bibliothek**
+(Schritt 8) — sie bietet ruhende Arten selbst nicht an, sonst unterliefe sie den
+`ui_status`, statt ihn einzulösen.
+
 Im Frontend filtern die Helfer in `frontend/src/lib/knotentypen.js` — **nicht**
 `RUHENDE_CONTENT_TYPES` direkt verwenden. Sie kennen die Ausnahme, die man sonst
 übersieht: Im Editor eines bestehenden Knotens bleibt **sein eigener Typ wählbar**, auch
 wenn er ruht. Sonst stünde dort ein leeres Auswahlfeld, und das Speichern schriebe
 stillschweigend etwas anderes.
 
-### 7. Rollen-Gewichtung
+### 8. Übernahme aus der Bibliothek: erlaubt oder nicht?
+
+`backend/app/artifacts/uebernahme.py`. „Als Baustein speichern" macht aus einem
+Bibliotheks-Artefakt einen Knoten (AP8) — für viele Typen **der** Erzeugungsweg und damit
+die Voraussetzung dafür, dass Schritt 7 `aktiv` sagen darf.
+
+Jeder Typ der Kategorien `document` und `artifact` gehört in genau eine von drei Listen:
+
+| Liste | Bedeutung |
+|---|---|
+| `LEHRKRAFT_TYPEN` | Lehrkräfte und Admins dürfen ihn aus einem Artefakt anlegen |
+| `SCHUELER_TYPEN` | Schüler:innen ebenfalls — dann **erzwungen** `private`/`private` |
+| `NICHT_UEBERNEHMBAR` | nicht übernehmbar, mit Begründung als Wert |
+
+Ein Typ darf in beiden Rollenlisten stehen (`strukturierung` ist rollenoffen), aber nie
+gleichzeitig in einer Rollenliste und in `NICHT_UEBERNEHMBAR`.
+
+**Der Wächtertest zwingt zur Entscheidung.** `test_uebernahme_typen_vollstaendig` in
+`tests/unit/test_uebernahme.py` fällt um, sobald ein Typ in keiner Liste steht. Das ist
+Absicht: Ohne ihn fiele ein neuer Typ stillschweigend aus der Übernahme heraus — nicht
+als Ablehnung, sondern als Lücke, die niemandem auffiele.
+
+Zu klären ist außerdem, aus welcher **Artefaktart** er entstehen kann
+(`UEBERNEHMBARE_KINDS`, heute `document` und `mermaid`) und ob der Knotentext daraus
+etwas Lesbares wird — ein Knoten, der außer dem Titel nichts trägt, ist derselbe Fehler
+wie in Schritt 4.
+
+### 9. Rollen-Gewichtung
 
 `_SCHUELER_BONUS` / `_LEHRKRAFT_BONUS` in `backend/app/context/taxonomy.py`. Ein
 **Vorzug, kein Filter**, und klein (≤ 0,05). Bildungsplan-Typen bleiben neutral (0), damit
 der Prüfsatz auf reinem BP-Bestand vergleichbar bleibt. Kein Eintrag heißt neutral — das
 ist ein zulässiges Ergebnis, aber eine bewusste Entscheidung.
 
-### 8. Kanten festlegen
+### 10. Kanten festlegen
 
 Mit welchen Typen steht der neue in Beziehung, über welche Relation? Der
 [Netzwerkgraph](#netzwerkgraph-der-kontexttypen) unten zeigt den Bestand — **er ist
@@ -181,7 +232,7 @@ Eine **neue Relation** (nicht bloß eine neue Kante zwischen bestehenden Typen) 
 sehr wohl eine Migration: Sie ist per CHECK gebunden
 (`check_context_edges_relation`, `app/db/models.py`).
 
-### 9. Migration — was wirklich nötig ist
+### 11. Migration — was wirklich nötig ist
 
 | Änderung | Migration? |
 |---|---|
@@ -191,28 +242,34 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 | neuer Index | ja, wenn eine Abfrage ihn braucht |
 | Backfill der Embeddings | kein Schema, aber ein Lauf (`scripts/`) |
 
-### 10. Oberfläche
+### 12. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
   deckt heute alle 41 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
-- `frontend/src/lib/components/NodeTypeIcon.svelte` — Symbol. Ohne Eintrag erscheint das
-  Kategorie-Symbol; das ist zulässig, aber meist nicht gewollt.
+- Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
+  in der Taxonomie (Schritt 2), und `NodeTypeIcon.svelte` liest nur noch die daraus
+  erzeugte `node_icons.js`.
+- **Aliase sind ebenfalls kein Punkt:** Weitere Namen hat seit Migration 0057 *jeder*
+  Knoten (Tabelle `node_aliases`, Pflege über `AliasFeld.svelte` in beiden Editoren).
+  Ein neuer Typ bekommt sie geschenkt. Nur wenn sie in seinen **Embedding-Input** sollen,
+  gehört `aliases` in sein `embedding_input` — dann lädt `braucht_aliase()` sie
+  automatisch nach.
 
-### 11. Werkzeuge
+### 13. Werkzeuge
 
 Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/router.py`,
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 12. Prüfsatz
+### 14. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 13. Dokumentation
+### 15. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.

@@ -4,6 +4,11 @@
   import { TriangleAlert } from "lucide-svelte";
   import { getFlags, createAccessRequest } from "$lib/api.js";
   import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
+  import {
+    severityLabel,
+    severityClass,
+    categoryLabel,
+  } from "$lib/crisis_labels.js";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
 
   let items = $state([]);
@@ -25,25 +30,12 @@
 
   const CLOSED = new Set(["resolved", "dismissed"]);
 
-  const SEVERITY = {
-    alert: { label: "Alarm", cls: "bg-light-re-2 dark:bg-dark-re-2 text-light-re dark:text-dark-re" },
-    warning: { label: "Warnung", cls: "bg-light-or-2 dark:bg-dark-or-2 text-light-or dark:text-dark-or" },
-    info: { label: "Hinweis", cls: "bg-light-bl-2 dark:bg-dark-bl-2 text-light-bl dark:text-dark-bl" },
-  };
   const STATUS = {
     open: "Offen",
     under_review: "In Prüfung",
     resolved: "Erledigt",
     dismissed: "Verworfen",
   };
-  const CATEGORY = {
-    suizidalitaet: "Suizidalität",
-    selbstverletzung: "Selbstverletzung",
-    haeusliche_gewalt: "Häusliche Gewalt",
-    essverhalten: "Essverhalten",
-    mobbing: "Mobbing",
-  };
-
   let rangeFrom = $derived(total === 0 ? 0 : offset + 1);
   let rangeTo = $derived(Math.min(offset + limit, total));
 
@@ -207,11 +199,12 @@
                        text-light-tx dark:text-dark-tx">
               <td class="py-2 pr-4">
                 <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium
-                             {SEVERITY[f.severity]?.cls ?? 'bg-light-ui-2 dark:bg-dark-ui-2'}">
-                  {SEVERITY[f.severity]?.label ?? f.severity}
+                             text-light-tx dark:text-dark-tx
+                             {severityClass(f.severity)}">
+                  {severityLabel(f.severity)}
                 </span>
               </td>
-              <td class="py-2 pr-4">{CATEGORY[f.flag_category] ?? f.flag_category}</td>
+              <td class="py-2 pr-4">{categoryLabel(f.flag_category)}</td>
               <td class="py-2 pr-4 font-mono text-xs text-light-tx-2 dark:text-dark-tx-2">
                 {f.pseudonym.slice(0, 10)}…
               </td>
@@ -297,8 +290,8 @@
       </h2>
       <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
         Anlass ist die Meldung
-        <strong>{CATEGORY[requestFor.flag_category] ?? requestFor.flag_category}</strong>
-        ({SEVERITY[requestFor.severity]?.label ?? requestFor.severity}) vom
+        <strong>{categoryLabel(requestFor.flag_category)}</strong>
+        ({severityLabel(requestFor.severity)}) vom
         {fmtDate(requestFor.flagged_at)}. Die Einsicht wird erst nach Freigabe durch
         eine zweite Person (Vier-Augen-Prinzip) und nur innerhalb des Zeitfensters
         möglich; jeder Zugriff wird protokolliert.

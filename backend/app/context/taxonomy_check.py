@@ -115,6 +115,26 @@ def pruefe_taxonomie() -> list[str]:
                 "Quelle: app/context/taxonomy.yaml"
             )
 
+    # ── Symbole ───────────────────────────────────────────────────────────────
+    # Geprüft wird nur die **Vollständigkeit**. Ob der Name eine echte
+    # lucide-Komponente ist, entscheidet der Frontend-Build: `generate_taxonomy.py`
+    # schreibt daraus statische Importe, ein Tippfehler bricht ihn. Hier fällt der
+    # Fall auf, der sonst niemandem auffiele — ein neuer Typ ohne Symbol, der still
+    # auf das Kategorie-Symbol zurückfällt.
+    for key, icon in sorted(taxonomy.ICONS.items()):
+        if not icon:
+            befunde.append(
+                f"content_type {key!r} hat kein `icon` — es fiele auf das "
+                "Kategorie-Symbol zurück und wäre in Listen nicht zu unterscheiden. "
+                "Quelle: app/context/taxonomy.yaml"
+            )
+    for kategorie, icon in sorted(taxonomy.CATEGORY_ICONS.items()):
+        if not icon:
+            befunde.append(
+                f"category {kategorie!r} hat kein `icon` (Rückfall für Knoten ohne "
+                "content_type). Quelle: app/context/taxonomy.yaml"
+            )
+
     # ── ui_status ─────────────────────────────────────────────────────────────
     for key, status in sorted(taxonomy.UI_STATUS.items()):
         if status not in taxonomy.GUELTIGE_UI_STATUS:
@@ -188,12 +208,14 @@ def pruefe_taxonomie() -> list[str]:
     for (_cat, key), quellen in sorted(taxonomy.EMBEDDING_INPUT.items()):
         for quelle in quellen:
             for teil in (t.strip() for t in quelle.split("|")):
-                if teil in ("title", "content") or teil.startswith("metadata."):
+                # `aliases` = Tabelle `node_aliases` (Migration 0057); die drei Namen
+                # sind genau die Zweige in `_teil_aus_quelle`.
+                if teil in ("title", "content", "aliases") or teil.startswith("metadata."):
                     continue
                 befunde.append(
                     f"embedding_input von {key!r} nennt die Quelle {teil!r} — erlaubt "
-                    "sind 'title', 'content' und 'metadata.<pfad>'. Sie liefert sonst "
-                    "stumm nichts. Quelle: app/context/taxonomy.yaml"
+                    "sind 'title', 'content', 'aliases' und 'metadata.<pfad>'. Sie "
+                    "liefert sonst stumm nichts. Quelle: app/context/taxonomy.yaml"
                 )
 
     # ── Sammlungs-Konfiguration und Feldschema (AP5a) ─────────────────────────

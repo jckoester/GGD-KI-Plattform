@@ -93,6 +93,31 @@ export const KATEGORIE_LABELS = {
 }
 
 /**
+ * Wie weit der Stundenentwurf einer Slot-Zeile gediehen ist.
+ *
+ * **Warum es die Stufe „Idee" braucht.** Ein angelegter, aber noch leerer Entwurf
+ * sah in der Jahresplanung genauso aus wie ein ausgearbeiteter: Thema fett,
+ * verlinkt, anklickbar. Erst beim Öffnen zeigte sich, dass nichts drinsteht. Von den
+ * drei Stufen des Todo-Eintrags waren die anderen beiden längst sichtbar —
+ * „nachbereitet" als eigenes Abzeichen, „kein Entwurf" am kursiven Thema und am
+ * Knopf „Stundenentwurf anlegen". Diese eine fehlte.
+ *
+ * **Die Nachbereitung steht bewusst nicht hier drin.** Sie ist keine Stufe des
+ * Entwurfs, sondern eine Aussage über die gehaltene Stunde, und das Abzeichen dafür
+ * gibt es schon. Sie zusätzlich als Rückgabewert zu führen hieße, dieselbe Tatsache
+ * an zwei Stellen zu kennen — die Fehlerquelle, die dieses Projekt am häufigsten
+ * einholt. Ob der Hinweis trotz Nachbereitung erscheint, entscheidet deshalb die
+ * aufrufende Zeile.
+ *
+ * @param {{stunde_node_id?: string|null, hat_phasen?: boolean}|null} slot
+ * @returns {'keiner'|'idee'|'entwurf'}
+ */
+export function entwurfsStand(slot) {
+    if (!slot?.stunde_node_id) return 'keiner'
+    return slot.hat_phasen ? 'entwurf' : 'idee'
+}
+
+/**
  * Gruppiert Slots nach Kalenderwochen und fügt Ferien- und Halbjahresbänder ein.
  *
  * Feiertage und unterrichtsfreie Tage werden als Sondertag-Zeilen eingefügt —
@@ -237,4 +262,30 @@ export function groupSlotsByWeek(
     }
 
     return items
+}
+
+/**
+ * Ergänzt fehlende Phasen-Kennungen, ohne vorhandene anzutasten.
+ *
+ * Die Kennung ist Referenz, kein Beiwerk: `phasen_status` schlüsselt danach, die
+ * Übertragung wählt Phasen darüber aus, und die Materialkanten vermerken, in
+ * welchen Phasen ein Baustein vorkommt. Eine neu vergebene Kennung ließe diese
+ * Verweise ins Leere laufen — deshalb wird nur ergänzt, nie ersetzt.
+ *
+ * ⚠️ **Auf die Reihenfolge kommt es an.** Bis 09/2026 stand hier
+ * `{ id: p.id ?? crypto.randomUUID(), ...p }` — der Spread *hinter* der Zuweisung.
+ * Bringt der Server eine Phase mit `id: null` mit (und das tut er:
+ * `patch_lesson` speichert mit `exclude_none=False`), überschreibt der Spread die
+ * eben erzeugte Kennung wieder mit `null`. Nur wenn der Schlüssel ganz fehlte,
+ * überlebte sie. Der Fehler ist still: Es sieht aus, als würden Kennungen
+ * vergeben.
+ *
+ * @param {Array<object>} phasen
+ * @returns {Array<object>}
+ */
+export function mitPhasenKennungen(phasen) {
+    return (phasen ?? []).map((p) => ({
+        ...p,
+        id: typeof p?.id === 'string' && p.id.trim() ? p.id : crypto.randomUUID(),
+    }))
 }

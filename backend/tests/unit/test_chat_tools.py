@@ -252,10 +252,12 @@ async def test_get_operatoren_current_edition_only_and_mapping():
     from app.context.search import Abschnitt
 
     treffer = [
+        # Die Synonyme kommen seit Migration 0057 als eigenes Trefferfeld `aliase`,
+        # nicht mehr aus den rohen Metadaten.
         {"title": "anwenden", "content": "alte Fassung", "bp_version": "2016",
-         "metadata": {"afb": ["II"], "aliase": []}},
+         "metadata": {"afb": ["II"]}},
         {"title": "beurteilen", "content": "def-b", "bp_version": "2016.V2",
-         "metadata": {"afb": ["III"], "aliase": ["bewerten"]}},
+         "metadata": {"afb": ["III"]}, "aliase": ["bewerten"]},
         {"title": "analysieren", "content": "def-a", "bp_version": "2016.V2",
          "metadata": {"afb": ["II", "III"]}},
     ]
