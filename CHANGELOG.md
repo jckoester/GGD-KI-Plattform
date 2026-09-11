@@ -124,6 +124,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Assistenten-Dialog (`/` im Chat) reagierte nicht auf die Tastatur.** Escape,
+  Pfeiltasten und Enter waren wirkungslos, Getipptes landete im Chat-Feld statt in der
+  Suche. Zusätzlich ließ sich der Dialog bei leerer Trefferliste nicht mehr abbrechen.
+
 - **Die Schweregrad-Chips in den Krisen-Meldungen und -Freigaben waren nicht lesbar.**
   „Alarm", „Warnung" und „Hinweis" standen in beiden Modi auf einer Fläche derselben
   Farbfamilie. Fläche und Rand tragen jetzt die Farbe, die Beschriftung die gewohnte

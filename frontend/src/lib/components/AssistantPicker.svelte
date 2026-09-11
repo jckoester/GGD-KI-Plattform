@@ -12,6 +12,7 @@
     let query = $state('')
     let focusedIndex = $state(0)
     let container = $state(null)
+    let inputEl = $state(null)
 
     // Filterlogik (unverändert)
     const filtered = $derived(
@@ -40,6 +41,16 @@
 
     // Tastatur-Navigation
     function handleKeydown(e) {
+        // ⚠️ Abbrechen **vor** jeder anderen Prüfung. Escape stand bis 10.09.2026
+        // unten im `switch` — also hinter dem `return` für die leere Trefferliste.
+        // Wer sich vertippt hatte und nichts fand, saß damit im Dialog fest:
+        // genau der Moment, in dem man abbrechen will.
+        if (e.key === 'Escape') {
+            e.preventDefault()
+            onclose()
+            return
+        }
+
         const count = sorted.length
         if (count === 0) return
 
@@ -56,13 +67,7 @@
                 break
             case 'Enter':
                 e.preventDefault()
-                if (count > 0) {
-                    onselect(sorted[focusedIndex])
-                }
-                break
-            case 'Escape':
-                e.preventDefault()
-                onclose()
+                onselect(sorted[focusedIndex])
                 break
         }
     }
@@ -91,9 +96,18 @@
         }
     })
 
-    // Fokus auf das erste Element beim Öffnen
+    // Fokus auf das Suchfeld beim Öffnen.
+    //
+    // ⚠️ **Ohne den `focus()`-Aufruf ist der ganze Dialog tot** — und zwar lautlos.
+    // `handleKeydown` hängt am Suchfeld; bleibt der Tastaturfokus im Chat-Textfeld,
+    // erreichen ihn weder Escape noch Pfeiltasten noch Enter. Auch der zweite
+    // Ausweg fällt aus: `onblur` kann nicht feuern, wenn das Feld nie Fokus hatte.
+    // Übrig blieb, einen Assistenten auszuwählen. Getipptes landete derweil im
+    // Chat-Textfeld. Der Kommentar kündigte den Aufruf an, den Aufruf gab es nicht
+    // (bis 10.09.2026); `SubjectPicker` machte es zwei Dateien weiter richtig.
     onMount(() => {
         focusedIndex = 0
+        inputEl?.focus()
     })
 </script>
 
@@ -109,6 +123,7 @@
         <!-- Suchfeld -->
         <div class="px-3 py-2 border-b border-light-ui-3 dark:border-dark-ui-3">
             <input
+                bind:this={inputEl}
                 type="text"
                 bind:value={query}
                 onkeydown={handleKeydown}
