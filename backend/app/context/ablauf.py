@@ -16,7 +16,7 @@ schon.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,18 @@ def vorgeschlagenes_ablaufdatum(content_type: str | None) -> date | None:
         get_valid_until_schuljahresende,
     )
 
-    heute = datetime.now(timezone.utc).date()
+    # ⚠️ **Lokales Kalenderdatum, nicht UTC** (korrigiert 11.09.2026). Ein
+    # Schuljahresende ist ein Datum im Kalender der Schule; die Frage „liegt es in der
+    # Zukunft?" beantwortet nicht die Weltzeit. Bis hierher stand
+    # `datetime.now(timezone.utc).date()`, und zwischen Mitternacht und 02:00 MESZ
+    # hielt die Funktion damit den Vortag für heute — am Tag des Schuljahresendes
+    # hätte ein um 00:30 angelegter Baustein ein Ablaufdatum bekommen und wäre in
+    # derselben Nacht archiviert worden. Genau der Fall, den die Prüfung unten
+    # verhindern soll.
+    #
+    # Aufgefallen, weil `test_heute_zaehlt_noch_nicht_als_zukunft` um 01:26 kippte:
+    # Der Test leitete „heute" lokal ab, die Funktion in UTC.
+    heute = date.today()
 
     if get_valid_until_schuljahresende(content_type):
         from app.planning.calendar import load_school_year

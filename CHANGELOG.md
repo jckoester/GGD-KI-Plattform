@@ -124,6 +124,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Das vorgeschlagene Ablaufdatum rechnete kurz nach Mitternacht mit dem Vortag.**
+  Ablaufdatum und nächtliche Archivierung leiten den Kalendertag jetzt lokal ab statt
+  aus der Weltzeit.
+
 - **Der Assistenten-Dialog (`/` im Chat) reagierte nicht auf die Tastatur.** Escape,
   Pfeiltasten und Enter waren wirkungslos, Getipptes landete im Chat-Feld statt in der
   Suche. Zusätzlich ließ sich der Dialog bei leerer Trefferliste nicht mehr abbrechen.
