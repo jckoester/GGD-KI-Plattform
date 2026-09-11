@@ -5,183 +5,130 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.9.0] – 2026-09-11
+
+Schwerpunkt: **Datenschutz und Verlässlichkeit**. Die Kontolöschung räumt jetzt alle
+Spuren ab, und kein Krisenfall bleibt mehr unbefristet liegen — er meldet sich per
+E-Mail, wird erinnert und hat eine Aufbewahrungsgrenze. Fachseite und
+Unterrichtsgruppe sind zu einer Übersicht zusammengewachsen, die beantwortet, wo man
+stehengeblieben ist. Schüler:innen sehen und verwalten erstmals ihre eigenen
+Bausteine.
+
 ### Neu
 
-- **Das Hilfe-Banner bleibt erhalten und steht dort, wo es hingehört.** Es erscheint
-  jetzt direkt unter der Nachricht, die es ausgelöst hat — also über der Antwort statt
-  darunter — und ist nach dem Neuladen des Gesprächs wieder da.
+- **Fachseite und Unterrichtsgruppe sind eine Übersicht geworden**: letzte Chats,
+  Assistenten der Gruppe, zuletzt Entstandenes und Absprünge zum Nachschlagen.
+  Schüler:innen landen direkt in ihrer Unterrichtsgruppe; die Fachseite bündelt für
+  Lehrkräfte die Gruppen und trägt, was Fachbezug ohne Gruppenbezug hat.
+
+- **Der Block „Jetzt"** zeigt Lehrkräften die laufende und nächste Unterrichtseinheit
+  samt Stand sowie die zuletzt gehaltene und die nächsten Stunden — mit Entwurfs- und
+  Nachbereitungsstand. Fehlt ein Entwurf, lässt er sich von dort anlegen.
+
+- **Archiv früherer Schuljahre.** Der Reiter „Archiv" macht die eigenen Chats und
+  Bausteine aus vergangenen Jahren wieder zugänglich; eigene Stundenentwürfe öffnen
+  sich schreibgeschützt mit Verlaufsplan. Die Jahresplanung einer früheren Gruppe
+  bleibt geschlossen.
+
+- **„Meine Bausteine"** unter *Wissensgraph → Meine Bausteine*, für alle Rollen: der
+  eigene Gesamtbestand nach Fach gruppiert, mit Filter auf eine Bausteinart.
+  Umbenennen, Ablauf verlängern, Archivieren und Löschen geschehen in der Zeile —
+  Archivieren mit Rückgängig-Streifen, Löschen mit Nachfrage, die bei fremden
+  Verweisen in „Stattdessen archivieren" wechselt. Ein Zähler in der Seitenleiste
+  nennt, was Aufmerksamkeit braucht: abgelaufen, läuft demnächst ab, verweist auf
+  Archiviertes oder hat noch keinen Inhalt.
+
+- **Jede Zeile zeigt Lehrkräften, in welcher Einheit oder Stunde der Baustein
+  steckt**; ein Klick darauf filtert die Liste.
+
+- **Der Unterrichtsplaner verknüpft eingesetztes Material mit der Stunde.** Was im
+  Verlaufsplan als Material steht, erscheint am Baustein als „Eingesetzt in".
+  Von Hand angelegte Verknüpfungen bleiben unberührt.
+
+- **„Als Baustein speichern"** — aus einem Dokument oder Flussdiagramm der Bibliothek
+  wird ein Baustein im Wissensgraphen, mit Bausteinart, Sichtbarkeit und Ablaufdatum.
+  Zwei Einstiege, ein Formular: unter der Chat-Antwort und an jeder Karte der
+  Bibliothek. Erneutes Speichern legt eine neue Fassung an statt eines zweiten
+  Bausteins; die bisherige wandert ins Archiv und bleibt erreichbar.
+
+- **Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen** — als
+  Schülertext, Lernplan, Schülerpräsentation oder Gliederung/Mindmap. Diese Bausteine
+  sind ausnahmslos privat.
+
+- **Schüler:innen erreichen die fachgebundenen Sammlungen.** Fachbegriffe,
+  Methodenblätter und Operatorenblätter stehen unter „Nachschlagen" auf der
+  Fachübersicht.
+
+- **Bausteine lassen sich unter weiteren Namen finden.** Jeder Baustein kann „Andere
+  Bezeichnungen" tragen; wer danach sucht, findet ihn — exakt, ähnlich geschrieben und
+  bei der Vervollständigung mit `@`.
 
 - **Krisenfälle melden sich per E-Mail.** Ein neuer Hinweis löst eine Nachricht an ein
   konfiguriertes Postfach aus; unerledigte Fälle werden nach sieben Tagen erinnert,
   danach wöchentlich. Die Nachricht nennt Zahl, Alter und den Weg zur Übersicht —
   weder Person noch Kategorie noch Inhalt.
 
-- **Offene Krisenfälle haben eine Aufbewahrungs-Obergrenze.** Bisher schützte ein
-  unbearbeiteter Fall die Konversation unbefristet. Jetzt endet der Schutz nach 365
-  Tagen, mit einer letzten Warnung 14 Tage vorher — und nur, wenn zuvor erinnert
+- **Einsicht-Anträge melden sich ebenfalls.** Ein neuer Antrag benachrichtigt die
+  Personen mit der Rolle „review", und wartende Anträge werden erinnert. Empfänger ist
+  `CRISIS_REVIEW_NOTIFY_TO`, getrennt von `CRISIS_NOTIFY_TO`.
+
+- **Offene Krisenfälle haben eine Aufbewahrungs-Obergrenze.** Der Schutz endet nach
+  365 Tagen, mit einer letzten Warnung 14 Tage vorher — und nur, wenn zuvor erinnert
   wurde. Alle drei Fristen sind einstellbar.
-
-- **Fachseite und Unterrichtsgruppe sind eine Übersicht geworden.** Sie beantwortet
-  „Wo war ich stehengeblieben?": letzte Chats, Assistenten der Gruppe, zuletzt
-  Entstandenes und Absprünge zum Nachschlagen. Schüler:innen landen direkt in ihrer
-  Unterrichtsgruppe; die Fachseite bündelt für Lehrkräfte die Gruppen und trägt, was
-  Fachbezug ohne Gruppenbezug hat.
-
-- **Der Block „Jetzt"** zeigt Lehrkräften die laufende und nächste Unterrichtseinheit
-  samt Stand sowie die zuletzt gehaltene und die nächsten Stunden — mit Entwurfs- und
-  Nachbereitungsstand. Fehlt ein Entwurf, lässt er sich von dort anlegen.
-
-- **Archiv früherer Schuljahre.** Unterrichtsgruppen vergangener Jahre verschwinden mit
-  dem Schuljahreswechsel aus der Oberfläche; der Reiter „Archiv" macht die eigenen Chats
-  und Bausteine daraus wieder zugänglich. Eigene Stundenentwürfe öffnen sich mit
-  Verlaufsplan, schreibgeschützt. Die Jahresplanung einer früheren Gruppe bleibt
-  geschlossen.
-
-- **Schüler:innen erreichen die fachgebundenen Sammlungen.** Fachbegriffe,
-  Methodenblätter und Operatorenblätter stehen unter „Nachschlagen" auf der
-  Fachübersicht; die Lesepfade des Kontextspeichers sind für alle Rollen offen.
 
 - **Die Bibliothek lässt sich auf ein Fach eingrenzen** (`/library?subject_id=…`).
 
-- **„Meine Bausteine"** unter *Wissensgraph → Meine Bausteine*, für alle Rollen. Die
-  Seite zeigt den eigenen Gesamtbestand über alle Fächer und Entstehungswege hinweg,
-  nach Fach gruppiert und innerhalb nach zuletzt geändert; ein Filter engt auf eine
-  Bausteinart ein. Umbenennen, Ablauf verlängern, Archivieren und Löschen geschehen
-  direkt in der Zeile — Archivieren mit Rückgängig-Streifen, Löschen mit Nachfrage, die
-  sich bei fremden Verweisen in „Stattdessen archivieren" verwandelt und die Verweise
-  zeigt. Inhalte ändert die Seite nicht: Dafür führt sie in den Planer oder den Editor
-  der Sammlung.
-
-- **Ein Zähler in der Seitenleiste nennt, was Aufmerksamkeit braucht** — abgelaufen,
-  läuft demnächst ab, verweist auf Archiviertes oder hat noch keinen Inhalt. Auf der
-  Seite steht derselbe Hinweis mit „Nur diese anzeigen".
-
-- **Jede Zeile zeigt Lehrkräften, in welcher Einheit oder Stunde der Baustein steckt.**
-  Ein Klick darauf filtert die Liste. Steht dort nichts, nutzt ihn keine Einheit mehr.
-
-- **Der Unterrichtsplaner verknüpft eingesetztes Material mit der Stunde.** Was im
-  Verlaufsplan als Material steht, erscheint am Baustein als „Eingesetzt in"; Änderungen
-  am Verlaufsplan ziehen die Verknüpfungen nach. Von Hand angelegte Verknüpfungen
-  bleiben davon unberührt.
-
-- **„Als Baustein speichern"** — aus einem Dokument oder Flussdiagramm der Bibliothek
-  wird ein Baustein im Wissensgraphen, mit Bausteinart, Sichtbarkeit und Ablaufdatum.
-  Zwei Einstiege, ein Formular: unter der Chat-Antwort neben „In Werkstatt öffnen" und
-  an jeder Karte der Bibliothek. Bilder, Schaltpläne, Funktionsgraphen und
-  GeoGebra-Dateien bleiben in der Bibliothek.
-
-- **Erneutes Speichern legt eine neue Fassung an, keinen zweiten Baustein.** Die
-  bisherige wandert ins Archiv und bleibt von der neuen aus erreichbar; wer die alte
-  Fassung als Material führt, bekommt die neue vorgeschlagen. Hat sich nichts geändert,
-  passiert nichts.
-
-- **Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen** — als
-  Schülertext, Lernplan, Schülerpräsentation oder Gliederung/Mindmap. Diese Bausteine
-  sind ausnahmslos privat; die Sichtbarkeit steht nicht zur Wahl.
-
-- **Der Bibliothekseintrag zeigt, was aus ihm geworden ist** — „als Baustein
-  übernommen →" mit Link auf den Baustein.
-
-- **Bausteine lassen sich unter weiteren Namen finden.** Jeder Baustein kann
-  „Andere Bezeichnungen" tragen; wer danach sucht, findet ihn — exakt wie über den
-  Titel, ähnlich geschrieben, und bei der Vervollständigung mit `@`. Der Treffer zeigt
-  die weiteren Namen mit. Bisher gab es das Feld nur bei Methoden und Sozialformen, und
-  es wirkte allein auf die thematische Suche, nicht auf die Namenssuche.
+- **Die Jahresplanung zeigt „Idee"** an Stundenentwürfen, die noch keine Phasen haben.
 
 ### Geändert
 
-- **Schüler:innen können ihre eigenen Bausteine verwalten** — Detailansicht, Umbenennen,
-  Archivieren, Löschen. Bisher endete jeder dieser Wege mit einer Rechte-Meldung.
+- **Beim Löschen eines Kontos entscheidet die Sichtbarkeit über die eigenen
+  Bausteine:** Was nur die Person selbst sehen konnte, wird mitgelöscht; was mit einer
+  Gruppe, einer Fachschaft oder der Schule geteilt war, bleibt bestehen und verliert
+  den Namen.
 
-- **Jede Bausteinart hat ein eigenes Symbol** in Listen und Detailansichten; bisher
-  trugen bis auf eine alle dasselbe.
+- **Die Kontolöschung räumt vier weitere Bereiche ab:** die persönliche Bibliothek
+  (samt Dateien), den persönlichen Lernstand, die Gruppenmitgliedschaften und die
+  eigenen Fach-Ausblendungen. Ehemalige verschwinden damit aus Gruppenlisten und
+  Zählungen. Der Lernstand einer Gruppe bleibt erhalten.
 
 - **Vier Bausteinarten stehen erstmals zur Verfügung** — Schülertext, Lernplan,
-  Schülerpräsentation und Gliederung/Mindmap. Sie waren angelegt, aber ohne Weg, einen
-  solchen Baustein zu erzeugen. Eine Mindmap ist damit auch als Unterrichtsmaterial
-  wählbar; persönliche Texte und Lernpläne bleiben aus der Material-Auswahl heraus.
+  Schülerpräsentation und Gliederung/Mindmap. Eine Mindmap ist damit auch als
+  Unterrichtsmaterial wählbar; persönliche Texte und Lernpläne bleiben aus der
+  Material-Auswahl heraus.
+
+- **Jede Bausteinart hat ein eigenes Symbol** in Listen und Detailansichten.
 
 - **Einheitliche Seitenbreiten.** Listen nutzen die volle Breite, Formulare und
   Textseiten eine lesbare Spalte — quer durch Assistenten, Bibliothek, Verlauf, Profil,
   Fächer und Werkzeuge.
 
-- **Beim Löschen eines Kontos entscheidet die Sichtbarkeit über die eigenen Bausteine:**
-  Was nur die Person selbst sehen konnte, wird mitgelöscht; was mit einer Gruppe, einer
-  Fachschaft oder der Schule geteilt war, bleibt bestehen und verliert den Namen.
-
-- **Die Kontolöschung räumt vier weitere Bereiche ab:** die persönliche Bibliothek
-  (Datenbankzeilen und Dateien, auch wenn ihre eigene Aufbewahrungsfrist noch läuft), den
-  persönlichen Lernstand, die Gruppenmitgliedschaften und die eigenen
-  Fach-Ausblendungen. Ehemalige verschwinden damit aus Gruppenlisten und Zählungen —
-  bisher blieben sie stehen, weil die Mitgliedschaften nur beim Anmelden abgeglichen
-  werden. Der Lernstand einer Gruppe bleibt erhalten.
-
-- **Die Jahresplanung zeigt „Idee" an noch leeren Stundenentwürfen.** Ein angelegter
-  Entwurf ohne Phasen war bisher nicht von einem ausgearbeiteten zu unterscheiden.
-
-- **Die Abzeichen der Jahresplanung sind lesbar.** „Fixpunkt", „✓ auto", „vorläufig"
-  und die Kategorie standen in zu blasser Schrift; Fläche und Rand tragen jetzt die
-  Farbe, die Beschriftung die gewohnte Textfarbe.
-
-- **Einsicht-Anträge melden sich per E-Mail.** Ein neuer Antrag auf Einsicht in einen
-  geflaggten Chat benachrichtigt die Personen mit der Rolle „review"; wartet er länger
-  als sieben Tage, wird wöchentlich erinnert. Empfänger ist die neue Einstellung
-  `CRISIS_REVIEW_NOTIFY_TO` — getrennt von `CRISIS_NOTIFY_TO`, damit Antrag und
-  Zweitfreigabe nicht im selben Postfach landen.
-
-### Behoben
-
-- **Das vorgeschlagene Ablaufdatum rechnete kurz nach Mitternacht mit dem Vortag.**
-  Ablaufdatum und nächtliche Archivierung leiten den Kalendertag jetzt lokal ab statt
-  aus der Weltzeit.
-
-- **Der Assistenten-Dialog (`/` im Chat) reagierte nicht auf die Tastatur.** Escape,
-  Pfeiltasten und Enter waren wirkungslos, Getipptes landete im Chat-Feld statt in der
-  Suche. Zusätzlich ließ sich der Dialog bei leerer Trefferliste nicht mehr abbrechen.
-
-- **Die Schweregrad-Chips in den Krisen-Meldungen und -Freigaben waren nicht lesbar.**
-  „Alarm", „Warnung" und „Hinweis" standen in beiden Modi auf einer Fläche derselben
-  Farbfamilie. Fläche und Rand tragen jetzt die Farbe, die Beschriftung die gewohnte
-  Textfarbe.
-
-### Migration
-
-- **`0057`** — Aliase bekommen eine eigene Tabelle. Der Lauf übernimmt vorhandene
-  Bezeichnungen aus den Metadaten und entfernt sie dort; die Reihenfolge bleibt erhalten,
-  ein Neu-Einbetten ist nicht nötig. Legt die PostgreSQL-Erweiterung `pg_trgm` an, falls
-  sie fehlt (seit 0054 in der Regel vorhanden).
-
-- **`0058`** — `messages.cost_status`: wie belastbar ein gespeicherter Kostenbetrag ist.
-  Bestandszeilen bleiben leer (= keine Aussage); keine Nacharbeit nötig.
-
-- **`0059`** — `conversation_flags.last_reminder_at`: wann zuletzt an einen offenen
-  Krisenfall erinnert wurde. Bestandszeilen bleiben leer und gelten damit als „nie
-  erinnert" — sie werden **nicht** gelöscht, bis der Erinnerungslauf sie erfasst hat.
-
-- **`0060`** — `conversation_access_requests.last_reminder_at`: dasselbe für wartende
-  Einsicht-Anträge. Bestandszeilen bleiben leer; keine Nacharbeit nötig.
-
-**Neu einzutragen:** `SMTP_*`, `CRISIS_NOTIFY_TO` und `CRISIS_REVIEW_NOTIFY_TO` (siehe
-`.env.example`). Ohne sie werden Krisen-Benachrichtigungen nur ins Log geschrieben;
-`scripts/check_production.py` meldet das als Fehler. Der Cron-Eintrag für
-`scripts/crisis_reminders.py` steht bereits in der `docker-compose.yml`.
-
-### Geändert
-
 - **Bild und die Knöpfe „In Werkstatt öffnen" / „Als Baustein speichern" stehen jetzt
-  in der Antwortblase**, nicht mehr darunter. Sie gehören zur selben Antwort wie der
-  Text und die Kostenzeile.
+  in der Antwortblase**, nicht mehr darunter. Bei einer Antwort mit Bild steht am
+  Übernehmen-Knopf, dass nur der Text mitgeht.
 
-- **Bei einer Antwort mit Bild steht am Übernehmen-Knopf, dass nur der Text mitgeht** —
-  und wo sich das Bild speichern lässt. Der Knopf zum Herunterladen eines Bildes hat
-  jetzt ebenfalls einen Tooltip.
+- **Der Bibliothekseintrag zeigt, was aus ihm geworden ist** — „als Baustein
+  übernommen →" mit Link.
+
+- **Das Hilfe-Banner steht unter der auslösenden Nachricht** statt unter der Antwort
+  und ist nach dem Neuladen des Gesprächs wieder da.
 
 ### Behoben
 
-- **Die Kontaktangaben im Hilfe-Banner waren im hellen Erscheinungsbild nicht lesbar.**
-  Grauer Text auf mittelblauem Grund ergab ein Kontrastverhältnis von 1,3:1 bei einer
-  Untergrenze von 4,5:1. Der Kasten liegt jetzt auf heller Fläche mit grüner Kante und
-  hebt sich damit auch von den Chat-Blasen ab, die dieselbe Blaufamilie nutzten.
+- **Der Chat wartet nicht mehr auf die Kostenabrechnung.** Bisher blieb die Verbindung
+  nach der fertigen Antwort bis zu 15 Sekunden offen; der Betrag wird jetzt im
+  Hintergrund nachgetragen. Solange er fehlt, steht „Kosten werden ermittelt …".
+
+- **Unvollständige Kostenangaben sind als solche erkennbar.** Fehlt für eine
+  Teilanfrage die Abrechnung, wird der Betrag als Untergrenze gekennzeichnet
+  („mindestens 0,01 €"). Die Statistik weist aus, wie viele Nachrichten betroffen sind.
+
+- **Eine leere Modell-Antwort zeigt jetzt einen Hinweis** samt gebuchtem Betrag statt
+  gar nichts.
+
+- **Schüler:innen können ihre eigenen Bausteine verwalten** — Detailansicht,
+  Umbenennen, Archivieren, Löschen. Bisher endete jeder dieser Wege mit einer
+  Rechte-Meldung.
 
 - **Die Fachseite zeigte Schüler:innen nie einen Chat.** Sie fragte nach Chats ohne
   Unterrichtsgruppe; Schülerchats haben aber immer eine.
@@ -192,29 +139,45 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **In einer leeren Sammlung erschien für Schüler:innen „Neu anlegen"**, obwohl das
   Anlegen abgelehnt wird.
 
-- **Der Chat wartet nicht mehr auf die Kostenabrechnung.** Bisher blieb die
-  Verbindung nach der fertigen Antwort bis zu 15 Sekunden offen, nur um den Betrag
-  abzuwarten; er wird jetzt im Hintergrund nachgetragen. Solange er fehlt, steht
-  „Kosten werden ermittelt …" statt einer leeren Zeile.
+- **Der Assistenten-Dialog (`/` im Chat) reagierte nicht auf die Tastatur.** Escape,
+  Pfeiltasten und Enter waren wirkungslos, Getipptes landete im Chat-Feld. Bei leerer
+  Trefferliste ließ er sich gar nicht mehr abbrechen.
 
-- **Unvollständige Kostenangaben sind als solche erkennbar.** Besteht eine Antwort aus
-  mehreren Teilanfragen und fehlt für eine die Abrechnung, wird der Betrag als
-  Untergrenze gekennzeichnet („mindestens 0,01 €"). Die Statistik weist zusätzlich aus,
-  wie viele Nachrichten eines Zeitraums betroffen sind.
+- **Mehrere Beschriftungen waren zu kontrastarm:** die Kontaktangaben im Hilfe-Banner,
+  die Schweregrad-Chips in Krisen-Meldungen und -Freigaben sowie die Abzeichen der
+  Jahresplanung.
 
-- **Das Backend startet nicht mehr mit veralteter Datenbank.** Eine fehlende Migration
-  zeigte sich vorher erst beim Anklicken, als fehlende Tabelle statt als fehlende
-  Migration; jetzt nennt eine Startprüfung beide Stände und den nötigen Befehl.
+- **Das vorgeschlagene Ablaufdatum rechnete kurz nach Mitternacht mit dem Vortag.**
+  Ablaufdatum und nächtliche Archivierung leiten den Kalendertag jetzt lokal ab.
 
-- **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten Öffnen
-  ließen sie sich nicht mehr eindeutig zuordnen.
+- **Das Backend startet nicht mehr mit veralteter Datenbank.** Eine Startprüfung nennt
+  beide Stände und den nötigen Befehl.
 
-- **Wer einen Baustein fachweit freigab, bekam Unterrichtsgruppen statt Fachschaften zur
-  Auswahl.** Die angebotene Gruppe konnte gar nicht zum gewählten Umfang passen.
+- **Der Verlaufsplan einer Stunde speicherte Phasen ohne Kennung.** Beim erneuten
+  Öffnen ließen sie sich nicht mehr eindeutig zuordnen.
+
+- **Wer einen Baustein fachweit freigab, bekam Unterrichtsgruppen statt Fachschaften
+  zur Auswahl.**
 
 - **Beim Ändern eines Bausteins wurde die zuständige Gruppe nicht geprüft.** Die
-  Prüfung galt bisher nur beim Anlegen; so ließ sich ein Baustein nachträglich auf einen
-  Umfang setzen, für den ihm die Gruppe fehlte.
+  Prüfung galt bisher nur beim Anlegen.
+
+### Migration
+
+`alembic upgrade head` führt `0057` bis `0060` aus. Bestandszeilen brauchen keine
+Nacharbeit.
+
+- **`0057`** — eigene Tabelle für Aliase; der Lauf übernimmt vorhandene Bezeichnungen
+  aus den Metadaten. Legt `pg_trgm` an, falls es fehlt.
+- **`0058`** — `messages.cost_status`: wie belastbar ein gespeicherter Betrag ist.
+- **`0059`** — `conversation_flags.last_reminder_at`. Bestandszeilen gelten als „nie
+  erinnert" und werden **nicht** gelöscht, bis der Erinnerungslauf sie erfasst hat.
+- **`0060`** — `conversation_access_requests.last_reminder_at`.
+
+**Neu einzutragen:** `SMTP_*`, `CRISIS_NOTIFY_TO` und `CRISIS_REVIEW_NOTIFY_TO` (siehe
+`.env.example`). Ohne sie werden Krisen-Benachrichtigungen nur ins Log geschrieben;
+`scripts/check_production.py` meldet das als Fehler. Der Cron-Eintrag für
+`scripts/crisis_reminders.py` steht bereits in der `docker-compose.yml`.
 
 ## [0.8.0] – 2026-09-05
 
