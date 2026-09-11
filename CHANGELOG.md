@@ -119,6 +119,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Die Jahresplanung zeigt „Idee" an noch leeren Stundenentwürfen.** Ein angelegter
   Entwurf ohne Phasen war bisher nicht von einem ausgearbeiteten zu unterscheiden.
 
+- **Die Abzeichen der Jahresplanung sind lesbar.** „Fixpunkt", „✓ auto", „vorläufig"
+  und die Kategorie standen in zu blasser Schrift; Fläche und Rand tragen jetzt die
+  Farbe, die Beschriftung die gewohnte Textfarbe.
+
 - **Einsicht-Anträge melden sich per E-Mail.** Ein neuer Antrag auf Einsicht in einen
   geflaggten Chat benachrichtigt die Personen mit der Rolle „review"; wartet er länger
   als sieben Tage, wird wöchentlich erinnert. Empfänger ist die neue Einstellung

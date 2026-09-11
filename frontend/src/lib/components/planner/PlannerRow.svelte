@@ -80,11 +80,35 @@
   const popoverOpen = $derived(uePicker || commentOpen || menuOpen)
   const dim = (cls) => (popoverOpen ? '' : cls)
 
+  /**
+   * Gemeinsame Form aller Abzeichen dieser Zeile — die Farbe kommt je Abzeichen dazu.
+   *
+   * **Die Schrift ist immer die gewohnte Textfarbe.** Sie war es bis 11.09.2026
+   * nirgends: Die farbigen Abzeichen trugen den Akzent als Schrift (`text-yellow-700`
+   * auf `bg-yellow-50` = 4,26:1 beim Fixpunkt), die grauen die abgeschwächte
+   * (`text-light-tx-2` auf `bg-light-ui-2` = **3,58:1** hell, **3,42:1** dunkel) —
+   * bei einer Untergrenze von 4,5:1 und `text-xs`. Ausgerechnet die unscheinbaren
+   * grauen waren die schlechtesten.
+   *
+   * Jetzt tragen Fläche und Rand die Farbe, die Schrift steht bei 8–16:1. Dasselbe
+   * Muster wie die Schweregrad-Chips in `/flags` und `/review`; die Begründung und
+   * die Messwerte stehen bei den `-bg`-Token in `routes/layout.css`.
+   *
+   * ⚠️ **Jedes Abzeichen trägt ein Wort.** Die hellen Tönungen unterscheiden sich
+   * untereinander nur um 1,01–1,07 in der Helligkeit — sie trennen sich über den
+   * Farbton. Wer den nicht sieht, liest die Beschriftung.
+   */
+  const ABZEICHEN =
+    'inline-flex items-center px-1.5 py-0.5 rounded border text-xs font-medium ' +
+    'text-light-tx dark:text-dark-tx'
+  const ABZEICHEN_NEUTRAL =
+    'bg-light-ui-2 dark:bg-dark-ui-2 border-light-ui-3 dark:border-dark-ui-3'
+
   const rowExtra = $derived(
     slot.kategorie === 'ausfall'
       ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
       : slot.kategorie === 'pruefung'
-        ? 'bg-red-50/60 dark:bg-red-950/20'
+        ? 'bg-light-re-bg/60 dark:bg-dark-re-bg/20'
         : slot.kategorie === 'puffer'
           ? dim('opacity-60')
           : vorlaeufig
@@ -233,8 +257,8 @@
   <!-- Status-Badges -->
   <div class="px-2 py-2.5 flex flex-wrap gap-1 items-start">
     {#if slot.pinned}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-200">
+      <span class="{ABZEICHEN} bg-light-ye-bg dark:bg-dark-ye-bg
+                   border-light-ye dark:border-dark-ye">
         Fixpunkt
       </span>
     {/if}
@@ -243,41 +267,40 @@
          Nach der Nachbereitung entfällt er: Dann ist die Stunde gehalten, und der
          Ausarbeitungsstand ist keine offene Aufgabe mehr. -->
     {#if entwurfsStand(slot) === 'idee' && !slot.nachbereitet_at}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-light-ui-2 text-light-tx dark:bg-dark-ui-2 dark:text-dark-tx"
+      <span class="{ABZEICHEN} {ABZEICHEN_NEUTRAL}"
             title="Stundenentwurf ist angelegt, enthält aber noch keine Phasen">
         Idee
       </span>
     {/if}
     {#if slot.nachbereitet_at}
       {#if slot.nachbereitet_auto}
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                     bg-light-ui-2 text-light-tx-2 dark:bg-dark-ui-2 dark:text-dark-tx-2"
+        <!-- Neutral statt grün: „automatisch bestätigt" ist eine schwächere Aussage
+             als „nachbereitet". Die Abstufung trägt die Fläche, nicht die Schrift —
+             eine abgeschwächte Schrift kostete die Lesbarkeit (vorher 3,58:1). -->
+        <span class="{ABZEICHEN} {ABZEICHEN_NEUTRAL}"
               title="Automatisch bestätigt — Klick zum Undo">
           ✓ auto
         </span>
       {:else}
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                     bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300">
+        <span class="{ABZEICHEN} bg-light-gr-bg dark:bg-dark-gr-bg
+                     border-light-gr dark:border-dark-gr">
           ✓ nachbereitet
         </span>
       {/if}
     {/if}
     {#if slot.anpassung_noetig}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+      <span class="{ABZEICHEN} bg-light-or-bg dark:bg-dark-or-bg
+                   border-light-or dark:border-dark-or">
         Anpassung
       </span>
     {/if}
     {#if vorlaeufig}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-light-ui-2 text-light-tx-2 dark:bg-dark-ui-2 dark:text-dark-tx-2">
+      <span class="{ABZEICHEN} {ABZEICHEN_NEUTRAL}">
         vorläufig
       </span>
     {/if}
     {#if slot.kategorie !== 'unterricht'}
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                   bg-light-ui-2 text-light-tx-2 dark:bg-dark-ui-2 dark:text-dark-tx-2">
+      <span class="{ABZEICHEN} {ABZEICHEN_NEUTRAL}">
         {KATEGORIE_LABELS[slot.kategorie] ?? slot.kategorie}
       </span>
     {/if}
@@ -291,7 +314,7 @@
       title={slot.pinned ? 'Fixpunkt aufheben' : 'Als Fixpunkt markieren'}
       class="p-1.5 rounded hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
              {slot.pinned
-               ? 'text-yellow-600 dark:text-yellow-400'
+               ? 'text-light-ye dark:text-dark-ye'
                : 'text-light-tx-2 dark:text-dark-tx-2 opacity-0 group-hover:opacity-100'}"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"

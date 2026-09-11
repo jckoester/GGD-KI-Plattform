@@ -204,20 +204,35 @@
 
     /* ── Getönte Flächen (`-bg`) ──────────────────────────────────────────────
      * Für farbige Chips, Kästen und Hinweisflächen. Darauf steht die **gewohnte**
-     * Textfarbe (`text-light-tx` / `dark:text-dark-tx`, 11–16:1), die Farbe tragen
-     * Fläche und Rand — der Rand in `-re`/`-or`/`-bl` liegt bei 4,0–5,4:1 gegen
-     * seine Tönung und ist damit deutlich sichtbar.
+     * Textfarbe (`text-light-tx` / `dark:text-dark-tx`, 10–16:1), die Farbe tragen
+     * Fläche und Rand — der Rand im zugehörigen Akzent (`-re`, `-or`, …) liegt bei
+     * 3,0–5,4:1 gegen seine Tönung und ist damit deutlich sichtbar. Für ein
+     * nichttextliches Element ist das die richtige Schwelle (3:1).
      *
      * ⚠️ **Nicht `-2` als Fläche unter `-1` als Schrift verwenden.** Die
      * `-2`-Token sind der Akzent des *jeweils anderen* Modus (`light-re-2` =
      * `dark-re` = red-400), liegen also eine Palettenstufe neben dem Akzent
      * selbst. `bg-light-or-2` + `text-light-or` ergab 1,45:1 — die Schrift war
      * unlesbar (aufgetreten in den Schweregrad-Chips von `/flags` und `/review`,
-     * behoben 10.09.2026). Wer eine farbige Fläche braucht, nimmt `-bg`. */
+     * behoben 10.09.2026). Wer eine farbige Fläche braucht, nimmt `-bg`.
+     *
+     * ⚠️ **Auch den Akzent selbst nicht als Schrift auf `-bg` setzen.** Naheliegend,
+     * aber nachgemessen (11.09.2026) scheitert es an fünf von zehn Kombinationen:
+     * gelb hell 3,01 · grün hell 3,81 · orange hell 4,03 · rot dunkel 4,09 · blau
+     * dunkel 4,47. Die gewohnte Textfarbe trägt dagegen überall.
+     *
+     * Die hellen Tönungen unterscheiden sich untereinander nur um 1,01–1,07 in der
+     * Helligkeit — sie trennen sich über den **Farbton**, nicht über die Helligkeit.
+     * Deshalb trägt ein Chip immer auch ein **Wort**: Wer Farben nicht unterscheiden
+     * kann, liest es. Die Farbe ist Verstärkung, nie die einzige Auskunft. */
     --color-light-re-bg: var(--color-red-50);
     --color-dark-re-bg: var(--color-red-950);
     --color-light-or-bg: var(--color-orange-50);
     --color-dark-or-bg: var(--color-orange-950);
+    --color-light-ye-bg: var(--color-yellow-50);
+    --color-dark-ye-bg: var(--color-yellow-950);
+    --color-light-gr-bg: var(--color-green-50);
+    --color-dark-gr-bg: var(--color-green-950);
     --color-light-bl-bg: var(--color-blue-50);
     --color-dark-bl-bg: var(--color-blue-950);
 }
