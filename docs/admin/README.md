@@ -43,7 +43,7 @@ Für eine vollständige Neuinstallation diese Schritte der Reihe nach durchführ
 - [ ] Modellnamen und Anbieter-Schlüssel in die `.env` eintragen (`CHAT_DEFAULT_MODEL`,
       `TITLE_MODEL`, `EMBEDDING_MODEL`) — Aufgabennamen, keine Produktnamen
 - [ ] `docker compose up -d` ausführen
-- [ ] Datenbank-Migration: `docker compose exec backend alembic upgrade head`
+- [ ] Datenbank-Migration: `docker compose run --rm backend alembic upgrade head`
 - [ ] Fächer einspielen: `docker compose exec backend python scripts/seed_subjects.py`
 - [ ] Wechselkurs setzen: `docker compose exec backend python scripts/seed_exchange_rate.py --rate …`
 - [ ] LiteLLM-Teams anlegen: `docker compose exec backend python scripts/create_litellm_teams.py`

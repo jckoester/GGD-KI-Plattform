@@ -74,7 +74,15 @@ def abweichung(
     if db_stand == kopf:
         return None
 
-    befehl = "cd backend && alembic upgrade head"
+    # **Nicht `docker compose exec`.** Diese Meldung liest man, während der Start
+    # scheitert — und ein Container, der beim Start abbricht, lebt nie lange genug für
+    # ein `exec`. Mit `restart: unless-stopped` läuft er stattdessen im Kreis. `run`
+    # startet einen eigenen Container mit überschriebenem Kommando; die Startprüfung
+    # kommt dabei gar nicht erst dran. (Aufgetreten beim Rollout von 0.9 auf Produktion.)
+    befehl = (
+        "docker compose run --rm backend alembic upgrade head "
+        "(im Entwicklungsbaum: cd backend && alembic upgrade head)"
+    )
     if not db_stand:
         return (
             "Die Datenbank kennt keine Migration (Tabelle alembic_version ist leer "
@@ -124,6 +132,11 @@ async def pruefe_beim_start(session_factory) -> None:
 
     meldung = abweichung(db_stand, kopf, bekannt)
     if meldung:
+        # Vor dem Werfen **und** als eigene Zeile: Die Ausnahme landet im Traceback des
+        # Startabbruchs, und bei `restart: unless-stopped` wiederholt sich der alle paar
+        # Sekunden. Wer dann in die Logs sieht, soll den Satz finden, nicht ihn aus einem
+        # Stapelabzug herauslesen müssen.
+        logger.error("Start abgebrochen: %s", meldung)
         raise SchemaVeraltet(meldung)
 
     logger.info("Datenbank auf Migrationsstand %s.", sorted(kopf))

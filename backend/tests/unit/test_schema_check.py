@@ -47,6 +47,20 @@ class TestAbweichung:
         assert "kennt dieser Code nicht" not in meldung
         assert "alembic upgrade head" in meldung
 
+    @pytest.mark.parametrize("db_stand", [{"0056"}, set()])
+    def test_der_vorgeschlagene_befehl_funktioniert_im_container(self, db_stand):
+        """`exec` wäre der falsche Rat — und zwar genau dann, wenn man ihn liest.
+
+        Diese Meldung erscheint, **während** der Start scheitert. Mit
+        `restart: unless-stopped` läuft der Container danach im Kreis und lebt nie lange
+        genug für ein `docker compose exec`. Beim Rollout von 0.9 auf Produktion war das
+        eine Sackgasse: Das Backend startete nicht wegen der fehlenden Migration, und die
+        Migration ließ sich nicht einspielen, weil das Backend nicht startete.
+        """
+        meldung = abweichung(db_stand, {"0057"})
+        assert "docker compose run --rm backend" in meldung
+        assert "compose exec" not in meldung
+
 
 class TestKopfRevisionen:
 

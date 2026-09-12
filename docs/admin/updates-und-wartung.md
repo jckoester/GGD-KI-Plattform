@@ -5,9 +5,18 @@
 ```bash
 git pull
 docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
 docker compose up -d
-docker compose exec backend alembic upgrade head
 ```
+
+> ⚠️ **Erst migrieren, dann starten — und `run`, nicht `exec`.** Das Backend prüft beim
+> Start, ob die Datenbank auf dem erwarteten Stand ist, und bricht sonst ab. Zusammen mit
+> `restart: unless-stopped` ergibt die umgekehrte Reihenfolge eine Sackgasse: Der
+> Container läuft im Kreis und lebt nie lange genug für ein `docker compose exec`.
+>
+> `run --rm` startet einen eigenen Container mit überschriebenem Kommando; die
+> Startprüfung kommt dabei gar nicht erst dran. Steckt man schon fest, ist derselbe
+> Befehl auch der Ausweg — `docker compose stop backend` davor macht die Logs ruhiger.
 
 > **Nur die Konfiguration geändert?** Dann ist `up -d` der **falsche** Befehl: Der Inhalt
 > einer eingehängten Datei ist für Compose unsichtbar, der Container wird nicht neu
@@ -490,7 +499,7 @@ vergessen.** Steht dort „N Knoten tragen den content_type …, den die Taxonom
 (mehr) kennt", fehlt der Datenbankteil des Updates:
 
 ```bash
-docker compose exec backend alembic upgrade head
+docker compose run --rm backend alembic upgrade head
 docker compose up -d backend
 ```
 

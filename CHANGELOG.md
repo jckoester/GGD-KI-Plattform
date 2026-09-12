@@ -164,6 +164,19 @@ Bausteine.
 
 ### Migration
 
+⚠️ **Migrieren, bevor die neuen Container starten:**
+
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+```
+
+Ab dieser Fassung bricht das Backend beim Start ab, wenn die Datenbank nicht auf dem
+erwarteten Stand ist. Wer zuerst `up -d` ausführt, bekommt einen Container, der im Kreis
+neu startet — und `docker compose exec` greift dann ins Leere. `run --rm` startet einen
+eigenen Container ohne die Startprüfung und ist auch der Ausweg, wenn man schon feststeckt.
+
 `alembic upgrade head` führt `0057` bis `0060` aus. Bestandszeilen brauchen keine
 Nacharbeit.
 

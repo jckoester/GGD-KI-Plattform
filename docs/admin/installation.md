@@ -168,7 +168,7 @@ ssh -L 4000:127.0.0.1:4000 admin@ki.beispielschule.de
 ## Schritt 5: Datenbank-Migration
 
 ```bash
-docker compose exec backend alembic upgrade head
+docker compose run --rm backend alembic upgrade head
 ```
 
 Dieser Befehl legt alle Datenbanktabellen an. Er ist bei jeder Installation
