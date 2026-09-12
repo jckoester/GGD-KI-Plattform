@@ -127,6 +127,8 @@ class UnitRead(BaseModel):
     metadata_: dict = Field(alias="metadata_")
     kapitel_node_id: Optional[UUID] = None
     kapitel_std: Optional[int] = None
+    # Änderungssignal für Clients außerhalb des Browsers (Unterrichtsplanungs-Sync).
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -242,6 +244,8 @@ class LessonRead(BaseModel):
     # der Archiv-Fall. Die Oberfläche schaltet dann in den Lesezustand, statt einen
     # Editor anzubieten, dessen Speichern mit 403 endet.
     darf_bearbeiten: bool = True
+    # Änderungssignal für Clients außerhalb des Browsers (Unterrichtsplanungs-Sync).
+    updated_at: datetime
 
 
 # ── Nachbereitung ────────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ import httpx
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ContextNode
+from app.db.models import ContextNode, ohne_aenderungsstempel
 from app.context.lookup import normalisiere_titel
 from app.context.taxonomy import (
     EMBEDDING_CONTENT_TYPES,
@@ -480,10 +480,20 @@ async def enqueue_embedding_job(node_id: UUID, db: AsyncSession) -> None:
         await db.execute(
             update(ContextNode)
             .where(ContextNode.id == node_id)
-            .values(embedding=embedding)
+            .values(embedding=embedding, **ohne_aenderungsstempel())
         )
         await db.commit()
     except Exception as exc:
         logger.error(f"Embedding-Fehler fuer Knoten {node_id}: {exc}")
-        node.metadata_ = {**node.metadata_, 'embedding_error': str(exc)}
+        # Als Core-Update, nicht als Attributzuweisung: Die Fehlermarke ist abgeleitet,
+        # und nur so lässt sich `onupdate` unterdrücken (bei der ORM-Zuweisung feuert es,
+        # weil ein gleich gebliebener Wert die Spalte nicht in das SET aufnimmt).
+        await db.execute(
+            update(ContextNode)
+            .where(ContextNode.id == node_id)
+            .values(
+                metadata_={**node.metadata_, "embedding_error": str(exc)},
+                **ohne_aenderungsstempel(),
+            )
+        )
         await db.commit()

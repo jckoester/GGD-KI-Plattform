@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Das Änderungsdatum eines Bausteins bleibt beim Bearbeiten nicht mehr stehen. Es
+  wandert jetzt auch beim Ändern von Inhalt, Titel, Unterrichtseinheit und beim
+  Archivieren mit; ein neu berechnetes Embedding zählt weiterhin nicht als Änderung.
+
+### Geändert
+
+- Stunden- und Unterrichtseinheit-Abruf liefern das Änderungsdatum mit.
+
 ## [0.9.0] – 2026-09-11
 
 Schwerpunkt: **Datenschutz und Verlässlichkeit**. Die Kontolöschung räumt jetzt alle

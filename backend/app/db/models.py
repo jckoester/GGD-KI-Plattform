@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from uuid import UUID, UUID as UUIDType
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
@@ -17,6 +17,35 @@ from app.config import settings
 
 class Base(DeclarativeBase):
     pass
+
+
+def _jetzt() -> datetime:
+    """Zeitpunkt für `onupdate`. Python-seitig, nicht `now()` in der Datenbank.
+
+    Der Serverwert wäre gleichwertig, macht das Attribut aber nach dem Schreiben stale —
+    im Async-Stack ist ein Nachladen an dieser Stelle eine Falle. Die Handschreibstellen
+    im Projekt benutzen ohnehin `datetime.now(timezone.utc)`.
+    """
+    return datetime.now(timezone.utc)
+
+
+def ohne_aenderungsstempel() -> dict:
+    """Zusatz für `update(...).values(...)`, wenn die Schreibung **keine** Änderung ist.
+
+    `updated_at` ist das einzige Änderungssignal, das Clients von außen haben (der
+    Unterrichtsplanungs-Sync hängt daran, „Meine Bausteine" sortiert danach). Abgeleitete
+    Daten — ein neu berechnetes Embedding, eine Fehlermarke der Einbettung — sind keine
+    inhaltliche Änderung: Der Knoten liest sich danach genau wie vorher.
+
+    `onupdate` feuert auch bei Core-`update()`, also auch im nächtlichen Backfill. Ohne
+    diesen Zusatz sähe nach einem Modellwechsel **jeder** Knoten geändert aus. Die Spalte
+    in `values()` mitzugeben unterdrückt `onupdate`; die Selbstzuweisung schreibt den
+    alten Wert zurück.
+
+    Nicht verwenden, wo sich der Zustand wirklich ändert (Archivieren, Löschen) — dort
+    ist der Sprung erwünscht.
+    """
+    return {"updated_at": ContextNode.updated_at}
 
 
 # Enums for CHECK constraints
@@ -858,8 +887,13 @@ class ContextNode(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+    # `onupdate` statt Handarbeit an jeder Schreibstelle: Auf dem Kontextpfad blieb der
+    # Zeitstempel bis 12.09.2026 stehen, weil die Endpunkte ihn schlicht nicht setzten —
+    # eine geänderte Stunde sah von außen unverändert aus. Abgeleitete Schreibungen
+    # nehmen `ohne_aenderungsstempel()` dazu.
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+        onupdate=_jetzt, nullable=False
     )
 
     __table_args__ = (
@@ -1209,8 +1243,12 @@ class LessonSlot(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+    # Siehe ContextNode.updated_at. Der WebUntis-Sync schreibt Slots per rohem SQL, an
+    # `onupdate` vorbei — er setzt den Zeitstempel selbst, und zwar bewusst nur bei
+    # echten Änderungen (`app/calendar/sync.py`).
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+        onupdate=_jetzt, nullable=False
     )
 
     __table_args__ = (

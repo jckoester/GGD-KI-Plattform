@@ -241,6 +241,7 @@ async def get_overview(
                 metadata_=ue.metadata_ or {},
                 kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
+                updated_at=ue.updated_at,
             )
         )
 
@@ -505,6 +506,7 @@ async def create_unit(
         metadata_=ue_node.metadata_ or {},
         kapitel_node_id=payload.kapitel_node_id,
         kapitel_std=kapitel_std,
+        updated_at=ue_node.updated_at,
     )
 
 
@@ -538,6 +540,7 @@ async def update_unit(
         metadata_=ue_node.metadata_ or {},
         kapitel_node_id=kapitel_node_id,
         kapitel_std=kapitel_std,
+        updated_at=ue_node.updated_at,
     )
 
 
@@ -577,6 +580,7 @@ async def list_units(
                 metadata_=ue.metadata_ or {},
                 kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
+                updated_at=ue.updated_at,
             )
         )
     return result
@@ -943,6 +947,7 @@ async def get_lesson(
         subject_id=lesson.subject_id,
         grade=resolved_curricula.grade,
         darf_bearbeiten=darf_bearbeiten,
+        updated_at=lesson.updated_at,
     )
 
 
