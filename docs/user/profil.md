@@ -70,6 +70,24 @@ Verfügbare Werte: 5, 8, 10, 15, 20, 30.
 
 Die Einstellung betrifft **nur, was Ihnen angezeigt wird**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche liest, legt die Schule zentral fest.
 
+## Zugangstoken (nur Lehrkräfte)
+
+Manche Programme außerhalb des Browsers sollen auf Ihre Unterrichtsplanung oder Ihre Bausteine zugreifen — etwa ein Notizprogramm, das Ihre Stundenentwürfe spiegelt. Dafür legen Sie im Profil ein **Zugangstoken** an: eine lange Zeichenkette, die das Programm statt Ihrer Anmeldung benutzt.
+
+So gehen Sie vor:
+
+1. Auf der Profilseite unter **„Zugangstoken"** auf *Neues Token*.
+2. Einen Namen vergeben, an dem Sie das Gerät wiedererkennen („MacBook Obsidian").
+3. Ankreuzen, was das Programm darf — Lesen und Ändern sind getrennt. Wählen Sie nur, was es wirklich braucht.
+4. Ein Ablaufdatum wählen (höchstens ein Jahr).
+5. Sich erneut anmelden. Das ist Absicht: Ein Token überlebt das Ausloggen, deshalb soll niemand an einem unbeaufsichtigten Bildschirm eines anlegen können.
+
+**Der Tokentext wird genau einmal angezeigt.** Kopieren Sie ihn sofort in das Programm. Wiederherstellen lässt er sich nicht — wer ihn verliert, beendet das alte Token und legt ein neues an.
+
+Ein Token kann **nicht** chatten, keine Budgets sehen und nichts verwalten. Es endet sofort, wenn Sie es beenden, wenn sein Datum abläuft oder wenn Ihnen die Lehrkraft-Rolle entzogen wird.
+
+Behandeln Sie den Tokentext wie ein Passwort: nicht per Mail verschicken, nicht in geteilte Notizen schreiben. Falls er doch einmal irgendwo gelandet ist, beenden Sie ihn im Profil — das wirkt sofort, auch mitten in einem laufenden Abgleich.
+
 ## Accountdaten
 
 Ihr Anzeigename und Ihre Nutzerrolle kommen direkt aus dem Schulkonto (SSO) und können innerhalb von ki@schule nicht geändert werden. Für Änderungen am Schulkonto wenden Sie sich an den IT-Support Ihrer Schule.

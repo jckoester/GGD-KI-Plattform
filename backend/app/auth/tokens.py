@@ -21,12 +21,21 @@ from app.db.models import PersonalAccessToken, PseudonymAudit
 
 PRAEFIX = "ggd_pat_"
 
-# Die Scopes, die es gibt. Lesen und Schreiben sind getrennt, damit ein Spiegel, der nur
-# liest, nicht schreiben *kann* — nicht bloß nicht schreiben *soll*.
-SCOPES = frozenset({
-    "planning:read", "planning:write",
-    "context:read", "context:write",
-})
+# Die Scopes, die es gibt, samt Beschriftung für die Oberfläche. Lesen und Schreiben sind
+# getrennt, damit ein Spiegel, der nur liest, nicht schreiben *kann* — nicht bloß nicht
+# schreiben *soll*.
+#
+# Eine Quelle: Die Oberfläche holt die Beschriftungen über `/tokens/scopes`, statt sie
+# zweitzuführen. Eine zweite Liste veraltete beim nächsten Scope, und zwar stumm — der
+# neue fehlte dann einfach im Auswahlfeld.
+SCOPE_BESCHRIFTUNG: dict[str, str] = {
+    "planning:read": "Unterrichtsplanung lesen",
+    "planning:write": "Unterrichtsplanung ändern",
+    "context:read": "Bausteine lesen",
+    "context:write": "Bausteine ändern",
+}
+
+SCOPES = frozenset(SCOPE_BESCHRIFTUNG)
 
 # Obergrenze der Gültigkeit. Richtlinie der Anwendung, keine Invariante der Daten —
 # deshalb hier und nicht als CHECK in der Migration.

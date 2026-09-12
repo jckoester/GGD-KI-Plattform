@@ -11,7 +11,7 @@ from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
 from app.auth.scopes import pruefe_zugang
-from app.auth.stepup import decode_stepup_token
+from app.auth.stepup import decode_stepup_token, ressource_erwartet
 from app.auth.stepup_nonce import consume_stepup_jti
 from app.config import settings
 from app.db.session import get_db
@@ -124,6 +124,30 @@ _STEPUP_REQUIRED = HTTPException(
 )
 
 
+async def _stepup_pruefen(
+    request: Request, action: str, resource_id: str, current_user: JwtPayload, db: AsyncSession
+) -> JwtPayload:
+    """Gemeinsamer Kern beider Guard-Formen: Claims prüfen und die Nonce einlösen."""
+    token = request.cookies.get("stepup")
+    claims = decode_stepup_token(token, settings.jwt_secret) if token else None
+    if (
+        not claims
+        or claims.get("sub") != current_user.sub
+        or claims.get("action") != action
+        or (claims.get("resource_id") or "") != resource_id
+    ):
+        raise _STEPUP_REQUIRED
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    if not jti or not exp:
+        raise _STEPUP_REQUIRED
+    expires_at = datetime.fromtimestamp(int(exp), tz=timezone.utc)
+    # Einmalverwendung: bereits eingelöst → Replay, ablehnen.
+    if not await consume_stepup_jti(db, jti, expires_at):
+        raise _STEPUP_REQUIRED
+    return current_user
+
+
 def require_fresh_stepup_for(action: str) -> Callable:
     """Dependency-Fabrik: verlangt ein frisches Step-up-Token, das an **genau diese**
     `action` und den Pfad-Parameter `request_id` (Ressource) gebunden ist, und löst es
@@ -137,23 +161,35 @@ def require_fresh_stepup_for(action: str) -> Callable:
         current_user: JwtPayload = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> JwtPayload:
-        token = request.cookies.get("stepup")
-        claims = decode_stepup_token(token, settings.jwt_secret) if token else None
-        if (
-            not claims
-            or claims.get("sub") != current_user.sub
-            or claims.get("action") != action
-            or claims.get("resource_id") != str(request_id)
-        ):
-            raise _STEPUP_REQUIRED
-        jti = claims.get("jti")
-        exp = claims.get("exp")
-        if not jti or not exp:
-            raise _STEPUP_REQUIRED
-        expires_at = datetime.fromtimestamp(int(exp), tz=timezone.utc)
-        # Einmalverwendung: bereits eingelöst → Replay, ablehnen.
-        if not await consume_stepup_jti(db, jti, expires_at):
-            raise _STEPUP_REQUIRED
-        return current_user
+        return await _stepup_pruefen(request, action, str(request_id), current_user, db)
+
+    return _guard
+
+
+def require_fresh_stepup_ohne_ressource(action: str) -> Callable:
+    """Dieselbe Prüfung für Aktionen, die kein Gegenüber haben — etwa das **Anlegen**
+    eines Zugangstokens: Die Ressource entsteht erst dadurch.
+
+    Bewusst eine **zweite Fabrik** statt eines Schalters an der ersten: Der Unterschied
+    liegt in der Signatur, nicht im Verhalten. Eine Fabrik mit `ressourcengebunden=False`
+    müsste den Pfad-Parameter `request_id` je nach Argument deklarieren oder eben nicht —
+    FastAPI liest die Signatur aber einmalig beim Registrieren, und ein optionaler
+    `request_id` hieße: Wer ihn wegzulassen vergisst, bekommt still keine Bindung.
+
+    Die Aktion muss in `STEPUP_AKTIONEN_OHNE_RESSOURCE` stehen. Sonst verlöre ein
+    ressourcengebundener Guard hier unbemerkt seine Bindung.
+    """
+    if ressource_erwartet(action):
+        raise ValueError(
+            f"'{action}' ist ressourcengebunden — `require_fresh_stepup_for` verwenden "
+            f"oder die Aktion in STEPUP_AKTIONEN_OHNE_RESSOURCE aufnehmen."
+        )
+
+    async def _guard(
+        request: Request,
+        current_user: JwtPayload = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> JwtPayload:
+        return await _stepup_pruefen(request, action, "", current_user, db)
 
     return _guard

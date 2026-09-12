@@ -7,12 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- Die API nimmt persönliche Zugangstoken über den `Authorization`-Header an —
-  für Clients außerhalb des Browsers. Ein Token erreicht ausschließlich
-  Unterrichtsplanung und Kontextspeicher, trennt Lese- und Schreibrecht, gilt
-  höchstens ein Jahr und endet mit Widerruf, Rollenentzug oder Kontolöschung.
-  Anfragen mit Token sind gedrosselt (`token`-Eimer in `rate_limits.yaml`),
-  gezählt je Token. Die Verwaltung im Profil folgt.
+- **Persönliche Zugangstoken** für Programme außerhalb des Browsers. Lehrkräfte
+  legen sie im Profil selbst an — nach erneuter Anmeldung, mit Ablaufdatum und
+  getrenntem Lese- und Schreibrecht für Unterrichtsplanung und Bausteine. Der
+  Tokentext ist einmalig sichtbar. Ein Token erreicht weder Chat noch Verwaltung,
+  ist gedrosselt und endet mit Widerruf, Rollenentzug oder Kontolöschung.
 
 ### Behoben
 
