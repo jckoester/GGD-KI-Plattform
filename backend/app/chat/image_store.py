@@ -34,8 +34,7 @@ _ORPHAN_GRACE = timedelta(hours=1)
 
 def storage_dir() -> Path:
     """Ablageverzeichnis (repo-root-relativ, falls nicht absolut) — cwd-unabhängig."""
-    base = Path(settings.image_storage_dir)
-    return aufloesen(base)
+    return aufloesen(settings.image_storage_dir)
 
 
 def _file_path(image_id: UUID, mime_type: str = "image/png") -> Path:

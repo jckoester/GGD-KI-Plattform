@@ -56,8 +56,7 @@ async def set_export_css(db: AsyncSession, css: Optional[str], updated_by: Optio
 # ── DOCX/ODT-Referenzdokumente (Disk) ─────────────────────────────────────────
 
 def template_dir() -> Path:
-    base = Path(settings.export_template_dir)
-    d = aufloesen(base)
+    d = aufloesen(settings.export_template_dir)
     d.mkdir(parents=True, exist_ok=True)
     return d
 

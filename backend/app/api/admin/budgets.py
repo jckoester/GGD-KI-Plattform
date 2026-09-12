@@ -17,6 +17,7 @@ from app.budget.forecast import Hochrechnung, hochrechnen
 from app.budget.schulwochen import anzahl_unterrichtswochen, wochen_bis
 from app.budget.tiers import _load_budget_tiers, _stufe, invalidate_budget_tiers_cache
 from app.config import settings
+from app.core.paths import aufloesen
 from app.db.session import get_db
 from app.planning.calendar import load_school_year
 from app.litellm.client import LiteLLMClient
@@ -201,7 +202,7 @@ async def update_budget_grades(
         )
 
     # 3. YAML lesen (aktueller Stand)
-    config_path = Path(settings.budget_tiers_path)
+    config_path = aufloesen(settings.budget_tiers_path)
     with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 

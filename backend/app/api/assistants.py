@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.config import settings
+from app.core.paths import aufloesen
 from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.db.models import Assistant, Subject, AssistantDocument, AssistantVisibility
@@ -29,7 +30,7 @@ def _get_assistant_schema() -> dict:
     """Laedt und cached das JSON Schema fuer Assistenten-Import."""
     global _assistant_schema
     if _assistant_schema is None:
-        with open(settings.assistant_schema_path, encoding="utf-8") as f:
+        with open(aufloesen(settings.assistant_schema_path), encoding="utf-8") as f:
             _assistant_schema = json.load(f)
     return _assistant_schema
 

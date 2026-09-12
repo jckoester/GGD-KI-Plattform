@@ -16,6 +16,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- Konfigurationsdateien werden unabhängig vom Arbeitsverzeichnis gelesen. Betroffen
+  waren Drosselung, Artefaktgrenzen, Budgetstufen, Assistenten-Schema, Schuljahr
+  und Auth-Konfiguration.
 - Das Änderungsdatum eines Bausteins bleibt beim Bearbeiten nicht mehr stehen. Es
   wandert jetzt auch beim Ändern von Inhalt, Titel, Unterrichtseinheit und beim
   Archivieren mit; ein neu berechnetes Embedding zählt weiterhin nicht als Änderung.

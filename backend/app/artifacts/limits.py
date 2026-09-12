@@ -11,6 +11,7 @@ from typing import Optional
 import yaml
 
 from app.config import settings
+from app.core.paths import aufloesen
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def _load() -> dict:
     global _cache
     if _cache is not None:
         return _cache
-    path = Path(settings.artifact_limits_path)
+    path = aufloesen(settings.artifact_limits_path)
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
             _cache = yaml.safe_load(f) or {}
