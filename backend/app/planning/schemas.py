@@ -100,6 +100,11 @@ class SlotUpdate(BaseModel):
     stunde_node_id: Optional[UUID] = None
     start_period: Optional[int] = None
     periods: Optional[int] = Field(None, ge=1, le=2)
+    # Optimistisches Sperren (freiwillig): Steht hier der `updated_at`-Stand, den
+    # der Client gelesen hat, und hat sich seither etwas geändert, antwortet der
+    # Endpunkt mit 409 statt still zu überschreiben. Weglassen = bisheriges
+    # Verhalten; die Oberfläche schickt es nicht.
+    expected_updated_at: Optional[datetime] = None
 
 
 class SlotSwapRequest(BaseModel):
@@ -204,6 +209,11 @@ class LessonUpdate(BaseModel):
     phasen: Optional[list[LessonPhaseItem]] = None
     refs: Optional[list[LessonRefItem]] = None
     refs_dismissed: Optional[list[UUID]] = None
+    # Optimistisches Sperren (freiwillig): Steht hier der `updated_at`-Stand, den
+    # der Client gelesen hat, und hat sich seither etwas geändert, antwortet der
+    # Endpunkt mit 409 statt still zu überschreiben. Weglassen = bisheriges
+    # Verhalten; die Oberfläche schickt es nicht.
+    expected_updated_at: Optional[datetime] = None
 
 
 class LessonSlotContext(BaseModel):

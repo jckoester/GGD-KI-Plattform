@@ -25,6 +25,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 ### Geändert
 
 - Stunden- und Unterrichtseinheit-Abruf liefern das Änderungsdatum mit.
+- `PATCH` auf Slot und Stunde nimmt `expected_updated_at` entgegen und antwortet mit
+  `409`, wenn sich der Stand inzwischen geändert hat. Ohne das Feld bleibt es beim
+  bisherigen Verhalten. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück.
 
 ## [0.9.0] – 2026-09-11
 

@@ -149,3 +149,20 @@ damit keine Bindung stillschweigend verlorengeht.
 
 Geprüft wird symmetrisch: Eine gebundene Aktion **braucht** eine ID, eine ressourcenlose
 darf keine tragen — sonst gäbe es zwei Lesarten desselben Tokens.
+
+### Nebenläufig schreiben: `expected_updated_at`
+
+`PATCH /planning/slots/{id}` und `PATCH /planning/lessons/{id}` nehmen optional den
+`updated_at`-Stand entgegen, den der Client gelesen hat. Weicht er vom aktuellen ab,
+antwortet der Endpunkt mit **409** und nennt im Körper beide Werte (`erwartet`,
+`tatsaechlich`) — statt still zu überschreiben, was inzwischen in der Oberfläche
+entstanden ist.
+
+Freiwillig: Ohne das Feld bleibt es beim bisherigen Verhalten; die Oberfläche schickt es
+nicht. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück, damit ein Client zweimal
+hintereinander schreiben kann, ohne dazwischen neu zu lesen.
+
+⚠️ Das Ganze steht und fällt damit, dass `updated_at` sich bewegt. Bis 12.09.2026 tat es
+das auf mehreren Schreibwegen nicht — dann ginge der Vergleich immer auf und der 409 käme
+nie. `tests/integration/test_updated_at_wird_fortgeschrieben.py` hält die Voraussetzung
+fest.
