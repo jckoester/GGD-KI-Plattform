@@ -15,6 +15,7 @@ from app.auth.stepup import decode_stepup_token
 from app.auth.stepup_nonce import consume_stepup_jti
 from app.config import settings
 from app.db.session import get_db
+from app.ratelimit.drossel import pruefe as drossel_pruefe
 
 
 @lru_cache(maxsize=1)
@@ -75,10 +76,16 @@ async def get_current_user(
         ergebnis = await token_modul.pruefe(db, kopfzeile[7:].strip())
         if ergebnis is None:
             raise HTTPException(status_code=401, detail="Ungültiges Zugangstoken")
-        _, payload = ergebnis
+        zeile, payload = ergebnis
         # Vor dem Router, nicht in ihm: Ein Token, dessen Scope diesen Pfad nicht deckt,
         # kommt gar nicht erst bis zur Rechteprüfung.
         pruefe_zugang(payload.token_scopes or [], request.method, request.url.path)
+        # Gedrosselt wird **je Token**, nicht je Person: Ein Mensch im Browser bremst
+        # sich selbst, eine Sync-Schleife nicht — und ein eigener Zähler sorgt dafür,
+        # dass ein durchdrehender Client seine Besitzerin nicht aus der Oberfläche
+        # aussperrt. `planning` und `context` tragen selbst keine Drossel; für
+        # Browser-Verkehr bleibt das bewusst so.
+        drossel_pruefe("token", str(zeile.id), payload.roles)
         return payload
 
     raise HTTPException(status_code=401, detail="Nicht authentifiziert")

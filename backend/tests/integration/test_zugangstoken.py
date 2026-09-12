@@ -251,6 +251,95 @@ class TestRollenSindFrisch:
         assert resp.status_code == 401, "Massenwiderruf ließ das Token stehen"
 
 
+class TestDrossel:
+    """Ein Mensch im Browser bremst sich selbst, eine Sync-Schleife nicht.
+
+    `planning` und `context` tragen selbst keine Drossel — für Browser-Verkehr bleibt das
+    bewusst so. Der Token-Zweig bringt seine eigene mit, damit sie nicht vergessen werden
+    kann, wenn ein weiterer Router in die Scope-Tabelle aufgenommen wird.
+    """
+
+    @pytest.fixture(autouse=True)
+    def leerer_zaehler(self):
+        from app.ratelimit import store
+
+        store.reset()
+        yield
+        store.reset()
+
+    async def test_zu_viele_anfragen_enden_in_429(self, test_client, db, audit, monkeypatch):
+        from app.ratelimit import config
+
+        monkeypatch.setattr(config, "resolve", lambda bucket, rollen: (3, 60.0))
+        klartext, _ = await tokens.erzeuge(
+            db, pseudonym=TEACHER1_PSEUDO, name="Schleife", scopes=["context:read"],
+            gueltig_bis=datetime.now(timezone.utc) + timedelta(days=1), rollen=["teacher"])
+        kopf = {"Authorization": f"Bearer {klartext}"}
+
+        stati = [
+            (await test_client.get("/context/nodes?limit=1", headers=kopf)).status_code
+            for _ in range(5)
+        ]
+        assert stati[:3] == [200, 200, 200], stati
+        assert stati[3:] == [429, 429], stati
+
+    async def test_429_nennt_die_wartezeit(self, test_client, db, audit, monkeypatch):
+        from app.ratelimit import config
+
+        monkeypatch.setattr(config, "resolve", lambda bucket, rollen: (1, 60.0))
+        klartext, _ = await tokens.erzeuge(
+            db, pseudonym=TEACHER1_PSEUDO, name="Schleife", scopes=["context:read"],
+            gueltig_bis=datetime.now(timezone.utc) + timedelta(days=1), rollen=["teacher"])
+        kopf = {"Authorization": f"Bearer {klartext}"}
+
+        await test_client.get("/context/nodes?limit=1", headers=kopf)
+        resp = await test_client.get("/context/nodes?limit=1", headers=kopf)
+        assert resp.status_code == 429
+        assert int(resp.headers["Retry-After"]) > 0
+
+    async def test_jedes_token_hat_seinen_eigenen_zaehler(
+        self, test_client, db, audit, monkeypatch
+    ):
+        """Der Grund, warum je Token gezählt wird und nicht je Pseudonym.
+
+        Zwei Token derselben Person: Läuft das eine voll, muss das andere weiterarbeiten —
+        und die Browser-Sitzung ohnehin.
+        """
+        from app.ratelimit import config
+
+        monkeypatch.setattr(config, "resolve", lambda bucket, rollen: (1, 60.0))
+        kopfe = []
+        for name in ("erstes", "zweites"):
+            klartext, _ = await tokens.erzeuge(
+                db, pseudonym=TEACHER1_PSEUDO, name=name, scopes=["context:read"],
+                gueltig_bis=datetime.now(timezone.utc) + timedelta(days=1),
+                rollen=["teacher"])
+            kopfe.append({"Authorization": f"Bearer {klartext}"})
+
+        assert (await test_client.get("/context/nodes?limit=1", headers=kopfe[0])).status_code == 200
+        assert (await test_client.get("/context/nodes?limit=1", headers=kopfe[0])).status_code == 429
+        # Dasselbe Pseudonym, anderes Token — unberührt.
+        assert (await test_client.get("/context/nodes?limit=1", headers=kopfe[1])).status_code == 200
+
+    async def test_sitzung_bleibt_von_der_token_drossel_unberuehrt(
+        self, test_client, auth_headers, db, audit, monkeypatch
+    ):
+        from app.ratelimit import config
+
+        monkeypatch.setattr(config, "resolve", lambda bucket, rollen: (1, 60.0))
+        klartext, _ = await tokens.erzeuge(
+            db, pseudonym=TEACHER1_PSEUDO, name="Schleife", scopes=["context:read"],
+            gueltig_bis=datetime.now(timezone.utc) + timedelta(days=1), rollen=["teacher"])
+        kopf = {"Authorization": f"Bearer {klartext}"}
+
+        await test_client.get("/context/nodes?limit=1", headers=kopf)
+        assert (await test_client.get("/context/nodes?limit=1", headers=kopf)).status_code == 429
+        # Dieselbe Person im Browser, mehrfach — die Token-Drossel greift hier nicht.
+        for _ in range(4):
+            resp = await test_client.get("/context/nodes?limit=1", headers=auth_headers)
+            assert resp.status_code == 200, resp.text
+
+
 class TestErzeugungWehrtAb:
     async def test_schueler_bekommen_kein_token(self, db):
         with pytest.raises(tokens.TokenFehler, match="Lehrkräften"):

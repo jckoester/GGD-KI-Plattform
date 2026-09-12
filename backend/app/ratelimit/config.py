@@ -21,6 +21,10 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     "pii_scan": (30, 60.0),
     "upload": (20, 60.0),
     "chat": (60, 60.0),
+    # Zugangstoken (`app.auth.tokens`), gezählt **je Token**. Großzügig, weil der erste
+    # vollständige Spiegel eines Schuljahres einige hundert Anfragen braucht; eng genug,
+    # dass eine Schleife ohne Abbruch auffällt statt durchzulaufen.
+    "token": (300, 60.0),
 }
 _FALLBACK = (60, 60.0)
 

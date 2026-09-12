@@ -11,7 +11,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   für Clients außerhalb des Browsers. Ein Token erreicht ausschließlich
   Unterrichtsplanung und Kontextspeicher, trennt Lese- und Schreibrecht, gilt
   höchstens ein Jahr und endet mit Widerruf, Rollenentzug oder Kontolöschung.
-  Die Verwaltung im Profil folgt.
+  Anfragen mit Token sind gedrosselt (`token`-Eimer in `rate_limits.yaml`),
+  gezählt je Token. Die Verwaltung im Profil folgt.
 
 ### Behoben
 
