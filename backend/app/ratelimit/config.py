@@ -13,6 +13,7 @@ from typing import Optional
 import yaml
 
 from app.config import settings
+from app.core.paths import aufloesen
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,10 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     "pii_scan": (30, 60.0),
     "upload": (20, 60.0),
     "chat": (60, 60.0),
+    # Zugangstoken (`app.auth.tokens`), gezählt **je Token**. Großzügig, weil der erste
+    # vollständige Spiegel eines Schuljahres einige hundert Anfragen braucht; eng genug,
+    # dass eine Schleife ohne Abbruch auffällt statt durchzulaufen.
+    "token": (300, 60.0),
 }
 _FALLBACK = (60, 60.0)
 
@@ -31,7 +36,7 @@ def _load() -> dict:
     global _cache
     if _cache is not None:
         return _cache
-    path = Path(settings.rate_limits_path)
+    path = aufloesen(settings.rate_limits_path)
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
             _cache = yaml.safe_load(f) or {}

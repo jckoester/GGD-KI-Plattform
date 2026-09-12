@@ -17,7 +17,22 @@ from jose import JWTError, jwt
 
 # Erlaubte Step-up-Aktionen (an den `action`-Claim gebunden). Neue sensible Aktion → hier
 # ergänzen und einen `require_fresh_stepup_for(...)`-Guard setzen.
-ALLOWED_STEPUP_ACTIONS = frozenset({"approve", "deny", "read", "export"})
+ALLOWED_STEPUP_ACTIONS = frozenset({"approve", "deny", "read", "export", "create_token"})
+
+# Aktionen ohne Ressource. Die vier Krisen-Aktionen beziehen sich je auf **einen** Antrag,
+# und das Token ist an dessen ID gebunden (Sicherheits-Audit #3). Das Anlegen eines
+# Zugangstokens hat kein solches Gegenüber — es gibt die Ressource erst danach.
+#
+# Lieber diese Liste als ein erfundener Platzhalter: Ein `resource_id="neu"` sähe aus wie
+# eine Bindung, wäre aber keine, und niemand könnte später unterscheiden, welche
+# Bindungen echt sind.
+STEPUP_AKTIONEN_OHNE_RESSOURCE = frozenset({"create_token"})
+
+
+def ressource_erwartet(action: str) -> bool:
+    """Ob `action` eine `resource_id` braucht. Symmetrisch geprüft: Eine Aktion ohne
+    Ressource darf auch keine mitbekommen, sonst gäbe es zwei Lesarten desselben Tokens."""
+    return action not in STEPUP_AKTIONEN_OHNE_RESSOURCE
 
 # Gültigkeitsdauer des Step-up-Tokens (Zeitfenster für die sensible Aktion).
 STEPUP_TTL_SECONDS = 300  # 5 Minuten

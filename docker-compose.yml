@@ -99,6 +99,11 @@ services:
       HELP_RESOURCES_PATH: /app/config/help_resources.yaml
       IMAGE_MODELS_PATH: /app/config/image_models.yaml
       IMAGE_BLOCKLIST_PATH: /app/config/image_blocklist.yaml
+      # Drosselung und Größengrenzen: Fällt eine dieser Dateien aus, greifen still die
+      # Built-in-Defaults — dieselbe Sorte stummer Ausfall wie oben.
+      RATE_LIMITS_PATH: /app/config/rate_limits.yaml
+      ARTIFACT_LIMITS_PATH: /app/config/artifact_limits.yaml
+      ASSISTANT_SCHEMA_PATH: /app/config/assistant_schema.json
       # Gegenstück zu `health_file` in der LiteLLM-Config (dort /app/data/…).
       GUARDRAIL_HEALTH_FILE: /app/data/guardrail_health.json
       # Server-Rendering (Phase 17): interner Sidecar für CircuiTikZ/Mathe (Chat + PDF).
@@ -194,10 +199,19 @@ services:
       HELP_RESOURCES_PATH: /app/config/help_resources.yaml
       IMAGE_MODELS_PATH: /app/config/image_models.yaml
       IMAGE_BLOCKLIST_PATH: /app/config/image_blocklist.yaml
+      # Drosselung und Größengrenzen: Fällt eine dieser Dateien aus, greifen still die
+      # Built-in-Defaults — dieselbe Sorte stummer Ausfall wie oben.
+      RATE_LIMITS_PATH: /app/config/rate_limits.yaml
+      ARTIFACT_LIMITS_PATH: /app/config/artifact_limits.yaml
+      ASSISTANT_SCHEMA_PATH: /app/config/assistant_schema.json
       GUARDRAIL_HEALTH_FILE: /app/data/guardrail_health.json
       # Muss zu backend passen (dasselbe ./data-Volume) — sonst räumt der Cron ins Leere.
       IMAGE_STORAGE_DIR: /app/data/generated_images
       ARTIFACT_STORAGE_DIR: /app/data/artifacts
+      # Kein Cron-Skript exportiert heute. Trotzdem gesetzt, damit beide Dienste
+      # **dieselbe** Pfadliste tragen: Die Alternative wäre eine Ausnahmeliste je Dienst,
+      # und zwei Listen laufen auseinander — genau das war hier schon einmal der Fall.
+      EXPORT_TEMPLATE_DIR: /app/data/export_templates
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data

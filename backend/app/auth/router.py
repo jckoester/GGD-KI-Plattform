@@ -20,6 +20,7 @@ from app.auth.stepup import (
     is_stepup_state,
     issue_stepup_token,
     parse_stepup_state,
+    ressource_erwartet,
     sign_stepup_state,
 )
 from app.config import settings
@@ -230,7 +231,10 @@ async def step_up_challenge(
     Aktion (Audit #3). direct: Frontend zeigt Passwort-Dialog (→ POST /step-up mit denselben
     Feldern). redirect: Aktion/Ressource reisen mitsigniert im State.
     """
-    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+    if action not in ALLOWED_STEPUP_ACTIONS or bool(resource_id) != ressource_erwartet(action):
+        # Symmetrisch: Eine ressourcengebundene Aktion **braucht** eine ID, eine
+        # ressourcenlose darf keine tragen. Sonst gäbe es zwei Lesarten desselben
+        # Tokens, und die schwächere gewänne.
         raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     if adapter.mode == "direct":
         return {"mode": "direct"}
@@ -260,7 +264,10 @@ async def step_up_direct(
     resource_id = body.get("resource_id") or ""
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing username or password")
-    if action not in ALLOWED_STEPUP_ACTIONS or not resource_id:
+    if action not in ALLOWED_STEPUP_ACTIONS or bool(resource_id) != ressource_erwartet(action):
+        # Symmetrisch: Eine ressourcengebundene Aktion **braucht** eine ID, eine
+        # ressourcenlose darf keine tragen. Sonst gäbe es zwei Lesarten desselben
+        # Tokens, und die schwächere gewänne.
         raise HTTPException(status_code=400, detail="Ungültige Step-up-Aktion")
     identity = await adapter.authenticate_direct(username, password)
     if identity is None:

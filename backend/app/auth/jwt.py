@@ -19,6 +19,11 @@ class JwtPayload(BaseModel):
     jti: str                                      # UUID4, für Revokation
     iat: int                                      # Unix-Timestamp
     exp: int                                      # Unix-Timestamp
+    # Nur bei Zugangstoken gesetzt (`app.auth.tokens`); eine Browser-Sitzung hat hier
+    # `None`. Der Unterschied ist nicht kosmetisch: `None` heißt „volle Sitzung", eine
+    # Liste heißt „nur diese Scopes, und nur auf Routern, die sie führen"
+    # (`app.auth.scopes`). Aus einem JWT kommt das Feld nie — Sitzungen tragen es nicht.
+    token_scopes: list[str] | None = None
 
 
 class JwtService:
@@ -53,7 +58,10 @@ class JwtService:
     def verify(self, token: str) -> JwtPayload:
         """Wirft JWTError bei ungültigem oder abgelaufenem Token."""
         raw = jwt.decode(token, self._secret, algorithms=[self._algorithm])
-        return JwtPayload.model_validate(raw)
+        # `token_scopes` gehört dem Token-Pfad und kann aus einer Sitzung nicht kommen.
+        # `issue` setzt es nie; hier steht es trotzdem, damit ein künftiger Aufrufer mit
+        # zusätzlichen Claims nicht versehentlich eine Sitzung in ein Token verwandelt.
+        return JwtPayload.model_validate({**raw, "token_scopes": None})
 
     async def revoke(
         self,

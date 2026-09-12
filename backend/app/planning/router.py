@@ -34,6 +34,7 @@ from app.db.session import get_db
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning import jetzt as jetzt_modul
+from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
@@ -241,6 +242,7 @@ async def get_overview(
                 metadata_=ue.metadata_ or {},
                 kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
+                updated_at=ue.updated_at,
             )
         )
 
@@ -413,7 +415,15 @@ async def update_slot(
 
     await require_group_teacher(slot.group_id, user, db)
 
+    vorbedingung.pruefe(slot.updated_at, payload.expected_updated_at, "Diese Stunde")
+
     update_data = payload.model_dump(exclude_unset=True)
+    # Kein Datenfeld, sondern eine Bedingung — sie gehört nicht in die Schleife unten.
+    # Ohne das Entfernen setzte `setattr` sie als **nicht abgebildetes** Attribut auf die
+    # Instanz: folgenlos für die Datenbank (nachgemessen), aber ein Wert, der aussieht,
+    # als gehörte er dorthin. Der nächste, der die Schleife erweitert, soll nicht darüber
+    # stolpern.
+    update_data.pop("expected_updated_at", None)
 
     changes_assignment = bool(_SNAPSHOT_ASSIGNMENT_FIELDS & update_data.keys())
     if changes_assignment:
@@ -505,6 +515,7 @@ async def create_unit(
         metadata_=ue_node.metadata_ or {},
         kapitel_node_id=payload.kapitel_node_id,
         kapitel_std=kapitel_std,
+        updated_at=ue_node.updated_at,
     )
 
 
@@ -538,6 +549,7 @@ async def update_unit(
         metadata_=ue_node.metadata_ or {},
         kapitel_node_id=kapitel_node_id,
         kapitel_std=kapitel_std,
+        updated_at=ue_node.updated_at,
     )
 
 
@@ -577,6 +589,7 @@ async def list_units(
                 metadata_=ue.metadata_ or {},
                 kapitel_node_id=kapitel_node_id,
                 kapitel_std=kapitel_std,
+                updated_at=ue.updated_at,
             )
         )
     return result
@@ -943,6 +956,7 @@ async def get_lesson(
         subject_id=lesson.subject_id,
         grade=resolved_curricula.grade,
         darf_bearbeiten=darf_bearbeiten,
+        updated_at=lesson.updated_at,
     )
 
 
@@ -964,6 +978,11 @@ async def patch_lesson(
     if group_id is None:
         raise HTTPException(status_code=422, detail="Stunde hat keine Gruppe")
     await require_group_teacher(group_id, user, db)
+
+    # Vor dem Snapshot: Ein abgelehnter Schreibversuch soll keinen Wiederherstellungspunkt
+    # erzeugen — sonst füllt ein Client mit veraltetem Stand den Verlauf mit Einträgen,
+    # hinter denen keine Änderung steht.
+    vorbedingung.pruefe(lesson.updated_at, payload.expected_updated_at, "Diese Stunde")
 
     if payload.phasen is not None:
         for phase in payload.phasen:
@@ -998,7 +1017,10 @@ async def patch_lesson(
     await synchronisiere_materialkanten(db, lesson.id, meta)
     await db.commit()
 
-    return {"ok": True}
+    # Der neue Stand gehört in die Antwort: Ein Client mit Vorbedingung braucht ihn für
+    # den nächsten Schreibversuch. Ohne ihn müsste er nach jedem Schreiben neu lesen —
+    # und in der Lücke dazwischen wäre er wieder veraltet.
+    return {"ok": True, "updated_at": now}
 
 
 # ── POST /planning/slots/{slot_id}/review ────────────────────────────────────

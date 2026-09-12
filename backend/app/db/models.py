@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from uuid import UUID, UUID as UUIDType
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
@@ -17,6 +17,35 @@ from app.config import settings
 
 class Base(DeclarativeBase):
     pass
+
+
+def _jetzt() -> datetime:
+    """Zeitpunkt für `onupdate`. Python-seitig, nicht `now()` in der Datenbank.
+
+    Der Serverwert wäre gleichwertig, macht das Attribut aber nach dem Schreiben stale —
+    im Async-Stack ist ein Nachladen an dieser Stelle eine Falle. Die Handschreibstellen
+    im Projekt benutzen ohnehin `datetime.now(timezone.utc)`.
+    """
+    return datetime.now(timezone.utc)
+
+
+def ohne_aenderungsstempel() -> dict:
+    """Zusatz für `update(...).values(...)`, wenn die Schreibung **keine** Änderung ist.
+
+    `updated_at` ist das einzige Änderungssignal, das Clients von außen haben (der
+    Unterrichtsplanungs-Sync hängt daran, „Meine Bausteine" sortiert danach). Abgeleitete
+    Daten — ein neu berechnetes Embedding, eine Fehlermarke der Einbettung — sind keine
+    inhaltliche Änderung: Der Knoten liest sich danach genau wie vorher.
+
+    `onupdate` feuert auch bei Core-`update()`, also auch im nächtlichen Backfill. Ohne
+    diesen Zusatz sähe nach einem Modellwechsel **jeder** Knoten geändert aus. Die Spalte
+    in `values()` mitzugeben unterdrückt `onupdate`; die Selbstzuweisung schreibt den
+    alten Wert zurück.
+
+    Nicht verwenden, wo sich der Zustand wirklich ändert (Archivieren, Löschen) — dort
+    ist der Sprung erwünscht.
+    """
+    return {"updated_at": ContextNode.updated_at}
 
 
 # Enums for CHECK constraints
@@ -858,8 +887,13 @@ class ContextNode(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+    # `onupdate` statt Handarbeit an jeder Schreibstelle: Auf dem Kontextpfad blieb der
+    # Zeitstempel bis 12.09.2026 stehen, weil die Endpunkte ihn schlicht nicht setzten —
+    # eine geänderte Stunde sah von außen unverändert aus. Abgeleitete Schreibungen
+    # nehmen `ohne_aenderungsstempel()` dazu.
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+        onupdate=_jetzt, nullable=False
     )
 
     __table_args__ = (
@@ -1209,8 +1243,12 @@ class LessonSlot(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+    # Siehe ContextNode.updated_at. Der WebUntis-Sync schreibt Slots per rohem SQL, an
+    # `onupdate` vorbei — er setzt den Zeitstempel selbst, und zwar bewusst nur bei
+    # echten Änderungen (`app/calendar/sync.py`).
     updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+        onupdate=_jetzt, nullable=False
     )
 
     __table_args__ = (
@@ -1301,4 +1339,48 @@ class CalendarSyncStatus(Base):
             "'anmeldung_fehlgeschlagen','fehler')",
             name="check_css_status",
         ),
+    )
+
+
+# 24. personal_access_tokens — Zugang für Clients außerhalb des Browsers
+class PersonalAccessToken(Base):
+    """Ein persönliches Zugangstoken, z. B. für den Unterrichtsplanungs-Sync.
+
+    **Warum nicht das Session-JWT wiederverwenden.** Das Cookie ist an den Browser und
+    an einen SSO-Login gebunden; ein Skript kann es weder holen noch erneuern. Ein Token
+    ist außerdem *schmaler*: Es trägt Scopes, die eine Session nicht kennt, und lässt
+    sich einzeln widerrufen, ohne jemanden auszuloggen.
+
+    **Rollen stehen absichtlich nicht hier.** Sie kommen bei jeder Anfrage frisch aus
+    `pseudonym_audit` — ein eingefrorener Rollensatz überlebte sonst den Entzug der
+    Lehrkraft-Rolle. Aus demselben Grund gilt `revoked_all_before` auch für Token.
+    """
+
+    __tablename__ = "personal_access_tokens"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    # Anzeigename, damit man in der Liste erkennt, welches Gerät man widerruft.
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # SHA-256 des Klartexts. Kein bcrypt/argon2: Das Token ist ein Zufallswert mit 256
+    # Bit Entropie, kein Passwort — ein Wörterbuchangriff greift nicht, und der schnelle
+    # Hash erlaubt den Abgleich über einen Index statt über einen Tabellendurchlauf.
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    scopes: Mapped[list] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Pflicht, nicht optional: Ein Token ohne Ablauf ist ein Passwort, das niemand ändert.
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
     )

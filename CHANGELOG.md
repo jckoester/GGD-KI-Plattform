@@ -5,6 +5,30 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Persönliche Zugangstoken** für Programme außerhalb des Browsers. Lehrkräfte
+  legen sie im Profil selbst an — nach erneuter Anmeldung, mit Ablaufdatum und
+  getrenntem Lese- und Schreibrecht für Unterrichtsplanung und Bausteine. Der
+  Tokentext ist einmalig sichtbar. Ein Token erreicht weder Chat noch Verwaltung,
+  ist gedrosselt und endet mit Widerruf, Rollenentzug oder Kontolöschung.
+
+### Behoben
+
+- Konfigurationsdateien werden unabhängig vom Arbeitsverzeichnis gelesen. Betroffen
+  waren Drosselung, Artefaktgrenzen, Budgetstufen, Assistenten-Schema, Schuljahr
+  und Auth-Konfiguration.
+- Das Änderungsdatum eines Bausteins bleibt beim Bearbeiten nicht mehr stehen. Es
+  wandert jetzt auch beim Ändern von Inhalt, Titel, Unterrichtseinheit und beim
+  Archivieren mit; ein neu berechnetes Embedding zählt weiterhin nicht als Änderung.
+
+### Geändert
+
+- Stunden- und Unterrichtseinheit-Abruf liefern das Änderungsdatum mit.
+- `PATCH` auf Slot und Stunde nimmt `expected_updated_at` entgegen und antwortet mit
+  `409`, wenn sich der Stand inzwischen geändert hat. Ohne das Feld bleibt es beim
+  bisherigen Verhalten. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück.
+
 ## [0.9.0] – 2026-09-11
 
 Schwerpunkt: **Datenschutz und Verlässlichkeit**. Die Kontolöschung räumt jetzt alle

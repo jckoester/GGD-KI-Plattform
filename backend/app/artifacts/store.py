@@ -46,8 +46,7 @@ def storage_dir() -> Path:
 
     Wichtig für den Cleanup-Cron: der läuft nicht aus dem Backend-Verzeichnis, muss aber
     denselben Pfad auflösen wie das Backend beim Speichern (analog `image_store`)."""
-    base = Path(settings.artifact_storage_dir)
-    d = aufloesen(base)
+    d = aufloesen(settings.artifact_storage_dir)
     d.mkdir(parents=True, exist_ok=True)
     return d
 

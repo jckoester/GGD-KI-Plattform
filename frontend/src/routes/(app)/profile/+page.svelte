@@ -14,6 +14,7 @@
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import TimetableSyncButton from "$lib/components/TimetableSyncButton.svelte";
+    import Zugangstoken from "$lib/components/Zugangstoken.svelte";
 
     // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
     const membershipGroups = $derived([
@@ -303,6 +304,12 @@
             {/if}
         </section>
         {/if}
+        {/if}
+
+        {#if $user?.roles?.includes('teacher')}
+        <section class="mb-8">
+            <Zugangstoken />
+        </section>
         {/if}
 
         <section class="mb-8">

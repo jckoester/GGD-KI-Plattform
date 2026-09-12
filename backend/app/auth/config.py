@@ -4,6 +4,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, computed_field, model_validator
 
+from app.core.paths import aufloesen
+
 
 class GroupRoleMapping(BaseModel):
     group: str
@@ -58,6 +60,11 @@ class AuthConfig(BaseModel):
 
 
 def load_auth_config(path: str) -> AuthConfig:
-    with open(path) as f:
+    """Lädt die Auth-Konfiguration. Relative Pfade werden zentral aufgelöst.
+
+    Die Auflösung sitzt hier und nicht an den fünf Aufrufstellen: Sonst hängt es davon
+    ab, welche man erwischt, und eine neue vergisst sie.
+    """
+    with open(aufloesen(path)) as f:
         data = yaml.safe_load(f)
     return AuthConfig.model_validate(data)

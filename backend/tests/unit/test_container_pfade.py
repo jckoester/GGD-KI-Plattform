@@ -24,6 +24,7 @@ Seit dem Umbau löst `app/core/paths.aufloesen` zentral auf. Diese Datei prüft 
 Auflösung **in einer nachgestellten Container-Anordnung** — die echte lässt sich hier
 nicht herstellen, die Entwicklungsumgebung hat keinen Docker.
 """
+import ast
 import re
 import subprocess
 import sys
@@ -39,17 +40,62 @@ APP = REPO / "backend" / "app"
 COMPOSE = yaml.safe_load((REPO / "docker-compose.yml").read_text(encoding="utf-8"))
 DIENSTE = ("backend", "cron")
 
-# Einstellung → Ort im Container. Die Compose übergibt diese Pfade zusätzlich absolut:
-# doppelt gemoppelt, aber der Ausfall wäre still, und die Variablen sind ohnehin der
-# dokumentierte Weg, eine Datei woanders hinzulegen (docs/admin/konfiguration.md).
-ABSOLUT_UEBERGEBEN = {
-    "PEDAGOGY_PATH": "/app/config/pedagogy.yaml",
-    "CRISIS_TRIGGERS_PATH": "/app/config/crisis_triggers.yaml",
-    "HELP_RESOURCES_PATH": "/app/config/help_resources.yaml",
-    "IMAGE_MODELS_PATH": "/app/config/image_models.yaml",
-    "IMAGE_BLOCKLIST_PATH": "/app/config/image_blocklist.yaml",
-    "GUARDRAIL_HEALTH_FILE": "/app/data/guardrail_health.json",
-}
+# Suffixe, die eine Einstellung als Pfad kennzeichnen. `upload_max_files` endet auf
+# `_files` und fällt dadurch heraus — es ist eine Anzahl, kein Pfad.
+PFAD_SUFFIXE = ("_path", "_file", "_dir")
+
+# Die eine Pfadvariable ohne Einstellung: `app/planning/calendar.py` liest sie direkt aus
+# der Umgebung, weil der Kalender ohne `app.config` auskommen soll.
+OHNE_EINSTELLUNG = {"SCHOOL_YEAR_PATH": "config/school_year.yaml"}
+
+
+def _vorgabewerte() -> dict[str, str]:
+    """Einstellung → relativer Vorgabewert, aus `app/config.py` gelesen."""
+    quelle = (APP / "config.py").read_text(encoding="utf-8")
+    return dict(
+        re.findall(r"^\s{4}(\w+(?:_path|_file|_dir)): str = \"([^\"]*)\"", quelle, re.M)
+    )
+
+
+def _pfadvariablen(dienst: str) -> dict[str, str]:
+    """Alle Pfad-Umgebungsvariablen, die die Compose diesem Dienst übergibt.
+
+    **Abgeleitet statt aufgezählt.** Hier stand bis 12.09.2026 eine Liste von sechs
+    Variablen — die Compose setzte längst fünfzehn. Zwei Listen über dieselbe Sache
+    laufen auseinander, und die stillere von beiden gewinnt: `RATE_LIMITS_PATH` fehlte in
+    beiden und fiel niemandem auf.
+    """
+    env = COMPOSE["services"][dienst].get("environment", {}) or {}
+    return {k: v for k, v in env.items() if k.endswith(tuple(s.upper() for s in PFAD_SUFFIXE))}
+
+
+def _settings_pfade(baum: ast.AST) -> list[tuple[str, int]]:
+    """`settings.<etwas_path>`-Zugriffe, die **direkt** als Dateipfad benutzt werden.
+
+    Gesucht ist `Path(settings.x)` und `open(settings.x)` — das Konstruieren eines Pfades
+    aus einem unaufgelösten Wert. Das Weitergeben an eine Funktion, die selbst auflöst
+    (`load_auth_config(settings.auth_config_path)`), ist ausdrücklich in Ordnung; sonst
+    bräuchte die Regel eine Ausnahmeliste und wäre keine mehr.
+
+    Über den AST, nicht über Textsuche: Sonst zählen Docstrings mit, die den
+    Einstellungsnamen bloß erwähnen — davon gibt es fünf.
+    """
+    treffer = []
+    for knoten in ast.walk(baum):
+        if not isinstance(knoten, ast.Call):
+            continue
+        name = getattr(knoten.func, "id", None) or getattr(knoten.func, "attr", None)
+        if name not in ("Path", "open"):
+            continue
+        for arg in knoten.args:
+            if (
+                isinstance(arg, ast.Attribute)
+                and isinstance(arg.value, ast.Name)
+                and arg.value.id == "settings"
+                and arg.attr.endswith(PFAD_SUFFIXE)
+            ):
+                treffer.append((arg.attr, knoten.lineno))
+    return treffer
 
 
 # ── Die Auflösung selbst ─────────────────────────────────────────────────────
@@ -161,6 +207,14 @@ def test_bestehende_config_wird_hier_gefunden():
 # ── Rückfallschutz ───────────────────────────────────────────────────────────
 
 
+# Beide Schreibweisen derselben Rechnung. `parent`×4 stand bis 12.09.2026 in
+# `app/planning/calendar.py` und ging an der `parents[N]`-Suche vorbei — im Container
+# ergab sie `/config/school_year.yaml`. Getragen hat das nur die Umgebungsvariable.
+_WURZEL_VON_HAND = re.compile(
+    r"Path\(__file__\)\.resolve\(\)\s*(?:\.parents\[[2-9]\]|(?:\.parent\s*){2,})"
+)
+
+
 def test_kein_modul_rechnet_die_wurzel_noch_selbst_aus():
     """Der eigentliche Regressionsschutz.
 
@@ -172,8 +226,7 @@ def test_kein_modul_rechnet_die_wurzel_noch_selbst_aus():
     for datei in sorted(APP.rglob("*.py")):
         if "__pycache__" in datei.parts or datei.name == "paths.py":
             continue
-        quelle = datei.read_text(encoding="utf-8")
-        if re.search(r"Path\(__file__\)\.resolve\(\)\.parents\[[2-9]\]", quelle):
+        if _WURZEL_VON_HAND.search(datei.read_text(encoding="utf-8")):
             treffer.append(str(datei.relative_to(APP)))
 
     assert treffer == [], (
@@ -183,16 +236,141 @@ def test_kein_modul_rechnet_die_wurzel_noch_selbst_aus():
     )
 
 
-@pytest.mark.parametrize("dienst", DIENSTE)
-@pytest.mark.parametrize("variable,erwartet", sorted(ABSOLUT_UEBERGEBEN.items()))
-def test_pfad_wird_zusaetzlich_absolut_uebergeben(dienst, variable, erwartet):
-    """Gürtel und Hosenträger: Die Auflösung ist repariert, die Übergabe bleibt.
+@pytest.mark.parametrize("schreibweise", [
+    "WURZEL = Path(__file__).resolve().parents[3] / 'config'",
+    "WURZEL = Path(__file__).resolve().parent.parent.parent.parent / 'config'",
+    "WURZEL = Path(__file__).resolve().parent.parent",
+])
+def test_die_suche_erkennt_beide_schreibweisen(schreibweise):
+    """Gegenprobe gegen den stummen Fehlschlag.
 
-    Sie kostet nichts, macht im Container sichtbar, wo die Dateien liegen, und trägt
-    weiter, falls jemand das Layout erneut verschiebt. Ein Ausfall wäre still — das ist
-    der Grund, hier nicht auf eine einzige Absicherung zu setzen.
+    Die erste Fassung kannte nur `parents[N]` und blieb grün, während die Kette daneben
+    stand. Ein Wächter, der die halbe Fehlerklasse nicht sieht, sichert nichts zu.
     """
-    gesetzt = COMPOSE["services"][dienst].get("environment", {}).get(variable)
-    assert gesetzt == erwartet, (
-        f"Dienst '{dienst}': {variable} fehlt oder ist falsch ({gesetzt!r})."
+    assert _WURZEL_VON_HAND.search(schreibweise)
+
+
+def test_ein_einzelnes_parent_ist_kein_wurzelrechnen():
+    """`.parent` allein ist das Verzeichnis der Datei — legitim und häufig."""
+    assert not _WURZEL_VON_HAND.search("HIER = Path(__file__).resolve().parent")
+
+
+# ── Kein Dateipfad aus einem unaufgelösten Einstellungswert ──────────────────
+
+
+def test_kein_settings_pfad_ohne_aufloeser():
+    """`Path(settings.x_path)` umgeht die zentrale Auflösung.
+
+    Der Wächter darüber prüfte nur die selbstgerechnete Wurzel — nicht den einfacheren
+    Weg, dasselbe falsch zu machen. Fünf Stellen taten es (Auth, Budget ×2,
+    Assistenten-Schema, Artefaktgrenzen, Drosselung); zwei davon fielen im lokalen
+    Betrieb **still** auf Built-in-Defaults zurück, und eine Drosselung, die stumm
+    ausfällt, ist eine Schutzfunktion weniger.
+    """
+    treffer = []
+    for datei in sorted(list(APP.rglob("*.py")) + list((APP.parent / "scripts").rglob("*.py"))):
+        if "__pycache__" in datei.parts:
+            continue
+        baum = ast.parse(datei.read_text(encoding="utf-8"))
+        for name, zeile in _settings_pfade(baum):
+            treffer.append(f"{datei.relative_to(APP.parent)}:{zeile} settings.{name}")
+
+    assert treffer == [], (
+        f"Diese Stellen bauen einen Dateipfad aus einem unaufgelösten Einstellungswert: "
+        f"{treffer}. Relative Vorgabewerte sind gegen die Repo-Wurzel bzw. das Paket "
+        f"gemeint, nicht gegen das Arbeitsverzeichnis — `app.core.paths.aufloesen` "
+        f"davorsetzen."
     )
+
+
+@pytest.mark.parametrize("quelle,erwartet", [
+    ("p = Path(settings.rate_limits_path)", ["rate_limits_path"]),
+    ("with open(settings.assistant_schema_path) as f: pass", ["assistant_schema_path"]),
+    ("p = aufloesen(settings.rate_limits_path)", []),
+    ("cfg = load_auth_config(settings.auth_config_path)", []),
+    ("n = Path(settings.upload_max_files)", []),   # Anzahl, kein Pfad
+    ("'settings.pedagogy_path steht nur im Docstring'", []),
+])
+def test_die_erkennung_trifft_das_richtige(quelle, erwartet):
+    """Selbstprüfung: Was der Wächter fangen soll — und was nicht.
+
+    Der letzte Fall ist der Grund für den AST: Eine Textsuche fände fünf Docstrings, die
+    Einstellungsnamen bloß erwähnen, und wäre damit dauerhaft rot.
+    """
+    assert [n for n, _ in _settings_pfade(ast.parse(quelle))] == erwartet
+
+
+def test_auth_config_loest_relative_pfade_selbst_auf():
+    """`load_auth_config` nimmt den Pfad als Argument — der Detektor oben sieht das nicht.
+
+    Er sucht `Path(settings.x)`/`open(settings.x)`; hier reicht der Einstellungswert
+    unverändert durch fünf Aufrufstellen und wird erst in der Funktion geöffnet. Die
+    Auflösung sitzt deshalb dort, und geprüft wird sie über das Verhalten: Aus
+    `backend/` heraus gibt es `config/auth.example.yaml` nicht — nur die Auflösung gegen
+    die Repo-Wurzel findet die Datei.
+    """
+    from app.auth.config import load_auth_config
+
+    assert not (Path.cwd() / "config" / "auth.example.yaml").exists(), (
+        "Der Test prüft nichts, wenn die Datei auch cwd-relativ liegt — dann läuft er "
+        "aus einem anderen Verzeichnis als erwartet."
+    )
+    assert load_auth_config("config/auth.example.yaml").adapter
+
+
+# ── Die Compose übergibt zusätzlich absolut ──────────────────────────────────
+
+
+def test_beide_dienste_tragen_dieselbe_pfadliste():
+    """`backend` und `cron` teilen das `./data`-Volume und dieselben Config-Dateien.
+
+    Eine Variable nur beim einen zu setzen ist die Sorte Abweichung, die erst auffällt,
+    wenn ein Cron-Lauf ins Leere räumt. `EXPORT_TEMPLATE_DIR` fehlte beim Cron.
+    """
+    backend, cron = (_pfadvariablen(d) for d in DIENSTE)
+    assert backend == cron, (
+        f"nur in backend: {sorted(set(backend) - set(cron))}; "
+        f"nur in cron: {sorted(set(cron) - set(backend))}"
+    )
+
+
+@pytest.mark.parametrize("dienst", DIENSTE)
+def test_uebergebene_pfade_sind_absolut(dienst):
+    """Ein relativer Wert in der Compose wäre der Fehler, den die Übergabe verhindern soll."""
+    relativ = {k: v for k, v in _pfadvariablen(dienst).items() if not str(v).startswith("/")}
+    assert relativ == {}, f"Dienst '{dienst}': relative Pfade übergeben: {relativ}"
+
+
+@pytest.mark.parametrize("dienst", DIENSTE)
+def test_jede_pfadvariable_passt_zu_ihrem_vorgabewert(dienst):
+    """Der übergebene Pfad muss `/app/` + Vorgabewert sein.
+
+    Sonst zeigen Compose und Vorgabewert auf verschiedene Stellen, und welche gilt, hängt
+    davon ab, ob die Variable gesetzt ist — im Container so, im Entwicklungsbaum anders.
+    """
+    vorgaben = _vorgabewerte() | {k.lower(): v for k, v in OHNE_EINSTELLUNG.items()}
+    abweichend = {}
+    for variable, wert in _pfadvariablen(dienst).items():
+        vorgabe = vorgaben.get(variable.lower())
+        if vorgabe is None:
+            abweichend[variable] = f"{wert!r} — keine Einstellung in app/config.py"
+        elif wert != "/app/" + vorgabe:
+            abweichend[variable] = f"{wert!r} ≠ '/app/{vorgabe}'"
+    assert abweichend == {}, f"Dienst '{dienst}': {abweichend}"
+
+
+@pytest.mark.parametrize("dienst", DIENSTE)
+def test_jeder_config_vorgabewert_wird_uebergeben(dienst):
+    """Gürtel und Hosenträger, und zwar vollständig.
+
+    Die Auflösung ist repariert — die Übergabe bleibt, weil sie nichts kostet, im
+    Container sichtbar macht, wo die Dateien liegen, und weiterträgt, falls jemand das
+    Layout erneut verschiebt. Ein Ausfall wäre still; das ist der Grund, hier nicht auf
+    eine einzige Absicherung zu setzen.
+    """
+    fehlen = sorted(
+        name.upper()
+        for name, vorgabe in _vorgabewerte().items()
+        if vorgabe.startswith("config/") and name.upper() not in _pfadvariablen(dienst)
+    )
+    assert fehlen == [], f"Dienst '{dienst}': nicht absolut übergeben: {fehlen}"

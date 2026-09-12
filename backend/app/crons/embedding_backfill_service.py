@@ -16,7 +16,7 @@ from app.context.embedding import (
     generate_embeddings,
 )
 from app.context import aliase as aliase_modul
-from app.db.models import ContextNode
+from app.db.models import ContextNode, ohne_aenderungsstempel
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,9 @@ async def backfill_embeddings(
         meta = dict(node.metadata_ or {})
         meta["embedding_error"] = detail
         await db.execute(
-            update(ContextNode).where(ContextNode.id == node.id).values(metadata_=meta)
+            update(ContextNode)
+            .where(ContextNode.id == node.id)
+            .values(metadata_=meta, **ohne_aenderungsstempel())
         )
 
     async def _stapel_einbetten(stapel: list[tuple[ContextNode, str]]) -> tuple[int, int]:
@@ -166,7 +168,9 @@ async def backfill_embeddings(
                 meta.pop("embedding_error", None)
                 werte["metadata_"] = meta
             await db.execute(
-                update(ContextNode).where(ContextNode.id == node.id).values(**werte)
+                update(ContextNode)
+                .where(ContextNode.id == node.id)
+                .values(**werte, **ohne_aenderungsstempel())
             )
             stats.ok += 1
         return 0, ergebnis.tokens

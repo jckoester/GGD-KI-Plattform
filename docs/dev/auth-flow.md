@@ -104,3 +104,65 @@ async def my_endpoint(
 
 `get_current_user` (`app/auth/dependencies.py`) liest das JWT-Cookie, verifiziert
 die Signatur und prüft ob das Token revoziert ist. Bei ungültigem Token: HTTP 401.
+
+## Zweiter Weg: persönliche Zugangstoken (PAT)
+
+Für Clients außerhalb des Browsers. Fehlt das Session-Cookie, prüft `get_current_user`
+den `Authorization: Bearer ggd_pat_…`-Header und baut daraus **denselben**
+`JwtPayload`-Principal — alle Guards dahinter (`require_group_teacher`, die
+Sichtbarkeitsfilter) arbeiten unverändert.
+
+Gespeichert wird nur `sha256(token)` (`personal_access_tokens`, Migration 0061); der
+Klartext ist einmal sichtbar, bei der Erzeugung. **Rollen stehen nicht im Token** — sie
+kommen bei jeder Anfrage frisch aus `pseudonym_audit`, damit ein Rollenentzug sofort
+wirkt. `revoked_all_before` gilt sinngemäß mit.
+
+### Das Scope-Gatter ist der eigentliche Sicherheitsteil
+
+156 Guard-Stellen in 32 Dateien laufen über `get_current_user`. Ein zweiter Auth-Zweig
+dort öffnet sie ohne Weiteres alle. `app/auth/scopes.py` ist deshalb die einzige Stelle,
+an der ein Token Zugang bekommt, und sie arbeitet **deny-by-default**: Was nicht in
+`_ZUSTAENDIG` steht, ist für Token gesperrt — ein neuer Router also ab der ersten Zeile.
+
+```python
+_ZUSTAENDIG = {
+    "/planning":      ("planning:read", "planning:write"),
+    "/context/nodes": ("context:read",  "context:write"),
+    ...
+}
+```
+
+Präfixe, aber **so eng wie der Zweck**: `/context` als Ganzes wäre zu viel gewesen —
+darunter hängen auch Assistenten-Anker und Chat-Anhänge.
+
+Schreibrecht enthält kein Leserecht; wer beides braucht, bekommt beide Scopes.
+Gedrosselt wird **je Token** (`token`-Eimer), nicht je Person: Eine durchdrehende
+Sync-Schleife soll ihre Besitzerin nicht aus dem Browser aussperren.
+
+### Step-up ohne Ressource
+
+Die Krisen-Aktionen binden ihr Step-up-Token an eine `resource_id` (Audit #3). Das
+Anlegen eines Zugangstokens hat kein solches Gegenüber — die Ressource entsteht erst
+dadurch. Dafür gibt es `require_fresh_stepup_ohne_ressource(action)` und die Liste
+`STEPUP_AKTIONEN_OHNE_RESSOURCE`; die Fabrik weist eine ressourcengebundene Aktion ab,
+damit keine Bindung stillschweigend verlorengeht.
+
+Geprüft wird symmetrisch: Eine gebundene Aktion **braucht** eine ID, eine ressourcenlose
+darf keine tragen — sonst gäbe es zwei Lesarten desselben Tokens.
+
+### Nebenläufig schreiben: `expected_updated_at`
+
+`PATCH /planning/slots/{id}` und `PATCH /planning/lessons/{id}` nehmen optional den
+`updated_at`-Stand entgegen, den der Client gelesen hat. Weicht er vom aktuellen ab,
+antwortet der Endpunkt mit **409** und nennt im Körper beide Werte (`erwartet`,
+`tatsaechlich`) — statt still zu überschreiben, was inzwischen in der Oberfläche
+entstanden ist.
+
+Freiwillig: Ohne das Feld bleibt es beim bisherigen Verhalten; die Oberfläche schickt es
+nicht. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück, damit ein Client zweimal
+hintereinander schreiben kann, ohne dazwischen neu zu lesen.
+
+⚠️ Das Ganze steht und fällt damit, dass `updated_at` sich bewegt. Bis 12.09.2026 tat es
+das auf mehreren Schreibwegen nicht — dann ginge der Vergleich immer auf und der 409 käme
+nie. `tests/integration/test_updated_at_wird_fortgeschrieben.py` hält die Voraussetzung
+fest.

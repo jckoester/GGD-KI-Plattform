@@ -1,7 +1,7 @@
 """Schuljahres- und Ferienkalender.
 
 Lädt aus config/school_year.yaml als Single Source of Truth.
-SCHOOL_YEAR_PATH-Umgebungsvariable überschreibt den Pfad (Docker).
+SCHOOL_YEAR_PATH-Umgebungsvariable überschreibt den Pfad.
 """
 
 from __future__ import annotations
@@ -13,6 +13,8 @@ from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, field_validator, model_validator
+
+from app.core.paths import aufloesen
 
 
 class FerienPeriod(BaseModel):
@@ -72,9 +74,15 @@ class SchoolYearConfig(BaseModel):
         return frozenset(t.datum for t in self.unterrichtsfreie_tage)
 
 
-_DEFAULT_PATH = Path(
-    os.environ.get("SCHOOL_YEAR_PATH", "")
-    or Path(__file__).resolve().parent.parent.parent.parent / "config" / "school_year.yaml"
+# Die Wurzel **nicht** selbst ausrechnen: `parent`×4 ergab im Container `/` und damit
+# `/config/school_year.yaml` — genau der Fehler vom 30.08.2026, der damals Jugendschutz
+# und Krisenerkennung still ausfallen ließ. Dass es auf Prod trug, lag allein an
+# `SCHOOL_YEAR_PATH` in der Compose; hier stand der Fehler weiter drin.
+#
+# Der Wächter über diese Fehlerklasse suchte nach `parents[N]` und übersah die
+# Schreibweise mit aneinandergehängten `.parent`. Er kennt sie jetzt.
+_DEFAULT_PATH = aufloesen(
+    os.environ.get("SCHOOL_YEAR_PATH", "") or "config/school_year.yaml"
 )
 
 

@@ -12,6 +12,11 @@ buckets:
   pii_scan: { limit: 30, window: 60 }   # lokaler spaCy-Scan (CPU-intensiv)
   upload:   { limit: 20, window: 60 }   # Datei-Upload (bis 10 MB je Datei)
   chat:     { limit: 60, window: 60 }   # Chat-/LLM-Anfragen
+  # Zugangstoken: gezählt je Token, nicht je Person — sonst sperrt eine
+  # durchdrehende Sync-Schleife die Lehrkraft aus ihrem eigenen Browser aus.
+  # Der erste vollständige Spiegel eines Schuljahres braucht einige hundert
+  # Anfragen; Clients müssen auf 429 mit `Retry-After` warten können.
+  token:    { limit: 300, window: 60 }  # persönliche Zugangstoken (PAT)
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

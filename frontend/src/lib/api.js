@@ -2263,3 +2263,55 @@ export async function getWeekPatternProposals(wochen = 4) {
   }
   return body;
 }
+
+// ── Persönliche Zugangstoken (Profil) ────────────────────────────────────────
+
+export async function getTokens() {
+  const res = await fetch(`${BASE}/tokens`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+export async function getTokenScopes() {
+  const res = await fetch(`${BASE}/tokens/scopes`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Wie `_accessAction`: 401 + X-Stepup-Required wird zu `stepUpRequired`, damit die
+// Oberfläche den Re-Auth-Dialog öffnen und den Aufruf danach wiederholen kann.
+export async function createToken({ name, scopes, gueltigBis }) {
+  const res = await fetch(`${BASE}/tokens`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, scopes, gueltig_bis: gueltigBis }),
+  });
+  if (!res.ok) {
+    if (res.status === 401 && res.headers.get("X-Stepup-Required")) {
+      const err = new ApiError(401, "Re-Authentifizierung erforderlich");
+      err.stepUpRequired = true;
+      throw err;
+    }
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { token, eintrag } — `token` ist nur hier zu haben
+}
+
+export async function revokeToken(id) {
+  const res = await fetch(`${BASE}/tokens/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+}

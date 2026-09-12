@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import settings
+from app.core.paths import aufloesen
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def _load_budget_tiers() -> dict:
     if _budget_tiers_cache is not None:
         return _budget_tiers_cache
     
-    config_path = Path(settings.budget_tiers_path)
+    config_path = aufloesen(settings.budget_tiers_path)
     if not config_path.exists():
         logger.error("budget_tiers.yaml nicht gefunden unter %s", config_path)
         raise FileNotFoundError(f"budget_tiers.yaml nicht gefunden: {config_path}")
