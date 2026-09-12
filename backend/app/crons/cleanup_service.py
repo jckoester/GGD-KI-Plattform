@@ -17,6 +17,7 @@ from app.db.models import (
     GroupMembership,
     JwtRevocation,
     NodeEngagement,
+    PersonalAccessToken,
     PseudonymAudit,
     TeacherGroupExclusion,
     UserPreference,
@@ -311,6 +312,15 @@ async def cleanup_inactive_accounts(
                         await db.execute(
                             delete(TeacherGroupExclusion).where(
                                 TeacherGroupExclusion.pseudonym == pseudonym
+                            )
+                        )
+                        # Zugangstoken zuerst: Sie sind lebende Zugänge. Bliebe eines
+                        # stehen, während `pseudonym_audit` fällt, verlöre es zwar seine
+                        # Rollen und damit seine Wirkung — aber ein gültiger Schlüssel zu
+                        # einem gelöschten Konto hat in der Tabelle nichts verloren.
+                        await db.execute(
+                            delete(PersonalAccessToken).where(
+                                PersonalAccessToken.pseudonym == pseudonym
                             )
                         )
                         await db.execute(

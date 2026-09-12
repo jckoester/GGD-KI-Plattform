@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.base import AuthAdapter
 from app.auth.config import SsoConfig, load_auth_config
 from app.auth.jwt import JwtPayload, JwtService
+from app.auth.scopes import pruefe_zugang
 from app.auth.stepup import decode_stepup_token
 from app.auth.stepup_nonce import consume_stepup_jti
 from app.config import settings
@@ -50,16 +51,37 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
     jwt_service: JwtService = Depends(get_jwt_service),
 ) -> JwtPayload:
+    """Der Principal — aus dem Session-Cookie oder aus einem Zugangstoken.
+
+    Zwei Wege, ein Ergebnis: Alles dahinter (`require_role`, `require_group_teacher`, die
+    Sichtbarkeitsfilter) arbeitet unverändert weiter. Der Unterschied steckt allein in
+    `token_scopes` und wird **hier** ausgewertet, bevor irgendein Router etwas sieht —
+    siehe `app.auth.scopes`.
+    """
     token = request.cookies.get("session")
-    if not token:
-        raise HTTPException(status_code=401, detail="Nicht authentifiziert")
-    try:
-        payload = jwt_service.verify(token)
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Ungültiger Token")
-    if await jwt_service.is_revoked(db, payload):
-        raise HTTPException(status_code=401, detail="Token revoziert")
-    return payload
+    if token:
+        try:
+            payload = jwt_service.verify(token)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Ungültiger Token")
+        if await jwt_service.is_revoked(db, payload):
+            raise HTTPException(status_code=401, detail="Token revoziert")
+        return payload
+
+    kopfzeile = request.headers.get("authorization") or ""
+    if kopfzeile.lower().startswith("bearer "):
+        from app.auth import tokens as token_modul
+
+        ergebnis = await token_modul.pruefe(db, kopfzeile[7:].strip())
+        if ergebnis is None:
+            raise HTTPException(status_code=401, detail="Ungültiges Zugangstoken")
+        _, payload = ergebnis
+        # Vor dem Router, nicht in ihm: Ein Token, dessen Scope diesen Pfad nicht deckt,
+        # kommt gar nicht erst bis zur Rechteprüfung.
+        pruefe_zugang(payload.token_scopes or [], request.method, request.url.path)
+        return payload
+
+    raise HTTPException(status_code=401, detail="Nicht authentifiziert")
 
 
 def require_role(role: str) -> Callable:
