@@ -116,6 +116,44 @@ def _derive_subject_slug(captured: str) -> Optional[str]:
     return None
 
 
+def _unterrichtsgruppe_lesen(
+    treffer: re.Match, sso_id: str, captured: str
+) -> tuple[str, Optional[str]]:
+    """Anzeigename und Fachkürzel einer Unterrichtsgruppe aus dem Treffer.
+
+    **Warum es hier eine Wahl gibt.** Die ursprüngliche Ableitung riet das Fach aus dem
+    letzten punktgetrennten Segment (`unterricht.8a.mathematik` → `mathematik`). Das
+    unterstellt, dass die Schule ihre Gruppen frei benennen kann. Wer sie aus dem
+    Stundenplan übernimmt, kann das nicht: `unterricht.ch2-ks-11` hat keinen Punkt, das
+    Raten scheitert, und die Gruppe landet **ohne Fach** in der Datenbank — sichtbar im
+    Profil, aber unter keinem Fach (aufgetreten in Produktion, 13.09.2026).
+
+    Mit `(?P<fach>…)` im Muster sagt die Konfiguration, wo das Fach steht, statt dass die
+    Plattform es errät. `(?P<bezeichnung>…)` tut dasselbe für den Anzeigenamen.
+
+    Der Rückfall ohne benannte Gruppen ist das alte Verhalten — unverändert, damit
+    bestehende Konfigurationen weiterlaufen.
+    """
+    benannt = treffer.groupdict()
+
+    if "bezeichnung" in benannt and benannt["bezeichnung"]:
+        name = benannt["bezeichnung"]
+    elif benannt:
+        # Benannte Gruppen im Spiel, aber keine `bezeichnung`: Gruppe 1 ist dann die
+        # erste *benannte* Gruppe und meist zu schmal (bei `(?P<fach>[a-z]+)` bliebe
+        # als Name „ch" übrig). Die volle Kennung ist unschön, aber nie falsch.
+        name = sso_id
+    else:
+        name = captured.replace(".", " ")
+
+    if "fach" in benannt:
+        fach = (benannt["fach"] or "").lower() or None
+    else:
+        fach = _derive_subject_slug(captured)
+
+    return name, fach
+
+
 def parse_sso_groups(
     sso_groups: list[str],
     patterns: SsoGroupPatterns,
@@ -150,8 +188,7 @@ def parse_sso_groups(
                     name = captured
                     subject_slug = captured.lower()
                 else:  # teaching_group
-                    name = captured.replace('.', ' ')
-                    subject_slug = _derive_subject_slug(captured)
+                    name, subject_slug = _unterrichtsgruppe_lesen(m, sso_id, captured)
 
                 result.append(ParsedGroup(
                     sso_group_id=sso_id,
@@ -213,9 +250,38 @@ async def _upsert_group_and_membership(
     group = res.scalars().first()
 
     if group is None:
+        # Dieselbe SSO-Gruppe, bisher **ohne** Fach: nachträglich zuordnen statt eine
+        # zweite Zeile anzulegen.
+        #
+        # Der Fall entsteht beim Nachziehen der Konfiguration: Solange das Muster kein
+        # `(?P<fach>…)` trug, landeten Unterrichtsgruppen aus dem Stundenplan ohne Fach
+        # in der Datenbank. Ohne diese Adoption ergäbe der erste Login danach ein Paar —
+        # eine verwaiste Zeile ohne Fach und eine neue mit Slug-Suffix `-2`. `dedup_groups`
+        # räumt das nicht auf, weil `subject_id` Teil seines Schlüssels ist.
+        #
+        # Nur für Unterrichtsgruppen: Eine Fachschaft kann mehrere Fächer betreuen, dort
+        # wäre „die Zeile ohne Fach ist dieselbe" falsch.
+        if pg.type == "teaching_group" and subject_id is not None:
+            res = await db.execute(
+                select(Group).where(
+                    func.lower(Group.sso_group_id) == sso_id_norm,
+                    Group.subject_id.is_(None),
+                    Group.type == "teaching_group",
+                )
+            )
+            ohne_fach = res.scalars().first()
+            if ohne_fach is not None:
+                logger.info(
+                    "SSO-Gruppe '%s': Fach nachgetragen (subject_id=%s) statt Doppelanlage.",
+                    pg.sso_group_id, subject_id,
+                )
+                ohne_fach.subject_id = subject_id
+                ohne_fach.name = pg.name
+                group = ohne_fach
+
         # Merge-Logik: bei teaching_group eine manuell (aus Fach+Klasse) erstellte
         # Gruppe ohne sso_group_id adoptieren statt neu anlegen.
-        if pg.type == "teaching_group" and subject_id is not None:
+        if group is None and pg.type == "teaching_group" and subject_id is not None:
             res = await db.execute(
                 select(Group)
                 .join(GroupMembership, GroupMembership.group_id == Group.id)
@@ -312,13 +378,36 @@ async def sync_groups(
         elif pg.type == "teaching_group" and pg.subject_slug:
             subject_id = await _resolve_subject_id(db, pg.subject_slug)
             if subject_id is None:
+                # Rückfall auf das Stundenplan-Vokabular. Wer seine Unterrichtsgruppen
+                # aus dem Stundenplan übernimmt, hat dort dessen Kürzel stehen (`ch2`,
+                # `m`) — und dafür führt `subjects.yaml` bereits `untis_codes`. Sie in
+                # `sso_aliases` zu wiederholen wäre ein **viertes** Vokabular mit
+                # demselben Inhalt; der Auflöser schneidet nebenbei die Kursziffer ab
+                # (`ch2` → `CH`).
+                from app.calendar.groups import resolve_subject
+
+                subject_id = await resolve_subject(db, pg.subject_slug)
+            if subject_id is None:
                 logger.warning(
-                    "SSO-Gruppe '%s' (teaching_group): Fach-Slug '%s' nicht aufgelöst. "
-                    "Fach + ggf. sso_aliases in config/subjects.yaml prüfen.",
+                    "SSO-Gruppe '%s' (teaching_group): Fach '%s' nicht aufgelöst — weder "
+                    "über Slug/sso_aliases noch über untis_codes/fach_code. "
+                    "config/subjects.yaml prüfen.",
                     pg.sso_group_id, pg.subject_slug,
                 )
             targets = [(subject_id, pg.slug)]
         else:
+            if pg.type == "teaching_group":
+                # Eine Unterrichtsgruppe ohne Fach ist kein Randfall, sondern eine
+                # Gruppe, die unter keinem Fach erscheinen kann — sie steht dann nur im
+                # Profil, und niemand sieht, warum. Genau so lief es bis 13.09.2026
+                # still: Die Warnung darüber greift erst, wenn ein Fach-Slug abgeleitet
+                # *und* nicht aufgelöst wurde; bei „gar nicht abgeleitet" schwieg alles.
+                logger.warning(
+                    "SSO-Gruppe '%s' (teaching_group): kein Fach ableitbar. Die Gruppe "
+                    "erscheint unter keinem Fach. Muster in config/auth.yaml um eine "
+                    "benannte Gruppe (?P<fach>…) ergänzen.",
+                    pg.sso_group_id,
+                )
             targets = [(None, pg.slug)]
 
         for subject_id, base_slug in targets:

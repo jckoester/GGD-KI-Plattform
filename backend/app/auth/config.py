@@ -13,7 +13,25 @@ class GroupRoleMapping(BaseModel):
 
 
 class SsoGroupPatterns(BaseModel):
-    """Reguläre Ausdrücke (je eine Capture-Group) für SSO-Gruppenmuster."""
+    """Reguläre Ausdrücke (je mindestens eine Capture-Group) für SSO-Gruppenmuster.
+
+    **Benannte Gruppen (optional).** Zwei Namen haben eine Bedeutung:
+
+    * ``(?P<fach>…)`` — das Fachkürzel. Ohne sie rät die Plattform: Sie nimmt das
+      letzte punktgetrennte Segment (``unterricht.8a.mathematik`` → ``mathematik``).
+      Das setzt voraus, dass die Schule ihre Gruppen so benennen *kann* — wer sie aus
+      dem Stundenplan übernimmt, kann das oft nicht (``unterricht.ch2-ks-11``).
+    * ``(?P<bezeichnung>…)`` — der Anzeigename der Gruppe. Ohne sie gilt Gruppe 1;
+      sind benannte Gruppen im Spiel und fehlt ``bezeichnung``, bleibt die volle
+      SSO-Kennung stehen. Das ist unschön, aber nie falsch.
+
+    Für ``unterricht.<fach><nr>-<kürzel>-<klasse>`` also etwa::
+
+        teaching_group: '^unterricht\\.(?P<bezeichnung>(?P<fach>[a-z]+)\\d*-.+)$'
+
+    Das ``\\d*`` schneidet die Kursziffer ab (``ch2`` → ``ch``); das Fach selbst wird
+    anschließend über ``subjects.slug`` **oder** ``subjects.sso_aliases`` aufgelöst.
+    """
 
     subject_department: str | None = None  # z.B. "^FS\\.(.+)$"
     school_class: str | None = None  # z.B. "^Klasse\\.(.+)$"

@@ -321,6 +321,38 @@ sso:
 > → Kunst) werden **nicht** hier, sondern pro Fach in `config/subjects.yaml`
 > (Feld `sso_aliases`) gepflegt.
 
+#### Wenn die Gruppennamen aus dem Stundenplan kommen
+
+Ohne weitere Angabe **rät** die Plattform das Fach einer Unterrichtsgruppe: Sie nimmt
+das letzte punktgetrennte Segment (`unterricht.8a.mathematik` → `mathematik`). Das setzt
+voraus, dass die Schule ihre Gruppen frei benennen kann. Werden sie automatisch aus dem
+Stundenplan übernommen — etwa als `unterricht.ch2-ks-11` —, geht das Raten daneben, und
+die Gruppe landet **ohne Fach**: Sie erscheint im Profil und in der Liste der
+Unterrichtsgruppen, aber unter keinem Fach. Im Log steht dann eine Warnung
+(„kein Fach ableitbar").
+
+Abhilfe sind **benannte Capture-Gruppen** im Muster:
+
+```yaml
+  groups:
+    teaching_group: '^unterricht\.(?P<bezeichnung>(?P<fach>[^-]+)-.+)$'
+```
+
+| Name | Bedeutung | fehlt sie? |
+|---|---|---|
+| `fach` | wo das Fachkürzel steht | die Plattform rät wie bisher |
+| `bezeichnung` | der Anzeigename der Gruppe | Gruppe 1, sonst die volle SSO-Kennung |
+
+Das Fachkürzel wird über `subjects.slug` und `sso_aliases` gesucht und, falls das nicht
+greift, über `untis_codes` und `fach_code`. Die Kursziffer fällt dabei weg (`ch2` → `CH`).
+
+> **Stundenplan-Kürzel gehören nicht zusätzlich in `sso_aliases`.** Sie stehen bereits in
+> `untis_codes`; sie zu wiederholen hieße, dieselbe Zuordnung an zwei Stellen zu pflegen.
+
+Wurden die Gruppen bereits ohne Fach angelegt, genügt das Nachziehen des Musters: Beim
+nächsten Login trägt die Plattform das Fach an der **vorhandenen** Gruppe nach, statt eine
+zweite anzulegen.
+
 **Rollen:** `admin`, `teacher`, `student`, `review`. Das Matching ist
 case-insensitiv und berücksichtigt Gruppen **und** Rollen, sodass z. B. die
 Gruppe `Kollegium` oder das IServ-Rollentoken `ROLE_TEACHER` zu `teacher` führt.

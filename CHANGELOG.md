@@ -15,6 +15,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Unterrichtsgruppen aus dem SSO finden ihr Fach auch dann, wenn ihre Namen aus
+  dem Stundenplan stammen.** Das Muster in `config/auth.yaml` darf jetzt sagen, wo
+  das Fachkürzel steht (`(?P<fach>…)`) und wie die Gruppe heißen soll
+  (`(?P<bezeichnung>…)`); gesucht wird auch in `untis_codes` und `fach_code`. Bisher
+  wurde das Fach geraten, und Gruppen ohne ableitbares Fach erschienen unter keinem
+  Fach — ohne Hinweis im Log. Bereits angelegte Gruppen bekommen ihr Fach beim
+  nächsten Login nachgetragen.
 - Konfigurationsdateien werden unabhängig vom Arbeitsverzeichnis gelesen. Betroffen
   waren Drosselung, Artefaktgrenzen, Budgetstufen, Assistenten-Schema, Schuljahr
   und Auth-Konfiguration.

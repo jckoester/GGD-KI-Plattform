@@ -70,6 +70,21 @@ sso:
     subject_department: '^FS\.(.+)$' # matcht fs.mathematik → subject_department
     school_class: '^Klasse\.(.+)$' # matcht klasse.8a → school_class
     teaching_group: '^unterricht\.(.+)$' # matcht unterricht.8a.mathematik → teaching_group
+    #
+    # Das Fach einer Unterrichtsgruppe wird ohne weitere Angabe **geraten**: letztes
+    # punktgetrenntes Segment (unterricht.8a.mathematik → mathematik). Wer seine Gruppen
+    # aus dem Stundenplan übernimmt, kann sie nicht frei benennen — dann passt das Raten
+    # nicht, und die Gruppe landet ohne Fach (sichtbar im Profil, unter keinem Fach).
+    #
+    # Mit der benannten Gruppe (?P<fach>…) sagt die Konfiguration, wo das Fach steht;
+    # (?P<bezeichnung>…) tut dasselbe für den Anzeigenamen. Für die Konvention
+    # `unterricht.<fach><nr>-<kürzel>-<klasse>` (z. B. unterricht.ch2-ks-11):
+    #
+    #   teaching_group: '^unterricht\.(?P<bezeichnung>(?P<fach>[^-]+)-.+)$'
+    #
+    # Das Fach wird dann über subjects.slug / sso_aliases aufgelöst und, falls das nicht
+    # greift, über untis_codes / fach_code — die Kursziffer (ch2 → CH) fällt dabei weg.
+    # Stundenplan-Kürzel gehören deshalb NICHT zusätzlich in sso_aliases.
   allow_manual_teaching_groups: true # false = Sidebar-Vorschläge deaktiviert
   # Hinweis: Fach-Aliase (alternative SSO-Gruppennamen, z. B. fs.bildende.kunst → kunst)
   # werden pro Fach in config/subjects.yaml gepflegt (Feld sso_aliases) — nicht mehr hier.

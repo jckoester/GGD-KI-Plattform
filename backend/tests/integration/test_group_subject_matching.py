@@ -169,3 +169,150 @@ async def test_sync_groups_fachschaft_multi_subject(async_engine):
             await db.execute(delete(Group).where(Group.sso_group_id == "fs.wirtschaft"))
             await db.execute(delete(Subject).where(Subject.slug.in_(["wirtschaft", "wbs"])))
             await db.commit()
+
+
+# ── Unterrichtsgruppen aus dem Stundenplan (Produktionsfall 13.09.2026) ───────
+
+STUNDENPLAN_PATTERNS = SsoGroupPatterns(
+    school_class=r"^Klasse\.(.+)$",
+    teaching_group=r"^unterricht\.(?P<bezeichnung>(?P<fach>[^-]+)-.+)$",
+)
+
+
+async def test_unterrichtsgruppe_findet_ihr_fach_ueber_das_stundenplan_kuerzel(
+    async_engine,
+):
+    """`unterricht.ch2-ks-11` → Gruppe **mit** subject_id, aufgelöst über `untis_codes`.
+
+    Die ganze Kette auf einmal: benannte Capture-Gruppe im Muster, Rückfall auf das
+    Stundenplan-Vokabular, Abschneiden der Kursziffer (`ch2` → `CH`). Vorher entstand
+    hier eine Gruppe ohne Fach — sichtbar im Profil, unter keinem Fach auffindbar.
+
+    Bewusst **ohne** `sso_aliases`: Stundenplan-Kürzel dort zu wiederholen wäre ein
+    viertes Vokabular mit demselben Inhalt.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    pseudo = "stundenplan-gruppe-pseudo"
+    try:
+        async with factory() as db:
+            chem_id = await _get_or_create_subject(db, "chemie-sp", "Chemie (Test)")
+            fach = await db.get(Subject, chem_id)
+            fach.untis_codes = ["CH"]
+            await db.commit()
+
+        async with factory() as db:
+            await sync_groups(
+                db=db, pseudonym=pseudo, sso_groups=["unterricht.ch2-ks-11"],
+                primary_role="teacher", patterns=STUNDENPLAN_PATTERNS,
+            )
+
+        async with factory() as db:
+            row = (await db.execute(
+                select(Group.subject_id, Group.name, Group.type)
+                .join(GroupMembership, GroupMembership.group_id == Group.id)
+                .where(GroupMembership.pseudonym == pseudo)
+            )).one()
+            assert row.type == "teaching_group"
+            assert row.subject_id == chem_id, "Gruppe ohne Fach — Auflösung griff nicht"
+            assert row.name == "ch2-ks-11"
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(
+                delete(Group).where(Group.sso_group_id == "unterricht.ch2-ks-11")
+            )
+            await db.execute(delete(Subject).where(Subject.slug == "chemie-sp"))
+            await db.commit()
+
+
+async def test_ohne_benanntes_fach_bleibt_die_gruppe_ohne_fach(async_engine):
+    """Der Ausgangszustand, festgehalten: altes Muster + Stundenplan-Benennung.
+
+    Ohne diesen Test sagte der obige nur, dass etwas funktioniert — nicht, dass es
+    vorher nicht funktionierte.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    pseudo = "stundenplan-ohne-muster-pseudo"
+    try:
+        async with factory() as db:
+            chem_id = await _get_or_create_subject(db, "chemie-sp2", "Chemie (Test 2)")
+            fach = await db.get(Subject, chem_id)
+            fach.untis_codes = ["CH"]
+            await db.commit()
+
+        async with factory() as db:
+            await sync_groups(
+                db=db, pseudonym=pseudo, sso_groups=["unterricht.ch2-ks-11"],
+                primary_role="teacher", patterns=PATTERNS,
+            )
+
+        async with factory() as db:
+            row = (await db.execute(
+                select(Group.subject_id)
+                .join(GroupMembership, GroupMembership.group_id == Group.id)
+                .where(GroupMembership.pseudonym == pseudo)
+            )).one()
+            assert row.subject_id is None
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(
+                delete(Group).where(Group.sso_group_id == "unterricht.ch2-ks-11")
+            )
+            await db.execute(delete(Subject).where(Subject.slug == "chemie-sp2"))
+            await db.commit()
+
+
+async def test_nachziehen_der_konfiguration_traegt_das_fach_nach(async_engine):
+    """Erst ohne Muster anmelden, dann mit — es darf **eine** Gruppe bleiben.
+
+    Genau der Rollout-Weg in Produktion: Die Gruppen stehen schon ohne Fach in der
+    Datenbank, dann wird `config/auth.yaml` nachgezogen. Ohne Adoption ergäbe das ein
+    Paar aus verwaister Zeile und neuer Gruppe mit Slug-Suffix `-2`; `dedup_groups`
+    räumt das nicht auf, weil `subject_id` Teil seines Schlüssels ist.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    pseudo = "nachziehen-pseudo"
+    try:
+        async with factory() as db:
+            chem_id = await _get_or_create_subject(db, "chemie-sp3", "Chemie (Test 3)")
+            fach = await db.get(Subject, chem_id)
+            fach.untis_codes = ["CH"]
+            await db.commit()
+
+        # 1. Login mit altem Muster → Gruppe ohne Fach
+        async with factory() as db:
+            await sync_groups(
+                db=db, pseudonym=pseudo, sso_groups=["unterricht.ch2-ks-11"],
+                primary_role="teacher", patterns=PATTERNS,
+            )
+        async with factory() as db:
+            vorher = (await db.execute(
+                select(Group.id, Group.subject_id, Group.slug)
+                .where(func.lower(Group.sso_group_id) == "unterricht.ch2-ks-11")
+            )).all()
+            assert len(vorher) == 1 and vorher[0].subject_id is None
+
+        # 2. Login mit nachgezogenem Muster → dieselbe Zeile, jetzt mit Fach
+        async with factory() as db:
+            await sync_groups(
+                db=db, pseudonym=pseudo, sso_groups=["unterricht.ch2-ks-11"],
+                primary_role="teacher", patterns=STUNDENPLAN_PATTERNS,
+            )
+        async with factory() as db:
+            nachher = (await db.execute(
+                select(Group.id, Group.subject_id, Group.slug)
+                .where(func.lower(Group.sso_group_id) == "unterricht.ch2-ks-11")
+            )).all()
+            assert len(nachher) == 1, f"Doppelanlage statt Adoption: {nachher}"
+            assert nachher[0].id == vorher[0].id
+            assert nachher[0].subject_id == chem_id
+            assert nachher[0].slug == vorher[0].slug, "Slug bekam ein Suffix"
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(
+                delete(Group).where(func.lower(Group.sso_group_id) == "unterricht.ch2-ks-11")
+            )
+            await db.execute(delete(Subject).where(Subject.slug == "chemie-sp3"))
+            await db.commit()

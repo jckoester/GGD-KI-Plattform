@@ -252,3 +252,64 @@ def test_parse_real_iserv_fachschaften():
     by_id = {r.sso_group_id: r.subject_slug for r in result}
     assert by_id["fs.mathematik"] == "mathematik"
     assert by_id["fs.bili"] == "bili"  # kein Subject → später NULL (Warnung)
+
+
+# ── Benannte Capture-Gruppen: Fach und Anzeigename aus der Konfiguration ──────
+#
+# Anlass (Produktion, 13.09.2026): Die Unterrichtsgruppen kommen automatisch aus dem
+# Stundenplan und heißen `unterricht.<fach><nr>-<kürzel>-<klasse>`. Das alte Raten (Fach
+# = letztes punktgetrenntes Segment) scheitert daran, und die Gruppen landeten **ohne
+# Fach** in der Datenbank — im Profil sichtbar, unter keinem Fach auffindbar, und ohne
+# eine Zeile im Log. Die Benennung ist nicht konfigurierbar; also muss es das Muster sein.
+
+STUNDENPLAN = SsoGroupPatterns(
+    teaching_group=r"^unterricht\.(?P<bezeichnung>(?P<fach>[^-]+)-.+)$",
+)
+
+
+class TestBenannteGruppen:
+    def test_fach_und_bezeichnung_kommen_aus_dem_muster(self):
+        (g,) = parse_sso_groups(["unterricht.ch2-ks-11"], STUNDENPLAN)
+        assert g.subject_slug == "ch2"
+        assert g.name == "ch2-ks-11"
+        assert g.type == "teaching_group"
+
+    def test_ohne_kursziffer_ebenso(self):
+        (g,) = parse_sso_groups(["unterricht.m-ks-12"], STUNDENPLAN)
+        assert g.subject_slug == "m"
+        assert g.name == "m-ks-12"
+
+    def test_ohne_bezeichnung_bleibt_die_volle_kennung_stehen(self):
+        """Gruppe 1 wäre dann die erste *benannte* Gruppe und damit zu schmal.
+
+        Bei `(?P<fach>[^-]+)` bliebe als Anzeigename „ch2" übrig — die Klasse fehlte.
+        Die volle Kennung ist unschön, aber nie falsch, und sie macht die fehlende
+        `bezeichnung` in der Oberfläche sichtbar.
+        """
+        flach = SsoGroupPatterns(
+            teaching_group=r"^unterricht\.(?P<fach>[^-]+)-(?P<rest>.+)$"
+        )
+        (g,) = parse_sso_groups(["unterricht.ch2-ks-11"], flach)
+        assert g.subject_slug == "ch2"
+        assert g.name == "unterricht.ch2-ks-11"
+
+    def test_leeres_fach_gilt_als_nicht_abgeleitet(self):
+        """`(?P<fach>…)` kann auch leer treffen — das ist kein Fach, sondern keins."""
+        leer = SsoGroupPatterns(teaching_group=r"^unterricht\.(?P<fach>[a-z]*)(?P<rest>.*)$")
+        (g,) = parse_sso_groups(["unterricht.123"], leer)
+        assert g.subject_slug is None
+
+
+class TestAltesVerhaltenBleibt:
+    """Ohne benannte Gruppen ändert sich nichts — bestehende Konfigurationen laufen weiter."""
+
+    def test_punktkonvention_unveraendert(self):
+        (g,) = parse_sso_groups(["unterricht.8a.Mathematik"], PATTERNS)
+        assert g.subject_slug == "mathematik"
+        assert g.name == "8a Mathematik"
+
+    def test_stundenplan_konvention_ohne_muster_bleibt_ohne_fach(self):
+        """Der Ausgangszustand — hier festgehalten, damit der Unterschied sichtbar ist."""
+        (g,) = parse_sso_groups(["unterricht.ch2-ks-11"], PATTERNS)
+        assert g.subject_slug is None
+        assert g.name == "ch2-ks-11"
