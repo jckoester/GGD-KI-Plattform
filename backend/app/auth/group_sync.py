@@ -329,6 +329,103 @@ async def _upsert_group_and_membership(
     return group.id
 
 
+async def _spiegle_mitgliedschaften(
+    db: AsyncSession, pseudonym: str, behalten: list[int]
+) -> None:
+    """Immediate Mirror: entfernt Mitgliedschaften, die das Token nicht mehr deckt.
+
+    **Nur für Gruppen mit `sso_group_id`.** Eine Gruppe ohne SSO-Entsprechung steht in
+    keinem Token und wäre sonst bei *jedem* Login fällig — auch die, die eine Lehrkraft
+    sich gerade erst aus einem Vorschlag angelegt hat. Nachgemessen am 13.09.2026: Sie
+    verlor dabei ihre **eigene** Mitgliedschaft, nicht nur die von Hand eingetragenen
+    Mitglieder; die Gruppe war nach dem nächsten Login leer und nur noch im Archiv
+    erreichbar.
+
+    Was keine SSO-Entsprechung hat, wird von Hand oder abgeleitet gepflegt — der Spiegel
+    ist dafür nicht zuständig. Er ist es weiterhin für alles, was aus dem Token kommt:
+    Fällt eine Fachschaft weg, fällt die Mitgliedschaft.
+    """
+    from app.db.models import Group, GroupMembership
+
+    aus_dem_sso = select(Group.id).where(Group.sso_group_id.is_not(None))
+    bedingungen = [
+        GroupMembership.pseudonym == pseudonym,
+        GroupMembership.group_id.in_(aus_dem_sso),
+    ]
+    if behalten:
+        bedingungen.append(GroupMembership.group_id.not_in(behalten))
+    await db.execute(delete(GroupMembership).where(*bedingungen))
+
+
+async def _erbe_unterrichtsgruppen_der_klasse(
+    db: AsyncSession, pseudonym: str, klassen_ids: list[int], primary_role: str
+) -> None:
+    """Schüler:innen erben die Unterrichtsgruppen, die aus ihrer Klasse abgeleitet sind.
+
+    **Die zweite Hälfte der Adoption.** Bestätigt eine Lehrkraft den Vorschlag „Klasse 8a
+    × Mathematik", entsteht eine Unterrichtsgruppe mit `source_class_group_id` auf die 8a
+    — bisher aber mit der Lehrkraft als einzigem Mitglied. Für Schüler:innen blieb sie
+    unsichtbar, obwohl im Datenmodell steht, woher sie kommt. Das war der Grund, warum
+    ein im Klassenverband unterrichtetes Fach trotzdem eine eigene SSO-Gruppe brauchte —
+    also genau die Verwaltungsarbeit, die die Ableitung ersparen sollte.
+
+    **Nur Schüler:innen.** Rollenblind gedacht zöge die Regel jede Lehrkraft, die in der
+    8a ist, in *jede* abgeleitete Gruppe dieser Klasse — die Klassenleitung säße in
+    „Mathe 8a", ohne das Fach zu unterrichten. Lehrkräfte kommen ausschließlich über
+    ihre eigene Adoption hinein.
+
+    **Nur Gruppen ohne `sso_group_id`.** Gibt es zu einer Unterrichtsgruppe eine
+    SSO-Entsprechung, ist deren Mitgliederliste maßgeblich; abzuleiten hieße, Leute
+    hineinzuschreiben, die der Provider nicht nennt.
+
+    Die Mitgliedschaft ist **abgeleitet**, nicht von Hand gesetzt: Wer die Klasse
+    verlässt, verliert sie beim nächsten Login wieder. Diese Bereinigung macht der
+    Immediate Mirror nicht — er fasst Gruppen ohne `sso_group_id` bewusst nicht an —,
+    also steht sie hier.
+    """
+    if primary_role != "student":
+        return
+
+    from app.db.models import Group, GroupMembership
+
+    abgeleitet: list[int] = []
+    if klassen_ids:
+        abgeleitet = list((await db.execute(
+            select(Group.id).where(
+                Group.type == "teaching_group",
+                Group.sso_group_id.is_(None),
+                Group.source_class_group_id.in_(klassen_ids),
+            )
+        )).scalars())
+
+    for gid in abgeleitet:
+        await db.execute(
+            pg_insert(GroupMembership)
+            .values(group_id=gid, pseudonym=pseudonym, role_in_group="student")
+            # `do_nothing`, nicht `do_update`: Hat ein Admin jemandem hier bewusst eine
+            # andere Rolle gegeben, ist das keine Ableitung und wird nicht überschrieben.
+            .on_conflict_do_nothing(index_elements=["group_id", "pseudonym"])
+        )
+
+    # Abgang: geerbte Mitgliedschaften, deren Quellklasse nicht mehr passt.
+    veraltet = select(Group.id).where(
+        Group.type == "teaching_group",
+        Group.sso_group_id.is_(None),
+        Group.source_class_group_id.is_not(None),
+    )
+    if abgeleitet:
+        veraltet = veraltet.where(Group.id.not_in(abgeleitet))
+    await db.execute(
+        delete(GroupMembership).where(
+            GroupMembership.pseudonym == pseudonym,
+            # Nur die geerbte Rolle: Die Mitgliedschaft der Lehrkraft ist der Nachweis
+            # ihrer Adoption und darf hier nicht fallen.
+            GroupMembership.role_in_group == "student",
+            GroupMembership.group_id.in_(veraltet),
+        )
+    )
+
+
 async def sync_groups(
     db: AsyncSession,
     pseudonym: str,
@@ -348,14 +445,17 @@ async def sync_groups(
 
     parsed = parse_sso_groups(sso_groups, patterns)
     if not parsed:
-        # Kein Muster passte → alle Mitgliedschaften entfernen (Immediate Mirror)
-        await db.execute(
-            delete(GroupMembership).where(GroupMembership.pseudonym == pseudonym)
-        )
+        # Kein Muster passte → alle SSO-gestützten Mitgliedschaften entfernen. Die
+        # Vererbung muss **auch hier** laufen: Ohne Klasse gibt es nichts zu erben, und
+        # was zuvor geerbt wurde, gehört weg. Der erste Entwurf kehrte an dieser Stelle
+        # zurück — eine Schülerin ohne Klassen behielt ihre geerbten Gruppen für immer.
+        await _spiegle_mitgliedschaften(db, pseudonym, behalten=[])
+        await _erbe_unterrichtsgruppen_der_klasse(db, pseudonym, [], primary_role)
         await db.commit()
         return
 
     matched_group_ids: list[int] = []
+    klassen_ids: list[int] = []
 
     for pg in parsed:
         # Ziel-Fächer + Gruppen-Slug je Fach bestimmen
@@ -415,18 +515,9 @@ async def sync_groups(
                 db, pg, subject_id, base_slug, pseudonym, primary_role
             )
             matched_group_ids.append(gid)
+            if pg.type == "school_class":
+                klassen_ids.append(gid)
 
-    # Immediate Mirror: Mitgliedschaften für nicht mehr enthaltene Gruppen entfernen
-    if matched_group_ids:
-        await db.execute(
-            delete(GroupMembership).where(
-                GroupMembership.pseudonym == pseudonym,
-                GroupMembership.group_id.not_in(matched_group_ids),
-            )
-        )
-    else:
-        await db.execute(
-            delete(GroupMembership).where(GroupMembership.pseudonym == pseudonym)
-        )
-
+    await _spiegle_mitgliedschaften(db, pseudonym, behalten=matched_group_ids)
+    await _erbe_unterrichtsgruppen_der_klasse(db, pseudonym, klassen_ids, primary_role)
     await db.commit()

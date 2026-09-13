@@ -7,6 +7,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Bestätigt eine Lehrkraft einen Gruppenvorschlag, kommt die Klasse mit.**
+  Die Schüler:innen der Quellklasse sind beim nächsten Login in der
+  Unterrichtsgruppe — ein im Klassenverband unterrichtetes Fach braucht damit
+  keine eigene Gruppe im Schulkonto. Wer die Klasse verlässt, verliert die
+  Gruppe ebenso automatisch. Gruppen mit Entsprechung im Schulkonto bleiben
+  unberührt: Dort zählt deren Mitgliederliste.
+
 - **Persönliche Zugangstoken** für Programme außerhalb des Browsers. Lehrkräfte
   legen sie im Profil selbst an — nach erneuter Anmeldung, mit Ablaufdatum und
   getrenntem Lese- und Schreibrecht für Unterrichtsplanung und Bausteine. Der
@@ -14,6 +21,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   ist gedrosselt und endet mit Widerruf, Rollenentzug oder Kontolöschung.
 
 ### Behoben
+
+- **Selbst angelegte Unterrichtsgruppen verschwanden beim nächsten Login.**
+  Der Abgleich mit dem Schulkonto entfernte auch Mitgliedschaften in Gruppen,
+  die es dort gar nicht gibt — einschließlich der Lehrkraft, die die Gruppe
+  gerade angelegt hatte. Er fasst solche Gruppen jetzt nicht mehr an.
 
 - **Unterrichtsgruppen aus dem SSO finden ihr Fach auch dann, wenn ihre Namen aus
   dem Stundenplan stammen.** Das Muster in `config/auth.yaml` darf jetzt sagen, wo

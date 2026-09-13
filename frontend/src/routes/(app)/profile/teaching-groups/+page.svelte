@@ -207,7 +207,8 @@
             </h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-4">
                 Basierend auf deinen Klassen- und Fachschaft-Mitgliedschaften.
-                Bestätige oder lehne ab.
+                Bestätigst du einen Vorschlag, entsteht die Unterrichtsgruppe — und
+                die Schüler:innen der Klasse sind ab ihrer nächsten Anmeldung darin.
             </p>
             <div class="space-y-3">
                 {#each $potentialTeachingGroups as pot (pot.class_group_id + "-" + pot.subject_id)}
