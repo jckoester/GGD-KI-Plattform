@@ -128,9 +128,9 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
           SCHOOL_SECRET: ci-dummy-school-secret-000000000000
           JWT_SECRET: ci-dummy-jwt-secret-0000000000000000
-          # `budget_tiers_path` hat einen cwd-relativen Vorgabewert
-          # ("config/budget_tiers.yaml"), der aus backend/ heraus ins Leere trifft.
-          # Lokal rettet das ein .env-Eintrag. Gehört zu den cwd-relativen Pfaden,
-          # die in Todo.md unter „Deployment“ stehen.
-          BUDGET_TIERS_PATH: ../config/budget_tiers.yaml
+          # Kein `*_PATH`-Override mehr nötig: Seit 12.09.2026 lösen alle Lader ihre
+          # Vorgabewerte über `app.core.paths.aufloesen` auf — verankert an der
+          # Repo-Wurzel, nicht am Arbeitsverzeichnis. Hier stand `../config/…`, und genau
+          # das brach, als der Auflöser kam: Er verankert *und* der Wert stieg noch eine
+          # Ebene auf, also landete die Suche oberhalb des Repos.
         run: pytest tests/unit -q --disable-warnings --tb=short

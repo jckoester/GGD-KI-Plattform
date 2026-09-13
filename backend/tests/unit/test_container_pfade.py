@@ -374,3 +374,57 @@ def test_jeder_config_vorgabewert_wird_uebergeben(dienst):
         if vorgabe.startswith("config/") and name.upper() not in _pfadvariablen(dienst)
     )
     assert fehlen == [], f"Dienst '{dienst}': nicht absolut übergeben: {fehlen}"
+
+
+# ── Keine cwd-relativen Behelfe mehr, nirgends ───────────────────────────────
+
+
+def _pfadwerte_aus_workflows() -> dict[str, str]:
+    """Alle `*_PATH`/`*_FILE`/`*_DIR`-Werte aus den CI-Workflows, je Fundstelle."""
+    gefunden: dict[str, str] = {}
+    for datei in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        for nr, zeile in enumerate(datei.read_text(encoding="utf-8").splitlines(), 1):
+            treffer = re.match(
+                r"\s*([A-Z_]+(?:_PATH|_FILE|_DIR)):\s*(\S.*?)\s*$", zeile
+            )
+            if treffer:
+                gefunden[f"{datei.name}:{nr} {treffer.group(1)}"] = treffer.group(2)
+    return gefunden
+
+
+def test_kein_workflow_steigt_aus_dem_repo_heraus():
+    """`../config/…` war der Behelf aus der Zeit vor `app.core.paths`.
+
+    Er lag an **zwei** Stellen — in der lokalen `.env` und in `tests.yml`. Die erste
+    wurde am 12.09.2026 entfernt, die zweite übersehen; die CI brach daraufhin mit
+    `budget_tiers.yaml nicht gefunden: …/GGD-KI-Plattform/../config/budget_tiers.yaml`.
+    Der Auflöser verankert an der Repo-Wurzel, und `..` steigt von dort noch eine Ebene
+    auf — zusammen zeigt das neben das Repo.
+
+    Die `.env` ist nicht versioniert und damit nicht prüfbar. Was hier liegt, schon.
+    """
+    heraus = {
+        ort: wert for ort, wert in _pfadwerte_aus_workflows().items()
+        if wert.startswith("..") or "/../" in wert
+    }
+    assert heraus == {}, (
+        f"Diese Werte zeigen aus dem Repo heraus: {heraus}. Relative Pfade sind gegen die "
+        f"Repo-Wurzel gemeint — `config/…` genügt, ein Override ist meist gar nicht nötig."
+    )
+
+
+@pytest.mark.parametrize("wert,verboten", [
+    ("../config/budget_tiers.yaml", True),
+    ("/app/config/budget_tiers.yaml", False),
+    ("config/budget_tiers.yaml", False),
+    ("data/../config/x.yaml", True),
+])
+def test_die_aufstiegs_erkennung_trifft_das_richtige(wert, verboten):
+    """Selbstprüfung — sonst bliebe der Wächter auch dann grün, wenn er nichts sieht.
+
+    Der Name muss sich von `test_die_erkennung_trifft_das_richtige` weiter oben
+    unterscheiden: Zwei gleichnamige Funktionen in einem Modul sind kein Fehler, die
+    zweite **ersetzt** die erste einfach — und deren Selbstprüfung wäre stillschweigend
+    verschwunden. Beim Anhängen dieses Blocks ist genau das passiert.
+    """
+    assert (wert.startswith("..") or "/../" in wert) is verboten
