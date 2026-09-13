@@ -117,6 +117,15 @@ else
       echo "      erreichbare Test-Datenbank (TEST_DATABASE_URL in .env, pgvector nötig)."
       echo "      Bewusst ohne sie prüfen: scripts/test.sh --schnell"
     fi
+    # Dasselbe für den Proxy: Ein paar Tests betten wirklich ein, statt zu tun als ob.
+    # Fällt er aus, scheitern sie — und danach die Zähl-Tests, weil die Knoten der
+    # abgebrochenen Läufe liegen bleiben. Das Fehlerbild zeigt dann auf Stellen, die
+    # nichts mit Embeddings zu tun haben (aufgetreten 13.09.2026).
+    if grep -qiE "LiteLLM nicht erreichbar|No deployments available" "$LETZTES_LOG" 2>/dev/null; then
+      echo "      ${GELB}Hinweis:${AUS} Läuft LiteLLM? Einige Integrationstests erzeugen echte"
+      echo "      Embeddings über den Proxy (LITELLM_PROXY_URL in .env)."
+      echo "      Starten: ./infra/litellm_start_dev.sh"
+    fi
     rm -f "$LETZTES_LOG"
   fi
 fi

@@ -164,11 +164,26 @@ class TestDerZweiteAuthWeg:
 class TestGesperrteBereiche:
     """Die eigentliche Sicherheitszusage: Ein Token erreicht nur, was die Tabelle nennt."""
 
-    @pytest.mark.parametrize("pfad", ["/budget/me", "/assistants", "/groups/me"])
+    @pytest.mark.parametrize("pfad", [
+        "/budget/me", "/assistants",
+        # `/groups/me` ist seit 13.09.2026 offen (ein Spiegel muss wissen, was er
+        # spiegeln soll) — der Rest des Routers nicht.
+        "/groups", "/groups/teaching/potential",
+    ])
     async def test_fremde_router_sind_403(self, test_client, voller_zugang, pfad):
         kopf, _, _ = voller_zugang
         resp = await test_client.get(pfad, headers=kopf)
         assert resp.status_code == 403, f"{pfad} antwortete {resp.status_code}"
+
+    async def test_eigene_gruppen_sind_erreichbar(self, test_client, voller_zugang):
+        """Die Ausnahme im Gruppen-Router, über HTTP geprüft.
+
+        Der Unit-Test über die Scope-Tabelle deckt die Zuordnung ab; dass der
+        Bearer-Zweig sie auch durchlässt, zeigt erst ein echter Aufruf.
+        """
+        kopf, _, _ = voller_zugang
+        resp = await test_client.get("/groups/me", headers=kopf)
+        assert resp.status_code == 200, resp.text
 
     async def test_leserecht_erlaubt_kein_schreiben(self, test_client, db, audit):
         klartext, _ = await tokens.erzeuge(
