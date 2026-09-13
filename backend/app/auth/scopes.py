@@ -33,6 +33,14 @@ _ZUSTAENDIG: dict[str, tuple[str, str]] = {
     "/context/nodes": ("context:read", "context:write"),
     "/context/edges": ("context:read", "context:write"),
     "/context/search": ("context:read", "context:write"),
+    # Damit ein Sync-Client seine Gruppen selbst findet, statt die `group_id` von Hand
+    # eingetragen zu bekommen — die sich jedes Schuljahr ändert.
+    #
+    # `/groups/me` und nicht `/groups`: Die Liste zeigt nur die eigenen Mitgliedschaften,
+    # während `/groups` alle Gruppen der Schule ausgibt und `/groups/teaching/potential`
+    # den Stundenplan-Abgleich. Der Pfad ist so eng wie der Zweck; `/groups/me/…` gibt es
+    # nicht, der Präfix-Treffer deckt also genau diese eine Route.
+    "/groups/me": ("planning:read", "planning:write"),
 }
 
 # HTTP-Methoden, die lesen. Alles andere gilt als Schreiben.

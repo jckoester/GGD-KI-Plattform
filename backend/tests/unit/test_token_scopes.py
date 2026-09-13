@@ -23,6 +23,8 @@ class TestWasEinTokenErreicht:
         ("PATCH", "/context/nodes/x", "context:write"),
         # Die Suche braucht einen Rumpf und ist deshalb POST — sie ändert nichts.
         ("POST", "/context/search", "context:read"),
+        # Eigene Gruppen: Ein Spiegel muss wissen, was er spiegeln soll.
+        ("GET", "/groups/me", "planning:read"),
     ])
     def test_zuordnung(self, methode, pfad, erwartet):
         assert benoetigter_scope(methode, pfad) == erwartet
@@ -30,7 +32,11 @@ class TestWasEinTokenErreicht:
     @pytest.mark.parametrize("pfad", [
         "/chat", "/chat/stream", "/budget", "/admin/flags", "/settings/users",
         "/assistants", "/auth/logout", "/review", "/access-requests/x",
-        "/artifacts", "/render", "/calendar/sync", "/pii/scan", "/groups/me",
+        "/artifacts", "/render", "/calendar/sync", "/pii/scan",
+        # `/groups/me` ist offen, der Rest des Routers nicht: alle Gruppen der Schule,
+        # die Konfiguration und der Stundenplan-Abgleich bleiben zu.
+        "/groups", "/groups/config", "/groups/teaching/potential", "/groups/exclusions",
+        "/groups/1", "/groups/members",
         # Unter `/context` hängt mehr als der Kontextspeicher. Diese beiden gehören der
         # Assistenten-Konfiguration bzw. dem Chat — ein Token hat dort nichts zu suchen.
         "/context/assistants/1/anchors", "/context/conversations/abc/nodes",
