@@ -11,7 +11,9 @@ Drei Entscheidungen prägen das Ergebnis:
    einmaliges Vorkommnis an ungewöhnlicher Position und würde als Muster ein Phantom
    erzeugen. Übernommene Aufsicht (`covering_for`) ist fremder Unterricht.
 2. **Rhythmus.** Wöchentlich oder 14-tägig, entschieden über die Anzahl der Wochen, in
-   denen eine Position vorkam.
+   denen eine Position vorkam — gemessen an den Wochen, in denen die Lehrkraft überhaupt
+   Unterricht hatte. Eine Woche ohne eine einzige Stunde ist kein Beleg gegen einen
+   wöchentlichen Rhythmus, sondern eine Woche ohne Daten.
 3. **Doppelstunden.** Zwei aufeinanderfolgende Stunden verschmelzen nur, wenn sie im
    Zeitraster **lückenlos** aneinandergrenzen.
 """
@@ -155,6 +157,12 @@ def derive_patterns(
     den Nenner: Ohne sie ließe sich „kam in 2 von 4 Wochen vor" nicht von „kam zweimal
     vor" unterscheiden, und jede Rhythmus-Aussage wäre geraten.
 
+    Aus dem Nenner fallen Wochen, in denen die Lehrkraft **gar keine** Stunde hatte —
+    Praktikums-, Projekt- oder bewegliche Ferienwoche. Sie belegen nichts; sie mitzuzählen
+    machte aus jedem wöchentlichen Termin einen 14-tägigen, und weil 14-tägig schon bei
+    der Hälfte als `sicher` gilt, wäre das Ergebnis zuversichtlich falsch. `ergebnis.wochen`
+    nennt deshalb die Wochen, die tatsächlich gezählt haben, nicht die abgerufenen.
+
     `kein_unterricht` sind Fachkürzel, hinter denen kein Unterricht steht (Präsenzstunde,
     Personalrats- oder Schulleitungssitzung). Sie erzeugen kein Muster — der Stundenplan
     führt sie wie Unterricht, die Jahresplanung kennt sie nicht.
@@ -176,6 +184,7 @@ def derive_patterns(
     # (Gruppe, Wochentag, Stunde) → in welchen Wochen gesehen
     ausgeschlossen = kein_unterricht or frozenset()
     beobachtung: dict[tuple[GroupKey, int, int], set[int]] = defaultdict(set)
+    mit_unterricht: set[int] = set()
     ohne_stunde = 0
     ohne_gruppe = 0
     dienstliches: set[str] = set()
@@ -195,10 +204,27 @@ def derive_patterns(
         index = week_index(lesson.date, anker)
         if index not in wochen_index:
             continue
+        mit_unterricht.add(index)
         for versatz in range(max(1, lesson.periods)):
             beobachtung[
                 (_gruppe(lesson), lesson.date.weekday(), lesson.start_period + versatz)
             ].add(index)
+
+    # Leere Wochen aus dem Nenner nehmen — aber nur, wenn überhaupt etwas übrig bleibt.
+    # Ist jede Woche leer, gibt es ohnehin keinen Vorschlag; dann bliebe nur eine
+    # irreführend leere Wochenliste.
+    leere = len(wochen_index) - len(mit_unterricht)
+    if leere and mit_unterricht:
+        ergebnis.hinweise.append(
+            f"{leere} von {len(wochen_index)} Wochen enthielten keine einzige Stunde und "
+            "zählen nicht mit (Praktikums-, Projekt- oder bewegliche Ferienwoche). "
+            "Ein leer gebliebener Abruf sähe allerdings genauso aus."
+        )
+        wochen_index = mit_unterricht
+        anzahl_wochen = len(wochen_index)
+        ergebnis.wochen = [
+            w for w in ergebnis.wochen if week_index(w, anker) in wochen_index
+        ]
 
     if ohne_stunde:
         ergebnis.hinweise.append(
@@ -249,7 +275,7 @@ def derive_patterns(
     )
     if anzahl_wochen < 2:
         ergebnis.hinweise.append(
-            "Nur eine Woche abgerufen — 14-tägige Termine sind so nicht von wöchentlichen "
+            "Nur eine Woche mit Unterricht — 14-tägige Termine sind so nicht von wöchentlichen "
             "zu unterscheiden. Alles gilt als wöchentlich."
         )
     return ergebnis

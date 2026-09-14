@@ -72,6 +72,20 @@ def jede_woche(wochentag: int, start: int, **kwargs) -> list[Lesson]:
     ]
 
 
+def uebriger_unterricht() -> list[Lesson]:
+    """Eine wöchentliche Stunde einer **anderen** Gruppe, in allen vier Wochen.
+
+    Wo ein 14-tägiges Muster geprüft wird, braucht es das: Ohne diese Stunde wären die
+    Wochen, in denen die untersuchte Stunde nicht liegt, vollständig leer — und leere
+    Wochen zählen seit Schritt 1 nicht mit. Eine Lehrkraft, die in jeder zweiten Woche
+    gar nichts unterrichtet, gibt es nicht; die Vorlage bildete sonst einen Fall ab, den
+    die Daten nie zeigen.
+
+    `SP 7A` sortiert hinter `M 5C`, damit `proposals[0]` das untersuchte Muster bleibt.
+    """
+    return jede_woche(4, 11, fach="SP", klasse=("7A",))
+
+
 # ── Zeitraster ───────────────────────────────────────────────────────────────
 
 
@@ -135,16 +149,14 @@ def test_jede_woche_ist_woechentlich():
 
 
 def test_jede_zweite_woche_ab_der_ersten_ist_a_woche():
-    lessons = [
-        stunde(WOCHEN[i], 1) for i in (0, 2)
-    ]
+    lessons = [stunde(WOCHEN[i], 1) for i in (0, 2)] + uebriger_unterricht()
     ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
     assert ergebnis.proposals[0].rhythmus == A_WOCHE
     assert ergebnis.proposals[0].sicher
 
 
 def test_jede_zweite_woche_ab_der_zweiten_ist_b_woche():
-    lessons = [stunde(WOCHEN[i], 1) for i in (1, 3)]
+    lessons = [stunde(WOCHEN[i], 1) for i in (1, 3)] + uebriger_unterricht()
     ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
     assert ergebnis.proposals[0].rhythmus == B_WOCHE
 
@@ -158,11 +170,61 @@ def test_eine_woche_erlaubt_keine_rhythmus_aussage():
 
 
 def test_luecken_werden_als_unsicher_gekennzeichnet():
-    """Drei von vier Wochen ist weder wöchentlich noch 14-tägig — meist ein Feiertag."""
-    lessons = [stunde(WOCHEN[i], 1) for i in (0, 1, 2)]
+    """Drei von vier Wochen ist weder wöchentlich noch 14-tägig — meist ein Feiertag.
+
+    Die vierte Woche muss dafür anderen Unterricht enthalten: Genau daran hängt der
+    Unterschied zwischen „die Stunde fiel aus" (Lücke, unsicher) und „diese Woche gab es
+    keine Daten" (zählt nicht mit).
+    """
+    lessons = [stunde(WOCHEN[i], 1) for i in (0, 1, 2)] + uebriger_unterricht()
     ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
     assert ergebnis.proposals[0].rhythmus == WOECHENTLICH
+    assert ergebnis.proposals[0].wochen == 4
     assert not ergebnis.proposals[0].sicher
+
+
+# ── Leere Wochen ─────────────────────────────────────────────────────────────
+
+
+def test_leere_woche_zaehlt_nicht_mit():
+    """Der gemessene Fall vom 14.09.2026: unterrichtsfreie Woche im Fenster.
+
+    Ohne die Regel wurde jede wöchentliche Stunde in 1 von 2 Wochen gesehen, als
+    14-tägig eingestuft — und weil 14-tägig schon bei der Hälfte als `sicher` gilt,
+    zuversichtlich falsch.
+    """
+    zwei = WOCHEN[:2]
+    ergebnis = derive_patterns([stunde(WOCHEN[0], 1)], wochen=zwei, timegrid=TIMEGRID)
+    assert ergebnis.proposals[0].rhythmus == WOECHENTLICH
+    assert ergebnis.proposals[0].wochen == 1
+    assert ergebnis.wochen == [WOCHEN[0]]
+    assert any("keine einzige Stunde" in h for h in ergebnis.hinweise)
+
+
+def test_leere_woche_in_der_mitte_erhaelt_den_ab_takt():
+    """Die Projektwoche fällt heraus, die Parität der übrigen Wochen bleibt.
+
+    Woche 3 (Index 2) ist leer. Die Stunde liegt in den Wochen 2 und 4 — ungerade
+    Indizes, also B-Woche. Ein Neudurchzählen der verbliebenen Wochen machte daraus
+    A-Woche und verschöbe das Muster um eine Woche.
+    """
+    lessons = [stunde(WOCHEN[i], 1) for i in (1, 3)] + [
+        stunde(w + timedelta(days=4), 11, fach="SP", klasse=("7A",))
+        for w in (WOCHEN[0], WOCHEN[1], WOCHEN[3])
+    ]
+    ergebnis = derive_patterns(lessons, wochen=WOCHEN, timegrid=TIMEGRID)
+    assert ergebnis.proposals[0].rhythmus == B_WOCHE
+    assert ergebnis.proposals[0].wochen == 3
+    assert ergebnis.wochen == [WOCHEN[0], WOCHEN[1], WOCHEN[3]]
+
+
+def test_gaenzlich_leerer_abruf_behaelt_die_wochenliste():
+    """Liefert der Abruf nichts, bleibt die Wochenliste stehen — sonst hieße es, es sei
+    gar nichts abgerufen worden, und der eigentliche Mangel verschwände."""
+    ergebnis = derive_patterns([], wochen=WOCHEN, timegrid=TIMEGRID)
+    assert ergebnis.proposals == []
+    assert ergebnis.wochen == WOCHEN
+    assert not any("keine einzige Stunde" in h for h in ergebnis.hinweise)
 
 
 def test_stunden_ohne_gemeinsames_auftreten_verschmelzen_nicht():

@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Wochen ohne eine einzige Stunde zählen beim Ableiten der Wochenmuster nicht mehr
+  mit. Bisher wurde in einer Praktikums-, Projekt- oder unterrichtsfreien Woche jeder
+  wöchentliche Termin als 14-tägig eingestuft.
+
 ## [0.10.0] – 2026-09-14
 
 Schwerpunkt: **Unterrichtsgruppen und Stundenplan**. Der Weg von der Gruppe zum
