@@ -1,6 +1,6 @@
 <script>
   import { setWeekPattern, generateSlots, getWeekPatternProposals } from '$lib/api.js'
-  import { calendarConfigured } from '$lib/stores/calendarStatus.js'
+  import { calendarConfigured, ensureCalendarStatus } from '$lib/stores/calendarStatus.js'
 
   const { open = false, groupId, patterns = [], onSaved, onGenerated, onClose } = $props()
 
@@ -22,6 +22,11 @@
       syncRows()
       error = null
       genSuccess = null
+      // Ob eine Stundenplanquelle eingerichtet ist, entscheidet über den
+      // Übernahme-Knopf. Den Status holt sonst niemand auf dieser Route — er wurde bis
+      // 14.09.2026 nur in der Admin-Seitenleiste geladen, und der Knopf fehlte deshalb
+      // immer. `ensureCalendarStatus` fragt höchstens einmal je Sitzung.
+      ensureCalendarStatus()
     }
   })
 

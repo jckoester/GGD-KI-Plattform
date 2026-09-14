@@ -22,6 +22,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **„Aus Stundenplan übernehmen“ fehlte im Wochenmuster-Dialog.** Der Knopf
+  erschien nur, wenn zuvor ein Verwaltungsbereich geöffnet worden war — sonst
+  blieb die Übernahme des Rasters aus dem Stundenplan unsichtbar.
+
 - **Selbst angelegte Unterrichtsgruppen verschwanden beim nächsten Login.**
   Der Abgleich mit dem Schulkonto entfernte auch Mitgliedschaften in Gruppen,
   die es dort gar nicht gibt — einschließlich der Lehrkraft, die die Gruppe
