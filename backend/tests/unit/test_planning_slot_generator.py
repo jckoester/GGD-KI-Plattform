@@ -9,7 +9,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.planning.calendar import FerienPeriod, SchoolYearConfig, halbjahr_bounds
+from app.planning.calendar import (
+    A_WOCHE,
+    B_WOCHE,
+    WOECHENTLICH,
+    FerienPeriod,
+    SchoolYearConfig,
+    halbjahr_bounds,
+)
 from app.planning.slot_generator import generate_slots
 
 
@@ -30,12 +37,21 @@ def _mini_cfg() -> SchoolYearConfig:
     )
 
 
-def _mk_pattern(weekday: int, start_period: int = 1, periods: int = 1, halbjahr: int = 1):
+def _mk_pattern(
+    weekday: int,
+    start_period: int = 1,
+    periods: int = 1,
+    halbjahr: int = 1,
+    rhythmus: str = WOECHENTLICH,
+):
     p = MagicMock()
     p.weekday = weekday
     p.start_period = start_period
     p.periods = periods
     p.halbjahr = halbjahr
+    # Muss gesetzt werden: Ein MagicMock ohne dieses Attribut liefert ein Mock-Objekt, und
+    # der Generator hielte jedes Muster für 14-tägig.
+    p.rhythmus = rhythmus
     return p
 
 
@@ -173,3 +189,86 @@ async def test_idempotenz_guard_ohne_regenerate():
             await generate_slots(db, group_id=1, halbjahr=1, cfg=cfg)
 
     assert exc.value.status_code == 409
+
+
+# ── 14-tägige Muster ─────────────────────────────────────────────────────────
+
+
+def _cfg_mit_ferienwoche(ab_zaehlung: str = "unterrichtswoche") -> SchoolYearConfig:
+    """Mo 05.01. bis Fr 06.02.2026, Woche 2 (12.–16.01.) Ferien.
+
+    Vier Montage im 1. Halbjahr, einer davon in den Ferien. Damit liegen zwei
+    Unterrichtswochen — der 19.01. und der 26.01. — unmittelbar hinter einer **einwöchigen**
+    Lücke, und genau dort trennen sich die beiden Zählweisen.
+    """
+    return SchoolYearConfig(
+        schuljahr="2026/27",
+        beginn=date(2026, 1, 5),
+        ende=date(2026, 2, 6),
+        halbjahreswechsel=date(2026, 2, 2),
+        ferien=[FerienPeriod(name="TestFerien", von=date(2026, 1, 12), bis=date(2026, 1, 16))],
+        ab_zaehlung=ab_zaehlung,
+    )
+
+
+async def _montage(cfg: SchoolYearConfig, rhythmus: str) -> list[date]:
+    db = _make_db({1: [_mk_pattern(weekday=0, halbjahr=1, rhythmus=rhythmus)]})
+    with patch("app.planning.slot_generator.load_school_year", return_value=cfg):
+        await generate_slots(db, group_id=1, halbjahr=1, cfg=cfg)
+    return sorted(aufruf[0][0].date for aufruf in db.add.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_vierzehntaegig_erzeugt_nur_die_halbe_anzahl():
+    """Bis zum 14.09.2026 las der Generator `rhythmus` gar nicht — jeder 14-tägige Termin
+    erzeugte doppelt so viele Stunden, wie er sollte."""
+    cfg = _cfg_mit_ferienwoche()
+    woechentlich = await _montage(cfg, WOECHENTLICH)
+    assert len(woechentlich) == 3
+    assert len(await _montage(cfg, A_WOCHE)) + len(await _montage(cfg, B_WOCHE)) == 3
+
+
+@pytest.mark.asyncio
+async def test_der_takt_laeuft_ueber_die_ferienwoche_weiter():
+    """Unterrichtswochenzählung: Die Ferienwoche zählt nicht, der Wechsel geht weiter.
+
+    Der 19.01. folgt unmittelbar auf die Ferien und ist trotzdem die *nächste* Woche im
+    Takt — ein A-Wochen-Muster überspringt ihn.
+    """
+    cfg = _cfg_mit_ferienwoche("unterrichtswoche")
+    assert await _montage(cfg, A_WOCHE) == [date(2026, 1, 5), date(2026, 1, 26)]
+    assert await _montage(cfg, B_WOCHE) == [date(2026, 1, 19)]
+
+
+@pytest.mark.asyncio
+async def test_kalenderwochenzaehlung_legt_dieselbe_stunde_anders():
+    """Dieselben Muster, dieselben Ferien — andere Regel, andere Wochen.
+
+    Der Beweis, dass `ab_zaehlung` tatsächlich bis in die Slots durchschlägt und nicht nur
+    ein Etikett verschiebt.
+    """
+    cfg = _cfg_mit_ferienwoche("kalenderwoche")
+    assert await _montage(cfg, A_WOCHE) == [date(2026, 1, 5), date(2026, 1, 19)]
+    assert await _montage(cfg, B_WOCHE) == [date(2026, 1, 26)]
+
+
+@pytest.mark.asyncio
+async def test_fallback_meldet_vierzehntaegige_muster():
+    """Die einzige Stelle, an der eine Phase über den Halbjahreswechsel getragen wird."""
+    cfg = _mini_cfg()
+    db = _make_db({1: [_mk_pattern(weekday=0, halbjahr=1, rhythmus=A_WOCHE)]}, primary_halbjahr=2)
+    with patch("app.planning.slot_generator.load_school_year", return_value=cfg):
+        stats = await generate_slots(db, group_id=1, halbjahr=2, cfg=cfg)
+    assert stats.used_hj1_fallback
+    assert stats.fallback_vierzehntaegig
+
+
+@pytest.mark.asyncio
+async def test_woechentlicher_fallback_meldet_nichts():
+    """Ein wöchentliches Muster kann über den Wechsel hinweg nicht verrutschen."""
+    cfg = _mini_cfg()
+    db = _make_db({1: [_mk_pattern(weekday=0, halbjahr=1)]}, primary_halbjahr=2)
+    with patch("app.planning.slot_generator.load_school_year", return_value=cfg):
+        stats = await generate_slots(db, group_id=1, halbjahr=2, cfg=cfg)
+    assert stats.used_hj1_fallback
+    assert not stats.fallback_vierzehntaegig

@@ -53,6 +53,9 @@ class SlotGenStatsRead(BaseModel):
     created: int
     halbjahr: int
     used_hj1_fallback: bool
+    # Der Fallback trug ein 14-tägiges Muster ins 2. Halbjahr — die einzige Stelle, an der
+    # die A-/B-Phase über den Halbjahreswechsel fortgeschrieben wird.
+    fallback_vierzehntaegig: bool = False
 
 
 class SlotRead(BaseModel):

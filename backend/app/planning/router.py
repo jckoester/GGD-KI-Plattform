@@ -396,6 +396,7 @@ async def generate_group_slots(
         created=stats.created,
         halbjahr=stats.halbjahr,
         used_hj1_fallback=stats.used_hj1_fallback,
+        fallback_vierzehntaegig=stats.fallback_vierzehntaegig,
     )
 
 

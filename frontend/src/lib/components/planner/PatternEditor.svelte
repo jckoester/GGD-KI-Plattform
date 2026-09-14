@@ -1,6 +1,9 @@
 <script>
   import { setWeekPattern, generateSlots, getWeekPatternProposals } from '$lib/api.js'
   import { calendarConfigured, ensureCalendarStatus } from '$lib/stores/calendarStatus.js'
+  import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import SuccessBanner from '$lib/components/SuccessBanner.svelte'
+  import WarningBanner from '$lib/components/WarningBanner.svelte'
 
   const { open = false, groupId, patterns = [], onSaved, onGenerated, onClose } = $props()
 
@@ -15,6 +18,7 @@
   let generating = $state(false)
   let error = $state(null)
   let genSuccess = $state(null)
+  let genWarnung = $state(null)
 
   // Lokalen State mit aktuellen Mustern für gewähltes Halbjahr befüllen
   $effect(() => {
@@ -22,6 +26,7 @@
       syncRows()
       error = null
       genSuccess = null
+      genWarnung = null
       // Ob eine Stundenplanquelle eingerichtet ist, entscheidet über den
       // Übernahme-Knopf. Den Status holt sonst niemand auf dieser Route — er wurde bis
       // 14.09.2026 nur in der Admin-Seitenleiste geladen, und der Knopf fehlte deshalb
@@ -114,10 +119,18 @@
     generating = true
     error = null
     genSuccess = null
+    genWarnung = null
     try {
       const stats = await generateSlots(groupId, halbjahr, regenerate)
       genSuccess = `${stats.created} Slots für HJ ${halbjahr} generiert.`
       if (stats.used_hj1_fallback) genSuccess += ' (HJ-1-Muster als Fallback verwendet)'
+      // Als Warnung, nicht als Anhängsel: Über den Halbjahreswechsel hinweg ist die
+      // A-/B-Phase die einzige Angabe, die um eine Woche danebenliegen kann.
+      if (stats.fallback_vierzehntaegig)
+        genWarnung =
+          'Die Wochenmuster stammen aus dem 1. Halbjahr. 14-tägige Termine können dadurch ' +
+          'um eine Woche verschoben sein — sobald der Stundenplan für das 2. Halbjahr ' +
+          'steht, bitte einmal neu aus dem Stundenplan übernehmen.'
       onGenerated(stats, { regenerate, halbjahr })
     } catch (e) {
       error = e.message
@@ -251,10 +264,13 @@
       </div>
 
       {#if error}
-        <p class="text-sm text-light-re dark:text-dark-re mb-3">{error}</p>
+        <ErrorBanner message={error} />
       {/if}
       {#if genSuccess}
-        <p class="text-sm text-green-600 dark:text-green-400 mb-3">{genSuccess}</p>
+        <SuccessBanner message={genSuccess} />
+      {/if}
+      {#if genWarnung}
+        <WarningBanner message={genWarnung} />
       {/if}
 
       <!-- Aktionen -->

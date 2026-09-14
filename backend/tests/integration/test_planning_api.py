@@ -104,6 +104,52 @@ async def test_pattern_setzen_und_generieren(
 
 
 @pytest.mark.asyncio
+async def test_vierzehntaegige_muster_teilen_die_woechentlichen_termine(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """A- und B-Woche zusammen ergeben genau die wöchentlichen Termine — keinen mehr, keinen
+    weniger, und keinen doppelt.
+
+    Bis zum 14.09.2026 las der Generator `rhythmus` gar nicht: Alle drei Läufe ergaben
+    dieselben Termine, ein 14-tägiger Kurs bekam doppelt so viele Stunden wie er hat.
+
+    Die Zusage wird als Eigenschaft geprüft, nicht gegen feste Datumswerte — sonst hinge
+    der Test an der `school_year.yaml` der Entwicklungsumgebung.
+    """
+    from datetime import date
+
+    async def termine(rhythmus: str) -> list[date]:
+        resp = await test_client.put(
+            "/planning/groups/100/pattern",
+            json={
+                "halbjahr": 1,
+                "patterns": [
+                    {"weekday": 0, "start_period": 3, "periods": 1, "rhythmus": rhythmus}
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        resp = await test_client.post(
+            "/planning/groups/100/slots/generate",
+            json={"halbjahr": 1, "regenerate": True},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+        assert resp.status_code == 200
+        return sorted(date.fromisoformat(s["date"]) for s in resp.json()["slots"])
+
+    woechentlich = await termine("woechentlich")
+    a_wochen = await termine("a_woche")
+    b_wochen = await termine("b_woche")
+
+    assert a_wochen and b_wochen, "sonst prüft der Test nichts"
+    assert not set(a_wochen) & set(b_wochen)
+    assert sorted(a_wochen + b_wochen) == woechentlich
+
+
+@pytest.mark.asyncio
 async def test_idempotenz_guard_409(test_client, auth_headers, seed_planning_fixtures):
     resp = await test_client.post(
         "/planning/groups/100/slots/generate",

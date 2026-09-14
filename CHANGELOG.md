@@ -20,6 +20,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   aufgefüllt. Am Schuljahresanfang blieb bisher eine einzige Woche übrig.
 - Ob ein 14-tägiger Termin als A- oder B-Woche erkannt wird, hing vom Zeitpunkt des
   Abrufs ab. Maßgeblich ist jetzt das Schuljahr.
+- 14-tägige Wochenmuster erzeugten Stunden in **jeder** Woche. Die Slot-Erzeugung hält
+  sich jetzt an den Rhythmus.
+- Übernimmt die Slot-Erzeugung mangels eigener Muster die des 1. Halbjahrs, wird bei
+  14-tägigen Terminen ausdrücklich gewarnt.
 - Der Ferienkalender-Import überschreibt `ab_zaehlung` nicht mehr mit der Vorgabe.
 
 ## [0.10.0] – 2026-09-14
