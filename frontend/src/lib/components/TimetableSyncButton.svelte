@@ -12,6 +12,7 @@
    */
   import { RefreshCw } from "lucide-svelte";
   import { getSyncStatus, runTimetableSync } from "$lib/api.js";
+  import { fehlendesRaster } from "$lib/stundenplan_abgleich.js";
   import { onMount } from "svelte";
   import ErrorBanner from "./ErrorBanner.svelte";
   import SuccessBanner from "./SuccessBanner.svelte";
@@ -79,6 +80,7 @@
     if (r.konflikte?.length) teile.push(`${r.konflikte.length} Hinweis(e)`);
     return teile.join(" · ");
   }
+
 </script>
 
 {#if status.configured && status.kuerzel}
@@ -121,6 +123,8 @@
     <div class="mt-3"><ErrorBanner message={fehler} /></div>
   {:else if stoerung && !ergebnis}
     <div class="mt-3"><WarningBanner message={stoerung} /></div>
+  {:else if ergebnis && fehlendesRaster(ergebnis)}
+    <div class="mt-3"><WarningBanner message={fehlendesRaster(ergebnis)} /></div>
   {:else if ergebnis}
     <div class="mt-3"><SuccessBanner message={zusammenfassung(ergebnis)} /></div>
   {/if}

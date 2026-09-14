@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Stundenraster für alle eigenen Gruppen auf einmal** — unter „Meine
+  Unterrichtsgruppen“ im Profil. Liest vier Wochen des Stundenplans und legt je
+  Gruppe Wochenmuster und Stunden an, statt jeden Jahresplan einzeln zu öffnen.
+
 - **Bestätigt eine Lehrkraft einen Gruppenvorschlag, kommt die Klasse mit.**
   Die Schüler:innen der Quellklasse sind beim nächsten Login in der
   Unterrichtsgruppe — ein im Klassenverband unterrichtetes Fach braucht damit
@@ -21,6 +25,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   ist gedrosselt und endet mit Widerruf, Rollenentzug oder Kontolöschung.
 
 ### Behoben
+
+- **Der Stundenplan-Abgleich sagt jetzt, wenn die Jahresplanung noch leer ist.**
+  Er meldete stattdessen „0 Stunden geändert“ und einen Hinweis je Stunde des
+  Stundenplans — richtig, aber irreführend: Er ändert vorhandene Stunden und legt
+  keine an.
 
 - **„Aus Stundenplan übernehmen“ fehlte im Wochenmuster-Dialog.** Der Knopf
   erschien nur, wenn zuvor ein Verwaltungsbereich geöffnet worden war — sonst

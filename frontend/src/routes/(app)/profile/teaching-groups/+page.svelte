@@ -20,6 +20,7 @@
     } from "$lib/api.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
+    import StundenrasterUebernahme from "$lib/components/StundenrasterUebernahme.svelte";
 
     let exclusions = $state([]);
     let loading = $state(true);
@@ -111,6 +112,13 @@
             <p class="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
     {/if}
+
+    <!-- Stundenraster für alle Gruppen auf einmal. Steht oben, weil es die Einrichtung
+         ist: Wer hier landet, hat seine Gruppen gerade erst zusammengestellt. Die
+         Komponente zeigt sich nur, wenn eine Stundenplanquelle eingerichtet ist. -->
+    <section class="mb-8">
+        <StundenrasterUebernahme />
+    </section>
 
     <!-- Sektion 1: Eigene Unterrichtsgruppen -->
     <section class="mb-8">
