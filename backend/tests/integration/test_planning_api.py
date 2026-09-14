@@ -150,6 +150,48 @@ async def test_vierzehntaegige_muster_teilen_die_woechentlichen_termine(
 
 
 @pytest.mark.asyncio
+async def test_ab_wochen_stimmen_mit_den_erzeugten_slots_ueberein(
+    test_client, auth_headers, seed_planning_fixtures
+):
+    """Der Editor zeigt Termine an, der Generator legt sie an — beide müssen dasselbe sagen.
+
+    Sonst wäre die Anzeige das Gegenteil dessen, wofür sie da ist: Eine Lehrkraft, die
+    „findet statt am 15.06." liest und dann keinen Slot am 15.06. vorfindet, korrigiert das
+    Auswahlfeld — und verschiebt die Phase erst dadurch.
+    """
+    from datetime import date
+
+    resp = await test_client.get("/planning/ab-wochen?halbjahr=1", headers=auth_headers)
+    assert resp.status_code == 200
+    kalender = resp.json()
+    a_tage = {date.fromisoformat(d) for d in kalender["a_woche"]}
+    b_tage = {date.fromisoformat(d) for d in kalender["b_woche"]}
+    assert a_tage and b_tage
+    assert not a_tage & b_tage
+
+    await test_client.put(
+        "/planning/groups/100/pattern",
+        json={
+            "halbjahr": 1,
+            "patterns": [
+                {"weekday": 0, "start_period": 3, "periods": 1, "rhythmus": "a_woche"}
+            ],
+        },
+        headers=auth_headers,
+    )
+    resp = await test_client.post(
+        "/planning/groups/100/slots/generate",
+        json={"halbjahr": 1, "regenerate": True},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+    erzeugt = {date.fromisoformat(s["date"]) for s in resp.json()["slots"]}
+
+    assert erzeugt == {t for t in a_tage if t.weekday() == 0}
+
+
+@pytest.mark.asyncio
 async def test_idempotenz_guard_409(test_client, auth_headers, seed_planning_fixtures):
     resp = await test_client.post(
         "/planning/groups/100/slots/generate",

@@ -1,5 +1,6 @@
 <script>
-  import { setWeekPattern, generateSlots, getWeekPatternProposals } from '$lib/api.js'
+  import { setWeekPattern, generateSlots, getWeekPatternProposals, getAbWochen } from '$lib/api.js'
+  import { terminzeile } from '$lib/ab_wochen.js'
   import { calendarConfigured, ensureCalendarStatus } from '$lib/stores/calendarStatus.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -19,6 +20,11 @@
   let error = $state(null)
   let genSuccess = $state(null)
   let genWarnung = $state(null)
+  // Schultage des Halbjahres nach A-/B-Woche getrennt — damit unter jedem 14-tägigen
+  // Muster die konkreten Termine stehen können. Scheitert der Abruf, bleibt es beim
+  // bloßen Buchstaben; das ist kein Grund, den Dialog zu stören.
+  let abWochen = $state(null)
+  const heute = new Date().toISOString().slice(0, 10)
 
   // Lokalen State mit aktuellen Mustern für gewähltes Halbjahr befüllen
   $effect(() => {
@@ -33,6 +39,19 @@
       // immer. `ensureCalendarStatus` fragt höchstens einmal je Sitzung.
       ensureCalendarStatus()
     }
+  })
+
+  // Eigener Effekt, denn die Termine hängen am Halbjahr: Der obige läuft nur beim Öffnen,
+  // das Auswahlfeld für das Halbjahr steht aber im Dialog.
+  $effect(() => {
+    if (!open) return
+    const hj = halbjahr
+    abWochen = null
+    getAbWochen(hj)
+      .then((k) => {
+        if (halbjahr === hj) abWochen = k
+      })
+      .catch(() => {})
   })
 
   $effect(() => {
@@ -200,6 +219,7 @@
         {:else}
           <div class="space-y-2">
             {#each rows as row, i}
+              <div>
               <div class="flex items-center gap-2">
                 <select
                   value={row.weekday}
@@ -253,6 +273,14 @@
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
                 </button>
+              </div>
+              <!-- Die konkreten Termine machen den Buchstaben entbehrlich: Heißt die
+                   Woche im Stundenplan anders, zählt hier das Datum. -->
+              {#if terminzeile(abWochen, row.weekday, row.rhythmus, { ab: heute })}
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1 ml-1">
+                  findet statt am {terminzeile(abWochen, row.weekday, row.rhythmus, { ab: heute })}
+                </p>
+              {/if}
               </div>
             {/each}
           </div>

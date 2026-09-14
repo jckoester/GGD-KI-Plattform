@@ -51,6 +51,12 @@ Ablauf, vergangene zeigen Ausfall und Vertretung. Stehen vor den Ferien oder am
 Schuljahresende nicht genug Wochen bevor, ergänzt die Plattform aus der Vergangenheit —
 über eine Ferienlücke hinweg aber nie, dort ist der A-/B-Takt nicht bestimmbar.
 
+Bei 14-tägigen Terminen steht unter der Zeile, **wann die Stunde tatsächlich stattfindet**
+(„findet statt am 15.06. · 29.06. · 13.07. · …"). Prüfen Sie diese Daten, nicht den
+Buchstaben: Ob Ihre Schule dieselbe Woche „A" nennt wie die Plattform, spielt keine Rolle —
+die Termine stimmen so oder so. Wer den Buchstaben „korrigiert", verschiebt den Takt um
+eine Woche.
+
 **Der Vorschlag füllt nur das Formular.** Nichts ist gespeichert, bis Sie auf „Speichern"
 klicken. Sie können vorher jede Zeile ändern, löschen oder ergänzen.
 

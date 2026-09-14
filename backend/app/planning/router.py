@@ -17,7 +17,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role
@@ -31,6 +31,7 @@ from app.db.models import (
     SlotPlanSnapshot,
 )
 from app.db.session import get_db
+from app.planning.calendar import ab_schultage
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning import jetzt as jetzt_modul
@@ -38,6 +39,7 @@ from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
+    AbWochenRead,
     BalanceRead,
     JetztEinheit,
     JetztRead,
@@ -371,6 +373,28 @@ async def set_week_pattern(
     for p in new_patterns:
         await db.refresh(p)
     return new_patterns
+
+
+# ── GET /planning/ab-wochen ───────────────────────────────────────────────────
+
+
+@router.get("/ab-wochen", response_model=AbWochenRead)
+async def ab_wochen(
+    halbjahr: int = Query(..., ge=1, le=2),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Welche Schultage im Halbjahr zur A- und welche zur B-Woche gehören.
+
+    Damit kann der Wochenmuster-Editor neben „B-Woche" die konkreten Termine zeigen — und
+    erst das macht den Buchstaben entbehrlich: Heißt die Woche in eurem Stundenplan anders
+    als hier, prüft die Lehrkraft die Daten und muss die Bezeichnungen nicht vergleichen.
+    Ohne das korrigiert früher oder später jemand das Auswahlfeld und verschiebt die Phase
+    um eine Woche.
+
+    Weder Gruppe noch Datenbank: Das ist reiner Schulkalender.
+    """
+    a_woche, b_woche = ab_schultage(halbjahr)
+    return AbWochenRead(halbjahr=halbjahr, a_woche=a_woche, b_woche=b_woche)
 
 
 # ── POST /planning/groups/{group_id}/slots/generate ───────────────────────────

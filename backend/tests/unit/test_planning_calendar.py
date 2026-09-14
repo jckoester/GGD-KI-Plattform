@@ -9,6 +9,7 @@ from app.planning.calendar import (
     NamedDay,
     SchoolYearConfig,
     ab_phasen,
+    ab_schultage,
     halbjahr_bounds,
     halbjahr_of,
     is_schoolday,
@@ -239,3 +240,60 @@ def test_unterrichtswochen_wechseln_das_ganze_schuljahr_hindurch():
     assert len(wochen) > 30
     for vorher, nachher in zip(wochen, wochen[1:]):
         assert phasen[vorher] != phasen[nachher], f"{vorher} → {nachher}"
+
+
+# ── Schultage nach A-/B-Woche ────────────────────────────────────────────────
+
+
+def _jahr_mit_feiertag() -> SchoolYearConfig:
+    """Wie `_jahr`, aber mit einem Feiertag am Montag, 05.10.2026 (3. Unterrichtswoche)."""
+    return SchoolYearConfig(
+        schuljahr="2026/27",
+        beginn=date(2026, 9, 14),
+        ende=date(2027, 7, 28),
+        halbjahreswechsel=date(2027, 2, 8),
+        ferien=EINE_WOCHE,
+        feiertage=[NamedDay(name="Testfeiertag", datum=date(2026, 10, 5))],
+    )
+
+
+def test_feiertag_erscheint_in_keiner_der_beiden_listen():
+    """Ein Feiertag nimmt einen **einzelnen** Termin heraus, ohne die Woche zu berühren.
+
+    Genau deshalb liefert die Funktion Tage und nicht Wochenanfänge: Aus einem Wochenanfang
+    ließe sich der ausgefallene Montag nicht ablesen, und die Oberfläche verspräche einen
+    Termin, den der Generator nicht anlegt.
+    """
+    a_woche, b_woche = ab_schultage(1, _jahr_mit_feiertag())
+    assert date(2026, 10, 5) not in a_woche
+    assert date(2026, 10, 5) not in b_woche
+    # Die übrige Woche steht weiterhin drin.
+    assert date(2026, 10, 6) in a_woche + b_woche
+
+
+def test_ferien_und_wochenenden_erscheinen_nicht():
+    a_woche, b_woche = ab_schultage(1, _jahr("unterrichtswoche", EINE_WOCHE))
+    alle = set(a_woche + b_woche)
+    assert date(2026, 10, 26) not in alle          # Ferienmontag
+    assert not any(t.weekday() >= 5 for t in alle)  # Samstag/Sonntag
+
+
+def test_die_beiden_listen_sind_disjunkt_und_vollstaendig():
+    """Jeder Schultag des Halbjahres gehört zu genau einer der beiden Wochen."""
+    cfg = _jahr("unterrichtswoche", EINE_WOCHE)
+    a_woche, b_woche = ab_schultage(1, cfg)
+    assert not set(a_woche) & set(b_woche)
+    start, ende = halbjahr_bounds(1, cfg)
+    erwartet = {
+        start + timedelta(days=n)
+        for n in range((ende - start).days + 1)
+        if is_schoolday(start + timedelta(days=n), cfg)
+    }
+    assert set(a_woche + b_woche) == erwartet
+
+
+def test_tage_einer_woche_liegen_in_derselben_liste():
+    """Die Phase gilt für die Woche, nicht für den Tag — sonst zerfiele ein Muster."""
+    a_woche, _ = ab_schultage(1, _jahr("unterrichtswoche", EINE_WOCHE))
+    erste_woche = [t for t in a_woche if date(2026, 9, 14) <= t <= date(2026, 9, 18)]
+    assert len(erste_woche) == 5

@@ -1964,6 +1964,12 @@ export async function generateSlots(groupId, halbjahr, regenerate = false) {
     return res.json()
 }
 
+export async function getAbWochen(halbjahr) {
+    const res = await fetch(`${BASE}/planning/ab-wochen?halbjahr=${halbjahr}`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'A-/B-Wochen konnten nicht geladen werden')
+    return res.json()
+}
+
 export async function getBalance(groupId) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/balance`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Bilanz konnte nicht geladen werden')

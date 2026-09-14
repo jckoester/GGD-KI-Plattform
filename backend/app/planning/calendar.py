@@ -177,3 +177,25 @@ def ab_phasen(cfg: SchoolYearConfig | None = None) -> dict[date, int]:
                 gezaehlt += 1
         montag += timedelta(weeks=1)
     return phasen
+
+
+def ab_schultage(
+    halbjahr: int, cfg: SchoolYearConfig | None = None
+) -> tuple[list[date], list[date]]:
+    """Die Schultage eines Halbjahres, getrennt nach A-Woche (Phase 0) und B-Woche.
+
+    Die **Tage**, nicht die Wochenanfänge: Erst damit beantwortet ein Filter nach Wochentag
+    die Frage „wann findet dieses Muster statt" vollständig — ein Feiertag nimmt einen
+    einzelnen Termin heraus, ohne die Woche zu berühren. Die Oberfläche braucht deshalb
+    keinen eigenen Schulkalender; zwei Kalenderrechnungen könnten auseinanderlaufen.
+    """
+    c = cfg or load_school_year()
+    start, ende = halbjahr_bounds(halbjahr, c)
+    phasen = ab_phasen(c)
+    je_phase: tuple[list[date], list[date]] = ([], [])
+    tag = start
+    while tag <= ende:
+        if is_schoolday(tag, c):
+            je_phase[phasen[tag - timedelta(days=tag.weekday())]].append(tag)
+        tag += timedelta(days=1)
+    return je_phase

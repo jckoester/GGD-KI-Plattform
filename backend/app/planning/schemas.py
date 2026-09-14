@@ -58,6 +58,20 @@ class SlotGenStatsRead(BaseModel):
     fallback_vierzehntaegig: bool = False
 
 
+class AbWochenRead(BaseModel):
+    """Die Schultage eines Halbjahres, nach A- und B-Woche getrennt.
+
+    Bewusst die **Tage**, nicht die Wochenanfänge: Damit beantwortet ein Filter nach
+    Wochentag die Frage „wann findet dieses Muster statt" vollständig — samt der Feiertage,
+    die einzelne Termine herausnehmen. Die Oberfläche braucht dafür keinen eigenen
+    Schulkalender, und zwei Kalenderrechnungen können nicht auseinanderlaufen.
+    """
+
+    halbjahr: int
+    a_woche: list[date]
+    b_woche: list[date]
+
+
 class SlotRead(BaseModel):
     id: UUID
     group_id: int
