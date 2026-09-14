@@ -1171,7 +1171,11 @@ class GroupWeekPattern(Base):
     weekday: Mapped[int] = mapped_column(nullable=False)   # 0=Montag … 4=Freitag
     start_period: Mapped[int] = mapped_column(nullable=False)
     periods: Mapped[int] = mapped_column(nullable=False, server_default=text("1"))
-    # 'woechentlich' | 'a_woche' | 'b_woche'; das Ankerdatum steht in school_year.yaml.
+    # 'woechentlich' | 'a_woche' | 'b_woche'. Welche Wochen A sind, entscheidet
+    # `ab_phasen()` in app/planning/calendar.py: Phase 0 ist die erste Unterrichtswoche des
+    # Schuljahres, weitergezählt nach `ab_zaehlung`. Ein Ankerdatum gibt es bewusst nicht —
+    # der Name ist gleichgültig, solange Ableitung und Slot-Generator dieselbe Regel
+    # benutzen.
     rhythmus: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'woechentlich'")
     )

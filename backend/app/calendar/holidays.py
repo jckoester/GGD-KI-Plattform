@@ -205,25 +205,31 @@ def render_school_year(
 ) -> str:
     """Die **vollständige** `school_year.yaml` — bereit zum Schreiben.
 
-    Zwei Felder werden aus der bestehenden Datei **übernommen, nie erzeugt**:
+    Drei Felder werden aus der bestehenden Datei **übernommen, nie erzeugt**:
 
     * `halbjahreswechsel` — die WebUntis-Schnittstelle kennt ihn nicht (`getSchoolyears`
       liefert nur Name und Grenzen). Eine Schulentscheidung.
     * `schuljahr` — dessen Schreibweise wird anderswo gelesen (`parse_schuljahr_start` für
       die Bildungsplan-Edition). Eine Quelle, die „2025/2026" statt „2025/26" schreibt,
       hätte hier nichts zu suchen.
+    * `ab_zaehlung` — wie die Schule A-/B-Wochen zählt. Ebenfalls eine Schulentscheidung.
+
+    Weil die Datei hier **neu aufgebaut** wird, verschwindet jedes Feld, das der Kopf nicht
+    nennt — lautlos, denn `SchoolYearConfig` füllt es beim nächsten Laden mit der Vorgabe
+    auf. `test_render_schreibt_jedes_config_feld` wacht darüber.
 
     `bounds` überschreibt Beginn und Ende, wenn die Quelle sie kennt.
     """
     beginn, ende = bounds or (cfg.beginn, cfg.ende)
     kopf = [
         "# Erzeugt vom Ferienkalender-Import (UP-8). Von Hand nachbearbeitbar.",
-        "# `schuljahr` und `halbjahreswechsel` stammen aus der bisherigen Fassung —",
-        "# die Stundenplanquelle kennt sie nicht.",
+        "# `schuljahr`, `halbjahreswechsel` und `ab_zaehlung` stammen aus der bisherigen",
+        "# Fassung — die Stundenplanquelle kennt sie nicht.",
         f'schuljahr: "{cfg.schuljahr}"',
         f"beginn: {beginn}",
         f"ende: {ende}",
         f"halbjahreswechsel: {cfg.halbjahreswechsel}",
+        f"ab_zaehlung: {cfg.ab_zaehlung}",
         "",
     ]
     return "\n".join(kopf) + to_yaml_block(proposal, cfg)

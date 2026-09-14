@@ -111,6 +111,35 @@ Häufigkeit. Das ist die Arbeitsliste zum Nachpflegen.
 
 ---
 
+## A-/B-Wochen: die Zählweise festlegen
+
+14-tägige Termine brauchen eine Auskunft, die kein Stundenplan mitliefert: **Zählen
+Ferienwochen mit?** In `config/school_year.yaml`:
+
+```yaml
+ab_zaehlung: unterrichtswoche   # oder: kalenderwoche
+```
+
+- `unterrichtswoche` (Vorgabe) — Ferienwochen zählen nicht, der Takt läuft über sie hinweg
+  weiter. Vor einwöchigen Ferien B, danach A.
+- `kalenderwoche` — jede Kalenderwoche zählt mit. Vor einwöchigen Ferien B, danach wieder B.
+
+Der Unterschied zeigt sich **nur bei ungerader Ferienlänge**, dort aber in jeder Woche bis
+zu den nächsten Ferien: Die falsche Zählweise legt jeden 14-tägigen Termin in die falsche
+Woche. Im Schuljahr 2025/26 traf das drei von sechs Ferienlücken.
+
+**So liest man es ab:** eine bekannte 14-tägige Stunde im Stundenplan, eine Woche vor und
+eine Woche nach einwöchigen Ferien. Wechselt die Bezeichnung (B → A), gilt
+`unterrichtswoche`; bleibt sie gleich (B → B), gilt `kalenderwoche`. Einmal je Schule, nicht
+je Schuljahr.
+
+Ein Ankerdatum gibt es bewusst nicht. Welche Woche „A" heißt, ist gleichgültig — Phase 0 ist
+immer die erste Unterrichtswoche des Schuljahres, und Ableitung wie Slot-Erzeugung benutzen
+dieselbe Regel. Stimmt der Buchstabe nicht mit dem im Stundenplan überein, ändert das
+nichts an den Terminen.
+
+---
+
 ## Ferienkalender übernehmen
 
 **`/settings/holidays`** (nur sichtbar, wenn WebUntis eingerichtet ist) holt die Ferien und

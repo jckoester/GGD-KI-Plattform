@@ -3,6 +3,18 @@ beginn: 2026-09-14
 ende: 2027-07-28
 halbjahreswechsel: 2027-02-08      # erster Tag des 2. Halbjahrs
 
+# Wie 14-tägige Termine (A-/B-Wochen) gezählt werden:
+#   unterrichtswoche  Ferienwochen zählen nicht mit, der Takt läuft über sie hinweg
+#                     weiter — vor einwöchigen Ferien B, danach A. (Vorgabe)
+#   kalenderwoche     jede Kalenderwoche zählt, auch eine Ferienwoche — vor einwöchigen
+#                     Ferien B, danach wieder B.
+#
+# Der Unterschied zeigt sich nur bei UNGERADER Ferienlänge, dort aber deutlich: Die
+# falsche Zählweise legt jede 14-tägige Stunde bis zu den nächsten Ferien in die falsche
+# Woche. Einmal am Stundenplan ablesen — eine bekannte 14-tägige Stunde vor und nach den
+# Herbstferien genügt.
+ab_zaehlung: unterrichtswoche
+
 ferien:
   - { name: "Herbstferien",    von: 2026-10-26, bis: 2026-10-30 }
   - { name: "Weihnachtsferien", von: 2026-12-23, bis: 2027-01-08 }

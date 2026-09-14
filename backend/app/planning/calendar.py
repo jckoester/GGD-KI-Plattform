@@ -10,6 +10,7 @@ import os
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, field_validator, model_validator
@@ -51,6 +52,9 @@ class SchoolYearConfig(BaseModel):
     ferien: list[FerienPeriod] = []
     feiertage: list[NamedDay] = []
     unterrichtsfreie_tage: list[NamedDay] = []
+    # Wie 14-tägige Wochen gezählt werden — siehe `ab_phasen()`. Die Vorgabe entspricht
+    # der Beobachtung am GGD; welche gilt, liest man einmal am Stundenplan ab.
+    ab_zaehlung: Literal["unterrichtswoche", "kalenderwoche"] = "unterrichtswoche"
 
     @model_validator(mode="after")
     def _validate_order(self) -> "SchoolYearConfig":
@@ -123,3 +127,53 @@ def halbjahr_bounds(halbjahr: int, cfg: SchoolYearConfig | None = None) -> tuple
     if halbjahr == 1:
         return c.beginn, c.halbjahreswechsel - timedelta(days=1)
     return c.halbjahreswechsel, c.ende
+
+
+# ── A-/B-Wochen ──────────────────────────────────────────────────────────────
+
+# Die drei erlaubten Werte von `group_week_patterns.rhythmus`. Sie stehen hier, weil hier
+# auch die Regel steht, die sie in konkrete Wochen übersetzt — die Ableitung aus dem
+# Stundenplan und der Slot-Generator müssen dieselben benutzen.
+WOECHENTLICH = "woechentlich"
+A_WOCHE = "a_woche"
+B_WOCHE = "b_woche"
+
+
+def ab_phasen(cfg: SchoolYearConfig | None = None) -> dict[date, int]:
+    """Montag jeder Unterrichtswoche des Schuljahres → 0 (A) oder 1 (B).
+
+    Phase 0 ist die **erste Unterrichtswoche des Schuljahres**. Ein konfiguriertes
+    Ankerdatum gibt es bewusst nicht: Welche Woche „A" heißt, ist gleichgültig, solange
+    Ableitung und Generator dieselbe Zuordnung benutzen. Gebraucht wird nur die Zählweise,
+    und die unterscheidet sich zwischen Schulen wirklich:
+
+    * `unterrichtswoche` — Ferienwochen zählen nicht mit, der Takt läuft über sie hinweg
+      weiter. So hält es das GGD (am Stundenplan abgelesen: vor den einwöchigen
+      Herbstferien B, danach A).
+    * `kalenderwoche` — jede Kalenderwoche zählt, auch eine Ferienwoche.
+
+    Der Unterschied ist keine Geschmacksfrage: Bei **ungerader** Ferienlänge laufen beide
+    Zählweisen auseinander, und dann liegt jede 14-tägige Stunde bis zu den nächsten Ferien
+    in der falschen Woche. Im Schuljahr 2025/26 traf das drei von sechs Ferienlücken.
+
+    Ein **Mapping**, keine Einzelabfrage: Die Unterrichtswochenzählung muss bei jeder
+    Frage wieder am Schuljahresbeginn anfangen, und der Slot-Generator geht jeden Schultag
+    eines Halbjahres durch. Einmal bauen, danach nachschlagen.
+    """
+    c = cfg or load_school_year()
+    nach_kalenderwochen = c.ab_zaehlung == "kalenderwoche"
+    phasen: dict[date, int] = {}
+    montag = c.beginn - timedelta(days=c.beginn.weekday())
+    erste: date | None = None
+    gezaehlt = 0
+    while montag <= c.ende:
+        if any(is_schoolday(montag + timedelta(days=n), c) for n in range(5)):
+            if erste is None:
+                erste = montag
+            if nach_kalenderwochen:
+                phasen[montag] = ((montag - erste).days // 7) % 2
+            else:
+                phasen[montag] = gezaehlt % 2
+                gezaehlt += 1
+        montag += timedelta(weeks=1)
+    return phasen

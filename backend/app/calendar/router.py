@@ -21,7 +21,7 @@ from app.calendar.service import (
     list_kuerzel,
 )
 from app.db.session import get_db
-from app.planning.calendar import is_schoolday, load_school_year
+from app.planning.calendar import ab_phasen, is_schoolday, load_school_year
 from app.preferences.service import get_preferences
 
 logger = logging.getLogger(__name__)
@@ -244,15 +244,18 @@ async def week_patterns(
         logger.warning("Stundenplan-Abruf für %s fehlgeschlagen: %s", kuerzel, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from None
 
+    cfg = load_school_year()
     result = derive_patterns(
         stunden,
         wochen=kalenderwochen,
         timegrid=raster,
+        # Welche Wochen A- und welche B-Wochen sind, entscheidet das Schuljahr, nicht das
+        # Abruffenster. Ohne das Mapping hinge das Etikett am Klickzeitpunkt.
+        phasen=ab_phasen(cfg),
         kein_unterricht=kein_unterricht_codes(),
     )
     # Aus welchem Halbjahr die Wochen stammen — der Editor schreibt je Halbjahr, und ein
     # Muster ins falsche zu übernehmen wäre schwer zu bemerken.
-    cfg = load_school_year()
     halbjahr = 1 if kalenderwochen[-1] < cfg.halbjahreswechsel else 2
     # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
     # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
@@ -368,6 +371,9 @@ async def _stundenplan_abgleich(
         for woche in kalenderwochen:
             stunden.extend((await adapter.fetch_week(kuerzel, woche)).lessons)  # type: ignore[attr-defined]
 
+    # Ohne `phasen`, anders als bei den Wochenmustern: Gebraucht werden hier allein die
+    # Lerngruppen-Schlüssel. Der Rhythmus wird verworfen — aus einem Fenster mit Lücken
+    # wäre er ohnehin nicht bestimmbar.
     muster = derive_patterns(
         stunden,
         wochen=kalenderwochen,

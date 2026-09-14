@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- `ab_zaehlung` in `school_year.yaml` legt fest, ob Ferienwochen beim 14-tägigen Takt
+  mitzählen (`unterrichtswoche`, Vorgabe) oder nicht (`kalenderwoche`).
+
 ### Behoben
 
 - Wochen ohne eine einzige Stunde zählen beim Ableiten der Wochenmuster nicht mehr
@@ -13,6 +18,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - „Aus Stundenplan übernehmen" liest jetzt die laufende und die kommenden
   Unterrichtswochen statt der vergangenen; reichen sie nicht, wird aus der Vergangenheit
   aufgefüllt. Am Schuljahresanfang blieb bisher eine einzige Woche übrig.
+- Ob ein 14-tägiger Termin als A- oder B-Woche erkannt wird, hing vom Zeitpunkt des
+  Abrufs ab. Maßgeblich ist jetzt das Schuljahr.
+- Der Ferienkalender-Import überschreibt `ab_zaehlung` nicht mehr mit der Vorgabe.
 
 ## [0.10.0] – 2026-09-14
 

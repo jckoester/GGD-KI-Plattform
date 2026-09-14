@@ -279,6 +279,35 @@ def test_render_uebernimmt_halbjahreswechsel_und_schuljahr():
     assert geladen.halbjahreswechsel == CONFIG.halbjahreswechsel
 
 
+def test_render_schreibt_jedes_config_feld():
+    """Der Kopf baut die Datei neu auf — ein vergessenes Feld verschwindet lautlos.
+
+    Lautlos deshalb, weil `SchoolYearConfig` es beim nächsten Laden mit der Vorgabe
+    auffüllt: Eine Schule, die `ab_zaehlung: kalenderwoche` gesetzt hat, stünde nach dem
+    Ferienimport wieder auf `unterrichtswoche`, und ihre 14-tägigen Stunden lägen nach der
+    nächsten einwöchigen Ferienlücke eine Woche daneben.
+
+    Der Test prüft nicht einzelne Felder, sondern **alle** — damit er auch das nächste
+    hinzugefügte trägt.
+    """
+    from app.calendar.holidays import render_school_year
+
+    text = render_school_year(build_proposal(HOLIDAYS, CONFIG), CONFIG)
+    geschrieben = pyyaml.safe_load(text)
+    fehlend = set(SchoolYearConfig.model_fields) - set(geschrieben)
+    assert not fehlend, f"nicht geschriebene Felder: {sorted(fehlend)}"
+
+
+def test_render_behaelt_die_ab_zaehlung():
+    """Wie die Schule A-/B-Wochen zählt, weiß die Stundenplanquelle nicht."""
+    from app.calendar.holidays import render_school_year
+
+    cfg = CONFIG.model_copy(update={"ab_zaehlung": "kalenderwoche"})
+    text = render_school_year(build_proposal(HOLIDAYS, cfg), cfg)
+    geladen = SchoolYearConfig.model_validate(pyyaml.safe_load(text))
+    assert geladen.ab_zaehlung == "kalenderwoche"
+
+
 def test_render_uebernimmt_grenzen_der_quelle():
     from app.calendar.holidays import render_school_year
 

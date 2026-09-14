@@ -458,6 +458,79 @@ def test_nach_dem_schuljahr_bleibt_der_letzte_plan(kalender):
     assert len(wochen) == 4
 
 
+# ── A-/B-Wochen ──────────────────────────────────────────────────────────────
+
+
+def _vierzehntaegig_ab(start: date) -> list[Lesson]:
+    """Mathe jede zweite Woche montags — dazu Sport wöchentlich, damit keine Woche leer ist."""
+    mathe = [stunde(start + timedelta(weeks=n), 1) for n in (0, 2, 4)]
+    sport = [
+        stunde(start + timedelta(weeks=n, days=4), 11, fach="SP", klasse=("7A",))
+        for n in range(6)
+    ]
+    return mathe + sport
+
+
+def test_das_etikett_haengt_nicht_am_abrufzeitpunkt():
+    """Gemessener Fehler (14.09.2026): Dieselbe Stunde hieß in einem Fenster ab dem 08.06.
+    `a_woche` und in einem ab dem 15.06. `b_woche` — beide Male „sicher".
+
+    Der Anker war die früheste **abgerufene** Woche und wanderte damit mit dem Klick. Mit
+    den Phasen des Schuljahres ist das Etikett eine Eigenschaft des Stundenplans.
+    """
+    from app.planning.calendar import ab_phasen
+
+    phasen = ab_phasen(_cfg())
+    start = date(2026, 6, 8)
+    lessons = _vierzehntaegig_ab(start)
+
+    etiketten = []
+    for versatz in (0, 1):
+        wochen = [start + timedelta(weeks=versatz + n) for n in range(4)]
+        ergebnis = derive_patterns(lessons, wochen=wochen, phasen=phasen, timegrid=TIMEGRID)
+        muster = [p for p in ergebnis.proposals if p.key.label == "M 5C"][0]
+        assert muster.sicher
+        etiketten.append(muster.rhythmus)
+
+    assert etiketten[0] in (A_WOCHE, B_WOCHE), "sonst prüft der Test nichts"
+    assert etiketten[0] == etiketten[1]
+
+
+def test_ohne_phasen_bleibt_es_bei_der_fensterparitaet():
+    """Der Gegenbeweis: Ohne das Mapping tritt der alte Fehler auf.
+
+    Steht hier, damit `test_das_etikett_haengt_nicht_am_abrufzeitpunkt` nicht ohnehin
+    durchliefe — und damit sichtbar bleibt, was der Parameter tatsächlich bewirkt.
+    """
+    start = date(2026, 6, 8)
+    lessons = _vierzehntaegig_ab(start)
+
+    etiketten = []
+    for versatz in (0, 1):
+        wochen = [start + timedelta(weeks=versatz + n) for n in range(4)]
+        ergebnis = derive_patterns(lessons, wochen=wochen, timegrid=TIMEGRID)
+        etiketten.append(
+            [p for p in ergebnis.proposals if p.key.label == "M 5C"][0].rhythmus
+        )
+
+    assert etiketten == [A_WOCHE, B_WOCHE]
+
+
+def test_die_phase_stammt_aus_dem_schuljahr_nicht_aus_dem_fenster():
+    """Welche Wochen A sind, entscheidet `ab_phasen` — nachgerechnet, nicht angenommen."""
+    from app.planning.calendar import ab_phasen
+
+    phasen = ab_phasen(_cfg())
+    start = date(2026, 6, 8)
+    wochen = [start + timedelta(weeks=n) for n in range(4)]
+    ergebnis = derive_patterns(
+        _vierzehntaegig_ab(start), wochen=wochen, phasen=phasen, timegrid=TIMEGRID
+    )
+    muster = [p for p in ergebnis.proposals if p.key.label == "M 5C"][0]
+    erwartet = A_WOCHE if phasen[start] == 0 else B_WOCHE
+    assert muster.rhythmus == erwartet
+
+
 # ── Übernahme in den Editor (Schritt 10b) ────────────────────────────────────
 
 

@@ -8,6 +8,7 @@ from app.planning.calendar import (
     FerienPeriod,
     NamedDay,
     SchoolYearConfig,
+    ab_phasen,
     halbjahr_bounds,
     halbjahr_of,
     is_schoolday,
@@ -141,3 +142,100 @@ def test_validation_ferien_outside():
             halbjahreswechsel=date(2027, 2, 8),
             ferien=[FerienPeriod(name="Zu früh", von=date(2026, 8, 1), bis=date(2026, 8, 5))],
         )
+
+
+# ── A-/B-Wochen ──────────────────────────────────────────────────────────────
+
+
+def _jahr(ab_zaehlung: str, ferien: list[FerienPeriod]) -> SchoolYearConfig:
+    """Schuljahr ab Montag, 14.09.2026 — ohne Feiertage, damit nur die Ferien wirken."""
+    return SchoolYearConfig(
+        schuljahr="2026/27",
+        beginn=date(2026, 9, 14),
+        ende=date(2027, 7, 28),
+        halbjahreswechsel=date(2027, 2, 8),
+        ferien=ferien,
+        ab_zaehlung=ab_zaehlung,
+    )
+
+
+EINE_WOCHE = [FerienPeriod(name="Herbst", von=date(2026, 10, 26), bis=date(2026, 10, 30))]
+ZWEI_WOCHEN = [FerienPeriod(name="Herbst", von=date(2026, 10, 26), bis=date(2026, 11, 6))]
+ZWEI_WOCHEN_SPAETER = [
+    FerienPeriod(name="Weihnachten", von=date(2026, 12, 21), bis=date(2027, 1, 1))
+]
+
+
+def test_erste_unterrichtswoche_ist_phase_null():
+    """Der Nullpunkt, den beide Seiten teilen — ohne konfiguriertes Ankerdatum."""
+    for regel in ("unterrichtswoche", "kalenderwoche"):
+        phasen = ab_phasen(_jahr(regel, EINE_WOCHE))
+        assert phasen[date(2026, 9, 14)] == 0
+        assert phasen[date(2026, 9, 21)] == 1
+
+
+def test_ferienwoche_bekommt_keine_phase():
+    """Sie ist keine Unterrichtswoche — ein Slot kann dort nicht liegen."""
+    phasen = ab_phasen(_jahr("unterrichtswoche", EINE_WOCHE))
+    assert date(2026, 10, 26) not in phasen
+
+
+def test_unterrichtswochen_zaehlen_ueber_eine_einwoechige_luecke_hinweg():
+    """Die Beobachtung am GGD: vor den einwöchigen Herbstferien B, danach A."""
+    phasen = ab_phasen(_jahr("unterrichtswoche", EINE_WOCHE))
+    assert phasen[date(2026, 10, 19)] == 1
+    assert phasen[date(2026, 11, 2)] == 0
+
+
+def test_kalenderwochen_zaehlen_die_ferienwoche_mit():
+    """Dieselbe Lücke, andere Regel: vor den Ferien B — und danach wieder B."""
+    phasen = ab_phasen(_jahr("kalenderwoche", EINE_WOCHE))
+    assert phasen[date(2026, 10, 19)] == 1
+    assert phasen[date(2026, 11, 2)] == 1
+
+
+def test_bei_gerader_ferienlaenge_sind_beide_regeln_gleich():
+    """Deshalb fällt der Unterschied so selten auf — und dann umso teurer."""
+    nach_ferien = date(2026, 11, 9)
+    uw = ab_phasen(_jahr("unterrichtswoche", ZWEI_WOCHEN))
+    kw = ab_phasen(_jahr("kalenderwoche", ZWEI_WOCHEN))
+    assert uw[nach_ferien] == kw[nach_ferien]
+
+
+def test_vorgabe_ist_die_unterrichtswoche():
+    """Bestehende Dateien ohne das Feld laufen weiter — mit der Zählweise des GGD."""
+    cfg = SchoolYearConfig(
+        schuljahr="2026/27",
+        beginn=date(2026, 9, 14),
+        ende=date(2027, 7, 28),
+        halbjahreswechsel=date(2027, 2, 8),
+    )
+    assert cfg.ab_zaehlung == "unterrichtswoche"
+
+
+def test_unbekannte_zaehlweise_wird_abgelehnt():
+    """Ein Tippfehler darf nicht als „dann eben die Vorgabe" durchgehen — die Stunden
+    lägen danach eine Woche daneben, ohne dass irgendwo etwas meldet."""
+    with pytest.raises(ValueError):
+        SchoolYearConfig(
+            schuljahr="2026/27",
+            beginn=date(2026, 9, 14),
+            ende=date(2027, 7, 28),
+            halbjahreswechsel=date(2027, 2, 8),
+            ab_zaehlung="unterrichtswochen",
+        )
+
+
+def test_unterrichtswochen_wechseln_das_ganze_schuljahr_hindurch():
+    """Zwei aufeinanderfolgende Unterrichtswochen haben nie dieselbe Phase.
+
+    Das ist genau das, was „Unterrichtswoche" bedeutet: Ein 14-tägiger Termin fällt in
+    jede zweite Unterrichtswoche, egal wie viele Ferien dazwischenliegen. Die Zählweise
+    `kalenderwoche` hat diese Eigenschaft bewusst **nicht** — dort teilen sich nach einer
+    ungeraden Lücke zwei aufeinanderfolgende Unterrichtswochen eine Phase.
+    """
+    phasen = ab_phasen(_jahr("unterrichtswoche", EINE_WOCHE + ZWEI_WOCHEN_SPAETER))
+    wochen = sorted(phasen)
+    assert len(wochen) > 30
+    for vorher, nachher in zip(wochen, wochen[1:]):
+        assert phasen[vorher] != phasen[nachher], f"{vorher} → {nachher}"

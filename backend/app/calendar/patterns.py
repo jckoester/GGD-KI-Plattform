@@ -25,6 +25,12 @@ from datetime import date, timedelta
 
 from app.calendar.base import Lesson, LessonState
 
+# Die Rhythmus-Werte stehen dort, wo auch die Regel steht, die sie in konkrete Wochen
+# übersetzt (`ab_phasen`). Zwei Umsetzungen derselben Regel drifteten irgendwann
+# auseinander — und zwar lautlos: Erst Monate später fiele auf, dass die Stunden eine
+# Woche verschoben liegen.
+from app.planning.calendar import A_WOCHE, B_WOCHE, WOECHENTLICH
+
 # Zustände, die belegen, dass an dieser Position regulär Unterricht steht.
 #
 # `CANCELLED` und `SUBSTITUTION` gehören dazu: Die Stunde ist ausgefallen bzw. wurde
@@ -39,11 +45,6 @@ MUSTER_ZUSTAENDE = frozenset(
         LessonState.SUBSTITUTION,
     }
 )
-
-WOECHENTLICH = "woechentlich"
-A_WOCHE = "a_woche"
-B_WOCHE = "b_woche"
-
 
 @dataclass(frozen=True)
 class GroupKey:
@@ -149,6 +150,7 @@ def derive_patterns(
     wochen: list[date],
     timegrid: list[tuple[int, int]] | None = None,
     anker: date | None = None,
+    phasen: dict[date, int] | None = None,
     kein_unterricht: frozenset[str] | None = None,
 ) -> PatternResult:
     """Wochenmuster aus den Stunden mehrerer Wochen ableiten.
@@ -167,9 +169,15 @@ def derive_patterns(
     Personalrats- oder Schulleitungssitzung). Sie erzeugen kein Muster — der Stundenplan
     führt sie wie Unterricht, die Jahresplanung kennt sie nicht.
 
-    `anker` legt fest, welche Woche A ist (Vorgabe: die früheste abgerufene). Der Plan
-    sieht dafür ein Datum in `school_year.yaml` vor; solange es fehlt, ist die Zuordnung
-    eine **Konvention** — welche der beiden Wochen A heißt, muss die Lehrkraft prüfen.
+    `anker` ist der Nullpunkt der Wochen**zählung** — er unterscheidet die abgerufenen
+    Wochen voneinander, mehr nicht (Vorgabe: die früheste abgerufene).
+
+    `phasen` entscheidet, welche davon A- und welche B-Wochen sind: ein Mapping
+    Montag → 0/1 aus `ab_phasen()`. Ohne das Mapping bliebe nur die Parität zum Anker —
+    und die wandert mit dem Abrufzeitpunkt: Dieselbe 14-tägige Stunde hieß in einem
+    Fenster ab dem 08.06. `a_woche` und in einem ab dem 15.06. `b_woche`, beide Male
+    „sicher". Der Router reicht die Phasen des Schuljahres durch; ohne sie bleibt es beim
+    alten Verhalten, damit die Funktion für sich benutzbar bleibt.
     """
     ergebnis = PatternResult(wochen=sorted(wochen))
     if not wochen:
@@ -241,6 +249,8 @@ def derive_patterns(
             "Nicht als Unterricht gewertet: " + ", ".join(sorted(dienstliches)) + "."
         )
 
+    phase_je_woche = {i: _phase(i, anker, phasen) for i in wochen_index}
+
     # Erst je Einzelstunde den Rhythmus bestimmen, dann benachbarte verschmelzen. Die
     # umgekehrte Reihenfolge verschmölze Stunden mit verschiedenen Rhythmen.
     # Die **Wochenmenge** wird mitgeführt, nicht nur ihre Größe: `_bloecke` verschmilzt
@@ -250,7 +260,7 @@ def derive_patterns(
     )
     for (key, weekday, stunde), indizes in beobachtung.items():
         einzeln[(key, weekday)][stunde] = (
-            _rhythmus(indizes, wochen_index, anzahl_wochen),
+            _rhythmus(indizes, wochen_index, anzahl_wochen, phase_je_woche),
             frozenset(indizes),
         )
 
@@ -281,7 +291,22 @@ def derive_patterns(
     return ergebnis
 
 
-def _rhythmus(indizes: set[int], alle: set[int], anzahl: int) -> str:
+def _phase(index: int, anker: date, phasen: dict[date, int] | None) -> int:
+    """Ob die Woche mit dieser Nummer eine A- (0) oder eine B-Woche (1) ist.
+
+    Fehlt das Mapping, bleibt nur die Parität zum Anker. Eine Woche, die das Mapping nicht
+    kennt, läge außerhalb des Schuljahres — über den Endpunkt unerreichbar, denn der holt
+    nur Unterrichtswochen.
+    """
+    if phasen is None:
+        return index % 2
+    montag = anker - timedelta(days=anker.weekday()) + timedelta(weeks=index)
+    return phasen.get(montag, index % 2)
+
+
+def _rhythmus(
+    indizes: set[int], alle: set[int], anzahl: int, phase: dict[int, int]
+) -> str:
     """Wöchentlich oder 14-tägig — und wenn 14-tägig, welche Woche.
 
     Bei nur einer abgerufenen Woche ist die Frage nicht entscheidbar; dann gilt
@@ -289,11 +314,11 @@ def _rhythmus(indizes: set[int], alle: set[int], anzahl: int) -> str:
     """
     if anzahl < 2 or len(indizes) == anzahl:
         return WOECHENTLICH
-    gerade = {i for i in alle if i % 2 == 0}
-    ungerade = alle - gerade
-    if indizes == gerade and gerade:
+    a_wochen = {i for i in alle if phase[i] == 0}
+    b_wochen = alle - a_wochen
+    if indizes == a_wochen and a_wochen:
         return A_WOCHE
-    if indizes == ungerade and ungerade:
+    if indizes == b_wochen and b_wochen:
         return B_WOCHE
     return WOECHENTLICH
 
