@@ -41,15 +41,23 @@ Ohne Kürzel passiert nichts — die Übernahme ist freiwillig.
 Im **Jahresplan** einer Gruppe öffnen Sie die Wochenmuster und wählen dort
 **„Aus Stundenplan übernehmen"**.
 
-Die Plattform sieht sich die letzten Unterrichtswochen an und schlägt vor, was sie darin
-regelmäßig findet — Wochentag, Stunde, Länge und Rhythmus (wöchentlich, A- oder B-Woche).
-Doppelstunden erkennt sie daran, dass zwischen zwei Stunden keine Pause liegt.
+Die Plattform sieht sich vier aufeinanderfolgende Unterrichtswochen an — die laufende und
+die kommenden — und schlägt vor, was sie darin regelmäßig findet: Wochentag, Stunde, Länge
+und Rhythmus (wöchentlich, A- oder B-Woche). Doppelstunden erkennt sie daran, dass zwischen
+zwei Stunden keine Pause liegt.
+
+Nach vorn, weil der Stundenplan ein Plan ist: Kommende Wochen zeigen den regelmäßigen
+Ablauf, vergangene zeigen Ausfall und Vertretung. Stehen vor den Ferien oder am
+Schuljahresende nicht genug Wochen bevor, ergänzt die Plattform aus der Vergangenheit —
+über eine Ferienlücke hinweg aber nie, dort ist der A-/B-Takt nicht bestimmbar.
 
 **Der Vorschlag füllt nur das Formular.** Nichts ist gespeichert, bis Sie auf „Speichern"
 klicken. Sie können vorher jede Zeile ändern, löschen oder ergänzen.
 
 Angezeigt wird auch, wie viele Einträge aus wie vielen Wochen stammen und welche davon
-**unsicher** sind — etwa weil eine Stunde nur einmal vorkam.
+**unsicher** sind — etwa weil eine Stunde nur einmal vorkam. Wochen, in denen Sie gar
+keinen Unterricht haben (Praktikums- oder Projektwoche), zählen dabei nicht mit; sie
+belegen nichts.
 
 **Wenn Ihre Gruppe nicht im Vorschlag auftaucht**, heißt sie im Stundenplan
 wahrscheinlich anders als hier, oder das Fachkürzel ist noch nicht zugeordnet. Melden Sie

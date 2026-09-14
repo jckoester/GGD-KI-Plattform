@@ -97,8 +97,35 @@ async def list_teachers(
         return {"configured": True, "teachers": [], "error": str(exc)}
 
 
+def _ist_unterrichtswoche(montag: date, cfg) -> bool:
+    return any(is_schoolday(montag + timedelta(days=n), cfg) for n in range(5))
+
+
+def _suche_woche(montag: date, cfg, richtung: int) -> date | None:
+    """Die erste Unterrichtswoche ab `montag` in dieser Richtung, `montag` eingeschlossen.
+
+    Zwei Schuljahre als Notbremse — weiter zu suchen hieße, eine Config zu bedienen, die
+    zum Datum gar nicht passt.
+    """
+    for _ in range(104):
+        if _ist_unterrichtswoche(montag, cfg):
+            return montag
+        montag += timedelta(weeks=richtung)
+    return None
+
+
+def _verlaengere(von: date, cfg, richtung: int, hoechstens: int) -> list[date]:
+    """Bis zu `hoechstens` **lückenlos** anschließende Unterrichtswochen neben `von`."""
+    wochen: list[date] = []
+    kandidat = von + timedelta(weeks=richtung)
+    while len(wochen) < hoechstens and _ist_unterrichtswoche(kandidat, cfg):
+        wochen.append(kandidat)
+        kandidat += timedelta(weeks=richtung)
+    return wochen
+
+
 def _unterrichtswochen(referenz: date, anzahl: int) -> list[date]:
-    """Die jüngsten `anzahl` **zusammenhängenden** Unterrichtswochen vor `referenz`.
+    """Bis zu `anzahl` **zusammenhängende** Unterrichtswochen ab `referenz`.
 
     Zwei Anforderungen, die einander widersprechen könnten:
 
@@ -109,28 +136,30 @@ def _unterrichtswochen(referenz: date, anzahl: int) -> list[date]:
       bestimmbar, ob der A/B-Takt nach Kalenderwochen weiterläuft oder neu anfängt. Aus
       Wochen mit Lücke einen Rhythmus abzuleiten hieße raten.
 
-    Deshalb wird rückwärts nach dem jüngsten **ununterbrochenen** Lauf gesucht, statt
-    Ferienwochen einfach zu überspringen. Rückwärts, weil vergangene Wochen belegt sind;
-    kommende sind Planung.
+    Deshalb wird nach einem **ununterbrochenen** Lauf gesucht, statt Ferienwochen einfach
+    zu überspringen.
+
+    **Nach vorn, nicht zurück** (14.09.2026). Der Stundenplan ist ein *Plan*: Für die
+    Frage, wann eine Stunde regelmäßig liegt, ist die Veröffentlichung die bessere Quelle
+    als die Vergangenheit, in der Ausfall und Vertretung das Bild schon verändert haben.
+    Und am Schuljahresanfang — genau dann, wenn man das Raster anlegen will — gibt es
+    keine Vergangenheit. Liegt `referenz` in den Ferien, zählt der Plan **danach**.
+
+    Reicht die Zukunft nicht, wird aus der Vergangenheit aufgefüllt: am Schuljahresende,
+    oder wenn die Ferien schon in zwei Wochen beginnen.
     """
     cfg = load_school_year()
     montag = referenz - timedelta(days=referenz.weekday())
-    lauf: list[date] = []
-    bester: list[date] = []
-    # Zwei Schuljahre Rückblick als Notbremse — älteres wäre ohnehin nicht aussagekräftig.
-    for _ in range(104):
-        if montag < cfg.beginn:
-            break
-        if any(is_schoolday(montag + timedelta(days=n), cfg) for n in range(5)):
-            lauf.append(montag)
-            if len(lauf) >= anzahl:
-                return sorted(lauf)
-        else:
-            if len(lauf) > len(bester):
-                bester = lauf
-            lauf = []
-        montag -= timedelta(weeks=1)
-    return sorted(lauf if len(lauf) > len(bester) else bester)
+    # Die laufende Woche, sonst die nächste mit Unterricht. Findet sich vorwärts keine
+    # mehr (Schuljahresende, oder die Config beschreibt ein vergangenes Jahr), dient die
+    # letzte vergangene als Anker — sonst bliebe die Antwort leer.
+    start = _suche_woche(montag, cfg, +1) or _suche_woche(montag, cfg, -1)
+    if start is None:
+        return []
+    fenster = [start] + _verlaengere(start, cfg, +1, anzahl - 1)
+    if len(fenster) < anzahl:
+        fenster += _verlaengere(fenster[0], cfg, -1, anzahl - len(fenster))
+    return sorted(fenster)
 
 
 def _abgleich_wochen(
@@ -138,14 +167,14 @@ def _abgleich_wochen(
 ) -> list[date]:
     """Kalenderwochen für den **Abgleich** — anderes Fenster als für die Musterableitung.
 
-    Zwei Unterschiede zu `_unterrichtswochen`, beide wesentlich:
+    Beide Fenster blicken nach vorn (seit 14.09.2026 auch `_unterrichtswochen`). Der
+    Unterschied ist die **Zusammenhangs-Regel**: Die Musterableitung braucht lückenlos
+    aneinandergrenzende Wochen, sonst ist der A-/B-Takt nicht bestimmbar. Der Abgleich
+    braucht das nicht — er braucht die **jüngsten** Wochen, und eine Verlegung über die
+    Ferien hinweg soll er trotzdem finden.
 
-    * **Nach vorn.** Eine Verlegung zeigt fast immer in die Zukunft; ihr Ziel liegt in
-      einer kommenden Woche. Ein reiner Rückblick fände den Ursprung und nie das Ziel.
-    * **Lücken sind erlaubt.** Die Musterableitung braucht zusammenhängende Wochen, sonst
-      ist der A-/B-Takt nicht bestimmbar. Der Abgleich braucht das nicht — er braucht die
-      **jüngsten** Wochen. Mit der Zusammenhangs-Regel landete er nach jeden Ferien
-      wochenlang in der Vergangenheit statt in der Gegenwart.
+    Er blickt außerdem eine Woche weiter zurück als die Musterableitung: Eine Verlegung
+    zeigt zwar meist nach vorn, ihr Ursprung liegt aber in der Vergangenheit.
 
     Die laufende Woche ist immer dabei, sofern sie Unterricht enthält.
     """
@@ -164,7 +193,7 @@ def _abgleich_wochen(
 @router.get("/week-patterns")
 async def week_patterns(
     wochen: int = Query(4, ge=1, le=12),
-    bis: date | None = None,
+    stichtag: date | None = None,
     db: AsyncSession = Depends(get_db),
     user=Depends(require_any_role(["teacher", "admin"])),
     _current=Depends(get_current_user),
@@ -194,11 +223,11 @@ async def week_patterns(
             ],
         }
 
-    kalenderwochen = _unterrichtswochen(bis or date.today(), wochen)
+    kalenderwochen = _unterrichtswochen(stichtag or date.today(), wochen)
     if not kalenderwochen:
         raise HTTPException(
             status_code=409,
-            detail="Im Schuljahr liegen vor diesem Datum keine Unterrichtswochen.",
+            detail="Im Schuljahr liegen um dieses Datum herum keine Unterrichtswochen.",
         )
 
     try:

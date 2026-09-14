@@ -232,18 +232,23 @@ def kalender(monkeypatch):
     return kalender_router
 
 
-def test_abgleich_enthaelt_die_laufende_woche(kalender):
-    """Der Kern des Problems: Änderungen betreffen **heute**.
+def test_beide_fenster_enthalten_die_laufende_woche(kalender):
+    """Änderungen betreffen **heute** — und ein Muster gilt ab heute.
 
-    Das Musterfenster sucht den jüngsten zusammenhängenden Lauf und landet nach Ferien
-    wochenlang in der Vergangenheit — für den Abgleich wäre das genau verkehrt.
+    Bis zum 14.09.2026 suchte das Musterfenster rückwärts und landete nach Ferien
+    wochenlang in der Vergangenheit. Jetzt blicken beide nach vorn; der Unterschied ist
+    allein die Zusammenhangs-Regel: Das Muster duldet keine Lücke, der Abgleich schon.
     """
     mittwoch = date(2026, 6, 10)
     muster = kalender._unterrichtswochen(mittwoch, 4)
     abgleich = kalender._abgleich_wochen(mittwoch, 4)
 
-    assert date(2026, 6, 8) not in muster        # Musterfenster: hinter den Ferien
-    assert date(2026, 6, 8) in abgleich          # Abgleichfenster: die laufende Woche
+    assert date(2026, 6, 8) in muster
+    assert date(2026, 6, 8) in abgleich
+    assert all((muster[i + 1] - muster[i]).days == 7 for i in range(len(muster) - 1))
+    # Der Abgleich greift über die Pfingstferien zurück, das Muster nicht.
+    assert date(2026, 5, 18) in abgleich
+    assert date(2026, 5, 18) not in muster
 
 
 def test_abgleich_schaut_nach_vorn(kalender):

@@ -387,34 +387,75 @@ def _cfg():
     )
 
 
-def test_wochenauswahl_ist_zusammenhaengend(monkeypatch):
+@pytest.fixture
+def kalender(monkeypatch):
+    from app.calendar import router as kalender_router
+    from app.planning import calendar as planungskalender
+
+    monkeypatch.setattr(planungskalender, "load_school_year", _cfg)
+    monkeypatch.setattr(kalender_router, "load_school_year", _cfg)
+    return kalender_router
+
+
+def test_wochenauswahl_blickt_nach_vorn(kalender):
+    """Am Schuljahresanfang gibt es keine Vergangenheit — und genau dann legt man das
+    Raster an. Rückwärts blieb hier eine einzige Woche übrig, aus der sich kein
+    Rhythmus ableiten lässt.
+    """
+    wochen = kalender._unterrichtswochen(date(2025, 9, 20), 4)
+    assert wochen == [
+        date(2025, 9, 15),
+        date(2025, 9, 22),
+        date(2025, 9, 29),
+        date(2025, 10, 6),
+    ]
+
+
+def test_wochenauswahl_ist_zusammenhaengend(kalender):
     """Der Kern: über eine Ferienlücke hinweg ist der A/B-Takt nicht bestimmbar.
 
-    Würden Ferienwochen einfach übersprungen, lägen zwischen zwei ausgewählten Wochen
-    zwei Kalenderwochen — und jede Rhythmus-Aussage wäre geraten.
+    Zwei Wochen vor den Pfingstferien ist nach der laufenden Woche vorwärts Schluss.
+    Aufgefüllt wird dann rückwärts — nicht über die Ferien hinweg. Würden Ferienwochen
+    einfach übersprungen, lägen zwischen zwei ausgewählten Wochen drei Kalenderwochen,
+    und jede Rhythmus-Aussage wäre geraten.
     """
-    from app.calendar import router as kalender_router
-    from app.planning import calendar as planungskalender
-
-    monkeypatch.setattr(planungskalender, "load_school_year", _cfg)
-    monkeypatch.setattr(kalender_router, "load_school_year", _cfg)
-
-    wochen = kalender_router._unterrichtswochen(date(2026, 6, 12), 4)
-    assert len(wochen) == 4
+    wochen = kalender._unterrichtswochen(date(2026, 5, 20), 4)
+    assert wochen == [
+        date(2026, 4, 27),
+        date(2026, 5, 4),
+        date(2026, 5, 11),
+        date(2026, 5, 18),
+    ]
     assert all((wochen[i + 1] - wochen[i]).days == 7 for i in range(3))
-    # Die Pfingstferien liegen NICHT dazwischen.
-    assert wochen[-1] < date(2026, 5, 25)
 
 
-def test_wochenauswahl_bricht_am_schuljahresbeginn_ab(monkeypatch):
-    from app.calendar import router as kalender_router
-    from app.planning import calendar as planungskalender
+def test_wochenauswahl_in_den_ferien_zaehlt_die_zeit_danach(kalender):
+    """Liegt der Stichtag in den Ferien, ist der Plan **danach** die Quelle."""
+    wochen = kalender._unterrichtswochen(date(2026, 5, 28), 4)
+    assert wochen[0] == date(2026, 6, 8)
+    assert all((wochen[i + 1] - wochen[i]).days == 7 for i in range(3))
 
-    monkeypatch.setattr(planungskalender, "load_school_year", _cfg)
-    monkeypatch.setattr(kalender_router, "load_school_year", _cfg)
 
-    wochen = kalender_router._unterrichtswochen(date(2025, 9, 20), 4)
-    assert wochen == [date(2025, 9, 15)]
+def test_wochenauswahl_fuellt_am_schuljahresende_rueckwaerts_auf(kalender):
+    """Die letzte Unterrichtswoche endet am 29.07.; vorwärts ist nichts mehr zu holen."""
+    wochen = kalender._unterrichtswochen(date(2026, 7, 27), 4)
+    assert wochen == [
+        date(2026, 7, 6),
+        date(2026, 7, 13),
+        date(2026, 7, 20),
+        date(2026, 7, 27),
+    ]
+
+
+def test_nach_dem_schuljahr_bleibt_der_letzte_plan(kalender):
+    """Sommerferien, Config noch nicht getauscht: dann gilt das vergangene Schuljahr.
+
+    Eine leere Antwort wäre ein 409 ohne Erkenntnis — und der Abruf wäre ausgerechnet in
+    den Wochen unbrauchbar, in denen man das nächste Jahr vorbereitet.
+    """
+    wochen = kalender._unterrichtswochen(date(2026, 8, 19), 4)
+    assert wochen[-1] == date(2026, 7, 27)
+    assert len(wochen) == 4
 
 
 # ── Übernahme in den Editor (Schritt 10b) ────────────────────────────────────
