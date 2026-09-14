@@ -5,61 +5,69 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.0] – 2026-09-14
+
+Schwerpunkt: **Unterrichtsgruppen und Stundenplan**. Der Weg von der Gruppe zum
+fertigen Jahresplan trägt jetzt durchgehend — Gruppen finden ihr Fach, die Klasse
+kommt bei der Adoption mit, und das Stundenraster lässt sich für alle Gruppen auf
+einmal aus dem Stundenplan übernehmen. Dazu ein zweiter Zugangsweg: persönliche
+Token für Programme außerhalb des Browsers.
+
 ### Neu
 
-- **Stundenraster für alle eigenen Gruppen auf einmal** — unter „Meine
-  Unterrichtsgruppen“ im Profil. Liest vier Wochen des Stundenplans und legt je
-  Gruppe Wochenmuster und Stunden an, statt jeden Jahresplan einzeln zu öffnen.
-
-- **Bestätigt eine Lehrkraft einen Gruppenvorschlag, kommt die Klasse mit.**
-  Die Schüler:innen der Quellklasse sind beim nächsten Login in der
-  Unterrichtsgruppe — ein im Klassenverband unterrichtetes Fach braucht damit
-  keine eigene Gruppe im Schulkonto. Wer die Klasse verlässt, verliert die
-  Gruppe ebenso automatisch. Gruppen mit Entsprechung im Schulkonto bleiben
-  unberührt: Dort zählt deren Mitgliederliste.
-
+- **Stundenraster für alle eigenen Gruppen auf einmal** — im Profil unter „Meine
+  Unterrichtsgruppen“. Liest vier Wochen des Stundenplans und legt je Gruppe
+  Wochenmuster und Stunden an.
+- **Bestätigt eine Lehrkraft einen Gruppenvorschlag, kommt die Klasse mit.** Die
+  Schüler:innen der Quellklasse sind ab ihrer nächsten Anmeldung in der
+  Unterrichtsgruppe; wer die Klasse verlässt, verliert sie wieder. Gruppen mit
+  Entsprechung im Schulkonto bleiben unberührt.
 - **Persönliche Zugangstoken** für Programme außerhalb des Browsers. Lehrkräfte
   legen sie im Profil selbst an — nach erneuter Anmeldung, mit Ablaufdatum und
   getrenntem Lese- und Schreibrecht für Unterrichtsplanung und Bausteine. Der
   Tokentext ist einmalig sichtbar. Ein Token erreicht weder Chat noch Verwaltung,
   ist gedrosselt und endet mit Widerruf, Rollenentzug oder Kontolöschung.
 
-### Behoben
-
-- **Der Stundenplan-Abgleich sagt jetzt, wenn die Jahresplanung noch leer ist.**
-  Er meldete stattdessen „0 Stunden geändert“ und einen Hinweis je Stunde des
-  Stundenplans — richtig, aber irreführend: Er ändert vorhandene Stunden und legt
-  keine an.
-
-- **„Aus Stundenplan übernehmen“ fehlte im Wochenmuster-Dialog.** Der Knopf
-  erschien nur, wenn zuvor ein Verwaltungsbereich geöffnet worden war — sonst
-  blieb die Übernahme des Rasters aus dem Stundenplan unsichtbar.
-
-- **Selbst angelegte Unterrichtsgruppen verschwanden beim nächsten Login.**
-  Der Abgleich mit dem Schulkonto entfernte auch Mitgliedschaften in Gruppen,
-  die es dort gar nicht gibt — einschließlich der Lehrkraft, die die Gruppe
-  gerade angelegt hatte. Er fasst solche Gruppen jetzt nicht mehr an.
-
-- **Unterrichtsgruppen aus dem SSO finden ihr Fach auch dann, wenn ihre Namen aus
-  dem Stundenplan stammen.** Das Muster in `config/auth.yaml` darf jetzt sagen, wo
-  das Fachkürzel steht (`(?P<fach>…)`) und wie die Gruppe heißen soll
-  (`(?P<bezeichnung>…)`); gesucht wird auch in `untis_codes` und `fach_code`. Bisher
-  wurde das Fach geraten, und Gruppen ohne ableitbares Fach erschienen unter keinem
-  Fach — ohne Hinweis im Log. Bereits angelegte Gruppen bekommen ihr Fach beim
-  nächsten Login nachgetragen.
-- Konfigurationsdateien werden unabhängig vom Arbeitsverzeichnis gelesen. Betroffen
-  waren Drosselung, Artefaktgrenzen, Budgetstufen, Assistenten-Schema, Schuljahr
-  und Auth-Konfiguration.
-- Das Änderungsdatum eines Bausteins bleibt beim Bearbeiten nicht mehr stehen. Es
-  wandert jetzt auch beim Ändern von Inhalt, Titel, Unterrichtseinheit und beim
-  Archivieren mit; ein neu berechnetes Embedding zählt weiterhin nicht als Änderung.
-
 ### Geändert
 
 - Stunden- und Unterrichtseinheit-Abruf liefern das Änderungsdatum mit.
-- `PATCH` auf Slot und Stunde nimmt `expected_updated_at` entgegen und antwortet mit
-  `409`, wenn sich der Stand inzwischen geändert hat. Ohne das Feld bleibt es beim
-  bisherigen Verhalten. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück.
+- `PATCH` auf Slot und Stunde nimmt `expected_updated_at` entgegen und antwortet
+  mit `409`, wenn sich der Stand inzwischen geändert hat. Ohne das Feld bleibt es
+  beim bisherigen Verhalten; der `PATCH` auf eine Stunde gibt den neuen Stand zurück.
+
+### Behoben
+
+- Der Stundenplan-Abgleich meldet jetzt, wenn die Jahresplanung noch leer ist,
+  statt einen Hinweis je Stunde des Stundenplans zu zählen.
+- „Aus Stundenplan übernehmen“ fehlte im Wochenmuster-Dialog, sofern zuvor kein
+  Verwaltungsbereich geöffnet worden war.
+- Selbst angelegte Unterrichtsgruppen verloren beim nächsten Login ihre
+  Mitglieder — einschließlich der Lehrkraft, die sie angelegt hatte.
+- Unterrichtsgruppen aus dem Schulkonto finden ihr Fach auch dann, wenn ihre Namen
+  aus dem Stundenplan stammen. Das Muster in `config/auth.yaml` darf jetzt benennen,
+  wo das Fachkürzel steht (`(?P<fach>…)`) und wie die Gruppe heißen soll
+  (`(?P<bezeichnung>…)`); gesucht wird auch in `untis_codes` und `fach_code`.
+  Bereits angelegte Gruppen bekommen ihr Fach beim nächsten Login nachgetragen.
+- Konfigurationsdateien werden unabhängig vom Arbeitsverzeichnis gelesen. Betroffen
+  waren Drosselung, Artefaktgrenzen, Budgetstufen, Assistenten-Schema, Schuljahr
+  und Auth-Konfiguration.
+- Das Änderungsdatum eines Bausteins bleibt beim Bearbeiten nicht mehr stehen; ein
+  neu berechnetes Embedding zählt weiterhin nicht als Änderung.
+
+### Migration
+
+⚠️ **Migrieren, bevor die neuen Container starten:**
+
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+```
+
+`alembic upgrade head` führt `0061` aus.
+
+- **`0061`** — `personal_access_tokens`: Tabelle für die persönlichen Zugangstoken.
+  Bestandsdaten sind nicht betroffen.
 
 ## [0.9.0] – 2026-09-11
 
