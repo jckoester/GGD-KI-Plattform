@@ -29,6 +29,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Stundenplan-Abgleich suchte die passende Unterrichtsgruppe schulweit und konnte
   deshalb auf die Gruppe einer anderen Lehrkraft zeigen. Gesucht wird jetzt nur unter den
   eigenen Gruppen.
+- Auf den Infoseiten (Impressum, Datenschutz, Nutzungsregeln) blieb eine Fehlermeldung
+  stehen, wenn man von einer unbekannten Seite auf eine gültige wechselte.
 - Der Wochenmuster-Dialog zeigt unter „Was der Stundenplan hergab", welche Lerngruppen
   erkannt wurden, wohin sie zugeordnet sind, für welche noch eine Unterrichtsgruppe fehlt
   und welche Fachkürzel unbekannt sind. Bisher meldete er nur „nichts gefunden".

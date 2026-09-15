@@ -10,19 +10,27 @@
         regeln: 'Nutzungsregeln'
     };
 
-    let renderedContent = '';
-    let error = null;
-    let loading = true;
+    let renderedContent = $state('');
+    let error = $state(null);
+    let loading = $state(true);
 
-    $: {
-        const key = $page.params.key;
-        if (key && VALID_KEYS.includes(key)) {
-            loadText(key);
-        } else {
+    const schluessel = $derived($page.params.key);
+
+    // Läuft bei jedem Seitenwechsel erneut. Der Zustand wird dabei **zurückgesetzt**:
+    // Vorher blieb nach einem unbekannten Schlüssel die Fehlermeldung stehen, und die
+    // nächste, gültige Seite zeigte sie weiter — die Vorlage prüft `error` vor dem Inhalt.
+    $effect(() => {
+        const aktuell = schluessel;
+        error = null;
+        renderedContent = '';
+        if (!VALID_KEYS.includes(aktuell)) {
             error = 'Unbekannte Seite';
             loading = false;
+            return;
         }
-    }
+        loading = true;
+        loadText(aktuell);
+    });
 
     async function loadText(key) {
         try {
@@ -48,10 +56,10 @@
     {#if loading}
         <div class="text-center py-8">Laden...</div>
     {:else if error}
-        <div class="text-center py-8 text-red-500">{error}</div>
+        <div class="text-center py-8 text-light-re dark:text-dark-re">{error}</div>
     {:else}
         <h1 class="text-2xl font-semibold mb-6 text-light-tx dark:text-dark-tx">
-            {LABELS[$page.params.key] ?? $page.params.key}
+            {LABELS[schluessel] ?? schluessel}
         </h1>
         {#if renderedContent}
             <div class="prose dark:prose-invert max-w-none">
