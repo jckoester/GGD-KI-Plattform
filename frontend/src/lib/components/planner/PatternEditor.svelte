@@ -136,27 +136,68 @@
     rows = rows.map((r, idx) => idx === i ? { ...r, [key]: wert } : r)
   }
 
-  async function save() {
+  // Der Ablauf hat **eine** erwartete Reihenfolge: speichern, dann erzeugen. Bis
+  // 15.09.2026 waren das vier Knöpfe, und „Generieren" las das Muster aus der
+  // **Datenbank** — wer nach „Aus Stundenplan übernehmen" direkt darauf drückte, erzeugte
+  // Stunden aus dem alten Muster. Bei einer neuen Gruppe keine, bei einer bestehenden
+  // lautlos die falschen. Deshalb gibt es den Schritt einzeln nicht mehr.
+  const VORHANDEN = 'vorhanden'
+
+  const ERSETZEN_FRAGE =
+    'Für dieses Halbjahr gibt es bereits Stunden. Neu erzeugen ersetzt sie — Thema, ' +
+    'verknüpfte Unterrichtseinheit und Nachbereitungsstand gehen dabei verloren. ' +
+    'Ein Wiederherstellungspunkt wird angelegt. Fortfahren?'
+
+  /** Schreibt das Muster. Gibt zurück, ob es geklappt hat. */
+  async function speichern() {
     saving = true
     error = null
     try {
       const updated = await setWeekPattern(groupId, halbjahr, rows)
       onSaved(halbjahr, updated)
+      return true
     } catch (e) {
       error = e.message
+      return false
     } finally {
       saving = false
     }
   }
 
+  async function nurSpeichern() {
+    genSuccess = null
+    genWarnung = null
+    if (await speichern()) {
+      genSuccess = `Wochenmuster für HJ ${halbjahr} gespeichert. Vorhandene Stunden wurden nicht angetastet.`
+    }
+  }
+
+  async function speichernUndErzeugen() {
+    genSuccess = null
+    genWarnung = null
+    if (!(await speichern())) return
+
+    let ergebnis = await generate(false)
+    if (ergebnis === VORHANDEN) {
+      // Die Frage darf nicht wegfallen: Neu erzeugen löscht die Stunden des Halbjahres.
+      // Der Wiederherstellungspunkt ist eine Rückfahrkarte, keine Erlaubnis.
+      if (!confirm(ERSETZEN_FRAGE)) {
+        genSuccess =
+          `Wochenmuster für HJ ${halbjahr} gespeichert. Die vorhandenen Stunden blieben unverändert.`
+        return
+      }
+      ergebnis = await generate(true)
+    }
+    if (ergebnis === true) onClose()
+  }
+
+  /** `true` | `false` | `VORHANDEN` — Letzteres heißt: Es gibt schon Stunden (409). */
   async function generate(regenerate = false) {
     generating = true
     error = null
-    genSuccess = null
-    genWarnung = null
     try {
       const stats = await generateSlots(groupId, halbjahr, regenerate)
-      genSuccess = `${stats.created} Slots für HJ ${halbjahr} generiert.`
+      genSuccess = `${stats.created} Slots für HJ ${halbjahr} erzeugt.`
       if (stats.used_hj1_fallback) genSuccess += ' (HJ-1-Muster als Fallback verwendet)'
       // Als Warnung, nicht als Anhängsel: Über den Halbjahreswechsel hinweg ist die
       // A-/B-Phase die einzige Angabe, die um eine Woche danebenliegen kann.
@@ -166,8 +207,11 @@
           'um eine Woche verschoben sein — sobald der Stundenplan für das 2. Halbjahr ' +
           'steht, bitte einmal neu aus dem Stundenplan übernehmen.'
       onGenerated(stats, { regenerate, halbjahr })
+      return true
     } catch (e) {
+      if (e.status === 409 && !regenerate) return VORHANDEN
       error = e.message
+      return false
     } finally {
       generating = false
     }
@@ -388,39 +432,40 @@
       {/if}
 
       <!-- Aktionen -->
+      <!--
+        Zwei Knöpfe, nicht vier. Der Primärknopf ist der **Abschluss** des Ablaufs, nicht
+        sein mittlerer Schritt: speichern, erzeugen, schließen. „Generieren HJx" und „Neu
+        generieren" gab es bis 15.09.2026 einzeln — sie lasen das Muster aus der Datenbank
+        und erzeugten nach dem Übernehmen aus dem Stundenplan lautlos die falschen Stunden.
+      -->
       <div class="flex items-center justify-between pt-4 border-t border-light-ui-3 dark:border-dark-ui-3">
+        <button
+          onclick={onClose}
+          class="px-4 py-2 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
+        >Schließen</button>
         <div class="flex gap-2">
           <button
-            onclick={() => generate(false)}
-            disabled={generating || saving}
-            class="px-3 py-1.5 text-sm rounded-lg font-medium border border-light-ui-3 dark:border-dark-ui-3
-                   text-light-tx dark:text-dark-tx hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors
-                   disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Generieren HJ{halbjahr}
-          </button>
-          <button
-            onclick={() => generate(true)}
-            disabled={generating || saving}
-            class="px-3 py-1.5 text-sm rounded-lg font-medium border border-light-ui-3 dark:border-dark-ui-3
-                   text-light-tx dark:text-dark-tx hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors
-                   disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Neu generieren
-          </button>
-        </div>
-        <div class="flex gap-2">
-          <button
-            onclick={onClose}
-            class="px-4 py-2 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors"
-          >Schließen</button>
-          <button
-            onclick={save}
+            onclick={nurSpeichern}
             disabled={saving || generating}
+            class="px-4 py-2 text-sm rounded-lg font-medium border border-light-ui-3 dark:border-dark-ui-3
+                   text-light-tx dark:text-dark-tx hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors
+                   disabled:opacity-50 disabled:cursor-not-allowed"
+          >Nur speichern</button>
+          <!-- Ohne Zeilen gibt es nichts zu erzeugen: Der Lauf schriebe ein leeres Muster
+               und böte danach an, die vorhandenen Stunden durch **keine** zu ersetzen —
+               eine zerstörerische Kette hinter einem einzigen Klick. Ein Muster bewusst
+               leeren geht weiterhin über „Nur speichern". -->
+          <button
+            onclick={speichernUndErzeugen}
+            disabled={saving || generating || rows.length === 0}
             class="px-4 py-2 text-sm rounded-lg font-medium bg-primary dark:bg-primary-dark text-white
                    hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? 'Speichern…' : 'Muster speichern'}
+            {saving
+              ? 'Speichern…'
+              : generating
+                ? 'Stunden werden erzeugt…'
+                : 'Speichern und Stunden erzeugen'}
           </button>
         </div>
       </div>

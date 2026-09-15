@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Der Wochenmuster-Dialog schließt den Ablauf mit **einem** Knopf ab: „Speichern und
+  Stunden erzeugen" speichert das Muster, erzeugt die Stunden und schließt. Gibt es für
+  das Halbjahr schon Stunden, wird gefragt, bevor sie ersetzt werden. „Nur speichern"
+  bleibt daneben; „Generieren HJx" und „Neu generieren" entfallen.
+
+### Behoben
+
+- „Generieren" erzeugte die Stunden aus dem **gespeicherten** Muster. Wer ein aus dem
+  Stundenplan übernommenes Muster nicht vorher speicherte, bekam Stunden aus dem alten
+  Muster — bei einer neuen Gruppe keine.
+- „Muster speichern" gab keine Rückmeldung.
+
 ## [0.10.1] – 2026-09-15
 
 Schwerpunkt: **Stundenplan und Schuljahr**. Die Übernahme aus dem Stundenplan trägt
