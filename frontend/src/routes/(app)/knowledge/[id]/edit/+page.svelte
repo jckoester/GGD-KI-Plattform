@@ -20,6 +20,7 @@
     } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
     import {
+        auswahlMitBestand,
         myTeachingGroups,
         myFachschaften,
         gruppenFuerScope,
@@ -309,12 +310,22 @@
     // Unterrichtsgruppe. Bis 09/2026 stand hier für beides dieselbe Liste mit
     // Unterrichtsgruppen — die falsche Wahl wurde stumm gespeichert, weil das
     // Backend den Gruppentyp nicht prüft.
-    const gruppen = $derived({
-        unterricht: $myTeachingGroups,
+    //
+    // Unterrichtsgruppen: die aktuellen **plus die schon gewählte** (AP8 Schritt 2). Ein
+    // Baustein aus einem früheren Schuljahr behält damit seine Zuordnung — ohne den Zusatz
+    // setzte `gueltigeGruppenwahl` sie beim Öffnen auf `null`, und das nächste Speichern
+    // löschte sie, ohne dass jemand sie angefasst hätte. Je Scope getrennt, denn Lese- und
+    // Schreibgruppe können verschieden sein.
+    const readGruppen = $derived({
+        unterricht: auswahlMitBestand($myTeachingGroups, readScopeGroupId),
         fachschaften: $myFachschaften,
     });
-    const readGroupOptions = $derived(gruppenFuerScope(readScope, gruppen));
-    const writeGroupOptions = $derived(gruppenFuerScope(writeScope, gruppen));
+    const writeGruppen = $derived({
+        unterricht: auswahlMitBestand($myTeachingGroups, writeScopeGroupId),
+        fachschaften: $myFachschaften,
+    });
+    const readGroupOptions = $derived(gruppenFuerScope(readScope, readGruppen));
+    const writeGroupOptions = $derived(gruppenFuerScope(writeScope, writeGruppen));
 
     // Zurückgesetzt wird **beim Umschalten**, nicht in einem Effekt: Ein Effekt
     // liefe auch beim Laden und leerte dann die Gruppe eines bestehenden Knotens,
@@ -322,13 +333,13 @@
     function readScopeGewechselt() {
         readScopeGroupId = gueltigeGruppenwahl(
             readScopeGroupId,
-            gruppenFuerScope(readScope, gruppen),
+            gruppenFuerScope(readScope, readGruppen),
         );
     }
     function writeScopeGewechselt() {
         writeScopeGroupId = gueltigeGruppenwahl(
             writeScopeGroupId,
-            gruppenFuerScope(writeScope, gruppen),
+            gruppenFuerScope(writeScope, writeGruppen),
         );
     }
 

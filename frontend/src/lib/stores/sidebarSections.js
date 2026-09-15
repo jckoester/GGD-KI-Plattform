@@ -1,6 +1,6 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { myGroups, myTeachingGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, myGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
@@ -8,7 +8,7 @@ import { potentialTeachingGroups } from './potentialTeachingGroups.js'
 import { hiddenSubjectIds } from './subjectVisibility.js'
 
 export const sidebarSubjectSections = derived(
-  [user, subjectMap, myGroups, myTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups],
+  [user, subjectMap, myGroups, aktuelleTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups],
   ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds, $potential]) => {
     if (!$user) return []
 

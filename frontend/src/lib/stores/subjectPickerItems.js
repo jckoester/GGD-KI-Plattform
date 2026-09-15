@@ -1,11 +1,18 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { myGroups, myTeachingGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, myGroups, myTeachingGroups } from './myGroups.js'
 
 /**
  * Schüler: flache Liste mit Fach-Alias (teaching_group → Fachname).
  * Bei mehreren Gruppen desselben Fachs: qualifizierender Gruppenname-Zusatz.
  * Jedes Item: { type: 'group', id, subjectId, label, color }
+ *
+ * **Bewusst alle Gruppen, nicht nur die aktuellen** (AP8 Schritt 2, 15.09.2026). Für eine
+ * Schüler:in *ist* die Gruppe das Fach — fiele sie hier heraus, ließe sich das Fach nicht
+ * mehr anwählen. Bei Lehrkräften ist eine zu viel gezeigte Gruppe Unordnung, hier wäre
+ * eine zu wenig gezeigte ein Ausfall. Die Gruppen von Schüler:innen stammen ohnehin aus
+ * dem Schulkonto (immer aktuell) oder werden über die Klasse vererbt — und die
+ * Klassenzugehörigkeit endet mit dem Schuljahr von selbst.
  */
 export const studentPickerItems = derived(
   [myTeachingGroups, subjectMap],
@@ -30,9 +37,13 @@ export const studentPickerItems = derived(
  * Lehrkraft: Fächer mit eingerückten Unterrichtsgruppen.
  * Fächer: { type: 'subject', id, label, color }
  * Gruppen: { type: 'group', id, subjectId, label, color }
+ *
+ * Nur die Gruppen des laufenden Schuljahres: Wer hier eine frühere wählte, schriebe seinen
+ * Chat in ein vergangenes Schuljahr. Die **Fächer** kommen weiter aus allen Gruppen — ein
+ * Fach verschwindet nicht, nur weil dieses Jahr noch keine Gruppe darin Belege hat.
  */
 export const teacherPickerItems = derived(
-  [myGroups, myTeachingGroups, subjectMap],
+  [myGroups, aktuelleTeachingGroups, subjectMap],
   ([$myGroups, $myTeachingGroups, $subjectMap]) => {
     const allSubjectIds = [...new Set(
       $myGroups

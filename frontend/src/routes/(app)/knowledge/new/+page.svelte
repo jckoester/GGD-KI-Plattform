@@ -18,7 +18,7 @@
   import { createContextNode } from '$lib/api.js'
   import { user } from '$lib/stores/user.js'
   import {
-    myTeachingGroups,
+    aktuelleTeachingGroups,
     myFachschaften,
     gruppenFuerScope,
     gueltigeGruppenwahl,
@@ -183,7 +183,9 @@
   // Unterrichtsgruppe. Bis 09/2026 stand hier für beides dieselbe Liste mit
   // Unterrichtsgruppen — die falsche Wahl wurde stumm gespeichert, weil das
   // Backend den Gruppentyp nicht prüft.
-  const gruppen = $derived({ unterricht: $myTeachingGroups, fachschaften: $myFachschaften })
+  // Nur aktuelle Unterrichtsgruppen — ein neuer Baustein gehört nicht in ein
+  // vergangenes Schuljahr (AP8 Schritt 2).
+  const gruppen = $derived({ unterricht: $aktuelleTeachingGroups, fachschaften: $myFachschaften })
   const readGroupOptions = $derived(gruppenFuerScope(readScope, gruppen))
   const writeGroupOptions = $derived(gruppenFuerScope(writeScope, gruppen))
 

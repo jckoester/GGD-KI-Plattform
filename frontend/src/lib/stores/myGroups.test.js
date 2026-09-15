@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
-import { gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
+import { auswahlMitBestand, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -133,5 +133,37 @@ describe("aktuelle und frühere Unterrichtsgruppen", () => {
     const { aktuelleTeachingGroups } = await laden(GRUPPEN)
     expect(get(aktuelleTeachingGroups).every(g => g.type === "teaching_group")).toBe(true)
     vi.doUnmock("$lib/api.js")
+  })
+})
+
+
+describe("auswahlMitBestand", () => {
+  const ALLE = [
+    { id: 1, name: "aktuell", aktuell: true },
+    { id: 2, name: "früher", aktuell: false },
+    { id: 3, name: "auch aktuell", aktuell: true },
+  ]
+
+  it("zeigt für einen neuen Eintrag nur die aktuellen", () => {
+    expect(auswahlMitBestand(ALLE, null).map(g => g.id)).toEqual([1, 3])
+  })
+
+  it("behält die bereits gewählte frühere Gruppe", () => {
+    // Sonst setzte `gueltigeGruppenwahl` die Wahl auf null, und beim nächsten Speichern
+    // wäre die Zuordnung weg — ohne dass jemand sie angefasst hätte.
+    expect(auswahlMitBestand(ALLE, 2).map(g => g.id)).toEqual([1, 3, 2])
+  })
+
+  it("verdoppelt eine bereits aktuelle Wahl nicht", () => {
+    expect(auswahlMitBestand(ALLE, 1).map(g => g.id)).toEqual([1, 3])
+  })
+
+  it("erfindet nichts, wenn die gewählte Gruppe gar nicht dabei ist", () => {
+    expect(auswahlMitBestand(ALLE, 99).map(g => g.id)).toEqual([1, 3])
+  })
+
+  it("zeigt ohne das Feld alles — etwa die Gesamtliste des Admins", () => {
+    const ohneFeld = [{ id: 5, name: "fremde Gruppe" }]
+    expect(auswahlMitBestand(ohneFeld, null).map(g => g.id)).toEqual([5])
   })
 })

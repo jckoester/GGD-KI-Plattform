@@ -103,6 +103,26 @@ export function gruppenFuerScope(scope, { unterricht = [], fachschaften = [] } =
  * mehr zur Wahl, ihre Id aber noch im Formular. Ohne das Zurücksetzen ginge sie
  * mit `write_scope = subject` an den Server, wo nichts sie ablehnt.
  */
+/**
+ * Auswahlliste für einen **Editor**: die aktuellen Gruppen, plus die bereits gewählte.
+ *
+ * Ohne den Zusatz verschwände beim Bearbeiten eines Bausteins oder Assistenten aus einem
+ * früheren Schuljahr die Gruppe aus der Liste — und `gueltigeGruppenwahl` setzte die Wahl
+ * stillschweigend auf `null`. Beim nächsten Speichern wäre die Zuordnung weg, ohne dass
+ * jemand sie angefasst hätte.
+ *
+ * Für **neue** Einträge gibt es nichts zu bewahren; dort genügt die aktuelle Liste.
+ *
+ * @param {Array} gruppen      alle eigenen Gruppen (ungefiltert)
+ * @param {number|null} gewaehlteId
+ */
+export function auswahlMitBestand(gruppen, gewaehlteId) {
+  const aktuell = (gruppen ?? []).filter((g) => g.aktuell !== false)
+  if (gewaehlteId == null || aktuell.some((g) => g.id === gewaehlteId)) return aktuell
+  const bestand = (gruppen ?? []).find((g) => g.id === gewaehlteId)
+  return bestand ? [...aktuell, bestand] : aktuell
+}
+
 export function gueltigeGruppenwahl(id, gruppen) {
     return (gruppen ?? []).some((g) => g.id === id) ? id : null
 }

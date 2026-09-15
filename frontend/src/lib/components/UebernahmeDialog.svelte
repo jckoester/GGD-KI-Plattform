@@ -30,7 +30,7 @@
         gruppenFuerScope,
         gueltigeGruppenwahl,
         myFachschaften,
-        myTeachingGroups,
+        aktuelleTeachingGroups,
     } from "$lib/stores/myGroups.js"
     import {
         alsTagMonat,
@@ -62,8 +62,10 @@
 
     const optionen = $derived(typOptionen(vorschlag))
     const scopesFest = $derived(vorschlag?.scopes_erzwungen != null)
+    // Nur aktuelle Unterrichtsgruppen: Hier entsteht ein **neuer** Baustein, da gibt es
+    // keine bestehende Zuordnung zu bewahren (AP8 Schritt 2).
     const gruppen = $derived({
-        unterricht: $myTeachingGroups,
+        unterricht: $aktuelleTeachingGroups,
         fachschaften: $myFachschaften,
     })
     const readGruppen = $derived(gruppenFuerScope(readScope, gruppen))

@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import { auswahlMitBestand } from "$lib/stores/myGroups.js";
     import {
         Bot,
         Send,
@@ -416,7 +417,14 @@
 
         switch (scope) {
             case "teaching_group":
-                return groups.filter((g) => g.type === "teaching_group");
+                // Nur Gruppen des laufenden Schuljahres — plus die bereits gewählte, damit
+                // ein Assistent aus einem früheren Schuljahr seine Zuordnung behält
+                // (AP8 Schritt 2). Die Admin-Gesamtliste trägt kein `aktuell` und bleibt
+                // deshalb vollständig.
+                return auswahlMitBestand(
+                    groups.filter((g) => g.type === "teaching_group"),
+                    form.scope_group_id ? parseInt(form.scope_group_id) : null,
+                );
             case "subject_department":
                 return groups.filter((g) => g.type === "subject_department");
             case "activity_group":
