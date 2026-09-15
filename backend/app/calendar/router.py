@@ -260,7 +260,7 @@ async def week_patterns(
     # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
     # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
     # hier fällt auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
-    abgleich = await match_groups(db, [p.key for p in result.proposals])
+    abgleich = await match_groups(db, [p.key for p in result.proposals], pseudonym=_current.sub)
     # Eine Gruppe kann mehrere Muster-Schlüssel bündeln (M + MD).
     zuordnung = {k: s for s in abgleich.fehlend for k in s.keys}
     vorhanden = set(abgleich.vorhanden)
@@ -380,7 +380,7 @@ async def _stundenplan_abgleich(
         timegrid=raster,
         kein_unterricht=kein_unterricht_codes(),
     )
-    abgleich = await match_groups(db, [p.key for p in muster.proposals])
+    abgleich = await match_groups(db, [p.key for p in muster.proposals], pseudonym=pseudonym)
 
     # Nur Stunden, deren Lerngruppe einer vorhandenen Unterrichtsgruppe entspricht —
     # ohne `group_id` gibt es keinen Slot, den man ändern könnte.

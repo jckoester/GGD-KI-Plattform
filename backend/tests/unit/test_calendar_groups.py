@@ -40,13 +40,19 @@ def test_exakte_variante_kommt_vor_der_gekuerzten():
 # ── Fake-Datenbank ───────────────────────────────────────────────────────────
 
 
+# Wer abruft. Die Gruppen der FakeDB tragen ihre Lehrkraft, weil `match_groups` seit dem
+# 15.09.2026 nur noch unter den **eigenen** Gruppen sucht.
+LEHRKRAFT = "pseudo-ich"
+KOLLEGIN = "pseudo-andere"
+
+
 class FakeDB:
     """Nur so viel Datenbank, wie `resolve_subject` und `match_groups` brauchen."""
 
     def __init__(self, subjects, groups=()):
         # subjects: [(id, slug, fach_code, untis_codes)]
         self.subjects = subjects
-        self.groups = list(groups)   # [(id, name, subject_id)]
+        self.groups = list(groups)   # [(id, name, subject_id, pseudonym, rolle)]
 
     async def scalar(self, stmt):
         beschreibung = str(stmt)
@@ -80,8 +86,13 @@ class FakeDB:
         return None
 
     async def execute(self, stmt):
-        werte = _werte(stmt)
-        subject_id = werte[-1] if werte else None
+        # Über die **Namen** der gebundenen Parameter, nicht über ihre Position: Der
+        # Mitgliedschafts-Join hat die Reihenfolge verschoben, und `werte[-1]` traf danach
+        # die Rolle statt der Fach-ID.
+        gebunden = _gebunden(stmt)
+        subject_id = gebunden.get("subject_id_1")
+        pseudonym = gebunden.get("pseudonym_1")
+        rolle = gebunden.get("role_in_group_1")
 
         class Result:
             def __init__(self, rows):
@@ -90,8 +101,17 @@ class FakeDB:
             def all(self):
                 return self._rows
 
+        # Fehlt eine Bedingung im Statement, filtert die Attrappe auch nicht danach —
+        # sonst verhielte sich eine **entfernte** Einschränkung wie eine vorhandene, und
+        # der Wächter darüber liefe ins Leere. (Genau das war am 15.09.2026 der Fall.)
         return Result(
-            [(gid, name) for gid, name, sid in self.groups if sid == subject_id]
+            [
+                (gid, name)
+                for gid, name, sid, lehrkraft, mitgliedsrolle in self.groups
+                if sid == subject_id
+                and (pseudonym is None or lehrkraft == pseudonym)
+                and (rolle is None or mitgliedsrolle == rolle)
+            ]
         )
 
 
@@ -102,6 +122,11 @@ def _werte(stmt):
         for p in stmt.compile().binds.values()
         if p.value is not None
     ]
+
+
+def _gebunden(stmt) -> dict:
+    """Die gebundenen Parameter nach ihrem Namen (`subject_id_1`, `pseudonym_1`, …)."""
+    return {name: p.value for name, p in stmt.compile().binds.items()}
 
 
 SUBJECTS = [
@@ -155,7 +180,7 @@ def key(fach, klassen, gruppe=None):
 
 @pytest.mark.asyncio
 async def test_fehlende_gruppe_wird_vorgeschlagen():
-    ergebnis = await match_groups(FakeDB(SUBJECTS), [key("M", ("5C",))])
+    ergebnis = await match_groups(FakeDB(SUBJECTS), [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.fehlend) == 1
     vorschlag = ergebnis.fehlend[0]
     assert vorschlag.subject_id == 1
@@ -165,16 +190,57 @@ async def test_fehlende_gruppe_wird_vorgeschlagen():
 @pytest.mark.asyncio
 async def test_vorhandene_gruppe_wird_nicht_vorgeschlagen():
     """Vorgeschlagen wird nur, was fehlt — sonst entstünden Dubletten."""
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1)])
-    ergebnis = await match_groups(db, [key("M", ("5C",))])
+    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "teacher")])
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.fehlend == []
     assert len(ergebnis.vorhanden) == 1
 
 
 @pytest.mark.asyncio
+async def test_gruppe_einer_kollegin_zaehlt_nicht_als_treffer():
+    """Gesucht wird nur unter den eigenen Gruppen.
+
+    Bis zum 15.09.2026 lief die Suche schulweit. Ein passender Name genügte, und der
+    Vorschlag zeigte auf eine fremde Gruppe — wohin die Lehrkraft dann ihr Wochenmuster
+    geschrieben hätte und wohin der tägliche Abgleich Entfall und Vertretung getragen
+    hätte. Aufgefallen wäre es zuerst der Kollegin, in deren Jahresplanung fremde
+    Änderungen auftauchen.
+    """
+    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, KOLLEGIN, "teacher")])
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
+    assert ergebnis.vorhanden == []
+    assert ergebnis.zuordnung == {}
+    assert len(ergebnis.fehlend) == 1, "die eigene Gruppe fehlt tatsächlich"
+
+
+@pytest.mark.asyncio
+async def test_gleichnamige_gruppen_zweier_lehrkraefte_treffen_die_eigene():
+    """Derselbe Name, zwei Lehrkräfte — der Namensabgleich allein entschiede falsch."""
+    db = FakeDB(
+        SUBJECTS,
+        groups=[(10, "Mathematik 5c", 1, KOLLEGIN, "teacher"), (11, "Mathematik 5c", 1, LEHRKRAFT, "teacher")],
+    )
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
+    assert list(ergebnis.zuordnung.values()) == [11]
+
+
+@pytest.mark.asyncio
+async def test_mitgliedschaft_ohne_lehrkraft_rolle_zaehlt_nicht():
+    """Dieselbe Bedingung wie in `require_group_teacher`: Mitglied **als Lehrkraft**.
+
+    Eine Unterrichtsgruppe enthält auch ihre Schüler:innen. Ohne die Rollenbedingung
+    entschiede eine beliebige Mitgliedschaft über den Treffer.
+    """
+    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "student")])
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
+    assert ergebnis.vorhanden == []
+    assert len(ergebnis.fehlend) == 1
+
+
+@pytest.mark.asyncio
 async def test_gruppe_eines_anderen_fachs_zaehlt_nicht_als_treffer():
-    db = FakeDB(SUBJECTS, groups=[(10, "Ethik 5c", 2)])
-    ergebnis = await match_groups(db, [key("M", ("5C",))])
+    db = FakeDB(SUBJECTS, groups=[(10, "Ethik 5c", 2, LEHRKRAFT, "teacher")])
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.fehlend) == 1
 
 
@@ -187,7 +253,9 @@ async def test_unbekanntes_fach_wird_gemeldet():
     hinterlassen.
     """
     ergebnis = await match_groups(
-        FakeDB(SUBJECTS), [key("PRÄS", ("PRÄ",)), key("PRÄS", ("PRÄ",)), key("M", ("5C",))]
+        FakeDB(SUBJECTS),
+        [key("PRÄS", ("PRÄ",)), key("PRÄS", ("PRÄ",)), key("M", ("5C",))],
+        pseudonym=LEHRKRAFT,
     )
     assert [u.code for u in ergebnis.unbekannte_faecher] == ["PRÄS"]
     assert ergebnis.unbekannte_faecher[0].klassen == ("PRÄ",)
@@ -199,21 +267,21 @@ async def test_unbekanntes_fach_wird_gemeldet():
 async def test_haeufigkeit_wird_mitgezaehlt():
     """Damit sich beurteilen lässt, ob ein unbekanntes Kürzel Pflege lohnt."""
     schluessel = key("PRÄS", ("PRÄ",))
-    ergebnis = await match_groups(FakeDB(SUBJECTS), [schluessel, schluessel, schluessel])
+    ergebnis = await match_groups(FakeDB(SUBJECTS), [schluessel, schluessel, schluessel], pseudonym=LEHRKRAFT)
     assert ergebnis.unbekannte_faecher[0].stunden == 3
 
 
 @pytest.mark.asyncio
 async def test_ohne_klasse_getrennt_gemeldet():
     """Kein Fachproblem, sondern ein Datenproblem — deshalb ein eigener Topf."""
-    ergebnis = await match_groups(FakeDB(SUBJECTS), [key("M", ())])
+    ergebnis = await match_groups(FakeDB(SUBJECTS), [key("M", ())], pseudonym=LEHRKRAFT)
     assert ergebnis.ohne_klasse and not ergebnis.fehlend
     assert not ergebnis.unbekannte_faecher
 
 
 @pytest.mark.asyncio
 async def test_ohne_fach_getrennt_gemeldet():
-    ergebnis = await match_groups(FakeDB(SUBJECTS), [key(None, ("5C",))])
+    ergebnis = await match_groups(FakeDB(SUBJECTS), [key(None, ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.ohne_klasse and not ergebnis.unbekannte_faecher
 
 
@@ -221,7 +289,9 @@ async def test_ohne_fach_getrennt_gemeldet():
 async def test_gruppe_ueber_mehrere_klassen():
     """Ethik wird klassenübergreifend unterrichtet — der Vorschlag nennt alle."""
     ergebnis = await match_groups(
-        FakeDB(SUBJECTS), [key("ET", ("5A", "5B", "5C"), gruppe="ET_5_BU")]
+        FakeDB(SUBJECTS),
+        [key("ET", ("5A", "5B", "5C"), gruppe="ET_5_BU")],
+        pseudonym=LEHRKRAFT,
     )
     assert ergebnis.fehlend[0].class_names == ("5A", "5B", "5C")
 
@@ -289,6 +359,7 @@ async def test_basis_und_leistungskurs_sind_zwei_gruppen():
     ergebnis = await match_groups(
         FakeDB(SUBJECTS + [(5, "biologie", "BIO", ["BIO"])]),
         [key("bio", ("11",)), key("BIO", ("11",))],
+        pseudonym=LEHRKRAFT,
     )
     assert len(ergebnis.fehlend) == 2
     arten = {v.kursart for v in ergebnis.fehlend}
@@ -303,9 +374,9 @@ async def test_basis_und_leistungskurs_sind_zwei_gruppen():
 async def test_gruppe_mit_kursart_im_namen_trifft_genau():
     db = FakeDB(
         SUBJECTS + [(5, "biologie", "BIO", ["BIO"])],
-        groups=[(10, "Biologie 11 Basiskurs", 5)],
+        groups=[(10, "Biologie 11 Basiskurs", 5, LEHRKRAFT, "teacher")],
     )
-    ergebnis = await match_groups(db, [key("bio", ("11",)), key("BIO", ("11",))])
+    ergebnis = await match_groups(db, [key("bio", ("11",)), key("BIO", ("11",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.vorhanden) == 1
     assert len(ergebnis.fehlend) == 1
     assert ergebnis.fehlend[0].kursart == LEISTUNGSKURS
@@ -320,9 +391,9 @@ async def test_gruppe_ohne_kursart_wird_als_mehrdeutig_gemeldet():
     """
     db = FakeDB(
         SUBJECTS + [(5, "biologie", "BIO", ["BIO"])],
-        groups=[(10, "Biologie 11", 5)],
+        groups=[(10, "Biologie 11", 5, LEHRKRAFT, "teacher")],
     )
-    ergebnis = await match_groups(db, [key("bio", ("11",))])
+    ergebnis = await match_groups(db, [key("bio", ("11",))], pseudonym=LEHRKRAFT)
     assert ergebnis.fehlend           # Vorschlag bleibt stehen
     assert ergebnis.mehrdeutig
     assert "Kursart" in ergebnis.mehrdeutig[0]
@@ -331,8 +402,8 @@ async def test_gruppe_ohne_kursart_wird_als_mehrdeutig_gemeldet():
 @pytest.mark.asyncio
 async def test_sek_eins_braucht_keine_kursart():
     """Dort gibt es die Unterscheidung nicht — der Name bleibt schlicht."""
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1)])
-    ergebnis = await match_groups(db, [key("M", ("5C",))])
+    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "teacher")])
+    ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.vorhanden and not ergebnis.mehrdeutig
 
 
@@ -393,6 +464,7 @@ async def test_studentgroup_trennt_gleiches_fach_in_gleicher_klasse():
             key("SPM", ("7A", "7D"), gruppe="SPM_7_RO"),
             key("SPW", ("7A", "7D"), gruppe="SPW_7_GÜN"),
         ],
+        pseudonym=LEHRKRAFT,
     )
     namen = sorted(v.vorschlag_name for v in ergebnis.fehlend)
     assert namen == ["sport 7A/7D [SPM]", "sport 7A/7D [SPW]"]
@@ -410,7 +482,7 @@ async def test_differenzierungsstunde_ist_dieselbe_gruppe():
     Kursstufen-Bezug — ohne `studentGroup` ist es immer regulärer Klassenunterricht.
     """
     db = FakeDB(SUBJECTS)
-    ergebnis = await match_groups(db, [key("M", ("5C",)), key("MD", ("5C",))])
+    ergebnis = await match_groups(db, [key("M", ("5C",)), key("MD", ("5C",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.fehlend) == 1
     vorschlag = ergebnis.fehlend[0]
     assert vorschlag.vorschlag_name == "mathematik 5C"
@@ -424,7 +496,9 @@ async def test_parallelkurse_der_kursstufe_bleiben_getrennt():
     """`M1` und `M2` in 11 — zwei Kurse, je eigenes `studentGroup`."""
     db = FakeDB(SUBJECTS)
     ergebnis = await match_groups(
-        db, [key("M1", ("11",), gruppe="M1_11"), key("M2", ("11",), gruppe="M2_11")]
+        db,
+        [key("M1", ("11",), gruppe="M1_11"), key("M2", ("11",), gruppe="M2_11")],
+        pseudonym=LEHRKRAFT,
     )
     assert len(ergebnis.fehlend) == 2
 
@@ -434,6 +508,8 @@ async def test_eindeutige_namen_bleiben_schlicht():
     """Der Zusatz erscheint nur, wo er gebraucht wird."""
     db = FakeDB(SUBJECTS + [SPORT])
     ergebnis = await match_groups(
-        db, [key("SPW", ("7A",), gruppe="SPW_7_KA"), key("M", ("5C",))]
+        db,
+        [key("SPW", ("7A",), gruppe="SPW_7_KA"), key("M", ("5C",))],
+        pseudonym=LEHRKRAFT,
     )
     assert all("[" not in v.vorschlag_name for v in ergebnis.fehlend)

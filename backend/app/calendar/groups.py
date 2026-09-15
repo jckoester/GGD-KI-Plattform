@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calendar.patterns import GroupKey
-from app.db.models import Group, Subject
+from app.db.models import Group, GroupMembership, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -223,12 +223,19 @@ def _gruppenidentitaet(
     return ("fach", subject_id, key.class_names, art)
 
 
-async def match_groups(db: AsyncSession, keys: list[GroupKey]) -> GroupMatchResult:
+async def match_groups(
+    db: AsyncSession, keys: list[GroupKey], *, pseudonym: str
+) -> GroupMatchResult:
     """Abgeglichene und fehlende Unterrichtsgruppen zu den erkannten Lerngruppen.
 
     Abgeglichen wird über **Fach + Klasse** — dieselbe Kombination, die auch der
     SSO-Gruppenimport als Identität verwendet. Der Gruppenname aus dem Stundenplan taugt
     dafür nicht: Er heißt dort `ET_5_BU` und in der Plattform `Ethik 5b`.
+
+    `pseudonym` ist keine Nebensache und deshalb ein Pflichtargument: Gesucht wird
+    ausschließlich unter den **eigenen** Unterrichtsgruppen. Bis zum 15.09.2026 lief die
+    Suche schulweit — ein Vorschlag konnte auf die Gruppe einer Kollegin zeigen, und der
+    tägliche Abgleich hätte Entfall und Vertretung in deren Jahresplanung geschrieben.
     """
     ergebnis = GroupMatchResult()
     unbekannt: dict[str, list[GroupKey]] = {}
@@ -271,7 +278,9 @@ async def match_groups(db: AsyncSession, keys: list[GroupKey]) -> GroupMatchResu
         art = eintrag["kursart"]
         klassen = eintrag["class_names"]
         slug = await db.scalar(select(Subject.slug).where(Subject.id == subject_id))
-        treffer, mehrdeutig = await _vorhandene_gruppe(db, subject_id, klassen, art)
+        treffer, mehrdeutig = await _vorhandene_gruppe(
+            db, subject_id, klassen, art, pseudonym
+        )
         if mehrdeutig:
             ergebnis.mehrdeutig.append(
                 f"{slug} {'/'.join(klassen)}: Es gibt eine Gruppe ohne Angabe der "
@@ -343,9 +352,15 @@ async def _vorhandene_gruppe(
     db: AsyncSession,
     subject_id: int,
     class_names: tuple[str, ...],
-    art: str = REGULAER,
+    art: str,
+    pseudonym: str,
 ) -> tuple[int | None, bool]:
-    """Passende `teaching_group` und ob die Zuordnung mehrdeutig ist.
+    """Passende **eigene** `teaching_group` und ob die Zuordnung mehrdeutig ist.
+
+    Gesucht wird nur unter den Gruppen, in denen die Lehrkraft selbst als `teacher`
+    eingetragen ist — dieselbe Bedingung, an der auch `require_group_teacher` den Zugriff
+    entscheidet. Das ist nicht nur eine Absicherung, sondern verkleinert die Kandidatenmenge
+    von „alle Gruppen dieses Fachs an der Schule" auf „meine" — meist eine einzige.
 
     Der Abgleich über den Namen ist grob, aber die einzige verfügbare Brücke: Die
     Plattform speichert bei Unterrichtsgruppen keine Klassenzugehörigkeit, sondern nur
@@ -359,8 +374,13 @@ async def _vorhandene_gruppe(
     stillschweigend geraten zu werden.
     """
     kandidaten = await db.execute(
-        select(Group.id, Group.name).where(
-            Group.type == "teaching_group", Group.subject_id == subject_id
+        select(Group.id, Group.name)
+        .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .where(
+            Group.type == "teaching_group",
+            Group.subject_id == subject_id,
+            GroupMembership.pseudonym == pseudonym,
+            GroupMembership.role_in_group == "teacher",
         )
     )
     mehrdeutig = False

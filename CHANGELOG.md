@@ -26,6 +26,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Übernimmt die Slot-Erzeugung mangels eigener Muster die des 1. Halbjahrs, wird bei
   14-tägigen Terminen ausdrücklich gewarnt.
 - Der Ferienkalender-Import überschreibt `ab_zaehlung` nicht mehr mit der Vorgabe.
+- Der Stundenplan-Abgleich suchte die passende Unterrichtsgruppe schulweit und konnte
+  deshalb auf die Gruppe einer anderen Lehrkraft zeigen. Gesucht wird jetzt nur unter den
+  eigenen Gruppen.
 
 ## [0.10.0] – 2026-09-14
 
