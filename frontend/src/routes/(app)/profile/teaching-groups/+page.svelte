@@ -1,8 +1,12 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
-    import { ArrowLeft, Check, Trash2, X } from "lucide-svelte";
-    import { myTeachingGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
+    import { ArrowLeft, Check, ChevronRight, Trash2, X } from "lucide-svelte";
+    import {
+        aktuelleTeachingGroups,
+        fruehereTeachingGroups,
+        refreshMyGroups,
+    } from "$lib/stores/myGroups.js";
     import {
         potentialTeachingGroups,
         refreshPotentialTeachingGroups,
@@ -130,78 +134,42 @@
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
                 Wird geladen...
             </p>
-        {:else if $myTeachingGroups.length === 0}
+        {:else if $aktuelleTeachingGroups.length === 0}
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-                Du hast noch keine Unterrichtsgruppen.
+                {$fruehereTeachingGroups.length > 0
+                    ? "Für dieses Schuljahr hast du noch keine Unterrichtsgruppen."
+                    : "Du hast noch keine Unterrichtsgruppen."}
             </p>
         {:else}
             <div class="space-y-3">
-                {#each $myTeachingGroups as group (group.id)}
-                    {@const subj = group.subject_id
-                        ? $subjectMap[group.subject_id]
-                        : null}
-                    {@const href = subj
-                        ? `/subjects/${subj.slug}/groups/${group.id}`
-                        : null}
-                    <div
-                        class="flex items-center justify-between p-3 rounded-lg
-                      bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-2 dark:border-dark-ui-2"
-                    >
-                        <div class="flex items-center gap-3 min-w-0">
-                            {#if subj}
-                                <SubjectIcon
-                                    name={subj.icon}
-                                    size={20}
-                                    color={subj.color}
-                                />
-                            {/if}
-                            <div class="min-w-0">
-                                {#if href}
-                                    <a
-                                        {href}
-                                        class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl transition-colors truncate block"
-                                    >
-                                        {group.name}
-                                    </a>
-                                {:else}
-                                    <p
-                                        class="font-medium text-light-tx dark:text-dark-tx truncate"
-                                    >
-                                        {group.name}
-                                    </p>
-                                {/if}
-                                {#if subj}
-                                    <p
-                                        class="text-xs text-light-tx-2 dark:text-dark-tx-2"
-                                    >
-                                        {subj.name}
-                                    </p>
-                                {/if}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span
-                                class="text-xs px-2 py-0.5 rounded-full
-                          {group.sso_group_id
-                                    ? 'bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2'
-                                    : 'bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark'}"
-                            >
-                                {group.sso_group_id ? "SSO" : "Manuell"}
-                            </span>
-                            {#if !group.sso_group_id}
-                                <button
-                                    onclick={() => handleDeleteGroup(group.id)}
-                                    class="p-1.5 rounded-lg text-light-re dark:text-dark-re
-                         hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
-                                    title="Löschen"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            {/if}
-                        </div>
-                    </div>
+                {#each $aktuelleTeachingGroups as group (group.id)}
+                    {@render gruppenzeile(group)}
                 {/each}
             </div>
+        {/if}
+
+        <!-- Frühere Schuljahre: eingeklappt, nicht verborgen. Eine Fehleinschätzung der
+             Regel bleibt damit folgenlos — und sobald die Gruppe im laufenden Schuljahr
+             Stunden oder einen Jahresplan hat, ordnet sie sich von selbst wieder oben
+             ein. -->
+        {#if $fruehereTeachingGroups.length > 0}
+            <details class="mt-4 group">
+                <summary
+                    class="flex items-center gap-1 cursor-pointer text-sm text-light-tx-2 dark:text-dark-tx-2
+                           hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                >
+                    <ChevronRight
+                        size={16}
+                        class="transition-transform group-open:rotate-90"
+                    />
+                    Aus früheren Schuljahren ({$fruehereTeachingGroups.length})
+                </summary>
+                <div class="space-y-3 mt-3">
+                    {#each $fruehereTeachingGroups as group (group.id)}
+                        {@render gruppenzeile(group)}
+                    {/each}
+                </div>
+            </details>
         {/if}
     </section>
 
@@ -352,3 +320,65 @@
     </section>
     
 </PageBody>
+
+{#snippet gruppenzeile(group)}
+    {@const subj = group.subject_id ? $subjectMap[group.subject_id] : null}
+    {@const href = subj ? `/subjects/${subj.slug}/groups/${group.id}` : null}
+                    <div
+        class="flex items-center justify-between p-3 rounded-lg
+      bg-light-bg-2 dark:bg-dark-bg-2 border border-light-ui-2 dark:border-dark-ui-2"
+    >
+        <div class="flex items-center gap-3 min-w-0">
+            {#if subj}
+                <SubjectIcon
+                    name={subj.icon}
+                    size={20}
+                    color={subj.color}
+                />
+            {/if}
+            <div class="min-w-0">
+                {#if href}
+                    <a
+        {href}
+        class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl transition-colors truncate block"
+                    >
+        {group.name}
+                    </a>
+                {:else}
+                    <p
+        class="font-medium text-light-tx dark:text-dark-tx truncate"
+                    >
+        {group.name}
+                    </p>
+                {/if}
+                {#if subj || group.letztes_schuljahr}
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                        {[subj?.name, group.letztes_schuljahr]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </p>
+                {/if}
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <span
+                class="text-xs px-2 py-0.5 rounded-full
+          {group.sso_group_id
+                    ? 'bg-light-ui-3 dark:bg-dark-ui-3 text-light-tx-2 dark:text-dark-tx-2'
+                    : 'bg-primary/10 dark:bg-primary-dark/10 text-primary dark:text-primary-dark'}"
+            >
+                {group.sso_group_id ? "SSO" : "Manuell"}
+            </span>
+            {#if !group.sso_group_id}
+                <button
+                    onclick={() => handleDeleteGroup(group.id)}
+                    class="p-1.5 rounded-lg text-light-re dark:text-dark-re
+         hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
+                    title="Löschen"
+                >
+                    <Trash2 size={16} />
+                </button>
+            {/if}
+        </div>
+    </div>
+{/snippet}

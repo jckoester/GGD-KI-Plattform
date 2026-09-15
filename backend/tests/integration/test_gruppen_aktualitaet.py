@@ -90,6 +90,12 @@ async def _meine(client, headers) -> dict:
     return {g["name"]: g["aktuell"] for g in resp.json()["items"]}
 
 
+async def _rohdaten(client, headers) -> dict:
+    resp = await client.get("/groups/me", headers=headers)
+    assert resp.status_code == 200, resp.text
+    return {g["name"]: g for g in resp.json()["items"]}
+
+
 async def test_beide_belege_zaehlen(test_client, auth_headers, welt):
     """Stunden und Planung entstehen zu verschiedenen Zeitpunkten — der Jahresplan beim
     ersten Öffnen der Planung, die Stunden erst mit dem Stundenraster. Wer nur einen
@@ -113,3 +119,36 @@ async def test_gruppe_aus_dem_schulkonto_bleibt_aktuell(test_client, auth_header
 async def test_frisch_angelegte_gruppe_bleibt_aktuell(test_client, auth_headers, welt):
     aktuell = await _meine(test_client, auth_headers)
     assert aktuell["AP8 frisch"] is True
+
+
+async def test_fruehere_gruppe_nennt_ihr_letztes_schuljahr(
+    test_client, auth_headers, welt, async_engine
+):
+    """Nach drei Jahren gibt es „Mathematik 9C" dreimal — der Name unterscheidet sie nicht.
+
+    Die Jahreszahl kommt aus der eigenen Planung, nicht aus einer Spalte an `groups`: Die
+    Gruppe weiß nicht, wann sie gelebt hat, ihre Jahrespläne schon.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as s:
+        s.add(ContextNode(
+            category="artifact", content_type="jahresplan", title="AP8 Altplan",
+            owner_pseudonym=TEACHER1_PSEUDO, read_scope="group", write_scope="group",
+            read_scope_group_id=welt["ohne_beleg"],
+            write_scope_group_id=welt["ohne_beleg"],
+            subject_id=welt["fach"], schuljahr="2025/26", status="active",
+        ))
+        await s.commit()
+
+    gruppen = await _rohdaten(test_client, auth_headers)
+    assert gruppen["AP8 ohne_beleg"]["aktuell"] is False
+    assert gruppen["AP8 ohne_beleg"]["letztes_schuljahr"] == "2025/26"
+
+
+async def test_aktuelle_gruppen_tragen_keine_jahresangabe(
+    test_client, auth_headers, welt
+):
+    """Für sie sagt sie nichts — und eine Zahl, die nichts sagt, steht nur im Weg."""
+    gruppen = await _rohdaten(test_client, auth_headers)
+    assert gruppen["AP8 mit_planung"]["aktuell"] is True
+    assert gruppen["AP8 mit_planung"]["letztes_schuljahr"] is None

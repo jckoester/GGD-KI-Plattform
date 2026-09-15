@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.config import SsoConfig
@@ -61,6 +61,10 @@ class MyGroupOut(GroupOut):
     # nicht in `GroupOut`: Für die Gesamtliste aller Schulgruppen wäre die Frage weder
     # sinnvoll noch billig zu beantworten.
     aktuell: bool
+    # Das jüngste Schuljahr, aus dem eigene Planung an dieser Gruppe hängt — nur für
+    # frühere Gruppen gefüllt und auch dort nur, wenn es etwas zu sagen gibt. Eine
+    # geratene Jahreszahl wäre schlechter als keine (dieselbe Regel wie im Archiv).
+    letztes_schuljahr: Optional[str] = None
 
 
 class MyGroupsResponse(BaseModel):
@@ -127,6 +131,34 @@ async def gruppen_mit_beleg(
     return {zeile[0] for zeile in zeilen.all()}
 
 
+async def letztes_schuljahr(
+    db: AsyncSession, gruppen_ids: list[int]
+) -> dict[int, str]:
+    """Das jüngste Schuljahr, aus dem Planung an diesen Gruppen hängt.
+
+    Nur für **frühere** Gruppen gedacht: Dort unterscheidet die Jahreszahl, was der Name
+    nicht unterscheidet — „Mathematik 9C" gibt es nach drei Jahren dreimal.
+
+    Die Gruppe selbst weiß nicht, wann sie gelebt hat; ihre Jahrespläne schon. Fehlt die
+    Angabe, fehlt sie — geraten wird nicht.
+    """
+    if not gruppen_ids:
+        return {}
+    zeilen = await db.execute(
+        select(
+            ContextNode.write_scope_group_id,
+            sa_func.max(ContextNode.schuljahr),
+        )
+        .where(
+            ContextNode.write_scope_group_id.in_(gruppen_ids),
+            ContextNode.schuljahr.is_not(None),
+            ContextNode.status == "active",
+        )
+        .group_by(ContextNode.write_scope_group_id)
+    )
+    return {gid: jahr for gid, jahr in zeilen.all() if jahr}
+
+
 @router.get("/me", response_model=MyGroupsResponse)
 async def list_my_groups(
     current_user: JwtPayload = Depends(get_current_user),
@@ -151,14 +183,20 @@ async def list_my_groups(
     beleg = await gruppen_mit_beleg(
         db, [g.id for g in gruppen if g.type == "teaching_group"], cfg
     )
+    aktualitaet = {g.id: ist_aktuell(g, beleg, cfg) for g in gruppen}
+    # Nur für die früheren nachschlagen — für die aktuellen sagt die Jahreszahl nichts.
+    jahre = await letztes_schuljahr(
+        db, [g.id for g in gruppen if not aktualitaet[g.id]]
+    )
     return MyGroupsResponse(
         items=[
-            # Erst `GroupOut` aus dem ORM-Objekt, dann das Kennzeichen daneben. Direkt
+            # Erst `GroupOut` aus dem ORM-Objekt, dann die Zusätze daneben. Direkt
             # `MyGroupOut.model_validate(gruppe)` schlägt fehl — `aktuell` gibt es am
             # Modell nicht, und die Validierung verlangt es.
             MyGroupOut(
                 **GroupOut.model_validate(g, from_attributes=True).model_dump(),
-                aktuell=ist_aktuell(g, beleg, cfg),
+                aktuell=aktualitaet[g.id],
+                letztes_schuljahr=jahre.get(g.id),
             )
             for g in gruppen
         ]

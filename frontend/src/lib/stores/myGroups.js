@@ -38,6 +38,31 @@ export const myTeachingGroups = derived(_myGroups, $g =>
 )
 
 /**
+ * Die Unterrichtsgruppen des **laufenden** Schuljahres.
+ *
+ * Welche das sind, entscheidet das Backend (`ist_aktuell` in `app/api/groups.py`) und
+ * nicht die Oberfläche: Die Regel liest Stunden, Planung, Herkunft und Anlagedatum —
+ * nichts davon steht hier zur Verfügung. Das Frontend trennt nur, was ihm gesagt wurde.
+ *
+ * `aktuell !== false` statt `aktuell === true`: Eine ältere Antwort ohne das Feld soll
+ * alles zeigen, nicht nichts.
+ */
+export const aktuelleTeachingGroups = derived(myTeachingGroups, $g =>
+  $g.filter(g => g.aktuell !== false)
+)
+
+/**
+ * Die Unterrichtsgruppen früherer Schuljahre — was nicht aktuell ist.
+ *
+ * Sie werden **eingeklappt** gezeigt, nicht verborgen. Damit ist eine Fehleinschätzung
+ * folgenlos: Wer die Gruppe doch braucht, klappt auf; sobald sie Stunden oder einen
+ * Jahresplan im laufenden Schuljahr hat, ordnet sie sich von selbst wieder ein.
+ */
+export const fruehereTeachingGroups = derived(myTeachingGroups, $g =>
+  $g.filter(g => g.aktuell === false)
+)
+
+/**
  * Nur eigene Fachschaften (`subject_department`), nach Fachname sortierbar über
  * `subject_id`.
  *

@@ -90,3 +90,48 @@ describe("myGroupsGeladen", () => {
     vi.doUnmock("$lib/api.js")
   })
 })
+
+
+// ── Aktuelle und frühere Gruppen (AP8) ──────────────────────────────────────
+
+describe("aktuelle und frühere Unterrichtsgruppen", () => {
+  const laden = async (items) => {
+    vi.resetModules()
+    vi.doMock("$lib/api.js", () => ({
+      getMyGroups: () => Promise.resolve({ items }),
+    }))
+    const mod = await import("./myGroups.js")
+    await mod.refreshMyGroups()
+    return mod
+  }
+
+  const GRUPPEN = [
+    { id: 1, name: "Mathe 10a", type: "teaching_group", subject_id: 1, aktuell: true },
+    { id: 2, name: "Mathe 9c", type: "teaching_group", subject_id: 1, aktuell: false,
+      letztes_schuljahr: "2025/26" },
+    { id: 3, name: "Fachschaft", type: "subject_department", subject_id: 1, aktuell: true },
+  ]
+
+  it("trennt nach dem Kennzeichen des Backends", async () => {
+    const { aktuelleTeachingGroups, fruehereTeachingGroups } = await laden(GRUPPEN)
+    expect(get(aktuelleTeachingGroups).map(g => g.id)).toEqual([1])
+    expect(get(fruehereTeachingGroups).map(g => g.id)).toEqual([2])
+    vi.doUnmock("$lib/api.js")
+  })
+
+  it("zeigt ohne das Feld alles als aktuell", async () => {
+    // Eine ältere Antwort soll alles zeigen, nicht nichts — `aktuell !== false`, nicht
+    // `aktuell === true`. Andersherum verschwänden bei einem Fehlschlag alle Gruppen.
+    const ohneFeld = [{ id: 9, name: "Alt", type: "teaching_group", subject_id: 1 }]
+    const { aktuelleTeachingGroups, fruehereTeachingGroups } = await laden(ohneFeld)
+    expect(get(aktuelleTeachingGroups).map(g => g.id)).toEqual([9])
+    expect(get(fruehereTeachingGroups)).toEqual([])
+    vi.doUnmock("$lib/api.js")
+  })
+
+  it("nimmt nur Unterrichtsgruppen, keine Fachschaften", async () => {
+    const { aktuelleTeachingGroups } = await laden(GRUPPEN)
+    expect(get(aktuelleTeachingGroups).every(g => g.type === "teaching_group")).toBe(true)
+    vi.doUnmock("$lib/api.js")
+  })
+})

@@ -10,6 +10,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - `ab_zaehlung` in `school_year.yaml` legt fest, ob Ferienwochen beim 14-tägigen Takt
   mitzählen (`unterrichtswoche`, Vorgabe) oder nicht (`kalenderwoche`).
 - Der Wochenmuster-Dialog zeigt unter jedem 14-tägigen Eintrag die konkreten Termine.
+- Unterrichtsgruppen früherer Schuljahre stehen unter „Meine Unterrichtsgruppen“ in
+  einem eingeklappten Abschnitt „Aus früheren Schuljahren“, mit Jahresangabe. Bisher
+  standen sie ununterscheidbar neben den aktuellen.
 
 ### Behoben
 
