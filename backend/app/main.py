@@ -103,11 +103,58 @@ async def check_embedding_dimension() -> bool:
     return True
 
 
+def _pruefe_zeitzone() -> None:
+    """Protokolliert, in welchem Kalender der Prozess rechnet.
+
+    Das Container-Image läuft ohne `TZ` in **UTC**. Zwischen Mitternacht und 02:00 MESZ
+    ist `date.today()` dann der Vortag — an zwei Dutzend Stellen im Anwendungscode. Beim
+    Stundenplan wächst sich der eine Tag zu einer ganzen Woche aus: `_unterrichtswochen`
+    nimmt den Montag der Bezugswoche, und mit dem Vortag ist das ab Montag früh die
+    Vorwoche. Für 14-tägige Muster kippt damit die A-/B-Phase.
+
+    Geprüft wird, was **tatsächlich** gilt, nicht was gesetzt wurde: Fehlt `tzdata` im
+    Image, bleibt `TZ=Europe/Berlin` wirkungslos und der Prozess still bei UTC. Genau
+    diese Kombination — gesetzt, aber unwirksam — wäre sonst von außen nicht zu erkennen.
+    """
+    import os
+    from datetime import datetime
+
+    # `jetzt.tzname()`, nicht `time.tzname[0]`: Letzteres nennt immer die Normalzeit und
+    # meldete im Sommer „CET (+0200)" — Name und Versatz widersprächen einander.
+    jetzt = datetime.now().astimezone()
+    name = jetzt.tzname() or "?"
+    gewuenscht = os.environ.get("TZ")
+    ist_utc = jetzt.utcoffset().total_seconds() == 0 and name in ("UTC", "GMT")
+    # Wer UTC ausdrücklich verlangt, bekommt UTC — und keine Fehlermeldung darüber.
+    utc_gewollt = (gewuenscht or "").upper() in {
+        "UTC", "GMT", "ETC/UTC", "ETC/GMT", "UNIVERSAL", "ZULU",
+    }
+
+    if gewuenscht and ist_utc and not utc_gewollt:
+        logger.error(
+            "KONFIGURATIONSFEHLER: TZ=%s ist gesetzt, der Prozess rechnet aber in UTC. "
+            "Sehr wahrscheinlich fehlt `tzdata` im Image. Folge: `date.today()` liefert "
+            "nachts den Vortag — beim Stundenplan-Abruf eine ganze Woche daneben. "
+            "Abhilfe: `tzdata` in backend/Dockerfile ergänzen und Image neu bauen.",
+            gewuenscht,
+        )
+    elif ist_utc and not utc_gewollt:
+        logger.warning(
+            "Keine Zeitzone gesetzt — der Prozess rechnet in UTC. Für Schulen außerhalb "
+            "von UTC ist „heute“ damit zwischen Mitternacht und Ortszeit-Morgen der "
+            "Vortag. Abhilfe: TZ in docker-compose.yml setzen (Vorgabe Europe/Berlin)."
+        )
+    else:
+        logger.info("Zeitzone: %s (%s)", name, jetzt.strftime("%z"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Adapter vorab instanziieren — Konfigurationsfehler früh sichtbar
     from app.auth.dependencies import get_auth_adapter
     get_auth_adapter()
+
+    _pruefe_zeitzone()
 
     # Startup-Check: Wechselkurs prüfen
     from sqlalchemy import select, func

@@ -29,6 +29,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Stundenplan-Abgleich suchte die passende Unterrichtsgruppe schulweit und konnte
   deshalb auf die Gruppe einer anderen Lehrkraft zeigen. Gesucht wird jetzt nur unter den
   eigenen Gruppen.
+- Backend und Cron laufen jetzt in der Zeitzone der Schule (`TZ`, Vorgabe
+  `Europe/Berlin`) statt in UTC. Bisher war „heute" dort nachts der Vortag.
+- Gruppennamen wie „BK 11" wurden als Basiskurs gelesen, obwohl `BK` das Fachkürzel für
+  Bildende Kunst ist. Die Kursart-Erkennung nimmt das Fachkürzel jetzt aus und sucht an
+  Wortgrenzen.
 - Auf den Infoseiten (Impressum, Datenschutz, Nutzungsregeln) blieb eine Fehlermeldung
   stehen, wenn man von einer unbekannten Seite auf eine gültige wechselte.
 - Der Wochenmuster-Dialog zeigt unter „Was der Stundenplan hergab", welche Lerngruppen

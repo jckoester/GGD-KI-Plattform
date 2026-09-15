@@ -352,6 +352,10 @@ def _namen_eindeutig_machen(vorschlaege: list[GroupSuggestion]) -> None:
 
 
 # Wörter, an denen sich die Kursart im Gruppennamen erkennen lässt.
+#
+# Gesucht wird an **Wortgrenzen**, nicht als Teilzeichenkette. Als Teilzeichenkette fand
+# `lk` sich in „Volkskunde" und `bk` in „Werkbank" — und ein falsch erkannter Marker
+# streicht eine gültige Kante, der Kurs findet seine Gruppe dann nicht mehr.
 _KURSART_MARKER = {
     BASISKURS: ("basiskurs", "basis", "bk"),
     LEISTUNGSKURS: ("leistungskurs", "leistung", "lk"),
@@ -366,6 +370,7 @@ class Kandidat:
     name: str
     subject_id: int
     quellklasse: str | None     # Name der Klasse, aus der die Gruppe entstanden ist
+    fach_code: str | None = None    # Fachkürzel — kollidiert mit den Kursart-Markern
 
 
 async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
@@ -378,9 +383,10 @@ async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
     """
     quelle = aliased(Group)
     zeilen = await db.execute(
-        select(Group.id, Group.name, Group.subject_id, quelle.name)
+        select(Group.id, Group.name, Group.subject_id, quelle.name, Subject.fach_code)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
         .outerjoin(quelle, quelle.id == Group.source_class_group_id)
+        .outerjoin(Subject, Subject.id == Group.subject_id)
         .where(
             Group.type == "teaching_group",
             GroupMembership.pseudonym == pseudonym,
@@ -388,24 +394,58 @@ async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
         )
     )
     return [
-        Kandidat(id=gid, name=name or "", subject_id=sid, quellklasse=quellname)
-        for gid, name, sid, quellname in zeilen.all()
+        Kandidat(
+            id=gid,
+            name=name or "",
+            subject_id=sid,
+            quellklasse=quellname,
+            fach_code=fach_code,
+        )
+        for gid, name, sid, quellname, fach_code in zeilen.all()
     ]
 
 
-def _widerspricht_kursart(name: str, art: str) -> bool:
+def _ohne_fachkuerzel(name: str, fach_code: str | None) -> str:
+    """Das eigene Fachkürzel aus dem Namen nehmen, bevor nach Kursart-Markern gesucht wird.
+
+    `BK` ist das Fachkürzel für Bildende Kunst **und** die Kurzform für Basiskurs. Eine
+    Kursstufen-Gruppe namens „BK 11" las sich deshalb als Basiskurs — und war sie in
+    Wahrheit der Leistungskurs, wurde ihre Kante gestrichen und der Kurs fand seine Gruppe
+    nicht. Dasselbe gilt für `LK` in Sprachen, die so abgekürzt werden.
+
+    Das Kürzel der Gruppe steht fest (sie hängt an genau einem Fach), also lässt sich die
+    Doppeldeutigkeit auflösen, statt sie zu erraten: Steht `BK` im Namen einer
+    BK-Gruppe, ist es das Fach. Bei „Bio BK 11" bleibt `bk` stehen und zählt als Marker.
+    """
+    if not fach_code:
+        return name
+    return re.sub(rf"\b{re.escape(fach_code)}\b", " ", name, flags=re.IGNORECASE)
+
+
+def _nennt_kursart(name: str, art: str) -> bool:
+    return any(
+        re.search(rf"\b{marker}\b", name) for marker in _KURSART_MARKER[art]
+    )
+
+
+def _widerspricht_kursart(name: str, art: str, fach_code: str | None = None) -> bool:
     """Ob der Gruppenname die **andere** Kursart nennt.
 
     Nur dann ist ein Treffer ausgeschlossen. Nennt der Name gar keine Kursart, bleibt die
     Gruppe Kandidatin — ob das eindeutig ist, entscheidet das Verfahren, nicht der Name.
+
+    Bewusst zurückhaltend: Ein **falsch erkannter** Marker streicht eine gültige Kante, und
+    der Kurs erscheint danach als „Gruppe fehlt". Ein **übersehener** Marker lässt die
+    Gruppe nur Kandidatin bleiben; bleibt es dann mehrdeutig, wird das gemeldet. Seit der
+    beidseitig eindeutigen Zuordnung (15.09.2026) ist das zweite Versagen deutlich
+    harmloser als das erste — deshalb im Zweifel nicht streichen.
     """
     if art == REGULAER:
         return False
-    klein = (name or "").lower()
-    if any(marker in klein for marker in _KURSART_MARKER[art]):
+    klein = _ohne_fachkuerzel(name or "", fach_code).lower()
+    if _nennt_kursart(klein, art):
         return False
-    andere = _KURSART_MARKER[LEISTUNGSKURS if art == BASISKURS else BASISKURS]
-    return any(marker in klein for marker in andere)
+    return _nennt_kursart(klein, LEISTUNGSKURS if art == BASISKURS else BASISKURS)
 
 
 def _nennt_klasse(kandidat: Kandidat, class_names: tuple[str, ...]) -> bool:
@@ -495,7 +535,7 @@ def zuordnen(
         for j, kandidat in enumerate(kandidaten):
             if kandidat.subject_id != subject_id:
                 continue
-            if _widerspricht_kursart(kandidat.name, art):
+            if _widerspricht_kursart(kandidat.name, art, kandidat.fach_code):
                 continue
             moeglich.add(j)
             if _nennt_klasse(kandidat, class_names):

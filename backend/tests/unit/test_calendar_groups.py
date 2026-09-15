@@ -111,8 +111,8 @@ class FakeDB:
         # der Wächter darüber liefe ins Leere. (Genau das war am 15.09.2026 der Fall.)
         return Result(
             [
-                (gid, name, sid, quellklasse)
-                for gid, name, sid, lehrkraft, mitgliedsrolle, quellklasse in self.groups
+                (gid, name, sid, quellklasse, fach_code)
+                for gid, name, sid, lehrkraft, mitgliedsrolle, quellklasse, fach_code in self.groups
                 if (pseudonym is None or lehrkraft == pseudonym)
                 and (rolle is None or mitgliedsrolle == rolle)
             ]
@@ -127,9 +127,10 @@ def gruppe(
     lehrkraft=None,
     rolle="teacher",
     quellklasse=None,
+    fach_code=None,
 ):
     """Eine Unterrichtsgruppe für die Attrappe — so, wie `_eigene_gruppen` sie liest."""
-    return (gid, name, subject_id, lehrkraft or LEHRKRAFT, rolle, quellklasse)
+    return (gid, name, subject_id, lehrkraft or LEHRKRAFT, rolle, quellklasse, fach_code)
 
 
 def _werte(stmt):
@@ -660,6 +661,42 @@ def test_kursart_im_namen_streicht_die_kante():
         [lerngruppe(("11",), LEISTUNGSKURS), lerngruppe(("11",), BASISKURS)], kandidaten
     )
     assert treffer == {0: 8, 1: 7}
+
+
+def test_fachkuerzel_bk_wird_nicht_als_basiskurs_gelesen():
+    """`BK` heißt Bildende Kunst **und** Basiskurs.
+
+    Eine BK-Gruppe namens „BK 11" las sich als Basiskurs. War sie in Wahrheit der
+    Leistungskurs, strich `_widerspricht_kursart` ihre Kante — und der Kurs erschien als
+    „Gruppe fehlt", obwohl sie danebenstand. Das Fachkürzel der Gruppe steht fest, also
+    lässt sich die Doppeldeutigkeit auflösen statt erraten.
+    """
+    kandidaten = [
+        Kandidat(id=7, name="BK 11", subject_id=CHEMIE, quellklasse=None, fach_code="BK")
+    ]
+    treffer, _ = zuordnen([lerngruppe(("11",), LEISTUNGSKURS)], kandidaten)
+    assert treffer == {0: 7}
+
+
+def test_kurzform_neben_einem_anderen_fach_zaehlt_weiter():
+    """Die Gegenprobe: Bei „Bio BK 11" ist `bk` nicht das Fach, sondern der Basiskurs."""
+    kandidaten = [
+        Kandidat(id=7, name="Bio BK 11", subject_id=CHEMIE, quellklasse=None, fach_code="BIO")
+    ]
+    treffer, rest = zuordnen([lerngruppe(("11",), LEISTUNGSKURS)], kandidaten)
+    assert treffer == {}
+    assert rest == {0: []}
+
+
+def test_marker_werden_an_wortgrenzen_gesucht():
+    """Als Teilzeichenkette fand sich `lk` in „Volkskunde" und `bk` in „Werkbank"."""
+    kandidaten = [
+        Kandidat(id=7, name="Volkskunde 11", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=8, name="Werkbank 11", subject_id=CHEMIE, quellklasse=None),
+    ]
+    for art in (BASISKURS, LEISTUNGSKURS):
+        _, rest = zuordnen([lerngruppe(("11",), art)], kandidaten)
+        assert len(rest[0]) == 2, f"{art}: eine Kante wurde zu Unrecht gestrichen"
 
 
 def test_anderes_fach_bildet_keine_kante():

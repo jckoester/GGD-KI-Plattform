@@ -428,3 +428,38 @@ def test_die_aufstiegs_erkennung_trifft_das_richtige(wert, verboten):
     verschwunden. Beim Anhängen dieses Blocks ist genau das passiert.
     """
     assert (wert.startswith("..") or "/../" in wert) is verboten
+
+
+# ── Zeitzone ─────────────────────────────────────────────────────────────────
+#
+# Statisch prüfbar, mehr geht hier nicht: Docker ist in der Entwicklungsumgebung nicht
+# installiert. Zur Laufzeit meldet `_pruefe_zeitzone` (app/main.py), was tatsächlich gilt.
+
+
+@pytest.mark.parametrize("dienst", DIENSTE)
+def test_dienste_setzen_eine_zeitzone(dienst):
+    """Ohne `TZ` läuft das Image in UTC.
+
+    `date.today()` liefert dann zwischen Mitternacht und 02:00 MESZ den Vortag — an zwei
+    Dutzend Stellen. Beim Stundenplan wächst sich das aus: `_unterrichtswochen` nimmt den
+    Montag der Bezugswoche, mit dem Vortag ist das ab Montag früh die **Vorwoche**, und
+    für 14-tägige Muster kippt damit die A-/B-Phase.
+    """
+    umgebung = COMPOSE["services"][dienst]["environment"]
+    assert "TZ" in umgebung, f"{dienst} setzt keine Zeitzone"
+    assert "Europe/Berlin" in str(umgebung["TZ"]), (
+        "Der Vorgabewert soll Europe/Berlin sein — überschreibbar über die .env, "
+        "damit Schulen in anderen Zeitzonen nicht patchen müssen."
+    )
+
+
+def test_das_image_bringt_zeitzonendaten_mit():
+    """`TZ` allein genügt nicht.
+
+    Ohne das Paket `tzdata` bleibt die Zeitzone still bei UTC — gesetzt, aber wirkungslos,
+    und von außen nicht zu unterscheiden von „nicht gesetzt". Genau diese Kombination
+    meldet `_pruefe_zeitzone` zur Laufzeit als Konfigurationsfehler.
+    """
+    dockerfile = (REPO / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    zeilen = [z.strip().rstrip(" \\") for z in dockerfile.splitlines()]
+    assert "tzdata" in zeilen, "tzdata fehlt in der Paketliste des Backend-Images"
