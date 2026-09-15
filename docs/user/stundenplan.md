@@ -65,9 +65,12 @@ Angezeigt wird auch, wie viele Einträge aus wie vielen Wochen stammen und welch
 keinen Unterricht haben (Praktikums- oder Projektwoche), zählen dabei nicht mit; sie
 belegen nichts.
 
-**Wenn Ihre Gruppe nicht im Vorschlag auftaucht**, heißt sie im Stundenplan
-wahrscheinlich anders als hier, oder das Fachkürzel ist noch nicht zugeordnet. Melden Sie
-das der Administration; von Hand eintragen funktioniert weiterhin.
+**Wenn Ihre Gruppe nicht im Vorschlag auftaucht**, klappen Sie „Was der Stundenplan
+hergab" auf. Dort steht, welche Lerngruppen erkannt wurden und wohin sie gingen, für
+welche noch keine Unterrichtsgruppe existiert, welche Fachkürzel die Plattform nicht kennt
+und wo die Zuordnung mehrdeutig blieb. Unbekannte Fachkürzel gehören der Administration
+gemeldet; alles andere klärt sich meist an dieser Liste. Von Hand eintragen funktioniert
+weiterhin.
 
 ---
 

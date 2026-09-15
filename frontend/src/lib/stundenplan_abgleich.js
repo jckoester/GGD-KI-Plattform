@@ -70,3 +70,64 @@ export function rasterJeGruppe(antwort) {
         // hängt daran, in welcher Reihenfolge der Stundenplan die Termine liefert.
         .sort((a, b) => (a.gruppe ?? "").localeCompare(b.gruppe ?? "", "de"))
 }
+
+
+/** Wohin eine erkannte Lerngruppe zugeordnet wurde. */
+export const ZUR_GRUPPE = "diese"
+export const ZU_ANDERER = "andere"
+export const OHNE_GRUPPE = "ohne"
+
+/**
+ * Was der Stundenplan hergab — lesbar aufbereitet.
+ *
+ * `GET /calendar/week-patterns` meldet weit mehr, als die Übernahme braucht: die
+ * erkannten Lerngruppen samt Fach und Klassen, die Gruppen, die es auf der Plattform noch
+ * nicht gibt, unbekannte Fachkürzel und freie Hinweise — darunter seit dem 15.09.2026
+ * auch, welche Zuordnung mehrdeutig blieb.
+ *
+ * Der Editor hat davon nur die eigenen Musterzeilen benutzt und im Fehlschlag „nichts
+ * gefunden" gemeldet, mit zwei geratenen Ursachen. Das ist die unangenehmste Auskunft
+ * überhaupt: Sie nennt das Ergebnis und verschweigt den Grund, obwohl er vorliegt.
+ *
+ * Eine Zeile je **Lerngruppe**, nicht je Termin — die Antwort führt jeden Termin einzeln.
+ */
+export function diagnose(antwort, groupId) {
+    // Eine `Map`, denn sie **ist** die Zusammenfassung — der Schlüssel ist die
+    // Lerngruppe. Der frühe Ausstieg spart nur das wiederholte Überschreiben.
+    const lerngruppen = new Map()
+    for (const p of antwort?.patterns ?? []) {
+        if (lerngruppen.has(p.gruppe)) continue
+        lerngruppen.set(p.gruppe, {
+            label: p.gruppe,
+            fach: p.subject_slug ?? p.fach ?? null,
+            klassen: p.klassen ?? [],
+            status: !p.group_id
+                ? OHNE_GRUPPE
+                : p.group_id === groupId
+                  ? ZUR_GRUPPE
+                  : ZU_ANDERER,
+        })
+    }
+    return {
+        kuerzel: antwort?.kuerzel ?? null,
+        wochen: antwort?.wochen?.length ?? 0,
+        lerngruppen: [...lerngruppen.values()],
+        fehlend: (antwort?.fehlende_gruppen ?? []).map((g) => ({
+            name: g.name,
+            klassen: g.klassen ?? [],
+        })),
+        unbekannt: antwort?.unbekannte_faecher ?? [],
+        hinweise: antwort?.hinweise ?? [],
+    }
+}
+
+/** Ob die Diagnose überhaupt etwas zu sagen hat. */
+export function diagnoseHatInhalt(d) {
+    return Boolean(
+        d &&
+            (d.lerngruppen.length ||
+                d.fehlend.length ||
+                d.unbekannt.length ||
+                d.hinweise.length),
+    )
+}

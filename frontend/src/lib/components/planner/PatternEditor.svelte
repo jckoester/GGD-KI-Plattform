@@ -1,6 +1,12 @@
 <script>
   import { setWeekPattern, generateSlots, getWeekPatternProposals, getAbWochen } from '$lib/api.js'
   import { terminzeile } from '$lib/ab_wochen.js'
+  import {
+    diagnose,
+    diagnoseHatInhalt,
+    OHNE_GRUPPE,
+    ZUR_GRUPPE,
+  } from '$lib/stundenplan_abgleich.js'
   import { calendarConfigured, ensureCalendarStatus } from '$lib/stores/calendarStatus.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -75,20 +81,29 @@
   // Ein eigener Schreibpfad daneben wäre eine zweite Wahrheit.
   let holeVorschlag = $state(false)
   let vorschlagHinweis = $state(null)
+  // Was der Abruf sonst noch hergab. Der Endpunkt meldet die erkannten Lerngruppen, die
+  // fehlenden Gruppen, unbekannte Fachkürzel und Hinweise — ohne das bliebe im Fehlschlag
+  // nur „nichts gefunden" mit geratenen Ursachen.
+  let befund = $state(null)
+  let befundOffen = $state(false)
 
   async function ausStundenplan() {
     holeVorschlag = true
     error = null
     vorschlagHinweis = null
+    befund = null
     try {
       const data = await getWeekPatternProposals(4)
       const eigene = (data.patterns ?? []).filter(p => p.group_id === groupId)
+      befund = diagnose(data, groupId)
       if (eigene.length === 0) {
-        vorschlagHinweis =
-          'Für diese Gruppe wurde im Stundenplan nichts gefunden. Möglich: Das Kürzel '
-          + 'fehlt im Profil, oder die Gruppe heißt im Stundenplan anders.'
+        vorschlagHinweis = 'Für diese Gruppe wurde im Stundenplan nichts gefunden.'
+        // Aufgeklappt, denn genau jetzt ist die Frage „warum nicht?" — und die Antwort
+        // steht darunter. Bei einem Treffer bleibt der Befund zu, er stört dann nur.
+        befundOffen = true
         return
       }
+      befundOffen = false
       halbjahr = data.halbjahr ?? halbjahr
       rows = eigene.map(p => ({
         weekday: p.weekday,
@@ -206,6 +221,77 @@
           </button>
           {#if vorschlagHinweis}
             <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">{vorschlagHinweis}</p>
+          {/if}
+          {#if diagnoseHatInhalt(befund)}
+            <details
+              open={befundOffen}
+              class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2"
+            >
+              <summary class="cursor-pointer text-light-bl dark:text-dark-bl">
+                Was der Stundenplan hergab
+              </summary>
+              <div class="mt-2 space-y-2 border-l-2 border-light-ui-3 dark:border-dark-ui-3 pl-3">
+                {#if befund.kuerzel}
+                  <p>Kürzel <strong>{befund.kuerzel}</strong>, {befund.wochen} Wochen gelesen.</p>
+                {/if}
+
+                {#if befund.lerngruppen.length}
+                  <div>
+                    <p class="font-medium text-light-tx dark:text-dark-tx">Erkannte Lerngruppen</p>
+                    <ul class="mt-1 space-y-0.5">
+                      {#each befund.lerngruppen as l}
+                        <li>
+                          <span class="text-light-tx dark:text-dark-tx">{l.label}</span>
+                          {#if l.klassen.length}({l.klassen.join(', ')}){/if}
+                          —
+                          {#if l.status === ZUR_GRUPPE}
+                            dieser Gruppe zugeordnet
+                          {:else if l.status === OHNE_GRUPPE}
+                            keiner Ihrer Gruppen zugeordnet
+                          {:else}
+                            einer anderen Ihrer Gruppen zugeordnet
+                          {/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+
+                {#if befund.fehlend.length}
+                  <div>
+                    <p class="font-medium text-light-tx dark:text-dark-tx">
+                      Dafür gibt es noch keine Unterrichtsgruppe
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                      {#each befund.fehlend as g}
+                        <li>{g.name}</li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+
+                {#if befund.unbekannt.length}
+                  <div>
+                    <p class="font-medium text-light-tx dark:text-dark-tx">
+                      Unbekannte Fachkürzel
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                      {#each befund.unbekannt as f}
+                        <li>{f.code} ({f.stunden} Stunden) — bitte der Administration melden</li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+
+                {#if befund.hinweise.length}
+                  <ul class="space-y-0.5">
+                    {#each befund.hinweise as h}
+                      <li>{h}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            </details>
           {/if}
         </div>
       {/if}
