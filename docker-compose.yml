@@ -83,6 +83,12 @@ services:
     build: ./backend
     env_file: .env
     environment:
+      # Zeitzone. Ohne sie läuft das Image in UTC, und `date.today()` liefert zwischen
+      # Mitternacht und 02:00 MESZ den Vortag — an zwei Dutzend Stellen, darunter das
+      # Wochenfenster des Stundenplans, wo aus einem Tag eine ganze Woche wird.
+      # Braucht `tzdata` im Image (backend/Dockerfile), sonst wirkt sie nicht; beim
+      # Start meldet `_pruefe_zeitzone` (app/main.py), was tatsächlich gilt.
+      TZ: ${TZ:-Europe/Berlin}
       # ⚠️ ALLE Pfade absolut. Das Image legt den Code nach /app, wodurch gegenüber dem
       # Entwicklungsbaum die Ebene `backend/` entfällt: Module, die ihre Repo-Wurzel als
       # `Path(__file__).parents[3]` berechnen, landen im Container bei `/` statt bei /app
@@ -190,6 +196,12 @@ services:
     build: ./backend
     env_file: .env
     environment:
+      # Zeitzone. Ohne sie läuft das Image in UTC, und `date.today()` liefert zwischen
+      # Mitternacht und 02:00 MESZ den Vortag — an zwei Dutzend Stellen, darunter das
+      # Wochenfenster des Stundenplans, wo aus einem Tag eine ganze Woche wird.
+      # Braucht `tzdata` im Image (backend/Dockerfile), sonst wirkt sie nicht; beim
+      # Start meldet `_pruefe_zeitzone` (app/main.py), was tatsächlich gilt.
+      TZ: ${TZ:-Europe/Berlin}
       # Absolut, aus demselben Grund wie beim backend-Dienst (siehe dort).
       AUTH_CONFIG_PATH: /app/config/auth.yaml
       BUDGET_TIERS_PATH: /app/config/budget_tiers.yaml

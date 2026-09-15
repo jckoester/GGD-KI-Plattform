@@ -6,9 +6,13 @@ FROM python:3.12-slim
 #    (Curriculum-PDF-Export, KS-Phase-6 Schritt 5)
 #  - shared-mime-info: MIME-Erkennung für eingebettete Bilder
 #  - fonts-liberation: Schriften (PDF-Template nutzt "Liberation Sans")
+#  - tzdata: Zeitzonendaten. OHNE das Paket bleibt `TZ=Europe/Berlin` WIRKUNGSLOS —
+#    der Prozess rechnet still in UTC weiter, und „heute" ist zwischen Mitternacht und
+#    02:00 MESZ der Vortag (siehe `_pruefe_zeitzone` in app/main.py).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cron \
         curl \
+        tzdata \
         libpango-1.0-0 \
         libpangocairo-1.0-0 \
         libpangoft2-1.0-0 \
