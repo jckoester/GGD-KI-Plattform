@@ -5,47 +5,44 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.1] – 2026-09-15
+
+Schwerpunkt: **Stundenplan und Schuljahr**. Die Übernahme aus dem Stundenplan trägt
+jetzt am Schuljahresanfang, 14-tägige Termine werden als solche geplant, und
+Unterrichtsgruppen vergangener Schuljahre stehen nicht mehr zwischen den aktuellen.
+
 ### Neu
 
-- `ab_zaehlung` in `school_year.yaml` legt fest, ob Ferienwochen beim 14-tägigen Takt
-  mitzählen (`unterrichtswoche`, Vorgabe) oder nicht (`kalenderwoche`).
-- Der Wochenmuster-Dialog zeigt unter jedem 14-tägigen Eintrag die konkreten Termine.
-- Unterrichtsgruppen früherer Schuljahre stehen unter „Meine Unterrichtsgruppen“ in
-  einem eingeklappten Abschnitt „Aus früheren Schuljahren“, mit Jahresangabe. Bisher
-  standen sie ununterscheidbar neben den aktuellen.
+- **A-/B-Wochen.** `ab_zaehlung` in `school_year.yaml` bestimmt, ob Ferienwochen beim
+  14-tägigen Takt mitzählen (`unterrichtswoche`, Vorgabe) oder nicht (`kalenderwoche`).
+  Der Wochenmuster-Dialog zeigt zu jedem 14-tägigen Eintrag die konkreten Termine.
+- **Unterrichtsgruppen früherer Schuljahre** stehen unter „Meine Unterrichtsgruppen“ in
+  einem eingeklappten Abschnitt, mit Jahresangabe.
 
 ### Behoben
 
-- Wochen ohne eine einzige Stunde zählen beim Ableiten der Wochenmuster nicht mehr
-  mit. Bisher wurde in einer Praktikums-, Projekt- oder unterrichtsfreien Woche jeder
-  wöchentliche Termin als 14-tägig eingestuft.
-- „Aus Stundenplan übernehmen" liest jetzt die laufende und die kommenden
-  Unterrichtswochen statt der vergangenen; reichen sie nicht, wird aus der Vergangenheit
-  aufgefüllt. Am Schuljahresanfang blieb bisher eine einzige Woche übrig.
-- Ob ein 14-tägiger Termin als A- oder B-Woche erkannt wird, hing vom Zeitpunkt des
-  Abrufs ab. Maßgeblich ist jetzt das Schuljahr.
-- 14-tägige Wochenmuster erzeugten Stunden in **jeder** Woche. Die Slot-Erzeugung hält
-  sich jetzt an den Rhythmus.
-- Übernimmt die Slot-Erzeugung mangels eigener Muster die des 1. Halbjahrs, wird bei
-  14-tägigen Terminen ausdrücklich gewarnt.
-- Der Ferienkalender-Import überschreibt `ab_zaehlung` nicht mehr mit der Vorgabe.
-- Der Stundenplan-Abgleich suchte die passende Unterrichtsgruppe schulweit und konnte
-  deshalb auf die Gruppe einer anderen Lehrkraft zeigen. Gesucht wird jetzt nur unter den
-  eigenen Gruppen.
-- Backend und Cron laufen jetzt in der Zeitzone der Schule (`TZ`, Vorgabe
-  `Europe/Berlin`) statt in UTC. Bisher war „heute" dort nachts der Vortag.
-- Gruppennamen wie „BK 11" wurden als Basiskurs gelesen, obwohl `BK` das Fachkürzel für
-  Bildende Kunst ist. Die Kursart-Erkennung nimmt das Fachkürzel jetzt aus und sucht an
-  Wortgrenzen.
-- Auf den Infoseiten (Impressum, Datenschutz, Nutzungsregeln) blieb eine Fehlermeldung
-  stehen, wenn man von einer unbekannten Seite auf eine gültige wechselte.
-- Der Wochenmuster-Dialog zeigt unter „Was der Stundenplan hergab", welche Lerngruppen
-  erkannt wurden, wohin sie zugeordnet sind, für welche noch eine Unterrichtsgruppe fehlt
-  und welche Fachkürzel unbekannt sind. Bisher meldete er nur „nichts gefunden".
-- Kursstufenkurse fanden ihre Unterrichtsgruppe nicht, weil der Stundenplan die Klasse
-  „11" nennt und der Gruppenname den Jahrgang nicht trägt. Zugeordnet wird jetzt über das
-  Fach; der Name schärft die Zuordnung, wo er passt. Bleibt sie mehrdeutig, wird das
-  gemeldet statt geraten.
+- **14-tägige Wochenmuster erzeugten Stunden in jeder Woche.** Die Slot-Erzeugung hält
+  sich jetzt an den Rhythmus — bestehende Raster mit 14-tägigen Terminen einmal neu
+  erzeugen.
+- **Die Musterableitung war am Schuljahresanfang unbrauchbar.** Sie liest jetzt die
+  laufende und die kommenden Unterrichtswochen statt der vergangenen, zählt Wochen ohne
+  eine einzige Stunde nicht mit und bestimmt A- und B-Woche nach dem Schuljahr statt nach
+  dem Zeitpunkt des Abrufs.
+- **Kursstufenkurse fanden ihre Unterrichtsgruppe nicht.** Zugeordnet wird jetzt über das
+  Fach, geschärft durch den Namen, wo er passt; Mehrdeutiges wird gemeldet statt geraten.
+  Gesucht wird nur noch unter den eigenen Gruppen.
+- Gruppennamen wie „BK 11“ galten als Basiskurs, obwohl `BK` das Fachkürzel für Bildende
+  Kunst ist.
+- Statt „nichts gefunden“ zeigt der Wochenmuster-Dialog unter „Was der Stundenplan
+  hergab“ die erkannten Lerngruppen samt Zuordnung, fehlende Gruppen und unbekannte
+  Fachkürzel.
+- Übernimmt die Slot-Erzeugung mangels eigener Muster die des 1. Halbjahrs, warnt sie bei
+  14-tägigen Terminen.
+- Backend und Cron laufen in der Zeitzone der Schule (`TZ`, Vorgabe `Europe/Berlin`)
+  statt in UTC.
+- Der Ferienkalender-Import überschreibt `ab_zaehlung` nicht mehr.
+- Auf den Infoseiten blieb eine Fehlermeldung stehen, wenn man von einer unbekannten
+  Seite auf eine gültige wechselte.
 
 ## [0.10.0] – 2026-09-14
 
