@@ -10,8 +10,16 @@ from app.auth.config import SsoConfig
 from app.auth.dependencies import get_current_user, get_sso_config
 from app.auth.jwt import JwtPayload
 from app.context.grades import parse_class_grade as _parse_grade
-from app.db.models import Group, GroupMembership, Subject, TeacherGroupExclusion
+from app.db.models import (
+    ContextNode,
+    Group,
+    GroupMembership,
+    LessonSlot,
+    Subject,
+    TeacherGroupExclusion,
+)
 from app.db.session import get_db
+from app.planning.calendar import SchoolYearConfig, load_school_year
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -48,8 +56,75 @@ class GroupMembershipOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MyGroupOut(GroupOut):
+    # Ob die Gruppe zum laufenden Schuljahr gehört — siehe `ist_aktuell`. Nur hier und
+    # nicht in `GroupOut`: Für die Gesamtliste aller Schulgruppen wäre die Frage weder
+    # sinnvoll noch billig zu beantworten.
+    aktuell: bool
+
+
 class MyGroupsResponse(BaseModel):
-    items: list[GroupOut]
+    items: list[MyGroupOut]
+
+
+def ist_aktuell(gruppe, mit_beleg: set[int], cfg: SchoolYearConfig) -> bool:
+    """Ob eine Gruppe zum laufenden Schuljahr gehört.
+
+    Drei Fälle brauchen keine Ableitung:
+
+    * **Kein Unterricht.** Klassen, Fachschaften und Arbeitsgruppen kennen kein
+      Schuljahresende in diesem Sinne.
+    * **Aus dem Schulkonto.** Für eine Gruppe mit `sso_group_id` ist die Mitgliedschaft
+      bereits die Antwort: Der Immediate Mirror entfernt bei jeder Anmeldung, was das Token
+      nicht mehr deckt. Steht der Kurs noch im Schulkonto, gibt es ihn. Das trägt zugleich
+      den **Kursstufenkurs über zwei Schuljahre** — er hat am ersten Schultag weder Stunden
+      noch Jahresplan im neuen Jahr und wäre sonst wochenlang „früher", ohne dass die
+      Lehrkraft etwas dagegen tun könnte (der Stundenplan ist noch nicht veröffentlicht).
+    * **Gerade erst angelegt.** Sie hat noch nichts, woran man sie erkennen könnte.
+
+    Bleibt die Ableitung für von Hand angelegte und adoptierte Gruppen. Die sind immer an
+    eine Klasse gebunden (`POST /groups/teaching` verlangt eine `school_class`) und laufen
+    deshalb nie über den Schuljahreswechsel.
+
+    `mit_beleg` sind die Gruppen mit Stunden oder Planung im laufenden Schuljahr —
+    ermittelt von `gruppen_mit_beleg`, in **einer** Abfrage für alle.
+    """
+    if gruppe.type != "teaching_group":
+        return True
+    if gruppe.sso_group_id:
+        return True
+    if gruppe.id in mit_beleg:
+        return True
+    # `astimezone()` vor `date()`: Der Zeitstempel kommt in der Zeitzone der
+    # Datenbanksitzung zurück, der Schuljahresbeginn ist ein Kalendertag der Schule. Ohne
+    # die Umrechnung entschied die Zeitzone über die Jahresgrenze — eine am ersten
+    # Schultag um 00:30 angelegte Gruppe galt als im Vorjahr angelegt. Aufgefallen am
+    # 15.09.2026, als der Integrationstest die Grenze mit einem reinen Datum traf.
+    return gruppe.created_at.astimezone().date() >= cfg.beginn
+
+
+async def gruppen_mit_beleg(
+    db: AsyncSession, gruppen_ids: list[int], cfg: SchoolYearConfig
+) -> set[int]:
+    """Welche dieser Gruppen im laufenden Schuljahr Stunden oder Planung haben.
+
+    Zwei Belege, weil sie zu verschiedenen Zeitpunkten entstehen: Der Jahresplan entsteht
+    beim ersten Öffnen der Planung, die Stunden erst mit dem Stundenraster. Wer nur auf
+    einen schaute, übersähe die halbe Wirklichkeit.
+    """
+    if not gruppen_ids:
+        return set()
+    stunden = select(LessonSlot.group_id).where(
+        LessonSlot.group_id.in_(gruppen_ids),
+        LessonSlot.date.between(cfg.beginn, cfg.ende),
+    )
+    planung = select(ContextNode.write_scope_group_id).where(
+        ContextNode.write_scope_group_id.in_(gruppen_ids),
+        ContextNode.schuljahr == cfg.schuljahr,
+        ContextNode.status == "active",
+    )
+    zeilen = await db.execute(stunden.union(planung))
+    return {zeile[0] for zeile in zeilen.all()}
 
 
 @router.get("/me", response_model=MyGroupsResponse)
@@ -57,7 +132,12 @@ async def list_my_groups(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> MyGroupsResponse:
-    """Gibt die Gruppen zurueck, in denen der aktuelle Nutzer Mitglied ist."""
+    """Gibt die Gruppen zurueck, in denen der aktuelle Nutzer Mitglied ist.
+
+    Je Gruppe steht dabei, ob sie zum laufenden Schuljahr gehört. Ohne diese Angabe
+    stünden die Unterrichtsgruppen mehrerer Jahre nebeneinander, ohne sich zu
+    unterscheiden — der Name trägt kein Jahr, „Mathematik 9C" gibt es dann dreimal.
+    """
     stmt = (
         select(Group)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
@@ -65,7 +145,24 @@ async def list_my_groups(
         .order_by(Group.type, Group.name)
     )
     result = await db.execute(stmt)
-    return MyGroupsResponse(items=list(result.scalars().all()))
+    gruppen = list(result.scalars().all())
+
+    cfg = load_school_year()
+    beleg = await gruppen_mit_beleg(
+        db, [g.id for g in gruppen if g.type == "teaching_group"], cfg
+    )
+    return MyGroupsResponse(
+        items=[
+            # Erst `GroupOut` aus dem ORM-Objekt, dann das Kennzeichen daneben. Direkt
+            # `MyGroupOut.model_validate(gruppe)` schlägt fehl — `aktuell` gibt es am
+            # Modell nicht, und die Validierung verlangt es.
+            MyGroupOut(
+                **GroupOut.model_validate(g, from_attributes=True).model_dump(),
+                aktuell=ist_aktuell(g, beleg, cfg),
+            )
+            for g in gruppen
+        ]
+    )
 
 
 class GroupsConfigResponse(BaseModel):
