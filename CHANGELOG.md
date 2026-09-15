@@ -29,6 +29,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Stundenplan-Abgleich suchte die passende Unterrichtsgruppe schulweit und konnte
   deshalb auf die Gruppe einer anderen Lehrkraft zeigen. Gesucht wird jetzt nur unter den
   eigenen Gruppen.
+- Kursstufenkurse fanden ihre Unterrichtsgruppe nicht, weil der Stundenplan die Klasse
+  „11" nennt und der Gruppenname den Jahrgang nicht trägt. Zugeordnet wird jetzt über das
+  Fach; der Name schärft die Zuordnung, wo er passt. Bleibt sie mehrdeutig, wird das
+  gemeldet statt geraten.
 
 ## [0.10.0] – 2026-09-14
 

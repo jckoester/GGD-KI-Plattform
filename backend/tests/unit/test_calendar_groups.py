@@ -6,7 +6,13 @@ Anwender mit einer unerklärlichen Lücke zurück.
 """
 import pytest
 
-from app.calendar.groups import code_varianten, match_groups, resolve_subject
+from app.calendar.groups import (
+    Kandidat,
+    code_varianten,
+    match_groups,
+    resolve_subject,
+    zuordnen,
+)
 from app.calendar.patterns import GroupKey
 
 
@@ -52,7 +58,7 @@ class FakeDB:
     def __init__(self, subjects, groups=()):
         # subjects: [(id, slug, fach_code, untis_codes)]
         self.subjects = subjects
-        self.groups = list(groups)   # [(id, name, subject_id, pseudonym, rolle)]
+        self.groups = list(groups)   # siehe `gruppe()`
 
     async def scalar(self, stmt):
         beschreibung = str(stmt)
@@ -90,7 +96,6 @@ class FakeDB:
         # Mitgliedschafts-Join hat die Reihenfolge verschoben, und `werte[-1]` traf danach
         # die Rolle statt der Fach-ID.
         gebunden = _gebunden(stmt)
-        subject_id = gebunden.get("subject_id_1")
         pseudonym = gebunden.get("pseudonym_1")
         rolle = gebunden.get("role_in_group_1")
 
@@ -106,13 +111,25 @@ class FakeDB:
         # der Wächter darüber liefe ins Leere. (Genau das war am 15.09.2026 der Fall.)
         return Result(
             [
-                (gid, name)
-                for gid, name, sid, lehrkraft, mitgliedsrolle in self.groups
-                if sid == subject_id
-                and (pseudonym is None or lehrkraft == pseudonym)
+                (gid, name, sid, quellklasse)
+                for gid, name, sid, lehrkraft, mitgliedsrolle, quellklasse in self.groups
+                if (pseudonym is None or lehrkraft == pseudonym)
                 and (rolle is None or mitgliedsrolle == rolle)
             ]
         )
+
+
+def gruppe(
+    gid,
+    name,
+    subject_id,
+    *,
+    lehrkraft=None,
+    rolle="teacher",
+    quellklasse=None,
+):
+    """Eine Unterrichtsgruppe für die Attrappe — so, wie `_eigene_gruppen` sie liest."""
+    return (gid, name, subject_id, lehrkraft or LEHRKRAFT, rolle, quellklasse)
 
 
 def _werte(stmt):
@@ -190,7 +207,7 @@ async def test_fehlende_gruppe_wird_vorgeschlagen():
 @pytest.mark.asyncio
 async def test_vorhandene_gruppe_wird_nicht_vorgeschlagen():
     """Vorgeschlagen wird nur, was fehlt — sonst entstünden Dubletten."""
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "teacher")])
+    db = FakeDB(SUBJECTS, groups=[gruppe(10, "Mathematik 5c", 1)])
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.fehlend == []
     assert len(ergebnis.vorhanden) == 1
@@ -206,7 +223,7 @@ async def test_gruppe_einer_kollegin_zaehlt_nicht_als_treffer():
     hätte. Aufgefallen wäre es zuerst der Kollegin, in deren Jahresplanung fremde
     Änderungen auftauchen.
     """
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, KOLLEGIN, "teacher")])
+    db = FakeDB(SUBJECTS, groups=[gruppe(10, "Mathematik 5c", 1, lehrkraft=KOLLEGIN)])
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.vorhanden == []
     assert ergebnis.zuordnung == {}
@@ -218,7 +235,7 @@ async def test_gleichnamige_gruppen_zweier_lehrkraefte_treffen_die_eigene():
     """Derselbe Name, zwei Lehrkräfte — der Namensabgleich allein entschiede falsch."""
     db = FakeDB(
         SUBJECTS,
-        groups=[(10, "Mathematik 5c", 1, KOLLEGIN, "teacher"), (11, "Mathematik 5c", 1, LEHRKRAFT, "teacher")],
+        groups=[gruppe(10, "Mathematik 5c", 1, lehrkraft=KOLLEGIN), gruppe(11, "Mathematik 5c", 1)],
     )
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert list(ergebnis.zuordnung.values()) == [11]
@@ -231,7 +248,7 @@ async def test_mitgliedschaft_ohne_lehrkraft_rolle_zaehlt_nicht():
     Eine Unterrichtsgruppe enthält auch ihre Schüler:innen. Ohne die Rollenbedingung
     entschiede eine beliebige Mitgliedschaft über den Treffer.
     """
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "student")])
+    db = FakeDB(SUBJECTS, groups=[gruppe(10, "Mathematik 5c", 1, rolle="student")])
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.vorhanden == []
     assert len(ergebnis.fehlend) == 1
@@ -239,7 +256,7 @@ async def test_mitgliedschaft_ohne_lehrkraft_rolle_zaehlt_nicht():
 
 @pytest.mark.asyncio
 async def test_gruppe_eines_anderen_fachs_zaehlt_nicht_als_treffer():
-    db = FakeDB(SUBJECTS, groups=[(10, "Ethik 5c", 2, LEHRKRAFT, "teacher")])
+    db = FakeDB(SUBJECTS, groups=[gruppe(10, "Ethik 5c", 2)])
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.fehlend) == 1
 
@@ -374,7 +391,7 @@ async def test_basis_und_leistungskurs_sind_zwei_gruppen():
 async def test_gruppe_mit_kursart_im_namen_trifft_genau():
     db = FakeDB(
         SUBJECTS + [(5, "biologie", "BIO", ["BIO"])],
-        groups=[(10, "Biologie 11 Basiskurs", 5, LEHRKRAFT, "teacher")],
+        groups=[gruppe(10, "Biologie 11 Basiskurs", 5)],
     )
     ergebnis = await match_groups(db, [key("bio", ("11",)), key("BIO", ("11",))], pseudonym=LEHRKRAFT)
     assert len(ergebnis.vorhanden) == 1
@@ -383,26 +400,48 @@ async def test_gruppe_mit_kursart_im_namen_trifft_genau():
 
 
 @pytest.mark.asyncio
-async def test_gruppe_ohne_kursart_wird_als_mehrdeutig_gemeldet():
+async def test_zwei_kurse_auf_eine_gruppe_bleiben_unzugeordnet():
     """Statt zu raten, welcher der beiden Kurse gemeint ist.
 
-    Ein Namenstreffer auf „Biologie 11" unterdrückte sonst systematisch einen der beiden
-    Vorschläge — und zwar immer denselben.
+    Eine Gruppe „Biologie 11" ohne Angabe der Kursart, dazu Basis- **und** Leistungskurs
+    im Stundenplan. Wer hier „genau ein Kandidat" rechnet, legt beide auf dieselbe Gruppe.
+    Deshalb muss die Zuordnung von beiden Seiten eindeutig sein.
     """
     db = FakeDB(
         SUBJECTS + [(5, "biologie", "BIO", ["BIO"])],
-        groups=[(10, "Biologie 11", 5, LEHRKRAFT, "teacher")],
+        groups=[gruppe(10, "Biologie 11", 5)],
     )
-    ergebnis = await match_groups(db, [key("bio", ("11",))], pseudonym=LEHRKRAFT)
-    assert ergebnis.fehlend           # Vorschlag bleibt stehen
-    assert ergebnis.mehrdeutig
-    assert "Kursart" in ergebnis.mehrdeutig[0]
+    ergebnis = await match_groups(
+        db, [key("bio", ("11",)), key("BIO", ("11",))], pseudonym=LEHRKRAFT
+    )
+    assert ergebnis.vorhanden == []
+    assert len(ergebnis.fehlend) == 2      # Vorschläge bleiben stehen
+    assert len(ergebnis.mehrdeutig) == 2
+    assert all("Biologie 11" in m for m in ergebnis.mehrdeutig)
+
+
+@pytest.mark.asyncio
+async def test_einzelner_kursstufenkurs_trifft_die_einzige_gruppe():
+    """Der gemessene Fehlschlag vom 14.09.2026, andersherum.
+
+    Der Stundenplan nennt die „Klasse" `11`, die Gruppe heißt `ch2-ks-abi28` — über den
+    Namen findet sich nichts. Unter den **eigenen** Gruppen gibt es aber nur eine in
+    diesem Fach, und im Stundenplan nur einen Kurs. Das ist eindeutig, ohne zu raten.
+    """
+    db = FakeDB(
+        SUBJECTS + [(5, "chemie", "CH", ["CH"])],
+        groups=[gruppe(58, "ch2-ks-abi28", 5)],
+    )
+    ergebnis = await match_groups(db, [key("CH2", ("11",))], pseudonym=LEHRKRAFT)
+    assert list(ergebnis.zuordnung.values()) == [58]
+    assert ergebnis.fehlend == []
+    assert ergebnis.mehrdeutig == []
 
 
 @pytest.mark.asyncio
 async def test_sek_eins_braucht_keine_kursart():
     """Dort gibt es die Unterscheidung nicht — der Name bleibt schlicht."""
-    db = FakeDB(SUBJECTS, groups=[(10, "Mathematik 5c", 1, LEHRKRAFT, "teacher")])
+    db = FakeDB(SUBJECTS, groups=[gruppe(10, "Mathematik 5c", 1)])
     ergebnis = await match_groups(db, [key("M", ("5C",))], pseudonym=LEHRKRAFT)
     assert ergebnis.vorhanden and not ergebnis.mehrdeutig
 
@@ -513,3 +552,140 @@ async def test_eindeutige_namen_bleiben_schlicht():
         pseudonym=LEHRKRAFT,
     )
     assert all("[" not in v.vorschlag_name for v in ergebnis.fehlend)
+
+
+# ── Das Zuordnungsverfahren ──────────────────────────────────────────────────
+#
+# Direkt auf `zuordnen` statt über `match_groups`: Das Verfahren ist der heikle Teil, und
+# ohne Fachauflösung und Bündelung davor liest sich nur, worum es geht.
+
+CHEMIE = 5
+
+
+def lerngruppe(klassen, art=REGULAER, fach=CHEMIE):
+    return (fach, klassen, art)
+
+
+def test_starke_kante_zuerst_dann_der_rest():
+    """Der Produktionsfall: Ein Namenstreffer räumt den Weg für die Zuordnung ohne Namen.
+
+    `CH 9D` findet Gruppe 49 über den Klassennamen. Damit sind beide Enden vergeben, und
+    für `CH2_11` bleibt nur noch Gruppe 58 übrig — eindeutig von beiden Seiten.
+    """
+    kandidaten = [
+        Kandidat(id=49, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=58, name="ch2-ks-abi28", subject_id=CHEMIE, quellklasse=None),
+    ]
+    treffer, rest = zuordnen(
+        [lerngruppe(("9D",)), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
+    )
+    assert treffer == {0: 49, 1: 58}
+    assert rest == {}
+
+
+def test_alle_eindeutigen_paare_werden_zugeordnet():
+    """Der Alltagsfall: drei Gruppen, drei Lerngruppen, jede über den Namen erkennbar.
+
+    Der Wächter darüber, dass **alle** gleichzeitig eindeutigen Paare zugeordnet werden.
+    Die innere Schleife bricht nach jedem Treffer ab — ohne die Wiederholung bliebe es bei
+    einem Paar je Durchgang, und die dritte Gruppe fiele lautlos heraus.
+    """
+    kandidaten = [
+        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=2, name="Chemie 9C", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=3, name="Chemie 8A", subject_id=CHEMIE, quellklasse=None),
+    ]
+    treffer, rest = zuordnen(
+        [lerngruppe(("9D",)), lerngruppe(("9C",)), lerngruppe(("8A",))], kandidaten
+    )
+    assert treffer == {0: 1, 1: 2, 2: 3}
+    assert rest == {}
+
+
+def test_ohne_die_starke_kante_bliebe_alles_mehrdeutig():
+    """Die Gegenprobe zur Reihenfolge: Erst der Namenstreffer macht den Rest eindeutig."""
+    kandidaten = [
+        Kandidat(id=49, name="Chemie A", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=58, name="Chemie B", subject_id=CHEMIE, quellklasse=None),
+    ]
+    treffer, rest = zuordnen(
+        [lerngruppe(("9D",)), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
+    )
+    assert treffer == {}
+    assert len(rest[0]) == 2 and len(rest[1]) == 2
+
+
+def test_quellklasse_traegt_die_starke_kante():
+    """Der Gruppenname muss die Klasse nicht nennen — die Quellklasse ist belastbarer.
+
+    Sie ist ein Fremdschlüssel auf die Klassengruppe, kein Text, und entsteht bei der
+    Adoption einer Klasse.
+    """
+    kandidaten = [
+        Kandidat(id=7, name="Mein Chemiekurs", subject_id=CHEMIE, quellklasse="9D"),
+        Kandidat(id=8, name="Chemie irgendwas", subject_id=CHEMIE, quellklasse="8A"),
+    ]
+    treffer, _ = zuordnen([lerngruppe(("9D",))], kandidaten)
+    assert treffer == {0: 7}
+
+
+def test_eine_gruppe_zwei_lerngruppen_bleibt_offen():
+    """Der Fall, an dem „genau ein Kandidat" scheitern würde."""
+    kandidaten = [Kandidat(id=7, name="Chemie", subject_id=CHEMIE, quellklasse=None)]
+    treffer, rest = zuordnen(
+        [lerngruppe(("11",), BASISKURS), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
+    )
+    assert treffer == {}
+    assert rest == {0: kandidaten, 1: kandidaten}
+
+
+def test_eine_lerngruppe_zwei_gruppen_bleibt_offen():
+    """Auch andersherum wird nicht geraten."""
+    kandidaten = [
+        Kandidat(id=7, name="Chemie eins", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=8, name="Chemie zwei", subject_id=CHEMIE, quellklasse=None),
+    ]
+    treffer, rest = zuordnen([lerngruppe(("11",), BASISKURS)], kandidaten)
+    assert treffer == {}
+    assert len(rest[0]) == 2
+
+
+def test_kursart_im_namen_streicht_die_kante():
+    """Ein Leistungskurs passt nicht auf eine Gruppe, die sich Basiskurs nennt."""
+    kandidaten = [
+        Kandidat(id=7, name="Chemie 11 Basiskurs", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=8, name="Chemie 11 Leistungskurs", subject_id=CHEMIE, quellklasse=None),
+    ]
+    treffer, _ = zuordnen(
+        [lerngruppe(("11",), LEISTUNGSKURS), lerngruppe(("11",), BASISKURS)], kandidaten
+    )
+    assert treffer == {0: 8, 1: 7}
+
+
+def test_anderes_fach_bildet_keine_kante():
+    kandidaten = [Kandidat(id=7, name="Mathematik 9D", subject_id=99, quellklasse="9D")]
+    treffer, rest = zuordnen([lerngruppe(("9D",))], kandidaten)
+    assert treffer == {}
+    assert rest == {0: []}
+
+
+def test_kettenaufloesung_ueber_mehrere_runden():
+    """Jede Zuordnung nimmt beide Enden heraus und kann die nächste erst eindeutig machen.
+
+    A trifft über den Namen. Danach bleibt für B nur noch die mittlere Gruppe, und erst
+    danach ist C eindeutig. Ohne Wiederholung bliebe nach der ersten Runde alles offen.
+    """
+    kandidaten = [
+        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=2, name="Kurs mitte", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=3, name="Kurs rechts", subject_id=CHEMIE, quellklasse=None),
+    ]
+    # Zwei namenlose Lerngruppen — erst nachdem 9D vergeben ist, wird der Rest eng.
+    treffer, rest = zuordnen(
+        [lerngruppe(("9D",)), lerngruppe(("11",), BASISKURS), lerngruppe(("12",), BASISKURS)],
+        kandidaten,
+    )
+    assert treffer[0] == 1
+    # Die beiden übrigen bleiben untereinander mehrdeutig — das ist richtig so.
+    assert sorted(rest) == [1, 2]
+    assert all(len(r) == 2 for r in rest.values())

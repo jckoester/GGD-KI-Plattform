@@ -16,6 +16,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calendar.patterns import GroupKey
@@ -273,27 +274,36 @@ async def match_groups(
         if len(key.class_names) > len(eintrag["class_names"]):
             eintrag["class_names"] = key.class_names
 
-    for eintrag in gebuendelt.values():
+    eintraege = list(gebuendelt.values())
+    kandidaten = await _eigene_gruppen(db, pseudonym)
+    treffer, rest = zuordnen(
+        [(e["subject_id"], e["class_names"], e["kursart"]) for e in eintraege],
+        kandidaten,
+    )
+
+    for i, eintrag in enumerate(eintraege):
         subject_id = eintrag["subject_id"]
         art = eintrag["kursart"]
         klassen = eintrag["class_names"]
         slug = await db.scalar(select(Subject.slug).where(Subject.id == subject_id))
-        treffer, mehrdeutig = await _vorhandene_gruppe(
-            db, subject_id, klassen, art, pseudonym
-        )
-        if mehrdeutig:
-            ergebnis.mehrdeutig.append(
-                f"{slug} {'/'.join(klassen)}: Es gibt eine Gruppe ohne Angabe der "
-                f"Kursart — Basis- und Leistungskurs sind dort nicht zu unterscheiden."
-            )
-        if treffer is not None:
+        name = f"{slug} {'/'.join(klassen)}"
+
+        if i in treffer:
             ergebnis.vorhanden.extend(eintrag["keys"])
             for k in eintrag["keys"]:
-                ergebnis.zuordnung[k] = treffer
+                ergebnis.zuordnung[k] = treffer[i]
             continue
 
+        # Kandidaten, aber keine Entscheidung: melden statt raten. Der Vorschlag bleibt
+        # daneben stehen — welche der beiden Lesarten stimmt, weiß nur die Lehrkraft.
+        if rest.get(i):
+            ergebnis.mehrdeutig.append(
+                f"{name}: keine eindeutige Zuordnung — infrage kommen "
+                + ", ".join(f"„{k.name}“" for k in rest[i])
+                + ". Bitte von Hand zuordnen."
+            )
+
         zusatz = KURSART_LABEL[art]
-        name = f"{slug} {'/'.join(klassen)}"
         ergebnis.fehlend.append(
             GroupSuggestion(
                 keys=tuple(eintrag["keys"]),
@@ -348,55 +358,158 @@ _KURSART_MARKER = {
 }
 
 
-async def _vorhandene_gruppe(
-    db: AsyncSession,
-    subject_id: int,
-    class_names: tuple[str, ...],
-    art: str,
-    pseudonym: str,
-) -> tuple[int | None, bool]:
-    """Passende **eigene** `teaching_group` und ob die Zuordnung mehrdeutig ist.
+@dataclass(frozen=True)
+class Kandidat:
+    """Eine eigene Unterrichtsgruppe, wie sie für die Zuordnung gebraucht wird."""
 
-    Gesucht wird nur unter den Gruppen, in denen die Lehrkraft selbst als `teacher`
-    eingetragen ist — dieselbe Bedingung, an der auch `require_group_teacher` den Zugriff
-    entscheidet. Das ist nicht nur eine Absicherung, sondern verkleinert die Kandidatenmenge
-    von „alle Gruppen dieses Fachs an der Schule" auf „meine" — meist eine einzige.
+    id: int
+    name: str
+    subject_id: int
+    quellklasse: str | None     # Name der Klasse, aus der die Gruppe entstanden ist
 
-    Der Abgleich über den Namen ist grob, aber die einzige verfügbare Brücke: Die
-    Plattform speichert bei Unterrichtsgruppen keine Klassenzugehörigkeit, sondern nur
-    `subject_id` und einen Namen wie `Mathematik 5c`.
 
-    **In der Kursstufe genügt Fach + Klasse nicht.** Dort gibt es zu einem Fach im selben
-    Jahrgang sowohl Basis- als auch Leistungskurs — ein Namenstreffer auf „Biologie 11"
-    unterdrückte sonst systematisch einen der beiden Vorschläge. Deshalb muss die Kursart
-    im Namen wiederzufinden sein. Fehlt dort jeder Hinweis darauf, ist die Lage
-    **mehrdeutig**: Der Vorschlag bleibt stehen und die Unklarheit wird gemeldet, statt
-    stillschweigend geraten zu werden.
+async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
+    """Alle Unterrichtsgruppen, in denen die Lehrkraft selbst als `teacher` steht.
+
+    Einmal geladen, nicht je Fach: Die Zuordnung braucht den Gesamtblick, weil sie
+    Eindeutigkeit **von beiden Seiten** prüft. Dieselbe Bedingung wie in
+    `require_group_teacher` — wo die Lehrkraft nicht schreiben dürfte, darf auch kein
+    Vorschlag hinzeigen.
     """
-    kandidaten = await db.execute(
-        select(Group.id, Group.name)
+    quelle = aliased(Group)
+    zeilen = await db.execute(
+        select(Group.id, Group.name, Group.subject_id, quelle.name)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .outerjoin(quelle, quelle.id == Group.source_class_group_id)
         .where(
             Group.type == "teaching_group",
-            Group.subject_id == subject_id,
             GroupMembership.pseudonym == pseudonym,
             GroupMembership.role_in_group == "teacher",
         )
     )
-    mehrdeutig = False
-    for gruppen_id, name in kandidaten.all():
-        klein = (name or "").lower()
-        if not any(klasse.lower() in klein for klasse in class_names):
-            continue
-        if art == REGULAER:
-            return gruppen_id, False
-        eigene = _KURSART_MARKER[art]
-        andere = _KURSART_MARKER[
-            LEISTUNGSKURS if art == BASISKURS else BASISKURS
-        ]
-        if any(marker in klein for marker in eigene):
-            return gruppen_id, False
-        if any(marker in klein for marker in andere):
-            continue                    # die andere Kursart — kein Treffer
-        mehrdeutig = True
-    return None, mehrdeutig
+    return [
+        Kandidat(id=gid, name=name or "", subject_id=sid, quellklasse=quellname)
+        for gid, name, sid, quellname in zeilen.all()
+    ]
+
+
+def _widerspricht_kursart(name: str, art: str) -> bool:
+    """Ob der Gruppenname die **andere** Kursart nennt.
+
+    Nur dann ist ein Treffer ausgeschlossen. Nennt der Name gar keine Kursart, bleibt die
+    Gruppe Kandidatin — ob das eindeutig ist, entscheidet das Verfahren, nicht der Name.
+    """
+    if art == REGULAER:
+        return False
+    klein = (name or "").lower()
+    if any(marker in klein for marker in _KURSART_MARKER[art]):
+        return False
+    andere = _KURSART_MARKER[LEISTUNGSKURS if art == BASISKURS else BASISKURS]
+    return any(marker in klein for marker in andere)
+
+
+def _nennt_klasse(kandidat: Kandidat, class_names: tuple[str, ...]) -> bool:
+    """Ob Gruppenname **oder** Quellklasse eine der Klassen aus dem Stundenplan nennt.
+
+    Die Quellklasse ist der belastbarere Weg — sie ist ein Fremdschlüssel, kein Text. Der
+    Name bleibt daneben stehen, weil Gruppen aus dem Schulkonto keine Quellklasse haben.
+    """
+    name = kandidat.name.lower()
+    quelle = (kandidat.quellklasse or "").lower()
+    return any(
+        klasse.lower() in name or (quelle and klasse.lower() in quelle)
+        for klasse in class_names
+    )
+
+
+def _eindeutige_paare(
+    kanten: dict[int, set[int]],
+    offen_l: set[int],
+    offen_g: set[int],
+    zuordnung: dict[int, int],
+) -> None:
+    """Paare zuordnen, die **von beiden Seiten** nur einen Partner haben — bis nichts mehr geht.
+
+    Von beiden Seiten, weil eine Lerngruppe ohne Gruppe erlaubt ist: Aus „diese Lerngruppe
+    hat nur einen Kandidaten" folgt deshalb **nicht**, dass sie ihn nehmen muss. Eine
+    Lehrkraft mit einer Chemie-Gruppe und zwei Chemie-Kursen im Stundenplan bekäme sonst
+    beide auf dieselbe Gruppe gelegt.
+
+    Wiederholt, weil mehrere Paare **gleichzeitig** eindeutig sein können und die innere
+    Schleife nach jedem Treffer abbricht — sie verändert die Mengen, über die sie läuft.
+    Ohne die Wiederholung bliebe es bei einem Paar je Durchgang; eine Lehrkraft mit drei
+    über den Namen erkennbaren Gruppen bekäme nur zwei zugeordnet.
+
+    Ein zugeordnetes Paar kann dagegen **kein** weiteres eindeutig machen: Die Lerngruppe
+    hatte nur diesen einen Kandidaten und war damit selbst die einzige Bewerberin um ihn —
+    an den übrigen Mengen ändert ihr Wegfall nichts. Wo etwas aufgeht, das vorher
+    mehrdeutig war, liegt es an der **Reihenfolge der Durchgänge**: Eine starke Kante ist
+    unter den starken Kanten eindeutig, im vollen Graphen oft nicht.
+    """
+    while True:
+        moeglich = {i: kanten[i] & offen_g for i in offen_l}
+        for i, kandidaten in moeglich.items():
+            if len(kandidaten) != 1:
+                continue
+            j = next(iter(kandidaten))
+            if sum(1 for k in offen_l if j in moeglich[k]) != 1:
+                continue        # mehrere Lerngruppen wollen dieselbe Gruppe
+            zuordnung[i] = j
+            offen_l.discard(i)
+            offen_g.discard(j)
+            break
+        else:
+            return
+
+
+def zuordnen(
+    lerngruppen: list[tuple[int, tuple[str, ...], str]],
+    kandidaten: list[Kandidat],
+) -> tuple[dict[int, int], dict[int, list[Kandidat]]]:
+    """Lerngruppen aus dem Stundenplan den eigenen Unterrichtsgruppen zuordnen.
+
+    `lerngruppen` sind Tripel aus `subject_id`, Klassennamen und Kursart.
+
+    Bis zum 15.09.2026 entschied allein der Gruppen**name**: Eine Gruppe galt als Treffer,
+    wenn einer der Klassennamen aus dem Stundenplan darin vorkam. In der Kursstufe geht
+    das nicht auf — der Stundenplan nennt die „Klasse" `11`, die Gruppe heißt
+    `ch2-ks-abi28`. Gemessen an der Produktion (14.09.2026) traf das fünf von sechs
+    Lerngruppen und scheiterte genau am Kursstufenkurs.
+
+    Stattdessen: Das **Fach** trägt die Zuordnung, der Name schärft sie.
+
+    1. Kanten zwischen jeder Lerngruppe und jeder eigenen Gruppe desselben Fachs.
+    2. Kanten streichen, die der Kursart widersprechen.
+    3. **Starke** Kanten zuerst — Klassenname im Gruppennamen oder in der Quellklasse.
+    4. Dann der Rest, jeweils nur bei Eindeutigkeit von beiden Seiten.
+
+    Ergebnis: Zuordnung (Index der Lerngruppe → `groups.id`) und, für alles Übrige, die
+    Kandidaten, die noch infrage kämen. Leer heißt „keine Gruppe vorhanden", mehrere heißen
+    „nicht auflösbar" — geraten wird in keinem Fall.
+    """
+    kanten: dict[int, set[int]] = {}
+    starke: dict[int, set[int]] = {}
+    for i, (subject_id, class_names, art) in enumerate(lerngruppen):
+        moeglich: set[int] = set()
+        deutlich: set[int] = set()
+        for j, kandidat in enumerate(kandidaten):
+            if kandidat.subject_id != subject_id:
+                continue
+            if _widerspricht_kursart(kandidat.name, art):
+                continue
+            moeglich.add(j)
+            if _nennt_klasse(kandidat, class_names):
+                deutlich.add(j)
+        kanten[i] = moeglich
+        starke[i] = deutlich
+
+    zuordnung: dict[int, int] = {}
+    offen_l = set(kanten)
+    offen_g = set(range(len(kandidaten)))
+    for menge in (starke, kanten):
+        _eindeutige_paare(menge, offen_l, offen_g, zuordnung)
+
+    rest = {
+        i: [kandidaten[j] for j in sorted(kanten[i] & offen_g)] for i in sorted(offen_l)
+    }
+    return {i: kandidaten[j].id for i, j in zuordnung.items()}, rest
