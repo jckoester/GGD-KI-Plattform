@@ -5,29 +5,47 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.2] – 2026-09-16
+
+Nacharbeiten aus dem Praxiseinsatz: Der Wochenmuster-Dialog führt durch den Ablauf,
+statt danebenzustehen, 14-tägige Termine überstehen einen Ausfall, und Gruppen aus dem
+Schulkonto lassen sich lesbar benennen.
+
 ### Neu
 
-- **Anzeigename für Unterrichtsgruppen.** Im Profil unter „Meine Unterrichtsgruppen"
-  lässt sich einer Gruppe ein lesbarer Name geben, statt `ch2-ks-abi28` aus dem
-  Schulkonto zu zeigen. Er gilt für alle, die die Gruppe sehen; leer lassen nimmt ihn
-  zurück. Die Zuordnung zum Stundenplan bleibt davon unberührt.
+- **Anzeigename für Unterrichtsgruppen** im Profil unter „Meine Unterrichtsgruppen“ —
+  statt `ch2-ks-abi28` aus dem Schulkonto. Er gilt für alle, die die Gruppe sehen; leer
+  lassen nimmt ihn zurück. Die Zuordnung zum Stundenplan bleibt unberührt.
 
 ### Geändert
 
 - Der Wochenmuster-Dialog schließt den Ablauf mit **einem** Knopf ab: „Speichern und
-  Stunden erzeugen" speichert das Muster, erzeugt die Stunden und schließt. Gibt es für
-  das Halbjahr schon Stunden, wird gefragt, bevor sie ersetzt werden. „Nur speichern"
-  bleibt daneben; „Generieren HJx" und „Neu generieren" entfallen.
+  Stunden erzeugen“. Gibt es für das Halbjahr schon Stunden, wird gefragt, bevor sie
+  ersetzt werden. „Nur speichern“ bleibt daneben, „Generieren HJx“ und „Neu generieren“
+  entfallen.
 
 ### Behoben
 
-- „Generieren" erzeugte die Stunden aus dem **gespeicherten** Muster. Wer ein aus dem
-  Stundenplan übernommenes Muster nicht vorher speicherte, bekam Stunden aus dem alten
-  Muster — bei einer neuen Gruppe keine.
-- „Muster speichern" gab keine Rückmeldung.
+- „Generieren“ erzeugte die Stunden aus dem **gespeicherten** Muster: Ein aus dem
+  Stundenplan übernommenes Muster musste erst gespeichert werden, sonst entstanden die
+  falschen Stunden oder keine. „Muster speichern“ meldete dabei nichts zurück.
 - Ein 14-tägiger Termin, der im Abrufzeitraum einmal ausfiel, wurde als wöchentlich
-  vorgeschlagen. Erkannt wird jetzt die Woche, zu der die Beobachtungen passen, auch
-  wenn sie unvollständig sind — als unsicher gekennzeichnet.
+  vorgeschlagen.
+
+### Migration
+
+⚠️ **Migrieren, bevor die neuen Container starten:**
+
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+```
+
+`alembic upgrade head` führt `0062` aus.
+
+- **`0062`** — `groups.display_name`: Spalte für den Anzeigenamen, anfangs leer.
+  Bestandsdaten sind nicht betroffen.
 
 ## [0.10.1] – 2026-09-15
 
