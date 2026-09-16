@@ -18,6 +18,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Stundenplan übernommenes Muster nicht vorher speicherte, bekam Stunden aus dem alten
   Muster — bei einer neuen Gruppe keine.
 - „Muster speichern" gab keine Rückmeldung.
+- Ein 14-tägiger Termin, der im Abrufzeitraum einmal ausfiel, wurde als wöchentlich
+  vorgeschlagen. Erkannt wird jetzt die Woche, zu der die Beobachtungen passen, auch
+  wenn sie unvollständig sind — als unsicher gekennzeichnet.
 
 ## [0.10.1] – 2026-09-15
 

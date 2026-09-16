@@ -311,14 +311,37 @@ def _rhythmus(
 
     Bei nur einer abgerufenen Woche ist die Frage nicht entscheidbar; dann gilt
     wöchentlich. Eine 14-tägige Vermutung aus einer einzigen Beobachtung wäre geraten.
+
+    Entschieden wird über **Teilmenge**, nicht über Gleichheit: Die beobachteten Wochen
+    müssen in *eine* der beiden Paritätsklassen passen, sie müssen sie nicht ausfüllen.
+    Bis zum 16.09.2026 war Gleichheit verlangt — fiel eine Stunde in der ersten A-Woche
+    aus, war {3} weder gleich {1,3} noch gleich {2,4}, und die Funktion fiel auf ihren
+    Vorgabewert `woechentlich` durch. Aus dem **schwächsten** Beleg wurde so die
+    **stärkste** Behauptung:
+
+    | Annahme      | erwartet | gesehen | fehlt |
+    | ------------ | -------: | ------: | ----: |
+    | A-Woche      |        2 |       1 |     1 |
+    | wöchentlich  |        4 |       1 |     3 |
+
+    Gewählt wird jetzt die Annahme, die weniger Fehlstellen braucht.
+
+    **Die Kehrseite, bewusst in Kauf genommen:** Eine *wöchentliche* Stunde, die dreimal
+    von vier ausfällt, heißt danach „A-Woche" statt „wöchentlich". Das ist derselbe Tausch
+    zugunsten der besseren Erklärung — und beide Fälle sind über `sicher` als prüfbedürftig
+    gekennzeichnet (1 von 4 erfüllt auch die 14-tägige Schwelle nicht).
+
+    Verteilen sich die Beobachtungen über **beide** Paritäten, bleibt es wöchentlich: Dann
+    erklärt keine 14-tägige Annahme die Daten.
     """
     if anzahl < 2 or len(indizes) == anzahl:
         return WOECHENTLICH
     a_wochen = {i for i in alle if phase[i] == 0}
     b_wochen = alle - a_wochen
-    if indizes == a_wochen and a_wochen:
+    # `indizes` ist nie leer — ein Eintrag entsteht erst mit der ersten Beobachtung.
+    if indizes <= a_wochen and a_wochen:
         return A_WOCHE
-    if indizes == b_wochen and b_wochen:
+    if indizes <= b_wochen and b_wochen:
         return B_WOCHE
     return WOECHENTLICH
 

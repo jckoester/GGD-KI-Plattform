@@ -516,6 +516,53 @@ def test_ohne_phasen_bleibt_es_bei_der_fensterparitaet():
     assert etiketten == [A_WOCHE, B_WOCHE]
 
 
+def test_unvollstaendig_beobachtetes_muster_bleibt_vierzehntaegig():
+    """Gemeldet 15.09.2026: Ein Leistungskurs, dessen Doppelstunde in der ersten A-Woche
+    ausfiel, wurde als **wöchentlich** vorgeschlagen.
+
+    Beobachtet war nur die zweite A-Woche. Das ist weder gleich der A-Menge noch gleich
+    der B-Menge — die Funktion fiel auf ihren Vorgabewert durch und behauptete damit aus
+    einer Beobachtung, die Stunde finde jede Woche statt. A-Woche braucht eine Fehlstelle,
+    wöchentlich drei.
+    """
+    from app.planning.calendar import ab_phasen
+
+    phasen = ab_phasen(_cfg())
+    start = date(2026, 6, 8)
+    wochen = [start + timedelta(weeks=n) for n in range(4)]
+    a_wochen = [w for w in wochen if phasen[w] == 0]
+
+    # Nur in der **zweiten** A-Woche gesehen; Sport hält alle vier Wochen belegt.
+    lessons = [stunde(a_wochen[1], 1)] + [
+        stunde(w + timedelta(days=4), 11, fach="SP", klasse=("7A",)) for w in wochen
+    ]
+    ergebnis = derive_patterns(lessons, wochen=wochen, phasen=phasen, timegrid=TIMEGRID)
+    muster = [p for p in ergebnis.proposals if p.key.label == "M 5C"][0]
+    assert muster.rhythmus == A_WOCHE
+    assert muster.gesehen == 1 and muster.wochen == 4
+    assert not muster.sicher, "eine von vier Wochen trägt keine Sicherheit"
+
+
+def test_ueber_beide_paritaeten_verteilt_bleibt_es_woechentlich():
+    """Gegenstück: Wo keine 14-tägige Annahme passt, wird auch keine behauptet.
+
+    Drei von vier Wochen — das erklärt weder A noch B, wohl aber „wöchentlich mit einer
+    Lücke". Ohne diese Grenze würde aus jeder Lücke ein 14-tägiger Termin.
+    """
+    from app.planning.calendar import ab_phasen
+
+    phasen = ab_phasen(_cfg())
+    start = date(2026, 6, 8)
+    wochen = [start + timedelta(weeks=n) for n in range(4)]
+    lessons = [stunde(w, 1) for w in wochen[:3]] + [
+        stunde(w + timedelta(days=4), 11, fach="SP", klasse=("7A",)) for w in wochen
+    ]
+    ergebnis = derive_patterns(lessons, wochen=wochen, phasen=phasen, timegrid=TIMEGRID)
+    muster = [p for p in ergebnis.proposals if p.key.label == "M 5C"][0]
+    assert muster.rhythmus == WOECHENTLICH
+    assert not muster.sicher
+
+
 def test_die_phase_stammt_aus_dem_schuljahr_nicht_aus_dem_fenster():
     """Welche Wochen A sind, entscheidet `ab_phasen` — nachgerechnet, nicht angenommen."""
     from app.planning.calendar import ab_phasen
