@@ -1964,6 +1964,17 @@ export async function generateSlots(groupId, halbjahr, regenerate = false) {
     return res.json()
 }
 
+export async function setGruppenAnzeigename(groupId, displayName) {
+    const res = await fetch(`${BASE}/groups/teaching/${groupId}/name`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: displayName }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Name konnte nicht gespeichert werden')
+    return res.json()
+}
+
 export async function getAbWochen(halbjahr) {
     const res = await fetch(`${BASE}/planning/ab-wochen?halbjahr=${halbjahr}`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'A-/B-Wochen konnten nicht geladen werden')

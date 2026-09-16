@@ -114,7 +114,7 @@ async def list_former_groups(
     stmt = (
         sa.select(
             Group.id,
-            Group.name,
+            sa.func.coalesce(Group.display_name, Group.name),
             Group.subject_id,
             sa.func.coalesce(knoten.c.anzahl, 0),
             sa.func.coalesce(chats.c.anzahl, 0),

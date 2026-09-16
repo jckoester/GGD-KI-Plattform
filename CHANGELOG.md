@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Anzeigename für Unterrichtsgruppen.** Im Profil unter „Meine Unterrichtsgruppen"
+  lässt sich einer Gruppe ein lesbarer Name geben, statt `ch2-ks-abi28` aus dem
+  Schulkonto zu zeigen. Er gilt für alle, die die Gruppe sehen; leer lassen nimmt ihn
+  zurück. Die Zuordnung zum Stundenplan bleibt davon unberührt.
+
 ### Geändert
 
 - Der Wochenmuster-Dialog schließt den Ablauf mit **einem** Knopf ab: „Speichern und

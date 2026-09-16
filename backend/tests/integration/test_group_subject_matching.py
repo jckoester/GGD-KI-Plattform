@@ -590,3 +590,51 @@ async def _erbe_aufraeumen(factory, pseudonyme, klassen_slugs, fach_slug):
             Group.slug.in_(klassen_slugs) | Group.slug.like("teaching-adoptiert-%")))
         await db.execute(delete(Subject).where(Subject.slug == fach_slug))
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_der_sync_laesst_den_anzeigenamen_stehen(async_engine):
+    """Der Kern der Entscheidung, `display_name` als eigene Spalte zu führen.
+
+    `sync_groups` schreibt `group.name` bei **jedem** Login neu — der Name gehört dem
+    Schulkonto. Läge der selbst vergebene Name dort, wäre er nach der nächsten Anmeldung
+    weg, und zwar lautlos. Dieser Test hält fest, dass der Sync ihn nicht anfasst und den
+    rohen Namen trotzdem weiterhin nachführt.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    pseudonym = "pseudo-anzeigename"
+    sso = "unterricht.ch2-ks-abi28"
+    try:
+        await sync_groups(
+            await _session(factory), pseudonym, [sso], "teacher", PATTERNS
+        )
+        async with factory() as db:
+            gruppe = (await db.execute(
+                select(Group).where(Group.sso_group_id == sso.lower())
+            )).scalar_one()
+            roh = gruppe.name
+            gruppe.display_name = "Chemie LK Abi 28"
+            await db.commit()
+
+        # Zweite Anmeldung — dabei schreibt der Sync `name` neu.
+        await sync_groups(
+            await _session(factory), pseudonym, [sso], "teacher", PATTERNS
+        )
+        async with factory() as db:
+            gruppe = (await db.execute(
+                select(Group).where(Group.sso_group_id == sso.lower())
+            )).scalar_one()
+            assert gruppe.display_name == "Chemie LK Abi 28"
+            assert gruppe.name == roh, "der rohe Name wird weiter vom Schulkonto geführt"
+            assert gruppe.anzeigename == "Chemie LK Abi 28"
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(
+                GroupMembership.pseudonym == pseudonym))
+            await db.execute(delete(Group).where(Group.sso_group_id == sso.lower()))
+            await db.commit()
+
+
+async def _session(factory) -> AsyncSession:
+    """`sync_groups` committet selbst — es bekommt deshalb eine eigene Sitzung."""
+    return factory()

@@ -1,7 +1,7 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
-    import { ArrowLeft, Check, ChevronRight, Trash2, X } from "lucide-svelte";
+    import { ArrowLeft, Check, ChevronRight, Pencil, Trash2, X } from "lucide-svelte";
     import {
         aktuelleTeachingGroups,
         fruehereTeachingGroups,
@@ -20,6 +20,7 @@
         removeExclusion,
         createTeachingGroup,
         deleteTeachingGroup,
+        setGruppenAnzeigename,
         addExclusion,
     } from "$lib/api.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -72,6 +73,29 @@
             await loadData();
         } catch (err) {
             error = err.message || "Fehler beim Reaktivieren";
+        }
+    }
+
+    // ── Anzeigename ──────────────────────────────────────────────────────────
+    //
+    // Der Name aus dem Schulkonto (`ch2-ks-abi28`) ist für die Oberfläche unbrauchbar.
+    // Umbenannt wird nur die **Anzeige**; der rohe Name bleibt, und die
+    // Stundenplan-Zuordnung rechnet weiter auf ihm — deshalb der Hinweis im Formular.
+    let bearbeiteteGruppe = $state(null);
+    let nameEntwurf = $state("");
+
+    function nameBearbeiten(group) {
+        bearbeiteteGruppe = group.id;
+        nameEntwurf = group.display_name ?? "";
+    }
+
+    async function nameSpeichern(groupId) {
+        try {
+            await setGruppenAnzeigename(groupId, nameEntwurf.trim() || null);
+            bearbeiteteGruppe = null;
+            await refreshMyGroups();
+        } catch (err) {
+            error = err.message || "Der Name konnte nicht gespeichert werden";
         }
     }
 
@@ -337,7 +361,34 @@
                 />
             {/if}
             <div class="min-w-0">
-                {#if href}
+                {#if bearbeiteteGruppe === group.id}
+                    <div class="flex items-center gap-2">
+                        <input
+                            bind:value={nameEntwurf}
+                            placeholder={group.name}
+                            onkeydown={(e) => {
+                                if (e.key === "Enter") nameSpeichern(group.id);
+                                if (e.key === "Escape") bearbeiteteGruppe = null;
+                            }}
+                            class="px-2 py-1 text-sm bg-light-bg dark:bg-dark-bg border border-light-ui-3 dark:border-dark-ui-3 rounded-md
+                                   text-light-tx dark:text-dark-tx outline-none focus:border-primary dark:focus:border-primary-dark"
+                        />
+                        <button
+                            onclick={() => nameSpeichern(group.id)}
+                            class="p-1 rounded text-light-gr dark:text-dark-gr hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
+                            title="Übernehmen"
+                        ><Check size={16} /></button>
+                        <button
+                            onclick={() => (bearbeiteteGruppe = null)}
+                            class="p-1 rounded text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
+                            title="Abbrechen"
+                        ><X size={16} /></button>
+                    </div>
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                        Leer lassen, um den Namen aus dem Schulkonto zu verwenden. Der
+                        Anzeigename ändert nichts an der Zuordnung zum Stundenplan.
+                    </p>
+                {:else if href}
                     <a
         {href}
         class="font-medium text-light-tx dark:text-dark-tx hover:text-light-bl dark:hover:text-dark-bl transition-colors truncate block"
@@ -361,6 +412,16 @@
             </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
+            {#if bearbeiteteGruppe !== group.id}
+                <button
+                    onclick={() => nameBearbeiten(group)}
+                    class="p-1.5 rounded-lg text-light-tx-2 dark:text-dark-tx-2
+                           hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"
+                    title="Anzeigename ändern"
+                >
+                    <Pencil size={16} />
+                </button>
+            {/if}
             <span
                 class="text-xs px-2 py-0.5 rounded-full
           {group.sso_group_id

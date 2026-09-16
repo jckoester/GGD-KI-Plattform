@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,14 +26,20 @@ router = APIRouter(prefix="/groups", tags=["groups"])
 
 class GroupOut(BaseModel):
     id: int
-    name: str
+    # Aufgelöst im Backend, nicht in der Oberfläche: 41 Stellen im Frontend zeigen einen
+    # Gruppennamen. Käme hier der rohe, wären es 41 Änderungen und 41 Gelegenheiten, eine
+    # zu vergessen. `Group.anzeigename` ist `display_name or name`.
+    name: str = Field(validation_alias="anzeigename")
     slug: str
     type: str
     subject_id: Optional[int]
     sso_group_id: Optional[str]
     source_class_group_id: Optional[int]
     created_at: datetime
-    model_config = ConfigDict(from_attributes=True)
+    # Was selbst vergeben wurde, oder `null`. `name` oben ist bereits aufgelöst; dieses
+    # Feld füllt das Eingabefeld beim Umbenennen und sagt, ob „zurücksetzen" etwas tut.
+    display_name: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class GroupListResponse(BaseModel):
@@ -330,11 +336,11 @@ class CreateTeachingGroupRequest(BaseModel):
 
 class TeachingGroupOut(BaseModel):
     id: int
-    name: str
+    name: str = Field(validation_alias="anzeigename")
     slug: str
     subject_id: Optional[int]
     source_class_group_id: Optional[int]
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 @router.post("/teaching", response_model=TeachingGroupOut, status_code=201)
@@ -451,6 +457,41 @@ async def delete_teaching_group(
 
     await db.delete(group)
     await db.commit()
+
+
+class AnzeigenameRequest(BaseModel):
+    # Leer oder nur Leerzeichen heißt: zurück auf den Namen aus dem Schulkonto.
+    display_name: Optional[str] = None
+
+
+@router.patch("/teaching/{group_id}/name", response_model=TeachingGroupOut)
+async def set_anzeigename(
+    group_id: int,
+    body: AnzeigenameRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Group:
+    """Einen eigenen Namen für die Unterrichtsgruppe setzen oder zurücknehmen.
+
+    **Für alle Unterrichtsgruppen, nicht nur die aus dem Schulkonto.** Der Anlass waren
+    zwar SSO-Namen wie `ch2-ks-abi28`, aber eine Ausnahme für adoptierte Gruppen wäre eine
+    Regel mehr ohne Gewinn.
+
+    Der Name aus dem Schulkonto (`name`) bleibt unberührt — er ist dessen Eigentum, wird
+    bei jedem Login neu geschrieben, und die Stundenplan-Zuordnung rechnet auf ihm.
+
+    Setzen darf, wer in der Gruppe als Lehrkraft eingetragen ist — dieselbe Bedingung, an
+    der auch die Jahresplanung hängt. Der Name gilt für **alle**, die die Gruppe sehen;
+    bei mehreren Lehrkräften gewinnt die zuletzt gesetzte Fassung.
+    """
+    from app.planning.permissions import require_group_teacher
+
+    group = await require_group_teacher(group_id, current_user, db)
+    gewuenscht = (body.display_name or "").strip()
+    group.display_name = gewuenscht or None
+    await db.commit()
+    await db.refresh(group)
+    return group
 
 
 class ExclusionOut(BaseModel):

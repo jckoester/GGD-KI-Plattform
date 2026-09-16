@@ -141,12 +141,22 @@ class Group(Base):
         ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
     )
     sso_group_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Selbst vergebener Name, vom Schulkonto-Sync unangetastet. `name` gehört dem
+    # Schulkonto (`sync_groups` überschreibt ihn bei jedem Login) und bleibt maßgeblich,
+    # wo Maschinen lesen — vor allem in der Stundenplan-Zuordnung, die den Klassennamen
+    # und die Kursart-Marker darin sucht.
+    display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_class_group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
+
+    @property
+    def anzeigename(self) -> str:
+        """Der Name für Menschen — der selbst vergebene, sonst der aus dem Schulkonto."""
+        return self.display_name or self.name
 
     __table_args__ = (
         CheckConstraint(

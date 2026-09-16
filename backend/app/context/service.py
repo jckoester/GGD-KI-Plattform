@@ -210,9 +210,12 @@ async def _group_label(db: AsyncSession, group_id: int) -> str:
     if group is None:
         return "Unterricht"
     subj = await db.get(Subject, group.subject_id) if group.subject_id else None
-    if subj and subj.name.lower() not in (group.name or "").lower():
-        return f"{subj.name}, {group.name}"
-    return group.name
+    # `anzeigename`: Was hier entsteht, lesen Menschen — in Chat-Beschriftungen und im
+    # Kontext des Modells. Der rohe Name aus dem Schulkonto gehört dorthin nicht.
+    name = group.anzeigename
+    if subj and subj.name.lower() not in (name or "").lower():
+        return f"{subj.name}, {name}"
+    return name
 
 
 async def _planning_block(db: AsyncSession, chat_id: UUID | None) -> str | None:

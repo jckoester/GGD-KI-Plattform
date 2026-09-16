@@ -21,15 +21,22 @@ _FAKE_USER = JwtPayload(
 _TS = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
 
-def _make_group(**kwargs) -> MagicMock:
+def _make_group(**kwargs):
+    """Ein **echtes** Group-Objekt.
+
+    Früher ein `MagicMock`. Der liefert für jedes Attribut etwas — auch für solche, die es
+    am Modell gar nicht gibt. Ein neues Antwortfeld (`display_name`, `anzeigename`) fiel
+    damit erst auf, als Pydantic sich an einem Mock verschluckte; ein fehlendes Feld wäre
+    stillschweigend durchgegangen.
+    """
+    from app.db.models import Group
+
     defaults = dict(id=1, name="Testgruppe", slug="testgruppe",
                     type="teaching_group", subject_id=None,
-                    sso_group_id=None, created_at=_TS)
+                    sso_group_id=None, source_class_group_id=None,
+                    display_name=None, created_at=_TS)
     defaults.update(kwargs)
-    g = MagicMock()
-    for k, v in defaults.items():
-        setattr(g, k, v)
-    return g
+    return Group(**defaults)
 
 
 def _make_db_mock(items: list) -> MagicMock:
