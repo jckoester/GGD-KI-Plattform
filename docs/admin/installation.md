@@ -14,7 +14,12 @@
 ```bash
 git clone https://github.com/jckoester/GGD-KI-Plattform.git ki-plattform
 cd ki-plattform
+git checkout "$(git tag --sort=-v:refname | head -1)"   # neueste Version
 ```
+
+> **Auf eine Version, nicht auf `main`.** Auf `main` liegt auch angefangene Arbeit an der
+> nächsten Version. Welcher Stand installiert ist, beantwortet später `git describe --tags`;
+> das Aktualisieren beschreibt [Updates & Wartung](updates-und-wartung.md).
 
 ## Schritt 2: Konfiguration anlegen
 

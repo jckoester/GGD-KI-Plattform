@@ -3,11 +3,22 @@
 ## Reguläres Update
 
 ```bash
-git pull
+git fetch --tags
+git checkout 0.10.2          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
 ```
+
+> **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
+> also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.10.2`, und
+> `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
+>
+> Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
+> bleiben beim Wechsel unangetastet.
+>
+> Welche Versionen es gibt: `git tag --sort=-v:refname | head`.
 
 > ⚠️ **Erst migrieren, dann starten — und `run`, nicht `exec`.** Das Backend prüft beim
 > Start, ob die Datenbank auf dem erwarteten Stand ist, und bricht sonst ab. Zusammen mit
@@ -35,6 +46,33 @@ docker compose logs -f backend
 
 Läuft alles, kann anschließend der Platz der überholten Images freigegeben werden — jedes
 Update hinterlässt welche.
+
+## Eine Version zurück
+
+```bash
+git checkout 0.10.1
+docker compose build --no-cache
+docker compose up -d
+```
+
+> ⚠️ **Der Code geht zurück, die Datenbank nicht.** Hat das Update migriert, steht das
+> Schema weiter auf dem neueren Stand. Die Startprüfung erkennt genau das („Datenbank
+> voraus") und bricht ab — ein `upgrade` hilft dann nicht, es ist ja nichts zu holen.
+>
+> Zurückgenommen wird **schrittweise**, einmal je Migration, die das Update ausgeführt
+> hat:
+>
+> ```bash
+> docker compose run --rm backend alembic downgrade -1
+> ```
+>
+> Wie viele Schritte das sind, nennt der CHANGELOG-Abschnitt „Migration" der Version, die
+> **verlassen** wird — er listet die dort ausgeführten Revisionen. (Beim Weg von 0.10.2
+> zurück auf 0.10.1: eine, nämlich `0062`.)
+>
+> Eine Migration rückwärts kann **Daten verlieren** — eine gelöschte Spalte ist gelöscht.
+> Vor dem Zurückgehen einen Auszug der Datenbank anlegen. Ohne Migration im Spiel ist der
+> Rückweg dagegen harmlos: Code tauschen, bauen, starten.
 
 ## Speicherplatz freigeben
 

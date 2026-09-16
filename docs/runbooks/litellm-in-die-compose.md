@@ -102,7 +102,8 @@ bleibt, bis die Abnahme durch ist.
 
 ```bash
 # Im ANWENDUNGS-Verzeichnis
-git pull
+git fetch --tags
+git checkout <version>     # die Version, die den Proxy-Dienst mitbringt
 ```
 
 ### 4. Datenbank anlegen
