@@ -120,7 +120,10 @@ function renderKatexPlaceholder(tex, display) {
         return d + tex + d;
     }
     const id = _mathCount++;
-    _mathStore[id] = html;
+    const d = display ? '$$' : '$';
+    // Die Quellnotation wird mitgeführt: Landet der Platzhalter in einem ATTRIBUT
+    // (Bild-`alt`), tritt sie an die Stelle der HTML-Ausgabe — siehe renderMarkdown.
+    _mathStore[id] = { html, quelle: d + tex + d };
     return `KMATH${_mathNonce}X${id}X`;
 }
 
@@ -189,6 +192,16 @@ marked.use({ extensions: [katexBlockExt, katexInlineExt] });
 // eslint-disable-next-line no-useless-escape
 const ALLOWED_URI_REGEXP = /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
+/** Escapet einen Wert für die Verwendung INNERHALB eines Attributs. */
+function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+}
+
+// Ein vollständiges Tag der sanitisierten Ausgabe — inklusive Attributwerten, die ein
+// `>` enthalten dürfen (`alt="a>b"`). DOMPurify serialisiert Werte stets in doppelten
+// Anführungszeichen, `"[^"]*"` deckt sie deshalb ab.
+const TAG = '<(?:[^>"]|"[^"]*")*>';
+
 export function renderMarkdown(text) {
     if (!text) return '';
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
@@ -199,14 +212,27 @@ export function renderMarkdown(text) {
     const clean = DOMPurify.sanitize(marked.parse(text), {
         ADD_TAGS: ['div'],
         ADD_ATTR: ['data-lang', 'class', 'target', 'rel'],
+        // `style` ist DOMPurify-Voreinstellung, hier aber unerwünscht: Eine LLM-Antwort
+        // oder ein schulweiter Wissensknoten könnte damit `url(https://fremd/…)` laden
+        // (Ruf nach draußen, den diese Plattform gerade vermeidet) oder sich per
+        // `position:fixed` über die Seite legen. KaTeX ist nicht betroffen — seine
+        // Inline-Styles werden erst NACH der Sanitisierung eingesetzt.
+        FORBID_ATTR: ['style'],
         ALLOWED_URI_REGEXP,
     });
 
     if (_mathCount === 0) return clean;
-    // Platzhalter durch die (vertrauenswürdige) KaTeX-Ausgabe ersetzen.
-    return clean.replace(
-        new RegExp(`KMATH${_mathNonce}X(\\d+)X`, 'g'),
-        (_, id) => _mathStore[id] ?? '',
+    // Platzhalter durch die (vertrauenswürdige) KaTeX-Ausgabe ersetzen — aber **nur im
+    // Textfluss**. `![$x^2$](bild.png)` legt den Platzhalter im `alt`-ATTRIBUT ab; rohes
+    // HTML bricht es dort auf, die Spans rutschen aus dem Tag heraus und der alt-Text,
+    // den ein Screenreader vorliest, wird zu `<span class=`. Innerhalb eines Tags tritt
+    // deshalb die Quellnotation als escapeter Klartext an die Stelle der Ausgabe.
+    const platzhalter = `KMATH${_mathNonce}X(\\d+)X`;
+    const imTag = new RegExp(platzhalter, 'g');
+    return clean.replace(new RegExp(`${TAG}|${platzhalter}`, 'g'), (treffer, id) =>
+        id !== undefined
+            ? _mathStore[id]?.html ?? ''
+            : treffer.replace(imTag, (_, tagId) => escapeAttr(_mathStore[tagId]?.quelle ?? '')),
     );
 }
 

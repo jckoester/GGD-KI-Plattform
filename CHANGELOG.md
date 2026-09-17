@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Sicherheit
+
+- Inline-`style` aus Chat-Antworten, Wissensknoten und Curricula wird entfernt. Er
+  konnte externe Adressen nachladen oder sich über die Seite legen.
+- Eine Formel im Alternativtext eines Bildes (`![$x^2$](bild.png)`) brach das Attribut
+  auf; sie bleibt jetzt Klartext.
+- Frontend-Abhängigkeiten aktualisiert (DOMPurify, Mermaid, Svelte u. a.). Die
+  Produktivabhängigkeiten melden keine offenen Schwachstellen mehr.
+
 ## [0.10.2] – 2026-09-16
 
 Nacharbeiten aus dem Praxiseinsatz: Der Wochenmuster-Dialog führt durch den Ablauf,

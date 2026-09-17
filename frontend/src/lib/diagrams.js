@@ -57,6 +57,15 @@ export function renderDiagrams(node) {
             block.dataset.source = source; // Rohquelle für „In Bibliothek speichern" bewahren
             try {
                 const { svg } = await mermaid.render(`mermaid-svg-${_seq++}`, source);
+                // ⚠️ Hier steht bewusst KEIN `sanitizeSvg` — anders als im
+                // Schwestermodul serverRender.js. Nachgemessen (17.09.2026): Das dortige
+                // Profil entfernt `<foreignObject>`, und genau darin liefert Mermaid die
+                // Knotenbeschriftungen. Sanitisieren hieße also: alle Labels weg.
+                // Die Grenze hält hier stattdessen `securityLevel: 'strict'` (Mermaid
+                // sanitisiert seine Labels selbst) — was voraussetzt, dass die Version
+                // aktuell bleibt: 11.15.0 hatte eine CSS-Injektion auf Nachbarelemente
+                // (GHSA-6x64-9x62-f2gx, behoben in 11.16.1). Wer hier härten will,
+                // braucht ein mermaid-taugliches Profil, keinen Einzeiler.
                 block.innerHTML = svg;
             } catch {
                 block.innerHTML =

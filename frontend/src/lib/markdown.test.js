@@ -262,3 +262,104 @@ describe('renderInlineMath — echte Bildungsplan-Titel', () => {
         expect(html.match(/class="katex"/g)?.length).toBe(2)
     })
 })
+
+// ── Sanitisierungs-Durchgang 17.09.2026 ─────────────────────────────────────
+// Die älteren Zusagen oben prüfen auf `not.toContain('<script>')`. Das ist die schwache
+// Form: Sie übersieht jeden Vektor, der ohne dieses Tag auskommt. Die folgenden Tests
+// bauen die Ausgabe deshalb zu echtem DOM und schauen nach, was darin steht.
+
+/** Rendert und gibt das aufgebaute DOM zurück. */
+function alsDom(md) {
+    const wurzel = document.createElement('div')
+    wurzel.innerHTML = renderMarkdown(md)
+    return wurzel
+}
+
+/** Alle Event-Handler-Attribute (`on…`) im Ergebnis. */
+function handler(wurzel) {
+    return [...wurzel.querySelectorAll('*')].flatMap((el) =>
+        [...el.attributes].filter((a) => /^on/i.test(a.name)).map((a) => `${el.tagName}/${a.name}`),
+    )
+}
+
+describe('renderMarkdown — kein aktiver Inhalt (am DOM geprüft)', () => {
+    const NUTZLASTEN = [
+        ['img onerror', '<img src=x onerror=alert(1)>'],
+        ['svg onload', '<svg onload=alert(1)></svg>'],
+        ['iframe srcdoc', '<iframe srcdoc="<script>alert(1)</script>"></iframe>'],
+        ['title-Ausbruch', '[x](https://a.de "t\\" onmouseover=\\"alert(1)")'],
+        ['mXSS noscript', '<noscript><p title="</noscript><img src=x onerror=alert(1)>"></noscript>'],
+        ['mXSS math/mtext', '<math><mtext><table><mglyph><style><!--</style><img src=x onerror=alert(1)>'],
+    ]
+
+    for (const [name, nutzlast] of NUTZLASTEN) {
+        it(`${name} hinterlässt keinen Handler`, () => {
+            expect(handler(alsDom(nutzlast))).toEqual([])
+        })
+    }
+
+    it('DOM-Clobbering über name="nodeName" wird entschärft', () => {
+        const dom = alsDom('<form><input name="nodeName"></form>')
+        expect(dom.querySelector('input')?.getAttribute('name')).toBeNull()
+    })
+
+    it('KaTeX \\href erzeugt keinen Link (trust:false)', () => {
+        const dom = alsDom('$\\href{javascript:alert(1)}{klick}$')
+        expect(dom.querySelector('a')).toBeNull()
+        // Die Quelle bleibt im MathML-`annotation`-Element stehen — als Text, nicht als
+        // URL. Geprüft wird deshalb, dass KEIN Attribut das Schema trägt.
+        const attribute = [...dom.querySelectorAll('*')].flatMap((el) =>
+            [...el.attributes].map((a) => a.value),
+        )
+        expect(attribute.some((v) => v.includes('javascript:'))).toBe(false)
+    })
+})
+
+describe('renderMarkdown — `style` ist kein Kanal nach draußen', () => {
+    it('entfernt style mit externer URL', () => {
+        const html = renderMarkdown('<p style="background:url(https://fremd.example/beacon)">x</p>')
+        expect(html).not.toContain('fremd.example')
+        expect(html).not.toContain('style=')
+    })
+
+    it('entfernt style, das die Seite überdecken würde', () => {
+        const html = renderMarkdown('<div style="position:fixed;inset:0;z-index:9999">X</div>')
+        expect(html).not.toContain('position:fixed')
+    })
+
+    it('die Inline-Styles von KaTeX bleiben — sie kommen erst nach der Sanitisierung', () => {
+        // Sonst wäre die Formeldarstellung zerstört: KaTeX setzt Höhen und Abstände
+        // ausschließlich über style.
+        expect(renderMarkdown('$x^2$')).toContain('style="height')
+    })
+})
+
+describe('renderMarkdown — Formeln brechen kein Attribut auf', () => {
+    it('Formel im alt-Text bleibt Klartext statt HTML', () => {
+        const dom = alsDom('![$x^2$](https://a.de/b.png)')
+        const img = dom.querySelector('img')
+        expect(img?.getAttribute('alt')).toBe('$x^2$')
+        // Nichts ist aus dem Tag herausgerutscht: das Bild ist das einzige Element.
+        expect(dom.querySelectorAll('span.katex')).toHaveLength(0)
+    })
+
+    it('auch mit einem `>` im alt-Text davor', () => {
+        // Das `>` bleibt im Attributwert unescaped — ein naiver Tag-Scanner hielte das
+        // Tag hier für beendet und setzte den Rest als HTML ein.
+        const dom = alsDom('![a > b $x^2$](https://a.de/b.png)')
+        expect(dom.querySelector('img')?.getAttribute('alt')).toBe('a > b $x^2$')
+        expect(dom.querySelectorAll('span.katex')).toHaveLength(0)
+    })
+
+    it('im Textfluss wird weiterhin echtes KaTeX eingesetzt', () => {
+        const dom = alsDom('Text $x^2$ und ![bild](https://a.de/b.png)')
+        expect(dom.querySelectorAll('span.katex').length).toBeGreaterThan(0)
+        expect(dom.querySelector('img')?.getAttribute('alt')).toBe('bild')
+    })
+
+    it('Anführungszeichen in der Formel sprengen das Attribut nicht', () => {
+        const dom = alsDom('![$\\text{a"b}$](https://a.de/b.png)')
+        expect(dom.querySelectorAll('img')).toHaveLength(1)
+        expect(handler(dom)).toEqual([])
+    })
+})
