@@ -156,7 +156,13 @@
     --color-light-secondary: var(--color-base-200);
     --color-dark-secondary: var(--color-base-900);
     --color-light-tx: var(--color-black);
-    --color-light-tx-2: var(--color-base-600);
+    /* base-700, nicht base-600: Als Sekundärfarbe der meistgenutzte Text des
+     * Projekts (rund 800 Stellen), und mit base-600 erreichte er auf KEINER hellen
+     * Fläche 4,5:1 (3,20 auf ui-3 bis 4,47 auf bg-2). Mit base-700 tragen alle
+     * (4,59-6,42). Eine Stufe weiter (base-800) wäre kontrastreicher, rückt dem
+     * Primärtext aber auf 1,80 heran - dann ist „sekundär" nicht mehr zu sehen;
+     * base-700 hält 2,61 Abstand. Gemessen 17.09.2026. */
+    --color-light-tx-2: var(--color-base-700);
     --color-light-tx-3: var(--color-base-300);
     --color-light-ui: var(--color-base-100);
     --color-light-ui-2: var(--color-base-150);
@@ -177,6 +183,12 @@
     --color-light-bl: var(--color-blue-600);
     --color-light-pu: var(--color-purple-600);
     --color-light-ma: var(--color-magenta-600);
+    /* ⚠️ red-400 bleibt, obwohl es als SCHRIFT im Dunkelmodus zu schwach ist
+     * (4,42 auf dem Seitengrund, 3,44 auf ui). Eine Stufe heller (red-300) würde
+     * genau das lösen - und die 57 GEFÜLLTEN Flächen brechen, die dasselbe Token
+     * tragen: Weiß auf red-400 fällt von 4,33 auf 3,04. Ein Token, zwei Rollen.
+     * Wer die Schrift heben will, braucht ein eigenes Token dafür, keinen
+     * Palettenschub. Gemessen 17.09.2026. */
     --color-dark-re: var(--color-red-400);
     --color-dark-or: var(--color-orange-400);
     --color-dark-ye: var(--color-yellow-400);

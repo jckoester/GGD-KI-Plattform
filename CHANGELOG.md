@@ -14,6 +14,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Frontend-Abhängigkeiten aktualisiert (DOMPurify, Mermaid, Svelte u. a.). Die
   Produktivabhängigkeiten melden keine offenen Schwachstellen mehr.
 
+### Geändert
+
+- **Lesbarkeit.** Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen jetzt auf
+  getöntem Grund mit gewohnter Schriftfarbe; die Farbe tragen Rand und Sinnbild. Der
+  Warnkasten war im Hellmodus praktisch unlesbar. Ebenso die Kategorie-Chips der
+  Datensparsamkeits-Warnung. Sekundärer Text ist durchgehend etwas dunkler.
+
 ## [0.10.2] – 2026-09-16
 
 Nacharbeiten aus dem Praxiseinsatz: Der Wochenmuster-Dialog führt durch den Ablauf,

@@ -55,8 +55,8 @@
                 {#each categories as cat}
                     <span
                         class="px-2 py-0.5 rounded-full text-xs font-medium
-                               bg-light-ye-2 dark:bg-dark-ye-2
-                               text-dark-tx dark:text-light-tx
+                               bg-light-ye-bg dark:bg-dark-ye-bg
+                               text-light-tx dark:text-dark-tx
                                border border-light-ye dark:border-dark-ye"
                     >
                         {labelFor(cat)}
