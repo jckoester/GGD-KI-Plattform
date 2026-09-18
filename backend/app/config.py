@@ -219,6 +219,12 @@ class Settings(BaseSettings):
     upload_max_files: int = 3
     assistant_schema_path: str = "config/assistant_schema.json"
     teacher_schoolwide_sharing_requires_admin: bool = True
+    # Begrenzter Testbetrieb: Schüler:innen sehen nur Fächer, deren Unterrichtsgruppe
+    # die Lehrkraft ausdrücklich freigegeben hat (`groups.student_visible`, Alembic
+    # 0063). Aus heißt: Die Spalte wird nicht gelesen, die Fachsicht ist die gewohnte.
+    # Die Freigabe selbst lässt sich unabhängig davon setzen — eine Lehrkraft darf
+    # vorbereiten, auch wenn der Modus gerade aus ist.
+    student_subjects_opt_in: bool = False
     schulart: str = "GYM"
     export_school_name: str = ""  # Schulname für Curriculum-Export (PDF-Kopfzeile + YAML `schule`)
     # Name der Plattform, wie ihn auch das Frontend anzeigt (`branding.name`). Wird in der

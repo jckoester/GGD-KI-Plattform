@@ -215,3 +215,48 @@ def test_antwort_baut_sich_aus_echtem_modell():
 
     with pytest.raises(ValidationError):
         MyGroupOut.model_validate(gruppe, from_attributes=True)
+
+
+# ── GET /groups/config ────────────────────────────────────────────────────────
+# Der Endpunkt reicht Schalter an die Oberfläche durch. Für `student_subjects_opt_in`
+# (begrenzter Testbetrieb, Alembic 0063) hängt daran zweierlei: ob der Freigabe-Schalter
+# bei den Unterrichtsgruppen überhaupt erscheint, und ob der Schülerzweig filtert. Meldet
+# er falsch, ist entweder ein wirkungsloser Schalter zu sehen oder die Freigabe wirkungslos.
+
+def _config_app(*, opt_in: bool, manuelle_gruppen: bool = True) -> FastAPI:
+    from app.api import groups as groups_module
+    from app.auth.config import SsoConfig
+    from app.auth.dependencies import get_sso_config
+
+    app = _make_app(_make_db_mock([]))
+    app.dependency_overrides[get_sso_config] = lambda: SsoConfig(
+        allow_manual_teaching_groups=manuelle_gruppen
+    )
+    groups_module.settings.student_subjects_opt_in = opt_in
+    return app
+
+
+@pytest.fixture(autouse=True)
+def _schalter_zuruecksetzen():
+    """Der Schalter ist ein Prozess-Zustand — sonst färbt ein Test auf den nächsten ab."""
+    from app.api import groups as groups_module
+
+    vorher = groups_module.settings.student_subjects_opt_in
+    yield
+    groups_module.settings.student_subjects_opt_in = vorher
+
+
+@pytest.mark.parametrize("opt_in", [True, False])
+def test_config_meldet_den_testbetriebs_schalter(opt_in):
+    client = TestClient(_config_app(opt_in=opt_in))
+    resp = client.get("/groups/config")
+    assert resp.status_code == 200
+    assert resp.json()["student_subjects_opt_in"] is opt_in
+
+
+def test_config_meldet_weiterhin_manuelle_gruppen():
+    """Der neue Schalter tritt neben den vorhandenen, er ersetzt ihn nicht."""
+    client = TestClient(_config_app(opt_in=True, manuelle_gruppen=False))
+    daten = client.get("/groups/config").json()
+    assert daten["allow_manual_teaching_groups"] is False
+    assert daten["student_subjects_opt_in"] is True

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.config import SsoConfig
 from app.auth.dependencies import get_current_user, get_sso_config
 from app.auth.jwt import JwtPayload
+from app.config import settings
 from app.context.grades import parse_class_grade as _parse_grade
 from app.db.models import (
     ContextNode,
@@ -211,6 +212,11 @@ async def list_my_groups(
 
 class GroupsConfigResponse(BaseModel):
     allow_manual_teaching_groups: bool
+    # Begrenzter Testbetrieb (Alembic 0063): Schüler:innen sehen nur freigegebene
+    # Unterrichtsgruppen. Die Oberfläche braucht die Auskunft an zwei Stellen — um den
+    # Freigabe-Schalter überhaupt zu zeigen (ein Schalter ohne Wirkung ist schlimmer als
+    # keiner) und um im Schülerzweig zu filtern.
+    student_subjects_opt_in: bool
 
 
 @router.get("/config", response_model=GroupsConfigResponse)
@@ -219,7 +225,8 @@ async def get_groups_config(
     sso_config: SsoConfig = Depends(get_sso_config),
 ) -> GroupsConfigResponse:
     return GroupsConfigResponse(
-        allow_manual_teaching_groups=sso_config.allow_manual_teaching_groups
+        allow_manual_teaching_groups=sso_config.allow_manual_teaching_groups,
+        student_subjects_opt_in=settings.student_subjects_opt_in,
     )
 
 
