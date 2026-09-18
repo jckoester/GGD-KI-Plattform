@@ -28,13 +28,18 @@ def _make_group(**kwargs):
     am Modell gar nicht gibt. Ein neues Antwortfeld (`display_name`, `anzeigename`) fiel
     damit erst auf, als Pydantic sich an einem Mock verschluckte; ein fehlendes Feld wäre
     stillschweigend durchgegangen.
+
+    Die Vorgaben bilden eine **gespeicherte** Zeile nach. `student_visible` gehört dazu:
+    Python-seitige Spaltenvorgaben greifen erst beim `flush()` — davor steht `None` am
+    Objekt, was kein `bool` ist. Produktiv tritt das nicht auf (nachgemessen: `db.add` +
+    `flush` ⇒ `False`), am unverankerten Objekt im Test aber schon.
     """
     from app.db.models import Group
 
     defaults = dict(id=1, name="Testgruppe", slug="testgruppe",
                     type="teaching_group", subject_id=None,
                     sso_group_id=None, source_class_group_id=None,
-                    display_name=None, created_at=_TS)
+                    display_name=None, student_visible=False, created_at=_TS)
     defaults.update(kwargs)
     return Group(**defaults)
 
@@ -129,6 +134,8 @@ def _gruppe(**kwargs):
     daten = dict(
         id=1, name="Mathematik 9C", slug="m-9c", type="teaching_group",
         subject_id=None, sso_group_id=None, source_class_group_id=None,
+        # Wie eine gespeicherte Zeile: Spaltenvorgaben greifen erst beim `flush()`.
+        student_visible=False,
         created_at=datetime(2025, 9, 20, tzinfo=timezone.utc),   # letztes Schuljahr
     )
     daten.update(kwargs)

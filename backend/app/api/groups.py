@@ -40,6 +40,11 @@ class GroupOut(BaseModel):
     # Was selbst vergeben wurde, oder `null`. `name` oben ist bereits aufgelöst; dieses
     # Feld füllt das Eingabefeld beim Umbenennen und sagt, ob „zurücksetzen" etwas tut.
     display_name: Optional[str] = None
+    # Freigabe für die Schüler:innen dieser Gruppe (begrenzter Testbetrieb, Alembic 0063).
+    # Immer mitgeliefert, auch wenn der Modus aus ist: Die Oberfläche entscheidet anhand
+    # von `student_subjects_opt_in` aus `GET /groups/config`, ob sie darauf hört. Das Feld
+    # von der Betriebsart abhängig zu machen hieße, zwei Schalter im Gleichklang zu halten.
+    student_visible: bool = False
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -347,6 +352,7 @@ class TeachingGroupOut(BaseModel):
     slug: str
     subject_id: Optional[int]
     source_class_group_id: Optional[int]
+    student_visible: bool = False
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -496,6 +502,40 @@ async def set_anzeigename(
     group = await require_group_teacher(group_id, current_user, db)
     gewuenscht = (body.display_name or "").strip()
     group.display_name = gewuenscht or None
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+class SchuelerSichtbarkeitRequest(BaseModel):
+    student_visible: bool
+
+
+@router.patch("/teaching/{group_id}/student-visible", response_model=TeachingGroupOut)
+async def set_schueler_sichtbarkeit(
+    group_id: int,
+    body: SchuelerSichtbarkeitRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Group:
+    """Die Gruppe für ihre Schüler:innen freigeben oder die Freigabe zurücknehmen.
+
+    Gedacht für den **begrenzten Testbetrieb**: Nimmt eine Lehrkraft mit einem Teil ihrer
+    Lerngruppen teil, sollen ihre Schüler:innen nur die dazugehörigen Fächer sehen. Gelesen
+    wird die Freigabe nur bei `STUDENT_SUBJECTS_OPT_IN=true`.
+
+    **Der Endpunkt arbeitet unabhängig von diesem Schalter.** Eine Lehrkraft darf ihre
+    Gruppen vorbereiten, auch wenn der Modus gerade aus ist — und beim Abschalten des
+    Modus bleiben die Freigaben stehen, statt verloren zu gehen.
+
+    Setzen darf, wer in der Gruppe als Lehrkraft eingetragen ist — dieselbe Bedingung wie
+    beim Anzeigenamen und in der Jahresplanung. Die Freigabe gilt für **alle**
+    Schüler:innen der Gruppe; bei mehreren Lehrkräften gewinnt die zuletzt gesetzte.
+    """
+    from app.planning.permissions import require_group_teacher
+
+    group = await require_group_teacher(group_id, current_user, db)
+    group.student_visible = body.student_visible
     await db.commit()
     await db.refresh(group)
     return group
