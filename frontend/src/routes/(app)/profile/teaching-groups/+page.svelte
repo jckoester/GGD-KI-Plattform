@@ -21,11 +21,13 @@
         createTeachingGroup,
         deleteTeachingGroup,
         setGruppenAnzeigename,
+        setGruppenSchuelerSichtbarkeit,
         addExclusion,
     } from "$lib/api.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import StundenrasterUebernahme from "$lib/components/StundenrasterUebernahme.svelte";
+    import InfoBanner from "$lib/components/InfoBanner.svelte";
 
     let exclusions = $state([]);
     let loading = $state(true);
@@ -99,6 +101,18 @@
         }
     }
 
+    // Begrenzter Testbetrieb: Der Schalter erscheint nur, wenn der Modus aktiv ist —
+    // andernfalls wäre er wirkungslos, und ein wirkungsloser Schalter ist schlimmer als
+    // keiner. Die Freigabe selbst bleibt beim Abschalten des Modus gespeichert.
+    async function sichtbarkeitSetzen(groupId, sichtbar) {
+        try {
+            await setGruppenSchuelerSichtbarkeit(groupId, sichtbar);
+            await refreshMyGroups();
+        } catch (err) {
+            error = err.message || "Die Freigabe konnte nicht gespeichert werden";
+        }
+    }
+
     async function handleDeleteGroup(groupId) {
         try {
             await deleteTeachingGroup(groupId);
@@ -154,6 +168,12 @@
             Meine Unterrichtsgruppen
         </h2>
 
+        {#if $groupsConfig.student_subjects_opt_in}
+            <InfoBanner
+                message="Erprobungsbetrieb: Deine Schüler:innen sehen ein Fach nur, wenn du die zugehörige Gruppe unten freigibst. Ohne Freigabe erscheint es weder in ihrer Fachübersicht noch im Chat."
+            />
+        {/if}
+
         {#if loading}
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
                 Wird geladen...
@@ -167,7 +187,7 @@
         {:else}
             <div class="space-y-3">
                 {#each $aktuelleTeachingGroups as group (group.id)}
-                    {@render gruppenzeile(group)}
+                    {@render gruppenzeile(group, true)}
                 {/each}
             </div>
         {/if}
@@ -345,7 +365,7 @@
     
 </PageBody>
 
-{#snippet gruppenzeile(group)}
+{#snippet gruppenzeile(group, mitFreigabe = false)}
     {@const subj = group.subject_id ? $subjectMap[group.subject_id] : null}
     {@const href = subj ? `/subjects/${subj.slug}/groups/${group.id}` : null}
                     <div
@@ -408,6 +428,23 @@
                             .filter(Boolean)
                             .join(" · ")}
                     </p>
+                {/if}
+                {#if mitFreigabe && $groupsConfig.student_subjects_opt_in}
+                    <label
+                        class="mt-1.5 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2 cursor-pointer"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={group.student_visible}
+                            onchange={(e) =>
+                                sichtbarkeitSetzen(
+                                    group.id,
+                                    e.currentTarget.checked,
+                                )}
+                            class="rounded border-light-ui-3 dark:border-dark-ui-3 text-primary"
+                        />
+                        Für Schüler:innen sichtbar
+                    </label>
                 {/if}
             </div>
         </div>
