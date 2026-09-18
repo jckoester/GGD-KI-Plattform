@@ -50,7 +50,7 @@
 </script>
 
 <div
-    class="min-h-screen bg-light-bg-2 dark:bg-dark-bg flex flex-col items-center justify-center p-4"
+    class="min-h-dvh bg-light-bg-2 dark:bg-dark-bg flex flex-col items-center justify-center p-4"
 >
     <div
         class="bg-light-bg dark:bg-dark-ui rounded-2xl shadow-lg w-full max-w-sm p-8 space-y-6"

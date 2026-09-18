@@ -2,7 +2,13 @@
 <html lang="de">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- interactive-widget=resizes-content: Ohne die Angabe lässt die Bildschirmtastatur
+         das Layout-Ansichtsfenster unverändert groß; `100dvh` bleibt die Höhe OHNE
+         Tastatur, der Browser schiebt die Seite nur hoch — unter dem App-Kasten wird
+         dann der Dokumenthintergrund sichtbar. Mit der Angabe schrumpft das Layout auf
+         den Platz über der Tastatur. -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
     <link rel="stylesheet" href="/static/config/colors.css" />
     %sveltekit.head%
   </head>

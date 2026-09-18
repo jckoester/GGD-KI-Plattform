@@ -252,6 +252,18 @@
 /* ── Unterrichtsplaner: schulintern überschreibbar via CSS-Variablen ─────── */
 /* Ferien- und Feiertags-Bänder; Schulen können --planner-ferien-* in ihrer   */
 /* eigenen CSS-Datei überschreiben, ohne Komponenten-Code zu ändern.           */
+/* Der Dokumenthintergrund — sonst leuchtet neben dem App-Kasten das Weiß des
+ * Browsers durch: beim Überscrollen, und auf dem Telefon zwischen Tastatur und
+ * Eingabeblock. Im Dunkelmodus ist das besonders unschön. Die App selbst liegt
+ * auf `bg-light-bg-2 dark:bg-dark-bg-2` (siehe `(app)/+layout.svelte`), deshalb steht
+ * hier derselbe Wert. */
+html {
+    background-color: var(--color-base-50);
+}
+html.dark {
+    background-color: var(--color-base-950);
+}
+
 :root {
     --planner-ferien-bg:     var(--color-yellow-50);
     --planner-ferien-stripe: var(--color-yellow-200);

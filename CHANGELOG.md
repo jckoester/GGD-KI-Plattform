@@ -16,12 +16,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Mobil:** Der Chat-Eingabeblock lag unterhalb des sichtbaren Bereichs und war nur
+  durch Scrollen erreichbar. Bei geöffneter Bildschirmtastatur blieb darunter ein
+  weißer Streifen.
 - „In Werkstatt öffnen" und „Als Baustein speichern" legten bei jedem Klick ein neues
   Dokument an. Der zweite Klick führt jetzt in das vorhandene — samt der daran
   gemachten Änderungen.
 
 ### Geändert
 
+- Auf schmalen Bildschirmen klappt die Tastenkürzel-Legende unter der Chat-Eingabe
+  hinter einen i-Knopf; der Hinweis „KI kann Fehler machen" bleibt stehen.
 - **Lesbarkeit.** Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen jetzt auf
   getöntem Grund mit gewohnter Schriftfarbe; die Farbe tragen Rand und Sinnbild. Der
   Warnkasten war im Hellmodus praktisch unlesbar. Ebenso die Kategorie-Chips der

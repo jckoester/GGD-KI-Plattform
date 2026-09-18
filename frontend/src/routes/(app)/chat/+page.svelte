@@ -74,6 +74,9 @@
     let fileInput = $state(null);
 
     // Assistenten-State
+    // Nur für schmale Bildschirme: Ab `sm` steht die Legende ohnehin da, der
+    // Zustand bleibt dann folgenlos.
+    let legendeOffen = $state(false);
     let availableAssistants = $state([]);
     let selectedAssistant = $state(null);
     let pickerOpen = $state(false);
@@ -1578,14 +1581,45 @@
                 {/if}
             </div>
             <div>
-                <!-- Globaler Hinweistext -->
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                <!-- Globaler Hinweistext. Die beiden Absätze wiegen NICHT gleich viel:
+                     Absatz 1 ist ein Transparenzhinweis und bleibt immer stehen
+                     (Entscheidung Jan, 18.09.2026). Die Tastenkürzel-Legende darunter ist
+                     reine Bedienhilfe — auf einem schmalen Telefon nahm sie drei bis vier
+                     Zeilen, die dem Chatverlauf fehlten, und klappt deshalb unterhalb
+                     `sm` hinter den i-Knopf. Ab `sm` steht sie unverändert da.
+
+                     Nachgesehen, weil die ursprüngliche Notiz eine Zusage vermutete:
+                     WEDER ADR-008 NOCH ADR-009 verlangen diesen Satz. Die Pflicht aus
+                     Art. 50 KI-VO („mit einer KI zu sprechen ist erkennbar") ruht laut
+                     ADR-009 auf dem Art.-13-Hinweis beim ersten Login, den
+                     Assistentennamen und der UI-Gestaltung — nicht hier. Der Satz ist
+                     eine freiwillige Zusage. Das macht ihn nicht weniger wert, verschiebt
+                     aber, wo Vorsicht nötig ist: Wer Transparenz kürzen will, darf an
+                     JENEN Stellen nichts wegnehmen. -->
+                <p
+                    class="text-xs text-light-tx-2 dark:text-dark-tx-2 flex items-center gap-1.5"
+                >
                     <b
                         >KI kann Fehler machen. Ergebnisse immer kritisch
                         prüfen.</b
                     >
+                    <button
+                        type="button"
+                        class="sm:hidden shrink-0 rounded hover:text-light-tx dark:hover:text-dark-tx"
+                        aria-label="Tastenkürzel anzeigen"
+                        aria-expanded={legendeOffen}
+                        aria-controls="chat-legende"
+                        onclick={() => (legendeOffen = !legendeOffen)}
+                    >
+                        <Info class="w-4 h-4" />
+                    </button>
                 </p>
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                <p
+                    id="chat-legende"
+                    class="text-xs text-light-tx-2 dark:text-dark-tx-2 {legendeOffen
+                        ? ''
+                        : 'hidden'} sm:block"
+                >
                     {#if availableAssistants.length > 0}
                         Verwende <code>/</code> um {selectedAssistant ||
                         conversationAssistant

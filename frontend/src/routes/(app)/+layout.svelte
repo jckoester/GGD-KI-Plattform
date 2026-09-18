@@ -66,7 +66,11 @@
     }
 </script>
 
-<div class="flex h-screen overflow-hidden">
+<!-- h-dvh, nicht h-screen: `100vh` ist auf mobilen Browsern die Höhe OHNE die
+     Adressleiste. Zusammen mit `overflow-hidden` schob das den unteren Rand des
+     Layouts - im Chat also das Eingabefeld - unter den sichtbaren Bereich, ohne
+     Weg dorthin. `100dvh` ist die tatsächlich sichtbare Höhe. -->
+<div class="flex h-dvh overflow-hidden">
     <!-- Backdrop (nur Mobile) -->
     {#if sidebarOpen && !isDesktop}
         <div
