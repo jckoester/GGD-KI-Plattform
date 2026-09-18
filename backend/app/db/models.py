@@ -146,6 +146,15 @@ class Group(Base):
     # wo Maschinen lesen — vor allem in der Stundenplan-Zuordnung, die den Klassennamen
     # und die Kursart-Marker darin sucht.
     display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Von der Lehrkraft gesetzte Freigabe für die Schüler:innen dieser Gruppe. Gelesen
+    # **nur** bei `STUDENT_SUBJECTS_OPT_IN=true` (begrenzter Testbetrieb) — ohne den
+    # Schalter ist die Spalte folgenlos und die Fachsicht die gewohnte.
+    # Bewusst gesetzt statt abgeleitet: „Gruppe hat ein Lehrkraft-Mitglied" wäre eine
+    # Aussage über die Person, nicht über die Gruppe — der Sync schreibt die Lehrkraft
+    # beim Login in alle ihre Gruppen (siehe Alembic 0063).
+    student_visible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
+    )
     source_class_group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
     )
