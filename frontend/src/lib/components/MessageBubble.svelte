@@ -292,11 +292,11 @@
     // seine Herkunft trägt (`metadata.source_artifact_id`) — es muss also erst ein
     // Artefakt geben. Sichtbar ist davon nur ein Knopf und derselbe Dialog.
     //
-    // ⚠️ Das angelegte Dokument wird **gemerkt**: `createDocument` ist bewusst nicht
-    // idempotent (Dokumente sind veränderbar), ein zweiter Klick legte sonst ein
-    // zweites Artefakt an — und damit einen Zweitknoten statt einer neuen Fassung.
-    // Nach einem Neuladen der Seite ist die Merknotiz weg; wer dann aktualisieren
-    // will, geht über die Bibliothek, wo das Badge den Baustein zeigt.
+    // Das angelegte Dokument wird gemerkt — das spart beim zweiten Klick eine Anfrage.
+    // Auf die Merknotiz kommt es aber nicht mehr an: `createDocument` ist seit dem
+    // 18.09.2026 über `message:<id>` idempotent, ein zweiter Klick liefert dasselbe
+    // Dokument. Vorher legte er ein zweites an — und damit einen Zweitknoten statt
+    // einer neuen Fassung, auch schon nach einem simplen Neuladen der Seite.
     let bausteinArtefakt = $state(null);
     let bausteinDialogOffen = $state(false);
     let bausteinLaeuft = $state(false);

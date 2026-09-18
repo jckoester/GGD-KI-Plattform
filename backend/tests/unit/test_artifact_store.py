@@ -150,8 +150,32 @@ async def test_create_document_delegates_to_save(monkeypatch):
     assert captured["mime_type"] == "text/markdown"
     assert captured["source"] == "# Titel\n\nText"
     assert captured["data"] == b"# Titel\n\nText"
-    assert captured["origin_ref"] is None        # mutabel, nicht content-adressiert
+    assert captured["origin_ref"] is None        # ohne Nachricht kein Herkunftsschlüssel
     assert captured["title"] == "Arbeitsblatt"    # getrimmt
+
+
+async def test_create_document_reicht_den_herkunftsschluessel_durch(monkeypatch):
+    """Der Schlüssel wird nicht im Store gebaut, sondern durchgereicht — hier der Beleg."""
+    captured = {}
+
+    async def fake_save(db, **kw):
+        captured.update(kw)
+        return SimpleNamespace(id=uuid4(), **kw)
+
+    monkeypatch.setattr(store, "save_artifact", fake_save)
+    await store.create_document(
+        MagicMock(), owner_pseudonym="p", roles=["teacher"], grade=None,
+        title="Aus dem Chat", markdown="Text", origin_ref="message:abc",
+    )
+    assert captured["origin_ref"] == "message:abc"
+
+
+def test_document_origin_ref():
+    """`message:<id>` benennt die Herkunft, nicht den Inhalt — stabil über Bearbeitungen."""
+    nachricht = uuid4()
+    assert store.document_origin_ref(nachricht) == f"message:{nachricht}"
+    # Ohne Nachricht kein Schlüssel: Zwei leere Dokumente sollen zwei bleiben.
+    assert store.document_origin_ref(None) is None
 
 
 async def test_update_document_rewrites_and_refreshes(monkeypatch, tmp_path):

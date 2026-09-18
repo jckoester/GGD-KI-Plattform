@@ -263,7 +263,15 @@ async def create_document(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SavedArtifact:
-    """Legt ein neues Markdown-Dokument an (leer oder aus dem Chat promotet)."""
+    """Legt ein neues Markdown-Dokument an (leer oder aus dem Chat promotet).
+
+    Aus dem Chat übernommene Dokumente sind über die Nachricht idempotent: Ein zweiter
+    Klick liefert dasselbe Dokument (`created=False`), kein zweites.
+    """
+    origin_ref = store.document_origin_ref(req.message_id)
+    created = origin_ref is None or (
+        await store.find_by_origin_ref(db, current_user.sub, origin_ref) is None
+    )
     try:
         artifact = await store.create_document(
             db,
@@ -272,6 +280,7 @@ async def create_document(
             grade=current_user.grade,
             title=req.title,
             markdown=req.markdown,
+            origin_ref=origin_ref,
             origin_conversation_id=req.origin_conversation_id,
             provider_model=await promote.herkunft_der_nachricht(
                 db, message_id=req.message_id, pseudonym=current_user.sub
@@ -282,7 +291,7 @@ async def create_document(
             status_code=409,
             detail="Deine Bibliothek ist voll. Bitte lösche zuerst ältere Artefakte.",
         )
-    return _saved(artifact, True)
+    return _saved(artifact, created)
 
 
 @router.get("/{artifact_id}/document", response_model=DocumentResponse)

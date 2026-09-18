@@ -160,6 +160,15 @@ def _clean_title(title: Optional[str]) -> str:
     return (title or "").strip()[:200] or "Dokument"
 
 
+def document_origin_ref(message_id: Optional[UUID]) -> Optional[str]:
+    """Herkunftsschlüssel eines aus einer Chatnachricht übernommenen Dokuments.
+
+    ``None`` für ein leer angelegtes Dokument: Zweimal „Neues Dokument" soll **zwei**
+    leere Dokumente ergeben, nicht zweimal dasselbe.
+    """
+    return f"message:{message_id}" if message_id is not None else None
+
+
 async def create_document(
     db: AsyncSession,
     *,
@@ -168,11 +177,21 @@ async def create_document(
     grade: Optional[int],
     title: str,
     markdown: str,
+    origin_ref: Optional[str] = None,
     origin_conversation_id: Optional[UUID] = None,
     provider_model: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> Artifact:
-    """Legt ein Text-Dokument (`kind='document'`, Markdown) an — mutabel, **kein** `origin_ref`."""
+    """Legt ein Text-Dokument (`kind='document'`, Markdown) an.
+
+    Dokumente sind **veränderbar** — deshalb ist `origin_ref` hier kein Inhalts-Hash wie
+    bei Diagrammen, sondern die **Herkunft** (`message:<id>`, siehe
+    `document_origin_ref`). Die bleibt über jede Bearbeitung stabil, und genau das ist
+    gewollt: Ein zweiter Klick auf „In Werkstatt öffnen" oder „Als Baustein speichern"
+    führt zurück in das vorhandene Dokument — mitsamt der bereits daran gemachten
+    Änderungen — statt ein zweites anzulegen. Ein zweites hieße bei „Als Baustein
+    speichern" ein zweiter Knoten statt einer neuen Fassung.
+    """
     return await save_artifact(
         db,
         owner_pseudonym=owner_pseudonym,
@@ -183,7 +202,7 @@ async def create_document(
         data=markdown.encode("utf-8"),
         title=_clean_title(title),
         source=markdown,
-        origin_ref=None,          # Dokumente sind veränderbar, nicht content-adressiert
+        origin_ref=origin_ref,
         origin_conversation_id=origin_conversation_id,
         provider_model=provider_model,
         now=now,

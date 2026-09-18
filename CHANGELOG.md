@@ -14,6 +14,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Frontend-Abhängigkeiten aktualisiert (DOMPurify, Mermaid, Svelte u. a.). Die
   Produktivabhängigkeiten melden keine offenen Schwachstellen mehr.
 
+### Behoben
+
+- „In Werkstatt öffnen" und „Als Baustein speichern" legten bei jedem Klick ein neues
+  Dokument an. Der zweite Klick führt jetzt in das vorhandene — samt der daran
+  gemachten Änderungen.
+
 ### Geändert
 
 - **Lesbarkeit.** Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen jetzt auf
