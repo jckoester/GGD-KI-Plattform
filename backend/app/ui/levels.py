@@ -1,0 +1,144 @@
+"""Darstellungsstufen — welcher Navigationseintrag ab welcher Stufe erscheint.
+
+Die Oberfläche ist über die Phasen hinweg stark gewachsen. Wer sie täglich benutzt,
+sieht den Funktionsumfang, der die Arbeit trägt; wer sich zum ersten Mal anmeldet, sieht
+eine Wand. Die Stufen lassen sie schmal beginnen und von der Nutzer:in selbst erweitern.
+
+⚠️ **Ein Anzeige-Filter, keine Berechtigung** (Leitprinzip 1 der Konzeptnotiz vom
+28.07.2026). Was eine Stufe verbirgt, bleibt über Direktlink und API erreichbar. Rechte
+stehen ausschließlich im Rollenmodell (ADR-003) — eine zweite, parallel wirkende
+Sperrschicht mit ganz anderer Motivation würde dessen Prüfbarkeit verwässern und bei
+jedem neuen Endpunkt die Frage aufwerfen, welche der beiden greift.
+
+Deshalb liest dieses Modul die Zuordnung nur aus und liefert sie aus; es entscheidet
+nichts. Die Zuordnung liegt in `config/ui_levels.yaml`, damit ein geänderter Zuschnitt
+kein Release kostet — der Startvorschlag ist ausdrücklich ein Vorschlag.
+"""
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+from pathlib import Path
+
+import yaml
+from pydantic import BaseModel, field_validator, model_validator
+
+from app.core.paths import aufloesen
+
+_DEFAULT_PATH = aufloesen(
+    os.environ.get("UI_LEVELS_PATH", "") or "config/ui_levels.yaml"
+)
+
+
+# Die Navigationseinträge, die es überhaupt gibt.
+#
+# **Warum hier und nicht in der YAML.** Die Datei entscheidet, auf welcher Stufe ein
+# Eintrag liegt — das ändert sich mit Erfahrung und soll ohne Release änderbar sein.
+# WELCHE Einträge es gibt, ändert sich dagegen nur, wenn die Oberfläche selbst sich
+# ändert; das gehört zum Code. Die Trennung fängt den teuersten Fehler ab: Ein Tippfehler
+# in der YAML (`libary`) ließe den Eintrag lautlos verschwinden, und niemand wüsste, warum
+# die Bibliothek fehlt.
+#
+# Ab Schritt 3 prüft ein Wächtertest, dass die Sidebar genau diese Schlüssel verwendet.
+BEKANNTE_EINTRAEGE = frozenset({
+    "chat",              # Neuer Chat
+    "assistants",        # Assistenten (Übersicht)
+    "assistants_my",     # Meine Assistenten (Lehrkraft)
+    "tools",             # Werkzeuge
+    "library",           # Bibliothek
+    "knowledge",         # Wissensbereich (Suche, Meine Bausteine, Graph)
+    "curricula",         # Curricula
+    "education_plans",   # Bildungspläne und Leitperspektiven
+    "subjects",          # Meine Fächer
+    "planner",           # Unterrichtsplanung (Jahresübersicht, Stundenentwurf)
+    "history",           # Letzte Chats / Verlauf
+})
+
+
+class Stufe(BaseModel):
+    stufe: int
+    name: str
+    beschreibung: str
+    # „Braucht einmalig ein eingerichtetes Wochenraster" — eine ehrliche Angabe, was das
+    # Freischalten kostet. Ohne sie schaltet jemand frei und steht vor einer leeren Seite.
+    aufwand: str | None = None
+    eintraege: list[str]
+
+
+class RollenStufen(BaseModel):
+    startstufe: int = 1
+    stufen: list[Stufe]
+
+    @field_validator("stufen")
+    @classmethod
+    def _aufsteigend_und_lueckenlos(cls, v: list[Stufe]) -> list[Stufe]:
+        """Stufen sind 1..n ohne Lücke.
+
+        Eine Lücke (1, 2, 4) wäre kein Tippfehler mit harmloser Folge: „Stufe 3" gäbe es
+        dann nicht, und wer von 2 aufsteigt, spränge unbemerkt über einen Block Funktionen.
+        """
+        nummern = [s.stufe for s in v]
+        if nummern != list(range(1, len(v) + 1)):
+            raise ValueError(f"Stufen müssen 1..n lückenlos sein, gefunden: {nummern}")
+        return v
+
+    @model_validator(mode="after")
+    def _startstufe_existiert(self):
+        if not any(s.stufe == self.startstufe for s in self.stufen):
+            raise ValueError(f"startstufe {self.startstufe} gibt es nicht")
+        return self
+
+    @model_validator(mode="after")
+    def _eintrag_gehoert_genau_einer_stufe(self):
+        """Kein Eintrag in zwei Stufen — sonst ist unbestimmt, ab wann er erscheint."""
+        gesehen: dict[str, int] = {}
+        for s in self.stufen:
+            for e in s.eintraege:
+                if e in gesehen:
+                    raise ValueError(
+                        f"Eintrag '{e}' steht in Stufe {gesehen[e]} und {s.stufe}"
+                    )
+                gesehen[e] = s.stufe
+        return self
+
+    @model_validator(mode="after")
+    def _nur_bekannte_eintraege(self):
+        unbekannt = sorted(
+            e for st in self.stufen for e in st.eintraege if e not in BEKANNTE_EINTRAEGE
+        )
+        if unbekannt:
+            raise ValueError(
+                f"unbekannte Navigationseinträge: {unbekannt} — "
+                f"bekannt sind: {sorted(BEKANNTE_EINTRAEGE)}"
+            )
+        return self
+
+    @property
+    def hoechste(self) -> int:
+        return len(self.stufen)
+
+    def eintraege_bis(self, stufe: int) -> list[str]:
+        """Alle Einträge bis einschließlich `stufe` — Stufen sind kumulativ."""
+        return [e for s in self.stufen if s.stufe <= stufe for e in s.eintraege]
+
+
+class UiLevels(BaseModel):
+    rollen: dict[str, RollenStufen]
+
+    def fuer(self, rollen: list[str]) -> RollenStufen | None:
+        """Die Stufen der wirksamen Rolle.
+
+        `teacher` gewinnt vor `student`: Admin ist eine Erweiterung der Lehrkraft-Rolle
+        (CLAUDE.md, Rollenmodell) und bekommt deshalb keinen eigenen Zuschnitt.
+        """
+        for name in ("teacher", "student"):
+            if name in rollen and name in self.rollen:
+                return self.rollen[name]
+        return None
+
+
+@lru_cache(maxsize=1)
+def load_ui_levels(path: Path | None = None) -> UiLevels:
+    p = path or _DEFAULT_PATH
+    with open(p, encoding="utf-8") as f:
+        return UiLevels.model_validate(yaml.safe_load(f))

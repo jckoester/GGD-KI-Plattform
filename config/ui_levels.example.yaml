@@ -1,0 +1,72 @@
+# ── Darstellungsstufen ──────────────────────────────────────────────────────────────
+#
+# Die Oberfläche startet schmal und wird von der Nutzer:in selbst erweitert. Diese Datei
+# bestimmt, welcher Navigationseintrag ab welcher Stufe erscheint.
+#
+# ⚠️ **Eine Stufe ist ein Anzeige-Filter, keine Berechtigung.** Was hier fehlt, bleibt
+# über Direktlink und API erreichbar — Rechte stehen ausschließlich im Rollenmodell
+# (ADR-003). Wer eine Funktion sperren will, ist hier falsch.
+#
+# Die Zuordnung liegt bewusst in einer Datei und nicht im Code: Der Zuschnitt ist ein
+# Vorschlag, der sich mit Erfahrung ändert, und eine Änderung soll kein Release kosten.
+#
+# **Regeln**
+#  * Jeder Navigationsschlüssel gehört zu genau EINER Stufe. Keine halb sichtbaren
+#    Seiten — das erzeugt eine Kombinatorik, die niemand mehr prüfen kann.
+#  * Stufen sind aufsteigend: Wer auf Stufe 3 steht, sieht auch 1 und 2.
+#  * Die Schlüssel müssen zu denen der Sidebar passen. Ein Tippfehler macht den Eintrag
+#    unsichtbar — der Wächtertest `test_ui_levels.py` fängt das ab.
+#  * Der Admin-Bereich gehört NICHT hierher; er hängt an der Rolle.
+
+rollen:
+  student:
+    startstufe: 1
+    stufen:
+      - stufe: 1
+        name: Chatten
+        beschreibung: >-
+          Chat, die für dich freigegebenen Assistenten und Werkzeuge, deine Fächer und
+          dein Verlauf.
+        eintraege: [chat, assistants, tools, subjects, history]
+
+      - stufe: 2
+        name: Sammeln und nachschlagen
+        beschreibung: >-
+          Dazu die Bibliothek für erzeugtes Material und der Wissensbereich mit Suche
+          und eigenen Bausteinen.
+        aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
+        eintraege: [library, knowledge]
+
+  teacher:
+    startstufe: 1
+    stufen:
+      - stufe: 1
+        name: Chatten
+        beschreibung: >-
+          Freier Chat, die schulweit freigegebenen Assistenten und Werkzeuge, Verlauf
+          und Profil.
+        eintraege: [chat, assistants, tools, history]
+
+      - stufe: 2
+        name: Eigene Assistenten und Material
+        beschreibung: >-
+          Eigene Assistenten bauen, Material in der Werkstatt erzeugen und in der
+          Bibliothek ablegen; Fach- und Gruppenseiten.
+        aufwand: Ohne Vorbereitung nutzbar.
+        eintraege: [assistants_my, library, subjects]
+
+      - stufe: 3
+        name: Unterricht planen
+        beschreibung: >-
+          Jahresübersicht, Stundenentwurf und Nachbereitung für deine
+          Unterrichtsgruppen.
+        aufwand: Braucht einmalig ein eingerichtetes Wochenraster je Gruppe.
+        eintraege: [planner]
+
+      - stufe: 4
+        name: Wissen strukturieren
+        beschreibung: >-
+          Wissensbereich mit Knotenverwaltung, Sammlungen, Curricula, Bildungsplänen
+          und Leitperspektiven.
+        aufwand: Setzt Vertrautheit mit dem Kontextspeicher voraus.
+        eintraege: [knowledge, curricula, education_plans]

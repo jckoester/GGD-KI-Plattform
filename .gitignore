@@ -17,6 +17,7 @@ config/rate_limits.yaml
 config/help_resources.yaml
 config/school_year.yaml
 config/subjects.yaml
+config/ui_levels.yaml
 config/static/colors.css
 
 # Python
