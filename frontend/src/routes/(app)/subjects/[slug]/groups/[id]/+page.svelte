@@ -8,6 +8,7 @@
   import { user } from '$lib/stores/user.js'
   import { REITER, aktiverReiter } from '$lib/gruppenseite.js'
   import { groupsConfig } from '$lib/stores/groupsConfig.js'
+  import { zeigtEintrag } from '$lib/stores/uiLevel.js'
   import { CircleCheck, TriangleAlert } from 'lucide-svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
@@ -92,7 +93,11 @@
         {@const gemeinsam =
           'px-4 py-2 text-sm font-medium border-b-2 transition-colors'}
         {#if tab.extern}
-          {#if group}
+          <!-- Die Planung ist der einzige Reiter, der eine eigene Stufe hat: Sie hängt
+               nicht in der Sidebar, sondern nur hier. Unterhalb ihrer Stufe verschwindet
+               der Reiter — die Seite selbst bleibt über den Direktlink erreichbar und
+               erklärt sich dort (Leitprinzip 1). -->
+          {#if group && $zeigtEintrag('planner')}
             <a
               href={`/subjects/${subject?.slug ?? $page.params.slug}/groups/${group.id}/planner`}
               class="{gemeinsam} border-transparent

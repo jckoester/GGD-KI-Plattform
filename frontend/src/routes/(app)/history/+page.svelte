@@ -1,5 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { getRecentConversations } from "$lib/api.js";
@@ -73,6 +74,7 @@
 </script>
 
 <PageBody breit>
+  <StufenHinweis eintrag="history" />
     <button
         onclick={() => history.back()}
         class="flex items-center gap-1 mb-4 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx transition-colors"

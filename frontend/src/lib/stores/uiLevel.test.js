@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { sichtbareEintraege, verborgeneStufen, wirksameStufe } from "./uiLevel.js"
+import { sichtbareEintraege, stufeVon, verborgeneStufen, wirksameStufe } from "./uiLevel.js"
 
 const REGISTRY = {
   rolle: "teacher",
@@ -82,7 +82,7 @@ describe("verborgeneStufen", () => {
 // wäre schlicht immer sichtbar, weil `$zeigtEintrag` einen unbekannten Schlüssel nicht
 // als „verborgen" erkennen kann. Genau dieser Fehler wäre stumm.
 
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 
 const SIDEBAR = new URL("../components/Sidebar.svelte", import.meta.url)
 const LEVELS_PY = new URL("../../../../backend/app/ui/levels.py", import.meta.url)
@@ -95,6 +95,29 @@ function bekannteSchluessel() {
         py.indexOf("})", py.indexOf("BEKANNTE_EINTRAEGE")),
     )
     return new Set([...block.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]))
+}
+
+/** Die Schlüssel aller `<StufenHinweis eintrag="…" />` unter `routes/`. */
+function hinweisSchluessel() {
+    const wurzel = new URL("../../routes/", import.meta.url)
+    const gefunden = new Set()
+    const gehe = (verzeichnis) => {
+        for (const eintrag of readdirSync(verzeichnis, { withFileTypes: true })) {
+            const pfad = new URL(
+                eintrag.name + (eintrag.isDirectory() ? "/" : ""),
+                verzeichnis,
+            )
+            if (eintrag.isDirectory()) gehe(pfad)
+            else if (eintrag.name.endsWith(".svelte")) {
+                const quelle = readFileSync(pfad, "utf8")
+                for (const m of quelle.matchAll(/<StufenHinweis\s+eintrag="([a-z_]+)"/g)) {
+                    gefunden.add(m[1])
+                }
+            }
+        }
+    }
+    gehe(wurzel)
+    return gefunden
 }
 
 /** Die Schlüssel, die die Sidebar filtert. */
@@ -119,6 +142,21 @@ describe("Sidebar-Schlüssel", () => {
         expect(unbekannt).toEqual([])
     })
 
+    it("auch die kontextnahen Hinweise verwenden nur bekannte Schlüssel", () => {
+        // `<StufenHinweis eintrag="libary" />` bliebe stumm: `stufeVon` fände nichts,
+        // der Hinweis erschiene nie — und niemand erführe, warum die Seite anders
+        // aussieht als beschrieben.
+        const bekannt = bekannteSchluessel()
+        const benutzt = new Set(
+            [...hinweisSchluessel()].filter((k) => !bekannt.has(k)),
+        )
+        expect([...benutzt]).toEqual([])
+    })
+
+    it("die Hinweis-Suche greift überhaupt", () => {
+        expect(hinweisSchluessel().size).toBeGreaterThan(3)
+    })
+
     it("Kommentare zählen nicht als Verwendung", () => {
         // Sonst hielte der Test einen erklärenden Satz für echten Code — derselbe
         // Fehler, der `farbregeln.test.js` einmal wertlos gemacht hat.
@@ -126,4 +164,21 @@ describe("Sidebar-Schlüssel", () => {
         expect(quelle).toContain("$zeigtEintrag(key)") // steht im Kommentar
         expect(sidebarSchluessel().has("key")).toBe(false)
     })
+})
+
+describe("stufeVon", () => {
+  it("findet die Stufe eines Eintrags", () => {
+    expect(stufeVon(REGISTRY, "library")).toBe(2)
+    expect(stufeVon(REGISTRY, "chat")).toBe(1)
+  })
+
+  it("gibt für einen unbekannten Eintrag null zurück", () => {
+    // Wichtig für den kontextnahen Hinweis: Ein Tippfehler im Schlüssel darf keinen
+    // Hinweis erzeugen, der von einer Stufe erzählt, die es nicht gibt.
+    expect(stufeVon(REGISTRY, "gibtsnicht")).toBeNull()
+  })
+
+  it("gibt ohne Registry null zurück", () => {
+    expect(stufeVon(null, "library")).toBeNull()
+  })
 })

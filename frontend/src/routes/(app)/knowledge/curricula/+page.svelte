@@ -10,6 +10,7 @@
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import { ArrowLeft } from 'lucide-svelte'
     import PageBody from '$lib/components/PageBody.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
 
     // Auth-Prüfung: nur teacher/admin
     $effect(() => {
@@ -82,6 +83,7 @@
 </script>
 
 <PageBody breit>
+  <StufenHinweis eintrag="curricula" />
         <!-- Kopfzeile -->
         <div class="flex items-center justify-between mb-6">
             <div>

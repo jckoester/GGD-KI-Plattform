@@ -20,6 +20,7 @@
     import { onMount } from "svelte";
 
     import ContextNodeLabel from "$lib/components/ContextNodeLabel.svelte";
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte';
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -215,6 +216,7 @@
 <div class="h-full flex flex-col">
     <div class="flex-1 overflow-y-auto">
         <div class="px-6 py-6">
+            <StufenHinweis eintrag="knowledge" />
             <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx mb-1">
                 Bausteine suchen
             </h1>

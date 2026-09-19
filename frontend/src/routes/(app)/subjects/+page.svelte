@@ -1,5 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { conversationCountsBySubject } from "$lib/stores/conversationCounts.js";
     import { myTeachingGroups } from "$lib/stores/myGroups.js";
@@ -54,6 +55,7 @@
 </script>
 
 <PageBody breit>
+  <StufenHinweis eintrag="subjects" />
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">

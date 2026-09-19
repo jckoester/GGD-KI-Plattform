@@ -1,5 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { getAssistants } from "$lib/api.js";
@@ -37,6 +38,7 @@
 </script>
 
 <PageBody breit>
+  <StufenHinweis eintrag="tools" />
     <div class="max-w-4xl mx-auto">
         <div class="flex items-center gap-2 mb-2 text-light-tx dark:text-dark-tx">
             <Wrench class="w-6 h-6" />

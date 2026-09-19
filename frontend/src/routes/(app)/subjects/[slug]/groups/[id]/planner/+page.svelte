@@ -14,6 +14,7 @@
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+  import StufenHinweis from '$lib/components/StufenHinweis.svelte'
   import TimetableSyncButton from '$lib/components/TimetableSyncButton.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import PlannerTable from '$lib/components/planner/PlannerTable.svelte'
@@ -356,6 +357,10 @@
       <TimetableSyncButton kompakt onFertig={loadOverview} />
     </div>
   </div>
+</div>
+
+<div class="px-6 pt-4">
+  <StufenHinweis eintrag="planner" />
 </div>
 
 {#if dragReflow}

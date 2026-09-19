@@ -1,5 +1,6 @@
 <script>
   import PageBody from '$lib/components/PageBody.svelte'
+    import StufenHinweis from '$lib/components/StufenHinweis.svelte'
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import yaml from 'js-yaml';
@@ -236,6 +237,7 @@
 </script>
 
 <PageBody breit>
+  <StufenHinweis eintrag="assistants_my" />
   <!-- Kopfzeile -->
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-xl font-semibold text-light-tx dark:text-dark-tx">

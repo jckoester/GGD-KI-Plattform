@@ -57,6 +57,20 @@ export function sichtbareEintraege(registry, stufe) {
     )
 }
 
+/**
+ * Die Stufe, zu der ein Navigationseintrag gehört — oder `null`, wenn unbekannt.
+ *
+ * Für den kontextnahen Einstieg: Wer über einen Direktlink auf einer Seite landet, deren
+ * Einstieg seine Stufe verbirgt, soll erfahren **warum** die Oberfläche anders aussieht
+ * als beschrieben — nicht abgewiesen werden. Die Seite selbst bleibt erreichbar
+ * (Leitprinzip 1: Anzeige-Filter, keine Berechtigung).
+ */
+export function stufeVon(registry, eintrag) {
+    if (!registry) return null
+    const treffer = registry.stufen?.find((s) => s.eintraege.includes(eintrag))
+    return treffer ? treffer.stufe : null
+}
+
 /** Die Stufen oberhalb der eigenen — Grundlage für den Hinweis am Ende der Sidebar. */
 export function verborgeneStufen(registry, stufe) {
     if (!registry || stufe == null) return []
