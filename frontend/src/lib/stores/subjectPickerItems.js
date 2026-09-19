@@ -1,6 +1,7 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { aktuelleTeachingGroups, myGroups, myTeachingGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, freigegebeneGruppen, myGroups, myTeachingGroups } from './myGroups.js'
+import { groupsConfig } from './groupsConfig.js'
 
 /**
  * Schüler: flache Liste mit Fach-Alias (teaching_group → Fachname).
@@ -15,13 +16,19 @@ import { aktuelleTeachingGroups, myGroups, myTeachingGroups } from './myGroups.j
  * Klassenzugehörigkeit endet mit dem Schuljahr von selbst.
  */
 export const studentPickerItems = derived(
-  [myTeachingGroups, subjectMap],
-  ([$myTeachingGroups, $subjectMap]) => {
+  [myTeachingGroups, subjectMap, groupsConfig],
+  ([$myTeachingGroups, $subjectMap, $groupsConfig]) => {
+    // Derselbe Filter wie in der Fachübersicht — sonst ließe sich ein ausgeblendetes
+    // Fach hier weiterhin anwählen, und der Chat landete in einer Gruppe, die es für
+    // die Schüler:in gar nicht gibt.
+    const gruppen = freigegebeneGruppen(
+      $myTeachingGroups, $groupsConfig.student_subjects_opt_in,
+    )
     const countPerSubject = {}
-    for (const g of $myTeachingGroups) {
+    for (const g of gruppen) {
       countPerSubject[g.subject_id] = (countPerSubject[g.subject_id] ?? 0) + 1
     }
-    return $myTeachingGroups.map(g => ({
+    return gruppen.map(g => ({
       type: 'group',
       id: g.id,
       subjectId: g.subject_id,

@@ -90,6 +90,27 @@ export const myFachschaften = derived(_myGroups, $g =>
  * @param {{unterricht?: Array, fachschaften?: Array}} gruppen
  * @returns {Array} leer, wenn der Scope gar keine Gruppe braucht
  */
+/**
+ * Die Unterrichtsgruppen, die eine Schüler:in sehen darf.
+ *
+ * Im **Erprobungsbetrieb** (`STUDENT_SUBJECTS_OPT_IN`) nur die von der Lehrkraft
+ * ausdrücklich freigegebenen: Nimmt eine Lehrkraft mit einem Teil ihrer Lerngruppen
+ * teil, hätten ihre Schüler:innen sonst auch deren übrige Fächer vor sich — ohne
+ * Material, ohne Assistenten, ohne Sinn.
+ *
+ * Hier als eigene Funktion, weil **zwei** Ansichten dieselbe Antwort brauchen: die
+ * Fachübersicht (`sidebarSections.js`) und das Auswahlfeld im Chat
+ * (`subjectPickerItems.js`). Stünde die Bedingung zweimal da, bliebe eines Tages eine
+ * der beiden zurück — und ein ausgeblendetes Fach ließe sich im Chat weiterhin anwählen.
+ *
+ * @param {Array} gruppen         Unterrichtsgruppen der Schüler:in
+ * @param {boolean} nurFreigegebene  Läuft der Erprobungsbetrieb?
+ */
+export function freigegebeneGruppen(gruppen, nurFreigegebene) {
+    if (!nurFreigegebene) return gruppen
+    return gruppen.filter(g => g.student_visible)
+}
+
 export function gruppenFuerScope(scope, { unterricht = [], fachschaften = [] } = {}) {
     if (scope === 'subject') return fachschaften
     if (scope === 'group') return unterricht

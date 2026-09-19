@@ -1,15 +1,16 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { aktuelleTeachingGroups, myGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, freigegebeneGruppen, myGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
 import { potentialTeachingGroups } from './potentialTeachingGroups.js'
 import { hiddenSubjectIds } from './subjectVisibility.js'
+import { groupsConfig } from './groupsConfig.js'
 
 export const sidebarSubjectSections = derived(
-  [user, subjectMap, myGroups, aktuelleTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups],
-  ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds, $potential]) => {
+  [user, subjectMap, myGroups, aktuelleTeachingGroups, conversationCountsByGroup, assistantSubjectIds, potentialTeachingGroups, groupsConfig],
+  ([$user, $subjectMap, $myGroups, $myTeachingGroups, $byGroup, $assistantSubjectIds, $potential, $groupsConfig]) => {
     if (!$user) return []
 
     const isTeacher = $user.roles?.includes('teacher')
@@ -51,12 +52,15 @@ export const sidebarSubjectSections = derived(
         }))
     } else {
       // Schüler:in: flache Fach-Liste (teaching_groups als Fach-Aliase)
+      const gruppen = freigegebeneGruppen(
+        $myTeachingGroups, $groupsConfig.student_subjects_opt_in,
+      )
       const countPerSubject = {}
-      for (const g of $myTeachingGroups) {
+      for (const g of gruppen) {
         if (g.subject_id != null)
           countPerSubject[g.subject_id] = (countPerSubject[g.subject_id] ?? 0) + 1
       }
-      return $myTeachingGroups
+      return gruppen
         .map(g => {
           const subj = $subjectMap[g.subject_id]
           const count = parseInt($byGroup[String(g.id)] ?? 0)

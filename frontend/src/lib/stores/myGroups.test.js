@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
-import { auswahlMitBestand, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
+import { readFileSync } from "node:fs"
+import { auswahlMitBestand, freigegebeneGruppen, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -166,4 +167,64 @@ describe("auswahlMitBestand", () => {
     const ohneFeld = [{ id: 5, name: "fremde Gruppe" }]
     expect(auswahlMitBestand(ohneFeld, null).map(g => g.id)).toEqual([5])
   })
+})
+
+// ── Erprobungsbetrieb: Fachsichtbarkeit für Schüler:innen ────────────────────
+// Die Regel steht bewusst **einmal** als Funktion da und nicht zweimal als Bedingung
+// in den Stores: Fachübersicht und Chat-Auswahlfeld müssen dieselbe Antwort geben,
+// sonst ließe sich ein ausgeblendetes Fach im Chat weiterhin anwählen.
+
+const KURSE = [
+  { id: 1, name: "M 9d", subject_id: 1, student_visible: true },
+  { id: 2, name: "D 9d", subject_id: 2, student_visible: false },
+  { id: 3, name: "Ph 9d", subject_id: 3, student_visible: false },
+]
+
+describe("freigegebeneGruppen", () => {
+  it("lässt im Regelbetrieb alles durch", () => {
+    expect(freigegebeneGruppen(KURSE, false)).toBe(KURSE)
+  })
+
+  it("behält im Erprobungsbetrieb nur die freigegebenen", () => {
+    expect(freigegebeneGruppen(KURSE, true).map((g) => g.id)).toEqual([1])
+  })
+
+  it("blendet ohne Freigabe alles aus", () => {
+    // Der Fall, den Jans Gegenbeispiel erzwingt: Eine Lehrkraft nimmt mit Gruppe 2 in
+    // einem Fach teil und unterrichtet dieselbe Gruppe in einem zweiten. Das zweite
+    // Fach darf nicht mitkommen, nur weil die Lehrkraft angemeldet ist.
+    const ohne = KURSE.map((g) => ({ ...g, student_visible: false }))
+    expect(freigegebeneGruppen(ohne, true)).toEqual([])
+  })
+
+  it("wertet ein fehlendes Feld als nicht freigegeben", () => {
+    // Robustheit gegen eine ältere Antwort ohne das Feld: Im Zweifel nicht zeigen —
+    // hier ist das die sichere Richtung, anders als beim Konfigurationsschalter.
+    expect(freigegebeneGruppen([{ id: 9, subject_id: 1 }], true)).toEqual([])
+  })
+})
+
+describe("beide Schüleransichten fragen dieselbe Funktion", () => {
+    // Wächter über die Aufteilung, nicht über das Verhalten: Fachübersicht und
+    // Auswahlfeld müssen dieselbe Antwort geben. Wer die Bedingung an einer Stelle
+    // wieder ausschreibt, bekommt zwei Regeln, die auseinanderlaufen können — und
+    // ein im Chat anwählbares Fach, das in der Übersicht fehlt.
+    //
+    // Was der Test NICHT kann: eine *neue*, dritte Ansicht bemerken. Dafür gibt es
+    // keinen Anker im Quelltext; er hält nur die beiden vorhandenen zusammen.
+    const DATEIEN = ["sidebarSections.js", "subjectPickerItems.js"]
+
+    for (const datei of DATEIEN) {
+        it(`${datei} ruft freigegebeneGruppen auf`, () => {
+            const quelle = readFileSync(new URL(datei, import.meta.url), "utf8")
+            expect(quelle).toContain("freigegebeneGruppen(")
+        })
+
+        it(`${datei} prüft student_visible nicht selbst`, () => {
+            const quelle = readFileSync(new URL(datei, import.meta.url), "utf8")
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .replace(/^\s*\/\/[^\n]*/gm, "")
+            expect(quelle).not.toContain("student_visible")
+        })
+    }
 })

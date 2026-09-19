@@ -6,6 +6,8 @@
     import { gruppenImFach, fachZielSchueler } from "$lib/gruppenseite.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { LayoutGrid, List } from "lucide-svelte";
+    import { user } from "$lib/stores/user.js";
+    import { groupsConfig } from "$lib/stores/groupsConfig.js";
 
     // Ansicht: 'grid' | 'list', aus localStorage (Default: 'grid')
     let viewMode = $state(localStorage.getItem("subjects_view_mode") ?? "grid");
@@ -84,7 +86,15 @@
     <!-- Leerer Zustand -->
     {#if sorted.length === 0}
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2">
-            Dir sind noch keine Fächer zugeordnet.
+            {#if $groupsConfig.student_subjects_opt_in && !$user?.roles?.includes("teacher")}
+                <!-- Im Erprobungsbetrieb wäre „keine Fächer zugeordnet" unwahr: Die
+                     Fächer gibt es, sie sind nur nicht freigegeben. Wer den Grund nicht
+                     erfährt, fragt zu Recht nach. -->
+                Für dich ist noch kein Fach freigegeben. Während der Erprobung sind nur
+                die Fächer der teilnehmenden Lehrkräfte zu sehen.
+            {:else}
+                Dir sind noch keine Fächer zugeordnet.
+            {/if}
         </p>
 
         <!-- Kachelansicht -->
