@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 import psycopg2
 import pytest
 import pytest_asyncio
+from sqlalchemy import text as sa_text
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -84,10 +85,45 @@ def run_migrations(db_url):
     return sync_url
 
 
+# Sequenzen auf den Bestand nachziehen.
+#
+# ⚠️ **Warum das nötig ist.** Viele Tests fügen mit **expliziten** IDs ein
+# (`INSERT INTO subjects (id, …) VALUES (100, …)`, bis hinauf zu 9512). Postgres zieht
+# die Sequenz dabei nicht nach. Ein späterer Test, der dieselbe Tabelle **ohne** ID
+# befüllt, bekommt irgendwann genau die schon vergebene Nummer — und scheitert mit
+# `duplicate key value violates unique constraint`.
+#
+# Der Fehler trifft dann eine unbeteiligte Datei und hängt an der Reihenfolge der Tests.
+# Aufgetreten am 19.09.2026: ein neuer Test legte ein Fach an, woraufhin
+# `test_schema.py::test_subject_crud` brach — allein im Gesamtlauf, nie einzeln.
+#
+# Deshalb je Test, nicht je Sitzung: Der Schaden entsteht *während* des Laufs, nicht
+# beim Aufsetzen. Gemessen rund 8 ms.
+_SEQUENZEN_NACHZIEHEN = """
+DO $$
+DECLARE r record; s text;
+BEGIN
+  FOR r IN
+    SELECT table_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND column_name = 'id'
+  LOOP
+    s := pg_get_serial_sequence(format('public.%I', r.table_name), 'id');
+    IF s IS NOT NULL THEN
+      EXECUTE format(
+        'SELECT setval(%L, GREATEST(COALESCE((SELECT max(id) FROM public.%I), 0), 1))',
+        s, r.table_name);
+    END IF;
+  END LOOP;
+END $$;
+"""
+
+
 @pytest_asyncio.fixture
 async def async_engine(db_url, run_migrations):
     """Async-Engine gegen die migrierte Test-DB — neu pro Test."""
     engine = create_async_engine(db_url, echo=False)
+    async with engine.begin() as conn:
+        await conn.execute(sa_text(_SEQUENZEN_NACHZIEHEN))
     yield engine
     await engine.dispose()
 

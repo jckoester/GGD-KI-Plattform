@@ -1,6 +1,6 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { aktuelleTeachingGroups, fachWirdAngeboten, freigegebeneGruppen, myGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, fachWirdAngeboten, freigegebeneGruppen, gruppenMitFach, myGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
@@ -52,9 +52,9 @@ export const sidebarSubjectSections = derived(
         }))
     } else {
       // Schüler:in: flache Fach-Liste (teaching_groups als Fach-Aliase)
-      const gruppen = freigegebeneGruppen(
+      const gruppen = gruppenMitFach(freigegebeneGruppen(
         $myTeachingGroups, $groupsConfig.student_subjects_opt_in,
-      )
+      ))
       const countPerSubject = {}
       for (const g of gruppen) {
         if (g.subject_id != null)

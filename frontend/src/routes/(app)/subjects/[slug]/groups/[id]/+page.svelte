@@ -7,6 +7,8 @@
   import { myTeachingGroups } from '$lib/stores/myGroups.js'
   import { user } from '$lib/stores/user.js'
   import { REITER, aktiverReiter } from '$lib/gruppenseite.js'
+  import { groupsConfig } from '$lib/stores/groupsConfig.js'
+  import { CircleCheck, TriangleAlert } from 'lucide-svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
   import GruppenArchiv from '$lib/components/GruppenArchiv.svelte'
@@ -49,6 +51,36 @@
     {/if}
     <span class="text-light-tx dark:text-dark-tx font-medium">{group?.name ?? '…'}</span>
   </div>
+
+  <!-- Erprobungsbetrieb: Ob diese Gruppe für ihre Schüler:innen sichtbar ist.
+       Nur für Lehrkräfte — Schüler:innen sehen eine nicht freigegebene Gruppe ohnehin
+       nicht, und für sie wäre die Auskunft ohne Handhabe. Der freigegebene Fall bleibt
+       leise (er ist der Normalfall), der andere trägt die Handlung. -->
+  {#if istLehrkraft && group && $groupsConfig.student_subjects_opt_in}
+    {#if group.student_visible}
+      <p class="mt-2 flex items-center gap-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+        <CircleCheck size={13} class="shrink-0 text-light-gr dark:text-dark-gr" />
+        Für Schüler:innen freigegeben.
+        <a href="/profile/teaching-groups"
+           class="underline hover:text-light-tx dark:hover:text-dark-tx transition-colors">
+          Ändern
+        </a>
+      </p>
+    {:else}
+      <div class="mt-2 flex items-start gap-2 rounded border p-3 text-sm
+                  bg-light-ye-bg dark:bg-dark-ye-bg
+                  border-light-ye dark:border-dark-ye
+                  text-light-tx dark:text-dark-tx">
+        <TriangleAlert size={16} class="mt-0.5 shrink-0 text-light-ye dark:text-dark-ye" />
+        <span>
+          <b>Nicht für Schüler:innen freigegeben.</b> Sie sehen dieses Fach derzeit nicht —
+          weder in ihrer Fachübersicht noch im Chat.
+          <a href="/profile/teaching-groups"
+             class="underline hover:no-underline">Unter „Meine Unterrichtsgruppen" freigeben</a>
+        </span>
+      </div>
+    {/if}
+  {/if}
 
   <!-- Reiter nur für Lehrkräfte: Schüler:innen sehen allein die Übersicht -->
   {#if istLehrkraft}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
 import { readFileSync } from "node:fs"
-import { auswahlMitBestand, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
+import { auswahlMitBestand, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gruppenMitFach, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -220,6 +220,11 @@ describe("beide Schüleransichten fragen dieselbe Funktion", () => {
             expect(quelle).toContain("freigegebeneGruppen(")
         })
 
+        it(`${datei} ruft gruppenMitFach auf`, () => {
+            const quelle = readFileSync(new URL(datei, import.meta.url), "utf8")
+            expect(quelle).toContain("gruppenMitFach(")
+        })
+
         it(`${datei} prüft student_visible nicht selbst`, () => {
             const quelle = readFileSync(new URL(datei, import.meta.url), "utf8")
                 .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -248,5 +253,33 @@ describe("fachWirdAngeboten", () => {
     // kaputt aus — und niemand könnte den ersten Chat anlegen, weil dafür das
     // Fach sichtbar sein müsste.
     expect(fachWirdAngeboten({ chats: 0, fachHatAssistent: false, erprobung: true })).toBe(true)
+  })
+})
+
+describe("gruppenMitFach", () => {
+  // Befund vom 19.09.2026: `unterricht.ch-ks-abi28` kam ohne Fach in der Datenbank an
+  // (das SSO-Muster gibt es für diese Schreibweise nicht her). Bei Schüler:innen stand
+  // die Gruppe daraufhin als „Fach" in der Übersicht — mit der rohen SSO-Kennung als
+  // Namen und einem Verweis, der mangels Fachseite im Verlauf landete.
+  const MIT = { id: 1, name: "9abcd nwt", subject_id: 16 }
+  const OHNE = { id: 27, name: "ch-ks-abi28", subject_id: null }
+
+  it("entfernt Gruppen ohne Fach", () => {
+    expect(gruppenMitFach([MIT, OHNE])).toEqual([MIT])
+  })
+
+  it("lässt Gruppen mit Fach unangetastet", () => {
+    expect(gruppenMitFach([MIT])).toEqual([MIT])
+  })
+
+  it("behandelt ein fehlendes Feld wie `null`", () => {
+    expect(gruppenMitFach([{ id: 9, name: "x" }])).toEqual([])
+  })
+
+  it("hält Fach-ID 0 nicht für fehlend", () => {
+    // `!g.subject_id` wäre hier falsch — 0 ist eine gültige ID, auch wenn sie in der
+    // Praxis nicht vorkommt. Der Test hält die Prüfung auf `!= null` fest.
+    const nullte = { id: 5, name: "y", subject_id: 0 }
+    expect(gruppenMitFach([nullte])).toEqual([nullte])
   })
 })

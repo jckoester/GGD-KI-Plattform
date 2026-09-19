@@ -10,6 +10,7 @@ from app.auth.config import SsoConfig
 from app.auth.dependencies import get_current_user, get_sso_config
 from app.auth.jwt import JwtPayload
 from app.config import settings
+from app.calendar.groups import ist_kursstufe
 from app.context.grades import parse_class_grade as _parse_grade
 from app.db.models import (
     ContextNode,
@@ -312,6 +313,14 @@ async def list_potential_teaching_groups(
 
     items: list[PotentialTeachingGroupItem] = []
     for cls in classes:
+        # Kursstufe erzeugt keine Vorschläge. Dort gibt es keine Klasse-Fach-Paare mehr:
+        # Der Jahrgang zerfällt in Kurse, die quer zu den Klassen liegen — „11 × Chemie"
+        # ist dort keine Lerngruppe, sondern ein ganzer Jahrgang. Erkannt an der
+        # Bezeichnung, nicht an einer Jahrgangsliste: Sek I trägt immer ein
+        # Buchstabensuffix (`5A`…`10D`), die Kursstufe heißt schlicht `11`/`12` (bzw.
+        # `12`/`13` in G9, `J1`/`K1`). Das trägt G8 und G9 ohne Konfiguration.
+        if ist_kursstufe((cls.name,)):
+            continue
         grade = _parse_grade(cls.name)
         for subj_id, subj in subjects.items():
             # Grade-Filter (nur wenn Fach min/max hat UND Jahrgang parsbar)

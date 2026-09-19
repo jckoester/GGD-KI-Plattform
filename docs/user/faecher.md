@@ -43,9 +43,20 @@ Was Ihre Lehrkraft für die Gruppe freigegeben hat, finden Sie über **Nachschla
 
 ### Ein Fach fehlt
 
-Die Zuordnung kommt aus Ihrem Schulkonto, nicht aus dieser Plattform. Fehlt ein Fach
-oder steht eines zu viel da, wenden Sie sich an Ihre Lehrkraft — hier lässt sich das
-nicht ändern.
+Zwei Dinge müssen zusammenkommen, damit ein Fach in Ihrer Übersicht steht.
+
+**Erstens die Zuordnung.** Sie kommt aus Ihrem Schulkonto, nicht aus dieser Plattform.
+Fehlt ein Fach oder steht eines zu viel da, wenden Sie sich an Ihre Lehrkraft — hier
+lässt sich das nicht ändern.
+
+**Zweitens: Im Fach muss etwas zu tun sein.** Angezeigt wird es, wenn mindestens eines
+davon zutrifft:
+
+* Sie haben dort schon **einen Chat**, oder
+* es gibt einen **Assistenten für dieses Fach**, den Sie nutzen dürfen.
+
+Trifft keines von beidem zu, bleibt das Fach aus der Übersicht — es gäbe dort nichts zu
+sehen. Sobald Ihre Lehrkraft einen Fachassistenten freigibt, erscheint es.
 
 ---
 
@@ -104,6 +115,13 @@ steht in der [Bibliothek](bibliothek.md), nur nicht in diesem Auszug.
 **Wo sind meine Chats ohne Fach?**
 Im [Verlauf](chat.md). Die Fachübersicht zeigt nur, was einem Fach zugeordnet ist; die
 Zuordnung ändern Sie im Menü neben jedem Chat.
+
+**Meine Schüler:innen sehen das Fach nicht, obwohl sie in der Gruppe sind.**
+Dann fehlt der zweite Teil der Regel oben: Solange die Schüler:in dort keinen eigenen
+Chat hat, braucht es einen Assistenten **mit diesem Fach**. Entscheidend ist die
+Fachzuordnung des Assistenten, nicht seine Freigabe: Ein schulweit freigegebener
+Assistent **ohne** Fach lässt kein Fach erscheinen. Prüfen Sie im Assistenten-Editor, ob
+das Feld „Fach" gesetzt ist.
 
 **Der Abschnitt „Nachschlagen" zeigt bei mir mehr/weniger als bei anderen.**
 Lehrkräfte sehen dort zusätzlich die Sammlungen, die sie pflegen. Schüler:innen sehen

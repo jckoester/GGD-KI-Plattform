@@ -132,6 +132,25 @@ export function fachWirdAngeboten({ chats, fachHatAssistent, erprobung }) {
     return chats > 0 || fachHatAssistent
 }
 
+/**
+ * Unterrichtsgruppen, die sich überhaupt als Fach darstellen lassen.
+ *
+ * Ohne `subject_id` gibt es kein Fach: kein Name, kein Symbol, keine Fachseite. Für eine
+ * Schüler:in erschiene die Gruppe trotzdem in der Fachübersicht — mit ihrer rohen
+ * SSO-Kennung als Beschriftung und einem Verweis, der mangels Fachseite im Verlauf
+ * landet. Das ist kein Fach, das ist ein Loch mit Namen.
+ *
+ * Fachlos wird eine Gruppe, wenn das SSO-Muster das Fach nicht hergibt (siehe
+ * `_unterrichtsgruppe_lesen` im Backend). Der Lehrkraft-Zweig entfernt sie längst über
+ * `filter(Boolean)`; hier zieht der Schülerzweig nach.
+ *
+ * ⚠️ **Nur verbergen, nicht heilen.** Die Gruppe bleibt im Profil der Lehrkraft sichtbar
+ * — dort gehört sie hin, denn dort kann jemand bemerken, dass die Zuordnung fehlt.
+ */
+export function gruppenMitFach(gruppen) {
+    return gruppen.filter(g => g.subject_id != null)
+}
+
 export function gruppenFuerScope(scope, { unterricht = [], fachschaften = [] } = {}) {
     if (scope === 'subject') return fachschaften
     if (scope === 'group') return unterricht

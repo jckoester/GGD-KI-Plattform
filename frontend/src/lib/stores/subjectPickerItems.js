@@ -1,6 +1,6 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { aktuelleTeachingGroups, freigegebeneGruppen, myGroups, myTeachingGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, freigegebeneGruppen, gruppenMitFach, myGroups, myTeachingGroups } from './myGroups.js'
 import { groupsConfig } from './groupsConfig.js'
 
 /**
@@ -21,9 +21,9 @@ export const studentPickerItems = derived(
     // Derselbe Filter wie in der Fachübersicht — sonst ließe sich ein ausgeblendetes
     // Fach hier weiterhin anwählen, und der Chat landete in einer Gruppe, die es für
     // die Schüler:in gar nicht gibt.
-    const gruppen = freigegebeneGruppen(
+    const gruppen = gruppenMitFach(freigegebeneGruppen(
       $myTeachingGroups, $groupsConfig.student_subjects_opt_in,
-    )
+    ))
     const countPerSubject = {}
     for (const g of gruppen) {
       countPerSubject[g.subject_id] = (countPerSubject[g.subject_id] ?? 0) + 1

@@ -1,7 +1,7 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
     import { onMount } from "svelte";
-    import { ArrowLeft, Check, ChevronRight, Pencil, Trash2, X } from "lucide-svelte";
+    import { ArrowLeft, Check, ChevronRight, Pencil, TriangleAlert, Trash2, X } from "lucide-svelte";
     import {
         aktuelleTeachingGroups,
         fruehereTeachingGroups,
@@ -429,13 +429,37 @@
                             .join(" · ")}
                     </p>
                 {/if}
+                <!-- Ohne Fach lässt sich die Gruppe nicht als Fach darstellen: kein
+                     Symbol, keine Fachseite, und bei Schüler:innen erscheint sie gar
+                     nicht. Geprüft wird `subject_id`, NICHT das aufgelöste `subj` —
+                     solange die Fachliste noch lädt, ist `subj` für jede Gruppe leer,
+                     und der Hinweis blitzte überall auf. -->
+                {#if group.subject_id == null}
+                    <p
+                        class="mt-1 flex items-start gap-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2"
+                    >
+                        <TriangleAlert
+                            size={13}
+                            class="mt-px shrink-0 text-light-or dark:text-dark-or"
+                        />
+                        <span>
+                            Keinem Fach zugeordnet — Schüler:innen sehen diese Gruppe
+                            nicht. Das lässt sich nur in der Konfiguration des
+                            Schulkontos beheben; bitte an die Administration wenden.
+                        </span>
+                    </p>
+                {/if}
                 {#if mitFreigabe && $groupsConfig.student_subjects_opt_in}
                     <label
-                        class="mt-1.5 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2 cursor-pointer"
+                        class="mt-1.5 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2
+                               {group.subject_id == null
+                            ? 'opacity-50'
+                            : 'cursor-pointer'}"
                     >
                         <input
                             type="checkbox"
                             checked={group.student_visible}
+                            disabled={group.subject_id == null}
                             onchange={(e) =>
                                 sichtbarkeitSetzen(
                                     group.id,
