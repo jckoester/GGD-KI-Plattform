@@ -26,6 +26,31 @@ Ein Bild kostet dabei ungefähr so viel wie vierzig Chat-Nachrichten. Wer viel m
 
 Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüler:innen, Lehrkräfte) unterschiedlich hoch sein. Zu Beginn eines neuen Schuljahres beginnt die Zählung von vorn.
 
+## Umfang der Oberfläche
+
+Die Plattform kann viel — und zeigt deshalb anfangs bewusst wenig. Sie beginnt mit
+Chat, Assistenten, Werkzeugen und Verlauf; alles Weitere blenden Sie selbst ein, wenn Sie
+es brauchen.
+
+Im Profil steht dafür der Abschnitt **Umfang der Oberfläche**. Jede Stufe enthält die
+vorherigen; ein Klick genügt, und die Seitenleiste ändert sich sofort.
+
+**Es geht dabei nichts verloren.** Schalten Sie zurück, verschwinden nur die
+Menüeinträge — Ihre Chats, Bausteine, Curricula und Planungen bleiben unberührt und sind
+wieder da, sobald Sie erhöhen. Probieren Sie eine niedrigere Stufe also ruhig aus.
+
+**Verborgen heißt nicht gesperrt.** Ein Link von einer Kollegin oder aus dieser
+Dokumentation funktioniert auch dann, wenn der zugehörige Menüpunkt bei Ihnen gerade
+nicht steht. Die Seite zeigt dann oben einen Hinweis, zu welcher Stufe sie gehört, und
+bietet an, sie dauerhaft einzublenden.
+
+Am Ende der Seitenleiste erinnert **„Es gibt mehr"** daran, dass noch etwas da ist.
+Aufgeklappt nennt der Hinweis die nächste Stufe und was sie mitbringt — samt der Angabe,
+was sie an Vorbereitung kostet.
+
+Welche Funktion zu welcher Stufe gehört, legt Ihre Schule fest; die Aufteilung kann sich
+also von der einer anderen Schule unterscheiden.
+
 ## Erscheinungsbild
 
 Sie können zwischen drei Darstellungsmodi wählen:

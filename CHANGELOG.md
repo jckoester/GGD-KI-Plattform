@@ -55,6 +55,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - `faecher.md` nennt jetzt beide Bedingungen, unter denen ein Fach erscheint: die
   Zuordnung aus dem Schulkonto und ein Chat oder ein Assistent **mit diesem Fach**.
+- `profil.md` und `erste-schritte.md` erklären den Umfang der Oberfläche;
+  `konfiguration.md` beschreibt `config/ui_levels.yaml`.
 
 ### Migration
 

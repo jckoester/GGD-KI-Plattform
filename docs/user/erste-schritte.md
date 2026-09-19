@@ -26,6 +26,16 @@ Nach der Anmeldung sehen Sie die Hauptansicht der Plattform:
 - **Über diese Software** — Version und Lizenzinformationen
 - **Abmelden** — sicher ausloggen
 
+### Warum die Seitenleiste so kurz ist
+
+Sie sehen anfangs nur wenige Einträge. Das ist Absicht: Die Plattform hat deutlich mehr
+zu bieten — Bibliothek, Unterrichtsplanung, Wissensbausteine —, aber alles auf einmal
+wäre eine Wand. Sie blenden ein, was Sie brauchen, wenn Sie es brauchen.
+
+Am Ende der Seitenleiste steht dafür **„Es gibt mehr"**, ausführlicher im
+[Profil](profil.md#umfang-der-oberfläche). Zurückschalten geht jederzeit, ohne dass etwas
+verloren geht.
+
 ## Ersten Chat starten
 
 1. Klicken Sie in der Seitenleiste auf **„Neuer Chat"**.

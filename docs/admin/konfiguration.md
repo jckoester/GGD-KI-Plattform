@@ -487,6 +487,51 @@ Override über `PEDAGOGY_PATH`. Aufbau und Auswahl-Logik stehen in
 
 ---
 
+## `config/ui_levels.yaml`
+
+Bestimmt, **ab welcher Darstellungsstufe ein Navigationseintrag erscheint**. Die
+Oberfläche startet für neue Konten schmal; alles Weitere blenden Nutzer:innen selbst ein
+(Profil → *Umfang der Oberfläche*).
+
+```yaml
+rollen:
+  student:
+    startstufe: 1
+    stufen:
+      - stufe: 1
+        name: Chatten
+        beschreibung: Chat, freigegebene Assistenten, deine Fächer und dein Verlauf.
+        eintraege: [chat, assistants, tools, subjects, history]
+      - stufe: 2
+        name: Sammeln und nachschlagen
+        beschreibung: Dazu Bibliothek und Wissensbereich.
+        aufwand: Lohnt sich, sobald du etwas aufbewahren willst.
+        eintraege: [library, knowledge]
+```
+
+- `startstufe` — womit **neue** Konten beginnen. Bestandskonten wurden bei der Migration
+  auf die höchste Stufe gesetzt; ihnen wird nichts weggenommen.
+- `beschreibung` und `aufwand` erscheinen wörtlich in der Oberfläche. `aufwand` ist
+  optional und sollte ehrlich sein („braucht einmalig ein eingerichtetes Wochenraster") —
+  wer freischaltet und vor einer leeren Seite steht, schaltet nicht wieder frei.
+- `eintraege` — die Navigationsschlüssel. Gültig sind: `chat`, `assistants`,
+  `assistants_my`, `tools`, `library`, `knowledge`, `curricula`, `education_plans`,
+  `subjects`, `planner`, `history`.
+
+**Regeln, die der Start erzwingt** (das Backend bricht sonst mit einer Meldung ab):
+Stufen laufen von 1 an ohne Lücke, jeder Eintrag steht in genau einer Stufe, und
+unbekannte Schlüssel sind nicht erlaubt — ein Tippfehler ließe den Eintrag sonst lautlos
+verschwinden.
+
+⚠️ **Eine Stufe ist ein Anzeige-Filter, keine Berechtigung.** Was sie verbirgt, bleibt
+über Direktlink und API erreichbar; die Seite zeigt dort einen Hinweis. Rechte stehen
+ausschließlich im Rollenmodell — wer eine Funktion sperren will, ist hier falsch. Der
+Admin-Bereich gehört nicht zu den Stufen, er hängt an der Rolle.
+
+Änderungen wirken nach **Backend-Neustart**. Pfad-Override über `UI_LEVELS_PATH`.
+
+---
+
 ## `infra/litellm_config.yaml`
 
 Konfiguriert den LiteLLM-Proxy: welche Modelle verfügbar sind, über welche Anbieter sie
