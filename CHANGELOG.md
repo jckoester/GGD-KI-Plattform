@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Erprobungsbetrieb für einen begrenzten Testkreis.** Mit
+  `STUDENT_SUBJECTS_OPT_IN=true` sehen Schüler:innen nur Fächer, deren Unterrichtsgruppe
+  die Lehrkraft unter „Meine Unterrichtsgruppen" freigegeben hat. Auf der Gruppenseite
+  steht, ob die Gruppe freigegeben ist. Ohne den Schalter verhält sich die Plattform wie
+  bisher; die Freigaben bleiben beim Abschalten erhalten.
+
 ### Sicherheit
 
 - Inline-`style` aus Chat-Antworten, Wissensknoten und Curricula wird entfernt. Er
@@ -22,15 +30,42 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - „In Werkstatt öffnen" und „Als Baustein speichern" legten bei jedem Klick ein neues
   Dokument an. Der zweite Klick führt jetzt in das vorhandene — samt der daran
   gemachten Änderungen.
+- Eine Unterrichtsgruppe ohne Fach erschien bei Schüler:innen als Fach — mit ihrer
+  rohen Kennung aus dem Schulkonto und einem Verweis, der im Verlauf endete. Sie wird
+  dort nicht mehr angeboten; die Lehrkraft findet stattdessen einen Hinweis bei ihren
+  Unterrichtsgruppen.
 
 ### Geändert
 
 - Auf schmalen Bildschirmen klappt die Tastenkürzel-Legende unter der Chat-Eingabe
   hinter einen i-Knopf; der Hinweis „KI kann Fehler machen" bleibt stehen.
+- Für die Kursstufe werden keine Unterrichtsgruppen mehr vorgeschlagen — dort zerfällt
+  der Jahrgang in Kurse, die quer zu den Klassen liegen.
 - **Lesbarkeit.** Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen jetzt auf
   getöntem Grund mit gewohnter Schriftfarbe; die Farbe tragen Rand und Sinnbild. Der
   Warnkasten war im Hellmodus praktisch unlesbar. Ebenso die Kategorie-Chips der
   Datensparsamkeits-Warnung. Sekundärer Text ist durchgehend etwas dunkler.
+
+### Dokumentation
+
+- `faecher.md` nennt jetzt beide Bedingungen, unter denen ein Fach erscheint: die
+  Zuordnung aus dem Schulkonto und ein Chat oder ein Assistent **mit diesem Fach**.
+
+### Migration
+
+⚠️ **Migrieren, bevor die neuen Container starten:**
+
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+```
+
+`alembic upgrade head` führt `0063` aus.
+
+- **`0063`** — `groups.student_visible`: Freigabe einer Unterrichtsgruppe für ihre
+  Schüler:innen, anfangs überall `false`. Ohne `STUDENT_SUBJECTS_OPT_IN` wird die Spalte
+  nicht gelesen; Bestandsdaten sind nicht betroffen.
 
 ## [0.10.2] – 2026-09-16
 
