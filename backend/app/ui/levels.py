@@ -137,6 +137,39 @@ class UiLevels(BaseModel):
         return None
 
 
+# Schlüssel in `user_preferences.preferences`. Kein Schemawechsel nötig — das Feld ist
+# JSONB, wie `hidden_subjects` und `cost_granularity` es vormachen.
+STUFEN_SCHLUESSEL = "ui_level"
+
+
+def stufe_fuer(prefs: dict, rollen: list[str], cfg: "UiLevels | None" = None) -> int | None:
+    """Die wirksame Stufe einer Nutzer:in — oder ``None``.
+
+    ``None`` heißt **nicht** „Stufe 0", sondern: Für diese Rolle sind keine Stufen
+    hinterlegt, der Filter gilt nicht, es wird alles gezeigt. Der Rückgabetyp zwingt die
+    aufrufende Stelle, diesen Fall zu behandeln — gäbe die Funktion hier `1` zurück,
+    verschwände für eine unbekannte Rolle stillschweigend fast die ganze Navigation.
+
+    **Fehlt der Schlüssel, gilt die Startstufe.** Bestandsnutzer:innen bekommen ihn
+    einmalig per Migration auf die höchste Stufe gesetzt (Alembic 0064) — wer die
+    Plattform heute benutzt, verliert nichts. Danach heißt „nicht gesetzt" verlässlich
+    „neu".
+
+    **Gelesen wird immer geklemmt.** Ein Wert außerhalb 1..höchste — aus einer älteren
+    Konfiguration mit mehr Stufen, oder von Hand gesetzt — dürfte niemals eine leere
+    Navigation erzeugen. 0 oder negativ wäre genau das.
+    """
+    c = cfg or load_ui_levels()
+    r = c.fuer(rollen)
+    if r is None:
+        return None
+    try:
+        wert = int(prefs.get(STUFEN_SCHLUESSEL, r.startstufe))
+    except (TypeError, ValueError):
+        return r.startstufe
+    return max(1, min(r.hoechste, wert))
+
+
 @lru_cache(maxsize=1)
 def load_ui_levels(path: Path | None = None) -> UiLevels:
     p = path or _DEFAULT_PATH

@@ -61,11 +61,14 @@ docker compose run --rm backend alembic upgrade head
 docker compose up -d
 ```
 
-`alembic upgrade head` führt `0063` aus.
+`alembic upgrade head` führt `0063` und `0064` aus.
 
 - **`0063`** — `groups.student_visible`: Freigabe einer Unterrichtsgruppe für ihre
   Schüler:innen, anfangs überall `false`. Ohne `STUDENT_SUBJECTS_OPT_IN` wird die Spalte
   nicht gelesen; Bestandsdaten sind nicht betroffen.
+- **`0064`** — setzt alle vorhandenen Konten auf die höchste Darstellungsstufe ihrer
+  Rolle. Kein Schemawechsel; die übrigen Einstellungen bleiben unverändert. Wer die
+  Plattform schon benutzt, sieht dadurch weiterhin alles.
 
 ## [0.10.2] – 2026-09-16
 

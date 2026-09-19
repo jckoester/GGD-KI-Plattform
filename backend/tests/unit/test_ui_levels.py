@@ -15,7 +15,13 @@ import yaml
 from pydantic import ValidationError
 
 from app.core.paths import aufloesen
-from app.ui.levels import BEKANNTE_EINTRAEGE, RollenStufen, UiLevels, load_ui_levels
+from app.ui.levels import (
+    BEKANNTE_EINTRAEGE,
+    RollenStufen,
+    UiLevels,
+    load_ui_levels,
+    stufe_fuer,
+)
 
 BEISPIEL = aufloesen("config/ui_levels.example.yaml")
 
@@ -174,3 +180,44 @@ def test_endpunkt_bleibt_bei_unbekannter_rolle_leer():
     daten = _client(["review"]).get("/ui/levels").json()
     assert daten["rolle"] is None
     assert daten["stufen"] == []
+
+
+# ── Die wirksame Stufe (`stufe_fuer`) ─────────────────────────────────────────
+
+def test_ohne_gesetzte_stufe_gilt_die_startstufe():
+    """Nach der Nachfüllung (Alembic 0064) heißt „nicht gesetzt" verlässlich „neu"."""
+    assert stufe_fuer({}, ["teacher"]) == 1
+    assert stufe_fuer({}, ["student"]) == 1
+
+
+def test_gesetzte_stufe_gilt():
+    assert stufe_fuer({"ui_level": 3}, ["teacher"]) == 3
+
+
+@pytest.mark.parametrize("wert,erwartet", [(0, 1), (-5, 1), (99, 4)])
+def test_beim_lesen_wird_geklemmt(wert, erwartet):
+    """Ein Altwert darf nie eine leere Navigation erzeugen — 0 wäre genau das.
+
+    Anders als beim Schreiben, wo ein solcher Wert abgewiesen wird: Dort ist er ein
+    Fehler, hier nur ein Fund aus einer älteren Konfiguration.
+    """
+    assert stufe_fuer({"ui_level": wert}, ["teacher"]) == erwartet
+
+
+@pytest.mark.parametrize("wert", ["abc", None, [], {}])
+def test_unlesbarer_wert_faellt_auf_die_startstufe(wert):
+    assert stufe_fuer({"ui_level": wert}, ["teacher"]) == 1
+
+
+def test_zahl_als_zeichenkette_wird_gelesen():
+    """JSONB gibt zurück, was hineingeschrieben wurde — auch `"2"`."""
+    assert stufe_fuer({"ui_level": "2"}, ["student"]) == 2
+
+
+def test_rolle_ohne_stufen_liefert_None_statt_1():
+    """`None` heißt „kein Filter", nicht „niedrigste Stufe".
+
+    Gäbe die Funktion hier 1 zurück, verschwände für eine unbekannte Rolle
+    stillschweigend fast die ganze Navigation.
+    """
+    assert stufe_fuer({"ui_level": 3}, ["review"]) is None
