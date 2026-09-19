@@ -7,6 +7,7 @@
     import {
         Plus,
         ChevronDown,
+        Info,
         ChevronRight,
         History,
         ShieldCheck,
@@ -75,6 +76,11 @@
     // erreichbar (Rollenmodell, ADR-003). Die Rollenweichen unten greifen unabhängig
     // davon — erst entscheidet die Rolle, was es gibt, dann die Stufe, was davon zu
     // sehen ist.
+    // Der Hinweis auf verborgene Funktionen ist eingeklappt. Aufgeklappt wirkte er wie
+    // eine Aufgabe, die zu erledigen ist, und drängte auf die höchste Stufe — das
+    // Gegenteil des Zwecks. Er soll sagen „es gibt mehr", nicht „schalte mehr frei".
+    let mehrOffen = $state(false);
+
     const istLehrkraft = $derived(
         $user?.roles.includes('teacher') || $user?.roles.includes('admin'),
     );
@@ -589,30 +595,66 @@
              dessen, was die Stufen bezwecken. Deshalb dezent, aber vorhanden. -->
         {#if $naechsteStufen.length > 0}
             {@const naechste = $naechsteStufen[0]}
-            <div
-                class="mt-4 p-3 rounded-lg border border-dashed border-light-ui-3 dark:border-dark-ui-3"
-            >
-                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    Es gibt mehr: {$naechsteStufen.map((s) => s.name).join(" · ")}
-                </p>
-                <p class="mt-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    {naechste.beschreibung}
-                </p>
-                {#if naechste.aufwand}
-                    <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2 italic">
-                        {naechste.aufwand}
-                    </p>
-                {/if}
+            <div class="mt-4">
                 <button
-                    onclick={() => setzeStufe(naechste.stufe)}
-                    class="mt-2 w-full px-3 py-1.5 rounded-md text-xs font-medium
-                           bg-primary dark:bg-primary-dark text-white hover:opacity-90 transition-opacity"
+                    onclick={() => (mehrOffen = !mehrOffen)}
+                    aria-expanded={mehrOffen}
+                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm
+                           text-light-tx-2 dark:text-dark-tx-2
+                           border border-dashed border-light-ui-3 dark:border-dark-ui-3
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
                 >
-                    „{naechste.name}" freischalten
+                    <Info class="w-4 h-4 shrink-0" />
+                    <span class="flex-1 text-left">Es gibt mehr</span>
+                    {#if mehrOffen}
+                        <ChevronDown class="w-4 h-4 shrink-0" />
+                    {:else}
+                        <ChevronRight class="w-4 h-4 shrink-0" />
+                    {/if}
                 </button>
-                <p class="mt-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    Jederzeit im Profil zurückzunehmen.
-                </p>
+
+                {#if mehrOffen}
+                    <div class="mt-1 px-3 py-2" transition:slide={{ duration: 150 }}>
+                        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Noch nicht eingeblendet:
+                        </p>
+                        <ul
+                            class="mt-1 ml-1 space-y-0.5 text-xs text-light-tx-2 dark:text-dark-tx-2"
+                        >
+                            {#each $naechsteStufen as s (s.stufe)}
+                                <li>· {s.name}</li>
+                            {/each}
+                        </ul>
+
+                        <!-- Eigene Überschrift, sonst liest sich der Absatz wie eine
+                             Wiederholung der Liste darüber. -->
+                        <p
+                            class="mt-2.5 text-xs font-medium text-light-tx dark:text-dark-tx"
+                        >
+                            Nächste Stufe
+                        </p>
+                        <p class="mt-0.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            <b>{naechste.name}</b> — {naechste.beschreibung}
+                        </p>
+                        {#if naechste.aufwand}
+                            <p
+                                class="mt-1 text-xs italic text-light-tx-2 dark:text-dark-tx-2"
+                            >
+                                {naechste.aufwand}
+                            </p>
+                        {/if}
+                        <button
+                            onclick={() => setzeStufe(naechste.stufe)}
+                            class="mt-2 text-xs underline text-light-tx dark:text-dark-tx
+                                   hover:no-underline transition-all"
+                        >
+                            Einblenden
+                        </button>
+                        <p class="mt-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                            Jederzeit im Profil zurückzunehmen; es geht nichts verloren.
+                        </p>
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>
