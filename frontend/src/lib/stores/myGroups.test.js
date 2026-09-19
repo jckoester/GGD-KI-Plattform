@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
 import { readFileSync } from "node:fs"
-import { auswahlMitBestand, freigegebeneGruppen, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
+import { auswahlMitBestand, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -227,4 +227,26 @@ describe("beide Schüleransichten fragen dieselbe Funktion", () => {
             expect(quelle).not.toContain("student_visible")
         })
     }
+})
+
+describe("fachWirdAngeboten", () => {
+  it("zeigt im Regelbetrieb ein Fach mit eigenem Chat", () => {
+    expect(fachWirdAngeboten({ chats: 1, fachHatAssistent: false, erprobung: false })).toBe(true)
+  })
+
+  it("zeigt im Regelbetrieb ein Fach mit Assistent", () => {
+    expect(fachWirdAngeboten({ chats: 0, fachHatAssistent: true, erprobung: false })).toBe(true)
+  })
+
+  it("verbirgt im Regelbetrieb ein Fach ohne beides", () => {
+    expect(fachWirdAngeboten({ chats: 0, fachHatAssistent: false, erprobung: false })).toBe(false)
+  })
+
+  it("zeigt im Erprobungsbetrieb auch ein Fach ohne beides", () => {
+    // Der Fall vom 19.09.2026: frisch freigegebene Gruppe, null Chats, kein
+    // fachgebundener Assistent. Ohne diese Ausnahme sähe der Freigabe-Schalter
+    // kaputt aus — und niemand könnte den ersten Chat anlegen, weil dafür das
+    // Fach sichtbar sein müsste.
+    expect(fachWirdAngeboten({ chats: 0, fachHatAssistent: false, erprobung: true })).toBe(true)
+  })
 })

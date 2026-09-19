@@ -1,6 +1,6 @@
 import { derived } from 'svelte/store'
 import { subjectMap } from './subjects.js'
-import { aktuelleTeachingGroups, freigegebeneGruppen, myGroups } from './myGroups.js'
+import { aktuelleTeachingGroups, fachWirdAngeboten, freigegebeneGruppen, myGroups } from './myGroups.js'
 import { conversationCountsByGroup } from './conversationCounts.js'
 import { assistantSubjectIds } from './assistants.js'
 import { user } from './user.js'
@@ -65,8 +65,12 @@ export const sidebarSubjectSections = derived(
           const subj = $subjectMap[g.subject_id]
           const count = parseInt($byGroup[String(g.id)] ?? 0)
           const hasAssistant = $assistantSubjectIds.has(g.subject_id)
-          // Sichtbarkeitsregel: mind. 1 Chat ODER mind. 1 Assistent verfügbar
-          if (count === 0 && !hasAssistant) return null
+          // Begründung beider Zweige steht bei `fachWirdAngeboten`.
+          if (!fachWirdAngeboten({
+            chats: count,
+            fachHatAssistent: hasAssistant,
+            erprobung: $groupsConfig.student_subjects_opt_in,
+          })) return null
           return {
             type: 'student',
             subjectId: g.subject_id,

@@ -111,6 +111,27 @@ export function freigegebeneGruppen(gruppen, nurFreigegebene) {
     return gruppen.filter(g => g.student_visible)
 }
 
+/**
+ * Ob ein Fach einer Schüler:in überhaupt angeboten wird.
+ *
+ * **Regelbetrieb:** nur, wenn es etwas hergibt — mindestens ein eigener Chat oder ein
+ * Assistent für dieses Fach. Sonst stünde in der Übersicht ein Fach, in dem nichts zu
+ * tun ist.
+ *
+ * **Erprobungsbetrieb:** immer. Dort ist die Freigabe durch die Lehrkraft schon die
+ * Aussage, und eine frisch freigegebene Gruppe hat naturgemäß null Chats. Mit der
+ * Heuristik davor bliebe das Fach unsichtbar, bis jemand darin schreibt — was ohne
+ * sichtbares Fach niemand kann. Genau dieser Fall ist am 19.09.2026 aufgetreten.
+ *
+ * @param {number} chats            eigene Chats in dieser Gruppe
+ * @param {boolean} fachHatAssistent  gibt es einen Assistenten für das Fach?
+ * @param {boolean} erprobung       läuft der Erprobungsbetrieb?
+ */
+export function fachWirdAngeboten({ chats, fachHatAssistent, erprobung }) {
+    if (erprobung) return true
+    return chats > 0 || fachHatAssistent
+}
+
 export function gruppenFuerScope(scope, { unterricht = [], fachschaften = [] } = {}) {
     if (scope === 'subject') return fachschaften
     if (scope === 'group') return unterricht
