@@ -1,12 +1,17 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
-    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, ChevronRight, Eye } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, Check, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
     import { zuwachsText, uebertragText } from "$lib/budget_text.js";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import {
+        setzeStufe,
+        stufenRegistry,
+        uiStufe,
+    } from "$lib/stores/uiLevel.js";
     import { goto } from "$app/navigation";
     import { patchPreferences, getPreferences, getCalendarTeachers } from "$lib/api.js";
     import { onMount } from "svelte";
@@ -310,6 +315,65 @@
         <section class="mb-8">
             <Zugangstoken />
         </section>
+        {/if}
+
+        <!-- Umfang der Oberfläche (Darstellungsstufen).
+             Bewusst NICHT „Darstellungsstufen" überschrieben: Direkt darunter steht
+             „Darstellungsmodus" für hell/dunkel — zwei fast gleiche Wörter für zwei ganz
+             verschiedene Dinge. Die Überschrift sagt hier, was die Einstellung bewirkt.
+
+             ⚠️ Anzeige-Filter, keine Berechtigung: Zurückschalten nimmt nichts weg, es
+             blendet nur aus. Der Satz darunter sagt das, weil sonst niemand es wagt. -->
+        {#if $stufenRegistry?.stufen?.length}
+            <section class="mb-8">
+                <h2
+                    class="text-base font-semibold mb-1 text-light-tx-2 dark:text-dark-tx-2"
+                >
+                    Umfang der Oberfläche
+                </h2>
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3">
+                    Wähle, wie viel du sehen möchtest. Jede Stufe enthält die vorherigen.
+                    Zurückschalten blendet nur aus — deine Chats, Bausteine und Planungen
+                    bleiben erhalten und sind wieder da, sobald du erhöhst.
+                </p>
+                <div class="space-y-2">
+                    {#each $stufenRegistry.stufen as s (s.stufe)}
+                        {@const aktiv = $uiStufe === s.stufe}
+                        <button
+                            onclick={() => setzeStufe(s.stufe)}
+                            aria-pressed={aktiv}
+                            class="w-full text-left p-3 rounded-lg border transition-colors
+                                   {aktiv
+                                ? 'border-primary dark:border-primary-dark bg-light-bl-bg dark:bg-dark-bl-bg'
+                                : 'border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
+                        >
+                            <span
+                                class="flex items-center gap-2 text-sm font-medium text-light-tx dark:text-dark-tx"
+                            >
+                                {#if aktiv}
+                                    <Check
+                                        size={15}
+                                        class="shrink-0 text-light-bl dark:text-dark-bl"
+                                    />
+                                {/if}
+                                Stufe {s.stufe}: {s.name}
+                            </span>
+                            <span
+                                class="block mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2"
+                            >
+                                {s.beschreibung}
+                            </span>
+                            {#if s.aufwand}
+                                <span
+                                    class="block mt-1 text-xs italic text-light-tx-2 dark:text-dark-tx-2"
+                                >
+                                    {s.aufwand}
+                                </span>
+                            {/if}
+                        </button>
+                    {/each}
+                </div>
+            </section>
         {/if}
 
         <section class="mb-8">
