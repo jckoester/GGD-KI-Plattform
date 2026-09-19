@@ -26,6 +26,7 @@
         refreshConversations,
     } from "$lib/stores/conversations.js";
     import { user } from "$lib/stores/user.js";
+    import { zeigtEintrag, naechsteStufen, setzeStufe } from '$lib/stores/uiLevel.js';
     import { page } from "$app/stores";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js"
@@ -68,6 +69,12 @@
     })
 
     // Admins sind Lehrkräfte mit zusätzlichen Rechten, kein eigener Nutzertyp (CLAUDE.md).
+    // Darstellungsstufen: `$zeigtEintrag(key)` ist `true`, solange kein Zuschnitt geladen
+    // ist oder die Rolle keine Stufen hat — dann zeigt die Sidebar alles. Der Filter ist
+    // ein Anzeige-Filter, KEINE Berechtigung: Was hier fehlt, bleibt über Direktlink
+    // erreichbar (Rollenmodell, ADR-003). Die Rollenweichen unten greifen unabhängig
+    // davon — erst entscheidet die Rolle, was es gibt, dann die Stufe, was davon zu
+    // sehen ist.
     const istLehrkraft = $derived(
         $user?.roles.includes('teacher') || $user?.roles.includes('admin'),
     );
@@ -187,375 +194,427 @@
 
     <!-- Sidebar-Inhalt -->
     <div class="flex-1 overflow-y-auto p-2">
-        <!-- Neuer Chat Button -->
-        <button
-            onclick={() => goto("/chat")}
-            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-        >
-            <Plus class="w-4 h-4" />
-            Neuer Chat
-        </button>
-
-        <!-- Assistenten -->
-        <div class="mt-2">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                       {$page.url.pathname.startsWith('/assistants') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+        {#if $zeigtEintrag('chat')}
+    <!-- Neuer Chat Button -->
+            <button
+                onclick={() => goto("/chat")}
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
             >
-                <button onclick={() => { openSection = 'assistants'; goto('/assistants') }}>
-                    <span class="flex items-center gap-2">
-                        <Bot class="w-4 h-4" />
-                        Assistenten
-                    </span>
+                <Plus class="w-4 h-4" />
+                Neuer Chat
+            </button>
+        {/if}
+
+        {#if $zeigtEintrag('assistants')}
+    <!-- Assistenten -->
+            <div class="mt-2">
+                <div
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {$page.url.pathname.startsWith('/assistants') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <button onclick={() => { openSection = 'assistants'; goto('/assistants') }}>
+                        <span class="flex items-center gap-2">
+                            <Bot class="w-4 h-4" />
+                            Assistenten
+                        </span>
+                    </button>
+                    {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
+                        <button onclick={() => toggle('assistants')}>
+                            {#if openSection === 'assistants'}
+                                <ChevronDown class="w-4 h-4" />
+                            {:else}
+                                <ChevronRight class="w-4 h-4" />
+                            {/if}
+                        </button>
+                    {/if}
+                </div>
+                {#if openSection === 'assistants' && ($user?.roles.includes('teacher') || $user?.roles.includes('admin'))}
+                    <div class="mt-1 space-y-1 pl-2">
+                        {#if $zeigtEintrag('assistants_my')}
+                        <button
+                            onclick={() => goto('/assistants/my')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname.startsWith('/assistants/my')
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <Pencil class="w-4 h-4" />
+                                Meine Assistenten
+                            </span>
+                        </button>
+                        {/if}
+                        {#if $user?.roles.includes('admin')}
+                            <button
+                                onclick={() => { goto('/assistants/manage'); refreshPendingCount(); }}
+                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                       {$page.url.pathname === '/assistants/manage'
+                                            ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <Settings class="w-4 h-4" />
+                                    Verwalten
+                                    {#if $pendingCount > 0}
+                                        <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                             bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
+                                            {$pendingCount}
+                                        </span>
+                                    {/if}
+                                </span>
+                            </button>
+                        {/if}
+                    </div>
+                {/if}
+            </div>
+
+        {/if}
+        {#if $zeigtEintrag('tools')}
+    <!-- Werkzeuge (alle Rollen) -->
+            <div class="mt-2">
+                <button
+                    onclick={() => goto('/tools')}
+                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {$page.url.pathname.startsWith('/tools') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <Wrench class="w-4 h-4" />
+                    Werkzeuge
                 </button>
-                {#if $user?.roles.includes('teacher') || $user?.roles.includes('admin')}
-                    <button onclick={() => toggle('assistants')}>
-                        {#if openSection === 'assistants'}
+            </div>
+
+        {/if}
+        {#if $zeigtEintrag('library')}
+    <!-- Bibliothek (alle Rollen) -->
+            <div class="mt-2">
+                <button
+                    onclick={() => goto('/library')}
+                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {$page.url.pathname.startsWith('/library') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <Library class="w-4 h-4" />
+                    Bibliothek
+                </button>
+            </div>
+
+        {/if}
+        {#if $zeigtEintrag('knowledge')}
+    <!-- Wissensgraph. Der Menüpunkt steht allen offen: Seine Landeseite ist die
+                 Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
+                 Suchknopf im Chat ohnehin erreichen.
+
+                 Seit AP7 ist die Sektion **für alle Rollen** aufklappbar. Schüler:innen
+                 sehen darin Suche und „Meine Bausteine" — neben der Suche ihre einzige
+                 Wissensgraph-Fläche (Notiz-Knotentyp-UI A4). Die übrigen Unterpunkte
+                 (Alle Bausteine, Sammlungen, Curricula, Bildungspläne,
+                 Leitperspektiven) bleiben Lehrkraft-Sache. -->
+              <div class="mt-2">
+                <div
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <button onclick={() => { toggle('knowledge'); goto('/knowledge/search') }}>
+                        <span class="flex items-center gap-2">
+                            <Database class="w-4 h-4" />
+                            Wissensgraph
+                        </span>
+                    </button>
+                    <button onclick={() => toggle('knowledge')} aria-label="Wissensgraph auf- oder zuklappen">
+                        {#if openSection === 'knowledge'}
                             <ChevronDown class="w-4 h-4" />
                         {:else}
                             <ChevronRight class="w-4 h-4" />
                         {/if}
                     </button>
-                {/if}
-            </div>
-            {#if openSection === 'assistants' && ($user?.roles.includes('teacher') || $user?.roles.includes('admin'))}
-                <div class="mt-1 space-y-1 pl-2">
-                    <button
-                        onclick={() => goto('/assistants/my')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname.startsWith('/assistants/my')
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
-                        <span class="flex items-center gap-2">
-                            <Pencil class="w-4 h-4" />
-                            Meine Assistenten
-                        </span>
-                    </button>
-                    {#if $user?.roles.includes('admin')}
+                </div>
+                {#if openSection === 'knowledge'}
+                    <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                        <!-- Für alle Rollen: Suche und der eigene Bestand. -->
                         <button
-                            onclick={() => { goto('/assistants/manage'); refreshPendingCount(); }}
+                            onclick={() => goto('/knowledge/search')}
                             class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
                                    hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === '/assistants/manage'
+                                   {$page.url.pathname === '/knowledge/search'
                                         ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
                         >
                             <span class="flex items-center gap-2">
-                                <Settings class="w-4 h-4" />
-                                Verwalten
-                                {#if $pendingCount > 0}
+                                <Search class="w-4 h-4" />
+                                Suche
+                            </span>
+                        </button>
+                        <button
+                            onclick={() => goto('/knowledge/mine')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/knowledge/mine'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <FolderHeart class="w-4 h-4" />
+                                Meine Bausteine
+                                {#if $aufmerksamkeit.gesamt > 0}
                                     <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
-                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye">
-                                        {$pendingCount}
+                                         bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye"
+                                         title="{$aufmerksamkeit.gesamt} Bausteine brauchen Aufmerksamkeit">
+                                        {$aufmerksamkeit.gesamt}
                                     </span>
                                 {/if}
                             </span>
                         </button>
-                    {/if}
-                </div>
-            {/if}
-        </div>
 
-        <!-- Werkzeuge (alle Rollen) -->
-        <div class="mt-2">
-            <button
-                onclick={() => goto('/tools')}
-                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                       {$page.url.pathname.startsWith('/tools') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
-            >
-                <Wrench class="w-4 h-4" />
-                Werkzeuge
-            </button>
-        </div>
+                        <!-- Ab hier Lehrkraft-Sache. Bewusst im selben Aufklapp-Container:
+                             Zwei `transition:slide` nebeneinander liefen als zwei
+                             Animationen ab und ruckelten sichtbar. -->
+                        {#if istLehrkraft}
+                        <button
+                            onclick={() => goto('/knowledge')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/knowledge'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <Database class="w-4 h-4" />
+                                Alle Bausteine
+                            </span>
+                        </button>
+                        <!-- Sammlungen: gepflegte Bestände je Bausteinart. Die Liste
+                             kommt aus der Taxonomie (`collection:`-Block) — eine neue
+                             Sammlung erscheint hier ohne Code-Änderung. -->
+                        <div class="pl-3 pt-1 pb-0.5 text-xs uppercase tracking-wide
+                                    text-light-tx-3 dark:text-dark-tx-3">
+                            Sammlungen
+                        </div>
+                        {#each sidebarSammlungen() as s}
+                            <button
+                                onclick={() => goto(`/knowledge/collections/${s.typ}`)}
+                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                       {$page.url.pathname === `/knowledge/collections/${s.typ}`
+                                            ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <NodeTypeIcon contentType={s.typ} size={16} />
+                                    {s.label}
+                                </span>
+                            </button>
+                        {/each}
 
-        <!-- Bibliothek (alle Rollen) -->
-        <div class="mt-2">
-            <button
-                onclick={() => goto('/library')}
-                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                       {$page.url.pathname.startsWith('/library') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
-            >
-                <Library class="w-4 h-4" />
-                Bibliothek
-            </button>
-        </div>
+                        {#if $zeigtEintrag('curricula')}
+                        <button
+                            onclick={() => goto('/knowledge/curricula')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/knowledge/curricula'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <BookOpen class="w-4 h-4" />
+                                Curricula
+                            </span>
+                        </button>
+                        {/if}
+                        {#if $zeigtEintrag('education_plans')}
+                        <button
+                            onclick={() => goto('/knowledge/education-plans')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/knowledge/education-plans'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <BookOpen class="w-4 h-4" />
+                                Bildungspläne
+                            </span>
+                        </button>
+                        <button
+                            onclick={() => goto('/knowledge/cross-cutting-themes')}
+                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                                   {$page.url.pathname === '/knowledge/cross-cutting-themes'
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        >
+                            <span class="flex items-center gap-2">
+                                <ShieldCheck class="w-4 h-4" />
+                                Leitperspektiven
+                            </span>
+                        </button>
+                        {/if}
+                        {/if}
+                    </div>
+                {/if}
+              </div>
 
-        <!-- Wissensgraph. Der Menüpunkt steht allen offen: Seine Landeseite ist die
-             Suche, und die durchsucht denselben Bestand, den Schüler:innen über den
-             Suchknopf im Chat ohnehin erreichen.
-
-             Seit AP7 ist die Sektion **für alle Rollen** aufklappbar. Schüler:innen
-             sehen darin Suche und „Meine Bausteine" — neben der Suche ihre einzige
-             Wissensgraph-Fläche (Notiz-Knotentyp-UI A4). Die übrigen Unterpunkte
-             (Alle Bausteine, Sammlungen, Curricula, Bildungspläne,
-             Leitperspektiven) bleiben Lehrkraft-Sache. -->
-          <div class="mt-2">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                       {$page.url.pathname.startsWith('/knowledge') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
-            >
-                <button onclick={() => { toggle('knowledge'); goto('/knowledge/search') }}>
-                    <span class="flex items-center gap-2">
-                        <Database class="w-4 h-4" />
-                        Wissensgraph
-                    </span>
-                </button>
-                <button onclick={() => toggle('knowledge')} aria-label="Wissensgraph auf- oder zuklappen">
-                    {#if openSection === 'knowledge'}
-                        <ChevronDown class="w-4 h-4" />
-                    {:else}
-                        <ChevronRight class="w-4 h-4" />
-                    {/if}
-                </button>
-            </div>
-            {#if openSection === 'knowledge'}
-                <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
-                    <!-- Für alle Rollen: Suche und der eigene Bestand. -->
-                    <button
-                        onclick={() => goto('/knowledge/search')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge/search'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
+        {/if}
+        {#if $zeigtEintrag('subjects')}
+    {#if $visibleSidebarSubjectSections.length > 0}
+              <div class="mt-2">
+                <div
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                           {$page.url.pathname.startsWith('/subjects') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
+                >
+                    <button onclick={() => { toggleSubjects(); goto('/subjects') }}>
                         <span class="flex items-center gap-2">
-                            <Search class="w-4 h-4" />
-                            Suche
+                            <BookOpen size={16} />
+                            Meine Fächer
                         </span>
                     </button>
+                    <button onclick={toggleSubjects}>
+                        {#if subjectsOpen}
+                            <ChevronDown class="w-4 h-4" />
+                        {:else}
+                            <ChevronRight class="w-4 h-4" />
+                        {/if}
+                    </button>
+                </div>
+
+                {#if subjectsOpen}
+                    <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
+                        {#each $visibleSidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
+                            <SidebarSubjectItem
+                                {section}
+                                expanded={openSection === `subject-${section.subjectId}`}
+                                ontoggle={() => toggle(`subject-${section.subjectId}`)}
+                            />
+                        {/each}
+                    </div>
+                {/if}
+              </div>
+            {/if}
+        {/if}
+
+        {#if $zeigtEintrag('history')}
+    <!-- Letzte Chats Sektion -->
+            <div class="mt-2">
+                <div
+                    class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+                >
                     <button
-                        onclick={() => goto('/knowledge/mine')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge/mine'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
+                        onclick={() => {
+                            openSection = 'recent';
+                            goto("/history");
+                        }}
                     >
                         <span class="flex items-center gap-2">
-                            <FolderHeart class="w-4 h-4" />
-                            Meine Bausteine
-                            {#if $aufmerksamkeit.gesamt > 0}
-                                <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
-                                     bg-light-ye/30 dark:bg-dark-ye/30 text-light-ye dark:text-dark-ye"
-                                     title="{$aufmerksamkeit.gesamt} Bausteine brauchen Aufmerksamkeit">
-                                    {$aufmerksamkeit.gesamt}
-                                </span>
+                            <History class="w-4 h-4" />
+                            Letzte Chats
+                        </span>
+                    </button>
+                    <button onclick={() => toggle('recent')}>
+                        <span class="flex items-center gap-2">
+                            {#if openSection === 'recent'}
+                                <ChevronDown class="w-4 h-4" />
+                            {:else}
+                                <ChevronRight class="w-4 h-4" />
                             {/if}
                         </span>
                     </button>
+                </div>
 
-                    <!-- Ab hier Lehrkraft-Sache. Bewusst im selben Aufklapp-Container:
-                         Zwei `transition:slide` nebeneinander liefen als zwei
-                         Animationen ab und ruckelten sichtbar. -->
-                    {#if istLehrkraft}
-                    <button
-                        onclick={() => goto('/knowledge')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
-                        <span class="flex items-center gap-2">
-                            <Database class="w-4 h-4" />
-                            Alle Bausteine
-                        </span>
-                    </button>
-                    <!-- Sammlungen: gepflegte Bestände je Bausteinart. Die Liste
-                         kommt aus der Taxonomie (`collection:`-Block) — eine neue
-                         Sammlung erscheint hier ohne Code-Änderung. -->
-                    <div class="pl-3 pt-1 pb-0.5 text-xs uppercase tracking-wide
-                                text-light-tx-3 dark:text-dark-tx-3">
-                        Sammlungen
+                {#if openSection === 'recent'}
+                    <div class="mt-1 space-y-1 pl-2">
+                        {#if $recentConversations.length === 0}
+                            <p
+                                class="text-sm text-light-tx-3 dark:text-dark-tx-3 px-3 py-1"
+                            >
+                                Noch keine Chats
+                            </p>
+                        {:else}
+                            {#each $recentConversations as conv}
+                                {@const convColor = conv.subject_id != null
+                                    ? ($subjectMap[conv.subject_id]?.color ?? null)
+                                    : null}
+                                <button
+                                    onclick={() => goto(`/chat?id=${conv.id}`)}
+                                    class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
+                                           hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors relative overflow-hidden
+                                           {conv.id === currentConversationId
+                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2'
+                                        : ''}"
+                                >
+                                    <!-- Farbstreifen links (nur wenn Fach mit Farbe) -->
+                                    {#if convColor}
+                                        <span
+                                            class="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
+                                            style="background-color: {convColor}"
+                                        ></span>
+                                    {/if}
+                                    <div
+                                        class="flex justify-between items-center gap-1"
+                                    >
+                                        <div
+                                            class="flex items-center gap-1 min-w-0"
+                                        >
+                                            {#if conv.assistant_name}
+                                                <Bot
+                                                    class="w-3 h-3 shrink-0 text-light-bl dark:text-dark-bl"
+                                                    title={conv.assistant_name}
+                                                />
+                                            {/if}
+                                            <span
+                                                class="truncate"
+                                                title={conv.title ??
+                                                    "Unbenannter Chat"}
+                                            >
+                                                {conv.title ?? "Unbenannter Chat"}
+                                            </span>
+                                        </div>
+                                        <span
+                                            class="text-xs text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap"
+                                        >
+                                            {formatDate(conv.last_message_at)}
+                                        </span>
+                                        <ConversationMenu
+                                            conversationId={conv.id}
+                                            title={conv.title}
+                                            subject_id={conv.subject_id}
+                                            group_id={conv.group_id}
+                                            onDeleted={handleDeleted}
+                                            iconSize={12}
+                                        />
+                                    </div>
+                                </button>
+                            {/each}
+                        {/if}
                     </div>
-                    {#each sidebarSammlungen() as s}
-                        <button
-                            onclick={() => goto(`/knowledge/collections/${s.typ}`)}
-                            class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                                   {$page.url.pathname === `/knowledge/collections/${s.typ}`
-                                        ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                        >
-                            <span class="flex items-center gap-2">
-                                <NodeTypeIcon contentType={s.typ} size={16} />
-                                {s.label}
-                            </span>
-                        </button>
-                    {/each}
-
-                    <button
-                        onclick={() => goto('/knowledge/curricula')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge/curricula'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
-                        <span class="flex items-center gap-2">
-                            <BookOpen class="w-4 h-4" />
-                            Curricula
-                        </span>
-                    </button>
-                    <button
-                        onclick={() => goto('/knowledge/education-plans')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge/education-plans'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
-                        <span class="flex items-center gap-2">
-                            <BookOpen class="w-4 h-4" />
-                            Bildungspläne
-                        </span>
-                    </button>
-                    <button
-                        onclick={() => goto('/knowledge/cross-cutting-themes')}
-                        class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                               {$page.url.pathname === '/knowledge/cross-cutting-themes'
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2 font-medium' : ''}"
-                    >
-                        <span class="flex items-center gap-2">
-                            <ShieldCheck class="w-4 h-4" />
-                            Leitperspektiven
-                        </span>
-                    </button>
-                    {/if}
-                </div>
-            {/if}
-          </div>
-
-        {#if $visibleSidebarSubjectSections.length > 0}
-          <div class="mt-2">
-            <div
-                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
-                       {$page.url.pathname.startsWith('/subjects') ? 'bg-light-ui-2 dark:bg-dark-ui-2' : ''}"
-            >
-                <button onclick={() => { toggleSubjects(); goto('/subjects') }}>
-                    <span class="flex items-center gap-2">
-                        <BookOpen size={16} />
-                        Meine Fächer
-                    </span>
-                </button>
-                <button onclick={toggleSubjects}>
-                    {#if subjectsOpen}
-                        <ChevronDown class="w-4 h-4" />
-                    {:else}
-                        <ChevronRight class="w-4 h-4" />
-                    {/if}
-                </button>
+                {/if}
             </div>
-
-            {#if subjectsOpen}
-                <div class="mt-1 space-y-1 pl-2" transition:slide={{ duration: 150 }}>
-                    {#each $visibleSidebarSubjectSections as section (section.type === 'student' ? `s-${section.groupId}` : `t-${section.subjectId}`)}
-                        <SidebarSubjectItem
-                            {section}
-                            expanded={openSection === `subject-${section.subjectId}`}
-                            ontoggle={() => toggle(`subject-${section.subjectId}`)}
-                        />
-                    {/each}
-                </div>
-            {/if}
-          </div>
         {/if}
 
-        <!-- Letzte Chats Sektion -->
-        <div class="mt-2">
+        <!-- Hinweis auf verborgene Funktionen (Leitprinzip 5 der Konzeptnotiz).
+             Ohne ihn entsteht der Eindruck, das Werkzeug könne wenig — das Gegenteil
+             dessen, was die Stufen bezwecken. Deshalb dezent, aber vorhanden. -->
+        {#if $naechsteStufen.length > 0}
+            {@const naechste = $naechsteStufen[0]}
             <div
-                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+                class="mt-4 p-3 rounded-lg border border-dashed border-light-ui-3 dark:border-dark-ui-3"
             >
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    Es gibt mehr: {$naechsteStufen.map((s) => s.name).join(" · ")}
+                </p>
+                <p class="mt-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    {naechste.beschreibung}
+                </p>
+                {#if naechste.aufwand}
+                    <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2 italic">
+                        {naechste.aufwand}
+                    </p>
+                {/if}
                 <button
-                    onclick={() => {
-                        openSection = 'recent';
-                        goto("/history");
-                    }}
+                    onclick={() => setzeStufe(naechste.stufe)}
+                    class="mt-2 w-full px-3 py-1.5 rounded-md text-xs font-medium
+                           bg-primary dark:bg-primary-dark text-white hover:opacity-90 transition-opacity"
                 >
-                    <span class="flex items-center gap-2">
-                        <History class="w-4 h-4" />
-                        Letzte Chats
-                    </span>
+                    „{naechste.name}" freischalten
                 </button>
-                <button onclick={() => toggle('recent')}>
-                    <span class="flex items-center gap-2">
-                        {#if openSection === 'recent'}
-                            <ChevronDown class="w-4 h-4" />
-                        {:else}
-                            <ChevronRight class="w-4 h-4" />
-                        {/if}
-                    </span>
-                </button>
+                <p class="mt-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    Jederzeit im Profil zurückzunehmen.
+                </p>
             </div>
-
-            {#if openSection === 'recent'}
-                <div class="mt-1 space-y-1 pl-2">
-                    {#if $recentConversations.length === 0}
-                        <p
-                            class="text-sm text-light-tx-3 dark:text-dark-tx-3 px-3 py-1"
-                        >
-                            Noch keine Chats
-                        </p>
-                    {:else}
-                        {#each $recentConversations as conv}
-                            {@const convColor = conv.subject_id != null
-                                ? ($subjectMap[conv.subject_id]?.color ?? null)
-                                : null}
-                            <button
-                                onclick={() => goto(`/chat?id=${conv.id}`)}
-                                class="w-full text-left px-3 py-2 text-sm rounded-lg text-light-tx dark:text-dark-tx
-                                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors relative overflow-hidden
-                                       {conv.id === currentConversationId
-                                    ? 'bg-light-ui-2 dark:bg-dark-ui-2'
-                                    : ''}"
-                            >
-                                <!-- Farbstreifen links (nur wenn Fach mit Farbe) -->
-                                {#if convColor}
-                                    <span
-                                        class="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg"
-                                        style="background-color: {convColor}"
-                                    ></span>
-                                {/if}
-                                <div
-                                    class="flex justify-between items-center gap-1"
-                                >
-                                    <div
-                                        class="flex items-center gap-1 min-w-0"
-                                    >
-                                        {#if conv.assistant_name}
-                                            <Bot
-                                                class="w-3 h-3 shrink-0 text-light-bl dark:text-dark-bl"
-                                                title={conv.assistant_name}
-                                            />
-                                        {/if}
-                                        <span
-                                            class="truncate"
-                                            title={conv.title ??
-                                                "Unbenannter Chat"}
-                                        >
-                                            {conv.title ?? "Unbenannter Chat"}
-                                        </span>
-                                    </div>
-                                    <span
-                                        class="text-xs text-light-tx-3 dark:text-dark-tx-3 whitespace-nowrap"
-                                    >
-                                        {formatDate(conv.last_message_at)}
-                                    </span>
-                                    <ConversationMenu
-                                        conversationId={conv.id}
-                                        title={conv.title}
-                                        subject_id={conv.subject_id}
-                                        group_id={conv.group_id}
-                                        onDeleted={handleDeleted}
-                                        iconSize={12}
-                                    />
-                                </div>
-                            </button>
-                        {/each}
-                    {/if}
-                </div>
-            {/if}
-        </div>
+        {/if}
     </div>
 
     <!-- Unterer Bereich -->

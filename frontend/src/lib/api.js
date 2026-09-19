@@ -1975,6 +1975,12 @@ export async function setGruppenAnzeigename(groupId, displayName) {
     return res.json()
 }
 
+export async function getUiLevels() {
+    const res = await fetch(`${BASE}/ui/levels`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, 'Darstellungsstufen konnten nicht geladen werden')
+    return res.json()
+}
+
 export async function setGruppenSchuelerSichtbarkeit(groupId, sichtbar) {
     const res = await fetch(`${BASE}/groups/teaching/${groupId}/student-visible`, {
         method: 'PATCH',

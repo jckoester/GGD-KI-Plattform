@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Die Oberfläche startet schmal.** Neue Konten sehen zunächst Chat, Assistenten,
+  Werkzeuge und Verlauf; alles Weitere schaltet man selbst frei — am Ende der Sidebar
+  oder im Profil, jederzeit rückschaltbar, ohne dass etwas verloren geht. Wer die
+  Plattform schon benutzt, sieht unverändert alles. Welche Funktion ab welcher Stufe
+  erscheint, steht in `config/ui_levels.yaml`.
 - **Erprobungsbetrieb für einen begrenzten Testkreis.** Mit
   `STUDENT_SUBJECTS_OPT_IN=true` sehen Schüler:innen nur Fächer, deren Unterrichtsgruppe
   die Lehrkraft unter „Meine Unterrichtsgruppen" freigegeben hat. Auf der Gruppenseite
