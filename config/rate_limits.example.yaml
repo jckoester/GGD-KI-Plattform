@@ -17,6 +17,9 @@ buckets:
   # Der erste vollständige Spiegel eines Schuljahres braucht einige hundert
   # Anfragen; Clients müssen auf 429 mit `Retry-After` warten können.
   token:    { limit: 300, window: 60 }  # persönliche Zugangstoken (PAT)
+  # Rückmeldungen: Stundenfenster statt Minutenfenster. Das Tageslimit (20/Tag)
+  # steht nicht hier — es zählt in der Datenbank, weil es einen Neustart überleben muss.
+  feedback: { limit: 5, window: 3600 }  # Meldungen über den Feedback-Kanal
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

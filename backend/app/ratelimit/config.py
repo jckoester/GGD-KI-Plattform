@@ -26,6 +26,10 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # vollständige Spiegel eines Schuljahres einige hundert Anfragen braucht; eng genug,
     # dass eine Schleife ohne Abbruch auffällt statt durchzulaufen.
     "token": (300, 60.0),
+    # Rückmeldungen (ADR-020): ein **Stundenfenster**, nicht wie die übrigen ein
+    # Minutenfenster. Fünf Meldungen in einer Stunde deckt jeden ehrlichen Fall ab;
+    # der eigentliche Riegel gegen Unsinn ist das Tageslimit aus der Datenbank.
+    "feedback": (5, 3600.0),
 }
 _FALLBACK = (60, 60.0)
 
