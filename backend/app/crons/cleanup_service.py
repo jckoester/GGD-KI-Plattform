@@ -14,6 +14,7 @@ from app.db.models import (
     ContextNode,
     Conversation,
     ConversationFlag,
+    Feedback,
     GroupMembership,
     JwtRevocation,
     NodeEngagement,
@@ -313,6 +314,24 @@ async def cleanup_inactive_accounts(
                             delete(TeacherGroupExclusion).where(
                                 TeacherGroupExclusion.pseudonym == pseudonym
                             )
+                        )
+                        # ── Rückmeldungen (ADR-020, ADR-011 §6.2) ─────────────
+                        #
+                        # Die einzige Tabelle hier, die ihre Zeilen **behält**. Eine
+                        # Fehlermeldung ist ein Befund über die Software, kein
+                        # Kontodatum; sie zu löschen, weil die meldende Person die
+                        # Schule verlassen hat, nähme der Sichtung die Vorgeschichte
+                        # einer Regression. Der Personenbezug geht trotzdem: Pseudonym
+                        # **und** die freiwillige Kontaktangabe — die einzige Spalte im
+                        # System, die einen Klarnamen tragen kann.
+                        #
+                        # ⚠️ Damit verschwindet der Eintrag auch aus „Meine Meldungen".
+                        # Das ist der vorgesehene Zustand: Der Rückweg läuft über das
+                        # Pseudonym, und das gibt es nicht mehr.
+                        await db.execute(
+                            update(Feedback)
+                            .where(Feedback.pseudonym == pseudonym)
+                            .values(pseudonym=None, contact=None)
                         )
                         # Zugangstoken zuerst: Sie sind lebende Zugänge. Bliebe eines
                         # stehen, während `pseudonym_audit` fällt, verlöre es zwar seine

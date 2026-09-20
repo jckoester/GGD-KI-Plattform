@@ -1407,3 +1407,81 @@ class PersonalAccessToken(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+
+
+# 25. feedback — Rückmeldungen aus der Anwendung heraus (ADR-020)
+class Feedback(Base):
+    """Eine Meldung: „etwas funktioniert nicht" oder „ich hätte gern …".
+
+    **Warum der Chat als Kopie und nicht als Verweis.** Ein Fremdschlüssel auf
+    `conversations.id` zeigte ins Leere, sobald die Konversation nach 90 Tagen oder
+    durch die Person selbst verschwindet — und genau dann braucht die Sichtung den
+    Inhalt noch. Der Snapshot hängt deshalb an der Frist der Meldung, nicht an der des
+    Chats. Diese Verlängerung ist vom Opt-in gedeckt und wird im Formular benannt.
+
+    **Warum `pseudonym` nullable ist.** Die Kontolöschung (ADR-011 §6.2) löscht den
+    Eintrag nicht, sie nimmt ihm den Personenbezug: Ein Fehlerbericht bleibt für die
+    Sichtung lesbar, „Meine Meldungen" braucht die Person dann nicht mehr. `contact`
+    fällt aus demselben Grund mit.
+
+    ⚠️ **Der Textkörper heißt `content`, nicht `text`.** Diese Datei importiert `text`
+    aus SQLAlchemy und benutzt es in fast jeder Tabelle für `server_default`; ein
+    Attribut dieses Namens verdeckte die Funktion im restlichen Klassenkörper
+    (`TypeError: 'MappedColumn' object is not callable`). `content` ist ohnehin der
+    Hausname für den Textkörper — `messages`, `context_nodes`, `assistant_documents`.
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    # **Kein Fremdschlüssel auf `pseudonym_audit`.** Keine andere Tabelle im Projekt
+    # führt einen; die Kontolöschung räumt jede Pseudonym-Spalte ausdrücklich ab. Ein
+    # `ON DELETE SET NULL` erreichte zudem nur diese Spalte — `contact` muss ohnehin von
+    # Hand fallen. Zwei halbe Mechanismen nebeneinander verwirren mehr, als sie sichern.
+    pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Die reale Rolle zum Zeitpunkt der Meldung. Eingefroren, nicht nachgeschlagen: Wer
+    # heute Schüler:in ist, meldet als Schüler:in — auch wenn das Konto später wechselt.
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Freiwillige Selbstauskunft, keine Verknüpfung durch das System (ADR-020). Die
+    # einzige Spalte im Projekt, die Pseudonym und Klarnamen in einer Zeile tragen kann —
+    # deshalb die eigene, kürzere Frist: genullt beim Abschluss der Meldung.
+    contact: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    app_version: Mapped[str] = mapped_column(Text, nullable=False)
+    route: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Ohne FK: Ein Assistent kann gelöscht werden, die Meldung über ihn bleibt gültig.
+    assistant_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    viewport: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    conversation_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'open'"), default="open"
+    )
+    admin_reply: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_in_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    issue_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Ab hier läuft die 180-Tage-Frist des Löschlaufs, und daran hängt die Spam-Sperre.
+    # Nullable: Eine Meldung, die niemand angefasst hat, hat keinen Wechsel erlebt.
+    status_changed_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('bug', 'suggestion', 'other')", name="ck_feedback_category"
+        ),
+        CheckConstraint(
+            "status IN ('open', 'in_progress', 'done', 'declined', 'spam')",
+            name="ck_feedback_status",
+        ),
+        # Ohne Richtungsangabe: Ein btree liest rückwärts genauso schnell, und keine
+        # andere Tabelle im Projekt schreibt eine Sortierrichtung in einen Index.
+        Index("idx_feedback_pseudonym_created", "pseudonym", "created_at"),
+        Index("idx_feedback_status_created", "status", "created_at"),
+    )

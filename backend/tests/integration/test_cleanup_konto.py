@@ -77,6 +77,20 @@ def _artefakt(cur, store, titel, *, owner):
     return aid, pfad
 
 
+MELDUNG = "Der Knopf zum Abschicken reagiert auf dem Handy nicht."
+
+
+def _feedback(cur, *, owner, kontakt):
+    """Eine Rückmeldung samt freiwilliger Kontaktangabe (ADR-020)."""
+    fid = uuid.uuid4()
+    cur.execute(
+        "INSERT INTO feedback (id, pseudonym, role, category, content, contact,"
+        " app_version) VALUES (%s,%s,'teacher','bug',%s,%s,'0.10.3')",
+        (str(fid), owner, MELDUNG, kontakt),
+    )
+    return fid
+
+
 @pytest.fixture
 def bestand(sync_conn, seed_test_group, artefakt_ablage):
     """Ein verlassenes Konto mit allem, was daran hängt — und ein aktives zur Gegenprobe."""
@@ -125,6 +139,11 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
             (seed_test_group, str(ids["schule"])),
         )
 
+        # ── Rückmeldungen ──
+        # Beide mit Kontaktangabe: Nur so zeigt der Lauf, dass er die Spalte kennt.
+        ids["feedback"] = _feedback(cur, owner=VERLASSEN, kontakt="Jan, 10b")
+        ids["feedback_fremd"] = _feedback(cur, owner=AKTIV, kontakt="Kollegin M.")
+
         # ── Mitgliedschaften und Ausblendungen ──
         cur.execute(
             "INSERT INTO group_memberships (group_id, pseudonym, role_in_group)"
@@ -148,6 +167,9 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
         cur.execute("DELETE FROM group_memberships WHERE pseudonym IN (%s,%s)",
                     (VERLASSEN, AKTIV))
         cur.execute("DELETE FROM teacher_group_exclusions WHERE pseudonym = %s", (VERLASSEN,))
+        # Über die ID, nicht über das Pseudonym: Nach dem Lauf steht dort NULL.
+        for schluessel in ("feedback", "feedback_fremd"):
+            cur.execute("DELETE FROM feedback WHERE id = %s", (str(ids[schluessel]),))
         cur.execute("DELETE FROM subjects WHERE id = %s", (SUBJECT_ID,))
         cur.execute("DELETE FROM pseudonym_audit WHERE pseudonym IN (%s,%s)",
                     (VERLASSEN, AKTIV))
@@ -280,3 +302,35 @@ class TestMitgliedschaften:
             "SELECT count(*) FROM teacher_group_exclusions WHERE pseudonym = %s",
             VERLASSEN,
         ) == 0
+
+
+class TestRueckmeldungen:
+    """ADR-020 — die einzige Tabelle, die ihre Zeilen behält."""
+
+    async def test_meldung_bleibt_und_verliert_den_personenbezug(self, sync_conn, gelaufen):
+        """Ein Fehlerbericht ist ein Befund über die Software, kein Kontodatum. Er
+        überlebt das Konto — ohne Pseudonym und ohne die freiwillige Kontaktangabe,
+        die einzige Spalte im System, die einen Klarnamen tragen kann."""
+        sync_conn.rollback()
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "SELECT pseudonym, contact, content FROM feedback WHERE id = %s",
+                (str(gelaufen["feedback"]),),
+            )
+            zeile = cur.fetchone()
+        assert zeile is not None, "Die Meldung wurde gelöscht statt anonymisiert"
+        pseudonym, kontakt, inhalt = zeile
+        assert pseudonym is None, "Das Pseudonym steht noch an der Meldung"
+        assert kontakt is None, "Die freiwillige Kontaktangabe steht noch da"
+        assert inhalt == MELDUNG, "Der Text der Meldung ist der Grund, sie zu behalten"
+
+    async def test_fremde_meldung_bleibt_unberuehrt(self, sync_conn, gelaufen):
+        """Die Gegenprobe: Ohne sie wäre ein `UPDATE feedback SET pseudonym = NULL`
+        ohne `WHERE` von diesem Test nicht zu unterscheiden."""
+        sync_conn.rollback()
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "SELECT pseudonym, contact FROM feedback WHERE id = %s",
+                (str(gelaufen["feedback_fremd"]),),
+            )
+            assert cur.fetchone() == (AKTIV, "Kollegin M.")

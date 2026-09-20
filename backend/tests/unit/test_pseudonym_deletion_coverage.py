@@ -39,18 +39,23 @@ _AUSGENOMMEN = {
 }
 
 
-def _geloeschte_modelle() -> set[str]:
-    """Modellnamen aus den `delete(X)`-Aufrufen in `cleanup_inactive_accounts`.
+def _funktion() -> ast.AsyncFunctionDef:
+    """Der Syntaxbaum von `cleanup_inactive_accounts` — nicht der ganzen Datei.
 
-    Über den Syntaxbaum statt per Textsuche: Ein `delete(` in einem Kommentar oder in
+    Über den Baum statt per Textsuche: Ein `delete(` in einem Kommentar oder in
     `cleanup_stale_conversations` soll nicht mitzählen.
     """
     baum = ast.parse(_CLEANUP.read_text(encoding="utf-8"))
-    funktion = next(
+    return next(
         k
         for k in ast.walk(baum)
         if isinstance(k, ast.AsyncFunctionDef) and k.name == "cleanup_inactive_accounts"
     )
+
+
+def _geloeschte_modelle() -> set[str]:
+    """Modellnamen aus den `delete(X)`-Aufrufen in `cleanup_inactive_accounts`."""
+    funktion = _funktion()
     namen = set()
     for knoten in ast.walk(funktion):
         if (
@@ -61,6 +66,47 @@ def _geloeschte_modelle() -> set[str]:
             and isinstance(knoten.args[0], ast.Name)
         ):
             namen.add(knoten.args[0].id)
+    return namen
+
+
+def _anonymisierte_modelle() -> set[str]:
+    """Modellnamen aus `update(X)…values(pseudonym=None)` in `cleanup_inactive_accounts`.
+
+    Nicht jede Tabelle wird geleert. `context_nodes` behält geteilte Bausteine,
+    `feedback` behält die Meldung — beide verlieren nur den Personenbezug. Ohne diesen
+    zweiten Weg meldete der Wächter unten sie als vergessen, und der einzige Weg, ihn zu
+    beruhigen, wäre ein Eintrag in `_AUSGENOMMEN`: genau die Verschleierung, gegen die
+    er gebaut ist.
+
+    Gezählt wird nur, was eine **Pseudonym-Spalte auf NULL** setzt. Ein `update(...)`,
+    das irgendetwas anderes schreibt, macht eine Tabelle nicht personenbezugsfrei.
+    """
+    namen = set()
+    for knoten in ast.walk(_funktion()):
+        if not (
+            isinstance(knoten, ast.Call)
+            and isinstance(knoten.func, ast.Attribute)
+            and knoten.func.attr == "values"
+        ):
+            continue
+        nullt = any(
+            kw.arg in _PSEUDONYM_SPALTEN
+            and isinstance(kw.value, ast.Constant)
+            and kw.value.value is None
+            for kw in knoten.keywords
+        )
+        if not nullt:
+            continue
+        # `update(X)` steht am Anfang derselben Aufrufkette (`update(X).where(…).values(…)`).
+        for teil in ast.walk(knoten.func):
+            if (
+                isinstance(teil, ast.Call)
+                and isinstance(teil.func, ast.Name)
+                and teil.func.id == "update"
+                and teil.args
+                and isinstance(teil.args[0], ast.Name)
+            ):
+                namen.add(teil.args[0].id)
     return namen
 
 
@@ -77,16 +123,16 @@ def _tabellen_mit_pseudonym() -> dict[str, str]:
 
 def test_jede_pseudonym_tabelle_ist_entschieden():
     """Jede Tabelle mit Pseudonym ist entweder gelöscht oder begründet ausgenommen."""
-    geloescht = _geloeschte_modelle()
+    behandelt = _geloeschte_modelle() | _anonymisierte_modelle()
     offen = {
         tabelle: modell
         for tabelle, modell in _tabellen_mit_pseudonym().items()
-        if modell not in geloescht and tabelle not in _AUSGENOMMEN
+        if modell not in behandelt and tabelle not in _AUSGENOMMEN
     }
     assert not offen, (
         "Neue Tabelle(n) mit Pseudonym-Spalte, die die Kontolöschung nicht kennt: "
-        f"{sorted(offen)}. Entweder in `cleanup_inactive_accounts` löschen oder in "
-        "`_AUSGENOMMEN` mit Begründung eintragen."
+        f"{sorted(offen)}. Entweder in `cleanup_inactive_accounts` löschen, dort das "
+        "Pseudonym auf NULL setzen oder in `_AUSGENOMMEN` mit Begründung eintragen."
     )
 
 
@@ -129,3 +175,18 @@ def test_ausnahmeliste_bleibt_aktuell():
     tabellen = set(_tabellen_mit_pseudonym())
     verwaist = set(_AUSGENOMMEN) - tabellen
     assert not verwaist, f"Ausnahme ohne zugehörige Tabelle: {sorted(verwaist)}"
+
+
+def test_feedback_wird_anonymisiert_statt_geloescht():
+    """ADR-020 — die Meldung bleibt, der Personenbezug geht.
+
+    Zwei Zusagen in einem Test, weil sie nur zusammen etwas wert sind: Ein `delete`
+    statt der Nullung nähme der Sichtung die Vorgeschichte einer Regression; eine
+    Nullung, die `contact` vergisst, ließe den einzigen möglichen Klarnamen im System
+    stehen. Die allgemeine Prüfung oben deckt nur die erste Hälfte ab.
+    """
+    assert "Feedback" in _anonymisierte_modelle()
+    assert "Feedback" not in _geloeschte_modelle()
+
+    quelle = ast.unparse(_funktion())
+    assert "contact=None" in quelle, "Die Kontaktangabe bleibt stehen"
