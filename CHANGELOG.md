@@ -5,58 +5,51 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.3] – 2026-09-20
+
+Die Oberfläche lässt sich stufenweise einblenden, statt von Anfang an alles zu zeigen.
+Dazu ein Schalter für den begrenzten Testbetrieb sowie Sicherheits- und
+Lesbarkeitsarbeiten aus dem Praxiseinsatz.
+
 ### Neu
 
-- **Die Oberfläche startet schmal.** Neue Konten sehen zunächst Chat, Assistenten,
-  Werkzeuge und Verlauf; alles Weitere schaltet man selbst frei — am Ende der Sidebar
-  oder im Profil, jederzeit rückschaltbar, ohne dass etwas verloren geht. Wer die
-  Plattform schon benutzt, sieht unverändert alles. Welche Funktion ab welcher Stufe
-  erscheint, steht in `config/ui_levels.yaml`.
-- **Erprobungsbetrieb für einen begrenzten Testkreis.** Mit
-  `STUDENT_SUBJECTS_OPT_IN=true` sehen Schüler:innen nur Fächer, deren Unterrichtsgruppe
-  die Lehrkraft unter „Meine Unterrichtsgruppen" freigegeben hat. Auf der Gruppenseite
-  steht, ob die Gruppe freigegeben ist. Ohne den Schalter verhält sich die Plattform wie
-  bisher; die Freigaben bleiben beim Abschalten erhalten.
+- **Umfang der Oberfläche.** Neue Konten sehen zunächst Chat, Assistenten, Werkzeuge und
+  Verlauf; alles Weitere blendet man selbst ein — in der Seitenleiste oder im Profil,
+  jederzeit rückschaltbar, ohne dass etwas verloren geht. Bestehende Konten sehen
+  unverändert alles. Der Zuschnitt steht in `config/ui_levels.yaml`.
+- **Erprobungsbetrieb** (`STUDENT_SUBJECTS_OPT_IN`). Schüler:innen sehen nur Fächer,
+  deren Unterrichtsgruppe die Lehrkraft freigegeben hat — unter „Meine
+  Unterrichtsgruppen"; der Stand steht auf der Gruppenseite. Ohne den Schalter ändert
+  sich nichts.
 
 ### Sicherheit
 
-- Inline-`style` aus Chat-Antworten, Wissensknoten und Curricula wird entfernt. Er
+- Inline-`style` aus Chat-Antworten, Wissensknoten und Curricula wird entfernt; er
   konnte externe Adressen nachladen oder sich über die Seite legen.
-- Eine Formel im Alternativtext eines Bildes (`![$x^2$](bild.png)`) brach das Attribut
-  auf; sie bleibt jetzt Klartext.
-- Frontend-Abhängigkeiten aktualisiert (DOMPurify, Mermaid, Svelte u. a.). Die
-  Produktivabhängigkeiten melden keine offenen Schwachstellen mehr.
+- Eine Formel im Alternativtext eines Bildes brach das Attribut auf.
+- Frontend-Abhängigkeiten aktualisiert (DOMPurify, Mermaid, Svelte u. a.).
 
 ### Behoben
 
-- **Mobil:** Der Chat-Eingabeblock lag unterhalb des sichtbaren Bereichs und war nur
-  durch Scrollen erreichbar. Bei geöffneter Bildschirmtastatur blieb darunter ein
-  weißer Streifen.
+- **Mobil:** Der Chat-Eingabeblock lag unter dem sichtbaren Bereich; bei geöffneter
+  Bildschirmtastatur blieb darunter ein weißer Streifen.
 - „In Werkstatt öffnen" und „Als Baustein speichern" legten bei jedem Klick ein neues
-  Dokument an. Der zweite Klick führt jetzt in das vorhandene — samt der daran
-  gemachten Änderungen.
-- Eine Unterrichtsgruppe ohne Fach erschien bei Schüler:innen als Fach — mit ihrer
-  rohen Kennung aus dem Schulkonto und einem Verweis, der im Verlauf endete. Sie wird
-  dort nicht mehr angeboten; die Lehrkraft findet stattdessen einen Hinweis bei ihren
-  Unterrichtsgruppen.
+  Dokument an.
+- Eine Unterrichtsgruppe ohne Fach erschien bei Schüler:innen als Fach; die Lehrkraft
+  findet dazu jetzt einen Hinweis bei ihren Unterrichtsgruppen.
 
 ### Geändert
 
+- Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen auf getöntem Grund mit gewohnter
+  Schriftfarbe, sekundärer Text ist dunkler.
 - Auf schmalen Bildschirmen klappt die Tastenkürzel-Legende unter der Chat-Eingabe
-  hinter einen i-Knopf; der Hinweis „KI kann Fehler machen" bleibt stehen.
-- Für die Kursstufe werden keine Unterrichtsgruppen mehr vorgeschlagen — dort zerfällt
-  der Jahrgang in Kurse, die quer zu den Klassen liegen.
-- **Lesbarkeit.** Hinweis-, Warn-, Erfolgs- und Fehlerkästen stehen jetzt auf
-  getöntem Grund mit gewohnter Schriftfarbe; die Farbe tragen Rand und Sinnbild. Der
-  Warnkasten war im Hellmodus praktisch unlesbar. Ebenso die Kategorie-Chips der
-  Datensparsamkeits-Warnung. Sekundärer Text ist durchgehend etwas dunkler.
+  hinter einen i-Knopf.
+- Für die Kursstufe werden keine Unterrichtsgruppen mehr vorgeschlagen.
 
 ### Dokumentation
 
-- `faecher.md` nennt jetzt beide Bedingungen, unter denen ein Fach erscheint: die
-  Zuordnung aus dem Schulkonto und ein Chat oder ein Assistent **mit diesem Fach**.
-- `profil.md` und `erste-schritte.md` erklären den Umfang der Oberfläche;
-  `konfiguration.md` beschreibt `config/ui_levels.yaml`.
+- Umfang der Oberfläche (`profil.md`, `erste-schritte.md`), `config/ui_levels.yaml`
+  (`konfiguration.md`), Sichtbarkeit von Fächern (`faecher.md`).
 
 ### Migration
 
