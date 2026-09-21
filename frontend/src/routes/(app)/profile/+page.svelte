@@ -1,6 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
-    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, Check, ChevronRight, Eye } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, ArrowLeft, BookOpen, Check, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -12,7 +12,6 @@
         stufenRegistry,
         uiStufe,
     } from "$lib/stores/uiLevel.js";
-    import { goto } from "$app/navigation";
     import { patchPreferences, getPreferences, getCalendarTeachers } from "$lib/api.js";
     import { onMount } from "svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
@@ -121,10 +120,6 @@
     async function updateContextSearchLimit(event) {
         const value = parseInt(event.target.value);
         await updatePreference("context_search_limit", value);
-    }
-
-    function doSave() {
-        goto("/");
     }
 
     let pct = $derived(
@@ -608,13 +603,5 @@
             </details>
         </section>
 
-        <section class="mb-8">
-            <button
-                class="px-4 py-2 rounded-md text-sm font-medium bg-light-gr-2 dark:bg-dark-gr-2 text-white hover:bg-light-gr dark:hover:bg-dark-gr transition-colors"
-                onclick={doSave}
-            >
-                <Save class="w-4 h-4 inline-block mr-1 mb-1" /> Speichern
-            </button>
-        </section>
     
 </PageBody>

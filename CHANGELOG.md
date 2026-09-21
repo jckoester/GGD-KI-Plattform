@@ -9,6 +9,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Mobil: die Seitenleiste bleibt nach dem Antippen eines Eintrags liegen.** Sie klappt
   jetzt beim Seitenwechsel zu; auf dem Desktop bleibt sie stehen.
+- **Der „Speichern"-Knopf im Profil speicherte nichts** — er navigierte nur zur
+  Startseite. Er ist entfernt; die Einstellungen der Seite werden weiterhin bei jeder
+  Änderung gespeichert.
 
 ## [0.10.4] – 2026-09-21
 
