@@ -214,6 +214,17 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `PUBLIC_SCHOOL_LOGO_URL_LIGHT` | Logo für helles Theme | `/static/logo-light.png` |
 | `PUBLIC_SCHOOL_LOGO_URL_DARK` | Logo für dunkles Theme | `/static/logo-dark.png` |
 
+### Rückmeldungen (optional)
+
+| Variable | Beschreibung | Beispiel |
+|----------|-------------|---------|
+| `FEEDBACK_NOTIFY_TO` | Wer über neue Rückmeldungen informiert wird. Höchstens eine Mail pro Stunde. **Leer = keine Mail** — zulässiger Betriebszustand, der Eingang ist in der Oberfläche sichtbar | `["ki-admin@schule.de"]` |
+
+Bewusst **getrennt** von `CRISIS_NOTIFY_TO` und ohne Rückfall darauf: Das eine ist eine
+Fehlermeldung über eine Schaltfläche, das andere ein Hinweis auf eine mögliche Notlage.
+Beides in dieselbe Liste zu legen, stumpfte die Aufmerksamkeit für das Zweite ab.
+Sichtung und Triage: [Rückmeldungen sichten](feedback.md).
+
 ### Stundenplan (optional)
 
 | Variable | Beschreibung | Beispiel |

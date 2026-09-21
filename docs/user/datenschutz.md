@@ -95,6 +95,7 @@ und wird nur in diesen geregelten Verfahren — und außerhalb der Software — 
 | Eigene Bausteine, die Sie geteilt haben | bleiben — ohne Ihren Namen |
 | Ihre Bibliothek (Bilder, Diagramme, Dokumente) | mit dem Account |
 | Gruppenmitgliedschaften, Lernstand, eigene Einstellungen | mit dem Account |
+| Rückmeldungen (Feedback) | 180 Tage nach dem Abschluss; offene bleiben stehen |
 
 Die Löschung erfolgt automatisch. Es gibt keine manuelle Wiederherstellung gelöschter Daten.
 
@@ -109,6 +110,30 @@ Planungen anderer. Der Baustein bleibt, die Verbindung zu Ihnen wird entfernt.
 
 > **Denken Sie daran:** Ergebnisse, die Sie aufbewahren möchten, müssen Sie
 > selbst kopieren — ki@schule ist kein dauerhafter Wissensspeicher.
+
+## Rückmeldungen
+
+Wenn Sie über **„Feedback geben"** eine Meldung schreiben, werden drei Arten von Daten
+gespeichert:
+
+| Was | Woher | Löschung |
+|-----|-------|---------|
+| Ihr Meldungstext samt technischem Kontext (Version, Seite, Browser, Fenstergröße) | Sie schreiben ihn, den Kontext legt die Plattform bei | 180 Tage nach dem Abschluss der Meldung |
+| Eine **freiwillige** Kontaktangabe | nur wenn Sie das Feld ausfüllen | beim Abschluss der Meldung, spätestens mit der Meldung |
+| Eine **Kopie des Chats**, wenn Sie ihn ausdrücklich anhängen | nur nach Ihrem Häkchen | beim Abschluss der Meldung, sofern sie nicht ausdrücklich behalten wird |
+
+Die Meldung trägt Ihr Pseudonym und Ihre Rolle — sonst keine Identität. Lesen können sie
+nur die Administrator:innen der Schule; sie dient allein der Verbesserung der Plattform.
+Eine Kontaktangabe wird **ausschließlich** für Rückfragen zu dieser einen Meldung
+genutzt, nie als Grundlage für Einsicht in Chats.
+
+Der angehängte Chat bleibt damit **länger erhalten** als die normalen drei Monate — er
+folgt der Frist der Meldung. Das geschieht nur auf Ihr ausdrückliches Häkchen hin.
+
+Wird Ihr Konto gelöscht, bleibt die Meldung als Befund über die Software bestehen,
+verliert aber Pseudonym und Kontaktangabe und ist dann niemandem mehr zuzuordnen.
+
+Mehr dazu: [Feedback geben](/help/feedback).
 
 ## Weiterführende Informationen
 

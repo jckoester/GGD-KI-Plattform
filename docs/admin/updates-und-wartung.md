@@ -524,6 +524,7 @@ Häufige Meldungen und ihre Bedeutung:
 | `Connection refused` zu LiteLLM | LiteLLM-Container nicht erreichbar | `LITELLM_PROXY_URL` in `.env` prüfen |
 | `alembic.util.exc.CommandError` beim Start | Datenbank-Migration fehlt | `alembic upgrade head` ausführen |
 | `SCHOOL_SECRET not set` | Pflichtumgebungsvariable fehlt | `.env` prüfen |
+| `… Rückmeldung(en) sind seit über 365 Tagen offen` | Unerledigte Meldungen im Feedback-Kanal | Kein Fehler — unter `/feedback/manage` abschließen oder bewusst behalten ([Leitfaden](feedback.md)) |
 
 ## Troubleshooting
 

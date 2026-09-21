@@ -22,6 +22,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Im Chat erscheint das Konversationsmenü jetzt schon bei der **ersten** Nachricht statt
   erst nach dem nächsten Seitenaufbau.
 
+### Dokumentation
+
+- Hilfeseite „Feedback geben"; Datenschutz-Seite um die drei Datenkategorien einer
+  Meldung ergänzt. Für Administrator:innen: `docs/admin/feedback.md` (Triage,
+  Zweckbindung der Kontaktangabe, Abgrenzung zur 4-Augen-Einsicht, Krisenandeutungen im
+  Freitext).
+
+### Migration
+
+⚠️ **Der Cron-Dienst muss neu erzeugt werden**, sonst läuft der Löschlauf für
+Rückmeldungen nicht — die Cron-Zeilen entstehen beim Start des Containers:
+
+```bash
+docker compose up -d --force-recreate cron
+```
+
+Neu: `50 2 * * * cleanup_feedback.py` — löscht abgeschlossene Meldungen 180 Tage nach
+dem Statuswechsel. Optional in der `.env`: `FEEDBACK_NOTIFY_TO`.
+
 ## [0.10.3] – 2026-09-20
 
 Die Oberfläche lässt sich stufenweise einblenden, statt von Anfang an alles zu zeigen.

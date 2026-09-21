@@ -6,5 +6,6 @@ export const helpNav = [
     { label: 'Unterrichtsplanung', path: '/help/unterrichtsplanung', file: 'unterrichtsplanung' },
     { label: 'Kontextspeicher', path: '/help/kontext',         file: 'kontext' },
     { label: 'Profil',          path: '/help/profil',          file: 'profil' },
+    { label: 'Feedback geben',  path: '/help/feedback',        file: 'feedback' },
     { label: 'Datenschutz',     path: '/help/datenschutz',     file: 'datenschutz' },
 ];

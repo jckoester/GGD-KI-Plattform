@@ -32,11 +32,12 @@ Cron-Container (separat):
 | `litellm/` | LiteLLM-HTTP-Client, Team-Anlage, User-Budget-Sync |
 | `upload/` | Dateiupload-Session, Text-Extraktion (PDF via pdfminer.six, Bilder via Base64) |
 | `db/` | SQLAlchemy-Modelle (async), Session-Factory |
-| `api/admin/` | Admin-only-Endpunkte: Modell-Allowlists, Assistenten, Statistiken, Site-Texte |
+| `api/admin/` | Admin-only-Endpunkte: Modell-Allowlists, Assistenten, Statistiken, Site-Texte, Rückmeldungen |
 | `api/assistants.py` | Öffentlicher Assistenten-Endpunkt (Sichtbarkeit nach Rolle) |
-| `crons/` | Cron-Logik (Cleanup Accounts/Konversationen, Embedding-Backfill, Stundenplan-Abgleich) — wird von Skripten aufgerufen |
+| `crons/` | Cron-Logik (Cleanup Accounts/Konversationen/Rückmeldungen, Embedding-Backfill, Stundenplan-Abgleich) — wird von Skripten aufgerufen |
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
+| `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
 

@@ -108,13 +108,14 @@ Person nichts ab.
 
 ## Automatische Datenlöschung (Cron-Jobs)
 
-Vier automatische Cron-Jobs laufen täglich. Drei davon räumen veraltete Daten ab, einer
+Fünf automatische Cron-Jobs laufen täglich. Vier davon räumen veraltete Daten ab, einer
 ergänzt fehlende Embeddings:
 
 | Job | Zeitplan | Was wird ausgeführt |
 |-----|---------|-----------------|
 | `cleanup_inactive_accounts` | täglich 02:00 Uhr | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
 | `cleanup_stale_conversations` | täglich 02:30 Uhr | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
+| `cleanup_feedback` | täglich 02:50 Uhr | Abgeschlossene Rückmeldungen 180 Tage nach dem Statuswechsel löschen |
 | `embedding_backfill` | täglich 03:15 Uhr | Embeddings für Knoten ohne Embedding nachgenerieren |
 | `node_lifecycle` | täglich 05:00 Uhr | Abgelaufene Bausteine archivieren, lange archivierte löschen |
 
@@ -166,6 +167,8 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 - den **persönlichen Lernzustand** (`node_engagement`) — der Zustand je Gruppe bleibt
 - **Gruppenmitgliedschaften** und die persönlichen **Fach-Ausblendungen**
 
+Eine Tabelle behält ihre Zeilen: **Rückmeldungen** (`feedback`). Eine Fehlermeldung ist ein Befund über die Software, kein Kontodatum — sie zu löschen, weil die meldende Person die Schule verlassen hat, nähme der Sichtung die Vorgeschichte einer Regression. Der Personenbezug geht trotzdem: Pseudonym **und** die freiwillige Kontaktangabe werden geleert. Der Eintrag verschwindet damit auch aus „Meine Meldungen“.
+
 > **Ausnahme Krisen-Aufbewahrung:** Hat das Konto eine geflaggte Konversation, die noch
 > aufzubewahren ist (offen, in Prüfung, oder abgeschlossen vor weniger als 180 Tagen),
 > wird das **gesamte** Konto übersprungen, bis die Frist endet.
@@ -209,7 +212,14 @@ SMTP_FROM=ki@schule.de
 SMTP_STARTTLS=true
 CRISIS_NOTIFY_TO=["krisenteam@schule.de","schulleitung@schule.de"]
 CRISIS_REVIEW_NOTIFY_TO=["schulsozialarbeit@schule.de"]
+FEEDBACK_NOTIFY_TO=["ki-admin@schule.de"]
 ```
+
+> `FEEDBACK_NOTIFY_TO` gehört **nicht** zu den Krisenadressen (ADR-020): Eine
+> Rückmeldung ist eine Fehlermeldung, kein Hinweis auf eine Notlage. Leer ist hier —
+> anders als oben — ein zulässiger Betriebszustand. Was in dieser Mail steht:
+> Kategorie, Rolle, Version und die ersten 200 Zeichen; **nicht** Pseudonym,
+> Kontaktangabe oder ein angehängter Chat. Siehe [Rückmeldungen sichten](feedback.md).
 
 **Warum die Empfänger in der Konfiguration stehen und nicht in der Datenbank:** Die
 Plattform kennt keine E-Mail-Adressen. Nur Pseudonyme verlassen die Anmeldung — es
