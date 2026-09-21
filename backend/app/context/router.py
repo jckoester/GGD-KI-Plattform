@@ -6,7 +6,6 @@ Sichtbarkeitsfilter werden in KS-Phase-3 um group_memberships-Prüfung erweitert
 
 import io
 import logging
-import os
 import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
@@ -176,15 +175,25 @@ def _read_scope_clause(user: JwtPayload):
 
 
 def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
-    """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym)."""
-    read_scope = tree.get("read_scope", "school")
-    if read_scope == "private":
+    """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym).
+
+    **Nur `private` schränkt ein** — dieselbe Linie wie in `read_scope_clause`, wo
+    `OFFENE_SCOPES` genau `global`, `school` und `subject` umfasst. Ein Curriculum ist
+    kein Geheimnis (Entscheidung Jan, 21.09.2026).
+
+    Bis zum 21.09.2026 stand hier ein zweiter Zweig: Bei `read_scope == 'subject'`
+    wurden Schüler:innen abgewiesen, außer `CURRICULUM_VISIBLE_TO_STUDENTS` war gesetzt.
+    Der Zweig war **wirkungslos** und irreführend zugleich. Wirkungslos, weil kein
+    Curriculum diesen Scope trägt (Curricula sind `school`, Bildungsplan-Knoten
+    `global`) und keine Stelle im Code ihn setzt. Irreführend, weil `subject` in
+    `read_scope_clause` ein **offener** Scope ist: Ein so markierter Knoten wäre über
+    jeden anderen Lesepfad ohnehin sichtbar gewesen. Die Variable war zudem in keiner
+    `.env.example` und in keiner Doku genannt — wer sich auf sie verließ, verließ sich
+    auf nichts.
+    """
+    if tree.get("read_scope", "school") == "private":
         if tree.get("owner_pseudonym") != user.sub:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    elif read_scope == "subject":
-        if "student" in user.roles and "teacher" not in user.roles:
-            if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
-                raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
 async def _require_curriculum_write(
