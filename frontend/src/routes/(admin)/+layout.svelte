@@ -1,6 +1,6 @@
 <script>
     import { onMount, onDestroy } from "svelte";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { getMe, getPreferences } from "$lib/api.js";
     import { user } from "$lib/stores/user.js";
@@ -42,6 +42,18 @@
         if (isDesktop) sidebarOpen = true;
         else sidebarOpen = false;
     }
+
+    // Auf kleinen Bildschirmen liegt die Seitenleiste als Overlay **über** der Seite.
+    // Ohne diese Zeile blieb sie nach dem Antippen eines Eintrags liegen: Die Seite
+    // wechselte dahinter, sichtbar war weiter das Menü, und es brauchte einen zweiten
+    // Tipp, um überhaupt etwas zu sehen (Befund aus dem Telefontest, 18.09.2026).
+    //
+    // Die Abfrage auf `isDesktop` ist nicht kosmetisch: Am Schreibtisch ist die
+    // Seitenleiste ein fester Teil des Layouts, kein Overlay — dort klappte sie sonst
+    // bei jedem Klick zu.
+    afterNavigate(() => {
+        if (!isDesktop) sidebarOpen = false;
+    });
 
     function toggleSidebar() {
         sidebarOpen = !sidebarOpen;

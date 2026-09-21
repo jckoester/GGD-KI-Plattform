@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Mobil: die Seitenleiste bleibt nach dem Antippen eines Eintrags liegen.** Sie klappt
+  jetzt beim Seitenwechsel zu; auf dem Desktop bleibt sie stehen.
+
 ## [0.10.4] – 2026-09-21
 
 Die Beta bekommt einen Rückkanal: Rückmeldungen lassen sich aus der Anwendung heraus
