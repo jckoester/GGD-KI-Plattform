@@ -409,3 +409,43 @@ class TestStundendrossel:
         for _ in range(8):
             assert (await test_client.get("/feedback/mine",
                                           headers=auth_headers_student)).status_code == 200
+
+
+class TestBenachrichtigung:
+    """Nicht die Dämpfung (die steht in `tests/unit/test_feedback_benachrichtigung.py`),
+    sondern die Verdrahtung: Wird überhaupt etwas angestoßen — und was, wenn es scheitert?"""
+
+    async def _anstossen(self, test_client, kopf, attrappe, monkeypatch):
+        from app.core import hintergrund
+        from app.feedback import router as feedback_router
+
+        monkeypatch.setattr(feedback_router, "benachrichtige", attrappe)
+        antwort = await test_client.post("/feedback", json=_rumpf(), headers=kopf)
+        await hintergrund.warte_auf_abschluss(2.0)
+        return antwort
+
+    async def test_eine_neue_meldung_stoesst_sie_an(
+        self, test_client, auth_headers_student, monkeypatch
+    ):
+        gerufen = []
+
+        async def attrappe(session_factory, **kw):
+            gerufen.append(True)
+            return False
+
+        antwort = await self._anstossen(test_client, auth_headers_student, attrappe, monkeypatch)
+        assert antwort.status_code == 201
+        assert gerufen == [True]
+
+    async def test_ein_mailfehler_verschluckt_die_meldung_nicht(
+        self, test_client, sync_conn, auth_headers_student, monkeypatch
+    ):
+        """Der Mailserver ist nicht Teil der Zusage. Wer eine Rückmeldung schreibt,
+        darf sie nicht verlieren, weil ein Postfach nicht erreichbar ist."""
+        async def attrappe(session_factory, **kw):
+            raise RuntimeError("Mailserver nicht erreichbar")
+
+        antwort = await self._anstossen(test_client, auth_headers_student, attrappe, monkeypatch)
+        assert antwort.status_code == 201
+        assert _zeile(sync_conn, STUDENT_PSEUDO) is not None
+

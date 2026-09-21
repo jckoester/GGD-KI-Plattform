@@ -194,6 +194,14 @@ class Settings(BaseSettings):
     # stiller Vorgabewert. Bleibt die Liste leer, wird nicht versendet, sondern
     # geloggt (`app/mail`), und `check_production.py` sagt es beim Start.
     crisis_review_notify_to: list[str] = []
+    # Wer über neue Rückmeldungen aus dem Feedback-Kanal informiert wird (ADR-020).
+    #
+    # Getrennt von den Krisen-Adressen und **ohne Rückfall** darauf: Das eine ist eine
+    # Fehlermeldung über eine Schaltfläche, das andere ein Hinweis auf eine mögliche
+    # Notlage. Wer beides in dieselbe Liste legte, stumpfte die Aufmerksamkeit für das
+    # Zweite ab. Leer heißt: keine Mail, der Eingang wird nur in der Oberfläche
+    # sichtbar — das ist ein zulässiger Betriebszustand, keine Fehlkonfiguration.
+    feedback_notify_to: list[str] = []
     # ── Fristen des Krisenprozesses (ADR-008 Teil 7) ──────────────────────────
     # Ab wann an einen unerledigten Fall erinnert wird — und danach höchstens
     # wöchentlich erneut.

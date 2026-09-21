@@ -35,8 +35,29 @@ SPERRE = timedelta(days=14)
 TAGESLIMIT = 20
 TAGESFENSTER = timedelta(hours=24)
 
-# Zustände, aus denen eine Meldung nicht mehr zurückgezogen werden kann.
+# ── Statusmaschine (ADR-020) ─────────────────────────────────────────────────────
 OFFEN = "open"
+IN_ARBEIT = "in_progress"
+ERLEDIGT = "done"
+ABGELEHNT = "declined"
+SPAM = "spam"
+
+# Zustände, in denen die Sichtung fertig ist. Beim Eintritt fallen Kontakt und
+# (ohne ausdrückliches Behalten) der Chat-Anhang.
+ABGESCHLOSSEN = frozenset({ERLEDIGT, ABGELEHNT, SPAM})
+
+# Wohin es von wo aus gehen darf. Was hier fehlt, ist ein 409 — nicht, weil der
+# Übergang undenkbar wäre, sondern weil er unter der Hand Daten vernichtete: Ein
+# direkter Sprung von `done` nach `declined` etwa liefe am Wiedereröffnen vorbei und
+# schriebe `status_changed_at` neu, obwohl der Anhang längst gefallen ist.
+UEBERGAENGE: dict[str, frozenset[str]] = {
+    OFFEN: frozenset({IN_ARBEIT, ERLEDIGT, ABGELEHNT, SPAM}),
+    IN_ARBEIT: frozenset({ERLEDIGT, ABGELEHNT, SPAM, OFFEN}),
+    # Aus einem abgeschlossenen Zustand führt nur der Weg zurück an den Anfang.
+    ERLEDIGT: frozenset({OFFEN}),
+    ABGELEHNT: frozenset({OFFEN}),
+    SPAM: frozenset({OFFEN}),
+}
 
 
 def _jetzt(jetzt: datetime | None) -> datetime:
@@ -215,3 +236,84 @@ def nach_aussen(eintrag: Feedback) -> FeedbackOut:
         created_at=eintrag.created_at,
         status_changed_at=eintrag.status_changed_at,
     )
+
+
+# ── Sichtung (AP3) ──────────────────────────────────────────────────────────────
+
+
+def pruefe_uebergang(alt: str, neu: str) -> None:
+    """Wirft 409, wenn der Wechsel nicht vorgesehen ist. Gleicher Status: erlaubt."""
+    if alt == neu:
+        return
+    if neu not in UEBERGAENGE.get(alt, frozenset()):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Wechsel von „{alt}“ nach „{neu}“ ist nicht vorgesehen.",
+        )
+
+
+async def aendere(
+    db: AsyncSession,
+    feedback_id: UUID,
+    *,
+    admin_pseudonym: str,
+    status: str | None = None,
+    admin_reply: str | None = None,
+    resolved_in_version: str | None = None,
+    issue_ref: str | None = None,
+    keep_snapshot: bool = False,
+    jetzt: datetime | None = None,
+) -> Feedback:
+    """Der Statuswechsel der Sichtung — mit allem, was daran hängt.
+
+    **Was beim Abschluss fällt.** `contact` immer: Nach dem Abschluss gibt es nichts
+    mehr nachzufragen, und es ist die einzige Spalte im System, die einen Klarnamen
+    tragen kann. Der Chat-Anhang ebenfalls, außer die sichtende Person wählt
+    ausdrücklich „behalten" — er ist eine Kopie fremder Chatinhalte und hat ohne
+    laufende Bearbeitung keinen Zweck.
+
+    `keep_snapshot` ohne Abschluss ist wirkungslos und **kein Fehler**: Die Oberfläche
+    schickt die Auswahl mit, auch wenn der Status unverändert bleibt.
+    """
+    jetzt = _jetzt(jetzt)
+    eintrag = await db.scalar(select(Feedback).where(Feedback.id == feedback_id))
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
+
+    vorher = eintrag.status
+    ziel = status or vorher
+    pruefe_uebergang(vorher, ziel)
+
+    # Die Begründung wird gegen den **Endzustand** geprüft, nicht gegen die Eingabe:
+    # Auch wer eine bereits abgelehnte Meldung nur nachbearbeitet, soll sie nicht
+    # begründungslos zurücklassen können.
+    antwort = admin_reply if admin_reply is not None else eintrag.admin_reply
+    if ziel == ABGELEHNT and not (antwort or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Für „nicht umgesetzt“ ist eine kurze Begründung erforderlich.",
+        )
+
+    if admin_reply is not None:
+        eintrag.admin_reply = admin_reply.strip() or None
+    if resolved_in_version is not None:
+        eintrag.resolved_in_version = resolved_in_version.strip() or None
+    if issue_ref is not None:
+        eintrag.issue_ref = issue_ref.strip() or None
+
+    if ziel != vorher:
+        eintrag.status = ziel
+        eintrag.status_changed_at = jetzt
+        if ziel in ABGESCHLOSSEN:
+            eintrag.contact = None
+            if not keep_snapshot:
+                eintrag.conversation_snapshot = None
+
+    await db.commit()
+    await db.refresh(eintrag)
+
+    logger.info(
+        "feedback_status_changed admin=%s id=%s status=%s->%s anhang_behalten=%s",
+        admin_pseudonym, feedback_id, vorher, ziel, keep_snapshot,
+    )
+    return eintrag
