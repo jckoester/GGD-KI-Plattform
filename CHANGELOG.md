@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.4] – 2026-09-21
+
+Die Beta bekommt einen Rückkanal: Rückmeldungen lassen sich aus der Anwendung heraus
+schreiben, verfolgen und in der Verwaltung sichten.
+
 ### Neu
 
 - **Feedback geben.** Fehler und Verbesserungsvorschläge lassen sich aus der Anwendung
@@ -31,15 +36,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Migration
 
-⚠️ **Der Cron-Dienst muss neu erzeugt werden**, sonst läuft der Löschlauf für
-Rückmeldungen nicht — die Cron-Zeilen entstehen beim Start des Containers:
+⚠️ **Migrieren, bevor die neuen Container starten:**
 
 ```bash
-docker compose up -d --force-recreate cron
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d --force-recreate
 ```
 
-Neu: `50 2 * * * cleanup_feedback.py` — löscht abgeschlossene Meldungen 180 Tage nach
-dem Statuswechsel. Optional in der `.env`: `FEEDBACK_NOTIFY_TO`.
+`alembic upgrade head` führt `0065` aus (Tabelle `feedback`).
+
+Der Cron-Dienst muss **neu erzeugt** werden — die Cron-Zeilen entstehen beim Start des
+Containers, ein bloßer Neustart übernimmt die neue Zeile nicht. Neu ist
+`50 2 * * * cleanup_feedback.py`: löscht abgeschlossene Meldungen 180 Tage nach dem
+Statuswechsel.
+
+Optional in der `.env`: `FEEDBACK_NOTIFY_TO` — leer heißt, dass keine Mail versendet
+wird; der Eingang ist in der Oberfläche sichtbar.
 
 ## [0.10.3] – 2026-09-20
 
