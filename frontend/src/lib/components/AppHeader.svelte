@@ -1,5 +1,6 @@
 <script>
-    import { PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
+    import { MessageSquareWarning, PanelLeftClose, PanelLeftOpen } from "lucide-svelte";
+    import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
     import { page } from "$app/stores";
     import { pageTitle, activeConversationId, activeConversationSubjectId, activeConversationGroupId } from "$lib/stores/pageTitle.js";
     import ConversationMenu from "$lib/components/ConversationMenu.svelte";
@@ -57,6 +58,17 @@
 
     <!-- Rechte Seite: Abmelden-Button oder Konversationsmenü -->
     {#if $activeConversationId}
+        <div class="flex items-center">
+            <!-- Der kurze Weg: Wer im Chat auf einen Fehler stößt, soll ihn dort melden
+                 können, wo er auftritt — mit dem Chat als Beleg, vorausgewählt. -->
+            <button
+                onclick={() => oeffneFeedback({ chatAnhaengen: true })}
+                aria-label="Feedback zu diesem Chat"
+                title="Feedback zu diesem Chat"
+                class="p-2 rounded-lg hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 {textClass} transition-colors"
+            >
+                <MessageSquareWarning size={20} />
+            </button>
         <ConversationMenu
             conversationId={$activeConversationId}
             title={$pageTitle}
@@ -65,5 +77,6 @@
             syncPageTitle={true}
             buttonClasses=" hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
         />
+        </div>
     {/if}
 </header>

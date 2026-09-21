@@ -50,6 +50,7 @@
     import {
         pageTitle,
         activeConversationId,
+        activeConversationAssistantId,
         activeConversationSubjectId,
         activeConversationGroupId,
     } from "$lib/stores/pageTitle.js";
@@ -589,6 +590,12 @@
                 if (item.type === "start") {
                     const wasNewConversation = conversationId == null;
                     conversationId = item.conversationId;
+                    // Auch im Store, nicht nur lokal: Von einer **neu entstandenen**
+                    // Konversation erfuhren die Stores bisher erst beim nächsten
+                    // Seitenaufbau — Fach und Gruppe werden unten ja schon gesetzt,
+                    // die ID fehlte. Daran hängen das Konversationsmenü im Kopf und
+                    // der Chat-Anhang einer Rückmeldung.
+                    activeConversationId.set(item.conversationId);
                     currentConversationModel = selectedAssistant
                         ? selectedAssistant.name
                         : selectedModelId || currentConversationModel;
@@ -637,6 +644,7 @@
                     // Assistenten-Referenz für laufende Konversation speichern
                     if (selectedAssistant) {
                         conversationAssistant = selectedAssistant;
+                        activeConversationAssistantId.set(selectedAssistant.id);
                         // subject_id aus Assistent übernehmen; group_id bleibt null
                         activeConversationSubjectId.set(
                             selectedAssistant.subject_id ?? null,
@@ -1055,6 +1063,7 @@
                 }
                 pageTitle.set(data.title || "");
                 activeConversationId.set(data.id);
+                activeConversationAssistantId.set(data.assistant_id ?? null);
                 activeConversationSubjectId.set(data.subject_id ?? null);
                 activeConversationGroupId.set(data.group_id ?? null);
                 // Kontext-Knoten laden
@@ -1074,6 +1083,7 @@
                         currentConversationModel = null;
                         pageTitle.set("");
                         activeConversationId.set(null);
+                        activeConversationAssistantId.set(null);
                         activeConversationSubjectId.set(null);
                         activeConversationGroupId.set(null);
                         pendingSuggestions = null;
@@ -1083,6 +1093,7 @@
                     currentConversationModel = null;
                     pageTitle.set("");
                     activeConversationId.set(null);
+                    activeConversationAssistantId.set(null);
                     activeConversationSubjectId.set(null);
                     activeConversationGroupId.set(null);
                 }
@@ -1099,6 +1110,7 @@
             conversationError = null;
             pageTitle.set("");
             activeConversationId.set(null);
+            activeConversationAssistantId.set(null);
             activeConversationSubjectId.set(null);
             activeConversationGroupId.set(null);
             conversationAssistant = null;
@@ -1181,6 +1193,7 @@
     onDestroy(() => {
         pageTitle.set("");
         activeConversationId.set(null);
+        activeConversationAssistantId.set(null);
         activeConversationSubjectId.set(null);
         activeConversationGroupId.set(null);
     });

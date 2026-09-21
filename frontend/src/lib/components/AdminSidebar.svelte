@@ -20,6 +20,7 @@
         PiggyBank,
         Bot,
         CalendarDays,
+        Inbox,
     } from "lucide-svelte";
     import SidebarBottom from "./SidebarBottom.svelte";
     import { hasAnyRole } from "$lib/stores/user.js";
@@ -28,10 +29,18 @@
         calendarConfigured,
         refreshCalendarStatus,
     } from "$lib/stores/calendarStatus.js";
+    import {
+        offeneFeedbackCount,
+        refreshFeedbackAlerts,
+    } from "$lib/stores/feedbackAlerts.js";
 
     // Der Ferienkalender erscheint nur, wenn eine Stundenplanquelle eingerichtet ist —
     // eine Schule ohne WebUntis soll den Menüpunkt gar nicht sehen (Plan §0).
     onMount(refreshCalendarStatus);
+    // Einmal beim Laden; danach zieht die Sichtungsseite den Zähler nach jedem
+    // Statuswechsel selbst nach. Eine Abfrageschleife wäre für Rückmeldungen,
+    // die einzeln über den Tag eintreffen, verschwendete Last.
+    onMount(refreshFeedbackAlerts);
 
     const canSeeSettings   = hasAnyRole(['admin']);
     const canSeeStatistics = hasAnyRole(['statistics', 'admin']);
@@ -366,6 +375,33 @@
                         Krisen-Meldungen
                     </span>
                 </button>
+            </div>
+        </div>
+        {/if}
+
+        <!-- Rückmeldungen (operativer Bereich wie die Krisen-Meldungen) -->
+        {#if $canSeeSettings}
+        <div class="mt-2 border-t border-light-ui-3 dark:border-dark-ui-3 pt-3">
+            <div
+                class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors rounded-lg"
+            >
+                <button
+                    onclick={() => {
+                        toggleOpenSection("feedback");
+                        goto("/feedback/manage");
+                    }}
+                >
+                    <span class="flex items-center gap-2">
+                        <Inbox class="w-4 h-4 text-light-bl dark:text-dark-bl" />
+                        Rückmeldungen
+                    </span>
+                </button>
+                {#if $offeneFeedbackCount > 0}
+                    <span class="text-xs font-semibold px-1.5 py-0.5 rounded-full
+                                 bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl">
+                        {$offeneFeedbackCount}
+                    </span>
+                {/if}
             </div>
         </div>
         {/if}

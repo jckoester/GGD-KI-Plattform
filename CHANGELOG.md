@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Feedback geben.** Fehler und Verbesserungsvorschläge lassen sich aus der Anwendung
+  heraus melden — über das Nutzermenü oder im Chat-Kopf, dort auf Wunsch mit dem
+  laufenden Chat als Beleg. Version, Seite und Browser gehen automatisch mit, eine
+  Kontaktangabe ist freiwillig. Unter „Meine Meldungen" steht, was aus einer Meldung
+  geworden ist.
+- **Rückmeldungen sichten** (Admin, `/feedback/manage`). Eingang mit Filter nach Status,
+  Kategorie, Rolle und Version; Statuswechsel mit Antwort, Version und Issue-Referenz.
+  Beim Abschluss werden Kontaktangabe und angehängter Chat gelöscht. Eine Mail an
+  `FEEDBACK_NOTIFY_TO` meldet neue Eingänge, höchstens eine pro Stunde.
+
+### Geändert
+
+- Im Chat erscheint das Konversationsmenü jetzt schon bei der **ersten** Nachricht statt
+  erst nach dem nächsten Seitenaufbau.
+
 ## [0.10.3] – 2026-09-20
 
 Die Oberfläche lässt sich stufenweise einblenden, statt von Anfang an alles zu zeigen.

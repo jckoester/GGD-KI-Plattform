@@ -10,8 +10,13 @@
         ChartNoAxesCombined,
         Info,
         TriangleAlert,
+        Megaphone,
+        MessageSquareText,
+        Inbox,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
+    import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
+    import { offeneFeedbackCount } from "$lib/stores/feedbackAlerts.js";
     import {
         openFlagCount,
         inReviewFlagCount,
@@ -91,6 +96,24 @@
         </a>
     {/if}
 
+    <!-- Rückmeldungen sichten (nur bei admin-Rolle) -->
+    {#if $user?.roles.includes("admin")}
+        <a
+            href="/feedback/manage"
+            onclick={onClose}
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        >
+            <Inbox class="w-4 h-4 mr-3 text-light-bl dark:text-dark-bl" />
+            Rückmeldungen
+            {#if $offeneFeedbackCount > 0}
+                <span class="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full
+                             bg-light-bl/20 dark:bg-dark-bl/20 text-light-bl dark:text-dark-bl">
+                    {$offeneFeedbackCount}
+                </span>
+            {/if}
+        </a>
+    {/if}
+
     <!-- Krisen-Freigaben (nur bei review-Rolle) -->
     {#if $user?.roles.includes("review")}
         <a
@@ -139,6 +162,31 @@
             class="border-t border-light-ui-3 dark:border-dark-ui-3 my-0"
         ></div>
     {/if}
+
+    <!-- Feedback (immer sichtbar, auf jeder Darstellungsstufe: Das Nutzermenü
+         wird von `ui_levels.yaml` nicht gefiltert — nur die Sidebar-Navigation) -->
+    <button
+        onclick={() => {
+            oeffneFeedback();
+            onClose();
+        }}
+        class="w-full flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+    >
+        <Megaphone class="w-4 h-4 mr-3" />
+        Feedback geben
+    </button>
+
+    <a
+        href="/feedback"
+        onclick={onClose}
+        class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+    >
+        <MessageSquareText class="w-4 h-4 mr-3" />
+        Meine Meldungen
+    </a>
+
+    <!-- Trenner -->
+    <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-0"></div>
 
     <!-- Über diese Software (immer sichtbar) -->
     <a

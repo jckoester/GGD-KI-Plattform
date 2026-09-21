@@ -13,6 +13,8 @@
     import { refreshUiLevels } from '$lib/stores/uiLevel.js';
     import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
     import Sidebar from "$lib/components/Sidebar.svelte";
+    import FeedbackDialog from "$lib/components/FeedbackDialog.svelte";
+    import { feedbackDialog, schliesseFeedback } from "$lib/stores/feedbackDialog.js";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
     let { children } = $props();
@@ -99,3 +101,13 @@
         </main>
     </div>
 </div>
+
+<!-- Einmal je Layout, geschaltet über den Store: Geöffnet wird der Dialog aus dem
+     Nutzermenü und aus dem Chat-Kopf — beides Elemente, die beim Klick
+     verschwinden. Ein Dialog, der dort hinge, ginge mit ihnen. -->
+{#if $feedbackDialog.offen}
+    <FeedbackDialog
+        vorauswahlChat={$feedbackDialog.chatAnhaengen}
+        onclose={schliesseFeedback}
+    />
+{/if}

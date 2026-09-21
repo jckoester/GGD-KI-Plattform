@@ -2349,3 +2349,97 @@ export async function revokeToken(id) {
     throw new ApiError(res.status, data.detail);
   }
 }
+
+// ── Rückmeldungen (ADR-020) ───────────────────────────────────────────────────
+
+// Eine Meldung absenden. 403 bei Spam-Sperre, 429 über dem Stunden-/Tageslimit —
+// in beiden Fällen trägt `detail` einen Satz, der angezeigt werden kann.
+export async function createFeedback(payload) {
+  const res = await fetch(`${BASE}/feedback`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Die eigenen Meldungen mit Status und Antwort.
+export async function getMyFeedback() {
+  const res = await fetch(`${BASE}/feedback/mine`, { credentials: "include" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Eine eigene Meldung zurückziehen — nur solange sie offen ist (sonst 409).
+export async function withdrawFeedback(id) {
+  const res = await fetch(`${BASE}/feedback/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Admin: der Eingang. Ohne `status` liefert der Server, was Arbeit macht
+// (offen + in Bearbeitung). `counts` folgt den übrigen Filtern, nicht dem Status.
+export async function getAdminFeedback({
+  status = null,
+  category = null,
+  role = null,
+  appVersion = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const params = new URLSearchParams({ limit, offset });
+  for (const s of status ?? []) params.append("status", s);
+  if (category) params.set("category", category);
+  if (role) params.set("role", role);
+  if (appVersion) params.set("app_version", appVersion);
+  const res = await fetch(`${BASE}/admin/feedback?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json(); // { items, total, counts }
+}
+
+// Admin: eine Meldung mit dem angehängten Chat.
+export async function getAdminFeedbackDetail(id) {
+  const res = await fetch(`${BASE}/admin/feedback/${id}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}
+
+// Admin: Status, Antwort, Version, Issue-Referenz. 409 bei unvorgesehenem Wechsel,
+// 422 ohne Begründung bei „nicht umgesetzt".
+export async function patchAdminFeedback(id, body) {
+  const res = await fetch(`${BASE}/admin/feedback/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail);
+  }
+  return res.json();
+}

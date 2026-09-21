@@ -7,6 +7,8 @@
     import { themePref } from "$lib/stores/theme.js";
     import { refreshCrisisAlerts } from "$lib/stores/crisisAlerts.js";
     import Sidebar from "$lib/components/AdminSidebar.svelte";
+    import FeedbackDialog from "$lib/components/FeedbackDialog.svelte";
+    import { feedbackDialog, schliesseFeedback } from "$lib/stores/feedbackDialog.js";
     import AppHeader from "$lib/components/AppHeader.svelte";
 
     let { children } = $props();
@@ -93,3 +95,12 @@
         </main>
     </div>
 </div>
+
+<!-- Einmal je Layout, geschaltet über den Store: Geöffnet wird der Dialog aus dem
+     Nutzermenü — das beim Klick zuklappt. Ein Dialog, der dort hinge, ginge mit. -->
+{#if $feedbackDialog.offen}
+    <FeedbackDialog
+        vorauswahlChat={$feedbackDialog.chatAnhaengen}
+        onclose={schliesseFeedback}
+    />
+{/if}
