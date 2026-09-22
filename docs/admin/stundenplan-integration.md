@@ -215,17 +215,55 @@ die Cron-Überwachung täglich, obwohl nichts zu tun ist. Die Fehlschläge stehe
 **Er ändert** die Kategorie vorhandener Slots (`unterricht` → `ausfall` / `vertretung` /
 `pruefung`) und setzt bei Ausfall und Vertretung das Kennzeichen „Anpassung nötig".
 
+**Er legt fehlende Slots an** — seit 09/2026. Kennt der Stundenplan Unterricht, für den die
+Jahresplanung keinen Termin hat, entsteht dieser Termin mit `source='import'`, der
+Kategorie **nach Lage** (bei der Verlegung `unterricht`) und **ohne Inhalt**. Der Anlass ist die Verlegung: In WebUntis ist sie ein
+Paar aus Entfall und Neuansetzung. Bisher schrieb der Abgleich nur den Entfall — die
+Planung verlor bei jeder Verlegung eine Stunde, ohne dass es auffiel.
+
+Zwei Grenzen halten das eng:
+
+- **Nur für Gruppen, die planen.** Hat eine Gruppe keinen einzigen Slot, wird nichts
+  angelegt; sie bekäme sonst aus dem Stundenplan ein ganzes Halbjahr geschenkt, das nie
+  jemand bestellt hat. Es bleibt bei der Meldung `kein_slot`.
+- **Kein Inhalt.** Der Slot ist leer. Was auf der verlegten Stunde geplant war, bringt nur
+  die Lehrkraft über den Verschiebe-Dialog dorthin.
+
 **Er ändert nie:**
 
 - Slots mit `pinned` oder von Hand gesetzte Slots — gemeldet als Konflikt, nicht geändert
 - Eigene Notizen. Der Abgleich schreibt nur in leere Notizfelder oder in solche, die er
   selbst mit `[Stundenplan]` markiert hat. Der Marker macht ihn zugleich wiederholbar.
-- Er **legt keine Slots an**. Kennt der Stundenplan Unterricht, den die Jahresplanung nicht
-  hat, ist das eine Abweichung zum Ansehen, keine Aufgabe zum Ausführen.
+- Den Inhalt eines Slots. Thema, Einheit und Stundenentwurf rührt er nicht an.
 
 **Verlegungen** erscheinen als Vorschlag, nicht als Änderung. Eine Verlegung ist in WebUntis
 ein Paar (Ursprung entfällt, Ziel entsteht); die Plattform bündelt es zu einem Vorschlag und
 öffnet damit den vorhandenen Verschiebe-Dialog.
+
+### Was ein Neuaufbau verschont
+
+Erzeugt eine Lehrkraft die Stunden eines Halbjahres neu (geänderte Wochenmuster,
+Halbjahreswechsel), wird **nicht** mehr das ganze Halbjahr gelöscht. Entscheidend ist die
+Spalte `lesson_slots.source` — sie sagt, **woher** ein Termin stammt:
+
+| `source` | Herkunft | Beim Neuaufbau |
+|---|---|---|
+| `pattern` | aus dem Wochenmuster erzeugt | wird gelöscht und neu erzeugt |
+| `import` | vom Stundenplan-Abgleich angelegt | bleibt stehen |
+| `manual` | von Hand angelegt | bleibt stehen |
+
+Ein verschonter Termin auf demselben Datum und derselben Stunde wie eine Musterzeile
+**verdrängt die Musterzeile** — sonst stünden dort zwei Stunden.
+
+Die Planung der gelöschten Muster-Slots geht dabei nicht verloren: Sie wird auf die neuen
+Termine **umgehängt** (Fixpunkte behalten ihr Datum, der Rest wandert nach Reihenfolge).
+Was keinen Termin findet, landet in `parked_lesson_content` — dem Parkplatz, den die
+Lehrkraft im Jahresplan sieht. Details in der
+[Anwender-Doku](../user/unterrichtsplanung.md#das-ganze-jahr-planen).
+
+> **Für den Abgleich heißt das:** Slots, die er selbst angelegt hat (`import`), überstehen
+> einen Neuaufbau. Er muss sie nicht erneut anlegen, und ein Neuaufbau macht seine Arbeit
+> nicht rückgängig.
 
 ---
 

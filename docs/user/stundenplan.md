@@ -60,6 +60,13 @@ eine Woche.
 **Der Vorschlag füllt nur das Formular.** Nichts ist gespeichert, bis Sie auf „Speichern"
 klicken. Sie können vorher jede Zeile ändern, löschen oder ergänzen.
 
+**Stunden bis zum Schuljahresende anlegen.** Solange das 1. Halbjahr läuft, ist diese
+Option vorbelegt: Das 2. Halbjahr entsteht dann **vorläufig** aus dem jetzigen Raster,
+damit Ihre Jahresplanung über den Halbjahreswechsel hinweg Termine hat. Kommt im Februar
+der neue Stundenplan, erzeugen Sie das Halbjahr neu — Ihre Planung wird dabei umgehängt,
+nicht verworfen. Wie das läuft, steht in der
+[Unterrichtsplanung](unterrichtsplanung.md#das-ganze-jahr-planen).
+
 Angezeigt wird auch, wie viele Einträge aus wie vielen Wochen stammen und welche davon
 **unsicher** sind — etwa weil eine Stunde nur einmal vorkam. Wochen, in denen Sie gar
 keinen Unterricht haben (Praktikums- oder Projektwoche), zählen dabei nicht mit; sie
@@ -111,9 +118,11 @@ Ein Vertretungshinweis wird nur in ein leeres Notizfeld geschrieben oder in eine
 Plattform selbst angelegt hat (erkennbar an `[Stundenplan]`). Was Sie selbst notiert haben,
 bleibt stehen.
 
-**Sie legt keine Stunden an.**
-Kennt der Stundenplan Unterricht, für den Ihre Jahresplanung keinen Termin hat, erscheint
-das als Hinweis. Ob daraus ein Termin wird, entscheiden Sie.
+**Sie legt nur an, was der Stundenplan zusätzlich ansetzt.**
+Wird eine Stunde auf einen Termin verlegt, an dem Ihre Gruppe sonst keinen Unterricht hat,
+entsteht dort ein Termin — sonst verlöre Ihre Planung diese Stunde. Der Termin ist leer:
+**Den Inhalt bringt nur der Verschiebe-Dialog dorthin, nicht der Abgleich.** Für Gruppen
+ohne Jahresplanung wird nichts angelegt; dort bleibt es beim Hinweis.
 
 **Sie plant nicht für Sie um.**
 Fällt eine Stunde aus, wird sie als Ausfall markiert und als *anzupassen* gekennzeichnet.
@@ -145,6 +154,9 @@ Ihrer Jahresplanung. Es ist nicht Ihr Unterricht.
 Wird eine Stunde verschoben, erkennt die Plattform beide Seiten — die entfallende und die
 neue — und meldet sie als **einen** Vorgang, nicht als zwei unabhängige Änderungen. Eine
 verlegte Doppelstunde bleibt eine Meldung.
+
+Fehlt der Zieltermin in Ihrer Jahresplanung, wird er angelegt — leer. So bleibt die
+Stundenzahl stimmig; den Stoff verschieben Sie selbst.
 
 Von dort öffnen Sie den gewohnten Verschiebe-Assistenten und entscheiden, was mit dem Stoff
 geschieht.

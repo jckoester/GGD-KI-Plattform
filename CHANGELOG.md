@@ -46,6 +46,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Startseite. Er ist entfernt; die Einstellungen der Seite werden weiterhin bei jeder
   Änderung gespeichert.
 
+### Dokumentation
+
+- Anwender-Doku: Abschnitt „Das ganze Jahr planen" (vorläufige Termine, Umhängen im
+  Februar, Parkplatz). Für Administrator:innen: welche Slots der Abgleich anlegt und
+  welche ein Neuaufbau verschont.
+
+### Migration
+
+⚠️ **Migrieren, bevor die neuen Container starten:**
+
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d --force-recreate
+```
+
+`alembic upgrade head` führt `0066` (Spalte `lesson_slots.vorlaeufig`) und `0067`
+(Tabelle `parked_lesson_content`) aus. Bestehende Termine gelten als nicht vorläufig.
+
 ## [0.10.4] – 2026-09-21
 
 Die Beta bekommt einen Rückkanal: Rückmeldungen lassen sich aus der Anwendung heraus
