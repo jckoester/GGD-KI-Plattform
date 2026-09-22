@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Stunden bis zum Schuljahresende anlegen.** Zu Schuljahresbeginn entsteht das 2.
+  Halbjahr auf Wunsch **vorläufig** aus dem jetzigen Raster — damit die Jahresplanung
+  über den Halbjahreswechsel hinweg Termine hat. Wählbar in der Sammelübernahme und im
+  Wochenmuster-Dialog; vorbelegt, solange das 1. Halbjahr läuft.
+
 ### Geändert
 
 - **Der Neuaufbau eines Halbjahres verschont Stunden, die nicht aus dem Wochenmuster

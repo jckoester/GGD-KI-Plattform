@@ -213,3 +213,55 @@ class TestLoeschen:
             f"/planning/slots/{uuid.uuid4()}", headers=auth_headers
         )
         assert antwort.status_code == 404
+
+
+class TestZweitesHalbjahr:
+    """AP2: Das zweite Halbjahr entsteht vorläufig aus dem Raster des ersten."""
+
+    @pytest.fixture
+    def erzeuge_hj2(self, async_engine):
+        async def _lauf(**kw):
+            factory = async_sessionmaker(
+                async_engine, class_=AsyncSession, expire_on_commit=False
+            )
+            async with factory() as db:
+                return await generate_slots(db, GRUPPE, 2, cfg=_cfg(), **kw)
+
+        return _lauf
+
+    async def test_faellt_auf_das_muster_des_ersten_zurueck(self, sync_conn, erzeuge_hj2):
+        """Für HJ2 ist **kein** Muster hinterlegt — bewusst: Es gibt keins, und ein
+        kopiertes sähe wie eine Zusage aus."""
+        stats = await erzeuge_hj2(vorlaeufig=True)
+
+        assert stats.used_hj1_fallback is True
+        assert stats.created == 1, "Montag der HJ2-Woche"
+        zeilen = _slots(sync_conn, halbjahr=2)
+        assert len(zeilen) == 1
+        assert zeilen[0][4] is True, "Der Termin ist eine Annahme, keine Auskunft"
+
+    async def test_erstes_halbjahr_bleibt_unvorlaeufig(self, sync_conn, erzeuge, erzeuge_hj2):
+        await erzeuge()
+        await erzeuge_hj2(vorlaeufig=True)
+
+        assert all(z[4] is False for z in _slots(sync_conn, halbjahr=1))
+        assert all(z[4] is True for z in _slots(sync_conn, halbjahr=2))
+
+    async def test_zweiter_durchgang_gibt_409_und_laesst_hj1_stehen(
+        self, sync_conn, erzeuge, erzeuge_hj2
+    ):
+        """Bestehende Stunden werden nicht überschrieben — auch nicht die vorläufigen."""
+        from fastapi import HTTPException
+
+        await erzeuge()
+        await erzeuge_hj2(vorlaeufig=True)
+        hj1_vorher = {z[0] for z in _slots(sync_conn, halbjahr=1)}
+        hj2_vorher = {z[0] for z in _slots(sync_conn, halbjahr=2)}
+
+        with pytest.raises(HTTPException) as fehler:
+            await erzeuge_hj2(vorlaeufig=True)
+        assert fehler.value.status_code == 409
+
+        assert {z[0] for z in _slots(sync_conn, halbjahr=1)} == hj1_vorher
+        assert {z[0] for z in _slots(sync_conn, halbjahr=2)} == hj2_vorher
+

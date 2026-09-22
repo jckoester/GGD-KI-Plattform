@@ -7,6 +7,11 @@
     OHNE_GRUPPE,
     ZUR_GRUPPE,
   } from '$lib/stundenplan_abgleich.js'
+  import {
+    restjahrMoeglich,
+    slotMeldung,
+    vierzehntaegigWarnung,
+  } from '$lib/jahresraster.js'
   import { calendarConfigured, ensureCalendarStatus } from '$lib/stores/calendarStatus.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import SuccessBanner from '$lib/components/SuccessBanner.svelte'
@@ -30,6 +35,8 @@
   // Muster die konkreten Termine stehen können. Scheitert der Abruf, bleibt es beim
   // bloßen Buchstaben; das ist kein Grund, den Dialog zu stören.
   let abWochen = $state(null)
+  // Nur im 1. Halbjahr: Das 2. vorläufig mit anlegen, damit die Jahresplanung Termine hat.
+  let bisSchuljahresende = $state(true)
   const heute = new Date().toISOString().slice(0, 10)
 
   // Lokalen State mit aktuellen Mustern für gewähltes Halbjahr befüllen
@@ -164,6 +171,8 @@
     }
   }
 
+  const restjahr = $derived(restjahrMoeglich(halbjahr))
+
   async function nurSpeichern() {
     genSuccess = null
     genWarnung = null
@@ -188,7 +197,22 @@
       }
       ergebnis = await generate(true)
     }
-    if (ergebnis === true) onClose()
+    if (ergebnis !== true) return
+
+    // Das 2. Halbjahr vorläufig mitnehmen, damit die Jahresplanung über den
+    // Halbjahreswechsel hinweg Termine hat. Ein 409 heißt hier: Dort stehen schon
+    // Stunden — die bleiben unangetastet, das ist kein Fehlschlag dieses Dialogs.
+    if (bisSchuljahresende && restjahrMoeglich(halbjahr)) {
+      try {
+        const stats = await generateSlots(groupId, 2, false, true)
+        genSuccess += ` ${slotMeldung(stats)}`
+        genWarnung = vierzehntaegigWarnung(stats) ?? genWarnung
+        onGenerated(stats, { regenerate: false, halbjahr: 2 })
+      } catch (e) {
+        if (e.status !== 409) error = e.message
+      }
+    }
+    onClose()
   }
 
   /** `true` | `false` | `VORHANDEN` — Letzteres heißt: Es gibt schon Stunden (409). */
@@ -197,15 +221,12 @@
     error = null
     try {
       const stats = await generateSlots(groupId, halbjahr, regenerate)
-      genSuccess = `${stats.created} Slots für HJ ${halbjahr} erzeugt.`
+      genSuccess = slotMeldung(stats)
       if (stats.used_hj1_fallback) genSuccess += ' (HJ-1-Muster als Fallback verwendet)'
       // Als Warnung, nicht als Anhängsel: Über den Halbjahreswechsel hinweg ist die
-      // A-/B-Phase die einzige Angabe, die um eine Woche danebenliegen kann.
-      if (stats.fallback_vierzehntaegig)
-        genWarnung =
-          'Die Wochenmuster stammen aus dem 1. Halbjahr. 14-tägige Termine können dadurch ' +
-          'um eine Woche verschoben sein — sobald der Stundenplan für das 2. Halbjahr ' +
-          'steht, bitte einmal neu aus dem Stundenplan übernehmen.'
+      // A-/B-Phase die einzige Angabe, die um eine Woche danebenliegen kann. Der Satz
+      // steht in `jahresraster.js`, weil die Sammelübernahme ihn ebenfalls braucht.
+      genWarnung = vierzehntaegigWarnung(stats) ?? genWarnung
       onGenerated(stats, { regenerate, halbjahr })
       return true
     } catch (e) {
@@ -438,6 +459,20 @@
         generieren" gab es bis 15.09.2026 einzeln — sie lasen das Muster aus der Datenbank
         und erzeugten nach dem Übernehmen aus dem Stundenplan lautlos die falschen Stunden.
       -->
+      {#if restjahr}
+        <label class="flex items-start gap-2 pt-4">
+          <input type="checkbox" bind:checked={bisSchuljahresende} class="mt-0.5 accent-primary" />
+          <span class="text-sm text-light-tx dark:text-dark-tx">
+            Stunden bis zum Schuljahresende anlegen
+            <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+              Das 2. Halbjahr entsteht <strong>vorläufig</strong> aus diesem Raster — damit
+              die Jahresplanung Termine hat. Kommt der Stundenplan für das 2. Halbjahr,
+              wird es neu aufgebaut und die Planung umgehängt.
+            </span>
+          </span>
+        </label>
+      {/if}
+
       <div class="flex items-center justify-between pt-4 border-t border-light-ui-3 dark:border-dark-ui-3">
         <button
           onclick={onClose}

@@ -14,6 +14,13 @@
   import { CalendarClock } from "lucide-svelte"
   import { getWeekPatternProposals, setWeekPattern, generateSlots } from "$lib/api.js"
   import { rasterJeGruppe } from "$lib/stundenplan_abgleich.js"
+  import {
+    halbjahrFuerMuster,
+    halbjahreFuerUebernahme,
+    restjahrMoeglich,
+    slotMeldung,
+    vierzehntaegigWarnung,
+  } from "$lib/jahresraster.js"
   import { calendarConfigured, ensureCalendarStatus } from "$lib/stores/calendarStatus.js"
   import ErrorBanner from "$lib/components/ErrorBanner.svelte"
   import InfoBanner from "$lib/components/InfoBanner.svelte"
@@ -24,8 +31,12 @@
   let antwort = $state(null)
   let schreibt = $state(false)
   let ergebnisse = $state([])
+  let bisSchuljahresende = $state(true)
+  let warnung = $state(null)
 
   const gruppen = $derived(rasterJeGruppe(antwort))
+  const aktuellesHalbjahr = $derived(antwort?.halbjahr ?? 1)
+  const restjahr = $derived(restjahrMoeglich(aktuellesHalbjahr))
   const unsicherGesamt = $derived(gruppen.reduce((n, g) => n + g.unsicher, 0))
 
   onMount(ensureCalendarStatus)
@@ -46,7 +57,11 @@
   async function uebernehmen() {
     schreibt = true
     fehler = null
-    const halbjahr = antwort?.halbjahr ?? 1
+    warnung = null
+    // Das Muster gilt für das Halbjahr, das der Stundenplan beschreibt — für das zweite
+    // wird bewusst keins hinterlegt (`halbjahrFuerMuster`).
+    const musterHalbjahr = halbjahrFuerMuster(aktuellesHalbjahr)
+    const laeufe = halbjahreFuerUebernahme(aktuellesHalbjahr, bisSchuljahresende)
     const gesammelt = []
     for (const g of gruppen) {
       try {
@@ -58,25 +73,29 @@
           periods: z.periods,
           rhythmus: z.rhythmus,
         }))
-        await setWeekPattern(g.group_id, halbjahr, zeilen)
+        await setWeekPattern(g.group_id, musterHalbjahr, zeilen)
       } catch (e) {
         gesammelt.push({ gruppe: g.gruppe, text: `Muster nicht gespeichert: ${e.message}` })
         continue
       }
-      try {
-        const stats = await generateSlots(g.group_id, halbjahr)
-        gesammelt.push({ gruppe: g.gruppe, text: `${stats.created} Stunden angelegt.` })
-      } catch (e) {
-        // 409 heißt: Das Halbjahr hat schon Stunden. Das Muster ist trotzdem gespeichert
-        // — neu erzeugen würde bestehende Planung überschreiben und bleibt deshalb dem
-        // Jahresplan vorbehalten, wo die Warnung dazu steht.
-        gesammelt.push({
-          gruppe: g.gruppe,
-          text: e.status === 409
-            ? "Muster gespeichert. Stunden bestehen bereits — Neuerzeugung im Jahresplan."
-            : `Muster gespeichert, Stunden nicht erzeugt: ${e.message}`,
-        })
+      const saetze = []
+      for (const lauf of laeufe) {
+        try {
+          const stats = await generateSlots(g.group_id, lauf.halbjahr, false, lauf.vorlaeufig)
+          saetze.push(slotMeldung(stats))
+          warnung ??= vierzehntaegigWarnung(stats)
+        } catch (e) {
+          // 409 heißt: Das Halbjahr hat schon Stunden. Das Muster ist trotzdem
+          // gespeichert — neu erzeugen würde bestehende Planung überschreiben und
+          // bleibt deshalb dem Jahresplan vorbehalten, wo die Warnung dazu steht.
+          saetze.push(
+            e.status === 409
+              ? `${lauf.halbjahr}. Halbjahr: Stunden bestehen bereits — Neuerzeugung im Jahresplan.`
+              : `${lauf.halbjahr}. Halbjahr: nicht erzeugt (${e.message}).`,
+          )
+        }
       }
+      gesammelt.push({ gruppe: g.gruppe, text: saetze.join(" ") })
     }
     ergebnisse = gesammelt
     schreibt = false
@@ -133,6 +152,24 @@
       <InfoBanner
         message={`${antwort.fehlende_gruppen.length} Lerngruppen aus Ihrem Stundenplan haben auf der Plattform keine Unterrichtsgruppe und bleiben hier außen vor.`}
       />
+    {/if}
+
+    {#if restjahr && !ergebnisse.length}
+      <label class="mt-3 flex items-start gap-2">
+        <input type="checkbox" bind:checked={bisSchuljahresende} class="mt-0.5 accent-primary" />
+        <span class="text-sm text-light-tx dark:text-dark-tx">
+          Stunden bis zum Schuljahresende anlegen
+          <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+            Das 2. Halbjahr entsteht <strong>vorläufig</strong> aus dem jetzigen Raster —
+            damit die Jahresplanung Termine hat. Kommt der Stundenplan für das 2. Halbjahr,
+            wird es neu aufgebaut und die Planung umgehängt.
+          </span>
+        </span>
+      </label>
+    {/if}
+
+    {#if warnung}
+      <div class="mt-3"><WarningBanner message={warnung} /></div>
     {/if}
 
     {#if ergebnisse.length}

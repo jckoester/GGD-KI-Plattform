@@ -1953,12 +1953,14 @@ export async function setWeekPattern(groupId, halbjahr, patterns) {
     return res.json()
 }
 
-export async function generateSlots(groupId, halbjahr, regenerate = false) {
+// `vorlaeufig` kennzeichnet die erzeugten Termine als Annahme — gebraucht für das
+// zweite Halbjahr, das zu Schuljahresbeginn aus dem Raster des ersten entsteht.
+export async function generateSlots(groupId, halbjahr, regenerate = false, vorlaeufig = false) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/generate`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ halbjahr, regenerate }),
+        body: JSON.stringify({ halbjahr, regenerate, vorlaeufig }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Slots konnten nicht generiert werden')
     return res.json()
