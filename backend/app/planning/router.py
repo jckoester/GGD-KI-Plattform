@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role
@@ -28,6 +29,7 @@ from app.db.models import (
     ContextNode,
     GroupWeekPattern,
     LessonSlot,
+    ParkedLessonContent,
     SlotPlanSnapshot,
 )
 from app.db.session import get_db
@@ -474,6 +476,114 @@ async def update_slot(
     await db.commit()
     await db.refresh(slot)
     return slot
+
+
+# ── Parkplatz: Planungsinhalt ohne Termin ────────────────────────────────────
+
+
+class ParkplatzItem(BaseModel):
+    id: UUID
+    halbjahr: int
+    herkunft_datum: date
+    thema: Optional[str] = None
+    ue_node_id: Optional[UUID] = None
+    ue_titel: Optional[str] = None
+    stunde_node_id: Optional[UUID] = None
+    stunde_titel: Optional[str] = None
+
+
+class ParkplatzRead(BaseModel):
+    items: list[ParkplatzItem]
+    # Welche Unterrichtseinheit über ihrem Soll liegt. Ohne diese Angabe stünde auf dem
+    # Parkplatz eine Liste ohne Begründung — und der Weg „kürzen" wäre nicht wählbar,
+    # sondern geraten.
+    ueberhang: list[OverhangFinding]
+
+
+@router.get("/groups/{group_id}/parkplatz", response_model=ParkplatzRead)
+async def get_parkplatz(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Was gerade keinen Termin hat — und warum.
+
+    Entsteht beim Umhängen der Jahresplanung auf ein neues Stundenraster: Gibt es
+    weniger Termine als Inhalte, bleibt der Rest hier liegen statt verloren zu gehen.
+    Zurück kommt er durch Umplanen (`unpark_content`) oder durch Kürzen.
+    """
+    await require_group_teacher(group_id, user, db)
+
+    eintraege = list(
+        (
+            await db.execute(
+                sa.select(ParkedLessonContent)
+                .where(ParkedLessonContent.group_id == group_id)
+                .order_by(ParkedLessonContent.herkunft_datum)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    knoten_ids = {
+        i for e in eintraege for i in (e.ue_node_id, e.stunde_node_id) if i is not None
+    }
+    titel = {
+        n.id: n.title
+        for n in (
+            await db.execute(
+                sa.select(ContextNode).where(ContextNode.id.in_(knoten_ids or {None}))
+            )
+        )
+        .scalars()
+        .all()
+    }
+
+    return ParkplatzRead(
+        items=[
+            ParkplatzItem(
+                id=e.id,
+                halbjahr=e.halbjahr,
+                herkunft_datum=e.herkunft_datum,
+                thema=e.thema,
+                ue_node_id=e.ue_node_id,
+                ue_titel=titel.get(e.ue_node_id),
+                stunde_node_id=e.stunde_node_id,
+                stunde_titel=titel.get(e.stunde_node_id),
+            )
+            for e in eintraege
+        ],
+        ueberhang=await detect_overhang(db, group_id),
+    )
+
+
+@router.delete("/parkplatz/{parkplatz_id}", response_model=dict)
+async def delete_parkplatz_eintrag(
+    parkplatz_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Verwirft einen Parkplatz-Eintrag.
+
+    ⚠️ **Der Stundenentwurf bleibt.** Verworfen wird nur die Zusage, dass er in diesen
+    Jahresplan gehört; der Knoten steht weiter im Wissensgraphen und ist dort auffindbar.
+    Der übliche Weg hierher: Die Phasen wurden per `transfer_phases` in eine andere
+    Stunde übernommen oder gekürzt — dann braucht der Eintrag keinen Termin mehr.
+    """
+    eintrag = await db.get(ParkedLessonContent, parkplatz_id)
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Parkplatz-Eintrag nicht gefunden")
+
+    await require_group_teacher(eintrag.group_id, user, db)
+
+    await db.delete(eintrag)
+    await db.commit()
+    logger.info(
+        "parkplatz_verworfen pseudonym=%s eintrag=%s gruppe=%s",
+        user.sub, parkplatz_id, eintrag.group_id,
+    )
+    return {"ok": True}
 
 
 # ── DELETE /planning/slots/{slot_id} ─────────────────────────────────────────

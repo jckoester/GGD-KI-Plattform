@@ -7,6 +7,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Ändert sich das Wochenmuster, bleibt die Jahresplanung erhalten.** Der Neuaufbau
+  eines Halbjahres hängt die Planung auf die neuen Termine um, statt sie zu verwerfen:
+  Klassenarbeiten behalten ihr Datum, alles andere wandert in seiner Reihenfolge mit.
+  Wechselt dabei der Umfang (Einzel- ↔ Doppelstunde), wird die Stunde als anzupassen
+  markiert. Was keinen Termin mehr findet, liegt auf dem **Parkplatz** und lässt sich von
+  dort auf einen freien Termin ziehen oder durch Kürzen eingliedern — verloren geht
+  nichts.
 - **Stunden bis zum Schuljahresende anlegen.** Zu Schuljahresbeginn entsteht das 2.
   Halbjahr auf Wunsch **vorläufig** aus dem jetzigen Raster — damit die Jahresplanung
   über den Halbjahreswechsel hinweg Termine hat. Wählbar in der Sammelübernahme und im

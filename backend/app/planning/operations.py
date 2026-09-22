@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ContextNode, LessonSlot
+from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 
@@ -31,6 +31,23 @@ VALID_KATEGORIEN: frozenset[str] = frozenset(
 class MoveContent(BaseModel):
     op: Literal["move_content"]
     from_slot_id: UUID
+    to_slot_id: UUID
+
+
+class UnparkContent(BaseModel):
+    """Geparkten Inhalt zurück in die Jahresplanung holen (AP3, 22.09.2026).
+
+    Der Gegenweg zum Umhängen: Was beim Wechsel des Wochenmusters keinen Termin fand,
+    liegt auf dem Parkplatz (`ParkedLessonContent`). Von dort kommt es entweder hierüber
+    zurück — auf einen freien Termin — oder es wird durch Kürzen aufgesaugt
+    (`transfer_phases`, `shorten_phase`, `strike_phase`) und danach verworfen.
+
+    **Nur auf einen leeren Termin.** Slot und Inhalt stehen 1:1; auf einen belegten
+    abzulegen überschriebe den einen mit dem anderen, und das kaskadiert.
+    """
+
+    op: Literal["unpark_content"]
+    parkplatz_id: UUID
     to_slot_id: UUID
 
 
@@ -88,6 +105,7 @@ PlanOperation = Annotated[
     Union[
         MoveContent, SwapContent, SetTopic, SetUnit, SetCategory,
         MarkNeedsAdjustment, TransferPhases, ShortenPhase, StrikePhase,
+        UnparkContent,
     ],
     Field(discriminator="op"),
 ]
@@ -127,6 +145,7 @@ def _lesson_ids(op: BaseModel) -> list[UUID]:
 async def _validate(
     db: AsyncSession, group_id: int, ops: list[PlanOperation],
     slots: dict[UUID, LessonSlot], lessons: dict[UUID, ContextNode],
+    parked: dict[UUID, ParkedLessonContent] | None = None,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -178,6 +197,20 @@ async def _validate(
         elif isinstance(op, SetCategory):
             if op.kategorie not in VALID_KATEGORIEN:
                 errors.append(f"{ctx}: ungültige Kategorie {op.kategorie!r}")
+        elif isinstance(op, UnparkContent):
+            eintrag = (parked or {}).get(op.parkplatz_id)
+            if eintrag is None:
+                errors.append(f"{ctx}: Parkplatz-Eintrag {op.parkplatz_id} nicht gefunden")
+            dst = slots.get(op.to_slot_id)
+            if dst is not None and dst.kategorie == "ausfall":
+                errors.append(f"{ctx}: Ziel ist Ausfall — nimmt keinen Inhalt auf")
+            if dst is not None and occ.get(op.to_slot_id):
+                # E10: Sonst überschreibt der eine Inhalt den anderen, und das kaskadiert.
+                # Mit Datum, weil beim Umplanen aus dem Parkplatz genau der Termin die
+                # Auskunft ist, die zur nächsten Wahl führt.
+                errors.append(f"{ctx}: Der Termin am {dst.date} ist belegt")
+            if dst is not None:
+                occ[op.to_slot_id] = True
         elif isinstance(op, (ShortenPhase, StrikePhase, TransferPhases)):
             _validate_phase_op(op, lessons, errors, ctx)
 
@@ -274,7 +307,20 @@ async def apply_operations(
         ).scalars().all()
     }
 
-    errors = await _validate(db, group_id, ops, slots, lessons)
+    parkplatz_ids = {op.parkplatz_id for op in ops if isinstance(op, UnparkContent)}
+    parked = {
+        e.id: e
+        for e in (
+            await db.execute(
+                sa.select(ParkedLessonContent).where(
+                    ParkedLessonContent.group_id == group_id,
+                    ParkedLessonContent.id.in_(parkplatz_ids or {None}),
+                )
+            )
+        ).scalars().all()
+    }
+
+    errors = await _validate(db, group_id, ops, slots, lessons, parked)
     if errors:
         return ExecutionResult(applied=0, errors=errors)
 
@@ -293,6 +339,15 @@ async def apply_operations(
             slots[op.slot_id].kategorie = op.kategorie
         elif isinstance(op, MarkNeedsAdjustment):
             slots[op.slot_id].anpassung_noetig = op.value
+        elif isinstance(op, UnparkContent):
+            eintrag, ziel = parked[op.parkplatz_id], slots[op.to_slot_id]
+            ziel.ue_node_id = eintrag.ue_node_id
+            ziel.stunde_node_id = eintrag.stunde_node_id
+            ziel.thema = eintrag.thema
+            # Der Termin ist ein anderer als der ursprüngliche — was dort geplant war,
+            # passt nicht ungeprüft. Denselben Marker setzt das Umhängen selbst.
+            ziel.anpassung_noetig = True
+            await db.delete(eintrag)
         elif isinstance(op, TransferPhases):
             _apply_transfer(lessons[op.from_lesson_id], lessons[op.to_lesson_id], op.phase_ids)
         elif isinstance(op, ShortenPhase):

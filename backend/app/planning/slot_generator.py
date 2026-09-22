@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import sqlalchemy as sa
@@ -21,6 +21,12 @@ from app.planning.calendar import (
     load_school_year,
 )
 from app.planning.snapshots import create_snapshot
+from app.planning.umhaengen import (
+    AlterSlot,
+    NeuerTermin,
+    plane_umhaengen,
+    wende_umhaengen_an,
+)
 
 
 @dataclass
@@ -33,6 +39,10 @@ class SlotGenStats:
     # Wie viele vorhandene Slots der Neuaufbau **nicht** angefasst hat, weil sie nicht
     # aus dem Muster stammen. Null bei einem Lauf ohne `regenerate`.
     verschont: int = 0
+    # Wurde eine bestehende Planung auf das neue Raster umgehängt?
+    umgehaengt: int = 0
+    geparkt: int = 0
+    meldungen: list[str] = field(default_factory=list)
     # Der Fallback trug ein 14-tägiges Muster ins zweite Halbjahr. Das ist die einzige
     # Stelle, an der eine Phase über den Halbjahreswechsel hinweg fortgeschrieben wird —
     # und die einzige, an der sie danebenliegen kann, wenn die Schule dort neu zählt.
@@ -49,6 +59,36 @@ def _findet_statt(rhythmus: str, phase: int) -> bool:
     if rhythmus == WOECHENTLICH:
         return True
     return phase == (0 if rhythmus == A_WOCHE else 1)
+
+
+def _raster(patterns, start, end, phasen, calendar, belegt) -> list[tuple]:
+    """Die Termine des Halbjahres als `(datum, start_period, periods)`.
+
+    Ausgelagert, weil zwei Wege sie brauchen: das gewöhnliche Erzeugen und das Umhängen.
+    Zwei Rechnungen desselben Rasters wären die eine Stelle, an der beide auseinanderlaufen
+    könnten, ohne dass es auffiele.
+    """
+    by_weekday: dict[int, list[GroupWeekPattern]] = defaultdict(list)
+    for p in patterns:
+        by_weekday[p.weekday].append(p)
+
+    termine: list[tuple] = []
+    d = start
+    while d <= end:
+        if is_schoolday(d, calendar):
+            # Der Montag liegt immer in `phasen`: `is_schoolday(d)` macht die Woche zur
+            # Unterrichtswoche, und genau die sammelt `ab_phasen`.
+            phase = phasen[d - timedelta(days=d.weekday())]
+            for p in by_weekday.get(d.weekday(), []):
+                if not _findet_statt(p.rhythmus, phase):
+                    continue
+                if (d, p.start_period) in belegt:
+                    # Ein verschonter Slot sitzt schon hier. Die Musterzeile entfällt —
+                    # zwei Slots auf derselben Stunde wären eine Dublette.
+                    continue
+                termine.append((d, p.start_period, p.periods))
+        d += timedelta(days=1)
+    return termine
 
 
 async def generate_slots(
@@ -132,19 +172,9 @@ async def generate_slots(
     )
 
     verschont: list[LessonSlot] = []
+    umzuhaengen: list[AlterSlot] = []
     if regenerate and existing_count:
-        await create_snapshot(db, group_id, reason="regeneration", created_by=created_by)
-        await db.execute(
-            sa.delete(LessonSlot).where(
-                LessonSlot.group_id == group_id,
-                LessonSlot.halbjahr == halbjahr,
-                LessonSlot.source == "pattern",
-            )
-        )
-        await db.flush()
-        # Was nach dem Löschen noch steht, hat der Lauf verschont — und belegt seinen
-        # Termin.
-        verschont = list(
+        vorhanden = list(
             (
                 await db.execute(
                     sa.select(LessonSlot).where(
@@ -156,39 +186,74 @@ async def generate_slots(
             .scalars()
             .all()
         )
+        # Nur Muster-Slots verschwinden; alles andere trägt eine Quellangabe oder eine
+        # Entscheidung von Hand und überlebt (AP1).
+        aus_muster = [s for s in vorhanden if s.source == "pattern"]
+        verschont = [s for s in vorhanden if s.source != "pattern"]
+        umzuhaengen = [
+            AlterSlot(
+                id=s.id,
+                datum=s.date,
+                start_period=s.start_period,
+                periods=s.periods,
+                kategorie=s.kategorie,
+                pinned=s.pinned,
+                ue_node_id=s.ue_node_id,
+                stunde_node_id=s.stunde_node_id,
+                thema=s.thema,
+            )
+            for s in aus_muster
+        ]
 
     belegt = {(s.date, s.start_period) for s in verschont}
 
-    by_weekday: dict[int, list[GroupWeekPattern]] = defaultdict(list)
-    for p in patterns:
-        by_weekday[p.weekday].append(p)
+    raster = _raster(patterns, start, end, phasen, calendar, belegt)
+
+    # Trug die alte Planung Inhalt, wird sie **umgehängt** statt weggeworfen: Inhalt
+    # wandert nach Reihenfolge auf die neuen Termine (`app/planning/umhaengen.py`).
+    # Bis zum 22.09.2026 löschte der Neuaufbau die Planung des Halbjahres mit.
+    if umzuhaengen and any(a.hat_inhalt for a in umzuhaengen):
+        plan = plane_umhaengen(
+            umzuhaengen,
+            [NeuerTermin(datum=d, start_period=sp, periods=pp) for d, sp, pp in raster],
+        )
+        created = await wende_umhaengen_an(
+            db, group_id, halbjahr, plan, vorlaeufig=vorlaeufig, created_by=created_by
+        )
+        return SlotGenStats(
+            created=created,
+            halbjahr=halbjahr,
+            used_hj1_fallback=used_hj1_fallback,
+            fallback_vierzehntaegig=fallback_vierzehntaegig,
+            vorlaeufig=vorlaeufig,
+            verschont=len(verschont),
+            umgehaengt=len(plan.zuordnungen),
+            geparkt=len(plan.ueberhang),
+            meldungen=plan.meldungen,
+        )
+
+    # Keine Planung zu retten: der bisherige Weg — Snapshot, löschen, neu erzeugen.
+    if umzuhaengen:
+        await create_snapshot(db, group_id, reason="regeneration", created_by=created_by)
+        await db.execute(
+            sa.delete(LessonSlot).where(LessonSlot.id.in_([a.id for a in umzuhaengen]))
+        )
+        await db.flush()
 
     created = 0
-    d = start
-    while d <= end:
-        if is_schoolday(d, calendar):
-            # Der Montag liegt immer in `phasen`: `is_schoolday(d)` macht die Woche zur
-            # Unterrichtswoche, und genau die sammelt `ab_phasen`.
-            phase = phasen[d - timedelta(days=d.weekday())]
-            for p in by_weekday.get(d.weekday(), []):
-                if not _findet_statt(p.rhythmus, phase):
-                    continue
-                if (d, p.start_period) in belegt:
-                    # Ein verschonter Slot sitzt schon hier. Die Musterzeile entfällt —
-                    # zwei Slots auf derselben Stunde wären eine Dublette.
-                    continue
-                slot = LessonSlot(
-                    group_id=group_id,
-                    date=d,
-                    start_period=p.start_period,
-                    periods=p.periods,
-                    halbjahr=halbjahr,
-                    kategorie="unterricht",
-                    vorlaeufig=vorlaeufig,
-                )
-                db.add(slot)
-                created += 1
-        d += timedelta(days=1)
+    for d, sp, pp in raster:
+        db.add(
+            LessonSlot(
+                group_id=group_id,
+                date=d,
+                start_period=sp,
+                periods=pp,
+                halbjahr=halbjahr,
+                kategorie="unterricht",
+                vorlaeufig=vorlaeufig,
+            )
+        )
+        created += 1
 
     await db.commit()
     return SlotGenStats(

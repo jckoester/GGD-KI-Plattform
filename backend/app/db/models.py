@@ -1494,3 +1494,55 @@ class Feedback(Base):
         Index("idx_feedback_pseudonym_created", "pseudonym", "created_at"),
         Index("idx_feedback_status_created", "status", "created_at"),
     )
+
+
+# 26. parked_lesson_content — Planungsinhalt ohne Termin (Jahresplanung/Stundenplanwechsel)
+class ParkedLessonContent(Base):
+    """Was beim Umhängen der Jahresplanung übrig bleibt.
+
+    Ändert sich das Wochenmuster, wandert die Planung nach Reihenfolge auf die neuen
+    Termine. Gibt es weniger Termine als Inhalte, bleibt etwas übrig — und das wird
+    **geparkt, nicht verworfen**. Zurück kommt es auf zwei Wegen: umplanen (auf einen
+    freien Termin ziehen) oder kürzen (Phasen in andere Stunden übernehmen).
+
+    **Einen Eintrag zu verwerfen löscht den Stundenentwurf nicht.** Es nimmt nur die
+    Zusage zurück, dass er in diesen Jahresplan gehört; der Knoten bleibt im
+    Wissensgraphen.
+
+    ⚠️ **Leere Einträge soll es nicht geben** — geparkt wird nur, was Inhalt trägt. Das
+    steht bewusst **nicht** als CHECK in der Datenbank: `ue_node_id` wird beim Löschen
+    des Knotens genullt, und eine Bedingung darüber ließe genau diese Löschung
+    scheitern. Die Zusage hält der Dienst (`app/planning/umhaengen.py`).
+    """
+
+    __tablename__ = "parked_lesson_content"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    halbjahr: Mapped[int] = mapped_column(nullable=False)
+    # Sortierschlüssel und Auskunft zugleich: „war für den 12.03. geplant".
+    herkunft_datum: Mapped[date] = mapped_column(nullable=False)
+    ue_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
+    # CASCADE, nicht SET NULL: Der Eintrag ist die Zusage, dass **dieser** Entwurf in den
+    # Jahresplan gehört — ohne Entwurf gibt es nichts zuzusagen.
+    stunde_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=True
+    )
+    thema: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("halbjahr IN (1, 2)", name="check_plc_halbjahr"),
+        Index(
+            "idx_parked_group_halbjahr", "group_id", "halbjahr", "herkunft_datum"
+        ),
+    )
+

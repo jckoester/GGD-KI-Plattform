@@ -59,22 +59,23 @@ def _make_db(
     patterns_hj: dict[int, list] | None = None,
     existing_count: int = 0,
     primary_halbjahr: int = 1,
-    verschonte: list | None = None,
+    vorhandene: list | None = None,
 ):
     """Erstellt eine Mock-DB.
 
     primary_halbjahr: das Halbjahr das zuerst abgefragt wird (ergibt Aufruf 0).
     Bei leerem primären Ergebnis und HJ2 folgt ein zweiter Aufruf für HJ1-Fallback.
 
-    `verschonte` sind die Slots, die nach dem Löschen noch stehen — der Generator fragt
-    sie ab, um belegte Termine zu erkennen (Neuaufbau seit 22.09.2026).
+    `vorhandene` sind die Slots, die beim Neuaufbau schon in der Datenbank stehen. Der
+    Generator liest sie **vor** dem Löschen und teilt sie nach `source`: Muster-Slots
+    verschwinden (bzw. werden umgehängt), alles andere bleibt und belegt seinen Termin.
 
     ⚠️ **Die Abfragen werden am Tabellennamen unterschieden, nicht an der Aufrufnummer.**
     Nach der Zählweise allein bekäme die Slot-Abfrage die Musterzeilen geliefert — der
     Mock behauptete dann etwas, was der Code nie sieht, und der Test wäre trotzdem grün.
     """
     patterns_hj = patterns_hj or {}
-    verschonte = verschonte or []
+    vorhandene = vorhandene or []
     call_counter = [0]
     # Reihenfolge: Aufruf 0 → primary_halbjahr, Aufruf 1 → HJ1-Fallback
     call_order = [primary_halbjahr, 1]
@@ -87,10 +88,10 @@ def _make_db(
         if "delete" in type(stmt).__name__.lower() or "Delete" in str(type(stmt)):
             return MagicMock()
 
-        # Die Abfrage der verschonten Slots — am Tabellennamen erkannt.
+        # Die Abfrage der vorhandenen Slots — am Tabellennamen erkannt.
         if "lesson_slots" in str(stmt):
             r = MagicMock()
-            r.scalars.return_value.all.return_value = verschonte
+            r.scalars.return_value.all.return_value = vorhandene
             return r
 
         hj = call_order[min(idx, len(call_order) - 1)]
@@ -289,14 +290,20 @@ async def test_woechentlicher_fallback_meldet_nichts():
     assert not stats.fallback_vierzehntaegig
 
 
-# ── Vorläufige Termine und verschonte Slots (AP1, 22.09.2026) ────────────────
+# ── Vorläufige Termine und vorhandene Slots (AP1, 22.09.2026) ────────────────
 
 
-def _mk_slot(datum, start_period=1):
-    """Ein verschonter Slot, wie ihn der Generator nach dem Löschen vorfindet."""
+def _mk_slot(datum, start_period=1, source="import"):
+    """Ein vorhandener Slot, wie ihn der Generator vor dem Löschen vorfindet.
+
+    `source` ist ausdrücklich gesetzt: Daran entscheidet der Generator, ob der Slot fällt
+    oder bleibt. Ein MagicMock ohne das Attribut lieferte ein Mock-Objekt, das zufällig
+    nie `"pattern"` ist — der Test hinge dann an einem Zufall statt an einer Angabe.
+    """
     s = MagicMock()
     s.date = datum
     s.start_period = start_period
+    s.source = source
     return s
 
 
@@ -330,7 +337,7 @@ async def test_ohne_angabe_ist_nichts_vorlaeufig():
 
 @pytest.mark.asyncio
 async def test_belegter_termin_laesst_die_musterzeile_entfallen():
-    """Entscheidung F4 (22.09.2026): Der verschonte Slot ist der konkretere — er kennt
+    """Entscheidung F4 (22.09.2026): Der vorhandene Slot ist der konkretere — er kennt
     seine Quelle. Zwei Slots auf derselben Stunde wären eine Dublette, die niemand
     auflösen kann."""
     cfg = _mini_cfg()
@@ -339,7 +346,7 @@ async def test_belegter_termin_laesst_die_musterzeile_entfallen():
     db = _make_db(
         {1: [_mk_pattern(weekday=0, halbjahr=1)]},
         existing_count=1,
-        verschonte=verschont,
+        vorhandene=verschont,
     )
 
     with (
@@ -356,13 +363,13 @@ async def test_belegter_termin_laesst_die_musterzeile_entfallen():
 
 @pytest.mark.asyncio
 async def test_anderer_termin_wird_trotzdem_erzeugt():
-    """Die Gegenprobe: Ein verschonter Slot blockiert nur *seinen* Termin."""
+    """Die Gegenprobe: Ein vorhandener Slot blockiert nur *seinen* Termin."""
     cfg = _mini_cfg()
     verschont = [_mk_slot(date(2026, 1, 6), start_period=1)]  # Dienstag
     db = _make_db(
         {1: [_mk_pattern(weekday=0, halbjahr=1)]},  # Muster: Montag
         existing_count=1,
-        verschonte=verschont,
+        vorhandene=verschont,
     )
 
     with (
