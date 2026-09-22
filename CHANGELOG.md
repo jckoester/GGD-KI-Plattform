@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Der Stundenplan-Abgleich legt fehlende Stunden an.** Wird eine Stunde auf einen
+  Termin verlegt, an dem die Gruppe sonst keinen Unterricht hat, entsteht dort jetzt ein
+  Termin — bisher wurde der Entfall am Ursprung geschrieben und am Ziel nichts, die
+  Planung verlor also eine Stunde. Den Inhalt bringt weiterhin nur die Lehrkraft über den
+  Verschiebe-Dialog dorthin.
 - **Ändert sich das Wochenmuster, bleibt die Jahresplanung erhalten.** Der Neuaufbau
   eines Halbjahres hängt die Planung auf die neuen Termine um, statt sie zu verwerfen:
   Klassenarbeiten behalten ihr Datum, alles andere wandert in seiner Reihenfolge mit.
@@ -30,6 +35,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Abgleich meldete für die zweite Hälfte jeder Doppelstunde „kein Slot".** Eine
+  Doppelstunde ist **eine** Stunde im Plan; der Abgleich prüfte sie als zwei und hielt die
+  zweite Hälfte für ungedeckt.
 - **Mobil: die Seitenleiste bleibt nach dem Antippen eines Eintrags liegen.** Sie klappt
   jetzt beim Seitenwechsel zu; auf dem Desktop bleibt sie stehen.
 - **Der „Speichern"-Knopf im Profil speicherte nichts** — er navigierte nur zur

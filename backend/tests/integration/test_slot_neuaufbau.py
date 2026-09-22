@@ -265,3 +265,53 @@ class TestZweitesHalbjahr:
         assert {z[0] for z in _slots(sync_conn, halbjahr=1)} == hj1_vorher
         assert {z[0] for z in _slots(sync_conn, halbjahr=2)} == hj2_vorher
 
+
+class TestAbgleichLegtAn:
+    """AP4: Der Stundenplan-Abgleich legt fehlende Termine an — und sie überleben.
+
+    Der zweite Teil ist der Punkt: Ein angelegter Termin mit `source='pattern'` wäre beim
+    nächsten „Stunden erzeugen" wieder weg, und der Befund wäre nur verschoben.
+    """
+
+    @pytest.fixture
+    def abgleichen(self, async_engine):
+        async def _lauf(plan):
+            from app.calendar.sync import apply_sync
+
+            factory = async_sessionmaker(
+                async_engine, class_=AsyncSession, expire_on_commit=False
+            )
+            async with factory() as db:
+                return await apply_sync(db, plan)
+
+        return _lauf
+
+    async def test_termin_entsteht_mit_quellangabe(self, sync_conn, erzeuge, abgleichen):
+        from app.calendar.sync import NeuerSlot, SyncPlan
+
+        await erzeuge()
+        ziel = date(2026, 1, 8)  # Donnerstag — im Wochenmuster (Montag) nicht vorgesehen
+        plan = SyncPlan(anzulegende=[
+            NeuerSlot(group_id=GRUPPE, datum=ziel, start_period=6,
+                      kategorie="unterricht", notiz=None, external_uid="v1")
+        ])
+        assert await abgleichen(plan) == 1
+
+        zeilen = [z for z in _slots(sync_conn) if z[1] == ziel]
+        assert len(zeilen) == 1
+        assert zeilen[0][3] == "import", "Ohne Quellangabe fiele er beim Neuaufbau"
+
+    async def test_er_ueberlebt_den_neuaufbau(self, sync_conn, erzeuge, abgleichen):
+        from app.calendar.sync import NeuerSlot, SyncPlan
+
+        await erzeuge()
+        ziel = date(2026, 1, 8)
+        await abgleichen(SyncPlan(anzulegende=[
+            NeuerSlot(group_id=GRUPPE, datum=ziel, start_period=6,
+                      kategorie="unterricht", notiz=None, external_uid="v1")
+        ]))
+
+        await erzeuge(regenerate=True)
+
+        assert [z for z in _slots(sync_conn) if z[1] == ziel], "Der Termin ist weg"
+

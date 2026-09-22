@@ -140,11 +140,49 @@ def test_eigene_importnotiz_wird_ersetzt():
     assert plan.changes[0].notiz == f"{NOTIZ_MARKER} Vertreten durch XYZ"
 
 
-def test_ohne_slot_wird_nichts_angelegt():
-    """Die Planung kennt die Stunde nicht — das ist eine Abweichung, keine Aufgabe."""
+def test_ohne_slot_wird_einer_angelegt():
+    """Seit dem 22.09.2026: Der Stundenplan kennt hier Unterricht, die Planung nicht.
+
+    Die alte Regel lautete „wird gemeldet, nicht angelegt". Sie hielt der Praxis nicht
+    stand: Bei einer Verlegung wurde der Entfall am Ursprung geschrieben, der Termin am
+    Ziel nicht — die Planung verlor eine Stunde und bekam keine zurück.
+    """
     plan = plan_sync([(1, stunde(7, LessonState.CANCELLED))], [slot(3)])
     assert plan.changes == []
+    assert len(plan.anzulegende) == 1
+    neuer = plan.anzulegende[0]
+    assert (neuer.group_id, neuer.start_period) == (1, 7)
+    assert plan.conflicts == []
+
+
+def test_ohne_jede_planung_wird_nichts_angelegt():
+    """Die Gegenprobe: Hat die Gruppe gar keinen Slot, fehlt das Wochenmuster.
+
+    Dann aus dem Stundenplan ein halbes Jahr anzulegen ginge am eigentlichen Schritt
+    vorbei — es bleibt bei der Meldung, aus der die Oberfläche zur Einrichtung führt.
+    """
+    plan = plan_sync([(1, stunde(7, LessonState.CANCELLED))], [])
+    assert plan.anzulegende == []
     assert plan.conflicts[0].grund == "kein_slot"
+
+
+def test_doppelstunde_deckt_beide_stunden_ab():
+    """Ein Slot kann zwei Stunden überspannen — sonst entstünde ein Phantom-Termin.
+
+    Der Generator legt eine Doppelstunde als **eine** Zeile mit `periods=2` an, der
+    Abgleich prüft Stunde für Stunde. Bis zum 22.09.2026 meldete er für die zweite
+    Hälfte „kein Slot"; seit Stunden angelegt werden, wäre daraus ein zweiter Termin
+    auf derselben Doppelstunde geworden.
+    """
+    doppel = SlotRef(
+        id="s1", group_id=1, datum=MONTAG, start_period=3, kategorie="unterricht",
+        pinned=False, source="pattern", note=None, periods=2,
+    )
+    plan = plan_sync([(1, stunde(3, LessonState.CANCELLED, periods=2))], [doppel])
+
+    assert plan.anzulegende == []
+    assert plan.conflicts == []
+    assert len(plan.changes) == 1
 
 
 def test_slot_ausserhalb_des_abrufzeitraums_bleibt_unberuehrt():
@@ -389,3 +427,90 @@ def test_echtes_verlegungspaar_aus_der_aufzeichnung():
     doppelstunde = [v for v in plan.verlegungen if v.periods == 2]
     assert len(doppelstunde) == 1
     assert doppelstunde[0].rueckwaerts        # 09.07. → 06.07.
+
+
+# ── Verlegung: der Termin am Ziel entsteht (AP4, 22.09.2026) ─────────────────
+
+
+def test_verlegung_legt_das_ziel_an_und_setzt_den_ursprung_auf_ausfall():
+    """Der Befund aus der Praxis, vollständig behoben.
+
+    Vorher: Der Entfall am Ursprung wurde geschrieben, der Termin am Ziel nicht — die
+    Planung verlor eine Stunde. Der `ShiftSuggestion` bleibt daneben bestehen; er ist das
+    **Angebot**, den Inhalt mitzunehmen. Verschoben wird er nicht automatisch: Die Planung
+    gehört der Lehrkraft.
+    """
+    ziel_tag = MONTAG + timedelta(days=2)
+    lessons = [
+        (1, verlegt(3, tag=MONTAG, ziel_tag=ziel_tag, ziel_stunde=6,
+                    is_source=True, uid="v1")),
+        (1, verlegt(6, tag=ziel_tag, ziel_tag=MONTAG, ziel_stunde=3,
+                    is_source=False, uid="v1")),
+    ]
+    plan = plan_sync(lessons, [slot(3)])
+
+    # Ursprung: Ausfall am vorhandenen Slot.
+    assert [c.nach_kategorie for c in plan.wirksame_changes] == ["ausfall"]
+    # Ziel: ein neuer Termin, weil die Planung dort keinen kennt.
+    assert len(plan.anzulegende) == 1
+    neuer = plan.anzulegende[0]
+    assert (neuer.datum, neuer.start_period) == (ziel_tag, 6)
+    assert neuer.kategorie == "unterricht", "Die verlegte Stunde findet statt"
+    # Das Angebot zum Verschieben bleibt.
+    assert len(plan.verlegungen) == 1
+
+
+def test_der_abgleich_verschiebt_keinen_inhalt():
+    """Die Grenze, die bleibt: Der Abgleich stellt einen Termin bereit, mehr nicht.
+
+    Geprüft an der Struktur — `NeuerSlot` trägt keine Inhaltsfelder. Wer hier Thema,
+    Einheit oder Stundenentwurf ergänzt, macht aus dem Abgleich einen Automatismus an
+    der Planung.
+    """
+    from dataclasses import fields
+
+    from app.calendar.sync import NeuerSlot
+
+    namen = {f.name for f in fields(NeuerSlot)}
+    assert namen == {
+        "group_id", "datum", "start_period", "kategorie", "notiz", "external_uid"
+    }
+
+
+# ── Die Verdrahtung von der Datenbankzeile zum SlotRef ───────────────────────
+
+
+def test_slot_refs_lesen_die_spanne_mit():
+    """`periods` muss aus der Zeile kommen — daran hängen die Phantom-Termine.
+
+    Beim Gegenprüfen blieb diese Verdrahtung zunächst ungedeckt: Ein fest verdrahtetes
+    `periods=1` färbte keinen Test rot, obwohl der Abgleich damit für die zweite Hälfte
+    jeder Doppelstunde einen Termin angelegt hätte.
+    """
+    from app.calendar.router import SLOT_SPALTEN, als_slot_refs
+
+    zeile = {
+        "id": "s1", "group_id": 7, "date": MONTAG, "start_period": 3,
+        "kategorie": "unterricht", "pinned": False, "source": "pattern",
+        "note": None, "periods": 2,
+    }
+    (ref,) = als_slot_refs([zeile])
+    assert ref.periods == 2
+    assert (ref.group_id, ref.start_period, ref.source) == (7, 3, "pattern")
+
+    # Abfrage und Abbildung dürfen nicht auseinanderlaufen.
+    assert set(SLOT_SPALTEN) == set(zeile)
+
+
+def test_slot_refs_vertragen_leere_angaben():
+    """`start_period` und `periods` sind in der Datenbank nullable."""
+    from app.calendar.router import als_slot_refs
+
+    zeile = {
+        "id": "s1", "group_id": 7, "date": MONTAG, "start_period": None,
+        "kategorie": "unterricht", "pinned": False, "source": "pattern",
+        "note": None, "periods": None,
+    }
+    (ref,) = als_slot_refs([zeile])
+    assert (ref.start_period, ref.periods) == (0, 1)
+

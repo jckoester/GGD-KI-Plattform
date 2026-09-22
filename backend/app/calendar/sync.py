@@ -11,8 +11,26 @@ Lehrkraft im Verschiebe-Dialog aus UP-6. Drei Grenzen sichern das ab:
 1. **`pinned` und `source='manual'` werden nie geändert**, nur gemeldet.
 2. **Die Notiz wird nur ersetzt, wenn sie vom Import stammt** — erkennbar am Marker.
    Selbstgeschriebene Notizen bleiben, auch wenn sie im Weg stehen.
-3. **Ohne passenden Slot wird nichts angelegt.** Eine Stunde, für die die Planung keinen
-   Slot kennt, ist eine Abweichung — sie wird gemeldet, nicht stillschweigend behoben.
+3. **Ohne passenden Slot wird einer angelegt** — seit dem 22.09.2026, vorher nicht.
+
+   Die alte Regel lautete: „Eine Stunde, für die die Planung keinen Slot kennt, ist eine
+   Abweichung — sie wird gemeldet, nicht stillschweigend behoben." Sie hielt der Praxis
+   nicht stand. Beobachtet an einer echten Verlegung: Die Hälfte einer Doppelstunde
+   wanderte auf einen Termin, an dem die Gruppe sonst keinen Unterricht hat. Der Entfall
+   am Ursprung **wurde** geschrieben, der Termin am Ziel nicht — die Planung verlor eine
+   Stunde und bekam keine zurück. Als Hinweis gemeint, wirkte es wie stiller Verlust.
+
+   Angelegt wird ein leerer Termin mit `source='import'`; er überlebt damit den
+   Neuaufbau eines Halbjahres. **Inhalt verschiebt der Abgleich weiterhin nicht** — er
+   stellt nur den Termin bereit, auf den der Verschiebe-Dialog zeigen kann. Alles
+   andere wäre ein Automatismus an der Planung, und die gehört der Lehrkraft (Regel 1).
+
+⚠️ **Ein Slot kann mehrere Stunden überspannen.** Der Generator legt eine Doppelstunde
+als **eine** Zeile mit `periods=2` an, der Abgleich prüft aber Stunde für Stunde. Ein
+Termin gilt deshalb als abgedeckt, wenn ein Slot ihn **überspannt** — nicht nur, wenn
+einer dort beginnt. Ohne diese Regel meldete der Abgleich für die zweite Hälfte jeder
+Doppelstunde „kein Slot" (bis 22.09.2026 tat er das), und seit Punkt 3 entstünde dort
+ein Phantom-Termin.
 """
 from __future__ import annotations
 
@@ -91,11 +109,29 @@ class ShiftSuggestion:
         return self.nach_datum < self.von_datum
 
 
+@dataclass(frozen=True)
+class NeuerSlot:
+    """Ein Termin, den der Stundenplan kennt und die Planung nicht.
+
+    Entsteht vor allem bei Verlegungen auf einen Tag außerhalb des Wochenmusters. Er wird
+    **leer** angelegt — den Inhalt bringt, wenn überhaupt, die Lehrkraft über den
+    Verschiebe-Dialog mit.
+    """
+
+    group_id: int
+    datum: date
+    start_period: int
+    kategorie: str
+    notiz: str | None
+    external_uid: str | None
+
+
 @dataclass
 class SyncPlan:
     changes: list[SlotChange] = field(default_factory=list)
     conflicts: list[SyncConflict] = field(default_factory=list)
     verlegungen: list[ShiftSuggestion] = field(default_factory=list)
+    anzulegende: list[NeuerSlot] = field(default_factory=list)
     meldungen: list[str] = field(default_factory=list)
 
     @property
@@ -115,6 +151,10 @@ class SlotRef:
     pinned: bool
     source: str
     note: str | None
+    # Wie viele Stunden dieser Slot belegt. Eine Doppelstunde ist **eine** Zeile mit
+    # `periods=2` — ohne diese Angabe hielte der Abgleich die zweite Hälfte für
+    # ungedeckt.
+    periods: int = 1
 
 
 def _notiz_fuer(lesson: Lesson) -> str | None:
@@ -148,7 +188,20 @@ def plan_sync(
     nicht geprüft und darf deshalb auch nicht geändert werden.
     """
     plan = SyncPlan()
-    nach_position = {(s.group_id, s.datum, s.start_period): s for s in slots}
+    # Jede belegte Stunde zeigt auf ihren Slot — eine Doppelstunde also zweimal auf
+    # dieselbe Zeile. Ohne das hielte der Abgleich ihre zweite Hälfte für ungedeckt.
+    nach_position = {
+        (s.group_id, s.datum, s.start_period + versatz): s
+        for s in slots
+        for versatz in range(max(1, s.periods))
+    }
+    # Welche Gruppen für diesen Zeitraum überhaupt eine Planung haben.
+    mit_planung = {s.group_id for s in slots}
+    # Ein Slot wird **einmal** geändert, auch wenn mehrere Stunden auf ihn zeigen. Bei
+    # einer Doppelstunde tun sie das (beide Hälften, eine Zeile mit `periods=2`) — ohne
+    # diese Sperre stünde dieselbe Änderung zweimal im Plan und dieselbe Meldung zweimal
+    # auf dem Bildschirm.
+    behandelte_slots: set = set()
     gesehen: set[tuple[int, date, int]] = set()
 
     for group_id, lesson in lessons:
@@ -169,18 +222,39 @@ def plan_sync(
             slot = nach_position.get(position)
 
             if slot is None:
-                # Kein Slot an dieser Stelle: Die Planung kennt die Stunde nicht. Das ist
-                # eine Abweichung, keine Aufgabe — angelegt wird hier nichts (Schritt 9
-                # behandelt den häufigsten Fall, die Verlegung).
-                plan.conflicts.append(
-                    SyncConflict(
+                # Kein Slot an dieser Stelle: Der Stundenplan kennt hier Unterricht, die
+                # Planung nicht. Seit dem 22.09.2026 wird er **angelegt** statt nur
+                # gemeldet — sonst verlöre eine Verlegung die Stunde (siehe Modulkopf,
+                # Regel 3). Leer: Den Inhalt bringt die Lehrkraft über den
+                # Verschiebe-Dialog mit, wenn sie es will.
+                if group_id not in mit_planung:
+                    # ⚠️ **Die Gruppe hat gar keine Planung.** Dann ist nicht ein Termin
+                    # zu ergänzen, sondern das Wochenmuster einzurichten — aus dem
+                    # Stundenplan hier ein ganzes Halbjahr anzulegen ginge am
+                    # eigentlichen Schritt vorbei und erzeugte Termine, die niemand
+                    # bestellt hat. Es bleibt bei der Meldung; die Oberfläche führt
+                    # daraus zur Einrichtung (`fehlendesRaster`).
+                    plan.conflicts.append(
+                        SyncConflict(
+                            datum=lesson.date,
+                            start_period=lesson.start_period + versatz,
+                            grund="kein_slot",
+                            beschreibung=(
+                                "Für diese Gruppe ist noch keine Planung angelegt — "
+                                "zuerst das Wochenmuster einrichten."
+                            ),
+                        )
+                    )
+                    continue
+
+                plan.anzulegende.append(
+                    NeuerSlot(
+                        group_id=group_id,
                         datum=lesson.date,
                         start_period=lesson.start_period + versatz,
-                        grund="kein_slot",
-                        beschreibung=(
-                            f"Stundenplan kennt Unterricht, die Jahresplanung hat dort "
-                            f"keinen Slot ({lesson.state.value})."
-                        ),
+                        kategorie=ziel,
+                        notiz=_notiz_fuer(lesson),
+                        external_uid=lesson.external_uid,
                     )
                 )
                 continue
@@ -200,6 +274,10 @@ def plan_sync(
                     )
                 )
                 continue
+
+            if slot.id in behandelte_slots:
+                continue
+            behandelte_slots.add(slot.id)
 
             notiz = _notiz_fuer(lesson)
             if notiz is not None and not _notiz_darf_geschrieben_werden(slot.note):
@@ -233,8 +311,10 @@ def plan_sync(
             )
 
     plan.verlegungen = _verlegungen(lessons, nach_position, zeitraum)
-    plan.meldungen = _meldungen(plan.wirksame_changes) + _verlegungsmeldungen(
-        plan.verlegungen
+    plan.meldungen = (
+        _meldungen(plan.wirksame_changes)
+        + _verlegungsmeldungen(plan.verlegungen)
+        + _anlagemeldungen(plan.anzulegende)
     )
     return plan
 
@@ -322,6 +402,19 @@ def _verlegungsmeldungen(verlegungen: list[ShiftSuggestion]) -> list[str]:
     return meldungen
 
 
+def _anlagemeldungen(neue: list[NeuerSlot]) -> list[str]:
+    """Angelegte Termine gehören benannt — sie sind eine Änderung an der Planung."""
+    if not neue:
+        return []
+    n = len(neue)
+    tage = sorted({x.datum for x in neue})
+    wo = f"am {tage[0]}" if len(tage) == 1 else f"an {len(tage)} Tagen"
+    return [
+        f"{n} {'Stunde' if n == 1 else 'Stunden'} {wo} neu angelegt — der Stundenplan "
+        "kennt dort Unterricht, die Planung hatte noch keinen Termin."
+    ]
+
+
 def _meldungen(changes: list[SlotChange]) -> list[str]:
     """Menschenlesbare Zusammenfassung — Tage mit Vollausfall gebündelt.
 
@@ -360,12 +453,19 @@ def _meldungen(changes: list[SlotChange]) -> list[str]:
 
 
 async def apply_sync(db, plan: SyncPlan) -> int:
-    """Den Plan ausführen. Gibt die Zahl geänderter Slots zurück.
+    """Den Plan ausführen. Gibt die Zahl geänderter **und angelegter** Slots zurück.
 
     Geschrieben wird nur, was sich tatsächlich ändert — ein Sync ohne Neuigkeiten soll die
     `updated_at`-Zeitstempel nicht durchrütteln und keine Änderungshistorie erfinden.
+
+    Angelegte Termine tragen `source='import'`. Das ist keine Formalie: Der Neuaufbau
+    eines Halbjahres löscht nur Muster-Slots, ein importierter überlebt ihn also
+    (`app/planning/slot_generator.py`). Ohne diese Herkunft wäre er beim nächsten
+    „Stunden erzeugen" wieder weg.
     """
     from sqlalchemy import text
+
+    from app.planning.calendar import load_school_year
 
     geaendert = 0
     for change in plan.wirksame_changes:
@@ -389,6 +489,30 @@ async def apply_sync(db, plan: SyncPlan) -> int:
             text(f"UPDATE lesson_slots SET {', '.join(felder)} WHERE id = :id"), params
         )
         geaendert += 1
+    # Was der Stundenplan kennt und die Planung nicht — leer angelegt, damit der
+    # Verschiebe-Dialog ein Ziel hat. Inhalt bringt nur die Lehrkraft dorthin.
+    if plan.anzulegende:
+        kalender = load_school_year()
+        for neu in plan.anzulegende:
+            await db.execute(
+                text(
+                    "INSERT INTO lesson_slots (group_id, date, start_period, periods,"
+                    " halbjahr, kategorie, source, external_uid, note)"
+                    " VALUES (:gid, :datum, :sp, 1, :hj, :kat, 'import', :uid, :notiz)"
+                ),
+                {
+                    "gid": neu.group_id,
+                    "datum": neu.datum,
+                    "sp": neu.start_period,
+                    # Das Halbjahr steht nicht am Termin, es folgt aus dem Datum.
+                    "hj": 1 if neu.datum < kalender.halbjahreswechsel else 2,
+                    "kat": neu.kategorie,
+                    "uid": neu.external_uid,
+                    "notiz": neu.notiz,
+                },
+            )
+            geaendert += 1
+
     if geaendert:
         await db.commit()
     return geaendert

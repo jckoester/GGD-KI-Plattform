@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.calendar.base import CalendarSourceError
+from app.calendar.sync import SlotRef
 from app.calendar.groups import kein_unterricht_codes, match_groups
 from app.calendar.patterns import derive_patterns
 from app.calendar.service import (
@@ -405,22 +406,50 @@ async def _stundenplan_abgleich(
     if gruppen:
         rows = await db.execute(
             text(
-                "SELECT id, group_id, date, start_period, kategorie, pinned, source, note "
+                f"SELECT {', '.join(SLOT_SPALTEN)} "
                 "FROM lesson_slots WHERE group_id = ANY(:gruppen) "
                 "AND date BETWEEN :von AND :bis"
             ),
             {"gruppen": gruppen, "von": zeitraum[0], "bis": zeitraum[1]},
         )
-        slots = [
-            SlotRef(
-                id=r[0], group_id=r[1], datum=r[2], start_period=r[3] or 0,
-                kategorie=r[4], pinned=r[5], source=r[6], note=r[7],
-            )
-            for r in rows.fetchall()
-        ]
+        slots = als_slot_refs(rows.mappings().all())
 
     plan = plan_sync(zugeordnet, slots, zeitraum=zeitraum)
     return plan, {"kuerzel": kuerzel, "wochen": kalenderwochen, "gruppen": gruppen}, None
+
+
+# Die Spalten, die der Abgleich von einem Slot braucht. Als Liste, damit Abfrage und
+# Abbildung nicht auseinanderlaufen können.
+SLOT_SPALTEN = (
+    "id", "group_id", "date", "start_period", "kategorie", "pinned", "source", "note",
+    "periods",
+)
+
+
+def als_slot_refs(zeilen) -> list[SlotRef]:
+    """Datenbankzeilen → `SlotRef`. Über **Namen**, nicht über Positionen.
+
+    ⚠️ **Warum das eine eigene Funktion ist.** Vorher stand die Abbildung inline und griff
+    mit `r[0]`…`r[8]` zu. Eine neue Spalte an der falschen Stelle hätte alles verschoben,
+    ohne dass etwas auffiele — und `periods` ist die Angabe, an der die Phantom-Termine
+    hängen: Fehlt sie, hält der Abgleich die zweite Hälfte jeder Doppelstunde für
+    ungedeckt und legt dort einen Termin an. Mit Namen kann das nicht mehr passieren, und
+    die Abbildung ist ohne Datenbank prüfbar.
+    """
+    return [
+        SlotRef(
+            id=z["id"],
+            group_id=z["group_id"],
+            datum=z["date"],
+            start_period=z["start_period"] or 0,
+            kategorie=z["kategorie"],
+            pinned=z["pinned"],
+            source=z["source"],
+            note=z["note"],
+            periods=z["periods"] or 1,
+        )
+        for z in zeilen
+    ]
 
 
 def _plan_als_json(plan, kontext) -> dict:
