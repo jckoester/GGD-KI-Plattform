@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- **Der Neuaufbau eines Halbjahres verschont Stunden, die nicht aus dem Wochenmuster
+  stammen.** Termine aus dem Stundenplan oder von Hand bleiben stehen; bisher fiel das
+  ganze Halbjahr. Trägt ein solcher Termin dieselbe Stunde wie das Muster, entfällt die
+  Musterzeile.
+- **Einzelne leere Stunden lassen sich löschen.** Nur ohne Inhalt und nur, wenn sie nicht
+  aus dem Wochenmuster kommen — eine Musterstunde entsteht beim nächsten Erzeugen wieder.
+
 ### Behoben
 
 - **Mobil: die Seitenleiste bleibt nach dem Antippen eines Eintrags liegen.** Sie klappt

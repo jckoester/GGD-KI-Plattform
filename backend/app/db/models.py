@@ -1259,6 +1259,15 @@ class LessonSlot(Base):
     source: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'pattern'")
     )
+    # Ein Termin, der noch nicht bestätigt ist: das zweite Halbjahr, vorläufig aus dem
+    # Raster des ersten erzeugt, damit die Jahresplanung Termine hat. Kommt der echte
+    # Stundenplan, wird das Halbjahr neu aufgebaut und die Planung umgehängt.
+    #
+    # **Unabhängig von `source`.** Dort steht, *woher* der Termin kommt; hier, ob er
+    # *bestätigt* ist. Ein vorläufiger Slot ist weiterhin `source='pattern'`.
+    vorlaeufig: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     # `lessonId` der Quelle — identifiziert die Unterrichts**reihe**, nicht diesen Slot.
     # Mehrere Slots teilen sie sich (belegt: 5 Perioden je lessonId). Zeilenidentität ist
     # und bleibt (group_id, date, start_period).

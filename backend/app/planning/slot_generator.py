@@ -28,6 +28,11 @@ class SlotGenStats:
     created: int
     halbjahr: int
     used_hj1_fallback: bool = False
+    # Wurden die erzeugten Termine als vorläufig markiert?
+    vorlaeufig: bool = False
+    # Wie viele vorhandene Slots der Neuaufbau **nicht** angefasst hat, weil sie nicht
+    # aus dem Muster stammen. Null bei einem Lauf ohne `regenerate`.
+    verschont: int = 0
     # Der Fallback trug ein 14-tägiges Muster ins zweite Halbjahr. Das ist die einzige
     # Stelle, an der eine Phase über den Halbjahreswechsel hinweg fortgeschrieben wird —
     # und die einzige, an der sie danebenliegen kann, wenn die Schule dort neu zählt.
@@ -52,6 +57,7 @@ async def generate_slots(
     halbjahr: int,
     *,
     regenerate: bool = False,
+    vorlaeufig: bool = False,
     created_by: str | None = None,
     cfg: SchoolYearConfig | None = None,
 ) -> SlotGenStats:
@@ -62,6 +68,20 @@ async def generate_slots(
 
     Mit regenerate=True: erst Snapshot anlegen, dann alte Slots löschen, dann neu erzeugen.
     Ohne Muster für HJ2 wird das HJ1-Muster als Fallback verwendet (vorläufig).
+
+    **Der Neuaufbau verschont, was kein Muster reproduziert.** Gelöscht wird nur
+    `source='pattern'`. Ein Slot mit `source='import'` trägt eine Quellangabe aus dem
+    Stundenplan, einer mit `source='manual'` eine Entscheidung von Hand — beides entsteht
+    beim Neuaufbau nicht wieder. Bis zum 22.09.2026 fiel das ganze Halbjahr; ein vom
+    Abgleich angelegter Termin verschwand damit beim nächsten Erzeugen wieder.
+
+    Trägt ein verschonter Slot denselben Termin wie eine Musterzeile, **entfällt die
+    Musterzeile** (Entscheidung 22.09.2026, F4): Der bestehende Slot ist der konkretere —
+    er kennt seine Quelle — und zwei Slots auf derselben Stunde wären eine Dublette, die
+    niemand auflösen kann.
+
+    `vorlaeufig=True` markiert die erzeugten Termine als Annahme; siehe
+    `LessonSlot.vorlaeufig`.
 
     **14-tägige Muster erzeugen nur in ihrer Woche einen Slot.** Welche Woche das ist,
     entscheidet `ab_phasen` — dieselbe Regel, mit der die Ableitung aus dem Stundenplan das
@@ -111,15 +131,33 @@ async def generate_slots(
         p.rhythmus != WOECHENTLICH for p in patterns
     )
 
+    verschont: list[LessonSlot] = []
     if regenerate and existing_count:
         await create_snapshot(db, group_id, reason="regeneration", created_by=created_by)
         await db.execute(
             sa.delete(LessonSlot).where(
                 LessonSlot.group_id == group_id,
                 LessonSlot.halbjahr == halbjahr,
+                LessonSlot.source == "pattern",
             )
         )
         await db.flush()
+        # Was nach dem Löschen noch steht, hat der Lauf verschont — und belegt seinen
+        # Termin.
+        verschont = list(
+            (
+                await db.execute(
+                    sa.select(LessonSlot).where(
+                        LessonSlot.group_id == group_id,
+                        LessonSlot.halbjahr == halbjahr,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    belegt = {(s.date, s.start_period) for s in verschont}
 
     by_weekday: dict[int, list[GroupWeekPattern]] = defaultdict(list)
     for p in patterns:
@@ -135,6 +173,10 @@ async def generate_slots(
             for p in by_weekday.get(d.weekday(), []):
                 if not _findet_statt(p.rhythmus, phase):
                     continue
+                if (d, p.start_period) in belegt:
+                    # Ein verschonter Slot sitzt schon hier. Die Musterzeile entfällt —
+                    # zwei Slots auf derselben Stunde wären eine Dublette.
+                    continue
                 slot = LessonSlot(
                     group_id=group_id,
                     date=d,
@@ -142,6 +184,7 @@ async def generate_slots(
                     periods=p.periods,
                     halbjahr=halbjahr,
                     kategorie="unterricht",
+                    vorlaeufig=vorlaeufig,
                 )
                 db.add(slot)
                 created += 1
@@ -153,4 +196,6 @@ async def generate_slots(
         halbjahr=halbjahr,
         used_hj1_fallback=used_hj1_fallback,
         fallback_vierzehntaegig=fallback_vierzehntaegig,
+        vorlaeufig=vorlaeufig,
+        verschont=len(verschont),
     )

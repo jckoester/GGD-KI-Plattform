@@ -414,6 +414,7 @@ async def generate_group_slots(
         group_id,
         payload.halbjahr,
         regenerate=payload.regenerate,
+        vorlaeufig=payload.vorlaeufig,
         created_by=user.sub,
     )
     return SlotGenStatsRead(
@@ -421,6 +422,8 @@ async def generate_group_slots(
         halbjahr=stats.halbjahr,
         used_hj1_fallback=stats.used_hj1_fallback,
         fallback_vierzehntaegig=stats.fallback_vierzehntaegig,
+        vorlaeufig=stats.vorlaeufig,
+        verschont=stats.verschont,
     )
 
 
@@ -471,6 +474,68 @@ async def update_slot(
     await db.commit()
     await db.refresh(slot)
     return slot
+
+
+# ── DELETE /planning/slots/{slot_id} ─────────────────────────────────────────
+
+
+@router.delete("/slots/{slot_id}", response_model=dict)
+async def delete_slot(
+    slot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Löscht einen einzelnen, leeren Termin.
+
+    **Warum es diesen Endpunkt gibt.** Slots ließen sich bis zum 22.09.2026 überhaupt
+    nicht einzeln löschen — es gab nur `regenerate`, und der nahm das ganze Halbjahr.
+    Seit derselben Änderung verschont der Neuaufbau aber Slots mit `source='import'`
+    oder `'manual'`: Ohne diesen Weg wäre ein versehentlich angelegter Termin
+    **unlöschbar**.
+
+    **Zwei Grenzen, beide mit 409:**
+
+    *Inhalt daran* — eine Stunde mit Thema, Einheit oder Entwurf zu löschen hieße, die
+    Planung wegzuwerfen, um einen Termin loszuwerden. Erst den Inhalt verschieben.
+
+    *Aus dem Wochenmuster* (`source='pattern'`) — ein solcher Slot wäre beim nächsten
+    Erzeugen wieder da. Die richtige Korrektur ist das Muster, nicht die Zeile.
+
+    ⚠️ **Kein Weg für „an diesem Termin findet nichts statt".** Den Termin gibt es im
+    Stundenplan, der Kalender zeigt ihn — das ist `kategorie='ausfall'` und keine
+    gelöschte Zeile. Der Abgleich schreibt das ohnehin selbst.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+
+    await require_group_teacher(slot.group_id, user, db)
+
+    if slot.ue_node_id or slot.stunde_node_id or (slot.thema or "").strip():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Diese Stunde trägt Inhalt. Verschieben Sie ihn zuerst auf einen "
+                "anderen Termin."
+            ),
+        )
+    if slot.source == "pattern":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Diese Stunde stammt aus dem Wochenmuster und entsteht beim nächsten "
+                "Erzeugen wieder. Ändern Sie das Wochenmuster der Gruppe."
+            ),
+        )
+
+    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
+    await db.delete(slot)
+    await db.commit()
+    logger.info(
+        "slot_geloescht pseudonym=%s slot=%s gruppe=%s source=%s",
+        user.sub, slot_id, slot.group_id, slot.source,
+    )
+    return {"ok": True}
 
 
 # ── POST /planning/groups/{group_id}/slots/swap ───────────────────────────────

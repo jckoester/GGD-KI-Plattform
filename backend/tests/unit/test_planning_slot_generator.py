@@ -59,13 +59,22 @@ def _make_db(
     patterns_hj: dict[int, list] | None = None,
     existing_count: int = 0,
     primary_halbjahr: int = 1,
+    verschonte: list | None = None,
 ):
     """Erstellt eine Mock-DB.
 
     primary_halbjahr: das Halbjahr das zuerst abgefragt wird (ergibt Aufruf 0).
     Bei leerem primären Ergebnis und HJ2 folgt ein zweiter Aufruf für HJ1-Fallback.
+
+    `verschonte` sind die Slots, die nach dem Löschen noch stehen — der Generator fragt
+    sie ab, um belegte Termine zu erkennen (Neuaufbau seit 22.09.2026).
+
+    ⚠️ **Die Abfragen werden am Tabellennamen unterschieden, nicht an der Aufrufnummer.**
+    Nach der Zählweise allein bekäme die Slot-Abfrage die Musterzeilen geliefert — der
+    Mock behauptete dann etwas, was der Code nie sieht, und der Test wäre trotzdem grün.
     """
     patterns_hj = patterns_hj or {}
+    verschonte = verschonte or []
     call_counter = [0]
     # Reihenfolge: Aufruf 0 → primary_halbjahr, Aufruf 1 → HJ1-Fallback
     call_order = [primary_halbjahr, 1]
@@ -77,6 +86,12 @@ def _make_db(
         # DELETE-Statement: kein scalars nötig
         if "delete" in type(stmt).__name__.lower() or "Delete" in str(type(stmt)):
             return MagicMock()
+
+        # Die Abfrage der verschonten Slots — am Tabellennamen erkannt.
+        if "lesson_slots" in str(stmt):
+            r = MagicMock()
+            r.scalars.return_value.all.return_value = verschonte
+            return r
 
         hj = call_order[min(idx, len(call_order) - 1)]
         r = MagicMock()
@@ -272,3 +287,91 @@ async def test_woechentlicher_fallback_meldet_nichts():
         stats = await generate_slots(db, group_id=1, halbjahr=2, cfg=cfg)
     assert stats.used_hj1_fallback
     assert not stats.fallback_vierzehntaegig
+
+
+# ── Vorläufige Termine und verschonte Slots (AP1, 22.09.2026) ────────────────
+
+
+def _mk_slot(datum, start_period=1):
+    """Ein verschonter Slot, wie ihn der Generator nach dem Löschen vorfindet."""
+    s = MagicMock()
+    s.date = datum
+    s.start_period = start_period
+    return s
+
+
+@pytest.mark.asyncio
+async def test_vorlaeufig_landet_an_den_erzeugten_slots():
+    """Das Kennzeichen muss bis an die Zeile durchreichen — sonst sieht ein vorläufiges
+    Halbjahr aus wie ein bestätigtes."""
+    cfg = _mini_cfg()
+    db = _make_db({1: [_mk_pattern(weekday=0, halbjahr=1)]})
+
+    with patch("app.planning.slot_generator.load_school_year", return_value=cfg):
+        stats = await generate_slots(db, group_id=1, halbjahr=1, vorlaeufig=True, cfg=cfg)
+
+    assert stats.created == 1
+    assert stats.vorlaeufig is True
+    angelegt = [c.args[0] for c in db.add.call_args_list]
+    assert all(s.vorlaeufig is True for s in angelegt)
+
+
+@pytest.mark.asyncio
+async def test_ohne_angabe_ist_nichts_vorlaeufig():
+    cfg = _mini_cfg()
+    db = _make_db({1: [_mk_pattern(weekday=0, halbjahr=1)]})
+
+    with patch("app.planning.slot_generator.load_school_year", return_value=cfg):
+        stats = await generate_slots(db, group_id=1, halbjahr=1, cfg=cfg)
+
+    assert stats.vorlaeufig is False
+    assert all(s.vorlaeufig is False for s in [c.args[0] for c in db.add.call_args_list])
+
+
+@pytest.mark.asyncio
+async def test_belegter_termin_laesst_die_musterzeile_entfallen():
+    """Entscheidung F4 (22.09.2026): Der verschonte Slot ist der konkretere — er kennt
+    seine Quelle. Zwei Slots auf derselben Stunde wären eine Dublette, die niemand
+    auflösen kann."""
+    cfg = _mini_cfg()
+    # Montag der ersten Woche, 1. Stunde — genau die Zeile, die das Muster erzeugen will.
+    verschont = [_mk_slot(date(2026, 1, 5), start_period=1)]
+    db = _make_db(
+        {1: [_mk_pattern(weekday=0, halbjahr=1)]},
+        existing_count=1,
+        verschonte=verschont,
+    )
+
+    with (
+        patch("app.planning.slot_generator.load_school_year", return_value=cfg),
+        patch("app.planning.slot_generator.create_snapshot", new_callable=AsyncMock),
+    ):
+        stats = await generate_slots(
+            db, group_id=1, halbjahr=1, regenerate=True, cfg=cfg
+        )
+
+    assert stats.created == 0, "Die Musterzeile hätte entfallen müssen"
+    assert stats.verschont == 1
+
+
+@pytest.mark.asyncio
+async def test_anderer_termin_wird_trotzdem_erzeugt():
+    """Die Gegenprobe: Ein verschonter Slot blockiert nur *seinen* Termin."""
+    cfg = _mini_cfg()
+    verschont = [_mk_slot(date(2026, 1, 6), start_period=1)]  # Dienstag
+    db = _make_db(
+        {1: [_mk_pattern(weekday=0, halbjahr=1)]},  # Muster: Montag
+        existing_count=1,
+        verschonte=verschont,
+    )
+
+    with (
+        patch("app.planning.slot_generator.load_school_year", return_value=cfg),
+        patch("app.planning.slot_generator.create_snapshot", new_callable=AsyncMock),
+    ):
+        stats = await generate_slots(
+            db, group_id=1, halbjahr=1, regenerate=True, cfg=cfg
+        )
+
+    assert stats.created == 1
+

@@ -47,6 +47,9 @@ class WeekPatternRead(BaseModel):
 class SlotGenerateRequest(BaseModel):
     halbjahr: int = Field(..., ge=1, le=2)
     regenerate: bool = False
+    # Termine als Annahme kennzeichnen — für das zweite Halbjahr, das zu
+    # Schuljahresbeginn aus dem Raster des ersten entsteht (siehe `LessonSlot.vorlaeufig`).
+    vorlaeufig: bool = False
 
 
 class SlotGenStatsRead(BaseModel):
@@ -56,6 +59,9 @@ class SlotGenStatsRead(BaseModel):
     # Der Fallback trug ein 14-tägiges Muster ins 2. Halbjahr — die einzige Stelle, an der
     # die A-/B-Phase über den Halbjahreswechsel fortgeschrieben wird.
     fallback_vierzehntaegig: bool = False
+    vorlaeufig: bool = False
+    # Wie viele vorhandene Slots der Neuaufbau nicht angefasst hat (Quelle oder Handarbeit).
+    verschont: int = 0
 
 
 class AbWochenRead(BaseModel):
@@ -85,6 +91,7 @@ class SlotRead(BaseModel):
     thema: Optional[str]
     pinned: bool
     anpassung_noetig: bool
+    vorlaeufig: bool = False
     note: Optional[str]
     nachbereitet_at: Optional[datetime]
     nachbereitet_auto: bool
