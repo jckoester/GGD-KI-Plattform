@@ -2,8 +2,13 @@
  * Wie das Ergebnis eines Stundenplan-Abgleichs zu lesen ist.
  *
  * Der Abgleich ändert **Kategorien vorhandener Stunden** — Entfall, Vertretung — und legt
- * keine an. Das ist Absicht und in `app/calendar/sync.py` als Grenze festgehalten: „Ohne
- * passenden Slot wird nichts angelegt."
+ * seit dem 22.09.2026 **fehlende Termine an**: Wird eine Stunde auf einen Tag verlegt, an
+ * dem die Gruppe sonst keinen Unterricht hat, entsteht dort einer. Vorher wurde nur der
+ * Entfall am Ursprung geschrieben, und die Planung verlor die Stunde.
+ *
+ * ⚠️ **Eine Ausnahme bleibt:** Hat die Gruppe **gar keine** Planung, wird nichts angelegt.
+ * Dann fehlt nicht ein Termin, sondern das Wochenmuster — und `fehlendesRaster` unten
+ * führt zur Einrichtung statt zu einem halben Jahr aus dem Stundenplan.
  */
 
 /** Grund, den das Backend an einen Konflikt schreibt, wenn die Planung die Stunde nicht kennt. */
@@ -27,6 +32,9 @@ export function fehlendesRaster(ergebnis) {
     if (!konflikte.length) return null
     if (ergebnis.geaendert !== 0) return null
     if (ergebnis.verlegungen?.length) return null
+    // Seit der Abgleich Termine anlegt: Wurde einer angelegt, hat die Gruppe eine
+    // Planung — dann ist es nicht der Einrichtungsfall.
+    if (ergebnis.angelegte?.length) return null
     if (!konflikte.every((k) => k.grund === OHNE_SLOT)) return null
     return (
         "Für diese Gruppe sind noch keine Stunden angelegt — der Abgleich hat nichts, " +
@@ -130,4 +138,22 @@ export function diagnoseHatInhalt(d) {
                 d.unbekannt.length ||
                 d.hinweise.length),
     )
+}
+
+/**
+ * Die Zusammenfassung eines Laufs in einem Satz.
+ *
+ * `geaendert` zählt seit dem 22.09.2026 geänderte **und angelegte** Stunden — die Zahl
+ * allein sagt also nicht mehr, was geschah. Deshalb werden angelegte Termine eigens
+ * genannt: Eine neue Stunde in der Jahresplanung ist etwas anderes als eine umgestellte.
+ */
+export function abgleichZusammenfassung(ergebnis) {
+    const teile = []
+    const angelegt = ergebnis?.angelegte?.length ?? 0
+    const geaendert = (ergebnis?.geaendert ?? 0) - angelegt
+    teile.push(geaendert === 1 ? "1 Stunde geändert" : `${geaendert} Stunden geändert`)
+    if (angelegt) teile.push(angelegt === 1 ? "1 Stunde angelegt" : `${angelegt} Stunden angelegt`)
+    if (ergebnis?.verlegungen?.length) teile.push(`${ergebnis.verlegungen.length} Verlegung(en)`)
+    if (ergebnis?.konflikte?.length) teile.push(`${ergebnis.konflikte.length} Hinweis(e)`)
+    return teile.join(" · ")
 }

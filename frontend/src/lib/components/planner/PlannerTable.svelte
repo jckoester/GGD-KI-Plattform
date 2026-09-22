@@ -16,10 +16,17 @@
         ende = null,
         onPatchSlot,
         onSwapSlots,
+        onUnpark = () => {},
         onEditLesson = null,
         onReview = null,
     } = $props();
 
+    // ⚠️ **Übergangsregel.** Ob ein Termin vorläufig ist, steht seit Migration `0066`
+    // an ihm selbst (`slot.vorlaeufig`). Die Ableitung „HJ2 hat kein eigenes Muster"
+    // bleibt daneben stehen, weil Slots aus der Zeit davor die Spalte auf `false`
+    // tragen — sie waren aber sehr wohl aus dem HJ1-Raster entstanden. Sobald ein
+    // Halbjahr einmal neu erzeugt wurde, trägt die Spalte die Wahrheit und die
+    // Ableitung kann weg.
     const hj2Vorlaeufig = $derived(!patterns.some((p) => p.halbjahr === 2));
 
     const weekItems = $derived(
@@ -173,9 +180,10 @@
                             slot={row.slot}
                             unit={unitForId(row.slot.ue_node_id)}
                             {units}
-                            vorlaeufig={hj2Vorlaeufig && row.slot.halbjahr === 2}
+                            vorlaeufig={row.slot.vorlaeufig || (hj2Vorlaeufig && row.slot.halbjahr === 2)}
                             onPatch={(updates) => onPatchSlot(row.slot.id, updates)}
                             onSwap={(sourceId) => onSwapSlots(sourceId, row.slot.id)}
+                            onUnpark={(parkplatzId) => onUnpark(parkplatzId, row.slot.id)}
                             {onEditLesson}
                             {onReview}
                         />

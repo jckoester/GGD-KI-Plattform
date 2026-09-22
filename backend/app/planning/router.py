@@ -39,6 +39,7 @@ from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning import jetzt as jetzt_modul
 from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
+from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     AbWochenRead,
@@ -417,6 +418,7 @@ async def generate_group_slots(
         payload.halbjahr,
         regenerate=payload.regenerate,
         vorlaeufig=payload.vorlaeufig,
+        dry_run=payload.dry_run,
         created_by=user.sub,
     )
     return SlotGenStatsRead(
@@ -426,6 +428,9 @@ async def generate_group_slots(
         fallback_vierzehntaegig=stats.fallback_vierzehntaegig,
         vorlaeufig=stats.vorlaeufig,
         verschont=stats.verschont,
+        umgehaengt=stats.umgehaengt,
+        geparkt=stats.geparkt,
+        meldungen=stats.meldungen,
     )
 
 
@@ -556,6 +561,52 @@ async def get_parkplatz(
         ],
         ueberhang=await detect_overhang(db, group_id),
     )
+
+
+class UnparkRequest(BaseModel):
+    to_slot_id: UUID
+
+
+@router.post("/parkplatz/{parkplatz_id}/unpark", response_model=dict)
+async def unpark_eintrag(
+    parkplatz_id: UUID,
+    payload: UnparkRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Holt einen geparkten Inhalt auf eine freie Stunde.
+
+    **Warum ein eigener Endpunkt und nicht „Operationen anwenden".** Plan-Operationen
+    laufen sonst über das Chat-Werkzeug `apply_plan_operations`; einen HTTP-Weg dorthin
+    gibt es nicht. Statt einen allgemeinen aufzumachen — der jede Operation von außen
+    erreichbar machte — bekommt der eine Vorgang, den die Oberfläche braucht, seinen
+    eigenen Eingang. Die Prüfung dahinter ist dieselbe: `apply_operations` mit der
+    Operation `unpark_content`, samt Snapshot und Undo.
+    """
+    eintrag = await db.get(ParkedLessonContent, parkplatz_id)
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Parkplatz-Eintrag nicht gefunden")
+
+    await require_group_teacher(eintrag.group_id, user, db)
+
+    ergebnis = await apply_operations(
+        db,
+        eintrag.group_id,
+        parse_operations([
+            {
+                "op": "unpark_content",
+                "parkplatz_id": str(parkplatz_id),
+                "to_slot_id": str(payload.to_slot_id),
+            }
+        ]),
+        summary="Stunde vom Parkplatz eingeplant",
+        created_by=user.sub,
+    )
+    if ergebnis.errors:
+        # 409: Der Zielslot ist belegt oder gehört zu einer anderen Gruppe — beides ist
+        # ein Konflikt mit dem Bestand, keine fehlerhafte Anfrage.
+        raise HTTPException(status_code=409, detail=" · ".join(ergebnis.errors))
+    return {"ok": True}
 
 
 @router.delete("/parkplatz/{parkplatz_id}", response_model=dict)

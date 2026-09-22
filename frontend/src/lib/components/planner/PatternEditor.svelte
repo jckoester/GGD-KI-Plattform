@@ -8,6 +8,7 @@
     ZUR_GRUPPE,
   } from '$lib/stundenplan_abgleich.js'
   import {
+    ersetzenFrage,
     restjahrMoeglich,
     slotMeldung,
     vierzehntaegigWarnung,
@@ -150,10 +151,24 @@
   // lautlos die falschen. Deshalb gibt es den Schritt einzeln nicht mehr.
   const VORHANDEN = 'vorhanden'
 
-  const ERSETZEN_FRAGE =
-    'Für dieses Halbjahr gibt es bereits Stunden. Neu erzeugen ersetzt sie — Thema, ' +
-    'verknüpfte Unterrichtseinheit und Nachbereitungsstand gehen dabei verloren. ' +
-    'Ein Wiederherstellungspunkt wird angelegt. Fortfahren?'
+  /**
+   * Die Rückfrage vor dem Neuaufbau — mit Zahlen statt mit Ahnungen.
+   *
+   * Bis zum 22.09.2026 lautete sie: „Neu erzeugen ersetzt sie — Thema, verknüpfte
+   * Unterrichtseinheit und Nachbereitungsstand gehen dabei verloren." Das stimmt nicht
+   * mehr: Die Planung wird umgehängt. Was tatsächlich geschieht, rechnet der Server
+   * vorher aus (`dry_run`), und genau das steht in der Frage.
+   */
+  async function ersetzenBestaetigen() {
+    let vorschau = null
+    try {
+      vorschau = await generateSlots(groupId, halbjahr, true, false, true)
+    } catch {
+      // Ohne Vorschau bleibt es bei der schlichten Rückfrage — eine gescheiterte
+      // Vorausberechnung darf den Weg nicht versperren.
+    }
+    return confirm(ersetzenFrage(vorschau))
+  }
 
   /** Schreibt das Muster. Gibt zurück, ob es geklappt hat. */
   async function speichern() {
@@ -190,7 +205,7 @@
     if (ergebnis === VORHANDEN) {
       // Die Frage darf nicht wegfallen: Neu erzeugen löscht die Stunden des Halbjahres.
       // Der Wiederherstellungspunkt ist eine Rückfahrkarte, keine Erlaubnis.
-      if (!confirm(ERSETZEN_FRAGE)) {
+      if (!(await ersetzenBestaetigen())) {
         genSuccess =
           `Wochenmuster für HJ ${halbjahr} gespeichert. Die vorhandenen Stunden blieben unverändert.`
         return

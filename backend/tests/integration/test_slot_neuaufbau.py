@@ -315,3 +315,50 @@ class TestAbgleichLegtAn:
 
         assert [z for z in _slots(sync_conn) if z[1] == ziel], "Der Termin ist weg"
 
+
+class TestVorschau:
+    """`dry_run` rechnet, ohne zu schreiben (AP5).
+
+    Ohne diese Zahlen ist die Frage „darf ich das Halbjahr neu aufbauen" nicht zu
+    beantworten — und genau davor stand bisher nur eine Ja/Nein-Rückfrage.
+    """
+
+    async def test_zaehlt_ohne_zu_schreiben(self, sync_conn, erzeuge):
+        await erzeuge()
+        vorher = {z[0] for z in _slots(sync_conn)}
+
+        stats = await erzeuge(regenerate=True, dry_run=True)
+
+        assert stats.created == len(vorher)
+        assert {z[0] for z in _slots(sync_conn)} == vorher, "Die Vorschau hat geschrieben"
+
+    async def test_nennt_umhaengen_und_parkplatz(self, sync_conn, erzeuge):
+        """Mit Inhalt und weniger Terminen: Die Vorschau sagt, was übrig bliebe."""
+        await erzeuge()
+        sync_conn.rollback()
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "UPDATE lesson_slots SET thema = 'A' WHERE group_id = %s", (GRUPPE,)
+            )
+            # Muster halbieren: nur noch jede zweite Stunde.
+            cur.execute(
+                "UPDATE group_week_patterns SET weekday = 4 WHERE group_id = %s", (GRUPPE,)
+            )
+        sync_conn.commit()
+        geparkt_vorher = _lese_parkplatz(sync_conn)
+
+        stats = await erzeuge(regenerate=True, dry_run=True)
+
+        assert stats.umgehaengt > 0
+        assert _lese_parkplatz(sync_conn) == geparkt_vorher, "Die Vorschau hat geparkt"
+        assert stats.meldungen, "Ohne Sätze ist die Vorschau keine Auskunft"
+
+
+def _lese_parkplatz(conn):
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM parked_lesson_content WHERE group_id = %s", (GRUPPE,)
+        )
+        return cur.fetchone()[0]
+

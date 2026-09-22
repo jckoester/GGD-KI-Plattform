@@ -491,6 +491,18 @@ def _plan_als_json(plan, kontext) -> dict:
             }
             for k in plan.conflicts
         ],
+        # Neu seit 22.09.2026: Termine, die der Abgleich anlegt, weil der Stundenplan
+        # dort Unterricht kennt und die Planung keinen hatte. Getrennt von `konflikte` —
+        # ein Hinweis ist etwas, das **nicht** geschah.
+        "angelegte": [
+            {
+                "group_id": n.group_id,
+                "datum": n.datum.isoformat(),
+                "stunde": n.start_period,
+                "kategorie": n.kategorie,
+            }
+            for n in plan.anzulegende
+        ],
         "meldungen": plan.meldungen,
     }
 

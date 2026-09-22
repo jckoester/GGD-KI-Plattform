@@ -1955,12 +1955,14 @@ export async function setWeekPattern(groupId, halbjahr, patterns) {
 
 // `vorlaeufig` kennzeichnet die erzeugten Termine als Annahme — gebraucht für das
 // zweite Halbjahr, das zu Schuljahresbeginn aus dem Raster des ersten entsteht.
-export async function generateSlots(groupId, halbjahr, regenerate = false, vorlaeufig = false) {
+// `dryRun` rechnet nur: Wie viele Stunden würden umgehängt, wie viele lägen danach auf
+// dem Parkplatz? Ohne diese Zahlen ist die Rückfrage vor dem Neuaufbau eine Zumutung.
+export async function generateSlots(groupId, halbjahr, regenerate = false, vorlaeufig = false, dryRun = false) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/generate`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ halbjahr, regenerate, vorlaeufig }),
+        body: JSON.stringify({ halbjahr, regenerate, vorlaeufig, dry_run: dryRun }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Slots konnten nicht generiert werden')
     return res.json()
@@ -2445,3 +2447,39 @@ export async function patchAdminFeedback(id, body) {
   }
   return res.json();
 }
+
+// ── Parkplatz: Planungsinhalt ohne Termin (Jahresplanung) ─────────────────────
+
+// Was beim Umhängen der Jahresplanung keinen Termin fand — samt Überhang-Bilanz,
+// damit die Wahl zwischen Umplanen und Kürzen begründet getroffen werden kann.
+export async function getParkplatz(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/parkplatz`, {
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Parkplatz konnte nicht geladen werden')
+    return res.json()
+}
+
+// Verwirft einen Eintrag. Der Stundenentwurf bleibt im Wissensgraphen erhalten.
+export async function deleteParkplatzEintrag(id) {
+    const res = await fetch(`${BASE}/planning/parkplatz/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Eintrag konnte nicht verworfen werden')
+    return res.json()
+}
+
+// Holt einen geparkten Inhalt auf eine **freie** Stunde. 409, wenn sie belegt ist —
+// Slot und Inhalt stehen 1:1, ein Überschreiben kaskadierte.
+export async function unparkEintrag(id, toSlotId) {
+    const res = await fetch(`${BASE}/planning/parkplatz/${id}/unpark`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_slot_id: toSlotId }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Die Stunde konnte nicht eingeplant werden')
+    return res.json()
+}
+

@@ -98,6 +98,7 @@ async def generate_slots(
     *,
     regenerate: bool = False,
     vorlaeufig: bool = False,
+    dry_run: bool = False,
     created_by: str | None = None,
     cfg: SchoolYearConfig | None = None,
 ) -> SlotGenStats:
@@ -122,6 +123,11 @@ async def generate_slots(
 
     `vorlaeufig=True` markiert die erzeugten Termine als Annahme; siehe
     `LessonSlot.vorlaeufig`.
+
+    `dry_run=True` rechnet nur: Die Statistik sagt, was geschähe — wie viele Stunden
+    umgehängt würden, wie viele danach auf dem Parkplatz lägen —, geschrieben wird
+    nichts. Für die Vorschau vor dem Neuaufbau: Die Frage „darf ich das Halbjahr neu
+    aufbauen" ist ohne diese Zahlen nicht zu beantworten.
 
     **14-tägige Muster erzeugen nur in ihrer Woche einen Slot.** Welche Woche das ist,
     entscheidet `ab_phasen` — dieselbe Regel, mit der die Ableitung aus dem Stundenplan das
@@ -217,8 +223,12 @@ async def generate_slots(
             umzuhaengen,
             [NeuerTermin(datum=d, start_period=sp, periods=pp) for d, sp, pp in raster],
         )
-        created = await wende_umhaengen_an(
-            db, group_id, halbjahr, plan, vorlaeufig=vorlaeufig, created_by=created_by
+        created = (
+            len(plan.zuordnungen) + len(plan.freie_termine)
+            if dry_run
+            else await wende_umhaengen_an(
+                db, group_id, halbjahr, plan, vorlaeufig=vorlaeufig, created_by=created_by
+            )
         )
         return SlotGenStats(
             created=created,
@@ -230,6 +240,17 @@ async def generate_slots(
             umgehaengt=len(plan.zuordnungen),
             geparkt=len(plan.ueberhang),
             meldungen=plan.meldungen,
+        )
+
+    if dry_run:
+        # Ohne Planung ist die Vorschau die Zahl der Termine — mehr passiert nicht.
+        return SlotGenStats(
+            created=len(raster),
+            halbjahr=halbjahr,
+            used_hj1_fallback=used_hj1_fallback,
+            fallback_vierzehntaegig=fallback_vierzehntaegig,
+            vorlaeufig=vorlaeufig,
+            verschont=len(verschont),
         )
 
     # Keine Planung zu retten: der bisherige Weg — Snapshot, löschen, neu erzeugen.

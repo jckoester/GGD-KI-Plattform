@@ -18,7 +18,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Wechselt dabei der Umfang (Einzel- ↔ Doppelstunde), wird die Stunde als anzupassen
   markiert. Was keinen Termin mehr findet, liegt auf dem **Parkplatz** und lässt sich von
   dort auf einen freien Termin ziehen oder durch Kürzen eingliedern — verloren geht
-  nichts.
+  nichts. Vor dem Neuaufbau steht, was er bewirken wird: wie viele Stunden wandern und
+  wie viele übrig bleiben. Vorläufige Termine des 2. Halbjahres sind im Plan als solche
+  gekennzeichnet.
 - **Stunden bis zum Schuljahresende anlegen.** Zu Schuljahresbeginn entsteht das 2.
   Halbjahr auf Wunsch **vorläufig** aus dem jetzigen Raster — damit die Jahresplanung
   über den Halbjahreswechsel hinweg Termine hat. Wählbar in der Sammelübernahme und im

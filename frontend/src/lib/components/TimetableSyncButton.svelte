@@ -12,7 +12,7 @@
    */
   import { RefreshCw } from "lucide-svelte";
   import { getSyncStatus, runTimetableSync } from "$lib/api.js";
-  import { fehlendesRaster } from "$lib/stundenplan_abgleich.js";
+  import { abgleichZusammenfassung, fehlendesRaster } from "$lib/stundenplan_abgleich.js";
   import { onMount } from "svelte";
   import ErrorBanner from "./ErrorBanner.svelte";
   import SuccessBanner from "./SuccessBanner.svelte";
@@ -73,13 +73,10 @@
   };
   const stoerung = $derived(STATUSTEXT[letzter?.status] ?? null);
 
-  function zusammenfassung(r) {
-    const teile = [];
-    teile.push(r.geaendert === 1 ? "1 Stunde geändert" : `${r.geaendert} Stunden geändert`);
-    if (r.verlegungen?.length) teile.push(`${r.verlegungen.length} Verlegung(en)`);
-    if (r.konflikte?.length) teile.push(`${r.konflikte.length} Hinweis(e)`);
-    return teile.join(" · ");
-  }
+  // Die Sätze stehen im Modul: `geaendert` zählt seit dem 22.09.2026 geänderte **und**
+  // angelegte Stunden, und eine neue Stunde in der Jahresplanung ist etwas anderes als
+  // eine umgestellte.
+  const zusammenfassung = abgleichZusammenfassung;
 
 </script>
 

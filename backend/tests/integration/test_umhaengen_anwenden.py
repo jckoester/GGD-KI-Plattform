@@ -408,3 +408,71 @@ class TestKategorieBleibtAmTermin:
             "SELECT thema, kategorie, date FROM lesson_slots WHERE group_id = %s", GRUPPE
         ) == [("Klassenarbeit", "pruefung", DI)]
 
+
+class TestUnparkEndpunkt:
+    """Der Weg, den die Oberfläche geht (AP5).
+
+    Plan-Operationen laufen sonst über das Chat-Werkzeug; für das Ziehen aus dem
+    Parkplatz bekommt der eine Vorgang seinen eigenen Eingang — mit derselben Prüfung
+    dahinter.
+    """
+
+    @pytest.fixture
+    def eintrag(self, sync_conn):
+        def _anlegen(thema="B"):
+            eid = uuid.uuid4()
+            sync_conn.rollback()
+            with sync_conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO parked_lesson_content (id, group_id, halbjahr,"
+                    " herkunft_datum, thema) VALUES (%s,%s,2,%s,%s)",
+                    (str(eid), GRUPPE, DI, thema),
+                )
+            sync_conn.commit()
+            return eid
+
+        return _anlegen
+
+    async def test_freie_stunde_nimmt_ihn_auf(
+        self, sync_conn, eintrag, test_client, auth_headers
+    ):
+        ziel = _slot(sync_conn, MO2)
+        eid = eintrag()
+
+        antwort = await test_client.post(
+            f"/planning/parkplatz/{eid}/unpark",
+            json={"to_slot_id": str(ziel)},
+            headers=auth_headers,
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert _lese(sync_conn, "SELECT thema FROM lesson_slots WHERE id = %s",
+                     str(ziel)) == [("B",)]
+
+    async def test_belegte_stunde_gibt_409(
+        self, sync_conn, eintrag, test_client, auth_headers
+    ):
+        ziel = _slot(sync_conn, MO2, thema="schon da")
+        eid = eintrag()
+
+        antwort = await test_client.post(
+            f"/planning/parkplatz/{eid}/unpark",
+            json={"to_slot_id": str(ziel)},
+            headers=auth_headers,
+        )
+        assert antwort.status_code == 409
+        assert "belegt" in antwort.json()["detail"]
+        assert _lese(sync_conn, "SELECT thema FROM lesson_slots WHERE id = %s",
+                     str(ziel)) == [("schon da",)]
+
+    async def test_fremde_lehrkraft_gibt_403(
+        self, sync_conn, eintrag, test_client, auth_headers_teacher2
+    ):
+        ziel = _slot(sync_conn, MO2)
+        eid = eintrag()
+        antwort = await test_client.post(
+            f"/planning/parkplatz/{eid}/unpark",
+            json={"to_slot_id": str(ziel)},
+            headers=auth_headers_teacher2,
+        )
+        assert antwort.status_code == 403
+

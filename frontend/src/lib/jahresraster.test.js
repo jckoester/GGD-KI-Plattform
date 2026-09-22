@@ -12,6 +12,8 @@ import {
     halbjahreFuerUebernahme,
     restjahrMoeglich,
     slotMeldung,
+    umhaengeErgebnis,
+    ersetzenFrage,
     vierzehntaegigWarnung,
 } from "./jahresraster.js";
 
@@ -87,6 +89,39 @@ describe("vierzehntaegigWarnung", () => {
 });
 
 
+describe("umhaengeErgebnis", () => {
+    it("schweigt, wenn nichts umgehängt wurde", () => {
+        expect(umhaengeErgebnis({ created: 12 })).toBeNull();
+    });
+
+    it("meldet den Parkplatz, wenn etwas übrig blieb", () => {
+        const e = umhaengeErgebnis({ umgehaengt: 10, geparkt: 2, meldungen: ["x"] });
+        expect(e.hatParkplatz).toBe(true);
+        expect(e.sätze).toEqual(["x"]);
+    });
+
+    it("ohne Überhang kein Parkplatz-Hinweis", () => {
+        expect(umhaengeErgebnis({ umgehaengt: 10, geparkt: 0 }).hatParkplatz).toBe(false);
+    });
+});
+
+describe("ersetzenFrage", () => {
+    it("ohne Vorschau bleibt es bei der schlichten Rückfrage", () => {
+        expect(ersetzenFrage(null)).toContain("Fortfahren?");
+    });
+
+    it("nennt Zahlen statt Ahnungen", () => {
+        const text = ersetzenFrage({ umgehaengt: 12, geparkt: 2 });
+        expect(text).toContain("12");
+        expect(text).toContain("Parkplatz");
+        expect(text).toContain("Wiederherstellungspunkt");
+    });
+
+    it("verschweigt den Parkplatz, wenn nichts übrig bleibt", () => {
+        expect(ersetzenFrage({ umgehaengt: 12, geparkt: 0 })).not.toContain("Parkplatz");
+    });
+});
+
 // ── Verdrahtung ──────────────────────────────────────────────────────────────
 //
 // ⚠️ Quelltext statt Verhalten: Das Projekt hat keine Svelte-Komponententests
@@ -147,3 +182,41 @@ describe("Beide Einstiege benutzen dasselbe Modul", () => {
     });
 });
 
+
+describe("Parkplatz und Umhängen in der Oberfläche", () => {
+    const PLANER = lies("../routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte");
+    const TABELLE = lies("components/planner/PlannerTable.svelte");
+    const PARKPLATZ = lies("components/planner/Parkplatz.svelte");
+    const EDITOR2 = lies("components/planner/PatternEditor.svelte");
+
+    it("der Planer lädt den Parkplatz beim Öffnen, nicht erst nach einem Neuaufbau", () => {
+        // Geparktes überlebt die Sitzung. Erschiene es erst nach dem nächsten
+        // Neuaufbau, wäre es genau dann unsichtbar, wenn es jemand braucht.
+        const ab = PLANER.indexOf("async function loadOverview");
+        const bis = PLANER.indexOf("afterNavigate", ab);
+        expect(PLANER.slice(ab, bis)).toContain("ladeParkplatz()");
+    });
+
+    it("die Leiste steckt nicht hinter einem Aufklapper", () => {
+        // Ein Parkplatz, den man wegklicken kann, ist am nächsten Tag vergessen.
+        expect(PARKPLATZ).not.toContain("<details");
+        expect(PARKPLATZ).not.toContain("summary");
+    });
+
+    it("die Vorläufigkeit kommt aus der Spalte, nicht nur aus der Ableitung", () => {
+        // Die Ableitung „HJ2 hat kein eigenes Muster" ist ein Invariant über zwei
+        // Tabellen; seit Migration 0066 steht die Antwort am Slot selbst.
+        expect(TABELLE).toContain("row.slot.vorlaeufig");
+    });
+
+    it("die Rückfrage vor dem Neuaufbau rechnet vorher", () => {
+        expect(EDITOR2).toContain("ersetzenFrage");
+        expect(EDITOR2).toMatch(/generateSlots\(groupId, halbjahr, true, false, true\)/);
+    });
+
+    it("der alte Satz „muss neu aufgebaut werden“ steht nirgends mehr", () => {
+        // Er stimmte, solange der Neuaufbau die Planung wegwarf. Seit sie umgehängt
+        // wird, forderte er zu Handarbeit auf, die niemand mehr leisten muss.
+        expect(PLANER).not.toContain("muss neu aufgebaut werden");
+    });
+});

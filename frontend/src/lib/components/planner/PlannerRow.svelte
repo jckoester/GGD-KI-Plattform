@@ -1,7 +1,8 @@
 <script>
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS, entwurfsStand } from '$lib/planner.js'
 
-  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson, onReview = null } = $props()
+  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap,
+          onUnpark = () => {}, onEditLesson, onReview = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -65,6 +66,14 @@
 
   function onDrop(e) {
     e.preventDefault()
+    // Zwei Sorten Ladung: eine andere Stunde (tauschen) oder ein Parkplatz-Eintrag
+    // (einplanen). Der eigene MIME-Typ hält sie auseinander, ohne dass die Zeile raten
+    // muss, was sie gerade bekommt.
+    const parkplatzId = e.dataTransfer.getData('application/x-parkplatz')
+    if (parkplatzId) {
+      if (!slot.pinned) onUnpark(parkplatzId)
+      return
+    }
     const sourceId = e.dataTransfer.getData('text/plain')
     if (sourceId && sourceId !== slot.id && !slot.pinned) onSwap(sourceId)
   }

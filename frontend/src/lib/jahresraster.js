@@ -69,3 +69,42 @@ export function vierzehntaegigWarnung(stats) {
         "steht, bitte einmal neu aus dem Stundenplan übernehmen."
     );
 }
+
+/**
+ * Was ein Neuaufbau ergeben hat — oder ergäbe (`dry_run`).
+ *
+ * **Warum das eine eigene Auskunft ist.** Bis zum 22.09.2026 warf der Neuaufbau die
+ * Planung des Halbjahres weg; der Planer zeigte danach den Satz „die Zuordnung muss neu
+ * aufgebaut werden". Seitdem wird umgehängt — und dann ist die Frage nicht mehr „was
+ * muss ich neu machen", sondern „was hat sich verschoben und was blieb übrig".
+ *
+ * @returns {{sätze: string[], hatParkplatz: boolean}|null}
+ */
+export function umhaengeErgebnis(stats) {
+    if (!stats?.umgehaengt && !stats?.geparkt) return null;
+    return {
+        sätze: stats.meldungen ?? [],
+        hatParkplatz: (stats.geparkt ?? 0) > 0,
+    };
+}
+
+/** Der Satz für die Rückfrage vor dem Neuaufbau — mit Zahlen statt mit Ahnungen. */
+export function ersetzenFrage(vorschau) {
+    if (!vorschau) {
+        return "Die Stunden dieses Halbjahres werden neu aufgebaut. Fortfahren?";
+    }
+    const zeilen = ["Die Stunden dieses Halbjahres werden neu aufgebaut."];
+    if (vorschau.umgehaengt) {
+        zeilen.push(
+            `${vorschau.umgehaengt} geplante ${vorschau.umgehaengt === 1 ? "Stunde wandert" : "Stunden wandern"} auf die neuen Termine.`,
+        );
+    }
+    if (vorschau.geparkt) {
+        zeilen.push(
+            `${vorschau.geparkt} ${vorschau.geparkt === 1 ? "Stunde findet" : "Stunden finden"} keinen Termin und ${vorschau.geparkt === 1 ? "liegt" : "liegen"} danach auf dem Parkplatz.`,
+        );
+    }
+    zeilen.push("Ein Wiederherstellungspunkt wird vorher angelegt. Fortfahren?");
+    return zeilen.join("\n\n");
+}
+

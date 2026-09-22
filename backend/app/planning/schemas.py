@@ -50,6 +50,9 @@ class SlotGenerateRequest(BaseModel):
     # Termine als Annahme kennzeichnen — für das zweite Halbjahr, das zu
     # Schuljahresbeginn aus dem Raster des ersten entsteht (siehe `LessonSlot.vorlaeufig`).
     vorlaeufig: bool = False
+    # Nur rechnen, nichts schreiben. Für die Vorschau vor dem Neuaufbau: Wie viele
+    # Stunden werden umgehängt, wie viele liegen danach auf dem Parkplatz?
+    dry_run: bool = False
 
 
 class SlotGenStatsRead(BaseModel):
@@ -62,6 +65,10 @@ class SlotGenStatsRead(BaseModel):
     vorlaeufig: bool = False
     # Wie viele vorhandene Slots der Neuaufbau nicht angefasst hat (Quelle oder Handarbeit).
     verschont: int = 0
+    # Was das Umhängen ergeben hat (bzw. ergäbe, bei `dry_run`).
+    umgehaengt: int = 0
+    geparkt: int = 0
+    meldungen: list[str] = []
 
 
 class AbWochenRead(BaseModel):

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+    abgleichZusammenfassung,
     diagnose,
     diagnoseHatInhalt,
     fehlendesRaster,
@@ -170,3 +171,38 @@ describe("diagnoseHatInhalt", () => {
         expect(diagnoseHatInhalt(d)).toBe(true)
     })
 })
+
+// ── Zusammenfassung und Einrichtungsfall nach AP4/AP5 (22.09.2026) ───────────
+
+describe("abgleichZusammenfassung", () => {
+    it("nennt angelegte Stunden eigens", () => {
+        // `geaendert` zählt beides — die Zahl allein sagt nicht mehr, was geschah.
+        const text = abgleichZusammenfassung({
+            geaendert: 5,
+            angelegte: [{ datum: "2026-03-02" }, { datum: "2026-03-03" }],
+        });
+        expect(text).toContain("3 Stunden geändert");
+        expect(text).toContain("2 Stunden angelegt");
+    });
+
+    it("ohne Anlagen bleibt es bei der alten Form", () => {
+        expect(abgleichZusammenfassung({ geaendert: 1 })).toBe("1 Stunde geändert");
+    });
+});
+
+describe("fehlendesRaster nach AP4", () => {
+    it("schweigt, wenn Termine angelegt wurden", () => {
+        // Dann hat die Gruppe eine Planung — es ist nicht der Einrichtungsfall.
+        const ergebnis = {
+            geaendert: 0,
+            konflikte: [{ grund: OHNE_SLOT }],
+            angelegte: [{ datum: "2026-03-02" }],
+        };
+        expect(fehlendesRaster(ergebnis)).toBeNull();
+    });
+
+    it("greift weiterhin, wenn die Gruppe gar keine Planung hat", () => {
+        const ergebnis = { geaendert: 0, konflikte: [{ grund: OHNE_SLOT }], angelegte: [] };
+        expect(fehlendesRaster(ergebnis)).toContain("noch keine Stunden angelegt");
+    });
+});
