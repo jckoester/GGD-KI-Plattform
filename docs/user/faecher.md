@@ -102,6 +102,54 @@ schreibgeschützt; ein Hinweis am Kopf sagt das.
 
 Gibt es zu einem Fach frühere Gruppen, weist die Fachseite darauf hin.
 
+## Beitrittscode
+
+Nicht jede Unterrichtsgruppe bekommt ihre Mitglieder aus einer Klasse. Kurse der
+Kursstufe haben keine Klasse als Anker, Teilgruppen ziehen aus mehreren Klassen, und
+Nachzügler kommen später dazu. Für all das gibt es den **Beitrittscode**.
+
+> **Warum kein Hinzufügen per Namensliste?** Die Plattform speichert keine Klarnamen —
+> eine Mitgliederliste bestünde aus Pseudonymen und wäre nicht bedienbar. Wer darin
+> jemanden ein- oder austragen wollte, müsste raten. Der Code ist der Weg, der ohne
+> Namen auskommt.
+
+### Für Lehrkräfte
+
+Den Code finden Sie auf der Seite Ihrer Unterrichtsgruppe unter **Beitrittscode**.
+
+- **Ausgeben / Erneuern.** Ein Code gilt **drei Tage**. Das reicht für die Stunde, in der
+  Sie ihn anschreiben, und für alle, die erst zu Hause beitreten. Beim Erneuern verfällt
+  der bisherige — es gilt immer nur einer.
+- **Ungültig machen.** Wer schon beigetreten ist, bleibt Mitglied; es kommt nur niemand
+  mehr nach.
+- Der Code enthält keine leicht verwechselbaren Zeichen (kein `O`, `0`, `I`, `1`, `L`) —
+  er ist zum Anschreiben und Vorlesen gemacht.
+
+**Zu viele beigetreten?** Unter dem Code steht, wie viele an welchem Tag dazugekommen
+sind — nur Zahlen, keine Namen. Sie können die Beitritte **eines Tages** oder **der
+ganzen Code-Runde** zurücknehmen.
+
+> ⚠️ **Was dabei passiert:** Die betroffenen Mitgliedschaften werden entfernt, und der
+> Code wird ungültig. Wer zu Recht beigetreten ist, muss mit einem **neuen** Code erneut
+> beitreten. Das ist gröber als einzelnes Entfernen und genau deshalb sicherer: Ohne
+> Namen trifft man sonst die Falsche und merkt es nicht.
+>
+> Geerbte Mitgliedschaften — also Schüler:innen, die über ihre Klasse in der Gruppe sind
+> — bleiben von der Rücknahme **unberührt**.
+
+### Für Schüler:innen
+
+Unter **Fächer** gibt es das Feld **„Einer Gruppe beitreten"**. Dort den Code eintippen,
+den die Lehrkraft im Unterricht genannt hat — Groß- und Kleinschreibung und der Strich
+sind egal. Danach erscheint die Gruppe in deiner Fachübersicht.
+
+Klappt es nicht, sagt die Meldung warum: Ein **abgelaufener** Code braucht einen neuen
+von der Lehrkraft. Sonst stimmt die Schreibweise nicht — oder der Code gehört zu einer
+Gruppe, für die er nicht gedacht war.
+
+---
+
+
 ---
 
 ## Häufige Fragen

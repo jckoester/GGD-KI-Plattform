@@ -37,6 +37,7 @@ Cron-Container (separat):
 | `crons/` | Cron-Logik (Cleanup Accounts/Konversationen/Rückmeldungen, Embedding-Backfill, Stundenplan-Abgleich) — wird von Skripten aufgerufen |
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
+| `groups/` | Unterrichtsgruppen jenseits der Endpunkte: Beitrittscodes (`beitritt.py` — reine Regeln plus schreibende Vorgänge, Rücknahme als Menge) und die Aktualitätsregel „gehört zum laufenden Schuljahr?" (`aktualitaet.py`, geteilt mit dem Stundenplan-Abgleich) |
 | `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
@@ -69,3 +70,5 @@ Eine Verletzung dieser Invariante ist ein kritischer Datenschutz-Bug.
 | `jwt_revocations` | `jti` | Revozierte Token-IDs |
 | `pseudonym_audit` | `pseudonym` | De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel |
 | `site_texts` | `key` | Verwaltete Texte (impressum, datenschutz, regeln) |
+| `group_source_classes` | (group_id, class_group_id) | Aus welchen Klassen sich eine Unterrichtsgruppe speist — Herkunft, nicht Mitgliedschaft |
+| `group_join_codes` | UUID | Beitrittscode je Gruppe: Code, Gültigkeit, Widerruf, ausgebendes Pseudonym |

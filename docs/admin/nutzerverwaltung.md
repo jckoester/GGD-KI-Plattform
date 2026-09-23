@@ -129,6 +129,56 @@ sso:
     M: mathematik
 ```
 
+
+## Woher Mitgliedschaften kommen — und wer sie aufräumt
+
+Auf Ebene 2 (Unterrichtsgruppen) gibt es **fünf** Wege, auf denen ein Pseudonym Mitglied
+wird. Sie stehen explizit in `group_memberships.herkunft`, weil sich daraus ergibt, was
+ein Aufräumlauf anfassen darf:
+
+| Herkunft | Wie sie entsteht | Wer entfernt sie automatisch |
+|---|---|---|
+| `sso` | Der Provider nennt die Person in der Gruppe | **Immediate Mirror** beim Login — er entfernt, was das Token nicht mehr deckt |
+| `geerbt` | Schüler:in der Quellklasse einer Unterrichtsgruppe | **Vererbungslauf** beim Login — er entfernt, wo die Quellklasse nicht mehr passt |
+| `code` | Selbstbeitritt per Beitrittscode | niemand — nur die Lehrkraft, durch Rücknahme einer Code-Runde |
+| `eigen` | Die Lehrkraft, die die Gruppe angelegt hat | niemand |
+| `manuell` | Admin über `POST /groups/{id}/members` | niemand |
+
+**Die Regel dahinter:** Ein Aufräumlauf darf nur entfernen, was er selbst hätte anlegen
+können. Alles andere ist die Entscheidung eines Menschen und fällt nicht von allein.
+
+⚠️ **Bis Alembic `0068` war die Herkunft geraten** — der Vererbungslauf löschte beim
+Abgang alles mit `role_in_group = 'student'`. Das war richtig, solange jede
+Schüler-Mitgliedschaft geerbt war; mit dem Beitrittscode stimmt es nicht mehr. Wer die
+Bedingung dort wieder auf die Rolle umstellt, wirft jeden Nachzügler aus jeder Gruppe,
+die zufällig auch eine Quellklasse hat.
+
+### Erbt eine Gruppe oder nicht?
+
+`groups.erbt_mitglieder` (Alembic `0069`) entscheidet, ob die Schüler:innen der
+Quellklassen automatisch Mitglied werden. Die Lehrkraft beantwortet die Frage beim
+Anlegen; vorgeschlagen wird sie nach der Lage — bei **genau einer** Klasse „ganze
+Klasse", bei mehreren und in der Kursstufe „Teilgruppe".
+
+Das ist bewusst **entschieden und nicht gezählt**: Auch eine einzelne Klasse kann geteilt
+sein (Religion und Ethik nennen nur einen Klassennamen), und zwei kleine Klassen können
+vollständig gemeinsam unterrichtet werden. Beides weiß nur die Lehrkraft.
+
+Wird der Wert später auf `false` gesetzt, räumt der Vererbungslauf die bisher geerbten
+Mitgliedschaften beim nächsten Login ab — die Entscheidung ist also korrigierbar.
+
+### Beitrittscodes
+
+`group_join_codes` hält je Gruppe den aktuellen Code. Gültigkeit **drei Tage**,
+erneuerbar; es gilt immer nur einer je Gruppe. Der Code gehört der **Gruppe**, nicht
+einer Person: Er trägt kein Personenmerkmal und wird deshalb nicht personenbezogen
+gelöscht. Nur `erstellt_von_pseudonym` fällt unter die 90-Tage-Frist und wird dann
+genullt — der Code selbst bleibt gültig, bis er abläuft.
+
+Das Einlösen ist gedrosselt (`group_join` in `rate_limits.yaml`, Vorgabe 10 Anfragen je
+5 Minuten und Person). **Das Lesen des Codes ist es nicht** — sonst sperrte sich eine
+Lehrkraft aus ihrer eigenen Gruppenansicht aus.
+
 ## Unterrichtsgruppen manuell anlegen
 
 Lehrkräfte können Unterrichtsgruppen auch manuell anlegen, wenn der SSO-Provider
@@ -138,7 +188,12 @@ sie nicht automatisch liefert. Das Verhalten wird über das Flag
 | Wert | Verhalten |
 |------|-----------|
 | `true` (Standard) | Lehrkräfte sehen Vorschläge in der Sidebar und können bestätigen oder ablehnen |
-| `false` | Vorschläge werden nicht angezeigt; `POST /api/groups/teaching` gibt HTTP 403 zurück |
+| `false` | Vorschläge werden nicht angezeigt; `POST /api/groups/teaching` **und** `POST /api/calendar/teaching-groups` geben HTTP 403 zurück |
+
+Der Schalter gilt für **beide** Wege, auf denen eine Lehrkraft eine Unterrichtsgruppe
+anlegen kann: „Klasse × Fach" und das Anlegen aus dem eigenen Stundenplan. Der zweite ist
+besser belegt, erzeugt aber dieselbe Art Gruppe — und in einer Installation, die auf den
+SSO setzt, dieselben Dubletten.
 
 `false` empfiehlt sich, wenn der SSO-Provider alle Unterrichtsgruppen
 zuverlässig liefert — so werden manuelle Inkonsistenzen vermieden.

@@ -79,6 +79,50 @@ und wo die Zuordnung mehrdeutig blieb. Unbekannte Fachkürzel gehören der Admin
 gemeldet; alles andere klärt sich meist an dieser Liste. Von Hand eintragen funktioniert
 weiterhin.
 
+### Fehlt Ihre Gruppe? Direkt anlegen
+
+Lerngruppen aus Ihrem Stundenplan, für die es auf der Plattform noch keine
+Unterrichtsgruppe gibt, stehen unter **„Noch ohne Unterrichtsgruppe"** — mit einem Knopf
+**„Anlegen"**. Sie werden darin automatisch Lehrkraft.
+
+Vor dem Anlegen fragt die Plattform, **wer dazugehört**:
+
+- **Die ganze Klasse** — die Schüler:innen dieser Klasse kommen von selbst dazu, beim
+  nächsten Login. Sie müssen nichts weiter tun.
+- **Nur ein Teil der Klasse** — dann ist es eine Teilgruppe, und die Schüler:innen treten
+  über einen [Beitrittscode](faecher.md#beitrittscode) bei.
+
+Vorbelegt ist die Antwort nach dem, was der Stundenplan hergibt: Steht dort **eine**
+Klasse, ist „die ganze Klasse" vorgeschlagen; bei mehreren Klassen und in der Kursstufe
+immer „nur ein Teil". Das ist die vorsichtige Richtung — wer den Vorschlag übernimmt,
+bekommt nie zu viele Mitglieder.
+
+> **Warum bei mehreren Klassen nie geerbt wird:** Eine Gruppe, die über 10a, 10b und 10c
+> läuft, ist fast immer eine **Auswahl** aus diesen Klassen — sonst würde sie je Klasse
+> unterrichtet. Alle drei hineinzunehmen hieße, Schüler:innen in eine Gruppe zu
+> schreiben, in der sie gar nicht sind.
+
+Umgekehrt gilt: Auch eine **einzelne** Klasse kann geteilt sein — Religion und Ethik
+nennen nur einen Klassennamen. Dort wählen Sie „nur ein Teil der Klasse", sonst erbt die
+Gruppe die ganze Klasse.
+
+**Die Entscheidung ist korrigierbar.** Stellen Sie eine Gruppe später auf Teilgruppe um,
+verlieren die zu viel geerbten Schüler:innen ihre Mitgliedschaft beim nächsten Login.
+
+---
+
+## Wenn eine Gruppe nicht mehr im Stundenplan steht
+
+Findet die Plattform zu einer Ihrer Unterrichtsgruppen nichts im Stundenplan, sagt sie
+das als Hinweis — und **ändert nichts**. Jahresplan, Stundenentwürfe und Chats bleiben.
+
+Das kann zwei Gründe haben: Die Gruppe läuft nicht mehr, oder sie liegt gerade außerhalb
+des Abrufzeitraums (die Plattform sieht vier Wochen). Welcher zutrifft, wissen nur Sie —
+deshalb wird nichts archiviert und nichts gelöscht.
+
+---
+
+
 ---
 
 ## Ausfall und Vertretung abgleichen

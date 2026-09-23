@@ -69,6 +69,10 @@ def _app(monkeypatch, fehlend, anlage=None):
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_current_user] = lambda: _LEHRKRAFT
     app.dependency_overrides[require_any_role(["teacher", "admin"])] = lambda: _LEHRKRAFT
+    from app.auth.dependencies import get_sso_config
+    app.dependency_overrides[get_sso_config] = lambda: SimpleNamespace(
+        allow_manual_teaching_groups=True
+    )
     app.include_router(calendar_router)
     return TestClient(app)
 
@@ -172,3 +176,24 @@ def test_ohne_angabe_entscheidet_die_vorbelegung(monkeypatch):
 
     from app.calendar.router import lege_gruppe_aus_vorschlag_an
     assert lege_gruppe_aus_vorschlag_an.await_args.args[3] is None
+
+
+def test_abgeschalteter_schalter_sperrt_auch_diesen_weg(monkeypatch):
+    """⚠️ **Der Schalter darf keine Hintertür haben.**
+
+    `allow_manual_teaching_groups=false` heißt „der SSO führt die Unterrichtsgruppen,
+    Lehrkräfte legen keine eigenen an". Dieser Weg ist besser belegt als „Klasse ×
+    Fach", erzeugt aber dieselbe Art Gruppe — und in einer SSO-geführten Installation
+    dieselben Dubletten. Griffe der Schalter hier nicht, wäre er wirkungslos, ohne dass
+    es jemand merkt.
+    """
+    from app.auth.dependencies import get_sso_config
+
+    client = _app(monkeypatch, [_vorschlag()])
+    client.app.dependency_overrides[get_sso_config] = lambda: SimpleNamespace(
+        allow_manual_teaching_groups=False
+    )
+    antwort = client.post("/calendar/teaching-groups",
+                          json={"gruppe": "CH 9D", "subject_id": 7})
+    assert antwort.status_code == 403
+    assert "Schulkonto" in antwort.json()["detail"]

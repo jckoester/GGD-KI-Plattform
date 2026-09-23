@@ -66,6 +66,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Dokumentation
 
+- Anwender-Doku: Gruppe aus dem Stundenplan anlegen samt der Frage „ganze Klasse oder
+  Teilgruppe?"; Beitrittscode aus Sicht der Lehrkraft und der Schüler:innen. Für
+  Administrator:innen: die fünf Herkünfte einer Mitgliedschaft und wer sie aufräumen darf.
 - Anwender-Doku: Abschnitt „Das ganze Jahr planen" (vorläufige Termine, Umhängen im
   Februar, Parkplatz). Für Administrator:innen: welche Slots der Abgleich anlegt und
   welche ein Neuaufbau verschont.
@@ -82,6 +85,24 @@ docker compose up -d --force-recreate
 
 `alembic upgrade head` führt `0066` (Spalte `lesson_slots.vorlaeufig`) und `0067`
 (Tabelle `parked_lesson_content`) aus. Bestehende Termine gelten als nicht vorläufig.
+
+`alembic upgrade head` führt drei Migrationen aus:
+
+- **`0068`** — Tabelle `group_source_classes` (eine Unterrichtsgruppe kann aus mehreren
+  Klassen stammen) und Spalte `group_memberships.herkunft`.
+  ⚠️ **Diese Migration schreibt Bestandsdaten um:** Sie füllt die Herkunft für jede
+  vorhandene Mitgliedschaft, überträgt `groups.source_class_group_id` in die neue Tabelle
+  und **entfernt die alte Spalte**. Vorher eine Sicherung ziehen; die Rückrolle
+  (`downgrade`) behält bei mehreren Quellklassen nur die kleinste.
+- **`0069`** — Spalte `groups.erbt_mitglieder`. Der Backfill schreibt den bisherigen
+  Zustand fest (genau eine Quellklasse = es wurde geerbt); der Bestand verhält sich danach
+  wie davor.
+- **`0070`** — Tabelle `group_join_codes` sowie `group_memberships.beigetreten_am` und
+  `.join_code_id` für die Rücknahme von Fehlbeitritten.
+
+Optional in `config/rate_limits.yaml`: der Bucket `group_join` (Vorgabe 10 Anfragen je
+5 Minuten und Person) drosselt das Einlösen von Beitrittscodes. Fehlt er, greift derselbe
+Wert als eingebaute Vorgabe.
 
 ## [0.10.4] – 2026-09-21
 

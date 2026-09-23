@@ -13,7 +13,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, require_any_role
+from app.auth.config import SsoConfig
+from app.auth.dependencies import get_current_user, get_sso_config, require_any_role
 from app.calendar.base import CalendarSourceError
 from app.calendar.sync import SlotRef
 from app.calendar.groups import (
@@ -414,6 +415,7 @@ async def gruppe_aus_stundenplan_anlegen(
     body: TeachingGroupAusStundenplan,
     db: AsyncSession = Depends(get_db),
     user=Depends(require_any_role(["teacher", "admin"])),
+    sso_config: SsoConfig = Depends(get_sso_config),
     _current=Depends(get_current_user),
 ) -> dict:
     """Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen.
@@ -432,6 +434,15 @@ async def gruppe_aus_stundenplan_anlegen(
     """
     if not is_configured():
         raise HTTPException(409, "Für diese Installation ist kein Stundenplan angebunden.")
+    # ⚠️ **Derselbe Schalter wie beim manuellen Weg.** `allow_manual_teaching_groups=false`
+    # heißt „der SSO liefert alle Unterrichtsgruppen, Lehrkräfte legen keine eigenen an".
+    # Dieser Weg hier ist besser belegt als „Klasse × Fach", aber er erzeugt dieselbe
+    # Art Gruppe — und in einer Installation, die auf den SSO setzt, dieselben
+    # Dubletten. Ohne die Prüfung wäre der Schalter über die Hintertür wirkungslos.
+    if not sso_config.allow_manual_teaching_groups:
+        raise HTTPException(
+            403, "Unterrichtsgruppen werden in dieser Installation vom Schulkonto geführt."
+        )
 
     prefs = await get_preferences(db, _current.sub)
     kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
