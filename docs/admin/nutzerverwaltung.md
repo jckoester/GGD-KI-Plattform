@@ -106,9 +106,14 @@ Zwei Mechanismen adressieren das:
 ## SSO-Gruppenimport: Unterrichtsgruppen
 
 Wenn der SSO-Provider Gruppen für Fachschaften, Schulklassen und
-Unterrichtsgruppen liefert, importiert die Plattform diese automatisch beim
-Login. Dafür müssen die Gruppennamen in `auth.yaml` unter `sso.groups` als
-Regex-Muster konfiguriert sein.
+Unterrichtsgruppen liefert, wertet die Plattform diese beim Login aus. Dafür müssen die
+Gruppennamen in `auth.yaml` unter `sso.groups` als Regex-Muster konfiguriert sein.
+
+⚠️ **Angelegt werden sie nicht alle gleich.** Fachschaften, Schulklassen, Lehrkräfte- und
+Arbeitsgruppen entstehen automatisch. **Unterrichtsgruppen nicht** — sie werden der
+Lehrkraft als *Angebot* vorgelegt (siehe unten). Bis zum 23.09.2026 entstanden auch sie
+automatisch; das führte zu Doppelgruppen und in einem Fall zu einem fehlgeschlagenen
+Login.
 
 **Matching-Reihenfolge:** Für jede SSO-Gruppe wird der aus dem Gruppenname
 extrahierte Wert zunächst direkt (case-insensitiv) mit dem Fach-Slug verglichen.
@@ -129,6 +134,59 @@ sso:
     M: mathematik
 ```
 
+
+
+## Unterrichtsgruppen aus dem Schulkonto: das Angebot
+
+Liefert der SSO eine Unterrichtsgruppe, zu der es auf der Plattform noch keine Gruppe
+gibt, **entsteht nichts**. Die Gruppe wird der Lehrkraft unter *Profil → Meine
+Unterrichtsgruppen* als **Angebot** vorgelegt; sie entscheidet:
+
+| Antwort | Was passiert |
+|---|---|
+| **Zuordnen** | Die SSO-Gruppe wird mit einer vorhandenen Unterrichtsgruppe verknüpft. Ab dann führt das Schulkonto die Mitglieder |
+| **Als neue Gruppe anlegen** | Eine neue Unterrichtsgruppe entsteht, bereits verknüpft |
+| **Ignorieren** | Nichts geschieht. Die Frage kehrt nicht zurück, lässt sich aber wieder einblenden |
+
+### Warum nicht automatisch
+
+Aus den SSO-Daten lässt sich **nicht bestimmen**, ob `unterricht.9d.ch` die vorhandene
+Gruppe *Chemie 9D* meint oder eine neue ist: Der Provider liefert einen Namen als
+Freitext, keine Klassenzuordnung. `„NwT 9a"` und `unterricht.9a.nwt` sehen nur
+*meistens* gleich aus.
+
+Bis zum 23.09.2026 versuchte die Plattform, das über `(Lehrkraft, Fach)` zu erraten. Das
+war aus zwei Gründen falsch:
+
+- **Zwei Gruppen im selben Fach sind der Normalfall.** *Chemie 9c* und *Chemie 9d* sind
+  getrennter Unterricht mit eigenen Terminen, Ausfällen und Reflexionen — und je einem
+  eigenen Stundenplan-Eintrag. Die Heuristik traf beide und brach mit einem Fehler ab;
+  die Lehrkraft kam nicht mehr hinein.
+- **Eine falsche Verschmelzung ist nicht rückgängig zu machen.** Sie schiebt zwei
+  Jahrespläne ineinander.
+
+Eine Dublette ist unbequem, ein falscher Zusammenschluss ist teuer. Deshalb wird gefragt.
+
+### Was beim Scharfschalten zu erwarten ist
+
+Wird im Schulkonto die Unterrichtsgruppen-Synchronisation neu aktiviert, sehen die
+Lehrkräfte beim nächsten Login **ein Angebot je Gruppe**. Nichts ändert sich, bis sie
+antworten. Bestehende Gruppen, Jahrespläne und Chats bleiben unberührt.
+
+**Die erste Antwort gilt für alle.** Bei kooperativ unterrichteten Kursen sehen mehrere
+Lehrkräfte dasselbe Angebot; sobald eine es beantwortet hat, verschwindet es bei den
+übrigen. Ohne diese Regel legte die zweite Antwort eine Doppelgruppe an.
+
+### Folgen einer Zuordnung
+
+- Die Mitglieder kommen ab dem nächsten Login aus dem Schulkonto (Herkunft `sso`).
+- **Über die Klasse geerbte Mitgliedschaften werden entfernt.** Die Vererbung ist für
+  SSO-Gruppen abgeschaltet; bliebe das Geerbte stehen, räumte es niemand mehr auf — auch
+  der Immediate Mirror nicht, der nur `sso` anfasst.
+- **Beitritte per Code bleiben.** Sie sind die Entscheidung eines Menschen. Der
+  Beitrittscode wird für die Gruppe allerdings ausgeblendet: Wo das Schulkonto die
+  Mitglieder führt, gäbe ein zweiter Weg hinein zwei Wahrheiten.
+- Jahresplan, Stundenentwürfe und Konversationen bleiben unberührt.
 
 ## Woher Mitgliedschaften kommen — und wer sie aufräumt
 

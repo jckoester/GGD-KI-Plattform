@@ -7,6 +7,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Unterrichtsgruppen aus dem Schulkonto werden angeboten, nicht angelegt.** Liefert das
+  Schulkonto eine Unterrichtsgruppe, zu der es hier noch keine gibt, entscheidet die
+  Lehrkraft unter „Meine Unterrichtsgruppen": zuordnen, als neue Gruppe anlegen oder
+  ignorieren. Bisher legte die Plattform sie automatisch an und versuchte zu erraten, ob
+  sie zu einer vorhandenen gehört — das erzeugte Doppelgruppen. Bei einer Zuordnung
+  kommen die Mitglieder ab dem nächsten Login aus dem Schulkonto; über die Klasse geerbte
+  Mitgliedschaften entfallen, Beitritte per Code bleiben. Für so verknüpfte Gruppen gibt
+  es keinen Beitrittscode mehr.
 - **Hinweis, wenn eine Gruppe nicht mehr im Stundenplan steht.** Beim Übernehmen aus dem
   Stundenplan meldet die Plattform, zu welchen Ihrer Unterrichtsgruppen sie nichts
   gefunden hat. **Geändert wird nichts** — Planung, Stundenentwürfe und Chats bleiben;
@@ -55,6 +63,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Eine Lehrkraft mit zwei Gruppen im selben Fach konnte sich nicht mehr anmelden**,
+  sobald das Schulkonto eine Unterrichtsgruppe dieses Fachs lieferte. Die Zuordnung
+  suchte über Lehrkraft und Fach, traf beide Gruppen und brach ab. Zwei Gruppen im selben
+  Fach sind der Normalfall — sie werden jetzt nicht mehr geraten. Zusätzlich verhindert
+  ein Fehler beim Gruppenabgleich die Anmeldung nicht mehr.
 - **Der Abgleich meldete für die zweite Hälfte jeder Doppelstunde „kein Slot".** Eine
   Doppelstunde ist **eine** Stunde im Plan; der Abgleich prüfte sie als zwei und hielt die
   zweite Hälfte für ungedeckt.
@@ -66,6 +79,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Dokumentation
 
+- Für Administrator:innen: Wie SSO- und Stundenplan-Gruppen zusammenfinden, warum nichts
+  automatisch angelegt wird und was beim Scharfschalten der
+  Unterrichtsgruppen-Synchronisation zu erwarten ist. Anwender-Doku um das Angebot und
+  seine drei Antworten ergänzt.
 - Anwender-Doku: Gruppe aus dem Stundenplan anlegen samt der Frage „ganze Klasse oder
   Teilgruppe?"; Beitrittscode aus Sicht der Lehrkraft und der Schüler:innen. Für
   Administrator:innen: die fünf Herkünfte einer Mitgliedschaft und wer sie aufräumen darf.
@@ -86,7 +103,7 @@ docker compose up -d --force-recreate
 `alembic upgrade head` führt `0066` (Spalte `lesson_slots.vorlaeufig`) und `0067`
 (Tabelle `parked_lesson_content`) aus. Bestehende Termine gelten als nicht vorläufig.
 
-`alembic upgrade head` führt drei Migrationen aus:
+`alembic upgrade head` führt vier Migrationen aus:
 
 - **`0068`** — Tabelle `group_source_classes` (eine Unterrichtsgruppe kann aus mehreren
   Klassen stammen) und Spalte `group_memberships.herkunft`.
@@ -99,6 +116,13 @@ docker compose up -d --force-recreate
   wie davor.
 - **`0070`** — Tabelle `group_join_codes` sowie `group_memberships.beigetreten_am` und
   `.join_code_id` für die Rücknahme von Fehlbeitritten.
+- **`0071`** — Tabelle `sso_group_offers`. Keine Bestandsänderung; sie ist beim Start
+  leer. ⚠️ **Wirkung ohne Migration:** Ab diesem Stand legt der Login-Sync für
+  Unterrichtsgruppen aus dem Schulkonto **nichts mehr automatisch an** — sie werden der
+  Lehrkraft angeboten. Wer die Unterrichtsgruppen-Synchronisation im Schulkonto neu
+  aktiviert, sollte diesen Stand **vorher** ausgerollt haben: Danach entstandene
+  Doppelgruppen lassen sich nicht mehr per Dialog zusammenführen, weil Jahresplan,
+  Stundenentwürfe und Chats daran hängen.
 
 Optional in `config/rate_limits.yaml`: der Bucket `group_join` (Vorgabe 10 Anfragen je
 5 Minuten und Person) drosselt das Einlösen von Beitrittscodes. Fehlt er, greift derselbe

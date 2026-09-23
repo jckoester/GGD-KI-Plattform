@@ -102,6 +102,37 @@ schreibgeschützt; ein Hinweis am Kopf sagt das.
 
 Gibt es zu einem Fach frühere Gruppen, weist die Fachseite darauf hin.
 
+## Neue Gruppen aus dem Schulkonto
+
+Führt Ihre Schule Unterrichtsgruppen auch im Schulkonto — etwa für ein
+Tauschverzeichnis —, tauchen sie unter **Profil → Meine Unterrichtsgruppen** als Angebot
+auf. Die Plattform legt sie **nicht** von selbst an: Sie kann nicht wissen, ob
+`unterricht.9d.ch` Ihre bestehende Gruppe *Chemie 9D* meint oder eine neue ist. Läge sie
+falsch, stünden zwei Jahrespläne ineinander.
+
+Drei Antworten stehen zur Wahl:
+
+- **Zuordnen** — die Gruppe gibt es schon. Wählen Sie sie aus der Liste; der Zusatz
+  („12 Stunden · 4 Chats") hilft, die richtige zu treffen. Ab dann kommen die Mitglieder
+  aus dem Schulkonto.
+- **Als neue Gruppe anlegen** — es ist wirklich eine neue.
+- **Ignorieren** — die Frage verschwindet und kehrt nicht wieder. Über „Ignorierte
+  anzeigen" holen Sie sie zurück.
+
+> **Was eine Zuordnung ändert:** Die Mitglieder kommen ab dem nächsten Login aus dem
+> Schulkonto. Wer bisher **über die Klasse** in der Gruppe war, verliert die
+> Mitgliedschaft — das Schulkonto führt sie jetzt. Wer per **Beitrittscode** dazukam,
+> bleibt. Jahresplan, Stundenentwürfe und Chats bleiben unberührt.
+>
+> Für eine so verknüpfte Gruppe gibt es keinen Beitrittscode mehr: Wer dazugehört,
+> entscheidet sich im Schulkonto.
+
+Unterrichtet ein Kurs kooperativ, sehen mehrere Lehrkräfte dasselbe Angebot. Die erste
+Antwort gilt — danach ist die Frage für alle beantwortet.
+
+---
+
+
 ## Beitrittscode
 
 Nicht jede Unterrichtsgruppe bekommt ihre Mitglieder aus einer Klasse. Kurse der
