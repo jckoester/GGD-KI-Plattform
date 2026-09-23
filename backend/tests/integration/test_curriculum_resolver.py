@@ -5,7 +5,7 @@ Seeding läuft über die transaktionale db_session-Fixture (Rollback pro Test).
 
 import pytest
 
-from app.db.models import ContextEdge, ContextNode, Group, Subject
+from app.db.models import ContextEdge, ContextNode, Group, GroupSourceClass, Subject
 from app.planning.curriculum_resolver import resolve_group_curricula
 
 SUBJECT_ID = 900
@@ -51,13 +51,21 @@ async def _seed(db):
         Group(id=910, name="5a", slug="cls-5a", type="school_class"),
         Group(id=911, name="6a", slug="cls-6a", type="school_class"),
         Group(id=920, name="5a Mathe", slug="tg-5a-m", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=910),
+              subject_id=SUBJECT_ID),
         Group(id=921, name="6a Mathe", slug="tg-6a-m", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=911),
+              subject_id=SUBJECT_ID),
         Group(id=922, name="Kurs ohne Klasse", slug="tg-nograde", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=None),
+              subject_id=SUBJECT_ID),
         Group(id=923, name="Fach ohne Curr", slug="tg-nocurr", type="teaching_group",
-              subject_id=SUBJECT_NO_CURR, source_class_group_id=910),
+              subject_id=SUBJECT_NO_CURR),
+    ])
+    await db.flush()
+    # Quellklassen seit Alembic 0068 in einer eigenen Tabelle. 922 bekommt bewusst
+    # keine — der Kurs ohne Klassenbezug ist der Fall, in dem kein Jahrgang ableitbar ist.
+    db.add_all([
+        GroupSourceClass(group_id=920, class_group_id=910),
+        GroupSourceClass(group_id=921, class_group_id=911),
+        GroupSourceClass(group_id=923, class_group_id=910),
     ])
     await db.flush()
 

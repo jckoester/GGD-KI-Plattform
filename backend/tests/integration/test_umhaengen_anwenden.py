@@ -52,8 +52,8 @@ def gruppe(sync_conn):
             (GRUPPE,),
         )
         cur.execute(
-            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group)"
-            " VALUES (%s,%s,'teacher')",
+            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)"
+            " VALUES (%s,%s,'teacher','eigen')",
             (GRUPPE, TEACHER1_PSEUDO),
         )
     sync_conn.commit()

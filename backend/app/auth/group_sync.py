@@ -230,7 +230,7 @@ async def _upsert_group_and_membership(
     Fachschaft kann mehrere Fächer betreuen und hat dann je Fach eine eigene Gruppe.
     subject_id darf NULL sein (Klasse, Sammelgruppe ohne Fach).
     """
-    from app.db.models import Group, GroupMembership
+    from app.db.models import Group, GroupMembership, GroupSourceClass
 
     # sso_group_id normalisiert (lowercase) als kanonischer Schlüssel: verhindert
     # Doppelgruppen, wenn der Provider die Schreibweise ändert (z. B. 'FS.Chemie'
@@ -290,7 +290,7 @@ async def _upsert_group_and_membership(
                     Group.type == "teaching_group",
                     Group.subject_id == subject_id,
                     Group.sso_group_id.is_(None),
-                    Group.source_class_group_id.is_not(None),
+                    Group.id.in_(select(GroupSourceClass.group_id)),
                 )
             )
             manual_group = res.scalar_one_or_none()
@@ -320,10 +320,18 @@ async def _upsert_group_and_membership(
     role_in_group = "teacher" if pg.type == "subject_department" else primary_role
     await db.execute(
         pg_insert(GroupMembership)
-        .values(group_id=group.id, pseudonym=pseudonym, role_in_group=role_in_group)
+        .values(
+            group_id=group.id,
+            pseudonym=pseudonym,
+            role_in_group=role_in_group,
+            herkunft="sso",
+        )
         .on_conflict_do_update(
             index_elements=["group_id", "pseudonym"],
-            set_={"role_in_group": role_in_group},
+            # Auch die Herkunft nachziehen: Wer erst per Code beitrat und später vom
+            # Provider genannt wird, gehört ab jetzt dem Spiegel — sonst bliebe eine
+            # Mitgliedschaft stehen, die das Token nicht mehr deckt.
+            set_={"role_in_group": role_in_group, "herkunft": "sso"},
         )
     )
     return group.id
@@ -363,8 +371,9 @@ async def _erbe_unterrichtsgruppen_der_klasse(
     """Schüler:innen erben die Unterrichtsgruppen, die aus ihrer Klasse abgeleitet sind.
 
     **Die zweite Hälfte der Adoption.** Bestätigt eine Lehrkraft den Vorschlag „Klasse 8a
-    × Mathematik", entsteht eine Unterrichtsgruppe mit `source_class_group_id` auf die 8a
-    — bisher aber mit der Lehrkraft als einzigem Mitglied. Für Schüler:innen blieb sie
+    × Mathematik", entsteht eine Unterrichtsgruppe mit einem Eintrag in
+    `group_source_classes` auf die 8a — bisher aber mit der Lehrkraft als einzigem
+    Mitglied. Für Schüler:innen blieb sie
     unsichtbar, obwohl im Datenmodell steht, woher sie kommt. Das war der Grund, warum
     ein im Klassenverband unterrichtetes Fach trotzdem eine eigene SSO-Gruppe brauchte —
     also genau die Verwaltungsarbeit, die die Ableitung ersparen sollte.
@@ -386,24 +395,35 @@ async def _erbe_unterrichtsgruppen_der_klasse(
     if primary_role != "student":
         return
 
-    from app.db.models import Group, GroupMembership
+    from app.db.models import Group, GroupMembership, GroupSourceClass
 
     abgeleitet: list[int] = []
     if klassen_ids:
+        # Mehrere Quellklassen je Gruppe (Alembic 0068): NwT 10a/10b/10c ist **eine**
+        # Gruppe aus drei Klassenverbänden. Wer in einer davon ist, erbt sie.
         abgeleitet = list((await db.execute(
-            select(Group.id).where(
+            select(Group.id)
+            .join(GroupSourceClass, GroupSourceClass.group_id == Group.id)
+            .where(
                 Group.type == "teaching_group",
                 Group.sso_group_id.is_(None),
-                Group.source_class_group_id.in_(klassen_ids),
+                GroupSourceClass.class_group_id.in_(klassen_ids),
             )
+            .distinct()
         )).scalars())
 
     for gid in abgeleitet:
         await db.execute(
             pg_insert(GroupMembership)
-            .values(group_id=gid, pseudonym=pseudonym, role_in_group="student")
-            # `do_nothing`, nicht `do_update`: Hat ein Admin jemandem hier bewusst eine
-            # andere Rolle gegeben, ist das keine Ableitung und wird nicht überschrieben.
+            .values(
+                group_id=gid,
+                pseudonym=pseudonym,
+                role_in_group="student",
+                herkunft="geerbt",
+            )
+            # `do_nothing`, nicht `do_update`: Wer schon per Code beigetreten ist oder
+            # von Hand eingetragen wurde, behält seine Herkunft — sonst würde die
+            # Ableitung sie überschreiben und der Abgang unten sie anschließend löschen.
             .on_conflict_do_nothing(index_elements=["group_id", "pseudonym"])
         )
 
@@ -411,16 +431,19 @@ async def _erbe_unterrichtsgruppen_der_klasse(
     veraltet = select(Group.id).where(
         Group.type == "teaching_group",
         Group.sso_group_id.is_(None),
-        Group.source_class_group_id.is_not(None),
+        Group.id.in_(select(GroupSourceClass.group_id)),
     )
     if abgeleitet:
         veraltet = veraltet.where(Group.id.not_in(abgeleitet))
     await db.execute(
         delete(GroupMembership).where(
             GroupMembership.pseudonym == pseudonym,
-            # Nur die geerbte Rolle: Die Mitgliedschaft der Lehrkraft ist der Nachweis
-            # ihrer Adoption und darf hier nicht fallen.
-            GroupMembership.role_in_group == "student",
+            # ⚠️ **Nur `geerbt`, nicht mehr `role_in_group == 'student'`.** Bis Alembic
+            # 0068 war beides gleichbedeutend; mit dem Beitrittscode ist es das nicht
+            # mehr. Nach der Rolle zu löschen risse jede:n Code-Beitretende:n aus einer
+            # Gruppe, die zufällig auch eine Quellklasse hat — also genau die Nachzügler,
+            # für die es den Code gibt.
+            GroupMembership.herkunft == "geerbt",
             GroupMembership.group_id.in_(veraltet),
         )
     )

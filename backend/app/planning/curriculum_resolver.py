@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.grades import parse_class_grade
-from app.db.models import ContextEdge, ContextNode, Group
+from app.db.models import ContextEdge, ContextNode, Group, GroupSourceClass
 
 
 @dataclass
@@ -42,11 +42,24 @@ class GroupCurriculaResult:
 
 
 async def _group_grade(db: AsyncSession, group: Group) -> int | None:
-    """Jahrgang der teaching_group aus der verknüpften Klassengruppe ableiten."""
-    if group.source_class_group_id is None:
-        return None
-    cls = await db.get(Group, group.source_class_group_id)
-    return parse_class_grade(cls.name) if cls else None
+    """Jahrgang der teaching_group aus den verknüpften Klassengruppen ableiten.
+
+    ⚠️ **Eine Gruppe kann aus mehreren Klassen stammen** (Alembic 0068), der Jahrgang
+    ist aber genau einer. Genommen wird der **kleinste** — nicht weil er richtiger wäre,
+    sondern weil die Wahl **deterministisch** sein muss: NwT 10a/10b/10c tragen alle
+    denselben Jahrgang, aber ohne feste Ordnung wanderte die Curriculum-Auflösung
+    zwischen zwei Läufen, sobald die Datenbank die Zeilen anders zurückgibt.
+
+    Bei gemischten Jahrgängen (eine Gruppe aus 9 und 10) ist der kleinste eine
+    Festlegung, keine Wahrheit. Das ist hinnehmbar, solange es *eine* Festlegung ist.
+    """
+    zeilen = await db.execute(
+        sa.select(Group.name)
+        .join(GroupSourceClass, GroupSourceClass.class_group_id == Group.id)
+        .where(GroupSourceClass.group_id == group.id)
+    )
+    jahrgaenge = [g for g in (parse_class_grade(n) for n in zeilen.scalars()) if g is not None]
+    return min(jahrgaenge) if jahrgaenge else None
 
 
 async def group_grade(db: AsyncSession, group_id: int) -> int | None:

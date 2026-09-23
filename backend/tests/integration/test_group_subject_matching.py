@@ -19,7 +19,7 @@ from app.auth.group_sync import (
     _resolve_subject_ids,
     sync_groups,
 )
-from app.db.models import Group, GroupMembership, Subject
+from app.db.models import Group, GroupMembership, GroupSourceClass, Subject
 
 
 PATTERNS = SsoGroupPatterns(
@@ -331,11 +331,15 @@ async def _adoptierte_gruppe(db, fach_id: int, klasse_id: int, pseudonym: str) -
     ohne `sso_group_id`, mit Bezug auf die Quellklasse, Lehrkraft als einziges Mitglied."""
     gruppe = Group(
         name="9z", slug=f"teaching-adoptiert-{klasse_id}", type="teaching_group",
-        subject_id=fach_id, source_class_group_id=klasse_id, sso_group_id=None,
+        subject_id=fach_id, sso_group_id=None,
     )
     db.add(gruppe)
     await db.flush()
-    db.add(GroupMembership(group_id=gruppe.id, pseudonym=pseudonym, role_in_group="teacher"))
+    db.add(GroupSourceClass(group_id=gruppe.id, class_group_id=klasse_id))
+    db.add(GroupMembership(
+        group_id=gruppe.id, pseudonym=pseudonym, role_in_group="teacher",
+        herkunft="eigen",
+    ))
     return gruppe.id
 
 
@@ -435,7 +439,7 @@ class TestVererbungAusDerKlasse:
 
     Die Lehrkraft bestätigt „Klasse 8a × Mathematik", und die Schüler:innen der 8a sind
     beim nächsten Login in der Gruppe. Bis 13.09.2026 war die Gruppe für sie unsichtbar:
-    `source_class_group_id` stand in der Datenbank, wurde aber nirgends für
+    Die Quellklasse stand in der Datenbank, wurde aber nirgends für
     Mitgliedschaften ausgewertet.
     """
 
@@ -553,9 +557,11 @@ class TestVererbungAusDerKlasse:
                 db.add(klasse)
                 await db.flush()
                 mit_sso = Group(name="8d", slug="teaching-mit-sso", type="teaching_group",
-                                subject_id=fach_id, source_class_group_id=klasse.id,
+                                subject_id=fach_id,
                                 sso_group_id="unterricht.erbe4-8d")
                 db.add(mit_sso)
+                await db.flush()
+                db.add(GroupSourceClass(group_id=mit_sso.id, class_group_id=klasse.id))
                 await db.flush()
                 gruppe_id = mit_sso.id
                 await db.commit()
@@ -633,6 +639,175 @@ async def test_der_sync_laesst_den_anzeigenamen_stehen(async_engine):
                 GroupMembership.pseudonym == pseudonym))
             await db.execute(delete(Group).where(Group.sso_group_id == sso.lower()))
             await db.commit()
+
+
+# ── Alembic 0068: Herkunft entscheidet, mehrere Quellklassen tragen ──────────
+
+
+class TestHerkunftUndMehrereQuellklassen:
+    """Was der Vererbungslauf anfassen darf — und woher eine Gruppe erben kann.
+
+    Bis Alembic 0068 räumte der Abgangslauf nach `role_in_group == 'student'` auf. Das
+    war richtig, solange jede Schüler-Mitgliedschaft geerbt war. Mit dem Beitrittscode
+    (AP4) stimmt das nicht mehr: Ein Nachzügler tritt per Code einer Gruppe bei, die
+    durchaus eine Quellklasse hat — und darf beim nächsten Login nicht herausfliegen.
+    """
+
+    async def test_code_beitritt_ueberlebt_den_login(self, async_engine):
+        """Die Gegenprobe zum Abgangslauf.
+
+        ⚠️ **Der Wächter für AP2 Punkt 4.** Stellt man die Löschbedingung wieder auf
+        `GroupMembership.role_in_group == "student"` um, fällt dieser Test — und genau
+        das wäre der Bruch, den der Beitrittscode nicht überleben würde.
+        """
+        factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+        lehrkraft, nachzuegler = "hk-lehrkraft", "hk-nachzuegler"
+        try:
+            async with factory() as db:
+                fach_id = await _get_or_create_subject(db, "hk-fach", "Herkunftskunde")
+                klasse = Group(name="8b", slug="klasse-8b-hk", type="school_class",
+                               sso_group_id="klasse.8b-hk")
+                db.add(klasse)
+                await db.flush()
+                gruppe_id = await _adoptierte_gruppe(db, fach_id, klasse.id, lehrkraft)
+                # Der Nachzügler ist **nicht** in der Quellklasse — er ist per Code drin.
+                db.add(GroupMembership(
+                    group_id=gruppe_id, pseudonym=nachzuegler,
+                    role_in_group="student", herkunft="code",
+                ))
+                await db.commit()
+
+            # Login ohne die Quellklasse: Der Abgangslauf läuft und findet ihn.
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=nachzuegler, sso_groups=[],
+                                  primary_role="student", patterns=OHNE_UNTERRICHT)
+
+            async with factory() as db:
+                geblieben = (await db.execute(
+                    select(GroupMembership.herkunft).where(
+                        GroupMembership.pseudonym == nachzuegler,
+                        GroupMembership.group_id == gruppe_id,
+                    )
+                )).scalar_one_or_none()
+            assert geblieben == "code", (
+                "Der Code-Beitritt wurde vom Vererbungslauf entfernt — dann ist die "
+                "Löschbedingung wieder an der Rolle statt an der Herkunft."
+            )
+        finally:
+            async with factory() as db:
+                await db.execute(delete(GroupMembership).where(
+                    GroupMembership.pseudonym.in_([lehrkraft, nachzuegler])))
+                await db.execute(delete(Group).where(
+                    Group.slug.in_(["klasse-8b-hk", "teaching-adoptiert-"])))
+                await db.execute(delete(Group).where(Group.slug.like("teaching-adoptiert-%")))
+                await db.execute(delete(Subject).where(Subject.slug == "hk-fach"))
+                await db.commit()
+
+    async def test_geerbte_mitgliedschaft_faellt_weiterhin(self, async_engine):
+        """Die Kehrseite: Was geerbt ist, verschwindet beim Klassenwechsel weiterhin.
+
+        Ohne diesen Test wäre `test_code_beitritt_ueberlebt_den_login` auch dann grün,
+        wenn der Abgangslauf **gar nichts** mehr löschte.
+        """
+        factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+        lehrkraft, schuelerin = "hk2-lehrkraft", "hk2-schuelerin"
+        try:
+            async with factory() as db:
+                fach_id = await _get_or_create_subject(db, "hk2-fach", "Herkunftskunde 2")
+                klasse = Group(name="8c", slug="klasse-8c-hk2", type="school_class",
+                               sso_group_id="klasse.8c-hk2")
+                db.add(klasse)
+                await db.flush()
+                gruppe_id = await _adoptierte_gruppe(db, fach_id, klasse.id, lehrkraft)
+                await db.commit()
+
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=schuelerin,
+                                  sso_groups=["klasse.8c-hk2"],
+                                  primary_role="student", patterns=OHNE_UNTERRICHT)
+            async with factory() as db:
+                assert (await db.execute(
+                    select(GroupMembership.herkunft).where(
+                        GroupMembership.pseudonym == schuelerin,
+                        GroupMembership.group_id == gruppe_id,
+                    )
+                )).scalar_one_or_none() == "geerbt"
+
+            # Klassenwechsel: Die Quellklasse passt nicht mehr.
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=schuelerin, sso_groups=[],
+                                  primary_role="student", patterns=OHNE_UNTERRICHT)
+            async with factory() as db:
+                assert (await db.execute(
+                    select(GroupMembership.herkunft).where(
+                        GroupMembership.pseudonym == schuelerin,
+                        GroupMembership.group_id == gruppe_id,
+                    )
+                )).scalar_one_or_none() is None, "geerbte Mitgliedschaft muss fallen"
+        finally:
+            async with factory() as db:
+                await db.execute(delete(GroupMembership).where(
+                    GroupMembership.pseudonym.in_([lehrkraft, schuelerin])))
+                await db.execute(delete(Group).where(Group.slug.like("teaching-adoptiert-%")))
+                await db.execute(delete(Group).where(Group.slug == "klasse-8c-hk2"))
+                await db.execute(delete(Subject).where(Subject.slug == "hk2-fach"))
+                await db.commit()
+
+    async def test_gruppe_aus_drei_klassen_vererbt_an_alle_drei(self, async_engine):
+        """NwT 10a/10b/10c: eine Gruppe, drei Klassenverbände.
+
+        Mit der alten Spalte `groups.source_class_group_id` war das nicht darstellbar —
+        die Gruppe erbte bestenfalls aus einer der drei Klassen.
+        """
+        factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+        schueler = ["nwt-a", "nwt-b", "nwt-c"]
+        klassen_slugs = ["klasse-10a-nwt", "klasse-10b-nwt", "klasse-10c-nwt"]
+        try:
+            async with factory() as db:
+                fach_id = await _get_or_create_subject(db, "nwt-fach", "NwT")
+                klassen = []
+                for name, slug in zip(["10a", "10b", "10c"], klassen_slugs):
+                    k = Group(name=name, slug=slug, type="school_class",
+                              sso_group_id=f"klasse.{name}-nwt")
+                    db.add(k)
+                    klassen.append(k)
+                await db.flush()
+                gruppe = Group(name="NwT 10", slug="teaching-nwt-10",
+                               type="teaching_group", subject_id=fach_id, sso_group_id=None)
+                db.add(gruppe)
+                await db.flush()
+                for k in klassen:
+                    db.add(GroupSourceClass(group_id=gruppe.id, class_group_id=k.id))
+                db.add(GroupMembership(group_id=gruppe.id, pseudonym="nwt-lehrkraft",
+                                       role_in_group="teacher", herkunft="eigen"))
+                gruppe_id = gruppe.id
+                await db.commit()
+
+            for pseudo, name in zip(schueler, ["10a", "10b", "10c"]):
+                async with factory() as db:
+                    await sync_groups(db=db, pseudonym=pseudo,
+                                      sso_groups=[f"klasse.{name}-nwt"],
+                                      primary_role="student", patterns=OHNE_UNTERRICHT)
+
+            async with factory() as db:
+                drin = (await db.execute(
+                    select(GroupMembership.pseudonym).where(
+                        GroupMembership.group_id == gruppe_id,
+                        GroupMembership.herkunft == "geerbt",
+                    )
+                )).scalars().all()
+            assert sorted(drin) == sorted(schueler), (
+                "Nicht alle drei Klassenverbände haben geerbt — dann liest der "
+                "Vererbungslauf nur eine Quellklasse statt aller."
+            )
+        finally:
+            async with factory() as db:
+                await db.execute(delete(GroupMembership).where(
+                    GroupMembership.pseudonym.in_([*schueler, "nwt-lehrkraft"])))
+                await db.execute(delete(Group).where(Group.slug == "teaching-nwt-10"))
+                await db.execute(delete(Group).where(Group.slug.in_(klassen_slugs)))
+                await db.execute(delete(Subject).where(Subject.slug == "nwt-fach"))
+                await db.commit()
 
 
 async def _session(factory) -> AsyncSession:

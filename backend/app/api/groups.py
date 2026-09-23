@@ -16,6 +16,7 @@ from app.db.models import (
     ContextNode,
     Group,
     GroupMembership,
+    GroupSourceClass,
     LessonSlot,
     Subject,
     TeacherGroupExclusion,
@@ -36,7 +37,6 @@ class GroupOut(BaseModel):
     type: str
     subject_id: Optional[int]
     sso_group_id: Optional[str]
-    source_class_group_id: Optional[int]
     created_at: datetime
     # Was selbst vergeben wurde, oder `null`. `name` oben ist bereits aufgelöst; dieses
     # Feld füllt das Eingabefeld beim Umbenennen und sagt, ob „zurücksetzen" etwas tut.
@@ -285,18 +285,20 @@ async def list_potential_teaching_groups(
     if not classes or not dept_subject_ids:
         return PotentialTeachingGroupsResponse(items=[])
 
-    # Eigene teaching_groups: (subject_id, source_class_group_id) -> bereits vorhanden
+    # Eigene teaching_groups: (subject_id, Quellklasse) -> bereits vorhanden.
+    # Eine Gruppe aus mehreren Klassen erzeugt hier mehrere Paare — richtig so: Für
+    # jede beteiligte Klasse ist der Vorschlag „Klasse × Fach" bereits eingelöst.
     stmt = (
-        select(Group.subject_id, Group.source_class_group_id)
+        select(Group.subject_id, GroupSourceClass.class_group_id)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .join(GroupSourceClass, GroupSourceClass.group_id == Group.id)
         .where(
             GroupMembership.pseudonym == pseudonym,
             Group.type == "teaching_group",
-            Group.source_class_group_id.is_not(None),
         )
     )
     result = await db.execute(stmt)
-    existing_pairs = {(row.subject_id, row.source_class_group_id) for row in result}
+    existing_pairs = {(row.subject_id, row.class_group_id) for row in result}
 
     # Negativliste
     stmt = select(
@@ -360,7 +362,6 @@ class TeachingGroupOut(BaseModel):
     name: str = Field(validation_alias="anzeigename")
     slug: str
     subject_id: Optional[int]
-    source_class_group_id: Optional[int]
     student_visible: bool = False
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -403,7 +404,11 @@ async def create_teaching_group(
             GroupMembership.pseudonym == pseudonym,
             Group.type == "teaching_group",
             Group.subject_id == body.subject_id,
-            Group.source_class_group_id == body.class_group_id,
+            Group.id.in_(
+                select(GroupSourceClass.group_id).where(
+                    GroupSourceClass.class_group_id == body.class_group_id
+                )
+            ),
         )
     )
     if (await db.execute(stmt)).scalar_one_or_none() is not None:
@@ -436,16 +441,20 @@ async def create_teaching_group(
         slug=slug,
         type="teaching_group",
         subject_id=body.subject_id,
-        source_class_group_id=body.class_group_id,
         sso_group_id=None,
     )
     db.add(group)
     await db.flush()
 
+    db.add(GroupSourceClass(group_id=group.id, class_group_id=body.class_group_id))
+
     membership = GroupMembership(
         group_id=group.id,
         pseudonym=pseudonym,
         role_in_group="teacher",
+        # `eigen`: Die Mitgliedschaft ist der Nachweis, dass die Gruppe ihr gehört —
+        # kein Aufräumlauf darf sie entfernen (Alembic 0068).
+        herkunft="eigen",
     )
     db.add(membership)
     await db.commit()

@@ -255,6 +255,10 @@ async def add_member(
             group_id=group_id,
             pseudonym=request.pseudonym,
             role_in_group=request.role_in_group,
+            # `manuell`: von Hand eingetragen, also von keinem Aufräumlauf zu entfernen
+            # — und unterscheidbar von `code`, damit die Rücknahme einer Code-Runde
+            # (Alembic 0069) nicht versehentlich hier hineingreift.
+            herkunft="manuell",
         )
         db.add(membership)
     

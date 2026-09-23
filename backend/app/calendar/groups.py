@@ -20,7 +20,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calendar.patterns import GroupKey
-from app.db.models import Group, GroupMembership, Subject
+from app.db.models import Group, GroupMembership, GroupSourceClass, Subject
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +369,9 @@ class Kandidat:
     id: int
     name: str
     subject_id: int
-    quellklasse: str | None     # Name der Klasse, aus der die Gruppe entstanden ist
+    # Namen **aller** Klassen, aus denen die Gruppe entstanden ist (Alembic 0068).
+    # Mehrzahl, seit eine Gruppe aus mehreren Klassenverbänden stammen kann.
+    quellklassen: tuple[str, ...] = ()
     fach_code: str | None = None    # Fachkürzel — kollidiert mit den Kursart-Markern
 
 
@@ -385,7 +387,10 @@ async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
     zeilen = await db.execute(
         select(Group.id, Group.name, Group.subject_id, quelle.name, Subject.fach_code)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
-        .outerjoin(quelle, quelle.id == Group.source_class_group_id)
+        # Eine Gruppe kann aus mehreren Klassen stammen: Der Join vervielfacht die Zeile
+        # entsprechend, unten werden die Klassennamen je Gruppe wieder eingesammelt.
+        .outerjoin(GroupSourceClass, GroupSourceClass.group_id == Group.id)
+        .outerjoin(quelle, quelle.id == GroupSourceClass.class_group_id)
         .outerjoin(Subject, Subject.id == Group.subject_id)
         .where(
             Group.type == "teaching_group",
@@ -393,15 +398,24 @@ async def _eigene_gruppen(db: AsyncSession, pseudonym: str) -> list[Kandidat]:
             GroupMembership.role_in_group == "teacher",
         )
     )
+    # `Kandidat` ist frozen — erst die Klassennamen je Gruppe sammeln, dann bauen.
+    rohdaten: dict[int, tuple[str, int | None, str | None]] = {}
+    klassen: dict[int, set[str]] = {}
+    for gid, name, sid, quellname, fach_code in zeilen.all():
+        rohdaten.setdefault(gid, (name or "", sid, fach_code))
+        if quellname:
+            klassen.setdefault(gid, set()).add(quellname)
     return [
         Kandidat(
             id=gid,
-            name=name or "",
+            name=name,
             subject_id=sid,
-            quellklasse=quellname,
             fach_code=fach_code,
+            # Sortiert, damit dieselbe Gruppe über Läufe hinweg dieselbe Reihenfolge
+            # trägt — die Zuordnung darf nicht von der Zeilenfolge der DB abhängen.
+            quellklassen=tuple(sorted(klassen.get(gid, ()))),
         )
-        for gid, name, sid, quellname, fach_code in zeilen.all()
+        for gid, (name, sid, fach_code) in rohdaten.items()
     ]
 
 
@@ -449,15 +463,20 @@ def _widerspricht_kursart(name: str, art: str, fach_code: str | None = None) -> 
 
 
 def _nennt_klasse(kandidat: Kandidat, class_names: tuple[str, ...]) -> bool:
-    """Ob Gruppenname **oder** Quellklasse eine der Klassen aus dem Stundenplan nennt.
+    """Ob Gruppenname **oder** eine der Quellklassen eine Klasse aus dem Stundenplan nennt.
 
-    Die Quellklasse ist der belastbarere Weg — sie ist ein Fremdschlüssel, kein Text. Der
+    Die Quellklassen sind der belastbarere Weg — sie sind Fremdschlüssel, kein Text. Der
     Name bleibt daneben stehen, weil Gruppen aus dem Schulkonto keine Quellklasse haben.
+
+    ⚠️ **Es genügt *eine* passende Quellklasse.** Eine Gruppe aus 10a/10b/10c soll auch
+    dann als „nennt die Klasse" gelten, wenn der Stundenplan nur die 10b nennt — sonst
+    verlöre genau die mehrklassige Gruppe ihre starke Kante und fiele in die schwächere
+    Eindeutigkeitsrunde zurück.
     """
     name = kandidat.name.lower()
-    quelle = (kandidat.quellklasse or "").lower()
+    quellen = [q.lower() for q in kandidat.quellklassen]
     return any(
-        klasse.lower() in name or (quelle and klasse.lower() in quelle)
+        klasse.lower() in name or any(klasse.lower() in q for q in quellen)
         for klasse in class_names
     )
 

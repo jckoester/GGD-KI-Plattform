@@ -146,8 +146,8 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
 
         # ── Mitgliedschaften und Ausblendungen ──
         cur.execute(
-            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group)"
-            " VALUES (%s,%s,'teacher'), (%s,%s,'teacher')"
+            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)"
+            " VALUES (%s,%s,'teacher','eigen'), (%s,%s,'teacher','eigen')"
             " ON CONFLICT DO NOTHING",
             (seed_test_group, VERLASSEN, seed_test_group, AKTIV),
         )

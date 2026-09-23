@@ -35,14 +35,14 @@ def seed_planning_fixtures(db_url, run_migrations):
         """)
         # teacher1 ist Lehrkraft der Gruppe
         cur.execute("""
-            INSERT INTO group_memberships (group_id, pseudonym, role_in_group)
-            VALUES (100, %s, 'teacher')
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)
+            VALUES (100, %s, 'teacher', 'eigen')
             ON CONFLICT DO NOTHING
         """, (TEACHER1_PSEUDO,))
         # student ist Schüler der Gruppe
         cur.execute("""
-            INSERT INTO group_memberships (group_id, pseudonym, role_in_group)
-            VALUES (100, %s, 'student')
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)
+            VALUES (100, %s, 'student', 'geerbt')
             ON CONFLICT DO NOTHING
         """, (STUDENT_PSEUDO,))
     conn.commit()

@@ -155,9 +155,6 @@ class Group(Base):
     student_visible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false"), default=False
     )
-    source_class_group_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
-    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -174,7 +171,6 @@ class Group(Base):
         ),
         Index("idx_groups_type", "type"),
         Index("idx_groups_subject_id", "subject_id"),
-        Index("idx_groups_source_class_group_id", "source_class_group_id"),
     )
 
 
@@ -200,13 +196,49 @@ class GroupMembership(Base):
     )
     pseudonym: Mapped[str] = mapped_column(Text, primary_key=True)
     role_in_group: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Woher die Mitgliedschaft stammt — und damit, wer sie aufräumen darf (Alembic 0068).
+    # Vorher war das aus Rolle und Gruppeneigenschaften **erraten**; mit dem Beitrittscode
+    # trägt das nicht mehr, weil dann nicht jede Schüler-Mitgliedschaft geerbt ist.
+    # Aufgeräumt wird nur `sso` (Immediate Mirror) und `geerbt` (Vererbungslauf).
+    herkunft: Mapped[str] = mapped_column(Text, nullable=False, default="manuell")
 
     __table_args__ = (
         CheckConstraint(
             "role_in_group IS NULL OR role_in_group IN ('teacher','student')",
             name="check_group_memberships_role",
         ),
+        CheckConstraint(
+            "herkunft IN ('sso','geerbt','code','eigen','manuell')",
+            name="check_group_memberships_herkunft",
+        ),
         Index("idx_group_memberships_pseudonym", "pseudonym"),
+    )
+
+
+class GroupSourceClass(Base):
+    """Aus welchen Klassen sich eine Unterrichtsgruppe speist (Alembic 0068).
+
+    Ersetzt `groups.source_class_group_id`. Eine Gruppe kann aus **mehreren** Klassen
+    stammen — NwT 10a/10b/10c ist eine Gruppe aus drei Klassenverbänden. Mit der alten
+    Spalte erbte sie bestenfalls aus einer davon.
+
+    Beide Fremdschlüssel löschen mit (`CASCADE`): Verschwindet die Klasse, verschwindet
+    die Herkunftsangabe — die Unterrichtsgruppe selbst bleibt und erbt eben nicht mehr
+    von dort. `SET NULL` wie bei der alten Spalte geht nicht, weil beide Spalten den
+    Schlüssel bilden.
+    """
+
+    __tablename__ = "group_source_classes"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    class_group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        Index("idx_group_source_classes_class", "class_group_id"),
     )
 
 
