@@ -2291,6 +2291,46 @@ export async function runTimetableSync(wochen = 1) {
   return body;
 }
 
+// ── Angebote für neue SSO-Unterrichtsgruppen ─────────────────────────────────
+
+export async function getGroupOffers(mitIgnorierten = false) {
+  const res = await fetch(`${BASE}/groups/offers?mit_ignorierten=${mitIgnorierten}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Angebote nicht lesbar (${res.status})`);
+  return res.json();
+}
+
+export async function assignGroupOffer(angebotId, groupId) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/assign`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_id: groupId }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Zuordnung fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function createGroupFromOffer(angebotId) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/create`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Anlegen fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function ignoreGroupOffer(angebotId, ignorieren = true) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/ignore`, {
+    method: ignorieren ? "POST" : "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Konnte nicht gespeichert werden (${res.status})`);
+}
+
 // ── Beitrittscodes (AP4) ──────────────────────────────────────────────────────
 
 export async function getJoinCode(groupId) {

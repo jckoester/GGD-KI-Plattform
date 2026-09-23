@@ -343,6 +343,13 @@ async def _upsert_group_and_membership(
         if group.sso_group_id != sso_id_norm:
             group.sso_group_id = sso_id_norm
         group.name = pg.name
+        # Die Frage ist beantwortet — offene Angebote dazu haben sich erledigt.
+        # ⚠️ **Auch die anderer Lehrkräfte** (Entscheidung F2): Hat eine Kollegin die
+        # Gruppe verknüpft, darf niemand sie ein zweites Mal anlegen. Ohne diese Zeile
+        # stünde ihr Angebot weiter da und führte genau dorthin.
+        await db.execute(
+            delete(SsoGroupOffer).where(SsoGroupOffer.sso_group_id == sso_id_norm)
+        )
 
     role_in_group = "teacher" if pg.type == "subject_department" else primary_role
     await db.execute(

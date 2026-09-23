@@ -24,7 +24,7 @@
   } from "$lib/beitrittscode.js"
   import ErrorBanner from "$lib/components/ErrorBanner.svelte"
 
-  let { groupId } = $props()
+  let { groupId, ssoGefuehrt = false } = $props()
 
   let antwort = $state(null)
   let laedt = $state(true)
@@ -37,7 +37,7 @@
 
   $effect(() => {
     void groupId
-    lesen()
+    if (!ssoGefuehrt) lesen()
   })
 
   async function lesen() {
@@ -81,6 +81,16 @@
     <KeyRound size={16} class="text-light-tx-2 dark:text-dark-tx-2" />
     Beitrittscode
   </h3>
+
+{#if ssoGefuehrt}
+  <!-- ⚠️ Kein Code, wo das Schulkonto die Mitglieder führt: Zwei Wege hinein hießen
+       zwei Wahrheiten über die Mitgliedschaft, und der Immediate Mirror räumt nur die
+       eine Sorte ab. Die Vererbung aus der Klasse ist hier aus demselben Grund aus. -->
+  <p class="mt-2 text-sm text-light-tx-2 dark:text-dark-tx-2">
+    Die Mitglieder dieser Gruppe kommen aus dem Schulkonto. Ein Beitrittscode ist
+    deshalb nicht nötig — wer dazugehört, entscheidet sich dort.
+  </p>
+{:else}
 
   {#if fehler}<div class="mt-2"><ErrorBanner message={fehler} /></div>{/if}
 
@@ -166,4 +176,5 @@
       </div>
     {/if}
   {/if}
+{/if}
 </section>

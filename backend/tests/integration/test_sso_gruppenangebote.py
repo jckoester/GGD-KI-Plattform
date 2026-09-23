@@ -271,3 +271,216 @@ async def test_nachgezogene_fachableitung_erreicht_das_angebot(async_engine):
         assert any(a.id == id_vorher for a in alle), "Das erste Angebot verschwand"
     finally:
         await _aufraeumen(factory)
+
+
+async def test_verknuepfung_loest_angebote_aller_lehrkraefte_auf(async_engine):
+    """⚠️ **Entscheidung F2: Die erste Bestätigung gilt für alle.**
+
+    Hat eine Kollegin die Gruppe verknüpft, muss das Angebot auch bei den übrigen
+    verschwinden — sonst legt die zweite Antwort eine Doppelgruppe an, also genau das,
+    was dieser Weg verhindern soll.
+    """
+    factory = _f(async_engine)
+    zweite = "angebot-lk2"
+    try:
+        async with factory() as db:
+            await _fach(db)
+            await db.commit()
+        # Beide sehen dieselbe SSO-Gruppe.
+        for wer in (LK, zweite):
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=wer,
+                                  sso_groups=["unterricht.angebot9d.ch"],
+                                  primary_role="teacher", patterns=MUSTER)
+        async with factory() as db:
+            offen = (await db.execute(
+                select(SsoGroupOffer).where(
+                    SsoGroupOffer.sso_group_id == "unterricht.angebot9d.ch")
+            )).scalars().all()
+        assert len(offen) == 2, "Beide Lehrkräfte sollten ein eigenes Angebot haben"
+
+        # Die erste verknüpft — hier abgekürzt über den Sync einer vorhandenen Gruppe.
+        async with factory() as db:
+            fach_id = await _fach(db)
+            g = Group(name="Chemie 9d", slug="angebot-erste",
+                      type="teaching_group", subject_id=fach_id,
+                      sso_group_id="unterricht.angebot9d.ch")
+            db.add(g)
+            await db.flush()
+            db.add(GroupMembership(group_id=g.id, pseudonym=LK,
+                                   role_in_group="teacher", herkunft="sso"))
+            await db.commit()
+        async with factory() as db:
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebot9d.ch"],
+                              primary_role="teacher", patterns=MUSTER)
+
+        async with factory() as db:
+            uebrig = (await db.execute(
+                select(SsoGroupOffer).where(
+                    SsoGroupOffer.sso_group_id == "unterricht.angebot9d.ch")
+            )).scalars().all()
+        assert uebrig == [], (
+            "Das Angebot der zweiten Lehrkraft steht noch — sie würde eine Doppelgruppe "
+            "anlegen."
+        )
+    finally:
+        async with factory() as db:
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == zweite))
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == zweite))
+            await db.commit()
+        await _aufraeumen(factory)
+
+
+# ── AP2: Die Bestätigung ─────────────────────────────────────────────────────
+
+
+async def test_zuordnen_verknuepft_und_raeumt_geerbte_weg(async_engine):
+    """⚠️ **Geerbte Mitgliedschaften müssen beim Verknüpfen fallen.**
+
+    Ab der Zuordnung führt das Schulkonto die Mitglieder; die Vererbung aus der Klasse
+    ist für SSO-Gruppen abgeschaltet. Bliebe das Geerbte stehen, räumte es **niemand**
+    mehr auf — auch der Immediate Mirror nicht, der nur `sso` anfasst. Zwei Wahrheiten
+    über die Mitgliedschaft, und eine davon eingefroren.
+    """
+    from app.groups.angebote import ordne_zu
+
+    factory = _f(async_engine)
+    try:
+        async with factory() as db:
+            fach_id = await _fach(db)
+            klasse = Group(name="9d", slug="angebot-klasse-9d", type="school_class")
+            db.add(klasse)
+            await db.flush()
+            gid = await _gruppe(db, fach_id, "Chemie 9d", "angebot-vorhanden", klasse.id)
+            db.add(GroupMembership(group_id=gid, pseudonym="angebot-schueler",
+                                   role_in_group="student", herkunft="geerbt"))
+            db.add(GroupMembership(group_id=gid, pseudonym="angebot-code",
+                                   role_in_group="student", herkunft="code"))
+            await db.commit()
+
+        async with factory() as db:
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebot9d.ch"],
+                              primary_role="teacher", patterns=MUSTER)
+
+        async with factory() as db:
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalar_one()
+            ergebnis = await ordne_zu(db, angebot.id, gid, LK)
+            await db.commit()
+
+        assert ergebnis.geerbte_entfernt == 1
+        async with factory() as db:
+            gruppe = await db.get(Group, gid)
+            herkuenfte = sorted((await db.execute(
+                select(GroupMembership.herkunft).where(GroupMembership.group_id == gid)
+            )).scalars().all())
+            offen = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalars().all()
+
+        assert gruppe.sso_group_id == "unterricht.angebot9d.ch"
+        assert gruppe.erbt_mitglieder is False, "Vererbung muss abgeschaltet sein"
+        assert herkuenfte == ["code", "eigen"], (
+            "Geerbtes muss fallen, Code-Beitritte müssen bleiben — sie sind die "
+            "Entscheidung eines Menschen."
+        )
+        assert offen == [], "Das beantwortete Angebot steht noch"
+    finally:
+        async with factory() as db:
+            for p in ("angebot-schueler", "angebot-code"):
+                await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == p))
+            await db.execute(delete(Group).where(Group.slug == "angebot-klasse-9d"))
+            await db.commit()
+        await _aufraeumen(factory)
+
+
+async def test_fremdes_angebot_laesst_sich_nicht_beantworten(async_engine):
+    """Wem ein Angebot gehört, geht niemand anderen etwas an."""
+    from app.groups.angebote import ignoriere
+
+    factory = _f(async_engine)
+    try:
+        async with factory() as db:
+            await _fach(db)
+            await db.commit()
+        async with factory() as db:
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebot9d.ch"],
+                              primary_role="teacher", patterns=MUSTER)
+        async with factory() as db:
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalar_one()
+            with pytest.raises(LookupError):
+                await ignoriere(db, angebot.id, "jemand-anderes")
+    finally:
+        await _aufraeumen(factory)
+
+
+async def test_neu_anlegen_erzeugt_eine_verknuepfte_gruppe(async_engine):
+    from app.groups.angebote import lege_an
+
+    factory = _f(async_engine)
+    try:
+        async with factory() as db:
+            await _fach(db)
+            await db.commit()
+        async with factory() as db:
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebot9d.ch"],
+                              primary_role="teacher", patterns=MUSTER)
+        async with factory() as db:
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalar_one()
+            gid = await lege_an(db, angebot.id, LK)
+            await db.commit()
+
+        async with factory() as db:
+            gruppe = await db.get(Group, gid)
+            offen = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalars().all()
+        assert gruppe.sso_group_id == "unterricht.angebot9d.ch"
+        assert gruppe.erbt_mitglieder is False
+        assert offen == []
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == LK))
+            await db.execute(delete(Group).where(Group.slug.like("sso-unterricht-angebot%")))
+            await db.commit()
+        await _aufraeumen(factory)
+
+
+async def test_ignorieren_ist_ruecknehmbar(async_engine):
+    """Ein Fehlklick darf nicht endgültig sein."""
+    from app.groups.angebote import hebe_ignorieren_auf, ignoriere, lade_angebote
+
+    factory = _f(async_engine)
+    try:
+        async with factory() as db:
+            await _fach(db)
+            await db.commit()
+        async with factory() as db:
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebot9d.ch"],
+                              primary_role="teacher", patterns=MUSTER)
+        async with factory() as db:
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalar_one()
+            await ignoriere(db, angebot.id, LK)
+            await db.commit()
+        async with factory() as db:
+            assert await lade_angebote(db, LK) == []
+            assert len(await lade_angebote(db, LK, mit_ignorierten=True)) == 1
+        async with factory() as db:
+            await hebe_ignorieren_auf(db, angebot.id, LK)
+            await db.commit()
+        async with factory() as db:
+            assert len(await lade_angebote(db, LK)) == 1
+    finally:
+        await _aufraeumen(factory)

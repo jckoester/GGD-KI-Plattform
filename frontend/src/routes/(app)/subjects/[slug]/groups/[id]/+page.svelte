@@ -133,7 +133,7 @@
          zu Beginn eines Kurses oder wenn jemand fehlt. -->
     {#if istLehrkraft && group}
       <div class="mt-6">
-        <BeitrittsCode groupId={group.id} />
+        <BeitrittsCode groupId={group.id} ssoGefuehrt={Boolean(group.sso_group_id)} />
       </div>
     {/if}
 

@@ -27,6 +27,7 @@
     import { subjectMap } from "$lib/stores/subjects.js";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import StundenrasterUebernahme from "$lib/components/StundenrasterUebernahme.svelte";
+    import GruppenAngebote from "$lib/components/GruppenAngebote.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
 
     let exclusions = $state([]);
@@ -159,6 +160,8 @@
          ist: Wer hier landet, hat seine Gruppen gerade erst zusammengestellt. Die
          Komponente zeigt sich nur, wenn eine Stundenplanquelle eingerichtet ist. -->
     <section class="mb-8">
+        <GruppenAngebote />
+
         <StundenrasterUebernahme />
     </section>
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -16,6 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
 from app.db.session import get_db
+from app.groups.angebote import (
+    hebe_ignorieren_auf,
+    ignoriere,
+    kandidaten,
+    lade_angebote,
+    lege_an,
+    ordne_zu,
+)
 from app.groups.beitritt import (
     aktueller_code,
     beitritte_je_tag,
@@ -170,3 +179,120 @@ async def beitreten(
     await db.commit()
     logger.info("gruppe_beigetreten pseudonym=%s gruppe=%s", user.sub, code.group_id)
     return {"group_id": code.group_id}
+
+
+# ── Angebote für neue SSO-Unterrichtsgruppen (AP2) ───────────────────────────
+
+
+@router.get("/offers")
+async def angebote_lesen(
+    mit_ignorierten: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_LEHRKRAFT),
+) -> dict:
+    """Die eigenen Angebote samt Gruppen, denen sie zugeordnet werden könnten.
+
+    Kandidaten und Angebote kommen **zusammen**: Die Oberfläche soll die Frage stellen
+    können, ohne eine zweite Runde zu drehen — und die Belege („12 Stunden, 4 Chats")
+    entstehen ohnehin in einer Abfrage.
+    """
+    angebote = await lade_angebote(db, user.sub, mit_ignorierten=mit_ignorierten)
+    gruppen = await kandidaten(db, user.sub) if angebote else []
+    return {
+        "angebote": [
+            {
+                "id": str(a.id),
+                "sso_group_id": a.sso_group_id,
+                "name": a.name,
+                "fach": a.fach,
+                "ignoriert": a.ignoriert,
+            }
+            for a in angebote
+        ],
+        "gruppen": [
+            {"id": k.id, "name": k.name, "fach": k.fach, "beleg": k.beleg}
+            for k in gruppen
+        ],
+    }
+
+
+class ZuordnenRequest(BaseModel):
+    group_id: int
+
+
+@router.post("/offers/{angebot_id}/assign")
+async def angebot_zuordnen(
+    angebot_id: UUID,
+    body: ZuordnenRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_LEHRKRAFT),
+) -> dict:
+    """Das Angebot einer vorhandenen Gruppe zuordnen."""
+    try:
+        ergebnis = await ordne_zu(db, angebot_id, body.group_id, user.sub)
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except PermissionError:
+        await db.rollback()
+        raise HTTPException(403, "Sie sind keine Lehrkraft dieser Gruppe.") from None
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    await db.commit()
+    logger.info(
+        "angebot_zugeordnet pseudonym=%s angebot=%s gruppe=%s geerbt_entfernt=%d",
+        user.sub, angebot_id, ergebnis.group_id, ergebnis.geerbte_entfernt,
+    )
+    return {
+        "group_id": ergebnis.group_id,
+        "geerbte_entfernt": ergebnis.geerbte_entfernt,
+    }
+
+
+@router.post("/offers/{angebot_id}/create", status_code=201)
+async def angebot_anlegen(
+    angebot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_LEHRKRAFT),
+) -> dict:
+    """Aus dem Angebot eine neue Unterrichtsgruppe machen."""
+    try:
+        group_id = await lege_an(db, angebot_id, user.sub)
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    await db.commit()
+    logger.info("angebot_angelegt pseudonym=%s angebot=%s gruppe=%s",
+                user.sub, angebot_id, group_id)
+    return {"group_id": group_id}
+
+
+@router.post("/offers/{angebot_id}/ignore", status_code=204)
+async def angebot_ignorieren(
+    angebot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_LEHRKRAFT),
+) -> None:
+    """Ablehnen. Die Frage kehrt nicht zurück — rücknehmbar bleibt sie trotzdem."""
+    try:
+        await ignoriere(db, angebot_id, user.sub)
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    await db.commit()
+
+
+@router.delete("/offers/{angebot_id}/ignore", status_code=204)
+async def angebot_wieder_zeigen(
+    angebot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_LEHRKRAFT),
+) -> None:
+    """Die Ablehnung zurücknehmen — sonst wäre ein Fehlklick endgültig."""
+    try:
+        await hebe_ignorieren_auf(db, angebot_id, user.sub)
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    await db.commit()
