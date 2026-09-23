@@ -212,12 +212,30 @@ describe("fehlendesRaster nach AP4", () => {
 // ── AP3: Woher kämen die Mitglieder? ─────────────────────────────────────────
 
 describe("herkunftDerMitglieder", () => {
-    it("nennt die Klassen, aus denen geerbt wird", () => {
+    it("nennt die Klasse, aus der geerbt wird", () => {
         const satz = herkunftDerMitglieder({
-            erbt_aus: ["10a", "10b", "10c"],
+            erbt_aus: ["9d"],
+            stammt_aus: ["9d"],
             klassen_ohne_treffer: [],
         })
-        expect(satz).toBe("Mitglieder aus 10a, 10b und 10c")
+        expect(satz).toBe("Mitglieder aus 9d")
+    })
+
+    it("erbt bei mehreren Klassen nicht, sondern verweist auf den Code", () => {
+        // ⚠️ **Der Befund von Jan (23.09.2026).** Eine Gruppe über 10a/10b/10c ist eine
+        // **Auswahl** aus diesen Klassen — sonst würde je Klasse unterrichtet. Alle drei
+        // hineinzuschreiben gäbe Schüler:innen Zugang zu einer Gruppe, in der sie nicht
+        // sind. Versprich hier „Mitglieder aus 10a, 10b und 10c", und der Fehler ist
+        // schon passiert, bevor jemand ihn bemerkt.
+        const satz = herkunftDerMitglieder({
+            mehrklassig: true,
+            erbt_aus: [],
+            stammt_aus: ["10a", "10b", "10c"],
+            klassen_ohne_treffer: [],
+        })
+        expect(satz).toContain("Teilgruppe")
+        expect(satz).toContain("Code")
+        expect(satz).not.toContain("Mitglieder aus")
     })
 
     it("verweist in der Kursstufe auf den Code", () => {

@@ -189,10 +189,17 @@ export function anlegbareGruppen(antwort) {
  */
 export function herkunftDerMitglieder(g) {
     const erbt = g?.erbt_aus ?? []
+    const stammt = g?.stammt_aus ?? []
     const fehlt = g?.klassen_ohne_treffer ?? []
 
     if (g?.kursstufe) {
         return "Kursstufe — Beitritt über einen Code"
+    }
+    if (g?.mehrklassig) {
+        // ⚠️ Mehrere Klassen heißen **Auswahl aus** diesen Klassen, nicht **alle**
+        // dieser Klassen — sonst würde je Klasse unterrichtet. Die Klassen zu nennen
+        // ist trotzdem richtig: Sie sagen, wen die Lehrkraft erwarten darf.
+        return `Teilgruppe aus ${listeMitUnd(stammt)} — Beitritt über einen Code`
     }
     if (erbt.length === 0) {
         return fehlt.length > 0

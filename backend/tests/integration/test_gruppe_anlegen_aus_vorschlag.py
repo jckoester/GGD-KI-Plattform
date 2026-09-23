@@ -63,8 +63,13 @@ async def _aufraeumen(factory):
         await db.commit()
 
 
-async def test_klassenverband_erbt_aus_allen_klassen(async_engine):
-    """NwT 10a/10b/10c: drei Quellklassen, alle verknüpft."""
+async def test_mehrere_klassen_werden_verknuepft_aber_nicht_vererbt(async_engine):
+    """NwT 10a/10b/10c: drei Quellklassen als **Herkunft**, aber keine Vererbung.
+
+    Die Herkunft trägt die Stundenplan-Zuordnung und die Jahrgangsableitung; die
+    Mitgliedschaft folgt daraus **nicht** — eine Gruppe über mehreren Klassen ist eine
+    Auswahl daraus (Befund Jan, 23.09.2026).
+    """
     factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
     try:
         async with factory() as db:
@@ -88,10 +93,14 @@ async def test_klassenverband_erbt_aus_allen_klassen(async_engine):
                     GroupMembership.pseudonym == LEHRKRAFT)
             )).scalar_one()
 
-        assert len(quellen) == 3, "alle drei Klassenverbände müssen verknüpft sein"
+        assert len(quellen) == 3, "alle drei Klassenverbände müssen als Herkunft stehen"
         assert sorted(ergebnis.quellklassen) == ["10A", "10B", "10C"]
         assert ergebnis.ohne_treffer == ()
         assert herkunft == "eigen"
+        assert ergebnis.erbt is False, (
+            "Eine mehrklassige Gruppe darf nicht vererben — sie ist eine Auswahl aus "
+            "diesen Klassen, nicht ihre Summe."
+        )
     finally:
         await _aufraeumen(factory)
 
@@ -153,6 +162,10 @@ async def test_fehlende_klasse_verhindert_die_anlage_nicht(async_engine):
         assert ergebnis.group_id is not None
         assert ergebnis.quellklassen == ("9A",)
         assert ergebnis.ohne_treffer == ("9B",), "die Lücke gehört benannt"
+        # Genau eine gefundene Klasse — also erbt die Gruppe von dort. Dass im
+        # Stundenplan eine zweite stand, ändert daran nichts: Über die fehlende Klasse
+        # kann die Plattform nichts wissen.
+        assert ergebnis.erbt is True
     finally:
         await _aufraeumen(factory)
 

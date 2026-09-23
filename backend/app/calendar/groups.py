@@ -582,6 +582,22 @@ class Klassenaufloesung:
     ohne_treffer: tuple[str, ...]      # genannt, aber auf der Plattform nicht vorhanden
     kursstufe: bool
 
+    @property
+    def mehrklassig(self) -> bool:
+        """Über mehrere Klassen hinweg — also eine **Auswahl** aus diesen Klassen."""
+        return len(self.treffer) > 1
+
+    @property
+    def erbt(self) -> bool:
+        """Ob die Gruppe ihre Mitglieder aus der Klasse bekommt.
+
+        ⚠️ **Nur bei genau einer Klasse** (Entscheidung Jan, 23.09.2026). Eine Gruppe
+        über mehreren Klassen ist per Konstruktion eine Auswahl daraus — sonst würde sie
+        je Klasse unterrichtet. Sie zu befüllen hieße, Schüler:innen in eine Gruppe zu
+        schreiben, in der sie nicht sind.
+        """
+        return not self.kursstufe and len(self.treffer) == 1
+
 
 async def klassenkarte(db: AsyncSession) -> dict[str, int]:
     """Alle Klassengruppen als `name.lower() → id`. Einmal laden, oft fragen."""
@@ -627,9 +643,11 @@ class Anlageergebnis:
     group_id: int
     name: str
     subject_id: int
-    quellklassen: tuple[str, ...]      # tatsächlich verknüpfte Klassen
+    quellklassen: tuple[str, ...]      # tatsächlich verknüpfte Klassen (Herkunft)
     ohne_treffer: tuple[str, ...]      # im Stundenplan genannt, auf der Plattform nicht
     kursstufe: bool
+    # Ob die Gruppe ihre Mitglieder aus der Klasse bekommt — nur bei genau einer.
+    erbt: bool = False
 
 
 async def lege_gruppe_aus_vorschlag_an(
@@ -697,6 +715,7 @@ async def lege_gruppe_aus_vorschlag_an(
         quellklassen=tuple(treffer),
         ohne_treffer=ohne_treffer,
         kursstufe=kursstufe,
+        erbt=aufloesung.erbt,
     )
 
 

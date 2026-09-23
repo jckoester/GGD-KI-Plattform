@@ -353,9 +353,16 @@ async def week_patterns(
                 # Mehrere Kürzel = eine Gruppe (Differenzierungsstunde).
                 "kuerzel": list(s.codes),
                 # Woher die Mitglieder kämen, wenn die Gruppe jetzt angelegt würde.
-                "erbt_aus": list(aufloesungen[s.key.label].treffer),
+                # `erbt_aus` ist leer, sobald die Gruppe über mehreren Klassen liegt —
+                # dann ist sie eine Auswahl daraus und füllt sich über den Code.
+                "erbt_aus": (
+                    list(aufloesungen[s.key.label].treffer)
+                    if aufloesungen[s.key.label].erbt else []
+                ),
+                "stammt_aus": list(aufloesungen[s.key.label].treffer),
                 "klassen_ohne_treffer": list(aufloesungen[s.key.label].ohne_treffer),
                 "kursstufe": aufloesungen[s.key.label].kursstufe,
+                "mehrklassig": aufloesungen[s.key.label].mehrklassig,
             }
             for s in abgleich.fehlend
         ],

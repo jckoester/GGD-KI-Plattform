@@ -753,11 +753,18 @@ class TestHerkunftUndMehrereQuellklassen:
                 await db.execute(delete(Subject).where(Subject.slug == "hk2-fach"))
                 await db.commit()
 
-    async def test_gruppe_aus_drei_klassen_vererbt_an_alle_drei(self, async_engine):
-        """NwT 10a/10b/10c: eine Gruppe, drei Klassenverbände.
+    async def test_gruppe_aus_drei_klassen_vererbt_an_niemanden(self, async_engine):
+        """⚠️ **NwT 10a/10b/10c erbt nicht** (Befund Jan, 23.09.2026).
 
-        Mit der alten Spalte `groups.source_class_group_id` war das nicht darstellbar —
-        die Gruppe erbte bestenfalls aus einer der drei Klassen.
+        Eine Gruppe über mehreren Klassen ist per Konstruktion eine **Auswahl** aus
+        diesen Klassen — sonst würde sie je Klasse unterrichtet. Alle drei Klassen
+        hineinzuschreiben gäbe Schüler:innen Zugang zu einer Gruppe, in der sie nicht
+        sind: fremde Assistenten-Freigaben, fremder Unterrichtskontext. Solche Gruppen
+        füllen sich über einen Beitrittscode oder über eine SSO-Gruppe.
+
+        Die Herkunft bleibt trotzdem gespeichert (`group_source_classes`) — sie trägt die
+        Stundenplan-Zuordnung und die Jahrgangsableitung. Nur **Mitgliedschaft** folgt
+        daraus nicht.
         """
         factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
         schueler = ["nwt-a", "nwt-b", "nwt-c"]
@@ -796,10 +803,15 @@ class TestHerkunftUndMehrereQuellklassen:
                         GroupMembership.herkunft == "geerbt",
                     )
                 )).scalars().all()
-            assert sorted(drin) == sorted(schueler), (
-                "Nicht alle drei Klassenverbände haben geerbt — dann liest der "
-                "Vererbungslauf nur eine Quellklasse statt aller."
+                quellen = (await db.execute(
+                    select(GroupSourceClass.class_group_id).where(
+                        GroupSourceClass.group_id == gruppe_id)
+                )).scalars().all()
+            assert drin == [], (
+                "Eine mehrklassige Gruppe hat vererbt — damit sitzen Schüler:innen in "
+                "einer Gruppe, in der sie nicht sind."
             )
+            assert len(quellen) == 3, "die Herkunft bleibt gespeichert, nur die Vererbung nicht"
         finally:
             async with factory() as db:
                 await db.execute(delete(GroupMembership).where(

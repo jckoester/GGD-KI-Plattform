@@ -399,8 +399,22 @@ async def _erbe_unterrichtsgruppen_der_klasse(
 
     abgeleitet: list[int] = []
     if klassen_ids:
-        # Mehrere Quellklassen je Gruppe (Alembic 0068): NwT 10a/10b/10c ist **eine**
-        # Gruppe aus drei Klassenverbänden. Wer in einer davon ist, erbt sie.
+        # ⚠️ **Geerbt wird nur aus einer einzelnen Klasse** (Entscheidung Jan,
+        # 23.09.2026). Steht im Stundenplan eine Gruppe über **mehreren** Klassen
+        # (`NWT_10A10B10C`), ist sie per Konstruktion eine **Auswahl** aus diesen
+        # Klassen — sonst würde sie je Klasse unterrichtet. Alle drei Klassen
+        # hineinzuschreiben gäbe Schüler:innen Zugang zu einer Gruppe, in der sie nicht
+        # sind: falsche Assistenten-Freigaben, falscher Unterrichtskontext. Solche
+        # Gruppen füllen sich über einen Beitrittscode oder über eine SSO-Gruppe.
+        #
+        # Der Preis: Zwei kleine Klassen, die *vollständig* gemeinsam unterrichtet
+        # werden, brauchen ebenfalls den Code. Das ist unbequem — die Gegenrichtung
+        # wäre ein stiller Zugriffsfehler, und der ist teurer.
+        einzelklassig = (
+            select(GroupSourceClass.group_id)
+            .group_by(GroupSourceClass.group_id)
+            .having(func.count() == 1)
+        )
         abgeleitet = list((await db.execute(
             select(Group.id)
             .join(GroupSourceClass, GroupSourceClass.group_id == Group.id)
@@ -408,6 +422,7 @@ async def _erbe_unterrichtsgruppen_der_klasse(
                 Group.type == "teaching_group",
                 Group.sso_group_id.is_(None),
                 GroupSourceClass.class_group_id.in_(klassen_ids),
+                Group.id.in_(einzelklassig),
             )
             .distinct()
         )).scalars())
@@ -428,6 +443,11 @@ async def _erbe_unterrichtsgruppen_der_klasse(
         )
 
     # Abgang: geerbte Mitgliedschaften, deren Quellklasse nicht mehr passt.
+    #
+    # Bewusst **ohne** die Einzelklassen-Bedingung von oben: Bekommt eine bisher
+    # einklassige Gruppe eine zweite Quellklasse, wird sie zur Teilgruppe und erbt nicht
+    # mehr — die vorher geerbten Mitgliedschaften müssen dann fallen. Mit der Bedingung
+    # hier stünden sie für immer drin, weil die Gruppe nie wieder in `abgeleitet` käme.
     veraltet = select(Group.id).where(
         Group.type == "teaching_group",
         Group.sso_group_id.is_(None),
