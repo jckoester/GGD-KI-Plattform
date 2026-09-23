@@ -651,7 +651,8 @@ class Anlageergebnis:
 
 
 async def lege_gruppe_aus_vorschlag_an(
-    db: AsyncSession, vorschlag: GroupSuggestion, pseudonym: str
+    db: AsyncSession, vorschlag: GroupSuggestion, pseudonym: str,
+    erbt: bool | None = None,
 ) -> Anlageergebnis:
     """Aus einem Stundenplan-Vorschlag eine Unterrichtsgruppe machen.
 
@@ -676,6 +677,9 @@ async def lege_gruppe_aus_vorschlag_an(
     kursstufe, treffer, ohne_treffer = (
         aufloesung.kursstufe, aufloesung.treffer, aufloesung.ohne_treffer
     )
+    # Die Entscheidung der Lehrkraft schlägt die Vorbelegung — aber nur, soweit sie
+    # überhaupt etwas bewirken kann: Ohne gefundene Klasse gibt es nichts zu erben.
+    erbt_wirklich = (aufloesung.erbt if erbt is None else erbt) and bool(treffer)
 
     basis = f"teaching-{vorschlag.subject_slug}-{_slugteil(vorschlag.vorschlag_name)}"
     slug = basis
@@ -690,6 +694,7 @@ async def lege_gruppe_aus_vorschlag_an(
         type="teaching_group",
         subject_id=vorschlag.subject_id,
         sso_group_id=None,
+        erbt_mitglieder=erbt_wirklich,
     )
     db.add(gruppe)
     await db.flush()
@@ -715,7 +720,7 @@ async def lege_gruppe_aus_vorschlag_an(
         quellklassen=tuple(treffer),
         ohne_treffer=ohne_treffer,
         kursstufe=kursstufe,
-        erbt=aufloesung.erbt,
+        erbt=erbt_wirklich,
     )
 
 

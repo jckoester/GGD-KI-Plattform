@@ -332,6 +332,8 @@ async def _adoptierte_gruppe(db, fach_id: int, klasse_id: int, pseudonym: str) -
     gruppe = Group(
         name="9z", slug=f"teaching-adoptiert-{klasse_id}", type="teaching_group",
         subject_id=fach_id, sso_group_id=None,
+        # „Klasse × Fach" ist der ganze Klassenverband — die Gruppe erbt (Alembic 0069).
+        erbt_mitglieder=True,
     )
     db.add(gruppe)
     await db.flush()
@@ -780,7 +782,9 @@ class TestHerkunftUndMehrereQuellklassen:
                     klassen.append(k)
                 await db.flush()
                 gruppe = Group(name="NwT 10", slug="teaching-nwt-10",
-                               type="teaching_group", subject_id=fach_id, sso_group_id=None)
+                               type="teaching_group", subject_id=fach_id, sso_group_id=None,
+                               # Vorbelegung bei mehreren Klassen: Teilgruppe.
+                               erbt_mitglieder=False)
                 db.add(gruppe)
                 await db.flush()
                 for k in klassen:
@@ -825,3 +829,66 @@ class TestHerkunftUndMehrereQuellklassen:
 async def _session(factory) -> AsyncSession:
     """`sync_groups` committet selbst — es bekommt deshalb eine eigene Sitzung."""
     return factory()
+
+
+class TestEntscheidungIstKorrigierbar:
+    """Von „ganze Klasse" auf „Teilgruppe" umzustellen muss die Mitglieder abräumen.
+
+    Sonst wäre die Entscheidung nur in eine Richtung korrigierbar: Wer sich beim Anlegen
+    vertut, bekäme die zu viel geerbten Schüler:innen nie wieder heraus — manuelle
+    Mitgliederpflege gibt es nicht.
+    """
+
+    async def test_umschalten_auf_teilgruppe_raeumt_ab(self, async_engine):
+        factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+        lehrkraft, schuelerin = "flip-lehrkraft", "flip-schuelerin"
+        try:
+            async with factory() as db:
+                fach_id = await _get_or_create_subject(db, "flip-fach", "Umschaltkunde")
+                klasse = Group(name="7e", slug="klasse-7e-flip", type="school_class",
+                               sso_group_id="klasse.7e-flip")
+                db.add(klasse)
+                await db.flush()
+                gruppe_id = await _adoptierte_gruppe(db, fach_id, klasse.id, lehrkraft)
+                await db.commit()
+
+            # Erst erben …
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=schuelerin,
+                                  sso_groups=["klasse.7e-flip"],
+                                  primary_role="student", patterns=OHNE_UNTERRICHT)
+            async with factory() as db:
+                assert (await db.execute(
+                    select(GroupMembership.herkunft).where(
+                        GroupMembership.pseudonym == schuelerin,
+                        GroupMembership.group_id == gruppe_id)
+                )).scalar_one_or_none() == "geerbt"
+
+            # … dann die Entscheidung drehen.
+            async with factory() as db:
+                gruppe = await db.get(Group, gruppe_id)
+                gruppe.erbt_mitglieder = False
+                await db.commit()
+
+            async with factory() as db:
+                await sync_groups(db=db, pseudonym=schuelerin,
+                                  sso_groups=["klasse.7e-flip"],
+                                  primary_role="student", patterns=OHNE_UNTERRICHT)
+            async with factory() as db:
+                geblieben = (await db.execute(
+                    select(GroupMembership.herkunft).where(
+                        GroupMembership.pseudonym == schuelerin,
+                        GroupMembership.group_id == gruppe_id)
+                )).scalar_one_or_none()
+            assert geblieben is None, (
+                "Nach dem Umschalten auf Teilgruppe muss die geerbte Mitgliedschaft "
+                "fallen — sonst ist die Entscheidung nicht korrigierbar."
+            )
+        finally:
+            async with factory() as db:
+                await db.execute(delete(GroupMembership).where(
+                    GroupMembership.pseudonym.in_([lehrkraft, schuelerin])))
+                await db.execute(delete(Group).where(Group.slug.like("teaching-adoptiert-%")))
+                await db.execute(delete(Group).where(Group.slug == "klasse-7e-flip"))
+                await db.execute(delete(Subject).where(Subject.slug == "flip-fach"))
+                await db.commit()

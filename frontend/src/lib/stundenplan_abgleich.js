@@ -172,7 +172,10 @@ export function anlegbareGruppen(antwort) {
         fach: g.subject_slug ?? null,
         klassen: g.klassen ?? [],
         herkunft: herkunftDerMitglieder(g),
-        erbt: (g.erbt_aus ?? []).length > 0,
+        // Ob die Frage „ganze Klasse oder Teilgruppe?" überhaupt sinnvoll ist. Ohne
+        // gefundene Klasse gibt es nichts zu erben — dann wäre sie eine Scheinwahl.
+        kannErben: Boolean(g.kann_erben),
+        erbtVorbelegt: Boolean(g.erbt_vorbelegt),
     }))
 }
 
@@ -217,4 +220,19 @@ function listeMitUnd(werte) {
     const w = [...werte]
     if (w.length <= 1) return w[0] ?? ""
     return `${w.slice(0, -1).join(", ")} und ${w[w.length - 1]}`
+}
+
+/**
+ * Der Satz zur getroffenen Wahl — was beim Anlegen tatsächlich passieren wird.
+ *
+ * Getrennt von `herkunftDerMitglieder`: Jene beschreibt die **Lage** (was der
+ * Stundenplan hergibt), diese die **Entscheidung**. Solange beides dasselbe sagte, war
+ * die Trennung unnötig; sobald die Lehrkraft widersprechen darf, ist sie es nicht mehr.
+ */
+export function wahlWirkung(g, erbt) {
+    if (!g?.kannErben) return g?.herkunft ?? ""
+    const klassen = g.klassen ?? []
+    return erbt
+        ? `Mitglieder aus ${listeMitUnd(klassen)} kommen automatisch dazu`
+        : "Teilgruppe — Schüler:innen treten über einen Code bei"
 }

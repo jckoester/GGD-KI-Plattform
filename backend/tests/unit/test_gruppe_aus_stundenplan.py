@@ -61,7 +61,7 @@ def _app(monkeypatch, fehlend, anlage=None):
         "app.calendar.router.lege_gruppe_aus_vorschlag_an",
         AsyncMock(return_value=anlage or SimpleNamespace(
             group_id=42, name="Chemie 9D", subject_id=7,
-            quellklassen=("9D",), ohne_treffer=(), kursstufe=False,
+            quellklassen=("9D",), ohne_treffer=(), kursstufe=False, erbt=True,
         )),
     )
     db = AsyncMock()
@@ -141,3 +141,34 @@ def test_ohne_stundenplan_anbindung_kein_anlegen(monkeypatch):
     antwort = TestClient(app).post("/calendar/teaching-groups",
                                    json={"gruppe": "CH 9D", "subject_id": 7})
     assert antwort.status_code == 409
+
+
+# ── Ganze Klasse oder Teilgruppe? ────────────────────────────────────────────
+
+
+def test_entscheidung_der_lehrkraft_geht_mit(monkeypatch):
+    """Die Wahl „ganze Klasse / Teilgruppe" muss bis zur Anlage durchkommen.
+
+    ⚠️ Sie ist der einzige Weg, den Religion-und-Ethik-Fall zu lösen: Der Stundenplan
+    nennt dort **eine** Klasse, die Gruppe ist trotzdem eine Auswahl daraus. Verschluckt
+    der Endpunkt das Feld, erbt die Gruppe die ganze Klasse — und niemand merkt es.
+    """
+    client = _app(monkeypatch, [_vorschlag()])
+    antwort = client.post("/calendar/teaching-groups",
+                          json={"gruppe": "CH 9D", "subject_id": 7, "erbt": False})
+    assert antwort.status_code == 201, antwort.text
+
+    from app.calendar.router import lege_gruppe_aus_vorschlag_an
+    # Viertes Argument ist die Entscheidung.
+    assert lege_gruppe_aus_vorschlag_an.await_args.args[3] is False
+
+
+def test_ohne_angabe_entscheidet_die_vorbelegung(monkeypatch):
+    """Ohne Feld bleibt die serverseitige Vorbelegung — `None`, nicht `False`."""
+    client = _app(monkeypatch, [_vorschlag()])
+    antwort = client.post("/calendar/teaching-groups",
+                          json={"gruppe": "CH 9D", "subject_id": 7})
+    assert antwort.status_code == 201
+
+    from app.calendar.router import lege_gruppe_aus_vorschlag_an
+    assert lege_gruppe_aus_vorschlag_an.await_args.args[3] is None

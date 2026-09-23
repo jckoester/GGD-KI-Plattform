@@ -155,6 +155,14 @@ class Group(Base):
     student_visible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false"), default=False
     )
+    # Ob die Gruppe ihre Mitglieder aus den Quellklassen zieht (Alembic 0069).
+    # **Entschieden, nicht gezählt:** Ob eine Gruppe den ganzen Klassenverband
+    # unterrichtet oder eine Auswahl daraus, weiß nur die Lehrkraft — Religion und Ethik
+    # teilen eine Klasse, ohne dass der Stundenplan zwei Klassennamen nennt. Die Anzahl
+    # der Quellklassen ist nur die **Vorbelegung** beim Anlegen.
+    erbt_mitglieder: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )

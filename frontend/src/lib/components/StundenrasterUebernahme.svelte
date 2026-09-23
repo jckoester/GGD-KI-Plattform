@@ -18,7 +18,7 @@
     setWeekPattern,
     generateSlots,
   } from "$lib/api.js"
-  import { anlegbareGruppen, rasterJeGruppe } from "$lib/stundenplan_abgleich.js"
+  import { anlegbareGruppen, rasterJeGruppe, wahlWirkung } from "$lib/stundenplan_abgleich.js"
   import {
     halbjahrFuerMuster,
     halbjahreFuerUebernahme,
@@ -44,6 +44,14 @@
 
   const gruppen = $derived(rasterJeGruppe(antwort))
   const anlegbar = $derived(anlegbareGruppen(antwort))
+  // Vorbelegt aus der Lage, überschreibbar von der Lehrkraft. Kein `$derived`:
+  // Die Wahl muss ein erneutes Lesen überleben, die Lage ist nur ihr Ausgangspunkt.
+  let wahl = $state({})
+  $effect(() => {
+    const naechste = {}
+    for (const g of anlegbar) naechste[g.gruppe] = wahl[g.gruppe] ?? g.erbtVorbelegt
+    wahl = naechste
+  })
   const aktuellesHalbjahr = $derived(antwort?.halbjahr ?? 1)
   const restjahr = $derived(restjahrMoeglich(aktuellesHalbjahr))
   const unsicherGesamt = $derived(gruppen.reduce((n, g) => n + g.unsicher, 0))
@@ -67,7 +75,7 @@
     legtAn = g.gruppe
     anlegeFehler = null
     try {
-      await createTeachingGroupFromTimetable(g.gruppe, g.subjectId)
+      await createTeachingGroupFromTimetable(g.gruppe, g.subjectId, wahl[g.gruppe])
       // Neu lesen statt lokal streichen: Die angelegte Gruppe taucht danach als
       // **vorhanden** auf und ihr Wochenmuster lässt sich in einem Zug übernehmen.
       // Ein lokales Entfernen ließe die Liste und den Server auseinanderlaufen.
@@ -245,9 +253,27 @@
               <span class="block text-sm text-light-tx dark:text-dark-tx">
                 {g.name}
               </span>
-              <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
-                {g.herkunft}
-              </span>
+              {#if g.kannErben}
+                <label class="mt-1 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  <span>Wer gehört dazu?</span>
+                  <select
+                    bind:value={wahl[g.gruppe]}
+                    class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-bg dark:bg-dark-bg px-1.5 py-0.5
+                           text-light-tx dark:text-dark-tx"
+                  >
+                    <option value={true}>die ganze Klasse</option>
+                    <option value={false}>nur ein Teil der Klasse</option>
+                  </select>
+                </label>
+                <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  {wahlWirkung(g, wahl[g.gruppe])}
+                </span>
+              {:else}
+                <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  {g.herkunft}
+                </span>
+              {/if}
             </span>
             <button
               onclick={() => anlegen(g)}

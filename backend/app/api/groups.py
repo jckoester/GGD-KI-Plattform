@@ -442,6 +442,8 @@ async def create_teaching_group(
         type="teaching_group",
         subject_id=body.subject_id,
         sso_group_id=None,
+        # Der manuelle Weg ist „Klasse × Fach" — also der ganze Klassenverband.
+        erbt_mitglieder=True,
     )
     db.add(group)
     await db.flush()

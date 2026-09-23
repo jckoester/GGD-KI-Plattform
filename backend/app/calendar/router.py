@@ -363,6 +363,10 @@ async def week_patterns(
                 "klassen_ohne_treffer": list(aufloesungen[s.key.label].ohne_treffer),
                 "kursstufe": aufloesungen[s.key.label].kursstufe,
                 "mehrklassig": aufloesungen[s.key.label].mehrklassig,
+                # Ob die Frage „ganze Klasse oder Teilgruppe?" überhaupt sinnvoll ist —
+                # ohne gefundene Klasse gibt es nichts zu erben.
+                "kann_erben": bool(aufloesungen[s.key.label].treffer),
+                "erbt_vorbelegt": aufloesungen[s.key.label].erbt,
             }
             for s in abgleich.fehlend
         ],
@@ -393,6 +397,9 @@ class TeachingGroupAusStundenplan(BaseModel):
 
     gruppe: str            # `GroupKey.label`, wie in `fehlende_gruppen.gruppe`
     subject_id: int        # zur Absicherung: muss zum serverseitigen Vorschlag passen
+    # Ob die Gruppe den ganzen Klassenverband unterrichtet (`true`) oder eine Auswahl
+    # daraus (`false`). `None` übernimmt die Vorbelegung des Servers.
+    erbt: bool | None = None
     wochen: int = 4
     stichtag: date | None = None
 
@@ -448,7 +455,7 @@ async def gruppe_aus_stundenplan_anlegen(
             "Bitte Liste neu laden.",
         )
 
-    ergebnis = await lege_gruppe_aus_vorschlag_an(db, vorschlag, _current.sub)
+    ergebnis = await lege_gruppe_aus_vorschlag_an(db, vorschlag, _current.sub, body.erbt)
     await db.commit()
     logger.info(
         "gruppe_aus_stundenplan pseudonym=%s gruppe=%s id=%s quellklassen=%d kursstufe=%s",
@@ -462,6 +469,7 @@ async def gruppe_aus_stundenplan_anlegen(
         "quellklassen": list(ergebnis.quellklassen),
         "ohne_treffer": list(ergebnis.ohne_treffer),
         "kursstufe": ergebnis.kursstufe,
+        "erbt": ergebnis.erbt,
     }
 
 

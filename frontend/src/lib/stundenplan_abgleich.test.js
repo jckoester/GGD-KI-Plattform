@@ -7,6 +7,7 @@ import {
     fehlendesRaster,
     herkunftDerMitglieder,
     rasterJeGruppe,
+    wahlWirkung,
     OHNE_GRUPPE,
     OHNE_SLOT,
     ZUR_GRUPPE,
@@ -272,15 +273,38 @@ describe("anlegbareGruppen", () => {
                 gruppe: "CH 9D", name: "Chemie 9D", subject_id: 7,
                 subject_slug: "chemie", klassen: ["9D"],
                 erbt_aus: ["9D"], klassen_ohne_treffer: [], kursstufe: false,
+                kann_erben: true, erbt_vorbelegt: true,
             }],
         })
         expect(g.gruppe).toBe("CH 9D")
         expect(g.subjectId).toBe(7)
-        expect(g.erbt).toBe(true)
+        expect(g.kannErben).toBe(true)
+        expect(g.erbtVorbelegt).toBe(true)
     })
 
     it("ist leer, wenn nichts fehlt", () => {
         expect(anlegbareGruppen({ fehlende_gruppen: [] })).toEqual([])
         expect(anlegbareGruppen(null)).toEqual([])
+    })
+})
+
+describe("wahlWirkung", () => {
+    it("nennt bei der Wahl ‚ganze Klasse‘ die Klassen, die dazukommen", () => {
+        const g = { kannErben: true, klassen: ["7a"], herkunft: "…" }
+        expect(wahlWirkung(g, true)).toContain("7a")
+        expect(wahlWirkung(g, true)).toContain("automatisch")
+    })
+
+    it("nennt bei der Wahl ‚Teilgruppe‘ den Code", () => {
+        // ⚠️ Der Religion-und-Ethik-Fall: **eine** Klasse im Stundenplan, trotzdem nur
+        // die halbe Klasse in der Gruppe.
+        const g = { kannErben: true, klassen: ["7a"], herkunft: "…" }
+        expect(wahlWirkung(g, false)).toContain("Code")
+        expect(wahlWirkung(g, false)).not.toContain("automatisch")
+    })
+
+    it("stellt die Frage nicht, wo es nichts zu erben gibt", () => {
+        const g = { kannErben: false, klassen: [], herkunft: "Kursstufe — Beitritt über einen Code" }
+        expect(wahlWirkung(g, true)).toBe(g.herkunft)
     })
 })

@@ -188,3 +188,97 @@ async def test_namensgleiche_gruppen_bekommen_eigene_slugs(async_engine):
         assert len(set(slugs)) == 2, f"Slugs müssen eindeutig sein: {slugs}"
     finally:
         await _aufraeumen(factory)
+
+
+async def test_lehrkraft_kann_einzelklasse_als_teilgruppe_anlegen(async_engine):
+    """⚠️ **Der Religion-und-Ethik-Fall** (Jan, 23.09.2026).
+
+    Der Stundenplan nennt **eine** Klasse — die Vorbelegung wäre also „erbt". Die Gruppe
+    ist trotzdem nur die Hälfte der Klasse. Sagt die Lehrkraft „Teilgruppe", darf nichts
+    geerbt werden; die Klasse bleibt als **Herkunft** stehen, weil sie für Zuordnung und
+    Jahrgang gebraucht wird.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            fach_id = await _fach(db)
+            await _klassen(db, ["7A"])
+            ergebnis = await lege_gruppe_aus_vorschlag_an(
+                db,
+                _Vorschlag(fach_id, "anlage-fach", ("7A",), "Ethik 7a"),
+                LEHRKRAFT,
+                erbt=False,
+            )
+            await db.commit()
+
+        async with factory() as db:
+            gruppe = await db.get(Group, ergebnis.group_id)
+            quellen = (await db.execute(
+                select(GroupSourceClass.class_group_id).where(
+                    GroupSourceClass.group_id == ergebnis.group_id)
+            )).scalars().all()
+
+        assert ergebnis.erbt is False
+        assert gruppe.erbt_mitglieder is False, (
+            "Die Entscheidung der Lehrkraft muss an der Gruppe stehen — sonst erbt sie "
+            "beim nächsten Login doch die ganze Klasse."
+        )
+        assert len(quellen) == 1, "die Herkunft bleibt, nur die Vererbung nicht"
+    finally:
+        await _aufraeumen(factory)
+
+
+async def test_lehrkraft_kann_mehrklassige_gruppe_erben_lassen(async_engine):
+    """Die Gegenrichtung: zwei kleine Klassen, vollständig gemeinsam unterrichtet.
+
+    Die Vorbelegung sagt „Teilgruppe", weil mehrklassig fast immer eine Auswahl ist.
+    Wer es besser weiß, kann es sagen — und dann erbt die Gruppe aus beiden.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            fach_id = await _fach(db)
+            await _klassen(db, ["5A", "5B"])
+            ergebnis = await lege_gruppe_aus_vorschlag_an(
+                db,
+                _Vorschlag(fach_id, "anlage-fach", ("5A", "5B"), "Sport 5ab"),
+                LEHRKRAFT,
+                erbt=True,
+            )
+            await db.commit()
+
+        async with factory() as db:
+            gruppe = await db.get(Group, ergebnis.group_id)
+        assert ergebnis.erbt is True
+        assert gruppe.erbt_mitglieder is True
+    finally:
+        await _aufraeumen(factory)
+
+
+async def test_ohne_gefundene_klasse_bleibt_es_beim_code(async_engine):
+    """„Erben" ohne Klasse ist keine Entscheidung, sondern ein Missverständnis.
+
+    Sagt jemand `erbt=True` für einen Kursstufenkurs, gibt es trotzdem nichts zu erben —
+    die Gruppe bliebe leer und niemand wüsste warum. Deshalb wird die Angabe hier
+    stillschweigend zu `false`, nicht zu einem Fehler: Die Lehrkraft hat nichts falsch
+    gemacht, die Frage war nur nicht anwendbar.
+    """
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            fach_id = await _fach(db)
+            await _klassen(db, ["11"])
+            ergebnis = await lege_gruppe_aus_vorschlag_an(
+                db,
+                _Vorschlag(fach_id, "anlage-fach", ("11",), "Chemie 2 (11)"),
+                LEHRKRAFT,
+                erbt=True,
+            )
+            await db.commit()
+
+        async with factory() as db:
+            gruppe = await db.get(Group, ergebnis.group_id)
+        assert ergebnis.erbt is False
+        assert gruppe.erbt_mitglieder is False
+    finally:
+        await _aufraeumen(factory)
