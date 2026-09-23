@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Hinweis, wenn eine Gruppe nicht mehr im Stundenplan steht.** Beim Übernehmen aus dem
+  Stundenplan meldet die Plattform, zu welchen Ihrer Unterrichtsgruppen sie nichts
+  gefunden hat. **Geändert wird nichts** — Planung, Stundenentwürfe und Chats bleiben;
+  ob die Gruppe ausgelaufen ist oder nur außerhalb des Abrufzeitraums liegt, entscheiden
+  Sie.
 - **Beitrittscode für Unterrichtsgruppen.** Wo eine Gruppe ihre Mitglieder nicht aus
   einer Klasse bekommt — Kurse der Kursstufe, Teilgruppen, Nachzügler — gibt die
   Lehrkraft einen kurzen Code aus; Schüler:innen treten damit unter „Fächer" selbst bei.

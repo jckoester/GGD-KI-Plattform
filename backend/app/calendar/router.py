@@ -10,6 +10,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
@@ -29,7 +30,9 @@ from app.calendar.service import (
     is_configured,
     list_kuerzel,
 )
+from app.db.models import Group
 from app.db.session import get_db
+from app.groups.aktualitaet import gruppen_mit_beleg, ist_aktuell
 from app.planning.calendar import ab_phasen, is_schoolday, load_school_year
 from app.preferences.service import get_preferences
 
@@ -310,6 +313,7 @@ async def week_patterns(
     aufloesungen = {
         s.key.label: quellklassen_aufloesen(karte, s.class_names) for s in abgleich.fehlend
     }
+    verschwunden = await _nicht_mehr_im_stundenplan(db, abgleich.nicht_im_stundenplan)
     # Eine Gruppe kann mehrere Muster-Schlüssel bündeln (M + MD).
     zuordnung = {k: s for s in abgleich.fehlend for k in s.keys}
     vorhanden = set(abgleich.vorhanden)
@@ -388,6 +392,7 @@ async def week_patterns(
                 else []
             ),
             *abgleich.mehrdeutig,
+            *verschwunden,
         ],
     }
 
@@ -471,6 +476,36 @@ async def gruppe_aus_stundenplan_anlegen(
         "kursstufe": ergebnis.kursstufe,
         "erbt": ergebnis.erbt,
     }
+
+
+async def _nicht_mehr_im_stundenplan(db: AsyncSession, kandidaten) -> list[str]:
+    """Hinweise zu eigenen Gruppen, die der Stundenplan nicht mehr nennt.
+
+    **Ein Hinweis, keine Handlung.** Nichts wird archiviert, gelöscht oder umbenannt: An
+    einer Unterrichtsgruppe hängen Jahresplan, Stundenentwürfe, Konversationen und
+    Kontextfreigaben. Ob eine Gruppe wirklich ausgelaufen ist oder nur gerade nicht im
+    Abrufzeitraum liegt, weiß die Lehrkraft — die Plattform sieht vier Wochen.
+
+    ⚠️ **Gefiltert auf das laufende Schuljahr.** Ohne `ist_aktuell` meldete der Hinweis
+    jede Gruppe aus jedem Vorjahr und aus dem anderen Halbjahr — Lärm, in dem der eine
+    echte Fall untergeht. Die Regel dafür teilt sich diese Stelle mit der Gruppenliste
+    (`app/groups/aktualitaet.py`); zwei Fassungen liefen auseinander.
+    """
+    if not kandidaten:
+        return []
+    ids = [k.id for k in kandidaten]
+    gruppen = list((await db.execute(select(Group).where(Group.id.in_(ids)))).scalars())
+    cfg = load_school_year()
+    beleg = await gruppen_mit_beleg(db, ids, cfg)
+    betroffen = [g for g in gruppen if ist_aktuell(g, beleg, cfg)]
+    if not betroffen:
+        return []
+    namen = ", ".join(f"„{g.anzeigename}“" for g in sorted(betroffen, key=lambda g: g.anzeigename))
+    return [
+        f"{namen}: im Stundenplan nicht gefunden. Das kann am Abrufzeitraum liegen — "
+        "oder die Gruppe läuft nicht mehr. Geändert wurde nichts; Planung und Chats "
+        "bleiben erhalten."
+    ]
 
 
 class _Leer:

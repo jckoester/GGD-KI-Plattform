@@ -282,3 +282,80 @@ async def test_ohne_gefundene_klasse_bleibt_es_beim_code(async_engine):
         assert gruppe.erbt_mitglieder is False
     finally:
         await _aufraeumen(factory)
+
+
+# ── AP5: Verschwindet eine Gruppe aus dem Stundenplan ────────────────────────
+
+
+async def test_abgleich_ohne_die_lerngruppe_aendert_nichts(async_engine):
+    """⚠️ **Die Zusage von AP5: Ein Hinweis ist keine Handlung.**
+
+    Steht eine Gruppe nicht mehr im Stundenplan, bleibt **alles** wie es war — Gruppe,
+    Mitgliedschaften, Quellklassen, Vererbungsentscheidung. An einer Unterrichtsgruppe
+    hängen Jahresplan, Stundenentwürfe und Konversationen; sie automatisch zu
+    archivieren hieße, eine Vier-Wochen-Momentaufnahme über ein Schuljahr entscheiden zu
+    lassen.
+
+    Geprüft wird der **Abgleich selbst** (`match_groups` mit leerem Stundenplan), nicht
+    der Endpunkt: Hier soll sich zeigen, dass der schreibende Teil gar nicht erst
+    angefasst wird.
+    """
+    from app.calendar.groups import match_groups
+
+    factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            fach_id = await _fach(db)
+            await _klassen(db, ["6A"])
+            ergebnis = await lege_gruppe_aus_vorschlag_an(
+                db,
+                _Vorschlag(fach_id, "anlage-fach", ("6A",), "Anlage 6a"),
+                LEHRKRAFT,
+            )
+            db.add(GroupMembership(group_id=ergebnis.group_id, pseudonym="schueler-6a",
+                                   role_in_group="student", herkunft="geerbt"))
+            await db.commit()
+
+        async with factory() as db:
+            vorher = await db.get(Group, ergebnis.group_id)
+            zustand_vorher = (vorher.name, vorher.slug, vorher.erbt_mitglieder,
+                              vorher.subject_id)
+            mitglieder_vorher = sorted(
+                (m.pseudonym, m.herkunft) for m in (await db.execute(
+                    select(GroupMembership).where(
+                        GroupMembership.group_id == ergebnis.group_id)
+                )).scalars().all()
+            )
+
+        # Der Stundenplan gibt nichts mehr her.
+        async with factory() as db:
+            abgleich = await match_groups(db, [], pseudonym=LEHRKRAFT)
+            await db.commit()
+
+        assert ergebnis.group_id in {k.id for k in abgleich.nicht_im_stundenplan}, (
+            "Die Gruppe wird nicht als vermisst gemeldet."
+        )
+
+        async with factory() as db:
+            nachher = await db.get(Group, ergebnis.group_id)
+            assert nachher is not None, "Die Gruppe wurde gelöscht"
+            assert (nachher.name, nachher.slug, nachher.erbt_mitglieder,
+                    nachher.subject_id) == zustand_vorher, "Die Gruppe wurde verändert"
+            mitglieder_nachher = sorted(
+                (m.pseudonym, m.herkunft) for m in (await db.execute(
+                    select(GroupMembership).where(
+                        GroupMembership.group_id == ergebnis.group_id)
+                )).scalars().all()
+            )
+            quellen = (await db.execute(
+                select(GroupSourceClass.class_group_id).where(
+                    GroupSourceClass.group_id == ergebnis.group_id)
+            )).scalars().all()
+        assert mitglieder_nachher == mitglieder_vorher, "Mitgliedschaften wurden angetastet"
+        assert len(quellen) == 1, "Die Quellklasse wurde entfernt"
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(
+                GroupMembership.pseudonym == "schueler-6a"))
+            await db.commit()
+        await _aufraeumen(factory)

@@ -197,6 +197,11 @@ class GroupMatchResult:
     # Kursstufen-Gruppen, bei denen sich Basis- und Leistungskurs nicht auseinanderhalten
     # lassen, weil der vorhandene Gruppenname die Kursart nicht nennt.
     mehrdeutig: list[str] = field(default_factory=list)
+    # Eigene Unterrichtsgruppen, für die der Stundenplan **nichts** hergab. Eine reine
+    # Feststellung: Ob das etwas bedeutet, entscheidet der Aufrufer — eine Gruppe des
+    # anderen Halbjahres oder eines Vorjahres steht hier genauso drin wie eine, die
+    # gerade aus dem Stundenplan gefallen ist.
+    nicht_im_stundenplan: list[Kandidat] = field(default_factory=list)
 
 
 def _gruppenidentitaet(
@@ -327,6 +332,11 @@ async def match_groups(
                 ),
             )
         )
+    # Die Gegenrichtung: eigene Gruppen, zu denen der Stundenplan nichts sagt.
+    # Bewusst **ohne** Bewertung — siehe das Feld.
+    zugeordnet = set(treffer.values())
+    ergebnis.nicht_im_stundenplan = [k for k in kandidaten if k.id not in zugeordnet]
+
     _namen_eindeutig_machen(ergebnis.fehlend)
     return ergebnis
 
