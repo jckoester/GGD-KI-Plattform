@@ -572,3 +572,138 @@ def zuordnen(
         i: [kandidaten[j] for j in sorted(kanten[i] & offen_g)] for i in sorted(offen_l)
     }
     return {i: kandidaten[j].id for i, j in zuordnung.items()}, rest
+
+
+@dataclass
+class Klassenaufloesung:
+    """Welche Klassennamen des Stundenplans auf Klassengruppen der Plattform passen."""
+
+    treffer: dict[str, int]            # Klassenname → `groups.id`
+    ohne_treffer: tuple[str, ...]      # genannt, aber auf der Plattform nicht vorhanden
+    kursstufe: bool
+
+
+async def klassenkarte(db: AsyncSession) -> dict[str, int]:
+    """Alle Klassengruppen als `name.lower() → id`. Einmal laden, oft fragen."""
+    zeilen = await db.execute(
+        select(Group.id, Group.name).where(Group.type == "school_class")
+    )
+    return {(name or "").strip().lower(): gid for gid, name in zeilen.all()}
+
+
+def quellklassen_aufloesen(
+    karte: dict[str, int], class_names: tuple[str, ...]
+) -> Klassenaufloesung:
+    """Aus Klassennamen des Stundenplans die Quellklassen der Gruppe bestimmen.
+
+    ⚠️ **In der Kursstufe wird bewusst nicht gesucht.** Dort heißt die „Klasse" `11` oder
+    `J1` und bezeichnet einen ganzen Jahrgang; eine Vererbung daraus schriebe den
+    kompletten Jahrgang in einen Kurs von zwanzig Leuten. Solche Gruppen leben vom
+    Beitrittscode. Entsprechend ist dort auch nichts „ohne Treffer" — es wurde nichts
+    gesucht, also fehlt auch nichts.
+
+    Rein, ohne Datenbank: Dieselbe Antwort braucht die Vorschlagsliste (*woher kämen die
+    Mitglieder?*) und die Anlage (*was wird verknüpft?*). Zwei Rechnungen liefen
+    auseinander, und die Liste verspräche etwas, das die Anlage nicht hält.
+    """
+    if ist_kursstufe(class_names):
+        return Klassenaufloesung(treffer={}, ohne_treffer=(), kursstufe=True)
+    treffer = {}
+    for roh in class_names:
+        klassen_id = karte.get(roh.strip().lower())
+        if klassen_id is not None:
+            treffer[roh] = klassen_id
+    return Klassenaufloesung(
+        treffer=treffer,
+        ohne_treffer=tuple(n for n in class_names if n not in treffer),
+        kursstufe=False,
+    )
+
+
+@dataclass
+class Anlageergebnis:
+    """Was beim Anlegen einer Gruppe aus dem Stundenplan herauskam."""
+
+    group_id: int
+    name: str
+    subject_id: int
+    quellklassen: tuple[str, ...]      # tatsächlich verknüpfte Klassen
+    ohne_treffer: tuple[str, ...]      # im Stundenplan genannt, auf der Plattform nicht
+    kursstufe: bool
+
+
+async def lege_gruppe_aus_vorschlag_an(
+    db: AsyncSession, vorschlag: GroupSuggestion, pseudonym: str
+) -> Anlageergebnis:
+    """Aus einem Stundenplan-Vorschlag eine Unterrichtsgruppe machen.
+
+    ⚠️ **Der Aufrufer hat die Berechtigung bereits geprüft.** Diese Funktion glaubt dem
+    `vorschlag` — er muss aus einem serverseitigen Abgleich stammen, nicht aus der
+    Anfrage. Wer hier einen selbstgebauten `GroupSuggestion` hineinreicht, legt eine
+    beliebige Gruppe an.
+
+    **Quellklassen nur im Klassenverband.** Die Klassennamen aus dem Stundenplan werden
+    auf `school_class`-Gruppen abgebildet; wo eine passt, erbt die Gruppe von dort
+    (`group_source_classes`). In der **Kursstufe** wird das bewusst übersprungen: Dort
+    heißt die „Klasse" `11` oder `J1` und bezeichnet einen ganzen Jahrgang. Eine
+    Vererbung daraus schriebe den kompletten Jahrgang in einen Kurs von zwanzig Leuten.
+    Solche Gruppen leben vom Beitrittscode.
+
+    Nicht gefundene Klassen sind **kein Fehler**: Die Gruppe entsteht trotzdem und die
+    Lücke wird gemeldet. Sonst scheiterte das Anlegen an einer Klasse, die auf der
+    Plattform schlicht noch nicht existiert — und die Lehrkraft stünde ohne Gruppe da.
+    """
+    karte = await klassenkarte(db)
+    aufloesung = quellklassen_aufloesen(karte, vorschlag.class_names)
+    kursstufe, treffer, ohne_treffer = (
+        aufloesung.kursstufe, aufloesung.treffer, aufloesung.ohne_treffer
+    )
+
+    basis = f"teaching-{vorschlag.subject_slug}-{_slugteil(vorschlag.vorschlag_name)}"
+    slug = basis
+    lauf = 1
+    while (await db.execute(select(Group.id).where(Group.slug == slug))).scalar_one_or_none():
+        slug = f"{basis}-{lauf}"
+        lauf += 1
+
+    gruppe = Group(
+        name=vorschlag.vorschlag_name,
+        slug=slug,
+        type="teaching_group",
+        subject_id=vorschlag.subject_id,
+        sso_group_id=None,
+    )
+    db.add(gruppe)
+    await db.flush()
+
+    for klassen_id in dict.fromkeys(treffer.values()):
+        db.add(GroupSourceClass(group_id=gruppe.id, class_group_id=klassen_id))
+
+    db.add(
+        GroupMembership(
+            group_id=gruppe.id,
+            pseudonym=pseudonym,
+            role_in_group="teacher",
+            # Die Mitgliedschaft ist der Nachweis, dass die Gruppe ihr gehört.
+            herkunft="eigen",
+        )
+    )
+    await db.flush()
+
+    return Anlageergebnis(
+        group_id=gruppe.id,
+        name=gruppe.name,
+        subject_id=vorschlag.subject_id,
+        quellklassen=tuple(treffer),
+        ohne_treffer=ohne_treffer,
+        kursstufe=kursstufe,
+    )
+
+
+def _slugteil(text: str) -> str:
+    """Ein Gruppenname als Slug-Bestandteil — klein, ohne Sonderzeichen."""
+    klein = text.strip().lower()
+    ersetzt = re.sub(r"[^a-z0-9]+", "-", klein.translate(
+        str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+    ))
+    return ersetzt.strip("-") or "gruppe"

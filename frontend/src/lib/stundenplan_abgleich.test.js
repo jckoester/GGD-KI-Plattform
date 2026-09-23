@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest"
 import {
     abgleichZusammenfassung,
+    anlegbareGruppen,
     diagnose,
     diagnoseHatInhalt,
     fehlendesRaster,
+    herkunftDerMitglieder,
     rasterJeGruppe,
     OHNE_GRUPPE,
     OHNE_SLOT,
@@ -206,3 +208,61 @@ describe("fehlendesRaster nach AP4", () => {
         expect(fehlendesRaster(ergebnis)).toContain("noch keine Stunden angelegt");
     });
 });
+
+// ── AP3: Woher kämen die Mitglieder? ─────────────────────────────────────────
+
+describe("herkunftDerMitglieder", () => {
+    it("nennt die Klassen, aus denen geerbt wird", () => {
+        const satz = herkunftDerMitglieder({
+            erbt_aus: ["10a", "10b", "10c"],
+            klassen_ohne_treffer: [],
+        })
+        expect(satz).toBe("Mitglieder aus 10a, 10b und 10c")
+    })
+
+    it("verweist in der Kursstufe auf den Code", () => {
+        // Dort heißt die „Klasse" 11 und meint einen ganzen Jahrgang — daraus wird
+        // bewusst nicht geerbt.
+        const satz = herkunftDerMitglieder({ kursstufe: true, erbt_aus: [] })
+        expect(satz).toContain("Code")
+        expect(satz).toContain("Kursstufe")
+    })
+
+    it("sagt, wenn eine genannte Klasse auf der Plattform fehlt", () => {
+        const satz = herkunftDerMitglieder({
+            erbt_aus: ["9a"],
+            klassen_ohne_treffer: ["9b"],
+        })
+        expect(satz).toContain("9a")
+        expect(satz).toContain("9b")
+        expect(satz).toContain("gibt es hier noch nicht")
+    })
+
+    it("verspricht nichts, wenn gar keine Klasse passt", () => {
+        // ⚠️ Der schlimmste Fall für die Lehrkraft: Sie legt an und die Gruppe bleibt
+        // leer. Ohne diesen Satz stünde sie ohne Erklärung da.
+        const satz = herkunftDerMitglieder({ erbt_aus: [], klassen_ohne_treffer: [] })
+        expect(satz).toContain("Code")
+        expect(satz).not.toContain("Mitglieder aus")
+    })
+})
+
+describe("anlegbareGruppen", () => {
+    it("übernimmt Schlüssel und Fach für die Anlage-Anfrage", () => {
+        const [g] = anlegbareGruppen({
+            fehlende_gruppen: [{
+                gruppe: "CH 9D", name: "Chemie 9D", subject_id: 7,
+                subject_slug: "chemie", klassen: ["9D"],
+                erbt_aus: ["9D"], klassen_ohne_treffer: [], kursstufe: false,
+            }],
+        })
+        expect(g.gruppe).toBe("CH 9D")
+        expect(g.subjectId).toBe(7)
+        expect(g.erbt).toBe(true)
+    })
+
+    it("ist leer, wenn nichts fehlt", () => {
+        expect(anlegbareGruppen({ fehlende_gruppen: [] })).toEqual([])
+        expect(anlegbareGruppen(null)).toEqual([])
+    })
+})

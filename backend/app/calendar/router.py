@@ -5,15 +5,23 @@ Bisher nur die Kürzel-Liste für die Profileinstellung (Schritt 3).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_any_role
 from app.calendar.base import CalendarSourceError
 from app.calendar.sync import SlotRef
-from app.calendar.groups import kein_unterricht_codes, match_groups
+from app.calendar.groups import (
+    kein_unterricht_codes,
+    klassenkarte,
+    lege_gruppe_aus_vorschlag_an,
+    match_groups,
+    quellklassen_aufloesen,
+)
 from app.calendar.patterns import derive_patterns
 from app.calendar.service import (
     KUERZEL_PREFERENCE_KEY,
@@ -191,39 +199,31 @@ def _abgleich_wochen(
     return wochen
 
 
-@router.get("/week-patterns")
-async def week_patterns(
-    wochen: int = Query(4, ge=1, le=12),
-    stichtag: date | None = None,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_any_role(["teacher", "admin"])),
-    _current=Depends(get_current_user),
-) -> dict:
-    """Wochenmuster-Vorschläge aus dem eigenen Stundenplan (UP-8, Schritt 6).
+@dataclass
+class _Musterlage:
+    """Was ein Stundenplan-Abruf über die Lerngruppen einer Lehrkraft hergibt."""
 
-    **Vorschlag, keine Übernahme.** Das Schreiben nach `group_week_patterns` braucht die
-    Zuordnung zu den Unterrichtsgruppen der Plattform — die kommt in Schritt 7.
+    result: object          # Ergebnis von `derive_patterns`
+    abgleich: object        # `GroupMatchResult`
+    halbjahr: int
+    warnungen: list[str]
 
-    Vier Wochen als Vorgabe: Weniger als zwei erlaubt keine Aussage über 14-tägige
-    Termine, mehr erhöht nur die Wahrscheinlichkeit, dass zwischendurch der Plan
-    gewechselt hat.
+
+async def _musterlage(
+    db: AsyncSession,
+    pseudonym: str,
+    kuerzel: str,
+    wochen: int,
+    stichtag: date | None,
+) -> _Musterlage:
+    """Stundenplan abrufen, Wochenmuster ableiten, gegen die eigenen Gruppen abgleichen.
+
+    **Gemeinsame Grundlage von `GET /week-patterns` und `POST /teaching-groups`.** Beide
+    müssen dasselbe sehen: Beim Anlegen ist das Vorkommen im eigenen Stundenplan die
+    **Berechtigung**, und die darf nicht aus einer zweiten, womöglich abweichenden
+    Rechnung stammen. Zwei Kopien dieser Kette liefen sonst irgendwann auseinander — und
+    die Abweichung fiele ausgerechnet dort auf, wo sie ein Rechteproblem wäre.
     """
-    if not is_configured():
-        return {"configured": False, "kuerzel": None, "patterns": [], "hinweise": []}
-
-    prefs = await get_preferences(db, _current.sub)
-    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
-    if not kuerzel:
-        return {
-            "configured": True,
-            "kuerzel": None,
-            "patterns": [],
-            "hinweise": [
-                "Im Profil ist kein Kürzel eingetragen — ohne das lässt sich kein "
-                "Stundenplan abrufen."
-            ],
-        }
-
     kalenderwochen = _unterrichtswochen(stichtag or date.today(), wochen)
     if not kalenderwochen:
         raise HTTPException(
@@ -258,10 +258,58 @@ async def week_patterns(
     # Aus welchem Halbjahr die Wochen stammen — der Editor schreibt je Halbjahr, und ein
     # Muster ins falsche zu übernehmen wäre schwer zu bemerken.
     halbjahr = 1 if kalenderwochen[-1] < cfg.halbjahreswechsel else 2
-    # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
-    # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
-    # hier fällt auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
-    abgleich = await match_groups(db, [p.key for p in result.proposals], pseudonym=_current.sub)
+    # Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform abgleichen.
+    # Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst hier fällt
+    # auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
+    abgleich = await match_groups(db, [p.key for p in result.proposals], pseudonym=pseudonym)
+    return _Musterlage(result=result, abgleich=abgleich, halbjahr=halbjahr,
+                       warnungen=warnungen)
+
+
+@router.get("/week-patterns")
+async def week_patterns(
+    wochen: int = Query(4, ge=1, le=12),
+    stichtag: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Wochenmuster-Vorschläge aus dem eigenen Stundenplan (UP-8, Schritt 6).
+
+    **Vorschlag, keine Übernahme.** Das Schreiben nach `group_week_patterns` braucht die
+    Zuordnung zu den Unterrichtsgruppen der Plattform — die kommt in Schritt 7.
+
+    Vier Wochen als Vorgabe: Weniger als zwei erlaubt keine Aussage über 14-tägige
+    Termine, mehr erhöht nur die Wahrscheinlichkeit, dass zwischendurch der Plan
+    gewechselt hat.
+    """
+    if not is_configured():
+        return {"configured": False, "kuerzel": None, "patterns": [], "hinweise": []}
+
+    prefs = await get_preferences(db, _current.sub)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    if not kuerzel:
+        return {
+            "configured": True,
+            "kuerzel": None,
+            "patterns": [],
+            "hinweise": [
+                "Im Profil ist kein Kürzel eingetragen — ohne das lässt sich kein "
+                "Stundenplan abrufen."
+            ],
+        }
+
+    lage = await _musterlage(db, _current.sub, kuerzel, wochen, stichtag)
+    result, abgleich, halbjahr, warnungen = (
+        lage.result, lage.abgleich, lage.halbjahr, lage.warnungen
+    )
+    # Woher die Mitglieder einer noch fehlenden Gruppe kämen, weiß nur der Server — die
+    # Oberfläche kennt die Klassengruppen der Plattform nicht. Sie hier mitzugeben ist
+    # billiger als eine zweite Abfrage und verhindert, dass die Liste rät.
+    karte = await klassenkarte(db) if abgleich.fehlend else {}
+    aufloesungen = {
+        s.key.label: quellklassen_aufloesen(karte, s.class_names) for s in abgleich.fehlend
+    }
     # Eine Gruppe kann mehrere Muster-Schlüssel bündeln (M + MD).
     zuordnung = {k: s for s in abgleich.fehlend for k in s.keys}
     vorhanden = set(abgleich.vorhanden)
@@ -304,6 +352,10 @@ async def week_patterns(
                 "kursart": s.kursart,
                 # Mehrere Kürzel = eine Gruppe (Differenzierungsstunde).
                 "kuerzel": list(s.codes),
+                # Woher die Mitglieder kämen, wenn die Gruppe jetzt angelegt würde.
+                "erbt_aus": list(aufloesungen[s.key.label].treffer),
+                "klassen_ohne_treffer": list(aufloesungen[s.key.label].ohne_treffer),
+                "kursstufe": aufloesungen[s.key.label].kursstufe,
             }
             for s in abgleich.fehlend
         ],
@@ -329,6 +381,83 @@ async def week_patterns(
     }
 
 
+class TeachingGroupAusStundenplan(BaseModel):
+    """Welche Lerngruppe des eigenen Stundenplans angelegt werden soll."""
+
+    gruppe: str            # `GroupKey.label`, wie in `fehlende_gruppen.gruppe`
+    subject_id: int        # zur Absicherung: muss zum serverseitigen Vorschlag passen
+    wochen: int = 4
+    stichtag: date | None = None
+
+
+@router.post("/teaching-groups", status_code=201)
+async def gruppe_aus_stundenplan_anlegen(
+    body: TeachingGroupAusStundenplan,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen.
+
+    ⚠️ **Die Berechtigung ist das Vorkommen im eigenen Stundenplan** — deshalb rechnet
+    der Endpunkt den Abgleich neu und sucht die angeforderte Lerngruppe in
+    `fehlend`. Name, Fach und Klassen stammen **ausschließlich** aus diesem Ergebnis;
+    aus der Anfrage kommt nur, *welche* Gruppe gemeint ist. Dasselbe Muster wie bei den
+    Plan-Operationen: Ein vom Client übergebener Vorschlag wäre eine Einladung, beliebige
+    Gruppen anzulegen und sich zur Lehrkraft darin zu machen.
+
+    `subject_id` wird mitgeschickt und **geprüft**, nicht übernommen: Stimmt sie nicht
+    mit dem serverseitigen Vorschlag überein, hat sich die Lage seit dem Laden der Liste
+    geändert (anderes Fachkürzel-Mapping, andere Woche) — dann ist Abbrechen richtiger
+    als Anlegen.
+    """
+    if not is_configured():
+        raise HTTPException(409, "Für diese Installation ist kein Stundenplan angebunden.")
+
+    prefs = await get_preferences(db, _current.sub)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    if not kuerzel:
+        raise HTTPException(
+            409, "Im Profil ist kein Kürzel eingetragen — ohne das gibt es keinen Stundenplan."
+        )
+
+    lage = await _musterlage(db, _current.sub, kuerzel, body.wochen, body.stichtag)
+
+    vorschlag = next(
+        (s for s in lage.abgleich.fehlend if s.key.label == body.gruppe), None
+    )
+    if vorschlag is None:
+        # Bewusst 403 und nicht 404: Die Gruppe mag es geben — nur nicht im Stundenplan
+        # dieser Lehrkraft. Der Unterschied ist eine Rechte-, keine Existenzfrage.
+        raise HTTPException(
+            403,
+            "Diese Lerngruppe steht nicht als fehlend in Ihrem Stundenplan. "
+            "Vielleicht ist die Gruppe inzwischen angelegt — bitte Liste neu laden.",
+        )
+    if vorschlag.subject_id != body.subject_id:
+        raise HTTPException(
+            409,
+            "Das Fach dieser Lerngruppe hat sich seit dem Laden der Liste geändert. "
+            "Bitte Liste neu laden.",
+        )
+
+    ergebnis = await lege_gruppe_aus_vorschlag_an(db, vorschlag, _current.sub)
+    await db.commit()
+    logger.info(
+        "gruppe_aus_stundenplan pseudonym=%s gruppe=%s id=%s quellklassen=%d kursstufe=%s",
+        _current.sub, body.gruppe, ergebnis.group_id,
+        len(ergebnis.quellklassen), ergebnis.kursstufe,
+    )
+    return {
+        "group_id": ergebnis.group_id,
+        "name": ergebnis.name,
+        "subject_id": ergebnis.subject_id,
+        "quellklassen": list(ergebnis.quellklassen),
+        "ohne_treffer": list(ergebnis.ohne_treffer),
+        "kursstufe": ergebnis.kursstufe,
+    }
+
+
 class _Leer:
     """Platzhalter für Muster ohne Gruppenzuordnung — spart Fallunterscheidungen oben."""
 
@@ -351,7 +480,13 @@ async def _stundenplan_abgleich(
     """
     from sqlalchemy import text
 
-    from app.calendar.groups import kein_unterricht_codes, match_groups
+    from app.calendar.groups import (
+    kein_unterricht_codes,
+    klassenkarte,
+    lege_gruppe_aus_vorschlag_an,
+    match_groups,
+    quellklassen_aufloesen,
+)
     from app.calendar.sync import SlotRef, plan_sync
 
     prefs = await get_preferences(db, pseudonym)

@@ -157,3 +157,57 @@ export function abgleichZusammenfassung(ergebnis) {
     if (ergebnis?.konflikte?.length) teile.push(`${ergebnis.konflikte.length} Hinweis(e)`)
     return teile.join(" · ")
 }
+
+/**
+ * Fehlende Unterrichtsgruppen, aufbereitet für die Anlage-Liste (AP3).
+ *
+ * @returns {{gruppe: string, name: string, subjectId: number, fach: string|null,
+ *            klassen: string[], herkunft: string, erbt: boolean}[]}
+ */
+export function anlegbareGruppen(antwort) {
+    return (antwort?.fehlende_gruppen ?? []).map((g) => ({
+        gruppe: g.gruppe,
+        name: g.name,
+        subjectId: g.subject_id,
+        fach: g.subject_slug ?? null,
+        klassen: g.klassen ?? [],
+        herkunft: herkunftDerMitglieder(g),
+        erbt: (g.erbt_aus ?? []).length > 0,
+    }))
+}
+
+/**
+ * Woher die Mitglieder kämen, wenn diese Gruppe jetzt angelegt würde.
+ *
+ * ⚠️ **Ohne diesen Satz legt die Lehrkraft eine leere Gruppe an und weiß nicht, warum
+ * sie leer bleibt.** Das ist der eigentliche Zweck der Zeile: Der Unterschied zwischen
+ * „läuft von selbst" und „ich muss noch einen Code ausgeben" ist nichts, was man raten
+ * soll.
+ *
+ * Die Angaben kommen vom Server — die Oberfläche kennt die Klassengruppen der Plattform
+ * nicht und könnte die Frage gar nicht beantworten.
+ */
+export function herkunftDerMitglieder(g) {
+    const erbt = g?.erbt_aus ?? []
+    const fehlt = g?.klassen_ohne_treffer ?? []
+
+    if (g?.kursstufe) {
+        return "Kursstufe — Beitritt über einen Code"
+    }
+    if (erbt.length === 0) {
+        return fehlt.length > 0
+            ? `Klasse ${listeMitUnd(fehlt)} gibt es hier noch nicht — Beitritt über einen Code`
+            : "Keine Klasse zugeordnet — Beitritt über einen Code"
+    }
+    const geerbt = `Mitglieder aus ${listeMitUnd(erbt)}`
+    return fehlt.length > 0
+        ? `${geerbt}; ${listeMitUnd(fehlt)} gibt es hier noch nicht`
+        : geerbt
+}
+
+/** „10a, 10b und 10c" — eine Aufzählung, wie man sie spricht. */
+function listeMitUnd(werte) {
+    const w = [...werte]
+    if (w.length <= 1) return w[0] ?? ""
+    return `${w.slice(0, -1).join(", ")} und ${w[w.length - 1]}`
+}

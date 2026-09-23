@@ -2291,6 +2291,23 @@ export async function runTimetableSync(wochen = 1) {
   return body;
 }
 
+// Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen (AP3).
+// `gruppe` ist der Schlüssel aus `fehlende_gruppen`; Name, Fach und Klassen bestimmt
+// der Server aus dem eigenen Stundenplan neu — hier geht nur mit, **welche** gemeint ist.
+export async function createTeachingGroupFromTimetable(gruppe, subjectId, wochen = 4) {
+  const res = await fetch(`${BASE}/calendar/teaching-groups`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gruppe, subject_id: subjectId, wochen }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Gruppe konnte nicht angelegt werden (${res.status})`);
+  }
+  return body;
+}
+
 export async function getWeekPatternProposals(wochen = 4) {
   const res = await fetch(`${BASE}/calendar/week-patterns?wochen=${wochen}`, {
     credentials: "include",

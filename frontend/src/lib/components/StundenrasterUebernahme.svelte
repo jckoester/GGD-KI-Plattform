@@ -12,8 +12,13 @@
    */
   import { onMount } from "svelte"
   import { CalendarClock } from "lucide-svelte"
-  import { getWeekPatternProposals, setWeekPattern, generateSlots } from "$lib/api.js"
-  import { rasterJeGruppe } from "$lib/stundenplan_abgleich.js"
+  import {
+    createTeachingGroupFromTimetable,
+    getWeekPatternProposals,
+    setWeekPattern,
+    generateSlots,
+  } from "$lib/api.js"
+  import { anlegbareGruppen, rasterJeGruppe } from "$lib/stundenplan_abgleich.js"
   import {
     halbjahrFuerMuster,
     halbjahreFuerUebernahme,
@@ -34,7 +39,11 @@
   let bisSchuljahresende = $state(true)
   let warnung = $state(null)
 
+  let legtAn = $state(null)
+  let anlegeFehler = $state(null)
+
   const gruppen = $derived(rasterJeGruppe(antwort))
+  const anlegbar = $derived(anlegbareGruppen(antwort))
   const aktuellesHalbjahr = $derived(antwort?.halbjahr ?? 1)
   const restjahr = $derived(restjahrMoeglich(aktuellesHalbjahr))
   const unsicherGesamt = $derived(gruppen.reduce((n, g) => n + g.unsicher, 0))
@@ -51,6 +60,22 @@
       fehler = e.message
     } finally {
       laden = false
+    }
+  }
+
+  async function anlegen(g) {
+    legtAn = g.gruppe
+    anlegeFehler = null
+    try {
+      await createTeachingGroupFromTimetable(g.gruppe, g.subjectId)
+      // Neu lesen statt lokal streichen: Die angelegte Gruppe taucht danach als
+      // **vorhanden** auf und ihr Wochenmuster lässt sich in einem Zug übernehmen.
+      // Ein lokales Entfernen ließe die Liste und den Server auseinanderlaufen.
+      await lesen()
+    } catch (e) {
+      anlegeFehler = e.message
+    } finally {
+      legtAn = null
     }
   }
 
@@ -126,7 +151,9 @@
     </button>
   {:else if gruppen.length === 0}
     <InfoBanner
-      message="Im Stundenplan wurde nichts gefunden, das zu einer Ihrer Unterrichtsgruppen passt."
+      message={anlegbar.length
+        ? "Im Stundenplan stehen Lerngruppen, für die es hier noch keine Unterrichtsgruppe gibt — unten anlegen."
+        : "Im Stundenplan wurde nichts gefunden, das zu einer Ihrer Unterrichtsgruppen passt."}
     />
   {:else}
     <ul class="mb-4 flex flex-col gap-2">
@@ -148,11 +175,6 @@
       />
     {/if}
 
-    {#if antwort.fehlende_gruppen?.length}
-      <InfoBanner
-        message={`${antwort.fehlende_gruppen.length} Lerngruppen aus Ihrem Stundenplan haben auf der Plattform keine Unterrichtsgruppe und bleiben hier außen vor.`}
-      />
-    {/if}
 
     {#if restjahr && !ergebnisse.length}
       <label class="mt-3 flex items-start gap-2">
@@ -199,5 +221,45 @@
         </button>
       </div>
     {/if}
+  {/if}
+
+  {#if anlegbar.length}
+    <div class="mt-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3">
+      <h4 class="text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        Noch ohne Unterrichtsgruppe ({anlegbar.length})
+      </h4>
+      <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2">
+        Diese Lerngruppen stehen in Ihrem Stundenplan, aber nicht auf der Plattform.
+        Angelegt werden Sie darin zur Lehrkraft.
+      </p>
+
+      {#if anlegeFehler}<ErrorBanner message={anlegeFehler} />{/if}
+
+      <ul class="flex flex-col gap-1.5">
+        {#each anlegbar as g (g.gruppe)}
+          <li
+            class="flex items-start gap-3 rounded-md border border-light-ui-3
+                   dark:border-dark-ui-3 px-2.5 py-2"
+          >
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm text-light-tx dark:text-dark-tx">
+                {g.name}
+              </span>
+              <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                {g.herkunft}
+              </span>
+            </span>
+            <button
+              onclick={() => anlegen(g)}
+              disabled={legtAn === g.gruppe || schreibt}
+              class="flex-shrink-0 px-2.5 py-1 rounded-md text-xs font-medium
+                     bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+            >
+              {legtAn === g.gruppe ? "Legt an …" : "Anlegen"}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
   {/if}
 {/if}

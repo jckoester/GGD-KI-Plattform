@@ -7,6 +7,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Unterrichtsgruppen aus dem Stundenplan anlegen.** Lerngruppen, die im eigenen
+  Stundenplan stehen, auf der Plattform aber noch keine Gruppe haben, lassen sich in der
+  Sammelübernahme direkt anlegen. Je Eintrag steht dabei, woher die Mitglieder kommen
+  werden: geerbt aus den Klassen oder — bei Kursen der Kursstufe und Teilgruppen — über
+  einen Beitrittscode. Eine Gruppe kann aus **mehreren** Klassen stammen und erbt dann
+  aus allen.
 - **Der Stundenplan-Abgleich legt fehlende Stunden an.** Wird eine Stunde auf einen
   Termin verlegt, an dem die Gruppe sonst keinen Unterricht hat, entsteht dort jetzt ein
   Termin — bisher wurde der Entfall am Ursprung geschrieben und am Ziel nichts, die
