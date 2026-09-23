@@ -12,6 +12,7 @@
   import { CircleCheck, TriangleAlert } from 'lucide-svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
+  import BeitrittsCode from '$lib/components/BeitrittsCode.svelte'
   import GruppenArchiv from '$lib/components/GruppenArchiv.svelte'
   import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
   import CurriculumList from '$lib/components/CurriculumList.svelte'
@@ -126,6 +127,15 @@
   <!-- Reiter-Inhalt -->
   {#if activeTab === 'uebersicht' || !istLehrkraft}
     <GruppenUebersicht {group} {subject} {istLehrkraft} />
+
+    <!-- Der Beitrittscode steht hier und nicht in einem eigenen Reiter: Er wird selten
+         gebraucht, aber genau dann, wenn die Lehrkraft ohnehin auf die Gruppe schaut —
+         zu Beginn eines Kurses oder wenn jemand fehlt. -->
+    {#if istLehrkraft && group}
+      <div class="mt-6">
+        <BeitrittsCode groupId={group.id} />
+      </div>
+    {/if}
 
   {:else if activeTab === 'curriculum'}
     <CurriculumList

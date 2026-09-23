@@ -2291,6 +2291,58 @@ export async function runTimetableSync(wochen = 1) {
   return body;
 }
 
+// ── Beitrittscodes (AP4) ──────────────────────────────────────────────────────
+
+export async function getJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Beitrittscode nicht lesbar (${res.status})`);
+  return res.json();
+}
+
+export async function createJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Code konnte nicht erzeugt werden (${res.status})`);
+  return body;
+}
+
+export async function revokeJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Code konnte nicht widerrufen werden (${res.status})`);
+}
+
+// Fehlbeitritte zurücknehmen — als Menge, nie je Person: ohne Namen ist eine
+// Einzelauswahl nicht sicher bedienbar. `tag` null = die ganze Code-Runde.
+export async function rollbackJoins(groupId, tag = null) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code/rollback`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tag }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Rücknahme fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function joinGroupByCode(code) {
+  const res = await fetch(`${BASE}/groups/join`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Beitritt fehlgeschlagen (${res.status})`);
+  return body;
+}
+
 // Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen (AP3).
 // `gruppe` ist der Schlüssel aus `fehlende_gruppen`; Name, Fach und Klassen bestimmt
 // der Server aus dem eigenen Stundenplan neu — hier geht nur mit, **welche** gemeint ist.

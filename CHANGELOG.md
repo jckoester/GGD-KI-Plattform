@@ -7,6 +7,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Beitrittscode für Unterrichtsgruppen.** Wo eine Gruppe ihre Mitglieder nicht aus
+  einer Klasse bekommt — Kurse der Kursstufe, Teilgruppen, Nachzügler — gibt die
+  Lehrkraft einen kurzen Code aus; Schüler:innen treten damit unter „Fächer" selbst bei.
+  Der Code gilt **drei Tage** und lässt sich erneuern oder ungültig machen. An der Gruppe
+  steht, wie viele an welchem Tag beigetreten sind; sind zu viele dabei, lassen sich die
+  Beitritte eines Tages oder der ganzen Code-Runde zurücknehmen — der Code wird dabei
+  ungültig, die Richtigen treten mit einem neuen erneut bei.
 - **Unterrichtsgruppen aus dem Stundenplan anlegen.** Lerngruppen, die im eigenen
   Stundenplan stehen, auf der Plattform aber noch keine Gruppe haben, lassen sich in der
   Sammelübernahme direkt anlegen. Dabei wird gefragt, wer dazugehört: Bei der **ganzen

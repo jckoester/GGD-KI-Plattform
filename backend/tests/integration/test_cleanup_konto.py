@@ -156,6 +156,17 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
             " VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
             (VERLASSEN, seed_test_group, SUBJECT_ID),
         )
+
+        # ── Beitrittscodes ──
+        # Zwei, damit der Lauf zeigt, dass er nur das eigene Pseudonym nullt.
+        for wer, code in ((VERLASSEN, "TEST-AAAA"), (AKTIV, "TEST-BBBB")):
+            cur.execute(
+                "INSERT INTO group_join_codes"
+                " (group_id, code, erstellt_von_pseudonym, gueltig_bis)"
+                " VALUES (%s,%s,%s, now() + interval '3 days') RETURNING id",
+                (seed_test_group, code, wer),
+            )
+            ids[f"code_{wer}"] = cur.fetchone()[0]
     sync_conn.commit()
     yield ids
     sync_conn.rollback()
@@ -167,6 +178,7 @@ def bestand(sync_conn, seed_test_group, artefakt_ablage):
         cur.execute("DELETE FROM group_memberships WHERE pseudonym IN (%s,%s)",
                     (VERLASSEN, AKTIV))
         cur.execute("DELETE FROM teacher_group_exclusions WHERE pseudonym = %s", (VERLASSEN,))
+        cur.execute("DELETE FROM group_join_codes WHERE code IN ('TEST-AAAA','TEST-BBBB')")
         # Über die ID, nicht über das Pseudonym: Nach dem Lauf steht dort NULL.
         for schluessel in ("feedback", "feedback_fremd"):
             cur.execute("DELETE FROM feedback WHERE id = %s", (str(ids[schluessel]),))
@@ -334,3 +346,22 @@ class TestRueckmeldungen:
                 (str(gelaufen["feedback_fremd"]),),
             )
             assert cur.fetchone() == (AKTIV, "Kollegin M.")
+
+
+def test_beitrittscode_verliert_nur_das_pseudonym(sync_conn, gelaufen):
+    """Der Code gehört der **Gruppe**, nicht der Lehrkraft, die ihn ausgegeben hat.
+
+    ⚠️ Ihn mitzulöschen wäre die falsche Richtung: Eine Gruppe verlöre mitten im
+    Schuljahr ihren Zugangsweg, weil jemand anderes die Schule verlassen hat. Fällt
+    darf nur das Pseudonym — es ist das einzige Personenmerkmal an der Zeile.
+    """
+    with sync_conn.cursor() as cur:
+        cur.execute(
+            "SELECT code, erstellt_von_pseudonym FROM group_join_codes"
+            " WHERE code IN ('TEST-AAAA','TEST-BBBB') ORDER BY code"
+        )
+        zeilen = dict(cur.fetchall())
+
+    assert set(zeilen) == {"TEST-AAAA", "TEST-BBBB"}, "Ein Code wurde mitgelöscht"
+    assert zeilen["TEST-AAAA"] is None, "Das Pseudonym der gegangenen Lehrkraft steht noch"
+    assert zeilen["TEST-BBBB"] == AKTIV, "Fremdes Pseudonym wurde mitgenullt"

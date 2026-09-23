@@ -17,6 +17,20 @@ from sqlalchemy import inspect as sa_inspect
 
 from app.db.models import Base
 
+# ⚠️ **Suffix statt fester Liste** (erweitert 23.09.2026). Bis dahin standen hier drei
+# Namen — `pseudonym`, `owner_pseudonym`, `updated_by_pseudonym`. Eine neue Spalte mit
+# einem anderen Namen war für diesen Wächter unsichtbar, und genau das ist beim
+# Beitrittscode passiert: `group_join_codes.erstellt_von` fiel durch, obwohl es ein
+# Pseudonym führt. Der Wächter verspricht „jede Tabelle mit Pseudonym" — dann darf er
+# nicht an einer Aufzählung hängen, die jemand pflegen muss.
+#
+# Die Regel hat einen Preis: Wer eine Pseudonym-Spalte anders benennt (`besitzer`,
+# `angelegt_von`), rutscht weiterhin durch. Das ist hinnehmbar, solange die Konvention
+# „endet auf `_pseudonym`" gilt — und sie steht jetzt in `docs/dev/`.
+def _ist_pseudonymspalte(name: str) -> bool:
+    return name == "pseudonym" or name.endswith("_pseudonym")
+
+
 _PSEUDONYM_SPALTEN = {"pseudonym", "owner_pseudonym", "updated_by_pseudonym"}
 
 _CLEANUP = Path(__file__).resolve().parents[2] / "app" / "crons" / "cleanup_service.py"
@@ -90,7 +104,8 @@ def _anonymisierte_modelle() -> set[str]:
         ):
             continue
         nullt = any(
-            kw.arg in _PSEUDONYM_SPALTEN
+            kw.arg is not None
+            and _ist_pseudonymspalte(kw.arg)
             and isinstance(kw.value, ast.Constant)
             and kw.value.value is None
             for kw in knoten.keywords
@@ -116,7 +131,7 @@ def _tabellen_mit_pseudonym() -> dict[str, str]:
     for mapper in Base.registry.mappers:
         modell = mapper.class_
         spalten = {c.name for c in sa_inspect(modell).columns}
-        if spalten & _PSEUDONYM_SPALTEN:
+        if any(_ist_pseudonymspalte(s) for s in spalten):
             gefunden[modell.__tablename__] = modell.__name__
     return gefunden
 

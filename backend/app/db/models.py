@@ -209,6 +209,16 @@ class GroupMembership(Base):
     # trägt das nicht mehr, weil dann nicht jede Schüler-Mitgliedschaft geerbt ist.
     # Aufgeräumt wird nur `sso` (Immediate Mirror) und `geerbt` (Vererbungslauf).
     herkunft: Mapped[str] = mapped_column(Text, nullable=False, default="manuell")
+    # Wann und über welchen Code jemand beigetreten ist (Alembic 0070). Beide `NULL`
+    # für alles, was nicht per Code entstand. Sie tragen die Rücknahme von
+    # Fehlbeitritten: ohne Namen lässt sich nur eine **Menge** zurücknehmen — eine
+    # Code-Runde oder ein Tag daraus.
+    beigetreten_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    join_code_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("group_join_codes.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -220,7 +230,48 @@ class GroupMembership(Base):
             name="check_group_memberships_herkunft",
         ),
         Index("idx_group_memberships_pseudonym", "pseudonym"),
+        Index("idx_group_memberships_join_code", "join_code_id"),
     )
+
+
+class GroupJoinCode(Base):
+    """Ein Beitrittscode für eine Unterrichtsgruppe (Alembic 0070).
+
+    **Gruppen-Berechtigung, kein Personenmerkmal.** Der Code gehört der Gruppe; wer ihn
+    einlöst, hinterlässt eine Mitgliedschaft mit Pseudonym — dieselbe Datenkategorie wie
+    jede andere Mitgliedschaft. Der Code selbst erlaubt keinen Rückschluss auf Personen
+    und wird deshalb auch nicht personenbezogen gelöscht: Er verfällt und stirbt mit der
+    Gruppe. Nur `erstellt_von` fällt unter die 90-Tage-Frist und wird dann genullt.
+
+    **Kurzlebig statt lang und kompliziert.** Drei Tage Gültigkeit (Entscheidung Jan,
+    23.09.2026): Der Code wird im Unterricht ausgegeben, der Beitritt geschieht sofort
+    oder am selben Abend. Das macht zugleich die Rücknahme brauchbar — eine Code-Runde
+    deckt dann faktisch eine Unterrichtsstunde ab.
+    """
+
+    __tablename__ = "group_join_codes"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    erstellt_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # Endet auf `_pseudonym`, damit `test_pseudonym_deletion_coverage` die Tabelle
+    # findet — der Wächter erkennt sie am Namensmuster, nicht am Inhalt.
+    erstellt_von_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gueltig_bis: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    widerrufen_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("idx_group_join_codes_group", "group_id"),)
 
 
 class GroupSourceClass(Base):
