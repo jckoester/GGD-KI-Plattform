@@ -27,16 +27,20 @@ from app.context.taxonomy import validate_content_type, validate_unterrichtsstun
 from app.db.models import (
     ContextEdge,
     ContextNode,
+    Group,
+    GroupMembership,
     GroupWeekPattern,
     LessonSlot,
     ParkedLessonContent,
     SlotPlanSnapshot,
+    Subject,
 )
 from app.db.session import get_db
-from app.planning.calendar import ab_schultage
+from app.planning.calendar import ab_schultage, load_school_year
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning import jetzt as jetzt_modul
+from app.planning import mein_tag as mein_tag_modul
 from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.operations import apply_operations, parse_operations
@@ -1428,3 +1432,145 @@ async def export_lesson(
         )
     else:
         raise HTTPException(status_code=422, detail=f"Unbekanntes Format: {format}")
+
+
+# ── GET /planning/mein-tag ────────────────────────────────────────────────────
+
+
+class StundeAmTagRead(BaseModel):
+    slot_id: UUID
+    group_id: int
+    gruppe: str
+    # Für den Absprung in die Planung: die Route lautet
+    # `/subjects/{slug}/groups/{id}/planner`. Ohne den Slug baut die Oberfläche einen
+    # toten Link — oder muss das Fach in einer zweiten Runde nachschlagen.
+    subject_slug: str | None
+    start_period: int | None
+    periods: int
+    stunde: str
+    kategorie: str
+    thema: str | None
+    hat_entwurf: bool
+    ue_node_id: UUID | None
+    ue_titel: str | None
+    anpassung_noetig: bool
+
+
+class TagRead(BaseModel):
+    datum: date
+    ist_heute: bool
+    stunden: list[StundeAmTagRead]
+    # Nur bei leerem Tag: warum. `wochenende` | `ferien` | `feiertag` |
+    # `unterrichtsfrei` | `kein_unterricht` | `ausserhalb_schuljahr`.
+    grund: str | None = None
+
+
+class MeinTagRead(BaseModel):
+    heute: TagRead
+    naechster: TagRead | None
+    # Ob die Lehrkraft überhaupt Unterrichtsgruppen hat, und ob darin geplant ist.
+    # ⚠️ **Die dritte Lage.** „Heute kein Unterricht" und „noch nichts geplant" sind
+    # verschiedene Auskünfte: Die erste ist eine Feststellung, die zweite eine
+    # Aufforderung. Ohne diese beiden Angaben könnte die Oberfläche sie nicht trennen.
+    hat_gruppen: bool
+    hat_planung: bool
+
+
+@router.get("/mein-tag", response_model=MeinTagRead)
+async def get_mein_tag(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Die eigenen Stunden für heute und den nächsten Schultag — für die Startseite.
+
+    **Eine Abfrage, nicht eine je Gruppe.** Eine Lehrkraft hat schnell zehn Gruppen;
+    zehn Rundreisen für eine Seite, die beim Anmelden sofort dastehen soll, wären die
+    falsche Bauform. Gefiltert wird über die Lehrkraft-Mitgliedschaften — **nicht**
+    über `require_group_teacher` je Gruppe, das gäbe es hier gar nicht zu prüfen.
+
+    ⚠️ **Der Filter ist die Zugriffsregel.** Fällt er weg, stehen die Stunden fremder
+    Kolleg:innen auf der eigenen Startseite. Ein Wächtertest hält das fest.
+
+    Geholt werden nur die Slots **zweier Tage**, nicht das Schuljahr: Anders als beim
+    „Jetzt"-Block braucht die Startseite keinen Fortschritt einer Einheit, nur den Tag.
+    """
+    cfg = load_school_year()
+    heute = date.today()
+    naechster = mein_tag_modul.naechster_schultag(heute, cfg)
+    tage = [d for d in (heute, naechster) if d is not None]
+
+    eigene = sa.select(GroupMembership.group_id).where(
+        GroupMembership.pseudonym == user.sub,
+        GroupMembership.role_in_group == "teacher",
+    )
+    zeilen = await db.execute(
+        sa.select(LessonSlot, Group.name, Group.display_name, Subject.slug)
+        .join(Group, Group.id == LessonSlot.group_id)
+        .outerjoin(Subject, Subject.id == Group.subject_id)
+        .where(LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage))
+    )
+    slots: list[LessonSlot] = []
+    namen: dict[int, str] = {}
+    faecher: dict[int, str | None] = {}
+    for slot, name, anzeige, fach_slug in zeilen.all():
+        slots.append(slot)
+        namen[slot.group_id] = anzeige or name
+        faecher[slot.group_id] = fach_slug
+
+    auswahl = mein_tag_modul.waehle(slots, heute, cfg)
+
+    # Einheitstitel in einer Abfrage — sonst eine je Stunde.
+    ue_ids = {
+        s.ue_node_id
+        for tag in (auswahl.heute, auswahl.naechster)
+        if tag is not None
+        for s in tag.stunden
+        if s.ue_node_id is not None
+    }
+    titel: dict[UUID, str] = {}
+    if ue_ids:
+        res = await db.execute(
+            sa.select(ContextNode.id, ContextNode.title).where(ContextNode.id.in_(ue_ids))
+        )
+        titel = {nid: t for nid, t in res.all()}
+
+    def als_tag(tag) -> TagRead:
+        return TagRead(
+            datum=tag.datum,
+            ist_heute=tag.ist_heute,
+            grund=tag.grund,
+            stunden=[
+                StundeAmTagRead(
+                    slot_id=s.slot_id,
+                    group_id=s.group_id,
+                    gruppe=namen.get(s.group_id, ""),
+                    subject_slug=faecher.get(s.group_id),
+                    start_period=s.start_period,
+                    periods=s.periods,
+                    stunde=s.stundenbezeichnung,
+                    kategorie=s.kategorie,
+                    thema=s.thema,
+                    hat_entwurf=s.hat_entwurf,
+                    ue_node_id=s.ue_node_id,
+                    ue_titel=titel.get(s.ue_node_id) if s.ue_node_id else None,
+                    anpassung_noetig=s.anpassung_noetig,
+                )
+                for s in tag.stunden
+            ],
+        )
+
+    # Zwei billige Zahlen statt einer Vermutung in der Oberfläche.
+    gruppen_anzahl = await db.scalar(
+        sa.select(sa.func.count()).select_from(eigene.subquery())
+    )
+    planung_vorhanden = await db.scalar(
+        sa.select(sa.literal(True))
+        .where(sa.exists(sa.select(LessonSlot.id).where(LessonSlot.group_id.in_(eigene))))
+    )
+
+    return MeinTagRead(
+        heute=als_tag(auswahl.heute),
+        naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
+        hat_gruppen=bool(gruppen_anzahl),
+        hat_planung=bool(planung_vorhanden),
+    )

@@ -1,9 +1,19 @@
 <script>
     import { goto } from '$app/navigation'
-    import { MessageSquare, ChevronRight } from 'lucide-svelte'
+    import { MessageSquare } from 'lucide-svelte'
     import { user } from '$lib/stores/user.js'
-    import { potentialTeachingGroups } from '$lib/stores/potentialTeachingGroups.js'
-    import { groupsConfig } from '$lib/stores/groupsConfig.js'
+    import { getMeinTag } from '$lib/api.js'
+    import { KEIN_NAECHSTER, zweiteUeberschrift } from '$lib/mein_tag.js'
+    import TagesKachel from '$lib/components/TagesKachel.svelte'
+    import GruppenKachel from '$lib/components/GruppenKachel.svelte'
+    import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+
+    let tag = $state(null)
+    let tagFehler = $state(null)
+    const lage = $derived({
+        hatGruppen: tag?.hat_gruppen ?? false,
+        hatPlanung: tag?.hat_planung ?? false,
+    })
 
     const displayName = sessionStorage.getItem('display_name') ?? ''
 
@@ -16,11 +26,12 @@
 
     const isTeacher = $derived($user?.roles?.includes('teacher') ?? false)
 
-    const showGroupsHint = $derived(
-        isTeacher &&
-        $groupsConfig.allow_manual_teaching_groups &&
-        $potentialTeachingGroups.length > 0
-    )
+    $effect(() => {
+        if (!isTeacher) return
+        getMeinTag()
+            .then((d) => (tag = d))
+            .catch((e) => (tagFehler = e.message))
+    })
 
     let inputText = $state('')
 
@@ -41,8 +52,8 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto flex flex-col items-center justify-center px-4 py-12">
-    <div class="w-full max-w-xl flex flex-col gap-8">
+<div class="h-full overflow-y-auto flex flex-col items-center px-4 py-12">
+    <div class="w-full max-w-xl flex flex-col gap-6">
 
         <!-- Begrüßung -->
         <div class="text-center">
@@ -81,35 +92,22 @@
             </button>
         </div>
 
-        <!-- Hinweis auf offene Unterrichtsgruppen (nur Lehrkräfte) -->
-        {#if showGroupsHint}
-            <a
-                href="/profile/teaching-groups"
-                class="flex items-center justify-between gap-3 px-4 py-3 rounded-xl
-                       border border-light-ui-3 dark:border-dark-ui-3
-                       bg-light-bg-2 dark:bg-dark-bg-2
-                       hover:border-primary dark:hover:border-primary-dark
-                       transition-colors group"
-            >
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-light-tx dark:text-dark-tx">
-                        {$potentialTeachingGroups.length}
-                        {$potentialTeachingGroups.length === 1
-                            ? 'vorgeschlagene Unterrichtsgruppe'
-                            : 'vorgeschlagene Unterrichtsgruppen'}
-                    </p>
-                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-0.5">
-                        Bestätigen oder ablehnen unter Profil → Unterrichtsgruppen
-                    </p>
-                </div>
-                <ChevronRight
-                    size={16}
-                    class="text-light-tx-2 dark:text-dark-tx-2 shrink-0
-                           group-hover:text-primary dark:group-hover:text-primary-dark
-                           transition-colors"
+        <!-- Der Tag (nur Lehrkräfte) -->
+        {#if isTeacher}
+            {#if tagFehler}
+                <ErrorBanner message={tagFehler} />
+            {:else if tag}
+                <TagesKachel titel="Heute" tag={tag.heute} lage={lage} />
+                <TagesKachel
+                    titel={zweiteUeberschrift(tag.naechster)}
+                    tag={tag.naechster}
+                    lage={lage}
+                    leerHinweis={tag.naechster ? null : KEIN_NAECHSTER}
                 />
-            </a>
+                <GruppenKachel />
+            {/if}
         {/if}
+
 
     </div>
 </div>

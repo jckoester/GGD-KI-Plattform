@@ -2291,6 +2291,13 @@ export async function runTimetableSync(wochen = 1) {
   return body;
 }
 
+// Die eigenen Stunden für heute und den nächsten Schultag (Startseite).
+export async function getMeinTag() {
+  const res = await fetch(`${BASE}/planning/mein-tag`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Der Tag konnte nicht geladen werden (${res.status})`);
+  return res.json();
+}
+
 // ── Angebote für neue SSO-Unterrichtsgruppen ─────────────────────────────────
 
 export async function getGroupOffers(mitIgnorierten = false) {

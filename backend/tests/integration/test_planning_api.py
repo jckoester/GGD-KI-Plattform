@@ -975,3 +975,90 @@ async def test_geleerte_phasen_fallen_auf_idee_zurueck(
         headers=auth_headers,
     )
     assert await hat_phasen() is False
+
+
+# ── GET /planning/mein-tag (Startseite, AP2) ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_zeigt_nur_eigene_gruppen(
+    test_client, auth_headers, auth_teacher2, seed_planning_fixtures, db_url
+):
+    """⚠️ **Der Mitgliedschaftsfilter ist die Zugriffsregel.**
+
+    Fällt er weg, stehen die Stunden fremder Kolleg:innen auf der eigenen Startseite —
+    mit Thema und Unterrichtseinheit. Das ist kein Anzeigefehler, sondern ein
+    Zugriffsfehler, und er fiele niemandem auf, der die andere Gruppe nicht kennt.
+    """
+    from datetime import date
+
+    heute = date.today()
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        # Zweite Gruppe, die teacher1 **nicht** gehört.
+        cur.execute("""
+            INSERT INTO groups (id, name, slug, type, subject_id)
+            VALUES (101, 'Fremde Gruppe', 'fremde-gruppe-test', 'teaching_group', 100)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        cur.execute("""
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)
+            VALUES (101, %s, 'teacher', 'eigen') ON CONFLICT DO NOTHING
+        """, (TEACHER2_PSEUDO,))
+        for gid, thema in ((100, "Eigenes Thema"), (101, "Fremdes Thema")):
+            cur.execute("""
+                INSERT INTO lesson_slots
+                    (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)
+                VALUES (%s, %s, %s, 2, 1, 1, 'unterricht', %s)
+            """, (str(uuid4()), gid, heute, thema))
+    conn.commit()
+
+    try:
+        resp = await test_client.get("/planning/mein-tag", headers=auth_headers)
+        assert resp.status_code == 200
+        themen = [s["thema"] for s in resp.json()["heute"]["stunden"]]
+        assert "Eigenes Thema" in themen
+        assert "Fremdes Thema" not in themen, (
+            "Die Stunde einer fremden Gruppe steht auf der eigenen Startseite."
+        )
+
+        # Gegenprobe aus der anderen Richtung: teacher2 sieht seine, nicht meine.
+        resp2 = await test_client.get("/planning/mein-tag", headers=auth_teacher2)
+        themen2 = [s["thema"] for s in resp2.json()["heute"]["stunden"]]
+        assert themen2 == ["Fremdes Thema"]
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE group_id IN (100, 101) AND date = %s",
+                        (heute,))
+            cur.execute("DELETE FROM group_memberships WHERE group_id = 101")
+            cur.execute("DELETE FROM groups WHERE id = 101")
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_liefert_stundenbezeichnung_statt_uhrzeit(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """Uhrzeiten gibt es im System nicht — die Stundennummer schon."""
+    from datetime import date
+
+    heute = date.today()
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 3, 2, 1, 'unterricht')
+        """, (str(uuid4()), heute))
+    conn.commit()
+    try:
+        resp = await test_client.get("/planning/mein-tag", headers=auth_headers)
+        stunde = resp.json()["heute"]["stunden"][0]
+        assert stunde["stunde"] == "3.–4. Stunde"
+        assert "uhrzeit" not in stunde
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE group_id = 100 AND date = %s", (heute,))
+        conn.commit()
+        conn.close()

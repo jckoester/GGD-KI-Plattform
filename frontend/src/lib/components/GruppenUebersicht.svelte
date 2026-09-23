@@ -16,9 +16,10 @@
    *
    * Leitfrage der Seite: „Wo war ich stehengeblieben?" Daher die Reihenfolge
    * Jetzt → Weiterarbeiten → Assistenten → Zuletzt entstanden → Nachschlagen.
-   * Die Abschnitte „Jetzt" (AP5) und „Zuletzt entstanden" (AP7) sind noch leer —
-   * bewusst ohne Platzhaltertext: Ein Kasten, der eine spätere Phase ankündigt, ist
-   * genau das, was diese Seite loswerden soll.
+   * ⚠️ *Korrektur 23.09.2026:* Hier stand, „Jetzt" (AP5) und „Zuletzt entstanden"
+   * (AP7) seien noch leer. Beide sind gebaut — der Kommentar hinkte dem Code
+   * hinterher. Die Regel dahinter gilt weiter: **kein Platzhaltertext**. Ein Kasten,
+   * der eine spätere Phase ankündigt, ist genau das, was diese Seite loswerden soll.
    */
   import { goto } from '$app/navigation'
   import {
