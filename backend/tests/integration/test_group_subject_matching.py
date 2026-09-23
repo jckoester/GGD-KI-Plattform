@@ -19,7 +19,9 @@ from app.auth.group_sync import (
     _resolve_subject_ids,
     sync_groups,
 )
-from app.db.models import Group, GroupMembership, GroupSourceClass, Subject
+from app.db.models import (
+    Group, GroupMembership, GroupSourceClass, SsoGroupOffer, Subject,
+)
 
 
 PATTERNS = SsoGroupPatterns(
@@ -166,6 +168,7 @@ async def test_sync_groups_fachschaft_multi_subject(async_engine):
     finally:
         async with factory() as db:
             await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo))
             await db.execute(delete(Group).where(Group.sso_group_id == "fs.wirtschaft"))
             await db.execute(delete(Subject).where(Subject.slug.in_(["wirtschaft", "wbs"])))
             await db.commit()
@@ -207,17 +210,22 @@ async def test_unterrichtsgruppe_findet_ihr_fach_ueber_das_stundenplan_kuerzel(
             )
 
         async with factory() as db:
-            row = (await db.execute(
-                select(Group.subject_id, Group.name, Group.type)
-                .join(GroupMembership, GroupMembership.group_id == Group.id)
-                .where(GroupMembership.pseudonym == pseudo)
-            )).one()
-            assert row.type == "teaching_group"
-            assert row.subject_id == chem_id, "Gruppe ohne Fach — Auflösung griff nicht"
-            assert row.name == "ch2-ks-11"
+            # Seit Alembic 0071 entsteht keine Gruppe mehr, sondern ein **Angebot** —
+            # die Fach-Auflösung läuft unverändert, ihr Ergebnis landet dort.
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo)
+            )).scalar_one()
+            assert angebot.subject_id == chem_id, "Angebot ohne Fach — Auflösung griff nicht"
+            assert angebot.name == "ch2-ks-11"
+            assert (await db.execute(
+                select(Group).join(GroupMembership, GroupMembership.group_id == Group.id)
+                .where(GroupMembership.pseudonym == pseudo,
+                       Group.type == "teaching_group")
+            )).scalars().first() is None, "Es darf keine Gruppe entstanden sein"
     finally:
         async with factory() as db:
             await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo))
             await db.execute(
                 delete(Group).where(Group.sso_group_id == "unterricht.ch2-ks-11")
             )
@@ -247,15 +255,14 @@ async def test_ohne_benanntes_fach_bleibt_die_gruppe_ohne_fach(async_engine):
             )
 
         async with factory() as db:
-            row = (await db.execute(
-                select(Group.subject_id)
-                .join(GroupMembership, GroupMembership.group_id == Group.id)
-                .where(GroupMembership.pseudonym == pseudo)
-            )).one()
-            assert row.subject_id is None
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo)
+            )).scalar_one()
+            assert angebot.subject_id is None
     finally:
         async with factory() as db:
             await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo))
             await db.execute(
                 delete(Group).where(Group.sso_group_id == "unterricht.ch2-ks-11")
             )
@@ -280,12 +287,23 @@ async def test_nachziehen_der_konfiguration_traegt_das_fach_nach(async_engine):
             fach.untis_codes = ["CH"]
             await db.commit()
 
-        # 1. Login mit altem Muster → Gruppe ohne Fach
+        # 1. Der Bestand: eine Gruppe, die vor Alembic 0071 ohne Fach entstand.
+        #
+        # ⚠️ Früher erzeugte dieser Schritt die Gruppe durch einen Login mit altem
+        # Muster. Seit 0071 legt der Sync für `unterricht.*` nichts mehr an — die
+        # Ausgangslage muss deshalb direkt hergestellt werden. Geprüft wird weiterhin
+        # dasselbe: Trifft ein Login auf eine Gruppe **mit derselben `sso_group_id`**,
+        # trägt er das Fach nach, statt eine zweite Zeile anzulegen.
         async with factory() as db:
-            await sync_groups(
-                db=db, pseudonym=pseudo, sso_groups=["unterricht.ch2-ks-11"],
-                primary_role="teacher", patterns=PATTERNS,
+            bestand = Group(
+                name="ch2-ks-11", slug="unterricht-ch2-ks-11", type="teaching_group",
+                subject_id=None, sso_group_id="unterricht.ch2-ks-11",
             )
+            db.add(bestand)
+            await db.flush()
+            db.add(GroupMembership(group_id=bestand.id, pseudonym=pseudo,
+                                   role_in_group="teacher", herkunft="sso"))
+            await db.commit()
         async with factory() as db:
             vorher = (await db.execute(
                 select(Group.id, Group.subject_id, Group.slug)
@@ -311,6 +329,7 @@ async def test_nachziehen_der_konfiguration_traegt_das_fach_nach(async_engine):
     finally:
         async with factory() as db:
             await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo))
             await db.execute(
                 delete(Group).where(func.lower(Group.sso_group_id) == "unterricht.ch2-ks-11")
             )
@@ -428,6 +447,7 @@ async def test_der_spiegel_raeumt_sso_gruppen_weiterhin_auf(async_engine):
     finally:
         async with factory() as db:
             await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == pseudo))
+            await db.execute(delete(SsoGroupOffer).where(SsoGroupOffer.pseudonym == pseudo))
             await db.execute(delete(Group).where(Group.slug.in_(["klasse-9w", "fs-abgangskunde"])))
             await db.execute(delete(Subject).where(Subject.slug == "abgang-fach"))
             await db.commit()
@@ -613,13 +633,16 @@ async def test_der_sync_laesst_den_anzeigenamen_stehen(async_engine):
     pseudonym = "pseudo-anzeigename"
     sso = "unterricht.ch2-ks-abi28"
     try:
-        await sync_groups(
-            await _session(factory), pseudonym, [sso], "teacher", PATTERNS
-        )
+        # Die Gruppe ist bereits verknüpft — seit Alembic 0071 legt der Sync sie nicht
+        # mehr selbst an. Geprüft wird, was er mit einer **vorhandenen** tut.
         async with factory() as db:
-            gruppe = (await db.execute(
-                select(Group).where(Group.sso_group_id == sso.lower())
-            )).scalar_one()
+            gruppe = Group(name="ch2-ks-abi28", slug="unterricht-ch2-ks-abi28",
+                           type="teaching_group", subject_id=None,
+                           sso_group_id=sso.lower())
+            db.add(gruppe)
+            await db.flush()
+            db.add(GroupMembership(group_id=gruppe.id, pseudonym=pseudonym,
+                                   role_in_group="teacher", herkunft="sso"))
             roh = gruppe.name
             gruppe.display_name = "Chemie LK Abi 28"
             await db.commit()

@@ -132,15 +132,32 @@ async def auth_callback(
     await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
     
     # Sync SSO-Gruppen
+    #
+    # ⚠️ **Ein Fehler hier darf die Anmeldung nicht verhindern.** Bis zum 23.09.2026 lief
+    # der Aufruf ungeschützt: Eine Ausnahme im Gruppen-Sync — etwa die inzwischen
+    # entfernte Adoptionsheuristik, die bei zwei Gruppen desselben Fachs
+    # `MultipleResultsFound` warf — endete als HTTP 500, und die Lehrkraft kam nicht
+    # hinein.
+    #
+    # Die Kopplung war falsch, unabhängig von jenem Befund: **Rollen und Budget stehen im
+    # Token**, die Gruppen sind Komfort. Wer sich anmelden kann, soll arbeiten können,
+    # auch wenn die Gruppenzuordnung gerade klemmt. Der Fehler wird protokolliert; die
+    # Gruppen holt der nächste Login nach.
     auth_config = load_auth_config(settings.auth_config_path)
     primary_role = get_primary_role(identity.roles)
-    await sync_groups(
-        db=db,
-        pseudonym=pseudonym,
-        sso_groups=identity.sso_groups,
-        primary_role=primary_role,
-        patterns=auth_config.sso.groups,
-    )
+    try:
+        await sync_groups(
+            db=db,
+            pseudonym=pseudonym,
+            sso_groups=identity.sso_groups,
+            primary_role=primary_role,
+            patterns=auth_config.sso.groups,
+        )
+    except Exception:
+        await db.rollback()
+        logger.exception(
+            "Gruppen-Sync fehlgeschlagen für %s — Anmeldung läuft weiter", pseudonym
+        )
     
     token, _ = jwt_service.issue(
         pseudonym, identity.roles, identity.grade, identity.display_name,
@@ -315,15 +332,32 @@ async def login_direct(
     await ensure_litellm_team_membership(pseudonym, identity.roles, identity.grade)
     
     # Sync SSO-Gruppen
+    #
+    # ⚠️ **Ein Fehler hier darf die Anmeldung nicht verhindern.** Bis zum 23.09.2026 lief
+    # der Aufruf ungeschützt: Eine Ausnahme im Gruppen-Sync — etwa die inzwischen
+    # entfernte Adoptionsheuristik, die bei zwei Gruppen desselben Fachs
+    # `MultipleResultsFound` warf — endete als HTTP 500, und die Lehrkraft kam nicht
+    # hinein.
+    #
+    # Die Kopplung war falsch, unabhängig von jenem Befund: **Rollen und Budget stehen im
+    # Token**, die Gruppen sind Komfort. Wer sich anmelden kann, soll arbeiten können,
+    # auch wenn die Gruppenzuordnung gerade klemmt. Der Fehler wird protokolliert; die
+    # Gruppen holt der nächste Login nach.
     auth_config = load_auth_config(settings.auth_config_path)
     primary_role = get_primary_role(identity.roles)
-    await sync_groups(
-        db=db,
-        pseudonym=pseudonym,
-        sso_groups=identity.sso_groups,
-        primary_role=primary_role,
-        patterns=auth_config.sso.groups,
-    )
+    try:
+        await sync_groups(
+            db=db,
+            pseudonym=pseudonym,
+            sso_groups=identity.sso_groups,
+            primary_role=primary_role,
+            patterns=auth_config.sso.groups,
+        )
+    except Exception:
+        await db.rollback()
+        logger.exception(
+            "Gruppen-Sync fehlgeschlagen für %s — Anmeldung läuft weiter", pseudonym
+        )
     
     token, _ = jwt_service.issue(
         pseudonym, identity.roles, identity.grade, identity.display_name,

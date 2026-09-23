@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, date, timezone
 from uuid import UUID, UUID as UUIDType
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
+from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
 from sqlalchemy import Numeric, Boolean, BigInteger
@@ -231,6 +231,44 @@ class GroupMembership(Base):
         ),
         Index("idx_group_memberships_pseudonym", "pseudonym"),
         Index("idx_group_memberships_join_code", "join_code_id"),
+    )
+
+
+class SsoGroupOffer(Base):
+    """Eine neue SSO-Unterrichtsgruppe, die noch keiner Plattform-Gruppe zugeordnet ist.
+
+    **Angeboten statt angelegt** (Alembic 0071). Aus den SSO-Daten lässt sich nicht
+    bestimmen, ob `unterricht.9d.ch` die vorhandene Gruppe *Chemie 9D* meint oder eine
+    neue ist — `ParsedGroup` trägt keine Klassennamen, nur einen Namen als Freitext. Eine
+    falsche Verschmelzung schiebt zwei Jahrespläne ineinander und ist aus Nutzersicht
+    nicht rückgängig zu machen; deshalb entscheidet die Lehrkraft.
+
+    **Je Lehrkraft eine Zeile.** Sonst verstecken sich Angebote gegenseitig: Ignoriert
+    eine Kollegin, wäre die Frage für alle weg.
+    """
+
+    __tablename__ = "sso_group_offers"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    sso_group_id: Mapped[str] = mapped_column(Text, nullable=False)
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    gesehen_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # Gesetzt heißt abgelehnt. Die Zeile bleibt, damit die Frage nicht wiederkehrt.
+    ignoriert_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("sso_group_id", "pseudonym", name="uq_sso_group_offers"),
+        Index("idx_sso_group_offers_pseudonym", "pseudonym"),
     )
 
 

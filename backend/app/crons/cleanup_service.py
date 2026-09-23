@@ -17,6 +17,7 @@ from app.db.models import (
     Feedback,
     GroupJoinCode,
     GroupMembership,
+    SsoGroupOffer,
     JwtRevocation,
     NodeEngagement,
     PersonalAccessToken,
@@ -311,6 +312,14 @@ async def cleanup_inactive_accounts(
                         # Welche Klassen-/Fach-Kombination eine Lehrkraft ausgeblendet
                         # hat — rein persönliche Ansichtseinstellung ohne Fremdbezug,
                         # dieselbe Kategorie wie `user_preferences`.
+                        # Angebote für neue SSO-Unterrichtsgruppen (Alembic 0071).
+                        # **Gelöscht, nicht genullt:** Ein Angebot ohne Empfängerin ist
+                        # nichts — es fragt niemanden mehr.
+                        await db.execute(
+                            delete(SsoGroupOffer).where(
+                                SsoGroupOffer.pseudonym == pseudonym
+                            )
+                        )
                         await db.execute(
                             delete(TeacherGroupExclusion).where(
                                 TeacherGroupExclusion.pseudonym == pseudonym

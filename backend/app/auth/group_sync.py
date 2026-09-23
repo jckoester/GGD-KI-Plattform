@@ -223,14 +223,21 @@ async def _upsert_group_and_membership(
     base_slug: str,
     pseudonym: str,
     primary_role: str,
-) -> int:
+) -> Optional[int]:
     """Upsert genau einer Gruppe (für ein Ziel-Fach) + Mitgliedschaft. Gibt group.id.
 
     Eindeutigkeit einer Gruppe ist das Paar (sso_group_id, subject_id) — eine
     Fachschaft kann mehrere Fächer betreuen und hat dann je Fach eine eigene Gruppe.
     subject_id darf NULL sein (Klasse, Sammelgruppe ohne Fach).
+
+    ⚠️ **Gibt `None` zurück, wenn eine unbekannte Unterrichtsgruppe nur angeboten wird**
+    (Alembic 0071). Dann ist keine Gruppe entstanden, und der Aufrufer darf sie auch
+    nicht in die Liste der gespiegelten Gruppen aufnehmen — sonst entfernte der Immediate
+    Mirror Mitgliedschaften, die es gar nicht gibt.
     """
-    from app.db.models import Group, GroupMembership, GroupSourceClass
+    from app.db.models import (
+        Group, GroupMembership, GroupSourceClass, SsoGroupOffer,
+    )
 
     # sso_group_id normalisiert (lowercase) als kanonischer Schlüssel: verhindert
     # Doppelgruppen, wenn der Provider die Schreibweise ändert (z. B. 'FS.Chemie'
@@ -279,25 +286,45 @@ async def _upsert_group_and_membership(
                 ohne_fach.name = pg.name
                 group = ohne_fach
 
-        # Merge-Logik: bei teaching_group eine manuell (aus Fach+Klasse) erstellte
-        # Gruppe ohne sso_group_id adoptieren statt neu anlegen.
-        if group is None and pg.type == "teaching_group" and subject_id is not None:
-            res = await db.execute(
-                select(Group)
-                .join(GroupMembership, GroupMembership.group_id == Group.id)
-                .where(
-                    GroupMembership.pseudonym == pseudonym,
-                    Group.type == "teaching_group",
-                    Group.subject_id == subject_id,
-                    Group.sso_group_id.is_(None),
-                    Group.id.in_(select(GroupSourceClass.group_id)),
+        # ⚠️ **Hier stand bis zum 23.09.2026 eine Adoptionsheuristik** über
+        # `(Lehrkraft, Fach)`: Sie adoptierte eine vorhandene Gruppe ohne `sso_group_id`,
+        # statt eine neue anzulegen. Sie ist **ersatzlos entfallen**, aus zwei Gründen:
+        #
+        # 1. Sie endete auf `scalar_one_or_none()`. Eine Lehrkraft mit *Chemie 9c* und
+        #    *Chemie 9d* traf zwei Zeilen → `MultipleResultsFound` → Login mit 500.
+        # 2. Der Schlüssel war **falsch**, nicht bloß unscharf: Zwei Gruppen im selben
+        #    Fach sind der Normalfall — getrennter Unterricht, eigene Termine, eigene
+        #    Ausfälle, je ein eigener Stundenplan-Eintrag.
+        #
+        # Geraten wird jetzt gar nichts mehr: Was sich nicht über die `sso_group_id`
+        # identifizieren lässt, wird **angeboten** (siehe unten).
+
+        if group is None and pg.type == "teaching_group":
+            # **Angebot statt Anlage** (Alembic 0071). Ob `unterricht.9d.ch` die
+            # vorhandene Gruppe *Chemie 9D* meint oder eine neue ist, steht in keinem
+            # Datum, das hier vorliegt — die Lehrkraft entscheidet.
+            #
+            # ⚠️ **Nur Unterrichtsgruppen.** Klassen, Fachschaften, Lehrkräfte- und
+            # Arbeitsgruppen entstehen weiterhin automatisch: Die Vererbung hängt an den
+            # Klassen, und eine Fachschaft ist keine Entscheidung.
+            await db.execute(
+                pg_insert(SsoGroupOffer)
+                .values(
+                    sso_group_id=sso_id_norm,
+                    pseudonym=pseudonym,
+                    name=pg.name,
+                    subject_id=subject_id,
+                )
+                # Name und Fach werden **nachgezogen**, `ignoriert_am` nicht: Wird die
+                # Fach-Ableitung in `auth.yaml` später repariert, soll das Angebot das
+                # Fach bekommen — aber ein einmal abgelehntes Angebot darf nicht durch
+                # den nächsten Login wieder auferstehen. Sonst wäre es eine Dauerfrage.
+                .on_conflict_do_update(
+                    index_elements=["sso_group_id", "pseudonym"],
+                    set_={"name": pg.name, "subject_id": subject_id},
                 )
             )
-            manual_group = res.scalar_one_or_none()
-            if manual_group is not None:
-                manual_group.sso_group_id = sso_id_norm
-                manual_group.name = pg.name
-                group = manual_group
+            return None
 
         if group is None:
             slug = await _unique_slug(db, base_slug)
@@ -552,6 +579,9 @@ async def sync_groups(
             gid = await _upsert_group_and_membership(
                 db, pg, subject_id, base_slug, pseudonym, primary_role
             )
+            if gid is None:
+                # Nur angeboten, nicht angelegt — es gibt nichts zu spiegeln.
+                continue
             matched_group_ids.append(gid)
             if pg.type == "school_class":
                 klassen_ids.append(gid)
