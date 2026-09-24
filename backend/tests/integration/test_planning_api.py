@@ -1330,3 +1330,204 @@ async def test_entwurf_am_termin_mit_einheit_haengt_sich_ein(
             cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
         conn.commit()
         conn.close()
+
+
+@pytest.fixture
+def regelbetrieb(monkeypatch):
+    """Der **Regelbetrieb** — ohne `STUDENT_SUBJECTS_OPT_IN`.
+
+    ⚠️ **Ausdrücklich gesetzt, nicht geerbt.** Die Entwicklungs-`.env` dieses Projekts
+    steht auf `true`; ein Test, der die Betriebsart von dort nimmt, grünt oder rotet je
+    nach Maschine. Gemerkt an einem Test, der grün war, weil der Erprobungsbetrieb ihm
+    *alle* Daten weggefiltert hatte — er prüfte nur Abwesenheit.
+
+    Die Freigabe selbst prüft `test_mein_tag_schueler_achtet_auf_die_freigabe`.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "student_subjects_opt_in", False)
+
+
+# ── GET /planning/mein-tag/schueler (Startseite, AP5) ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_schueler_traegt_keine_planungsfelder(
+    test_client, auth_student, seed_planning_fixtures, db_url, regelbetrieb
+):
+    """⚠️ **Thema, Einheit und Entwurf sind Material der Lehrkraft.**
+
+    `docs/user/datenschutz.md`, „Was Schüler:innen mitbekommen": Die Vorbereitung einer
+    Lehrkraft — worauf sie hinauswill, welche Einheit sie ansetzt, was im Entwurf steht —
+    gehört ihr. Eine Startseite, die das ausliefert, verrät es auch dann, wenn die
+    Oberfläche es nicht anzeigt: Es steht im JSON.
+
+    Geprüft wird deshalb die **Antwort**, nicht die Darstellung.
+    """
+    from datetime import date
+
+    heute = date.today()
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)
+            VALUES (%s, 100, %s, 4, 2, 1, 'unterricht', 'Geheime Vorbereitung')
+        """, (slot_id, heute))
+    conn.commit()
+    try:
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        assert resp.status_code == 200, resp.text
+        daten = resp.json()
+
+        fach = next(f for f in daten["heute"]["faecher"] if f["stunde"] == "4.–5.")
+        assert fach["fach"]  # der Gruppenname steht da
+        assert fach["hinweis"] is None  # regulärer Unterricht sagt nichts
+
+        # ⚠️ Der Wächter: **kein** Planungsfeld, in keiner Stunde, in keinem der Tage.
+        verboten = {
+            "thema", "ue_node_id", "ue_titel", "stunde_node_id", "hat_entwurf",
+            "kategorie", "anpassung_noetig", "slot_id",
+        }
+        for tag in ("heute", "naechster"):
+            for f in (daten[tag] or {}).get("faecher", []):
+                gefunden = verboten & set(f)
+                assert not gefunden, f"Planungsfelder in der Schülerantwort: {gefunden}"
+
+        # Und die Gegenrichtung: Das Thema darf auch nicht im ganzen JSON auftauchen.
+        assert "Geheime Vorbereitung" not in resp.text
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_schueler_nennt_den_ausfall(
+    test_client, auth_student, seed_planning_fixtures, db_url, regelbetrieb
+):
+    """Eine ausgefallene Stunde als gewöhnliche zu listen wäre eine Falschauskunft —
+    und sie wegzulassen auch. Also steht der Grund da, als **ein Wort**."""
+    from datetime import date
+
+    heute = date.today()
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 6, 1, 1, 'ausfall')
+        """, (slot_id, heute))
+    conn.commit()
+    try:
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        fach = next(f for f in resp.json()["heute"]["faecher"] if f["stunde"] == "6.")
+        assert fach["hinweis"] == "fällt aus"
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_schueler_zeigt_nur_eigene_gruppen(
+    test_client, auth_student, seed_planning_fixtures, db_url, regelbetrieb
+):
+    """⚠️ Der Mitgliedschaftsfilter ist auch hier die Zugriffsregel — und er fragt nach
+    `role_in_group = 'student'`: Die Lehrkraft-Zeile derselben Gruppe darf nicht greifen,
+    sonst sähe jede Lehrkraft ihren Tag zweimal und in der falschen Form."""
+    from datetime import date
+
+    heute = date.today()
+    slot_id = str(uuid4())
+    eigener_slot = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO groups (id, name, slug, type, subject_id)
+            VALUES (102, 'Fremde Lerngruppe', 'fremde-lerngruppe-test', 'teaching_group', 100)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 102, %s, 1, 1, 1, 'unterricht')
+        """, (slot_id, heute))
+        # Die eigene Stunde als Vergleichspunkt — ohne sie prüft der Test nur, dass
+        # überhaupt nichts ankommt, und das wäre auch bei einem kaputten Endpunkt wahr.
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 1, 1, 1, 'unterricht')
+        """, (eigener_slot, heute))
+    conn.commit()
+    try:
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        gruppen = {f["group_id"] for f in resp.json()["heute"]["faecher"]}
+        # ⚠️ **Erst die positive Aussage.** Der erste Entwurf dieses Tests prüfte nur die
+        # Abwesenheit der fremden Gruppe — und war grün, weil der Erprobungsbetrieb aus
+        # der `.env` *beide* herausfilterte. Ein Test, der nichts findet, beweist nichts.
+        assert 100 in gruppen, "Die eigene Gruppe fehlt — der Test misst nichts."
+        assert 102 not in gruppen, "Der Stundenplan einer fremden Gruppe steht in der Antwort."
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id IN (%s, %s)",
+                        (slot_id, eigener_slot))
+            cur.execute("DELETE FROM groups WHERE id = 102")
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_schueler_achtet_auf_die_freigabe(
+    test_client, auth_student, seed_planning_fixtures, db_url, monkeypatch
+):
+    """⚠️ **Im Erprobungsbetrieb zählt `student_visible` — serverseitig.**
+
+    Für die Fachübersicht filtert das Frontend; das genügt dort, weil die Liste nur
+    Namen trägt. Hier ginge es um den **Stundenplan** einer nicht freigegebenen Gruppe.
+    Der hat in der Antwort nichts verloren, auch nicht ungenutzt im JSON.
+    """
+    from datetime import date
+    from app.config import settings
+
+    heute = date.today()
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 2, 1, 1, 'unterricht')
+        """, (slot_id, heute))
+        cur.execute("UPDATE groups SET student_visible = false WHERE id = 100")
+    conn.commit()
+    try:
+        # Regelbetrieb: Die Freigabe ist folgenlos, die Stunde steht da.
+        monkeypatch.setattr(settings, "student_subjects_opt_in", False)
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        assert any(f["stunde"] == "2." for f in resp.json()["heute"]["faecher"])
+
+        # Erprobungsbetrieb ohne Freigabe: nichts.
+        monkeypatch.setattr(settings, "student_subjects_opt_in", True)
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        assert not any(f["stunde"] == "2." for f in resp.json()["heute"]["faecher"]), (
+            "Der Stundenplan einer nicht freigegebenen Gruppe steht in der Antwort."
+        )
+
+        # Mit Freigabe wieder sichtbar — sonst prüfte der Test nur, dass irgendetwas fehlt.
+        with conn.cursor() as cur:
+            cur.execute("UPDATE groups SET student_visible = true WHERE id = 100")
+        conn.commit()
+        resp = await test_client.get("/planning/mein-tag/schueler", headers=auth_student)
+        assert any(f["stunde"] == "2." for f in resp.json()["heute"]["faecher"])
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+            cur.execute("UPDATE groups SET student_visible = false WHERE id = 100")
+        conn.commit()
+        conn.close()

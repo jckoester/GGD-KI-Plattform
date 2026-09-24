@@ -12,6 +12,7 @@ import {
     stundenZeile,
     titelAktion,
     titelText,
+    zeigtTag,
     zweiteUeberschrift,
 } from "./mein_tag.js"
 
@@ -35,8 +36,10 @@ describe("leerSatz", () => {
         expect(leerSatz({ grund: "wochenende" }, GEPLANT)).toBe("Wochenende.")
     })
 
-    it("fällt auf eine Feststellung zurück, wenn der Grund fehlt", () => {
-        expect(leerSatz({}, GEPLANT)).toBe("Kein Unterricht.")
+    it("fällt auf eine Aussage über die Plattform zurück, nicht über den Tag", () => {
+        // Früher „Kein Unterricht." — das behauptete, der Tag sei frei. Weiß die
+        // Plattform nicht (Jan, 24.09.2026).
+        expect(leerSatz({}, GEPLANT)).toBe("Für diesen Tag ist hier nichts eingetragen.")
     })
 })
 
@@ -221,5 +224,52 @@ describe("stundenVorspann und stundenTitel", () => {
 
     it("erfindet keinen Titel", () => {
         expect(stundenTitel({ stunde: "1.", gruppe: "9C" })).toBeNull()
+    })
+})
+
+describe("zeigtTag", () => {
+    const geplant = { hatGruppen: true, hatPlanung: true }
+
+    it("⚠️ verschweigt den Schultag ohne Einträge, statt ihn zu behaupten", () => {
+        // Der Anlass (Jan, 24.09.2026): „Heute kein Unterricht" ist eine Aussage über die
+        // Wirklichkeit. Die Plattform kennt aber nur ihre eigene Datenbank — gemeint war
+        // immer „hier steht nichts". Also steht dort nichts.
+        expect(zeigtTag({ stunden: [], grund: "kein_unterricht" }, geplant)).toBe(false)
+    })
+
+    it("zeigt den Tag, sobald Stunden darin stehen", () => {
+        expect(zeigtTag({ stunden: [{}], grund: null }, geplant)).toBe(true)
+    })
+
+    it("behält die Gründe, die im Schuljahreskalender stehen", () => {
+        // Ferien und Feiertage weiß der Server wirklich — das erklärt die Lücke, statt
+        // sie zu behaupten.
+        for (const grund of ["ferien", "feiertag", "wochenende", "unterrichtsfrei",
+                             "ausserhalb_schuljahr"]) {
+            expect(zeigtTag({ stunden: [], grund }, geplant), grund).toBe(true)
+        }
+    })
+
+    it("⚠️ bleibt, solange noch nichts eingerichtet ist", () => {
+        // **Der Weg ins Einrichten hängt an dieser Kachel** (`leerFuehrtZurEinrichtung`).
+        // Ohne sie stünde eine neue Lehrkraft vor einer leeren Seite ohne Hinweis, was
+        // zu tun ist — das Gegenteil dessen, was die Startseite leisten soll.
+        expect(zeigtTag({ stunden: [], grund: "kein_unterricht" },
+                        { hatGruppen: false, hatPlanung: false })).toBe(true)
+        expect(zeigtTag({ stunden: [], grund: "kein_unterricht" },
+                        { hatGruppen: true, hatPlanung: false })).toBe(true)
+    })
+
+    it("bleibt, wenn es keinen nächsten Schultag mehr gibt", () => {
+        // „In diesem Schuljahr kommt keiner mehr" ist eine Auskunft, kein Schweigen.
+        expect(zeigtTag(null, geplant)).toBe(true)
+    })
+})
+
+describe("leerSatz — Rückfalltext", () => {
+    it("behauptet nichts über den Tag", () => {
+        const satz = leerSatz({ grund: "kein_unterricht" }, { hatGruppen: true, hatPlanung: true })
+        expect(satz).not.toMatch(/kein Unterricht/i)
+        expect(satz).toContain("eingetragen")
     })
 })

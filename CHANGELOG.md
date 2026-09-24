@@ -7,6 +7,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Das Chatfeld der Startseite steht wieder mittig, wenn keine Kacheln darunter stehen.**
+- **Die Tageskachel erscheint nur, wenn sie etwas zu sagen hat.** An einem Schultag ohne
+  Einträge entfällt sie, statt „Kein Unterricht" zu melden — was dort stattfindet, weiß
+  die Plattform nicht. Ferien, Feiertage und unterrichtsfreie Tage stehen weiterhin da,
+  ebenso der Hinweis zum Einrichten, solange noch keine Unterrichtsgruppen angelegt sind.
+- **Die Startseite zeigt Schüler:innen ihre heutigen Fächer.** Fach-Icon, Stunde und
+  Fachname, verlinkt auf die Fachseite; darunter der nächste Schultag. Fällt eine Stunde
+  aus oder ist Vertretung oder eine Prüfung angesetzt, steht es daneben. Thema,
+  Unterrichtseinheit und Stundenentwurf der Lehrkraft erscheinen nicht.
 - **Startseite mit dem eigenen Unterrichtstag.** Nach dem Login stehen die Stunden des
   Tages untereinander — Fach-Icon in der Fachfarbe, Stunde, Gruppe und Thema. Ein Klick
   auf den Titel führt in den Stundenentwurf und legt ihn an, falls es noch keinen gibt —

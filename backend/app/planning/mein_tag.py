@@ -11,7 +11,7 @@ Tageszeit (Befund Jan, 23.09.2026). Ob eine Stunde schon *vorbei* ist, lässt si
 nicht sagen; das käme nur aus dem Stundenraster des Stundenplans, und dafür eine
 Abhängigkeit aufzumachen, nur um Zeilen grau zu färben, stünde in keinem Verhältnis.
 Was es gibt, ist die **Reihenfolge** — danach wird sortiert und beschriftet
-(„3.–4. Stunde" statt „09:45").
+(„3.–4." statt „09:45").
 
 **Warum „nächster Schultag" und nicht „morgen".** Am Freitag ist morgen Samstag, vor den
 Ferien liegt der nächste Unterricht Wochen entfernt. Eine Kachel „Morgen", die den
@@ -31,6 +31,23 @@ from app.planning.calendar import SchoolYearConfig, is_schoolday
 # Sommerferien nicht ab — das ist Absicht: Danach gibt es keinen „nächsten Schultag"
 # mehr, sondern ein neues Schuljahr.
 MAX_VORLAUF_TAGE = 42
+
+
+# Was Schüler:innen von der Kategorie einer Stunde erfahren — und nur das.
+#
+# ⚠️ **Eine ausgefallene Stunde schweigend als normale zu listen, wäre eine
+# Falschauskunft**, und sie wegzulassen wäre auch eine: Beides lässt die Schüler:in im
+# Glauben, es sei alles wie immer, beziehungsweise es sei nie etwas gewesen. Deshalb
+# steht der Grund da — als **ein Wort**, nicht als Planungsvokabular.
+#
+# `unterricht` und `puffer` erscheinen bewusst nicht: Der Puffer ist aus Sicht der
+# Schüler:in gewöhnlicher Unterricht; dass die Lehrkraft ihn als Reserve führt, ist
+# Planung und geht sie nichts an.
+SCHUELER_HINWEISE = {
+    "ausfall": "fällt aus",
+    "vertretung": "Vertretung",
+    "pruefung": "Prüfung",
+}
 
 
 class SlotArtig(Protocol):
@@ -79,6 +96,15 @@ class StundeAmTag:
         if self.periods > 1:
             return f"{self.start_period}.–{self.start_period + self.periods - 1}."
         return f"{self.start_period}."
+
+    @property
+    def schueler_hinweis(self) -> Optional[str]:
+        """Was Schüler:innen über diese Stunde erfahren — ein Wort oder gar nichts.
+
+        Siehe :data:`SCHUELER_HINWEISE`. Regulärer Unterricht sagt nichts: Eine Zeile,
+        die bei jeder Stunde ‚findet statt‘ trüge, wäre Rauschen.
+        """
+        return SCHUELER_HINWEISE.get(self.kategorie)
 
 
 @dataclass(frozen=True)

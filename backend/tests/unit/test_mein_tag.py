@@ -204,3 +204,25 @@ def test_leerer_tag_traegt_seinen_grund():
     sonntag = date(2026, 9, 20)
     ergebnis = waehle([], sonntag, CFG)
     assert ergebnis.heute.grund == "wochenende"
+
+
+@pytest.mark.parametrize(
+    "kategorie,erwartet",
+    [
+        ("unterricht", None),
+        ("puffer", None),
+        ("ausfall", "fällt aus"),
+        ("vertretung", "Vertretung"),
+        ("pruefung", "Prüfung"),
+    ],
+)
+def test_schueler_hinweis(kategorie, erwartet):
+    """⚠️ **Der Puffer sagt nichts.**
+
+    Er ist aus Sicht der Schüler:in gewöhnlicher Unterricht; dass die Lehrkraft ihn als
+    Reserve führt, ist Planung. Und regulärer Unterricht sagt erst recht nichts — eine
+    Zeile, die bei jeder Stunde „findet statt" trüge, wäre Rauschen.
+    """
+    heute = date(2026, 9, 21)
+    ergebnis = waehle([Slot(date=heute, kategorie=kategorie)], heute, CFG)
+    assert ergebnis.heute.stunden[0].schueler_hinweis == erwartet

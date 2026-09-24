@@ -41,13 +41,101 @@ export function leerSatz(tag, lage = {}) {
         case "ausserhalb_schuljahr":
             return "Außerhalb des Schuljahres."
         default:
-            return "Kein Unterricht."
+            // ⚠️ **Keine Aussage über den Tag.** Diese Zeile wird kaum je sichtbar — bei
+            // `kein_unterricht` entfällt die Kachel (`zeigtTag`). Sie bleibt trotzdem
+            // ehrlich: Die Plattform weiß, was in ihr steht, nicht was stattfindet.
+            return "Für diesen Tag ist hier nichts eingetragen."
+    }
+}
+
+/**
+ * Der Weg von einer Stunde zur Fachseite — `null`, wenn er nicht gebaut werden kann.
+ *
+ * Für Schüler:innen ist das Ziel `/subjects/{slug}`, nicht die Gruppenseite: Dort liegen
+ * Assistenten und eigene Chats des Fachs. Die Planungsansicht der Gruppe gehört der
+ * Lehrkraft.
+ */
+export function fachLink(f) {
+    return f?.subject_slug ? `/subjects/${f.subject_slug}` : null
+}
+
+/**
+ * Der Satz für einen leeren Tag in der Schüler:innen-Sicht.
+ *
+ * ⚠️ **Andere Rolle, andere Sätze.** `leerSatz` fordert zum Einrichten auf („Legen Sie
+ * eine an") — das ist Lehrkraft-Sprache und hier eine Sackgasse: Eine Schüler:in kann
+ * keine Unterrichtsgruppe anlegen. Ohne Gruppen steht hier deshalb eine Erklärung,
+ * keine Aufgabe.
+ */
+export function schuelerLeerSatz(tag, hatGruppen = false) {
+    if (!hatGruppen) {
+        return "Für dich sind noch keine Fächer eingerichtet."
+    }
+    switch (tag?.grund) {
+        case "ferien":
+            return "Ferien."
+        case "feiertag":
+            return "Feiertag."
+        case "unterrichtsfrei":
+            return "Unterrichtsfrei."
+        case "wochenende":
+            return "Wochenende."
+        case "ausserhalb_schuljahr":
+            return "Außerhalb des Schuljahres."
+        default:
+            return "Für diesen Tag ist hier nichts eingetragen."
     }
 }
 
 /** Ob der leere Zustand zum Einrichten auffordert — dann gehört ein Weg dorthin daneben. */
 export function leerFuehrtZurEinrichtung(lage = {}) {
     return !lage.hatGruppen || !lage.hatPlanung
+}
+
+/**
+ * Gründe, die der **Schuljahreskalender** kennt — die darf die Plattform behaupten.
+ *
+ * ⚠️ Der sechste Grund, `kein_unterricht`, gehört ausdrücklich **nicht** dazu. Er heißt
+ * nicht „heute ist frei", sondern „hier ist nichts eingetragen". Die Plattform kennt den
+ * Stundenplan nicht, sie kennt ihre eigene Datenbank; aus einer leeren Tabelle auf einen
+ * freien Tag zu schließen ist eine Aussage über die Wirklichkeit, die sie nicht treffen
+ * kann (Jan, 24.09.2026).
+ */
+const KALENDERGRUENDE = new Set([
+    "ferien",
+    "feiertag",
+    "wochenende",
+    "unterrichtsfrei",
+    "ausserhalb_schuljahr",
+])
+
+/**
+ * Ob die Tageskachel überhaupt erscheint.
+ *
+ * **Eine leere Kachel ist meistens Rauschen** — sie belegt Platz, um mitzuteilen, dass
+ * sie nichts mitzuteilen hat. Sie bleibt nur, wo das Leere selbst die Auskunft ist:
+ *
+ * | Lage | Kachel | warum |
+ * |---|---|---|
+ * | Stunden vorhanden | ja | der Normalfall |
+ * | Noch keine Gruppen / keine Planung | ja | **der Weg ins Einrichten hängt daran** — ohne die Kachel steht eine neue Lehrkraft vor einer leeren Seite |
+ * | Ferien, Feiertag, Wochenende … | ja | steht im Schuljahreskalender, ist also wahr und erklärt die Lücke |
+ * | Kein nächster Schultag (`tag === null`) | ja | „in diesem Schuljahr kommt keiner mehr" ist eine Auskunft |
+ * | Schultag ohne Einträge | **nein** | hier wüsste die Plattform nichts zu sagen |
+ */
+export function zeigtTag(tag, lage = {}) {
+    if (tag === null || tag === undefined) return true
+    if ((tag.stunden ?? []).length) return true
+    if (leerFuehrtZurEinrichtung(lage)) return true
+    return KALENDERGRUENDE.has(tag.grund)
+}
+
+/** Dieselbe Regel für die Schüler:innen-Kachel — dort heißen die Einträge `faecher`. */
+export function zeigtSchuelerTag(tag, hatGruppen = false) {
+    if (tag === null || tag === undefined) return true
+    if ((tag.faecher ?? []).length) return true
+    if (!hatGruppen) return true
+    return KALENDERGRUENDE.has(tag.grund)
 }
 
 /** Die Überschrift der zweiten Kachel — nie „Morgen". */

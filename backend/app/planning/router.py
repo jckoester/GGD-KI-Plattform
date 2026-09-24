@@ -21,8 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_any_role
+from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
+from app.config import settings
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
 from app.db.models import (
     ContextEdge,
@@ -1690,4 +1691,129 @@ async def get_mein_tag(
         naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
         hat_gruppen=bool(gruppen_anzahl),
         hat_planung=bool(planung_vorhanden),
+    )
+
+
+# ── GET /planning/mein-tag/schueler ───────────────────────────────────────────
+
+
+class FachAmTagRead(BaseModel):
+    """Eine Stunde, wie Schüler:innen sie sehen.
+
+    ⚠️ **Ein eigenes Modell, kein gefiltertes.** Thema, Unterrichtseinheit und
+    Stundenentwurf sind Material der Lehrkraft (`docs/user/datenschutz.md`, „Was
+    Schüler:innen mitbekommen"). Sie hier wegzulassen wäre eine Zusage, die jeder
+    spätere Umbau von `StundeAmTagRead` unbemerkt brechen könnte — ein Feld ergänzt,
+    und es steht in beiden Antworten. Zwei getrennte Modelle können das nicht: Was
+    hier nicht steht, lässt sich nicht durchreichen.
+    """
+
+    group_id: int
+    # Aus Schülersicht **ist** die Unterrichtsgruppe das Fach (CLAUDE.md,
+    # Fachbegriff-Tabelle). Angezeigt wird deshalb ihr Anzeigename.
+    fach: str
+    subject_slug: str | None
+    subject_icon: str | None
+    subject_color: str | None
+    start_period: int | None
+    periods: int
+    stunde: str
+    # Ein Wort oder nichts — siehe `mein_tag.SCHUELER_HINWEISE`. **Nicht** die rohe
+    # Kategorie: `puffer` ist Planungsvokabular und ginge niemanden sonst etwas an.
+    hinweis: str | None
+
+
+class SchuelerTagRead(BaseModel):
+    datum: date
+    ist_heute: bool
+    faecher: list[FachAmTagRead]
+    grund: str | None = None
+
+
+class MeinTagSchuelerRead(BaseModel):
+    heute: SchuelerTagRead
+    naechster: SchuelerTagRead | None
+    hat_gruppen: bool
+
+
+@router.get("/mein-tag/schueler", response_model=MeinTagSchuelerRead)
+async def get_mein_tag_schueler(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Die heutigen Fächer — die Startseite aus Schülersicht.
+
+    Gleiche Auswahlregel wie bei der Lehrkraft (`mein_tag.waehle`), **anderer
+    Ausschnitt**: Fach, Stunde und im Ausnahmefall ein Wort dazu. Kein Thema, kein
+    Entwurf, keine Unterrichtseinheit.
+
+    ⚠️ **Die Freigabe wird hier serverseitig gelesen, nicht in der Oberfläche.** Für die
+    Fachübersicht filtert das Frontend (`myGroups.freigegebeneGruppen`) — das genügt
+    dort, weil die Liste ohnehin nur Namen trägt. Hier ginge es um den **Stundenplan**
+    einer nicht freigegebenen Gruppe; der hat in der Antwort nichts verloren, auch nicht
+    ungenutzt im JSON. Gelesen wird `student_visible` nur im Erprobungsbetrieb
+    (`STUDENT_SUBJECTS_OPT_IN`) — dieselbe Bedingung wie überall sonst.
+    """
+    cfg = load_school_year()
+    heute = date.today()
+    naechster = mein_tag_modul.naechster_schultag(heute, cfg)
+    tage = [d for d in (heute, naechster) if d is not None]
+
+    eigene = sa.select(GroupMembership.group_id).where(
+        GroupMembership.pseudonym == user.sub,
+        GroupMembership.role_in_group == "student",
+    )
+
+    bedingungen = [LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage)]
+    if settings.student_subjects_opt_in:
+        bedingungen.append(Group.student_visible.is_(True))
+
+    zeilen = await db.execute(
+        sa.select(
+            LessonSlot, Group.name, Group.display_name,
+            Subject.slug, Subject.icon, Subject.color,
+        )
+        .join(Group, Group.id == LessonSlot.group_id)
+        .outerjoin(Subject, Subject.id == Group.subject_id)
+        .where(*bedingungen)
+    )
+    slots: list[LessonSlot] = []
+    namen: dict[int, str] = {}
+    faecher: dict[int, tuple[str | None, str | None, str | None]] = {}
+    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe in zeilen.all():
+        slots.append(slot)
+        namen[slot.group_id] = anzeige or name
+        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe)
+
+    auswahl = mein_tag_modul.waehle(slots, heute, cfg)
+
+    def als_tag(tag) -> SchuelerTagRead:
+        return SchuelerTagRead(
+            datum=tag.datum,
+            ist_heute=tag.ist_heute,
+            grund=tag.grund,
+            faecher=[
+                FachAmTagRead(
+                    group_id=s.group_id,
+                    fach=namen.get(s.group_id, ""),
+                    subject_slug=faecher.get(s.group_id, (None, None, None))[0],
+                    subject_icon=faecher.get(s.group_id, (None, None, None))[1],
+                    subject_color=faecher.get(s.group_id, (None, None, None))[2],
+                    start_period=s.start_period,
+                    periods=s.periods,
+                    stunde=s.stundenbezeichnung,
+                    hinweis=s.schueler_hinweis,
+                )
+                for s in tag.stunden
+            ],
+        )
+
+    gruppen_anzahl = await db.scalar(
+        sa.select(sa.func.count()).select_from(eigene.subquery())
+    )
+
+    return MeinTagSchuelerRead(
+        heute=als_tag(auswahl.heute),
+        naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
+        hat_gruppen=bool(gruppen_anzahl),
     )

@@ -2,9 +2,15 @@
     import { goto } from '$app/navigation'
     import { MessageSquare } from 'lucide-svelte'
     import { user } from '$lib/stores/user.js'
-    import { getMeinTag } from '$lib/api.js'
-    import { KEIN_NAECHSTER, zweiteUeberschrift } from '$lib/mein_tag.js'
+    import { getMeinTag, getMeinTagSchueler } from '$lib/api.js'
+    import {
+        KEIN_NAECHSTER,
+        zeigtSchuelerTag,
+        zeigtTag,
+        zweiteUeberschrift,
+    } from '$lib/mein_tag.js'
     import TagesKachel from '$lib/components/TagesKachel.svelte'
+    import SchuelerTagKachel from '$lib/components/SchuelerTagKachel.svelte'
     import GruppenKachel from '$lib/components/GruppenKachel.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import {
@@ -31,12 +37,39 @@
 
     const isTeacher = $derived($user?.roles?.includes('teacher') ?? false)
 
+    // Zwei Rollen, zwei Endpunkte. Die Schüler:innen-Antwort trägt Thema, Einheit und
+    // Entwurf gar nicht erst — sie werden nicht ausgeblendet, sie stehen nicht drin.
     $effect(() => {
-        if (!isTeacher) return
-        getMeinTag()
+        const laden = isTeacher ? getMeinTag : getMeinTagSchueler
+        laden()
             .then((d) => (tag = d))
             .catch((e) => (tagFehler = e.message))
     })
+
+    /**
+     * Welche Kacheln erscheinen — **als Objekt, nicht als lose Variablen.**
+     *
+     * Von dieser Aufstellung hängen zwei Dinge ab: was gerendert wird und **ob die Seite
+     * mittig steht**. Als einzelne Booleans mit einer Oder-Kette daneben wäre die
+     * nächste Kachel irgendwann nur an einer der beiden Stellen eingetragen — die Seite
+     * zentrierte sich dann, obwohl darunter Inhalt steht, und schnüge ihn oben ab. So
+     * zählt jeder neue Eintrag von selbst mit.
+     */
+    const kacheln = $derived({
+        heute: !!tag && isTeacher && $zeigtKachel('heute') && zeigtTag(tag.heute, lage),
+        naechster: !!tag && isTeacher && $zeigtKachel('naechster') && zeigtTag(tag.naechster, lage),
+        gruppen: !!tag && isTeacher && $zeigtKachel('gruppen'),
+        schuelerHeute:
+            !!tag && !isTeacher && zeigtSchuelerTag(tag.heute, tag.hat_gruppen),
+        schuelerNaechster:
+            !!tag && !isTeacher && !!tag.naechster
+            && zeigtSchuelerTag(tag.naechster, tag.hat_gruppen),
+        fehler: !!tagFehler,
+    })
+
+    // Steht nichts darunter, gehört das Chatfeld in die Mitte — so war die Seite vor den
+    // Kacheln, und so ist sie als Einstieg gedacht (Jan, 24.09.2026).
+    const hatKacheln = $derived(Object.values(kacheln).some(Boolean))
 
     let inputText = $state('')
 
@@ -57,7 +90,10 @@
     }
 </script>
 
-<div class="h-full overflow-y-auto flex flex-col items-center px-4 py-12">
+<div
+    class="h-full overflow-y-auto flex flex-col items-center px-4 py-12"
+    class:justify-center={!hatKacheln}
+>
     <div class="w-full max-w-xl flex flex-col gap-6">
 
         <!-- Begrüßung -->
@@ -97,15 +133,28 @@
             </button>
         </div>
 
-        <!-- Der Tag (nur Lehrkräfte) -->
+        <!-- Der Tag — für Lehrkräfte mit Planung, für Schüler:innen nur die Fächer -->
+        {#if kacheln.schuelerHeute}
+            <SchuelerTagKachel titel="Heute" tag={tag.heute} hatGruppen={tag.hat_gruppen} />
+        {/if}
+        {#if kacheln.schuelerNaechster}
+            <SchuelerTagKachel
+                titel={zweiteUeberschrift(tag.naechster)}
+                tag={tag.naechster}
+                hatGruppen={tag.hat_gruppen}
+            />
+        {/if}
+
+        {#if kacheln.fehler}
+            <ErrorBanner message={tagFehler} />
+        {/if}
+
         {#if isTeacher}
-            {#if tagFehler}
-                <ErrorBanner message={tagFehler} />
-            {:else if tag}
-                {#if $zeigtKachel('heute')}
+            {#if tag}
+                {#if kacheln.heute}
                     <TagesKachel titel="Heute" tag={tag.heute} lage={lage} />
                 {/if}
-                {#if $zeigtKachel('naechster')}
+                {#if kacheln.naechster}
                     <TagesKachel
                         titel={zweiteUeberschrift(tag.naechster)}
                         tag={tag.naechster}
@@ -113,7 +162,7 @@
                         leerHinweis={tag.naechster ? null : KEIN_NAECHSTER}
                     />
                 {/if}
-                {#if $zeigtKachel('gruppen')}
+                {#if kacheln.gruppen}
                     <GruppenKachel />
                 {/if}
 

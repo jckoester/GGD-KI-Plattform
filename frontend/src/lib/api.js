@@ -1946,6 +1946,16 @@ export async function createLesson(unitNodeId, data) {
  * Entwurf **vom Termin aus** anlegen — auch wenn der Termin noch zu keiner
  * Unterrichtseinheit gehört. Idempotent: Gibt es schon einen, kommt dieser zurück.
  */
+/**
+ * Die heutigen Fächer aus Schülersicht — **eigener Endpunkt**, nicht derselbe gefiltert.
+ * Thema, Einheit und Entwurf stehen dort gar nicht erst drin.
+ */
+export async function getMeinTagSchueler() {
+    const res = await fetch(`${BASE}/planning/mein-tag/schueler`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Tag konnte nicht geladen werden')
+    return res.json()
+}
+
 export async function createLessonForSlot(slotId) {
     const res = await fetch(`${BASE}/planning/slots/${slotId}/lesson`, {
         method: 'POST',
