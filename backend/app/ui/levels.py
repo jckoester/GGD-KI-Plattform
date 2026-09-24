@@ -17,6 +17,8 @@ kein Release kostet — der Startvorschlag ist ausdrücklich ein Vorschlag.
 from __future__ import annotations
 
 import os
+import logging
+from difflib import get_close_matches
 from functools import lru_cache
 from pathlib import Path
 
@@ -40,6 +42,8 @@ _DEFAULT_PATH = aufloesen(
 # die Bibliothek fehlt.
 #
 # Ab Schritt 3 prüft ein Wächtertest, dass die Sidebar genau diese Schlüssel verwendet.
+logger = logging.getLogger(__name__)
+
 BEKANNTE_EINTRAEGE = frozenset({
     "chat",              # Neuer Chat
     "assistants",        # Assistenten (Übersicht)
@@ -101,16 +105,42 @@ class RollenStufen(BaseModel):
                 gesehen[e] = s.stufe
         return self
 
+    #: Was beim Laden übergangen wurde — für die Meldung, nicht für die Anwendung.
+    ignoriert: tuple[str, ...] = ()
+
     @model_validator(mode="after")
     def _nur_bekannte_eintraege(self):
+        """Unbekannte Einträge werden **entfernt und gemeldet**, nicht abgewiesen.
+
+        ⚠️ **Bis zum 24.09.2026 warf das hier.** Der Grund war gut — ein Tippfehler
+        (`libary`) ließe die Bibliothek lautlos verschwinden, und niemand wüsste, warum.
+        Die Folge war es nicht: `load_ui_levels()` scheiterte dann **ganz**, `GET
+        /ui/levels` antwortete mit 500, und ohne geladene Registry zeigt die Oberfläche
+        *alles* an. Aus einem fehlenden Eintrag wurde so eine Navigation ohne jede
+        Stufung.
+
+        Praktisch aufgefallen ist es anders herum: `config/ui_levels.yaml` ist
+        gitignored und überlebt jeden Zweigwechsel. Ein Schlüssel aus einem neueren
+        Zweig (`welcome`) legte auf dem älteren **zehn Integrationstests** lahm — und
+        `scripts/test.sh` ist der Pre-Push-Hook. Dasselbe passiert bei einem Rollback in
+        der Produktion: Die Konfiguration weiß dann mehr als der Code.
+
+        Beide Fälle sehen gleich aus und lassen sich nicht sicher trennen. Deshalb:
+        weiterlaufen, den Eintrag weglassen — und **laut** sagen, was fehlt. Die Meldung
+        schlägt zusätzlich einen bekannten Schlüssel vor, wenn der unbekannte ihm ähnelt;
+        genau das trennt den Tippfehler von der Versionsdifferenz.
+
+        Die **Beispieldatei** bleibt streng geprüft: `test_beispiel_kennt_alle_eintraege`
+        vergleicht ihre Einträge mit `BEKANNTE_EINTRAEGE`, ein Tippfehler dort fällt also
+        weiter auf.
+        """
         unbekannt = sorted(
-            e for st in self.stufen for e in st.eintraege if e not in BEKANNTE_EINTRAEGE
+            {e for st in self.stufen for e in st.eintraege if e not in BEKANNTE_EINTRAEGE}
         )
         if unbekannt:
-            raise ValueError(
-                f"unbekannte Navigationseinträge: {unbekannt} — "
-                f"bekannt sind: {sorted(BEKANNTE_EINTRAEGE)}"
-            )
+            for st in self.stufen:
+                st.eintraege = [e for e in st.eintraege if e in BEKANNTE_EINTRAEGE]
+            self.ignoriert = tuple(unbekannt)
         return self
 
     @property
@@ -170,8 +200,32 @@ def stufe_fuer(prefs: dict, rollen: list[str], cfg: "UiLevels | None" = None) ->
     return max(1, min(r.hoechste, wert))
 
 
+def _meldung_zu_ignorierten(rolle: str, unbekannt: tuple[str, ...]) -> str:
+    """Eine Zeile, die sagt, was fehlt — und wahrscheinlich warum.
+
+    ⚠️ Der Vorschlag ist der Kern: Liegt der unbekannte Schlüssel **nah** an einem
+    bekannten, ist es fast sicher ein Tippfehler und der Eintrag fehlt jetzt in der
+    Navigation. Liegt er weit weg, stammt er vermutlich aus einer anderen Fassung —
+    nach einem Rollback oder einem Zweigwechsel. Beides sieht in der Datei gleich aus;
+    erst der Abstand trennt sie.
+    """
+    teile = []
+    for e in unbekannt:
+        nah = get_close_matches(e, BEKANNTE_EINTRAEGE, n=1, cutoff=0.7)
+        teile.append(f"{e!r} (meinten Sie {nah[0]!r}?)" if nah else repr(e))
+    return (
+        f"Rolle {rolle!r}: unbekannte Navigationseinträge übergangen — {', '.join(teile)}. "
+        f"Bekannt sind: {sorted(BEKANNTE_EINTRAEGE)}. "
+        "Diese Einträge erscheinen nicht in der Navigation."
+    )
+
+
 @lru_cache(maxsize=1)
 def load_ui_levels(path: Path | None = None) -> UiLevels:
     p = path or _DEFAULT_PATH
     with open(p, encoding="utf-8") as f:
-        return UiLevels.model_validate(yaml.safe_load(f))
+        cfg = UiLevels.model_validate(yaml.safe_load(f))
+    for rolle, stufen in cfg.rollen.items():
+        if stufen.ignoriert:
+            logger.warning("KONFIGURATION: %s", _meldung_zu_ignorierten(rolle, stufen.ignoriert))
+    return cfg

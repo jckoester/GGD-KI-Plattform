@@ -7,6 +7,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Ein unbekannter Eintrag in `ui_levels.yaml` legt nicht mehr die ganze Navigation
+  lahm.** Kennt die Anwendung einen Navigationsschlüssel nicht — etwa nach einem
+  Rollback, bei dem die Konfiguration neuer ist als der Code —, wird er übergangen und
+  im Log benannt, statt das Laden der Stufen abzubrechen. Bisher antwortete
+  `GET /ui/levels` in diesem Fall mit einem Fehler, und die Oberfläche zeigte
+  **alle** Einträge ungefiltert.
 - **Das Neuladen einer Unterseite endete mit einem Proxy-Fehler (502).** Nur die
   Startadresse lud; jede tiefere Adresse — `/chat`, eine Curriculum-Ansicht — scheiterte,
   sobald man sie direkt aufrief oder die Seite neu lud. Die Plattform schickte einen zu

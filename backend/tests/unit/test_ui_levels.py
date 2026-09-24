@@ -81,13 +81,56 @@ def test_die_hoechste_lehrkraft_stufe_zeigt_alles():
 
 # ── Die stummen Fehler ────────────────────────────────────────────────────────
 
-def test_tippfehler_im_eintrag_wird_abgewiesen():
-    """`libary` statt `library` ließe die Bibliothek lautlos verschwinden."""
+def test_tippfehler_verschwindet_nicht_lautlos():
+    """⚠️ **Dieser Test verlangte bis zum 24.09.2026 das Gegenteil.**
+
+    Er hieß `test_tippfehler_im_eintrag_wird_abgewiesen` und forderte eine
+    `ValidationError`. Die Begründung — „`libary` statt `library` ließe die Bibliothek
+    lautlos verschwinden" — bleibt richtig. Die **Folge** war es nicht: `load_ui_levels()`
+    scheiterte dann ganz, `GET /ui/levels` antwortete mit 500, und ohne geladene Registry
+    zeigt die Oberfläche *alles*. Aus einem fehlenden Eintrag wurde eine Navigation ohne
+    jede Stufung.
+
+    Jetzt wird der Eintrag **weggelassen und gemeldet** — leise verschwindet er nicht.
+    """
     daten = _rolle(stufen=[
-        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["libary"]},
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["libary", "chat"]},
     ])
-    with pytest.raises(ValidationError, match="unbekannte Navigationseinträge"):
-        RollenStufen.model_validate(daten)
+    r = RollenStufen.model_validate(daten)
+    assert r.eintraege_bis(1) == ["chat"]
+    assert r.ignoriert == ("libary",)
+
+
+def test_die_meldung_nennt_den_wahrscheinlichen_tippfehler():
+    """⚠️ Der Abstand trennt den Tippfehler von der Versionsdifferenz.
+
+    Beide sehen in der Datei gleich aus: ein Schlüssel, den der Code nicht kennt. Liegt er
+    **nah** an einem bekannten, fehlt jetzt sehr wahrscheinlich ein Eintrag, den jemand
+    wollte. Liegt er weit weg, stammt er aus einer anderen Fassung — Rollback oder
+    Zweigwechsel.
+    """
+    from app.ui.levels import _meldung_zu_ignorierten
+
+    assert "'library'" in _meldung_zu_ignorierten("teacher", ("libary",))
+    # `welcome` kam aus einem neueren Zweig — kein Vorschlag, keine falsche Fährte.
+    assert "meinten Sie" not in _meldung_zu_ignorierten("teacher", ("welcome",))
+
+
+def test_ein_schluessel_aus_einer_anderen_fassung_blockiert_nichts():
+    """⚠️ **Der Fall, der das ausgelöst hat** (24.09.2026).
+
+    `config/ui_levels.yaml` ist gitignored und überlebt jeden Zweigwechsel. Ein Schlüssel
+    aus einem neueren Zweig legte auf dem älteren **zehn Integrationstests** lahm — und
+    `scripts/test.sh` ist der Pre-Push-Hook. Dasselbe passiert bei einem Rollback in der
+    Produktion: Die Konfiguration weiß dann mehr als der Code.
+    """
+    daten = _rolle(stufen=[
+        {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": ["welcome", "chat"]},
+        {"stufe": 2, "name": "B", "beschreibung": "…", "eintraege": ["library"]},
+    ])
+    r = RollenStufen.model_validate(daten)
+    assert r.eintraege_bis(2) == ["chat", "library"]
+    assert r.ignoriert == ("welcome",)
 
 
 def test_luecke_in_der_nummerierung_wird_abgewiesen():
