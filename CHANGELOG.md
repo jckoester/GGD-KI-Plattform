@@ -5,22 +5,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.10.5] – 2026-09-24
+
+Drei Fehler aus dem Betatest.
+
 ### Behoben
 
-- **Ein unbekannter Eintrag in `ui_levels.yaml` legt nicht mehr die ganze Navigation
-  lahm.** Kennt die Anwendung einen Navigationsschlüssel nicht — etwa nach einem
-  Rollback, bei dem die Konfiguration neuer ist als der Code —, wird er übergangen und
-  im Log benannt, statt das Laden der Stufen abzubrechen. Bisher antwortete
-  `GET /ui/levels` in diesem Fall mit einem Fehler, und die Oberfläche zeigte
-  **alle** Einträge ungefiltert.
-- **Das Neuladen einer Unterseite endete mit einem Proxy-Fehler (502).** Nur die
-  Startadresse lud; jede tiefere Adresse — `/chat`, eine Curriculum-Ansicht — scheiterte,
-  sobald man sie direkt aufrief oder die Seite neu lud. Die Plattform schickte einen zu
-  großen Antwortkopf, den der Proxy abwies.
-- **Die Jahresplanung einer Klasse erschien gar nicht.** Deckte ein Ferienblock zwei
-  Lücken im Stundenplan ab — etwa weil ein Termin mitten in den Ferien lag —, wurde er
-  doppelt eingefügt, und die gesamte Tabelle blieb leer. Sichtbar war das nur in der
-  Browser-Konsole.
+- Unterseiten ließen sich weder direkt aufrufen noch neu laden — der Proxy wies die
+  Antwort mit einem Fehler (502) ab. Nur die Startadresse lud.
+- Die Jahresplanung einer Klasse blieb leer, wenn ein Ferienblock zwei Lücken im
+  Stundenplan überdeckte.
+- Ein Navigationsschlüssel in `ui_levels.yaml`, den die Anwendung nicht kennt, brach das
+  Laden der Oberflächenstufen ab; die Seitenleiste zeigte dann alle Einträge ungefiltert.
+  Er wird jetzt übergangen und im Log genannt.
 
 ## [0.10.4] – 2026-09-21
 
