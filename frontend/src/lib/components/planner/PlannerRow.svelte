@@ -117,7 +117,7 @@
     slot.kategorie === 'ausfall'
       ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
       : slot.kategorie === 'pruefung'
-        ? 'bg-light-re-bg/60 dark:bg-dark-re-bg/20'
+        ? 'planner-pruefung-band'
         : slot.kategorie === 'puffer'
           ? dim('opacity-60')
           : vorlaeufig

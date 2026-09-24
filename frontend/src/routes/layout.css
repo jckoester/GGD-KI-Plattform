@@ -275,6 +275,13 @@ html.dark {
     --planner-unterrichtsfrei-stripe: var(--color-orange-200);
     --planner-unterrichtsfrei-color:  var(--color-orange-700);
     --planner-unterrichtsfrei-border: var(--color-orange-200);
+
+    /* Prüfungen: rot. Anders als Ferien und unterrichtsfreie Tage ist das keine
+       eigene Zeile, sondern eine **Slot-Zeile** mit Inhalt — die Schraffur liegt
+       deshalb hinter Text und Abzeichen und bleibt entsprechend zurückhaltend. */
+    --planner-pruefung-bg:     var(--color-red-50);
+    --planner-pruefung-stripe: var(--color-red-200);
+    --planner-pruefung-border: var(--color-red-200);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
@@ -286,6 +293,10 @@ html.dark {
     --planner-unterrichtsfrei-stripe: color-mix(in srgb, var(--color-orange-400) 22%, transparent);
     --planner-unterrichtsfrei-color:  var(--color-orange-200);
     --planner-unterrichtsfrei-border: color-mix(in srgb, var(--color-orange-400) 25%, transparent);
+
+    --planner-pruefung-bg:     color-mix(in srgb, var(--color-red-300) 8%, transparent);
+    --planner-pruefung-stripe: color-mix(in srgb, var(--color-red-400) 22%, transparent);
+    --planner-pruefung-border: color-mix(in srgb, var(--color-red-400) 25%, transparent);
 }
 
 .planner-ferien-band {
@@ -299,6 +310,22 @@ html.dark {
     );
     color:             var(--planner-ferien-color);
     border-bottom: 1px solid var(--planner-ferien-border);
+}
+
+/* ⚠️ **Setzt kein `color`** — anders als die beiden Bänder darüber. Die tragen eine
+   eigene Zeile mit einem Wort darin; diese Klasse liegt auf einer Slot-Zeile mit Thema,
+   Einheit und Abzeichen. Eine geerbte Schriftfarbe überschriebe deren Kontrast, der
+   oben in `PlannerRow` ausdrücklich auf 8–16:1 eingestellt ist. */
+.planner-pruefung-band {
+    background-color: var(--planner-pruefung-bg);
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent        0px,
+        transparent        5px,
+        var(--planner-pruefung-stripe) 5px,
+        var(--planner-pruefung-stripe) 6px
+    );
+    border-bottom: 1px solid var(--planner-pruefung-border);
 }
 
 .planner-unterrichtsfrei-band {

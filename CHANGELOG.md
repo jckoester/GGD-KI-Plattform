@@ -31,6 +31,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Prüfungsstunden sind im Jahresplan rot schraffiert** statt nur rot hinterlegt — auf
+  einen Blick von regulärem Unterricht zu unterscheiden.
 - **Das Chatfeld der Startseite steht wieder mittig, wenn keine Kacheln darunter stehen.**
 - **Die Tageskachel erscheint nur, wenn sie etwas zu sagen hat.** An einem Schultag ohne
   Einträge entfällt sie, statt „Kein Unterricht" zu melden — was dort stattfindet, weiß
