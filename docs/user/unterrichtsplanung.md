@@ -106,8 +106,10 @@ zu suchen, die es nicht gibt.
 ## Stundenentwurf
 
 Den Stundenentwurf öffnen Sie über den Titel einer Stunde oder den Stift in der
-Jahresübersicht. Er besteht aus dem **Verlaufsplan** (Phasen) und einer
-**Kompetenz-Leiste**.
+Jahresübersicht — oder über den Stundentitel auf der
+[Startseite](erste-schritte.md#die-startseite). Gibt es noch keinen Entwurf, entsteht er
+beim Klick; eine Unterrichtseinheit braucht es dafür nicht, die Zuordnung können Sie
+nachholen. Er besteht aus dem **Verlaufsplan** (Phasen) und einer **Kompetenz-Leiste**.
 
 > 📷 *Screenshot folgt: Stundenentwurf mit Phasentabelle, Zeitbudget-Balken und Kompetenz-Leiste.*
 <!-- Ersetzen durch: ![Stundenentwurf](/help-images/unterrichtsplanung/stundenentwurf.png) -->
