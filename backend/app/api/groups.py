@@ -47,6 +47,12 @@ class GroupOut(BaseModel):
     # von `student_subjects_opt_in` aus `GET /groups/config`, ob sie darauf hört. Das Feld
     # von der Betriebsart abhängig zu machen hieße, zwei Schalter im Gleichklang zu halten.
     student_visible: bool = False
+    # ⚠️ **Die Festlegung gehört in die Liste, nicht nur in die Antwort des Setzers.**
+    # Die Gruppenverwaltung zeigt das Eingabefeld aus dieser Liste; fehlte das Feld hier,
+    # stünde es bei jedem Laden wieder leer, obwohl ein Wert gesetzt ist. Genau diese
+    # Sorte Lücke — Feld gesetzt, Feld nicht ausgeliefert — hat am 24.09.2026 schon
+    # einmal einen toten Link erzeugt (`stunde_node_id`).
+    jahrgang: Optional[int] = None
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -304,6 +310,9 @@ class TeachingGroupOut(BaseModel):
     slug: str
     subject_id: Optional[int]
     student_visible: bool = False
+    # Die **Festlegung**, nicht der wirksame Jahrgang: `null` heißt „nicht festgelegt",
+    # dann leitet die Plattform aus Klasse oder Name ab (Alembic 0073).
+    jahrgang: Optional[int] = None
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -501,6 +510,43 @@ async def set_schueler_sichtbarkeit(
     await db.refresh(group)
     return group
 
+
+
+class JahrgangRequest(BaseModel):
+    """`null` heißt: Entscheidung zurücknehmen, wieder ableiten lassen."""
+
+    jahrgang: Optional[int] = Field(default=None, ge=1, le=13)
+
+
+@router.patch("/teaching/{group_id}/jahrgang", response_model=TeachingGroupOut)
+async def set_jahrgang(
+    group_id: int,
+    body: JahrgangRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Group:
+    """Den Jahrgang der Unterrichtsgruppe setzen oder die Festlegung zurücknehmen.
+
+    ⚠️ **Die Festlegung schlägt jede Ableitung.** Gelesen wird in dieser Reihenfolge:
+    diese Spalte → die Klassen aus `group_source_classes` → das Namensmuster
+    (`app/groups/jahrgang.py`). Wer hier etwas einträgt, überstimmt also auch eine
+    Klassenzuordnung — Absicht: Die Klasse ist ein guter Anhaltspunkt und nicht immer der
+    richtige (jahrgangsübergreifende Kurse, Wiederholer-Gruppen).
+
+    **`null` ist kein Fehler, sondern eine Rücknahme.** Danach leitet die Plattform
+    wieder ab; eine versehentlich gesetzte Zahl lässt sich so wieder loswerden, ohne dass
+    jemand raten muss, welcher Wert der „richtige" war.
+
+    Setzen darf, wer in der Gruppe als Lehrkraft eingetragen ist — dieselbe Bedingung wie
+    beim Anzeigenamen und der Schüler-Freigabe.
+    """
+    from app.planning.permissions import require_group_teacher
+
+    group = await require_group_teacher(group_id, current_user, db)
+    group.jahrgang = body.jahrgang
+    await db.commit()
+    await db.refresh(group)
+    return group
 
 class ExclusionOut(BaseModel):
     class_group_id: int

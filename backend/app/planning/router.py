@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
 from app.config import settings
+from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
 from app.db.models import (
     ContextEdge,
@@ -103,7 +104,7 @@ async def _kapitel_std(db: AsyncSession, kapitel_node_id: UUID) -> int | None:
     node = await db.get(ContextNode, kapitel_node_id)
     if node is None:
         return None
-    return (node.metadata_ or {}).get("std")
+    return als_stundenzahl((node.metadata_ or {}).get("std"))
 
 
 async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int | None]:
@@ -117,7 +118,7 @@ async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int 
     for edge in edges.scalars().all():
         kap = await db.get(ContextNode, edge.to_node_id)
         if kap and kap.content_type == "kapitel":
-            return kap.id, (kap.metadata_ or {}).get("std")
+            return kap.id, als_stundenzahl((kap.metadata_ or {}).get("std"))
     return None, None
 
 
@@ -153,7 +154,7 @@ async def _build_balance(
         for edge in kapitel_edge.scalars().all():
             kapitel = await db.get(ContextNode, edge.to_node_id)
             if kapitel and kapitel.content_type == "kapitel":
-                soll_std = (kapitel.metadata_ or {}).get("std")
+                soll_std = als_stundenzahl((kapitel.metadata_ or {}).get("std"))
                 break
 
         puffer = 0
@@ -888,6 +889,7 @@ async def get_group_curriculum_chapters(
         ],
         grade=resolved.grade,
         grade_unbekannt=resolved.grade_unbekannt,
+        fach_fehlt=resolved.fach_fehlt,
     )
 
 

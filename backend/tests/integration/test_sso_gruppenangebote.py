@@ -484,3 +484,49 @@ async def test_ignorieren_ist_ruecknehmbar(async_engine):
             assert len(await lade_angebote(db, LK)) == 1
     finally:
         await _aufraeumen(factory)
+
+
+async def test_angebot_ohne_fach_wird_nicht_zur_gruppe(async_engine):
+    """⚠️ **Ohne Fach entsteht keine Unterrichtsgruppe.**
+
+    Aus Schülersicht *ist* die Unterrichtsgruppe das Fach (CLAUDE.md, Fachbegriff-Tabelle).
+    Ohne `subject_id` fällt jede fachbezogene Funktion aus — Curriculum-Auflösung,
+    Assistentenauswahl, Fachseite. Die Gruppe sähe vollständig aus und wäre es nicht.
+
+    Genau so entstand am 16.09.2026 `ch-ks-abi28` (Gruppe 27, aus dem Schulkonto, ohne
+    Fach). In der Jahresplanung stand daraufhin „kein Curriculum gefunden" — eine
+    Auskunft, die zur falschen Suche schickt: Es lag nicht am Curriculum.
+    """
+    from app.groups.angebote import FachFehlt, lege_an
+
+    factory = _f(async_engine)
+    try:
+        async with factory() as db:
+            # Ein Fachkürzel, das in `subjects` nichts trifft → Angebot ohne subject_id.
+            await sync_groups(db=db, pseudonym=LK,
+                              sso_groups=["unterricht.angebotxy.zzz"],
+                              primary_role="teacher", patterns=MUSTER)
+        async with factory() as db:
+            angebot = (await db.execute(
+                select(SsoGroupOffer).where(SsoGroupOffer.pseudonym == LK)
+            )).scalar_one()
+            assert angebot.subject_id is None, "Vorbedingung: Das Angebot trägt kein Fach."
+
+            with pytest.raises(FachFehlt) as fehler:
+                await lege_an(db, angebot.id, LK)
+            # Die Meldung muss den Weg nennen, nicht nur das Problem.
+            assert "Klasse und Fach" in str(fehler.value)
+            await db.rollback()
+
+        # Gegenprobe: Es ist wirklich keine Gruppe entstanden.
+        async with factory() as db:
+            gruppen = (await db.execute(
+                select(Group).where(Group.sso_group_id == "unterricht.angebotxy.zzz")
+            )).scalars().all()
+            assert gruppen == []
+    finally:
+        async with factory() as db:
+            await db.execute(delete(GroupMembership).where(GroupMembership.pseudonym == LK))
+            await db.execute(delete(Group).where(Group.slug.like("sso-unterricht-angebot%")))
+            await db.commit()
+        await _aufraeumen(factory)

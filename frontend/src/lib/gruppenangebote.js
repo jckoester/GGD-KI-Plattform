@@ -61,3 +61,20 @@ export function angebotsHinweis(daten) {
         "Gruppe eine zweite."
     )
 }
+
+/**
+ * Warum sich aus diesem Angebot keine neue Gruppe machen lässt — `null`, wenn es geht.
+ *
+ * ⚠️ **Ohne Fach entsteht keine Unterrichtsgruppe** (`lege_an` antwortet mit 422). Aus
+ * Schülersicht *ist* die Unterrichtsgruppe das Fach; ohne `subject_id` fiele jede
+ * fachbezogene Funktion aus, die Gruppe sähe vollständig aus und wäre es nicht.
+ *
+ * Den Knopf trotzdem anzubieten wäre schlechter als keiner: Er sieht nach einem Weg aus
+ * und endet in einer Fehlermeldung. Das **Zuordnen** zu einer vorhandenen Gruppe bleibt
+ * möglich — dort kommt das Fach von der Zielgruppe.
+ */
+export function anlegenGesperrt(angebot) {
+    if (angebot?.kann_angelegt_werden !== false) return null
+    return "Zu diesem Angebot lässt sich kein Fach bestimmen — ordnen Sie es einer " +
+        "vorhandenen Gruppe zu oder legen Sie sie über „Klasse und Fach“ an."
+}

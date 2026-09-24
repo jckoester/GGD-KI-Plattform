@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Unterrichtsgruppen ohne Klasse bekommen einen Jahrgang.** Kurse aus dem Stundenplan
+  und der Kursstufe hatten keinen — die Jahresplanung bot ihnen deshalb *alle* Curricula
+  des Fachs an, einem Abiturkurs also auch die der Mittelstufe. Der Jahrgang wird jetzt
+  aus Klasse oder Gruppenname abgeleitet und lässt sich unter „Meine Unterrichtsgruppen"
+  eintragen oder korrigieren. Ist er unbekannt, wird kein Curriculum mehr vorgeschlagen.
+- **„Kein Curriculum gefunden" sagt jetzt, woran es liegt.** Fehlendes Fach an der Gruppe,
+  unbekannter Jahrgang und tatsächlich fehlendes Curriculum sahen gleich aus; zwei der
+  drei Hinweise schickten damit auf die falsche Suche.
+- **Aus einem Schulkonto-Angebot ohne erkennbares Fach entsteht keine Unterrichtsgruppe
+  mehr.** Solche Gruppen blieben ohne Fach und damit ohne Curriculum, Assistenten und
+  Fachseite. Das Angebot lässt sich weiterhin einer vorhandenen Gruppe zuordnen; der
+  Knopf „Als neue Gruppe anlegen" erscheint dort nicht mehr, dafür der Grund.
+- **Die Jahresübersicht einer Gruppe blieb leer oder lud nicht.** Wo die Stundenzahl eines
+  Curriculum-Kapitels als Text statt als Zahl gespeichert war, brach der Abruf ab — eine
+  neu angelegte Unterrichtseinheit erschien dann nicht, und ein zweiter Anlauf erzeugte
+  eine Dublette. Betroffen war die Mehrheit der importierten Kapitel.
+
 ### Neu
 
 - **Das Chatfeld der Startseite steht wieder mittig, wenn keine Kacheln darunter stehen.**

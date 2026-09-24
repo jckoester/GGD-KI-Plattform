@@ -22,6 +22,7 @@ from app.groups.angebote import (
     ignoriere,
     kandidaten,
     lade_angebote,
+    FachFehlt,
     lege_an,
     ordne_zu,
 )
@@ -205,6 +206,10 @@ async def angebote_lesen(
                 "sso_group_id": a.sso_group_id,
                 "name": a.name,
                 "fach": a.fach,
+                # Ob „Neu anlegen“ überhaupt gehen kann. Ohne Fach entsteht keine
+                # Unterrichtsgruppe (`lege_an`); einen Knopf anzubieten, der mit 422
+                # antwortet, wäre schlechter als keiner — er sieht nach einem Weg aus.
+                "kann_angelegt_werden": a.subject_id is not None,
                 "ignoriert": a.ignoriert,
             }
             for a in angebote
@@ -259,6 +264,10 @@ async def angebot_anlegen(
     """Aus dem Angebot eine neue Unterrichtsgruppe machen."""
     try:
         group_id = await lege_an(db, angebot_id, user.sub)
+    except FachFehlt as exc:
+        # 422, nicht 404: Das Angebot gibt es, es taugt nur nicht zum Anlegen.
+        await db.rollback()
+        raise HTTPException(422, str(exc)) from None
     except LookupError as exc:
         await db.rollback()
         raise HTTPException(404, str(exc)) from None

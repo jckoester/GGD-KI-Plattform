@@ -396,7 +396,12 @@ class CurriculumDraftLernsequenz(BaseModel):
     bp_titel: str | None = None
     bp_leitidee: str | None = None
     reihenfolge: int | None = None
-    std: str | None = None
+    # ⚠️ **Zahl oder Text — das Zwischenformat nimmt beides.** Es kommt aus
+    # LLM-Extraktion, YAML und dem eigenen Export; ein strenger Typ hier würde
+    # Importe abweisen, deren Angabe „12“ oder „12-14“ lautet. Zur **Zahl** wird der
+    # Wert erst beim Schreiben des Knotens (`als_stundenzahl`, `context/service.py`);
+    # so steht in der Datenbank ein Typ und an der Grenze steht Nachsicht.
+    std: int | str | None = None
     eintraege: list[CurriculumDraftEntry] = Field(default_factory=list)
     confidence: float = Field(default=1.0, description="Konfidenz der Extraktion")
     warnings: list[str] = Field(default_factory=list)
@@ -406,7 +411,9 @@ class CurriculumDraftKapitel(BaseModel):
     """Ein Kapitel im Zwischenformat."""
     titel: str
     reihenfolge: int
-    std: str | None = None
+    # Siehe `CurriculumDraftLernsequenz.std`: nachsichtig an der Grenze,
+    # normalisiert beim Schreiben.
+    std: int | str | None = None
     hinweis: str | None = None
     konkretisierung: list[str] = Field(default_factory=list)
     lernsequenzen: list[CurriculumDraftLernsequenz] = Field(default_factory=list)

@@ -16,6 +16,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context
@@ -1239,7 +1240,9 @@ async def import_curriculum_from_draft(
             "subject_id": subject_id,
             "owner_pseudonym": user_pseudonym,
             "metadata_": {
-                "std": kap.std,
+                # Normalisiert beim Schreiben — der Entwurf führt `std` als Text
+                # (`CurriculumDraftKapitel`), die Jahresplanung rechnet damit.
+                "std": als_stundenzahl(kap.std),
                 "reihenfolge": kap.reihenfolge,
                 "einleitung": kap.hinweis or "",
                 "breadcrumb": f"{schulart} | {fach_name} | Kl. {jahrgangsstufe}: {kap.titel}",
@@ -1380,7 +1383,7 @@ async def import_curriculum_from_draft(
                 "metadata_": {
                     "bp_leitidee": ls.bp_leitidee,
                     "reihenfolge": ls_reihenfolge,
-                    "std": getattr(ls, "std", None),
+                    "std": als_stundenzahl(getattr(ls, "std", None)),
                     "eintraege": eintraege_for_meta,
                     "import_key": ls_import_key,
                 }

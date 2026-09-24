@@ -15,6 +15,7 @@
     ignoreGroupOffer,
   } from "$lib/api.js"
   import {
+    anlegenGesperrt,
     angebotsHinweis,
     hatKandidaten,
     kandidatZeile,
@@ -101,6 +102,7 @@
 
     <ul class="flex flex-col gap-2">
       {#each sichtbar as a (a.id)}
+        {@const gesperrt = anlegenGesperrt(a)}
         <li
           class="rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3"
           class:opacity-60={a.ignoriert}
@@ -114,6 +116,10 @@
           <p class="font-mono text-xs text-light-tx-2 dark:text-dark-tx-2">
             {a.sso_group_id}
           </p>
+
+          {#if gesperrt}
+            <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">{gesperrt}</p>
+          {/if}
 
           {#if !a.ignoriert}
             <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -138,15 +144,17 @@
                   <Link2 size={13} /> Zuordnen
                 </button>
               {/if}
-              <button
-                onclick={() => anlegen(a)}
-                disabled={arbeitet === a.id}
-                class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
-                       border border-light-ui-3 dark:border-dark-ui-3
-                       text-light-tx dark:text-dark-tx disabled:opacity-50"
-              >
-                <Plus size={13} /> Als neue Gruppe anlegen
-              </button>
+              {#if !gesperrt}
+                <button
+                  onclick={() => anlegen(a)}
+                  disabled={arbeitet === a.id}
+                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium
+                         border border-light-ui-3 dark:border-dark-ui-3
+                         text-light-tx dark:text-dark-tx disabled:opacity-50"
+                >
+                  <Plus size={13} /> Als neue Gruppe anlegen
+                </button>
+              {/if}
               <button
                 onclick={() => umschalten(a)}
                 disabled={arbeitet === a.id}

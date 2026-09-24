@@ -6,7 +6,7 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger
+from sqlalchemy import Numeric, Boolean, BigInteger, SmallInteger
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -155,6 +155,12 @@ class Group(Base):
     student_visible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false"), default=False
     )
+    # Der Jahrgang, **entschieden** (Alembic 0073). Leer heißt „noch nicht entschieden",
+    # nicht „hat keinen": Dann leitet `app/groups/jahrgang.py` aus dem Namen ab. Nötig
+    # wurde die Spalte für Gruppen **ohne Klasse** — Stundenplangruppen und Kursstufe
+    # tragen nichts in `group_source_classes`, und ohne Jahrgang bot die
+    # Curriculum-Auflösung alle Curricula des Fachs an.
+    jahrgang: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     # Ob die Gruppe ihre Mitglieder aus den Quellklassen zieht (Alembic 0069).
     # **Entschieden, nicht gezählt:** Ob eine Gruppe den ganzen Klassenverband
     # unterrichtet oder eine Auswahl daraus, weiß nur die Lehrkraft — Religion und Ethik

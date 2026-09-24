@@ -20,6 +20,7 @@
         removeExclusion,
         createTeachingGroup,
         deleteTeachingGroup,
+        setGruppenJahrgang,
         setGruppenAnzeigename,
         setGruppenSchuelerSichtbarkeit,
         addExclusion,
@@ -105,6 +106,18 @@
     // Begrenzter Testbetrieb: Der Schalter erscheint nur, wenn der Modus aktiv ist —
     // andernfalls wäre er wirkungslos, und ein wirkungsloser Schalter ist schlimmer als
     // keiner. Die Freigabe selbst bleibt beim Abschalten des Modus gespeichert.
+    async function jahrgangSetzen(groupId, roh) {
+        // Leeres Feld heißt „nicht festgelegt" — dann leitet die Plattform wieder ab.
+        const wert = roh.trim() === "" ? null : Number(roh);
+        if (wert !== null && !Number.isInteger(wert)) return;
+        try {
+            await setGruppenJahrgang(groupId, wert);
+            await refreshMyGroups();
+        } catch (err) {
+            error = err.message || "Der Jahrgang konnte nicht gespeichert werden";
+        }
+    }
+
     async function sichtbarkeitSetzen(groupId, sichtbar) {
         try {
             await setGruppenSchuelerSichtbarkeit(groupId, sichtbar);
@@ -452,6 +465,22 @@
                         </span>
                     </p>
                 {/if}
+                <label
+                    class="mt-1.5 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2"
+                >
+                    Jahrgang
+                    <input
+                        type="number"
+                        min="1"
+                        max="13"
+                        value={group.jahrgang ?? ""}
+                        placeholder="wird abgeleitet"
+                        onchange={(e) => jahrgangSetzen(group.id, e.currentTarget.value)}
+                        class="w-28 rounded border border-light-ui-3 dark:border-dark-ui-3
+                               bg-light-bg dark:bg-dark-bg px-1.5 py-0.5
+                               text-light-tx dark:text-dark-tx"
+                    />
+                </label>
                 {#if mitFreigabe && $groupsConfig.student_subjects_opt_in}
                     <label
                         class="mt-1.5 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2

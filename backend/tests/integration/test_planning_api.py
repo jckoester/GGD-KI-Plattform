@@ -1531,3 +1531,97 @@ async def test_mein_tag_schueler_achtet_auf_die_freigabe(
             cur.execute("UPDATE groups SET student_visible = false WHERE id = 100")
         conn.commit()
         conn.close()
+
+
+# ── Stundenzahl als Text (Paket 4, AP1) ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_jahresuebersicht_haelt_eine_stundenzahl_als_text_aus(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Eine Zeichenkette in `metadata['std']` legte die ganze Jahresübersicht lahm.**
+
+    `_build_balance` rechnete `max(0, zugewiesen - soll_std)` — mit `"12"` warf das
+    `TypeError`, und `GET /groups/{id}/overview` antwortete mit **500**. Sichtbar wurde
+    das nicht als Fehlermeldung, sondern als „meine neue Unterrichtseinheit wird nicht
+    gespeichert": Der Refresh nach dem Anlegen scheiterte, die Seite blieb unverändert,
+    der zweite Klick erzeugte eine Dublette (Jan, 24.09.2026).
+
+    `context_nodes.metadata` ist JSONB und erzwingt nichts — im Dev-Bestand standen
+    **18 von 24** Kapiteln als Text da. Die Typannotation `soll_std: int | None` war
+    schlicht unwahr; eine Annotation prüft nichts.
+    """
+    kapitel_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO context_nodes
+                (id, category, content_type, title, read_scope, write_scope,
+                 status, metadata)
+            VALUES (%s, 'knowledge', 'kapitel', 'Kapitel mit Text-Stundenzahl',
+                    'school', 'school', 'active', '{"std": "12"}'::jsonb)
+        """, (kapitel_id,))
+    conn.commit()
+    try:
+        ue_id = (
+            await test_client.post(
+                "/planning/groups/100/units",
+                json={"titel": "Einheit am Text-Kapitel", "farbe": 0,
+                      "kapitel_node_id": kapitel_id},
+                headers=auth_headers,
+            )
+        ).json()["id"]
+
+        resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+
+        eintrag = next(i for i in resp.json()["balance"]["items"]
+                       if i["ue_node_id"] == ue_id)
+        assert eintrag["soll_std"] == 12, "Die Stundenzahl kam nicht als Zahl an."
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM context_edges WHERE to_node_id = %s", (kapitel_id,))
+            cur.execute("DELETE FROM context_nodes WHERE id = %s", (kapitel_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_unbrauchbare_stundenzahl_wird_zu_keiner_angabe(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """Aus „12-14" eine 12 zu machen wäre eine Erfindung — die Übersicht muss trotzdem
+    antworten, nur eben ohne Sollwert."""
+    kapitel_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO context_nodes
+                (id, category, content_type, title, read_scope, write_scope,
+                 status, metadata)
+            VALUES (%s, 'knowledge', 'kapitel', 'Kapitel mit Spanne',
+                    'school', 'school', 'active', '{"std": "12-14"}'::jsonb)
+        """, (kapitel_id,))
+    conn.commit()
+    try:
+        ue_id = (
+            await test_client.post(
+                "/planning/groups/100/units",
+                json={"titel": "Einheit an der Spanne", "farbe": 0,
+                      "kapitel_node_id": kapitel_id},
+                headers=auth_headers,
+            )
+        ).json()["id"]
+
+        resp = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        eintrag = next(i for i in resp.json()["balance"]["items"]
+                       if i["ue_node_id"] == ue_id)
+        assert eintrag["soll_std"] is None
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM context_edges WHERE to_node_id = %s", (kapitel_id,))
+            cur.execute("DELETE FROM context_nodes WHERE id = %s", (kapitel_id,))
+        conn.commit()
+        conn.close()

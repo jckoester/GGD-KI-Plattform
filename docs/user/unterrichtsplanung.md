@@ -43,6 +43,35 @@ Damit arbeiten Sie so:
 
 ---
 
+### Wenn keine Kapitel zur Auswahl stehen
+
+Beim Anlegen einer Unterrichtseinheit können Sie sie mit einem Kapitel des
+[Schulcurriculums](curriculum.md) verknüpfen. Stehen dort keine zur Auswahl, sagt die
+Plattform, **woran** es liegt — die drei Gründe verlangen verschiedene Schritte:
+
+| Was dasteht | Was fehlt | Was zu tun ist |
+|---|---|---|
+| „Dieser Gruppe ist kein Fach zugeordnet." | das **Fach** an der Gruppe | Ohne Fach gibt es weder Curriculum noch Assistentenauswahl noch Fachseite. Legen Sie die Gruppe über **Klasse und Fach** neu an. |
+| „Der Jahrgang dieser Gruppe ist nicht bekannt." | die **Stufe** | Tragen Sie sie unter **Profil → Meine Unterrichtsgruppen** im Feld „Jahrgang" ein. |
+| „Für diese Stufe ist kein Curriculum hinterlegt." | tatsächlich das Curriculum | Nichts — die Verknüpfung ist optional. Wer eines braucht, legt es unter [Schulcurriculum](curriculum.md) an. |
+
+### Der Jahrgang einer Unterrichtsgruppe
+
+Meist ergibt er sich von selbst: aus der Klasse, aus der die Gruppe stammt, sonst aus
+ihrem Namen (`10abcd nwt` → 10, `ch-tl-abi28` → Kursstufe). Beides ist nur eine
+**Vermutung**. Unter **Profil → Meine Unterrichtsgruppen** steht dafür das Feld
+„Jahrgang":
+
+- Leer heißt **nicht festgelegt** — dann gilt die Vermutung.
+- Eine eingetragene Zahl **gilt**, auch gegen die Klasse. Das ist Absicht: Bei
+  jahrgangsübergreifenden Kursen und Wiederholer-Gruppen ist die Klasse der falsche
+  Anhaltspunkt.
+- Das Feld wieder zu leeren nimmt die Festlegung zurück.
+
+Der Jahrgang entscheidet, **welche** Curricula angeboten werden. Ist er unbekannt, wird
+gar keines angeboten — früher waren es alle des Fachs, was einem Abiturkurs auch
+Curricula der Mittelstufe vorlegte.
+
 ## Das ganze Jahr planen
 
 Viele Lehrkräfte legen ihre Jahresplanung **im September** an — für das ganze Schuljahr,

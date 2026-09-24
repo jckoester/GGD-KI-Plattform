@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+    anlegenGesperrt,
     angebotsHinweis,
     hatKandidaten,
     kandidatZeile,
@@ -77,5 +78,32 @@ describe("hatKandidaten", () => {
     it("erkennt, wenn es nichts zuzuordnen gibt", () => {
         expect(hatKandidaten({ gruppen: [] })).toBe(false)
         expect(hatKandidaten({ gruppen: [{ id: 1 }] })).toBe(true)
+    })
+})
+
+describe("anlegenGesperrt", () => {
+    it("⚠️ sperrt das Anlegen, wenn dem Angebot das Fach fehlt", () => {
+        // `lege_an` antwortet ohne Fach mit 422. Einen Knopf anzubieten, der in einer
+        // Fehlermeldung endet, wäre schlechter als keiner — er sieht nach einem Weg aus.
+        const grund = anlegenGesperrt({ kann_angelegt_werden: false })
+        expect(grund).toBeTruthy()
+        expect(grund).toContain("kein Fach")
+    })
+
+    it("nennt beide Auswege, nicht nur das Problem", () => {
+        const grund = anlegenGesperrt({ kann_angelegt_werden: false })
+        expect(grund).toContain("vorhandenen Gruppe")
+        expect(grund).toContain("Klasse und Fach")
+    })
+
+    it("lässt anlegen, wo ein Fach da ist", () => {
+        expect(anlegenGesperrt({ kann_angelegt_werden: true })).toBeNull()
+    })
+
+    it("⚠️ sperrt nicht, solange das Feld fehlt", () => {
+        // Ältere Antworten ohne `kann_angelegt_werden` dürfen nicht plötzlich alle
+        // Angebote sperren — das Feld ist neu (24.09.2026).
+        expect(anlegenGesperrt({})).toBeNull()
+        expect(anlegenGesperrt(null)).toBeNull()
     })
 })

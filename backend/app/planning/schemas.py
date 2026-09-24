@@ -192,6 +192,11 @@ class GroupCurriculaRead(BaseModel):
     curricula: list[CurriculumOption] = []
     grade: Optional[int] = None
     grade_unbekannt: bool = False
+    # ⚠️ **Drei Lagen, nicht eine leere Liste.** „Kein Fach an der Gruppe", „Stufe
+    # unbekannt" und „Stufe bekannt, kein Curriculum hinterlegt" sahen bis zum
+    # 24.09.2026 gleich aus. Die Oberfläche sagte dreimal „kein Curriculum gefunden"
+    # und schickte die Lehrkraft zweimal auf die falsche Suche.
+    fach_fehlt: bool = False
 
 
 # ── Stunden-Knoten ────────────────────────────────────────────────────────────

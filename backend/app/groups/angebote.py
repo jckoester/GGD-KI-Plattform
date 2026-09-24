@@ -190,9 +190,30 @@ async def ordne_zu(
     return Zuordnungsergebnis(group_id=group_id, geerbte_entfernt=entfernt.rowcount or 0)
 
 
+class FachFehlt(ValueError):
+    """Das Angebot trägt kein auflösbares Fach — daraus wird keine Gruppe."""
+
+
 async def lege_an(db: AsyncSession, angebot_id: UUID, pseudonym: str) -> int:
-    """Aus dem Angebot eine neue Gruppe machen."""
+    """Aus dem Angebot eine neue Gruppe machen.
+
+    ⚠️ **Ohne Fach entsteht hier nichts.** Aus Schülersicht *ist* die Unterrichtsgruppe
+    das Fach (CLAUDE.md, Fachbegriff-Tabelle); ohne `subject_id` fällt jede fachbezogene
+    Funktion aus — Curriculum-Auflösung, Assistentenauswahl, Fachseite. Die Gruppe sähe
+    vollständig aus und wäre es nicht.
+
+    Gefunden am 24.09.2026: `ch-ks-abi28` (Gruppe 27, aus dem Schulkonto am 16.09.
+    automatisch angelegt) trug `subject_id = NULL`. In der Jahresplanung stand daraufhin
+    „kein Curriculum gefunden“ — eine Auskunft, die zur falschen Suche schickt: Es lag
+    nicht am Curriculum.
+    """
     offer = await _hole(db, angebot_id, pseudonym)
+    if offer.subject_id is None:
+        raise FachFehlt(
+            f"Zu „{offer.name}“ lässt sich kein Fach bestimmen. "
+            "Legen Sie die Gruppe über „Klasse und Fach“ an oder ordnen Sie das Angebot "
+            "einer vorhandenen Gruppe zu."
+        )
     basis = f"sso-{offer.sso_group_id.replace('.', '-').lower()}"
     slug, lauf = basis, 1
     while (await db.execute(select(Group.id).where(Group.slug == slug))).scalar_one_or_none():

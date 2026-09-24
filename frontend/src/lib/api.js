@@ -2008,6 +2008,21 @@ export async function getUiLevels() {
     return res.json()
 }
 
+/**
+ * Den Jahrgang einer Unterrichtsgruppe festlegen — `null` nimmt die Festlegung zurück,
+ * die Plattform leitet dann wieder aus Klasse oder Name ab.
+ */
+export async function setGruppenJahrgang(groupId, jahrgang) {
+    const res = await fetch(`${BASE}/groups/teaching/${groupId}/jahrgang`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jahrgang }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Jahrgang konnte nicht gespeichert werden')
+    return res.json()
+}
+
 export async function setGruppenSchuelerSichtbarkeit(groupId, sichtbar) {
     const res = await fetch(`${BASE}/groups/teaching/${groupId}/student-visible`, {
         method: 'PATCH',

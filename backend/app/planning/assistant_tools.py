@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.stunden import als_stundenzahl
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
@@ -512,7 +513,7 @@ async def _handle_get_unit_detail(args: dict, ctx: ToolContext) -> dict:
             chapter_info = {
                 "id": str(ch.id),
                 "titel": ch.title,
-                "std": (ch.metadata_ or {}).get("std"),
+                "std": als_stundenzahl((ch.metadata_ or {}).get("std")),
                 "lernsequenzen": (ch.metadata_ or {}).get("lernsequenzen", []),
             }
 
