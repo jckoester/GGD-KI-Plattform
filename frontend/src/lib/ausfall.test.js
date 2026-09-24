@@ -6,8 +6,11 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
+    assistentFrage,
+    ausfallWege,
     darfZurueckgenommenWerden,
     eintragFrage,
+    zeileBrauchtEntscheidung,
     herkunftText,
     ruecknahmeWarnung,
 } from "./ausfall.js"
@@ -112,5 +115,129 @@ describe("Planungsseite: Auffrischen nach einer Server-Aktion", () => {
             expect(block.slice(0, block.indexOf("\n  }")), fn)
                 .toContain("refreshVomServer()")
         }
+    })
+})
+
+describe("ausfallWege", () => {
+    it("⚠️ fragt nicht, wo es nichts zu entscheiden gibt", () => {
+        // Eine leere Stunde fällt aus, und damit ist es gut. Danach zu fragen hieße,
+        // nach Arbeit zu rufen, die niemand hat — und der Hinweis verlöre seine
+        // Bedeutung für die Fälle, in denen es wirklich etwas zu tun gibt.
+        expect(ausfallWege({ betroffen: 3, mit_inhalt: 0 })).toBeNull()
+        expect(ausfallWege({})).toBeNull()
+        expect(ausfallWege(null)).toBeNull()
+    })
+
+    it("bietet genau die drei Wege an", () => {
+        const a = ausfallWege({ betroffen: 2, mit_inhalt: 2 })
+        expect(a.wege.map((w) => w.id)).toEqual(["entfallen", "verschieben", "umplanen"])
+        // Jeder trägt einen Hinweis — die Wörter allein sagen nicht, was folgt.
+        expect(a.wege.every((w) => w.hinweis?.length > 10)).toBe(true)
+    })
+
+    it("zählt richtig", () => {
+        expect(ausfallWege({ mit_inhalt: 1 }).satz).toContain("Eine")
+        expect(ausfallWege({ mit_inhalt: 3 }).satz).toContain("3")
+    })
+})
+
+describe("assistentFrage", () => {
+    it("⚠️ trennt Verschieben von Umplanen", () => {
+        // Zwei Absichten, zwei Sätze. In einen gelegt, träfe das Modell die
+        // Entscheidung, die gerade die Lehrkraft getroffen hat.
+        const v = assistentFrage("verschieben", "2026-11-10")
+        const u = assistentFrage("umplanen", "2026-11-10")
+        expect(v).toContain("verschieben")
+        expect(u).toMatch(/kürzen|umverteilen/)
+        expect(v).not.toBe(u)
+    })
+
+    it("nennt das Datum lesbar", () => {
+        expect(assistentFrage("verschieben", "2026-11-03")).toContain("3.11.2026")
+    })
+
+    it("kommt ohne Datum zurecht", () => {
+        expect(assistentFrage("umplanen", null)).toContain("diesem Tag")
+    })
+})
+
+describe("zeileBrauchtEntscheidung", () => {
+    const offen = {
+        kategorie: "ausfall", anpassung_noetig: true, thema: "Titration",
+    }
+
+    it("⚠️ liest die Daten, nicht den Sitzungszustand", () => {
+        // Jan, 24.09.2026: Der Hinweis stand über der Tabelle und verschwand beim
+        // Neuladen — die offene Entscheidung wurde unsichtbar, obwohl sie offen blieb.
+        expect(zeileBrauchtEntscheidung(offen)).toBe(true)
+    })
+
+    it("schweigt nach der Entscheidung", () => {
+        // „Inhalte entfallen" räumt `anpassung_noetig` ab. Ohne diese Prüfung stünde der
+        // Hinweis auch danach noch da.
+        expect(zeileBrauchtEntscheidung({ ...offen, anpassung_noetig: false })).toBe(false)
+    })
+
+    it("schweigt an einer Stunde, die stattfindet", () => {
+        expect(zeileBrauchtEntscheidung({ ...offen, kategorie: "unterricht" })).toBe(false)
+    })
+
+    it("⚠️ schweigt, wo nichts geplant war", () => {
+        // Eine leere Stunde fällt aus, und damit ist es gut.
+        expect(zeileBrauchtEntscheidung({
+            kategorie: "ausfall", anpassung_noetig: true, thema: "   ",
+        })).toBe(false)
+    })
+
+    it("erkennt Einheit und Entwurf als Inhalt", () => {
+        for (const feld of ["ue_node_id", "stunde_node_id"]) {
+            expect(zeileBrauchtEntscheidung({
+                kategorie: "ausfall", anpassung_noetig: true, [feld]: "x",
+            }), feld).toBe(true)
+        }
+    })
+})
+
+describe("Zeile: bearbeiten ohne Unterrichtseinheit", () => {
+    const ZEILE2 = readFileSync(join(SRC, "lib/components/planner/PlannerRow.svelte"), "utf8")
+
+    it("⚠️ hängt das Bearbeiten-Symbol nicht mehr an der Einheit", () => {
+        // Es stand auf `slot.ue_node_id` — aus der Zeit, als ein Entwurf nur unter einer
+        // Einheit entstehen konnte. Seit `POST /planning/slots/{id}/lesson` stimmt das
+        // nicht mehr; am Ziel einer verschobenen Stunde fehlte das Symbol (Jan).
+        expect(ZEILE2).toMatch(/\{#if onEditLesson && hatInhalt\}/)
+        expect(ZEILE2).not.toMatch(/\{#if onEditLesson && slot\.ue_node_id\}/)
+    })
+
+    it("zeigt es nicht an leeren Zeilen", () => {
+        const def = ZEILE2.slice(ZEILE2.indexOf("const hatInhalt"))
+        expect(def.slice(0, def.indexOf("\n\n"))).toMatch(/thema \|\| ''\)\.trim\(\)/)
+    })
+})
+
+describe("Planungsseite: der Hinweis steht an der Zeile", () => {
+    const SEITE2 = readFileSync(
+        join(SRC, "routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte"), "utf8")
+
+    it("⚠️ kein Seiten-Banner mehr für dieselbe Frage", () => {
+        // Zwei Orte für eine Frage waren als Todo notiert; Jans Rückmeldung hat
+        // entschieden, welcher bleibt.
+        expect(SEITE2).not.toContain("ausfallAngebot")
+    })
+
+    it("reicht den Weg an die Tabelle durch", () => {
+        expect(SEITE2).toContain("onAusfallWeg={ausfallWegZeile}")
+    })
+
+    it("legt Entwürfe auch ohne Einheit an", () => {
+        const fn = SEITE2.slice(SEITE2.indexOf("async function handleEditLesson"))
+        const rumpf = fn.slice(0, fn.indexOf("\n  }"))
+        expect(rumpf).toContain("createLessonForSlot")
+        // ⚠️ **Ohne Kommentarzeilen prüfen.** Der erste Entwurf dieses Tests schlug an,
+        // weil der Kommentar daneben die alte Zeile zitiert — ein Wächter, der auf die
+        // Begründung anspringt statt auf den Code, meldet jede gute Dokumentation als
+        // Fehler.
+        const code = rumpf.split("\n").filter((z) => !z.trim().startsWith("//")).join("\n")
+        expect(code).not.toMatch(/if \(!slot\?\.ue_node_id\) return/)
     })
 })

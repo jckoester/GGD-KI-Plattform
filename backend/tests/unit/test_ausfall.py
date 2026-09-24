@@ -20,6 +20,9 @@ class Slot:
     kategorie: str = "unterricht"
     ausfall_herkunft: Optional[str] = None
     ausfall_vorher: Optional[str] = None
+    ue_node_id: Optional[UUID] = None
+    stunde_node_id: Optional[UUID] = None
+    thema: Optional[str] = None
 
 
 def _s(gid=1, tag=HEUTE, **kw):
@@ -155,3 +158,28 @@ def test_setze_kategorie_weist_unbekannte_herkunft_ab():
 
     with pytest.raises(ValueError):
         setze_kategorie(_s(), "ausfall", herkunft="irgendwoher")
+
+
+# ── Was „Inhalt" heißt ───────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("feld,wert", [
+    ("ue_node_id", uuid4()),
+    ("stunde_node_id", uuid4()),
+    ("thema", "Titration"),
+])
+def test_geplante_stunden_werden_als_solche_erkannt(feld, wert):
+    """Nur wo etwas geplant war, gibt es etwas zu entscheiden."""
+    treffer = plane_ausfall([_s(**{feld: wert})], datum=HEUTE, reichweite="tag")
+    assert treffer[0].mit_inhalt is True
+
+
+@pytest.mark.parametrize("thema", [None, "", "   "])
+def test_eine_leere_stunde_hat_keinen_inhalt(thema):
+    """⚠️ Auch Leerzeichen sind kein Thema.
+
+    Sonst riefe die Hinweisleiste nach Arbeit, die niemand hat — und die Lehrkraft
+    suchte einen Inhalt, den es nie gab.
+    """
+    treffer = plane_ausfall([_s(thema=thema)], datum=HEUTE, reichweite="tag")
+    assert treffer[0].mit_inhalt is False

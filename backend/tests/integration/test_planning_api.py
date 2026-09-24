@@ -1872,3 +1872,66 @@ async def test_von_hand_gesetzter_ausfall_traegt_die_herkunft(
             cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
         conn.commit()
         conn.close()
+
+
+@pytest.mark.asyncio
+async def test_ausfall_meldet_wie_viele_stunden_inhalt_hatten(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Nur mit Inhalt gibt es etwas zu entscheiden.**
+
+    Die Oberfläche bietet nach einem Ausfall drei Wege an (Inhalte entfallen ·
+    verschieben · umplanen). Ohne diese Zahl fragte sie auch nach einem leeren Tag — eine
+    Aufgabe, die es nicht gibt, und der Hinweis verlöre seine Bedeutung für die Fälle,
+    in denen wirklich etwas zu tun ist.
+    """
+    from datetime import date, timedelta
+
+    tag = date.today() + timedelta(days=24)
+    mit, ohne = str(uuid4()), str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)
+            VALUES (%s, 100, %s, 1, 1, 1, 'unterricht', 'Titration')
+        """, (mit, tag))
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 2, 1, 1, 'unterricht')
+        """, (ohne, tag))
+    conn.commit()
+    try:
+        resp = await test_client.post(
+            "/planning/absences",
+            json={"datum": tag.isoformat(), "reichweite": "gruppe", "group_id": 100},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["betroffen"] == 2
+        assert resp.json()["mit_inhalt"] == 1
+
+        # Der Anpassungsbedarf steht nur an der geplanten Stunde.
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, anpassung_noetig FROM lesson_slots WHERE id IN (%s,%s)",
+                        (mit, ohne))
+            stand = {str(r[0]).replace("-", ""): r[1] for r in cur.fetchall()}
+        assert stand[mit.replace("-", "")] is True
+        assert stand[ohne.replace("-", "")] is False, (
+            "Eine leere Stunde ruft nach Arbeit, die es nicht gibt."
+        )
+
+        # Zurücknehmen räumt ihn wieder weg — die Stunde findet ja wieder statt.
+        await test_client.delete(
+            f"/planning/absences?datum={tag.isoformat()}&reichweite=gruppe&group_id=100",
+            headers=auth_headers,
+        )
+        with conn.cursor() as cur:
+            cur.execute("SELECT anpassung_noetig FROM lesson_slots WHERE id = %s", (mit,))
+            assert cur.fetchone()[0] is False
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id IN (%s,%s)", (mit, ohne))
+        conn.commit()
+        conn.close()

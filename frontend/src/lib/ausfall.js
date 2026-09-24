@@ -53,3 +53,81 @@ export function eintragFrage(reichweite, gruppenname) {
         ? "Alle Ihre Stunden dieses Tages als Ausfall markieren?"
         : `Alle Stunden von ${gruppenname || "dieser Gruppe"} an diesem Tag als Ausfall markieren?`
 }
+
+/**
+ * Die drei Wege nach einem Ausfall — `null`, wenn es nichts zu entscheiden gibt.
+ *
+ * ⚠️ **Keiner davon geschieht automatisch** (Jan, 24.09.2026): „Je nach
+ * Unterrichtsgruppe werden die Auswirkungen eines Ausfalls sehr unterschiedlich sein …
+ * Das ist aktive Arbeit der Lehrkraft." Welcher richtig ist, hängt am Fach, an der
+ * Einheit und am Rest des Halbjahres — das weiß nur sie.
+ *
+ * Bei `mitInhalt === 0` gibt es **keine** Frage: Eine leere Stunde fällt aus, und damit
+ * ist es gut. Danach zu fragen hieße, nach Arbeit zu rufen, die niemand hat.
+ */
+export function ausfallWege(ergebnis) {
+    const mit = ergebnis?.mit_inhalt ?? 0
+    if (!mit) return null
+    return {
+        anzahl: mit,
+        satz: mit === 1
+            ? "Eine ausgefallene Stunde hatte geplante Inhalte. Was soll damit geschehen?"
+            : `${mit} ausgefallene Stunden hatten geplante Inhalte. Was soll damit geschehen?`,
+        wege: [
+            {
+                id: "entfallen",
+                text: "Inhalte entfallen",
+                hinweis: "Die Einheit rückt nicht nach — der Stoff ist gestrichen.",
+            },
+            {
+                id: "verschieben",
+                text: "Stunden verschieben",
+                hinweis: "Die Inhalte wandern auf die folgenden Stunden.",
+            },
+            {
+                id: "umplanen",
+                text: "Umplanen",
+                hinweis: "Die Einheit neu zuschneiden — kürzen oder zusammenlegen.",
+            },
+        ],
+    }
+}
+
+/**
+ * Der Satz, mit dem der Assistent den Fall übernimmt.
+ *
+ * Zwei Absichten, zwei Sätze: **verschieben** rückt den Stoff nach hinten,
+ * **umplanen** stellt die Einheit selbst in Frage. Sie in einen Satz zu legen hieße,
+ * dem Modell die Entscheidung zu überlassen, die gerade die Lehrkraft getroffen hat.
+ */
+export function assistentFrage(weg, datumIso) {
+    const [y, m, d] = (datumIso || "").split("-")
+    const datum = y ? `${+d}.${+m}.${y}` : "diesem Tag"
+    if (weg === "verschieben") {
+        return `Am ${datum} sind geplante Stunden ausgefallen. Bitte hilf mir, die `
+            + "Inhalte auf die folgenden Stunden zu verschieben."
+    }
+    return `Am ${datum} sind geplante Stunden ausgefallen. Bitte schlage vor, wie ich die `
+        + "betroffene Unterrichtseinheit kürzen oder umverteilen kann."
+}
+
+/**
+ * Ob an dieser **einen** Zeile noch etwas zu entscheiden ist.
+ *
+ * ⚠️ **Am Slot, nicht über der Tabelle** (Jan, 24.09.2026): „der Hinweis zum
+ * Verschiebe-Assistenten erscheint nur oberhalb der Jahresplanungstabelle, nicht am
+ * Ausfallslot, wo ich ihn erwartet hätte."
+ *
+ * Das ist mehr als eine Platzfrage. Ein Banner über der Tabelle ist **Sitzungszustand**:
+ * Es verschwindet beim Neuladen, und die offene Entscheidung wird unsichtbar, obwohl sie
+ * offen bleibt. Diese Bedingung liest die **Daten** — sie steht wieder da, solange sie
+ * gilt, und sie steht dort, wo die betroffene Stunde ist.
+ *
+ * `anpassung_noetig` ist der Schalter: Das Eintragen setzt ihn, „Inhalte entfallen"
+ * räumt ihn ab. Ohne ihn bliebe der Hinweis auch nach der Entscheidung stehen.
+ */
+export function zeileBrauchtEntscheidung(slot) {
+    if (slot?.kategorie !== "ausfall") return false
+    if (!slot?.anpassung_noetig) return false
+    return !!(slot.ue_node_id || slot.stunde_node_id || (slot.thema || "").trim())
+}

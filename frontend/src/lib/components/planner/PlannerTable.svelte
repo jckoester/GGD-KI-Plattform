@@ -21,6 +21,7 @@
         onReview = null,
         onAusfallTag = null,
         onAusfallZurueck = null,
+        onAusfallWeg = null,
     } = $props();
 
     // ⚠️ **Übergangsregel.** Ob ein Termin vorläufig ist, steht seit Migration `0066`
@@ -190,6 +191,7 @@
                             {onReview}
                             {onAusfallTag}
                             {onAusfallZurueck}
+                            {onAusfallWeg}
                         />
                     {:else}
                         <SpecialDayRow

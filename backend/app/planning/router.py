@@ -1843,6 +1843,11 @@ class AusfallRequest(BaseModel):
 class AusfallRead(BaseModel):
     betroffen: int
     slot_ids: list[UUID]
+    # ⚠️ **Wie viele der Stunden etwas Geplantes trugen.** Nur dann gibt es eine
+    # Entscheidung zu treffen (Inhalte entfallen · verschieben · umplanen). Ohne diese
+    # Zahl fragte die Oberfläche auch nach einem leeren Tag — eine Aufgabe, die es nicht
+    # gibt, und der Hinweis verlöre seine Bedeutung.
+    mit_inhalt: int = 0
 
 
 @router.post("/absences", response_model=AusfallRead, status_code=201)
@@ -1886,7 +1891,9 @@ async def ausfall_eintragen(
         )
         await db.commit()
     return AusfallRead(
-        betroffen=len(markierungen), slot_ids=[m.slot_id for m in markierungen]
+        betroffen=len(markierungen),
+        slot_ids=[m.slot_id for m in markierungen],
+        mit_inhalt=sum(1 for m in markierungen if m.mit_inhalt),
     )
 
 

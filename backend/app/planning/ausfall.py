@@ -40,6 +40,9 @@ class SlotArtig(Protocol):
     kategorie: str
     ausfall_herkunft: Optional[str]
     ausfall_vorher: Optional[str]
+    ue_node_id: Optional[UUID]
+    stunde_node_id: Optional[UUID]
+    thema: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,9 @@ class Markierung:
     slot_id: UUID
     group_id: int
     vorher: str
+    # Ob an dieser Stunde etwas geplant war. Nur dann gibt es überhaupt etwas zu
+    # entscheiden — eine leere Stunde fällt aus und fertig.
+    mit_inhalt: bool = False
 
 
 @dataclass(frozen=True)
@@ -82,7 +88,12 @@ def plane_ausfall(
         raise ValueError("Reichweite 'gruppe' verlangt eine group_id")
 
     return tuple(
-        Markierung(slot_id=s.id, group_id=s.group_id, vorher=s.kategorie)
+        Markierung(
+            slot_id=s.id,
+            group_id=s.group_id,
+            vorher=s.kategorie,
+            mit_inhalt=bool(s.ue_node_id or s.stunde_node_id or (s.thema or "").strip()),
+        )
         for s in slots
         if s.date == datum
         and s.kategorie != AUSFALL
@@ -208,6 +219,12 @@ async def wende_ausfall_an(
         slot.kategorie = AUSFALL
         slot.ausfall_herkunft = herkunft
         slot.ausfall_vorher = m.vorher
+        # ⚠️ **Nur wo etwas geplant war.** `anpassung_noetig` heißt „hier ist noch etwas
+        # zu entscheiden"; an einer leeren Stunde wäre es eine Aufgabe, die es nicht
+        # gibt — und die Hinweisleiste riefe nach Arbeit, die niemand hat. Der
+        # Stundenplan-Abgleich setzt dasselbe Feld bei Ausfällen aus der Quelle.
+        if m.mit_inhalt:
+            slot.anpassung_noetig = True
         if notiz:
             # ⚠️ Über `mit_eigenem_text`, nicht durch Zuweisung: Eine vorhandene
             # `[Stundenplan]`-Zeile gehört dem Abgleich und muss stehen bleiben.
@@ -227,5 +244,7 @@ async def nimm_ausfall_zurueck(db, slots, ruecknahmen: tuple[Ruecknahme, ...]) -
         slot.kategorie = r.zurueck_auf
         slot.ausfall_herkunft = None
         slot.ausfall_vorher = None
+        # Die Stunde findet wieder statt — es gibt nichts mehr anzupassen.
+        slot.anpassung_noetig = False
         slot.updated_at = jetzt
     return len(ruecknahmen)

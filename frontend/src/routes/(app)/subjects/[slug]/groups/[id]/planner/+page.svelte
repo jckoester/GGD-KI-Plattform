@@ -1,5 +1,5 @@
 <script>
-  import { eintragFrage, ruecknahmeWarnung } from '$lib/ausfall.js'
+  import { assistentFrage, eintragFrage, ruecknahmeWarnung } from '$lib/ausfall.js'
   import { page } from '$app/stores'
   import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
@@ -12,6 +12,7 @@
     listSnapshots,
     restoreSnapshot,
     createLesson,
+    createLessonForSlot,
     setzeAusfall,
     nimmAusfallZurueck,
   } from '$lib/api.js'
@@ -171,14 +172,21 @@
       goto(`/subjects/${slug}/groups/${groupId}/planner/lessons/${existingLessonNodeId}`)
       return
     }
-    // Stunde noch nicht angelegt: Slot → UE ermitteln, dann Stunde anlegen
+    // ⚠️ **Auch ohne Unterrichtseinheit.** Hier stand `if (!slot?.ue_node_id) return` —
+    // ein stiller Abbruch, aus der Zeit vor `POST /planning/slots/{id}/lesson`. Die
+    // Startseite legt seitdem Entwürfe ohne Einheit an; der Jahresplan tat es nicht, und
+    // am Ziel einer verschobenen Stunde (dort steht oft nur das Thema) ließ sich nichts
+    // bearbeiten (Jan, 24.09.2026). Der Weg über die Einheit bleibt, wo es eine gibt —
+    // er hängt die Stunde gleich richtig ein.
     const slot = slots.find(s => s.id === slotId)
-    if (!slot?.ue_node_id) return
+    if (!slot) return
     try {
-      const result = await createLesson(slot.ue_node_id, {
-        titel: slot.thema || 'Neue Stunde',
-        slot_id: slotId,
-      })
+      const result = slot.ue_node_id
+        ? await createLesson(slot.ue_node_id, {
+            titel: slot.thema || 'Neue Stunde',
+            slot_id: slotId,
+          })
+        : await createLessonForSlot(slotId)
       // Slot optimistisch aktualisieren
       const idx = slots.findIndex(s => s.id === slotId)
       if (idx !== -1) slots[idx] = { ...slots[idx], stunde_node_id: result.id }
@@ -211,6 +219,31 @@
     } catch (e) {
       error = e.message
     }
+  }
+
+  /**
+   * Einer der drei Wege wurde gewählt.
+   *
+   * ⚠️ **„Inhalte entfallen" ist eine Entscheidung, kein Schließen.** Es räumt den
+   * Anpassungsbedarf ab, den das Eintragen gesetzt hat — die Stunde bleibt ausgefallen,
+   * aber niemand wartet mehr auf etwas. Das ✕ daneben tut das **nicht**: Es vertagt.
+   */
+  async function ausfallWeg(weg, slotIds, datum) {
+    if (weg === 'entfallen') {
+      try {
+        await Promise.all(slotIds.map((id) => updateSlot(id, { anpassung_noetig: false })))
+        await refreshVomServer()
+      } catch (e) {
+        error = e.message
+      }
+      return
+    }
+    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(assistentFrage(weg, datum))}`)
+  }
+
+  /** Aus der Zeile heraus — betrifft genau diese eine Stunde. */
+  function ausfallWegZeile(weg, slot) {
+    return ausfallWeg(weg, [slot.id], slot.date)
   }
 
   async function ausfallZurueck(slot) {
@@ -566,6 +599,7 @@
       onEditLesson={handleEditLesson}
       onAusfallTag={ausfallGanzerTag}
       onAusfallZurueck={ausfallZurueck}
+      onAusfallWeg={ausfallWegZeile}
       onReview={handleReview}
     />
   </div>

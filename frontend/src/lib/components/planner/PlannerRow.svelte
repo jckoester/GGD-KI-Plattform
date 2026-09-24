@@ -1,12 +1,14 @@
 <script>
-  import { darfZurueckgenommenWerden, herkunftText } from '$lib/ausfall.js'
+  import { darfZurueckgenommenWerden, herkunftText, zeileBrauchtEntscheidung } from '$lib/ausfall.js'
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS, entwurfsStand } from '$lib/planner.js'
 
   const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap,
           onUnpark = () => {}, onEditLesson, onReview = null,
           // Persönlicher Ausfall (AP4). Beide sind optional: Die Zeile wird auch
           // dort verwendet, wo es keinen Tageskontext gibt.
-          onAusfallTag = null, onAusfallZurueck = null } = $props()
+          onAusfallTag = null, onAusfallZurueck = null,
+          // AP5: die drei Wege, wenn an dieser Zeile noch etwas offen ist.
+          onAusfallWeg = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -120,6 +122,19 @@
   // Woher der Ausfall stammt — damit erkennbar bleibt, ob er aus dem Stundenplan kommt
   // oder selbst gesetzt wurde. Ohne das sähen beide gleich aus, und die Lehrkraft wüsste
   // nicht, ob sie ihn zurücknehmen kann.
+  // ⚠️ **Nicht mehr an der Unterrichtseinheit.** Das Bearbeiten-Symbol hing an
+  // `slot.ue_node_id` — aus der Zeit, als ein Entwurf nur unter einer Einheit entstehen
+  // konnte. Seit `POST /planning/slots/{id}/lesson` stimmt das nicht mehr, und am Ziel
+  // einer verschobenen Stunde (dort steht oft nur das Thema) fehlte das Symbol.
+  //
+  // An einem **leeren** Slot bleibt es aus: Dort führt der Weg über das Themenfeld, und
+  // ein Stift in jeder freien Zeile wäre Rauschen.
+  const hatInhalt = $derived(
+    !!(slot.ue_node_id || slot.stunde_node_id || (slot.thema || '').trim()),
+  )
+
+  const braucht = $derived(zeileBrauchtEntscheidung(slot))
+
   const herkunft = $derived(herkunftText(slot))
   const eigenerAusfall = $derived(darfZurueckgenommenWerden(slot))
 
@@ -230,6 +245,18 @@
     {#if herkunft}
       <div class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate mt-0.5">
         Ausfall {herkunft}
+      </div>
+    {/if}
+
+    {#if braucht && onAusfallWeg}
+      <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+        <span class="text-light-tx-2 dark:text-dark-tx-2">Geplante Inhalte:</span>
+        {#each [['entfallen', 'entfallen lassen'], ['verschieben', 'verschieben'], ['umplanen', 'umplanen']] as [id, wort] (id)}
+          <button
+            onclick={(e) => { e.stopPropagation(); onAusfallWeg(id, slot) }}
+            class="underline text-light-bl dark:text-dark-bl hover:no-underline"
+          >{wort}</button>
+        {/each}
       </div>
     {/if}
 
@@ -350,7 +377,7 @@
     </button>
 
     <!-- Stundenentwurf öffnen -->
-    {#if onEditLesson && slot.ue_node_id}
+    {#if onEditLesson && hatInhalt}
       <button
         onclick={(e) => { e.stopPropagation(); onEditLesson(slot.id, slot.stunde_node_id ?? null) }}
         title={slot.stunde_node_id ? 'Stundenentwurf öffnen' : 'Stundenentwurf anlegen'}

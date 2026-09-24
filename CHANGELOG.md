@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Stunden lassen sich im Jahresplan auch ohne Unterrichtseinheit bearbeiten.** Wo nur
+  ein Thema stand — etwa am Ziel einer verschobenen Stunde — fehlte das Stift-Symbol, und
+  ein Klick blieb wirkungslos. Der Entwurf entsteht jetzt auch dort.
+- **Der Hinweis auf offene Inhalte steht an der ausgefallenen Stunde**, nicht mehr nur
+  über der Tabelle — und er verschwindet nicht mehr beim Neuladen.
 - **Die Jahresplanung zeigt Änderungen sofort.** Nach dem Eintragen eines Ausfalls und
   nach dem Löschen einer Unterrichtseinheit blieb die Ansicht auf dem alten Stand, bis
   man die Seite neu lud.
@@ -37,6 +42,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Nach einem Ausfall fragt die Jahresplanung, was mit den Inhalten geschehen soll.**
+  Drei Wege stehen zur Wahl: Inhalte entfallen lassen, die Stunden verschieben oder die
+  Einheit mit dem Assistenten umplanen. Keiner geschieht automatisch — und wo an den
+  ausgefallenen Stunden nichts geplant war, wird auch nicht gefragt.
 - **Persönlichen Ausfall eintragen.** Fällt eine Lehrkraft aus — Fortbildung, Krankheit —,
   lässt sich das im Jahresplan für eine Unterrichtsgruppe oder für den ganzen Tag über
   alle eigenen Gruppen markieren, mit Grund. Der Stundenplan-Abgleich setzt einen so
