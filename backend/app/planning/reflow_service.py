@@ -229,11 +229,54 @@ async def build_reflow_context(
         key=lambda s: (s.date, s.start_period or 0),
     )
 
+    # ⚠️ **Die neue Tranche ist die Differenz zum Snapshot, nicht ein Halbjahr.**
+    #
+    # Bis zum 24.09.2026 sammelte sie hart aus `s.halbjahr == 2`, und `start_date` war bei
+    # `regeneration` fest der Halbjahreswechsel. Hängt die Planung im **ersten** Halbjahr
+    # um — eine Lehrkraft korrigiert das Wochenmuster mitten im Halbjahr —, bekam das
+    # Modell damit eine **leere** Tranche und einen Startzeitpunkt in der Zukunft
+    # (gemessen, nicht vermutet: der Test dazu war vorher rot mit `[]`).
+    #
+    # „Das Halbjahr von heute" wäre der naheliegende Ersatz und **falsch**: Zum
+    # Halbjahreswechsel werden die HJ2-Slots erzeugt, während man noch im ersten steht.
+    # Der Snapshot weiß es besser — `slot_generator` legt ihn **vor** dem Löschen an, und
+    # die neuen Slots bekommen frische Ids. Was jetzt da ist und dort fehlt, ist genau das
+    # Regenerierte.
+    snap = None
+    if trigger == "regeneration":
+        snap = (
+            await db.execute(
+                sa.select(SlotPlanSnapshot)
+                .where(
+                    SlotPlanSnapshot.group_id == group_id,
+                    SlotPlanSnapshot.reason == "regeneration",
+                )
+                .order_by(SlotPlanSnapshot.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    neue_slots: list[LessonSlot] = []
+    if trigger == "regeneration" and snap is not None:
+        alte_ids = {
+            str(e.get("slot_id")) for e in (snap.payload.get("slots") or [])
+        }
+        neue_slots = [s for s in all_slots if str(s.id) not in alte_ids]
+
     # Startdatum + Halbjahres-Horizont.
     if betroffene_slots:
         start_date = betroffene_slots[0].date
     elif trigger == "regeneration":
-        start_date = cfg.halbjahreswechsel
+        # Der Anfang der neuen Tranche — ohne Snapshot: **jetzt**.
+        #
+        # `slot_generator` legt den Snapshot nur an, wenn es Planung zu retten gibt
+        # (`if umzuhaengen:`). Ohne ihn gibt es also nichts umzuverteilen, und die
+        # Auskunft ist bestenfalls beschreibend; „jetzt" ist dann richtiger als der
+        # Halbjahreswechsel, der bei einer Regeneration mitten im ersten Halbjahr Wochen
+        # in der Zukunft läge. *Erkauft wird das mit einem Randfall:* Wer die HJ2-Slots
+        # vorab auf leerem Plan erzeugt, bekommt das laufende Halbjahr gemeldet. Ohne
+        # geretteten Inhalt führt das zu keiner falschen Umverteilung.
+        start_date = min((s.date for s in neue_slots), default=today or date.today())
     else:
         start_date = today or date.today()
     start_hj = 1 if start_date < cfg.halbjahreswechsel else 2
@@ -313,21 +356,14 @@ async def build_reflow_context(
 
     regeneration = None
     if trigger == "regeneration":
-        snap = (
-            await db.execute(
-                sa.select(SlotPlanSnapshot)
-                .where(
-                    SlotPlanSnapshot.group_id == group_id,
-                    SlotPlanSnapshot.reason == "regeneration",
-                )
-                .order_by(SlotPlanSnapshot.created_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
+        # Ohne Snapshot gibt es keine Differenz — dann das Halbjahr des Starts. Das ist
+        # gröber (es nimmt auch verschonte Slots mit), aber nie leer.
+        tranche = neue_slots if snap is not None else [
+            s for s in all_slots if s.halbjahr == start_hj
+        ]
         neue_tranche = [
             _slot_state(s, ue_map, stunde_map).model_dump()
-            for s in all_slots
-            if s.halbjahr == 2
+            for s in sorted(tranche, key=lambda s: (s.date, s.start_period or 0))
         ]
         regeneration = {
             "alte_zuordnung": (snap.payload.get("slots") if snap else None),

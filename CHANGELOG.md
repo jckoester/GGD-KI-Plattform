@@ -7,6 +7,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Verschiebe-Assistent kennt jetzt auch das erste Halbjahr.** Wurden die Stunden
+  mitten im ersten Halbjahr neu erzeugt — etwa nach einer Korrektur des Wochenmusters —,
+  bekam er die neuen Termine gar nicht zu sehen und konnte entsprechend wenig vorschlagen.
 - **Schüler:innen können die Stundenplanung ihrer Lehrkräfte nicht mehr einsehen.**
   Unterrichtsstunden, Unterrichtseinheiten und Jahrespläne waren über den Wissensbereich
   für alle Mitglieder der Gruppe lesbar — einschließlich der Notizen, die eine Lehrkraft
