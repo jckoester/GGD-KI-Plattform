@@ -28,7 +28,9 @@ Damit arbeiten Sie so:
   gegen die zugewiesenen Slots.
 - **Slots einer UE zuordnen**, Themen direkt eintragen, **Kategorie** ändern
   (Unterricht, Prüfung, Puffer, Ausfall, Vertretung), Stunden **anpinnen** (Fixpunkte
-  wie Klassenarbeiten) und Kommentare hinterlegen.
+  wie Klassenarbeiten) und Kommentare hinterlegen. Prüfungsstunden sind **rot
+  schraffiert**, ausgefallene gedämpft und durchgestrichen — der Tag lässt sich
+  überfliegen, ohne jede Zeile zu lesen.
 - **Klick auf eine UE** in der oberen Leiste springt zur ersten Stunde dieser UE.
 - **Klick auf den Titel** einer geplanten Stunde öffnet deren Stundenentwurf.
 - Beim Öffnen scrollt die Übersicht automatisch zur **aktuellen Woche**.
@@ -154,7 +156,9 @@ liegen oder einen Überhang haben.
 - **Sozialform / Methode** (gestapelt: oben Sozialform, darunter Methode): Sie
   tippen frei oder wählen aus dem mitgelieferten Vokabular (z. B. *Partnerarbeit*,
   *Think-Pair-Share*). Tippen schlägt passende Begriffe vor — auch über Synonyme
-  (z. B. findet „Ich-Du-Wir" den Eintrag „Think-Pair-Share"). Über **„+ … anlegen"**
+  (z. B. findet „Ich-Du-Wir" den Eintrag „Think-Pair-Share"). Ein aus dem Vokabular
+  gewählter Eintrag ist **anklickbar**: Er öffnet in einem neuen Tab die Beschreibung der
+  Methode — wie sie abläuft und worauf es ankommt. Über **„+ … anlegen"**
   legen Sie einen eigenen, zunächst privaten Eintrag an, den Sie später Ihrer
   Fachschaft freigeben können.
 - **Material**: Freitext **oder** verknüpfter Material-Knoten. Im Feld tippen Sie
@@ -194,8 +198,9 @@ Folge jeder Änderung in Zahlen.
 Aufgerufen wird er an mehreren Stellen — alle öffnen einen Chat mit Gruppenbezug und
 einem vorbefüllten Anliegen:
 
-- **Ausfall:** Setzen Sie eine Stunde **mit Inhalt** auf *Ausfall*, erscheint über der
-  Tabelle ein Banner **„Inhalte verschieben (Assistent)"**.
+- **Ausfall:** Wo an einer ausgefallenen Stunde etwas geplant war, stehen **an der Zeile**
+  drei Wege — *entfallen lassen*, *verschieben*, *umplanen*. Die beiden letzten öffnen den
+  Assistenten. Mehr unter [Wenn Sie ausfallen](#wenn-sie-ausfallen).
 - **Verschieben per Drag & Drop:** Ziehen Sie eine **bereits ausgeplante** Stunde,
   öffnet sich der Dialog (statt eines einfachen Tauschs) — der Drop ist ein Auftrag,
   kein direkter Eingriff.
@@ -214,6 +219,49 @@ oder per „Mach das rückgängig" im Chat **rückgängig** machen.
 > **Voraussetzung:** Es muss ein Assistent mit der Fähigkeit *Unterrichtsplanung* und dem
 > Verschiebe-Prompt freigeschaltet sein. Das richtet Ihre Schul-Administration ein
 > (siehe Admin-Doku „Modelle & Assistenten").
+
+---
+
+## Wenn Sie ausfallen
+
+Fortbildung, Krankheit, ein Termin: Im Jahresplan tragen Sie den Ausfall selbst ein —
+über das Menü **⋯** an einer Stunde, Eintrag **„Ich falle aus — ganzer Tag"**. Das
+markiert **alle** Ihre Stunden dieses Tages, über alle Unterrichtsgruppen hinweg; ein
+Grund lässt sich dazuschreiben („Fortbildung"). Einzelne Stunden stellen Sie wie bisher
+über die Kategorie-Auswahl auf *Ausfall*.
+
+An der Zeile steht danach, **woher** der Ausfall stammt — aus dem Stundenplan, von Ihnen
+selbst oder vom Assistenten. Das ist keine Kosmetik: Nur Ihre eigenen Einträge können Sie
+auch zurücknehmen; ein Ausfall aus dem Stundenplan gehört dem Abgleich und käme beim
+nächsten Lauf ohnehin wieder.
+
+**Ihr Eintrag überlebt den Stundenplan-Abgleich.** Meldet der Stundenplan später dieselbe
+Stunde — oft Tage danach —, bleibt Ihre Markierung stehen. Eine Vertretungsangabe kommt
+dann **zusätzlich** zu Ihrem Grund in die Notiz; überschrieben wird nichts.
+
+### Was mit den Inhalten geschieht
+
+Nichts — **von allein**. Was aus einem Ausfall folgt, hängt am Fach, an der Einheit und
+am Rest des Halbjahres; das kann keine Mechanik entscheiden. Wo an der ausgefallenen
+Stunde etwas geplant war, bietet die Zeile deshalb drei Wege an:
+
+| Weg | Was er bedeutet |
+|---|---|
+| **entfallen lassen** | Der Stoff ist gestrichen, die Einheit rückt nicht nach |
+| **verschieben** | Die Inhalte wandern mit dem Assistenten auf die folgenden Stunden |
+| **umplanen** | Die Einheit wird neu zugeschnitten — kürzen oder zusammenlegen |
+
+Der Hinweis steht **an der betroffenen Stunde** und bleibt dort, bis Sie entschieden
+haben — auch nach dem Neuladen. War an der Stunde nichts geplant, fragt die Plattform
+gar nicht erst.
+
+### Zurücknehmen
+
+⚠️ Die Rücknahme eines Tages nimmt **alle selbst eingetragenen** Ausfälle dieses Tages
+mit — auch solche, die Sie vorher einzeln für eine Stunde gesetzt hatten. Nach dem
+Eintragen lässt sich beides nicht mehr unterscheiden; die Rückfrage sagt es Ihnen vorher.
+Die Stunden bekommen dabei ihre vorherige Kategorie zurück: Aus einer Klassenarbeit wird
+wieder eine Klassenarbeit, nicht bloß „Unterricht".
 
 ---
 
@@ -237,8 +285,8 @@ funktioniert vollständig manuell. Der Assistent ist ein Angebot, kein Zwang.
 
 **Was passiert mit einer ausgefallenen Stunde?**
 Sie zählt nicht mehr zur Stundenbilanz der UE. Die Zuordnung bleibt zur
-Nachvollziehbarkeit erhalten; die Inhalte verschieben Sie bei Bedarf (manuell oder
-per Assistent).
+Nachvollziehbarkeit erhalten; über die Inhalte entscheiden Sie — siehe
+[Wenn Sie ausfallen](#wenn-sie-ausfallen).
 
 **Mein Stundenplan ändert sich zum Halbjahr — verliere ich meine Planung?**
 Nein. Beim Neu-Erzeugen des 2. Halbjahres wird die Planung auf die neuen Termine

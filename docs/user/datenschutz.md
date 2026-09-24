@@ -26,6 +26,8 @@ Führen Sie einen Chat **mit Bezug zu einer Unterrichtsgruppe**, ergänzt die Pl
 
 **Nicht** übermittelt werden interne Planungsfelder der Lehrkraft — etwa Kommentare, Reflexionen, der Pin-Status oder die einzelnen Phasen einer Stunde. Es werden nur Angaben weitergegeben, die ohnehin für die Gruppe bestimmt sind (Themen, Stundenziele, Klassenarbeits-Umfang).
 
+Dasselbe gilt für den **Wissensbereich**: Jahrespläne, Unterrichtseinheiten und Stundenentwürfe sind den **Lehrkräften ihrer Unterrichtsgruppe** vorbehalten. Schüler:innen derselben Gruppe finden sie weder über die Suche noch über einen Direktaufruf. *(Bis September 2026 war das anders — sie galten als gruppenweit lesbar, was auch die Schüler:innen einschloss. Seit 0.11 nicht mehr.)*
+
 ## Warnung bei persönlichen Daten
 
 Auch wenn der KI-Anbieter Ihren Namen nie erfährt (siehe oben): Der **Inhalt** Ihrer

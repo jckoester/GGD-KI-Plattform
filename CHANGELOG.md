@@ -7,6 +7,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Verweise innerhalb der Hilfeseiten funktionieren.** Links auf einen Abschnitt
+  derselben Seite führten nirgendwohin und öffneten dabei einen neuen Tab.
 - **Stunden lassen sich im Jahresplan auch ohne Unterrichtseinheit bearbeiten.** Wo nur
   ein Thema stand — etwa am Ziel einer verschobenen Stunde — fehlte das Stift-Symbol, und
   ein Klick blieb wirkungslos. Der Entwurf entsteht jetzt auch dort.

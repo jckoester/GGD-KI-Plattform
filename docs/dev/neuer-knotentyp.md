@@ -140,7 +140,20 @@ Knoten**, keine Rechteprüfung — die liegt in `app/context/visibility.py` und 
 einheitlich für alle Abfragewege.
 
 Faustregel: Bildungsplan `global/global`, Fachschaftsmaterial `school/subject`,
-Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`.
+Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`,
+**Planung der Lehrkraft** `group_teachers/group_teachers`.
+
+⚠️ **`group` heißt alle Mitglieder — auch Schüler:innen.** Wer einen Typ anlegt, der
+Vorbereitung enthält (Verlaufspläne, Reflexionen, Bilanzen), nimmt `group_teachers`:
+Der Wert verlangt zusätzlich die Lehrkraft-Rolle. Der Unterschied fiel am 24.09.2026
+auf, weil `unterrichtsstunde`, `unterrichtseinheit` und `jahresplan` auf `group` standen
+und Schüler:innen derselben Gruppe sie über `GET /context/nodes` lesen konnten —
+`metadata.reflexion` eingeschlossen (Alembic 0074).
+
+⚠️ **Die Rangfolge steht an drei Stellen** (Datenbank-Bedingung
+`check_context_nodes_scope_restrictivity`, `app/db/models.py`,
+`taxonomy_check._SCOPE_RANG`). Ein neuer Scope-Wert muss in alle drei — und
+`write_scope` darf nie weiter reichen als `read_scope`.
 
 ### 6. Lifecycle
 

@@ -15,7 +15,7 @@ Eine Schicht, drei Verfahren, ein Ergebnisumschlag.
 | Modul | Inhalt |
 |---|---|
 | `search.py` | Die Suchschicht: `suche()`, `identifikation()`, `thematisch()`, `aufzaehlung()`, `Suchprofil`, `Suchergebnis` |
-| `visibility.py` | **Eine** Sichtbarkeitsregel für alle Abfragewege über `context_nodes` |
+| `visibility.py` | **Eine** Sichtbarkeitsregel für alle Abfragewege über `context_nodes`. Scopes von eng nach weit: `private` · `group_teachers` · `group` · `subject` · `school` · `global`. ⚠️ **`group_teachers` verlangt zusätzlich die Lehrkraft-Rolle** — `group` allein heißt *alle Mitglieder*, also auch Schüler:innen. Der Wert kam am 24.09.2026 (Alembic 0074), weil Planungsknoten auf `group` standen und Schüler:innen damit die Stundenentwürfe ihrer Lehrkraft lesen konnten, `metadata.reflexion` eingeschlossen |
 | `filters.py` | **Eine** Übersetzung der Feldfilter (Fach, Typ, Stufe, Titel …) — genutzt von der Aufzählung *und* von `GET /context/nodes` |
 | `lookup.py` | Normalisierung von Titeln und Bildung des Nachschlage-Begriffs |
 | `retrieval.py` | Nur noch der **Lernstand** (`node_engagement`). Er ist Traversierung, keine Suche — die frühere zweite Vektorsuche für Anker-Assistenten ist in `search.py` aufgegangen |

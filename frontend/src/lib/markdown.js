@@ -36,9 +36,35 @@ marked.use({ gfm: true, breaks: true });
 // Code-Block-Renderer
 const renderer = new marked.Renderer();
 
+/**
+ * Anker-Kennung einer Überschrift — kleingeschrieben, Satzzeichen weg, Leerzeichen zu
+ * Bindestrichen. Umlaute bleiben.
+ *
+ * ⚠️ **Ohne `id` an der Überschrift ist jeder Seitenanker tot.** `marked` erzeugt von
+ * sich aus keine; die Anwenderdoku trug am 24.09.2026 acht `](#…)`-Links, von denen
+ * **keiner** funktionierte — sie sahen wie ein Weg aus und führten nirgendwohin.
+ */
+export function ueberschriftId(text) {
+    return String(text)
+        .toLowerCase()
+        .trim()
+        .replace(/<[^>]*>/g, '')
+        .replace(/[^\p{L}\p{N}\s-]/gu, '')
+        .replace(/\s+/g, '-');
+}
+
+renderer.heading = ({ text, depth, tokens }) => {
+    const inhalt = tokens ? marked.Parser.parseInline(tokens) : text;
+    return `<h${depth} id="${ueberschriftId(text)}">${inhalt}</h${depth}>`;
+};
+
 renderer.link = ({ href, title, text }) => {
     const titleAttr = title ? ` title="${title}"` : '';
-    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    // ⚠️ **Seitenanker bleiben im Tab.** `target="_blank"` galt für *jeden* Link — ein
+    // `#abschnitt` öffnete damit eine neue Seite, und zwar ohne Sprungziel.
+    const intern = String(href || '').startsWith('#');
+    const ziel = intern ? '' : ' target="_blank" rel="noopener noreferrer"';
+    return `<a href="${href}"${titleAttr}${ziel}>${text}</a>`;
 };
 
 function escapeHtml(s) {
