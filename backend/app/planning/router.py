@@ -978,6 +978,111 @@ async def create_lesson(
     return {"id": str(stunde.id), "title": stunde.title}
 
 
+# ── POST /planning/slots/{slot_id}/lesson ─────────────────────────────────────
+
+
+@router.post("/slots/{slot_id}/lesson", response_model=dict, status_code=201)
+async def create_lesson_for_slot(
+    slot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Entwurf **vom Termin aus** anlegen — auch ohne Unterrichtseinheit.
+
+    Die ältere Route `POST /units/{node_id}/lessons` hängt am Einheitenknoten, weil sie
+    Gruppe und Fach von dort nimmt. Ein Termin ohne Einheit kann darüber keinen Entwurf
+    bekommen — und das ist der Normalfall am Anfang eines Schuljahres: Der Stundenplan
+    steht, die Jahresplanung noch nicht.
+
+    Beides steht aber genauso am Slot. Die **Leseseite trägt das längst**: `get_lesson`
+    lässt `ue_edge` fehlen, `_lesson_nav` fängt `unit_id is None` ab, und die
+    Jahresplanung liest `stunde_node_id` vom Slot statt über die Einheit. Gesperrt war
+    nur das Anlegen.
+
+    Eine so entstandene Stunde zählt in **keiner** Einheitenbilanz mit — sie gehört zu
+    keiner. Das ist kein Mangel, sondern die Aussage: Die Zuordnung steht noch aus. Wird
+    die Einheit später am Slot gesetzt, zieht `PATCH /planning/slots/{id}` die Kante nach.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Termin nicht gefunden")
+
+    await require_group_teacher(slot.group_id, user, db)
+
+    # ⚠️ **Idempotent.** Der Aufruf hängt an einem Klick auf den Stundentitel; ein
+    # Doppelklick oder ein zweiter Tab darf keinen zweiten Entwurf erzeugen. Der Slot
+    # führt nur *einen* — der Überzählige wäre unauffindbar und bliebe für immer liegen.
+    if slot.stunde_node_id:
+        vorhanden = await db.get(ContextNode, slot.stunde_node_id)
+        if vorhanden is not None and vorhanden.status == "active":
+            return {"id": str(vorhanden.id), "title": vorhanden.title, "neu": False}
+
+    ue_node = None
+    if slot.ue_node_id:
+        kandidat = await db.get(ContextNode, slot.ue_node_id)
+        if kandidat is not None and kandidat.status == "active":
+            ue_node = kandidat
+
+    if ue_node is not None:
+        subject_id = ue_node.subject_id
+    else:
+        group = await db.get(Group, slot.group_id)
+        subject_id = group.subject_id if group else None
+
+    stunde = ContextNode(
+        category="artifact",
+        content_type="unterrichtsstunde",
+        title=(slot.thema or "").strip() or "Neue Stunde",
+        read_scope="group",
+        write_scope="group",
+        read_scope_group_id=slot.group_id,
+        write_scope_group_id=slot.group_id,
+        owner_pseudonym=user.sub,
+        subject_id=subject_id,
+        metadata_={"phasen": []},
+        status="active",
+    )
+    db.add(stunde)
+    await db.flush()
+
+    # Einordnung nur, wenn es eine Einheit gibt — sonst hängt die Stunde am Slot allein.
+    if ue_node is not None:
+        db.add(ContextEdge(
+            from_node_id=stunde.id,
+            to_node_id=ue_node.id,
+            relation="part_of",
+            metadata_={},
+        ))
+        vorgaenger = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == ue_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "unterrichtsstunde",
+                ContextNode.status == "active",
+                ContextNode.id != stunde.id,
+            )
+            .order_by(ContextNode.created_at.desc())
+            .limit(1)
+        )
+        letzte = vorgaenger.scalar_one_or_none()
+        if letzte is not None:
+            db.add(ContextEdge(
+                from_node_id=stunde.id,
+                to_node_id=letzte.id,
+                relation="follows",
+                metadata_={},
+            ))
+
+    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
+    slot.stunde_node_id = stunde.id
+    slot.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(stunde)
+    return {"id": str(stunde.id), "title": stunde.title, "neu": True}
+
 # ── GET /planning/groups/{group_id}/balance ───────────────────────────────────
 
 
@@ -1445,12 +1550,18 @@ class StundeAmTagRead(BaseModel):
     # `/subjects/{slug}/groups/{id}/planner`. Ohne den Slug baut die Oberfläche einen
     # toten Link — oder muss das Fach in einer zweiten Runde nachschlagen.
     subject_slug: str | None
+    # Icon und Farbe des Fachs — die Zeile trägt sie am Anfang, damit sich der Tag
+    # überfliegen lässt, ohne jeden Gruppennamen zu lesen.
+    subject_icon: str | None
+    subject_color: str | None
     start_period: int | None
     periods: int
     stunde: str
     kategorie: str
     thema: str | None
     hat_entwurf: bool
+    # Ohne die Id lässt sich der Weg in den Stundenentwurf nicht bauen.
+    stunde_node_id: UUID | None
     ue_node_id: UUID | None
     ue_titel: str | None
     anpassung_noetig: bool
@@ -1504,18 +1615,21 @@ async def get_mein_tag(
         GroupMembership.role_in_group == "teacher",
     )
     zeilen = await db.execute(
-        sa.select(LessonSlot, Group.name, Group.display_name, Subject.slug)
+        sa.select(
+            LessonSlot, Group.name, Group.display_name,
+            Subject.slug, Subject.icon, Subject.color,
+        )
         .join(Group, Group.id == LessonSlot.group_id)
         .outerjoin(Subject, Subject.id == Group.subject_id)
         .where(LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage))
     )
     slots: list[LessonSlot] = []
     namen: dict[int, str] = {}
-    faecher: dict[int, str | None] = {}
-    for slot, name, anzeige, fach_slug in zeilen.all():
+    faecher: dict[int, tuple[str | None, str | None, str | None]] = {}
+    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe in zeilen.all():
         slots.append(slot)
         namen[slot.group_id] = anzeige or name
-        faecher[slot.group_id] = fach_slug
+        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe)
 
     auswahl = mein_tag_modul.waehle(slots, heute, cfg)
 
@@ -1544,13 +1658,16 @@ async def get_mein_tag(
                     slot_id=s.slot_id,
                     group_id=s.group_id,
                     gruppe=namen.get(s.group_id, ""),
-                    subject_slug=faecher.get(s.group_id),
+                    subject_slug=faecher.get(s.group_id, (None, None, None))[0],
+                    subject_icon=faecher.get(s.group_id, (None, None, None))[1],
+                    subject_color=faecher.get(s.group_id, (None, None, None))[2],
                     start_period=s.start_period,
                     periods=s.periods,
                     stunde=s.stundenbezeichnung,
                     kategorie=s.kategorie,
                     thema=s.thema,
                     hat_entwurf=s.hat_entwurf,
+                    stunde_node_id=s.stunde_node_id,
                     ue_node_id=s.ue_node_id,
                     ue_titel=titel.get(s.ue_node_id) if s.ue_node_id else None,
                     anpassung_noetig=s.anpassung_noetig,

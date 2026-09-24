@@ -7,6 +7,11 @@
     import TagesKachel from '$lib/components/TagesKachel.svelte'
     import GruppenKachel from '$lib/components/GruppenKachel.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
+    import {
+        KACHELN,
+        schalteKachel,
+        zeigtKachel,
+    } from '$lib/stores/startkacheln.js'
 
     let tag = $state(null)
     let tagFehler = $state(null)
@@ -97,16 +102,42 @@
             {#if tagFehler}
                 <ErrorBanner message={tagFehler} />
             {:else if tag}
-                <TagesKachel titel="Heute" tag={tag.heute} lage={lage} />
-                <TagesKachel
-                    titel={zweiteUeberschrift(tag.naechster)}
-                    tag={tag.naechster}
-                    lage={lage}
-                    leerHinweis={tag.naechster ? null : KEIN_NAECHSTER}
-                />
-                <GruppenKachel />
+                {#if $zeigtKachel('heute')}
+                    <TagesKachel titel="Heute" tag={tag.heute} lage={lage} />
+                {/if}
+                {#if $zeigtKachel('naechster')}
+                    <TagesKachel
+                        titel={zweiteUeberschrift(tag.naechster)}
+                        tag={tag.naechster}
+                        lage={lage}
+                        leerHinweis={tag.naechster ? null : KEIN_NAECHSTER}
+                    />
+                {/if}
+                {#if $zeigtKachel('gruppen')}
+                    <GruppenKachel />
+                {/if}
+
+                <!-- Die Wahl steht hier und nicht im Profil: Wer eine Kachel weghaben
+                     will, denkt das beim Ansehen — nicht zwei Seiten später. -->
+                <details class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    <summary class="cursor-pointer">Kacheln wählen</summary>
+                    <div class="mt-2 flex flex-col gap-1">
+                        {#each KACHELN as k (k.id)}
+                            <label class="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={$zeigtKachel(k.id)}
+                                    onchange={(e) => schalteKachel(k.id, e.currentTarget.checked)}
+                                    class="accent-primary"
+                                />
+                                {k.name}
+                            </label>
+                        {/each}
+                    </div>
+                </details>
             {/if}
         {/if}
+
 
 
     </div>

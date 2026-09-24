@@ -10,6 +10,9 @@ finden.
 Geprüft wird gegen `ui_levels.example.yaml`: Die lokale `ui_levels.yaml` gehört der
 jeweiligen Schule und darf abweichen.
 """
+import re
+from pathlib import Path
+
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -221,3 +224,57 @@ def test_rolle_ohne_stufen_liefert_None_statt_1():
     stillschweigend fast die ganze Navigation.
     """
     assert stufe_fuer({"ui_level": 3}, ["review"]) is None
+
+
+# ── Gegenrichtung: hat jeder Sidebar-Eintrag auch eine Stufe? ─────────────────
+
+
+def _sidebar_schluessel() -> set[str]:
+    """Die Schlüssel, nach denen die Sidebar filtert — ohne Kommentare."""
+    quelle = (
+        Path(__file__).resolve().parents[3]
+        / "frontend" / "src" / "lib" / "components" / "Sidebar.svelte"
+    ).read_text(encoding="utf-8")
+    quelle = re.sub(r"<!--[\s\S]*?-->", "", quelle)
+    quelle = re.sub(r"^\s*//[^\n]*", "", quelle, flags=re.M)
+    return set(re.findall(r"\$zeigtEintrag\('([a-z_]+)'\)", quelle))
+
+
+def _zugeordnete_eintraege(pfad: Path) -> set[str]:
+    cfg = yaml.safe_load(pfad.read_text(encoding="utf-8"))
+    return {
+        e
+        for rolle in cfg["rollen"].values()
+        for st in rolle["stufen"]
+        for e in st["eintraege"]
+    }
+
+
+def test_die_suche_greift_ueberhaupt():
+    """Gegenprobe gegen den stummen Fehlschlag — ein leeres Muster bliebe grün."""
+    assert len(_sidebar_schluessel()) > 5
+
+
+def test_jeder_sidebar_eintrag_hat_eine_stufe():
+    """⚠️ **Die Gegenrichtung zu `test_tippfehler_im_eintrag_wird_abgewiesen`.**
+
+    Jener Test fängt Schlüssel ab, die in der YAML stehen, aber die Registry nicht kennt.
+    Dieser fängt den umgekehrten Fall: einen Schlüssel, den die Sidebar benutzt und die
+    Registry kennt — der aber **keiner Stufe** zugeordnet ist.
+
+    Die Folge wäre kein Fehler, sondern **Stille**: `zeigtEintrag` liefert
+    `$s.has(schluessel)`, und was in keiner Stufe steht, ist in keiner Menge. Der
+    Navigationspunkt verschwindet für alle Rollen, und niemand merkt es — genau die
+    Falle, vor der der Kopf von `ui_levels.yaml` warnt.
+
+    *Gefunden am 24.09.2026 bei einer Gegenprobe: `welcome` aus der YAML zu entfernen
+    machte keinen einzigen Test rot.*
+    """
+    # Gegen die **Beispieldatei**, wie alle Prüfungen hier: Die lokale
+    # `ui_levels.yaml` gehört der jeweiligen Schule und darf abweichen.
+    pfad = Path(__file__).resolve().parents[3] / "config" / "ui_levels.example.yaml"
+    fehlend = sorted(_sidebar_schluessel() - _zugeordnete_eintraege(pfad))
+    assert not fehlend, (
+        "Diese Sidebar-Einträge sind keiner Stufe zugeordnet und damit für alle "
+        f"unsichtbar: {fehlend}"
+    )

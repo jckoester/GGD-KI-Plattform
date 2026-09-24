@@ -57,17 +57,28 @@ class StundeAmTag:
     kategorie: str
     thema: Optional[str]
     hat_entwurf: bool
+    # ⚠️ **Die Id, nicht nur das Ja/Nein.** Ohne sie lässt sich der Weg in den
+    # Stundenentwurf nicht bauen — `hat_entwurf` sagt, *dass* es einen gibt, nicht
+    # *welchen*. Das hat am 24.09.2026 einen toten Link erzeugt, den weder der
+    # Funktionstest noch der Quelltext-Wächter sahen.
+    stunde_node_id: Optional[UUID]
     ue_node_id: Optional[UUID]
     anpassung_noetig: bool
 
     @property
     def stundenbezeichnung(self) -> str:
-        """„3. Stunde" oder „3.–4. Stunde" — die Zeitangabe, die das System hat."""
+        """„3." oder „1.–2." — die Zeitangabe, die das System hat.
+
+        **Ohne das Wort „Stunde"** (Jan, 24.09.2026): In einer Tagesliste steht es in
+        jeder Zeile und kostet Platz, den der Titel besser braucht. Die Ordnungszahl
+        allein ist eindeutig — und ein angehängtes „h" wäre es gerade **nicht**, weil es
+        sich als Uhrzeit lesen ließe, die es hier nicht gibt.
+        """
         if self.start_period is None:
-            return "ohne Stundenangabe"
+            return "ohne Angabe"
         if self.periods > 1:
-            return f"{self.start_period}.–{self.start_period + self.periods - 1}. Stunde"
-        return f"{self.start_period}. Stunde"
+            return f"{self.start_period}.–{self.start_period + self.periods - 1}."
+        return f"{self.start_period}."
 
 
 @dataclass(frozen=True)
@@ -139,6 +150,7 @@ def _als_stunde(slot: SlotArtig) -> StundeAmTag:
         kategorie=slot.kategorie,
         thema=slot.thema,
         hat_entwurf=slot.stunde_node_id is not None,
+        stunde_node_id=slot.stunde_node_id,
         ue_node_id=slot.ue_node_id,
         anpassung_noetig=bool(slot.anpassung_noetig),
     )

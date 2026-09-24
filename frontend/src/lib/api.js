@@ -1942,6 +1942,19 @@ export async function createLesson(unitNodeId, data) {
     return res.json()
 }
 
+/**
+ * Entwurf **vom Termin aus** anlegen — auch wenn der Termin noch zu keiner
+ * Unterrichtseinheit gehört. Idempotent: Gibt es schon einen, kommt dieser zurück.
+ */
+export async function createLessonForSlot(slotId) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/lesson`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht erstellt werden')
+    return res.json()
+}
+
 export async function setWeekPattern(groupId, halbjahr, patterns) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/pattern`, {
         method: 'PUT',

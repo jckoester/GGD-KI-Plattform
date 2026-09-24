@@ -1044,21 +1044,289 @@ async def test_mein_tag_liefert_stundenbezeichnung_statt_uhrzeit(
     from datetime import date
 
     heute = date.today()
+    slot_id = str(uuid4())
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO lesson_slots
                 (id, group_id, date, start_period, periods, halbjahr, kategorie)
             VALUES (%s, 100, %s, 3, 2, 1, 'unterricht')
-        """, (str(uuid4()), heute))
+        """, (slot_id, heute))
     conn.commit()
     try:
         resp = await test_client.get("/planning/mein-tag", headers=auth_headers)
-        stunde = resp.json()["heute"]["stunden"][0]
-        assert stunde["stunde"] == "3.–4. Stunde"
+        # ⚠️ **Die eigene Stunde suchen, nicht `stunden[0]` nehmen.** Andere Tests des
+        # Laufs legen für dieselbe Gruppe Slots an; welche zuerst steht, hängt dann von
+        # der Testreihenfolge ab. Der erste Entwurf dieses Tests lief allein grün und im
+        # Gesamtlauf rot.
+        stunden = resp.json()["heute"]["stunden"]
+        stunde = next(s for s in stunden if s["slot_id"].replace("-", "")
+                      == slot_id.replace("-", ""))
+        # Ohne das Wort „Stunde“ — in einer Tagesliste steht es in jeder Zeile.
+        assert stunde["stunde"] == "3.–4."
         assert "uhrzeit" not in stunde
     finally:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM lesson_slots WHERE group_id = 100 AND date = %s", (heute,))
+            # Nur die eigene Zeile — fremde Slots dieses Tages gehören anderen Tests.
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_mein_tag_liefert_die_id_des_entwurfs(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **`hat_entwurf` allein macht keinen Link.**
+
+    Die Startseite verlinkt den Stundentitel in den Entwurf. Dafür braucht sie dessen
+    **Id**, nicht nur die Auskunft, dass es einen gibt. Fehlt `stunde_node_id` in der
+    Antwort, rendert der Titel klaglos als reiner Text — kein Fehler, keine Warnung,
+    nur eine Funktion, die es nicht gibt.
+
+    Genau das ist am 24.09.2026 passiert und durch zwei Prüfungen gefallen: Der
+    Unit-Test reichte die Id **selbst** in `stundenLink()` hinein und prüfte damit die
+    Funktion statt des Datenwegs; der Quelltext-Wächter sah `href={zumEntwurf}` im
+    Markup und fragte nicht, ob `zumEntwurf` je einen Wert annimmt. Dieser Test prüft
+    das eine, was beide nicht prüften: **dass die Id über die API ankommt.**
+    """
+    from datetime import date
+
+    heute = date.today()
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 5, 1, 1, 'unterricht')
+        """, (slot_id, heute))
+    conn.commit()
+    try:
+        ue_id = (
+            await test_client.post(
+                "/planning/groups/100/units",
+                json={"titel": "Einheit mit Entwurf", "farbe": 0},
+                headers=auth_headers,
+            )
+        ).json()["id"]
+        await test_client.patch(
+            f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+        )
+        lesson_id = (
+            await test_client.post(
+                f"/planning/units/{ue_id}/lessons",
+                json={"titel": "Entwurf zur Stunde", "slot_id": slot_id},
+                headers=auth_headers,
+            )
+        ).json()["id"]
+
+        resp = await test_client.get("/planning/mein-tag", headers=auth_headers)
+        assert resp.status_code == 200
+        stunden = resp.json()["heute"]["stunden"]
+        stunde = next(s for s in stunden if s["slot_id"].replace("-", "")
+                      == slot_id.replace("-", ""))
+        assert stunde["hat_entwurf"] is True
+        assert stunde["stunde_node_id"] is not None, (
+            "Die Antwort meldet einen Entwurf, nennt ihn aber nicht — der Titel auf der "
+            "Startseite kann nicht verlinken."
+        )
+        assert stunde["stunde_node_id"].replace("-", "") == lesson_id.replace("-", "")
+
+        # Gegenprobe: eine Stunde ohne Entwurf trägt hier nichts ein.
+        ohne = [s for s in stunden if not s["hat_entwurf"]]
+        assert all(s["stunde_node_id"] is None for s in ohne)
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+# ── POST /planning/slots/{slot_id}/lesson (Entwurf vom Termin aus) ────────────
+
+
+@pytest.mark.asyncio
+async def test_entwurf_am_termin_ohne_einheit(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Der Normalfall am Schuljahresanfang: Stundenplan ja, Jahresplanung nein.**
+
+    Über `POST /units/{id}/lessons` kommt so ein Termin an keinen Entwurf — die Route
+    hängt am Einheitenknoten. Dieser Weg nimmt Gruppe und Fach vom Slot.
+
+    Geprüft wird nicht nur, dass etwas entsteht, sondern dass es **benutzbar** ist:
+    Der Editor muss die Stunde ohne Einheit laden können. Täte er es nicht, hätten wir
+    einen Entwurf angelegt, den niemand öffnen kann.
+    """
+    from datetime import date
+
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)
+            VALUES (%s, 100, %s, 7, 1, 1, 'unterricht', 'Titration')
+        """, (slot_id, date.today()))
+    conn.commit()
+    try:
+        resp = await test_client.post(
+            f"/planning/slots/{slot_id}/lesson", headers=auth_headers
+        )
+        assert resp.status_code == 201, resp.text
+        lesson_id = resp.json()["id"]
+        # Das Thema des Termins wird der Titel — nicht „Neue Stunde".
+        assert resp.json()["title"] == "Titration"
+
+        # Der Editor muss sie laden können, ohne Einheit.
+        gelesen = await test_client.get(
+            f"/planning/lessons/{lesson_id}", headers=auth_headers
+        )
+        assert gelesen.status_code == 200, gelesen.text
+        assert gelesen.json()["ue"] is None
+        assert gelesen.json()["group_id"] == 100
+        assert gelesen.json()["nav"]["total"] == 1
+
+        # Und der Termin führt sie — sonst fände die Startseite sie nie wieder.
+        ov = await test_client.get("/planning/groups/100/overview", headers=auth_headers)
+        slot = next(s for s in ov.json()["slots"]
+                    if s["id"].replace("-", "") == slot_id.replace("-", ""))
+        assert slot["stunde_node_id"].replace("-", "") == lesson_id.replace("-", "")
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_entwurf_am_termin_ist_idempotent(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Zweimal klicken darf keinen zweiten Entwurf erzeugen.**
+
+    Der Aufruf hängt am Klick auf den Stundentitel — Doppelklick und zweiter Tab sind
+    keine Ausnahme, sondern Alltag. Der Slot führt nur *eine* Stunde: Der Überzählige
+    wäre über keine Oberfläche erreichbar und bliebe für immer liegen.
+    """
+    from datetime import date
+
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 8, 1, 1, 'unterricht')
+        """, (slot_id, date.today()))
+    conn.commit()
+    try:
+        erst = await test_client.post(
+            f"/planning/slots/{slot_id}/lesson", headers=auth_headers
+        )
+        zweit = await test_client.post(
+            f"/planning/slots/{slot_id}/lesson", headers=auth_headers
+        )
+        assert erst.json()["id"] == zweit.json()["id"]
+        assert erst.json()["neu"] is True
+        assert zweit.json()["neu"] is False
+
+        # Ohne Thema am Termin braucht die Stunde einen tragfähigen Vorgabetitel.
+        assert erst.json()["title"] == "Neue Stunde"
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT count(*) FROM context_nodes
+                WHERE content_type = 'unterrichtsstunde' AND status = 'active'
+                  AND write_scope_group_id = 100 AND title = 'Neue Stunde'
+            """)
+            assert cur.fetchone()[0] == 1, "Der zweite Klick hat einen Entwurf erzeugt."
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+            cur.execute("""
+                DELETE FROM context_nodes
+                WHERE content_type = 'unterrichtsstunde'
+                  AND write_scope_group_id = 100 AND title = 'Neue Stunde'
+            """)
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_entwurf_am_termin_nur_fuer_die_eigene_gruppe(
+    test_client, auth_teacher2, seed_planning_fixtures, db_url
+):
+    """Wer nicht in der Gruppe unterrichtet, legt dort auch keinen Entwurf an."""
+    from datetime import date
+
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 9, 1, 1, 'unterricht')
+        """, (slot_id, date.today()))
+    conn.commit()
+    try:
+        resp = await test_client.post(
+            f"/planning/slots/{slot_id}/lesson", headers=auth_teacher2
+        )
+        assert resp.status_code == 403, resp.text
+        with conn.cursor() as cur:
+            cur.execute("SELECT stunde_node_id FROM lesson_slots WHERE id = %s", (slot_id,))
+            assert cur.fetchone()[0] is None
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_entwurf_am_termin_mit_einheit_haengt_sich_ein(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """Gibt es eine Einheit, gehört die Stunde hinein — der Weg über den Slot darf sie
+    nicht aus der Jahresplanung herausfallen lassen."""
+    from datetime import date
+
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 10, 1, 1, 'unterricht')
+        """, (slot_id, date.today()))
+    conn.commit()
+    try:
+        ue_id = (
+            await test_client.post(
+                "/planning/groups/100/units",
+                json={"titel": "Säuren und Basen", "farbe": 0},
+                headers=auth_headers,
+            )
+        ).json()["id"]
+        await test_client.patch(
+            f"/planning/slots/{slot_id}", json={"ue_node_id": ue_id}, headers=auth_headers
+        )
+
+        resp = await test_client.post(
+            f"/planning/slots/{slot_id}/lesson", headers=auth_headers
+        )
+        assert resp.status_code == 201, resp.text
+        gelesen = await test_client.get(
+            f"/planning/lessons/{resp.json()['id']}", headers=auth_headers
+        )
+        assert gelesen.json()["ue"] is not None, (
+            "Die Stunde hängt an keiner Einheit, obwohl der Termin eine trägt."
+        )
+        assert gelesen.json()["ue"]["id"] == ue_id
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
         conn.commit()
         conn.close()

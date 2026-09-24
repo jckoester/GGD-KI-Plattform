@@ -154,7 +154,7 @@ def test_am_schuljahresende_fehlt_der_zweite_block():
 
 @pytest.mark.parametrize(
     "start,dauer,erwartet",
-    [(3, 1, "3. Stunde"), (3, 2, "3.–4. Stunde"), (1, 3, "1.–3. Stunde")],
+    [(3, 1, "3."), (3, 2, "3.–4."), (1, 3, "1.–3.")],
 )
 def test_stundenbezeichnung(start, dauer, erwartet):
     heute = date(2026, 9, 21)

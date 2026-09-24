@@ -5,6 +5,7 @@
     import { slide } from "svelte/transition";
     import { goto } from "$app/navigation";
     import {
+        Home,
         Plus,
         ChevronDown,
         Info,
@@ -200,6 +201,19 @@
 
     <!-- Sidebar-Inhalt -->
     <div class="flex-1 overflow-y-auto p-2">
+        {#if $zeigtEintrag('welcome')}
+    <!-- Startseite: der Tag auf einen Blick. Steht ganz oben, weil sie die Frage
+         beantwortet, mit der man sich morgens anmeldet. -->
+            <button
+                onclick={() => goto("/welcome")}
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <Home class="w-4 h-4" />
+                Startseite
+            </button>
+        {/if}
+
         {#if $zeigtEintrag('chat')}
     <!-- Neuer Chat Button -->
             <button

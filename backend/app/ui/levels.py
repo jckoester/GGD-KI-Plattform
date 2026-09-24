@@ -41,6 +41,7 @@ _DEFAULT_PATH = aufloesen(
 #
 # Ab Schritt 3 prüft ein Wächtertest, dass die Sidebar genau diese Schlüssel verwendet.
 BEKANNTE_EINTRAEGE = frozenset({
+    "welcome",           # Startseite: der Tag auf einen Blick
     "chat",              # Neuer Chat
     "assistants",        # Assistenten (Übersicht)
     "assistants_my",     # Meine Assistenten (Lehrkraft)

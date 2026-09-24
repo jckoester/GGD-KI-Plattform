@@ -69,9 +69,24 @@ export const KEIN_NAECHSTER =
  */
 export function stundenZeile(s) {
     const teile = [s.stunde, s.gruppe]
-    const inhalt = s.thema || s.ue_titel
+    const inhalt = stundenTitel(s)
     if (inhalt) teile.push(inhalt)
     return teile.join(" · ")
+}
+
+/**
+ * Der Vorspann einer Zeile: Stunde und Gruppe — das, was **nicht** verlinkt wird.
+ *
+ * Getrennt vom Titel, weil die beiden verschiedene Ziele haben: Der Titel führt in den
+ * Stundenentwurf, die Zeile als ganze soll nicht zu einer großen Schaltfläche werden.
+ */
+export function stundenVorspann(s) {
+    return [s.stunde, s.gruppe].filter(Boolean).join(" · ")
+}
+
+/** Thema oder Einheit — was die Stunde inhaltlich benennt. `null`, wenn nichts dasteht. */
+export function stundenTitel(s) {
+    return s?.thema || s?.ue_titel || null
 }
 
 /** Das Kennzeichen einer Stunde — `null`, wenn es regulärer Unterricht ist. */
@@ -80,16 +95,56 @@ export function kennzeichen(s) {
 }
 
 /**
- * Was die Stunde als Nächstes braucht.
+ * Der Stundentitel als Weg — `null`, wenn keiner gebaut werden kann.
  *
- * ⚠️ **Ohne Einheit kann kein Entwurf entstehen** — der Endpunkt dafür hängt an der
- * Unterrichtseinheit. Eine Schaltfläche anzubieten, die 404 antwortet, wäre schlimmer
- * als keine.
+ * **Immer ein `<a>`, nie eine Schaltfläche.** Das ist keine Stilfrage, sondern die
+ * Bedingung dafür, dass der Titel überhaupt zu sehen ist: Die Zeile steht in einem
+ * `truncate`-Container, und `text-overflow: ellipsis` kann **Text** kürzen, aber keinen
+ * Inline-Block. Ein `<button>` ist ein atomarer Kasten — er passt ganz oder gar nicht,
+ * und wenn er nicht passt, bleibt vom Titel nur das „…". Genau so ist er am 24.09.2026
+ * verschwunden, nachdem er vorher als reiner Text lesbar gewesen war.
+ *
+ * `ziel` ist deshalb **immer** ein sinnvolles Linkziel: der Entwurf, wenn es einen gibt,
+ * sonst die Jahresplanung. Ist zusätzlich `slotId` gesetzt, kann der Klick es besser —
+ * er legt den Entwurf an und springt hinein. Das `href` bleibt trotzdem echt, damit
+ * Mittelklick und „in neuem Tab öffnen" irgendwo landen und nicht ins Leere.
  */
-export function naechsterSchritt(s) {
-    if (s.hat_entwurf) return { text: "Entwurf öffnen", moeglich: true }
-    if (!s.ue_node_id) return { text: "Erst einer Einheit zuordnen", moeglich: false }
-    return { text: "Entwurf anlegen", moeglich: true }
+export function titelAktion(s) {
+    const basis = plannerLink(s)
+    if (!basis) return null
+    if (s?.stunde_node_id) {
+        return { ziel: `${basis}/lessons/${s.stunde_node_id}`, slotId: null }
+    }
+    return { ziel: basis, slotId: s?.slot_id ?? null }
+}
+
+/**
+ * Die Beschriftung des Titels.
+ *
+ * **Eine Stunde ohne Thema und ohne Einheit hat keinen Titel** — am Anfang des
+ * Schuljahres ist das die Mehrheit. Hier steht dann „ohne Thema", nicht „Stunde planen":
+ * An der Stelle des Titels gehört eine **Beschreibung**, keine Handlungsaufforderung.
+ * Ein Aktionswort an dieser Stelle liest sich wie der Titel der Stunde und drängt sich
+ * vor das, was man eigentlich sucht (Jan, 24.09.2026).
+ */
+export function titelText(s) {
+    return stundenTitel(s) ?? "ohne Thema"
+}
+
+/**
+ * Der Hinweis auf die fehlende Unterrichtseinheit — `null`, wenn sie zugeordnet ist.
+ *
+ * Er sagt **nichts mehr über den Entwurf**: Den erreicht der Titel selbst, in jedem
+ * Zustand. Zwei Bedienelemente derselben Zeile, die dasselbe tun, sind keine Hilfe,
+ * sondern eine Frage — welches ist das richtige?
+ *
+ * Die Zuordnung zur Einheit bleibt ein eigener Schritt, und sie geschieht in der
+ * **Jahresplanung**: Dort sieht man, welche Einheiten es gibt und wie sie im Jahr liegen.
+ * Ein Hinweis ohne Weg wäre eine Sackgasse — man weiß, was fehlt, aber nicht, wohin.
+ */
+export function einheitHinweis(s) {
+    if (s?.ue_node_id) return null
+    return { text: "Erst einer Einheit zuordnen", ziel: plannerLink(s) }
 }
 
 /**

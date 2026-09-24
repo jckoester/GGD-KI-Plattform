@@ -7,6 +7,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Startseite mit dem eigenen Unterrichtstag.** Nach dem Login stehen die Stunden des
+  Tages untereinander — Fach-Icon in der Fachfarbe, Stunde, Gruppe und Thema. Ein Klick
+  auf den Titel führt in den Stundenentwurf und legt ihn an, falls es noch keinen gibt —
+  auch dann, wenn die Stunde noch zu keiner Unterrichtseinheit gehört. Die Zuordnung zur
+  Einheit lässt sich später nachholen; der Hinweis dazu führt in die Jahresplanung. An
+  unterrichtsfreien Tagen zeigt die Seite den nächsten Schultag. Daneben liegen Kacheln
+  für die eigenen Unterrichtsgruppen und für offene Entscheidungen; welche Kacheln
+  erscheinen, lässt sich auf der Seite selbst einstellen.
 - **Unterrichtsgruppen aus dem Schulkonto werden angeboten, nicht angelegt.** Liefert das
   Schulkonto eine Unterrichtsgruppe, zu der es hier noch keine gibt, entscheidet die
   Lehrkraft unter „Meine Unterrichtsgruppen": zuordnen, als neue Gruppe anlegen oder
