@@ -21,7 +21,7 @@ MONTAG = date(2026, 6, 8)
 
 
 def slot(period, *, gruppe=1, tag=MONTAG, kategorie="unterricht", pinned=False,
-         source="pattern", note=None, sid=None):
+         source="pattern", note=None, sid=None, ausfall_herkunft=None):
     return SlotRef(
         id=sid or f"{gruppe}-{tag}-{period}",
         group_id=gruppe,
@@ -31,6 +31,7 @@ def slot(period, *, gruppe=1, tag=MONTAG, kategorie="unterricht", pinned=False,
         pinned=pinned,
         source=source,
         note=note,
+        ausfall_herkunft=ausfall_herkunft,
     )
 
 
@@ -120,14 +121,75 @@ def test_manuell_gesetzter_slot_bleibt_unveraendert():
     assert plan.conflicts[0].grund == "manual"
 
 
-def test_eigene_notiz_wird_nicht_ueberschrieben():
-    """Datenverlust, den niemand bemerkt — die neue Notiz sähe plausibel aus."""
+def test_eigene_notiz_wird_ergaenzt_statt_ueberschrieben():
+    """⚠️ **Dieser Test hielt bis zum 24.09.2026 das Gegenteil fest.**
+
+    Er hieß `test_eigene_notiz_wird_nicht_ueberschrieben` und verlangte, dass der Abgleich
+    bei fremder Notiz **gar nichts** schreibt (`notiz is None`, Konflikt `fremde_notiz`).
+    Seine Begründung — „Datenverlust, den niemand bemerkt, weil die neue Notiz plausibel
+    aussieht" — bleibt richtig. Die Antwort darauf war zu grob: Überspringen schützte den
+    eigenen Text und **verlor den Vertretungshinweis**.
+
+    Jan, 24.09.2026: „… die Notiz nicht überschreibt sondern nur ergänzt."
+    """
     plan = plan_sync(
         [(1, stunde(3, LessonState.SUBSTITUTION, covered_by="XYZ"))],
         [slot(3, note="Arbeit zurückgeben!")],
     )
-    assert plan.changes[0].notiz is None          # Kategorie ja, Notiz nein
-    assert plan.conflicts[0].grund == "fremde_notiz"
+    assert plan.changes[0].notiz == (
+        f"Arbeit zurückgeben!\n{NOTIZ_MARKER} Vertreten durch XYZ"
+    )
+    assert [k.grund for k in plan.conflicts] == []
+
+
+def test_eigener_ausfall_ueberlebt_den_abgleich():
+    """⚠️ **Ein selbst eingetragener Ausfall gehört der Lehrkraft.**
+
+    Sie trägt eine Fortbildung ein; der Stundenplan weiß nichts davon und meldete die
+    Stunde bisher wieder als Unterricht — lautlos. Dieselbe Regel wie bei
+    `group_memberships.herkunft`: Ein automatischer Lauf überschreibt nur, was er selbst
+    gesetzt haben könnte.
+    """
+    plan = plan_sync(
+        [(1, stunde(3, LessonState.REGULAR))],
+        [slot(3, kategorie="ausfall", ausfall_herkunft="eigen")],
+    )
+    assert plan.changes == [] or plan.changes[0].nach_kategorie == "ausfall"
+    assert plan.conflicts[0].grund == "eigener_ausfall"
+
+
+def test_eigener_ausfall_bekommt_die_vertretung_trotzdem():
+    """Der Ablauf aus F5: Der Stundenplan meldet denselben Ausfall **später**, mit
+    Vertretungsangabe. Die Kategorie bleibt, die Angabe kommt dazu.
+
+    ⚠️ Ohne diese Ausnahme schützte die Herkunft den ganzen Slot — und die
+    Vertretungsangabe käme nie an.
+    """
+    plan = plan_sync(
+        [(1, stunde(3, LessonState.SUBSTITUTION, covered_by="XYZ"))],
+        [slot(3, kategorie="ausfall", ausfall_herkunft="eigen", note="Fortbildung")],
+    )
+    assert plan.changes[0].notiz == f"Fortbildung\n{NOTIZ_MARKER} Vertreten durch XYZ"
+
+
+def test_der_abgleich_raeumt_seine_eigene_zeile_wieder_weg():
+    """Wird die Vertretung zurückgezogen, verschwindet die Importzeile — der eigene
+    Text bleibt. Ohne das bliebe ein Hinweis stehen, der nicht mehr gilt."""
+    from app.calendar.sync import mit_importzeile
+
+    assert mit_importzeile(f"Fortbildung\n{NOTIZ_MARKER} Vertreten durch ABC", None) == (
+        "Fortbildung"
+    )
+    assert mit_importzeile(f"{NOTIZ_MARKER} Vertreten durch ABC", None) is None
+
+
+def test_mehrere_importzeilen_werden_alle_ersetzt():
+    """Vor dieser Regel konnte eine zweite entstehen; eine Fassung, die nur die erste
+    kennt, ließe die übrigen für immer stehen."""
+    from app.calendar.sync import mit_importzeile
+
+    alt = f"Eigenes\n{NOTIZ_MARKER} A\n{NOTIZ_MARKER} B"
+    assert mit_importzeile(alt, f"{NOTIZ_MARKER} C") == f"Eigenes\n{NOTIZ_MARKER} C"
 
 
 def test_eigene_importnotiz_wird_ersetzt():
@@ -492,7 +554,7 @@ def test_slot_refs_lesen_die_spanne_mit():
     zeile = {
         "id": "s1", "group_id": 7, "date": MONTAG, "start_period": 3,
         "kategorie": "unterricht", "pinned": False, "source": "pattern",
-        "note": None, "periods": 2,
+        "note": None, "periods": 2, "ausfall_herkunft": None,
     }
     (ref,) = als_slot_refs([zeile])
     assert ref.periods == 2
@@ -509,7 +571,7 @@ def test_slot_refs_vertragen_leere_angaben():
     zeile = {
         "id": "s1", "group_id": 7, "date": MONTAG, "start_period": None,
         "kategorie": "unterricht", "pinned": False, "source": "pattern",
-        "note": None, "periods": None,
+        "note": None, "periods": None, "ausfall_herkunft": None,
     }
     (ref,) = als_slot_refs([zeile])
     assert (ref.start_period, ref.periods) == (0, 1)

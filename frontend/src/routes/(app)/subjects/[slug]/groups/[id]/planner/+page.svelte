@@ -1,4 +1,5 @@
 <script>
+  import { eintragFrage, ruecknahmeWarnung } from '$lib/ausfall.js'
   import { page } from '$app/stores'
   import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
@@ -11,6 +12,8 @@
     listSnapshots,
     restoreSnapshot,
     createLesson,
+    setzeAusfall,
+    nimmAusfallZurueck,
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
@@ -193,16 +196,60 @@
   }
 
   // ── UE erstellt / bearbeitet ─────────────────────────────────────────────────
-  async function refreshAfterUnitChange() {
-    // Overview neu laden damit Balance + Units aktuell ist
+  // ── Persönlicher Ausfall (AP4) ──────────────────────────────────────────────
+  //
+  // ⚠️ **Beide Wege fragen vorher.** Der Tageseintrag trifft Gruppen, die gerade nicht
+  // auf dem Bildschirm sind; die Rücknahme nimmt auch einzeln gesetzte Ausfälle mit
+  // (F4). Beides ist hinnehmbar, solange es angekündigt ist — eine stille Wirkung über
+  // mehrere Gruppen hinweg wäre es nicht.
+  async function ausfallGanzerTag(slot) {
+    if (!confirm(eintragFrage('tag'))) return
+    const notiz = prompt('Grund (erscheint an den Stunden, optional):', '') ?? null
+    try {
+      await setzeAusfall({ datum: slot.date, reichweite: 'tag', notiz: notiz || null })
+      await refreshVomServer()
+    } catch (e) {
+      error = e.message
+    }
+  }
+
+  async function ausfallZurueck(slot) {
+    if (!confirm(`${ruecknahmeWarnung('tag')}\n\nFortfahren?`)) return
+    try {
+      await nimmAusfallZurueck({ datum: slot.date, reichweite: 'tag' })
+      await refreshVomServer()
+    } catch (e) {
+      error = e.message
+    }
+  }
+
+  /**
+   * Nach einer **Server**-Aktion: Übersicht und Slots frisch übernehmen.
+   *
+   * ⚠️ **Hier stand `refreshed.slots.map(s => slots.find(l => l.id === s.id) ?? s)`** —
+   * für bestehende Slots also die *lokale* Kopie. Das ist richtig auf dem PATCH-Pfad
+   * (dort hat der Client den Wert gerade selbst gesetzt und der Server ihn bestätigt)
+   * und **falsch** nach allem, was der Server von sich aus ändert: Die Ansicht behielte
+   * den alten Stand bis zum Neuladen.
+   *
+   * Gemeldet von Jan am 24.09.2026 für den ganztägigen Ausfall — die Stunden blieben
+   * „Unterricht", bis man die Seite neu lud. **Derselbe Fehler bestand schon vorher**
+   * beim Löschen einer Unterrichtseinheit: `delete_unit_node` lässt
+   * `lesson_slots.ue_node_id` per `ON DELETE SET NULL` wegfallen, die Zeile zeigte die
+   * gelöschte Einheit trotzdem weiter.
+   *
+   * Nach einer Server-Aktion gibt es keine offene optimistische Änderung zu schützen —
+   * der Server ist die Quelle.
+   */
+  async function refreshVomServer() {
     const refreshed = await getPlanningOverview(groupId)
     overview = refreshed
-    slots = refreshed.slots.map(s => slots.find(l => l.id === s.id) ?? s)
+    slots = refreshed.slots
   }
 
   async function onUnitCreated() {
     showUnitDialog = false
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   function openEditUnit(unit) {
@@ -213,13 +260,13 @@
   async function onUnitUpdated() {
     showUnitDialog = false
     editUnit = null
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   async function onUnitDeleted() {
     showUnitDialog = false
     editUnit = null
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   function closeUnitDialog() {
@@ -517,6 +564,8 @@
       onSwapSlots={handleSwapSlots}
       onUnpark={einplanen}
       onEditLesson={handleEditLesson}
+      onAusfallTag={ausfallGanzerTag}
+      onAusfallZurueck={ausfallZurueck}
       onReview={handleReview}
     />
   </div>

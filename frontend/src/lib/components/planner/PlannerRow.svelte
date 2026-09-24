@@ -1,8 +1,12 @@
 <script>
+  import { darfZurueckgenommenWerden, herkunftText } from '$lib/ausfall.js'
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS, entwurfsStand } from '$lib/planner.js'
 
   const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap,
-          onUnpark = () => {}, onEditLesson, onReview = null } = $props()
+          onUnpark = () => {}, onEditLesson, onReview = null,
+          // Persönlicher Ausfall (AP4). Beide sind optional: Die Zeile wird auch
+          // dort verwendet, wo es keinen Tageskontext gibt.
+          onAusfallTag = null, onAusfallZurueck = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -113,6 +117,12 @@
   const ABZEICHEN_NEUTRAL =
     'bg-light-ui-2 dark:bg-dark-ui-2 border-light-ui-3 dark:border-dark-ui-3'
 
+  // Woher der Ausfall stammt — damit erkennbar bleibt, ob er aus dem Stundenplan kommt
+  // oder selbst gesetzt wurde. Ohne das sähen beide gleich aus, und die Lehrkraft wüsste
+  // nicht, ob sie ihn zurücknehmen kann.
+  const herkunft = $derived(herkunftText(slot))
+  const eigenerAusfall = $derived(darfZurueckgenommenWerden(slot))
+
   const rowExtra = $derived(
     slot.kategorie === 'ausfall'
       ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
@@ -215,6 +225,12 @@
       >
         {slot.thema || 'Thema eingeben …'}
       </button>
+    {/if}
+
+    {#if herkunft}
+      <div class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate mt-0.5">
+        Ausfall {herkunft}
+      </div>
     {/if}
 
     {#if slot.note}
@@ -417,6 +433,22 @@
               {KATEGORIE_LABELS[kat] ?? kat}
             </button>
           {/each}
+          <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
+          {#if eigenerAusfall}
+            <button
+              onclick={() => { onAusfallZurueck?.(slot); menuOpen = false }}
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              Ausfall zurücknehmen
+            </button>
+          {:else}
+            <button
+              onclick={() => { onAusfallTag?.(slot); menuOpen = false }}
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              Ich falle aus — ganzer Tag
+            </button>
+          {/if}
           <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
           {#if slot.stunde_node_id}
             <button

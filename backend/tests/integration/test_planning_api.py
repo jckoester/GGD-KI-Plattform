@@ -1706,3 +1706,169 @@ async def test_schuelerin_sieht_den_stundenentwurf_nicht(
                            AND title = 'Vorbereitung der Lehrkraft'""")
         conn.commit()
         conn.close()
+
+
+# ── Persönlicher Ausfall (Paket 5, AP4) ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ausfall_fuer_eine_gruppe_merkt_sich_den_vorzustand(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Nicht `unterricht` annehmen.** Krankheit am Klausurtag ist genau der Fall, in
+    dem der Rückweg sonst die Prüfung verlöre."""
+    from datetime import date, timedelta
+
+    tag = date.today() + timedelta(days=21)
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 2, 1, 1, 'pruefung')
+        """, (slot_id, tag))
+    conn.commit()
+    try:
+        resp = await test_client.post(
+            "/planning/absences",
+            json={"datum": tag.isoformat(), "reichweite": "gruppe", "group_id": 100,
+                  "notiz": "Fortbildung"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["betroffen"] == 1
+
+        with conn.cursor() as cur:
+            cur.execute("""SELECT kategorie, ausfall_herkunft, ausfall_vorher, note
+                           FROM lesson_slots WHERE id = %s""", (slot_id,))
+            assert cur.fetchone() == ("ausfall", "eigen", "pruefung", "Fortbildung")
+
+        # Zurücknehmen stellt die Prüfung wieder her, nicht „Unterricht".
+        weg = await test_client.delete(
+            f"/planning/absences?datum={tag.isoformat()}&reichweite=gruppe&group_id=100",
+            headers=auth_headers,
+        )
+        assert weg.status_code == 200, weg.text
+        with conn.cursor() as cur:
+            cur.execute("""SELECT kategorie, ausfall_herkunft, ausfall_vorher
+                           FROM lesson_slots WHERE id = %s""", (slot_id,))
+            assert cur.fetchone() == ("pruefung", None, None)
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_ganzer_tag_trifft_alle_eigenen_gruppen_und_keine_fremde(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """⚠️ **Die Mitgliedschaft ist auch hier die Zugriffsregel.**
+
+    Ohne den Filter markierte „ganzer Tag" die Stunden fremder Kolleg:innen mit — und das
+    fiele niemandem auf, der die andere Gruppe nicht kennt.
+    """
+    from datetime import date, timedelta
+
+    tag = date.today() + timedelta(days=22)
+    eigen_a, eigen_b, fremd = str(uuid4()), str(uuid4()), str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO groups (id, name, slug, type, subject_id)
+            VALUES (103, 'Zweite eigene', 'zweite-eigene-test', 'teaching_group', 100)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        cur.execute("""
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)
+            VALUES (103, %s, 'teacher', 'eigen') ON CONFLICT DO NOTHING
+        """, (TEACHER1_PSEUDO,))
+        cur.execute("""
+            INSERT INTO groups (id, name, slug, type, subject_id)
+            VALUES (104, 'Fremde', 'fremde-ausfall-test', 'teaching_group', 100)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        for sid, gid in ((eigen_a, 100), (eigen_b, 103), (fremd, 104)):
+            cur.execute("""
+                INSERT INTO lesson_slots
+                    (id, group_id, date, start_period, periods, halbjahr, kategorie)
+                VALUES (%s, %s, %s, 1, 1, 1, 'unterricht')
+            """, (sid, gid, tag))
+    conn.commit()
+    try:
+        resp = await test_client.post(
+            "/planning/absences",
+            json={"datum": tag.isoformat(), "reichweite": "tag"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["betroffen"] == 2
+
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, kategorie FROM lesson_slots WHERE id IN (%s,%s,%s)",
+                        (eigen_a, eigen_b, fremd))
+            stand = {str(r[0]).replace("-", ""): r[1] for r in cur.fetchall()}
+        assert stand[eigen_a.replace("-", "")] == "ausfall"
+        assert stand[eigen_b.replace("-", "")] == "ausfall"
+        assert stand[fremd.replace("-", "")] == "unterricht", (
+            "Der ganze Tag hat eine fremde Gruppe mitmarkiert."
+        )
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id IN (%s,%s,%s)",
+                        (eigen_a, eigen_b, fremd))
+            cur.execute("DELETE FROM group_memberships WHERE group_id = 103")
+            cur.execute("DELETE FROM groups WHERE id IN (103, 104)")
+        conn.commit()
+        conn.close()
+
+
+@pytest.mark.asyncio
+async def test_von_hand_gesetzter_ausfall_traegt_die_herkunft(
+    test_client, auth_headers, seed_planning_fixtures, db_url
+):
+    """Auch die Kategorie-Auswahl an der einzelnen Zeile ist ein **eigener** Eintrag.
+
+    ⚠️ Ohne die Herkunft bliebe er ungeschützt: Der nächste Stundenplan-Abgleich machte
+    ihn lautlos rückgängig. Der PATCH-Pfad setzte `kategorie` per `setattr` — die beiden
+    Nachbarfelder wären dabei liegen geblieben.
+    """
+    from datetime import date, timedelta
+
+    tag = date.today() + timedelta(days=23)
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie)
+            VALUES (%s, 100, %s, 1, 1, 1, 'unterricht')
+        """, (slot_id, tag))
+    conn.commit()
+    try:
+        resp = await test_client.patch(
+            f"/planning/slots/{slot_id}", json={"kategorie": "ausfall"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        with conn.cursor() as cur:
+            cur.execute("""SELECT ausfall_herkunft, ausfall_vorher
+                           FROM lesson_slots WHERE id = %s""", (slot_id,))
+            assert cur.fetchone() == ("eigen", "unterricht")
+
+        # Und zurück: die Angaben müssen weg, sonst zeigt der Rückweg irgendwohin.
+        await test_client.patch(
+            f"/planning/slots/{slot_id}", json={"kategorie": "unterricht"},
+            headers=auth_headers,
+        )
+        with conn.cursor() as cur:
+            cur.execute("""SELECT ausfall_herkunft, ausfall_vorher
+                           FROM lesson_slots WHERE id = %s""", (slot_id,))
+            assert cur.fetchone() == (None, None)
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+        conn.commit()
+        conn.close()

@@ -618,7 +618,7 @@ async def _stundenplan_abgleich(
 # Abbildung nicht auseinanderlaufen können.
 SLOT_SPALTEN = (
     "id", "group_id", "date", "start_period", "kategorie", "pinned", "source", "note",
-    "periods",
+    "periods", "ausfall_herkunft",
 )
 
 
@@ -643,6 +643,7 @@ def als_slot_refs(zeilen) -> list[SlotRef]:
             source=z["source"],
             note=z["note"],
             periods=z["periods"] or 1,
+            ausfall_herkunft=z["ausfall_herkunft"],
         )
         for z in zeilen
     ]

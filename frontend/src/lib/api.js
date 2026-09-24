@@ -1965,6 +1965,33 @@ export async function createLessonForSlot(slotId) {
     return res.json()
 }
 
+/**
+ * Persönlichen Ausfall eintragen. `reichweite` ist `'gruppe'` oder `'tag'`;
+ * `'tag'` trifft alle Unterrichtsgruppen der Lehrkraft an diesem Datum.
+ */
+export async function setzeAusfall({ datum, reichweite, groupId = null, notiz = null }) {
+    const res = await fetch(`${BASE}/planning/absences`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ datum, reichweite, group_id: groupId, notiz }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Ausfall konnte nicht eingetragen werden')
+    return res.json()
+}
+
+/** Einen eingetragenen Ausfall zurücknehmen — Angaben als Query, nicht als Rumpf. */
+export async function nimmAusfallZurueck({ datum, reichweite, groupId = null }) {
+    const p = new URLSearchParams({ datum, reichweite })
+    if (groupId !== null) p.set('group_id', String(groupId))
+    const res = await fetch(`${BASE}/planning/absences?${p}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Ausfall konnte nicht zurückgenommen werden')
+    return res.json()
+}
+
 export async function setWeekPattern(groupId, halbjahr, patterns) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/pattern`, {
         method: 'PUT',

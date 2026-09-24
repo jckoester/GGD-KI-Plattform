@@ -79,7 +79,7 @@ class SyncConflict:
 
     datum: date
     start_period: int | None
-    grund: str            # 'pinned' | 'manual' | 'kein_slot' | 'fremde_notiz'
+    grund: str            # 'pinned' | 'manual' | 'kein_slot' | 'eigener_ausfall'
     beschreibung: str
 
 
@@ -151,6 +151,9 @@ class SlotRef:
     pinned: bool
     source: str
     note: str | None
+    # Wer den Ausfall gesetzt hat (Alembic 0075). Ist es nicht der Stundenplan, darf der
+    # Abgleich die **Kategorie** nicht überschreiben — die Notiz schon.
+    ausfall_herkunft: str | None = None
     # Wie viele Stunden dieser Slot belegt. Eine Doppelstunde ist **eine** Zeile mit
     # `periods=2` — ohne diese Angabe hielte der Abgleich die zweite Hälfte für
     # ungedeckt.
@@ -164,15 +167,66 @@ def _notiz_fuer(lesson: Lesson) -> str | None:
     return None
 
 
-def _notiz_darf_geschrieben_werden(vorhanden: str | None) -> bool:
-    """Nur leere oder vom Import stammende Notizen werden ersetzt.
+def eigener_teil(notiz: str | None) -> str:
+    """Was von der Notiz der Lehrkraft gehört — alles außer den Importzeilen.
 
-    Eine selbstgeschriebene Notiz zu überschreiben wäre Datenverlust — und zwar einer, den
-    niemand bemerkt, weil die neue Notiz plausibel aussieht.
+    ⚠️ **Das Feld hat zwei Eigentümer** (entschieden 24.09.2026). Bis dahin galt
+    „alles oder nichts": War eine fremde Notiz da, schrieb der Abgleich gar nichts und
+    meldete `fremde_notiz`. Die Begründung war richtig — eine selbstgeschriebene Notiz zu
+    überschreiben wäre Datenverlust, den niemand bemerkt —, die Antwort darauf zu grob:
+    Sie schützte den eigenen Text und verlor den Vertretungshinweis.
+
+    Jan, 24.09.2026: „Es muss sichergestellt sein, dass ein Stundenplansync … die Notiz
+    nicht überschreibt sondern nur ergänzt."
+
+    **Mehrere Importzeilen werden alle entfernt.** Nicht aus Vorsicht: Vor dieser Regel
+    konnte eine zweite entstehen, und eine Fassung, die nur die erste kennt, ließe die
+    übrigen für immer stehen.
     """
-    return not (vorhanden or "").strip() or (vorhanden or "").lstrip().startswith(
-        NOTIZ_MARKER
-    )
+    zeilen = (notiz or "").splitlines()
+    behalten = [z for z in zeilen if not z.lstrip().startswith(NOTIZ_MARKER)]
+    return "\n".join(behalten).strip()
+
+
+def mit_importzeile(vorhanden: str | None, importzeile: str | None) -> str | None:
+    """Die Notiz, wie der Abgleich sie hinterlässt: eigener Text + höchstens eine Zeile.
+
+    `importzeile is None` heißt: Der Stundenplan hat nichts (mehr) zu sagen — seine Zeile
+    verschwindet, der eigene Text bleibt.
+
+    Idempotent: Ein zweiter Lauf mit derselben Zeile ergibt dasselbe Ergebnis. Ohne diese
+    Eigenschaft wüchse die Notiz bei jedem Abgleich.
+
+    Beispiele stehen als Tests in `tests/unit/test_calendar_sync.py` — als Doctest
+    ließe sich der Zeilenumbruch im Ergebnis nicht lesbar darstellen.
+    """
+    eigen = eigener_teil(vorhanden)
+    if importzeile is None:
+        return eigen or None
+    return f"{eigen}\n{importzeile}" if eigen else importzeile
+
+
+def importzeile(notiz: str | None) -> str | None:
+    """Die Zeile, die dem Abgleich gehört — oder ``None``."""
+    for z in (notiz or "").splitlines():
+        if z.lstrip().startswith(NOTIZ_MARKER):
+            return z.strip()
+    return None
+
+
+def mit_eigenem_text(vorhanden: str | None, text: str | None) -> str | None:
+    """Die Gegenrichtung zu :func:`mit_importzeile`: eigenen Text setzen, Importzeile behalten.
+
+    ⚠️ **Dasselbe Feld, zwei Eigentümer.** Wer hier eine Notiz der Lehrkraft schreibt,
+    darf die `[Stundenplan]`-Zeile nicht mitnehmen — sie ist die Auskunft der Schule und
+    kommt beim nächsten Abgleich ohnehin wieder. Die beiden Funktionen sind bewusst
+    Nachbarn: Wer die eine ändert, sieht die andere.
+    """
+    zeile = importzeile(vorhanden)
+    eigen = (text or "").strip()
+    if not zeile:
+        return eigen or None
+    return f"{eigen}\n{zeile}" if eigen else zeile
 
 
 def plan_sync(
@@ -279,20 +333,43 @@ def plan_sync(
                 continue
             behandelte_slots.add(slot.id)
 
-            notiz = _notiz_fuer(lesson)
-            if notiz is not None and not _notiz_darf_geschrieben_werden(slot.note):
+            # ⚠️ **Ein selbst eingetragener Ausfall gehört der Lehrkraft.**
+            #
+            # Dieselbe Regel wie bei `group_memberships.herkunft` (Paket 1): Ein
+            # automatischer Lauf überschreibt nur, was er selbst gesetzt haben könnte.
+            # Ohne sie wäre eine eingetragene Fortbildung beim nächsten Abgleich wieder
+            # gewöhnlicher Unterricht — lautlos.
+            #
+            # **Nur die Kategorie ist geschützt, nicht der Slot.** Genau der von Jan
+            # beschriebene Ablauf hängt daran (24.09.2026): Die Lehrkraft trägt ihren
+            # Ausfall ein, Tage später meldet der Stundenplan denselben Ausfall mit
+            # Vertretungsangabe. Die soll **ankommen**, als eigene Zeile neben der
+            # Notiz der Lehrkraft.
+            eigener_ausfall = (
+                slot.kategorie == "ausfall"
+                and slot.ausfall_herkunft in ("eigen", "assistent")
+            )
+            if eigener_ausfall and ziel != slot.kategorie:
                 plan.conflicts.append(
                     SyncConflict(
                         datum=slot.datum,
                         start_period=slot.start_period,
-                        grund="fremde_notiz",
+                        grund="eigener_ausfall",
                         beschreibung=(
-                            "Eigene Notiz vorhanden — der Vertretungshinweis wurde nicht "
-                            "geschrieben."
+                            "Selbst eingetragener Ausfall — der Stundenplan meldet "
+                            f"{lesson.state.value}, die Kategorie blieb unverändert."
                         ),
                     )
                 )
-                notiz = None
+                ziel = slot.kategorie
+
+            notiz = _notiz_fuer(lesson)
+            # Der eigene Text bleibt, die Importzeile wird ersetzt (siehe
+            # `mit_importzeile`). Bis zum 24.09.2026 übersprang der Abgleich hier und
+            # meldete `fremde_notiz` — das schützte den eigenen Text und verlor den
+            # Vertretungshinweis.
+            neue_notiz = mit_importzeile(slot.note, notiz)
+            notiz = neue_notiz if neue_notiz != slot.note else None
 
             plan.changes.append(
                 SlotChange(

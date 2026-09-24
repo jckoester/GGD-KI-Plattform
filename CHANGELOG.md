@@ -7,6 +7,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Die Jahresplanung zeigt Änderungen sofort.** Nach dem Eintragen eines Ausfalls und
+  nach dem Löschen einer Unterrichtseinheit blieb die Ansicht auf dem alten Stand, bis
+  man die Seite neu lud.
 - **Der Verschiebe-Assistent kennt jetzt auch das erste Halbjahr.** Wurden die Stunden
   mitten im ersten Halbjahr neu erzeugt — etwa nach einer Korrektur des Wochenmusters —,
   bekam er die neuen Termine gar nicht zu sehen und konnte entsprechend wenig vorschlagen.
@@ -34,6 +37,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Persönlichen Ausfall eintragen.** Fällt eine Lehrkraft aus — Fortbildung, Krankheit —,
+  lässt sich das im Jahresplan für eine Unterrichtsgruppe oder für den ganzen Tag über
+  alle eigenen Gruppen markieren, mit Grund. Der Stundenplan-Abgleich setzt einen so
+  eingetragenen Ausfall nicht mehr zurück; meldet er später dieselbe Stunde mit
+  Vertretung, kommt die Angabe **zusätzlich** zum eigenen Grund. Zurücknehmen stellt die
+  vorherige Kategorie wieder her — eine Klassenarbeit bleibt eine Klassenarbeit.
 - **Prüfungsstunden sind im Jahresplan rot schraffiert** statt nur rot hinterlegt — auf
   einen Blick von regulärem Unterricht zu unterscheiden.
 - **Das Chatfeld der Startseite steht wieder mittig, wenn keine Kacheln darunter stehen.**

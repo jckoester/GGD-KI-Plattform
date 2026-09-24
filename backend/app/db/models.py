@@ -1387,6 +1387,20 @@ class LessonSlot(Base):
         Boolean, nullable=False, server_default=text("false")
     )
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # ── Ausfall: wer und was vorher (Alembic 0075) ───────────────────────────
+    #
+    # ⚠️ **Nur bedeutsam, solange `kategorie == 'ausfall'`.** Eine Datenbank-Bedingung
+    # für diese Paarung gibt es bewusst nicht — der Snapshot-Restore schreibt `kategorie`
+    # aus einem JSON, das die Spalten nicht kennt. Wer sie liest, prüft die Kategorie mit.
+    #
+    # `stundenplan | eigen | assistent`. Der Abgleich darf die **Kategorie** eines Slots
+    # mit fremder Herkunft nicht überschreiben (dieselbe Regel wie bei
+    # `group_memberships.herkunft`: Ein automatischer Lauf entfernt nur, was er selbst
+    # gesetzt haben könnte). Die **Notiz** ist davon ausgenommen.
+    ausfall_herkunft: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Die Kategorie davor — für den Rückweg. **Nicht `unterricht` annehmen:** Krankheit
+    # am Klausurtag ist der Fall, in dem das die Prüfung verlöre.
+    ausfall_vorher: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     nachbereitet_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
@@ -1428,6 +1442,16 @@ class LessonSlot(Base):
         CheckConstraint(
             "kategorie IN ('unterricht','pruefung','ausfall','puffer','vertretung')",
             name="check_ls_kategorie",
+        ),
+        CheckConstraint(
+            "ausfall_herkunft IS NULL OR "
+            "ausfall_herkunft IN ('stundenplan','eigen','assistent')",
+            name="check_lesson_slots_ausfall_herkunft",
+        ),
+        CheckConstraint(
+            "ausfall_vorher IS NULL OR ausfall_vorher IN "
+            "('unterricht','pruefung','ausfall','puffer','vertretung')",
+            name="check_lesson_slots_ausfall_vorher",
         ),
         CheckConstraint(
             "source IN ('pattern','import','manual')", name="check_ls_source"

@@ -19,6 +19,8 @@
         onUnpark = () => {},
         onEditLesson = null,
         onReview = null,
+        onAusfallTag = null,
+        onAusfallZurueck = null,
     } = $props();
 
     // ⚠️ **Übergangsregel.** Ob ein Termin vorläufig ist, steht seit Migration `0066`
@@ -186,6 +188,8 @@
                             onUnpark={(parkplatzId) => onUnpark(parkplatzId, row.slot.id)}
                             {onEditLesson}
                             {onReview}
+                            {onAusfallTag}
+                            {onAusfallZurueck}
                         />
                     {:else}
                         <SpecialDayRow

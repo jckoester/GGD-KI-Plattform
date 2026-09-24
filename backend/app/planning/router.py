@@ -41,6 +41,7 @@ from app.db.session import get_db
 from app.planning.calendar import ab_schultage, load_school_year
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
+from app.planning import ausfall as ausfall_modul
 from app.planning import jetzt as jetzt_modul
 from app.planning import mein_tag as mein_tag_modul
 from app.planning import vorbedingung
@@ -480,8 +481,14 @@ async def update_slot(
                 detail=f"Ungültige Kategorie. Erlaubt: {sorted(valid_kategorien)}",
             )
 
+    # ⚠️ Die Kategorie **nicht** über `setattr`: Sie bewegt zwei weitere Felder mit
+    # (Herkunft und Vorzustand). Ohne das bliebe ein von Hand gesetzter Ausfall
+    # ungeschützt — der nächste Stundenplan-Abgleich machte ihn lautlos rückgängig.
+    neue_kategorie = update_data.pop("kategorie", None)
     for field, value in update_data.items():
         setattr(slot, field, value)
+    if neue_kategorie is not None:
+        ausfall_modul.setze_kategorie(slot, neue_kategorie, herkunft="eigen")
 
     slot.updated_at = datetime.now(timezone.utc)
     await db.commit()
@@ -1818,4 +1825,113 @@ async def get_mein_tag_schueler(
         heute=als_tag(auswahl.heute),
         naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
         hat_gruppen=bool(gruppen_anzahl),
+    )
+
+
+# ── Persönlicher Ausfall (Paket 5, AP4) ───────────────────────────────────────
+
+
+class AusfallRequest(BaseModel):
+    datum: date
+    # `gruppe` = nur diese Unterrichtsgruppe, `tag` = alle Gruppen der Lehrkraft an
+    # diesem Datum. Fortbildung und Krankheit gelten nicht je Fach (Jan, 24.09.2026).
+    reichweite: str = "gruppe"
+    group_id: Optional[int] = None
+    notiz: Optional[str] = None
+
+
+class AusfallRead(BaseModel):
+    betroffen: int
+    slot_ids: list[UUID]
+
+
+@router.post("/absences", response_model=AusfallRead, status_code=201)
+async def ausfall_eintragen(
+    payload: AusfallRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einen persönlichen Ausfall eintragen — für eine Gruppe oder den ganzen Tag.
+
+    ⚠️ **Markiert, entscheidet aber nichts.** Was aus dem Ausfall folgt — Inhalte
+    entfallen lassen, Stunden verschieben, umplanen —, hängt am Fach, an der Einheit und
+    am Rest des Halbjahres. Das ist Arbeit der Lehrkraft; die Oberfläche bietet die drei
+    Wege danach an (AP5).
+    """
+    if payload.reichweite not in ausfall_modul.REICHWEITEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Reichweite muss {' oder '.join(ausfall_modul.REICHWEITEN)} sein",
+        )
+    if payload.reichweite == "gruppe":
+        if payload.group_id is None:
+            raise HTTPException(422, "Reichweite 'gruppe' verlangt eine group_id")
+        await require_group_teacher(payload.group_id, user, db)
+
+    slots = await ausfall_modul.lade_slots_am_tag(
+        db, user.sub, payload.datum,
+        group_id=payload.group_id if payload.reichweite == "gruppe" else None,
+    )
+    markierungen = ausfall_modul.plane_ausfall(
+        slots, datum=payload.datum, reichweite=payload.reichweite,
+        group_id=payload.group_id,
+    )
+    if markierungen:
+        # Ein Snapshot je betroffener Gruppe — der Rückweg über „Stand
+        # wiederherstellen" soll auch dann tragen, wenn der Tag mehrere Gruppen trifft.
+        for gid in {m.group_id for m in markierungen}:
+            await create_snapshot(db, gid, reason="edit", created_by=user.sub)
+        await ausfall_modul.wende_ausfall_an(
+            db, slots, markierungen, herkunft="eigen", notiz=payload.notiz
+        )
+        await db.commit()
+    return AusfallRead(
+        betroffen=len(markierungen), slot_ids=[m.slot_id for m in markierungen]
+    )
+
+
+@router.delete("/absences", response_model=AusfallRead)
+async def ausfall_zuruecknehmen(
+    # ⚠️ Als Query-Parameter, nicht als Rumpf: Ein DELETE mit Body ist zulässig, aber
+    # manche Proxys entfernen ihn unterwegs — und die drei Angaben sind Skalare.
+    datum: date,
+    reichweite: str = "gruppe",
+    group_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einen eingetragenen Ausfall zurücknehmen.
+
+    ⚠️ **Nimmt alle *eigenen* Ausfälle dieses Tages mit** — auch einzeln gesetzte
+    (entschieden 24.09.2026, F4). Nach dem Schreiben ist nicht mehr unterscheidbar, ob
+    ein Slot über „ganzer Tag" oder einzeln markiert wurde. Die Oberfläche sagt das
+    vorher; hier steht es, damit es niemand für ein Versehen hält.
+
+    Ausfälle aus dem Stundenplan bleiben unberührt: Sie gehören dem Abgleich.
+    """
+    if reichweite not in ausfall_modul.REICHWEITEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Reichweite muss {' oder '.join(ausfall_modul.REICHWEITEN)} sein",
+        )
+    if reichweite == "gruppe":
+        if group_id is None:
+            raise HTTPException(422, "Reichweite 'gruppe' verlangt eine group_id")
+        await require_group_teacher(group_id, user, db)
+
+    slots = await ausfall_modul.lade_slots_am_tag(
+        db, user.sub, datum,
+        group_id=group_id if reichweite == "gruppe" else None,
+    )
+    ruecknahmen = ausfall_modul.plane_ruecknahme(
+        slots, datum=datum, reichweite=reichweite,
+        group_id=group_id,
+    )
+    if ruecknahmen:
+        for gid in {r.group_id for r in ruecknahmen}:
+            await create_snapshot(db, gid, reason="edit", created_by=user.sub)
+        await ausfall_modul.nimm_ausfall_zurueck(db, slots, ruecknahmen)
+        await db.commit()
+    return AusfallRead(
+        betroffen=len(ruecknahmen), slot_ids=[r.slot_id for r in ruecknahmen]
     )

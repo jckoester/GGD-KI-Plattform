@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.planning.ausfall import setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
@@ -336,7 +337,12 @@ async def apply_operations(
         elif isinstance(op, SetUnit):
             slots[op.slot_id].ue_node_id = op.unit_node_id
         elif isinstance(op, SetCategory):
-            slots[op.slot_id].kategorie = op.kategorie
+            # ⚠️ **Die Herkunft wandert mit der Kategorie.** Setzt der Assistent einen
+            # Ausfall, gehört er nicht dem Stundenplan — sonst überschriebe der nächste
+            # Abgleich ihn lautlos. Verlässt der Slot den Ausfall wieder, müssen die
+            # Angaben weg: Ein zurückgebliebenes `ausfall_vorher` führte beim nächsten
+            # Zurücknehmen auf eine Kategorie, die niemand gesetzt hat.
+            setze_kategorie(slots[op.slot_id], op.kategorie, herkunft="assistent")
         elif isinstance(op, MarkNeedsAdjustment):
             slots[op.slot_id].anpassung_noetig = op.value
         elif isinstance(op, UnparkContent):
