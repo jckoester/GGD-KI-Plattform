@@ -319,8 +319,16 @@ def get_valid_until_schuljahresende(content_type: str | None) -> bool:
 # Wahl — und beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding
 # ist das". Wer sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der
 # eigenen Seite; ein privat gesetzter Fachbegriff erschiene dort fälschlich.
+# ⚠️ **`group_teachers` zählt mit** (24.09.2026). Der Wert kam mit Alembic 0074 für die
+# Planungsknoten; sie sind weiterhin **selbst gepflegt**, nur eben von den Lehrkräften
+# einer Gruppe gemeinsam statt von einer Person allein. Ohne diese Zeile fielen
+# `unterrichtsstunde`, `unterrichtseinheit` und `jahresplan` aus „Meine Bausteine" heraus
+# — die Lehrkraft verlöre ihre eigenen Entwürfe von der eigenen Seite. Ein Test hat es
+# gefangen; die Zahl der persönlichen Typen bleibt bei 16.
+_SELBST_GEPFLEGT: Final[frozenset[str]] = frozenset({"private", "group_teachers"})
+
 PERSOENLICHE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
-    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write == "private"
+    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write in _SELBST_GEPFLEGT
 )
 
 

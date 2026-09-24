@@ -119,9 +119,23 @@ class TestGetScopeDefaults:
         assert read == "school" and write == "subject"
 
     def test_private_artifacts(self):
-        for ct in ("klausur", "unterrichtsstunde", "lernplan"):
+        for ct in ("klausur", "lernplan"):
             read, write = get_scope_defaults(ct)
             assert read == "private" and write == "private"
+
+    def test_planungsknoten_gehoeren_den_lehrkraeften_der_gruppe(self):
+        """🔴 Bis zum 24.09.2026 stand hier `unterrichtsstunde` unter „privat".
+
+        In der Taxonomie — im **Code** wurden Planungsknoten längst mit `group` angelegt,
+        und `group` heißt *alle Mitglieder*. Schüler:innen lasen damit die Stundenentwürfe
+        ihrer Lehrkraft samt `metadata.reflexion` (über `GET /context/nodes`, der Planer
+        selbst sperrte korrekt).
+
+        Die Taxonomie sagt jetzt, was gilt, und der Wert sagt, was gemeint ist.
+        """
+        for ct in ("unterrichtsstunde", "unterrichtseinheit", "jahresplan"):
+            read, write = get_scope_defaults(ct)
+            assert (read, write) == ("group_teachers", "group_teachers"), ct
 
     def test_none_returns_fallback(self):
         read, write = get_scope_defaults(None)
@@ -132,8 +146,15 @@ class TestGetScopeDefaults:
         assert read == "school" and write == "private"
 
     def test_scope_restrictivity_invariant(self):
-        """write_scope darf nie permissiver sein als read_scope."""
-        scope_order = {"private": 0, "group": 1, "subject": 2, "school": 3, "global": 4}
+        """write_scope darf nie permissiver sein als read_scope.
+
+        ⚠️ **Die Rangfolge wird importiert, nicht wiederholt.** Bis zum 24.09.2026 stand
+        sie hier noch einmal abgeschrieben — die vierte Kopie neben Datenbank-Bedingung,
+        `app/db/models.py` und `taxonomy_check.py`. Beim Einführen von `group_teachers`
+        schlug dieser Test mit `KeyError` fehl, was glücklich war: Eine Kopie, die einen
+        neuen Wert *kennt*, aber falsch einordnet, wäre still durchgelaufen.
+        """
+        from app.context.taxonomy_check import _SCOPE_RANG as scope_order
         for ct in list(VALID_CONTENT_TYPES["document"]) + \
                   list(VALID_CONTENT_TYPES["knowledge"]) + \
                   list(VALID_CONTENT_TYPES["artifact"]) + \

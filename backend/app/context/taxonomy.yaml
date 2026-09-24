@@ -347,7 +347,7 @@ categories:
       - key: jahresplan
         label_de: "Jahresplan"
         icon: CalendarRange
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
         icon: ClipboardCheck
@@ -367,7 +367,7 @@ categories:
       - key: unterrichtsstunde
         label_de: "Unterrichtsstunde"
         icon: SquareChartGantt
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
         scope_anchor: true
         valid_until_default: schuljahresende
         # Thema, nicht Ablauf: Verlaufsplan (`phasen`) bleibt draußen.
@@ -383,7 +383,7 @@ categories:
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         icon: Map
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
         # Anker: Ein Assistent für genau eine Einheit ist der Regelfall — die Stunde
         # darunter ist es ohnehin. Bis 02.09.2026 stand hier `false`, während der
         # Assistenten-Editor den Typ längst anbot (Drift, von der AP1-Startprüfung

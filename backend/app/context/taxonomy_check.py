@@ -47,7 +47,23 @@ class TaxonomieFehler(RuntimeError):
 
 
 # Reihenfolge von eng nach weit — `write_scope` darf nie weiter reichen als `read_scope`.
-_SCOPE_RANG = {"private": 0, "group": 1, "subject": 2, "school": 3, "global": 4}
+#
+# ⚠️ **Dieselbe Rangfolge steht an drei Stellen**: hier, in `app/db/models.py`
+# (`check_context_nodes_scope_restrictivity`) und als Bedingung in der Datenbank. Wer
+# einen Wert ergänzt, muss alle drei anfassen — beim Einführen von `group_teachers`
+# (24.09.2026) fiel genau das dieser Prüfung auf, und zwar erst beim dritten Anlauf.
+# Zusammenzuführen wäre möglich (die Migration könnte den Text aus dieser Tabelle
+# erzeugen), aber Migrationen sollen eingefroren bleiben — ein eigener Punkt.
+_SCOPE_RANG = {
+    "private": 0,
+    # Lehrkräfte einer Gruppe: enger als „alle Mitglieder", weiter als „nur ich".
+    # Trägt die Planungsknoten, seit Schüler:innen deren Entwürfe lesen konnten.
+    "group_teachers": 1,
+    "group": 2,
+    "subject": 3,
+    "school": 4,
+    "global": 5,
+}
 
 
 def pruefe_altlast() -> str | None:

@@ -421,20 +421,20 @@ export const SCOPE_DEFAULTS = {
     "global"
   ],
   "jahresplan": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "pruefungsanforderung": [
     "school",
     "subject"
   ],
   "unterrichtsstunde": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "unterrichtseinheit": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "arbeitsblatt": [
     "group",

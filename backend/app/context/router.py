@@ -118,7 +118,7 @@ async def _check_write_permission(
     if node.owner_pseudonym == user.sub:
         return
     if (
-        node.write_scope == "group"
+        node.write_scope in ("group", "group_teachers")
         and node.write_scope_group_id is not None
         and "teacher" in user.roles
     ):
@@ -152,7 +152,12 @@ async def _check_read_permission(
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     if "admin" in user.roles:
         return
-    if node.read_scope == "group":
+    if node.read_scope in ("group", "group_teachers"):
+        # ⚠️ `group_teachers` verlangt zusätzlich die Rolle — dieselbe Bedingung, die
+        # `_check_write_permission` bei `group` schon hatte. Das Fehlen dieser Zeile hieß:
+        # Schüler:innen lasen die Stundenentwürfe ihrer Lehrkraft (Befund 24.09.2026).
+        if node.read_scope == "group_teachers" and "teacher" not in user.roles:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
         if node.read_scope_group_id is None:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
         result = await db.execute(

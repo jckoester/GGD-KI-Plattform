@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Schüler:innen können die Stundenplanung ihrer Lehrkräfte nicht mehr einsehen.**
+  Unterrichtsstunden, Unterrichtseinheiten und Jahrespläne waren über den Wissensbereich
+  für alle Mitglieder der Gruppe lesbar — einschließlich der Notizen, die eine Lehrkraft
+  nach der Stunde festhält. Sie sind jetzt den Lehrkräften der Gruppe vorbehalten.
+
 - **Unterrichtsgruppen ohne Klasse bekommen einen Jahrgang.** Kurse aus dem Stundenplan
   und der Kursstufe hatten keinen — die Jahresplanung bot ihnen deshalb *alle* Curricula
   des Fachs an, einem Abiturkurs also auch die der Mittelstufe. Der Jahrgang wird jetzt

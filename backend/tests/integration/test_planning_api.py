@@ -1625,3 +1625,84 @@ async def test_unbrauchbare_stundenzahl_wird_zu_keiner_angabe(
             cur.execute("DELETE FROM context_nodes WHERE id = %s", (kapitel_id,))
         conn.commit()
         conn.close()
+
+
+# ── Sichtbarkeit von Planungsknoten (Paket 5, AP3) ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_schuelerin_sieht_den_stundenentwurf_nicht(
+    test_client, auth_headers, auth_student, seed_planning_fixtures, db_url
+):
+    """🔴 **Der Befund vom 24.09.2026, als Wächter.**
+
+    Planungsknoten standen auf `read_scope = 'group'` — und `group` heißt *alle
+    Mitglieder*, also auch Schüler:innen. Gemessen wurde damals:
+
+        GET /planning/lessons/{id}                        (Schüler:in) -> 403   ✓
+        GET /context/nodes/{id}                           (Schüler:in) -> 200   ✗
+        GET /context/nodes?content_type=unterrichtsstunde (Schüler:in) -> enthielt ihn
+
+    Ausgeliefert wurden `metadata.phasen` **und** `metadata.reflexion` — die Notiz, die
+    die Lehrkraft nach der Stunde über die Klasse schreibt. Eine UUID brauchte es nicht.
+
+    Die Ursache war eine Asymmetrie: Die Schreibprüfung verlangte bei `group` die
+    Lehrkraft-Rolle, die Leseprüfung nicht. Seit Alembic 0074 tragen Planungsknoten
+    `group_teachers`, und beide Seiten verlangen dasselbe.
+
+    ⚠️ **Geprüft werden alle drei Wege.** Der Planer allein genügt nicht: Er war die
+    einzige Tür, die schon zu war.
+    """
+    from datetime import date
+
+    slot_id = str(uuid4())
+    conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO lesson_slots
+                (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)
+            VALUES (%s, 100, %s, 3, 1, 1, 'unterricht', 'Vorbereitung der Lehrkraft')
+        """, (slot_id, date.today()))
+    conn.commit()
+    try:
+        lid = (await test_client.post(f"/planning/slots/{slot_id}/lesson",
+                                      headers=auth_headers)).json()["id"]
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE context_nodes SET metadata = metadata ||
+                           '{"reflexion": "Klasse war unruhig"}'::jsonb
+                           WHERE id = %s""", (lid,))
+        conn.commit()
+
+        # 1. Der Planer — war schon immer zu.
+        assert (await test_client.get(f"/planning/lessons/{lid}",
+                                      headers=auth_student)).status_code == 403
+
+        # 2. Der Einzelknoten über den Kontextpfad.
+        einzeln = await test_client.get(f"/context/nodes/{lid}", headers=auth_student)
+        assert einzeln.status_code == 403, (
+            f"Schüler:in liest den Entwurf über /context/nodes: {einzeln.text[:200]}"
+        )
+
+        # 3. Die Liste — hier brauchte es nicht einmal die Id.
+        liste = await test_client.get(
+            "/context/nodes?content_type=unterrichtsstunde", headers=auth_student
+        )
+        roh = liste.json()
+        eintraege = roh.get("items", roh) if isinstance(roh, dict) else roh
+        assert all(e.get("id") != lid for e in eintraege), (
+            "Der Entwurf steht in der Knotenliste der Schüler:in."
+        )
+        assert "Klasse war unruhig" not in liste.text
+
+        # Gegenprobe: Die Lehrkraft kommt weiterhin heran — sonst hätten wir den
+        # Zugriff nicht eingeschränkt, sondern abgeschafft.
+        assert (await test_client.get(f"/context/nodes/{lid}",
+                                      headers=auth_headers)).status_code == 200
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM lesson_slots WHERE id = %s", (slot_id,))
+            cur.execute("""DELETE FROM context_nodes WHERE content_type = 'unterrichtsstunde'
+                           AND write_scope_group_id = 100
+                           AND title = 'Vorbereitung der Lehrkraft'""")
+        conn.commit()
+        conn.close()

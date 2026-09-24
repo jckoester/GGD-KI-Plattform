@@ -59,7 +59,7 @@ async def _load_ue_map(db: AsyncSession, group_id: int) -> dict[UUID, str]:
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "unterrichtseinheit",
-            ContextNode.write_scope == "group",
+            ContextNode.write_scope.in_(("group", "group_teachers")),
             ContextNode.write_scope_group_id == group_id,
             ContextNode.status == "active",
         )
@@ -637,8 +637,8 @@ async def _handle_create_lessons(args: dict, ctx: ToolContext) -> dict:
             category="artifact",
             content_type="unterrichtsstunde",
             title=titel,
-            read_scope="group",
-            write_scope="group",
+            read_scope="group_teachers",
+            write_scope="group_teachers",
             read_scope_group_id=group_id,
             write_scope_group_id=group_id,
             owner_pseudonym=ctx.user.sub,

@@ -1056,11 +1056,11 @@ class ContextNode(Base):
             name="check_context_nodes_category",
         ),
         CheckConstraint(
-            "read_scope IN ('global','school','subject','group','private')",
+            "read_scope IN ('global','school','subject','group','group_teachers','private')",
             name="check_context_nodes_read_scope",
         ),
         CheckConstraint(
-            "write_scope IN ('global','school','subject','group','private')",
+            "write_scope IN ('global','school','subject','group','group_teachers','private')",
             name="check_context_nodes_write_scope",
         ),
         CheckConstraint(
@@ -1068,23 +1068,28 @@ class ContextNode(Base):
             name="check_context_nodes_status",
         ),
         CheckConstraint(
-            "read_scope NOT IN ('subject','group') OR read_scope_group_id IS NOT NULL",
+            "read_scope NOT IN ('subject','group','group_teachers') OR read_scope_group_id IS NOT NULL",
             name="check_context_nodes_read_group_id",
         ),
         CheckConstraint(
-            "write_scope NOT IN ('subject','group') OR write_scope_group_id IS NOT NULL",
+            "write_scope NOT IN ('subject','group','group_teachers') OR write_scope_group_id IS NOT NULL",
             name="check_context_nodes_write_group_id",
         ),
         CheckConstraint(
             """
+            -- ⚠️ `group_teachers` rangiert **zwischen** `private` und `group`: Es ist
+            -- enger als „alle Mitglieder“ und weiter als „nur ich“. Genau diese Ordnung hat
+            -- am 24.09.2026 den Zuschnitt entschieden — `read=group_teachers` mit
+            -- `write=group` verletzt die Bedingung, und zu Recht: Man dürfte schreiben,
+            -- was man nicht lesen kann.
             CASE write_scope
-              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
-              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+              WHEN 'private' THEN 0 WHEN 'group_teachers' THEN 1 WHEN 'group' THEN 2
+              WHEN 'subject' THEN 3 WHEN 'school' THEN 4 WHEN 'global' THEN 5
             END
             <=
             CASE read_scope
-              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
-              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+              WHEN 'private' THEN 0 WHEN 'group_teachers' THEN 1 WHEN 'group' THEN 2
+              WHEN 'subject' THEN 3 WHEN 'school' THEN 4 WHEN 'global' THEN 5
             END
             """,
             name="check_context_nodes_scope_restrictivity",

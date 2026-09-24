@@ -179,7 +179,7 @@ async def _load_units(db: AsyncSession, group_id: int) -> list[ContextNode]:
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "unterrichtseinheit",
-            ContextNode.write_scope == "group",
+            ContextNode.write_scope.in_(("group", "group_teachers")),
             ContextNode.write_scope_group_id == group_id,
             ContextNode.status == "active",
         ).order_by(ContextNode.created_at)
@@ -941,8 +941,8 @@ async def create_lesson(
         category="artifact",
         content_type="unterrichtsstunde",
         title=payload.titel,
-        read_scope="group",
-        write_scope="group",
+        read_scope="group_teachers",
+        write_scope="group_teachers",
         read_scope_group_id=group_id,
         write_scope_group_id=group_id,
         owner_pseudonym=user.sub,
@@ -1036,8 +1036,8 @@ async def create_lesson_for_slot(
         category="artifact",
         content_type="unterrichtsstunde",
         title=(slot.thema or "").strip() or "Neue Stunde",
-        read_scope="group",
-        write_scope="group",
+        read_scope="group_teachers",
+        write_scope="group_teachers",
         read_scope_group_id=slot.group_id,
         write_scope_group_id=slot.group_id,
         owner_pseudonym=user.sub,
