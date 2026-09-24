@@ -104,8 +104,12 @@ export function assistentFrage(weg, datumIso) {
     const [y, m, d] = (datumIso || "").split("-")
     const datum = y ? `${+d}.${+m}.${y}` : "diesem Tag"
     if (weg === "verschieben") {
-        return `Am ${datum} sind geplante Stunden ausgefallen. Bitte hilf mir, die `
-            + "Inhalte auf die folgenden Stunden zu verschieben."
+        // ⚠️ **„Inhalte" allein genügte nicht.** Am 24.09.2026 kam am Zieltermin nur das
+        // Thema an — das Modell hatte `set_topic` gewählt statt `move_content`. Der Satz
+        // nennt jetzt, was mitkommen soll; die Werkzeugbeschreibung sagt, womit.
+        return `Am ${datum} sind geplante Stunden ausgefallen. Bitte verschiebe die `
+            + "geplanten Stunden vollständig auf die folgenden Termine — mit "
+            + "Unterrichtseinheit und Stundenentwurf, nicht nur dem Thema."
     }
     return `Am ${datum} sind geplante Stunden ausgefallen. Bitte schlage vor, wie ich die `
         + "betroffene Unterrichtseinheit kürzen oder umverteilen kann."

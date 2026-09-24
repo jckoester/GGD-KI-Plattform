@@ -147,7 +147,10 @@ describe("assistentFrage", () => {
         // Entscheidung, die gerade die Lehrkraft getroffen hat.
         const v = assistentFrage("verschieben", "2026-11-10")
         const u = assistentFrage("umplanen", "2026-11-10")
-        expect(v).toContain("verschieben")
+        expect(v).toMatch(/verschieb/)
+        // ⚠️ Nennt, was mitkommen soll: Am 24.09.2026 kam nur das Thema an.
+        expect(v).toContain("Unterrichtseinheit")
+        expect(v).toContain("Stundenentwurf")
         expect(u).toMatch(/kürzen|umverteilen/)
         expect(v).not.toBe(u)
     })

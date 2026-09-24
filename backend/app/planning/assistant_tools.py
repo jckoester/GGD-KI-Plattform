@@ -1033,7 +1033,12 @@ async def _handle_apply_plan_operations(args: dict, ctx: ToolContext) -> dict:
     )
     if res.errors:
         return {"ok": False, "errors": res.errors}
-    return {"ok": True, "applied": res.applied, "snapshot_id": res.snapshot_id, "summary": summary}
+    antwort = {"ok": True, "applied": res.applied, "snapshot_id": res.snapshot_id,
+               "summary": summary}
+    if res.hinweise:
+        # Kein Fehler — angewandt ist angewandt. Aber das Modell soll es lesen.
+        antwort["hinweise"] = res.hinweise
+    return antwort
 
 
 register_tool(ChatTool(
@@ -1048,7 +1053,16 @@ register_tool(ChatTool(
                 "Wendet eine Liste typisierter Plan-Operationen atomar an (Snapshot davor). "
                 "summary wird als Undo-Label gespeichert (z. B. 'KW43-Ausfall: 2 Themen "
                 "geschoben, Vertiefung gestrichen'). Bei Validierungsfehler wird nichts "
-                "angewendet (errors zurück). Nur nach Bestätigung der Lehrkraft."
+                "angewendet (errors zurück). Nur nach Bestätigung der Lehrkraft.\n"
+                "WICHTIG: Eine geplante Stunde verlegt man mit move_content — es nimmt "
+                "Thema, Unterrichtseinheit UND Stundenentwurf mit. set_topic setzt nur "
+                "die Überschrift und lässt Einheit und Entwurf am alten Termin zurück; "
+                "es ist für Termine ohne Entwurf gedacht.\n"
+                "WICHTIG: Ein Ausfall muss eigens eingetragen werden — mit "
+                "set_category{slot_id,'ausfall'} im selben Stapel. move_content räumt "
+                "den Quelltermin nur leer; seine Kategorie bleibt 'unterricht', und er "
+                "zählt weiter als gehaltene Stunde in der Stundenbilanz. Nennt die "
+                "Lehrkraft einen Entfall, gehören beide Operationen zusammen."
             ),
             "parameters": {
                 "type": "object",
@@ -1057,13 +1071,33 @@ register_tool(ChatTool(
                         "type": "array",
                         "items": {"type": "object"},
                         "description": (
-                            "Operationen, je mit 'op': move_content{from_slot_id,to_slot_id}, "
-                            "swap_content{slot_a,slot_b}, set_topic{slot_id,thema}, "
-                            "set_unit{slot_id,unit_node_id}, set_category{slot_id,kategorie}, "
-                            "mark_needs_adjustment{slot_id,value}, "
-                            "transfer_phases{from_lesson_id,to_lesson_id,phase_ids}, "
-                            "shorten_phase{lesson_id,phase_id,dauer_min}, "
-                            "strike_phase{lesson_id,phase_id}"
+                            "Operationen, je mit 'op'. Was sie bewirken:\n"
+                            "- move_content{from_slot_id,to_slot_id}: verlegt eine Stunde "
+                            "vollständig — Thema, Unterrichtseinheit und Stundenentwurf "
+                            "wandern zum Ziel, die Quelle bleibt leer zurück. Das ist die "
+                            "Operation für 'Stunde verschieben'. Die **Kategorie** der "
+                            "Quelle ändert sie NICHT: Ein ausgefallener Termin bleibt "
+                            "sonst 'unterricht' und zählt weiter mit — dafür zusätzlich "
+                            "set_category.\n"
+                            "- swap_content{slot_a,slot_b}: tauscht den Inhalt zweier "
+                            "Termine vollständig.\n"
+                            "- set_topic{slot_id,thema}: setzt NUR die Überschrift eines "
+                            "Termins. Einheit und Entwurf bleiben, wo sie sind — für eine "
+                            "Verlegung ist das falsch.\n"
+                            "- set_unit{slot_id,unit_node_id}: ordnet einem Termin eine "
+                            "Unterrichtseinheit zu (null löst die Zuordnung).\n"
+                            "- set_category{slot_id,kategorie}: unterricht | pruefung | "
+                            "puffer | ausfall | vertretung.\n"
+                            "- mark_needs_adjustment{slot_id,value}: markiert, dass an "
+                            "diesem Termin noch etwas zu entscheiden ist.\n"
+                            "- transfer_phases{from_lesson_id,to_lesson_id,phase_ids}: "
+                            "verschiebt einzelne Verlaufsphasen zwischen zwei Entwürfen.\n"
+                            "- shorten_phase{lesson_id,phase_id,dauer_min}: kürzt eine "
+                            "Phase auf die angegebene Dauer.\n"
+                            "- strike_phase{lesson_id,phase_id}: streicht eine Phase. "
+                            "Sie bleibt im Verlaufsplan sichtbar (als gestrichen "
+                            "markiert), zählt aber nicht mehr zur Zeit — gelöscht wird "
+                            "nichts."
                         ),
                     },
                     "summary": {"type": "string", "description": "Kurzlabel für den Undo-Verlauf"},

@@ -124,6 +124,9 @@ class ExecutionResult:
     applied: int
     errors: list[str] = field(default_factory=list)
     snapshot_id: str | None = None
+    # ⚠️ **Hinweise sind keine Fehler.** Die Operationen bleiben angewandt; sie gehen
+    # nur ans Modell zurück, damit es nachbessern kann, und stehen im Verlauf.
+    hinweise: list[str] = field(default_factory=list)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -379,5 +382,64 @@ async def apply_operations(
     for lesson in lessons.values():
         await synchronisiere_materialkanten(db, lesson.id, lesson.metadata_)
 
+    hinweise = await _pruefe_halben_umzug(db, group_id, ops)
+
     await db.commit()
-    return ExecutionResult(applied=len(ops), errors=[], snapshot_id=str(snap.id))
+    return ExecutionResult(
+        applied=len(ops), errors=[], snapshot_id=str(snap.id), hinweise=hinweise
+    )
+
+
+async def _pruefe_halben_umzug(
+    db: AsyncSession, group_id: int, ops: list[PlanOperation]
+) -> list[str]:
+    """Meldet, wenn ein `set_topic` den Inhalt zerrissen hat.
+
+    ⚠️ **Der Fall, der das nötig machte** (beobachtet 24.09.2026): Nach „Stunden
+    verschieben" stand am Zieltermin nur das Thema — Unterrichtseinheit und
+    Stundenentwurf blieben am ausgefallenen Termin. Das Modell hatte `set_topic` gewählt,
+    wo `move_content` gemeint war. Verboten war es nicht, und niemand merkte es: Die
+    Lehrkraft sah die Stunde am neuen Termin stehen und konnte sie dort nicht bearbeiten.
+
+    **Eine bessere Werkzeugbeschreibung macht das unwahrscheinlicher, nicht unmöglich.**
+    Diese Prüfung sorgt dafür, dass das Ergebnis nicht *unbemerkt* bleibt.
+
+    Bewusst eng geschnitten: „Ein ausgefallener Termin trägt noch Inhalt" allein ist der
+    **Normalfall** direkt nach einem Ausfall — die Zuordnung bleibt für die
+    Nachvollziehbarkeit erhalten. Ein Hinweis darauf wäre Rauschen und entwertete die
+    Fälle, die zählen. Gemeldet wird nur die Kombination: ein `set_topic` **und** ein
+    ausgefallener Termin mit demselben Thema, der Einheit oder Entwurf noch hält.
+    """
+    themen = {
+        (op.thema or "").strip()
+        for op in ops
+        if isinstance(op, SetTopic) and (op.thema or "").strip()
+    }
+    if not themen:
+        return []
+
+    # ⚠️ **Eigene Abfrage, nicht die geladenen Slots.** `apply_operations` lädt nur, was
+    # die Operationen **nennen** — der zurückgebliebene Quelltermin steht gerade nicht
+    # darin, denn das `set_topic` betraf ja das Ziel. Der erste Entwurf dieser Prüfung
+    # sah deshalb nie etwas und meldete nie etwas; der Test war rot, und zu Recht.
+    zurueckgeblieben = [
+        s for s in (
+            await db.execute(
+                sa.select(LessonSlot).where(
+                    LessonSlot.group_id == group_id,
+                    LessonSlot.kategorie == "ausfall",
+                )
+            )
+        ).scalars().all()
+        if (s.thema or "").strip() in themen
+        and (s.ue_node_id is not None or s.stunde_node_id is not None)
+    ]
+    if not zurueckgeblieben:
+        return []
+    return [
+        f"Am ausgefallenen Termin {s.date} bleiben Unterrichtseinheit bzw. "
+        f"Stundenentwurf von \u201e{(s.thema or '').strip()}\u201c zurück — `set_topic` "
+        "hat nur die Überschrift gesetzt. Für eine Verlegung ist `move_content` "
+        "richtig: Es nimmt Thema, Einheit und Entwurf mit."
+        for s in zurueckgeblieben
+    ]
