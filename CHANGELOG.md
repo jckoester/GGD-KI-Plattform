@@ -42,6 +42,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Methode und Sozialform im Stundenentwurf führen zu ihrer Beschreibung.** Ein Klick
+  auf das verlinkte Vokabel öffnet den Knoten in einem neuen Tab — bisher stand der Name
+  nur da.
 - **Nach einem Ausfall fragt die Jahresplanung, was mit den Inhalten geschehen soll.**
   Drei Wege stehen zur Wahl: Inhalte entfallen lassen, die Stunden verschieben oder die
   Einheit mit dem Assistenten umplanen. Keiner geschieht automatisch — und wo an den
