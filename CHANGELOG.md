@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Das Neuladen einer Unterseite endete mit einem Proxy-Fehler (502).** Nur die
+  Startadresse lud; jede tiefere Adresse — `/chat`, eine Curriculum-Ansicht — scheiterte,
+  sobald man sie direkt aufrief oder die Seite neu lud. Die Plattform schickte einen zu
+  großen Antwortkopf, den der Proxy abwies.
 - **Die Jahresplanung einer Klasse erschien gar nicht.** Deckte ein Ferienblock zwei
   Lücken im Stundenplan ab — etwa weil ein Termin mitten in den Ferien lag —, wurde er
   doppelt eingefügt, und die gesamte Tabelle blieb leer. Sichtbar war das nur in der
