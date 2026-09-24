@@ -137,7 +137,15 @@
         <div class="px-2 py-2 text-right">Aktionen</div>
     </div>
 
-    {#each weekItems as item (item.type === "week" ? item.key : item.type + (item.name ?? item.type))}
+    <!--
+      ⚠️ **Der Schlüssel kommt aus den Daten, nicht aus dem Markup.** Hier stand
+      `item.type + (item.name ?? item.type)` — für zwei Ferienbänder desselben Blocks
+      also zweimal derselbe Wert. Svelte bricht bei doppelten Schlüsseln das Rendern der
+      **ganzen** Komponente ab: Die Jahresplanung einer Klasse war unsichtbar, ohne
+      Fehler im Backend-Log (Betatest 23.09.2026). `groupSlotsByWeek` vergibt den
+      Schlüssel jetzt selbst und entdoppelt dabei.
+    -->
+    {#each weekItems as item (item.key)}
         {#if item.type === "week"}
             <!--
         Wochen-Wrapper: linker Balken zeigt Wochenzugehörigkeit,

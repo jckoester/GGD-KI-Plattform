@@ -137,8 +137,8 @@ export function entwurfsStand(slot) {
  * @param {{ ferien?: Array, feiertage?: Array, unterrichtsfreie?: Array, halbjahreswechsel?: string, beginn?: string, ende?: string }} calendar
  * @returns Array of items:
  *   { type: 'week', key, week, year, slots, rows }
- *   { type: 'ferien', name, von, bis }
- *   { type: 'halbjahr' }
+ *   { type: 'ferien', key, name, von, bis }
+ *   { type: 'halbjahr', key }
  */
 export function groupSlotsByWeek(
     slots,
@@ -217,6 +217,7 @@ export function groupSlotsByWeek(
     const weekKeys = [...byWeek.keys()].sort()
     const items = []
     let halbjahrInserted = false
+    const gezeigteFerien = new Set()
 
     for (let i = 0; i < weekKeys.length; i++) {
         const weekData = byWeek.get(weekKeys[i])
@@ -229,19 +230,29 @@ export function groupSlotsByWeek(
             gapEnd.setDate(gapEnd.getDate() - 1)
 
             // Ferien-Bänder im Gap
+            //
+            // ⚠️ **Jeder Ferienblock nur einmal.** Diese Schleife läuft je **Lücke**
+            // zwischen zwei Unterrichtswochen. Liegt ein Termin *innerhalb* der Ferien
+            // (Nachschreibtermin, Import, fehlerhaft erzeugter Slot), überlappt derselbe
+            // Block die Lücke davor **und** die dahinter — und stand zweimal in der
+            // Liste. Im Markup bekamen beide denselben Schlüssel, Svelte brach mit
+            // `each_key_duplicate` ab, und die **ganze** Jahresplanung blieb unsichtbar
+            // (Betatest 23.09.2026, eine Klasse betroffen).
             if (gapStart <= gapEnd) {
                 for (const f of ferien) {
                     const fStart = new Date(f.von + 'T00:00:00')
                     const fEnd = new Date(f.bis + 'T00:00:00')
-                    if (fStart <= gapEnd && fEnd >= gapStart) {
-                        items.push({ type: 'ferien', name: f.name, von: f.von, bis: f.bis })
-                    }
+                    if (fStart > gapEnd || fEnd < gapStart) continue
+                    const key = `ferien-${f.von}-${f.bis}-${f.name ?? ''}`
+                    if (gezeigteFerien.has(key)) continue
+                    gezeigteFerien.add(key)
+                    items.push({ type: 'ferien', key, name: f.name, von: f.von, bis: f.bis })
                 }
             }
 
             // Halbjahresbruch zwischen HJ1-Ende und HJ2-Beginn
             if (!halbjahrInserted && weekHj(prevData) === 1 && weekHj(weekData) === 2) {
-                items.push({ type: 'halbjahr' })
+                items.push({ type: 'halbjahr', key: 'halbjahr' })
                 halbjahrInserted = true
             }
         }

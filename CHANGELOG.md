@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Die Jahresplanung einer Klasse erschien gar nicht.** Deckte ein Ferienblock zwei
+  Lücken im Stundenplan ab — etwa weil ein Termin mitten in den Ferien lag —, wurde er
+  doppelt eingefügt, und die gesamte Tabelle blieb leer. Sichtbar war das nur in der
+  Browser-Konsole.
+
 ## [0.10.4] – 2026-09-21
 
 Die Beta bekommt einen Rückkanal: Rückmeldungen lassen sich aus der Anwendung heraus
