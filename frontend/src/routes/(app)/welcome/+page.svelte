@@ -14,8 +14,6 @@
     import GruppenKachel from '$lib/components/GruppenKachel.svelte'
     import ErrorBanner from '$lib/components/ErrorBanner.svelte'
     import {
-        KACHELN,
-        schalteKachel,
         zeigtKachel,
     } from '$lib/stores/startkacheln.js'
 
@@ -166,24 +164,16 @@
                     <GruppenKachel />
                 {/if}
 
-                <!-- Die Wahl steht hier und nicht im Profil: Wer eine Kachel weghaben
-                     will, denkt das beim Ansehen — nicht zwei Seiten später. -->
-                <details class="text-xs text-light-tx-2 dark:text-dark-tx-2">
-                    <summary class="cursor-pointer">Kacheln wählen</summary>
-                    <div class="mt-2 flex flex-col gap-1">
-                        {#each KACHELN as k (k.id)}
-                            <label class="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    checked={$zeigtKachel(k.id)}
-                                    onchange={(e) => schalteKachel(k.id, e.currentTarget.checked)}
-                                    class="accent-primary"
-                                />
-                                {k.name}
-                            </label>
-                        {/each}
-                    </div>
-                </details>
+                <!-- ⚠️ **Die Wahl selbst steht seit dem 25.09.2026 im Profil** (Jan).
+                     Hier stand sie, weil man beim Ansehen merkt, dass eine Kachel stört —
+                     dafür wurde die Startseite zu ihrer eigenen Einstellungsseite. Der
+                     Weg bleibt: ein Verweis, keine zweite Bedienstelle. -->
+                <a
+                    href="/profile"
+                    class="text-xs text-light-tx-2 dark:text-dark-tx-2 hover:underline"
+                >
+                    Kacheln wählen
+                </a>
             {/if}
         {/if}
 

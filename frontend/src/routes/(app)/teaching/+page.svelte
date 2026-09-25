@@ -30,10 +30,50 @@
     import StundenrasterUebernahme from "$lib/components/StundenrasterUebernahme.svelte";
     import GruppenAngebote from "$lib/components/GruppenAngebote.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
+    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+    import SuccessBanner from "$lib/components/SuccessBanner.svelte";
+    import TimetableSyncButton from "$lib/components/TimetableSyncButton.svelte";
+    import { getCalendarTeachers, getPreferences, patchPreferences } from "$lib/api.js";
+    import { user } from "$lib/stores/user.js";
 
     let exclusions = $state([]);
     let loading = $state(true);
     let error = $state(null);
+
+    // ── WebUntis-Kürzel (aus dem Profil hierher gezogen, Paket 7 AP6) ─────────
+    //
+    // ⚠️ **Es stand im Profil und gehört nicht dorthin** (Jan, 25.09.2026): Was die
+    // Lehrkraft in der Regel einmal zu Schuljahresbeginn einstellt und was mit dem
+    // Benutzerprofil nichts zu tun hat, steht hier bei den Gruppen — an derselben
+    // Stelle, an der auch die Stunden entstehen.
+    //
+    // Auswahl aus der geladenen Liste statt Freitext: Ein Tippfehler führte sonst zu
+    // einem stillen Nicht-Abruf, den später niemand zuordnet.
+    let preferences = $state({});
+    let kuerzelListe = $state({ configured: false, teachers: [], error: null });
+    let kuerzelFehler = $state("");
+    let kuerzelGespeichert = $state(false);
+
+    async function updateKuerzel(event) {
+        const wert = event.target.value;
+        kuerzelFehler = "";
+        kuerzelGespeichert = false;
+        try {
+            await patchPreferences({ webuntis_kuerzel: wert });
+            user.update((u) => ({
+                ...u,
+                preferences: { ...u?.preferences, webuntis_kuerzel: wert },
+            }));
+            preferences = { ...preferences, webuntis_kuerzel: wert };
+            kuerzelGespeichert = true;
+        } catch (err) {
+            kuerzelFehler = err.message;
+            // Anzeige auf den gespeicherten Stand zurücksetzen — sonst zeigt das Feld
+            // eine Auswahl, die der Server abgelehnt hat.
+            event.target.value = preferences?.webuntis_kuerzel ?? "";
+        }
+    }
 
     async function loadData() {
         loading = true;
@@ -137,10 +177,20 @@
         }
     }
 
-    onMount(() => {
+    onMount(async () => {
         loadData();
         refreshPotentialTeachingGroups();
         refreshGroupsConfig();
+        try {
+            preferences = await getPreferences();
+        } catch (err) {
+            console.error("Fehler beim Laden der Präferenzen:", err);
+        }
+        // Bewusst ohne Rollenprüfung: Der Nutzer-Store ist beim Einhängen nicht
+        // zwangsläufig schon befüllt — eine Abfrage von `roles` an dieser Stelle ist ein
+        // Wettlauf, der sich als „Feld fehlt" äußert. Der Server entscheidet (403 für
+        // Schüler:innen), die Antwort trägt das Ergebnis in `allowed`.
+        kuerzelListe = await getCalendarTeachers();
     });
 </script>
 
@@ -153,11 +203,11 @@
     </button>
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-light-tx dark:text-dark-tx">
-            Unterrichtsgruppen verwalten
+            Unterricht
         </h1>
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
-            Hier kannst du deine Unterrichtsgruppen verwalten und abgelehnte
-            Kombinationen wiederherstellen.
+            Ihre Unterrichtsgruppen, Ihr Kürzel im Stundenplan und der Abgleich — die
+            Einstellungen, die Sie meist zu Schuljahresbeginn einmal treffen.
         </p>
     </div>
 
@@ -167,6 +217,79 @@
         >
             <p class="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
+    {/if}
+
+    {#if kuerzelListe.allowed && kuerzelListe.error && !kuerzelListe.configured}
+    <!-- Sichtbar scheitern statt lautlos verschwinden: Ohne diesen Hinweis sieht ein
+         Serverfehler genauso aus wie „diese Schule nutzt kein WebUntis". -->
+    <section class="mb-8">
+        <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
+            Stundenplan
+        </h2>
+        <WarningBanner message={kuerzelListe.error} />
+    </section>
+    {/if}
+
+    {#if kuerzelListe.configured}
+    <section class="mb-8">
+        <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
+            Stundenplan
+        </h2>
+        {#if kuerzelListe.error}
+            <div class="mb-3"><WarningBanner message={kuerzelListe.error} /></div>
+        {/if}
+        <label
+            for="webuntis-kuerzel"
+            class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
+        >
+            Ihr Kürzel im Stundenplan
+        </label>
+        <select
+            id="webuntis-kuerzel"
+            value={preferences?.webuntis_kuerzel ?? ""}
+            onchange={updateKuerzel}
+            class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                   bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
+                   focus:outline-none focus:ring-2 focus:ring-primary"
+            disabled={loading}
+        >
+            <option value="">— nicht zugeordnet —</option>
+            {#each kuerzelListe.teachers as k}
+                <option value={k}>{k}</option>
+            {/each}
+        </select>
+
+        <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
+            Ihr Kürzel wird ausschließlich verwendet, um Ihren Stundenplan abzurufen
+            (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
+            KI-Modelle übermittelt und erscheint in keinem Chat, keinem
+            Assistenten-Kontext und keinem Wissensknoten. Sie können es jederzeit
+            entfernen; dann entfällt die Stundenplan-Übernahme.
+        </p>
+
+        {#if kuerzelFehler}
+            <div class="mt-3"><ErrorBanner message={kuerzelFehler} /></div>
+        {:else if kuerzelGespeichert}
+            <div class="mt-3"><SuccessBanner message="Kürzel gespeichert." /></div>
+        {/if}
+
+        <!-- Handabgleich und Status. Der Hauptweg ist der Knopf im Jahresplan —
+             hier steht er, weil hier auch der Zustand hingehört: wann zuletzt
+             abgeglichen wurde und ob der nächtliche Lauf scheitert. -->
+        {#if preferences?.webuntis_kuerzel}
+            <div class="mt-6 pt-4 border-t border-light-ui-3 dark:border-dark-ui-3">
+                <h3 class="text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-3">
+                    Abgleich
+                </h3>
+                <TimetableSyncButton />
+                <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
+                    Ausfälle und Vertretungen werden nachts automatisch übernommen.
+                    Wer von einer kurzfristigen Änderung weiß — etwa einer verlegten
+                    Stunde —, gleicht hier oder im Jahresplan von Hand ab.
+                </p>
+            </div>
+        {/if}
+    </section>
     {/if}
 
     <!-- Stundenraster für alle Gruppen auf einmal. Steht oben, weil es die Einrichtung

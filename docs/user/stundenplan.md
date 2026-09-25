@@ -18,7 +18,7 @@ Tipparbeit abnehmen:
 
 ## Einmal einrichten: Ihr Kürzel
 
-Damit die Plattform weiß, welcher Plan Ihrer ist, tragen Sie im **Profil** unter
+Damit die Plattform weiß, welcher Plan Ihrer ist, tragen Sie unter **Unterricht** bei
 „Stundenplan" Ihr Lehrkraft-Kürzel ein — dasselbe, das im Vertretungsplan steht (z. B. `AK`).
 
 Sie wählen es aus einer Liste; freies Tippen ist nicht nötig und ein Vertipper damit
@@ -137,7 +137,7 @@ Vertretung in die Jahresplanung ein.
 ### Von Hand, wenn Sie es sofort brauchen
 
 Dafür gibt es den Knopf **„Stundenplan"** in der Werkzeugleiste des Jahresplans und
-**„Jetzt abgleichen"** im Profil.
+**„Jetzt abgleichen"** unter *Unterricht*.
 
 Das ist der praktisch wichtigere Weg: An vielen Schulen wird der Vertretungsplan erst
 wenige Minuten vor Unterrichtsbeginn gepflegt, und über den Vormittag kommt Weiteres dazu.

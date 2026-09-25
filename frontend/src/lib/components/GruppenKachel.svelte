@@ -4,7 +4,7 @@
    *
    * ⚠️ **Hier wird nichts angelegt.** Offene Stundenplan-Vorschläge und
    * Schulkonto-Angebote werden **gezählt** und verlinkt — die Anlege-Oberfläche steht
-   * auf `/profile/teaching-groups` und ist dort vollständig. Sie hier zu wiederholen
+   * auf `/teaching` und ist dort vollständig. Sie hier zu wiederholen
    * ergäbe einen dritten Ort, an dem man Gruppen anlegt, und drei Orte heißt: zwei
    * veralten.
    */
@@ -55,7 +55,7 @@
 
   {#if offen}
     <a
-      href="/profile/teaching-groups"
+      href="/teaching"
       class="mt-3 inline-flex items-center gap-0.5 text-sm underline
              text-light-bl dark:text-dark-bl"
     >

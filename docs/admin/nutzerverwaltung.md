@@ -139,7 +139,7 @@ sso:
 ## Unterrichtsgruppen aus dem Schulkonto: das Angebot
 
 Liefert der SSO eine Unterrichtsgruppe, zu der es auf der Plattform noch keine Gruppe
-gibt, **entsteht nichts**. Die Gruppe wird der Lehrkraft unter *Profil → Meine
+gibt, **entsteht nichts**. Die Gruppe wird der Lehrkraft unter *Unterricht → Meine
 Unterrichtsgruppen* als **Angebot** vorgelegt; sie entscheidet:
 
 | Antwort | Was passiert |

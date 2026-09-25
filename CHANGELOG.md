@@ -148,6 +148,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **„Unterricht“ ist eine eigene Seite.** Unterrichtsgruppen, das Kürzel im
+  Stundenplan und der Abgleich standen im Profil; sie stehen jetzt unter *Unterricht* —
+  im Nutzermenü, von der Startseite und von jeder Gruppenseite erreichbar. Alte
+  Lesezeichen werden weitergeleitet.
+- **Das Profil ist aufgeräumt.** Was die Anzeige betrifft — Darstellungsmodus, Umfang
+  der Oberfläche, Kostenanzeige, Chat-Sidebar, Kontext-Suche und neu die Kacheln der
+  Startseite — steht unter einer gemeinsamen Überschrift; Zugangstoken und
+  SSO-Diagnose folgen darunter.
+- **Die Seite quittiert wieder, dass gespeichert wurde** — kurz neben dem geänderten
+  Feld. Seit dem Wegfall des Speichern-Knopfes meldete sie gar nichts mehr.
+
 - **Ein Assistent „für alle Lehrkräfte“ geht jetzt durch die Freigabe.** Er
   erreicht das ganze Kollegium, entstand aber bisher ohne Prüfung und blieb frei
   änderbar. Bestehende Assistenten dieser Reichweite bleiben unberührt.

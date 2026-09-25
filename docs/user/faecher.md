@@ -105,7 +105,7 @@ Gibt es zu einem Fach frühere Gruppen, weist die Fachseite darauf hin.
 ## Neue Gruppen aus dem Schulkonto
 
 Führt Ihre Schule Unterrichtsgruppen auch im Schulkonto — etwa für ein
-Tauschverzeichnis —, tauchen sie unter **Profil → Meine Unterrichtsgruppen** als Angebot
+Tauschverzeichnis —, tauchen sie unter **Unterricht → Meine Unterrichtsgruppen** als Angebot
 auf. Die Plattform legt sie **nicht** von selbst an: Sie kann nicht wissen, ob
 `unterricht.9d.ch` Ihre bestehende Gruppe *Chemie 9D* meint oder eine neue ist. Läge sie
 falsch, stünden zwei Jahrespläne ineinander.

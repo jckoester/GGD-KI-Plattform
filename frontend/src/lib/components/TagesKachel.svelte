@@ -114,7 +114,7 @@
     </p>
     {#if leerFuehrtZurEinrichtung(lage)}
       <a
-        href="/profile/teaching-groups"
+        href="/teaching"
         class="mt-2 inline-flex items-center gap-0.5 text-sm underline
                text-light-bl dark:text-dark-bl"
       >

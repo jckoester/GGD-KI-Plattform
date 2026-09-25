@@ -13,6 +13,7 @@
         Megaphone,
         MessageSquareText,
         Inbox,
+        BookOpen,
     } from "lucide-svelte";
     import { logout } from "$lib/api.js";
     import { oeffneFeedback } from "$lib/stores/feedbackDialog.js";
@@ -200,6 +201,22 @@
 
     <!-- Trenner -->
     <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-0"></div>
+
+    <!-- Unterricht (nur Lehrkräfte) — Gruppen, Stundenplan-Kürzel, Abgleich.
+         ⚠️ Seit dem 25.09.2026 eine eigene Seite (Paket 7, AP6). Sie war bis dahin ein
+         Unterpunkt des Profils und nur von dort erreichbar; wer sie suchte, suchte sie im
+         Menü. Steht direkt über „Profil", weil beides Einstellungen sind — das eine zum
+         Unterricht, das andere zur Person. -->
+    {#if $user?.roles?.includes("teacher")}
+        <a
+            href="/teaching"
+            onclick={onClose}
+            class="flex items-center px-4 py-2 text-sm text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2"
+        >
+            <BookOpen class="w-4 h-4 mr-3" />
+            Unterricht
+        </a>
+    {/if}
 
     <!-- Profile (immer sichtbar) -->
     <a

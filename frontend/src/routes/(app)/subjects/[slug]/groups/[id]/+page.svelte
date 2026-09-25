@@ -63,7 +63,7 @@
       <p class="mt-2 flex items-center gap-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
         <CircleCheck size={13} class="shrink-0 text-light-gr dark:text-dark-gr" />
         Für Schüler:innen freigegeben.
-        <a href="/profile/teaching-groups"
+        <a href="/teaching"
            class="underline hover:text-light-tx dark:hover:text-dark-tx transition-colors">
           Ändern
         </a>
@@ -77,7 +77,7 @@
         <span>
           <b>Nicht für Schüler:innen freigegeben.</b> Sie sehen dieses Fach derzeit nicht —
           weder in ihrer Fachübersicht noch im Chat.
-          <a href="/profile/teaching-groups"
+          <a href="/teaching"
              class="underline hover:no-underline">Unter „Meine Unterrichtsgruppen" freigeben</a>
         </span>
       </div>
