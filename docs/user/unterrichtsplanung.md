@@ -225,10 +225,14 @@ oder per „Mach das rückgängig" im Chat **rückgängig** machen.
 ## Wenn Sie ausfallen
 
 Fortbildung, Krankheit, ein Termin: Im Jahresplan tragen Sie den Ausfall selbst ein —
-über das Menü **⋯** an einer Stunde, Eintrag **„Ich falle aus — ganzer Tag"**. Das
-markiert **alle** Ihre Stunden dieses Tages, über alle Unterrichtsgruppen hinweg; ein
-Grund lässt sich dazuschreiben („Fortbildung"). Einzelne Stunden stellen Sie wie bisher
-über die Kategorie-Auswahl auf *Ausfall*.
+über das Menü **⋯** an einer Stunde, Eintrag **„Ich falle aus …"**. Es öffnet sich ein
+Dialog mit zwei Fragen:
+
+- **Was ist betroffen?** Nur die gerade bearbeitete Gruppe, oder **alle** Ihre Stunden
+  dieses Tages über alle Unterrichtsgruppen hinweg.
+- **Warum?** Ein Grund („Fortbildung") ist freiwillig und erscheint an den Stunden.
+
+Einzelne Stunden stellen Sie wie bisher über die Kategorie-Auswahl auf *Ausfall*.
 
 An der Zeile steht danach, **woher** der Ausfall stammt — aus dem Stundenplan, von Ihnen
 selbst oder vom Assistenten. Das ist keine Kosmetik: Nur Ihre eigenen Einträge können Sie
@@ -256,6 +260,8 @@ haben — auch nach dem Neuladen. War an der Stunde nichts geplant, fragt die Pl
 gar nicht erst.
 
 ### Zurücknehmen
+
+Auch das Zurücknehmen läuft über den Dialog; die Reichweite wählen Sie dort genauso.
 
 ⚠️ Die Rücknahme eines Tages nimmt **alle selbst eingetragenen** Ausfälle dieses Tages
 mit — auch solche, die Sie vorher einzeln für eine Stunde gesetzt hatten. Nach dem
