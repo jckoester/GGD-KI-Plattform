@@ -129,6 +129,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Musterzeile.
 - **Einzelne leere Stunden lassen sich löschen.** Nur ohne Inhalt und nur, wenn sie nicht
   aus dem Wochenmuster kommen — eine Musterstunde entsteht beim nächsten Erzeugen wieder.
+- **„Ich falle aus" fragt in einem Dialog statt in Browser-Abfragen.** Dort lässt sich
+  jetzt wählen, ob nur die bearbeitete Gruppe betroffen ist oder alle Stunden des Tages;
+  der Grund ist mehrzeilig. Bisher war der ganze Tag die einzige Möglichkeit.
 
 ### Behoben
 

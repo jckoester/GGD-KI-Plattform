@@ -282,6 +282,12 @@ html.dark {
     --planner-pruefung-bg:     var(--color-red-50);
     --planner-pruefung-stripe: var(--color-red-200);
     --planner-pruefung-border: var(--color-red-200);
+
+    /* Ausfall: **neutral**, nicht farbig. Anders als Ferien, unterrichtsfreie Tage und
+       Prüfungen ist der Ausfall keine Kategorie mit eigener Bedeutungsfarbe, sondern
+       eine Zeile, die zurücktritt — die Farbe trägt hier das Abzeichen, nicht die
+       Fläche. */
+    --planner-ausfall-stripe: rgba(0, 0, 0, 0.04);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
@@ -297,6 +303,8 @@ html.dark {
     --planner-pruefung-bg:     color-mix(in srgb, var(--color-red-300) 8%, transparent);
     --planner-pruefung-stripe: color-mix(in srgb, var(--color-red-400) 22%, transparent);
     --planner-pruefung-border: color-mix(in srgb, var(--color-red-400) 25%, transparent);
+
+    --planner-ausfall-stripe: rgba(255, 255, 255, 0.06);
 }
 
 .planner-ferien-band {
@@ -316,6 +324,22 @@ html.dark {
    eigene Zeile mit einem Wort darin; diese Klasse liegt auf einer Slot-Zeile mit Thema,
    Einheit und Abzeichen. Eine geerbte Schriftfarbe überschriebe deren Kontrast, der
    oben in `PlannerRow` ausdrücklich auf 8–16:1 eingestellt ist. */
+/* ⚠️ **Bis zum 25.09.2026 stand diese Schraffur als Tailwind-Sonderwert im Markup**
+   (`bg-[repeating-linear-gradient(...)]`, zweimal für hell und dunkel, rund 200 Zeichen
+   in einer Zeile). Sie tat dasselbe wie die drei Bänder hier, entzog sich aber der
+   Palette und war in keiner Datei auffindbar, in der man Planerfarben sucht. Die Optik
+   ist unverändert übernommen: breitere, weichere Streifen als bei den farbigen Bändern —
+   der Ausfall soll zurücktreten, nicht rufen. */
+.planner-ausfall-band {
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent               0px,
+        transparent               4px,
+        var(--planner-ausfall-stripe) 4px,
+        var(--planner-ausfall-stripe) 8px
+    );
+}
+
 .planner-pruefung-band {
     background-color: var(--planner-pruefung-bg);
     background-image: repeating-linear-gradient(

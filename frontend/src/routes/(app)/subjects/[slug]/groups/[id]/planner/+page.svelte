@@ -1,5 +1,7 @@
 <script>
-  import { assistentFrage, eintragFrage, ruecknahmeWarnung } from '$lib/ausfall.js'
+  // `eintragFrage` und `ruecknahmeWarnung` stehen jetzt im Dialog — hier bleibt nur
+  // der Satz, mit dem der Assistent den Fall übernimmt.
+  import { assistentFrage } from '$lib/ausfall.js'
   import { page } from '$app/stores'
   import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
@@ -24,6 +26,7 @@
   import PlannerTable from '$lib/components/planner/PlannerTable.svelte'
   import UnitLegend from '$lib/components/planner/UnitLegend.svelte'
   import UnitDialog from '$lib/components/planner/UnitDialog.svelte'
+  import AusfallDialog from '$lib/components/planner/AusfallDialog.svelte'
   import PatternEditor from '$lib/components/planner/PatternEditor.svelte'
   import ReflowAssistbar from '$lib/components/planner/ReflowAssistbar.svelte'
   import Parkplatz from '$lib/components/planner/Parkplatz.svelte'
@@ -210,11 +213,26 @@
   // auf dem Bildschirm sind; die Rücknahme nimmt auch einzeln gesetzte Ausfälle mit
   // (F4). Beides ist hinnehmbar, solange es angekündigt ist — eine stille Wirkung über
   // mehrere Gruppen hinweg wäre es nicht.
-  async function ausfallGanzerTag(slot) {
-    if (!confirm(eintragFrage('tag'))) return
-    const notiz = prompt('Grund (erscheint an den Stunden, optional):', '') ?? null
+  // `null` heißt geschlossen; sonst `{ modus, datum }`.
+  let ausfallDialog = $state(null)
+
+  function ausfallEintragen(slot) {
+    ausfallDialog = { modus: 'eintragen', datum: slot.date }
+  }
+
+  async function ausfallBestaetigt({ reichweite, notiz }) {
+    const datum = ausfallDialog?.datum
+    const zuruecknehmen = ausfallDialog?.modus === 'zuruecknehmen'
+    // Nur bei `gruppe` ist die Gruppe gemeint; bei `tag` bestimmt der Server die
+    // betroffenen Gruppen aus den Mitgliedschaften.
+    const gid = reichweite === 'gruppe' ? groupId : null
+    ausfallDialog = null
     try {
-      await setzeAusfall({ datum: slot.date, reichweite: 'tag', notiz: notiz || null })
+      if (zuruecknehmen) {
+        await nimmAusfallZurueck({ datum, reichweite, groupId: gid })
+      } else {
+        await setzeAusfall({ datum, reichweite, groupId: gid, notiz })
+      }
       await refreshVomServer()
     } catch (e) {
       error = e.message
@@ -246,14 +264,8 @@
     return ausfallWeg(weg, [slot.id], slot.date)
   }
 
-  async function ausfallZurueck(slot) {
-    if (!confirm(`${ruecknahmeWarnung('tag')}\n\nFortfahren?`)) return
-    try {
-      await nimmAusfallZurueck({ datum: slot.date, reichweite: 'tag' })
-      await refreshVomServer()
-    } catch (e) {
-      error = e.message
-    }
+  function ausfallZurueck(slot) {
+    ausfallDialog = { modus: 'zuruecknehmen', datum: slot.date }
   }
 
   /**
@@ -597,7 +609,7 @@
       onSwapSlots={handleSwapSlots}
       onUnpark={einplanen}
       onEditLesson={handleEditLesson}
-      onAusfallTag={ausfallGanzerTag}
+      onAusfallTag={ausfallEintragen}
       onAusfallZurueck={ausfallZurueck}
       onAusfallWeg={ausfallWegZeile}
       onReview={handleReview}
@@ -609,6 +621,15 @@
 {/if}
 
 <!-- Modals -->
+<AusfallDialog
+  open={!!ausfallDialog}
+  modus={ausfallDialog?.modus ?? 'eintragen'}
+  datum={ausfallDialog?.datum ?? null}
+  gruppenname={group?.name ?? ''}
+  onConfirm={ausfallBestaetigt}
+  onClose={() => { ausfallDialog = null }}
+/>
+
 <UnitDialog
   open={showUnitDialog}
   {groupId}

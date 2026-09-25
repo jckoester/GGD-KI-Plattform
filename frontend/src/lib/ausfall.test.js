@@ -110,11 +110,17 @@ describe("Planungsseite: Auffrischen nach einer Server-Aktion", () => {
     it("beide Ausfall-Wege frischen auf", () => {
         // Ohne das bliebe die Zeile stehen, wie sie war — und die Lehrkraft hielte den
         // Eintrag für gescheitert.
-        for (const fn of ["ausfallGanzerTag", "ausfallZurueck"]) {
-            const block = SEITE.slice(SEITE.indexOf(`async function ${fn}`))
-            expect(block.slice(0, block.indexOf("\n  }")), fn)
-                .toContain("refreshVomServer()")
-        }
+        //
+        // ⚠️ **Seit dem 25.09.2026 ist es *eine* Funktion.** Eintragen und Zurücknehmen
+        // laufen über denselben Dialog und damit über `ausfallBestaetigt`; die früheren
+        // `ausfallGanzerTag`/`ausfallZurueck` öffnen ihn nur noch. Geprüft wird deshalb,
+        // dass beide Aufrufe **in** dieser einen Funktion stehen und sie auffrischt —
+        // sonst ginge die Zusage beim Umbau still verloren.
+        const block = SEITE.slice(SEITE.indexOf("async function ausfallBestaetigt"))
+        const rumpf = block.slice(0, block.indexOf("\n  }"))
+        expect(rumpf).toContain("nimmAusfallZurueck(")
+        expect(rumpf).toContain("setzeAusfall(")
+        expect(rumpf).toContain("refreshVomServer()")
     })
 })
 
@@ -242,5 +248,50 @@ describe("Planungsseite: der Hinweis steht an der Zeile", () => {
         // Fehler.
         const code = rumpf.split("\n").filter((z) => !z.trim().startsWith("//")).join("\n")
         expect(code).not.toMatch(/if \(!slot\?\.ue_node_id\) return/)
+    })
+})
+
+describe("Eintragen und Zurücknehmen laufen über einen Dialog", () => {
+    const SEITE = readFileSync(
+        join(SRC, "routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte"),
+        "utf8",
+    )
+    const DIALOG = readFileSync(
+        join(SRC, "lib/components/planner/AusfallDialog.svelte"),
+        "utf8",
+    )
+
+    /** Kommentarzeilen raus — sonst prüft der Wächter seine eigene Begründung mit. */
+    const ohneKommentare = (text) =>
+        text.split("\n").filter((z) => !/^\s*(\/\/|\*|\/\*)/.test(z)).join("\n")
+
+    it("⚠️ die Planungsseite fragt nicht mehr über `confirm` und `prompt`", () => {
+        // `prompt` ist keine Eingabe für einen Grund: einzeilig, ungestaltet, im
+        // Dunkelmodus fremd. Die Rückfrage selbst bleibt nötig — sie trifft Gruppen, die
+        // nicht auf dem Bildschirm stehen.
+        const quelle = ohneKommentare(SEITE)
+        expect(quelle).not.toMatch(/\bconfirm\(/)
+        expect(quelle).not.toMatch(/\bprompt\(/)
+    })
+
+    it("⚠️ der Dialog lässt die Reichweite wählen", () => {
+        // Jan, 24.09.2026: „Wenn eine Lehrkraft Ausfall selbst einträgt, muss sie die
+        // Wahl haben, ob das nur die aktuell bearbeitete Gruppe betrifft oder den ganzen
+        // Tag." Über das Zeilenmenü gab es bisher nur den ganzen Tag.
+        expect(DIALOG).toContain('value="gruppe"')
+        expect(DIALOG).toContain('value="tag"')
+    })
+
+    it("er nimmt die geprüften Texte aus `ausfall.js`, statt neue zu erfinden", () => {
+        expect(DIALOG).toContain("eintragFrage")
+        expect(DIALOG).toContain("ruecknahmeWarnung")
+    })
+
+    it("und ein Grundfeld gibt es nur beim Eintragen", () => {
+        // Beim Zurücknehmen gibt es nichts zu begründen — dort steht stattdessen die
+        // Warnung, dass auch einzeln Gesetztes mitgeht.
+        const feld = DIALOG.indexOf('id="ausfall-notiz"')
+        expect(feld).toBeGreaterThan(0)
+        expect(DIALOG.slice(0, feld)).toContain("{#if !zuruecknehmen}")
     })
 })

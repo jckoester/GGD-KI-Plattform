@@ -65,3 +65,33 @@ describe("Prüfungsstunden im Jahresplan", () => {
         }
     })
 })
+
+describe("Ausfallstunden im Jahresplan", () => {
+    it("⚠️ tragen die Schraffur als Klasse, nicht als Sonderwert im Markup", () => {
+        // Bis zum 25.09.2026 stand hier ein Tailwind-Sonderwert
+        // (`bg-[repeating-linear-gradient(...)]`), zweimal für hell und dunkel, rund 200
+        // Zeichen in einer Zeile. Er tat dasselbe wie die Band-Klassen, entzog sich aber
+        // der Palette und war dort nicht auffindbar, wo man Planerfarben sucht.
+        expect(ZEILE).toContain("planner-ausfall-band")
+        expect(ZEILE, "Die Schraffur gehört in die Palette, nicht ins Markup")
+            .not.toContain("repeating-linear-gradient")
+    })
+
+    it("die Klasse ist definiert und schraffiert wirklich", () => {
+        expect(CSS).toContain(".planner-ausfall-band {")
+        const block = CSS.slice(CSS.indexOf(".planner-ausfall-band {"))
+        expect(block.slice(0, block.indexOf("}"))).toContain("repeating-linear-gradient")
+    })
+
+    it("hat helle und dunkle Werte", () => {
+        // Dieselbe Falle wie oben: Der Block, nicht irgendein Vorkommen des Namens.
+        const dunkelStart = CSS.indexOf("\n.dark {")
+        expect(dunkelStart, "Der Dunkelmodus-Block wurde nicht gefunden").toBeGreaterThan(0)
+        const hell = CSS.slice(0, dunkelStart)
+        const dunkel = CSS.slice(dunkelStart, CSS.indexOf("}", dunkelStart))
+        expect(hell, "--planner-ausfall-stripe fehlt im Hellmodus")
+            .toContain("--planner-ausfall-stripe:")
+        expect(dunkel, "--planner-ausfall-stripe fehlt im Dunkelmodus")
+            .toContain("--planner-ausfall-stripe:")
+    })
+})

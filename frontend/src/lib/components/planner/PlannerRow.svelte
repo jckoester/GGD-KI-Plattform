@@ -140,7 +140,7 @@
 
   const rowExtra = $derived(
     slot.kategorie === 'ausfall'
-      ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
+      ? `${dim('opacity-60')} planner-ausfall-band`
       : slot.kategorie === 'pruefung'
         ? 'planner-pruefung-band'
         : slot.kategorie === 'puffer'
@@ -466,14 +466,14 @@
               onclick={() => { onAusfallZurueck?.(slot); menuOpen = false }}
               class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
             >
-              Ausfall zurücknehmen
+              Ausfall zurücknehmen …
             </button>
           {:else}
             <button
               onclick={() => { onAusfallTag?.(slot); menuOpen = false }}
               class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
             >
-              Ich falle aus — ganzer Tag
+              Ich falle aus …
             </button>
           {/if}
           <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
