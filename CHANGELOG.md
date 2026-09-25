@@ -49,6 +49,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Die Unterrichtsgruppe steht an den Chats.** In der Historie zeigt eine Marke neben
+  dem Titel, zu welcher Gruppe ein Chat gehört; in der Seitenleiste nennt sie der
+  Tooltip. Vier Chats „Sinusfunktionen verstehen“ ließen sich vorher nicht
+  auseinanderhalten. Wer eine kürzere Form möchte, vergibt der Gruppe einen
+  Anzeigenamen. Schüler:innen sehen die Marke nicht — für sie ist die Gruppe das Fach,
+  und das zeigt schon das farbige Symbol.
+
 - **Lehrkräfte pflegen ihre eigenen Assistenten vollständig selbst.** Wer einen
   Assistenten für sich, eine Unterrichtsgruppe, eine Fachschaft oder eine AG anlegt,
   kann ihn jederzeit ändern, **abschalten** und löschen — bisher ging nach dem Anlegen

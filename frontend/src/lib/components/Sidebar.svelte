@@ -31,6 +31,8 @@
     import { zeigtEintrag, naechsteStufen, setzeStufe } from '$lib/stores/uiLevel.js';
     import { page } from "$app/stores";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups } from "$lib/stores/myGroups.js";
+    import { gruppenMarke, chatTooltip } from "$lib/gruppenmarke.js";
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js"
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
@@ -574,10 +576,16 @@
                                                     title={conv.assistant_name}
                                                 />
                                             {/if}
+                                            <!-- Die Unterrichtsgruppe steht hier nur im
+                                                 Tooltip: Titel, Datum und Menü teilen
+                                                 sich bereits eine schmale Zeile. In der
+                                                 History, wo Platz ist, steht sie sichtbar. -->
                                             <span
                                                 class="truncate"
-                                                title={conv.title ??
-                                                    "Unbenannter Chat"}
+                                                title={chatTooltip(
+                                                    conv.title,
+                                                    gruppenMarke(conv.group_id, $myGroups, { istLehrkraft }),
+                                                )}
                                             >
                                                 {conv.title ?? "Unbenannter Chat"}
                                             </span>
