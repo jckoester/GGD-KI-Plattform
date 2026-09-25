@@ -41,6 +41,18 @@ Cron-Container (separat):
 | `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
+| `api/` | Übrige Endpunkt-Module neben `api/admin/`: Gruppen, Fächer, Bildarten, Zugangstoken, Leitplanken, PII-Prüfung, Krisen-Freigabe (`review.py`), Archiv |
+| `artifacts/` | Artefaktbibliothek (Phase 18): Speicher (`store.py`), Übernahme aus dem Chat (`promote.py`, `uebernahme.py`), GeoGebra-Export, Mengengrenzen |
+| `core/` | Querschnitt ohne eigene Fachlichkeit: Client-IP, Hintergrundaufgaben, Pfade, Produktions-Selbstprüfung |
+| `crisis/` | Krisenerkennung (ADR-008): Schlüsselwort-Erkennung (`detector.py`), Benachrichtigung, Erinnerungen an unerledigte Fälle |
+| `export/` | Ausgabeformate: PDF (weasyprint), DOCX/ODT (Pandoc), Vorlagen, Prärendern von Diagrammen |
+| `mail/` | SMTP-Versand — einzige Stelle, die Mails verschickt |
+| `models/` | Platzhalter-Paket ohne Inhalt; die SQLAlchemy-Modelle liegen in `db/` |
+| `pedagogy/` | Pädagogische Leitplanken (ADR-008 Teil 1+2): `pedagogy.yaml` laden, Präambeln und Lernverhalten in den System-Prompt komponieren |
+| `pii/` | Datensparsamkeit-Gate (Phase 14): lokale NER + Muster, ohne Netzaufruf |
+| `ratelimit/` | Drosselung: Regeln aus `rate_limits.yaml`, Zähler, FastAPI-Abhängigkeit |
+| `render/` | Server-Rendering (Phase 17): CircuiTikZ/MathJax über den Node-Sidecar, Plot-Auswertung, Cache |
+| `ui/` | Darstellungsstufen: `ui_levels.yaml` laden und ausliefern — was die Oberfläche zeigt, nicht was sie darf |
 
 ## Privacy-Invariante
 
@@ -62,13 +74,12 @@ Eine Verletzung dieser Invariante ist ein kritischer Datenschutz-Bug.
 
 | Tabelle | Primärschlüssel | Enthält |
 |---------|----------------|---------|
-| `users` | `pseudonym` (str) | Rolle, Jahrgang, letzter Login |
+| `pseudonym_audit` | `pseudonym` | Rolle(n), Jahrgang, letzter Login, De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel. ⚠️ Eine Tabelle `users` gibt es nicht — hier stand sie bis zum 25.09.2026 |
 | `conversations` | UUID | `pseudonym`, Modell, Assistent-Ref, Titel, Kostensum |
 | `messages` | UUID | `conversation_id`, Rolle, Inhalt (Text/JSON), Kosten |
 | `assistants` | int | Name, System-Prompt, Modell, Status, Audience, Scope |
 | `exchange_rates` | id | EUR→USD-Kurs, Quelle, Datum |
 | `jwt_revocations` | `jti` | Revozierte Token-IDs |
-| `pseudonym_audit` | `pseudonym` | De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel |
 | `site_texts` | `key` | Verwaltete Texte (impressum, datenschutz, regeln) |
 | `group_source_classes` | (group_id, class_group_id) | Aus welchen Klassen sich eine Unterrichtsgruppe speist — Herkunft, nicht Mitgliedschaft |
 | `group_join_codes` | UUID | Beitrittscode je Gruppe: Code, Gültigkeit, Widerruf, ausgebendes Pseudonym |

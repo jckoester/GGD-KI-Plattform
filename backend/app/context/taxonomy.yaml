@@ -262,6 +262,35 @@ categories:
         scope_anchor: true
         embedding: true
         embedding_enrichment: ["metadata.breadcrumb"]
+        # ⚠️ **Vollständig, nicht nur `std`** (Entscheidung Jan, 25.09.2026). Bis dahin
+        # hatte `kapitel` gar kein Feldschema: `app/context/metadata.py` prüfte hier
+        # nichts, obwohl `std` die Stundenbilanz der Jahresplanung trägt — eine
+        # Zeichenkette statt einer Zahl brach am 24.09.2026 die ganze Ansicht (Alembic
+        # `0072`). Nur `std` aufzunehmen hätte dem Knoten-Editor ein Formular mit genau
+        # einem Feld gegeben, während die drei anderen ungeregelt danebenstünden.
+        felder:
+          std:
+            typ: int
+            min: 0
+            label: "Stunden (Soll)"
+            hinweis: >-
+              Wie viele Unterrichtsstunden das Kapitel vorsieht. Grundlage der
+              Stundenbilanz im Jahresplan.
+          reihenfolge:
+            typ: int
+            min: 0
+            label: "Reihenfolge"
+            hinweis: "Position im Curriculum — kleinere Zahl steht weiter vorn."
+          einleitung:
+            typ: text
+            label: "Einleitung"
+            hinweis: "Der einleitende Text des Kapitels aus dem Bildungsplan."
+          breadcrumb:
+            typ: text
+            label: "Pfad im Bildungsplan"
+            hinweis: >-
+              Der Weg zum Kapitel, etwa „Chemie › Klasse 9/10 › Stoffe und ihre
+              Eigenschaften". Fließt in das Embedding ein.
       - key: lernsequenz
         label_de: "Lernsequenz"
         icon: Waypoints

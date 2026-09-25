@@ -148,6 +148,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Kapitel im Wissensbereich haben ein Formular.** Stundenzahl, Reihenfolge,
+  Einleitung und Pfad im Bildungsplan werden jetzt geprüft, statt beliebig gefüllt zu
+  werden — eine Stundenzahl als Text hatte im September die Jahresübersicht
+  lahmgelegt.
+
 - **„Unterricht“ ist eine eigene Seite.** Unterrichtsgruppen, das Kürzel im
   Stundenplan und der Abgleich standen im Profil; sie stehen jetzt unter *Unterricht* —
   im Nutzermenü, von der Startseite und von jeder Gruppenseite erreichbar. Alte
@@ -193,6 +198,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Dokumentation
 
+- **Drei Aufzählungen sind vollständig — und bleiben es.** Die Betriebsdoku nennt jetzt
+  alle vierzehn nächtlichen Läufe (vorher fünf) und alle sechzehn Datenkategorien, die
+  die Kontolöschung anfasst (vorher fünf); die Entwicklerdoku kennt alle Backend-Module
+  (vorher zwölf von 26). Die Löschung selbst geschah immer vollständig — unvollständig
+  war ihre Beschreibung. Tests halten die drei Listen künftig gegen die Wirklichkeit.
 - Für Administrator:innen: Wie SSO- und Stundenplan-Gruppen zusammenfinden, warum nichts
   automatisch angelegt wird und was beim Scharfschalten der
   Unterrichtsgruppen-Synchronisation zu erwarten ist. Anwender-Doku um das Angebot und

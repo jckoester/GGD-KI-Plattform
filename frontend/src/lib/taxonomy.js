@@ -236,6 +236,30 @@ export const COLLECTIONS = {
 // Metadaten-Feldschema je Typ — dieselbe Beschreibung, aus der das Backend prüft
 // (app/context/metadata.py). Der Editor baut sein Formular daraus.
 export const FELD_SCHEMATA = {
+  "kapitel": {
+    "std": {
+      "typ": "int",
+      "min": 0,
+      "label": "Stunden (Soll)",
+      "hinweis": "Wie viele Unterrichtsstunden das Kapitel vorsieht. Grundlage der Stundenbilanz im Jahresplan."
+    },
+    "reihenfolge": {
+      "typ": "int",
+      "min": 0,
+      "label": "Reihenfolge",
+      "hinweis": "Position im Curriculum — kleinere Zahl steht weiter vorn."
+    },
+    "einleitung": {
+      "typ": "text",
+      "label": "Einleitung",
+      "hinweis": "Der einleitende Text des Kapitels aus dem Bildungsplan."
+    },
+    "breadcrumb": {
+      "typ": "text",
+      "label": "Pfad im Bildungsplan",
+      "hinweis": "Der Weg zum Kapitel, etwa „Chemie › Klasse 9/10 › Stoffe und ihre Eigenschaften\". Fließt in das Embedding ein."
+    }
+  },
   "methode": {
     "ablauf": {
       "typ": "text",
