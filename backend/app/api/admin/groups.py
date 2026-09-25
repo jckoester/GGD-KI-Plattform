@@ -84,12 +84,44 @@ class MemberListResponse(BaseModel):
 @router.get("", response_model=GroupListResponse)
 async def list_groups(
     type_filter: Optional[str] = None,
+    ohne_lehrkraft: bool = False,
     _: JwtPayload = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db),
 ) -> GroupListResponse:
-    """Liste aller Gruppen mit optionalem Typ-Filter."""
+    """Liste aller Gruppen mit optionalem Typ-Filter.
+
+    `ohne_lehrkraft=true` sucht **verwaiste Unterrichtsgruppen** — solche, in denen
+    niemand mehr `role_in_group = 'teacher'` ist. Ihre Jahresübersicht ist dann für
+    niemanden erreichbar (`require_group_teacher` → 403), und in keiner Gruppenliste
+    taucht sie auf: Die Lehrkraft-Ansicht zeigt nur eigene Gruppen.
+
+    ⚠️ **Das entsteht im laufenden Betrieb**, nicht nur beim Ausprobieren. Zwei Wege sind
+    gemessen: Der Immediate Mirror entfernt die Mitgliedschaft, sobald die SSO-Gruppe
+    nicht mehr im Token steht (`_spiegle_mitgliedschaften`), und der 90-Tage-Löschlauf
+    nimmt sie mit dem Konto — bei einer Lehrkraft, die die Schule verlässt, der
+    Normalfall. Die Gruppe bleibt mit Jahresplan, Stundenentwürfen und Konversationen
+    stehen.
+
+    Der Filter gilt **nur für Unterrichtsgruppen**: Eine Klasse ohne Lehrkraft ist der
+    Normalfall, eine Fachschaft hat ohnehin nur welche. Ein Treffer ist deshalb immer ein
+    Befund, kein Rauschen.
+
+    Reparieren lässt er sich mit `POST /admin/groups/{id}/members` (Pseudonym aus dem
+    Audit-Log); beschrieben in `docs/admin/nutzerverwaltung.md`.
+    """
     stmt = select(Group).order_by(Group.type, Group.name)
-    
+
+    if ohne_lehrkraft:
+        hat_lehrkraft = (
+            select(GroupMembership.group_id)
+            .where(
+                GroupMembership.group_id == Group.id,
+                GroupMembership.role_in_group == "teacher",
+            )
+            .exists()
+        )
+        stmt = stmt.where(Group.type == "teaching_group", ~hat_lehrkraft)
+
     if type_filter is not None:
         if type_filter not in VALID_GROUP_TYPES:
             raise HTTPException(

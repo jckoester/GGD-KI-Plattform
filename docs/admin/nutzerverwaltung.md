@@ -237,6 +237,54 @@ Das Einlösen ist gedrosselt (`group_join` in `rate_limits.yaml`, Vorgabe 10 Anf
 5 Minuten und Person). **Das Lesen des Codes ist es nicht** — sonst sperrte sich eine
 Lehrkraft aus ihrer eigenen Gruppenansicht aus.
 
+## Verwaiste Unterrichtsgruppen finden
+
+Eine Unterrichtsgruppe **ohne Lehrkraft** ist für niemanden mehr erreichbar: Die
+Jahresübersicht verlangt eine Lehrkraft-Mitgliedschaft, und die Gruppenliste einer
+Lehrkraft zeigt nur eigene Gruppen. Jahresplan, Stundenentwürfe und Konversationen
+bleiben trotzdem stehen.
+
+**Das entsteht im laufenden Betrieb**, nicht nur beim Ausprobieren — zwei Wege:
+
+- Der **Immediate Mirror** entfernt die Mitgliedschaft, sobald die Schulkonto-Gruppe
+  nicht mehr im Token steht.
+- Der **90-Tage-Löschlauf** nimmt sie mitsamt dem Konto. Bei einer Lehrkraft, die die
+  Schule verlässt, ist das der Normalfall.
+
+```bash
+curl -s -b "session=$TOKEN" \
+  "https://.../api/admin/groups?ohne_lehrkraft=true" | jq '.total, .items[].name'
+```
+
+Der Filter gilt nur für Unterrichtsgruppen: Eine Klasse ohne Lehrkraft ist der
+Normalfall, eine Fachschaft hat ohnehin nur welche. Ein Treffer ist deshalb immer ein
+Befund. Übernehmen kann die Gruppe dann eine Lehrkraft, die Sie als Mitglied eintragen
+(siehe unten) — oder Sie lassen sie stehen, bis klar ist, ob noch jemand den Jahresplan
+braucht.
+
+## Die Gruppen-API für Reparaturen
+
+Unter `/admin/groups` liegen acht Endpunkte (auflisten, anlegen, ansehen, ändern,
+löschen, Mitglieder lesen, Mitglied eintragen, Mitglied entfernen). Sie haben **bewusst
+keine Oberfläche**: Mitgliederpflege von Hand ist im Regelbetrieb ausgeschlossen, weil
+die Plattform keine Klarnamen zeigt — eine Liste aus Pseudonymen wäre nicht bedienbar
+(ADR-003, Ebene 2).
+
+Für die **Reparatur** ist das etwas anderes. Dort liegt genau ein Pseudonym vor, und es
+kommt aus dem Audit-Log: Sie wissen, wen Sie eintragen wollen, und Sie tragen genau den
+ein.
+
+```bash
+# Lehrkraft einer verwaisten Gruppe zuordnen
+curl -s -X POST -b "session=$TOKEN" -H 'Content-Type: application/json' \
+  -d '{"pseudonym": "<aus dem Audit-Log>", "role_in_group": "teacher"}' \
+  "https://.../api/admin/groups/<id>/members"
+```
+
+Die so entstandene Mitgliedschaft trägt `herkunft = 'manuell'` und wird von **keinem**
+Aufräumlauf entfernt — auch nicht von der Rücknahme einer Beitrittscode-Runde. Das ist
+Absicht: Was ein Mensch entschieden hat, fällt nicht von allein.
+
 ## Unterrichtsgruppen manuell anlegen
 
 Lehrkräfte können Unterrichtsgruppen auch manuell anlegen, wenn der SSO-Provider

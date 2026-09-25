@@ -26,8 +26,20 @@ def _gruppe(**kwargs):
     return SimpleNamespace(**vorgabe)
 
 
+def _aktuell(gruppe, beleg=frozenset(), *, mit_klasse=True):
+    """Kurzform — `mit_klasse=False` heißt Kurs ohne Klassenverband (Kursstufe)."""
+    return ist_aktuell(
+        gruppe, set(beleg), SCHULJAHR, {gruppe.id} if mit_klasse else set()
+    )
+
+
 def test_gruppe_mit_stunden_im_laufenden_jahr_gilt_als_aktuell():
-    assert ist_aktuell(_gruppe(created_at=FRUEHER), {1}, SCHULJAHR)
+    assert _aktuell(_gruppe(created_at=FRUEHER), {1})
+
+
+def test_kurs_ohne_klassenverband_gilt_als_aktuell():
+    """Kursstufe und Stundenplangruppen hängen an keinem Schuljahr — siehe `ist_aktuell`."""
+    assert _aktuell(_gruppe(created_at=FRUEHER), mit_klasse=False)
 
 
 def test_gruppe_aus_dem_vorjahr_ohne_beleg_gilt_nicht_als_aktuell():
@@ -36,22 +48,20 @@ def test_gruppe_aus_dem_vorjahr_ohne_beleg_gilt_nicht_als_aktuell():
     Eine Lehrkraft sammelt über Jahre Gruppen an. Eine Meldung, die sie alle nennt,
     sagt nichts über den einen Kurs, der gerade ausgelaufen ist.
     """
-    assert not ist_aktuell(_gruppe(created_at=FRUEHER), set(), SCHULJAHR)
+    assert not _aktuell(_gruppe(created_at=FRUEHER))
 
 
 def test_frisch_angelegte_gruppe_gilt_als_aktuell():
     """Sie hat noch nichts, woran man sie erkennen könnte — und ist trotzdem neu."""
-    assert ist_aktuell(_gruppe(created_at=HEUTE), set(), SCHULJAHR)
+    assert _aktuell(_gruppe(created_at=HEUTE))
 
 
 def test_gruppe_aus_dem_schulkonto_gilt_immer_als_aktuell():
     """Steht sie im Token, gibt es sie — der Immediate Mirror räumt den Rest ab."""
-    assert ist_aktuell(
-        _gruppe(sso_group_id="unterricht.9a.m", created_at=FRUEHER), set(), SCHULJAHR
-    )
+    assert _aktuell(_gruppe(sso_group_id="unterricht.9a.m", created_at=FRUEHER))
 
 
 @pytest.mark.parametrize("typ", ["school_class", "subject_department", "activity_group"])
 def test_nur_unterrichtsgruppen_werden_beurteilt(typ):
     """Klassen und Fachschaften kennen kein Schuljahresende in diesem Sinne."""
-    assert ist_aktuell(_gruppe(type=typ, created_at=FRUEHER), set(), SCHULJAHR)
+    assert _aktuell(_gruppe(type=typ, created_at=FRUEHER))

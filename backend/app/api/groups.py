@@ -21,7 +21,11 @@ from app.db.models import (
     Subject,
     TeacherGroupExclusion,
 )
-from app.groups.aktualitaet import gruppen_mit_beleg, ist_aktuell
+from app.groups.aktualitaet import (
+    gruppen_mit_beleg,
+    gruppen_mit_quellklasse,
+    ist_aktuell,
+)
 from app.db.session import get_db
 from app.planning.calendar import SchoolYearConfig, load_school_year
 
@@ -140,10 +144,10 @@ async def list_my_groups(
     gruppen = list(result.scalars().all())
 
     cfg = load_school_year()
-    beleg = await gruppen_mit_beleg(
-        db, [g.id for g in gruppen if g.type == "teaching_group"], cfg
-    )
-    aktualitaet = {g.id: ist_aktuell(g, beleg, cfg) for g in gruppen}
+    unterricht_ids = [g.id for g in gruppen if g.type == "teaching_group"]
+    beleg = await gruppen_mit_beleg(db, unterricht_ids, cfg)
+    quellklassen = await gruppen_mit_quellklasse(db, unterricht_ids)
+    aktualitaet = {g.id: ist_aktuell(g, beleg, cfg, quellklassen) for g in gruppen}
     # Nur für die früheren nachschlagen — für die aktuellen sagt die Jahreszahl nichts.
     jahre = await letztes_schuljahr(
         db, [g.id for g in gruppen if not aktualitaet[g.id]]

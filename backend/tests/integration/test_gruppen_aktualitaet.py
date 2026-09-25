@@ -22,7 +22,14 @@ JAHR = load_school_year()
 
 @pytest_asyncio.fixture
 async def welt(async_engine):
-    """Fünf Gruppen, in allen bin ich Lehrkraft — sie unterscheiden sich nur im Beleg."""
+    """Sechs Gruppen, in allen bin ich Lehrkraft — sie unterscheiden sich nur im Beleg.
+
+    ⚠️ **Alle bis auf eine hängen an einer Quellklasse.** Seit dem 25.09.2026 ist eine
+    Unterrichtsgruppe **ohne** Klassenverband immer aktuell — sie ist an kein Schuljahr
+    gebunden (Kursstufe). Ohne die Klasse hier prüfte der Beleg-Teil dieses Tests nichts
+    mehr: Jede Gruppe wäre schon deshalb aktuell. Die eine ohne Klasse (`ohne_klasse`)
+    prüft genau diese neue Regel.
+    """
     factory = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
     daten = {}
     async with factory() as s:
@@ -35,12 +42,21 @@ async def welt(async_engine):
         # `created_at` bewusst vor dem Schuljahresbeginn: Sonst wären alle schon deshalb
         # aktuell, und die beiden Belege blieben ungeprüft.
         vorjahr = JAHR.beginn - timedelta(days=30)
+
+        res = await s.execute(text(
+            "INSERT INTO groups (name, slug, type, created_at) "
+            "VALUES ('AP8 Klasse', 'ap8-klasse', 'school_class', :ts) RETURNING id"
+        ), {"ts": vorjahr})
+        klasse = res.scalar_one()
+        daten["klasse"] = klasse
+
         for kuerzel, sso in (
             ("mit_stunden", None),
             ("mit_planung", None),
             ("ohne_beleg", None),
             ("aus_dem_sso", "unterricht.ap8-ks"),
             ("frisch", None),
+            ("ohne_klasse", None),
         ):
             res = await s.execute(text(
                 "INSERT INTO groups (name, slug, type, subject_id, sso_group_id, created_at) "
@@ -51,6 +67,11 @@ async def welt(async_engine):
             await s.execute(insert(GroupMembership).values(
                 group_id=daten[kuerzel], pseudonym=TEACHER1_PSEUDO, role_in_group="teacher"
             ))
+            if kuerzel != "ohne_klasse":
+                await s.execute(text(
+                    "INSERT INTO group_source_classes (group_id, class_group_id) "
+                    "VALUES (:g, :k)"
+                ), {"g": daten[kuerzel], "k": klasse})
 
         s.add(LessonSlot(
             group_id=daten["mit_stunden"], date=JAHR.beginn + timedelta(days=1),
@@ -74,7 +95,8 @@ async def welt(async_engine):
 
     async with factory() as s:
         gids = [daten[k] for k in
-                ("mit_stunden", "mit_planung", "ohne_beleg", "aus_dem_sso", "frisch")]
+                ("mit_stunden", "mit_planung", "ohne_beleg", "aus_dem_sso", "frisch",
+                 "ohne_klasse", "klasse")]
         await s.execute(delete(LessonSlot).where(LessonSlot.group_id.in_(gids)))
         await s.execute(delete(ContextNode).where(
             ContextNode.write_scope_group_id.in_(gids)))
@@ -107,6 +129,20 @@ async def test_beide_belege_zaehlen(test_client, auth_headers, welt):
 
 async def test_stunden_aus_dem_vorjahr_zaehlen_nicht(test_client, auth_headers, welt):
     aktuell = await _meine(test_client, auth_headers)
+    assert aktuell["AP8 ohne_beleg"] is False
+
+
+async def test_kurs_ohne_klassenverband_bleibt_aktuell(test_client, auth_headers, welt):
+    """⚠️ **Der Fund vom 23.09.2026, behoben am 25.09.** Eine Kursstufengruppe aus dem
+    Stundenplan hat keine Quellklasse und kein `sso_group_id`. Bis dahin fiel sie auf das
+    Anlagedatum zurück — im zweiten Schuljahr fand die Lehrkraft ihren laufenden Kurs im
+    Archiv, und der Stundenplan-Hinweis übersprang ihn, weil der auf „aktuell" filtert.
+
+    Dieselbe Gruppe **mit** Klasse ist „AP8 ohne_beleg" und gilt als früher — die beiden
+    Zeilen zusammen zeigen, dass hier die Klasse entscheidet und nicht der Zufall.
+    """
+    aktuell = await _meine(test_client, auth_headers)
+    assert aktuell["AP8 ohne_klasse"] is True
     assert aktuell["AP8 ohne_beleg"] is False
 
 

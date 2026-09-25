@@ -142,6 +142,19 @@ def _gruppe(**kwargs):
     return Group(**daten)
 
 
+def _aktuell(gruppe, beleg=frozenset(), *, mit_klasse=True):
+    """Kurzform für die Tests.
+
+    `mit_klasse=False` heißt: Die Gruppe hängt an keinem Klassenverband — ein
+    Kursstufenkurs oder eine Gruppe aus dem Stundenplan. Genau diese Unterscheidung
+    entscheidet seit dem 25.09.2026 über die Aktualität, deshalb steht sie in jedem
+    Aufruf ausdrücklich da.
+    """
+    return ist_aktuell(
+        gruppe, set(beleg), JAHR, {gruppe.id} if mit_klasse else set()
+    )
+
+
 def test_gruppe_aus_dem_schulkonto_bleibt_ohne_jeden_beleg_aktuell():
     """Der Wächter über die Entscheidung aus §6a des Gruppenübersicht-Plans.
 
@@ -151,29 +164,51 @@ def test_gruppe_aus_dem_schulkonto_bleibt_ohne_jeden_beleg_aktuell():
     Jahresplan im neuen Jahr hat — und auch keine bekommen kann, solange der Stundenplan
     nicht veröffentlicht ist.
     """
+    # ⚠️ **Mit Klasse geprüft** — sonst spräche schon die fehlende Quellklasse für
+    # „aktuell“ und die SSO-Zeile bliebe ungeprüft. Genau so entsteht der Fall in
+    # `angebote.ordne_zu`: eine von Hand angelegte Gruppe (Klasse × Fach), die später
+    # einem Schulkonto-Angebot zugeordnet wurde.
     kurs = _gruppe(sso_group_id="unterricht.ch2-ks-abi28")
-    assert ist_aktuell(kurs, set(), JAHR) is True
+    assert _aktuell(kurs, mit_klasse=True) is True
+
+
+def test_kurs_ohne_klassenverband_gilt_als_aktuell():
+    """⚠️ **Der Fall, der dieses Arbeitspaket ausgelöst hat** (Todo vom 23.09.2026).
+
+    Eine Kursstufengruppe aus dem Stundenplan hat weder Quellklasse noch
+    `sso_group_id`. Bis zum 25.09.2026 fiel sie deshalb auf das Anlagedatum zurück und
+    galt im zweiten Schuljahr als ausgelaufen, bis der neue Stundenplan Stunden lieferte
+    — die Lehrkraft fand ihren laufenden Kurs im Archiv und bekam zu ihm auch keinen
+    Stundenplan-Hinweis mehr (der filtert auf „aktuell").
+
+    Wer an keinen Klassenverband gebunden ist, ist an kein Schuljahr gebunden.
+    """
+    kurs = _gruppe(name="Chemie 2 (KS1)", slug="ch2-ks1")
+    assert _aktuell(kurs, mit_klasse=False) is True
+    # Gegenprobe: **mit** Klasse ist dieselbe Gruppe „früher" — sonst prüfte der Test
+    # nur, dass irgendetwas True liefert.
+    assert _aktuell(kurs, mit_klasse=True) is False
 
 
 def test_klassen_und_fachschaften_werden_nicht_beurteilt():
     for typ in ("school_class", "subject_department", "activity_group", "teachers"):
-        assert ist_aktuell(_gruppe(type=typ), set(), JAHR) is True
+        assert _aktuell(_gruppe(type=typ)) is True
 
 
 def test_gruppe_mit_stunden_oder_planung_im_laufenden_jahr_ist_aktuell():
-    assert ist_aktuell(_gruppe(id=7), {7}, JAHR) is True
+    assert _aktuell(_gruppe(id=7), {7}) is True
 
 
 def test_adoptierte_gruppe_ohne_beleg_ist_frueher():
     """Der eigentliche Fall: letztes Schuljahr angelegt, dieses Jahr nichts passiert."""
-    assert ist_aktuell(_gruppe(), set(), JAHR) is False
+    assert _aktuell(_gruppe()) is False
 
 
 def test_frisch_angelegte_gruppe_ist_aktuell():
     """Sie hat noch nichts, woran man sie erkennen könnte — ohne diese Regel wäre jede
     neue Gruppe im Moment ihrer Entstehung „früher"."""
     neu = _gruppe(created_at=datetime(2026, 9, 15, tzinfo=timezone.utc))
-    assert ist_aktuell(neu, set(), JAHR) is True
+    assert _aktuell(neu) is True
 
 
 def _wie_aus_der_datenbank(*teile) -> datetime:
@@ -200,8 +235,8 @@ def test_der_erste_schultag_zaehlt_nach_dem_kalender_der_schule():
     """
     erster = _wie_aus_der_datenbank(2026, 9, 14, 0, 0)
     davor = _wie_aus_der_datenbank(2026, 9, 13, 23, 0)
-    assert ist_aktuell(_gruppe(created_at=erster), set(), JAHR) is True
-    assert ist_aktuell(_gruppe(created_at=davor), set(), JAHR) is False
+    assert _aktuell(_gruppe(created_at=erster)) is True
+    assert _aktuell(_gruppe(created_at=davor)) is False
 
 
 def test_antwort_baut_sich_aus_echtem_modell():

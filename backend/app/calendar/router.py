@@ -33,7 +33,11 @@ from app.calendar.service import (
 )
 from app.db.models import Group
 from app.db.session import get_db
-from app.groups.aktualitaet import gruppen_mit_beleg, ist_aktuell
+from app.groups.aktualitaet import (
+    gruppen_mit_beleg,
+    gruppen_mit_quellklasse,
+    ist_aktuell,
+)
 from app.planning.calendar import ab_phasen, is_schoolday, load_school_year
 from app.preferences.service import get_preferences
 
@@ -508,7 +512,8 @@ async def _nicht_mehr_im_stundenplan(db: AsyncSession, kandidaten) -> list[str]:
     gruppen = list((await db.execute(select(Group).where(Group.id.in_(ids)))).scalars())
     cfg = load_school_year()
     beleg = await gruppen_mit_beleg(db, ids, cfg)
-    betroffen = [g for g in gruppen if ist_aktuell(g, beleg, cfg)]
+    quellklassen = await gruppen_mit_quellklasse(db, ids)
+    betroffen = [g for g in gruppen if ist_aktuell(g, beleg, cfg, quellklassen)]
     if not betroffen:
         return []
     namen = ", ".join(f"„{g.anzeigename}“" for g in sorted(betroffen, key=lambda g: g.anzeigename))

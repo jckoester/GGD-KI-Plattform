@@ -7,6 +7,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Kurse ohne Klassenverband landen nicht mehr im Archiv.** Ein Kursstufenkurs oder
+  eine Gruppe aus dem Stundenplan galt zu Schuljahresbeginn als „früher", solange sie
+  weder Stunden noch Jahresplan hatte — sie stand also im Archiv, während sie
+  unterrichtet wurde, und bekam auch keinen Stundenplan-Hinweis mehr. Wer an keinen
+  Klassenverband gebunden ist, ist an kein Schuljahr gebunden.
 - **Verweise innerhalb der Hilfeseiten funktionieren.** Links auf einen Abschnitt
   derselben Seite führten nirgendwohin und öffneten dabei einen neuen Tab.
 - **Stunden lassen sich im Jahresplan auch ohne Unterrichtseinheit bearbeiten.** Wo nur
@@ -43,6 +48,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   eine Dublette. Betroffen war die Mehrheit der importierten Kapitel.
 
 ### Neu
+
+- **Verwaiste Unterrichtsgruppen lassen sich finden** (Admin, über die Schnittstelle:
+  `GET /admin/groups?ohne_lehrkraft=true`). Verlässt die einzige Lehrkraft die Schule,
+  bleibt die Gruppe mitsamt Jahresplan stehen, ist aber für niemanden mehr erreichbar.
+  Beschrieben in der Admin-Doku, samt Weg zurück.
 
 - **Methode und Sozialform im Stundenentwurf führen zu ihrer Beschreibung.** Ein Klick
   auf das verlinkte Vokabel öffnet den Knoten in einem neuen Tab — bisher stand der Name
