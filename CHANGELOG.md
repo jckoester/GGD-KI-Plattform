@@ -231,6 +231,9 @@ Dazu fünf weitere, die kein Zutun verlangen:
   Ausfall.
 - **`0076`** — `assistants.deletion_requested_at` und `.deletion_reason` für den
   Löschantrag.
+- **`0077`** — setzt sechs Spaltenvorgaben in `assistants` richtig; sie waren doppelt
+  gequotet und damit unbrauchbar. Repariert nebenbei Namen, Modell und Prompt, falls
+  dort zwei Apostrophe statt eines leeren Feldes stehen.
 
 Optional in `config/rate_limits.yaml`: der Bucket `group_join` (Vorgabe 10 Anfragen je
 5 Minuten und Person) drosselt das Einlösen von Beitrittscodes. Fehlt er, greift derselbe
