@@ -296,6 +296,24 @@ Freigabe erfolgt unter `/settings/assistants`:
 Die Sichtbarkeit kann pro Assistent gesteuert werden. Eine granulare
 Freigabe nach Rolle oder Jahrgang ist in einer späteren Version geplant.
 
+## Löschanträge von Lehrkräften
+
+Ein freigegebener schulweiter Assistent lässt sich von seiner Urheberin nicht selbst
+löschen — sie beantragt es. In `/assistants/manage` steht dann neben dem Status das
+Abzeichen **„Löschung beantragt"**; die Begründung liegt als Tooltip darauf.
+
+⚠️ **Der Antrag schaltet nichts ab.** Der Assistent bleibt aktiv und im Unterricht
+nutzbar, bis Sie entscheiden — ein Antrag ist eine Bitte, keine Handlung. Der Weg dorthin
+ist der gewohnte: erst **deaktivieren**, dann löschen (ein aktiver Assistent lässt sich
+auch von der Administration nicht direkt löschen).
+
+Technisch sind es zwei Felder an `assistants` (`deletion_requested_at`,
+`deletion_reason`, Alembic `0076`) und **kein** eigener Status: `status` beantwortet
+weiterhin genau die Frage, ob ein Assistent benutzbar ist.
+
+Assistenten mit eigener Reichweite — privat, Unterrichtsgruppe, Fachschaft, AG — löschen
+Lehrkräfte selbst; dort erscheint nie ein Antrag.
+
 ## Assistenten mit verschwundenem Modell
 
 Ein Assistent kann fest an ein Modell gebunden sein (Feld **Modell** gesetzt statt

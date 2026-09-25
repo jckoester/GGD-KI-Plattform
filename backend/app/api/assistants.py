@@ -194,6 +194,9 @@ class AssistantResponse(BaseModel):
     created_by: Optional[str]
     creator_role: str
     reject_reason: Optional[str]
+    # Löschantrag (Alembic 0076) — nur schulweit belegt; siehe `request_deletion`.
+    deletion_requested_at: Optional[datetime] = None
+    deletion_reason: Optional[str] = None
     updated_by_pseudonym: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -379,7 +382,15 @@ VALID_SCOPES = {
 }
 VALID_VISIBILITIES = {"public", "private", "hidden"}
 GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
-SCHOOLWIDE_SCOPES = {"grade", "all_students", "all"}
+# ⚠️ **`teachers` gehört dazu** (Entscheidung Jan, 25.09.2026). Der Scope „Alle
+# Lehrkräfte" erreicht das ganze Kollegium; er stand bis dahin weder in dieser Menge noch
+# in `GROUP_SCOPES` und entstand deshalb ohne Freigabe und ohne Bearbeitungsschutz.
+#
+# ⚠️ **Diese Menge gibt es ein zweites Mal im Frontend** (`AssistantEditor.svelte`), wo
+# sie über die Bearbeitbarkeit entscheidet. Laufen die beiden auseinander, bietet die
+# Oberfläche ein Feld an, das der Server ablehnt — genau der Fall, der bis zum 25.09.2026
+# bestand. Ein Wächter hält sie zusammen (`tests/unit/test_assistant_lebenszyklus.py`).
+SCHOOLWIDE_SCOPES = {"teachers", "grade", "all_students", "all"}
 
 
 def _is_student_visible_image_assistant(
@@ -492,15 +503,31 @@ def _check_assistant_access(assistant: Assistant, current_user: JwtPayload, is_a
 
 
 def _check_assistant_update_permission(assistant: Assistant, current_user: JwtPayload, is_admin: bool) -> None:
-    """Prueft Berechtigung fuer PATCH-Operationen."""
+    """Prueft Berechtigung fuer PATCH-Operationen.
+
+    ⚠️ **Die Reichweite entscheidet, nicht der Status** (seit 25.09.2026). Vorher galt
+    „Bearbeiten nur im Entwurf" — und in `draft` kam der Assistent einer Lehrkraft
+    **nie**: Private, Gruppen- und Fachschafts-Assistenten entstehen sofort als `active`
+    (`_initial_status`, so gewollt, keine Freigabe). Sie waren damit für ihre Urheberin
+    eingefroren: kein Ändern, kein Abschalten, kein Löschen, nur über einen Admin.
+
+    Aufgefallen ist es lange nicht, weil die **Oberfläche die Regel schon richtig kannte**
+    (`AssistantEditor.svelte`: `active` außerhalb der schulweiten Scopes ist editierbar) —
+    die Felder waren bedienbar, erst das Speichern antwortete mit 409. Wer beim Testen
+    zugleich Admin ist, trifft die Sperre nie.
+
+    Schulweit bleibt es beim Entwurf: Dort hat jemand den Prompt geprüft, und eine
+    stille Änderung danach machte die Prüfung wertlos.
+    """
     if not is_admin:
         if assistant.created_by != current_user.sub:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
-        if assistant.status != "draft":
+        if assistant.scope in SCHOOLWIDE_SCOPES and assistant.status != "draft":
             raise HTTPException(
                 status_code=409,
-                detail="Bearbeitung nur im Status 'draft' moeglich. "
-                       "Eingereichte Assistenten muessen zuerst zurueckgezogen werden.",
+                detail="Schulweite Assistenten lassen sich nur im Entwurf bearbeiten. "
+                       "Ziehen Sie die Einreichung zurueck oder beantragen Sie die "
+                       "Loeschung.",
             )
 
 
@@ -515,10 +542,16 @@ def _check_assistant_delete_permission(assistant: Assistant, current_user: JwtPa
     else:
         if assistant.created_by != current_user.sub:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
-        if assistant.status not in ("draft", "pending_review"):
+        # Eigene, nicht schulweite Assistenten: jederzeit. Die Konversationen bleiben —
+        # `conversations.assistant_id` und `messages.assistant_id` stehen auf
+        # `ON DELETE SET NULL`.
+        if assistant.scope in SCHOOLWIDE_SCOPES and assistant.status not in (
+            "draft", "pending_review",
+        ):
             raise HTTPException(
                 status_code=409,
-                detail="Nur eigene Assistenten im Status 'draft' oder 'pending_review' koennen geloescht werden.",
+                detail="Ein freigegebener schulweiter Assistent wird nicht selbst "
+                       "geloescht - beantragen Sie die Loeschung.",
             )
 
 
@@ -785,6 +818,156 @@ async def submit_assistant(
     assistant.updated_at = datetime.now(timezone.utc)
     assistant.updated_by_pseudonym = current_user.sub
 
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+async def _eigener(db: AsyncSession, assistant_id: int, pseudonym: str) -> Assistant:
+    """Der eigene Assistent — oder 404/403. Grundlage der Lebenszyklus-Endpunkte."""
+    result = await db.execute(select(Assistant).where(Assistant.id == assistant_id))
+    assistant = result.scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+    if assistant.created_by != pseudonym:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    return assistant
+
+
+@router.post("/{assistant_id}/withdraw", response_model=AssistantResponse)
+async def withdraw_assistant(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Zieht eine Einreichung zurueck: `pending_review` → `draft`.
+
+    ⚠️ **Der Rueckweg fehlte.** Eingereicht werden konnte ein Entwurf immer, zurueck kam
+    er nicht — die Lehrkraft hatte nur die teure Antwort: loeschen und neu schreiben. Der
+    Text der Bearbeitungssperre verwies sogar auf ein Zurueckziehen, das es nicht gab.
+    """
+    assistant = await _eigener(db, assistant_id, current_user.sub)
+    if assistant.status != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail="Nur eingereichte Assistenten koennen zurueckgezogen werden.",
+        )
+    assistant.status = "draft"
+    assistant.updated_at = datetime.now(timezone.utc)
+    assistant.updated_by_pseudonym = current_user.sub
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+@router.post("/{assistant_id}/disable", response_model=AssistantResponse)
+async def disable_assistant(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Schaltet einen eigenen, **nicht schulweiten** Assistenten ab: `active` → `disabled`.
+
+    Das Gegenstueck zum Loeschen: Wer eine Unterrichtsreihe beendet, will den Assistenten
+    oft nur aus dem Weg haben, nicht weg. Schulweit bleibt das dem Admin vorbehalten —
+    dort haengen Kolleg:innen dran, die von der Abschaltung nichts wissen.
+    """
+    assistant = await _eigener(db, assistant_id, current_user.sub)
+    if assistant.scope in SCHOOLWIDE_SCOPES:
+        raise HTTPException(
+            status_code=409,
+            detail="Schulweite Assistenten schaltet die Administration ab.",
+        )
+    if assistant.status != "active":
+        raise HTTPException(status_code=409, detail="Nur aktive Assistenten lassen sich abschalten.")
+    assistant.status = "disabled"
+    assistant.updated_at = datetime.now(timezone.utc)
+    assistant.updated_by_pseudonym = current_user.sub
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+@router.post("/{assistant_id}/enable", response_model=AssistantResponse)
+async def enable_assistant(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Nimmt einen eigenen, nicht schulweiten Assistenten wieder in Betrieb.
+
+    ⚠️ **Schulweit ausgeschlossen** — sonst waere die Freigabe umgehbar: abschalten
+    lassen, aendern, selbst wieder einschalten.
+    """
+    assistant = await _eigener(db, assistant_id, current_user.sub)
+    if assistant.scope in SCHOOLWIDE_SCOPES:
+        raise HTTPException(
+            status_code=409,
+            detail="Schulweite Assistenten gibt die Administration wieder frei.",
+        )
+    if assistant.status != "disabled":
+        raise HTTPException(
+            status_code=409, detail="Nur abgeschaltete Assistenten lassen sich wieder freigeben."
+        )
+    assistant.status = "active"
+    assistant.updated_at = datetime.now(timezone.utc)
+    assistant.updated_by_pseudonym = current_user.sub
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+class LoeschantragRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.post("/{assistant_id}/request-deletion", response_model=AssistantResponse)
+async def request_deletion(
+    assistant_id: int,
+    request: LoeschantragRequest,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Beantragt die Loeschung eines freigegebenen **schulweiten** Assistenten.
+
+    ⚠️ **Der Antrag schaltet nichts ab** (Entscheidung Jan, 25.09.2026). Ein Antrag ist
+    eine Bitte, keine Handlung: Er sofort wirksam zu machen naehme dem Admin die
+    Entscheidung ab und dem Unterricht ohne Vorwarnung ein Werkzeug. Deshalb ein Feld
+    neben dem Status und kein eigener Status — `assistants.status` beantwortet weiterhin
+    genau die eine Frage, ob der Assistent benutzbar ist.
+
+    Nicht schulweite Assistenten loescht die Lehrkraft selbst; dort gibt es nichts zu
+    beantragen.
+    """
+    assistant = await _eigener(db, assistant_id, current_user.sub)
+    if assistant.scope not in SCHOOLWIDE_SCOPES:
+        raise HTTPException(
+            status_code=409,
+            detail="Diesen Assistenten koennen Sie selbst loeschen - ein Antrag ist "
+                   "nicht noetig.",
+        )
+    if assistant.status in ("draft", "pending_review"):
+        raise HTTPException(
+            status_code=409,
+            detail="Ein Entwurf oder eine Einreichung laesst sich selbst loeschen.",
+        )
+    assistant.deletion_requested_at = datetime.now(timezone.utc)
+    assistant.deletion_reason = (request.reason or "").strip() or None
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
+
+
+@router.delete("/{assistant_id}/request-deletion", response_model=AssistantResponse)
+async def withdraw_deletion_request(
+    assistant_id: int,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Nimmt den Loeschantrag zurueck — ein Fehlklick soll nicht endgueltig sein."""
+    assistant = await _eigener(db, assistant_id, current_user.sub)
+    assistant.deletion_requested_at = None
+    assistant.deletion_reason = None
     await db.commit()
     await db.refresh(assistant)
     return AssistantResponse.model_validate(assistant)

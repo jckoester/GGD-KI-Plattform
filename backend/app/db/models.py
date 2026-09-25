@@ -412,6 +412,15 @@ class Assistant(Base):
         Text, nullable=False, server_default=text("'admin'")
     )
     reject_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Löschantrag für **schulweite** Assistenten (Alembic 0076). Bewusst ein Feld und
+    # kein Status: Der Antrag schaltet nichts ab — der Assistent bleibt im Unterricht,
+    # bis der Admin entscheidet. Ein Statuswert müsste überall wie `active` behandelt
+    # werden und machte die Spalte mehrdeutig. Eigene Gruppen-Assistenten löscht die
+    # Lehrkraft selbst; dort gibt es nichts zu beantragen.
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    deletion_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )

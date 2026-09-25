@@ -33,6 +33,11 @@
         activateAssistant,
         deactivateAssistant,
         submitMyAssistant,
+        withdrawMyAssistant,
+        disableMyAssistant,
+        enableMyAssistant,
+        requestAssistantDeletion,
+        withdrawAssistantDeletionRequest,
         exportAssistant,
         approveAssistant,
         rejectAssistant,
@@ -48,6 +53,7 @@
         getImageKinds,
     } from "$lib/api.js";
     import { SCOPE_ANCHOR_CONTENT_TYPES } from "$lib/taxonomy.js";
+    import { STUDENT_GRADES } from "$lib/grades.js";
     import { refreshPendingCount } from "$lib/stores/pendingAssistants.js";
 
     // ── Props ─────────────────────────────────────────────────────────────────
@@ -325,7 +331,11 @@
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
     let isNew = $derived(assistantId === "neu");
-    const SCHOOLWIDE_SCOPES = new Set(["grade", "all_students", "all"]);
+    // ⚠️ **Dieselbe Menge führt das Backend** (`app/api/assistants.py`). Laufen sie
+    // auseinander, bietet die Oberfläche ein Feld an, das der Server mit 409 ablehnt —
+    // genau der Fall, der bis zum 25.09.2026 bestand. Ein Wächter hält sie zusammen
+    // (`tests/unit/test_assistant_lebenszyklus.py`).
+    const SCHOOLWIDE_SCOPES = new Set(["teachers", "grade", "all_students", "all"]);
     let isDraft = $derived(isNew || form.status === "draft");
     // Lehrkräfte können auch aktive Assistenten bearbeiten, sofern kein schulweiter Scope
     // (schulweite Assistenten wurden bereits von einem Admin freigegeben)
@@ -401,6 +411,8 @@
             image_kinds: [],
             status: "draft",
             reject_reason: null,
+            deletion_requested_at: null,
+            deletion_reason: null,
         };
     }
 
@@ -466,6 +478,8 @@
             image_kinds: a.image_kinds ?? [],
             status: a.status || "draft",
             reject_reason: a.reject_reason || null,
+            deletion_requested_at: a.deletion_requested_at || null,
+            deletion_reason: a.deletion_reason || null,
         };
     }
 
@@ -571,6 +585,9 @@
                         status: "draft",
                         sort_order: 0,
                         reject_reason: null,
+                        // Eine Kopie erbt keinen Löschantrag der Vorlage.
+                        deletion_requested_at: null,
+                        deletion_reason: null,
                     };
                 } else {
                     form = emptyForm();
@@ -641,6 +658,70 @@
             submitting = false;
         }
     }
+
+    // ── Die übrigen Wege durch den Lebenszyklus (Paket 7, AP4) ────────────────
+    //
+    // ⚠️ **Die Reichweite entscheidet, nicht der Status.** Eigene Gruppen-, Fachschafts-
+    // und private Assistenten gehören der Lehrkraft: ändern, abschalten, löschen ohne
+    // Rückfrage. Schulweite sind freigegeben — dort gibt es den Rückzug vor der Freigabe
+    // und danach den Löschantrag, der **nichts abschaltet**.
+    let schulweit = $derived(SCHOOLWIDE_SCOPES.has(form.scope));
+    let loeschantragOffen = $derived(!!form.deletion_requested_at);
+
+    async function lebenszyklus(aktion, erfolgstext) {
+        if (!assistantId || isNew) return;
+        submitting = true;
+        error = null;
+        try {
+            const result = await aktion();
+            form.status = result.status ?? form.status;
+            form.deletion_requested_at = result.deletion_requested_at ?? null;
+            form.deletion_reason = result.deletion_reason ?? null;
+            savedForm = { ...form };
+            success = erfolgstext;
+        } catch (e) {
+            error = e.message ?? "Die Aktion ist fehlgeschlagen.";
+        } finally {
+            submitting = false;
+        }
+    }
+
+    const zurueckziehen = () =>
+        lebenszyklus(
+            () => withdrawMyAssistant(assistantId),
+            "Die Einreichung wurde zurückgezogen — der Assistent ist wieder ein Entwurf.",
+        );
+
+    const abschalten = () =>
+        lebenszyklus(
+            () => disableMyAssistant(assistantId),
+            "Der Assistent ist abgeschaltet und für niemanden mehr auswählbar.",
+        );
+
+    const wiederFreigeben = () =>
+        lebenszyklus(() => enableMyAssistant(assistantId), "Der Assistent ist wieder aktiv.");
+
+    // ⚠️ **Kein `prompt` für den Grund** — dieselbe Begründung wie beim Ausfall-Dialog
+    // (Paket 7, AP2): einzeilig, ungestaltet, im Dunkelmodus fremd. Hier genügt ein
+    // eingeblendeter Block; ein eigener Dialog wäre für ein Feld zu viel Apparat.
+    let zeigeAntragFormular = $state(false);
+    let antragGrund = $state("");
+
+    async function loeschungBeantragen() {
+        await lebenszyklus(
+            () => requestAssistantDeletion(assistantId, antragGrund),
+            "Die Löschung ist beantragt. Der Assistent bleibt nutzbar, bis die "
+                + "Administration entscheidet.",
+        );
+        zeigeAntragFormular = false;
+        antragGrund = "";
+    }
+
+    const antragZuruecknehmen = () =>
+        lebenszyklus(
+            () => withdrawAssistantDeletionRequest(assistantId),
+            "Der Löschantrag ist zurückgenommen.",
+        );
 
     async function approveInEditor() {
         if (!assistantId || isNew) return;
@@ -936,6 +1017,53 @@
                 {/if}
             </button>
 
+            {#if !isAdmin && !isNew && form.status === "pending_review"}
+                <button
+                    onclick={zurueckziehen}
+                    disabled={submitting}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 text-sm"
+                >
+                    Einreichung zurückziehen
+                </button>
+            {/if}
+
+            {#if !isAdmin && !isNew && !schulweit && form.status === "active"}
+                <button
+                    onclick={abschalten}
+                    disabled={submitting}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 text-sm"
+                >
+                    Abschalten
+                </button>
+            {/if}
+
+            {#if !isAdmin && !isNew && !schulweit && form.status === "disabled"}
+                <button
+                    onclick={wiederFreigeben}
+                    disabled={submitting}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 text-sm"
+                >
+                    Wieder freigeben
+                </button>
+            {/if}
+
+            {#if !isAdmin && !isNew && schulweit && !isDraft && form.status !== "pending_review"}
+                <button
+                    onclick={() => {
+                        if (loeschantragOffen) antragZuruecknehmen();
+                        else zeigeAntragFormular = !zeigeAntragFormular;
+                    }}
+                    disabled={submitting}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 text-sm"
+                >
+                    {loeschantragOffen ? "Löschantrag zurücknehmen" : "Löschung beantragen"}
+                </button>
+            {/if}
+
             {#if !isAdmin && isDraft && !isNew}
                 <button
                     onclick={submitAssistant}
@@ -975,6 +1103,63 @@
                         message={success}
                         onClose={() => (success = null)}
                     />
+                </div>
+            {/if}
+
+            {#if loeschantragOffen}
+                <div
+                    class="mb-4 rounded-lg border border-light-ye/40 dark:border-dark-ye/40
+                           bg-light-ye/5 dark:bg-dark-ye/10 p-3"
+                >
+                    <p class="text-sm text-light-tx dark:text-dark-tx font-medium">
+                        Löschung beantragt
+                    </p>
+                    <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                        Der Assistent bleibt nutzbar, bis die Administration entscheidet.
+                        {#if form.deletion_reason}
+                            Begründung: „{form.deletion_reason}"
+                        {/if}
+                    </p>
+                </div>
+            {:else if zeigeAntragFormular}
+                <div
+                    class="mb-4 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-bg-2 dark:bg-dark-bg-2 p-3"
+                >
+                    <label
+                        for="loeschantrag-grund"
+                        class="block text-xs font-medium text-light-tx-2 dark:text-dark-tx-2 mb-1"
+                    >
+                        Warum soll der Assistent gelöscht werden?
+                        <span class="font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                        id="loeschantrag-grund"
+                        bind:value={antragGrund}
+                        rows="2"
+                        class="w-full px-3 py-2 text-sm bg-light-bg dark:bg-dark-bg border
+                               border-light-ui-3 dark:border-dark-ui-3 rounded-lg
+                               text-light-tx dark:text-dark-tx outline-none
+                               focus:border-primary dark:focus:border-primary-dark resize-y"
+                    ></textarea>
+                    <div class="flex justify-end gap-2 mt-2">
+                        <button
+                            onclick={() => { zeigeAntragFormular = false; antragGrund = ""; }}
+                            class="px-3 py-1.5 text-sm rounded-lg text-light-tx-2 dark:text-dark-tx-2
+                                   hover:bg-light-bg dark:hover:bg-dark-bg transition-colors"
+                        >
+                            Abbrechen
+                        </button>
+                        <button
+                            onclick={loeschungBeantragen}
+                            disabled={submitting}
+                            class="px-3 py-1.5 text-sm rounded-lg font-medium bg-primary
+                                   dark:bg-primary-dark text-white hover:opacity-90
+                                   transition-opacity disabled:opacity-50"
+                        >
+                            Antrag stellen
+                        </button>
+                    </div>
                 </div>
             {/if}
 
@@ -1306,9 +1491,9 @@
                                     bind:value={form.min_grade}
                                     disabled={!canEdit}
                                     type="number"
-                                    min="1"
-                                    max="13"
-                                    placeholder="5"
+                                    min={STUDENT_GRADES[0]}
+                                    max={STUDENT_GRADES.at(-1)}
+                                    placeholder={String(STUDENT_GRADES[0])}
                                     class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                          bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                          px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1326,9 +1511,9 @@
                                     bind:value={form.max_grade}
                                     disabled={!canEdit}
                                     type="number"
-                                    min="1"
-                                    max="13"
-                                    placeholder="10"
+                                    min={STUDENT_GRADES[0]}
+                                    max={STUDENT_GRADES.at(-1)}
+                                    placeholder={String(STUDENT_GRADES.at(-1))}
                                     class="w-full rounded border border-light-ui-3 dark:border-dark-ui-3
                          bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
                          px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"

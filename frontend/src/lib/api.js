@@ -1230,6 +1230,42 @@ export async function submitMyAssistant(id) {
   return res.json(); // TeacherAssistantResponse
 }
 
+/**
+ * Die übrigen Wege durch den Lebenszyklus (Paket 7, AP4).
+ *
+ * ⚠️ **Welcher Weg offensteht, hängt an der Reichweite, nicht am Status.** Eigene
+ * Gruppen-, Fachschafts- und private Assistenten gehören der Lehrkraft — sie ändert,
+ * schaltet ab und löscht selbst. Schulweite sind freigegeben; dort gibt es nur den
+ * Rückzug vor der Freigabe und danach den Löschantrag.
+ */
+async function _assistentAktion(id, pfad, { method = "POST", body = null } = {}) {
+  const res = await fetch(`${BASE}/assistants/${id}/${pfad}`, {
+    method,
+    credentials: "include",
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
+/** Eingereichten Assistenten zurückziehen: `pending_review` → `draft`. */
+export const withdrawMyAssistant = (id) => _assistentAktion(id, "withdraw");
+
+/** Eigenen, nicht schulweiten Assistenten abschalten. */
+export const disableMyAssistant = (id) => _assistentAktion(id, "disable");
+
+/** … und wieder in Betrieb nehmen. */
+export const enableMyAssistant = (id) => _assistentAktion(id, "enable");
+
+/** Löschung eines freigegebenen schulweiten Assistenten beantragen. */
+export const requestAssistantDeletion = (id, reason) =>
+  _assistentAktion(id, "request-deletion", { body: { reason: reason || null } });
+
+/** Den Löschantrag zurücknehmen. */
+export const withdrawAssistantDeletionRequest = (id) =>
+  _assistentAktion(id, "request-deletion", { method: "DELETE" });
+
 // Admin: Assistent freigeben
 export async function approveAssistant(id) {
   const res = await fetch(`${BASE}/admin/assistants/${id}/approve`, {

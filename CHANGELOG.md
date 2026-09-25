@@ -49,6 +49,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Lehrkräfte pflegen ihre eigenen Assistenten vollständig selbst.** Wer einen
+  Assistenten für sich, eine Unterrichtsgruppe, eine Fachschaft oder eine AG anlegt,
+  kann ihn jederzeit ändern, **abschalten** und löschen — bisher ging nach dem Anlegen
+  nichts davon ohne die Administration. Bei schulweiten Assistenten bleibt es bei der
+  Freigabe; dort lässt sich jetzt die **Einreichung zurückziehen** und für einen
+  freigegebenen Assistenten die **Löschung beantragen**. Der Antrag schaltet nichts ab:
+  Der Assistent bleibt nutzbar, bis die Administration entscheidet.
+
 - **Verwaiste Unterrichtsgruppen lassen sich finden** (Admin, über die Schnittstelle:
   `GET /admin/groups?ohne_lehrkraft=true`). Verlässt die einzige Lehrkraft die Schule,
   bleibt die Gruppe mitsamt Jahresplan stehen, ist aber für niemanden mehr erreichbar.
@@ -133,6 +141,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Ein Assistent „für alle Lehrkräfte“ geht jetzt durch die Freigabe.** Er
+  erreicht das ganze Kollegium, entstand aber bisher ohne Prüfung und blieb frei
+  änderbar. Bestehende Assistenten dieser Reichweite bleiben unberührt.
+- **Die Jahrgangsfelder im Assistenten-Editor kennen die Stufen dieser Schule.** Sie
+  standen fest auf 1 bis 13, unabhängig davon, welche Jahrgänge es gibt.
+
 - **Der Neuaufbau eines Halbjahres verschont Stunden, die nicht aus dem Wochenmuster
   stammen.** Termine aus dem Stundenplan oder von Hand bleiben stehen; bisher fiel das
   ganze Halbjahr. Trägt ein solcher Termin dieselbe Stunde wie das Muster, entfällt die
@@ -205,6 +219,18 @@ docker compose up -d --force-recreate
   aktiviert, sollte diesen Stand **vorher** ausgerollt haben: Danach entstandene
   Doppelgruppen lassen sich nicht mehr per Dialog zusammenführen, weil Jahresplan,
   Stundenentwürfe und Chats daran hängen.
+
+Dazu fünf weitere, die kein Zutun verlangen:
+
+- **`0072`** — Stundenzahl der Curriculum-Kapitel als Zahl statt als Text. ⚠️ **Schreibt
+  Bestandsdaten um:** Die Mehrheit der importierten Kapitel trug die Zahl als Zeichenkette.
+- **`0073`** — Spalte `groups.jahrgang` für Gruppen ohne Klasse (kein Backfill).
+- **`0074`** — neuer Sichtbarkeits-Scope `group_teachers`; die Prüfbedingungen an
+  `context_nodes` werden neu gesetzt.
+- **`0075`** — `lesson_slots.ausfall_herkunft` und `.ausfall_vorher` für den persönlichen
+  Ausfall.
+- **`0076`** — `assistants.deletion_requested_at` und `.deletion_reason` für den
+  Löschantrag.
 
 Optional in `config/rate_limits.yaml`: der Bucket `group_join` (Vorgabe 10 Anfragen je
 5 Minuten und Person) drosselt das Einlösen von Beitrittscodes. Fehlt er, greift derselbe
