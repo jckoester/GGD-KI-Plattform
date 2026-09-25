@@ -987,7 +987,19 @@ def run_import(
     )
 
     conn = psycopg2.connect(psycopg2_url)
-    psycopg2.extras.register_uuid()
+    # ⚠️ **`conn_or_curs=conn`, nicht das erste Argument.** Die Signatur lautet
+    # `register_uuid(oids=None, conn_or_curs=None)`; ohne Schlüsselwort registriert
+    # psycopg2 den Typadapter **prozessweit**, und danach liefern `uuid`-Spalten überall
+    # `uuid.UUID` statt `str`. Im Skript selbst wäre das folgenlos — es liest ohnehin über
+    # `UUID(str(row[0]))` —, aber die Integrationstests rufen `run_import` im eigenen
+    # Prozess auf: Ab dem ersten Import galt die Registrierung für **alle** folgenden
+    # Tests. Das kostete am 22.09.2026 eine Fehlersuche in der falschen Datei
+    # (`test_slot_neuaufbau.py` lief allein grün, im Gesamtlauf rot).
+    #
+    # Die Gegenrichtung — `register_adapter(UUID, …)` für das **Schreiben** — ist in
+    # psycopg2 immer global und wird hier gebraucht: Das Skript übergibt `UUID`-Objekte
+    # als Parameter.
+    psycopg2.extras.register_uuid(conn_or_curs=conn)
 
     # Hilfsfunktion zum Extrahieren von fach_slug aus bp_id
     _edition_suffix = re.compile(r'\.\w+$')

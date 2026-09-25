@@ -95,11 +95,14 @@ def _slot(sync_conn, *, datum, start_period=1, source, thema=None, halbjahr=1):
 def _slots(conn, *, halbjahr=1):
     """Die Slots der Testgruppe. Die `id` kommt **immer als Zeichenkette** zurück.
 
-    ⚠️ Nicht Kosmetik, sondern eine Kopplung zwischen Testdateien: `test_ks_phase2.py`
-    ruft `psycopg2.extras.register_uuid(conn)` — die Verbindung landet dabei im ersten
-    Parameter `oids`, nicht in `conn_or_curs`, und der Adapter wird damit **global**
-    registriert statt für diese eine Verbindung. Danach liefert psycopg2 `uuid`-Spalten
-    als `uuid.UUID` statt als `str`. Allein lief diese Datei grün, im Gesamtlauf nicht.
+    Das ist eine Zusage dieses Helfers, keine Umgehung: Der Aufrufer vergleicht die `id`
+    mit dem Rückgabewert von `_lege_slot_an`, und der ist ein `str`.
+
+    ⚠️ Bis zum 25.09.2026 stand hier die eigentliche Begründung — `test_ks_phase2.py`
+    registrierte den UUID-Typadapter versehentlich **global**, und danach lieferte
+    psycopg2 `uuid`-Spalten als `uuid.UUID`. Allein lief diese Datei grün, im Gesamtlauf
+    nicht. Die Ursache ist beseitigt, und ein Wächter in `conftest.py`
+    (`_kein_globaler_uuid_adapter`) lässt sie nicht zurückkommen.
     """
     conn.rollback()
     with conn.cursor() as cur:

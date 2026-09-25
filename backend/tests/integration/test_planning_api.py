@@ -1711,6 +1711,36 @@ async def test_schuelerin_sieht_den_stundenentwurf_nicht(
 # ── Persönlicher Ausfall (Paket 5, AP4) ───────────────────────────────────────
 
 
+def _tag_ohne_stunden(cur, gruppen: tuple[int, ...], start) -> "date":
+    """Das erste Datum ab `start`, an dem keine der Gruppen eine Stunde hat.
+
+    ⚠️ **Nicht Vorsicht, sondern Notwendigkeit.** Ein früherer Test dieser Datei erzeugt
+    über `POST /planning/groups/100/slots/generate` Slots für **jeden Montag** des
+    Halbjahres. Ein fester Abstand wie „heute + 24 Tage" trifft diese Montage je nach
+    Wochentag des Laufs — und dann zählt der Ausfall eine Stunde mehr, als der Test
+    angelegt hat.
+
+    Gemessen am 25.09.2026: `heute + 24` fiel auf Montag, den 19.10.2026; der Test
+    erwartete `betroffen == 2` und bekam 3. Am Vortag war derselbe Test grün. Ein
+    Prüflauf, dessen Ergebnis vom Wochentag abhängt, ist keiner.
+
+    Bewusst **kein** Löschen der fremden Slots: Sie gehören einem anderen Test, der sie
+    später noch zählt.
+    """
+    from datetime import timedelta
+
+    tag = start
+    while True:
+        cur.execute(
+            "SELECT 1 FROM lesson_slots WHERE group_id = ANY(%s) AND date = %s LIMIT 1",
+            (list(gruppen), tag),
+        )
+        if cur.fetchone() is None:
+            return tag
+        tag += timedelta(days=1)
+
+
+
 @pytest.mark.asyncio
 async def test_ausfall_fuer_eine_gruppe_merkt_sich_den_vorzustand(
     test_client, auth_headers, seed_planning_fixtures, db_url
@@ -1719,10 +1749,10 @@ async def test_ausfall_fuer_eine_gruppe_merkt_sich_den_vorzustand(
     dem der Rückweg sonst die Prüfung verlöre."""
     from datetime import date, timedelta
 
-    tag = date.today() + timedelta(days=21)
     slot_id = str(uuid4())
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
+        tag = _tag_ohne_stunden(cur, (100,), date.today() + timedelta(days=21))
         cur.execute("""
             INSERT INTO lesson_slots
                 (id, group_id, date, start_period, periods, halbjahr, kategorie)
@@ -1772,10 +1802,10 @@ async def test_ganzer_tag_trifft_alle_eigenen_gruppen_und_keine_fremde(
     """
     from datetime import date, timedelta
 
-    tag = date.today() + timedelta(days=22)
     eigen_a, eigen_b, fremd = str(uuid4()), str(uuid4()), str(uuid4())
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
+        tag = _tag_ohne_stunden(cur, (100, 103, 104), date.today() + timedelta(days=22))
         cur.execute("""
             INSERT INTO groups (id, name, slug, type, subject_id)
             VALUES (103, 'Zweite eigene', 'zweite-eigene-test', 'teaching_group', 100)
@@ -1837,10 +1867,10 @@ async def test_von_hand_gesetzter_ausfall_traegt_die_herkunft(
     """
     from datetime import date, timedelta
 
-    tag = date.today() + timedelta(days=23)
     slot_id = str(uuid4())
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
+        tag = _tag_ohne_stunden(cur, (100,), date.today() + timedelta(days=23))
         cur.execute("""
             INSERT INTO lesson_slots
                 (id, group_id, date, start_period, periods, halbjahr, kategorie)
@@ -1887,10 +1917,10 @@ async def test_ausfall_meldet_wie_viele_stunden_inhalt_hatten(
     """
     from datetime import date, timedelta
 
-    tag = date.today() + timedelta(days=24)
     mit, ohne = str(uuid4()), str(uuid4())
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
+        tag = _tag_ohne_stunden(cur, (100,), date.today() + timedelta(days=24))
         cur.execute("""
             INSERT INTO lesson_slots
                 (id, group_id, date, start_period, periods, halbjahr, kategorie, thema)

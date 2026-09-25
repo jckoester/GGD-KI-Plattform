@@ -11,6 +11,7 @@ import os
 from collections.abc import AsyncIterator
 
 import psycopg2
+import psycopg2.extensions
 import pytest
 import pytest_asyncio
 from sqlalchemy import text as sa_text
@@ -26,6 +27,34 @@ load_dotenv()
 # Der Batch-Service backfill_embeddings bleibt unberührt (Tests mocken dort gezielt).
 from app.config import settings as _settings
 _settings.embeddings_enabled = False
+
+# OID des PostgreSQL-Typs `uuid`. psycopg2 liefert solche Spalten standardmäßig als
+# `str`; erst ein registrierter Typadapter macht `uuid.UUID` daraus.
+_UUID_OID = 2950
+
+
+@pytest.fixture(autouse=True)
+def _kein_globaler_uuid_adapter():
+    """Wacht darüber, dass niemand den UUID-Adapter prozessweit registriert.
+
+    `psycopg2.extras.register_uuid(conn)` sieht aus wie „für diese eine Verbindung", ist
+    es aber nicht: Die Signatur lautet `register_uuid(oids=None, conn_or_curs=None)` — die
+    Verbindung landet im **ersten** Parameter, und registriert wird **global**. Danach
+    liefern `uuid`-Spalten in *allen* folgenden Tests `uuid.UUID` statt `str`.
+
+    Das ist eine Kopplung zwischen Testdateien, und sie zeigt sich als „läuft allein grün,
+    im Gesamtlauf rot" (gemessen am 22.09.2026 an `test_slot_neuaufbau.py`) — also als
+    Fehler dort, wo er **nicht** verursacht wurde. Der Wächter prüft **nach** jedem Test:
+    Wer registriert, fällt selbst auf.
+    """
+    yield
+    assert _UUID_OID not in psycopg2.extensions.string_types, (
+        "Der UUID-Typadapter wurde prozessweit registriert. Vermutlich "
+        "`psycopg2.extras.register_uuid(conn)` — das Argument gehört nach "
+        "`conn_or_curs=conn`, sonst gilt die Registrierung global und alle folgenden "
+        "Tests bekommen `uuid.UUID` statt `str`."
+    )
+
 
 # Pseudonyme der Test-Nutzer
 TEACHER1_PSEUDO = "teacher1-pseudo"
