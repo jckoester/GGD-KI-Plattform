@@ -526,15 +526,18 @@ async def test_suchwerkzeug_liefert_kein_svg_ans_modell():
     db = MagicMock()
     db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))
     ctx = ToolContext(
-        db=db, user=SimpleNamespace(sub="p", roles=["student"]),
+        db=db, user=SimpleNamespace(sub="p", roles=["student"], grade="9"),
         group_id=2, conversation_id=None,
     )
     ergebnis = Suchergebnis(
         identifikation=Abschnitt(treffer=[_knoten("Wasser")], gesamt=1, vollstaendig=True),
         thematisch=Abschnitt(treffer=[_knoten("Eis")]),
     )
+    # Abgrenzungen und Stufenbänder brauchen eine Datenbank; hier geht es allein um
+    # den Engpass, durch den die Treffer ans Modell gehen.
     with patch.object(router, "suche", new=AsyncMock(return_value=ergebnis)) as gesucht, \
-         patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})):
+         patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})), \
+         patch.object(router, "bp_baender_zu", new=AsyncMock(return_value={})):
         antwort = await router._search_context_nodes_handler({"query": "Wasser"}, ctx)
 
     assert gesucht.await_args.args[1].mit_metadaten is True

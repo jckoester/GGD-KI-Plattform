@@ -114,3 +114,44 @@ def test_output_format_not_in_compose():
         _ped(), student_treatment=True, context_str=None, assistant_system_prompt="SP"
     )
     assert "Markdown gerendert" not in out
+
+
+class TestKlassenstufeImSystemkontext:
+    """Die eine Zeile zur Klassenstufe (Paket 9, N5).
+
+    ⚠️ **Sie steht vor dem Kontext, nicht darin.** Die Stufe gilt für die ganze
+    Antwort, auch wenn die Suche nichts gefunden hat — läge sie im Kontextblock,
+    verschwände sie genau dann, wenn das Modell ohnehin aus eigenem Wissen antwortet.
+    """
+
+    def _inhalt(self, **kwargs):
+        from app.pedagogy.compose import compose_system_content
+        from app.pedagogy.config import load_pedagogy
+
+        vorgaben = dict(
+            student_treatment=True, context_str=None, assistant_system_prompt=None
+        )
+        return compose_system_content(load_pedagogy(), **{**vorgaben, **kwargs})
+
+    def test_stufe_steht_drin(self):
+        assert "Klasse 9" in self._inhalt(stufe=9)
+
+    def test_regel_steht_daneben(self):
+        """Ohne sie ist die Stufe eine Angabe ohne Auftrag: Das Modell weiß, in welcher
+        Klasse jemand ist, und antwortet trotzdem auf Kursstufenniveau."""
+        from app.pedagogy.compose import STUFEN_REGEL
+
+        assert STUFEN_REGEL in self._inhalt(stufe=9)
+
+    def test_ohne_stufe_keine_zeile(self):
+        assert "Klasse" not in self._inhalt(stufe=None).split("Wissens")[0][-400:]
+
+    def test_lehrkraefte_bekommen_keine_stufe(self):
+        """Eine Lehrkraft, die den Unterricht einer neunten Klasse vorbereitet, braucht
+        alle Fassungen ohne Zurückhaltung — sie entscheidet, was in die Stunde gehört."""
+        inhalt = self._inhalt(student_treatment=False, stufe=9)
+        assert "Die fragende Person ist in Klasse" not in inhalt
+
+    def test_stufe_vor_dem_kontext(self):
+        inhalt = self._inhalt(stufe=9, context_str="## Relevante Lerninhalte\n\nX")
+        assert inhalt.index("Klasse 9") < inhalt.index("Relevante Lerninhalte")

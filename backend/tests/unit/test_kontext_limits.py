@@ -64,7 +64,7 @@ class TestSuchtiefeDesAssistenten:
                           new=AsyncMock(return_value=Suchergebnis())) as gesucht:
             ctx = router.ToolContext(
                 db=object(),
-                user=type("U", (), {"sub": "p", "roles": ["student"]})(),
+                user=type("U", (), {"sub": "p", "roles": ["student"], "grade": None})(),
                 group_id=None, conversation_id=None,
             )
             await router._search_context_nodes_handler({"query": "x"}, ctx)

@@ -57,7 +57,7 @@ from app.chat.image_store import (
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.api.assistants import _is_visible_for_user
-from app.context.service import get_context_for_query
+from app.context.service import get_context_for_query, stufe_der_person
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
 from app.context.search import (
@@ -66,6 +66,11 @@ from app.context.search import (
     abgrenzungen_zu,
     aufzaehlung,
     suche,
+)
+from app.context.stufen import (
+    bp_baender_zu,
+    sortiere_passende_nach_vorn,
+    vermerke as stufen_vermerke,
 )
 from app.context.taxonomy import modell_metadata_felder
 from app.crisis.detector import CrisisHit, scan
@@ -613,7 +618,11 @@ def _abbildungen_aufgeloest(inhalt: str, metadata) -> str:
     return _ABBILDUNG.sub(ersetze, inhalt)
 
 
-def _fuer_modell(treffer: list, abgrenzungen: dict | None = None) -> list:
+def _fuer_modell(
+    treffer: list,
+    abgrenzungen: dict | None = None,
+    stufenvermerke: dict | None = None,
+) -> list:
     """Suchergebnis für den LLM-Kontext aufbereiten.
 
     Bis 08/2026 bekam das Modell **nur die Titel**. Damit war jede Frage nach dem
@@ -632,8 +641,9 @@ def _fuer_modell(treffer: list, abgrenzungen: dict | None = None) -> list:
     Strukturformel im Prompt.
 
     ``abgrenzungen`` kommt aus :func:`app.context.search.abgrenzungen_zu` — je Knoten
-    die Sätze, die ihn von ähnlichen unterscheiden. Sie brauchen eine Datenbank und
-    können hier deshalb nicht selbst geholt werden.
+    die Sätze, die ihn von ähnlichen unterscheiden. ``stufenvermerke`` aus
+    :mod:`app.context.stufen`. Beide brauchen eine Datenbank und können hier deshalb
+    nicht selbst geholt werden.
     """
     aufbereitet = []
     for t in treffer:
@@ -663,6 +673,11 @@ def _fuer_modell(treffer: list, abgrenzungen: dict | None = None) -> list:
         hinweise = (abgrenzungen or {}).get(str(t["node_id"]))
         if hinweise:
             eintrag["abgrenzungen"] = hinweise
+        # ⚠️ **Nur wo etwas nicht passt** (Paket 9, N6). Ein Vermerk an jedem Treffer
+        # wäre Rauschen; er soll auffallen.
+        vermerk = (stufenvermerke or {}).get(str(t["node_id"]))
+        if vermerk:
+            eintrag["stufe"] = vermerk
         eintrag |= _metadata_fuers_modell(t.get("content_type"), t.get("metadata"))
         inhalt = (t.get("content") or "").strip()
         if inhalt:
@@ -715,16 +730,29 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     for t in ident.treffer:
         nach_art[t.get("treffer_art", "exakt")].append(t)
 
-    alle = nach_art["exakt"] + nach_art["teilweise"] + list(ergebnis.thematisch.treffer)
+    thematisch = list(ergebnis.thematisch.treffer)
+    alle = nach_art["exakt"] + nach_art["teilweise"] + thematisch
     # Eine Abfrage für alle drei Abschnitte zusammen — nicht eine je Treffer.
     grenzen = await abgrenzungen_zu(ctx.db, [t.get("node_id") for t in alle])
 
+    # Klassenstufe (N5) und Stufenvermerk je Treffer (N6). Die passende Fassung wandert
+    # nach vorn; **ausgeblendet wird nichts** — wer ausdrücklich nach der späteren
+    # Fassung fragt, soll sie finden, statt eine Antwort aus dem Modellwissen zu
+    # bekommen.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
+    baender = await bp_baender_zu(ctx.db, alle, stufe) if stufe is not None else {}
+    vermerke = stufen_vermerke(alle, stufe, baender)
+    if vermerke:
+        for abschnitt in (nach_art["exakt"], nach_art["teilweise"]):
+            abschnitt[:] = sortiere_passende_nach_vorn(abschnitt, vermerke)
+        thematisch = sortiere_passende_nach_vorn(thematisch, vermerke)
+
     antwort: dict = {
-        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"], grenzen),
+        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"], grenzen, vermerke),
         "gesamt": ident.gesamt,
         "vollstaendig": ident.vollstaendig,
-        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"], grenzen),
-        "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer, grenzen),
+        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"], grenzen, vermerke),
+        "naechstliegende_bausteine": _fuer_modell(thematisch, grenzen, vermerke),
     }
     if ergebnis.hinweise:
         antwort["hinweise"] = ergebnis.hinweise
@@ -924,11 +952,19 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     grenzen = await abgrenzungen_zu(
         ctx.db, [t.get("node_id") for t in abschnitt.treffer]
     )
+    # ⚠️ **Hier wird gekennzeichnet, aber nicht sortiert.** Eine Aufzählung beantwortet
+    # „alle, die …" und ist nach Fach und Titel geordnet; diese Ordnung ist die Aussage.
+    # Sie nach Stufe umzustellen machte aus der Liste eine Rangfolge.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
+    baender = (
+        await bp_baender_zu(ctx.db, abschnitt.treffer, stufe) if stufe is not None else {}
+    )
+    vermerke = stufen_vermerke(abschnitt.treffer, stufe, baender)
     antwort: dict = {
         "gesamt": abschnitt.gesamt,
         "geliefert": abschnitt.geliefert,
         "vollstaendig": abschnitt.vollstaendig,
-        "bausteine": _fuer_modell(abschnitt.treffer, grenzen),
+        "bausteine": _fuer_modell(abschnitt.treffer, grenzen, vermerke),
     }
     if abschnitt.gruppen is not None:
         antwort["gruppen"] = [
@@ -1951,6 +1987,7 @@ async def chat(
         "content": compose_system_content(
             pedagogy,
             student_treatment=student_treatment,
+            stufe=await stufe_der_person(db, conversation_id, current_user.grade),
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,

@@ -384,7 +384,7 @@ class TestAufzaehlungsWerkzeug:
              patch.object(router, "_subject_id_aus_name",
                           new=AsyncMock(return_value=subject_id)):
             ctx = router.ToolContext(
-                db=object(), user=type("U", (), {"sub": "p", "roles": []})(),
+                db=object(), user=type("U", (), {"sub": "p", "roles": [], "grade": None})(),
                 group_id=None, conversation_id=None,
             )
             return await router._list_context_nodes_handler(args, ctx), gez
@@ -599,7 +599,7 @@ class TestWerkzeugantwort:
              patch.object(router, "_resolve_conversation_subject_id",
                           new=AsyncMock(return_value=None)):
             ctx = router.ToolContext(
-                db=object(), user=type("U", (), {"sub": "p", "roles": []})(),
+                db=object(), user=type("U", (), {"sub": "p", "roles": [], "grade": None})(),
                 group_id=None, conversation_id=None,
             )
             return await router._search_context_nodes_handler({"query": "nennen"}, ctx)
@@ -806,7 +806,7 @@ class TestZeitraumAufzaehlung:
 
         with patch.object(router, "aufzaehlung", new=AsyncMock()) as gezaehlt:
             ctx = router.ToolContext(
-                db=object(), user=type("U", (), {"sub": "p", "roles": []})(),
+                db=object(), user=type("U", (), {"sub": "p", "roles": [], "grade": None})(),
                 group_id=None, conversation_id=None,
             )
             antwort = await router._list_context_nodes_handler(

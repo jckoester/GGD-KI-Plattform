@@ -192,6 +192,35 @@ async def get_context_for_query(
     return base
 
 
+async def stufe_der_person(
+    db: AsyncSession, chat_id: UUID | None, jwt_stufe: str | None
+) -> int | None:
+    """In welcher Klassenstufe ist, wer hier fragt? ``None``, wenn unbekannt.
+
+    **Die Reihenfolge ist die Aussage** (Paket 9, N5): Zuerst die Unterrichtsgruppe der
+    Konversation, dann der Jahrgang aus der Anmeldung. Die Gruppe gewinnt, weil sie
+    genauer ist — eine Zehntklässlerin im Chemie-Chat ihrer Klasse 10 ist dort in
+    Klasse 10, auch wenn ihr Konto etwas anderes sagt (Wiederholer, Sprung,
+    fehlerhafte Schulkonto-Gruppe).
+
+    ⚠️ **Das dritte Glied fehlt noch.** N5 nennt als letzte Quelle „im Vorschaumodus
+    die gewählte Stufe“. Den Vorschaumodus (ADR-016) gibt es noch nicht; er steht als
+    Todo. Wenn er kommt, gehört seine Stufe **vor** die beiden hier — sie ist die
+    ausdrückliche Wahl einer Lehrkraft und schlägt jede Ableitung.
+
+    ⚠️ **Unbekannt bleibt unbekannt.** Auf eine Vorgabe auszuweichen (etwa die
+    Mittelstufe) hieße, jeden Erwachsenen ohne Jahrgang wie eine Achtklässlerin zu
+    behandeln — und die Kennzeichnung der Treffer würde durchweg falsch.
+    """
+    aus_gruppe = await _conversation_grade(db, chat_id)
+    if aus_gruppe is not None:
+        return aus_gruppe
+    try:
+        return int(str(jwt_stufe).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 async def _conversation_grade(db: AsyncSession, chat_id: UUID | None) -> int | None:
     """Jahrgang der Konversation über ihre Unterrichtsgruppe — sonst ``None``."""
     if chat_id is None:

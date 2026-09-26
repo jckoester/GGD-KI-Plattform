@@ -114,6 +114,36 @@ Grund wie die Fehlvorstellungen: Sie sagen, was der Begriff **nicht** ist, und z
 Vektor genau die Fragen an, die sie abgrenzen sollen. Bis 09/2026 sah das Modell sie
 deshalb **gar nicht**, dabei sind es die Sätze, die Verwechslungen verhindern.
 
+| `stufe` | Klassenstufe der Person gegen die des Knotens | Nur **wo etwas nicht passt** — „kommt ab Klasse 10“, „Vorwissen (frühere Fassung)“, „früherer Stoff“. Passende Treffer stehen ohne Vermerk vorn |
+
+### Klassenstufe: kennzeichnen und sortieren, nicht filtern
+
+Woher die Stufe kommt, entscheidet `stufe_der_person` (`context/service.py`) in dieser
+Reihenfolge: **Unterrichtsgruppe der Konversation**, dann der Jahrgang aus der
+Anmeldung. Die Gruppe gewinnt, weil sie genauer ist — eine Zehntklässlerin im Chemie-Chat
+ihrer Klasse 10 ist dort in Klasse 10, auch wenn ihr Konto etwas anderes sagt.
+Unbekannt bleibt unbekannt: Ein Rückfall auf eine Vorgabe behandelte jeden Erwachsenen
+ohne Jahrgang wie eine Achtklässlerin.
+
+Die Stufe eines **Bausteins** kommt aus zwei Quellen (`context/stufen.py`):
+
+1. `metadata.ab_klasse` bei Begriffen mit mehreren Fassungen. Welche die aktuelle ist,
+   entscheidet der Vergleich **untereinander** — die höchste erreichte Stufe gewinnt,
+   frühere sind Vorwissen. Ohne diesen Vergleich wäre jeder Begriff unterhalb der
+   Stufe „Vorwissen“, also fast jeder.
+2. Sonst das Klassenband seiner Bildungsplan-Fundstellen. Es steht in den Daten
+   (`min_grade`/`max_grade` an der Kompetenz) und wird nicht nachgebaut; gezählt werden
+   nur **aktive** Ziele in der für Fach und Stufe geltenden Edition.
+
+⚠️ **Gefiltert wird nicht.** Fragt eine Neuntklässlerin ausdrücklich nach der
+Elektronen-Fassung der Oxidation, fände der Assistent sonst nichts und antwortete aus
+dem Modellwissen — also ohne die Definition ihrer Schule. Sortiert wird **stabil** und
+in zwei Gruppen (passt / passt nicht); „kommt später“ gegen „Vorwissen“ zu
+ordnen hieße, eine Vorliebe zu behaupten, für die es keine Grundlage gibt.
+
+Die **Aufzählung** kennzeichnet, sortiert aber nicht: Sie beantwortet „alle, die …“
+und ist nach Fach und Titel geordnet — das ist ihre Aussage.
+
 ⚠️ **Im Embedding und im Namensabgleich bleiben Aliase unverändert** — dort sind sie
 richtig. Drei Prüfsatzfälle halten das fest („Mol“, „Molzahl“,
 „Wasserstoffbrückenbindung“): Wer bei der Beschriftung versehentlich die Suche

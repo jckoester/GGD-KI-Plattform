@@ -29,6 +29,28 @@ def _augmentation_texts(pedagogy: PedagogyConfig, disabled: list[str] | None) ->
     return [a.text for a in pedagogy.student_augmentations if a.key not in disabled_set]
 
 
+#: Was neben der Klassenstufe steht. Ohne diesen Satz ist die Stufe eine Angabe ohne
+#: Auftrag — das Modell weiß, in welcher Klasse jemand ist, und antwortet trotzdem auf
+#: Kursstufenniveau.
+#:
+#: ⚠️ **Ausblenden wäre die schlechtere Lösung** (N6): Fragt eine Neuntklässlerin
+#: ausdrücklich nach der Elektronen-Fassung der Oxidation, fände der Assistent nichts
+#: und antwortete aus dem Modellwissen. Deshalb bekommt er alles zu sehen — und die
+#: Regel, wonach er sich richtet.
+STUFEN_REGEL = (
+    "Antworte auf dem Stand dieser Klassenstufe. Spätere Inhalte nur, wenn "
+    "ausdrücklich danach gefragt wird, und dann mit dem Hinweis, dass sie später "
+    "genauer kommen."
+)
+
+
+def stufen_hinweis(stufe: int | None) -> str:
+    """Die eine Zeile zur Klassenstufe — leer, wenn sie unbekannt ist."""
+    if stufe is None:
+        return ""
+    return f"Die fragende Person ist in Klasse {stufe}. {STUFEN_REGEL}"
+
+
 def compose_system_content(
     pedagogy: PedagogyConfig,
     *,
@@ -36,12 +58,17 @@ def compose_system_content(
     context_str: str | None,
     assistant_system_prompt: str | None,
     disabled_augmentations: list[str] | None = None,
+    stufe: int | None = None,
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
-    Reihenfolge: universelle Basis · Zielgruppen-Erweiterung · [Wissens-Kontext +
-    Assistenten-Prompt] · [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
+    Reihenfolge: universelle Basis · Zielgruppen-Erweiterung · [Klassenstufe — nur
+    Schüler-Behandlung] · [Wissens-Kontext + Assistenten-Prompt] ·
+    [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
+
+    ``stufe`` steht **vor** dem Kontext, nicht darin: Sie gilt für die ganze Antwort,
+    auch wenn die Suche nichts gefunden hat.
     """
     extension = (
         pedagogy.preambles.student_extension
@@ -49,6 +76,14 @@ def compose_system_content(
         else pedagogy.preambles.teacher_extension
     )
     parts: list[str] = [pedagogy.preambles.universal_base.strip(), extension.strip()]
+
+    # ⚠️ **Nur bei Schüler-Behandlung.** Eine Lehrkraft, die den Unterricht einer
+    # neunten Klasse vorbereitet, braucht alle Fassungen ohne Zurückhaltung — sie
+    # entscheidet selbst, was in die Stunde gehört (N5).
+    if student_treatment:
+        hinweis = stufen_hinweis(stufe)
+        if hinweis:
+            parts.append(hinweis)
 
     ctx = (context_str or "").strip()
     prompt = (assistant_system_prompt or "").strip()

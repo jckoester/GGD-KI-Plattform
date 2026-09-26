@@ -68,6 +68,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Assistenten antworten auf dem Stand der Klassenstufe.** Gibt es einen Begriff
+  in mehreren Fassungen — „Oxidation“ als Sauerstoffaufnahme und als
+  Elektronenabgabe —, steht die passende vorn. Die andere bleibt erreichbar: Wer
+  ausdrücklich danach fragt, bekommt sie, mit dem Hinweis, dass sie später
+  genauer kommt. Die Stufe kommt aus der Unterrichtsgruppe des Chats, sonst aus
+  der Anmeldung.
 - **Assistenten verwechseln ähnliche Fachbegriffe seltener.** Sie bekommen jetzt die Abgrenzungen eines Bausteins mit — die Sätze, die sagen, wovon er sich
   unterscheidet und wodurch. Und sie erkennen andere Bezeichnungen als das,
   was sie sind: Suchbegriffe, unter denen gefragt wird. Geantwortet wird mit
