@@ -85,3 +85,62 @@ def test_validation_rejects_missing_preamble():
         PedagogyConfig.model_validate(
             {"preambles": {"universal_base": "x", "student_extension": "y"}}
         )
+
+
+class TestSchuelerPraeambelN8:
+    """Zusagen der Schüler-Präambel in der Fassung N8 (Paket 9, Nachgang AP7 Schritt 5).
+
+    Die Texte selbst sind Redaktionssache und werden hier **nicht** festgenagelt —
+    geprüft ist, was daran Mechanik ist.
+    """
+
+    def test_schluessel_der_zusaetze_unveraendert(self):
+        """⚠️ **Stumme Falle.** `assistants.disabled_augmentations` ist eine
+        Textspalte mit genau diesen Schlüsseln (Alembic 0032). Wer einen Schlüssel
+        umbenennt, schaltet bei jedem Assistenten, der ihn abgewählt hatte, den
+        Zusatz **wieder ein** — ohne Fehler, ohne Migration, ohne Hinweis in der
+        Oberfläche. N8 hat alle vier Texte neu gefasst und die Schlüssel bewusst
+        stehen lassen.
+        """
+        vorhanden = {a.key for a in load_pedagogy().student_augmentations}
+        # Teilmenge, nicht Gleichheit: Ein **neuer** Zusatz ist harmlos (er ist überall
+        # an, bis ihn jemand abwählt). Gefährlich ist nur, wenn einer verschwindet.
+        assert vorhanden >= {
+            "no_complete_homework_solutions",
+            "socratic_preference",
+            "no_verbatim_copy_from_sources",
+            "metacognitive_nudges",
+        }, f"vorhanden: {sorted(vorhanden)}"
+
+    def _nummern(self, text: str) -> list[int]:
+        import re
+        return [int(m) for m in re.findall(r"^\s*(\d+)\. ", text, re.MULTILINE)]
+
+    def test_nummerierung_laeuft_ueber_die_praeambeln_durch(self):
+        """Die Grundsätze sind **eine** Liste, verteilt auf zwei Bausteine.
+
+        ⚠️ Das Modell sieht `universal_base` und die Zielgruppen-Erweiterung als
+        fortlaufenden Text. Ein zusätzlicher Grundsatz in der Basis, ohne die
+        Erweiterungen nachzuziehen, ergibt „1, 2, 3, 4 · 4, 5" — zwei Punkte 4.
+        """
+        cfg = load_pedagogy()
+        basis = self._nummern(cfg.preambles.universal_base)
+        assert basis == list(range(1, len(basis) + 1))
+        for erweiterung in (cfg.preambles.student_extension,
+                            cfg.preambles.teacher_extension):
+            nummern = self._nummern(erweiterung)
+            assert nummern == list(range(basis[-1] + 1, basis[-1] + 1 + len(nummern)))
+
+    def test_querverweis_auf_eigene_punkte_trifft(self):
+        """„Die Punkte 4 bis 6 gelten, sofern …" — ein Verweis im Text auf Nummern,
+        die die Umnummerierung aus dem vorigen Test mitverschöbe, ohne dass jemand
+        den Satz anfasst."""
+        import re
+        cfg = load_pedagogy()
+        nummern = set(self._nummern(cfg.preambles.student_extension))
+        verweise = re.findall(r"Punkte (\d+) bis (\d+)", cfg.preambles.student_extension)
+        assert verweise, "Der Querverweis fehlt — dann gehört dieser Test weg."
+        for von, bis in verweise:
+            assert {int(von), int(bis)} <= nummern, (
+                f"Verweis auf Punkte {von}–{bis}, vorhanden sind {sorted(nummern)}"
+            )

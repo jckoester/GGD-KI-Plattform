@@ -23,6 +23,7 @@ stellt die Suche mit demselben Profil nach.
 """
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -35,7 +36,8 @@ from app.config import settings
 
 
 def frage_stellen(
-    client: httpx.Client, frage: str, *, assistent: int | None, gruppe: int | None
+    client: httpx.Client, frage: str, *, assistent: int | None, gruppe: int | None,
+    modell: str | None = None,
 ) -> dict:
     """Eine Frage senden und den Rohstrom auswerten.
 
@@ -49,6 +51,8 @@ def frage_stellen(
         rumpf["assistant_id"] = assistent
     if gruppe is not None:
         rumpf["group_id"] = gruppe
+    if modell is not None:
+        rumpf["model_id"] = modell
 
     werkzeuge: list[dict] = []
     stuecke: list[str] = []
@@ -88,8 +92,30 @@ def frage_stellen(
         # Die Kennzahlen aus dem Messplan (N8): Kürze und Rückfragen sind das, was die
         # neue Präambel ändern soll — sie hier mitzuzählen erspart das Nachzählen von
         # Hand und macht zwei Läufe vergleichbar.
+        **kennzahlen(antwort),
+    }
+
+
+#: Überschrift und Aufzählungspunkt in der Antwort — beides zählt, weil der Befund aus
+#: AP7 nicht „zu lang" hieß, sondern „zu viel auf einmal": Gliederungen wie „Was du jetzt
+#: noch überlegen könntest" mit Leitfragen, Reflexionsanstößen und Versuchsideen unter
+#: einer Frage, die mit drei Sätzen beantwortet wäre. Die Wortzahl allein sieht das nicht.
+_UEBERSCHRIFT = re.compile(r"^#{1,6} ", re.MULTILINE)
+_LISTENPUNKT = re.compile(r"^\s*(?:[-*+]|\d+\.)\s", re.MULTILINE)
+
+
+def kennzahlen(antwort: str) -> dict:
+    """Die vier Formkennzahlen aus dem Messplan (N8).
+
+    ⚠️ **`fragezeichen` ist eine Näherung für „Rückfragen".** Eine rhetorische Frage
+    mitten im Text zählt mit, eine Rückfrage ohne Fragezeichen nicht. Für den Vergleich
+    zweier Läufe genügt das; für eine Einzelaussage nicht.
+    """
+    return {
         "woerter": len(antwort.split()),
         "fragezeichen": antwort.count("?"),
+        "ueberschriften": len(_UEBERSCHRIFT.findall(antwort)),
+        "listenpunkte": len(_LISTENPUNKT.findall(antwort)),
     }
 
 
@@ -99,6 +125,8 @@ def main() -> None:
     p.add_argument("--datei", type=Path, help="Datei mit einer Frage je Zeile")
     p.add_argument("--assistent", type=int, default=None)
     p.add_argument("--gruppe", type=int, default=None)
+    p.add_argument("--modell", default=None,
+                   help="Modell-Alias, sonst das des Assistenten (z. B. chat-reasoning)")
     p.add_argument("--pseudonym", default="probe-schueler",
                    help="Pseudonym für den Token; für Budget und Gruppenbezug relevant")
     p.add_argument("--stufe", default="9", help="Jahrgang im Token (Zeichenkette)")
@@ -134,7 +162,8 @@ def main() -> None:
                       headers={"Cookie": f"session={token}"}) as client:
         for frage in fragen:
             ergebnisse.append(
-                frage_stellen(client, frage, assistent=args.assistent, gruppe=args.gruppe)
+                frage_stellen(client, frage, assistent=args.assistent,
+                              gruppe=args.gruppe, modell=args.modell)
             )
 
     if args.json:
@@ -146,7 +175,8 @@ def main() -> None:
         ) or "KEIN Werkzeugaufruf"
         print(f"\n{'─' * 78}\n▸ {e['frage']}")
         print(f"  Werkzeuge: {werkzeuge}")
-        print(f"  {e['woerter']} Wörter, {e['fragezeichen']} Fragezeichen\n")
+        print(f"  {e['woerter']} Wörter, {e['fragezeichen']} Fragezeichen, "
+              f"{e['ueberschriften']} Überschriften, {e['listenpunkte']} Listenpunkte\n")
         print(e["antwort"])
 
 

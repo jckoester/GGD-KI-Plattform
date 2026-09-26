@@ -602,10 +602,25 @@ Lehrkräfte behalten **vollständige, direkte** Antworten.
 | Block | Gilt für | Inhalt |
 |-------|----------|--------|
 | `universal_base` | **alle** | Faktentreue, Prompt-Injection-Abwehr, Krisen-Hinweispflicht |
-| `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — Denkanstöße statt Komplettlösungen |
+| `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — kurze Antwort auf eine Sache, höchstens eine Rückfrage, und nur ungefährliche Versuchsvorschläge für zu Hause |
 | `teacher_extension` | Lehrkraft-Behandlung | direkt, vollständig, Musterlösungen ausdrücklich erwünscht |
 | `student_augmentations` | nur Schüler-Behandlung | sanfte Lernverhalten-Leitplanken (s. u.), pro Assistent abschaltbar |
 | `output_format` | **alle** | Ausgabe als Markdown ohne umschließende Code-Fences |
+
+### Zwei Stolperstellen beim Bearbeiten
+
+**Die Nummerierung läuft über zwei Blöcke.** `universal_base` zählt die Grundsätze 1
+bis 3, beide Zielgruppen-Erweiterungen setzen bei 4 fort — das Modell liest sie als
+einen Text. Wer der Basis einen vierten Grundsatz gibt, ohne die Erweiterungen
+nachzuziehen, liefert zwei Punkte 4. Innerhalb der Schüler-Präambel gibt es zudem einen
+Verweis auf eigene Punktnummern („Die Punkte 4 bis 6 gelten, sofern …"). Beides prüft
+der Start nicht, aber ein Test tut es.
+
+**Die `key`-Werte der Augmentierungen sind Daten, nicht Beschriftung.** An jedem
+Assistenten steht, welche Zusätze abgewählt wurden — als Liste genau dieser Schlüssel.
+Wer einen Schlüssel umbenennt, schaltet den Zusatz überall dort **wieder ein**, wo ihn
+jemand abgewählt hatte: ohne Fehlermeldung, ohne Eintrag in der Oberfläche. Den Text
+eines Zusatzes dürfen Sie jederzeit neu fassen, den Schlüssel nicht.
 
 ### Wer bekommt welche Behandlung? (`audience` + Rolle)
 
@@ -631,9 +646,15 @@ Test-Chats einer Lehrkraft an einem `student`-Assistenten zeigen bewusst die
 ### Lernverhalten-Leitplanken (`student_augmentations`)
 
 Greifen **nur** in der Schüler-Behandlung und sind **sanfte Augmentierungen, keine
-Blockaden**. Mitgeliefert sind u. a. „keine Komplettlösungen", „sokratische Rückfragen",
+Blockaden**. Mitgeliefert sind „keine Komplettlösungen", „sokratische Rückfragen",
 „zum Paraphrasieren motivieren", „Reflexions-Hinweise". Pro Assistent lassen sie sich im
 **Editor** (Checkbox-Liste, nur bei Zielgruppe Schüler:innen/Alle) einzeln abwählen.
+
+⚠️ **Eine Leitplanke im System-Prompt ist eine Bitte, keine Sperre.** Gemessen am
+26.09.2026: Die Regel, zu Hause keine Elektrolyse vorzuschlagen, steht wörtlich in der
+Präambel — der Assistent schlug sie auf ausdrückliche Nachfrage trotzdem vor, wenn auch
+deutlich zurückhaltender als ohne die Regel. Wo eine Zusage verlässlich sein muss,
+gehört sie auf die Sperr-Ebene (Abschnitt B), nicht hierher.
 
 ### `audience` als bewusster Prüfpunkt beim Freigeben
 

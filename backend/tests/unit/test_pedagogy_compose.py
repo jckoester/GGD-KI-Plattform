@@ -45,14 +45,25 @@ def _ped():
     return load_pedagogy()
 
 
+def _aug(key: str) -> str:
+    """Text einer Lernverhalten-Augmentierung über ihren **Schlüssel**.
+
+    ⚠️ **Die Formulierung nicht festnageln.** Bis zum 26.09.2026 prüften zwei Tests
+    hier auf die Wendung „zum Ergebnis kommt". Sie fielen um, als N8 die Texte neu
+    fasste — obwohl am geprüften Verhalten nichts falsch war. Zugesagt ist der
+    Schlüssel (`disabled_augmentations` in der Datenbank nennt genau ihn), nicht der
+    Wortlaut; den ändert die Redaktion.
+    """
+    return next(a.text for a in load_pedagogy().student_augmentations if a.key == key)
+
+
 def test_student_treatment_includes_extension_and_augmentations():
     out = compose_system_content(
         _ped(), student_treatment=True, context_str=None, assistant_system_prompt="SP"
     )
     assert "Lernassistent" in out          # student_extension
     assert "Lehrkräfte" not in out         # KEINE teacher_extension
-    # augmentierungs-eindeutige Phrase (nicht in der Präambel enthalten):
-    assert "zum Ergebnis kommt" in out     # Augmentierung no_complete_homework_solutions
+    assert _aug("no_complete_homework_solutions") in out
     assert "SP" in out
 
 
@@ -62,7 +73,7 @@ def test_teacher_treatment_has_no_augmentations():
     )
     assert "Lehrkräfte" in out             # teacher_extension
     assert "Lernassistent" not in out
-    assert "zum Ergebnis kommt" not in out  # keine Augmentierungen für Lehrkräfte
+    assert _aug("no_complete_homework_solutions") not in out
 
 
 def test_universal_base_always_present():
@@ -104,8 +115,8 @@ def test_disabled_augmentation_excluded():
         assistant_system_prompt="SP",
         disabled_augmentations=["no_complete_homework_solutions"],
     )
-    assert "zum Ergebnis kommt" not in out  # deaktiviert
-    assert "Rückfragen" in out              # socratic_preference bleibt aktiv
+    assert _aug("no_complete_homework_solutions") not in out   # deaktiviert
+    assert _aug("socratic_preference") in out                  # bleibt aktiv
 
 
 def test_output_format_not_in_compose():

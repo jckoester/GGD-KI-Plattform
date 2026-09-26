@@ -202,6 +202,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Assistenten antworten Schüler:innen kürzer und auf eine Sache.** Statt Antwort,
+  Leitfragen, Reflexionsanstößen und Versuchsideen in einem Zug steht jetzt eine kurze
+  Antwort mit höchstens einer Rückfrage. Hintergrundwissen aus dem Wissensspeicher —
+  etwa vermerkte Irrtümer — wird genutzt, aber nicht mehr aufgezählt.
+
+- **Versuchsvorschläge für zu Hause sind begrenzt.** Assistenten schlagen Schüler:innen
+  nur noch Ungefährliches vor (Küchenzutaten, Wasser, Batterien bis 9 Volt); für alles
+  andere verweisen sie auf den Unterricht.
+
 - **Kapitel im Wissensbereich haben ein Formular.** Stundenzahl, Reihenfolge,
   Einleitung und Pfad im Bildungsplan werden jetzt geprüft, statt beliebig gefüllt zu
   werden — eine Stundenzahl als Text hatte im September die Jahresübersicht

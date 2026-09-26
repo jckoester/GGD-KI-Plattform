@@ -103,6 +103,13 @@
 #
 # Deshalb steht `reasoning_effort: none` überall dort, wo NICHT gedacht werden soll — und
 # fehlt bewusst bei `chat-reasoning` und `chat-komplex`.
+#
+# ⚠️ **Sparen kostet hier mehr, als es spart** (gemessen 26.09.2026). Die niedrigste
+# Denkstufe spart ein paar Ausgabe-Tokens und nimmt dem Modell zugleich die Entscheidung
+# „schlage ich nach?“ — es antwortet dann aus dem eigenen Wissen statt aus dem
+# Wissensspeicher der Schule. Wer die Stufe eines Modells senkt, das Werkzeuge nutzen
+# soll, misst hinterher die **Aufrufquote**, nicht nur die Tokenzahl
+# (`backend/scripts/chat_probe.py` zählt sie mit).
 # ─────────────────────────────────────────────────────────────────────────────────────
 
 model_list:
@@ -130,10 +137,18 @@ model_list:
       model: openai/openai/gpt-oss-120b       # doppeltes `openai/`: Provider + IONOS-ID
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
-      # `low`, NICHT `none`: gpt-oss-120b lehnt `none` ab („Harmony does not support
+      # NICHT `none`: gpt-oss-120b lehnt das ab („Harmony does not support
       # reasoning_effort='none'", HTTP 400) — es denkt immer, nur unterschiedlich lang.
       # low = 28 Tokens, ohne Angabe 56, high 179 (gemessen).
-      reasoning_effort: low
+      #
+      # ⚠️ **`low` hat den Wissensspeicher unbrauchbar gemacht.** Ob das Modell die
+      # Kontextsuche aufruft, ist eine Denkentscheidung — mit 28 Tokens Denkbudget
+      # fällt sie meistens gegen die Suche aus. Gemessen am 26.09.2026, vier Fragen à
+      # vier Läufe, Chemie-Assistent mit ausdrücklicher Such-Anweisung im Prompt:
+      # `low` 4 von 16 Aufrufen, `high` 15 von 16 — bei gleich kurzen Antworten.
+      # Die Frage „Beim Sieden zerfällt Wasser …“ wurde mit `low` in **keinem** Lauf
+      # nachgeschlagen und entsprechend falsch beantwortet.
+      reasoning_effort: medium
       allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
       supports_function_calling: true         # gemessen
