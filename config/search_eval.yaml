@@ -329,6 +329,35 @@ faelle:
       Zweiter Fall mit derselben räumlichen Anordnung wie Kugellager — die beiden
       dürfen sich nicht verwechseln lassen.
 
+  # ── Stoffsteckbriefe (Paket 9, ab 26.09.2026) ────────────────────────────────
+  #
+  # ⚠️ **Noch ohne Bestand.** Die Knoten entstehen erst mit dem Pilot-Import (AP7);
+  # bis dahin melden diese Fälle „nicht gefunden". Sie stehen trotzdem schon hier: Der
+  # Prüfsatz vor dem Import ist die Vergleichsbasis dafür, ob der Import bestehende
+  # Treffer verdrängt (Leitplanke 1 des Pakets).
+
+  - frage: Womit weist man Chloridionen nach?
+    fach: Chemie
+    knoten: Salzsäure
+    notiz: >-
+      Der Nachweis steht in einem eigenen Feld, **nicht** im Embedding-Input. Gefunden
+      werden soll der Stoff über seinen Text; findet der Fall nichts, obwohl der Knoten
+      da ist, gehört `nachweis` doch in den Vektor.
+
+  - frage: Wie heißt Kochsalz richtig?
+    fach: Chemie
+    knoten: Natriumchlorid
+    notiz: >-
+      Der Alltagsname steht in `trivialnamen` und ist ausdrücklich Teil des
+      Embedding-Inputs — genau danach fragen Schüler:innen.
+
+  - frage: Welcher Stoff raucht an feuchter Luft und greift Metalle an?
+    fach: Chemie
+    knoten: Salzsäure
+    notiz: >-
+      Umschreibung ohne Namen. Prüft, ob der Text trägt, ohne dass die
+      Eigenschaftstabelle im Vektor steht.
+
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #
 # Eine andere Frageklasse und deshalb ein eigener Abschnitt: „alle, die …" verlangt

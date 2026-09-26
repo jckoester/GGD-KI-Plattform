@@ -633,6 +633,115 @@ categories:
             typ: text
             label: "Herkunft"
             hinweis: "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
+      - key: stoffsteckbrief
+        label_de: "Stoffsteckbrief"
+        icon: FlaskConical
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        # ⚠️ **Warum ein eigener Typ und nicht `begriff` mit Zusatzfeldern**
+        # (Entscheidung Jan, 26.09.2026, Paket 9/E2). Das Existenz-Kriterium verlangt
+        # eine **Mechanik** oder einen **Filter**, nicht eine Mindestzahl — beides ist
+        # erfüllt:
+        #
+        # 1. Der Embedding-Input ist ein anderer. Ein Begriff trägt Definition und
+        #    Erklärung; ein Steckbrief zusätzlich seine Alltagsnamen („Kochsalz",
+        #    „Trockeneis"), unter denen Schüler:innen ihn suchen. Die
+        #    Eigenschaftstabelle dagegen gehört **nicht** in den Vektor.
+        # 2. Die Liste ist eine andere: „Welche Stoffe hatten wir?" mit Formel und
+        #    Prüfstatus ist nicht die Fachbegriffsliste.
+        # 3. Stoffklasse, Teilchen und Gefahrenpiktogramme sind **Kanten** — als freies
+        #    Metadata an einem `begriff` blieben sie tote Zeichenketten.
+        embedding: true
+        # Titel, Aliase und Trivialnamen tragen die Identifikation; `content` (Definition
+        # → Erklärung → Beispiele) die Sache. **Ohne** `eigenschaften`: Schmelz- und
+        # Siedetemperaturen ähneln sich über alle Stoffe und machten die Vektoren
+        # einander ähnlich statt unterscheidbar — dieselbe Falle wie der Verlaufsplan
+        # beim Stundenentwurf.
+        embedding_input: ["title", "aliases", "metadata.trivialnamen", "content"]
+        collection:
+          beschreibung: >-
+            Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung
+            sind getrennt (Chlorwasserstoff / Salzsäure) — sonst verwischt die
+            Unterscheidung zwischen Säure und saurer Lösung.
+          spalten: [titel, formel, fach, pruefstatus, status, geaendert]
+          filter: [fach, pruefstatus, status, titel]
+          # Wie `begriff`: Nachschlagen im Unterricht ist der Kernfall, und die Frage
+          # „was ist das für ein Stoff?" stellt man ohne das eigene Fach im Kopf.
+          sidebar: true
+          schueler: true
+          relationen:
+            is_a:
+              label: "gehört zur Stoffklasse"
+              ziel: [begriff]
+            related_to:
+              label: "steht in Beziehung zu"
+              ziel: [begriff, stoffsteckbrief]
+            references:
+              label: "wird im Bildungsplan verlangt in"
+              ziel: [ik_kompetenz]
+          # Pflicht wie beim Begriff: Ein Steckbrief ohne Definition ist eine Tabelle
+          # ohne Aussage — und im Vektor stünde nur der Name.
+          content:
+            label: "Definition"
+            pflicht: true
+            hinweis: >-
+              Was für ein Stoff das ist, in einem Satz. Darunter Erklärung und
+              Beispiele.
+        felder:
+          formel:
+            typ: text
+            label: "Formel"
+            hinweis: >-
+              In mhchem-Schreibweise, etwa `\ce{H2O}`. Bei Lösungen die Kurzform
+              (`HCl(aq)`).
+          smiles:
+            typ: text
+            label: "SMILES"
+            hinweis: "Nur für Reinstoffe; bei Gemischen leer lassen."
+          trivialnamen:
+            typ: liste
+            label: "Alltagsnamen"
+            hinweis: >-
+              Kochsalz, Trockeneis, gebrannte Magnesia. Auch fachlich schiefe Namen wie
+              „Kohlensäure" gehören hierher — die Richtigstellung steht im Text. Geht in
+              die Suche ein: Danach fragen Schüler:innen.
+          nachweis:
+            typ: text
+            label: "Nachweis"
+            hinweis: >-
+              Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine
+              verlangt.
+          bevorzugter_begriff:
+            typ: text
+            label: "Bevorzugte Bezeichnung"
+            hinweis: "Die an dieser Schule übliche Bezeichnung."
+          genus:
+            typ: auswahl
+            label: "Artikel"
+            werte: [der, die, das]
+            hinweis: "Für Lernende mit Deutsch als Zweitsprache."
+          plural:
+            typ: text
+            label: "Mehrzahl"
+            hinweis: >-
+              Ein Gedankenstrich, wo es keine gibt.
+          pruefstatus:
+            typ: auswahl
+            label: "Prüfstatus"
+            werte: [entwurf, fachlich_geprueft, freigegeben]
+            hinweis: >-
+              Gefahrstoffangaben ändern sich; der Status sagt, wann zuletzt jemand
+              fachlich daraufgesehen hat.
+          quelle:
+            typ: text
+            label: "Herkunft"
+            hinweis: >-
+              Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des
+              DEGINTU-Abgleichs.
+        # ⚠️ **`eigenschaften` und `ghs` bleiben ungeprüftes Metadata.** Die Feldtypen
+        # (`int|text|auswahl|liste`) tragen weder verschachtelte Objekte noch gemischte
+        # Listen, und `ghs` ist genau das: entweder ein Verweis oder ein Verweis **mit
+        # Bedingung** („ab 0,1 mol/L"). Die Bedingung gehört an die Kante, nicht an den
+        # Knoten; das Seed-Skript schreibt sie dorthin (AP5).
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und

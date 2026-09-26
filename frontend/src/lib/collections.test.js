@@ -19,7 +19,7 @@ import {
 } from "./collections.js"
 
 describe("alleSammlungen", () => {
-  it("liefert die fünf ersten Sammlungen mit Label und Beschreibungssatz", () => {
+  it("liefert die sechs Sammlungen mit Label und Beschreibungssatz", () => {
     const typen = alleSammlungen().map((s) => s.typ)
     expect(typen).toEqual([
       "methodenblatt",
@@ -27,6 +27,9 @@ describe("alleSammlungen", () => {
       "methode",
       "sozialform",
       "begriff",
+      // Seit 26.09.2026 (Paket 9): Stoffe sind eine eigene Liste — mit Formel und
+      // Prüfstatus, nicht mit Definition.
+      "stoffsteckbrief",
     ])
     expect(alleSammlungen().every((s) => s.label && s.beschreibung)).toBe(true)
   })
@@ -259,6 +262,7 @@ describe("sidebarSammlungen", () => {
       "methode",
       "sozialform",
       "begriff",
+      "stoffsteckbrief",
     ])
   })
 
@@ -282,6 +286,7 @@ describe("fachSammlungen", () => {
       "operatorenblatt",
       "methode",
       "begriff",
+      "stoffsteckbrief",
     ])
   })
 
@@ -296,7 +301,7 @@ describe("fachSammlungen", () => {
     const beides = fachSammlungen()
       .map((s) => s.typ)
       .filter((typ) => sidebarSammlungen().some((s) => s.typ === typ))
-    expect(beides).toEqual(["methode", "begriff"])
+    expect(beides).toEqual(["methode", "begriff", "stoffsteckbrief"])
   })
 })
 
@@ -307,6 +312,9 @@ describe("schuelerSammlungen", () => {
       "methodenblatt",
       "operatorenblatt",
       "begriff",
+      // „Was ist das für ein Stoff?" ist eine Schülerfrage — dieselbe Art wie der
+      // Fachbegriff.
+      "stoffsteckbrief",
     ])
   })
 

@@ -355,6 +355,7 @@ flowchart LR
     funktion["funktion ◆"]:::emb
     bauteil["bauteil ◆"]:::emb
     begriff["begriff ◆"]:::emb
+    stoff["stoffsteckbrief ◆"]:::emb
     code["code_beispiel ◆"]:::emb
   end
 
@@ -407,6 +408,9 @@ flowchart LR
   begriff -.->|requires| begriff
   begriff -.->|is_a| begriff
   begriff -.->|references| ik
+  stoff -.->|is_a| begriff
+  stoff -.->|related_to| begriff
+  stoff -.->|references| ik
   bauteil -.->|used_with| funktion
   code -.->|references| funktion
 

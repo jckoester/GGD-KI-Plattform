@@ -62,6 +62,9 @@ EXPECTED_EMBEDDING_TYPES = frozenset({
     # `aufgabenblatt` in `arbeitsblatt` (V1), `reflexion` in `metadata.reflexion` der
     # Stunde (V3) — deshalb stehen die drei hier nicht mehr.
     'begriff',
+    # Stoffsteckbriefe (Paket 9, 26.09.2026): „Was ist das weiße Pulver, das mit
+    # Säure schäumt?“ soll den Stoff finden, ohne dass man ihn benennen kann.
+    'stoffsteckbrief',
 })
 
 # Typen, deren Embedding-Input ausdrücklich festgelegt ist, statt sich aus `content` plus
@@ -70,6 +73,9 @@ EXPECTED_INPUT_KEYS = {
     ('knowledge', 'methode'),
     ('artifact', 'unterrichtsstunde'),
     ('artifact', 'unterrichtseinheit'),
+    # Stoffsteckbrief: Alltagsnamen **hinein** („Kochsalz“, „Trockeneis“ —
+    # danach fragen Schüler:innen), Eigenschaftstabelle **heraus**.
+    ('concept', 'stoffsteckbrief'),
 }
 
 EXPECTED_ENRICHMENT_KEYS = {
@@ -106,6 +112,22 @@ class TestEmbeddingDerivation:
             quellen = EMBEDDING_INPUT[schluessel]
             assert not any("phasen" in q for q in quellen), quellen
             assert "title" in quellen
+
+    def test_eigenschaftstabelle_bleibt_draussen(self):
+        """Dieselbe Regel für den Stoffsteckbrief — dieselbe Gefahr.
+
+        `eigenschaften` trägt Aussehen, Schmelz- und Siedetemperatur, Dichte,
+        Löslichkeit: Wörter, die in **jedem** Steckbrief stehen. Im Vektor zögen sie
+        alle Stoffe zueinander, statt sie zu unterscheiden. Die Alltagsnamen dagegen
+        gehören hinein — unter ihnen wird gesucht.
+        """
+        from app.context.taxonomy import EMBEDDING_INPUT
+
+        quellen = EMBEDDING_INPUT[("concept", "stoffsteckbrief")]
+        assert not any("eigenschaften" in q for q in quellen), quellen
+        assert not any("nachweis" in q for q in quellen), quellen
+        assert "metadata.trivialnamen" in quellen
+        assert "title" in quellen and "content" in quellen
 
     def test_embedding_re_export_matches_taxonomy(self):
         assert EMBEDDING_CONTENT_TYPES == TAXONOMY_EMBEDDING_CONTENT_TYPES

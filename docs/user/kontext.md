@@ -26,6 +26,10 @@ Der Kontextspeicher ist eine Sammlung von Wissensbausteinen, die Sie einer Chat-
 Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
 
 - eine Kompetenz aus dem Bildungsplan (z. B. „Schülerinnen und Schüler können Brüche auf der Zahlengeraden darstellen")
+- ein **Fachbegriff** mit Definition, Beispielen und den häufigen Irrtümern dazu
+- ein **Stoffsteckbrief** in Chemie: Formel, Eigenschaften, Nachweis und
+  Gefahrenhinweise zu einem Stoff — Reinstoff und Lösung getrennt
+  (Chlorwasserstoff / Salzsäure)
 - ein schultypisches Konzept, das an Ihrer Schule besonders behandelt wird
 - ein Thema oder eine Funktion aus dem Unterrichtsmaterial
 

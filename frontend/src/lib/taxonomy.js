@@ -51,7 +51,8 @@ export const CONTENT_TYPES = {
   "concept": [
     "funktion",
     "bauteil",
-    "begriff"
+    "begriff",
+    "stoffsteckbrief"
   ]
 }
 
@@ -251,6 +252,51 @@ export const COLLECTIONS = {
       "pflicht": true,
       "hinweis": "Macht den Eintrag thematisch auffindbar — auch für Suchende, die den Begriff nicht kennen."
     }
+  },
+  "stoffsteckbrief": {
+    "beschreibung": "Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung sind getrennt (Chlorwasserstoff / Salzsäure) — sonst verwischt die Unterscheidung zwischen Säure und saurer Lösung.",
+    "spalten": [
+      "titel",
+      "formel",
+      "fach",
+      "pruefstatus",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "pruefstatus",
+      "status",
+      "titel"
+    ],
+    "sidebar": true,
+    "schueler": true,
+    "relationen": {
+      "is_a": {
+        "label": "gehört zur Stoffklasse",
+        "ziel": [
+          "begriff"
+        ]
+      },
+      "related_to": {
+        "label": "steht in Beziehung zu",
+        "ziel": [
+          "begriff",
+          "stoffsteckbrief"
+        ]
+      },
+      "references": {
+        "label": "wird im Bildungsplan verlangt in",
+        "ziel": [
+          "ik_kompetenz"
+        ]
+      }
+    },
+    "content": {
+      "label": "Definition",
+      "pflicht": true,
+      "hinweis": "Was für ein Stoff das ist, in einem Satz. Darunter Erklärung und Beispiele."
+    }
   }
 }
 
@@ -352,6 +398,63 @@ export const FELD_SCHEMATA = {
       "label": "Herkunft",
       "hinweis": "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
     }
+  },
+  "stoffsteckbrief": {
+    "formel": {
+      "typ": "text",
+      "label": "Formel",
+      "hinweis": "In mhchem-Schreibweise, etwa `\\ce{H2O}`. Bei Lösungen die Kurzform (`HCl(aq)`)."
+    },
+    "smiles": {
+      "typ": "text",
+      "label": "SMILES",
+      "hinweis": "Nur für Reinstoffe; bei Gemischen leer lassen."
+    },
+    "trivialnamen": {
+      "typ": "liste",
+      "label": "Alltagsnamen",
+      "hinweis": "Kochsalz, Trockeneis, gebrannte Magnesia. Auch fachlich schiefe Namen wie „Kohlensäure\" gehören hierher — die Richtigstellung steht im Text. Geht in die Suche ein: Danach fragen Schüler:innen."
+    },
+    "nachweis": {
+      "typ": "text",
+      "label": "Nachweis",
+      "hinweis": "Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine verlangt."
+    },
+    "bevorzugter_begriff": {
+      "typ": "text",
+      "label": "Bevorzugte Bezeichnung",
+      "hinweis": "Die an dieser Schule übliche Bezeichnung."
+    },
+    "genus": {
+      "typ": "auswahl",
+      "label": "Artikel",
+      "werte": [
+        "der",
+        "die",
+        "das"
+      ],
+      "hinweis": "Für Lernende mit Deutsch als Zweitsprache."
+    },
+    "plural": {
+      "typ": "text",
+      "label": "Mehrzahl",
+      "hinweis": "Ein Gedankenstrich, wo es keine gibt."
+    },
+    "pruefstatus": {
+      "typ": "auswahl",
+      "label": "Prüfstatus",
+      "werte": [
+        "entwurf",
+        "fachlich_geprueft",
+        "freigegeben"
+      ],
+      "hinweis": "Gefahrstoffangaben ändern sich; der Status sagt, wann zuletzt jemand fachlich daraufgesehen hat."
+    },
+    "quelle": {
+      "typ": "text",
+      "label": "Herkunft",
+      "hinweis": "Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des DEGINTU-Abgleichs."
+    }
   }
 }
 
@@ -410,7 +513,8 @@ export const CONTENT_TYPE_LABELS = {
   "feedback_text": "Feedback-Text",
   "funktion": "Funktion",
   "bauteil": "Bauteil",
-  "begriff": "Fachbegriff"
+  "begriff": "Fachbegriff",
+  "stoffsteckbrief": "Stoffsteckbrief"
 }
 
 export const SCOPE_DEFAULTS = {
@@ -575,6 +679,10 @@ export const SCOPE_DEFAULTS = {
     "subject"
   ],
   "begriff": [
+    "school",
+    "subject"
+  ],
+  "stoffsteckbrief": [
     "school",
     "subject"
   ]

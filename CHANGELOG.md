@@ -53,6 +53,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Stoffsteckbriefe als eigene Bausteinart.** Chemie-Stoffe mit Formel,
+  Eigenschaften, Nachweis und Gefahrenhinweisen stehen in einer eigenen Liste —
+  auffindbar auch über Alltagsnamen wie „Kochsalz“. Reinstoff und Lösung sind
+  getrennt (Chlorwasserstoff / Salzsäure), damit die Unterscheidung zwischen Säure
+  und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
+- **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
+  benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+
 - **Die Hilfe zeigt die ganze Anwender-Doku.** Bisher waren zehn von achtzehn Seiten
   in der Anwendung erreichbar — acht fehlten, darunter „Stundenplan übernehmen“,
   „Bibliothek“ und „Zitieren“. Neu dabei sind außerdem **„Die ersten 30

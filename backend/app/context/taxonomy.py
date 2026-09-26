@@ -123,6 +123,9 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "funktion": None,
     "bauteil": None,
     "begriff": None,
+    # Ein Stoff läuft nicht ab. Der Eintrag steht hier trotzdem — ein fehlender
+    # hieße „nie ablaufen" aus Versehen statt aus Entscheidung (Falle 1).
+    "stoffsteckbrief": None,
 }
 # ⚠️ **Diese Liste wird von Hand gepflegt und deckt jeden content_type ab.** Ein
 # fehlender Eintrag fällt sonst nicht auf: `get_valid_until_offset` liefert über
@@ -453,6 +456,8 @@ _SCHUELER_BONUS: Final[dict[str, float]] = {
     "arbeitsblatt": 0.02,
     "aufgabe": 0.02,
     "begriff": 0.02,
+    # Nachschlagen im Unterricht — dieselbe Frage wie beim Fachbegriff.
+    "stoffsteckbrief": 0.02,
 }
 
 _LEHRKRAFT_BONUS: Final[dict[str, float]] = {
