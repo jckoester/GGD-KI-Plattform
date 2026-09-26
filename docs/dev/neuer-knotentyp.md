@@ -9,7 +9,7 @@ Grundlage: `ADR-013` (Kontextspeicher-Graph) und `ADR-017` (Neukonzeption der
 Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 [kontextsuche.md](kontextsuche.md).
 
-> **Zwei Fallen vorweg**, weil sie beide **stumm** sind — sie führen nicht zu einem
+> **Drei Fallen vorweg**, weil sie alle **stumm** sind — sie führen nicht zu einem
 > Fehler, sondern zu falschem Verhalten, das niemandem auffällt:
 >
 > 1. `VALID_UNTIL_DEFAULTS_DAYS` wird **von Hand** gepflegt. Ein fehlender Eintrag liefert
@@ -18,6 +18,8 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 > 2. Ein Typ mit `embedding: true`, dessen Embedding-Input am Ende **nur aus dem Titel**
 >    besteht, ist keine thematische Suche, sondern eine unscharfe Titelsuche im
 >    Vektorraum — mit Kosten und ohne Gewinn. Schritt 4 prüft genau das.
+> 3. Ein Typ, dessen fachlicher Wert im **Metadata** steckt und der in `MODELL_METADATA`
+>    fehlt, zeigt seine Felder überall — nur der Assistent sieht sie nie. Schritt 14.
 
 ## `taxonomy.yaml` ist eine Systemdatei
 
@@ -101,7 +103,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 09/2026: 27 von 41 Typen mit Embedding.
+`taxonomy.yaml`. Stand 09/2026: 28 von 42 Typen mit Embedding.
 
 ### 4. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -258,7 +260,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 ### 12. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
-  deckt heute alle 41 Typen ab, das soll so bleiben). Bei importierten
+  deckt heute alle 42 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
@@ -276,13 +278,43 @@ Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/rou
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 14. Prüfsatz
+### 14. Was das Modell sieht
+
+`MODELL_METADATA` in `backend/app/context/taxonomy.py`. Welche **Metadatenfelder** des
+Typs gehen in den Kontext des Assistenten? Kein Eintrag heißt: keine — und das ist für
+die meisten Typen richtig, weil die Spalte vor allem Import-Interna trägt (`bp_id`,
+`breadcrumb`, `reihenfolge`).
+
+⚠️ **Eine dritte stumme Falle.** Ein Typ, dessen Wert im Metadata steckt und der hier
+fehlt, verliert ihn **lautlos**: Die Felder stehen in der Oberfläche, der Editor pflegt
+sie, die Sammlung zeigt sie — nur der Assistent hat sie nie gesehen. Nachweisbar ist das
+erst an einer Antwort, die es nicht gibt. Die Frage lautet deshalb nicht „brauchen wir
+das?", sondern: *Welche dieser Felder würde eine Lehrkraft im Gespräch nennen?* Bei
+`stoffsteckbrief` ist es die Eigenschaftstabelle, bei `begriff` sind es die
+Fehlvorstellungen und die bevorzugte Bezeichnung.
+
+Drei Regeln dazu:
+
+- **Whitelist, nicht „alles Metadata".** Ein SVG im Metadata (`illustrationen[].svg`,
+  `schaltzeichen.svg`) ist im Pilot bis 47 kB groß — pauschal mitgegeben stünde mehr
+  Grafikmarkup im Prompt als Unterrichtsinhalt. `_ohne_svg` in `app/chat/router.py`
+  entfernt den Schlüssel in jeder Tiefe; was das Bild zeigt, steht in `beschreibung`.
+- **Nicht dieselbe Liste wie der Embedding-Input** (Schritt 4). Die Eigenschaftstabelle
+  gehört ins Gespräch, aber nicht in den Vektor: Dort machte sie alle Stoffe einander
+  ähnlich. Umgekehrt gehören Fehlvorstellungen ins Gespräch, aber nicht in den Vektor —
+  sie zögen die Fragen an, die sie widerlegen sollen.
+- **Ein Feld, das nicht im Feldschema steht, ist begründungspflichtig.** Ein Test
+  (`test_context_taxonomy.py::TestModellMetadata`) prüft die Whitelist gegen `felder:`
+  und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute
+  `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann.
+
+### 15. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 15. Dokumentation
+### 16. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.

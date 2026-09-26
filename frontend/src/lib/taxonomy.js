@@ -420,6 +420,11 @@ export const FELD_SCHEMATA = {
       "label": "Nachweis",
       "hinweis": "Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine verlangt."
     },
+    "fehlvorstellungen": {
+      "typ": "liste",
+      "label": "Häufige Irrtümer",
+      "hinweis": "Typische Fehlvorstellungen zu diesem Stoff, gegen die eine Erklärung anarbeiten muss („Die Blasen in kochendem Wasser sind Luft“). Der Assistent bekommt sie mit und kann sie ansprechen."
+    },
     "bevorzugter_begriff": {
       "typ": "text",
       "label": "Bevorzugte Bezeichnung",

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
@@ -60,6 +61,7 @@ from app.context.service import get_context_for_query
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
 from app.context.search import _AUFZAEHLUNG_MAX, Suchprofil, aufzaehlung, suche
+from app.context.taxonomy import modell_metadata_felder
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -511,6 +513,91 @@ def _ergebnis_umfang(ergebnis) -> str:
     return type(ergebnis).__name__
 
 
+# Eine Abbildung im Knotentext: `{{abbildung:EN_H2O.svg}}`.
+#
+# ⚠️ **Der Platzhalter ist die Absprache zwischen drei Stellen** (Paket 9): Das
+# Seed-Skript setzt ihn anstelle der Obsidian-Einbettung `![[…]]` (AP5), die Oberfläche
+# zeigt dort das SVG (AP6), und hier wird er zur Bildbeschreibung fürs Modell. Eine
+# eigene Form statt der Vault-Syntax, weil der Text im Web-Editor bearbeitbar ist: Ein
+# `![[…]]` dort sähe aus wie ein durchgerutschtes Artefakt, dies sieht aus wie das, was
+# es ist. Und es bleibt sichtbar, wenn eine Seite ihn nicht auflöst, statt still zu
+# verschwinden.
+_ABBILDUNG = re.compile(r"\{\{abbildung:([^{}]+)\}\}")
+
+
+def _ohne_svg(wert):
+    """Alle ``svg``-Schlüssel in jeder Tiefe entfernen, der Rest bleibt.
+
+    ⚠️ **Ein SVG ist für das Modell nur Ballast** — im Pilot bis 47 kB je Bild, also
+    mehr als der gesamte übrige Kontext einer Anfrage. Was es zeigt, steht daneben in
+    ``beschreibung``; genau die soll das Modell lesen. Betroffen sind
+    ``illustrationen[].svg`` (Fachbegriffe, Stoffsteckbriefe) und ``schaltzeichen.svg``
+    (Bauteile).
+
+    Offen für AP5: Führt das Seed-Skript unter ``tex`` künftig den **Quelltext** statt
+    des Vault-Pfads, gehört der Schlüssel hier dazu — derselbe Ballast, andere Endung.
+    """
+    if isinstance(wert, dict):
+        return {k: _ohne_svg(v) for k, v in wert.items() if k != "svg"}
+    if isinstance(wert, list):
+        return [_ohne_svg(v) for v in wert]
+    return wert
+
+
+def _metadata_fuers_modell(content_type, metadata) -> dict:
+    """Die Metadatenfelder dieses Knotentyps, die das Modell sehen darf.
+
+    Die Auswahl steht als Whitelist je Typ in :data:`app.context.taxonomy.MODELL_METADATA`
+    — dort auch die Begründung je Feld. Hier bleibt nur das Anwenden, samt SVG-Filter für
+    den Fall, dass ein erlaubtes Feld selbst eine Grafik trägt (``schaltzeichen``).
+    """
+    if not isinstance(metadata, dict):
+        return {}
+    erlaubt = modell_metadata_felder(content_type)
+    # Leere Werte weglassen: `"fassung": ""` an jedem Treffer ist Rauschen, und ein
+    # leeres Feld sagt dem Modell nichts, was das Fehlen nicht auch sagte.
+    return {
+        feld: _ohne_svg(metadata[feld])
+        for feld in erlaubt
+        if metadata.get(feld) not in (None, "", [], {})
+    }
+
+
+def _abbildungen_aufgeloest(inhalt: str, metadata) -> str:
+    """Bild-Einbettungen im Knotentext durch ihre Beschreibung ersetzen.
+
+    Aus ``{{abbildung:EN_H2O.svg}}`` wird ``[Abbildung: Wassermolekül mit
+    Partialladungen …]``. So weiß der Assistent **an der Stelle, an der das Bild
+    steht**, was dort zu sehen ist — ohne dass ihm jemand das SVG vorlegt.
+
+    Gefunden wird die Beschreibung über den **Dateinamen**, nicht über den ganzen Pfad:
+    Im Vault steht im Text die bare Form (`EN_H2O.svg`), im Frontmatter eine
+    Pfadangabe (`_Abb/EN_H2O.svg`). Welche von beiden das Seed-Skript in den Platzhalter
+    schreibt, darf hier keine Rolle spielen — an genau dieser Stelle fänden die zwei
+    Schreibweisen sonst nicht zusammen.
+
+    Ohne passenden Eintrag bleibt ``[Abbildung]`` stehen: Dass dort ein Bild ist, gehört
+    zur Aussage des Textes. Der Dateiname wandert bewusst **nicht** mit — er lädt dazu
+    ein, ihn Lernenden gegenüber zu zitieren, und eine fehlende Beschreibung ist ein
+    Importmangel, den der Bericht des Seed-Skripts meldet (AP5).
+    """
+    if "{{abbildung:" not in inhalt:
+        return inhalt
+    beschreibungen = {}
+    if isinstance(metadata, dict):
+        for abb in metadata.get("illustrationen") or []:
+            if isinstance(abb, dict) and abb.get("datei"):
+                name = str(abb["datei"]).rsplit("/", 1)[-1]
+                beschreibungen[name] = (abb.get("beschreibung") or "").strip()
+
+    def ersetze(treffer):
+        name = treffer.group(1).strip().rsplit("/", 1)[-1]
+        text = beschreibungen.get(name)
+        return f"[Abbildung: {text}]" if text else "[Abbildung]"
+
+    return _ABBILDUNG.sub(ersetze, inhalt)
+
+
 def _fuer_modell(treffer: list) -> list:
     """Suchergebnis für den LLM-Kontext aufbereiten.
 
@@ -522,6 +609,12 @@ def _fuer_modell(treffer: list) -> list:
     Die interne ``node_id`` bleibt draußen: Sie nützt dem Modell nichts (kein Werkzeug
     nimmt sie entgegen) und taucht sonst in Antworten auf. Ergebnisse anderer Werkzeuge
     der Gruppe werden unverändert durchgereicht.
+
+    ⚠️ **Hier fällt die Entscheidung, was das Modell sieht** (Paket 9, AP3). Die
+    Suchschicht liefert seither die rohe Metadatenspalte mit (`mit_metadaten`); diese
+    Funktion ist die einzige Stelle, die daraus auswählt. Wer eine Trefferliste am
+    Werkzeugweg vorbei serialisiert, umgeht die Auswahl — dann steht das 47-kB-SVG einer
+    Strukturformel im Prompt.
     """
     aufbereitet = []
     for t in treffer:
@@ -532,12 +625,18 @@ def _fuer_modell(treffer: list) -> list:
         # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
         eintrag = {
             k: v for k, v in t.items()
-            if k not in ("node_id", "content", "subject_id", "fach")
+            if k not in ("node_id", "content", "subject_id", "fach", "metadata")
         }
         if t.get("fach"):
             eintrag["fach"] = t["fach"]
+        eintrag |= _metadata_fuers_modell(t.get("content_type"), t.get("metadata"))
         inhalt = (t.get("content") or "").strip()
         if inhalt:
+            # ⚠️ **Auflösen vor dem Kürzen.** Andersherum bliebe ein halber Platzhalter
+            # stehen (`{{abbildung:EN_H`). Der Preis: Eine Bildbeschreibung ist rund
+            # 200 Zeichen lang und verdrängt damit ein Viertel des Kürzungsbudgets —
+            # AP7 misst, ob 800 Zeichen für Begriffe noch reichen.
+            inhalt = _abbildungen_aufgeloest(inhalt, t.get("metadata"))
             eintrag["content"] = (
                 inhalt[:_INHALT_MAX_ZEICHEN] + " …"
                 if len(inhalt) > _INHALT_MAX_ZEICHEN
@@ -570,6 +669,10 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             subject_id=await _resolve_conversation_subject_id(ctx),
             identifikation=tiefe,
             thematisch=tiefe,
+            # Roh geholt, ausgewählt wird in `_fuer_modell` (Paket 9, AP3). Kostet
+            # nichts: Die Spalte steht ohnehin in jeder Trefferzeile, `mit_metadaten`
+            # entscheidet nur, ob sie am Treffer hängenbleibt.
+            mit_metadaten=True,
         ),
         ctx.db,
     )
@@ -776,6 +879,8 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         ),
         ctx.db,
         gruppierung=args.get("gruppierung"),
+        # Wie bei der Suche: roh holen, in `_fuer_modell` auswählen.
+        mit_metadaten=True,
     )
 
     antwort: dict = {

@@ -301,3 +301,66 @@ class TestScopeKorrekturen:
 
         assert "schuelerpraesentation" not in EMBEDDING_CONTENT_TYPES
         assert "strukturierung" not in EMBEDDING_CONTENT_TYPES
+
+
+class TestModellMetadata:
+    """Was das Modell von den Metadaten eines Knotens sieht (Paket 9, AP3).
+
+    ⚠️ **Zwei Listen, die auseinanderlaufen können.** `MODELL_METADATA` nennt
+    Feldnamen, `taxonomy.yaml` legt sie an. Wird ein Feld umbenannt oder gestrichen,
+    greift die Whitelist ins Leere — ohne Fehler, ohne Log: Das Feld steht weiter in
+    der Oberfläche, das Modell bekommt es nur nie zu sehen. Dieselbe Familie wie die
+    Scope-Rangfolge und die Relationsliste.
+    """
+
+    # Metadatenschlüssel, die **absichtlich** kein Feld im Schema sind. Die
+    # Feldtypen (`int|text|auswahl|liste`) tragen keine verschachtelten Objekte;
+    # `eigenschaften` ist genau das (Schmelztemperatur, Dichte, … unter festen
+    # Schlüsseln). Ungeprüft heißt nicht wertlos: Die Tabelle ist der Zweck des
+    # Steckbriefs, und im Gespräch wird nach ihr gefragt. Wer hier etwas ergänzt,
+    # nimmt es damit ausdrücklich von der Feldprüfung aus.
+    OHNE_FELDSCHEMA = {"stoffsteckbrief": {"eigenschaften"}}
+
+    def test_nur_felder_die_es_gibt(self):
+        from app.context.taxonomy import MODELL_METADATA, feld_schema
+
+        unbekannt = {}
+        for typ, felder in MODELL_METADATA.items():
+            offen = (
+                set(felder) - set(feld_schema(typ)) - self.OHNE_FELDSCHEMA.get(typ, set())
+            )
+            if offen:
+                unbekannt[typ] = sorted(offen)
+        assert not unbekannt, (
+            f"Whitelist nennt Felder, die `taxonomy.yaml` nicht kennt: {unbekannt}"
+        )
+
+    def test_nur_typen_die_es_gibt(self):
+        from app.context.taxonomy import MODELL_METADATA, SCOPE_DEFAULTS
+
+        verwaist = sorted(set(MODELL_METADATA) - set(SCOPE_DEFAULTS))
+        assert not verwaist, f"Whitelist-Eintrag ohne content_type: {verwaist}"
+
+    def test_fachbegriff_und_stoffsteckbrief_sind_dabei(self):
+        """Namentlich festgehalten: Beide Typen tragen ihren Wert **im Metadata**.
+
+        Ein Fachbegriff ohne `fehlvorstellungen` und ein Stoffsteckbrief ohne
+        `eigenschaften` sind im Tutor-Dialog das, was sie vor AP3 waren — ein Titel mit
+        Definitionstext. Die allgemeine Prüfung oben ginge auch durch, wenn beide
+        Einträge gemeinsam verschwänden.
+        """
+        from app.context.taxonomy import modell_metadata_felder
+
+        assert "fehlvorstellungen" in modell_metadata_felder("begriff")
+        assert "eigenschaften" in modell_metadata_felder("stoffsteckbrief")
+
+    def test_unbekannter_typ_gibt_nichts_preis(self):
+        """Der Normalfall: Wer nicht in der Tabelle steht, schickt keine Metadaten.
+
+        Das ist der Stand vor AP3 und die Voreinstellung — Import-Interna wie `bp_id`
+        oder `breadcrumb` haben im Modellkontext nichts verloren.
+        """
+        from app.context.taxonomy import modell_metadata_felder
+
+        assert modell_metadata_felder("ik_kompetenz") == ()
+        assert modell_metadata_felder(None) == ()

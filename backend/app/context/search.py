@@ -803,7 +803,7 @@ async def identifikation(
     anderen Aufrufer bleibt sie aus, damit der Prüfsatz vergleichbar bleibt.
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
-    verglichen, nicht eingebettet — und 30 der 44 Knotentypen tragen laut
+    verglichen, nicht eingebettet — und 14 der 42 Knotentypen tragen laut
     ``taxonomy.yaml`` bewusst kein Embedding (Fachpläne, Curricula, Methoden,
     Leitperspektiven …). Bliebe der Filter hier stehen, wären diese Knoten unter ihrem
     eigenen Namen unauffindbar, während die Aufzählung sie zählt: zwei Grundmengen in
@@ -812,6 +812,13 @@ async def identifikation(
     kandidaten = _kandidaten(frage)
     if not kandidaten:
         return Abschnitt(gesamt=0, vollstaendig=True)
+
+    # ⚠️ **`mit_metadaten` galt hier bis 09/2026 nicht.** Das Feld stand im Profil, die
+    # thematische Auswahl und die Aufzählung werteten es aus — die Identifikation nicht.
+    # Wer nach einem Begriff bei seinem Namen fragt, landet aber genau hier, und ohne
+    # Metadaten fehlte dem Modell ausgerechnet im Nachschlagefall, was der Knoten an
+    # Fachlichem trägt (Paket 9, AP3).
+    md = profil.mit_metadaten
 
     # Aliastreffer vorab auflösen — je Stufe eine kurze, indexgestützte Abfrage.
     # Warum nicht als EXISTS in der Hauptabfrage: siehe `knoten_mit_alias`.
@@ -823,7 +830,7 @@ async def identifikation(
         )
     ).mappings().all()
     gesamt = zeilen[0]["gesamt"] if zeilen else 0
-    exakt = [_treffer(z) | {"treffer_art": "exakt"} for z in zeilen]
+    exakt = [_treffer(z, mit_metadaten=md) | {"treffer_art": "exakt"} for z in zeilen]
 
     # Die weiteren Stufen füllen nur auf, was die erste offen gelassen hat.
     rest = profil.identifikation - len(exakt)
@@ -838,7 +845,10 @@ async def identifikation(
         zeilen_p = (await db.execute(
             praefix_abfrage(roh, profil, ausschluss=gesehen, alias_ids=alias_praefix)
         )).mappings().all()
-        neu = [_treffer(z) | {"treffer_art": "praefix"} for z in zeilen_p[:rest]]
+        neu = [
+            _treffer(z, mit_metadaten=md) | {"treffer_art": "praefix"}
+            for z in zeilen_p[:rest]
+        ]
         weitere += neu
         gesehen |= {t["node_id"] for t in neu}
         rest -= len(neu)
@@ -856,7 +866,8 @@ async def identifikation(
             )
         )).mappings().all()
         weitere += [
-            _treffer(z) | {"treffer_art": "teilweise"} for z in zeilen_t[:rest]
+            _treffer(z, mit_metadaten=md) | {"treffer_art": "teilweise"}
+            for z in zeilen_t[:rest]
         ]
 
     return Abschnitt(

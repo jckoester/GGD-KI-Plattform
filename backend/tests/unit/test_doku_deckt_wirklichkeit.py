@@ -148,3 +148,61 @@ def test_jede_geloeschte_kategorie_steht_in_der_betriebsdoku():
         f"Gelöschte Kategorie(n) ohne Zeile in der Doku: {fehlend}. "
         "In `docs/admin/datenschutz-betrieb.md` eintragen — und in ADR-003 Teil 6."
     )
+
+
+# ── 4. Typzahlen in der Doku ─────────────────────────────────────────────────
+
+# Sätze der Form „27 von 41 Typen", die sich ausdrücklich auf einen **vergangenen**
+# Stand beziehen. Sie sollen nicht mitwachsen — sie erklären, warum etwas eingeführt
+# wurde.
+_HISTORISCH = ("bis 09/2026 hatten 30 der 41 Typen kein eigenes Symbol",)
+
+# „14 der 42 Typen", „28 von 42 Knotentypen" — Zähler, Nenner.
+_TYPZAHL = re.compile(r"(\d+)\s+(?:von|der)\s+(\d+)\s+(?:Knoten)?[Tt]ypen")
+
+_DOKU_MIT_TYPZAHLEN = (
+    WURZEL / "docs" / "dev" / "neuer-knotentyp.md",
+    WURZEL / "docs" / "dev" / "kontextsuche.md",
+    WURZEL / "docs" / "admin" / "updates-und-wartung.md",
+    WURZEL / "backend" / "app" / "context" / "search.py",
+)
+
+
+def test_typzahlen_in_der_doku_stimmen():
+    """„27 von 41 Typen" — der Nenner ist die Zahl der Knotentypen, und die wächst.
+
+    ⚠️ **Genau so gedriftet**: Mit `stoffsteckbrief` (26.09.2026) wurden aus 41 Typen
+    42, und fünf Sätze in drei Dateien behaupteten weiter 41 — einer davon seit
+    längerem sogar 44. Niemand liest eine Zahl nach, die plausibel aussieht; die
+    Checkliste für neue Knotentypen ist ohnehin lang genug, ohne dass man sich auch noch
+    an jede Prosa-Zahl erinnern müsste.
+
+    Der Zähler bleibt ungeprüft — er meint je nach Satz etwas anderes (mit Embedding,
+    ohne Embedding, privat). Der **Nenner** ist immer dieselbe Zahl, und genau der war
+    falsch.
+    """
+    from app.context.taxonomy import SCOPE_DEFAULTS
+
+    gesamt = len(SCOPE_DEFAULTS)
+    falsch = []
+    for pfad in _DOKU_MIT_TYPZAHLEN:
+        text = pfad.read_text(encoding="utf-8")
+        # Die Stellen, an denen ein datierter Satz steht — Treffer darin zählen nicht.
+        # Über einen Ausdruck mit `\s+` gesucht, nicht wörtlich: In Markdown läuft ein
+        # Satz über Zeilenumbrüche, und ein Umbruch mitten in der Ausnahme darf sie
+        # nicht aufheben.
+        ausgenommen = [
+            (m.start(), m.end())
+            for h in _HISTORISCH
+            if (m := re.search(r"\s+".join(map(re.escape, h.split())), text))
+        ]
+        for treffer in _TYPZAHL.finditer(text):
+            if any(a <= treffer.start() < b for a, b in ausgenommen):
+                continue
+            if int(treffer.group(2)) != gesamt:
+                falsch.append(f"{pfad.name}: „{treffer.group(0)}“")
+    assert not falsch, (
+        f"Es gibt {gesamt} Knotentypen, die Doku sagt etwas anderes: {falsch}. "
+        "Zahl nachziehen — oder, wenn der Satz einen vergangenen Stand meint, ihn "
+        "datieren und in `_HISTORISCH` eintragen."
+    )

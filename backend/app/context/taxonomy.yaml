@@ -710,6 +710,16 @@ categories:
             hinweis: >-
               Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine
               verlangt.
+          fehlvorstellungen:
+            typ: liste
+            label: "Häufige Irrtümer"
+            # ⚠️ **Nicht im Embedding** — wie beim Fachbegriff: Sie beschreiben, was
+            # nicht zutrifft, und zögen im Vektor genau die Fragen an, die sie
+            # widerlegen sollen.
+            hinweis: >-
+              Typische Fehlvorstellungen zu diesem Stoff, gegen die eine Erklärung
+              anarbeiten muss („Die Blasen in kochendem Wasser sind Luft“). Der
+              Assistent bekommt sie mit und kann sie ansprechen.
           bevorzugter_begriff:
             typ: text
             label: "Bevorzugte Bezeichnung"

@@ -488,3 +488,61 @@ def rollen_typ_bonus(rollen) -> dict[str, float]:
     if "student" in rollen:
         return ROLLEN_TYP_BONUS["student"]
     return {}
+
+
+# ── Was das Modell von den Metadaten sieht (Paket 9, AP3) ────────────────────
+
+# Metadatenfelder, die **immer** ans Modell mitgehen — je Knotentyp einzeln benannt.
+#
+# ⚠️ **Whitelist, nicht „alles Metadata".** Die Spalte trägt neben Fachlichem auch
+# Import-Interna (`bp_id`, `breadcrumb`, `reihenfolge`), Anzeigekram und bei
+# Abbildungen ganze SVG-Dokumente — im Pilot bis 47 kB je Bild. Pauschal mitgegeben
+# kostete sie im Modellkontext ein Vielfaches des Knotentextes, für den sie stehen soll.
+#
+# Ein Typ, der hier **nicht** steht, gibt nichts mit. Das ist der Normalfall und der
+# Stand vor AP3; der Weg dorthin bleibt `Suchprofil.mit_metadaten` für Aufrufer, die
+# die rohe Spalte selbst auswerten (`get_operatoren`, Breadcrumb im Ankerkontext).
+#
+# ⚠️ Diese Tabelle ist **Schritt 14** aus `docs/dev/neuer-knotentyp.md`. Ein neuer
+# Typ mit fachlich gehaltvollen Feldern, der hier fehlt, verliert sie im Gespräch
+# lautlos — die Felder stehen in der Oberfläche, und niemand merkt, dass der Assistent
+# sie nie gesehen hat.
+MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
+    "begriff": (
+        # Die an der Schule übliche Bezeichnung: Gefragt nach „Atombindung", antwortet
+        # der Assistent mit „Elektronenpaarbindung".
+        "bevorzugter_begriff",
+        # Welche von mehreren gleichnamigen Definitionen gemeint ist — und ab wann sie
+        # gilt. Ohne beides verwechselt das Modell die Klasse-8- mit der
+        # Klasse-10-Fassung von „Oxidation".
+        "fassung",
+        "ab_klasse",
+        # Artikel und Mehrzahl, damit die Antwort den Begriff richtig beugt. Genau
+        # dafür sind die Felder da (siehe ihren Hinweistext in `taxonomy.yaml`).
+        "genus",
+        "plural",
+        # Der eigentliche Mehrwert im Tutor-Dialog: Was der Assistent ansprechen kann,
+        # statt daran vorbeizuerklären. **Nicht** im Embedding — im Vektor zögen sie
+        # die Fragen an, die sie widerlegen sollen.
+        "fehlvorstellungen",
+    ),
+    "stoffsteckbrief": (
+        "bevorzugter_begriff",
+        "genus",
+        "plural",
+        # „Kochsalz", „Trockeneis" — unter diesen Namen fragen Schüler:innen.
+        "trivialnamen",
+        "formel",
+        # Die Eigenschaftstabelle ist der Zweck des Steckbriefs. Sie steht bewusst
+        # **nicht** im Embedding (dort machte sie alle Stoffe einander ähnlich), wohl
+        # aber im Gespräch: „Bei welcher Temperatur schmilzt Magnesiumoxid?"
+        "eigenschaften",
+        "nachweis",
+        "fehlvorstellungen",
+    ),
+}
+
+
+def modell_metadata_felder(content_type: str | None) -> tuple[str, ...]:
+    """Welche Metadatenfelder dieses Typs das Modell sehen darf (leer = keine)."""
+    return MODELL_METADATA.get(content_type or "", ())

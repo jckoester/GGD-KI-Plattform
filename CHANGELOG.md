@@ -60,6 +60,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Assistenten kennen jetzt die Zusatzangaben eines Fachbegriffs.** Bevorzugte
+  Bezeichnung, Fassung, Klassenstufe, Artikel und Mehrzahl sowie die häufigen Irrtümer
+  gehen mit in das Gespräch — beim Stoffsteckbrief zusätzlich Formel, Alltagsnamen,
+  Eigenschaftstabelle und Nachweis. Abbildungen erscheinen dort als Beschreibung an der
+  Stelle, an der sie im Text stehen.
 
 - **Die Hilfe zeigt die ganze Anwender-Doku.** Bisher waren zehn von achtzehn Seiten
   in der Anwendung erreichbar — acht fehlten, darunter „Stundenplan übernehmen“,
