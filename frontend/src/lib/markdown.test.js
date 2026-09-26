@@ -363,3 +363,36 @@ describe('renderMarkdown — Formeln brechen kein Attribut auf', () => {
         expect(handler(dom)).toEqual([])
     })
 })
+
+describe("Verweise zwischen Hilfeseiten", () => {
+    it("⚠️ `datei.md` wird in der Hilfe zur Hilfe-Adresse", () => {
+        // Die Übersichtsseite der Hilfe ist `docs/user/README.md`; ihre Verweise sind
+        // Dateinamen, weil die Doku auch außerhalb der Anwendung gelesen wird. In der
+        // Anwendung landete ein Klick bis zum 26.09.2026 auf `/help/erste-schritte.md`
+        // — in einem neuen Tab, mit 404. Das Inhaltsverzeichnis führte also ins Leere.
+        const html = renderMarkdown("[Start](erste-schritte.md)", { dokuLinks: true })
+        expect(html).toContain('href="/help/erste-schritte"')
+        expect(html).not.toContain("target=")
+    })
+
+    it("nimmt den Anker mit und kennt die Übersicht", () => {
+        const mitAnker = renderMarkdown("[Archiv](faecher.md#archiv)", { dokuLinks: true })
+        expect(mitAnker).toContain('href="/help/faecher#archiv"')
+        const uebersicht = renderMarkdown("[Zurück](README.md)", { dokuLinks: true })
+        expect(uebersicht).toContain('href="/help"')
+    })
+
+    it("⚠️ **nur** in der Hilfe — sonst ist `foo.md` ein Dateiname", () => {
+        // Dieselbe Funktion rendert Chat-Antworten und Wissensknoten. Dort auf eine
+        // Hilfeseite umzuleiten wäre schlicht falsch.
+        const html = renderMarkdown("[Anhang](anleitung.md)")
+        expect(html).toContain('href="anleitung.md"')
+        expect(html).toContain("target=")
+    })
+
+    it("lässt echte Adressen unberührt", () => {
+        const html = renderMarkdown("[Extern](https://example.org/a.md)", { dokuLinks: true })
+        expect(html).toContain('href="https://example.org/a.md"')
+        expect(html).toContain("target=")
+    })
+})

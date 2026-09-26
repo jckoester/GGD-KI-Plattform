@@ -1,12 +1,19 @@
 <script>
     import { page } from '$app/stores';
-    import { helpNav } from '$lib/help-nav.js';
+    import { sichtbareHilfe } from '$lib/help-nav.js';
+    import { user } from '$lib/stores/user.js';
     import { ChevronRight, Menu } from 'lucide-svelte';
     import { goto } from '$app/navigation';
 
     let { children } = $props();
 
     let tocOpen = $state(false);
+
+    // ⚠️ **Gefiltert, nicht gesperrt** (Entscheidung Jan, 26.09.2026). Eine Schülerin,
+    // die „Schulcurriculum" und „Stundenplan übernehmen" im Verzeichnis sieht, sucht
+    // nach Funktionen, die es für sie nicht gibt. Wer den Pfad kennt, liest die Seite
+    // trotzdem — die eine Ausnahme steht in `help-nav.js` als `geschuetzt`.
+    const verzeichnis = $derived(sichtbareHilfe($user?.roles));
 
     function toggleToc() {
         tocOpen = !tocOpen;
@@ -21,7 +28,7 @@
                 Inhaltsverzeichnis
             </h2>
             <ul class="space-y-1">
-                {#each helpNav as item}
+                {#each verzeichnis as item (item.path)}
                     <li>
                         <a
                             href={item.path}
@@ -56,7 +63,7 @@
         {#if tocOpen}
             <nav class="p-4 border-b border-light-ui-3 dark:border-dark-ui-3">
                 <ul class="space-y-1">
-                    {#each helpNav as item}
+                    {#each verzeichnis as item (item.path)}
                         <li>
                             <a
                                 href={item.path}

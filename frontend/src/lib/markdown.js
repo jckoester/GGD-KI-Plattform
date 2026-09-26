@@ -58,13 +58,41 @@ renderer.heading = ({ text, depth, tokens }) => {
     return `<h${depth} id="${ueberschriftId(text)}">${inhalt}</h${depth}>`;
 };
 
+/**
+ * Ob `datei.md`-Verweise auf Hilfe-Adressen umgeschrieben werden.
+ *
+ * ⚠️ **Nur in der Hilfe.** Dieselbe Funktion rendert Chat-Antworten und Wissensknoten;
+ * dort ist `foo.md` ein Dateiname und keine Seite dieser Plattform. Die Umschreibung ist
+ * deshalb ein Schalter und keine Regel.
+ */
+let _dokuLinks = false;
+
+/**
+ * `erste-schritte.md` → `/help/erste-schritte`, `faecher.md#archiv` → `/help/faecher#archiv`.
+ *
+ * ⚠️ **Das Inhaltsverzeichnis der Hilfe hat bis zum 26.09.2026 ins Leere geführt.** Die
+ * Übersichtsseite ist `docs/user/README.md`; ihre Verweise sind Dateinamen, weil die
+ * Doku auch außerhalb der Anwendung gelesen wird (im Repository, später auf einer
+ * Webseite). In der Anwendung landete ein Klick auf `/help/erste-schritte.md` — in einem
+ * **neuen Tab**, mit 404. Aufgefallen beim Umbau auf die dynamische Route.
+ */
+function alsHilfepfad(href) {
+    const treffer = /^([a-z0-9-]+)\.md(#.*)?$/i.exec(String(href || ''));
+    if (!treffer) return null;
+    const [, datei, anker = ''] = treffer;
+    return datei.toLowerCase() === 'readme' ? `/help${anker}` : `/help/${datei}${anker}`;
+}
+
 renderer.link = ({ href, title, text }) => {
     const titleAttr = title ? ` title="${title}"` : '';
+    const hilfepfad = _dokuLinks ? alsHilfepfad(href) : null;
     // ⚠️ **Seitenanker bleiben im Tab.** `target="_blank"` galt für *jeden* Link — ein
-    // `#abschnitt` öffnete damit eine neue Seite, und zwar ohne Sprungziel.
-    const intern = String(href || '').startsWith('#');
+    // `#abschnitt` öffnete damit eine neue Seite, und zwar ohne Sprungziel. Dasselbe
+    // gilt für Verweise auf andere Hilfeseiten: Sie führen innerhalb der Anwendung
+    // weiter.
+    const intern = hilfepfad !== null || String(href || '').startsWith('#');
     const ziel = intern ? '' : ' target="_blank" rel="noopener noreferrer"';
-    return `<a href="${href}"${titleAttr}${ziel}>${text}</a>`;
+    return `<a href="${hilfepfad ?? href}"${titleAttr}${ziel}>${text}</a>`;
 };
 
 function escapeHtml(s) {
@@ -228,8 +256,9 @@ function escapeAttr(s) {
 // Anführungszeichen, `"[^"]*"` deckt sie deshalb ab.
 const TAG = '<(?:[^>"]|"[^"]*")*>';
 
-export function renderMarkdown(text) {
+export function renderMarkdown(text, { dokuLinks = false } = {}) {
     if (!text) return '';
+    _dokuLinks = dokuLinks;
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
     _mathStore = {};
     _mathCount = 0;

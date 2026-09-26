@@ -26,6 +26,8 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 ## Inhaltsverzeichnis
 
 - [Erste Schritte](erste-schritte.md) — Anmelden, Oberfläche, erster Chat
+- [Die ersten 30 Minuten](erste-30-minuten.md) — *(Lehrkräfte)* der Weg von der Anmeldung zum ersten Jahresplan
+- [Für Schüler:innen](schueler.md) — was das hier ist, wer was sieht, wie man zitiert
 - [Den Chat nutzen](chat.md) — Nachrichten, Dateien, Modelle, Verlauf
 - [Fächer und Unterrichtsgruppen](faecher.md) — die Übersichtsseite, „Jetzt", Archiv früherer Schuljahre
 - [Assistenten](assistenten.md) — Was sind Assistenten und wie nutzt man sie?
@@ -40,6 +42,8 @@ Willkommen bei **ki@schule**. Diese Plattform gibt Ihnen Zugang zu Künstlicher 
 - [Kontextspeicher](kontext.md) — Wissensbausteinen gezielt in den Chat einbinden
 - [Profil & Budget](profil.md) — Budget, Erscheinungsbild, Einstellungen
 - [Datenschutz](datenschutz.md) — Was wird gespeichert, was nicht?
+- [Feedback geben](feedback.md) — Fehler melden und den Stand der eigenen Meldungen sehen
+- [Inhaltsrichtlinien](guardrails.md) — *(Admins)* wie die Schutzregeln der Modelle wirken
 
 ---
 

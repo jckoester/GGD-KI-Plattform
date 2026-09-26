@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Die Verweise in der Hilfe führen wieder ans Ziel.** Das Inhaltsverzeichnis der
+  Hilfe-Übersicht zeigte auf Dateinamen — ein Klick landete in einem neuen Tab auf
+  einer nicht vorhandenen Seite.
+
 - **Kurse ohne Klassenverband landen nicht mehr im Archiv.** Ein Kursstufenkurs oder
   eine Gruppe aus dem Stundenplan galt zu Schuljahresbeginn als „früher", solange sie
   weder Stunden noch Jahresplan hatte — sie stand also im Archiv, während sie
@@ -48,6 +52,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   eine Dublette. Betroffen war die Mehrheit der importierten Kapitel.
 
 ### Neu
+
+- **Die Hilfe zeigt die ganze Anwender-Doku.** Bisher waren zehn von achtzehn Seiten
+  in der Anwendung erreichbar — acht fehlten, darunter „Stundenplan übernehmen“,
+  „Bibliothek“ und „Zitieren“. Neu dabei sind außerdem **„Die ersten 30
+  Minuten“** für Lehrkräfte (der Weg von der Anmeldung zum ersten Jahresplan) und
+  **„Für Schüler:innen“** in einfacher Sprache. Das Verzeichnis zeigt jeder Rolle,
+  was zu ihr passt.
 
 - **Die Unterrichtsgruppe steht an den Chats.** In der Historie zeigt eine Marke neben
   dem Titel, zu welcher Gruppe ein Chat gehört; in der Seitenleiste nennt sie der
@@ -197,6 +208,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Änderung gespeichert.
 
 ### Dokumentation
+
+- **Die Sammelübernahme aus dem Stundenplan ist beschrieben** — der Knopf, der für
+  alle Gruppen auf einmal das Wochenmuster samt Stunden anlegt. Er war die zweite
+  Stelle im System, an der Stunden entstehen, und kam in keiner Anleitung vor.
 
 - **Drei Aufzählungen sind vollständig — und bleiben es.** Die Betriebsdoku nennt jetzt
   alle vierzehn nächtlichen Läufe (vorher fünf) und alle sechzehn Datenkategorien, die

@@ -36,7 +36,24 @@ Ohne Kürzel passiert nichts — die Übernahme ist freiwillig.
 
 ---
 
-## Wochenmuster übernehmen
+## Alle Gruppen auf einmal: das Stundenraster
+
+Der schnellste Weg von null zu einem bespielbaren Jahresplan steht auf der Seite
+**Unterricht**: **„Stundenplan lesen"**. Die Plattform liest vier Wochen Ihres Plans und
+legt für **jede** Ihrer Gruppen das Wochenmuster samt Stunden an — Sie sehen vorher, was
+sie gefunden hat, und bestätigen mit **„Für n Gruppen übernehmen"**.
+
+Das ist die **zweite Stelle im System, an der Stunden entstehen** (die erste ist das
+Wochenmuster einer einzelnen Gruppe, siehe unten). Beide legen dasselbe an; es ist eine
+Frage der Zahl, nicht der Wirkung.
+
+**Was sie nicht tut:** Gruppen anlegen. Was der Stundenplan hergibt und noch keine Gruppe
+ist, steht auf derselben Seite als Vorschlag — erst wenn Sie ihn bestätigen, entsteht
+eine Gruppe, und erst dann kann sie Stunden bekommen.
+
+Steht keine Stundenplanquelle bereit oder fehlt Ihr Kürzel, erscheint der Knopf gar nicht.
+
+## Wochenmuster übernehmen — Gruppe für Gruppe
 
 Im **Jahresplan** einer Gruppe öffnen Sie die Wochenmuster und wählen dort
 **„Aus Stundenplan übernehmen"**.
