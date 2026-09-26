@@ -91,6 +91,18 @@ describe("Gespeichert wird quittiert", () => {
         expect(stellen.length).toBeGreaterThanOrEqual(6)
     })
 
+    it("⚠️ und meldet auch, wenn es **nicht** geklappt hat", () => {
+        // Vorher lief eine gescheiterte Anfrage als unbehandelte Ablehnung ins Leere:
+        // keine Quittung, keine Meldung — die Seite sah aus wie vor dem Klick, und der
+        // Wert war nicht gespeichert. Das ist der Fall, in dem eine Rückmeldung am
+        // meisten wert ist.
+        expect(profil).toContain("quittungFehler")
+        expect(profil).toContain("Nicht gespeichert")
+        expect(profil, "der Schreibfehler muss gefangen werden").toMatch(
+            /catch \(err\)[\s\S]{0,200}quittiere\(key, \{ fehler: true \}\)/,
+        )
+    })
+
     it("auch für die Wege, die nicht über `updatePreference` laufen", () => {
         // Darstellungsmodus, Darstellungsstufe und Kacheln schreiben über eigene Stores.
         // Ohne diese drei wäre die Rückmeldung genau dort still, wo man sie am ehesten

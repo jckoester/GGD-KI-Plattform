@@ -80,17 +80,35 @@
     // Ein **Seiten**banner wäre falsch: Bei sechs Einstellungen untereinander sagt es
     // nicht, welche gemeint ist. Die Quittung steht deshalb am Feld und verschwindet
     // wieder.
+    // `quittung` trägt den Schlüssel des zuletzt geschriebenen Feldes, `quittungFehler`
+    // den eines gescheiterten Schreibversuchs.
     let quittung = $state(null);
+    let quittungFehler = $state(null);
     let quittungTimer = null;
 
-    function quittiere(key) {
-        quittung = key;
+    function quittiere(key, { fehler = false } = {}) {
+        quittung = fehler ? null : key;
+        quittungFehler = fehler ? key : null;
         clearTimeout(quittungTimer);
-        quittungTimer = setTimeout(() => (quittung = null), 2500);
+        // ⚠️ **Vier Sekunden, nicht zwei.** Wer eine Auswahlliste bedient, schaut beim
+        // Loslassen noch auf das Feld und erst danach auf die Überschrift daneben. Bei
+        // 2,5 Sekunden war die Meldung oft schon weg, bevor der Blick ankam
+        // (Rückmeldung Jan, 26.09.2026). Ein Fehler bleibt stehen, bis das nächste Feld
+        // geschrieben wird — er ist keine Beiläufigkeit.
+        if (!fehler) quittungTimer = setTimeout(() => (quittung = null), 4000);
     }
 
     async function updatePreference(key, value) {
-        await patchPreferences({ [key]: value });
+        // ⚠️ **Der Fehlerfall gehört dazu.** Vorher lief eine gescheiterte Anfrage als
+        // unbehandelte Ablehnung ins Leere: keine Quittung, keine Meldung — die Seite
+        // sah genauso aus wie vor dem Klick, und der Wert war nicht gespeichert.
+        try {
+            await patchPreferences({ [key]: value });
+        } catch (err) {
+            console.error("Einstellung nicht gespeichert:", key, err);
+            quittiere(key, { fehler: true });
+            return;
+        }
         // User-Store aktualisieren
         user.update((u) => ({
             ...u,
@@ -221,7 +239,7 @@
                     class="text-base font-semibold mb-1 text-light-tx-2 dark:text-dark-tx-2"
                 >
                     Umfang der Oberfläche
-                {#if quittung === "ui_stufe"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+                {#if quittung === "ui_stufe"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "ui_stufe"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
                 </h2>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3">
                     Wähle, wie viel du sehen möchtest. Jede Stufe enthält die vorherigen.
@@ -273,7 +291,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Darstellungsmodus
-            {#if quittung === "theme"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+            {#if quittung === "theme"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "theme"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div class="flex gap-2">
                 {#each themeOptions as { value, label, Icon }}
@@ -296,7 +314,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Kostenanzeige
-            {#if quittung === "cost_granularity"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+            {#if quittung === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
                 <label
@@ -325,7 +343,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Chat-Sidebar
-            {#if quittung === "sidebar_recent_chats_limit"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+            {#if quittung === "sidebar_recent_chats_limit"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "sidebar_recent_chats_limit"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div class="space-y-4">
                 <div>
@@ -355,7 +373,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Kontext-Suche
-            {#if quittung === "context_search_limit"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+            {#if quittung === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
                 <label
@@ -408,7 +426,7 @@
         <section class="mb-8">
             <h2 class="text-base font-semibold mb-1 text-light-tx-2 dark:text-dark-tx-2">
                 Kacheln der Startseite
-            {#if quittung === "startkacheln"}<span class="ml-2 text-xs text-light-gr dark:text-dark-gr" aria-live="polite">Gespeichert</span>{/if}
+            {#if quittung === "startkacheln"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "startkacheln"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3 max-w-prose">
                 Was auf der Startseite steht. Eine abgewählte Kachel verschwindet nur aus
