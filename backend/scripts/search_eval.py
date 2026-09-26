@@ -43,7 +43,7 @@ import asyncio
 import json
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, fields, field
 from pathlib import Path
 
 import asyncpg
@@ -107,6 +107,16 @@ class Fall:
     # Titel eines Ankerknotens (`retrieval_scope`). Gesetzt heißt: Der Fall misst das
     # Profil eines Anker-Assistenten — gesucht wird nur im Teilgraphen darunter.
     anker: str | None = None
+    # Knotenart, die der erwartete Treffer haben **muss**. Optional.
+    #
+    # ⚠️ **Ohne dieses Feld zählt ein Substring im Titel** — und der
+    # Bildungsplan nennt die Fachbegriffe beim Namen. „Wasserstoffbrücken“ steht
+    # auch in „3.2.1.3(10) die besonderen Eigenschaften von Wasser erklären (Dipol,
+    # Wasserstoffbrücken)“. Zehn der dreizehn Fachbegriff-Fälle waren dadurch auch
+    # ohne den Pilot-Bestand erfüllbar (geprüft 26.09.2026); sie meldeten Erfolg für
+    # etwas, das sie nicht messen. Wer prüfen will, ob der **Begriff** gefunden wird,
+    # schreibt `typ: begriff` dazu.
+    typ: str | None = None
     notiz: str | None = None
 
 
@@ -216,17 +226,26 @@ async def _suche(
     )
 
 
-def _rang(treffer: list[Treffer], knoten: str | None) -> int | None:
+def _rang(
+    treffer: list[Treffer], knoten: str | None, typ: str | None = None
+) -> int | None:
     """Platz des ersten Treffers, der zum erwarteten Knoten passt.
 
     Verglichen wird gegen die Kompetenznummer **oder** gegen den Titel; damit taugt das
     Feld sowohl für `3.3.2(1)` als auch für ein Stichwort wie `Pythagoras`. Mehrere
     Fassungen derselben Kompetenz zählen als ein Treffer — der beste Platz gewinnt.
+
+    ⚠️ **Der Titelvergleich ist ein Substring, und das ist eine Falle.** Der
+    Bildungsplan nennt die Fachbegriffe beim Namen: „Wasserstoffbrücken“ steht auch
+    im Titel einer Kompetenz. Ein Fall mit `typ` verlangt zusätzlich die Knotenart und
+    ist damit nicht mehr von einer Kompetenz zu erfüllen.
     """
     if not knoten:
         return None
     gesucht = knoten.strip().lower()
     for i, t in enumerate(treffer, 1):
+        if typ and t.content_type != typ:
+            continue
         if t.nr.strip().lower() == gesucht or gesucht in t.titel.lower():
             return i
     return None
@@ -242,7 +261,7 @@ def _bewerte(
     recall = len(ids_index & ids_exakt) / len(ids_exakt) if ids_exakt else 0.0
 
     warnungen: list[str] = []
-    if fall.knoten and _rang(produktiv, fall.knoten) is None:
+    if fall.knoten and _rang(produktiv, fall.knoten, fall.typ) is None:
         warnungen.append(
             f"erwarteter Knoten '{fall.knoten}' nicht in der Trefferliste — entweder von "
             f"ähnlicheren Knoten verdrängt (dann ist der Fall echt) oder nicht im Bestand "
@@ -256,7 +275,7 @@ def _bewerte(
         nachschlagen=nachschlagen, recall=recall,
         ident_n=ident_n, thema_n=thema_n,
         fach_ok=(produktiv[0].fach == fall.fach) if (fall.fach and produktiv) else None,
-        rang=_rang(produktiv, fall.knoten),
+        rang=_rang(produktiv, fall.knoten, fall.typ),
         operatoren_top3=sum(1 for t in produktiv[:3] if t.content_type == "operator"),
         warnungen=warnungen,
     )
@@ -433,19 +452,33 @@ async def _fach_ids(dsn: str) -> dict[str, int]:
         await con.close()
 
 
+def _aus_yaml(klasse, eintrag: dict, wo: str):
+    """Einen Fall aus seinem YAML-Eintrag bauen — und **unbekannte Schlüssel abweisen**.
+
+    ⚠️ **Sonst fällt ein Feld lautlos weg.** Bis 26.09.2026 bildete diese Funktion die
+    Felder einzeln ab; ein neu eingeführtes `typ:` stand in der Konfiguration, kam aber
+    nie an, und der Prüfsatz meldete unverändert „grün“ — für ein Kriterium, das er
+    gar nicht anwandte. Ein Tippfehler im Schlüssel hätte dasselbe getan.
+    """
+    erlaubt = {f.name for f in fields(klasse)}
+    unbekannt = sorted(set(eintrag) - erlaubt)
+    if unbekannt:
+        raise SystemExit(
+            f"{wo}: unbekannte Schlüssel {unbekannt} — erlaubt sind {sorted(erlaubt)}"
+        )
+    return klasse(**eintrag)
+
+
 def _lade(pfad: Path) -> tuple[list[Fall], int, list["Aufzaehlfall"]]:
     daten = yaml.safe_load(pfad.read_text(encoding="utf-8")) or {}
-    faelle = [
-        Fall(frage=f["frage"], fach=f.get("fach"), chat_fach=f.get("chat_fach"), knoten=(
-            None if f.get("knoten") is None else str(f["knoten"])
-        ), anker=f.get("anker"), notiz=f.get("notiz"))
-        for f in daten.get("faelle", [])
-    ]
+    faelle = []
+    for f in daten.get("faelle", []):
+        eintrag = dict(f)
+        if eintrag.get("knoten") is not None:
+            eintrag["knoten"] = str(eintrag["knoten"])
+        faelle.append(_aus_yaml(Fall, eintrag, f"Fall {f.get('frage')!r}"))
     aufzaehlungen = [
-        Aufzaehlfall(
-            titel=a.get("titel"), content_type=a.get("content_type"), fach=a.get("fach"),
-            gesamt=a.get("gesamt"), faecher=a.get("faecher"), notiz=a.get("notiz"),
-        )
+        _aus_yaml(Aufzaehlfall, dict(a), f"Aufzählung {a.get('titel')!r}")
         for a in daten.get("aufzaehlungen", [])
     ]
     return faelle, int(daten.get("top_k", 10)), aufzaehlungen

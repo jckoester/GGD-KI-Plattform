@@ -402,17 +402,39 @@ def _aus_dem_fach(profil: Suchprofil):
 
 # ── Teilgraph unter Ankern (Profil `anchor_ids`) ─────────────────────────────
 
+#: Knotenarten, die **über eine eingehende Kante** in den Teilgraphen eines Ankers
+#: kommen. Bewusst kurz: Jede weitere Art holt alles herein, was auf dieselbe
+#: Bildungsplan-Kompetenz zeigt — Arbeitsblätter, Klausuren, Stundenentwürfe.
+BEGRIFFSTYPEN = ("begriff", "stoffsteckbrief")
+
 
 def teilgraph(anchor_ids: Sequence[UUID]):
     """Die Knoten unter den Ankern eines Assistenten — als Unterabfrage.
 
-    Zwei Wege führen hinein, beide aus ADR-013:
+    Drei Wege führen hinein, die ersten beiden aus ADR-013:
 
     * **Abstammung** — alles, was über ``part_of`` unter einem Anker hängt, rekursiv.
       Ein Curriculum-Anker erfasst so seine Kapitel und deren Lernsequenzen.
     * **Verweise** — was der Anker selbst über ``references`` oder ``develops``
       benennt. Eine Lernsequenz zieht damit die Kompetenzen herein, die sie entwickelt,
       ohne dass sie unter ihr hängen.
+    * **Fachbegriffe, die auf den Teilgraphen zeigen** (Paket 9, N7 / E4 Variante A) —
+      also **eingehende** ``references``, beschränkt auf ``begriff`` und
+      ``stoffsteckbrief``.
+
+    ⚠️ **Warum der dritte Weg nötig wurde, und warum er so eng ist.** Ein Fachbegriff
+    verweist **auf** die Kompetenz, in der der Bildungsplan ihn verlangt — die Kante
+    entsteht am Begriff, nicht an der Kompetenz (AP1: sonst trüge sie Tausende
+    Rückverweise). Über die ersten beiden Wege ist er damit unerreichbar. Gemessen am
+    26.09.2026: Der Teilgraph unter der Chemie-Leitidee
+    „Bindungs- und Wechselwirkungsmodelle“ enthielt **13 Knoten — die Leitidee und
+    ihre zwölf Kompetenzen**, keinen einzigen Begriff. Ein Anker-Assistent sah also nur
+    Bildungsplan-Text und antwortete zum Rest aus dem Modellwissen.
+
+    **Die Typbeschränkung ist die Leitplanke, nicht ein Detail.** Ohne sie holte die
+    Umkehrung jedes Arbeitsblatt, jede Klausur und jeden Stundenentwurf herein, der auf
+    dieselbe Kompetenz zeigt — genau die Kantendichte, vor der ADR-013 bei
+    Bildungsplan-Knoten warnt. Wer die Menge erweitert, misst vorher.
 
     Bis 09/2026 stand diese Abfrage als roher SQL-Text in ``retrieval.py`` und war der
     einzige Ort mit einer zweiten Vektorsuche. Jetzt ist sie ein Vorfilter der Schicht:
@@ -436,7 +458,19 @@ def teilgraph(anchor_ids: Sequence[UUID]):
         kanten.c.from_node_id.in_(ids),
         kanten.c.relation.in_(["references", "develops"]),
     )
-    return sa.union(sa.select(abstammung.c.id), verwiesen)
+    # Eingehend, und nur von Fachbegriffen: Sie zeigen auf **alles**, was unter dem
+    # Anker hängt — nicht nur auf den Anker selbst.
+    begriffe = (
+        sa.select(kanten.c.from_node_id)
+        .select_from(kanten.join(knoten, knoten.c.id == kanten.c.from_node_id))
+        .where(
+            kanten.c.to_node_id.in_(sa.select(abstammung.c.id)),
+            kanten.c.relation == "references",
+            knoten.c.content_type.in_(BEGRIFFSTYPEN),
+            knoten.c.status == "active",
+        )
+    )
+    return sa.union(sa.select(abstammung.c.id), verwiesen, begriffe)
 
 
 # ── Editionen: zwei gültige BP-Fassungen gleichzeitig ────────────────────────

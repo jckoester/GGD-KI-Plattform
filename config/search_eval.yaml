@@ -276,6 +276,18 @@ faelle:
       der stillschweigend zu weit greift: Ein Mathematik-Kapitel darf hier nicht
       auftauchen.
 
+  - frage: Warum schwimmt Eis auf Wasser?
+    anker: 3.2.1.3 Bindungs- und Wechselwirkungsmodelle
+    knoten: Wasserstoffbrücken
+    typ: begriff
+    notiz: >-
+      ⚠️ **Dieser Fall war vor Paket 9/N7 rot, und zwar mit Ansage.** Der Teilgraph
+      unter einem Anker entstand aus `part_of` nach unten und den **ausgehenden**
+      Verweisen des Ankers — ein Fachbegriff zeigt aber **auf** die Kompetenz, nicht
+      umgekehrt. Gemessen am 26.09.2026: 13 Knoten im Teilgraphen, kein einziger
+      Begriff. Ein Anker-Assistent sah damit nur Bildungsplan-Kompetenzen und
+      antwortete zum Rest aus dem Modellwissen.
+
   # ── S8: Methoden thematisch finden, ohne den Namen zu kennen ────────────────
   #
   # Die Gegenprobe zum Nachschlagen: Dort ist der Name bekannt und gesucht wird der
@@ -339,6 +351,7 @@ faelle:
   - frage: Womit weist man Chloridionen nach?
     fach: Chemie
     knoten: Salzsäure
+    typ: stoffsteckbrief
     notiz: >-
       Der Nachweis steht in einem eigenen Feld, **nicht** im Embedding-Input. Gefunden
       werden soll der Stoff über seinen Text; findet der Fall nichts, obwohl der Knoten
@@ -347,6 +360,7 @@ faelle:
   - frage: Wie heißt Kochsalz richtig?
     fach: Chemie
     knoten: Natriumchlorid
+    typ: stoffsteckbrief
     notiz: >-
       Der Alltagsname steht in `trivialnamen` und ist ausdrücklich Teil des
       Embedding-Inputs — genau danach fragen Schüler:innen.
@@ -354,6 +368,7 @@ faelle:
   - frage: Welcher Stoff raucht an feuchter Luft und greift Metalle an?
     fach: Chemie
     knoten: Chlorwasserstoff
+    typ: stoffsteckbrief
     notiz: >-
       Umschreibung ohne Namen. ⚠️ **Erwartet wird Chlorwasserstoff, nicht Salzsäure** —
       und das ist vorab entschieden, nicht nachträglich angepasst (Plan AP7, Notiz vom
@@ -374,6 +389,7 @@ faelle:
   - frage: Oxidation
     fach: Chemie
     knoten: Oxidation
+    typ: begriff
     notiz: >-
       Nachschlagen unter dem Namen, und zugleich der Fassungsfall: „Oxidation“ gibt
       es zweimal (Sauerstoffaufnahme, Elektronenabgabe). Beide sind Namensträger; die
@@ -382,11 +398,13 @@ faelle:
   - frage: Elektronenpaarbindung
     fach: Chemie
     knoten: Elektronenpaarbindung
+    typ: begriff
     notiz: Gegenprobe ohne Fassungen — ein Begriff, den es nur einmal gibt.
 
   - frage: Atombindung
     fach: Chemie
     knoten: Elektronenpaarbindung
+    typ: begriff
     notiz: >-
       Alias. Am GGD heißt der Begriff „Elektronenpaarbindung“; „Atombindung“
       steht in `aliase` und geht in den Vektor ein. Wer den Schulbegriff nicht kennt,
@@ -395,6 +413,7 @@ faelle:
   - frage: Wasserstoffbrücke
     fach: Chemie
     knoten: Wasserstoffbrücken
+    typ: begriff
     notiz: >-
       Andere Zahlform. Der Titel folgt dem Bildungsplan und steht im Plural; die
       Einzahl wird **nicht** als Alias gepflegt (Konvention 24.09.2026) — sie muss
@@ -403,6 +422,7 @@ faelle:
   - frage: Warum schwimmt Eis auf Wasser?
     fach: Chemie
     knoten: Wasserstoffbrücken
+    typ: begriff
     notiz: >-
       Thematisch, ohne den Begriff zu kennen — der Kernfall. Die Antwort steht in der
       Erklärung von „Wasserstoffbrücken“ (Dichteanomalie), nicht in ihrem Titel.
@@ -410,11 +430,13 @@ faelle:
   - frage: Was passiert, wenn man Säure und Lauge mischt?
     fach: Chemie
     knoten: Neutralisation
+    typ: begriff
     notiz: Dasselbe in Schülersprache — „Lauge“ statt „alkalische Lösung“.
 
   - frage: Was bedeutet das Zeichen mit der Flamme auf der Flasche?
     fach: Chemie
     knoten: Flamme
+    typ: begriff
     notiz: >-
       Gefahrenpiktogramm über seine Anmutung gesucht, nicht über seinen Namen. ⚠️ Der
       Gegenfall zu „Welcher Stoff raucht …“: Dort **stören** die Piktogramme, hier
@@ -434,6 +456,7 @@ faelle:
   - frage: Mol
     fach: Chemie
     knoten: Stoffmenge
+    typ: begriff
     notiz: >-
       Die Einheit statt der Größe — so fragen Schüler:innen. Der Knoten heißt
       „Stoffmenge“ und führt „Mol“ als Alias; die Fehlvorstellung dazu steht
@@ -442,11 +465,13 @@ faelle:
   - frage: Molzahl
     fach: Chemie
     knoten: Stoffmenge
+    typ: begriff
     notiz: Zweite schiefe Form derselben Sache.
 
   - frage: Wasserstoffbrückenbindung
     fach: Chemie
     knoten: Wasserstoffbrücken
+    typ: begriff
     notiz: >-
       Der Ausdruck aus Szenario (f). Er ist Alias, nicht Titel — gefunden werden muss
       er trotzdem, und die Antwort soll den Titel verwenden.

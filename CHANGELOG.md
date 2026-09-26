@@ -68,6 +68,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Assistenten mit eigenem Wissensbereich finden jetzt auch die Fachbegriffe
+  dazu.** Bisher sahen sie nur die Bildungsplan-Kompetenzen unter ihrem
+  Ankerpunkt — die Begriffe, die auf genau diese Kompetenzen verweisen, fehlten.
 - **Assistenten antworten auf dem Stand der Klassenstufe.** Gibt es einen Begriff
   in mehreren Fassungen — „Oxidation“ als Sauerstoffaufnahme und als
   Elektronenabgabe —, steht die passende vorn. Die andere bleibt erreichbar: Wer
