@@ -33,6 +33,11 @@ Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
 - ein schultypisches Konzept, das an Ihrer Schule besonders behandelt wird
 - ein Thema oder eine Funktion aus dem Unterrichtsmaterial
 
+Ein Baustein kann **Abbildungen** enthalten — sie stehen an der Stelle im Text, an der
+sie erklärt werden, mit einer Beschreibung darunter. Diese Beschreibung ist kein
+Beiwerk: Sie ist das, was Sie hören, wenn Sie einen Screenreader benutzen, und das, was
+ein Assistent über das Bild weiß. Er sieht die Zeichnung nicht.
+
 Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
 
 ## Wozu ist das nützlich?

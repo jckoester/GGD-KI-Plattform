@@ -234,7 +234,44 @@ const katexInlineExt = {
     },
 };
 
-marked.use({ extensions: [katexBlockExt, katexInlineExt] });
+/**
+ * `{{abbildung:EN_H2O.svg}}` — eine Abbildung an genau dieser Stelle im Knotentext.
+ *
+ * Der Platzhalter ist die Absprache zwischen drei Stellen (Paket 9): Das Seed-Skript
+ * setzt ihn anstelle der Obsidian-Einbettung `![[…]]` (AP5), `_fuer_modell` im Backend
+ * macht daraus die Bildbeschreibung fürs Modell (AP3), und hier wird er zu einer leeren
+ * Hülle, die die Svelte-Action `renderAbbildungen` (abbildungen.js) mit dem SVG füllt.
+ *
+ * ⚠️ **Hier nur die Hülle, kein SVG.** Das SVG steht in `metadata.illustrationen` des
+ * Knotens; `renderMarkdown` bekommt nur den Text und kennt den Knoten nicht. Dasselbe
+ * Muster wie bei Mermaid und den server-gerenderten Blöcken: synchroner Platzhalter,
+ * Inhalt nach dem Mount.
+ *
+ * `<span>`, nicht `<div>`: Der Platzhalter kann mitten in einem Absatz stehen, und ein
+ * `<div>` im `<p>` ist ungültiges HTML. Die Blockdarstellung macht das Stylesheet.
+ */
+const abbildungExt = {
+    name: 'abbildung',
+    level: 'inline',
+    start(src) {
+        const i = src.indexOf('{{abbildung:');
+        return i < 0 ? undefined : i;
+    },
+    tokenizer(src) {
+        const treffer = /^\{\{abbildung:([^{}]+)\}\}/.exec(src);
+        if (treffer) {
+            return { type: 'abbildung', raw: treffer[0], datei: treffer[1].trim() };
+        }
+    },
+    renderer(token) {
+        // Nur der Dateiname, nicht der Pfad — dieselbe Regel wie im Backend: Im Vault
+        // steht im Text die bare Form, im Frontmatter eine Pfadangabe.
+        const datei = token.datei.split('/').pop();
+        return `<span class="abbildung-block" data-datei="${escapeAttr(datei)}"></span>`;
+    },
+};
+
+marked.use({ extensions: [katexBlockExt, katexInlineExt, abbildungExt] });
 
 // Explizite URL-Allowlist (Sicherheits-Audit #16): nur http(s)/mailto sowie relative bzw.
 // Anchor-URLs (kein Schema). Bewusst version-UNABHÄNGIG — statt auf DOMPurifys sich änderndes

@@ -34,6 +34,25 @@ export const RELATION_LABEL = {
   is_a: { raus: "Ist ein(e)", rein: "Unterarten" },
 }
 
+/**
+ * Feinere Sätze für `related_to`-Kanten, die eine `art` tragen (Paket 9).
+ *
+ * ⚠️ **Warum nicht je eine eigene Relation.** Der Knotentyp `stoffsteckbrief` führt
+ * `is_a`, `related_to` und `references` (AP2b); jede Spielart zu einer Relation zu
+ * machen hieße, den CHECK-Constraint und drei Listen für eine Beschriftungsfrage
+ * anzufassen. `art` steht in den **Kanten**-Metadaten — genau dafür sind sie da.
+ *
+ * Ohne Eintrag hier bleibt es bei „Steht in Beziehung zu": Eine unbekannte Art ist
+ * kein Fehler, nur eine Kante ohne eigenen Satz.
+ */
+export const ART_LABEL = {
+  abgrenzung: { raus: "Grenzt sich ab von", symmetrisch: true },
+  // Richtung ist hier die Aussage: Die frühere Fassung wird in der späteren vertieft.
+  vertiefung: { raus: "Wird vertieft in", rein: "Vertieft" },
+  teilchen: { raus: "Besteht aus den Teilchen", rein: "Kommt vor in" },
+  ghs: { raus: "Gefahrenpiktogramme", rein: "Gilt für" },
+}
+
 /** Ab hier wird gekappt und „+ n weitere" gezeigt (ADR-013-Leitplanke). */
 export const KAPPUNG = 20
 
@@ -76,15 +95,21 @@ export function gruppiereKanten(node, nachbarschaft) {
     const gegen = knoten[raus ? kante.to_node_id : kante.from_node_id]
     if (!gegen || gegen.id === node.id) continue
 
-    const richtung =
-      RELATION_LABEL[kante.relation]?.symmetrisch || raus ? "raus" : "rein"
-    ;(nach[`${kante.relation}:${richtung}`] ??= []).push({ kante, gegen, raus })
+    // Die Art verfeinert nur `related_to` — bei `is_a` oder `requires` wäre sie eine
+    // zweite Aussage über dieselbe Kante.
+    const art =
+      kante.relation === "related_to" && ART_LABEL[kante.metadata?.art]
+        ? kante.metadata.art
+        : ""
+    const beschriftung = art ? ART_LABEL[art] : RELATION_LABEL[kante.relation]
+    const richtung = beschriftung?.symmetrisch || raus ? "raus" : "rein"
+    ;(nach[`${kante.relation}:${richtung}:${art}`] ??= []).push({ kante, gegen, raus })
   }
 
   return Object.entries(nach)
     .map(([schluessel, eintraege]) => {
-      const [relation, richtung] = schluessel.split(":")
-      const b = RELATION_LABEL[relation] ?? {}
+      const [relation, richtung, art] = schluessel.split(":")
+      const b = (art ? ART_LABEL[art] : RELATION_LABEL[relation]) ?? {}
       const nurZahl = eintraege.length > NUR_ZAHL_AB
       return {
         schluessel,

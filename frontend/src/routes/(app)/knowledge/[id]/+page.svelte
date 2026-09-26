@@ -14,6 +14,8 @@
     import { renderInlineMath, renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
     import { renderServerBlocks } from "$lib/serverRender.js";
+    import { fuelleAbbildungen, ohneEinbettung } from "$lib/abbildungen.js";
+    import { feldSchema } from "$lib/collections.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { ArrowLeft, Pencil, Check, X } from "lucide-svelte";
@@ -154,8 +156,103 @@
         global: "Global",
     };
 
-    const isStructured = $derived(
-        node?.content_type === "funktion" || node?.content_type === "bauteil",
+    const isStructured = $derived(node?.content_type === "funktion");
+
+    // ── Abbildungen (Paket 9, AP6) ───────────────────────────────────────────
+    //
+    // Der Platzhalter `{{abbildung:…}}` im Text wird zur leeren Hülle (renderMarkdown);
+    // gefüllt wird sie hier, weil erst hier der Knoten und damit
+    // `metadata.illustrationen` bekannt ist. Dieselbe Funktion füllt die Hüllen, die
+    // unten für die Abbildungen ohne Einbettung und für das Schaltzeichen stehen —
+    // deshalb umschließt `inhaltWurzel` beide Bereiche.
+    const illustrationen = $derived(node?.metadata?.illustrationen ?? []);
+
+    // Ein Schaltzeichen ist eine Abbildung wie jede andere, nur ohne Datei. Der
+    // Pseudoname hängt es an denselben Renderer, statt einen zweiten zu bauen.
+    const SCHALTZEICHEN = "schaltzeichen";
+    const schaltzeichen = $derived(
+        node?.content_type === "bauteil" && node?.metadata?.schaltzeichen?.svg
+            ? { ...node.metadata.schaltzeichen, datei: SCHALTZEICHEN }
+            : null,
+    );
+
+    const alleAbbildungen = $derived(
+        schaltzeichen ? [...illustrationen, schaltzeichen] : illustrationen,
+    );
+
+    // Abbildungen, die im Text nicht vorkommen — sie stehen am Ende, statt zu fehlen.
+    const nachgestellt = $derived(ohneEinbettung(node?.content ?? "", illustrationen));
+
+    let inhaltWurzel = $state(null);
+
+    $effect(() => {
+        // Von `contentHtml` und `alleAbbildungen` abhängig: Beides kommt asynchron, und
+        // der Effekt muss **nach** dem Einsetzen des HTML laufen. Ein `use:`-Action mit
+        // MutationObserver (wie bei Mermaid) täte es auch, bekäme aber die geänderte
+        // Abbildungsliste nicht mit.
+        contentHtml;
+        const abbildungen = alleAbbildungen;
+        if (inhaltWurzel) fuelleAbbildungen(inhaltWurzel, abbildungen);
+    });
+
+    /** Häufige Irrtümer — der eigentliche Mehrwert eines Fachbegriffs im Gespräch. */
+    const fehlvorstellungen = $derived(
+        Array.isArray(node?.metadata?.fehlvorstellungen)
+            ? node.metadata.fehlvorstellungen
+            : [],
+    );
+
+    /**
+     * Die Eigenschaftstabelle eines Stoffsteckbriefs.
+     *
+     * Feste Schlüssel nach Bildungsplan 3.1.2.1 (1), deshalb eine Beschriftungstabelle
+     * und kein freies Dictionary: `loeslichkeit_wasser` als Überschrift zu zeigen wäre
+     * eine Datenbankspalte, keine Auskunft.
+     */
+    const EIGENSCHAFT_LABELS = {
+        aussehen: "Aussehen",
+        schmelztemperatur: "Schmelztemperatur",
+        siedetemperatur: "Siedetemperatur",
+        dichte: "Dichte",
+        loeslichkeit_wasser: "Löslichkeit in Wasser",
+        molare_masse: "Molare Masse",
+        elektrische_leitfaehigkeit: "Elektrische Leitfähigkeit",
+        konzentration: "Konzentration",
+        besonderheiten: "Besonderheiten",
+    };
+
+    const eigenschaften = $derived(
+        Object.entries(node?.metadata?.eigenschaften ?? {})
+            .filter(([, wert]) => wert !== null && wert !== "")
+            // Reihenfolge der Tabelle, nicht die der Datei: So steht bei jedem Stoff
+            // dasselbe an derselben Stelle, und man vergleicht Zeilen statt zu suchen.
+            .sort(
+                (a, b) =>
+                    Object.keys(EIGENSCHAFT_LABELS).indexOf(a[0]) -
+                    Object.keys(EIGENSCHAFT_LABELS).indexOf(b[0]),
+            )
+            .map(([schluessel, wert]) => [
+                EIGENSCHAFT_LABELS[schluessel] ?? schluessel,
+                String(wert),
+            ]),
+    );
+
+    /**
+     * Die Schema-Felder des Knotens für den Eigenschaften-Block.
+     *
+     * Aus `taxonomy.js` abgeleitet, nicht aufgezählt: Ein Feld, das AP1 ergänzt, steht
+     * damit von selbst da — und ein umbenanntes verschwindet, statt leer zu bleiben.
+     * `fehlvorstellungen` und `eigenschaften` bleiben draußen; sie haben oben ihren
+     * eigenen Platz.
+     */
+    const EIGENER_PLATZ = ["fehlvorstellungen", "formel", "fassung", "ab_klasse"];
+
+    const schemaFelder = $derived(
+        Object.entries(feldSchema(node?.content_type) ?? {})
+            .filter(([name]) => !EIGENER_PLATZ.includes(name))
+            .map(([name, feld]) => [feld.label ?? name, node?.metadata?.[name]])
+            .filter(([, wert]) => wert !== undefined && wert !== null && wert !== "")
+            .map(([label, wert]) => [label, Array.isArray(wert) ? wert.join(", ") : String(wert)]),
     );
 
     // Knoten laden (Curriculum-Knoten haben eine eigene Ansicht)
@@ -287,6 +384,21 @@
                         · {CONTENT_TYPE_LABELS[node.content_type] ??
                             node.content_type}
                     {/if}
+                    <!-- ⚠️ Fassung und Klassenstufe **im Kopf**, nicht in den
+                         Eigenschaften: Bei gleichnamigen Begriffen („Oxidation") sind
+                         sie das Einzige, woran man erkennt, welchen man vor sich hat.
+                         Eingeklappt wären sie genau dort unsichtbar, wo sie zählen. -->
+                    {#if node.metadata?.fassung}
+                        · <span class="text-light-tx dark:text-dark-tx"
+                            >{node.metadata.fassung}</span
+                        >
+                    {/if}
+                    {#if node.metadata?.ab_klasse}
+                        · ab Klasse {node.metadata.ab_klasse}
+                    {/if}
+                    {#if node.metadata?.formel}
+                        · {@html renderInlineMath(`$${node.metadata.formel}$`)}
+                    {/if}
                 </p>
             </div>
             {#if canEdit && !isImported && ziel.url}
@@ -341,31 +453,113 @@
             </div>
         {/if}
 
-        <!-- Inhalt -->
-        {#if contentHtml}
-            <div
-                class="prose dark:prose-invert
-                       prose-p:text-light-tx dark:prose-p:text-dark-tx
-                       prose-headings:text-light-tx dark:prose-headings:text-dark-tx
-                       prose-strong:text-light-tx dark:prose-strong:text-dark-tx
-                       prose-li:text-light-tx dark:prose-li:text-dark-tx
-                       prose-a:text-light-bl dark:prose-a:text-dark-bl"
-                use:renderDiagrams use:renderServerBlocks
-            >
-                {@html contentHtml}
-            </div>
-        {:else}
-            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 italic">
-                Kein Inhalt hinterlegt.
-            </p>
-        {/if}
+        <!-- Inhalt. `inhaltWurzel` umschließt alles, was Abbildungshüllen enthalten
+             kann — den Fließtext, die nachgestellten Abbildungen und das
+             Schaltzeichen. Gefüllt werden sie alle von derselben Funktion. -->
+        <div bind:this={inhaltWurzel}>
+            {#if contentHtml}
+                <div
+                    class="prose dark:prose-invert
+                           prose-p:text-light-tx dark:prose-p:text-dark-tx
+                           prose-headings:text-light-tx dark:prose-headings:text-dark-tx
+                           prose-strong:text-light-tx dark:prose-strong:text-dark-tx
+                           prose-li:text-light-tx dark:prose-li:text-dark-tx
+                           prose-a:text-light-bl dark:prose-a:text-dark-bl"
+                    use:renderDiagrams
+                    use:renderServerBlocks
+                >
+                    {@html contentHtml}
+                </div>
+            {:else}
+                <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 italic">
+                    Kein Inhalt hinterlegt.
+                </p>
+            {/if}
+
+            <!-- Eigenschaften eines Stoffs: der Zweck des Steckbriefs. Feste Reihenfolge,
+                 damit man Zeilen vergleicht, statt sie zu suchen. -->
+            {#if eigenschaften.length > 0}
+                <section class="mt-6">
+                    <h2
+                        class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2"
+                    >
+                        Eigenschaften des Stoffs
+                    </h2>
+                    <dl
+                        class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm
+                               border border-light-ui-3 dark:border-dark-ui-3 rounded-lg p-4
+                               bg-light-bg-2 dark:bg-dark-bg-2"
+                    >
+                        {#each eigenschaften as [label, wert] (label)}
+                            <dt class="text-light-tx-2 dark:text-dark-tx-2">{label}</dt>
+                            <dd class="text-light-tx dark:text-dark-tx">
+                                {@html renderInlineMath(wert)}
+                            </dd>
+                        {/each}
+                    </dl>
+                </section>
+            {/if}
+
+            <!-- ⚠️ **Eigener Abschnitt, nicht in den Eigenschaften versteckt.** Häufige
+                 Irrtümer sind das, wogegen eine Erklärung anarbeiten muss — für eine
+                 Lehrkraft der Grund, den Eintrag überhaupt zu öffnen. -->
+            {#if fehlvorstellungen.length > 0}
+                <section class="mt-6">
+                    <h2
+                        class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2"
+                    >
+                        Häufige Irrtümer
+                    </h2>
+                    <ul
+                        class="space-y-1.5 text-sm text-light-tx dark:text-dark-tx
+                               list-disc pl-5"
+                    >
+                        {#each fehlvorstellungen as irrtum, i (i)}
+                            <li>{@html renderInlineMath(irrtum)}</li>
+                        {/each}
+                    </ul>
+                </section>
+            {/if}
+
+            <!-- Abbildungen ohne Einbettung: Sie stehen nicht im Text, gehören aber zum
+                 Eintrag. Die Hülle ist dieselbe wie im Fließtext. -->
+            {#if nachgestellt.length > 0}
+                <section class="mt-6">
+                    <h2
+                        class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2"
+                    >
+                        Abbildungen
+                    </h2>
+                    {#each nachgestellt as abb (abb.datei)}
+                        <span class="abbildung-block" data-datei={abb.datei}></span>
+                    {/each}
+                </section>
+            {/if}
+
+            <!-- Schaltzeichen eines Bauteils: bis 09/2026 nur im Bearbeiten-Modus
+                 sichtbar — also für alle, die nicht bearbeiten dürfen, gar nicht. -->
+            {#if schaltzeichen}
+                <section class="mt-6">
+                    <h2
+                        class="text-sm font-semibold text-light-tx dark:text-dark-tx mb-2"
+                    >
+                        Schaltzeichen
+                        {#if node.metadata.schaltzeichen.norm}
+                            <span
+                                class="font-normal text-light-tx-2 dark:text-dark-tx-2"
+                                >· {node.metadata.schaltzeichen.norm}</span
+                            >
+                        {/if}
+                    </h2>
+                    <span class="abbildung-block" data-datei={SCHALTZEICHEN}></span>
+                </section>
+            {/if}
+        </div>
 
         <!-- Hinweis für strukturierte Typen (MVP: Details im Bearbeiten-Modus) -->
         {#if isStructured}
             <p class="mt-4 text-sm text-light-tx-2 dark:text-dark-tx-2">
-                Strukturierte Details ({node.content_type === "funktion"
-                    ? "Funktionssignatur"
-                    : "Schaltzeichen"}) sind im Bearbeiten-Modus sichtbar.
+                Die Funktionssignatur ist im Bearbeiten-Modus sichtbar.
             </p>
         {/if}
         <!-- ── Nachbarschaft (A3) + Verknüpfen (A8) ───────────────────────── -->
@@ -452,7 +646,8 @@
                                             />
                                             <a
                                                 href="/knowledge/{eintrag.gegen.id}"
-                                                title={eintrag.gegen.title}
+                                                title={eintrag.kante.metadata
+                                                    ?.hinweis ?? eintrag.gegen.title}
                                                 class="text-light-tx dark:text-dark-tx
                                                        hover:underline truncate"
                                             >
@@ -546,6 +741,16 @@
                         {formatDate(node.valid_until)}
                     </dd>
                 {/if}
+
+                <!-- Die typeigenen Felder aus dem Schema (Prüfstatus, Herkunft,
+                     Alltagsnamen, Nachweis …). Bis 09/2026 waren sie nur im Editor zu
+                     sehen — also für alle, die nicht bearbeiten dürfen, gar nicht. -->
+                {#each schemaFelder as [label, wert] (label)}
+                    <dt class="text-light-tx-2 dark:text-dark-tx-2">{label}</dt>
+                    <dd class="text-light-tx dark:text-dark-tx">
+                        {@html renderInlineMath(wert)}
+                    </dd>
+                {/each}
             </dl>
         </details>
 

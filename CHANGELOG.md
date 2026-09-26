@@ -60,6 +60,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Bausteine können Abbildungen im Text tragen.** Eine Zeichnung steht an der Stelle,
+  an der sie erklärt wird, mit ihrer Beschreibung darunter. Bei Stoffen zeigt die
+  Detailansicht zusätzlich die Eigenschaftstabelle, bei Fachbegriffen die häufigen
+  Irrtümer als eigenen Abschnitt.
+- **Das Schaltzeichen eines Bauteils ist jetzt beim Lesen sichtbar** — bisher nur beim
+  Bearbeiten, also für Schüler:innen gar nicht.
 - **Assistenten kennen jetzt die Zusatzangaben eines Fachbegriffs.** Bevorzugte
   Bezeichnung, Fassung, Klassenstufe, Artikel und Mehrzahl sowie die häufigen Irrtümer
   gehen mit in das Gespräch — beim Stoffsteckbrief zusätzlich Formel, Alltagsnamen,
