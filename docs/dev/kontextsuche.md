@@ -21,7 +21,7 @@ Eine Schicht, drei Verfahren, ein Ergebnisumschlag.
 | `retrieval.py` | Nur noch der **Lernstand** (`node_engagement`). Er ist Traversierung, keine Suche — die frühere zweite Vektorsuche für Anker-Assistenten ist in `search.py` aufgegangen |
 | `embedding.py` | Einbettung der Knoten (welche Typen, siehe `app/context/taxonomy.yaml`) |
 
-**Die drei Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
+**Die vier Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
 verrechnet werden:
 
 - **Identifikation** — „diesen Baustein". Titelabgleich in zwei Stufen: exakt über den
@@ -33,6 +33,13 @@ verrechnet werden:
   Gesamtzahl.
 - **Aufzählung** — „alle, die …". Deterministische Filterabfrage mit Zählung vor dem
   Limit, Fassungs-Deduplizierung und Gruppierung.
+- **Vorab-Suche** (`vorab()`) — „was gehört vermutlich zu dieser Nachricht". Läuft zu
+  **jeder** Chat-Nachricht, ohne dass jemand danach fragt, und legt bis zu fünf Treffer
+  in den System-Prompt. Deshalb die einzige, die eine **Schwelle** kennt: exakter
+  Namens- oder Suchbegriff-Treffer, sonst Kosinus-Distanz ≤ `VORAB_SCHWELLE`. Beschränkt
+  auf `VORAB_TYPEN` — die Arten, die Schüler:innen im Unterricht in die Hand bekommen
+  (Flag `collection.schueler` der Taxonomie). Begründung und Messung: ADR-017, Nachtrag
+  „Vorab-Suche als Grundschicht".
 
 Jeder Abschnitt hat sein **eigenes Budget** (`Suchprofil`). Das ist keine Kosmetik: Ein
 gemeinsames Limit hieße, dass Namenstreffer die thematischen verdrängen — der Fehler, der
@@ -48,6 +55,7 @@ die Neukonzeption ausgelöst hat.
 | Werkzeug `search_context_nodes` | Identifikation + thematisch | `ASSISTANT_CONTEXT_LIMIT` |
 | Werkzeug `list_context_nodes` | Aufzählung | `ASSISTANT_CONTEXT_LIMIT` |
 | Assistent mit Wissensbereich | thematisch im Teilgraphen | `_ANKER_TOP_K` |
+| **Grundschicht jedes Chats** | Vorab-Suche (Name/Alias + Schwelle) | `VORAB_MAX` = 5 |
 
 ---
 

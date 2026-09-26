@@ -7,6 +7,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Assistenten bekommen die passenden Einträge aus dem Wissensspeicher, ohne danach
+  suchen zu müssen.** Zu jeder Nachricht sucht die Plattform selbst und legt passende
+  Fachbegriffe, Stoffsteckbriefe sowie Methoden- und Operatorenblätter dazu — auch im
+  freien Chat ohne Assistenten. Passt nichts, bleibt der Kontext leer; das
+  Suchwerkzeug bleibt für gezieltes Nachschlagen.
+
 - **Assistenten schlagen wieder zuverlässig im Wissensspeicher nach.** Das Standardmodell
   lief mit der niedrigsten Denkstufe und entschied sich deshalb meist gegen die Suche —
   es antwortete aus eigenem Wissen statt aus den Einträgen der Fachschaft. Gemessen: vier

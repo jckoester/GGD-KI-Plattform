@@ -20,6 +20,9 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 >    Vektorraum — mit Kosten und ohne Gewinn. Schritt 4 prüft genau das.
 > 3. Ein Typ, dessen fachlicher Wert im **Metadata** steckt und der in `MODELL_METADATA`
 >    fehlt, zeigt seine Felder überall — nur der Assistent sieht sie nie. Schritt 14.
+> 4. `collection.schueler: true` sieht nach einer Anzeigeeinstellung aus, entscheidet
+>    aber seit dem 26.09.2026 **auch**, ob Knoten dieses Typs ungefragt im Chat-Prompt
+>    landen. Schritt 15.
 
 ## `taxonomy.yaml` ist eine Systemdatei
 
@@ -297,7 +300,7 @@ Drei Regeln dazu:
 
 - **Whitelist, nicht „alles Metadata".** Ein SVG im Metadata (`illustrationen[].svg`,
   `schaltzeichen.svg`) ist im Pilot bis 47 kB groß — pauschal mitgegeben stünde mehr
-  Grafikmarkup im Prompt als Unterrichtsinhalt. `_ohne_svg` in `app/chat/router.py`
+  Grafikmarkup im Prompt als Unterrichtsinhalt. `ohne_svg` in `app/context/modellsicht.py`
   entfernt den Schlüssel in jeder Tiefe; was das Bild zeigt, steht in `beschreibung`.
 - **Nicht dieselbe Liste wie der Embedding-Input** (Schritt 4). Die Eigenschaftstabelle
   gehört ins Gespräch, aber nicht in den Vektor: Dort machte sie alle Stoffe einander
@@ -308,13 +311,37 @@ Drei Regeln dazu:
   und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute
   `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann.
 
-### 15. Prüfsatz
+### 15. Darf der Typ ungefragt in einen Chat?
+
+Das Flag `collection.schueler` in `taxonomy.yaml`. Es beantwortete ursprünglich nur eine
+Anzeigefrage („erscheint die Sammlung im Abschnitt *Nachschlagen* der
+Unterrichtsgruppen-Seite auch für Schüler:innen?"). Seit der Vorab-Suche (ADR-017,
+Nachtrag vom 26.09.2026) hat es eine zweite Wirkung: `VORAB_TYPEN` leitet sich daraus
+ab, und Knoten dieser Arten landen **ohne Nachfrage** im System-Prompt jeder passenden
+Chat-Nachricht.
+
+⚠️ **Die vierte stumme Falle**, und sie geht in beide Richtungen. Wer das Flag setzt,
+weil die Sammlung in der Gruppenansicht auftauchen soll, öffnet zugleich den Weg in den
+Prompt. Wer es weglässt, weil die Sammlungsansicht nicht gebraucht wird, sperrt den Typ
+lautlos aus dem Chat aus — der Assistent findet ihn dann nur noch, wenn er von sich aus
+sucht, und das tut er gemessen nicht zuverlässig.
+
+Die Frage dahinter ist in beiden Fällen dieselbe und eine gute: *Ist das etwas, das
+Schüler:innen im Unterricht in die Hand bekommen?* Ja bei Fachbegriffen, Stoffsteckbriefen,
+Methoden- und Operatorenblättern. Nein bei Planungsvokabular der Lehrkraft und bei
+Bildungsplan-Kompetenzen — letztere sind zahlreich genug, jeden Prompt zu füllen, und
+beantworten die Frage einer Lehrkraft, nicht die einer Schülerin.
+
+Fällt die Antwort auseinander (Sammlung ja, Prompt nein — oder umgekehrt), ist das Flag
+zu teilen. Heute deckt eine Frage beide Fälle; das ist keine Zusage für immer.
+
+### 16. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 16. Dokumentation
+### 17. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.

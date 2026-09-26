@@ -546,3 +546,25 @@ MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
 def modell_metadata_felder(content_type: str | None) -> tuple[str, ...]:
     """Welche Metadatenfelder dieses Typs das Modell sehen darf (leer = keine)."""
     return MODELL_METADATA.get(content_type or "", ())
+
+
+#: Knotenarten, die **ungefragt** im Prompt landen dürfen (Paket 9, N11).
+#:
+#: Abgeleitet aus dem Flag ``sammlung.schueler`` der Taxonomie, **nicht** von Hand
+#: gepflegt. Das Flag beantwortet genau die richtige Frage: „Ist das etwas, das
+#: Schüler:innen im Unterricht in die Hand bekommen?" Wer einen neuen Typ so
+#: kennzeichnet, entscheidet damit auch, dass er in einem Schüler-Chat ohne Nachfrage
+#: erscheinen darf — das steht als Schritt in ``docs/dev/neuer-knotentyp.md``.
+#:
+#: ⚠️ **Es ist keine Rechteangabe.** Was jemand lesen darf, regelt allein
+#: ``app/context/visibility.py``; die Vorab-Suche läuft über dieselbe Grundabfrage wie
+#: jede andere Suche. Hier wird nur entschieden, was **ohne Anlass** vorgelegt wird.
+#: Bildungsplan-Kompetenzen und Curricula bleiben deshalb draußen: Sie beantworten die
+#: Frage einer Lehrkraft, nicht die einer Schülerin, und sie sind zahlreich genug, um
+#: jeden Prompt zu füllen.
+VORAB_TYPEN: Final[tuple[str, ...]] = tuple(
+    ct["key"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if (ct.get("collection") or {}).get("schueler") is True
+)

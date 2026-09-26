@@ -1,21 +1,23 @@
-"""Was der Chat aus einem Werkzeug-Ergebnis macht (app/chat/router.py).
+"""Was ein Treffer dem Modell über sich sagt (app/context/modellsicht.py).
 
 Übrig ist ein Weg: der **Text ans Modell**. Er trug bis 08/2026 ausschließlich Titel,
 womit jede Frage nach dem *Inhalt* des Wissensgraphen unbeantwortbar war.
 
 Der zweite Weg — die Vorschlagsliste im Chat (SSE `context_suggestions`) — ist mit
 ADR-017/AP1 entfallen. Die Form**prüfung**, die er brauchte, ist damit ebenfalls weg;
-`_fuer_modell` prüft ohnehin je Eintrag und reicht fremde Formen durch (siehe
+`fuer_modell` prüft ohnehin je Eintrag und reicht fremde Formen durch (siehe
 ``TestFuerModell``). Genau daran war der Stream einmal abgerissen: Die Gruppe
 `context_search` enthält auch `get_operatoren`, dessen Einträge `operator`/`afb`/
 `bedeutung` tragen und keinen `title`.
 """
 
-from app.chat.router import (
-    _INHALT_MAX_ZEICHEN,
-    _abbildungen_aufgeloest,
-    _fuer_modell,
-    _ohne_svg,
+# ⚠️ **Seit 26.09.2026 nicht mehr aus `app.chat.router`.** Die Auswahl gilt für zwei
+# Wege — das Werkzeug und die Vorab-Suche (N11) — und liegt deshalb im Kontextpaket.
+from app.context.modellsicht import (
+    INHALT_MAX_ZEICHEN,
+    abbildungen_aufgeloest,
+    fuer_modell,
+    ohne_svg,
 )
 
 
@@ -28,21 +30,21 @@ def _knoten(**felder):
 class TestFuerModell:
     def test_inhalt_geht_mit(self):
         """Der Kern der Sache: ohne Inhalt kann das Modell die Knoten nicht lesen."""
-        [e] = _fuer_modell([_knoten(content="Fläche und Umfang eines Kreises")])
+        [e] = fuer_modell([_knoten(content="Fläche und Umfang eines Kreises")])
         assert e["content"] == "Fläche und Umfang eines Kreises"
 
     def test_node_id_bleibt_draussen(self):
         """Sie nützt dem Modell nichts und landet sonst in der Antwort."""
-        [e] = _fuer_modell([_knoten(content="x")])
+        [e] = fuer_modell([_knoten(content="x")])
         assert "node_id" not in e and e["title"] == "Titel"
 
     def test_langer_inhalt_wird_gekuerzt(self):
-        [e] = _fuer_modell([_knoten(content="A" * (_INHALT_MAX_ZEICHEN + 500))])
-        assert len(e["content"]) == _INHALT_MAX_ZEICHEN + 2
+        [e] = fuer_modell([_knoten(content="A" * (INHALT_MAX_ZEICHEN + 500))])
+        assert len(e["content"]) == INHALT_MAX_ZEICHEN + 2
         assert e["content"].endswith(" …")
 
     def test_leerer_inhalt_erzeugt_kein_feld(self):
-        [e] = _fuer_modell([_knoten(content=None)])
+        [e] = fuer_modell([_knoten(content=None)])
         assert "content" not in e
 
     def test_fach_statt_interner_id(self):
@@ -52,13 +54,13 @@ class TestFuerModell:
         nicht beantworten und meldete, es gebe keine Einträge je Fach — obwohl die
         Treffer stimmten.
         """
-        [e] = _fuer_modell([_knoten()])
+        [e] = fuer_modell([_knoten()])
         assert e["fach"] == "Mathematik"
         assert "subject_id" not in e
 
     def test_knoten_ohne_fach_bekommt_kein_feld(self):
         """Leitperspektiven tragen kein Fach — dann steht dort auch nichts."""
-        [e] = _fuer_modell([_knoten(fach=None, subject_id=None)])
+        [e] = fuer_modell([_knoten(fach=None, subject_id=None)])
         assert "fach" not in e and "subject_id" not in e
 
     def test_fremde_form_wird_durchgereicht(self):
@@ -68,18 +70,18 @@ class TestFuerModell:
         Unterscheidung fällt je Eintrag, nicht für die Liste als Ganzes.
         """
         eintrag = {"operator": "nennen", "afb": "I", "bedeutung": "knapp anführen"}
-        assert _fuer_modell([eintrag]) == [eintrag]
+        assert fuer_modell([eintrag]) == [eintrag]
 
     def test_gemischte_liste(self):
         """Knoten und fremde Form nebeneinander — beide überstehen die Aufbereitung."""
         fremd = {"operator": "nennen", "afb": "I"}
-        knoten, durchgereicht = _fuer_modell([_knoten(content="x"), fremd])
+        knoten, durchgereicht = fuer_modell([_knoten(content="x"), fremd])
         assert durchgereicht == fremd
         assert knoten["title"] == "Titel" and "node_id" not in knoten
 
     def test_hinweis_dict_wird_nicht_angefasst(self):
         """`get_operatoren` ohne Fachbezug liefert einen Hinweis statt einer Liste."""
-        assert _fuer_modell([{"hinweis": "kein Fachbezug"}]) == [{"hinweis": "kein Fachbezug"}]
+        assert fuer_modell([{"hinweis": "kein Fachbezug"}]) == [{"hinweis": "kein Fachbezug"}]
 
 
 class TestErgebnisUmfangFuersLog:
@@ -126,7 +128,7 @@ class TestOhneSvg:
 
     def test_svg_faellt_weg_beschreibung_bleibt(self):
         roh = {"schaltzeichen": {"svg": "<svg/>", "beschreibung": "Dreieck", "norm": "IEC"}}
-        assert _ohne_svg(roh) == {
+        assert ohne_svg(roh) == {
             "schaltzeichen": {"beschreibung": "Dreieck", "norm": "IEC"}
         }
 
@@ -136,7 +138,7 @@ class TestOhneSvg:
             {"datei": "a.svg", "svg": "<svg/>", "beschreibung": "eins"},
             {"datei": "b.svg", "svg": "<svg/>", "beschreibung": "zwei"},
         ]}
-        assert _ohne_svg(roh) == {"illustrationen": [
+        assert ohne_svg(roh) == {"illustrationen": [
             {"datei": "a.svg", "beschreibung": "eins"},
             {"datei": "b.svg", "beschreibung": "zwei"},
         ]}
@@ -144,20 +146,20 @@ class TestOhneSvg:
     def test_beliebige_tiefe(self):
         """„In jeder Tiefe" heißt: auch dort, wo heute niemand ein SVG erwartet."""
         roh = {"a": {"b": [{"c": {"svg": "<svg/>", "d": 1}}]}}
-        assert _ohne_svg(roh) == {"a": {"b": [{"c": {"d": 1}}]}}
+        assert ohne_svg(roh) == {"a": {"b": [{"c": {"d": 1}}]}}
 
     def test_ohne_svg_bleibt_alles_stehen(self):
         roh = {"fassung": "Klasse 8", "fehlvorstellungen": ["a", "b"], "ab_klasse": 8}
-        assert _ohne_svg(roh) == roh
+        assert ohne_svg(roh) == roh
 
     def test_skalare_und_leeres_ueberstehen_es(self):
-        assert _ohne_svg({}) == {} and _ohne_svg([]) == []
-        assert _ohne_svg("svg") == "svg" and _ohne_svg(None) is None
+        assert ohne_svg({}) == {} and ohne_svg([]) == []
+        assert ohne_svg("svg") == "svg" and ohne_svg(None) is None
 
     def test_nur_der_schluessel_zaehlt_nicht_der_wert(self):
         """Gegenprobe: Ein Feld, das zufällig „svg" **enthält**, bleibt."""
         roh = {"svg_beschreibung": "x", "quelle": "svg-Datei aus dem Vault"}
-        assert _ohne_svg(roh) == roh
+        assert ohne_svg(roh) == roh
 
 
 class TestAbbildungenFuersModell:
@@ -173,7 +175,7 @@ class TestAbbildungenFuersModell:
     ]}
 
     def test_platzhalter_wird_zur_beschreibung(self):
-        text = _abbildungen_aufgeloest("Davor\n\n{{abbildung:EN_H2O.svg}}\n\nDanach", self.ILL)
+        text = abbildungen_aufgeloest("Davor\n\n{{abbildung:EN_H2O.svg}}\n\nDanach", self.ILL)
         assert text == (
             "Davor\n\n[Abbildung: Wassermolekül mit Partialladungen]\n\nDanach"
         )
@@ -186,7 +188,7 @@ class TestAbbildungenFuersModell:
         entscheiden — sonst hinge die Auflösung an einer Festlegung in AP5.
         """
         for platzhalter in ("{{abbildung:EN_H2O.svg}}", "{{abbildung:_Abb/EN_H2O.svg}}"):
-            assert "Partialladungen" in _abbildungen_aufgeloest(platzhalter, self.ILL)
+            assert "Partialladungen" in abbildungen_aufgeloest(platzhalter, self.ILL)
 
     def test_ohne_eintrag_bleibt_die_stelle_sichtbar(self):
         """Dass dort ein Bild steht, gehört zur Aussage — der Dateiname nicht.
@@ -195,33 +197,33 @@ class TestAbbildungenFuersModell:
         Beschreibung ist ein Importmangel und gehört in den Bericht, nicht in den
         Prompt.
         """
-        text = _abbildungen_aufgeloest("{{abbildung:Unbekannt.svg}}", self.ILL)
+        text = abbildungen_aufgeloest("{{abbildung:Unbekannt.svg}}", self.ILL)
         assert text == "[Abbildung]" and "Unbekannt" not in text
 
     def test_leere_beschreibung_zaehlt_als_fehlend(self):
         ill = {"illustrationen": [{"datei": "a.svg", "beschreibung": "   "}]}
-        assert _abbildungen_aufgeloest("{{abbildung:a.svg}}", ill) == "[Abbildung]"
+        assert abbildungen_aufgeloest("{{abbildung:a.svg}}", ill) == "[Abbildung]"
 
     def test_mehrere_bilder_je_an_ihrer_stelle(self):
         ill = {"illustrationen": [
             {"datei": "_Abb/a.svg", "beschreibung": "eins"},
             {"datei": "_Abb/b.svg", "beschreibung": "zwei"},
         ]}
-        assert _abbildungen_aufgeloest("{{abbildung:b.svg}} x {{abbildung:a.svg}}", ill) == (
+        assert abbildungen_aufgeloest("{{abbildung:b.svg}} x {{abbildung:a.svg}}", ill) == (
             "[Abbildung: zwei] x [Abbildung: eins]"
         )
 
     def test_text_ohne_einbettung_bleibt_unberuehrt(self):
-        assert _abbildungen_aufgeloest("Nur Text", self.ILL) == "Nur Text"
+        assert abbildungen_aufgeloest("Nur Text", self.ILL) == "Nur Text"
 
     def test_kein_metadata_stuerzt_nicht_ab(self):
-        assert _abbildungen_aufgeloest("{{abbildung:a.svg}}", None) == "[Abbildung]"
+        assert abbildungen_aufgeloest("{{abbildung:a.svg}}", None) == "[Abbildung]"
 
 
 class TestMetadataFuersModell:
     """Welche Metadaten ein Treffer mitbringt — Whitelist je Typ (Paket 9, AP3).
 
-    Die Suchschicht liefert seither die **rohe** Spalte mit; `_fuer_modell` wählt aus.
+    Die Suchschicht liefert seither die **rohe** Spalte mit; `fuer_modell` wählt aus.
     Die Tabelle steht in `app.context.taxonomy.MODELL_METADATA`, geprüft gegen
     `taxonomy.yaml` in `test_context_taxonomy.py`.
     """
@@ -231,7 +233,7 @@ class TestMetadataFuersModell:
 
     def test_fachliche_felder_gehen_mit(self):
         """Der Zweck der Sache: Ohne sie ist ein Fachbegriff im Dialog nur ein Text."""
-        [e] = _fuer_modell([self._begriff({
+        [e] = fuer_modell([self._begriff({
             "bevorzugter_begriff": "Elektronenpaarbindung",
             "fassung": "Elektronenabgabe",
             "ab_klasse": 10,
@@ -251,7 +253,7 @@ class TestMetadataFuersModell:
         hätte Import-Interna, Breadcrumbs und ganze SVG-Dokumente in den Prompt
         gestellt.
         """
-        [e] = _fuer_modell([self._begriff({
+        [e] = fuer_modell([self._begriff({
             "fassung": "Elektronenabgabe",
             "bp_id": "CH.V2 3.2.1.1",
             "breadcrumb": ["Chemie", "Leitidee"],
@@ -263,12 +265,12 @@ class TestMetadataFuersModell:
 
     def test_typ_ohne_eintrag_bekommt_nichts(self):
         """Der Normalfall und der Stand vor AP3."""
-        [e] = _fuer_modell([_knoten(metadata={"kompetenz_nr": "3.2.1.1", "std": 4})])
+        [e] = fuer_modell([_knoten(metadata={"kompetenz_nr": "3.2.1.1", "std": 4})])
         assert "kompetenz_nr" not in e and "std" not in e
 
     def test_leere_werte_erzeugen_kein_feld(self):
         """`"fassung": ""` an jedem Treffer wäre Rauschen ohne Aussage."""
-        [e] = _fuer_modell([self._begriff(
+        [e] = fuer_modell([self._begriff(
             {"fassung": "", "fehlvorstellungen": [], "ab_klasse": None, "genus": "der"}
         )])
         assert "fassung" not in e and "fehlvorstellungen" not in e
@@ -280,7 +282,7 @@ class TestMetadataFuersModell:
         „Bei welcher Temperatur schmilzt Magnesiumoxid?" ist die Frage, für die der
         Steckbrief da ist.
         """
-        [e] = _fuer_modell([_knoten(content_type="stoffsteckbrief", metadata={
+        [e] = fuer_modell([_knoten(content_type="stoffsteckbrief", metadata={
             "formel": r"\ce{MgO}",
             "eigenschaften": {"schmelztemperatur": "2852 °C"},
             "trivialnamen": ["gebrannte Magnesia"],
@@ -300,17 +302,17 @@ class TestMetadataFuersModell:
         auf **jede** Klammer, nicht auf das ganze Wort — ein abgeschnittenes
         `{{abbildun` enthält `{{abbildung` gerade nicht mehr und käme sonst durch.
         """
-        vorlauf = "A" * (_INHALT_MAX_ZEICHEN - 10)
-        [e] = _fuer_modell([self._begriff(
+        vorlauf = "A" * (INHALT_MAX_ZEICHEN - 10)
+        [e] = fuer_modell([self._begriff(
             {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "Ein Bild"}]},
             content=vorlauf + "{{abbildung:x.svg}}",
         )])
         assert "{" not in e["content"] and "}" not in e["content"]
         assert e["content"].startswith(vorlauf + "[Abbildung")
-        assert len(e["content"]) == _INHALT_MAX_ZEICHEN + 2
+        assert len(e["content"]) == INHALT_MAX_ZEICHEN + 2
 
     def test_metadata_ohne_dict_stuerzt_nicht_ab(self):
-        [e] = _fuer_modell([self._begriff(None)])
+        [e] = fuer_modell([self._begriff(None)])
         assert "fassung" not in e
 
 
@@ -328,13 +330,13 @@ class TestSuchbegriffeUndAbgrenzungen:
         „Wasserstoffbrückenbindung", obwohl der Knoten „Wasserstoffbrücken" heißt und
         den anderen Ausdruck nur als Suchbegriff führt.
         """
-        [e] = _fuer_modell([self._knoten_mit(aliase=["Wasserstoffbrückenbindung"])])
+        [e] = fuer_modell([self._knoten_mit(aliase=["Wasserstoffbrückenbindung"])])
         assert e["suchbegriffe"] == ["Wasserstoffbrückenbindung"]
         assert "aliase" not in e, "Der alte, unbeschriftete Schlüssel ist weg"
 
     def test_ohne_aliase_kein_feld(self):
         """`"suchbegriffe": []` an jedem Treffer wäre Rauschen ohne Aussage."""
-        [e] = _fuer_modell([self._knoten_mit()])
+        [e] = fuer_modell([self._knoten_mit()])
         assert "suchbegriffe" not in e
 
     def test_abgrenzungen_gehen_mit(self):
@@ -342,14 +344,14 @@ class TestSuchbegriffeUndAbgrenzungen:
         sie gar nicht, dabei verhindern genau sie die Verwechslung."""
         grenzen = {"abc": [{"zu": "Elektronenpaarbindung",
                             "hinweis": "wirkt innerhalb eines Moleküls"}]}
-        [e] = _fuer_modell([self._knoten_mit()], grenzen)
+        [e] = fuer_modell([self._knoten_mit()], grenzen)
         assert e["abgrenzungen"] == grenzen["abc"]
 
     def test_abgrenzungen_werden_dem_richtigen_knoten_zugeordnet(self):
         """Die Zuordnung läuft über die `node_id` — wäre sie positionsabhängig, stünde
         der Hinweis am falschen Treffer und niemandem fiele es auf."""
         grenzen = {"zwei": [{"zu": "Y"}]}
-        eins, zwei = _fuer_modell(
+        eins, zwei = fuer_modell(
             [_knoten(node_id="eins", title="Eins"), _knoten(node_id="zwei", title="Zwei")],
             grenzen,
         )
@@ -357,7 +359,7 @@ class TestSuchbegriffeUndAbgrenzungen:
         assert zwei["abgrenzungen"] == [{"zu": "Y"}]
 
     def test_ohne_abgrenzungen_kein_feld(self):
-        [e] = _fuer_modell([self._knoten_mit()], {})
+        [e] = fuer_modell([self._knoten_mit()], {})
         assert "abgrenzungen" not in e
-        [e2] = _fuer_modell([self._knoten_mit()])
+        [e2] = fuer_modell([self._knoten_mit()])
         assert "abgrenzungen" not in e2

@@ -72,7 +72,7 @@ from app.context.stufen import (
     sortiere_passende_nach_vorn,
     vermerke as stufen_vermerke,
 )
-from app.context.taxonomy import modell_metadata_felder
+from app.context.modellsicht import fuer_modell
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -203,8 +203,14 @@ _SEARCH_CONTEXT_NODES_TOOL = {
     "function": {
         "name": "search_context_nodes",
         "description": (
-            "Sucht Bausteine im Kontextspeicher der Plattform. Die Antwort hat drei "
-            "getrennte Abschnitte, die du unterschiedlich behandeln musst:\n"
+            "Sucht Bausteine im Kontextspeicher der Plattform. Zur letzten Nachricht "
+            "stehen unter „Einträge aus dem Wissensspeicher der Schule\" möglicherweise "
+            "schon passende Bausteine im Systemtext — sieh zuerst dort nach. Dieses "
+            "Werkzeug brauchst du, wenn dort nichts Passendes steht, wenn du einen "
+            "anderen Begriff suchen willst oder wenn du wissen musst, ob es zu einem "
+            "Namen überhaupt einen Baustein gibt.\n"
+            "Die Antwort hat drei getrennte Abschnitte, die du unterschiedlich "
+            "behandeln musst:\n"
             "- 'exakte_namenstraeger': Bausteine, die genau so HEISSEN. Dazu gehört "
             "'gesamt' (wie viele es insgesamt gibt) und 'vollstaendig' (ob alle davon "
             "hier stehen). Nur dieser Abschnitt trägt eine Aussage darüber, ob es "
@@ -445,13 +451,6 @@ async def _get_model_info() -> dict[str, bool | None]:
     return info
 
 
-# Wie viel eines Knoteninhalts das Modell im Suchergebnis sieht. Bemessen am Bestand:
-# Kompetenzen liegen im Median bei 137 Zeichen, Leitideen bei 307, das 90. Perzentil
-# reicht bis 775. 800 deckt also fast alles vollständig ab, und selbst bei der größten
-# erlaubten Trefferzahl bleibt das Ergebnis im vierstelligen Tokenbereich.
-_INHALT_MAX_ZEICHEN = 800
-
-
 @dataclass(frozen=True)
 class Zugkosten:
     """Kosten eines Chat-Zuges — Summe plus die Zahlen, die sie belegen.
@@ -533,168 +532,6 @@ def _ergebnis_umfang(ergebnis) -> str:
     return type(ergebnis).__name__
 
 
-# Eine Abbildung im Knotentext: `{{abbildung:EN_H2O.svg}}`.
-#
-# ⚠️ **Der Platzhalter ist die Absprache zwischen drei Stellen** (Paket 9): Das
-# Seed-Skript setzt ihn anstelle der Obsidian-Einbettung `![[…]]` (AP5), die Oberfläche
-# zeigt dort das SVG (AP6), und hier wird er zur Bildbeschreibung fürs Modell. Eine
-# eigene Form statt der Vault-Syntax, weil der Text im Web-Editor bearbeitbar ist: Ein
-# `![[…]]` dort sähe aus wie ein durchgerutschtes Artefakt, dies sieht aus wie das, was
-# es ist. Und es bleibt sichtbar, wenn eine Seite ihn nicht auflöst, statt still zu
-# verschwinden.
-_ABBILDUNG = re.compile(r"\{\{abbildung:([^{}]+)\}\}")
-
-
-def _ohne_svg(wert):
-    """Alle ``svg``-Schlüssel in jeder Tiefe entfernen, der Rest bleibt.
-
-    ⚠️ **Ein SVG ist für das Modell nur Ballast** — im Pilot bis 47 kB je Bild, also
-    mehr als der gesamte übrige Kontext einer Anfrage. Was es zeigt, steht daneben in
-    ``beschreibung``; genau die soll das Modell lesen. Betroffen sind
-    ``illustrationen[].svg`` (Fachbegriffe, Stoffsteckbriefe) und ``schaltzeichen.svg``
-    (Bauteile).
-
-    Offen für AP5: Führt das Seed-Skript unter ``tex`` künftig den **Quelltext** statt
-    des Vault-Pfads, gehört der Schlüssel hier dazu — derselbe Ballast, andere Endung.
-    """
-    if isinstance(wert, dict):
-        return {k: _ohne_svg(v) for k, v in wert.items() if k != "svg"}
-    if isinstance(wert, list):
-        return [_ohne_svg(v) for v in wert]
-    return wert
-
-
-def _metadata_fuers_modell(content_type, metadata) -> dict:
-    """Die Metadatenfelder dieses Knotentyps, die das Modell sehen darf.
-
-    Die Auswahl steht als Whitelist je Typ in :data:`app.context.taxonomy.MODELL_METADATA`
-    — dort auch die Begründung je Feld. Hier bleibt nur das Anwenden, samt SVG-Filter für
-    den Fall, dass ein erlaubtes Feld selbst eine Grafik trägt (``schaltzeichen``).
-    """
-    if not isinstance(metadata, dict):
-        return {}
-    erlaubt = modell_metadata_felder(content_type)
-    # Leere Werte weglassen: `"fassung": ""` an jedem Treffer ist Rauschen, und ein
-    # leeres Feld sagt dem Modell nichts, was das Fehlen nicht auch sagte.
-    return {
-        feld: _ohne_svg(metadata[feld])
-        for feld in erlaubt
-        if metadata.get(feld) not in (None, "", [], {})
-    }
-
-
-def _abbildungen_aufgeloest(inhalt: str, metadata) -> str:
-    """Bild-Einbettungen im Knotentext durch ihre Beschreibung ersetzen.
-
-    Aus ``{{abbildung:EN_H2O.svg}}`` wird ``[Abbildung: Wassermolekül mit
-    Partialladungen …]``. So weiß der Assistent **an der Stelle, an der das Bild
-    steht**, was dort zu sehen ist — ohne dass ihm jemand das SVG vorlegt.
-
-    Gefunden wird die Beschreibung über den **Dateinamen**, nicht über den ganzen Pfad:
-    Im Vault steht im Text die bare Form (`EN_H2O.svg`), im Frontmatter eine
-    Pfadangabe (`_Abb/EN_H2O.svg`). Welche von beiden das Seed-Skript in den Platzhalter
-    schreibt, darf hier keine Rolle spielen — an genau dieser Stelle fänden die zwei
-    Schreibweisen sonst nicht zusammen.
-
-    Ohne passenden Eintrag bleibt ``[Abbildung]`` stehen: Dass dort ein Bild ist, gehört
-    zur Aussage des Textes. Der Dateiname wandert bewusst **nicht** mit — er lädt dazu
-    ein, ihn Lernenden gegenüber zu zitieren, und eine fehlende Beschreibung ist ein
-    Importmangel, den der Bericht des Seed-Skripts meldet (AP5).
-    """
-    if "{{abbildung:" not in inhalt:
-        return inhalt
-    beschreibungen = {}
-    if isinstance(metadata, dict):
-        for abb in metadata.get("illustrationen") or []:
-            if isinstance(abb, dict) and abb.get("datei"):
-                name = str(abb["datei"]).rsplit("/", 1)[-1]
-                beschreibungen[name] = (abb.get("beschreibung") or "").strip()
-
-    def ersetze(treffer):
-        name = treffer.group(1).strip().rsplit("/", 1)[-1]
-        text = beschreibungen.get(name)
-        return f"[Abbildung: {text}]" if text else "[Abbildung]"
-
-    return _ABBILDUNG.sub(ersetze, inhalt)
-
-
-def _fuer_modell(
-    treffer: list,
-    abgrenzungen: dict | None = None,
-    stufenvermerke: dict | None = None,
-) -> list:
-    """Suchergebnis für den LLM-Kontext aufbereiten.
-
-    Bis 08/2026 bekam das Modell **nur die Titel**. Damit war jede Frage nach dem
-    *Inhalt* des Wissensgraphen unbeantwortbar: Die Suche fand die richtigen Knoten, das
-    Modell sah aber nur deren Überschriften und meldete, es gebe nichts. Deshalb geht der
-    Inhalt jetzt mit — gekürzt, nicht weggelassen.
-
-    Die interne ``node_id`` bleibt draußen: Sie nützt dem Modell nichts (kein Werkzeug
-    nimmt sie entgegen) und taucht sonst in Antworten auf. Ergebnisse anderer Werkzeuge
-    der Gruppe werden unverändert durchgereicht.
-
-    ⚠️ **Hier fällt die Entscheidung, was das Modell sieht** (Paket 9, AP3). Die
-    Suchschicht liefert seither die rohe Metadatenspalte mit (`mit_metadaten`); diese
-    Funktion ist die einzige Stelle, die daraus auswählt. Wer eine Trefferliste am
-    Werkzeugweg vorbei serialisiert, umgeht die Auswahl — dann steht das 47-kB-SVG einer
-    Strukturformel im Prompt.
-
-    ``abgrenzungen`` kommt aus :func:`app.context.search.abgrenzungen_zu` — je Knoten
-    die Sätze, die ihn von ähnlichen unterscheiden. ``stufenvermerke`` aus
-    :mod:`app.context.stufen`. Beide brauchen eine Datenbank und können hier deshalb
-    nicht selbst geholt werden.
-    """
-    aufbereitet = []
-    for t in treffer:
-        if not isinstance(t, dict) or "node_id" not in t:
-            aufbereitet.append(t)          # fremde Form (z. B. get_operatoren)
-            continue
-        # `subject_id` ist eine interne Zahl — für das Modell wertlos und irreführend.
-        # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
-        eintrag = {
-            k: v for k, v in t.items()
-            if k not in ("node_id", "content", "subject_id", "fach", "metadata",
-                         "aliase")
-        }
-        if t.get("fach"):
-            eintrag["fach"] = t["fach"]
-        # ⚠️ **Aliase beschriftet, nicht nackt** (Paket 9, N1). Unter `aliase` standen
-        # sie gleichberechtigt neben `bevorzugter_begriff` — und das Modell verwendete
-        # sie: In Szenario (f) antwortete es mit „Wasserstoffbrückenbindung", obwohl
-        # der Knoten „Wasserstoffbrücken" heißt und den anderen Ausdruck nur als
-        # Suchbegriff führt. `_Format.md` sagt es deutlich: Aliase sind das, **wonach
-        # gefragt wird**, auch in schiefer Form („Mol" für die Stoffmenge).
-        #
-        # Im **Embedding** und im **Namensabgleich** bleiben sie unverändert — dort
-        # sind sie richtig, und drei Prüfsatzfälle halten das fest.
-        if t.get("aliase"):
-            eintrag["suchbegriffe"] = list(t["aliase"])
-        hinweise = (abgrenzungen or {}).get(str(t["node_id"]))
-        if hinweise:
-            eintrag["abgrenzungen"] = hinweise
-        # ⚠️ **Nur wo etwas nicht passt** (Paket 9, N6). Ein Vermerk an jedem Treffer
-        # wäre Rauschen; er soll auffallen.
-        vermerk = (stufenvermerke or {}).get(str(t["node_id"]))
-        if vermerk:
-            eintrag["stufe"] = vermerk
-        eintrag |= _metadata_fuers_modell(t.get("content_type"), t.get("metadata"))
-        inhalt = (t.get("content") or "").strip()
-        if inhalt:
-            # ⚠️ **Auflösen vor dem Kürzen.** Andersherum bliebe ein halber Platzhalter
-            # stehen (`{{abbildung:EN_H`). Der Preis: Eine Bildbeschreibung ist rund
-            # 200 Zeichen lang und verdrängt damit ein Viertel des Kürzungsbudgets —
-            # AP7 misst, ob 800 Zeichen für Begriffe noch reichen.
-            inhalt = _abbildungen_aufgeloest(inhalt, t.get("metadata"))
-            eintrag["content"] = (
-                inhalt[:_INHALT_MAX_ZEICHEN] + " …"
-                if len(inhalt) > _INHALT_MAX_ZEICHEN
-                else inhalt
-            )
-        aufbereitet.append(eintrag)
-    return aufbereitet
-
-
 async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     """Die Suche für das Modell — beschriftete Abschnitte statt einer flachen Liste.
 
@@ -718,7 +555,7 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             subject_id=await _resolve_conversation_subject_id(ctx),
             identifikation=tiefe,
             thematisch=tiefe,
-            # Roh geholt, ausgewählt wird in `_fuer_modell` (Paket 9, AP3). Kostet
+            # Roh geholt, ausgewählt wird in `fuer_modell` (Paket 9, AP3). Kostet
             # nichts: Die Spalte steht ohnehin in jeder Trefferzeile, `mit_metadaten`
             # entscheidet nur, ob sie am Treffer hängenbleibt.
             mit_metadaten=True,
@@ -748,11 +585,11 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         thematisch = sortiere_passende_nach_vorn(thematisch, vermerke)
 
     antwort: dict = {
-        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"], grenzen, vermerke),
+        "exakte_namenstraeger": fuer_modell(nach_art["exakt"], grenzen, vermerke),
         "gesamt": ident.gesamt,
         "vollstaendig": ident.vollstaendig,
-        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"], grenzen, vermerke),
-        "naechstliegende_bausteine": _fuer_modell(thematisch, grenzen, vermerke),
+        "aehnlich_benannte_bausteine": fuer_modell(nach_art["teilweise"], grenzen, vermerke),
+        "naechstliegende_bausteine": fuer_modell(thematisch, grenzen, vermerke),
     }
     if ergebnis.hinweise:
         antwort["hinweise"] = ergebnis.hinweise
@@ -945,7 +782,7 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         ),
         ctx.db,
         gruppierung=args.get("gruppierung"),
-        # Wie bei der Suche: roh holen, in `_fuer_modell` auswählen.
+        # Wie bei der Suche: roh holen, in `fuer_modell` auswählen.
         mit_metadaten=True,
     )
 
@@ -964,7 +801,7 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         "gesamt": abschnitt.gesamt,
         "geliefert": abschnitt.geliefert,
         "vollstaendig": abschnitt.vollstaendig,
-        "bausteine": _fuer_modell(abschnitt.treffer, grenzen, vermerke),
+        "bausteine": fuer_modell(abschnitt.treffer, grenzen, vermerke),
     }
     if abschnitt.gruppen is not None:
         antwort["gruppen"] = [
@@ -1947,6 +1784,9 @@ async def chat(
         chat_id=conversation_id,
         db=db,
         rollen=current_user.roles,
+        # Für die Grundschicht (N11): Im freien Chat gibt es keine Unterrichtsgruppe,
+        # aus der sich Stufe und Fach ableiten ließen.
+        jwt_stufe=current_user.grade,
     )
 
     llm_messages: list[dict] = []
@@ -2267,7 +2107,7 @@ async def chat(
                     # `get_operatoren`, das noch eine flache Liste liefert (AP3 macht
                     # daraus ein Alias auf die Aufzählung).
                     tool_result_str = json.dumps(
-                        {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False
+                        {"nodes": fuer_modell(tool_result)}, ensure_ascii=False
                     )
                 elif _tc_name == "generate_image" and isinstance(tool_result, dict):
                     # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
