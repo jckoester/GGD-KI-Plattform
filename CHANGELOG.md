@@ -68,6 +68,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Assistenten verwechseln ähnliche Fachbegriffe seltener.** Sie bekommen jetzt die Abgrenzungen eines Bausteins mit — die Sätze, die sagen, wovon er sich
+  unterscheidet und wodurch. Und sie erkennen andere Bezeichnungen als das,
+  was sie sind: Suchbegriffe, unter denen gefragt wird. Geantwortet wird mit
+  dem Begriff, den die Fachschaft festgelegt hat.
 - **Stoffe lassen sich über ihr Aussehen finden.** „Welcher Stoff raucht an
   feuchter Luft?“ führt jetzt zum Steckbrief — die Beschreibung des Aussehens
   geht in die Suche ein, die Messwerte bewusst nicht.

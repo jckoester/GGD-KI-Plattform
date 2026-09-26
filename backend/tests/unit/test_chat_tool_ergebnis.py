@@ -312,3 +312,52 @@ class TestMetadataFuersModell:
     def test_metadata_ohne_dict_stuerzt_nicht_ab(self):
         [e] = _fuer_modell([self._begriff(None)])
         assert "fassung" not in e
+
+
+class TestSuchbegriffeUndAbgrenzungen:
+    """Was ein Treffer dem Modell über sich sagt (Paket 9, Nachgang N1 + N4)."""
+
+    def _knoten_mit(self, **felder):
+        return _knoten(content_type="begriff", **felder)
+
+    def test_aliase_heissen_suchbegriffe(self):
+        """⚠️ Der Name ist die Maßnahme.
+
+        Unter `aliase` standen sie gleichberechtigt neben `bevorzugter_begriff`, und
+        das Modell verwendete sie: In Szenario (f) antwortete es mit
+        „Wasserstoffbrückenbindung", obwohl der Knoten „Wasserstoffbrücken" heißt und
+        den anderen Ausdruck nur als Suchbegriff führt.
+        """
+        [e] = _fuer_modell([self._knoten_mit(aliase=["Wasserstoffbrückenbindung"])])
+        assert e["suchbegriffe"] == ["Wasserstoffbrückenbindung"]
+        assert "aliase" not in e, "Der alte, unbeschriftete Schlüssel ist weg"
+
+    def test_ohne_aliase_kein_feld(self):
+        """`"suchbegriffe": []` an jedem Treffer wäre Rauschen ohne Aussage."""
+        [e] = _fuer_modell([self._knoten_mit()])
+        assert "suchbegriffe" not in e
+
+    def test_abgrenzungen_gehen_mit(self):
+        """Sie stehen weder im Knotentext noch im Embedding — bis N4 sah das Modell
+        sie gar nicht, dabei verhindern genau sie die Verwechslung."""
+        grenzen = {"abc": [{"zu": "Elektronenpaarbindung",
+                            "hinweis": "wirkt innerhalb eines Moleküls"}]}
+        [e] = _fuer_modell([self._knoten_mit()], grenzen)
+        assert e["abgrenzungen"] == grenzen["abc"]
+
+    def test_abgrenzungen_werden_dem_richtigen_knoten_zugeordnet(self):
+        """Die Zuordnung läuft über die `node_id` — wäre sie positionsabhängig, stünde
+        der Hinweis am falschen Treffer und niemandem fiele es auf."""
+        grenzen = {"zwei": [{"zu": "Y"}]}
+        eins, zwei = _fuer_modell(
+            [_knoten(node_id="eins", title="Eins"), _knoten(node_id="zwei", title="Zwei")],
+            grenzen,
+        )
+        assert "abgrenzungen" not in eins
+        assert zwei["abgrenzungen"] == [{"zu": "Y"}]
+
+    def test_ohne_abgrenzungen_kein_feld(self):
+        [e] = _fuer_modell([self._knoten_mit()], {})
+        assert "abgrenzungen" not in e
+        [e2] = _fuer_modell([self._knoten_mit()])
+        assert "abgrenzungen" not in e2

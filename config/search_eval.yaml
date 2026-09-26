@@ -421,6 +421,36 @@ faelle:
       sind sie die Antwort. Beides mit derselben Gewichtung zu treffen ist die
       eigentliche Schwierigkeit — wer die Piktogramme zurückstuft, verliert diesen Fall.
 
+  # ── Aliase als Suchbegriffe (Paket 9, Nachgang N2) ──────────────────────────
+  #
+  # ⚠️ **Diese drei Fälle sichern eine Änderung ab, die sie nicht betrifft.** Mit N1
+  # wandern die Aliase im Modellkontext unter einen beschrifteten Schlüssel
+  # (`suchbegriffe`) — im **Embedding** und im **Namensabgleich** bleiben sie, wo sie
+  # sind. Genau das prüfen sie: Wer bei der Beschriftung aus Versehen auch die Suche
+  # anfasst, sieht es hier. `_Format.md` führt Aliase ausdrücklich als Suchbegriffe,
+  # auch schiefe — „Mol“ ist eine Einheit, keine Größe, und wird trotzdem so
+  # gefragt.
+
+  - frage: Mol
+    fach: Chemie
+    knoten: Stoffmenge
+    notiz: >-
+      Die Einheit statt der Größe — so fragen Schüler:innen. Der Knoten heißt
+      „Stoffmenge“ und führt „Mol“ als Alias; die Fehlvorstellung dazu steht
+      in ihm.
+
+  - frage: Molzahl
+    fach: Chemie
+    knoten: Stoffmenge
+    notiz: Zweite schiefe Form derselben Sache.
+
+  - frage: Wasserstoffbrückenbindung
+    fach: Chemie
+    knoten: Wasserstoffbrücken
+    notiz: >-
+      Der Ausdruck aus Szenario (f). Er ist Alias, nicht Titel — gefunden werden muss
+      er trotzdem, und die Antwort soll den Titel verwenden.
+
   - frage: Energie
     fach: Physik
     knoten: 3.2.3

@@ -377,7 +377,10 @@ class TestAufzaehlungsWerkzeug:
 
         from app.chat import router
 
+        # ⚠️ `abgrenzungen_zu` stillgelegt — seit Paket 9/N4 holt der Handler die
+        # Abgrenzungen aus der Datenbank, und hier gibt es keine.
         with patch.object(router, "aufzaehlung", new=AsyncMock(return_value=abschnitt)) as gez, \
+             patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})), \
              patch.object(router, "_subject_id_aus_name",
                           new=AsyncMock(return_value=subject_id)):
             ctx = router.ToolContext(
@@ -588,7 +591,11 @@ class TestWerkzeugantwort:
 
         from app.chat import router
 
+        # ⚠️ `abgrenzungen_zu` stillgelegt: Der Handler holt seit Paket 9/N4 die
+        # Abgrenzungen aus der Datenbank, und hier gibt es keine. Was die Funktion
+        # liefert, prüft `test_abgrenzungen_db.py` gegen eine echte.
         with patch.object(router, "suche", new=AsyncMock(return_value=ergebnis)), \
+             patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})), \
              patch.object(router, "_resolve_conversation_subject_id",
                           new=AsyncMock(return_value=None)):
             ctx = router.ToolContext(

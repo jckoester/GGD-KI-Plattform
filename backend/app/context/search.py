@@ -160,6 +160,67 @@ class Suchergebnis:
 _FACHBONUS = 0.05
 
 
+# ── Abgrenzungen zu einem Treffer ────────────────────────────────────────────
+
+#: Wie viele Abgrenzungen je Treffer höchstens mitgehen.
+#:
+#: ⚠️ **Ein Deckel, kein Auswahlkriterium.** Die Abgrenzungen sind kurz, aber ein gut
+#: vernetzter Begriff hat viele, und zwanzig Treffer mit je zehn Sätzen sind mehr
+#: Kontext als die Knotentexte selbst. Fünf deckt den Bestand ab (Höchstwert im Pilot:
+#: drei); wird der Deckel je erreicht, ist das ein Hinweis auf einen Knoten, der zu
+#: viel abgrenzt — nicht auf einen zu kleinen Deckel.
+ABGRENZUNGEN_JE_TREFFER = 5
+
+
+async def abgrenzungen_zu(db: AsyncSession, node_ids) -> dict[str, list[dict]]:
+    """„Wovon unterscheidet sich dieser Baustein, und wodurch?" — je Knoten.
+
+    ⚠️ **Diese Sätze sind der Grund, warum es Abgrenzungen gibt** (Paket 9, N4): Sie
+    stehen weder im Knotentext (`## Abgrenzung` bleibt bewusst aus `content` heraus,
+    sonst zögen sie im Vektor die Fragen an, die sie abgrenzen sollen) noch im
+    Embedding. Bis 09/2026 sah das Modell sie deshalb **gar nicht** — dabei sind es
+    genau die Sätze, die Verwechslungen verhindern („eine Wasserstoffbrücke wirkt
+    zwischen Molekülen, eine Elektronenpaarbindung innerhalb").
+
+    **Eine Abfrage für alle Treffer**, nicht eine je Treffer: Bei zwanzig Treffern wären
+    das zwanzig Rundreisen für ein paar Zeilen Text.
+
+    Nur **aktive** Ziele und nur **Titel**, keine IDs: Ein archivierter Knoten ist für
+    die fragende Person nicht erreichbar, und eine UUID im Modellkontext taucht früher
+    oder später in einer Antwort auf.
+    """
+    ids = [i for i in (node_ids or []) if i]
+    if not ids:
+        return {}
+    ziel = sa.orm.aliased(ContextNode)
+    zeilen = (await db.execute(
+        sa.select(
+            ContextEdge.from_node_id,
+            ziel.title,
+            ContextEdge.metadata_["hinweis"].astext,
+        )
+        .join(ziel, ziel.id == ContextEdge.to_node_id)
+        .where(
+            ContextEdge.from_node_id.in_(ids),
+            ContextEdge.relation == "related_to",
+            ContextEdge.metadata_["art"].astext == "abgrenzung",
+            ziel.status == "active",
+        )
+        .order_by(ContextEdge.from_node_id, ziel.title)
+    )).all()
+
+    nach_knoten: dict[str, list[dict]] = {}
+    for von, titel, hinweis in zeilen:
+        eintraege = nach_knoten.setdefault(str(von), [])
+        if len(eintraege) >= ABGRENZUNGEN_JE_TREFFER:
+            continue
+        eintrag = {"zu": titel}
+        if hinweis:
+            eintrag["hinweis"] = hinweis
+        eintraege.append(eintrag)
+    return nach_knoten
+
+
 # ── Trefferform ──────────────────────────────────────────────────────────────
 
 

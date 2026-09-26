@@ -533,7 +533,8 @@ async def test_suchwerkzeug_liefert_kein_svg_ans_modell():
         identifikation=Abschnitt(treffer=[_knoten("Wasser")], gesamt=1, vollstaendig=True),
         thematisch=Abschnitt(treffer=[_knoten("Eis")]),
     )
-    with patch.object(router, "suche", new=AsyncMock(return_value=ergebnis)) as gesucht:
+    with patch.object(router, "suche", new=AsyncMock(return_value=ergebnis)) as gesucht, \
+         patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})):
         antwort = await router._search_context_nodes_handler({"query": "Wasser"}, ctx)
 
     assert gesucht.await_args.args[1].mit_metadaten is True

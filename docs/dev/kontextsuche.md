@@ -95,6 +95,30 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 | `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
 
+### Was ein Treffer dem Modell über sich sagt
+
+Nicht alles, was an einem Knoten steht, geht in den Modellkontext — und was geht, ist
+beschriftet. Entschieden wird das an **einer** Stelle, `_fuer_modell` in
+`app/chat/router.py`.
+
+| Feld | Herkunft | Warum es so heißt |
+|---|---|---|
+| `content` | Knotentext, auf `_INHALT_MAX_ZEICHEN` gekürzt | Abbildungsplatzhalter werden **vor** dem Kürzen zur Beschreibung aufgelöst |
+| Metadaten je Typ | `MODELL_METADATA` in `taxonomy.py` | Whitelist, kein „alles Metadata“ — die Spalte trägt auch Import-Interna und ganze SVG-Dokumente |
+| `suchbegriffe` | `node_aliases` | ⚠️ **Die Beschriftung ist die Maßnahme.** Unbenannt („aliase") standen sie gleichberechtigt neben dem bevorzugten Begriff, und das Modell verwendete sie: Es antwortete „Wasserstoffbrückenbindung“, obwohl der Knoten „Wasserstoffbrücken“ heißt. Aliase sind das, **wonach gefragt wird**, auch in schiefer Form („Mol“ für die Stoffmenge) |
+| `abgrenzungen` | Kanten `related_to` mit `art: abgrenzung` | Wovon sich der Knoten unterscheidet und wodurch. Höchstens fünf je Treffer, nur **aktive** Ziele, Titel statt IDs |
+
+⚠️ **Die Abgrenzungen sind der Sonderfall unter diesen Feldern**: Sie stehen weder im
+Knotentext noch im Embedding. `## Abgrenzung` bleibt aus `content` heraus — aus demselben
+Grund wie die Fehlvorstellungen: Sie sagen, was der Begriff **nicht** ist, und zögen im
+Vektor genau die Fragen an, die sie abgrenzen sollen. Bis 09/2026 sah das Modell sie
+deshalb **gar nicht**, dabei sind es die Sätze, die Verwechslungen verhindern.
+
+⚠️ **Im Embedding und im Namensabgleich bleiben Aliase unverändert** — dort sind sie
+richtig. Drei Prüfsatzfälle halten das fest („Mol“, „Molzahl“,
+„Wasserstoffbrückenbindung“): Wer bei der Beschriftung versehentlich die Suche
+anfasst, sieht es dort.
+
 ⚠️ **Der Eigentümer-Bonus und die rollenbasierte Gewichtung hängen an derselben
 Vorbedingung: Der Typ muss überhaupt ein Embedding tragen.** Ein Bonus auf etwas, das in
 der thematischen Auswahl nie erscheint, tut nichts. Bis zur Embedding-Ausweitung

@@ -60,7 +60,13 @@ from app.api.assistants import _is_visible_for_user
 from app.context.service import get_context_for_query
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
-from app.context.search import _AUFZAEHLUNG_MAX, Suchprofil, aufzaehlung, suche
+from app.context.search import (
+    _AUFZAEHLUNG_MAX,
+    Suchprofil,
+    abgrenzungen_zu,
+    aufzaehlung,
+    suche,
+)
 from app.context.taxonomy import modell_metadata_felder
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
@@ -206,7 +212,16 @@ _SEARCH_CONTEXT_NODES_TOOL = {
             "darüber aus, was es gibt oder nicht gibt. Antworte niemals 'dazu gibt es "
             "nichts', nur weil dieser Abschnitt leer ist oder unpassend wirkt.\n"
             "Ist 'vollstaendig' false, sag die Gesamtzahl dazu, statt die gezeigten "
-            "Treffer als vollständige Liste auszugeben."
+            "Treffer als vollständige Liste auszugeben.\n"
+            "An einem Baustein können zwei Felder stehen, die du unterschiedlich "
+            "behandelst:\n"
+            "- 'suchbegriffe': andere Ausdrücke, unter denen nach diesem Baustein "
+            "gefragt wird — auch fachlich unsaubere. Sie helfen dir, die Frage "
+            "zuzuordnen. Verwende sie NICHT in deiner Antwort: Dort gilt der Titel "
+            "bzw. 'bevorzugter_begriff'. Wurde mit einem Suchbegriff gefragt, darfst "
+            "du ihn einmal nennen, damit klar ist, dass ihr dasselbe meint.\n"
+            "- 'abgrenzungen': wovon sich der Baustein unterscheidet und wodurch. "
+            "Nutze sie, wenn Verwechslungsgefahr besteht."
         ),
         "parameters": {
             "type": "object",
@@ -598,7 +613,7 @@ def _abbildungen_aufgeloest(inhalt: str, metadata) -> str:
     return _ABBILDUNG.sub(ersetze, inhalt)
 
 
-def _fuer_modell(treffer: list) -> list:
+def _fuer_modell(treffer: list, abgrenzungen: dict | None = None) -> list:
     """Suchergebnis für den LLM-Kontext aufbereiten.
 
     Bis 08/2026 bekam das Modell **nur die Titel**. Damit war jede Frage nach dem
@@ -615,6 +630,10 @@ def _fuer_modell(treffer: list) -> list:
     Funktion ist die einzige Stelle, die daraus auswählt. Wer eine Trefferliste am
     Werkzeugweg vorbei serialisiert, umgeht die Auswahl — dann steht das 47-kB-SVG einer
     Strukturformel im Prompt.
+
+    ``abgrenzungen`` kommt aus :func:`app.context.search.abgrenzungen_zu` — je Knoten
+    die Sätze, die ihn von ähnlichen unterscheiden. Sie brauchen eine Datenbank und
+    können hier deshalb nicht selbst geholt werden.
     """
     aufbereitet = []
     for t in treffer:
@@ -625,10 +644,25 @@ def _fuer_modell(treffer: list) -> list:
         # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
         eintrag = {
             k: v for k, v in t.items()
-            if k not in ("node_id", "content", "subject_id", "fach", "metadata")
+            if k not in ("node_id", "content", "subject_id", "fach", "metadata",
+                         "aliase")
         }
         if t.get("fach"):
             eintrag["fach"] = t["fach"]
+        # ⚠️ **Aliase beschriftet, nicht nackt** (Paket 9, N1). Unter `aliase` standen
+        # sie gleichberechtigt neben `bevorzugter_begriff` — und das Modell verwendete
+        # sie: In Szenario (f) antwortete es mit „Wasserstoffbrückenbindung", obwohl
+        # der Knoten „Wasserstoffbrücken" heißt und den anderen Ausdruck nur als
+        # Suchbegriff führt. `_Format.md` sagt es deutlich: Aliase sind das, **wonach
+        # gefragt wird**, auch in schiefer Form („Mol" für die Stoffmenge).
+        #
+        # Im **Embedding** und im **Namensabgleich** bleiben sie unverändert — dort
+        # sind sie richtig, und drei Prüfsatzfälle halten das fest.
+        if t.get("aliase"):
+            eintrag["suchbegriffe"] = list(t["aliase"])
+        hinweise = (abgrenzungen or {}).get(str(t["node_id"]))
+        if hinweise:
+            eintrag["abgrenzungen"] = hinweise
         eintrag |= _metadata_fuers_modell(t.get("content_type"), t.get("metadata"))
         inhalt = (t.get("content") or "").strip()
         if inhalt:
@@ -681,12 +715,16 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     for t in ident.treffer:
         nach_art[t.get("treffer_art", "exakt")].append(t)
 
+    alle = nach_art["exakt"] + nach_art["teilweise"] + list(ergebnis.thematisch.treffer)
+    # Eine Abfrage für alle drei Abschnitte zusammen — nicht eine je Treffer.
+    grenzen = await abgrenzungen_zu(ctx.db, [t.get("node_id") for t in alle])
+
     antwort: dict = {
-        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"]),
+        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"], grenzen),
         "gesamt": ident.gesamt,
         "vollstaendig": ident.vollstaendig,
-        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"]),
-        "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer),
+        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"], grenzen),
+        "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer, grenzen),
     }
     if ergebnis.hinweise:
         antwort["hinweise"] = ergebnis.hinweise
@@ -883,11 +921,14 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         mit_metadaten=True,
     )
 
+    grenzen = await abgrenzungen_zu(
+        ctx.db, [t.get("node_id") for t in abschnitt.treffer]
+    )
     antwort: dict = {
         "gesamt": abschnitt.gesamt,
         "geliefert": abschnitt.geliefert,
         "vollstaendig": abschnitt.vollstaendig,
-        "bausteine": _fuer_modell(abschnitt.treffer),
+        "bausteine": _fuer_modell(abschnitt.treffer, grenzen),
     }
     if abschnitt.gruppen is not None:
         antwort["gruppen"] = [
