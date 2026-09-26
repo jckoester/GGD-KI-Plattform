@@ -7,6 +7,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Assistenten schlagen wieder zuverlässig im Wissensspeicher nach.** Das Standardmodell
+  lief mit der niedrigsten Denkstufe und entschied sich deshalb meist gegen die Suche —
+  es antwortete aus eigenem Wissen statt aus den Einträgen der Fachschaft. Gemessen: vier
+  von sechzehn Nachschlagevorgängen vorher, fünfzehn von sechzehn jetzt. Antworten
+  brauchen dafür einige Sekunden länger.
+
 - **Der Hinweis auf archivierte Verknüpfungen warnt nicht mehr, sondern erklärt.**
   Er stand als gelbe Warnung da und legte nahe, die verknüpften
   Bildungsplan-Inhalte seien veraltet. Oft stimmt das nicht: Eine Fassung kann für
@@ -201,6 +207,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Wochenmuster-Dialog; vorbelegt, solange das 1. Halbjahr läuft.
 
 ### Geändert
+
+- **Die Modellstufe „denkt vor der Antwort" ist entfallen.** Sie war dasselbe Modell wie
+  die Standardstufe; seit diese selbst mit voller Denktiefe läuft, unterschieden sich die
+  beiden in nichts mehr. Bestehende Chats behalten ihren Eintrag in der Historie.
 
 - **Assistenten antworten Schüler:innen kürzer und auf eine Sache.** Statt Antwort,
   Leitfragen, Reflexionsanstößen und Versuchsideen in einem Zug steht jetzt eine kurze

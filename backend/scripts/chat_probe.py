@@ -126,7 +126,7 @@ def main() -> None:
     p.add_argument("--assistent", type=int, default=None)
     p.add_argument("--gruppe", type=int, default=None)
     p.add_argument("--modell", default=None,
-                   help="Modell-Alias, sonst das des Assistenten (z. B. chat-reasoning)")
+                   help="Modell-Alias, sonst das des Assistenten (z. B. chat-komplex)")
     p.add_argument("--pseudonym", default="probe-schueler",
                    help="Pseudonym für den Token; für Budget und Gruppenbezug relevant")
     p.add_argument("--stufe", default="9", help="Jahrgang im Token (Zeichenkette)")

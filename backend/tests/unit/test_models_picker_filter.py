@@ -38,7 +38,6 @@ FULL_MODEL_LIST = [
     "chat-schnell", "chat-standard", "chat-code", "chat-komplex",
     "system-titel", "system-moderation",
     "embedding-standard", "bild-standard",
-    "chat-reasoning",
     "ionos-gpt-oss-120b",
 ]
 
@@ -72,7 +71,7 @@ def test_student_sees_only_chat_stages():
 
     assert ids == [
         "chat-schnell", "chat-standard", "chat-code", "chat-komplex",
-        "chat-reasoning", "ionos-gpt-oss-120b",
+        "ionos-gpt-oss-120b",
     ]
     assert not [m for m in ids if m.startswith(("system-", "embedding-", "bild-"))]
 
@@ -105,6 +104,24 @@ def test_filter_does_not_touch_the_allowlist():
     ids = _get_models(_fake_student_payload(grade=5), allowlist=["system-titel"])
 
     assert ids == []
+
+
+def test_gestrichenes_modell_verschwindet_trotz_allowlist():
+    """Ein Modell, das die Proxy-Config nicht mehr führt, taucht nicht mehr auf — auch
+    wenn es in der Team-Allowlist stehen geblieben ist.
+
+    Das ist kein Randfall, sondern der Zustand **jeder** bestehenden Installation, wenn
+    eine Stufe aus der Config fällt (am 26.09.2026 `chat-reasoning`): Die Allowlists
+    leben in LiteLLM und werden dabei nicht mitgezogen. Die Auswahl entsteht deshalb als
+    Schnittmenge **aus dem, was der Proxy meldet** — nicht aus der Allowlist.
+    """
+    ids = _get_models(
+        _fake_student_payload(grade=11),
+        allowlist=FULL_MODEL_LIST + ["chat-reasoning"],
+    )
+
+    assert "chat-reasoning" not in ids
+    assert "chat-standard" in ids
 
 
 def test_title_model_stays_callable_despite_being_hidden():

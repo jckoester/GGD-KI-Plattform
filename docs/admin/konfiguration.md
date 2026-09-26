@@ -577,7 +577,7 @@ general_settings:
 ```
 
 Bewährt hat sich eine Staffel nach Aufgabe — `chat-schnell`, `chat-standard`, `chat-code`,
-`chat-reasoning`, `chat-komplex` — plus interne Modelle unter dem Präfix `system-`
+`chat-komplex` — plus interne Modelle unter dem Präfix `system-`
 (`system-titel`, `system-moderation`), die `MODEL_PICKER_HIDDEN_PREFIXES` aus dem
 Modellwähler ausblendet. Welche Modelle sich wofür eignen, steht in
 [Vor der Installation](vor-der-installation.md#modellwahl).
