@@ -194,6 +194,56 @@ def aktuelles_schuljahr_start() -> int:
     return parse_schuljahr_start(load_school_year().schuljahr)
 
 
+def gilt_ab_schuljahr(
+    bp_version: str,
+    min_grade: int | None,
+    max_grade: int | None,
+    schuljahr_start: int | None = None,
+) -> int | None:
+    """Ab welchem Schuljahr deckt diese Edition **irgendeine** Stufe dieses Fachs ab?
+
+    ``None`` heißt: Sie gilt schon, sie steht nicht im Fahrplan, oder sie erreicht
+    diese Stufen nie. Ein Jahr heißt: Sie gilt noch nicht — und zwar ab dann.
+
+    ⚠️ **Wofür das gebraucht wird.** Ein archivierter Bildungsplan-Knoten sagt nicht,
+    *warum* er archiviert ist. Gemessen am Dev-Bestand (26.09.2026) stecken darin
+    mindestens drei verschiedene Ursachen: abgelöste Inhalte, eine alte
+    `bp_id`-Schreibweise (326 Mathematik-Knoten) — und Editionen, die für dieses Fach
+    schlicht **noch nicht gelten**. Der letzte Fall ist der einzige, den der Fahrplan
+    erklären kann, und nur für ihn darf die Oberfläche einen Grund nennen. In allen
+    anderen Fällen kommt hier ``None`` zurück, und es bleibt bei der neutralen
+    Auskunft: „erscheint derzeit nicht in Suche und Assistenten“.
+
+    Beispiel Chemie: V3 startet 2026/27 in den Stufen 5–7 und wächst nach oben; Chemie
+    beginnt bei Stufe 8. Die Edition erreicht das Fach damit 2027/28.
+    """
+    if min_grade is None and max_grade is None:
+        return None
+    editions = load_edition_schedule(load_subjects_config())
+    edition = next((e for e in editions if e.bp_version == bp_version), None)
+    if edition is None:
+        return None
+
+    unten = min_grade if min_grade is not None else 1
+    oben = max_grade if max_grade is not None else 13
+    jahr = (
+        schuljahr_start if schuljahr_start is not None else aktuelles_schuljahr_start()
+    )
+
+    def deckt(im_jahr: int) -> bool:
+        return any(_deckt_ab(edition, stufe, im_jahr) for stufe in range(unten, oben + 1))
+
+    if deckt(jahr):
+        return None
+    # Nach vorn suchen, aber nicht endlos: Eine Edition, die in zwölf Jahren keine
+    # Stufe des Fachs erreicht, erreicht sie nie — dann ist die Archivierung nicht mit
+    # dem Fahrplan zu erklären.
+    for kuenftig in range(jahr + 1, jahr + 13):
+        if deckt(kuenftig):
+            return kuenftig
+    return None
+
+
 def aktive_bp_version(
     stufe: int,
     verfuegbare_bp_versions: set[str],

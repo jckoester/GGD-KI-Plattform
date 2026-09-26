@@ -283,6 +283,11 @@
             });
     });
 
+    /** 2027 → „2027/28". Der Fahrplan rechnet in Anfangsjahren, gelesen wird anders. */
+    function schuljahrText(start) {
+        return `${start}/${String(start + 1).slice(2)}`;
+    }
+
     function formatDate(dateString) {
         if (!dateString) return "";
         return new Date(dateString).toLocaleDateString("de-DE", {
@@ -426,14 +431,23 @@
             <WarningBanner message={node.metadata.import_hinweis} />
         {/if}
 
-        <!-- Banner für archivierte Referenzen -->
+        <!-- Banner für archivierte Referenzen.
+
+             ⚠️ **Kein Warnton mehr** (26.09.2026). Bis dahin stand hier ein gelbes
+             Feld mit „⚠️ verweist auf archivierte Inhalte" — das las sich als
+             „veraltet", und in zwei von drei Fällen stimmte das nicht: Archiviert
+             heißt an einem Bildungsplan-Knoten auch „alte Schreibweise der bp_id"
+             oder „Edition gilt für dieses Fach noch nicht". Jetzt steht da die
+             **Wirkung**, die in jedem Fall zutrifft, und ein Grund nur dort, wo der
+             Editionsfahrplan ihn hergibt. -->
         {#if archivedRefs.length > 0}
             <div
-                class="mb-4 px-4 py-3 rounded-md border border-light-ye dark:border-dark-ye
-                  bg-light-ye/10 dark:bg-dark-ye/10 text-sm text-light-tx dark:text-dark-tx"
+                class="mb-4 px-4 py-3 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                  bg-light-bg-2 dark:bg-dark-bg-2 text-sm text-light-tx dark:text-dark-tx"
             >
                 <p class="font-medium mb-1">
-                    ⚠️ Dieser Knoten verweist auf archivierte Inhalte:
+                    Diese verknüpften Bausteine erscheinen derzeit nicht in Suche und
+                    Assistenten:
                 </p>
                 <ul class="space-y-1 ml-2">
                     {#each archivedRefs as ref (ref.id)}
@@ -447,6 +461,11 @@
                             >
                                 {ref.title}
                             </a>
+                            {#if ref.gilt_ab}
+                                <span class="text-light-tx-2 dark:text-dark-tx-2">
+                                    — gilt ab Schuljahr {schuljahrText(ref.gilt_ab)}
+                                </span>
+                            {/if}
                         </li>
                     {/each}
                 </ul>

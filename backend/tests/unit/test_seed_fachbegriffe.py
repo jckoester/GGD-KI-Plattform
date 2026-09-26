@@ -154,15 +154,48 @@ class TestKanten:
     def test_teilchen_und_ghs_als_related_to_mit_art(self, teststoff):
         """Der Knotentyp führt `is_a`, `related_to` und `references` — mehr zu
         erfinden hieße, die Typentscheidung aus AP2b im Seed zu überstimmen."""
-        assert self._kanten(teststoff, art="ghs") == ["Nebensache", "Vorwissen"]
+        assert self._kanten(teststoff, art="ghs") == ["Nebensache"]
+        assert self._kanten(teststoff, art="teilchen") == ["Vorwissen"]
 
-    def test_widersprechende_arten_werden_gemeldet(self, teststoff):
-        """Das Fixture nennt „Vorwissen" als Teilchen **und** als Piktogramm.
+    def test_zwei_arten_auf_einem_ziel_entscheidet_der_rang(self, teststoff):
+        """⚠️ Das Fixture nennt „Vorwissen" als Teilchen **und** als Piktogramm.
 
-        Der Graph trägt nur eine Kante je Paar, also wird zusammengezogen — aber nicht
-        stumm: Ein Knoten kann nicht beides sein, und das ist ein Fehler in der Datei.
+        Zwei Kanten kann die Datenbank nicht halten (eindeutiger Index über
+        `from/to/relation`), also gewinnt eine — und zwar nach `ART_RANG`, nicht nach
+        der Zahl der Metadatenschlüssel. Genau daran war die erste Fassung falsch: Bei
+        „Redoxreaktion (Sauerstoffübertragung)" gewann die Abgrenzung (mit Hinweistext)
+        über die Vertiefung, und damit fiel der Lernpfad weg.
         """
-        assert any("zweimal genannt" in w for w in teststoff.warnungen)
+        [kante] = [k for k in teststoff.kanten if k.ziel_datei == "Vorwissen"]
+        assert kante.metadata["art"] == "teilchen"
+        # Nichts geht verloren: Die Angaben der unterlegenen Nennung wandern mit.
+        assert kante.metadata["gilt_fuer"] == "ab 0,1 mol/L"
+        assert kante.metadata["arten"] == ["ghs", "teilchen"]
+
+    def test_vertiefung_gewinnt_ueber_abgrenzung(self, seed):
+        """Der Fall aus dem Pilot, wegen dem es `ART_RANG` gibt.
+
+        Dieselbe Fassung ist zugleich Abgrenzung und Vertiefung; die Vertiefung ist die
+        Aussage, der eine Traversierung folgt (ADR-013).
+        """
+        kanten = seed.vereinige([
+            seed.Kante("related_to", "Z", {"art": "abgrenzung", "hinweis": "Spezialfall"}),
+            seed.Kante("related_to", "Z", {"art": "vertiefung"}),
+        ])
+        assert len(kanten) == 1
+        assert kanten[0].metadata["art"] == "vertiefung"
+        assert kanten[0].metadata["hinweis"] == "Spezialfall"
+        assert kanten[0].metadata["arten"] == ["abgrenzung", "vertiefung"]
+
+    def test_nennung_ohne_art_faellt_weg(self, seed):
+        """`verwandt` sagt nichts, was `grenzt sich ab von` nicht auch sagt."""
+        kanten = seed.vereinige([
+            seed.Kante("related_to", "Z", {}),
+            seed.Kante("related_to", "Z", {"art": "abgrenzung", "hinweis": "x"}),
+        ])
+        assert len(kanten) == 1 and kanten[0].metadata["art"] == "abgrenzung"
+        # Keine Sammelangabe, wo es nichts zu sammeln gibt.
+        assert "arten" not in kanten[0].metadata
 
     def test_ghs_bedingung_wird_kanten_metadata(self, teststoff):
         """„ab 0,1 mol/L" ist eine Eigenschaft der **Beziehung**: Sonst stünde am

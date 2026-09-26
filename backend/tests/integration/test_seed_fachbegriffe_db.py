@@ -133,6 +133,34 @@ class TestErsterLauf:
         )).scalars().all()
         assert sorted(ziele) == ["3.2.1.1 Die Leitidee", "3.2.1.1(1) die erste Kompetenz"]
 
+    async def test_archivierte_fundstelle_wird_gezaehlt(self, seed, db_session, testfach):
+        """⚠️ Am Dev-Bestand aufgefallen: 84 von 164 Fundstellen des Pilots zeigen auf
+        **archivierte** Knoten — die ganze V3-Edition ist dort archiviert.
+
+        Die Kante entsteht trotzdem (sie trägt, sobald die Edition wieder gilt), aber
+        die Nachbarschaft zeigt nur Aktives: In der Oberfläche wirkt sie nicht. Ohne
+        Zeile im Bericht merkt das niemand — die Hälfte der Bildungsplan-Verweise
+        täte lautlos nichts.
+        """
+        kompetenz = (await db_session.execute(
+            sa.select(ContextNode).where(ContextNode.title.like("3.2.1.1(1)%"))
+        )).scalars().one()
+        kompetenz.status = "archived"
+        await db_session.flush()
+
+        bilanz = await _lauf(seed, db_session)
+        assert sum(bilanz.archivierte_ziele.values()) == 1
+        assert "TF.V2" in bilanz.archivierte_ziele
+        # Die Kante ist trotzdem da — verworfen wäre schlimmer als unsichtbar.
+        begriff = await _knoten(db_session, "Fiktivum")
+        vorhanden = (await db_session.execute(
+            sa.select(sa.func.count()).select_from(ContextEdge).where(
+                ContextEdge.from_node_id == begriff.id,
+                ContextEdge.to_node_id == kompetenz.id,
+            )
+        )).scalar_one()
+        assert vorhanden == 1
+
     async def test_unbekannte_fundstelle_bricht_nicht_ab(self, seed, db_session, testfach):
         """`3.9.9.9 (1)` gibt es nicht, `Unsinn` ist nicht einmal lesbar."""
         bilanz = await _lauf(seed, db_session)

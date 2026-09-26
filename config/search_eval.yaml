@@ -353,10 +353,81 @@ faelle:
 
   - frage: Welcher Stoff raucht an feuchter Luft und greift Metalle an?
     fach: Chemie
-    knoten: Salzsäure
+    knoten: Chlorwasserstoff
     notiz: >-
-      Umschreibung ohne Namen. Prüft, ob der Text trägt, ohne dass die
-      Eigenschaftstabelle im Vektor steht.
+      Umschreibung ohne Namen. ⚠️ **Erwartet wird Chlorwasserstoff, nicht Salzsäure** —
+      und das ist vorab entschieden, nicht nachträglich angepasst (Plan AP7, Notiz vom
+      26.09.2026): „Raucht an feuchter Luft“ steht in beiden Steckbriefen, Salzsäure
+      ist die bessere Antwort, Chlorwasserstoff eine richtige. Gemessen am 26.09.2026
+      liegt Salzsäure auf Rang 12: Die zweite Hälfte der Frage
+      („greift Metalle an“) steht bei ihr nur in `ghs[].gilt_fuer`, und das ist
+      bewusst nicht im Vektor. Der Fall misst damit, ob `eigenschaften.aussehen`
+      trägt — vorher lag Chlorwasserstoff auf Rang 9.
+
+  # ── S10: Fachbegriffe im Bestand (Paket 9, AP7) ─────────────────────────────
+  #
+  # Die Fälle darüber standen schon vor dem Import da; diese hier setzen ihn voraus
+  # (36 Pilotknoten Chemie, Stand 26.09.2026). Sie prüfen die drei Wege getrennt:
+  # Nachschlagen unter dem Namen, unter einem Alias, und thematisch **ohne** den Namen
+  # zu kennen — der eigentliche Grund, warum `content` bei `begriff` Pflicht ist.
+
+  - frage: Oxidation
+    fach: Chemie
+    knoten: Oxidation
+    notiz: >-
+      Nachschlagen unter dem Namen, und zugleich der Fassungsfall: „Oxidation“ gibt
+      es zweimal (Sauerstoffaufnahme, Elektronenabgabe). Beide sind Namensträger; die
+      Identifikation muss sie zählen, statt eine davon als *die* Antwort auszugeben.
+
+  - frage: Elektronenpaarbindung
+    fach: Chemie
+    knoten: Elektronenpaarbindung
+    notiz: Gegenprobe ohne Fassungen — ein Begriff, den es nur einmal gibt.
+
+  - frage: Atombindung
+    fach: Chemie
+    knoten: Elektronenpaarbindung
+    notiz: >-
+      Alias. Am GGD heißt der Begriff „Elektronenpaarbindung“; „Atombindung“
+      steht in `aliase` und geht in den Vektor ein. Wer den Schulbegriff nicht kennt,
+      muss trotzdem ankommen.
+
+  - frage: Wasserstoffbrücke
+    fach: Chemie
+    knoten: Wasserstoffbrücken
+    notiz: >-
+      Andere Zahlform. Der Titel folgt dem Bildungsplan und steht im Plural; die
+      Einzahl wird **nicht** als Alias gepflegt (Konvention 24.09.2026) — sie muss
+      über die Ähnlichkeitsstufe der Identifikation ankommen.
+
+  - frage: Warum schwimmt Eis auf Wasser?
+    fach: Chemie
+    knoten: Wasserstoffbrücken
+    notiz: >-
+      Thematisch, ohne den Begriff zu kennen — der Kernfall. Die Antwort steht in der
+      Erklärung von „Wasserstoffbrücken“ (Dichteanomalie), nicht in ihrem Titel.
+
+  - frage: Was passiert, wenn man Säure und Lauge mischt?
+    fach: Chemie
+    knoten: Neutralisation
+    notiz: Dasselbe in Schülersprache — „Lauge“ statt „alkalische Lösung“.
+
+  - frage: Was bedeutet das Zeichen mit der Flamme auf der Flasche?
+    fach: Chemie
+    knoten: Flamme
+    notiz: >-
+      Gefahrenpiktogramm über seine Anmutung gesucht, nicht über seinen Namen. ⚠️ Der
+      Gegenfall zu „Welcher Stoff raucht …“: Dort **stören** die Piktogramme, hier
+      sind sie die Antwort. Beides mit derselben Gewichtung zu treffen ist die
+      eigentliche Schwierigkeit — wer die Piktogramme zurückstuft, verliert diesen Fall.
+
+  - frage: Energie
+    fach: Physik
+    knoten: 3.2.3
+    notiz: >-
+      ⚠️ Wächter gegen Übergriff. Der Chemie-Bestand ist seit dem Pilot der größte
+      Einzelbestand im Dev-System; im Physik-Chat darf er trotzdem nicht nach vorn
+      kommen. Erwartet wird ein Physik-Knoten, nicht ein Chemie-Begriff.
 
 # ── Aufzählungen ──────────────────────────────────────────────────────────────
 #

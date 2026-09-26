@@ -56,7 +56,7 @@ from app.context.schemas import (
     PkKompetenzRead,
 )
 from app.context import aliase as aliase_modul
-from app.context.editions import aktive_bp_version
+from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.meine_bausteine import (
@@ -482,6 +482,9 @@ async def get_archived_references(
             n.category,
             n.content_type,
             n.archived_at,
+            n.bp_version,
+            s.min_grade,
+            s.max_grade,
             e.relation,
             (
                 SELECT s.id FROM context_edges se
@@ -493,12 +496,27 @@ async def get_archived_references(
             ) AS suggested_successor_id
           FROM context_edges e
           JOIN context_nodes n ON n.id = e.to_node_id
+          LEFT JOIN subjects s ON s.id = n.subject_id
          WHERE e.from_node_id = :node_id
            AND n.status = 'archived'
     """)
     result = await db.execute(sql, {"node_id": str(node_id)})
-    rows = result.mappings().all()
-    return [ArchivedReferenceRead(**dict(row)) for row in rows]
+
+    # ⚠️ **Ein Grund nur, wo es einen gibt.** Archiviert heißt an einem
+    # Bildungsplan-Knoten dreierlei (gemessen am Bestand, 26.09.2026): abgelöst, alte
+    # `bp_id`-Schreibweise, oder eine Edition, die für dieses Fach noch nicht gilt.
+    # Nur den letzten kann der Fahrplan erklären — bei den anderen bleibt es bei der
+    # neutralen Auskunft, statt eine Begründung zu erfinden.
+    referenzen = []
+    for row in result.mappings().all():
+        daten = dict(row)
+        bp_version = daten.pop("bp_version", None)
+        min_grade, max_grade = daten.pop("min_grade", None), daten.pop("max_grade", None)
+        daten["gilt_ab"] = (
+            gilt_ab_schuljahr(bp_version, min_grade, max_grade) if bp_version else None
+        )
+        referenzen.append(ArchivedReferenceRead(**daten))
+    return referenzen
 
 
 # ── POST /api/context/nodes/{id}/copy ───────────────────────────────────────

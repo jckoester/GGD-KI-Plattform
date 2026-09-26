@@ -735,6 +735,31 @@ class TestArchivedReferences:
         assert data[0]["suggested_successor_id"] == phase4_node_ids["archived_successor"]
 
     @pytest.mark.asyncio
+    async def test_ohne_editionsbezug_kein_grund(
+        self, test_client, teacher_headers, phase4_node_ids
+    ):
+        """⚠️ **Lieber unerklärt als falsch erklärt** (Paket 9, AP7).
+
+        Archiviert heißt an einem Bildungsplan-Knoten dreierlei — abgelöst, alte
+        `bp_id`-Schreibweise, oder eine Edition, die für ihr Fach noch nicht gilt.
+        Nur die dritte kann der Fahrplan erklären. Ein Testknoten ohne
+        Editionsbezug muss deshalb `gilt_ab: null` liefern; stünde dort eine
+        Jahreszahl, behauptete die Oberfläche einen Grund, den sie nicht kennt.
+
+        Die Rechnung selbst prüft `test_editions.py::TestGiltAbSchuljahr` — hier geht
+        es darum, dass das Feld überhaupt durchgereicht wird.
+        """
+        node_source_id = phase4_node_ids["archived_source"]
+        resp = await test_client.get(
+            f"/context/nodes/{node_source_id}/archived-references",
+            headers=teacher_headers,
+        )
+        assert resp.status_code == 200
+        [eintrag] = resp.json()
+        assert "gilt_ab" in eintrag, "Das Feld fehlt — die Oberfläche kann nichts zeigen"
+        assert eintrag["gilt_ab"] is None
+
+    @pytest.mark.asyncio
     async def test_archived_references_empty(self, test_client, teacher_headers, phase4_node_ids):
         """[] wenn keine archivierten Referenzen."""
         # Ein Knoten ohne ausgehende Kanten zu archivierten Knoten

@@ -166,3 +166,64 @@ def test_aktive_bp_version_gegen_echte_subjects_yaml():
     )
     # Leerer Editionsbestand → None.
     assert aktive_bp_version(5, set(), schuljahr_start=2026) is None
+
+
+# ── „Gilt noch nicht" vom Fahrplan erklären lassen (Paket 9, AP7) ────────────
+
+
+class TestGiltAbSchuljahr:
+    """Warum ein archivierter Bildungsplan-Knoten archiviert ist — soweit ableitbar.
+
+    ⚠️ **Der Wert dieser Funktion liegt in dem, was sie *nicht* beantwortet.**
+    Gemessen am Dev-Bestand (26.09.2026) stecken in `status = 'archived'` mindestens
+    drei Ursachen: abgelöste Inhalte, eine alte `bp_id`-Schreibweise (326
+    Mathematik-Knoten, gleicher Text, neue ID) und Editionen, die für ihr Fach noch
+    nicht gelten. Nur die dritte kann der Fahrplan erklären. Für die anderen liefert
+    die Funktion `None`, und die Oberfläche bleibt bei der neutralen Auskunft — sonst
+    stünde an einem Knoten mit alter Schreibweise „gilt ab 2027/28", was schlicht
+    falsch wäre.
+    """
+
+    def test_chemie_v3_gilt_ab_2027(self):
+        """Der Fall, der das ausgelöst hat.
+
+        V3 startet 2026/27 in den Stufen 5–7 und wächst jährlich nach oben; Chemie
+        beginnt bei Stufe 8. Die Edition erreicht das Fach damit ein Jahr später.
+        """
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V3", 8, 12, schuljahr_start=2026) == 2027
+
+    def test_mathematik_v3_gilt_schon(self):
+        """Dasselbe V3, anderes Fach: Mathematik hat die Stufen 5–7, also gilt es."""
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V3", 5, 13, schuljahr_start=2026) is None
+
+    def test_geltende_edition_gibt_keinen_grund(self):
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V2", 8, 12, schuljahr_start=2026) is None
+
+    def test_unbekannte_edition_gibt_keinen_grund(self):
+        """⚠️ Das Gegenteil von „raten": Was nicht im Fahrplan steht, bleibt unerklärt."""
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2099.V9", 8, 12, schuljahr_start=2026) is None
+
+    def test_fach_ohne_stufen_gibt_keinen_grund(self):
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V3", None, None, schuljahr_start=2026) is None
+
+    def test_spaeteres_jahr_verschiebt_die_antwort(self):
+        """Ein Jahr später gilt V3 in Chemie — dann gibt es nichts mehr zu erklären."""
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V3", 8, 12, schuljahr_start=2027) is None
+
+    def test_oberstufe_wartet_laenger(self):
+        """Ein Fach, das erst in Klasse 11 beginnt, erreicht V3 erst 2030/31."""
+        from app.context.editions import gilt_ab_schuljahr
+
+        assert gilt_ab_schuljahr("2016.V3", 11, 12, schuljahr_start=2026) == 2030

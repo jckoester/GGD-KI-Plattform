@@ -208,37 +208,60 @@ def _fliesstext(text: str) -> str:
     return _WIKILINK.sub(lambda m: _anzeigetext(m.group(1)), text)
 
 
-def vereinige(kanten: list[Kante], warnungen: list[str] | None = None) -> list[Kante]:
-    """Mehrfach genannte Ziele zu einer Kante zusammenziehen.
+#: Welche Art gewinnt, wenn dieselbe Kante mehrfach genannt wird — absteigend.
+#:
+#: ⚠️ **Die Reihenfolge ist eine Entscheidung, keine Aufzählung.** Ganz oben steht, was
+#: eine **Traversierung** verfolgen würde: Die Vertiefung ist der Lernpfad zwischen zwei
+#: Fassungen und der Grund, warum ADR-013 Kanten überhaupt nach Art trennt. Die
+#: Abgrenzung steht unten — sie erklärt, sie verbindet nicht. Ihr Hinweistext geht
+#: trotzdem nicht verloren (siehe `vereinige`).
+ART_RANG = ("vertiefung", "teilchen", "ghs", "abgrenzung")
 
-    ⚠️ **Der Regelfall, nicht die Ausnahme.** „Wasser" nennt „Wasserstoff" unter
-    `verwandt` *und* in der Abgrenzung; „Salzsäure" ebenso „Chlorwasserstoff". Ohne
-    Zusammenzug stünden zwei `related_to`-Kanten zwischen denselben Knoten — im Graphen
-    eine doppelte Linie, in der Detailansicht ein doppelter Eintrag.
 
-    Gewinnt die **aussagekräftigere**: Die Abgrenzung trägt einen Hinweistext, der bloße
-    Verwandtschaftseintrag nichts. Nach Anzahl der Metadatenschlüssel zu entscheiden
-    hängt das nicht an der Lesereihenfolge auf.
+def vereinige(kanten: list[Kante]) -> list[Kante]:
+    """Mehrfach genannte Ziele zu **einer** Kante zusammenziehen.
+
+    ⚠️ **Der Zusammenzug ist erzwungen, nicht gewählt.** Auf `context_edges` liegt ein
+    eindeutiger Index über `(from_node_id, to_node_id, relation)`: Zwei
+    `related_to`-Kanten zwischen denselben Knoten kann die Datenbank gar nicht halten.
+    Zu entscheiden ist also nur, **welche** Aussage die Kante trägt.
+
+    Der Regelfall ist harmlos: „Wasser" nennt „Wasserstoff" unter `verwandt` *und* in
+    der Abgrenzung — dasselbe zweimal, die aussagekräftigere gewinnt.
+
+    ⚠️ **Der Grenzfall war es nicht.** „Redoxreaktion (Sauerstoffübertragung)" nennt die
+    Elektronenfassung als **Abgrenzung** *und* als **Vertiefung**; beides stimmt, und es
+    sind zwei verschiedene Aussagen. Die erste Fassung entschied nach der Zahl der
+    Metadatenschlüssel — damit gewann die Abgrenzung (sie trägt einen Hinweistext), und
+    die Vertiefung fiel lautlos weg: ausgerechnet die Kantenart, für die es die
+    Unterscheidung gibt. Jetzt entscheidet :data:`ART_RANG`, und die Angaben der
+    unterlegenen Nennung **wandern mit** — der Hinweistext bleibt, und `arten` hält
+    fest, dass die Kante mehr als eine Lesart hat.
     """
-    beste: dict[tuple[str, str], Kante] = {}
+    gruppen: dict[tuple[str, str], list[Kante]] = {}
     for kante in kanten:
-        schluessel = (kante.relation, kante.ziel_datei)
-        vorher = beste.get(schluessel)
-        if vorher is not None and warnungen is not None:
-            arten = {vorher.metadata.get("art"), kante.metadata.get("art")} - {None}
-            # ⚠️ Zwei verschiedene **Arten** auf dasselbe Ziel sind keine Dublette,
-            # sondern eine Aussage, die sich widerspricht: Ein Knoten kann nicht
-            # zugleich Teilchen und Gefahrenpiktogramm sein. Zusammengezogen wird
-            # trotzdem — der Graph trägt nur eine Kante je Paar —, aber nicht stumm.
-            if len(arten) > 1:
-                warnungen.append(
-                    f"{kante.ziel_datei}: zweimal genannt, als "
-                    + " und als ".join(sorted(arten))
-                    + " — zusammengezogen"
-                )
-        if vorher is None or len(kante.metadata) > len(vorher.metadata):
-            beste[schluessel] = kante
-    return list(beste.values())
+        gruppen.setdefault((kante.relation, kante.ziel_datei), []).append(kante)
+
+    def rang(kante: Kante) -> tuple[int, int]:
+        art = kante.metadata.get("art", "")
+        # Ohne Art ganz nach hinten: „verwandt" sagt nichts, was „grenzt sich ab von"
+        # nicht auch sagt. Bei gleichem Rang gewinnt die reichhaltigere Nennung.
+        platz = ART_RANG.index(art) if art in ART_RANG else len(ART_RANG)
+        return (platz, -len(kante.metadata))
+
+    vereint: list[Kante] = []
+    for (relation, ziel), gruppe in gruppen.items():
+        gruppe.sort(key=rang)
+        gewinner, rest = gruppe[0], gruppe[1:]
+        metadata = dict(gewinner.metadata)
+        for andere in rest:
+            for schluessel, wert in andere.metadata.items():
+                metadata.setdefault(schluessel, wert)
+        arten = [k.metadata["art"] for k in gruppe if k.metadata.get("art")]
+        if len(set(arten)) > 1:
+            metadata["arten"] = sorted(set(arten))
+        vereint.append(Kante(relation, ziel, metadata))
+    return vereint
 
 
 def _abgrenzungszeile(zeile: str, warnungen: list[str]) -> list[Kante]:
@@ -372,7 +395,7 @@ def lies_datei(pfad: Path) -> Quelldatei | None:
         aliase=alias_dienst.bereinige(_als_liste(kopf_daten.get("aliase"))),
         metadata=metadata,
         fundstellen=[f for f in _als_liste(kopf_daten.get("bildungsplan"))],
-        kanten=vereinige(kanten, warnungen),
+        kanten=vereinige(kanten),
         warnungen=warnungen,
     )
 
@@ -504,6 +527,9 @@ class Bilanz:
     offene_ziele: Counter = field(default_factory=Counter)
     #: Fundstellen, zu denen es keinen Bildungsplan-Knoten gibt.
     offene_fundstellen: Counter = field(default_factory=Counter)
+    #: Fundstellen, deren Knoten **archiviert** ist — die Kante entsteht, wirkt
+    #: in der Oberfläche aber nicht (die Nachbarschaft zeigt nur Aktives).
+    archivierte_ziele: Counter = field(default_factory=Counter)
 
 
 async def _faecher(db: AsyncSession) -> dict[str, Subject]:
@@ -544,14 +570,20 @@ async def _bp_knoten(db: AsyncSession, subject_id: int) -> dict[tuple[str, str, 
         ContextNode.metadata_["nr"].astext,
     )
     zeilen = (await db.execute(
-        sa.select(ContextNode.id, ContextNode.bp_version, ContextNode.content_type, nummer)
-        .where(
+        sa.select(
+            ContextNode.id, ContextNode.bp_version, ContextNode.content_type,
+            nummer, ContextNode.status,
+        ).where(
             ContextNode.subject_id == subject_id,
             ContextNode.content_type.in_(("ik_kompetenz", "leitidee")),
             nummer.isnot(None),
         )
     )).all()
-    return {(v, ct, nr): knoten_id for knoten_id, v, ct, nr in zeilen}
+    # Der Status wandert mit: Eine Kante auf einen **archivierten** Knoten entsteht
+    # zwar, wirkt in der Oberfläche aber nicht — die Nachbarschaft zeigt nur Aktives.
+    # Angelegt wird sie trotzdem (sie trägt, sobald die Edition wieder gilt); gezählt
+    # wird sie im Bericht.
+    return {(v, ct, nr): (knoten_id, status) for knoten_id, v, ct, nr, status in zeilen}
 
 
 def _ist_zustand(node: ContextNode, aliase: list[str]) -> dict[str, Any]:
@@ -680,12 +712,15 @@ async def _schreibe_kanten(
             bilanz.warnungen.append(f"{quelle.datei}: Fundstelle unlesbar — {roh!r}")
             continue
         version = editionen.get(fundstelle.suffix)
-        ziel_id = bp.get(
+        treffer = bp.get(
             (version, fundstelle.content_type, fundstelle.schluessel)
         ) if version else None
-        if ziel_id is None:
+        if treffer is None:
             bilanz.offene_fundstellen[fundstelle.roh] += 1
             continue
+        ziel_id, status = treffer
+        if status != "active":
+            bilanz.archivierte_ziele[f"{fundstelle.fach_code}{fundstelle.suffix}"] += 1
         geplant.append(("references", ziel_id, {"fundstelle": fundstelle.roh}))
 
     soll: dict[tuple[str, Any], dict] = {}
@@ -855,6 +890,15 @@ def _berichte(bilanz: Bilanz, *, dry_run: bool) -> None:
         )
         for roh, anzahl in bilanz.offene_fundstellen.most_common():
             logger.warning("    %2dx  %s", anzahl, roh)
+    if bilanz.archivierte_ziele:
+        # ⚠️ Kein Fehler des Imports, aber eine Lücke in der Wirkung: In der
+        # Detailansicht taucht eine Kante auf einen archivierten Knoten nicht auf.
+        logger.warning(
+            "%d Fundstellen zeigen auf **archivierte** Bildungsplan-Knoten — die "
+            "Kanten entstehen, sind in der Oberfläche aber unsichtbar. Je Edition: %s",
+            sum(bilanz.archivierte_ziele.values()),
+            ", ".join(f"{k}: {n}" for k, n in bilanz.archivierte_ziele.most_common()),
+        )
     if bilanz.offene_ziele:
         logger.info(
             "%d Verweise auf noch nicht vorhandene Bausteine (%d verschieden) — "

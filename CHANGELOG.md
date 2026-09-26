@@ -7,6 +7,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Der Hinweis auf archivierte Verknüpfungen warnt nicht mehr, sondern erklärt.**
+  Er stand als gelbe Warnung da und legte nahe, die verknüpften
+  Bildungsplan-Inhalte seien veraltet. Oft stimmt das nicht: Eine Fassung kann für
+  ein Fach auch schlicht **noch nicht gelten** — der Chemie-Bildungsplan V3
+  beispielsweise erst ab Klasse 8 im Schuljahr 2027/28. Der Hinweis nennt jetzt,
+  was tatsächlich gilt („erscheinen derzeit nicht in Suche und Assistenten“),
+  und den Grund nur dort, wo er sich aus dem Bildungsplan-Fahrplan ergibt.
+
 - **Die Verweise in der Hilfe führen wieder ans Ziel.** Das Inhaltsverzeichnis der
   Hilfe-Übersicht zeigte auf Dateinamen — ein Klick landete in einem neuen Tab auf
   einer nicht vorhandenen Seite.
@@ -60,6 +68,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
 - **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
   benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
+- **Stoffe lassen sich über ihr Aussehen finden.** „Welcher Stoff raucht an
+  feuchter Luft?“ führt jetzt zum Steckbrief — die Beschreibung des Aussehens
+  geht in die Suche ein, die Messwerte bewusst nicht.
 - **Bausteine können Abbildungen im Text tragen.** Eine Zeichnung steht an der Stelle,
   an der sie erklärt wird, mit ihrer Beschreibung darunter. Bei Stoffen zeigt die
   Detailansicht zusätzlich die Eigenschaftstabelle, bei Fachbegriffen die häufigen

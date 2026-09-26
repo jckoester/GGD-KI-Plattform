@@ -656,7 +656,20 @@ categories:
         # Siedetemperaturen ähneln sich über alle Stoffe und machten die Vektoren
         # einander ähnlich statt unterscheidbar — dieselbe Falle wie der Verlaufsplan
         # beim Stundenentwurf.
-        embedding_input: ["title", "aliases", "metadata.trivialnamen", "content"]
+        # ⚠️ **`eigenschaften.aussehen` ja, die Zahlenfelder nein** (AP7, gemessen
+        # 26.09.2026). Schmelz- und Siedetemperatur stehen in jedem Steckbrief und
+        # machten die Vektoren einander ähnlich statt unterscheidbar — das Aussehen
+        # dagegen ist unterscheidende Prosa („raucht an feuchter Luft"), und danach
+        # fragen Schüler:innen. Gemessen am Fall „Welcher Stoff raucht an feuchter
+        # Luft …": Chlorwasserstoff steigt von Rang 9 auf Rang 3, Salzsäure von 20
+        # auf 12; die beiden anderen Steckbrief-Fälle bleiben unverändert grün.
+        #
+        # `metadata.nachweis` wurde im selben Zug gemessen und **verworfen**: Er
+        # bewegt denselben Fall um einen Rang (12 → 13, Rauschen), und sein eigener
+        # Prüfsatzfall („Womit weist man Chloridionen nach?") war schon ohne ihn grün.
+        # Die Notiz dort hatte genau das vorab festgelegt.
+        embedding_input: ["title", "aliases", "metadata.trivialnamen",
+                          "metadata.eigenschaften.aussehen", "content"]
         collection:
           beschreibung: >-
             Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung

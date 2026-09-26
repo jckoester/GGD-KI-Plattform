@@ -164,6 +164,11 @@ class ArchivedReferenceRead(BaseModel):
     archived_at: datetime
     relation: str
     suggested_successor_id: UUID | None
+    #: Schuljahr, ab dem die Bildungsplan-Edition dieses Knotens für sein Fach gilt —
+    #: oder ``None``. Nur der Fall „gilt noch nicht“ lässt sich aus dem Fahrplan
+    #: erklären; alle anderen Archivierungsgründe bleiben unbenannt, statt geraten zu
+    #: werden (siehe `editions.gilt_ab_schuljahr`).
+    gilt_ab: int | None = None
 
 
 class ContextNodeCopyRequest(BaseModel):
