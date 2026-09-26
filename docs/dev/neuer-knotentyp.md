@@ -404,6 +404,9 @@ flowchart LR
   bauteil -.->|part_of| themengebiet
   begriff -.->|part_of| themengebiet
   begriff -.->|related_to| begriff
+  begriff -.->|requires| begriff
+  begriff -.->|is_a| begriff
+  begriff -.->|references| ik
   bauteil -.->|used_with| funktion
   code -.->|references| funktion
 

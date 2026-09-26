@@ -46,6 +46,7 @@
     related_to:   '#6b7280',
     follows:      '#14b8a6',
     derived_from: '#8b5cf6',
+    is_a:         '#0ea5e9',
   }
 
   function runSimulation(rawNodes, rawEdges, width, height) {

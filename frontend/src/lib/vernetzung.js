@@ -28,6 +28,10 @@ export const RELATION_LABEL = {
   supersedes: { raus: "Löst ab", rein: "Abgelöst durch" },
   follows: { raus: "Folgt auf", rein: "Gefolgt von" },
   derived_from: { raus: "Abgeleitet aus", rein: "Grundlage für" },
+  // ⚠️ **Nicht symmetrisch und nicht `part_of`.** „Natriumchlorid ist ein Salz"
+  // liest sich rückwärts als „Salz — Unterart: Natriumchlorid", nicht als
+  // „Salz ist ein Natriumchlorid".
+  is_a: { raus: "Ist ein(e)", rein: "Unterarten" },
 }
 
 /** Ab hier wird gekappt und „+ n weitere" gezeigt (ADR-013-Leitplanke). */

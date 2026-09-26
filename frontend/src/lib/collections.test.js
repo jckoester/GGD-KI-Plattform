@@ -48,10 +48,15 @@ describe("sammlung", () => {
 describe("spalten", () => {
   it("mischt feste Spalten und Metadatenfelder", () => {
     const s = spalten("begriff")
+    // Reihenfolge = YAML. `fassung` und `pruefstatus` kamen am 26.09.2026 dazu
+    // (Paket 9/AP1): Gleichnamige Begriffe unterscheiden sich nur in der Fassung,
+    // und der Prüfstatus entscheidet später über die Schülersichtbarkeit.
     expect(s.map((c) => c.name)).toEqual([
       "titel",
+      "fassung",
       "fach",
       "ab_klasse",
+      "pruefstatus",
       "status",
       "geaendert",
     ])
@@ -86,7 +91,14 @@ describe("zellenwert", () => {
     updated_at: "2026-09-02T10:00:00Z",
     metadata: { ab_klasse: 7 },
   }
-  const [titel, fach, abKlasse, status, geaendert] = spalten("begriff")
+  // ⚠️ **Über den Namen, nicht über die Position.** Die Destrukturierung
+  // `const [titel, fach, abKlasse, …]` brach am 26.09.2026, als zwei Spalten dazukamen —
+  // und zwar nicht an der Stelle, die sich geändert hatte, sondern in fünf Tests, die
+  // mit Spalten nichts zu tun haben.
+  const spalte = (name) => spalten("begriff").find((c) => c.name === name)
+  const [titel, fach, abKlasse, status, geaendert] = [
+    "titel", "fach", "ab_klasse", "status", "geaendert",
+  ].map(spalte)
 
   it("liest den Titel", () => {
     expect(zellenwert(node, titel)).toBe("Energie")
@@ -199,9 +211,13 @@ describe("metadatenAusFormular", () => {
 
   it("lässt fremde Metadaten unangetastet", () => {
     // `metadata` ist ein freies Feld — der Editor darf nicht wegwerfen, was er nicht kennt.
+    //
+    // ⚠️ Hier stand bis zum 26.09.2026 `quelle` als Beispiel für „fremd". Das Feld ist
+    // seit Paket 9/AP1 Teil des Schemas; der Test prüfte danach das Gegenteil seiner
+    // Absicht. Jetzt steht hier, was der Import schreibt und der Editor nie anzeigt.
     expect(
-      metadatenAusFormular("begriff", { ab_klasse: 7 }, { quelle: "Duden" }),
-    ).toEqual({ quelle: "Duden", ab_klasse: 7 })
+      metadatenAusFormular("begriff", { ab_klasse: 7 }, { import_key: "CH-042" }),
+    ).toEqual({ import_key: "CH-042", ab_klasse: 7 })
   })
 })
 
@@ -316,14 +332,31 @@ describe("schuelerSammlungen", () => {
 describe("relationen", () => {
   it("bietet bei Fachbegriffen eine kuratierte Teilmenge", () => {
     const r = relationen("begriff")
-    expect(r.map((x) => x.relation)).toEqual(["related_to", "part_of"])
+    expect(r.map((x) => x.relation)).toEqual([
+      "related_to", "part_of", "references", "requires", "is_a",
+    ])
     // Die Richtung wird als Satz gezeigt, nicht als Pfeil-Abstraktion.
     expect(r[0].label).toBe("steht in Beziehung zu")
   })
 
-  it("lässt `references` bewusst weg", () => {
-    // Sie entsteht am Material, das den Begriff nutzt — nicht am Begriff selbst.
-    expect(relationen("begriff").map((r) => r.relation)).not.toContain("references")
+  it("⚠️ `references` zeigt hier **auf** den Bildungsplan", () => {
+    // Bis zum 26.09.2026 stand hier das Gegenteil: „lässt `references` bewusst weg —
+    // sie entsteht am Material, das den Begriff nutzt". Das gilt weiterhin für die
+    // Richtung *Material → Begriff*. Die Gegenrichtung ist eine andere Aussage: Ein
+    // Begriff verweist auf die Kompetenz, in der der Bildungsplan ihn verlangt, und
+    // diese Kante entsteht am Begriff (Paket 9/AP1). Am Kompetenzknoten dürfte sie
+    // nicht entstehen — der trüge sonst Tausende Rückverweise (ADR-013, Kantendichte).
+    const references = relationen("begriff").find((r) => r.relation === "references")
+    expect(references.ziel).toEqual(["ik_kompetenz"])
+    expect(references.label).toBe("wird im Bildungsplan verlangt in")
+  })
+
+  it("kennt `is_a` als eigene Beziehungsart", () => {
+    // Hierarchie ist kein `related_to` mit Beiwerk: Graphansicht und Traversierung
+    // filtern nach Relationstyp (ADR-013, Nachtrag 26.09.2026).
+    const isA = relationen("begriff").find((r) => r.relation === "is_a")
+    expect(isA.ziel).toEqual(["begriff"])
+    expect(isA.label).toBe("ist ein(e)")
   })
 
   it("schränkt die Zieltypen ein", () => {
@@ -338,10 +371,16 @@ describe("relationen", () => {
   })
 
   it("nennt nur Relationen, die die Datenbank zulässt", () => {
-    // Neun, nicht zehn: `reflects_on` fiel mit Migration 0056 weg.
+    // Zehn: `reflects_on` fiel mit Migration 0056 weg, `is_a` kam mit 0078 dazu.
+    //
+    // ⚠️ **Diese Liste ist die vierte Kopie** (DB-CHECK, `models.py`,
+    // `ERLAUBTE_RELATIONEN`, hier). Sie lässt sich von hier aus nicht auflösen — die
+    // erzeugte `taxonomy.js` trägt die Relationen nicht, und der Generator liest nur
+    // YAML, keinen Python-Code. Backend-seitig hält `test_relationen_einheitlich.py`
+    // Modell und Konstante zusammen; als Todo notiert.
     const erlaubt = new Set([
       "requires", "used_with", "part_of", "develops", "supersedes",
-      "references", "follows", "derived_from", "related_to",
+      "references", "follows", "derived_from", "related_to", "is_a",
     ])
     for (const s of alleSammlungen()) {
       for (const r of relationen(s.typ)) expect(erlaubt.has(r.relation)).toBe(true)

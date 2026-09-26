@@ -1227,9 +1227,13 @@ class ContextEdge(Base):
         CheckConstraint(
             # `reflects_on` fiel mit Migration 0056 weg — die Relation gehörte zum
             # in 0055 gestrichenen Knotentyp `reflexion`.
+            # `is_a` seit Alembic 0078 (Paket 9): „ist ein(e)" als eigene Kantenart.
+            # Hierarchie ist keine Spielart von `related_to` — Graphansicht und
+            # Traversierung filtern nach Relationstyp (ADR-013), und `part_of` heißt
+            # „Teil von", nicht „ist ein".
             "relation IN ('requires','used_with','part_of','develops',"
             "             'supersedes','references','follows','derived_from',"
-            "             'related_to')",
+            "             'related_to','is_a')",
             name="check_context_edges_relation",
         ),
         Index("idx_context_edges_from", "from_node_id"),

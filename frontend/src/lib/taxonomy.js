@@ -198,14 +198,17 @@ export const COLLECTIONS = {
     "beschreibung": "Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der Normalfall — „Energie\" heißt in Physik etwas anderes als in Ethik.",
     "spalten": [
       "titel",
+      "fassung",
       "fach",
       "ab_klasse",
+      "pruefstatus",
       "status",
       "geaendert"
     ],
     "filter": [
       "fach",
       "ab_klasse",
+      "pruefstatus",
       "status",
       "titel"
     ],
@@ -222,6 +225,24 @@ export const COLLECTIONS = {
         "label": "gehört zum Themengebiet",
         "ziel": [
           "themengebiet"
+        ]
+      },
+      "references": {
+        "label": "wird im Bildungsplan verlangt in",
+        "ziel": [
+          "ik_kompetenz"
+        ]
+      },
+      "requires": {
+        "label": "setzt voraus",
+        "ziel": [
+          "begriff"
+        ]
+      },
+      "is_a": {
+        "label": "ist ein(e)",
+        "ziel": [
+          "begriff"
         ]
       }
     },
@@ -284,7 +305,52 @@ export const FELD_SCHEMATA = {
       "label": "Ab Klassenstufe",
       "min": 1,
       "max": 13,
-      "hinweis": "Für welche Stufe diese Fassung gemeint ist. „Energie\" in Klasse 6 verlangt eine andere Definition als in Klasse 11; zwei Einträge mit verschiedener Stufe sind der vorgesehene Weg dahin."
+      "hinweis": "Nur ausfüllen, wenn es diesen Begriff in mehreren Fassungen gibt: „Energie\" in Klasse 6 verlangt eine andere Definition als in Klasse 11, „Oxidation\" in Klasse 8 eine andere als in Klasse 10. Zwei Einträge mit verschiedener Stufe sind der vorgesehene Weg dahin."
+    },
+    "fassung": {
+      "typ": "text",
+      "label": "Fassung",
+      "hinweis": "Unterscheidet gleichnamige Einträge in der Liste — „Sauerstoffaufnahme\" gegenüber „Elektronenabgabe\". Ohne sie stünde derselbe Titel zweimal da."
+    },
+    "bevorzugter_begriff": {
+      "typ": "text",
+      "label": "Bevorzugte Bezeichnung",
+      "hinweis": "Die an dieser Schule übliche Bezeichnung. Der Assistent antwortet damit, auch wenn gefragt wurde: „Atombindung\" beantwortet er als „Elektronenpaarbindung\"."
+    },
+    "genus": {
+      "typ": "auswahl",
+      "label": "Artikel",
+      "werte": [
+        "der",
+        "die",
+        "das"
+      ],
+      "hinweis": "Für Lernende, die Deutsch als Zweitsprache sprechen — und für Antworten, die den Begriff im Satz beugen."
+    },
+    "plural": {
+      "typ": "text",
+      "label": "Mehrzahl",
+      "hinweis": "Ersetzt Plural-Aliase; die Suche findet beide Formen ohnehin."
+    },
+    "fehlvorstellungen": {
+      "typ": "liste",
+      "label": "Häufige Irrtümer",
+      "hinweis": "Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim Sieden zerfällt Wasser in Wasserstoff und Sauerstoff\"). Der Assistent bekommt sie mit und kann sie ansprechen."
+    },
+    "pruefstatus": {
+      "typ": "auswahl",
+      "label": "Prüfstatus",
+      "werte": [
+        "entwurf",
+        "fachlich_geprueft",
+        "freigegeben"
+      ],
+      "hinweis": "Wie weit der Eintrag fachlich geprüft ist. Vorbereitung für die Frage, ob Schüler:innen Entwürfe sehen — heute rein informativ."
+    },
+    "quelle": {
+      "typ": "text",
+      "label": "Herkunft",
+      "hinweis": "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
     }
   }
 }

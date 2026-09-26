@@ -535,8 +535,8 @@ categories:
           beschreibung: >-
             Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der
             Normalfall — „Energie" heißt in Physik etwas anderes als in Ethik.
-          spalten: [titel, fach, ab_klasse, status, geaendert]
-          filter: [fach, ab_klasse, status, titel]
+          spalten: [titel, fassung, fach, ab_klasse, pruefstatus, status, geaendert]
+          filter: [fach, ab_klasse, pruefstatus, status, titel]
           # Fachgebunden, aber trotzdem in der Sidebar (Entscheidung Jan, 02.09.2026):
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
           # Biologie?" fragt man ohne das eigene Fach im Kopf.
@@ -550,6 +550,24 @@ categories:
             part_of:
               label: "gehört zum Themengebiet"
               ziel: [themengebiet]
+            # ⚠️ **Hier ist `references` die richtige Richtung** — anders als beim
+            # Material, das auf einen Begriff zeigt. Ein Begriff verweist auf die
+            # Kompetenz, in der der Bildungsplan ihn verlangt; die Kante entsteht am
+            # Begriff, nicht an der Kompetenz (die trägt sonst Tausende Rückverweise,
+            # siehe ADR-013 zur Kantendichte).
+            references:
+              label: "wird im Bildungsplan verlangt in"
+              ziel: [ik_kompetenz]
+            requires:
+              label: "setzt voraus"
+              ziel: [begriff]
+            # „ist ein(e)" (Alembic 0078). Zeigt auf eine **bestimmte Fassung**:
+            # „Redoxreaktion (Elektronenübergang)" ist etwas anderes als die
+            # Klasse-8-Fassung. Keine Transitivität im Datenmodell — Ketten entstehen
+            # durch Traversierung.
+            is_a:
+              label: "ist ein(e)"
+              ziel: [begriff]
           # Pflicht: Ein Begriff ohne Definition ist ein Titel, kein Baustein.
           content:
             label: "Definition"
@@ -563,10 +581,58 @@ categories:
             label: "Ab Klassenstufe"
             min: 1
             max: 13
+            # ⚠️ **Nur bei Begriffen mit mehreren Fassungen** (Entscheidung 25.09.2026).
+            # Ein Begriff, den es nur einmal gibt, braucht keine Stufe — sie stünde dann
+            # als Schranke da, wo keine gemeint ist.
             hinweis: >-
-              Für welche Stufe diese Fassung gemeint ist. „Energie" in Klasse 6
-              verlangt eine andere Definition als in Klasse 11; zwei Einträge mit
-              verschiedener Stufe sind der vorgesehene Weg dahin.
+              Nur ausfüllen, wenn es diesen Begriff in mehreren Fassungen gibt: „Energie"
+              in Klasse 6 verlangt eine andere Definition als in Klasse 11, „Oxidation"
+              in Klasse 8 eine andere als in Klasse 10. Zwei Einträge mit verschiedener
+              Stufe sind der vorgesehene Weg dahin.
+          fassung:
+            typ: text
+            label: "Fassung"
+            hinweis: >-
+              Unterscheidet gleichnamige Einträge in der Liste — „Sauerstoffaufnahme"
+              gegenüber „Elektronenabgabe". Ohne sie stünde derselbe Titel zweimal da.
+          bevorzugter_begriff:
+            typ: text
+            label: "Bevorzugte Bezeichnung"
+            hinweis: >-
+              Die an dieser Schule übliche Bezeichnung. Der Assistent antwortet damit,
+              auch wenn gefragt wurde: „Atombindung" beantwortet er als
+              „Elektronenpaarbindung".
+          genus:
+            typ: auswahl
+            label: "Artikel"
+            werte: [der, die, das]
+            hinweis: >-
+              Für Lernende, die Deutsch als Zweitsprache sprechen — und für Antworten,
+              die den Begriff im Satz beugen.
+          plural:
+            typ: text
+            label: "Mehrzahl"
+            hinweis: "Ersetzt Plural-Aliase; die Suche findet beide Formen ohnehin."
+          fehlvorstellungen:
+            typ: liste
+            label: "Häufige Irrtümer"
+            # ⚠️ **Nicht im Embedding.** Sie beschreiben, was der Begriff *nicht* ist;
+            # im Vektor zögen sie genau die Fragen an, die sie widerlegen sollen.
+            hinweis: >-
+              Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim
+              Sieden zerfällt Wasser in Wasserstoff und Sauerstoff"). Der Assistent
+              bekommt sie mit und kann sie ansprechen.
+          pruefstatus:
+            typ: auswahl
+            label: "Prüfstatus"
+            werte: [entwurf, fachlich_geprueft, freigegeben]
+            hinweis: >-
+              Wie weit der Eintrag fachlich geprüft ist. Vorbereitung für die Frage, ob
+              Schüler:innen Entwürfe sehen — heute rein informativ.
+          quelle:
+            typ: text
+            label: "Herkunft"
+            hinweis: "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und

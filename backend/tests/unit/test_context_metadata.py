@@ -227,3 +227,62 @@ class TestRelationsKonfiguration:
         )
         monkeypatch.setattr(taxonomy, "FELD_SCHEMATA", {})
         assert any("kein `label`" in b for b in pruefe_schema_konsistenz())
+
+
+
+class TestBegriffFelderAusDemFachbegriffsPilot:
+    """Die Felder aus Paket 9, AP1 — sie tragen den Pilot-Import Chemie.
+
+    ⚠️ **Geprüft wird die Wirkung, nicht die Existenz.** Ein Feld, das im Schema steht,
+    aber keinen falschen Wert abweist, ist eine Beschriftung im Editor und sonst nichts.
+    """
+
+    @pytest.mark.parametrize("wert", ["der", "die", "das"])
+    def test_genus_nimmt_die_drei_artikel(self, wert):
+        validate_node_metadata("begriff", {"genus": wert})
+
+    @pytest.mark.parametrize("wert", ["Der", "des", "the", ""])
+    def test_genus_weist_alles_andere_ab(self, wert):
+        if wert == "":
+            # Leer heißt „nicht ausgefüllt" und ist erlaubt — sonst könnte man ein
+            # optionales Auswahlfeld nie wieder leeren.
+            validate_node_metadata("begriff", {"genus": wert})
+            return
+        with pytest.raises(ValueError, match="Artikel"):
+            validate_node_metadata("begriff", {"genus": wert})
+
+    @pytest.mark.parametrize("wert", ["entwurf", "fachlich_geprueft", "freigegeben"])
+    def test_pruefstatus_kennt_die_drei_stufen(self, wert):
+        validate_node_metadata("begriff", {"pruefstatus": wert})
+
+    def test_pruefstatus_weist_erfundene_stufen_ab(self):
+        """Vorbereitung für E6: An diesem Wert hängt später die Schülersichtbarkeit."""
+        with pytest.raises(ValueError, match="Prüfstatus"):
+            validate_node_metadata("begriff", {"pruefstatus": "geprueft"})
+
+    def test_fehlvorstellungen_sind_eine_liste_von_texten(self):
+        validate_node_metadata(
+            "begriff",
+            {"fehlvorstellungen": ["Beim Sieden zerfällt Wasser in seine Elemente."]},
+        )
+
+    @pytest.mark.parametrize("wert", ["ein Satz", ["ok", 5], {"a": "b"}])
+    def test_fehlvorstellungen_weisen_anderes_ab(self, wert):
+        with pytest.raises(ValueError, match="Liste von Texten"):
+            validate_node_metadata("begriff", {"fehlvorstellungen": wert})
+
+    def test_freitextfelder_verlangen_text(self):
+        for feld in ("fassung", "bevorzugter_begriff", "plural", "quelle"):
+            validate_node_metadata("begriff", {feld: "Elektronenabgabe"})
+            with pytest.raises(ValueError, match="Text"):
+                validate_node_metadata("begriff", {feld: 42})
+
+    def test_illustrationen_bleiben_ungeprueft(self):
+        """⚠️ **Absicht, kein Versehen.** Die Feldtypen (`int|text|auswahl|liste`)
+        tragen keine Objektlisten, und ein vierter Typ nur für dieses eine Feld lohnt
+        nicht. Der Import schreibt es; der Editor zeigt es nicht an.
+        """
+        validate_node_metadata(
+            "begriff",
+            {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "…"}]},
+        )
