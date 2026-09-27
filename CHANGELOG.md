@@ -92,6 +92,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Einträgen, die seit dem letzten Mal in der Oberfläche bearbeitet wurden, je Zeile
   wählen zwischen behalten und überschreiben. Vorher konnte das nur die Administration
   über ein Skript.
+- **Vorlage und Anleitung zum Pflegen von Fachbegriffen.** Im Einspiel-Dialog führt
+  „Vorlage herunterladen“ zu einem Paket mit zwei Musterbegriffen, einem
+  Stoffsteckbrief und einer Kurzfassung des Formats — kommentiert und sofort
+  einspielbar. Die ausführliche Anleitung steht in der Hilfe unter „Fachbegriffe
+  pflegen“.
 - **Fachbegriffe lassen sich wieder herausholen.** „Als Zip“ an derselben Stelle sichert
   den Bestand eines Fachs als Markdown-Dateien samt Abbildungen — dasselbe Format, das der
   Import liest. Einzelne Einträge gehen über „Als Markdown" in der Detailansicht. Damit

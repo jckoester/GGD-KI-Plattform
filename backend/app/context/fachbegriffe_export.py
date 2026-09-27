@@ -29,6 +29,7 @@ import logging
 import re
 import zipfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import sqlalchemy as sa
@@ -56,6 +57,9 @@ logger = logging.getLogger(__name__)
 
 #: Die Hinweisdatei im Bündel. Unterstrich, damit `lies_buendel` sie übergeht.
 HINWEISE = "_Export-Hinweise.txt"
+
+#: Der Unterordner, unter dem das Format seine Abbildungen führt.
+ABB = "_Abb"
 
 #: Metadatenschlüssel, die nicht ins Frontmatter gehören, ohne dass etwas fehlte:
 #: Verwaltungsangaben des Imports und die Stub-Markierung, die der Schreibteil aus dem
@@ -449,6 +453,30 @@ def hinweisdatei(bilanz: Exportbilanz) -> Ausgabedatei:
             f"- {zeile}" for zeile in bilanz.warnungen
         ) + "\n"
     return Ausgabedatei(HINWEISE, text.encode("utf-8"))
+
+
+#: Die Musterdateien, die „Vorlage herunterladen" ausliefert (AP6).
+#:
+#: ⚠️ **Sie liegen als echte Dateien neben dem Code, nicht als Zeichenketten darin.**
+#: Eine Vorlage, die man nicht in Obsidian öffnen kann, ist als Vorlage nicht zu
+#: beurteilen — und `tests/` spielt genau diese Dateien ein und besteht auf null
+#: Warnungen. Ein Format, das sich ändert, macht die Vorlage rot statt sie veralten zu
+#: lassen.
+VORLAGE = Path(__file__).resolve().parent / "templates" / "fachbegriffe"
+
+
+def vorlage() -> list[Ausgabedatei]:
+    """Die Musterdateien als Bündel — flach plus `_Abb/`, wie der Import sie erwartet."""
+    dateien = [
+        Ausgabedatei(pfad.name, pfad.read_bytes())
+        for pfad in sorted(VORLAGE.glob("*.md"))
+    ]
+    dateien += [
+        Ausgabedatei(f"{ABB}/{pfad.name}", pfad.read_bytes())
+        for pfad in sorted((VORLAGE / ABB).glob("*"))
+        if pfad.is_file()
+    ]
+    return dateien
 
 
 def als_zip(dateien: list[Ausgabedatei]) -> bytes:

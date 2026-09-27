@@ -34,6 +34,7 @@ export const helpNav = [
     { label: 'KI-Ergebnisse zitieren', slug: 'zitieren',         file: 'zitieren' },
     { label: 'Fächer und Gruppen',  slug: 'faecher',             file: 'faecher' },
     { label: 'Kontextspeicher',     slug: 'kontext',             file: 'kontext' },
+    { label: 'Fachbegriffe pflegen', slug: 'fachbegriffe-pflegen', file: 'fachbegriffe-pflegen', fuer: 'teacher' },
     { label: 'Schulcurriculum',     slug: 'curriculum',          file: 'curriculum', fuer: 'teacher' },
     { label: 'Unterrichtsplanung',  slug: 'unterrichtsplanung',  file: 'unterrichtsplanung', fuer: 'teacher' },
     { label: 'Stundenplan übernehmen', slug: 'stundenplan',      file: 'stundenplan', fuer: 'teacher' },

@@ -2368,3 +2368,24 @@ async def knoten_als_markdown(
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{datei.pfad}"'},
     )
+
+
+@router.get("/fachbegriffe/vorlage")
+async def fachbegriff_vorlage(
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> Response:
+    """Musterdateien zum Loslegen — zwei Fassungen eines Begriffs und ein Steckbrief.
+
+    Ohne Fach und ohne Fachschaftsprüfung: Das ist eine Anleitung, kein Bestand. Wer
+    wissen will, wie das Format aussieht, soll es ansehen können, bevor er irgendwo
+    Mitglied ist.
+    """
+    from app.context.fachbegriffe_export import als_zip, vorlage
+
+    return Response(
+        content=als_zip(vorlage()),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="fachbegriffe-vorlage.zip"'
+        },
+    )

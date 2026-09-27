@@ -10,7 +10,7 @@
      * Darstellung. Warum getrennt: Welche Zeile eine Frage stellt und wann „einspielen"
      * überhaupt lohnt, sind Entscheidungen — die prüft das Projekt im Modul.
      */
-    import { Upload, Loader2, ExternalLink } from "lucide-svelte";
+    import { Upload, Loader2, ExternalLink, FileDown } from "lucide-svelte";
     import { importiereFachbegriffe } from "$lib/api.js";
     import {
         brauchtEinbettung,
@@ -114,6 +114,29 @@
                     {dateien.length === 1 ? "Datei" : "Dateien"} gewählt
                 </p>
             {/if}
+            <!--
+                Ein schlichter Link, kein `fetch`: Der Browser schickt das Sitzungscookie
+                von selbst mit, und es gibt nichts zu parametrieren. Ein Umweg über
+                `api.js` brächte hier nur eine Fehlerbehandlung für einen Fall, den es
+                nicht gibt — wer den Dialog offen hat, ist Lehrkraft.
+            -->
+            <p class="mt-3 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                Noch keine Dateien?
+                <a
+                    href="/api/context/fachbegriffe/vorlage"
+                    download
+                    class="text-light-bl dark:text-dark-bl hover:underline
+                           inline-flex items-center gap-1"
+                >
+                    <FileDown size="12" /> Vorlage herunterladen
+                </a>
+                — zwei Musterbegriffe, ein Stoffsteckbrief und eine Kurzfassung des
+                Formats. Ausführlich in der
+                <a
+                    href="/help/fachbegriffe-pflegen"
+                    class="text-light-bl dark:text-dark-bl hover:underline"
+                >Hilfe</a>.
+            </p>
         {/if}
 
         {#if fehler}

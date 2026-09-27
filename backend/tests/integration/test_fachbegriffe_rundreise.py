@@ -389,3 +389,91 @@ class TestEinzelnerKnoten:
         dateien, _ = await export.exportiere(db_session, testfach, nur=alpha_id)
         assert [d.pfad for d in dateien] == ["Alpha.md"]
         assert "[[Ober]]" in dateien[0].inhalt.decode()
+
+
+class TestVorlage:
+    """Die Musterdateien aus „Vorlage herunterladen" (AP6).
+
+    ⚠️ **Eine Vorlage, die das Format nicht mehr trifft, ist schlimmer als keine:** Wer
+    ihr folgt, bekommt Warnungen und sucht den Fehler bei sich. Deshalb wird sie hier
+    nicht angesehen, sondern **eingespielt**.
+    """
+
+    async def test_laesst_sich_ohne_eine_einzige_warnung_einspielen(
+        self, seed, export, db_session, testfach
+    ):
+        buendel = {d.pfad: d.inhalt for d in export.vorlage()}
+        bilanz = await seed.importiere(db_session, buendel, nur_fach=testfach)
+        await db_session.flush()
+        assert bilanz.warnungen == [], bilanz.warnungen
+        assert bilanz.neu == 3
+
+    async def test_zeigt_beide_knotentypen_und_zwei_fassungen(
+        self, seed, export, db_session, testfach
+    ):
+        """Der Plan verlangt genau das: ein Begriff in zwei Fassungen und ein
+        Steckbrief. Zwei Fassungen sind die Stelle, an der das Format etwas kann, was
+        man ihm nicht ansieht — ohne Beispiel baut es niemand nach."""
+        buendel = {d.pfad: d.inhalt for d in export.vorlage()}
+        await seed.importiere(db_session, buendel, nur_fach=testfach)
+        await db_session.flush()
+        zeilen = (await db_session.execute(
+            sa.select(ContextNode.title, ContextNode.content_type,
+                      ContextNode.metadata_["fassung"].astext)
+            .where(ContextNode.subject_id == testfach.id,
+                   ContextNode.content_type.in_(("begriff", "stoffsteckbrief")))
+            .order_by(ContextNode.title)
+        )).all()
+        typen = {t for _n, t, _f in zeilen}
+        assert typen == {"begriff", "stoffsteckbrief"}
+        fassungen = sorted(f for n, _t, f in zeilen if n == "Energie")
+        assert fassungen == ["Erhaltung", "Grundfassung"]
+
+    async def test_die_beispiele_verweisen_aufeinander(
+        self, seed, export, db_session, testfach
+    ):
+        """Ein Verweis, der ins Leere zeigt, wäre in einer Vorlage ein Stolperstein:
+        Der Bericht meldete ihn, und die Fachschaft hielte ihn für ihren Fehler."""
+        buendel = {d.pfad: d.inhalt for d in export.vorlage()}
+        bilanz = await seed.importiere(db_session, buendel, nur_fach=testfach)
+        await db_session.flush()
+        assert bilanz.offene_ziele == {}, dict(bilanz.offene_ziele)
+        assert bilanz.kanten > 0
+
+    async def test_die_abbildung_kommt_mit(self, seed, export, db_session, testfach):
+        buendel = {d.pfad: d.inhalt for d in export.vorlage()}
+        await seed.importiere(db_session, buendel, nur_fach=testfach)
+        await db_session.flush()
+        metadata = (await db_session.execute(
+            sa.select(ContextNode.metadata_).where(
+                ContextNode.subject_id == testfach.id,
+                ContextNode.metadata_["fassung"].astext == "Grundfassung",
+            )
+        )).scalar_one()
+        assert metadata["illustrationen"][0]["svg"].startswith("<svg")
+
+    async def test_die_erklaerdatei_wird_uebergangen(self, seed, export, db_session):
+        """`_Format.md` fährt mit, ohne ein Knoten zu werden — der Unterstrich hält sie
+        draußen, so wie beim Beipackzettel des Exports."""
+        pfade = [d.pfad for d in export.vorlage()]
+        assert "_Format.md" in pfade
+        bilanz = seed.Bilanz()
+        gelesen = seed.lies_buendel(
+            {d.pfad: d.inhalt for d in export.vorlage() if d.pfad.startswith("_")},
+            bilanz,
+        )
+        assert gelesen == [] and bilanz.warnungen == []
+
+    async def test_ueberlebt_die_rundreise(self, seed, export, db_session, testfach):
+        """Was die Vorlage zeigt, muss der Export genauso wieder hergeben — sonst
+        lehrt sie ein Format, das die Plattform selbst nicht schreibt."""
+        buendel = {d.pfad: d.inhalt for d in export.vorlage()}
+        await seed.importiere(db_session, buendel, nur_fach=testfach)
+        await db_session.flush()
+        dateien, exportbilanz = await export.exportiere(db_session, testfach)
+        zweit = await seed.importiere(
+            db_session, {d.pfad: d.inhalt for d in dateien}, nur_fach=testfach
+        )
+        await db_session.flush()
+        assert exportbilanz.warnungen == []
+        assert (zweit.neu, zweit.aktualisiert, zweit.kanten_geaendert) == (0, 0, 0)

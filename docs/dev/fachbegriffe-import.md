@@ -340,6 +340,25 @@ Kante mit mehreren Lesarten (`arten`, etwa Vertiefung **und** Abgrenzung) wird u
 **jeder** davon geschrieben — nur die Gewinner-Art zurückzuschreiben verlöre die andere
 bei jedem Rundgang.
 
+## Die Vorlage
+
+„Vorlage herunterladen" im Dialog liefert
+`GET /context/fachbegriffe/vorlage` — die Dateien aus
+`app/context/templates/fachbegriffe/`: zwei Fassungen eines Begriffs, ein
+Stoffsteckbrief, eine Abbildung und `_Format.md` als Kurzfassung.
+
+⚠️ **Sie liegen als echte Dateien neben dem Code, nicht als Zeichenketten darin** — und
+`tests/integration/test_fachbegriffe_rundreise.py` **spielt sie ein** statt sie
+anzusehen: drei neue Knoten, null Warnungen, keine offenen Ziele, und der Rundgang
+Export→Import geht auf. Eine Vorlage, die das Format nicht mehr trifft, ist schlimmer
+als keine: Wer ihr folgt, bekommt Warnungen und sucht den Fehler bei sich.
+
+Die Kurzfassung in `_Format.md` und die Anwenderdoku
+[`docs/user/fachbegriffe-pflegen.md`](../user/fachbegriffe-pflegen.md) sagen teils
+dasselbe. Bewusst: Die eine liegt beim Bearbeiten daneben, die andere in der Anwendung.
+Die Kurzfassung bleibt kurz und verweist am Anfang auf die andere — wer etwas Neues
+erklärt, tut es dort.
+
 ## Zusammenhänge
 
 - **Der Import ist die Freigabe.** Es gibt keinen Entwurfszustand; was eingespielt wird,

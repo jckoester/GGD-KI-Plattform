@@ -770,3 +770,58 @@ class TestEinzelneDateiHerunterladen:
             f"/context/nodes/{node_id}/markdown", headers=fachschaft_headers
         )
         assert antwort.status_code == 404
+
+
+class TestVorlageHerunterladen:
+    """„Vorlage herunterladen" im Dialog (AP6)."""
+
+    @pytest.mark.asyncio
+    async def test_liefert_ein_zip_mit_mustern(self, test_client, fachschaft_headers):
+        antwort = await test_client.get(
+            "/context/fachbegriffe/vorlage", headers=fachschaft_headers
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.headers["content-type"] == "application/zip"
+        with zipfile.ZipFile(io.BytesIO(antwort.content)) as archiv:
+            namen = archiv.namelist()
+        assert "_Format.md" in namen
+        assert any(n.startswith("_Abb/") for n in namen)
+        assert len([n for n in namen if n.endswith(".md") and not n.startswith("_")]) == 3
+
+    @pytest.mark.asyncio
+    async def test_ohne_fach_und_ohne_fachschaft(
+        self, test_client, fremde_headers
+    ):
+        """Eine Anleitung, kein Bestand: Wer wissen will, wie das Format aussieht, soll
+        es ansehen können, bevor er irgendwo Mitglied ist."""
+        antwort = await test_client.get(
+            "/context/fachbegriffe/vorlage", headers=fremde_headers
+        )
+        assert antwort.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_nicht_fuer_schuelerinnen(self, test_client, schuelerin_headers):
+        antwort = await test_client.get(
+            "/context/fachbegriffe/vorlage", headers=schuelerin_headers
+        )
+        assert antwort.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_die_vorlage_laesst_sich_sofort_einspielen(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        """⚠️ **Der Weg, den eine Lehrkraft wirklich geht:** herunterladen, hochladen,
+        ansehen. Dass die Dateien zum Format passen, prüft der Modultest; dass sie
+        **durch beide Endpunkte** kommen, nur dieser."""
+        vorlage = await test_client.get(
+            "/context/fachbegriffe/vorlage", headers=fachschaft_headers
+        )
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("fachbegriffe-vorlage.zip", vorlage.content)],
+            headers=fachschaft_headers,
+        )
+        bericht = antwort.json()
+        assert bericht["neu"] == 3, bericht
+        assert bericht["warnungen"] == [], bericht["warnungen"]
+        assert len(_knoten(sync_conn, fach["id"])) == 3
