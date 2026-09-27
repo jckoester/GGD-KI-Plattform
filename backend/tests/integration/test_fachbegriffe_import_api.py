@@ -192,13 +192,22 @@ class TestWerImportierenDarf:
 
     @pytest.mark.asyncio
     async def test_fremde_lehrkraft_nicht(self, test_client, fach, fremde_headers):
-        """Lehrkraft ja — aber nicht in dieser Fachschaft."""
+        """Lehrkraft ja — aber nicht in dieser Fachschaft.
+
+        ⚠️ Die **Meldung** ist mitgeprüft, nicht nur der Status. „Nur die Fachschaft
+        kann das" liest eine Chemielehrkraft als Widerspruch: Sie *ist* in der
+        Fachschaft, nur nicht in der Gruppe, aus der die Plattform das ableitet. Ohne
+        Ursache und Fach in der Meldung sucht sie den Fehler bei sich.
+        """
         antwort = await test_client.post(
             PFAD, params={"fach": fach["slug"]},
             files=[_datei("Alpha.md", _md("Alpha"))], headers=fremde_headers,
         )
         assert antwort.status_code == 403
-        assert "Fachschaft" in antwort.json()["detail"]
+        meldung = antwort.json()["detail"]
+        assert "Fachschaftsgruppe" in meldung
+        assert "Importfach" in meldung, "das betroffene Fach fehlt"
+        assert "Schulkonto" in meldung, "der Grund fehlt"
 
     @pytest.mark.asyncio
     async def test_die_eigene_fachschaft_ja(self, test_client, fach, fachschaft_headers):

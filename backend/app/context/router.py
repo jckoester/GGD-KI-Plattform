@@ -2206,10 +2206,17 @@ async def _fach_mit_schreibrecht(
     if "admin" in user.roles:
         return treffer
     if not await is_subject_department_member(db, treffer.id, user.sub):
+        # ⚠️ **Die Ursache gehört in die Meldung.** „Nur die Fachschaft kann das" liest
+        # eine Chemielehrkraft als Widerspruch — sie *ist* in der Fachschaft, nur eben
+        # nicht in der SSO-Gruppe, aus der die Plattform das ableitet. Ohne den Zusatz
+        # sucht sie den Fehler bei sich und meldet einen Bug.
         raise HTTPException(
             status_code=403,
-            detail=f"Nur die Fachschaft {treffer.name} kann dort Fachbegriffe "
-                   "einspielen.",
+            detail=(
+                f"Dafür braucht es die Fachschaftsgruppe von {treffer.name}. Die "
+                "Plattform übernimmt sie aus dem Schulkonto; fehlt sie oder sind Sie "
+                "nicht darin, hilft die Administration weiter."
+            ),
         )
     return treffer
 

@@ -29,9 +29,13 @@ Beides finden Sie unter **Fächer → Ihr Fach → „weiterer Kontext"**:
 
 Einen einzelnen Eintrag holen Sie in seiner Detailansicht über **Als Markdown** heraus.
 
-**Wer darf das?** Lehrkräfte des Fachs — genauer: wer in der Fachschaftsgruppe des Fachs
-ist. Eine Rolle „Fachschaftsleitung" gibt es nicht; innerhalb der Fachschaft sind alle
-gleichberechtigt.
+**Wer darf das?** Lehrkräfte des Fachs — genauer: wer in der **Fachschaftsgruppe** des
+Fachs ist. Eine Rolle „Fachschaftsleitung" gibt es nicht; innerhalb der Fachschaft sind
+alle gleichberechtigt.
+
+> Die Fachschaftsgruppe übernimmt die Plattform aus Ihrem Schulkonto. Wenn Sie das Fach
+> unterrichten, die Schaltfläche aber mit einer Absage antwortet, fehlt diese Gruppe —
+> das ist eine Sache der Administration, nicht Ihres Kontos.
 
 ## Eine Datei ist ein Eintrag
 

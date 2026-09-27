@@ -109,6 +109,13 @@ Wenn der SSO-Provider Gruppen für Fachschaften, Schulklassen und
 Unterrichtsgruppen liefert, wertet die Plattform diese beim Login aus. Dafür müssen die
 Gruppennamen in `auth.yaml` unter `sso.groups` als Regex-Muster konfiguriert sein.
 
+⚠️ **Ohne Fachschaftsgruppe kein Fachbegriff-Import.** Wer Fachbegriffe als Dateien
+einspielen oder exportieren will, muss Mitglied der `subject_department`-Gruppe des
+Fachs sein — die Rolle „Lehrkraft" genügt nicht. Fehlt die SSO-Gruppe `FS.<Fach>`,
+erscheint die Schaltfläche zwar, jeder Versuch endet aber mit einer Absage. Prüfen
+lässt sich der Stand unter `/settings/users`; die Meldung nennt das Fach, um das es
+geht. Siehe [Fachbegriffe pflegen](../user/fachbegriffe-pflegen.md).
+
 ⚠️ **Angelegt werden sie nicht alle gleich.** Fachschaften, Schulklassen, Lehrkräfte- und
 Arbeitsgruppen entstehen automatisch. **Unterrichtsgruppen nicht** — sie werden der
 Lehrkraft als *Angebot* vorgelegt (siehe unten). Bis zum 23.09.2026 entstanden auch sie
