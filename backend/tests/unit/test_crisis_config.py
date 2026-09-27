@@ -43,6 +43,28 @@ def test_load_crisis_triggers_real_file():
     assert all(t.coreviewer_role == "review" for t in cfg.triggers)
 
 
+def test_kein_steuerzeichen_in_den_mustern():
+    r"""⚠️ **Stumme YAML-Falle.** In doppelten Anführungszeichen ist `\b` das
+    Steuerzeichen Backspace, nicht die Regex-Wortgrenze — das Muster läuft dann ohne
+    Fehlermeldung ins Leere.
+
+    Bei den Hausversuchs-Auslösern (Paket 9, Schritt 2c) ist genau das passiert: „Wie
+    stelle ich Wasserstoff her?" löste nichts aus, und niemand hätte es bemerkt.
+    `crisis_triggers.yaml` verwendet dieselbe Schreibweise; heute steht dort zufällig
+    kein Backslash — aber hier geht es um Muster, deren Versagen eine Notlage
+    übersieht. Ein Wächter ist billiger als der Zufall.
+
+    Wer einen Backslash braucht, nimmt einfache Anführungszeichen.
+    """
+    for trigger in load_crisis_triggers().triggers:
+        for muster in trigger.patterns:
+            steuer = [c for c in muster if ord(c) < 32]
+            assert not steuer, (
+                f"Steuerzeichen {steuer!r} in {trigger.category}/{muster!r} — "
+                "einfache Anführungszeichen nehmen"
+            )
+
+
 def test_load_help_resources_real_file():
     res = load_help_resources()
     assert "crisis" in res.topics

@@ -7,6 +7,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Ein Assistent, der für eine Unterrichtsgruppe freigegeben ist, erscheint nur noch
+  dort.** Bisher sahen ihn auch Schüler:innen anderer Gruppen, und über seine Adresse
+  ließ er sich sogar benutzen — die Freigabe war eine Beschriftung, keine
+  Einschränkung. Dasselbe galt für private Assistenten. Umgekehrt fehlte er der
+  Lehrkraft, die ihn angelegt hatte: Sie findet ihn jetzt wieder, ebenso die Lehrkräfte
+  der Gruppe.
+- **„Neuer Chat“ auf der Fachseite behält das Fach.** Die Unterhaltung entstand bisher
+  ohne Fachbezug — mit spürbaren Folgen: Die Suche gewichtete das Fach nicht, die
+  Bildungsplan-Fassung wurde nicht gewählt, das Operatoren-Werkzeug antwortete gar
+  nicht, und in der Historie stand der Chat ohne Zuordnung.
+
 - **Assistenten lesen die Einträge aus dem Wissensspeicher nach festen Regeln.** Vor
   jedem Kontextblock steht jetzt, wie sie zu verwenden sind: die bevorzugte Bezeichnung
   statt des Suchbegriffs, vermerkte Irrtümer ansprechen statt aufzählen, Zahlenwerte und
@@ -241,6 +252,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Halbjahr auf Wunsch **vorläufig** aus dem jetzigen Raster — damit die Jahresplanung
   über den Halbjahreswechsel hinweg Termine hat. Wählbar in der Sammelübernahme und im
   Wochenmuster-Dialog; vorbelegt, solange das 1. Halbjahr läuft.
+
+
+### Migration
+
+⚠️ **`0080` löscht Daten — vorher sichern.** Sie entfernt archivierte
+Bildungsplan-Knoten, die nur deshalb archiviert sind, weil der Scraper sein
+ID-Schema geändert hat: derselbe Inhalt steht aktiv unter neuer ID daneben. Betroffen
+sind im Produktivsystem wie im Entwicklungsbaum ausschließlich Mathematik `2016.V2`
+(je 326 Zeilen).
+
+Der Lauf ist selbstbegrenzend — er fasst nur an, was einen **aktiven Zwilling gleicher
+Nummer in derselben Edition** hat, auf das **keine Kante** zeigt und was in **keinem
+Chat** angeheftet ist. Die Knoten der Basisfassung bleiben deshalb stehen; dort ist die
+ganze Edition abgelöst, und das ist der legitime Fall.
+
+**Rückrollbar ist das nicht:** Der Scraper erzeugt die alte Schreibweise nicht mehr, ein
+erneuter Import bringt sie also nicht zurück. Der einzige Weg zurück ist die Sicherung
+(→ [Updates und Wartung](docs/admin/updates-und-wartung.md)).
 
 ### Geändert
 

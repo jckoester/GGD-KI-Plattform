@@ -36,23 +36,12 @@ def _get_assistant_schema() -> dict:
 
 
 # ── Visibility Check ─────────────────────────────────────────────────────────
-
-def _is_visible_for_user(assistant: Assistant, roles: list[str]) -> bool:
-    if assistant.status != "active":
-        return False
-    now = datetime.now(timezone.utc)
-    if assistant.available_from and assistant.available_from > now:
-        return False
-    if assistant.available_until and assistant.available_until < now:
-        return False
-    match assistant.audience:
-        case "all":
-            return True
-        case "student":
-            return "student" in roles
-        case "teacher":
-            return "teacher" in roles or "admin" in roles
-    return False
+#
+# ⚠️ **Die Regel steht in `app/assistants/sichtbarkeit.py`**, nicht mehr hier. Bis zum
+# 27.09.2026 gab es sie zweimal: als Funktion für den Chat (nur Zielgruppe und
+# Zeitfenster) und als SQL-Bedingung für diese Liste (zusätzlich `private`). Die
+# Scopes kannte keine von beiden — eine Freigabe „für diese Unterrichtsgruppe" war
+# deshalb keine Einschränkung.
 
 
 # ── Common Schemas ───────────────────────────────────────────────────────────
@@ -565,30 +554,12 @@ async def list_assistants(
     current_user: JwtPayload = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AssistantListResponse:
-    roles = current_user.roles
-    is_student = "student" in roles
-    is_teacher = "teacher" in roles or "admin" in roles
-    now = datetime.now(timezone.utc)
+    from app.assistants.sichtbarkeit import lade_zugang, sichtbar_klausel
 
+    zugang = await lade_zugang(db, current_user)
     stmt = (
         select(Assistant)
-        .where(
-            and_(
-                Assistant.status == "active",
-                or_(Assistant.available_from.is_(None), Assistant.available_from <= now),
-                or_(Assistant.available_until.is_(None), Assistant.available_until >= now),
-                or_(
-                    Assistant.audience == "all",
-                    and_(Assistant.audience == "student", is_student),
-                    and_(Assistant.audience == "teacher", is_teacher),
-                ),
-                # private-Scope: nur fuer den Ersteller sichtbar
-                or_(
-                    Assistant.scope != "private",
-                    Assistant.created_by == current_user.sub,
-                ),
-            )
-        )
+        .where(sichtbar_klausel(zugang))
         .order_by(Assistant.sort_order.asc(), Assistant.name.asc())
     )
 

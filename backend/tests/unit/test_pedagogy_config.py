@@ -144,3 +144,62 @@ class TestSchuelerPraeambelN8:
             assert {int(von), int(bis)} <= nummern, (
                 f"Verweis auf Punkte {von}–{bis}, vorhanden sind {sorted(nummern)}"
             )
+
+
+class TestSicherheitsanker:
+    """Sicherheitsrelevante Grundsätze dürfen nicht lautlos verschwinden.
+
+    ⚠️ **Der Befund** (26.09.2026, bei Paket 9 Nachgang Schritt 5): Weder der
+    Krisen-Grundsatz in `universal_base` noch die Heimversuchs-Regel in
+    `student_extension` war durch einen Test gedeckt. Wer sie beim Kürzen streicht,
+    merkt nichts — und beide sind der Grund, warum es die Präambeln überhaupt gibt.
+
+    Ein Test auf den Wortlaut wäre falsch gewesen: Er bräche bei jeder Redaktion
+    (zwei solche Tests hat die Umarbeitung der Schüler-Präambel umgeworfen). Geprüft
+    wird deshalb ein **Anker** — der Satzanfang, der in `pedagogy.yaml` neben dem Text
+    steht. Wer umformuliert, ändert ihn mit; wer streicht, wird rot.
+    """
+
+    def _zusammengesetzt(self, *, student_treatment: bool) -> str:
+        from app.pedagogy.compose import compose_system_content
+
+        return compose_system_content(
+            load_pedagogy(),
+            student_treatment=student_treatment,
+            context_str=None,
+            assistant_system_prompt=None,
+        )
+
+    def test_es_gibt_ueberhaupt_anker(self):
+        """Eine leere Liste bestünde jeden Test unten — und schützte nichts."""
+        anker = load_pedagogy().sicherheitsanker
+        schluessel = {a.schluessel for a in anker}
+        assert {"krise", "hausversuche"} <= schluessel, schluessel
+
+    def test_jeder_anker_steht_in_seiner_zielgruppe(self):
+        fuer_schueler = self._zusammengesetzt(student_treatment=True)
+        fuer_lehrkraft = self._zusammengesetzt(student_treatment=False)
+        for a in load_pedagogy().sicherheitsanker:
+            assert a.anker in fuer_schueler, (
+                f'„{a.schluessel}“ fehlt im Schülertext — {a.warum}'
+            )
+            if a.gilt_fuer == "alle":
+                assert a.anker in fuer_lehrkraft, (
+                    f'„{a.schluessel}“ gilt für alle, fehlt aber im Lehrkrafttext'
+                )
+
+    def test_schueler_anker_stehen_nicht_bei_lehrkraeften(self):
+        """Gegenprobe zur Zeile darüber: Stünde alles überall, sagte sie nichts."""
+        fuer_lehrkraft = self._zusammengesetzt(student_treatment=False)
+        nur_schueler = [
+            a for a in load_pedagogy().sicherheitsanker if a.gilt_fuer == "schueler"
+        ]
+        assert nur_schueler, "ohne einen solchen Anker belegt dieser Fall nichts"
+        for a in nur_schueler:
+            assert a.anker not in fuer_lehrkraft, a.schluessel
+
+    def test_gilt_fuer_kennt_nur_zwei_werte(self):
+        """Ein Tippfehler („schuler“) machte den Anker wirkungslos — er würde dann
+        weder als „alle" noch als „schueler" geprüft."""
+        for a in load_pedagogy().sicherheitsanker:
+            assert a.gilt_fuer in ("alle", "schueler"), (a.schluessel, a.gilt_fuer)

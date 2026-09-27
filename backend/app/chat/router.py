@@ -56,7 +56,7 @@ from app.chat.image_store import (
 )
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
-from app.api.assistants import _is_visible_for_user
+from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
 from app.context.service import get_context_for_query, stufe_der_person
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
@@ -1596,6 +1596,51 @@ def _crisis_sse_event(record: Optional[_CrisisRecord]) -> Optional[str]:
     return f"event: crisis\ndata: {json.dumps(payload)}\n\n"
 
 
+async def assistent_fuer_chat(
+    db: AsyncSession,
+    assistant_id: int,
+    user: JwtPayload,
+    *,
+    testlauf: bool,
+) -> Assistant:
+    """Den Assistenten laden und den Zugang prüfen — der **eine** Weg in den Chat.
+
+    ⚠️ **Bis zum 27.09.2026 gab es ihn zweimal.** Zwei Zweige laden hier einen
+    Assistenten (neues Gespräch und Wechsel mittendrin), und beide fragten auf ihre
+    Weise — der eine mit Testlauf-Sonderfall, der andere ohne. Keiner von beiden kannte
+    die Scopes: Wer die ID kannte, konnte einen Assistenten benutzen, der für eine
+    fremde Unterrichtsgruppe freigegeben war, und sogar einen **privaten**.
+
+    Eine Prüfung, die es zweimal gibt, ist eine, die einmal vergessen wird. Die Regel
+    selbst steht in :mod:`app.assistants.sichtbarkeit` und gilt auch für die Liste.
+
+    ``testlauf`` ist der Vorschaumodus aus dem Editor (ADR-016): Dort darf eine
+    Lehrkraft den **eigenen** Assistenten auch dann starten, wenn er noch nicht aktiv
+    ist — deshalb prüft er Rolle und Eigentum statt der Sichtbarkeit.
+    """
+    assistant = (await db.execute(
+        select(Assistant).where(Assistant.id == assistant_id)
+    )).scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+
+    if testlauf:
+        ist_admin = "admin" in user.roles
+        if not ist_admin and "teacher" not in user.roles:
+            raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
+        if assistant.status != "active" and not ist_admin:
+            if assistant.created_by != user.sub:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Nur der Ersteller kann diesen Assistenten testen",
+                )
+        return assistant
+
+    if not darf_nutzen(assistant, await lade_zugang(db, user)):
+        raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+    return assistant
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -1636,27 +1681,13 @@ async def chat(
     if is_new:
         assistant: Optional[Assistant] = None
         if request.assistant_id is not None:
-            asst_result = await db.execute(
-                select(Assistant).where(Assistant.id == request.assistant_id)
-            )
-            assistant = asst_result.scalar_one_or_none()
-            if assistant is None:
+            try:
+                assistant = await assistent_fuer_chat(
+                    db, request.assistant_id, current_user, testlauf=request.is_test
+                )
+            except HTTPException:
                 await client.aclose()
-                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-            if request.is_test:
-                is_admin = "admin" in current_user.roles
-                is_teacher = "teacher" in current_user.roles
-                if not is_admin and not is_teacher:
-                    await client.aclose()
-                    raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
-                # Nicht-aktive Assistenten: nur Ersteller oder Admin darf testen
-                if assistant.status != "active" and not is_admin:
-                    if assistant.created_by != current_user.sub:
-                        await client.aclose()
-                        raise HTTPException(status_code=403, detail="Nur der Ersteller kann diesen Assistenten testen")
-            elif not _is_visible_for_user(assistant, current_user.roles):
-                await client.aclose()
-                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+                raise
             system_prompt_snapshot = assistant.system_prompt
             # Leeres Assistenten-Modell = „schulweiter Standard" → `model_used` behält den
             # Wert aus CHAT_DEFAULT_MODEL. Ohne die Leerprüfung ginge ein leerer Modellname
@@ -1726,16 +1757,17 @@ async def chat(
 
         # 2-1: Assistentenwechsel mid-Chat
         if request.assistant_id is not None:
-            asst_result = await db.execute(
-                select(Assistant).where(Assistant.id == request.assistant_id)
-            )
-            new_assistant = asst_result.scalar_one_or_none()
-            if new_assistant is None:
+            try:
+                # ⚠️ `testlauf=False`, auch wenn die Anfrage `is_test` trägt: Ein
+                # Testchat beginnt ein neues Gespräch und läuft damit über den Zweig
+                # oben. Hier `request.is_test` durchzureichen änderte das Verhalten
+                # eines Weges, um den es in diesem Befund nicht geht.
+                new_assistant = await assistent_fuer_chat(
+                    db, request.assistant_id, current_user, testlauf=False
+                )
+            except HTTPException:
                 await client.aclose()
-                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-            if not _is_visible_for_user(new_assistant, current_user.roles):
-                await client.aclose()
-                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+                raise
 
             system_prompt_snapshot = new_assistant.system_prompt
             active_assistant_id = new_assistant.id
