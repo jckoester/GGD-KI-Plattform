@@ -19,6 +19,26 @@
 export const IMPORTIERBARE_TYPEN = ["begriff", "stoffsteckbrief"];
 
 /**
+ * Stehen „Aus Dateien" und „Als Zip" an dieser Stelle zur Verfügung?
+ *
+ * Zwei Bedingungen, und beide sind leicht zu vergessen:
+ *
+ * 1. **Ein Fach muss feststehen.** Die Werkzeuge gehören einer Fachschaft; ohne Fach
+ *    wüsste weder die Oberfläche, wohin, noch das Backend, wessen Rechte zu prüfen
+ *    sind. ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge` ganz ohne Fach — dort
+ *    darf der Knopf nicht auftauchen, und das sieht man der Komponente nicht an.
+ * 2. **Lehrkraft.** Die Sammlungen stehen auch Schüler:innen offen; das Einspielen
+ *    nicht. (Admin ist eine Erweiterung der Lehrkraft-Rolle, siehe CLAUDE.md — deshalb
+ *    genügt die Prüfung auf `teacher`.)
+ *
+ * Das Backend prüft beides noch einmal und schärfer (Mitgliedschaft in der
+ * Fachschaft); hier geht es nur darum, keinen Knopf zu zeigen, der mit 403 antwortet.
+ */
+export function zeigeDateiwerkzeuge(fach, rollen) {
+  return Boolean(fach) && (rollen ?? []).includes("teacher");
+}
+
+/**
  * Die fünf Zustände, in der Reihenfolge, in der sie jemanden interessieren.
  *
  * ⚠️ **Handänderungen zuerst.** Sie sind das Einzige, wozu die Vorschau eine Frage

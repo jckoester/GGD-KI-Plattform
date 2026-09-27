@@ -10,17 +10,21 @@
     import { auswaehlbareTypOptionen } from "$lib/knotentypen.js";
     import { STUDENT_GRADES as studentGrades } from "$lib/grades.js";
     import {
+        exportiereFachbegriffe,
         getContextNodes,
         updateContextNode,
         deleteContextNode,
     } from "$lib/api.js";
+    import { zeigeDateiwerkzeuge } from "$lib/fachbegriffe_import.js";
+    import { user } from "$lib/stores/user.js";
+    import FachbegriffImportDialog from "./FachbegriffImportDialog.svelte";
     import ErrorBanner from "./ErrorBanner.svelte";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { renderInlineMath } from "$lib/markdown.js";
     import NodeTypeIcon from "./NodeTypeIcon.svelte";
     import SubjectIcon from "./SubjectIcon.svelte";
-    import { Anchor, Archive, Trash2 } from "lucide-svelte";
+    import { Anchor, Archive, Trash2, Download, Upload } from "lucide-svelte";
 
     let {
         fixedSubjectSlug = null, // gesetzt im Subject-Kontext-Tab
@@ -30,7 +34,35 @@
         onNodeClick = null, // optional: callback statt goto
         initialGrade = null, // voreingestellte Jahrgangsstufe
         excludeContentTypes = [], // Content-Typen, die ausgeblendet werden sollen
+        /**
+         * Das Fach, in das Fachbegriffe eingespielt werden dürfen — oder `null`.
+         *
+         * ⚠️ **Ein Prop, kein fester Einbau.** Dieselbe Komponente steht unter
+         * `/knowledge` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe,
+         * nicht die Fachschaft). Nur die Fachseite gibt es mit; die Regel dahinter
+         * steht in `zeigeDateiwerkzeuge()`.
+         */
+        importFach = null,
     } = $props();
+
+    const dateiwerkzeuge = $derived(
+        zeigeDateiwerkzeuge(importFach, $user?.roles),
+    );
+    let importDialog = $state(false);
+    let exportLaeuft = $state(false);
+    let werkzeugFehler = $state(null);
+
+    async function exportieren() {
+        exportLaeuft = true;
+        werkzeugFehler = null;
+        try {
+            await exportiereFachbegriffe(importFach.slug);
+        } catch (e) {
+            werkzeugFehler = e.message;
+        } finally {
+            exportLaeuft = false;
+        }
+    }
 
     let nodes = $state([]);
     let loading = $state(false);
@@ -360,6 +392,30 @@
         {/each}
     </select>
 
+    <!-- Fachbegriffe als Dateien: nur auf der Fachseite (AP8) -->
+    {#if dateiwerkzeuge}
+        <button
+            onclick={exportieren}
+            disabled={exportLaeuft}
+            title="Alle Fachbegriffe und Stoffsteckbriefe aus {importFach.name} als Zip
+                   sichern — dieselben Dateien, die der Import liest"
+            class="ml-auto px-3 py-1.5 text-sm rounded-md border border-light-ui-3
+                   dark:border-dark-ui-3 text-light-tx dark:text-dark-tx
+                   whitespace-nowrap disabled:opacity-50 inline-flex items-center gap-1.5"
+        >
+            <Download size="16" /> Als Zip
+        </button>
+        <button
+            onclick={() => (importDialog = true)}
+            title="Markdown-Dateien in {importFach.name} einspielen"
+            class="px-3 py-1.5 text-sm rounded-md border border-light-ui-3
+                   dark:border-dark-ui-3 text-light-tx dark:text-dark-tx
+                   whitespace-nowrap inline-flex items-center gap-1.5"
+        >
+            <Upload size="16" /> Aus Dateien
+        </button>
+    {/if}
+
     <!-- Neuer-Knoten-Button -->
     {#if showNewButton}
         {@const backParam = `&back=${encodeURIComponent($page.url.pathname + $page.url.search)}`}
@@ -370,8 +426,9 @@
               : `/knowledge/new?${backParam.slice(1)}`}
         <a
             href={newUrl}
-            class="ml-auto px-3 py-1.5 text-sm rounded-md bg-primary dark:bg-primary-dark
-             text-white font-medium hover:opacity-90 transition-opacity whitespace-nowrap"
+            class="{dateiwerkzeuge ? '' : 'ml-auto'} px-3 py-1.5 text-sm rounded-md
+             bg-primary dark:bg-primary-dark text-white font-medium
+             hover:opacity-90 transition-opacity whitespace-nowrap"
         >
             + Neuer Knoten
         </a>
@@ -379,6 +436,10 @@
 </div>
 
 <!-- Tabelle -->
+{#if werkzeugFehler}
+    <div class="mb-3"><ErrorBanner message={werkzeugFehler} /></div>
+{/if}
+
 {#if aktionsfehler}
     <div class="mb-3"><ErrorBanner message={aktionsfehler} /></div>
 {/if}
@@ -689,4 +750,13 @@
             </button>
         {/if}
     </div>
+{/if}
+
+{#if importDialog && importFach}
+    <FachbegriffImportDialog
+        fach={importFach.slug}
+        fachname={importFach.name}
+        onclose={() => (importDialog = false)}
+        onfertig={load}
+    />
 {/if}

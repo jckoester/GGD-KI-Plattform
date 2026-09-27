@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   IMPORTIERBARE_TYPEN,
   ZUSTAENDE,
+  zeigeDateiwerkzeuge,
   brauchtEinbettung,
   eingespielt,
   entwuerfe,
@@ -173,5 +175,63 @@ describe('welche Sammlungen einen Import anbieten', () => {
     // ⚠️ Dieselbe Liste steht als `TYPEN` im Backend. Der Abgleich läuft dort
     // (`test_taxonomy_check.py`) — hier steht sie nur einmal, damit es nicht drei sind.
     expect(IMPORTIERBARE_TYPEN).toEqual(['begriff', 'stoffsteckbrief'])
+  })
+})
+
+
+describe('wo die Dateiwerkzeuge stehen', () => {
+  const fach = { id: 1, slug: 'chemie', name: 'Chemie' }
+
+  it('nur mit Fach', () => {
+    // ⚠️ `KnowledgeNodeList` steht auch unter `/knowledge` ganz ohne Fach. Dort wäre
+    // der Knopf ein Versprechen, das das Backend nicht halten kann — und der
+    // Komponente sieht man das nicht an.
+    expect(zeigeDateiwerkzeuge(null, ['teacher'])).toBe(false)
+    expect(zeigeDateiwerkzeuge(undefined, ['teacher'])).toBe(false)
+    expect(zeigeDateiwerkzeuge(fach, ['teacher'])).toBe(true)
+  })
+
+  it('nur für Lehrkräfte', () => {
+    // Die Sammlungen stehen Schüler:innen offen, das Einspielen nicht.
+    expect(zeigeDateiwerkzeuge(fach, ['student'])).toBe(false)
+    expect(zeigeDateiwerkzeuge(fach, [])).toBe(false)
+    expect(zeigeDateiwerkzeuge(fach, undefined)).toBe(false)
+  })
+
+  it('Admins sind Lehrkräfte mit mehr Rechten', () => {
+    // CLAUDE.md, Rollenmodell: additiv, nicht exklusiv.
+    expect(zeigeDateiwerkzeuge(fach, ['teacher', 'admin'])).toBe(true)
+  })
+})
+
+
+describe('die Regel hängt auch wirklich am Knopf', () => {
+  /**
+   * ⚠️ **Eine Quelltextprüfung, und das ist kein Versehen.** Das Projekt hat keine
+   * Komponententests — Regeln liegen im Modul, Darstellung in `.svelte`. Damit prüft
+   * `zeigeDateiwerkzeuge()` oben zwar die Regel, aber nicht, dass die Komponente sie
+   * **benutzt**. Genau diese Lücke hat in Paket 9 schon einmal eine Gegenprobe grün
+   * gehalten (der Lesehinweis war getestet, sein Einsatz am Werkzeugweg nicht).
+   *
+   * Wird hier einmal mit `@testing-library/svelte` gerendert, ersetzt das diesen Test.
+   */
+  const quelle = readFileSync(
+    new URL('./components/KnowledgeNodeList.svelte', import.meta.url),
+    'utf8',
+  )
+
+  it('KnowledgeNodeList leitet die Sichtbarkeit aus der Regel ab', () => {
+    expect(quelle).toContain('zeigeDateiwerkzeuge(importFach, $user?.roles)')
+  })
+
+  it('beide Knöpfe stehen im geschützten Block', () => {
+    const start = quelle.indexOf('{#if dateiwerkzeuge}')
+    expect(start).toBeGreaterThan(-1)
+    const ende = quelle.indexOf('{/if}', start)
+    const block = quelle.slice(start, ende)
+    // Unter `/knowledge` gibt es kein Fach: `importFach.name` im Titel liefe dort auf
+    // `null` und risse die Seite mit.
+    expect(block).toContain('Aus Dateien')
+    expect(block).toContain('Als Zip')
   })
 })

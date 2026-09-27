@@ -10,12 +10,8 @@
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
-    import { Plus, Archive, Pencil, Upload, Download } from "lucide-svelte";
-    import {
-        exportiereFachbegriffe,
-        getContextNodes,
-        updateContextNode,
-    } from "$lib/api.js";
+    import { Plus, Archive, Pencil } from "lucide-svelte";
+    import { getContextNodes, updateContextNode } from "$lib/api.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import {
         sammlung,
@@ -26,9 +22,7 @@
     } from "$lib/collections.js";
     import { subjects, subjectMap } from "$lib/stores/subjects.js";
     import { user } from "$lib/stores/user.js";
-    import { IMPORTIERBARE_TYPEN } from "$lib/fachbegriffe_import.js";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
-    import FachbegriffImportDialog from "$lib/components/FachbegriffImportDialog.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import InfoBanner from "$lib/components/InfoBanner.svelte";
@@ -194,31 +188,6 @@
     );
     const unvollstaendige = $derived(nodes.filter(istStub).length);
 
-    /**
-     * „Aus Dateien einspielen" (Paket 10, AP4).
-     *
-     * ⚠️ **Nur mit gewähltem Fach.** Der Import gehört einer Fachschaft; ohne Fach
-     * wüsste weder die Oberfläche, wohin, noch das Backend, wessen Rechte zu prüfen
-     * sind. Statt den Knopf zu verstecken, steht er inaktiv da und sagt, was fehlt —
-     * ein fehlender Knopf lässt jemanden suchen, ein grauer erklärt sich.
-     */
-    const importierbar = $derived(IMPORTIERBARE_TYPEN.includes(typ) && istLehrkraft);
-    const importFach = $derived(fachId ? $subjectMap[Number(fachId)] : null);
-    let importDialog = $state(false);
-    let exportLaeuft = $state(false);
-
-    async function exportieren() {
-        exportLaeuft = true;
-        aktionsfehler = null;
-        try {
-            await exportiereFachbegriffe(importFach.slug);
-        } catch (e) {
-            aktionsfehler = e.message;
-        } finally {
-            exportLaeuft = false;
-        }
-    }
-
     async function archivieren(node) {
         aktionsfehler = null;
         try {
@@ -274,45 +243,17 @@
                     {/if}
                 </p>
             </div>
-            <div class="shrink-0 flex items-center gap-2">
-                {#if importierbar}
-                    <button
-                        onclick={exportieren}
-                        disabled={!importFach || exportLaeuft}
-                        title={importFach
-                            ? `Alle Einträge aus ${importFach.name} als Zip sichern — dieselben Dateien, die der Import liest`
-                            : "Zuerst ein Fach wählen"}
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
-                               border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx disabled:opacity-50"
-                    >
-                        <Download size="16" /> Als Zip
-                    </button>
-                    <button
-                        onclick={() => (importDialog = true)}
-                        disabled={!importFach}
-                        title={importFach
-                            ? `Markdown-Dateien in ${importFach.name} einspielen`
-                            : "Zuerst ein Fach wählen — eingespielt wird in genau eines"}
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
-                               border border-light-ui-3 dark:border-dark-ui-3
-                               text-light-tx dark:text-dark-tx disabled:opacity-50"
-                    >
-                        <Upload size="16" /> Aus Dateien
-                    </button>
-                {/if}
-                {#if darfAnlegen}
-                    <a
-                        href="/knowledge/collections/{typ}/new?back={encodeURIComponent(
-                            rueckweg,
-                        )}{fachId ? `&subject_id=${fachId}` : ''}"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
-                               bg-primary dark:bg-primary-dark text-white hover:opacity-90"
-                    >
-                        <Plus size="16" /> Neuer Eintrag
-                    </a>
-                {/if}
-            </div>
+            {#if darfAnlegen}
+                <a
+                    href="/knowledge/collections/{typ}/new?back={encodeURIComponent(
+                        rueckweg,
+                    )}{fachId ? `&subject_id=${fachId}` : ''}"
+                    class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
+                           bg-primary dark:bg-primary-dark text-white hover:opacity-90"
+                >
+                    <Plus size="16" /> Neuer Eintrag
+                </a>
+            {/if}
         </div>
 
         {#if aktionsfehler}
@@ -479,11 +420,3 @@
     {/if}
 </PageBody>
 
-{#if importDialog && importFach}
-    <FachbegriffImportDialog
-        fach={importFach.slug}
-        fachname={importFach.name}
-        onclose={() => (importDialog = false)}
-        onfertig={load}
-    />
-{/if}

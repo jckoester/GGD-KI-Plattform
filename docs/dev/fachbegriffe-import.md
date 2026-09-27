@@ -10,7 +10,7 @@ sitzen zwei Hüllen:
 | Weg | Wer | Eingabe |
 |---|---|---|
 | `backend/scripts/seed_fachbegriffe.py` | Admin auf der Kommandozeile | ein Ordner |
-| „Aus Dateien“ in der Sammlung → `POST /context/fachbegriffe/import` | Lehrkräfte des Fachs | Formular-Upload |
+| „Aus Dateien“ auf der Fachseite → `POST /context/fachbegriffe/import` | Lehrkräfte des Fachs | Formular-Upload |
 
 Beide rufen `importiere()` und drucken bzw. liefern dieselbe `Bilanz`; ein Test hält
 fest, dass sie auf demselben Bündel dieselben Zahlen ergeben.
@@ -218,10 +218,27 @@ Arbeit lautlos preis, die eine Lehrkraft im Editor investiert hat.
 
 ## Der Dialog
 
-„Aus Dateien" steht in den Sammlungen `begriff` und `stoffsteckbrief`, sobald oben ein
-**Fach** gewählt ist — ohne Fach wüsste weder die Oberfläche, wohin, noch das Backend,
-wessen Rechte zu prüfen sind. Der Knopf bleibt dann sichtbar und inaktiv; ein fehlender
-ließe jemanden suchen.
+„Aus Dateien" und „Als Zip" stehen unter **Fächer → Fach → „weiterer Kontext"**
+(`/subjects/<fach>?tab=kontext`), im Kopf von `KnowledgeNodeList`.
+
+⚠️ **Nicht in der Sammlung, obwohl sie dort zuerst saßen** (Befund Jan, 27.09.2026).
+Drei Gründe, der mittlere ist der schwerste:
+
+1. Auf der Fachseite steht das **Fach schon fest**. In der Sammlung musste man es erst
+   oben wählen; wer über die Sidebar kam, landete auf einem grauen Knopf.
+2. **Ein Bündel enthält beide Typen.** Die Sammlung ist typgebunden — ein Import, der in
+   „Fachbegriff" angestoßen wird, legt auch Stoffsteckbriefe an, und die tauchen in der
+   Liste darunter nicht auf. Der Tab zeigt alle Kontexttypen des Fachs.
+3. Der Tab wird **nur für Lehrkräfte** gerendert; die Sammlung steht auch
+   Schüler:innen offen.
+
+⚠️ **Der Knopf hängt an einem Prop, nicht am Einbau.** `KnowledgeNodeList` steht auch
+unter `/knowledge` (ganz ohne Fach) und im Gruppen-Tab (eine Unterrichtsgruppe, nicht
+die Fachschaft). Nur die Fachseite gibt `importFach` mit; die Regel steht in
+`zeigeDateiwerkzeuge()`. Dass die Komponente sie **benutzt**, prüft eine
+Quelltextprüfung in `fachbegriffe_import.test.js` — das Projekt hat keine
+Komponententests, und genau diese Lücke hat in Paket 9 schon einmal eine Gegenprobe
+grün gehalten.
 
 Zwei Schritte: **Vorschau, dann einspielen.** Derselbe Aufruf, einmal ohne und einmal
 mit Wirkung.

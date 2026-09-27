@@ -85,15 +85,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Fachschaften spielen ihre Fachbegriffe selbst ein.** In den Sammlungen
-  „Fachbegriff“ und „Stoffsteckbrief“ führt „Aus Dateien“ zu einem Dialog: Markdown-
-  Dateien oder ein Zip-Bündel mit Abbildungen wählen, Vorschau ansehen, einspielen. Die
+- **Fachschaften spielen ihre Fachbegriffe selbst ein.** Unter *Fächer → Fach →
+  „weiterer Kontext“* führt „Aus Dateien“ zu einem Dialog: Markdown-Dateien oder ein
+  Zip-Bündel mit Abbildungen wählen, Vorschau ansehen, einspielen. Die
   Vorschau zeigt je Datei, was geschähe — neu, aktualisiert, unverändert — und lässt bei
   Einträgen, die seit dem letzten Mal in der Oberfläche bearbeitet wurden, je Zeile
   wählen zwischen behalten und überschreiben. Vorher konnte das nur die Administration
   über ein Skript.
-- **Fachbegriffe lassen sich wieder herausholen.** „Als Zip" in der Sammlung sichert den
-  Bestand eines Fachs als Markdown-Dateien samt Abbildungen — dasselbe Format, das der
+- **Fachbegriffe lassen sich wieder herausholen.** „Als Zip“ an derselben Stelle sichert
+  den Bestand eines Fachs als Markdown-Dateien samt Abbildungen — dasselbe Format, das der
   Import liest. Einzelne Einträge gehen über „Als Markdown" in der Detailansicht. Damit
   bleibt eine Fachschaft, die in der Oberfläche pflegt, für spätere Massenänderungen
   anschlussfähig. Dem Bündel liegt ein Hinweisblatt bei: Verweise auf Begriffe, die es

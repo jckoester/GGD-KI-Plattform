@@ -412,6 +412,7 @@
                 showSubjectFilter={false}
                 showNewButton={true}
                 excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
+                importFach={subject}
             />
         {/if}
     {/if}
