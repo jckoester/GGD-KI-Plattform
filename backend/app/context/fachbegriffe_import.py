@@ -28,6 +28,14 @@ der Lauf ihn und sagt es. `ueberschreiben=True` setzt sich darüber hinweg.
 Hand angelegte Kanten bleiben unberührt: Wer im Verknüpfen-Dialog etwas ergänzt, soll es
 beim nächsten Import nicht verlieren.
 
+**Woran ein Knoten wiedererkannt wird: an seiner `id`** (AP2, Entscheidung D3), einer
+Kleinbuchstaben-Kennung im Frontmatter, die je Fach eindeutig ist. Bis Paket 9 war es
+der **Dateiname** (`metadata.seed_quelle`) — eine umbenannte Datei ergab einen zweiten
+Knoten, und beim Pflegen im Vault ist Umbenennen keine Ausnahme. Fehlt die `id`, leitet
+der Lauf sie aus Fachkürzel und Dateiname ab (`ch-oxidation-sauerstoffaufnahme`), legt
+sie am Knoten ab und meldet sie; der Export (AP5) schreibt sie in die Datei zurück.
+Gesucht wird erst nach `id`, dann — für den Übergang — nach `seed_quelle`.
+
 **Zwei Durchläufe, und das muss so sein:** Erst alle Knoten, dann alle Kanten. Ein
 Wikilink zeigt auf eine **Datei**, nicht auf einen Titel — gleichnamige Fassungen
 („Oxidation") haben denselben Titel und wären über ihn nicht zu unterscheiden. Die
@@ -57,6 +65,7 @@ from typing import Any, Mapping
 import sqlalchemy as sa
 import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import attributes
 
 from app.context import aliase as alias_dienst
 from app.context.metadata import STUB_MARKIERUNG, validate_node_metadata
@@ -65,7 +74,7 @@ from app.context.taxonomy import (
     EMBEDDING_CONTENT_TYPES,
     feld_schema,
 )
-from app.db.models import ContextEdge, ContextNode, Group, Subject
+from app.db.models import ContextEdge, ContextNode, Group, Subject, ohne_aenderungsstempel
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +92,14 @@ FREIE_METADATEN = ("eigenschaften", "ghs", "illustrationen")
 #: ob seither jemand in der Oberfläche daran gearbeitet hat.
 SEED_QUELLE = "seed_quelle"
 SEED_HASH = "seed_hash"
+#: Die **stabile Kennung** eines Knotens im Fach (AP2, Entscheidung D3). Sie steht im
+#: Frontmatter als `id:` und übersteht das Umbenennen der Datei — `seed_quelle` tut das
+#: nicht: Eine umbenannte Datei ergäbe einen zweiten Knoten. Der Name führt „seed" fort,
+#: weil die drei Schlüssel zusammengehören und dasselbe aussagen — geschrieben vom
+#: Import, nicht in der Oberfläche.
+SEED_ID = "seed_id"
+#: Alles, was der Import an Verwaltungsangaben an den Knoten schreibt.
+SEED_SCHLUESSEL = (SEED_QUELLE, SEED_HASH, SEED_ID)
 
 
 
@@ -101,6 +118,41 @@ _FUNDSTELLE = re.compile(
     r"^(?P<fach>[A-Za-zÄÖÜäöü]+)(?P<suffix>\.[A-Z0-9]+)?\s+"
     r"(?P<nr>\d+(?:\.\d+)*)\s+(?:\((?P<teil>\d+)\)|Einl\.)$"
 )
+
+#: Eine `id` ist kleingeschrieben, trägt Ziffern und Bindestriche — und sonst nichts.
+#: Sie steht in Dateien, in Exportnamen und später in URLs; Großschreibung, Umlaute oder
+#: Leerzeichen wären an jeder dieser Stellen eine eigene Fehlerquelle.
+_ID_MUSTER = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def ist_gueltige_id(wert: str) -> bool:
+    return bool(_ID_MUSTER.match(wert or ""))
+
+
+def _slug(text: str) -> str:
+    klein = (text or "").strip().lower().translate(_UMLAUTE)
+    return re.sub(r"[^a-z0-9]+", "-", klein).strip("-")
+
+
+def leite_id_ab(fach_praefix: str, dateiname: str) -> str:
+    """Kennung aus Fachkürzel und Dateiname: `CH` + `Oxidation (Sauerstoffaufnahme)`
+    → `ch-oxidation-sauerstoffaufnahme`.
+
+    Leer, wenn der Dateiname nichts hergibt (`Δ.md`). Dann hat die Datei keine
+    ableitbare Identität, und der Bericht verlangt ein `id:` im Frontmatter — eine
+    erfundene Kennung (etwa aus einer Prüfsumme) wäre schlimmer als eine verlangte:
+    Sie stünde später im Export, ohne dass jemand sie wiedererkennt.
+
+    ⚠️ Dieselbe Regel steht ein zweites Mal als SQL in Alembic `0079` (Migration der
+    Bestandsknoten). `tests/integration/test_seed_id_sql.py` hält beide zusammen.
+    """
+    rest = _slug(dateiname)
+    if not rest:
+        return ""
+    praefix = _slug(fach_praefix)
+    return f"{praefix}-{rest}" if praefix else rest
+
 
 #: Der Abschnitt, dessen Text **ohne Überschrift** an den Anfang von `content` kommt.
 #: Die Taxonomie nennt das Feld selbst „Definition" — eine Überschrift gleichen Namens
@@ -135,6 +187,9 @@ class Quelldatei:
     fundstellen: list[str]          # Rohform, aufgelöst wird erst gegen die Datenbank
     kanten: list[Kante]
     warnungen: list[str]
+    #: `id:` aus dem Frontmatter, bereits geprüft. Leer heißt „nicht angegeben" — dann
+    #: leitet der Schreibteil sie ab; nur er kennt das Fachkürzel.
+    id_angabe: str = ""
 
 
 def _ziel(wikilink: str) -> str:
@@ -319,6 +374,18 @@ def lies_datei(dateiname: str, roh: str) -> Quelldatei | None:
         return None
 
     warnungen: list[str] = []
+    id_angabe = str(kopf_daten.get("id") or "").strip()
+    if id_angabe and not ist_gueltige_id(id_angabe):
+        # ⚠️ **Die Datei wird trotzdem gelesen.** Eine ungültige Kennung hat noch nie
+        # einen Knoten benannt — geschrieben wird nur Geprüftes. Sie wie „nicht
+        # angegeben" zu behandeln kann deshalb keinen zweiten Knoten erzeugen: Der
+        # Import findet den bestehenden weiter über `seed_quelle`. Die Datei
+        # abzuweisen verlöre dagegen sechsunddreißig Kanten wegen eines Großbuchstabens.
+        warnungen.append(
+            f"id „{id_angabe}“ verworfen — erlaubt sind Kleinbuchstaben, Ziffern und "
+            "Bindestriche"
+        )
+        id_angabe = ""
     absaetze: list[str] = []
     metadata: dict[str, Any] = {}
     kanten: list[Kante] = []
@@ -402,6 +469,7 @@ def lies_datei(dateiname: str, roh: str) -> Quelldatei | None:
         fundstellen=[f for f in _als_liste(kopf_daten.get("bildungsplan"))],
         kanten=vereinige(kanten),
         warnungen=warnungen,
+        id_angabe=id_angabe,
     )
 
 
@@ -510,8 +578,13 @@ def stand_hash(titel: str, content: str, metadata: dict, aliase: list[str]) -> s
     """Fingerabdruck dessen, was der Seed am Knoten verantwortet.
 
     Die Seed-Schlüssel selbst bleiben draußen — sonst hinge der Hash von sich selbst ab.
+
+    ⚠️ **Auch `seed_id`**, und zwar nicht aus Bequemlichkeit: Die Kennung ist Identität,
+    nicht Inhalt. Stünde sie im Hash, hielte der Lauf nach der Migration (Alembic 0079)
+    sechsunddreißig unveränderte Knoten für handverändert und rührte keinen davon mehr
+    an — die Idempotenz wäre genau dort gebrochen, wo sie gebraucht wird.
     """
-    ohne_seed = {k: v for k, v in (metadata or {}).items() if k not in (SEED_QUELLE, SEED_HASH)}
+    ohne_seed = {k: v for k, v in (metadata or {}).items() if k not in SEED_SCHLUESSEL}
     roh = json.dumps(
         [titel, content, ohne_seed, list(aliase)], sort_keys=True, ensure_ascii=False
     )
@@ -535,6 +608,10 @@ class Bilanz:
     offene_ziele: Counter = field(default_factory=Counter)
     #: Fundstellen, zu denen es keinen Bildungsplan-Knoten gibt.
     offene_fundstellen: Counter = field(default_factory=Counter)
+    #: Dateien ohne `id:` im Frontmatter → die Kennung, die der Lauf vergeben hat.
+    #: Solange die Fachschaft in Dateien ohne `id:` pflegt, meldet das jeder Lauf; der
+    #: Export (AP5) schreibt sie zurück, und dann verstummt die Meldung von selbst.
+    vergebene_ids: dict[str, str] = field(default_factory=dict)
     #: Fundstellen, deren Knoten **archiviert** ist — die Kante entsteht, wirkt
     #: in der Oberfläche aber nicht (die Nachbarschaft zeigt nur Aktives).
     archivierte_ziele: Counter = field(default_factory=Counter)
@@ -594,6 +671,70 @@ async def _bp_knoten(db: AsyncSession, subject_id: int) -> dict[tuple[str, str, 
     return {(v, ct, nr): (knoten_id, status) for knoten_id, v, ct, nr, status in zeilen}
 
 
+@dataclass
+class Bestand:
+    """Was im Fach schon liegt — für Wikilinks, deren Ziel **nicht** im Bündel steckt.
+
+    Beim Ordnerimport aus dem Vault ist das die Ausnahme (dort liegen alle Dateien
+    beieinander); beim Hochladen einer einzelnen Datei ist es der Normalfall, und ohne
+    diesen Rückgriff verlöre so eine Datei jede Kante.
+
+    Gesucht wird in drei Anläufen: erst die abgeleitete Kennung, dann die Herkunftsdatei,
+    zuletzt der Titel. Der Titel steht am Ende, weil er als Einziger mehrdeutig sein
+    kann — „Oxidation" tragen im Pilot zwei Fassungen.
+    """
+
+    nach_id: dict[str, Any]
+    nach_quelle: dict[str, Any]
+    #: Titel (casefold) → Knoten-ID, oder ``None``, wenn ihn mehrere Knoten tragen.
+    nach_titel: dict[str, Any]
+    praefix: str
+
+    def finde(self, ziel_datei: str) -> Any:
+        treffer = self.nach_id.get(leite_id_ab(self.praefix, ziel_datei))
+        if treffer is None:
+            treffer = self.nach_quelle.get(ziel_datei)
+        if treffer is None:
+            treffer = self.nach_titel.get(ziel_datei.strip().casefold())
+        return treffer
+
+    def mehrdeutig(self, ziel_datei: str) -> bool:
+        schluessel = ziel_datei.strip().casefold()
+        return schluessel in self.nach_titel and self.nach_titel[schluessel] is None
+
+
+async def _bestand(db: AsyncSession, fach: Subject) -> Bestand:
+    """Kennung, Herkunftsdatei und Titel aller Fachbegriffe **eines Fachs**.
+
+    Auf `TYPEN` beschränkt: Ein Wikilink `[[Säuren und Basen]]` darf nicht auf ein
+    gleichnamiges Curriculum-Kapitel zeigen. Was der Import schreibt, darf er auch
+    als Ziel annehmen — mehr nicht.
+    """
+    zeilen = (await db.execute(
+        sa.select(
+            ContextNode.id,
+            ContextNode.title,
+            ContextNode.metadata_[SEED_ID].astext,
+            ContextNode.metadata_[SEED_QUELLE].astext,
+        ).where(
+            ContextNode.subject_id == fach.id,
+            ContextNode.content_type.in_(TYPEN),
+        )
+    )).all()
+    nach_id: dict[str, Any] = {}
+    nach_quelle: dict[str, Any] = {}
+    nach_titel: dict[str, Any] = {}
+    for knoten_id, titel, kennung, quelle in zeilen:
+        if kennung:
+            nach_id[kennung] = knoten_id
+        if quelle:
+            nach_quelle[quelle] = knoten_id
+        schluessel = (titel or "").strip().casefold()
+        if schluessel:
+            nach_titel[schluessel] = None if schluessel in nach_titel else knoten_id
+    return Bestand(nach_id, nach_quelle, nach_titel, fach.fach_code or fach.slug)
+
+
 def _ist_zustand(node: ContextNode, aliase: list[str]) -> dict[str, Any]:
     metadata = dict(node.metadata_ or {})
     return {
@@ -606,6 +747,38 @@ def _ist_zustand(node: ContextNode, aliase: list[str]) -> dict[str, Any]:
     }
 
 
+async def _finde_knoten(
+    db: AsyncSession, subject_id: int, stabile_id: str, dateiname: str
+) -> ContextNode | None:
+    """Den Knoten zu einer Quelldatei suchen — **erst** über die Kennung.
+
+    Der zweite Griff über `seed_quelle` ist der Übergang aus Paket 9: Knoten von damals
+    tragen nur die Herkunftsdatei. Alembic `0079` rüstet die Kennung nach, aber ein
+    Bestand, der vor der Migration importiert und seither nie wieder angefasst wurde,
+    liefe sonst in einen zweiten Knoten. Der Lauf schreibt dabei die Kennung mit —
+    danach greift der erste Weg.
+
+    ⚠️ Die Reihenfolge zählt, wo **beides** zutrifft — und das ist genau beim Aufräumen
+    nach altem Recht: Wer vor AP2 umbenannt hat, hat zwei Knoten, einen mit der Kennung
+    und einen mit dem alten Dateinamen. Die Kennung ist die ausdrückliche Angabe der
+    Fachschaft, der Dateiname nur eine Vermutung des Imports; also gewinnt sie.
+    """
+    treffer = (await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.subject_id == subject_id,
+            ContextNode.metadata_[SEED_ID].astext == stabile_id,
+        )
+    )).scalars().first()
+    if treffer is not None:
+        return treffer
+    return (await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.subject_id == subject_id,
+            ContextNode.metadata_[SEED_QUELLE].astext == dateiname,
+        )
+    )).scalars().first()
+
+
 async def _schreibe_knoten(
     db: AsyncSession,
     quelle: Quelldatei,
@@ -613,18 +786,14 @@ async def _schreibe_knoten(
     gruppe_id: int,
     bilanz: Bilanz,
     *,
+    stabile_id: str,
+    vorhanden: ContextNode | None,
     ueberschreiben: bool,
 ) -> Any:
     """Einen Knoten anlegen oder nachziehen. Gibt die Knoten-ID zurück (oder ``None``)."""
-    vorhanden = (await db.execute(
-        sa.select(ContextNode).where(
-            ContextNode.subject_id == fach.id,
-            ContextNode.metadata_[SEED_QUELLE].astext == quelle.datei,
-        )
-    )).scalars().first()
-
     metadata = dict(quelle.metadata)
     metadata[SEED_QUELLE] = quelle.datei
+    metadata[SEED_ID] = stabile_id
     # Ohne Text ist ein Eintrag ein Titel: `content` ist bei beiden Typen Pflicht, und
     # `traegt_substanz()` hielte den Vektor ohnehin zurück. Die Markierung ist dieselbe
     # wie beim Verknüpfen-Dialog (UI-Notiz A8).
@@ -661,6 +830,7 @@ async def _schreibe_knoten(
         return knoten.id
 
     ist = _ist_zustand(vorhanden, await alias_dienst.lade(db, vorhanden.id))
+    await _trage_kennung_nach(db, vorhanden, stabile_id)
     if ist["hash"] == metadata[SEED_HASH]:
         bilanz.unveraendert += 1
         return vorhanden.id
@@ -688,11 +858,42 @@ async def _schreibe_knoten(
     return vorhanden.id
 
 
+async def _trage_kennung_nach(
+    db: AsyncSession, knoten: ContextNode, stabile_id: str
+) -> None:
+    """Die Kennung an einem bestehenden Knoten nachziehen — **vor** jedem Rückweg.
+
+    ⚠️ Sonst bliebe die Übergangsschicht liegen, wo sie am meisten gebraucht wird: Ein
+    Knoten, dessen Datei sich nicht geändert hat, verließe jeden Lauf über den Zweig
+    „unverändert", bekäme nie eine Kennung — und ein Umbenennen der Datei ergäbe doch
+    wieder einen zweiten Knoten. Dasselbe gilt für handveränderte Knoten: Ihren Inhalt
+    lässt der Lauf in Ruhe, ihre Identität ist davon unberührt.
+
+    Ohne Änderungsstempel: Eine Kennung nachzutragen ist keine Bearbeitung, und
+    `updated_at` ist seit Paket 9 die Antwort auf „wie aktuell ist dieser Knoten?".
+    Deshalb als Core-`update()` — bei einer ORM-Zuweisung feuerte `onupdate`.
+    """
+    if (knoten.metadata_ or {}).get(SEED_ID) == stabile_id:
+        return
+    neu = {**(knoten.metadata_ or {}), SEED_ID: stabile_id}
+    await db.execute(
+        sa.update(ContextNode)
+        .where(ContextNode.id == knoten.id)
+        .values(metadata_=neu, **ohne_aenderungsstempel())
+        .execution_options(synchronize_session=False)
+    )
+    # Den Stand im Speicher nachziehen, **ohne** das Objekt schmutzig zu machen: Eine
+    # gewöhnliche Zuweisung löste beim Flush ein zweites UPDATE samt `onupdate` aus,
+    # `expire()` einen Nachladeversuch — und der bricht in asyncio ab.
+    attributes.set_committed_value(knoten, "metadata_", neu)
+
+
 async def _schreibe_kanten(
     db: AsyncSession,
     quelle: Quelldatei,
     von_id: Any,
     nach_datei: dict[str, Any],
+    bestand: Bestand,
     bp: dict[tuple[str, str, str], Any],
     editionen: dict[str, str],
     bilanz: Bilanz,
@@ -702,12 +903,24 @@ async def _schreibe_kanten(
     Von Hand angelegte Kanten bleiben stehen: Wer im Verknüpfen-Dialog etwas ergänzt,
     soll es beim nächsten Import nicht verlieren. Erkennbar sind die eigenen an
     `metadata.seed`.
+
+    Ein Wikilink zeigt zuerst ins **Bündel** (dort steht die Zuordnung Datei → Knoten
+    fest) und erst danach in den vorhandenen Bestand des Fachs — sonst hätte eine
+    einzeln hochgeladene Datei keine einzige Kante.
     """
     geplant: list[tuple[str, Any, dict]] = []
     for kante in quelle.kanten:
-        ziel_id = nach_datei.get(kante.ziel_datei)
+        ziel_id = nach_datei.get(kante.ziel_datei) or bestand.finde(kante.ziel_datei)
         if ziel_id is None:
-            bilanz.offene_ziele[kante.ziel_datei] += 1
+            if bestand.mehrdeutig(kante.ziel_datei):
+                # Zwei Fassungen tragen denselben Titel („Oxidation"). Eine davon zu
+                # greifen wäre geraten; im Bündel unterscheidet der Dateiname sie.
+                bilanz.warnungen.append(
+                    f"{quelle.datei}: Ziel „{kante.ziel_datei}“ ist im Bestand "
+                    "mehrdeutig — keine Kante"
+                )
+            else:
+                bilanz.offene_ziele[kante.ziel_datei] += 1
             continue
         if ziel_id == von_id:
             bilanz.warnungen.append(f"{quelle.datei}: Kante auf sich selbst, ausgelassen")
@@ -780,6 +993,13 @@ async def seed_in_session(
     faecher = await _faecher(db)
     nach_datei: dict[str, Any] = {}
     zu_verkanten: list[tuple[Quelldatei, Any, Subject]] = []
+    #: (Fach, Kennung) → Datei. Zwei Dateien mit derselben `id` sind ein Fehler im
+    #: Bündel; ohne diese Prüfung überschriebe die zweite die erste, und der Bericht
+    #: meldete „2 aktualisiert" für einen Knoten.
+    belegt: dict[tuple[int, str], str] = {}
+    #: Knoten-ID → Datei. Dieselbe Falle über Bande: Datei A trifft den Knoten über die
+    #: Kennung, Datei B über die Herkunftsdatei.
+    beansprucht: dict[Any, str] = {}
 
     for quelle in gelesen:
         fach = faecher.get(quelle.fach.casefold())
@@ -801,21 +1021,56 @@ async def seed_in_session(
                 "übersprungen"
             )
             continue
+
+        stabile_id = quelle.id_angabe or leite_id_ab(
+            fach.fach_code or fach.slug, quelle.datei
+        )
+        if not stabile_id:
+            bilanz.warnungen.append(
+                f"{quelle.datei}: keine `id` ableitbar — bitte `id:` im Frontmatter "
+                "setzen"
+            )
+            continue
+        schon = belegt.get((fach.id, stabile_id))
+        if schon:
+            bilanz.warnungen.append(
+                f"{quelle.datei}: Kennung „{stabile_id}“ gehört in diesem Bündel schon "
+                f"zu {schon} — übersprungen"
+            )
+            continue
+        belegt[(fach.id, stabile_id)] = quelle.datei
+        if not quelle.id_angabe:
+            bilanz.vergebene_ids[quelle.datei] = stabile_id
+
+        vorhanden = await _finde_knoten(db, fach.id, stabile_id, quelle.datei)
+        if vorhanden is not None and vorhanden.id in beansprucht:
+            bilanz.warnungen.append(
+                f"{quelle.datei}: trifft denselben Knoten wie "
+                f"{beansprucht[vorhanden.id]} — übersprungen"
+            )
+            continue
+
         knoten_id = await _schreibe_knoten(
-            db, quelle, fach, gruppe_id, bilanz, ueberschreiben=ueberschreiben
+            db, quelle, fach, gruppe_id, bilanz,
+            stabile_id=stabile_id, vorhanden=vorhanden, ueberschreiben=ueberschreiben,
         )
         if knoten_id is not None:
+            beansprucht[knoten_id] = quelle.datei
             nach_datei[quelle.datei] = knoten_id
             zu_verkanten.append((quelle, knoten_id, fach))
 
     bp_je_fach: dict[int, dict] = {}
     editionen_je_fach: dict[int, dict] = {}
+    bestand_je_fach: dict[int, Bestand] = {}
     for quelle, knoten_id, fach in zu_verkanten:
         if fach.id not in bp_je_fach:
             bp_je_fach[fach.id] = await _bp_knoten(db, fach.id)
             editionen_je_fach[fach.id] = await _editionen(db, fach.id)
+            # Nach dem Knotendurchlauf gelesen, also einschließlich der eben
+            # geschriebenen — was in `nach_datei` steht, findet sich hier wieder.
+            bestand_je_fach[fach.id] = await _bestand(db, fach)
         await _schreibe_kanten(
-            db, quelle, knoten_id, nach_datei,
+            db, quelle, knoten_id, nach_datei, bestand_je_fach[fach.id],
             bp_je_fach[fach.id], editionen_je_fach[fach.id], bilanz,
         )
 

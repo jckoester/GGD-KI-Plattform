@@ -89,6 +89,13 @@ def _berichte(bilanz: Bilanz, *, dry_run: bool) -> None:
             "nicht überschrieben (mit --ueberschreiben erzwingen): %s",
             len(bilanz.uebersprungen), ", ".join(bilanz.uebersprungen),
         )
+    if bilanz.vergebene_ids:
+        logger.info(
+            "%d Dateien ohne `id:` im Frontmatter — Kennung aus Fachkürzel und "
+            "Dateiname vergeben:", len(bilanz.vergebene_ids),
+        )
+        for datei, kennung in sorted(bilanz.vergebene_ids.items()):
+            logger.info("    vergeben: %-40s (%s)", kennung, datei)
     for zeile in bilanz.warnungen:
         logger.warning("%s", zeile)
     if bilanz.offene_fundstellen:

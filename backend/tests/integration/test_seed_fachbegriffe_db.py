@@ -366,4 +366,240 @@ class TestSkriptUndServiceStimmenUeberein:
             assert getattr(aus_skript, feld) == getattr(aus_service, feld), feld
         assert sorted(aus_skript.warnungen) == sorted(aus_service.warnungen)
         assert aus_skript.offene_ziele == aus_service.offene_ziele
+        assert aus_skript.vergebene_ids == aus_service.vergebene_ids
         assert aus_skript.neu > 0, "ohne geschriebene Knoten belegt der Vergleich nichts"
+
+
+
+def _md(titel: str, *, kennung: str = "", zeilen: str = "") -> bytes:
+    """Eine Minimaldatei — für die Fälle, in denen es nur auf die Identität ankommt."""
+    kopf = f"id: {kennung}\n" if kennung else ""
+    return (
+        f"---\nknotentyp: begriff\n{kopf}titel: {titel}\nfach: Testfach\n"
+        f"{zeilen}---\n\nEin Text über {titel}.\n"
+    ).encode("utf-8")
+
+
+class TestStabileKennung:
+    """Paket 10, AP2 (Entscheidung D3): Ein Knoten wird an seiner `id` wiedererkannt.
+
+    ⚠️ **Warum das überhaupt nötig war.** Bis Paket 9 hing die Identität am Dateinamen.
+    Beim Pflegen im Vault ist Umbenennen keine Ausnahme — „Oxidation.md" wird zu
+    „Oxidation (Sauerstoffaufnahme).md", sobald die zweite Fassung dazukommt. Der
+    nächste Lauf legte dann einen zweiten Knoten an, und beide standen in der Sammlung,
+    die Schüler:innen sehen.
+    """
+
+    async def test_kennung_wird_vergeben_und_gemeldet(self, seed, db_session, testfach):
+        bilanz = await _lauf(seed, db_session)
+        knoten = await _knoten(db_session, "Fiktivum")
+        assert knoten.metadata_["seed_id"] == "tf-fiktivum"
+        assert bilanz.vergebene_ids["Fiktivum"] == "tf-fiktivum"
+
+    async def test_angegebene_kennung_wird_nicht_ueberschrieben(
+        self, seed, db_session, testfach
+    ):
+        bilanz = await seed.importiere(
+            db_session, {"Alpha.md": _md("Alpha", kennung="tf-eigene")}
+        )
+        await db_session.flush()
+        knoten = await _knoten(db_session, "Alpha")
+        assert knoten.metadata_["seed_id"] == "tf-eigene"
+        assert bilanz.vergebene_ids == {}, "eine mitgebrachte Kennung ist nicht vergeben"
+
+    async def test_umbenannte_datei_ergibt_keinen_zweiten_knoten(
+        self, seed, db_session, testfach
+    ):
+        """Der Test aus dem Plan — und der einzige Grund für das ganze Arbeitspaket."""
+        inhalt = _md("Alpha", kennung="tf-alpha")
+        erst = await seed.importiere(db_session, {"Alpha.md": inhalt})
+        await db_session.flush()
+        zweit = await seed.importiere(db_session, {"Alpha (Grundfassung).md": inhalt})
+        await db_session.flush()
+
+        assert erst.neu == 1
+        assert zweit.neu == 0, "die umbenannte Datei hat einen Zwilling angelegt"
+        anzahl = (await db_session.execute(
+            sa.select(sa.func.count()).select_from(ContextNode).where(
+                ContextNode.subject_id == testfach.id,
+                ContextNode.content_type == "begriff",
+            )
+        )).scalar_one()
+        assert anzahl == 1
+
+    async def test_uebergang_knoten_ohne_kennung_wird_gefunden(
+        self, seed, db_session, testfach
+    ):
+        """Der zweite Griff über `seed_quelle` — für Bestand, den Alembic 0079 verfehlt.
+
+        Nachgestellt wird der Stand von Paket 9: nur `seed_quelle`, keine Kennung.
+        """
+        await _lauf(seed, db_session)
+        knoten = await _knoten(db_session, "Fiktivum")
+        alt = dict(knoten.metadata_)
+        alt.pop("seed_id")
+        knoten.metadata_ = alt
+        await db_session.flush()
+
+        bilanz = await _lauf(seed, db_session)
+        assert bilanz.neu == 0, "der Knoten ohne Kennung wurde nicht wiedererkannt"
+        await db_session.refresh(knoten)
+        assert knoten.metadata_["seed_id"] == "tf-fiktivum"
+
+    async def test_unveraenderter_knoten_bekommt_die_kennung_nachgetragen(
+        self, seed, db_session, testfach
+    ):
+        """⚠️ Der stille Fall: Ein Knoten, an dem sich nichts ändert, verlässt den Lauf
+        über den Zweig „unverändert" — und bliebe ohne Kennung, wenn die nur auf dem
+        Schreibweg gesetzt würde. Beim nächsten Umbenennen gäbe es doch den Zwilling."""
+        await _lauf(seed, db_session)
+        knoten = await _knoten(db_session, "Fiktivum")
+        alt = dict(knoten.metadata_)
+        alt.pop("seed_id")
+        knoten.metadata_ = alt
+        await db_session.flush()
+
+        bilanz = await _lauf(seed, db_session)
+        assert bilanz.unveraendert == 2 and bilanz.aktualisiert == 0
+        await db_session.refresh(knoten)
+        assert knoten.metadata_["seed_id"] == "tf-fiktivum"
+
+    async def test_nachtragen_ist_keine_bearbeitung(self, seed, db_session, testfach):
+        """`updated_at` beantwortet seit Paket 9 „wie aktuell ist dieser Knoten?".
+
+        Eine nachgetragene Kennung ist keine Bearbeitung — der Stempel muss stehen
+        bleiben, sonst sähen nach der Migration alle Knoten frisch bearbeitet aus.
+        """
+        await _lauf(seed, db_session)
+        knoten = await _knoten(db_session, "Fiktivum")
+        alt = dict(knoten.metadata_)
+        alt.pop("seed_id")
+        knoten.metadata_ = alt
+        await db_session.flush()
+        await db_session.refresh(knoten)
+        vorher = knoten.updated_at
+
+        await _lauf(seed, db_session)
+        await db_session.refresh(knoten)
+        assert knoten.metadata_["seed_id"] == "tf-fiktivum"
+        assert knoten.updated_at == vorher
+
+    async def test_handveraenderter_knoten_bekommt_sie_auch(
+        self, seed, db_session, testfach
+    ):
+        """Inhalt bleibt in Ruhe, Identität ist davon unberührt."""
+        await _lauf(seed, db_session)
+        knoten = await _knoten(db_session, "Fiktivum")
+        alt = dict(knoten.metadata_)
+        alt.pop("seed_id")
+        knoten.metadata_ = alt
+        knoten.content = "In der Oberfläche umgeschrieben."
+        await db_session.flush()
+
+        bilanz = await _lauf(seed, db_session)
+        assert bilanz.uebersprungen == ["Fiktivum"]
+        await db_session.refresh(knoten)
+        assert knoten.metadata_["seed_id"] == "tf-fiktivum"
+        assert knoten.content == "In der Oberfläche umgeschrieben."
+
+    async def test_zwei_dateien_mit_derselben_kennung(self, seed, db_session, testfach):
+        """Ohne diese Prüfung überschriebe die zweite Datei lautlos die erste — und der
+        Bericht meldete „2 neu" für einen Knoten."""
+        bilanz = await seed.importiere(db_session, {
+            "Alpha.md": _md("Alpha", kennung="tf-doppelt"),
+            "Beta.md": _md("Beta", kennung="tf-doppelt"),
+        })
+        await db_session.flush()
+        assert bilanz.neu == 1
+        assert any("tf-doppelt" in w and "Beta" in w for w in bilanz.warnungen), (
+            bilanz.warnungen
+        )
+
+    async def test_ohne_ableitbare_kennung_wird_gemeldet(
+        self, seed, db_session, testfach
+    ):
+        bilanz = await seed.importiere(db_session, {"Δ.md": _md("Delta")})
+        await db_session.flush()
+        assert bilanz.neu == 0
+        assert any("keine `id` ableitbar" in w for w in bilanz.warnungen)
+
+
+class TestZielImBestand:
+    """Wikilinks, deren Ziel **nicht** im Bündel liegt (AP2).
+
+    Beim Ordnerimport die Ausnahme, beim Hochladen einer einzelnen Datei der Normalfall:
+    Ohne diesen Rückgriff hätte eine einzeln importierte Datei keine einzige Kante.
+    """
+
+    async def _nur_fiktivum(self) -> dict[str, bytes]:
+        alle = _buendel()
+        return {n: i for n, i in alle.items() if n == "Fiktivum.md" or n.startswith("_Abb/")}
+
+    async def test_ziel_wird_ueber_den_titel_gefunden(self, seed, db_session, testfach):
+        db_session.add(ContextNode(
+            category="knowledge", content_type="begriff", title="Sammelbegriff",
+            content="Steht schon im Speicher.", subject_id=testfach.id, status="active",
+            read_scope="school", write_scope="school",
+        ))
+        await db_session.flush()
+
+        bilanz = await seed.importiere(db_session, await self._nur_fiktivum())
+        await db_session.flush()
+        assert "Sammelbegriff" not in bilanz.offene_ziele
+        ziele = (await db_session.execute(
+            sa.select(ContextNode.title)
+            .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+            .where(ContextEdge.relation == "is_a")
+        )).scalars().all()
+        assert "Sammelbegriff" in ziele
+
+    async def test_ziel_wird_ueber_die_kennung_gefunden(self, seed, db_session, testfach):
+        """Der umbenannte Fall auch für Ziele: Die Datei heißt anders, die Kennung nicht."""
+        await seed.importiere(
+            db_session, {"Sammelbegriff.md": _md("Ganz anderer Titel")}
+        )
+        await db_session.flush()
+        # ⚠️ Herkunftsdatei und Titel wegnehmen, sonst belegt der Fall nichts: Beide
+        # würden das Ziel ebenfalls finden, und der Weg über die Kennung bliebe ungeprüft.
+        ziel = await _knoten(db_session, "Ganz anderer Titel")
+        ziel.metadata_ = {"seed_id": ziel.metadata_["seed_id"]}
+        ziel.title = "Nichts, wonach jemand sucht"
+        await db_session.flush()
+
+        bilanz = await seed.importiere(db_session, await self._nur_fiktivum())
+        await db_session.flush()
+        assert "Sammelbegriff" not in bilanz.offene_ziele
+
+    async def test_mehrdeutiger_titel_ergibt_keine_kante(self, seed, db_session, testfach):
+        """Zwei Fassungen tragen denselben Titel — eine davon zu greifen wäre geraten."""
+        for kennung in ("tf-eins", "tf-zwei"):
+            db_session.add(ContextNode(
+                category="knowledge", content_type="begriff", title="Sammelbegriff",
+                content=f"Fassung {kennung}.", subject_id=testfach.id, status="active",
+                read_scope="school", write_scope="school",
+                metadata_={"seed_id": kennung},
+            ))
+        await db_session.flush()
+
+        bilanz = await seed.importiere(db_session, await self._nur_fiktivum())
+        await db_session.flush()
+        assert any("mehrdeutig" in w for w in bilanz.warnungen), bilanz.warnungen
+        assert "Sammelbegriff" not in bilanz.offene_ziele
+
+    async def test_fremdes_fach_wird_nicht_getroffen(self, seed, db_session, testfach):
+        """Der Bestand ist je Fach — sonst hinge ein Chemiebegriff an einem Physikknoten."""
+        anderes = Subject(
+            slug=f"anderes-{uuid.uuid4().hex[:8]}", name="Anderes", fach_code="AF"
+        )
+        db_session.add(anderes)
+        await db_session.flush()
+        db_session.add(ContextNode(
+            category="knowledge", content_type="begriff", title="Sammelbegriff",
+            content="Gehört einem anderen Fach.", subject_id=anderes.id, status="active",
+            read_scope="school", write_scope="school",
+        ))
+        await db_session.flush()
+
+        bilanz = await seed.importiere(db_session, await self._nur_fiktivum())
+        await db_session.flush()
+        assert bilanz.offene_ziele["Sammelbegriff"] >= 1

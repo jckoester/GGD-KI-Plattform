@@ -351,6 +351,109 @@ class TestStandHash:
         )
         assert ohne == mit
 
+    def test_die_kennung_zaehlt_nicht(self, seed):
+        """⚠️ Der Grund ist nicht Symmetrie, sondern die Migration (Alembic 0079).
+
+        Sie trägt `seed_id` an sechsunddreißig unveränderten Knoten nach. Stünde die
+        Kennung im Hash, hielte der nächste Lauf jeden davon für handverändert und
+        rührte keinen mehr an — Idempotenz kaputt, ohne dass irgendwo etwas rot wird.
+        """
+        ohne = seed.stand_hash("T", "Text", {"x": 1}, [])
+        mit = seed.stand_hash("T", "Text", {"x": 1, "seed_id": "ch-t"}, [])
+        assert ohne == mit
+
+
+class TestStabileKennung:
+    """Die `id` im Frontmatter (Paket 10, AP2, Entscheidung D3).
+
+    Ohne sie erkennt der Import einen Knoten am Dateinamen — und eine umbenannte Datei
+    ergibt einen zweiten Knoten. Hier steht nur der datenbankfreie Teil: Format, Ableitung
+    und was `lies_datei` daraus macht. Dass das Umbenennen wirklich keinen Zwilling mehr
+    erzeugt, prüft `tests/integration/test_seed_fachbegriffe_db.py`.
+    """
+
+    @pytest.mark.parametrize("wert", ["ch-oxidation", "ch1", "a", "ch-oxidation-2"])
+    def test_gueltige_kennungen(self, seed, wert):
+        assert seed.ist_gueltige_id(wert)
+
+    @pytest.mark.parametrize(
+        "wert",
+        [
+            "CH-Oxidation",    # Großbuchstaben — in Dateinamen und URLs eine Falle
+            "ch_oxidation",    # Unterstrich ist nicht der vereinbarte Trenner
+            "ch oxidation",    # Leerzeichen
+            "ch--oxidation",   # Doppelbindestrich
+            "-ch",             # führender Bindestrich
+            "ch-",             # abschließender Bindestrich
+            "säure",           # Umlaut
+            "",
+        ],
+    )
+    def test_ungueltige_kennungen(self, seed, wert):
+        assert not seed.ist_gueltige_id(wert)
+
+    def test_ableitung_aus_fach_und_dateiname(self, seed):
+        """Das Beispiel aus dem Plan, Zeichen für Zeichen."""
+        assert seed.leite_id_ab("CH", "Oxidation (Sauerstoffaufnahme)") == (
+            "ch-oxidation-sauerstoffaufnahme"
+        )
+
+    @pytest.mark.parametrize(
+        "dateiname,erwartet",
+        [
+            ("Säure-Base-Reaktion", "ch-saeure-base-reaktion"),
+            ("Stöchiometrie", "ch-stoechiometrie"),
+            ("Grüße", "ch-gruesse"),
+            ("zwischenmolekulare Wechselwirkungen", "ch-zwischenmolekulare-wechselwirkungen"),
+            ("GHS05 Ätzwirkung", "ch-ghs05-aetzwirkung"),
+        ],
+    )
+    def test_umlaute_werden_ausgeschrieben(self, seed, dateiname, erwartet):
+        """⚠️ Ausgeschrieben, nicht zu Bindestrichen zerlegt.
+
+        Ohne die Regel ergäbe `Säure-Base-Reaktion` die Kennung `ch-s-ure-base-reaktion`
+        — lesbar für niemanden, und jede andere Schreibweise mit Sonderzeichen an
+        derselben Stelle fiele damit zusammen.
+        """
+        assert seed.leite_id_ab("CH", dateiname) == erwartet
+
+    def test_ohne_ableitbaren_rest_keine_kennung(self, seed):
+        """Lieber gar keine als eine erfundene — der Bericht verlangt dann ein `id:`."""
+        assert seed.leite_id_ab("CH", "Δ") == ""
+        assert seed.leite_id_ab("CH", "…") == ""
+
+    def test_die_abgeleitete_kennung_ist_selbst_gueltig(self, seed):
+        """Sonst schriebe der Import etwas, das er beim Lesen zurückweist."""
+        for name in ["Oxidation (Sauerstoffaufnahme)", "Säure-Base-Reaktion", "pH-Wert"]:
+            assert seed.ist_gueltige_id(seed.leite_id_ab("CH", name))
+
+    def test_id_aus_dem_frontmatter_wird_uebernommen(self, seed):
+        quelle = seed.lies_datei(
+            "Irgendwas",
+            "---\nknotentyp: begriff\nid: ch-eigene-kennung\ntitel: X\n---\n\nText.\n",
+        )
+        assert quelle.id_angabe == "ch-eigene-kennung"
+
+    def test_ohne_id_bleibt_die_angabe_leer(self, seed, fiktivum):
+        """Die Ableitung passiert erst beim Schreiben — nur dort ist das Fach bekannt."""
+        assert fiktivum.id_angabe == ""
+
+    def test_ungueltige_id_wird_verworfen_die_datei_nicht(self, seed):
+        """⚠️ **Die Datei fällt nicht durch.**
+
+        Eine ungültige Kennung hat noch nie einen Knoten benannt — geschrieben wird nur
+        Geprüftes. Sie wie „nicht angegeben" zu behandeln kann deshalb keinen zweiten
+        Knoten erzeugen. Die Datei abzuweisen verlöre dagegen den ganzen Eintrag samt
+        Kanten wegen eines Großbuchstabens.
+        """
+        quelle = seed.lies_datei(
+            "Irgendwas",
+            "---\nknotentyp: begriff\nid: CH-Falsch\ntitel: X\n---\n\nText.\n",
+        )
+        assert quelle is not None
+        assert quelle.id_angabe == ""
+        assert any("CH-Falsch" in w for w in quelle.warnungen)
+
 
 class TestSkriptHuelle:
     """Die Ordner-Ebene ist das Einzige, was nur das Admin-Skript kennt (Paket 10, AP1).

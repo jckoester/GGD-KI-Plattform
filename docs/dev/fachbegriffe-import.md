@@ -48,7 +48,7 @@ liefe sonst bei **jedem** Lauf als „nicht lesbar" in den Bericht — und ein B
 immer dieselbe Warnung steht, wird nicht mehr gelesen. Alles unter `_Abb/` wird nicht
 übersprungen, sondern über die Pfadangabe in `illustrationen` gesucht.
 
-**Aus dem Frontmatter:** Steuerschlüssel (`knotentyp`, `titel`, `fach`, `aliase`,
+**Aus dem Frontmatter:** Steuerschlüssel (`id`, `knotentyp`, `titel`, `fach`, `aliase`,
 `bildungsplan`) und Beziehungen (`oberbegriff`, `verwandt`, `voraussetzung`,
 `vertieft_in`, `teilchen`, `ghs`) werden ausgewertet und **nicht** an den Knoten
 geschrieben.
@@ -74,14 +74,54 @@ Datenbank verschwindet).
 `illustrationen`; die Oberfläche setzt dort das SVG ein, das Modell bekommt die
 `beschreibung`.
 
+## Woran ein Knoten wiedererkannt wird
+
+An seiner **`id`** — einer Kennung aus Kleinbuchstaben, Ziffern und Bindestrichen, je
+Fach eindeutig, im Frontmatter der Datei:
+
+```yaml
+id: ch-oxidation-sauerstoffaufnahme
+```
+
+⚠️ **Bis Paket 9 war es der Dateiname**, und beim Pflegen im Vault ist Umbenennen keine
+Ausnahme: Sobald die zweite Fassung dazukommt, wird aus `Oxidation.md` eben
+`Oxidation (Sauerstoffaufnahme).md`. Der nächste Lauf legte dann einen **zweiten**
+Knoten an, und beide standen in der Sammlung, die Schüler:innen sehen. Gemessen am
+Pilot: umbenennen ohne `id` ergibt „1 neu, 35 unverändert", mit `id` „0 neu, 36
+unverändert".
+
+**Fehlt die `id`**, leitet der Lauf sie aus Fachkürzel und Dateiname ab —
+`CH` + `Oxidation (Sauerstoffaufnahme)` → `ch-oxidation-sauerstoffaufnahme`; Umlaute
+werden ausgeschrieben (`ä`→`ae`, `ß`→`ss`), alles Übrige wird zum Bindestrich. Die
+Kennung steht danach am Knoten und im Bericht (`vergeben: …`); der Export schreibt sie in
+die Datei zurück. Solange sie nur abgeleitet ist, gilt der alte Zustand weiter: Ein
+Umbenennen erzeugt einen zweiten Knoten.
+
+Steht im Frontmatter eine Kennung, die das Format verletzt (`CH-Oxidation`), wird sie
+verworfen und gemeldet — die Datei selbst wird trotzdem gelesen. Eine ungültige Kennung
+hat noch nie einen Knoten benannt; sie wie „nicht angegeben" zu behandeln kann deshalb
+nichts verdoppeln, die Datei abzuweisen verlöre dagegen den ganzen Eintrag.
+
+Ergibt der Dateiname keine Kennung (nur Sonderzeichen), meldet der Bericht das und
+überspringt die Datei. Eine Kennung zu erfinden, die niemand wiedererkennt, wäre
+schlechter als keine.
+
+**Gesucht wird in dieser Reihenfolge:** `id`, dann — für den Übergang aus Paket 9 —
+`seed_quelle`. Knoten von damals bekommen ihre Kennung beim nächsten Lauf nachgetragen,
+auch wenn sonst nichts passiert; Alembic `0079` hat das für den Bestand schon erledigt.
+
 ## Idempotenz — was ein zweiter Lauf tut
 
-Das Skript schreibt zwei Schlüssel an jeden Knoten:
+Das Skript schreibt drei Schlüssel an jeden Knoten:
 
-- **`seed_quelle`** — der Dateiname. Darüber findet der nächste Lauf denselben Knoten
-  wieder, auch wenn sich der Titel geändert hat.
+- **`seed_id`** — die Kennung von oben.
+- **`seed_quelle`** — der Dateiname, aus dem der Knoten kam.
 - **`seed_hash`** — der Stand, den der letzte Lauf hinterlassen hat (Titel, Text,
   Metadaten, Aliase).
+
+⚠️ **`seed_id` zählt nicht zum Stand.** Identität ist kein Inhalt — und stünde die
+Kennung im Hash, hielte der erste Lauf nach der Migration jeden nachgerüsteten Knoten
+für handverändert und rührte keinen mehr an.
 
 Daraus ergeben sich drei Fälle:
 
@@ -94,15 +134,29 @@ Daraus ergeben sich drei Fälle:
 ⚠️ **Der dritte Fall ist der Grund für den Hash.** Ohne ihn gäbe ein Re-Import die
 Arbeit lautlos preis, die eine Lehrkraft im Editor investiert hat.
 
+## Wohin ein Wikilink zeigt
+
+`[[Ziel]]` meint eine **Datei**, keinen Titel — gleichnamige Fassungen („Oxidation")
+wären über den Titel nicht zu unterscheiden. Gesucht wird deshalb zuerst im **Bündel**.
+Liegt das Ziel nicht darin (der Normalfall beim Hochladen einer einzelnen Datei),
+greift der Lauf auf den Bestand des Fachs zurück: abgeleitete Kennung, dann
+Herkunftsdatei, dann Titel. Tragen mehrere Knoten denselben Titel, entsteht **keine**
+Kante — eine davon zu greifen wäre geraten.
+
+Gefunden wird nur, was der Import auch schreibt (`begriff`, `stoffsteckbrief`) und nur
+im selben Fach. Sonst hinge ein Chemiebegriff an einem gleichnamigen Curriculum-Kapitel.
+
 ## Der Bericht
 
 | Zeile | Bedeutung |
 |---|---|
 | `n neu, n aktualisiert, n unverändert` | siehe Tabelle oben |
 | `n übersprungen` | in der Oberfläche geändert — Liste der Dateien folgt |
+| `vergeben: ch-…` | Die Datei hat kein `id:`; der Lauf hat eine Kennung abgeleitet |
 | `n Kanten, davon n angefasst` | Soll-Ist-Abgleich; gelöschte Kanten sind mitgezählt |
 | `Feld \`x\` verworfen — …` | Das Feld steht im Schema, sein **Wert** passt nicht. Der Knoten bleibt, das Feld fehlt |
 | `Wikilink-Ziel ohne Knoten` | Ein `[[Verweis]]` auf etwas, das es (noch) nicht gibt — die Arbeitsliste für die nächste Ausbaustufe |
+| `Ziel „x" ist im Bestand mehrdeutig` | Mehrere Knoten des Fachs tragen diesen Titel (zwei Fassungen). Im Bündel unterscheidet der Dateiname sie, außerhalb nicht — es entsteht keine Kante |
 | `Fundstellen ohne Bildungsplan-Knoten` | Die `bildungsplan:`-Angabe trifft keine Kompetenz — meist ein Tippfehler in der Nummer |
 | `Fundstellen zeigen auf **archivierte** Knoten` | Die Kante entsteht, wirkt aber nicht: Die Nachbarschaft zeigt nur Aktives. Im Dev-System betrifft das die ganze Edition CH.V3, die erst ab 2027/28 gilt |
 | `n Vektoren verworfen` | So viele Knoten brauchen den Backfill-Lauf oben |
