@@ -535,8 +535,8 @@ categories:
           beschreibung: >-
             Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der
             Normalfall — „Energie" heißt in Physik etwas anderes als in Ethik.
-          spalten: [titel, fassung, fach, ab_klasse, pruefstatus, status, geaendert]
-          filter: [fach, ab_klasse, pruefstatus, status, titel]
+          spalten: [titel, fassung, fach, ab_klasse, status, geaendert]
+          filter: [fach, ab_klasse, status, titel]
           # Fachgebunden, aber trotzdem in der Sidebar (Entscheidung Jan, 02.09.2026):
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
           # Biologie?" fragt man ohne das eigene Fach im Kopf.
@@ -622,13 +622,6 @@ categories:
               Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim
               Sieden zerfällt Wasser in Wasserstoff und Sauerstoff"). Der Assistent
               bekommt sie mit und kann sie ansprechen.
-          pruefstatus:
-            typ: auswahl
-            label: "Prüfstatus"
-            werte: [entwurf, fachlich_geprueft, freigegeben]
-            hinweis: >-
-              Wie weit der Eintrag fachlich geprüft ist. Vorbereitung für die Frage, ob
-              Schüler:innen Entwürfe sehen — heute rein informativ.
           quelle:
             typ: text
             label: "Herkunft"
@@ -675,8 +668,8 @@ categories:
             Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung
             sind getrennt (Chlorwasserstoff / Salzsäure) — sonst verwischt die
             Unterscheidung zwischen Säure und saurer Lösung.
-          spalten: [titel, formel, fach, pruefstatus, status, geaendert]
-          filter: [fach, pruefstatus, status, titel]
+          spalten: [titel, formel, fach, status, geaendert]
+          filter: [fach, status, titel]
           # Wie `begriff`: Nachschlagen im Unterricht ist der Kernfall, und die Frage
           # „was ist das für ein Stoff?" stellt man ohne das eigene Fach im Kopf.
           sidebar: true
@@ -747,13 +740,6 @@ categories:
             label: "Mehrzahl"
             hinweis: >-
               Ein Gedankenstrich, wo es keine gibt.
-          pruefstatus:
-            typ: auswahl
-            label: "Prüfstatus"
-            werte: [entwurf, fachlich_geprueft, freigegeben]
-            hinweis: >-
-              Gefahrstoffangaben ändern sich; der Status sagt, wann zuletzt jemand
-              fachlich daraufgesehen hat.
           quelle:
             typ: text
             label: "Herkunft"

@@ -19,7 +19,6 @@ illustrationen:
     tex: "Irgendwo/im/Vault/schema.tex"
   - datei: _Abb/fehlt.svg
     beschreibung: "Gibt es auf der Platte nicht."
-pruefstatus: entwurf
 quelle: "Test"
 ---
 

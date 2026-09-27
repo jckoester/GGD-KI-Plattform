@@ -251,14 +251,28 @@ class TestBegriffFelderAusDemFachbegriffsPilot:
         with pytest.raises(ValueError, match="Artikel"):
             validate_node_metadata("begriff", {"genus": wert})
 
-    @pytest.mark.parametrize("wert", ["entwurf", "fachlich_geprueft", "freigegeben"])
-    def test_pruefstatus_kennt_die_drei_stufen(self, wert):
-        validate_node_metadata("begriff", {"pruefstatus": wert})
+    def test_pruefstatus_gibt_es_nicht_mehr(self):
+        """⚠️ **Der Prüfstatus ist am 27.09.2026 entfallen** (Entscheidung Jan).
 
-    def test_pruefstatus_weist_erfundene_stufen_ab(self):
-        """Vorbereitung für E6: An diesem Wert hängt später die Schülersichtbarkeit."""
-        with pytest.raises(ValueError, match="Prüfstatus"):
-            validate_node_metadata("begriff", {"pruefstatus": "geprueft"})
+        Er war nie ein Begriff der Plattform: Keine Zeile Code hat ihn gelesen oder
+        geschrieben, der Editor belegte ihn nicht vor, und die drei Werte kamen allein
+        aus dem Frontmatter der Vault-Dateien. Ein Freigabeverfahren, auf das er hätte
+        verweisen können, gibt es nicht — **die Nutzeraktion „Import" ist die Freigabe**.
+        Was nicht fertig ist, wird nicht importiert.
+
+        ⚠️ **Geprüft wird das Schema, nicht die Zurückweisung eines Werts.**
+        `validate_node_metadata` läuft über die Schemafelder; ein unbekannter Schlüssel
+        passiert still. Ein Test, der `{"pruefstatus": "entwurf"}` abgewiesen sehen will,
+        wäre deshalb immer rot — und würde grün, sobald jemand das Feld zurückbrächte.
+        Genau verkehrt herum.
+        """
+        from app.context.taxonomy import collection_config, feld_schema
+
+        for typ in ("begriff", "stoffsteckbrief"):
+            assert "pruefstatus" not in feld_schema(typ), typ
+            sammlung = collection_config(typ) or {}
+            assert "pruefstatus" not in sammlung.get("spalten", []), typ
+            assert "pruefstatus" not in sammlung.get("filter", []), typ
 
     def test_fehlvorstellungen_sind_eine_liste_von_texten(self):
         validate_node_metadata(

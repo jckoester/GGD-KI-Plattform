@@ -51,15 +51,15 @@ describe("sammlung", () => {
 describe("spalten", () => {
   it("mischt feste Spalten und Metadatenfelder", () => {
     const s = spalten("begriff")
-    // Reihenfolge = YAML. `fassung` und `pruefstatus` kamen am 26.09.2026 dazu
-    // (Paket 9/AP1): Gleichnamige Begriffe unterscheiden sich nur in der Fassung,
-    // und der Prüfstatus entscheidet später über die Schülersichtbarkeit.
+    // Reihenfolge = YAML. `fassung` kam am 26.09.2026 dazu (Paket 9/AP1):
+    // Gleichnamige Begriffe unterscheiden sich nur in der Fassung.
+    // `pruefstatus` stand hier bis zum 27.09.2026 und ist entfallen — es gibt kein
+    // Freigabeverfahren, auf das er hätte zeigen können.
     expect(s.map((c) => c.name)).toEqual([
       "titel",
       "fassung",
       "fach",
       "ab_klasse",
-      "pruefstatus",
       "status",
       "geaendert",
     ])

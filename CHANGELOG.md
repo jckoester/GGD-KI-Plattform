@@ -226,6 +226,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **Der Prüfstatus an Fachbegriffen und Stoffsteckbriefen ist entfallen.** Das Feld hatte
+  keine Wirkung: Es gibt kein Freigabeverfahren, auf das es hätte verweisen können.
+  Stattdessen gilt, was ohnehin galt — **wer speichert, veröffentlicht**, und wer
+  importiert, gibt damit frei. Ein Zwischenspeichern unfertiger Bausteine kann später
+  dazukommen; es wäre dann eine eigene Fassung, kein Häkchen.
+
 - **Die Modellstufe „denkt vor der Antwort" ist entfallen.** Sie war dasselbe Modell wie
   die Standardstufe; seit diese selbst mit voller Denktiefe läuft, unterschieden sich die
   beiden in nichts mehr. Bestehende Chats behalten ihren Eintrag in der Historie.

@@ -177,6 +177,26 @@ Hat sich nichts geändert, sagt die Plattform das und legt nichts an.
 > in der [Material-Werkstatt](werkstatt.md); dorthin gehen Änderungen am Text. Erst ein
 > erneutes „Baustein aktualisieren" holt sie in den Wissensgraphen.
 
+### Speichern heißt veröffentlichen
+
+**Es gibt keinen Entwurfszustand.** Was Sie in einem Sammlungs-Editor speichern, ist
+sofort da: in der Sammlung, in der Suche und im Kontext, den ein Assistent zu passenden
+Fragen mitliest. Ein Zwischenspeichern „nur für mich" gibt es nicht.
+
+Wenn Sie an etwas arbeiten, das noch nicht fertig ist, haben Sie zwei Möglichkeiten:
+
+- **Außerhalb schreiben** und erst den fertigen Text einsetzen.
+- **Die Sichtbarkeit eng stellen** (`privat` oder auf Ihre Unterrichtsgruppe), solange
+  der Baustein reift, und sie danach weiten.
+
+Dasselbe gilt für importierte Bausteine: **Der Import ist die Freigabe.** Wer eine Datei
+einspielt, verantwortet ihren Inhalt — es gibt kein Häkchen, das einen Eintrag danach
+noch „freigibt".
+
+> Ein Zwischenspeichern kann später dazukommen. Es wäre dann eine eigene Fassung neben
+> der gültigen, keine Markierung am veröffentlichten Baustein — sonst stünde ein
+> unfertiger Text schon in den Antworten, während das Häkchen noch fehlt.
+
 ## Archivieren statt löschen
 
 Bausteine, die Sie selbst angelegt haben, können Sie unter **Meine Bausteine**

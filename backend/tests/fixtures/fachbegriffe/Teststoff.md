@@ -21,7 +21,6 @@ ghs:
   - 17
 bildungsplan: []
 verwandt: ["[[Fiktivum]]"]
-pruefstatus: freigegeben
 quelle: "Test"
 ---
 

@@ -202,14 +202,12 @@ export const COLLECTIONS = {
       "fassung",
       "fach",
       "ab_klasse",
-      "pruefstatus",
       "status",
       "geaendert"
     ],
     "filter": [
       "fach",
       "ab_klasse",
-      "pruefstatus",
       "status",
       "titel"
     ],
@@ -259,13 +257,11 @@ export const COLLECTIONS = {
       "titel",
       "formel",
       "fach",
-      "pruefstatus",
       "status",
       "geaendert"
     ],
     "filter": [
       "fach",
-      "pruefstatus",
       "status",
       "titel"
     ],
@@ -383,16 +379,6 @@ export const FELD_SCHEMATA = {
       "label": "Häufige Irrtümer",
       "hinweis": "Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim Sieden zerfällt Wasser in Wasserstoff und Sauerstoff\"). Der Assistent bekommt sie mit und kann sie ansprechen."
     },
-    "pruefstatus": {
-      "typ": "auswahl",
-      "label": "Prüfstatus",
-      "werte": [
-        "entwurf",
-        "fachlich_geprueft",
-        "freigegeben"
-      ],
-      "hinweis": "Wie weit der Eintrag fachlich geprüft ist. Vorbereitung für die Frage, ob Schüler:innen Entwürfe sehen — heute rein informativ."
-    },
     "quelle": {
       "typ": "text",
       "label": "Herkunft",
@@ -444,16 +430,6 @@ export const FELD_SCHEMATA = {
       "typ": "text",
       "label": "Mehrzahl",
       "hinweis": "Ein Gedankenstrich, wo es keine gibt."
-    },
-    "pruefstatus": {
-      "typ": "auswahl",
-      "label": "Prüfstatus",
-      "werte": [
-        "entwurf",
-        "fachlich_geprueft",
-        "freigegeben"
-      ],
-      "hinweis": "Gefahrstoffangaben ändern sich; der Status sagt, wann zuletzt jemand fachlich daraufgesehen hat."
     },
     "quelle": {
       "typ": "text",
