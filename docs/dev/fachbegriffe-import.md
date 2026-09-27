@@ -1,7 +1,8 @@
-# Fachbegriffe aus einem Obsidian-Ordner einspielen
+# Fachbegriffe einspielen und wieder herausholen
 
-Aus Markdown-Dateien werden `begriff`- und `stoffsteckbrief`-Knoten samt Kanten. Es ist
-ein **Einspielvorgang**, kein Synchronisierungsdienst: Er läuft, wenn jemand ihn startet.
+Aus Markdown-Dateien werden `begriff`- und `stoffsteckbrief`-Knoten samt Kanten, und aus
+Knoten wieder Dateien. Es ist ein **Einspielvorgang**, kein Synchronisierungsdienst: Er
+läuft, wenn jemand ihn startet.
 
 **Die Arbeit liegt in `app/context/fachbegriffe_import.py`**, nicht im Skript. Darauf
 sitzen zwei Hüllen:
@@ -273,6 +274,54 @@ im selben Fach. Sonst hinge ein Chemiebegriff an einem gleichnamigen Curriculum-
 nicht den Knoten und schon gar nicht den Lauf — über einen falschen Artikel die
 Definition, die Aliase und elf Kanten zu verlieren, stünde in keinem Verhältnis. Jedes
 verworfene Feld steht im Bericht; **den liest man**.
+
+## Der Rückweg: Export
+
+```
+GET /context/fachbegriffe/export?fach=chemie     → Zip, Rechte wie beim Import
+GET /context/nodes/<uuid>/markdown               → eine Datei, Leserecht genügt
+```
+
+Eine Fachschaft darf in Dateien pflegen **oder** in der Oberfläche (Entscheidung D1).
+Ohne Rückweg wäre die zweite von jeder späteren Massenänderung abgeschnitten. Der Code
+liegt in `app/context/fachbegriffe_export.py` — die Umkehrung von `lies_datei`.
+
+**Was der Export ist: der Stand des Speichers.** Nicht die Datei von vorgestern. Was
+beim Lesen aufgelöst wurde, kommt nicht zurück:
+
+| | |
+|---|---|
+| Verweise auf Begriffe **ohne Knoten** | Sie sind nie zu einer Kante geworden (Entscheidung E3) und fehlen. ⚠️ Im Chemie-Pilot sind das **251 Wikilinks** — wer damit einen gepflegten Vault überschreibt, verliert genau die Arbeitsliste für die Breite |
+| `pruefstatus` | wird nicht gespeichert |
+| `[[Verweis]]` im Fließtext | wurde beim Lesen zu Klartext |
+| `## Offene Fragen` | wird beim Lesen verworfen |
+
+Deshalb liegt in **jedem** Bündel ein `_Export-Hinweise.txt` mit genau dieser Liste —
+auch wenn sonst nichts aufgefallen ist. Der Unterstrich hält es beim Wiedereinlesen
+draußen.
+
+⚠️ **Jede Datei prüft sich selbst.** Nach dem Schreiben liest `lies_datei` sie zurück
+und vergleicht den Stand-Hash mit dem des Knotens. Stimmt er nicht, stünde beim nächsten
+Import „aktualisiert", obwohl sich nichts geändert hat — und niemand wüsste, warum. Der
+Befund landet im Beipackzettel. Das passiert bei Knoten, die nie durch eine Datei
+gegangen sind: eine `##`-Überschrift im Text, eine mehrzeilige Fehlvorstellung.
+
+**Der Rundreise-Wächter** (`tests/integration/test_fachbegriffe_rundreise.py`) geht den
+Kreis: importieren → exportieren → wieder importieren. Gleich bleiben müssen Knoten,
+**Kanten** und Aliase. Kanten stecken nicht im Stand-Hash — ohne diese Zeile fiele ihr
+Verlust nicht auf.
+
+⚠️ **Auch Kanten, die nicht vom Import stammen, gehen mit.** Wer in der Oberfläche
+verknüpft hat, soll das im Export wiederfinden; sonst wäre der Rückweg löchrig, und
+genau dagegen gibt es ihn. Die Folge: Nach einem Rundgang gehört auch diese Verbindung
+der Datei, und ein späterer Import ohne sie löscht sie.
+
+Zwei Zuordnungen, die das Format nicht eindeutig hergibt und die deshalb festgelegt
+sind: `is_a` schreibt sich bei `stoffsteckbrief` als `stoffklasse`, sonst als
+`oberbegriff` (dieselbe Relation, das Wort der Fachschaft ist ein anderes). Und eine
+Kante mit mehreren Lesarten (`arten`, etwa Vertiefung **und** Abgrenzung) wird unter
+**jeder** davon geschrieben — nur die Gewinner-Art zurückzuschreiben verlöre die andere
+bei jedem Rundgang.
 
 ## Zusammenhänge
 

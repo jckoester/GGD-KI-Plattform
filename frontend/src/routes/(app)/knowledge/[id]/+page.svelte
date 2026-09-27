@@ -10,7 +10,12 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { CATEGORY_LABELS, CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
-    import { getContextNode, getArchivedReferences, updateNodeTitle } from "$lib/api.js";
+    import {
+        getContextNode,
+        getArchivedReferences,
+        knotenAlsMarkdown,
+        updateNodeTitle,
+    } from "$lib/api.js";
     import { renderInlineMath, renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
     import { renderServerBlocks } from "$lib/serverRender.js";
@@ -18,7 +23,8 @@
     import { feldSchema } from "$lib/collections.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
-    import { ArrowLeft, Pencil, Check, X } from "lucide-svelte";
+    import { ArrowLeft, Pencil, Check, X, Download } from "lucide-svelte";
+    import { IMPORTIERBARE_TYPEN } from "$lib/fachbegriffe_import.js";
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
@@ -36,6 +42,19 @@
     let titleError = $state(null);
 
     const isAdmin = $derived($user?.roles?.includes("admin") ?? false);
+    // Admin ist eine Erweiterung der Lehrkraft-Rolle (CLAUDE.md, Rollenmodell).
+    const istLehrkraft = $derived($user?.roles?.includes("teacher") ?? false);
+    /**
+     * „Als Markdown" — der Weg eines einzelnen Eintrags zurück in den Vault (AP5).
+     *
+     * Nur bei den Typen, die der Import auch liest: Für eine Methode gäbe es keine
+     * Datei, in die sie passte, und ein Knopf, der eine unbrauchbare Datei liefert,
+     * ist schlimmer als keiner.
+     */
+    const alsMarkdown = $derived(
+        istLehrkraft && IMPORTIERBARE_TYPEN.includes(node?.content_type),
+    );
+    let downloadFehler = $state(null);
     // Importierte BP-Knoten tragen metadata.bp_id; nur der Titel ist korrigierbar,
     // der Inhalt bleibt read-only (die Voll-Bearbeiten-Ansicht entfällt für sie).
     const isImported = $derived(!!node?.metadata?.bp_id);
@@ -406,6 +425,29 @@
                     {/if}
                 </p>
             </div>
+            {#if alsMarkdown}
+                <button
+                    onclick={async () => {
+                        downloadFehler = null;
+                        try {
+                            await knotenAlsMarkdown(node.id);
+                        } catch (e) {
+                            downloadFehler = e.message;
+                        }
+                    }}
+                    title="Diesen Eintrag als Markdown-Datei im Vault-Format sichern"
+                    class="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm rounded-md
+                           border border-light-ui-3 dark:border-dark-ui-3
+                           text-light-tx dark:text-dark-tx"
+                >
+                    <Download class="w-4 h-4" /> Als Markdown
+                </button>
+            {/if}
+            {#if downloadFehler}
+                <div class="shrink-0 max-w-64">
+                    <ErrorBanner message={downloadFehler} />
+                </div>
+            {/if}
             {#if canEdit && !isImported && ziel.url}
                 <a
                     href={ziel.url}

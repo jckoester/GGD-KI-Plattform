@@ -607,7 +607,7 @@ class TestDrossel:
         from fastapi import HTTPException
 
         from app.auth.jwt import JwtPayload
-        from app.context.router import _import_nutzer
+        from app.context.router import _fachbegriffe_nutzer
         from app.ratelimit.config import resolve
 
         nutzer = JwtPayload(
@@ -616,7 +616,157 @@ class TestDrossel:
         )
         limit, _ = resolve("fachbegriffe_import", nutzer.roles)
         for _ in range(limit):
-            assert await _import_nutzer(nutzer) is nutzer
+            assert await _fachbegriffe_nutzer(nutzer) is nutzer
         with pytest.raises(HTTPException) as fehler:
-            await _import_nutzer(nutzer)
+            await _fachbegriffe_nutzer(nutzer)
         assert fehler.value.status_code == 429
+
+
+EXPORT = "/context/fachbegriffe/export"
+
+
+class TestExport:
+    """Der Rückweg über die API (AP5, D1).
+
+    Die Mechanik des Formats prüft `test_fachbegriffe_rundreise.py`; hier geht es um
+    die Verdrahtung — Rechte, Kopfzeilen und der Kreis **durch beide Endpunkte**.
+    """
+
+    @pytest.mark.asyncio
+    async def test_zip_enthaelt_die_eingespielten_dateien(
+        self, test_client, fach, fachschaft_headers
+    ):
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        antwort = await test_client.get(
+            EXPORT, params={"fach": fach["slug"]}, headers=fachschaft_headers
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.headers["content-type"] == "application/zip"
+        assert ".zip" in antwort.headers["content-disposition"]
+        with zipfile.ZipFile(io.BytesIO(antwort.content)) as archiv:
+            # Der Beipackzettel liegt immer bei — er sagt, was der Export **nicht**
+            # mitbringen kann, und das hängt nicht vom einzelnen Lauf ab.
+            assert sorted(archiv.namelist()) == ["Alpha.md", "_Export-Hinweise.txt"]
+            assert "titel: Alpha" in archiv.read("Alpha.md").decode("utf-8")
+
+    @pytest.mark.asyncio
+    async def test_rundreise_durch_beide_endpunkte(
+        self, test_client, fach, fachschaft_headers
+    ):
+        """⚠️ **Die Probe, die beide Richtungen zusammenhält.** Der Kreis im
+        Modultest läuft am HTTP-Weg vorbei: Dort entsteht das Zip erst, wird wieder
+        entpackt, der Wurzelordner abgeschnitten, die SVG geprüft. Jeder dieser
+        Schritte könnte das Bündel verändern, ohne dass es auffiele."""
+        zusatz = (
+            "illustrationen:\n  - datei: _Abb/schema.svg\n"
+            '    beschreibung: "Ein Kreis."\n'
+        )
+        hin = _zip({
+            "Alpha.md": _md("Alpha", zusatz=zusatz),
+            "_Abb/schema.svg": SVG.encode("utf-8"),
+        })
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("pilot.zip", hin)], headers=fachschaft_headers,
+        )
+        heraus = await test_client.get(
+            EXPORT, params={"fach": fach["slug"]}, headers=fachschaft_headers
+        )
+        assert heraus.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(heraus.content)) as archiv:
+            assert sorted(archiv.namelist()) == [
+                "Alpha.md", "_Abb/schema.svg", "_Export-Hinweise.txt",
+            ]
+
+        zurueck = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("zurueck.zip", heraus.content)], headers=fachschaft_headers,
+        )
+        bericht = zurueck.json()
+        assert (bericht["neu"], bericht["aktualisiert"]) == (0, 0), bericht
+        assert bericht["unveraendert"] == 1
+        assert bericht["kanten_geaendert"] == 0
+
+    @pytest.mark.asyncio
+    async def test_schuelerin_nicht(self, test_client, fach, schuelerin_headers):
+        antwort = await test_client.get(
+            EXPORT, params={"fach": fach["slug"]}, headers=schuelerin_headers
+        )
+        assert antwort.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_fremde_lehrkraft_nicht(self, test_client, fach, fremde_headers):
+        antwort = await test_client.get(
+            EXPORT, params={"fach": fach["slug"]}, headers=fremde_headers
+        )
+        assert antwort.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_unbekanntes_fach(self, test_client, fachschaft_headers):
+        antwort = await test_client.get(
+            EXPORT, params={"fach": "gibtesnicht"}, headers=fachschaft_headers
+        )
+        assert antwort.status_code == 404
+
+
+class TestEinzelneDateiHerunterladen:
+    """„Als Markdown herunterladen" in der Detailansicht."""
+
+    async def _alpha_id(self, test_client, fach, headers, sync_conn):
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=headers,
+        )
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM context_nodes WHERE subject_id = %s AND title = 'Alpha'",
+                (fach["id"],),
+            )
+            return cur.fetchone()[0]
+
+    @pytest.mark.asyncio
+    async def test_liefert_markdown_mit_dateinamen(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        node_id = await self._alpha_id(test_client, fach, fachschaft_headers, sync_conn)
+        antwort = await test_client.get(
+            f"/context/nodes/{node_id}/markdown", headers=fachschaft_headers
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.headers["content-type"].startswith("text/markdown")
+        assert 'filename="Alpha.md"' in antwort.headers["content-disposition"]
+        assert antwort.text.startswith("---\n")
+
+    @pytest.mark.asyncio
+    async def test_auch_fuer_eine_fremde_lehrkraft(
+        self, test_client, fach, fachschaft_headers, fremde_headers, sync_conn
+    ):
+        """Eine einzelne Datei ist kein Massenvorgang: Der Inhalt steht in der
+        Detailansicht ohnehin offen, geprüft wird nur das Leserecht."""
+        node_id = await self._alpha_id(test_client, fach, fachschaft_headers, sync_conn)
+        antwort = await test_client.get(
+            f"/context/nodes/{node_id}/markdown", headers=fremde_headers
+        )
+        assert antwort.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_fremder_knotentyp_ist_kein_download(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO context_nodes (category, content_type, title, content,"
+                " subject_id, status, read_scope, write_scope, metadata)"
+                " VALUES ('knowledge','methode','Eine Methode','x',%s,'active',"
+                "'school','school','{}') RETURNING id",
+                (fach["id"],),
+            )
+            node_id = cur.fetchone()[0]
+        sync_conn.commit()
+        antwort = await test_client.get(
+            f"/context/nodes/{node_id}/markdown", headers=fachschaft_headers
+        )
+        assert antwort.status_code == 404

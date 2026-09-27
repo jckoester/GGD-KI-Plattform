@@ -10,8 +10,12 @@
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
-    import { Plus, Archive, Pencil, Upload } from "lucide-svelte";
-    import { getContextNodes, updateContextNode } from "$lib/api.js";
+    import { Plus, Archive, Pencil, Upload, Download } from "lucide-svelte";
+    import {
+        exportiereFachbegriffe,
+        getContextNodes,
+        updateContextNode,
+    } from "$lib/api.js";
     import { CONTENT_TYPE_LABELS } from "$lib/taxonomy.js";
     import {
         sammlung,
@@ -201,6 +205,19 @@
     const importierbar = $derived(IMPORTIERBARE_TYPEN.includes(typ) && istLehrkraft);
     const importFach = $derived(fachId ? $subjectMap[Number(fachId)] : null);
     let importDialog = $state(false);
+    let exportLaeuft = $state(false);
+
+    async function exportieren() {
+        exportLaeuft = true;
+        aktionsfehler = null;
+        try {
+            await exportiereFachbegriffe(importFach.slug);
+        } catch (e) {
+            aktionsfehler = e.message;
+        } finally {
+            exportLaeuft = false;
+        }
+    }
 
     async function archivieren(node) {
         aktionsfehler = null;
@@ -259,6 +276,18 @@
             </div>
             <div class="shrink-0 flex items-center gap-2">
                 {#if importierbar}
+                    <button
+                        onclick={exportieren}
+                        disabled={!importFach || exportLaeuft}
+                        title={importFach
+                            ? `Alle Einträge aus ${importFach.name} als Zip sichern — dieselben Dateien, die der Import liest`
+                            : "Zuerst ein Fach wählen"}
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm
+                               border border-light-ui-3 dark:border-dark-ui-3
+                               text-light-tx dark:text-dark-tx disabled:opacity-50"
+                    >
+                        <Download size="16" /> Als Zip
+                    </button>
                     <button
                         onclick={() => (importDialog = true)}
                         disabled={!importFach}

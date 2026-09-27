@@ -7,10 +7,10 @@ Sichtbarkeitsfilter werden in KS-Phase-3 um group_memberships-Prüfung erweitert
 import io
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -2160,11 +2160,17 @@ async def get_fachplan_by_subject(
 
 # ── Fachbegriffe hochladen (Paket 10, AP3) ───────────────────────────────────
 
-async def _import_nutzer(user: JwtPayload = Depends(_TEACHER_OR_ADMIN)) -> JwtPayload:
+async def _fachbegriffe_nutzer(
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> JwtPayload:
     """Lehrkraft oder Admin — und gedrosselt.
 
     Reihenfolge mit Absicht: erst die Rolle, dann die Drossel. Wer gar nicht
     importieren darf, soll nicht den Zähler einer fremden Person füllen können.
+
+    **Ein Zähler für Import und Export.** Beides sind Massenvorgänge derselben Person
+    am selben Bestand; zwei Eimer wären zwei Zahlen, die niemand getrennt einstellen
+    will.
     """
     from app.ratelimit.drossel import pruefe
 
@@ -2228,7 +2234,7 @@ async def importiere_fachbegriffe(
     ),
     dateien: list[UploadFile] = File(..., description=".md, .svg oder ein .zip"),
     db: AsyncSession = Depends(get_db),
-    user: JwtPayload = Depends(_import_nutzer),
+    user: JwtPayload = Depends(_fachbegriffe_nutzer),
 ) -> FachbegriffImportBericht:
     """Fachbegriffe und Stoffsteckbriefe einer Fachschaft einspielen.
 
@@ -2294,4 +2300,71 @@ async def importiere_fachbegriffe(
         offene_ziele=_zaehlung(bilanz.offene_ziele),
         offene_fundstellen=_zaehlung(bilanz.offene_fundstellen),
         archivierte_ziele=_zaehlung(bilanz.archivierte_ziele),
+    )
+
+
+@router.get("/fachbegriffe/export")
+async def exportiere_fachbegriffe(
+    fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_fachbegriffe_nutzer),
+) -> Response:
+    """Den Fachbegriffsbestand eines Fachs als Zip im Vault-Format (D1).
+
+    **Der Rückweg.** Eine Fachschaft darf in Dateien pflegen *oder* in der Oberfläche;
+    ohne Export wäre die zweite von jeder späteren Massenänderung abgeschnitten.
+
+    Dieselbe Rechteprüfung wie beim Import — nicht, weil die Inhalte geheim wären (sie
+    stehen für alle lesbar in der Sammlung), sondern weil Hin- und Rückweg dieselbe
+    Zuständigkeit beschreiben: Es ist der Bestand **dieser** Fachschaft.
+    """
+    from app.context.fachbegriffe_export import als_zip, exportiere, hinweisdatei
+
+    fach_zeile = await _fach_mit_schreibrecht(fach, db, user)
+    slug = fach_zeile.slug
+    dateien, bilanz = await exportiere(db, fach_zeile)
+    dateien.append(hinweisdatei(bilanz))
+    if bilanz.warnungen:
+        logger.info("Fachbegriff-Export %s: %d Hinweise", slug, len(bilanz.warnungen))
+    name = f"fachbegriffe_{slug}_{date.today().isoformat()}.zip"
+    return Response(
+        content=als_zip(dateien),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
+
+
+@router.get("/nodes/{node_id}/markdown")
+async def knoten_als_markdown(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> Response:
+    """Einen Fachbegriff als Markdown-Datei — „herunterladen" in der Detailansicht.
+
+    Ohne Drossel und ohne Fachschaftsprüfung: Das ist **eine** Datei, deren Inhalt in
+    der Detailansicht ohnehin offen dasteht. Geprüft wird das Leserecht am Knoten, wie
+    überall sonst auf diesem Weg.
+    """
+    from app.context.fachbegriffe_export import exportiere
+    from app.context.fachbegriffe_import import TYPEN
+
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.content_type not in TYPEN:
+        raise HTTPException(
+            status_code=404, detail="Kein Fachbegriff oder Stoffsteckbrief."
+        )
+    await _check_read_permission(node, user, db)
+    if node.subject_id is None:
+        raise HTTPException(status_code=422, detail="Der Eintrag hat kein Fach.")
+    fach_zeile = await db.get(Subject, node.subject_id)
+
+    dateien, _ = await exportiere(db, fach_zeile, nur=node.id)
+    if not dateien:
+        raise HTTPException(status_code=404, detail="Nichts zu exportieren.")
+    datei = dateien[0]
+    return Response(
+        content=datei.inhalt,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{datei.pfad}"'},
     )

@@ -92,6 +92,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Einträgen, die seit dem letzten Mal in der Oberfläche bearbeitet wurden, je Zeile
   wählen zwischen behalten und überschreiben. Vorher konnte das nur die Administration
   über ein Skript.
+- **Fachbegriffe lassen sich wieder herausholen.** „Als Zip" in der Sammlung sichert den
+  Bestand eines Fachs als Markdown-Dateien samt Abbildungen — dasselbe Format, das der
+  Import liest. Einzelne Einträge gehen über „Als Markdown" in der Detailansicht. Damit
+  bleibt eine Fachschaft, die in der Oberfläche pflegt, für spätere Massenänderungen
+  anschlussfähig. Dem Bündel liegt ein Hinweisblatt bei: Verweise auf Begriffe, die es
+  noch nicht gibt, sind im Speicher nicht abgebildet und fehlen in den Dateien.
 - **Stoffsteckbriefe als eigene Bausteinart.** Chemie-Stoffe mit Formel,
   Eigenschaften, Nachweis und Gefahrenhinweisen stehen in einer eigenen Liste —
   auffindbar auch über Alltagsnamen wie „Kochsalz“. Reinstoff und Lösung sind

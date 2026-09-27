@@ -1406,6 +1406,55 @@ export async function importiereFachbegriffe(fach, dateien, optionen = {}) {
   return res.json();
 }
 
+/**
+ * Den Dateinamen aus `Content-Disposition` lesen, sonst den Rückfall nehmen.
+ *
+ * ⚠️ **Der Server bestimmt ihn, nicht der Browser.** Beim Export heißt die Datei so wie
+ * im Bündel — und das ist der Name, über den der nächste Import den Knoten wiederfindet,
+ * solange keine `id` in der Datei steht. Ihn hier neu zu erfinden hieße, aus
+ * „Oxidation (Sauerstoffaufnahme).md" ein „oxidation.md" zu machen.
+ */
+function _dateiname(antwort, rueckfall) {
+  const kopf = antwort.headers.get("content-disposition") ?? "";
+  const treffer = kopf.match(/filename="([^"]+)"/);
+  return treffer ? treffer[1] : rueckfall;
+}
+
+async function _herunterladen(antwort, rueckfall) {
+  const blob = await antwort.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = _dateiname(antwort, rueckfall);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Den Fachbegriffsbestand eines Fachs als Zip herunterladen (AP5, D1). */
+export async function exportiereFachbegriffe(fach) {
+  const params = new URLSearchParams({ fach });
+  const res = await fetch(`${BASE}/context/fachbegriffe/export?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Export fehlgeschlagen");
+  }
+  await _herunterladen(res, `fachbegriffe-${fach}.zip`);
+}
+
+/** Einen einzelnen Eintrag als Markdown-Datei herunterladen. */
+export async function knotenAlsMarkdown(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/markdown`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Download fehlgeschlagen");
+  }
+  await _herunterladen(res, `${nodeId}.md`);
+}
+
 // ── Context Nodes CRUD ──────────────────────────────────────────────────────
 
 /**
