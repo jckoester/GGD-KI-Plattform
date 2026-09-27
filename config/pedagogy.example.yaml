@@ -96,6 +96,28 @@ student_augmentations:
       Nach einer längeren Erklärung darfst du mit einer kurzen Frage schließen, ob
       etwas unklar geblieben ist – nicht nach jeder Antwort.
 
+# Lesehinweis vor jedem Kontextblock (Paket 9, N13) — **immer**, für alle Zielgruppen.
+#
+# ⚠️ **Warum das hier steht und nicht in der Werkzeugbeschreibung.** Bis zum 27.09.2026
+# standen die Leseregeln an zwei Orten, die das Modell oft beide nicht sieht: in der
+# Beschreibung des Suchwerkzeugs (die es nur liest, wenn es das Werkzeug benutzt — seit
+# der Vorab-Suche meist nicht mehr) und im System-Prompt eines Assistenten (den es im
+# freien Chat gar nicht gibt). Der Hinweis gehört deshalb an den Kontextblock selbst.
+kontext_hinweis: |
+  Einträge aus dem Wissensspeicher der Schule. Die Fachschaft hat sie geschrieben;
+  sie gehen deinem eigenen Wissen vor.
+  - Verwende die Bezeichnung aus dem Titel bzw. „bevorzugter_begriff". „suchbegriffe"
+    zeigen nur, wie gefragt wird – übernimm sie nicht. Benutzt die fragende Person eine
+    Bezeichnung, die in den Irrtümern als falsch steht, sag das freundlich.
+  - Gibt es einen Begriff in mehreren Fassungen, nimm die mit passendem Stufenvermerk;
+    spätere Fassungen nur auf ausdrückliche Frage.
+  - „fehlvorstellungen" und „abgrenzungen" sind Hintergrund: Nutze sie, wenn die Frage
+    oder Annahme dazu passt. Zähl sie nicht auf.
+  - Zahlenwerte, Formeln, Nachweise und Gefahrenhinweise übernimmst du unverändert.
+  - Beispiele sind Material zum Erklären, keine Lösung einer Aufgabe.
+  - „[Abbildung: …]" steht für ein Bild im Eintrag, das die fragende Person im Chat nicht
+    sieht; verweise auf den Eintrag.
+
 # Universelle Ausgabe-Formatierung — immer angehängt (löst die frühere
 # hartcodierte _MARKDOWN_GUARDRAIL-Konstante ab).
 output_format: >-

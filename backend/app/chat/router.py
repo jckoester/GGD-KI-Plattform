@@ -72,7 +72,7 @@ from app.context.stufen import (
     sortiere_passende_nach_vorn,
     vermerke as stufen_vermerke,
 )
-from app.context.modellsicht import fuer_modell
+from app.context.modellsicht import fuer_modell, werkzeug_nutzlast
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -228,15 +228,8 @@ _SEARCH_CONTEXT_NODES_TOOL = {
             "nichts', nur weil dieser Abschnitt leer ist oder unpassend wirkt.\n"
             "Ist 'vollstaendig' false, sag die Gesamtzahl dazu, statt die gezeigten "
             "Treffer als vollständige Liste auszugeben.\n"
-            "An einem Baustein können zwei Felder stehen, die du unterschiedlich "
-            "behandelst:\n"
-            "- 'suchbegriffe': andere Ausdrücke, unter denen nach diesem Baustein "
-            "gefragt wird — auch fachlich unsaubere. Sie helfen dir, die Frage "
-            "zuzuordnen. Verwende sie NICHT in deiner Antwort: Dort gilt der Titel "
-            "bzw. 'bevorzugter_begriff'. Wurde mit einem Suchbegriff gefragt, darfst "
-            "du ihn einmal nennen, damit klar ist, dass ihr dasselbe meint.\n"
-            "- 'abgrenzungen': wovon sich der Baustein unterscheidet und wodurch. "
-            "Nutze sie, wenn Verwechslungsgefahr besteht."
+            "Wie die Felder eines Bausteins zu lesen sind, steht im Hinweis, der dem "
+            "Ergebnis vorangestellt ist."
         ),
         "parameters": {
             "type": "object",
@@ -2118,16 +2111,10 @@ async def chat(
                 # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
                 # Befüllt wird das Fenster jetzt allein vom Suchknopf über
                 # `POST /context/search`.
-                if tool.group == "context_search" and isinstance(tool_result, dict):
-                    # Umschlag der Suchschicht: Die Abschnitte sind bereits fürs Modell
-                    # aufbereitet, hier bleibt nur die Serialisierung.
-                    tool_result_str = json.dumps(tool_result, ensure_ascii=False)
-                elif tool.group == "context_search" and isinstance(tool_result, list):
-                    # `get_operatoren`, das noch eine flache Liste liefert (AP3 macht
-                    # daraus ein Alias auf die Aufzählung).
-                    tool_result_str = json.dumps(
-                        {"nodes": fuer_modell(tool_result)}, ensure_ascii=False
-                    )
+                if tool.group == "context_search":
+                    # Serialisierung **und** Lesehinweis liegen in einer Funktion —
+                    # siehe `werkzeug_nutzlast`, dort auch die beiden Ergebnisformen.
+                    tool_result_str = werkzeug_nutzlast(tool_result)
                 elif _tc_name == "generate_image" and isinstance(tool_result, dict):
                     # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
                     # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)

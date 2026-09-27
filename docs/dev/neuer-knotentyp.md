@@ -306,6 +306,11 @@ Drei Regeln dazu:
   gehört ins Gespräch, aber nicht in den Vektor: Dort machte sie alle Stoffe einander
   ähnlich. Umgekehrt gehören Fehlvorstellungen ins Gespräch, aber nicht in den Vektor —
   sie zögen die Fragen an, die sie widerlegen sollen.
+- **Gliedert der Typ seinen Text in Abschnitte, gehört er in `ABSCHNITTS_TYPEN`.**
+  Sonst schneidet die Kürzung bei 800 Zeichen mitten hinein. `begriff` und
+  `stoffsteckbrief` folgen `_Format.md` (Definition, „### Erklärung", „### Beispiele")
+  und werden deshalb abschnittsweise gekürzt: Kern vollständig, Beispiele nach Budget.
+  Für Typen ohne solche Gliederung ist der harte Schnitt richtig.
 - **Ein Feld, das nicht im Feldschema steht, ist begründungspflichtig.** Ein Test
   (`test_context_taxonomy.py::TestModellMetadata`) prüft die Whitelist gegen `felder:`
   und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute

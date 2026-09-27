@@ -21,7 +21,7 @@ from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context
-from app.context.modellsicht import fuer_modell
+from app.context.modellsicht import fuer_modell, mit_lesehinweis
 from app.context.search import (
     Suchprofil,
     abgrenzungen_zu,
@@ -68,15 +68,15 @@ def _vorab_block(eintraege: list[dict]) -> str:
     ``fehlvorstellungen`` und ``stufe``. Diese Felder in Prosa aufzulösen hieße, sie zu
     erfinden — das Modell kennt die Form bereits aus dem Werkzeug-Ergebnis.
 
-    Der einleitende Satz ist kein Schmuck: Ohne ihn liest ein Modell die Liste als
-    Auftrag, alles darin zu verwenden, und zählt sie auf (in AP7 mehrfach gesehen).
+    Die Leseregeln davor stehen in ``pedagogy.yaml`` und sind dieselben wie am
+    Werkzeugergebnis (N13). Der Zusatz hier ist nur der Satz, der die **Herkunft**
+    erklärt: Diese Treffer hat niemand angefordert, sie können also auch danebenliegen.
     """
     return (
-        "## Einträge aus dem Wissensspeicher der Schule\n\n"
-        "Automatisch zur letzten Nachricht herausgesucht — sie können passen oder auch "
-        "nicht. Was passt, geht deinem eigenen Wissen vor. Was nicht passt, lässt du "
-        "weg; aufzuzählen ist hier nichts. Brauchst du mehr, such mit deinem Werkzeug.\n\n"
-        + json.dumps(eintraege, ensure_ascii=False, indent=1)
+        mit_lesehinweis(json.dumps(eintraege, ensure_ascii=False, indent=1))
+        + "\n\nDiese Einträge wurden automatisch zur letzten Nachricht herausgesucht; "
+        "was nicht passt, lässt du weg. Brauchst du etwas anderes, such mit deinem "
+        "Werkzeug."
     )
 
 

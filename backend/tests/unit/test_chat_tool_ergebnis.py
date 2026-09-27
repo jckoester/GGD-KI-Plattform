@@ -15,6 +15,7 @@ ADR-017/AP1 entfallen. Die Form**prüfung**, die er brauchte, ist damit ebenfall
 # Wege — das Werkzeug und die Vorab-Suche (N11) — und liegt deshalb im Kontextpaket.
 from app.context.modellsicht import (
     INHALT_MAX_ZEICHEN,
+    INHALT_MAX_ZEICHEN_ABSCHNITTE,
     abbildungen_aufgeloest,
     fuer_modell,
     ohne_svg,
@@ -302,14 +303,18 @@ class TestMetadataFuersModell:
         auf **jede** Klammer, nicht auf das ganze Wort — ein abgeschnittenes
         `{{abbildun` enthält `{{abbildung` gerade nicht mehr und käme sonst durch.
         """
-        vorlauf = "A" * (INHALT_MAX_ZEICHEN - 10)
+        # ⚠️ Die Schnittkante hängt an der **Knotenart**: `begriff` wird seit N14
+        # abschnittsweise gekürzt und hat ein größeres Budget. Der Test rechnete bis zum
+        # 27.09.2026 mit 800 und prüfte danach an einem Text, der gar nicht mehr
+        # geschnitten wurde — die Zusage wäre still ungeprüft geblieben.
+        vorlauf = "A" * (INHALT_MAX_ZEICHEN_ABSCHNITTE - 10)
         [e] = fuer_modell([self._begriff(
             {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "Ein Bild"}]},
             content=vorlauf + "{{abbildung:x.svg}}",
         )])
         assert "{" not in e["content"] and "}" not in e["content"]
         assert e["content"].startswith(vorlauf + "[Abbildung")
-        assert len(e["content"]) == INHALT_MAX_ZEICHEN + 2
+        assert len(e["content"]) == INHALT_MAX_ZEICHEN_ABSCHNITTE + 2
 
     def test_metadata_ohne_dict_stuerzt_nicht_ab(self):
         [e] = fuer_modell([self._begriff(None)])
@@ -363,3 +368,136 @@ class TestSuchbegriffeUndAbgrenzungen:
         assert "abgrenzungen" not in e
         [e2] = fuer_modell([self._knoten_mit()])
         assert "abgrenzungen" not in e2
+
+
+class TestLesehinweis:
+    """Der Lesehinweis vor jedem Kontextblock (Paket 9, N13).
+
+    ⚠️ **Zwei Wege, ein Hinweis.** Bausteine erreichen das Modell über die Vorab-Suche
+    **und** über das Suchwerkzeug. Stünde der Hinweis nur an einem, hinge das Verhalten
+    davon ab, welchen Weg das Modell zufällig genommen hat — genau die Abhängigkeit, die
+    die Vorab-Suche gerade beseitigt hat.
+    """
+
+    def test_hinweis_steht_vorn(self):
+        from app.context.modellsicht import mit_lesehinweis
+        from app.pedagogy.config import load_pedagogy
+        aus = mit_lesehinweis('{"nodes": []}')
+        assert aus.startswith(load_pedagogy().kontext_hinweis.strip())
+        assert aus.endswith('{"nodes": []}')
+
+    def test_ohne_hinweis_bleibt_der_rumpf_unberuehrt(self, monkeypatch):
+        """Leerer Schlüssel = kein Hinweis. Eine Schule, die ihn streicht, bekommt den
+        Block ohne Vorwort — nicht einen Block mit zwei Leerzeilen davor."""
+        from app.context import modellsicht
+        from app.pedagogy.config import load_pedagogy
+
+        konfig = load_pedagogy().model_copy(update={"kontext_hinweis": "  "})
+        monkeypatch.setattr(modellsicht, "load_pedagogy", lambda: konfig)
+        assert modellsicht.mit_lesehinweis("RUMPF") == "RUMPF"
+
+    def test_werkzeugergebnis_traegt_den_hinweis(self):
+        """Beide Ergebnisformen der Gruppe `context_search` — Umschlag und flache Liste."""
+        from app.context.modellsicht import werkzeug_nutzlast
+        from app.pedagogy.config import load_pedagogy
+        kopf = load_pedagogy().kontext_hinweis.strip()
+
+        umschlag = werkzeug_nutzlast({"exakte_namenstraeger": [], "gesamt": 0})
+        assert umschlag.startswith(kopf)
+        assert '"gesamt": 0' in umschlag
+
+        liste = werkzeug_nutzlast([_knoten(content="x")])
+        assert liste.startswith(kopf)
+        assert '"nodes"' in liste
+        # Durch `fuer_modell` gelaufen: die interne ID bleibt draußen.
+        assert "node_id" not in liste
+
+    def test_regeln_stehen_nicht_mehr_in_der_werkzeugbeschreibung(self):
+        """⚠️ **Sonst stünden sie an zwei Orten.** Der Grund für N13 war, dass die
+        Leseregeln nur dort standen, wo das Modell sie oft nicht sieht. Sie zusätzlich
+        stehen zu lassen, hieße dieselbe Regel doppelt zu pflegen — und die eine würde
+        eines Tages geändert und die andere nicht.
+        """
+        from app.chat.router import _SEARCH_CONTEXT_NODES_TOOL
+        beschreibung = _SEARCH_CONTEXT_NODES_TOOL["function"]["description"]
+        assert "suchbegriffe" not in beschreibung
+        assert "abgrenzungen" not in beschreibung
+        assert "Hinweis" in beschreibung
+
+
+class TestAbschnittsweiseKuerzung:
+    """Definition und Erklärung vollständig, Beispiele nach Budget (Paket 9, N14).
+
+    ⚠️ **Der Anlass war eine Zählung, kein Gefühl:** Bei 800 Zeichen wurden 26 der 36
+    Pilotknoten gekürzt, der Schnitt lag fast immer mitten in der Erklärung, und der
+    Beispiel-Abschnitt erreichte das Modell in 11 von 36 Fällen. Bei drei von fünf Knoten
+    mit Abbildung fiel auch der Platzhalter weg — gerade der Hinweis, dass es ein Bild gibt.
+    """
+
+    def _knoten_text(self, erklaerung_laenge=300, beispiele=6):
+        return (
+            "Die Definition in einem Satz.\n\n### Erklärung\n\n"
+            + "E" * erklaerung_laenge
+            + "\n\n### Beispiele\n\n"
+            + "\n".join(f"- Beispiel {i} " + "b" * 90 for i in range(beispiele))
+        )
+
+    def test_definition_und_erklaerung_bleiben_ganz(self):
+        from app.context.modellsicht import kuerze
+        text = self._knoten_text()
+        aus = kuerze(text, "begriff")
+        assert "Die Definition in einem Satz." in aus
+        assert "E" * 300 in aus
+
+    def test_beispiele_werden_zuerst_geopfert(self):
+        from app.context.modellsicht import kuerze, INHALT_MAX_ZEICHEN_ABSCHNITTE
+        aus = kuerze(self._knoten_text(beispiele=30), "begriff")
+        assert len(aus) <= INHALT_MAX_ZEICHEN_ABSCHNITTE
+        assert aus.rstrip().endswith("…"), "gekürzt, aber ohne sichtbares Zeichen"
+        assert "Beispiel 0" in aus and "Beispiel 29" not in aus
+
+    def test_schnitt_liegt_auf_einer_zeilengrenze(self):
+        """Ein halber Spiegelstrich ist schlechter als einer weniger."""
+        from app.context.modellsicht import kuerze
+        aus = kuerze(self._knoten_text(beispiele=30), "begriff")
+        for zeile in aus.splitlines():
+            if zeile.startswith("- Beispiel"):
+                assert zeile.endswith("b" * 90), f"angeschnitten: {zeile[-30:]!r}"
+
+    def test_kurzer_knoten_bleibt_unangetastet(self):
+        from app.context.modellsicht import kuerze
+        text = self._knoten_text(erklaerung_laenge=50, beispiele=2)
+        assert kuerze(text, "begriff") == text
+
+    def test_ueberlanger_kern_wird_trotzdem_geschnitten(self):
+        """⚠️ Die Zusage lautet „Beispiele zuerst", nicht „der Kern ist heilig" — sonst
+        füllte ein einzelner Baustein den halben Prompt."""
+        from app.context.modellsicht import kuerze, INHALT_MAX_ZEICHEN_ABSCHNITTE
+        aus = kuerze(self._knoten_text(erklaerung_laenge=4000, beispiele=3), "begriff")
+        assert len(aus) <= INHALT_MAX_ZEICHEN_ABSCHNITTE + 2
+        assert aus.endswith("…")
+
+    def test_andere_knotenarten_behalten_den_harten_schnitt(self):
+        """Eine Bildungsplan-Kompetenz hat keine Beispiele, die man schonen könnte —
+        und liegt im Median bei 137 Zeichen."""
+        from app.context.modellsicht import kuerze, INHALT_MAX_ZEICHEN
+        lang = "K" * (INHALT_MAX_ZEICHEN + 500)
+        assert len(kuerze(lang, "ik_kompetenz")) == INHALT_MAX_ZEICHEN + 2
+
+    def test_bildbeschreibung_zaehlt_mit(self):
+        """`abbildungen_aufgeloest` läuft vorher; ihr Ergebnis ist Teil des Budgets.
+
+        Ohne diese Reihenfolge stünde am Ende ein halber Platzhalter im Prompt — der
+        Fehler, den schon AP3 vermieden hat.
+        """
+        from app.context.modellsicht import fuer_modell, INHALT_MAX_ZEICHEN_ABSCHNITTE
+        beschreibung = "Wassermolekül mit Partialladungen, " * 20
+        [e] = fuer_modell([_knoten(
+            content_type="begriff",
+            content="Definition.\n\n{{abbildung:x.svg}}\n\n### Beispiele\n\n"
+                    + "\n".join(f"- B{i} " + "y" * 90 for i in range(30)),
+            metadata={"illustrationen": [{"datei": "x.svg", "beschreibung": beschreibung}]},
+        )])
+        assert "[Abbildung: " in e["content"]
+        assert "{" not in e["content"] and "}" not in e["content"]
+        assert len(e["content"]) <= INHALT_MAX_ZEICHEN_ABSCHNITTE + 2

@@ -7,6 +7,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Assistenten lesen die Einträge aus dem Wissensspeicher nach festen Regeln.** Vor
+  jedem Kontextblock steht jetzt, wie sie zu verwenden sind: die bevorzugte Bezeichnung
+  statt des Suchbegriffs, vermerkte Irrtümer ansprechen statt aufzählen, Zahlenwerte und
+  Gefahrenhinweise unverändert übernehmen. Die Regeln standen bisher nur in der
+  Werkzeugbeschreibung und erreichten Chats ohne Assistenten gar nicht; der Text steht in
+  `config/pedagogy.yaml`.
+
+- **Längere Einträge kommen vollständiger beim Assistenten an.** Bei Fachbegriffen und
+  Stoffsteckbriefen werden Definition und Erklärung nicht mehr abgeschnitten; Beispiele
+  gehen mit, soweit der Platz reicht. Bisher endete der Text meist mitten in der
+  Erklärung, und die Beispiele erreichten den Assistenten fast nie.
+
 - **Assistenten bekommen die passenden Einträge aus dem Wissensspeicher, ohne danach
   suchen zu müssen.** Zu jeder Nachricht sucht die Plattform selbst und legt passende
   Fachbegriffe, Stoffsteckbriefe sowie Methoden- und Operatorenblätter dazu — auch im

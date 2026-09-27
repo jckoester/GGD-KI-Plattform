@@ -52,6 +52,9 @@ class PedagogyConfig(BaseModel):
     preambles: Preambles
     student_augmentations: list[Augmentation] = []
     output_format: str = ""
+    #: Steht vor **jedem** Kontextblock — Vorab-Suche wie Werkzeugergebnis (N13).
+    #: Leer heißt: kein Hinweis; die Bausteine stehen dann unkommentiert da.
+    kontext_hinweis: str = ""
 
 
 # ---------------------------------------------------------------------------

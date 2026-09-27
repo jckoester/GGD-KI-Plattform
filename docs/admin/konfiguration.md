@@ -490,6 +490,10 @@ Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferen
 - `student_augmentations` — sanfte Lernverhalten-Leitplanken (keine Komplettlösungen,
   sokratische Rückfragen …), **nur** für die Schüler-Behandlung. Pro Assistent über die
   Checkbox-Liste im Editor abschaltbar.
+- `kontext_hinweis` — die Leseregeln für Einträge aus dem Wissensspeicher. Sie stehen
+  vor **jedem** Kontextblock, für alle Zielgruppen. ⚠️ Ohne sie kommen die Regeln im
+  freien Chat nirgends an: Einen Assistenten-Prompt gibt es dort nicht, und die
+  Werkzeugbeschreibung liest das Modell nur, wenn es das Werkzeug benutzt.
 - `output_format` — universelle Ausgabe-Anweisung (Markdown ohne umschließende Fences).
 
 Anders als die Krisen-Dateien ist `pedagogy.yaml` **versioniert**: Änderungen wirken erst

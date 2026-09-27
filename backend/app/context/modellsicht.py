@@ -17,9 +17,11 @@ Die Tabelle, **welches** Feld je Knotenart erlaubt ist, steht in
 :data:`app.context.taxonomy.MODELL_METADATA` — samt Begründung je Feld.
 """
 
+import json
 import re
 
 from app.context.taxonomy import modell_metadata_felder
+from app.pedagogy.config import load_pedagogy
 
 
 # Wie viel eines Knoteninhalts das Modell im Suchergebnis sieht. Bemessen am Bestand:
@@ -114,6 +116,79 @@ def abbildungen_aufgeloest(inhalt: str, metadata) -> str:
     return _ABBILDUNG.sub(ersetze, inhalt)
 
 
+#: Knotenarten, deren Text **abschnittsweise** gekürzt wird (Paket 9, N14).
+#: Sie sind nach `_Format.md` gegliedert: Definition (ohne Überschrift), „### Erklärung",
+#: „### Beispiele" — und nur bei ihnen lohnt die Unterscheidung.
+ABSCHNITTS_TYPEN: tuple[str, ...] = ("begriff", "stoffsteckbrief")
+
+#: Wie viel Text ein solcher Baustein im Prompt bekommen darf.
+#:
+#: ⚠️ **Warum die harte Grenze von 800 Zeichen hier schadete** (nachgezählt 26.09.2026):
+#: 26 der 36 Pilotknoten wurden gekürzt, und der Schnitt lag fast immer mitten in der
+#: Erklärung — die Beispiele erreichten das Modell praktisch **nie**. Bei drei von fünf
+#: Knoten mit Abbildung fiel auch der Platzhalter `[Abbildung: …]` weg, also gerade der
+#: Hinweis, dass es dazu ein Bild gibt.
+INHALT_MAX_ZEICHEN_ABSCHNITTE = 1500
+
+#: Weniger Platz als das lohnt sich für ein Beispiel nicht — ein angefangener Satz
+#: kostet Tokens und sagt nichts.
+_BEISPIEL_MINDESTPLATZ = 120
+
+_BEISPIEL_UEBERSCHRIFT = re.compile(r"^#{1,6}\s*Beispiel", re.MULTILINE | re.IGNORECASE)
+
+
+def _hart(inhalt: str, grenze: int) -> str:
+    return inhalt[:grenze] + " …" if len(inhalt) > grenze else inhalt
+
+
+def kuerze(inhalt: str, content_type: str | None) -> str:
+    """Den Knotentext auf Prompt-Maß bringen — je nach Knotenart anders.
+
+    Für :data:`ABSCHNITTS_TYPEN`: **Definition und Erklärung vollständig**, Beispiele nur,
+    soweit das Budget reicht, abgeschnitten an einer Zeilengrenze und mit sichtbarem „…".
+    Für alle anderen Arten bleibt es beim harten Schnitt bei
+    :data:`INHALT_MAX_ZEICHEN` — eine Bildungsplan-Kompetenz hat keine Beispiele, die
+    man schonen könnte, und liegt im Median ohnehin bei 137 Zeichen.
+
+    ⚠️ **Auch der Kern ist nicht unbegrenzt.** Wären Definition und Erklärung zusammen
+    länger als das Budget, würde ein einzelner Baustein den halben Prompt füllen; dann
+    greift derselbe harte Schnitt. Die Zusage lautet „Beispiele werden zuerst geopfert",
+    nicht „der Kern ist heilig".
+
+    Bildbeschreibungen zählen mit: :func:`abbildungen_aufgeloest` läuft **vor** dieser
+    Funktion, ihr Ergebnis ist Teil des Textes.
+    """
+    if content_type not in ABSCHNITTS_TYPEN:
+        return _hart(inhalt, INHALT_MAX_ZEICHEN)
+
+    treffer = _BEISPIEL_UEBERSCHRIFT.search(inhalt)
+    kern = inhalt[: treffer.start()].rstrip() if treffer else inhalt.rstrip()
+    beispiele = inhalt[treffer.start():].rstrip() if treffer else ""
+
+    if len(kern) >= INHALT_MAX_ZEICHEN_ABSCHNITTE:
+        return _hart(kern, INHALT_MAX_ZEICHEN_ABSCHNITTE)
+    if not beispiele:
+        return kern
+
+    rest = INHALT_MAX_ZEICHEN_ABSCHNITTE - len(kern) - 2   # die beiden Zeilenumbrüche
+    if rest < _BEISPIEL_MINDESTPLATZ:
+        return kern + "\n\n…"
+
+    # An einer Zeilengrenze schneiden: Die Beispiele sind eine Aufzählung, ein halber
+    # Spiegelstrich ist schlechter als einer weniger.
+    passend: list[str] = []
+    verbraucht = 0
+    for zeile in beispiele.splitlines():
+        if verbraucht + len(zeile) + 1 > rest:
+            break
+        passend.append(zeile)
+        verbraucht += len(zeile) + 1
+    gekuerzt = len(passend) < len(beispiele.splitlines())
+    if len(passend) <= 1:          # nur die Überschrift passt — dann lieber gar nicht
+        return kern + "\n\n…"
+    return kern + "\n\n" + "\n".join(passend).rstrip() + ("\n…" if gekuerzt else "")
+
+
 def fuer_modell(
     treffer: list,
     abgrenzungen: dict | None = None,
@@ -182,10 +257,37 @@ def fuer_modell(
             # 200 Zeichen lang und verdrängt damit ein Viertel des Kürzungsbudgets —
             # AP7 misst, ob 800 Zeichen für Begriffe noch reichen.
             inhalt = abbildungen_aufgeloest(inhalt, t.get("metadata"))
-            eintrag["content"] = (
-                inhalt[:INHALT_MAX_ZEICHEN] + " …"
-                if len(inhalt) > INHALT_MAX_ZEICHEN
-                else inhalt
-            )
+            eintrag["content"] = kuerze(inhalt, t.get("content_type"))
         aufbereitet.append(eintrag)
     return aufbereitet
+
+
+def mit_lesehinweis(rumpf: str) -> str:
+    """Den Lesehinweis vor einen Kontextblock setzen (Paket 9, N13).
+
+    ⚠️ **Es gibt zwei Wege, auf denen Bausteine zum Modell kommen** — die Vorab-Suche
+    und das Suchwerkzeug —, und beide brauchen denselben Hinweis. Stünde er nur am
+    einen, hinge das Verhalten davon ab, welchen Weg das Modell zufällig genommen hat;
+    genau diese Abhängigkeit hat die Vorab-Suche gerade beseitigt.
+
+    Der Text selbst steht in ``pedagogy.yaml`` (Schlüssel ``kontext_hinweis``): Er ist
+    Prompt-Text, wird wie die Präambeln gegengelesen und gehört nicht in den Code.
+    """
+    hinweis = load_pedagogy().kontext_hinweis.strip()
+    return f"{hinweis}\n\n{rumpf}" if hinweis else rumpf
+
+
+def werkzeug_nutzlast(ergebnis) -> str:
+    """Ein Ergebnis der Werkzeuggruppe ``context_search``, wie das Modell es liest.
+
+    Die **einzige** Stelle, die daraus Text macht — samt Lesehinweis. Vorher stand die
+    Serialisierung an zwei Zweigen im Streaming-Pfad des Routers, und damit hätte ein
+    dritter Zweig den Hinweis leicht vergessen.
+
+    Zwei Formen, weil die Werkzeuge zwei liefern: Die Suche und die Aufzählung geben
+    einen fertigen Umschlag (Dict), ``get_operatoren`` noch eine flache Liste, die hier
+    durch :func:`fuer_modell` geht.
+    """
+    if isinstance(ergebnis, list):
+        ergebnis = {"nodes": fuer_modell(ergebnis)}
+    return mit_lesehinweis(json.dumps(ergebnis, ensure_ascii=False))

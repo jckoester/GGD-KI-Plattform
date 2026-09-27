@@ -605,6 +605,7 @@ Lehrkräfte behalten **vollständige, direkte** Antworten.
 | `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — kurze Antwort auf eine Sache, höchstens eine Rückfrage, und nur ungefährliche Versuchsvorschläge für zu Hause |
 | `teacher_extension` | Lehrkraft-Behandlung | direkt, vollständig, Musterlösungen ausdrücklich erwünscht |
 | `student_augmentations` | nur Schüler-Behandlung | sanfte Lernverhalten-Leitplanken (s. u.), pro Assistent abschaltbar |
+| `kontext_hinweis` | **alle** | Wie Einträge aus dem Wissensspeicher zu lesen sind — bevorzugte Bezeichnung, Suchbegriffe nicht übernehmen, Irrtümer nutzen statt aufzählen, Werte unverändert. Steht vor **jedem** Kontextblock |
 | `output_format` | **alle** | Ausgabe als Markdown ohne umschließende Code-Fences |
 
 ### Zwei Stolperstellen beim Bearbeiten

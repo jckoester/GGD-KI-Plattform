@@ -105,6 +105,22 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 
 ### Was ein Treffer dem Modell über sich sagt
 
+**Die Auswahl liegt in `app/context/modellsicht.py`** — seit dem 26.09.2026 nicht mehr im
+Chat-Router, weil zwei Wege dieselbe Entscheidung brauchen: das Suchwerkzeug und die
+Vorab-Suche. Dort stehen auch die beiden Regeln, die den Text betreffen:
+
+- **Lesehinweis** (`mit_lesehinweis`): Vor jedem Kontextblock steht
+  `pedagogy.kontext_hinweis` — bevorzugte Bezeichnung statt Suchbegriff, Irrtümer nutzen
+  statt aufzählen, Werte unverändert. ⚠️ Vorher standen diese Regeln nur in der
+  Werkzeugbeschreibung und im Assistenten-Prompt; im freien Chat gibt es weder das eine
+  noch das andere.
+- **Kürzung** (`kuerze`): Für `begriff` und `stoffsteckbrief` abschnittsweise —
+  Definition und Erklärung vollständig, Beispiele nach Budget (1 500 Zeichen), Schnitt
+  auf einer Zeilengrenze, sichtbares „…". Alle anderen Arten behalten den harten Schnitt
+  bei 800. Gemessen am Pilotbestand: Der Beispiel-Abschnitt erreichte das Modell vorher
+  in 11 von 36 Fällen, jetzt in 30; die Bildplatzhalter in 2 von 5, jetzt in 4.
+
+
 Nicht alles, was an einem Knoten steht, geht in den Modellkontext — und was geht, ist
 beschriftet. Entschieden wird das an **einer** Stelle, `_fuer_modell` in
 `app/chat/router.py`.
