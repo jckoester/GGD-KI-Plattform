@@ -456,14 +456,46 @@ python scripts/seed_search_eval_nodes.py --entfernen # wieder wegräumen
 Der Prüfsatz (`config/search_eval.yaml`) misst drei Frageklassen und beendet sich mit
 Exit-Code 1, wenn eine Zusage bricht:
 
-| Kennzahl | Bedeutung | Ausgangswert |
+| Kennzahl | Bedeutung | Stand 27.09.2026 |
 |---|---|---|
-| Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 17/21 |
-| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 36/39 |
+| Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 30/35 |
+| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 51/54 (mittlerer Rang 2,1) |
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
-| Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten — erstmals gemessen | 2/2 auf Rang 1 |
-| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | derzeit 0 |
+| Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten | 3/3, zwei davon auf Rang 1 |
+| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | 8 solcher Fälle, größter Abschnitt 3 |
+
+⚠️ **Die drei roten Fälle sind Altbestand** und kein Rückschritt: zweimal Deutsch
+`3.4.1.1` (einmal mit, einmal ohne Fachbezug) und Informatik `3.1.2(1)`. Beide Knoten
+gibt es; sie werden von ähnlicheren verdrängt. Wer daran arbeitet, prüft zuerst, ob die
+Erwartung stimmt — der Bericht sagt das bei jedem Fall dazu.
+
+### `typ:` — warum ein Fall ohne ihn lügen kann
+
+Ein Fall nennt in `knoten:` den erwarteten Baustein, und `_rang` vergleicht das als
+**Teilzeichenkette** gegen den Titel. Das genügt für Bildungsplan-Nummern
+(`3.2.1.3`), ist aber gefährlich, sobald ein Fall einen **Fachbegriff** erwartet: Der
+Bildungsplan nennt die Begriffe beim Namen. „Wasserstoffbrücken" steht auch in
+„3.2.1.3(10) die besonderen Eigenschaften von Wasser erklären (Dipol,
+Wasserstoffbrücken)" — der Fall wäre grün, ohne dass der Fachbegriff existiert.
+
+⚠️ **Gemessen am 26.09.2026: Zehn von dreizehn** neu angelegten Fachbegriff-Fällen waren
+so auch ohne den Pilotbestand erfüllbar. Sie waren nicht falsch, aber sie belegten
+nichts.
+
+Deshalb trägt ein Fall, der einen bestimmten Knotentyp meint, ihn ausdrücklich:
+
+```yaml
+  - frage: Wie heißt die Bindung im Wassermolekül richtig?
+    fach: Chemie
+    knoten: Elektronenpaarbindung
+    typ: begriff          # ohne diese Zeile zählte auch die BP-Kompetenz als Treffer
+```
+
+**Der Lader weist unbekannte Schlüssel ab.** Das ist keine Kosmetik: Die erste Fassung
+bildete die Felder einzeln ab und verschluckte `typ` stillschweigend — die Messung zeigte
+dieselbe Zahl wie ohne, und der Fehler wäre nicht aufgefallen, hätte die Zahl nicht
+*gleich* bleiben müssen.
 
 **Unterschreiten ist ein Fehlschlag, kein Kompromiss.** Wer eine Kennzahl bewusst
 opfert, begründet das im Code-Kommentar neben dem geänderten Wert — so wie es die
