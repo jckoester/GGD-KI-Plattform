@@ -182,12 +182,25 @@ services:
 
   nginx:
     image: nginx:alpine
+    environment:
+      # ⚠️ **Der Filter ist nicht optional.** Ohne ihn ersetzte envsubst in der Vorlage
+      # auch `$host`, `$remote_addr` und `$upstream_backend` durch Leerzeichenketten —
+      # die Konfiguration wäre syntaktisch heil und funktional kaputt (kein Host-Header,
+      # kein Upstream). Mit ihm werden nur `NGINX_…`-Platzhalter eingesetzt.
+      NGINX_ENVSUBST_FILTER: "NGINX_"
+      # Grobe Obergrenze des Anfragekörpers am Proxy. Muss **über** allen Grenzen der
+      # Anwendung liegen (`UPLOAD_MAX_BYTES`, `FACHBEGRIFFE_IMPORT_MAX_BYTES`), sonst
+      # antwortet nginx mit einem nackten 413, bevor das Backend erklären kann, was zu
+      # tun ist. Der Vorgabewert steht hier und nicht in der Vorlage, damit die
+      # Variable immer gesetzt ist: Eine fehlende ließe envsubst den Platzhalter
+      # stehen, und nginx startete nicht.
+      NGINX_MAX_BODY_SIZE: ${NGINX_MAX_BODY_SIZE:-24m}
     ports:
       # Host-Port konfigurierbar (z.B. hinter einem vorgelagerten Reverse-Proxy);
       # Container-Port bleibt 80. Setzen über NGINX_PORT in .env, Default 80.
       - "${NGINX_PORT:-80}:80"
     volumes:
-      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       - backend
       - frontend

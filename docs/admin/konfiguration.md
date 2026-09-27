@@ -215,6 +215,36 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `PUBLIC_SCHOOL_LOGO_URL_LIGHT` | Logo für helles Theme | `/static/logo-light.png` |
 | `PUBLIC_SCHOOL_LOGO_URL_DARK` | Logo für dunkles Theme | `/static/logo-dark.png` |
 
+### Upload-Grenzen
+
+Vier Zahlen, die dasselbe Ereignis begrenzen — drei in der Anwendung, eine am
+Reverse-Proxy.
+
+| Variable | Beschreibung | Vorgabe |
+|----------|-------------|---------|
+| `UPLOAD_MAX_BYTES` | Anhang im Chat, je Datei | `10485760` (10 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_BYTES` | Bündel des Fachbegriff-Imports, **entpackt** | `20971520` (20 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_FILE_BYTES` | einzelne `.md`/`.svg` darin | `2097152` (2 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_FILES` | Dateien je Importlauf | `500` |
+| `NGINX_MAX_BODY_SIZE` | grobe Obergrenze am Proxy, nginx-Schreibweise | `24m` |
+
+⚠️ **`NGINX_MAX_BODY_SIZE` muss über allen anderen liegen — mit Puffer.** Antwortet der
+Proxy zuerst, bekommt die Nutzer:in ein nacktes „Request Entity Too Large" ohne Text: Sie
+erfährt weder, was zu groß war, noch wie groß es sein darf. Die Meldung der Anwendung,
+die beides sagt, erreicht sie nie. Der Puffer ist nötig, weil ein Formular-Upload mehr
+überträgt als seine Nutzlast (Trennzeichen und Kopfzeilen je Datei, und ein Bündel hat
+viele). Ein Prüfsatz (`test_upload_grenzen_passen.py`) hält die Zahlen zusammen.
+
+Die Vorlage `infra/nginx.conf.template` trägt keine feste Zahl mehr, sondern den
+Platzhalter `${NGINX_MAX_BODY_SIZE}`; der Einstiegspunkt des nginx-Images setzt ihn beim
+Start ein. **Wer einen eigenen Reverse-Proxy davorschaltet** (Option B der
+[Installation](installation.md)), muss dort dieselbe Grenze setzen — der äußerste Proxy
+entscheidet, und der mitgelieferte nginx sieht die Anfrage dann gar nicht mehr.
+
+Wie groß muss es sein? Gemessen an der Chemie-Pilotsammlung: 36 Begriffe mit 31
+Abbildungen sind rund 400 KB. Die Vorgabe trägt also ein Vielfaches davon; nach oben
+kostet sie nur Arbeitsspeicher und Zeit je Anfrage.
+
 ### Rückmeldungen (optional)
 
 | Variable | Beschreibung | Beispiel |

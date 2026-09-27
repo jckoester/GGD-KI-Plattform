@@ -1,9 +1,20 @@
 server {
     listen 80;
 
-    # Maximale Upload-Größe (Sicherheits-Audit #5): nginx-Default ist 1 MB und würde die
-    # eigenen bis zu 10-MB-Uploads (/api/upload/session) am Proxy abweisen. 12m = 10 MB + Puffer.
-    client_max_body_size 12m;
+    # ⚠️ **Vorlage, keine fertige Konfiguration.** Die Datei wird nach
+    # `/etc/nginx/templates/default.conf.template` gemountet; der Einstiegspunkt des
+    # nginx-Images setzt beim Start die `NGINX_`-Platzhalter ein (envsubst) und legt
+    # das Ergebnis in `conf.d/` ab. `NGINX_ENVSUBST_FILTER` in `docker-compose.yml`
+    # sorgt dafür, dass **nur** diese Platzhalter ersetzt werden — `$host`,
+    # `$remote_addr` und `$upstream_backend` unten müssen stehen bleiben.
+    #
+    # Maximale Anfragegröße (Sicherheits-Audit #5): nginx-Default ist 1 MB und wiese
+    # die eigenen Uploads am Proxy ab. Der Wert ist die **grobe Obergrenze**; die
+    # eigentlichen Grenzen setzt die Anwendung (`UPLOAD_MAX_BYTES`,
+    # `FACHBEGRIFFE_IMPORT_MAX_BYTES`) — nur sie kann erklären, was zu tun ist. Deshalb
+    # muss dieser Wert über allen Anwendungsgrenzen liegen; darauf sieht
+    # `backend/tests/unit/test_upload_grenzen_passen.py`.
+    client_max_body_size ${NGINX_MAX_BODY_SIZE};
 
     # ── Security-Header (Sicherheits-Audit #5) ────────────────────────────────
     # Zentral hier gesetzt (nginx ist immer im Stack; ein vorgelagertes Caddy/TLS-Proxy

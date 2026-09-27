@@ -482,12 +482,25 @@ def lade_svg(metadata: dict[str, Any], dateien: Mapping[str, bytes]) -> list[str
 
     `tex` bleibt eine Pfadangabe in den Vault: Die Quelle einer Strukturformel ist ein
     Arbeitsmittel des Autors, kein Inhalt des Wissensgraphen.
+
+    ⚠️ **Gesucht wird erst der Pfad, dann der bloße Dateiname.** Aus dem Vault kommt
+    `_Abb/EN_H2O.svg`, aus dem Upload-Dialog (AP3) womöglich eine einzeln gewählte
+    Datei ohne Ordner. Die Oberfläche vergleicht an derselben Stelle schon immer
+    Dateinamen statt Pfade (`abbildungen.js`); eine Abbildung, die im Bündel liegt und
+    trotzdem als fehlend gemeldet wird, wäre für niemanden erklärlich.
     """
+    nach_name: dict[str, bytes] = {}
+    for pfad, inhalt in dateien.items():
+        nach_name.setdefault(pfad.rsplit("/", 1)[-1], inhalt)
+
     fehlend: list[str] = []
     for abb in metadata.get("illustrationen") or []:
         if not isinstance(abb, dict) or not abb.get("datei"):
             continue
-        roh = dateien.get(str(abb["datei"]))
+        angabe = str(abb["datei"])
+        roh = dateien.get(angabe)
+        if roh is None:
+            roh = nach_name.get(angabe.rsplit("/", 1)[-1])
         if roh is None:
             fehlend.append(str(abb["datei"]))
             continue
@@ -982,6 +995,7 @@ async def seed_in_session(
     gelesen: list[Quelldatei],
     bilanz: "Bilanz",
     *,
+    nur_fach: Subject | None = None,
     ueberschreiben: bool = False,
 ) -> None:
     """Der Schreibteil — mit einer **übergebenen** Sitzung.
@@ -989,6 +1003,13 @@ async def seed_in_session(
     Getrennt von :func:`seed`, damit der Integrationstest gegen die Testdatenbank
     laufen kann, ohne `settings.database_url` umzubiegen. Committet nicht: Wer die
     Sitzung mitbringt, entscheidet über die Transaktion.
+
+    ``nur_fach`` bindet den Lauf an **ein** Fach (AP3): Der Upload-Dialog importiert in
+    das Fach, dessen Sammlung gerade offen ist und für das die Rechte geprüft wurden.
+    Eine Datei, die im Frontmatter ein anderes Fach nennt, wird dann gemeldet und
+    übersprungen. ⚠️ Nicht stillschweigend umhängen — das Fach steht in der Datei, weil
+    jemand es dort hingeschrieben hat; es zu überstimmen, ohne es zu sagen, verwandelt
+    einen Tippfehler in einen Knoten am falschen Ort.
     """
     faecher = await _faecher(db)
     nach_datei: dict[str, Any] = {}
@@ -1005,6 +1026,12 @@ async def seed_in_session(
         fach = faecher.get(quelle.fach.casefold())
         if fach is None:
             bilanz.warnungen.append(f"{quelle.datei}: Fach „{quelle.fach}“ unbekannt")
+            continue
+        if nur_fach is not None and fach.id != nur_fach.id:
+            bilanz.warnungen.append(
+                f"{quelle.datei}: Die Datei nennt das Fach „{quelle.fach}“, "
+                f"importiert wird nach {nur_fach.name} — übersprungen"
+            )
             continue
         gruppe_id = (await db.execute(
             sa.select(Group.id).where(
@@ -1127,6 +1154,7 @@ async def importiere(
     dateien: Mapping[str, bytes],
     *,
     fach_vorgabe: str | None = None,
+    nur_fach: Subject | None = None,
     ueberschreiben: bool = False,
 ) -> Bilanz:
     """Ein Bündel einlesen und schreiben — der eine Weg, den Skript und Endpunkt gehen.
@@ -1134,8 +1162,16 @@ async def importiere(
     Gibt den Bericht zurück und **committet nicht**: Wer aufruft, entscheidet, ob der
     Lauf zählt. Genau daran hängt der Probelauf des Dialogs (AP3) — er verwirft die
     Transaktion und legt dieselbe Bilanz vor.
+
+    ``nur_fach`` bindet den Lauf an ein Fach und ist zugleich die Vorgabe für Dateien
+    ohne `fach:`; siehe :func:`seed_in_session`.
     """
     bilanz = Bilanz()
+    if nur_fach is not None and fach_vorgabe is None:
+        # Eine Datei ohne `fach:` gehört dorthin, wohin der Lauf gebunden ist.
+        fach_vorgabe = nur_fach.slug
     gelesen = lies_buendel(dateien, bilanz, fach_vorgabe)
-    await seed_in_session(db, gelesen, bilanz, ueberschreiben=ueberschreiben)
+    await seed_in_session(
+        db, gelesen, bilanz, nur_fach=nur_fach, ueberschreiben=ueberschreiben
+    )
     return bilanz

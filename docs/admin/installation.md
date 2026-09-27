@@ -300,6 +300,13 @@ Den internen nginx-Port in `docker-compose.yml` auf einen anderen Host-Port
 legen (z. B. `8080:80`) und einen externen nginx als TLS-Terminator davor
 schalten.
 
+⚠️ **Die Upload-Grenze gilt am äußersten Proxy.** Steht ein eigener nginx oder Caddy
+davor, entscheidet dessen `client_max_body_size` — der mitgelieferte nginx sieht eine zu
+große Anfrage dann gar nicht mehr, und die Fachschaft bekommt beim Einspielen ihrer
+Fachbegriffe ein nacktes „Request Entity Too Large" ohne Hinweis, was zu groß war. Den
+Wert dort mindestens so hoch setzen wie `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`, siehe
+[Upload-Grenzen](konfiguration.md#upload-grenzen)).
+
 ## Schritt 11: Erster Login und Grundkonfiguration
 
 1. Die Plattform im Browser unter der konfigurierten Domain aufrufen.

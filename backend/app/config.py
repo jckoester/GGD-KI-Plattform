@@ -226,6 +226,20 @@ class Settings(BaseSettings):
     assistant_context_limit: int = 20
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3
+    # ── Fachbegriff-Import (Paket 10/AP3) ────────────────────────────────────
+    # Eine Fachschaft spielt ihre Begriffe als Bündel ein: einzelne `.md`/`.svg` oder
+    # ein Zip. Die Zahlen sind am Pilot gemessen (36 Knoten plus 31 Abbildungen ≈
+    # 400 KB) und großzügig aufgerundet — sie sollen eine vollständige Sammlung
+    # tragen, nicht knapp reichen.
+    #
+    # ⚠️ **Der Reverse-Proxy muss mitwachsen.** `NGINX_MAX_BODY_SIZE` (Vorgabe 24m in
+    # `docker-compose.yml`) begrenzt den Anfragekörper, bevor er das Backend erreicht.
+    # Ist er kleiner als `fachbegriffe_import_max_bytes`, bekommt die Fachschaft ein
+    # nacktes 413 vom nginx statt eines Satzes, der sagt, was zu tun ist.
+    # `tests/unit/test_upload_grenzen_passen.py` hält beide zusammen.
+    fachbegriffe_import_max_bytes: int = 20 * 1024 * 1024        # Bündel, entpackt
+    fachbegriffe_import_max_file_bytes: int = 2 * 1024 * 1024    # je `.md`/`.svg`
+    fachbegriffe_import_max_files: int = 500                     # Dateien je Lauf
     assistant_schema_path: str = "config/assistant_schema.json"
     teacher_schoolwide_sharing_requires_admin: bool = True
     # Begrenzter Testbetrieb: Schüler:innen sehen nur Fächer, deren Unterrichtsgruppe

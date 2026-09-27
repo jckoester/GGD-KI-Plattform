@@ -3,10 +3,16 @@
 Aus Markdown-Dateien werden `begriff`- und `stoffsteckbrief`-Knoten samt Kanten. Es ist
 ein **Einspielvorgang**, kein Synchronisierungsdienst: Er läuft, wenn jemand ihn startet.
 
-**Die Arbeit liegt in `app/context/fachbegriffe_import.py`**, nicht im Skript.
-`backend/scripts/seed_fachbegriffe.py` ist die Admin-Hülle: Ordner einlesen, Service
-rufen, Bericht ausgeben. Den zweiten Weg auf denselben Kern baut Paket 10 als
-Upload-Dialog für die Fachschaften.
+**Die Arbeit liegt in `app/context/fachbegriffe_import.py`**, nicht im Skript. Darauf
+sitzen zwei Hüllen:
+
+| Weg | Wer | Eingabe |
+|---|---|---|
+| `backend/scripts/seed_fachbegriffe.py` | Admin auf der Kommandozeile | ein Ordner |
+| `POST /context/fachbegriffe/import` | Lehrkräfte des Fachs | Formular-Upload |
+
+Beide rufen `importiere()` und drucken bzw. liefern dieselbe `Bilanz`; ein Test hält
+fest, dass sie auf demselben Bündel dieselben Zahlen ergeben.
 
 ⚠️ **Die Eingabe des Service ist ein Bündel, kein Ordner** — `Pfad → Bytes`. Wo die
 Bytes herkommen, entscheidet der Aufrufer: Das Skript liest ein Verzeichnis, der
@@ -39,6 +45,70 @@ venv/bin/python scripts/embedding_backfill.py --content-type begriff --content-t
 
 ⚠️ Ohne diesen zweiten Lauf sind geänderte Knoten **nicht auffindbar**: Das Skript
 verwirft den Vektor, dessen Eingabe sich geändert hat, und legt keinen neuen an.
+
+## Der Upload-Endpunkt
+
+```
+POST /context/fachbegriffe/import?fach=chemie&probelauf=true&ueberschreiben=false
+Content-Type: multipart/form-data      ·      Feld `dateien` (mehrfach)
+```
+
+**Rechte** (Entscheidung D2): Lehrkraft **und** Mitglied einer Fachschaftsgruppe des
+Fachs, oder Admin. ⚠️ Strenger als `/curricula/new`: Gibt es zum Fach gar keine
+Fachschaft, ist das hier ein 403 und kein „dann eben ohne Prüfung" — der Import hängt
+seine Knoten an genau diese Gruppe und meldete sonst jede Datei als übersprungen.
+
+**Ein Fach.** Der Lauf ist an das Fach gebunden, für das die Rechte geprüft wurden.
+Eine Datei ohne `fach:` landet dort; eine Datei mit einem **anderen** `fach:` wird
+gemeldet und übersprungen — nicht umgehängt.
+
+**`probelauf` ist vorgabemäßig `true`.** Er schreibt nichts (die Transaktion wird
+verworfen) und liefert denselben Bericht wie der echte Lauf. Darauf steht die Vorschau
+im Dialog: Was im Probelauf steht, ist das, was der echte Lauf täte.
+
+**Was angenommen wird:** `.md`, `.svg` und `.zip`. Im Zip zählen `*.md` auf oberster
+Ebene und `_Abb/*`; eine gemeinsame erste Ordnerebene (so packt der Finder) wird
+abgeschnitten. Eine einzeln hochgeladene `.svg` landet unter `_Abb/` — nennt das
+Frontmatter sie ohne Ordner, findet der Import sie trotzdem (gesucht wird erst der
+Pfad, dann der bloße Dateiname).
+
+| Grenze | Vorgabe | Stellschraube | Verhalten |
+|---|---|---|---|
+| Dateien je Lauf | 500 | `FACHBEGRIFFE_IMPORT_MAX_FILES` | 413 |
+| Bündel gesamt (entpackt) | 20 MB | `FACHBEGRIFFE_IMPORT_MAX_BYTES` | 413 |
+| einzelne `.md`/`.svg` | 2 MB | `FACHBEGRIFFE_IMPORT_MAX_FILE_BYTES` | 413 |
+| `..`, absolute Pfade, `\` im Zip | — | — | 400, ganzes Archiv |
+| fremde Endung einzeln gewählt | — | — | 415 |
+| fremde Endung **im Zip** | — | — | übergangen, im Bericht |
+| Anfragen je Person | 20 / 5 min | `fachbegriffe_import` in `rate_limits.yaml` | 429 |
+
+⚠️ **Keine dieser Zahlen steht im Code.** Wie groß ein Bündel sein darf, ist eine
+Einstellung des Servers; `Grenzen` in `fachbegriffe_upload.py` hat deshalb **keine**
+Vorgabewerte, sondern wird aus `app/config.py` gefüllt (`aus_konfiguration()`). Stünde
+dort eine Zahl, gäbe es zwei Wahrheiten, und die im Modul gewänne stillschweigend.
+
+⚠️ **Der Reverse-Proxy muss mitwachsen.** `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`) begrenzt
+den Anfragekörper, bevor er das Backend erreicht. Ist er kleiner, bekommt die Fachschaft
+ein nacktes 413 vom nginx statt eines Satzes, der sagt, was zu tun ist —
+`tests/unit/test_upload_grenzen_passen.py` hält beide zusammen. Für Betreiber steht das
+in [Upload-Grenzen](../admin/konfiguration.md#upload-grenzen).
+
+⚠️ **Jedes SVG wird geprüft, nicht umgeschrieben** (`app/context/svg_pruefung.py`).
+Abgewiesen wird, was Verhalten mitbringt oder nach außen zeigt: `<script>`,
+`<foreignObject>`, Animationselemente, `on…`-Attribute, `javascript:`, `href`/`url()`
+außerhalb des Dokuments, Entity-Deklarationen, ein fehlender SVG-Namensraum. Die
+Abbildung fällt dann weg, **der Knoten bleibt** — dieselbe Verhältnismäßigkeit wie bei
+einem verworfenen Metadatenfeld, und der Grund steht im Bericht.
+
+Ein Sanitisierer, der das Bild „repariert", gäbe der Autorin etwas anderes zurück, als
+sie hochgeladen hat, ohne dass sie es erführe. Bis Paket 9 kamen alle SVGs aus eigenen
+Werkzeugen; `app/render/export.py` trägt diese Annahme im Kopf und verweist jetzt
+hierher.
+
+**Nach dem Import sind die Knoten da, aber noch nicht über die Bedeutung auffindbar:**
+Geänderte Knoten verlieren ihren Vektor, neue haben keinen. Beides holt der nächtliche
+Backfill (03:15). Bis dahin finden sie die Namens- und Aliassuche, **nicht** aber die
+Vorab-Suche im Chat — die arbeitet über Vektoren.
 
 ## Was aus einer Datei gelesen wird
 

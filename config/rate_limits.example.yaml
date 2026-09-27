@@ -24,6 +24,9 @@ buckets:
   # Eine ganze Klasse tritt gleichzeitig bei — das Limit zählt je Person und muss
   # deshalb nur einzelnes Durchprobieren bremsen, nicht den Normalfall.
   group_join: { limit: 10, window: 300 }
+  # Fachbegriff-Import: ein Lauf liest ein ganzes Bündel und schreibt Knoten und
+  # Kanten. Jeder Import über den Dialog sind zwei Anfragen (Probelauf, echter Lauf).
+  fachbegriffe_import: { limit: 20, window: 300 }
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

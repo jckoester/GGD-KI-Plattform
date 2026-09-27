@@ -680,3 +680,39 @@ class EinsatzortRead(BaseModel):
     id: UUID
     titel: str
     content_type: str
+
+
+class ZielZaehlung(BaseModel):
+    """Ein offener Verweis samt Häufigkeit — die Arbeitsliste im Importbericht."""
+
+    ziel: str
+    anzahl: int
+
+
+class FachbegriffImportBericht(BaseModel):
+    """Was ein Import- oder Probelauf ergeben hat (Paket 10, AP3).
+
+    Dieselben Zahlen, die das Admin-Skript auf die Konsole schreibt. Der Probelauf
+    liefert sie, **ohne** dass etwas geschrieben wurde — daran hängt die Vorschau aus
+    AP4: Was hier steht, ist genau das, was der echte Lauf tun würde.
+    """
+
+    probelauf: bool
+    fach: str
+    neu: int = 0
+    aktualisiert: int = 0
+    unveraendert: int = 0
+    #: Dateien, deren Knoten seit dem letzten Import in der Oberfläche bearbeitet
+    #: wurde. Sie bleiben unangetastet, bis jemand das Überschreiben verlangt.
+    uebersprungen: list[str] = Field(default_factory=list)
+    kanten: int = 0
+    kanten_geaendert: int = 0
+    #: Knoten, deren Vektor verworfen wurde. Sie sind erst nach dem nächtlichen
+    #: Backfill wieder über die Bedeutung auffindbar, nicht sofort.
+    neu_einzubetten: int = 0
+    warnungen: list[str] = Field(default_factory=list)
+    #: Datei → Kennung, die der Lauf vergeben hat, weil `id:` fehlte.
+    vergebene_ids: dict[str, str] = Field(default_factory=dict)
+    offene_ziele: list[ZielZaehlung] = Field(default_factory=list)
+    offene_fundstellen: list[ZielZaehlung] = Field(default_factory=list)
+    archivierte_ziele: list[ZielZaehlung] = Field(default_factory=list)

@@ -10,7 +10,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +54,8 @@ from app.context.schemas import (
     IkKompetenzRead,
     PkGruppeRead,
     PkKompetenzRead,
+    FachbegriffImportBericht,
+    ZielZaehlung,
 )
 from app.context import aliase as aliase_modul
 from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
@@ -2153,3 +2155,134 @@ async def get_fachplan_by_subject(
     )
 
 
+
+
+# ── Fachbegriffe hochladen (Paket 10, AP3) ───────────────────────────────────
+
+async def _import_nutzer(user: JwtPayload = Depends(_TEACHER_OR_ADMIN)) -> JwtPayload:
+    """Lehrkraft oder Admin — und gedrosselt.
+
+    Reihenfolge mit Absicht: erst die Rolle, dann die Drossel. Wer gar nicht
+    importieren darf, soll nicht den Zähler einer fremden Person füllen können.
+    """
+    from app.ratelimit.drossel import pruefe
+
+    pruefe("fachbegriffe_import", user.sub, user.roles)
+    return user
+
+
+async def _fach_mit_schreibrecht(
+    fach: str, db: AsyncSession, user: JwtPayload
+) -> Subject:
+    """Das Fach auflösen und das Schreibrecht darin prüfen (Entscheidung D2).
+
+    ⚠️ **Strenger als `/curricula/new`.** Dort gilt: Gibt es zum Fach gar keine
+    Fachschaftsgruppe, wird nicht geprüft. Hier wäre das sinnlos — der Import hängt
+    seine Knoten an genau diese Gruppe (`write_scope = subject`) und meldete ohne sie
+    jede Datei als übersprungen. Ein 403 mit Klartext ist ehrlicher als ein leerer
+    Bericht. Admins bleiben ausgenommen; sie machen das heute über das Skript.
+    """
+    from app.context.service import is_subject_department_member
+
+    schluessel = fach.strip().casefold()
+    treffer = (await db.execute(
+        sa.select(Subject).where(
+            sa.or_(
+                sa.func.lower(Subject.slug) == schluessel,
+                sa.func.lower(Subject.fach_code) == schluessel,
+                sa.func.lower(Subject.name) == schluessel,
+            )
+        ).order_by(Subject.id).limit(1)
+    )).scalars().first()
+    if treffer is None:
+        raise HTTPException(status_code=404, detail=f"Fach „{fach}“ gibt es nicht.")
+    if "admin" in user.roles:
+        return treffer
+    if not await is_subject_department_member(db, treffer.id, user.sub):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Nur die Fachschaft {treffer.name} kann dort Fachbegriffe "
+                   "einspielen.",
+        )
+    return treffer
+
+
+def _zaehlung(counter) -> list[ZielZaehlung]:
+    return [ZielZaehlung(ziel=z, anzahl=n) for z, n in counter.most_common()]
+
+
+@router.post("/fachbegriffe/import", response_model=FachbegriffImportBericht)
+async def importiere_fachbegriffe(
+    fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
+    probelauf: bool = Query(
+        True, description="True: nichts schreiben, nur den Bericht liefern"
+    ),
+    ueberschreiben: bool = Query(
+        False,
+        description=(
+            "Auch Knoten ersetzen, die seit dem letzten Import in der Oberfläche "
+            "bearbeitet wurden"
+        ),
+    ),
+    dateien: list[UploadFile] = File(..., description=".md, .svg oder ein .zip"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_import_nutzer),
+) -> FachbegriffImportBericht:
+    """Fachbegriffe und Stoffsteckbriefe einer Fachschaft einspielen.
+
+    Derselbe Kern wie `scripts/seed_fachbegriffe.py` — hier mit einem Bündel aus dem
+    Formular statt aus einem Ordner, gebunden an **ein** Fach und hinter einer
+    Rechteprüfung.
+
+    ⚠️ **`probelauf=true` ist die Vorgabe.** Der Weg über die Oberfläche zeigt erst
+    den Bericht und fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung,
+    kein Vorgabewert. Die Transaktion wird im Probelauf verworfen — das ist die
+    einzige Zusage, die der Bericht braucht, um dem echten Lauf zu entsprechen.
+    """
+    from app.context.fachbegriffe_import import importiere
+    from app.context.fachbegriffe_upload import BuendelFehler, baue_buendel
+
+    fach_zeile = await _fach_mit_schreibrecht(fach, db, user)
+    # ⚠️ **Vor der Transaktionsentscheidung ablesen.** `rollback()` macht jedes Objekt
+    # der Sitzung ungültig — auch das Fach. Ein `fach_zeile.name` danach löste ein
+    # Nachladen aus, und das scheitert in asyncio. Der Probelauf wäre also genau der
+    # Fall gewesen, der nie funktioniert.
+    fach_name, fach_slug = fach_zeile.name, fach_zeile.slug
+
+    hochgeladen = [(d.filename or "", await d.read()) for d in dateien]
+    try:
+        buendel, warnungen = baue_buendel(hochgeladen)
+    except BuendelFehler as fehler:
+        raise HTTPException(status_code=fehler.status, detail=fehler.text)
+
+    bilanz = await importiere(
+        db, buendel, nur_fach=fach_zeile, ueberschreiben=ueberschreiben
+    )
+    if probelauf:
+        await db.rollback()
+    else:
+        await db.commit()
+        logger.info(
+            "Fachbegriff-Import %s durch %s: %d neu, %d aktualisiert, %d unverändert",
+            fach_slug, user.sub, bilanz.neu, bilanz.aktualisiert,
+            bilanz.unveraendert,
+        )
+
+    return FachbegriffImportBericht(
+        probelauf=probelauf,
+        fach=fach_name,
+        neu=bilanz.neu,
+        aktualisiert=bilanz.aktualisiert,
+        unveraendert=bilanz.unveraendert,
+        uebersprungen=bilanz.uebersprungen,
+        kanten=bilanz.kanten,
+        kanten_geaendert=bilanz.kanten_geaendert,
+        neu_einzubetten=bilanz.neu_einzubetten,
+        # Was am Bündel auffiel, steht vor dem, was am Inhalt auffiel: Eine abgelehnte
+        # Abbildung erklärt die „SVG nicht gefunden"-Zeile, die darunter folgt.
+        warnungen=[*warnungen, *bilanz.warnungen],
+        vergebene_ids=bilanz.vergebene_ids,
+        offene_ziele=_zaehlung(bilanz.offene_ziele),
+        offene_fundstellen=_zaehlung(bilanz.offene_fundstellen),
+        archivierte_ziele=_zaehlung(bilanz.archivierte_ziele),
+    )
