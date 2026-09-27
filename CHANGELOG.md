@@ -85,6 +85,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Fachschaften spielen ihre Fachbegriffe selbst ein.** In den Sammlungen
+  „Fachbegriff“ und „Stoffsteckbrief“ führt „Aus Dateien“ zu einem Dialog: Markdown-
+  Dateien oder ein Zip-Bündel mit Abbildungen wählen, Vorschau ansehen, einspielen. Die
+  Vorschau zeigt je Datei, was geschähe — neu, aktualisiert, unverändert — und lässt bei
+  Einträgen, die seit dem letzten Mal in der Oberfläche bearbeitet wurden, je Zeile
+  wählen zwischen behalten und überschreiben. Vorher konnte das nur die Administration
+  über ein Skript.
 - **Stoffsteckbriefe als eigene Bausteinart.** Chemie-Stoffe mit Formel,
   Eigenschaften, Nachweis und Gefahrenhinweisen stehen in einer eigenen Liste —
   auffindbar auch über Alltagsnamen wie „Kochsalz“. Reinstoff und Lösung sind

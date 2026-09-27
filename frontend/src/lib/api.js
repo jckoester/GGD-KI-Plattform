@@ -1371,6 +1371,41 @@ export async function searchContextNodesLegacy(query, contentTypes = []) {
   return res.json(); // ContextNodeResult[]
 }
 
+// ── Fachbegriffe einspielen (Paket 10, AP4) ─────────────────────────────────
+
+/**
+ * Ein Bündel Fachbegriffe hochladen — Probelauf oder echter Lauf.
+ *
+ * ⚠️ **`probelauf` ist die Vorgabe, auch hier.** Der Dialog zeigt erst den Bericht und
+ * fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung. Derselbe Aufruf
+ * liefert in beiden Fällen denselben Bericht — nur einmal mit und einmal ohne Wirkung.
+ *
+ * @param {string} fach Kürzel, Slug oder Name
+ * @param {File[]} dateien `.md`, `.svg` oder ein `.zip`
+ * @param {{ probelauf?: boolean, ueberschreiben?: string[] }} optionen
+ *   `ueberschreiben` nennt die Dateien, deren handveränderte Knoten ersetzt werden
+ *   sollen — je Zeile entschieden, nicht für den ganzen Lauf.
+ */
+export async function importiereFachbegriffe(fach, dateien, optionen = {}) {
+  const { probelauf = true, ueberschreiben = [] } = optionen;
+  const params = new URLSearchParams({ fach, probelauf: String(probelauf) });
+  for (const datei of ueberschreiben) params.append("ueberschreiben", datei);
+
+  const fd = new FormData();
+  for (const datei of dateien) fd.append("dateien", datei, datei.name);
+
+  const res = await fetch(`${BASE}/context/fachbegriffe/import?${params}`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Import fehlgeschlagen");
+  }
+  return res.json();
+}
+
 // ── Context Nodes CRUD ──────────────────────────────────────────────────────
 
 /**

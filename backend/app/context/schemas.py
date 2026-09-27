@@ -689,6 +689,27 @@ class ZielZaehlung(BaseModel):
     anzahl: int
 
 
+class DateiErgebnisRead(BaseModel):
+    """Eine Zeile der Importvorschau (AP4).
+
+    ⚠️ **Je Datei, nicht nur als Summe.** Der Dialog lässt bei handveränderten Knoten
+    je Zeile wählen („behalten" oder „überschreiben"); eine Zahl „3 übersprungen"
+    trüge diese Entscheidung nicht.
+    """
+
+    datei: str
+    titel: str
+    #: `neu` · `aktualisiert` · `unveraendert` · `uebersprungen` (Handänderung) ·
+    #: `uebergangen` (gelesen, aber nicht geschrieben — Grund steht in `warnungen`)
+    zustand: str
+    node_id: UUID | None = None
+    #: Arbeitsstand aus der Datei, im Wortlaut. Wird **nicht** importiert.
+    pruefstatus: str = ""
+    #: Trägt die Datei einen anderen Stand als „geprüft"? Import ist Freigabe — die
+    #: Vorschau fragt dann nach, verhindert aber nichts.
+    entwurf: bool = False
+
+
 class FachbegriffImportBericht(BaseModel):
     """Was ein Import- oder Probelauf ergeben hat (Paket 10, AP3).
 
@@ -711,6 +732,8 @@ class FachbegriffImportBericht(BaseModel):
     #: Backfill wieder über die Bedeutung auffindbar, nicht sofort.
     neu_einzubetten: int = 0
     warnungen: list[str] = Field(default_factory=list)
+    #: Eine Zeile je gelesener Datei, in Bündelreihenfolge.
+    dateien: list[DateiErgebnisRead] = Field(default_factory=list)
     #: Datei → Kennung, die der Lauf vergeben hat, weil `id:` fehlte.
     vergebene_ids: dict[str, str] = Field(default_factory=dict)
     offene_ziele: list[ZielZaehlung] = Field(default_factory=list)

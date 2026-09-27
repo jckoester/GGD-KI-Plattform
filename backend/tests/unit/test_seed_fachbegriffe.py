@@ -510,3 +510,85 @@ class TestWelcheDateienGelesenWerden:
         gelesen = seed.lies_buendel({"Kaputt.md": "---\ntitel: Café\n---\n".encode("latin-1")}, bilanz)
         assert gelesen == []
         assert any("UTF-8" in w for w in bilanz.warnungen), bilanz.warnungen
+
+
+class TestPruefstatus:
+    """Der Arbeitsstand der Fachschaft — gelesen, gemeldet, **nicht** importiert.
+
+    ⚠️ Die Plattform kennt keinen Freigabestatus: Import **ist** Freigabe (ADR-019,
+    Nachtrag 27.09.2026). Ein `pruefstatus: entwurf` darf deshalb nichts verhindern —
+    aber die Vorschau soll fragen können, statt es zu verschweigen.
+    """
+
+    def test_wird_gelesen(self, seed):
+        quelle = seed.lies_datei(
+            "Alpha",
+            "---\nknotentyp: begriff\ntitel: Alpha\npruefstatus: entwurf\n---\n\nText.\n",
+        )
+        assert quelle.pruefstatus == "entwurf"
+
+    def test_landet_nicht_in_den_metadaten(self, seed):
+        """Er steht nicht im Feldschema und fällt damit durch die Whitelist — hier
+        namentlich festgehalten, weil die Zusage an dieser Stelle hängt."""
+        quelle = seed.lies_datei(
+            "Alpha",
+            "---\nknotentyp: begriff\ntitel: Alpha\npruefstatus: entwurf\n---\n\nText.\n",
+        )
+        assert "pruefstatus" not in quelle.metadata
+
+    def test_ohne_angabe_leer(self, seed, fiktivum):
+        assert fiktivum.pruefstatus == ""
+
+    @pytest.mark.parametrize(
+        "wert,entwurf",
+        [("entwurf", True), ("in_arbeit", True), ("fachlich_geprueft", False), ("", False)],
+    )
+    def test_was_als_entwurf_gilt(self, seed, wert, entwurf):
+        ergebnis = seed.DateiErgebnis("Alpha", "Alpha", "neu", pruefstatus=wert)
+        assert ergebnis.entwurf is entwurf
+
+
+class TestUeberschreibenJeDatei:
+    """`--ueberschreiben` gilt für alle, der Dialog entscheidet je Zeile (AP4)."""
+
+    def test_wahrheitswert_gilt_fuer_alle(self, seed):
+        assert seed.darf_ueberschreiben(True, "Alpha") is True
+        assert seed.darf_ueberschreiben(False, "Alpha") is False
+
+    def test_menge_gilt_nur_fuer_die_genannten(self, seed):
+        auswahl = {"Alpha"}
+        assert seed.darf_ueberschreiben(auswahl, "Alpha") is True
+        assert seed.darf_ueberschreiben(auswahl, "Beta") is False
+
+    def test_leere_menge_ist_nicht_alle(self, seed):
+        """⚠️ Der Unterschied zu `True`: Eine leere Auswahl heißt „nichts
+        überschreiben", nicht „nichts ausgewählt, also alles"."""
+        assert seed.darf_ueberschreiben(set(), "Alpha") is False
+
+
+class TestOberflaecheKenntDieselbenTypen:
+    """`TYPEN` steht ein zweites Mal im Frontend (Paket 10, AP4).
+
+    Die Sammlungsseite entscheidet daran, ob sie „Aus Dateien" anbietet. Liefe die
+    Liste auseinander, gäbe es entweder einen Knopf, der nichts einspielt (der Leser
+    weist den `knotentyp:` ab), oder eine Sammlung ohne Knopf, obwohl der Import sie
+    schreiben könnte. Beides fällt niemandem auf, bis es jemanden trifft.
+
+    ⚠️ Dieselbe Familie wie `test_relationen_einheitlich.py` — eine Regel an mehreren
+    Orten, die nur beim Benutzen auffällt.
+    """
+
+    def test_liste_stimmt_mit_dem_backend_ueberein(self, seed):
+        import json
+        import re
+
+        pfad = (
+            Path(__file__).resolve().parents[3]
+            / "frontend" / "src" / "lib" / "fachbegriffe_import.js"
+        )
+        treffer = re.search(
+            r"export const IMPORTIERBARE_TYPEN = (\[[^\]]*\])", pfad.read_text("utf-8")
+        )
+        assert treffer, "IMPORTIERBARE_TYPEN fehlt in fachbegriffe_import.js"
+        aus_der_oberflaeche = json.loads(treffer.group(1).replace("'", '"'))
+        assert aus_der_oberflaeche == list(seed.TYPEN)

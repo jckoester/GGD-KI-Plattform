@@ -117,6 +117,25 @@ def fach(sync_conn):
 
 
 @pytest.fixture(autouse=True)
+def ohne_drossel():
+    """Den Zähler vor jedem Test leeren.
+
+    ⚠️ Der Store ist prozess-lokal und **überlebt** den Test: Ab dem einundzwanzigsten
+    Lauf in fünf Minuten antwortete der Endpunkt mit 429, und die Tests danach
+    scheiterten an einer Grenze, die sie gar nicht prüfen wollten. Genau so passiert,
+    als diese Datei über zwanzig Anfragen hinauswuchs.
+
+    Dass die Drossel überhaupt hängt, prüft `tests/unit/test_beitritt_router.py`-artig
+    die Verdrahtung — hier wäre sie nur Rauschen.
+    """
+    from app.ratelimit import store
+
+    store.reset()
+    yield
+    store.reset()
+
+
+@pytest.fixture(autouse=True)
 def leerer_bestand(sync_conn, fach):
     """Vor **und** nach jedem Test: keine Knoten im Fach.
 
@@ -416,3 +435,188 @@ class TestGrenzenAmEndpunkt:
         assert any("abgelehnt" in w and "script" in w for w in bericht["warnungen"]), bericht
         (_, metadata), = _knoten(sync_conn, fach["id"])
         assert "svg" not in metadata["illustrationen"][0]
+
+
+class TestVorschau:
+    """Was der Dialog anzeigt (AP4): eine Zeile je Datei, nicht nur Summen."""
+
+    @pytest.mark.asyncio
+    async def test_eine_zeile_je_datei(self, test_client, fach, fachschaft_headers):
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"]},
+            files=[
+                _datei("Alpha.md", _md("Alpha")),
+                _datei("Beta.md", _md("Beta")),
+            ],
+            headers=fachschaft_headers,
+        )
+        zeilen = antwort.json()["dateien"]
+        assert [z["datei"] for z in zeilen] == ["Alpha", "Beta"]
+        assert {z["zustand"] for z in zeilen} == {"neu"}
+        assert [z["titel"] for z in zeilen] == ["Alpha", "Beta"]
+
+    @pytest.mark.asyncio
+    async def test_die_summen_sind_die_summe_der_zeilen(
+        self, test_client, fach, fachschaft_headers
+    ):
+        """⚠️ Zwei Darstellungen desselben Laufs. Liefen sie auseinander, zeigte der
+        Dialog eine Tabelle, die nicht zur Zeile darüber passt — und niemand wüsste,
+        welcher der beiden zu glauben ist."""
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"]},
+            files=[
+                _datei("Alpha.md", _md("Alpha")),
+                _datei("Beta.md", _md("Beta")),
+            ],
+            headers=fachschaft_headers,
+        )
+        b = antwort.json()
+        zustaende = [z["zustand"] for z in b["dateien"]]
+        assert zustaende.count("neu") == b["neu"] == 1
+        assert zustaende.count("unveraendert") == b["unveraendert"] == 1
+
+    @pytest.mark.asyncio
+    async def test_uebergangene_dateien_fehlen_nicht(
+        self, test_client, fach, fachschaft_headers
+    ):
+        """Eine Datei, die nicht geschrieben wird, muss trotzdem in der Tabelle stehen.
+
+        Sonst zeigte der Dialog weniger Dateien an, als hochgeladen wurden — der
+        verwirrendste aller Zustände.
+        """
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"]},
+            files=[
+                _datei("Alpha.md", _md("Alpha")),
+                _datei("Fremd.md", _md("Fremd", fach="Anderesfach")),
+            ],
+            headers=fachschaft_headers,
+        )
+        zeilen = {z["datei"]: z["zustand"] for z in antwort.json()["dateien"]}
+        assert zeilen == {"Alpha": "neu", "Fremd": "uebergangen"}
+
+    @pytest.mark.asyncio
+    async def test_knoten_id_fuer_den_sprung_in_die_sammlung(
+        self, test_client, fach, fachschaft_headers
+    ):
+        """Nach dem Import verlinkt der Dialog auf das Eingespielte — dafür die ID."""
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        (zeile,) = antwort.json()["dateien"]
+        assert zeile["node_id"]
+
+    @pytest.mark.asyncio
+    async def test_pruefstatus_wird_gemeldet_nicht_importiert(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha", zusatz="pruefstatus: entwurf\n"))],
+            headers=fachschaft_headers,
+        )
+        (zeile,) = antwort.json()["dateien"]
+        assert zeile["pruefstatus"] == "entwurf" and zeile["entwurf"] is True
+        (_, metadata), = _knoten(sync_conn, fach["id"])
+        assert "pruefstatus" not in metadata, "Import ist Freigabe — kein Status am Knoten"
+
+
+class TestUeberschreibenJeZeile:
+    """Die Wahl „behalten"/„überschreiben" je Knoten (AP4).
+
+    ⚠️ **Der Unterschied zu `--ueberschreiben`** des Skripts: Das gilt für alle. Im
+    Dialog fällt die Entscheidung je Zeile verschieden aus — an einem Knoten hat jemand
+    gearbeitet, am nächsten nicht.
+    """
+
+    async def _handarbeit(self, test_client, fach, headers, sync_conn):
+        """Zwei Knoten einspielen und beide in der Oberfläche verändern."""
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha")), _datei("Beta.md", _md("Beta"))],
+            headers=headers,
+        )
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "UPDATE context_nodes SET content = 'In der Oberfläche geändert.'"
+                " WHERE subject_id = %s", (fach["id"],)
+            )
+        sync_conn.commit()
+
+    @pytest.mark.asyncio
+    async def test_ohne_auswahl_bleibt_alles_stehen(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        await self._handarbeit(test_client, fach, fachschaft_headers, sync_conn)
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha")), _datei("Beta.md", _md("Beta"))],
+            headers=fachschaft_headers,
+        )
+        assert sorted(antwort.json()["uebersprungen"]) == ["Alpha", "Beta"]
+        inhalte = {
+            t: m for t, m in
+            [(z[0], z[1]) for z in _knoten(sync_conn, fach["id"])]
+        }
+        assert set(inhalte) == {"Alpha", "Beta"}
+
+    @pytest.mark.asyncio
+    async def test_nur_die_genannte_zeile_wird_ersetzt(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        await self._handarbeit(test_client, fach, fachschaft_headers, sync_conn)
+        antwort = await test_client.post(
+            PFAD,
+            params={
+                "fach": fach["slug"], "probelauf": "false", "ueberschreiben": ["Alpha"],
+            },
+            files=[_datei("Alpha.md", _md("Alpha")), _datei("Beta.md", _md("Beta"))],
+            headers=fachschaft_headers,
+        )
+        zeilen = {z["datei"]: z["zustand"] for z in antwort.json()["dateien"]}
+        assert zeilen == {"Alpha": "aktualisiert", "Beta": "uebersprungen"}
+
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, content FROM context_nodes WHERE subject_id = %s"
+                " ORDER BY title", (fach["id"],)
+            )
+            inhalte = dict(cur.fetchall())
+        assert "Ein Text über Alpha." in inhalte["Alpha"]
+        assert inhalte["Beta"] == "In der Oberfläche geändert.", (
+            "Beta stand nicht in der Auswahl und muss unangetastet bleiben"
+        )
+
+
+class TestDrossel:
+    """Dass die Drossel überhaupt hängt — sonst nimmt sie ihr eigener Test heraus.
+
+    ⚠️ Die übrigen Fälle setzen den Zähler vor jedem Lauf zurück (`ohne_drossel`),
+    weil sie sonst an einer Grenze scheiterten, die sie nicht prüfen wollen. Damit
+    prüft **keiner** von ihnen mehr, dass es sie gibt. Diese Klasse tut es — an der
+    Abhängigkeit selbst, ohne einundzwanzig echte Importläufe.
+    """
+
+    @pytest.mark.asyncio
+    async def test_nach_dem_limit_kommt_429(self, jwt_service):
+        from fastapi import HTTPException
+
+        from app.auth.jwt import JwtPayload
+        from app.context.router import _import_nutzer
+        from app.ratelimit.config import resolve
+
+        nutzer = JwtPayload(
+            sub="drossel-probe", roles=["teacher"], grade=None,
+            jti="00000000-0000-4000-8000-000000000000", iat=0, exp=2**31,
+        )
+        limit, _ = resolve("fachbegriffe_import", nutzer.roles)
+        for _ in range(limit):
+            assert await _import_nutzer(nutzer) is nutzer
+        with pytest.raises(HTTPException) as fehler:
+            await _import_nutzer(nutzer)
+        assert fehler.value.status_code == 429

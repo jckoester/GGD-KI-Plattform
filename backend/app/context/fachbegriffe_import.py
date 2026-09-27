@@ -60,7 +60,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, Collection, Mapping
 
 import sqlalchemy as sa
 import yaml
@@ -82,6 +82,13 @@ logger = logging.getLogger(__name__)
 #: Knotentypen, die dieser Seed schreibt. Andere `knotentyp:`-Werte sind ein Tippfehler
 #: in der Datei und werden gemeldet, nicht stillschweigend übergangen.
 TYPEN = ("begriff", "stoffsteckbrief")
+
+#: Der Wert in `pruefstatus:`, mit dem eine Fachschaft eine Datei als geprüft
+#: kennzeichnet (Vault-Konvention aus `_Format.md`). Das Feld wird **nicht** importiert
+#: — die Plattform kennt keinen Freigabestatus, Import ist Freigabe (ADR-019, Nachtrag
+#: 27.09.2026). Der Bericht nennt jede Datei, die anders markiert ist, damit die
+#: Vorschau fragen kann: „als Entwurf markiert — trotzdem einspielen?"
+PRUEFSTATUS_GEPRUEFT = "fachlich_geprueft"
 
 #: Metadatenschlüssel, die **nicht** im Feldschema stehen und trotzdem mitgeschrieben
 #: werden. Die Feldtypen (`int|text|auswahl|liste`) tragen keine verschachtelten
@@ -190,6 +197,8 @@ class Quelldatei:
     #: `id:` aus dem Frontmatter, bereits geprüft. Leer heißt „nicht angegeben" — dann
     #: leitet der Schreibteil sie ab; nur er kennt das Fachkürzel.
     id_angabe: str = ""
+    #: `pruefstatus:` im Wortlaut der Datei. Wird nicht geschrieben, nur berichtet.
+    pruefstatus: str = ""
 
 
 def _ziel(wikilink: str) -> str:
@@ -470,6 +479,7 @@ def lies_datei(dateiname: str, roh: str) -> Quelldatei | None:
         kanten=vereinige(kanten),
         warnungen=warnungen,
         id_angabe=id_angabe,
+        pruefstatus=str(kopf_daten.get("pruefstatus") or "").strip(),
     )
 
 
@@ -607,6 +617,35 @@ def stand_hash(titel: str, content: str, metadata: dict, aliase: list[str]) -> s
 # ── Teil 2: Schreiben ────────────────────────────────────────────────────────
 
 
+#: Was mit einer Datei geschehen ist. `uebergangen` heißt: gelesen, aber nicht
+#: geschrieben (fremdes Fach, doppelte Kennung, Fach ohne Fachschaft) — der Grund steht
+#: als Warnung daneben.
+ZUSTAENDE = ("neu", "aktualisiert", "unveraendert", "uebersprungen", "uebergangen")
+
+
+@dataclass
+class DateiErgebnis:
+    """Eine Zeile der Vorschau (AP4).
+
+    ⚠️ **Warum je Datei und nicht nur als Summe.** Der Dialog lässt bei handveränderten
+    Knoten je Zeile wählen („behalten" oder „überschreiben"). Eine Zahl „3
+    übersprungen" trüge diese Entscheidung nicht — sie sagt nicht, welche drei, und
+    schon gar nicht, wie sie heißen.
+    """
+
+    datei: str
+    titel: str
+    zustand: str
+    node_id: Any = None
+    #: `pruefstatus:` im Wortlaut der Datei, leer wenn keiner dasteht.
+    pruefstatus: str = ""
+
+    @property
+    def entwurf(self) -> bool:
+        """Trägt die Datei einen anderen Stand als „geprüft"?"""
+        return bool(self.pruefstatus) and self.pruefstatus != PRUEFSTATUS_GEPRUEFT
+
+
 @dataclass
 class Bilanz:
     neu: int = 0
@@ -625,6 +664,8 @@ class Bilanz:
     #: Solange die Fachschaft in Dateien ohne `id:` pflegt, meldet das jeder Lauf; der
     #: Export (AP5) schreibt sie zurück, und dann verstummt die Meldung von selbst.
     vergebene_ids: dict[str, str] = field(default_factory=dict)
+    #: Eine Zeile je gelesener Datei, in Bündelreihenfolge — die Vorschau des Dialogs.
+    dateien: list[DateiErgebnis] = field(default_factory=list)
     #: Fundstellen, deren Knoten **archiviert** ist — die Kante entsteht, wirkt
     #: in der Oberfläche aber nicht (die Nachbarschaft zeigt nur Aktives).
     archivierte_ziele: Counter = field(default_factory=Counter)
@@ -802,8 +843,13 @@ async def _schreibe_knoten(
     stabile_id: str,
     vorhanden: ContextNode | None,
     ueberschreiben: bool,
-) -> Any:
-    """Einen Knoten anlegen oder nachziehen. Gibt die Knoten-ID zurück (oder ``None``)."""
+) -> tuple[Any, str]:
+    """Einen Knoten anlegen oder nachziehen. Gibt (Knoten-ID, Zustand) zurück.
+
+    Der Zustand ist einer aus :data:`ZUSTAENDE` und landet in der Vorschau — die Zahlen
+    der `Bilanz` sind seine Summe. Beides aus **einer** Stelle, damit die Tabelle im
+    Dialog und die Zeile darüber nicht auseinanderlaufen können.
+    """
     metadata = dict(quelle.metadata)
     metadata[SEED_QUELLE] = quelle.datei
     metadata[SEED_ID] = stabile_id
@@ -840,13 +886,13 @@ async def _schreibe_knoten(
         await db.flush()
         await alias_dienst.setze(db, knoten.id, quelle.aliase)
         bilanz.neu += 1
-        return knoten.id
+        return knoten.id, "neu"
 
     ist = _ist_zustand(vorhanden, await alias_dienst.lade(db, vorhanden.id))
     await _trage_kennung_nach(db, vorhanden, stabile_id)
     if ist["hash"] == metadata[SEED_HASH]:
         bilanz.unveraendert += 1
-        return vorhanden.id
+        return vorhanden.id, "unveraendert"
 
     # ⚠️ **Der Kern der Idempotenz.** `seed_hash` ist der Stand, den der letzte Lauf
     # hinterlassen hat. Stimmt der heutige Stand damit überein, hat seither niemand in
@@ -855,7 +901,7 @@ async def _schreibe_knoten(
     gemerkt = (vorhanden.metadata_ or {}).get(SEED_HASH)
     if gemerkt and ist["hash"] != gemerkt and not ueberschreiben:
         bilanz.uebersprungen.append(quelle.datei)
-        return vorhanden.id
+        return vorhanden.id, "uebersprungen"
 
     vorhanden.title = quelle.titel
     vorhanden.content = quelle.content
@@ -868,7 +914,7 @@ async def _schreibe_knoten(
         vorhanden.embedding = None
         bilanz.neu_einzubetten += 1
     bilanz.aktualisiert += 1
-    return vorhanden.id
+    return vorhanden.id, "aktualisiert"
 
 
 async def _trage_kennung_nach(
@@ -990,13 +1036,26 @@ async def _schreibe_kanten(
     bilanz.kanten_geaendert += len(soll) + len(ist)
 
 
+def darf_ueberschreiben(auswahl: "bool | Collection[str]", datei: str) -> bool:
+    """Soll dieser handveränderte Knoten ersetzt werden?
+
+    ``True`` ist der Weg des Admin-Skripts (`--ueberschreiben` gilt für alle). Eine
+    **Menge von Dateinamen** ist der Weg des Dialogs: Dort steht die Entscheidung je
+    Zeile, weil sie je Zeile verschieden ausfällt — an einem Knoten hat jemand
+    gearbeitet, am nächsten nicht.
+    """
+    if isinstance(auswahl, bool):
+        return auswahl
+    return datei in auswahl
+
+
 async def seed_in_session(
     db: AsyncSession,
     gelesen: list[Quelldatei],
     bilanz: "Bilanz",
     *,
     nur_fach: Subject | None = None,
-    ueberschreiben: bool = False,
+    ueberschreiben: "bool | Collection[str]" = False,
 ) -> None:
     """Der Schreibteil — mit einer **übergebenen** Sitzung.
 
@@ -1023,14 +1082,27 @@ async def seed_in_session(
     beansprucht: dict[Any, str] = {}
 
     for quelle in gelesen:
+        def uebergangen(grund: str) -> None:
+            """Gelesen, aber nicht geschrieben — Zeile **und** Warnung.
+
+            Ohne die Zeile fehlte die Datei in der Vorschau, und der Dialog zeigte
+            weniger Dateien an, als hochgeladen wurden: der verwirrendste aller
+            Zustände.
+            """
+            bilanz.warnungen.append(f"{quelle.datei}: {grund}")
+            bilanz.dateien.append(DateiErgebnis(
+                datei=quelle.datei, titel=quelle.titel, zustand="uebergangen",
+                pruefstatus=quelle.pruefstatus,
+            ))
+
         fach = faecher.get(quelle.fach.casefold())
         if fach is None:
-            bilanz.warnungen.append(f"{quelle.datei}: Fach „{quelle.fach}“ unbekannt")
+            uebergangen(f"Fach „{quelle.fach}“ unbekannt")
             continue
         if nur_fach is not None and fach.id != nur_fach.id:
-            bilanz.warnungen.append(
-                f"{quelle.datei}: Die Datei nennt das Fach „{quelle.fach}“, "
-                f"importiert wird nach {nur_fach.name} — übersprungen"
+            uebergangen(
+                f"Die Datei nennt das Fach „{quelle.fach}“, importiert wird nach "
+                f"{nur_fach.name} — übersprungen"
             )
             continue
         gruppe_id = (await db.execute(
@@ -1043,26 +1115,20 @@ async def seed_in_session(
             # `check_context_nodes_write_group_id`). Auf `school` auszuweichen wäre kein
             # Notbehelf, sondern eine andere Zusage: Dann dürfte jede Lehrkraft den
             # Eintrag ändern, nicht die Fachschaft.
-            bilanz.warnungen.append(
-                f"{quelle.datei}: Fach „{fach.name}“ hat keine Fachschaftsgruppe — "
-                "übersprungen"
-            )
+            uebergangen(f"Fach „{fach.name}“ hat keine Fachschaftsgruppe — übersprungen")
             continue
 
         stabile_id = quelle.id_angabe or leite_id_ab(
             fach.fach_code or fach.slug, quelle.datei
         )
         if not stabile_id:
-            bilanz.warnungen.append(
-                f"{quelle.datei}: keine `id` ableitbar — bitte `id:` im Frontmatter "
-                "setzen"
-            )
+            uebergangen("keine `id` ableitbar — bitte `id:` im Frontmatter setzen")
             continue
         schon = belegt.get((fach.id, stabile_id))
         if schon:
-            bilanz.warnungen.append(
-                f"{quelle.datei}: Kennung „{stabile_id}“ gehört in diesem Bündel schon "
-                f"zu {schon} — übersprungen"
+            uebergangen(
+                f"Kennung „{stabile_id}“ gehört in diesem Bündel schon zu {schon} — "
+                "übersprungen"
             )
             continue
         belegt[(fach.id, stabile_id)] = quelle.datei
@@ -1071,16 +1137,20 @@ async def seed_in_session(
 
         vorhanden = await _finde_knoten(db, fach.id, stabile_id, quelle.datei)
         if vorhanden is not None and vorhanden.id in beansprucht:
-            bilanz.warnungen.append(
-                f"{quelle.datei}: trifft denselben Knoten wie "
-                f"{beansprucht[vorhanden.id]} — übersprungen"
+            uebergangen(
+                f"trifft denselben Knoten wie {beansprucht[vorhanden.id]} — übersprungen"
             )
             continue
 
-        knoten_id = await _schreibe_knoten(
+        knoten_id, zustand = await _schreibe_knoten(
             db, quelle, fach, gruppe_id, bilanz,
-            stabile_id=stabile_id, vorhanden=vorhanden, ueberschreiben=ueberschreiben,
+            stabile_id=stabile_id, vorhanden=vorhanden,
+            ueberschreiben=darf_ueberschreiben(ueberschreiben, quelle.datei),
         )
+        bilanz.dateien.append(DateiErgebnis(
+            datei=quelle.datei, titel=quelle.titel, zustand=zustand,
+            node_id=knoten_id, pruefstatus=quelle.pruefstatus,
+        ))
         if knoten_id is not None:
             beansprucht[knoten_id] = quelle.datei
             nach_datei[quelle.datei] = knoten_id
@@ -1155,7 +1225,7 @@ async def importiere(
     *,
     fach_vorgabe: str | None = None,
     nur_fach: Subject | None = None,
-    ueberschreiben: bool = False,
+    ueberschreiben: "bool | Collection[str]" = False,
 ) -> Bilanz:
     """Ein Bündel einlesen und schreiben — der eine Weg, den Skript und Endpunkt gehen.
 

@@ -54,6 +54,7 @@ from app.context.schemas import (
     IkKompetenzRead,
     PkGruppeRead,
     PkKompetenzRead,
+    DateiErgebnisRead,
     FachbegriffImportBericht,
     ZielZaehlung,
 )
@@ -2217,11 +2218,12 @@ async def importiere_fachbegriffe(
     probelauf: bool = Query(
         True, description="True: nichts schreiben, nur den Bericht liefern"
     ),
-    ueberschreiben: bool = Query(
-        False,
+    ueberschreiben: list[str] = Query(
+        default=[],
         description=(
-            "Auch Knoten ersetzen, die seit dem letzten Import in der Oberfläche "
-            "bearbeitet wurden"
+            "Dateinamen (ohne `.md`), deren Knoten ersetzt werden sollen, obwohl sie "
+            "seit dem letzten Import in der Oberfläche bearbeitet wurden. Mehrfach "
+            "angeben. Leer = alle behalten."
         ),
     ),
     dateien: list[UploadFile] = File(..., description=".md, .svg oder ein .zip"),
@@ -2256,7 +2258,7 @@ async def importiere_fachbegriffe(
         raise HTTPException(status_code=fehler.status, detail=fehler.text)
 
     bilanz = await importiere(
-        db, buendel, nur_fach=fach_zeile, ueberschreiben=ueberschreiben
+        db, buendel, nur_fach=fach_zeile, ueberschreiben=set(ueberschreiben)
     )
     if probelauf:
         await db.rollback()
@@ -2278,6 +2280,13 @@ async def importiere_fachbegriffe(
         kanten=bilanz.kanten,
         kanten_geaendert=bilanz.kanten_geaendert,
         neu_einzubetten=bilanz.neu_einzubetten,
+        dateien=[
+            DateiErgebnisRead(
+                datei=d.datei, titel=d.titel, zustand=d.zustand, node_id=d.node_id,
+                pruefstatus=d.pruefstatus, entwurf=d.entwurf,
+            )
+            for d in bilanz.dateien
+        ],
         # Was am Bündel auffiel, steht vor dem, was am Inhalt auffiel: Eine abgelehnte
         # Abbildung erklärt die „SVG nicht gefunden"-Zeile, die darunter folgt.
         warnungen=[*warnungen, *bilanz.warnungen],

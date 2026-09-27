@@ -9,7 +9,7 @@ sitzen zwei Hüllen:
 | Weg | Wer | Eingabe |
 |---|---|---|
 | `backend/scripts/seed_fachbegriffe.py` | Admin auf der Kommandozeile | ein Ordner |
-| `POST /context/fachbegriffe/import` | Lehrkräfte des Fachs | Formular-Upload |
+| „Aus Dateien“ in der Sammlung → `POST /context/fachbegriffe/import` | Lehrkräfte des Fachs | Formular-Upload |
 
 Beide rufen `importiere()` und drucken bzw. liefern dieselbe `Bilanz`; ein Test hält
 fest, dass sie auf demselben Bündel dieselben Zahlen ergeben.
@@ -65,6 +65,11 @@ gemeldet und übersprungen — nicht umgehängt.
 **`probelauf` ist vorgabemäßig `true`.** Er schreibt nichts (die Transaktion wird
 verworfen) und liefert denselben Bericht wie der echte Lauf. Darauf steht die Vorschau
 im Dialog: Was im Probelauf steht, ist das, was der echte Lauf täte.
+
+**`ueberschreiben` nennt Dateinamen, keinen Wahrheitswert** (mehrfach angeben). Das
+Skript kennt `--ueberschreiben` für alle; im Dialog fällt die Entscheidung je Zeile
+verschieden aus — an einem Knoten hat jemand gearbeitet, am nächsten nicht. Eine **leere**
+Liste heißt „alle behalten", nicht „nichts ausgewählt, also alles".
 
 **Was angenommen wird:** `.md`, `.svg` und `.zip`. Im Zip zählen `*.md` auf oberster
 Ebene und `_Abb/*`; eine gemeinsame erste Ordnerebene (so packt der Finder) wird
@@ -140,6 +145,12 @@ Datenbank verschwindet).
 | `### Abgrenzung` | Kanten `related_to` mit `art: abgrenzung` und `hinweis` |
 | `### Offene Fragen` | verworfen — Arbeitsnotizen der Fachschaft |
 
+⚠️ **`pruefstatus` wird gelesen, aber nicht geschrieben.** Er ist der Arbeitsstand der
+Fachschaft im Vault; die Plattform kennt keinen Freigabestatus — Import **ist** Freigabe
+(ADR-019, Nachtrag 27.09.2026). Der Bericht nennt jede Datei, die einen anderen Wert als
+`fachlich_geprueft` trägt, und die Vorschau fragt nach. Verhindern tut sie nichts: Ob ein
+Entwurf reif ist, weiß die Fachschaft, nicht die Software.
+
 `{{abbildung:datei.svg}}` im Text ist der Platzhalter für ein Bild aus
 `illustrationen`; die Oberfläche setzt dort das SVG ein, das Modell bekommt die
 `beschreibung`.
@@ -204,6 +215,32 @@ Daraus ergeben sich drei Fälle:
 ⚠️ **Der dritte Fall ist der Grund für den Hash.** Ohne ihn gäbe ein Re-Import die
 Arbeit lautlos preis, die eine Lehrkraft im Editor investiert hat.
 
+## Der Dialog
+
+„Aus Dateien" steht in den Sammlungen `begriff` und `stoffsteckbrief`, sobald oben ein
+**Fach** gewählt ist — ohne Fach wüsste weder die Oberfläche, wohin, noch das Backend,
+wessen Rechte zu prüfen sind. Der Knopf bleibt dann sichtbar und inaktiv; ein fehlender
+ließe jemanden suchen.
+
+Zwei Schritte: **Vorschau, dann einspielen.** Derselbe Aufruf, einmal ohne und einmal
+mit Wirkung.
+
+⚠️ **Die Reihenfolge der Gruppen in der Vorschau ist keine Kosmetik.** „In der
+Oberfläche bearbeitet" steht oben, weil es das Einzige ist, wozu die Vorschau eine
+**Frage** stellt; alles andere ist Bericht. Hinter dreißig „unverändert"-Zeilen würde die
+Frage überlesen, und der nächste Lauf überschriebe entweder zu viel oder ließe eine
+Überarbeitung liegen.
+
+Die Regeln der Vorschau stehen in `frontend/src/lib/fachbegriffe_import.js`, nicht in der
+Komponente — welche Zeile eine Frage stellt, wann „einspielen" lohnt und was nach dem
+Lauf verlinkt wird, sind Entscheidungen. ⚠️ Eine davon ist leicht zu übersehen:
+`lohntSich()` rechnet die **Auswahl** mit, nicht nur den Bericht. Ein Probelauf meldet
+für einen behaltenen Knoten „0 aktualisiert" — ohne die Auswahl wäre der Knopf genau
+dann aus, wenn er gebraucht wird.
+
+`IMPORTIERBARE_TYPEN` dort ist dieselbe Liste wie `TYPEN` hier;
+`tests/unit/test_seed_fachbegriffe.py` hält beide zusammen.
+
 ## Wohin ein Wikilink zeigt
 
 `[[Ziel]]` meint eine **Datei**, keinen Titel — gleichnamige Fassungen („Oxidation")
@@ -223,6 +260,7 @@ im selben Fach. Sonst hinge ein Chemiebegriff an einem gleichnamigen Curriculum-
 | `n neu, n aktualisiert, n unverändert` | siehe Tabelle oben |
 | `n übersprungen` | in der Oberfläche geändert — Liste der Dateien folgt |
 | `vergeben: ch-…` | Die Datei hat kein `id:`; der Lauf hat eine Kennung abgeleitet |
+| `dateien[]` | Eine Zeile je gelesener Datei: `zustand` (`neu` · `aktualisiert` · `unveraendert` · `uebersprungen` · `uebergangen`), Titel, Knoten-ID, `pruefstatus`. Die Summen oben sind ihre Summe — beides entsteht an derselben Stelle, damit Tabelle und Kopfzeile nicht auseinanderlaufen |
 | `n Kanten, davon n angefasst` | Soll-Ist-Abgleich; gelöschte Kanten sind mitgezählt |
 | `Feld \`x\` verworfen — …` | Das Feld steht im Schema, sein **Wert** passt nicht. Der Knoten bleibt, das Feld fehlt |
 | `Wikilink-Ziel ohne Knoten` | Ein `[[Verweis]]` auf etwas, das es (noch) nicht gibt — die Arbeitsliste für die nächste Ausbaustufe |
