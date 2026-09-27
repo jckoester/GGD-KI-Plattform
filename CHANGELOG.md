@@ -5,370 +5,177 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
-### Behoben
+## [0.11.0] – 2026-09-27
 
-- **Ein Assistent, der für eine Unterrichtsgruppe freigegeben ist, erscheint nur noch
-  dort.** Bisher sahen ihn auch Schüler:innen anderer Gruppen, und über seine Adresse
-  ließ er sich sogar benutzen — die Freigabe war eine Beschriftung, keine
-  Einschränkung. Dasselbe galt für private Assistenten. Umgekehrt fehlte er der
-  Lehrkraft, die ihn angelegt hatte: Sie findet ihn jetzt wieder, ebenso die Lehrkräfte
-  der Gruppe.
-- **„Neuer Chat“ auf der Fachseite behält das Fach.** Die Unterhaltung entstand bisher
-  ohne Fachbezug — mit spürbaren Folgen: Die Suche gewichtete das Fach nicht, die
-  Bildungsplan-Fassung wurde nicht gewählt, das Operatoren-Werkzeug antwortete gar
-  nicht, und in der Historie stand der Chat ohne Zuordnung.
-
-- **Assistenten lesen die Einträge aus dem Wissensspeicher nach festen Regeln.** Vor
-  jedem Kontextblock steht jetzt, wie sie zu verwenden sind: die bevorzugte Bezeichnung
-  statt des Suchbegriffs, vermerkte Irrtümer ansprechen statt aufzählen, Zahlenwerte und
-  Gefahrenhinweise unverändert übernehmen. Die Regeln standen bisher nur in der
-  Werkzeugbeschreibung und erreichten Chats ohne Assistenten gar nicht; der Text steht in
-  `config/pedagogy.yaml`.
-
-- **Längere Einträge kommen vollständiger beim Assistenten an.** Bei Fachbegriffen und
-  Stoffsteckbriefen werden Definition und Erklärung nicht mehr abgeschnitten; Beispiele
-  gehen mit, soweit der Platz reicht. Bisher endete der Text meist mitten in der
-  Erklärung, und die Beispiele erreichten den Assistenten fast nie.
-
-- **Assistenten bekommen die passenden Einträge aus dem Wissensspeicher, ohne danach
-  suchen zu müssen.** Zu jeder Nachricht sucht die Plattform selbst und legt passende
-  Fachbegriffe, Stoffsteckbriefe sowie Methoden- und Operatorenblätter dazu — auch im
-  freien Chat ohne Assistenten. Passt nichts, bleibt der Kontext leer; das
-  Suchwerkzeug bleibt für gezieltes Nachschlagen.
-
-- **Assistenten schlagen wieder zuverlässig im Wissensspeicher nach.** Das Standardmodell
-  lief mit der niedrigsten Denkstufe und entschied sich deshalb meist gegen die Suche —
-  es antwortete aus eigenem Wissen statt aus den Einträgen der Fachschaft. Gemessen: vier
-  von sechzehn Nachschlagevorgängen vorher, fünfzehn von sechzehn jetzt. Antworten
-  brauchen dafür einige Sekunden länger.
-
-- **Der Hinweis auf archivierte Verknüpfungen warnt nicht mehr, sondern erklärt.**
-  Er stand als gelbe Warnung da und legte nahe, die verknüpften
-  Bildungsplan-Inhalte seien veraltet. Oft stimmt das nicht: Eine Fassung kann für
-  ein Fach auch schlicht **noch nicht gelten** — der Chemie-Bildungsplan V3
-  beispielsweise erst ab Klasse 8 im Schuljahr 2027/28. Der Hinweis nennt jetzt,
-  was tatsächlich gilt („erscheinen derzeit nicht in Suche und Assistenten“),
-  und den Grund nur dort, wo er sich aus dem Bildungsplan-Fahrplan ergibt.
-
-- **Die Verweise in der Hilfe führen wieder ans Ziel.** Das Inhaltsverzeichnis der
-  Hilfe-Übersicht zeigte auf Dateinamen — ein Klick landete in einem neuen Tab auf
-  einer nicht vorhandenen Seite.
-
-- **Kurse ohne Klassenverband landen nicht mehr im Archiv.** Ein Kursstufenkurs oder
-  eine Gruppe aus dem Stundenplan galt zu Schuljahresbeginn als „früher", solange sie
-  weder Stunden noch Jahresplan hatte — sie stand also im Archiv, während sie
-  unterrichtet wurde, und bekam auch keinen Stundenplan-Hinweis mehr. Wer an keinen
-  Klassenverband gebunden ist, ist an kein Schuljahr gebunden.
-- **Verweise innerhalb der Hilfeseiten funktionieren.** Links auf einen Abschnitt
-  derselben Seite führten nirgendwohin und öffneten dabei einen neuen Tab.
-- **Stunden lassen sich im Jahresplan auch ohne Unterrichtseinheit bearbeiten.** Wo nur
-  ein Thema stand — etwa am Ziel einer verschobenen Stunde — fehlte das Stift-Symbol, und
-  ein Klick blieb wirkungslos. Der Entwurf entsteht jetzt auch dort.
-- **Der Hinweis auf offene Inhalte steht an der ausgefallenen Stunde**, nicht mehr nur
-  über der Tabelle — und er verschwindet nicht mehr beim Neuladen.
-- **Die Jahresplanung zeigt Änderungen sofort.** Nach dem Eintragen eines Ausfalls und
-  nach dem Löschen einer Unterrichtseinheit blieb die Ansicht auf dem alten Stand, bis
-  man die Seite neu lud.
-- **Der Verschiebe-Assistent kennt jetzt auch das erste Halbjahr.** Wurden die Stunden
-  mitten im ersten Halbjahr neu erzeugt — etwa nach einer Korrektur des Wochenmusters —,
-  bekam er die neuen Termine gar nicht zu sehen und konnte entsprechend wenig vorschlagen.
-- **Schüler:innen können die Stundenplanung ihrer Lehrkräfte nicht mehr einsehen.**
-  Unterrichtsstunden, Unterrichtseinheiten und Jahrespläne waren über den Wissensbereich
-  für alle Mitglieder der Gruppe lesbar — einschließlich der Notizen, die eine Lehrkraft
-  nach der Stunde festhält. Sie sind jetzt den Lehrkräften der Gruppe vorbehalten.
-
-- **Unterrichtsgruppen ohne Klasse bekommen einen Jahrgang.** Kurse aus dem Stundenplan
-  und der Kursstufe hatten keinen — die Jahresplanung bot ihnen deshalb *alle* Curricula
-  des Fachs an, einem Abiturkurs also auch die der Mittelstufe. Der Jahrgang wird jetzt
-  aus Klasse oder Gruppenname abgeleitet und lässt sich unter „Meine Unterrichtsgruppen"
-  eintragen oder korrigieren. Ist er unbekannt, wird kein Curriculum mehr vorgeschlagen.
-- **„Kein Curriculum gefunden" sagt jetzt, woran es liegt.** Fehlendes Fach an der Gruppe,
-  unbekannter Jahrgang und tatsächlich fehlendes Curriculum sahen gleich aus; zwei der
-  drei Hinweise schickten damit auf die falsche Suche.
-- **Aus einem Schulkonto-Angebot ohne erkennbares Fach entsteht keine Unterrichtsgruppe
-  mehr.** Solche Gruppen blieben ohne Fach und damit ohne Curriculum, Assistenten und
-  Fachseite. Das Angebot lässt sich weiterhin einer vorhandenen Gruppe zuordnen; der
-  Knopf „Als neue Gruppe anlegen" erscheint dort nicht mehr, dafür der Grund.
-- **Die Jahresübersicht einer Gruppe blieb leer oder lud nicht.** Wo die Stundenzahl eines
-  Curriculum-Kapitels als Text statt als Zahl gespeichert war, brach der Abruf ab — eine
-  neu angelegte Unterrichtseinheit erschien dann nicht, und ein zweiter Anlauf erzeugte
-  eine Dublette. Betroffen war die Mehrheit der importierten Kapitel.
+Der Unterrichtsalltag kommt an: Unterrichtsgruppen entstehen aus Stundenplan und
+Schulkonto, die Jahresplanung übersteht Ausfälle und Musterwechsel, und die Startseite
+zeigt den eigenen Tag. Dazu bekommt der Wissensspeicher seine erste gepflegte
+Fachsammlung — Fachbegriffe und Stoffsteckbriefe, die eine Fachschaft selbst einspielt
+und wieder herausholt.
 
 ### Neu
 
-- **Fachschaften spielen ihre Fachbegriffe selbst ein.** Unter *Fächer → Fach →
-  „weiterer Kontext“* führt „Aus Dateien“ zu einem Dialog: Markdown-Dateien oder ein
-  Zip-Bündel mit Abbildungen wählen, Vorschau ansehen, einspielen. Die
-  Vorschau zeigt je Datei, was geschähe — neu, aktualisiert, unverändert — und lässt bei
-  Einträgen, die seit dem letzten Mal in der Oberfläche bearbeitet wurden, je Zeile
-  wählen zwischen behalten und überschreiben. Vorher konnte das nur die Administration
-  über ein Skript.
-- **Vorlage und Anleitung zum Pflegen von Fachbegriffen.** Im Einspiel-Dialog führt
-  „Vorlage herunterladen“ zu einem Paket mit zwei Musterbegriffen, einem
-  Stoffsteckbrief und einer Kurzfassung des Formats — kommentiert und sofort
-  einspielbar. Die ausführliche Anleitung steht in der Hilfe unter „Fachbegriffe
-  pflegen“.
-- **Fachbegriffe lassen sich wieder herausholen.** „Als Zip“ an derselben Stelle sichert
-  den Bestand eines Fachs als Markdown-Dateien samt Abbildungen — dasselbe Format, das der
-  Import liest. Einzelne Einträge gehen über „Als Markdown" in der Detailansicht. Damit
-  bleibt eine Fachschaft, die in der Oberfläche pflegt, für spätere Massenänderungen
-  anschlussfähig. Dem Bündel liegt ein Hinweisblatt bei: Verweise auf Begriffe, die es
-  noch nicht gibt, sind im Speicher nicht abgebildet und fehlen in den Dateien.
-- **Stoffsteckbriefe als eigene Bausteinart.** Chemie-Stoffe mit Formel,
-  Eigenschaften, Nachweis und Gefahrenhinweisen stehen in einer eigenen Liste —
-  auffindbar auch über Alltagsnamen wie „Kochsalz“. Reinstoff und Lösung sind
-  getrennt (Chlorwasserstoff / Salzsäure), damit die Unterscheidung zwischen Säure
-  und saurer Lösung erhalten bleibt. Inhalte folgen mit dem Pilot-Import.
-- **Bausteine können „ist ein(e)“ ausdrücken.** Damit lässt sich ein Oberbegriff
-  benennen — „Natriumchlorid ist ein Salz“ — und im Wissensgraph verfolgen.
-- **Assistenten mit eigenem Wissensbereich finden jetzt auch die Fachbegriffe
-  dazu.** Bisher sahen sie nur die Bildungsplan-Kompetenzen unter ihrem
-  Ankerpunkt — die Begriffe, die auf genau diese Kompetenzen verweisen, fehlten.
-- **Assistenten antworten auf dem Stand der Klassenstufe.** Gibt es einen Begriff
-  in mehreren Fassungen — „Oxidation“ als Sauerstoffaufnahme und als
-  Elektronenabgabe —, steht die passende vorn. Die andere bleibt erreichbar: Wer
-  ausdrücklich danach fragt, bekommt sie, mit dem Hinweis, dass sie später
-  genauer kommt. Die Stufe kommt aus der Unterrichtsgruppe des Chats, sonst aus
-  der Anmeldung.
-- **Assistenten verwechseln ähnliche Fachbegriffe seltener.** Sie bekommen jetzt die Abgrenzungen eines Bausteins mit — die Sätze, die sagen, wovon er sich
-  unterscheidet und wodurch. Und sie erkennen andere Bezeichnungen als das,
-  was sie sind: Suchbegriffe, unter denen gefragt wird. Geantwortet wird mit
-  dem Begriff, den die Fachschaft festgelegt hat.
-- **Stoffe lassen sich über ihr Aussehen finden.** „Welcher Stoff raucht an
-  feuchter Luft?“ führt jetzt zum Steckbrief — die Beschreibung des Aussehens
-  geht in die Suche ein, die Messwerte bewusst nicht.
-- **Bausteine können Abbildungen im Text tragen.** Eine Zeichnung steht an der Stelle,
-  an der sie erklärt wird, mit ihrer Beschreibung darunter. Bei Stoffen zeigt die
-  Detailansicht zusätzlich die Eigenschaftstabelle, bei Fachbegriffen die häufigen
-  Irrtümer als eigenen Abschnitt.
-- **Das Schaltzeichen eines Bauteils ist jetzt beim Lesen sichtbar** — bisher nur beim
-  Bearbeiten, also für Schüler:innen gar nicht.
-- **Assistenten kennen jetzt die Zusatzangaben eines Fachbegriffs.** Bevorzugte
-  Bezeichnung, Fassung, Klassenstufe, Artikel und Mehrzahl sowie die häufigen Irrtümer
-  gehen mit in das Gespräch — beim Stoffsteckbrief zusätzlich Formel, Alltagsnamen,
-  Eigenschaftstabelle und Nachweis. Abbildungen erscheinen dort als Beschreibung an der
-  Stelle, an der sie im Text stehen.
-
-- **Die Hilfe zeigt die ganze Anwender-Doku.** Bisher waren zehn von achtzehn Seiten
-  in der Anwendung erreichbar — acht fehlten, darunter „Stundenplan übernehmen“,
-  „Bibliothek“ und „Zitieren“. Neu dabei sind außerdem **„Die ersten 30
-  Minuten“** für Lehrkräfte (der Weg von der Anmeldung zum ersten Jahresplan) und
-  **„Für Schüler:innen“** in einfacher Sprache. Das Verzeichnis zeigt jeder Rolle,
-  was zu ihr passt.
-
-- **Die Unterrichtsgruppe steht an den Chats.** In der Historie zeigt eine Marke neben
-  dem Titel, zu welcher Gruppe ein Chat gehört; in der Seitenleiste nennt sie der
-  Tooltip. Vier Chats „Sinusfunktionen verstehen“ ließen sich vorher nicht
-  auseinanderhalten. Wer eine kürzere Form möchte, vergibt der Gruppe einen
-  Anzeigenamen. Schüler:innen sehen die Marke nicht — für sie ist die Gruppe das Fach,
-  und das zeigt schon das farbige Symbol.
-
-- **Lehrkräfte pflegen ihre eigenen Assistenten vollständig selbst.** Wer einen
-  Assistenten für sich, eine Unterrichtsgruppe, eine Fachschaft oder eine AG anlegt,
-  kann ihn jederzeit ändern, **abschalten** und löschen — bisher ging nach dem Anlegen
-  nichts davon ohne die Administration. Bei schulweiten Assistenten bleibt es bei der
-  Freigabe; dort lässt sich jetzt die **Einreichung zurückziehen** und für einen
-  freigegebenen Assistenten die **Löschung beantragen**. Der Antrag schaltet nichts ab:
-  Der Assistent bleibt nutzbar, bis die Administration entscheidet.
-
-- **Verwaiste Unterrichtsgruppen lassen sich finden** (Admin, über die Schnittstelle:
-  `GET /admin/groups?ohne_lehrkraft=true`). Verlässt die einzige Lehrkraft die Schule,
-  bleibt die Gruppe mitsamt Jahresplan stehen, ist aber für niemanden mehr erreichbar.
-  Beschrieben in der Admin-Doku, samt Weg zurück.
-
-- **Methode und Sozialform im Stundenentwurf führen zu ihrer Beschreibung.** Ein Klick
-  auf das verlinkte Vokabel öffnet den Knoten in einem neuen Tab — bisher stand der Name
-  nur da.
-- **Nach einem Ausfall fragt die Jahresplanung, was mit den Inhalten geschehen soll.**
-  Drei Wege stehen zur Wahl: Inhalte entfallen lassen, die Stunden verschieben oder die
-  Einheit mit dem Assistenten umplanen. Keiner geschieht automatisch — und wo an den
-  ausgefallenen Stunden nichts geplant war, wird auch nicht gefragt.
-- **Persönlichen Ausfall eintragen.** Fällt eine Lehrkraft aus — Fortbildung, Krankheit —,
-  lässt sich das im Jahresplan für eine Unterrichtsgruppe oder für den ganzen Tag über
-  alle eigenen Gruppen markieren, mit Grund. Der Stundenplan-Abgleich setzt einen so
-  eingetragenen Ausfall nicht mehr zurück; meldet er später dieselbe Stunde mit
-  Vertretung, kommt die Angabe **zusätzlich** zum eigenen Grund. Zurücknehmen stellt die
-  vorherige Kategorie wieder her — eine Klassenarbeit bleibt eine Klassenarbeit.
-- **Prüfungsstunden sind im Jahresplan rot schraffiert** statt nur rot hinterlegt — auf
-  einen Blick von regulärem Unterricht zu unterscheiden.
-- **Das Chatfeld der Startseite steht wieder mittig, wenn keine Kacheln darunter stehen.**
-- **Die Tageskachel erscheint nur, wenn sie etwas zu sagen hat.** An einem Schultag ohne
-  Einträge entfällt sie, statt „Kein Unterricht" zu melden — was dort stattfindet, weiß
-  die Plattform nicht. Ferien, Feiertage und unterrichtsfreie Tage stehen weiterhin da,
-  ebenso der Hinweis zum Einrichten, solange noch keine Unterrichtsgruppen angelegt sind.
-- **Die Startseite zeigt Schüler:innen ihre heutigen Fächer.** Fach-Icon, Stunde und
-  Fachname, verlinkt auf die Fachseite; darunter der nächste Schultag. Fällt eine Stunde
-  aus oder ist Vertretung oder eine Prüfung angesetzt, steht es daneben. Thema,
-  Unterrichtseinheit und Stundenentwurf der Lehrkraft erscheinen nicht.
-- **Startseite mit dem eigenen Unterrichtstag.** Nach dem Login stehen die Stunden des
-  Tages untereinander — Fach-Icon in der Fachfarbe, Stunde, Gruppe und Thema. Ein Klick
-  auf den Titel führt in den Stundenentwurf und legt ihn an, falls es noch keinen gibt —
-  auch dann, wenn die Stunde noch zu keiner Unterrichtseinheit gehört. Die Zuordnung zur
-  Einheit lässt sich später nachholen; der Hinweis dazu führt in die Jahresplanung. An
-  unterrichtsfreien Tagen zeigt die Seite den nächsten Schultag. Daneben liegen Kacheln
-  für die eigenen Unterrichtsgruppen und für offene Entscheidungen; welche Kacheln
-  erscheinen, lässt sich auf der Seite selbst einstellen.
-- **Unterrichtsgruppen aus dem Schulkonto werden angeboten, nicht angelegt.** Liefert das
-  Schulkonto eine Unterrichtsgruppe, zu der es hier noch keine gibt, entscheidet die
-  Lehrkraft unter „Meine Unterrichtsgruppen": zuordnen, als neue Gruppe anlegen oder
-  ignorieren. Bisher legte die Plattform sie automatisch an und versuchte zu erraten, ob
-  sie zu einer vorhandenen gehört — das erzeugte Doppelgruppen. Bei einer Zuordnung
-  kommen die Mitglieder ab dem nächsten Login aus dem Schulkonto; über die Klasse geerbte
-  Mitgliedschaften entfallen, Beitritte per Code bleiben. Für so verknüpfte Gruppen gibt
-  es keinen Beitrittscode mehr.
-- **Hinweis, wenn eine Gruppe nicht mehr im Stundenplan steht.** Beim Übernehmen aus dem
-  Stundenplan meldet die Plattform, zu welchen Ihrer Unterrichtsgruppen sie nichts
-  gefunden hat. **Geändert wird nichts** — Planung, Stundenentwürfe und Chats bleiben;
-  ob die Gruppe ausgelaufen ist oder nur außerhalb des Abrufzeitraums liegt, entscheiden
-  Sie.
-- **Beitrittscode für Unterrichtsgruppen.** Wo eine Gruppe ihre Mitglieder nicht aus
-  einer Klasse bekommt — Kurse der Kursstufe, Teilgruppen, Nachzügler — gibt die
-  Lehrkraft einen kurzen Code aus; Schüler:innen treten damit unter „Fächer" selbst bei.
-  Der Code gilt **drei Tage** und lässt sich erneuern oder ungültig machen. An der Gruppe
-  steht, wie viele an welchem Tag beigetreten sind; sind zu viele dabei, lassen sich die
-  Beitritte eines Tages oder der ganzen Code-Runde zurücknehmen — der Code wird dabei
-  ungültig, die Richtigen treten mit einem neuen erneut bei.
-- **Unterrichtsgruppen aus dem Stundenplan anlegen.** Lerngruppen, die im eigenen
-  Stundenplan stehen, auf der Plattform aber noch keine Gruppe haben, lassen sich in der
-  Sammelübernahme direkt anlegen. Dabei wird gefragt, wer dazugehört: Bei der **ganzen
-  Klasse** kommen deren Schüler:innen automatisch dazu; bei einer **Teilgruppe** treten
-  sie über einen Beitrittscode bei. Vorbelegt ist die Antwort nach der Zahl der Klassen —
-  bei mehreren Klassen und in der Kursstufe ist es immer eine Teilgruppe.
-- **Der Stundenplan-Abgleich legt fehlende Stunden an.** Wird eine Stunde auf einen
-  Termin verlegt, an dem die Gruppe sonst keinen Unterricht hat, entsteht dort jetzt ein
-  Termin — bisher wurde der Entfall am Ursprung geschrieben und am Ziel nichts, die
-  Planung verlor also eine Stunde. Den Inhalt bringt weiterhin nur die Lehrkraft über den
-  Verschiebe-Dialog dorthin.
-- **Ändert sich das Wochenmuster, bleibt die Jahresplanung erhalten.** Der Neuaufbau
-  eines Halbjahres hängt die Planung auf die neuen Termine um, statt sie zu verwerfen:
-  Klassenarbeiten behalten ihr Datum, alles andere wandert in seiner Reihenfolge mit.
-  Wechselt dabei der Umfang (Einzel- ↔ Doppelstunde), wird die Stunde als anzupassen
-  markiert. Was keinen Termin mehr findet, liegt auf dem **Parkplatz** und lässt sich von
-  dort auf einen freien Termin ziehen oder durch Kürzen eingliedern — verloren geht
-  nichts. Vor dem Neuaufbau steht, was er bewirken wird: wie viele Stunden wandern und
-  wie viele übrig bleiben. Vorläufige Termine des 2. Halbjahres sind im Plan als solche
-  gekennzeichnet.
-- **Stunden bis zum Schuljahresende anlegen.** Zu Schuljahresbeginn entsteht das 2.
-  Halbjahr auf Wunsch **vorläufig** aus dem jetzigen Raster — damit die Jahresplanung
-  über den Halbjahreswechsel hinweg Termine hat. Wählbar in der Sammelübernahme und im
-  Wochenmuster-Dialog; vorbelegt, solange das 1. Halbjahr läuft.
-
-
-### Migration
-
-⚠️ **`0080` löscht Daten — vorher sichern.** Sie entfernt archivierte
-Bildungsplan-Knoten, die nur deshalb archiviert sind, weil der Scraper sein
-ID-Schema geändert hat: derselbe Inhalt steht aktiv unter neuer ID daneben. Betroffen
-sind im Produktivsystem wie im Entwicklungsbaum ausschließlich Mathematik `2016.V2`
-(je 326 Zeilen).
-
-Der Lauf ist selbstbegrenzend — er fasst nur an, was einen **aktiven Zwilling gleicher
-Nummer in derselben Edition** hat, auf das **keine Kante** zeigt und was in **keinem
-Chat** angeheftet ist. Die Knoten der Basisfassung bleiben deshalb stehen; dort ist die
-ganze Edition abgelöst, und das ist der legitime Fall.
-
-**Rückrollbar ist das nicht:** Der Scraper erzeugt die alte Schreibweise nicht mehr, ein
-erneuter Import bringt sie also nicht zurück. Der einzige Weg zurück ist die Sicherung
-(→ [Updates und Wartung](docs/admin/updates-und-wartung.md)).
+- **Fachschaften pflegen ihre Fachbegriffe selbst.** Unter *Fächer → Fach → „weiterer
+  Kontext"* spielt „Aus Dateien" Markdown-Dateien oder ein Zip-Bündel mit Abbildungen
+  ein — mit Vorschau je Datei (neu / aktualisiert / unverändert) und, wo jemand in der
+  Oberfläche gearbeitet hat, der Wahl zwischen behalten und überschreiben. „Als Zip"
+  gibt den Bestand im selben Format zurück, „Als Markdown" einen einzelnen Eintrag.
+  „Vorlage herunterladen" liefert kommentierte Musterdateien; die Anleitung steht in
+  der Hilfe unter „Fachbegriffe pflegen". Bisher konnte das nur die Administration über
+  ein Skript.
+- **Stoffsteckbriefe als eigene Bausteinart.** Chemie-Stoffe mit Formel, Eigenschaften,
+  Nachweis und Gefahrenhinweisen, auffindbar auch über Alltagsnamen wie „Kochsalz" oder
+  über das Aussehen („Welcher Stoff raucht an feuchter Luft?"). Reinstoff und Lösung
+  sind getrennt (Chlorwasserstoff / Salzsäure).
+- **Bausteine können „ist ein(e)" ausdrücken**, Abbildungen im Text tragen — an der
+  Stelle, an der sie erklärt werden — und zeigen bei Stoffen die Eigenschaftstabelle,
+  bei Fachbegriffen die häufigen Irrtümer als eigenen Abschnitt. Das Schaltzeichen
+  eines Bauteils ist jetzt auch beim Lesen sichtbar, nicht nur beim Bearbeiten.
+- **Assistenten nutzen den Wissensspeicher von selbst.** Zu jeder Nachricht sucht die
+  Plattform passende Bausteine und legt sie dazu — auch im freien Chat ohne Assistenten;
+  das Suchwerkzeug bleibt fürs gezielte Nachschlagen. Mit dabei: die Zusatzangaben eines
+  Begriffs (bevorzugte Bezeichnung, Fassung, Klassenstufe, Artikel, Mehrzahl, Irrtümer;
+  bei Stoffen Formel, Alltagsnamen, Eigenschaften, Nachweis), die **Abgrenzungen** zu
+  ähnlichen Begriffen und die zur Klassenstufe passende **Fassung** — „Oxidation" als
+  Sauerstoffaufnahme oder als Elektronenabgabe. Assistenten mit eigenem Wissensbereich
+  finden jetzt auch die Fachbegriffe unter ihrem Ankerpunkt.
+- **Lehrkräfte verwalten ihre Assistenten vollständig selbst** — ändern, abschalten,
+  löschen. Bei schulweiten Assistenten bleibt es bei der Freigabe; dort lässt sich die
+  Einreichung zurückziehen und für einen freigegebenen Assistenten die Löschung
+  beantragen. Der Antrag schaltet nichts ab.
+- **Startseite mit dem eigenen Unterrichtstag.** Lehrkräfte sehen die Stunden des Tages
+  mit Fach, Gruppe und Thema; ein Klick führt in den Stundenentwurf und legt ihn an,
+  falls nötig. Schüler:innen sehen ihre Fächer mit Stunde und Hinweis auf Ausfall,
+  Vertretung oder Prüfung — ohne Thema und Stundenentwurf. An unterrichtsfreien Tagen
+  steht der nächste Schultag da. Welche Kacheln daneben erscheinen, ist einstellbar.
+- **Unterrichtsgruppen entstehen mit Ansage.** Liefert das Schulkonto eine Gruppe, wird
+  sie der Lehrkraft **angeboten** statt automatisch angelegt: zuordnen, neu anlegen oder
+  ignorieren. Lerngruppen aus dem eigenen Stundenplan lassen sich in der
+  Sammelübernahme direkt anlegen, mit der Frage „ganze Klasse oder Teilgruppe?". Für
+  Gruppen ohne Klasse gibt es einen **Beitrittscode** (drei Tage gültig, erneuerbar,
+  Fehlbeitritte tageweise zurücknehmbar). Verschwindet eine Gruppe aus dem Stundenplan,
+  meldet die Plattform das — und ändert nichts.
+- **Die Jahresplanung übersteht den Alltag.** Nach einem Ausfall fragt sie, was mit den
+  Inhalten geschehen soll (entfallen lassen, verschieben, mit dem Assistenten umplanen).
+  Persönlicher Ausfall lässt sich für eine Gruppe oder den ganzen Tag eintragen, mit
+  Grund; der Stundenplan-Abgleich setzt ihn nicht mehr zurück. Ändert sich das
+  Wochenmuster, wandert die Planung mit: Klassenarbeiten behalten ihr Datum, der Rest
+  folgt der Reihenfolge, Übriges liegt auf dem **Parkplatz**. Verlegt der Stundenplan
+  eine Stunde auf einen sonst freien Termin, entsteht sie dort. Das 2. Halbjahr lässt
+  sich zu Schuljahresbeginn **vorläufig** anlegen. Prüfungsstunden sind rot schraffiert.
+- **Die Unterrichtsgruppe steht an den Chats** — als Marke in der Historie, als Tooltip
+  in der Seitenleiste. Vier Chats „Sinusfunktionen verstehen" ließen sich vorher nicht
+  auseinanderhalten. Schüler:innen sehen die Marke nicht; für sie ist die Gruppe das Fach.
+- **Die Hilfe zeigt die ganze Anwender-Doku** — bisher zehn von achtzehn Seiten. Neu
+  dabei: „Die ersten 30 Minuten" für Lehrkräfte und „Für Schüler:innen" in einfacher
+  Sprache. Das Verzeichnis zeigt jeder Rolle, was zu ihr passt.
+- **Methode und Sozialform im Stundenentwurf führen zu ihrer Beschreibung.**
+- **Verwaiste Unterrichtsgruppen lassen sich finden** (Admin, `GET
+  /admin/groups?ohne_lehrkraft=true`): Verlässt die einzige Lehrkraft die Schule, bleibt
+  die Gruppe mitsamt Jahresplan stehen, aber für niemanden erreichbar.
 
 ### Geändert
 
-- **Der Prüfstatus an Fachbegriffen und Stoffsteckbriefen ist entfallen.** Das Feld hatte
-  keine Wirkung: Es gibt kein Freigabeverfahren, auf das es hätte verweisen können.
-  Stattdessen gilt, was ohnehin galt — **wer speichert, veröffentlicht**, und wer
-  importiert, gibt damit frei. Ein Zwischenspeichern unfertiger Bausteine kann später
-  dazukommen; es wäre dann eine eigene Fassung, kein Häkchen.
-
-- **Die Modellstufe „denkt vor der Antwort" ist entfallen.** Sie war dasselbe Modell wie
-  die Standardstufe; seit diese selbst mit voller Denktiefe läuft, unterschieden sich die
-  beiden in nichts mehr. Bestehende Chats behalten ihren Eintrag in der Historie.
-
-- **Assistenten antworten Schüler:innen kürzer und auf eine Sache.** Statt Antwort,
-  Leitfragen, Reflexionsanstößen und Versuchsideen in einem Zug steht jetzt eine kurze
-  Antwort mit höchstens einer Rückfrage. Hintergrundwissen aus dem Wissensspeicher —
-  etwa vermerkte Irrtümer — wird genutzt, aber nicht mehr aufgezählt.
-
-- **Versuchsvorschläge für zu Hause sind begrenzt.** Assistenten schlagen Schüler:innen
-  nur noch Ungefährliches vor (Küchenzutaten, Wasser, Batterien bis 9 Volt); für alles
-  andere verweisen sie auf den Unterricht. Fragt jemand ausdrücklich nach einem riskanten
-  Versuch — Elektrolyse, Laugen, Reinigungsmittel mischen, offenes Feuer, Steckdose —,
-  erklärt der Assistent kurz, worum es geht und warum es in den Unterricht gehört, und
-  bietet einen ungefährlichen Versuch an. Welche Themen das sind, steht in
-  `config/home_experiment_triggers.yaml` und kann von der Schule angepasst werden.
-
-- **Kapitel im Wissensbereich haben ein Formular.** Stundenzahl, Reihenfolge,
-  Einleitung und Pfad im Bildungsplan werden jetzt geprüft, statt beliebig gefüllt zu
-  werden — eine Stundenzahl als Text hatte im September die Jahresübersicht
-  lahmgelegt.
-
-- **„Unterricht“ ist eine eigene Seite.** Unterrichtsgruppen, das Kürzel im
-  Stundenplan und der Abgleich standen im Profil; sie stehen jetzt unter *Unterricht* —
-  im Nutzermenü, von der Startseite und von jeder Gruppenseite erreichbar. Alte
-  Lesezeichen werden weitergeleitet.
-- **Das Profil ist aufgeräumt.** Was die Anzeige betrifft — Darstellungsmodus, Umfang
-  der Oberfläche, Kostenanzeige, Chat-Sidebar, Kontext-Suche und neu die Kacheln der
-  Startseite — steht unter einer gemeinsamen Überschrift; Zugangstoken und
-  SSO-Diagnose folgen darunter.
-- **Die Seite quittiert wieder, dass gespeichert wurde** — kurz neben dem geänderten
-  Feld. Seit dem Wegfall des Speichern-Knopfes meldete sie gar nichts mehr.
-
-- **Ein Assistent „für alle Lehrkräfte“ geht jetzt durch die Freigabe.** Er
-  erreicht das ganze Kollegium, entstand aber bisher ohne Prüfung und blieb frei
-  änderbar. Bestehende Assistenten dieser Reichweite bleiben unberührt.
-- **Die Jahrgangsfelder im Assistenten-Editor kennen die Stufen dieser Schule.** Sie
-  standen fest auf 1 bis 13, unabhängig davon, welche Jahrgänge es gibt.
-
+- **Assistenten antworten Schüler:innen kürzer und auf eine Sache** — eine knappe
+  Antwort mit höchstens einer Rückfrage statt Antwort, Leitfragen, Reflexionsanstößen
+  und Versuchsideen in einem Zug. Hintergrundwissen wird genutzt, nicht aufgezählt.
+- **Versuchsvorschläge für zu Hause sind begrenzt.** Vorgeschlagen wird nur
+  Ungefährliches (Küchenzutaten, Wasser, Batterien bis 9 Volt). Fragt jemand nach
+  Elektrolyse, Laugen, Reinigungsmitteln, offenem Feuer oder Steckdose, erklärt der
+  Assistent kurz, warum das in den Unterricht gehört, und bietet eine Alternative an.
+  Die Themen stehen in `config/home_experiment_triggers.yaml`.
+- **Der Prüfstatus an Fachbegriffen und Stoffsteckbriefen ist entfallen.** Es gibt kein
+  Freigabeverfahren, auf das er hätte verweisen können: Wer speichert, veröffentlicht;
+  wer importiert, gibt frei.
+- **Die Modellstufe „denkt vor der Antwort" ist entfallen** — sie war dasselbe Modell
+  wie die Standardstufe, seit diese mit voller Denktiefe läuft. Bestehende Chats
+  behalten ihren Eintrag in der Historie.
+- **„Unterricht" ist eine eigene Seite.** Unterrichtsgruppen, Stundenplan-Kürzel und
+  Abgleich standen im Profil; alte Lesezeichen werden weitergeleitet. Das Profil selbst
+  ist aufgeräumt, und es quittiert wieder, dass gespeichert wurde.
+- **Ein Assistent „für alle Lehrkräfte" geht jetzt durch die Freigabe** — er erreicht
+  das ganze Kollegium, entstand aber bisher ohne Prüfung. Bestehende bleiben unberührt.
+  Die Jahrgangsfelder im Editor kennen jetzt die Stufen dieser Schule statt fest 1–13.
+- **Kapitel im Wissensbereich haben ein Formular**; Stundenzahl, Reihenfolge,
+  Einleitung und Bildungsplan-Pfad werden geprüft.
 - **Der Neuaufbau eines Halbjahres verschont Stunden, die nicht aus dem Wochenmuster
-  stammen.** Termine aus dem Stundenplan oder von Hand bleiben stehen; bisher fiel das
-  ganze Halbjahr. Trägt ein solcher Termin dieselbe Stunde wie das Muster, entfällt die
-  Musterzeile.
-- **Einzelne leere Stunden lassen sich löschen.** Nur ohne Inhalt und nur, wenn sie nicht
-  aus dem Wochenmuster kommen — eine Musterstunde entsteht beim nächsten Erzeugen wieder.
-- **„Ich falle aus" fragt in einem Dialog statt in Browser-Abfragen.** Dort lässt sich
-  jetzt wählen, ob nur die bearbeitete Gruppe betroffen ist oder alle Stunden des Tages;
-  der Grund ist mehrzeilig. Bisher war der ganze Tag die einzige Möglichkeit.
+  stammen**; einzelne leere Stunden lassen sich löschen; „Ich falle aus" fragt in einem
+  Dialog statt in Browser-Abfragen und lässt zwischen einer Gruppe und dem ganzen Tag
+  wählen.
 
 ### Behoben
 
+- **Ein Assistent für eine Unterrichtsgruppe erscheint nur noch dort.** Bisher sahen ihn
+  auch Schüler:innen anderer Gruppen, und über seine Adresse ließ er sich benutzen — die
+  Freigabe war eine Beschriftung, keine Einschränkung; dasselbe galt für private
+  Assistenten. Umgekehrt fehlte er der Lehrkraft, die ihn angelegt hatte: Sie findet ihn
+  wieder, ebenso die Lehrkräfte der Gruppe.
+- **Schüler:innen können die Stundenplanung ihrer Lehrkräfte nicht mehr einsehen.**
+  Unterrichtsstunden, Einheiten und Jahrespläne waren für alle Gruppenmitglieder lesbar,
+  einschließlich der Notizen nach der Stunde. Sie sind jetzt den Lehrkräften vorbehalten.
+- **Assistenten schlagen wieder zuverlässig im Wissensspeicher nach.** Das
+  Standardmodell lief mit der niedrigsten Denkstufe und entschied sich meist gegen die
+  Suche. Gemessen: vier von sechzehn Nachschlagevorgängen vorher, fünfzehn von sechzehn
+  jetzt. Antworten brauchen dafür einige Sekunden länger.
+- **Längere Einträge kommen vollständiger beim Assistenten an**, und vor jedem
+  Kontextblock stehen jetzt die Leseregeln (bevorzugte Bezeichnung statt Suchbegriff,
+  Irrtümer ansprechen statt aufzählen, Zahlenwerte und Gefahrenhinweise unverändert).
+  Bisher endete der Text meist mitten in der Erklärung.
+- **„Neuer Chat" auf der Fachseite behält das Fach.** Die Unterhaltung entstand ohne
+  Fachbezug — die Suche gewichtete das Fach nicht, die Bildungsplan-Fassung wurde nicht
+  gewählt, das Operatoren-Werkzeug antwortete gar nicht.
 - **Eine Lehrkraft mit zwei Gruppen im selben Fach konnte sich nicht mehr anmelden**,
-  sobald das Schulkonto eine Unterrichtsgruppe dieses Fachs lieferte. Die Zuordnung
-  suchte über Lehrkraft und Fach, traf beide Gruppen und brach ab. Zwei Gruppen im selben
-  Fach sind der Normalfall — sie werden jetzt nicht mehr geraten. Zusätzlich verhindert
-  ein Fehler beim Gruppenabgleich die Anmeldung nicht mehr.
-- **Der Abgleich meldete für die zweite Hälfte jeder Doppelstunde „kein Slot".** Eine
-  Doppelstunde ist **eine** Stunde im Plan; der Abgleich prüfte sie als zwei und hielt die
-  zweite Hälfte für ungedeckt.
-- **Mobil: die Seitenleiste bleibt nach dem Antippen eines Eintrags liegen.** Sie klappt
-  jetzt beim Seitenwechsel zu; auf dem Desktop bleibt sie stehen.
-- **Der „Speichern"-Knopf im Profil speicherte nichts** — er navigierte nur zur
-  Startseite. Er ist entfernt; die Einstellungen der Seite werden weiterhin bei jeder
-  Änderung gespeichert.
+  sobald das Schulkonto eine Unterrichtsgruppe dieses Fachs lieferte. Ein Fehler beim
+  Gruppenabgleich verhindert die Anmeldung jetzt ohnehin nicht mehr.
+- **Unterrichtsgruppen ohne Klasse bekommen einen Jahrgang.** Kurse aus Stundenplan und
+  Kursstufe hatten keinen; die Jahresplanung bot ihnen deshalb alle Curricula des Fachs
+  an. Ist er unbekannt, wird keines mehr vorgeschlagen — und „Kein Curriculum gefunden"
+  sagt jetzt, woran es liegt. Aus einem Schulkonto-Angebot ohne erkennbares Fach
+  entsteht keine Gruppe mehr.
+- **Die Jahresübersicht einer Gruppe blieb leer oder lud nicht**, wo die Stundenzahl
+  eines Kapitels als Text gespeichert war; ein zweiter Anlauf erzeugte eine Dublette.
+- **Kurse ohne Klassenverband landen nicht mehr im Archiv**, solange sie weder Stunden
+  noch Jahresplan haben.
+- **Der Abgleich meldete für die zweite Hälfte jeder Doppelstunde „kein Slot"** — eine
+  Doppelstunde ist **eine** Stunde im Plan.
+- **Der Hinweis auf archivierte Verknüpfungen warnt nicht mehr, sondern erklärt.** Eine
+  Bildungsplan-Fassung kann auch schlicht noch nicht gelten.
+- **Kleinere Korrekturen in der Jahresplanung:** Stunden ohne Unterrichtseinheit lassen
+  sich bearbeiten; der Hinweis auf offene Inhalte steht an der ausgefallenen Stunde und
+  übersteht das Neuladen; Ausfall und Löschen wirken sofort statt erst nach einem
+  Seitenaufbau; der Verschiebe-Assistent kennt auch das erste Halbjahr.
+- **Verweise in der Hilfe führen wieder ans Ziel** — sowohl die des Inhaltsverzeichnisses
+  als auch Sprungmarken innerhalb einer Seite.
+- **Mobil: die Seitenleiste klappt beim Seitenwechsel zu.** Der „Speichern"-Knopf im
+  Profil, der nur navigierte, ist entfernt.
 
 ### Dokumentation
 
-- **Die Sammelübernahme aus dem Stundenplan ist beschrieben** — der Knopf, der für
-  alle Gruppen auf einmal das Wochenmuster samt Stunden anlegt. Er war die zweite
-  Stelle im System, an der Stunden entstehen, und kam in keiner Anleitung vor.
-
-- **Drei Aufzählungen sind vollständig — und bleiben es.** Die Betriebsdoku nennt jetzt
-  alle vierzehn nächtlichen Läufe (vorher fünf) und alle sechzehn Datenkategorien, die
-  die Kontolöschung anfasst (vorher fünf); die Entwicklerdoku kennt alle Backend-Module
-  (vorher zwölf von 26). Die Löschung selbst geschah immer vollständig — unvollständig
-  war ihre Beschreibung. Tests halten die drei Listen künftig gegen die Wirklichkeit.
-- Für Administrator:innen: Wie SSO- und Stundenplan-Gruppen zusammenfinden, warum nichts
-  automatisch angelegt wird und was beim Scharfschalten der
-  Unterrichtsgruppen-Synchronisation zu erwarten ist. Anwender-Doku um das Angebot und
-  seine drei Antworten ergänzt.
-- Anwender-Doku: Gruppe aus dem Stundenplan anlegen samt der Frage „ganze Klasse oder
-  Teilgruppe?"; Beitrittscode aus Sicht der Lehrkraft und der Schüler:innen. Für
-  Administrator:innen: die fünf Herkünfte einer Mitgliedschaft und wer sie aufräumen darf.
-- Anwender-Doku: Abschnitt „Das ganze Jahr planen" (vorläufige Termine, Umhängen im
-  Februar, Parkplatz). Für Administrator:innen: welche Slots der Abgleich anlegt und
-  welche ein Neuaufbau verschont.
+- Anwender-Doku: „Fachbegriffe pflegen" (Dateiformat, Einspielen mit Vorschau, Export),
+  „Das ganze Jahr planen", Gruppe aus dem Stundenplan anlegen, Beitrittscode aus beiden
+  Blickwinkeln, Sammelübernahme aus dem Stundenplan.
+- Admin-Doku: wie SSO- und Stundenplan-Gruppen zusammenfinden und warum nichts
+  automatisch entsteht; die fünf Herkünfte einer Mitgliedschaft; welche Slots der
+  Abgleich anlegt und welche ein Neuaufbau verschont; Upload-Grenzen.
+- **Drei Aufzählungen sind vollständig — und bleiben es.** Die Betriebsdoku nennt alle
+  vierzehn nächtlichen Läufe (vorher fünf) und alle sechzehn Datenkategorien der
+  Kontolöschung (vorher fünf), die Entwicklerdoku alle Backend-Module (vorher zwölf von
+  26). Tests halten die Listen künftig gegen die Wirklichkeit.
 
 ### Migration
 
-⚠️ **Migrieren, bevor die neuen Container starten:**
+⚠️ **Vor dem Ausrollen eine Sicherung ziehen.** Drei Migrationen schreiben oder löschen
+Bestandsdaten (`0068`, `0072`, `0080`); `0080` ist nicht rückrollbar.
+
+**Neue Konfigurationsdatei** — vor dem Start anlegen, sonst scheitert **jeder
+Schüler-Chat** mit `FileNotFoundError` (nicht der Start; ein Rauchtest mit einem
+Lehrkraft-Konto übersieht das):
+
+```bash
+cp config/home_experiment_triggers.example.yaml config/home_experiment_triggers.yaml
+```
+
+**Dann migrieren, bevor die neuen Container starten:**
 
 ```bash
 docker compose build --no-cache
@@ -376,48 +183,39 @@ docker compose run --rm backend alembic upgrade head
 docker compose up -d --force-recreate
 ```
 
-`alembic upgrade head` führt `0066` (Spalte `lesson_slots.vorlaeufig`) und `0067`
-(Tabelle `parked_lesson_content`) aus. Bestehende Termine gelten als nicht vorläufig.
+`--force-recreate` ist diesmal nötig: Der nginx-Dienst bekommt seine Konfiguration jetzt
+als **Vorlage** (`infra/nginx.conf.template`), die beim Start gefüllt wird. Danach
+`docker compose logs nginx` ansehen.
 
-`alembic upgrade head` führt vier Migrationen aus:
+`alembic upgrade head` führt `0066`–`0080` aus. Zutun verlangen drei:
 
-- **`0068`** — Tabelle `group_source_classes` (eine Unterrichtsgruppe kann aus mehreren
-  Klassen stammen) und Spalte `group_memberships.herkunft`.
-  ⚠️ **Diese Migration schreibt Bestandsdaten um:** Sie füllt die Herkunft für jede
-  vorhandene Mitgliedschaft, überträgt `groups.source_class_group_id` in die neue Tabelle
-  und **entfernt die alte Spalte**. Vorher eine Sicherung ziehen; die Rückrolle
-  (`downgrade`) behält bei mehreren Quellklassen nur die kleinste.
-- **`0069`** — Spalte `groups.erbt_mitglieder`. Der Backfill schreibt den bisherigen
-  Zustand fest (genau eine Quellklasse = es wurde geerbt); der Bestand verhält sich danach
-  wie davor.
-- **`0070`** — Tabelle `group_join_codes` sowie `group_memberships.beigetreten_am` und
-  `.join_code_id` für die Rücknahme von Fehlbeitritten.
-- **`0071`** — Tabelle `sso_group_offers`. Keine Bestandsänderung; sie ist beim Start
-  leer. ⚠️ **Wirkung ohne Migration:** Ab diesem Stand legt der Login-Sync für
-  Unterrichtsgruppen aus dem Schulkonto **nichts mehr automatisch an** — sie werden der
-  Lehrkraft angeboten. Wer die Unterrichtsgruppen-Synchronisation im Schulkonto neu
-  aktiviert, sollte diesen Stand **vorher** ausgerollt haben: Danach entstandene
-  Doppelgruppen lassen sich nicht mehr per Dialog zusammenführen, weil Jahresplan,
-  Stundenentwürfe und Chats daran hängen.
+- **`0068`** — Tabelle `group_source_classes` (eine Gruppe kann aus mehreren Klassen
+  stammen) und Spalte `group_memberships.herkunft`. ⚠️ **Schreibt Bestandsdaten um** und
+  entfernt `groups.source_class_group_id`; die Rückrolle behält bei mehreren
+  Quellklassen nur die kleinste.
+- **`0071`** — Tabelle `sso_group_offers`. ⚠️ **Wirkung unabhängig von der Migration:**
+  Ab diesem Stand legt der Login-Sync Unterrichtsgruppen aus dem Schulkonto **nicht mehr
+  automatisch an**. Wer die Synchronisation im Schulkonto neu aktiviert, sollte diesen
+  Stand vorher ausgerollt haben — danach entstandene Doppelgruppen lassen sich nicht
+  mehr per Dialog zusammenführen.
+- **`0080`** — entfernt archivierte Bildungsplan-Knoten, die nur deshalb archiviert sind,
+  weil der Scraper sein ID-Schema geändert hat; derselbe Inhalt steht aktiv daneben.
+  Betroffen ist ausschließlich Mathematik `2016.V2` (326 Zeilen). Der Lauf fasst nur an,
+  was einen aktiven Zwilling gleicher Nummer und Edition hat, auf das keine Kante zeigt
+  und was in keinem Chat angeheftet ist. ⚠️ **Nicht rückrollbar** — der Scraper erzeugt
+  die alte Schreibweise nicht mehr.
 
-Dazu fünf weitere, die kein Zutun verlangen:
+Die übrigen laufen ohne Zutun: `0066`/`0067` (vorläufige Termine, Parkplatz), `0069`
+(`groups.erbt_mitglieder`), `0070` (Beitrittscodes), **`0072`** (⚠️ schreibt die
+Stundenzahl der Curriculum-Kapitel von Text auf Zahl um), `0073` (`groups.jahrgang`),
+`0074` (Scope `group_teachers`), `0075` (persönlicher Ausfall), `0076` (Löschantrag),
+`0077` (Spaltenvorgaben in `assistants`), `0078` (Relation `is_a`), `0079` (Kennung
+`seed_id` an importierten Fachbegriffen).
 
-- **`0072`** — Stundenzahl der Curriculum-Kapitel als Zahl statt als Text. ⚠️ **Schreibt
-  Bestandsdaten um:** Die Mehrheit der importierten Kapitel trug die Zahl als Zeichenkette.
-- **`0073`** — Spalte `groups.jahrgang` für Gruppen ohne Klasse (kein Backfill).
-- **`0074`** — neuer Sichtbarkeits-Scope `group_teachers`; die Prüfbedingungen an
-  `context_nodes` werden neu gesetzt.
-- **`0075`** — `lesson_slots.ausfall_herkunft` und `.ausfall_vorher` für den persönlichen
-  Ausfall.
-- **`0076`** — `assistants.deletion_requested_at` und `.deletion_reason` für den
-  Löschantrag.
-- **`0077`** — setzt sechs Spaltenvorgaben in `assistants` richtig; sie waren doppelt
-  gequotet und damit unbrauchbar. Repariert nebenbei Namen, Modell und Prompt, falls
-  dort zwei Apostrophe statt eines leeren Feldes stehen.
-
-Optional in `config/rate_limits.yaml`: der Bucket `group_join` (Vorgabe 10 Anfragen je
-5 Minuten und Person) drosselt das Einlösen von Beitrittscodes. Fehlt er, greift derselbe
-Wert als eingebaute Vorgabe.
+Optional in `config/rate_limits.yaml`: die Eimer `group_join` (10 je 5 Minuten) und
+`fachbegriffe_import` (20 je 5 Minuten). Fehlen sie, greifen dieselben Werte als
+eingebaute Vorgabe. Ebenfalls optional in `.env`: `NGINX_MAX_BODY_SIZE` und die
+`FACHBEGRIFFE_IMPORT_*`-Grenzen (siehe „Upload-Grenzen" in der Admin-Doku).
 
 ## [0.10.4] – 2026-09-21
 
