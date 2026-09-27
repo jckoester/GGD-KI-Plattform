@@ -59,6 +59,8 @@ cd frontend && npm install && npm run dev
 - [Auth-Flow & Pseudonymisierung](auth-flow.md) — Adapter-Interface, JWT, Pseudonymisierung
 - [Chat & Streaming](chat-streaming.md) — Chat-Request → LiteLLM → SSE-Antwort
 - [Kontextsuche](kontextsuche.md) — Suchschicht, Stellschrauben fürs Feintuning, Prüfsatz
+- [Fachbegriffe einspielen](fachbegriffe-import.md) — Schnittstelle des Seed-Skripts, Idempotenz, Bericht
+- [Neuen Knotentyp einführen](neuer-knotentyp.md) — Checkliste, Netzwerkgraph, die vier stummen Fallen
 - [Bildgenerierung](bildgenerierung.md) — Chat-Tool, Persistenz/Lifecycle, Moderations-Schichten
 - [Server-Rendering](server-rendering.md) — CircuiTikZ/Plots/PDF-Mathe: Sidecar, Render-Router, Cache
 - [Artefaktbibliothek](artefaktbibliothek.md) — `artifacts`-Modell, Promotion/Idempotenz, ggb-Export

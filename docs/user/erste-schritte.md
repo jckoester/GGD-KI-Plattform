@@ -6,6 +6,66 @@ Die Anmeldung bei ki@schule erfolgt über Ihr Schulkonto. Klicken Sie auf der St
 
 Ein separater Account ist nicht notwendig. Wer ein Schulkonto hat, kann sofort loslegen.
 
+## Die Startseite
+
+Nach der Anmeldung landen Sie auf der Startseite. Oben steht das Eingabefeld für einen
+neuen Chat; darunter erscheinen **Kacheln**, sofern es etwas zu zeigen gibt.
+
+### Als Lehrkraft
+
+| Kachel | Was darin steht |
+|---|---|
+| **Heute** | Ihre heutigen Stunden aus allen eigenen Unterrichtsgruppen, nach Stundennummer sortiert |
+| **Nächster Schultag** | Dasselbe für den nächsten Unterrichtstag, mit Datum |
+| **Meine Unterrichtsgruppen** | Ihre Gruppen als Direktlinks, dazu offene Vorschläge aus dem Stundenplan und Angebote aus dem Schulkonto |
+
+Eine Zeile in „Heute" sieht so aus:
+
+> 🧪 **3.–4. · 9C · Titration** — *Erst einer Einheit zuordnen*
+
+Von links nach rechts: das Fach-Icon in der Fachfarbe, die Stundennummer, die Gruppe und
+das Thema. Steht kein Thema und keine Unterrichtseinheit fest, heißt die Stunde „ohne
+Thema".
+
+**Der Titel führt in den Stundenentwurf.** Gibt es noch keinen, wird er beim Klick
+angelegt und geöffnet — auch dann, wenn die Stunde noch zu keiner Unterrichtseinheit
+gehört. Die Zuordnung zur Einheit können Sie später in der Jahresplanung nachholen;
+solange sie fehlt, steht rechts der Hinweis *„Erst einer Einheit zuordnen"*, der ebenfalls
+dorthin führt.
+
+Ausgefallene und vertretene Stunden bleiben sichtbar — sie erklären die Lücke im Tag,
+statt sie zu verschweigen.
+
+### Als Schüler:in
+
+Sie sehen Ihre heutigen Fächer und die des nächsten Schultags, jedes verlinkt auf seine
+Fachseite. Fällt eine Stunde aus, ist Vertretung oder eine Prüfung angesetzt, steht es
+daneben.
+
+Was Ihre Lehrkraft für die Stunde vorbereitet hat — Thema, Unterrichtseinheit,
+Stundenentwurf —, erscheint hier nicht. Das gehört ihr (siehe
+[Datenschutz](datenschutz.md)).
+
+### Wann eine Kachel fehlt
+
+Eine Tageskachel erscheint **nur, wenn sie etwas zu sagen hat**. An einem Schultag, zu
+dem hier nichts eingetragen ist, entfällt sie: Die Plattform kennt Ihren Stundenplan
+nicht, sondern nur, was in ihr steht — „heute kein Unterricht" wäre eine Behauptung, die
+sie nicht belegen kann.
+
+Ferien, Feiertage und unterrichtsfreie Tage stehen dagegen im Schuljahreskalender. Sie
+werden benannt, weil sie die Lücke erklären.
+
+Fehlen Ihnen als Lehrkraft noch Unterrichtsgruppen oder ein Wochenmuster, bleibt die
+Kachel ebenfalls stehen — mit dem Weg zum Einrichten.
+
+### Kacheln wählen
+
+Unter den Kacheln steht **„Kacheln wählen"**. Dort schalten Sie einzelne ab; die
+Einstellung gilt für Ihr Konto und bleibt erhalten. Neue Kacheln, die später dazukommen,
+sind zunächst sichtbar — abgespeichert wird, was Sie ausgeblendet haben, nicht was Sie
+sehen wollen.
+
 ## Die Oberfläche auf einen Blick
 
 Nach der Anmeldung sehen Sie die Hauptansicht der Plattform:

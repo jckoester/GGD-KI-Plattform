@@ -50,8 +50,8 @@ def seed_material_gruppe(sync_conn):
             (GROUP_ID, SUBJECT_ID),
         )
         cur.execute(
-            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group) "
-            "VALUES (%s, %s, 'teacher') ON CONFLICT DO NOTHING",
+            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) "
+            "VALUES (%s, %s, 'teacher', 'eigen') ON CONFLICT DO NOTHING",
             (GROUP_ID, TEACHER_PSEUDO),
         )
     sync_conn.commit()

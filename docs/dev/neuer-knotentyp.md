@@ -9,7 +9,7 @@ Grundlage: `ADR-013` (Kontextspeicher-Graph) und `ADR-017` (Neukonzeption der
 Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 [kontextsuche.md](kontextsuche.md).
 
-> **Zwei Fallen vorweg**, weil sie beide **stumm** sind — sie führen nicht zu einem
+> **Drei Fallen vorweg**, weil sie alle **stumm** sind — sie führen nicht zu einem
 > Fehler, sondern zu falschem Verhalten, das niemandem auffällt:
 >
 > 1. `VALID_UNTIL_DEFAULTS_DAYS` wird **von Hand** gepflegt. Ein fehlender Eintrag liefert
@@ -18,6 +18,11 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 > 2. Ein Typ mit `embedding: true`, dessen Embedding-Input am Ende **nur aus dem Titel**
 >    besteht, ist keine thematische Suche, sondern eine unscharfe Titelsuche im
 >    Vektorraum — mit Kosten und ohne Gewinn. Schritt 4 prüft genau das.
+> 3. Ein Typ, dessen fachlicher Wert im **Metadata** steckt und der in `MODELL_METADATA`
+>    fehlt, zeigt seine Felder überall — nur der Assistent sieht sie nie. Schritt 14.
+> 4. `collection.schueler: true` sieht nach einer Anzeigeeinstellung aus, entscheidet
+>    aber seit dem 26.09.2026 **auch**, ob Knoten dieses Typs ungefragt im Chat-Prompt
+>    landen. Schritt 15.
 
 ## `taxonomy.yaml` ist eine Systemdatei
 
@@ -101,7 +106,7 @@ Drei Gründe sprechen dagegen:
   einer Person, nicht dem Suchraum.
 
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
-`taxonomy.yaml`. Stand 09/2026: 27 von 41 Typen mit Embedding.
+`taxonomy.yaml`. Stand 09/2026: 28 von 42 Typen mit Embedding.
 
 ### 4. Bei „ja": den Embedding-Input gegenprüfen
 
@@ -140,7 +145,20 @@ Knoten**, keine Rechteprüfung — die liegt in `app/context/visibility.py` und 
 einheitlich für alle Abfragewege.
 
 Faustregel: Bildungsplan `global/global`, Fachschaftsmaterial `school/subject`,
-Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`.
+Unterrichtsmaterial `group/private`, Schülerartefakte `private/private`,
+**Planung der Lehrkraft** `group_teachers/group_teachers`.
+
+⚠️ **`group` heißt alle Mitglieder — auch Schüler:innen.** Wer einen Typ anlegt, der
+Vorbereitung enthält (Verlaufspläne, Reflexionen, Bilanzen), nimmt `group_teachers`:
+Der Wert verlangt zusätzlich die Lehrkraft-Rolle. Der Unterschied fiel am 24.09.2026
+auf, weil `unterrichtsstunde`, `unterrichtseinheit` und `jahresplan` auf `group` standen
+und Schüler:innen derselben Gruppe sie über `GET /context/nodes` lesen konnten —
+`metadata.reflexion` eingeschlossen (Alembic 0074).
+
+⚠️ **Die Rangfolge steht an drei Stellen** (Datenbank-Bedingung
+`check_context_nodes_scope_restrictivity`, `app/db/models.py`,
+`taxonomy_check._SCOPE_RANG`). Ein neuer Scope-Wert muss in alle drei — und
+`write_scope` darf nie weiter reichen als `read_scope`.
 
 ### 6. Lifecycle
 
@@ -245,7 +263,7 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 ### 12. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
-  deckt heute alle 41 Typen ab, das soll so bleiben). Bei importierten
+  deckt heute alle 42 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
@@ -263,13 +281,72 @@ Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/rou
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 14. Prüfsatz
+### 14. Was das Modell sieht
+
+`MODELL_METADATA` in `backend/app/context/taxonomy.py`. Welche **Metadatenfelder** des
+Typs gehen in den Kontext des Assistenten? Kein Eintrag heißt: keine — und das ist für
+die meisten Typen richtig, weil die Spalte vor allem Import-Interna trägt (`bp_id`,
+`breadcrumb`, `reihenfolge`).
+
+⚠️ **Eine dritte stumme Falle.** Ein Typ, dessen Wert im Metadata steckt und der hier
+fehlt, verliert ihn **lautlos**: Die Felder stehen in der Oberfläche, der Editor pflegt
+sie, die Sammlung zeigt sie — nur der Assistent hat sie nie gesehen. Nachweisbar ist das
+erst an einer Antwort, die es nicht gibt. Die Frage lautet deshalb nicht „brauchen wir
+das?", sondern: *Welche dieser Felder würde eine Lehrkraft im Gespräch nennen?* Bei
+`stoffsteckbrief` ist es die Eigenschaftstabelle, bei `begriff` sind es die
+Fehlvorstellungen und die bevorzugte Bezeichnung.
+
+Drei Regeln dazu:
+
+- **Whitelist, nicht „alles Metadata".** Ein SVG im Metadata (`illustrationen[].svg`,
+  `schaltzeichen.svg`) ist im Pilot bis 47 kB groß — pauschal mitgegeben stünde mehr
+  Grafikmarkup im Prompt als Unterrichtsinhalt. `ohne_svg` in `app/context/modellsicht.py`
+  entfernt den Schlüssel in jeder Tiefe; was das Bild zeigt, steht in `beschreibung`.
+- **Nicht dieselbe Liste wie der Embedding-Input** (Schritt 4). Die Eigenschaftstabelle
+  gehört ins Gespräch, aber nicht in den Vektor: Dort machte sie alle Stoffe einander
+  ähnlich. Umgekehrt gehören Fehlvorstellungen ins Gespräch, aber nicht in den Vektor —
+  sie zögen die Fragen an, die sie widerlegen sollen.
+- **Gliedert der Typ seinen Text in Abschnitte, gehört er in `ABSCHNITTS_TYPEN`.**
+  Sonst schneidet die Kürzung bei 800 Zeichen mitten hinein. `begriff` und
+  `stoffsteckbrief` folgen `_Format.md` (Definition, „### Erklärung", „### Beispiele")
+  und werden deshalb abschnittsweise gekürzt: Kern vollständig, Beispiele nach Budget.
+  Für Typen ohne solche Gliederung ist der harte Schnitt richtig.
+- **Ein Feld, das nicht im Feldschema steht, ist begründungspflichtig.** Ein Test
+  (`test_context_taxonomy.py::TestModellMetadata`) prüft die Whitelist gegen `felder:`
+  und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute
+  `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann.
+
+### 15. Darf der Typ ungefragt in einen Chat?
+
+Das Flag `collection.schueler` in `taxonomy.yaml`. Es beantwortete ursprünglich nur eine
+Anzeigefrage („erscheint die Sammlung im Abschnitt *Nachschlagen* der
+Unterrichtsgruppen-Seite auch für Schüler:innen?"). Seit der Vorab-Suche (ADR-017,
+Nachtrag vom 26.09.2026) hat es eine zweite Wirkung: `VORAB_TYPEN` leitet sich daraus
+ab, und Knoten dieser Arten landen **ohne Nachfrage** im System-Prompt jeder passenden
+Chat-Nachricht.
+
+⚠️ **Die vierte stumme Falle**, und sie geht in beide Richtungen. Wer das Flag setzt,
+weil die Sammlung in der Gruppenansicht auftauchen soll, öffnet zugleich den Weg in den
+Prompt. Wer es weglässt, weil die Sammlungsansicht nicht gebraucht wird, sperrt den Typ
+lautlos aus dem Chat aus — der Assistent findet ihn dann nur noch, wenn er von sich aus
+sucht, und das tut er gemessen nicht zuverlässig.
+
+Die Frage dahinter ist in beiden Fällen dieselbe und eine gute: *Ist das etwas, das
+Schüler:innen im Unterricht in die Hand bekommen?* Ja bei Fachbegriffen, Stoffsteckbriefen,
+Methoden- und Operatorenblättern. Nein bei Planungsvokabular der Lehrkraft und bei
+Bildungsplan-Kompetenzen — letztere sind zahlreich genug, jeden Prompt zu füllen, und
+beantworten die Frage einer Lehrkraft, nicht die einer Schülerin.
+
+Fällt die Antwort auseinander (Sammlung ja, Prompt nein — oder umgekehrt), ist das Flag
+zu teilen. Heute deckt eine Frage beide Fälle; das ist keine Zusage für immer.
+
+### 16. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 15. Dokumentation
+### 17. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
 Und diese Seite: Graph ergänzen.
@@ -342,6 +419,7 @@ flowchart LR
     funktion["funktion ◆"]:::emb
     bauteil["bauteil ◆"]:::emb
     begriff["begriff ◆"]:::emb
+    stoff["stoffsteckbrief ◆"]:::emb
     code["code_beispiel ◆"]:::emb
   end
 
@@ -391,6 +469,12 @@ flowchart LR
   bauteil -.->|part_of| themengebiet
   begriff -.->|part_of| themengebiet
   begriff -.->|related_to| begriff
+  begriff -.->|requires| begriff
+  begriff -.->|is_a| begriff
+  begriff -.->|references| ik
+  stoff -.->|is_a| begriff
+  stoff -.->|related_to| begriff
+  stoff -.->|references| ik
   bauteil -.->|used_with| funktion
   code -.->|references| funktion
 

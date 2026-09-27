@@ -23,6 +23,7 @@ import {
     FileSignature,
     FileText,
     FileType,
+    FlaskConical,
     GraduationCap,
     Languages,
     Layers,
@@ -90,6 +91,7 @@ export const NODE_ICONS = {
     funktion: Braces,
     bauteil: Cpu,
     begriff: BookMarked,
+    stoffsteckbrief: FlaskConical,
 }
 
 /** Rückfall je Kategorie — greift nur, wenn ein Knoten keinen content_type hat. */

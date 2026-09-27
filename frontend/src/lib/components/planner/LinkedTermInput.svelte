@@ -139,8 +139,24 @@
 {#if isNode}
   <span class="text-xs flex items-center gap-1">
     <span class="text-primary dark:text-primary-dark" aria-hidden="true">⬡</span>
-    <span class="text-light-tx dark:text-dark-tx truncate max-w-[140px]"
-          title={value.titel || value.node_id}>{value.titel || value.node_id}</span>
+    <!--
+      ⚠️ **Der Chip war ein `<span>`.** Die Lehrkraft wählte „Placemat" und kam aus der
+      Planung nicht zur Erklärung — obwohl jede Methode eine Kurzbeschreibung trägt
+      (Pflichtfeld laut Taxonomie, alle 16 geseedeten haben eine). Genau das meinte der
+      Todo mit „mit einem Klick zur konkreten Handreichung"; er nahm nur den Umweg über
+      ein Methodenblatt an, das etwas anderes ist (siehe Plan, AP7).
+
+      `target="_blank"`, weil der Stundenentwurf ungespeicherte Eingaben tragen kann —
+      ein Wechsel im selben Tab verlöre sie.
+    -->
+    <a
+      href={`/knowledge/${value.node_id}`}
+      target="_blank"
+      rel="noopener"
+      class="text-light-tx dark:text-dark-tx truncate max-w-[140px] underline
+             decoration-dotted hover:decoration-solid"
+      title={`${value.titel || value.node_id} — Beschreibung öffnen`}
+    >{value.titel || value.node_id}</a>
     <button
       onclick={clear}
       class="text-light-tx-2 dark:text-dark-tx-2 hover:text-light-re dark:hover:text-dark-re ml-auto"

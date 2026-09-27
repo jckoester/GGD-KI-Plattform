@@ -227,3 +227,76 @@ class TestRelationsKonfiguration:
         )
         monkeypatch.setattr(taxonomy, "FELD_SCHEMATA", {})
         assert any("kein `label`" in b for b in pruefe_schema_konsistenz())
+
+
+
+class TestBegriffFelderAusDemFachbegriffsPilot:
+    """Die Felder aus Paket 9, AP1 — sie tragen den Pilot-Import Chemie.
+
+    ⚠️ **Geprüft wird die Wirkung, nicht die Existenz.** Ein Feld, das im Schema steht,
+    aber keinen falschen Wert abweist, ist eine Beschriftung im Editor und sonst nichts.
+    """
+
+    @pytest.mark.parametrize("wert", ["der", "die", "das"])
+    def test_genus_nimmt_die_drei_artikel(self, wert):
+        validate_node_metadata("begriff", {"genus": wert})
+
+    @pytest.mark.parametrize("wert", ["Der", "des", "the", ""])
+    def test_genus_weist_alles_andere_ab(self, wert):
+        if wert == "":
+            # Leer heißt „nicht ausgefüllt" und ist erlaubt — sonst könnte man ein
+            # optionales Auswahlfeld nie wieder leeren.
+            validate_node_metadata("begriff", {"genus": wert})
+            return
+        with pytest.raises(ValueError, match="Artikel"):
+            validate_node_metadata("begriff", {"genus": wert})
+
+    def test_pruefstatus_gibt_es_nicht_mehr(self):
+        """⚠️ **Der Prüfstatus ist am 27.09.2026 entfallen** (Entscheidung Jan).
+
+        Er war nie ein Begriff der Plattform: Keine Zeile Code hat ihn gelesen oder
+        geschrieben, der Editor belegte ihn nicht vor, und die drei Werte kamen allein
+        aus dem Frontmatter der Vault-Dateien. Ein Freigabeverfahren, auf das er hätte
+        verweisen können, gibt es nicht — **die Nutzeraktion „Import" ist die Freigabe**.
+        Was nicht fertig ist, wird nicht importiert.
+
+        ⚠️ **Geprüft wird das Schema, nicht die Zurückweisung eines Werts.**
+        `validate_node_metadata` läuft über die Schemafelder; ein unbekannter Schlüssel
+        passiert still. Ein Test, der `{"pruefstatus": "entwurf"}` abgewiesen sehen will,
+        wäre deshalb immer rot — und würde grün, sobald jemand das Feld zurückbrächte.
+        Genau verkehrt herum.
+        """
+        from app.context.taxonomy import collection_config, feld_schema
+
+        for typ in ("begriff", "stoffsteckbrief"):
+            assert "pruefstatus" not in feld_schema(typ), typ
+            sammlung = collection_config(typ) or {}
+            assert "pruefstatus" not in sammlung.get("spalten", []), typ
+            assert "pruefstatus" not in sammlung.get("filter", []), typ
+
+    def test_fehlvorstellungen_sind_eine_liste_von_texten(self):
+        validate_node_metadata(
+            "begriff",
+            {"fehlvorstellungen": ["Beim Sieden zerfällt Wasser in seine Elemente."]},
+        )
+
+    @pytest.mark.parametrize("wert", ["ein Satz", ["ok", 5], {"a": "b"}])
+    def test_fehlvorstellungen_weisen_anderes_ab(self, wert):
+        with pytest.raises(ValueError, match="Liste von Texten"):
+            validate_node_metadata("begriff", {"fehlvorstellungen": wert})
+
+    def test_freitextfelder_verlangen_text(self):
+        for feld in ("fassung", "bevorzugter_begriff", "plural", "quelle"):
+            validate_node_metadata("begriff", {feld: "Elektronenabgabe"})
+            with pytest.raises(ValueError, match="Text"):
+                validate_node_metadata("begriff", {feld: 42})
+
+    def test_illustrationen_bleiben_ungeprueft(self):
+        """⚠️ **Absicht, kein Versehen.** Die Feldtypen (`int|text|auswahl|liste`)
+        tragen keine Objektlisten, und ein vierter Typ nur für dieses eine Feld lohnt
+        nicht. Der Import schreibt es; der Editor zeigt es nicht an.
+        """
+        validate_node_metadata(
+            "begriff",
+            {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "…"}]},
+        )

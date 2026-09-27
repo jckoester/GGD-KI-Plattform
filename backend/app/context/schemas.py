@@ -164,6 +164,11 @@ class ArchivedReferenceRead(BaseModel):
     archived_at: datetime
     relation: str
     suggested_successor_id: UUID | None
+    #: Schuljahr, ab dem die Bildungsplan-Edition dieses Knotens für sein Fach gilt —
+    #: oder ``None``. Nur der Fall „gilt noch nicht“ lässt sich aus dem Fahrplan
+    #: erklären; alle anderen Archivierungsgründe bleiben unbenannt, statt geraten zu
+    #: werden (siehe `editions.gilt_ab_schuljahr`).
+    gilt_ab: int | None = None
 
 
 class ContextNodeCopyRequest(BaseModel):
@@ -396,7 +401,12 @@ class CurriculumDraftLernsequenz(BaseModel):
     bp_titel: str | None = None
     bp_leitidee: str | None = None
     reihenfolge: int | None = None
-    std: str | None = None
+    # ⚠️ **Zahl oder Text — das Zwischenformat nimmt beides.** Es kommt aus
+    # LLM-Extraktion, YAML und dem eigenen Export; ein strenger Typ hier würde
+    # Importe abweisen, deren Angabe „12“ oder „12-14“ lautet. Zur **Zahl** wird der
+    # Wert erst beim Schreiben des Knotens (`als_stundenzahl`, `context/service.py`);
+    # so steht in der Datenbank ein Typ und an der Grenze steht Nachsicht.
+    std: int | str | None = None
     eintraege: list[CurriculumDraftEntry] = Field(default_factory=list)
     confidence: float = Field(default=1.0, description="Konfidenz der Extraktion")
     warnings: list[str] = Field(default_factory=list)
@@ -406,7 +416,9 @@ class CurriculumDraftKapitel(BaseModel):
     """Ein Kapitel im Zwischenformat."""
     titel: str
     reihenfolge: int
-    std: str | None = None
+    # Siehe `CurriculumDraftLernsequenz.std`: nachsichtig an der Grenze,
+    # normalisiert beim Schreiben.
+    std: int | str | None = None
     hinweis: str | None = None
     konkretisierung: list[str] = Field(default_factory=list)
     lernsequenzen: list[CurriculumDraftLernsequenz] = Field(default_factory=list)
@@ -668,3 +680,62 @@ class EinsatzortRead(BaseModel):
     id: UUID
     titel: str
     content_type: str
+
+
+class ZielZaehlung(BaseModel):
+    """Ein offener Verweis samt Häufigkeit — die Arbeitsliste im Importbericht."""
+
+    ziel: str
+    anzahl: int
+
+
+class DateiErgebnisRead(BaseModel):
+    """Eine Zeile der Importvorschau (AP4).
+
+    ⚠️ **Je Datei, nicht nur als Summe.** Der Dialog lässt bei handveränderten Knoten
+    je Zeile wählen („behalten" oder „überschreiben"); eine Zahl „3 übersprungen"
+    trüge diese Entscheidung nicht.
+    """
+
+    datei: str
+    titel: str
+    #: `neu` · `aktualisiert` · `unveraendert` · `uebersprungen` (Handänderung) ·
+    #: `uebergangen` (gelesen, aber nicht geschrieben — Grund steht in `warnungen`)
+    zustand: str
+    node_id: UUID | None = None
+    #: Arbeitsstand aus der Datei, im Wortlaut. Wird **nicht** importiert.
+    pruefstatus: str = ""
+    #: Trägt die Datei einen anderen Stand als „geprüft"? Import ist Freigabe — die
+    #: Vorschau fragt dann nach, verhindert aber nichts.
+    entwurf: bool = False
+
+
+class FachbegriffImportBericht(BaseModel):
+    """Was ein Import- oder Probelauf ergeben hat (Paket 10, AP3).
+
+    Dieselben Zahlen, die das Admin-Skript auf die Konsole schreibt. Der Probelauf
+    liefert sie, **ohne** dass etwas geschrieben wurde — daran hängt die Vorschau aus
+    AP4: Was hier steht, ist genau das, was der echte Lauf tun würde.
+    """
+
+    probelauf: bool
+    fach: str
+    neu: int = 0
+    aktualisiert: int = 0
+    unveraendert: int = 0
+    #: Dateien, deren Knoten seit dem letzten Import in der Oberfläche bearbeitet
+    #: wurde. Sie bleiben unangetastet, bis jemand das Überschreiben verlangt.
+    uebersprungen: list[str] = Field(default_factory=list)
+    kanten: int = 0
+    kanten_geaendert: int = 0
+    #: Knoten, deren Vektor verworfen wurde. Sie sind erst nach dem nächtlichen
+    #: Backfill wieder über die Bedeutung auffindbar, nicht sofort.
+    neu_einzubetten: int = 0
+    warnungen: list[str] = Field(default_factory=list)
+    #: Eine Zeile je gelesener Datei, in Bündelreihenfolge.
+    dateien: list[DateiErgebnisRead] = Field(default_factory=list)
+    #: Datei → Kennung, die der Lauf vergeben hat, weil `id:` fehlte.
+    vergebene_ids: dict[str, str] = Field(default_factory=dict)
+    offene_ziele: list[ZielZaehlung] = Field(default_factory=list)
+    offene_fundstellen: list[ZielZaehlung] = Field(default_factory=list)
+    archivierte_ziele: list[ZielZaehlung] = Field(default_factory=list)

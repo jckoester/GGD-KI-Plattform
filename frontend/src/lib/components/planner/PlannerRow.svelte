@@ -1,7 +1,14 @@
 <script>
+  import { darfZurueckgenommenWerden, herkunftText, zeileBrauchtEntscheidung } from '$lib/ausfall.js'
   import { ueColor, weekdayLabel, dateLabel, periodLabel, KATEGORIE_LABELS, entwurfsStand } from '$lib/planner.js'
 
-  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap, onEditLesson, onReview = null } = $props()
+  const { slot, unit, units = [], vorlaeufig = false, onPatch, onSwap,
+          onUnpark = () => {}, onEditLesson, onReview = null,
+          // Persönlicher Ausfall (AP4). Beide sind optional: Die Zeile wird auch
+          // dort verwendet, wo es keinen Tageskontext gibt.
+          onAusfallTag = null, onAusfallZurueck = null,
+          // AP5: die drei Wege, wenn an dieser Zeile noch etwas offen ist.
+          onAusfallWeg = null } = $props()
 
   // Inline-Thema-Bearbeitung
   let editingThema = $state(false)
@@ -65,6 +72,14 @@
 
   function onDrop(e) {
     e.preventDefault()
+    // Zwei Sorten Ladung: eine andere Stunde (tauschen) oder ein Parkplatz-Eintrag
+    // (einplanen). Der eigene MIME-Typ hält sie auseinander, ohne dass die Zeile raten
+    // muss, was sie gerade bekommt.
+    const parkplatzId = e.dataTransfer.getData('application/x-parkplatz')
+    if (parkplatzId) {
+      if (!slot.pinned) onUnpark(parkplatzId)
+      return
+    }
     const sourceId = e.dataTransfer.getData('text/plain')
     if (sourceId && sourceId !== slot.id && !slot.pinned) onSwap(sourceId)
   }
@@ -104,11 +119,30 @@
   const ABZEICHEN_NEUTRAL =
     'bg-light-ui-2 dark:bg-dark-ui-2 border-light-ui-3 dark:border-dark-ui-3'
 
+  // Woher der Ausfall stammt — damit erkennbar bleibt, ob er aus dem Stundenplan kommt
+  // oder selbst gesetzt wurde. Ohne das sähen beide gleich aus, und die Lehrkraft wüsste
+  // nicht, ob sie ihn zurücknehmen kann.
+  // ⚠️ **Nicht mehr an der Unterrichtseinheit.** Das Bearbeiten-Symbol hing an
+  // `slot.ue_node_id` — aus der Zeit, als ein Entwurf nur unter einer Einheit entstehen
+  // konnte. Seit `POST /planning/slots/{id}/lesson` stimmt das nicht mehr, und am Ziel
+  // einer verschobenen Stunde (dort steht oft nur das Thema) fehlte das Symbol.
+  //
+  // An einem **leeren** Slot bleibt es aus: Dort führt der Weg über das Themenfeld, und
+  // ein Stift in jeder freien Zeile wäre Rauschen.
+  const hatInhalt = $derived(
+    !!(slot.ue_node_id || slot.stunde_node_id || (slot.thema || '').trim()),
+  )
+
+  const braucht = $derived(zeileBrauchtEntscheidung(slot))
+
+  const herkunft = $derived(herkunftText(slot))
+  const eigenerAusfall = $derived(darfZurueckgenommenWerden(slot))
+
   const rowExtra = $derived(
     slot.kategorie === 'ausfall'
-      ? `${dim('opacity-60')} bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(0,0,0,0.04)_4px,rgba(0,0,0,0.04)_8px)] dark:bg-[repeating-linear-gradient(135deg,transparent,transparent_4px,rgba(255,255,255,0.06)_4px,rgba(255,255,255,0.06)_8px)]`
+      ? `${dim('opacity-60')} planner-ausfall-band`
       : slot.kategorie === 'pruefung'
-        ? 'bg-light-re-bg/60 dark:bg-dark-re-bg/20'
+        ? 'planner-pruefung-band'
         : slot.kategorie === 'puffer'
           ? dim('opacity-60')
           : vorlaeufig
@@ -206,6 +240,24 @@
       >
         {slot.thema || 'Thema eingeben …'}
       </button>
+    {/if}
+
+    {#if herkunft}
+      <div class="text-xs text-light-tx-2 dark:text-dark-tx-2 truncate mt-0.5">
+        Ausfall {herkunft}
+      </div>
+    {/if}
+
+    {#if braucht && onAusfallWeg}
+      <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+        <span class="text-light-tx-2 dark:text-dark-tx-2">Geplante Inhalte:</span>
+        {#each [['entfallen', 'entfallen lassen'], ['verschieben', 'verschieben'], ['umplanen', 'umplanen']] as [id, wort] (id)}
+          <button
+            onclick={(e) => { e.stopPropagation(); onAusfallWeg(id, slot) }}
+            class="underline text-light-bl dark:text-dark-bl hover:no-underline"
+          >{wort}</button>
+        {/each}
+      </div>
     {/if}
 
     {#if slot.note}
@@ -325,7 +377,7 @@
     </button>
 
     <!-- Stundenentwurf öffnen -->
-    {#if onEditLesson && slot.ue_node_id}
+    {#if onEditLesson && hatInhalt}
       <button
         onclick={(e) => { e.stopPropagation(); onEditLesson(slot.id, slot.stunde_node_id ?? null) }}
         title={slot.stunde_node_id ? 'Stundenentwurf öffnen' : 'Stundenentwurf anlegen'}
@@ -408,6 +460,22 @@
               {KATEGORIE_LABELS[kat] ?? kat}
             </button>
           {/each}
+          <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
+          {#if eigenerAusfall}
+            <button
+              onclick={() => { onAusfallZurueck?.(slot); menuOpen = false }}
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              Ausfall zurücknehmen …
+            </button>
+          {:else}
+            <button
+              onclick={() => { onAusfallTag?.(slot); menuOpen = false }}
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 transition-colors text-light-tx dark:text-dark-tx"
+            >
+              Ich falle aus …
+            </button>
+          {/if}
           <div class="border-t border-light-ui-3 dark:border-dark-ui-3 my-1"></div>
           {#if slot.stunde_node_id}
             <button

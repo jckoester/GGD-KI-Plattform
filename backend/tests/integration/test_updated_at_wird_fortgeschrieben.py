@@ -45,8 +45,8 @@ def sync_gruppe(db_url, run_migrations):
             (GRUPPE, FACH),
         )
         cur.execute(
-            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group) "
-            "VALUES (%s, %s, 'teacher') ON CONFLICT DO NOTHING",
+            "INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft) "
+            "VALUES (%s, %s, 'teacher', 'eigen') ON CONFLICT DO NOTHING",
             (GRUPPE, TEACHER1_PSEUDO),
         )
     conn.commit()

@@ -15,16 +15,25 @@ Bewährt hat sich diese Staffel:
 | `chat-schnell` | Kurze Fragen, Vokabeln, Textvereinfachung. Günstig, antwortet sofort | alle |
 | `chat-standard` | Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback | alle |
 | `chat-code` | Programmieraufgaben | alle |
-| `chat-reasoning` | Denkt vor der Antwort — mehrschrittige Aufgaben, Herleitungen | höhere Jahrgänge |
 | `chat-komplex` | Analyse, lange Texte, Unterrichtsplanung. Deutlich teurer | nur Lehrkräfte |
 | `system-titel` | Gesprächstitel — **muss in jeder Allowlist stehen**, s. u. | alle (ausgeblendet) |
 | `system-moderation` | Jugendschutz-Klassifikator | — (ausgeblendet) |
 | `embedding-standard` | Kontextspeicher, semantische Suche | — (ausgeblendet) |
 | `bild-standard` | Bildgenerierung | nach Bedarf |
 
-`chat-standard` und `chat-reasoning` dürfen dasselbe Modell sein — bei Modellen mit
-regelbarer Denktiefe unterscheidet sie nur `reasoning_effort`. Didaktisch lässt sich das
-gut erklären: derselbe Assistent, aber er denkt erst nach.
+⚠️ **Eine Stufe „denkt schneller" ist keine Ersparnis.** Bis zum 26.09.2026 stand hier
+eine sechste Stufe `chat-reasoning` — dasselbe Modell wie `chat-standard`, nur mit höherer
+Denktiefe. Der Reiz daran war, `chat-standard` im Gegenzug niedrig zu stellen und Tokens
+zu sparen. Genau das hat den Wissensspeicher lahmgelegt: Ob ein Modell die Kontextsuche
+aufruft, ist eine Denkentscheidung, und mit knappem Denkbudget fällt sie dagegen aus —
+gemessen vier von sechzehn Nachschlagevorgängen gegenüber fünfzehn von sechzehn bei voller
+Denktiefe, bei gleich langen Antworten. Seither läuft `chat-standard` auf der vollen Stufe,
+und die sechste Stufe ist entfallen, weil sich beide in nichts mehr unterschieden.
+
+**Wer eine Denktiefe senkt, misst hinterher die Aufrufquote der Werkzeuge**, nicht nur die
+Tokenzahl (`backend/scripts/chat_probe.py` zählt sie mit). Und wer höheren Jahrgängen mehr
+geben will, schaltet ihnen `chat-komplex` frei — das ist eine Kostenentscheidung in
+[Modelle freischalten](#modelle-freischalten-settingsmodels), keine zusätzliche Stufe in der Proxy-Config.
 
 Wer **einzelne Modelle** namentlich anbieten will (etwa damit Lehrkräfte einen Assistenten
 bewusst binden können), stellt einen Anbieter-Präfix voran: `ionos-gpt-oss-120b`. Solche
@@ -295,6 +304,24 @@ Freigabe erfolgt unter `/settings/assistants`:
 
 Die Sichtbarkeit kann pro Assistent gesteuert werden. Eine granulare
 Freigabe nach Rolle oder Jahrgang ist in einer späteren Version geplant.
+
+## Löschanträge von Lehrkräften
+
+Ein freigegebener schulweiter Assistent lässt sich von seiner Urheberin nicht selbst
+löschen — sie beantragt es. In `/assistants/manage` steht dann neben dem Status das
+Abzeichen **„Löschung beantragt"**; die Begründung liegt als Tooltip darauf.
+
+⚠️ **Der Antrag schaltet nichts ab.** Der Assistent bleibt aktiv und im Unterricht
+nutzbar, bis Sie entscheiden — ein Antrag ist eine Bitte, keine Handlung. Der Weg dorthin
+ist der gewohnte: erst **deaktivieren**, dann löschen (ein aktiver Assistent lässt sich
+auch von der Administration nicht direkt löschen).
+
+Technisch sind es zwei Felder an `assistants` (`deletion_requested_at`,
+`deletion_reason`, Alembic `0076`) und **kein** eigener Status: `status` beantwortet
+weiterhin genau die Frage, ob ein Assistent benutzbar ist.
+
+Assistenten mit eigener Reichweite — privat, Unterrichtsgruppe, Fachschaft, AG — löschen
+Lehrkräfte selbst; dort erscheint nie ein Antrag.
 
 ## Assistenten mit verschwundenem Modell
 

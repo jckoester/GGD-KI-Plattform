@@ -13,30 +13,40 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_any_role
+from app.auth.dependencies import get_current_user, require_any_role
 from app.auth.jwt import JwtPayload
+from app.config import settings
+from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
 from app.db.models import (
     ContextEdge,
     ContextNode,
+    Group,
+    GroupMembership,
     GroupWeekPattern,
     LessonSlot,
+    ParkedLessonContent,
     SlotPlanSnapshot,
+    Subject,
 )
 from app.db.session import get_db
-from app.planning.calendar import ab_schultage
+from app.planning.calendar import ab_schultage, load_school_year
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
+from app.planning import ausfall as ausfall_modul
 from app.planning import jetzt as jetzt_modul
+from app.planning import mein_tag as mein_tag_modul
 from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
+from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen
 from app.planning.schemas import (
     AbWochenRead,
@@ -95,7 +105,7 @@ async def _kapitel_std(db: AsyncSession, kapitel_node_id: UUID) -> int | None:
     node = await db.get(ContextNode, kapitel_node_id)
     if node is None:
         return None
-    return (node.metadata_ or {}).get("std")
+    return als_stundenzahl((node.metadata_ or {}).get("std"))
 
 
 async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int | None]:
@@ -109,7 +119,7 @@ async def _kapitel_ref(db: AsyncSession, ue_id: UUID) -> tuple[UUID | None, int 
     for edge in edges.scalars().all():
         kap = await db.get(ContextNode, edge.to_node_id)
         if kap and kap.content_type == "kapitel":
-            return kap.id, (kap.metadata_ or {}).get("std")
+            return kap.id, als_stundenzahl((kap.metadata_ or {}).get("std"))
     return None, None
 
 
@@ -145,7 +155,7 @@ async def _build_balance(
         for edge in kapitel_edge.scalars().all():
             kapitel = await db.get(ContextNode, edge.to_node_id)
             if kapitel and kapitel.content_type == "kapitel":
-                soll_std = (kapitel.metadata_ or {}).get("std")
+                soll_std = als_stundenzahl((kapitel.metadata_ or {}).get("std"))
                 break
 
         puffer = 0
@@ -170,7 +180,7 @@ async def _load_units(db: AsyncSession, group_id: int) -> list[ContextNode]:
     result = await db.execute(
         sa.select(ContextNode).where(
             ContextNode.content_type == "unterrichtseinheit",
-            ContextNode.write_scope == "group",
+            ContextNode.write_scope.in_(("group", "group_teachers")),
             ContextNode.write_scope_group_id == group_id,
             ContextNode.status == "active",
         ).order_by(ContextNode.created_at)
@@ -414,6 +424,8 @@ async def generate_group_slots(
         group_id,
         payload.halbjahr,
         regenerate=payload.regenerate,
+        vorlaeufig=payload.vorlaeufig,
+        dry_run=payload.dry_run,
         created_by=user.sub,
     )
     return SlotGenStatsRead(
@@ -421,6 +433,11 @@ async def generate_group_slots(
         halbjahr=stats.halbjahr,
         used_hj1_fallback=stats.used_hj1_fallback,
         fallback_vierzehntaegig=stats.fallback_vierzehntaegig,
+        vorlaeufig=stats.vorlaeufig,
+        verschont=stats.verschont,
+        umgehaengt=stats.umgehaengt,
+        geparkt=stats.geparkt,
+        meldungen=stats.meldungen,
     )
 
 
@@ -464,13 +481,235 @@ async def update_slot(
                 detail=f"Ungültige Kategorie. Erlaubt: {sorted(valid_kategorien)}",
             )
 
+    # ⚠️ Die Kategorie **nicht** über `setattr`: Sie bewegt zwei weitere Felder mit
+    # (Herkunft und Vorzustand). Ohne das bliebe ein von Hand gesetzter Ausfall
+    # ungeschützt — der nächste Stundenplan-Abgleich machte ihn lautlos rückgängig.
+    neue_kategorie = update_data.pop("kategorie", None)
     for field, value in update_data.items():
         setattr(slot, field, value)
+    if neue_kategorie is not None:
+        ausfall_modul.setze_kategorie(slot, neue_kategorie, herkunft="eigen")
 
     slot.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(slot)
     return slot
+
+
+# ── Parkplatz: Planungsinhalt ohne Termin ────────────────────────────────────
+
+
+class ParkplatzItem(BaseModel):
+    id: UUID
+    halbjahr: int
+    herkunft_datum: date
+    thema: Optional[str] = None
+    ue_node_id: Optional[UUID] = None
+    ue_titel: Optional[str] = None
+    stunde_node_id: Optional[UUID] = None
+    stunde_titel: Optional[str] = None
+
+
+class ParkplatzRead(BaseModel):
+    items: list[ParkplatzItem]
+    # Welche Unterrichtseinheit über ihrem Soll liegt. Ohne diese Angabe stünde auf dem
+    # Parkplatz eine Liste ohne Begründung — und der Weg „kürzen" wäre nicht wählbar,
+    # sondern geraten.
+    ueberhang: list[OverhangFinding]
+
+
+@router.get("/groups/{group_id}/parkplatz", response_model=ParkplatzRead)
+async def get_parkplatz(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Was gerade keinen Termin hat — und warum.
+
+    Entsteht beim Umhängen der Jahresplanung auf ein neues Stundenraster: Gibt es
+    weniger Termine als Inhalte, bleibt der Rest hier liegen statt verloren zu gehen.
+    Zurück kommt er durch Umplanen (`unpark_content`) oder durch Kürzen.
+    """
+    await require_group_teacher(group_id, user, db)
+
+    eintraege = list(
+        (
+            await db.execute(
+                sa.select(ParkedLessonContent)
+                .where(ParkedLessonContent.group_id == group_id)
+                .order_by(ParkedLessonContent.herkunft_datum)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    knoten_ids = {
+        i for e in eintraege for i in (e.ue_node_id, e.stunde_node_id) if i is not None
+    }
+    titel = {
+        n.id: n.title
+        for n in (
+            await db.execute(
+                sa.select(ContextNode).where(ContextNode.id.in_(knoten_ids or {None}))
+            )
+        )
+        .scalars()
+        .all()
+    }
+
+    return ParkplatzRead(
+        items=[
+            ParkplatzItem(
+                id=e.id,
+                halbjahr=e.halbjahr,
+                herkunft_datum=e.herkunft_datum,
+                thema=e.thema,
+                ue_node_id=e.ue_node_id,
+                ue_titel=titel.get(e.ue_node_id),
+                stunde_node_id=e.stunde_node_id,
+                stunde_titel=titel.get(e.stunde_node_id),
+            )
+            for e in eintraege
+        ],
+        ueberhang=await detect_overhang(db, group_id),
+    )
+
+
+class UnparkRequest(BaseModel):
+    to_slot_id: UUID
+
+
+@router.post("/parkplatz/{parkplatz_id}/unpark", response_model=dict)
+async def unpark_eintrag(
+    parkplatz_id: UUID,
+    payload: UnparkRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Holt einen geparkten Inhalt auf eine freie Stunde.
+
+    **Warum ein eigener Endpunkt und nicht „Operationen anwenden".** Plan-Operationen
+    laufen sonst über das Chat-Werkzeug `apply_plan_operations`; einen HTTP-Weg dorthin
+    gibt es nicht. Statt einen allgemeinen aufzumachen — der jede Operation von außen
+    erreichbar machte — bekommt der eine Vorgang, den die Oberfläche braucht, seinen
+    eigenen Eingang. Die Prüfung dahinter ist dieselbe: `apply_operations` mit der
+    Operation `unpark_content`, samt Snapshot und Undo.
+    """
+    eintrag = await db.get(ParkedLessonContent, parkplatz_id)
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Parkplatz-Eintrag nicht gefunden")
+
+    await require_group_teacher(eintrag.group_id, user, db)
+
+    ergebnis = await apply_operations(
+        db,
+        eintrag.group_id,
+        parse_operations([
+            {
+                "op": "unpark_content",
+                "parkplatz_id": str(parkplatz_id),
+                "to_slot_id": str(payload.to_slot_id),
+            }
+        ]),
+        summary="Stunde vom Parkplatz eingeplant",
+        created_by=user.sub,
+    )
+    if ergebnis.errors:
+        # 409: Der Zielslot ist belegt oder gehört zu einer anderen Gruppe — beides ist
+        # ein Konflikt mit dem Bestand, keine fehlerhafte Anfrage.
+        raise HTTPException(status_code=409, detail=" · ".join(ergebnis.errors))
+    return {"ok": True}
+
+
+@router.delete("/parkplatz/{parkplatz_id}", response_model=dict)
+async def delete_parkplatz_eintrag(
+    parkplatz_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Verwirft einen Parkplatz-Eintrag.
+
+    ⚠️ **Der Stundenentwurf bleibt.** Verworfen wird nur die Zusage, dass er in diesen
+    Jahresplan gehört; der Knoten steht weiter im Wissensgraphen und ist dort auffindbar.
+    Der übliche Weg hierher: Die Phasen wurden per `transfer_phases` in eine andere
+    Stunde übernommen oder gekürzt — dann braucht der Eintrag keinen Termin mehr.
+    """
+    eintrag = await db.get(ParkedLessonContent, parkplatz_id)
+    if eintrag is None:
+        raise HTTPException(status_code=404, detail="Parkplatz-Eintrag nicht gefunden")
+
+    await require_group_teacher(eintrag.group_id, user, db)
+
+    await db.delete(eintrag)
+    await db.commit()
+    logger.info(
+        "parkplatz_verworfen pseudonym=%s eintrag=%s gruppe=%s",
+        user.sub, parkplatz_id, eintrag.group_id,
+    )
+    return {"ok": True}
+
+
+# ── DELETE /planning/slots/{slot_id} ─────────────────────────────────────────
+
+
+@router.delete("/slots/{slot_id}", response_model=dict)
+async def delete_slot(
+    slot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Löscht einen einzelnen, leeren Termin.
+
+    **Warum es diesen Endpunkt gibt.** Slots ließen sich bis zum 22.09.2026 überhaupt
+    nicht einzeln löschen — es gab nur `regenerate`, und der nahm das ganze Halbjahr.
+    Seit derselben Änderung verschont der Neuaufbau aber Slots mit `source='import'`
+    oder `'manual'`: Ohne diesen Weg wäre ein versehentlich angelegter Termin
+    **unlöschbar**.
+
+    **Zwei Grenzen, beide mit 409:**
+
+    *Inhalt daran* — eine Stunde mit Thema, Einheit oder Entwurf zu löschen hieße, die
+    Planung wegzuwerfen, um einen Termin loszuwerden. Erst den Inhalt verschieben.
+
+    *Aus dem Wochenmuster* (`source='pattern'`) — ein solcher Slot wäre beim nächsten
+    Erzeugen wieder da. Die richtige Korrektur ist das Muster, nicht die Zeile.
+
+    ⚠️ **Kein Weg für „an diesem Termin findet nichts statt".** Den Termin gibt es im
+    Stundenplan, der Kalender zeigt ihn — das ist `kategorie='ausfall'` und keine
+    gelöschte Zeile. Der Abgleich schreibt das ohnehin selbst.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot nicht gefunden")
+
+    await require_group_teacher(slot.group_id, user, db)
+
+    if slot.ue_node_id or slot.stunde_node_id or (slot.thema or "").strip():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Diese Stunde trägt Inhalt. Verschieben Sie ihn zuerst auf einen "
+                "anderen Termin."
+            ),
+        )
+    if slot.source == "pattern":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Diese Stunde stammt aus dem Wochenmuster und entsteht beim nächsten "
+                "Erzeugen wieder. Ändern Sie das Wochenmuster der Gruppe."
+            ),
+        )
+
+    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
+    await db.delete(slot)
+    await db.commit()
+    logger.info(
+        "slot_geloescht pseudonym=%s slot=%s gruppe=%s source=%s",
+        user.sub, slot_id, slot.group_id, slot.source,
+    )
+    return {"ok": True}
 
 
 # ── POST /planning/groups/{group_id}/slots/swap ───────────────────────────────
@@ -657,6 +896,7 @@ async def get_group_curriculum_chapters(
         ],
         grade=resolved.grade,
         grade_unbekannt=resolved.grade_unbekannt,
+        fach_fehlt=resolved.fach_fehlt,
     )
 
 
@@ -708,8 +948,8 @@ async def create_lesson(
         category="artifact",
         content_type="unterrichtsstunde",
         title=payload.titel,
-        read_scope="group",
-        write_scope="group",
+        read_scope="group_teachers",
+        write_scope="group_teachers",
         read_scope_group_id=group_id,
         write_scope_group_id=group_id,
         owner_pseudonym=user.sub,
@@ -747,6 +987,111 @@ async def create_lesson(
     await db.refresh(stunde)
     return {"id": str(stunde.id), "title": stunde.title}
 
+
+# ── POST /planning/slots/{slot_id}/lesson ─────────────────────────────────────
+
+
+@router.post("/slots/{slot_id}/lesson", response_model=dict, status_code=201)
+async def create_lesson_for_slot(
+    slot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Entwurf **vom Termin aus** anlegen — auch ohne Unterrichtseinheit.
+
+    Die ältere Route `POST /units/{node_id}/lessons` hängt am Einheitenknoten, weil sie
+    Gruppe und Fach von dort nimmt. Ein Termin ohne Einheit kann darüber keinen Entwurf
+    bekommen — und das ist der Normalfall am Anfang eines Schuljahres: Der Stundenplan
+    steht, die Jahresplanung noch nicht.
+
+    Beides steht aber genauso am Slot. Die **Leseseite trägt das längst**: `get_lesson`
+    lässt `ue_edge` fehlen, `_lesson_nav` fängt `unit_id is None` ab, und die
+    Jahresplanung liest `stunde_node_id` vom Slot statt über die Einheit. Gesperrt war
+    nur das Anlegen.
+
+    Eine so entstandene Stunde zählt in **keiner** Einheitenbilanz mit — sie gehört zu
+    keiner. Das ist kein Mangel, sondern die Aussage: Die Zuordnung steht noch aus. Wird
+    die Einheit später am Slot gesetzt, zieht `PATCH /planning/slots/{id}` die Kante nach.
+    """
+    slot = await db.get(LessonSlot, slot_id)
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Termin nicht gefunden")
+
+    await require_group_teacher(slot.group_id, user, db)
+
+    # ⚠️ **Idempotent.** Der Aufruf hängt an einem Klick auf den Stundentitel; ein
+    # Doppelklick oder ein zweiter Tab darf keinen zweiten Entwurf erzeugen. Der Slot
+    # führt nur *einen* — der Überzählige wäre unauffindbar und bliebe für immer liegen.
+    if slot.stunde_node_id:
+        vorhanden = await db.get(ContextNode, slot.stunde_node_id)
+        if vorhanden is not None and vorhanden.status == "active":
+            return {"id": str(vorhanden.id), "title": vorhanden.title, "neu": False}
+
+    ue_node = None
+    if slot.ue_node_id:
+        kandidat = await db.get(ContextNode, slot.ue_node_id)
+        if kandidat is not None and kandidat.status == "active":
+            ue_node = kandidat
+
+    if ue_node is not None:
+        subject_id = ue_node.subject_id
+    else:
+        group = await db.get(Group, slot.group_id)
+        subject_id = group.subject_id if group else None
+
+    stunde = ContextNode(
+        category="artifact",
+        content_type="unterrichtsstunde",
+        title=(slot.thema or "").strip() or "Neue Stunde",
+        read_scope="group_teachers",
+        write_scope="group_teachers",
+        read_scope_group_id=slot.group_id,
+        write_scope_group_id=slot.group_id,
+        owner_pseudonym=user.sub,
+        subject_id=subject_id,
+        metadata_={"phasen": []},
+        status="active",
+    )
+    db.add(stunde)
+    await db.flush()
+
+    # Einordnung nur, wenn es eine Einheit gibt — sonst hängt die Stunde am Slot allein.
+    if ue_node is not None:
+        db.add(ContextEdge(
+            from_node_id=stunde.id,
+            to_node_id=ue_node.id,
+            relation="part_of",
+            metadata_={},
+        ))
+        vorgaenger = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == ue_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "unterrichtsstunde",
+                ContextNode.status == "active",
+                ContextNode.id != stunde.id,
+            )
+            .order_by(ContextNode.created_at.desc())
+            .limit(1)
+        )
+        letzte = vorgaenger.scalar_one_or_none()
+        if letzte is not None:
+            db.add(ContextEdge(
+                from_node_id=stunde.id,
+                to_node_id=letzte.id,
+                relation="follows",
+                metadata_={},
+            ))
+
+    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
+    slot.stunde_node_id = stunde.id
+    slot.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(stunde)
+    return {"id": str(stunde.id), "title": stunde.title, "neu": True}
 
 # ── GET /planning/groups/{group_id}/balance ───────────────────────────────────
 
@@ -1202,3 +1547,398 @@ async def export_lesson(
         )
     else:
         raise HTTPException(status_code=422, detail=f"Unbekanntes Format: {format}")
+
+
+# ── GET /planning/mein-tag ────────────────────────────────────────────────────
+
+
+class StundeAmTagRead(BaseModel):
+    slot_id: UUID
+    group_id: int
+    gruppe: str
+    # Für den Absprung in die Planung: die Route lautet
+    # `/subjects/{slug}/groups/{id}/planner`. Ohne den Slug baut die Oberfläche einen
+    # toten Link — oder muss das Fach in einer zweiten Runde nachschlagen.
+    subject_slug: str | None
+    # Icon und Farbe des Fachs — die Zeile trägt sie am Anfang, damit sich der Tag
+    # überfliegen lässt, ohne jeden Gruppennamen zu lesen.
+    subject_icon: str | None
+    subject_color: str | None
+    start_period: int | None
+    periods: int
+    stunde: str
+    kategorie: str
+    thema: str | None
+    hat_entwurf: bool
+    # Ohne die Id lässt sich der Weg in den Stundenentwurf nicht bauen.
+    stunde_node_id: UUID | None
+    ue_node_id: UUID | None
+    ue_titel: str | None
+    anpassung_noetig: bool
+
+
+class TagRead(BaseModel):
+    datum: date
+    ist_heute: bool
+    stunden: list[StundeAmTagRead]
+    # Nur bei leerem Tag: warum. `wochenende` | `ferien` | `feiertag` |
+    # `unterrichtsfrei` | `kein_unterricht` | `ausserhalb_schuljahr`.
+    grund: str | None = None
+
+
+class MeinTagRead(BaseModel):
+    heute: TagRead
+    naechster: TagRead | None
+    # Ob die Lehrkraft überhaupt Unterrichtsgruppen hat, und ob darin geplant ist.
+    # ⚠️ **Die dritte Lage.** „Heute kein Unterricht" und „noch nichts geplant" sind
+    # verschiedene Auskünfte: Die erste ist eine Feststellung, die zweite eine
+    # Aufforderung. Ohne diese beiden Angaben könnte die Oberfläche sie nicht trennen.
+    hat_gruppen: bool
+    hat_planung: bool
+
+
+@router.get("/mein-tag", response_model=MeinTagRead)
+async def get_mein_tag(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Die eigenen Stunden für heute und den nächsten Schultag — für die Startseite.
+
+    **Eine Abfrage, nicht eine je Gruppe.** Eine Lehrkraft hat schnell zehn Gruppen;
+    zehn Rundreisen für eine Seite, die beim Anmelden sofort dastehen soll, wären die
+    falsche Bauform. Gefiltert wird über die Lehrkraft-Mitgliedschaften — **nicht**
+    über `require_group_teacher` je Gruppe, das gäbe es hier gar nicht zu prüfen.
+
+    ⚠️ **Der Filter ist die Zugriffsregel.** Fällt er weg, stehen die Stunden fremder
+    Kolleg:innen auf der eigenen Startseite. Ein Wächtertest hält das fest.
+
+    Geholt werden nur die Slots **zweier Tage**, nicht das Schuljahr: Anders als beim
+    „Jetzt"-Block braucht die Startseite keinen Fortschritt einer Einheit, nur den Tag.
+    """
+    cfg = load_school_year()
+    heute = date.today()
+    naechster = mein_tag_modul.naechster_schultag(heute, cfg)
+    tage = [d for d in (heute, naechster) if d is not None]
+
+    eigene = sa.select(GroupMembership.group_id).where(
+        GroupMembership.pseudonym == user.sub,
+        GroupMembership.role_in_group == "teacher",
+    )
+    zeilen = await db.execute(
+        sa.select(
+            LessonSlot, Group.name, Group.display_name,
+            Subject.slug, Subject.icon, Subject.color,
+        )
+        .join(Group, Group.id == LessonSlot.group_id)
+        .outerjoin(Subject, Subject.id == Group.subject_id)
+        .where(LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage))
+    )
+    slots: list[LessonSlot] = []
+    namen: dict[int, str] = {}
+    faecher: dict[int, tuple[str | None, str | None, str | None]] = {}
+    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe in zeilen.all():
+        slots.append(slot)
+        namen[slot.group_id] = anzeige or name
+        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe)
+
+    auswahl = mein_tag_modul.waehle(slots, heute, cfg)
+
+    # Einheitstitel in einer Abfrage — sonst eine je Stunde.
+    ue_ids = {
+        s.ue_node_id
+        for tag in (auswahl.heute, auswahl.naechster)
+        if tag is not None
+        for s in tag.stunden
+        if s.ue_node_id is not None
+    }
+    titel: dict[UUID, str] = {}
+    if ue_ids:
+        res = await db.execute(
+            sa.select(ContextNode.id, ContextNode.title).where(ContextNode.id.in_(ue_ids))
+        )
+        titel = {nid: t for nid, t in res.all()}
+
+    def als_tag(tag) -> TagRead:
+        return TagRead(
+            datum=tag.datum,
+            ist_heute=tag.ist_heute,
+            grund=tag.grund,
+            stunden=[
+                StundeAmTagRead(
+                    slot_id=s.slot_id,
+                    group_id=s.group_id,
+                    gruppe=namen.get(s.group_id, ""),
+                    subject_slug=faecher.get(s.group_id, (None, None, None))[0],
+                    subject_icon=faecher.get(s.group_id, (None, None, None))[1],
+                    subject_color=faecher.get(s.group_id, (None, None, None))[2],
+                    start_period=s.start_period,
+                    periods=s.periods,
+                    stunde=s.stundenbezeichnung,
+                    kategorie=s.kategorie,
+                    thema=s.thema,
+                    hat_entwurf=s.hat_entwurf,
+                    stunde_node_id=s.stunde_node_id,
+                    ue_node_id=s.ue_node_id,
+                    ue_titel=titel.get(s.ue_node_id) if s.ue_node_id else None,
+                    anpassung_noetig=s.anpassung_noetig,
+                )
+                for s in tag.stunden
+            ],
+        )
+
+    # Zwei billige Zahlen statt einer Vermutung in der Oberfläche.
+    gruppen_anzahl = await db.scalar(
+        sa.select(sa.func.count()).select_from(eigene.subquery())
+    )
+    planung_vorhanden = await db.scalar(
+        sa.select(sa.literal(True))
+        .where(sa.exists(sa.select(LessonSlot.id).where(LessonSlot.group_id.in_(eigene))))
+    )
+
+    return MeinTagRead(
+        heute=als_tag(auswahl.heute),
+        naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
+        hat_gruppen=bool(gruppen_anzahl),
+        hat_planung=bool(planung_vorhanden),
+    )
+
+
+# ── GET /planning/mein-tag/schueler ───────────────────────────────────────────
+
+
+class FachAmTagRead(BaseModel):
+    """Eine Stunde, wie Schüler:innen sie sehen.
+
+    ⚠️ **Ein eigenes Modell, kein gefiltertes.** Thema, Unterrichtseinheit und
+    Stundenentwurf sind Material der Lehrkraft (`docs/user/datenschutz.md`, „Was
+    Schüler:innen mitbekommen"). Sie hier wegzulassen wäre eine Zusage, die jeder
+    spätere Umbau von `StundeAmTagRead` unbemerkt brechen könnte — ein Feld ergänzt,
+    und es steht in beiden Antworten. Zwei getrennte Modelle können das nicht: Was
+    hier nicht steht, lässt sich nicht durchreichen.
+    """
+
+    group_id: int
+    # Aus Schülersicht **ist** die Unterrichtsgruppe das Fach (CLAUDE.md,
+    # Fachbegriff-Tabelle). Angezeigt wird deshalb ihr Anzeigename.
+    fach: str
+    subject_slug: str | None
+    subject_icon: str | None
+    subject_color: str | None
+    start_period: int | None
+    periods: int
+    stunde: str
+    # Ein Wort oder nichts — siehe `mein_tag.SCHUELER_HINWEISE`. **Nicht** die rohe
+    # Kategorie: `puffer` ist Planungsvokabular und ginge niemanden sonst etwas an.
+    hinweis: str | None
+
+
+class SchuelerTagRead(BaseModel):
+    datum: date
+    ist_heute: bool
+    faecher: list[FachAmTagRead]
+    grund: str | None = None
+
+
+class MeinTagSchuelerRead(BaseModel):
+    heute: SchuelerTagRead
+    naechster: SchuelerTagRead | None
+    hat_gruppen: bool
+
+
+@router.get("/mein-tag/schueler", response_model=MeinTagSchuelerRead)
+async def get_mein_tag_schueler(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(get_current_user),
+):
+    """Die heutigen Fächer — die Startseite aus Schülersicht.
+
+    Gleiche Auswahlregel wie bei der Lehrkraft (`mein_tag.waehle`), **anderer
+    Ausschnitt**: Fach, Stunde und im Ausnahmefall ein Wort dazu. Kein Thema, kein
+    Entwurf, keine Unterrichtseinheit.
+
+    ⚠️ **Die Freigabe wird hier serverseitig gelesen, nicht in der Oberfläche.** Für die
+    Fachübersicht filtert das Frontend (`myGroups.freigegebeneGruppen`) — das genügt
+    dort, weil die Liste ohnehin nur Namen trägt. Hier ginge es um den **Stundenplan**
+    einer nicht freigegebenen Gruppe; der hat in der Antwort nichts verloren, auch nicht
+    ungenutzt im JSON. Gelesen wird `student_visible` nur im Erprobungsbetrieb
+    (`STUDENT_SUBJECTS_OPT_IN`) — dieselbe Bedingung wie überall sonst.
+    """
+    cfg = load_school_year()
+    heute = date.today()
+    naechster = mein_tag_modul.naechster_schultag(heute, cfg)
+    tage = [d for d in (heute, naechster) if d is not None]
+
+    eigene = sa.select(GroupMembership.group_id).where(
+        GroupMembership.pseudonym == user.sub,
+        GroupMembership.role_in_group == "student",
+    )
+
+    bedingungen = [LessonSlot.group_id.in_(eigene), LessonSlot.date.in_(tage)]
+    if settings.student_subjects_opt_in:
+        bedingungen.append(Group.student_visible.is_(True))
+
+    zeilen = await db.execute(
+        sa.select(
+            LessonSlot, Group.name, Group.display_name,
+            Subject.slug, Subject.icon, Subject.color,
+        )
+        .join(Group, Group.id == LessonSlot.group_id)
+        .outerjoin(Subject, Subject.id == Group.subject_id)
+        .where(*bedingungen)
+    )
+    slots: list[LessonSlot] = []
+    namen: dict[int, str] = {}
+    faecher: dict[int, tuple[str | None, str | None, str | None]] = {}
+    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe in zeilen.all():
+        slots.append(slot)
+        namen[slot.group_id] = anzeige or name
+        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe)
+
+    auswahl = mein_tag_modul.waehle(slots, heute, cfg)
+
+    def als_tag(tag) -> SchuelerTagRead:
+        return SchuelerTagRead(
+            datum=tag.datum,
+            ist_heute=tag.ist_heute,
+            grund=tag.grund,
+            faecher=[
+                FachAmTagRead(
+                    group_id=s.group_id,
+                    fach=namen.get(s.group_id, ""),
+                    subject_slug=faecher.get(s.group_id, (None, None, None))[0],
+                    subject_icon=faecher.get(s.group_id, (None, None, None))[1],
+                    subject_color=faecher.get(s.group_id, (None, None, None))[2],
+                    start_period=s.start_period,
+                    periods=s.periods,
+                    stunde=s.stundenbezeichnung,
+                    hinweis=s.schueler_hinweis,
+                )
+                for s in tag.stunden
+            ],
+        )
+
+    gruppen_anzahl = await db.scalar(
+        sa.select(sa.func.count()).select_from(eigene.subquery())
+    )
+
+    return MeinTagSchuelerRead(
+        heute=als_tag(auswahl.heute),
+        naechster=als_tag(auswahl.naechster) if auswahl.naechster else None,
+        hat_gruppen=bool(gruppen_anzahl),
+    )
+
+
+# ── Persönlicher Ausfall (Paket 5, AP4) ───────────────────────────────────────
+
+
+class AusfallRequest(BaseModel):
+    datum: date
+    # `gruppe` = nur diese Unterrichtsgruppe, `tag` = alle Gruppen der Lehrkraft an
+    # diesem Datum. Fortbildung und Krankheit gelten nicht je Fach (Jan, 24.09.2026).
+    reichweite: str = "gruppe"
+    group_id: Optional[int] = None
+    notiz: Optional[str] = None
+
+
+class AusfallRead(BaseModel):
+    betroffen: int
+    slot_ids: list[UUID]
+    # ⚠️ **Wie viele der Stunden etwas Geplantes trugen.** Nur dann gibt es eine
+    # Entscheidung zu treffen (Inhalte entfallen · verschieben · umplanen). Ohne diese
+    # Zahl fragte die Oberfläche auch nach einem leeren Tag — eine Aufgabe, die es nicht
+    # gibt, und der Hinweis verlöre seine Bedeutung.
+    mit_inhalt: int = 0
+
+
+@router.post("/absences", response_model=AusfallRead, status_code=201)
+async def ausfall_eintragen(
+    payload: AusfallRequest,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einen persönlichen Ausfall eintragen — für eine Gruppe oder den ganzen Tag.
+
+    ⚠️ **Markiert, entscheidet aber nichts.** Was aus dem Ausfall folgt — Inhalte
+    entfallen lassen, Stunden verschieben, umplanen —, hängt am Fach, an der Einheit und
+    am Rest des Halbjahres. Das ist Arbeit der Lehrkraft; die Oberfläche bietet die drei
+    Wege danach an (AP5).
+    """
+    if payload.reichweite not in ausfall_modul.REICHWEITEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Reichweite muss {' oder '.join(ausfall_modul.REICHWEITEN)} sein",
+        )
+    if payload.reichweite == "gruppe":
+        if payload.group_id is None:
+            raise HTTPException(422, "Reichweite 'gruppe' verlangt eine group_id")
+        await require_group_teacher(payload.group_id, user, db)
+
+    slots = await ausfall_modul.lade_slots_am_tag(
+        db, user.sub, payload.datum,
+        group_id=payload.group_id if payload.reichweite == "gruppe" else None,
+    )
+    markierungen = ausfall_modul.plane_ausfall(
+        slots, datum=payload.datum, reichweite=payload.reichweite,
+        group_id=payload.group_id,
+    )
+    if markierungen:
+        # Ein Snapshot je betroffener Gruppe — der Rückweg über „Stand
+        # wiederherstellen" soll auch dann tragen, wenn der Tag mehrere Gruppen trifft.
+        for gid in {m.group_id for m in markierungen}:
+            await create_snapshot(db, gid, reason="edit", created_by=user.sub)
+        await ausfall_modul.wende_ausfall_an(
+            db, slots, markierungen, herkunft="eigen", notiz=payload.notiz
+        )
+        await db.commit()
+    return AusfallRead(
+        betroffen=len(markierungen),
+        slot_ids=[m.slot_id for m in markierungen],
+        mit_inhalt=sum(1 for m in markierungen if m.mit_inhalt),
+    )
+
+
+@router.delete("/absences", response_model=AusfallRead)
+async def ausfall_zuruecknehmen(
+    # ⚠️ Als Query-Parameter, nicht als Rumpf: Ein DELETE mit Body ist zulässig, aber
+    # manche Proxys entfernen ihn unterwegs — und die drei Angaben sind Skalare.
+    datum: date,
+    reichweite: str = "gruppe",
+    group_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Einen eingetragenen Ausfall zurücknehmen.
+
+    ⚠️ **Nimmt alle *eigenen* Ausfälle dieses Tages mit** — auch einzeln gesetzte
+    (entschieden 24.09.2026, F4). Nach dem Schreiben ist nicht mehr unterscheidbar, ob
+    ein Slot über „ganzer Tag" oder einzeln markiert wurde. Die Oberfläche sagt das
+    vorher; hier steht es, damit es niemand für ein Versehen hält.
+
+    Ausfälle aus dem Stundenplan bleiben unberührt: Sie gehören dem Abgleich.
+    """
+    if reichweite not in ausfall_modul.REICHWEITEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Reichweite muss {' oder '.join(ausfall_modul.REICHWEITEN)} sein",
+        )
+    if reichweite == "gruppe":
+        if group_id is None:
+            raise HTTPException(422, "Reichweite 'gruppe' verlangt eine group_id")
+        await require_group_teacher(group_id, user, db)
+
+    slots = await ausfall_modul.lade_slots_am_tag(
+        db, user.sub, datum,
+        group_id=group_id if reichweite == "gruppe" else None,
+    )
+    ruecknahmen = ausfall_modul.plane_ruecknahme(
+        slots, datum=datum, reichweite=reichweite,
+        group_id=group_id,
+    )
+    if ruecknahmen:
+        for gid in {r.group_id for r in ruecknahmen}:
+            await create_snapshot(db, gid, reason="edit", created_by=user.sub)
+        await ausfall_modul.nimm_ausfall_zurueck(db, slots, ruecknahmen)
+        await db.commit()
+    return AusfallRead(
+        betroffen=len(ruecknahmen), slot_ids=[r.slot_id for r in ruecknahmen]
+    )

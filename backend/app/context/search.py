@@ -27,7 +27,7 @@ Jede Konstante hier ist gemessen; wer eine ändert, misst neu
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Sequence
 from uuid import UUID
 
@@ -43,7 +43,7 @@ from app.context.filters import TITEL_NORMALISIERT as _TITEL_NORMALISIERT
 from app.context.filters import Knotenfilter, wende_an
 from app.context.lookup import nachschlage_begriff, normalisiere_titel
 from app.context.schemas import anzeige_felder
-from app.context.taxonomy import rollen_typ_bonus
+from app.context.taxonomy import VORAB_TYPEN, rollen_typ_bonus
 from app.context.visibility import read_scope_clause
 from app.db.models import ContextEdge, ContextNode, NodeAlias, Subject
 
@@ -85,6 +85,11 @@ class Suchprofil:
     # Rohe Metadaten an den Treffern (Breadcrumb, `afb`, `aliase`). Standardmäßig aus:
     # Sie kosten im Modellkontext Platz, den Import-Interna nicht wert sind.
     mit_metadaten: bool = False
+    # Fächer, in denen die fragende Person Unterricht hat. Schwächerer Vorzug als
+    # `subject_id` — er greift, wenn die Konversation **kein** Fach trägt (freier Chat).
+    # „Energie" ist dann für eine Physikschülerin eher der Physikbegriff als der aus
+    # Ethik, ohne dass Ethik verschwände.
+    eigene_faecher: tuple[int, ...] = ()
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────
@@ -158,6 +163,67 @@ class Suchergebnis:
 # fragt, soll die Mathematik-Kompetenz bekommen. Ab 0,08 verdrängt das Fach der
 # Konversation genau solche Treffer — deshalb der Abstand zur Kippgrenze.
 _FACHBONUS = 0.05
+
+
+# ── Abgrenzungen zu einem Treffer ────────────────────────────────────────────
+
+#: Wie viele Abgrenzungen je Treffer höchstens mitgehen.
+#:
+#: ⚠️ **Ein Deckel, kein Auswahlkriterium.** Die Abgrenzungen sind kurz, aber ein gut
+#: vernetzter Begriff hat viele, und zwanzig Treffer mit je zehn Sätzen sind mehr
+#: Kontext als die Knotentexte selbst. Fünf deckt den Bestand ab (Höchstwert im Pilot:
+#: drei); wird der Deckel je erreicht, ist das ein Hinweis auf einen Knoten, der zu
+#: viel abgrenzt — nicht auf einen zu kleinen Deckel.
+ABGRENZUNGEN_JE_TREFFER = 5
+
+
+async def abgrenzungen_zu(db: AsyncSession, node_ids) -> dict[str, list[dict]]:
+    """„Wovon unterscheidet sich dieser Baustein, und wodurch?" — je Knoten.
+
+    ⚠️ **Diese Sätze sind der Grund, warum es Abgrenzungen gibt** (Paket 9, N4): Sie
+    stehen weder im Knotentext (`## Abgrenzung` bleibt bewusst aus `content` heraus,
+    sonst zögen sie im Vektor die Fragen an, die sie abgrenzen sollen) noch im
+    Embedding. Bis 09/2026 sah das Modell sie deshalb **gar nicht** — dabei sind es
+    genau die Sätze, die Verwechslungen verhindern („eine Wasserstoffbrücke wirkt
+    zwischen Molekülen, eine Elektronenpaarbindung innerhalb").
+
+    **Eine Abfrage für alle Treffer**, nicht eine je Treffer: Bei zwanzig Treffern wären
+    das zwanzig Rundreisen für ein paar Zeilen Text.
+
+    Nur **aktive** Ziele und nur **Titel**, keine IDs: Ein archivierter Knoten ist für
+    die fragende Person nicht erreichbar, und eine UUID im Modellkontext taucht früher
+    oder später in einer Antwort auf.
+    """
+    ids = [i for i in (node_ids or []) if i]
+    if not ids:
+        return {}
+    ziel = sa.orm.aliased(ContextNode)
+    zeilen = (await db.execute(
+        sa.select(
+            ContextEdge.from_node_id,
+            ziel.title,
+            ContextEdge.metadata_["hinweis"].astext,
+        )
+        .join(ziel, ziel.id == ContextEdge.to_node_id)
+        .where(
+            ContextEdge.from_node_id.in_(ids),
+            ContextEdge.relation == "related_to",
+            ContextEdge.metadata_["art"].astext == "abgrenzung",
+            ziel.status == "active",
+        )
+        .order_by(ContextEdge.from_node_id, ziel.title)
+    )).all()
+
+    nach_knoten: dict[str, list[dict]] = {}
+    for von, titel, hinweis in zeilen:
+        eintraege = nach_knoten.setdefault(str(von), [])
+        if len(eintraege) >= ABGRENZUNGEN_JE_TREFFER:
+            continue
+        eintrag = {"zu": titel}
+        if hinweis:
+            eintrag["hinweis"] = hinweis
+        eintraege.append(eintrag)
+    return nach_knoten
 
 
 # ── Trefferform ──────────────────────────────────────────────────────────────
@@ -339,19 +405,59 @@ def _aus_dem_fach(profil: Suchprofil):
     return ContextNode.subject_id == profil.subject_id
 
 
+#: Vorsprung für die Fächer der eigenen Unterrichtsgruppen — schwächer als
+#: `_FACHBONUS`. Beide zugleich kommen nicht vor: `eigene_faecher` wirkt nur im freien
+#: Chat, und dort ist `subject_id` per Definition leer.
+_GRUPPENFACH_BONUS = 0.02
+
+
+def _aus_eigenem_fach(profil: Suchprofil):
+    """„Stammt dieser Knoten aus einem Fach, das die Person hat?" — oder ``None``.
+
+    Dieselbe Falle wie bei :func:`_aus_dem_fach`: Ohne Fächer darf hier **keine**
+    Bedingung entstehen, sonst bekämen über ``subject_id IN ()`` … nichts, oder bei
+    einem leeren ``IN`` je nach Dialekt alles den Bonus.
+    """
+    if not profil.eigene_faecher:
+        return None
+    return ContextNode.subject_id.in_(profil.eigene_faecher)
+
+
 # ── Teilgraph unter Ankern (Profil `anchor_ids`) ─────────────────────────────
+
+#: Knotenarten, die **über eine eingehende Kante** in den Teilgraphen eines Ankers
+#: kommen. Bewusst kurz: Jede weitere Art holt alles herein, was auf dieselbe
+#: Bildungsplan-Kompetenz zeigt — Arbeitsblätter, Klausuren, Stundenentwürfe.
+BEGRIFFSTYPEN = ("begriff", "stoffsteckbrief")
 
 
 def teilgraph(anchor_ids: Sequence[UUID]):
     """Die Knoten unter den Ankern eines Assistenten — als Unterabfrage.
 
-    Zwei Wege führen hinein, beide aus ADR-013:
+    Drei Wege führen hinein, die ersten beiden aus ADR-013:
 
     * **Abstammung** — alles, was über ``part_of`` unter einem Anker hängt, rekursiv.
       Ein Curriculum-Anker erfasst so seine Kapitel und deren Lernsequenzen.
     * **Verweise** — was der Anker selbst über ``references`` oder ``develops``
       benennt. Eine Lernsequenz zieht damit die Kompetenzen herein, die sie entwickelt,
       ohne dass sie unter ihr hängen.
+    * **Fachbegriffe, die auf den Teilgraphen zeigen** (Paket 9, N7 / E4 Variante A) —
+      also **eingehende** ``references``, beschränkt auf ``begriff`` und
+      ``stoffsteckbrief``.
+
+    ⚠️ **Warum der dritte Weg nötig wurde, und warum er so eng ist.** Ein Fachbegriff
+    verweist **auf** die Kompetenz, in der der Bildungsplan ihn verlangt — die Kante
+    entsteht am Begriff, nicht an der Kompetenz (AP1: sonst trüge sie Tausende
+    Rückverweise). Über die ersten beiden Wege ist er damit unerreichbar. Gemessen am
+    26.09.2026: Der Teilgraph unter der Chemie-Leitidee
+    „Bindungs- und Wechselwirkungsmodelle“ enthielt **13 Knoten — die Leitidee und
+    ihre zwölf Kompetenzen**, keinen einzigen Begriff. Ein Anker-Assistent sah also nur
+    Bildungsplan-Text und antwortete zum Rest aus dem Modellwissen.
+
+    **Die Typbeschränkung ist die Leitplanke, nicht ein Detail.** Ohne sie holte die
+    Umkehrung jedes Arbeitsblatt, jede Klausur und jeden Stundenentwurf herein, der auf
+    dieselbe Kompetenz zeigt — genau die Kantendichte, vor der ADR-013 bei
+    Bildungsplan-Knoten warnt. Wer die Menge erweitert, misst vorher.
 
     Bis 09/2026 stand diese Abfrage als roher SQL-Text in ``retrieval.py`` und war der
     einzige Ort mit einer zweiten Vektorsuche. Jetzt ist sie ein Vorfilter der Schicht:
@@ -375,7 +481,19 @@ def teilgraph(anchor_ids: Sequence[UUID]):
         kanten.c.from_node_id.in_(ids),
         kanten.c.relation.in_(["references", "develops"]),
     )
-    return sa.union(sa.select(abstammung.c.id), verwiesen)
+    # Eingehend, und nur von Fachbegriffen: Sie zeigen auf **alles**, was unter dem
+    # Anker hängt — nicht nur auf den Anker selbst.
+    begriffe = (
+        sa.select(kanten.c.from_node_id)
+        .select_from(kanten.join(knoten, knoten.c.id == kanten.c.from_node_id))
+        .where(
+            kanten.c.to_node_id.in_(sa.select(abstammung.c.id)),
+            kanten.c.relation == "references",
+            knoten.c.content_type.in_(BEGRIFFSTYPEN),
+            knoten.c.status == "active",
+        )
+    )
+    return sa.union(sa.select(abstammung.c.id), verwiesen, begriffe)
 
 
 # ── Editionen: zwei gültige BP-Fassungen gleichzeitig ────────────────────────
@@ -803,7 +921,7 @@ async def identifikation(
     anderen Aufrufer bleibt sie aus, damit der Prüfsatz vergleichbar bleibt.
 
     ⚠️ **Ohne Embedding-Filter, anders als die thematische Auswahl.** Ein Titel wird
-    verglichen, nicht eingebettet — und 30 der 44 Knotentypen tragen laut
+    verglichen, nicht eingebettet — und 14 der 42 Knotentypen tragen laut
     ``taxonomy.yaml`` bewusst kein Embedding (Fachpläne, Curricula, Methoden,
     Leitperspektiven …). Bliebe der Filter hier stehen, wären diese Knoten unter ihrem
     eigenen Namen unauffindbar, während die Aufzählung sie zählt: zwei Grundmengen in
@@ -812,6 +930,13 @@ async def identifikation(
     kandidaten = _kandidaten(frage)
     if not kandidaten:
         return Abschnitt(gesamt=0, vollstaendig=True)
+
+    # ⚠️ **`mit_metadaten` galt hier bis 09/2026 nicht.** Das Feld stand im Profil, die
+    # thematische Auswahl und die Aufzählung werteten es aus — die Identifikation nicht.
+    # Wer nach einem Begriff bei seinem Namen fragt, landet aber genau hier, und ohne
+    # Metadaten fehlte dem Modell ausgerechnet im Nachschlagefall, was der Knoten an
+    # Fachlichem trägt (Paket 9, AP3).
+    md = profil.mit_metadaten
 
     # Aliastreffer vorab auflösen — je Stufe eine kurze, indexgestützte Abfrage.
     # Warum nicht als EXISTS in der Hauptabfrage: siehe `knoten_mit_alias`.
@@ -823,7 +948,7 @@ async def identifikation(
         )
     ).mappings().all()
     gesamt = zeilen[0]["gesamt"] if zeilen else 0
-    exakt = [_treffer(z) | {"treffer_art": "exakt"} for z in zeilen]
+    exakt = [_treffer(z, mit_metadaten=md) | {"treffer_art": "exakt"} for z in zeilen]
 
     # Die weiteren Stufen füllen nur auf, was die erste offen gelassen hat.
     rest = profil.identifikation - len(exakt)
@@ -838,7 +963,10 @@ async def identifikation(
         zeilen_p = (await db.execute(
             praefix_abfrage(roh, profil, ausschluss=gesehen, alias_ids=alias_praefix)
         )).mappings().all()
-        neu = [_treffer(z) | {"treffer_art": "praefix"} for z in zeilen_p[:rest]]
+        neu = [
+            _treffer(z, mit_metadaten=md) | {"treffer_art": "praefix"}
+            for z in zeilen_p[:rest]
+        ]
         weitere += neu
         gesehen |= {t["node_id"] for t in neu}
         rest -= len(neu)
@@ -856,7 +984,8 @@ async def identifikation(
             )
         )).mappings().all()
         weitere += [
-            _treffer(z) | {"treffer_art": "teilweise"} for z in zeilen_t[:rest]
+            _treffer(z, mit_metadaten=md) | {"treffer_art": "teilweise"}
+            for z in zeilen_t[:rest]
         ]
 
     return Abschnitt(
@@ -948,6 +1077,9 @@ async def thematisch(
         # Die Abfrage läuft, sie tut nur nichts.
         if aus_dem_fach is not None:
             naehe = naehe - _bonus(aus_dem_fach, _FACHBONUS)
+        aus_eigenem_fach = _aus_eigenem_fach(profil)
+        if aus_eigenem_fach is not None:
+            naehe = naehe - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
         naehe = naehe - _bonus(
             ContextNode.owner_pseudonym == profil.pseudonym, _EIGENTUEMER_BONUS
         )
@@ -1077,3 +1209,121 @@ async def suche(
     return Suchergebnis(
         identifikation=ident, thematisch=thema, hinweise=_hinweise(frage, ident)
     )
+
+
+# ── Verfahren 4: Vorab-Suche als Grundschicht (Paket 9, N11) ─────────────────
+
+#: Wie nah ein Treffer sein muss, um **ungefragt** in den Prompt zu kommen —
+#: Kosinus-Distanz, kleiner ist näher.
+#:
+#: **Gemessen am 26.09.2026** (bge-m3, Pilotbestand Chemie plus Methoden- und
+#: Operatorenblätter), je Nachricht die Distanz zum nächsten Treffer:
+#:
+#: ===================================================== =======
+#: Nachricht                                             Distanz
+#: ===================================================== =======
+#: „Was ist eine Oxidation?" → Oxidation                   0,249
+#: „Ist Salzsäure eine Säure?" → Salzsäure                 0,292
+#: „Wie heißt die Bindung im Wassermolekül?" → Wasser      0,357
+#: „Zeichen mit der Flamme?" → Flamme (GHS02)              0,432
+#: ----------------------------------------------------- -------
+#: „Hilf mir bei meiner Bewerbung" → Operatorenblatt       0,481
+#: „Wie geht es dir?" → Gesundheitsgefahr (GHS08)          0,590
+#: „Danke!" → Donator-Akzeptor-Prinzip                     0,609
+#: „Wann sind die Sommerferien?" → Totenkopf (GHS06)       0,688
+#: ===================================================== =======
+#:
+#: ⚠️ **Die Verteilungen überlappen, und zwar an einer lehrreichen Stelle.** Zwischen
+#: dem letzten erwünschten (0,432) und dem ersten unerwünschten Treffer (0,481) liegen
+#: 0,05 — und genau dazwischen fällt ein Fall, der **richtig** wäre: „Ich muss ein
+#: Gedicht von Goethe interpretieren" findet das Merkblatt zur Gedichtanalyse bei 0,482.
+#: Keine Schwelle trennt ihn vom Bewerbungsschreiben. Der Wert steht deshalb **unter**
+#: beiden: Lieber kein Kontext als ein falscher — ein verfehlter Treffer kostet nur,
+#: dass das Modell sein Werkzeug benutzen muss, ein falscher steht als Wissen der Schule
+#: im Prompt und wird geglaubt.
+#:
+#: ⚠️ **Der Wert hängt am Bestand und ist nachzumessen, wenn er wächst** —
+#: `backend/scripts/vorab_schwelle.py` fährt die Messung. Der Abstand zum
+#: GHS02-Fall beträgt nur 0,018.
+VORAB_SCHWELLE = 0.45
+
+#: Wie viele Treffer die Grundschicht höchstens beisteuert. Das Werkzeug darf mehr; hier
+#: geht es um Platz im Prompt **jeder** Nachricht, nicht nur der nachgeschlagenen.
+VORAB_MAX = 5
+
+
+async def vorab(
+    frage: str, profil: Suchprofil, db: AsyncSession, *, vektor=_SELBST_HOLEN
+) -> list[dict]:
+    """Was ohne Nachfrage in den Prompt darf — die Grundschicht jedes Chats (N11).
+
+    Zwei Wege hinein, und beide müssen **eng** sein, weil hier niemand um Kontext
+    gebeten hat:
+
+    1. **Exakter Namens- oder Suchbegriff-Treffer.** Wer „Was ist ein Mol?" schreibt,
+       nennt den Eintrag beim Namen — dafür braucht es keine Ähnlichkeitsschwelle.
+    2. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
+
+    Beschränkt auf :data:`app.context.taxonomy.VORAB_TYPEN` — die Arten, die
+    Schüler:innen im Unterricht in die Hand bekommen. Bildungsplan-Kompetenzen und
+    Curricula bleiben dem Werkzeug vorbehalten; sie beantworten die Frage einer
+    Lehrkraft und sind zahlreich genug, jeden Prompt zu füllen.
+
+    ⚠️ **Die Schwelle gilt auf der rohen Distanz, nicht auf der sortierten.** Fach- und
+    Eigentümerbonus verschieben die *Reihenfolge*; zöge man sie vor dem Vergleich ab,
+    rutschte ein fachfremder Knoten allein deshalb unter die Schwelle, weil er aus dem
+    richtigen Fach kommt. Die Gegenprobe dazu steht in den Tests.
+
+    ⚠️ **Kein ILIKE-Rückfall.** Gibt es kein Embedding, steuert Weg 2 nichts bei. Eine
+    Teilstringsuche über *jede* Nachricht schriebe bei „Wie geht es dir?" alles in den
+    Prompt, was irgendwo „wie" enthält — im Werkzeugweg ist der Rückfall richtig, weil
+    dort jemand ausdrücklich gesucht hat.
+    """
+    aus_profil = replace(profil, identifikation=VORAB_MAX)
+    treffer: list[dict] = []
+    gesehen: set[str] = set()
+
+    kandidaten = _kandidaten(frage)
+    if kandidaten:
+        alias_exakt = await knoten_mit_alias(db, ALIAS_NORMALISIERT.in_(kandidaten))
+        zeilen = (await db.execute(
+            identifikations_abfrage(kandidaten, aus_profil, alias_ids=alias_exakt)
+            .where(ContextNode.content_type.in_(VORAB_TYPEN))
+        )).mappings().all()
+        for z in zeilen:
+            t = _treffer(z, mit_metadaten=profil.mit_metadaten)
+            treffer.append(t)
+            gesehen.add(t["node_id"])
+
+    if vektor is _SELBST_HOLEN:
+        vektor = await vektor_oder_none(frage)
+
+    if vektor is not None and len(treffer) < VORAB_MAX:
+        roh = ContextNode.embedding.cosine_distance(vektor)
+        sortiert = roh
+        aus_dem_fach = _aus_dem_fach(profil)
+        if aus_dem_fach is not None:
+            sortiert = sortiert - _bonus(aus_dem_fach, _FACHBONUS)
+        aus_eigenem_fach = _aus_eigenem_fach(profil)
+        if aus_eigenem_fach is not None:
+            sortiert = sortiert - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
+        stmt = (
+            _grundabfrage(profil)
+            .add_columns(roh.label("distanz"))
+            .where(ContextNode.content_type.in_(VORAB_TYPEN))
+            .where(ContextNode.embedding.is_not(None))
+            .order_by(sortiert)
+            .limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
+        )
+        for z in (await db.execute(stmt)).mappings().all():
+            if len(treffer) >= VORAB_MAX:
+                break
+            if z["distanz"] > VORAB_SCHWELLE:
+                continue
+            t = _treffer(z, mit_metadaten=profil.mit_metadaten)
+            if t["node_id"] in gesehen:
+                continue
+            treffer.append(t)
+            gesehen.add(t["node_id"])
+
+    return await _auf_geltende_fassung(treffer[:VORAB_MAX], profil, db)

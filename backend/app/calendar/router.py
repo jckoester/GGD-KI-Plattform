@@ -5,14 +5,25 @@ Bisher nur die Kürzel-Liste für die Profileinstellung (Schritt 3).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, require_any_role
+from app.auth.config import SsoConfig
+from app.auth.dependencies import get_current_user, get_sso_config, require_any_role
 from app.calendar.base import CalendarSourceError
-from app.calendar.groups import kein_unterricht_codes, match_groups
+from app.calendar.sync import SlotRef
+from app.calendar.groups import (
+    kein_unterricht_codes,
+    klassenkarte,
+    lege_gruppe_aus_vorschlag_an,
+    match_groups,
+    quellklassen_aufloesen,
+)
 from app.calendar.patterns import derive_patterns
 from app.calendar.service import (
     KUERZEL_PREFERENCE_KEY,
@@ -20,7 +31,13 @@ from app.calendar.service import (
     is_configured,
     list_kuerzel,
 )
+from app.db.models import Group
 from app.db.session import get_db
+from app.groups.aktualitaet import (
+    gruppen_mit_beleg,
+    gruppen_mit_quellklasse,
+    ist_aktuell,
+)
 from app.planning.calendar import ab_phasen, is_schoolday, load_school_year
 from app.preferences.service import get_preferences
 
@@ -190,39 +207,31 @@ def _abgleich_wochen(
     return wochen
 
 
-@router.get("/week-patterns")
-async def week_patterns(
-    wochen: int = Query(4, ge=1, le=12),
-    stichtag: date | None = None,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_any_role(["teacher", "admin"])),
-    _current=Depends(get_current_user),
-) -> dict:
-    """Wochenmuster-Vorschläge aus dem eigenen Stundenplan (UP-8, Schritt 6).
+@dataclass
+class _Musterlage:
+    """Was ein Stundenplan-Abruf über die Lerngruppen einer Lehrkraft hergibt."""
 
-    **Vorschlag, keine Übernahme.** Das Schreiben nach `group_week_patterns` braucht die
-    Zuordnung zu den Unterrichtsgruppen der Plattform — die kommt in Schritt 7.
+    result: object          # Ergebnis von `derive_patterns`
+    abgleich: object        # `GroupMatchResult`
+    halbjahr: int
+    warnungen: list[str]
 
-    Vier Wochen als Vorgabe: Weniger als zwei erlaubt keine Aussage über 14-tägige
-    Termine, mehr erhöht nur die Wahrscheinlichkeit, dass zwischendurch der Plan
-    gewechselt hat.
+
+async def _musterlage(
+    db: AsyncSession,
+    pseudonym: str,
+    kuerzel: str,
+    wochen: int,
+    stichtag: date | None,
+) -> _Musterlage:
+    """Stundenplan abrufen, Wochenmuster ableiten, gegen die eigenen Gruppen abgleichen.
+
+    **Gemeinsame Grundlage von `GET /week-patterns` und `POST /teaching-groups`.** Beide
+    müssen dasselbe sehen: Beim Anlegen ist das Vorkommen im eigenen Stundenplan die
+    **Berechtigung**, und die darf nicht aus einer zweiten, womöglich abweichenden
+    Rechnung stammen. Zwei Kopien dieser Kette liefen sonst irgendwann auseinander — und
+    die Abweichung fiele ausgerechnet dort auf, wo sie ein Rechteproblem wäre.
     """
-    if not is_configured():
-        return {"configured": False, "kuerzel": None, "patterns": [], "hinweise": []}
-
-    prefs = await get_preferences(db, _current.sub)
-    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
-    if not kuerzel:
-        return {
-            "configured": True,
-            "kuerzel": None,
-            "patterns": [],
-            "hinweise": [
-                "Im Profil ist kein Kürzel eingetragen — ohne das lässt sich kein "
-                "Stundenplan abrufen."
-            ],
-        }
-
     kalenderwochen = _unterrichtswochen(stichtag or date.today(), wochen)
     if not kalenderwochen:
         raise HTTPException(
@@ -257,10 +266,59 @@ async def week_patterns(
     # Aus welchem Halbjahr die Wochen stammen — der Editor schreibt je Halbjahr, und ein
     # Muster ins falsche zu übernehmen wäre schwer zu bemerken.
     halbjahr = 1 if kalenderwochen[-1] < cfg.halbjahreswechsel else 2
-    # Schritt 7: Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform
-    # abgleichen. Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst
-    # hier fällt auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
-    abgleich = await match_groups(db, [p.key for p in result.proposals], pseudonym=_current.sub)
+    # Die erkannten Lerngruppen gegen die Unterrichtsgruppen der Plattform abgleichen.
+    # Erst damit wird aus einem Muster ein schreibbarer Vorschlag — und erst hier fällt
+    # auf, wenn ein Fachkürzel keinem Fach zugeordnet ist.
+    abgleich = await match_groups(db, [p.key for p in result.proposals], pseudonym=pseudonym)
+    return _Musterlage(result=result, abgleich=abgleich, halbjahr=halbjahr,
+                       warnungen=warnungen)
+
+
+@router.get("/week-patterns")
+async def week_patterns(
+    wochen: int = Query(4, ge=1, le=12),
+    stichtag: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_any_role(["teacher", "admin"])),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Wochenmuster-Vorschläge aus dem eigenen Stundenplan (UP-8, Schritt 6).
+
+    **Vorschlag, keine Übernahme.** Das Schreiben nach `group_week_patterns` braucht die
+    Zuordnung zu den Unterrichtsgruppen der Plattform — die kommt in Schritt 7.
+
+    Vier Wochen als Vorgabe: Weniger als zwei erlaubt keine Aussage über 14-tägige
+    Termine, mehr erhöht nur die Wahrscheinlichkeit, dass zwischendurch der Plan
+    gewechselt hat.
+    """
+    if not is_configured():
+        return {"configured": False, "kuerzel": None, "patterns": [], "hinweise": []}
+
+    prefs = await get_preferences(db, _current.sub)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    if not kuerzel:
+        return {
+            "configured": True,
+            "kuerzel": None,
+            "patterns": [],
+            "hinweise": [
+                "Im Profil ist kein Kürzel eingetragen — ohne das lässt sich kein "
+                "Stundenplan abrufen."
+            ],
+        }
+
+    lage = await _musterlage(db, _current.sub, kuerzel, wochen, stichtag)
+    result, abgleich, halbjahr, warnungen = (
+        lage.result, lage.abgleich, lage.halbjahr, lage.warnungen
+    )
+    # Woher die Mitglieder einer noch fehlenden Gruppe kämen, weiß nur der Server — die
+    # Oberfläche kennt die Klassengruppen der Plattform nicht. Sie hier mitzugeben ist
+    # billiger als eine zweite Abfrage und verhindert, dass die Liste rät.
+    karte = await klassenkarte(db) if abgleich.fehlend else {}
+    aufloesungen = {
+        s.key.label: quellklassen_aufloesen(karte, s.class_names) for s in abgleich.fehlend
+    }
+    verschwunden = await _nicht_mehr_im_stundenplan(db, abgleich.nicht_im_stundenplan)
     # Eine Gruppe kann mehrere Muster-Schlüssel bündeln (M + MD).
     zuordnung = {k: s for s in abgleich.fehlend for k in s.keys}
     vorhanden = set(abgleich.vorhanden)
@@ -303,6 +361,21 @@ async def week_patterns(
                 "kursart": s.kursart,
                 # Mehrere Kürzel = eine Gruppe (Differenzierungsstunde).
                 "kuerzel": list(s.codes),
+                # Woher die Mitglieder kämen, wenn die Gruppe jetzt angelegt würde.
+                # `erbt_aus` ist leer, sobald die Gruppe über mehreren Klassen liegt —
+                # dann ist sie eine Auswahl daraus und füllt sich über den Code.
+                "erbt_aus": (
+                    list(aufloesungen[s.key.label].treffer)
+                    if aufloesungen[s.key.label].erbt else []
+                ),
+                "stammt_aus": list(aufloesungen[s.key.label].treffer),
+                "klassen_ohne_treffer": list(aufloesungen[s.key.label].ohne_treffer),
+                "kursstufe": aufloesungen[s.key.label].kursstufe,
+                "mehrklassig": aufloesungen[s.key.label].mehrklassig,
+                # Ob die Frage „ganze Klasse oder Teilgruppe?" überhaupt sinnvoll ist —
+                # ohne gefundene Klasse gibt es nichts zu erben.
+                "kann_erben": bool(aufloesungen[s.key.label].treffer),
+                "erbt_vorbelegt": aufloesungen[s.key.label].erbt,
             }
             for s in abgleich.fehlend
         ],
@@ -324,8 +397,131 @@ async def week_patterns(
                 else []
             ),
             *abgleich.mehrdeutig,
+            *verschwunden,
         ],
     }
+
+
+class TeachingGroupAusStundenplan(BaseModel):
+    """Welche Lerngruppe des eigenen Stundenplans angelegt werden soll."""
+
+    gruppe: str            # `GroupKey.label`, wie in `fehlende_gruppen.gruppe`
+    subject_id: int        # zur Absicherung: muss zum serverseitigen Vorschlag passen
+    # Ob die Gruppe den ganzen Klassenverband unterrichtet (`true`) oder eine Auswahl
+    # daraus (`false`). `None` übernimmt die Vorbelegung des Servers.
+    erbt: bool | None = None
+    wochen: int = 4
+    stichtag: date | None = None
+
+
+@router.post("/teaching-groups", status_code=201)
+async def gruppe_aus_stundenplan_anlegen(
+    body: TeachingGroupAusStundenplan,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_any_role(["teacher", "admin"])),
+    sso_config: SsoConfig = Depends(get_sso_config),
+    _current=Depends(get_current_user),
+) -> dict:
+    """Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen.
+
+    ⚠️ **Die Berechtigung ist das Vorkommen im eigenen Stundenplan** — deshalb rechnet
+    der Endpunkt den Abgleich neu und sucht die angeforderte Lerngruppe in
+    `fehlend`. Name, Fach und Klassen stammen **ausschließlich** aus diesem Ergebnis;
+    aus der Anfrage kommt nur, *welche* Gruppe gemeint ist. Dasselbe Muster wie bei den
+    Plan-Operationen: Ein vom Client übergebener Vorschlag wäre eine Einladung, beliebige
+    Gruppen anzulegen und sich zur Lehrkraft darin zu machen.
+
+    `subject_id` wird mitgeschickt und **geprüft**, nicht übernommen: Stimmt sie nicht
+    mit dem serverseitigen Vorschlag überein, hat sich die Lage seit dem Laden der Liste
+    geändert (anderes Fachkürzel-Mapping, andere Woche) — dann ist Abbrechen richtiger
+    als Anlegen.
+    """
+    if not is_configured():
+        raise HTTPException(409, "Für diese Installation ist kein Stundenplan angebunden.")
+    # ⚠️ **Derselbe Schalter wie beim manuellen Weg.** `allow_manual_teaching_groups=false`
+    # heißt „der SSO liefert alle Unterrichtsgruppen, Lehrkräfte legen keine eigenen an".
+    # Dieser Weg hier ist besser belegt als „Klasse × Fach", aber er erzeugt dieselbe
+    # Art Gruppe — und in einer Installation, die auf den SSO setzt, dieselben
+    # Dubletten. Ohne die Prüfung wäre der Schalter über die Hintertür wirkungslos.
+    if not sso_config.allow_manual_teaching_groups:
+        raise HTTPException(
+            403, "Unterrichtsgruppen werden in dieser Installation vom Schulkonto geführt."
+        )
+
+    prefs = await get_preferences(db, _current.sub)
+    kuerzel = (prefs.get(KUERZEL_PREFERENCE_KEY) or "").strip()
+    if not kuerzel:
+        raise HTTPException(
+            409, "Im Profil ist kein Kürzel eingetragen — ohne das gibt es keinen Stundenplan."
+        )
+
+    lage = await _musterlage(db, _current.sub, kuerzel, body.wochen, body.stichtag)
+
+    vorschlag = next(
+        (s for s in lage.abgleich.fehlend if s.key.label == body.gruppe), None
+    )
+    if vorschlag is None:
+        # Bewusst 403 und nicht 404: Die Gruppe mag es geben — nur nicht im Stundenplan
+        # dieser Lehrkraft. Der Unterschied ist eine Rechte-, keine Existenzfrage.
+        raise HTTPException(
+            403,
+            "Diese Lerngruppe steht nicht als fehlend in Ihrem Stundenplan. "
+            "Vielleicht ist die Gruppe inzwischen angelegt — bitte Liste neu laden.",
+        )
+    if vorschlag.subject_id != body.subject_id:
+        raise HTTPException(
+            409,
+            "Das Fach dieser Lerngruppe hat sich seit dem Laden der Liste geändert. "
+            "Bitte Liste neu laden.",
+        )
+
+    ergebnis = await lege_gruppe_aus_vorschlag_an(db, vorschlag, _current.sub, body.erbt)
+    await db.commit()
+    logger.info(
+        "gruppe_aus_stundenplan pseudonym=%s gruppe=%s id=%s quellklassen=%d kursstufe=%s",
+        _current.sub, body.gruppe, ergebnis.group_id,
+        len(ergebnis.quellklassen), ergebnis.kursstufe,
+    )
+    return {
+        "group_id": ergebnis.group_id,
+        "name": ergebnis.name,
+        "subject_id": ergebnis.subject_id,
+        "quellklassen": list(ergebnis.quellklassen),
+        "ohne_treffer": list(ergebnis.ohne_treffer),
+        "kursstufe": ergebnis.kursstufe,
+        "erbt": ergebnis.erbt,
+    }
+
+
+async def _nicht_mehr_im_stundenplan(db: AsyncSession, kandidaten) -> list[str]:
+    """Hinweise zu eigenen Gruppen, die der Stundenplan nicht mehr nennt.
+
+    **Ein Hinweis, keine Handlung.** Nichts wird archiviert, gelöscht oder umbenannt: An
+    einer Unterrichtsgruppe hängen Jahresplan, Stundenentwürfe, Konversationen und
+    Kontextfreigaben. Ob eine Gruppe wirklich ausgelaufen ist oder nur gerade nicht im
+    Abrufzeitraum liegt, weiß die Lehrkraft — die Plattform sieht vier Wochen.
+
+    ⚠️ **Gefiltert auf das laufende Schuljahr.** Ohne `ist_aktuell` meldete der Hinweis
+    jede Gruppe aus jedem Vorjahr und aus dem anderen Halbjahr — Lärm, in dem der eine
+    echte Fall untergeht. Die Regel dafür teilt sich diese Stelle mit der Gruppenliste
+    (`app/groups/aktualitaet.py`); zwei Fassungen liefen auseinander.
+    """
+    if not kandidaten:
+        return []
+    ids = [k.id for k in kandidaten]
+    gruppen = list((await db.execute(select(Group).where(Group.id.in_(ids)))).scalars())
+    cfg = load_school_year()
+    beleg = await gruppen_mit_beleg(db, ids, cfg)
+    quellklassen = await gruppen_mit_quellklasse(db, ids)
+    betroffen = [g for g in gruppen if ist_aktuell(g, beleg, cfg, quellklassen)]
+    if not betroffen:
+        return []
+    namen = ", ".join(f"„{g.anzeigename}“" for g in sorted(betroffen, key=lambda g: g.anzeigename))
+    return [
+        f"{namen}: im Stundenplan nicht gefunden. Das kann am Abrufzeitraum liegen — "
+        "oder die Gruppe läuft nicht mehr. Geändert wurde nichts; Planung und Chats "
+        "bleiben erhalten."
+    ]
 
 
 class _Leer:
@@ -350,7 +546,13 @@ async def _stundenplan_abgleich(
     """
     from sqlalchemy import text
 
-    from app.calendar.groups import kein_unterricht_codes, match_groups
+    from app.calendar.groups import (
+    kein_unterricht_codes,
+    klassenkarte,
+    lege_gruppe_aus_vorschlag_an,
+    match_groups,
+    quellklassen_aufloesen,
+)
     from app.calendar.sync import SlotRef, plan_sync
 
     prefs = await get_preferences(db, pseudonym)
@@ -405,22 +607,51 @@ async def _stundenplan_abgleich(
     if gruppen:
         rows = await db.execute(
             text(
-                "SELECT id, group_id, date, start_period, kategorie, pinned, source, note "
+                f"SELECT {', '.join(SLOT_SPALTEN)} "
                 "FROM lesson_slots WHERE group_id = ANY(:gruppen) "
                 "AND date BETWEEN :von AND :bis"
             ),
             {"gruppen": gruppen, "von": zeitraum[0], "bis": zeitraum[1]},
         )
-        slots = [
-            SlotRef(
-                id=r[0], group_id=r[1], datum=r[2], start_period=r[3] or 0,
-                kategorie=r[4], pinned=r[5], source=r[6], note=r[7],
-            )
-            for r in rows.fetchall()
-        ]
+        slots = als_slot_refs(rows.mappings().all())
 
     plan = plan_sync(zugeordnet, slots, zeitraum=zeitraum)
     return plan, {"kuerzel": kuerzel, "wochen": kalenderwochen, "gruppen": gruppen}, None
+
+
+# Die Spalten, die der Abgleich von einem Slot braucht. Als Liste, damit Abfrage und
+# Abbildung nicht auseinanderlaufen können.
+SLOT_SPALTEN = (
+    "id", "group_id", "date", "start_period", "kategorie", "pinned", "source", "note",
+    "periods", "ausfall_herkunft",
+)
+
+
+def als_slot_refs(zeilen) -> list[SlotRef]:
+    """Datenbankzeilen → `SlotRef`. Über **Namen**, nicht über Positionen.
+
+    ⚠️ **Warum das eine eigene Funktion ist.** Vorher stand die Abbildung inline und griff
+    mit `r[0]`…`r[8]` zu. Eine neue Spalte an der falschen Stelle hätte alles verschoben,
+    ohne dass etwas auffiele — und `periods` ist die Angabe, an der die Phantom-Termine
+    hängen: Fehlt sie, hält der Abgleich die zweite Hälfte jeder Doppelstunde für
+    ungedeckt und legt dort einen Termin an. Mit Namen kann das nicht mehr passieren, und
+    die Abbildung ist ohne Datenbank prüfbar.
+    """
+    return [
+        SlotRef(
+            id=z["id"],
+            group_id=z["group_id"],
+            datum=z["date"],
+            start_period=z["start_period"] or 0,
+            kategorie=z["kategorie"],
+            pinned=z["pinned"],
+            source=z["source"],
+            note=z["note"],
+            periods=z["periods"] or 1,
+            ausfall_herkunft=z["ausfall_herkunft"],
+        )
+        for z in zeilen
+    ]
 
 
 def _plan_als_json(plan, kontext) -> dict:
@@ -461,6 +692,18 @@ def _plan_als_json(plan, kontext) -> dict:
                 "beschreibung": k.beschreibung,
             }
             for k in plan.conflicts
+        ],
+        # Neu seit 22.09.2026: Termine, die der Abgleich anlegt, weil der Stundenplan
+        # dort Unterricht kennt und die Planung keinen hatte. Getrennt von `konflikte` —
+        # ein Hinweis ist etwas, das **nicht** geschah.
+        "angelegte": [
+            {
+                "group_id": n.group_id,
+                "datum": n.datum.isoformat(),
+                "stunde": n.start_period,
+                "kategorie": n.kategorie,
+            }
+            for n in plan.anzulegende
         ],
         "meldungen": plan.meldungen,
     }

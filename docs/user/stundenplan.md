@@ -18,7 +18,7 @@ Tipparbeit abnehmen:
 
 ## Einmal einrichten: Ihr Kürzel
 
-Damit die Plattform weiß, welcher Plan Ihrer ist, tragen Sie im **Profil** unter
+Damit die Plattform weiß, welcher Plan Ihrer ist, tragen Sie unter **Unterricht** bei
 „Stundenplan" Ihr Lehrkraft-Kürzel ein — dasselbe, das im Vertretungsplan steht (z. B. `AK`).
 
 Sie wählen es aus einer Liste; freies Tippen ist nicht nötig und ein Vertipper damit
@@ -36,7 +36,24 @@ Ohne Kürzel passiert nichts — die Übernahme ist freiwillig.
 
 ---
 
-## Wochenmuster übernehmen
+## Alle Gruppen auf einmal: das Stundenraster
+
+Der schnellste Weg von null zu einem bespielbaren Jahresplan steht auf der Seite
+**Unterricht**: **„Stundenplan lesen"**. Die Plattform liest vier Wochen Ihres Plans und
+legt für **jede** Ihrer Gruppen das Wochenmuster samt Stunden an — Sie sehen vorher, was
+sie gefunden hat, und bestätigen mit **„Für n Gruppen übernehmen"**.
+
+Das ist die **zweite Stelle im System, an der Stunden entstehen** (die erste ist das
+Wochenmuster einer einzelnen Gruppe, siehe unten). Beide legen dasselbe an; es ist eine
+Frage der Zahl, nicht der Wirkung.
+
+**Was sie nicht tut:** Gruppen anlegen. Was der Stundenplan hergibt und noch keine Gruppe
+ist, steht auf derselben Seite als Vorschlag — erst wenn Sie ihn bestätigen, entsteht
+eine Gruppe, und erst dann kann sie Stunden bekommen.
+
+Steht keine Stundenplanquelle bereit oder fehlt Ihr Kürzel, erscheint der Knopf gar nicht.
+
+## Wochenmuster übernehmen — Gruppe für Gruppe
 
 Im **Jahresplan** einer Gruppe öffnen Sie die Wochenmuster und wählen dort
 **„Aus Stundenplan übernehmen"**.
@@ -60,6 +77,13 @@ eine Woche.
 **Der Vorschlag füllt nur das Formular.** Nichts ist gespeichert, bis Sie auf „Speichern"
 klicken. Sie können vorher jede Zeile ändern, löschen oder ergänzen.
 
+**Stunden bis zum Schuljahresende anlegen.** Solange das 1. Halbjahr läuft, ist diese
+Option vorbelegt: Das 2. Halbjahr entsteht dann **vorläufig** aus dem jetzigen Raster,
+damit Ihre Jahresplanung über den Halbjahreswechsel hinweg Termine hat. Kommt im Februar
+der neue Stundenplan, erzeugen Sie das Halbjahr neu — Ihre Planung wird dabei umgehängt,
+nicht verworfen. Wie das läuft, steht in der
+[Unterrichtsplanung](unterrichtsplanung.md#das-ganze-jahr-planen).
+
 Angezeigt wird auch, wie viele Einträge aus wie vielen Wochen stammen und welche davon
 **unsicher** sind — etwa weil eine Stunde nur einmal vorkam. Wochen, in denen Sie gar
 keinen Unterricht haben (Praktikums- oder Projektwoche), zählen dabei nicht mit; sie
@@ -71,6 +95,50 @@ welche noch keine Unterrichtsgruppe existiert, welche Fachkürzel die Plattform 
 und wo die Zuordnung mehrdeutig blieb. Unbekannte Fachkürzel gehören der Administration
 gemeldet; alles andere klärt sich meist an dieser Liste. Von Hand eintragen funktioniert
 weiterhin.
+
+### Fehlt Ihre Gruppe? Direkt anlegen
+
+Lerngruppen aus Ihrem Stundenplan, für die es auf der Plattform noch keine
+Unterrichtsgruppe gibt, stehen unter **„Noch ohne Unterrichtsgruppe"** — mit einem Knopf
+**„Anlegen"**. Sie werden darin automatisch Lehrkraft.
+
+Vor dem Anlegen fragt die Plattform, **wer dazugehört**:
+
+- **Die ganze Klasse** — die Schüler:innen dieser Klasse kommen von selbst dazu, beim
+  nächsten Login. Sie müssen nichts weiter tun.
+- **Nur ein Teil der Klasse** — dann ist es eine Teilgruppe, und die Schüler:innen treten
+  über einen [Beitrittscode](faecher.md#beitrittscode) bei.
+
+Vorbelegt ist die Antwort nach dem, was der Stundenplan hergibt: Steht dort **eine**
+Klasse, ist „die ganze Klasse" vorgeschlagen; bei mehreren Klassen und in der Kursstufe
+immer „nur ein Teil". Das ist die vorsichtige Richtung — wer den Vorschlag übernimmt,
+bekommt nie zu viele Mitglieder.
+
+> **Warum bei mehreren Klassen nie geerbt wird:** Eine Gruppe, die über 10a, 10b und 10c
+> läuft, ist fast immer eine **Auswahl** aus diesen Klassen — sonst würde sie je Klasse
+> unterrichtet. Alle drei hineinzunehmen hieße, Schüler:innen in eine Gruppe zu
+> schreiben, in der sie gar nicht sind.
+
+Umgekehrt gilt: Auch eine **einzelne** Klasse kann geteilt sein — Religion und Ethik
+nennen nur einen Klassennamen. Dort wählen Sie „nur ein Teil der Klasse", sonst erbt die
+Gruppe die ganze Klasse.
+
+**Die Entscheidung ist korrigierbar.** Stellen Sie eine Gruppe später auf Teilgruppe um,
+verlieren die zu viel geerbten Schüler:innen ihre Mitgliedschaft beim nächsten Login.
+
+---
+
+## Wenn eine Gruppe nicht mehr im Stundenplan steht
+
+Findet die Plattform zu einer Ihrer Unterrichtsgruppen nichts im Stundenplan, sagt sie
+das als Hinweis — und **ändert nichts**. Jahresplan, Stundenentwürfe und Chats bleiben.
+
+Das kann zwei Gründe haben: Die Gruppe läuft nicht mehr, oder sie liegt gerade außerhalb
+des Abrufzeitraums (die Plattform sieht vier Wochen). Welcher zutrifft, wissen nur Sie —
+deshalb wird nichts archiviert und nichts gelöscht.
+
+---
+
 
 ---
 
@@ -86,7 +154,7 @@ Vertretung in die Jahresplanung ein.
 ### Von Hand, wenn Sie es sofort brauchen
 
 Dafür gibt es den Knopf **„Stundenplan"** in der Werkzeugleiste des Jahresplans und
-**„Jetzt abgleichen"** im Profil.
+**„Jetzt abgleichen"** unter *Unterricht*.
 
 Das ist der praktisch wichtigere Weg: An vielen Schulen wird der Vertretungsplan erst
 wenige Minuten vor Unterrichtsbeginn gepflegt, und über den Vormittag kommt Weiteres dazu.
@@ -111,9 +179,11 @@ Ein Vertretungshinweis wird nur in ein leeres Notizfeld geschrieben oder in eine
 Plattform selbst angelegt hat (erkennbar an `[Stundenplan]`). Was Sie selbst notiert haben,
 bleibt stehen.
 
-**Sie legt keine Stunden an.**
-Kennt der Stundenplan Unterricht, für den Ihre Jahresplanung keinen Termin hat, erscheint
-das als Hinweis. Ob daraus ein Termin wird, entscheiden Sie.
+**Sie legt nur an, was der Stundenplan zusätzlich ansetzt.**
+Wird eine Stunde auf einen Termin verlegt, an dem Ihre Gruppe sonst keinen Unterricht hat,
+entsteht dort ein Termin — sonst verlöre Ihre Planung diese Stunde. Der Termin ist leer:
+**Den Inhalt bringt nur der Verschiebe-Dialog dorthin, nicht der Abgleich.** Für Gruppen
+ohne Jahresplanung wird nichts angelegt; dort bleibt es beim Hinweis.
 
 **Sie plant nicht für Sie um.**
 Fällt eine Stunde aus, wird sie als Ausfall markiert und als *anzupassen* gekennzeichnet.
@@ -145,6 +215,9 @@ Ihrer Jahresplanung. Es ist nicht Ihr Unterricht.
 Wird eine Stunde verschoben, erkennt die Plattform beide Seiten — die entfallende und die
 neue — und meldet sie als **einen** Vorgang, nicht als zwei unabhängige Änderungen. Eine
 verlegte Doppelstunde bleibt eine Meldung.
+
+Fehlt der Zieltermin in Ihrer Jahresplanung, wird er angelegt — leer. So bleibt die
+Stundenzahl stimmig; den Stoff verschieben Sie selbst.
 
 Von dort öffnen Sie den gewohnten Verschiebe-Assistenten und entscheiden, was mit dem Stoff
 geschieht.

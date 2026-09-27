@@ -125,3 +125,70 @@ describe("gruppiereKanten — Reihenfolge", () => {
     expect(g.map((x) => x.gesamt)).toEqual([2, 1])
   })
 })
+
+describe("gruppiereKanten — Art einer related_to-Kante (Paket 9)", () => {
+  const mitArt = (id, from, to, art, extra = {}) => ({
+    ...kante(id, from, to, "related_to"),
+    metadata: { art, ...extra },
+  })
+
+  it("beschriftet eine Abgrenzung mit ihrem eigenen Satz", () => {
+    const g = bau([mitArt("k", "ego", "a", "abgrenzung")], [knoten("a")])
+    expect(g.map((x) => x.label)).toEqual(["Grenzt sich ab von"])
+  })
+
+  it("trennt Arten voneinander und von der Beziehung ohne Art", () => {
+    // Sonst stünden Abgrenzungen, Teilchen und schlichte Verwandtschaft unter einer
+    // gemeinsamen Überschrift „Steht in Beziehung zu" — die Unterscheidung wäre in den
+    // Daten, aber nicht auf der Seite.
+    const g = bau(
+      [
+        mitArt("k1", "ego", "a", "abgrenzung"),
+        mitArt("k2", "ego", "b", "teilchen"),
+        kante("k3", "ego", "c", "related_to"),
+      ],
+      [knoten("a"), knoten("b"), knoten("c")],
+    )
+    expect(g.map((x) => x.label).sort()).toEqual([
+      "Besteht aus den Teilchen",
+      "Grenzt sich ab von",
+      "Steht in Beziehung zu",
+    ])
+  })
+
+  it("liest eine Vertiefung richtungsabhängig", () => {
+    // Die Richtung ist hier die Aussage: Die frühere Fassung wird in der späteren
+    // vertieft, nicht umgekehrt.
+    const g = bau(
+      [mitArt("k1", "ego", "a", "vertiefung"), mitArt("k2", "b", "ego", "vertiefung")],
+      [knoten("a"), knoten("b")],
+    )
+    expect(g.map((x) => x.label).sort()).toEqual(["Vertieft", "Wird vertieft in"])
+  })
+
+  it("behandelt eine Abgrenzung als symmetrisch", () => {
+    // „A grenzt sich von B ab" heißt dasselbe wie umgekehrt — zwei Gruppen wären eine
+    // Unterscheidung ohne Unterschied.
+    const g = bau(
+      [mitArt("k1", "ego", "a", "abgrenzung"), mitArt("k2", "b", "ego", "abgrenzung")],
+      [knoten("a"), knoten("b")],
+    )
+    expect(g).toHaveLength(1)
+    expect(g[0].gesamt).toBe(2)
+  })
+
+  it("⚠️ verfeinert nur related_to", () => {
+    // Bei `is_a` wäre die Art eine zweite Aussage über dieselbe Kante — und der
+    // Oberbegriff stünde plötzlich unter „Grenzt sich ab von".
+    const g = bau(
+      [{ ...kante("k", "ego", "a", "is_a"), metadata: { art: "abgrenzung" } }],
+      [knoten("a")],
+    )
+    expect(g.map((x) => x.label)).toEqual(["Ist ein(e)"])
+  })
+
+  it("fällt bei unbekannter Art auf die Relation zurück", () => {
+    const g = bau([mitArt("k", "ego", "a", "voellig-neu")], [knoten("a")])
+    expect(g.map((x) => x.label)).toEqual(["Steht in Beziehung zu"])
+  })
+})

@@ -163,3 +163,118 @@ async def test_detect_overhang(db_session, seed_reflow_group):
     f = next(x for x in findings if x.titel == "UE Überhang")
     assert f.ueberhang == 1
     assert f.fixpunkt_datum == (BASE + timedelta(days=3)).isoformat()
+
+
+# ── Regeneration in beiden Halbjahren (Paket 5, AP2) ──────────────────────────
+
+
+def _snapshot(slots):
+    """Ein Regenerations-Snapshot des **alten** Stands — so, wie `slot_generator`
+    ihn vor dem Löschen anlegt."""
+    from app.db.models import SlotPlanSnapshot
+
+    return SlotPlanSnapshot(
+        group_id=GROUP_ID,
+        reason="regeneration",
+        payload={
+            "slots": [
+                {"slot_id": str(s.id), "date": s.date.isoformat(),
+                 "kategorie": s.kategorie, "ue_node_id": None, "stunde_node_id": None,
+                 "thema": s.thema, "pinned": s.pinned, "anpassung_noetig": False}
+                for s in slots
+            ],
+            "stunden_phasen": {},
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_regeneration_im_ersten_halbjahr_liefert_dessen_tranche(
+    db_session, seed_reflow_group
+):
+    """⚠️ **Der Befund vom 22.09.2026, gemessen am 24.09.2026.**
+
+    `neue_tranche` sammelte hart aus `s.halbjahr == 2`, und `start_date` war bei
+    `trigger='regeneration'` fest der Halbjahreswechsel. Hängt die Planung im **ersten**
+    Halbjahr um — etwa weil eine Lehrkraft das Wochenmuster mitten im Halbjahr
+    korrigiert —, bekam der Verschiebe-Assistent damit eine leere Tranche und einen
+    Startzeitpunkt in der Zukunft.
+
+    Kein Datenverlust, aber dünner Kontext: Das Modell soll kürzen und umverteilen und
+    sieht dabei die Stunden nicht, um die es geht.
+    """
+    alt = _slot(BASE, thema="alt 1")
+    db_session.add(alt)
+    await db_session.flush()
+    db_session.add(_snapshot([alt]))
+
+    # Die Neuerzeugung: alte Zeile weg, neue Slots desselben Halbjahres.
+    await db_session.delete(alt)
+    neu = [_slot(BASE + timedelta(days=i), thema=f"neu {i}") for i in (1, 2, 3)]
+    db_session.add_all(neu)
+    await db_session.flush()
+
+    ctx = await build_reflow_context(db_session, GROUP_ID, trigger="regeneration")
+
+    assert ctx.halbjahr == 1, "Der Kontext steht im falschen Halbjahr."
+    themen = [s["thema"] for s in ctx.regeneration["neue_tranche"]]
+    assert themen == ["neu 1", "neu 2", "neu 3"], (
+        f"Die neue Tranche ist nicht die regenerierte: {themen}"
+    )
+    assert ctx.regeneration["alte_zuordnung"] is not None
+
+
+@pytest.mark.asyncio
+async def test_regeneration_des_zweiten_halbjahres_waehrend_des_ersten(
+    db_session, seed_reflow_group
+):
+    """Der ursprünglich gebaute Fall muss weiter tragen.
+
+    Zum Halbjahreswechsel werden die HJ2-Slots erzeugt, **während** man noch im ersten
+    Halbjahr steht. Eine Regel „nimm das Halbjahr von heute" würde hier die falsche
+    Tranche liefern — deshalb kommt sie aus dem Vergleich mit dem Snapshot.
+    """
+    hj2 = _CFG.halbjahreswechsel + timedelta(days=7)
+    bestand = _slot(BASE, thema="HJ1 bleibt")
+    db_session.add(bestand)
+    await db_session.flush()
+    db_session.add(_snapshot([bestand]))
+
+    neu = [_slot(hj2 + timedelta(days=i), thema=f"HJ2 neu {i}") for i in (0, 1)]
+    for s in neu:
+        s.halbjahr = 2
+    db_session.add_all(neu)
+    await db_session.flush()
+
+    ctx = await build_reflow_context(db_session, GROUP_ID, trigger="regeneration")
+
+    themen = [s["thema"] for s in ctx.regeneration["neue_tranche"]]
+    assert themen == ["HJ2 neu 0", "HJ2 neu 1"], themen
+    assert ctx.halbjahr == 2
+
+
+@pytest.mark.asyncio
+async def test_regeneration_ohne_snapshot_faellt_auf_das_halbjahr_zurueck(
+    db_session, seed_reflow_group
+):
+    """Ohne Snapshot gibt es keine Differenz — dann zählt das Halbjahr des Starts.
+
+    ⚠️ Der Rückfall ist nötig, nicht kosmetisch: `slot_generator` legt den Snapshot
+    **nur** an, wenn es Planung zu retten gibt (`if umzuhaengen:`). Eine Regeneration
+    auf einem leeren Plan hat keinen.
+
+    Das Startdatum ist dann **heute** — nicht der Halbjahreswechsel, der bei einer
+    Regeneration mitten im ersten Halbjahr Wochen in der Zukunft läge. Erkauft wird das
+    mit einem Randfall: Wer die HJ2-Slots vorab auf leerem Plan erzeugt, bekommt das
+    laufende Halbjahr gemeldet. Ohne geretteten Inhalt gibt es dabei nichts falsch
+    umzuverteilen.
+    """
+    neu = [_slot(BASE + timedelta(days=i), thema=f"ohne snap {i}") for i in (0, 1)]
+    db_session.add_all(neu)
+    await db_session.flush()
+
+    ctx = await build_reflow_context(db_session, GROUP_ID, trigger="regeneration")
+
+    assert ctx.regeneration["alte_zuordnung"] is None
+    themen = [s["thema"] for s in ctx.regeneration["neue_tranche"]]
+    assert themen == ["ohne snap 0", "ohne snap 1"], themen

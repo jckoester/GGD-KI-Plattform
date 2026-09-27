@@ -2,6 +2,12 @@
 
 Die Profilseite erreichen Sie über das User-Menü oben rechts → **„Profil"**.
 
+> **Unterricht hat eine eigene Seite.** Ihr Kürzel im Stundenplan, der Abgleich und Ihre
+> Unterrichtsgruppen stehen unter **Unterricht** — im Nutzermenü oben rechts, direkt über
+> „Profil". Das sind Einstellungen, die Sie meist zu
+> Schuljahresbeginn einmal treffen — im Profil standen sie nur, weil sie irgendwo stehen
+> mussten.
+
 ## Budget
 
 Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das in Euro gerechnet wird und die tatsächlichen Kosten der genutzten Modelle abbildet. Günstigere Modelle verbrauchen es langsamer als leistungsstärkere.
@@ -94,6 +100,16 @@ Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Tref
 Verfügbare Werte: 5, 8, 10, 15, 20, 30.
 
 Die Einstellung betrifft **nur, was Ihnen angezeigt wird**. Wie viele Bausteine ein Assistent bei seiner eigenen Suche liest, legt die Schule zentral fest.
+
+## Kacheln der Startseite (nur Lehrkräfte)
+
+Welche Kacheln die Startseite zeigt — „Heute", „Nächster Schultag", „Meine
+Unterrichtsgruppen" —, wählen Sie hier. Eine abgewählte Kachel verschwindet nur aus der
+Ansicht; die Daten dahinter bleiben, und neue Kacheln erscheinen von selbst.
+
+Gespeichert wird sofort. Rechts neben der Überschrift steht kurz „Gespeichert" — das gilt
+für alle Einstellungen auf dieser Seite: Es gibt keinen Speichern-Knopf, weil es keinen
+braucht.
 
 ## Zugangstoken (nur Lehrkräfte)
 

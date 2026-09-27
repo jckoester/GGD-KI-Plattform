@@ -20,6 +20,13 @@ buckets:
   # Rückmeldungen: Stundenfenster statt Minutenfenster. Das Tageslimit (20/Tag)
   # steht nicht hier — es zählt in der Datenbank, weil es einen Neustart überleben muss.
   feedback: { limit: 5, window: 3600 }  # Meldungen über den Feedback-Kanal
+  # Beitrittscodes: nur das **Einlösen**, nicht das Lesen des eigenen Gruppenstands.
+  # Eine ganze Klasse tritt gleichzeitig bei — das Limit zählt je Person und muss
+  # deshalb nur einzelnes Durchprobieren bremsen, nicht den Normalfall.
+  group_join: { limit: 10, window: 300 }
+  # Fachbegriff-Import: ein Lauf liest ein ganzes Bündel und schreibt Knoten und
+  # Kanten. Jeder Import über den Dialog sind zwei Anfragen (Probelauf, echter Lauf).
+  fachbegriffe_import: { limit: 20, window: 300 }
 
 # Rollen-Overrides (optional) — z. B. Lehrkräfte großzügiger:
 roles:

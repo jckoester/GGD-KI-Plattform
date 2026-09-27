@@ -11,8 +11,26 @@ Lehrkraft im Verschiebe-Dialog aus UP-6. Drei Grenzen sichern das ab:
 1. **`pinned` und `source='manual'` werden nie geändert**, nur gemeldet.
 2. **Die Notiz wird nur ersetzt, wenn sie vom Import stammt** — erkennbar am Marker.
    Selbstgeschriebene Notizen bleiben, auch wenn sie im Weg stehen.
-3. **Ohne passenden Slot wird nichts angelegt.** Eine Stunde, für die die Planung keinen
-   Slot kennt, ist eine Abweichung — sie wird gemeldet, nicht stillschweigend behoben.
+3. **Ohne passenden Slot wird einer angelegt** — seit dem 22.09.2026, vorher nicht.
+
+   Die alte Regel lautete: „Eine Stunde, für die die Planung keinen Slot kennt, ist eine
+   Abweichung — sie wird gemeldet, nicht stillschweigend behoben." Sie hielt der Praxis
+   nicht stand. Beobachtet an einer echten Verlegung: Die Hälfte einer Doppelstunde
+   wanderte auf einen Termin, an dem die Gruppe sonst keinen Unterricht hat. Der Entfall
+   am Ursprung **wurde** geschrieben, der Termin am Ziel nicht — die Planung verlor eine
+   Stunde und bekam keine zurück. Als Hinweis gemeint, wirkte es wie stiller Verlust.
+
+   Angelegt wird ein leerer Termin mit `source='import'`; er überlebt damit den
+   Neuaufbau eines Halbjahres. **Inhalt verschiebt der Abgleich weiterhin nicht** — er
+   stellt nur den Termin bereit, auf den der Verschiebe-Dialog zeigen kann. Alles
+   andere wäre ein Automatismus an der Planung, und die gehört der Lehrkraft (Regel 1).
+
+⚠️ **Ein Slot kann mehrere Stunden überspannen.** Der Generator legt eine Doppelstunde
+als **eine** Zeile mit `periods=2` an, der Abgleich prüft aber Stunde für Stunde. Ein
+Termin gilt deshalb als abgedeckt, wenn ein Slot ihn **überspannt** — nicht nur, wenn
+einer dort beginnt. Ohne diese Regel meldete der Abgleich für die zweite Hälfte jeder
+Doppelstunde „kein Slot" (bis 22.09.2026 tat er das), und seit Punkt 3 entstünde dort
+ein Phantom-Termin.
 """
 from __future__ import annotations
 
@@ -61,7 +79,7 @@ class SyncConflict:
 
     datum: date
     start_period: int | None
-    grund: str            # 'pinned' | 'manual' | 'kein_slot' | 'fremde_notiz'
+    grund: str            # 'pinned' | 'manual' | 'kein_slot' | 'eigener_ausfall'
     beschreibung: str
 
 
@@ -91,11 +109,29 @@ class ShiftSuggestion:
         return self.nach_datum < self.von_datum
 
 
+@dataclass(frozen=True)
+class NeuerSlot:
+    """Ein Termin, den der Stundenplan kennt und die Planung nicht.
+
+    Entsteht vor allem bei Verlegungen auf einen Tag außerhalb des Wochenmusters. Er wird
+    **leer** angelegt — den Inhalt bringt, wenn überhaupt, die Lehrkraft über den
+    Verschiebe-Dialog mit.
+    """
+
+    group_id: int
+    datum: date
+    start_period: int
+    kategorie: str
+    notiz: str | None
+    external_uid: str | None
+
+
 @dataclass
 class SyncPlan:
     changes: list[SlotChange] = field(default_factory=list)
     conflicts: list[SyncConflict] = field(default_factory=list)
     verlegungen: list[ShiftSuggestion] = field(default_factory=list)
+    anzulegende: list[NeuerSlot] = field(default_factory=list)
     meldungen: list[str] = field(default_factory=list)
 
     @property
@@ -115,6 +151,13 @@ class SlotRef:
     pinned: bool
     source: str
     note: str | None
+    # Wer den Ausfall gesetzt hat (Alembic 0075). Ist es nicht der Stundenplan, darf der
+    # Abgleich die **Kategorie** nicht überschreiben — die Notiz schon.
+    ausfall_herkunft: str | None = None
+    # Wie viele Stunden dieser Slot belegt. Eine Doppelstunde ist **eine** Zeile mit
+    # `periods=2` — ohne diese Angabe hielte der Abgleich die zweite Hälfte für
+    # ungedeckt.
+    periods: int = 1
 
 
 def _notiz_fuer(lesson: Lesson) -> str | None:
@@ -124,15 +167,66 @@ def _notiz_fuer(lesson: Lesson) -> str | None:
     return None
 
 
-def _notiz_darf_geschrieben_werden(vorhanden: str | None) -> bool:
-    """Nur leere oder vom Import stammende Notizen werden ersetzt.
+def eigener_teil(notiz: str | None) -> str:
+    """Was von der Notiz der Lehrkraft gehört — alles außer den Importzeilen.
 
-    Eine selbstgeschriebene Notiz zu überschreiben wäre Datenverlust — und zwar einer, den
-    niemand bemerkt, weil die neue Notiz plausibel aussieht.
+    ⚠️ **Das Feld hat zwei Eigentümer** (entschieden 24.09.2026). Bis dahin galt
+    „alles oder nichts": War eine fremde Notiz da, schrieb der Abgleich gar nichts und
+    meldete `fremde_notiz`. Die Begründung war richtig — eine selbstgeschriebene Notiz zu
+    überschreiben wäre Datenverlust, den niemand bemerkt —, die Antwort darauf zu grob:
+    Sie schützte den eigenen Text und verlor den Vertretungshinweis.
+
+    Jan, 24.09.2026: „Es muss sichergestellt sein, dass ein Stundenplansync … die Notiz
+    nicht überschreibt sondern nur ergänzt."
+
+    **Mehrere Importzeilen werden alle entfernt.** Nicht aus Vorsicht: Vor dieser Regel
+    konnte eine zweite entstehen, und eine Fassung, die nur die erste kennt, ließe die
+    übrigen für immer stehen.
     """
-    return not (vorhanden or "").strip() or (vorhanden or "").lstrip().startswith(
-        NOTIZ_MARKER
-    )
+    zeilen = (notiz or "").splitlines()
+    behalten = [z for z in zeilen if not z.lstrip().startswith(NOTIZ_MARKER)]
+    return "\n".join(behalten).strip()
+
+
+def mit_importzeile(vorhanden: str | None, importzeile: str | None) -> str | None:
+    """Die Notiz, wie der Abgleich sie hinterlässt: eigener Text + höchstens eine Zeile.
+
+    `importzeile is None` heißt: Der Stundenplan hat nichts (mehr) zu sagen — seine Zeile
+    verschwindet, der eigene Text bleibt.
+
+    Idempotent: Ein zweiter Lauf mit derselben Zeile ergibt dasselbe Ergebnis. Ohne diese
+    Eigenschaft wüchse die Notiz bei jedem Abgleich.
+
+    Beispiele stehen als Tests in `tests/unit/test_calendar_sync.py` — als Doctest
+    ließe sich der Zeilenumbruch im Ergebnis nicht lesbar darstellen.
+    """
+    eigen = eigener_teil(vorhanden)
+    if importzeile is None:
+        return eigen or None
+    return f"{eigen}\n{importzeile}" if eigen else importzeile
+
+
+def importzeile(notiz: str | None) -> str | None:
+    """Die Zeile, die dem Abgleich gehört — oder ``None``."""
+    for z in (notiz or "").splitlines():
+        if z.lstrip().startswith(NOTIZ_MARKER):
+            return z.strip()
+    return None
+
+
+def mit_eigenem_text(vorhanden: str | None, text: str | None) -> str | None:
+    """Die Gegenrichtung zu :func:`mit_importzeile`: eigenen Text setzen, Importzeile behalten.
+
+    ⚠️ **Dasselbe Feld, zwei Eigentümer.** Wer hier eine Notiz der Lehrkraft schreibt,
+    darf die `[Stundenplan]`-Zeile nicht mitnehmen — sie ist die Auskunft der Schule und
+    kommt beim nächsten Abgleich ohnehin wieder. Die beiden Funktionen sind bewusst
+    Nachbarn: Wer die eine ändert, sieht die andere.
+    """
+    zeile = importzeile(vorhanden)
+    eigen = (text or "").strip()
+    if not zeile:
+        return eigen or None
+    return f"{eigen}\n{zeile}" if eigen else zeile
 
 
 def plan_sync(
@@ -148,7 +242,20 @@ def plan_sync(
     nicht geprüft und darf deshalb auch nicht geändert werden.
     """
     plan = SyncPlan()
-    nach_position = {(s.group_id, s.datum, s.start_period): s for s in slots}
+    # Jede belegte Stunde zeigt auf ihren Slot — eine Doppelstunde also zweimal auf
+    # dieselbe Zeile. Ohne das hielte der Abgleich ihre zweite Hälfte für ungedeckt.
+    nach_position = {
+        (s.group_id, s.datum, s.start_period + versatz): s
+        for s in slots
+        for versatz in range(max(1, s.periods))
+    }
+    # Welche Gruppen für diesen Zeitraum überhaupt eine Planung haben.
+    mit_planung = {s.group_id for s in slots}
+    # Ein Slot wird **einmal** geändert, auch wenn mehrere Stunden auf ihn zeigen. Bei
+    # einer Doppelstunde tun sie das (beide Hälften, eine Zeile mit `periods=2`) — ohne
+    # diese Sperre stünde dieselbe Änderung zweimal im Plan und dieselbe Meldung zweimal
+    # auf dem Bildschirm.
+    behandelte_slots: set = set()
     gesehen: set[tuple[int, date, int]] = set()
 
     for group_id, lesson in lessons:
@@ -169,18 +276,39 @@ def plan_sync(
             slot = nach_position.get(position)
 
             if slot is None:
-                # Kein Slot an dieser Stelle: Die Planung kennt die Stunde nicht. Das ist
-                # eine Abweichung, keine Aufgabe — angelegt wird hier nichts (Schritt 9
-                # behandelt den häufigsten Fall, die Verlegung).
-                plan.conflicts.append(
-                    SyncConflict(
+                # Kein Slot an dieser Stelle: Der Stundenplan kennt hier Unterricht, die
+                # Planung nicht. Seit dem 22.09.2026 wird er **angelegt** statt nur
+                # gemeldet — sonst verlöre eine Verlegung die Stunde (siehe Modulkopf,
+                # Regel 3). Leer: Den Inhalt bringt die Lehrkraft über den
+                # Verschiebe-Dialog mit, wenn sie es will.
+                if group_id not in mit_planung:
+                    # ⚠️ **Die Gruppe hat gar keine Planung.** Dann ist nicht ein Termin
+                    # zu ergänzen, sondern das Wochenmuster einzurichten — aus dem
+                    # Stundenplan hier ein ganzes Halbjahr anzulegen ginge am
+                    # eigentlichen Schritt vorbei und erzeugte Termine, die niemand
+                    # bestellt hat. Es bleibt bei der Meldung; die Oberfläche führt
+                    # daraus zur Einrichtung (`fehlendesRaster`).
+                    plan.conflicts.append(
+                        SyncConflict(
+                            datum=lesson.date,
+                            start_period=lesson.start_period + versatz,
+                            grund="kein_slot",
+                            beschreibung=(
+                                "Für diese Gruppe ist noch keine Planung angelegt — "
+                                "zuerst das Wochenmuster einrichten."
+                            ),
+                        )
+                    )
+                    continue
+
+                plan.anzulegende.append(
+                    NeuerSlot(
+                        group_id=group_id,
                         datum=lesson.date,
                         start_period=lesson.start_period + versatz,
-                        grund="kein_slot",
-                        beschreibung=(
-                            f"Stundenplan kennt Unterricht, die Jahresplanung hat dort "
-                            f"keinen Slot ({lesson.state.value})."
-                        ),
+                        kategorie=ziel,
+                        notiz=_notiz_fuer(lesson),
+                        external_uid=lesson.external_uid,
                     )
                 )
                 continue
@@ -201,20 +329,47 @@ def plan_sync(
                 )
                 continue
 
-            notiz = _notiz_fuer(lesson)
-            if notiz is not None and not _notiz_darf_geschrieben_werden(slot.note):
+            if slot.id in behandelte_slots:
+                continue
+            behandelte_slots.add(slot.id)
+
+            # ⚠️ **Ein selbst eingetragener Ausfall gehört der Lehrkraft.**
+            #
+            # Dieselbe Regel wie bei `group_memberships.herkunft` (Paket 1): Ein
+            # automatischer Lauf überschreibt nur, was er selbst gesetzt haben könnte.
+            # Ohne sie wäre eine eingetragene Fortbildung beim nächsten Abgleich wieder
+            # gewöhnlicher Unterricht — lautlos.
+            #
+            # **Nur die Kategorie ist geschützt, nicht der Slot.** Genau der von Jan
+            # beschriebene Ablauf hängt daran (24.09.2026): Die Lehrkraft trägt ihren
+            # Ausfall ein, Tage später meldet der Stundenplan denselben Ausfall mit
+            # Vertretungsangabe. Die soll **ankommen**, als eigene Zeile neben der
+            # Notiz der Lehrkraft.
+            eigener_ausfall = (
+                slot.kategorie == "ausfall"
+                and slot.ausfall_herkunft in ("eigen", "assistent")
+            )
+            if eigener_ausfall and ziel != slot.kategorie:
                 plan.conflicts.append(
                     SyncConflict(
                         datum=slot.datum,
                         start_period=slot.start_period,
-                        grund="fremde_notiz",
+                        grund="eigener_ausfall",
                         beschreibung=(
-                            "Eigene Notiz vorhanden — der Vertretungshinweis wurde nicht "
-                            "geschrieben."
+                            "Selbst eingetragener Ausfall — der Stundenplan meldet "
+                            f"{lesson.state.value}, die Kategorie blieb unverändert."
                         ),
                     )
                 )
-                notiz = None
+                ziel = slot.kategorie
+
+            notiz = _notiz_fuer(lesson)
+            # Der eigene Text bleibt, die Importzeile wird ersetzt (siehe
+            # `mit_importzeile`). Bis zum 24.09.2026 übersprang der Abgleich hier und
+            # meldete `fremde_notiz` — das schützte den eigenen Text und verlor den
+            # Vertretungshinweis.
+            neue_notiz = mit_importzeile(slot.note, notiz)
+            notiz = neue_notiz if neue_notiz != slot.note else None
 
             plan.changes.append(
                 SlotChange(
@@ -233,8 +388,10 @@ def plan_sync(
             )
 
     plan.verlegungen = _verlegungen(lessons, nach_position, zeitraum)
-    plan.meldungen = _meldungen(plan.wirksame_changes) + _verlegungsmeldungen(
-        plan.verlegungen
+    plan.meldungen = (
+        _meldungen(plan.wirksame_changes)
+        + _verlegungsmeldungen(plan.verlegungen)
+        + _anlagemeldungen(plan.anzulegende)
     )
     return plan
 
@@ -322,6 +479,19 @@ def _verlegungsmeldungen(verlegungen: list[ShiftSuggestion]) -> list[str]:
     return meldungen
 
 
+def _anlagemeldungen(neue: list[NeuerSlot]) -> list[str]:
+    """Angelegte Termine gehören benannt — sie sind eine Änderung an der Planung."""
+    if not neue:
+        return []
+    n = len(neue)
+    tage = sorted({x.datum for x in neue})
+    wo = f"am {tage[0]}" if len(tage) == 1 else f"an {len(tage)} Tagen"
+    return [
+        f"{n} {'Stunde' if n == 1 else 'Stunden'} {wo} neu angelegt — der Stundenplan "
+        "kennt dort Unterricht, die Planung hatte noch keinen Termin."
+    ]
+
+
 def _meldungen(changes: list[SlotChange]) -> list[str]:
     """Menschenlesbare Zusammenfassung — Tage mit Vollausfall gebündelt.
 
@@ -360,12 +530,19 @@ def _meldungen(changes: list[SlotChange]) -> list[str]:
 
 
 async def apply_sync(db, plan: SyncPlan) -> int:
-    """Den Plan ausführen. Gibt die Zahl geänderter Slots zurück.
+    """Den Plan ausführen. Gibt die Zahl geänderter **und angelegter** Slots zurück.
 
     Geschrieben wird nur, was sich tatsächlich ändert — ein Sync ohne Neuigkeiten soll die
     `updated_at`-Zeitstempel nicht durchrütteln und keine Änderungshistorie erfinden.
+
+    Angelegte Termine tragen `source='import'`. Das ist keine Formalie: Der Neuaufbau
+    eines Halbjahres löscht nur Muster-Slots, ein importierter überlebt ihn also
+    (`app/planning/slot_generator.py`). Ohne diese Herkunft wäre er beim nächsten
+    „Stunden erzeugen" wieder weg.
     """
     from sqlalchemy import text
+
+    from app.planning.calendar import load_school_year
 
     geaendert = 0
     for change in plan.wirksame_changes:
@@ -389,6 +566,30 @@ async def apply_sync(db, plan: SyncPlan) -> int:
             text(f"UPDATE lesson_slots SET {', '.join(felder)} WHERE id = :id"), params
         )
         geaendert += 1
+    # Was der Stundenplan kennt und die Planung nicht — leer angelegt, damit der
+    # Verschiebe-Dialog ein Ziel hat. Inhalt bringt nur die Lehrkraft dorthin.
+    if plan.anzulegende:
+        kalender = load_school_year()
+        for neu in plan.anzulegende:
+            await db.execute(
+                text(
+                    "INSERT INTO lesson_slots (group_id, date, start_period, periods,"
+                    " halbjahr, kategorie, source, external_uid, note)"
+                    " VALUES (:gid, :datum, :sp, 1, :hj, :kat, 'import', :uid, :notiz)"
+                ),
+                {
+                    "gid": neu.group_id,
+                    "datum": neu.datum,
+                    "sp": neu.start_period,
+                    # Das Halbjahr steht nicht am Termin, es folgt aus dem Datum.
+                    "hj": 1 if neu.datum < kalender.halbjahreswechsel else 2,
+                    "kat": neu.kategorie,
+                    "uid": neu.external_uid,
+                    "notiz": neu.notiz,
+                },
+            )
+            geaendert += 1
+
     if geaendert:
         await db.commit()
     return geaendert

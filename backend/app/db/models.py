@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime, date, timezone
 from uuid import UUID, UUID as UUIDType
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, event, text, TIMESTAMP, Text, ARRAY
+from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger
+from sqlalchemy import Numeric, Boolean, BigInteger, SmallInteger
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -155,8 +155,19 @@ class Group(Base):
     student_visible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false"), default=False
     )
-    source_class_group_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    # Der Jahrgang, **entschieden** (Alembic 0073). Leer heißt „noch nicht entschieden",
+    # nicht „hat keinen": Dann leitet `app/groups/jahrgang.py` aus dem Namen ab. Nötig
+    # wurde die Spalte für Gruppen **ohne Klasse** — Stundenplangruppen und Kursstufe
+    # tragen nichts in `group_source_classes`, und ohne Jahrgang bot die
+    # Curriculum-Auflösung alle Curricula des Fachs an.
+    jahrgang: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    # Ob die Gruppe ihre Mitglieder aus den Quellklassen zieht (Alembic 0069).
+    # **Entschieden, nicht gezählt:** Ob eine Gruppe den ganzen Klassenverband
+    # unterrichtet oder eine Auswahl daraus, weiß nur die Lehrkraft — Religion und Ethik
+    # teilen eine Klasse, ohne dass der Stundenplan zwei Klassennamen nennt. Die Anzahl
+    # der Quellklassen ist nur die **Vorbelegung** beim Anlegen.
+    erbt_mitglieder: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), default=False
     )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
@@ -174,7 +185,6 @@ class Group(Base):
         ),
         Index("idx_groups_type", "type"),
         Index("idx_groups_subject_id", "subject_id"),
-        Index("idx_groups_source_class_group_id", "source_class_group_id"),
     )
 
 
@@ -200,13 +210,138 @@ class GroupMembership(Base):
     )
     pseudonym: Mapped[str] = mapped_column(Text, primary_key=True)
     role_in_group: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Woher die Mitgliedschaft stammt — und damit, wer sie aufräumen darf (Alembic 0068).
+    # Vorher war das aus Rolle und Gruppeneigenschaften **erraten**; mit dem Beitrittscode
+    # trägt das nicht mehr, weil dann nicht jede Schüler-Mitgliedschaft geerbt ist.
+    # Aufgeräumt wird nur `sso` (Immediate Mirror) und `geerbt` (Vererbungslauf).
+    herkunft: Mapped[str] = mapped_column(Text, nullable=False, default="manuell")
+    # Wann und über welchen Code jemand beigetreten ist (Alembic 0070). Beide `NULL`
+    # für alles, was nicht per Code entstand. Sie tragen die Rücknahme von
+    # Fehlbeitritten: ohne Namen lässt sich nur eine **Menge** zurücknehmen — eine
+    # Code-Runde oder ein Tag daraus.
+    beigetreten_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    join_code_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("group_join_codes.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(
             "role_in_group IS NULL OR role_in_group IN ('teacher','student')",
             name="check_group_memberships_role",
         ),
+        CheckConstraint(
+            "herkunft IN ('sso','geerbt','code','eigen','manuell')",
+            name="check_group_memberships_herkunft",
+        ),
         Index("idx_group_memberships_pseudonym", "pseudonym"),
+        Index("idx_group_memberships_join_code", "join_code_id"),
+    )
+
+
+class SsoGroupOffer(Base):
+    """Eine neue SSO-Unterrichtsgruppe, die noch keiner Plattform-Gruppe zugeordnet ist.
+
+    **Angeboten statt angelegt** (Alembic 0071). Aus den SSO-Daten lässt sich nicht
+    bestimmen, ob `unterricht.9d.ch` die vorhandene Gruppe *Chemie 9D* meint oder eine
+    neue ist — `ParsedGroup` trägt keine Klassennamen, nur einen Namen als Freitext. Eine
+    falsche Verschmelzung schiebt zwei Jahrespläne ineinander und ist aus Nutzersicht
+    nicht rückgängig zu machen; deshalb entscheidet die Lehrkraft.
+
+    **Je Lehrkraft eine Zeile.** Sonst verstecken sich Angebote gegenseitig: Ignoriert
+    eine Kollegin, wäre die Frage für alle weg.
+    """
+
+    __tablename__ = "sso_group_offers"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    sso_group_id: Mapped[str] = mapped_column(Text, nullable=False)
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    gesehen_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # Gesetzt heißt abgelehnt. Die Zeile bleibt, damit die Frage nicht wiederkehrt.
+    ignoriert_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("sso_group_id", "pseudonym", name="uq_sso_group_offers"),
+        Index("idx_sso_group_offers_pseudonym", "pseudonym"),
+    )
+
+
+class GroupJoinCode(Base):
+    """Ein Beitrittscode für eine Unterrichtsgruppe (Alembic 0070).
+
+    **Gruppen-Berechtigung, kein Personenmerkmal.** Der Code gehört der Gruppe; wer ihn
+    einlöst, hinterlässt eine Mitgliedschaft mit Pseudonym — dieselbe Datenkategorie wie
+    jede andere Mitgliedschaft. Der Code selbst erlaubt keinen Rückschluss auf Personen
+    und wird deshalb auch nicht personenbezogen gelöscht: Er verfällt und stirbt mit der
+    Gruppe. Nur `erstellt_von` fällt unter die 90-Tage-Frist und wird dann genullt.
+
+    **Kurzlebig statt lang und kompliziert.** Drei Tage Gültigkeit (Entscheidung Jan,
+    23.09.2026): Der Code wird im Unterricht ausgegeben, der Beitritt geschieht sofort
+    oder am selben Abend. Das macht zugleich die Rücknahme brauchbar — eine Code-Runde
+    deckt dann faktisch eine Unterrichtsstunde ab.
+    """
+
+    __tablename__ = "group_join_codes"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    erstellt_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # Endet auf `_pseudonym`, damit `test_pseudonym_deletion_coverage` die Tabelle
+    # findet — der Wächter erkennt sie am Namensmuster, nicht am Inhalt.
+    erstellt_von_pseudonym: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gueltig_bis: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    widerrufen_am: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("idx_group_join_codes_group", "group_id"),)
+
+
+class GroupSourceClass(Base):
+    """Aus welchen Klassen sich eine Unterrichtsgruppe speist (Alembic 0068).
+
+    Ersetzt `groups.source_class_group_id`. Eine Gruppe kann aus **mehreren** Klassen
+    stammen — NwT 10a/10b/10c ist eine Gruppe aus drei Klassenverbänden. Mit der alten
+    Spalte erbte sie bestenfalls aus einer davon.
+
+    Beide Fremdschlüssel löschen mit (`CASCADE`): Verschwindet die Klasse, verschwindet
+    die Herkunftsangabe — die Unterrichtsgruppe selbst bleibt und erbt eben nicht mehr
+    von dort. `SET NULL` wie bei der alten Spalte geht nicht, weil beide Spalten den
+    Schlüssel bilden.
+    """
+
+    __tablename__ = "group_source_classes"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    class_group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    __table_args__ = (
+        Index("idx_group_source_classes_class", "class_group_id"),
     )
 
 
@@ -277,6 +412,15 @@ class Assistant(Base):
         Text, nullable=False, server_default=text("'admin'")
     )
     reject_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Löschantrag für **schulweite** Assistenten (Alembic 0076). Bewusst ein Feld und
+    # kein Status: Der Antrag schaltet nichts ab — der Assistent bleibt im Unterricht,
+    # bis der Admin entscheidet. Ein Statuswert müsste überall wie `active` behandelt
+    # werden und machte die Spalte mehrdeutig. Eigene Gruppen-Assistenten löscht die
+    # Lehrkraft selbst; dort gibt es nichts zu beantragen.
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    deletion_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )
@@ -921,11 +1065,11 @@ class ContextNode(Base):
             name="check_context_nodes_category",
         ),
         CheckConstraint(
-            "read_scope IN ('global','school','subject','group','private')",
+            "read_scope IN ('global','school','subject','group','group_teachers','private')",
             name="check_context_nodes_read_scope",
         ),
         CheckConstraint(
-            "write_scope IN ('global','school','subject','group','private')",
+            "write_scope IN ('global','school','subject','group','group_teachers','private')",
             name="check_context_nodes_write_scope",
         ),
         CheckConstraint(
@@ -933,23 +1077,28 @@ class ContextNode(Base):
             name="check_context_nodes_status",
         ),
         CheckConstraint(
-            "read_scope NOT IN ('subject','group') OR read_scope_group_id IS NOT NULL",
+            "read_scope NOT IN ('subject','group','group_teachers') OR read_scope_group_id IS NOT NULL",
             name="check_context_nodes_read_group_id",
         ),
         CheckConstraint(
-            "write_scope NOT IN ('subject','group') OR write_scope_group_id IS NOT NULL",
+            "write_scope NOT IN ('subject','group','group_teachers') OR write_scope_group_id IS NOT NULL",
             name="check_context_nodes_write_group_id",
         ),
         CheckConstraint(
             """
+            -- ⚠️ `group_teachers` rangiert **zwischen** `private` und `group`: Es ist
+            -- enger als „alle Mitglieder“ und weiter als „nur ich“. Genau diese Ordnung hat
+            -- am 24.09.2026 den Zuschnitt entschieden — `read=group_teachers` mit
+            -- `write=group` verletzt die Bedingung, und zu Recht: Man dürfte schreiben,
+            -- was man nicht lesen kann.
             CASE write_scope
-              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
-              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+              WHEN 'private' THEN 0 WHEN 'group_teachers' THEN 1 WHEN 'group' THEN 2
+              WHEN 'subject' THEN 3 WHEN 'school' THEN 4 WHEN 'global' THEN 5
             END
             <=
             CASE read_scope
-              WHEN 'private' THEN 0 WHEN 'group'   THEN 1 WHEN 'subject' THEN 2
-              WHEN 'school'  THEN 3 WHEN 'global'  THEN 4
+              WHEN 'private' THEN 0 WHEN 'group_teachers' THEN 1 WHEN 'group' THEN 2
+              WHEN 'subject' THEN 3 WHEN 'school' THEN 4 WHEN 'global' THEN 5
             END
             """,
             name="check_context_nodes_scope_restrictivity",
@@ -1078,9 +1227,13 @@ class ContextEdge(Base):
         CheckConstraint(
             # `reflects_on` fiel mit Migration 0056 weg — die Relation gehörte zum
             # in 0055 gestrichenen Knotentyp `reflexion`.
+            # `is_a` seit Alembic 0078 (Paket 9): „ist ein(e)" als eigene Kantenart.
+            # Hierarchie ist keine Spielart von `related_to` — Graphansicht und
+            # Traversierung filtern nach Relationstyp (ADR-013), und `part_of` heißt
+            # „Teil von", nicht „ist ein".
             "relation IN ('requires','used_with','part_of','develops',"
             "             'supersedes','references','follows','derived_from',"
-            "             'related_to')",
+            "             'related_to','is_a')",
             name="check_context_edges_relation",
         ),
         Index("idx_context_edges_from", "from_node_id"),
@@ -1247,6 +1400,20 @@ class LessonSlot(Base):
         Boolean, nullable=False, server_default=text("false")
     )
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # ── Ausfall: wer und was vorher (Alembic 0075) ───────────────────────────
+    #
+    # ⚠️ **Nur bedeutsam, solange `kategorie == 'ausfall'`.** Eine Datenbank-Bedingung
+    # für diese Paarung gibt es bewusst nicht — der Snapshot-Restore schreibt `kategorie`
+    # aus einem JSON, das die Spalten nicht kennt. Wer sie liest, prüft die Kategorie mit.
+    #
+    # `stundenplan | eigen | assistent`. Der Abgleich darf die **Kategorie** eines Slots
+    # mit fremder Herkunft nicht überschreiben (dieselbe Regel wie bei
+    # `group_memberships.herkunft`: Ein automatischer Lauf entfernt nur, was er selbst
+    # gesetzt haben könnte). Die **Notiz** ist davon ausgenommen.
+    ausfall_herkunft: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Die Kategorie davor — für den Rückweg. **Nicht `unterricht` annehmen:** Krankheit
+    # am Klausurtag ist der Fall, in dem das die Prüfung verlöre.
+    ausfall_vorher: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     nachbereitet_at: Mapped[Optional[datetime]] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
@@ -1258,6 +1425,15 @@ class LessonSlot(Base):
     # gemeldet, nie geändert (UP-8).
     source: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'pattern'")
+    )
+    # Ein Termin, der noch nicht bestätigt ist: das zweite Halbjahr, vorläufig aus dem
+    # Raster des ersten erzeugt, damit die Jahresplanung Termine hat. Kommt der echte
+    # Stundenplan, wird das Halbjahr neu aufgebaut und die Planung umgehängt.
+    #
+    # **Unabhängig von `source`.** Dort steht, *woher* der Termin kommt; hier, ob er
+    # *bestätigt* ist. Ein vorläufiger Slot ist weiterhin `source='pattern'`.
+    vorlaeufig: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
     )
     # `lessonId` der Quelle — identifiziert die Unterrichts**reihe**, nicht diesen Slot.
     # Mehrere Slots teilen sie sich (belegt: 5 Perioden je lessonId). Zeilenidentität ist
@@ -1279,6 +1455,16 @@ class LessonSlot(Base):
         CheckConstraint(
             "kategorie IN ('unterricht','pruefung','ausfall','puffer','vertretung')",
             name="check_ls_kategorie",
+        ),
+        CheckConstraint(
+            "ausfall_herkunft IS NULL OR "
+            "ausfall_herkunft IN ('stundenplan','eigen','assistent')",
+            name="check_lesson_slots_ausfall_herkunft",
+        ),
+        CheckConstraint(
+            "ausfall_vorher IS NULL OR ausfall_vorher IN "
+            "('unterricht','pruefung','ausfall','puffer','vertretung')",
+            name="check_lesson_slots_ausfall_vorher",
         ),
         CheckConstraint(
             "source IN ('pattern','import','manual')", name="check_ls_source"
@@ -1485,3 +1671,55 @@ class Feedback(Base):
         Index("idx_feedback_pseudonym_created", "pseudonym", "created_at"),
         Index("idx_feedback_status_created", "status", "created_at"),
     )
+
+
+# 26. parked_lesson_content — Planungsinhalt ohne Termin (Jahresplanung/Stundenplanwechsel)
+class ParkedLessonContent(Base):
+    """Was beim Umhängen der Jahresplanung übrig bleibt.
+
+    Ändert sich das Wochenmuster, wandert die Planung nach Reihenfolge auf die neuen
+    Termine. Gibt es weniger Termine als Inhalte, bleibt etwas übrig — und das wird
+    **geparkt, nicht verworfen**. Zurück kommt es auf zwei Wegen: umplanen (auf einen
+    freien Termin ziehen) oder kürzen (Phasen in andere Stunden übernehmen).
+
+    **Einen Eintrag zu verwerfen löscht den Stundenentwurf nicht.** Es nimmt nur die
+    Zusage zurück, dass er in diesen Jahresplan gehört; der Knoten bleibt im
+    Wissensgraphen.
+
+    ⚠️ **Leere Einträge soll es nicht geben** — geparkt wird nur, was Inhalt trägt. Das
+    steht bewusst **nicht** als CHECK in der Datenbank: `ue_node_id` wird beim Löschen
+    des Knotens genullt, und eine Bedingung darüber ließe genau diese Löschung
+    scheitern. Die Zusage hält der Dienst (`app/planning/umhaengen.py`).
+    """
+
+    __tablename__ = "parked_lesson_content"
+
+    id: Mapped[UUIDType] = mapped_column(
+        primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
+    )
+    halbjahr: Mapped[int] = mapped_column(nullable=False)
+    # Sortierschlüssel und Auskunft zugleich: „war für den 12.03. geplant".
+    herkunft_datum: Mapped[date] = mapped_column(nullable=False)
+    ue_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
+    # CASCADE, nicht SET NULL: Der Eintrag ist die Zusage, dass **dieser** Entwurf in den
+    # Jahresplan gehört — ohne Entwurf gibt es nichts zuzusagen.
+    stunde_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), nullable=True
+    )
+    thema: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("halbjahr IN (1, 2)", name="check_plc_halbjahr"),
+        Index(
+            "idx_parked_group_halbjahr", "group_id", "halbjahr", "herkunft_datum"
+        ),
+    )
+

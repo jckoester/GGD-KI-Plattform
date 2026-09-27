@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
@@ -55,14 +56,30 @@ from app.chat.image_store import (
 )
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
-from app.api.assistants import _is_visible_for_user
-from app.context.service import get_context_for_query
+from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
+from app.context.service import get_context_for_query, stufe_der_person
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
-from app.context.search import _AUFZAEHLUNG_MAX, Suchprofil, aufzaehlung, suche
+from app.context.search import (
+    _AUFZAEHLUNG_MAX,
+    Suchprofil,
+    abgrenzungen_zu,
+    aufzaehlung,
+    suche,
+)
+from app.context.stufen import (
+    bp_baender_zu,
+    sortiere_passende_nach_vorn,
+    vermerke as stufen_vermerke,
+)
+from app.context.modellsicht import fuer_modell, werkzeug_nutzlast
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
+from app.pedagogy.hausversuche import (
+    anweisung as hausversuch_anweisung,
+    gefahr_fuer as hausversuch_gefahr,
+)
 from app.pedagogy.compose import compose_system_content, is_student_treatment
 from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
@@ -190,8 +207,14 @@ _SEARCH_CONTEXT_NODES_TOOL = {
     "function": {
         "name": "search_context_nodes",
         "description": (
-            "Sucht Bausteine im Kontextspeicher der Plattform. Die Antwort hat drei "
-            "getrennte Abschnitte, die du unterschiedlich behandeln musst:\n"
+            "Sucht Bausteine im Kontextspeicher der Plattform. Zur letzten Nachricht "
+            "stehen unter „Einträge aus dem Wissensspeicher der Schule\" möglicherweise "
+            "schon passende Bausteine im Systemtext — sieh zuerst dort nach. Dieses "
+            "Werkzeug brauchst du, wenn dort nichts Passendes steht, wenn du einen "
+            "anderen Begriff suchen willst oder wenn du wissen musst, ob es zu einem "
+            "Namen überhaupt einen Baustein gibt.\n"
+            "Die Antwort hat drei getrennte Abschnitte, die du unterschiedlich "
+            "behandeln musst:\n"
             "- 'exakte_namenstraeger': Bausteine, die genau so HEISSEN. Dazu gehört "
             "'gesamt' (wie viele es insgesamt gibt) und 'vollstaendig' (ob alle davon "
             "hier stehen). Nur dieser Abschnitt trägt eine Aussage darüber, ob es "
@@ -204,7 +227,9 @@ _SEARCH_CONTEXT_NODES_TOOL = {
             "darüber aus, was es gibt oder nicht gibt. Antworte niemals 'dazu gibt es "
             "nichts', nur weil dieser Abschnitt leer ist oder unpassend wirkt.\n"
             "Ist 'vollstaendig' false, sag die Gesamtzahl dazu, statt die gezeigten "
-            "Treffer als vollständige Liste auszugeben."
+            "Treffer als vollständige Liste auszugeben.\n"
+            "Wie die Felder eines Bausteins zu lesen sind, steht im Hinweis, der dem "
+            "Ergebnis vorangestellt ist."
         ),
         "parameters": {
             "type": "object",
@@ -423,13 +448,6 @@ async def _get_model_info() -> dict[str, bool | None]:
     return info
 
 
-# Wie viel eines Knoteninhalts das Modell im Suchergebnis sieht. Bemessen am Bestand:
-# Kompetenzen liegen im Median bei 137 Zeichen, Leitideen bei 307, das 90. Perzentil
-# reicht bis 775. 800 deckt also fast alles vollständig ab, und selbst bei der größten
-# erlaubten Trefferzahl bleibt das Ergebnis im vierstelligen Tokenbereich.
-_INHALT_MAX_ZEICHEN = 800
-
-
 @dataclass(frozen=True)
 class Zugkosten:
     """Kosten eines Chat-Zuges — Summe plus die Zahlen, die sie belegen.
@@ -511,42 +529,6 @@ def _ergebnis_umfang(ergebnis) -> str:
     return type(ergebnis).__name__
 
 
-def _fuer_modell(treffer: list) -> list:
-    """Suchergebnis für den LLM-Kontext aufbereiten.
-
-    Bis 08/2026 bekam das Modell **nur die Titel**. Damit war jede Frage nach dem
-    *Inhalt* des Wissensgraphen unbeantwortbar: Die Suche fand die richtigen Knoten, das
-    Modell sah aber nur deren Überschriften und meldete, es gebe nichts. Deshalb geht der
-    Inhalt jetzt mit — gekürzt, nicht weggelassen.
-
-    Die interne ``node_id`` bleibt draußen: Sie nützt dem Modell nichts (kein Werkzeug
-    nimmt sie entgegen) und taucht sonst in Antworten auf. Ergebnisse anderer Werkzeuge
-    der Gruppe werden unverändert durchgereicht.
-    """
-    aufbereitet = []
-    for t in treffer:
-        if not isinstance(t, dict) or "node_id" not in t:
-            aufbereitet.append(t)          # fremde Form (z. B. get_operatoren)
-            continue
-        # `subject_id` ist eine interne Zahl — für das Modell wertlos und irreführend.
-        # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
-        eintrag = {
-            k: v for k, v in t.items()
-            if k not in ("node_id", "content", "subject_id", "fach")
-        }
-        if t.get("fach"):
-            eintrag["fach"] = t["fach"]
-        inhalt = (t.get("content") or "").strip()
-        if inhalt:
-            eintrag["content"] = (
-                inhalt[:_INHALT_MAX_ZEICHEN] + " …"
-                if len(inhalt) > _INHALT_MAX_ZEICHEN
-                else inhalt
-            )
-        aufbereitet.append(eintrag)
-    return aufbereitet
-
-
 async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     """Die Suche für das Modell — beschriftete Abschnitte statt einer flachen Liste.
 
@@ -570,6 +552,10 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             subject_id=await _resolve_conversation_subject_id(ctx),
             identifikation=tiefe,
             thematisch=tiefe,
+            # Roh geholt, ausgewählt wird in `fuer_modell` (Paket 9, AP3). Kostet
+            # nichts: Die Spalte steht ohnehin in jeder Trefferzeile, `mit_metadaten`
+            # entscheidet nur, ob sie am Treffer hängenbleibt.
+            mit_metadaten=True,
         ),
         ctx.db,
     )
@@ -578,12 +564,29 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
     for t in ident.treffer:
         nach_art[t.get("treffer_art", "exakt")].append(t)
 
+    thematisch = list(ergebnis.thematisch.treffer)
+    alle = nach_art["exakt"] + nach_art["teilweise"] + thematisch
+    # Eine Abfrage für alle drei Abschnitte zusammen — nicht eine je Treffer.
+    grenzen = await abgrenzungen_zu(ctx.db, [t.get("node_id") for t in alle])
+
+    # Klassenstufe (N5) und Stufenvermerk je Treffer (N6). Die passende Fassung wandert
+    # nach vorn; **ausgeblendet wird nichts** — wer ausdrücklich nach der späteren
+    # Fassung fragt, soll sie finden, statt eine Antwort aus dem Modellwissen zu
+    # bekommen.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
+    baender = await bp_baender_zu(ctx.db, alle, stufe) if stufe is not None else {}
+    vermerke = stufen_vermerke(alle, stufe, baender)
+    if vermerke:
+        for abschnitt in (nach_art["exakt"], nach_art["teilweise"]):
+            abschnitt[:] = sortiere_passende_nach_vorn(abschnitt, vermerke)
+        thematisch = sortiere_passende_nach_vorn(thematisch, vermerke)
+
     antwort: dict = {
-        "exakte_namenstraeger": _fuer_modell(nach_art["exakt"]),
+        "exakte_namenstraeger": fuer_modell(nach_art["exakt"], grenzen, vermerke),
         "gesamt": ident.gesamt,
         "vollstaendig": ident.vollstaendig,
-        "aehnlich_benannte_bausteine": _fuer_modell(nach_art["teilweise"]),
-        "naechstliegende_bausteine": _fuer_modell(ergebnis.thematisch.treffer),
+        "aehnlich_benannte_bausteine": fuer_modell(nach_art["teilweise"], grenzen, vermerke),
+        "naechstliegende_bausteine": fuer_modell(thematisch, grenzen, vermerke),
     }
     if ergebnis.hinweise:
         antwort["hinweise"] = ergebnis.hinweise
@@ -776,13 +779,26 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         ),
         ctx.db,
         gruppierung=args.get("gruppierung"),
+        # Wie bei der Suche: roh holen, in `fuer_modell` auswählen.
+        mit_metadaten=True,
     )
 
+    grenzen = await abgrenzungen_zu(
+        ctx.db, [t.get("node_id") for t in abschnitt.treffer]
+    )
+    # ⚠️ **Hier wird gekennzeichnet, aber nicht sortiert.** Eine Aufzählung beantwortet
+    # „alle, die …" und ist nach Fach und Titel geordnet; diese Ordnung ist die Aussage.
+    # Sie nach Stufe umzustellen machte aus der Liste eine Rangfolge.
+    stufe = await stufe_der_person(ctx.db, ctx.conversation_id, ctx.user.grade)
+    baender = (
+        await bp_baender_zu(ctx.db, abschnitt.treffer, stufe) if stufe is not None else {}
+    )
+    vermerke = stufen_vermerke(abschnitt.treffer, stufe, baender)
     antwort: dict = {
         "gesamt": abschnitt.gesamt,
         "geliefert": abschnitt.geliefert,
         "vollstaendig": abschnitt.vollstaendig,
-        "bausteine": _fuer_modell(abschnitt.treffer),
+        "bausteine": fuer_modell(abschnitt.treffer, grenzen, vermerke),
     }
     if abschnitt.gruppen is not None:
         antwort["gruppen"] = [
@@ -1580,6 +1596,51 @@ def _crisis_sse_event(record: Optional[_CrisisRecord]) -> Optional[str]:
     return f"event: crisis\ndata: {json.dumps(payload)}\n\n"
 
 
+async def assistent_fuer_chat(
+    db: AsyncSession,
+    assistant_id: int,
+    user: JwtPayload,
+    *,
+    testlauf: bool,
+) -> Assistant:
+    """Den Assistenten laden und den Zugang prüfen — der **eine** Weg in den Chat.
+
+    ⚠️ **Bis zum 27.09.2026 gab es ihn zweimal.** Zwei Zweige laden hier einen
+    Assistenten (neues Gespräch und Wechsel mittendrin), und beide fragten auf ihre
+    Weise — der eine mit Testlauf-Sonderfall, der andere ohne. Keiner von beiden kannte
+    die Scopes: Wer die ID kannte, konnte einen Assistenten benutzen, der für eine
+    fremde Unterrichtsgruppe freigegeben war, und sogar einen **privaten**.
+
+    Eine Prüfung, die es zweimal gibt, ist eine, die einmal vergessen wird. Die Regel
+    selbst steht in :mod:`app.assistants.sichtbarkeit` und gilt auch für die Liste.
+
+    ``testlauf`` ist der Vorschaumodus aus dem Editor (ADR-016): Dort darf eine
+    Lehrkraft den **eigenen** Assistenten auch dann starten, wenn er noch nicht aktiv
+    ist — deshalb prüft er Rolle und Eigentum statt der Sichtbarkeit.
+    """
+    assistant = (await db.execute(
+        select(Assistant).where(Assistant.id == assistant_id)
+    )).scalar_one_or_none()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
+
+    if testlauf:
+        ist_admin = "admin" in user.roles
+        if not ist_admin and "teacher" not in user.roles:
+            raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
+        if assistant.status != "active" and not ist_admin:
+            if assistant.created_by != user.sub:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Nur der Ersteller kann diesen Assistenten testen",
+                )
+        return assistant
+
+    if not darf_nutzen(assistant, await lade_zugang(db, user)):
+        raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+    return assistant
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -1620,27 +1681,13 @@ async def chat(
     if is_new:
         assistant: Optional[Assistant] = None
         if request.assistant_id is not None:
-            asst_result = await db.execute(
-                select(Assistant).where(Assistant.id == request.assistant_id)
-            )
-            assistant = asst_result.scalar_one_or_none()
-            if assistant is None:
+            try:
+                assistant = await assistent_fuer_chat(
+                    db, request.assistant_id, current_user, testlauf=request.is_test
+                )
+            except HTTPException:
                 await client.aclose()
-                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-            if request.is_test:
-                is_admin = "admin" in current_user.roles
-                is_teacher = "teacher" in current_user.roles
-                if not is_admin and not is_teacher:
-                    await client.aclose()
-                    raise HTTPException(status_code=403, detail="Testchat nicht erlaubt")
-                # Nicht-aktive Assistenten: nur Ersteller oder Admin darf testen
-                if assistant.status != "active" and not is_admin:
-                    if assistant.created_by != current_user.sub:
-                        await client.aclose()
-                        raise HTTPException(status_code=403, detail="Nur der Ersteller kann diesen Assistenten testen")
-            elif not _is_visible_for_user(assistant, current_user.roles):
-                await client.aclose()
-                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+                raise
             system_prompt_snapshot = assistant.system_prompt
             # Leeres Assistenten-Modell = „schulweiter Standard" → `model_used` behält den
             # Wert aus CHAT_DEFAULT_MODEL. Ohne die Leerprüfung ginge ein leerer Modellname
@@ -1710,16 +1757,17 @@ async def chat(
 
         # 2-1: Assistentenwechsel mid-Chat
         if request.assistant_id is not None:
-            asst_result = await db.execute(
-                select(Assistant).where(Assistant.id == request.assistant_id)
-            )
-            new_assistant = asst_result.scalar_one_or_none()
-            if new_assistant is None:
+            try:
+                # ⚠️ `testlauf=False`, auch wenn die Anfrage `is_test` trägt: Ein
+                # Testchat beginnt ein neues Gespräch und läuft damit über den Zweig
+                # oben. Hier `request.is_test` durchzureichen änderte das Verhalten
+                # eines Weges, um den es in diesem Befund nicht geht.
+                new_assistant = await assistent_fuer_chat(
+                    db, request.assistant_id, current_user, testlauf=False
+                )
+            except HTTPException:
                 await client.aclose()
-                raise HTTPException(status_code=404, detail="Assistent nicht gefunden")
-            if not _is_visible_for_user(new_assistant, current_user.roles):
-                await client.aclose()
-                raise HTTPException(status_code=403, detail="Assistent nicht verfügbar")
+                raise
 
             system_prompt_snapshot = new_assistant.system_prompt
             active_assistant_id = new_assistant.id
@@ -1765,6 +1813,9 @@ async def chat(
         chat_id=conversation_id,
         db=db,
         rollen=current_user.roles,
+        # Für die Grundschicht (N11): Im freien Chat gibt es keine Unterrichtsgruppe,
+        # aus der sich Stufe und Fach ableiten ließen.
+        jwt_stufe=current_user.grade,
     )
 
     llm_messages: list[dict] = []
@@ -1805,6 +1856,7 @@ async def chat(
         "content": compose_system_content(
             pedagogy,
             student_treatment=student_treatment,
+            stufe=await stufe_der_person(db, conversation_id, current_user.grade),
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,
@@ -1813,6 +1865,21 @@ async def chat(
     if pedagogy.output_format.strip():
         llm_messages.append(
             {"role": "system", "content": pedagogy.output_format.strip()}
+        )
+    # Sicherheitsauslöser für Hausversuche (Paket 9, N12) — **als letzte** Systemnachricht
+    # und nur in der Schüler-Behandlung. Die Stellung ist Absicht: Punkt 8 der Präambel
+    # sagt dasselbe allgemein und wurde gemessen überlesen; was hier steht, ist konkret,
+    # benannt und steht unmittelbar vor der Frage.
+    gefahr = hausversuch_gefahr(user_message, student_treatment=student_treatment)
+    if gefahr is not None:
+        # Nur das Thema ins Log, nie die Nachricht — dort steht, was die PII-Warnung
+        # gerade aus dem Prompt heraushalten soll.
+        logger.info(
+            "Hausversuchs-Auslöser: Thema=%s, Konversation=%s",
+            gefahr.thema, conversation_id,
+        )
+        llm_messages.append(
+            {"role": "system", "content": hausversuch_anweisung(gefahr)}
         )
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
@@ -2076,16 +2143,10 @@ async def chat(
                 # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
                 # Befüllt wird das Fenster jetzt allein vom Suchknopf über
                 # `POST /context/search`.
-                if tool.group == "context_search" and isinstance(tool_result, dict):
-                    # Umschlag der Suchschicht: Die Abschnitte sind bereits fürs Modell
-                    # aufbereitet, hier bleibt nur die Serialisierung.
-                    tool_result_str = json.dumps(tool_result, ensure_ascii=False)
-                elif tool.group == "context_search" and isinstance(tool_result, list):
-                    # `get_operatoren`, das noch eine flache Liste liefert (AP3 macht
-                    # daraus ein Alias auf die Aufzählung).
-                    tool_result_str = json.dumps(
-                        {"nodes": _fuer_modell(tool_result)}, ensure_ascii=False
-                    )
+                if tool.group == "context_search":
+                    # Serialisierung **und** Lesehinweis liegen in einer Funktion —
+                    # siehe `werkzeug_nutzlast`, dort auch die beiden Ergebnisformen.
+                    tool_result_str = werkzeug_nutzlast(tool_result)
                 elif _tc_name == "generate_image" and isinstance(tool_result, dict):
                     # Bild-Tool (Phase 16): Referenz ans Frontend (SSE-`image`), Bild-ID für die
                     # message_id-Verknüpfung (Schritt 5) und Kosten für die Buchung (Schritt 7)

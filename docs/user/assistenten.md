@@ -43,3 +43,25 @@ beide Gruppen sichtbar und verhalten sich dann je nach angemeldeter Person unter
 ## Eigene Assistenten erstellen
 
 Das Anlegen von Assistenten ist Lehrkräften und Administratoren vorbehalten. Wenn Sie eine Idee für einen nützlichen Assistenten haben, sprechen Sie Ihre Lehrkraft oder den IT-Verantwortlichen an.
+
+## Für Lehrkräfte: den eigenen Assistenten pflegen
+
+Was Sie mit einem Assistenten tun können, hängt daran, **wen er erreicht** — nicht daran,
+wie alt er ist.
+
+**Privat, Unterrichtsgruppe, Fachschaft, AG:** Der Assistent gehört Ihnen. Er ist sofort
+einsatzbereit, ohne Freigabe, und Sie können ihn jederzeit ändern, abschalten und
+löschen. „Abschalten" nimmt ihn aus der Auswahl, ohne ihn wegzuwerfen — praktisch am Ende
+einer Unterrichtsreihe. Beim Löschen bleiben die bisherigen Chats erhalten; nur der
+Assistent verschwindet aus ihnen.
+
+**Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
+eine **Freigabe**. Solange Ihr Entwurf eingereicht ist, können Sie ihn nicht ändern —
+aber Sie können die **Einreichung zurückziehen** und weiterarbeiten. Ist er freigegeben,
+bleibt er so, wie er geprüft wurde: Änderungen und Löschen laufen dann über die
+Administration.
+
+Wollen Sie einen freigegebenen Assistenten loswerden, beantragen Sie die **Löschung** —
+mit einer kurzen Begründung, wenn Sie mögen. ⚠️ **Der Antrag schaltet nichts ab:** Der
+Assistent bleibt im Unterricht nutzbar, bis die Administration entschieden hat. Bis dahin
+können Sie den Antrag jederzeit zurücknehmen.

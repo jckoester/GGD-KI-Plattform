@@ -26,6 +26,7 @@
     import { chatFehlertext } from "$lib/chat_errors.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import { chatVorgaben } from "$lib/chatziel.js";
     import { tick } from "svelte";
     import {
         streamChat,
@@ -1147,12 +1148,18 @@
         }
     });
 
-    // group_id aus URL-Parameter: Neue Konversation der Gruppe zuordnen
-    // + Planning-Assistenten vorauswählen, wenn einer verfügbar ist
+    // Vorbelegung aus der Adresse: Fach und/oder Gruppe für die neue Konversation.
+    // ⚠️ **`subject_id` fehlte hier bis zum 27.09.2026** — `pendingSubjectId` gab es,
+    // aber kein Parameter füllte es. Wer von der Fachseite kam, chattete ohne Fach und
+    // bekam damit eine schlechtere Suche als über den Umweg „Fach von Hand wählen".
+    // Was der Link schreibt und was hier gelesen wird, steht in `$lib/chatziel.js`.
     $effect(() => {
-        const paramGroupId = $page.url.searchParams.get("group_id");
-        if (paramGroupId && !conversationId) {
-            pendingGroupId = parseInt(paramGroupId, 10);
+        const { subjectId, groupId } = chatVorgaben($page.url.searchParams);
+        if (subjectId !== null && !conversationId) {
+            pendingSubjectId = subjectId;
+        }
+        if (groupId !== null && !conversationId) {
+            pendingGroupId = groupId;
             if (availableAssistants.length > 0 && !selectedAssistant) {
                 const planningAssistant = availableAssistants.find(
                     (a) => Array.isArray(a.tool_groups) && a.tool_groups.includes("planning"),

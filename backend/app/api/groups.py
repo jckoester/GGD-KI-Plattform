@@ -16,9 +16,15 @@ from app.db.models import (
     ContextNode,
     Group,
     GroupMembership,
+    GroupSourceClass,
     LessonSlot,
     Subject,
     TeacherGroupExclusion,
+)
+from app.groups.aktualitaet import (
+    gruppen_mit_beleg,
+    gruppen_mit_quellklasse,
+    ist_aktuell,
 )
 from app.db.session import get_db
 from app.planning.calendar import SchoolYearConfig, load_school_year
@@ -36,7 +42,6 @@ class GroupOut(BaseModel):
     type: str
     subject_id: Optional[int]
     sso_group_id: Optional[str]
-    source_class_group_id: Optional[int]
     created_at: datetime
     # Was selbst vergeben wurde, oder `null`. `name` oben ist bereits aufgelöst; dieses
     # Feld füllt das Eingabefeld beim Umbenennen und sagt, ob „zurücksetzen" etwas tut.
@@ -46,6 +51,12 @@ class GroupOut(BaseModel):
     # von `student_subjects_opt_in` aus `GET /groups/config`, ob sie darauf hört. Das Feld
     # von der Betriebsart abhängig zu machen hieße, zwei Schalter im Gleichklang zu halten.
     student_visible: bool = False
+    # ⚠️ **Die Festlegung gehört in die Liste, nicht nur in die Antwort des Setzers.**
+    # Die Gruppenverwaltung zeigt das Eingabefeld aus dieser Liste; fehlte das Feld hier,
+    # stünde es bei jedem Laden wieder leer, obwohl ein Wert gesetzt ist. Genau diese
+    # Sorte Lücke — Feld gesetzt, Feld nicht ausgeliefert — hat am 24.09.2026 schon
+    # einmal einen toten Link erzeugt (`stunde_node_id`).
+    jahrgang: Optional[int] = None
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -82,66 +93,6 @@ class MyGroupOut(GroupOut):
 
 class MyGroupsResponse(BaseModel):
     items: list[MyGroupOut]
-
-
-def ist_aktuell(gruppe, mit_beleg: set[int], cfg: SchoolYearConfig) -> bool:
-    """Ob eine Gruppe zum laufenden Schuljahr gehört.
-
-    Drei Fälle brauchen keine Ableitung:
-
-    * **Kein Unterricht.** Klassen, Fachschaften und Arbeitsgruppen kennen kein
-      Schuljahresende in diesem Sinne.
-    * **Aus dem Schulkonto.** Für eine Gruppe mit `sso_group_id` ist die Mitgliedschaft
-      bereits die Antwort: Der Immediate Mirror entfernt bei jeder Anmeldung, was das Token
-      nicht mehr deckt. Steht der Kurs noch im Schulkonto, gibt es ihn. Das trägt zugleich
-      den **Kursstufenkurs über zwei Schuljahre** — er hat am ersten Schultag weder Stunden
-      noch Jahresplan im neuen Jahr und wäre sonst wochenlang „früher", ohne dass die
-      Lehrkraft etwas dagegen tun könnte (der Stundenplan ist noch nicht veröffentlicht).
-    * **Gerade erst angelegt.** Sie hat noch nichts, woran man sie erkennen könnte.
-
-    Bleibt die Ableitung für von Hand angelegte und adoptierte Gruppen. Die sind immer an
-    eine Klasse gebunden (`POST /groups/teaching` verlangt eine `school_class`) und laufen
-    deshalb nie über den Schuljahreswechsel.
-
-    `mit_beleg` sind die Gruppen mit Stunden oder Planung im laufenden Schuljahr —
-    ermittelt von `gruppen_mit_beleg`, in **einer** Abfrage für alle.
-    """
-    if gruppe.type != "teaching_group":
-        return True
-    if gruppe.sso_group_id:
-        return True
-    if gruppe.id in mit_beleg:
-        return True
-    # `astimezone()` vor `date()`: Der Zeitstempel kommt in der Zeitzone der
-    # Datenbanksitzung zurück, der Schuljahresbeginn ist ein Kalendertag der Schule. Ohne
-    # die Umrechnung entschied die Zeitzone über die Jahresgrenze — eine am ersten
-    # Schultag um 00:30 angelegte Gruppe galt als im Vorjahr angelegt. Aufgefallen am
-    # 15.09.2026, als der Integrationstest die Grenze mit einem reinen Datum traf.
-    return gruppe.created_at.astimezone().date() >= cfg.beginn
-
-
-async def gruppen_mit_beleg(
-    db: AsyncSession, gruppen_ids: list[int], cfg: SchoolYearConfig
-) -> set[int]:
-    """Welche dieser Gruppen im laufenden Schuljahr Stunden oder Planung haben.
-
-    Zwei Belege, weil sie zu verschiedenen Zeitpunkten entstehen: Der Jahresplan entsteht
-    beim ersten Öffnen der Planung, die Stunden erst mit dem Stundenraster. Wer nur auf
-    einen schaute, übersähe die halbe Wirklichkeit.
-    """
-    if not gruppen_ids:
-        return set()
-    stunden = select(LessonSlot.group_id).where(
-        LessonSlot.group_id.in_(gruppen_ids),
-        LessonSlot.date.between(cfg.beginn, cfg.ende),
-    )
-    planung = select(ContextNode.write_scope_group_id).where(
-        ContextNode.write_scope_group_id.in_(gruppen_ids),
-        ContextNode.schuljahr == cfg.schuljahr,
-        ContextNode.status == "active",
-    )
-    zeilen = await db.execute(stunden.union(planung))
-    return {zeile[0] for zeile in zeilen.all()}
 
 
 async def letztes_schuljahr(
@@ -193,10 +144,10 @@ async def list_my_groups(
     gruppen = list(result.scalars().all())
 
     cfg = load_school_year()
-    beleg = await gruppen_mit_beleg(
-        db, [g.id for g in gruppen if g.type == "teaching_group"], cfg
-    )
-    aktualitaet = {g.id: ist_aktuell(g, beleg, cfg) for g in gruppen}
+    unterricht_ids = [g.id for g in gruppen if g.type == "teaching_group"]
+    beleg = await gruppen_mit_beleg(db, unterricht_ids, cfg)
+    quellklassen = await gruppen_mit_quellklasse(db, unterricht_ids)
+    aktualitaet = {g.id: ist_aktuell(g, beleg, cfg, quellklassen) for g in gruppen}
     # Nur für die früheren nachschlagen — für die aktuellen sagt die Jahreszahl nichts.
     jahre = await letztes_schuljahr(
         db, [g.id for g in gruppen if not aktualitaet[g.id]]
@@ -285,18 +236,20 @@ async def list_potential_teaching_groups(
     if not classes or not dept_subject_ids:
         return PotentialTeachingGroupsResponse(items=[])
 
-    # Eigene teaching_groups: (subject_id, source_class_group_id) -> bereits vorhanden
+    # Eigene teaching_groups: (subject_id, Quellklasse) -> bereits vorhanden.
+    # Eine Gruppe aus mehreren Klassen erzeugt hier mehrere Paare — richtig so: Für
+    # jede beteiligte Klasse ist der Vorschlag „Klasse × Fach" bereits eingelöst.
     stmt = (
-        select(Group.subject_id, Group.source_class_group_id)
+        select(Group.subject_id, GroupSourceClass.class_group_id)
         .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .join(GroupSourceClass, GroupSourceClass.group_id == Group.id)
         .where(
             GroupMembership.pseudonym == pseudonym,
             Group.type == "teaching_group",
-            Group.source_class_group_id.is_not(None),
         )
     )
     result = await db.execute(stmt)
-    existing_pairs = {(row.subject_id, row.source_class_group_id) for row in result}
+    existing_pairs = {(row.subject_id, row.class_group_id) for row in result}
 
     # Negativliste
     stmt = select(
@@ -360,8 +313,10 @@ class TeachingGroupOut(BaseModel):
     name: str = Field(validation_alias="anzeigename")
     slug: str
     subject_id: Optional[int]
-    source_class_group_id: Optional[int]
     student_visible: bool = False
+    # Die **Festlegung**, nicht der wirksame Jahrgang: `null` heißt „nicht festgelegt",
+    # dann leitet die Plattform aus Klasse oder Name ab (Alembic 0073).
+    jahrgang: Optional[int] = None
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
@@ -403,7 +358,11 @@ async def create_teaching_group(
             GroupMembership.pseudonym == pseudonym,
             Group.type == "teaching_group",
             Group.subject_id == body.subject_id,
-            Group.source_class_group_id == body.class_group_id,
+            Group.id.in_(
+                select(GroupSourceClass.group_id).where(
+                    GroupSourceClass.class_group_id == body.class_group_id
+                )
+            ),
         )
     )
     if (await db.execute(stmt)).scalar_one_or_none() is not None:
@@ -436,16 +395,22 @@ async def create_teaching_group(
         slug=slug,
         type="teaching_group",
         subject_id=body.subject_id,
-        source_class_group_id=body.class_group_id,
         sso_group_id=None,
+        # Der manuelle Weg ist „Klasse × Fach" — also der ganze Klassenverband.
+        erbt_mitglieder=True,
     )
     db.add(group)
     await db.flush()
+
+    db.add(GroupSourceClass(group_id=group.id, class_group_id=body.class_group_id))
 
     membership = GroupMembership(
         group_id=group.id,
         pseudonym=pseudonym,
         role_in_group="teacher",
+        # `eigen`: Die Mitgliedschaft ist der Nachweis, dass die Gruppe ihr gehört —
+        # kein Aufräumlauf darf sie entfernen (Alembic 0068).
+        herkunft="eigen",
     )
     db.add(membership)
     await db.commit()
@@ -549,6 +514,43 @@ async def set_schueler_sichtbarkeit(
     await db.refresh(group)
     return group
 
+
+
+class JahrgangRequest(BaseModel):
+    """`null` heißt: Entscheidung zurücknehmen, wieder ableiten lassen."""
+
+    jahrgang: Optional[int] = Field(default=None, ge=1, le=13)
+
+
+@router.patch("/teaching/{group_id}/jahrgang", response_model=TeachingGroupOut)
+async def set_jahrgang(
+    group_id: int,
+    body: JahrgangRequest,
+    current_user: JwtPayload = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Group:
+    """Den Jahrgang der Unterrichtsgruppe setzen oder die Festlegung zurücknehmen.
+
+    ⚠️ **Die Festlegung schlägt jede Ableitung.** Gelesen wird in dieser Reihenfolge:
+    diese Spalte → die Klassen aus `group_source_classes` → das Namensmuster
+    (`app/groups/jahrgang.py`). Wer hier etwas einträgt, überstimmt also auch eine
+    Klassenzuordnung — Absicht: Die Klasse ist ein guter Anhaltspunkt und nicht immer der
+    richtige (jahrgangsübergreifende Kurse, Wiederholer-Gruppen).
+
+    **`null` ist kein Fehler, sondern eine Rücknahme.** Danach leitet die Plattform
+    wieder ab; eine versehentlich gesetzte Zahl lässt sich so wieder loswerden, ohne dass
+    jemand raten muss, welcher Wert der „richtige" war.
+
+    Setzen darf, wer in der Gruppe als Lehrkraft eingetragen ist — dieselbe Bedingung wie
+    beim Anzeigenamen und der Schüler-Freigabe.
+    """
+    from app.planning.permissions import require_group_teacher
+
+    group = await require_group_teacher(group_id, current_user, db)
+    group.jahrgang = body.jahrgang
+    await db.commit()
+    await db.refresh(group)
+    return group
 
 class ExclusionOut(BaseModel):
     class_group_id: int

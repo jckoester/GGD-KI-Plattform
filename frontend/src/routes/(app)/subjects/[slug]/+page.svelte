@@ -15,6 +15,7 @@
      */
     import PageBody from '$lib/components/PageBody.svelte'
     import { fachSammlungen } from "$lib/collections.js";
+    import { neuerChatPfad } from "$lib/chatziel.js";
     import NodeTypeIcon from "$lib/components/NodeTypeIcon.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
@@ -282,7 +283,8 @@
                             Ohne Gruppenbezug
                         </h2>
                         <button
-                            onclick={() => goto("/chat")}
+                            onclick={() =>
+                                goto(neuerChatPfad({ subjectId: subject?.id }))}
                             class="text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
                                    text-white font-medium hover:opacity-90 transition-opacity"
                         >
@@ -412,6 +414,7 @@
                 showSubjectFilter={false}
                 showNewButton={true}
                 excludeContentTypes={BP_CURRICULUM_CONTENT_TYPES}
+                importFach={subject}
             />
         {/if}
     {/if}

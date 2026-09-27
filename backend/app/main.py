@@ -48,6 +48,7 @@ from app.render.router import router as render_router
 from app.artifacts.router import router as artifacts_router
 from app.calendar.router import router as calendar_router
 from app.feedback.router import router as feedback_router
+from app.groups.router import router as group_join_router
 from app.ui.router import router as ui_router
 
 logger = logging.getLogger(__name__)
@@ -282,3 +283,4 @@ app.include_router(artifacts_router)
 app.include_router(calendar_router)
 app.include_router(ui_router)
 app.include_router(feedback_router)
+app.include_router(group_join_router)

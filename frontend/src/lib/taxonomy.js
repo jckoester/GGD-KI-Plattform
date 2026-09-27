@@ -51,7 +51,8 @@ export const CONTENT_TYPES = {
   "concept": [
     "funktion",
     "bauteil",
-    "begriff"
+    "begriff",
+    "stoffsteckbrief"
   ]
 }
 
@@ -198,6 +199,7 @@ export const COLLECTIONS = {
     "beschreibung": "Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der Normalfall — „Energie\" heißt in Physik etwas anderes als in Ethik.",
     "spalten": [
       "titel",
+      "fassung",
       "fach",
       "ab_klasse",
       "status",
@@ -223,6 +225,24 @@ export const COLLECTIONS = {
         "ziel": [
           "themengebiet"
         ]
+      },
+      "references": {
+        "label": "wird im Bildungsplan verlangt in",
+        "ziel": [
+          "ik_kompetenz"
+        ]
+      },
+      "requires": {
+        "label": "setzt voraus",
+        "ziel": [
+          "begriff"
+        ]
+      },
+      "is_a": {
+        "label": "ist ein(e)",
+        "ziel": [
+          "begriff"
+        ]
       }
     },
     "content": {
@@ -230,12 +250,79 @@ export const COLLECTIONS = {
       "pflicht": true,
       "hinweis": "Macht den Eintrag thematisch auffindbar — auch für Suchende, die den Begriff nicht kennen."
     }
+  },
+  "stoffsteckbrief": {
+    "beschreibung": "Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung sind getrennt (Chlorwasserstoff / Salzsäure) — sonst verwischt die Unterscheidung zwischen Säure und saurer Lösung.",
+    "spalten": [
+      "titel",
+      "formel",
+      "fach",
+      "status",
+      "geaendert"
+    ],
+    "filter": [
+      "fach",
+      "status",
+      "titel"
+    ],
+    "sidebar": true,
+    "schueler": true,
+    "relationen": {
+      "is_a": {
+        "label": "gehört zur Stoffklasse",
+        "ziel": [
+          "begriff"
+        ]
+      },
+      "related_to": {
+        "label": "steht in Beziehung zu",
+        "ziel": [
+          "begriff",
+          "stoffsteckbrief"
+        ]
+      },
+      "references": {
+        "label": "wird im Bildungsplan verlangt in",
+        "ziel": [
+          "ik_kompetenz"
+        ]
+      }
+    },
+    "content": {
+      "label": "Definition",
+      "pflicht": true,
+      "hinweis": "Was für ein Stoff das ist, in einem Satz. Darunter Erklärung und Beispiele."
+    }
   }
 }
 
 // Metadaten-Feldschema je Typ — dieselbe Beschreibung, aus der das Backend prüft
 // (app/context/metadata.py). Der Editor baut sein Formular daraus.
 export const FELD_SCHEMATA = {
+  "kapitel": {
+    "std": {
+      "typ": "int",
+      "min": 0,
+      "label": "Stunden (Soll)",
+      "hinweis": "Wie viele Unterrichtsstunden das Kapitel vorsieht. Grundlage der Stundenbilanz im Jahresplan."
+    },
+    "reihenfolge": {
+      "typ": "int",
+      "min": 0,
+      "label": "Reihenfolge",
+      "hinweis": "Position im Curriculum — kleinere Zahl steht weiter vorn."
+    },
+    "einleitung": {
+      "typ": "text",
+      "label": "Einleitung",
+      "hinweis": "Der einleitende Text des Kapitels aus dem Bildungsplan."
+    },
+    "breadcrumb": {
+      "typ": "text",
+      "label": "Pfad im Bildungsplan",
+      "hinweis": "Der Weg zum Kapitel, etwa „Chemie › Klasse 9/10 › Stoffe und ihre Eigenschaften\". Fließt in das Embedding ein."
+    }
+  },
   "methode": {
     "ablauf": {
       "typ": "text",
@@ -260,7 +347,94 @@ export const FELD_SCHEMATA = {
       "label": "Ab Klassenstufe",
       "min": 1,
       "max": 13,
-      "hinweis": "Für welche Stufe diese Fassung gemeint ist. „Energie\" in Klasse 6 verlangt eine andere Definition als in Klasse 11; zwei Einträge mit verschiedener Stufe sind der vorgesehene Weg dahin."
+      "hinweis": "Nur ausfüllen, wenn es diesen Begriff in mehreren Fassungen gibt: „Energie\" in Klasse 6 verlangt eine andere Definition als in Klasse 11, „Oxidation\" in Klasse 8 eine andere als in Klasse 10. Zwei Einträge mit verschiedener Stufe sind der vorgesehene Weg dahin."
+    },
+    "fassung": {
+      "typ": "text",
+      "label": "Fassung",
+      "hinweis": "Unterscheidet gleichnamige Einträge in der Liste — „Sauerstoffaufnahme\" gegenüber „Elektronenabgabe\". Ohne sie stünde derselbe Titel zweimal da."
+    },
+    "bevorzugter_begriff": {
+      "typ": "text",
+      "label": "Bevorzugte Bezeichnung",
+      "hinweis": "Die an dieser Schule übliche Bezeichnung. Der Assistent antwortet damit, auch wenn gefragt wurde: „Atombindung\" beantwortet er als „Elektronenpaarbindung\"."
+    },
+    "genus": {
+      "typ": "auswahl",
+      "label": "Artikel",
+      "werte": [
+        "der",
+        "die",
+        "das"
+      ],
+      "hinweis": "Für Lernende, die Deutsch als Zweitsprache sprechen — und für Antworten, die den Begriff im Satz beugen."
+    },
+    "plural": {
+      "typ": "text",
+      "label": "Mehrzahl",
+      "hinweis": "Ersetzt Plural-Aliase; die Suche findet beide Formen ohnehin."
+    },
+    "fehlvorstellungen": {
+      "typ": "liste",
+      "label": "Häufige Irrtümer",
+      "hinweis": "Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim Sieden zerfällt Wasser in Wasserstoff und Sauerstoff\"). Der Assistent bekommt sie mit und kann sie ansprechen."
+    },
+    "quelle": {
+      "typ": "text",
+      "label": "Herkunft",
+      "hinweis": "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
+    }
+  },
+  "stoffsteckbrief": {
+    "formel": {
+      "typ": "text",
+      "label": "Formel",
+      "hinweis": "In mhchem-Schreibweise, etwa `\\ce{H2O}`. Bei Lösungen die Kurzform (`HCl(aq)`)."
+    },
+    "smiles": {
+      "typ": "text",
+      "label": "SMILES",
+      "hinweis": "Nur für Reinstoffe; bei Gemischen leer lassen."
+    },
+    "trivialnamen": {
+      "typ": "liste",
+      "label": "Alltagsnamen",
+      "hinweis": "Kochsalz, Trockeneis, gebrannte Magnesia. Auch fachlich schiefe Namen wie „Kohlensäure\" gehören hierher — die Richtigstellung steht im Text. Geht in die Suche ein: Danach fragen Schüler:innen."
+    },
+    "nachweis": {
+      "typ": "text",
+      "label": "Nachweis",
+      "hinweis": "Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine verlangt."
+    },
+    "fehlvorstellungen": {
+      "typ": "liste",
+      "label": "Häufige Irrtümer",
+      "hinweis": "Typische Fehlvorstellungen zu diesem Stoff, gegen die eine Erklärung anarbeiten muss („Die Blasen in kochendem Wasser sind Luft“). Der Assistent bekommt sie mit und kann sie ansprechen."
+    },
+    "bevorzugter_begriff": {
+      "typ": "text",
+      "label": "Bevorzugte Bezeichnung",
+      "hinweis": "Die an dieser Schule übliche Bezeichnung."
+    },
+    "genus": {
+      "typ": "auswahl",
+      "label": "Artikel",
+      "werte": [
+        "der",
+        "die",
+        "das"
+      ],
+      "hinweis": "Für Lernende mit Deutsch als Zweitsprache."
+    },
+    "plural": {
+      "typ": "text",
+      "label": "Mehrzahl",
+      "hinweis": "Ein Gedankenstrich, wo es keine gibt."
+    },
+    "quelle": {
+      "typ": "text",
+      "label": "Herkunft",
+      "hinweis": "Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des DEGINTU-Abgleichs."
     }
   }
 }
@@ -320,7 +494,8 @@ export const CONTENT_TYPE_LABELS = {
   "feedback_text": "Feedback-Text",
   "funktion": "Funktion",
   "bauteil": "Bauteil",
-  "begriff": "Fachbegriff"
+  "begriff": "Fachbegriff",
+  "stoffsteckbrief": "Stoffsteckbrief"
 }
 
 export const SCOPE_DEFAULTS = {
@@ -421,20 +596,20 @@ export const SCOPE_DEFAULTS = {
     "global"
   ],
   "jahresplan": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "pruefungsanforderung": [
     "school",
     "subject"
   ],
   "unterrichtsstunde": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "unterrichtseinheit": [
-    "private",
-    "private"
+    "group_teachers",
+    "group_teachers"
   ],
   "arbeitsblatt": [
     "group",
@@ -485,6 +660,10 @@ export const SCOPE_DEFAULTS = {
     "subject"
   ],
   "begriff": [
+    "school",
+    "subject"
+  ],
+  "stoffsteckbrief": [
     "school",
     "subject"
   ]

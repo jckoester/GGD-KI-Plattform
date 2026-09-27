@@ -8,8 +8,15 @@ im PDF nicht. Diese Funktion **prä-rendert** vor weasyprint:
 …und bettet das SVG in die HTML ein, die weasyprint dann zu PDF macht.
 
 Token-basiert (markdown-it-py + `dollarmath`): Mathe wird nur außerhalb von Code erkannt.
-Keine Sanitisierung nötig — weasyprint führt kein JS aus, und die SVGs stammen aus den
-eigenen Renderern.
+Keine Sanitisierung nötig — weasyprint führt kein JS aus, und die hier **erzeugten** SVGs
+stammen aus den eigenen Renderern.
+
+⚠️ **Seit Paket 10 stimmt der zweite Halbsatz nicht mehr für alle SVGs im System.** Der
+Upload-Dialog für Fachbegriffe nimmt Zeichnungen entgegen, die niemand gesehen hat, und
+legt sie in `metadata.illustrationen[].svg` ab — von dort können sie in einen Export
+geraten. Geprüft werden sie deshalb **beim Import**
+(:mod:`app.context.svg_pruefung`), nicht hier: Ein Bild abzuweisen, wenn jemand es
+hochlädt, ist erklärbar; es beim Drucken zu verschlucken, nicht.
 """
 from __future__ import annotations
 

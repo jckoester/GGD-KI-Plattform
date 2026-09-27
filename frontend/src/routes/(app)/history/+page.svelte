@@ -11,8 +11,17 @@
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import SubjectIcon from "$lib/components/SubjectIcon.svelte";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups } from "$lib/stores/myGroups.js";
+    import { user } from "$lib/stores/user.js";
+    import { gruppenMarke, chatTooltip } from "$lib/gruppenmarke.js";
 
     let conversations = $state([]);
+    // Die Unterrichtsgruppe steht nur für Lehrkräfte in der Zeile — siehe
+    // `gruppenMarke`: Aus Schülersicht ist die Gruppe das Fach, und das zeigt
+    // bereits das farbige Symbol.
+    const istLehrkraft = $derived(
+        $user?.roles.includes('teacher') || $user?.roles.includes('admin'),
+    );
     let loading = $state(true);
     let error = $state(null);
     let offset = $state(0);
@@ -151,7 +160,24 @@
                                                 title={conv.assistant_name}
                                             />
                                         {/if}
+                                        <!-- Die Unterrichtsgruppe, sofern der Chat einer
+                                             zugeordnet ist. Hier ist Platz für den Namen;
+                                             in der Sidebar steht er nur im Tooltip. -->
+                                        {#if gruppenMarke(conv.group_id, $myGroups, { istLehrkraft })}
+                                            <span
+                                                class="shrink-0 max-w-[12rem] truncate px-1.5 py-0.5 rounded
+                                                       bg-light-ui-2 dark:bg-dark-ui-2
+                                                       text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                                title={gruppenMarke(conv.group_id, $myGroups, { istLehrkraft })}
+                                            >
+                                                {gruppenMarke(conv.group_id, $myGroups, { istLehrkraft })}
+                                            </span>
+                                        {/if}
                                         <span
+                                            title={chatTooltip(
+                                                conv.title,
+                                                gruppenMarke(conv.group_id, $myGroups, { istLehrkraft }),
+                                            )}
                                             >{conv.title ??
                                                 "Unbenannter Chat"}</span
                                         >

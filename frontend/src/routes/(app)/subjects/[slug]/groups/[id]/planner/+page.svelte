@@ -1,4 +1,7 @@
 <script>
+  // `eintragFrage` und `ruecknahmeWarnung` stehen jetzt im Dialog — hier bleibt nur
+  // der Satz, mit dem der Assistent den Fall übernimmt.
+  import { assistentFrage } from '$lib/ausfall.js'
   import { page } from '$app/stores'
   import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
@@ -11,6 +14,9 @@
     listSnapshots,
     restoreSnapshot,
     createLesson,
+    createLessonForSlot,
+    setzeAusfall,
+    nimmAusfallZurueck,
   } from '$lib/api.js'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
@@ -20,8 +26,12 @@
   import PlannerTable from '$lib/components/planner/PlannerTable.svelte'
   import UnitLegend from '$lib/components/planner/UnitLegend.svelte'
   import UnitDialog from '$lib/components/planner/UnitDialog.svelte'
+  import AusfallDialog from '$lib/components/planner/AusfallDialog.svelte'
   import PatternEditor from '$lib/components/planner/PatternEditor.svelte'
   import ReflowAssistbar from '$lib/components/planner/ReflowAssistbar.svelte'
+  import Parkplatz from '$lib/components/planner/Parkplatz.svelte'
+  import { getParkplatz, unparkEintrag } from '$lib/api.js'
+  import { umhaengeErgebnis } from '$lib/jahresraster.js'
 
   const groupId = $derived(Number($page.params.id))
   const slug = $derived($page.params.slug)
@@ -48,7 +58,9 @@
   let restoringId = $state(null)
   let overhang = $state([])   // UP-6 Schritt 8: Überhang-Befunde für die Assistbar
   let reflowBanner = $state(null)  // UP-6 Schritt 6: Ausfall-mit-Inhalt → Verschiebe-Angebot
-  let regenHint = $state(false)    // UP-6 Schritt 7: nach HJ2-Regenerierung
+  // Was der letzte Neuaufbau ergeben hat — Sätze aus dem Umhängen (AP3/AP5).
+  let umhaengen = $state(null)
+  let parkplatz = $state({ items: [], ueberhang: [] })
   let dragReflow = $state(null)    // UP-6 Schritt 6: Drag&Drop mit geplanter Stunde
 
   function dragDeepLink(dr) {
@@ -58,14 +70,10 @@
       + `Bitte hilf mir, das sauber umzuplanen.`
     return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
   }
-  // Hinweis verschwindet, sobald die HJ2-Slots wieder Zuordnungen tragen.
-  const showRegenHint = $derived(
-    regenHint && !slots.some(s => s.halbjahr === 2 && s.ue_node_id)
-  )
-
-  function regenDeepLink() {
-    const p = `Ich habe das 2. Halbjahr neu generiert. Bitte hilf mir, die UE-Folge und `
-      + `Themen aus dem vorigen Stand auf das neue Raster zu übertragen.`
+  function parkplatzDeepLink() {
+    const p = `Beim Umhängen der Jahresplanung sind ${parkplatz.items.length} Stunden `
+      + `ohne Termin übrig geblieben. Bitte hilf mir, sie durch Kürzen oder Umplanen `
+      + `wieder einzugliedern.`
     return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
   }
 
@@ -85,6 +93,9 @@
       overview = data
       slots = [...data.slots]
       getPlanningOverhang(groupId).then((f) => { overhang = f }).catch(() => { overhang = [] })
+      // Geparktes überlebt die Sitzung — es muss beim Öffnen sichtbar sein, nicht
+      // erst nach dem nächsten Neuaufbau.
+      ladeParkplatz()
     } catch (e) {
       error = e.message
     } finally {
@@ -164,14 +175,21 @@
       goto(`/subjects/${slug}/groups/${groupId}/planner/lessons/${existingLessonNodeId}`)
       return
     }
-    // Stunde noch nicht angelegt: Slot → UE ermitteln, dann Stunde anlegen
+    // ⚠️ **Auch ohne Unterrichtseinheit.** Hier stand `if (!slot?.ue_node_id) return` —
+    // ein stiller Abbruch, aus der Zeit vor `POST /planning/slots/{id}/lesson`. Die
+    // Startseite legt seitdem Entwürfe ohne Einheit an; der Jahresplan tat es nicht, und
+    // am Ziel einer verschobenen Stunde (dort steht oft nur das Thema) ließ sich nichts
+    // bearbeiten (Jan, 24.09.2026). Der Weg über die Einheit bleibt, wo es eine gibt —
+    // er hängt die Stunde gleich richtig ein.
     const slot = slots.find(s => s.id === slotId)
-    if (!slot?.ue_node_id) return
+    if (!slot) return
     try {
-      const result = await createLesson(slot.ue_node_id, {
-        titel: slot.thema || 'Neue Stunde',
-        slot_id: slotId,
-      })
+      const result = slot.ue_node_id
+        ? await createLesson(slot.ue_node_id, {
+            titel: slot.thema || 'Neue Stunde',
+            slot_id: slotId,
+          })
+        : await createLessonForSlot(slotId)
       // Slot optimistisch aktualisieren
       const idx = slots.findIndex(s => s.id === slotId)
       if (idx !== -1) slots[idx] = { ...slots[idx], stunde_node_id: result.id }
@@ -189,16 +207,94 @@
   }
 
   // ── UE erstellt / bearbeitet ─────────────────────────────────────────────────
-  async function refreshAfterUnitChange() {
-    // Overview neu laden damit Balance + Units aktuell ist
+  // ── Persönlicher Ausfall (AP4) ──────────────────────────────────────────────
+  //
+  // ⚠️ **Beide Wege fragen vorher.** Der Tageseintrag trifft Gruppen, die gerade nicht
+  // auf dem Bildschirm sind; die Rücknahme nimmt auch einzeln gesetzte Ausfälle mit
+  // (F4). Beides ist hinnehmbar, solange es angekündigt ist — eine stille Wirkung über
+  // mehrere Gruppen hinweg wäre es nicht.
+  // `null` heißt geschlossen; sonst `{ modus, datum }`.
+  let ausfallDialog = $state(null)
+
+  function ausfallEintragen(slot) {
+    ausfallDialog = { modus: 'eintragen', datum: slot.date }
+  }
+
+  async function ausfallBestaetigt({ reichweite, notiz }) {
+    const datum = ausfallDialog?.datum
+    const zuruecknehmen = ausfallDialog?.modus === 'zuruecknehmen'
+    // Nur bei `gruppe` ist die Gruppe gemeint; bei `tag` bestimmt der Server die
+    // betroffenen Gruppen aus den Mitgliedschaften.
+    const gid = reichweite === 'gruppe' ? groupId : null
+    ausfallDialog = null
+    try {
+      if (zuruecknehmen) {
+        await nimmAusfallZurueck({ datum, reichweite, groupId: gid })
+      } else {
+        await setzeAusfall({ datum, reichweite, groupId: gid, notiz })
+      }
+      await refreshVomServer()
+    } catch (e) {
+      error = e.message
+    }
+  }
+
+  /**
+   * Einer der drei Wege wurde gewählt.
+   *
+   * ⚠️ **„Inhalte entfallen" ist eine Entscheidung, kein Schließen.** Es räumt den
+   * Anpassungsbedarf ab, den das Eintragen gesetzt hat — die Stunde bleibt ausgefallen,
+   * aber niemand wartet mehr auf etwas. Das ✕ daneben tut das **nicht**: Es vertagt.
+   */
+  async function ausfallWeg(weg, slotIds, datum) {
+    if (weg === 'entfallen') {
+      try {
+        await Promise.all(slotIds.map((id) => updateSlot(id, { anpassung_noetig: false })))
+        await refreshVomServer()
+      } catch (e) {
+        error = e.message
+      }
+      return
+    }
+    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(assistentFrage(weg, datum))}`)
+  }
+
+  /** Aus der Zeile heraus — betrifft genau diese eine Stunde. */
+  function ausfallWegZeile(weg, slot) {
+    return ausfallWeg(weg, [slot.id], slot.date)
+  }
+
+  function ausfallZurueck(slot) {
+    ausfallDialog = { modus: 'zuruecknehmen', datum: slot.date }
+  }
+
+  /**
+   * Nach einer **Server**-Aktion: Übersicht und Slots frisch übernehmen.
+   *
+   * ⚠️ **Hier stand `refreshed.slots.map(s => slots.find(l => l.id === s.id) ?? s)`** —
+   * für bestehende Slots also die *lokale* Kopie. Das ist richtig auf dem PATCH-Pfad
+   * (dort hat der Client den Wert gerade selbst gesetzt und der Server ihn bestätigt)
+   * und **falsch** nach allem, was der Server von sich aus ändert: Die Ansicht behielte
+   * den alten Stand bis zum Neuladen.
+   *
+   * Gemeldet von Jan am 24.09.2026 für den ganztägigen Ausfall — die Stunden blieben
+   * „Unterricht", bis man die Seite neu lud. **Derselbe Fehler bestand schon vorher**
+   * beim Löschen einer Unterrichtseinheit: `delete_unit_node` lässt
+   * `lesson_slots.ue_node_id` per `ON DELETE SET NULL` wegfallen, die Zeile zeigte die
+   * gelöschte Einheit trotzdem weiter.
+   *
+   * Nach einer Server-Aktion gibt es keine offene optimistische Änderung zu schützen —
+   * der Server ist die Quelle.
+   */
+  async function refreshVomServer() {
     const refreshed = await getPlanningOverview(groupId)
     overview = refreshed
-    slots = refreshed.slots.map(s => slots.find(l => l.id === s.id) ?? s)
+    slots = refreshed.slots
   }
 
   async function onUnitCreated() {
     showUnitDialog = false
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   function openEditUnit(unit) {
@@ -209,13 +305,13 @@
   async function onUnitUpdated() {
     showUnitDialog = false
     editUnit = null
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   async function onUnitDeleted() {
     showUnitDialog = false
     editUnit = null
-    await refreshAfterUnitChange()
+    await refreshVomServer()
   }
 
   function closeUnitDialog() {
@@ -230,13 +326,38 @@
     overview = { ...overview, patterns: [...otherPatterns, ...updatedPatterns] }
   }
 
-  async function onSlotsGenerated(stats, meta = {}) {
+  async function onSlotsGenerated(stats) {
     // Slots neu laden
     const refreshed = await getPlanningOverview(groupId)
     overview = refreshed
     slots = refreshed.slots
-    // Regenerierung des 2. Halbjahres → Neuaufbau-Hinweis (UP-6 Schritt 7).
-    if (meta.regenerate && meta.halbjahr === 2) regenHint = true
+    // Seit dem 22.09.2026 wirft ein Neuaufbau die Planung nicht mehr weg, sondern hängt
+    // sie um. Der Hinweis berichtet deshalb, **was geschah**, statt zur Handarbeit
+    // aufzufordern — dazu gab es bis dahin allen Grund, jetzt nicht mehr.
+    umhaengen = umhaengeErgebnis(stats)
+    await ladeParkplatz()
+  }
+
+  async function ladeParkplatz() {
+    try {
+      parkplatz = await getParkplatz(groupId)
+    } catch {
+      // Der Parkplatz ist eine Zusatzauskunft — sein Ausfall darf den Plan nicht stören.
+      parkplatz = { items: [], ueberhang: [] }
+    }
+  }
+
+  async function einplanen(parkplatzId, slotId) {
+    patchError = null
+    try {
+      await unparkEintrag(parkplatzId, slotId)
+      const refreshed = await getPlanningOverview(groupId)
+      overview = refreshed
+      slots = refreshed.slots
+      await ladeParkplatz()
+    } catch (e) {
+      patchError = e.message
+    }
   }
 
   // ── Undo-Panel ───────────────────────────────────────────────────────────────
@@ -385,27 +506,37 @@
   </div>
 {/if}
 
-{#if showRegenHint}
+{#if umhaengen}
   <div class="px-4 pt-2">
-    <div class="flex items-center gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+    <div class="flex items-start gap-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
                 bg-light-bg-2 dark:bg-dark-bg-2 px-3 py-2 text-sm">
       <span class="text-light-or dark:text-dark-or flex-shrink-0" aria-hidden="true">⟳</span>
       <span class="flex-1 min-w-0 text-light-tx dark:text-dark-tx">
-        Das 2. Halbjahr wurde neu generiert — die Zuordnung muss neu aufgebaut werden.
+        {#each umhaengen.sätze as satz (satz)}
+          <span class="block">{satz}</span>
+        {/each}
       </span>
-      <a
-        href={regenDeepLink()}
-        class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
-               text-white font-medium hover:opacity-90 transition-opacity"
-      >Neu aufbauen (Assistent)</a>
+      {#if umhaengen.hatParkplatz}
+        <a
+          href={parkplatzDeepLink()}
+          class="flex-shrink-0 px-2.5 py-1 text-xs rounded-md bg-primary dark:bg-primary-dark
+                 text-white font-medium hover:opacity-90 transition-opacity"
+        >Beim Eingliedern helfen</a>
+      {/if}
       <button
-        onclick={() => { regenHint = false }}
+        onclick={() => { umhaengen = null }}
         aria-label="Schließen"
         class="flex-shrink-0 text-light-tx-2 dark:text-dark-tx-2 hover:text-light-tx dark:hover:text-dark-tx"
       >✕</button>
     </div>
   </div>
 {/if}
+
+<Parkplatz
+  eintraege={parkplatz.items}
+  ueberhang={parkplatz.ueberhang}
+  onGeaendert={ladeParkplatz}
+/>
 
 {#if reflowBanner}
   <div class="px-4 pt-2">
@@ -476,7 +607,11 @@
       ende={overview.ende}
       onPatchSlot={patchSlot}
       onSwapSlots={handleSwapSlots}
+      onUnpark={einplanen}
       onEditLesson={handleEditLesson}
+      onAusfallTag={ausfallEintragen}
+      onAusfallZurueck={ausfallZurueck}
+      onAusfallWeg={ausfallWegZeile}
       onReview={handleReview}
     />
   </div>
@@ -486,6 +621,15 @@
 {/if}
 
 <!-- Modals -->
+<AusfallDialog
+  open={!!ausfallDialog}
+  modus={ausfallDialog?.modus ?? 'eintragen'}
+  datum={ausfallDialog?.datum ?? null}
+  gruppenname={group?.name ?? ''}
+  onConfirm={ausfallBestaetigt}
+  onClose={() => { ausfallDialog = null }}
+/>
+
 <UnitDialog
   open={showUnitDialog}
   {groupId}

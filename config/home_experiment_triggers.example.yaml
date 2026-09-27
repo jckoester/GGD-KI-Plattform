@@ -1,0 +1,95 @@
+# Sicherheitsauslöser für Versuche zu Hause (Paket 9, N12).
+#
+# **Wozu.** Punkt 8 der Schüler-Präambel (`pedagogy.yaml`) verbietet gefährliche
+# Versuchsvorschläge für zu Hause. Gemessen am 26.09.2026 hält er nicht zuverlässig: Auf
+# „Kann ich Wasser zu Hause mit einer Batterie zerlegen?" empfahl der Assistent einen
+# Elektrolyse-Aufbau mit Natron- oder Kalilauge. Eine allgemeine Regel in einer langen
+# Präambel wird eben nur mit einer gewissen Wahrscheinlichkeit befolgt. Diese Liste
+# erzeugt für **genau diese Antwort** eine zusätzliche, konkrete Anweisung.
+#
+# ⚠️ **Es ist keine Sperre.** Der Chat läuft weiter, die Frage wird beantwortet — nur
+# ohne Anleitung. Wer eine harte Grenze braucht, ist auf der Guardrail-Ebene richtig
+# (`docs/admin/content-moderation.md`, Abschnitt B).
+#
+# **Zwei Listen, mit UND verknüpft.** Nur wenn die Nachricht sowohl eine Absicht
+# („mache ich selbst / zu Hause") als auch ein riskantes Thema nennt, greift die Regel.
+# Ohne diese Kopplung verweigerte der Assistent auch die Erklärung einer Elektrolyse im
+# Unterricht — und das ist Chemieunterricht, kein Sicherheitsproblem.
+#
+# Abgeglichen wird regex-basiert auf der normalisierten Nachricht (NFKC + casefold),
+# wie bei `crisis_triggers.yaml`. Änderungen wirken nach Backend-Neustart.
+#
+# ⚠ Startkuratierung — gehört wie `pedagogy.yaml` in der Betatestphase gegengelesen
+#   (Fachschaften Chemie/Physik/NwT und Schulleitung: Was ist an dieser Schule erlaubt?).
+
+# Greift nur in der Schüler-Behandlung. Für Lehrkräfte bleibt die Liste ohne Wirkung —
+# wer eine Stunde zur Elektrolyse vorbereitet, braucht die Anleitung.
+absicht:
+  - "zu ?hause|daheim|bei mir (zu ?hause|zuhause)|in der küche|in meinem zimmer"
+  - "(kann|darf|soll) ich .{0,40}(machen|ausprobieren|testen|bauen|herstellen|nachmachen)"
+  - "wie (mache|stelle|baue|kriege|bekomme) ich"
+  - "selbst (machen|herstellen|bauen|ausprobieren)"
+  - "(will|möchte|wollte) ich? ?.{0,20}(ausprobieren|nachbauen|selbst machen)"
+  - "was passiert,? wenn ich"
+
+themen:
+  - thema: Elektrolyse
+    hinweis: >-
+      Strom durch eine Flüssigkeit zu leiten — dabei entstehen Wasserstoff (hochentzündlich)
+      und je nach Lösung giftiges Chlor
+    # ⚠️ Die Abstände sind gemessen, nicht geschätzt. „Wasser zu Hause mit einer
+    # Batterie zerlegen" hat zwischen den beiden Wörtern 28 Zeichen; mit `{0,20}`
+    # löste der Fall **nicht** aus. Und „herstellen" steht im Deutschen getrennt:
+    # „Wie stelle ich Wasserstoff her?" — deshalb `her\b` als eigene Alternative.
+    patterns:
+      - "elektrolyse"
+      - "(wasser|h2o) .{0,40}(zerlegen|spalten|aufspalten|zersetzen)"
+      - "(zerlegen|spalten|zersetzen) .{0,40}(wasser|h2o)"
+      - "(strom|spannung|batterie|netzteil) .{0,40}(wasser|salzwasser|flüssigkeit|lösung|elektrolyt)"
+      - "(wasser|salzwasser|lösung) .{0,40}(batterie|elektrode|elektroden|netzteil)"
+      # ⚠️ **Einfache Anführungszeichen.** In doppelten ist `\b` in YAML das
+      # Steuerzeichen Backspace, nicht die Regex-Wortgrenze — das Muster liefe
+      # ohne Fehlermeldung ins Leere. Wer einen Backslash braucht, nimmt '…'.
+      - 'wasserstoff .{0,30}(herstellen|her\b|gewinnen|erzeugen|machen|produzieren)'
+
+  - thema: Laugen und Säuren
+    hinweis: >-
+      ätzende Stoffe — Laugen und konzentrierte Säuren verursachen schwere Verletzungen,
+      besonders an den Augen
+    patterns:
+      - "(natron|kali)lauge|ätznatron|natriumhydroxid|kaliumhydroxid"
+      - "(salz|schwefel|salpeter|batterie)säure"
+      - "abflussreiniger|rohrreiniger"
+
+  - thema: Reinigungsmittel
+    hinweis: >-
+      Reinigungsmittel zu mischen — dabei kann Chlorgas entstehen, das schon in kleinen
+      Mengen die Atemwege schädigt
+    patterns:
+      - "(reiniger|reinigungsmittel|putzmittel|chlorreiniger|wc.?reiniger|bleiche|javel)"
+      - "chlor .{0,20}(herstellen|erzeugen|machen)"
+
+  - thema: offenes Feuer
+    hinweis: >-
+      offene Flammen und brennbare Flüssigkeiten — Spiritus und Benzin entzünden sich
+      als Dampf, oft weit von der Flamme entfernt
+    patterns:
+      - "bunsenbrenner|gasbrenner|spiritusbrenner|lötlampe"
+      - "(spiritus|benzin|aceton|nagellackentferner) .{0,25}(anzünden|entzünden|brennen)"
+      - "(anzünden|entzünden|verbrennen) .{0,25}(spiritus|benzin|aceton)"
+
+  - thema: Netzstrom
+    hinweis: >-
+      Strom aus der Steckdose — 230 Volt sind lebensgefährlich, anders als die
+      Batteriespannungen aus dem Unterricht
+    patterns:
+      - "steckdose|netzstrom|230 ?v(olt)?|220 ?v(olt)?"
+
+  - thema: Stoffe aus Labor, Apotheke oder Baumarkt
+    hinweis: >-
+      Chemikalien, die nicht aus der Küche stammen — ohne Abzug, Schutzausrüstung und
+      Aufsicht ist ihre Wirkung nicht abzuschätzen
+    patterns:
+      - "(aus der|in der) apotheke .{0,30}(kaufen|besorgen|holen)"
+      - "(im|aus dem) baumarkt .{0,30}(kaufen|besorgen|holen)"
+      - "chemikalien .{0,20}(kaufen|besorgen|bestellen)"

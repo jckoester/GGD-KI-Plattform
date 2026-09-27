@@ -15,13 +15,13 @@ Eine Schicht, drei Verfahren, ein Ergebnisumschlag.
 | Modul | Inhalt |
 |---|---|
 | `search.py` | Die Suchschicht: `suche()`, `identifikation()`, `thematisch()`, `aufzaehlung()`, `Suchprofil`, `Suchergebnis` |
-| `visibility.py` | **Eine** Sichtbarkeitsregel für alle Abfragewege über `context_nodes` |
+| `visibility.py` | **Eine** Sichtbarkeitsregel für alle Abfragewege über `context_nodes`. Scopes von eng nach weit: `private` · `group_teachers` · `group` · `subject` · `school` · `global`. ⚠️ **`group_teachers` verlangt zusätzlich die Lehrkraft-Rolle** — `group` allein heißt *alle Mitglieder*, also auch Schüler:innen. Der Wert kam am 24.09.2026 (Alembic 0074), weil Planungsknoten auf `group` standen und Schüler:innen damit die Stundenentwürfe ihrer Lehrkraft lesen konnten, `metadata.reflexion` eingeschlossen |
 | `filters.py` | **Eine** Übersetzung der Feldfilter (Fach, Typ, Stufe, Titel …) — genutzt von der Aufzählung *und* von `GET /context/nodes` |
 | `lookup.py` | Normalisierung von Titeln und Bildung des Nachschlage-Begriffs |
 | `retrieval.py` | Nur noch der **Lernstand** (`node_engagement`). Er ist Traversierung, keine Suche — die frühere zweite Vektorsuche für Anker-Assistenten ist in `search.py` aufgegangen |
 | `embedding.py` | Einbettung der Knoten (welche Typen, siehe `app/context/taxonomy.yaml`) |
 
-**Die drei Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
+**Die vier Verfahren** beantworten verschiedene Fragen und dürfen deshalb nicht
 verrechnet werden:
 
 - **Identifikation** — „diesen Baustein". Titelabgleich in zwei Stufen: exakt über den
@@ -33,6 +33,13 @@ verrechnet werden:
   Gesamtzahl.
 - **Aufzählung** — „alle, die …". Deterministische Filterabfrage mit Zählung vor dem
   Limit, Fassungs-Deduplizierung und Gruppierung.
+- **Vorab-Suche** (`vorab()`) — „was gehört vermutlich zu dieser Nachricht". Läuft zu
+  **jeder** Chat-Nachricht, ohne dass jemand danach fragt, und legt bis zu fünf Treffer
+  in den System-Prompt. Deshalb die einzige, die eine **Schwelle** kennt: exakter
+  Namens- oder Suchbegriff-Treffer, sonst Kosinus-Distanz ≤ `VORAB_SCHWELLE`. Beschränkt
+  auf `VORAB_TYPEN` — die Arten, die Schüler:innen im Unterricht in die Hand bekommen
+  (Flag `collection.schueler` der Taxonomie). Begründung und Messung: ADR-017, Nachtrag
+  „Vorab-Suche als Grundschicht".
 
 Jeder Abschnitt hat sein **eigenes Budget** (`Suchprofil`). Das ist keine Kosmetik: Ein
 gemeinsames Limit hieße, dass Namenstreffer die thematischen verdrängen — der Fehler, der
@@ -48,6 +55,7 @@ die Neukonzeption ausgelöst hat.
 | Werkzeug `search_context_nodes` | Identifikation + thematisch | `ASSISTANT_CONTEXT_LIMIT` |
 | Werkzeug `list_context_nodes` | Aufzählung | `ASSISTANT_CONTEXT_LIMIT` |
 | Assistent mit Wissensbereich | thematisch im Teilgraphen | `_ANKER_TOP_K` |
+| **Grundschicht jedes Chats** | Vorab-Suche (Name/Alias + Schwelle) | `VORAB_MAX` = 5 |
 
 ---
 
@@ -90,17 +98,87 @@ stellen nach vorne, was zum Fach der Konversation gehört.
 
 | Ort | Wirkung |
 |---|---|
-| `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 27 von 41 Typen |
+| `app/context/taxonomy.yaml`, `embedding: true` je content_type | Entscheidet, ob ein Knotentyp **thematisch** auffindbar ist. Ohne Embedding bleibt er über Name und Aufzählung erreichbar, taucht aber in keiner Ähnlichkeitssuche auf. Seit 09/2026: 28 von 42 Typen |
 | `app/context/taxonomy.yaml`, `embedding_input` je content_type | Woraus der Vektor gebildet wird — die **einzige** Stelle, an der sich etwas gezielt weglassen lässt (Stundenentwurf: Thema statt Verlaufsplan). Ändern entwertet bestehende Vektoren dieses Typs und verlangt einen Re-Embed |
 | `ROLLEN_TYP_BONUS` | `context/taxonomy.py` | Rollenabhängiger Vorsprung je Bausteinart (≤ 0,05, Bildungsplan-Typen neutral). Ein Vorzug, kein Filter — Rechte regelt `visibility.py` |
 | `lookup.py`, `GENERISCHE_WOERTER` | Wörter, die bei der Begriffsbildung wegfallen („Operator", „Bedeutung", Artikel …). Betrifft **nur** den exakten Abgleich — die Teilsuche bekommt die Rohanfrage |
+
+### Was ein Treffer dem Modell über sich sagt
+
+**Die Auswahl liegt in `app/context/modellsicht.py`** — seit dem 26.09.2026 nicht mehr im
+Chat-Router, weil zwei Wege dieselbe Entscheidung brauchen: das Suchwerkzeug und die
+Vorab-Suche. Dort stehen auch die beiden Regeln, die den Text betreffen:
+
+- **Lesehinweis** (`mit_lesehinweis`): Vor jedem Kontextblock steht
+  `pedagogy.kontext_hinweis` — bevorzugte Bezeichnung statt Suchbegriff, Irrtümer nutzen
+  statt aufzählen, Werte unverändert. ⚠️ Vorher standen diese Regeln nur in der
+  Werkzeugbeschreibung und im Assistenten-Prompt; im freien Chat gibt es weder das eine
+  noch das andere.
+- **Kürzung** (`kuerze`): Für `begriff` und `stoffsteckbrief` abschnittsweise —
+  Definition und Erklärung vollständig, Beispiele nach Budget (1 500 Zeichen), Schnitt
+  auf einer Zeilengrenze, sichtbares „…". Alle anderen Arten behalten den harten Schnitt
+  bei 800. Gemessen am Pilotbestand: Der Beispiel-Abschnitt erreichte das Modell vorher
+  in 11 von 36 Fällen, jetzt in 30; die Bildplatzhalter in 2 von 5, jetzt in 4.
+
+
+Nicht alles, was an einem Knoten steht, geht in den Modellkontext — und was geht, ist
+beschriftet. Entschieden wird das an **einer** Stelle, `_fuer_modell` in
+`app/chat/router.py`.
+
+| Feld | Herkunft | Warum es so heißt |
+|---|---|---|
+| `content` | Knotentext, auf `_INHALT_MAX_ZEICHEN` gekürzt | Abbildungsplatzhalter werden **vor** dem Kürzen zur Beschreibung aufgelöst |
+| Metadaten je Typ | `MODELL_METADATA` in `taxonomy.py` | Whitelist, kein „alles Metadata“ — die Spalte trägt auch Import-Interna und ganze SVG-Dokumente |
+| `suchbegriffe` | `node_aliases` | ⚠️ **Die Beschriftung ist die Maßnahme.** Unbenannt („aliase") standen sie gleichberechtigt neben dem bevorzugten Begriff, und das Modell verwendete sie: Es antwortete „Wasserstoffbrückenbindung“, obwohl der Knoten „Wasserstoffbrücken“ heißt. Aliase sind das, **wonach gefragt wird**, auch in schiefer Form („Mol“ für die Stoffmenge) |
+| `abgrenzungen` | Kanten `related_to` mit `art: abgrenzung` | Wovon sich der Knoten unterscheidet und wodurch. Höchstens fünf je Treffer, nur **aktive** Ziele, Titel statt IDs |
+
+⚠️ **Die Abgrenzungen sind der Sonderfall unter diesen Feldern**: Sie stehen weder im
+Knotentext noch im Embedding. `## Abgrenzung` bleibt aus `content` heraus — aus demselben
+Grund wie die Fehlvorstellungen: Sie sagen, was der Begriff **nicht** ist, und zögen im
+Vektor genau die Fragen an, die sie abgrenzen sollen. Bis 09/2026 sah das Modell sie
+deshalb **gar nicht**, dabei sind es die Sätze, die Verwechslungen verhindern.
+
+| `stufe` | Klassenstufe der Person gegen die des Knotens | Nur **wo etwas nicht passt** — „kommt ab Klasse 10“, „Vorwissen (frühere Fassung)“, „früherer Stoff“. Passende Treffer stehen ohne Vermerk vorn |
+
+### Klassenstufe: kennzeichnen und sortieren, nicht filtern
+
+Woher die Stufe kommt, entscheidet `stufe_der_person` (`context/service.py`) in dieser
+Reihenfolge: **Unterrichtsgruppe der Konversation**, dann der Jahrgang aus der
+Anmeldung. Die Gruppe gewinnt, weil sie genauer ist — eine Zehntklässlerin im Chemie-Chat
+ihrer Klasse 10 ist dort in Klasse 10, auch wenn ihr Konto etwas anderes sagt.
+Unbekannt bleibt unbekannt: Ein Rückfall auf eine Vorgabe behandelte jeden Erwachsenen
+ohne Jahrgang wie eine Achtklässlerin.
+
+Die Stufe eines **Bausteins** kommt aus zwei Quellen (`context/stufen.py`):
+
+1. `metadata.ab_klasse` bei Begriffen mit mehreren Fassungen. Welche die aktuelle ist,
+   entscheidet der Vergleich **untereinander** — die höchste erreichte Stufe gewinnt,
+   frühere sind Vorwissen. Ohne diesen Vergleich wäre jeder Begriff unterhalb der
+   Stufe „Vorwissen“, also fast jeder.
+2. Sonst das Klassenband seiner Bildungsplan-Fundstellen. Es steht in den Daten
+   (`min_grade`/`max_grade` an der Kompetenz) und wird nicht nachgebaut; gezählt werden
+   nur **aktive** Ziele in der für Fach und Stufe geltenden Edition.
+
+⚠️ **Gefiltert wird nicht.** Fragt eine Neuntklässlerin ausdrücklich nach der
+Elektronen-Fassung der Oxidation, fände der Assistent sonst nichts und antwortete aus
+dem Modellwissen — also ohne die Definition ihrer Schule. Sortiert wird **stabil** und
+in zwei Gruppen (passt / passt nicht); „kommt später“ gegen „Vorwissen“ zu
+ordnen hieße, eine Vorliebe zu behaupten, für die es keine Grundlage gibt.
+
+Die **Aufzählung** kennzeichnet, sortiert aber nicht: Sie beantwortet „alle, die …“
+und ist nach Fach und Titel geordnet — das ist ihre Aussage.
+
+⚠️ **Im Embedding und im Namensabgleich bleiben Aliase unverändert** — dort sind sie
+richtig. Drei Prüfsatzfälle halten das fest („Mol“, „Molzahl“,
+„Wasserstoffbrückenbindung“): Wer bei der Beschriftung versehentlich die Suche
+anfasst, sieht es dort.
 
 ⚠️ **Der Eigentümer-Bonus und die rollenbasierte Gewichtung hängen an derselben
 Vorbedingung: Der Typ muss überhaupt ein Embedding tragen.** Ein Bonus auf etwas, das in
 der thematischen Auswahl nie erscheint, tut nichts. Bis zur Embedding-Ausweitung
 (ADR-017) galt das für **alle** nutzererzeugten Bausteine — Arbeitsblätter, Klausuren und
 Stundenentwürfe waren dort strukturell unsichtbar, und die Gewichtung lief leer. Heute
-tragen 27 der 41 Typen ein Embedding; die 14 übrigen bleiben bewusst draußen und sind
+tragen 28 der 42 Typen ein Embedding; die 14 übrigen bleiben bewusst draußen und sind
 über Name und Aufzählung erreichbar. Wer daran etwas ändern will, ändert zuerst die
 Taxonomie und lässt den Embedding-Backfill laufen.
 
@@ -214,7 +292,7 @@ die niemandem einzeln gehören — ein Curriculum beschließt die Fachschaft gem
 
 Die Typmenge dafür ist **abgeleitet, nicht gepflegt**:
 `PERSOENLICHE_CONTENT_TYPES` in `taxonomy.py` ist genau die Menge mit
-`scope_defaults.write_scope == "private"` — 16 von 41 Typen, deckungsgleich mit
+`scope_defaults.write_scope == "private"` — 16 von 42 Typen, deckungsgleich mit
 Lehrkraft-Material, Lehrkraft-Planung und Schüler-Artefakten.
 
 ⚠️ **Der Vorgabewert des Typs, nicht der Scope des Knotens.** Letzterer ist eine
@@ -378,14 +456,46 @@ python scripts/seed_search_eval_nodes.py --entfernen # wieder wegräumen
 Der Prüfsatz (`config/search_eval.yaml`) misst drei Frageklassen und beendet sich mit
 Exit-Code 1, wenn eine Zusage bricht:
 
-| Kennzahl | Bedeutung | Ausgangswert |
+| Kennzahl | Bedeutung | Stand 27.09.2026 |
 |---|---|---|
-| Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 17/21 |
-| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 36/39 |
+| Richtiges Fach auf Platz 1 | Rangqualität der thematischen Auswahl | 30/35 |
+| Erwarteter Knoten gefunden | Wird der gesuchte Baustein überhaupt geliefert | 51/54 (mittlerer Rang 2,1) |
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
-| Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten — erstmals gemessen | 2/2 auf Rang 1 |
-| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | derzeit 0 |
+| Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten | 3/3, zwei davon auf Rang 1 |
+| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | 8 solcher Fälle, größter Abschnitt 3 |
+
+⚠️ **Die drei roten Fälle sind Altbestand** und kein Rückschritt: zweimal Deutsch
+`3.4.1.1` (einmal mit, einmal ohne Fachbezug) und Informatik `3.1.2(1)`. Beide Knoten
+gibt es; sie werden von ähnlicheren verdrängt. Wer daran arbeitet, prüft zuerst, ob die
+Erwartung stimmt — der Bericht sagt das bei jedem Fall dazu.
+
+### `typ:` — warum ein Fall ohne ihn lügen kann
+
+Ein Fall nennt in `knoten:` den erwarteten Baustein, und `_rang` vergleicht das als
+**Teilzeichenkette** gegen den Titel. Das genügt für Bildungsplan-Nummern
+(`3.2.1.3`), ist aber gefährlich, sobald ein Fall einen **Fachbegriff** erwartet: Der
+Bildungsplan nennt die Begriffe beim Namen. „Wasserstoffbrücken" steht auch in
+„3.2.1.3(10) die besonderen Eigenschaften von Wasser erklären (Dipol,
+Wasserstoffbrücken)" — der Fall wäre grün, ohne dass der Fachbegriff existiert.
+
+⚠️ **Gemessen am 26.09.2026: Zehn von dreizehn** neu angelegten Fachbegriff-Fällen waren
+so auch ohne den Pilotbestand erfüllbar. Sie waren nicht falsch, aber sie belegten
+nichts.
+
+Deshalb trägt ein Fall, der einen bestimmten Knotentyp meint, ihn ausdrücklich:
+
+```yaml
+  - frage: Wie heißt die Bindung im Wassermolekül richtig?
+    fach: Chemie
+    knoten: Elektronenpaarbindung
+    typ: begriff          # ohne diese Zeile zählte auch die BP-Kompetenz als Treffer
+```
+
+**Der Lader weist unbekannte Schlüssel ab.** Das ist keine Kosmetik: Die erste Fassung
+bildete die Felder einzeln ab und verschluckte `typ` stillschweigend — die Messung zeigte
+dieselbe Zahl wie ohne, und der Fehler wäre nicht aufgefallen, hätte die Zahl nicht
+*gleich* bleiben müssen.
 
 **Unterschreiten ist ein Fehlschlag, kein Kompromiss.** Wer eine Kennzahl bewusst
 opfert, begründet das im Code-Kommentar neben dem geänderten Wert — so wie es die

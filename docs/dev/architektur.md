@@ -24,10 +24,11 @@ Cron-Container (separat):
 | Modul | Zweck |
 |-------|-------|
 | `auth/` | OAuth2/OIDC-Flow, JWT-Ausgabe und -Prüfung, Pseudonymisierung, Adapter-Interface |
+| `assistants/` | Wer darf welchen Assistenten benutzen (`sichtbarkeit.py`) — **eine** Regel in zwei Darstellungen: `darf_nutzen()` für den einzelnen Fall (Chat), `sichtbar_klausel()` für die Liste. Ein Prüfsatz lässt beide am selben Bestand gegeneinander laufen. Bis 09/2026 gab es die Regel zweimal, und keine der beiden kannte die Scopes |
 | `chat/` | Chat-Endpunkte, SSE-Streaming, Konversations- und Nachrichtenverwaltung, Tool-Registry (`tools.py`: `planning` / `student_planning`) |
 | `context/` | Kontextspeicher: Knoten/Kanten, Curriculum-Import, Retrieval (semantisch + Engagement-UNION), Taxonomie |
-| `planning/` | Unterrichtsplanung (UP-Reihe): Slots/Snapshots, Jahresplan- und Stundenentwurfs-Logik, Assistenten-Tools. Verschiebe-Dialog: `reflow_service.py` (Reflow-Kontext + Überhang-Erkennung), `operations.py` (typisierte Plan-Operationen + atomarer Executor). Schüler-Kontext: `student_context.py` (aktuelles Thema, Klassenarbeits-Scope, Whitelist) |
-| `calendar/` | Stundenplan-Anbindung (UP-8): Adapter-Interface (`base.py`) + WebUntis-Implementierung, Ferien-Übernahme, Wochenmuster-Ableitung, Abgleich von Entfall/Vertretung/Verlegung (`sync.py`: `plan_sync` rein, `apply_sync` schreibend). Wie bei `auth/` ist das Interface der Erweiterungspunkt für andere Quellen |
+| `planning/` | Unterrichtsplanung (UP-Reihe): Slots/Snapshots, Jahresplan- und Stundenentwurfs-Logik, Assistenten-Tools. Slot-Erzeugung: `slot_generator.py` (Neuaufbau verschont `source != 'pattern'`). Stundenrasterwechsel: `umhaengen.py` (`plane_umhaengen` rein / `wende_umhaengen_an` schreibend — Fixpunkte behalten ihr Datum, der Rest wandert nach Reihenfolge, Übriges auf den Parkplatz). Verschiebe-Dialog: `reflow_service.py` (Reflow-Kontext + Überhang-Erkennung), `operations.py` (typisierte Plan-Operationen + atomarer Executor). Schüler-Kontext: `student_context.py` (aktuelles Thema, Klassenarbeits-Scope, Whitelist). Startseite und „Jetzt"-Block: `mein_tag.py` (heutige und nächste Stunden je Rolle) und `jetzt.py` (wo stehe ich in der Einheit) — beide **reine Regeln ohne Datenbank**, damit sich die Grenzfälle des Kalenders (Freitag, Ferienvorabend, Schuljahresende) prüfen lassen, ohne eine Welt aufzubauen. ⚠️ `lesson_slots` trägt **keine Uhrzeit**, nur `start_period`/`periods`: Es gibt eine Reihenfolge, aber kein „vergangen" |
+| `calendar/` | Stundenplan-Anbindung (UP-8): Adapter-Interface (`base.py`) + WebUntis-Implementierung, Ferien-Übernahme, Wochenmuster-Ableitung, Abgleich von Entfall/Vertretung/Verlegung (`sync.py`: `plan_sync` rein, `apply_sync` schreibend — legt fehlende Slots mit `source='import'` an, aber nur für Gruppen mit Planung). Wie bei `auth/` ist das Interface der Erweiterungspunkt für andere Quellen |
 | `budget/` | Wochenmodell: Stufen aus YAML (`tiers.py`), Unterrichtswochen aus `school_year.yaml` (`schulwochen.py`), Zuteilungslogik (`accrual.py`), Hochrechnung (`forecast.py`), Wechselkurs (`exchange.py`) |
 | `litellm/` | LiteLLM-HTTP-Client, Team-Anlage, User-Budget-Sync |
 | `upload/` | Dateiupload-Session, Text-Extraktion (PDF via pdfminer.six, Bilder via Base64) |
@@ -37,9 +38,22 @@ Cron-Container (separat):
 | `crons/` | Cron-Logik (Cleanup Accounts/Konversationen/Rückmeldungen, Embedding-Backfill, Stundenplan-Abgleich) — wird von Skripten aufgerufen |
 | `site_texts/` | Öffentliche Texte (Impressum, Datenschutz, Nutzungsregeln) aus DB |
 | `preferences/` | Nutzerpräferenzen (Theme, Kostenanzeige-Granularität) |
+| `groups/` | Unterrichtsgruppen jenseits der Endpunkte: Beitrittscodes (`beitritt.py` — reine Regeln plus schreibende Vorgänge, Rücknahme als Menge), die Aktualitätsregel „gehört zum laufenden Schuljahr?" (`aktualitaet.py`, geteilt mit dem Stundenplan-Abgleich) und die Angebote für neue SSO-Unterrichtsgruppen (`angebote.py` — zuordnen, anlegen, ignorieren) |
 | `feedback/` | Rückmeldekanal (ADR-020): Endpunkte für alle Rollen, Statusmaschine und Missbrauchsschutz (`service.py` — von Nutzer- **und** Admin-Seite benutzt), Chat-Snapshot, Benachrichtigung mit Stundenfenster |
 | `config.py` | Pydantic-Settings — liest alle Umgebungsvariablen |
 | `main.py` | FastAPI-App-Instanz, Router-Einbindung, CORS |
+| `api/` | Übrige Endpunkt-Module neben `api/admin/`: Gruppen, Fächer, Bildarten, Zugangstoken, Leitplanken, PII-Prüfung, Krisen-Freigabe (`review.py`), Archiv |
+| `artifacts/` | Artefaktbibliothek (Phase 18): Speicher (`store.py`), Übernahme aus dem Chat (`promote.py`, `uebernahme.py`), GeoGebra-Export, Mengengrenzen |
+| `core/` | Querschnitt ohne eigene Fachlichkeit: Client-IP, Hintergrundaufgaben, Pfade, Produktions-Selbstprüfung |
+| `crisis/` | Krisenerkennung (ADR-008): Schlüsselwort-Erkennung (`detector.py`), Benachrichtigung, Erinnerungen an unerledigte Fälle |
+| `export/` | Ausgabeformate: PDF (weasyprint), DOCX/ODT (Pandoc), Vorlagen, Prärendern von Diagrammen |
+| `mail/` | SMTP-Versand — einzige Stelle, die Mails verschickt |
+| `models/` | Platzhalter-Paket ohne Inhalt; die SQLAlchemy-Modelle liegen in `db/` |
+| `pedagogy/` | Pädagogische Leitplanken (ADR-008 Teil 1+2): `pedagogy.yaml` laden, Präambeln und Lernverhalten in den System-Prompt komponieren |
+| `pii/` | Datensparsamkeit-Gate (Phase 14): lokale NER + Muster, ohne Netzaufruf |
+| `ratelimit/` | Drosselung: Regeln aus `rate_limits.yaml`, Zähler, FastAPI-Abhängigkeit |
+| `render/` | Server-Rendering (Phase 17): CircuiTikZ/MathJax über den Node-Sidecar, Plot-Auswertung, Cache |
+| `ui/` | Darstellungsstufen: `ui_levels.yaml` laden und ausliefern — was die Oberfläche zeigt, nicht was sie darf |
 
 ## Privacy-Invariante
 
@@ -61,11 +75,13 @@ Eine Verletzung dieser Invariante ist ein kritischer Datenschutz-Bug.
 
 | Tabelle | Primärschlüssel | Enthält |
 |---------|----------------|---------|
-| `users` | `pseudonym` (str) | Rolle, Jahrgang, letzter Login |
+| `pseudonym_audit` | `pseudonym` | Rolle(n), Jahrgang, letzter Login, De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel. ⚠️ Eine Tabelle `users` gibt es nicht — hier stand sie bis zum 25.09.2026 |
 | `conversations` | UUID | `pseudonym`, Modell, Assistent-Ref, Titel, Kostensum |
 | `messages` | UUID | `conversation_id`, Rolle, Inhalt (Text/JSON), Kosten |
 | `assistants` | int | Name, System-Prompt, Modell, Status, Audience, Scope |
 | `exchange_rates` | id | EUR→USD-Kurs, Quelle, Datum |
 | `jwt_revocations` | `jti` | Revozierte Token-IDs |
-| `pseudonym_audit` | `pseudonym` | De-Anonymisierungs-Log, Massen-Revokations-Zeitstempel |
 | `site_texts` | `key` | Verwaltete Texte (impressum, datenschutz, regeln) |
+| `group_source_classes` | (group_id, class_group_id) | Aus welchen Klassen sich eine Unterrichtsgruppe speist — Herkunft, nicht Mitgliedschaft |
+| `group_join_codes` | UUID | Beitrittscode je Gruppe: Code, Gültigkeit, Widerruf, ausgebendes Pseudonym |
+| `sso_group_offers` | UUID | Neue SSO-Unterrichtsgruppe, die noch keiner Plattform-Gruppe zugeordnet ist — je Lehrkraft eine Zeile |

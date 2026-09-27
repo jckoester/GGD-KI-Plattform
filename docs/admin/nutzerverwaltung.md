@@ -106,9 +106,21 @@ Zwei Mechanismen adressieren das:
 ## SSO-Gruppenimport: Unterrichtsgruppen
 
 Wenn der SSO-Provider Gruppen für Fachschaften, Schulklassen und
-Unterrichtsgruppen liefert, importiert die Plattform diese automatisch beim
-Login. Dafür müssen die Gruppennamen in `auth.yaml` unter `sso.groups` als
-Regex-Muster konfiguriert sein.
+Unterrichtsgruppen liefert, wertet die Plattform diese beim Login aus. Dafür müssen die
+Gruppennamen in `auth.yaml` unter `sso.groups` als Regex-Muster konfiguriert sein.
+
+⚠️ **Ohne Fachschaftsgruppe kein Fachbegriff-Import.** Wer Fachbegriffe als Dateien
+einspielen oder exportieren will, muss Mitglied der `subject_department`-Gruppe des
+Fachs sein — die Rolle „Lehrkraft" genügt nicht. Fehlt die SSO-Gruppe `FS.<Fach>`,
+erscheint die Schaltfläche zwar, jeder Versuch endet aber mit einer Absage. Prüfen
+lässt sich der Stand unter `/settings/users`; die Meldung nennt das Fach, um das es
+geht. Siehe [Fachbegriffe pflegen](../user/fachbegriffe-pflegen.md).
+
+⚠️ **Angelegt werden sie nicht alle gleich.** Fachschaften, Schulklassen, Lehrkräfte- und
+Arbeitsgruppen entstehen automatisch. **Unterrichtsgruppen nicht** — sie werden der
+Lehrkraft als *Angebot* vorgelegt (siehe unten). Bis zum 23.09.2026 entstanden auch sie
+automatisch; das führte zu Doppelgruppen und in einem Fall zu einem fehlgeschlagenen
+Login.
 
 **Matching-Reihenfolge:** Für jede SSO-Gruppe wird der aus dem Gruppenname
 extrahierte Wert zunächst direkt (case-insensitiv) mit dem Fach-Slug verglichen.
@@ -129,6 +141,157 @@ sso:
     M: mathematik
 ```
 
+
+
+## Unterrichtsgruppen aus dem Schulkonto: das Angebot
+
+Liefert der SSO eine Unterrichtsgruppe, zu der es auf der Plattform noch keine Gruppe
+gibt, **entsteht nichts**. Die Gruppe wird der Lehrkraft unter *Unterricht → Meine
+Unterrichtsgruppen* als **Angebot** vorgelegt; sie entscheidet:
+
+| Antwort | Was passiert |
+|---|---|
+| **Zuordnen** | Die SSO-Gruppe wird mit einer vorhandenen Unterrichtsgruppe verknüpft. Ab dann führt das Schulkonto die Mitglieder |
+| **Als neue Gruppe anlegen** | Eine neue Unterrichtsgruppe entsteht, bereits verknüpft |
+| **Ignorieren** | Nichts geschieht. Die Frage kehrt nicht zurück, lässt sich aber wieder einblenden |
+
+### Warum nicht automatisch
+
+Aus den SSO-Daten lässt sich **nicht bestimmen**, ob `unterricht.9d.ch` die vorhandene
+Gruppe *Chemie 9D* meint oder eine neue ist: Der Provider liefert einen Namen als
+Freitext, keine Klassenzuordnung. `„NwT 9a"` und `unterricht.9a.nwt` sehen nur
+*meistens* gleich aus.
+
+Bis zum 23.09.2026 versuchte die Plattform, das über `(Lehrkraft, Fach)` zu erraten. Das
+war aus zwei Gründen falsch:
+
+- **Zwei Gruppen im selben Fach sind der Normalfall.** *Chemie 9c* und *Chemie 9d* sind
+  getrennter Unterricht mit eigenen Terminen, Ausfällen und Reflexionen — und je einem
+  eigenen Stundenplan-Eintrag. Die Heuristik traf beide und brach mit einem Fehler ab;
+  die Lehrkraft kam nicht mehr hinein.
+- **Eine falsche Verschmelzung ist nicht rückgängig zu machen.** Sie schiebt zwei
+  Jahrespläne ineinander.
+
+Eine Dublette ist unbequem, ein falscher Zusammenschluss ist teuer. Deshalb wird gefragt.
+
+### Was beim Scharfschalten zu erwarten ist
+
+Wird im Schulkonto die Unterrichtsgruppen-Synchronisation neu aktiviert, sehen die
+Lehrkräfte beim nächsten Login **ein Angebot je Gruppe**. Nichts ändert sich, bis sie
+antworten. Bestehende Gruppen, Jahrespläne und Chats bleiben unberührt.
+
+**Die erste Antwort gilt für alle.** Bei kooperativ unterrichteten Kursen sehen mehrere
+Lehrkräfte dasselbe Angebot; sobald eine es beantwortet hat, verschwindet es bei den
+übrigen. Ohne diese Regel legte die zweite Antwort eine Doppelgruppe an.
+
+### Folgen einer Zuordnung
+
+- Die Mitglieder kommen ab dem nächsten Login aus dem Schulkonto (Herkunft `sso`).
+- **Über die Klasse geerbte Mitgliedschaften werden entfernt.** Die Vererbung ist für
+  SSO-Gruppen abgeschaltet; bliebe das Geerbte stehen, räumte es niemand mehr auf — auch
+  der Immediate Mirror nicht, der nur `sso` anfasst.
+- **Beitritte per Code bleiben.** Sie sind die Entscheidung eines Menschen. Der
+  Beitrittscode wird für die Gruppe allerdings ausgeblendet: Wo das Schulkonto die
+  Mitglieder führt, gäbe ein zweiter Weg hinein zwei Wahrheiten.
+- Jahresplan, Stundenentwürfe und Konversationen bleiben unberührt.
+
+## Woher Mitgliedschaften kommen — und wer sie aufräumt
+
+Auf Ebene 2 (Unterrichtsgruppen) gibt es **fünf** Wege, auf denen ein Pseudonym Mitglied
+wird. Sie stehen explizit in `group_memberships.herkunft`, weil sich daraus ergibt, was
+ein Aufräumlauf anfassen darf:
+
+| Herkunft | Wie sie entsteht | Wer entfernt sie automatisch |
+|---|---|---|
+| `sso` | Der Provider nennt die Person in der Gruppe | **Immediate Mirror** beim Login — er entfernt, was das Token nicht mehr deckt |
+| `geerbt` | Schüler:in der Quellklasse einer Unterrichtsgruppe | **Vererbungslauf** beim Login — er entfernt, wo die Quellklasse nicht mehr passt |
+| `code` | Selbstbeitritt per Beitrittscode | niemand — nur die Lehrkraft, durch Rücknahme einer Code-Runde |
+| `eigen` | Die Lehrkraft, die die Gruppe angelegt hat | niemand |
+| `manuell` | Admin über `POST /groups/{id}/members` | niemand |
+
+**Die Regel dahinter:** Ein Aufräumlauf darf nur entfernen, was er selbst hätte anlegen
+können. Alles andere ist die Entscheidung eines Menschen und fällt nicht von allein.
+
+⚠️ **Bis Alembic `0068` war die Herkunft geraten** — der Vererbungslauf löschte beim
+Abgang alles mit `role_in_group = 'student'`. Das war richtig, solange jede
+Schüler-Mitgliedschaft geerbt war; mit dem Beitrittscode stimmt es nicht mehr. Wer die
+Bedingung dort wieder auf die Rolle umstellt, wirft jeden Nachzügler aus jeder Gruppe,
+die zufällig auch eine Quellklasse hat.
+
+### Erbt eine Gruppe oder nicht?
+
+`groups.erbt_mitglieder` (Alembic `0069`) entscheidet, ob die Schüler:innen der
+Quellklassen automatisch Mitglied werden. Die Lehrkraft beantwortet die Frage beim
+Anlegen; vorgeschlagen wird sie nach der Lage — bei **genau einer** Klasse „ganze
+Klasse", bei mehreren und in der Kursstufe „Teilgruppe".
+
+Das ist bewusst **entschieden und nicht gezählt**: Auch eine einzelne Klasse kann geteilt
+sein (Religion und Ethik nennen nur einen Klassennamen), und zwei kleine Klassen können
+vollständig gemeinsam unterrichtet werden. Beides weiß nur die Lehrkraft.
+
+Wird der Wert später auf `false` gesetzt, räumt der Vererbungslauf die bisher geerbten
+Mitgliedschaften beim nächsten Login ab — die Entscheidung ist also korrigierbar.
+
+### Beitrittscodes
+
+`group_join_codes` hält je Gruppe den aktuellen Code. Gültigkeit **drei Tage**,
+erneuerbar; es gilt immer nur einer je Gruppe. Der Code gehört der **Gruppe**, nicht
+einer Person: Er trägt kein Personenmerkmal und wird deshalb nicht personenbezogen
+gelöscht. Nur `erstellt_von_pseudonym` fällt unter die 90-Tage-Frist und wird dann
+genullt — der Code selbst bleibt gültig, bis er abläuft.
+
+Das Einlösen ist gedrosselt (`group_join` in `rate_limits.yaml`, Vorgabe 10 Anfragen je
+5 Minuten und Person). **Das Lesen des Codes ist es nicht** — sonst sperrte sich eine
+Lehrkraft aus ihrer eigenen Gruppenansicht aus.
+
+## Verwaiste Unterrichtsgruppen finden
+
+Eine Unterrichtsgruppe **ohne Lehrkraft** ist für niemanden mehr erreichbar: Die
+Jahresübersicht verlangt eine Lehrkraft-Mitgliedschaft, und die Gruppenliste einer
+Lehrkraft zeigt nur eigene Gruppen. Jahresplan, Stundenentwürfe und Konversationen
+bleiben trotzdem stehen.
+
+**Das entsteht im laufenden Betrieb**, nicht nur beim Ausprobieren — zwei Wege:
+
+- Der **Immediate Mirror** entfernt die Mitgliedschaft, sobald die Schulkonto-Gruppe
+  nicht mehr im Token steht.
+- Der **90-Tage-Löschlauf** nimmt sie mitsamt dem Konto. Bei einer Lehrkraft, die die
+  Schule verlässt, ist das der Normalfall.
+
+```bash
+curl -s -b "session=$TOKEN" \
+  "https://.../api/admin/groups?ohne_lehrkraft=true" | jq '.total, .items[].name'
+```
+
+Der Filter gilt nur für Unterrichtsgruppen: Eine Klasse ohne Lehrkraft ist der
+Normalfall, eine Fachschaft hat ohnehin nur welche. Ein Treffer ist deshalb immer ein
+Befund. Übernehmen kann die Gruppe dann eine Lehrkraft, die Sie als Mitglied eintragen
+(siehe unten) — oder Sie lassen sie stehen, bis klar ist, ob noch jemand den Jahresplan
+braucht.
+
+## Die Gruppen-API für Reparaturen
+
+Unter `/admin/groups` liegen acht Endpunkte (auflisten, anlegen, ansehen, ändern,
+löschen, Mitglieder lesen, Mitglied eintragen, Mitglied entfernen). Sie haben **bewusst
+keine Oberfläche**: Mitgliederpflege von Hand ist im Regelbetrieb ausgeschlossen, weil
+die Plattform keine Klarnamen zeigt — eine Liste aus Pseudonymen wäre nicht bedienbar
+(ADR-003, Ebene 2).
+
+Für die **Reparatur** ist das etwas anderes. Dort liegt genau ein Pseudonym vor, und es
+kommt aus dem Audit-Log: Sie wissen, wen Sie eintragen wollen, und Sie tragen genau den
+ein.
+
+```bash
+# Lehrkraft einer verwaisten Gruppe zuordnen
+curl -s -X POST -b "session=$TOKEN" -H 'Content-Type: application/json' \
+  -d '{"pseudonym": "<aus dem Audit-Log>", "role_in_group": "teacher"}' \
+  "https://.../api/admin/groups/<id>/members"
+```
+
+Die so entstandene Mitgliedschaft trägt `herkunft = 'manuell'` und wird von **keinem**
+Aufräumlauf entfernt — auch nicht von der Rücknahme einer Beitrittscode-Runde. Das ist
+Absicht: Was ein Mensch entschieden hat, fällt nicht von allein.
+
 ## Unterrichtsgruppen manuell anlegen
 
 Lehrkräfte können Unterrichtsgruppen auch manuell anlegen, wenn der SSO-Provider
@@ -138,7 +301,12 @@ sie nicht automatisch liefert. Das Verhalten wird über das Flag
 | Wert | Verhalten |
 |------|-----------|
 | `true` (Standard) | Lehrkräfte sehen Vorschläge in der Sidebar und können bestätigen oder ablehnen |
-| `false` | Vorschläge werden nicht angezeigt; `POST /api/groups/teaching` gibt HTTP 403 zurück |
+| `false` | Vorschläge werden nicht angezeigt; `POST /api/groups/teaching` **und** `POST /api/calendar/teaching-groups` geben HTTP 403 zurück |
+
+Der Schalter gilt für **beide** Wege, auf denen eine Lehrkraft eine Unterrichtsgruppe
+anlegen kann: „Klasse × Fach" und das Anlegen aus dem eigenen Stundenplan. Der zweite ist
+besser belegt, erzeugt aber dieselbe Art Gruppe — und in einer Installation, die auf den
+SSO setzt, dieselben Dubletten.
 
 `false` empfiehlt sich, wenn der SSO-Provider alle Unterrichtsgruppen
 zuverlässig liefert — so werden manuelle Inkonsistenzen vermieden.

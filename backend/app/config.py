@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     crisis_triggers_path: str = "config/crisis_triggers.yaml"
     help_resources_path: str = "config/help_resources.yaml"
     pedagogy_path: str = "config/pedagogy.yaml"
+    home_experiment_triggers_path: str = "config/home_experiment_triggers.yaml"
     rate_limits_path: str = "config/rate_limits.yaml"
     auth_iserv_client_secret: str = ""
     # Wenn True, loggt der OAuth-Adapter beim Login die rohen userinfo-Gruppen/-Rollen
@@ -225,6 +226,20 @@ class Settings(BaseSettings):
     assistant_context_limit: int = 20
     upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB
     upload_max_files: int = 3
+    # ── Fachbegriff-Import (Paket 10/AP3) ────────────────────────────────────
+    # Eine Fachschaft spielt ihre Begriffe als Bündel ein: einzelne `.md`/`.svg` oder
+    # ein Zip. Die Zahlen sind am Pilot gemessen (36 Knoten plus 31 Abbildungen ≈
+    # 400 KB) und großzügig aufgerundet — sie sollen eine vollständige Sammlung
+    # tragen, nicht knapp reichen.
+    #
+    # ⚠️ **Der Reverse-Proxy muss mitwachsen.** `NGINX_MAX_BODY_SIZE` (Vorgabe 24m in
+    # `docker-compose.yml`) begrenzt den Anfragekörper, bevor er das Backend erreicht.
+    # Ist er kleiner als `fachbegriffe_import_max_bytes`, bekommt die Fachschaft ein
+    # nacktes 413 vom nginx statt eines Satzes, der sagt, was zu tun ist.
+    # `tests/unit/test_upload_grenzen_passen.py` hält beide zusammen.
+    fachbegriffe_import_max_bytes: int = 20 * 1024 * 1024        # Bündel, entpackt
+    fachbegriffe_import_max_file_bytes: int = 2 * 1024 * 1024    # je `.md`/`.svg`
+    fachbegriffe_import_max_files: int = 500                     # Dateien je Lauf
     assistant_schema_path: str = "config/assistant_schema.json"
     teacher_schoolwide_sharing_requires_admin: bool = True
     # Begrenzter Testbetrieb: Schüler:innen sehen nur Fächer, deren Unterrichtsgruppe

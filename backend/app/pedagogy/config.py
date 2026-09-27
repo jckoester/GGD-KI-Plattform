@@ -48,10 +48,31 @@ class Preambles(BaseModel):
     teacher_extension: str
 
 
+class Sicherheitsanker(BaseModel):
+    """Ein sicherheitsrelevanter Grundsatz und wo er stehen muss.
+
+    ⚠️ **Kein Wortlaut-Test, aber auch kein blinder Fleck.** Die Präambeln sind
+    Fließtext; ein Grundsatz darin lässt sich beim Kürzen streichen, ohne dass etwas
+    rot wird. Der `anker` ist der Satzanfang — kurz genug, um eine Redaktion zu
+    überleben, lang genug, um das Streichen aufzudecken.
+    """
+
+    schluessel: str
+    #: `alle` oder `schueler` — in welcher Zielgruppe der Grundsatz stehen muss.
+    gilt_fuer: str = "alle"
+    anker: str
+    warum: str = ""
+
+
 class PedagogyConfig(BaseModel):
     preambles: Preambles
     student_augmentations: list[Augmentation] = []
     output_format: str = ""
+    #: Steht vor **jedem** Kontextblock — Vorab-Suche wie Werkzeugergebnis (N13).
+    #: Leer heißt: kein Hinweis; die Bausteine stehen dann unkommentiert da.
+    kontext_hinweis: str = ""
+    #: Grundsätze, deren Verschwinden auffallen muss (siehe :class:`Sicherheitsanker`).
+    sicherheitsanker: list[Sicherheitsanker] = []
 
 
 # ---------------------------------------------------------------------------

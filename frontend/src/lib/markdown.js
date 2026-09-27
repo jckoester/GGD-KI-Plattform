@@ -36,9 +36,63 @@ marked.use({ gfm: true, breaks: true });
 // Code-Block-Renderer
 const renderer = new marked.Renderer();
 
+/**
+ * Anker-Kennung einer Überschrift — kleingeschrieben, Satzzeichen weg, Leerzeichen zu
+ * Bindestrichen. Umlaute bleiben.
+ *
+ * ⚠️ **Ohne `id` an der Überschrift ist jeder Seitenanker tot.** `marked` erzeugt von
+ * sich aus keine; die Anwenderdoku trug am 24.09.2026 acht `](#…)`-Links, von denen
+ * **keiner** funktionierte — sie sahen wie ein Weg aus und führten nirgendwohin.
+ */
+export function ueberschriftId(text) {
+    return String(text)
+        .toLowerCase()
+        .trim()
+        .replace(/<[^>]*>/g, '')
+        .replace(/[^\p{L}\p{N}\s-]/gu, '')
+        .replace(/\s+/g, '-');
+}
+
+renderer.heading = ({ text, depth, tokens }) => {
+    const inhalt = tokens ? marked.Parser.parseInline(tokens) : text;
+    return `<h${depth} id="${ueberschriftId(text)}">${inhalt}</h${depth}>`;
+};
+
+/**
+ * Ob `datei.md`-Verweise auf Hilfe-Adressen umgeschrieben werden.
+ *
+ * ⚠️ **Nur in der Hilfe.** Dieselbe Funktion rendert Chat-Antworten und Wissensknoten;
+ * dort ist `foo.md` ein Dateiname und keine Seite dieser Plattform. Die Umschreibung ist
+ * deshalb ein Schalter und keine Regel.
+ */
+let _dokuLinks = false;
+
+/**
+ * `erste-schritte.md` → `/help/erste-schritte`, `faecher.md#archiv` → `/help/faecher#archiv`.
+ *
+ * ⚠️ **Das Inhaltsverzeichnis der Hilfe hat bis zum 26.09.2026 ins Leere geführt.** Die
+ * Übersichtsseite ist `docs/user/README.md`; ihre Verweise sind Dateinamen, weil die
+ * Doku auch außerhalb der Anwendung gelesen wird (im Repository, später auf einer
+ * Webseite). In der Anwendung landete ein Klick auf `/help/erste-schritte.md` — in einem
+ * **neuen Tab**, mit 404. Aufgefallen beim Umbau auf die dynamische Route.
+ */
+function alsHilfepfad(href) {
+    const treffer = /^([a-z0-9-]+)\.md(#.*)?$/i.exec(String(href || ''));
+    if (!treffer) return null;
+    const [, datei, anker = ''] = treffer;
+    return datei.toLowerCase() === 'readme' ? `/help${anker}` : `/help/${datei}${anker}`;
+}
+
 renderer.link = ({ href, title, text }) => {
     const titleAttr = title ? ` title="${title}"` : '';
-    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    const hilfepfad = _dokuLinks ? alsHilfepfad(href) : null;
+    // ⚠️ **Seitenanker bleiben im Tab.** `target="_blank"` galt für *jeden* Link — ein
+    // `#abschnitt` öffnete damit eine neue Seite, und zwar ohne Sprungziel. Dasselbe
+    // gilt für Verweise auf andere Hilfeseiten: Sie führen innerhalb der Anwendung
+    // weiter.
+    const intern = hilfepfad !== null || String(href || '').startsWith('#');
+    const ziel = intern ? '' : ' target="_blank" rel="noopener noreferrer"';
+    return `<a href="${hilfepfad ?? href}"${titleAttr}${ziel}>${text}</a>`;
 };
 
 function escapeHtml(s) {
@@ -180,7 +234,44 @@ const katexInlineExt = {
     },
 };
 
-marked.use({ extensions: [katexBlockExt, katexInlineExt] });
+/**
+ * `{{abbildung:EN_H2O.svg}}` — eine Abbildung an genau dieser Stelle im Knotentext.
+ *
+ * Der Platzhalter ist die Absprache zwischen drei Stellen (Paket 9): Das Seed-Skript
+ * setzt ihn anstelle der Obsidian-Einbettung `![[…]]` (AP5), `_fuer_modell` im Backend
+ * macht daraus die Bildbeschreibung fürs Modell (AP3), und hier wird er zu einer leeren
+ * Hülle, die die Svelte-Action `renderAbbildungen` (abbildungen.js) mit dem SVG füllt.
+ *
+ * ⚠️ **Hier nur die Hülle, kein SVG.** Das SVG steht in `metadata.illustrationen` des
+ * Knotens; `renderMarkdown` bekommt nur den Text und kennt den Knoten nicht. Dasselbe
+ * Muster wie bei Mermaid und den server-gerenderten Blöcken: synchroner Platzhalter,
+ * Inhalt nach dem Mount.
+ *
+ * `<span>`, nicht `<div>`: Der Platzhalter kann mitten in einem Absatz stehen, und ein
+ * `<div>` im `<p>` ist ungültiges HTML. Die Blockdarstellung macht das Stylesheet.
+ */
+const abbildungExt = {
+    name: 'abbildung',
+    level: 'inline',
+    start(src) {
+        const i = src.indexOf('{{abbildung:');
+        return i < 0 ? undefined : i;
+    },
+    tokenizer(src) {
+        const treffer = /^\{\{abbildung:([^{}]+)\}\}/.exec(src);
+        if (treffer) {
+            return { type: 'abbildung', raw: treffer[0], datei: treffer[1].trim() };
+        }
+    },
+    renderer(token) {
+        // Nur der Dateiname, nicht der Pfad — dieselbe Regel wie im Backend: Im Vault
+        // steht im Text die bare Form, im Frontmatter eine Pfadangabe.
+        const datei = token.datei.split('/').pop();
+        return `<span class="abbildung-block" data-datei="${escapeAttr(datei)}"></span>`;
+    },
+};
+
+marked.use({ extensions: [katexBlockExt, katexInlineExt, abbildungExt] });
 
 // Explizite URL-Allowlist (Sicherheits-Audit #16): nur http(s)/mailto sowie relative bzw.
 // Anchor-URLs (kein Schema). Bewusst version-UNABHÄNGIG — statt auf DOMPurifys sich änderndes
@@ -202,8 +293,9 @@ function escapeAttr(s) {
 // Anführungszeichen, `"[^"]*"` deckt sie deshalb ab.
 const TAG = '<(?:[^>"]|"[^"]*")*>';
 
-export function renderMarkdown(text) {
+export function renderMarkdown(text, { dokuLinks = false } = {}) {
     if (!text) return '';
+    _dokuLinks = dokuLinks;
     // Per-Aufruf-Speicher zurücksetzen; Nonce verhindert Kollision mit echtem Inhalt.
     _mathStore = {};
     _mathCount = 0;

@@ -5,7 +5,7 @@ Seeding läuft über die transaktionale db_session-Fixture (Rollback pro Test).
 
 import pytest
 
-from app.db.models import ContextEdge, ContextNode, Group, Subject
+from app.db.models import ContextEdge, ContextNode, Group, GroupSourceClass, Subject
 from app.planning.curriculum_resolver import resolve_group_curricula
 
 SUBJECT_ID = 900
@@ -51,13 +51,21 @@ async def _seed(db):
         Group(id=910, name="5a", slug="cls-5a", type="school_class"),
         Group(id=911, name="6a", slug="cls-6a", type="school_class"),
         Group(id=920, name="5a Mathe", slug="tg-5a-m", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=910),
+              subject_id=SUBJECT_ID),
         Group(id=921, name="6a Mathe", slug="tg-6a-m", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=911),
+              subject_id=SUBJECT_ID),
         Group(id=922, name="Kurs ohne Klasse", slug="tg-nograde", type="teaching_group",
-              subject_id=SUBJECT_ID, source_class_group_id=None),
+              subject_id=SUBJECT_ID),
         Group(id=923, name="Fach ohne Curr", slug="tg-nocurr", type="teaching_group",
-              subject_id=SUBJECT_NO_CURR, source_class_group_id=910),
+              subject_id=SUBJECT_NO_CURR),
+    ])
+    await db.flush()
+    # Quellklassen seit Alembic 0068 in einer eigenen Tabelle. 922 bekommt bewusst
+    # keine — der Kurs ohne Klassenbezug ist der Fall, in dem kein Jahrgang ableitbar ist.
+    db.add_all([
+        GroupSourceClass(group_id=920, class_group_id=910),
+        GroupSourceClass(group_id=921, class_group_id=911),
+        GroupSourceClass(group_id=923, class_group_id=910),
     ])
     await db.flush()
 
@@ -104,14 +112,76 @@ async def test_band_matcht_grade6_einzelstufe_nicht(db_session):
 
 
 @pytest.mark.asyncio
-async def test_grade_unbekannt_liefert_alle_curricula(db_session):
+async def test_ohne_stufe_wird_nichts_angeboten(db_session):
+    """⚠️ **Dieser Test hielt bis zum 24.09.2026 das Gegenteil fest.**
+
+    Er hieß `test_grade_unbekannt_liefert_alle_curricula` und verlangte, dass ohne
+    Jahrgang **alle** Curricula des Fachs zurückkommen. Im Betrieb hieß das: Einem
+    Abi-28-Chemiekurs wurde „CH Kl. 8“ zur Auswahl gestellt (Befund Jan, 24.09.2026).
+
+    Das ist schlimmer als eine leere Liste. Eine falsche Auswahl sieht aus wie eine
+    getroffene Entscheidung; wer sie ankreuzt, merkt den Fehler erst, wenn die
+    Jahresplanung an den Kompetenzen der falschen Stufe hängt. Ein leeres Ergebnis mit
+    der Auskunft „Stufe unbekannt“ ist ehrlich und führt zur Behebung.
+
+    *Ein grüner Test ist kein Beweis, dass das Verhalten richtig ist — nur, dass es
+    gewollt war, als jemand ihn schrieb.*
+    """
     await _seed(db_session)
     res = await resolve_group_curricula(db_session, 922)
 
     assert res.grade is None
     assert res.grade_unbekannt is True
-    titel = {c.titel for c in res.curricula}
-    assert titel == {"Mathe Kl. 5", "Mathe Kl. 5/6"}
+    assert res.fach_fehlt is False, "Das Fach ist da — nur die Stufe fehlt."
+    assert res.curricula == []
+
+
+@pytest.mark.asyncio
+async def test_festgelegter_jahrgang_schlaegt_die_ableitung(db_session):
+    """Die Spalte `groups.jahrgang` (Alembic 0073) gewinnt — auch gegen die Klasse.
+
+    Absicht: Die Klasse ist ein guter Anhaltspunkt und nicht immer der richtige
+    (jahrgangsübergreifende Kurse, Wiederholer-Gruppen).
+    """
+    await _seed(db_session)
+    gruppe = await db_session.get(Group, 920)   # Klasse 5a → Jahrgang 5
+    gruppe.jahrgang = 6
+    await db_session.flush()
+
+    res = await resolve_group_curricula(db_session, 920)
+    assert res.grade == 6
+    assert {c.titel for c in res.curricula} == {"Mathe Kl. 5/6"}
+
+
+@pytest.mark.asyncio
+async def test_der_name_springt_ein_wenn_sonst_nichts_da_ist(db_session):
+    """Gruppe ohne Klasse und ohne Festlegung: Der Name trägt die Vermutung."""
+    await _seed(db_session)
+    gruppe = await db_session.get(Group, 922)
+    gruppe.name = "6a Mathe Vertiefung"
+    await db_session.flush()
+
+    res = await resolve_group_curricula(db_session, 922)
+    assert res.grade == 6
+    assert res.grade_unbekannt is False
+    assert {c.titel for c in res.curricula} == {"Mathe Kl. 5/6"}
+
+
+@pytest.mark.asyncio
+async def test_fehlendes_fach_ist_etwas_anderes_als_fehlende_stufe(db_session):
+    """⚠️ Drei Lagen, die bis zum 24.09.2026 alle gleich aussahen: eine leere Liste.
+
+    Die Oberfläche sagte dreimal „kein Curriculum gefunden“ — und schickte die Lehrkraft
+    zweimal auf die falsche Suche, denn am Curriculum lag es nur in einem der Fälle.
+    """
+    await _seed(db_session)
+    gruppe = await db_session.get(Group, 922)
+    gruppe.subject_id = None
+    await db_session.flush()
+
+    res = await resolve_group_curricula(db_session, 922)
+    assert res.fach_fehlt is True
+    assert res.curricula == []
 
 
 @pytest.mark.asyncio
@@ -164,7 +234,13 @@ async def test_group_grade_liest_den_jahrgang_der_klassengruppe(db_session):
 
 @pytest.mark.asyncio
 async def test_group_grade_ohne_klassenbezug_ist_none(db_session):
-    """Oberstufenkurs ohne Klassengruppe — der Jahrgang bleibt unbekannt."""
+    """Kurs ohne Klassengruppe **und** ohne Anhaltspunkt im Namen.
+
+    „Kurs ohne Klasse" trägt keine Zahl — hier bleibt der Jahrgang zu Recht unbekannt.
+    Seit dem 24.09.2026 ist das nicht mehr der einzige Weg: Trüge der Name eine Stufe
+    („10abcd nwt") oder einen Abiturjahrgang („ch-tl-abi28"), leitete
+    `app/groups/jahrgang.py` sie ab.
+    """
     from app.planning.curriculum_resolver import group_grade
 
     await _seed(db_session)

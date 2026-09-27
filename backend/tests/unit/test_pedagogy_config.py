@@ -85,3 +85,121 @@ def test_validation_rejects_missing_preamble():
         PedagogyConfig.model_validate(
             {"preambles": {"universal_base": "x", "student_extension": "y"}}
         )
+
+
+class TestSchuelerPraeambelN8:
+    """Zusagen der Schüler-Präambel in der Fassung N8 (Paket 9, Nachgang AP7 Schritt 5).
+
+    Die Texte selbst sind Redaktionssache und werden hier **nicht** festgenagelt —
+    geprüft ist, was daran Mechanik ist.
+    """
+
+    def test_schluessel_der_zusaetze_unveraendert(self):
+        """⚠️ **Stumme Falle.** `assistants.disabled_augmentations` ist eine
+        Textspalte mit genau diesen Schlüsseln (Alembic 0032). Wer einen Schlüssel
+        umbenennt, schaltet bei jedem Assistenten, der ihn abgewählt hatte, den
+        Zusatz **wieder ein** — ohne Fehler, ohne Migration, ohne Hinweis in der
+        Oberfläche. N8 hat alle vier Texte neu gefasst und die Schlüssel bewusst
+        stehen lassen.
+        """
+        vorhanden = {a.key for a in load_pedagogy().student_augmentations}
+        # Teilmenge, nicht Gleichheit: Ein **neuer** Zusatz ist harmlos (er ist überall
+        # an, bis ihn jemand abwählt). Gefährlich ist nur, wenn einer verschwindet.
+        assert vorhanden >= {
+            "no_complete_homework_solutions",
+            "socratic_preference",
+            "no_verbatim_copy_from_sources",
+            "metacognitive_nudges",
+        }, f"vorhanden: {sorted(vorhanden)}"
+
+    def _nummern(self, text: str) -> list[int]:
+        import re
+        return [int(m) for m in re.findall(r"^\s*(\d+)\. ", text, re.MULTILINE)]
+
+    def test_nummerierung_laeuft_ueber_die_praeambeln_durch(self):
+        """Die Grundsätze sind **eine** Liste, verteilt auf zwei Bausteine.
+
+        ⚠️ Das Modell sieht `universal_base` und die Zielgruppen-Erweiterung als
+        fortlaufenden Text. Ein zusätzlicher Grundsatz in der Basis, ohne die
+        Erweiterungen nachzuziehen, ergibt „1, 2, 3, 4 · 4, 5" — zwei Punkte 4.
+        """
+        cfg = load_pedagogy()
+        basis = self._nummern(cfg.preambles.universal_base)
+        assert basis == list(range(1, len(basis) + 1))
+        for erweiterung in (cfg.preambles.student_extension,
+                            cfg.preambles.teacher_extension):
+            nummern = self._nummern(erweiterung)
+            assert nummern == list(range(basis[-1] + 1, basis[-1] + 1 + len(nummern)))
+
+    def test_querverweis_auf_eigene_punkte_trifft(self):
+        """„Die Punkte 4 bis 6 gelten, sofern …" — ein Verweis im Text auf Nummern,
+        die die Umnummerierung aus dem vorigen Test mitverschöbe, ohne dass jemand
+        den Satz anfasst."""
+        import re
+        cfg = load_pedagogy()
+        nummern = set(self._nummern(cfg.preambles.student_extension))
+        verweise = re.findall(r"Punkte (\d+) bis (\d+)", cfg.preambles.student_extension)
+        assert verweise, "Der Querverweis fehlt — dann gehört dieser Test weg."
+        for von, bis in verweise:
+            assert {int(von), int(bis)} <= nummern, (
+                f"Verweis auf Punkte {von}–{bis}, vorhanden sind {sorted(nummern)}"
+            )
+
+
+class TestSicherheitsanker:
+    """Sicherheitsrelevante Grundsätze dürfen nicht lautlos verschwinden.
+
+    ⚠️ **Der Befund** (26.09.2026, bei Paket 9 Nachgang Schritt 5): Weder der
+    Krisen-Grundsatz in `universal_base` noch die Heimversuchs-Regel in
+    `student_extension` war durch einen Test gedeckt. Wer sie beim Kürzen streicht,
+    merkt nichts — und beide sind der Grund, warum es die Präambeln überhaupt gibt.
+
+    Ein Test auf den Wortlaut wäre falsch gewesen: Er bräche bei jeder Redaktion
+    (zwei solche Tests hat die Umarbeitung der Schüler-Präambel umgeworfen). Geprüft
+    wird deshalb ein **Anker** — der Satzanfang, der in `pedagogy.yaml` neben dem Text
+    steht. Wer umformuliert, ändert ihn mit; wer streicht, wird rot.
+    """
+
+    def _zusammengesetzt(self, *, student_treatment: bool) -> str:
+        from app.pedagogy.compose import compose_system_content
+
+        return compose_system_content(
+            load_pedagogy(),
+            student_treatment=student_treatment,
+            context_str=None,
+            assistant_system_prompt=None,
+        )
+
+    def test_es_gibt_ueberhaupt_anker(self):
+        """Eine leere Liste bestünde jeden Test unten — und schützte nichts."""
+        anker = load_pedagogy().sicherheitsanker
+        schluessel = {a.schluessel for a in anker}
+        assert {"krise", "hausversuche"} <= schluessel, schluessel
+
+    def test_jeder_anker_steht_in_seiner_zielgruppe(self):
+        fuer_schueler = self._zusammengesetzt(student_treatment=True)
+        fuer_lehrkraft = self._zusammengesetzt(student_treatment=False)
+        for a in load_pedagogy().sicherheitsanker:
+            assert a.anker in fuer_schueler, (
+                f'„{a.schluessel}“ fehlt im Schülertext — {a.warum}'
+            )
+            if a.gilt_fuer == "alle":
+                assert a.anker in fuer_lehrkraft, (
+                    f'„{a.schluessel}“ gilt für alle, fehlt aber im Lehrkrafttext'
+                )
+
+    def test_schueler_anker_stehen_nicht_bei_lehrkraeften(self):
+        """Gegenprobe zur Zeile darüber: Stünde alles überall, sagte sie nichts."""
+        fuer_lehrkraft = self._zusammengesetzt(student_treatment=False)
+        nur_schueler = [
+            a for a in load_pedagogy().sicherheitsanker if a.gilt_fuer == "schueler"
+        ]
+        assert nur_schueler, "ohne einen solchen Anker belegt dieser Fall nichts"
+        for a in nur_schueler:
+            assert a.anker not in fuer_lehrkraft, a.schluessel
+
+    def test_gilt_fuer_kennt_nur_zwei_werte(self):
+        """Ein Tippfehler („schuler“) machte den Anker wirkungslos — er würde dann
+        weder als „alle" noch als „schueler" geprüft."""
+        for a in load_pedagogy().sicherheitsanker:
+            assert a.gilt_fuer in ("alle", "schueler"), (a.schluessel, a.gilt_fuer)

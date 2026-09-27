@@ -4,6 +4,7 @@ get_context_for_query() ist die einzige Funktion, die vom Chat-Router aufgerufen
 """
 
 import asyncio
+import json
 import logging
 import re
 import uuid
@@ -16,10 +17,19 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.retrieval import EngagementEntry, get_engagement_context
-from app.context.search import Suchprofil, thematisch, vektor_oder_none
+from app.context.modellsicht import fuer_modell, mit_lesehinweis
+from app.context.search import (
+    Suchprofil,
+    abgrenzungen_zu,
+    thematisch,
+    vektor_oder_none,
+    vorab,
+)
+from app.context.stufen import bp_baender_zu, vermerke as stufen_vermerke
 from app.context.schemas import CurriculumDraftConfirmed
 from app.db.models import (
     AssistantContextAnchor,
@@ -49,18 +59,47 @@ _RELATION_LABELS: dict[str, str] = {
 }
 
 
+def _vorab_block(eintraege: list[dict]) -> str:
+    """Die Grundschicht als Prompt-Abschnitt (Paket 9, N11).
+
+    ⚠️ **Als JSON, nicht als Fließtext** — anders als „Relevante Lerninhalte" darunter.
+    Die Einträge kommen aus :func:`app.context.modellsicht.fuer_modell`, derselben
+    Auswahl, die das Werkzeug liefert: mit ``suchbegriffe``, ``abgrenzungen``,
+    ``fehlvorstellungen`` und ``stufe``. Diese Felder in Prosa aufzulösen hieße, sie zu
+    erfinden — das Modell kennt die Form bereits aus dem Werkzeug-Ergebnis.
+
+    Die Leseregeln davor stehen in ``pedagogy.yaml`` und sind dieselben wie am
+    Werkzeugergebnis (N13). Der Zusatz hier ist nur der Satz, der die **Herkunft**
+    erklärt: Diese Treffer hat niemand angefordert, sie können also auch danebenliegen.
+    """
+    return (
+        mit_lesehinweis(json.dumps(eintraege, ensure_ascii=False, indent=1))
+        + "\n\nDiese Einträge wurden automatisch zur letzten Nachricht herausgesucht; "
+        "was nicht passt, lässt du weg. Brauchst du etwas anderes, such mit deinem "
+        "Werkzeug."
+    )
+
+
 def _assemble_context(
     semantic_treffer: list[dict],
     engagement_entries: list[EngagementEntry],
     pinned_nodes: list[ContextNode],
+    vorab_eintraege: list[dict] | None = None,
 ) -> str:
     """Den Kontext-Block für den Prompt bauen.
 
     ``semantic_treffer`` sind Treffer der Suchschicht (Dicts), keine ORM-Knoten: Seit
     ADR-017/AP5 liefert der Anker-Weg dasselbe wie jede andere Suche. Gepinnte Knoten
     kommen weiterhin als ORM-Objekte — sie werden direkt geladen, nicht gesucht.
+
+    ``vorab_eintraege`` ist die Grundschicht (N11) und steht **zuerst**: Sie ist das,
+    was zur aktuellen Frage gehört, während Anker-Treffer und gepinnte Knoten das ganze
+    Gespräch begleiten.
     """
     sections: list[str] = []
+
+    if vorab_eintraege:
+        sections.append(_vorab_block(vorab_eintraege))
 
     if semantic_treffer:
         lines = ["## Relevante Lerninhalte\n"]
@@ -95,6 +134,98 @@ def _assemble_context(
     return "\n\n---\n\n".join(sections)
 
 
+async def _conversation_subject(db: AsyncSession, chat_id: UUID | None) -> int | None:
+    """Fach der Konversation: Unterrichtsgruppe zuerst, sonst die Fachzuordnung.
+
+    Dieselbe Rangfolge wie bei der Klassenstufe (N5) und aus demselben Grund: Die Gruppe
+    ist die genauere Angabe. Ein Chat ohne beides ist der freie Chat — dort gibt es kein
+    Fach, und das ist keine Lücke, sondern der Normalfall.
+    """
+    if chat_id is None:
+        return None
+    conv = await db.get(Conversation, chat_id)
+    if conv is None:
+        return None
+    if isinstance(conv.group_id, int):
+        grp = await db.get(Group, conv.group_id)
+        if grp is not None and grp.subject_id is not None:
+            return grp.subject_id
+    return conv.subject_id
+
+
+async def _faecher_der_person(db: AsyncSession, pseudonym: str) -> tuple[int, ...]:
+    """Die Fächer, in denen jemand Unterricht hat — für den Vorzug im freien Chat.
+
+    Nur `teaching_group`: Eine Fachschaftsgruppe sagt, dass jemand das Fach
+    **unterrichtet**, und das ist für die Frage „welche Bedeutung von ‚Energie‘ meint
+    diese Person wohl?" die falsche Auskunft — eine Lehrkraft fragt oft über ihr Fach
+    hinaus.
+    """
+    zeilen = await db.execute(
+        sa.select(Group.subject_id)
+        .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .where(
+            GroupMembership.pseudonym == pseudonym,
+            Group.type == "teaching_group",
+            Group.subject_id.is_not(None),
+        )
+        .distinct()
+    )
+    return tuple(r[0] for r in zeilen.all())
+
+
+async def _grundschicht(
+    frage: str,
+    db: AsyncSession,
+    *,
+    pseudonym: str,
+    rollen: Sequence[str],
+    chat_id: UUID | None,
+    anchor_ids: Sequence[UUID],
+    jwt_stufe: str | None,
+    vektor,
+) -> tuple[list[dict], set[str]]:
+    """Die Vorab-Suche und ihre Aufbereitung fürs Modell (Paket 9, N11).
+
+    Liefert die fertigen Einträge **und** ihre ``node_id``s — die Einträge selbst tragen
+    sie nicht mehr (``fuer_modell`` streift sie ab, sie nützen dem Modell nichts). Der
+    Aufrufer braucht sie, um dieselben Knoten nicht ein zweites Mal aus dem Teilgraphen
+    eines Ankers zu holen.
+
+    **Das Fach** kommt aus der Konversation (N11): ihre Unterrichtsgruppe, sonst ihre
+    Fachzuordnung. Das Fach eines Assistenten steckt bereits darin — der Chat-Router
+    schreibt es beim Anlegen in die Konversationszeile. Gibt es keins, tritt der
+    schwächere Vorzug für die Fächer der eigenen Unterrichtsgruppen an seine Stelle: Im
+    freien Chat ist „Energie" für eine Physikschülerin eher der Physikbegriff, ohne dass
+    Ethik verschwände.
+    """
+    subject_id = await _conversation_subject(db, chat_id)
+    eigene = () if subject_id else await _faecher_der_person(db, pseudonym)
+    stufe = await stufe_der_person(db, chat_id, jwt_stufe)
+
+    profil = Suchprofil(
+        pseudonym=pseudonym,
+        rollen=rollen,
+        subject_id=subject_id,
+        eigene_faecher=eigene,
+        anchor_ids=tuple(anchor_ids),
+        grade=stufe,
+        # Wie im Werkzeugweg: roh holen, in `fuer_modell` auswählen.
+        mit_metadaten=True,
+    )
+    treffer = await vorab(frage, profil, db, vektor=vektor)
+    if not treffer:
+        return [], set()
+
+    grenzen = await abgrenzungen_zu(db, [t["node_id"] for t in treffer])
+    baender = await bp_baender_zu(db, treffer, stufe) if stufe is not None else {}
+    merkmale = stufen_vermerke(treffer, stufe, baender)
+    return (
+        fuer_modell(treffer, grenzen, merkmale),
+        {t["node_id"] for t in treffer},
+    )
+
+
 async def get_context_for_query(
     assistant_id: int | None,
     pseudonym: str,
@@ -102,14 +233,25 @@ async def get_context_for_query(
     chat_id: UUID | None,
     db: AsyncSession,
     rollen: Sequence[str] = (),
+    jwt_stufe: str | None = None,
 ) -> str:
     """Assembliert den Kontext-String für einen Chat-Prompt.
 
-    Kombiniert semantische Suche, Engagement-Retrieval und explizit gepinnte Knoten.
-    Pinned nodes werden unabhängig von einem Assistenten oder retrieval_scope geladen.
+    Kombiniert die **Vorab-Suche** (N11), semantische Suche im Teilgraphen eines Ankers,
+    Engagement-Retrieval und explizit gepinnte Knoten.
+
+    ⚠️ **Die Vorab-Suche läuft für jeden Chat** — mit Assistent, ohne Assistent, mit und
+    ohne Fachbezug. Bis zum 26.09.2026 landete ungefragter Kontext nur bei
+    Anker-Assistenten im Prompt; alle anderen hingen daran, dass das Modell von sich aus
+    sein Suchwerkzeug aufruft. Gemessen tat es das in 4 von 16 Fällen (und nach Anheben
+    der Denkstufe in 15 von 16) — zu wenig für eine Zusage über den Wissensspeicher.
+    Begründung und Abwägung: ADR-017, Nachtrag „Vorab-Suche als Grundschicht".
 
     ``rollen`` geht in die Sichtbarkeitsprüfung der Suchschicht ein. Ohne Angabe gilt die
     strengere Nicht-Admin-Regel — im Zweifel weniger zu zeigen ist die richtige Richtung.
+
+    ``jwt_stufe`` ist der Jahrgang aus der Anmeldung; er trägt die Stufenvermerke im
+    freien Chat, wo es keine Unterrichtsgruppe gibt (N5).
     """
     # Retrieval-Scope-Anker nur laden wenn ein Assistent aktiv ist
     anchor_ids: list[UUID] = []
@@ -135,6 +277,26 @@ async def get_context_for_query(
             )
         )
         pinned_nodes = list(pinned_result.scalars().all())
+
+    # ⚠️ **Ein Embedding für beide Wege.** Grundschicht und Ankersuche stellen dieselbe
+    # Frage; zweimal zu holen kostete je Nachricht einen zweiten Anbieteraufruf (rund
+    # 370 ms, gemessen 01.09.2026). Der Task startet hier und läuft, während die
+    # Datenbank arbeitet.
+    vektor_task = asyncio.create_task(vektor_oder_none(query_text))
+    try:
+        vorab_eintraege, vorab_ids = await _grundschicht(
+            query_text,
+            db,
+            pseudonym=pseudonym,
+            rollen=rollen,
+            chat_id=chat_id,
+            anchor_ids=anchor_ids,
+            jwt_stufe=jwt_stufe,
+            vektor=await vektor_task,
+        )
+    except BaseException:
+        vektor_task.cancel()
+        raise
 
     # Semantische Suche nur wenn retrieval_scope-Anker vorhanden
     semantic_treffer: list[dict] = []
@@ -170,25 +332,53 @@ async def get_context_for_query(
         # Anfrage wäre mit `IllegalStateChangeError` gescheitert.
         #
         # Überlappt wird stattdessen ausdrücklich das, was überlappt werden darf: der
-        # Netzaufruf. Er startet zuerst und läuft, während der Lernstand abgefragt wird.
-        vektor_task = asyncio.create_task(vektor_oder_none(query_text))
-        try:
-            engagement_entries = await get_engagement_context(anchor_ids, pseudonym, db)
-        except BaseException:
-            vektor_task.cancel()
-            raise
+        # Netzaufruf. Er ist oben schon gestartet und längst fertig.
+        engagement_entries = await get_engagement_context(anchor_ids, pseudonym, db)
+        # `ausschluss`: Was die Grundschicht schon vorgelegt hat, gehört nicht ein
+        # zweites Mal in denselben Prompt — einmal als JSON-Eintrag, einmal als Absatz.
         thematisch_abschnitt = await thematisch(
-            query_text, profil, db, vektor=await vektor_task
+            query_text, profil, db, ausschluss=vorab_ids, vektor=await vektor_task
         )
         semantic_treffer = thematisch_abschnitt.treffer
 
-    base = _assemble_context(semantic_treffer, engagement_entries, pinned_nodes)
+    base = _assemble_context(
+        semantic_treffer, engagement_entries, pinned_nodes, vorab_eintraege
+    )
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
     planning_block = await _planning_block(db, chat_id)
     if planning_block:
         return f"{planning_block}\n\n{base}" if base else planning_block
     return base
+
+
+async def stufe_der_person(
+    db: AsyncSession, chat_id: UUID | None, jwt_stufe: str | None
+) -> int | None:
+    """In welcher Klassenstufe ist, wer hier fragt? ``None``, wenn unbekannt.
+
+    **Die Reihenfolge ist die Aussage** (Paket 9, N5): Zuerst die Unterrichtsgruppe der
+    Konversation, dann der Jahrgang aus der Anmeldung. Die Gruppe gewinnt, weil sie
+    genauer ist — eine Zehntklässlerin im Chemie-Chat ihrer Klasse 10 ist dort in
+    Klasse 10, auch wenn ihr Konto etwas anderes sagt (Wiederholer, Sprung,
+    fehlerhafte Schulkonto-Gruppe).
+
+    ⚠️ **Das dritte Glied fehlt noch.** N5 nennt als letzte Quelle „im Vorschaumodus
+    die gewählte Stufe“. Den Vorschaumodus (ADR-016) gibt es noch nicht; er steht als
+    Todo. Wenn er kommt, gehört seine Stufe **vor** die beiden hier — sie ist die
+    ausdrückliche Wahl einer Lehrkraft und schlägt jede Ableitung.
+
+    ⚠️ **Unbekannt bleibt unbekannt.** Auf eine Vorgabe auszuweichen (etwa die
+    Mittelstufe) hieße, jeden Erwachsenen ohne Jahrgang wie eine Achtklässlerin zu
+    behandeln — und die Kennzeichnung der Treffer würde durchweg falsch.
+    """
+    aus_gruppe = await _conversation_grade(db, chat_id)
+    if aus_gruppe is not None:
+        return aus_gruppe
+    try:
+        return int(str(jwt_stufe).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 async def _conversation_grade(db: AsyncSession, chat_id: UUID | None) -> int | None:
@@ -1239,7 +1429,9 @@ async def import_curriculum_from_draft(
             "subject_id": subject_id,
             "owner_pseudonym": user_pseudonym,
             "metadata_": {
-                "std": kap.std,
+                # Normalisiert beim Schreiben — der Entwurf führt `std` als Text
+                # (`CurriculumDraftKapitel`), die Jahresplanung rechnet damit.
+                "std": als_stundenzahl(kap.std),
                 "reihenfolge": kap.reihenfolge,
                 "einleitung": kap.hinweis or "",
                 "breadcrumb": f"{schulart} | {fach_name} | Kl. {jahrgangsstufe}: {kap.titel}",
@@ -1380,7 +1572,7 @@ async def import_curriculum_from_draft(
                 "metadata_": {
                     "bp_leitidee": ls.bp_leitidee,
                     "reihenfolge": ls_reihenfolge,
-                    "std": getattr(ls, "std", None),
+                    "std": als_stundenzahl(getattr(ls, "std", None)),
                     "eintraege": eintraege_for_meta,
                     "import_key": ls_import_key,
                 }

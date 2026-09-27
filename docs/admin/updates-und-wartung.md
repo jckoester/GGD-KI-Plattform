@@ -4,7 +4,7 @@
 
 ```bash
 git fetch --tags
-git checkout 0.10.5          # die auszurollende Version
+git checkout 0.11.0          # die auszurollende Version
 docker compose build --no-cache
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
@@ -12,7 +12,7 @@ docker compose up -d
 
 > **Auf die Version, nicht auf den Zweig.** `git pull` holt, was gerade auf `main` liegt —
 > also auch angefangene Arbeit an der nächsten Version. Mit `git checkout <version>` ist
-> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.10.5`, und
+> der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.11.0`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
@@ -67,8 +67,12 @@ docker compose up -d
 > ```
 >
 > Wie viele Schritte das sind, nennt der CHANGELOG-Abschnitt „Migration" der Version, die
-> **verlassen** wird — er listet die dort ausgeführten Revisionen. (Beim Weg von 0.10.5
-> zurück auf 0.10.3: eine, nämlich `0065`.)
+> **verlassen** wird — er listet die dort ausgeführten Revisionen. (Beim Weg von 0.11.0
+> zurück auf 0.10.5: fünfzehn, nämlich `0066`–`0080`.)
+>
+> ⚠️ **Nicht jede Migration lässt sich zurücknehmen.** `0080` (in 0.11.0) löscht Zeilen,
+> die kein erneuter Import wiederherstellt; ihre Rückrolle tut nichts. Dorthin führt nur
+> die Sicherung.
 >
 > Eine Migration rückwärts kann **Daten verlieren** — eine gelöschte Spalte ist gelöscht.
 > Vor dem Zurückgehen einen Auszug der Datenbank anlegen. Ohne Migration im Spiel ist der
@@ -565,7 +569,7 @@ Seit 09/2026 antwortet die Suche in getrennten Abschnitten mit Zählung (siehe
 [Kontextspeicher](../user/kontext.md)): Namensträger und Aufzählung sind vollständig, die
 thematische Auswahl ist es ausdrücklich nie. Bleibt ein Baustein trotzdem ungenannt,
 lohnen zwei Fragen: Hat das Modell **thematisch** gesucht, wo eine Aufzählung nötig
-gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 14 der 41 Typen sind
+gewesen wäre? Und trägt der Knotentyp überhaupt ein Embedding — 14 der 42 Typen sind
 bewusst nur über Name und Aufzählung erreichbar
 ([neuer-knotentyp.md](../dev/neuer-knotentyp.md)).
 

@@ -5,6 +5,7 @@
     import { slide } from "svelte/transition";
     import { goto } from "$app/navigation";
     import {
+        Home,
         Plus,
         ChevronDown,
         Info,
@@ -30,6 +31,8 @@
     import { zeigtEintrag, naechsteStufen, setzeStufe } from '$lib/stores/uiLevel.js';
     import { page } from "$app/stores";
     import { subjectMap } from "$lib/stores/subjects.js";
+    import { myGroups } from "$lib/stores/myGroups.js";
+    import { gruppenMarke, chatTooltip } from "$lib/gruppenmarke.js";
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js"
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js"
     import { refreshPotentialTeachingGroups } from "$lib/stores/potentialTeachingGroups.js"
@@ -200,6 +203,19 @@
 
     <!-- Sidebar-Inhalt -->
     <div class="flex-1 overflow-y-auto p-2">
+        {#if $zeigtEintrag('welcome')}
+    <!-- Startseite: der Tag auf einen Blick. Steht ganz oben, weil sie die Frage
+         beantwortet, mit der man sich morgens anmeldet. -->
+            <button
+                onclick={() => goto("/welcome")}
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <Home class="w-4 h-4" />
+                Startseite
+            </button>
+        {/if}
+
         {#if $zeigtEintrag('chat')}
     <!-- Neuer Chat Button -->
             <button
@@ -560,10 +576,16 @@
                                                     title={conv.assistant_name}
                                                 />
                                             {/if}
+                                            <!-- Die Unterrichtsgruppe steht hier nur im
+                                                 Tooltip: Titel, Datum und Menü teilen
+                                                 sich bereits eine schmale Zeile. In der
+                                                 History, wo Platz ist, steht sie sichtbar. -->
                                             <span
                                                 class="truncate"
-                                                title={conv.title ??
-                                                    "Unbenannter Chat"}
+                                                title={chatTooltip(
+                                                    conv.title,
+                                                    gruppenMarke(conv.group_id, $myGroups, { istLehrkraft }),
+                                                )}
                                             >
                                                 {conv.title ?? "Unbenannter Chat"}
                                             </span>

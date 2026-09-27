@@ -102,7 +102,14 @@
 # Reasoning bliebe an, und man merkt es nur an der Rechnung.
 #
 # Deshalb steht `reasoning_effort: none` überall dort, wo NICHT gedacht werden soll — und
-# fehlt bewusst bei `chat-reasoning` und `chat-komplex`.
+# fehlt bewusst bei `chat-komplex`.
+#
+# ⚠️ **Sparen kostet hier mehr, als es spart** (gemessen 26.09.2026). Die niedrigste
+# Denkstufe spart ein paar Ausgabe-Tokens und nimmt dem Modell zugleich die Entscheidung
+# „schlage ich nach?“ — es antwortet dann aus dem eigenen Wissen statt aus dem
+# Wissensspeicher der Schule. Wer die Stufe eines Modells senkt, das Werkzeuge nutzen
+# soll, misst hinterher die **Aufrufquote**, nicht nur die Tokenzahl
+# (`backend/scripts/chat_probe.py` zählt sie mit).
 # ─────────────────────────────────────────────────────────────────────────────────────
 
 model_list:
@@ -124,16 +131,30 @@ model_list:
       output_cost_per_token: 3.0e-07        # 0,30 €/M
 
   # Arbeitspferd: Erklärungen, Hausaufgabenhilfe, Feedback. Für alle Teams.
-  # Reasoning ausgeschaltet — wer eine denkende Antwort will, wählt `chat-reasoning`.
   - model_name: chat-standard
     litellm_params:
       model: openai/openai/gpt-oss-120b       # doppeltes `openai/`: Provider + IONOS-ID
       api_base: os.environ/IONOS_API_BASE
       api_key: os.environ/IONOS_API_KEY
-      # `low`, NICHT `none`: gpt-oss-120b lehnt `none` ab („Harmony does not support
+      # NICHT `none`: gpt-oss-120b lehnt das ab („Harmony does not support
       # reasoning_effort='none'", HTTP 400) — es denkt immer, nur unterschiedlich lang.
       # low = 28 Tokens, ohne Angabe 56, high 179 (gemessen).
-      reasoning_effort: low
+      #
+      # ⚠️ **`low` hat den Wissensspeicher unbrauchbar gemacht.** Ob das Modell die
+      # Kontextsuche aufruft, ist eine Denkentscheidung — mit 28 Tokens Denkbudget
+      # fällt sie meistens gegen die Suche aus. Gemessen am 26.09.2026, vier Fragen à
+      # vier Läufe, Chemie-Assistent mit ausdrücklicher Such-Anweisung im Prompt:
+      #
+      #   low 4/16 · medium 12/16 · high 15/16   (Antwortlänge bleibt gleich)
+      #
+      # „Was bedeutet das Zeichen mit der Flamme?“ wurde mit `low` in **keinem** Lauf
+      # nachgeschlagen — und in keinem richtig beantwortet (GHS02 steht im Knoten, nicht
+      # im Modell). `medium` genügt nicht: dort fällt dieselbe Frage auf 2 von 4 zurück.
+      #
+      # Kostet rund 5 Sekunden je Antwort (4 Fragen: 9 s mit low und einer Suche, 30 s
+      # mit high und vier Suchen) — der größere Teil davon ist die Werkzeugrunde selbst,
+      # also die erwünschte Wirkung, nicht die Denkspur.
+      reasoning_effort: high
       allowed_openai_params: ["reasoning_effort"]   # sonst UnsupportedParamsError, s. o.
     model_info:
       supports_function_calling: true         # gemessen
@@ -152,24 +173,15 @@ model_list:
       input_cost_per_token: 1.5e-07        # 0,15 €/M
       output_cost_per_token: 8.0e-07       # 0,80 €/M
 
-  # Denkt vor der Antwort — für mehrschrittige Aufgaben, Herleitungen, Begründungen.
-  # Dasselbe Backend wie `chat-standard`, nur mit aktivem Reasoning: didaktisch als „derselbe
-  # Assistent, aber er denkt erst nach" erklärbar, und die Denkspur kostet nur Ausgabe-Tokens
-  # desselben günstigen Modells. Freigabe nach Jahrgang (höhere Klassen), nicht schulweit.
-  # Wechsel auf ein stärkeres Modell (z. B. Qwen3.5-397B) = eine Zeile `model:` hier.
-  - model_name: chat-reasoning
-    litellm_params:
-      model: openai/openai/gpt-oss-120b
-      api_base: os.environ/IONOS_API_BASE
-      api_key: os.environ/IONOS_API_KEY
-      # Der Unterschied zu chat-standard ist allein diese Zeile: high statt low —
-      # 179 statt 28 Ausgabe-Tokens, 800 statt 22 Zeichen Denkspur (gemessen).
-      reasoning_effort: high
-      allowed_openai_params: ["reasoning_effort"]
-    model_info:
-      supports_function_calling: true
-      input_cost_per_token: 1.5e-07        # 0,15 €/M
-      output_cost_per_token: 6.5e-07        # 0,65 €/M
+  # ⚠️ **Hier stand bis zum 26.09.2026 `chat-reasoning`** — dasselbe Modell wie
+  # `chat-standard`, nur mit `reasoning_effort: high` statt `low`. Der Eintrag ist
+  # gestrichen, weil `chat-standard` seither selbst auf `high` läuft (s. o.) und damit
+  # nichts mehr übrig blieb, worin sich die beiden unterschieden hätten.
+  #
+  # Eine „denkende" Stufe **zwischen** gpt-oss-120b und Qwen3.5-397B gibt es bei IONOS
+  # nicht. Wer höheren Jahrgängen mehr geben will, schaltet ihnen `chat-komplex` frei —
+  # das ist eine Entscheidung in `/settings/models` und eine Kostenfrage
+  # (3,60 statt 0,65 €/M Ausgabe), keine Zeile in dieser Datei.
 
   # Analyse, lange Texte, Unterrichtsplanung. Mit Abstand am teuersten (4,00 $/M Ausgabe bei
   # starkem Reasoning) → NUR für `lehrkraefte` freischalten.

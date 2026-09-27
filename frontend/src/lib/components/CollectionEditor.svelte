@@ -66,6 +66,31 @@
     // Eigenschaft jedes Knotens — deshalb neben `felder`, nicht darin.
     let aliase = $state([...(node?.aliase ?? [])]);
 
+    /**
+     * Metadaten, die aus dem Import stammen und hier **nicht** im Formular stehen
+     * (Paket 9, AP6).
+     *
+     * ⚠️ **Sie gehen beim Speichern nicht verloren** — `metadatenAusFormular` baut auf
+     * den bestehenden Metadaten auf und ersetzt nur die Schemafelder. Ohne einen
+     * Hinweis sieht das Formular allerdings aus, als wäre der Eintrag vollständig
+     * abgebildet; wer die Eigenschaftstabelle sucht, sucht sonst an der falschen
+     * Stelle. Bearbeitet werden sie im Vault, der Import zieht sie nach.
+     */
+    const AUS_DEM_IMPORT = {
+        illustrationen: "Abbildungen",
+        eigenschaften: "Eigenschaften des Stoffs",
+        ghs: "Gefahrenhinweise",
+    };
+
+    const importFelder = $derived(
+        Object.entries(AUS_DEM_IMPORT)
+            .filter(([name]) => {
+                const wert = node?.metadata?.[name];
+                return Array.isArray(wert) ? wert.length > 0 : Boolean(wert);
+            })
+            .map(([, label]) => label),
+    );
+
     let speichert = $state(false);
     let fehler = $state({});
     let serverfehler = $state(null);
@@ -288,6 +313,14 @@
                 {/if}
             </div>
         {/each}
+
+        {#if importFelder.length > 0}
+            <p class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                Aus dem Import übernommen und hier nicht änderbar:
+                {importFelder.join(", ")}. Sie bleiben beim Speichern erhalten; geändert
+                werden sie in der Quelldatei.
+            </p>
+        {/if}
 
         <!-- Fach -->
         {#if fachWaehlbar}

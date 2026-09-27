@@ -34,6 +34,9 @@ from app.context.taxonomy import (
 ERLAUBTE_RELATIONEN = frozenset({
     "requires", "used_with", "part_of", "develops", "supersedes",
     "references", "follows", "derived_from", "related_to",
+    # „ist ein(e)" (Alembic 0078). Zeigt auf eine **bestimmte Fassung**: Ein Begriff
+    # „Redoxreaktion (Elektronenübergang)" ist etwas anderes als die Klasse-8-Fassung.
+    "is_a",
 })
 
 

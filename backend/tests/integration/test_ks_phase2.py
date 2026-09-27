@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import psycopg2
-import psycopg2.extras
 import pytest
 from app.config import settings
 
@@ -157,7 +156,6 @@ class TestImportHashUpdate:
         # Manuell ein Fake-Embedding in der konfigurierten Breite setzen
         fake_vec = '[' + ','.join(['0.1'] * settings.embedding_dimensions) + ']'
         conn = psycopg2.connect(get_sync_url(db_url))
-        psycopg2.extras.register_uuid(conn)
         with conn.cursor() as cur:
             cur.execute(
                 f"UPDATE context_nodes SET embedding = '{fake_vec}'::vector "

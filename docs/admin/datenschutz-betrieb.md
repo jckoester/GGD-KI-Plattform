@@ -106,18 +106,33 @@ Kontext- und Pädagogik-Modulen nicht vorkommt.
 Die Übernahme ist **freiwillig**: Ohne eingetragenes Kürzel ruft die Plattform für diese
 Person nichts ab.
 
-## Automatische Datenlöschung (Cron-Jobs)
+## Automatische Läufe (Cron-Jobs)
 
-Fünf automatische Cron-Jobs laufen täglich. Vier davon räumen veraltete Daten ab, einer
-ergänzt fehlende Embeddings:
+**Alle** nächtlichen Läufe, nicht nur die löschenden — wer wissen will, was der Server
+nachts tut, findet es hier vollständig. Die Spalte **Löscht** sagt, welche davon Daten
+entfernen.
 
-| Job | Zeitplan | Was wird ausgeführt |
-|-----|---------|-----------------|
-| `cleanup_inactive_accounts` | täglich 02:00 Uhr | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
-| `cleanup_stale_conversations` | täglich 02:30 Uhr | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
-| `cleanup_feedback` | täglich 02:50 Uhr | Abgeschlossene Rückmeldungen 180 Tage nach dem Statuswechsel löschen |
-| `embedding_backfill` | täglich 03:15 Uhr | Embeddings für Knoten ohne Embedding nachgenerieren |
-| `node_lifecycle` | täglich 05:00 Uhr | Abgelaufene Bausteine archivieren, lange archivierte löschen |
+⚠️ **Bis zum 25.09.2026 standen hier fünf von vierzehn.** Die Liste war nicht falsch,
+nur unvollständig — und nichts erinnerte daran, sie mitzuziehen, wenn ein Lauf
+dazukommt. Jetzt prüft ein Test sie gegen die `docker-compose.yml`
+(`tests/unit/test_doku_deckt_wirklichkeit.py`).
+
+| Job | Zeitplan | Löscht | Was wird ausgeführt |
+|-----|---------|:--:|-----------------|
+| `cleanup_inactive_accounts` | täglich 02:00 Uhr | ✅ | Nutzerkonten ohne Login seit 90 Tagen löschen (inkl. aller Konversationen) |
+| `cleanup_stale_conversations` | täglich 02:30 Uhr | ✅ | Konversationen ohne neue Nachrichten seit 93 Tagen löschen |
+| `cleanup_feedback` | täglich 02:50 Uhr | ✅ | Abgeschlossene Rückmeldungen 180 Tage nach dem Statuswechsel löschen |
+| `embedding_backfill` | täglich 03:15 Uhr | — | Embeddings für Knoten ohne Embedding nachgenerieren |
+| `auto_confirm_reviews` | täglich 03:45 Uhr | — | Nachbereitungen, die niemand bestätigt hat, automatisch abschließen |
+| `cleanup_rendered_svg` | täglich 04:00 Uhr | ✅ | Zwischengespeicherte Server-Renderings räumen |
+| `cleanup_generated_images` | täglich 04:30 Uhr | ✅ | Erzeugte Bilder nach Ablauf der Frist löschen |
+| `cleanup_artifacts` | täglich 04:45 Uhr | ✅ | Abgelaufene Artefakte der Bibliothek löschen |
+| `node_lifecycle` | täglich 05:00 Uhr | ✅ | Abgelaufene Bausteine archivieren, lange archivierte löschen |
+| `weekly_budget_accrual` | montags 05:00 Uhr | — | Wochenguthaben zuteilen (idempotent; ein ausgefallener Lauf holt nach) |
+| `sync_timetable` | Mo–Fr 05:30 Uhr | — | Stundenplan abgleichen: Entfall, Vertretung, Verlegung |
+| `crisis_reminders` | täglich 06:00 Uhr | — | An unerledigte Krisenfälle erinnern, vor der Löschgrenze warnen |
+| `refresh_ecb_rate` | monatlich, 1. um 06:00 Uhr | — | EZB-Wechselkurs EUR→USD holen |
+| `monthly_team_reconcile` | monatlich, 1. um 07:00 Uhr | — | LiteLLM-Teams und Budgets abgleichen |
 
 Die Löschung ist unwiederbringlich. Es gibt keine Wiederherstellungsfunktion.
 
@@ -156,16 +171,36 @@ docker compose exec backend python scripts/node_lifecycle.py --dry-run
 
 ### Was die Kontolöschung abräumt
 
-`cleanup_inactive_accounts` löscht zum Pseudonym:
+`cleanup_inactive_accounts` entfernt **dreizehn** Datenkategorien und macht **drei**
+weitere personenbezugsfrei. Die Unterscheidung ist Absicht: Was nur der Person gehört,
+fällt; was mit anderen geteilt wurde oder als Beleg gebraucht wird, verliert den
+Personenbezug und bleibt.
 
-- alle Konversationen samt Nachrichten, erzeugten Bildern und Krisen-Flags
-- die Nutzereinstellungen (`user_preferences`) — darin auch das Stundenplan-Kürzel
-- den Stundenplan-Abrufstatus (`calendar_sync_status`)
-- zurückgezogene Sitzungen (`jwt_revocations`) und den Audit-Eintrag selbst
-- **private Bausteine** (`read_scope = private`) — siehe unten
-- die **persönliche Bibliothek** (`artifacts`), Datenbankzeilen **und** Dateien
-- den **persönlichen Lernzustand** (`node_engagement`) — der Zustand je Gruppe bleibt
-- **Gruppenmitgliedschaften** und die persönlichen **Fach-Ausblendungen**
+| Tabelle | Was geschieht |
+|---|---|
+| `conversations` | gelöscht — samt Nachrichten, erzeugten Bildern und Krisen-Flags |
+| `pseudonym_audit` | gelöscht — damit ist die Rückrechnung auf die Person endgültig unmöglich |
+| `user_preferences` | gelöscht; darin auch das Stundenplan-Kürzel |
+| `calendar_sync_status` | gelöscht — der Abrufstatus des Stundenplans |
+| `personal_access_tokens` | gelöscht |
+| `jwt_revocations` | gelöscht |
+| `budget_accruals` | gelöscht — die Zuteilungshistorie des Wochenmodells |
+| `artifacts` | gelöscht, Datenbankzeilen **und** Dateien — die Bibliothek ist strikt privat |
+| `node_engagement` | gelöscht — persönlicher Lernzustand; der Zustand je Gruppe bleibt |
+| `group_memberships` | gelöscht, alle Herkünfte |
+| `teacher_group_exclusions` | gelöscht — die persönlichen Fach-Ausblendungen |
+| `sso_group_offers` | gelöscht — offene Angebote betreffen nur diese Lehrkraft |
+| `context_nodes` (privat) | gelöscht — `read_scope = private`, siehe unten |
+| `context_nodes` (geteilt) | **bleibt**, `owner_pseudonym` wird `NULL` — sonst verschwänden Bausteine, mit denen eine Fachschaft arbeitet |
+| `feedback` | **bleibt**, Pseudonym und Kontaktangabe fallen (siehe unten) |
+| `group_join_codes.erstellt_von` | auf `NULL` — der Code gehört der Gruppe, nicht der Person |
+
+⚠️ **Diese Tabelle wird geprüft, nicht gepflegt.** `test_pseudonym_deletion_coverage.py`
+erzwingt für jede neue Tabelle mit Pseudonym-Spalte eine Entscheidung im **Code**, und
+`test_doku_deckt_wirklichkeit.py` hält diese **Beschreibung** dagegen. Bis zum 25.09.2026
+nannte sie fünf von dreizehn Kategorien — die Löschung geschah trotzdem vollständig, aber
+eine Auskunft, die eine Kategorie verschweigt, ist falsch. Dieselbe Tabelle steht in
+ADR-003 Teil 6; sie ist beim Ändern mitzuziehen.
 
 Eine Tabelle behält ihre Zeilen: **Rückmeldungen** (`feedback`). Eine Fehlermeldung ist ein Befund über die Software, kein Kontodatum — sie zu löschen, weil die meldende Person die Schule verlassen hat, nähme der Sichtung die Vorgeschichte einer Regression. Der Personenbezug geht trotzdem: Pseudonym **und** die freiwillige Kontaktangabe werden geleert. Der Eintrag verschwindet damit auch aus „Meine Meldungen“.
 

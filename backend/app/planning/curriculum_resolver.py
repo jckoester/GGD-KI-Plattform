@@ -14,7 +14,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.grades import parse_class_grade
-from app.db.models import ContextEdge, ContextNode, Group
+from app.context.stunden import als_stundenzahl
+from app.groups.jahrgang import leite_jahrgang_ab
+from app.planning.calendar import load_school_year
+from app.db.models import ContextEdge, ContextNode, Group, GroupSourceClass
 
 
 @dataclass
@@ -39,14 +42,42 @@ class GroupCurriculaResult:
     curricula: list[CurriculumChapters]
     grade: int | None
     grade_unbekannt: bool
+    # ⚠️ **Drei Lagen, nicht zwei.** „Kein Fach an der Gruppe“, „Stufe unbekannt“ und
+    # „Stufe bekannt, kein Curriculum hinterlegt“ sahen bis zum 24.09.2026 gleich aus —
+    # eine leere Liste. Die Oberfläche sagte dreimal „kein Curriculum gefunden“ und
+    # schickte die Lehrkraft zweimal auf die falsche Suche.
+    fach_fehlt: bool = False
 
 
 async def _group_grade(db: AsyncSession, group: Group) -> int | None:
-    """Jahrgang der teaching_group aus der verknüpften Klassengruppe ableiten."""
-    if group.source_class_group_id is None:
-        return None
-    cls = await db.get(Group, group.source_class_group_id)
-    return parse_class_grade(cls.name) if cls else None
+    """Jahrgang der teaching_group aus den verknüpften Klassengruppen ableiten.
+
+    ⚠️ **Eine Gruppe kann aus mehreren Klassen stammen** (Alembic 0068), der Jahrgang
+    ist aber genau einer. Genommen wird der **kleinste** — nicht weil er richtiger wäre,
+    sondern weil die Wahl **deterministisch** sein muss: NwT 10a/10b/10c tragen alle
+    denselben Jahrgang, aber ohne feste Ordnung wanderte die Curriculum-Auflösung
+    zwischen zwei Läufen, sobald die Datenbank die Zeilen anders zurückgibt.
+
+    Bei gemischten Jahrgängen (eine Gruppe aus 9 und 10) ist der kleinste eine
+    Festlegung, keine Wahrheit. Das ist hinnehmbar, solange es *eine* Festlegung ist.
+    """
+    # 1. Die Entscheidung gewinnt (Alembic 0073).
+    if group.jahrgang is not None:
+        return group.jahrgang
+
+    # 2. Sonst die Klassen, aus denen die Gruppe stammt.
+    zeilen = await db.execute(
+        sa.select(Group.name)
+        .join(GroupSourceClass, GroupSourceClass.class_group_id == Group.id)
+        .where(GroupSourceClass.group_id == group.id)
+    )
+    jahrgaenge = [g for g in (parse_class_grade(n) for n in zeilen.scalars()) if g is not None]
+    if jahrgaenge:
+        return min(jahrgaenge)
+
+    # 3. Zuletzt der Name — eine Vermutung, ausdrücklich als solche (`jahrgang.py`).
+    # Sie wird **nicht** gespeichert: Gespeichert wird nur, was ein Mensch entschieden hat.
+    return leite_jahrgang_ab(group.anzeigename, schuljahr_ende=load_school_year().ende.year)
 
 
 async def group_grade(db: AsyncSession, group_id: int) -> int | None:
@@ -98,9 +129,19 @@ async def resolve_group_curricula(db: AsyncSession, group_id: int) -> GroupCurri
     """
     group = await db.get(Group, group_id)
     if group is None or group.subject_id is None:
-        return GroupCurriculaResult(curricula=[], grade=None, grade_unbekannt=True)
+        return GroupCurriculaResult(
+            curricula=[], grade=None, grade_unbekannt=True, fach_fehlt=True
+        )
 
     grade = await _group_grade(db, group)
+
+    # ⚠️ **Ohne Stufe wird nichts angeboten.** Bis zum 24.09.2026 entfiel hier nur der
+    # Jahrgangsfilter — zurück kamen *alle* Curricula des Fachs, einem Abi-28-Kurs also
+    # „CH Kl. 8“. Das ist schlimmer als eine leere Liste: Eine falsche Auswahl sieht aus
+    # wie eine getroffene Entscheidung, und wer sie ankreuzt, merkt den Fehler erst,
+    # wenn die Jahresplanung an den falschen Kompetenzen hängt.
+    if grade is None:
+        return GroupCurriculaResult(curricula=[], grade=None, grade_unbekannt=True)
 
     stmt = sa.select(ContextNode).where(
         ContextNode.content_type == "curriculum",
@@ -147,7 +188,7 @@ async def resolve_group_curricula(db: AsyncSession, group_id: int) -> GroupCurri
             KapitelInfo(
                 id=k.id,
                 titel=k.title,
-                std=(k.metadata_ or {}).get("std"),
+                std=als_stundenzahl((k.metadata_ or {}).get("std")),
                 reihenfolge=(k.metadata_ or {}).get("reihenfolge"),
                 ues=ue_map.get(k.id, []),
             )

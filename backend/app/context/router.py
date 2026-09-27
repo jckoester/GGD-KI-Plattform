@@ -6,12 +6,11 @@ Sichtbarkeitsfilter werden in KS-Phase-3 um group_memberships-Prüfung erweitert
 
 import io
 import logging
-import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,9 +54,12 @@ from app.context.schemas import (
     IkKompetenzRead,
     PkGruppeRead,
     PkKompetenzRead,
+    DateiErgebnisRead,
+    FachbegriffImportBericht,
+    ZielZaehlung,
 )
 from app.context import aliase as aliase_modul
-from app.context.editions import aktive_bp_version
+from app.context.editions import aktive_bp_version, gilt_ab_schuljahr
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
 from app.context.meine_bausteine import (
@@ -119,7 +121,7 @@ async def _check_write_permission(
     if node.owner_pseudonym == user.sub:
         return
     if (
-        node.write_scope == "group"
+        node.write_scope in ("group", "group_teachers")
         and node.write_scope_group_id is not None
         and "teacher" in user.roles
     ):
@@ -153,7 +155,12 @@ async def _check_read_permission(
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
     if "admin" in user.roles:
         return
-    if node.read_scope == "group":
+    if node.read_scope in ("group", "group_teachers"):
+        # ⚠️ `group_teachers` verlangt zusätzlich die Rolle — dieselbe Bedingung, die
+        # `_check_write_permission` bei `group` schon hatte. Das Fehlen dieser Zeile hieß:
+        # Schüler:innen lasen die Stundenentwürfe ihrer Lehrkraft (Befund 24.09.2026).
+        if node.read_scope == "group_teachers" and "teacher" not in user.roles:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung")
         if node.read_scope_group_id is None:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
         result = await db.execute(
@@ -176,15 +183,25 @@ def _read_scope_clause(user: JwtPayload):
 
 
 def _check_curriculum_read_permission(tree: dict, user: JwtPayload) -> None:
-    """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym)."""
-    read_scope = tree.get("read_scope", "school")
-    if read_scope == "private":
+    """Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym).
+
+    **Nur `private` schränkt ein** — dieselbe Linie wie in `read_scope_clause`, wo
+    `OFFENE_SCOPES` genau `global`, `school` und `subject` umfasst. Ein Curriculum ist
+    kein Geheimnis (Entscheidung Jan, 21.09.2026).
+
+    Bis zum 21.09.2026 stand hier ein zweiter Zweig: Bei `read_scope == 'subject'`
+    wurden Schüler:innen abgewiesen, außer `CURRICULUM_VISIBLE_TO_STUDENTS` war gesetzt.
+    Der Zweig war **wirkungslos** und irreführend zugleich. Wirkungslos, weil kein
+    Curriculum diesen Scope trägt (Curricula sind `school`, Bildungsplan-Knoten
+    `global`) und keine Stelle im Code ihn setzt. Irreführend, weil `subject` in
+    `read_scope_clause` ein **offener** Scope ist: Ein so markierter Knoten wäre über
+    jeden anderen Lesepfad ohnehin sichtbar gewesen. Die Variable war zudem in keiner
+    `.env.example` und in keiner Doku genannt — wer sich auf sie verließ, verließ sich
+    auf nichts.
+    """
+    if tree.get("read_scope", "school") == "private":
         if tree.get("owner_pseudonym") != user.sub:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    elif read_scope == "subject":
-        if "student" in user.roles and "teacher" not in user.roles:
-            if os.environ.get("CURRICULUM_VISIBLE_TO_STUDENTS", "false").lower() != "true":
-                raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
 
 async def _require_curriculum_write(
@@ -468,6 +485,9 @@ async def get_archived_references(
             n.category,
             n.content_type,
             n.archived_at,
+            n.bp_version,
+            s.min_grade,
+            s.max_grade,
             e.relation,
             (
                 SELECT s.id FROM context_edges se
@@ -479,12 +499,27 @@ async def get_archived_references(
             ) AS suggested_successor_id
           FROM context_edges e
           JOIN context_nodes n ON n.id = e.to_node_id
+          LEFT JOIN subjects s ON s.id = n.subject_id
          WHERE e.from_node_id = :node_id
            AND n.status = 'archived'
     """)
     result = await db.execute(sql, {"node_id": str(node_id)})
-    rows = result.mappings().all()
-    return [ArchivedReferenceRead(**dict(row)) for row in rows]
+
+    # ⚠️ **Ein Grund nur, wo es einen gibt.** Archiviert heißt an einem
+    # Bildungsplan-Knoten dreierlei (gemessen am Bestand, 26.09.2026): abgelöst, alte
+    # `bp_id`-Schreibweise, oder eine Edition, die für dieses Fach noch nicht gilt.
+    # Nur den letzten kann der Fahrplan erklären — bei den anderen bleibt es bei der
+    # neutralen Auskunft, statt eine Begründung zu erfinden.
+    referenzen = []
+    for row in result.mappings().all():
+        daten = dict(row)
+        bp_version = daten.pop("bp_version", None)
+        min_grade, max_grade = daten.pop("min_grade", None), daten.pop("max_grade", None)
+        daten["gilt_ab"] = (
+            gilt_ab_schuljahr(bp_version, min_grade, max_grade) if bp_version else None
+        )
+        referenzen.append(ArchivedReferenceRead(**daten))
+    return referenzen
 
 
 # ── POST /api/context/nodes/{id}/copy ───────────────────────────────────────
@@ -2121,3 +2156,243 @@ async def get_fachplan_by_subject(
     )
 
 
+
+
+# ── Fachbegriffe hochladen (Paket 10, AP3) ───────────────────────────────────
+
+async def _fachbegriffe_nutzer(
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> JwtPayload:
+    """Lehrkraft oder Admin — und gedrosselt.
+
+    Reihenfolge mit Absicht: erst die Rolle, dann die Drossel. Wer gar nicht
+    importieren darf, soll nicht den Zähler einer fremden Person füllen können.
+
+    **Ein Zähler für Import und Export.** Beides sind Massenvorgänge derselben Person
+    am selben Bestand; zwei Eimer wären zwei Zahlen, die niemand getrennt einstellen
+    will.
+    """
+    from app.ratelimit.drossel import pruefe
+
+    pruefe("fachbegriffe_import", user.sub, user.roles)
+    return user
+
+
+async def _fach_mit_schreibrecht(
+    fach: str, db: AsyncSession, user: JwtPayload
+) -> Subject:
+    """Das Fach auflösen und das Schreibrecht darin prüfen (Entscheidung D2).
+
+    ⚠️ **Strenger als `/curricula/new`.** Dort gilt: Gibt es zum Fach gar keine
+    Fachschaftsgruppe, wird nicht geprüft. Hier wäre das sinnlos — der Import hängt
+    seine Knoten an genau diese Gruppe (`write_scope = subject`) und meldete ohne sie
+    jede Datei als übersprungen. Ein 403 mit Klartext ist ehrlicher als ein leerer
+    Bericht. Admins bleiben ausgenommen; sie machen das heute über das Skript.
+    """
+    from app.context.service import is_subject_department_member
+
+    schluessel = fach.strip().casefold()
+    treffer = (await db.execute(
+        sa.select(Subject).where(
+            sa.or_(
+                sa.func.lower(Subject.slug) == schluessel,
+                sa.func.lower(Subject.fach_code) == schluessel,
+                sa.func.lower(Subject.name) == schluessel,
+            )
+        ).order_by(Subject.id).limit(1)
+    )).scalars().first()
+    if treffer is None:
+        raise HTTPException(status_code=404, detail=f"Fach „{fach}“ gibt es nicht.")
+    if "admin" in user.roles:
+        return treffer
+    if not await is_subject_department_member(db, treffer.id, user.sub):
+        # ⚠️ **Die Ursache gehört in die Meldung.** „Nur die Fachschaft kann das" liest
+        # eine Chemielehrkraft als Widerspruch — sie *ist* in der Fachschaft, nur eben
+        # nicht in der SSO-Gruppe, aus der die Plattform das ableitet. Ohne den Zusatz
+        # sucht sie den Fehler bei sich und meldet einen Bug.
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Dafür braucht es die Fachschaftsgruppe von {treffer.name}. Die "
+                "Plattform übernimmt sie aus dem Schulkonto; fehlt sie oder sind Sie "
+                "nicht darin, hilft die Administration weiter."
+            ),
+        )
+    return treffer
+
+
+def _zaehlung(counter) -> list[ZielZaehlung]:
+    return [ZielZaehlung(ziel=z, anzahl=n) for z, n in counter.most_common()]
+
+
+@router.post("/fachbegriffe/import", response_model=FachbegriffImportBericht)
+async def importiere_fachbegriffe(
+    fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
+    probelauf: bool = Query(
+        True, description="True: nichts schreiben, nur den Bericht liefern"
+    ),
+    ueberschreiben: list[str] = Query(
+        default=[],
+        description=(
+            "Dateinamen (ohne `.md`), deren Knoten ersetzt werden sollen, obwohl sie "
+            "seit dem letzten Import in der Oberfläche bearbeitet wurden. Mehrfach "
+            "angeben. Leer = alle behalten."
+        ),
+    ),
+    dateien: list[UploadFile] = File(..., description=".md, .svg oder ein .zip"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_fachbegriffe_nutzer),
+) -> FachbegriffImportBericht:
+    """Fachbegriffe und Stoffsteckbriefe einer Fachschaft einspielen.
+
+    Derselbe Kern wie `scripts/seed_fachbegriffe.py` — hier mit einem Bündel aus dem
+    Formular statt aus einem Ordner, gebunden an **ein** Fach und hinter einer
+    Rechteprüfung.
+
+    ⚠️ **`probelauf=true` ist die Vorgabe.** Der Weg über die Oberfläche zeigt erst
+    den Bericht und fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung,
+    kein Vorgabewert. Die Transaktion wird im Probelauf verworfen — das ist die
+    einzige Zusage, die der Bericht braucht, um dem echten Lauf zu entsprechen.
+    """
+    from app.context.fachbegriffe_import import importiere
+    from app.context.fachbegriffe_upload import BuendelFehler, baue_buendel
+
+    fach_zeile = await _fach_mit_schreibrecht(fach, db, user)
+    # ⚠️ **Vor der Transaktionsentscheidung ablesen.** `rollback()` macht jedes Objekt
+    # der Sitzung ungültig — auch das Fach. Ein `fach_zeile.name` danach löste ein
+    # Nachladen aus, und das scheitert in asyncio. Der Probelauf wäre also genau der
+    # Fall gewesen, der nie funktioniert.
+    fach_name, fach_slug = fach_zeile.name, fach_zeile.slug
+
+    hochgeladen = [(d.filename or "", await d.read()) for d in dateien]
+    try:
+        buendel, warnungen = baue_buendel(hochgeladen)
+    except BuendelFehler as fehler:
+        raise HTTPException(status_code=fehler.status, detail=fehler.text)
+
+    bilanz = await importiere(
+        db, buendel, nur_fach=fach_zeile, ueberschreiben=set(ueberschreiben)
+    )
+    if probelauf:
+        await db.rollback()
+    else:
+        await db.commit()
+        logger.info(
+            "Fachbegriff-Import %s durch %s: %d neu, %d aktualisiert, %d unverändert",
+            fach_slug, user.sub, bilanz.neu, bilanz.aktualisiert,
+            bilanz.unveraendert,
+        )
+
+    return FachbegriffImportBericht(
+        probelauf=probelauf,
+        fach=fach_name,
+        neu=bilanz.neu,
+        aktualisiert=bilanz.aktualisiert,
+        unveraendert=bilanz.unveraendert,
+        uebersprungen=bilanz.uebersprungen,
+        kanten=bilanz.kanten,
+        kanten_geaendert=bilanz.kanten_geaendert,
+        neu_einzubetten=bilanz.neu_einzubetten,
+        dateien=[
+            DateiErgebnisRead(
+                datei=d.datei, titel=d.titel, zustand=d.zustand, node_id=d.node_id,
+                pruefstatus=d.pruefstatus, entwurf=d.entwurf,
+            )
+            for d in bilanz.dateien
+        ],
+        # Was am Bündel auffiel, steht vor dem, was am Inhalt auffiel: Eine abgelehnte
+        # Abbildung erklärt die „SVG nicht gefunden"-Zeile, die darunter folgt.
+        warnungen=[*warnungen, *bilanz.warnungen],
+        vergebene_ids=bilanz.vergebene_ids,
+        offene_ziele=_zaehlung(bilanz.offene_ziele),
+        offene_fundstellen=_zaehlung(bilanz.offene_fundstellen),
+        archivierte_ziele=_zaehlung(bilanz.archivierte_ziele),
+    )
+
+
+@router.get("/fachbegriffe/export")
+async def exportiere_fachbegriffe(
+    fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_fachbegriffe_nutzer),
+) -> Response:
+    """Den Fachbegriffsbestand eines Fachs als Zip im Vault-Format (D1).
+
+    **Der Rückweg.** Eine Fachschaft darf in Dateien pflegen *oder* in der Oberfläche;
+    ohne Export wäre die zweite von jeder späteren Massenänderung abgeschnitten.
+
+    Dieselbe Rechteprüfung wie beim Import — nicht, weil die Inhalte geheim wären (sie
+    stehen für alle lesbar in der Sammlung), sondern weil Hin- und Rückweg dieselbe
+    Zuständigkeit beschreiben: Es ist der Bestand **dieser** Fachschaft.
+    """
+    from app.context.fachbegriffe_export import als_zip, exportiere, hinweisdatei
+
+    fach_zeile = await _fach_mit_schreibrecht(fach, db, user)
+    slug = fach_zeile.slug
+    dateien, bilanz = await exportiere(db, fach_zeile)
+    dateien.append(hinweisdatei(bilanz))
+    if bilanz.warnungen:
+        logger.info("Fachbegriff-Export %s: %d Hinweise", slug, len(bilanz.warnungen))
+    name = f"fachbegriffe_{slug}_{date.today().isoformat()}.zip"
+    return Response(
+        content=als_zip(dateien),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
+
+
+@router.get("/nodes/{node_id}/markdown")
+async def knoten_als_markdown(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> Response:
+    """Einen Fachbegriff als Markdown-Datei — „herunterladen" in der Detailansicht.
+
+    Ohne Drossel und ohne Fachschaftsprüfung: Das ist **eine** Datei, deren Inhalt in
+    der Detailansicht ohnehin offen dasteht. Geprüft wird das Leserecht am Knoten, wie
+    überall sonst auf diesem Weg.
+    """
+    from app.context.fachbegriffe_export import exportiere
+    from app.context.fachbegriffe_import import TYPEN
+
+    node = await db.get(ContextNode, node_id)
+    if node is None or node.content_type not in TYPEN:
+        raise HTTPException(
+            status_code=404, detail="Kein Fachbegriff oder Stoffsteckbrief."
+        )
+    await _check_read_permission(node, user, db)
+    if node.subject_id is None:
+        raise HTTPException(status_code=422, detail="Der Eintrag hat kein Fach.")
+    fach_zeile = await db.get(Subject, node.subject_id)
+
+    dateien, _ = await exportiere(db, fach_zeile, nur=node.id)
+    if not dateien:
+        raise HTTPException(status_code=404, detail="Nichts zu exportieren.")
+    datei = dateien[0]
+    return Response(
+        content=datei.inhalt,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{datei.pfad}"'},
+    )
+
+
+@router.get("/fachbegriffe/vorlage")
+async def fachbegriff_vorlage(
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+) -> Response:
+    """Musterdateien zum Loslegen — zwei Fassungen eines Begriffs und ein Steckbrief.
+
+    Ohne Fach und ohne Fachschaftsprüfung: Das ist eine Anleitung, kein Bestand. Wer
+    wissen will, wie das Format aussieht, soll es ansehen können, bevor er irgendwo
+    Mitglied ist.
+    """
+    from app.context.fachbegriffe_export import als_zip, vorlage
+
+    return Response(
+        content=als_zip(vorlage()),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="fachbegriffe-vorlage.zip"'
+        },
+    )

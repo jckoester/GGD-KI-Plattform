@@ -588,6 +588,21 @@
                                             {STATUS_LABEL[assistant.status] ||
                                                 assistant.status}
                                         </span>
+                                        <!-- ⚠️ **Neben dem Status, nicht statt seiner**
+                                             (Paket 7, AP4): Ein Löschantrag schaltet
+                                             nichts ab — der Assistent bleibt im
+                                             Unterricht, bis hier jemand entscheidet. -->
+                                        {#if assistant.deletion_requested_at}
+                                            <span
+                                                title={assistant.deletion_reason ||
+                                                    "ohne Begründung"}
+                                                class="ml-1 px-2 py-1 rounded-full text-xs
+                                                       bg-light-ye/20 dark:bg-dark-ye/20
+                                                       text-light-ye dark:text-dark-ye"
+                                            >
+                                                Löschung beantragt
+                                            </span>
+                                        {/if}
                                     </td>
                                     <td class="py-3 pr-4">
                                         <div class="flex items-center gap-2">

@@ -26,8 +26,17 @@ Der Kontextspeicher ist eine Sammlung von Wissensbausteinen, die Sie einer Chat-
 Ein Kontextbaustein ist ein konkretes Informationsstück — zum Beispiel:
 
 - eine Kompetenz aus dem Bildungsplan (z. B. „Schülerinnen und Schüler können Brüche auf der Zahlengeraden darstellen")
+- ein **Fachbegriff** mit Definition, Beispielen und den häufigen Irrtümern dazu
+- ein **Stoffsteckbrief** in Chemie: Formel, Eigenschaften, Nachweis und
+  Gefahrenhinweise zu einem Stoff — Reinstoff und Lösung getrennt
+  (Chlorwasserstoff / Salzsäure)
 - ein schultypisches Konzept, das an Ihrer Schule besonders behandelt wird
 - ein Thema oder eine Funktion aus dem Unterrichtsmaterial
+
+Ein Baustein kann **Abbildungen** enthalten — sie stehen an der Stelle im Text, an der
+sie erklärt werden, mit einer Beschreibung darunter. Diese Beschreibung ist kein
+Beiwerk: Sie ist das, was Sie hören, wenn Sie einen Screenreader benutzen, und das, was
+ein Assistent über das Bild weiß. Er sieht die Zeichnung nicht.
 
 Diese Bausteine werden von der Schule gepflegt und stehen allen Nutzenden zur Verfügung. Lehrkräfte können zusätzlich eigene Bausteine anlegen; Schüler:innen können eigene Chat-Ergebnisse als Baustein ablegen — dann ausschließlich für sich selbst (siehe [Aus einem Chat-Ergebnis einen Baustein machen](#aus-einem-chat-ergebnis-einen-baustein-machen)).
 
@@ -167,6 +176,26 @@ Hat sich nichts geändert, sagt die Plattform das und legt nichts an.
 > Sichtbarkeit, Verknüpfungen. Das Dokument in der Bibliothek bearbeiten Sie weiterhin
 > in der [Material-Werkstatt](werkstatt.md); dorthin gehen Änderungen am Text. Erst ein
 > erneutes „Baustein aktualisieren" holt sie in den Wissensgraphen.
+
+### Speichern heißt veröffentlichen
+
+**Es gibt keinen Entwurfszustand.** Was Sie in einem Sammlungs-Editor speichern, ist
+sofort da: in der Sammlung, in der Suche und im Kontext, den ein Assistent zu passenden
+Fragen mitliest. Ein Zwischenspeichern „nur für mich" gibt es nicht.
+
+Wenn Sie an etwas arbeiten, das noch nicht fertig ist, haben Sie zwei Möglichkeiten:
+
+- **Außerhalb schreiben** und erst den fertigen Text einsetzen.
+- **Die Sichtbarkeit eng stellen** (`privat` oder auf Ihre Unterrichtsgruppe), solange
+  der Baustein reift, und sie danach weiten.
+
+Dasselbe gilt für importierte Bausteine: **Der Import ist die Freigabe.** Wer eine Datei
+einspielt, verantwortet ihren Inhalt — es gibt kein Häkchen, das einen Eintrag danach
+noch „freigibt".
+
+> Ein Zwischenspeichern kann später dazukommen. Es wäre dann eine eigene Fassung neben
+> der gültigen, keine Markierung am veröffentlichten Baustein — sonst stünde ein
+> unfertiger Text schon in den Antworten, während das Häkchen noch fehlt.
 
 ## Archivieren statt löschen
 

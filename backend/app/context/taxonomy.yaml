@@ -262,6 +262,35 @@ categories:
         scope_anchor: true
         embedding: true
         embedding_enrichment: ["metadata.breadcrumb"]
+        # ⚠️ **Vollständig, nicht nur `std`** (Entscheidung Jan, 25.09.2026). Bis dahin
+        # hatte `kapitel` gar kein Feldschema: `app/context/metadata.py` prüfte hier
+        # nichts, obwohl `std` die Stundenbilanz der Jahresplanung trägt — eine
+        # Zeichenkette statt einer Zahl brach am 24.09.2026 die ganze Ansicht (Alembic
+        # `0072`). Nur `std` aufzunehmen hätte dem Knoten-Editor ein Formular mit genau
+        # einem Feld gegeben, während die drei anderen ungeregelt danebenstünden.
+        felder:
+          std:
+            typ: int
+            min: 0
+            label: "Stunden (Soll)"
+            hinweis: >-
+              Wie viele Unterrichtsstunden das Kapitel vorsieht. Grundlage der
+              Stundenbilanz im Jahresplan.
+          reihenfolge:
+            typ: int
+            min: 0
+            label: "Reihenfolge"
+            hinweis: "Position im Curriculum — kleinere Zahl steht weiter vorn."
+          einleitung:
+            typ: text
+            label: "Einleitung"
+            hinweis: "Der einleitende Text des Kapitels aus dem Bildungsplan."
+          breadcrumb:
+            typ: text
+            label: "Pfad im Bildungsplan"
+            hinweis: >-
+              Der Weg zum Kapitel, etwa „Chemie › Klasse 9/10 › Stoffe und ihre
+              Eigenschaften". Fließt in das Embedding ein.
       - key: lernsequenz
         label_de: "Lernsequenz"
         icon: Waypoints
@@ -347,7 +376,7 @@ categories:
       - key: jahresplan
         label_de: "Jahresplan"
         icon: CalendarRange
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
       - key: pruefungsanforderung
         label_de: "Prüfungsanforderung"
         icon: ClipboardCheck
@@ -367,7 +396,7 @@ categories:
       - key: unterrichtsstunde
         label_de: "Unterrichtsstunde"
         icon: SquareChartGantt
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
         scope_anchor: true
         valid_until_default: schuljahresende
         # Thema, nicht Ablauf: Verlaufsplan (`phasen`) bleibt draußen.
@@ -383,7 +412,7 @@ categories:
       - key: unterrichtseinheit
         label_de: "Unterrichtseinheit"
         icon: Map
-        scope_defaults: {read_scope: private,  write_scope: private }
+        scope_defaults: {read_scope: group_teachers, write_scope: group_teachers}
         # Anker: Ein Assistent für genau eine Einheit ist der Regelfall — die Stunde
         # darunter ist es ohnehin. Bis 02.09.2026 stand hier `false`, während der
         # Assistenten-Editor den Typ längst anbot (Drift, von der AP1-Startprüfung
@@ -506,7 +535,7 @@ categories:
           beschreibung: >-
             Fachbegriffe mit Definition. Gleichnamige Begriffe je Fach sind der
             Normalfall — „Energie" heißt in Physik etwas anderes als in Ethik.
-          spalten: [titel, fach, ab_klasse, status, geaendert]
+          spalten: [titel, fassung, fach, ab_klasse, status, geaendert]
           filter: [fach, ab_klasse, status, titel]
           # Fachgebunden, aber trotzdem in der Sidebar (Entscheidung Jan, 02.09.2026):
           # Fachbegriffe anderer Fächer sind von Interesse — „was heißt Energie in
@@ -521,6 +550,24 @@ categories:
             part_of:
               label: "gehört zum Themengebiet"
               ziel: [themengebiet]
+            # ⚠️ **Hier ist `references` die richtige Richtung** — anders als beim
+            # Material, das auf einen Begriff zeigt. Ein Begriff verweist auf die
+            # Kompetenz, in der der Bildungsplan ihn verlangt; die Kante entsteht am
+            # Begriff, nicht an der Kompetenz (die trägt sonst Tausende Rückverweise,
+            # siehe ADR-013 zur Kantendichte).
+            references:
+              label: "wird im Bildungsplan verlangt in"
+              ziel: [ik_kompetenz]
+            requires:
+              label: "setzt voraus"
+              ziel: [begriff]
+            # „ist ein(e)" (Alembic 0078). Zeigt auf eine **bestimmte Fassung**:
+            # „Redoxreaktion (Elektronenübergang)" ist etwas anderes als die
+            # Klasse-8-Fassung. Keine Transitivität im Datenmodell — Ketten entstehen
+            # durch Traversierung.
+            is_a:
+              label: "ist ein(e)"
+              ziel: [begriff]
           # Pflicht: Ein Begriff ohne Definition ist ein Titel, kein Baustein.
           content:
             label: "Definition"
@@ -534,10 +581,176 @@ categories:
             label: "Ab Klassenstufe"
             min: 1
             max: 13
+            # ⚠️ **Nur bei Begriffen mit mehreren Fassungen** (Entscheidung 25.09.2026).
+            # Ein Begriff, den es nur einmal gibt, braucht keine Stufe — sie stünde dann
+            # als Schranke da, wo keine gemeint ist.
             hinweis: >-
-              Für welche Stufe diese Fassung gemeint ist. „Energie" in Klasse 6
-              verlangt eine andere Definition als in Klasse 11; zwei Einträge mit
-              verschiedener Stufe sind der vorgesehene Weg dahin.
+              Nur ausfüllen, wenn es diesen Begriff in mehreren Fassungen gibt: „Energie"
+              in Klasse 6 verlangt eine andere Definition als in Klasse 11, „Oxidation"
+              in Klasse 8 eine andere als in Klasse 10. Zwei Einträge mit verschiedener
+              Stufe sind der vorgesehene Weg dahin.
+          fassung:
+            typ: text
+            label: "Fassung"
+            hinweis: >-
+              Unterscheidet gleichnamige Einträge in der Liste — „Sauerstoffaufnahme"
+              gegenüber „Elektronenabgabe". Ohne sie stünde derselbe Titel zweimal da.
+          bevorzugter_begriff:
+            typ: text
+            label: "Bevorzugte Bezeichnung"
+            hinweis: >-
+              Die an dieser Schule übliche Bezeichnung. Der Assistent antwortet damit,
+              auch wenn gefragt wurde: „Atombindung" beantwortet er als
+              „Elektronenpaarbindung".
+          genus:
+            typ: auswahl
+            label: "Artikel"
+            werte: [der, die, das]
+            hinweis: >-
+              Für Lernende, die Deutsch als Zweitsprache sprechen — und für Antworten,
+              die den Begriff im Satz beugen.
+          plural:
+            typ: text
+            label: "Mehrzahl"
+            hinweis: "Ersetzt Plural-Aliase; die Suche findet beide Formen ohnehin."
+          fehlvorstellungen:
+            typ: liste
+            label: "Häufige Irrtümer"
+            # ⚠️ **Nicht im Embedding.** Sie beschreiben, was der Begriff *nicht* ist;
+            # im Vektor zögen sie genau die Fragen an, die sie widerlegen sollen.
+            hinweis: >-
+              Typische Fehlvorstellungen, gegen die eine Erklärung anarbeiten muss („Beim
+              Sieden zerfällt Wasser in Wasserstoff und Sauerstoff"). Der Assistent
+              bekommt sie mit und kann sie ansprechen.
+          quelle:
+            typ: text
+            label: "Herkunft"
+            hinweis: "Woher der Entwurf stammt — Lehrwerk, Fachschaft, eigene Arbeit."
+      - key: stoffsteckbrief
+        label_de: "Stoffsteckbrief"
+        icon: FlaskConical
+        scope_defaults: {read_scope: school,   write_scope: subject }
+        # ⚠️ **Warum ein eigener Typ und nicht `begriff` mit Zusatzfeldern**
+        # (Entscheidung Jan, 26.09.2026, Paket 9/E2). Das Existenz-Kriterium verlangt
+        # eine **Mechanik** oder einen **Filter**, nicht eine Mindestzahl — beides ist
+        # erfüllt:
+        #
+        # 1. Der Embedding-Input ist ein anderer. Ein Begriff trägt Definition und
+        #    Erklärung; ein Steckbrief zusätzlich seine Alltagsnamen („Kochsalz",
+        #    „Trockeneis"), unter denen Schüler:innen ihn suchen. Die
+        #    Eigenschaftstabelle dagegen gehört **nicht** in den Vektor.
+        # 2. Die Liste ist eine andere: „Welche Stoffe hatten wir?" mit Formel und
+        #    Prüfstatus ist nicht die Fachbegriffsliste.
+        # 3. Stoffklasse, Teilchen und Gefahrenpiktogramme sind **Kanten** — als freies
+        #    Metadata an einem `begriff` blieben sie tote Zeichenketten.
+        embedding: true
+        # Titel, Aliase und Trivialnamen tragen die Identifikation; `content` (Definition
+        # → Erklärung → Beispiele) die Sache. **Ohne** `eigenschaften`: Schmelz- und
+        # Siedetemperaturen ähneln sich über alle Stoffe und machten die Vektoren
+        # einander ähnlich statt unterscheidbar — dieselbe Falle wie der Verlaufsplan
+        # beim Stundenentwurf.
+        # ⚠️ **`eigenschaften.aussehen` ja, die Zahlenfelder nein** (AP7, gemessen
+        # 26.09.2026). Schmelz- und Siedetemperatur stehen in jedem Steckbrief und
+        # machten die Vektoren einander ähnlich statt unterscheidbar — das Aussehen
+        # dagegen ist unterscheidende Prosa („raucht an feuchter Luft"), und danach
+        # fragen Schüler:innen. Gemessen am Fall „Welcher Stoff raucht an feuchter
+        # Luft …": Chlorwasserstoff steigt von Rang 9 auf Rang 3, Salzsäure von 20
+        # auf 12; die beiden anderen Steckbrief-Fälle bleiben unverändert grün.
+        #
+        # `metadata.nachweis` wurde im selben Zug gemessen und **verworfen**: Er
+        # bewegt denselben Fall um einen Rang (12 → 13, Rauschen), und sein eigener
+        # Prüfsatzfall („Womit weist man Chloridionen nach?") war schon ohne ihn grün.
+        # Die Notiz dort hatte genau das vorab festgelegt.
+        embedding_input: ["title", "aliases", "metadata.trivialnamen",
+                          "metadata.eigenschaften.aussehen", "content"]
+        collection:
+          beschreibung: >-
+            Stoffe mit Formel, Eigenschaften und Gefahrenhinweisen. Reinstoff und Lösung
+            sind getrennt (Chlorwasserstoff / Salzsäure) — sonst verwischt die
+            Unterscheidung zwischen Säure und saurer Lösung.
+          spalten: [titel, formel, fach, status, geaendert]
+          filter: [fach, status, titel]
+          # Wie `begriff`: Nachschlagen im Unterricht ist der Kernfall, und die Frage
+          # „was ist das für ein Stoff?" stellt man ohne das eigene Fach im Kopf.
+          sidebar: true
+          schueler: true
+          relationen:
+            is_a:
+              label: "gehört zur Stoffklasse"
+              ziel: [begriff]
+            related_to:
+              label: "steht in Beziehung zu"
+              ziel: [begriff, stoffsteckbrief]
+            references:
+              label: "wird im Bildungsplan verlangt in"
+              ziel: [ik_kompetenz]
+          # Pflicht wie beim Begriff: Ein Steckbrief ohne Definition ist eine Tabelle
+          # ohne Aussage — und im Vektor stünde nur der Name.
+          content:
+            label: "Definition"
+            pflicht: true
+            hinweis: >-
+              Was für ein Stoff das ist, in einem Satz. Darunter Erklärung und
+              Beispiele.
+        felder:
+          formel:
+            typ: text
+            label: "Formel"
+            hinweis: >-
+              In mhchem-Schreibweise, etwa `\ce{H2O}`. Bei Lösungen die Kurzform
+              (`HCl(aq)`).
+          smiles:
+            typ: text
+            label: "SMILES"
+            hinweis: "Nur für Reinstoffe; bei Gemischen leer lassen."
+          trivialnamen:
+            typ: liste
+            label: "Alltagsnamen"
+            hinweis: >-
+              Kochsalz, Trockeneis, gebrannte Magnesia. Auch fachlich schiefe Namen wie
+              „Kohlensäure" gehören hierher — die Richtigstellung steht im Text. Geht in
+              die Suche ein: Danach fragen Schüler:innen.
+          nachweis:
+            typ: text
+            label: "Nachweis"
+            hinweis: >-
+              Die Nachweisreaktion in einem Satz. Leer, wenn der Bildungsplan keine
+              verlangt.
+          fehlvorstellungen:
+            typ: liste
+            label: "Häufige Irrtümer"
+            # ⚠️ **Nicht im Embedding** — wie beim Fachbegriff: Sie beschreiben, was
+            # nicht zutrifft, und zögen im Vektor genau die Fragen an, die sie
+            # widerlegen sollen.
+            hinweis: >-
+              Typische Fehlvorstellungen zu diesem Stoff, gegen die eine Erklärung
+              anarbeiten muss („Die Blasen in kochendem Wasser sind Luft“). Der
+              Assistent bekommt sie mit und kann sie ansprechen.
+          bevorzugter_begriff:
+            typ: text
+            label: "Bevorzugte Bezeichnung"
+            hinweis: "Die an dieser Schule übliche Bezeichnung."
+          genus:
+            typ: auswahl
+            label: "Artikel"
+            werte: [der, die, das]
+            hinweis: "Für Lernende mit Deutsch als Zweitsprache."
+          plural:
+            typ: text
+            label: "Mehrzahl"
+            hinweis: >-
+              Ein Gedankenstrich, wo es keine gibt.
+          quelle:
+            typ: text
+            label: "Herkunft"
+            hinweis: >-
+              Woher die Angaben stammen — bei Gefahrstoffdaten mit dem Datum des
+              DEGINTU-Abgleichs.
+        # ⚠️ **`eigenschaften` und `ghs` bleiben ungeprüftes Metadata.** Die Feldtypen
+        # (`int|text|auswahl|liste`) tragen weder verschachtelte Objekte noch gemischte
+        # Listen, und `ghs` ist genau das: entweder ein Verweis oder ein Verweis **mit
+        # Bedingung** („ab 0,1 mol/L"). Die Bedingung gehört an die Kante, nicht an den
+        # Knoten; das Seed-Skript schreibt sie dorthin (AP5).
 
 # Importierte Bildungsplan-/Curriculum-Knotentypen. Sie gehören in die BildungsplanTree-/
 # Curricula-Ansichten, NICHT in die freie /knowledge-Liste (dort kosten sie Ladezeit und

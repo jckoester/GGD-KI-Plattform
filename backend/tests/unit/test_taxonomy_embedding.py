@@ -62,6 +62,9 @@ EXPECTED_EMBEDDING_TYPES = frozenset({
     # `aufgabenblatt` in `arbeitsblatt` (V1), `reflexion` in `metadata.reflexion` der
     # Stunde (V3) — deshalb stehen die drei hier nicht mehr.
     'begriff',
+    # Stoffsteckbriefe (Paket 9, 26.09.2026): „Was ist das weiße Pulver, das mit
+    # Säure schäumt?“ soll den Stoff finden, ohne dass man ihn benennen kann.
+    'stoffsteckbrief',
 })
 
 # Typen, deren Embedding-Input ausdrücklich festgelegt ist, statt sich aus `content` plus
@@ -70,6 +73,9 @@ EXPECTED_INPUT_KEYS = {
     ('knowledge', 'methode'),
     ('artifact', 'unterrichtsstunde'),
     ('artifact', 'unterrichtseinheit'),
+    # Stoffsteckbrief: Alltagsnamen **hinein** („Kochsalz“, „Trockeneis“ —
+    # danach fragen Schüler:innen), Eigenschaftstabelle **heraus**.
+    ('concept', 'stoffsteckbrief'),
 }
 
 EXPECTED_ENRICHMENT_KEYS = {
@@ -106,6 +112,54 @@ class TestEmbeddingDerivation:
             quellen = EMBEDDING_INPUT[schluessel]
             assert not any("phasen" in q for q in quellen), quellen
             assert "title" in quellen
+
+    #: Eigenschaften, die in **jedem** Steckbrief stehen und deshalb nicht
+    #: unterscheiden: Zahlen mit Einheit. Sie zögen alle Stoffe zueinander.
+    MESSWERTE = (
+        "schmelztemperatur", "siedetemperatur", "dichte", "molare_masse",
+        "loeslichkeit_wasser", "elektrische_leitfaehigkeit", "konzentration",
+    )
+
+    def test_messwerte_bleiben_aus_dem_vektor(self):
+        """Dieselbe Regel für den Stoffsteckbrief — aber genauer gefasst.
+
+        ⚠️ **Die erste Fassung hielt `eigenschaften` als Ganzes heraus** und war damit
+        zu grob. Gemessen am 26.09.2026 (AP7) trägt `eigenschaften.aussehen` sehr wohl:
+        „raucht an feuchter Luft“, „silbrig glänzendes Leichtmetall“ — das
+        unterscheidet Stoffe und ist das, wonach Schüler:innen fragen. Chlorwasserstoff
+        stieg dadurch im Prüfsatz von Rang 9 auf 3.
+
+        Die **Zahlen** bleiben draußen, und dafür steht dieser Wächter: Eine
+        Schmelztemperatur hat jeder Stoff, ein „g/mol“ steht in jedem Steckbrief.
+        Wer die Tabelle als Ganzes einträgt, macht alle Stoffe einander ähnlich.
+        """
+        from app.context.taxonomy import EMBEDDING_INPUT
+
+        quellen = EMBEDDING_INPUT[("concept", "stoffsteckbrief")]
+        assert "metadata.eigenschaften" not in quellen, (
+            "Die Eigenschaftstabelle als Ganzes gehört nicht in den Vektor — "
+            f"einzelne Felder daraus schon: {quellen}"
+        )
+        for feld in self.MESSWERTE:
+            assert not any(feld in q for q in quellen), (
+                f"`{feld}` ist ein Messwert und steht in jedem Steckbrief: {quellen}"
+            )
+        # Was drin sein **muss** — sonst ist der Vektor eine Titelsuche.
+        assert "metadata.trivialnamen" in quellen
+        assert "metadata.eigenschaften.aussehen" in quellen
+        assert "title" in quellen and "content" in quellen
+
+    def test_nachweis_bleibt_draussen(self):
+        """Gemessen und verworfen (AP7): Er bewegt seinen Zielfall um einen Rang.
+
+        Sein eigener Prüfsatzfall („Womit weist man Chloridionen nach?“) war schon
+        ohne ihn grün, und die Notiz dort hatte das vorab zur Bedingung gemacht. Wer
+        ihn aufnimmt, tut es also gegen eine Messung — dann bitte mit einer neuen.
+        """
+        from app.context.taxonomy import EMBEDDING_INPUT
+
+        quellen = EMBEDDING_INPUT[("concept", "stoffsteckbrief")]
+        assert not any("nachweis" in q for q in quellen), quellen
 
     def test_embedding_re_export_matches_taxonomy(self):
         assert EMBEDDING_CONTENT_TYPES == TAXONOMY_EMBEDDING_CONTENT_TYPES

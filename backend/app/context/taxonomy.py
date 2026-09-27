@@ -123,6 +123,9 @@ VALID_UNTIL_DEFAULTS_DAYS: Final[dict[str, int | None]] = {
     "funktion": None,
     "bauteil": None,
     "begriff": None,
+    # Ein Stoff läuft nicht ab. Der Eintrag steht hier trotzdem — ein fehlender
+    # hieße „nie ablaufen" aus Versehen statt aus Entscheidung (Falle 1).
+    "stoffsteckbrief": None,
 }
 # ⚠️ **Diese Liste wird von Hand gepflegt und deckt jeden content_type ab.** Ein
 # fehlender Eintrag fällt sonst nicht auf: `get_valid_until_offset` liefert über
@@ -319,8 +322,16 @@ def get_valid_until_schuljahresende(content_type: str | None) -> bool:
 # Wahl — und beantwortet „wer darf diesen einen bearbeiten", nicht „was für ein Ding
 # ist das". Wer sein Arbeitsblatt mit der Fachschaft teilt, verlöre es sonst von der
 # eigenen Seite; ein privat gesetzter Fachbegriff erschiene dort fälschlich.
+# ⚠️ **`group_teachers` zählt mit** (24.09.2026). Der Wert kam mit Alembic 0074 für die
+# Planungsknoten; sie sind weiterhin **selbst gepflegt**, nur eben von den Lehrkräften
+# einer Gruppe gemeinsam statt von einer Person allein. Ohne diese Zeile fielen
+# `unterrichtsstunde`, `unterrichtseinheit` und `jahresplan` aus „Meine Bausteine" heraus
+# — die Lehrkraft verlöre ihre eigenen Entwürfe von der eigenen Seite. Ein Test hat es
+# gefangen; die Zahl der persönlichen Typen bleibt bei 16.
+_SELBST_GEPFLEGT: Final[frozenset[str]] = frozenset({"private", "group_teachers"})
+
 PERSOENLICHE_CONTENT_TYPES: Final[frozenset[str]] = frozenset(
-    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write == "private"
+    typ for typ, (_read, write) in SCOPE_DEFAULTS.items() if write in _SELBST_GEPFLEGT
 )
 
 
@@ -445,6 +456,8 @@ _SCHUELER_BONUS: Final[dict[str, float]] = {
     "arbeitsblatt": 0.02,
     "aufgabe": 0.02,
     "begriff": 0.02,
+    # Nachschlagen im Unterricht — dieselbe Frage wie beim Fachbegriff.
+    "stoffsteckbrief": 0.02,
 }
 
 _LEHRKRAFT_BONUS: Final[dict[str, float]] = {
@@ -475,3 +488,83 @@ def rollen_typ_bonus(rollen) -> dict[str, float]:
     if "student" in rollen:
         return ROLLEN_TYP_BONUS["student"]
     return {}
+
+
+# ── Was das Modell von den Metadaten sieht (Paket 9, AP3) ────────────────────
+
+# Metadatenfelder, die **immer** ans Modell mitgehen — je Knotentyp einzeln benannt.
+#
+# ⚠️ **Whitelist, nicht „alles Metadata".** Die Spalte trägt neben Fachlichem auch
+# Import-Interna (`bp_id`, `breadcrumb`, `reihenfolge`), Anzeigekram und bei
+# Abbildungen ganze SVG-Dokumente — im Pilot bis 47 kB je Bild. Pauschal mitgegeben
+# kostete sie im Modellkontext ein Vielfaches des Knotentextes, für den sie stehen soll.
+#
+# Ein Typ, der hier **nicht** steht, gibt nichts mit. Das ist der Normalfall und der
+# Stand vor AP3; der Weg dorthin bleibt `Suchprofil.mit_metadaten` für Aufrufer, die
+# die rohe Spalte selbst auswerten (`get_operatoren`, Breadcrumb im Ankerkontext).
+#
+# ⚠️ Diese Tabelle ist **Schritt 14** aus `docs/dev/neuer-knotentyp.md`. Ein neuer
+# Typ mit fachlich gehaltvollen Feldern, der hier fehlt, verliert sie im Gespräch
+# lautlos — die Felder stehen in der Oberfläche, und niemand merkt, dass der Assistent
+# sie nie gesehen hat.
+MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
+    "begriff": (
+        # Die an der Schule übliche Bezeichnung: Gefragt nach „Atombindung", antwortet
+        # der Assistent mit „Elektronenpaarbindung".
+        "bevorzugter_begriff",
+        # Welche von mehreren gleichnamigen Definitionen gemeint ist — und ab wann sie
+        # gilt. Ohne beides verwechselt das Modell die Klasse-8- mit der
+        # Klasse-10-Fassung von „Oxidation".
+        "fassung",
+        "ab_klasse",
+        # Artikel und Mehrzahl, damit die Antwort den Begriff richtig beugt. Genau
+        # dafür sind die Felder da (siehe ihren Hinweistext in `taxonomy.yaml`).
+        "genus",
+        "plural",
+        # Der eigentliche Mehrwert im Tutor-Dialog: Was der Assistent ansprechen kann,
+        # statt daran vorbeizuerklären. **Nicht** im Embedding — im Vektor zögen sie
+        # die Fragen an, die sie widerlegen sollen.
+        "fehlvorstellungen",
+    ),
+    "stoffsteckbrief": (
+        "bevorzugter_begriff",
+        "genus",
+        "plural",
+        # „Kochsalz", „Trockeneis" — unter diesen Namen fragen Schüler:innen.
+        "trivialnamen",
+        "formel",
+        # Die Eigenschaftstabelle ist der Zweck des Steckbriefs. Sie steht bewusst
+        # **nicht** im Embedding (dort machte sie alle Stoffe einander ähnlich), wohl
+        # aber im Gespräch: „Bei welcher Temperatur schmilzt Magnesiumoxid?"
+        "eigenschaften",
+        "nachweis",
+        "fehlvorstellungen",
+    ),
+}
+
+
+def modell_metadata_felder(content_type: str | None) -> tuple[str, ...]:
+    """Welche Metadatenfelder dieses Typs das Modell sehen darf (leer = keine)."""
+    return MODELL_METADATA.get(content_type or "", ())
+
+
+#: Knotenarten, die **ungefragt** im Prompt landen dürfen (Paket 9, N11).
+#:
+#: Abgeleitet aus dem Flag ``sammlung.schueler`` der Taxonomie, **nicht** von Hand
+#: gepflegt. Das Flag beantwortet genau die richtige Frage: „Ist das etwas, das
+#: Schüler:innen im Unterricht in die Hand bekommen?" Wer einen neuen Typ so
+#: kennzeichnet, entscheidet damit auch, dass er in einem Schüler-Chat ohne Nachfrage
+#: erscheinen darf — das steht als Schritt in ``docs/dev/neuer-knotentyp.md``.
+#:
+#: ⚠️ **Es ist keine Rechteangabe.** Was jemand lesen darf, regelt allein
+#: ``app/context/visibility.py``; die Vorab-Suche läuft über dieselbe Grundabfrage wie
+#: jede andere Suche. Hier wird nur entschieden, was **ohne Anlass** vorgelegt wird.
+#: Bildungsplan-Kompetenzen und Curricula bleiben deshalb draußen: Sie beantworten die
+#: Frage einer Lehrkraft, nicht die einer Schülerin, und sie sind zahlreich genug, um
+#: jeden Prompt zu füllen.
+VORAB_TYPEN: Final[tuple[str, ...]] = tuple(
+    ct["key"]
+    for cat_info in _data["categories"].values()
+    for ct in cat_info["content_types"]
+    if (ct.get("collection") or {}).get("schueler") is True
+)

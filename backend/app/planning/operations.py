@@ -16,7 +16,8 @@ import sqlalchemy as sa
 from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ContextNode, LessonSlot
+from app.planning.ausfall import setze_kategorie
+from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 
@@ -31,6 +32,23 @@ VALID_KATEGORIEN: frozenset[str] = frozenset(
 class MoveContent(BaseModel):
     op: Literal["move_content"]
     from_slot_id: UUID
+    to_slot_id: UUID
+
+
+class UnparkContent(BaseModel):
+    """Geparkten Inhalt zurück in die Jahresplanung holen (AP3, 22.09.2026).
+
+    Der Gegenweg zum Umhängen: Was beim Wechsel des Wochenmusters keinen Termin fand,
+    liegt auf dem Parkplatz (`ParkedLessonContent`). Von dort kommt es entweder hierüber
+    zurück — auf einen freien Termin — oder es wird durch Kürzen aufgesaugt
+    (`transfer_phases`, `shorten_phase`, `strike_phase`) und danach verworfen.
+
+    **Nur auf einen leeren Termin.** Slot und Inhalt stehen 1:1; auf einen belegten
+    abzulegen überschriebe den einen mit dem anderen, und das kaskadiert.
+    """
+
+    op: Literal["unpark_content"]
+    parkplatz_id: UUID
     to_slot_id: UUID
 
 
@@ -88,6 +106,7 @@ PlanOperation = Annotated[
     Union[
         MoveContent, SwapContent, SetTopic, SetUnit, SetCategory,
         MarkNeedsAdjustment, TransferPhases, ShortenPhase, StrikePhase,
+        UnparkContent,
     ],
     Field(discriminator="op"),
 ]
@@ -105,6 +124,9 @@ class ExecutionResult:
     applied: int
     errors: list[str] = field(default_factory=list)
     snapshot_id: str | None = None
+    # ⚠️ **Hinweise sind keine Fehler.** Die Operationen bleiben angewandt; sie gehen
+    # nur ans Modell zurück, damit es nachbessern kann, und stehen im Verlauf.
+    hinweise: list[str] = field(default_factory=list)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,6 +149,7 @@ def _lesson_ids(op: BaseModel) -> list[UUID]:
 async def _validate(
     db: AsyncSession, group_id: int, ops: list[PlanOperation],
     slots: dict[UUID, LessonSlot], lessons: dict[UUID, ContextNode],
+    parked: dict[UUID, ParkedLessonContent] | None = None,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -178,6 +201,20 @@ async def _validate(
         elif isinstance(op, SetCategory):
             if op.kategorie not in VALID_KATEGORIEN:
                 errors.append(f"{ctx}: ungültige Kategorie {op.kategorie!r}")
+        elif isinstance(op, UnparkContent):
+            eintrag = (parked or {}).get(op.parkplatz_id)
+            if eintrag is None:
+                errors.append(f"{ctx}: Parkplatz-Eintrag {op.parkplatz_id} nicht gefunden")
+            dst = slots.get(op.to_slot_id)
+            if dst is not None and dst.kategorie == "ausfall":
+                errors.append(f"{ctx}: Ziel ist Ausfall — nimmt keinen Inhalt auf")
+            if dst is not None and occ.get(op.to_slot_id):
+                # E10: Sonst überschreibt der eine Inhalt den anderen, und das kaskadiert.
+                # Mit Datum, weil beim Umplanen aus dem Parkplatz genau der Termin die
+                # Auskunft ist, die zur nächsten Wahl führt.
+                errors.append(f"{ctx}: Der Termin am {dst.date} ist belegt")
+            if dst is not None:
+                occ[op.to_slot_id] = True
         elif isinstance(op, (ShortenPhase, StrikePhase, TransferPhases)):
             _validate_phase_op(op, lessons, errors, ctx)
 
@@ -274,7 +311,20 @@ async def apply_operations(
         ).scalars().all()
     }
 
-    errors = await _validate(db, group_id, ops, slots, lessons)
+    parkplatz_ids = {op.parkplatz_id for op in ops if isinstance(op, UnparkContent)}
+    parked = {
+        e.id: e
+        for e in (
+            await db.execute(
+                sa.select(ParkedLessonContent).where(
+                    ParkedLessonContent.group_id == group_id,
+                    ParkedLessonContent.id.in_(parkplatz_ids or {None}),
+                )
+            )
+        ).scalars().all()
+    }
+
+    errors = await _validate(db, group_id, ops, slots, lessons, parked)
     if errors:
         return ExecutionResult(applied=0, errors=errors)
 
@@ -290,9 +340,23 @@ async def apply_operations(
         elif isinstance(op, SetUnit):
             slots[op.slot_id].ue_node_id = op.unit_node_id
         elif isinstance(op, SetCategory):
-            slots[op.slot_id].kategorie = op.kategorie
+            # ⚠️ **Die Herkunft wandert mit der Kategorie.** Setzt der Assistent einen
+            # Ausfall, gehört er nicht dem Stundenplan — sonst überschriebe der nächste
+            # Abgleich ihn lautlos. Verlässt der Slot den Ausfall wieder, müssen die
+            # Angaben weg: Ein zurückgebliebenes `ausfall_vorher` führte beim nächsten
+            # Zurücknehmen auf eine Kategorie, die niemand gesetzt hat.
+            setze_kategorie(slots[op.slot_id], op.kategorie, herkunft="assistent")
         elif isinstance(op, MarkNeedsAdjustment):
             slots[op.slot_id].anpassung_noetig = op.value
+        elif isinstance(op, UnparkContent):
+            eintrag, ziel = parked[op.parkplatz_id], slots[op.to_slot_id]
+            ziel.ue_node_id = eintrag.ue_node_id
+            ziel.stunde_node_id = eintrag.stunde_node_id
+            ziel.thema = eintrag.thema
+            # Der Termin ist ein anderer als der ursprüngliche — was dort geplant war,
+            # passt nicht ungeprüft. Denselben Marker setzt das Umhängen selbst.
+            ziel.anpassung_noetig = True
+            await db.delete(eintrag)
         elif isinstance(op, TransferPhases):
             _apply_transfer(lessons[op.from_lesson_id], lessons[op.to_lesson_id], op.phase_ids)
         elif isinstance(op, ShortenPhase):
@@ -318,5 +382,64 @@ async def apply_operations(
     for lesson in lessons.values():
         await synchronisiere_materialkanten(db, lesson.id, lesson.metadata_)
 
+    hinweise = await _pruefe_halben_umzug(db, group_id, ops)
+
     await db.commit()
-    return ExecutionResult(applied=len(ops), errors=[], snapshot_id=str(snap.id))
+    return ExecutionResult(
+        applied=len(ops), errors=[], snapshot_id=str(snap.id), hinweise=hinweise
+    )
+
+
+async def _pruefe_halben_umzug(
+    db: AsyncSession, group_id: int, ops: list[PlanOperation]
+) -> list[str]:
+    """Meldet, wenn ein `set_topic` den Inhalt zerrissen hat.
+
+    ⚠️ **Der Fall, der das nötig machte** (beobachtet 24.09.2026): Nach „Stunden
+    verschieben" stand am Zieltermin nur das Thema — Unterrichtseinheit und
+    Stundenentwurf blieben am ausgefallenen Termin. Das Modell hatte `set_topic` gewählt,
+    wo `move_content` gemeint war. Verboten war es nicht, und niemand merkte es: Die
+    Lehrkraft sah die Stunde am neuen Termin stehen und konnte sie dort nicht bearbeiten.
+
+    **Eine bessere Werkzeugbeschreibung macht das unwahrscheinlicher, nicht unmöglich.**
+    Diese Prüfung sorgt dafür, dass das Ergebnis nicht *unbemerkt* bleibt.
+
+    Bewusst eng geschnitten: „Ein ausgefallener Termin trägt noch Inhalt" allein ist der
+    **Normalfall** direkt nach einem Ausfall — die Zuordnung bleibt für die
+    Nachvollziehbarkeit erhalten. Ein Hinweis darauf wäre Rauschen und entwertete die
+    Fälle, die zählen. Gemeldet wird nur die Kombination: ein `set_topic` **und** ein
+    ausgefallener Termin mit demselben Thema, der Einheit oder Entwurf noch hält.
+    """
+    themen = {
+        (op.thema or "").strip()
+        for op in ops
+        if isinstance(op, SetTopic) and (op.thema or "").strip()
+    }
+    if not themen:
+        return []
+
+    # ⚠️ **Eigene Abfrage, nicht die geladenen Slots.** `apply_operations` lädt nur, was
+    # die Operationen **nennen** — der zurückgebliebene Quelltermin steht gerade nicht
+    # darin, denn das `set_topic` betraf ja das Ziel. Der erste Entwurf dieser Prüfung
+    # sah deshalb nie etwas und meldete nie etwas; der Test war rot, und zu Recht.
+    zurueckgeblieben = [
+        s for s in (
+            await db.execute(
+                sa.select(LessonSlot).where(
+                    LessonSlot.group_id == group_id,
+                    LessonSlot.kategorie == "ausfall",
+                )
+            )
+        ).scalars().all()
+        if (s.thema or "").strip() in themen
+        and (s.ue_node_id is not None or s.stunde_node_id is not None)
+    ]
+    if not zurueckgeblieben:
+        return []
+    return [
+        f"Am ausgefallenen Termin {s.date} bleiben Unterrichtseinheit bzw. "
+        f"Stundenentwurf von \u201e{(s.thema or '').strip()}\u201c zurück — `set_topic` "
+        "hat nur die Überschrift gesetzt. Für eine Verlegung ist `move_content` "
+        "richtig: Es nimmt Thema, Einheit und Entwurf mit."
+        for s in zurueckgeblieben
+    ]

@@ -47,6 +47,12 @@ class WeekPatternRead(BaseModel):
 class SlotGenerateRequest(BaseModel):
     halbjahr: int = Field(..., ge=1, le=2)
     regenerate: bool = False
+    # Termine als Annahme kennzeichnen — für das zweite Halbjahr, das zu
+    # Schuljahresbeginn aus dem Raster des ersten entsteht (siehe `LessonSlot.vorlaeufig`).
+    vorlaeufig: bool = False
+    # Nur rechnen, nichts schreiben. Für die Vorschau vor dem Neuaufbau: Wie viele
+    # Stunden werden umgehängt, wie viele liegen danach auf dem Parkplatz?
+    dry_run: bool = False
 
 
 class SlotGenStatsRead(BaseModel):
@@ -56,6 +62,13 @@ class SlotGenStatsRead(BaseModel):
     # Der Fallback trug ein 14-tägiges Muster ins 2. Halbjahr — die einzige Stelle, an der
     # die A-/B-Phase über den Halbjahreswechsel fortgeschrieben wird.
     fallback_vierzehntaegig: bool = False
+    vorlaeufig: bool = False
+    # Wie viele vorhandene Slots der Neuaufbau nicht angefasst hat (Quelle oder Handarbeit).
+    verschont: int = 0
+    # Was das Umhängen ergeben hat (bzw. ergäbe, bei `dry_run`).
+    umgehaengt: int = 0
+    geparkt: int = 0
+    meldungen: list[str] = []
 
 
 class AbWochenRead(BaseModel):
@@ -85,6 +98,7 @@ class SlotRead(BaseModel):
     thema: Optional[str]
     pinned: bool
     anpassung_noetig: bool
+    vorlaeufig: bool = False
     note: Optional[str]
     nachbereitet_at: Optional[datetime]
     nachbereitet_auto: bool
@@ -178,6 +192,11 @@ class GroupCurriculaRead(BaseModel):
     curricula: list[CurriculumOption] = []
     grade: Optional[int] = None
     grade_unbekannt: bool = False
+    # ⚠️ **Drei Lagen, nicht eine leere Liste.** „Kein Fach an der Gruppe", „Stufe
+    # unbekannt" und „Stufe bekannt, kein Curriculum hinterlegt" sahen bis zum
+    # 24.09.2026 gleich aus. Die Oberfläche sagte dreimal „kein Curriculum gefunden"
+    # und schickte die Lehrkraft zweimal auf die falsche Suche.
+    fach_fehlt: bool = False
 
 
 # ── Stunden-Knoten ────────────────────────────────────────────────────────────

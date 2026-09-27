@@ -77,6 +77,12 @@ Alle Ihre Gespräche werden unter **„Letzte Chats"** in der Seitenleiste gespe
 
 Gespräche, die mit einem Assistenten geführt wurden, sind im Verlauf entsprechend gekennzeichnet.
 
+**Für Lehrkräfte:** Gehört ein Chat zu einer Unterrichtsgruppe, steht deren Name in der
+Chat-Übersicht neben dem Titel; in der Seitenleiste nennt ihn der Tooltip. Vier Chats mit
+dem Titel „Sinusfunktionen verstehen" lassen sich sonst nicht auseinanderhalten. Ist Ihnen
+der Name zu lang, vergeben Sie der Gruppe unter *Unterricht* einen kürzeren Anzeigenamen —
+er wird überall verwendet.
+
 > **Hinweis:** Gespräche werden 3 Monate nach der letzten Nachricht automatisch gelöscht.
 > Ergebnisse, die Sie aufbewahren möchten, müssen Sie selbst kopieren.
 

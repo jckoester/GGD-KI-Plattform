@@ -2,8 +2,13 @@
  * Wie das Ergebnis eines Stundenplan-Abgleichs zu lesen ist.
  *
  * Der Abgleich ändert **Kategorien vorhandener Stunden** — Entfall, Vertretung — und legt
- * keine an. Das ist Absicht und in `app/calendar/sync.py` als Grenze festgehalten: „Ohne
- * passenden Slot wird nichts angelegt."
+ * seit dem 22.09.2026 **fehlende Termine an**: Wird eine Stunde auf einen Tag verlegt, an
+ * dem die Gruppe sonst keinen Unterricht hat, entsteht dort einer. Vorher wurde nur der
+ * Entfall am Ursprung geschrieben, und die Planung verlor die Stunde.
+ *
+ * ⚠️ **Eine Ausnahme bleibt:** Hat die Gruppe **gar keine** Planung, wird nichts angelegt.
+ * Dann fehlt nicht ein Termin, sondern das Wochenmuster — und `fehlendesRaster` unten
+ * führt zur Einrichtung statt zu einem halben Jahr aus dem Stundenplan.
  */
 
 /** Grund, den das Backend an einen Konflikt schreibt, wenn die Planung die Stunde nicht kennt. */
@@ -27,6 +32,9 @@ export function fehlendesRaster(ergebnis) {
     if (!konflikte.length) return null
     if (ergebnis.geaendert !== 0) return null
     if (ergebnis.verlegungen?.length) return null
+    // Seit der Abgleich Termine anlegt: Wurde einer angelegt, hat die Gruppe eine
+    // Planung — dann ist es nicht der Einrichtungsfall.
+    if (ergebnis.angelegte?.length) return null
     if (!konflikte.every((k) => k.grund === OHNE_SLOT)) return null
     return (
         "Für diese Gruppe sind noch keine Stunden angelegt — der Abgleich hat nichts, " +
@@ -130,4 +138,101 @@ export function diagnoseHatInhalt(d) {
                 d.unbekannt.length ||
                 d.hinweise.length),
     )
+}
+
+/**
+ * Die Zusammenfassung eines Laufs in einem Satz.
+ *
+ * `geaendert` zählt seit dem 22.09.2026 geänderte **und angelegte** Stunden — die Zahl
+ * allein sagt also nicht mehr, was geschah. Deshalb werden angelegte Termine eigens
+ * genannt: Eine neue Stunde in der Jahresplanung ist etwas anderes als eine umgestellte.
+ */
+export function abgleichZusammenfassung(ergebnis) {
+    const teile = []
+    const angelegt = ergebnis?.angelegte?.length ?? 0
+    const geaendert = (ergebnis?.geaendert ?? 0) - angelegt
+    teile.push(geaendert === 1 ? "1 Stunde geändert" : `${geaendert} Stunden geändert`)
+    if (angelegt) teile.push(angelegt === 1 ? "1 Stunde angelegt" : `${angelegt} Stunden angelegt`)
+    if (ergebnis?.verlegungen?.length) teile.push(`${ergebnis.verlegungen.length} Verlegung(en)`)
+    if (ergebnis?.konflikte?.length) teile.push(`${ergebnis.konflikte.length} Hinweis(e)`)
+    return teile.join(" · ")
+}
+
+/**
+ * Fehlende Unterrichtsgruppen, aufbereitet für die Anlage-Liste (AP3).
+ *
+ * @returns {{gruppe: string, name: string, subjectId: number, fach: string|null,
+ *            klassen: string[], herkunft: string, erbt: boolean}[]}
+ */
+export function anlegbareGruppen(antwort) {
+    return (antwort?.fehlende_gruppen ?? []).map((g) => ({
+        gruppe: g.gruppe,
+        name: g.name,
+        subjectId: g.subject_id,
+        fach: g.subject_slug ?? null,
+        klassen: g.klassen ?? [],
+        herkunft: herkunftDerMitglieder(g),
+        // Ob die Frage „ganze Klasse oder Teilgruppe?" überhaupt sinnvoll ist. Ohne
+        // gefundene Klasse gibt es nichts zu erben — dann wäre sie eine Scheinwahl.
+        kannErben: Boolean(g.kann_erben),
+        erbtVorbelegt: Boolean(g.erbt_vorbelegt),
+    }))
+}
+
+/**
+ * Woher die Mitglieder kämen, wenn diese Gruppe jetzt angelegt würde.
+ *
+ * ⚠️ **Ohne diesen Satz legt die Lehrkraft eine leere Gruppe an und weiß nicht, warum
+ * sie leer bleibt.** Das ist der eigentliche Zweck der Zeile: Der Unterschied zwischen
+ * „läuft von selbst" und „ich muss noch einen Code ausgeben" ist nichts, was man raten
+ * soll.
+ *
+ * Die Angaben kommen vom Server — die Oberfläche kennt die Klassengruppen der Plattform
+ * nicht und könnte die Frage gar nicht beantworten.
+ */
+export function herkunftDerMitglieder(g) {
+    const erbt = g?.erbt_aus ?? []
+    const stammt = g?.stammt_aus ?? []
+    const fehlt = g?.klassen_ohne_treffer ?? []
+
+    if (g?.kursstufe) {
+        return "Kursstufe — Beitritt über einen Code"
+    }
+    if (g?.mehrklassig) {
+        // ⚠️ Mehrere Klassen heißen **Auswahl aus** diesen Klassen, nicht **alle**
+        // dieser Klassen — sonst würde je Klasse unterrichtet. Die Klassen zu nennen
+        // ist trotzdem richtig: Sie sagen, wen die Lehrkraft erwarten darf.
+        return `Teilgruppe aus ${listeMitUnd(stammt)} — Beitritt über einen Code`
+    }
+    if (erbt.length === 0) {
+        return fehlt.length > 0
+            ? `Klasse ${listeMitUnd(fehlt)} gibt es hier noch nicht — Beitritt über einen Code`
+            : "Keine Klasse zugeordnet — Beitritt über einen Code"
+    }
+    const geerbt = `Mitglieder aus ${listeMitUnd(erbt)}`
+    return fehlt.length > 0
+        ? `${geerbt}; ${listeMitUnd(fehlt)} gibt es hier noch nicht`
+        : geerbt
+}
+
+/** „10a, 10b und 10c" — eine Aufzählung, wie man sie spricht. */
+function listeMitUnd(werte) {
+    const w = [...werte]
+    if (w.length <= 1) return w[0] ?? ""
+    return `${w.slice(0, -1).join(", ")} und ${w[w.length - 1]}`
+}
+
+/**
+ * Der Satz zur getroffenen Wahl — was beim Anlegen tatsächlich passieren wird.
+ *
+ * Getrennt von `herkunftDerMitglieder`: Jene beschreibt die **Lage** (was der
+ * Stundenplan hergibt), diese die **Entscheidung**. Solange beides dasselbe sagte, war
+ * die Trennung unnötig; sobald die Lehrkraft widersprechen darf, ist sie es nicht mehr.
+ */
+export function wahlWirkung(g, erbt) {
+    if (!g?.kannErben) return g?.herkunft ?? ""
+    const klassen = g.klassen ?? []
+    return erbt
+        ? `Mitglieder aus ${listeMitUnd(klassen)} kommen automatisch dazu`
+        : "Teilgruppe — Schüler:innen treten über einen Code bei"
 }

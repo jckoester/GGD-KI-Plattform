@@ -30,6 +30,16 @@ _DEFAULTS: dict[str, tuple[int, float]] = {
     # Minutenfenster. Fünf Meldungen in einer Stunde deckt jeden ehrlichen Fall ab;
     # der eigentliche Riegel gegen Unsinn ist das Tageslimit aus der Datenbank.
     "feedback": (5, 3600.0),
+    # Beitrittscode einlösen (AP4). Eine ganze Klasse tritt gleichzeitig bei —
+    # das Limit zählt je Person, nicht je Gruppe, und muss deshalb nur ein
+    # einzelnes Durchprobieren bremsen, nicht den Normalfall.
+    "group_join": (10, 300.0),
+    # Fachbegriff-Import (Paket 10/AP3): Ein Lauf liest ein ganzes Bündel, schreibt
+    # Knoten **und** Kanten und ist damit die teuerste Anfrage, die eine Lehrkraft
+    # auslösen kann. Zwanzig in fünf Minuten decken das Arbeiten ab (jeder Import ist
+    # ein Probelauf plus ein echter Lauf, und man korrigiert ein paar Mal), bremsen
+    # aber eine Schleife.
+    "fachbegriffe_import": (20, 300.0),
 }
 _FALLBACK = (60, 60.0)
 

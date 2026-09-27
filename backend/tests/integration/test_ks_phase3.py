@@ -92,8 +92,8 @@ def insert_group_membership_sync(db_url: str, *, group_id: int, pseudonym: str,
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO group_memberships (group_id, pseudonym, role_in_group)
-            VALUES (%s, %s, %s)
+            INSERT INTO group_memberships (group_id, pseudonym, role_in_group, herkunft)
+            VALUES (%s, %s, %s, 'manuell')
             ON CONFLICT (group_id, pseudonym) DO NOTHING
         """, (group_id, pseudonym, role_in_group))
     conn.commit()

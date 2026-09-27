@@ -1,5 +1,6 @@
 """Tests für Tool-Registry und Mehrrunden-Loop-Logik (chat/tools.py)."""
 
+import json
 import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -490,3 +491,60 @@ def test_registrierte_gruppen_sind_erklaert():
         f"Diese Werkzeug-Gruppen fehlen in FAEHIGKEITEN: {sorted(nicht_erklaert)}. "
         f"Ohne Eintrag verwirft der YAML-Import sie als unbekannt."
     )
+
+
+@pytest.mark.asyncio
+async def test_suchwerkzeug_liefert_kein_svg_ans_modell():
+    """⚠️ Der Engpass-Wächter (Paket 9, AP3).
+
+    Seit AP3 holt das Suchwerkzeug die **rohe** Metadatenspalte (`mit_metadaten=True`)
+    und `_fuer_modell` wählt daraus aus. Das ist die richtige Arbeitsteilung — solange
+    niemand die Trefferliste daran vorbei serialisiert. Genau das prüft dieser Test am
+    **ganzen Umschlag**, nicht am einzelnen Treffer: Ein 47-kB-SVG im Prompt fiele sonst
+    erst an der Rechnung auf.
+    """
+    from unittest.mock import patch
+
+    from app.chat import router
+    from app.context.search import Abschnitt, Suchergebnis
+
+    def _knoten(titel):
+        return {
+            "node_id": "n-" + titel, "title": titel, "category": "concept",
+            "content_type": "stoffsteckbrief", "content": "Definition.\n\n{{abbildung:a.svg}}",
+            "subject_id": 6, "fach": "Chemie",
+            "metadata": {
+                "formel": r"\ce{H2O}",
+                "bp_id": "CH.V2 3.2.1.1",
+                "illustrationen": [
+                    {"datei": "_Abb/a.svg", "svg": "<svg>" + "x" * 47_000 + "</svg>",
+                     "beschreibung": "Wassermolekül mit Partialladungen"}
+                ],
+            },
+        }
+
+    db = MagicMock()
+    db.get = AsyncMock(return_value=SimpleNamespace(subject_id=6))
+    ctx = ToolContext(
+        db=db, user=SimpleNamespace(sub="p", roles=["student"], grade="9"),
+        group_id=2, conversation_id=None,
+    )
+    ergebnis = Suchergebnis(
+        identifikation=Abschnitt(treffer=[_knoten("Wasser")], gesamt=1, vollstaendig=True),
+        thematisch=Abschnitt(treffer=[_knoten("Eis")]),
+    )
+    # Abgrenzungen und Stufenbänder brauchen eine Datenbank; hier geht es allein um
+    # den Engpass, durch den die Treffer ans Modell gehen.
+    with patch.object(router, "suche", new=AsyncMock(return_value=ergebnis)) as gesucht, \
+         patch.object(router, "abgrenzungen_zu", new=AsyncMock(return_value={})), \
+         patch.object(router, "bp_baender_zu", new=AsyncMock(return_value={})):
+        antwort = await router._search_context_nodes_handler({"query": "Wasser"}, ctx)
+
+    assert gesucht.await_args.args[1].mit_metadaten is True
+
+    text = json.dumps(antwort, ensure_ascii=False)
+    assert "<svg" not in text and "xxxx" not in text
+    assert "bp_id" not in text
+    # Was bleiben soll: die Formel und die Bildbeschreibung an ihrer Stelle im Text.
+    assert r"\ce{H2O}" in text and "Partialladungen" in text
+    assert "{{abbildung" not in text

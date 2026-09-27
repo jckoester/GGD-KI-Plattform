@@ -12,8 +12,20 @@
    */
   import { onMount } from "svelte"
   import { CalendarClock } from "lucide-svelte"
-  import { getWeekPatternProposals, setWeekPattern, generateSlots } from "$lib/api.js"
-  import { rasterJeGruppe } from "$lib/stundenplan_abgleich.js"
+  import {
+    createTeachingGroupFromTimetable,
+    getWeekPatternProposals,
+    setWeekPattern,
+    generateSlots,
+  } from "$lib/api.js"
+  import { anlegbareGruppen, rasterJeGruppe, wahlWirkung } from "$lib/stundenplan_abgleich.js"
+  import {
+    halbjahrFuerMuster,
+    halbjahreFuerUebernahme,
+    restjahrMoeglich,
+    slotMeldung,
+    vierzehntaegigWarnung,
+  } from "$lib/jahresraster.js"
   import { calendarConfigured, ensureCalendarStatus } from "$lib/stores/calendarStatus.js"
   import ErrorBanner from "$lib/components/ErrorBanner.svelte"
   import InfoBanner from "$lib/components/InfoBanner.svelte"
@@ -24,8 +36,24 @@
   let antwort = $state(null)
   let schreibt = $state(false)
   let ergebnisse = $state([])
+  let bisSchuljahresende = $state(true)
+  let warnung = $state(null)
+
+  let legtAn = $state(null)
+  let anlegeFehler = $state(null)
 
   const gruppen = $derived(rasterJeGruppe(antwort))
+  const anlegbar = $derived(anlegbareGruppen(antwort))
+  // Vorbelegt aus der Lage, überschreibbar von der Lehrkraft. Kein `$derived`:
+  // Die Wahl muss ein erneutes Lesen überleben, die Lage ist nur ihr Ausgangspunkt.
+  let wahl = $state({})
+  $effect(() => {
+    const naechste = {}
+    for (const g of anlegbar) naechste[g.gruppe] = wahl[g.gruppe] ?? g.erbtVorbelegt
+    wahl = naechste
+  })
+  const aktuellesHalbjahr = $derived(antwort?.halbjahr ?? 1)
+  const restjahr = $derived(restjahrMoeglich(aktuellesHalbjahr))
   const unsicherGesamt = $derived(gruppen.reduce((n, g) => n + g.unsicher, 0))
 
   onMount(ensureCalendarStatus)
@@ -43,10 +71,30 @@
     }
   }
 
+  async function anlegen(g) {
+    legtAn = g.gruppe
+    anlegeFehler = null
+    try {
+      await createTeachingGroupFromTimetable(g.gruppe, g.subjectId, wahl[g.gruppe])
+      // Neu lesen statt lokal streichen: Die angelegte Gruppe taucht danach als
+      // **vorhanden** auf und ihr Wochenmuster lässt sich in einem Zug übernehmen.
+      // Ein lokales Entfernen ließe die Liste und den Server auseinanderlaufen.
+      await lesen()
+    } catch (e) {
+      anlegeFehler = e.message
+    } finally {
+      legtAn = null
+    }
+  }
+
   async function uebernehmen() {
     schreibt = true
     fehler = null
-    const halbjahr = antwort?.halbjahr ?? 1
+    warnung = null
+    // Das Muster gilt für das Halbjahr, das der Stundenplan beschreibt — für das zweite
+    // wird bewusst keins hinterlegt (`halbjahrFuerMuster`).
+    const musterHalbjahr = halbjahrFuerMuster(aktuellesHalbjahr)
+    const laeufe = halbjahreFuerUebernahme(aktuellesHalbjahr, bisSchuljahresende)
     const gesammelt = []
     for (const g of gruppen) {
       try {
@@ -58,25 +106,29 @@
           periods: z.periods,
           rhythmus: z.rhythmus,
         }))
-        await setWeekPattern(g.group_id, halbjahr, zeilen)
+        await setWeekPattern(g.group_id, musterHalbjahr, zeilen)
       } catch (e) {
         gesammelt.push({ gruppe: g.gruppe, text: `Muster nicht gespeichert: ${e.message}` })
         continue
       }
-      try {
-        const stats = await generateSlots(g.group_id, halbjahr)
-        gesammelt.push({ gruppe: g.gruppe, text: `${stats.created} Stunden angelegt.` })
-      } catch (e) {
-        // 409 heißt: Das Halbjahr hat schon Stunden. Das Muster ist trotzdem gespeichert
-        // — neu erzeugen würde bestehende Planung überschreiben und bleibt deshalb dem
-        // Jahresplan vorbehalten, wo die Warnung dazu steht.
-        gesammelt.push({
-          gruppe: g.gruppe,
-          text: e.status === 409
-            ? "Muster gespeichert. Stunden bestehen bereits — Neuerzeugung im Jahresplan."
-            : `Muster gespeichert, Stunden nicht erzeugt: ${e.message}`,
-        })
+      const saetze = []
+      for (const lauf of laeufe) {
+        try {
+          const stats = await generateSlots(g.group_id, lauf.halbjahr, false, lauf.vorlaeufig)
+          saetze.push(slotMeldung(stats))
+          warnung ??= vierzehntaegigWarnung(stats)
+        } catch (e) {
+          // 409 heißt: Das Halbjahr hat schon Stunden. Das Muster ist trotzdem
+          // gespeichert — neu erzeugen würde bestehende Planung überschreiben und
+          // bleibt deshalb dem Jahresplan vorbehalten, wo die Warnung dazu steht.
+          saetze.push(
+            e.status === 409
+              ? `${lauf.halbjahr}. Halbjahr: Stunden bestehen bereits — Neuerzeugung im Jahresplan.`
+              : `${lauf.halbjahr}. Halbjahr: nicht erzeugt (${e.message}).`,
+          )
+        }
       }
+      gesammelt.push({ gruppe: g.gruppe, text: saetze.join(" ") })
     }
     ergebnisse = gesammelt
     schreibt = false
@@ -107,7 +159,9 @@
     </button>
   {:else if gruppen.length === 0}
     <InfoBanner
-      message="Im Stundenplan wurde nichts gefunden, das zu einer Ihrer Unterrichtsgruppen passt."
+      message={anlegbar.length
+        ? "Im Stundenplan stehen Lerngruppen, für die es hier noch keine Unterrichtsgruppe gibt — unten anlegen."
+        : "Im Stundenplan wurde nichts gefunden, das zu einer Ihrer Unterrichtsgruppen passt."}
     />
   {:else}
     <ul class="mb-4 flex flex-col gap-2">
@@ -129,10 +183,23 @@
       />
     {/if}
 
-    {#if antwort.fehlende_gruppen?.length}
-      <InfoBanner
-        message={`${antwort.fehlende_gruppen.length} Lerngruppen aus Ihrem Stundenplan haben auf der Plattform keine Unterrichtsgruppe und bleiben hier außen vor.`}
-      />
+
+    {#if restjahr && !ergebnisse.length}
+      <label class="mt-3 flex items-start gap-2">
+        <input type="checkbox" bind:checked={bisSchuljahresende} class="mt-0.5 accent-primary" />
+        <span class="text-sm text-light-tx dark:text-dark-tx">
+          Stunden bis zum Schuljahresende anlegen
+          <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+            Das 2. Halbjahr entsteht <strong>vorläufig</strong> aus dem jetzigen Raster —
+            damit die Jahresplanung Termine hat. Kommt der Stundenplan für das 2. Halbjahr,
+            wird es neu aufgebaut und die Planung umgehängt.
+          </span>
+        </span>
+      </label>
+    {/if}
+
+    {#if warnung}
+      <div class="mt-3"><WarningBanner message={warnung} /></div>
     {/if}
 
     {#if ergebnisse.length}
@@ -162,5 +229,63 @@
         </button>
       </div>
     {/if}
+  {/if}
+
+  {#if anlegbar.length}
+    <div class="mt-3 rounded-lg border border-light-ui-3 dark:border-dark-ui-3 p-3">
+      <h4 class="text-sm font-medium text-light-tx dark:text-dark-tx mb-1">
+        Noch ohne Unterrichtsgruppe ({anlegbar.length})
+      </h4>
+      <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mb-2">
+        Diese Lerngruppen stehen in Ihrem Stundenplan, aber nicht auf der Plattform.
+        Angelegt werden Sie darin zur Lehrkraft.
+      </p>
+
+      {#if anlegeFehler}<ErrorBanner message={anlegeFehler} />{/if}
+
+      <ul class="flex flex-col gap-1.5">
+        {#each anlegbar as g (g.gruppe)}
+          <li
+            class="flex items-start gap-3 rounded-md border border-light-ui-3
+                   dark:border-dark-ui-3 px-2.5 py-2"
+          >
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm text-light-tx dark:text-dark-tx">
+                {g.name}
+              </span>
+              {#if g.kannErben}
+                <label class="mt-1 flex items-center gap-2 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  <span>Wer gehört dazu?</span>
+                  <select
+                    bind:value={wahl[g.gruppe]}
+                    class="rounded border border-light-ui-3 dark:border-dark-ui-3
+                           bg-light-bg dark:bg-dark-bg px-1.5 py-0.5
+                           text-light-tx dark:text-dark-tx"
+                  >
+                    <option value={true}>die ganze Klasse</option>
+                    <option value={false}>nur ein Teil der Klasse</option>
+                  </select>
+                </label>
+                <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  {wahlWirkung(g, wahl[g.gruppe])}
+                </span>
+              {:else}
+                <span class="block text-xs text-light-tx-2 dark:text-dark-tx-2">
+                  {g.herkunft}
+                </span>
+              {/if}
+            </span>
+            <button
+              onclick={() => anlegen(g)}
+              disabled={legtAn === g.gruppe || schreibt}
+              class="flex-shrink-0 px-2.5 py-1 rounded-md text-xs font-medium
+                     bg-primary dark:bg-primary-dark text-white disabled:opacity-50"
+            >
+              {legtAn === g.gruppe ? "Legt an …" : "Anlegen"}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
   {/if}
 {/if}

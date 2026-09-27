@@ -15,7 +15,9 @@ from app.db.models import (
     Conversation,
     ConversationFlag,
     Feedback,
+    GroupJoinCode,
     GroupMembership,
+    SsoGroupOffer,
     JwtRevocation,
     NodeEngagement,
     PersonalAccessToken,
@@ -310,6 +312,14 @@ async def cleanup_inactive_accounts(
                         # Welche Klassen-/Fach-Kombination eine Lehrkraft ausgeblendet
                         # hat — rein persönliche Ansichtseinstellung ohne Fremdbezug,
                         # dieselbe Kategorie wie `user_preferences`.
+                        # Angebote für neue SSO-Unterrichtsgruppen (Alembic 0071).
+                        # **Gelöscht, nicht genullt:** Ein Angebot ohne Empfängerin ist
+                        # nichts — es fragt niemanden mehr.
+                        await db.execute(
+                            delete(SsoGroupOffer).where(
+                                SsoGroupOffer.pseudonym == pseudonym
+                            )
+                        )
                         await db.execute(
                             delete(TeacherGroupExclusion).where(
                                 TeacherGroupExclusion.pseudonym == pseudonym
@@ -332,6 +342,22 @@ async def cleanup_inactive_accounts(
                             update(Feedback)
                             .where(Feedback.pseudonym == pseudonym)
                             .values(pseudonym=None, contact=None)
+                        )
+                        # ── Beitrittscodes (AP4) ──────────────────────────────
+                        #
+                        # Der Code gehört der **Gruppe**, nicht der Lehrkraft, die ihn
+                        # ausgegeben hat: Er berechtigt zum Beitritt und trägt kein
+                        # Merkmal der Person, die ihn einlöst. Verlässt die ausgebende
+                        # Lehrkraft die Schule, fällt deshalb nur ihr Pseudonym — der
+                        # Code bleibt gültig, bis er abläuft oder widerrufen wird.
+                        #
+                        # Ihn mitzulöschen wäre die falsche Richtung: Eine Gruppe
+                        # verlöre mitten im Schuljahr ihren Zugangsweg, weil jemand
+                        # anderes gegangen ist.
+                        await db.execute(
+                            update(GroupJoinCode)
+                            .where(GroupJoinCode.erstellt_von_pseudonym == pseudonym)
+                            .values(erstellt_von_pseudonym=None)
                         )
                         # Zugangstoken zuerst: Sie sind lebende Zugänge. Bliebe eines
                         # stehen, während `pseudonym_audit` fällt, verlöre es zwar seine

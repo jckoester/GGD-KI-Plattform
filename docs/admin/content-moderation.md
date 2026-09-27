@@ -602,10 +602,26 @@ Lehrkräfte behalten **vollständige, direkte** Antworten.
 | Block | Gilt für | Inhalt |
 |-------|----------|--------|
 | `universal_base` | **alle** | Faktentreue, Prompt-Injection-Abwehr, Krisen-Hinweispflicht |
-| `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — Denkanstöße statt Komplettlösungen |
+| `student_extension` | Schüler-Behandlung | „hilft beim Lernen, ersetzt es nicht" — kurze Antwort auf eine Sache, höchstens eine Rückfrage, und nur ungefährliche Versuchsvorschläge für zu Hause |
 | `teacher_extension` | Lehrkraft-Behandlung | direkt, vollständig, Musterlösungen ausdrücklich erwünscht |
 | `student_augmentations` | nur Schüler-Behandlung | sanfte Lernverhalten-Leitplanken (s. u.), pro Assistent abschaltbar |
+| `kontext_hinweis` | **alle** | Wie Einträge aus dem Wissensspeicher zu lesen sind — bevorzugte Bezeichnung, Suchbegriffe nicht übernehmen, Irrtümer nutzen statt aufzählen, Werte unverändert. Steht vor **jedem** Kontextblock |
 | `output_format` | **alle** | Ausgabe als Markdown ohne umschließende Code-Fences |
+
+### Zwei Stolperstellen beim Bearbeiten
+
+**Die Nummerierung läuft über zwei Blöcke.** `universal_base` zählt die Grundsätze 1
+bis 3, beide Zielgruppen-Erweiterungen setzen bei 4 fort — das Modell liest sie als
+einen Text. Wer der Basis einen vierten Grundsatz gibt, ohne die Erweiterungen
+nachzuziehen, liefert zwei Punkte 4. Innerhalb der Schüler-Präambel gibt es zudem einen
+Verweis auf eigene Punktnummern („Die Punkte 4 bis 6 gelten, sofern …"). Beides prüft
+der Start nicht, aber ein Test tut es.
+
+**Die `key`-Werte der Augmentierungen sind Daten, nicht Beschriftung.** An jedem
+Assistenten steht, welche Zusätze abgewählt wurden — als Liste genau dieser Schlüssel.
+Wer einen Schlüssel umbenennt, schaltet den Zusatz überall dort **wieder ein**, wo ihn
+jemand abgewählt hatte: ohne Fehlermeldung, ohne Eintrag in der Oberfläche. Den Text
+eines Zusatzes dürfen Sie jederzeit neu fassen, den Schlüssel nicht.
 
 ### Wer bekommt welche Behandlung? (`audience` + Rolle)
 
@@ -631,9 +647,35 @@ Test-Chats einer Lehrkraft an einem `student`-Assistenten zeigen bewusst die
 ### Lernverhalten-Leitplanken (`student_augmentations`)
 
 Greifen **nur** in der Schüler-Behandlung und sind **sanfte Augmentierungen, keine
-Blockaden**. Mitgeliefert sind u. a. „keine Komplettlösungen", „sokratische Rückfragen",
+Blockaden**. Mitgeliefert sind „keine Komplettlösungen", „sokratische Rückfragen",
 „zum Paraphrasieren motivieren", „Reflexions-Hinweise". Pro Assistent lassen sie sich im
 **Editor** (Checkbox-Liste, nur bei Zielgruppe Schüler:innen/Alle) einzeln abwählen.
+
+⚠️ **Eine Leitplanke im System-Prompt ist eine Bitte, keine Sperre.** Gemessen am
+26.09.2026: Die Regel, zu Hause keine Elektrolyse vorzuschlagen, steht wörtlich in der
+Präambel — der Assistent schlug sie auf ausdrückliche Nachfrage trotzdem vor, samt
+Elektroden, Elektrolyt und Spannung. Wo eine Zusage verlässlich sein muss, gehört sie
+auf die Sperr-Ebene (Abschnitt B), nicht hierher.
+
+### Wenn eine Präambelregel nicht reicht: benannte Auslöser
+
+Für den Fall oben gibt es deshalb eine Zwischenstufe: `config/home_experiment_triggers.yaml`
+(beschrieben in [Konfiguration](konfiguration.md#confighome_experiment_triggersyaml)).
+Nennt eine Schüler-Nachricht **sowohl** eine eigene Absicht („zu Hause", „kann ich das
+ausprobieren") **als auch** ein riskantes Thema (Elektrolyse, Laugen, Reinigungsmittel,
+offenes Feuer, Netzstrom, Laborchemikalien), hängt das Backend für diese eine Antwort
+eine konkrete Anweisung an den Systemtext — statt sich auf den allgemeinen Punkt in der
+Präambel zu verlassen.
+
+Das Muster ist übertragbar: **Eine allgemeine Regel unter acht anderen wird unzuverlässig
+befolgt; dieselbe Regel, benannt und unmittelbar vor der Frage, deutlich zuverlässiger.**
+Gemessen an vier gefährlichen Fragen mit je fünf Läufen: konkrete Mittel vorher in 18 von
+20 Antworten, danach in keiner — bei unveränderter Präambel. Die beiden harmlosen
+Gegenproben (Rotkohlsaft, Stromkreis mit Lämpchen) wurden weiterhin in allen Läufen
+beantwortet.
+
+Es bleibt trotzdem eine Anweisung, keine Sperre. Wer eine harte Grenze braucht, kommt um
+Abschnitt B nicht herum.
 
 ### `audience` als bewusster Prüfpunkt beim Freigeben
 

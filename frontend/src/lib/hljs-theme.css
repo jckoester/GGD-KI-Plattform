@@ -39,6 +39,56 @@
     margin-bottom: 0.25rem;
 }
 
+/* Abbildungen eines Wissensknotens (Paket 9, AP6).
+   `span` statt `figure`: Der Platzhalter `{{abbildung:…}}` kann mitten in einem Absatz
+   stehen, und ein Blockelement im `<p>` wäre ungültiges HTML. Die Blockdarstellung
+   macht deshalb das Stylesheet. */
+.abbildung-block {
+    display: block;
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.abbildung-bild {
+    display: block;
+}
+
+/* Breite setzt `fuelleAbbildungen` aus der Eigengröße (× ANZEIGE_FAKTOR); hier stehen
+   nur die Deckel. `max-width` gilt **absolut**, nicht nur als Prozentwert: Dieselbe
+   Abbildung steht einmal im Fließtext (Prosa-Spalte, ~65 Zeichen) und einmal darunter
+   in voller Seitenbreite — ohne festen Deckel wäre sie an beiden Stellen anders groß.
+   `max-height` fängt die quadratischen Gefahrenpiktogramme ab. */
+.abbildung-bild svg {
+    display: block;
+    margin: 0 auto;
+    max-width: min(100%, 34rem);
+    height: auto;
+    max-height: 20rem;
+}
+
+/* Die Bildbeschreibung ist Unterschrift **und** `aria-label` am Bild — der sichtbare
+   Text ist deshalb `aria-hidden`, sonst hörte man ihn zweimal. */
+.abbildung-text {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-light-tx-2, #666);
+    text-align: left;
+}
+
+.dark .abbildung-text {
+    color: var(--color-dark-tx-2, #999);
+}
+
+/* Sichtbar scheitern statt leer bleiben: Eine leere Stelle im Text sieht aus wie ein
+   Ladefehler und wird nicht gemeldet. */
+.abbildung-fehlt {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--color-light-re, #b00);
+}
+
 /* Basis: Code-Block-Container */
 .code-block {
     position: relative;

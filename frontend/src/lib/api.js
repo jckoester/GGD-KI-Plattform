@@ -1230,6 +1230,42 @@ export async function submitMyAssistant(id) {
   return res.json(); // TeacherAssistantResponse
 }
 
+/**
+ * Die übrigen Wege durch den Lebenszyklus (Paket 7, AP4).
+ *
+ * ⚠️ **Welcher Weg offensteht, hängt an der Reichweite, nicht am Status.** Eigene
+ * Gruppen-, Fachschafts- und private Assistenten gehören der Lehrkraft — sie ändert,
+ * schaltet ab und löscht selbst. Schulweite sind freigegeben; dort gibt es nur den
+ * Rückzug vor der Freigabe und danach den Löschantrag.
+ */
+async function _assistentAktion(id, pfad, { method = "POST", body = null } = {}) {
+  const res = await fetch(`${BASE}/assistants/${id}/${pfad}`, {
+    method,
+    credentials: "include",
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json();
+}
+
+/** Eingereichten Assistenten zurückziehen: `pending_review` → `draft`. */
+export const withdrawMyAssistant = (id) => _assistentAktion(id, "withdraw");
+
+/** Eigenen, nicht schulweiten Assistenten abschalten. */
+export const disableMyAssistant = (id) => _assistentAktion(id, "disable");
+
+/** … und wieder in Betrieb nehmen. */
+export const enableMyAssistant = (id) => _assistentAktion(id, "enable");
+
+/** Löschung eines freigegebenen schulweiten Assistenten beantragen. */
+export const requestAssistantDeletion = (id, reason) =>
+  _assistentAktion(id, "request-deletion", { body: { reason: reason || null } });
+
+/** Den Löschantrag zurücknehmen. */
+export const withdrawAssistantDeletionRequest = (id) =>
+  _assistentAktion(id, "request-deletion", { method: "DELETE" });
+
 // Admin: Assistent freigeben
 export async function approveAssistant(id) {
   const res = await fetch(`${BASE}/admin/assistants/${id}/approve`, {
@@ -1333,6 +1369,90 @@ export async function searchContextNodesLegacy(query, contentTypes = []) {
     throw new ApiError(res.status, data.detail ?? "Fehler bei der Knotensuche");
   }
   return res.json(); // ContextNodeResult[]
+}
+
+// ── Fachbegriffe einspielen (Paket 10, AP4) ─────────────────────────────────
+
+/**
+ * Ein Bündel Fachbegriffe hochladen — Probelauf oder echter Lauf.
+ *
+ * ⚠️ **`probelauf` ist die Vorgabe, auch hier.** Der Dialog zeigt erst den Bericht und
+ * fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung. Derselbe Aufruf
+ * liefert in beiden Fällen denselben Bericht — nur einmal mit und einmal ohne Wirkung.
+ *
+ * @param {string} fach Kürzel, Slug oder Name
+ * @param {File[]} dateien `.md`, `.svg` oder ein `.zip`
+ * @param {{ probelauf?: boolean, ueberschreiben?: string[] }} optionen
+ *   `ueberschreiben` nennt die Dateien, deren handveränderte Knoten ersetzt werden
+ *   sollen — je Zeile entschieden, nicht für den ganzen Lauf.
+ */
+export async function importiereFachbegriffe(fach, dateien, optionen = {}) {
+  const { probelauf = true, ueberschreiben = [] } = optionen;
+  const params = new URLSearchParams({ fach, probelauf: String(probelauf) });
+  for (const datei of ueberschreiben) params.append("ueberschreiben", datei);
+
+  const fd = new FormData();
+  for (const datei of dateien) fd.append("dateien", datei, datei.name);
+
+  const res = await fetch(`${BASE}/context/fachbegriffe/import?${params}`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Import fehlgeschlagen");
+  }
+  return res.json();
+}
+
+/**
+ * Den Dateinamen aus `Content-Disposition` lesen, sonst den Rückfall nehmen.
+ *
+ * ⚠️ **Der Server bestimmt ihn, nicht der Browser.** Beim Export heißt die Datei so wie
+ * im Bündel — und das ist der Name, über den der nächste Import den Knoten wiederfindet,
+ * solange keine `id` in der Datei steht. Ihn hier neu zu erfinden hieße, aus
+ * „Oxidation (Sauerstoffaufnahme).md" ein „oxidation.md" zu machen.
+ */
+function _dateiname(antwort, rueckfall) {
+  const kopf = antwort.headers.get("content-disposition") ?? "";
+  const treffer = kopf.match(/filename="([^"]+)"/);
+  return treffer ? treffer[1] : rueckfall;
+}
+
+async function _herunterladen(antwort, rueckfall) {
+  const blob = await antwort.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = _dateiname(antwort, rueckfall);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Den Fachbegriffsbestand eines Fachs als Zip herunterladen (AP5, D1). */
+export async function exportiereFachbegriffe(fach) {
+  const params = new URLSearchParams({ fach });
+  const res = await fetch(`${BASE}/context/fachbegriffe/export?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Export fehlgeschlagen");
+  }
+  await _herunterladen(res, `fachbegriffe-${fach}.zip`);
+}
+
+/** Einen einzelnen Eintrag als Markdown-Datei herunterladen. */
+export async function knotenAlsMarkdown(nodeId) {
+  const res = await fetch(`${BASE}/context/nodes/${nodeId}/markdown`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Download fehlgeschlagen");
+  }
+  await _herunterladen(res, `${nodeId}.md`);
 }
 
 // ── Context Nodes CRUD ──────────────────────────────────────────────────────
@@ -1942,6 +2062,56 @@ export async function createLesson(unitNodeId, data) {
     return res.json()
 }
 
+/**
+ * Entwurf **vom Termin aus** anlegen — auch wenn der Termin noch zu keiner
+ * Unterrichtseinheit gehört. Idempotent: Gibt es schon einen, kommt dieser zurück.
+ */
+/**
+ * Die heutigen Fächer aus Schülersicht — **eigener Endpunkt**, nicht derselbe gefiltert.
+ * Thema, Einheit und Entwurf stehen dort gar nicht erst drin.
+ */
+export async function getMeinTagSchueler() {
+    const res = await fetch(`${BASE}/planning/mein-tag/schueler`, { credentials: 'include' })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Tag konnte nicht geladen werden')
+    return res.json()
+}
+
+export async function createLessonForSlot(slotId) {
+    const res = await fetch(`${BASE}/planning/slots/${slotId}/lesson`, {
+        method: 'POST',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Stunde konnte nicht erstellt werden')
+    return res.json()
+}
+
+/**
+ * Persönlichen Ausfall eintragen. `reichweite` ist `'gruppe'` oder `'tag'`;
+ * `'tag'` trifft alle Unterrichtsgruppen der Lehrkraft an diesem Datum.
+ */
+export async function setzeAusfall({ datum, reichweite, groupId = null, notiz = null }) {
+    const res = await fetch(`${BASE}/planning/absences`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ datum, reichweite, group_id: groupId, notiz }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Ausfall konnte nicht eingetragen werden')
+    return res.json()
+}
+
+/** Einen eingetragenen Ausfall zurücknehmen — Angaben als Query, nicht als Rumpf. */
+export async function nimmAusfallZurueck({ datum, reichweite, groupId = null }) {
+    const p = new URLSearchParams({ datum, reichweite })
+    if (groupId !== null) p.set('group_id', String(groupId))
+    const res = await fetch(`${BASE}/planning/absences?${p}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Ausfall konnte nicht zurückgenommen werden')
+    return res.json()
+}
+
 export async function setWeekPattern(groupId, halbjahr, patterns) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/pattern`, {
         method: 'PUT',
@@ -1953,12 +2123,16 @@ export async function setWeekPattern(groupId, halbjahr, patterns) {
     return res.json()
 }
 
-export async function generateSlots(groupId, halbjahr, regenerate = false) {
+// `vorlaeufig` kennzeichnet die erzeugten Termine als Annahme — gebraucht für das
+// zweite Halbjahr, das zu Schuljahresbeginn aus dem Raster des ersten entsteht.
+// `dryRun` rechnet nur: Wie viele Stunden würden umgehängt, wie viele lägen danach auf
+// dem Parkplatz? Ohne diese Zahlen ist die Rückfrage vor dem Neuaufbau eine Zumutung.
+export async function generateSlots(groupId, halbjahr, regenerate = false, vorlaeufig = false, dryRun = false) {
     const res = await fetch(`${BASE}/planning/groups/${groupId}/slots/generate`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ halbjahr, regenerate }),
+        body: JSON.stringify({ halbjahr, regenerate, vorlaeufig, dry_run: dryRun }),
     })
     if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Slots konnten nicht generiert werden')
     return res.json()
@@ -1978,6 +2152,21 @@ export async function setGruppenAnzeigename(groupId, displayName) {
 export async function getUiLevels() {
     const res = await fetch(`${BASE}/ui/levels`, { credentials: 'include' })
     if (!res.ok) throw new ApiError(res.status, 'Darstellungsstufen konnten nicht geladen werden')
+    return res.json()
+}
+
+/**
+ * Den Jahrgang einer Unterrichtsgruppe festlegen — `null` nimmt die Festlegung zurück,
+ * die Plattform leitet dann wieder aus Klasse oder Name ab.
+ */
+export async function setGruppenJahrgang(groupId, jahrgang) {
+    const res = await fetch(`${BASE}/groups/teaching/${groupId}/jahrgang`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jahrgang }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Jahrgang konnte nicht gespeichert werden')
     return res.json()
 }
 
@@ -2287,6 +2476,122 @@ export async function runTimetableSync(wochen = 1) {
   return body;
 }
 
+// Die eigenen Stunden für heute und den nächsten Schultag (Startseite).
+export async function getMeinTag() {
+  const res = await fetch(`${BASE}/planning/mein-tag`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Der Tag konnte nicht geladen werden (${res.status})`);
+  return res.json();
+}
+
+// ── Angebote für neue SSO-Unterrichtsgruppen ─────────────────────────────────
+
+export async function getGroupOffers(mitIgnorierten = false) {
+  const res = await fetch(`${BASE}/groups/offers?mit_ignorierten=${mitIgnorierten}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Angebote nicht lesbar (${res.status})`);
+  return res.json();
+}
+
+export async function assignGroupOffer(angebotId, groupId) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/assign`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_id: groupId }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Zuordnung fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function createGroupFromOffer(angebotId) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/create`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Anlegen fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function ignoreGroupOffer(angebotId, ignorieren = true) {
+  const res = await fetch(`${BASE}/groups/offers/${angebotId}/ignore`, {
+    method: ignorieren ? "POST" : "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Konnte nicht gespeichert werden (${res.status})`);
+}
+
+// ── Beitrittscodes (AP4) ──────────────────────────────────────────────────────
+
+export async function getJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Beitrittscode nicht lesbar (${res.status})`);
+  return res.json();
+}
+
+export async function createJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Code konnte nicht erzeugt werden (${res.status})`);
+  return body;
+}
+
+export async function revokeJoinCode(groupId) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Code konnte nicht widerrufen werden (${res.status})`);
+}
+
+// Fehlbeitritte zurücknehmen — als Menge, nie je Person: ohne Namen ist eine
+// Einzelauswahl nicht sicher bedienbar. `tag` null = die ganze Code-Runde.
+export async function rollbackJoins(groupId, tag = null) {
+  const res = await fetch(`${BASE}/groups/${groupId}/join-code/rollback`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tag }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Rücknahme fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+export async function joinGroupByCode(code) {
+  const res = await fetch(`${BASE}/groups/join`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.detail || `Beitritt fehlgeschlagen (${res.status})`);
+  return body;
+}
+
+// Eine im Stundenplan gefundene, auf der Plattform fehlende Gruppe anlegen (AP3).
+// `gruppe` ist der Schlüssel aus `fehlende_gruppen`; Name, Fach und Klassen bestimmt
+// der Server aus dem eigenen Stundenplan neu — hier geht nur mit, **welche** gemeint ist.
+export async function createTeachingGroupFromTimetable(gruppe, subjectId, erbt = null, wochen = 4) {
+  const res = await fetch(`${BASE}/calendar/teaching-groups`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gruppe, subject_id: subjectId, erbt, wochen }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.detail || `Gruppe konnte nicht angelegt werden (${res.status})`);
+  }
+  return body;
+}
+
 export async function getWeekPatternProposals(wochen = 4) {
   const res = await fetch(`${BASE}/calendar/week-patterns?wochen=${wochen}`, {
     credentials: "include",
@@ -2443,3 +2748,39 @@ export async function patchAdminFeedback(id, body) {
   }
   return res.json();
 }
+
+// ── Parkplatz: Planungsinhalt ohne Termin (Jahresplanung) ─────────────────────
+
+// Was beim Umhängen der Jahresplanung keinen Termin fand — samt Überhang-Bilanz,
+// damit die Wahl zwischen Umplanen und Kürzen begründet getroffen werden kann.
+export async function getParkplatz(groupId) {
+    const res = await fetch(`${BASE}/planning/groups/${groupId}/parkplatz`, {
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Parkplatz konnte nicht geladen werden')
+    return res.json()
+}
+
+// Verwirft einen Eintrag. Der Stundenentwurf bleibt im Wissensgraphen erhalten.
+export async function deleteParkplatzEintrag(id) {
+    const res = await fetch(`${BASE}/planning/parkplatz/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Der Eintrag konnte nicht verworfen werden')
+    return res.json()
+}
+
+// Holt einen geparkten Inhalt auf eine **freie** Stunde. 409, wenn sie belegt ist —
+// Slot und Inhalt stehen 1:1, ein Überschreiben kaskadierte.
+export async function unparkEintrag(id, toSlotId) {
+    const res = await fetch(`${BASE}/planning/parkplatz/${id}/unpark`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_slot_id: toSlotId }),
+    })
+    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail ?? 'Die Stunde konnte nicht eingeplant werden')
+    return res.json()
+}
+

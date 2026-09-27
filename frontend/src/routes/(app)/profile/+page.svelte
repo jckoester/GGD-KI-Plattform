@@ -1,6 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
-    import { User, Sun, Moon, Monitor, Save, ArrowLeft, BookOpen, Check, ChevronRight, Eye } from "lucide-svelte";
+    import { User, Sun, Moon, Monitor, ArrowLeft, Check, ChevronRight, Eye } from "lucide-svelte";
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
@@ -12,14 +12,10 @@
         stufenRegistry,
         uiStufe,
     } from "$lib/stores/uiLevel.js";
-    import { goto } from "$app/navigation";
-    import { patchPreferences, getPreferences, getCalendarTeachers } from "$lib/api.js";
+    import { patchPreferences, getPreferences } from "$lib/api.js";
     import { onMount } from "svelte";
-    import ErrorBanner from "$lib/components/ErrorBanner.svelte";
-    import SuccessBanner from "$lib/components/SuccessBanner.svelte";
-    import WarningBanner from "$lib/components/WarningBanner.svelte";
-    import TimetableSyncButton from "$lib/components/TimetableSyncButton.svelte";
     import Zugangstoken from "$lib/components/Zugangstoken.svelte";
+    import { KACHELN, schalteKachel, zeigtKachel } from "$lib/stores/startkacheln.js";
 
     // Aufgelöste Plattform-Mitgliedschaften für die SSO-Diagnose, nach Typ gruppiert.
     const membershipGroups = $derived([
@@ -60,12 +56,6 @@
         });
     }
 
-    // ── WebUntis-Kürzel (UP-8 Schritt 3) ──────────────────────────────────
-    // Auswahl aus der geladenen Liste statt Freitext: Ein Tippfehler führte sonst zu einem
-    // stillen Nicht-Abruf, den später niemand zuordnet.
-    let kuerzelListe = $state({ configured: false, teachers: [], error: null });
-    let kuerzelFehler = $state("");
-    let kuerzelGespeichert = $state(false);
 
     onMount(async () => {
         try {
@@ -77,30 +67,48 @@
         }
         // Aufgelöste Mitgliedschaften für die Diagnose frisch laden
         refreshMyGroups();
-        // Bewusst ohne Rollenprüfung: Der Nutzer-Store ist beim Einhängen nicht
-        // zwangsläufig schon befüllt — eine Abfrage von `roles` an dieser Stelle ist ein
-        // Wettlauf, der sich als „Feld fehlt" äußert. Der Server entscheidet (403 für
-        // Schüler:innen), die Antwort trägt das Ergebnis in `allowed`.
-        kuerzelListe = await getCalendarTeachers();
     });
 
-    async function updateKuerzel(event) {
-        const wert = event.target.value;
-        kuerzelFehler = "";
-        kuerzelGespeichert = false;
-        try {
-            await updatePreference("webuntis_kuerzel", wert);
-            kuerzelGespeichert = true;
-        } catch (err) {
-            kuerzelFehler = err.message;
-            // Anzeige auf den gespeicherten Stand zurücksetzen — sonst zeigt das Feld
-            // eine Auswahl, die der Server abgelehnt hat.
-            event.target.value = preferences?.webuntis_kuerzel ?? "";
-        }
+    // ── Eine Quittung je Feld ────────────────────────────────────────────────
+    //
+    // ⚠️ **Die Seite meldete nicht mehr, dass gespeichert wurde.** Mit dem
+    // „Speichern"-Knopf verschwand am 21.09.2026 die letzte Rückmeldung — er war zwar
+    // eine falsche (er navigierte nur), aber danach quittierte nur noch das
+    // WebUntis-Kürzel. Alle Felder hier schreiben bei Änderung; wer nichts sieht, drückt
+    // ein zweites Mal oder traut der Seite nicht.
+    //
+    // Ein **Seiten**banner wäre falsch: Bei sechs Einstellungen untereinander sagt es
+    // nicht, welche gemeint ist. Die Quittung steht deshalb am Feld und verschwindet
+    // wieder.
+    // `quittung` trägt den Schlüssel des zuletzt geschriebenen Feldes, `quittungFehler`
+    // den eines gescheiterten Schreibversuchs.
+    let quittung = $state(null);
+    let quittungFehler = $state(null);
+    let quittungTimer = null;
+
+    function quittiere(key, { fehler = false } = {}) {
+        quittung = fehler ? null : key;
+        quittungFehler = fehler ? key : null;
+        clearTimeout(quittungTimer);
+        // ⚠️ **Vier Sekunden, nicht zwei.** Wer eine Auswahlliste bedient, schaut beim
+        // Loslassen noch auf das Feld und erst danach auf die Überschrift daneben. Bei
+        // 2,5 Sekunden war die Meldung oft schon weg, bevor der Blick ankam
+        // (Rückmeldung Jan, 26.09.2026). Ein Fehler bleibt stehen, bis das nächste Feld
+        // geschrieben wird — er ist keine Beiläufigkeit.
+        if (!fehler) quittungTimer = setTimeout(() => (quittung = null), 4000);
     }
 
     async function updatePreference(key, value) {
-        await patchPreferences({ [key]: value });
+        // ⚠️ **Der Fehlerfall gehört dazu.** Vorher lief eine gescheiterte Anfrage als
+        // unbehandelte Ablehnung ins Leere: keine Quittung, keine Meldung — die Seite
+        // sah genauso aus wie vor dem Klick, und der Wert war nicht gespeichert.
+        try {
+            await patchPreferences({ [key]: value });
+        } catch (err) {
+            console.error("Einstellung nicht gespeichert:", key, err);
+            quittiere(key, { fehler: true });
+            return;
+        }
         // User-Store aktualisieren
         user.update((u) => ({
             ...u,
@@ -111,6 +119,7 @@
         }));
         // Lokale Präferenzen aktualisieren
         preferences = { ...preferences, [key]: value };
+        quittiere(key);
     }
 
     async function updateSidebarLimit(event) {
@@ -121,10 +130,6 @@
     async function updateContextSearchLimit(event) {
         const value = parseInt(event.target.value);
         await updatePreference("context_search_limit", value);
-    }
-
-    function doSave() {
-        goto("/");
     }
 
     let pct = $derived(
@@ -212,110 +217,14 @@
             {/if}
         </section>
 
-        <!-- Lehrkraft-Verwaltungslinks (nur für Lehrkräfte) -->
-        {#if $user?.roles?.includes('teacher')}
-        <section class="mb-8 flex flex-col gap-2">
-            <a
-                href="/profile/teaching-groups"
-                class="flex items-center gap-2 px-4 py-3 rounded-lg
-                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-            >
-                <BookOpen class="w-4 h-4" />
-                <span>Unterrichtsgruppen verwalten</span>
-                <ChevronRight class="w-4 h-4 ml-auto" />
-            </a>
-            <a
-                href="/profile/subjects"
-                class="flex items-center gap-2 px-4 py-3 rounded-lg
-                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
-                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
-            >
-                <Eye class="w-4 h-4" />
-                <span>Fächer in der Seitenleiste</span>
-                <ChevronRight class="w-4 h-4 ml-auto" />
-            </a>
-        </section>
 
-        {#if kuerzelListe.allowed && kuerzelListe.error && !kuerzelListe.configured}
-        <!-- Sichtbar scheitern statt lautlos verschwinden: Ohne diesen Hinweis sieht ein
-             Serverfehler genauso aus wie „diese Schule nutzt kein WebUntis". -->
-        <section class="mb-8">
-            <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
-                Stundenplan
-            </h2>
-            <WarningBanner message={kuerzelListe.error} />
-        </section>
-        {/if}
-
-        {#if kuerzelListe.configured}
-        <section class="mb-8">
-            <h2 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2">
-                Stundenplan
-            </h2>
-            {#if kuerzelListe.error}
-                <div class="mb-3"><WarningBanner message={kuerzelListe.error} /></div>
-            {/if}
-            <label
-                for="webuntis-kuerzel"
-                class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
-            >
-                Ihr Kürzel im Stundenplan
-            </label>
-            <select
-                id="webuntis-kuerzel"
-                value={preferences?.webuntis_kuerzel ?? ""}
-                onchange={updateKuerzel}
-                class="w-full max-w-40 px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
-                       bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
-                       focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={loading}
-            >
-                <option value="">— nicht zugeordnet —</option>
-                {#each kuerzelListe.teachers as k}
-                    <option value={k}>{k}</option>
-                {/each}
-            </select>
-
-            <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
-                Ihr Kürzel wird ausschließlich verwendet, um Ihren Stundenplan abzurufen
-                (Wochenmuster, Ausfälle, Vertretungen). Es wird <strong>nicht</strong> an
-                KI-Modelle übermittelt und erscheint in keinem Chat, keinem
-                Assistenten-Kontext und keinem Wissensknoten. Sie können es jederzeit
-                entfernen; dann entfällt die Stundenplan-Übernahme.
-            </p>
-
-            {#if kuerzelFehler}
-                <div class="mt-3"><ErrorBanner message={kuerzelFehler} /></div>
-            {:else if kuerzelGespeichert}
-                <div class="mt-3"><SuccessBanner message="Kürzel gespeichert." /></div>
-            {/if}
-
-            <!-- Handabgleich und Status. Der Hauptweg ist der Knopf im Jahresplan —
-                 hier steht er, weil hier auch der Zustand hingehört: wann zuletzt
-                 abgeglichen wurde und ob der nächtliche Lauf scheitert. -->
-            {#if preferences?.webuntis_kuerzel}
-                <div class="mt-6 pt-4 border-t border-light-ui-3 dark:border-dark-ui-3">
-                    <h3 class="text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-3">
-                        Abgleich
-                    </h3>
-                    <TimetableSyncButton />
-                    <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2 max-w-prose">
-                        Ausfälle und Vertretungen werden nachts automatisch übernommen.
-                        Wer von einer kurzfristigen Änderung weiß — etwa einer verlegten
-                        Stunde —, gleicht hier oder im Jahresplan von Hand ab.
-                    </p>
-                </div>
-            {/if}
-        </section>
-        {/if}
-        {/if}
-
-        {#if $user?.roles?.includes('teacher')}
-        <section class="mb-8">
-            <Zugangstoken />
-        </section>
-        {/if}
+        <!-- ── Darstellung ──────────────────────────────────────────────────────
+             Fünf Einstellungen, die alle dasselbe tun: bestimmen, was und wie viel auf
+             dem Bildschirm steht. Sie standen verstreut zwischen Budget, Kürzel und
+             Diagnose; die Überschrift fasst sie zusammen, ohne sie zu verändern. -->
+        <h2 class="text-lg font-semibold mb-4 text-light-tx dark:text-dark-tx">
+            Darstellung
+        </h2>
 
         <!-- Umfang der Oberfläche (Darstellungsstufen).
              Bewusst NICHT „Darstellungsstufen" überschrieben: Direkt darunter steht
@@ -330,6 +239,7 @@
                     class="text-base font-semibold mb-1 text-light-tx-2 dark:text-dark-tx-2"
                 >
                     Umfang der Oberfläche
+                {#if quittung === "ui_stufe"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "ui_stufe"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
                 </h2>
                 <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3">
                     Wähle, wie viel du sehen möchtest. Jede Stufe enthält die vorherigen.
@@ -340,7 +250,7 @@
                     {#each $stufenRegistry.stufen as s (s.stufe)}
                         {@const aktiv = $uiStufe === s.stufe}
                         <button
-                            onclick={() => setzeStufe(s.stufe)}
+                            onclick={() => { setzeStufe(s.stufe); quittiere('ui_stufe'); }}
                             aria-pressed={aktiv}
                             class="w-full text-left p-3 rounded-lg border transition-colors
                                    {aktiv
@@ -381,6 +291,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Darstellungsmodus
+            {#if quittung === "theme"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "theme"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div class="flex gap-2">
                 {#each themeOptions as { value, label, Icon }}
@@ -389,7 +300,7 @@
                         {$themePref === value
                             ? 'bg-primary text-white'
                             : 'bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx hover:bg-light-ui-2 dark:hover:bg-dark-ui-2'}"
-                        onclick={() => themePref.set(value)}
+                        onclick={() => { themePref.set(value); quittiere('theme'); }}
                     >
                         <Icon class="w-4 h-4" />
                         {label}
@@ -403,6 +314,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Kostenanzeige
+            {#if quittung === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "cost_granularity"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
                 <label
@@ -431,6 +343,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Chat-Sidebar
+            {#if quittung === "sidebar_recent_chats_limit"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "sidebar_recent_chats_limit"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div class="space-y-4">
                 <div>
@@ -460,6 +373,7 @@
                 class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
             >
                 Kontext-Suche
+            {#if quittung === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "context_search_limit"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
             </h2>
             <div>
                 <label
@@ -481,6 +395,65 @@
                 </select>
             </div>
         </section>
+
+        <!-- ⚠️ **Ein Verweis, kein Ausklappbereich** (Jan, 25.09.2026). Hier standen zwei
+             Zeilen mit Chevron über der ganzen Seite — sie sahen nach aufklappbaren
+             Abschnitten aus und waren doch nur Links. „Unterricht" ist jetzt im
+             Nutzermenü; die Fächerauswahl gehört hierher, weil sie eine
+             Anzeige-Einstellung ist. -->
+        {#if $user?.roles?.includes('teacher')}
+        <section class="mb-8">
+            <a
+                href="/profile/subjects"
+                class="flex items-center gap-2 px-4 py-3 rounded-lg
+                       bg-light-bg-2 dark:bg-dark-bg-2 text-light-tx dark:text-dark-tx
+                       hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors"
+            >
+                <Eye class="w-4 h-4" />
+                <span>Fächer in der Seitenleiste</span>
+                <ChevronRight class="w-4 h-4 ml-auto" />
+            </a>
+        </section>
+        {/if}
+
+        <!-- Startseiten-Kacheln.
+             ⚠️ **Umgezogen am 25.09.2026** (Jan, Paket 7 AP6). Die Wahl stand auf der
+             Startseite selbst, mit der Begründung: „Wer eine Kachel weghaben will, denkt
+             das beim Ansehen — nicht zwei Seiten später." Dagegen stand, dass die
+             Startseite dadurch ihre eigene Einstellungsseite wurde. Jetzt steht sie bei
+             den übrigen Anzeige-Einstellungen; die Startseite verweist darauf. -->
+        {#if $user?.roles?.includes('teacher')}
+        <section class="mb-8">
+            <h2 class="text-base font-semibold mb-1 text-light-tx-2 dark:text-dark-tx-2">
+                Kacheln der Startseite
+            {#if quittung === "startkacheln"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "startkacheln"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
+            </h2>
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mb-3 max-w-prose">
+                Was auf der Startseite steht. Eine abgewählte Kachel verschwindet nur aus
+                der Ansicht — die Daten dahinter bleiben, und neue Kacheln erscheinen von
+                selbst.
+            </p>
+            <div class="flex flex-col gap-2">
+                {#each KACHELN as k (k.id)}
+                    <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx">
+                        <input
+                            type="checkbox"
+                            checked={$zeigtKachel(k.id)}
+                            onchange={(e) => { schalteKachel(k.id, e.currentTarget.checked); quittiere('startkacheln'); }}
+                            class="accent-primary"
+                        />
+                        {k.name}
+                    </label>
+                {/each}
+            </div>
+        </section>
+        {/if}
+
+        {#if $user?.roles?.includes('teacher')}
+        <section class="mb-8">
+            <Zugangstoken />
+        </section>
+        {/if}
 
         <!-- SSO-Diagnose: rohe Gruppen/Rollen vom Anmeldedienst, für alle sichtbar -->
         <section class="mb-8">
@@ -608,13 +581,5 @@
             </details>
         </section>
 
-        <section class="mb-8">
-            <button
-                class="px-4 py-2 rounded-md text-sm font-medium bg-light-gr-2 dark:bg-dark-gr-2 text-white hover:bg-light-gr dark:hover:bg-dark-gr transition-colors"
-                onclick={doSave}
-            >
-                <Save class="w-4 h-4 inline-block mr-1 mb-1" /> Speichern
-            </button>
-        </section>
     
 </PageBody>

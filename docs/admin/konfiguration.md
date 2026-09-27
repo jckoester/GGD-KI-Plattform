@@ -198,6 +198,7 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
+| `HOME_EXPERIMENT_TRIGGERS_PATH` | Pfad zur home_experiment_triggers.yaml | `config/home_experiment_triggers.yaml` |
 
 ### Anmeldung, Schule, Darstellung
 
@@ -213,6 +214,36 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `PUBLIC_SCHOOL_LOGO_URL` | Logo-URL (Fallback für beide Themes) | *(leer → Initialen)* |
 | `PUBLIC_SCHOOL_LOGO_URL_LIGHT` | Logo für helles Theme | `/static/logo-light.png` |
 | `PUBLIC_SCHOOL_LOGO_URL_DARK` | Logo für dunkles Theme | `/static/logo-dark.png` |
+
+### Upload-Grenzen
+
+Vier Zahlen, die dasselbe Ereignis begrenzen — drei in der Anwendung, eine am
+Reverse-Proxy.
+
+| Variable | Beschreibung | Vorgabe |
+|----------|-------------|---------|
+| `UPLOAD_MAX_BYTES` | Anhang im Chat, je Datei | `10485760` (10 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_BYTES` | Bündel des Fachbegriff-Imports, **entpackt** | `20971520` (20 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_FILE_BYTES` | einzelne `.md`/`.svg` darin | `2097152` (2 MB) |
+| `FACHBEGRIFFE_IMPORT_MAX_FILES` | Dateien je Importlauf | `500` |
+| `NGINX_MAX_BODY_SIZE` | grobe Obergrenze am Proxy, nginx-Schreibweise | `24m` |
+
+⚠️ **`NGINX_MAX_BODY_SIZE` muss über allen anderen liegen — mit Puffer.** Antwortet der
+Proxy zuerst, bekommt die Nutzer:in ein nacktes „Request Entity Too Large" ohne Text: Sie
+erfährt weder, was zu groß war, noch wie groß es sein darf. Die Meldung der Anwendung,
+die beides sagt, erreicht sie nie. Der Puffer ist nötig, weil ein Formular-Upload mehr
+überträgt als seine Nutzlast (Trennzeichen und Kopfzeilen je Datei, und ein Bündel hat
+viele). Ein Prüfsatz (`test_upload_grenzen_passen.py`) hält die Zahlen zusammen.
+
+Die Vorlage `infra/nginx.conf.template` trägt keine feste Zahl mehr, sondern den
+Platzhalter `${NGINX_MAX_BODY_SIZE}`; der Einstiegspunkt des nginx-Images setzt ihn beim
+Start ein. **Wer einen eigenen Reverse-Proxy davorschaltet** (Option B der
+[Installation](installation.md)), muss dort dieselbe Grenze setzen — der äußerste Proxy
+entscheidet, und der mitgelieferte nginx sieht die Anfrage dann gar nicht mehr.
+
+Wie groß muss es sein? Gemessen an der Chemie-Pilotsammlung: 36 Begriffe mit 31
+Abbildungen sind rund 400 KB. Die Vorgabe trägt also ein Vielfaches davon; nach oben
+kostet sie nur Arbeitsspeicher und Zeit je Anfrage.
 
 ### Rückmeldungen (optional)
 
@@ -489,12 +520,54 @@ Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferen
 - `student_augmentations` — sanfte Lernverhalten-Leitplanken (keine Komplettlösungen,
   sokratische Rückfragen …), **nur** für die Schüler-Behandlung. Pro Assistent über die
   Checkbox-Liste im Editor abschaltbar.
+- `kontext_hinweis` — die Leseregeln für Einträge aus dem Wissensspeicher. Sie stehen
+  vor **jedem** Kontextblock, für alle Zielgruppen. ⚠️ Ohne sie kommen die Regeln im
+  freien Chat nirgends an: Einen Assistenten-Prompt gibt es dort nicht, und die
+  Werkzeugbeschreibung liest das Modell nur, wenn es das Werkzeug benutzt.
 - `output_format` — universelle Ausgabe-Anweisung (Markdown ohne umschließende Fences).
 
 Anders als die Krisen-Dateien ist `pedagogy.yaml` **versioniert**: Änderungen wirken erst
 nach **Backend-Neustart** (Deployment-Gate + Git-Audit-Trail; kein Hot-Reload). Pfad-
 Override über `PEDAGOGY_PATH`. Aufbau und Auswahl-Logik stehen in
 [Content-Moderation & Guardrails](content-moderation.md), Abschnitt F.
+
+---
+
+## `config/home_experiment_triggers.yaml`
+
+Sorgt dafür, dass Assistenten Schüler:innen **keine gefährlichen Versuche für zu Hause**
+anleiten. Zwei Listen, die mit UND verknüpft sind:
+
+- `absicht` — Formulierungen, die auf ein eigenes Vorhaben deuten („zu Hause", „kann ich
+  … ausprobieren", „was passiert, wenn ich …").
+- `themen` — je Thema ein `hinweis` (der Grund, den das Modell nennen soll) und
+  `patterns` (die Stichworte). Mitgeliefert: Elektrolyse, Laugen und Säuren,
+  Reinigungsmittel, offenes Feuer, Netzstrom, Stoffe aus Labor/Apotheke/Baumarkt.
+
+Trifft beides zu und ist die Zielgruppe Schüler:innen, hängt das Backend **für diese eine
+Antwort** eine zusätzliche Anweisung an den Systemtext: nicht anleiten, kurz begründen,
+auf den Unterricht verweisen, Alternative anbieten. Für Lehrkräfte greift die Regel
+nicht — wer eine Stunde zur Elektrolyse vorbereitet, braucht den Aufbau.
+
+⚠️ **Warum die UND-Verknüpfung nötig ist:** Ohne sie verweigerte der Assistent auch die
+Erklärung einer Elektrolyse im Unterricht. Gesucht ist der Fall „ich mache das selbst",
+nicht das Thema an sich.
+
+⚠️ **Es ist keine Sperre**, sondern eine Anweisung — der Chat läuft weiter, die Frage
+wird beantwortet. Gemessen am 26.09.2026 an vier gefährlichen und zwei harmlosen Fragen,
+je fünf Läufe: Konkrete Mittel (Elektroden, Elektrolyt, Spannung) nannte der Assistent
+vorher in 18 von 20 Antworten, danach in **keiner**; die beiden harmlosen Fragen wurden
+in allen zehn Läufen unverändert beantwortet. Wer eine harte Grenze braucht, ist auf der
+Guardrail-Ebene richtig (Abschnitt B in
+[Content-Moderation & Guardrails](content-moderation.md)).
+
+⚠️ **Einfache Anführungszeichen bei Backslashes.** In doppelten ist `\b` für YAML das
+Steuerzeichen Backspace, nicht die Wortgrenze der Regex — das Muster läuft dann ohne
+Fehlermeldung ins Leere. Ein Test prüft die Liste darauf.
+
+Änderungen wirken nach **Backend-Neustart**. Die Startliste gehört wie `pedagogy.yaml` in
+der Einführungsphase gegengelesen: Was an Ihrer Schule als Hausversuch erlaubt ist, ist
+eine Entscheidung der Fachschaften.
 
 ---
 
@@ -577,7 +650,7 @@ general_settings:
 ```
 
 Bewährt hat sich eine Staffel nach Aufgabe — `chat-schnell`, `chat-standard`, `chat-code`,
-`chat-reasoning`, `chat-komplex` — plus interne Modelle unter dem Präfix `system-`
+`chat-komplex` — plus interne Modelle unter dem Präfix `system-`
 (`system-titel`, `system-moderation`), die `MODEL_PICKER_HIDDEN_PREFIXES` aus dem
 Modellwähler ausblendet. Welche Modelle sich wofür eignen, steht in
 [Vor der Installation](vor-der-installation.md#modellwahl).

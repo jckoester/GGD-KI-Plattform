@@ -1,5 +1,6 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
+    import GruppeBeitreten from '$lib/components/GruppeBeitreten.svelte'
     import StufenHinweis from '$lib/components/StufenHinweis.svelte'
     import { visibleSidebarSubjectSections } from "$lib/stores/sidebarSections.js";
     import { conversationCountsBySubject } from "$lib/stores/conversationCounts.js";
@@ -184,5 +185,12 @@
                 </div>
             {/each}
         </div>
+    {/if}
+
+    <!-- Der Beitrittsweg steht **immer** da, nicht nur im leeren Zustand: Nachzügler
+         haben schon Fächer und brauchen trotzdem einen Code für die eine neue Gruppe.
+         Für Lehrkräfte entfällt er — der Code macht Schüler-Mitgliedschaften. -->
+    {#if !$user?.roles?.includes("teacher")}
+        <GruppeBeitreten />
     {/if}
 </PageBody>

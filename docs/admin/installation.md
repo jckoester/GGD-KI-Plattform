@@ -31,7 +31,8 @@ cp .env.example                          .env
 cp infra/litellm_config.example.yaml     infra/litellm_config.yaml
 
 for f in auth budget_tiers subjects crisis_triggers help_resources \
-         rate_limits pedagogy image_blocklist artifact_limits school_year; do
+         rate_limits pedagogy image_blocklist artifact_limits school_year \
+         home_experiment_triggers; do
   cp "config/$f.example.yaml" "config/$f.yaml"
 done
 ```
@@ -39,7 +40,10 @@ done
 > **Alle kopieren, auch wenn nicht jede den Start verhindert.** Diese Dateien stehen in
 > `.gitignore` und werden vom Repository nicht mitgeliefert; **auf die `.example`-Fassung
 > fällt keine von ihnen zurück**. `auth`, `budget_tiers`, `crisis_triggers` und
-> `image_blocklist` brechen ohne ihre Datei mit `FileNotFoundError` ab;
+> `image_blocklist` brechen ohne ihre Datei mit `FileNotFoundError` ab.
+> ⚠️ **`home_experiment_triggers` ebenfalls — aber erst beim ersten Schüler-Chat**,
+> nicht beim Start: Der Sicherheitsauslöser für Versuche zu Hause wird je Nachricht
+> gelesen. Ein Rauchtest mit einem Lehrkraft-Konto übersieht das.
 > `rate_limits` und `artifact_limits` starten mit eingebauten Vorgaben und einer Warnung
 > im Log — was leicht übersehen wird. `config/subjects.yaml` braucht spätestens Schritt 6.
 >
@@ -299,6 +303,13 @@ Caddy als Systemdienst oder in einem separaten Container betreiben.
 Den internen nginx-Port in `docker-compose.yml` auf einen anderen Host-Port
 legen (z. B. `8080:80`) und einen externen nginx als TLS-Terminator davor
 schalten.
+
+⚠️ **Die Upload-Grenze gilt am äußersten Proxy.** Steht ein eigener nginx oder Caddy
+davor, entscheidet dessen `client_max_body_size` — der mitgelieferte nginx sieht eine zu
+große Anfrage dann gar nicht mehr, und die Fachschaft bekommt beim Einspielen ihrer
+Fachbegriffe ein nacktes „Request Entity Too Large" ohne Hinweis, was zu groß war. Den
+Wert dort mindestens so hoch setzen wie `NGINX_MAX_BODY_SIZE` (Vorgabe `24m`, siehe
+[Upload-Grenzen](konfiguration.md#upload-grenzen)).
 
 ## Schritt 11: Erster Login und Grundkonfiguration
 

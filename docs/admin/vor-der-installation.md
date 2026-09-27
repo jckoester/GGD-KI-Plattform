@@ -237,7 +237,7 @@ Mistral also kein Auswahlkriterium — anders als bei IONOS, wo Mistral NeMo dar
 > jede Trivialität hunderte Ausgabe-Tokens. Die Magistral-Reihe denkt **nicht von allein**:
 > Auf „antworte knapp" kamen 5–12 Tokens und eine falsche Antwort, auf „denke Schritt für
 > Schritt" 386–461 Tokens und eine richtige. Ein separates `reasoning`-Feld liefert sie
-> nicht. Wer eine denkende Stufe (`chat-reasoning`) anbietet, muss das also im
+> nicht. Wer bei einem solchen Modell eine denkende Stufe anbieten will, muss das also im
 > **System-Prompt des Assistenten** verankern — der Modellname allein bewirkt nichts.
 >
 > *(Eine Rechenaufgabe ist kein Maßstab für Qualität; belastbar ist hier das Verhalten,

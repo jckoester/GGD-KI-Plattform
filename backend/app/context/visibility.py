@@ -18,6 +18,7 @@ abschreiben ist der Fehler, den man erst bemerkt, wenn er wirkt.
   nicht;
 * ``global``, ``school``, ``subject`` für alle angemeldeten Nutzer:innen;
 * ``group`` nur für Mitglieder der freigegebenen Gruppe — Admins ausgenommen.
+* ``group_teachers`` nur für deren **Lehrkräfte** (Planungsknoten, Alembic 0074).
 """
 
 from collections.abc import Iterable
@@ -42,7 +43,7 @@ def read_scope_clause(pseudonym: str, rollen: Iterable[str] = ()):
 
     if "admin" in rollen:
         return or_(
-            ContextNode.read_scope.in_([*OFFENE_SCOPES, "group"]),
+            ContextNode.read_scope.in_([*OFFENE_SCOPES, "group", "group_teachers"]),
             ContextNode.owner_pseudonym == pseudonym,
         )
 
@@ -51,11 +52,17 @@ def read_scope_clause(pseudonym: str, rollen: Iterable[str] = ()):
         .where(GroupMembership.pseudonym == pseudonym)
         .scalar_subquery()
     )
+    # ⚠️ **`group_teachers` nur mit Lehrkraft-Rolle.** Bis zum 24.09.2026 gab es den Wert
+    # nicht, und Planungsknoten standen auf `group` — also lasen Schüler:innen der Gruppe
+    # die Stundenentwürfe ihrer Lehrkraft, samt `metadata.reflexion`. Die Schreibprüfung
+    # verlangte die Rolle längst; nur das Lesen tat es nicht.
+    lehrkraft = "teacher" in rollen
+    gruppenscopes = ["group", "group_teachers"] if lehrkraft else ["group"]
     return or_(
         ContextNode.read_scope.in_(OFFENE_SCOPES),
         ContextNode.owner_pseudonym == pseudonym,
         and_(
-            ContextNode.read_scope == "group",
+            ContextNode.read_scope.in_(gruppenscopes),
             ContextNode.read_scope_group_id.in_(eigene_gruppen),
         ),
     )

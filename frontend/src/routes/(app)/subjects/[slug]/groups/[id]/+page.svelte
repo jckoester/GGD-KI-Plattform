@@ -12,6 +12,7 @@
   import { CircleCheck, TriangleAlert } from 'lucide-svelte'
   import SubjectIcon from '$lib/components/SubjectIcon.svelte'
   import GruppenUebersicht from '$lib/components/GruppenUebersicht.svelte'
+  import BeitrittsCode from '$lib/components/BeitrittsCode.svelte'
   import GruppenArchiv from '$lib/components/GruppenArchiv.svelte'
   import KnowledgeNodeList from '$lib/components/KnowledgeNodeList.svelte'
   import CurriculumList from '$lib/components/CurriculumList.svelte'
@@ -62,7 +63,7 @@
       <p class="mt-2 flex items-center gap-1.5 text-xs text-light-tx-2 dark:text-dark-tx-2">
         <CircleCheck size={13} class="shrink-0 text-light-gr dark:text-dark-gr" />
         Für Schüler:innen freigegeben.
-        <a href="/profile/teaching-groups"
+        <a href="/teaching"
            class="underline hover:text-light-tx dark:hover:text-dark-tx transition-colors">
           Ändern
         </a>
@@ -76,7 +77,7 @@
         <span>
           <b>Nicht für Schüler:innen freigegeben.</b> Sie sehen dieses Fach derzeit nicht —
           weder in ihrer Fachübersicht noch im Chat.
-          <a href="/profile/teaching-groups"
+          <a href="/teaching"
              class="underline hover:no-underline">Unter „Meine Unterrichtsgruppen" freigeben</a>
         </span>
       </div>
@@ -126,6 +127,15 @@
   <!-- Reiter-Inhalt -->
   {#if activeTab === 'uebersicht' || !istLehrkraft}
     <GruppenUebersicht {group} {subject} {istLehrkraft} />
+
+    <!-- Der Beitrittscode steht hier und nicht in einem eigenen Reiter: Er wird selten
+         gebraucht, aber genau dann, wenn die Lehrkraft ohnehin auf die Gruppe schaut —
+         zu Beginn eines Kurses oder wenn jemand fehlt. -->
+    {#if istLehrkraft && group}
+      <div class="mt-6">
+        <BeitrittsCode groupId={group.id} ssoGefuehrt={Boolean(group.sso_group_id)} />
+      </div>
+    {/if}
 
   {:else if activeTab === 'curriculum'}
     <CurriculumList

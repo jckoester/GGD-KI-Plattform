@@ -1,6 +1,7 @@
 <script>
   import { UE_PALETTE } from '$lib/planner.js'
   import { createUnit, updateUnit, deleteUnit, getGroupCurriculumChapters } from '$lib/api.js'
+  import { curriculumLage } from '$lib/curriculumlage.js'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
 
@@ -18,7 +19,7 @@
 
   // Curriculum-Kapitel-Auswahl
   let curricula = $state([])
-  let gradeUnbekannt = $state(false)
+  let lage = $state(null)
   let loadingChapters = $state(false)
   let chaptersError = $state(null)
   let selectedKapitelId = $state('')
@@ -40,17 +41,15 @@
     try {
       const data = await getGroupCurriculumChapters(groupId)
       curricula = data.curricula ?? []
-      gradeUnbekannt = data.grade_unbekannt ?? false
+      lage = curriculumLage(data)
     } catch (e) {
       chaptersError = e.message
       curricula = []
-      gradeUnbekannt = false
+      lage = null
     } finally {
       loadingChapters = false
     }
   }
-
-  const hasChapters = $derived(curricula.some(c => c.kapitel.length > 0))
 
   function findKapitel(id) {
     if (!id) return null
@@ -195,13 +194,9 @@
               {/each}
             {/if}
           </select>
-          {#if !hasChapters}
+          {#if lage}
             <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
-              Kein Curriculum für diese Gruppe gefunden – die Verknüpfung ist optional.
-            </p>
-          {:else if gradeUnbekannt}
-            <p class="mt-1 text-xs text-light-tx-2 dark:text-dark-tx-2">
-              Jahrgang nicht erkannt – es werden alle Curricula des Fachs angezeigt.
+              {lage.text}{#if lage.tun}&nbsp;{lage.tun}{/if}
             </p>
           {/if}
           {#if selectedStd != null}

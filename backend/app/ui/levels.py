@@ -45,6 +45,7 @@ _DEFAULT_PATH = aufloesen(
 logger = logging.getLogger(__name__)
 
 BEKANNTE_EINTRAEGE = frozenset({
+    "welcome",           # Startseite: der Tag auf einen Blick
     "chat",              # Neuer Chat
     "assistants",        # Assistenten (Übersicht)
     "assistants_my",     # Meine Assistenten (Lehrkraft)

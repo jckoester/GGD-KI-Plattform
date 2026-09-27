@@ -22,7 +22,11 @@ import { fileURLToPath } from "node:url"
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
 const HOOK = join(SRC, "hooks.server.js")
-const NGINX = join(dirname(dirname(SRC)), "infra/nginx.conf")
+// ⚠️ **Seit 0.11 eine Vorlage**, keine fertige Konfiguration: Der nginx-Dienst
+// bekommt `nginx.conf.template` gemountet und füllt `${NGINX_…}` beim Start. Der Test
+// las noch den alten Namen und fiel beim Merge um — die Datei gab es nicht mehr. Die
+// Pufferzeilen stehen unverändert darin; geprüft wird weiterhin ihr Vorhandensein.
+const NGINX = join(dirname(dirname(SRC)), "infra/nginx.conf.template")
 
 describe("Vorlade-Hinweise", () => {
     it("⚠️ die Regel existiert", () => {

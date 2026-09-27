@@ -147,3 +147,89 @@ async def test_apply_transfer_phases(db_session, seed_ops_group):
     assert dst_phasen[0]["status"] == "geplant"
     assert [p["id"] for p in src.metadata_["phasen"]] == ["p2"]  # aus Quelle entfernt
     assert any(r["node_id"] == R for r in dst.metadata_["refs"])  # refs_offen mitgeführt
+
+
+# ── Halber Umzug: set_topic statt move_content (Paket 5, AP6) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_set_topic_meldet_zurueckgebliebenen_inhalt(db_session, seed_ops_group):
+    """⚠️ **Der Fall, der das nötig machte** (beobachtet 24.09.2026).
+
+    Nach „Stunden verschieben" stand am Zieltermin nur das Thema — Unterrichtseinheit und
+    Stundenentwurf blieben am ausgefallenen Termin. Das Modell hatte `set_topic` gewählt,
+    wo `move_content` gemeint war. Verboten war es nicht, und niemand merkte es: Die
+    Lehrkraft sah die Stunde am neuen Termin stehen und konnte sie dort nicht bearbeiten.
+
+    Eine bessere Werkzeugbeschreibung macht das unwahrscheinlicher, nicht unmöglich.
+    Dieser Hinweis sorgt dafür, dass das Ergebnis nicht **unbemerkt** bleibt — er ist
+    kein Fehler, die Operation bleibt angewandt.
+    """
+    stunde = _stunde("Titration")
+    db_session.add(stunde)
+    ausgefallen = _slot(D0, kategorie="ausfall", thema="Titration", stunde_id=stunde.id)
+    ziel = _slot(D0 + timedelta(days=7))
+    db_session.add_all([ausgefallen, ziel])
+    await db_session.flush()
+
+    res = await _apply(db_session, [SetTopic(op="set_topic", slot_id=ziel.id,
+                                             thema="Titration")])
+    assert res.errors == []
+    assert res.applied == 1
+    assert len(res.hinweise) == 1
+    assert "move_content" in res.hinweise[0]
+    assert "Titration" in res.hinweise[0]
+
+
+@pytest.mark.asyncio
+async def test_move_content_erzeugt_keinen_hinweis(db_session, seed_ops_group):
+    """Die Gegenprobe: derselbe Umzug, richtig gemacht."""
+    stunde = _stunde("Titration")
+    db_session.add(stunde)
+    ausgefallen = _slot(D0, kategorie="ausfall", thema="Titration", stunde_id=stunde.id)
+    ziel = _slot(D0 + timedelta(days=7))
+    db_session.add_all([ausgefallen, ziel])
+    await db_session.flush()
+
+    res = await _apply(db_session, [MoveContent(op="move_content",
+                                                from_slot_id=ausgefallen.id,
+                                                to_slot_id=ziel.id)])
+    assert res.errors == []
+    assert res.hinweise == []
+
+
+@pytest.mark.asyncio
+async def test_ein_gewoehnlicher_ausfall_mit_inhalt_meldet_nichts(
+    db_session, seed_ops_group
+):
+    """⚠️ **Eng geschnitten mit Absicht.**
+
+    „Ein ausgefallener Termin trägt noch Inhalt" ist der **Normalfall** direkt nach einem
+    Ausfall — die Zuordnung bleibt für die Nachvollziehbarkeit erhalten. Ein Hinweis
+    darauf wäre Rauschen und entwertete die Fälle, die zählen.
+    """
+    stunde = _stunde("Titration")
+    db_session.add(stunde)
+    s = _slot(D0, thema="Titration", stunde_id=stunde.id)
+    db_session.add(s)
+    await db_session.flush()
+
+    res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id,
+                                                kategorie="ausfall")])
+    assert res.errors == []
+    assert res.hinweise == []
+
+
+@pytest.mark.asyncio
+async def test_set_topic_auf_anderes_thema_meldet_nichts(db_session, seed_ops_group):
+    """Nur dasselbe Thema zählt — sonst hat niemand etwas verschoben."""
+    stunde = _stunde("Titration")
+    db_session.add(stunde)
+    ausgefallen = _slot(D0, kategorie="ausfall", thema="Titration", stunde_id=stunde.id)
+    ziel = _slot(D0 + timedelta(days=7))
+    db_session.add_all([ausgefallen, ziel])
+    await db_session.flush()
+
+    res = await _apply(db_session, [SetTopic(op="set_topic", slot_id=ziel.id,
+                                             thema="Ganz anderes Thema")])
+    assert res.hinweise == []

@@ -129,7 +129,12 @@ def gruppe(
     quellklasse=None,
     fach_code=None,
 ):
-    """Eine Unterrichtsgruppe für die Attrappe — so, wie `_eigene_gruppen` sie liest."""
+    """Eine Unterrichtsgruppe für die Attrappe — so, wie `_eigene_gruppen` sie liest.
+
+    **Einzahl mit Absicht:** Die Abfrage joint auf `group_source_classes` und liefert je
+    Quellklasse **eine Zeile**. Eine Gruppe aus 10a/10b/10c entsteht hier also durch drei
+    `gruppe(...)`-Einträge mit derselben `gid` — genauso, wie die Datenbank sie liefert.
+    """
     return (gid, name, subject_id, lehrkraft or LEHRKRAFT, rolle, quellklasse, fach_code)
 
 
@@ -574,8 +579,8 @@ def test_starke_kante_zuerst_dann_der_rest():
     für `CH2_11` bleibt nur noch Gruppe 58 übrig — eindeutig von beiden Seiten.
     """
     kandidaten = [
-        Kandidat(id=49, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=58, name="ch2-ks-abi28", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=49, name="Chemie 9D", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=58, name="ch2-ks-abi28", subject_id=CHEMIE, quellklassen=()),
     ]
     treffer, rest = zuordnen(
         [lerngruppe(("9D",)), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
@@ -592,9 +597,9 @@ def test_alle_eindeutigen_paare_werden_zugeordnet():
     einem Paar je Durchgang, und die dritte Gruppe fiele lautlos heraus.
     """
     kandidaten = [
-        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=2, name="Chemie 9C", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=3, name="Chemie 8A", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=2, name="Chemie 9C", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=3, name="Chemie 8A", subject_id=CHEMIE, quellklassen=()),
     ]
     treffer, rest = zuordnen(
         [lerngruppe(("9D",)), lerngruppe(("9C",)), lerngruppe(("8A",))], kandidaten
@@ -606,8 +611,8 @@ def test_alle_eindeutigen_paare_werden_zugeordnet():
 def test_ohne_die_starke_kante_bliebe_alles_mehrdeutig():
     """Die Gegenprobe zur Reihenfolge: Erst der Namenstreffer macht den Rest eindeutig."""
     kandidaten = [
-        Kandidat(id=49, name="Chemie A", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=58, name="Chemie B", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=49, name="Chemie A", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=58, name="Chemie B", subject_id=CHEMIE, quellklassen=()),
     ]
     treffer, rest = zuordnen(
         [lerngruppe(("9D",)), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
@@ -623,8 +628,8 @@ def test_quellklasse_traegt_die_starke_kante():
     Adoption einer Klasse.
     """
     kandidaten = [
-        Kandidat(id=7, name="Mein Chemiekurs", subject_id=CHEMIE, quellklasse="9D"),
-        Kandidat(id=8, name="Chemie irgendwas", subject_id=CHEMIE, quellklasse="8A"),
+        Kandidat(id=7, name="Mein Chemiekurs", subject_id=CHEMIE, quellklassen=("9D",)),
+        Kandidat(id=8, name="Chemie irgendwas", subject_id=CHEMIE, quellklassen=("8A",)),
     ]
     treffer, _ = zuordnen([lerngruppe(("9D",))], kandidaten)
     assert treffer == {0: 7}
@@ -632,7 +637,7 @@ def test_quellklasse_traegt_die_starke_kante():
 
 def test_eine_gruppe_zwei_lerngruppen_bleibt_offen():
     """Der Fall, an dem „genau ein Kandidat" scheitern würde."""
-    kandidaten = [Kandidat(id=7, name="Chemie", subject_id=CHEMIE, quellklasse=None)]
+    kandidaten = [Kandidat(id=7, name="Chemie", subject_id=CHEMIE, quellklassen=())]
     treffer, rest = zuordnen(
         [lerngruppe(("11",), BASISKURS), lerngruppe(("11",), LEISTUNGSKURS)], kandidaten
     )
@@ -643,8 +648,8 @@ def test_eine_gruppe_zwei_lerngruppen_bleibt_offen():
 def test_eine_lerngruppe_zwei_gruppen_bleibt_offen():
     """Auch andersherum wird nicht geraten."""
     kandidaten = [
-        Kandidat(id=7, name="Chemie eins", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=8, name="Chemie zwei", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=7, name="Chemie eins", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=8, name="Chemie zwei", subject_id=CHEMIE, quellklassen=()),
     ]
     treffer, rest = zuordnen([lerngruppe(("11",), BASISKURS)], kandidaten)
     assert treffer == {}
@@ -654,8 +659,8 @@ def test_eine_lerngruppe_zwei_gruppen_bleibt_offen():
 def test_kursart_im_namen_streicht_die_kante():
     """Ein Leistungskurs passt nicht auf eine Gruppe, die sich Basiskurs nennt."""
     kandidaten = [
-        Kandidat(id=7, name="Chemie 11 Basiskurs", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=8, name="Chemie 11 Leistungskurs", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=7, name="Chemie 11 Basiskurs", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=8, name="Chemie 11 Leistungskurs", subject_id=CHEMIE, quellklassen=()),
     ]
     treffer, _ = zuordnen(
         [lerngruppe(("11",), LEISTUNGSKURS), lerngruppe(("11",), BASISKURS)], kandidaten
@@ -672,7 +677,7 @@ def test_fachkuerzel_bk_wird_nicht_als_basiskurs_gelesen():
     lässt sich die Doppeldeutigkeit auflösen statt erraten.
     """
     kandidaten = [
-        Kandidat(id=7, name="BK 11", subject_id=CHEMIE, quellklasse=None, fach_code="BK")
+        Kandidat(id=7, name="BK 11", subject_id=CHEMIE, quellklassen=(), fach_code="BK")
     ]
     treffer, _ = zuordnen([lerngruppe(("11",), LEISTUNGSKURS)], kandidaten)
     assert treffer == {0: 7}
@@ -681,7 +686,7 @@ def test_fachkuerzel_bk_wird_nicht_als_basiskurs_gelesen():
 def test_kurzform_neben_einem_anderen_fach_zaehlt_weiter():
     """Die Gegenprobe: Bei „Bio BK 11" ist `bk` nicht das Fach, sondern der Basiskurs."""
     kandidaten = [
-        Kandidat(id=7, name="Bio BK 11", subject_id=CHEMIE, quellklasse=None, fach_code="BIO")
+        Kandidat(id=7, name="Bio BK 11", subject_id=CHEMIE, quellklassen=(), fach_code="BIO")
     ]
     treffer, rest = zuordnen([lerngruppe(("11",), LEISTUNGSKURS)], kandidaten)
     assert treffer == {}
@@ -691,8 +696,8 @@ def test_kurzform_neben_einem_anderen_fach_zaehlt_weiter():
 def test_marker_werden_an_wortgrenzen_gesucht():
     """Als Teilzeichenkette fand sich `lk` in „Volkskunde" und `bk` in „Werkbank"."""
     kandidaten = [
-        Kandidat(id=7, name="Volkskunde 11", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=8, name="Werkbank 11", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=7, name="Volkskunde 11", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=8, name="Werkbank 11", subject_id=CHEMIE, quellklassen=()),
     ]
     for art in (BASISKURS, LEISTUNGSKURS):
         _, rest = zuordnen([lerngruppe(("11",), art)], kandidaten)
@@ -700,7 +705,7 @@ def test_marker_werden_an_wortgrenzen_gesucht():
 
 
 def test_anderes_fach_bildet_keine_kante():
-    kandidaten = [Kandidat(id=7, name="Mathematik 9D", subject_id=99, quellklasse="9D")]
+    kandidaten = [Kandidat(id=7, name="Mathematik 9D", subject_id=99, quellklassen=("9D",))]
     treffer, rest = zuordnen([lerngruppe(("9D",))], kandidaten)
     assert treffer == {}
     assert rest == {0: []}
@@ -713,9 +718,9 @@ def test_kettenaufloesung_ueber_mehrere_runden():
     danach ist C eindeutig. Ohne Wiederholung bliebe nach der ersten Runde alles offen.
     """
     kandidaten = [
-        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=2, name="Kurs mitte", subject_id=CHEMIE, quellklasse=None),
-        Kandidat(id=3, name="Kurs rechts", subject_id=CHEMIE, quellklasse=None),
+        Kandidat(id=1, name="Chemie 9D", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=2, name="Kurs mitte", subject_id=CHEMIE, quellklassen=()),
+        Kandidat(id=3, name="Kurs rechts", subject_id=CHEMIE, quellklassen=()),
     ]
     # Zwei namenlose Lerngruppen — erst nachdem 9D vergeben ist, wird der Rest eng.
     treffer, rest = zuordnen(
