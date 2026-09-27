@@ -9,7 +9,6 @@ denselben Bestand keine Aussage ist.
 keinen Bildungsplan; die beiden Kompetenzknoten unten sind das Minimum, an dem sich
 zeigt, dass `3.2.1.1(1)` nicht `3.2.1.1(10)` trifft.
 """
-import importlib.util
 import uuid
 from pathlib import Path
 
@@ -20,20 +19,23 @@ from app.db.models import ContextEdge, ContextNode, Group, NodeAlias, Subject
 
 pytestmark = pytest.mark.asyncio
 
-SKRIPT = Path(__file__).resolve().parents[2] / "scripts" / "seed_fachbegriffe.py"
 VAULT = Path(__file__).resolve().parents[1] / "fixtures" / "fachbegriffe"
 
 
-def _seed_modul():
-    spec = importlib.util.spec_from_file_location("seed_fachbegriffe", SKRIPT)
-    modul = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modul)
-    return modul
+def _buendel() -> dict[str, bytes]:
+    """Das Fixture-Verzeichnis als Bündel — wie der Endpunkt es aus einem Zip baut."""
+    dateien = {p.name: p.read_bytes() for p in sorted(VAULT.glob("*.md"))}
+    dateien |= {
+        f"_Abb/{p.name}": p.read_bytes() for p in sorted((VAULT / "_Abb").glob("*"))
+    }
+    return dateien
 
 
 @pytest.fixture(scope="module")
 def seed():
-    return _seed_modul()
+    """⚠️ Seit 27.09.2026 der Service, nicht mehr das Skript (Paket 10, AP1)."""
+    from app.context import fachbegriffe_import
+    return fachbegriffe_import
 
 
 @pytest.fixture
@@ -73,9 +75,9 @@ async def testfach(db_session):
 
 
 async def _lauf(seed, db_session, *, ueberschreiben=False):
-    bilanz = seed.Bilanz()
-    gelesen = seed.lies_ordner(VAULT, bilanz)
-    await seed.seed_in_session(db_session, gelesen, bilanz, ueberschreiben=ueberschreiben)
+    bilanz = await seed.importiere(
+        db_session, _buendel(), ueberschreiben=ueberschreiben
+    )
     await db_session.flush()
     return bilanz
 
@@ -323,3 +325,45 @@ class TestFachOhneFachschaft:
         bilanz = await _lauf(seed, db_session)
         assert bilanz.neu == 0
         assert any("unbekannt" in w for w in bilanz.warnungen)
+
+
+class TestSkriptUndServiceStimmenUeberein:
+    """Die Zusage von Paket 10/AP1: **ein** Kern, zwei Wege.
+
+    ⚠️ **Warum das ein Test sein muss und kein Vertrauen.** Das Skript hat die Logik bis
+    zum 27.09.2026 selbst getragen; ab AP3 ruft ein Endpunkt denselben Kern. Liefen die
+    beiden auseinander, bekäme eine Fachschaft im Dialog ein anderes Ergebnis als der
+    Admin auf der Kommandozeile — und niemand fiele darüber, bis es jemandem auffällt.
+
+    Geprüft wird die **Bilanz**, nicht der ausgedruckte Text: Was das Skript auf die
+    Konsole schreibt, ist Darstellung; was beide gemeinsam haben müssen, sind die Zahlen
+    und Meldungen.
+    """
+
+    def _skript(self):
+        """Das Admin-Skript über den Dateipfad laden — `backend/scripts/` ist kein Paket."""
+        import importlib.util
+        pfad = Path(__file__).resolve().parents[2] / "scripts" / "seed_fachbegriffe.py"
+        spec = importlib.util.spec_from_file_location("seed_fachbegriffe", pfad)
+        modul = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modul)
+        return modul
+
+    async def test_dasselbe_buendel_dieselbe_bilanz(self, seed, db_session, testfach):
+        skript = self._skript()
+
+        # ⚠️ **Savepoint, kein `rollback()`.** Das Fach samt Bildungsplan-Knoten entsteht
+        # in derselben Sitzung; ein voller Rollback nähme es mit, und der zweite Lauf
+        # fände kein Fach mehr. Beim ersten Anlauf genau so passiert.
+        sp = await db_session.begin_nested()
+        aus_skript = await seed.importiere(db_session, skript.lies_ordner(VAULT))
+        await sp.rollback()
+
+        # Der Weg des Endpunkts: Bündel direkt.
+        aus_service = await seed.importiere(db_session, _buendel())
+
+        for feld in ("neu", "aktualisiert", "unveraendert", "kanten", "kanten_geaendert"):
+            assert getattr(aus_skript, feld) == getattr(aus_service, feld), feld
+        assert sorted(aus_skript.warnungen) == sorted(aus_service.warnungen)
+        assert aus_skript.offene_ziele == aus_service.offene_ziele
+        assert aus_skript.neu > 0, "ohne geschriebene Knoten belegt der Vergleich nichts"

@@ -1,8 +1,17 @@
 # Fachbegriffe aus einem Obsidian-Ordner einspielen
 
-`backend/scripts/seed_fachbegriffe.py` liest einen Ordner mit Markdown-Dateien und legt
-daraus `begriff`- und `stoffsteckbrief`-Knoten samt Kanten an. Es ist ein
-**Einspielskript**, kein Synchronisierungsdienst: Es läuft, wenn jemand es startet.
+Aus Markdown-Dateien werden `begriff`- und `stoffsteckbrief`-Knoten samt Kanten. Es ist
+ein **Einspielvorgang**, kein Synchronisierungsdienst: Er läuft, wenn jemand ihn startet.
+
+**Die Arbeit liegt in `app/context/fachbegriffe_import.py`**, nicht im Skript.
+`backend/scripts/seed_fachbegriffe.py` ist die Admin-Hülle: Ordner einlesen, Service
+rufen, Bericht ausgeben. Den zweiten Weg auf denselben Kern baut Paket 10 als
+Upload-Dialog für die Fachschaften.
+
+⚠️ **Die Eingabe des Service ist ein Bündel, kein Ordner** — `Pfad → Bytes`. Wo die
+Bytes herkommen, entscheidet der Aufrufer: Das Skript liest ein Verzeichnis, der
+Endpunkt entpackt ein Zip. Der Kern kennt kein Dateisystem, und ein Test hält fest, dass
+beide Wege auf demselben Bündel **dieselbe Bilanz** ergeben.
 
 > **Was in eine Datei gehört, steht nicht hier.** Die inhaltlichen Regeln — wie eine
 > Definition aussieht, was eine Fehlvorstellung ist, wann ein Steckbrief statt eines
@@ -32,6 +41,12 @@ venv/bin/python scripts/embedding_backfill.py --content-type begriff --content-t
 verwirft den Vektor, dessen Eingabe sich geändert hat, und legt keinen neuen an.
 
 ## Was aus einer Datei gelesen wird
+
+**Welche Dateien überhaupt gelesen werden:** `*.md` auf oberster Ebene, ohne führenden
+Unterstrich. ⚠️ Der Unterstrich ist nicht Kosmetik: `_Format.md` hat kein Frontmatter und
+liefe sonst bei **jedem** Lauf als „nicht lesbar" in den Bericht — und ein Bericht, in dem
+immer dieselbe Warnung steht, wird nicht mehr gelesen. Alles unter `_Abb/` wird nicht
+übersprungen, sondern über die Pfadangabe in `illustrationen` gesucht.
 
 **Aus dem Frontmatter:** Steuerschlüssel (`knotentyp`, `titel`, `fach`, `aliase`,
 `bildungsplan`) und Beziehungen (`oberbegriff`, `verwandt`, `voraussetzung`,

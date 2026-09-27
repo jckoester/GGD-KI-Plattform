@@ -1,8 +1,14 @@
-"""Der Vault-Leser des Fachbegriff-Seeds (Paket 9, AP5).
+"""Der Leser des Fachbegriff-Imports (Paket 9/AP5, Paket 10/AP1).
 
-Geprüft wird der **datenbankfreie** Teil von `scripts/seed_fachbegriffe.py`: Frontmatter,
-Abschnitte, Abgrenzungszeilen, Fundstellen, Abbildungen, Idempotenz-Hash. Der Schreibteil
-braucht eine Datenbank und steht in `tests/integration/test_seed_fachbegriffe_db.py`.
+Geprüft wird der **datenbankfreie** Teil von `app/context/fachbegriffe_import.py`:
+Frontmatter, Abschnitte, Abgrenzungszeilen, Fundstellen, Abbildungen, Idempotenz-Hash.
+Der Schreibteil braucht eine Datenbank und steht in
+`tests/integration/test_seed_fachbegriffe_db.py`.
+
+⚠️ **Seit 27.09.2026 nicht mehr aus dem Skript geladen.** Der Kern liegt im
+Anwendungspaket, weil ab Paket 10 zwei Wege ihn benutzen — das Admin-Skript und der
+Upload-Dialog. Die Eingabe ist deshalb ein **Bündel** (Pfad → Bytes) statt eines
+Ordners; `_buendel()` unten baut es aus dem Fixture-Verzeichnis.
 
 ⚠️ **Die Fixtures sind erfunden** (`tests/fixtures/fachbegriffe/`). Keine GGD-Inhalte im
 Repo — die Pilotdateien gehören der Fachschaft, nicht dem Projekt (Leitplanke 3). Jede
@@ -11,53 +17,63 @@ Abgrenzungszeile, ein Abschnitt außerhalb des Formats, ein ungültiger Auswahlw
 GHS-Eintrag mit Bedingung, ein fehlendes SVG.
 """
 
-import importlib.util
+import os
 from pathlib import Path
 
 import pytest
 
-SKRIPT = Path(__file__).resolve().parents[2] / "scripts" / "seed_fachbegriffe.py"
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
+os.environ.setdefault("SCHOOL_SECRET", "test-secret")
+os.environ.setdefault("JWT_SECRET", "test-jwt")
+
+from app.context import fachbegriffe_import
+
 VAULT = Path(__file__).resolve().parents[1] / "fixtures" / "fachbegriffe"
 
 
-def _laden():
-    """Über den Dateipfad laden — `backend/scripts/` ist bewusst kein Paket."""
-    spec = importlib.util.spec_from_file_location("seed_fachbegriffe", SKRIPT)
-    modul = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modul)
-    return modul
+def _buendel() -> dict[str, bytes]:
+    """Das Fixture-Verzeichnis als Bündel — wie der Endpunkt es aus einem Zip baut."""
+    dateien = {p.name: p.read_bytes() for p in sorted(VAULT.glob("*.md"))}
+    dateien |= {
+        f"_Abb/{p.name}": p.read_bytes() for p in sorted((VAULT / "_Abb").glob("*"))
+    }
+    return dateien
+
+
+def _lies(dateiname: str):
+    """Eine Fixture-Datei einlesen — `lies_datei` nimmt Name und Text, keinen Pfad."""
+    pfad = VAULT / dateiname
+    return fachbegriffe_import.lies_datei(pfad.stem, pfad.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
 def seed():
-    return _laden()
+    return fachbegriffe_import
 
 
 @pytest.fixture(scope="module")
 def fiktivum(seed):
-    return seed.lies_datei(VAULT / "Fiktivum.md")
+    return _lies("Fiktivum.md")
 
 
 @pytest.fixture(scope="module")
 def teststoff(seed):
-    return seed.lies_datei(VAULT / "Teststoff.md")
+    return _lies("Teststoff.md")
 
 
 class TestWasGelesenWird:
     def test_fremder_knotentyp_wird_uebergangen(self, seed):
         """Ein `arbeitsblatt` im Ordner ist kein Fehler — es gehört nur nicht hierher."""
-        assert seed.lies_datei(VAULT / "Fremdling.md") is None
+        assert _lies("Fremdling.md") is None
 
-    def test_datei_ohne_frontmatter_scheitert_laut(self, seed, tmp_path):
+    def test_datei_ohne_frontmatter_scheitert_laut(self, seed):
         """⚠️ Kein stilles Überspringen: Das ist ein Fehler **in der Datei**.
 
         Eine Datei, die niemand importiert und die sich auch nicht beschwert, fällt
         beim Zählen nicht auf — und genau danach sieht man im Bericht nicht.
         """
-        kaputt = tmp_path / "Kaputt.md"
-        kaputt.write_text("## Definition\n\nOhne Frontmatter.\n", encoding="utf-8")
         with pytest.raises(ValueError, match="Frontmatter"):
-            seed.lies_datei(kaputt)
+            seed.lies_datei("Kaputt", "## Definition\n\nOhne Frontmatter.\n")
 
     def test_kopfdaten(self, fiktivum):
         assert fiktivum.datei == "Fiktivum"      # Dateiname = Schlüssel für Wikilinks
@@ -276,7 +292,7 @@ class TestFundstellen:
 class TestAbbildungen:
     def test_svg_wird_eingelesen(self, seed, fiktivum):
         metadata = {"illustrationen": [dict(a) for a in fiktivum.metadata["illustrationen"]]}
-        fehlend = seed.lade_svg(metadata, VAULT)
+        fehlend = seed.lade_svg(metadata, _buendel())
         assert metadata["illustrationen"][0]["svg"].startswith("<svg")
         assert fehlend == ["_Abb/fehlt.svg"]
 
@@ -284,7 +300,7 @@ class TestAbbildungen:
         """Die Quelle einer Strukturformel ist ein Arbeitsmittel des Autors, kein
         Inhalt des Wissensgraphen."""
         metadata = {"illustrationen": [dict(a) for a in fiktivum.metadata["illustrationen"]]}
-        seed.lade_svg(metadata, VAULT)
+        seed.lade_svg(metadata, _buendel())
         assert metadata["illustrationen"][0]["tex"] == "Irgendwo/im/Vault/schema.tex"
 
     def test_platzhalter_ohne_eintrag_wird_gemeldet(self, seed, fiktivum):
@@ -334,3 +350,60 @@ class TestStandHash:
             "T", "Text", {"x": 1, "seed_hash": "egal", "seed_quelle": "T"}, []
         )
         assert ohne == mit
+
+
+class TestSkriptHuelle:
+    """Die Ordner-Ebene ist das Einzige, was nur das Admin-Skript kennt (Paket 10, AP1).
+
+    Der Rest liegt im Service; dass beide Wege **dieselbe Bilanz** ergeben, prüft
+    `tests/integration/test_seed_fachbegriffe_db.py`. Hier geht es nur um den Schritt
+    davor: Aus einem Ordner muss dasselbe Bündel werden, das ein Zip liefern würde.
+    """
+
+    def test_ordner_wird_zum_selben_buendel(self):
+        import importlib.util
+
+        pfad = Path(__file__).resolve().parents[2] / "scripts" / "seed_fachbegriffe.py"
+        spec = importlib.util.spec_from_file_location("seed_fachbegriffe", pfad)
+        skript = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(skript)
+
+        assert skript.lies_ordner(VAULT) == _buendel()
+
+    def test_das_buendel_enthaelt_auch_die_abbildungen(self):
+        """⚠️ Ohne `_Abb/` fände `lade_svg` nichts und meldete jede Illustration als
+        fehlend — der Ordnerleser muss den Unterordner mitnehmen, obwohl `*.md` ihn
+        nicht trifft."""
+        assert any(name.startswith("_Abb/") for name in _buendel())
+
+
+class TestWelcheDateienGelesenWerden:
+    """Der Filter des Bündels (Paket 10, AP1) — er entscheidet, was überhaupt ankommt."""
+
+    def test_unterstrich_dateien_bleiben_stumm(self, seed):
+        """⚠️ **Nicht nur „wird übersprungen", sondern „ohne Warnung".**
+
+        `_Format.md` hat kein Frontmatter. Ohne den Filter liefe sie in `lies_datei`,
+        bekäme dort zu Recht ein `ValueError` („kein Frontmatter") und stünde bei
+        **jedem** Lauf als „nicht lesbar" im Bericht. Ein Bericht, in dem immer dieselbe
+        Warnung steht, wird nicht mehr gelesen — und genau dann geht die echte unter.
+        """
+        bilanz = seed.Bilanz()
+        seed.lies_buendel(_buendel(), bilanz)
+        assert not [w for w in bilanz.warnungen if w.startswith("_")]
+
+    def test_unterordner_werden_nicht_als_knoten_gelesen(self, seed):
+        """Eine `.md` unter `_Abb/` wäre ein Knoten aus einem Anhangverzeichnis."""
+        bilanz = seed.Bilanz()
+        gelesen = seed.lies_buendel(
+            {"_Abb/Notiz.md": b"---\nknotentyp: begriff\ntitel: X\n---\n\nText.\n"},
+            bilanz,
+        )
+        assert gelesen == [] and bilanz.warnungen == []
+
+    def test_kaputte_kodierung_landet_im_bericht(self, seed):
+        """Aus einem Zip kommen Bytes; eine Datei in Latin-1 darf den Lauf nicht kippen."""
+        bilanz = seed.Bilanz()
+        gelesen = seed.lies_buendel({"Kaputt.md": "---\ntitel: Café\n---\n".encode("latin-1")}, bilanz)
+        assert gelesen == []
+        assert any("UTF-8" in w for w in bilanz.warnungen), bilanz.warnungen
