@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     crisis_triggers_path: str = "config/crisis_triggers.yaml"
     help_resources_path: str = "config/help_resources.yaml"
     pedagogy_path: str = "config/pedagogy.yaml"
+    home_experiment_triggers_path: str = "config/home_experiment_triggers.yaml"
     rate_limits_path: str = "config/rate_limits.yaml"
     auth_iserv_client_secret: str = ""
     # Wenn True, loggt der OAuth-Adapter beim Login die rohen userinfo-Gruppen/-Rollen

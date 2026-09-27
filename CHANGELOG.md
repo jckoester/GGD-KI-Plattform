@@ -225,7 +225,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Versuchsvorschläge für zu Hause sind begrenzt.** Assistenten schlagen Schüler:innen
   nur noch Ungefährliches vor (Küchenzutaten, Wasser, Batterien bis 9 Volt); für alles
-  andere verweisen sie auf den Unterricht.
+  andere verweisen sie auf den Unterricht. Fragt jemand ausdrücklich nach einem riskanten
+  Versuch — Elektrolyse, Laugen, Reinigungsmittel mischen, offenes Feuer, Steckdose —,
+  erklärt der Assistent kurz, worum es geht und warum es in den Unterricht gehört, und
+  bietet einen ungefährlichen Versuch an. Welche Themen das sind, steht in
+  `config/home_experiment_triggers.yaml` und kann von der Schule angepasst werden.
 
 - **Kapitel im Wissensbereich haben ein Formular.** Stundenzahl, Reihenfolge,
   Einleitung und Pfad im Bildungsplan werden jetzt geprüft, statt beliebig gefüllt zu

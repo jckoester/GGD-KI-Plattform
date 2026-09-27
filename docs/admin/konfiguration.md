@@ -198,6 +198,7 @@ beschränkt — siehe [Vor der Installation](vor-der-installation.md#modellwahl)
 | `CRISIS_TRIGGERS_PATH` | Pfad zur crisis_triggers.yaml | `config/crisis_triggers.yaml` |
 | `HELP_RESOURCES_PATH` | Pfad zur help_resources.yaml | `config/help_resources.yaml` |
 | `PEDAGOGY_PATH` | Pfad zur pedagogy.yaml | `config/pedagogy.yaml` |
+| `HOME_EXPERIMENT_TRIGGERS_PATH` | Pfad zur home_experiment_triggers.yaml | `config/home_experiment_triggers.yaml` |
 
 ### Anmeldung, Schule, Darstellung
 
@@ -495,6 +496,44 @@ Anders als die Krisen-Dateien ist `pedagogy.yaml` **versioniert**: Änderungen w
 nach **Backend-Neustart** (Deployment-Gate + Git-Audit-Trail; kein Hot-Reload). Pfad-
 Override über `PEDAGOGY_PATH`. Aufbau und Auswahl-Logik stehen in
 [Content-Moderation & Guardrails](content-moderation.md), Abschnitt F.
+
+---
+
+## `config/home_experiment_triggers.yaml`
+
+Sorgt dafür, dass Assistenten Schüler:innen **keine gefährlichen Versuche für zu Hause**
+anleiten. Zwei Listen, die mit UND verknüpft sind:
+
+- `absicht` — Formulierungen, die auf ein eigenes Vorhaben deuten („zu Hause", „kann ich
+  … ausprobieren", „was passiert, wenn ich …").
+- `themen` — je Thema ein `hinweis` (der Grund, den das Modell nennen soll) und
+  `patterns` (die Stichworte). Mitgeliefert: Elektrolyse, Laugen und Säuren,
+  Reinigungsmittel, offenes Feuer, Netzstrom, Stoffe aus Labor/Apotheke/Baumarkt.
+
+Trifft beides zu und ist die Zielgruppe Schüler:innen, hängt das Backend **für diese eine
+Antwort** eine zusätzliche Anweisung an den Systemtext: nicht anleiten, kurz begründen,
+auf den Unterricht verweisen, Alternative anbieten. Für Lehrkräfte greift die Regel
+nicht — wer eine Stunde zur Elektrolyse vorbereitet, braucht den Aufbau.
+
+⚠️ **Warum die UND-Verknüpfung nötig ist:** Ohne sie verweigerte der Assistent auch die
+Erklärung einer Elektrolyse im Unterricht. Gesucht ist der Fall „ich mache das selbst",
+nicht das Thema an sich.
+
+⚠️ **Es ist keine Sperre**, sondern eine Anweisung — der Chat läuft weiter, die Frage
+wird beantwortet. Gemessen am 26.09.2026 an vier gefährlichen und zwei harmlosen Fragen,
+je fünf Läufe: Konkrete Mittel (Elektroden, Elektrolyt, Spannung) nannte der Assistent
+vorher in 18 von 20 Antworten, danach in **keiner**; die beiden harmlosen Fragen wurden
+in allen zehn Läufen unverändert beantwortet. Wer eine harte Grenze braucht, ist auf der
+Guardrail-Ebene richtig (Abschnitt B in
+[Content-Moderation & Guardrails](content-moderation.md)).
+
+⚠️ **Einfache Anführungszeichen bei Backslashes.** In doppelten ist `\b` für YAML das
+Steuerzeichen Backspace, nicht die Wortgrenze der Regex — das Muster läuft dann ohne
+Fehlermeldung ins Leere. Ein Test prüft die Liste darauf.
+
+Änderungen wirken nach **Backend-Neustart**. Die Startliste gehört wie `pedagogy.yaml` in
+der Einführungsphase gegengelesen: Was an Ihrer Schule als Hausversuch erlaubt ist, ist
+eine Entscheidung der Fachschaften.
 
 ---
 

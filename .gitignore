@@ -60,6 +60,7 @@ config/image_blocklist.yaml
 config/image_models.yaml
 data/generated_images/*
 config/pedagogy.yaml
+config/home_experiment_triggers.yaml
 config/artifact_limits.yaml
 data/artifacts/*
 # Laufzeitstand des Jugendschutz-Guardrails (Zähler), vom LiteLLM-Proxy geschrieben

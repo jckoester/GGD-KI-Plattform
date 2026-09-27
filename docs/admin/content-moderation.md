@@ -652,9 +652,29 @@ Blockaden**. Mitgeliefert sind „keine Komplettlösungen", „sokratische Rück
 
 ⚠️ **Eine Leitplanke im System-Prompt ist eine Bitte, keine Sperre.** Gemessen am
 26.09.2026: Die Regel, zu Hause keine Elektrolyse vorzuschlagen, steht wörtlich in der
-Präambel — der Assistent schlug sie auf ausdrückliche Nachfrage trotzdem vor, wenn auch
-deutlich zurückhaltender als ohne die Regel. Wo eine Zusage verlässlich sein muss,
-gehört sie auf die Sperr-Ebene (Abschnitt B), nicht hierher.
+Präambel — der Assistent schlug sie auf ausdrückliche Nachfrage trotzdem vor, samt
+Elektroden, Elektrolyt und Spannung. Wo eine Zusage verlässlich sein muss, gehört sie
+auf die Sperr-Ebene (Abschnitt B), nicht hierher.
+
+### Wenn eine Präambelregel nicht reicht: benannte Auslöser
+
+Für den Fall oben gibt es deshalb eine Zwischenstufe: `config/home_experiment_triggers.yaml`
+(beschrieben in [Konfiguration](konfiguration.md#confighome_experiment_triggersyaml)).
+Nennt eine Schüler-Nachricht **sowohl** eine eigene Absicht („zu Hause", „kann ich das
+ausprobieren") **als auch** ein riskantes Thema (Elektrolyse, Laugen, Reinigungsmittel,
+offenes Feuer, Netzstrom, Laborchemikalien), hängt das Backend für diese eine Antwort
+eine konkrete Anweisung an den Systemtext — statt sich auf den allgemeinen Punkt in der
+Präambel zu verlassen.
+
+Das Muster ist übertragbar: **Eine allgemeine Regel unter acht anderen wird unzuverlässig
+befolgt; dieselbe Regel, benannt und unmittelbar vor der Frage, deutlich zuverlässiger.**
+Gemessen an vier gefährlichen Fragen mit je fünf Läufen: konkrete Mittel vorher in 18 von
+20 Antworten, danach in keiner — bei unveränderter Präambel. Die beiden harmlosen
+Gegenproben (Rotkohlsaft, Stromkreis mit Lämpchen) wurden weiterhin in allen Läufen
+beantwortet.
+
+Es bleibt trotzdem eine Anweisung, keine Sperre. Wer eine harte Grenze braucht, kommt um
+Abschnitt B nicht herum.
 
 ### `audience` als bewusster Prüfpunkt beim Freigeben
 

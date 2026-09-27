@@ -76,6 +76,10 @@ from app.context.modellsicht import fuer_modell
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
+from app.pedagogy.hausversuche import (
+    anweisung as hausversuch_anweisung,
+    gefahr_fuer as hausversuch_gefahr,
+)
 from app.pedagogy.compose import compose_system_content, is_student_treatment
 from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
@@ -1836,6 +1840,21 @@ async def chat(
     if pedagogy.output_format.strip():
         llm_messages.append(
             {"role": "system", "content": pedagogy.output_format.strip()}
+        )
+    # Sicherheitsauslöser für Hausversuche (Paket 9, N12) — **als letzte** Systemnachricht
+    # und nur in der Schüler-Behandlung. Die Stellung ist Absicht: Punkt 8 der Präambel
+    # sagt dasselbe allgemein und wurde gemessen überlesen; was hier steht, ist konkret,
+    # benannt und steht unmittelbar vor der Frage.
+    gefahr = hausversuch_gefahr(user_message, student_treatment=student_treatment)
+    if gefahr is not None:
+        # Nur das Thema ins Log, nie die Nachricht — dort steht, was die PII-Warnung
+        # gerade aus dem Prompt heraushalten soll.
+        logger.info(
+            "Hausversuchs-Auslöser: Thema=%s, Konversation=%s",
+            gefahr.thema, conversation_id,
+        )
+        llm_messages.append(
+            {"role": "system", "content": hausversuch_anweisung(gefahr)}
         )
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}
