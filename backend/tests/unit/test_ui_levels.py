@@ -328,3 +328,113 @@ def test_jeder_sidebar_eintrag_hat_eine_stufe():
         "Diese Sidebar-Einträge sind keiner Stufe zugeordnet und damit für alle "
         f"unsichtbar: {fehlend}"
     )
+
+
+# ── Die Gegenrichtung: der Code kennt mehr als die eigene Datei ───────────────
+
+class TestNachgereichteEintraege:
+    """⚠️ **Der Fall, der das ausgelöst hat** (Jan, 29.09.2026, Produktivsystem).
+
+    Nach dem Release 0.11 fehlte in der Sidebar der Eintrag zur Startseite. Kein
+    Deployment-Fehler: `config/ui_levels.yaml` ist gitignored, wird bei der Installation
+    **einmal** aus der `.example` kopiert und danach nie überschrieben — richtig so, sie
+    trägt den Zuschnitt der Schule. `welcome` stand deshalb nur in der Beispieldatei,
+    und der Eintrag erschien nie.
+
+    Die umgekehrte Richtung war längst abgedeckt (unbekannter Schlüssel → entfernt und
+    gemeldet, 24.09.2026). Diese hier war es nicht: Es passierte **gar nichts**.
+    """
+
+    def _dateien(self, tmp_path, eigene: list[str], beispiel: list[str]) -> Path:
+        def schreib(name: str, eintraege: list[str]) -> Path:
+            p = tmp_path / name
+            p.write_text(yaml.safe_dump({"rollen": {"teacher": _rolle(stufen=[
+                {"stufe": 1, "name": "A", "beschreibung": "…", "eintraege": eintraege},
+            ])}}), encoding="utf-8")
+            return p
+
+        schreib("ui_levels.example.yaml", beispiel)
+        return schreib("ui_levels.yaml", eigene)
+
+    def _fehlend(self, tmp_path, eigene, beispiel) -> dict:
+        from app.ui.levels import UiLevels, _nachgereichte_eintraege
+
+        pfad = self._dateien(tmp_path, eigene, beispiel)
+        cfg = UiLevels.model_validate(yaml.safe_load(pfad.read_text(encoding="utf-8")))
+        return _nachgereichte_eintraege(
+            cfg, pfad.with_name("ui_levels.example.yaml")
+        )
+
+    def test_der_gemeldete_fall(self, tmp_path):
+        """Eigene Datei aus 0.10.x, Beispiel aus 0.11: `welcome` fehlt."""
+        assert self._fehlend(
+            tmp_path, eigene=["chat", "history"], beispiel=["welcome", "chat", "history"]
+        ) == {"teacher": ["welcome"]}
+
+    def test_gleichstand_meldet_nichts(self, tmp_path):
+        assert self._fehlend(
+            tmp_path, eigene=["welcome", "chat"], beispiel=["welcome", "chat"]
+        ) == {}
+
+    def test_eigene_zusaetze_sind_kein_befund(self, tmp_path):
+        """Die Schule darf mehr zeigen als die Vorlage — das ist ihr Zuschnitt, kein
+        Rückstand."""
+        assert self._fehlend(
+            tmp_path, eigene=["welcome", "chat", "library"], beispiel=["welcome", "chat"]
+        ) == {}
+
+    def test_ohne_beispieldatei_kein_abgleich(self, tmp_path):
+        """Das Beispiel ist Diagnosemittel, nicht Voraussetzung."""
+        from app.ui.levels import UiLevels, _nachgereichte_eintraege
+
+        pfad = self._dateien(tmp_path, ["chat"], ["welcome", "chat"])
+        (tmp_path / "ui_levels.example.yaml").unlink()
+        cfg = UiLevels.model_validate(yaml.safe_load(pfad.read_text(encoding="utf-8")))
+        assert _nachgereichte_eintraege(cfg, tmp_path / "ui_levels.example.yaml") == {}
+
+    def test_kaputtes_beispiel_reisst_nichts_mit(self, tmp_path):
+        """Ein unlesbares Beispiel darf den Start nicht verhindern — es ist nur der
+        Maßstab, nicht die Konfiguration."""
+        from app.ui.levels import UiLevels, _nachgereichte_eintraege
+
+        pfad = self._dateien(tmp_path, ["chat"], ["welcome", "chat"])
+        (tmp_path / "ui_levels.example.yaml").write_text(": kein yaml [", encoding="utf-8")
+        cfg = UiLevels.model_validate(yaml.safe_load(pfad.read_text(encoding="utf-8")))
+        assert _nachgereichte_eintraege(cfg, tmp_path / "ui_levels.example.yaml") == {}
+
+    def test_rolle_nur_im_beispiel_wird_uebergangen(self, tmp_path):
+        """Eine Schule ohne Schüler-Zuschnitt soll nicht jede Zeile davon vorgehalten
+        bekommen — hier fehlt keine Ergänzung, hier fehlt die ganze Rolle."""
+        from app.ui.levels import UiLevels, _nachgereichte_eintraege
+
+        beispiel = tmp_path / "ui_levels.example.yaml"
+        beispiel.write_text(yaml.safe_dump({"rollen": {
+            "teacher": _rolle(stufen=[{"stufe": 1, "name": "A", "beschreibung": "…",
+                                       "eintraege": ["chat"]}]),
+            "student": _rolle(stufen=[{"stufe": 1, "name": "A", "beschreibung": "…",
+                                       "eintraege": ["chat", "welcome"]}]),
+        }}), encoding="utf-8")
+        eigene = tmp_path / "ui_levels.yaml"
+        eigene.write_text(yaml.safe_dump({"rollen": {
+            "teacher": _rolle(stufen=[{"stufe": 1, "name": "A", "beschreibung": "…",
+                                       "eintraege": ["chat"]}]),
+        }}), encoding="utf-8")
+        cfg = UiLevels.model_validate(yaml.safe_load(eigene.read_text(encoding="utf-8")))
+        assert _nachgereichte_eintraege(cfg, beispiel) == {}
+
+    def test_die_meldung_steht_im_log(self, tmp_path, caplog):
+        """⚠️ Der Befund nützt nur, wenn er auftaucht. Geprüft wird die **Meldung**,
+        nicht nur die Funktion — der Weg dahin war in diesem Projekt schon zweimal die
+        Lücke."""
+        import logging
+
+        from app.ui.levels import load_ui_levels
+
+        pfad = self._dateien(tmp_path, ["chat"], ["welcome", "chat"])
+        load_ui_levels.cache_clear()
+        with caplog.at_level(logging.WARNING, logger="app.ui.levels"):
+            load_ui_levels(pfad)
+        load_ui_levels.cache_clear()
+        text = caplog.text
+        assert "'welcome'" in text and "teacher" in text
+        assert "Navigation" in text

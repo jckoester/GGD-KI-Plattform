@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- **Nach einem Update fehlende Navigationseinträge fallen jetzt auf.** Die eigene
+  `config/ui_levels.yaml` wird beim Update nie überschrieben — neue Einträge stehen
+  zunächst nur in der mitgelieferten Vorlage und erschienen deshalb nicht in der
+  Seitenleiste, ohne dass irgendwo etwas davon stand. So blieb nach 0.11 die Startseite
+  unsichtbar. Das Backend nennt beim Start jetzt Rolle und Eintrag. Wer den engeren
+  Zuschnitt absichtlich gewählt hat, übergeht die Meldung.
+
 ## [0.11.0] – 2026-09-27
 
 Der Unterrichtsalltag kommt an: Unterrichtsgruppen entstehen aus Stundenplan und

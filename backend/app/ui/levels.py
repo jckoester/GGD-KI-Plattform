@@ -221,6 +221,52 @@ def _meldung_zu_ignorierten(rolle: str, unbekannt: tuple[str, ...]) -> str:
     )
 
 
+def _nachgereichte_eintraege(cfg: UiLevels, beispiel: Path) -> dict[str, list[str]]:
+    """Rolle → Einträge, die die Beispieldatei kennt und die eigene Datei nicht.
+
+    ⚠️ **Die Gegenrichtung zu `ignoriert` — und sie war ungeschützt.** Kennt die
+    Konfiguration einen Schlüssel, den der Code nicht kennt, wird er entfernt *und
+    gemeldet*. Kennt der **Code** einen Eintrag, den die Konfiguration nicht listet,
+    geschah bis 0.11.1 gar nichts: Der Eintrag erschien einfach nie.
+
+    Genau so ist die **Startseite** nach dem Release 0.11 auf dem Produktivsystem
+    unsichtbar geblieben (Jan, 29.09.2026). `config/ui_levels.yaml` ist gitignored und
+    überlebt jedes Update — sie wird bei der Installation einmal aus der `.example`
+    kopiert und danach nie überschrieben. `welcome` stand deshalb nur in der
+    Beispieldatei.
+
+    ⚠️ **Verglichen wird gegen die Beispieldatei, nicht gegen `BEKANNTE_EINTRAEGE`.**
+    Die Menge aller Einträge taugt nicht als Maßstab: `planner` oder `curricula`
+    gehören bei `student` zu Recht nicht in die Navigation, und eine Meldung, die das
+    jedes Mal anmahnt, wird nach dem zweiten Start überlesen. Die Beispieldatei sagt
+    dagegen genau, was **diese Fassung** je Rolle vorsieht — und ein Zuschnitt, den die
+    Schule bewusst enger gewählt hat, taucht dann zwar auf, aber nur einmal je
+    Neustart und mit dem Hinweis, dass Absicht eine gültige Antwort ist.
+    """
+    if not beispiel.exists():
+        # Kein Maßstab, keine Meldung. Die Beispieldatei ist Diagnosemittel, nicht
+        # Voraussetzung — ohne sie läuft die Anwendung unverändert weiter.
+        return {}
+    try:
+        with open(beispiel, encoding="utf-8") as f:
+            vorbild = UiLevels.model_validate(yaml.safe_load(f))
+    except Exception as fehler:      # noqa: BLE001 — jeder Fehler heißt: kein Maßstab
+        logger.debug("Beispiel-Stufen nicht lesbar (%s) — kein Abgleich", fehler)
+        return {}
+
+    fehlend: dict[str, list[str]] = {}
+    for rolle, soll in vorbild.rollen.items():
+        ist = cfg.rollen.get(rolle)
+        if ist is None:
+            continue
+        offen = set(soll.eintraege_bis(soll.hoechste)) - set(
+            ist.eintraege_bis(ist.hoechste)
+        )
+        if offen:
+            fehlend[rolle] = sorted(offen)
+    return fehlend
+
+
 @lru_cache(maxsize=1)
 def load_ui_levels(path: Path | None = None) -> UiLevels:
     p = path or _DEFAULT_PATH
@@ -229,4 +275,15 @@ def load_ui_levels(path: Path | None = None) -> UiLevels:
     for rolle, stufen in cfg.rollen.items():
         if stufen.ignoriert:
             logger.warning("KONFIGURATION: %s", _meldung_zu_ignorierten(rolle, stufen.ignoriert))
+    for rolle, fehlend in _nachgereichte_eintraege(
+        cfg, Path(str(p).replace(".yaml", ".example.yaml"))
+    ).items():
+        logger.warning(
+            "KONFIGURATION: Rolle %r — %s steht in ui_levels.example.yaml, aber in "
+            "keiner Stufe Ihrer %s. Diese Einträge erscheinen in der Navigation nicht. "
+            "Nach einem Update ist das der Normalfall: Die eigene Datei wird nie "
+            "überschrieben. Ist der engere Zuschnitt Absicht, können Sie die Meldung "
+            "übergehen.",
+            rolle, ", ".join(repr(e) for e in fehlend), p.name,
+        )
     return cfg

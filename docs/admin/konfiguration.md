@@ -598,14 +598,32 @@ rollen:
 - `beschreibung` und `aufwand` erscheinen wörtlich in der Oberfläche. `aufwand` ist
   optional und sollte ehrlich sein („braucht einmalig ein eingerichtetes Wochenraster") —
   wer freischaltet und vor einer leeren Seite steht, schaltet nicht wieder frei.
-- `eintraege` — die Navigationsschlüssel. Gültig sind: `chat`, `assistants`,
+- `eintraege` — die Navigationsschlüssel. Gültig sind: `welcome`, `chat`, `assistants`,
   `assistants_my`, `tools`, `library`, `knowledge`, `curricula`, `education_plans`,
   `subjects`, `planner`, `history`.
 
 **Regeln, die der Start erzwingt** (das Backend bricht sonst mit einer Meldung ab):
-Stufen laufen von 1 an ohne Lücke, jeder Eintrag steht in genau einer Stufe, und
-unbekannte Schlüssel sind nicht erlaubt — ein Tippfehler ließe den Eintrag sonst lautlos
-verschwinden.
+Stufen laufen von 1 an ohne Lücke, und jeder Eintrag steht in genau einer Stufe.
+
+**Ein unbekannter Schlüssel bricht dagegen nichts mehr ab** (seit 0.10.5): Er wird
+übergangen und im Log genannt, samt Vorschlag, falls er einem bekannten ähnelt. Vorher
+scheiterte das Laden ganz — und ohne geladene Stufen zeigte die Oberfläche *alles* an,
+aus einem Tippfehler wurde also eine Navigation ohne jeden Filter.
+
+⚠️ **Nach einem Update fehlen hier neue Einträge — die Datei wird nie überschrieben.**
+Sie gehört Ihrer Schule und bleibt beim Update unangetastet; neue Navigationseinträge
+stehen zunächst nur in `ui_levels.example.yaml`. Genau so blieb nach 0.11 die Startseite
+(`welcome`) in der Seitenleiste unsichtbar. Seit 0.11.1 nennt das Backend beim Start,
+was fehlt:
+
+```
+KONFIGURATION: Rolle 'teacher' — 'welcome' steht in ui_levels.example.yaml, aber in
+keiner Stufe Ihrer ui_levels.yaml. Diese Einträge erscheinen in der Navigation nicht.
+```
+
+Ist der engere Zuschnitt Absicht, können Sie die Meldung übergehen — sie kommt einmal je
+Neustart. Sonst den Schlüssel in die passende Stufe eintragen und das Backend neu
+starten; ein Abgleich mit der Beispieldatei zeigt, was dazugekommen ist.
 
 ⚠️ **Eine Stufe ist ein Anzeige-Filter, keine Berechtigung.** Was sie verbirgt, bleibt
 über Direktlink und API erreichbar; die Seite zeigt dort einen Hinweis. Rechte stehen
