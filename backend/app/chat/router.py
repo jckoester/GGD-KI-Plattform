@@ -74,6 +74,7 @@ from app.context.stufen import (
 )
 from app.context.modellsicht import fuer_modell, werkzeug_nutzlast
 from app.crisis.anweisung import anweisung_fuer as krisen_anweisung
+from app.litellm.modell_eigenschaften import Eigenschaften, alle_eigenschaften
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -159,6 +160,13 @@ class ConversationCountsResponse(BaseModel):
 class ModelItem(BaseModel):
     id: str
     supports_function_calling: bool | None = None
+    # ⚠️ Überall `None` = **unbekannt**, nicht „nein". Die Oberfläche lässt die Angabe
+    # dann weg, statt eine Null oder ein „kann nicht" zu erfinden — beim Kontextfenster
+    # ist das der Regelfall (17 von 31 Deployments haben es, keines der IONOS-Modelle).
+    usd_je_nachricht: float | None = None
+    kontextfenster: int | None = None
+    denkt: bool | None = None
+    bilder: bool | None = None
 
 
 class ModelListResponse(BaseModel):
@@ -198,10 +206,6 @@ _MAX_TOOL_ROUNDS: int = 6
 # Guardrail-Prompt-Cache
 _GUARDRAIL_TTL = 60.0  # Sekunden
 _guardrail_prompt_cache: tuple[str | None, float] | None = None
-
-# Model-Info-Cache (supports_function_calling pro Modell)
-_MODEL_INFO_TTL = 60.0  # Sekunden
-_model_info_cache: tuple[dict[str, bool | None], float] | None = None
 
 _SEARCH_CONTEXT_NODES_TOOL = {
     "type": "function",
@@ -433,20 +437,15 @@ async def _get_guardrail_prompt(db: AsyncSession) -> str | None:
 
 
 async def _get_model_info() -> dict[str, bool | None]:
-    """Gibt eine Map model_id → supports_function_calling zurück (60-s-Cache)."""
-    global _model_info_cache
-    now = asyncio.get_event_loop().time()
-    if _model_info_cache is not None and now < _model_info_cache[1]:
-        return _model_info_cache[0]
-    litellm_client = LiteLLMClient()
-    try:
-        info = await litellm_client.get_model_info()
-    except Exception:
-        info = {}
-    finally:
-        await litellm_client.close()
-    _model_info_cache = (info, now + _MODEL_INFO_TTL)
-    return info
+    """Map model_id → supports_function_calling.
+
+    Leitet sich seit 0.12 aus `alle_eigenschaften()` ab, statt `/model/info` ein zweites
+    Mal zu holen: Dieselbe Antwort trägt Preise und Fähigkeiten, und zwei Caches über
+    einer Quelle laufen irgendwann auseinander.
+    """
+    return {
+        name: e.funktionsaufrufe for name, e in (await alle_eigenschaften()).items()
+    }
 
 
 @dataclass(frozen=True)
@@ -2397,17 +2396,28 @@ async def list_models(
 
     await client.close()
 
-    capability_map = await _get_model_info()
+    eigenschaften = await alle_eigenschaften()
 
     return ModelListResponse(
         models=[
-            ModelItem(
-                id=model_id,
-                supports_function_calling=capability_map.get(model_id),
-            )
+            _modell_eintrag(model_id, eigenschaften.get(model_id))
             for model_id in filtered_models
         ],
         default_model=settings.chat_default_model,
+    )
+
+
+def _modell_eintrag(model_id: str, e: Eigenschaften | None) -> ModelItem:
+    """Ein Eintrag für den Modellwähler — ohne Angaben, wenn der Proxy schweigt."""
+    if e is None:
+        return ModelItem(id=model_id)
+    return ModelItem(
+        id=model_id,
+        supports_function_calling=e.funktionsaufrufe,
+        usd_je_nachricht=e.usd_je_nachricht,
+        kontextfenster=e.kontextfenster,
+        denkt=e.denkt,
+        bilder=e.bilder,
     )
 
 

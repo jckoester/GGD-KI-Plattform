@@ -1,5 +1,8 @@
 <script>
     import { onMount, onDestroy } from "svelte";
+    import { budget } from "$lib/stores/budget.js";
+    import { angaben, eintragsText } from "$lib/modellangaben.js";
+    import { kurshinweis } from "$lib/einheiten.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { auswahlMitBestand } from "$lib/stores/myGroups.js";
@@ -74,6 +77,13 @@
 
     // Daten für Dropdowns
     let models = $state([]);
+    let modellAngaben = $derived(
+        angaben(
+            models.find((m) => m.id === form.model),
+            $budget?.eur_usd_rate,
+            $budget?.einheiten_je_euro,
+        ),
+    );
     let subjects = $state([]);
     let groups = $state([]);
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
@@ -1277,10 +1287,50 @@
                                 >
                                 {#each models as model}
                                     <option value={model.id}
-                                        >{model.label || model.id}{model.supports_function_calling === true ? ' ⚙' : ''}</option
+                                        >{eintragsText(
+                                            model,
+                                            $budget?.eur_usd_rate,
+                                            $budget?.einheiten_je_euro,
+                                        )}</option
                                     >
                                 {/each}
                             </select>
+                            <!-- Angaben zum **gewählten** Modell. Ein `<option>` erlaubt
+                                 keine Gestaltung, deshalb steht hier, was man zum
+                                 Entscheiden braucht — und nur, was bekannt ist. -->
+                            {#if modellAngaben.length > 0}
+                                <ul
+                                    class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs
+                                           text-light-tx-2 dark:text-dark-tx-2"
+                                >
+                                    {#each modellAngaben as a (a.was)}
+                                        <li><span class="font-medium">{a.was}:</span> {a.wert}</li>
+                                    {/each}
+                                </ul>
+                                <details class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    <summary class="cursor-pointer">Was bedeuten diese Angaben?</summary>
+                                    <div class="mt-1 space-y-1">
+                                        <p>
+                                            <strong>Kosten</strong> sind eine Schätzung an einer
+                                            mittleren Nachricht — abgerechnet wird nach
+                                            tatsächlichem Verbrauch. {kurshinweis(
+                                                $budget?.einheiten_je_euro,
+                                            )}.
+                                        </p>
+                                        <p>
+                                            Das <strong>Kontextfenster</strong> sagt, wie viel
+                                            Vorgeschichte das Modell auf einmal sehen kann. Fehlt
+                                            die Angabe, meldet der Proxy sie nicht — sie lässt
+                                            sich in der LiteLLM-Konfiguration eintragen.
+                                        </p>
+                                        <p>
+                                            Ohne <strong>Werkzeuge</strong> kann der Assistent
+                                            weder im Wissensspeicher suchen noch Unterricht
+                                            planen.
+                                        </p>
+                                    </div>
+                                </details>
+                            {/if}
                         {:else}
                             <input
                                 id="ae-model"

@@ -89,6 +89,8 @@ model_list:
       supports_function_calling: true       # PFLICHT — sonst fallen alle Funktionen aus
       input_cost_per_token: 0.00000017      # PFLICHT — sonst Spend 0
       output_cost_per_token: 0.00000071
+      max_input_tokens: 131072              # empfohlen — sonst bleibt die Angabe
+                                            # im Modellwähler leer (s. Fallen-Tabelle)
 
   - model_name: embedding-standard
     litellm_params:
@@ -395,6 +397,7 @@ dass sie **still** scheitern.
 
 | Falle | Betrifft | Symptom | Abhilfe |
 |---|---|---|---|
+| Kein `max_input_tokens` | **alle frei benannten Modelle** (IONOS, lokale) | Im Modellwähler fehlt das Kontextfenster — die Zeile bleibt einfach weg | `max_input_tokens` (und bei Bedarf `max_output_tokens`) in `model_info` eintragen. LiteLLM kennt die Größe nur für Modelle seiner eingebauten Tabelle; gemessen am 29.09.2026 meldeten **17 von 31** Deployments eine, **keines** der IONOS-Modelle. Kein Fehler, aber eine Entscheidungshilfe, die ohne diesen Eintrag fehlt |
 | `reasoning_effort` ohne `allowed_openai_params` | IONOS (alle) | `UnsupportedParamsError`, Eintrag komplett unbenutzbar | `allowed_openai_params: ["reasoning_effort"]`. **Nicht** `drop_params: true` — das entfernt den Parameter still, das Reasoning bleibt an, und man merkt es an der Rechnung |
 | Gültige `reasoning_effort`-Werte sind modellabhängig | IONOS | HTTP 400 („Harmony does not support…") | Qwen versteht `none`, gpt-oss nur `low`/`medium`/`high` — nachmessen |
 | Fehlendes `encoding_format: float` | IONOS-Embedding | LiteLLM schickt base64, der Anbieter lehnt ab — Kontextspeicher tot | Parameter setzen |

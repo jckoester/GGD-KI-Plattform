@@ -350,10 +350,10 @@ def check_config(
     return findings
 
 
-#: Die mediane Nachricht, gemessen am 01.10.2026 über 522 Nachrichten mit Tokenzahlen.
-#: Der hohe Eingabewert stammt von den seit 0.11 mitgehenden Wissensbausteinen. Er dient
-#: **nur** dieser Prüfung — abgerechnet wird nach echtem Verbrauch.
-REFERENZ_NACHRICHT = (2941, 530)
+# Die Referenznachricht steht in `app/litellm/modell_eigenschaften.py` — dieselbe Größe
+# schätzt dort den Preis im Modellwähler. Zwei Referenzen hießen zwei Zahlen, die
+# auseinanderlaufen; re-exportiert, damit Aufrufer sie hier weiterhin finden.
+from app.litellm.modell_eigenschaften import REFERENZ_NACHRICHT  # noqa: E402
 
 
 def _pruefe_einheitenskala(entries: dict, settings: Any) -> list[Finding]:

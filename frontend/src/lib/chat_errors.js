@@ -67,13 +67,14 @@ export function istLeereAntwort(message, isStreaming = false) {
  * Das Budget zu verschweigen wäre die zweite Hälfte desselben Fehlers: Die Anfrage
  * *hat* gekostet, auch ohne Ergebnis.
  *
- * @param {string|null} costEur  bereits formatierter Betrag oder `null`
+ * @param {string|null} betrag  fertiger Betragstext („8 Einheiten") oder `null`.
+ *   Trägt die Einheit selbst — hier darf **kein** Währungszeichen mehr dahinter.
  */
-export function leereAntwortText(costEur = null) {
+export function leereAntwortText(betrag = null) {
     const basis =
         "Das Modell hat diesmal nichts geantwortet. Das kommt gelegentlich vor — " +
         "schick die Frage einfach noch einmal ab.";
-    return costEur !== null
-        ? `${basis} Die Anfrage wurde trotzdem berechnet (${costEur} €).`
+    return betrag !== null
+        ? `${basis} Die Anfrage wurde trotzdem berechnet (${betrag}).`
         : basis;
 }

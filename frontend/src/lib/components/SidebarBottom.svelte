@@ -2,6 +2,11 @@
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
     import { zuwachsKurz } from "$lib/budget_text.js";
+    import {
+        ausUsd,
+        zahl as einheitenZahl,
+        text as einheitenText,
+    } from "$lib/einheiten.js";
     import { crisisAlertTotal } from "$lib/stores/crisisAlerts.js";
     import { Coins, HelpCircle, Info, AlertTriangle } from "lucide-svelte";
     import UserMenu from "./UserMenu.svelte";
@@ -25,18 +30,17 @@
         menuOpen = false;
     }
 
-    // Formatierung: 2 Dezimalstellen, Komma als Trennzeichen
-    function fmt(v) {
-        if (v == null) return "–";
-        return v.toLocaleString("de-DE", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-    }
-
-    // Kurzform („+0,04 € am Mo., 21.09."). Ohne sie liest sich ein niedriger Stand
+    // Kurzform („+400 Einheiten am Mo., 21.09."). Ohne sie liest sich ein niedriger Stand
     // in der Seitenleiste wie ein endgültiger.
     let zuwachs = $derived(zuwachsKurz($budget));
+
+    // Aus USD, nicht aus `*_eur`: Die Server-Felder sind auf Cent gerundet.
+    let restEinheiten = $derived(
+        ausUsd($budget?.remaining_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
+    );
+    let grenzeEinheiten = $derived(
+        ausUsd($budget?.max_budget_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
+    );
 
     let pct = $derived(
         $budget?.max_budget_eur && $budget?.spend_eur != null
@@ -57,7 +61,7 @@
     <div class="flex items-center text-xs mb-2">
         <Coins class="w-3 h-3 mr-2 text-light-tx-2 dark:text-dark-tx-2" />
         <span class="text-light-tx-2 dark:text-dark-tx-2"
-            >{fmt($budget?.remaining_eur)} / {fmt($budget?.max_budget_eur)} €</span
+            >{einheitenZahl(restEinheiten)} / {einheitenText(grenzeEinheiten)}</span
         >
         {#if pct != null}
             <span class="ml-auto text-xs text-light-tx-3 dark:text-dark-tx-3"

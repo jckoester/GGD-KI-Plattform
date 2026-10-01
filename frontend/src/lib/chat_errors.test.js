@@ -91,11 +91,18 @@ describe("leereAntwortText", () => {
 
     it("nennt die Kosten, wenn welche gebucht wurden", () => {
         // Sie zu verschweigen wäre die zweite Hälfte desselben Fehlers.
-        expect(leereAntwortText("0,01")).toContain("0,01 €");
-        expect(leereAntwortText("0,01")).toContain("trotzdem berechnet");
+        expect(leereAntwortText("8 Einheiten")).toContain("8 Einheiten");
+        expect(leereAntwortText("8 Einheiten")).toContain("trotzdem berechnet");
+    });
+
+    it("hängt kein Währungszeichen an", () => {
+        // ⚠️ Mit der Umstellung auf Einheiten (0.12) trug der Betrag seine Einheit
+        // selbst — das feste „€" dahinter ergab „8 Einheiten €". Gefunden, weil Jan
+        // die Sidebar gemeldet hat und ich danach nach dem Euro-Zeichen gesucht habe.
+        expect(leereAntwortText("8 Einheiten")).not.toContain("€");
     });
 
     it("erfindet keine Kosten, wenn keine bekannt sind", () => {
-        expect(leereAntwortText(null)).not.toContain("€");
+        expect(leereAntwortText(null)).not.toContain("berechnet");
     });
 });

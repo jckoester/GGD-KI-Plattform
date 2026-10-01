@@ -49,6 +49,7 @@
     import { subjectMap } from "$lib/stores/subjects.js";
     import { myGroups } from "$lib/stores/myGroups.js";
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
+    import { eintragsText } from "$lib/modellangaben.js";
     import {
         pageTitle,
         activeConversationId,
@@ -1573,10 +1574,11 @@
                             {#if availableModels.length > 0}
                                 {#each availableModels as model}
                                     <option value={model.id}
-                                        >{model.id}{model.supports_function_calling ===
-                                        true
-                                            ? " ⚙"
-                                            : ""}</option
+                                        >{eintragsText(
+                                            model,
+                                            $budget?.eur_usd_rate,
+                                            $budget?.einheiten_je_euro,
+                                        )}</option
                                     >
                                 {/each}
                             {:else}
