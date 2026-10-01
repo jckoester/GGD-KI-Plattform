@@ -502,6 +502,16 @@ Dateien außerhalb `backend/` keinen Reload aus).
 Aufbau, Beispiele und Pflegehinweise (Abstimmung mit der Schulsozialarbeit) stehen
 in [Content-Moderation & Guardrails](content-moderation.md), Abschnitt D.
 
+Je Kategorie ist seit 0.12 ein eigener Anweisungstext möglich (`anweisung:`). Ohne
+Angabe gilt ein mitgelieferter Standard — er wird mit dem Update **aktiv, ohne dass Sie
+etwas tun**, und ist damit die einzige Stelle hier, die man abbestellt statt bestellt.
+
+⚠️ **Neue Kategorien erreichen Ihre Datei nicht von selbst.** `crisis_triggers.yaml`
+wird bei einem Update nie überschrieben. Was eine neue Fassung mitbringt, steht zunächst
+nur in `crisis_triggers.example.yaml`; das Backend meldet solche Kategorien beim Start
+mit Namen und Folge. Übernommen wird nichts automatisch — Krisenmuster sind eine
+Entscheidung Ihrer Schule. Dasselbe gilt für `home_experiment_triggers.yaml`.
+
 Die Pfade lassen sich über `CRISIS_TRIGGERS_PATH` / `HELP_RESOURCES_PATH` in `.env`
 überschreiben (Standard: `config/crisis_triggers.yaml` bzw.
 `config/help_resources.yaml`).
@@ -542,7 +552,16 @@ anleiten. Zwei Listen, die mit UND verknüpft sind:
   … ausprobieren", „was passiert, wenn ich …").
 - `themen` — je Thema ein `hinweis` (der Grund, den das Modell nennen soll) und
   `patterns` (die Stichworte). Mitgeliefert: Elektrolyse, Laugen und Säuren,
-  Reinigungsmittel, offenes Feuer, Netzstrom, Stoffe aus Labor/Apotheke/Baumarkt.
+  Reinigungsmittel, offenes Feuer, Netzstrom, Stoffe aus Labor/Apotheke/Baumarkt —
+  und seit 0.12 „Giftigkeit und Dosis".
+
+Je Thema sind zwei weitere Angaben möglich:
+
+- `absicht_noetig: false` — das Thema greift **ohne** Absichtsbekundung, am Thema allein.
+  Für Fragen, die für sich schon heikel sind („Wie viel Koffein ist tödlich?").
+- `anweisung:` — ein eigener Text statt der Versuchsanweisung, mit dem Platzhalter
+  `{hinweis}`. Für ein Thema ohne Absicht praktisch Pflicht: „keine Materialliste, keinen
+  Aufbau" geht an einer Dosisfrage vorbei. Ein Prüfsatz verlangt ihn dort.
 
 Trifft beides zu und ist die Zielgruppe Schüler:innen, hängt das Backend **für diese eine
 Antwort** eine zusätzliche Anweisung an den Systemtext: nicht anleiten, kurz begründen,
@@ -551,7 +570,9 @@ nicht — wer eine Stunde zur Elektrolyse vorbereitet, braucht den Aufbau.
 
 ⚠️ **Warum die UND-Verknüpfung nötig ist:** Ohne sie verweigerte der Assistent auch die
 Erklärung einer Elektrolyse im Unterricht. Gesucht ist der Fall „ich mache das selbst",
-nicht das Thema an sich.
+nicht das Thema an sich. Ein Thema mit `absicht_noetig: false` verzichtet bewusst darauf
+und braucht deshalb **engere Muster** — ein Muster auf „tödlich" oder „giftig" allein
+träfe „Warum ist Kohlenstoffmonooxid tödlich?", also Unterricht.
 
 ⚠️ **Es ist keine Sperre**, sondern eine Anweisung — der Chat läuft weiter, die Frage
 wird beantwortet. Gemessen am 26.09.2026 an vier gefährlichen und zwei harmlosen Fragen,

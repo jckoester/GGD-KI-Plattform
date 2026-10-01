@@ -6,7 +6,8 @@ Die Plattform kennt mehrere Schutz- und Steuerungsmechanismen, die sich ergänze
 |-------|----------------|---------|
 | Schulweiter Guardrail-Prompt | Admin-Dashboard (`/settings/guardrail`) | Leitlinien für das Modell — kein Blocking |
 | LiteLLM-Guardrails (Jugendschutz) | `infra/litellm_config.yaml` + `infra/guardrails/` + Deployment | Aktives Blocking harter Ausgaben für alle Rollen |
-| Krisen-Erkennung | `config/crisis_triggers.yaml` + `config/help_resources.yaml` | Lokale Stichwort-Erkennung in Nutzernachrichten → Hilfe-Banner, kein Blocking |
+| Krisen-Erkennung | `config/crisis_triggers.yaml` + `config/help_resources.yaml` | Lokale Stichwort-Erkennung in Nutzernachrichten → Hilfe-Banner, Flag **und Anweisung an das Modell** (seit 0.12), kein Blocking |
+| Benannte Sicherheitsauslöser | `config/home_experiment_triggers.yaml` | Konkrete Anweisung für **eine** Antwort, wenn eine Präambelregel erfahrungsgemäß nicht trägt — kein Blocking |
 | Pädagogische Leitplanken | `config/pedagogy.yaml` | Zielgruppenabhängige System-Prompt-Präambeln + Lernverhalten für Schüler:innen — formt den Dialog, kein Blocking |
 
 ---
@@ -676,6 +677,56 @@ beantwortet.
 
 Es bleibt trotzdem eine Anweisung, keine Sperre. Wer eine harte Grenze braucht, kommt um
 Abschnitt B nicht herum.
+
+#### Themen, die auch ohne Absicht greifen (seit 0.12)
+
+Die UND-Kopplung oben ist der Regelfall, nicht das Gesetz. Manche Fragen sind heikel,
+**ohne dass jemand etwas vorhat**: „Wie viel Koffein ist tödlich?" nennt keine Absicht
+und ist trotzdem keine Frage, auf die eine Menge für Menschen gehört. Ein Thema mit
+`absicht_noetig: false` greift deshalb am Thema allein.
+
+Zwei Dinge gehören zu einem solchen Thema:
+
+* **Eine eigene `anweisung:`.** Die Versuchsanweisung („keine Materialliste, keinen
+  Aufbau") geht an einer Dosisfrage vorbei. Mitgeliefert ist für „Giftigkeit und Dosis":
+  erklären und Stoffe vergleichen, aber keine Menge nennen, die für einen Menschen
+  gefährlich wäre, und keine Tierversuchswerte auf Körpergewicht umrechnen.
+* **Engere Muster.** Ohne den Vorsatz als zweite Bedingung trifft das Thema breiter. Ein
+  Muster auf „tödlich" oder „giftig" allein träfe „Warum ist Kohlenstoffmonooxid
+  tödlich?" — also Unterricht.
+
+#### Bei einem Krisentreffer: Anweisung statt nur Banner (seit 0.12)
+
+Bis 0.12 änderte ein Krisentreffer **Banner, Flag und Meldung — nicht die Antwort**. Wie
+das Modell mit der Nachricht umgeht, hing allein an der Präambel; dieselbe Konstruktion
+hat bei den Hausversuchen nicht getragen. Jetzt hängt das Backend bei jedem Treffer eine
+Anweisung an, als **letzte** Systemnachricht: keine Mengen, Mittel oder Methoden nennen,
+die Person ruhig und ohne Vorwurf ansprechen, keine Diagnose, auf Hilfe hinweisen — und
+**keine Telefonnummern oder Adressen erfinden**.
+
+Das gilt für **alle** Kategorien und alle Rollen. Wer einen anderen Text möchte, setzt
+`anweisung:` an der Kategorie in `crisis_triggers.yaml`. Der Text verweist bewusst nicht
+auf das Hilfe-Banner: Das erscheint nur beim **ersten** Treffer einer Kategorie je
+Konversation.
+
+#### Wo landet welche Frage?
+
+| Frage | Erkennung | Was geschieht |
+|---|---|---|
+| „Kann ich zu Hause Wasser mit einer Batterie zerlegen?" | Hausversuch (Absicht **und** Thema) | Anweisung: nicht anleiten. Kein Flag. |
+| „Was bedeutet LD50?", „Ist Kochsalz giftig?" | Thema ohne Absicht | Anweisung: erklären, aber keine Menge für Menschen. Kein Flag. |
+| „Wie viele Tabletten sind tödlich?", „Ab wie viel stirbt man bei 50 kg?" | Krise (`letalitaet`) | Banner, Flag, Einsicht zu zweit **und** Krisen-Anweisung. |
+| „Warum ist Kohlenstoffmonooxid tödlich?" | nichts | Normale Antwort. |
+
+Greifen zwei zugleich, steht die **Krisen-Anweisung zuletzt** und damit am nächsten an
+der Frage.
+
+⚠️ **Gemessen, nicht angenommen** (01.10.2026, fünf Fragen × fünf Läufe gegen
+`chat-standard`): Umrechnungen auf eine tödliche Menge für Menschen gingen von **vier auf
+null** zurück. Was in den Antworten blieb, sind Tagesrichtwerte („3 mg pro kg und Tag"),
+keine tödlichen Mengen. Die beiden Gegenproben wurden in **allen** Läufen normal
+beantwortet — keine einzige Absage in 50 Antworten. Nachstellbar mit
+`backend/scripts/dosisfragen_messung.py`.
 
 ### `audience` als bewusster Prüfpunkt beim Freigeben
 
