@@ -53,7 +53,7 @@ async def seeded(db_session):
 
 async def test_lists_flags_pseudonymous(db_session, seeded):
     resp = await list_flags(
-        status=None, severity=None, limit=25, offset=0, db=db_session, _=ADMIN
+        status=None, severity=None, category=None, limit=25, offset=0, db=db_session, _=ADMIN
     )
     pseudonyms = {i.pseudonym for i in resp.items}
     assert {"dash-alpha", "dash-beta"} <= pseudonyms
@@ -76,7 +76,7 @@ async def test_has_active_request_reflects_pending(db_session, seeded):
     await db_session.flush()
 
     resp = await list_flags(
-        status=None, severity=None, limit=25, offset=0, db=db_session, _=ADMIN
+        status=None, severity=None, category=None, limit=25, offset=0, db=db_session, _=ADMIN
     )
     by_id = {i.id: i for i in resp.items}
     assert by_id[a_flag.id].has_active_request is True
@@ -96,7 +96,7 @@ async def test_denied_request_does_not_count_as_active(db_session, seeded):
     await db_session.flush()
 
     resp = await list_flags(
-        status=None, severity=None, limit=25, offset=0, db=db_session, _=ADMIN
+        status=None, severity=None, category=None, limit=25, offset=0, db=db_session, _=ADMIN
     )
     by_id = {i.id: i for i in resp.items}
     assert by_id[a_flag.id].has_active_request is False
@@ -104,7 +104,7 @@ async def test_denied_request_does_not_count_as_active(db_session, seeded):
 
 async def test_severity_filter(db_session, seeded):
     resp = await list_flags(
-        status=None, severity="alert", limit=25, offset=0, db=db_session, _=ADMIN
+        status=None, severity="alert", category=None, limit=25, offset=0, db=db_session, _=ADMIN
     )
     assert all(i.severity == "alert" for i in resp.items)
     assert any(i.pseudonym == "dash-alpha" for i in resp.items)
@@ -113,15 +113,49 @@ async def test_severity_filter(db_session, seeded):
 
 async def test_status_filter(db_session, seeded):
     resp = await list_flags(
-        status="resolved", severity=None, limit=25, offset=0, db=db_session, _=ADMIN
+        status="resolved", severity=None, category=None, limit=25, offset=0, db=db_session, _=ADMIN
     )
     assert all(i.status == "resolved" for i in resp.items)
 
 
 async def test_pagination_limits_items(db_session, seeded):
     resp = await list_flags(
-        status=None, severity=None, limit=1, offset=0, db=db_session, _=ADMIN
+        status=None, severity=None, category=None, limit=1, offset=0, db=db_session, _=ADMIN
     )
     assert len(resp.items) == 1
     assert resp.limit == 1
     assert resp.total >= 2
+
+
+async def test_category_filter(db_session, seeded):
+    """E3: Ohne ihn wäre die eigene Kategorie `letalitaet` nicht getrennt auswertbar.
+
+    Der Schweregrad trennt sie nicht — `letalitaet`, `suizidalitaet` und
+    `selbstverletzung` sind alle `alert`.
+    """
+    resp = await list_flags(
+        status=None, severity=None, category="mobbing", limit=25, offset=0,
+        db=db_session, _=ADMIN,
+    )
+    assert resp.items, "Testaufbau: es muss ein mobbing-Flag geben"
+    assert all(i.flag_category == "mobbing" for i in resp.items)
+    assert all(i.pseudonym != "dash-alpha" for i in resp.items)
+
+
+async def test_kategorien_kommen_vom_server(db_session, seeded):
+    resp = await list_flags(
+        status=None, severity=None, category=None, limit=25, offset=0,
+        db=db_session, _=ADMIN,
+    )
+    assert "suizidalitaet" in resp.kategorien
+    assert "mobbing" in resp.kategorien
+
+
+async def test_kategorienliste_schrumpft_nicht_mit_dem_filter(db_session, seeded):
+    """Sonst bliebe nach der ersten Wahl nur noch der gewählte Eintrag übrig — und
+    man käme ohne Neuladen nicht mehr zu einer anderen Kategorie."""
+    resp = await list_flags(
+        status=None, severity=None, category="mobbing", limit=25, offset=0,
+        db=db_session, _=ADMIN,
+    )
+    assert "suizidalitaet" in resp.kategorien

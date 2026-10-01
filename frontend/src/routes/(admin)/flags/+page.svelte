@@ -18,6 +18,10 @@
 
   let status = $state("");
   let severity = $state("");
+  let category = $state("");
+  // Wonach sich filtern lässt — kommt vom Server, damit die Liste nicht hier
+  // zum vierten Mal gepflegt werden muss (DB-CHECK, Modell, Konfiguration, Frontend).
+  let kategorien = $state([]);
   let offset = $state(0);
   const limit = 25;
 
@@ -46,11 +50,13 @@
       const data = await getFlags({
         status: status || null,
         severity: severity || null,
+        category: category || null,
         limit,
         offset,
       });
       items = data.items;
       total = data.total;
+      kategorien = data.kategorien ?? [];
     } catch (e) {
       error = e.message ?? "Meldungen konnten nicht geladen werden.";
       items = [];
@@ -166,6 +172,24 @@
         <option value="info">Hinweis</option>
       </select>
     </label>
+    <!-- Erst ab zwei Kategorien: Bei einer gibt es nichts zu trennen, und ein
+         Auswahlfeld ohne Wahl ist nur ein Bedienelement mehr. -->
+    {#if kategorien.length > 1}
+      <label class="text-sm text-light-tx-2 dark:text-dark-tx-2">
+        Kategorie
+        <select
+          bind:value={category}
+          onchange={applyFilters}
+          class="ml-1 px-2 py-1 rounded-md border border-light-ui-3 dark:border-dark-ui-3
+                 bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx text-sm"
+        >
+          <option value="">Alle</option>
+          {#each kategorien as k (k)}
+            <option value={k}>{categoryLabel(k)}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
   </div>
 
   {#if error}

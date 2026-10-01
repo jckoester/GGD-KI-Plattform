@@ -718,10 +718,17 @@ export async function getGuardrailHealth() {
 }
 
 // Admin: Krisen-/Moderations-Flags (pseudonymisiert, ohne Chat-Inhalte)
-export async function getFlags({ status = null, severity = null, limit = 25, offset = 0 } = {}) {
+export async function getFlags({
+  status = null,
+  severity = null,
+  category = null,
+  limit = 25,
+  offset = 0,
+} = {}) {
   const params = new URLSearchParams({ limit, offset });
   if (status) params.set("status", status);
   if (severity) params.set("severity", severity);
+  if (category) params.set("category", category);
   const res = await fetch(`${BASE}/admin/flags?${params}`, {
     credentials: "include",
   });
@@ -729,7 +736,7 @@ export async function getFlags({ status = null, severity = null, limit = 25, off
     const data = await res.json().catch(() => ({}));
     throw new ApiError(res.status, data.detail);
   }
-  return res.json(); // { items: [...], total, limit, offset }
+  return res.json(); // { items: [...], total, limit, offset, kategorien }
 }
 
 // Admin: Einsicht in eine geflaggte Konversation beantragen (4-Augen-Prinzip)

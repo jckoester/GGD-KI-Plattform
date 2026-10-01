@@ -50,6 +50,12 @@ class FlagListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+    #: Kategorien, nach denen sich filtern lässt — **ungefiltert** erhoben, sonst
+    #: schrumpfte die Auswahlliste auf den gerade gewählten Eintrag zusammen.
+    #: Quelle ist der Bestand, nicht die Konfiguration: So stehen auch Kategorien
+    #: zur Wahl, die eine frühere Fassung erzeugt hat, und keine, zu der es nichts
+    #: zu sehen gibt.
+    kategorien: list[str] = []
 
 
 class FlagSummaryResponse(BaseModel):
@@ -84,6 +90,7 @@ async def flag_summary(
 async def list_flags(
     status: str | None = Query(default=None),
     severity: str | None = Query(default=None),
+    category: str | None = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -94,6 +101,8 @@ async def list_flags(
         where_conditions.append(ConversationFlag.status == status)
     if severity is not None:
         where_conditions.append(ConversationFlag.severity == severity)
+    if category is not None:
+        where_conditions.append(ConversationFlag.flag_category == category)
 
     total = await db.scalar(
         select(func.count()).select_from(ConversationFlag).where(*where_conditions)
@@ -140,7 +149,14 @@ async def list_flags(
         )
         for flag, pseudonym, ar_id, ar_status in rows
     ]
-    return FlagListResponse(items=items, total=total or 0, limit=limit, offset=offset)
+    kategorien = sorted(
+        (
+            await db.execute(select(ConversationFlag.flag_category).distinct())
+        ).scalars().all()
+    )
+    return FlagListResponse(
+        items=items, total=total or 0, limit=limit, offset=offset, kategorien=kategorien
+    )
 
 
 # ---------- Einsicht-Antrag (Schritt 4) ----------

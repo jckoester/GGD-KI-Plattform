@@ -96,7 +96,9 @@ def test_list_flags_empty():
     app = _make_app(_admin(), db)
     response = TestClient(app).get("/flags")
     assert response.status_code == 200
-    assert response.json() == {"items": [], "total": 0, "limit": 25, "offset": 0}
+    assert response.json() == {
+        "items": [], "total": 0, "limit": 25, "offset": 0, "kategorien": [],
+    }
 
 
 def test_list_flags_requires_admin():

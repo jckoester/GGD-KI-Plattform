@@ -45,6 +45,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from app.config import settings
 from app.core.paths import aufloesen
+from app.core.vorlagenabgleich import melde_fehlende
 from app.crisis.config import normalize
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,15 @@ def load_hausversuche() -> Hausversuche:
         _cache = Hausversuche.model_validate(yaml.safe_load(f) or {})
     logger.info(
         "Hausversuchs-Auslöser geladen von %s (%d Themen)", pfad, len(_cache.themen)
+    )
+    # Ein Thema, das nur in der Vorlage steht, prüft nichts — und der Chat antwortet
+    # normal weiter (siehe app/core/vorlagenabgleich.py).
+    melde_fehlende(
+        pfad,
+        liste="themen",
+        schluessel="thema",
+        bezeichnung="Das Gefahrenthema",
+        folge="Der Sicherheitsauslöser greift dafür nicht.",
     )
     return _cache
 

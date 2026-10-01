@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from app.config import settings
 from app.core.paths import aufloesen
+from app.core.vorlagenabgleich import melde_fehlende
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,19 @@ def load_crisis_triggers() -> CrisisTriggers:
     _triggers_cache = CrisisTriggers.model_validate(_load_yaml(path))
     logger.info(
         "Krisen-Trigger geladen von %s (%d Kategorien)", path, len(_triggers_cache.triggers)
+    )
+    # Eine Kategorie, die nur in der Vorlage steht, erkennt nichts — und das fällt
+    # niemandem auf, weil der Chat normal antwortet (siehe app/core/vorlagenabgleich.py).
+    melde_fehlende(
+        path,
+        liste="triggers",
+        schluessel="category",
+        bezeichnung="Die Krisenkategorie",
+        folge="Ihre Krisenerkennung löst dafür nicht aus.",
+        hinweis=(
+            "Krisenmuster sind eine Schulentscheidung — übernehmen Sie den Abschnitt "
+            "erst nach Abstimmung mit Ihrer Schulsozialarbeit."
+        ),
     )
     return _triggers_cache
 

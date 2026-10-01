@@ -247,3 +247,46 @@ class TestKonfigurationOhneAbsicht:
         andere = [t for t in load_hausversuche().themen if t.thema != "Giftigkeit und Dosis"]
         assert andere, "Testaufbau: es muss weitere Themen geben"
         assert all(t.absicht_noetig for t in andere)
+
+
+class TestWaechterMeldetFehlendesThema:
+    """Der Wächter aus AP2 — hier an der zweiten Datei, die er bedient.
+
+    Ohne ihn bekäme eine Schule beim Update auf 0.12 das Thema „Giftigkeit und Dosis"
+    nicht in ihre Instanzdatei und merkte nichts davon: Der Chat antwortet weiter,
+    nur eben ohne die Anweisung. Genau so blieb nach 0.11 die Startseite unsichtbar.
+    """
+
+    def test_start_nennt_das_nicht_uebernommene_thema(self, tmp_path, monkeypatch, caplog):
+        import logging
+
+        from app.config import settings
+
+        eigen = tmp_path / "home_experiment_triggers.yaml"
+        vorlage = tmp_path / "home_experiment_triggers.example.yaml"
+        rumpf = (
+            "absicht:\n  - \"zu ?hause\"\nthemen:\n"
+            "  - thema: Elektrolyse\n    hinweis: x\n    patterns:\n      - \"elektrolyse\"\n"
+        )
+        eigen.write_text(rumpf, encoding="utf-8")
+        vorlage.write_text(
+            rumpf
+            + "  - thema: Giftigkeit und Dosis\n    absicht_noetig: false\n"
+              "    hinweis: y\n    anweisung: z\n    patterns:\n      - \"ld50\"\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(settings, "home_experiment_triggers_path", str(eigen))
+        invalidate_hausversuche_cache()
+        with caplog.at_level(logging.WARNING):
+            load_hausversuche()
+        assert "Giftigkeit und Dosis" in caplog.text
+        assert "greift dafür nicht" in caplog.text
+
+    def test_bei_gleichstand_keine_meldung(self, caplog):
+        """Die mitgelieferte Instanzdatei dieses Projekts ist auf Stand."""
+        import logging
+
+        invalidate_hausversuche_cache()
+        with caplog.at_level(logging.WARNING):
+            load_hausversuche()
+        assert "KONFIGURATION" not in caplog.text

@@ -42,6 +42,7 @@ export const CATEGORY = {
     haeusliche_gewalt: "Häusliche Gewalt",
     essverhalten: "Essverhalten",
     mobbing: "Mobbing",
+    letalitaet: "Tödliche Menge",
 };
 
 /** Beschriftung eines Schweregrads; unbekannte Werte kommen unverändert zurück,

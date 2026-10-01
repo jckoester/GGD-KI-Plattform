@@ -58,3 +58,35 @@ triggers:
       - "alle lachen über mich"
       - "niemand mag mich in der klasse"
       - "(ärgern|fertigmachen|mobben) mich (in der schule|in der klasse)"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # ⚠️ UNABGESTIMMTER FORMULIERUNGSVORSCHLAG (0.12). Vor der Übernahme in die eigene
+  # `crisis_triggers.yaml` mit der Schulsozialarbeit abstimmen — diese Muster sind
+  # nicht geprüft, sondern ein Ausgangspunkt.
+  #
+  # Abgrenzung zum Sicherheitsauslöser N12 (`home_experiment_triggers.yaml`): Die
+  # **Sachfrage** nach Giftigkeit („Was bedeutet LD50?", „Wie viel Koffein ist
+  # tödlich?") ist Unterrichtsstoff und löst hier **nicht** aus; sie bekommt dort eine
+  # Anweisung, keine Menge zu nennen. Hier geht es um die beiden Fälle, die als
+  # Warnzeichen gelten: Letalität zusammen mit einem **Medikament** oder mit einem
+  # **Personenbezug**.
+  #
+  # ⚠️ Deshalb **kein** Muster auf „tödlich", „überdosis" oder „ld50" allein — das
+  # träfe den Chemieunterricht. Jedes Muster verlangt beide Hälften.
+  #
+  # ⚠️ Einfache Anführungszeichen, wo ein Backslash vorkommt: In doppelten ist `\d`
+  # in YAML eine ungültige Escape-Sequenz und die Datei lädt nicht mehr.
+  - category: letalitaet
+    severity: alert
+    help_topic: crisis
+    coreviewer_role: review
+    patterns:
+      # Medikament + Letalität, beide Richtungen
+      - "(tabletten|pillen|medikament|schlaftablett|paracetamol|ibuprofen|aspirin|insulin).{0,40}(tödlich|sterben|umbringen|überdosis|letal)"
+      - "(tödlich|sterben|umbringen|überdosis|letal).{0,40}(tabletten|pillen|medikament|schlaftablett|paracetamol|ibuprofen|aspirin|insulin)"
+      # Letalität + Personenbezug, beide Richtungen
+      - "(tödlich|sterbe|sterben|stirbt man|überdosis|letal).{0,40}(bei mir|für mich|ich wiege|meinem gewicht)"
+      - "(bei mir|für mich|ich wiege|mein gewicht).{0,40}(tödlich|sterbe|sterben|stirbt man|überdosis|letal)"
+      - '\d+ ?kg.{0,40}(tödlich|sterben|stirbt|gefährlich)'
+      - '(tödlich|sterben|stirbt).{0,40}\d+ ?kg'
+      - "nicht mehr aufwachen"

@@ -1,4 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { load } from "js-yaml";
+
+// repo/frontend/src/lib → repo/config
+const WURZEL = dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
+const BEISPIEL = join(WURZEL, "config", "crisis_triggers.example.yaml");
 import {
     SEVERITY,
     CATEGORY,
@@ -14,6 +22,11 @@ describe("crisis_labels", () => {
         expect(severityLabel("info")).toBe("Hinweis");
     });
 
+    it("beschriftet die Kategorie „letalitaet\" lesbar", () => {
+        // Ohne Eintrag stünde der Schlüssel in der Tabelle — lesbar, aber roh.
+        expect(categoryLabel("letalitaet")).toBe("Tödliche Menge");
+    });
+
     it("gibt einen unbekannten Schweregrad unverändert zurück", () => {
         // Ein neuer Grad im Backend soll sichtbar werden, nicht als leere Zelle
         // verschwinden.
@@ -27,8 +40,17 @@ describe("crisis_labels", () => {
         expect(cls).toContain("dark:bg-dark-ui-2");
     });
 
-    it("beschriftet alle fünf Kategorien", () => {
-        expect(Object.keys(CATEGORY)).toHaveLength(5);
+    it("beschriftet jede ausgelieferte Kategorie", () => {
+        // ⚠️ Vorher stand hier `toHaveLength(5)`. Das prüfte die Anzahl, nicht die
+        // Sache: Eine neue Kategorie im Backend ließ den Test scheitern, ohne zu
+        // sagen welche — und eine Umbenennung wäre unbemerkt durchgegangen.
+        // Jetzt ist die ausgelieferte Vorlage der Maßstab (Paket 1 von 0.12, AP2).
+        const yaml = load(readFileSync(BEISPIEL, "utf8"));
+        const kategorien = yaml.triggers.map((t) => t.category);
+        expect(kategorien.length).toBeGreaterThan(0);
+        for (const k of kategorien) {
+            expect(CATEGORY, `Kategorie '${k}' hat keine Beschriftung`).toHaveProperty(k);
+        }
         for (const label of Object.values(CATEGORY)) {
             expect(label).not.toMatch(/_/); // Anzeigetext, kein Schlüssel
         }

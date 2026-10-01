@@ -20,7 +20,26 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `config/home_experiment_triggers.yaml` wird beim Update nicht überschrieben — ohne
   Übernahme des Abschnitts „Giftigkeit und Dosis" bleibt die Antwort unverändert.
 
+- **Krisenerkennung: Fragen nach tödlichen Mengen — als Vorschlag zum Übernehmen.**
+  Die neue Kategorie `letalitaet` erkennt Letalität zusammen mit einem Medikament oder
+  einem Personenbezug („Wie viele Tabletten sind tödlich?", „Ab wie viel stirbt man bei
+  50 kg?"); Sachfragen aus dem Unterricht lösen nicht aus. In den Krisen-Meldungen lässt
+  sich jetzt nach Kategorie filtern.
+
+  ⚠️ **Der Abschnitt steht nur in `config/crisis_triggers.example.yaml` und ist ein
+  unabgestimmter Formulierungsvorschlag.** Vor der Übernahme in die eigene
+  `config/crisis_triggers.yaml` mit der Schulsozialarbeit abstimmen; bis dahin erkennt
+  die Kategorie nichts. Das Backend weist beim Start darauf hin.
+
 ### Behoben
+
+- **Nicht übernommene Abschnitte aus den mitgelieferten Vorlagen fallen jetzt auf.**
+  Ergänzt die Meldung aus 0.11.1 um die Krisenmuster (`crisis_triggers.yaml`) und die
+  Sicherheitsauslöser (`home_experiment_triggers.yaml`). Beide Dateien überleben jedes
+  Update — was eine neue Fassung hinzufügt, stand bisher nur in der Vorlage, und eine
+  nicht übernommene Prüfung fand schlicht nicht statt, ohne dass irgendwo etwas davon
+  stand. Das Backend nennt beim Start Datei, Eintrag und Folge. Übernommen wird nichts
+  von selbst: Krisenmuster und Gefahrenthemen bleiben Schulentscheidung.
 
 - **Nach einem Update fehlende Navigationseinträge fallen jetzt auf.** Die eigene
   `config/ui_levels.yaml` wird beim Update nie überschrieben — neue Einträge stehen
