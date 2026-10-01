@@ -3,11 +3,21 @@
 # Jede eingehende Nutzer-Nachricht wird regex-basiert, case-insensitive und
 # Unicode-normalisiert (NFKC + casefold) gegen die patterns geprüft. Bei Treffer:
 # dezentes Hilfe-Ressourcen-Banner (help_topic → help_resources.yaml), ein
-# pseudonymes Flag und ein Log-Eintrag — KEINE Blockierung des Chats (ADR-008 Teil 3).
+# pseudonymes Flag, ein Log-Eintrag und — seit 0.12 — eine **Anweisung an das Modell**,
+# wie es antworten soll. KEINE Blockierung des Chats (ADR-008 Teil 3).
 #
 #   severity:        info | warning | alert
 #   help_topic:      muss einen Eintrag in help_resources.yaml (topics) referenzieren
 #   coreviewer_role: empfohlene Zweit-Rolle für die spätere 4-Augen-Einsicht (stets "review")
+#   anweisung:       optional — eigener Text statt des mitgelieferten Standards
+#
+# **Zur `anweisung`.** Ohne Angabe gilt ein Standardtext aus dem Code
+# (`app/crisis/anweisung.py`): keine Mengen/Mittel/Methoden nennen, die Person ruhig und
+# ohne Vorwurf ansprechen, keine Diagnose, auf Hilfe hinweisen — und keine
+# Telefonnummern erfinden. Er wird mit dem Update aktiv, ohne dass Sie etwas tun; wer
+# ihn anders will, setzt `anweisung:` an der Kategorie. Er verweist bewusst **nicht**
+# auf das Hilfe-Banner: Das erscheint nur beim ersten Treffer einer Kategorie je
+# Konversation.
 #
 # ⚠ Startkuratierung — MUSS mit der Schulsozialarbeit final abgestimmt werden
 #   (Sprachsensibilität, Jugendsprache, regionale Ausdrücke, Fehlalarme).

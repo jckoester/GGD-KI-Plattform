@@ -73,6 +73,7 @@ from app.context.stufen import (
     vermerke as stufen_vermerke,
 )
 from app.context.modellsicht import fuer_modell, werkzeug_nutzlast
+from app.crisis.anweisung import anweisung_fuer as krisen_anweisung
 from app.crisis.detector import CrisisHit, scan
 from app.crisis.config import resolve_help_topic
 from app.pedagogy.config import load_pedagogy
@@ -1793,6 +1794,7 @@ async def chat(
     # Krisen-Erkennung (ADR-008 Teil 3): lokal, parallel zum LLM-Call, OHNE Blockieren.
     # Test-Chats (Assistenten-Entwicklung) werden nicht geflaggt.
     crisis_record: Optional[_CrisisRecord] = None
+    crisis_hit: Optional[CrisisHit] = None
     if not conversation_is_test:
         crisis_record = await _record_crisis(
             db,
@@ -1801,6 +1803,12 @@ async def chat(
             request.messages[-1].attachments if request.messages else [],
             current_user.sub,
         )
+        crisis_hit = crisis_record.hit if crisis_record is not None else None
+    else:
+        # Test-Chats werden nicht geflaggt — die **Anweisung** bekommen sie trotzdem.
+        # Sonst ließe sich ausgerechnet das Verhalten, um das es geht, nicht prüfen,
+        # ohne einen echten Fall in der Einsicht zu zweit zu erzeugen (AP4).
+        crisis_hit = scan(user_message)
 
     # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
     assistant_id_for_docs = active_assistant_id
@@ -1880,6 +1888,19 @@ async def chat(
         )
         llm_messages.append(
             {"role": "system", "content": hausversuch_anweisung(gefahr)}
+        )
+    # Krisen-Anweisung (Paket 1 von 0.12, AP3) — **als allerletzte** Systemnachricht,
+    # also nach der N12-Anweisung: Greifen beide (Dosisfrage mit Personenbezug), soll
+    # die Krisen-Anweisung die äußere sein. Anders als N12 **nicht** auf die
+    # Schüler-Behandlung beschränkt — eine Notlage kennt keine Rolle (E2).
+    if crisis_hit is not None:
+        # Wie bei N12: nur Kategorie und Konversation ins Log, nie die Nachricht.
+        logger.info(
+            "Krisen-Anweisung angehängt: kategorie=%s, conv=%s",
+            crisis_hit.category, conversation_id,
+        )
+        llm_messages.append(
+            {"role": "system", "content": krisen_anweisung(crisis_hit)}
         )
     llm_messages.extend(
         {"role": msg.role, "content": _serialize_content(msg.content)}

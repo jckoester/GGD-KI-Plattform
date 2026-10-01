@@ -20,6 +20,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `config/home_experiment_triggers.yaml` wird beim Update nicht überschrieben — ohne
   Übernahme des Abschnitts „Giftigkeit und Dosis" bleibt die Antwort unverändert.
 
+- **Bei einem Krisentreffer bekommt das Modell jetzt eine Anweisung für seine Antwort.**
+  Bisher änderte ein Treffer nur Banner und Meldung, nicht die Antwort selbst. Jetzt
+  gilt: keine Mengen, Mittel oder Methoden nennen, die Person ruhig und ohne Vorwurf
+  ansprechen, keine Diagnose, auf Hilfe hinweisen — und keine Telefonnummern oder
+  Adressen erfinden. Das wirkt in **allen** Krisenkategorien und für alle Rollen. Wer
+  einen anderen Text möchte, setzt `anweisung:` an der Kategorie in
+  `config/crisis_triggers.yaml`.
+
 - **Krisenerkennung: Fragen nach tödlichen Mengen — als Vorschlag zum Übernehmen.**
   Die neue Kategorie `letalitaet` erkennt Letalität zusammen mit einem Medikament oder
   einem Personenbezug („Wie viele Tabletten sind tödlich?", „Ab wie viel stirbt man bei

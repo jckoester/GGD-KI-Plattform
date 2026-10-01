@@ -26,6 +26,10 @@ class CrisisHit(BaseModel):
     help_topic: str
     trigger_rule: str  # "crisis_triggers:<category>" — referenziert die Regel, kein Text
     coreviewer_role: str
+    #: Schuleigener Anweisungstext, falls die Kategorie einen trägt (AP3). ``None``
+    #: heißt Standard — aufgelöst in ``app/crisis/anweisung.py``, nicht hier, damit der
+    #: Treffer weiterhin nur Konfiguration transportiert und keinen Vorgabetext.
+    anweisung: str | None = None
 
 
 def scan(text: str) -> CrisisHit | None:
@@ -55,4 +59,5 @@ def scan(text: str) -> CrisisHit | None:
         help_topic=best.help_topic,
         trigger_rule=f"crisis_triggers:{best.category}",
         coreviewer_role=best.coreviewer_role,
+        anweisung=best.anweisung,
     )

@@ -63,6 +63,9 @@ class CrisisTrigger(BaseModel):
     patterns: list[str] = Field(min_length=1)
     help_topic: str
     coreviewer_role: str = "review"
+    #: Eigener Anweisungstext für das Modell statt des Standards aus
+    #: ``app/crisis/anweisung.py``. Leer lassen heißt: Standard.
+    anweisung: str | None = None
 
     # Vorkompilierte Patterns (normalisiert, IGNORECASE) — kein YAML-Feld.
     _compiled: list[re.Pattern] = PrivateAttr(default_factory=list)
