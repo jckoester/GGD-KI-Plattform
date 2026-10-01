@@ -39,6 +39,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `config/crisis_triggers.yaml` mit der Schulsozialarbeit abstimmen; bis dahin erkennt
   die Kategorie nichts. Das Backend weist beim Start darauf hin.
 
+### Geändert
+
+- **Kosten erscheinen in „Einheiten" statt in Euro.** Eine Nachricht kostet rund
+  0,0007 € — im Chat stand deshalb bei fast jeder Antwort dasselbe „< 0,01 €", und am
+  Budget „0,04 € von 0,12 €". Eine Einheit ist ein Hundertstelcent (10 000 Einheiten
+  = 1 €, der Kurs steht im Profil): Eine normale Nachricht kostet damit 4–8 Einheiten,
+  ein Wochenbudget liegt bei 400–3 100, und ein teures Modell ist als teuer zu erkennen.
+  Betroffen sind die Angabe unter einer Antwort, die Chat-Summe und das Budget im Profil.
+  **Für die Administration ändert sich nichts** — `/budget` und die Kostenstatistik
+  führen weiter Euro, prüfbar gegen die Anbieterrechnung. Der Faktor steht in
+  `config/budget_tiers.yaml` (`einheiten_je_euro`); gerechnet und gespeichert wird
+  weiterhin in USD.
+
 ### Behoben
 
 - **Nicht übernommene Abschnitte aus den mitgelieferten Vorlagen fallen jetzt auf.**

@@ -1,3 +1,5 @@
+import { ausEuro, text as einheitenText } from "./einheiten.js";
+
 // Wie das Budget Nutzer:innen erklärt wird.
 //
 // Seit dem Wochenmodell wird nichts zurückgesetzt: Das Guthaben **wächst** jede
@@ -18,8 +20,10 @@ function wochentag(iso) {
     });
 }
 
-function betrag(eur) {
-    return typeof eur === "number" ? eur.toFixed(2).replace(".", ",") : null;
+/** Ein in Euro konfigurierter Betrag als Einheiten-Text — `null`, wenn er fehlt. */
+function einheiten(eur, faktor) {
+    if (typeof eur !== "number") return null;
+    return einheitenText(ausEuro(eur, faktor ?? undefined));
 }
 
 /**
@@ -32,7 +36,7 @@ function betrag(eur) {
  * @returns {string|null}
  */
 export function zuwachsText(b) {
-    const wochenbetrag = betrag(b?.wochenbetrag_eur);
+    const wochenbetrag = einheiten(b?.wochenbetrag_eur, b?.einheiten_je_euro);
     if (!wochenbetrag || b?.wochenbetrag_eur <= 0) return null;
 
     const tag = b?.naechste_aufstockung ? wochentag(b.naechste_aufstockung) : null;
@@ -43,7 +47,7 @@ export function zuwachsText(b) {
     }
     // Ohne Schlusspunkt: Das Datum endet in de-DE bereits auf einen („Mo., 21.09."),
     // ein zweiter ergäbe „21.09...".
-    return `Jede Unterrichtswoche kommen ${wochenbetrag} € dazu — das nächste Mal am ${tag}`;
+    return `Jede Unterrichtswoche kommen ${wochenbetrag} dazu — das nächste Mal am ${tag}`;
 }
 
 /**
@@ -61,13 +65,13 @@ export function uebertragText(b) {
     if (!Number.isFinite(wochen) || wochen < 1) return null;
 
     const wocheWort = wochen === 1 ? "einer Woche" : `${wochen} Wochen`;
-    const grenze = betrag(b?.wochenbetrag_eur * wochen);
+    const grenze = einheiten(b?.wochenbetrag_eur * wochen, b?.einheiten_je_euro);
 
     // Ohne Wochenbetrag nur die Wochen nennen — halb ist besser als falsch.
     if (!grenze || !(b?.wochenbetrag_eur > 0)) {
         return `Ungenutztes bleibt dir erhalten, höchstens aber der Betrag von ${wocheWort}.`;
     }
-    return `Ungenutztes bleibt dir erhalten — bis zu ${grenze} €, dem Betrag von ${wocheWort}. Mehr sammelt sich nicht an.`;
+    return `Ungenutztes bleibt dir erhalten — bis zu ${grenze}, dem Betrag von ${wocheWort}. Mehr sammelt sich nicht an.`;
 }
 
 /**
@@ -75,10 +79,10 @@ export function uebertragText(b) {
  * @returns {string|null}
  */
 export function zuwachsKurz(b) {
-    const wochenbetrag = betrag(b?.wochenbetrag_eur);
+    const wochenbetrag = einheiten(b?.wochenbetrag_eur, b?.einheiten_je_euro);
     if (!wochenbetrag || b?.wochenbetrag_eur <= 0) return null;
     const tag = b?.naechste_aufstockung ? wochentag(b.naechste_aufstockung) : null;
-    return tag ? `+${wochenbetrag} € am ${tag}` : null;
+    return tag ? `+${wochenbetrag} am ${tag}` : null;
 }
 
 // ── Kostenangabe an einer Chat-Antwort ──────────────────────────────────────
@@ -94,7 +98,7 @@ export function zuwachsKurz(b) {
 /**
  * Was unter der Antwortblase steht.
  *
- * @param {string|null} betrag  formatierter Euro-Betrag oder `null`
+ * @param {string|null} betrag  fertiger Betragstext („8 Einheiten") oder `null`
  * @param {string|null} status  `ausstehend` | `vollstaendig` | `unvollstaendig` | `null`
  * @returns {{text: string, unsicher: boolean}|null} `null` = gar nichts anzeigen
  */
@@ -106,9 +110,9 @@ export function kostenAnzeige(betrag, status = null) {
     if (status === "unvollstaendig") {
         // „mindestens", weil mindestens ein SpendLog fehlt: Der echte Betrag ist
         // höher, nie niedriger.
-        return { text: `mindestens ${betrag} €`, unsicher: true };
+        return { text: `mindestens ${betrag}`, unsicher: true };
     }
-    return { text: `${betrag} €`, unsicher: false };
+    return { text: `${betrag}`, unsicher: false };
 }
 
 /** Erklärung zum unsicheren Zustand — als Titel-Attribut, nicht als Dauertext. */

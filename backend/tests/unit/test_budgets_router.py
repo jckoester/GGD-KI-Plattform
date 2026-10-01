@@ -350,3 +350,44 @@ def test_post_grades_invalidates_tiers_cache():
         Path(temp_path).unlink(missing_ok=True)
     
     assert response.status_code == 200
+
+
+def test_post_grades_erhaelt_den_einheiten_faktor():
+    """⚠️ `/budget` schreibt `budget_tiers.yaml` neu — der Faktor darf dabei nicht
+    verschwinden.
+
+    Die Datei trägt seit 0.12 neben den Beträgen auch `einheiten_je_euro`
+    (Anzeige-Einheit). Der Schreibpfad liest die ganze Datei und gibt sie zurück; diese
+    Prüfung hält das fest, denn ein stilles Wegfallen zeigte sich erst an einer
+    Oberfläche, die plötzlich mit dem Vorgabefaktor rechnet — also an Zahlen, die
+    zehnmal zu klein oder zu groß sind, ohne dass jemand etwas geändert hat.
+    """
+    session = AsyncMock()
+    user_result = MagicMock()
+    user_result.fetchall.return_value = []
+    session.execute.return_value = user_result
+
+    konfig = dict(_TEST_BUDGET_CONFIG)
+    konfig["einheiten_je_euro"] = 10000
+    konfig["vorsprung_wochen"] = 3
+
+    mock_client = AsyncMock()
+    mock_client.update_user_budget = AsyncMock()
+    mock_client.close = AsyncMock()
+
+    with NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(konfig, f)
+        temp_path = f.name
+    try:
+        with patch.object(settings, "budget_tiers_path", temp_path):
+            with patch("app.api.admin.budgets.get_current_rate", new=AsyncMock(return_value=1.08)):
+                with patch("app.api.admin.budgets.LiteLLMClient", return_value=mock_client):
+                    app = _make_budgets_app(_fake_admin_payload(), session)
+                    client = TestClient(app)
+                    body = {"grades": [{"key": "jahrgang-10", "max_budget_eur": 3.50}]}
+                    assert client.post("/budgets/grades", json=body).status_code == 200
+        danach = yaml.safe_load(Path(temp_path).read_text(encoding="utf-8"))
+        assert danach["einheiten_je_euro"] == 10000
+        assert danach["vorsprung_wochen"] == 3
+    finally:
+        Path(temp_path).unlink(missing_ok=True)

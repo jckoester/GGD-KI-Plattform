@@ -309,3 +309,22 @@ async def test_kaputte_schuljahres_config_bricht_die_anzeige_nicht():
     assert result["remaining_eur"] == 0.75
     assert result["wochenbetrag_eur"] is None
     assert result["naechste_aufstockung"] is None
+
+
+def test_antwort_nennt_den_einheiten_faktor():
+    """Ohne ihn müsste die Oberfläche den Umrechnungsfaktor raten (AP4).
+
+    Sie rechnet aus den **USD**-Werten: `*_eur` ist serverseitig auf Cent gerundet, und
+    ein Cent sind 100 Einheiten — genau die Auflösung, derentwegen es die Einheit gibt.
+    """
+    antwort = _build_response({"max_budget": 1.0, "spend": 0.25}, 1.10)
+    assert antwort["einheiten_je_euro"] == 10_000
+    assert antwort["max_budget_usd"] == 1.0
+
+
+def test_leeres_budget_nennt_ihn_auch():
+    """Sonst fiele die Anzeige genau dort auf einen Vorgabewert zurück, wo sie sagen
+    soll, dass sie nichts weiß."""
+    from app.budget.service import _empty_budget
+
+    assert _empty_budget(1.10)["einheiten_je_euro"] == 10_000

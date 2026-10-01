@@ -16,6 +16,9 @@ _budget_tiers_cache: Optional[dict] = None
 #: Menge, die an einem Nachmittag verbraucht werden kann.
 VORSPRUNG_WOCHEN_DEFAULT = 3
 
+#: 1 Einheit = 1/10 000 € = ein Hundertstelcent. Siehe einheiten_je_euro().
+EINHEITEN_JE_EURO_DEFAULT = 10_000
+
 
 
 
@@ -51,6 +54,43 @@ def vorsprung_wochen() -> int:
     except (TypeError, ValueError):
         logger.warning("vorsprung_wochen=%r unbrauchbar, nutze %d", wert, VORSPRUNG_WOCHEN_DEFAULT)
         return VORSPRUNG_WOCHEN_DEFAULT
+
+
+def einheiten_je_euro() -> int:
+    """Wie viele **Einheiten** ein Euro sind. Vorgabe 10 000 — ein Hundertstelcent.
+
+    **Warum es diese Einheit gibt.** Ein Euro ist für den Gegenstand zu grob: Eine
+    Nachricht kostet rund 0,0007 € (gemessen 29.09.2026 an der medianen
+    Nachrichtengröße). Die Anzeige wich deshalb unter einem Cent auf „< 0,01 €" aus —
+    und **97,7 % aller erfassten Nachrichten zeigten denselben Text**. Eine Angabe, die
+    0,001 € nicht von 0,009 € unterscheidet, ist keine Auskunft.
+
+    **Warum 10 000 und nicht 1 000.** Bei 1 000 lägen die meistgenutzten Modelle
+    *unter* einer Einheit (`chat-schnell` 0,43, `chat-standard` 0,75) — derselbe Fehler,
+    eine Kommastelle weiter rechts. Bei 10 000 kostet eine normale Nachricht 4–8
+    Einheiten, ein Wochenbudget liegt bei 400–3 100. Größer wäre unleserlich: Die
+    Spreizung zwischen günstigstem und teuerstem Modell beträgt heute 81-fach.
+
+    **Warum konfigurierbar.** Werden Modelle deutlich billiger, rutscht die Skala nach
+    unten. Weil der Faktor hier steht und **nie gespeichert wird** (gerechnet wird in
+    USD, die Einheit ist reine Anzeige), ist das Nachziehen eine Zeile — und verfälscht
+    keine alten Zahlen. `scripts/check_litellm_config.py` meldet, wenn es so weit ist.
+    """
+    wert = _load_budget_tiers().get("einheiten_je_euro", EINHEITEN_JE_EURO_DEFAULT)
+    try:
+        zahl = int(wert)
+    except (TypeError, ValueError):
+        logger.warning(
+            "einheiten_je_euro=%r unbrauchbar, nutze %d", wert, EINHEITEN_JE_EURO_DEFAULT
+        )
+        return EINHEITEN_JE_EURO_DEFAULT
+    if zahl < 1:
+        logger.warning(
+            "einheiten_je_euro=%r muss mindestens 1 sein, nutze %d",
+            wert, EINHEITEN_JE_EURO_DEFAULT,
+        )
+        return EINHEITEN_JE_EURO_DEFAULT
+    return zahl
 
 
 def _stufe(eintrag: dict) -> Optional[float]:

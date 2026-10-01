@@ -4,6 +4,12 @@
     import { themePref } from "$lib/stores/theme.js";
     import { user } from "$lib/stores/user.js";
     import { budget } from "$lib/stores/budget.js";
+    import {
+        ausUsd,
+        zahl as einheitenZahl,
+        text as einheitenText,
+        kurshinweis,
+    } from "$lib/einheiten.js";
     import { zuwachsText, uebertragText } from "$lib/budget_text.js";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -48,13 +54,6 @@
     let loading = $state(true);
 
     // Formatierung: 2 Dezimalstellen, Komma als Trennzeichen
-    function fmt(v) {
-        if (v == null) return "–";
-        return v.toLocaleString("de-DE", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-    }
 
 
     onMount(async () => {
@@ -132,6 +131,16 @@
         await updatePreference("context_search_limit", value);
     }
 
+    // Aus **USD** gerechnet, nicht aus `*_eur`: Die sind auf Cent gerundet, und ein
+    // Cent sind 100 Einheiten — die Auflösung, derentwegen es die Einheit gibt, wäre
+    // damit weg.
+    let restEinheiten = $derived(
+        ausUsd($budget?.remaining_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
+    );
+    let grenzeEinheiten = $derived(
+        ausUsd($budget?.max_budget_usd, $budget?.eur_usd_rate, $budget?.einheiten_je_euro),
+    );
+
     let pct = $derived(
         $budget?.max_budget_eur && $budget?.spend_eur != null
             ? Math.min(
@@ -190,9 +199,9 @@
 
                 <div class="flex items-center text-sm mb-2">
                     <span class="text-light-tx-2 dark:text-dark-tx-2">
-                        Noch {fmt($budget?.remaining_eur)} € von {fmt(
-                            $budget?.max_budget_eur,
-                        )} € verfügbar.
+                        Noch {einheitenZahl(restEinheiten)} von {einheitenText(
+                            grenzeEinheiten,
+                        )} verfügbar.
                     </span>
                     {#if pct != null}
                         <span
@@ -209,6 +218,10 @@
                         <p>{uebertrag}</p>
                     {/if}
                     <p>In den Ferien kommt nichts dazu.</p>
+                    <!-- Der Kurs gehört sichtbar in die Oberfläche: Die Einheit ist
+                         keine erfundene Währung, sondern eine Unterteilung des Euro —
+                         wer nachrechnen will, soll es können. -->
+                    <p class="text-xs">{kurshinweis($budget?.einheiten_je_euro)}</p>
                 </div>
             {:else}
                 <div class="text-sm mb-2 text-light-tx-2 dark:text-dark-tx-2">

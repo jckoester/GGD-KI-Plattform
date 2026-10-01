@@ -48,6 +48,7 @@
     import { budget, refreshBudget } from "$lib/stores/budget.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { myGroups } from "$lib/stores/myGroups.js";
+    import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import {
         pageTitle,
         activeConversationId,
@@ -286,15 +287,14 @@
 
     onDestroy(() => nachschlagTimer.forEach(clearTimeout));
 
-    // Hilfsfunktion zur Kostenformatierung
-    function formatCostEur(costUsd, rate) {
-        if (costUsd == null || !rate) return null;
-        const eur = costUsd / rate;
-        if (eur < 0.01) return "< 0,01";
-        return eur.toLocaleString("de-DE", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
+    // Kosten in **Einheiten** statt in Euro (1 Einheit = 1/10 000 €).
+    //
+    // ⚠️ Vorher stand hier eine Euro-Formatierung mit `if (eur < 0.01) return "< 0,01"`.
+    // Gemessen am 29.09.2026: **97,7 % aller erfassten Nachrichten** fielen in diesen
+    // Zweig und zeigten damit denselben Text — die Anzeige unterschied 0,001 € nicht
+    // von 0,009 €. Gerechnet wird weiter aus USD; der Faktor kommt vom Server.
+    function kostenEinheiten(costUsd, rate) {
+        return einheitenText(ausUsd(costUsd, rate, $budget?.einheiten_je_euro));
     }
 
     let granularity = $derived($user?.preferences?.cost_granularity ?? "none");
@@ -1269,7 +1269,7 @@
                             granularity === "both"}
                         costEur={granularity === "message" ||
                         granularity === "both"
-                            ? formatCostEur(
+                            ? kostenEinheiten(
                                   message.cost_usd,
                                   $budget?.eur_usd_rate,
                               )
@@ -1318,10 +1318,10 @@
                 <div
                     class="text-xs text-right text-light-tx-2 dark:text-dark-tx-2"
                 >
-                    Kosten dieses Chats: {formatCostEur(
+                    Kosten dieses Chats: {kostenEinheiten(
                         totalCostUsd,
                         $budget?.eur_usd_rate,
-                    )} €
+                    )}
                 </div>
             {/if}
 

@@ -450,12 +450,28 @@ or state" fehl, loggt der Callback den vom Provider gemeldeten OAuth-`error`
 
 ## `config/budget_tiers.yaml`
 
-Legt die Euro-Budgets **je Unterrichtswoche** pro Jahrgangsstufe und Rolle fest.
+Legt die Euro-Budgets **je Unterrichtswoche** pro Jahrgangsstufe und Rolle fest — und
+den Faktor für die **Anzeige-Einheit**.
+
+**Warum Nutzer:innen Einheiten sehen und nicht Euro.** Eine Nachricht kostet rund
+0,0007 €. Die Anzeige wich deshalb unter einem Cent auf „< 0,01 €" aus, und **97,7 % aller
+Nachrichten zeigten denselben Text** (gemessen 29.09.2026). Mit `einheiten_je_euro: 10000`
+kostet eine normale Nachricht 4–8 Einheiten, ein Wochenbudget liegt bei 400–3 100. Der
+Euro bleibt, wo er hingehört: in `/budget` und `/statistics/costs`, gegen die
+Anbieterrechnung prüfbar; der Kurs steht im Profil neben dem Budget.
+
+Gerechnet und gespeichert wird in USD — die Einheit ist reine Anzeige, eine spätere
+Änderung des Faktors verfälscht also keine alten Angaben.
+`scripts/check_litellm_config.py` meldet, wenn die Modelle so billig geworden sind, dass
+eine Nachricht beim günstigsten sichtbaren Modell unter eine Einheit fällt.
 
 ```yaml
 # Wie viele Wochenbeträge die Obergrenze dem Verbrauch vorauseilen darf.
 # Nur hier global, nicht je Stufe. Vorgabe: 3.
 vorsprung_wochen: 3
+
+# Anzeige-Einheit für Kosten. 1 Einheit = 1/10 000 € (ein Hundertstelcent).
+einheiten_je_euro: 10000
 
 grades:
   5:

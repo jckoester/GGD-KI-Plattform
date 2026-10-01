@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { zuwachsText, zuwachsKurz, uebertragText, kostenAnzeige, kostenErklaerung } from "./budget_text.js";
+import { text as einheitenText } from "./einheiten.js";
 
 describe("zuwachsText", () => {
     it("nennt Betrag und Termin", () => {
@@ -9,7 +10,7 @@ describe("zuwachsText", () => {
         });
         // Kein zweiter Punkt am Ende: „Mo., 21.09." bringt ihn schon mit.
         expect(text).toBe(
-            "Jede Unterrichtswoche kommen 0,04 € dazu — das nächste Mal am Mo., 21.09.",
+            `Jede Unterrichtswoche kommen ${einheitenText(400)} dazu — das nächste Mal am Mo., 21.09.`,
         );
         expect(text).not.toMatch(/\.\.$/);
     });
@@ -41,7 +42,7 @@ describe("zuwachsKurz", () => {
     it("passt in die Seitenleiste", () => {
         expect(
             zuwachsKurz({ wochenbetrag_eur: 0.31, naechste_aufstockung: "2026-09-21" }),
-        ).toBe("+0,31 € am Mo., 21.09.");
+        ).toBe(`+${einheitenText(3100)} am Mo., 21.09.`);
     });
 
     it("schweigt ohne Termin", () => {
@@ -53,14 +54,14 @@ describe("zuwachsKurz", () => {
 describe("uebertragText", () => {
     it("nennt Wochenzahl und Betrag statt „einige Wochen“", () => {
         expect(uebertragText({ wochenbetrag_eur: 0.04, vorsprung_wochen: 3 })).toBe(
-            "Ungenutztes bleibt dir erhalten — bis zu 0,12 €, dem Betrag von 3 Wochen. " +
+            `Ungenutztes bleibt dir erhalten — bis zu ${einheitenText(1200)}, dem Betrag von 3 Wochen. ` +
                 "Mehr sammelt sich nicht an.",
         );
     });
 
     it("beugt den Singular", () => {
         expect(uebertragText({ wochenbetrag_eur: 0.5, vorsprung_wochen: 1 })).toBe(
-            "Ungenutztes bleibt dir erhalten — bis zu 0,50 €, dem Betrag von einer Woche. " +
+            `Ungenutztes bleibt dir erhalten — bis zu ${einheitenText(5000)}, dem Betrag von einer Woche. ` +
                 "Mehr sammelt sich nicht an.",
         );
     });
@@ -89,19 +90,19 @@ describe("kostenAnzeige", () => {
 
     it("meldet ausstehend auch dann, wenn schon ein Teilbetrag dasteht", () => {
         // Bildkosten sind sofort bekannt, die Textkosten noch nicht.
-        expect(kostenAnzeige("0,04", "ausstehend").unsicher).toBe(true);
+        expect(kostenAnzeige(einheitenText(4), "ausstehend").unsicher).toBe(true);
     });
 
     it("kennzeichnet eine Teilsumme als Untergrenze", () => {
-        expect(kostenAnzeige("0,01", "unvollstaendig")).toEqual({
-            text: "mindestens 0,01 €",
+        expect(kostenAnzeige(einheitenText(1), "unvollstaendig")).toEqual({
+            text: `mindestens ${einheitenText(1)}`,
             unsicher: true,
         });
     });
 
     it("zeigt den belastbaren Betrag schlicht", () => {
-        expect(kostenAnzeige("0,02", "vollstaendig")).toEqual({
-            text: "0,02 €",
+        expect(kostenAnzeige(einheitenText(2), "vollstaendig")).toEqual({
+            text: einheitenText(2),
             unsicher: false,
         });
     });
@@ -109,7 +110,7 @@ describe("kostenAnzeige", () => {
     it("behandelt fehlenden Zustand wie belastbar", () => {
         // Bestandszeilen vor Migration 0058 tragen `null` — für sie gab es die
         // Unterscheidung nicht, und eine Warnung wäre eine erfundene Aussage.
-        expect(kostenAnzeige("0,02", null)).toEqual({ text: "0,02 €", unsicher: false });
+        expect(kostenAnzeige(einheitenText(2), null)).toEqual({ text: einheitenText(2), unsicher: false });
     });
 
     it("zeigt ohne Betrag und ohne Zustand gar nichts", () => {

@@ -24,6 +24,21 @@
 # heißt auch: mehr, das an einem einzigen Nachmittag verbraucht werden kann — ein Bild
 # kostet rund vierzig Chat-Nachrichten. Wer ein halbes Jahr nichts nutzt, sammelt so
 # kein halbes Jahr an.
+# ── Anzeige-Einheit ─────────────────────────────────────────────────────────────────
+#
+# Kosten werden Nutzer:innen in **Einheiten** gezeigt, nicht in Euro: Eine Nachricht
+# kostet rund 0,0007 €, und eine Anzeige, die 0,001 € nicht von 0,009 € unterscheidet,
+# sagt nichts. 1 Einheit = 1/10 000 € = ein Hundertstelcent; eine normale Nachricht
+# kostet damit 4–8 Einheiten, ein Wochenbudget liegt bei 400–3 100.
+#
+# Gerechnet und gespeichert wird weiter in USD — die Einheit ist reine Anzeige. Eine
+# Änderung hier verfälscht deshalb keine alten Angaben. Dass es Zeit dafür ist, meldet
+# `scripts/check_litellm_config.py`, wenn die Modelle so billig geworden sind, dass eine
+# Nachricht unter eine Einheit fällt.
+#
+# Der Euro bleibt die Einheit für Verwaltung und Schulleitung (/budget, /statistics).
+einheiten_je_euro: 10000
+
 vorsprung_wochen: 3
 
 # Die Beträge unten sind ein BEISPIEL. Der eigene Wert ergibt sich aus dem Jahrestopf der

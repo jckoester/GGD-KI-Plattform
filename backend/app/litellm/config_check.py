@@ -346,7 +346,70 @@ def check_config(
         ))
 
     findings.extend(_pruefe_waehrung(entries, settings))
+    findings.extend(_pruefe_einheitenskala(entries, settings))
     return findings
+
+
+#: Die mediane Nachricht, gemessen am 01.10.2026 über 522 Nachrichten mit Tokenzahlen.
+#: Der hohe Eingabewert stammt von den seit 0.11 mitgehenden Wissensbausteinen. Er dient
+#: **nur** dieser Prüfung — abgerechnet wird nach echtem Verbrauch.
+REFERENZ_NACHRICHT = (2941, 530)
+
+
+def _pruefe_einheitenskala(entries: dict, settings: Any) -> list[Finding]:
+    """Trägt die Einheit (1/10 000 €) noch, oder sind die Modelle zu billig geworden?
+
+    **Warum hier und nicht beim Start.** Die Skala driftet, wenn sich **Preise** ändern —
+    also genau dann, wenn jemand die `model_list` anfasst und dieses Skript ohnehin läuft.
+    Beim Start bräuchte die Prüfung einen Live-Aufruf zum Proxy; ist der langsam oder aus,
+    bliebe sie stumm — ausgerechnet nach einer Konfigurationsänderung.
+
+    Gemeldet wird, wenn eine mediane Nachricht beim **günstigsten** Chat-Modell unter eine
+    Einheit fällt. Dann zeigt die Oberfläche dort Nachkommastellen; das ist kein Fehler,
+    aber der Zeitpunkt, den Faktor in `budget_tiers.yaml` nachzuziehen.
+    """
+    from app.budget.tiers import einheiten_je_euro
+
+    ein, aus = REFERENZ_NACHRICHT
+    faktor = einheiten_je_euro()
+    # Der tagesaktuelle Kurs steht in der Datenbank; für eine Größenordnungsprüfung
+    # genügt der Fallback — ein paar Prozent Kursdifferenz entscheiden nicht darüber,
+    # ob eine Nachricht unter eine Einheit fällt.
+    kurs = float(getattr(settings, "exchange_rate_fallback", 1.10) or 1.10)
+
+    # Nur Modelle, deren Kosten jemand **je Nachricht sieht** — also die im Modellwähler
+    # sichtbaren. `system-titel` ist um Größenordnungen billiger und erzeugt nur
+    # Konversationstitel; als „günstigstes Modell" löste er die Prüfung dauerhaft aus,
+    # ohne dass an der Anzeige etwas dran wäre.
+    versteckt = tuple(getattr(settings, "model_picker_hidden_prefixes", None) or ())
+    guenstigste: tuple[float, str] | None = None
+    for name, eintrag in entries.items():
+        info = eintrag.get("model_info") or {}
+        if (info.get("mode") or "") == "embedding" or "embed" in name:
+            continue
+        if versteckt and name.startswith(versteckt):
+            continue
+        preis_ein = info.get("input_cost_per_token")
+        if not preis_ein:
+            continue
+        usd = ein * preis_ein + aus * (info.get("output_cost_per_token") or 0.0)
+        if guenstigste is None or usd < guenstigste[0]:
+            guenstigste = (usd, name)
+
+    if guenstigste is None:
+        return []
+    usd, name = guenstigste
+    einheiten = usd / kurs * faktor
+    if einheiten >= 1:
+        return []
+    return [Finding(
+        WARNING,
+        f"Die Kosten-Einheit ist zu grob geworden: Eine mediane Nachricht kostet beim "
+        f"günstigsten Modell '{name}' nur noch {einheiten:.2f} Einheiten "
+        f"(Faktor {faktor} je Euro). Unter einer Einheit zeigt die Oberfläche "
+        f"Nachkommastellen. Erwägen Sie, `einheiten_je_euro` in budget_tiers.yaml "
+        f"anzuheben — gespeichert wird in USD, alte Angaben bleiben also richtig.",
+    )]
 
 
 def _pruefe_waehrung(entries: dict, settings: Any) -> list[Finding]:

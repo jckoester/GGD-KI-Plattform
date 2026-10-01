@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.budget.exchange import get_current_rate
 from app.budget.schulwochen import naechste_woche_nach
-from app.budget.tiers import get_budget_for, vorsprung_wochen
+from app.budget.tiers import einheiten_je_euro, get_budget_for, vorsprung_wochen
 from app.litellm.client import LiteLLMClient
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ def _empty_budget(eur_usd: float) -> dict:
         "naechste_aufstockung": None,
         "vorsprung_wochen": None,
         "eur_usd_rate": eur_usd,
+        "einheiten_je_euro": einheiten_je_euro(),
     }
 
 
@@ -80,6 +81,10 @@ def _build_response(
         # die Oberfläche „einige Wochen" nicht raten muss — die Zahl ist konfiguriert.
         "vorsprung_wochen": vorsprung,
         "eur_usd_rate": eur_usd,
+        # Der Umrechnungsfaktor für die **Einheiten**-Anzeige. Er gehört in die Antwort,
+        # weil die Oberfläche aus den USD-Werten rechnet — nicht aus `*_eur`: Die sind
+        # auf Cent gerundet, und ein Cent sind 10 000 Einheiten.
+        "einheiten_je_euro": einheiten_je_euro(),
     }
 
 
