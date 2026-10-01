@@ -11,10 +11,15 @@
 # ohne Anleitung. Wer eine harte Grenze braucht, ist auf der Guardrail-Ebene richtig
 # (`docs/admin/content-moderation.md`, Abschnitt B).
 #
-# **Zwei Listen, mit UND verknüpft.** Nur wenn die Nachricht sowohl eine Absicht
-# („mache ich selbst / zu Hause") als auch ein riskantes Thema nennt, greift die Regel.
-# Ohne diese Kopplung verweigerte der Assistent auch die Erklärung einer Elektrolyse im
-# Unterricht — und das ist Chemieunterricht, kein Sicherheitsproblem.
+# **Zwei Listen, mit UND verknüpft** — im Regelfall. Nur wenn die Nachricht sowohl eine
+# Absicht („mache ich selbst / zu Hause") als auch ein riskantes Thema nennt, greift die
+# Regel. Ohne diese Kopplung verweigerte der Assistent auch die Erklärung einer
+# Elektrolyse im Unterricht — und das ist Chemieunterricht, kein Sicherheitsproblem.
+#
+# **Ausnahme: `absicht_noetig: false`.** Ein Thema kann auch ohne Absicht greifen, wenn
+# die Frage für sich schon heikel ist (Dosisfragen). Solche Themen brauchen eine eigene
+# `anweisung:` — die Versuchsanweisung passt auf sie nicht — und **engere Muster**, weil
+# ihnen der Vorsatz als zweite Bedingung fehlt.
 #
 # Abgeglichen wird regex-basiert auf der normalisierten Nachricht (NFKC + casefold),
 # wie bei `crisis_triggers.yaml`. Änderungen wirken nach Backend-Neustart.
@@ -93,3 +98,33 @@ themen:
       - "(aus der|in der) apotheke .{0,30}(kaufen|besorgen|holen)"
       - "(im|aus dem) baumarkt .{0,30}(kaufen|besorgen|holen)"
       - "chemikalien .{0,20}(kaufen|besorgen|bestellen)"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Thema **ohne** Absichtsbekundung (Paket 1 von 0.12, Fall A/D).
+  #
+  # „Wie viel Koffein ist tödlich?" nennt keine Absicht und ist trotzdem keine Frage,
+  # auf die eine Menge für Menschen gehört. Deshalb `absicht_noetig: false` — und
+  # deshalb eine **eigene Anweisung**: Die Versuchsanweisung („keine Materialliste,
+  # keinen Aufbau") geht an einer Dosisfrage vorbei.
+  #
+  # ⚠️ Ohne Absichtskopplung greift das Thema breiter. Die Muster sind deshalb enger:
+  # **kein** Muster auf „tödlich", „giftig" oder „ld50" allein ohne Mengenbezug —
+  # sonst trifft es „Warum ist Kohlenstoffmonooxid tödlich?", also Unterricht.
+  # Die Sachfrage soll beantwortet werden, nur ohne Zahl für Menschen.
+  - thema: Giftigkeit und Dosis
+    absicht_noetig: false
+    hinweis: >-
+      die Giftigkeit eines Stoffes und die Frage, ab welcher Menge er schadet
+    anweisung: >-
+      Zu dieser Frage: Sie betrifft {hinweis}. Erkläre den Begriff und vergleiche Stoffe
+      miteinander, aber nenne keine Menge, die für einen Menschen gefährlich oder tödlich
+      wäre, und rechne keine Werte aus Tierversuchen auf das Körpergewicht eines Menschen
+      um — auch nicht abgeschwächt, als Beispiel oder auf Nachfrage. Wer sich wegen einer
+      möglichen Vergiftung sorgt, soll den Giftnotruf anrufen.
+    patterns:
+      - "ld[ -]?50"
+      - "letale dosis|letaldosis"
+      - "tödliche (dosis|menge)"
+      - "überdosis"
+      - "(wie viel|wieviel|ab wann|ab wie viel|ab welcher menge).{0,40}(tödlich|giftig|stirbt|sterben)"
+      - "(tödlich|giftig|stirbt|sterben).{0,40}(wie viel|wieviel|ab wann|ab welcher menge)"

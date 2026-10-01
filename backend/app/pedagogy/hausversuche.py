@@ -16,10 +16,22 @@ Anleitung. Wer eine harte Grenze braucht, ist auf der Guardrail-Ebene des Proxys
 richtig. Dass eine Prompt-Anweisung wiederum nur wahrscheinlich befolgt wird, gilt auch
 hier — sie ist nur erheblich schwerer zu übersehen als ein Punkt unter acht.
 
-**Die beiden Listen sind mit UND verknüpft.** Eine Absicht („mache ich selbst, zu
-Hause") **und** ein riskantes Thema. Ohne diese Kopplung verweigerte der Assistent auch
-die Erklärung einer Elektrolyse im Unterricht, und das ist Chemieunterricht, kein
-Sicherheitsproblem.
+**Die beiden Listen sind mit UND verknüpft** — im Regelfall. Eine Absicht („mache ich
+selbst, zu Hause") **und** ein riskantes Thema. Ohne diese Kopplung verweigerte der
+Assistent auch die Erklärung einer Elektrolyse im Unterricht, und das ist
+Chemieunterricht, kein Sicherheitsproblem.
+
+**Die Ausnahme: Themen ohne Absicht** (``absicht_noetig: false``). Manche Fragen sind
+heikel, ohne dass jemand etwas vorhat — „Wie viel Koffein ist tödlich?" nennt keine
+Absicht und ist trotzdem keine Frage, auf die eine Menge für Menschen gehört. Solche
+Themen tragen deshalb eine **eigene Anweisung** (``anweisung:``): Die Versuchsanweisung
+(„keine Materialliste, keinen Aufbau") passt auf sie nicht, sie ist auf Anleitungen
+gemünzt. Ein Thema ohne Absicht und ohne eigenen Text wäre ein Widerspruch, der
+niemandem auffällt — fehlt der Text, bleibt es bei der Versuchsanweisung.
+
+⚠️ **Ein Thema ohne Absicht greift breiter als die anderen.** Es sieht nur noch das
+Thema, nicht mehr den Vorsatz — die Muster müssen deshalb enger sein. „tödlich" allein
+trifft „Warum ist Kohlenstoffmonooxid tödlich?", also Unterricht.
 """
 
 from __future__ import annotations
@@ -44,6 +56,11 @@ class Gefahrenthema(BaseModel):
     thema: str
     hinweis: str
     patterns: list[str] = Field(min_length=1)
+    #: Greift das Thema auch **ohne** Absichtsbekundung? Vorgabe: nein — die UND-Kopplung
+    #: ist der Regelfall und hält den Unterricht frei.
+    absicht_noetig: bool = True
+    #: Eigener Anweisungstext statt der Versuchsanweisung. Platzhalter ``{hinweis}``.
+    anweisung: str | None = None
 
     _compiled: list[re.Pattern] = PrivateAttr(default_factory=list)
 
@@ -111,10 +128,20 @@ def pruefe(text: str) -> Gefahrenthema | None:
         return None
     normalisiert = normalize(text)
     konfig = load_hausversuche()
+
+    # Erst die Themen, die für sich allein stehen. Sie zuerst zu prüfen ist nicht nur
+    # Reihenfolge, sondern Bedingung: Stünden sie in der Schleife unten, käme der
+    # Absichts-Check davor und ihre Zusage („auch ohne Absicht") wäre keine.
+    for thema in konfig.themen:
+        if thema.absicht_noetig:
+            continue
+        if any(p.search(normalisiert) for p in thema.compiled):
+            return thema
+
     if not any(p.search(normalisiert) for p in konfig.absicht_compiled):
         return None
     for thema in konfig.themen:
-        if any(p.search(normalisiert) for p in thema.compiled):
+        if thema.absicht_noetig and any(p.search(normalisiert) for p in thema.compiled):
             return thema
     return None
 
@@ -140,7 +167,17 @@ def anweisung(thema: Gefahrenthema) -> str:
     Versuchen" ist das, was in der Präambel schon steht und nicht gereicht hat. Was
     wirkt, ist die benannte Sache — und ein Grund, den die Schüler:in in der Antwort
     wiederfindet, statt nur eine Absage.
+
+    Trägt das Thema einen eigenen Text (``anweisung:``), gilt dieser. Nötig für Themen,
+    bei denen nicht angeleitet, sondern **nicht beziffert** werden soll: „keine
+    Materialliste, keinen Aufbau" geht an einer Frage nach einer tödlichen Menge vorbei.
     """
+    if thema.anweisung:
+        # `replace` statt `str.format`: Der Text kommt aus der Konfiguration und darf
+        # geschweifte Klammern enthalten, ohne dass die Anweisung mit KeyError ausfällt
+        # — und eine Sicherheitsanweisung, die an einer Klammer scheitert, fällt
+        # lautlos aus, weil der Chat ja weiterläuft.
+        return thema.anweisung.replace("{hinweis}", thema.hinweis)
     return (
         f"Zu dieser Frage: Sie betrifft {thema.hinweis}. Leite das nicht an — keine "
         f"Materialliste, keinen Aufbau, keine Mengen, auch nicht abgeschwächt oder als "

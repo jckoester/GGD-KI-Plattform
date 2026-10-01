@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Fragen nach Giftigkeit und tödlichen Mengen werden erklärt, nicht beziffert.** Auf
+  „Was bedeutet LD50?" oder „Wie viel Koffein ist tödlich?" erläutert der Assistent den
+  Sachverhalt und vergleicht Stoffe, nennt aber keine Menge, die für einen Menschen
+  gefährlich wäre, und rechnet keine Tierversuchswerte auf Körpergewicht um; er verweist
+  auf den Giftnotruf. Unterrichtsfragen wie „Warum ist Kohlenstoffmonooxid tödlich?"
+  bleiben unberührt. Gilt nur für Schüler:innen — wer eine Stunde zur
+  Expositions-Risiko-Beziehung vorbereitet, bekommt die Werte weiterhin.
+
+  ⚠️ **Für bestehende Installationen:** Das neue Thema steht in
+  `config/home_experiment_triggers.example.yaml`. Die eigene
+  `config/home_experiment_triggers.yaml` wird beim Update nicht überschrieben — ohne
+  Übernahme des Abschnitts „Giftigkeit und Dosis" bleibt die Antwort unverändert.
+
 ### Behoben
 
 - **Nach einem Update fehlende Navigationseinträge fallen jetzt auf.** Die eigene

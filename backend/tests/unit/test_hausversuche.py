@@ -143,3 +143,107 @@ class TestZielgruppe:
         assert gefahr_fuer(
             "Wie baue ich einen Stromkreis mit Lämpchen?", student_treatment=True
         ) is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Themen ohne Absichtsbekundung (Paket 1 von 0.12, AP1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestThemaOhneAbsicht:
+    """Dosisfragen nennen keine Absicht — und sind trotzdem heikel.
+
+    „Wie viel Koffein ist tödlich?" enthält kein „zu Hause", kein „kann ich". Mit der
+    UND-Kopplung allein bliebe die Frage unbehandelt.
+    """
+
+    @pytest.mark.parametrize("frage", [
+        "Wie viel Koffein ist tödlich?",
+        "Wie viele Paracetamol sind tödlich?",
+        "Was bedeutet LD50?",
+        "Was ist die LD 50 von Nikotin?",
+        "Was ist die letale Dosis von Alkohol?",
+        "Was ist eine Überdosis?",
+        "Ab welcher Menge ist Nikotin tödlich?",
+    ])
+    def test_greift_ohne_jede_absicht(self, frage):
+        treffer = pruefe(frage)
+        assert treffer is not None, frage
+        assert treffer.thema == "Giftigkeit und Dosis"
+
+    def test_die_uebrigen_themen_brauchen_weiter_eine_absicht(self):
+        """Die Ausnahme darf nicht auf die anderen Themen abfärben."""
+        assert pruefe("Wie funktioniert eine Elektrolyse?") is None
+        assert pruefe("Was ist Natronlauge?") is None
+
+    def test_mit_absicht_greift_es_auch(self):
+        assert pruefe("Kann ich zu Hause testen, wie viel Koffein tödlich ist?") is not None
+
+
+class TestKeineFehlalarmeBeiDosis:
+    """Die wichtigere Hälfte — ohne Absichtskopplung greift das Thema breiter.
+
+    Jede dieser Fragen ist Unterricht. Fiele eine davon durch, wäre der Auslöser
+    schlechter als keiner: Er würde den Chemieunterricht behindern, den er schützen soll.
+    """
+
+    @pytest.mark.parametrize("frage", [
+        "Warum ist Kohlenstoffmonooxid tödlich?",
+        "Warum ist Kochsalz weniger giftig als Koffein?",
+        "Ist Kochsalz giftig?",
+        "Warum sind manche Pilze giftig?",
+        "Erkläre die Expositions-Risiko-Beziehung.",
+        "Wie viel Wasser soll ich am Tag trinken?",
+        "Wie viele Kalorien hat ein Kaffee?",
+    ])
+    def test_unterrichtsfrage_loest_nicht_aus(self, frage):
+        assert pruefe(frage) is None, frage
+
+    def test_auch_fuer_schuelerinnen_nicht(self):
+        assert gefahr_fuer(
+            "Warum ist Kohlenstoffmonooxid tödlich?", student_treatment=True
+        ) is None
+
+    def test_dosisfrage_erreicht_lehrkraefte_nicht(self):
+        """E1: Wer die Stunde zur Expositions-Risiko-Beziehung vorbereitet, braucht Werte."""
+        assert gefahr_fuer("Wie viel Koffein ist tödlich?", student_treatment=False) is None
+        assert gefahr_fuer("Wie viel Koffein ist tödlich?", student_treatment=True) is not None
+
+
+class TestEigeneAnweisung:
+    def test_dosisthema_nutzt_seinen_eigenen_text(self):
+        text = anweisung(pruefe("Wie viel Koffein ist tödlich?"))
+        assert "keine Menge" in text
+        assert "Giftnotruf" in text
+        # Die Versuchsanweisung passt hier nicht und darf nicht erscheinen.
+        assert "Materialliste" not in text
+
+    def test_platzhalter_wird_ersetzt(self):
+        text = anweisung(pruefe("Was bedeutet LD50?"))
+        # „Giftnotruf" steht nur im eigenen Text — ohne diese Zusicherung bestünde der
+        # Test auch dann, wenn die Versuchsanweisung zurückfiele: Sie setzt denselben
+        # Hinweis per f-String ein. (Gegenprobe 2 vom 01.10.2026 blieb genau daran grün.)
+        assert "Giftnotruf" in text
+        assert "{hinweis}" not in text
+        assert "ab welcher Menge er schadet" in text
+
+    def test_themen_ohne_eigenen_text_behalten_die_versuchsanweisung(self):
+        text = anweisung(pruefe("Kann ich zu Hause mit Natronlauge experimentieren?"))
+        assert "Materialliste" in text
+        assert "Giftnotruf" not in text
+
+
+class TestKonfigurationOhneAbsicht:
+    def test_thema_ohne_absicht_hat_eine_eigene_anweisung(self):
+        """Sonst bekäme eine Dosisfrage die Versuchsanweisung — „keine Materialliste,
+        keinen Aufbau" geht an ihr vorbei, und niemandem fiele es auf.
+        """
+        for thema in load_hausversuche().themen:
+            if not thema.absicht_noetig:
+                assert thema.anweisung, thema.thema
+
+    def test_vorgabe_ist_die_und_kopplung(self):
+        """Ein neues Thema ist im Zweifel das engere — nicht das breitere."""
+        andere = [t for t in load_hausversuche().themen if t.thema != "Giftigkeit und Dosis"]
+        assert andere, "Testaufbau: es muss weitere Themen geben"
+        assert all(t.absicht_noetig for t in andere)
