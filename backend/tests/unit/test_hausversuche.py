@@ -8,6 +8,7 @@ schlimmer als keiner.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -25,7 +26,23 @@ from app.pedagogy.hausversuche import (
 
 
 @pytest.fixture(autouse=True)
-def _frischer_cache():
+def _vorlage_als_eigene_datei(tmp_path, monkeypatch):
+    """Geprüft werden die **ausgelieferten** Muster, nicht die Konfiguration des Rechners.
+
+    Bis 02.10.2026 lasen diese Tests `config/home_experiment_triggers.yaml` — lokal die
+    eigene Datei, in CI eine Kopie der Vorlage. Gemessen mit einer eigenen Datei ohne den
+    Abschnitt „Giftigkeit und Dosis": zwölf Tests rot. Grün waren sie nur, weil die
+    Datei des Entwicklungsrechners ihn schon übernommen hatte.
+    """
+    import shutil
+
+    from app.config import settings
+
+    vorlage = Path(__file__).parents[3] / "config" / "home_experiment_triggers.example.yaml"
+    eigene = tmp_path / "home_experiment_triggers.yaml"
+    shutil.copy(vorlage, eigene)
+    shutil.copy(vorlage, tmp_path / vorlage.name)
+    monkeypatch.setattr(settings, "home_experiment_triggers_path", str(eigene))
     invalidate_hausversuche_cache()
     yield
     invalidate_hausversuche_cache()
@@ -283,7 +300,7 @@ class TestWaechterMeldetFehlendesThema:
         assert "greift dafür nicht" in caplog.text
 
     def test_bei_gleichstand_keine_meldung(self, caplog):
-        """Die mitgelieferte Instanzdatei dieses Projekts ist auf Stand."""
+        """Stimmen eigene Datei und Vorlage überein, meldet der Wächter nichts."""
         import logging
 
         invalidate_hausversuche_cache()

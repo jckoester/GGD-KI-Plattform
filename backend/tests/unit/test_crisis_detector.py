@@ -6,6 +6,7 @@ Schultext, dazu Normalisierung, Severity-Vorrang und YAML-Reihenfolge-Tie-Break.
 
 import os
 import unicodedata
+from pathlib import Path
 
 import pytest
 
@@ -183,29 +184,57 @@ class TestLetalitaet:
         kategorien = [t.category for t in load_crisis_triggers().triggers]
         assert "letalitaet" in kategorien
 
-    def test_steht_nicht_in_der_eigenen_datei(self):
+    def test_vorlage_kennzeichnet_sie_als_unabgestimmt(self):
         """E4: Das Release liefert einen Vorschlag, keine fertige Konfiguration.
 
-        Übernimmt eine Schule die Kategorie nach ihrer Abstimmung, schlägt dieser Test
-        fehl — dann ist er zu löschen. Er hält den **Auslieferungszustand** fest, nicht
-        eine Vorschrift.
+        Ausgeliefert wird nur die Vorlage; die eigene `crisis_triggers.yaml` gehört der
+        Schule. Bis 02.10.2026 prüfte dieser Test stattdessen, dass die Kategorie dort
+        **fehlt** — also die Konfiguration des Rechners, auf dem er lief. In CI, das die
+        Vorlagen nach `config/` kopiert, fiel er um; bei jeder Schule nach der
+        Abstimmung ebenso.
         """
-        from app.crisis.config import load_crisis_triggers
+        vorlage = Path(__file__).parents[3] / "config" / "crisis_triggers.example.yaml"
+        text = vorlage.read_text(encoding="utf-8")
+        davor = text[: text.index("- category: letalitaet")]
+        abschnitt = davor[davor.rindex("# ───"):]
+        assert "UNABGESTIMMTER FORMULIERUNGSVORSCHLAG" in abschnitt
 
-        invalidate_crisis_cache()
-        kategorien = [t.category for t in load_crisis_triggers().triggers]
-        assert "letalitaet" not in kategorien
+
+@pytest.fixture
+def schulkonfiguration_ohne_letalitaet(tmp_path, monkeypatch):
+    """Eine eigene `crisis_triggers.yaml` ohne die neue Kategorie, die Vorlage daneben.
+
+    Unabhängig davon, was im `config/` des laufenden Rechners steht — in CI ist das eine
+    Kopie der Vorlage, lokal die eigene Datei.
+    """
+    import shutil
+
+    import yaml
+    from app.config import settings
+
+    vorlage = Path(__file__).parents[3] / "config" / "crisis_triggers.example.yaml"
+    daten = yaml.safe_load(vorlage.read_text(encoding="utf-8"))
+    daten["triggers"] = [t for t in daten["triggers"] if t["category"] != "letalitaet"]
+    eigene = tmp_path / "crisis_triggers.yaml"
+    eigene.write_text(yaml.safe_dump(daten, allow_unicode=True), encoding="utf-8")
+    shutil.copy(vorlage, tmp_path / "crisis_triggers.example.yaml")
+
+    monkeypatch.setattr(settings, "crisis_triggers_path", str(eigene))
+    invalidate_crisis_cache()
+    yield
+    invalidate_crisis_cache()
 
 
 class TestWaechterMeldetFehlendeKategorie:
-    def test_start_nennt_die_nicht_uebernommene_kategorie(self, caplog):
+    def test_start_nennt_die_nicht_uebernommene_kategorie(
+        self, caplog, schulkonfiguration_ohne_letalitaet
+    ):
         """Ohne diese Meldung bliebe die Kategorie unbemerkt liegen — der Chat
         antwortet ja normal weiter (siehe `app/core/vorlagenabgleich.py`)."""
         import logging
 
         from app.crisis.config import load_crisis_triggers
 
-        invalidate_crisis_cache()
         with caplog.at_level(logging.WARNING):
             load_crisis_triggers()
         assert "letalitaet" in caplog.text
