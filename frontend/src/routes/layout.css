@@ -288,6 +288,27 @@ html.dark {
        eine Zeile, die zurücktritt — die Farbe trägt hier das Abzeichen, nicht die
        Fläche. */
     --planner-ausfall-stripe: rgba(0, 0, 0, 0.04);
+
+    /* ── Diagrammfarben — zur Laufzeit lesbar (chart.js) ─────────────────────────
+       chart.js zeichnet auf eine Leinwand und braucht konkrete Farbwerte, die es über
+       `getComputedStyle` liest (`lib/diagrammfarben.js`).
+
+       ⚠️ **Warum hier und nicht direkt die semantischen Tokens.** Die stehen oben in
+       `@theme inline` — dort gibt Tailwind eine Variable nur aus, wenn irgendwo ein
+       `var(…)` auf sie verweist. `--color-light-bl` gab es zur Laufzeit zufällig,
+       `--color-light-or` nicht; die Soll-Linie auf `/budget` fiel deshalb auf die
+       schwarze Vorgabefarbe von chart.js zurück (Jan, 02.10.2026). Die Verweise hier
+       sorgen dafür, dass jede verwendete Farbe ausgegeben wird.
+
+       **Rollen, keine Farbnamen.** „Verbrauch ist blau" steht damit einmal fest, für
+       alle Diagramme — die Ist-Linie auf `/budget` und die Balken unter Statistik sind
+       dieselbe Größe und sehen deshalb gleich aus. Farbpaar mit `validate_palette.js`
+       gegen die Kartenfläche (`bg-2`) geprüft, hell und dunkel. */
+    --diagramm-verbrauch: var(--color-light-bl);
+    --diagramm-zusage: var(--color-light-or);
+    --diagramm-text: var(--color-light-tx-2);
+    --diagramm-gitter: var(--color-light-ui-3);
+    --diagramm-flaeche: var(--color-light-bg-2);
 }
 .dark {
     --planner-ferien-bg:     color-mix(in srgb, var(--color-yellow-300) 8%, transparent);
@@ -305,6 +326,13 @@ html.dark {
     --planner-pruefung-border: color-mix(in srgb, var(--color-red-400) 25%, transparent);
 
     --planner-ausfall-stripe: rgba(255, 255, 255, 0.06);
+
+    /* Diagrammfarben, dunkel — eigens gewählt, keine Umkehrung (siehe :root). */
+    --diagramm-verbrauch: var(--color-dark-bl);
+    --diagramm-zusage: var(--color-dark-or);
+    --diagramm-text: var(--color-dark-tx-2);
+    --diagramm-gitter: var(--color-dark-ui-3);
+    --diagramm-flaeche: var(--color-dark-bg-2);
 }
 
 .planner-ferien-band {

@@ -53,6 +53,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Geändert
 
+- **`/budget` zeigt den Verbrauch gegen die Zusage als Verlauf.** Unter der Hochrechnung
+  stehen jetzt beide Linien Woche für Woche: Ist (tatsächlicher Verbrauch) und Soll (die
+  Zusage der Schule). Die Soll-Linie wächst nur in Unterrichtswochen und bleibt in den
+  Ferien flach. Daneben steht eine Tabelle mit denselben Werten.
+
 - **Der Modellwähler sagt jetzt, was ein Modell kostet und kann.** Im Auswahlfeld steht
   neben dem Namen eine Schätzung („~7"), im Assistenten-Editor darunter die Angaben zum
   gewählten Modell: Kosten je Nachricht, Kontextfenster (mit grober Seitenzahl),
@@ -77,6 +82,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   weiterhin in USD.
 
 ### Behoben
+
+- **Diagramme und Statistiken liegen einheitlich auf der Kartenfläche.** Im Dunkelmodus
+  war die Kostenstatistik schwarz, die Nutzungs-Heatmap grau. Beide Statistiken und das
+  Verbrauchsdiagramm unter `/budget` nutzen jetzt dieselbe erhöhte Fläche.
+
+- **Das Kostendiagramm unter Statistik passt jetzt zu Hell- und Dunkelmodus.** Es nahm
+  feste Farben, die keinem Modus folgten. Beträge stehen jetzt in deutscher Schreibweise
+  (`0,0123 €` statt `0.0123 €`); unter einem Euro mit bis zu vier Nachkommastellen, damit
+  ein einzelner Tag nicht als `0,00 €` erscheint. Die Werte gibt es zusätzlich als
+  aufklappbare Tabelle.
 
 - **Die Rollen `budget` und `statistics` lassen sich jetzt vergeben.** Die Plattform
   prüfte beide überall, die Zuordnung über Gruppen (`group_role_map` in

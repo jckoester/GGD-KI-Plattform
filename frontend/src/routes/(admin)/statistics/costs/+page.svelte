@@ -4,6 +4,8 @@
     import { ArrowLeft, ReceiptEuro, LoaderCircle } from "lucide-svelte";
     import ErrorBanner from "$lib/components/ErrorBanner.svelte";
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
+    import { token, beobachteModus } from "$lib/diagrammfarben.js";
+    import { betrag, tabellenZeilen } from "$lib/kostendiagramm.js";
 
     function toDateString(d) {
         return d.toLocaleDateString('sv-SE')
@@ -28,6 +30,7 @@
     let canvas = $state(null);
     let chart = null;
     let ChartConstructor = null;
+    let abmelden = null;
 
     async function reload() {
         if (chart) {
@@ -65,19 +68,35 @@
             return;
         }
 
-        const ctx = canvas.getContext("2d");
-        chart = new ChartConstructor(ctx, {
+        zeichnen();
+    }
+
+    // Verbrauch ist **Blau** — dieselbe Größe wie die Ist-Linie auf `/budget`, dieselbe
+    // Farbe. Bis 0.12 stand hier ein Olivgrün als fester Wert: Grün ist Statusfarbe
+    // („gut") und für Datenreihen reserviert, und ein fester Wert folgt weder der
+    // Palette noch dem Dunkelmodus. Flächig, ohne Rand: Eine halbtransparente Füllung
+    // verfälscht die geprüfte Farbe.
+    function konfiguration() {
+        const f = {
+            balken: token("verbrauch"),
+            text2: token("text"),
+            gitter: token("gitter"),
+        };
+        return {
             type: "bar",
             data: {
                 labels: data.entries.map((e) => e.period),
                 datasets: [
                     {
-                        label: "Verbrauch (€)",
+                        label: "Verbrauch",
                         data: data.entries.map((e) => e.eur),
-                        backgroundColor: "rgba(139, 154, 72, 0.7)",
-                        borderColor: "rgba(139, 154, 72, 1)",
-                        borderWidth: 1,
+                        backgroundColor: f.balken,
+                        borderWidth: 0,
+                        // Abgerundet am Datenende, eckig an der Grundlinie
+                        // (`borderSkipped` ist dort die Vorgabe).
                         borderRadius: 4,
+                        // Schmal halten: Bei drei Monaten wären es sonst breite Klötze.
+                        maxBarThickness: 24,
                     },
                 ],
             },
@@ -85,16 +104,14 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
+                    // Eine Reihe — keine Legende; die Überschrift benennt sie.
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => {
-                                const idx = ctx.dataIndex;
-                                const e = data.entries[idx];
-                                return [
-                                    `${e.eur.toFixed(4)} €`,
-                                    `${e.usd.toFixed(4)} $`,
-                                ];
+                            // Wert vorn.
+                            label: (c) => {
+                                const e = data.entries[c.dataIndex];
+                                return [betrag(e.eur, "€"), betrag(e.usd, "$")];
                             },
                         },
                     },
@@ -102,24 +119,30 @@
                 scales: {
                     x: {
                         grid: { display: false },
-                        ticks: { color: "#9ca3af" },
+                        ticks: { color: f.text2 },
                     },
                     y: {
                         beginAtZero: true,
-                        ticks: {
-                            color: "#9ca3af",
-                            callback: (v) => `${v} €`,
-                        },
+                        grid: { color: f.gitter, lineWidth: 1 },
+                        ticks: { color: f.text2, callback: (v) => betrag(v, "€") },
                     },
                 },
             },
-        });
+        };
+    }
+
+    function zeichnen() {
+        if (!canvas || !ChartConstructor || !data?.entries?.length) return;
+        chart?.destroy();
+        chart = new ChartConstructor(canvas.getContext("2d"), konfiguration());
     }
 
     onMount(async () => {
         const { Chart, registerables } = await import("chart.js");
         Chart.register(...registerables);
         ChartConstructor = Chart;
+        // Dunkelmodus eigens gewählt: beim Umschalten mit den dunklen Tokens neu zeichnen.
+        abmelden = beobachteModus(zeichnen);
 
         const [teamsData, modelsData] = await Promise.all([
             getStatsTeams(),
@@ -131,6 +154,7 @@
     });
 
     onDestroy(() => {
+        abmelden?.();
         chart?.destroy();
     });
 </script>
@@ -277,7 +301,7 @@
         {:else}
             <div
                 class="rounded border border-light-tx-2 dark:border-dark-tx-2
-                  bg-light-bg dark:bg-dark-bg p-4"
+                  bg-light-bg-2 dark:bg-dark-bg-2 p-4"
             >
                 <div class="relative h-72">
                     {#if reloading}
@@ -286,8 +310,39 @@
                         <LoaderCircle class="w-5 h-5 animate-spin text-light-tx-2 dark:text-dark-tx-2" />
                       </div>
                     {/if}
-                    <canvas bind:this={canvas}></canvas>
+                    <div
+                        class="h-full"
+                        role="img"
+                        aria-label="Verbrauch je Zeitraum, insgesamt {betrag(
+                            data.total_eur,
+                        )}. Werte in der Tabelle darunter."
+                    >
+                        <canvas bind:this={canvas} aria-hidden="true"></canvas>
+                    </div>
                 </div>
+                <!-- Tooltips ergänzen, sie dürfen nicht der einzige Weg zu einem Wert sein
+                     (Tastatur, Bildschirmleser, Ausdruck). -->
+                <details class="mt-3 text-xs text-light-tx-2 dark:text-dark-tx-2">
+                    <summary class="cursor-pointer">Als Tabelle</summary>
+                    <table class="mt-2 w-full">
+                        <thead>
+                            <tr class="text-left">
+                                <th class="pr-4 font-medium">Zeitraum</th>
+                                <th class="pr-4 font-medium text-right">Euro</th>
+                                <th class="font-medium text-right">Dollar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each tabellenZeilen(data.entries) as z (z.periode)}
+                                <tr>
+                                    <td class="pr-4">{z.periode}</td>
+                                    <td class="pr-4 text-right tabular-nums">{z.eur}</td>
+                                    <td class="text-right tabular-nums">{z.usd}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </details>
                 <div
                     class="flex flex-wrap items-center justify-between gap-4 mt-4
                     pt-4 border-t border-light-tx-2 dark:border-dark-tx-2
@@ -295,12 +350,15 @@
                 >
                     <span>
                         Gesamt:
-                        <strong>{data.total_eur.toFixed(2)} €</strong>
+                        <strong>{betrag(data.total_eur, "€")}</strong>
                         /
-                        <strong>{data.total_usd.toFixed(2)} $</strong>
+                        <strong>{betrag(data.total_usd, "$")}</strong>
                     </span>
                     <span class="text-light-tx-2 dark:text-dark-tx-2 text-xs">
-                        Kurs: 1 EUR = {data.eur_usd_rate.toFixed(4)} USD
+                        Kurs: 1 EUR = {data.eur_usd_rate.toLocaleString("de-DE", {
+                            minimumFractionDigits: 4,
+                            maximumFractionDigits: 4,
+                        })} USD
                     </span>
                 </div>
             </div>

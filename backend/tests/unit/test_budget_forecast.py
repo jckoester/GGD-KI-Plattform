@@ -73,3 +73,64 @@ def test_ueberschreitung_wird_nicht_gedeckelt():
 
     assert h.erwartet_eur == 2400.0
     assert h.auslastung == pytest.approx(1.2)
+
+
+# ── Verlauf: Ist gegen Soll (0.12, Paket 2, AP2) ─────────────────────────────
+
+from datetime import date as _date
+
+from app.budget.forecast import verlauf
+
+# Schuljahr über fünf Kalenderwochen, die dritte sind Ferien.
+_MO = [_date(2026, 9, 14), _date(2026, 9, 21), _date(2026, 9, 28),
+       _date(2026, 10, 5), _date(2026, 10, 12)]
+_UNTERRICHT = {_MO[0], _MO[1], _MO[3], _MO[4]}
+
+
+def _verlauf(heute=_date(2026, 10, 16), ist=None):
+    return verlauf(
+        beginn=_MO[0], ende=_date(2026, 10, 16), unterrichts_montage=_UNTERRICHT,
+        wochensumme_eur=10.0, ist_je_woche=ist or {}, heute=heute,
+    )
+
+
+def test_soll_ist_eine_treppe_in_den_ferien_flach():
+    """⚠️ Eine Gerade läge in den Ferien über der Wirklichkeit und würde die Schule
+    fälschlich beruhigen. Die Ferienwoche bleibt flach."""
+    assert [p.soll_eur for p in _verlauf()] == [10.0, 20.0, 20.0, 30.0, 40.0]
+
+
+def test_ferienwoche_ist_als_solche_markiert():
+    assert [p.unterricht for p in _verlauf()] == [True, True, False, True, True]
+
+
+def test_ist_ist_kumuliert_und_laeuft_auch_in_den_ferien():
+    """Wer Guthaben angesammelt hat, darf es in den Ferien nutzen — gezählt wird, was
+    tatsächlich verbraucht wurde."""
+    ist = {_MO[0]: 1.0, _MO[2]: 0.5, _MO[3]: 2.0}
+    assert [p.ist_eur for p in _verlauf(ist=ist)] == [1.0, 1.0, 1.5, 3.5, 3.5]
+
+
+def test_zukunft_hat_kein_ist():
+    """Eine Null für kommende Wochen sähe aus wie „nichts verbraucht"."""
+    punkte = _verlauf(heute=_date(2026, 9, 23), ist={_MO[0]: 1.0, _MO[1]: 1.0})
+    assert [p.ist_eur for p in punkte] == [1.0, 2.0, None, None, None]
+    # Die Zusage dagegen steht für das ganze Jahr fest.
+    assert punkte[-1].soll_eur == 40.0
+
+
+def test_endpunkt_ist_die_jahreszusage():
+    """Letzter Soll-Wert = Wochensumme × Unterrichtswochen — dieselbe Zahl, die die
+    Hochrechnung als „zugeteilt" führt."""
+    assert _verlauf()[-1].soll_eur == 10.0 * len(_UNTERRICHT)
+
+
+def test_beginn_mitten_in_der_woche():
+    """Das Schuljahr beginnt nicht immer montags — die Woche zählt trotzdem ab ihrem
+    Montag, wie bei der Zuteilung."""
+    punkte = verlauf(
+        beginn=_date(2026, 9, 16), ende=_date(2026, 9, 25),
+        unterrichts_montage={_MO[0], _MO[1]}, wochensumme_eur=1.0,
+        ist_je_woche={}, heute=_date(2026, 9, 25),
+    )
+    assert [p.montag for p in punkte] == [_MO[0], _MO[1]]

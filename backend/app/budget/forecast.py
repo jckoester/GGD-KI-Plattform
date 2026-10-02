@@ -16,6 +16,7 @@ Belastbarkeit: die Zahl der Wochen, auf denen sie beruht.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Optional
 
 #: Unter so vielen Wochen ist die Hochrechnung Rauschen — eine einzelne Projektwoche
@@ -63,3 +64,64 @@ def hochrechnen(
         zugeteilt_eur=round(zugeteilt_eur, 2) if zugeteilt_eur else None,
         belastbar=wochen_vergangen >= BELASTBAR_AB_WOCHEN,
     )
+
+
+# ── Verlauf: Ist gegen Soll, Woche für Woche (0.12, Paket 2, AP2) ─────────────
+
+
+@dataclass(frozen=True)
+class Verlaufspunkt:
+    montag: date
+    #: Kumulierte Zusage bis einschließlich dieser Woche.
+    soll_eur: float
+    #: Kumulierter Verbrauch — ``None`` für Wochen, die noch nicht begonnen haben.
+    ist_eur: Optional[float]
+    #: Unterrichtswoche? Ferienwochen bekommen keine Zuteilung — die Soll-Linie bleibt
+    #: dort flach, der Verbrauch darf weiterlaufen.
+    unterricht: bool
+
+
+def verlauf(
+    *,
+    beginn: date,
+    ende: date,
+    unterrichts_montage: set[date],
+    wochensumme_eur: float,
+    ist_je_woche: dict[date, float],
+    heute: date,
+) -> list[Verlaufspunkt]:
+    """Je Kalenderwoche des Schuljahres: kumulierte Zusage und kumulierter Verbrauch.
+
+    ⚠️ **Die Soll-Linie ist eine Treppe, keine Gerade.** Sie wächst nur in
+    Unterrichtswochen — genau wie die Zuteilung selbst (`accrual.py`). Eine Gerade über
+    das ganze Jahr läge in den Herbst- und Weihnachtsferien über der Wirklichkeit und
+    würde die Schule im Januar fälschlich beruhigen: Der Abstand zum Verbrauch sähe
+    größer aus, als die Zusage tatsächlich ist.
+
+    Die x-Achse sind deshalb **Kalenderwochen**, nicht Unterrichtswochen: Nur so sind
+    die Ferien als flache Stufe überhaupt zu sehen.
+
+    Der Verbrauch darf in den Ferien steigen — wer Guthaben angesammelt hat, kann es
+    nutzen. Gezählt wird, was tatsächlich verbraucht wurde.
+    """
+    def montag_von(d: date) -> date:
+        return d - timedelta(days=d.weekday())
+
+    punkte: list[Verlaufspunkt] = []
+    soll = 0.0
+    ist = 0.0
+    heute_montag = montag_von(heute)
+    montag = montag_von(beginn)
+    letzter = montag_von(ende)
+    while montag <= letzter:
+        unterricht = montag in unterrichts_montage
+        if unterricht:
+            soll += wochensumme_eur
+        if montag <= heute_montag:
+            ist += ist_je_woche.get(montag, 0.0)
+            ist_wert: Optional[float] = round(ist, 2)
+        else:
+            ist_wert = None
+        punkte.append(Verlaufspunkt(montag, round(soll, 2), ist_wert, unterricht))
+        montag += timedelta(days=7)
+    return punkte

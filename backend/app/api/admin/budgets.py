@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.budget.exchange import get_current_rate
-from app.budget.forecast import Hochrechnung, hochrechnen
-from app.budget.schulwochen import anzahl_unterrichtswochen, wochen_bis
+from app.budget.forecast import Hochrechnung, hochrechnen, verlauf
+from app.budget.schulwochen import anzahl_unterrichtswochen, unterrichtswochen, wochen_bis
 from app.budget.tiers import (
     _load_budget_tiers,
     _stufe,
@@ -56,6 +56,15 @@ class HochrechnungInfo(BaseModel):
     belastbar: bool
 
 
+class VerlaufInfo(BaseModel):
+    """Eine Kalenderwoche des Schuljahres: kumulierte Zusage und kumulierter Verbrauch."""
+
+    montag: date
+    soll_eur: float
+    ist_eur: Optional[float]  # None = Woche hat noch nicht begonnen
+    unterricht: bool
+
+
 class BudgetGradesResponse(BaseModel):
     grades: list[GradeInfo]  # aufsteigend nach grade, Lehrkräfte am Ende
     eur_usd_rate: float
@@ -64,6 +73,9 @@ class BudgetGradesResponse(BaseModel):
     # Jahressumme dann weg, statt eine erfundene Zahl zu zeigen.
     unterrichtswochen: Optional[int]
     hochrechnung: Optional[HochrechnungInfo]
+    #: Ist gegen Soll je Kalenderwoche (0.12, AP2). Leer, wenn sich der Verlauf nicht
+    #: ermitteln lässt — die Seite bleibt dann ohne Diagramm benutzbar.
+    verlauf: list[VerlaufInfo] = []
 
 
 class GradeUpdate(BaseModel):
@@ -129,15 +141,36 @@ async def get_budget_grades(
         # unbenutzbar machen — die Oberfläche lässt die Jahressumme dann weg.
         logger.exception("Unterrichtswochen nicht ermittelbar")
 
+    hochrechnung, verlauf_punkte = await _hochrechnung(db, rows, wochen, eur_usd_rate)
     return BudgetGradesResponse(
         grades=rows, eur_usd_rate=eur_usd_rate, unterrichtswochen=wochen,
-        hochrechnung=await _hochrechnung(db, rows, wochen, eur_usd_rate),
+        hochrechnung=hochrechnung, verlauf=verlauf_punkte,
     )
+
+
+async def _wochenverbrauch(db: AsyncSession, beginn: date, eur_usd: float) -> dict[date, float]:
+    """Verbrauch je Kalenderwoche (Montag, Ortszeit) seit Schuljahresbeginn, in Euro.
+
+    ⚠️ **Die einzige Quelle für den Verbrauch auf dieser Seite.** Die Hochrechnung
+    summiert genau diese Wochen, der Verlauf kumuliert sie — der letzte Punkt der
+    Ist-Linie ist damit die Zahl „bisher verbraucht", per Konstruktion und nicht, weil
+    zwei Abfragen zufällig übereinstimmen.
+    """
+    zeilen = (await db.execute(
+        text(
+            "SELECT (DATE_TRUNC('week', m.created_at AT TIME ZONE 'Europe/Berlin'))::date "
+            "AS montag, COALESCE(SUM(m.cost_usd), 0)::float AS summe "
+            "FROM messages m WHERE m.cost_usd IS NOT NULL AND m.created_at >= :beginn "
+            "GROUP BY 1"
+        ),
+        {"beginn": beginn},
+    )).all()
+    return {z.montag: z.summe / eur_usd for z in zeilen}
 
 
 async def _hochrechnung(
     db: AsyncSession, rows: list[GradeInfo], wochen: Optional[int], eur_usd: float
-) -> Optional[HochrechnungInfo]:
+) -> tuple[Optional[HochrechnungInfo], list[VerlaufInfo]]:
     """Bisheriger Verbrauch im laufenden Schuljahr, hochgerechnet aufs ganze Jahr.
 
     Der Verbrauch kommt aus der **eigenen** Datenbank (`messages.cost_usd`), nicht vom
@@ -149,31 +182,35 @@ async def _hochrechnung(
     umgerechnet: `get_current_rate` liefert dann 1,0, und eine zweite Division wäre falsch.
     """
     if not wochen:
-        return None
+        return None, []
     try:
         cfg = load_school_year()
-        vergangen = len(wochen_bis(date.today(), cfg))
-        result = await db.execute(
-            text(
-                "SELECT COALESCE(SUM(m.cost_usd), 0)::float FROM messages m "
-                "WHERE m.cost_usd IS NOT NULL AND m.created_at >= :beginn"
-            ),
-            {"beginn": cfg.beginn},
-        )
-        verbraucht = float(result.scalar_one() or 0.0) / eur_usd
-        zugeteilt = sum(r.max_budget_eur * r.user_count for r in rows) * wochen
+        heute = date.today()
+        vergangen = len(wochen_bis(heute, cfg))
+        je_woche = await _wochenverbrauch(db, cfg.beginn, eur_usd)
+        verbraucht = sum(je_woche.values())
+        wochensumme = sum(r.max_budget_eur * r.user_count for r in rows)
+        zugeteilt = wochensumme * wochen
         h: Hochrechnung = hochrechnen(
             verbraucht_eur=verbraucht,
             wochen_vergangen=vergangen,
             wochen_gesamt=wochen,
             zugeteilt_eur=zugeteilt or None,
         )
-        return HochrechnungInfo(**h.__dict__)
+        punkte = verlauf(
+            beginn=cfg.beginn,
+            ende=cfg.ende,
+            unterrichts_montage={w.montag for w in unterrichtswochen(cfg)},
+            wochensumme_eur=wochensumme,
+            ist_je_woche=je_woche,
+            heute=heute,
+        )
+        return HochrechnungInfo(**h.__dict__), [VerlaufInfo(**p.__dict__) for p in punkte]
     except Exception:
         # Die Budget-Seite muss ohne die Hochrechnung benutzbar bleiben — sie ist
         # Zusatzinformation, nicht ihr Zweck.
         logger.exception("Hochrechnung nicht ermittelbar")
-        return None
+        return None, []
 
 
 @router.post("/grades", response_model=BudgetGradesUpdateResult)

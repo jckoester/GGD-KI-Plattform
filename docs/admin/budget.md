@@ -248,6 +248,27 @@ achthundert Einzelabfragen für eine Übersichtsseite verbieten sich.
 > Etwas Klügeres als eine lineare Fortschreibung wäre Scheingenauigkeit — es gibt keine
 > Vorjahresdaten, an denen sich ein Saisonmuster ablesen ließe.
 
+### Verbrauch gegen Zusage — der Verlauf *(seit 0.12)*
+
+Unter der Hochrechnung zeigt `/budget` beide Größen Woche für Woche, aufsummiert seit
+Schuljahresbeginn: **Ist** (blau, durchgezogen) ist der tatsächliche Verbrauch, **Soll**
+(orange, gestrichelt) die Zusage der Schule. Eine Tabelle darunter führt dieselben Werte.
+
+**Die Soll-Linie ist eine Treppe.** Sie wächst nur in Unterrichtswochen; in den Ferien
+bleibt sie flach, so wie die Zuteilung selbst. Eine Gerade über das ganze Jahr läge in den
+Ferien über der Wirklichkeit und ließe den Abstand zum Verbrauch größer erscheinen, als er
+ist. ⚠️ Die Stufen erscheinen nur, wenn `school_year.yaml` Ferien enthält — mit
+`ferien: []` (wie in einer frischen Installation) ist die Linie gerade.
+
+**Ist läuft auch in den Ferien.** Wer Guthaben angesammelt hat, darf es nutzen.
+
+**Der letzte Ist-Punkt ist die Zahl „bisher verbraucht" darüber.** Beide entstehen aus
+derselben Abfrage. Weichen sie je voneinander ab, ist das ein Fehler, keine Rundung.
+
+Liegt der Verbrauch weit unter der Zusage, liegt die blaue Linie nah an der Nulllinie. Das
+ist die Aussage, um die es der Hochrechnung geht: Es fließt nur ein Bruchteil ab, und die
+Wochenbeträge fürs zweite Halbjahr lassen sich anheben.
+
 ## Admin-Übersicht (`/budget`)
 
 Im Admin-Bereich zeigt `/budget` eine aggregierte Übersicht der Ausgaben —

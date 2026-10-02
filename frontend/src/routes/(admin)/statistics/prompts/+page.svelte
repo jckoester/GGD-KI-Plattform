@@ -181,11 +181,12 @@
         <LoadingBanner />
     {:else if data}
         <div
-            class="rounded border border-light-tx-2 dark:border-dark-tx-2 inline-block"
+            class="rounded border border-light-tx-2 dark:border-dark-tx-2 inline-block
+                   bg-light-bg-2 dark:bg-dark-bg-2"
         >
             <table class="border-collapse text-xs">
                 <thead>
-                    <tr class="bg-light-ui-3 dark:bg-dark-ui-3">
+                    <tr>
                         <!-- leere Ecke über der Stunden-Spalte -->
                         <th
                             class="w-6 border-b border-r border-light-tx-2 dark:border-dark-tx-2"
@@ -236,7 +237,7 @@
                          {hour % 3 === 2 ? 'border-b-2' : 'border-b'}
                          border-light-tx-2 dark:border-dark-tx-2
                          {count === 0
-                                        ? 'bg-light-ui-3 dark:bg-dark-ui-3'
+                                        ? ''
                                         : 'bg-light-gr-2 dark:bg-dark-gr-2'}"
                                     style={count > 0
                                         ? `opacity: ${opacity.toFixed(2)}`

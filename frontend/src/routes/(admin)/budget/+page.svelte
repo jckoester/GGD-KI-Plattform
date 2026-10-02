@@ -4,6 +4,8 @@
     import { PiggyBank, ArrowLeft, LoaderCircle } from 'lucide-svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
     import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';
+    import BudgetVerlauf from '$lib/components/BudgetVerlauf.svelte';
+    import { zeigbar } from '$lib/budgetverlauf.js';
 
     let data = $state(null);           // BudgetGradesResponse
     let loading = $state(true);
@@ -203,6 +205,12 @@
             </table>
         </div>
 
+        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-4">
+            Spalte "Nutzer (DB)" zeigt nur Nutzer, die sich mindestens einmal angemeldet haben.
+            Für die Kostenschätzung tatsächliche Schülerzahl eintragen.
+        </p>
+
+
         {#if hr}
             <div class="mt-6 rounded border border-light-ui-3 dark:border-dark-ui-3
                         bg-light-bg-2 dark:bg-dark-bg-2 px-4 py-3">
@@ -249,10 +257,10 @@
             </div>
         {/if}
 
-        <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-4">
-            Spalte "Nutzer (DB)" zeigt nur Nutzer, die sich mindestens einmal angemeldet haben.
-            Für die Kostenschätzung tatsächliche Schülerzahl eintragen.
-        </p>
+        {#if zeigbar(data?.verlauf)}
+            <BudgetVerlauf verlauf={data.verlauf} />
+        {/if}
+
 
         <div class="mt-4 rounded border border-light-tx-2 dark:border-dark-tx-2 bg-light-ui dark:bg-dark-ui px-4 py-3 text-sm text-light-tx-2 dark:text-dark-tx-2 space-y-1">
             <p><strong class="text-light-tx dark:text-dark-tx">Wirkung einer Budgetänderung:</strong></p>
@@ -323,7 +331,7 @@
             <ul class="list-disc list-inside text-light-tx dark:text-dark-tx">
                 {#each changedGrades as g}
                     <li>
-                        {g.label}: {g.max_budget_eur.toFixed(2)} € → 
+                        {g.label}: {g.max_budget_eur.toFixed(2)} € →
                         {parseFloat(editedBudgets[g.key]).toFixed(2)} €
                     </li>
                 {/each}
