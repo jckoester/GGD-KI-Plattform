@@ -257,3 +257,46 @@ pseudonymisiert: es sind keine Klarnamen sichtbar.
 Für rechtlich begründete Einzelfälle (z. B. Missbrauchsverdacht) ist eine
 De-Anonymisierung über das Audit-Log möglich — dies wird protokolliert.
 Details dazu in [Datenschutz & Betrieb](datenschutz-betrieb.md).
+
+## Zuschläge von Hand
+
+Seit 0.12 lässt sich auf `/budget` unter **„Zuschlag aufbuchen"** zusätzliches Budget
+vergeben — für eine Projektwoche, eine Facharbeit, eine Fortbildung. Das dürfen alle mit
+der Rolle `budget` oder `admin`.
+
+**Wem.** Einer **Gruppe** (Klasse, Unterrichtsgruppe, AG, Fachschaft) oder einer
+**einzelnen Lehrkraft**. Schüler:innen bekommen Zuschläge über ihre Gruppe; einzeln
+aufbuchen lässt sich nur, wer eine Kennung nennen kann, und die zeigt das Profil vorerst
+nur Lehrkräften.
+
+**Der Betrag gilt je Person.** „Die 7b bekommt 0,50 €" heißt: jedes Mitglied bekommt
+0,50 €. Budgets hängen an der einzelnen Person, einen gemeinsamen Topf gibt es nicht.
+
+**Erst prüfen, dann buchen.** „Prüfen" nennt Anzahl und Summe, getrennt nach Schüler:innen
+und Lehrkräften, bevor irgendetwas gebucht ist — etwa „28 Schüler:innen, 1 Lehrkraft:
+29 × 0,50 € = 14,50 €". „Jetzt aufbuchen" ist erst danach frei, und nur, solange die
+Eingaben noch genau die geprüften sind. Eine feste Obergrenze gibt es bewusst nicht; die
+Vorschau ist der Schutz gegen einen Tippfehler.
+
+⚠️ **Eine Unterrichtsgruppe enthält auch ihre Lehrkraft.** Deshalb gibt es die Wahl „nur
+Schüler:innen / nur Lehrkräfte / alle". Bei Klassen und Unterrichtsgruppen steht sie auf
+Schüler:innen, bei Fachschaften auf Lehrkräften.
+
+**Einzelne Lehrkraft — über die Kennung.** Die Plattform kennt keine Namen. Die Lehrkraft
+liest ihre Kennung im Profil ab (zwölf Zeichen, etwa `a3f9 c2b8 1e04`) und nennt sie; Sie
+geben sie ein. Leerzeichen und Großschreibung spielen keine Rolle.
+
+**Was ein Zuschlag bewirkt.** Er wird sofort gutgeschrieben und läuft bis zum Ende des
+Schuljahres. Die wöchentliche Aufstockung läuft danach **normal weiter** — das ist der
+Unterschied zu einem bloß am Proxy erhöhten Limit: Ein solches läge über der Grenze, bis zu
+der sich Guthaben ansammeln darf, und hielte die Aufstockung an, bis der Verbrauch
+aufgeholt hat. Gemessen waren das sieben Wochen ohne Zuwachs.
+
+**Das Protokoll.** Jeder Zuschlag ist eine Zeile in `budget_grants`, mit Grund, Datum
+und dem Pseudonym der vergebenden Person. Geändert oder gelöscht wird nichts, außer mit
+dem Konto der begünstigten Person (siehe [Datenschutz & Betrieb](datenschutz-betrieb.md)).
+
+**Wenn etwas nicht klappt.** Ist der LiteLLM-Proxy für einzelne Konten nicht erreichbar,
+wird dort **nichts** gebucht, und die Meldung nennt die Zahl. Ein zweiter Versuch ist
+gefahrlos, es wird nicht doppelt gebucht. Konten ohne Budgetgrenze werden nicht
+angefasst, ihnen einen Betrag zu setzen hieße, sie zu begrenzen.

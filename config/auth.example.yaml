@@ -60,6 +60,17 @@ group_role_map:
   # Die Rolle darf eigenständig vorkommen (ohne Lehrkraft-Rolle).
   - group: ki-reviewer
     role: review
+  # Budget verwalten (Stufenbeträge, Zuschläge von Hand) und Statistik einsehen — ohne
+  # die übrigen Admin-Rechte. Seit 0.12 vergebbar; davor ließ die Konfiguration beide
+  # Rollen nicht zu, obwohl die Plattform sie überall prüfte.
+  #
+  # ⚠️ **Nur zusätzlich zu `teacher` oder `admin`.** Anders als `review` sind beide keine
+  # eigenständigen Login-Rollen: Wer NUR in einer dieser Gruppen ist (etwa das
+  # Sekretariat), kann sich nicht anmelden.
+  # - group: ki-budget
+  #   role: budget
+  # - group: ki-statistik
+  #   role: statistics
 
 # SSO-Gruppenimport: Namensmuster für automatischen Gruppentyp-Zuordnung
 # Jedes Muster muss genau eine Capture-Group enthalten (für Name-Ableitung).

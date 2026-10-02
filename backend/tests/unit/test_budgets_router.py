@@ -391,3 +391,132 @@ def test_post_grades_erhaelt_den_einheiten_faktor():
         assert danach["vorsprung_wochen"] == 3
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+
+# ========== Zuschläge von Hand (0.12, Paket 2, AP1) ==========
+
+
+KENNUNG = "a3f9c2b81e04"
+VOLL = KENNUNG + "0" * 52
+
+
+def _zuschlag_app(payload, *, treffer=1):
+    """Test-App, deren DB zu einer Kennung `treffer` Konten findet; Buchung abgefangen."""
+    from app.db.models import PseudonymAudit
+
+    session = AsyncMock()
+    ergebnis = MagicMock()
+    ergebnis.scalars.return_value.all.return_value = [
+        PseudonymAudit(pseudonym=VOLL[:-1] + str(i), role="teacher") for i in range(treffer)
+    ]
+    session.execute = AsyncMock(return_value=ergebnis)
+    return _make_budgets_app(payload, session), session
+
+
+def _ergebnis(gebucht=1):
+    from app.budget.zuschlag import Ergebnis
+    return Ergebnis(gebucht=["ziel"] * gebucht)
+
+
+@pytest.mark.parametrize("payload", [_fake_budget_payload(), _fake_admin_payload()])
+def test_zuschlag_darf_wer_budget_verwaltet(payload):
+    """F3: `budget` **oder** `admin` — wie im übrigen Budget-Bereich."""
+    app, _ = _zuschlag_app(payload)
+    with patch("app.api.admin.budgets.buche_auf", new=AsyncMock(return_value=_ergebnis())), \
+         patch("app.api.admin.budgets.get_current_rate", new=AsyncMock(return_value=1.1)), \
+         patch("app.api.admin.budgets.load_school_year") as jahr:
+        jahr.return_value.schuljahr = "2026/27"
+        r = TestClient(app).post("/budgets/grants", json={
+            "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": KENNUNG})
+    assert r.status_code == 200, r.text
+    assert r.json()["gebucht"] == 1
+
+
+def test_zuschlag_lehrkraft_allein_darf_nicht():
+    """Eine Lehrkraft ohne Budget-Rolle darf sich nicht selbst (oder anderen) aufbuchen."""
+    app, _ = _zuschlag_app(_fake_teacher_payload())
+    r = TestClient(app).post("/budgets/grants", json={
+        "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": KENNUNG})
+    assert r.status_code == 403
+
+
+def test_zuschlag_unbekannte_kennung_404():
+    """Früh und deutlich — sonst meldete erst der Proxy eine „Störung", wo ein
+    Tippfehler war."""
+    app, _ = _zuschlag_app(_fake_admin_payload(), treffer=0)
+    r = TestClient(app).post("/budgets/grants", json={
+        "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": KENNUNG})
+    assert r.status_code == 404
+
+
+@pytest.mark.parametrize("koerper", [
+    {"betrag_eur": 0.5, "grund": "Klausur"},                                   # kein Ziel
+    {"betrag_eur": 0.5, "grund": "Klausur", "pseudonym": "a", "gruppe_id": 1},  # zwei Ziele
+    {"betrag_eur": 0, "grund": "Klausur", "pseudonym": "a"},                   # null
+    {"betrag_eur": 0.5, "grund": "", "pseudonym": "a"},                        # kein Grund
+])
+def test_zuschlag_unsinn_422(koerper):
+    app, _ = _zuschlag_app(_fake_admin_payload())
+    assert TestClient(app).post("/budgets/grants", json=koerper).status_code == 422
+
+
+def test_probelauf_bucht_nichts_und_nennt_summe():
+    """Gegen den Tippfehler (5,00 → 500) schützt der Probelauf, nicht eine Obergrenze im
+    Code: Er nennt Anzahl und Summe, **bevor** gebucht wird."""
+    app, _ = _zuschlag_app(_fake_admin_payload())
+    buchen = AsyncMock()
+    with patch("app.api.admin.budgets.buche_auf", new=buchen):
+        r = TestClient(app).post("/budgets/grants", json={
+            "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": KENNUNG, "probelauf": True})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["anzahl"] == 1
+    assert body["summe_eur"] == 0.5
+    assert body["einheiten_je_person"] == 5000
+    buchen.assert_not_awaited()
+
+
+
+# ── Kennung statt vollem Pseudonym (Entscheidung Jan, 02.10.2026) ──
+
+
+@pytest.mark.parametrize("eingabe", [KENNUNG, "a3f9 c2b8 1e04", "A3F9C2B81E04", VOLL])
+def test_kennung_wird_in_jeder_schreibweise_aufgeloest(eingabe):
+    """Das Profil zeigt sie in Vierergruppen, damit sie sich vorlesen lässt — die
+    Eingabe muss Leerzeichen und Großschreibung vertragen."""
+    app, _ = _zuschlag_app(_fake_admin_payload())
+    r = TestClient(app).post("/budgets/grants", json={
+        "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": eingabe, "probelauf": True})
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.parametrize("eingabe", ["a3f9c2", "a3f9c2b81e0x", "Max Muster"])
+def test_zu_kurze_oder_unsinnige_kennung_422(eingabe):
+    """Unter 12 Zeichen träfe ein Präfix womöglich mehrere Konten; Nicht-Hex ist sicher
+    keine Kennung — beides vorher abweisen, nicht in der Datenbank raten."""
+    app, _ = _zuschlag_app(_fake_admin_payload())
+    r = TestClient(app).post("/budgets/grants", json={
+        "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": eingabe})
+    assert r.status_code == 422
+
+
+def test_mehrdeutige_kennung_409():
+    """Fallen zwei Konten auf dieselben 12 Zeichen, wird nicht geraten."""
+    app, _ = _zuschlag_app(_fake_admin_payload(), treffer=2)
+    r = TestClient(app).post("/budgets/grants", json={
+        "betrag_eur": 0.5, "grund": "Klausur", "pseudonym": KENNUNG})
+    assert r.status_code == 409
+
+
+def test_gruppenliste_fuer_die_budgetrolle():
+    """Die Budget-Rolle braucht eine Gruppenliste — die Admin-Liste ist ihr verschlossen."""
+    app, session = _zuschlag_app(_fake_budget_payload())
+    ergebnis = MagicMock()
+    ergebnis.all.return_value = []
+    session.execute = AsyncMock(return_value=ergebnis)
+    assert TestClient(app).get("/budgets/grants/gruppen").status_code == 200
+
+
+def test_gruppenliste_nicht_fuer_lehrkraefte():
+    app, _ = _zuschlag_app(_fake_teacher_payload())
+    assert TestClient(app).get("/budgets/grants/gruppen").status_code == 403

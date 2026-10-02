@@ -884,6 +884,58 @@ class BudgetAccrual(Base):
     )
 
 
+class BudgetGrant(Base):
+    """Ein von Hand aufgebuchter Zuschlag — und zugleich sein Protokoll (0.12, AP1).
+
+    **Append-only.** Jede Vergabe ist eine Zeile; geändert oder gelöscht wird nichts
+    (außer mit dem Konto, s. u.). Damit ist die Tabelle das Protokoll, das die Roadmap
+    verlangt — ein eigenes `audit_log` braucht es dafür nicht (ADR-010 Teil 2 ist offen).
+
+    **Warum eine eigene Tabelle und nicht einfach `max_budget` anheben.** Die
+    Wochenaufstockung deckelt die Grenze auf `verbrauch + vorsprung × wochenbetrag`. Ein
+    nur am Proxy erhöhtes Limit liegt über diesem Deckel und friert die Aufstockung ein,
+    bis der Verbrauch aufholt — gemessen: sieben Wochen ohne Zuwachs. Der Zuschlag wäre
+    eine **Vorauszahlung** der kommenden Wochen, keine Zugabe. Die Summe dieser Zeilen
+    hebt deshalb den Deckel mit an (`accrual.berechne(zusatz_usd=…)`).
+
+    **Je Mitglied, nicht je Gruppe** (F1). Budgets leben am LiteLLM-*User*; eine
+    Gruppenvergabe schreibt eine Zeile je Mitglied und vermerkt die Gruppe in
+    `quelle_gruppe_id`. Wer später beitritt, bekommt nichts — der Zuschlag hängt am
+    Menschen, nicht an der Mitgliedschaft.
+
+    **Endet mit dem Schuljahr** (F2). `schuljahr` filtert in der Aufstockung; Zeilen
+    eines früheren Jahres wirken nicht mehr.
+
+    ⚠️ **Kein Fremdschlüssel auf `pseudonym_audit`** — wie `budget_accrual`. Die Zeilen
+    werden deshalb in `cleanup_inactive_accounts` ausdrücklich mitgelöscht; ohne diese
+    Zeile bliebe je verlassenem Konto ein Pseudonym zurück, das nichts mehr aufräumt.
+    """
+
+    __tablename__ = "budget_grants"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pseudonym: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    # Aus school_year.yaml, z. B. "2026/27".
+    schuljahr: Mapped[str] = mapped_column(Text, nullable=False)
+    betrag_usd: Mapped[float] = mapped_column(nullable=False)
+    grund: Mapped[str] = mapped_column(Text, nullable=False)
+    # Pseudonym der vergebenden Person — keine reale Identität.
+    erstellt_von: Mapped[str] = mapped_column(Text, nullable=False)
+    erstellt_am: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+    # Gruppe, über die vergeben wurde; NULL bei Einzelvergabe. Wird die Gruppe
+    # gelöscht, bleibt die Zeile (sie ist Protokoll) und verliert nur den Verweis.
+    quelle_gruppe_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("groups.id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint("betrag_usd > 0", name="check_budget_grants_positiv"),
+        Index("ix_budget_grants_pseudonym_schuljahr", "pseudonym", "schuljahr"),
+    )
+
+
 # 8. pseudonym_audit
 class PseudonymAudit(Base):
     __tablename__ = "pseudonym_audit"

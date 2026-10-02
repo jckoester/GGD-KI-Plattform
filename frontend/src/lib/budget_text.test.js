@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { zuwachsText, zuwachsKurz, uebertragText, kostenAnzeige, kostenErklaerung } from "./budget_text.js";
+import {
+    zuwachsText,
+    zuwachsKurz,
+    uebertragText,
+    kostenAnzeige,
+    kostenErklaerung,
+    zuschlagText,
+} from "./budget_text.js";
 import { text as einheitenText } from "./einheiten.js";
 
 describe("zuwachsText", () => {
@@ -128,5 +135,24 @@ describe("kostenErklaerung", () => {
     it("erklärt nichts, wo es nichts zu erklären gibt", () => {
         expect(kostenErklaerung("vollstaendig")).toBeNull();
         expect(kostenErklaerung(null)).toBeNull();
+    });
+});
+
+
+describe("zuschlagText", () => {
+    it("nennt den Zuschlag in Einheiten und dass er mit dem Schuljahr endet", () => {
+        // 0,55 USD / 1,1 × 10 000 = 5 000 Einheiten
+        expect(zuschlagText({ zuschlag_usd: 0.55, eur_usd_rate: 1.1, einheiten_je_euro: 10000 }))
+            .toBe(`Darin enthalten: ${einheitenText(5000)} als Zuschlag in diesem Schuljahr.`);
+    });
+
+    it("schweigt ohne Zuschlag", () => {
+        expect(zuschlagText({ zuschlag_usd: 0, eur_usd_rate: 1.1 })).toBeNull();
+        expect(zuschlagText({ zuschlag_usd: null, eur_usd_rate: 1.1 })).toBeNull();
+        expect(zuschlagText({})).toBeNull();
+    });
+
+    it("schweigt ohne Kurs, statt eine falsche Zahl zu nennen", () => {
+        expect(zuschlagText({ zuschlag_usd: 0.55 })).toBeNull();
     });
 });

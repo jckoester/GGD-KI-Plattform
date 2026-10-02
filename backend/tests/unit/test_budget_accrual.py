@@ -114,14 +114,22 @@ def test_wer_nichts_nutzt_sammelt_nichts_an():
 
 
 class _FakeDb:
-    """Minimaler Ersatz für `AsyncSession.get` / `add` — kein Postgres nötig."""
+    """Minimaler Ersatz für `AsyncSession.get` / `add` / `scalar` — kein Postgres nötig.
 
-    def __init__(self, stand=None):
+    `scalar` beantwortet nur eine Frage: die Zuschlagssumme (0.12, AP1). Vorgabe 0,0 —
+    damit prüfen alle Fälle von vor 0.12 genau das, was sie vorher prüften.
+    """
+
+    def __init__(self, stand=None, zuschlag=0.0):
         self.stand = stand
+        self.zuschlag = zuschlag
         self.hinzugefuegt = []
 
     async def get(self, _modell, _pk):
         return self.stand
+
+    async def scalar(self, _abfrage):
+        return self.zuschlag
 
     def add(self, obj):
         self.hinzugefuegt.append(obj)
@@ -517,3 +525,97 @@ async def test_lauf_nullt_den_verbrauch_nur_beim_jahreswechsel():
     with lauf(Zuteilung(6.0, 1, 2, jahreswechsel=False)):
         await run(dry_run=False, stichtag=date(2026, 9, 22), pseudonym_filter=None)
     assert client.update_user_budget.await_args.kwargs["spend"] is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Zuschläge von Hand (0.12, Paket 2, AP1)
+#
+# Gemessen am 29.09.2026 mit dieser Funktion: Ein am Proxy erhöhtes Limit liegt über dem
+# Deckel `verbrauch + vorsprung × wochenbetrag` und friert die Aufstockung ein — sieben
+# Wochen ohne Zuwachs. Der Zuschlag war eine Vorauszahlung, keine Zugabe.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _vier_wochen(zusatz):
+    """Grenze 3,00 + 5,00 Zuschlag, Verbrauch 0,50 und +0,50 je Woche; vier Läufe."""
+    grenze, verbrauch, zuwachs = 3.0 + 5.0, 0.5, []
+    for _ in range(4):
+        neu = berechne(
+            wochenbetrag_usd=1.0, aktuelle_grenze_usd=grenze, verbrauch_usd=verbrauch,
+            fehlende_wochen=1, vorsprung=3, zusatz_usd=zusatz,
+        )
+        zuwachs.append(round(neu - grenze, 4))
+        grenze, verbrauch = neu, verbrauch + 0.5
+    return zuwachs
+
+
+def test_ohne_zuschlag_im_deckel_steht_die_aufstockung_still():
+    """Der Befund selbst, als Prüfung festgehalten: So verhielt es sich vor 0.12."""
+    assert _vier_wochen(zusatz=0.0) == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_zuschlag_ueberlebt_vier_aufstockungen():
+    """Mit dem Zuschlag im Deckel läuft die Aufstockung weiter.
+
+    +0,50 statt +1,00 je Woche ist richtig: Der Deckel bindet wie bei jedem sparsamen
+    Konto (Verbrauch +0,50/Woche). Entscheidend ist, dass überhaupt etwas dazukommt.
+    """
+    assert _vier_wochen(zusatz=5.0) == [0.5, 0.5, 0.5, 0.5]
+
+
+def test_zuschlag_null_aendert_nichts():
+    """Vorgabe 0,0 — bitweise dasselbe Ergebnis wie ohne den Parameter."""
+    for grenze, verbrauch in [(5.0, 4.5), (None, 0.0), (3.0, 0.0), (20.0, 18.0)]:
+        ohne = berechne(wochenbetrag_usd=1.0, aktuelle_grenze_usd=grenze,
+                        verbrauch_usd=verbrauch, fehlende_wochen=1, vorsprung=3)
+        mit = berechne(wochenbetrag_usd=1.0, aktuelle_grenze_usd=grenze,
+                       verbrauch_usd=verbrauch, fehlende_wochen=1, vorsprung=3,
+                       zusatz_usd=0.0)
+        assert ohne == mit
+
+
+@pytest.mark.asyncio
+async def test_plane_holt_den_zuschlag_selbst():
+    """Aus der Datenbank, nicht als Parameter — ein vergessener Parameter mit Vorgabe
+    0,0 sähe genau aus wie „kein Zuschlag"."""
+    from app.budget.accrual import plane
+    from app.db.models import BudgetAccrual
+
+    stand = BudgetAccrual(pseudonym="p", schuljahr="2026/27", letzte_woche=1)
+    zuteilung = await plane(
+        _FakeDb(stand, zuschlag=5.0), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=8.0, verbrauch_usd=0.5,
+        stichtag=date(2026, 9, 22), cfg=_schuljahr(),
+    )
+    assert zuteilung.neue_grenze_usd == 8.5, "ohne Zuschlag im Deckel bliebe es bei 8,0"
+
+
+@pytest.mark.asyncio
+async def test_jahreswechsel_behaelt_den_zuschlag_des_neuen_jahres():
+    """⚠️ Wird im September aufgebucht, **bevor** der erste Lauf des Jahres stattfand,
+    steht der Betrag schon am Proxy. Der Jahreswechsel setzte die Grenze auf genau einen
+    Wochenbetrag zurück — der Zuschlag wäre still verschwunden."""
+    from app.budget.accrual import plane
+    from app.db.models import BudgetAccrual
+
+    alt = BudgetAccrual(pseudonym="p", schuljahr="2025/26", letzte_woche=38)
+    zuteilung = await plane(
+        _FakeDb(alt, zuschlag=2.0), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=42.0, verbrauch_usd=39.0,
+        stichtag=date(2026, 9, 15), cfg=_schuljahr(),
+    )
+    assert zuteilung.jahreswechsel is True
+    assert zuteilung.neue_grenze_usd == 3.0, "ein Wochenbetrag plus Zuschlag"
+
+
+@pytest.mark.asyncio
+async def test_neuaufbau_verwirft_den_zuschlag_nicht():
+    from app.budget.accrual import plane
+
+    zuteilung = await plane(
+        _FakeDb(None, zuschlag=5.0), "p",
+        wochenbetrag_usd=1.0, aktuelle_grenze_usd=100.0, verbrauch_usd=2.0,
+        stichtag=date(2026, 9, 15), cfg=_schuljahr(), neuaufbau=True,
+    )
+    # Auf Verbrauch + Zuschlag aufgesetzt, plus ein Wochenbetrag.
+    assert zuteilung.neue_grenze_usd == 8.0

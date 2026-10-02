@@ -22,12 +22,12 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.budget.schulwochen import Unterrichtswoche, woche_am, wochen_bis
 from app.budget.tiers import vorsprung_wochen
-from app.db.models import BudgetAccrual
+from app.db.models import BudgetAccrual, BudgetGrant
 from app.planning.calendar import SchoolYearConfig, load_school_year
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ def berechne(
     verbrauch_usd: float,
     fehlende_wochen: int,
     vorsprung: int,
+    zusatz_usd: float = 0.0,
 ) -> float:
     """Die neue Obergrenze. Reine Rechnung, ohne Datenbank und ohne Proxy.
 
@@ -67,10 +68,30 @@ def berechne(
     Vorsprung — sonst wäre der ausgefallene Cron ein Freibrief.
     """
     gewachsen = (aktuelle_grenze_usd or 0.0) + fehlende_wochen * wochenbetrag_usd
-    gedeckelt = verbrauch_usd + vorsprung * wochenbetrag_usd
+    # ⚠️ **Der Zuschlag hebt den Deckel, nicht nur die Grenze** (0.12, AP1). Ein von Hand
+    # aufgebuchter Betrag steckt bereits in `aktuelle_grenze_usd` (er wird beim Aufbuchen
+    # sofort am Proxy gesetzt) — also auch in `gewachsen`. Fehlte er im Deckel, läge die
+    # Grenze darüber und die Aufstockung stünde still, bis der Verbrauch aufholt:
+    # gemessen sieben Wochen ohne Zuwachs, der Zuschlag wäre eine Vorauszahlung statt
+    # einer Zugabe. Vorgabe 0,0 — ohne Zuschlag ändert sich nichts.
+    gedeckelt = verbrauch_usd + vorsprung * wochenbetrag_usd + zusatz_usd
     # Nie unter die bestehende Grenze: Eine Kürzung wäre für die Nutzerin ein plötzlich
     # verschwundenes Guthaben, und der Deckel soll bremsen, nicht wegnehmen.
     return round(max(min(gewachsen, gedeckelt), aktuelle_grenze_usd or 0.0), 4)
+
+
+async def zuschlag_usd(db: AsyncSession, pseudonym: str, schuljahr: str) -> float:
+    """Summe der von Hand aufgebuchten Zuschläge in **diesem** Schuljahr (F2).
+
+    Zeilen eines früheren Schuljahres zählen nicht — ein Zuschlag endet mit dem Jahr.
+    """
+    summe = await db.scalar(
+        select(func.coalesce(func.sum(BudgetGrant.betrag_usd), 0.0)).where(
+            BudgetGrant.pseudonym == pseudonym,
+            BudgetGrant.schuljahr == schuljahr,
+        )
+    )
+    return float(summe or 0.0)
 
 
 async def plane(
@@ -118,6 +139,10 @@ async def plane(
             )
         return Zuteilung(None, 0, None, "keine Unterrichtswoche (Ferien)")
 
+    # Aus der Datenbank, nicht als Parameter: Ein Zuschlag, den der Aufrufer zu übergeben
+    # vergisst, wirkte still nicht — die Vorgabe 0,0 sähe genau wie „kein Zuschlag" aus.
+    zusatz = await zuschlag_usd(db, pseudonym, c.schuljahr)
+
     if neuaufbau:
         # Die alte Grenze wird verworfen — aber **auf dem Verbrauch aufgesetzt**, nicht
         # bei null. Sonst läge die neue Grenze unter dem bereits Verbrauchten und die
@@ -127,10 +152,13 @@ async def plane(
         return Zuteilung(
             berechne(
                 wochenbetrag_usd=wochenbetrag_usd,
-                aktuelle_grenze_usd=verbrauch_usd,
+                # Auf Verbrauch **und** Zuschlag aufsetzen — sonst verwürfe der Neuaufbau
+                # mit der alten Grenze auch das, was jemand von Hand dazugegeben hat.
+                aktuelle_grenze_usd=verbrauch_usd + zusatz,
                 verbrauch_usd=verbrauch_usd,
                 fehlende_wochen=1,
                 vorsprung=vorsprung_wochen(),
+                zusatz_usd=zusatz,
             ),
             1,
             woche.index,
@@ -148,8 +176,13 @@ async def plane(
         #
         # Der Verbrauch wird beim Schreiben genullt (`Zuteilung.jahreswechsel`), deshalb
         # steht die neue Grenze bei genau einem Wochenbetrag.
+        #
+        # ⚠️ **Plus Zuschlag des neuen Jahres.** Wird im September aufgebucht, bevor der
+        # erste Lauf des Schuljahres stattfand, steht der Betrag schon am Proxy — und
+        # dieser Zweig setzte die Grenze auf genau einen Wochenbetrag zurück. Der
+        # Zuschlag wäre verschwunden, ohne dass es jemand bemerkt.
         return Zuteilung(
-            round(wochenbetrag_usd, 4), 1, woche.index, jahreswechsel=True
+            round(wochenbetrag_usd + zusatz, 4), 1, woche.index, jahreswechsel=True
         )
 
     if stand is None:
@@ -172,6 +205,7 @@ async def plane(
         verbrauch_usd=verbrauch_usd,
         fehlende_wochen=fehlende,
         vorsprung=vorsprung_wochen(),
+        zusatz_usd=zusatz,
     )
     return Zuteilung(neue, fehlende, woche.index)
 

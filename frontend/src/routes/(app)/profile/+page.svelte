@@ -10,7 +10,8 @@
         text as einheitenText,
         kurshinweis,
     } from "$lib/einheiten.js";
-    import { zuwachsText, uebertragText } from "$lib/budget_text.js";
+    import { zuwachsText, uebertragText, zuschlagText } from "$lib/budget_text.js";
+    import { eigeneKennung } from "$lib/zuschlag.js";
     import { myGroups, refreshMyGroups } from "$lib/stores/myGroups.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import {
@@ -157,6 +158,8 @@
     let zuwachs = $derived(zuwachsText($budget));
     // Wie viel sich höchstens ansammelt — aus `vorsprung_wochen`, nicht geschätzt.
     let uebertrag = $derived(uebertragText($budget));
+    let zuschlag = $derived(zuschlagText($budget));
+    let kennungAnzeige = $derived(eigeneKennung($user));
 </script>
 
 <button
@@ -216,6 +219,18 @@
                     {/if}
                     {#if uebertrag}
                         <p>{uebertrag}</p>
+                    {/if}
+                    {#if zuschlag}
+                        <p>{zuschlag}</p>
+                    {/if}
+                    {#if kennungAnzeige}
+                        <!-- Die Brücke über das Pseudonymisierungsprinzip: Der Server
+                             kennt keine Namen. Wer dir etwas aufbuchen soll, braucht
+                             diese Kennung von dir — den Namen erfährt nur der Mensch. -->
+                        <p class="text-xs">
+                            Deine Kennung: <span class="font-mono">{kennungAnzeige}</span>
+                            — nenne sie, wenn dir jemand Budget aufbuchen soll.
+                        </p>
                     {/if}
                     <p>In den Ferien kommt nichts dazu.</p>
                     <!-- Der Kurs gehört sichtbar in die Oberfläche: Die Einheit ist

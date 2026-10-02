@@ -7,9 +7,18 @@ from pydantic import BaseModel, computed_field, model_validator
 from app.core.paths import aufloesen
 
 
+#: Was über `group_role_map` vergeben werden kann. ⚠️ **`budget` und `statistics` fehlten
+#: hier bis 0.12** — obwohl Backend und Frontend beide Rollen durchgehend prüfen
+#: (`api/admin/budgets.py`, `api/admin/stats.py`, `budget/+page.js`, `UserMenu.svelte`) und
+#: `test_users.yaml` sie vergibt. Im Dev funktionierten sie also; in Produktion kommen
+#: Rollen aber nur über diese Liste, und dort konnte sie niemand bekommen. Zwei
+#: Delegationsrollen, überall vorgesehen außer an der Stelle, die sie vergibt.
+VergebbareRolle = Literal["student", "teacher", "admin", "review", "budget", "statistics"]
+
+
 class GroupRoleMapping(BaseModel):
     group: str
-    role: Literal["student", "teacher", "admin", "review"]
+    role: VergebbareRolle
 
 
 class SsoGroupPatterns(BaseModel):
@@ -69,7 +78,7 @@ class AuthConfig(BaseModel):
     @property
     def group_role_map_dict(
         self,
-    ) -> dict[str, Literal["student", "teacher", "admin", "review"]]:
+    ) -> dict[str, VergebbareRolle]:
         """Konvertiert die Liste der GroupRoleMapping in ein Dictionary für schnellen Lookup."""
         result: dict[str, str] = {}
         for mapping in self.group_role_map:

@@ -2,12 +2,12 @@ import asyncio
 import logging
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import text
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import require_any_role
@@ -15,9 +15,16 @@ from app.auth.jwt import JwtPayload
 from app.budget.exchange import get_current_rate
 from app.budget.forecast import Hochrechnung, hochrechnen
 from app.budget.schulwochen import anzahl_unterrichtswochen, wochen_bis
-from app.budget.tiers import _load_budget_tiers, _stufe, invalidate_budget_tiers_cache
+from app.budget.tiers import (
+    _load_budget_tiers,
+    _stufe,
+    einheiten_je_euro,
+    invalidate_budget_tiers_cache,
+)
+from app.budget.zuschlag import buche_auf
 from app.config import settings
 from app.core.paths import aufloesen
+from app.db.models import Group, GroupMembership, PseudonymAudit
 from app.db.session import get_db
 from app.planning.calendar import load_school_year
 from app.litellm.client import LiteLLMClient
@@ -277,3 +284,196 @@ async def update_budget_grades(
     logger.info("Budget-Update abgeschlossen: %d/%d Nutzer erfolgreich aktualisiert", success, len(tasks))
 
     return BudgetGradesUpdateResult(ok=True, updated_users=success)
+
+
+# ── Zuschläge von Hand (0.12, Paket 2, AP1) ───────────────────────────────────
+#
+# Einzelne Person oder Gruppe, je Mitglied ein Betrag (F1), endet mit dem Schuljahr (F2),
+# vergeben von allen, die Budget verwalten (F3). Die Rechnung dahinter steht in
+# `app/budget/accrual.py`, der Ablauf in `app/budget/zuschlag.py`.
+#
+# **Kein fest eingebauter Höchstbetrag.** Gegen einen Tippfehler (5,00 → 500) schützt der
+# Probelauf: Er nennt Anzahl und Summe, **bevor** gebucht wird — „28 × 5 € = 140 €" ist
+# eine andere Entscheidung als „5 €". Eine feste Grenze im Code wäre eine Schulentscheidung,
+# die jemand anderes getroffen hat.
+
+Mitgliederwahl = Literal["alle", "schueler", "lehrkraefte"]
+
+
+class ZuschlagAnfrage(BaseModel):
+    betrag_eur: float = Field(gt=0, description="Je Person, nicht für die ganze Gruppe.")
+    grund: str = Field(min_length=3, max_length=500)
+    pseudonym: Optional[str] = None
+    gruppe_id: Optional[int] = None
+    #: Nur bei Gruppen. ⚠️ Eine Unterrichtsgruppe hat auch Lehrkräfte als Mitglieder —
+    #: „alle" träfe bei „Klasse 7b" die Lehrkraft mit.
+    mitglieder: Mitgliederwahl = "alle"
+    #: Nur zählen und rechnen, nichts buchen.
+    probelauf: bool = False
+
+    @model_validator(mode="after")
+    def _genau_ein_ziel(self) -> "ZuschlagAnfrage":
+        if (self.pseudonym is None) == (self.gruppe_id is None):
+            raise ValueError("Genau eines angeben: pseudonym oder gruppe_id.")
+        return self
+
+
+class ZuschlagVorschau(BaseModel):
+    anzahl: int
+    schueler: int
+    lehrkraefte: int
+    #: Mitglieder ohne Rolle in der Gruppe — werden bei „schueler"/„lehrkraefte" nicht
+    #: getroffen, bei „alle" schon.
+    ohne_rolle: int
+    betrag_eur: float
+    summe_eur: float
+    einheiten_je_person: int
+    gruppenname: Optional[str] = None
+
+
+class ZuschlagErgebnis(BaseModel):
+    gebucht: int
+    fehlgeschlagen: list[str]
+    unbegrenzt: list[str]
+
+
+#: So viele Zeichen zeigt das Profil als **Kennung**. 12 Hex-Zeichen sind 48 Bit — bei
+#: einigen hundert Konten ist ein Zusammenfall praktisch ausgeschlossen, und falls doch,
+#: meldet die Auflösung ihn, statt zu raten.
+KENNUNG_LAENGE = 12
+
+
+async def _person_zur_kennung(db: AsyncSession, eingabe: str) -> PseudonymAudit:
+    """Volles Pseudonym oder Kennung (die ersten 12 Zeichen) → das Konto.
+
+    **Warum eine Kennung.** Der Server kennt keine Namen — das ist das
+    Pseudonymisierungsprinzip, und es bleibt unberührt. Wer einer Lehrkraft etwas
+    aufbuchen will, braucht deshalb deren Mitwirkung: Sie liest ihre Kennung im Profil ab
+    und nennt sie. Den Namen erfährt dabei nur der Mensch, nie der Server.
+
+    Leerzeichen und Großschreibung werden ignoriert — das Profil zeigt die Kennung in
+    Vierergruppen („a3f9 c2b8 1e04"), damit sie sich vorlesen lässt.
+    """
+    kennung = "".join(eingabe.split()).lower()
+    if len(kennung) < KENNUNG_LAENGE or any(z not in "0123456789abcdef" for z in kennung):
+        raise HTTPException(
+            422, detail=f"Eine Kennung hat {KENNUNG_LAENGE} Zeichen aus 0–9 und a–f."
+        )
+    treffer = (await db.execute(
+        select(PseudonymAudit)
+        .where(PseudonymAudit.pseudonym.startswith(kennung))
+        .limit(2)
+    )).scalars().all()
+    if not treffer:
+        # Früh und deutlich: Sonst schlüge erst der Proxy fehl, und die Meldung spräche
+        # von einer Störung statt von einem Tippfehler.
+        raise HTTPException(404, detail="Diese Kennung ist nicht bekannt.")
+    if len(treffer) > 1:
+        raise HTTPException(
+            409, detail="Diese Kennung ist nicht eindeutig — bitte mehr Zeichen angeben."
+        )
+    return treffer[0]
+
+
+async def _ziele(db: AsyncSession, anfrage: ZuschlagAnfrage) -> tuple[list[tuple[str, Optional[str]]], Optional[str]]:
+    """(Pseudonym, Rolle in der Gruppe) je Ziel — plus Gruppenname für die Vorschau."""
+    if anfrage.pseudonym is not None:
+        bekannt = await _person_zur_kennung(db, anfrage.pseudonym)
+        return [(bekannt.pseudonym, bekannt.role)], None
+
+    gruppe = await db.get(Group, anfrage.gruppe_id)
+    if gruppe is None:
+        raise HTTPException(404, detail="Gruppe nicht gefunden.")
+    zeilen = (await db.execute(
+        select(GroupMembership.pseudonym, GroupMembership.role_in_group)
+        .where(GroupMembership.group_id == anfrage.gruppe_id)
+    )).all()
+    filter_rolle = {"schueler": "student", "lehrkraefte": "teacher"}.get(anfrage.mitglieder)
+    if filter_rolle is not None:
+        zeilen = [z for z in zeilen if z.role_in_group == filter_rolle]
+    return [(z.pseudonym, z.role_in_group) for z in zeilen], gruppe.anzeigename
+
+
+@router.post("/grants", response_model=ZuschlagVorschau | ZuschlagErgebnis)
+async def zuschlag_buchen(
+    anfrage: ZuschlagAnfrage,
+    db: AsyncSession = Depends(get_db),
+    current_user: JwtPayload = Depends(require_any_role(["budget", "admin"])),
+):
+    ziele, gruppenname = await _ziele(db, anfrage)
+    if not ziele:
+        raise HTTPException(422, detail="Die Auswahl trifft niemanden.")
+
+    if anfrage.probelauf:
+        rollen = [r for _, r in ziele]
+        return ZuschlagVorschau(
+            anzahl=len(ziele),
+            schueler=rollen.count("student"),
+            lehrkraefte=rollen.count("teacher"),
+            ohne_rolle=sum(1 for r in rollen if r not in ("student", "teacher")),
+            betrag_eur=anfrage.betrag_eur,
+            summe_eur=round(anfrage.betrag_eur * len(ziele), 2),
+            einheiten_je_person=round(anfrage.betrag_eur * einheiten_je_euro()),
+            gruppenname=gruppenname,
+        )
+
+    kurs = await get_current_rate(db)
+    ergebnis = await buche_auf(
+        db,
+        pseudonyme=[p for p, _ in ziele],
+        betrag_usd=round(anfrage.betrag_eur * kurs, 6),
+        grund=anfrage.grund,
+        erstellt_von=current_user.sub,
+        schuljahr=load_school_year().schuljahr,
+        quelle_gruppe_id=anfrage.gruppe_id,
+    )
+    logger.info(
+        "Zuschlag: %d gebucht, %d fehlgeschlagen, %d unbegrenzt (gruppe=%s, betrag_eur=%.2f)",
+        len(ergebnis.gebucht), len(ergebnis.fehlgeschlagen), len(ergebnis.unbegrenzt),
+        anfrage.gruppe_id, anfrage.betrag_eur,
+    )
+    return ZuschlagErgebnis(
+        gebucht=len(ergebnis.gebucht),
+        fehlgeschlagen=ergebnis.fehlgeschlagen,
+        unbegrenzt=ergebnis.unbegrenzt,
+    )
+
+
+class ZuschlagGruppe(BaseModel):
+    id: int
+    name: str
+    typ: str
+    schueler: int
+    lehrkraefte: int
+
+
+@router.get("/grants/gruppen", response_model=list[ZuschlagGruppe])
+async def zuschlag_gruppen(
+    db: AsyncSession = Depends(get_db),
+    _: JwtPayload = Depends(require_any_role(["budget", "admin"])),
+) -> list[ZuschlagGruppe]:
+    """Die Gruppen, auf die sich aufbuchen lässt — **nur**, was die Auswahl braucht.
+
+    ⚠️ Bewusst nicht die Admin-Gruppenliste (`/admin/groups`) für die Budget-Rolle
+    geöffnet: Die führt mehr, als zum Aufbuchen nötig ist. Hier stehen Name, Art und die
+    Zahl der Mitglieder je Rolle — keine Pseudonyme.
+    """
+    zahlen = (
+        select(
+            GroupMembership.group_id,
+            func.count().filter(GroupMembership.role_in_group == "student").label("s"),
+            func.count().filter(GroupMembership.role_in_group == "teacher").label("l"),
+        )
+        .group_by(GroupMembership.group_id)
+        .subquery()
+    )
+    zeilen = (await db.execute(
+        select(Group, zahlen.c.s, zahlen.c.l)
+        .join(zahlen, zahlen.c.group_id == Group.id)
+        .order_by(Group.type, Group.name)
+    )).all()
+    return [
+        ZuschlagGruppe(id=g.id, name=g.anzeigename, typ=g.type,
+                       schueler=s or 0, lehrkraefte=l or 0)
+        for g, s, l in zeilen
+    ]

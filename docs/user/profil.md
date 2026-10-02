@@ -10,7 +10,9 @@ Die Profilseite erreichen Sie über das User-Menü oben rechts → **„Profil"*
 
 ## Budget
 
-Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das in Euro gerechnet wird und die tatsächlichen Kosten der genutzten Modelle abbildet. Günstigere Modelle verbrauchen es langsamer als leistungsstärkere.
+Jede Nutzerin und jeder Nutzer hat ein Budget für KI-Anfragen, das die tatsächlichen Kosten der genutzten Modelle abbildet. Günstigere Modelle verbrauchen es langsamer als leistungsstärkere.
+
+**Angezeigt wird es in Einheiten, nicht in Euro.** Eine Nachricht kostet nur Bruchteile eines Cents — in Euro stünde bei fast jeder Antwort dasselbe „weniger als ein Cent". Eine Einheit ist ein Hundertstelcent (10.000 Einheiten = 1 €; der Kurs steht auch im Profil). Eine gewöhnliche Nachricht kostet damit einige Einheiten, ein teures Modell deutlich mehr — im Modellwähler steht die Schätzung neben jedem Modell („~7 🪙").
 
 **Das Budget wächst jede Unterrichtswoche.** Es wird nicht zurückgesetzt: Was Sie in einer ruhigen Woche nicht verbrauchen, bleibt Ihnen für dichtere Wochen erhalten. Ansammeln lässt sich allerdings höchstens der Betrag einiger Wochen — wie vieler, legt die Schule fest (`vorsprung_wochen`, Vorgabe drei); die Profilseite nennt die Zahl und den Betrag. In den Ferien kommt nichts dazu.
 
@@ -31,6 +33,10 @@ Neue Nachrichten werden abgelehnt. Ältere Gespräche können Sie weiterhin lese
 Ein Bild kostet dabei ungefähr so viel wie vierzig Chat-Nachrichten. Wer viel mit Bildern arbeitet, merkt das am Budget deutlich schneller.
 
 Das Budget wird von der Schule festgelegt und kann je nach Nutzergruppe (Schüler:innen, Lehrkräfte) unterschiedlich hoch sein. Zu Beginn eines neuen Schuljahres beginnt die Zählung von vorn.
+
+**Zuschlag für einen besonderen Anlass.** Für eine Projektwoche oder eine größere Aufgabe kann die Schule zusätzliches Budget aufbuchen — Schüler:innen über ihre Klasse oder Unterrichtsgruppe, Lehrkräften auch einzeln. Ein Zuschlag kommt **obendrauf**: Das wöchentliche Guthaben wächst danach normal weiter. Er gilt bis zum Ende des Schuljahres; das Profil nennt ihn als eigene Zeile („Darin enthalten: … als Zuschlag").
+
+**Ihre Kennung (nur für Lehrkräfte).** Die Plattform kennt Ihren Namen nicht — sie arbeitet mit einem Pseudonym. Soll Ihnen jemand einzeln Budget aufbuchen, braucht diese Person deshalb Ihre **Kennung**: zwölf Zeichen, die im Profil unter „Budget" stehen (etwa `a3f9 c2b8 1e04`). Nennen Sie sie der Person, die das Budget verwaltet. Ihren Namen erfährt dabei nur sie, nicht die Plattform.
 
 ## Umfang der Oberfläche
 

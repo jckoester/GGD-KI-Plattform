@@ -363,6 +363,24 @@ sso:
 > → Kunst) werden **nicht** hier, sondern pro Fach in `config/subjects.yaml`
 > (Feld `sso_aliases`) gepflegt.
 
+#### Vergebbare Rollen
+
+| Rolle | Wofür | Eigenständig? |
+|---|---|---|
+| `student`, `teacher` | Grundrollen | ja |
+| `admin` | Verwaltung, Einstellungen | nein — zusätzlich zu `teacher` |
+| `review` | Krisen-Einsicht zu zweit (Schulsozialarbeit) | **ja** — muss keine Lehrkraft sein |
+| `budget` | Budget verwalten: Stufenbeträge, Zuschläge von Hand *(seit 0.12)* | nein — zusätzlich zu `teacher` oder `admin` |
+| `statistics` | Nutzungs- und Kostenstatistik einsehen *(seit 0.12)* | nein — zusätzlich zu `teacher` oder `admin` |
+
+⚠️ **`budget` und `statistics` waren bis 0.12 nicht vergebbar**, obwohl die Plattform sie
+überall prüfte — die Konfiguration ließ sie schlicht nicht zu. Wer beide Aufgaben bisher
+über `admin` verteilt hat, kann sie jetzt enger zuschneiden.
+
+⚠️ **Nur zusätzlich, nicht allein.** Wer *ausschließlich* in einer `budget`- oder
+`statistics`-Gruppe ist (etwa das Sekretariat), kann sich nicht anmelden — beide Rollen
+sind wie `admin` eine Erweiterung, keine eigene Art Konto.
+
 #### Wenn die Gruppennamen aus dem Stundenplan kommen
 
 Ohne weitere Angabe **rät** die Plattform das Fach einer Unterrichtsgruppe: Sie nimmt

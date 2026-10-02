@@ -3,6 +3,7 @@
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
     import { PiggyBank, ArrowLeft, LoaderCircle } from 'lucide-svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
+    import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';
 
     let data = $state(null);           // BudgetGradesResponse
     let loading = $state(true);
@@ -304,6 +305,8 @@
         </div>
 
     {/if}
+
+    <ZuschlagAufbuchen />
 </div>
 
 <!-- Bestaetigungs-Dialog -->

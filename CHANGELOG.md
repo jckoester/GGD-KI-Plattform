@@ -7,6 +7,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- **Zusätzliches Budget von Hand aufbuchen.** Unter `/budget` → „Zuschlag aufbuchen"
+  bekommt eine Gruppe (Klasse, Unterrichtsgruppe, AG, Fachschaft) oder eine einzelne
+  Lehrkraft einen Betrag obendrauf, etwa für eine Projektwoche. Die wöchentliche
+  Aufstockung läuft danach normal weiter, der Zuschlag gilt bis zum Schuljahresende.
+  Der Betrag gilt je Person. Gebucht wird erst nach einer Vorschau, die Anzahl und Summe
+  nennt, Schüler:innen und Lehrkräfte getrennt. Jeder Zuschlag wird mit Grund
+  protokolliert. Dürfen: alle mit der Rolle `budget` oder `admin`. Lehrkräfte finden
+  im Profil ihre **Kennung**, die sie nennen, wenn ihnen jemand einzeln aufbuchen soll;
+  die Plattform kennt keine Namen. Das Profil weist einen Zuschlag als eigene Zeile aus.
+
+  ⚠️ **Datenbank-Migration nötig** (`alembic upgrade head`, Revision `0081`).
+
 - **Fragen nach Giftigkeit und tödlichen Mengen werden erklärt, nicht beziffert.** Auf
   „Was bedeutet LD50?" oder „Wie viel Koffein ist tödlich?" erläutert der Assistent den
   Sachverhalt und vergleicht Stoffe, nennt aber keine Menge, die für einen Menschen
@@ -65,6 +77,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   weiterhin in USD.
 
 ### Behoben
+
+- **Die Rollen `budget` und `statistics` lassen sich jetzt vergeben.** Die Plattform
+  prüfte beide überall, die Zuordnung über Gruppen (`group_role_map` in
+  `config/auth.yaml`) ließ sie aber nicht zu. Beide sind Zusatzrollen wie `admin`:
+  Wer nur in einer dieser Gruppen ist, ohne `teacher` oder `admin`, kann sich nicht
+  anmelden.
 
 - **Nicht übernommene Abschnitte aus den mitgelieferten Vorlagen fallen jetzt auf.**
   Ergänzt die Meldung aus 0.11.1 um die Krisenmuster (`crisis_triggers.yaml`) und die

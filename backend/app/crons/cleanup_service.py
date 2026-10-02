@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     Artifact,
     BudgetAccrual,
+    BudgetGrant,
     CalendarSyncStatus,
     ContextNode,
     Conversation,
@@ -234,6 +235,13 @@ async def cleanup_inactive_accounts(
                         # Buchführung ohne Fremdbezug — sie hat ohne Konto keinen Zweck.
                         await db.execute(
                             delete(BudgetAccrual).where(BudgetAccrual.pseudonym == pseudonym)
+                        )
+                        # Zuschläge von Hand (0.12). Sie sind zugleich Protokoll — aber
+                        # eines über ein Konto, das es nicht mehr gibt, und ohne Konto
+                        # haben sie keinen Zweck. Kein FK auf pseudonym_audit, deshalb
+                        # hier ausdrücklich; sonst bliebe das Pseudonym zurück.
+                        await db.execute(
+                            delete(BudgetGrant).where(BudgetGrant.pseudonym == pseudonym)
                         )
                         # ── Eigene Wissensbausteine (M2, Entscheidung 07.09.2026) ──
                         #

@@ -185,6 +185,7 @@ Personenbezug und bleibt.
 | `personal_access_tokens` | gelöscht |
 | `jwt_revocations` | gelöscht |
 | `budget_accruals` | gelöscht — die Zuteilungshistorie des Wochenmodells |
+| `budget_grants` | gelöscht — von Hand aufgebuchte Zuschläge samt ihrem Protokoll (wer, wann, warum) |
 | `artifacts` | gelöscht, Datenbankzeilen **und** Dateien — die Bibliothek ist strikt privat |
 | `node_engagement` | gelöscht — persönlicher Lernzustand; der Zustand je Gruppe bleibt |
 | `group_memberships` | gelöscht, alle Herkünfte |

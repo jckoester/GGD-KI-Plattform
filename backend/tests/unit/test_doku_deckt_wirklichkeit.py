@@ -94,6 +94,7 @@ _TABELLE = {
     "PersonalAccessToken": "personal_access_tokens",
     "JwtRevocation": "jwt_revocations",
     "BudgetAccrual": "budget_accruals",
+    "BudgetGrant": "budget_grants",
     "Artifact": "artifacts",
     "NodeEngagement": "node_engagement",
     "GroupMembership": "group_memberships",
@@ -205,4 +206,34 @@ def test_typzahlen_in_der_doku_stimmen():
         f"Es gibt {gesamt} Knotentypen, die Doku sagt etwas anderes: {falsch}. "
         "Zahl nachziehen — oder, wenn der Satz einen vergangenen Stand meint, ihn "
         "datieren und in `_HISTORISCH` eintragen."
+    )
+
+
+def test_was_mit_dem_konto_geht_geht_auch_morgen_mit():
+    """Die Gegenrichtung zum Test oben — und sie war ungeschützt.
+
+    Oben wird geprüft: Was die Kontolöschung abräumt, steht in der Doku. **Nicht**
+    geprüft war: dass es abgeräumt **bleibt**. Gegenprobe vom 02.10.2026: Die Löschzeile
+    für `budget_grants` entfernt — alle Tests grün, weil der Doku-Wächter das Modell dann
+    gar nicht mehr sah. Ein Versehen hätte je verlassenem Konto Pseudonyme
+    hinterlassen, die nichts mehr aufräumt.
+
+    ⚠️ **Bewusst der heutige Stand, keine allgemeine Regel.** Eine Prüfung „jede Tabelle
+    mit Pseudonym-Spalte" fände fünf bestehende Tabellen, die heute nicht mitgehen
+    (`assistants`, `feedback`, `generated_images`, `group_join_codes`,
+    `slot_plan_snapshots`) — jede mit eigener Begründung oder offener Frage (Kaskade über
+    Konversationen, eigener Lebenszyklus, Autorschaft). Das ist als Todo notiert. Diese
+    Liste hält fest, was entschieden ist, und wächst mit jeder neuen Entscheidung.
+    """
+    muss = {
+        "Conversation", "PseudonymAudit", "UserPreference", "CalendarSyncStatus",
+        "PersonalAccessToken", "JwtRevocation", "BudgetAccrual", "BudgetGrant",
+        "Artifact", "NodeEngagement", "GroupMembership", "TeacherGroupExclusion",
+        "ContextNode", "SsoGroupOffer",
+    }
+    fehlt = sorted(muss - _abgeraeumte_modelle())
+    assert not fehlt, (
+        f"Die Kontolöschung räumt nicht mehr ab: {fehlt}. War das Absicht, gehört die "
+        f"Entscheidung in ADR-003 Teil 6 und diese Liste angepasst — sonst die "
+        f"`delete(...)`-Zeile in `cleanup_inactive_accounts` zurückholen."
     )

@@ -5,10 +5,12 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.budget.accrual import zuschlag_usd
 from app.budget.exchange import get_current_rate
 from app.budget.schulwochen import naechste_woche_nach
 from app.budget.tiers import einheiten_je_euro, get_budget_for, vorsprung_wochen
 from app.litellm.client import LiteLLMClient
+from app.planning.calendar import load_school_year
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,19 @@ def _zuwachs(
     return betrag, naechste, vorsprung
 
 
+async def _zuschlag(db: AsyncSession, pseudonym: str) -> Optional[float]:
+    """Zuschläge dieses Schuljahres in USD — `None`, wenn sich das nicht ermitteln lässt.
+
+    Wie beim Wochenbetrag: Die Budget-Anzeige selbst darf daran nicht scheitern. Fehlt
+    die Schuljahres-Konfiguration, bleibt die Zeile weg, statt die Seite zu brechen.
+    """
+    try:
+        return await zuschlag_usd(db, pseudonym, load_school_year().schuljahr)
+    except Exception:
+        logger.warning("Zuschlag nicht ermittelbar pseudonym=%s", pseudonym, exc_info=True)
+        return None
+
+
 async def get_budget_info(
     db: AsyncSession,
     pseudonym: str,
@@ -126,6 +141,8 @@ async def get_budget_info(
     """
     eur_usd = await get_current_rate(db)
     wochenbetrag, naechste, vorsprung = _zuwachs(roles or [], grade)
+    # Eine höhere Grenze ohne Erklärung ist keine Auskunft (0.12, AP1).
+    zuschlag = await _zuschlag(db, pseudonym)
 
     client = LiteLLMClient()
     try:
@@ -143,10 +160,11 @@ async def get_budget_info(
             "wochenbetrag_eur": wochenbetrag,
             "naechste_aufstockung": naechste,
             "vorsprung_wochen": vorsprung,
+            "zuschlag_usd": zuschlag,
         }
 
     return _build_response(
         user_info, eur_usd,
         wochenbetrag_eur=wochenbetrag, naechste_aufstockung=naechste,
         vorsprung=vorsprung,
-    )
+    ) | {"zuschlag_usd": zuschlag}

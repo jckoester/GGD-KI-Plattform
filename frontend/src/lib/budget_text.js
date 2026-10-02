@@ -1,4 +1,4 @@
-import { ausEuro, text as einheitenText } from "./einheiten.js";
+import { ausEuro, ausUsd, text as einheitenText } from "./einheiten.js";
 
 // Wie das Budget Nutzer:innen erklärt wird.
 //
@@ -83,6 +83,22 @@ export function zuwachsKurz(b) {
     if (!wochenbetrag || b?.wochenbetrag_eur <= 0) return null;
     const tag = b?.naechste_aufstockung ? wochentag(b.naechste_aufstockung) : null;
     return tag ? `+${wochenbetrag} am ${tag}` : null;
+}
+
+/**
+ * Ein von Hand aufgebuchter Zuschlag (0.12) — oder `null`, wenn es keinen gibt.
+ *
+ * Eine Grenze, die ohne Erklärung höher liegt als die der anderen, ist keine Auskunft;
+ * wer sie sieht, soll wissen, woher sie kommt — und dass sie mit dem Schuljahr endet.
+ *
+ * @param {{ zuschlag_usd?: number|null, eur_usd_rate?: number, einheiten_je_euro?: number }} b
+ * @returns {string|null}
+ */
+export function zuschlagText(b) {
+    if (!(b?.zuschlag_usd > 0)) return null;
+    const betrag = einheitenText(ausUsd(b.zuschlag_usd, b.eur_usd_rate, b?.einheiten_je_euro));
+    if (!betrag) return null;
+    return `Darin enthalten: ${betrag} als Zuschlag in diesem Schuljahr.`;
 }
 
 // ── Kostenangabe an einer Chat-Antwort ──────────────────────────────────────

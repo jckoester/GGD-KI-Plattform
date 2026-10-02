@@ -649,6 +649,27 @@ export async function saveBudgetGrades(grades) {
   return res.json(); // { ok, updated_users }
 }
 
+// Zuschläge von Hand (0.12) — Gruppen, auf die sich aufbuchen lässt
+export async function getZuschlagGruppen() {
+  const res = await fetch(`${BASE}/admin/budgets/grants/gruppen`, { credentials: "include" });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // [{ id, name, typ, schueler, lehrkraefte }]
+}
+
+// Zuschlag buchen — mit `probelauf: true` nur zählen und rechnen
+export async function postZuschlag(body) {
+  const res = await fetch(`${BASE}/admin/budgets/grants`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // Vorschau oder { gebucht, fehlgeschlagen, unbegrenzt }
+}
+
 export async function getSiteText(key) {
   const res = await fetch(`${BASE}/site-texts/${key}`, {
     credentials: "include",
