@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     litellm_proxy_url: str = "http://localhost:4000"
     litellm_master_key: str = ""
+    # Schlüssel für Modellaufrufe, die keiner Person gehören (heute: Einbettungen für
+    # Suche, Import und Backfill). Leer → Master-Key mit Warnung beim Start, damit eine
+    # bestehende Installation nicht stehenbleibt. Siehe `app/litellm/systemkonto.py`.
+    litellm_system_key: str = ""
     litellm_verify_ssl: bool = True
     # Inline-Embedding-Generierung beim Anlegen/Ändern von Knoten (enqueue_embedding_job).
     # In Tests deaktivierbar, da dort kein LiteLLM-Proxy läuft.

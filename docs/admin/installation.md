@@ -248,6 +248,31 @@ Dieses Skript legt in LiteLLM die Teams an, über die Budgets und
 Modell-Freischaltungen pro Nutzergruppe durchgesetzt werden. Es ist idempotent —
 mehrfaches Ausführen ist unschädlich.
 
+### Systemschlüssel
+
+Einbettungen für Suche, Import und Backfill gehören keiner Person. Sie laufen über einen
+eigenen Schlüssel, damit nicht jede Suche den Master-Key trägt, der am Proxy alles darf.
+Ein gewöhnlicher Virtual Key genügt, ohne Budget:
+
+```bash
+docker compose exec backend sh -c \
+  'curl -s $LITELLM_PROXY_URL/key/generate \
+     -H "Authorization: Bearer $LITELLM_MASTER_KEY" -H "Content-Type: application/json" \
+     -d "{\"key_alias\": \"system\"}"'
+```
+
+Den Wert von `"key"` aus der Antwort als `LITELLM_SYSTEM_KEY` in die `.env` eintragen und
+das Backend neu erzeugen — `restart` liest die `.env` nicht neu:
+
+```bash
+docker compose up -d backend
+```
+
+Ohne diesen Schlüssel läuft alles weiter, nur über den Master-Key; der Start meldet das
+als Warnung. Was die Plattform für sich selbst verbraucht, zeigen `/budget` und
+`/statistics/costs` als Zeile **System** — unabhängig davon, welcher Schlüssel benutzt
+wird.
+
 ## Schritt 9: Modellkonfiguration prüfen
 
 Jetzt läuft der Proxy, und die Konfiguration aus Schritt 3 lässt sich gegen ihn abgleichen:

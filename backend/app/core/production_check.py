@@ -82,6 +82,15 @@ def pruefe_produktion(
                 f"Zeichen. Mit ENVIRONMENT=production startet die Anwendung damit nicht.",
             ))
 
+    if not (getattr(settings, "litellm_system_key", "") or ""):
+        befunde.append(Befund(
+            WARNING,
+            "LITELLM_SYSTEM_KEY ist nicht gesetzt — Einbettungen für Suche und Import "
+            "laufen über den Master-Key. Kein Fehler, aber jede Suche trägt dann den "
+            "Schlüssel, der alles darf. Anlegen: docs/admin/installation.md, "
+            "Abschnitt „Systemschlüssel“.",
+        ))
+
     # ── Host-Header (Audit #18) ──────────────────────────────────────────────
     hosts = list(getattr(settings, "allowed_hosts", []) or [])
     if not hosts or hosts == ["*"]:

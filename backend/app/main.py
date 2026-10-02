@@ -205,6 +205,11 @@ async def lifespan(app: FastAPI):
     from app.mail import pruefe_beim_start as pruefe_mail
     pruefe_mail()
 
+    # Startup-Check: eigener Schlüssel für Systemaufrufe? Weich — der Rückfall auf den
+    # Master-Key funktioniert, er soll nur nicht unbemerkt bleiben.
+    from app.litellm.systemkonto import pruefe_beim_start as pruefe_systemkonto
+    pruefe_systemkonto()
+
     # Startup-Check: Standard-Chatmodell gesetzt?
     if not settings.chat_default_model:
         logger.error(

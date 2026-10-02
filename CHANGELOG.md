@@ -51,6 +51,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   `config/crisis_triggers.yaml` mit der Schulsozialarbeit abstimmen; bis dahin erkennt
   die Kategorie nichts. Das Backend weist beim Start darauf hin.
 
+- **Was die Plattform selbst verbraucht, steht jetzt in der Auskunft.** `/budget` und
+  `/statistics/costs` zeigen eine eigene Zeile „System" für die Einbettungen von Suche und
+  Import — keinem Nutzerbudget angerechnet. Diese Aufrufe laufen über einen eigenen
+  Schlüssel statt über den Master-Key.
+
+  ⚠️ **Datenbank-Migration nötig** (`alembic upgrade head`, Revision `0082`).
+  ⚠️ **Neue Variable `LITELLM_SYSTEM_KEY`.** Ohne sie läuft alles weiter über den
+  Master-Key, mit Warnung beim Start. Anlegen: `docs/admin/installation.md`,
+  Abschnitt „Systemschlüssel".
+
 ### Geändert
 
 - **`/budget` zeigt den Verbrauch gegen die Zusage als Verlauf.** Unter der Hochrechnung
@@ -90,7 +100,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - **Das Kostendiagramm unter Statistik passt jetzt zu Hell- und Dunkelmodus.** Es nahm
   feste Farben, die keinem Modus folgten. Beträge stehen jetzt in deutscher Schreibweise
   (`0,0123 €` statt `0.0123 €`); unter einem Euro mit bis zu vier Nachkommastellen, damit
-  ein einzelner Tag nicht als `0,00 €` erscheint. Die Werte gibt es zusätzlich als
+  ein einzelner Tag nicht als `0,00 €` erscheint; noch kleinere Beträge als
+  `< 0,0001 €`. Die Werte gibt es zusätzlich als
   aufklappbare Tabelle.
 
 - **Die Rollen `budget` und `statistics` lassen sich jetzt vergeben.** Die Plattform

@@ -6,6 +6,7 @@
     import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';
     import BudgetVerlauf from '$lib/components/BudgetVerlauf.svelte';
     import { zeigbar } from '$lib/budgetverlauf.js';
+    import { SYSTEM_BESCHREIBUNG, systemText } from '$lib/systemkosten.js';
 
     let data = $state(null);           // BudgetGradesResponse
     let loading = $state(true);
@@ -259,6 +260,15 @@
 
         {#if zeigbar(data?.verlauf)}
             <BudgetVerlauf verlauf={data.verlauf} />
+        {/if}
+
+        {#if data?.system}
+            <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                <strong class="text-light-tx dark:text-dark-tx">System</strong>
+                ({SYSTEM_BESCHREIBUNG}) seit Schuljahresbeginn:
+                {systemText(data.system.verbraucht_eur, data.system.anfragen)}. Keinem
+                Nutzerbudget angerechnet, in Hochrechnung und Verlauf nicht enthalten.
+            </p>
         {/if}
 
 

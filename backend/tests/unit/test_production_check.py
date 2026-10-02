@@ -23,6 +23,7 @@ def _settings(**over):
         school_secret="x" * 40,
         jwt_secret="y" * 40,
         litellm_master_key="sk-" + "z" * 30,
+        litellm_system_key="sk-" + "s" * 30,
         allowed_hosts=["ki.beispielschule.de"],
         frontend_origin="https://ki.beispielschule.de",
         trusted_proxies=["172.16.0.0/12"],
@@ -68,6 +69,15 @@ def test_saubere_konfiguration_meldet_nichts():
 
 
 # ── Betriebsmodus und Secrets (Audit #7, #9) ─────────────────────────────────
+
+
+def test_ohne_systemschluessel_eine_warnung_kein_fehler():
+    """Der Rückfall auf den Master-Key funktioniert — er soll nur auffallen (0.12, AP3)."""
+    befunde = pruefe_produktion(
+        _settings(litellm_system_key=""), _auth(), _schuljahr(), heute=date(2026, 9, 20)
+    )
+    assert "LITELLM_SYSTEM_KEY" in _texte(befunde, WARNING)
+    assert "LITELLM_SYSTEM_KEY" not in _texte(befunde, ERROR)
 
 
 def test_entwicklungsmodus_ist_ein_fehler():

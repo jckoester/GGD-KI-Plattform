@@ -12,6 +12,13 @@ describe("kostendiagramm", () => {
         expect(betrag(0.5)).toBe("0,50 €");
     });
 
+    it("zeigt einen Betrag über null nie als null — auch unter der vierten Stelle", () => {
+        expect(betrag(0.0000001)).toBe("< 0,0001 €");
+        expect(betrag(0.00004, "$")).toBe("< 0,0001 $");
+        expect(betrag(0.00006)).toBe("0,0001 €");
+        expect(betrag(0)).toBe("0,00 €");
+    });
+
     it("kennt Dollar für die zweite Spalte", () => {
         expect(betrag(0.0144, "$")).toBe("0,0144 $");
     });

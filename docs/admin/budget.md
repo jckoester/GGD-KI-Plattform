@@ -269,6 +269,22 @@ Liegt der Verbrauch weit unter der Zusage, liegt die blaue Linie nah an der Null
 ist die Aussage, um die es der Hochrechnung geht: Es fließt nur ein Bruchteil ab, und die
 Wochenbeträge fürs zweite Halbjahr lassen sich anheben.
 
+### Was die Plattform selbst verbraucht — die Zeile „System" *(seit 0.12)*
+
+Einbettungen für Suche, Import und Backfill gehören keiner Person und stehen deshalb in
+keiner Nachricht. Ihr Betrag erscheint als eigene Zeile **System**:
+
+- unter dem Verlauf in `/budget`, seit Schuljahresbeginn;
+- unter dem Diagramm in `/statistics/costs`, für den gewählten Zeitraum — nur **ohne**
+  Team- und Modellfilter, denn diese Kosten gehören keinem Team.
+
+Sie sind **keinem Nutzerbudget angerechnet** und stecken weder in der Hochrechnung noch
+in den Balken. Eine Suche kostet je nach Modell rund 0,0000001 bis 0,0000005 USD; was
+unter der vierten Nachkommastelle liegt, steht als „< 0,0001 €" da, nie als „0,00 €".
+
+Gezählt wird aus dem Kostenkopf jeder Proxy-Antwort, also auch, solange der eigene
+Schlüssel noch fehlt ([Installation, Systemschlüssel](installation.md#systemschlüssel)).
+
 ## Admin-Übersicht (`/budget`)
 
 Im Admin-Bereich zeigt `/budget` eine aggregierte Übersicht der Ausgaben —

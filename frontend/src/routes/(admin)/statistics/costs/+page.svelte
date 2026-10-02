@@ -6,6 +6,7 @@
     import LoadingBanner from "$lib/components/LoadingBanner.svelte";
     import { token, beobachteModus } from "$lib/diagrammfarben.js";
     import { betrag, tabellenZeilen } from "$lib/kostendiagramm.js";
+    import { SYSTEM_BESCHREIBUNG, systemText } from "$lib/systemkosten.js";
 
     function toDateString(d) {
         return d.toLocaleDateString('sv-SE')
@@ -362,6 +363,15 @@
                     </span>
                 </div>
             </div>
+        {/if}
+        <!-- Nur ohne Team- und Modellfilter: Die Kosten gehören keinem Team. -->
+        {#if data.system}
+            <p class="mt-3 text-sm text-light-tx-2 dark:text-dark-tx-2">
+                <strong class="text-light-tx dark:text-dark-tx">System</strong>
+                ({SYSTEM_BESCHREIBUNG}):
+                {systemText(data.system.eur, data.system.anfragen)} — in keinem Balken
+                enthalten, keinem Nutzerbudget angerechnet.
+            </p>
         {/if}
     {/if}
 </div>

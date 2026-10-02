@@ -18,6 +18,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode, ohne_aenderungsstempel
+from app.litellm import systemkonto
 from app.context.lookup import normalisiere_titel
 from app.context.taxonomy import (
     EMBEDDING_CONTENT_TYPES,
@@ -307,9 +308,16 @@ async def _post_mit_wiederholung(
     for versuch in range(1, settings.embedding_max_retries + 2):
         letzte = await client.post(
             f"{settings.litellm_proxy_url}/embeddings",
-            headers={"Authorization": f"Bearer {settings.litellm_master_key}"},
+            headers={"Authorization": f"Bearer {systemkonto.schluessel()}"},
             json=payload,
         )
+        if letzte.status_code == 401 and settings.litellm_system_key:
+            # Ein falscher Systemschlüssel legt die semantische Suche still, ohne dass
+            # es sonst jemand merkt — die Knoten tragen nur `embedding_error`.
+            logger.error(
+                "Der Proxy weist LITELLM_SYSTEM_KEY ab (401). Einbettungen für Suche und "
+                "Import schlagen fehl, bis der Schlüssel stimmt oder die Variable leer ist."
+            )
         if letzte.status_code not in _RETRY_STATUS:
             break
         if versuch > settings.embedding_max_retries:
@@ -391,6 +399,9 @@ async def generate_embeddings(texts: list[str]) -> EmbeddingStapel:
         response = await _post_mit_wiederholung(client, payload)
         data = response.json()
 
+    # Vor jeder Prüfung der Antwort: Bezahlt ist die Anfrage auch, wenn sie unbrauchbar ist.
+    await systemkonto.verbuche(response)
+
     eintraege = data.get("data") or []
     if len(eintraege) != len(gekuerzt):
         # Ein unvollstaendiger Stapel darf NICHT teilweise verarbeitet werden: Ohne
@@ -447,7 +458,8 @@ async def generate_embedding(text: str) -> list[float]:
 
     Konsistent mit dem Chat-Pfad: Das Backend spricht den LiteLLM-Proxy ausschliesslich
     ueber HTTP an (kein litellm-SDK), OpenAI-kompatibel. Modellname, Input-Cap und
-    erwartete Vektorbreite kommen aus den Settings; Proxy-URL/Master-Key/SSL ebenso.
+    erwartete Vektorbreite kommen aus den Settings; Proxy-URL/SSL ebenso, der
+    Schluessel aus ``systemkonto.schluessel()``.
 
     Einzelaufruf — fuer mehrere Texte ``generate_embeddings`` verwenden.
     """

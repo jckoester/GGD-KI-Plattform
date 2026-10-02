@@ -8,9 +8,18 @@
  * behoben haben.
  */
 
-/** Betrag in deutscher Schreibweise; unter 1 bis zu vier Nachkommastellen. */
+/** Kleinster Betrag, den vier Nachkommastellen noch zeigen. */
+const KLEINSTER = 0.0001;
+
+/**
+ * Betrag in deutscher Schreibweise; unter 1 bis zu vier Nachkommastellen.
+ * Was darunter liegt, aber über null, heißt „< 0,0001 €" — nie „0,00 €".
+ */
 export function betrag(wert, waehrung = "€") {
     if (wert === null || wert === undefined) return "—";
+    if (wert > 0 && wert < KLEINSTER / 2) {
+        return `< ${KLEINSTER.toLocaleString("de-DE", { maximumFractionDigits: 4 })} ${waehrung}`;
+    }
     const stellen = Math.abs(wert) < 1 ? 4 : 2;
     const zahl = wert.toLocaleString("de-DE", {
         minimumFractionDigits: 2,

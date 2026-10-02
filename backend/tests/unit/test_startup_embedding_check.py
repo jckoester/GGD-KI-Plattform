@@ -186,3 +186,22 @@ async def test_configured_chat_default_model_is_not_flagged(monkeypatch, caplog)
         r for r in caplog.records
         if r.levelname == "ERROR" and "CHAT_DEFAULT_MODEL" in r.getMessage()
     ]
+
+
+# ── LITELLM_SYSTEM_KEY (0.12, AP3) ───────────────────────────────────────────
+
+async def test_fehlender_systemschluessel_meldet_sich_beim_start(monkeypatch, caplog):
+    """Abnahme AP3: Schlüssel leer → Master-Key **und** Warnung — beim Start, nicht
+    erst, wenn jemand die Prüffunktion von Hand aufruft."""
+    from app.main import lifespan
+
+    monkeypatch.setattr(settings, "litellm_system_key", "")
+    monkeypatch.setattr(settings, "chat_default_model", "chat-standard")
+    with patch("app.auth.dependencies.get_auth_adapter", MagicMock()), \
+         patch("app.main.check_embedding_dimension", AsyncMock(return_value=True)), \
+         _patch_session(lambda: _session_yielding(1)), \
+         caplog.at_level("WARNING", logger="app.litellm.systemkonto"):
+        async with lifespan(MagicMock()):
+            pass
+
+    assert any("LITELLM_SYSTEM_KEY" in r.getMessage() for r in caplog.records)

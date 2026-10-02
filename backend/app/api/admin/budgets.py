@@ -27,6 +27,7 @@ from app.core.paths import aufloesen
 from app.db.models import Group, GroupMembership, PseudonymAudit
 from app.db.session import get_db
 from app.planning.calendar import load_school_year
+from app.litellm import systemkonto
 from app.litellm.client import LiteLLMClient
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID, VALID_GRADES
 
@@ -65,6 +66,13 @@ class VerlaufInfo(BaseModel):
     unterricht: bool
 
 
+class SystemInfo(BaseModel):
+    """Verbrauch der Plattform selbst seit Schuljahresbeginn (0.12, AP3)."""
+
+    verbraucht_eur: float
+    anfragen: int
+
+
 class BudgetGradesResponse(BaseModel):
     grades: list[GradeInfo]  # aufsteigend nach grade, Lehrkräfte am Ende
     eur_usd_rate: float
@@ -76,6 +84,9 @@ class BudgetGradesResponse(BaseModel):
     #: Ist gegen Soll je Kalenderwoche (0.12, AP2). Leer, wenn sich der Verlauf nicht
     #: ermitteln lässt — die Seite bleibt dann ohne Diagramm benutzbar.
     verlauf: list[VerlaufInfo] = []
+    #: Einbettungen für Suche und Import — keinem Nutzerbudget angerechnet und in
+    #: Hochrechnung und Verlauf nicht enthalten. `None`, wenn nicht ermittelbar.
+    system: Optional[SystemInfo] = None
 
 
 class GradeUpdate(BaseModel):
@@ -145,7 +156,25 @@ async def get_budget_grades(
     return BudgetGradesResponse(
         grades=rows, eur_usd_rate=eur_usd_rate, unterrichtswochen=wochen,
         hochrechnung=hochrechnung, verlauf=verlauf_punkte,
+        # Zuletzt: Scheitert die Abfrage (Migration fehlt), ist die Sitzung danach
+        # unbrauchbar — davor stehende Abfragen wären mit ihr gescheitert.
+        system=await _systemverbrauch(db, eur_usd_rate),
     )
+
+
+async def _systemverbrauch(db: AsyncSession, eur_usd: float) -> Optional[SystemInfo]:
+    """Was die Plattform selbst verbraucht hat, seit Schuljahresbeginn.
+
+    Steht **neben** der Hochrechnung, nicht in ihr: Kein Nutzerbudget trägt diese
+    Kosten, und die Zusage, gegen die hochgerechnet wird, sieht sie nicht vor. Dieselbe
+    Währungsregel wie dort (siehe `_hochrechnung`).
+    """
+    try:
+        betrag, anfragen = await systemkonto.summe(db, load_school_year().beginn)
+    except Exception:
+        logger.exception("Systemverbrauch nicht ermittelbar")
+        return None
+    return SystemInfo(verbraucht_eur=betrag / eur_usd, anfragen=anfragen)
 
 
 async def _wochenverbrauch(db: AsyncSession, beginn: date, eur_usd: float) -> dict[date, float]:

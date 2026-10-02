@@ -233,7 +233,7 @@ Der `@`-Shortcode im Chat ist **Namensvervollständigung**, nicht Suche: Man tip
 Titel, den man kennt. Zwei Abweichungen folgen daraus, beide gemessen am 01.09.2026.
 
 **Keine thematische Auswahl** (`identification_only`). Sie kostet einen Netzaufruf zum
-Embedding-Modell — rund 370 ms, über den Master-Key aufs Systembudget. Das Dropdown fragt
+Embedding-Modell — rund 370 ms, über den Systemschlüssel aufs Systemkonto. Das Dropdown fragt
 bei jedem Tastendruck neu und zeigt von den thematischen Treffern keinen einzigen; sie
 wären weder gewollt noch sichtbar, nur bezahlt.
 

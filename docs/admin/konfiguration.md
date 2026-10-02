@@ -130,6 +130,7 @@ Es genügen die Zugänge der Anbieter, die in der LiteLLM-Config tatsächlich vo
 |----------|-------------|---------|
 | `LITELLM_PROXY_URL` | Interne URL des Proxys | `http://litellm:4000` |
 | `LITELLM_MASTER_KEY` | Zugangsschlüssel für die Admin-API. Muss mit `master_key` der Proxy-Config übereinstimmen | `openssl rand -base64 32` |
+| `LITELLM_SYSTEM_KEY` | Virtual Key für Aufrufe, die keiner Person gehören (Einbettungen für Suche und Import). Leer → Master-Key mit Warnung beim Start. Anlegen: [Installation, Systemschlüssel](installation.md#systemschlüssel) | `sk-…` |
 | `LITELLM_DATABASE_URL` | **Eigene** Postgres-DB nur für den Proxy (Virtual Keys, Budgets, SpendLogs). Plain `postgresql://`, damit LiteLLMs Prisma-Schema nicht mit dem Alembic-Schema kollidiert | `postgresql://postgres:<PW>@db:5432/litellm` |
 | `LITELLM_SALT_KEY` | Verschlüsselt in der DB gespeicherte Credentials. Fest setzen, sonst macht ein späterer Master-Key-Wechsel sie unlesbar | `openssl rand -base64 32` |
 | `UI_USERNAME` / `UI_PASSWORD` | Login der Proxy-Admin-UI. Betrifft **nicht** das Schul-Frontend | `admin` |

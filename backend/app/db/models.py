@@ -936,6 +936,27 @@ class BudgetGrant(Base):
     )
 
 
+class SystemSpend(Base):
+    """Was die Plattform für sich selbst verbraucht — eine Zeile je Tag (0.12, AP3).
+
+    Heute sind das allein die Einbettungen (Suche, Import, Backfill); sie gehören keiner
+    Person und erscheinen deshalb in keinem `messages.cost_usd`. Der Betrag kommt aus dem
+    Antwortkopf `x-litellm-response-cost`, nicht aus den SpendLogs des Proxys: So zählt
+    er auch, solange noch der Master-Key benutzt wird, und Zeitraum und Zeitzone
+    funktionieren wie bei den Nachrichten.
+
+    `tag` ist das **Berliner** Datum des Aufrufs. `kosten_usd` führt wie
+    `messages.cost_usd` die Währung der LiteLLM-Preise, im Euro-Betrieb also Euro.
+    Kein Personenbezug, deshalb kein Eintrag in der Kontolöschung.
+    """
+
+    __tablename__ = "system_spend"
+
+    tag: Mapped[date] = mapped_column(primary_key=True)
+    kosten_usd: Mapped[float] = mapped_column(nullable=False, server_default=text("0"))
+    anfragen: Mapped[int] = mapped_column(nullable=False, server_default=text("0"))
+
+
 # 8. pseudonym_audit
 class PseudonymAudit(Base):
     __tablename__ = "pseudonym_audit"

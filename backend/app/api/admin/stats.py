@@ -12,6 +12,7 @@ from app.auth.dependencies import require_any_role
 from app.auth.jwt import JwtPayload
 from app.db.models import ExchangeRate
 from app.db.session import get_db
+from app.litellm import systemkonto
 from app.litellm.teams import TEACHER_TEAM_ID, STUDENT_TEAM_PREFIX, VALID_GRADES
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,14 @@ class SpendEntry(BaseModel):
     eur: float
 
 
+class SystemPosten(BaseModel):
+    """Verbrauch der Plattform selbst im Zeitraum (0.12, AP3) — in keinem Balken."""
+
+    usd: float
+    eur: float
+    anfragen: int
+
+
 class SpendResponse(BaseModel):
     entries: list[SpendEntry]
     total_usd: float
@@ -55,6 +64,10 @@ class SpendResponse(BaseModel):
     # der Fehler unbemerkt blieb.
     unvollstaendige_nachrichten: int = 0
     ausstehende_nachrichten: int = 0
+    # Einbettungen für Suche und Import. Nur ohne Team- und Modellfilter: Die Kosten
+    # gehören keinem Team, und neben einer gefilterten Summe läsen sie sich wie ein Teil
+    # davon.
+    system: SystemPosten | None = None
 
 
 class TeamOption(BaseModel):
@@ -286,6 +299,15 @@ async def get_spend(
         logger.exception("Fehler beim Laden der Kosten-Güte")
         raise HTTPException(status_code=500, detail="Interner Serverfehler")
 
+    system = None
+    if team_id is None and model is None:
+        try:
+            sys_usd, sys_anfragen = await systemkonto.summe(db, from_date, to_date)
+            system = SystemPosten(usd=sys_usd, eur=sys_usd / rate, anfragen=sys_anfragen)
+        except Exception:
+            # Zusatzinformation — die Kostenseite bleibt ohne sie benutzbar.
+            logger.exception("Systemverbrauch nicht ermittelbar")
+
     total_usd = sum(e.usd for e in entries)
     total_eur = sum(e.eur for e in entries)
     return SpendResponse(
@@ -297,4 +319,5 @@ async def get_spend(
         model=model,
         unvollstaendige_nachrichten=int(guete[0] or 0),
         ausstehende_nachrichten=int(guete[1] or 0),
+        system=system,
     )
