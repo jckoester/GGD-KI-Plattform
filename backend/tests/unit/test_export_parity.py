@@ -6,8 +6,9 @@ tragen, sonst sieht die Lehrkraft etwas, das im Export verschwindet:
   wurden für Phase 19 aktiviert.
 - **DOCX/ODT** über Pandoc `commonmark_x+hard_line_breaks`.
 
-Bewusst dokumentierte Abweichungen (siehe docs/dev/material-werkstatt.md): Fußnoten rendert die
-Vorschau (marked) nicht; Task-Listen zeigt die Vorschau als Checkbox, beide Exporte als `[ ]/[x]`.
+Bewusst dokumentierte Abweichung (siehe docs/dev/material-werkstatt.md): Task-Listen zeigt die
+Vorschau als Checkbox, beide Exporte als `[ ]/[x]`. Fußnoten können seit 0.12 alle drei — bis
+dahin prüfte dieser Satz sie nur für DOCX, und das PDF zeigte unbemerkt `[^1]` als Rohtext.
 """
 import io
 import os
@@ -38,6 +39,18 @@ async def test_pdf_renders_table():
 async def test_pdf_renders_strikethrough():
     html = await render_markdown_for_pdf("~~weg~~")
     assert "<s>" in html
+
+
+async def test_pdf_renders_footnote():
+    html = await render_markdown_for_pdf("Text[^1]\n\n[^1]: Fußnote.")
+    assert "[^1]" not in html
+    assert '<sup class="footnote-ref"><a href="#fn1" id="fnref1">1</a></sup>' in html
+    assert '<section class="footnotes">' in html and "Fußnote." in html
+
+
+async def test_pdf_footnote_ohne_ruecksprungpfeil():
+    # Auf Papier führt er nirgendwohin, und „↩︎" fehlt in den Schriften der Vorlage.
+    assert "↩" not in await render_markdown_for_pdf("Text[^1]\n\n[^1]: Fußnote.")
 
 
 # ── DOCX-Pfad (Pandoc) ────────────────────────────────────────────────────────

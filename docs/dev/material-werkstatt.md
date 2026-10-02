@@ -35,11 +35,15 @@ beides. Endpunkt `POST /artifacts/{id}/export?format=&save=` (`save=false` Downl
 
 Drei Renderer: Editor-/Chat-**Vorschau** = `marked` (GFM); **PDF** = markdown-it-py; **DOCX/ODT**
 = Pandoc `commonmark_x+hard_line_breaks`. Angeglichen: Überschriften, Fett/Kursiv, Listen,
-**Tabellen**, **Strikethrough**, **harte Zeilenumbrüche**, Code, Zitate, Mathe. Bewusst
+**Tabellen**, **Strikethrough**, **harte Zeilenumbrüche**, Code, Zitate, Mathe und seit 0.12
+**Fußnoten** (`[^1]`): Vorschau (`marked-footnote`) und PDF (`mdit_py_plugins.footnote`) setzen
+sie als Anmerkungen ans Dokumentende, DOCX/ODT als echte Fußnoten unten auf der Seite.
+⚠️ Bis 0.11 zeigte nicht nur die Vorschau, sondern auch das **PDF** Rohtext — der Paritätstest
+prüfte Fußnoten nur für DOCX, und diese Seite nannte den Export pauschal „✔". Bewusst
 verbleibende Abweichungen (Tests: `test_export_parity.py`):
 
-- **Fußnoten** (`[^1]`): Export ✔ (echte Fußnote), Vorschau ✘ (`marked` ohne Footnote-Plugin →
-  Rohtext). → Todo: Footnote-Plugin in `marked`.
+- **Fußnoten-Anker** brauchen in der Vorschau eine Kennung je Ausgabe (`renderMarkdown`
+  ersetzt den Platzhalter durch die Nonce) — im Chat stehen viele Antworten auf einer Seite.
 - **Task-Listen** (`- [ ]`): Vorschau = Checkbox, beide Exporte = `[ ]`/`[x]`-Text.
 
 ## Vorlagen-Governance (Schritt 6)
@@ -54,4 +58,5 @@ DOCX/ODT-**reference-doc** auf Disk (`EXPORT_TEMPLATE_DIR`, cwd-unabhängig). Ad
 `saveDocumentExport`, Admin-Vorlagen-Funktionen) · `lib/workshop.js` `deriveDocTitle` ·
 Editor-Route `(app)/library/[id]/edit` (Textarea ⇄ Vorschau via `renderMarkdown` +
 `renderDiagrams` + `renderServerBlocks`, Export-Leiste) · Admin-Seite `(admin)/settings/export`.
-Einstieg aus dem Chat: `MessageBubble` „In Werkstatt öffnen".
+Einstieg aus dem Chat: `MessageBubble` „Als Dokument bearbeiten" — der Knopf nennt die
+Tätigkeit, die Ansicht heißt weiter Werkstatt (Entscheidung zu 0.12).

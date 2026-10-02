@@ -187,7 +187,7 @@ async def create_document(
     Dokumente sind **veränderbar** — deshalb ist `origin_ref` hier kein Inhalts-Hash wie
     bei Diagrammen, sondern die **Herkunft** (`message:<id>`, siehe
     `document_origin_ref`). Die bleibt über jede Bearbeitung stabil, und genau das ist
-    gewollt: Ein zweiter Klick auf „In Werkstatt öffnen" oder „Als Baustein speichern"
+    gewollt: Ein zweiter Klick auf „Als Dokument bearbeiten" oder „Als Baustein speichern"
     führt zurück in das vorhandene Dokument — mitsamt der bereits daran gemachten
     Änderungen — statt ein zweites anzulegen. Ein zweites hieße bei „Als Baustein
     speichern" ein zweiter Knoten statt einer neuen Fassung.

@@ -89,6 +89,19 @@
     color: var(--color-light-re, #b00);
 }
 
+/* Fußnoten (0.12): abgesetzt und kleiner, wie im Export. Die Überschrift trägt
+   `sr-only` — sie ist für Bildschirmleser da, nicht fürs Auge. */
+section.footnotes {
+    margin-top: 1.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-light-ui-3);
+    font-size: 0.875em;
+}
+
+.dark section.footnotes {
+    border-top-color: var(--color-dark-ui-3);
+}
+
 /* Basis: Code-Block-Container */
 .code-block {
     position: relative;

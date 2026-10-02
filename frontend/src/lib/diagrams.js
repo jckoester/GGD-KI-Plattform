@@ -30,6 +30,25 @@ function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/**
+ * Die Quelle mit hellem Thema — für eine Datei, die das Diagramm verlässt (0.12, AP6c).
+ *
+ * Im Dunkelmodus rendert die Seite mit `theme: 'dark'`: helle Linien und Schrift auf
+ * durchsichtigem Grund. Als Datei gesichert und auf weißem Papier gedruckt, wäre davon
+ * kaum etwas zu sehen. Die Anweisung gilt nur für dieses eine Diagramm; die Einstellung
+ * der Seite bleibt unberührt.
+ */
+export function hellesThema(source) {
+    return `%%{init: {"theme": "default"}}%%\n${source}`;
+}
+
+/** SVG eines Diagramms im hellen Thema, unabhängig vom Modus der Seite. */
+export async function mermaidSvgHell(source) {
+    const mermaid = await loadMermaid();
+    const { svg } = await mermaid.render(`mermaid-export-${_seq++}`, hellesThema(source));
+    return svg;
+}
+
 export function renderDiagrams(node) {
     let timer = null;
 

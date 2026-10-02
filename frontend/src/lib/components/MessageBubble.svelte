@@ -3,6 +3,7 @@
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
+    import { diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
     import { user } from '$lib/stores/user.js';
@@ -156,7 +157,9 @@
                 const bar = document.createElement('div');
                 bar.className = [
                     'absolute top-1.5 right-1.5 flex gap-1',
-                    'opacity-0 group-hover:opacity-100 transition-opacity',
+                    // focus-within: Wer mit der Tastatur kommt, sieht die Leiste auch.
+                    'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                    'transition-opacity',
                 ].join(' ');
 
                 const btnClass = [
@@ -165,6 +168,10 @@
                     'text-light-tx-2 dark:text-dark-tx-2',
                     'hover:bg-light-ui-3 dark:hover:bg-dark-ui-3',
                 ].join(' ');
+
+                // Quelle kopieren und als SVG sichern (0.12, AP6c) — ohne Umweg über die
+                // Bibliothek.
+                diagrammKnoepfe(bar, block, kind, btnClass);
 
                 const saveBtn = document.createElement('button');
                 saveBtn.type = 'button';
@@ -253,6 +260,11 @@
 
                 block.appendChild(btn);
             });
+
+            // Abgesetzte Formeln (0.12, AP6c) — Inline-Formeln kopiert copy-tex beim Markieren.
+            node.querySelectorAll('.katex-display:not([data-copy-attached])').forEach(formel => {
+                if (formelKnopf(formel)) formel.setAttribute('data-copy-attached', '');
+            });
         }
 
         attachButtons();
@@ -266,8 +278,9 @@
         };
     }
 
-    // „In Werkstatt öffnen" (Phase 19): den Antworttext als Markdown-Dokument ablegen
-    // und in den Editor springen.
+    // „Als Dokument bearbeiten" (Phase 19; Knopftext seit 0.12, F5): den Antworttext als
+    // Markdown-Dokument ablegen und in die Werkstatt springen. Der Knopf nennt die
+    // Tätigkeit, „Werkstatt" bleibt der Name der Ansicht.
     let openingWorkshop = $state(false);
     let workshopError = $state(null);
     async function openInWorkshop() {
@@ -283,7 +296,7 @@
             openingWorkshop = false;
             workshopError = e?.status === 409
                 ? 'Bibliothek voll — bitte zuerst aufräumen.'
-                : 'Konnte nicht in die Werkstatt übernommen werden.';
+                : 'Konnte nicht als Dokument angelegt werden.';
         }
     }
 
@@ -487,7 +500,7 @@
                                disabled:opacity-50"
                     >
                         <FileEdit class="w-3.5 h-3.5" />
-                        {openingWorkshop ? 'Wird geöffnet…' : 'In Werkstatt öffnen'}
+                        {openingWorkshop ? 'Wird geöffnet…' : 'Als Dokument bearbeiten'}
                     </button>
                     <!-- Der zweite Einstieg in dasselbe Formular (AP8). Die Werkstatt ist
                          zum Weiterschreiben da, der Baustein zum Wiederfinden — zwei

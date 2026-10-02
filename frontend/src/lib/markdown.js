@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import markedFootnote from 'marked-footnote';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js/lib/core';
 import katex from 'katex';
@@ -273,6 +274,21 @@ const abbildungExt = {
 
 marked.use({ extensions: [katexBlockExt, katexInlineExt, abbildungExt] });
 
+// ── Fußnoten (0.12, AP6b) ───────────────────────────────────────────────────
+// `[^1]` im Text, `[^1]: …` darunter. Beide Exporte setzen sie um (PDF über das
+// Fußnoten-Plugin von markdown-it, DOCX/ODT über Pandoc) — ohne diese Extension zeigte
+// allein die Vorschau Rohtext und damit etwas anderes als die fertige Datei.
+//
+// ⚠️ **Die Anker brauchen eine Kennung je Ausgabe.** Im Chat stehen viele Antworten auf
+// einer Seite; mit festem Präfix hätte jede ihre `footnote-1`, und ein Klick spränge
+// in die erste. Der Platzhalter wird in `renderMarkdown` durch die Nonce ersetzt.
+const FUSSNOTE_PLATZHALTER = 'FNPLATZHALTER';
+marked.use(markedFootnote({
+    prefixId: `${FUSSNOTE_PLATZHALTER}-`,
+    description: 'Fußnoten',
+    backRefLabel: 'Zurück zur Stelle {0}',
+}));
+
 // Explizite URL-Allowlist (Sicherheits-Audit #16): nur http(s)/mailto sowie relative bzw.
 // Anchor-URLs (kein Schema). Bewusst version-UNABHÄNGIG — statt auf DOMPurifys sich änderndes
 // Default-Verhalten zu vertrauen. Blockiert javascript:, data:, tel:, vbscript: usw. Es ist die
@@ -313,7 +329,12 @@ export function renderMarkdown(text, { dokuLinks = false } = {}) {
         ALLOWED_URI_REGEXP,
     });
 
-    if (_mathCount === 0) return clean;
+    // DOMPurify schreibt Attributnamen klein — `data-fnplatzhalter-ref` wird zum
+    // gewohnten `data-footnote-ref`, die Anker bekommen die Nonce.
+    const sauber = clean
+        .replaceAll(`data-${FUSSNOTE_PLATZHALTER.toLowerCase()}-`, 'data-footnote-')
+        .replaceAll(FUSSNOTE_PLATZHALTER, `fn-${_mathNonce}`);
+    if (_mathCount === 0) return sauber;
     // Platzhalter durch die (vertrauenswürdige) KaTeX-Ausgabe ersetzen — aber **nur im
     // Textfluss**. `![$x^2$](bild.png)` legt den Platzhalter im `alt`-ATTRIBUT ab; rohes
     // HTML bricht es dort auf, die Spans rutschen aus dem Tag heraus und der alt-Text,
@@ -321,7 +342,7 @@ export function renderMarkdown(text, { dokuLinks = false } = {}) {
     // deshalb die Quellnotation als escapeter Klartext an die Stelle der Ausgabe.
     const platzhalter = `KMATH${_mathNonce}X(\\d+)X`;
     const imTag = new RegExp(platzhalter, 'g');
-    return clean.replace(new RegExp(`${TAG}|${platzhalter}`, 'g'), (treffer, id) =>
+    return sauber.replace(new RegExp(`${TAG}|${platzhalter}`, 'g'), (treffer, id) =>
         id !== undefined
             ? _mathStore[id]?.html ?? ''
             : treffer.replace(imTag, (_, tagId) => escapeAttr(_mathStore[tagId]?.quelle ?? '')),

@@ -10,8 +10,8 @@ Chat erhalten.
 Zwei Wege:
 
 - **Aus dem Chat:** Lass dir von einem Assistenten ein Arbeitsblatt schreiben und klicke unter
-  der Antwort auf **„In Werkstatt öffnen"**. Der Text wird als Dokument übernommen und der Editor
-  öffnet sich. (Rahmensätze wie „Hier ist dein Arbeitsblatt:" kannst du im Editor löschen.)
+  der Antwort auf **„Als Dokument bearbeiten"**. Der Text wird als Dokument übernommen und die
+  Werkstatt öffnet sich. (Rahmensätze wie „Hier ist dein Arbeitsblatt:" kannst du im Editor löschen.)
 - **Leer:** In der [Bibliothek](bibliothek.md) oben rechts auf **„Neues Dokument"**.
 
 > **Der Knopf daneben heißt „Als Baustein speichern" und macht etwas anderes.** Die
@@ -56,8 +56,8 @@ Fassung — deine ungespeicherten Änderungen werden also zuerst gesichert.
   schulweite Formatvorlage. PDF- und Word-Layout sehen ähnlich, aber nicht identisch aus — das ist
   technisch bedingt.
 - **Formeln** werden in Word zu echten, bearbeitbaren Word-Formeln.
-- Ein paar Feinheiten unterscheiden Vorschau und Export: **Fußnoten** (`[^1]`) erscheinen erst im
-  Export als richtige Fußnote (in der Vorschau als Text); **Ankreuz-Listen** (`- [ ]`) zeigt die
-  Vorschau als Kästchen, der Export als `[ ]`/`[x]`.
+- Ein paar Feinheiten unterscheiden Vorschau und Export: **Fußnoten** (`[^1]`) stehen in Vorschau
+  und PDF gesammelt am Ende, in Word/ODT unten auf der jeweiligen Seite; **Ankreuz-Listen**
+  (`- [ ]`) zeigt die Vorschau als Kästchen, der Export als `[ ]`/`[x]`.
 - Dokumente zählen wie andere Artefakte auf dein Speicherlimit und werden nach der
   Aufbewahrungsfrist automatisch entfernt — lade Wichtiges rechtzeitig herunter.

@@ -49,6 +49,9 @@
   a { color: #1a4b8c; text-decoration: none; }
   h1, h2, h3 { page-break-after: avoid; }
   table, pre, blockquote { page-break-inside: avoid; }
+  /* Fußnoten (0.12): gesammelt am Ende, kleiner — wie in der Vorschau. */
+  section.footnotes { font-size: 0.85em; }
+  hr.footnotes-sep { border: 0; border-top: 1px solid #ccc; margin: 1.5em 0 0.5em; }
   {{ extra_css|safe }}
 </style>
 </head>

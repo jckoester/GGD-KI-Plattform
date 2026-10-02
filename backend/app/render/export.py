@@ -27,6 +27,7 @@ import re
 
 from markdown_it import MarkdownIt
 from mdit_py_plugins.dollarmath import dollarmath_plugin
+from mdit_py_plugins.footnote import footnote_plugin
 
 from app.render import sidecar
 from app.render.errors import RenderError
@@ -150,6 +151,9 @@ def _build_md() -> MarkdownIt:
     # GFM) an (Phase-19-Parität). Zusätzlich von curriculum-/lesson-PDF genutzt (additiv, sicher).
     md = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
     md.use(dollarmath_plugin, double_inline=True)
+    # Fußnoten (0.12, AP6b) — die Vorschau (marked-footnote) und Pandoc (`commonmark_x`)
+    # kennen sie; ohne das Plugin stand im PDF als einzigem Format `[^1]` als Rohtext.
+    md.use(footnote_plugin)
     md.inline.ruler.before("escape", "klammer_mathe", _klammer_mathe_regel)
 
     def _from_map(self, tokens, idx, options, env):
@@ -165,6 +169,17 @@ def _build_md() -> MarkdownIt:
     md.add_render_rule("math_inline_double", _from_map)
     md.add_render_rule("math_block", _from_map)
     md.add_render_rule("fence", _fence_rule)
+
+    def _fussnote_nummer(self, tokens, idx, options, env):
+        # „1" statt „[1]" — wie in der Vorschau.
+        meta = tokens[idx].meta
+        nummer = str(meta["id"] + 1)
+        return f"{nummer}:{meta['subId']}" if meta.get("subId", 0) > 0 else nummer
+
+    md.add_render_rule("footnote_caption", _fussnote_nummer)
+    # Kein Rücksprungpfeil: Auf Papier führt er nirgendwohin, und „↩︎" fehlt in den
+    # Schriften der Vorlage.
+    md.add_render_rule("footnote_anchor", lambda self, tokens, idx, options, env: "")
     return md
 
 

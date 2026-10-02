@@ -396,3 +396,40 @@ describe("Verweise zwischen Hilfeseiten", () => {
         expect(html).toContain("target=")
     })
 })
+
+describe('renderMarkdown — Fußnoten (0.12, AP6b)', () => {
+    const DOK = 'Wasser siedet bei 100 °C.[^1]\n\n[^1]: Bei Normaldruck.'
+
+    it('macht aus [^1] eine Verweisnummer und eine Liste — kein Rohtext', () => {
+        const html = renderMarkdown(DOK)
+        expect(html).not.toContain('[^1]')
+        expect(html).toMatch(/<sup><a [^>]*href="#fn-[a-z0-9]+-1"[^>]*>1<\/a><\/sup>/)
+        expect(html).toContain('<section class="footnotes"')
+        expect(html).toContain('Bei Normaldruck.')
+    })
+
+    it('Verweis und Ziel passen zusammen, und jede Ausgabe hat eigene Anker', () => {
+        const a = renderMarkdown(DOK)
+        const b = renderMarkdown(DOK)
+        const ziel = (html) => /href="#(fn-[a-z0-9]+-1)"/.exec(html)[1]
+        expect(a).toContain(`<li id="${ziel(a)}"`)
+        // Im Chat stehen viele Antworten untereinander — gleiche Anker sprängen in die erste.
+        expect(ziel(a)).not.toBe(ziel(b))
+    })
+
+    it('lässt keinen Platzhalter zurück', () => {
+        expect(renderMarkdown(DOK)).not.toMatch(/fnplatzhalter/i)
+        expect(renderMarkdown(DOK)).toContain('data-footnote-ref')
+    })
+
+    it('ohne Fußnote kein Fußnotenabschnitt — und nichts vom vorigen Aufruf', () => {
+        renderMarkdown(DOK)
+        const html = renderMarkdown('Nur Text.')
+        expect(html).not.toContain('footnotes')
+        expect(html).not.toContain('Normaldruck')
+    })
+
+    it('rendert Formeln auch in der Fußnote', () => {
+        expect(hasKatex(renderMarkdown('Satz.[^1]\n\n[^1]: Mit $x^2$.'))).toBe(true)
+    })
+})

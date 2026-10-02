@@ -61,7 +61,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Master-Key, mit Warnung beim Start. Anlegen: `docs/admin/installation.md`,
   Abschnitt „Systemschlüssel".
 
+- **Fußnoten** (`[^1]`) erscheinen jetzt in der Werkstatt-Vorschau, im Chat und im
+  PDF-Export als Fußnoten. Bisher gelang das nur in Word und ODT; Vorschau und PDF
+  zeigten Rohtext.
+
+- **Formeln und Diagramme lassen sich kopieren.** Über einer abgesetzten Formel erscheint
+  „Kopieren" und liefert die LaTeX-Schreibweise; markierter Text mit Formeln wird
+  ebenfalls so kopiert. Diagramme im Chat bekommen „Code kopieren" und „SVG" (immer in
+  heller Darstellung).
+
 ### Geändert
+
+- **Der Knopf unter einer Antwort heißt „Als Dokument bearbeiten"** statt „In Werkstatt
+  öffnen". Die Werkstatt selbst behält ihren Namen.
 
 - **`/budget` zeigt den Verbrauch gegen die Zusage als Verlauf.** Unter der Hochrechnung
   stehen jetzt beide Linien Woche für Woche: Ist (tatsächlicher Verbrauch) und Soll (die

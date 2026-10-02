@@ -141,7 +141,7 @@ das soll bleiben und wiederauffindbar sein. Dafür gibt es **„Als Baustein spe
 
 Zwei Wege führen zum selben Formular:
 
-- **Im Chat**, unter der Antwort neben „In Werkstatt öffnen".
+- **Im Chat**, unter der Antwort neben „Als Dokument bearbeiten".
 - **In der [Bibliothek](bibliothek.md)**, an jedem Dokument und jedem Flussdiagramm.
 
 Im Formular legen Sie fest:

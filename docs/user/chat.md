@@ -68,6 +68,13 @@ Die Darstellung passiert automatisch auf Ihrem Gerät. Wenn Sie die LaTeX-Schrei
 kennen, bitten Sie die KI einfach, etwas „als Formel" zu schreiben — sie kümmert sich um die
 richtige Notation.
 
+**Weiterverwenden.** Fahren Sie über eine abgesetzte Formel, erscheint **„Kopieren"**: In der
+Zwischenablage landet die Schreibweise `$$…$$`, die sich in Chat, Werkstatt oder Wissensgraph
+wieder einfügen lässt. Wer Text mit Formeln markiert und kopiert, bekommt die Formeln ebenfalls
+so. An Diagrammen stehen beim Darüberfahren **„Code kopieren"**, **„SVG"** und **„In
+Bibliothek"**. Die SVG-Datei ist immer hell, auch wenn Sie den Dunkelmodus nutzen — sie soll
+auf weißem Papier lesbar sein.
+
 > **Hinweis:** Elektrische Schaltpläne werden derzeit noch nicht grafisch dargestellt; diese
 > Funktion ist in Vorbereitung.
 
