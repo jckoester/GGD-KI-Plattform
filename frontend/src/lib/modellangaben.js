@@ -3,18 +3,24 @@
  *
  * Bis 0.12 stand dort eine Liste von Namen und ein Zahnrad. Wer einen Assistenten
  * anlegt, hatte damit keine Entscheidungshilfe: Welches Modell ist teuer, welches kann
- * Werkzeuge, wie viel Vorgeschichte verträgt es?
+ * die Fähigkeiten eines Assistenten nutzen, wie viel Vorgeschichte verträgt es?
  *
  * ⚠️ **`null` heißt unbekannt, nicht „nein".** Beim Kontextfenster ist das der
  * Regelfall: Gemessen am 29.09.2026 melden 17 von 31 Deployments eine Größe — **keines**
  * der IONOS-Modelle, weil LiteLLM sie nur für Modelle seiner eingebauten Tabelle kennt.
- * Eine Oberfläche, die daraus „0 Token" oder „kann keine Werkzeuge" macht, erfindet eine
+ * Eine Oberfläche, die daraus „0 Token" oder „Fähigkeiten nicht nutzbar" macht, erfindet eine
  * Auskunft. Unbekanntes wird deshalb weggelassen, nicht verneint.
  */
 
 import { ausUsd, zahl as einheitenZahl, BEZEICHNUNG } from "./einheiten.js";
 
-/** Münze für die Kosten, Zahnrad für die Werkzeuge — die Marken im Auswahlfeld. */
+/**
+ * Münze für die Kosten, Zahnrad für die Fähigkeiten — die Marken im Auswahlfeld.
+ *
+ * ⚠️ Sichtbar heißt es **Fähigkeiten**, nicht „Werkzeuge": Werkzeug ist in der Oberfläche
+ * ein Assistent, der Medien herstellt (CLAUDE.md, Begriffstabelle). Bis 02.10.2026 stand
+ * im Editor „Werkzeuge: ja". Der Codename `MARKE_WERKZEUGE` bleibt, wie die Regel es will.
+ */
 export const MARKE_KOSTEN = "🪙";
 export const MARKE_WERKZEUGE = "⚙";
 
@@ -73,11 +79,11 @@ export function angaben(modell, kurs, faktor) {
         liste.push({ was: "Kontextfenster", wert: tokenKurz(modell.kontextfenster) });
     }
     if (modell.supports_function_calling === true) {
-        liste.push({ was: "Werkzeuge", wert: "ja" });
+        liste.push({ was: "Fähigkeiten", wert: "nutzbar" });
     } else if (modell.supports_function_calling === false) {
-        // Hier ist das „nein" belegt und wichtig: Ohne Werkzeuge fallen Wissensspeicher
-        // und Unterrichtsplanung aus — das soll man **vor** der Wahl sehen.
-        liste.push({ was: "Werkzeuge", wert: "nein" });
+        // Hier ist das „nicht" belegt und wichtig: Ohne Funktionsaufrufe fallen
+        // Wissensspeicher und Unterrichtsplanung aus — das soll man **vor** der Wahl sehen.
+        liste.push({ was: "Fähigkeiten", wert: "nicht nutzbar" });
     }
     if (modell.denkt === true) liste.push({ was: "Denkt vor der Antwort", wert: "ja" });
     if (modell.bilder === true) liste.push({ was: "Versteht Bilder", wert: "ja" });

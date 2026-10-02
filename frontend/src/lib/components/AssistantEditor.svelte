@@ -1324,9 +1324,10 @@
                                             sich in der LiteLLM-Konfiguration eintragen.
                                         </p>
                                         <p>
-                                            Ohne <strong>Werkzeuge</strong> kann der Assistent
-                                            weder im Wissensspeicher suchen noch Unterricht
-                                            planen.
+                                            Sind die <strong>Fähigkeiten</strong> nicht nutzbar,
+                                            wirken die Schalter weiter unten nicht: Der
+                                            Assistent kann dann weder im Wissensspeicher suchen
+                                            noch Unterricht planen.
                                         </p>
                                     </div>
                                 </details>

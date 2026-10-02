@@ -81,11 +81,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Ferien flach. Daneben steht eine Tabelle mit denselben Werten.
 
 - **Der Modellwähler sagt jetzt, was ein Modell kostet und kann.** Im Auswahlfeld steht
-  neben dem Namen eine Schätzung („~7"), im Assistenten-Editor darunter die Angaben zum
-  gewählten Modell: Kosten je Nachricht, Kontextfenster (mit grober Seitenzahl),
-  Werkzeugfähigkeit und ob es vor der Antwort denkt oder Bilder versteht. Ein
-  aufklappbarer Hinweis erklärt, was die Zahlen bedeuten. Bisher stand dort eine Liste
-  von Namen und ein Zahnrad.
+  neben dem Namen eine Schätzung („~7 🪙"), im Assistenten-Editor darunter die Angaben
+  zum gewählten Modell: Kosten je Nachricht, Kontextfenster (mit grober Seitenzahl), ob
+  es die Fähigkeiten eines Assistenten nutzen kann und ob es vor der Antwort denkt oder
+  Bilder versteht. Ein aufklappbarer Hinweis erklärt, was die Zahlen bedeuten, die Hilfe
+  zum Chat die Zeichen im Auswahlfeld. Bisher stand dort eine Liste von Namen und ein
+  Zahnrad.
 
   ⚠️ **Was der Proxy nicht meldet, bleibt weg** — es wird nicht als „nein" oder „0"
   dargestellt. Das Kontextfenster kennt LiteLLM nur für Modelle seiner eingebauten

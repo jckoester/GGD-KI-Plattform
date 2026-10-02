@@ -5,11 +5,12 @@ Taxonomie, Embedding, Sichtbarkeit, Lifecycle, Suche, Oberfläche, Werkzeuge, Do
 Seite ist die Checkliste dafür — damit nichts übersehen wird, und damit die
 Entscheidungen begründet sind statt beiläufig getroffen.
 
-Grundlage: `ADR-013` (Kontextspeicher-Graph) und `ADR-017` (Neukonzeption der
-Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
+Grundlage: `ADR-013` (Kontextspeicher-Graph), `ADR-017` (Neukonzeption der
+Kontextsuche, samt Nachtrag zur Embedding-Frage) und `ADR-019` (Lebenszyklus-Klassen,
+`ui_status`, Sammlungen). Die Suche selbst beschreibt
 [kontextsuche.md](kontextsuche.md).
 
-> **Drei Fallen vorweg**, weil sie alle **stumm** sind — sie führen nicht zu einem
+> **Vier Fallen vorweg**, weil sie alle **stumm** sind — sie führen nicht zu einem
 > Fehler, sondern zu falschem Verhalten, das niemandem auffällt:
 >
 > 1. `VALID_UNTIL_DEFAULTS_DAYS` wird **von Hand** gepflegt. Ein fehlender Eintrag liefert
@@ -17,12 +18,12 @@ Kontextsuche, samt Nachtrag zur Embedding-Frage). Die Suche selbst beschreibt
 >    verfallen sollte, bliebe für immer stehen. (Ein Test hält die Vollständigkeit fest.)
 > 2. Ein Typ mit `embedding: true`, dessen Embedding-Input am Ende **nur aus dem Titel**
 >    besteht, ist keine thematische Suche, sondern eine unscharfe Titelsuche im
->    Vektorraum — mit Kosten und ohne Gewinn. Schritt 4 prüft genau das.
+>    Vektorraum — mit Kosten und ohne Gewinn. Schritt 5 prüft genau das.
 > 3. Ein Typ, dessen fachlicher Wert im **Metadata** steckt und der in `MODELL_METADATA`
->    fehlt, zeigt seine Felder überall — nur der Assistent sieht sie nie. Schritt 14.
+>    fehlt, zeigt seine Felder überall — nur der Assistent sieht sie nie. Schritt 16.
 > 4. `collection.schueler: true` sieht nach einer Anzeigeeinstellung aus, entscheidet
 >    aber seit dem 26.09.2026 **auch**, ob Knoten dieses Typs ungefragt im Chat-Prompt
->    landen. Schritt 15.
+>    landen. Schritt 17.
 
 ## `taxonomy.yaml` ist eine Systemdatei
 
@@ -52,6 +53,29 @@ wenn niemand mehr weiß, welches Update es war.
 
 ---
 
+## Vorab: Verdient der Typ seine Existenz?
+
+Die erste Frage ist nicht *wie*, sondern *ob*. Jeder Typ kostet einen Durchlauf dieser
+Checkliste, eine Zeile in der Rollen-Gewichtung, `ui_status`-Pflege, Label, Symbol,
+Filter, Doku und einen Fall im Prüfsatz. Und Streichen ist nur billig, solange es keinen
+Bestand gibt — mit Knoten wird daraus eine Datenmigration samt Referenzen.
+
+> **Das Existenz-Kriterium** (Taxonomie-Bereinigung V1–V5, 02.09.2026): Ein Typ verdient
+> seine Existenz, wenn er sich **(a)** in mindestens einer Mechanik von jedem anderen Typ
+> unterscheidet — Kategorie-Verhalten, Scope-Defaults, `embedding`/`enrichment`,
+> `scope_anchor`, Lebenszyklus-Klasse oder `valid_until`, Erzeugungsweg und Ort in der
+> Oberfläche, Werkzeug-Preset — **oder (b)** als Filterbegriff oder eigenes Auswahlfeld
+> fachlich gebraucht wird.
+
+Wer beides nicht erfüllt, ist ein Etikett ohne Verhalten. Dann gibt es zwei bessere Wege:
+ein **bestehender Typ mit einem Feld** (`felder:`, Schritt 9) oder **Daten statt Typ** —
+ein `themengebiet` als Wurzel, Kanten, Aliase. Beispiel aus der Bereinigung:
+`aufgabenblatt` ging in `arbeitsblatt` auf. Beide unterschieden sich nur in der Herkunft
+(hochgeladen oder erzeugt), und die ist am Knoten ohnehin erfasst.
+
+Die Antwort steht als Einzeiler im YAML-Kommentar des Typs, neben Klasse (Schritt 2) und
+Embedding-Entscheidung (Schritt 4).
+
 ## Checkliste
 
 ### 1. Kategorie wählen
@@ -71,7 +95,42 @@ Die Kategorie ist das **einzige** Feld mit DB-Constraint
 (`check_context_nodes_category`). Der `content_type` selbst ist in der Datenbank freier
 Text — für ihn allein braucht es **keine Migration**.
 
-### 2. Symbol wählen
+### 2. Lebenszyklus-Klasse zuordnen
+
+Jeder Typ gehört zu genau **einer von sechs Klassen** (ADR-019). Die Klasse beantwortet
+vier Fragen — wer legt an, wer sieht und nutzt, wer pflegt, wer archiviert oder löscht —
+und legt damit den **Ort in der Oberfläche** fest. Kein Typ ohne Klasse, keine Klasse
+ohne Ort.
+
+| Klasse | Typen (Beispiele) | Entsteht durch | Gepflegt von | Ort |
+|---|---|---|---|---|
+| **K1** Importiert-global | `fachplan`, `leitidee`, `operator` | Import-Skripte | niemand in der Oberfläche — eine neue Edition ersetzt | Bildungsplan-Ansichten, nur lesend |
+| **K2** Fachschafts-Struktur | `curriculum`, `kapitel`, `lernsequenz` | Curriculum-Editor, Import | Fachschaft | Curriculum-Editor |
+| **K3** Kuratierte Sammlungen | `methode`, `begriff`, `stoffsteckbrief`, `operatorenblatt` | Sammlung, Upload, Seed | wer den `write_scope` hat — meist die Fachschaft | Sammlung (Schritt 9) |
+| **K4** Lehrkraft-Material | `arbeitsblatt`, `quelltext`, `klausur` | Upload, Übernahme aus der Bibliothek | Eigentümerin | „Meine Bausteine", „Alle Bausteine" |
+| **K5** Lehrkraft-Planung | `jahresplan`, `unterrichtseinheit`, `unterrichtsstunde` | Unterrichtsplanung | Eigentümerin | Planner, dazu „Meine Bausteine" |
+| **K6** Schüler-Artefakte | `schuelertext`, `strukturierung`, `lernplan` | Übernahme aus dem Chat | Schüler:in (umbenennen, löschen — kein Editor) | „Meine Bausteine" |
+
+**Was aus der Klasse folgt** — sie nimmt spätere Antworten vorweg:
+
+- **K1/K2:** in `bp_curriculum_content_types`, sonst steht der Typ in der freien Liste
+  (Schritt 14).
+- **K3:** der Kandidat für eine Sammlung (Schritt 9). Wer pflegt, entscheidet der
+  `write_scope`, nicht die Klasse — nicht alles Kuratierte ist Sache der Fachschaft.
+- **K4/K6:** Übernahme aus der Bibliothek regeln (Schritt 10); K6 ist immer
+  `private`/`private` (Schritt 6), die Übernahme erzwingt das.
+- **K5:** kein Material — `KEIN_MATERIAL` in `frontend/src/lib/material.js` (siehe Kopf der
+  `taxonomy.yaml`).
+- **Alle:** Löschen wird zu Archivieren, solange fremde Knoten auf den Knoten verweisen
+  (ADR-019, F7).
+
+**Findet sich keine Klasse** — weil es noch keinen Weg gibt, so einen Knoten anzulegen —,
+ruht der Typ (Schritt 8), bis es ihn gibt.
+
+Die Klasse steht als Einzeiler im YAML-Kommentar des Typs; die Zuordnung aller Typen
+führt die Tabelle in ADR-019.
+
+### 3. Symbol wählen
 
 `icon:` am Typ, der Name einer [lucide](https://lucide.dev)-Komponente in
 PascalCase (`icon: PencilRuler`). **Pflichtangabe** — die Startprüfung lehnt einen Typ
@@ -91,7 +150,7 @@ Innerhalb von `artifact` prüft ein Test dagegen auf **durchweg** eigene Symbole
 Generator schreibt daraus statische Importe; ein Name, den lucide nicht kennt, bricht
 den Build, statt still auf ein Ersatzsymbol zu fallen.
 
-### 3. Embedding: ja oder nein?
+### 4. Embedding: ja oder nein?
 
 Das Kriterium aus dem ADR-017-Nachtrag lautet: **Soll dieser Baustein auffindbar sein,
 ohne dass man weiß, dass es ihn gibt?** Nur dann `embedding: true`.
@@ -108,7 +167,7 @@ Drei Gründe sprechen dagegen:
 Die Entscheidung kommt als **Einzeiler-Begründung** als Kommentar neben den Eintrag in
 `taxonomy.yaml`. Stand 09/2026: 28 von 42 Typen mit Embedding.
 
-### 4. Bei „ja": den Embedding-Input gegenprüfen
+### 5. Bei „ja": den Embedding-Input gegenprüfen
 
 ⚠️ **Der Schritt, der am ehesten übersprungen wird.** Woraus besteht der Vektor
 tatsächlich?
@@ -131,14 +190,14 @@ macht, macht seinen Vektor unschärfer — ein ergänzter Variantensatz warf den
 von Rang 1 auf 7. Wo ein Typ sowohl gelesen als auch gefunden werden soll, trennt man
 beides: ein Feld für Menschen, ein Satz für die Suche.
 
-Bleibt am Ende **nur der Titel** übrig, lautet die Entscheidung aus Schritt 3 „nein". Das
+Bleibt am Ende **nur der Titel** übrig, lautet die Entscheidung aus Schritt 4 „nein". Das
 ist Identifikationsstoff, keine thematische Auffindbarkeit — `traegt_substanz()` in
 `embedding.py` weist solche Knoten ab.
 
 Ein bestehender Typ, dessen `embedding_input` sich ändert, braucht einen **Re-Embed**:
 Die alten Vektoren sind dann aus etwas anderem gebildet und nicht mehr vergleichbar.
 
-### 5. Sichtbarkeit: `scope_defaults`
+### 6. Sichtbarkeit: `scope_defaults`
 
 `read_scope`/`write_scope` je Typ in `taxonomy.yaml`. Sie sind **Vorgaben für neue
 Knoten**, keine Rechteprüfung — die liegt in `app/context/visibility.py` und gilt
@@ -160,7 +219,7 @@ und Schüler:innen derselben Gruppe sie über `GET /context/nodes` lesen konnten
 `taxonomy_check._SCOPE_RANG`). Ein neuer Scope-Wert muss in alle drei — und
 `write_scope` darf nie weiter reichen als `read_scope`.
 
-### 6. Lifecycle
+### 7. Lifecycle
 
 `VALID_UNTIL_DEFAULTS_DAYS` in `backend/app/context/taxonomy.py` — **auch dann eintragen,
 wenn der Wert `None` lautet** (siehe Falle 1 oben). Läuft der Typ zum Schuljahresende ab,
@@ -182,7 +241,7 @@ Wert unverändert — auch `null`. Wer einen ablaufenden Typ neu einführt, erg�
 Formular-Hinweis (`SCHULJAHRESENDE_CONTENT_TYPES` in der erzeugten `taxonomy.js`); sonst
 bekäme man beim Anlegen stillschweigend ein Datum, das man nicht gewählt hat.
 
-### 7. `ui_status`: erscheint der Typ in Auswahlflächen?
+### 8. `ui_status`: erscheint der Typ in Auswahlflächen?
 
 `ui_status: aktiv | ruhend` in der `taxonomy.yaml` (fehlt das Feld, gilt `aktiv`).
 
@@ -197,7 +256,7 @@ Anwendung nicht einlöst. Der Wechsel `ruhend → aktiv` gehört in dasselbe Arb
 der Erzeugungsweg und bekommt eine Einzeiler-Begründung in der YAML.
 
 Für die meisten Artefakt-Typen ist dieser Weg die **Übernahme aus der Bibliothek**
-(Schritt 8) — sie bietet ruhende Arten selbst nicht an, sonst unterliefe sie den
+(Schritt 10) — sie bietet ruhende Arten selbst nicht an, sonst unterliefe sie den
 `ui_status`, statt ihn einzulösen.
 
 Im Frontend filtern die Helfer in `frontend/src/lib/knotentypen.js` — **nicht**
@@ -206,11 +265,44 @@ Im Frontend filtern die Helfer in `frontend/src/lib/knotentypen.js` — **nicht*
 wenn er ruht. Sonst stünde dort ein leeres Auswahlfeld, und das Speichern schriebe
 stillschweigend etwas anderes.
 
-### 8. Übernahme aus der Bibliothek: erlaubt oder nicht?
+### 9. Sammlung: bekommt der Typ eine eigene Ansicht?
+
+Ein `collection:`-Block in der `taxonomy.yaml` erzeugt `/knowledge/collections/<typ>`:
+Liste, Filter, Formular-Editor, Detailansicht. Ohne ihn gibt es keine — der Typ bleibt
+über Suche, „Alle Bausteine" und Auswahlfelder erreichbar. Was die einzelnen Schlüssel
+bedeuten, steht im Kopf der `taxonomy.yaml`; hier die Entscheidungen.
+
+- **Ob überhaupt.** Gebaut ist der Mechanismus für K3 (Schritt 2), aber nicht jeder
+  K3-Typ hat schon eine Sammlung: `konvention`, `funktion`, `bauteil` und `themengebiet`
+  nicht. K4–K6 nie — ihr Ort ist „Meine Bausteine". K1 und K2 haben eigene Ansichten.
+- **`felder:` steht neben `collection:`, nicht darin.** Das Metadaten-Schema gilt auch
+  ohne Sammlung; Editor, Backend-Prüfung (`app/context/metadata.py`) und Spalten lesen
+  dieselbe Stelle. Darin eingehängt, verlöre ein ruhender Typ seine Feldprüfung, ohne dass
+  es auffiele.
+- **`spalten` und `filter`** nennen feste Spalten (`titel`, `fach`, `status`,
+  `geaendert`) oder Feldnamen. **`fach` im Filter macht die Sammlung fachgebunden** — sie
+  erscheint dann im Fachschafts-Abschnitt der Fachseite.
+- **`relationen`** ist eine kuratierte Auswahl, keine Liste aller möglichen Kanten:
+  Angeboten wird nur die Richtung, die an diesem Typ entsteht. Ohne Eintrag kein
+  Verknüpfen-Dialog.
+- **`content`** — Pflicht, wenn ein Knoten ohne Text nur über seinen Namen auffindbar
+  wäre. Bei `embedding: true` ohnehin: sonst bleibt ein Titel-Vektor (Schritt 5).
+- **`sidebar`**: Vorgabe nein. Wer einen Eintrag in der Navigation will, begründet ihn.
+- **`schueler`** wirkt doppelt — auf die Gruppenansicht **und** auf den Chat-Prompt
+  (Schritt 17).
+
+**Die Startprüfung lehnt ab** (`pruefe_schema_konsistenz` in `app/context/metadata.py`,
+aufgerufen aus `taxonomy_check.py`): Spalten oder Filter, die weder feste Spalte noch Feld
+sind; Relationen, die kein erlaubter Kantentyp sind oder kein `label` tragen; ein
+`sidebar`, das kein Wahrheitswert ist; eine Sammlung ohne `beschreibung`; Felder mit
+unbekanntem Typ, ohne `label` oder — bei `auswahl` — ohne `werte`. Und **eine Sammlung an
+einem ruhenden Typ**: eine Ansicht, in der sich nichts anlegen lässt.
+
+### 10. Übernahme aus der Bibliothek: erlaubt oder nicht?
 
 `backend/app/artifacts/uebernahme.py`. „Als Baustein speichern" macht aus einem
 Bibliotheks-Artefakt einen Knoten (AP8) — für viele Typen **der** Erzeugungsweg und damit
-die Voraussetzung dafür, dass Schritt 7 `aktiv` sagen darf.
+die Voraussetzung dafür, dass Schritt 8 `aktiv` sagen darf.
 
 Jeder Typ der Kategorien `document` und `artifact` gehört in genau eine von drei Listen:
 
@@ -231,16 +323,16 @@ als Ablehnung, sondern als Lücke, die niemandem auffiele.
 Zu klären ist außerdem, aus welcher **Artefaktart** er entstehen kann
 (`UEBERNEHMBARE_KINDS`, heute `document` und `mermaid`) und ob der Knotentext daraus
 etwas Lesbares wird — ein Knoten, der außer dem Titel nichts trägt, ist derselbe Fehler
-wie in Schritt 4.
+wie in Schritt 5.
 
-### 9. Rollen-Gewichtung
+### 11. Rollen-Gewichtung
 
 `_SCHUELER_BONUS` / `_LEHRKRAFT_BONUS` in `backend/app/context/taxonomy.py`. Ein
 **Vorzug, kein Filter**, und klein (≤ 0,05). Bildungsplan-Typen bleiben neutral (0), damit
 der Prüfsatz auf reinem BP-Bestand vergleichbar bleibt. Kein Eintrag heißt neutral — das
 ist ein zulässiges Ergebnis, aber eine bewusste Entscheidung.
 
-### 10. Kanten festlegen
+### 12. Kanten festlegen
 
 Mit welchen Typen steht der neue in Beziehung, über welche Relation? Der
 [Netzwerkgraph](#netzwerkgraph-der-kontexttypen) unten zeigt den Bestand — **er ist
@@ -250,7 +342,7 @@ Eine **neue Relation** (nicht bloß eine neue Kante zwischen bestehenden Typen) 
 sehr wohl eine Migration: Sie ist per CHECK gebunden
 (`check_context_edges_relation`, `app/db/models.py`).
 
-### 11. Migration — was wirklich nötig ist
+### 13. Migration — was wirklich nötig ist
 
 | Änderung | Migration? |
 |---|---|
@@ -260,14 +352,14 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
 | neuer Index | ja, wenn eine Abfrage ihn braucht |
 | Backfill der Embeddings | kein Schema, aber ein Lauf (`scripts/`) |
 
-### 12. Oberfläche
+### 14. Oberfläche
 
 - `frontend/src/lib/taxonomy.js` — `CONTENT_TYPE_LABELS` (deutsches Label; der Spiegel
   deckt heute alle 42 Typen ab, das soll so bleiben). Bei importierten
   Bildungsplan-/Curriculum-Typen zusätzlich `BP_CURRICULUM_CONTENT_TYPES`, sonst taucht
   der Typ in der freien `/knowledge`-Liste auf.
 - Das Symbol ist **kein** Punkt mehr für diese Liste: Es steht seit 09/2026 als `icon:`
-  in der Taxonomie (Schritt 2), und `NodeTypeIcon.svelte` liest nur noch die daraus
+  in der Taxonomie (Schritt 3), und `NodeTypeIcon.svelte` liest nur noch die daraus
   erzeugte `node_icons.js`.
 - **Aliase sind ebenfalls kein Punkt:** Weitere Namen hat seit Migration 0057 *jeder*
   Knoten (Tabelle `node_aliases`, Pflege über `AliasFeld.svelte` in beiden Editoren).
@@ -275,13 +367,13 @@ sehr wohl eine Migration: Sie ist per CHECK gebunden
   gehört `aliases` in sein `embedding_input` — dann lädt `braucht_aliase()` sie
   automatisch nach.
 
-### 13. Werkzeuge
+### 15. Werkzeuge
 
 Erscheint der Typ in einer Werkzeugbeschreibung des Chats (`backend/app/chat/router.py`,
 z. B. die Aufzählung „`leitidee`, `methode`, `themengebiet`")? Werkzeugbeschreibungen
 sind Prompt-Text: Was dort nicht steht, wählt das Modell seltener.
 
-### 14. Was das Modell sieht
+### 16. Was das Modell sieht
 
 `MODELL_METADATA` in `backend/app/context/taxonomy.py`. Welche **Metadatenfelder** des
 Typs gehen in den Kontext des Assistenten? Kein Eintrag heißt: keine — und das ist für
@@ -302,7 +394,7 @@ Drei Regeln dazu:
   `schaltzeichen.svg`) ist im Pilot bis 47 kB groß — pauschal mitgegeben stünde mehr
   Grafikmarkup im Prompt als Unterrichtsinhalt. `ohne_svg` in `app/context/modellsicht.py`
   entfernt den Schlüssel in jeder Tiefe; was das Bild zeigt, steht in `beschreibung`.
-- **Nicht dieselbe Liste wie der Embedding-Input** (Schritt 4). Die Eigenschaftstabelle
+- **Nicht dieselbe Liste wie der Embedding-Input** (Schritt 5). Die Eigenschaftstabelle
   gehört ins Gespräch, aber nicht in den Vektor: Dort machte sie alle Stoffe einander
   ähnlich. Umgekehrt gehören Fehlvorstellungen ins Gespräch, aber nicht in den Vektor —
   sie zögen die Fragen an, die sie widerlegen sollen.
@@ -316,7 +408,7 @@ Drei Regeln dazu:
   und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute
   `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann.
 
-### 15. Darf der Typ ungefragt in einen Chat?
+### 17. Darf der Typ ungefragt in einen Chat?
 
 Das Flag `collection.schueler` in `taxonomy.yaml`. Es beantwortete ursprünglich nur eine
 Anzeigefrage („erscheint die Sammlung im Abschnitt *Nachschlagen* der
@@ -340,16 +432,17 @@ beantworten die Frage einer Lehrkraft, nicht die einer Schülerin.
 Fällt die Antwort auseinander (Sammlung ja, Prompt nein — oder umgekehrt), ist das Flag
 zu teilen. Heute deckt eine Frage beide Fälle; das ist keine Zusage für immer.
 
-### 16. Prüfsatz
+### 18. Prüfsatz
 
 Mindestens **ein Fall** in `config/search_eval.yaml`. Ohne ihn ist nicht messbar, ob der
 neue Typ die Suche verbessert oder bestehende Treffer verdrängt. Vorgehen:
 [kontextsuche.md](kontextsuche.md#ändern-und-messen).
 
-### 17. Dokumentation
+### 19. Dokumentation
 
 Nutzer-Doku (`docs/user/kontext.md`) und, wenn der Typ verwaltet wird, Admin-Doku.
-Und diese Seite: Graph ergänzen.
+Und diese Seite: Graph ergänzen. Außerhalb des Repositorys: die Zuordnungstabelle in
+ADR-019 um eine Zeile (Klasse, Entstehung, Pflege, Ort, `ui_status`).
 
 ---
 

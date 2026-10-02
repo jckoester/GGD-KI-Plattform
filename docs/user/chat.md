@@ -20,6 +20,8 @@ Ein einmal gewähltes Modell wird gespeichert und beim nächsten Chat automatisc
 
 Modelle unterscheiden sich in Geschwindigkeit, Qualität und Kosten. Für die meisten Aufgaben reicht das voreingestellte Modell aus. Wenn Sie sehr lange Texte verarbeiten oder besonders anspruchsvolle Aufgaben stellen, kann ein leistungsstärkeres Modell besser geeignet sein.
 
+**Was neben dem Namen steht.** `~7 🪙` schätzt, wie viele Einheiten eine gewöhnliche Nachricht mit diesem Modell kostet; abgerechnet wird nach dem tatsächlichen Verbrauch. Was eine Einheit ist, erklärt [Profil & Budget](profil.md). Das Zahnrad `⚙` heißt: Das Modell kann die Fähigkeiten eines Assistenten nutzen, etwa im Wissensspeicher suchen oder Unterricht planen. Fehlt es, ist das nicht der Fall oder nicht bekannt — für einfache Fragen spielt es keine Rolle.
+
 Wenn Sie das Modell wechseln, erscheint im Gesprächsverlauf ein schmaler Trenner, der anzeigt, ab welcher Antwort das neue Modell aktiv war. Der bisherige Verlauf bleibt vollständig erhalten und ist weiterhin Teil des Kontexts.
 
 ## Assistenten im laufenden Chat wechseln

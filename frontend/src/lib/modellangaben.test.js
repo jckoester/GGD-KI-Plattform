@@ -42,7 +42,7 @@ describe("eintragsText", () => {
         );
     });
 
-    it("zeigt das Zahnrad nur bei belegten Werkzeugen", () => {
+    it("zeigt das Zahnrad nur, wenn die Fähigkeiten belegt nutzbar sind", () => {
         // Es ist im Chat-Wähler der einzige Fähigkeitshinweis — dort gibt es keine
         // Angabenzeile darunter. Unbekannt heißt weglassen, nicht verneinen.
         const ohne = { id: "x", usd_je_nachricht: 0.000877 };
@@ -58,24 +58,32 @@ describe("eintragsText", () => {
 });
 
 describe("angaben", () => {
-    it("nennt Kosten, Kontextfenster und Werkzeuge", () => {
+    it("nennt Kosten, Kontextfenster und Fähigkeiten", () => {
         const liste = angaben(standard, KURS, FAKTOR);
-        expect(liste.map((a) => a.was)).toEqual(["Kosten", "Kontextfenster", "Werkzeuge"]);
+        expect(liste.map((a) => a.was)).toEqual(["Kosten", "Kontextfenster", "Fähigkeiten"]);
         expect(liste[0].wert).toBe(`etwa 7 ${BEZEICHNUNG.plural} je Nachricht`);
     });
 
     it("lässt Unbekanntes weg, statt es zu verneinen", () => {
         // ⚠️ Der Regelfall bei IONOS: Kontextfenster unbekannt. „0 Token" oder
-        // „kann keine Werkzeuge" wäre eine erfundene Auskunft.
+        // „Fähigkeiten nicht nutzbar" wäre eine erfundene Auskunft.
         const ionos = { id: "ionos-gpt-oss-120b", usd_je_nachricht: 0.000877 };
         expect(angaben(ionos, KURS, FAKTOR).map((a) => a.was)).toEqual(["Kosten"]);
     });
 
-    it("nennt ein belegtes Nein bei den Werkzeugen", () => {
-        // Hier ist das Nein wichtig: Ohne Werkzeuge fallen Wissensspeicher und
+    it("nennt ein belegtes Nein bei den Fähigkeiten", () => {
+        // Hier ist das Nein wichtig: Ohne Funktionsaufrufe fallen Wissensspeicher und
         // Unterrichtsplanung aus.
         const ohne = { id: "x", supports_function_calling: false };
-        expect(angaben(ohne, KURS, FAKTOR)).toEqual([{ was: "Werkzeuge", wert: "nein" }]);
+        expect(angaben(ohne, KURS, FAKTOR)).toEqual([{ was: "Fähigkeiten", wert: "nicht nutzbar" }]);
+    });
+
+    it("sagt nie „Werkzeuge“ — das ist in der Oberfläche ein Medien-Assistent", () => {
+        const sichtbar = [
+            ...angaben(standard, KURS, FAKTOR),
+            ...angaben({ id: "x", supports_function_calling: false }, KURS, FAKTOR),
+        ].flatMap((a) => [a.was, a.wert]);
+        expect(sichtbar.filter((w) => /werkzeug/i.test(w))).toEqual([]);
     });
 
     it("nennt weitere Fähigkeiten nur, wenn sie zutreffen", () => {
