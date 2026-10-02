@@ -1,16 +1,16 @@
 # Graph Report - GGD-KI-Plattform  (2026-10-02)
 
 ## Corpus Check
-- 1085 files · ~936,526 words
+- 1087 files · ~937,484 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 16338 nodes · 33993 edges · 811 communities (601 shown, 82 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 2274 edges (avg confidence: 0.92)
+- 16351 nodes · 34013 edges · 794 communities (583 shown, 81 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 2275 edges (avg confidence: 0.92)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a1b3bc05`
+- Built from commit: `abe971a5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,20 +20,20 @@
 - context/service.py
 - context/router.py
 - import_curriculum_from_draft
-- test_calendar_patterns.py
-- Lesson
-- load_school_year
+- timedelta
+- WebUntisAdapter
+- SchoolYearConfig
 - plan_sync
 - [slug]/+page.svelte
-- insert_node_sync
+- asyncio
 - test_calendar_holidays.py
-- Group
+- Subject
 - ToolContext
 - make_app
 - Suchprofil
 - SimpleNamespace
 - calendar/router.py
-- test_chat_context_nodes.py
+- aufzaehlung
 - asyncio
 - artifacts/store.py
 - test_group_sync.py
@@ -41,21 +41,21 @@
 - JwtPayload
 - test_krisen_benachrichtigung.py
 - test_geogebra.py
-- test_crisis_reader.py
+- ConversationAccessRequest
 - lib/components/AssistantEditor.svelte
 - test_chat_router_helpers.py
 - Conversation
 - test_context_search.py
-- _sql
+- zuordnen
 - LiteLLMClient
-- test_hausversuche.py
+- pruefe
 - test_curriculum_resolver.py
 - _build_embedding_input
 - fachbegriffe_import.py
 - asyncio
 - auth/router.py
 - test_budget_accrual.py
-- export.py
+- render_markdown_for_pdf
 - groups/router.py
 - $lib/api.js
 - admin/models.py
@@ -65,60 +65,60 @@
 - test_kosten_nachtrag.py
 - markdown_to_office_sync
 - test_seed_fachbegriffe.py
-- budgets.py
-- test_assistant_admin_api.py
+- calendar/groups.py
+- api/assistants.py
 - test_calendar_webuntis.py
 - test_scraper_gen2x.py
-- angebote.py
+- sync_groups
 - admin/groups.py
 - artifacts/router.py
 - test_ausfall.py
 - Bildart
-- timedelta
+- _rumpf
 - test_pdf_import.py
 - test_pdf_import_fremdsprache.py
 - parsers.py
-- api/assistants.py
-- embedding.py
+- unit/test_assistant_lebenszyklus.py
+- session_factory
 - lib/taxonomy.js
 - test_slot_neuaufbau.py
 - image_store.py
 - test_mein_tag.py
 - test_planning_api.py
-- bildpreis_probe.py
+- _Client
 - load_fixture
 - test_stats_router.py
 - test_budget_service.py
 - test_production_check.py
 - test_meine_bausteine.py
 - test_budgets_router.py
-- aliase.py
+- embedding.py
 - chat/router.py
 - test_budget_zuschlag.py
-- JwtService
+- test_auth_router.py
 - test_einheiten_skala.py
 - test_chat_tools.py
 - import_bildungsplan.py
 - dev/README.md
 - $app/navigation
 - darf_nutzen
-- TestPflege
+- NodeAlias
 - test_curriculum_meta_update.py
 - test_cleanup_konto.py
-- test_chat_models.py
+- _AblehnungsResponse
 - _ist
 - lib/markdown.js
-- $app/stores
+- search/+page.svelte
 - test_student_context.py
 - test_models_router.py
 - generate_embeddings
-- scan
 - test_crisis_config.py
-- CalendarSourceError
-- pruefe_schema_konsistenz
+- ._reihenfolge
+- test_calendar_cron.py
+- taxonomy.py
 - test_bildungsplan_editions.py
-- _make_app
-- test_calendar_groups.py
+- test_fachplan_router.py
+- match_groups
 - pruefe_beim_start
 - test_lesson_export.py
 - test_groups_router.py
@@ -127,17 +127,17 @@
 - test_vorab_suche_db.py
 - assistants/manage/+page.svelte
 - _sammle_klassisch
-- ConversationAccessRequest
+- flags.py
 - test_guardrail_admin.py
 - test_startup_embedding_check.py
-- export_templates.py
+- app/config.py
 - YamlTestAdapter
 - test_zugangstoken.py
 - test_render_service.py
 - FeedbackCreate
 - client.py
 - webuntis_probe.py
-- ressource_erwartet
+- test_calendar_groups.py
 - test_image_formats.py
 - complete_review
 - waehle
@@ -154,23 +154,23 @@
 - lib/components/CurriculumTable.svelte
 - erinnerung.py
 - feedback/service.py
-- build_reflow_context
+- LessonSlot
 - _post
 - _eines
-- test_budget_forecast.py
+- budgets.py
 - search_eval.py
-- SchoolYearConfig
+- unterrichtswochen
 - server.mjs
 - relink.py
-- test_render_plot.py
-- get_budget_for
+- RenderError
+- accrual.py
 - test_editions.py
-- test_ks_phase1.py
+- TestMigration
 - require_any_role
 - pruefe_svg
-- PseudonymAudit
+- db/models.py
 - test_token_verwaltung.py
-- admin/holidays.py
+- test_lesson_endpoints.py
 - test_embedding_titel.py
 - test_taxonomy_check.py
 - SiteConfig
@@ -183,7 +183,7 @@
 - meine_bausteine.py
 - fehlende_namen
 - _meldung
-- WebUntisAdapter
+- auth/tokens.py
 - cleanup_service.py
 - fachbegriffe_export.py
 - fremdsprache.py
@@ -192,8 +192,8 @@
 - test_image_kinds_api.py
 - ensure_litellm_user
 - test_bausteine_verwalten.py
-- get_engagement_context
-- test_curriculum_export_pdf.py
+- run
+- _build_pdf_kapitel
 - anbietermodell
 - TestChatContextNodes
 - test_admin_flags.py
@@ -207,19 +207,19 @@
 - integration/conftest.py
 - `.env`
 - knowledge/[id]/edit/+page.svelte
-- lege_gruppe_aus_vorschlag_an
+- Group
 - ist_budget_erschoepft
 - resize_embedding_column
 - soll_kanten
-- test_umhaengen_anwenden.py
+- test_reflow_tools.py
 - test_updated_at_wird_fortgeschrieben.py
 - test_fachbegriffe_export.py
 - scan
-- _Client
-- db/models.py
+- standard_unter
+- _make_app
 - PlannerRow.svelte
 - check_config
-- pruefe
+- pii.py
 - baue_buendel
 - test_calendar_slot_fields.py
 - test_archiv_gruppen.py
@@ -228,7 +228,7 @@
 - budget/+page.svelte
 - admin/README.md
 - test_admin_users.py
-- student_context.py
+- embedding_backfill_service.py
 - feedback/benachrichtigung.py
 - test_material_edges_pfade.py
 - test_scope_gruppen.py
@@ -240,14 +240,14 @@
 - test_pseudonym_deletion_coverage.py
 - vorgeschlagenes_ablaufdatum
 - get_scope_defaults
-- ExchangeRate
+- fetch_ecb_rate
 - test_pedagogy_compose.py
 - test_feedback_benachrichtigung.py
 - test_compose_litellm.py
 - Updates & Wartung
 - Kontextsuche
 - Runbook: Bildungsplan-Import
-- [type]/+page.svelte
+- lib/components/BildungsplanTree.svelte
 - lib/stores/myGroups.js
 - strip_soft_hyphens
 - test_subjects_router.py
@@ -256,7 +256,7 @@
 - _lauf
 - test_embedding_config.py
 - Checkliste
-- test_beitrittscode.py
+- _app
 - pruefe_zugang
 - Versandergebnis
 - sichere_phasen_kennungen
@@ -272,7 +272,7 @@
 - lib/collections.js
 - seed_methodik.py
 - client_ip
-- test_planning_assistant_tools.py
+- assistant_tools.py
 - pruefe
 - TestRollenGewichtung
 - test_doku_deckt_wirklichkeit.py
@@ -281,28 +281,28 @@
 - lib/planner.js
 - knowledge/new/+page.svelte
 - test_container_pfade.py
-- asyncio
+- test_assistant_scope_validation.py
 - integration/test_systemkonto.py
 - test_node_aliases_backfill.py
-- test_admin_assistant_model_check.py
+- TestVorlage
 - parametrize
 - Nutzerverwaltung & Rollen
 - lib/stores/sidebarSections.js
 - feedback.py
-- _build_signature_line
-- test_chat_tool_ergebnis.py
+- test_taxonomy_embedding.py
+- TestLesehinweis
 - pruefe_taxonomie
-- snapshot.py
+- test_feedback_snapshot.py
 - leite_jahrgang_ab
 - properties
 - test_gruppen_schueler_sichtbarkeit.py
-- prerender_diagrams
+- issue_stepup_token
 - test_budget_exchange_currency.py
 - test_ui_levels.py
 - properties
 - Datenschutz & Betrieb
 - lib/gruppenseite.js
-- taxonomy.py
+- validate_unterrichtsstunde_metadata
 - RollenStufen
 - asyncio
 - test_ks_phase4.py
@@ -313,19 +313,19 @@
 - TestNachgereichteEintraege
 - Ablauf
 - Unterrichtsplanung
-- ._zwei_fassungen
+- TestUiStatus
 - test_artifact_auszug.py
-- RenderError
+- TestModellregel
 - validate_content_type
 - crisis/benachrichtigung.py
 - test_bildungsplan_rollover.py
 - test_gruppen_aktualitaet.py
 - TestStabileKennung
 - test_ui_level_speichern.py
-- test_verwaiste_gruppen.py
+- bibliotheken.test.js
 - _CrossFachCursor
-- test_abgrenzungen_db.py
-- test_chat_assistant_model_fallback.py
+- abgrenzungen_zu
+- welcome/+page.svelte
 - _aufloesen_in
 - asyncio
 - test_neuaufbau_guard.py
@@ -339,10 +339,10 @@
 - curriculum/new/+page.svelte
 - render-sidecar/package.json
 - TestIdentifikationZweistufig
-- ohne_svg
+- test_chat_tool_ergebnis.py
 - _check_curriculum_read_permission
-- LessonSlot
-- preferences/router.py
+- snapshots.py
+- test_kontext_limits.py
 - load_ui_levels
 - properties
 - test_context_schueler_lesepfad.py
@@ -353,7 +353,7 @@
 - Modelle & Assistenten
 - Fachbegriffe pflegen
 - lib/library.js
-- export_document
+- test_context_taxonomy.py
 - kuerze
 - test_gruppe_jahrgang_api.py
 - test_kosten_guete.py
@@ -367,7 +367,7 @@
 - Kontextspeicher
 - lib/stores/user.js
 - OAuthConfig
-- _list_context_nodes_handler
+- asyncio
 - abbildungen_aufgeloest
 - stufe_fuer
 - test_gruppen_anzeigename.py
@@ -384,19 +384,19 @@
 - mine/+page.svelte
 - 0079_fachbegriff_kennung.py
 - lib/abbildungen.js
-- test_crisis_resolve.py
+- auth_time_is_fresh
 - Grenzen
 - BuendelFehler
-- _gruppiere
+- TestUeberlappterNetzaufruf
 - Energie (Grundfassung).md
 - production_check.py
 - cleanup_feedback
 - config
 - test_fachbegriffe_rundreise.py
-- als_stundenzahl
+- seed_fachbegriffe.py
 - TestNeighborhood
 - test_seed_fachbegriffe_db.py
-- test_export_parity.py
+- TestGesperrteBereiche
 - test_calendar_school_year.py
 - config
 - Modell-Szenarien: welcher Anbieter, welche Konfiguration
@@ -405,12 +405,12 @@
 - vernetzung.test.js
 - expand_operator_title
 - _Session
-- _buendel
+- TestDerZweiteAuthWeg
 - UiLevels
 - items
 - Fiktivum.md
 - lib/components/ConversationMenu.svelte
-- Knotenfilter
+- subjects.py
 - TestAssistantModel
 - test_config_secrets.py
 - TestStellungImSystemtext
@@ -421,19 +421,19 @@
 - Schulcurriculum
 - Profil & Einstellungen
 - lib/stores/calendarStatus.js
-- umschlag.test.js
+- _ist_inhaltsfehler
 - _as_str_list
 - Settings
-- normalize
+- seed_assistants.py
 - test_crisis_reminders_skript.py
-- modell_metadata_felder
+- TestModellMetadata
 - feedback/__init__.py
-- cache.py
+- Fundstelle
 - TestCopyNode
 - _tag_ohne_stunden
 - test_relation_is_a.py
 - TestZielImBestand
-- TestZurueckInDenPlan
+- arduino_seed
 - TestSuchbegriffeUndAbgrenzungen
 - TestKlassenstufeImSystemkontext
 - bildpreise.py
@@ -456,14 +456,14 @@
 - run.py
 - TestSlot
 - TestZweiterLauf
-- TestWasGelesenWird
+- TestActivateDeactivateAssistant
 - TestLifecycleVollstaendigkeit
 - TestEinzelneDateien
 - test_kalendertage_sind_lokal.py
 - TestText
 - test_material_edges_abdeckung.py
-- TestSchuelerPraeambelN8
-- limits.py
+- TestExportAssistant
+- doku_anker.test.js
 - parametrize
 - TestFundstellen
 - _FakeSession
@@ -474,17 +474,17 @@
 - lib/beitrittscode.js
 - extract_niveau_from_bp_id
 - Klassenaufloesung
-- kosten_nachtrag.py
-- Zugkosten
+- _bildarten_ohne_lokale_datei
+- TestTaxonomyThemengebiet
 - PII-NER-Engine — Entscheidung (Phase 14, Schritt 1)
 - test_assistant_spaltenvorgaben.py
 - _filtere_auf_frontier
 - field_validator
-- lib/components/VerknuepfenDialog.svelte
-- TestObergrenze
+- lib/tools.js
+- test_krisen_erinnerung.py
 - TestArchivedReferences
 - lib/serverRender.js
-- texts/+page.svelte
+- _gebunden
 - TestStandardtext
 - test_scope_rangfolge.py
 - TestFrontendAbleitung
@@ -500,12 +500,11 @@
 - help_nav.test.js
 - betrag
 - TestText
-- image_kinds.py
+- _werte
 - backend/config/assistant_schema.json
-- seed_assistants.py
+- _build_survivor_map
 - dosisfragen_messung.py
-- test_ks_phase3.py
-- _CrisisRecord
+- arduino_nodes.py
 - fixture
 - test_host_guard.py
 - _bildpreis_meldung
@@ -534,11 +533,8 @@
 - null
 - enum
 - .test_exchange_code_fresh_rejects_bad_signature
-- TestWelcheDateienGelesenWerden
-- TestUnparkEndpunkt
 - TestFaktorAusDerKonfiguration
 - TestAntragstext
-- test_relationen_einheitlich.py
 - [0.11.0] – 2026-09-27
 - [0.6.0] – 2026-08-26
 - enum
@@ -567,9 +563,7 @@
 - 0080_alte_bp_schreibweise.py
 - Wasser.md
 - test_scope_rangfolge_db.py
-- TestParkplatzEndpunkte
 - Server-Rendering (Phase 17)
-- pruefe_scopes
 - [0.10.0] – 2026-09-14
 - [0.10.2] – 2026-09-16
 - [0.10.4] – 2026-09-21
@@ -598,14 +592,11 @@
 - 0071_sso_gruppenangebote.py
 - 0072_stundenzahl_als_zahl.py
 - 0077_assistants_spaltenvorgaben.py
-- AlterSlot
 - _meldung_zu_ignorierten
 - temperature
 - fragt_nach_stufe
 - TestLifecycleRoundtrip
 - TestFachOhneFachschaft
-- FeedbackOut
-- _Sitzung
 - test_missing_category_yields_none_instead_of_assuming_zero
 - TestStandHash
 - [0.3.0] – 2026-07-16
@@ -627,11 +618,8 @@
 - Preferences
 - Backend Notes
 - migrate_budget_duration.py
-- TestFassungen
-- TestPruefstatus
-- TestUeberschreibenJeDatei
+- fasse_fassungen_zusammen
 - 0043_embedding_dimensions.py
-- .naechstes_format
 - core
 - test_unusable_answers_yield_none
 - [0.5.5] – 2026-08-25
@@ -672,11 +660,9 @@
 - test_fail_open_teams_are_configurable
 - test_prompt_carves_out_the_caring_crisis_answer
 - eslint-plugin-svelte
-- _fachbegriffe_nutzer
 - @sveltejs/adapter-auto
-- cleanup_artifacts.py
 - @sveltejs/kit
-- TestVorschlag
+- integration/test_uebernahme.py
 - vite
 - importAssistant
 - lib/branding.js
@@ -688,13 +674,8 @@
 - 10-litellm-db.sh
 - pdf_import/__init__.py
 - werkstatt_knopf.test.js
-- .group_role_map_dict
-- _KeinClient
 - TestStartpruefung
-- _Jahr
-- _clear_cache
 - test_unreplaced_placeholders_are_errors
-- _ohne_warten
 - @eslint/js
 - svelte-eslint-parser
 - @tailwindcss/vite
@@ -726,95 +707,95 @@
 ## Import Cycles
 - None detected.
 
-## Communities (811 total, 82 thin omitted)
+## Communities (794 total, 81 thin omitted)
 
 ### Community 0 - "planning/router.py"
-Cohesion: 0.04
-Nodes (134): GroupWeekPattern, Lädt die Gruppe und prüft Lehrkraft-Mitgliedschaft. Raises HTTPException 404…, require_group_teacher(), ab_wochen(), AusfallRequest, _build_balance(), _build_lesson_nav(), create_lesson() (+126 more)
+Cohesion: 0.05
+Nodes (122): GroupWeekPattern, Lädt die Gruppe und prüft Lehrkraft-Mitgliedschaft. Raises HTTPException 404…, require_group_teacher(), ab_wochen(), ausfall_eintragen(), ausfall_zuruecknehmen(), AusfallRead, AusfallRequest (+114 more)
 
 ### Community 1 - "lib/api.js"
 Cohesion: 0.02
 Nodes (160): activateAssistant(), addChatContextNode(), addContextAnchor(), ApiError, approveAssistant(), bausteinAusArtefakt(), copyContextNode(), createAccessRequest() (+152 more)
 
 ### Community 2 - "context/service.py"
-Cohesion: 0.03
-Nodes (105): Die Suche für das Modell — beschriftete Abschnitte statt einer flachen Liste.…, _search_context_nodes_handler(), EngagementEntry, create_curriculum_node(), Erstellt einen neuen leeren Curriculum-Knoten für den Editor., abgrenzungen_zu(), „Wovon unterscheidet sich dieser Baustein, und wodurch?" — je Knoten. ⚠️…, archive_orphaned_curriculum_nodes() (+97 more)
+Cohesion: 0.04
+Nodes (85): create_curriculum_node(), Erstellt einen neuen leeren Curriculum-Knoten für den Editor., archive_orphaned_curriculum_nodes(), _conversation_subject(), create_edge(), _editions_filter(), _fach_filter(), fachplan_diagnose() (+77 more)
 
 ### Community 3 - "context/router.py"
-Cohesion: 0.03
-Nodes (167): Die vergebbaren Berechtigungen samt Beschriftung — damit die Oberfläche sie…, verfuegbare_scopes(), get_login_challenge_v1(), AsyncSession, read_my_budget(), Ersetzt die Aliase eines Knotens vollständig. Committet nicht. Löschen und neu…, setze(), enqueue_embedding_job() (+159 more)
+Cohesion: 0.02
+Nodes (189): aktive_bp_version(), Die für (Stufe, aktuelles Schuljahr) geltende ``bp_version``. Verbindet den…, enqueue_embedding_job(), AsyncSession, Generiert sofort ein Embedding fuer einen einzelnen neu angelegten Knoten. Wird…, als_zip(), Ausgabedatei, hinweisdatei() (+181 more)
 
 ### Community 4 - "import_curriculum_from_draft"
 Cohesion: 0.03
-Nodes (129): build_curriculum_export_dict(), Baut das code-basierte Export-Dict für YAML-Serialisierung. Verwendet den…, CurriculumDraftConfirmed, CurriculumDraftEntry, CurriculumDraftKapitel, CurriculumDraftLernsequenz, Ein einzelner Eintrag in einer Lernsequenz-Tabelle., Eine Lernsequenz im Zwischenformat. (+121 more)
+Nodes (139): build_curriculum_export_dict(), _fachplan_bp_id(), hinweise_uuid_to_code(), AsyncSession, Curriculum-Export: YAML und PDF., Baut das code-basierte Export-Dict für YAML-Serialisierung. Verwendet den…, Lädt ausgewählte metadata_-Felder eines Knotens per UUID., `bp_id` des Fachplans, an dem dieses Curriculum hängt. Über die… (+131 more)
 
-### Community 5 - "test_calendar_patterns.py"
-Cohesion: 0.04
-Nodes (100): _block(), _bloecke(), contiguous_periods(), derive_patterns(), PatternProposal, PatternResult, _phase(), date (+92 more)
+### Community 5 - "timedelta"
+Cohesion: 0.03
+Nodes (110): Lesson, Ob aus dieser Stunde ein `lesson_slot` in **meiner** Jahresplanung werden darf.…, Ob das **geplante Stundenziel** an diesem Termin erreicht wurde. Der…, Eine Stunde aus einer Kalenderquelle, normalisiert. `external_uid` ist die…, _block(), _bloecke(), contiguous_periods(), derive_patterns() (+102 more)
 
-### Community 6 - "Lesson"
-Cohesion: 0.04
-Nodes (73): CalendarAdapter, FetchResult, Lesson, NoActiveSchoolYearError, ABC, date, Adapter-Schnittstelle für Stundenplan- und Kalenderquellen (UP-8, Schritt 1).…, Ob aus dieser Stunde ein `lesson_slot` in **meiner** Jahresplanung werden darf.… (+65 more)
+### Community 6 - "WebUntisAdapter"
+Cohesion: 0.03
+Nodes (95): AuthenticationError, CalendarAdapter, CalendarSourceError, FetchResult, NoActiveSchoolYearError, ABC, date, RuntimeError (+87 more)
 
-### Community 7 - "load_school_year"
+### Community 7 - "SchoolYearConfig"
 Cohesion: 0.06
-Nodes (66): Das laufende Schuljahr aus `config/school_year.yaml`. Damit die Oberfläche kein…, school_year(), ab_phasen(), ab_schultage(), FerienPeriod, halbjahr_bounds(), halbjahr_of(), is_schoolday() (+58 more)
+Nodes (64): ab_phasen(), ab_schultage(), FerienPeriod, halbjahr_bounds(), halbjahr_of(), is_schoolday(), NamedDay, BaseModel (+56 more)
 
 ### Community 8 - "plan_sync"
 Cohesion: 0.04
-Nodes (119): LessonState, Zustand einer Stunde, quellenunabhängig. Bewusst eine geschlossene Aufzählung…, _anlagemeldungen(), apply_sync(), eigener_teil(), importzeile(), _meldungen(), mit_importzeile() (+111 more)
+Nodes (116): LessonState, Zustand einer Stunde, quellenunabhängig. Bewusst eine geschlossene Aufzählung…, _anlagemeldungen(), apply_sync(), eigener_teil(), _meldungen(), mit_importzeile(), NeuerSlot (+108 more)
 
 ### Community 9 - "[slug]/+page.svelte"
-Cohesion: 0.04
-Nodes (12): hinweis, activeTab, conversations, fruehereGruppen, isTeacher, loading, loadingMore, myGroupsForSubject (+4 more)
+Cohesion: 0.05
+Nodes (23): anlegenUndVerknuepfen(), beiEingabe(), fehler, frage, kannAnlegen, laeuft, suchen(), sucht (+15 more)
 
-### Community 10 - "insert_node_sync"
-Cohesion: 0.11
-Nodes (22): insert_anchor_sync(), insert_edge_sync(), insert_node_sync(), Legt einen AssistantContextAnchor an., Integrationstests fuer get_context_for_query (KS-Phase-3, Schritt 4)., Anker konfiguriert + Knoten mit Embedding im Scope → Titel im Kontext., Schüler hat Engagement für Scope-Knoten → Vorwissen-Abschnitt im Kontext., Keine Engagements → kein Vorwissen-Abschnitt im Kontext-String. (+14 more)
+### Community 10 - "asyncio"
+Cohesion: 0.04
+Nodes (62): insert_anchor_sync(), insert_edge_sync(), insert_engagement_sync(), insert_group_engagement_sync(), insert_group_membership_sync(), insert_node_sync(), insert_subject_sync(), asyncio (+54 more)
 
 ### Community 11 - "test_calendar_holidays.py"
-Cohesion: 0.06
-Nodes (70): Holiday, Ein unterrichtsfreier Abschnitt (Datenstrom A). `start == end` ist ein…, build_proposal(), bw_public_holidays(), config_free_days(), easter(), merge_adjacent(), Proposal (+62 more)
+Cohesion: 0.04
+Nodes (100): _antwort(), ApplyRequest, _bounds_pruefen(), _hole_vorschlag(), holiday_apply(), holiday_proposal(), BaseModel, date (+92 more)
 
-### Community 12 - "Group"
-Cohesion: 0.05
-Nodes (108): _erbe_unterrichtsgruppen_der_klasse(), AsyncSession, Gibt den Slug zurück, fügt bei Kollision einen Zähler-Suffix an., Upsert genau einer Gruppe (für ein Ziel-Fach) + Mitgliedschaft. Gibt group.id.…, Löst einen aus dem SSO-Token abgeleiteten Wert auf Subject-IDs auf. Case-…, Immediate Mirror: entfernt Mitgliedschaften, die das Token nicht mehr deckt.…, Schüler:innen erben die Unterrichtsgruppen, die aus ihrer Klasse abgeleitet…, Synchronisiert Gruppen und Mitgliedschaften für einen einloggenden Nutzer. Eine… (+100 more)
+### Community 12 - "Subject"
+Cohesion: 0.09
+Nodes (43): Löst einen aus dem SSO-Token abgeleiteten Wert auf Subject-IDs auf. Case-…, Einzel-Auflösung: erster (direkt bevorzugter) Treffer oder None., _resolve_subject_id(), _resolve_subject_ids(), Subject, _get_or_create_subject(), asyncio, AsyncSession (+35 more)
 
 ### Community 13 - "ToolContext"
 Cohesion: 0.04
-Nodes (91): _bild_fehlertext(), _exec_generate_image(), _generate_image_handler(), Ablehnung des Proxys → ein Satz, den das Chat-Modell weitergeben kann. Der Text…, Erzeugt ein Bild über den LiteLLM-Bild-Endpoint (Schritt 2: roh, ohne…, ToolContext, ImageGenerationError, ImageGenerationResult (+83 more)
+Nodes (91): _exec_generate_image(), _generate_image_handler(), Erzeugt ein Bild über den LiteLLM-Bild-Endpoint (Schritt 2: roh, ohne…, ToolContext, ImageGenerationError, ImageGenerationResult, Ergebnis eines Bild-Calls: dekodierte Bytes + Kosten (aus dem LiteLLM-Header)., Fehlgeschlagener Bild-Call, mit HTTP-Status und Budget-Merkmal. Der Status… (+83 more)
 
 ### Community 14 - "make_app"
-Cohesion: 0.05
-Nodes (42): _delete_db(), _exec_result(), _group_node(), _keine_mitgliedspruefung(), make_app(), _make_curriculum_db(), make_jwt(), make_mock_db() (+34 more)
+Cohesion: 0.06
+Nodes (38): _delete_db(), _exec_result(), _group_node(), _keine_mitgliedspruefung(), make_app(), _make_curriculum_db(), make_jwt(), make_mock_db() (+30 more)
 
 ### Community 15 - "Suchprofil"
-Cohesion: 0.04
-Nodes (91): alias_aehnlichkeit(), _auf_geltende_fassung(), aufzaehlung(), _aus_dem_fach(), _aus_eigenem_fach(), _bonus(), fasse_fassungen_zusammen(), fassungs_schluessel() (+83 more)
+Cohesion: 0.03
+Nodes (100): alias_aehnlichkeit(), _auf_geltende_fassung(), _aus_dem_fach(), _aus_eigenem_fach(), _bonus(), _frontier_je_fach(), _grundabfrage(), _hinweise() (+92 more)
 
 ### Community 16 - "SimpleNamespace"
 Cohesion: 0.05
-Nodes (91): herkunft_der_nachricht(), promote_diagram(), promote_image(), PromotionError, AsyncSession, Exception, UUID, Promotion von Chat-Inhalten in die persönliche Artefaktbibliothek (Phase 18,… (+83 more)
+Nodes (87): herkunft_der_nachricht(), promote_diagram(), promote_image(), PromotionError, AsyncSession, Exception, UUID, Promotion von Chat-Inhalten in die persönliche Artefaktbibliothek (Phase 18,… (+79 more)
 
 ### Community 17 - "calendar/router.py"
 Cohesion: 0.05
-Nodes (71): kein_unterricht_codes(), klassenkarte(), quellklassen_aufloesen(), Stundenplan-Kürzel, hinter denen kein Unterricht steht. Aus…, Alle Klassengruppen als `name.lower() → id`. Einmal laden, oft fragen., Aus Klassennamen des Stundenplans die Quellklassen der Gruppe bestimmen. ⚠️…, _gruppe(), _abgleich_wochen() (+63 more)
+Nodes (77): list_my_groups(), Gibt die Gruppen zurueck, in denen der aktuelle Nutzer Mitglied ist. Je Gruppe…, kein_unterricht_codes(), klassenkarte(), quellklassen_aufloesen(), Stundenplan-Kürzel, hinter denen kein Unterricht steht. Aus…, Alle Klassengruppen als `name.lower() → id`. Einmal laden, oft fragen., Aus Klassennamen des Stundenplans die Quellklassen der Gruppe bestimmen. ⚠️… (+69 more)
 
-### Community 18 - "test_chat_context_nodes.py"
+### Community 18 - "aufzaehlung"
 Cohesion: 0.03
-Nodes (44): _als_liste(), archived_node(), conversation(), node(), private_node_other_user(), fixture, Integrationstests für KS-Phase-5 Schritt 1: chat_context_nodes API., Den Ergebnisumschlag in Lesereihenfolge flach machen. ``/context/search``… (+36 more)
+Nodes (56): _exec_get_operatoren(), _get_operatoren_handler(), _list_context_nodes_handler(), date, ``"letzte_woche"`` → (Montag, Sonntag) der Vorwoche. Unbekannt → ``None``., Die Aufzählung für das Modell. ⚠️ **Ohne Fachangabe wird über alle Fächer…, Operatoren des Konversations-Fachs (aktuelle Edition) für den Assistenten.…, _zeitraum_grenzen() (+48 more)
 
 ### Community 19 - "asyncio"
 Cohesion: 0.05
 Nodes (49): _datei(), fach(), fachschaft_headers(), fremde_headers(), _knoten(), leerer_bestand(), _md(), ohne_drossel() (+41 more)
 
 ### Community 20 - "artifacts/store.py"
-Cohesion: 0.09
-Nodes (46): ArtifactCleanupStats, _clean_title(), cleanup_artifacts(), collect_pseudonym_artifact_paths(), create_document(), delete_artifact(), document_origin_ref(), _file_path() (+38 more)
+Cohesion: 0.07
+Nodes (57): get_artifact_limits(), invalidate_cache(), Gibt (retention_days, quota_bytes) für die Nutzer:in zurück. teacher (auch…, list_library(), Die eigene Bibliothek (neueste zuerst) + Belegung/Quota für die Anzeige.…, ArtifactCleanupStats, _clean_title(), cleanup_artifacts() (+49 more)
 
 ### Community 21 - "test_group_sync.py"
-Cohesion: 0.04
-Nodes (75): Reguläre Ausdrücke (je mindestens eine Capture-Group) für SSO-Gruppenmuster.…, SsoGroupPatterns, _derive_subject_slug(), _normalize_for_slug(), parse_sso_groups(), ParsedGroup, Leitet aus einem Capture-Wert einen Subject-Slug ab. Für 'Mathematik' →…, Anzeigename und Fachkürzel einer Unterrichtsgruppe aus dem Treffer. **Warum es… (+67 more)
+Cohesion: 0.03
+Nodes (86): Reguläre Ausdrücke (je mindestens eine Capture-Group) für SSO-Gruppenmuster.…, SsoGroupPatterns, _derive_subject_slug(), _erbe_unterrichtsgruppen_der_klasse(), _normalize_for_slug(), parse_sso_groups(), ParsedGroup, AsyncSession (+78 more)
 
 ### Community 22 - "Eigenschaften"
 Cohesion: 0.09
@@ -822,7 +803,7 @@ Nodes (26): _get_model_info(), _modell_eintrag(), Ein Eintrag für den Modellwä
 
 ### Community 23 - "JwtPayload"
 Cohesion: 0.02
-Nodes (159): activate_assistant(), approve_assistant(), check_assistant_models(), export_all_assistants(), list_assistants(), list_pending_assistants(), ModelCheckResponse, OrphanedAssistant (+151 more)
+Nodes (179): activate_assistant(), approve_assistant(), check_assistant_models(), deactivate_assistant(), export_all_assistants(), list_assistants(), list_pending_assistants(), ModelCheckResponse (+171 more)
 
 ### Community 24 - "test_krisen_benachrichtigung.py"
 Cohesion: 0.13
@@ -832,49 +813,49 @@ Nodes (13): _antrags_factory(), _factory(), asyncio, Die Benachrichtigung über 
 Cohesion: 0.09
 Nodes (32): _attr(), _coord_system(), _func_label(), ggb_bytes_from_source(), ggb_bytes_from_spec(), plot_spec_to_ggb_xml(), _point_label(), Plot-Spec → GeoGebra-Datei (`.ggb`) — Export für Funktionsgraphen (Phase 18,… (+24 more)
 
-### Community 26 - "test_crisis_reader.py"
-Cohesion: 0.10
-Nodes (47): AccessRequestItem, AccessRequestListResponse, ApprovalResponse, approve_access_request(), _authorize_reader(), _build_reader_payload(), _client_ip(), deny_access_request() (+39 more)
+### Community 26 - "ConversationAccessRequest"
+Cohesion: 0.07
+Nodes (76): AccessRequestItem, AccessRequestListResponse, ApprovalResponse, approve_access_request(), _authorize_reader(), _build_reader_payload(), _client_ip(), CountResponse (+68 more)
 
 ### Community 27 - "lib/components/AssistantEditor.svelte"
 Cohesion: 0.03
 Nodes (63): abschalten(), adjustTestTextareaHeight(), anchorError, anchorQuery, anchorSearchLoading, anchorSearchResults, antragGrund, antragZuruecknehmen() (+55 more)
 
 ### Community 28 - "test_chat_router_helpers.py"
-Cohesion: 0.08
-Nodes (67): chat(), _count_message_files(), _generate_title(), _get_guardrail_prompt(), _parse_stored_content(), Umhüllt die Nutzernachricht, damit das Modell sie **betitelt** statt sie zu…, Erzeugt einen Konversationstitel über den User-Virtual-Key (Audit #8). Läuft…, Gibt nur den vom Nutzer eingetippten Text zurück (ohne Datei-Inhalte). (+59 more)
+Cohesion: 0.04
+Nodes (115): chat(), _count_message_files(), _generate_title(), _get_guardrail_prompt(), _parse_stored_content(), Umhüllt die Nutzernachricht, damit das Modell sie **betitelt** statt sie zu…, Erzeugt einen Konversationstitel über den User-Virtual-Key (Audit #8). Läuft…, Gibt nur den vom Nutzer eingetippten Text zurück (ohne Datei-Inhalte). (+107 more)
 
 ### Community 29 - "Conversation"
-Cohesion: 0.06
-Nodes (59): delete_conversation(), delete, Krisen-Erkennung (ADR-008 Teil 3) — OHNE Blockieren des Chats. Bei Treffer wird…, _record_crisis(), Conversation, ConversationFlag, Message, conv_flag() (+51 more)
+Cohesion: 0.05
+Nodes (75): date, Verbrauch je Kalenderwoche (Montag, Ortszeit) seit Schuljahresbeginn, in Euro.…, _wochenverbrauch(), _crisis_sse_event(), _CrisisRecord, delete_conversation(), delete, Ergebnis der Krisen-Erkennung für eine Nachricht (Schritt 5: Banner-SSE). (+67 more)
 
 ### Community 30 - "test_context_search.py"
 Cohesion: 0.04
-Nodes (43): Abschnitt, Gruppe, „Mathematik: 3" — eine Zeile der Gruppierung einer Aufzählung. Gezählt wird…, Ein beschrifteter Teil des Ergebnisses samt Auskunft über seine…, Der Ergebnisumschlag: getrennte Abschnitte statt einer vermischten Liste., Suchergebnis, Die Suchschicht (app/context/search.py) — Umschlag, Budgets, Abfrageform.…, Vollständigkeit ist eine Angabe, keine Vermutung. (+35 more)
+Nodes (47): Abschnitt, Gruppe, _gruppiere(), „Mathematik: 3" — eine Zeile der Gruppierung einer Aufzählung. Gezählt wird…, Ein beschrifteter Teil des Ergebnisses samt Auskunft über seine…, Der Ergebnisumschlag: getrennte Abschnitte statt einer vermischten Liste., Nach Fach oder Typ zählen, absteigend nach Anzahl, dann alphabetisch., Suchergebnis (+39 more)
 
-### Community 31 - "_sql"
-Cohesion: 0.05
-Nodes (27): Wer welchen Knoten lesen darf — **eine** Klausel für alle Abfragewege. Bis…, SQL-Bedingung für die von dieser Person lesbaren ``context_nodes``. ``rollen``…, read_scope_clause(), parametrize, Der Anker-Weg ist seit AP5 eine Profilvariante, kein zweiter Suchweg., Der freie Chat sucht im ganzen Graphen — ein leerer Anker darf nicht…, Abstammung über `part_of` **und** Verweise über `references`/`develops` — beide…, ⚠️ **Bewusste Verhaltensänderung.** Der Ankerweg las bis 09/2026 nur… (+19 more)
+### Community 31 - "zuordnen"
+Cohesion: 0.12
+Nodes (30): Kandidat, _nennt_klasse(), Eine eigene Unterrichtsgruppe, wie sie für die Zuordnung gebraucht wird., Ob Gruppenname **oder** eine der Quellklassen eine Klasse aus dem Stundenplan…, Lerngruppen aus dem Stundenplan den eigenen Unterrichtsgruppen zuordnen.…, zuordnen(), lerngruppe(), Der Produktionsfall: Ein Namenstreffer räumt den Weg für die Zuordnung ohne… (+22 more)
 
 ### Community 32 - "LiteLLMClient"
 Cohesion: 0.06
 Nodes (48): LiteLLMClient, AsyncClient, RuntimeError, Alias für get_user mit konsistentem Namensschema., POST /user/update ``spend`` nur zum **Schuljahreswechsel** setzen (auf 0). Es…, GET /models. Gibt eine deduplizierte Liste von Modell-IDs zurück., POST /user/delete. 404 wird als Erfolg behandelt (idempotentes Verhalten)., POST /team/new — legt Team an, falls noch nicht vorhanden. 409/Konflikt wird… (+40 more)
 
-### Community 33 - "test_hausversuche.py"
-Cohesion: 0.06
-Nodes (32): anweisung(), gefahr_fuer(), Gefahrenthema, Hausversuche, invalidate_hausversuche_cache(), load_hausversuche(), BaseModel, Pattern (+24 more)
+### Community 33 - "pruefe"
+Cohesion: 0.05
+Nodes (44): anweisung(), gefahr_fuer(), Gefahrenthema, Hausversuche, invalidate_hausversuche_cache(), load_hausversuche(), pruefe(), BaseModel (+36 more)
 
 ### Community 34 - "test_curriculum_resolver.py"
 Cohesion: 0.07
-Nodes (51): upgrade(), parse_class_grade(), parse_grade_band(), Jahrgangs-/Stufen-Parsing — zentral, damit Schreibpfade und Matching konsistent…, Normalisiert ein Jahrgangs-/Stufenband in ``(min_grade, max_grade)``. Annahme:…, Führende Jahrgangs-Zahl aus einem Klassennamen. ``"10C"`` -> 10, ``"8a"`` -> 8,…, AssistantContextAnchor, CurriculumChapters (+43 more)
+Nodes (54): _conversation_grade(), Jahrgang der Konversation über ihre Unterrichtsgruppe — sonst ``None``., als_stundenzahl(), Die Stundenzahl eines Curriculum-Kapitels — aus freiem JSON zu einer Zahl. ⚠️…, Eine ganze Zahl von Unterrichtsstunden — oder ``None``, wenn es keine ist.…, _handle_get_unit_detail(), CurriculumChapters, _group_grade() (+46 more)
 
 ### Community 35 - "_build_embedding_input"
-Cohesion: 0.04
-Nodes (46): _build_embedding_input(), _extract_metadata_field(), Einen Baustein des Embedding-Inputs aufloesen. ``title``, ``content`` oder ein…, Lohnt sich ein Vektor fuer diesen Knoten — oder waere es nur sein Titel? Ein…, Erstellt den Embedding-Input fuer einen Knoten. Zwei Wege, und der erste hat…, Extrahiert einen Wert aus verschachteltem metadata anhand eines Punktpfades.…, _teil_aus_quelle(), traegt_substanz() (+38 more)
+Cohesion: 0.06
+Nodes (34): _build_embedding_input(), Lohnt sich ein Vektor fuer diesen Knoten — oder waere es nur sein Titel? Ein…, Erstellt den Embedding-Input fuer einen Knoten. Zwei Wege, und der erste hat…, traegt_substanz(), make_node(), fixture, V3-Folge (AP3): Der Typ `reflexion` ist entfallen, die Notiz lebt an der…, Der Grund, warum die Migration nur Stunden **mit** Reflexion neu einbettet: Bei… (+26 more)
 
 ### Community 36 - "fachbegriffe_import.py"
 Cohesion: 0.05
-Nodes (63): bereinige_metadata(), Bestand, Bilanz, _bp_knoten(), darf_ueberschreiben(), DateiErgebnis, _editionen(), _faecher() (+55 more)
+Nodes (64): _abgrenzungszeile(), _abschnitte(), _als_liste(), _anzeigetext(), _aufzaehlung(), bereinige_metadata(), Bestand, Bilanz (+56 more)
 
 ### Community 37 - "asyncio"
 Cohesion: 0.10
@@ -882,27 +863,27 @@ Nodes (21): _adapter_with_map(), _make_mock_client(), _mock_token(), _mock_useri
 
 ### Community 38 - "auth/router.py"
 Cohesion: 0.03
-Nodes (82): OAuthAdapter, Prüft die Signatur des ID-Tokens gegen die IdP-JWKS (Audit #6). Claims oder…, Bildet SSO-Gruppen UND SSO-Rollen auf Plattform-Rollen ab. Gruppen und Rollen…, Dekodiert die Claims eines JWT **ohne** Signaturprüfung. Zulässig nur für das…, _unverified_jwt_claims(), get_primary_role(), AsyncSession, Gibt die budgetrelevante Hauptrolle zurück. Priorität: teacher > student. (+74 more)
+Nodes (81): OAuthAdapter, Prüft die Signatur des ID-Tokens gegen die IdP-JWKS (Audit #6). Claims oder…, Bildet SSO-Gruppen UND SSO-Rollen auf Plattform-Rollen ab. Gruppen und Rollen…, Dekodiert die Claims eines JWT **ohne** Signaturprüfung. Zulässig nur für das…, _unverified_jwt_claims(), get_primary_role(), AsyncSession, Gibt die budgetrelevante Hauptrolle zurück. Priorität: teacher > student. (+73 more)
 
 ### Community 39 - "test_budget_accrual.py"
 Cohesion: 0.06
-Nodes (72): berechne(), plane(), date, Ermittelt die Zuteilung für **eine** Nutzerin, ohne sie zu schreiben.…, Was für eine Nutzerin zu tun ist — oder warum nichts., Die neue Obergrenze. Reine Rechnung, ohne Datenbank und ohne Proxy.…, Zuteilung, _berechne() (+64 more)
+Nodes (74): berechne(), plane(), date, Ermittelt die Zuteilung für **eine** Nutzerin, ohne sie zu schreiben.…, Was für eine Nutzerin zu tun ist — oder warum nichts., Die neue Obergrenze. Reine Rechnung, ohne Datenbank und ohne Proxy.…, Zuteilung, BudgetAccrual (+66 more)
 
-### Community 40 - "export.py"
-Cohesion: 0.10
-Nodes (29): _build_pdf_kapitel(), _parse_hinweise_for_pdf(), _parse_material_for_pdf(), Zerlegt Hinweise-Text in Segmente für PDF-Rendering., Zerlegt Material-Text in Segmente für PDF-Rendering., Reichert die Curriculum-Struktur fürs PDF-Template an. - IK/PK als Volltext…, Rendert das Curriculum als PDF via weasyprint + Jinja2., render_curriculum_pdf() (+21 more)
+### Community 40 - "render_markdown_for_pdf"
+Cohesion: 0.15
+Nodes (24): Rendert das Curriculum als PDF via weasyprint + Jinja2., render_curriculum_pdf(), Markdown → HTML (Block) mit eingebetteten Mathe-/Diagramm-SVGs., render_markdown_for_pdf(), _docx(), _needs_pandoc, Dialekt-Parität der Export-Pfade (Phase 19, Schritt 7). Die Editor-Vorschau…, test_docx_footnote_survives() (+16 more)
 
 ### Community 41 - "groups/router.py"
-Cohesion: 0.07
-Nodes (74): GroupJoinCode, Ein Beitrittscode für eine Unterrichtsgruppe (Alembic 0070). **Gruppen-…, aktueller_code(), beitritte_je_tag(), Beitrittstag, Codelage, erzeuge_code(), loese_ein() (+66 more)
+Cohesion: 0.05
+Nodes (95): GroupJoinCode, Ein Beitrittscode für eine Unterrichtsgruppe (Alembic 0070). **Gruppen-…, aktueller_code(), beitritte_je_tag(), Beitrittstag, code_erzeugen(), Codelage, erzeuge_code() (+87 more)
 
 ### Community 42 - "$lib/api.js"
-Cohesion: 0.07
-Nodes (5): datum(), zustand(), antwort(), budget, modelleOhneBildart
+Cohesion: 0.06
+Nodes (5): datum(), zustand(), budget, apply(), modelleOhneBildart
 
 ### Community 43 - "admin/models.py"
-Cohesion: 0.10
-Nodes (35): _fetch_matrix(), get_model_matrix(), ModelMatrixResponse, ModelMatrixUpdate, phase1_team_ids(), BaseModel, Feste Reihenfolge: jahrgang-5..12, dann lehrkraefte., Interne Hilfsfunktion: Fetcht die aktuelle Chat-Matrix aus LiteLLM. Bild-… (+27 more)
+Cohesion: 0.06
+Nodes (60): _fetch_matrix(), get_image_model_matrix(), ImageModelMatrixResponse, ImageModelMatrixUpdate, BaseModel, Fetcht die aktuelle Bild-Modell-Matrix aus LiteLLM. Spalten sind ausschließlich…, Liefert die aktuelle Bild-Modell-Freischaltungsmatrix für alle Phase-1-Teams., Speichert die Bild-Modell-Freischaltung für alle Phase-1-Teams. **Merge mit der… (+52 more)
 
 ### Community 44 - "test_litellm_config_check.py"
 Cohesion: 0.12
@@ -913,28 +894,28 @@ Cohesion: 0.09
 Nodes (27): current_dimension(), current_dimension_async(), _parse_dim(), Vektorbreite von ``context_nodes.embedding`` umstellen (Schema-Wartung).…, Ergebnis einer Umstellung. ``changed=False`` heißt: Die Spalte entsprach…, ``'vector(1536)'`` → ``1536``; ``None``/``'vector'`` → ``None``., Aktuelle Vektorbreite der Spalte aus dem Katalog (synchron). Für Migration und…, Wie :func:`current_dimension`, aber für eine ``AsyncSession`` (Backend-Startup). (+19 more)
 
 ### Community 46 - "api/groups.py"
-Cohesion: 0.09
-Nodes (44): add_exclusion(), AnzeigenameRequest, create_teaching_group(), CreateExclusionRequest, CreateTeachingGroupRequest, delete_teaching_group(), ExclusionOut, get_groups_config() (+36 more)
+Cohesion: 0.07
+Nodes (39): add_exclusion(), AnzeigenameRequest, CreateExclusionRequest, CreateTeachingGroupRequest, ExclusionOut, get_groups_config(), GroupListResponse, GroupMembershipOut (+31 more)
 
 ### Community 47 - "test_kosten_nachtrag.py"
-Cohesion: 0.17
-Nodes (18): offene_anzahl(), Aufgaben, die nach der Antwort weiterlaufen. Zwei Dinge geschehen in dieser…, Wie viele Aufgaben gerade laufen — für Diagnose und Tests., Beim Herunterfahren: laufende Aufgaben zu Ende bringen lassen. Was die Frist…, warte_auf_abschluss(), _factory(), asyncio, Das Nachtragen der Kosten im Hintergrund (AP2). Bis 09/2026 hielt der Chat den… (+10 more)
+Cohesion: 0.06
+Nodes (44): _lauf(), nachtragen(), Task, UUID, Kosten eines Chat-Zuges nachtragen — nach dem Antworttext, nicht davor.…, Betrag und Zustand an Nachricht und Konversation nachtragen. Der Betrag wird…, Startet den Nachtrag und gibt die Aufgabe zurück (für Tests). Fehler landen im…, _schreibe() (+36 more)
 
 ### Community 48 - "markdown_to_office_sync"
-Cohesion: 0.14
-Nodes (23): markdown_to_office(), markdown_to_office_sync(), pandoc_available(), _pandoc_bin(), PandocError, PandocUnavailable, Exception, r"""Office-Export (DOCX/ODT) über Pandoc — Material-Werkstatt (Phase 19,… (+15 more)
+Cohesion: 0.06
+Nodes (55): export_document(), _mit_herkunft(), AsyncSession, Dokument-Export der Material-Werkstatt (Phase 19, Schritt 4). Ein Markdown-…, Hängt die Herkunftszeile als abgesetzten Absatz an., Markdown → PDF über weasyprint (Body via render_markdown_for_pdf, eigenes…, Exportiert ein Dokument. Gibt (Bytes, MIME) zurück. Wirft `ValueError` bei…, _to_pdf() (+47 more)
 
 ### Community 49 - "test_seed_fachbegriffe.py"
-Cohesion: 0.17
-Nodes (11): fiktivum(), _lies(), fixture, Der Leser des Fachbegriff-Imports (Paket 9/AP5, Paket 10/AP1). Geprüft wird der…, ⚠️ Im Pilot echt vorgekommen (`genus: "der (Stoff)"`). Über einen Artikel die…, Eine Fixture-Datei einlesen — `lies_datei` nimmt Name und Text, keinen Pfad., `TYPEN` steht ein zweites Mal im Frontend (Paket 10, AP4). Die Sammlungsseite…, seed() (+3 more)
+Cohesion: 0.04
+Nodes (33): _buendel(), fiktivum(), _lies(), fixture, Der Leser des Fachbegriff-Imports (Paket 9/AP5, Paket 10/AP1). Geprüft wird der…, Die Quelle einer Strukturformel ist ein Arbeitsmittel des Autors, kein Inhalt…, Sonst steht in der Oberfläche eine leere Stelle und beim Modell ein nacktes…, ⚠️ Im Pilot echt vorgekommen (`genus: "der (Stoff)"`). Über einen Artikel die… (+25 more)
 
-### Community 50 - "budgets.py"
-Cohesion: 0.08
-Nodes (42): BudgetGradesResponse, BudgetGradesUpdateRequest, BudgetGradesUpdateResult, GradeInfo, GradeUpdate, _hochrechnung(), HochrechnungInfo, BaseModel (+34 more)
+### Community 50 - "calendar/groups.py"
+Cohesion: 0.09
+Nodes (25): Anlageergebnis, _eindeutige_paare(), GroupMatchResult, GroupSuggestion, _gruppenidentitaet(), _namen_eindeutig_machen(), _nennt_kursart(), _ohne_fachkuerzel() (+17 more)
 
-### Community 51 - "test_assistant_admin_api.py"
+### Community 51 - "api/assistants.py"
 Cohesion: 0.02
-Nodes (81): _assistant_to_yaml(), AssistantCreate, AssistantUpdate, bekannte_bildarten(), bekannte_faehigkeiten(), _grades_list(), _parse_iso(), Any (+73 more)
+Nodes (139): _assistant_to_yaml(), AssistantCreate, AssistantDocumentOut, AssistantFullListResponse, AssistantImportResponse, AssistantListResponse, AssistantResponse, AssistantSummary (+131 more)
 
 ### Community 52 - "test_calendar_webuntis.py"
 Cohesion: 0.06
@@ -944,29 +925,29 @@ Nodes (58): make_adapter(), asyncio, UP-8 Schritt 2 — WebUntis-Adapter. Die Fi
 Cohesion: 0.04
 Nodes (55): knoten(), _load(), lp_knoten(), ph_knoten(), fixture, Unit-Tests für den GEN2X-Parser (Bildungsplan V3, neue Seitengeneration). Die…, Die alte Generation hat kein `id`-Attribut — die Nummer steht nur im Titel. Sie…, Das Versprechen aus E1: Import, Fahrplan und Archivierung bleiben unberührt.… (+47 more)
 
-### Community 54 - "angebote.py"
-Cohesion: 0.13
-Nodes (27): Angebot, FachFehlt, hebe_ignorieren_auf(), _hole(), ignoriere(), Kandidat, kandidaten(), lade_angebote() (+19 more)
+### Community 54 - "sync_groups"
+Cohesion: 0.09
+Nodes (58): Synchronisiert Gruppen und Mitgliedschaften für einen einloggenden Nutzer. Eine…, sync_groups(), Eine neue SSO-Unterrichtsgruppe, die noch keiner Plattform-Gruppe zugeordnet…, SsoGroupOffer, Angebot, FachFehlt, hebe_ignorieren_auf(), _hole() (+50 more)
 
 ### Community 55 - "admin/groups.py"
-Cohesion: 0.07
-Nodes (50): add_member(), _count_members(), create_group(), delete_group(), get_group(), _get_or_404(), GroupCreate, GroupDetailOut (+42 more)
+Cohesion: 0.11
+Nodes (32): add_member(), _count_members(), create_group(), delete_group(), get_group(), _get_or_404(), GroupCreate, GroupDetailOut (+24 more)
 
 ### Community 56 - "artifacts/router.py"
 Cohesion: 0.08
-Nodes (57): ArtifactItem, baustein_aus_artefakt(), baustein_vorschlag(), BausteinAntwort, BausteinRequest, BausteinVorschlag, create_document(), delete_artifact_endpoint() (+49 more)
+Nodes (55): ArtifactItem, baustein_aus_artefakt(), baustein_vorschlag(), BausteinAntwort, BausteinRequest, BausteinVorschlag, create_document(), delete_artifact_endpoint() (+47 more)
 
 ### Community 57 - "test_ausfall.py"
 Cohesion: 0.06
-Nodes (62): mit_eigenem_text(), Die Gegenrichtung zu :func:`mit_importzeile`: eigenen Text setzen, Importzeile…, lade_slots_am_tag(), Markierung, nimm_ausfall_zurueck(), plane_ausfall(), plane_ruecknahme(), date (+54 more)
+Nodes (58): importzeile(), mit_eigenem_text(), Die Zeile, die dem Abgleich gehört — oder ``None``., Die Gegenrichtung zu :func:`mit_importzeile`: eigenen Text setzen, Importzeile…, lade_slots_am_tag(), Markierung, nimm_ausfall_zurueck(), plane_ausfall() (+50 more)
 
 ### Community 58 - "Bildart"
 Cohesion: 0.06
-Nodes (63): alle_bildarten(), bekanntes_seitenverhaeltnis(), Bildart, default_bildart(), get_bildart(), ImageModelsConfig, invalidate_image_models_cache(), load_image_models() (+55 more)
+Nodes (51): _freigaben(), get_image_kinds(), ImageKindItem, ImageKindsResponse, BaseModel, Bildarten für den Assistenten-Editor (Mehrmodell-Plan, Schritt 4). Liefert die…, team_id → freigeschaltete Modelle, plus ob die Auskunft überhaupt zustande kam., Konfigurierte Bildarten + für welche Jahrgänge ihr Modell fehlt. (+43 more)
 
-### Community 59 - "timedelta"
-Cohesion: 0.04
-Nodes (40): _konversation(), leere_tabelle(), leerer_zaehler(), _meldungen(), fixture, Die drei Nutzer-Endpunkte des Feedback-Kanals (ADR-020, AP2). Warum gegen die…, `auth_headers` ist Lehrkraft **und** Admin — festgehalten wird die Primärrolle,…, 404 statt 403: Ein 403 verriete, dass es die fremde Konversation gibt. (+32 more)
+### Community 59 - "_rumpf"
+Cohesion: 0.06
+Nodes (30): _konversation(), leere_tabelle(), leerer_zaehler(), _meldungen(), fixture, Die drei Nutzer-Endpunkte des Feedback-Kanals (ADR-020, AP2). Warum gegen die…, `auth_headers` ist Lehrkraft **und** Admin — festgehalten wird die Primärrolle,…, 404 statt 403: Ein 403 verriete, dass es die fremde Konversation gibt. (+22 more)
 
 ### Community 60 - "test_pdf_import.py"
 Cohesion: 0.06
@@ -980,13 +961,13 @@ Nodes (42): by_id(), _load_isolated(), nodes(), _pdf_pages(), fixture, Unit-Test
 Cohesion: 0.09
 Nodes (47): Deterministische Node-Assemblierung für den PDF→JSONL-Import. Baut Knoten-Dicts…, Bildungsplan-Scraper — Hauptmodul. Aufruf: python -m…, _collect_intro_text(), _content_hash(), _extract_bp_id_from_url(), _extract_breadcrumb(), extract_grades_from_bp_id(), _ik_parent_bp_id() (+39 more)
 
-### Community 63 - "api/assistants.py"
-Cohesion: 0.03
-Nodes (114): deactivate_assistant(), Deaktiviert einen Assistenten., AssistantDocumentOut, AssistantFullListResponse, AssistantImportResponse, AssistantListResponse, AssistantResponse, AssistantSummary (+106 more)
+### Community 63 - "unit/test_assistant_lebenszyklus.py"
+Cohesion: 0.09
+Nodes (39): _check_assistant_delete_permission(), _check_assistant_update_permission(), _initial_status(), _is_student_visible_image_assistant(), True, wenn der Assistent Bilder erzeugt UND Schüler:innen erreicht.…, Bestimmt den initialen Status eines Assistenten bei Erstellung. Admins starten…, Prueft Berechtigung fuer PATCH-Operationen. ⚠️ **Die Reichweite entscheidet,…, Prueft Berechtigung fuer DELETE-Operationen. (+31 more)
 
-### Community 64 - "embedding.py"
-Cohesion: 0.07
-Nodes (37): braucht_aliase(), EmbeddingStapel, UUID, Embedding-Generierung fuer Kontextspeicher-Knoten. Das Embedding-Modell ist…, Verwendet dieser Typ überhaupt Aliase im Embedding-Input? Nur `methode` (über…, Vektoren einer Stapelanfrage plus deren tatsaechlicher Tokenverbrauch. Der…, backfill_embeddings(), EmbeddingBackfillStats (+29 more)
+### Community 64 - "session_factory"
+Cohesion: 0.10
+Nodes (28): EmbeddingStapel, Vektoren einer Stapelanfrage plus deren tatsaechlicher Tokenverbrauch. Der…, backfill_embeddings(), AsyncSession, cleanup_nodes(), _liefert(), asyncio, fixture (+20 more)
 
 ### Community 65 - "lib/taxonomy.js"
 Cohesion: 0.06
@@ -997,8 +978,8 @@ Cohesion: 0.08
 Nodes (30): bestand(), _cfg(), erzeuge(), _existiert(), _lese_parkplatz(), fixture, Was der Neuaufbau eines Halbjahres anfasst — und der Löschpfad dazu (AP1,…, Er trägt eine Quellangabe aus dem Stundenplan — die reproduziert kein Muster. (+22 more)
 
 ### Community 67 - "image_store.py"
-Cohesion: 0.08
-Nodes (48): cleanup_generated_images(), collect_conversation_image_paths(), collect_pseudonym_image_paths(), _file_path(), get_image_record(), ImageCleanupStats, link_images_to_message(), list_message_images() (+40 more)
+Cohesion: 0.07
+Nodes (54): cleanup_generated_images(), collect_conversation_image_paths(), collect_pseudonym_image_paths(), _file_path(), get_image_record(), ImageCleanupStats, link_images_to_message(), list_message_images() (+46 more)
 
 ### Community 68 - "test_mein_tag.py"
 Cohesion: 0.07
@@ -1008,9 +989,9 @@ Nodes (50): _als_stunde(), grund_fuer_leeren_tag(), MeinTag, naechster_schultag(
 Cohesion: 0.06
 Nodes (54): asyncio, Integrationstests für die Unterrichtsplanungs-API (UP-Phase-1). Router-Pfade…, Uhrzeiten gibt es im System nicht — die Stundennummer schon., ⚠️ **`hat_entwurf` allein macht keinen Link.** Die Startseite verlinkt den…, A- und B-Woche zusammen ergeben genau die wöchentlichen Termine — keinen mehr,…, Gibt es eine Einheit, gehört die Stunde hinein — der Weg über den Slot darf sie…, ⚠️ **Thema, Einheit und Entwurf sind Material der Lehrkraft.**…, Eine ausgefallene Stunde als gewöhnliche zu listen wäre eine Falschauskunft —… (+46 more)
 
-### Community 70 - "bildpreis_probe.py"
-Cohesion: 0.11
-Nodes (29): _aus_env_datei(), bericht(), bild_erzeugen(), _bildmasse(), empfehlung(), _eur(), _fehler(), main() (+21 more)
+### Community 70 - "_Client"
+Cohesion: 0.06
+Nodes (45): _Client, _ohne_warten(), fixture, Kostenabrechnung eines Chat-Zuges (app/chat/router.py). Ein Zug ist **mehr als…, Die Zusage, die den Chat schnell hält. LiteLLM schreibt die SpendLogs…, Der Grund für die Wiederholung überhaupt., Liefert je Request-ID einen Betrag — oder erst ab dem n-ten Versuch., Die Wartezeit ist hier nur Ablauf, nicht Gegenstand der Prüfung. (+37 more)
 
 ### Community 71 - "load_fixture"
 Cohesion: 0.06
@@ -1018,11 +999,11 @@ Nodes (22): parse_ik_kompetenz_list(), parse_leitperspektive_aspekt_list(), Extr
 
 ### Community 72 - "test_stats_router.py"
 Cohesion: 0.08
-Nodes (53): _build_team_where(), _format_period(), get_heatmap(), get_spend(), get_stats_models(), get_stats_teams(), HeatmapCell, HeatmapResponse (+45 more)
+Nodes (50): _build_team_where(), _format_period(), get_heatmap(), get_spend(), HeatmapCell, HeatmapResponse, AsyncSession, BaseModel (+42 more)
 
 ### Community 73 - "test_budget_service.py"
-Cohesion: 0.05
-Nodes (71): get_budget_grades(), Gibt die Budget-Einstellungen pro Jahrgang/Rolle zurück. Enthält auch die…, merke(), AsyncSession, Wöchentliche Aufstockung der Budget-Obergrenze. Das Budget wird **nicht…, Schreibt den Merkposten fort. Erst aufrufen, wenn der Proxy bestätigt hat., Pseudonyme, deren Merkposten noch aus einem früheren Schuljahr stammt., zurueckgestellte() (+63 more)
+Cohesion: 0.08
+Nodes (41): _build_response(), _empty_budget(), get_budget_info(), AsyncSession, Zuschläge dieses Schuljahres in USD — `None`, wenn sich das nicht ermitteln…, Laedt Budget-Daten aus LiteLLM und rechnet sie in EUR um. Fehler werden nicht…, Rechnet USD in EUR um, rundet auf 2 Dezimalstellen., Gibt ein Budget-Response mit null-Werten zurueck. (+33 more)
 
 ### Community 74 - "test_production_check.py"
 Cohesion: 0.09
@@ -1034,31 +1015,31 @@ Nodes (52): bestand(), einsatz(), faecher(), lehrer_headers(), _nach_titel(), _n
 
 ### Community 76 - "test_budgets_router.py"
 Cohesion: 0.08
-Nodes (50): _ergebnis(), _fake_admin_payload(), _fake_budget_payload(), _fake_teacher_payload(), _make_budgets_app(), FastAPI, parametrize, Tests für app.api.admin.budgets - GET/POST /budgets/grades (+42 more)
+Nodes (51): Ergebnis, _ergebnis(), _fake_admin_payload(), _fake_budget_payload(), _fake_teacher_payload(), _make_budgets_app(), FastAPI, parametrize (+43 more)
 
-### Community 77 - "aliase.py"
-Cohesion: 0.04
-Nodes (44): upgrade(), upgrade(), Aliase als eigene Tabelle statt als Metadaten-Krücke Bis hierher lagen weitere…, bereinige(), lade(), lade_viele(), normalisiere(), AsyncSession (+36 more)
+### Community 77 - "embedding.py"
+Cohesion: 0.05
+Nodes (33): upgrade(), upgrade(), Aliase als eigene Tabelle statt als Metadaten-Krücke Bis hierher lagen weitere…, UUID, Embedding-Generierung fuer Kontextspeicher-Knoten. Das Embedding-Modell ist…, _ist_generisch(), nachschlage_begriff(), normalisiere_titel() (+25 more)
 
 ### Community 78 - "chat/router.py"
 Cohesion: 0.06
-Nodes (59): _bild_fehlertext_ui(), _build_generate_image_tool(), ConversationCountsResponse, ConversationDetailResponse, ConversationItem, ConversationListResponse, ConversationUpdateRequest, _einzeilig() (+51 more)
+Nodes (57): bekanntes_seitenverhaeltnis(), Seitenverhältnis eines Formatnamens, gesucht über **alle** Bildarten. Damit…, _bild_fehlertext(), _bild_fehlertext_ui(), ConversationCountsResponse, ConversationDetailResponse, ConversationItem, ConversationListResponse (+49 more)
 
 ### Community 79 - "test_budget_zuschlag.py"
-Cohesion: 0.08
-Nodes (38): _person_zur_kennung(), AsyncSession, Volles Pseudonym oder Kennung (die ersten 12 Zeichen) → das Konto. **Warum eine…, (Pseudonym, Rolle in der Gruppe) je Ziel — plus Gruppenname für die Vorschau., _ziele(), zuschlag_buchen(), ZuschlagAnfrage, Summe der von Hand aufgebuchten Zuschläge in **diesem** Schuljahr (F2). Zeilen… (+30 more)
+Cohesion: 0.09
+Nodes (30): Summe der von Hand aufgebuchten Zuschläge in **diesem** Schuljahr (F2). Zeilen…, zuschlag_usd(), buche_auf(), AsyncSession, Zusätzliches Budget von Hand aufbuchen (0.12, Paket 2, AP1). **Was ein Zuschlag…, Bucht jedem Pseudonym `betrag_usd` auf. Committet selbst., BudgetGrant, Ein von Hand aufgebuchter Zuschlag — und zugleich sein Protokoll (0.12, AP1).… (+22 more)
 
-### Community 80 - "JwtService"
-Cohesion: 0.03
-Nodes (40): get_jwt_service(), JwtService, AsyncSession, datetime, Gibt (token, jti) zurück., Wirft JWTError bei ungültigem oder abgelaufenem Token., frage_stellen(), kennzahlen() (+32 more)
+### Community 80 - "test_auth_router.py"
+Cohesion: 0.04
+Nodes (39): SsoConfig, app_no_revocation(), jwt_service(), _make_jwt_service(), mock_db(), mock_direct_adapter(), mock_redirect_adapter(), _no_revocation_db() (+31 more)
 
 ### Community 81 - "test_einheiten_skala.py"
 Cohesion: 0.09
 Nodes (16): _eintraege(), _frischer_cache(), fixture, Die Kosten-Einheit und ihre Skala (Paket 2 von 0.12, AP4). 1 Einheit = 1/10 000…, Fehlende Preise meldet Prüfung 2 — hier wäre es eine zweite, falsche Meldung., Die Prüfung rechnet mit einer gemessenen Größe, nicht mit einer geratenen., Die Prüfung muss in `check_config` hängen — sonst läuft sie nie., Gezählt wird, was jemand als Kosten **je Nachricht** sieht. Aufgefallen beim… (+8 more)
 
 ### Community 82 - "test_chat_tools.py"
-Cohesion: 0.06
-Nodes (51): _exec_get_operatoren(), _generate_image_definition(), _get_operatoren_handler(), Schema-Callable: wird je Chat mit Assistent und Modell-Freigaben ausgewertet., Operatoren des Konversations-Fachs (aktuelle Edition) für den Assistenten.…, ChatTool, _mit_aufgeloestem_schema(), Any (+43 more)
+Cohesion: 0.07
+Nodes (44): ChatTool, _mit_aufgeloestem_schema(), Any, Tool-Registry für den Chat-Router. ChatTool bündelt OpenAI-Function-Schema und…, Ersetzt ein Schema-Callable durch das fertige Dict für diesen Kontext. Kopiert…, Gibt die für diese Konversation freigeschalteten Tools zurück. Schema-Callables…, Was ein Schema-Callable über den Chat wissen darf. Bewusst **Daten statt…, register_tool() (+36 more)
 
 ### Community 83 - "import_bildungsplan.py"
 Cohesion: 0.06
@@ -1069,80 +1050,81 @@ Cohesion: 0.05
 Nodes (36): Backend-Module (`backend/app/`), Datenmodell (wichtigste Tabellen), Komponenten-Übersicht, Privacy-Invariante, Systemarchitektur, Bildarten (Mehrmodell), Bildgenerierung (Phase 16), Client (+28 more)
 
 ### Community 85 - "$app/navigation"
-Cohesion: 0.05
-Nodes (10): verborgen, isToolAssistant(), MEDIA_TOOL_GROUPS, apply(), mySubjectIds, selectedSubjectId, sortedSubjects, defaultGrade (+2 more)
+Cohesion: 0.04
+Nodes (8): verborgen, mySubjectIds, selectedSubjectId, sortedSubjects, defaultGrade, istLehrkraft, subject, group()
 
 ### Community 86 - "darf_nutzen"
 Cohesion: 0.05
 Nodes (46): darf_nutzen(), lade_zugang(), AsyncSession, Darf diese Person diesen Assistenten benutzen? — **eine** Regel für alle Wege.…, Die Regel als Funktion — für einen einzelnen Assistenten (Chat, Detailansicht)., Dieselbe Regel als SQL-Bedingung — für die Liste. ⚠️ Wer hier etwas ändert,…, Was von einer Person für diese Frage zählt. Als Objekt, weil beide…, Admin ist eine Erweiterung der Lehrkraft-Rolle (CLAUDE.md, Rollenmodell). (+38 more)
 
-### Community 87 - "TestPflege"
-Cohesion: 0.20
-Nodes (4): Anlegen, Ändern, Anzeigen — der Weg, auf dem Aliase überhaupt entstehen., Der Unterschied zwischen `None` und `[]`. Ein Formular ohne Aliasfeld — etwa…, Der Fremdschlüssel steht auf CASCADE — sonst blieben Namen ohne Knoten., TestPflege
+### Community 87 - "NodeAlias"
+Cohesion: 0.06
+Nodes (30): bereinige(), lade(), lade_viele(), normalisiere(), AsyncSession, UUID, Weitere Namen eines Bausteins — Lesen, Schreiben, Vergleichen. Seit Migration…, Dieselbe Normalisierung wie bei Titeln — klein, ohne Gliederungsnummer, ein… (+22 more)
 
 ### Community 88 - "test_curriculum_meta_update.py"
-Cohesion: 0.11
-Nodes (37): _import_keys_umschreiben(), Titel und Jahrgangsband eines Curriculums ändern. Mehr geht hier bewusst nicht.…, `import_key` des Curriculums und seiner Kapitel/Lernsequenzen nachziehen. Warum…, update_curriculum_meta(), ContextNodeUpdate, CurriculumMetaUpdate, Die **einzigen** beiden Angaben eines Curriculums, die frei änderbar sind.…, db() (+29 more)
+Cohesion: 0.13
+Nodes (32): Titel und Jahrgangsband eines Curriculums ändern. Mehr geht hier bewusst nicht.…, update_curriculum_meta(), CurriculumMetaUpdate, Die **einzigen** beiden Angaben eines Curriculums, die frei änderbar sind.…, db(), AsyncSession, fixture, Titel und Jahrgangsband eines Curriculums ändern (`PATCH… (+24 more)
 
 ### Community 89 - "test_cleanup_konto.py"
 Cohesion: 0.05
 Nodes (39): _artefakt(), artefakt_ablage(), bestand(), _feedback(), gelaufen(), _node(), fixture, Was die Kontolöschung mit den persönlichen Daten macht — M2, entschieden… (+31 more)
-
-### Community 90 - "test_chat_models.py"
-Cohesion: 0.08
-Nodes (35): _AblehnendeHttpClient, _AblehnungsResponse, _chat_mit_ablehnung(), _fake_payload(), _FakeHttpClient, _FakeStreamResponse, _make_app(), _make_execute_mock() (+27 more)
 
 ### Community 91 - "_ist"
 Cohesion: 0.05
 Nodes (27): _anwenden(), _ist(), _laden(), fixture, parametrize, Der Methodik-Seed darf die Arbeit der Schule nicht überschreiben (AP6). Nach…, `("Concept Map")` ist ein String, kein Tupel — das Komma fehlt. Ohne…, Wächter gegen die nächste Ergänzung — ein Alias ist nie ein einzelnes Zeichen. (+19 more)
 
 ### Community 92 - "lib/markdown.js"
-Cohesion: 0.12
-Nodes (17): DOKU, WURZEL, abbildungExt, escapeAttr(), escapeHtml(), katexBlockExt, katexHtml(), katexInlineExt (+9 more)
+Cohesion: 0.16
+Nodes (14): abbildungExt, escapeAttr(), escapeHtml(), katexBlockExt, katexHtml(), katexInlineExt, matchDisplayMath(), matchInlineMath() (+6 more)
 
-### Community 93 - "$app/stores"
-Cohesion: 0.06
-Nodes (4): zeile(), umschlag(), inDieUrl(), suchen()
+### Community 93 - "search/+page.svelte"
+Cohesion: 0.07
+Nodes (15): sichtbar, versteckt, ansicht, einordnen, {
+        node,
+        fassung = null,
+        iconSize = 14,
+        titleClass = "truncate",
+    }, ABSCHNITT_TITEL, alleTreffer(), gueltigeAuswahl() (+7 more)
 
 ### Community 94 - "test_student_context.py"
-Cohesion: 0.19
-Nodes (24): _handle_get_exam_scope(), asyncio, date, fixture, UP-7 Schritt 1: Tests für get_current_topic (Service „Aktuelles Thema")., Fach + Unterrichtsgruppe (id 200) für die student_context-Tests., UP-5 schreibt introduced/lesson_plan → erscheint im Schüler-Lernstand; eine…, seed_sc_group() (+16 more)
+Cohesion: 0.08
+Nodes (57): EngagementEntry, get_engagement_context(), AsyncSession, UUID, Retrieval-Funktionen fuer den Kontextspeicher (KS-Phase-3)., Kombinierter Lernstand (eigene + Gruppen-Engagements), scoped auf Anker-…, _assemble_context(), get_context_for_query() (+49 more)
 
 ### Community 95 - "test_models_router.py"
 Cohesion: 0.08
 Nodes (46): _get_models(), fixture, Unit-Tests: interne Modelle erscheinen nicht im Chat-Modellwähler. Mit dem…, Ein Modell, das die Proxy-Config nicht mehr führt, taucht nicht mehr auf — auch…, Gegenprobe zur Kosmetik-Zusage: der Chat-Flow nutzt settings.title_model…, Wer anders benennt, passt die Präfixe an — der Filter greift dann dort., Die Freischaltungsmatrix darf NICHT filtern — dort schaltet der Admin sie ja…, Alles freigeschaltet — trotzdem nur wählbare Modelle im Dropdown. (+38 more)
 
 ### Community 96 - "generate_embeddings"
-Cohesion: 0.11
-Nodes (46): _batch_timeout(), EmbeddingDimensionError, EmbeddingResponseError, generate_embeddings(), RuntimeError, Das Modell lieferte eine andere Vektorbreite als konfiguriert. Eigener Typ,…, Die Antwort passt nicht zur Anfrage — falsche Anzahl oder Indizes. Betrifft nur…, Zeitbudget fuer eine Anfrage mit ``anzahl`` Texten. Ein fester 30s-Wert passt… (+38 more)
+Cohesion: 0.13
+Nodes (40): _batch_timeout(), EmbeddingDimensionError, EmbeddingResponseError, generate_embeddings(), RuntimeError, Das Modell lieferte eine andere Vektorbreite als konfiguriert. Eigener Typ,…, Die Antwort passt nicht zur Anfrage — falsche Anzahl oder Indizes. Betrifft nur…, Zeitbudget fuer eine Anfrage mit ``anzahl`` Texten. Ein fester 30s-Wert passt… (+32 more)
 
-### Community 97 - "scan"
-Cohesion: 0.08
-Nodes (34): anweisung_fuer(), Was das Modell bei einem Krisentreffer zu tun hat (Paket 1 von 0.12, AP3).…, Der Text für diesen Treffer — eigener aus der Konfiguration, sonst der Standard., invalidate_crisis_cache(), Setzt beide Caches zurück (nach YAML-Änderung / Hot-Reload)., CrisisHit, BaseModel, Krisen-Erkennung — Abgleich einer Nachricht gegen die kuratierten Trigger.… (+26 more)
+### Community 97 - "test_crisis_config.py"
+Cohesion: 0.04
+Nodes (82): anweisung_fuer(), Was das Modell bei einem Krisentreffer zu tun hat (Paket 1 von 0.12, AP3).…, Der Text für diesen Treffer — eigener aus der Konfiguration, sonst der Standard., CrisisTrigger, CrisisTriggers, HelpContact, HelpResources, HelpTopic (+74 more)
 
-### Community 98 - "test_crisis_config.py"
+### Community 98 - "._reihenfolge"
 Cohesion: 0.09
-Nodes (40): CrisisTrigger, CrisisTriggers, HelpContact, HelpResources, HelpTopic, load_crisis_triggers(), load_help_resources(), _load_yaml() (+32 more)
+Nodes (14): `/context/search` zieht Treffer aus dem Fach der Konversation vor. Vorgezogen,…, Drei Knoten mit gesetzten Abständen zur Suchanfrage., Der unveränderte Fall — und der häufigste: ein Chat ohne Fach., 0,03 Rückstand ist weniger als der Bonus — `fach` überholt `fremd`., Die Gegenprobe zum Filter: `fremd_stark` hat gar kein Fach und bleibt erster.…, teacher2 nennt die Konversation von teacher1 — die Reihenfolge darf sich…, Ein benannter Knoten steht vorn — auch wenn ein anderer semantisch näher liegt.…, Ein Knoten mit dem gesuchten *Namen*, ein anderer semantisch viel näher. (+6 more)
 
-### Community 99 - "CalendarSourceError"
-Cohesion: 0.05
-Nodes (56): AuthenticationError, CalendarSourceError, RuntimeError, Basisfehler aller Adapter. Wichtig: Die Meldung wird in…, Anmeldung fehlgeschlagen — falsche Zugangsdaten oder Konto gesperrt., Ob die Stunde vorgezogen wurde — kommt vor (beobachtet: 09.07. → 06.07.)., Etwas, das der Sync **nicht** angefasst hat, und warum., Eine Verlegung, als Vorschlag für den Verschiebe-Dialog aus UP-6 (Schritt 9).… (+48 more)
+### Community 99 - "test_calendar_cron.py"
+Cohesion: 0.07
+Nodes (45): _lehrkraefte_mit_kuerzel(), letzter_status(), AsyncSession, date, Exception, Täglicher Stundenplan-Abgleich (UP-8, Schritt 10a). Gleicht für jede Lehrkraft…, Alle Lehrkräfte mit hinterlegtem Kürzel abgleichen., Der letzte Abgleich dieser Lehrkraft — Grundlage der Anzeige in 10b. (+37 more)
 
-### Community 100 - "pruefe_schema_konsistenz"
-Cohesion: 0.17
-Nodes (8): pruefe_schema_konsistenz(), Prüft die Sammlungs-Konfigurationen selbst — für die Startprüfung (ADR-018).…, Die Startprüfung über die Konfiguration selbst (ADR-018)., Eine Spalte, die auf kein Feld zeigt, bliebe in der Liste leer., Der Verknüpfen-Dialog darf nur Relationen anbieten, die die Datenbank kennt., Die Oberfläche zeigt die Richtung als Satz — dafür braucht sie einen., TestRelationsKonfiguration, TestSchemaKonsistenz
+### Community 100 - "taxonomy.py"
+Cohesion: 0.07
+Nodes (26): ist_stub(), pruefe_schema_konsistenz(), Prüfung von `metadata` und `content` beim Anlegen und Ändern von Knoten.…, Erzwingt den Knotentext, wo die Sammlung ihn als Pflicht führt. Der Grund steht…, Prüft die Sammlungs-Konfigurationen selbst — für die Startprüfung (ADR-018).…, validate_node_content(), collection_config(), feld_schema() (+18 more)
 
 ### Community 101 - "test_bildungsplan_editions.py"
 Cohesion: 0.03
 Nodes (94): _AppBlocker, _async_client_cm(), _cfg(), _FakeCursor, _ik_node(), _jsonl(), _knoten(), _lade_kopie() (+86 more)
 
-### Community 102 - "_make_app"
+### Community 102 - "test_fachplan_router.py"
 Cohesion: 0.13
-Nodes (32): _band_row(), _make_app(), _mock_fachplan_node(), _mock_ik(), _mock_leitidee(), _mock_pk_gruppe(), _mock_session(), FastAPI (+24 more)
+Nodes (34): _band_row(), _fake_teacher_payload(), _make_app(), _mock_fachplan_node(), _mock_ik(), _mock_leitidee(), _mock_pk_gruppe(), _mock_session() (+26 more)
 
-### Community 103 - "test_calendar_groups.py"
-Cohesion: 0.03
-Nodes (126): Anlageergebnis, code_varianten(), _eigene_gruppen(), _eindeutige_paare(), GroupMatchResult, GroupSuggestion, _gruppenidentitaet(), Kandidat (+118 more)
+### Community 103 - "match_groups"
+Cohesion: 0.11
+Nodes (44): match_groups(), Abgeglichene und fehlende Unterrichtsgruppen zu den erkannten Lerngruppen.…, FakeDB, gruppe(), key(), asyncio, Eine Unterrichtsgruppe für die Attrappe — so, wie `_eigene_gruppen` sie liest.…, Vorgeschlagen wird nur, was fehlt — sonst entstünden Dubletten. (+36 more)
 
 ### Community 104 - "pruefe_beim_start"
 Cohesion: 0.11
@@ -1153,16 +1135,16 @@ Cohesion: 0.11
 Nodes (37): build_lesson_export(), _display_linked(), export_docx(), export_markdown(), export_pdf(), ExportPhase, LessonExport, AsyncSession (+29 more)
 
 ### Community 106 - "test_groups_router.py"
-Cohesion: 0.10
-Nodes (39): _aktuell(), _config_app(), _gruppe(), _make_app(), _make_db_mock(), _make_group(), datetime, FastAPI (+31 more)
+Cohesion: 0.09
+Nodes (43): GroupOut, MyGroupOut, _aktuell(), _config_app(), _gruppe(), _make_app(), _make_db_mock(), _make_group() (+35 more)
 
 ### Community 107 - "load_pedagogy"
 Cohesion: 0.08
-Nodes (37): Augmentation, get_student_augmentations(), invalidate_pedagogy_cache(), list_augmentations(), load_pedagogy(), _load_yaml(), PedagogyConfig, Preambles (+29 more)
+Nodes (30): get_student_augmentations(), invalidate_pedagogy_cache(), list_augmentations(), load_pedagogy(), Setzt den Cache zurück (nach YAML-Änderung)., Augmentierungs-Texte für die Schüler-Behandlung, ohne die deaktivierten Keys., Verfügbare Augmentierungen als ``[{key, label}]`` — für die Editor-UI (Schritt…, Lädt + validiert pedagogy.yaml (einmalig, danach aus dem Cache). (+22 more)
 
 ### Community 108 - "ContextNode"
-Cohesion: 0.03
-Nodes (80): _fachplan_bp_id(), hinweise_uuid_to_code(), AsyncSession, Curriculum-Export: YAML und PDF., Lädt ausgewählte metadata_-Felder eines Knotens per UUID., `bp_id` des Fachplans, an dem dieses Curriculum hängt. Über die…, Übersetzt UUID-Token im Hinweise-Feld in Code-Token (für portables YAML).…, _resolve_node_meta() (+72 more)
+Cohesion: 0.04
+Nodes (61): In welcher Klassenstufe ist, wer hier fragt? ``None``, wenn unbekannt. **Die…, stufe_der_person(), bp_baender_zu(), AsyncSession, Das Klassenband je Knoten, aus seinen Bildungsplan-Fundstellen. Nur **aktive**…, ContextEdge, ContextNode, _handle_create_lessons() (+53 more)
 
 ### Community 109 - "test_vorab_suche_db.py"
 Cohesion: 0.06
@@ -1176,9 +1158,9 @@ Nodes (39): assistants, AUDIENCE_LABELS, closeReject(), confirmDelete(), confirm
 Cohesion: 0.05
 Nodes (53): parametrize, Minimalseite mit den Kopfangaben, auf die die Prüfung schaut. Die Titel sind…, V2 angefordert, V2 geliefert. Die richtige Seite trägt kein canonical., Der Fehlerfall vom 24.08.2026 — und der Grund für diese ganze Prüfung. Die…, Basisfassung ist ein gültiger Wunsch — canonical zeigt dann korrekt auf sie., Auch die Gegenrichtung wird erkannt — hier über den Titel, kein canonical da., Neue Seitengeneration: Marke steht im Bezeichner *und* im Titel., V3 (GEN2X) angefordert, alte Seite geliefert → Ausfall. (+45 more)
 
-### Community 112 - "ConversationAccessRequest"
-Cohesion: 0.07
-Nodes (51): AccessRequestCreate, AccessRequestResponse, create_access_request(), flag_summary(), FlagItem, FlagListResponse, FlagSummaryResponse, list_flags() (+43 more)
+### Community 112 - "flags.py"
+Cohesion: 0.08
+Nodes (42): AccessRequestCreate, AccessRequestResponse, create_access_request(), flag_summary(), FlagItem, FlagListResponse, FlagSummaryResponse, list_flags() (+34 more)
 
 ### Community 113 - "test_guardrail_admin.py"
 Cohesion: 0.09
@@ -1188,37 +1170,37 @@ Nodes (42): Path, Absoluter Pfad bleibt; relativer wird an der Wurzel verankert 
 Cohesion: 0.15
 Nodes (28): check_embedding_dimension(), lifespan(), _pruefe_zeitzone(), Protokolliert, in welchem Kalender der Prozess rechnet. Das Container-Image…, Prüft, ob `EMBEDDING_DIMENSIONS` zur Spalte `context_nodes.embedding` passt.…, _patch_session(), Unit-Tests für den Startup-Konsistenzcheck Spaltenbreite ↔…, Ist die DB nicht erreichbar, darf der Check den Start nicht abbrechen. (+20 more)
 
-### Community 115 - "export_templates.py"
-Cohesion: 0.10
-Nodes (39): CssUpdate, delete_reference(), ExportTemplatesStatus, get_status(), ProvenanceUpdate, AsyncSession, BaseModel, delete (+31 more)
+### Community 115 - "app/config.py"
+Cohesion: 0.07
+Nodes (38): _grade_entry(), _load(), _maybe_int(), Aufbewahrung + Quota der Artefaktbibliothek — role-/jahrgangsbasiert (Phase…, Jahrgangseintrag, robust gegen int-/str-Schlüssel (JWT liefert grade als…, Path, Bildarten — Laden + Validieren der ``image_models.yaml`` (Mehrmodell-Plan,…, Siehe app/core/paths.aufloesen — Wurzel je nach Layout (dev/Container). (+30 more)
 
 ### Community 116 - "YamlTestAdapter"
 Cohesion: 0.09
 Nodes (22): BaseModel, Lädt die Testnutzer aus der YAML-Datei., YamlTestAdapter, YamlTestConfig, YamlUser, asyncio, fixture, Path (+14 more)
 
 ### Community 117 - "test_zugangstoken.py"
-Cohesion: 0.05
-Nodes (37): erzeuge(), _hash(), meine(), pruefe(), AsyncSession, datetime, Exception, UUID (+29 more)
+Cohesion: 0.09
+Nodes (13): audit(), db(), fixture, Zugangstoken (PAT) über HTTP — der zweite Auth-Weg neben dem Session-Cookie.…, Ein Token mit allen vier Scopes., Der Grund, warum keine Rollen im Token stehen., Session **ohne** umschließende Transaktion. `db_session` aus dem conftest rollt…, Der Rollensatz, aus dem ein Token bei jeder Anfrage seine Rollen zieht. Wird… (+5 more)
 
 ### Community 118 - "test_render_service.py"
-Cohesion: 0.20
-Nodes (20): AsyncSession, Rendert `source` als `kind`. Gibt {svg, cached, error} zurück (wirft nie)., render(), POST /render/circuit → SVG (str). Wirft RenderError bei Fehler/Timeout., render_circuit(), asyncio, Cache-Treffer → kein Sidecar-Call, kein erneutes Cachen., _resp() (+12 more)
+Cohesion: 0.12
+Nodes (30): Cache: Hash der Render-Quelle → fertiges SVG (Phase 17, Server-Rendering).…, RenderedSvg, cleanup_rendered_svg(), get_cached_svg(), AsyncSession, Persistenter SVG-Cache (Tabelle `rendered_svg`) für Server-Rendering (Phase…, Löscht Cache-Einträge älter als max_age_days. Gibt die Anzahl zurück., set_cached_svg() (+22 more)
 
 ### Community 119 - "FeedbackCreate"
-Cohesion: 0.16
-Nodes (11): FeedbackCreate, _felder(), Was der Client schickt, bevor die Datenbank es sieht (ADR-020, AP2). Die…, Sonst käme „test" mit angehängten Leerzeichen durch die Mindestlänge., `""` in der Spalte sähe für die Sichtung aus wie eine Angabe., Getipptes, also geprüft — anders als die automatischen Felder unten., Eine Query kann tragen, was in einer Meldung nichts zu suchen hat., Der Bericht ist das Wertvolle, die Kennung die Zugabe. (+3 more)
+Cohesion: 0.14
+Nodes (12): FeedbackCreate, Was der Client schickt und was zurückkommt (ADR-020). **Zwei Sorten Felder,…, _felder(), Was der Client schickt, bevor die Datenbank es sieht (ADR-020, AP2). Die…, Sonst käme „test" mit angehängten Leerzeichen durch die Mindestlänge., `""` in der Spalte sähe für die Sichtung aus wie eine Angabe., Getipptes, also geprüft — anders als die automatischen Felder unten., Eine Query kann tragen, was in einer Meldung nichts zu suchen hat. (+4 more)
 
 ### Community 120 - "client.py"
-Cohesion: 0.05
-Nodes (65): _fetch_matrix(), get_image_model_matrix(), ImageModelMatrixResponse, ImageModelMatrixUpdate, BaseModel, Fetcht die aktuelle Bild-Modell-Matrix aus LiteLLM. Spalten sind ausschließlich…, Liefert die aktuelle Bild-Modell-Freischaltungsmatrix für alle Phase-1-Teams., Speichert die Bild-Modell-Freischaltung für alle Phase-1-Teams. **Merge mit der… (+57 more)
+Cohesion: 0.16
+Nodes (20): Synchronisiert Phase-1 Team-Membership auf genau ein Zielteam. Fremdteams…, reconcile_user_team(), get_target_team_id(), is_phase1_team(), normalize_grade(), Leitet die Phase-1 Zielteam-ID aus Rollen/Jahrgang ab. teacher hat Vorrang vor…, create_team(), main() (+12 more)
 
 ### Community 121 - "webuntis_probe.py"
 Cohesion: 0.08
 Nodes (32): anonymize(), dump_fixtures(), find_keys(), interpret_holiday_error(), main(), _mark(), merge_adjacent(), parse_holidays() (+24 more)
 
-### Community 122 - "ressource_erwartet"
-Cohesion: 0.18
-Nodes (6): Ob `action` eine `resource_id` braucht. Symmetrisch geprüft: Eine Aktion ohne…, ressource_erwartet(), Die Verallgemeinerung selbst — unabhängig vom Token-Endpunkt., Der Riegel gegen den stillen Verlust der Bindung., Symmetrie: Eine ressourcenlose Aktion darf auch keine ID mitbekommen., TestRessourcenloses_Stepup
+### Community 122 - "test_calendar_groups.py"
+Cohesion: 0.12
+Nodes (25): code_varianten(), ist_kursstufe(), kursart(), AsyncSession, Basiskurs, Leistungskurs oder regulärer Unterricht. **Die Groß-/Kleinschreibung…, Stundenplan-Kürzel → `subjects.id`, oder None. Gesucht wird in…, Schreibweisen eines Stundenplan-Kürzels — **nur für die Fachauflösung**. Für…, Ob die Klassenbezeichnungen auf die Kursstufe deuten. Belegt an den echten… (+17 more)
 
 ### Community 123 - "test_image_formats.py"
 Cohesion: 0.08
@@ -1233,8 +1215,8 @@ Cohesion: 0.11
 Nodes (38): _als_stunde(), _einheit(), EinheitRef, Jetzt, date, Protocol, UUID, „Jetzt" — wo eine Unterrichtsgruppe gerade steht. Die Auswahlregel für den… (+30 more)
 
 ### Community 126 - "generate_slots"
-Cohesion: 0.14
-Nodes (40): generate_slots(), AsyncSession, Erzeugt lesson_slots für ein Halbjahr aus den Wochenmustern der Gruppe.…, SlotGenStats, _cfg_mit_ferienwoche(), _make_db(), _mini_cfg(), _mk_pattern() (+32 more)
+Cohesion: 0.12
+Nodes (45): _findet_statt(), generate_slots(), AsyncSession, _raster(), Slot-Generator: erzeugt lesson_slots für ein Halbjahr aus group_week_patterns., Erzeugt lesson_slots für ein Halbjahr aus den Wochenmustern der Gruppe.…, Ob ein Muster in einer Woche dieser Phase Unterricht hat. Phase 0 heißt…, Die Termine des Halbjahres als `(datum, start_period, periods)`. Ausgelagert,… (+37 more)
 
 ### Community 127 - "content_matches"
 Cohesion: 0.14
@@ -1246,7 +1228,7 @@ Nodes (21): fuer_modell(), Suchergebnis für den LLM-Kontext aufbereiten. Bis 08
 
 ### Community 129 - "vermerke"
 Cohesion: 0.08
-Nodes (23): _ab_klasse(), Je Knoten ein Satz zur Stufe — oder gar nichts, wenn er passt. ⚠️ **Kein…, Passendes zuerst — **stabil**, damit die Ähnlichkeit innerhalb der Gruppen…, sortiere_passende_nach_vorn(), vermerke(), _begriff(), Passt ein Baustein zur Klassenstufe? (Paket 9, Nachgang N6) ⚠️ **Die Regel…, ⚠️ Die Reihenfolge innerhalb einer Gruppe stammt aus der Suche — sie ist nach… (+15 more)
+Nodes (26): Die Suche für das Modell — beschriftete Abschnitte statt einer flachen Liste.…, _search_context_nodes_handler(), _ab_klasse(), Passt ein Baustein zur Klassenstufe der fragenden Person? (Paket 9, N6) **Warum…, Je Knoten ein Satz zur Stufe — oder gar nichts, wenn er passt. ⚠️ **Kein…, Passendes zuerst — **stabil**, damit die Ähnlichkeit innerhalb der Gruppen…, sortiere_passende_nach_vorn(), vermerke() (+18 more)
 
 ### Community 130 - "loesche_alte_archivierte"
 Cohesion: 0.12
@@ -1257,25 +1239,20 @@ Cohesion: 0.08
 Nodes (26): get_sync_url(), _import_repo_script(), asyncio, fixture, Path, KS-Phase-2 Integrations-Tests: Import-Skript, Embedding-Batch., Zweimaliger Import derselben JSONL -> zweiter Lauf aendert nichts., Knoten mit geaendertem Hash -> UPDATE; embedding wird auf NULL zurueckgesetzt. (+18 more)
 
 ### Community 132 - "knowledge/[id]/+page.svelte"
-Cohesion: 0.05
-Nodes (9): sichtbar, versteckt, ansicht, einordnen, {
-        node,
-        fassung = null,
-        iconSize = 14,
-        titleClass = "truncate",
-    }, formatAfb(), sortOperatorsByTitle(), op() (+1 more)
+Cohesion: 0.07
+Nodes (9): error, isChanged, loading, loadTab(), saveError, saveSuccess, saving, switchTab() (+1 more)
 
 ### Community 133 - "stepup.py"
-Cohesion: 0.11
-Nodes (19): auth_time_is_fresh(), _b64(), decode_stepup_token(), is_stepup_state(), issue_stepup_token(), parse_stepup_state(), Step-up-Re-Authentifizierung (Krisen-Einsicht Phase 12, Schritt 5 — D1).…, Signierter State… (+11 more)
+Cohesion: 0.22
+Nodes (11): _b64(), is_stepup_state(), parse_stepup_state(), Step-up-Re-Authentifizierung (Krisen-Einsicht Phase 12, Schritt 5 — D1).…, Signierter State…, Verifiziert Signatur, gibt (sub, return_to, action, resource_id) oder None., sign_stepup_state(), _state_sig() (+3 more)
 
 ### Community 134 - "test_calendar_kuerzel.py"
 Cohesion: 0.07
 Nodes (38): NoCalendarSourceError, Keine Stundenplanquelle konfiguriert. Eigener Typ, weil das der **Normalfall**…, Ein eingetragenes Kürzel prüfen. Gibt die normalisierte Form zurück. **Leeren…, validate_kuerzel(), echte_quelle(), _handler(), keine_quelle(), asyncio (+30 more)
 
 ### Community 135 - "validate_node_metadata"
-Cohesion: 0.06
-Nodes (28): ist_stub(), Erzwingt den Knotentext, wo die Sammlung ihn als Pflicht führt. Der Grund steht…, Prüft die im Schema beschriebenen Felder. Fehlende Felder sind erlaubt.…, validate_node_content(), validate_node_metadata(), collection_config(), Die Sammlungs-Konfiguration eines Typs, oder ``None``., parametrize (+20 more)
+Cohesion: 0.09
+Nodes (16): Prüft die im Schema beschriebenen Felder. Fehlende Felder sind erlaubt.…, validate_node_metadata(), parametrize, Ein Stub darf unvollständig sein, nicht falsch., Die Felder aus Paket 9, AP1 — sie tragen den Pilot-Import Chemie. ⚠️ **Geprüft…, Das Feld ist optional — ausdrücklich leer zu lassen ist kein Fehler., ⚠️ **Absicht, kein Versehen.** Die Feldtypen (`int|text|auswahl|liste`) tragen…, `True` ist in Python ein `int` und ginge sonst als Klasse 1 durch. (+8 more)
 
 ### Community 136 - "lib/components/CurriculumTable.svelte"
 Cohesion: 0.08
@@ -1286,76 +1263,76 @@ Cohesion: 0.14
 Nodes (26): _alter_in_tagen(), antragserinnerungstext(), erinnerungstext(), _flags_url(), Lage, lage_ermitteln(), lauf(), _offen() (+18 more)
 
 ### Community 138 - "feedback/service.py"
-Cohesion: 0.21
-Nodes (21): Feedback, Eine Meldung: „etwas funktioniert nicht" oder „ich hätte gern …". **Warum der…, aendere(), eigene(), erstelle(), gesperrt_bis(), _jetzt(), pruefe_grenzen() (+13 more)
+Cohesion: 0.14
+Nodes (28): Feedback, Eine Meldung: „etwas funktioniert nicht" oder „ich hätte gern …". **Warum der…, FeedbackOut, BaseModel, Die eigene Meldung, wie die meldende Person sie sieht. **Ohne `issue_ref`**:…, aendere(), eigene(), erstelle() (+20 more)
 
-### Community 139 - "build_reflow_context"
+### Community 139 - "LessonSlot"
 Cohesion: 0.11
-Nodes (39): build_reflow_context(), detect_overhang(), FixpunktState, _is_fixpunkt(), OpenPhase, OpenPhasesInfo, OverhangFinding, _phasen_kurzform() (+31 more)
+Nodes (41): LessonSlot, build_reflow_context(), detect_overhang(), FixpunktState, _is_fixpunkt(), OpenPhase, OpenPhasesInfo, OverhangFinding (+33 more)
 
 ### Community 140 - "_post"
-Cohesion: 0.04
-Nodes (63): _load(), Ratelimit-Konfiguration aus `config/rate_limits.yaml` (Sicherheits-Audit #2).…, Gibt (limit, window_sekunden) für Bucket + Rollen zurück., resolve(), allow(), _cleanup(), In-Memory-Ratelimit-Zähler (Sicherheits-Audit #2). Fixed-Window pro `(bucket,…, Zählt eine Anfrage. Gibt (erlaubt, retry_after_sekunden) zurück. `limit <= 0`… (+55 more)
+Cohesion: 0.09
+Nodes (36): bildarten_datei(), _frischer_ratelimit(), _post(), fixture, Unit-Tests für POST /images/{id}/variieren (Mehrmodell-Plan, Schritt 9).…, Sonst stünden die Varianten beim erneuten Laden nicht bei ihrem Original., Auch wenn sie nicht das Standardformat der Bildart ist., Die Bildart wurde umkonfiguriert — nie eine unbepreiste Größe schicken. (+28 more)
 
 ### Community 141 - "_eines"
 Cohesion: 0.05
 Nodes (38): _eines(), Ein inhaltsbezogener Standard vollständig — Schema wie in der alten Generation., Ein Link auf die **ganze** Fachseite hat kein Kompetenzziel. Als unaufgelösten…, Die prozessbezogenen Kompetenzen sind in V3 **neu nummeriert**. V2: `2.1.1` ·…, „Klasse 11" ist ein Band aus einer Stufe — sonst stünde sie ohne Jahrgang da., Leistungs-/Basisfach steht in V3 in der Überschrift, nicht mehr in der URL., `BO(1)` → `BO_01` — die Form, die der Import seit jeher erwartet., Der Bezeichner eines fremden Fachs lässt sich hier nicht bilden. `PH(V3.0)… (+30 more)
 
-### Community 142 - "test_budget_forecast.py"
-Cohesion: 0.09
-Nodes (32): hochrechnen(), date, Hochrechnung des Schuljahresverbrauchs. Die Schule bindet sich auf eine…, Lineare Fortschreibung des bisherigen Verbrauchs auf das ganze Schuljahr., Je Kalenderwoche des Schuljahres: kumulierte Zusage und kumulierter Verbrauch.…, verlauf(), Verlaufspunkt, parametrize (+24 more)
+### Community 142 - "budgets.py"
+Cohesion: 0.05
+Nodes (73): BudgetGradesResponse, BudgetGradesUpdateRequest, BudgetGradesUpdateResult, get_budget_grades(), GradeInfo, GradeUpdate, _hochrechnung(), HochrechnungInfo (+65 more)
 
 ### Community 143 - "search_eval.py"
 Cohesion: 0.11
 Nodes (35): _anker_id(), Aufzaehlfall, _aus_yaml(), _ausgabe(), _bewerte(), _dsn(), Ergebnis, _erwartung() (+27 more)
 
-### Community 144 - "SchoolYearConfig"
-Cohesion: 0.07
-Nodes (45): anzahl_unterrichtswochen(), _cfg(), naechste_woche_nach(), date, Unterrichtswochen eines Schuljahres — der Takt der Budget-Zuteilung. Das Budget…, Die nächste Unterrichtswoche, die **nach** der Woche von ``d`` beginnt.…, Alle Unterrichtswochen, die am Stichtag begonnen haben (einschließlich seiner).…, Eine Kalenderwoche, in der mindestens ein Unterrichtstag liegt. (+37 more)
+### Community 144 - "unterrichtswochen"
+Cohesion: 0.10
+Nodes (35): anzahl_unterrichtswochen(), _cfg(), naechste_woche_nach(), date, Unterrichtswochen eines Schuljahres — der Takt der Budget-Zuteilung. Das Budget…, Die nächste Unterrichtswoche, die **nach** der Woche von ``d`` beginnt.…, Alle Unterrichtswochen, die am Stichtag begonnen haben (einschließlich seiner).…, Eine Kalenderwoche, in der mindestens ein Unterrichtstag liegt. (+27 more)
 
 ### Community 145 - "server.mjs"
 Cohesion: 0.09
 Nodes (21): CircuitRenderPool, WORKER_PATH, _adaptor, BoundedCache, _mjDoc, renderMath(), sha256(), wrapCircuit() (+13 more)
 
 ### Community 146 - "relink.py"
-Cohesion: 0.08
-Nodes (34): aktive_bp_version(), Die für (Stufe, aktuelles Schuljahr) geltende ``bp_version``. Verbindet den…, apply_relink(), _available_bp_versions(), _children(), _clone_node(), _decide(), duplicate_curriculum() (+26 more)
+Cohesion: 0.06
+Nodes (42): upgrade(), parse_class_grade(), parse_grade_band(), Jahrgangs-/Stufen-Parsing — zentral, damit Schreibpfade und Matching konsistent…, Normalisiert ein Jahrgangs-/Stufenband in ``(min_grade, max_grade)``. Annahme:…, Führende Jahrgangs-Zahl aus einem Klassennamen. ``"10C"`` -> 10, ``"8a"`` -> 8,…, apply_relink(), _available_bp_versions() (+34 more)
 
-### Community 147 - "test_render_plot.py"
-Cohesion: 0.09
-Nodes (22): compile_expr(), parse_plot_spec(), PlotError, Parst einen Funktionsterm zu einer vektorisierten numpy-Funktion. Wirft…, YAML-Quelle → validierte PlotSpec. Wirft PlotError bei ungültiger Eingabe., Ungültige Plot-Spec oder unzulässiger Ausdruck., Baut aus dem Parse-Baum eine vektorisierte Funktion ``f(x)`` (numpy). Jede…, _ToCallable (+14 more)
+### Community 147 - "RenderError"
+Cohesion: 0.05
+Nodes (54): Diagramm-Prärender für den Office-Export (Phase 19, Schritt 2). Pandoc kennt…, Exception, Gemeinsame Render-Fehlerklasse (Phase 17). Von allen Renderern genutzt…, Rendern fehlgeschlagen (Fehler, Timeout oder ungültige Eingabe)., RenderError, _build_md(), _collect_and_render(), _iter_tokens() (+46 more)
 
-### Community 148 - "get_budget_for"
-Cohesion: 0.10
-Nodes (33): get_budget_for(), Gibt den Wochenbetrag in Euro zurück (``None``, wenn keiner ermittelbar ist).…, Tests für app.budget.tiers - get_budget_for und invalidate_budget_tiers_cache, Lehrer mit Jahrgang bekommt trotzdem Lehrer-Budget, Eine nicht umgestellte Datei liefert kein Budget — und einen Fehler im Log. Den…, Testet, dass invalidate_budget_tiers_cache den Cache löscht, Testet, dass get_budget_for den Cache verwendet, Testet, dass nach Cache-Invalidation neues Laden funktioniert (+25 more)
+### Community 148 - "accrual.py"
+Cohesion: 0.06
+Nodes (54): merke(), AsyncSession, Wöchentliche Aufstockung der Budget-Obergrenze. Das Budget wird **nicht…, Schreibt den Merkposten fort. Erst aufrufen, wenn der Proxy bestätigt hat., Pseudonyme, deren Merkposten noch aus einem früheren Schuljahr stammt., zurueckgestellte(), Wochenbetrag und Datum der nächsten Aufstockung — beide bestenfalls. Fehlt die…, _zuwachs() (+46 more)
 
 ### Community 149 - "test_editions.py"
 Cohesion: 0.07
 Nodes (43): aktive_edition(), aktuelles_schuljahr_start(), _basis_jahr(), _deckt_ab(), Edition, gilt_ab_schuljahr(), load_edition_schedule(), load_subjects_config() (+35 more)
 
-### Community 150 - "test_ks_phase1.py"
-Cohesion: 0.07
-Nodes (23): insert_node(), make_node_data(), Integrationstests für KS-Phase-1: Migration und CRUD-Roundtrip., global/global ist eine erlaubte Scope-Kombination., Ungültige category verletzt CHECK., Ungültiger read_scope verletzt CHECK., write_scope permissiver als read_scope verletzt Restriktivitäts-CHECK., read_scope='subject' ohne read_scope_group_id verletzt CHECK. (+15 more)
+### Community 150 - "TestMigration"
+Cohesion: 0.29
+Nodes (4): Alle fünf Tabellen sind nach upgrade head vorhanden., pgvector-Extension ist nach der Migration verfügbar., embedding-Spalte ist ein vector in der konfigurierten Breite. Prüft neben dem…, TestMigration
 
 ### Community 151 - "require_any_role"
-Cohesion: 0.12
-Nodes (30): Dependency-Factory: 403 wenn keine der `roles` in user.roles., require_any_role(), make_payload(), asyncio, test_require_any_role_denies_if_none_match(), test_require_any_role_grants_if_one_matches(), test_require_any_role_with_budget_and_admin_combination(), test_require_any_role_with_budget_role() (+22 more)
+Cohesion: 0.14
+Nodes (25): AugmentationItem, AugmentationsResponse, get_augmentations(), BaseModel, Pädagogik-Konfiguration für die UI (Phase 13). Liefert die verfügbaren…, Dependency-Factory: 403 wenn keine der `roles` in user.roles., require_any_role(), make_payload() (+17 more)
 
 ### Community 152 - "pruefe_svg"
 Cohesion: 0.09
 Nodes (18): _lokal(), pruefe_svg(), Ist dieses SVG harmlos genug, um es zu speichern und später anzuzeigen? **Warum…, `{http://…}path` → `path`, kleingeschrieben., ``None``, wenn die Datei gespeichert werden darf; sonst der Grund im Klartext.…, _url_grund(), parametrize, Die SVG-Prüfung vor dem Speichern (Paket 10, AP3). ⚠️ **Warum es sie erst jetzt… (+10 more)
 
-### Community 153 - "PseudonymAudit"
-Cohesion: 0.08
-Nodes (42): Base, CalendarSyncStatus, JwtRevocation, PseudonymAudit, Eine Zeile je Lehrkraft. Zugangsdaten stehen in der Umgebung, der Status hier —…, UserPreference, main(), migrate_keys() (+34 more)
+### Community 153 - "db/models.py"
+Cohesion: 0.04
+Nodes (79): get_migration_url(), Get database URL for migrations. Alembic uses synchronous connections for…, Run migrations in 'offline' mode. This configures the context with just a URL…, Run migrations in 'online' mode. In this scenario we need to create an Engine…, run_migrations_offline(), run_migrations_online(), consume_stepup_jti(), AsyncSession (+71 more)
 
 ### Community 154 - "test_token_verwaltung.py"
-Cohesion: 0.08
+Cohesion: 0.09
 Nodes (20): _anlegen(), audit(), db(), _mit_stepup(), fixture, Die Selbstverwaltung der Zugangstoken im Profil — samt Re-Authentifizierung.…, Cross-Action-Reuse: Wer eine Krisen-Freigabe re-authentifiziert hat, hat damit…, Die Nonce: Dasselbe Cookie zweimal einzulösen ist ein Replay. (+12 more)
 
-### Community 155 - "admin/holidays.py"
-Cohesion: 0.09
-Nodes (29): _antwort(), ApplyRequest, _bounds_pruefen(), _hole_vorschlag(), holiday_apply(), holiday_proposal(), BaseModel, date (+21 more)
+### Community 155 - "test_lesson_endpoints.py"
+Cohesion: 0.16
+Nodes (17): LessonLinkedItem, LessonPhaseItem, LessonRefItem, LessonUpdate, asyncio, Unit-Tests für GET/PATCH /planning/lessons/{node_id}., test_build_lesson_nav_empty_unit(), test_build_lesson_nav_no_unit() (+9 more)
 
 ### Community 156 - "test_embedding_titel.py"
 Cohesion: 0.14
@@ -1366,16 +1343,16 @@ Cohesion: 0.10
 Nodes (20): lade_bestandskombinationen(), pruefe_altlast(), pruefe_beim_start(), pruefe_bestand(), AsyncSession, RuntimeError, Startprüfung der Knotentyp-Taxonomie (ADR-018). **Wogegen das schützt.**…, Prüft die vorgefundenen (category, content_type, Anzahl)-Tripel gegen die… (+12 more)
 
 ### Community 158 - "SiteConfig"
-Cohesion: 0.06
-Nodes (55): _alter_in_stunden(), get_guardrail_health(), get_guardrail_prompt(), get_litellm_guardrails(), GuardrailHealthResponse, GuardrailPromptResponse, GuardrailPromptUpdate, LiteLLMGuardrailItem (+47 more)
+Cohesion: 0.05
+Nodes (68): CssUpdate, delete_reference(), ExportTemplatesStatus, get_status(), ProvenanceUpdate, AsyncSession, BaseModel, delete (+60 more)
 
 ### Community 159 - "unit/test_systemkonto.py"
 Cohesion: 0.18
 Nodes (23): pruefe_beim_start(), Meldet den Rückfall auf den Master-Key. Bewusst **weich**: Es funktioniert ja., _antwort(), _client(), _gesendeter_schluessel(), asyncio, fixture, Das Systemkonto (0.12, Paket 2, AP3): eigener Schlüssel, Rückfall, Betrag. Die… (+15 more)
 
 ### Community 160 - "plane_umhaengen"
-Cohesion: 0.14
-Nodes (17): plane_umhaengen(), Rechnet, was wohin wandert. Ohne Datenbank, ohne Seiteneffekt., _sortiert(), Wie die Jahresplanung auf ein neues Stundenraster wandert (AP3, 22.09.2026).…, Ohne diesen Vorrang schöbe die Reihenfolge die Klassenarbeit weg., Das Anwenden löscht darüber — auch die inhaltsleeren Slots müssen drin sein., Der Kern von E3: Der i-te Inhalt landet auf dem i-ten Termin., E4: Was für eine Doppelstunde geplant war, passt nicht ungeprüft in eine… (+9 more)
+Cohesion: 0.06
+Nodes (45): AlterSlot, NeuerTermin, plane_umhaengen(), Rechnet, was wohin wandert. Ohne Datenbank, ohne Seiteneffekt., Ein Slot, wie das Umhängen ihn braucht — ohne SQLAlchemy-Bindung., _sortiert(), _alte(), anwenden() (+37 more)
 
 ### Community 161 - "user/README.md"
 Cohesion: 0.13
@@ -1405,17 +1382,17 @@ Nodes (21): beispielpfad(), fehlende_namen(), melde_fehlende(), _namen(), Path, 
 Cohesion: 0.07
 Nodes (18): leere_tabelle(), _meldung(), fixture, Die Sichtung der Rückmeldungen (ADR-020, AP3). Der Schwerpunkt liegt auf dem,…, Sonst zeigte der Knopf „Erledigt" immer die Zahl, die gerade ausgewählt ist —…, Fünfzig Meldungen mit Chatverlauf wären ein Vielfaches an Inhalt, das niemand…, Erst der Abschluss räumt auf — wer bearbeitet, braucht den Kontakt noch., Die Löschzusage aus ADR-011 §6.2 — nach dem Abschluss gibt es nichts mehr… (+10 more)
 
-### Community 168 - "WebUntisAdapter"
-Cohesion: 0.13
-Nodes (14): _parse_untis_date(), AsyncClient, date, Ein JSON-RPC-Aufruf. Wirft bei Fehlern eine passende `CalendarSourceError`.…, Zugangsdaten prüfen, ohne Daten zu holen., Der Sitzung das Schuljahr aufprägen, in dem `day` liegt. Ohne diesen Schritt…, Kürzel → `elementId`, aus `weekly/pageconfig`. Das Servicekonto hat keine…, Das Stundenraster als (Beginn, Ende) in Minuten, aufsteigend. Grundlage für… (+6 more)
+### Community 168 - "auth/tokens.py"
+Cohesion: 0.18
+Nodes (18): erzeuge(), _hash(), meine(), pruefe(), AsyncSession, datetime, Exception, UUID (+10 more)
 
 ### Community 169 - "cleanup_service.py"
-Cohesion: 0.07
-Nodes (45): AbstractAsyncContextManager, Löscht die übergebenen Dateien best-effort; gibt die Anzahl gelöschter zurück., unlink_paths(), cleanup_inactive_accounts(), cleanup_stale_conversations(), CleanupStats, _crisis_protected_exists(), _protecting_flag_condition() (+37 more)
+Cohesion: 0.08
+Nodes (38): AbstractAsyncContextManager, cleanup_inactive_accounts(), cleanup_stale_conversations(), CleanupStats, _crisis_protected_exists(), _protecting_flag_condition(), AsyncSession, datetime (+30 more)
 
 ### Community 170 - "fachbegriffe_export.py"
-Cohesion: 0.06
-Nodes (49): _abschnitte_aus_content(), _arten(), _dateiname(), Exportbilanz, exportiere(), _kanten_je_knoten(), _kantenfelder(), _mit_einbettungen() (+41 more)
+Cohesion: 0.13
+Nodes (23): _abschnitte_aus_content(), _arten(), _dateiname(), Exportbilanz, exportiere(), _kanten_je_knoten(), _kantenfelder(), _mit_einbettungen() (+15 more)
 
 ### Community 171 - "fremdsprache.py"
 Cohesion: 0.09
@@ -1426,28 +1403,28 @@ Cohesion: 0.11
 Nodes (31): test_band_ohne_klassenangabe_wirft(), _anker_zu_bp_id(), band_aus_ueberschrift(), _intro(), _knoten(), _kompetenzen_anhaengen(), _kompetenzzeilen(), _lp_aspekte() (+23 more)
 
 ### Community 173 - "ValueError"
-Cohesion: 0.11
-Nodes (11): model_validator, field_validator, model_validator, field_validator, model_validator, model_validator, PlotSpec, BaseModel (+3 more)
+Cohesion: 0.10
+Nodes (11): model_validator, field_validator, model_validator, model_validator, field_validator, model_validator, model_validator, _pruefe_feld() (+3 more)
 
 ### Community 174 - "test_image_kinds_api.py"
 Cohesion: 0.13
 Nodes (21): _app(), bildarten_datei(), client(), fixture, Unit-Tests für GET /image-kinds (Mehrmodell-Plan, Schritt 4). Der Endpunkt…, Mehrzeiliger YAML-Text würde die Editor-Zeile sonst sprengen., Nur `bild-standard` ist freigeschaltet — `formatwahl` fehlt überall., LiteLLMs Platzhalter für „nichts freigeschaltet" ist keine Modell-ID. (+13 more)
 
 ### Community 175 - "ensure_litellm_user"
-Cohesion: 0.13
-Nodes (28): ensure_litellm_team_membership(), ensure_litellm_user(), AsyncSession, Stellt sicher, dass der User in LiteLLM genau im richtigen Phase-1-Team ist.…, Prüft ob LiteLLM-User existiert und legt ihn ggf. an. Fehler werden geloggt,…, asyncio, Kein Key in DB → generate_key wird aufgerufen und Key committed., Key bereits in DB → generate_key wird nicht aufgerufen. (+20 more)
+Cohesion: 0.12
+Nodes (30): ensure_litellm_team_membership(), ensure_litellm_user(), _extract_current_team_ids(), AsyncSession, Stellt sicher, dass der User in LiteLLM genau im richtigen Phase-1-Team ist.…, Extrahiert Team-IDs/Aliases robust aus LiteLLM user/info Antworten., Prüft ob LiteLLM-User existiert und legt ihn ggf. an. Fehler werden geloggt,…, asyncio (+22 more)
 
 ### Community 176 - "test_bausteine_verwalten.py"
 Cohesion: 0.10
 Nodes (30): bestand(), _node(), asyncio, fixture, Selbstverwaltung eigener Bausteine — AP7, Schritt 3 (Backend). Die Seite „Meine…, Ohne `archived_at` berechnet der Löschlauf nie eine Frist (ADR-013)., Sonst sammelte der nächtliche Lauf den Knoten in derselben Nacht wieder ein., `null` heißt „gilt dauerhaft" — das braucht das Flag, sonst wäre es von „Feld… (+22 more)
 
-### Community 177 - "get_engagement_context"
-Cohesion: 0.10
-Nodes (21): get_engagement_context(), AsyncSession, UUID, Retrieval-Funktionen fuer den Kontextspeicher (KS-Phase-3)., Kombinierter Lernstand (eigene + Gruppen-Engagements), scoped auf Anker-…, insert_engagement_sync(), insert_group_engagement_sync(), insert_group_membership_sync() (+13 more)
+### Community 177 - "run"
+Cohesion: 0.22
+Nodes (18): main(), Hauptlogik: Alle Nutzer durchgehen und ihre Team-Zugehörigkeit angleichen., run(), _make_db_session(), _make_user(), asyncio, 2 User; get_user wirft bei User 1 Exception -> User 2 wird trotzdem verarbeitet, Hilfsfunktion: Erstellt einen Mock-User. (+10 more)
 
-### Community 178 - "test_curriculum_export_pdf.py"
-Cohesion: 0.13
-Nodes (15): Rendert Konkretisierungs-Markdown zu HTML (Listen, Betonung etc.). Roh-HTML in…, _render_markdown(), asyncio, Unit-Tests für die PDF-Aufbereitung des Curriculum-Exports (KS-Phase-6 Schritt…, Nicht nur die Titel — auch der Freitext des Curriculums., Das Template gibt mit `| safe` aus — der Renderer muss selbst escapen., IK/PK werden über node_id auf den Knoten-Volltext (title) gemappt., Ohne passenden Ref-Titel fällt der Text auf nr bzw. pk_id zurück. (+7 more)
+### Community 178 - "_build_pdf_kapitel"
+Cohesion: 0.11
+Nodes (21): _build_pdf_kapitel(), _parse_hinweise_for_pdf(), _parse_material_for_pdf(), Zerlegt Hinweise-Text in Segmente für PDF-Rendering., Zerlegt Material-Text in Segmente für PDF-Rendering., Rendert Konkretisierungs-Markdown zu HTML (Listen, Betonung etc.). Roh-HTML in…, Reichert die Curriculum-Struktur fürs PDF-Template an. - IK/PK als Volltext…, _render_markdown() (+13 more)
 
 ### Community 179 - "anbietermodell"
 Cohesion: 0.10
@@ -1470,12 +1447,12 @@ Cohesion: 0.18
 Nodes (22): einheiten(), kostenAnzeige(), kostenErklaerung(), uebertragText(), wochentag(), zuschlagText(), zuwachsKurz(), zuwachsText() (+14 more)
 
 ### Community 184 - "test_stepup_router.py"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (23): _bound_token(), _consume_db(), _DirectAdapter, _make_app(), _protected_app(), Unit-Tests für die Step-up-Endpunkte + require_fresh_stepup (Phase 12, Schritt…, _RedirectAdapter, test_get_stepup_direct_mode() (+15 more)
 
 ### Community 185 - "image_moderation.py"
-Cohesion: 0.12
-Nodes (26): image_prompt_block_reason(), ImageBlocklist, ImageBlockRule, invalidate_image_blocklist_cache(), load_image_blocklist(), BaseModel, Path, Pattern (+18 more)
+Cohesion: 0.11
+Nodes (27): image_prompt_block_reason(), ImageBlocklist, ImageBlockRule, invalidate_image_blocklist_cache(), load_image_blocklist(), BaseModel, model_validator, Path (+19 more)
 
 ### Community 186 - "generate_embedding"
 Cohesion: 0.16
@@ -1487,7 +1464,7 @@ Nodes (27): erlaubte_modelle(), erlaubte_modelle_fuer(), invalidate_team_models_
 
 ### Community 188 - "operations.py"
 Cohesion: 0.08
-Nodes (59): ParkedLessonContent, Was beim Umhängen der Jahresplanung übrig bleibt. Ändert sich das Wochenmuster,…, _apply_move(), apply_operations(), _apply_swap(), _apply_transfer(), ExecutionResult, _has_content() (+51 more)
+Nodes (57): ParkedLessonContent, Was beim Umhängen der Jahresplanung übrig bleibt. Ändert sich das Wochenmuster,…, _apply_move(), apply_operations(), _apply_swap(), _apply_transfer(), ExecutionResult, _has_content() (+49 more)
 
 ### Community 189 - "integration/conftest.py"
 Cohesion: 0.07
@@ -1501,9 +1478,9 @@ Nodes (29): Anmeldung, Schule, Darstellung, Basis, Bildgenerierung, `config/auth
 Cohesion: 0.07
 Nodes (18): archivedRefs, archiveLoading, buildMetadata(), canEdit, contentTypeOptions, copyError, copyLoading, copySchuljahr (+10 more)
 
-### Community 192 - "lege_gruppe_aus_vorschlag_an"
-Cohesion: 0.20
-Nodes (25): lege_gruppe_aus_vorschlag_an(), Aus einem Stundenplan-Vorschlag eine Unterrichtsgruppe machen. ⚠️ **Der…, _aufraeumen(), _fach(), _Key, _klassen(), AP3: `lege_gruppe_aus_vorschlag_an` — woher die Mitglieder kommen werden. Die…, ⚠️ **Der Kern des Kursstufenfalls.** Dort heißt die „Klasse" `11` und… (+17 more)
+### Community 192 - "Group"
+Cohesion: 0.05
+Nodes (75): create_teaching_group(), delete_teaching_group(), letztes_schuljahr(), list_exclusions(), list_potential_teaching_groups(), AsyncSession, delete, Das jüngste Schuljahr, aus dem Planung an diesen Gruppen hängt. Nur für… (+67 more)
 
 ### Community 193 - "ist_budget_erschoepft"
 Cohesion: 0.14
@@ -1517,9 +1494,9 @@ Nodes (25): Stellt ``context_nodes.embedding`` auf ``target`` Dimensionen um.…
 Cohesion: 0.08
 Nodes (30): Abgleich, _als_uuid(), plane_abgleich(), Any, AsyncSession, UUID, Materialkanten aus der Stundenplanung (AP6b). Eine Stunde führt ihr Material…, Vergleicht die vorhandenen Kanten mit dem, was die Phasen verlangen. ⚠️… (+22 more)
 
-### Community 196 - "test_umhaengen_anwenden.py"
-Cohesion: 0.21
-Nodes (17): NeuerTermin, _alte(), anwenden(), _inhalt_gesamt(), _lese(), Das Umhängen gegen die Datenbank (AP3, 22.09.2026). Hier zählt, was…, Die vorhandenen Muster-Slots als `AlterSlot` — so übergibt sie der Generator., `reason='regeneration'` — daran findet der vorhandene Reflow-Kontext ihn. (+9 more)
+### Community 196 - "test_reflow_tools.py"
+Cohesion: 0.24
+Nodes (17): _handle_apply_plan_operations(), _handle_get_reflow_context(), _handle_undo_last_change(), _commit_as_flush(), fixture, Ersetzt db.commit() durch flush(), damit der Fixture-Rollback greift., _ctx(), _patch_commit() (+9 more)
 
 ### Community 197 - "test_updated_at_wird_fortgeschrieben.py"
 Cohesion: 0.10
@@ -1533,13 +1510,13 @@ Nodes (13): _Knoten, parametrize, Der Schreibteil des Exports, ohne Datenbank (P
 Cohesion: 0.19
 Nodes (18): _get_nlp(), _merge(), PiiSpan, PII-Scan: Name + Wohnort (Phase 14, Schritt 2). ``scan(text) -> list[PiiSpan]``…, Lädt das spaCy-Modell einmalig (gecachter Singleton)., Überlappende Spans gleicher Kategorie zur Vereinigung zusammenfassen., scan(), _cats() (+10 more)
 
-### Community 200 - "_Client"
-Cohesion: 0.14
-Nodes (13): _Client, Kostenabrechnung eines Chat-Zuges (app/chat/router.py). Ein Zug ist **mehr als…, Die Zusage, die den Chat schnell hält. LiteLLM schreibt die SpendLogs…, Der Grund für die Wiederholung überhaupt., Liefert je Request-ID einen Betrag — oder erst ab dem n-ten Versuch., Der Kern: drei Anfragen, drei Beträge, eine Summe., Lieber ein belegter Teilbetrag als gar keiner — die Zahlen sagen, dass er…, Wie bisher: keine Kostenangabe statt einer erfundenen Null. (+5 more)
+### Community 200 - "standard_unter"
+Cohesion: 0.13
+Nodes (17): Die Vorgabe innerhalb einer **Teilmenge** von Bildarten. Die global…, standard_unter(), bildarten_fuer(), _build_generate_image_tool(), _einzeilig(), _formate_vereinigt(), _generate_image_definition(), Any (+9 more)
 
-### Community 201 - "db/models.py"
-Cohesion: 0.08
-Nodes (27): get_migration_url(), Get database URL for migrations. Alembic uses synchronous connections for…, Run migrations in 'offline' mode. This configures the context with just a URL…, Run migrations in 'online' mode. In this scenario we need to create an Engine…, run_migrations_offline(), run_migrations_online(), consume_stepup_jti(), AsyncSession (+19 more)
+### Community 201 - "_make_app"
+Cohesion: 0.13
+Nodes (17): _make_app(), _make_group_mock(), FastAPI, DELETE /groups/{id} schlägt fehl, wenn Assistenten darauf referenzieren → 409., POST /groups/{id}/members mit ungültiger Rolle → 422., POST /groups/{id}/members mit nicht existierender Gruppe → 404., DELETE /groups/{id}/members/{pseudonym} — Mitgliedschaft nicht gefunden → 404., GET /groups/{id} mit unbekannter ID → 404. (+9 more)
 
 ### Community 202 - "PlannerRow.svelte"
 Cohesion: 0.09
@@ -1549,9 +1526,9 @@ Nodes (8): onKeydown(), braucht, eigenerAusfall, hatInhalt, herkunft, KATEGORIEN
 Cohesion: 0.14
 Nodes (24): _anbieter_id(), check_config(), _dokumentierter_bildpreis(), _entries_by_name(), Finding, _has_price(), _info(), _preis_aus_image_prices() (+16 more)
 
-### Community 204 - "pruefe"
-Cohesion: 0.11
-Nodes (12): pruefe(), Fragt die Nachricht nach einem gefährlichen Versuch für zu Hause? Liefert das…, parametrize, Dosisfragen nennen keine Absicht — und sind trotzdem heikel. „Wie viel Koffein…, Die Ausnahme darf nicht auf die anderen Themen abfärben., Die wichtigere Hälfte — jede dieser Fragen muss normal beantwortet werden., ⚠️ **Der Kern der Regel.** Absicht **und** Thema — eins allein reicht nicht.…, TestDieUndVerknuepfung (+4 more)
+### Community 204 - "pii.py"
+Cohesion: 0.22
+Nodes (14): pii_scan(), PiiScanRequest, PiiScanResponse, PiiSpanOut, BaseModel, PII-Scan-Endpoint (Phase 14, Schritt 2). Prüft eine Eingabe lokal auf…, _make_app(), Unit-Tests für app.api.pii (Phase 14, Schritt 2). (+6 more)
 
 ### Community 205 - "baue_buendel"
 Cohesion: 0.14
@@ -1562,8 +1539,8 @@ Cohesion: 0.10
 Nodes (24): _constraint(), _index(), UP-8 Schritt 5 — die neuen Slot-Felder. Geprüft wird das **Modell**, nicht die…, Der Index, der die Zeilenidentität trägt, ist unverändert vorhanden., Bestehende Muster sind wöchentlich — alles andere wäre eine stille Änderung am…, Eine Slot-Position gehört zu genau einem Rhythmus. Mit `rhythmus` im Index wäre…, Was einen Slot erzeugt, braucht eine Kategorie — sonst scheitert Schritt 8., `pattern` (Generator), `import` (Quelle), `manual` (von Hand). (+16 more)
 
 ### Community 207 - "test_archiv_gruppen.py"
-Cohesion: 0.09
-Nodes (26): _archiv(), fixture, Frühere Unterrichtsgruppen (AP6 des Fachseiten-Plans). Der Anker ist der…, Eine Gruppe kann nur Chats haben; ein Join über die Bausteine verlöre sie., Die tragende Annahme des Archivs. Der Knoten hat `read_scope: group`, die…, Gegenprobe: Das Archiv gibt kein Fenster auf fremdes Gruppenmaterial. Geprüft…, Merkt sich die Knoten-Ids der beiden angelegten Stundenentwürfe., Der Archiv-Fall: Die Mitgliedschaft ist weg, der eigene Entwurf bleibt. Vor dem… (+18 more)
+Cohesion: 0.10
+Nodes (24): _archiv(), fixture, Frühere Unterrichtsgruppen (AP6 des Fachseiten-Plans). Der Anker ist der…, Eine Gruppe kann nur Chats haben; ein Join über die Bausteine verlöre sie., Die tragende Annahme des Archivs. Der Knoten hat `read_scope: group`, die…, Gegenprobe: Das Archiv gibt kein Fenster auf fremdes Gruppenmaterial. Geprüft…, Merkt sich die Knoten-Ids der beiden angelegten Stundenentwürfe., Der Archiv-Fall: Die Mitgliedschaft ist weg, der eigene Entwurf bleibt. Vor dem… (+16 more)
 
 ### Community 208 - "test_litellm_client_image.py"
 Cohesion: 0.15
@@ -1585,17 +1562,17 @@ Nodes (4): Admin-Dokumentation, Architektur auf einen Blick, Inhaltsverzeichnis,
 Cohesion: 0.35
 Nodes (11): _app(), _list_db(), _payload(), Tests: Admin-Nutzer-/Sitzungsverwaltung (Sicherheits-Audit #11, „D")., _row(), test_list_users_requires_admin(), test_list_users_returns_effective_roles(), test_list_users_role_filter() (+3 more)
 
-### Community 213 - "student_context.py"
-Cohesion: 0.17
-Nodes (21): _belegt_filter(), CurrentTopic, ExamScope, ExamScopeRef, _fmt_datum(), get_current_topic(), get_exam_scope(), AsyncSession (+13 more)
+### Community 213 - "embedding_backfill_service.py"
+Cohesion: 0.15
+Nodes (10): braucht_aliase(), Verwendet dieser Typ überhaupt Aliase im Embedding-Input? Nur `methode` (über…, EmbeddingBackfillStats, ohne_aenderungsstempel(), Zusatz für `update(...).values(...)`, wenn die Schreibung **keine** Änderung…, main(), run(), Wer die Aliase gar nicht verwendet, soll sie auch nicht laden. (+2 more)
 
 ### Community 214 - "feedback/benachrichtigung.py"
 Cohesion: 0.21
 Nodes (14): benachrichtige(), Eintrag, _feedback_url(), _lage(), datetime, Benachrichtigung über neue Rückmeldungen (ADR-020, AP3). **Warum diese Mail…, Verschickt die Mail, wenn diese Meldung die erste im Fenster ist. :param…, Was von einer Meldung in die Mail darf — und nichts sonst. Bewusst vier Felder… (+6 more)
 
 ### Community 215 - "test_material_edges_pfade.py"
-Cohesion: 0.15
-Nodes (24): TransferPhases, _alle_used_with(), knoten(), _materialkanten(), _neuer_knoten(), _phase(), asyncio, fixture (+16 more)
+Cohesion: 0.16
+Nodes (23): _alle_used_with(), knoten(), _materialkanten(), _neuer_knoten(), _phase(), asyncio, fixture, Integrationstests: Jeder Speicherpfad zieht die Materialkanten nach (AP6b,… (+15 more)
 
 ### Community 216 - "test_scope_gruppen.py"
 Cohesion: 0.14
@@ -1614,8 +1591,8 @@ Cohesion: 0.19
 Nodes (24): _empty_db(), _make_app(), _pending_req(), Unit-Tests für die Zweitfreigabe-Guards (Phase 12, Schritt 6). Rollen- und…, db-Mock, das den Nonce-Verbrauch (db.execute→rowcount) und db.get(req) bedient., _stepup_cookie(), _stepup_db(), test_approve_allowed_for_independent_reviewer() (+16 more)
 
 ### Community 220 - "TestStabileKennung"
-Cohesion: 0.12
-Nodes (9): parametrize, Die `id` im Frontmatter (Paket 10, AP2, Entscheidung D3). Ohne sie erkennt der…, Das Beispiel aus dem Plan, Zeichen für Zeichen., ⚠️ Ausgeschrieben, nicht zu Bindestrichen zerlegt. Ohne die Regel ergäbe…, Lieber gar keine als eine erfundene — der Bericht verlangt dann ein `id:`., Sonst schriebe der Import etwas, das er beim Lesen zurückweist., Die Ableitung passiert erst beim Schreiben — nur dort ist das Fach bekannt., ⚠️ **Die Datei fällt nicht durch.** Eine ungültige Kennung hat noch nie einen… (+1 more)
+Cohesion: 0.09
+Nodes (12): parametrize, Die `id` im Frontmatter (Paket 10, AP2, Entscheidung D3). Ohne sie erkennt der…, Das Beispiel aus dem Plan, Zeichen für Zeichen., ⚠️ Ausgeschrieben, nicht zu Bindestrichen zerlegt. Ohne die Regel ergäbe…, Lieber gar keine als eine erfundene — der Bericht verlangt dann ein `id:`., Sonst schriebe der Import etwas, das er beim Lesen zurückweist., Die Ableitung passiert erst beim Schreiben — nur dort ist das Fach bekannt., ⚠️ **Die Datei fällt nicht durch.** Eine ungültige Kennung hat noch nie einen… (+4 more)
 
 ### Community 221 - "lib/mein_tag.js"
 Cohesion: 0.16
@@ -1626,20 +1603,20 @@ Cohesion: 0.13
 Nodes (23): AsyncFunctionDef, _anonymisierte_modelle(), _funktion(), _geloeschte_modelle(), _ist_pseudonymspalte(), Strukturprüfung: Welche pseudonym-geführten Tabellen räumt die Kontolöschung…, Tabellenname → Modellname für alle Modelle mit Pseudonym-Spalte., Jede Tabelle mit Pseudonym ist entweder gelöscht oder begründet ausgenommen. (+15 more)
 
 ### Community 223 - "vorgeschlagenes_ablaufdatum"
-Cohesion: 0.07
-Nodes (27): date, Das Ablaufdatum, das die Taxonomie für eine Bausteinart vorsieht. **Eine…, Das ``valid_until`` aus der Taxonomie (``None`` = dauerhaft). Zwei Formen: ein…, vorgeschlagenes_ablaufdatum(), get_valid_until_offset(), get_valid_until_schuljahresende(), Gibt den empfohlenen valid_until-Offset in Tagen zurück (None = permanent)., True wenn der content_type einen Schuljahresende-Lifecycle hat. (+19 more)
+Cohesion: 0.13
+Nodes (17): date, Das Ablaufdatum, das die Taxonomie für eine Bausteinart vorsieht. **Eine…, Das ``valid_until`` aus der Taxonomie (``None`` = dauerhaft). Zwei Formen: ein…, vorgeschlagenes_ablaufdatum(), get_valid_until_schuljahresende(), True wenn der content_type einen Schuljahresende-Lifecycle hat., _ablaufdatum_vorbelegen(), Setzt `valid_until` aus der Taxonomie, wo der Erzeuger keins mitbringt. **Warum… (+9 more)
 
 ### Community 224 - "get_scope_defaults"
-Cohesion: 0.08
-Nodes (16): get_scope_defaults(), ist_ruhend(), Gibt (read_scope, write_scope)-Defaults für content_type zurück. Fallback:…, True, wenn der Typ in keiner Auswahlfläche erscheinen soll., Unit-Tests für app.context.taxonomy., 🔴 Bis zum 24.09.2026 stand hier `unterrichtsstunde` unter „privat". In der…, write_scope darf nie permissiver sein als read_scope. ⚠️ **Die Rangfolge wird…, `ui_status` steuert ausschließlich Auswahlflächen (ADR-019 F6). (+8 more)
+Cohesion: 0.12
+Nodes (10): get_scope_defaults(), Gibt (read_scope, write_scope)-Defaults für content_type zurück. Fallback:…, 🔴 Bis zum 24.09.2026 stand hier `unterrichtsstunde` unter „privat". In der…, write_scope darf nie permissiver sein als read_scope. ⚠️ **Die Rangfolge wird…, Die Korrekturen aus ADR-019 K3 — je eine bewusste Zuständigkeits-Entscheidung., Was fachlich ist, pflegt die Fachschaft, nicht der Schul-Admin., Geschlossene, fachneutrale Kleinstmenge — keine Fachschafts-Varianten., Ausschlussgrund 3: fremdes Eigentum ohne Suchnutzen. (+2 more)
 
-### Community 225 - "ExchangeRate"
-Cohesion: 0.14
-Nodes (21): ExchangeRate, fetch_ecb_rate(), main(), Holt den aktuellen EUR/USD-Wechselkurs von der EZB., Hauptlogik: Kurs abrufen und ggf. in DB speichern., run(), check_existing_rate(), main() (+13 more)
+### Community 225 - "fetch_ecb_rate"
+Cohesion: 0.21
+Nodes (14): fetch_ecb_rate(), main(), Holt den aktuellen EUR/USD-Wechselkurs von der EZB., Hauptlogik: Kurs abrufen und ggf. in DB speichern., run(), asyncio, raise_for_status() wirft httpx.HTTPStatusError -> Propagiert, Valides XML mit USD rate="1.1040" -> 1.104 (float) (+6 more)
 
 ### Community 226 - "test_pedagogy_compose.py"
-Cohesion: 0.15
-Nodes (24): _augmentation_texts(), compose_system_content(), is_student_treatment(), Audience-/rollenabhängige System-Prompt-Komposition (ADR-008 Teil 2 + 1B, D1).…, Schüler-Behandlung (student_extension + Augmentierungen) — ja/nein? (D1) -…, Die eine Zeile zur Klassenstufe — leer, wenn sie unbekannt ist., Kombinierter Pädagogik-/Assistenten-System-Inhalt. Reihenfolge: universelle…, stufen_hinweis() (+16 more)
+Cohesion: 0.16
+Nodes (23): _augmentation_texts(), compose_system_content(), Audience-/rollenabhängige System-Prompt-Komposition (ADR-008 Teil 2 + 1B, D1).…, Die eine Zeile zur Klassenstufe — leer, wenn sie unbekannt ist., Kombinierter Pädagogik-/Assistenten-System-Inhalt. Reihenfolge: universelle…, stufen_hinweis(), PedagogyConfig, _aug() (+15 more)
 
 ### Community 227 - "test_feedback_benachrichtigung.py"
 Cohesion: 0.11
@@ -1661,9 +1638,9 @@ Nodes (24): Abgeleiteter Index, kein zweiter Speicherort, Aliase — ein zweiter
 Cohesion: 0.08
 Nodes (24): Ab V3: eine neue Seitengeneration, Ein Fach auf eine neue Fassung stellen, Fehlerbehebung, Fremdsprachen (Englisch `E1`, Französisch `F2`), Geändertes Bandschema in V3, LFDB, Monitor-Empfehlung, Nach Editions-Wechsel: Curricula aktualisieren (Lehrkraft-Aufgabe) (+16 more)
 
-### Community 232 - "[type]/+page.svelte"
-Cohesion: 0.18
-Nodes (6): chatVorgaben(), neuerChatPfad(), params(), darfAnlegen, istLehrkraft, unvollstaendige
+### Community 232 - "lib/components/BildungsplanTree.svelte"
+Cohesion: 0.10
+Nodes (6): chatVorgaben(), neuerChatPfad(), params(), formatAfb(), sortOperatorsByTitle(), op()
 
 ### Community 233 - "lib/stores/myGroups.js"
 Cohesion: 0.14
@@ -1678,8 +1655,8 @@ Cohesion: 0.21
 Nodes (14): _make_db_mock(), _make_mini_app(), _make_subject(), MockScalarResult, FastAPI, Unit tests für den Subjects-Endpunkt., GET /subjects gibt leere Liste zurück, wenn keine Fächer vorhanden., GET /subjects gibt Fächer in der Reihenfolge zurück, die die DB liefert. (+6 more)
 
 ### Community 236 - "integration/test_assistant_lebenszyklus.py"
-Cohesion: 0.11
-Nodes (21): assistenten(), fixture, Der Lebenszyklus eines Assistenten über die echte Schnittstelle (Paket 7, AP4).…, Dort hängen Kolleg:innen dran, die von der Abschaltung nichts wüssten., Der Rückweg fehlte ganz — es blieb nur Löschen und neu schreiben., ⚠️ **Die Entscheidung vom 25.09.2026 in einer Zeile.** Ein Antrag ist eine…, Wer selbst löschen darf, soll nicht beantragen — sonst wartet jemand auf nichts., Die Chats bleiben — `assistant_id` steht auf `ON DELETE SET NULL`. (+13 more)
+Cohesion: 0.06
+Nodes (35): assistenten(), fixture, Der Lebenszyklus eines Assistenten über die echte Schnittstelle (Paket 7, AP4).…, Dort hängen Kolleg:innen dran, die von der Abschaltung nichts wüssten., Der Rückweg fehlte ganz — es blieb nur Löschen und neu schreiben., ⚠️ **Die Entscheidung vom 25.09.2026 in einer Zeile.** Ein Antrag ist eine…, Wer selbst löschen darf, soll nicht beantragen — sonst wartet jemand auf nichts., Die Chats bleiben — `assistant_id` steht auf `ON DELETE SET NULL`. (+27 more)
 
 ### Community 237 - "_sender_sammler"
 Cohesion: 0.12
@@ -1697,9 +1674,9 @@ Nodes (22): embed(), _mock_client(), fixture, Unit-Tests: Embedding-Modell und -
 Cohesion: 0.09
 Nodes (23): 10. Kanten festlegen, 11. Migration — was wirklich nötig ist, 12. Oberfläche, 13. Werkzeuge, 14. Was das Modell sieht, 15. Darf der Typ ungefragt in einen Chat?, 16. Prüfsatz, 17. Dokumentation (+15 more)
 
-### Community 241 - "test_beitrittscode.py"
-Cohesion: 0.12
-Nodes (21): code_erzeugen(), Ein neuer Code — `secrets`, nicht `random`: Er ist eine Berechtigung., _code(), parametrize, AP4: Die reinen Regeln des Beitrittscodes — Alphabet, Normalisierung,…, Drei Tage (Entscheidung Jan): im Unterricht ausgegeben, sofort eingelöst. Ein…, ⚠️ **Der Code wird an die Tafel geschrieben oder diktiert.** `I` gegen `1` zu…, Kein Beweis für Zufälligkeit, aber ein Wächter gegen eine feste Rückgabe. (+13 more)
+### Community 241 - "_app"
+Cohesion: 0.18
+Nodes (15): _app(), Das Fach kommt vom Server; die Anfrage darf es nur **bestätigen**. Weicht es…, Die Wahl „ganze Klasse / Teilgruppe" muss bis zur Anlage durchkommen. ⚠️ Sie…, Ohne Feld bleibt die serverseitige Vorbelegung — `None`, nicht `False`., ⚠️ **Der Schalter darf keine Hintertür haben.**…, Ein `GroupSuggestion`, wie der serverseitige Abgleich ihn liefert., Router mit ersetzter Musterlage — der Netzabruf gehört nicht in diesen Test., ⚠️ **Die Gegenprobe zur Berechtigungsregel.** Im eigenen Stundenplan steht `CH… (+7 more)
 
 ### Community 242 - "pruefe_zugang"
 Cohesion: 0.14
@@ -1714,8 +1691,8 @@ Cohesion: 0.14
 Nodes (20): Any, Stabile Kennungen für Stundenphasen (AP6b, Schritt 3). `LessonPhaseItem.id` ist…, Gibt die Phasenliste zurück, in der jede Phase eine `id` trägt. Vorhandene…, sichere_phasen_kennungen(), Unit-Tests für app.planning.phasen — AP6b, Schritt 3. Die Kennung einer Phase…, Der Fall aus der Praxis: `patch_lesson` speichert mit `exclude_none=False`,…, Sie neu zu vergeben ließe `phasen_status` und Übertragungen ins Leere laufen., Sonst schriebe jedes Speichern neue Kennungen — und bräche alle Verweise. (+12 more)
 
 ### Community 245 - "test_alte_bp_schreibweise.py"
-Cohesion: 0.19
-Nodes (14): fach(), _ik(), _laeuft(), _lebt(), migration(), fixture, Was Alembic 0080 löscht — und vor allem, was es stehen lässt. ⚠️ **Eine…, Im Dev-Bestand trifft das genau einen Knoten. Ihn wegzulöschen risse ein Loch… (+6 more)
+Cohesion: 0.18
+Nodes (15): ChatContextNode, fach(), _ik(), _laeuft(), _lebt(), migration(), fixture, Was Alembic 0080 löscht — und vor allem, was es stehen lässt. ⚠️ **Eine… (+7 more)
 
 ### Community 246 - "asyncio"
 Cohesion: 0.11
@@ -1761,9 +1738,9 @@ Nodes (16): content_ist_pflicht(), Verlangt dieser Typ einen Knotentext? Bei `me
 Cohesion: 0.22
 Nodes (18): client_ip(), _is_trusted(), _parse_networks(), Request, Vertrauenswürdige Ableitung der Client-IP hinter einem Reverse-Proxy…, Gibt die vertrauenswürdig abgeleitete Client-IP zurück (oder None). - Ist der…, Unit-Tests: vertrauenswürdige Client-IP-Ableitung (Sicherheits-Audit #13)., _request() (+10 more)
 
-### Community 257 - "test_planning_assistant_tools.py"
-Cohesion: 0.18
-Nodes (19): _build_compact_balance(), _handle_assign_slots_to_unit(), _handle_create_teaching_unit(), _handle_get_plan_balance(), _handle_set_slot_category(), _handle_set_slot_topics(), Gibt eine kompakte Bilanz zurück (Soll/Ist pro UE + unzugewiesen)., _make_ctx() (+11 more)
+### Community 257 - "assistant_tools.py"
+Cohesion: 0.08
+Nodes (46): _build_compact_balance(), _handle_assign_slots_to_unit(), _handle_create_teaching_unit(), _handle_get_curriculum_chapters(), _handle_get_lesson_detail(), _handle_get_lesson_slots(), _handle_get_plan_balance(), _handle_set_slot_category() (+38 more)
 
 ### Community 258 - "pruefe"
 Cohesion: 0.14
@@ -1797,21 +1774,21 @@ Nodes (12): buildMetadata(), contentTypeOptions, errors, gruppen, isAdmin, readG
 Cohesion: 0.10
 Nodes (22): AST, _pfadwerte_aus_workflows(), Konfigurationspfade in beiden Verzeichnislayouts. Anlass (30.08.2026,…, Gegenprobe in der echten Umgebung: Die Datei liegt in der Repo-Wurzel., Der eigentliche Regressionsschutz. Jede Rechnung von Hand ist eine Gelegenheit,…, `.parent` allein ist das Verzeichnis der Datei — legitim und häufig., `Path(settings.x_path)` umgeht die zentrale Auflösung. Der Wächter darüber…, Selbstprüfung: Was der Wächter fangen soll — und was nicht. Der letzte Fall ist… (+14 more)
 
-### Community 266 - "asyncio"
-Cohesion: 0.12
-Nodes (12): asyncio, Assistent ohne konfigurierte Anker gibt leeren Kontext-String zurück., Integrationstests fuer die Context Anchor API., POST mit gueltigem fachplan-Knoten -> 201, Anker in DB., POST mit ik_kompetenz-Knoten als retrieval_scope -> 422., POST mit themengebiet-Knoten -> 201 (Typ ist in VALID_SCOPE_ANCHOR_TYPES)., GET gibt alle Anker mit node_title zurueck., DELETE -> 204, Anker nicht mehr in DB. (+4 more)
+### Community 266 - "test_assistant_scope_validation.py"
+Cohesion: 0.18
+Nodes (8): parametrize, Tests für Assistenten-Scope-Validierung nach der class_group → teaching_group…, test_class_group_scope_rejected(), test_group_scope_with_scope_group_id_valid(), test_group_scope_without_scope_group_id_raises(), test_non_group_scope_with_scope_group_id_raises(), test_non_group_scope_without_scope_group_id_valid(), test_unknown_scope_rejected()
 
 ### Community 267 - "integration/test_systemkonto.py"
 Cohesion: 0.11
-Nodes (29): Was die Plattform selbst verbraucht hat, seit Schuljahresbeginn. Steht…, _systemverbrauch(), Was die Plattform für sich selbst verbraucht — eine Zeile je Tag (0.12, AP3).…, SystemSpend, kosten_aus_antwort(), AsyncSession, date, Das Systemkonto: Modellaufrufe, die keiner Person gehören (0.12, AP3). Heute… (+21 more)
+Nodes (27): Was die Plattform für sich selbst verbraucht — eine Zeile je Tag (0.12, AP3).…, SystemSpend, kosten_aus_antwort(), AsyncSession, date, Das Systemkonto: Modellaufrufe, die keiner Person gehören (0.12, AP3). Heute…, Betrag und Anfragen von ``von`` bis ``bis`` — beide einschließlich, Berliner…, Betrag aus dem Antwortkopf; ``None``, wenn er fehlt oder unbrauchbar ist. Nur… (+19 more)
 
 ### Community 268 - "test_node_aliases_backfill.py"
 Cohesion: 0.15
 Nodes (18): _aliase(), conn(), gelaufen(), knoten(), _lade_migration(), fixture, Der Backfill der Migration 0057 — gegen gesetzte Daten, nicht gegen ein leeres…, „ think-pair-share " ist nach der Normalisierung derselbe Alias — der Unique-… (+10 more)
 
-### Community 269 - "test_admin_assistant_model_check.py"
-Cohesion: 0.15
-Nodes (18): _admin(), _assistant(), _make_client(), Unit-Tests: Assistenten mit verschwundenem Modell werden gemeldet. Die zweite…, Archivierte laufen ohnehin nicht — sie als Problem zu melden wäre Rauschen., Ausfall darf nicht wie „alles in Ordnung" aussehen. Ohne das `checked`-Flag…, Ein aktiver Assistent wiegt schwerer als ein Entwurf — die UI soll das zeigen…, Der Modellwähler-Filter (Schritt 10) ist kosmetisch — hier zählt die volle… (+10 more)
+### Community 269 - "TestVorlage"
+Cohesion: 0.17
+Nodes (6): Die Musterdateien aus „Vorlage herunterladen" (AP6). ⚠️ **Eine Vorlage, die das…, Der Plan verlangt genau das: ein Begriff in zwei Fassungen und ein Steckbrief.…, Ein Verweis, der ins Leere zeigt, wäre in einer Vorlage ein Stolperstein: Der…, `_Format.md` fährt mit, ohne ein Knoten zu werden — der Unterstrich hält sie…, Was die Vorlage zeigt, muss der Export genauso wieder hergeben — sonst lehrt…, TestVorlage
 
 ### Community 270 - "parametrize"
 Cohesion: 0.12
@@ -1829,21 +1806,21 @@ Nodes (10): _assistants, assistantSubjectIds, conversationCountsByGroup, convers
 Cohesion: 0.22
 Nodes (17): FeedbackAdminDetail, FeedbackAdminOut, FeedbackListe, FeedbackPatch, get_feedback(), list_feedback(), _nach_aussen(), patch_feedback() (+9 more)
 
-### Community 274 - "_build_signature_line"
-Cohesion: 0.39
-Nodes (3): _build_signature_line(), Rekonstruiert eine lesbare Signaturzeile aus dem signatur-Dict. Beispiel:…, TestBuildSignatureLine
+### Community 274 - "test_taxonomy_embedding.py"
+Cohesion: 0.10
+Nodes (12): _build_signature_line(), _extract_metadata_field(), Einen Baustein des Embedding-Inputs aufloesen. ``title``, ``content`` oder ein…, Rekonstruiert eine lesbare Signaturzeile aus dem signatur-Dict. Beispiel:…, Extrahiert einen Wert aus verschachteltem metadata anhand eines Punktpfades.…, _teil_aus_quelle(), MockContextNode, Unit-Tests fuer EMBEDDING_ENRICHMENT und Anreicherungslogik. (+4 more)
 
-### Community 275 - "test_chat_tool_ergebnis.py"
-Cohesion: 0.14
-Nodes (12): _hart(), mit_lesehinweis(), Was ein Suchtreffer dem **Modell** über sich sagt (Paket 9, AP3 und N11). Hier…, Den Lesehinweis vor einen Kontextblock setzen (Paket 9, N13). ⚠️ **Es gibt zwei…, Ein Ergebnis der Werkzeuggruppe ``context_search``, wie das Modell es liest.…, werkzeug_nutzlast(), Was ein Treffer dem Modell über sich sagt (app/context/modellsicht.py). Übrig…, Der Lesehinweis vor jedem Kontextblock (Paket 9, N13). ⚠️ **Zwei Wege, ein… (+4 more)
+### Community 275 - "TestLesehinweis"
+Cohesion: 0.22
+Nodes (5): Der Lesehinweis vor jedem Kontextblock (Paket 9, N13). ⚠️ **Zwei Wege, ein…, Leerer Schlüssel = kein Hinweis. Eine Schule, die ihn streicht, bekommt den…, Beide Ergebnisformen der Gruppe `context_search` — Umschlag und flache Liste., ⚠️ **Sonst stünden sie an zwei Orten.** Der Grund für N13 war, dass die…, TestLesehinweis
 
 ### Community 276 - "pruefe_taxonomie"
 Cohesion: 0.17
 Nodes (7): pruefe_taxonomie(), Die datenbankfreien Prüfungen. Gibt Befunde zurück; leere Liste = in Ordnung.…, Ein Vektor-Input für einen Typ, der nie eingebettet wird, ist tote Konfig., Eine Quelle, die es nicht gibt, liefert stumm nichts. Der Knoten bekommt dann…, Genau die Drift, die AP1 vorgefunden hat: drei Listen, zwei Meinungen., Der ausgelieferte Stand darf keinen Befund erzeugen., TestLookupDrift
 
-### Community 277 - "snapshot.py"
-Cohesion: 0.20
-Nodes (16): baue(), lade(), AsyncSession, UUID, Der Chat-Anhang einer Meldung — eine Kopie, kein Verweis (ADR-020). **Warum…, Der JSONB-Inhalt. `created_at` als ISO-Zeichenkette — JSONB kennt kein datetime., Der Snapshot einer **eigenen** Konversation, sonst `None`. Fremd und nicht…, _konversation() (+8 more)
+### Community 277 - "test_feedback_snapshot.py"
+Cohesion: 0.32
+Nodes (11): baue(), Der JSONB-Inhalt. `created_at` als ISO-Zeichenkette — JSONB kennt kein datetime., _konversation(), _nachricht(), Die Form des Chat-Anhangs (ADR-020, AP2). Ohne Datenbank: `baue` rechnet auf…, JSONB kennt kein `datetime` — ohne `isoformat` scheitert erst der Insert., Sie beantworten keine Frage, die eine Fehlermeldung stellt., test_keine_kosten_und_keine_token() (+3 more)
 
 ### Community 278 - "leite_jahrgang_ab"
 Cohesion: 0.17
@@ -1854,12 +1831,12 @@ Cohesion: 0.11
 Nodes (18): type, type, type, type, properties, minLength, type, author (+10 more)
 
 ### Community 280 - "test_gruppen_schueler_sichtbarkeit.py"
-Cohesion: 0.16
-Nodes (17): gruppe(), klasse(), _meine(), _pfad(), fixture, Freigabe einer Unterrichtsgruppe für ihre Schüler:innen (Beta-Fachsichtbarkeit,…, Auch nicht als Mitglied — der Wächter verlangt die Rolle `teacher` in der…, 404 statt 403: Die Freigabe gibt es für Klassen und Fachschaften gar nicht. (+9 more)
+Cohesion: 0.22
+Nodes (13): _meine(), _pfad(), Freigabe einer Unterrichtsgruppe für ihre Schüler:innen (Beta-Fachsichtbarkeit,…, Auch nicht als Mitglied — der Wächter verlangt die Rolle `teacher` in der…, 404 statt 403: Die Freigabe gibt es für Klassen und Fachschaften gar nicht., `false` als Vorgabe ist die sichere Richtung — nichts ist sichtbar, was nicht…, Vorbereiten muss möglich sein, auch wenn der Modus gerade aus ist., test_der_endpunkt_haengt_nicht_am_betriebsschalter() (+5 more)
 
-### Community 281 - "prerender_diagrams"
-Cohesion: 0.16
-Nodes (16): prerender_diagrams(), AsyncSession, Diagramm-Prärender für den Office-Export (Phase 19, Schritt 2). Pandoc kennt…, Ersetzt ```circuitikz/```plot-Fences durch eingebettete SVG-Bilder (Daten-URI).…, _svg_data_uri(), Render-Service: Registry + Cache-Orchestrierung (Phase 17, §3.2). Ein Renderer-…, _decode_data_uri(), skipif (+8 more)
+### Community 281 - "issue_stepup_token"
+Cohesion: 0.33
+Nodes (5): decode_stepup_token(), issue_stepup_token(), Frisches, **einmalig** einlösbares Step-up-Token, gebunden an Aktion +…, Dekodiert + validiert Signatur/Ablauf/`purpose`. Gibt die Claims zurück oder…, TestStepupToken
 
 ### Community 282 - "test_budget_exchange_currency.py"
 Cohesion: 0.18
@@ -1881,9 +1858,9 @@ Nodes (18): Automatische Läufe (Cron-Jobs), Bausteine: gelöscht oder anonymisi
 Cohesion: 0.18
 Nodes (16): aktiverReiter(), ALTE_KENNUNGEN, fachZielSchueler(), fortschritt(), gruppenImFach(), GUELTIG, REITER, ROLLEN_LABEL (+8 more)
 
-### Community 287 - "taxonomy.py"
-Cohesion: 0.14
-Nodes (17): ist_persoenlich(), Knoten-Taxonomie: valide category × content_type-Kombinationen und Lifecycle-…, Ob dieser Typ von der einzelnen Person gepflegt wird. `None` ist nicht…, Validiert das metadata-Objekt eines unterrichtsstunde-Knotens. Wirft ValueError…, validate_unterrichtsstunde_metadata(), Unit-Tests für Taxonomie-Ergänzungen (Schritt 3)., test_validate_dauer_null_fehler(), test_validate_keine_phasen_ok() (+9 more)
+### Community 287 - "validate_unterrichtsstunde_metadata"
+Cohesion: 0.20
+Nodes (14): Validiert das metadata-Objekt eines unterrichtsstunde-Knotens. Wirft ValueError…, validate_unterrichtsstunde_metadata(), Unit-Tests für Taxonomie-Ergänzungen (Schritt 3)., test_validate_dauer_null_fehler(), test_validate_keine_phasen_ok(), test_validate_leer_ok(), test_validate_methode_beides_fehler(), test_validate_methode_keines_fehler() (+6 more)
 
 ### Community 288 - "RollenStufen"
 Cohesion: 0.15
@@ -1925,21 +1902,21 @@ Nodes (17): 10. Aufräumen — später, 1. Bestand sichern, 2. Alten Proxy stopp
 Cohesion: 0.12
 Nodes (17): Das ganze Jahr planen, Der Jahrgang einer Unterrichtsgruppe, Der Parkplatz, Export, Häufige Fragen, Jahresübersicht, Nachbereiten, Phasen (+9 more)
 
-### Community 298 - "._zwei_fassungen"
-Cohesion: 0.16
-Nodes (12): insert_subject_sync(), Legt ein Fach an (idempotent) — noetig als FK-Ziel fuer context_nodes. Ohne…, Semantische Suche bei zwei gleichzeitig aktiven BP-Fassungen. Waehrend eine…, Anker + dieselbe IK-Kompetenz 3.1.1(1) in V2 und V3. Das V2-Embedding liegt…, `nahe` = Position des Suchvektors: 1 trifft V2, 2 trifft V3., Klasse 5 wird nach V3 unterrichtet -> nur die V3-Fassung im Ergebnis. Und zwar…, Klasse 10 hat die V3-Frontier 2026/27 noch nicht erreicht -> V2. Der Suchvektor…, Freier Chat ohne Gruppenbezug: zusammenfassen statt filtern. Ohne Fahrplan-… (+4 more)
+### Community 298 - "TestUiStatus"
+Cohesion: 0.24
+Nodes (5): ist_ruhend(), True, wenn der Typ in keiner Auswahlfläche erscheinen soll., `ui_status` steuert ausschließlich Auswahlflächen (ADR-019 F6)., Ruhend heißt: Es gibt keinen Weg, so einen Knoten anzulegen.…, TestUiStatus
 
 ### Community 299 - "test_artifact_auszug.py"
 Cohesion: 0.35
 Nodes (15): list_artifacts(), Die eigene Bibliothek, neueste zuerst — wahlweise auf einen Unterrichtsbezug…, _artefakt(), _chat(), _fach(), _gruppe(), asyncio, Der Unterrichtsbezug der Bibliothek (AP3 des Fachseiten-Plans). `artifacts`… (+7 more)
 
-### Community 300 - "RenderError"
-Cohesion: 0.16
-Nodes (16): Exception, Gemeinsame Render-Fehlerklasse (Phase 17). Von allen Renderern genutzt…, Rendern fehlgeschlagen (Fehler, Timeout oder ungültige Eingabe)., RenderError, _render_one(), Registry-Renderer für kind='plot': YAML-Spec → SVG. Wirft RenderError., render_plot(), _get_client() (+8 more)
+### Community 300 - "TestModellregel"
+Cohesion: 0.25
+Nodes (6): parametrize, Der Beschluss vom 04.09.2026: alle sieben, auch die Planungsknoten., Die `before_insert`-Regel — ohne Datenbank, durch direktes Auslösen., Löst die Regel direkt aus — `mapper` und `connection` nutzt sie nicht., Nur füllen, nie überschreiben — auch nicht bei Import oder Migration., TestModellregel
 
 ### Community 301 - "validate_content_type"
-Cohesion: 0.16
-Nodes (5): Wirft ValueError wenn content_type zur category nicht passt. content_type darf…, validate_content_type(), TestValidateContentType, Seit AP2 (02.09.2026) pflegt die Fachschaft die Wurzeln, nicht der Admin —…, TestTaxonomyThemengebiet
+Cohesion: 0.25
+Nodes (3): Wirft ValueError wenn content_type zur category nicht passt. content_type darf…, validate_content_type(), TestValidateContentType
 
 ### Community 302 - "crisis/benachrichtigung.py"
 Cohesion: 0.19
@@ -1961,21 +1938,17 @@ Nodes (9): _md(), Eine Minimaldatei — für die Fälle, in denen es nur auf die
 Cohesion: 0.12
 Nodes (12): aufraeumen(), fixture, parametrize, Darstellungsstufe speichern und lesen (Schritt 2). Die Stufe liegt in…, Leitprinzip 3: rückschaltbar, ohne dass etwas verloren geht., Der teuerste Fehler wäre, beim Setzen der Stufe den Rest zu überschreiben., Eine Lehrkraft hat vier Stufen; 0 hätte die Navigation geleert., Geprüft wird vor dem Speichern — sonst stünde die halbe Änderung schon da. (+4 more)
 
-### Community 307 - "test_verwaiste_gruppen.py"
-Cohesion: 0.17
-Nodes (14): _namen(), fixture, Verwaiste Unterrichtsgruppen finden (Paket 7, AP3). Eine Unterrichtsgruppe ohne…, Vier Gruppen: mit Lehrkraft, ohne, nur mit Schüler:in, und eine Klasse., Die Gegenprobe. Ohne sie prüfte der Test nur, dass die Liste nicht leer ist., Eine Gruppe voller Schüler:innen ohne Lehrkraft ist der eigentliche…, Eine Klasse ohne Lehrkraft ist der Normalfall — sie gehörte nur ins Rauschen., Der Vorgabewert ändert nichts — der Filter ist eine Zugabe, keine Umstellung. (+6 more)
+### Community 307 - "bibliotheken.test.js"
+Cohesion: 0.24
+Nodes (8): BIBLIOTHEKEN, BACKEND_KEINE_BIBLIOTHEK, FRONTEND, FRONTEND_KEINE_BIBLIOTHEK, gelistet(), norm(), requirements(), WURZEL
 
 ### Community 308 - "_CrossFachCursor"
 Cohesion: 0.16
 Nodes (12): _CrossFachCursor, _knoten_mit_verweisen(), Zwei Ausfallarten, zwei Meldungen — sonst sucht man an der falschen Stelle., Im vollständigen Fachplan darf das nicht vorkommen — also melden, nicht…, Cursor-Ersatz: kennt genau ein Ziel, gibt es nur bei passender Fassung heraus., Beim Scrapen war das Ziel nicht bestimmbar — beim Import ist der ganze Bestand…, Kein Rückfall auf die Fassung des verweisenden Knotens. Ein erster Entwurf tat…, test_cross_fach_verweis_wird_zur_kante() (+4 more)
 
-### Community 309 - "test_abgrenzungen_db.py"
-Cohesion: 0.18
-Nodes (11): begriff(), _kante(), _knoten(), fixture, Die Abgrenzungen eines Treffers gegen eine echte Datenbank (Paket 9, N4). Was…, Eine Abfrage für alle Treffer — bei zwanzig Treffern sonst zwanzig Rundreisen., Eine UUID im Modellkontext taucht früher oder später in einer Antwort auf., ⚠️ Ein archivierter Knoten ist für die fragende Person nicht erreichbar. Ihn zu… (+3 more)
-
-### Community 310 - "test_chat_assistant_model_fallback.py"
-Cohesion: 0.23
-Nodes (15): _assistant(), _db_with_assistant(), _payload(), asyncio, Unit-Tests: Ein Assistent ohne eigenes Modell nutzt den schulweiten Standard.…, Eine ausdrückliche Modellwahl im Request schlägt beides., Minimaler Assistent, der die Sichtbarkeitsprüfung passiert., db.execute liefert erst den Assistenten, danach generische Treffer. (+7 more)
+### Community 309 - "abgrenzungen_zu"
+Cohesion: 0.19
+Nodes (13): abgrenzungen_zu(), „Wovon unterscheidet sich dieser Baustein, und wodurch?" — je Knoten. ⚠️…, begriff(), _kante(), _knoten(), fixture, Die Abgrenzungen eines Treffers gegen eine echte Datenbank (Paket 9, N4). Was…, Eine Abfrage für alle Treffer — bei zwanzig Treffern sonst zwanzig Rundreisen. (+5 more)
 
 ### Community 311 - "_aufloesen_in"
 Cohesion: 0.17
@@ -2002,8 +1975,8 @@ Cohesion: 0.12
 Nodes (16): 1. Proxy-Abhängigkeiten installieren, 2. Eigene Postgres-DB für den Proxy anlegen, 3. Config anlegen, 4. Proxy starten, 5. Prüfen, Admin-UI des Proxys (optional), Auf GitHub, Backend (+8 more)
 
 ### Community 317 - "fachbegriffe_import.test.js"
-Cohesion: 0.22
-Nodes (12): importiereFachbegriffe(), brauchtEinbettung(), eingespielt(), entwuerfe(), gruppiert(), IMPORTIERBARE_TYPEN, lohntSich(), bericht() (+4 more)
+Cohesion: 0.20
+Nodes (13): importiereFachbegriffe(), brauchtEinbettung(), eingespielt(), entwuerfe(), gruppiert(), IMPORTIERBARE_TYPEN, lohntSich(), bericht() (+5 more)
 
 ### Community 318 - "lib/feedback.js"
 Cohesion: 0.21
@@ -2029,20 +2002,20 @@ Nodes (15): mathjax-full, node-tikzjax, dependencies, mathjax-full, node-tikzjax
 Cohesion: 0.15
 Nodes (10): Exakte Namensträger und ähnlich benannte Bausteine, sauber getrennt (AP4)., Ein exakt benannter Knoten, zwei beschreibend benannte in fremder Hand., Die Reihenfolge ist die Aussage: Was so **heißt**, steht vor dem, was so…, Die Zählung trägt die Existenzaussage — Ähnlichkeit darf nicht hineinzählen., Die Gegenprobe zur Schwelle 0,50: Ein einzelnes gemeinsames Wort reicht nicht.…, Der S2-Leitfall: verkürzte Anfrage, längerer Titel, kein exakter Name., Zwei gleichnamige Handreichungen — die eigene zuerst, die fremde bleibt., Die Gegenprobe — sonst wäre es kein Vorrang, sondern eine feste Reihenfolge. (+2 more)
 
-### Community 324 - "ohne_svg"
-Cohesion: 0.22
-Nodes (7): ohne_svg(), Alle ``svg``-Schlüssel in jeder Tiefe entfernen, der Rest bleibt. ⚠️ **Ein SVG…, Der SVG-Filter (Paket 9, AP3). ⚠️ **Warum überhaupt.** Eine Strukturformel…, Der eigentliche Fall: `illustrationen` ist eine Liste, nicht ein Objekt., „In jeder Tiefe" heißt: auch dort, wo heute niemand ein SVG erwartet., Gegenprobe: Ein Feld, das zufällig „svg" **enthält**, bleibt., TestOhneSvg
+### Community 324 - "test_chat_tool_ergebnis.py"
+Cohesion: 0.12
+Nodes (17): metadata_fuers_modell(), mit_lesehinweis(), ohne_svg(), Was ein Suchtreffer dem **Modell** über sich sagt (Paket 9, AP3 und N11). Hier…, Den Lesehinweis vor einen Kontextblock setzen (Paket 9, N13). ⚠️ **Es gibt zwei…, Ein Ergebnis der Werkzeuggruppe ``context_search``, wie das Modell es liest.…, Alle ``svg``-Schlüssel in jeder Tiefe entfernen, der Rest bleibt. ⚠️ **Ein SVG…, Die Metadatenfelder dieses Knotentyps, die das Modell sehen darf. Die Auswahl… (+9 more)
 
 ### Community 325 - "_check_curriculum_read_permission"
 Cohesion: 0.18
 Nodes (13): _check_curriculum_read_permission(), Prüft Leseberechtigung anhand des tree-Dicts (read_scope + owner_pseudonym).…, _Nutzer, parametrize, Wer ein Curriculum lesen darf (Entscheidung Jan, 21.09.2026). **Nur `private`…, Gekoppelt an `OFFENE_SCOPES`: Wer dort etwas ergänzt, bekommt es hier…, Die Gegenprobe zur entfernten Variablen: Sie hat keine Wirkung mehr. Stünde der…, Der Vorgabewert des Baums — ein Curriculum ohne Scope ist nicht versehentlich… (+5 more)
 
-### Community 326 - "LessonSlot"
-Cohesion: 0.07
-Nodes (54): LessonSlot, SlotPlanSnapshot, _handle_apply_plan_operations(), _handle_get_curriculum_chapters(), _handle_get_lesson_detail(), _handle_get_lesson_slots(), _handle_get_reflow_context(), _handle_undo_last_change() (+46 more)
+### Community 326 - "snapshots.py"
+Cohesion: 0.12
+Nodes (24): SlotPlanSnapshot, AsyncSession, UUID, Snapshot-Service: Undo-Verlauf für den Unterrichtsplan. create_snapshot:…, Stellt den Plan-Zustand eines Snapshots wieder her. Legt vorher einen…, restore_snapshot(), _meldungen(), AsyncSession (+16 more)
 
-### Community 327 - "preferences/router.py"
-Cohesion: 0.11
+### Community 327 - "test_kontext_limits.py"
+Cohesion: 0.10
 Nodes (18): _pruefe_stufe(), AsyncSession, patch, Die Darstellungsstufe, bevor sie gespeichert wird. Geprüft statt geklemmt: Ein…, read_preferences(), update_preferences(), anzeige_limit(), patch_preferences() (+10 more)
 
 ### Community 328 - "load_ui_levels"
@@ -2062,8 +2035,8 @@ Cohesion: 0.13
 Nodes (9): skipif, E2E-Tests für Arduino-Wissensgraph und Assistenten., Nach Seed: themengebiet-Knoten 'Arduino-Wissensgraph' in DB., Alle Nicht-Wurzel-Knoten haben eine part_of-Kante zum Wurzelknoten., Zweiter Seed-Lauf ändert Knotenzahl nicht., Scope-CTE mit Wurzelknoten als Anker -> alle Nicht-Wurzel-Knoten im Ergebnis., Nach Embedding-Batch: Suche 'Licht ansteuern' findet LED-Knoten., Testet, dass der Kontext-String relevante Knoten enthaelt. (+1 more)
 
 ### Community 332 - "TestDieMigrationSelbst"
-Cohesion: 0.27
-Nodes (6): Wer schon eine hat, hat sie aus der Datei — die Migration überstimmt sie nicht., Ein im Editor angelegter Begriff stammt nicht aus einem Import., Lieber keine als eine erfundene — der Import verlangt dann ein `id:`., Eine nachgetragene Kennung ist keine Bearbeitung. Rohes SQL geht an SQLAlchemys…, Nicht nur die Regel, sondern die Anweisung: Trifft sie die richtigen Zeilen? ⚠️…, TestDieMigrationSelbst
+Cohesion: 0.12
+Nodes (17): leite_id_ab(), Kennung aus Fachkürzel und Dateiname: `CH` + `Oxidation (Sauerstoffaufnahme)` →…, _slug(), migration(), fixture, parametrize, Dieselbe Slug-Regel in Python und in SQL (Paket 10, AP2).…, Wer schon eine hat, hat sie aus der Datei — die Migration überstimmt sie nicht. (+9 more)
 
 ### Community 333 - "TestEmbeddingDerivation"
 Cohesion: 0.13
@@ -2085,17 +2058,17 @@ Nodes (15): Abbildungen, Der Kopf, Der Textteil, Eine Datei ist ein Eintrag, Ein
 Cohesion: 0.22
 Nodes (13): CODE_EXT, codeExt(), formatBytes(), isImageLike(), isSvg(), KIND_LABELS, kindLabel(), MIME_EXT (+5 more)
 
-### Community 338 - "export_document"
-Cohesion: 0.18
-Nodes (14): export_document(), AsyncSession, Dokument-Export der Material-Werkstatt (Phase 19, Schritt 4). Ein Markdown-…, Markdown → PDF über weasyprint (Body via render_markdown_for_pdf, eigenes…, Exportiert ein Dokument. Gibt (Bytes, MIME) zurück. Wirft `ValueError` bei…, _to_pdf(), _needs_pandoc, Unit-Tests: Dokument-Export PDF/DOCX/ODT (Phase 19, Schritt 4). PDF läuft über… (+6 more)
+### Community 338 - "test_context_taxonomy.py"
+Cohesion: 0.29
+Nodes (5): get_valid_until_offset(), Gibt den empfohlenen valid_until-Offset in Tagen zurück (None = permanent)., Unit-Tests für app.context.taxonomy., Seit 02.09.2026 kein Tages-Offset mehr, sondern Schuljahresende. Die Typen…, TestGetValidUntilOffset
 
 ### Community 339 - "kuerze"
-Cohesion: 0.25
-Nodes (7): kuerze(), Den Knotentext auf Prompt-Maß bringen — je nach Knotenart anders. Für…, Definition und Erklärung vollständig, Beispiele nach Budget (Paket 9, N14). ⚠️…, Ein halber Spiegelstrich ist schlechter als einer weniger., ⚠️ Die Zusage lautet „Beispiele zuerst", nicht „der Kern ist heilig" — sonst…, Eine Bildungsplan-Kompetenz hat keine Beispiele, die man schonen könnte — und…, TestAbschnittsweiseKuerzung
+Cohesion: 0.23
+Nodes (8): _hart(), kuerze(), Den Knotentext auf Prompt-Maß bringen — je nach Knotenart anders. Für…, Definition und Erklärung vollständig, Beispiele nach Budget (Paket 9, N14). ⚠️…, Ein halber Spiegelstrich ist schlechter als einer weniger., ⚠️ Die Zusage lautet „Beispiele zuerst", nicht „der Kern ist heilig" — sonst…, Eine Bildungsplan-Kompetenz hat keine Beispiele, die man schonen könnte — und…, TestAbschnittsweiseKuerzung
 
 ### Community 340 - "test_gruppe_jahrgang_api.py"
-Cohesion: 0.19
-Nodes (13): gruppe(), _pfad(), fixture, parametrize, Den Jahrgang einer Unterrichtsgruppe festlegen und zurücknehmen (Paket 4, AP3).…, `null` heißt „nicht festgelegt", nicht „hat keinen" — dann wird abgeleitet., Ohne Schranke würde aus einem Tippfehler eine Zahl, die niemandem auffällt., ⚠️ **Der Datenweg, nicht nur der Endpunkt.** Dass die Spalte gesetzt wird, ist… (+5 more)
+Cohesion: 0.23
+Nodes (11): _pfad(), parametrize, Den Jahrgang einer Unterrichtsgruppe festlegen und zurücknehmen (Paket 4, AP3).…, `null` heißt „nicht festgelegt", nicht „hat keinen" — dann wird abgeleitet., Ohne Schranke würde aus einem Tippfehler eine Zahl, die niemandem auffällt., ⚠️ **Der Datenweg, nicht nur der Endpunkt.** Dass die Spalte gesetzt wird, ist…, test_die_festlegung_wirkt_auf_die_curriculum_aufloesung(), test_festlegen_und_zuruecknehmen() (+3 more)
 
 ### Community 341 - "test_kosten_guete.py"
 Cohesion: 0.14
@@ -2141,9 +2114,9 @@ Nodes (5): offeneFeedbackCount, ausgeblendet, KACHELN, sichtbareKacheln, zeigtKa
 Cohesion: 0.17
 Nodes (5): OAuthConfig, BaseModel, model_validator, Ohne explizite Angabe wird der IServ-Scope `iserv:groups` angefordert., TestOAuthConfig
 
-### Community 352 - "_list_context_nodes_handler"
-Cohesion: 0.19
-Nodes (8): _list_context_nodes_handler(), date, ``"letzte_woche"`` → (Montag, Sonntag) der Vorwoche. Unbekannt → ``None``., Die Aufzählung für das Modell. ⚠️ **Ohne Fachangabe wird über alle Fächer…, _zeitraum_grenzen(), „Was haben wir letzte Woche gemacht?" — eine Aufzählungs-, keine…, Ohne Unterrichtsgruppe gibt es keinen Stundenplan, auf den sich ein Zeitraum…, TestZeitraumAufzaehlung
+### Community 352 - "asyncio"
+Cohesion: 0.31
+Nodes (3): asyncio, TestJwtServiceIsRevoked, TestJwtServiceRevoke
 
 ### Community 353 - "abbildungen_aufgeloest"
 Cohesion: 0.23
@@ -2154,8 +2127,8 @@ Cohesion: 0.17
 Nodes (13): Die wirksame Stufe einer Nutzer:in — oder ``None``. ``None`` heißt **nicht**…, stufe_fuer(), parametrize, Nach der Nachfüllung (Alembic 0064) heißt „nicht gesetzt" verlässlich „neu"., Ein Altwert darf nie eine leere Navigation erzeugen — 0 wäre genau das. Anders…, JSONB gibt zurück, was hineingeschrieben wurde — auch `"2"`., `None` heißt „kein Filter", nicht „niedrigste Stufe". Gäbe die Funktion hier 1…, test_beim_lesen_wird_geklemmt() (+5 more)
 
 ### Community 355 - "test_gruppen_anzeigename.py"
-Cohesion: 0.19
-Nodes (12): gruppe(), _meine(), fixture, Anzeigename einer Unterrichtsgruppe (Sammlung 0.10.2, Punkt 3). Die Namen…, Aufgelöst wird im Backend: 41 Stellen im Frontend zeigen einen Gruppennamen., Dieselbe Bedingung wie bei der Jahresplanung: Mitglied mit Rolle `teacher`., Die Stundenplan-Zuordnung rechnet auf ihm — sie ist damit gegen Umbenennen…, test_der_rohe_name_bleibt_in_der_datenbank() (+4 more)
+Cohesion: 0.24
+Nodes (10): _meine(), Anzeigename einer Unterrichtsgruppe (Sammlung 0.10.2, Punkt 3). Die Namen…, Aufgelöst wird im Backend: 41 Stellen im Frontend zeigen einen Gruppennamen., Dieselbe Bedingung wie bei der Jahresplanung: Mitglied mit Rolle `teacher`., Die Stundenplan-Zuordnung rechnet auf ihm — sie ist damit gegen Umbenennen…, test_der_rohe_name_bleibt_in_der_datenbank(), test_fremde_lehrkraft_darf_nicht_umbenennen(), test_gesetzter_anzeigename_ersetzt_den_namen_in_der_antwort() (+2 more)
 
 ### Community 356 - "test_optimistisches_sperren.py"
 Cohesion: 0.18
@@ -2209,9 +2182,9 @@ Nodes (11): downgrade(), downgrade_sql(), kennung_sql(), Stabile Kennung (`seed_
 Cohesion: 0.27
 Nodes (10): ANZEIGE_FAKTOR, dateiname(), eingebettet(), EINHEITEN, fuelle(), fuelleAbbildungen(), HUELLE, intrinsischeBreite() (+2 more)
 
-### Community 369 - "test_crisis_resolve.py"
-Cohesion: 0.36
-Nodes (12): resolve_access_request(), ResolveRequest, db(), fixture, Integrationstests für die Resolution (Phase 12, Schritt 8). Resolution setzt…, _request(), test_resolve_already_closed_409(), test_resolve_blank_note_rejected() (+4 more)
+### Community 369 - "auth_time_is_fresh"
+Cohesion: 0.39
+Nodes (3): auth_time_is_fresh(), True, wenn die IdP-Authentifizierung innerhalb des Frische-Fensters liegt., TestAuthTimeFreshness
 
 ### Community 370 - "Grenzen"
 Cohesion: 0.21
@@ -2221,17 +2194,17 @@ Nodes (8): aus_konfiguration(), Grenzen, Obergrenzen eines Uploads. ⚠️ **Ohn
 Cohesion: 0.18
 Nodes (8): BuendelFehler, Exception, Der Upload ist als Ganzes nicht verwertbar. `status` wird zum HTTP-Status.…, parametrize, Aus hochgeladenen Dateien ein Bündel — mit Grenzen (Paket 10, AP3). ⚠️ **Der…, ⚠️ Kein Zurechtrücken. Ein `..` im Archiv ist kein Zuschnitt-Problem., Die Zip-Spezifikation verlangt `/`. Wer `\\` schickt, will an einem Prüfer…, TestPfadeAusDemBuendelHeraus
 
-### Community 372 - "_gruppiere"
-Cohesion: 0.24
-Nodes (6): _gruppiere(), Nach Fach oder Typ zählen, absteigend nach Anzahl, dann alphabetisch., „Alle, die …" — Vollständigkeit ist der Anspruch, nicht Ähnlichkeit., Nicht nur die mitgelieferten: „In welchen Fächern gibt es das?" ist eine Frage…, Leitperspektiven und schulweite Dokumente tragen kein Fach — sie dürfen aus der…, TestAufzaehlung
+### Community 372 - "TestUeberlappterNetzaufruf"
+Cohesion: 0.25
+Nodes (5): Das Embedding läuft, während die Identifikation die Datenbank befragt., Sonst liefe der teure Netzaufruf zweimal — und die Ersparnis wäre dahin., Der ILIKE-Rückfall hängt daran: `None` heißt „es gibt keinen Vektor“ — eine…, ⚠️ Eine `AsyncSession` verträgt keine nebenläufigen Abfragen…, TestUeberlappterNetzaufruf
 
 ### Community 373 - "Energie (Grundfassung).md"
 Cohesion: 0.17
 Nodes (10): Abgrenzung, Definition, Erklärung, Fehlvorstellungen, Abgrenzung, Beispiele, Definition, Erklärung (+2 more)
 
 ### Community 374 - "production_check.py"
-Cohesion: 0.21
-Nodes (10): Befund, _ist_loopback(), _ist_platzhalter(), _pruefe_auth(), Any, Betriebswerte gegen die Anforderungen des Sicherheits-Audits prüfen. Der Audit…, _auth_config(), main() (+2 more)
+Cohesion: 0.15
+Nodes (13): Konvertiert die Liste der GroupRoleMapping in ein Dictionary für schnellen…, Befund, _ist_loopback(), _ist_platzhalter(), _pruefe_auth(), Any, Betriebswerte gegen die Anforderungen des Sicherheits-Audits prüfen. Der Audit…, _auth_config() (+5 more)
 
 ### Community 375 - "cleanup_feedback"
 Cohesion: 0.29
@@ -2242,12 +2215,12 @@ Cohesion: 0.17
 Nodes (12): additionalProperties, required, type, audience, name, system_prompt, additionalProperties, required (+4 more)
 
 ### Community 377 - "test_fachbegriffe_rundreise.py"
-Cohesion: 0.06
-Nodes (27): _bestand(), _buendel(), export(), _hin_und_zurueck(), fixture, Export → Import auf demselben Bestand = nichts ändert sich (Paket 10, AP5). ⚠️…, Fixtures importieren, exportieren, das Ergebnis wieder importieren., Die Zusage aus dem Plan, wörtlich: „0 neu, 0 aktualisiert". (+19 more)
+Cohesion: 0.09
+Nodes (21): _bestand(), _buendel(), export(), _hin_und_zurueck(), fixture, Export → Import auf demselben Bestand = nichts ändert sich (Paket 10, AP5). ⚠️…, Fixtures importieren, exportieren, das Ergebnis wieder importieren., Die Zusage aus dem Plan, wörtlich: „0 neu, 0 aktualisiert". (+13 more)
 
-### Community 378 - "als_stundenzahl"
-Cohesion: 0.23
-Nodes (11): als_stundenzahl(), Die Stundenzahl eines Curriculum-Kapitels — aus freiem JSON zu einer Zahl. ⚠️…, Eine ganze Zahl von Unterrichtsstunden — oder ``None``, wenn es keine ist.…, parametrize, Die Normalisierung der Kapitel-Stundenzahl. ⚠️ Der Anlass war kein…, ⚠️ **Aus „12-14" die 12 zu nehmen wäre bequem und eine Erfindung.** Niemand hat…, `bool` ist in Python eine `int`-Unterklasse — ohne eigene Prüfung wäre `True` 1., test_erfindet_keine_zahl() (+3 more)
+### Community 378 - "seed_fachbegriffe.py"
+Cohesion: 0.48
+Nodes (6): _berichte(), lies_ordner(), main(), Path, Einen Ordner in ein Bündel verwandeln — die einzige Stelle mit Dateisystem.…, seed()
 
 ### Community 379 - "TestNeighborhood"
 Cohesion: 0.17
@@ -2257,9 +2230,9 @@ Nodes (7): Tests für GET /context/nodes/{id}/neighborhood., depth=1 liefert nur
 Cohesion: 0.20
 Nodes (9): _buendel(), fixture, Der Schreibteil des Fachbegriff-Seeds gegen eine echte Datenbank (Paket 9,…, Das Fixture-Verzeichnis als Bündel — wie der Endpunkt es aus einem Zip baut., Die Zusage von Paket 10/AP1: **ein** Kern, zwei Wege. ⚠️ **Warum das ein Test…, Das Admin-Skript über den Dateipfad laden — `backend/scripts/` ist kein Paket., ⚠️ Seit 27.09.2026 der Service, nicht mehr das Skript (Paket 10, AP1)., seed() (+1 more)
 
-### Community 381 - "test_export_parity.py"
-Cohesion: 0.26
-Nodes (12): _docx(), _needs_pandoc, Dialekt-Parität der Export-Pfade (Phase 19, Schritt 7). Die Editor-Vorschau…, test_docx_footnote_survives(), test_docx_hard_line_break(), test_docx_strikethrough(), test_docx_table(), test_docx_task_list_text_survives() (+4 more)
+### Community 381 - "TestGesperrteBereiche"
+Cohesion: 0.29
+Nodes (4): parametrize, Die eigentliche Sicherheitszusage: Ein Token erreicht nur, was die Tabelle…, Die Ausnahme im Gruppen-Router, über HTTP geprüft. Der Unit-Test über die…, TestGesperrteBereiche
 
 ### Community 382 - "test_calendar_school_year.py"
 Cohesion: 0.32
@@ -2293,10 +2266,6 @@ Nodes (9): expand_operator_title(), Stamm eines präfigierten Verbs ('zuordnen' 
 Cohesion: 0.27
 Nodes (5): _factory(), asyncio, Unbekannt ist nicht dasselbe wie veraltet. Ist die Datenbank weg, scheitern die…, _Session, TestPruefeBeimStart
 
-### Community 390 - "_buendel"
-Cohesion: 0.18
-Nodes (8): _buendel(), Die Quelle einer Strukturformel ist ein Arbeitsmittel des Autors, kein Inhalt…, Sonst steht in der Oberfläche eine leere Stelle und beim Modell ein nacktes…, Das Fixture-Verzeichnis als Bündel — wie der Endpunkt es aus einem Zip baut., Die Ordner-Ebene ist das Einzige, was nur das Admin-Skript kennt (Paket 10,…, ⚠️ Ohne `_Abb/` fände `lade_svg` nichts und meldete jede Illustration als…, TestAbbildungen, TestSkriptHuelle
-
 ### Community 391 - "UiLevels"
 Cohesion: 0.18
 Nodes (10): Die Stufen der wirksamen Rolle. `teacher` gewinnt vor `student`: Admin ist eine…, UiLevels, Entscheidung Jan, 19.09.2026: die kleinste Fassung ist die übersichtlichste., Der Kern der Entscheidung: Was am Anfang leer ist, kostet nur Aufmerksamkeit., Sonst gäbe es Funktionen, die über die Navigation nie erreichbar sind., test_beide_rollen_starten_auf_stufe_1(), test_beispieldatei_laedt(), test_die_hoechste_lehrkraft_stufe_zeigt_alles() (+2 more)
@@ -2313,9 +2282,9 @@ Nodes (9): Abgrenzung, Beispiele, Darstellung, Definition, Erklärung, Fehlvorst
 Cohesion: 0.18
 Nodes (4): dividerIndex, handleKeydown(), scrollIntoView(), sorted
 
-### Community 395 - "Knotenfilter"
-Cohesion: 0.24
-Nodes (9): Knotenfilter, Die Feldfilter über ``context_nodes`` — **eine** Übersetzung von Bedingung zu…, Wonach eingeschränkt wird. Alle Felder sind unabhängig und werden UND-…, Knoten, die in diesem Zeitraum bzw. dieser Gruppe **auf dem Stundenplan…, Die gesetzten Bedingungen an eine Abfrage über ``context_nodes`` hängen., _verplante_knoten(), wende_an(), Der Termin eines Bausteins steht in `lesson_slots`, nirgends sonst — und dort… (+1 more)
+### Community 395 - "subjects.py"
+Cohesion: 0.47
+Nodes (5): list_subjects(), AsyncSession, BaseModel, SubjectListResponse, SubjectOut
 
 ### Community 396 - "TestAssistantModel"
 Cohesion: 0.18
@@ -2357,9 +2326,9 @@ Nodes (11): Accountdaten, Budget, Erscheinungsbild, Kacheln der Startseite (nur 
 Cohesion: 0.22
 Nodes (7): calendarConfigured, calendarStatus, ensureCalendarStatus(), refreshCalendarStatus(), _status, frisch(), SRC
 
-### Community 406 - "umschlag.test.js"
-Cohesion: 0.31
-Nodes (7): ABSCHNITT_TITEL, alleTreffer(), gueltigeAuswahl(), ADR-0017, PRO_ABSCHNITT_VORAUSGEWAEHLT, vorauswahl(), vorschlagsAbschnitte()
+### Community 406 - "_ist_inhaltsfehler"
+Cohesion: 0.33
+Nodes (6): _ist_inhaltsfehler(), Exception, Liegt es am Text — oder am Zugang? Die Unterscheidung entscheidet, ob ein…, _http_fehler(), test_inhaltsfehler_nur_bei_400(), HTTPStatusError
 
 ### Community 407 - "_as_str_list"
 Cohesion: 0.31
@@ -2369,25 +2338,25 @@ Nodes (4): _as_str_list(), Normalisiert einen userinfo-Claim auf eine Liste von 
 Cohesion: 0.16
 Nodes (13): model_validator, `IMAGE_DEFAULT_FORMAT` muss ein Schlüssel aus `IMAGE_SIZES` sein. Bewusst ein…, In Produktion muss `LITELLM_MASTER_KEY` stark sein (Sicherheits-Audit #9). Der…, In Produktion müssen `SCHOOL_SECRET` und `JWT_SECRET` stark sein (Sicherheits-…, Settings, Unit-Tests: starker LiteLLM-Master-Key in Produktion (Sicherheits-Audit #9)., _settings(), test_dev_weak_master_key_allowed() (+5 more)
 
-### Community 409 - "normalize"
-Cohesion: 0.22
-Nodes (6): model_validator, normalize(), model_validator, NFKC-Normalisierung + casefold — für case- und unicode-insensitiven Abgleich.…, model_validator, test_normalize_casefold_and_nfkc()
+### Community 409 - "seed_assistants.py"
+Cohesion: 0.67
+Nodes (5): _default_config(), main(), Path, _resolve_system_prompt(), seed()
 
 ### Community 410 - "test_crisis_reminders_skript.py"
 Cohesion: 0.20
 Nodes (10): Krisen-Erkennung (ADR-008 Teil 3 + 4). Lokale, keyword-basierte Erkennung von…, parametrize, Wächter über `scripts/crisis_reminders.py` — den Probelauf. Der Trockenlauf…, Alle `_vermerke*`-Koroutinen des Erinnerungsmoduls., Sonst prüfte der Test unten eine leere Menge und wäre immer grün., Das Monkeypatching des Skripts wirkt nur bei einem Modul-Attributzugriff. Würde…, test_das_modul_hat_ueberhaupt_vermerk_funktionen(), test_der_probelauf_legt_jede_vermerk_funktion_stumm() (+2 more)
 
-### Community 411 - "modell_metadata_felder"
-Cohesion: 0.18
-Nodes (8): metadata_fuers_modell(), Die Metadatenfelder dieses Knotentyps, die das Modell sehen darf. Die Auswahl…, modell_metadata_felder(), Welche Metadatenfelder dieses Typs das Modell sehen darf (leer = keine)., Was das Modell von den Metadaten eines Knotens sieht (Paket 9, AP3). ⚠️ **Zwei…, Namentlich festgehalten: Beide Typen tragen ihren Wert **im Metadata**. Ein…, Der Normalfall: Wer nicht in der Tabelle steht, schickt keine Metadaten. Das…, TestModellMetadata
+### Community 411 - "TestModellMetadata"
+Cohesion: 0.25
+Nodes (4): Was das Modell von den Metadaten eines Knotens sieht (Paket 9, AP3). ⚠️ **Zwei…, Namentlich festgehalten: Beide Typen tragen ihren Wert **im Metadata**. Ein…, Der Normalfall: Wer nicht in der Tabelle steht, schickt keine Metadaten. Das…, TestModellMetadata
 
 ### Community 412 - "feedback/__init__.py"
-Cohesion: 0.18
-Nodes (10): Der Feedback-Kanal (ADR-020) — Meldungen aus der Anwendung heraus., pruefe_uebergang(), Wirft 409, wenn der Wechsel nicht vorgesehen ist. Gleicher Status: erlaubt., parametrize, Welcher Statuswechsel erlaubt ist — und was er mitnimmt (ADR-020, AP3). Die…, Die Oberfläche schickt den Status mit, auch wenn nur die Antwort sich ändert., Woran die Nullung von Kontakt und Anhang hängt — und die 180-Tage-Frist., test_abgeschlossen_ist_genau_die_drei() (+2 more)
+Cohesion: 0.20
+Nodes (8): Der Feedback-Kanal (ADR-020) — Meldungen aus der Anwendung heraus., parametrize, Welcher Statuswechsel erlaubt ist — und was er mitnimmt (ADR-020, AP3). Die…, Die Oberfläche schickt den Status mit, auch wenn nur die Antwort sich ändert., Woran die Nullung von Kontakt und Anhang hängt — und die 180-Tage-Frist., test_abgeschlossen_ist_genau_die_drei(), test_gleicher_status_ist_kein_wechsel(), test_uebergangstabelle()
 
-### Community 413 - "cache.py"
-Cohesion: 0.29
-Nodes (10): Cache: Hash der Render-Quelle → fertiges SVG (Phase 17, Server-Rendering).…, RenderedSvg, cleanup_rendered_svg(), get_cached_svg(), AsyncSession, Persistenter SVG-Cache (Tabelle `rendered_svg`) für Server-Rendering (Phase…, Löscht Cache-Einträge älter als max_age_days. Gibt die Anzahl zurück., set_cached_svg() (+2 more)
+### Community 413 - "Fundstelle"
+Cohesion: 0.40
+Nodes (3): Fundstelle, `CH.V2 3.2.1.3 (3)` zerlegt. ``teil is None`` heißt: die Einleitung des…, Der Wert, unter dem der Bildungsplan-Import die Nummer abgelegt hat. ⚠️ **Gegen…
 
 ### Community 414 - "TestCopyNode"
 Cohesion: 0.20
@@ -2405,9 +2374,9 @@ Nodes (9): conn(), _knoten(), fixture, Die Relation `is_a` in der Datenbank (Pak
 Cohesion: 0.29
 Nodes (5): Wikilinks, deren Ziel **nicht** im Bündel liegt (AP2). Beim Ordnerimport die…, Der umbenannte Fall auch für Ziele: Die Datei heißt anders, die Kennung nicht., Zwei Fassungen tragen denselben Titel — eine davon zu greifen wäre geraten., Der Bestand ist je Fach — sonst hinge ein Chemiebegriff an einem Physikknoten., TestZielImBestand
 
-### Community 418 - "TestZurueckInDenPlan"
-Cohesion: 0.33
-Nodes (5): gruppe(), fixture, Der Gegenweg: `unpark_content` holt geparkten Inhalt auf einen freien Termin.…, sync_conn(), TestZurueckInDenPlan
+### Community 418 - "arduino_seed"
+Cohesion: 0.40
+Nodes (5): arduino_seed(), fixture, Leert alle Tabellen vor jedem Test., Seed Arduino-Wissensgraph direkt in die Test-DB (idempotent)., truncate_ks3_tables()
 
 ### Community 419 - "TestSuchbegriffeUndAbgrenzungen"
 Cohesion: 0.29
@@ -2493,9 +2462,9 @@ Nodes (4): Die Oberfläche schickt nichts — sie darf durch alle Änderungen hi
 Cohesion: 0.22
 Nodes (5): Die eigentliche Zusage der Idempotenz — ohne zweiten Lauf ist sie keine., ⚠️ Der Fall, für den es `seed_hash` gibt. Ohne ihn nähme jeder Lauf der…, Was im Verknüpfen-Dialog entstand, darf der Import nicht wegräumen. ⚠️ **Eine…, Ein Vektor zu altem Text ist schlimmer als keiner: Er sieht gültig aus.…, TestZweiterLauf
 
-### Community 441 - "TestWasGelesenWird"
-Cohesion: 0.17
-Nodes (6): Ein `arbeitsblatt` im Ordner ist kein Fehler — es gehört nur nicht hierher., ⚠️ Kein stilles Überspringen: Das ist ein Fehler **in der Datei**. Eine Datei,…, Leeres weg, Dubletten weg — die Reihenfolge ist Teil der Daten., `bildungsplan`, `oberbegriff`, `verwandt` steuern den Seed — sie sind keine…, `eigenschaften` ist ein verschachteltes Objekt und deshalb kein Feld im Schema…, TestWasGelesenWird
+### Community 441 - "TestActivateDeactivateAssistant"
+Cohesion: 0.40
+Nodes (3): POST /assistants/{id}/activate → 200 + status=active., POST /assistants/{id}/deactivate → 200 + status=disabled., TestActivateDeactivateAssistant
 
 ### Community 442 - "TestLifecycleVollstaendigkeit"
 Cohesion: 0.22
@@ -2517,13 +2486,13 @@ Nodes (3): Die stärkere Zusage: Der Text **bekommt** nichts Verräterisches. Ei
 Cohesion: 0.28
 Nodes (7): _dateien_die_phasen_schreiben(), Wächter: Jede Stelle, die `metadata["phasen"]` schreibt, zieht die Kanten nach.…, Wer Phasen von außen entgegennimmt, sorgt für stabile `id`s. Ohne sie laufen…, Gegenprobe: Ein Muster, das nichts mehr findet, wäre ein stiller Totalausfall.…, test_der_waechter_findet_die_bekannten_schreibstellen(), test_eingangsstellen_vergeben_kennungen(), test_jede_schreibstelle_zieht_die_kanten_nach()
 
-### Community 447 - "TestSchuelerPraeambelN8"
-Cohesion: 0.28
-Nodes (5): Die Grundsätze sind **eine** Liste, verteilt auf zwei Bausteine. ⚠️ Das Modell…, „Die Punkte 4 bis 6 gelten, sofern …" — ein Verweis im Text auf Nummern, die…, Zusagen der Schüler-Präambel in der Fassung N8 (Paket 9, Nachgang AP7 Schritt…, ⚠️ **Stumme Falle.** `assistants.disabled_augmentations` ist eine Textspalte…, TestSchuelerPraeambelN8
+### Community 447 - "TestExportAssistant"
+Cohesion: 0.40
+Nodes (3): GET /assistants/{id}/export nicht gefunden → 404., GET /assistants/{id}/export → 200 + Content-Disposition: attachment., TestExportAssistant
 
-### Community 448 - "limits.py"
-Cohesion: 0.25
-Nodes (10): get_artifact_limits(), _grade_entry(), invalidate_cache(), _load(), _maybe_int(), Aufbewahrung + Quota der Artefaktbibliothek — role-/jahrgangsbasiert (Phase…, Jahrgangseintrag, robust gegen int-/str-Schlüssel (JWT liefert grade als…, Gibt (retention_days, quota_bytes) für die Nutzer:in zurück. teacher (auch… (+2 more)
+### Community 448 - "doku_anker.test.js"
+Cohesion: 0.40
+Nodes (3): DOKU, WURZEL, ueberschriftId()
 
 ### Community 449 - "parametrize"
 Cohesion: 0.22
@@ -2565,13 +2534,9 @@ Nodes (3): extract_niveau_from_bp_id(), …11-12-BF_…' → 'basis', '…11-12-
 Cohesion: 0.33
 Nodes (4): Klassenaufloesung, Welche Klassennamen des Stundenplans auf Klassengruppen der Plattform passen., Über mehrere Klassen hinweg — also eine **Auswahl** aus diesen Klassen., Ob die Gruppe ihre Mitglieder aus der Klasse bekommt. ⚠️ **Nur bei genau einer…
 
-### Community 459 - "kosten_nachtrag.py"
-Cohesion: 0.29
-Nodes (10): _lauf(), nachtragen(), Task, UUID, Kosten eines Chat-Zuges nachtragen — nach dem Antworttext, nicht davor.…, Betrag und Zustand an Nachricht und Konversation nachtragen. Der Betrag wird…, Startet den Nachtrag und gibt die Aufgabe zurück (für Tests). Fehler landen im…, _schreibe() (+2 more)
-
-### Community 460 - "Zugkosten"
-Cohesion: 0.27
-Nodes (9): Kosten eines Chat-Zuges — Summe plus die Zahlen, die sie belegen.…, Der Wert für ``messages.cost_status``. `gefunden == gesamt` ist die einzige…, Zugkosten, Wie belastbar die Kostensumme eines Chat-Zuges ist. Ein Zug besteht aus…, test_alle_gefunden_ist_vollstaendig(), test_nichts_gefunden_ist_ebenfalls_unvollstaendig(), test_teilsumme_ist_unvollstaendig(), test_zug_ohne_anfragen_gilt_als_vollstaendig() (+1 more)
+### Community 459 - "_bildarten_ohne_lokale_datei"
+Cohesion: 0.50
+Nodes (3): _bildarten_ohne_lokale_datei(), fixture, Unit-Tests laufen so, als gäbe es keine `config/image_models.yaml`. Die Datei…
 
 ### Community 461 - "PII-NER-Engine — Entscheidung (Phase 14, Schritt 1)"
 Cohesion: 0.25
@@ -2589,13 +2554,9 @@ Nodes (7): _filtere_auf_frontier(), Nur die geltende Fassung behalten — unvers
 Cohesion: 0.24
 Nodes (5): _gekuerzt(), field_validator, Erst trimmen, dann messen — sonst genügten 20 Leerzeichen der Mindestlänge., Ein leer gelassenes Feld ist `NULL`, nicht `""` — sonst sähe die Sichtung einen…, Nur der Pfad. Eine Query trägt hier nichts bei und kann tragen, was in einer…
 
-### Community 465 - "lib/components/VerknuepfenDialog.svelte"
-Cohesion: 0.22
-Nodes (10): anlegenUndVerknuepfen(), beiEingabe(), fehler, frage, kannAnlegen, laeuft, suchen(), sucht (+2 more)
-
-### Community 466 - "TestObergrenze"
-Cohesion: 0.39
-Nodes (3): Der eigentliche Punkt: Vorher galt der Schutz unbefristet., Nie gewarnt heißt: nicht löschen. Läuft der Erinnerungslauf nicht, bleibt alles…, TestObergrenze
+### Community 466 - "test_krisen_erinnerung.py"
+Cohesion: 0.18
+Nodes (9): antraege(), fixture, Erinnerung und Aufbewahrungs-Obergrenze für Krisenfälle (AP3). Zwei Zusagen,…, Der eigentliche Punkt: Vorher galt der Schutz unbefristet., Nie gewarnt heißt: nicht löschen. Läuft der Erinnerungslauf nicht, bleibt alles…, Vier Fälle mit unterschiedlichem Alter und Erinnerungsstand., Drei wartende Einsicht-Anträge mit unterschiedlichem Erinnerungsstand. Hängen…, TestObergrenze (+1 more)
 
 ### Community 467 - "TestArchivedReferences"
 Cohesion: 0.25
@@ -2604,10 +2565,6 @@ Nodes (5): Tests für GET /context/nodes/{id}/archived-references., ⚠️ **Lie
 ### Community 468 - "lib/serverRender.js"
 Cohesion: 0.29
 Nodes (9): BLOCK_KINDS, escapeHtml(), renderBlock(), renderError(), renderServerBlocks(), process(), schedule(), sanitizeSvg() (+1 more)
-
-### Community 469 - "texts/+page.svelte"
-Cohesion: 0.20
-Nodes (8): error, isChanged, loading, loadTab(), saveError, saveSuccess, saving, switchTab()
 
 ### Community 470 - "TestStandardtext"
 Cohesion: 0.29
@@ -2669,37 +2626,29 @@ Nodes (4): betrag(), tabellenZeilen(), SYSTEM_BESCHREIBUNG, systemText()
 Cohesion: 0.22
 Nodes (4): _eintrag(), Die stärkere Zusage: Der Text **bekommt** sie nicht. Eine Wortsuche im Ergebnis…, Lieber der rohe Wert als eine Lücke, wenn später eine Kategorie dazukommt., TestText
 
-### Community 485 - "image_kinds.py"
-Cohesion: 0.33
-Nodes (8): _freigaben(), get_image_kinds(), ImageKindItem, ImageKindsResponse, BaseModel, Bildarten für den Assistenten-Editor (Mehrmodell-Plan, Schritt 4). Liefert die…, team_id → freigeschaltete Modelle, plus ob die Auskunft überhaupt zustande kam., Konfigurierte Bildarten + für welche Jahrgänge ihr Modell fehlt.
-
 ### Community 486 - "backend/config/assistant_schema.json"
 Cohesion: 0.29
 Nodes (6): additionalProperties, config, metadata, required, $schema, type
 
-### Community 487 - "seed_assistants.py"
-Cohesion: 0.24
-Nodes (10): _build_survivor_map(), dedup(), main(), AsyncSession, old_id → survivor_id für alle Duplikat-Sets., _default_config(), main(), Path (+2 more)
+### Community 487 - "_build_survivor_map"
+Cohesion: 0.43
+Nodes (5): _build_survivor_map(), dedup(), main(), AsyncSession, old_id → survivor_id für alle Duplikat-Sets.
 
 ### Community 488 - "dosisfragen_messung.py"
 Cohesion: 0.52
 Nodes (6): ist_absage(), main(), menschenmenge(), Die Sätze, die eine auf Menschen bezogene Menge nennen — leer heißt sauber., saetze(), selbstpruefung()
 
-### Community 489 - "test_ks_phase3.py"
-Cohesion: 0.15
-Nodes (14): AsyncSession, Arduino-Wissensgraph: Testdaten und Seed-Funktion für KS-Phase-3-E2E-Tests., Idempotentes Seeden der Arduino-Wissensgraph-Knoten. Prüft per…, Löscht alle Arduino-Wissensgraph-Knoten aus der Datenbank. Cascades automatisch…, seed(), teardown(), anker_suche(), arduino_seed() (+6 more)
-
-### Community 490 - "_CrisisRecord"
-Cohesion: 0.36
-Nodes (9): _crisis_sse_event(), _CrisisRecord, Ergebnis der Krisen-Erkennung für eine Nachricht (Schritt 5: Banner-SSE)., SSE-Event-String für das Hilfe-Banner — None, wenn kein Banner gezeigt wird.…, _crisis_hit(), test_crisis_sse_event_emits_resolved_resources(), test_crisis_sse_event_none_when_banner_suppressed(), test_crisis_sse_event_none_without_record() (+1 more)
+### Community 489 - "arduino_nodes.py"
+Cohesion: 0.33
+Nodes (6): AsyncSession, Arduino-Wissensgraph: Testdaten und Seed-Funktion für KS-Phase-3-E2E-Tests., Idempotentes Seeden der Arduino-Wissensgraph-Knoten. Prüft per…, Löscht alle Arduino-Wissensgraph-Knoten aus der Datenbank. Cascades automatisch…, seed(), teardown()
 
 ### Community 491 - "fixture"
 Cohesion: 0.29
 Nodes (7): auth_student(), auth_teacher2(), fixture, Der **Regelbetrieb** — ohne `STUDENT_SUBJECTS_OPT_IN`. ⚠️ **Ausdrücklich…, Legt Subject, Gruppe und Mitgliedschaften für Planungstests an., regelbetrieb(), seed_planning_fixtures()
 
 ### Community 492 - "test_host_guard.py"
-Cohesion: 0.31
-Nodes (8): configure_host_guard(), FastAPI, Host-Header-Schutz als Defense-in-Depth (Audit #18). Standard `["*"]`…, _app_with_settings(), Unit-Tests: TrustedHostMiddleware / Host-Header-Schutz (Sicherheits-Audit #18)., test_real_allowlist_accepts_configured_host(), test_real_allowlist_rejects_foreign_host(), test_wildcard_does_not_add_middleware()
+Cohesion: 0.53
+Nodes (5): _app_with_settings(), Unit-Tests: TrustedHostMiddleware / Host-Header-Schutz (Sicherheits-Audit #18)., test_real_allowlist_accepts_configured_host(), test_real_allowlist_rejects_foreign_host(), test_wildcard_does_not_add_middleware()
 
 ### Community 493 - "_bildpreis_meldung"
 Cohesion: 0.22
@@ -2805,17 +2754,9 @@ Nodes (6): hidden, private, public, visibility, enum, type
 Cohesion: 0.43
 Nodes (3): _make_rsa_jwks(), _mock_token_signed_id(), _sign()
 
-### Community 519 - "TestWelcheDateienGelesenWerden"
-Cohesion: 0.25
-Nodes (5): Der Filter des Bündels (Paket 10, AP1) — er entscheidet, was überhaupt ankommt., ⚠️ **Nicht nur „wird übersprungen", sondern „ohne Warnung".** `_Format.md` hat…, Eine `.md` unter `_Abb/` wäre ein Knoten aus einem Anhangverzeichnis., Aus einem Zip kommen Bytes; eine Datei in Latin-1 darf den Lauf nicht kippen., TestWelcheDateienGelesenWerden
-
 ### Community 521 - "TestFaktorAusDerKonfiguration"
 Cohesion: 0.33
 Nodes (3): parametrize, Ein Tippfehler in der YAML darf die Anzeige nicht auf 0 oder ins Negative…, TestFaktorAusDerKonfiguration
-
-### Community 523 - "test_relationen_einheitlich.py"
-Cohesion: 0.47
-Nodes (5): _aus_dem_modell(), Dieselbe Relationsliste an zwei Orten im Backend (Paket 9, AP2).…, Namentlich festgehalten — die allgemeine Prüfung oben ginge auch durch, wenn…, test_is_a_ist_dabei(), test_modell_und_anwendung_kennen_dieselben_relationen()
 
 ### Community 524 - "[0.11.0] – 2026-09-27"
 Cohesion: 0.33
@@ -2854,8 +2795,8 @@ Cohesion: 0.33
 Nodes (6): _assistentAktion(), disableMyAssistant(), enableMyAssistant(), requestAssistantDeletion(), withdrawAssistantDeletionRequest(), withdrawMyAssistant()
 
 ### Community 533 - "fachbegriffe_export.test.js"
-Cohesion: 0.50
-Nodes (4): _dateiname(), exportiereFachbegriffe(), _herunterladen(), knotenAlsMarkdown()
+Cohesion: 0.40
+Nodes (5): _dateiname(), exportiereFachbegriffe(), _herunterladen(), knotenAlsMarkdown(), antwort()
 
 ### Community 534 - "bearbeiten.test.js"
 Cohesion: 0.40
@@ -2932,10 +2873,6 @@ Nodes (3): conn(), fixture, Die Rangfolge in der **laufenden** Datenbank (Paket 
 ### Community 553 - "Server-Rendering (Phase 17)"
 Cohesion: 0.25
 Nodes (8): Backend-Render-Router (`app/render/`), Bausteine im Überblick, Betrieb & Sicherheit, Frontend (`renderServerBlocks`), Node-Render-Sidecar (`render-sidecar/`), PDF-Prärender (D5, `app/render/export.py`), ```plot-Spec (v1), Server-Rendering (Phase 17)
-
-### Community 554 - "pruefe_scopes"
-Cohesion: 0.38
-Nodes (6): pruefe_scope_gruppe(), pruefe_scopes(), AsyncSession, Passen Scope und Trägergruppe eines Knotens zusammen? Zwei Regeln, die bisher…, Prüft **einen** Scope samt Gruppe. Wirft ``ValueError`` mit Klartext. ``feld``…, Beide Scopes eines Knotens. Wirft ``ValueError`` beim ersten Verstoß.
 
 ### Community 555 - "[0.10.0] – 2026-09-14"
 Cohesion: 0.40
@@ -3017,10 +2954,6 @@ Nodes (3): fragt_nach_stufe(), Der Satz, der nach der Stufe fragt — oder ``Non
 Cohesion: 0.50
 Nodes (3): Tests für Status-Übergänge., PATCH status=archived → active; kein 403 für Eigentümer., TestLifecycleRoundtrip
 
-### Community 589 - "FeedbackOut"
-Cohesion: 0.29
-Nodes (6): FeedbackOut, BaseModel, Was der Client schickt und was zurückkommt (ADR-020). **Zwei Sorten Felder,…, Die eigene Meldung, wie die meldende Person sie sieht. **Ohne `issue_ref`**:…, nach_aussen(), Die Sicht der meldenden Person auf ihre eigene Meldung. `spam` erscheint als…
-
 ### Community 591 - "test_missing_category_yields_none_instead_of_assuming_zero"
 Cohesion: 0.33
 Nodes (4): Eine nicht bewertete Kategorie ist ungeprüft — nicht unauffällig. Ein…, Der eigentliche Zweck: Eine abgewiesene Antwort ist ärgerlich, eine…, test_missing_category_yields_none_instead_of_assuming_zero(), test_students_are_blocked_when_the_classifier_is_down()
@@ -3073,17 +3006,9 @@ Nodes (3): Erwartete Dateien, Screenshots: Unterrichtsplanung-Hilfe, So ergänze
 Cohesion: 0.67
 Nodes (3): _aus_env(), main(), Misst, wie LiteLLM ein User-Budget **ohne** ``budget_duration`` behandelt. Das…
 
-### Community 677 - "TestFassungen"
-Cohesion: 0.33
-Nodes (4): Dieselbe Kompetenz in zwei BP-Editionen ist **ein** Treffer, nicht zwei., Zwei Nutzerknoten mit zufällig gleicher Nummer sind keine Fassungen voneinander., Seit AP5 gibt es nur noch **einen** Weg, auf dem Fassungen zusammenfallen. Bis…, TestFassungen
-
-### Community 678 - "TestPruefstatus"
-Cohesion: 0.33
-Nodes (3): Der Arbeitsstand der Fachschaft — gelesen, gemeldet, **nicht** importiert. ⚠️…, Er steht nicht im Feldschema und fällt damit durch die Whitelist — hier…, TestPruefstatus
-
-### Community 679 - "TestUeberschreibenJeDatei"
-Cohesion: 0.33
-Nodes (3): `--ueberschreiben` gilt für alle, der Dialog entscheidet je Zeile (AP4)., ⚠️ Der Unterschied zu `True`: Eine leere Auswahl heißt „nichts überschreiben",…, TestUeberschreibenJeDatei
+### Community 677 - "fasse_fassungen_zusammen"
+Cohesion: 0.17
+Nodes (11): fasse_fassungen_zusammen(), fassungs_schluessel(), Identität einer BP-Kompetenz **über Fassungen hinweg**: Fach, Typ, Nummer.…, Je Kompetenz nur den erstbesten Eintrag behalten (Reihenfolge bleibt).…, Der Fassungsschlüssel eines Schicht-Treffers. ``bp_version`` muss gesetzt sein:…, _treffer_schluessel(), Dieselbe Kompetenz in zwei BP-Editionen ist **ein** Treffer, nicht zwei., Operatoren tragen keine Kompetenznummer — „nennen" in Mathematik und „nennen"… (+3 more)
 
 ### Community 680 - "0043_embedding_dimensions.py"
 Cohesion: 0.60
@@ -3105,51 +3030,35 @@ Nodes (3): [0.5.5] – 2026-08-25, Behoben, Dokumentation
 Cohesion: 0.67
 Nodes (3): _accessAction(), approveAccessRequest(), denyAccessRequest()
 
-### Community 725 - "_fachbegriffe_nutzer"
-Cohesion: 0.40
-Nodes (4): _fachbegriffe_nutzer(), Lehrkraft oder Admin — und gedrosselt. Reihenfolge mit Absicht: erst die Rolle,…, Dass die Drossel überhaupt hängt — sonst nimmt sie ihr eigener Test heraus. ⚠️…, TestDrossel
-
-### Community 727 - "cleanup_artifacts.py"
-Cohesion: 0.80
-Nodes (4): main(), _parse_now(), datetime, run_cleanup()
+### Community 729 - "integration/test_uebernahme.py"
+Cohesion: 0.06
+Nodes (24): artefakt_ablage(), _aufraeumen(), dokument(), fixture, Artefakt → Baustein über die Schnittstelle (AP8, Schritt 1). Was hier steht und…, Die Verknüpfung in die Gegenrichtung — sonst wäre die Übernahme eine…, Die archivierte Vorgängerin trägt dieselbe Herkunft — sie darf das Badge nicht…, Gegenprobe zur Eigentümerbindung der Sammelabfrage. (+16 more)
 
 ### Community 734 - "kopieren.test.js"
-Cohesion: 0.24
-Nodes (11): triggerDownload(), diagrammKnoepfe(), FORMEL_KNOPF, formelKnopf(), formelZumKopieren(), leistenKnopf(), SVG_DATEINAME, svgDatei() (+3 more)
+Cohesion: 0.23
+Nodes (12): triggerDownload(), bibliotheksSvg(), diagrammKnoepfe(), FORMEL_KNOPF, formelKnopf(), formelZumKopieren(), leistenKnopf(), SVG_DATEINAME (+4 more)
 
 ### Community 800 - "werkstatt_knopf.test.js"
 Cohesion: 0.40
 Nodes (3): DIESE, SRC, WURZEL
 
-### Community 801 - ".group_role_map_dict"
-Cohesion: 0.50
-Nodes (3): Konvertiert die Liste der GroupRoleMapping in ein Dictionary für schnellen…, computed_field, VergebbareRolle
-
-### Community 805 - "_clear_cache"
-Cohesion: 0.67
-Nodes (3): _clear_cache(), fixture, Jeder Test startet und endet mit leerem Modul-Cache.
-
 ### Community 806 - "test_unreplaced_placeholders_are_errors"
 Cohesion: 0.67
 Nodes (3): parametrize, Die Vorlage ist voller `<…>` — wer eines übersieht, soll es hier erfahren., test_unreplaced_placeholders_are_errors()
 
-### Community 807 - "_ohne_warten"
-Cohesion: 0.67
-Nodes (3): _ohne_warten(), fixture, Die Wartezeit ist hier nur Ablauf, nicht Gegenstand der Prüfung.
-
 ## Knowledge Gaps
-- **1201 isolated node(s):** `Config`, `AssistantStatus`, `MessageRole`, `ExchangeRateSource`, `Zuordnung` (+1196 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 6573 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **82 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1205 isolated node(s):** `Config`, `AssistantStatus`, `MessageRole`, `ExchangeRateSource`, `Zuordnung` (+1200 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 6579 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **81 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `JwtPayload` connect `JwtPayload` to `planning/router.py`, `context/service.py`, `context/router.py`, `_post`, `ToolContext`, `test_admin_assistant_model_check.py`, `permissions.py`, `SimpleNamespace`, `feedback.py`, `make_app`, `asyncio`, `require_any_role`, `test_crisis_reader.py`, `admin/holidays.py`, `test_chat_router_helpers.py`, `Conversation`, `SiteConfig`, `test_ui_levels.py`, `uebernahme.py`, `auth/router.py`, `groups/router.py`, `admin/models.py`, `api/groups.py`, `test_image_kinds_api.py`, `budgets.py`, `test_assistant_admin_api.py`, `test_admin_flags.py`, `angebote.py`, `admin/groups.py`, `artifacts/router.py`, `test_ausfall.py`, `test_chat_assistant_model_fallback.py`, `test_stepup_router.py`, `api/assistants.py`, `image_store.py`, `_check_curriculum_read_permission`, `LessonSlot`, `test_stats_router.py`, `test_budget_service.py`, `test_budgets_router.py`, `chat/router.py`, `test_budget_zuschlag.py`, `JwtService`, `test_chat_tools.py`, `test_admin_users.py`, `_fachbegriffe_nutzer`, `darf_nutzen`, `upload_session`, `test_curriculum_meta_update.py`, `test_chat_models.py`, `test_review_router.py`, `test_models_router.py`, `image_kinds.py`, `test_groups_router.py`, `ContextNode`, `ConversationAccessRequest`, `test_crisis_resolve.py`, `test_guardrail_admin.py`, `export_templates.py`, `test_zugangstoken.py`, `client.py`, `test_calendar_school_year.py`?**
+- **Why does `JwtPayload` connect `JwtPayload` to `planning/router.py`, `assistant_tools.py`, `context/service.py`, `context/router.py`, `test_calendar_holidays.py`, `_post`, `ToolContext`, `budgets.py`, `permissions.py`, `SimpleNamespace`, `feedback.py`, `calendar/router.py`, `asyncio`, `artifacts/store.py`, `make_app`, `require_any_role`, `ConversationAccessRequest`, `test_ui_levels.py`, `test_chat_router_helpers.py`, `Conversation`, `SiteConfig`, `uebernahme.py`, `auth/router.py`, `auth/tokens.py`, `groups/router.py`, `admin/models.py`, `api/groups.py`, `test_image_kinds_api.py`, `api/assistants.py`, `test_admin_flags.py`, `sync_groups`, `admin/groups.py`, `artifacts/router.py`, `test_stepup_router.py`, `Bildart`, `unit/test_assistant_lebenszyklus.py`, `Group`, `image_store.py`, `_check_curriculum_read_permission`, `snapshots.py`, `test_stats_router.py`, `pii.py`, `test_budgets_router.py`, `chat/router.py`, `test_budget_zuschlag.py`, `test_chat_tools.py`, `test_admin_users.py`, `darf_nutzen`, `upload_session`, `test_curriculum_meta_update.py`, `test_review_router.py`, `test_models_router.py`, `test_fachplan_router.py`, `test_groups_router.py`, `flags.py`, `test_guardrail_admin.py`, `test_calendar_school_year.py`?**
   _High betweenness centrality (0.081) - this node is a cross-community bridge._
-- **Why does `ContextNode` connect `ContextNode` to `planning/router.py`, `context/service.py`, `context/router.py`, `import_curriculum_from_draft`, `loesche_alte_archivierte`, `Knotenfilter`, `build_reflow_context`, `Suchprofil`, `SchoolYearConfig`, `calendar/router.py`, `relink.py`, `search_eval.py`, `test_ks_phase1.py`, `JwtPayload`, `PseudonymAudit`, `test_context_search.py`, `_sql`, `TestZielImBestand`, `test_curriculum_resolver.py`, `_build_embedding_input`, `uebernahme.py`, `fachbegriffe_import.py`, `meine_bausteine.py`, `cleanup_service.py`, `fachbegriffe_export.py`, `api/groups.py`, `test_gruppen_aktualitaet.py`, `get_engagement_context`, `TestStabileKennung`, `test_abgrenzungen_db.py`, `operations.py`, `embedding.py`, `resize_embedding_column`, `test_updated_at_wird_fortgeschrieben.py`, `LessonSlot`, `db/models.py`, `test_context_schueler_lesepfad.py`, `TestDieMigrationSelbst`, `chat/router.py`, `test_archiv_gruppen.py`, `student_context.py`, `test_material_edges_pfade.py`, `test_curriculum_meta_update.py`, `test_scope_rangfolge.py`, `test_student_context.py`, `vorgeschlagenes_ablaufdatum`, `_list_context_nodes_handler`, `test_lesson_export.py`, `test_vorab_suche_db.py`, `_lauf`, `test_alte_bp_schreibweise.py`, `test_seed_fachbegriffe_db.py`, `test_fachbegriffe_rundreise.py`, `complete_review`, `seed_methodik.py`?**
+- **Why does `ContextNode` connect `ContextNode` to `planning/router.py`, `vermerke`, `context/service.py`, `context/router.py`, `import_curriculum_from_draft`, `loesche_alte_archivierte`, `assistant_tools.py`, `LessonSlot`, `Subject`, `TestVorlage`, `Suchprofil`, `search_eval.py`, `calendar/router.py`, `test_taxonomy_embedding.py`, `aufzaehlung`, `relink.py`, `JwtPayload`, `db/models.py`, `test_context_search.py`, `TestZielImBestand`, `test_curriculum_resolver.py`, `_build_embedding_input`, `uebernahme.py`, `fachbegriffe_import.py`, `meine_bausteine.py`, `cleanup_service.py`, `fachbegriffe_export.py`, `TestModellregel`, `api/groups.py`, `test_gruppen_aktualitaet.py`, `TestStabileKennung`, `abgrenzungen_zu`, `operations.py`, `Group`, `session_factory`, `resize_embedding_column`, `test_reflow_tools.py`, `test_updated_at_wird_fortgeschrieben.py`, `snapshots.py`, `test_context_schueler_lesepfad.py`, `TestDieMigrationSelbst`, `embedding.py`, `chat/router.py`, `test_archiv_gruppen.py`, `embedding_backfill_service.py`, `NodeAlias`, `test_curriculum_meta_update.py`, `test_material_edges_pfade.py`, `integration/test_uebernahme.py`, `test_scope_rangfolge.py`, `test_student_context.py`, `vorgeschlagenes_ablaufdatum`, `test_fachplan_router.py`, `test_lesson_export.py`, `test_vorab_suche_db.py`, `_lauf`, `test_alte_bp_schreibweise.py`, `test_seed_fachbegriffe_db.py`, `test_fachbegriffe_rundreise.py`, `complete_review`, `seed_methodik.py`?**
   _High betweenness centrality (0.069) - this node is a cross-community bridge._
-- **Why does `Group` connect `Group` to `planning/router.py`, `test_planning_assistant_tools.py`, `context/service.py`, `context/router.py`, `test_calendar_patterns.py`, `Knotenfilter`, `permissions.py`, `calendar/router.py`, `JwtPayload`, `test_gruppen_schueler_sichtbarkeit.py`, `PseudonymAudit`, `test_chat_router_helpers.py`, `test_curriculum_resolver.py`, `fachbegriffe_import.py`, `groups/router.py`, `pruefe_scopes`, `test_artifact_auszug.py`, `api/groups.py`, `test_gruppen_aktualitaet.py`, `budgets.py`, `angebote.py`, `admin/groups.py`, `integration/conftest.py`, `lege_gruppe_aus_vorschlag_an`, `LessonSlot`, `db/models.py`, `test_context_schueler_lesepfad.py`, `chat/router.py`, `test_budget_zuschlag.py`, `test_archiv_gruppen.py`, `test_gruppe_jahrgang_api.py`, `darf_nutzen`, `test_gruppen_anzeigename.py`, `test_calendar_groups.py`, `test_lesson_export.py`, `test_groups_router.py`, `ContextNode`, `_lauf`, `test_fachbegriffe_rundreise.py`, `test_seed_fachbegriffe_db.py`?**
+- **Why does `Group` connect `Group` to `planning/router.py`, `assistant_tools.py`, `context/service.py`, `context/router.py`, `timedelta`, `Subject`, `budgets.py`, `permissions.py`, `calendar/router.py`, `aufzaehlung`, `test_group_sync.py`, `JwtPayload`, `test_gruppen_schueler_sichtbarkeit.py`, `db/models.py`, `test_chat_router_helpers.py`, `test_curriculum_resolver.py`, `fachbegriffe_import.py`, `groups/router.py`, `test_artifact_auszug.py`, `api/groups.py`, `test_gruppen_aktualitaet.py`, `calendar/groups.py`, `sync_groups`, `admin/groups.py`, `integration/conftest.py`, `test_context_schueler_lesepfad.py`, `chat/router.py`, `test_archiv_gruppen.py`, `test_budget_zuschlag.py`, `test_gruppe_jahrgang_api.py`, `darf_nutzen`, `test_gruppen_anzeigename.py`, `test_lesson_export.py`, `test_groups_router.py`, `ContextNode`, `_lauf`, `test_fachbegriffe_rundreise.py`, `test_seed_fachbegriffe_db.py`?**
   _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Are the 261 inferred relationships involving `JwtPayload` (e.g. with `activate_assistant()` and `approve_assistant()`) actually correct?**
   _`JwtPayload` has 261 INFERRED edges - model-reasoned connections that need verification._

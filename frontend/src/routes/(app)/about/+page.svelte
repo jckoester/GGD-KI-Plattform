@@ -1,6 +1,7 @@
 <script>
     import PageBody from '$lib/components/PageBody.svelte'
     import { branding } from "$lib/branding.js";
+    import { BIBLIOTHEKEN } from "$lib/bibliotheken.js";
     import {
         ExternalLink,
         Scale,
@@ -11,25 +12,6 @@
         ShieldCheck,
         ShieldBan,
     } from "lucide-svelte";
-
-    // Bibliotheken-Tabelle
-    const frontendLibs = [
-        { name: "SvelteKit", version: "^2.0.0", license: "MIT" },
-        { name: "Tailwind CSS", version: "^4.2.2", license: "MIT" },
-        { name: "marked", version: "^18.0.2", license: "MIT" },
-        { name: "highlight.js", version: "^11.11.1", license: "BSD-3-Clause" },
-        { name: "lucide-svelte", version: "^1.0.1", license: "ISC" },
-    ];
-
-    const backendLibs = [
-        { name: "FastAPI", version: "", license: "MIT" },
-        { name: "SQLAlchemy", version: "", license: "MIT" },
-        { name: "Pydantic", version: "", license: "MIT" },
-        { name: "LiteLLM", version: "", license: "MIT" },
-        { name: "Alembic", version: "", license: "MIT" },
-        { name: "httpx", version: "", license: "BSD-3-Clause" },
-        { name: "pdfminer.six", version: "", license: "MIT" },
-    ];
 
     const authors = [{ name: "Jan Köster", github: "jckoester" }];
 
@@ -198,93 +180,56 @@
                 Verwendete Bibliotheken
             </h2>
 
-            <h3
-                class="text-base font-medium mb-3 text-light-tx-2 dark:text-dark-tx-2"
-            >
-                Frontend
-            </h3>
-            <div class="overflow-x-auto mb-6">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr
-                            class="border-b border-light-ui-3 dark:border-dark-ui-3"
-                        >
-                            <th
-                                class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
-                            >
-                                Bibliothek
-                            </th>
-                            <th
-                                class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
-                            >
-                                Lizenz
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each frontendLibs as lib}
-                            <tr
-                                class="border-b border-light-ui-3 dark:border-dark-ui-3 last:border-0"
-                            >
-                                <td
-                                    class="py-2 px-3 text-light-tx dark:text-dark-tx"
-                                >
-                                    {lib.name}
-                                </td>
-                                <td
-                                    class="py-2 px-3 text-light-tx-2 dark:text-dark-tx-2"
-                                >
-                                    {lib.license}
-                                </td>
-                            </tr>
-                        {/each}
-                    </tbody>
-                </table>
-            </div>
+            <p class="text-sm mb-4 text-light-tx-2 dark:text-dark-tx-2">
+                Alle direkt eingebundenen Bibliotheken und Programme. Deren eigene
+                Abhängigkeiten stehen in den Paketdateien des Repositorys.
+            </p>
 
-            <h3
-                class="text-base font-medium mb-3 text-light-tx-2 dark:text-dark-tx-2"
-            >
-                Backend
-            </h3>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr
-                            class="border-b border-light-ui-3 dark:border-dark-ui-3"
-                        >
-                            <th
-                                class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
-                            >
-                                Bibliothek
-                            </th>
-                            <th
-                                class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
-                            >
-                                Lizenz
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each backendLibs as lib}
+            {#each BIBLIOTHEKEN as gruppe (gruppe.gruppe)}
+                <h3
+                    class="text-base font-medium mb-3 text-light-tx-2 dark:text-dark-tx-2"
+                >
+                    {gruppe.gruppe}
+                </h3>
+                <div class="overflow-x-auto mb-6 last:mb-0">
+                    <table class="min-w-full text-sm">
+                        <thead>
                             <tr
-                                class="border-b border-light-ui-3 dark:border-dark-ui-3 last:border-0"
+                                class="border-b border-light-ui-3 dark:border-dark-ui-3"
                             >
-                                <td
-                                    class="py-2 px-3 text-light-tx dark:text-dark-tx"
+                                <th
+                                    class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
                                 >
-                                    {lib.name}
-                                </td>
-                                <td
-                                    class="py-2 px-3 text-light-tx-2 dark:text-dark-tx-2"
+                                    {gruppe.quelle ? "Bibliothek" : "Programm"}
+                                </th>
+                                <th
+                                    class="text-left py-2 px-3 text-light-tx-2 dark:text-dark-tx-2 font-medium"
                                 >
-                                    {lib.license}
-                                </td>
+                                    Lizenz
+                                </th>
                             </tr>
-                        {/each}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {#each gruppe.eintraege as lib (lib.name)}
+                                <tr
+                                    class="border-b border-light-ui-3 dark:border-dark-ui-3 last:border-0"
+                                >
+                                    <td
+                                        class="py-2 px-3 text-light-tx dark:text-dark-tx"
+                                    >
+                                        {lib.name}
+                                    </td>
+                                    <td
+                                        class="py-2 px-3 text-light-tx-2 dark:text-dark-tx-2"
+                                    >
+                                        {lib.lizenz}
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
+            {/each}
         </section>
 
         <!-- Git-Build-Referenz -->

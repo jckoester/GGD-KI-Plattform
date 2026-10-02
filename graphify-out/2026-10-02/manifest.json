@@ -690,9 +690,9 @@
     "semantic_hash": ""
   },
   "backend/app/artifacts/store.py": {
-    "mtime": 1789699888.753612,
-    "seen": 1790929908.124773,
-    "ast_hash": "5914a15a7cfde073bb7c061b3d60bebb",
+    "mtime": 1790930200.0584838,
+    "seen": 1790930876.920139,
+    "ast_hash": "81721e89cc780439163b48b7180b5c83",
     "semantic_hash": ""
   },
   "backend/app/artifacts/uebernahme.py": {
@@ -1716,9 +1716,9 @@
     "semantic_hash": ""
   },
   "backend/app/render/export.py": {
-    "mtime": 1790529700.1898143,
-    "seen": 1790929908.124827,
-    "ast_hash": "1abee2d9199d9105ea0d3e050493f743",
+    "mtime": 1790930644.760615,
+    "seen": 1790930876.9201999,
+    "ast_hash": "b9993cf37b40dac19447f3aaf4466ef1",
     "semantic_hash": ""
   },
   "backend/app/render/plot.py": {
@@ -3060,9 +3060,9 @@
     "semantic_hash": ""
   },
   "backend/tests/unit/test_export_parity.py": {
-    "mtime": 1785389653.2959142,
-    "seen": 1790929908.124898,
-    "ast_hash": "2a64fa9a39487b65ea742763c7a29118",
+    "mtime": 1790930329.6131933,
+    "seen": 1790930876.920287,
+    "ast_hash": "368023544861df1d4ae5f530f455feaa",
     "semantic_hash": ""
   },
   "backend/tests/unit/test_export_prerender.py": {
@@ -3798,9 +3798,9 @@
     "semantic_hash": ""
   },
   "frontend/package.json": {
-    "mtime": 1790529795.7614696,
-    "seen": 1790929908.124937,
-    "ast_hash": "eb7f5102907e3d09dc86697547241e82",
+    "mtime": 1790930155.0147176,
+    "seen": 1790930876.920331,
+    "ast_hash": "f4bd6d07bf41745dfc134379be34d9ee",
     "semantic_hash": ""
   },
   "frontend/scripts/circuit_spike/eval.mjs": {
@@ -4194,9 +4194,9 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/components/MessageBubble.svelte": {
-    "mtime": 1789699770.7386067,
-    "seen": 1790929908.12496,
-    "ast_hash": "9898c784a3b3d149f638bd20b3aa2ab1",
+    "mtime": 1790930644.7598658,
+    "seen": 1790930876.920359,
+    "ast_hash": "262aeec53f6bc23344d11f740b98936d",
     "semantic_hash": ""
   },
   "frontend/src/lib/components/ModelMatrixTable.svelte": {
@@ -4512,9 +4512,9 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/diagrams.js": {
-    "mtime": 1789614462.1227984,
-    "seen": 1790929908.1249778,
-    "ast_hash": "d8298a8db0f311ba7c7571c18195185e",
+    "mtime": 1790930644.7609434,
+    "seen": 1790930876.9203799,
+    "ast_hash": "130f9ed9abd8036189f2971a60ebb7a6",
     "semantic_hash": ""
   },
   "frontend/src/lib/doku_anker.test.js": {
@@ -4722,15 +4722,15 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/markdown.js": {
-    "mtime": 1790529700.2133188,
-    "seen": 1790929908.1250181,
-    "ast_hash": "a1bd83c045936d3214cafda46bfa8ee8",
+    "mtime": 1790930644.7604299,
+    "seen": 1790930876.920416,
+    "ast_hash": "b5cad64b7b8c0d4bb1b33680b90c4a82",
     "semantic_hash": ""
   },
   "frontend/src/lib/markdown.test.js": {
-    "mtime": 1790529700.2134404,
-    "seen": 1790929908.1250181,
-    "ast_hash": "56b02f7b646295510f2e191a90895fb5",
+    "mtime": 1790930274.9037154,
+    "seen": 1790930876.920416,
+    "ast_hash": "b827a8921415204561adaf6d0ac45c71",
     "semantic_hash": ""
   },
   "frontend/src/lib/material.js": {
@@ -4800,8 +4800,8 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/node_icons.js": {
-    "mtime": 1790926664.2637193,
-    "seen": 1790929908.125022,
+    "mtime": 1790930771.0624273,
+    "seen": 1790930876.9204211,
     "ast_hash": "2d896bd58ec1b415aadfcfbeb77e0e03",
     "semantic_hash": ""
   },
@@ -5154,8 +5154,8 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/taxonomy.js": {
-    "mtime": 1790926664.2634914,
-    "seen": 1790929908.125039,
+    "mtime": 1790930771.062299,
+    "seen": 1790930876.920444,
     "ast_hash": "bbf44796544c90a49477634fe2080c49",
     "semantic_hash": ""
   },
@@ -5772,9 +5772,9 @@
     "semantic_hash": ""
   },
   "frontend/src/routes/+layout.svelte": {
-    "mtime": 1782280358.6702619,
-    "seen": 1790929908.1250691,
-    "ast_hash": "616773ff1551158a86b6435f8d4d7a96",
+    "mtime": 1790930644.7611265,
+    "seen": 1790930876.920491,
+    "ast_hash": "e41075475e95fe1a74af863fde14a9f6",
     "semantic_hash": ""
   },
   "frontend/src/routes/+page.svelte": {
@@ -6030,9 +6030,9 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1790929799.642676,
-    "seen": 1790929908.125083,
-    "ast_hash": "703fea2f31bf77dc8a30f5e0c8732ebf",
+    "mtime": 1790930682.2307808,
+    "seen": 1790930876.92051,
+    "ast_hash": "7734b900aec00ffb6784f621fcd8062e",
     "semantic_hash": ""
   },
   "README.md": {
@@ -6084,9 +6084,9 @@
     "semantic_hash": ""
   },
   "backend/app/export/templates/document_pdf.html": {
-    "mtime": 1785389653.2926004,
-    "seen": 1790929908.125087,
-    "ast_hash": "0ce96bf548219f4d2bd1edd99566c15b",
+    "mtime": 1790930329.6341777,
+    "seen": 1790930876.920515,
+    "ast_hash": "821d03a1f984a0963d26ba96da1491c6",
     "semantic_hash": ""
   },
   "backend/app/planning/templates/lesson.html": {
@@ -6438,9 +6438,9 @@
     "semantic_hash": ""
   },
   "docs/dev/material-werkstatt.md": {
-    "mtime": 1785389653.299685,
-    "seen": 1790929908.1251059,
-    "ast_hash": "0e9495547c28d6a7cfcd7e00b8555ddd",
+    "mtime": 1790930644.7601848,
+    "seen": 1790930876.920542,
+    "ast_hash": "c20e0c62ec056ad3df461dc69b7ae31b",
     "semantic_hash": ""
   },
   "docs/dev/neuer-auth-adapter.md": {
@@ -6516,9 +6516,9 @@
     "semantic_hash": ""
   },
   "docs/user/chat.md": {
-    "mtime": 1790529700.205022,
-    "seen": 1790929908.12511,
-    "ast_hash": "6973f670af49cc8389ba40f35717ac5d",
+    "mtime": 1790930661.691969,
+    "seen": 1790930876.920547,
+    "ast_hash": "f2d1815ce3e1014760fb13e237595a71",
     "semantic_hash": ""
   },
   "docs/user/curriculum.md": {
@@ -6576,9 +6576,9 @@
     "semantic_hash": ""
   },
   "docs/user/kontext.md": {
-    "mtime": 1790529700.2059023,
-    "seen": 1790929908.1251142,
-    "ast_hash": "8fae8e1146bd92532f68108396310dbd",
+    "mtime": 1790930644.7600443,
+    "seen": 1790930876.920552,
+    "ast_hash": "4d1ece148cce4e6416d04f7dce046188",
     "semantic_hash": ""
   },
   "docs/user/profil.md": {
@@ -6606,9 +6606,9 @@
     "semantic_hash": ""
   },
   "docs/user/werkstatt.md": {
-    "mtime": 1789163211.5142667,
-    "seen": 1790929908.125115,
-    "ast_hash": "4f5d32b62c48533eb72aedbc771a4421",
+    "mtime": 1790930329.6130066,
+    "seen": 1790930876.920557,
+    "ast_hash": "6ee5c9b65f68df290d71df55540f6151",
     "semantic_hash": ""
   },
   "docs/user/zitieren.md": {
@@ -6795,6 +6795,24 @@
     "mtime": 1790529700.1911075,
     "seen": 1790929908.1251252,
     "ast_hash": "9cf1fcc81a0c0a4e0ed727a50a53e6b6",
+    "semantic_hash": ""
+  },
+  "frontend/src/lib/kopieren.js": {
+    "mtime": 1790930644.7607875,
+    "seen": 1790930876.920413,
+    "ast_hash": "a8df2d57f4598dc19ba7d70007ca0d81",
+    "semantic_hash": ""
+  },
+  "frontend/src/lib/kopieren.test.js": {
+    "mtime": 1790930609.8966932,
+    "seen": 1790930876.920413,
+    "ast_hash": "a05c058a2b12c2a6442b65972bfb0992",
+    "semantic_hash": ""
+  },
+  "frontend/src/lib/werkstatt_knopf.test.js": {
+    "mtime": 1790930224.8987174,
+    "seen": 1790930876.920448,
+    "ast_hash": "9cefa39df4eb6f92cd8c610e2473fb5d",
     "semantic_hash": ""
   }
 }

@@ -3798,8 +3798,8 @@
     "semantic_hash": ""
   },
   "frontend/package.json": {
-    "mtime": 1790930155.0147176,
-    "seen": 1790930876.920331,
+    "mtime": 1790954272.8928812,
+    "seen": 1790954419.1445491,
     "ast_hash": "f4bd6d07bf41745dfc134379be34d9ee",
     "semantic_hash": ""
   },
@@ -4194,9 +4194,9 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/components/MessageBubble.svelte": {
-    "mtime": 1790930644.7598658,
-    "seen": 1790930876.920359,
-    "ast_hash": "262aeec53f6bc23344d11f740b98936d",
+    "mtime": 1790954272.8923771,
+    "seen": 1790954419.144581,
+    "ast_hash": "47bd4de9aa71da69b2d163bf13eeb4b7",
     "semantic_hash": ""
   },
   "frontend/src/lib/components/ModelMatrixTable.svelte": {
@@ -5412,9 +5412,9 @@
     "semantic_hash": ""
   },
   "frontend/src/routes/(app)/about/+page.svelte": {
-    "mtime": 1789163211.5242379,
-    "seen": 1790929908.1250508,
-    "ast_hash": "1f3cde58a52a9c85640536e9e76faeff",
+    "mtime": 1790954238.6670907,
+    "seen": 1790954419.155648,
+    "ast_hash": "41cc68a4a372852557703b192053a588",
     "semantic_hash": ""
   },
   "frontend/src/routes/(app)/access-requests/[id]/+page.svelte": {
@@ -6030,9 +6030,9 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1790930682.2307808,
-    "seen": 1790930876.92051,
-    "ast_hash": "7734b900aec00ffb6784f621fcd8062e",
+    "mtime": 1790954283.684229,
+    "seen": 1790954419.155705,
+    "ast_hash": "ec48e6b4e7cac38c5ef7aa65d4fe26b7",
     "semantic_hash": ""
   },
   "README.md": {
@@ -6096,8 +6096,8 @@
     "semantic_hash": ""
   },
   "backend/requirements.txt": {
-    "mtime": 1788098737.3876898,
-    "seen": 1790929908.125087,
+    "mtime": 1790954272.8927786,
+    "seen": 1790954419.155712,
     "ast_hash": "563e947e5222f752ecea988277d0a82f",
     "semantic_hash": ""
   },
@@ -6516,9 +6516,9 @@
     "semantic_hash": ""
   },
   "docs/user/chat.md": {
-    "mtime": 1790930661.691969,
-    "seen": 1790930876.920547,
-    "ast_hash": "f2d1815ce3e1014760fb13e237595a71",
+    "mtime": 1790931204.4772685,
+    "seen": 1790954419.1557481,
+    "ast_hash": "940e831b824f2d6d8fc71c56157ac9a6",
     "semantic_hash": ""
   },
   "docs/user/curriculum.md": {
@@ -6534,9 +6534,9 @@
     "semantic_hash": ""
   },
   "docs/user/diagramme.md": {
-    "mtime": 1785389653.300169,
-    "seen": 1790929908.125111,
-    "ast_hash": "516b78385c150bdc90f7d98a1bca1da1",
+    "mtime": 1790931197.1917472,
+    "seen": 1790954419.1557498,
+    "ast_hash": "fa2fa65a4fb53aede504f480a37fd9d0",
     "semantic_hash": ""
   },
   "docs/user/erste-30-minuten.md": {
@@ -6798,21 +6798,33 @@
     "semantic_hash": ""
   },
   "frontend/src/lib/kopieren.js": {
-    "mtime": 1790930644.7607875,
-    "seen": 1790930876.920413,
-    "ast_hash": "a8df2d57f4598dc19ba7d70007ca0d81",
+    "mtime": 1790954272.8925488,
+    "seen": 1790954419.155573,
+    "ast_hash": "5a628f80d9300c3a00dcb31a7c2dbd49",
     "semantic_hash": ""
   },
   "frontend/src/lib/kopieren.test.js": {
-    "mtime": 1790930609.8966932,
-    "seen": 1790930876.920413,
-    "ast_hash": "a05c058a2b12c2a6442b65972bfb0992",
+    "mtime": 1790931157.3804111,
+    "seen": 1790954419.155574,
+    "ast_hash": "08b2a17fc3ded60a23100bbf1496ea5b",
     "semantic_hash": ""
   },
   "frontend/src/lib/werkstatt_knopf.test.js": {
     "mtime": 1790930224.8987174,
     "seen": 1790930876.920448,
     "ast_hash": "9cefa39df4eb6f92cd8c610e2473fb5d",
+    "semantic_hash": ""
+  },
+  "frontend/src/lib/bibliotheken.js": {
+    "mtime": 1790954272.892664,
+    "seen": 1790954419.1445582,
+    "ast_hash": "86c25a1ee21bb14135f90c61d4986833",
+    "semantic_hash": ""
+  },
+  "frontend/src/lib/bibliotheken.test.js": {
+    "mtime": 1790933310.4253078,
+    "seen": 1790954419.1445591,
+    "ast_hash": "7e93af4fa31da9159e8ed772469f59b8",
     "semantic_hash": ""
   }
 }

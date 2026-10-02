@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
-    import { diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
+    import { bibliotheksSvg, diagrammKnoepfe, formelKnopf } from '$lib/kopieren.js';
     import { renderServerBlocks } from '$lib/serverRender.js';
     import { saveImageToLibrary, saveDiagramToLibrary, getPlotGgbBlob, createDocument, variiereBild } from '$lib/api.js';
     import { user } from '$lib/stores/user.js';
@@ -183,8 +183,8 @@
                     if (saveBtn.disabled) return;
                     saveBtn.disabled = true;
                     const src = block.dataset.source ?? '';
-                    const svg = kind === 'mermaid' ? block.querySelector('svg')?.outerHTML ?? null : null;
                     try {
+                        const svg = await bibliotheksSvg(kind, src);
                         const r = await saveDiagramToLibrary(kind, src, { svg, messageId: message.id ?? null });
                         saveBtn.textContent = r.created ? '✓ Gespeichert' : '✓ Vorhanden';
                     } catch (e) {

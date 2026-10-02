@@ -11,10 +11,15 @@ nichts installieren oder zeichnen können, sondern nur danach fragen.
 - **Funktionsgraphen** — z. B. „Zeichne den Graphen von f(x) = x² − 2 im Bereich −4 bis 4."
 
 Der Assistent beschreibt die Grafik in einem Code-Block, der bei uns automatisch als Bild
-dargestellt wird. Über das Symbol am Bild kannst du es herunterladen. Fährst du mit der Maus
-über die Grafik, kannst du sie mit **„In Bibliothek"** dauerhaft ablegen — sonst verschwindet
-sie mit dem Chat (→ [Bibliothek](bibliothek.md)). Bei Funktionsgraphen gibt es dort zusätzlich
-einen **GeoGebra**-Export (`.ggb`).
+dargestellt wird. Fährst du mit der Maus über die Grafik, erscheinen oben rechts:
+
+- **„Code kopieren"** — der Quelltext der Grafik, etwa um sie in der
+  [Werkstatt](werkstatt.md) weiterzuverwenden.
+- **„SVG"** — die Grafik als Datei. Sie ist **immer hell**, auch wenn du den Dunkelmodus
+  nutzt, damit sie auf weißem Papier lesbar bleibt.
+- **„In Bibliothek"** — legt die Grafik dauerhaft ab; sonst verschwindet sie mit dem Chat
+  (→ [Bibliothek](bibliothek.md)).
+- **„GeoGebra"** — nur bei Funktionsgraphen: eine `.ggb`-Datei zum Weiterbearbeiten.
 
 ## Gut zu wissen
 

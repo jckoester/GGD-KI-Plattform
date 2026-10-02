@@ -105,6 +105,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
+- **Flussdiagramme landen hell in der Bibliothek.** Wer im Dunkelmodus „In Bibliothek"
+  wählte, bekam ein Diagramm mit hellen Linien auf durchsichtigem Grund, auf der weißen
+  Vorschau und als PNG kaum lesbar. Schon gespeicherte Diagramme bleiben so; löschen und
+  neu speichern behebt es.
+
+- **„Über diese Software" nennt alle verwendeten Bibliotheken und Programme** samt Lizenz,
+  darunter KaTeX, Mermaid, DOMPurify, WeasyPrint und Pandoc. Bisher stand dort eine kleine
+  Auswahl.
+
+- **Die Hilfe zum Chat sagte, Schaltpläne würden noch nicht dargestellt.** Das stimmte
+  nicht mehr; sie verweist jetzt auf die Seite zu Diagrammen und Funktionsgraphen.
+
 - **Diagramme und Statistiken liegen einheitlich auf der Kartenfläche.** Im Dunkelmodus
   war die Kostenstatistik schwarz, die Nutzungs-Heatmap grau. Beide Statistiken und das
   Verbrauchsdiagramm unter `/budget` nutzen jetzt dieselbe erhöhte Fläche.
