@@ -5,150 +5,79 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.12.0] – 2026-10-02
+
+Kosten werden lesbar: Einheiten statt Bruchteilen eines Cents, ein Verlauf gegen die
+Zusage und Zuschläge von Hand. Dazu Regeln für Fragen nach tödlichen Mengen.
+
 ### Neu
 
-- **Zusätzliches Budget von Hand aufbuchen.** Unter `/budget` → „Zuschlag aufbuchen"
-  bekommt eine Gruppe (Klasse, Unterrichtsgruppe, AG, Fachschaft) oder eine einzelne
-  Lehrkraft einen Betrag obendrauf, etwa für eine Projektwoche. Die wöchentliche
-  Aufstockung läuft danach normal weiter, der Zuschlag gilt bis zum Schuljahresende.
-  Der Betrag gilt je Person. Gebucht wird erst nach einer Vorschau, die Anzahl und Summe
-  nennt, Schüler:innen und Lehrkräfte getrennt. Jeder Zuschlag wird mit Grund
-  protokolliert. Dürfen: alle mit der Rolle `budget` oder `admin`. Lehrkräfte finden
-  im Profil ihre **Kennung**, die sie nennen, wenn ihnen jemand einzeln aufbuchen soll;
-  die Plattform kennt keine Namen. Das Profil weist einen Zuschlag als eigene Zeile aus.
-
-  ⚠️ **Datenbank-Migration nötig** (`alembic upgrade head`, Revision `0081`).
-
-- **Fragen nach Giftigkeit und tödlichen Mengen werden erklärt, nicht beziffert.** Auf
-  „Was bedeutet LD50?" oder „Wie viel Koffein ist tödlich?" erläutert der Assistent den
-  Sachverhalt und vergleicht Stoffe, nennt aber keine Menge, die für einen Menschen
-  gefährlich wäre, und rechnet keine Tierversuchswerte auf Körpergewicht um; er verweist
-  auf den Giftnotruf. Unterrichtsfragen wie „Warum ist Kohlenstoffmonooxid tödlich?"
-  bleiben unberührt. Gilt nur für Schüler:innen — wer eine Stunde zur
-  Expositions-Risiko-Beziehung vorbereitet, bekommt die Werte weiterhin.
-
-  ⚠️ **Für bestehende Installationen:** Das neue Thema steht in
-  `config/home_experiment_triggers.example.yaml`. Die eigene
-  `config/home_experiment_triggers.yaml` wird beim Update nicht überschrieben — ohne
-  Übernahme des Abschnitts „Giftigkeit und Dosis" bleibt die Antwort unverändert.
-
-- **Bei einem Krisentreffer bekommt das Modell jetzt eine Anweisung für seine Antwort.**
-  Bisher änderte ein Treffer nur Banner und Meldung, nicht die Antwort selbst. Jetzt
-  gilt: keine Mengen, Mittel oder Methoden nennen, die Person ruhig und ohne Vorwurf
-  ansprechen, keine Diagnose, auf Hilfe hinweisen — und keine Telefonnummern oder
-  Adressen erfinden. Das wirkt in **allen** Krisenkategorien und für alle Rollen. Wer
-  einen anderen Text möchte, setzt `anweisung:` an der Kategorie in
-  `config/crisis_triggers.yaml`.
-
-- **Krisenerkennung: Fragen nach tödlichen Mengen — als Vorschlag zum Übernehmen.**
-  Die neue Kategorie `letalitaet` erkennt Letalität zusammen mit einem Medikament oder
-  einem Personenbezug („Wie viele Tabletten sind tödlich?", „Ab wie viel stirbt man bei
-  50 kg?"); Sachfragen aus dem Unterricht lösen nicht aus. In den Krisen-Meldungen lässt
-  sich jetzt nach Kategorie filtern.
-
-  ⚠️ **Der Abschnitt steht nur in `config/crisis_triggers.example.yaml` und ist ein
-  unabgestimmter Formulierungsvorschlag.** Vor der Übernahme in die eigene
-  `config/crisis_triggers.yaml` mit der Schulsozialarbeit abstimmen; bis dahin erkennt
-  die Kategorie nichts. Das Backend weist beim Start darauf hin.
-
-- **Was die Plattform selbst verbraucht, steht jetzt in der Auskunft.** `/budget` und
-  `/statistics/costs` zeigen eine eigene Zeile „System" für die Einbettungen von Suche und
-  Import — keinem Nutzerbudget angerechnet. Diese Aufrufe laufen über einen eigenen
-  Schlüssel statt über den Master-Key.
-
-  ⚠️ **Datenbank-Migration nötig** (`alembic upgrade head`, Revision `0082`).
-  ⚠️ **Neue Variable `LITELLM_SYSTEM_KEY`.** Ohne sie läuft alles weiter über den
-  Master-Key, mit Warnung beim Start. Anlegen: `docs/admin/installation.md`,
-  Abschnitt „Systemschlüssel".
-
-- **Fußnoten** (`[^1]`) erscheinen jetzt in der Werkstatt-Vorschau, im Chat und im
-  PDF-Export als Fußnoten. Bisher gelang das nur in Word und ODT; Vorschau und PDF
-  zeigten Rohtext.
-
-- **Formeln und Diagramme lassen sich kopieren.** Über einer abgesetzten Formel erscheint
-  „Kopieren" und liefert die LaTeX-Schreibweise; markierter Text mit Formeln wird
-  ebenfalls so kopiert. Diagramme im Chat bekommen „Code kopieren" und „SVG" (immer in
-  heller Darstellung).
+- **Zuschläge von Hand** unter `/budget`: zusätzliches Budget für eine Gruppe oder eine
+  Lehrkraft bis Schuljahresende, mit Vorschau und Grund im Protokoll (Rollen `budget`,
+  `admin`). Lehrkräfte finden dafür ihre **Kennung** im Profil.
+- **Verlauf auf `/budget`:** Verbrauch gegen Zusage, Woche für Woche, mit Tabelle.
+- **Zeile „System"** in `/budget` und `/statistics/costs`: Verbrauch von Suche und
+  Import, keinem Nutzerbudget angerechnet.
+- **Fragen nach Giftigkeit und tödlichen Mengen** werden Schüler:innen erklärt, aber
+  nicht beziffert; der Assistent verweist auf den Giftnotruf.
+- **Antwortanweisung bei Krisentreffern** (alle Kategorien): keine Mengen oder Methoden,
+  ruhig ansprechen, auf Hilfe verweisen, keine Kontaktdaten erfinden. Anpassbar über
+  `anweisung:` in `config/crisis_triggers.yaml`.
+- **Krisenkategorie `letalitaet`** als unabgestimmter Vorschlag in der Vorlage.
+  Krisen-Meldungen lassen sich nach Kategorie filtern.
+- **Fußnoten** in Werkstatt-Vorschau, Chat und PDF.
+- **Kopieren an Formeln und Diagrammen:** LaTeX einer Formel, Code und SVG eines
+  Diagramms. Markierter Text mit Formeln wird als LaTeX kopiert.
 
 ### Geändert
 
-- **Der Knopf unter einer Antwort heißt „Als Dokument bearbeiten"** statt „In Werkstatt
-  öffnen". Die Werkstatt selbst behält ihren Namen.
-
-- **`/budget` zeigt den Verbrauch gegen die Zusage als Verlauf.** Unter der Hochrechnung
-  stehen jetzt beide Linien Woche für Woche: Ist (tatsächlicher Verbrauch) und Soll (die
-  Zusage der Schule). Die Soll-Linie wächst nur in Unterrichtswochen und bleibt in den
-  Ferien flach. Daneben steht eine Tabelle mit denselben Werten.
-
-- **Der Modellwähler sagt jetzt, was ein Modell kostet und kann.** Im Auswahlfeld steht
-  neben dem Namen eine Schätzung („~7 🪙"), im Assistenten-Editor darunter die Angaben
-  zum gewählten Modell: Kosten je Nachricht, Kontextfenster (mit grober Seitenzahl), ob
-  es die Fähigkeiten eines Assistenten nutzen kann und ob es vor der Antwort denkt oder
-  Bilder versteht. Ein aufklappbarer Hinweis erklärt, was die Zahlen bedeuten, die Hilfe
-  zum Chat die Zeichen im Auswahlfeld. Bisher stand dort eine Liste von Namen und ein
-  Zahnrad.
-
-  ⚠️ **Was der Proxy nicht meldet, bleibt weg** — es wird nicht als „nein" oder „0"
-  dargestellt. Das Kontextfenster kennt LiteLLM nur für Modelle seiner eingebauten
-  Tabelle; für frei benannte Modelle trägt man `max_input_tokens` in `model_info` ein
-  (siehe [Modell-Szenarien](docs/admin/modell-szenarien.md)).
-
-- **Kosten erscheinen in „Einheiten" statt in Euro.** Eine Nachricht kostet rund
-  0,0007 € — im Chat stand deshalb bei fast jeder Antwort dasselbe „< 0,01 €", und am
-  Budget „0,04 € von 0,12 €". Eine Einheit ist ein Hundertstelcent (10 000 Einheiten
-  = 1 €, der Kurs steht im Profil): Eine normale Nachricht kostet damit 4–8 Einheiten,
-  ein Wochenbudget liegt bei 400–3 100, und ein teures Modell ist als teuer zu erkennen.
-  Betroffen sind die Angabe unter einer Antwort, die Chat-Summe und das Budget im Profil.
-  **Für die Administration ändert sich nichts** — `/budget` und die Kostenstatistik
-  führen weiter Euro, prüfbar gegen die Anbieterrechnung. Der Faktor steht in
-  `config/budget_tiers.yaml` (`einheiten_je_euro`); gerechnet und gespeichert wird
-  weiterhin in USD.
+- **Kosten in Einheiten** (10 000 Einheiten = 1 €) unter der Antwort, in der Chat-Summe
+  und im Profil. `/budget` und die Statistik bleiben in Euro.
+- **Modellwähler mit Kosten und Fähigkeiten:** „~7 🪙" und ⚙ im Auswahlfeld; im
+  Assistenten-Editor Kosten, Kontextfenster und Fähigkeiten des gewählten Modells.
+- Der Knopf unter einer Antwort heißt **„Als Dokument bearbeiten"**.
 
 ### Behoben
 
-- **Flussdiagramme landen hell in der Bibliothek.** Wer im Dunkelmodus „In Bibliothek"
-  wählte, bekam ein Diagramm mit hellen Linien auf durchsichtigem Grund, auf der weißen
-  Vorschau und als PNG kaum lesbar. Schon gespeicherte Diagramme bleiben so; löschen und
-  neu speichern behebt es.
+- Die Rollen `budget` und `statistics` lassen sich über `group_role_map` vergeben (als
+  Zusatzrollen; allein ermöglichen sie keine Anmeldung).
+- Einträge, die in `ui_levels.yaml`, `crisis_triggers.yaml` oder
+  `home_experiment_triggers.yaml` gegenüber der Vorlage fehlen, meldet das Backend beim
+  Start.
+- Kostendiagramm und Statistiken folgen dem Dunkelmodus; Beträge in deutscher
+  Schreibweise, kleine Beträge nie als „0,00 €".
+- Flussdiagramme landen auch im Dunkelmodus hell in der Bibliothek.
+- „Über diese Software" nennt alle Bibliotheken und Programme mit Lizenz.
 
-- **„Über diese Software" nennt alle verwendeten Bibliotheken und Programme** samt Lizenz,
-  darunter KaTeX, Mermaid, DOMPurify, WeasyPrint und Pandoc. Bisher stand dort eine kleine
-  Auswahl.
+### Migration
 
-- **Die Hilfe zum Chat sagte, Schaltpläne würden noch nicht dargestellt.** Das stimmte
-  nicht mehr; sie verweist jetzt auf die Seite zu Diagrammen und Funktionsgraphen.
+⚠️ **Vor dem Ausrollen eine Sicherung ziehen.**
 
-- **Diagramme und Statistiken liegen einheitlich auf der Kartenfläche.** Im Dunkelmodus
-  war die Kostenstatistik schwarz, die Nutzungs-Heatmap grau. Beide Statistiken und das
-  Verbrauchsdiagramm unter `/budget` nutzen jetzt dieselbe erhöhte Fläche.
+```bash
+docker compose build --no-cache
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
+```
 
-- **Das Kostendiagramm unter Statistik passt jetzt zu Hell- und Dunkelmodus.** Es nahm
-  feste Farben, die keinem Modus folgten. Beträge stehen jetzt in deutscher Schreibweise
-  (`0,0123 €` statt `0.0123 €`); unter einem Euro mit bis zu vier Nachkommastellen, damit
-  ein einzelner Tag nicht als `0,00 €` erscheint; noch kleinere Beträge als
-  `< 0,0001 €`. Die Werte gibt es zusätzlich als
-  aufklappbare Tabelle.
+`alembic upgrade head` führt `0081` (Tabelle `budget_grants`) und `0082` (Tabelle
+`system_spend`) aus. Beide sind rückrollbar; dabei gehen Zuschläge samt Protokoll bzw.
+der Systemverbrauch verloren.
 
-- **Die Rollen `budget` und `statistics` lassen sich jetzt vergeben.** Die Plattform
-  prüfte beide überall, die Zuordnung über Gruppen (`group_role_map` in
-  `config/auth.yaml`) ließ sie aber nicht zu. Beide sind Zusatzrollen wie `admin`:
-  Wer nur in einer dieser Gruppen ist, ohne `teacher` oder `admin`, kann sich nicht
-  anmelden.
+**Neue Variable `LITELLM_SYSTEM_KEY`** — Anleitung in `docs/admin/installation.md`,
+Abschnitt „Systemschlüssel". Ohne sie läuft alles weiter über den Master-Key, mit
+Warnung beim Start.
 
-- **Nicht übernommene Abschnitte aus den mitgelieferten Vorlagen fallen jetzt auf.**
-  Ergänzt die Meldung aus 0.11.1 um die Krisenmuster (`crisis_triggers.yaml`) und die
-  Sicherheitsauslöser (`home_experiment_triggers.yaml`). Beide Dateien überleben jedes
-  Update — was eine neue Fassung hinzufügt, stand bisher nur in der Vorlage, und eine
-  nicht übernommene Prüfung fand schlicht nicht statt, ohne dass irgendwo etwas davon
-  stand. Das Backend nennt beim Start Datei, Eintrag und Folge. Übernommen wird nichts
-  von selbst: Krisenmuster und Gefahrenthemen bleiben Schulentscheidung.
+**Aus den Vorlagen übernehmen** — die eigenen Dateien werden nicht überschrieben; das
+Backend nennt beim Start, was fehlt:
 
-- **Nach einem Update fehlende Navigationseinträge fallen jetzt auf.** Die eigene
-  `config/ui_levels.yaml` wird beim Update nie überschrieben — neue Einträge stehen
-  zunächst nur in der mitgelieferten Vorlage und erschienen deshalb nicht in der
-  Seitenleiste, ohne dass irgendwo etwas davon stand. So blieb nach 0.11 die Startseite
-  unsichtbar. Das Backend nennt beim Start jetzt Rolle und Eintrag. Wer den engeren
-  Zuschnitt absichtlich gewählt hat, übergeht die Meldung.
+- `config/home_experiment_triggers.yaml`: Thema „Giftigkeit und Dosis".
+- `config/crisis_triggers.yaml`: Kategorie `letalitaet` — **erst nach Abstimmung mit
+  der Schulsozialarbeit**.
+- `config/ui_levels.yaml`: fehlende Navigationseinträge.
+
+Optional: `einheiten_je_euro` in `config/budget_tiers.yaml` (Vorgabe 10 000);
+`max_input_tokens` in `model_info` der LiteLLM-Config, damit frei benannte Modelle ihr
+Kontextfenster zeigen (siehe `docs/admin/modell-szenarien.md`).
 
 ## [0.11.0] – 2026-09-27
 
