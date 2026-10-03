@@ -5,9 +5,13 @@ import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import path from "path";
 
-const { version } = JSON.parse(
-  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
-);
+// Die Plattformversion hat **eine** Quelle: `backend/VERSION` (0.13, P4). Das Backend
+// meldet sie in `/health`; hier landet sie in `__APP_VERSION__` (Über-Seite, Feedback).
+// `package.json` trägt bewusst keine Version mehr — sonst gäbe es zwei Zahlen.
+const version = readFileSync(
+  new URL("../backend/VERSION", import.meta.url),
+  "utf-8",
+).trim();
 
 const gitCommit = (() => {
   try {

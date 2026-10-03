@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   solchen Phase zeigen Planer und Word-Export keine Uhrzeiten mehr an.
 - `PATCH /planning/lessons/{id}` antwortet zusätzlich mit den gespeicherten Phasen (samt
   neu vergebener Kennungen) und dem Stundenziel.
+- `GET /health` nennt die Plattformversion (`{"status": "ok", "version": "…"}`). Sie steht
+  jetzt allein in `backend/VERSION`.
 
 ### Behoben
 

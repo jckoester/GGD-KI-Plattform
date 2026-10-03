@@ -15,6 +15,14 @@ docker compose up -d
 > der Stand des Servers **benannt**: `git status` zeigt `HEAD detached at 0.12.1`, und
 > `git describe --tags` beantwortet jederzeit „was läuft hier eigentlich".
 >
+> Was das laufende Backend **tatsächlich** ist — das gebaute Image, nicht der ausgecheckte
+> Stand —, nennt seit 0.13 `/health`. Weichen beide ab, fehlt der Neubau:
+>
+> ```bash
+> docker compose exec backend curl -s localhost:8000/health
+> # {"status":"ok","version":"0.13.0"}
+> ```
+>
 > Die eigenen Konfigurationsdateien unter `config/` gehören nicht zum Repository und
 > bleiben beim Wechsel unangetastet.
 >

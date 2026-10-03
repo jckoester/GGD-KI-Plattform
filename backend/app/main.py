@@ -262,7 +262,11 @@ app.add_middleware(
 
 @app.get("/health", tags=["meta"])
 async def health():
-    return {"status": "ok"}
+    # Seit 0.13 mit Version (`app/version.py`): Clients wie das Obsidian-Plugin prüfen
+    # daran, ob die Plattform eine Fähigkeit schon hat. Ohne Anmeldung erreichbar.
+    from app.version import plattformversion
+
+    return {"status": "ok", "version": plattformversion()}
 
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])

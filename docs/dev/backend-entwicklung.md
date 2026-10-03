@@ -68,6 +68,18 @@ Integrationstests laufen gegen eine lokale PostgreSQL-Instanz mit pgvector.
 Die Verbindungs-URL wird aus `TEST_DATABASE_URL` (`.env`) gelesen.
 Alembic-Migrationen werden automatisch vor der Test-Session eingespielt.
 
+## Plattformversion
+
+Die Version steht in **`backend/VERSION`** — eine Zeile, die einzige Quelle. Bei der
+Release-Vorbereitung wird sie dort hochgezählt, nirgends sonst. Das Backend meldet sie in
+`GET /health` (`app/version.py`), der Frontend-Build setzt sie als `__APP_VERSION__`
+(Über-Seite, Feedback; `vite.config.js` liest die Datei, `frontend/Dockerfile` kopiert sie
+mit). `frontend/package.json` trägt bewusst **keine** Version; `src/lib/version.test.js`
+schlägt an, falls dort wieder eine entsteht.
+
+Clients prüfen daran Fähigkeiten: Das Obsidian-Plugin schreibt Phasen erst zurück, wenn
+`/health` mindestens 0.13.0 nennt.
+
 ## Skripte (`backend/scripts/`)
 
 Alle Skripte sind eigenständig ausführbar und können sowohl direkt als auch

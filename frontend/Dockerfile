@@ -15,6 +15,8 @@ COPY docs/user/ /repo/docs/user/
 COPY scripts/ /repo/scripts/
 # Quelle der generierten taxonomy.js — Systemdatei im Backend, nicht in config/ (ADR-018)
 COPY backend/app/context/taxonomy.yaml /repo/backend/app/context/taxonomy.yaml
+# Die Plattformversion — einzige Quelle, `vite.config.js` liest sie (0.13, P4)
+COPY backend/VERSION /repo/backend/VERSION
 
 ARG PUBLIC_SCHOOL_NAME=ki@schule
 ARG PUBLIC_SCHOOL_LOGO_URL=
