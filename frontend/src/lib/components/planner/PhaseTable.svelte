@@ -1,4 +1,5 @@
 <script>
+    import { startzeiten } from "$lib/phasendauer.js";
     import { PRIO_COLORS } from "$lib/planner.js";
     import PhaseRow from "./PhaseRow.svelte";
 
@@ -30,15 +31,8 @@
     );
     const ueberhang = $derived(gesamtMin - verfuegbareMin);
 
-    // Kumulierte Minuten pro Phase
-    const kumMinutes = $derived(
-        (phasen || []).reduce((acc, p, i) => {
-            acc.push(
-                i === 0 ? 0 : acc[i - 1] + (phasen[i - 1]?.dauer_min || 0),
-            );
-            return acc;
-        }, []),
-    );
+    // Beginn je Phase — `null` nach einer Phase ohne Dauer (phasendauer.js)
+    const kumMinutes = $derived(startzeiten(phasen));
 
     // Prio-Segmente für Zeitbudget-Balken
     const prioSegments = $derived(() => {

@@ -305,7 +305,8 @@ def test_docx_mit_phase_ohne_dauer():
 
     doc = Document(io.BytesIO(export_docx(_mit_skizze())))
     zeiten = [zeile.cells[0].text for zeile in doc.tables[0].rows[1:]]
-    # Die Skizze beginnt bei 15 — und die Uhr läuft für die nächste Phase nicht weiter.
-    assert zeiten == ["0–15′", "ab 15′", "15–30′"]
+    # Die Skizze beginnt bei 15. Danach steht die Uhr: Wann die Sicherung beginnt, weiß
+    # niemand. Bis 03.10.2026 stand hier „15–30′" — die fehlende Dauer als 0 gezählt.
+    assert zeiten == ["0–15′", "ab 15′", "–"]
     budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
     assert "30′ / 90′ verfügbar · 1 Phase ohne Dauer" in budget

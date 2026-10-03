@@ -9,7 +9,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - **Phasen ohne Dauer:** Im Stundenentwurf darf die Minutenangabe einer Phase fehlen — für
   Skizzen, die erst später ausgearbeitet werden. Summen zählen sie nicht mit; der Export
-  zeigt für sie keine Minuten und nennt, wie viele Phasen noch ohne Dauer sind.
+  zeigt für sie keine Minuten und nennt, wie viele Phasen noch ohne Dauer sind. Nach einer
+  solchen Phase zeigen Planer und Word-Export keine Uhrzeiten mehr an.
 
 ## [0.12.1] – 2026-10-03
 

@@ -313,11 +313,16 @@ def export_docx(data: LessonExport) -> bytes:
         kum = 0
         for phase in data.phasen:
             row = table.add_row().cells
-            # Ohne Dauer: der Beginn ist bekannt, das Ende nicht — und die Uhr läuft
-            # für die nächste Phase nicht weiter.
-            row[0].text = (
-                f"{kum}–{kum + phase.dauer_min}′" if phase.dauer_min is not None else f"ab {kum}′"
-            )
+            # Ohne Dauer ist der Beginn bekannt, das Ende nicht — und damit auch nicht der
+            # Beginn jeder folgenden Phase: Die Uhr steht (`kum = None`), statt die fehlende
+            # Dauer als 0 weiterzuzählen. Dieselbe Regel wie `startzeiten()` im Planer
+            # (`frontend/src/lib/phasendauer.js`).
+            if kum is None:
+                row[0].text = "–"
+            elif phase.dauer_min is None:
+                row[0].text = f"ab {kum}′"
+            else:
+                row[0].text = f"{kum}–{kum + phase.dauer_min}′"
 
             # Prio: farbige Zelle + Kürzel (K/Ü/V), weiß zentriert — analog zur App.
             prio_cell = row[1]
@@ -340,7 +345,7 @@ def export_docx(data: LessonExport) -> bytes:
                     mc.add_paragraph(phase.methode)
 
             row[4].text = "\n".join(m for m in phase.material if m)
-            kum += phase.dauer_min or 0
+            kum = None if kum is None or phase.dauer_min is None else kum + phase.dauer_min
 
     buf = io.BytesIO()
     doc.save(buf)

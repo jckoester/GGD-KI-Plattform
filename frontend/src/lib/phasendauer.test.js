@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { dauerAusEingabe, dauerZusatz, zeitspanne } from "./phasendauer.js"
+import { dauerAusEingabe, dauerZusatz, startzeiten, zeitspanne } from "./phasendauer.js"
 
 describe("phasendauer — Phasen ohne Dauer (0.13, P1)", () => {
     it("ein geleertes Feld speichert null, keine 1", () => {
@@ -23,5 +23,17 @@ describe("phasendauer — Phasen ohne Dauer (0.13, P1)", () => {
     it("der Prompt nennt eine Dauer nur, wenn es eine gibt", () => {
         expect(dauerZusatz(15)).toBe(" (15′)")
         expect(dauerZusatz(null)).toBe("")
+    })
+
+    it("nach einer Phase ohne Dauer steht die Uhr — auch für alle folgenden", () => {
+        const phasen = [{ dauer_min: 10 }, { dauer_min: null }, { dauer_min: 10 }, { dauer_min: 5 }]
+        expect(startzeiten(phasen)).toEqual([0, 10, null, null])
+        expect(startzeiten(phasen).map((b, i) => zeitspanne(b, phasen[i].dauer_min)))
+            .toEqual(["0–10′", "ab 10′", "–", "–"])
+    })
+
+    it("ohne fehlende Dauer zählt die Uhr wie bisher", () => {
+        expect(startzeiten([{ dauer_min: 10 }, { dauer_min: 15 }, { dauer_min: 5 }])).toEqual([0, 10, 25])
+        expect(startzeiten([])).toEqual([])
     })
 })

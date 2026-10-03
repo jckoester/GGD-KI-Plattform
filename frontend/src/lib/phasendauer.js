@@ -17,8 +17,27 @@ export function dauerAusEingabe(text) {
     return Math.min(480, Math.max(1, zahl))
 }
 
-/** Die Zeitspalte: „10–25′", ohne Dauer „ab 10′" — nie „10–10′". */
+/**
+ * Der Beginn jeder Phase in Minuten — oder `null`, wo er sich nicht wissen lässt.
+ *
+ * ⚠️ **Nach einer Phase ohne Dauer steht die Uhr.** Ihr eigener Beginn ist bekannt, ihr
+ * Ende nicht — und damit auch nicht der Beginn jeder folgenden Phase. Eine fehlende Dauer
+ * als 0 weiterzuzählen hieße, `10–20′` anzuzeigen, wo niemand weiß, wann die Phase
+ * beginnt (Jan, 03.10.2026, im Browser bemerkt).
+ */
+export function startzeiten(phasen) {
+    const starts = []
+    let uhr = 0
+    for (const phase of phasen ?? []) {
+        starts.push(uhr)
+        uhr = uhr == null || phase?.dauer_min == null ? null : uhr + phase.dauer_min
+    }
+    return starts
+}
+
+/** Die Zeitspalte: „10–25′", ohne Dauer „ab 10′", mit unbekanntem Beginn „–". */
 export function zeitspanne(beginn, dauer) {
+    if (beginn == null) return "–"
     return dauer == null ? `ab ${beginn}′` : `${beginn}–${beginn + dauer}′`
 }
 
