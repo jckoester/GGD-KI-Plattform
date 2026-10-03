@@ -26,6 +26,7 @@ from app.auth.jwt import JwtPayload
 from app.config import settings
 from app.context.stunden import als_stundenzahl
 from app.context.taxonomy import validate_content_type, validate_unterrichtsstunde_metadata
+from app.planning import zuordnung
 from app.db.models import (
     ContextEdge,
     ContextNode,
@@ -466,6 +467,14 @@ async def update_slot(
     # als gehörte er dorthin. Der nächste, der die Schleife erweitert, soll nicht darüber
     # stolpern.
     update_data.pop("expected_updated_at", None)
+
+    # Nur Stunden und Einheiten **dieser** Gruppe (`zuordnung.py`) — vor dem Snapshot,
+    # damit eine abgelehnte Änderung keinen Wiederherstellungspunkt hinterlässt.
+    for feld in zuordnung.ARTEN:
+        if feld in update_data:
+            fehler = await zuordnung.fehler_fuer(db, slot.group_id, feld, update_data[feld])
+            if fehler:
+                raise HTTPException(status_code=422, detail=fehler)
 
     changes_assignment = bool(_SNAPSHOT_ASSIGNMENT_FIELDS & update_data.keys())
     if changes_assignment:

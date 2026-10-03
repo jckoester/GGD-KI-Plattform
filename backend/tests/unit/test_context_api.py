@@ -989,6 +989,10 @@ class TestStundenschemaAuchAllgemein:
     Planner-Router. Über `PATCH /context/nodes/{id}` — den der allgemeine Editor benutzt
     — ließ sich ein kaputter Verlaufsplan schreiben, den der Planner danach nicht mehr
     darstellen kann.
+
+    Seit 03.10.2026 (Patch 0.12.x) prüft dieser Weg mit **dem Schema des Planers**
+    (`LessonPhaseItem`): `name` statt `titel`, `status` optional. Vorher verlangte er ein
+    nie gebautes Format, und jede im Planer bearbeitete Stunde scheiterte hier mit 422.
     """
 
     def _db(self, node):
@@ -1006,18 +1010,17 @@ class TestStundenschemaAuchAllgemein:
         node = self._stunde()
         resp = TestClient(make_app(self._db(node), make_jwt())).patch(
             f"/context/nodes/{node.id}",
-            json={"metadata": {"phasen": [{"titel": "Einstieg"}]}},
+            json={"metadata": {"phasen": [{"name": "Einstieg"}]}},
         )
         assert resp.status_code == 422
-        assert "Pflichtfeld" in resp.json()["detail"]
+        assert "dauer_min" in resp.json()["detail"]
 
     def test_ungueltige_prio_wird_abgewiesen(self):
         node = self._stunde()
         resp = TestClient(make_app(self._db(node), make_jwt())).patch(
             f"/context/nodes/{node.id}",
             json={"metadata": {"phasen": [{
-                "id": "p1", "titel": "Einstieg", "dauer_min": 10,
-                "prio": "wichtig", "status": "geplant",
+                "id": "p1", "name": "Einstieg", "dauer_min": 10, "prio": "wichtig",
             }]}},
         )
         assert resp.status_code == 422
@@ -1028,8 +1031,8 @@ class TestStundenschemaAuchAllgemein:
         resp = TestClient(make_app(self._db(node), make_jwt())).patch(
             f"/context/nodes/{node.id}",
             json={"metadata": {"phasen": [{
-                "id": "p1", "titel": "Einstieg", "dauer_min": 10,
-                "prio": "kern", "status": "geplant",
+                "id": "p1", "name": "Einstieg", "dauer_min": 10, "prio": "kern",
+                "material": [{"typ": "text", "wert": "AB"}],
             }]}},
         )
         assert resp.status_code == 200

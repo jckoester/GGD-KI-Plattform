@@ -48,6 +48,8 @@
     import { budget, refreshBudget } from "$lib/stores/budget.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { myGroups } from "$lib/stores/myGroups.js";
+    import { studentPickerItems } from "$lib/stores/subjectPickerItems.js";
+    import { chatKontextText } from "$lib/gruppenmarke.js";
     import { ausUsd, text as einheitenText } from "$lib/einheiten.js";
     import { eintragsText } from "$lib/modellangaben.js";
     import {
@@ -58,6 +60,10 @@
         activeConversationGroupId,
     } from "$lib/stores/pageTitle.js";
 
+    // Wie in der Sidebar: `admin` ist eine Erweiterung der Lehrkraft-Rolle.
+    const istLehrkraft = $derived(
+        $user?.roles.includes("teacher") || $user?.roles.includes("admin"),
+    );
     let messages = $state([]);
     let input = $state("");
     let textarea = $state(null);
@@ -1514,12 +1520,14 @@
                             />
                             <span>
                                 {#if activeGroupId}
-                                    <!-- Gruppenname aus myTeachingGroups -->
-                                    {$myGroups.find(
-                                        (g) => g.id === activeGroupId,
-                                    )?.name ??
-                                        subj?.name ??
-                                        ""}
+                                    <!-- Lehrkraft: die Gruppe; Schüler:in: das Fach,
+                                         wie in der Fachauswahl (gruppenmarke.js) -->
+                                    {chatKontextText(activeGroupId, {
+                                        istLehrkraft,
+                                        gruppen: $myGroups,
+                                        schuelerAuswahl: $studentPickerItems,
+                                        fachName: subj?.name ?? null,
+                                    })}
                                 {:else}
                                     {subj?.name ?? ""}
                                 {/if}

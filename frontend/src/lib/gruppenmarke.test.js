@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { chatTooltip, gruppenMarke, gruppeZumChat } from "./gruppenmarke.js"
+import { chatKontextText, chatTooltip, gruppenMarke, gruppeZumChat } from "./gruppenmarke.js"
 
 const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -107,5 +107,50 @@ describe("Beide Listen benutzen dieselbe Regel", () => {
 
     it("die History zeigt sie sichtbar — dort ist Platz", () => {
         expect(HISTORY).toContain("gruppenMarke(")
+    })
+})
+
+describe("chatKontextText — die Marke unter der Chateingabe", () => {
+    const VIER = [
+        { id: 11, name: "M 10A" }, { id: 12, name: "M 10B" },
+        { id: 13, name: "M 10C" }, { id: 14, name: "M 10D" },
+    ]
+
+    it("Lehrkraft: vier Gruppen desselben Fachs bleiben unterscheidbar", () => {
+        const texte = VIER.map((g) =>
+            chatKontextText(g.id, { istLehrkraft: true, gruppen: VIER, fachName: "Mathematik" }))
+        expect(texte).toEqual(["M 10A", "M 10B", "M 10C", "M 10D"])
+    })
+
+    it("Schüler:in: das Fach, nicht der Gruppenname", () => {
+        const auswahl = [{ id: 21, label: "Mathematik" }]
+        const gruppen = [{ id: 21, name: "m-hb-10c-2026" }]
+        expect(chatKontextText(21, { gruppen, schuelerAuswahl: auswahl, fachName: "Mathematik" }))
+            .toBe("Mathematik")
+    })
+
+    it("Schüler:in mit zwei Gruppen desselben Fachs: dieselbe Beschriftung wie in der Fachauswahl", () => {
+        const auswahl = [
+            { id: 31, label: "Englisch · E-Förder" },
+            { id: 32, label: "Englisch · E 9b" },
+        ]
+        expect(chatKontextText(32, { schuelerAuswahl: auswahl, fachName: "Englisch" }))
+            .toBe("Englisch · E 9b")
+    })
+
+    it("Schüler:in, Gruppe nicht in der Auswahl: das Fach — nie die Kennung", () => {
+        const gruppen = [{ id: 41, name: "nwt-tl-9abcd" }]
+        expect(chatKontextText(41, { gruppen, schuelerAuswahl: [], fachName: "NwT" })).toBe("NwT")
+    })
+
+    it("nichts bekannt: leer statt erfunden", () => {
+        expect(chatKontextText(99, { istLehrkraft: true })).toBe("")
+        expect(chatKontextText(99, {})).toBe("")
+    })
+
+    it("die Chat-Seite nutzt die Regel, statt den Gruppennamen selbst zu suchen", () => {
+        const CHAT = readFileSync(join(SRC, "routes/(app)/chat/+page.svelte"), "utf8")
+        expect(CHAT).toContain("chatKontextText(")
+        expect(CHAT).not.toContain("$myGroups.find(")
     })
 })

@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Die Marke unter der Chateingabe zeigt Schüler:innen das Fach statt des Gruppennamens.
+- Eine im Planer bearbeitete Stunde lässt sich auch über den Wissensspeicher speichern
+  (bisher Fehler 422).
+- Ein Termin im Jahresplan nimmt nur Stunden und Unterrichtseinheiten seiner eigenen
+  Gruppe auf — auch über die Schnittstelle und die Planungswerkzeuge des Assistenten.
+
 ## [0.12.0] – 2026-10-02
 
 Kosten werden lesbar: Einheiten statt Bruchteilen eines Cents, ein Verlauf gegen die

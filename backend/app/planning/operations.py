@@ -20,6 +20,7 @@ from app.planning.ausfall import setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
+from app.planning import zuordnung
 
 VALID_KATEGORIEN: frozenset[str] = frozenset(
     {"unterricht", "pruefung", "puffer", "ausfall", "vertretung"}
@@ -194,6 +195,10 @@ async def _validate(
             s = slots.get(op.slot_id)
             if s is not None and s.kategorie == "ausfall" and op.unit_node_id is not None:
                 errors.append(f"{ctx}: Ausfall-Slot nimmt keine UE auf")
+            # Die ID kommt vom Modell — nur Einheiten dieser Gruppe (`zuordnung.py`).
+            fehler = await zuordnung.fehler_fuer(db, group_id, "ue_node_id", op.unit_node_id)
+            if fehler:
+                errors.append(f"{ctx}: {fehler}")
         elif isinstance(op, SetTopic):
             s = slots.get(op.slot_id)
             if s is not None and s.kategorie == "ausfall" and op.thema:

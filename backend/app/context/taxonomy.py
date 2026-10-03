@@ -344,50 +344,54 @@ def ist_persoenlich(content_type: str | None) -> bool:
     return content_type in PERSOENLICHE_CONTENT_TYPES
 
 
-_VALID_PRIOS = frozenset({"kern", "uebung", "vertiefung"})
 _VALID_PHASEN_STATUS = frozenset({"geplant", "erledigt", "offen", "gestrichen"})
 
 
 def validate_unterrichtsstunde_metadata(metadata: dict) -> None:
     """Validiert das metadata-Objekt eines unterrichtsstunde-Knotens.
 
-    Wirft ValueError bei Verstößen gegen das Phasen-Schema.
+    Je Phase gilt **dasselbe Schema wie im Planer** (`LessonPhaseItem`): `name` und
+    `dauer_min` Pflicht, `prio`, `sozialform`, `methode` und `material` (eine Liste)
+    so, wie Planer und Planungsassistent sie schreiben. Dazu `status`, den das Schema
+    nicht kennt: optional (Nachbereitung, Kürzung), aber gültig, wenn gesetzt.
+
+    ⚠️ Bis 0.12.0 verlangte diese Funktion ein eigenes, nie gebautes Format — `titel`
+    und `status` als Pflicht, `material` als Einzelobjekt. Jede im Planer bearbeitete
+    Stunde scheiterte damit über `PATCH /context/nodes` mit 422. Eine Feldliste statt
+    zwei: Was der Planer speichern kann, nimmt dieser Weg auch an.
+
+    Wirft ValueError bei Verstößen.
     """
+    from pydantic import ValidationError
+
+    # Erst hier: Das Planungsmodul ist ein Nutzer dieser Datei, kein Teil von ihr.
+    from app.planning.schemas import LessonPhaseItem
+
     phasen = metadata.get("phasen", [])
     if not isinstance(phasen, list):
         raise ValueError("metadata.phasen muss eine Liste sein")
 
     for i, phase in enumerate(phasen):
         prefix = f"phasen[{i}]"
-        for field in ("id", "titel", "dauer_min", "prio", "status"):
-            if field not in phase:
-                raise ValueError(f"{prefix}.{field} ist Pflichtfeld")
-
-        dauer = phase["dauer_min"]
-        if not isinstance(dauer, (int, float)) or dauer <= 0:
-            raise ValueError(f"{prefix}.dauer_min muss > 0 sein")
-
-        if phase["prio"] not in _VALID_PRIOS:
-            raise ValueError(
-                f"{prefix}.prio '{phase['prio']}' ist ungültig. "
-                f"Erlaubt: {sorted(_VALID_PRIOS)}"
+        if not isinstance(phase, dict):
+            raise ValueError(f"{prefix} muss ein Objekt sein")
+        try:
+            LessonPhaseItem.model_validate(phase).validate_prio()
+        except ValidationError as exc:
+            gruende = "; ".join(
+                f"{'.'.join(str(t) for t in fehler['loc'])}: {fehler['msg']}"
+                for fehler in exc.errors()
             )
+            raise ValueError(f"{prefix}: {gruende}") from None
+        except ValueError as exc:
+            raise ValueError(f"{prefix}.prio: {exc}") from None
 
-        if phase["status"] not in _VALID_PHASEN_STATUS:
+        status = phase.get("status")
+        if status is not None and status not in _VALID_PHASEN_STATUS:
             raise ValueError(
-                f"{prefix}.status '{phase['status']}' ist ungültig. "
+                f"{prefix}.status '{status}' ist ungültig. "
                 f"Erlaubt: {sorted(_VALID_PHASEN_STATUS)}"
             )
-
-        for field in ("sozialform", "methode", "material"):
-            if field in phase and phase[field] is not None:
-                val = phase[field]
-                has_text = "text" in val
-                has_node = "node_id" in val
-                if has_text == has_node:
-                    raise ValueError(
-                        f"{prefix}.{field} muss genau eines von 'text' oder 'node_id' enthalten"
-                    )
 
 
 # content_types die ein Embedding erhalten — abgeleitet aus taxonomy.yaml (embedding: true)

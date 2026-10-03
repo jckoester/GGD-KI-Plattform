@@ -322,6 +322,12 @@ async def _handle_assign_slots_to_unit(args: dict, ctx: ToolContext) -> dict:
     unit_id = UUID(unit_str)
     slot_ids = [UUID(s) for s in slot_strs]
 
+    # Die ID kommt vom Modell — nur Einheiten dieser Gruppe (`zuordnung.py`).
+    from app.planning.zuordnung import fehler_fuer
+    fehler = await fehler_fuer(ctx.db, group_id, "ue_node_id", unit_id)
+    if fehler:
+        return {"error": fehler}
+
     updated = await assign_slots_to_unit(
         ctx.db, group_id, ctx.user, unit_id, slot_ids
     )

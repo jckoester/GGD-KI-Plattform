@@ -57,3 +57,28 @@ export function chatTooltip(titel, marke) {
     const t = (titel ?? "").trim() || "Unbenannter Chat"
     return marke ? `${t} · ${marke}` : t
 }
+
+/**
+ * Der Text der Marke unter der Chateingabe, wenn eine Gruppe gewählt ist (Patch 0.12.x).
+ *
+ * Dieselbe Regel wie bei `gruppenMarke`, aber ein anderer Rückgabewert: Die Marke ist
+ * Text und hat kein farbiges Fachsymbol daneben, das die Auskunft schon gäbe — sie
+ * schweigt deshalb nie, wo ein Fach bekannt ist.
+ *
+ * - **Lehrkraft:** die Gruppe. Vier Chats zu vier Gruppen desselben Fachs müssen
+ *   unterscheidbar bleiben.
+ * - **Schüler:in:** das Fach — und zwar **genau die Beschriftung der Fachauswahl**
+ *   (`studentPickerItems`), also mit Gruppenzusatz, wenn sie zwei Gruppen desselben
+ *   Fachs hat. Die Marke zeigt, was gewählt wurde, mit denselben Worten.
+ *
+ * ⚠️ Bis 0.12.0 stand hier für alle der Gruppenname — für Schüler:innen eine Kennung aus
+ * Schulkonto oder Stundenplan, keine Auskunft.
+ *
+ * @param {number|null} groupId
+ * @param {{istLehrkraft?: boolean, gruppen?: Array, schuelerAuswahl?: Array, fachName?: string|null}} kontext
+ */
+export function chatKontextText(groupId, { istLehrkraft = false, gruppen = [], schuelerAuswahl = [], fachName = null } = {}) {
+    const fach = fachName ?? ""
+    if (istLehrkraft) return gruppeZumChat(groupId, gruppen)?.name ?? fach
+    return (schuelerAuswahl ?? []).find((i) => i.id === groupId)?.label ?? fach
+}
