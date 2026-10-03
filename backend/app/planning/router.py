@@ -1402,7 +1402,19 @@ async def patch_lesson(
     # Der neue Stand gehört in die Antwort: Ein Client mit Vorbedingung braucht ihn für
     # den nächsten Schreibversuch. Ohne ihn müsste er nach jedem Schreiben neu lesen —
     # und in der Lücke dazwischen wäre er wieder veraltet.
-    return {"ok": True, "updated_at": now}
+    #
+    # Seit 0.13 (P3) auch Phasen und Stundenziel, **so wie gespeichert** — mit den
+    # Kennungen, die `sichere_phasen_kennungen` neuen Phasen vergeben hat, und den
+    # Feldern, die `uebernimm_zusatzfelder` übernommen hat. Dieselbe Form wie
+    # `GET /planning/lessons/{id}`. Ein Client, der sich den Serverstand merkt (das
+    # Obsidian-Plugin, `uplan_server_hash`), kennt sonst die Kennungen seiner neuen
+    # Phasen nicht und hielte den nächsten Abgleich für eine Änderung auf dem Server.
+    return {
+        "ok": True,
+        "updated_at": now,
+        "phasen": meta.get("phasen", []),
+        "stundenziel": meta.get("stundenziel"),
+    }
 
 
 # ── POST /planning/slots/{slot_id}/review ────────────────────────────────────

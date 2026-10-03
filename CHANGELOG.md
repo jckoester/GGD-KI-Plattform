@@ -11,6 +11,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Skizzen, die erst später ausgearbeitet werden. Summen zählen sie nicht mit; der Export
   zeigt für sie keine Minuten und nennt, wie viele Phasen noch ohne Dauer sind. Nach einer
   solchen Phase zeigen Planer und Word-Export keine Uhrzeiten mehr an.
+- `PATCH /planning/lessons/{id}` antwortet zusätzlich mit den gespeicherten Phasen (samt
+  neu vergebener Kennungen) und dem Stundenziel.
 
 ### Behoben
 

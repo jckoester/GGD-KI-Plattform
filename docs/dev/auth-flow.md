@@ -160,7 +160,16 @@ entstanden ist.
 
 Freiwillig: Ohne das Feld bleibt es beim bisherigen Verhalten; die Oberfläche schickt es
 nicht. Der `PATCH` auf eine Stunde gibt den neuen Stand zurück, damit ein Client zweimal
-hintereinander schreiben kann, ohne dazwischen neu zu lesen.
+hintereinander schreiben kann, ohne dazwischen neu zu lesen: `updated_at` und seit 0.13
+auch `phasen` und `stundenziel`, **so wie gespeichert** — dieselbe Form wie
+`GET /planning/lessons/{id}`, mit den Kennungen, die neue Phasen bekommen haben.
+
+**Felder, die der Client nicht kennt, bleiben erhalten (0.13).** Nachbereitung, Streichen,
+Kürzen und Übertragen setzen an einer Phase Felder außerhalb des Phasenschemas (`status`,
+`kuerzung`, `uebertrag_von`). Ein Client schickt nur die Schemafelder zurück; für jede Phase
+mit bekannter `id` übernimmt der Server die übrigen aus dem gespeicherten Stand. Er muss sie
+also weder kennen noch zurückschicken — wohl aber die `id` jeder bestehenden Phase, sonst
+gilt sie als neu. Regel: `app/planning/phasen.py`, `uebernimm_zusatzfelder`.
 
 ⚠️ Das Ganze steht und fällt damit, dass `updated_at` sich bewegt. Bis 12.09.2026 tat es
 das auf mehreren Schreibwegen nicht — dann ginge der Vergleich immer auf und der 409 käme

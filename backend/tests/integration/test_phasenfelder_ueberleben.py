@@ -182,3 +182,43 @@ async def test_planungsassistent_behaelt_den_status(test_client, auth_headers, g
     nachher = await _phasen(test_client, h, stunde)
     assert nachher[0]["status"] == "offen" and nachher[0]["name"] == "Erarbeitung (überarbeitet)"
     assert "status" not in nachher[1]
+
+
+# ── P3: Die Antwort nennt den gespeicherten Stand ────────────────────────────
+
+@pytest.mark.asyncio
+async def test_antwort_nennt_den_gespeicherten_stand(test_client, auth_headers, gruppe):
+    """Kennungen neuer Phasen und übernommene Felder — ohne neu zu lesen (0.13, P3)."""
+    h = auth_headers
+    slot = (await _slots(test_client, h))[7]["id"]
+    stunde = await _stunde(test_client, h, slot)
+    vorher = await _phasen(test_client, h, stunde)
+    await test_client.post(f"/planning/slots/{slot}/review", headers=h,
+                           json={"phasen_status": {vorher[1]["id"]: "offen"}})
+
+    phasen = [{k: p.get(k) for k in SCHEMAFELDER} for p in vorher] + [{"name": "Neu", "dauer_min": 5}]
+    resp = await test_client.patch(f"/planning/lessons/{stunde}", headers=h,
+                                   json={"phasen": phasen, "stundenziel": "Übersetzung berechnen"})
+    assert resp.status_code == 200, resp.text
+    antwort = resp.json()
+    assert antwort["ok"] is True and antwort["updated_at"]
+    assert antwort["stundenziel"] == "Übersetzung berechnen"
+    assert [p["status"] for p in antwort["phasen"][:3]] == ["erledigt", "offen", "erledigt"]
+    neu = antwort["phasen"][3]
+    assert neu["name"] == "Neu" and neu["id"] and "status" not in neu
+
+    gelesen = (await test_client.get(f"/planning/lessons/{stunde}", headers=h)).json()
+    assert gelesen["phasen"] == antwort["phasen"]
+    assert gelesen["stundenziel"] == antwort["stundenziel"]
+
+
+@pytest.mark.asyncio
+async def test_antwort_ohne_phasen_im_aufruf_nennt_die_gespeicherten(test_client, auth_headers, gruppe):
+    """Wer nur das Stundenziel schickt, bekommt trotzdem den ganzen Stand zurück."""
+    h = auth_headers
+    slot = (await _slots(test_client, h))[8]["id"]
+    stunde = await _stunde(test_client, h, slot)
+    resp = await test_client.patch(f"/planning/lessons/{stunde}", headers=h, json={"stundenziel": ""})
+    assert resp.status_code == 200
+    assert [p["name"] for p in resp.json()["phasen"]] == ["Einstieg", "Erarbeitung", "Sicherung"]
+    assert resp.json()["stundenziel"] == ""
