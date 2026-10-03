@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.12.1] – 2026-10-03
+
+Drei Fehler, zwei davon in der Jahresplanung.
+
 ### Behoben
 
 - Die Marke unter der Chateingabe zeigt Schüler:innen das Fach statt des Gruppennamens.
