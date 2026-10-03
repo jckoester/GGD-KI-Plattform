@@ -1010,10 +1010,10 @@ class TestStundenschemaAuchAllgemein:
         node = self._stunde()
         resp = TestClient(make_app(self._db(node), make_jwt())).patch(
             f"/context/nodes/{node.id}",
-            json={"metadata": {"phasen": [{"name": "Einstieg"}]}},
+            json={"metadata": {"phasen": [{"dauer_min": 10}]}},
         )
         assert resp.status_code == 422
-        assert "dauer_min" in resp.json()["detail"]
+        assert "name" in resp.json()["detail"]
 
     def test_ungueltige_prio_wird_abgewiesen(self):
         node = self._stunde()

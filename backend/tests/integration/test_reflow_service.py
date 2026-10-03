@@ -278,3 +278,22 @@ async def test_regeneration_ohne_snapshot_faellt_auf_das_halbjahr_zurueck(
     assert ctx.regeneration["alte_zuordnung"] is None
     themen = [s["thema"] for s in ctx.regeneration["neue_tranche"]]
     assert themen == ["ohne snap 0", "ohne snap 1"], themen
+
+
+@pytest.mark.asyncio
+async def test_reflow_open_phases_mit_phase_ohne_dauer(db_session, seed_reflow_group):
+    """0.13, P1: `"dauer_min": null` war hier ein 500er — `p.get("dauer_min", 0)`
+    liefert bei vorhandenem Schlüssel `None`, nicht die Vorgabe."""
+    stunde = _stunde(
+        "Skizze",
+        phasen=[{"id": "p1", "name": "Erarbeitung", "prio": "kern",
+                 "dauer_min": None, "status": "offen"}],
+        refs_offen=[],
+    )
+    db_session.add(stunde)
+    s = _slot(BASE + timedelta(days=1), stunde_id=stunde.id, thema="Skizze")
+    db_session.add(s)
+    await db_session.flush()
+
+    ctx = await build_reflow_context(db_session, GROUP_ID, trigger="open_phases", slot_ids=[s.id])
+    assert [(p.name, p.dauer_min) for p in ctx.offene_phasen.phasen] == [("Erarbeitung", None)]

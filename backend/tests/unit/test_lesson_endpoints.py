@@ -139,3 +139,14 @@ def test_lesson_update_phasen_invalid_prio_rejected():
     with pytest.raises(ValueError):
         for p in payload.phasen:
             p.validate_prio()
+
+
+def test_lesson_phase_item_ohne_dauer_ist_gueltig():
+    """0.13, P1: Eine Skizze hat noch keine Minuten — fehlend und `None` sind gleich."""
+    from app.planning.schemas import LessonPhaseItem
+    from pydantic import ValidationError
+
+    assert LessonPhaseItem(name="Einstieg").dauer_min is None
+    assert LessonPhaseItem(name="Einstieg", dauer_min=None).dauer_min is None
+    with pytest.raises(ValidationError):
+        LessonPhaseItem(name="Einstieg", dauer_min=481)

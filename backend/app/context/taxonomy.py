@@ -350,8 +350,8 @@ _VALID_PHASEN_STATUS = frozenset({"geplant", "erledigt", "offen", "gestrichen"})
 def validate_unterrichtsstunde_metadata(metadata: dict) -> None:
     """Validiert das metadata-Objekt eines unterrichtsstunde-Knotens.
 
-    Je Phase gilt **dasselbe Schema wie im Planer** (`LessonPhaseItem`): `name` und
-    `dauer_min` Pflicht, `prio`, `sozialform`, `methode` und `material` (eine Liste)
+    Je Phase gilt **dasselbe Schema wie im Planer** (`LessonPhaseItem`): `name` Pflicht,
+    `dauer_min` optional (seit 0.13), `prio`, `sozialform`, `methode` und `material` (eine Liste)
     so, wie Planer und Planungsassistent sie schreiben. Dazu `status`, den das Schema
     nicht kennt: optional (Nachbereitung, Kürzung), aber gültig, wenn gesetzt.
 

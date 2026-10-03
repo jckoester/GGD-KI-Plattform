@@ -64,7 +64,8 @@ async def test_kaputte_phase_wird_weiter_abgelehnt(test_client, auth_headers, gr
                                  json={"titel": "Zahnräder 2", "farbe": 0})).json()["id"]
     stunde = (await test_client.post(f"/planning/units/{ue}/lessons", headers=h,
                                      json={"titel": "Kaputt"})).json()["id"]
+    # Ohne Namen — eine Phase ohne Dauer ist seit 0.13 gültig (P1).
     resp = await test_client.patch(f"/context/nodes/{stunde}", headers=h,
-                                   json={"metadata": {"phasen": [{"name": "Ohne Dauer"}]}})
+                                   json={"metadata": {"phasen": [{"dauer_min": 10}]}})
     assert resp.status_code == 422
-    assert "dauer_min" in resp.text
+    assert "name" in resp.text

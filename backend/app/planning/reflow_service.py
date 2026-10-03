@@ -12,6 +12,8 @@ from datetime import date, timedelta
 from uuid import UUID
 
 import sqlalchemy as sa
+from typing import Optional
+
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,7 +64,8 @@ class UeBilanzItem(BaseModel):
 class OpenPhase(BaseModel):
     id: str
     name: str
-    dauer_min: int
+    # None = noch nicht festgelegt (0.13). Nur Kontext für den Assistenten; niemand rechnet damit.
+    dauer_min: Optional[int] = None
     prio: str
     status: str
 
@@ -344,7 +347,7 @@ async def build_reflow_context(
                     OpenPhase(
                         id=str(p.get("id") or ""),
                         name=p.get("name", ""),
-                        dauer_min=p.get("dauer_min", 0),
+                        dauer_min=p.get("dauer_min"),
                         prio=p.get("prio", "kern"),
                         status=p.get("status", "geplant"),
                     )

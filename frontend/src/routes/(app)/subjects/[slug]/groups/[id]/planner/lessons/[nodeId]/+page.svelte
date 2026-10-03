@@ -1,4 +1,5 @@
 <script>
+  import { dauerZusatz } from '$lib/phasendauer.js'
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
   import {
@@ -175,7 +176,7 @@
   // ── Material-Erzeugung (✦ Szenario 6) ───────────────────────────────────────
   function openMaterialCreate(phase) {
     const prompt = encodeURIComponent(
-      `Erstelle Material für Phase "${phase.name}" (${phase.dauer_min}′) im Stundenentwurf "${titel}".`
+      `Erstelle Material für Phase "${phase.name}"${dauerZusatz(phase.dauer_min)} im Stundenentwurf "${titel}".`
     )
     goto(`/chat?group_id=${groupId}&q=${prompt}`)
   }

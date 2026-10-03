@@ -269,3 +269,43 @@ class TestFormelnImStundenPdf:
     async def test_ohne_kompetenzen_kein_block(self):
         html = await self._pdf_html(_make_export(refs=[]))
         assert "Kompetenzen:" not in html
+
+
+# ── Phasen ohne Dauer (0.13, P1) ──────────────────────────────────────────────
+
+def _mit_skizze(**overrides):
+    """Die Beispielstunde, deren Erarbeitung noch keine Minuten hat."""
+    export = _make_export(**overrides)
+    export.phasen[1].dauer_min = None
+    return export
+
+
+def test_markdown_phase_ohne_dauer_nur_mit_prio():
+    md = export_markdown(_mit_skizze())
+    assert "## Erarbeitung (Kern)" in md
+    assert "None" not in md and "0′ ·" not in md
+
+
+def test_markdown_zeitbudget_zaehlt_nur_gesetzte_dauern_und_nennt_den_rest():
+    md = export_markdown(_mit_skizze())
+    # 15 + 15, die Erarbeitung zählt nicht als 0 still mit
+    assert "30′ geplant / 90′ verfügbar · 1 Phase ohne Dauer" in md
+
+
+def test_markdown_ohne_fehlende_dauer_kein_zusatz():
+    assert "ohne Dauer" not in export_markdown(_make_export())
+
+
+def test_docx_mit_phase_ohne_dauer():
+    import io
+
+    from docx import Document
+
+    from app.planning.lesson_export import export_docx
+
+    doc = Document(io.BytesIO(export_docx(_mit_skizze())))
+    zeiten = [zeile.cells[0].text for zeile in doc.tables[0].rows[1:]]
+    # Die Skizze beginnt bei 15 — und die Uhr läuft für die nächste Phase nicht weiter.
+    assert zeiten == ["0–15′", "ab 15′", "15–30′"]
+    budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
+    assert "30′ / 90′ verfügbar · 1 Phase ohne Dauer" in budget

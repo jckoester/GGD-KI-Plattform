@@ -89,3 +89,10 @@ def test_validate_phase_muss_objekt_sein():
 def test_validate_phasen_muss_liste_sein():
     with pytest.raises(ValueError, match="Liste"):
         validate_unterrichtsstunde_metadata({"phasen": {"name": "Einstieg"}})
+
+
+def test_validate_phase_ohne_dauer_ok():
+    """0.13, P1 — auf dem Weg `PATCH /context/nodes` ebenso wie über den Planer."""
+    phase = {k: v for k, v in PLANER_PHASE.items() if k != "dauer_min"}
+    validate_unterrichtsstunde_metadata({"phasen": [phase]})
+    validate_unterrichtsstunde_metadata(_mit(dauer_min=None))

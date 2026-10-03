@@ -19,10 +19,27 @@ logger = logging.getLogger(__name__)
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
+def zeitbudget(phasen) -> tuple[int, int]:
+    """(Summe der gesetzten Dauern, Zahl der Phasen ohne Dauer) — für beide Exporte.
+
+    Fehlende Dauern zählen nicht als 0 stillschweigend mit: Die Zahl der Phasen ohne
+    Dauer wird genannt, sonst sähe „35′ geplant" vollständig aus, obwohl zwei fehlen.
+    """
+    gesetzt = [p.dauer_min for p in phasen if p.dauer_min is not None]
+    return sum(gesetzt), len(phasen) - len(gesetzt)
+
+
+def ohne_dauer_zusatz(anzahl: int) -> str:
+    """„ · 2 Phasen ohne Dauer" — oder nichts."""
+    if not anzahl:
+        return ""
+    return f" · {anzahl} {'Phase' if anzahl == 1 else 'Phasen'} ohne Dauer"
+
+
 @dataclass
 class ExportPhase:
     name: str
-    dauer_min: int
+    dauer_min: Optional[int]  # None = noch nicht festgelegt (0.13)
     beschreibung: str
     prio: str
     sozialform: str  # display string
@@ -104,7 +121,7 @@ async def build_lesson_export(db: AsyncSession, node_id: UUID) -> LessonExport:
     phasen = [
         ExportPhase(
             name=p.get("name", ""),
-            dauer_min=p.get("dauer_min", 0),
+            dauer_min=p.get("dauer_min"),
             beschreibung=p.get("beschreibung") or "",
             prio=p.get("prio", "kern"),
             sozialform=_display_linked(p.get("sozialform") or {}),
@@ -151,16 +168,19 @@ def export_markdown(data: LessonExport) -> str:
     if data.stundenziel:
         lines += [f"**Stundenziel:** {data.stundenziel}", ""]
 
-    total = sum(p.dauer_min for p in data.phasen)
+    total, ohne = zeitbudget(data.phasen)
     lines.append(
         f"Zeitbudget: {total}′ geplant / {data.verfuegbare_min}′ verfügbar"
         + (f" (**+{total - data.verfuegbare_min}′ Überhang**)" if total > data.verfuegbare_min else "")
+        + ohne_dauer_zusatz(ohne)
     )
     lines.append("")
 
     for phase in data.phasen:
         prio = prio_labels.get(phase.prio, phase.prio)
-        lines.append(f"## {phase.name} ({phase.dauer_min}′ · {prio})")
+        # Ohne Dauer nur die Prio — nie `0′`, nie `None′`.
+        dauer = f"{phase.dauer_min}′ · " if phase.dauer_min is not None else ""
+        lines.append(f"## {phase.name} ({dauer}{prio})")
         if phase.beschreibung:
             lines.append("")
             lines.append(phase.beschreibung)
@@ -273,10 +293,11 @@ def export_docx(data: LessonExport) -> bytes:
         p.add_run("Stundenziel: ").bold = True
         p.add_run(data.stundenziel)
 
-    total = sum(ph.dauer_min for ph in data.phasen)
+    total, ohne = zeitbudget(data.phasen)
     budget_text = f"Zeitbudget: {total}′ / {data.verfuegbare_min}′ verfügbar"
     if total > data.verfuegbare_min:
         budget_text += f" (+{total - data.verfuegbare_min}′ Überhang)"
+    budget_text += ohne_dauer_zusatz(ohne)
     doc.add_paragraph(budget_text).runs[0].font.size = Pt(9)
 
     doc.add_paragraph()
@@ -292,7 +313,11 @@ def export_docx(data: LessonExport) -> bytes:
         kum = 0
         for phase in data.phasen:
             row = table.add_row().cells
-            row[0].text = f"{kum}–{kum + phase.dauer_min}′"
+            # Ohne Dauer: der Beginn ist bekannt, das Ende nicht — und die Uhr läuft
+            # für die nächste Phase nicht weiter.
+            row[0].text = (
+                f"{kum}–{kum + phase.dauer_min}′" if phase.dauer_min is not None else f"ab {kum}′"
+            )
 
             # Prio: farbige Zelle + Kürzel (K/Ü/V), weiß zentriert — analog zur App.
             prio_cell = row[1]
@@ -315,7 +340,7 @@ def export_docx(data: LessonExport) -> bytes:
                     mc.add_paragraph(phase.methode)
 
             row[4].text = "\n".join(m for m in phase.material if m)
-            kum += phase.dauer_min
+            kum += phase.dauer_min or 0
 
     buf = io.BytesIO()
     doc.save(buf)

@@ -219,7 +219,10 @@ class LessonLinkedItem(BaseModel):
 class LessonPhaseItem(BaseModel):
     id: Optional[str] = None
     name: str = Field(..., min_length=1, max_length=200)
-    dauer_min: int = Field(..., ge=1, le=480)
+    # Optional seit 0.13 (P1): Eine Skizze aus dem Vault hat oft noch keine Minuten.
+    # `None` heißt „noch nicht festgelegt"; `0` bleibt ungültig — es gibt keine Phase
+    # mit null Minuten, nur eine ohne Angabe. Leser behandeln `null` und Fehlen gleich.
+    dauer_min: Optional[int] = Field(None, ge=1, le=480)
     beschreibung: Optional[str] = None
     prio: str = Field("kern")
     sozialform: Optional[LessonLinkedItem] = None

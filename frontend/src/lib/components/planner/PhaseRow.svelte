@@ -1,4 +1,5 @@
 <script>
+  import { dauerAusEingabe, zeitspanne } from '$lib/phasendauer.js'
   import { PRIO_COLORS, PRIO_LABELS } from '$lib/planner.js'
   import MaterialCell from './MaterialCell.svelte'
   import LinkedTermInput from './LinkedTermInput.svelte'
@@ -30,7 +31,6 @@
   } = $props()
 
   const PRIOS = ['kern', 'uebung', 'vertiefung']
-  const endMin = $derived(kumMin + (phase.dauer_min || 0))
 
   function patch(updates) {
     onChange({ ...phase, ...updates })
@@ -45,7 +45,7 @@
 <tr class="border-b border-light-ui-3 dark:border-dark-ui-3 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2 group">
   <!-- Zeit -->
   <td class="px-2 py-2 text-xs text-light-tx-2 dark:text-dark-tx-2 whitespace-nowrap w-20">
-    {kumMin}–{endMin}′
+    {zeitspanne(kumMin, phase.dauer_min)}
   </td>
 
   <!-- Prio-Pill + Select -->
@@ -115,8 +115,9 @@
       type="number"
       min="1"
       max="480"
-      value={phase.dauer_min}
-      onchange={(e) => patch({ dauer_min: Math.max(1, parseInt(e.currentTarget.value) || 1) })}
+      value={phase.dauer_min ?? ''}
+      placeholder="–"
+      onchange={(e) => patch({ dauer_min: dauerAusEingabe(e.currentTarget.value) })}
       class="w-full bg-transparent text-sm text-light-tx dark:text-dark-tx text-right
              border-b border-transparent focus:border-primary dark:focus:border-primary-dark outline-none"
       aria-label="Dauer in Minuten"
