@@ -233,3 +233,41 @@ async def test_set_topic_auf_anderes_thema_meldet_nichts(db_session, seed_ops_gr
     res = await _apply(db_session, [SetTopic(op="set_topic", slot_id=ziel.id,
                                              thema="Ganz anderes Thema")])
     assert res.hinweise == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("art", ["streichen", "kuerzen"])
+async def test_phasenoperation_kommt_in_der_datenbank_an(async_engine, seed_ops_group, art):
+    """Bis 0.13 meldeten Streichen und Kürzen `applied=1` und hinterließen nichts.
+
+    ⚠️ Gelesen wird in einer **frischen** Sitzung. Die übrigen Tests hier prüfen das
+    Objekt im Speicher derselben Sitzung — dort war die Änderung (bis zum nächsten
+    Neuladen) zu sehen, und genau deshalb blieb der Fehler unbemerkt.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from app.planning.operations import ShortenPhase
+
+    fabrik = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    nid = uuid4()
+    async with fabrik() as db:
+        db.add(ContextNode(
+            id=nid, category="artifact", content_type="unterrichtsstunde", title="Persistenz",
+            metadata_={"phasen": [{"id": "p1", "name": "Sicherung", "dauer_min": 20, "prio": "kern"}]},
+            read_scope="group_teachers", write_scope="group_teachers",
+            read_scope_group_id=GROUP_ID, write_scope_group_id=GROUP_ID, status="active",
+        ))
+        await db.commit()
+
+    op = (StrikePhase(op="strike_phase", lesson_id=nid, phase_id="p1") if art == "streichen"
+          else ShortenPhase(op="shorten_phase", lesson_id=nid, phase_id="p1", dauer_min=5))
+    async with fabrik() as db:
+        ergebnis = await apply_operations(db, GROUP_ID, [op], summary=art)
+    assert ergebnis.applied == 1 and not ergebnis.errors
+
+    async with fabrik() as db:
+        phase = (await db.get(ContextNode, nid)).metadata_["phasen"][0]
+    if art == "streichen":
+        assert phase["status"] == "gestrichen" and phase["kuerzung"] is True
+    else:
+        assert phase["dauer_min"] == 5 and phase["kuerzung"] is True

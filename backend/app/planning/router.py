@@ -48,7 +48,7 @@ from app.planning import mein_tag as mein_tag_modul
 from app.planning import vorbedingung
 from app.planning.permissions import require_group_teacher, zugang_zur_stunde
 from app.planning.operations import apply_operations, parse_operations
-from app.planning.phasen import sichere_phasen_kennungen
+from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
 from app.planning.schemas import (
     AbWochenRead,
     BalanceRead,
@@ -1383,9 +1383,12 @@ async def patch_lesson(
         # `exclude_none=False` schreibt eine fehlende Kennung als `"id": null` in
         # die Metadaten — deshalb wird sie hier vergeben und nicht erst dort
         # bemerkt, wo etwas auf sie zeigt.
-        meta["phasen"] = sichere_phasen_kennungen(
-            [p.model_dump(exclude_none=False, mode="json") for p in payload.phasen]
-        )
+        # Felder, die der Planer nicht kennt (Nachbereitung, Streichen, Übertragen),
+        # übernimmt der Server aus dem gespeicherten Stand — `uebernimm_zusatzfelder`.
+        meta["phasen"] = sichere_phasen_kennungen(uebernimm_zusatzfelder(
+            [p.model_dump(exclude_none=False, mode="json") for p in payload.phasen],
+            meta.get("phasen"),
+        ))
     if payload.refs is not None:
         meta["refs"] = [r.model_dump(mode="json") for r in payload.refs]
     if payload.refs_dismissed is not None:

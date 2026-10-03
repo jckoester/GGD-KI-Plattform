@@ -46,3 +46,51 @@ def sichere_phasen_kennungen(phasen: Any) -> list[dict[str, Any]]:
         else:
             ergebnis.append({**phase, "id": str(uuid.uuid4())})
     return ergebnis
+
+
+def uebernimm_zusatzfelder(
+    neu: Any, gespeichert: Any
+) -> list[dict[str, Any]]:
+    """Die neue Phasenliste eines Editors — mit den Feldern, die er nicht kennt (0.13, P2).
+
+    Drei Wege schreiben Felder in eine Phase, die `LessonPhaseItem` nicht kennt: die
+    Nachbereitung (`status`), das Streichen und Kürzen (`status`, `kuerzung`) und das
+    Übertragen (`status`, `uebertrag_von`). Ein Editor — der Planer, das Obsidian-Plugin,
+    der Planungsassistent — schickt nur die Schemafelder. Bis 0.12 verwarf jedes Speichern
+    deshalb Nachbereitungsstatus, Kürzungs- und Übertragsmarke: Eine als „offen"
+    nachbereitete Phase tauchte im Reflow nicht mehr auf.
+
+    Die Regel (Entscheidung Jan, 03.10.2026):
+
+    - Aus der **neuen** Phase zählen nur die Schemafelder. Was der Editor darüber hinaus
+      schickt, bestimmt er nicht — diese Felder gehören der Nachbereitung und den
+      Operationen.
+    - Kommt die Phase mit einer `id`, die gespeichert ist, werden **alle** Felder der
+      gespeicherten Phase übernommen, die nicht zum Schema gehören. „Alle" statt einer
+      festen Liste: Das nächste Feld, das eine Operation setzt, ist gleich mit geschützt.
+    - Neue Phasen (ohne oder mit unbekannter `id`) bekommen nichts — auch kein ``null``,
+      denn jeder Leser behandelt ``null`` wie Fehlen, und ``"status": null`` wäre eine
+      Falle (`reflow_service`: ``p.get("status", "geplant")``).
+    - Was der Editor weglässt, ist weg, samt seiner Felder. Gewollt.
+
+    Die Kennungsvergabe (`sichere_phasen_kennungen`) läuft **danach**: Eine neu vergebene
+    Kennung kann nichts Gespeichertes treffen.
+    """
+    from app.planning.schemas import LessonPhaseItem
+
+    schema = set(LessonPhaseItem.model_fields)
+    vorher = {
+        p["id"]: p
+        for p in (gespeichert or [])
+        if isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"].strip()
+    }
+    ergebnis: list[dict[str, Any]] = []
+    for phase in neu or []:
+        if not isinstance(phase, dict):
+            ergebnis.append(phase)
+            continue
+        eigene = {k: v for k, v in phase.items() if k in schema}
+        alt = vorher.get(phase.get("id")) if isinstance(phase.get("id"), str) else None
+        zusatz = {k: v for k, v in (alt or {}).items() if k not in schema}
+        ergebnis.append({**eigene, **zusatz})
+    return ergebnis

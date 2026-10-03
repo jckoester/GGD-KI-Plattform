@@ -12,6 +12,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   zeigt für sie keine Minuten und nennt, wie viele Phasen noch ohne Dauer sind. Nach einer
   solchen Phase zeigen Planer und Word-Export keine Uhrzeiten mehr an.
 
+### Behoben
+
+- Speichern im Stundenplaner löschte den Nachbereitungsstatus von Phasen sowie Kürzungs-
+  und Übertragsmarken; ebenso, wenn der Planungsassistent die Phasen überarbeitete.
+- Streichen und Kürzen einer Phase durch den Planungsassistenten wurden als erledigt
+  gemeldet, aber nicht gespeichert.
+
 ## [0.12.1] – 2026-10-03
 
 Drei Fehler, zwei davon in der Jahresplanung.

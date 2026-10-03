@@ -262,7 +262,13 @@ def _apply_swap(a: LessonSlot, b: LessonSlot) -> None:
 
 def _mutate_phases(lesson: ContextNode, fn) -> None:
     meta = dict(lesson.metadata_ or {})
-    meta["phasen"] = fn(list(meta.get("phasen", [])))
+    # ⚠️ Jede Phase **kopieren**, bevor `fn` sie ändert. Bis 0.13 änderte `fn` die
+    # gespeicherten Dicts an Ort und Stelle — dieselben Objekte, die SQLAlchemy als
+    # „alten Wert" hält. Alt und neu waren damit gleich, es wurde kein UPDATE
+    # geschrieben, und der nächste Ladevorgang holte den alten Stand zurück: Streichen
+    # und Kürzen durch den Assistenten meldeten Erfolg und hinterließen nichts
+    # (gemessen 03.10.2026 in zwei Sitzungen). `_apply_transfer` kopiert schon so.
+    meta["phasen"] = fn([dict(p) if isinstance(p, dict) else p for p in meta.get("phasen", [])])
     lesson.metadata_ = meta
 
 

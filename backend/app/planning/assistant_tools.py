@@ -21,7 +21,7 @@ from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
-from app.planning.phasen import sichere_phasen_kennungen
+from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
 from app.planning.permissions import require_group_teacher
 from app.planning.reflow_service import build_reflow_context
 from app.planning.snapshots import restore_snapshot
@@ -824,7 +824,9 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     # durch `LessonPhaseItem` — ohne diesen Schritt hätten seine Phasen nie eine
     # Kennung, und `phasen_status`, Übertragung und Materialkanten liefen still
     # ins Leere.
-    phasen = sichere_phasen_kennungen(phasen)
+    # Dieselbe Regel wie beim Speichern im Planer: Was die Nachbereitung und die
+    # Operationen an einer Phase vermerkt haben, überlebt (`uebernimm_zusatzfelder`).
+    phasen = sichere_phasen_kennungen(uebernimm_zusatzfelder(phasen, meta.get("phasen")))
     meta["phasen"] = phasen
     stundenziel = args.get("stundenziel")
     if stundenziel is not None:
@@ -905,6 +907,15 @@ register_tool(ChatTool(
                         "items": {
                             "type": "object",
                             "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "description": (
+                                        "Kennung aus get_lesson_detail — bei bestehenden "
+                                        "Phasen unverändert übernehmen, sonst gehen ihr "
+                                        "Nachbereitungsstatus und ihre Marken verloren. "
+                                        "Neue Phasen ohne id."
+                                    ),
+                                },
                                 "name": {"type": "string"},
                                 "dauer_min": {"type": "integer", "minimum": 1},
                                 "beschreibung": {"type": "string"},
