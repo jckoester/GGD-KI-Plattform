@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.13.0] – 2026-10-03
+
+Vorarbeit für den Rückkanal aus Obsidian: Stundenentwürfe dürfen Phasen ohne Dauer
+haben, und ein Speichern behält, was Nachbereitung und Assistent an den Phasen vermerkt
+haben. Keine Migration, keine neue Konfiguration.
+
 ### Geändert
 
 - **Phasen ohne Dauer:** Im Stundenentwurf darf die Minutenangabe einer Phase fehlen — für
