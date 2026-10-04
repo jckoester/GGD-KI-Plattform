@@ -78,7 +78,7 @@ mit). `frontend/package.json` trägt bewusst **keine** Version; `src/lib/version
 schlägt an, falls dort wieder eine entsteht.
 
 Clients prüfen daran Fähigkeiten: Das Obsidian-Plugin schreibt Phasen erst zurück, wenn
-`/health` mindestens 0.13.0 nennt.
+`/health` mindestens 0.13.0 nennt. `GET /planning/groups` gibt es ab 0.13.1.
 
 ## Skripte (`backend/scripts/`)
 

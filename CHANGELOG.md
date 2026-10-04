@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.13.1] – 2026-10-04
+
+Fehlerbehebungen an Stundenentwurf und Nachbereitung, weitere Namen von Bausteinen wirken
+wieder, dazu die Gruppenliste für das Obsidian-Plugin. Keine Migration, keine neue
+Konfiguration — nach dem Update aber einmal `aliase_nachziehen.py` (unten).
+
 ### Neu
 
 - `GET /planning/groups` nennt die eigenen Unterrichtsgruppen (als Lehrkraft) mit Fach,
@@ -13,28 +19,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Behoben
 
-- Der PDF-Export eines Stundenentwurfs brach ab, sobald eine Phase keine Dauer hatte. Er
-  zeigt die Zeiten jetzt wie der Word-Export.
-- Nach „Rückgängig" behielten die Phasen ihren Nachbereitungsstatus, und eine erneute
-  Nachbereitung wurde oft nicht gespeichert. „Rückgängig" stellt jetzt den Stand vor der
-  Nachbereitung wieder her — eine vorab gestrichene Phase bleibt gestrichen.
+- Der PDF-Export eines Stundenentwurfs brach bei einer Phase ohne Dauer ab.
+- „Rückgängig" bei der Nachbereitung und eine erneute Nachbereitung wurden oft nicht
+  gespeichert. „Rückgängig" stellt jetzt den Stand davor wieder her; eine vorab
+  gestrichene Phase bleibt gestrichen.
 - Die Nachbereitung setzte jede Phase auf „erledigt", auch eine vorab gestrichene — von
-  Hand ebenso wie automatisch. Ein gespeicherter Status bleibt jetzt stehen, solange die
-  Lehrkraft ihn nicht ändert.
+  Hand wie automatisch. Ein gespeicherter Status bleibt jetzt stehen.
 - Die Vorschläge für Methode und Sozialform im Stundenentwurf und die Filterfelder der
-  Sammlungen fanden Bausteine nicht mehr über ihre weiteren Namen (etwa „Ich-Du-Wir" →
+  Sammlungen fanden Bausteine nicht über ihre weiteren Namen (etwa „Ich-Du-Wir" →
   Think-Pair-Share).
-- Bildungsplan-Import, Methoden-Grundvokabular (`seed_methodik.py`) und
-  `POST/PATCH /context/nodes` legten weitere Namen seit 0.9.0 an einer Stelle ab, die
-  niemand liest: Nach einem Import fehlten die Synonyme der Operatoren in Suche,
-  Vorschlägen und Vektoren. Die API weist `metadata.aliase` jetzt ab; weitere Namen
-  gehören in das Feld `aliase`.
+- Bildungsplan-Import, Methodik-Seed und `POST/PATCH /context/nodes` legten weitere Namen
+  seit 0.9.0 in einem Feld ab, das niemand liest; Operator-Synonyme fehlten dann in Suche,
+  Vorschlägen und Vektoren. Die API weist `metadata.aliase` jetzt ab.
 
 ### Nach dem Update
 
-Direkt nach dem Update einmal nachziehen, was bis dahin im alten Feld gelandet ist
-(betrifft jede Instanz, auf der seit 0.9.0 ein Bildungsplan-Import oder der Methodik-Seed
-lief). Bis dahin lassen sich betroffene Bausteine im Editor nicht speichern:
+Direkt nach dem Update einmal nachziehen, was im alten Feld gelandet ist (betrifft jede
+Instanz, auf der seit 0.9.0 ein Bildungsplan-Import oder der Methodik-Seed lief). Bis
+dahin lassen sich betroffene Bausteine im Editor nicht speichern:
 
 ```bash
 docker compose exec backend python scripts/aliase_nachziehen.py --dry-run
