@@ -36,6 +36,26 @@ def ohne_dauer_zusatz(anzahl: int) -> str:
     return f" · {anzahl} {'Phase' if anzahl == 1 else 'Phasen'} ohne Dauer"
 
 
+def zeitspalte(phasen) -> list[str]:
+    """Die Zeitangabe je Phase — für die Tabellen in DOCX und PDF.
+
+    Ohne Dauer ist der Beginn bekannt, das Ende nicht — und damit auch nicht der Beginn
+    jeder folgenden Phase: Die Uhr steht, statt die fehlende Dauer als 0 weiterzuzählen.
+    Dieselbe Regel wie `startzeiten()` im Planer (`frontend/src/lib/phasendauer.js`).
+    """
+    zeiten = []
+    uhr = 0
+    for phase in phasen:
+        if uhr is None:
+            zeiten.append("–")
+        elif phase.dauer_min is None:
+            zeiten.append(f"ab {uhr}′")
+        else:
+            zeiten.append(f"{uhr}–{uhr + phase.dauer_min}′")
+        uhr = None if uhr is None or phase.dauer_min is None else uhr + phase.dauer_min
+    return zeiten
+
+
 @dataclass
 class ExportPhase:
     name: str
@@ -231,12 +251,18 @@ async def export_pdf(data: LessonExport) -> bytes:
         loader=FileSystemLoader(str(_TEMPLATES_DIR)),
         autoescape=select_autoescape(["html"]),
     )
+    # Zeiten und Budget rechnet Python, das Template zeigt sie nur an — bis 0.13.0 rechnete
+    # es selbst und brach an einer Phase ohne Dauer mit `int + None` ab.
+    total, ohne = zeitbudget(data.phasen)
     template = env.get_template("lesson.html")
     html_str = template.render(
         data=data,
         beschreibungen=beschreibungen,
         stundenziel_html=stundenziel_html,
         refs_html=refs_html,
+        zeiten=zeitspalte(data.phasen),
+        total=total,
+        ohne_dauer=ohne_dauer_zusatz(ohne),
     )
     return weasyprint.HTML(string=html_str, base_url=str(_TEMPLATES_DIR)).write_pdf()
 
@@ -310,19 +336,9 @@ def export_docx(data: LessonExport) -> bytes:
             hdr[i].text = label
             hdr[i].paragraphs[0].runs[0].bold = True
 
-        kum = 0
-        for phase in data.phasen:
+        for phase, zeit in zip(data.phasen, zeitspalte(data.phasen)):
             row = table.add_row().cells
-            # Ohne Dauer ist der Beginn bekannt, das Ende nicht — und damit auch nicht der
-            # Beginn jeder folgenden Phase: Die Uhr steht (`kum = None`), statt die fehlende
-            # Dauer als 0 weiterzuzählen. Dieselbe Regel wie `startzeiten()` im Planer
-            # (`frontend/src/lib/phasendauer.js`).
-            if kum is None:
-                row[0].text = "–"
-            elif phase.dauer_min is None:
-                row[0].text = f"ab {kum}′"
-            else:
-                row[0].text = f"{kum}–{kum + phase.dauer_min}′"
+            row[0].text = zeit
 
             # Prio: farbige Zelle + Kürzel (K/Ü/V), weiß zentriert — analog zur App.
             prio_cell = row[1]
@@ -345,7 +361,6 @@ def export_docx(data: LessonExport) -> bytes:
                     mc.add_paragraph(phase.methode)
 
             row[4].text = "\n".join(m for m in phase.material if m)
-            kum = None if kum is None or phase.dauer_min is None else kum + phase.dauer_min
 
     buf = io.BytesIO()
     doc.save(buf)

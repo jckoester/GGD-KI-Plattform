@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Der PDF-Export eines Stundenentwurfs brach ab, sobald eine Phase keine Dauer hatte. Er
+  zeigt die Zeiten jetzt wie der Word-Export.
+
 ## [0.13.0] – 2026-10-03
 
 Vorarbeit für den Rückkanal aus Obsidian: Stundenentwürfe dürfen Phasen ohne Dauer

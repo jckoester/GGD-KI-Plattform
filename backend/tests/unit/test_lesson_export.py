@@ -310,3 +310,23 @@ def test_docx_mit_phase_ohne_dauer():
     assert zeiten == ["0–15′", "ab 15′", "–"]
     budget = next(p.text for p in doc.paragraphs if p.text.startswith("Zeitbudget"))
     assert "30′ / 90′ verfügbar · 1 Phase ohne Dauer" in budget
+
+
+@pytest.mark.asyncio
+async def test_pdf_mit_phase_ohne_dauer():
+    """Bis 0.13.0 rechnete `lesson.html` selbst und brach mit `int + None` ab (0.13.1)."""
+    pytest.importorskip("weasyprint")
+    from app.planning.lesson_export import export_pdf
+
+    assert (await export_pdf(_mit_skizze()))[:4] == b"%PDF"
+
+
+@pytest.mark.asyncio
+async def test_pdf_zeitspalte_und_budget_ohne_dauer():
+    import re
+
+    html = await TestFormelnImStundenPdf()._pdf_html(_mit_skizze())
+    zellen = re.findall(r"<tr>\s*<td>([^<]*)</td>", html)
+    # Dieselbe Regel wie im DOCX: nach der Skizze steht die Uhr.
+    assert zellen == ["0–15′", "ab 15′", "–"]
+    assert re.search(r"30′ geplant / 90′ verfügbar\s+· 1 Phase ohne Dauer", html)

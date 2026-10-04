@@ -53,12 +53,12 @@
 <p class="ziel"><strong>Stundenziel:</strong> {{ stundenziel_html | safe }}</p>
 {% endif %}
 
-{% set total = data.phasen | sum(attribute='dauer_min') %}
 <p class="budget">
   Zeitbudget: {{ total }}′ geplant / {{ data.verfuegbare_min }}′ verfügbar
   {% if total > data.verfuegbare_min %}
     <span class="warn">(+{{ total - data.verfuegbare_min }}′ Überhang)</span>
   {% endif %}
+  {{ ohne_dauer }}
 </p>
 
 {% if data.phasen %}
@@ -73,11 +73,10 @@
     </tr>
   </thead>
   <tbody>
-    {% set ns = namespace(kum=0) %}
     {% for phase in data.phasen %}
     {% set prio_class = "prio-" ~ phase.prio %}
     <tr>
-      <td>{{ ns.kum }}–{{ ns.kum + phase.dauer_min }}′</td>
+      <td>{{ zeiten[loop.index0] }}</td>
       <td class="prio-cell {{ prio_class }}"
           title="{% if phase.prio == 'kern' %}Kern{% elif phase.prio == 'uebung' %}Übung{% else %}Vertiefung{% endif %}">
         {% if phase.prio == "kern" %}K{% elif phase.prio == "uebung" %}Ü{% else %}V{% endif %}
@@ -93,7 +92,6 @@
       </td>
       <td>{% for m in phase.material %}{% if m %}{{ m }}{% if not loop.last %}<br>{% endif %}{% endif %}{% endfor %}</td>
     </tr>
-    {% set ns.kum = ns.kum + phase.dauer_min %}
     {% endfor %}
   </tbody>
 </table>
