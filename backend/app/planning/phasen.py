@@ -54,11 +54,11 @@ def uebernimm_zusatzfelder(
     """Die neue Phasenliste eines Editors — mit den Feldern, die er nicht kennt (0.13, P2).
 
     Drei Wege schreiben Felder in eine Phase, die `LessonPhaseItem` nicht kennt: die
-    Nachbereitung (`status`), das Streichen und Kürzen (`status`, `kuerzung`) und das
-    Übertragen (`status`, `uebertrag_von`). Ein Editor — der Planer, das Obsidian-Plugin,
-    der Planungsassistent — schickt nur die Schemafelder. Bis 0.12 verwarf jedes Speichern
-    deshalb Nachbereitungsstatus, Kürzungs- und Übertragsmarke: Eine als „offen"
-    nachbereitete Phase tauchte im Reflow nicht mehr auf.
+    Nachbereitung (`status`, `status_vorher`), das Streichen und Kürzen (`status`,
+    `kuerzung`) und das Übertragen (`status`, `uebertrag_von`). Ein Editor — der Planer,
+    das Obsidian-Plugin, der Planungsassistent — schickt nur die Schemafelder. Bis 0.12
+    verwarf jedes Speichern deshalb Nachbereitungsstatus, Kürzungs- und Übertragsmarke:
+    Eine als „offen" nachbereitete Phase tauchte im Reflow nicht mehr auf.
 
     Die Regel (Entscheidung Jan, 03.10.2026):
 

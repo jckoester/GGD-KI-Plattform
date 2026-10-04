@@ -166,7 +166,8 @@ auch `phasen` und `stundenziel`, **so wie gespeichert** — dieselbe Form wie
 
 **Felder, die der Client nicht kennt, bleiben erhalten (0.13).** Nachbereitung, Streichen,
 Kürzen und Übertragen setzen an einer Phase Felder außerhalb des Phasenschemas (`status`,
-`kuerzung`, `uebertrag_von`). Ein Client schickt nur die Schemafelder zurück; für jede Phase
+`status_vorher`, `kuerzung`, `uebertrag_von`; `status_vorher` hält den Status vor der
+Nachbereitung fest, damit „Rückgängig" ihn zurückgibt). Ein Client schickt nur die Schemafelder zurück; für jede Phase
 mit bekannter `id` übernimmt der Server die übrigen aus dem gespeicherten Stand. Er muss sie
 also weder kennen noch zurückschicken — wohl aber die `id` jeder bestehenden Phase, sonst
 gilt sie als neu. Regel: `app/planning/phasen.py`, `uebernimm_zusatzfelder`.

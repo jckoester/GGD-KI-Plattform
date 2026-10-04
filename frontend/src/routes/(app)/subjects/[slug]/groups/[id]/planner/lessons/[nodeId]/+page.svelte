@@ -9,7 +9,13 @@
     createReview,
     deleteReview,
   } from '$lib/api.js'
-  import { dateLabel, weekdayLabel, ueColorIndex, mitPhasenKennungen } from '$lib/planner.js'
+  import {
+    dateLabel,
+    weekdayLabel,
+    ueColorIndex,
+    mitPhasenKennungen,
+    nachbereitungsVorbelegung,
+  } from '$lib/planner.js'
   import ErrorBanner from '$lib/components/ErrorBanner.svelte'
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
@@ -207,12 +213,8 @@
   // ── Nachbereiten ─────────────────────────────────────────────────────────────
 
   function startReview() {
-    // Alle Phasen auf 'erledigt' vorbelegen
-    const initial = {}
-    for (const p of phasen) {
-      initial[p.id ?? ''] = 'erledigt'
-    }
-    reviewStatus = initial
+    // Gespeicherte Stati bleiben stehen, sonst 'erledigt'
+    reviewStatus = nachbereitungsVorbelegung(phasen)
     reviewReflexion = ''
     reviewRefsOffen = []
     reviewStep = 'phases'

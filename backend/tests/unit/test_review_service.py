@@ -148,6 +148,24 @@ async def test_complete_review_default_status_erledigt():
     assert stunde.metadata_["phasen"][0]["status"] == "erledigt"
 
 
+@pytest.mark.parametrize(
+    "gespeichert, erwartet",
+    [
+        (None, "erledigt"),
+        ("gestrichen", "gestrichen"),
+        ("offen", "offen"),
+        ("erledigt", "erledigt"),
+        # Aus einer Übertragung — heißt „noch nicht nachbereitet".
+        ("geplant", "erledigt"),
+    ],
+)
+def test_vorbelegung_behaelt_einen_gespeicherten_status(gespeichert, erwartet):
+    from app.planning.review_service import vorbelegung
+
+    phase = {"id": "p1"} if gespeichert is None else {"id": "p1", "status": gespeichert}
+    assert vorbelegung(phase) == erwartet
+
+
 # ── complete_review: refs_offen ausgenommen ───────────────────────────────────
 
 @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { mitPhasenKennungen, entwurfsStand } from "./planner.js"
+import { mitPhasenKennungen, entwurfsStand, nachbereitungsVorbelegung } from "./planner.js"
 
 describe("entwurfsStand", () => {
   it("ohne verknüpften Entwurf: keiner", () => {
@@ -89,5 +89,29 @@ describe("mitPhasenKennungen", () => {
     expect(mitPhasenKennungen([])).toEqual([])
     expect(mitPhasenKennungen(null)).toEqual([])
     expect(mitPhasenKennungen(undefined)).toEqual([])
+  })
+})
+
+describe("nachbereitungsVorbelegung", () => {
+  it("ohne gespeicherten Status: erledigt", () => {
+    expect(nachbereitungsVorbelegung([{ id: "a" }, { id: "b", status: null }])).toEqual({
+      a: "erledigt",
+      b: "erledigt",
+    })
+  })
+
+  it("ein gespeicherter Status bleibt stehen", () => {
+    // Bis 0.13.0 begann jede Phase als „erledigt" — eine vom Assistenten gestrichene
+    // Phase wurde beim Absenden wieder erledigt.
+    const stati = nachbereitungsVorbelegung([
+      { id: "a", status: "gestrichen" },
+      { id: "b", status: "offen" },
+      { id: "c", status: "erledigt" },
+    ])
+    expect(stati).toEqual({ a: "gestrichen", b: "offen", c: "erledigt" })
+  })
+
+  it("„geplant“ aus einer Übertragung heißt noch nicht nachbereitet", () => {
+    expect(nachbereitungsVorbelegung([{ id: "a", status: "geplant" }])).toEqual({ a: "erledigt" })
   })
 })

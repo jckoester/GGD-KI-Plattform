@@ -12,6 +12,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode, LessonSlot, NodeEngagement
 
+#: Was eine Nachbereitung über eine Phase sagen kann. Andere gespeicherte Werte — etwa
+#: „geplant" aus einer Übertragung — heißen „noch nicht nachbereitet".
+NACHBEREITUNG_STATI = ("erledigt", "offen", "gestrichen")
+
+
+def vorbelegung(phase: dict) -> str:
+    """Der Status einer Phase, wenn die Nachbereitung nichts über sie sagt.
+
+    Ein schon gespeicherter Status bleibt — eine vorab gestrichene Phase wird nicht
+    „erledigt", nur weil die Nachbereitung sie nicht erwähnt. Bis 0.13.0 galt pauschal
+    „erledigt"; die Auto-Nachbereitung schickt gar keine Stati und überschrieb damit jede
+    Streichung. Dieselbe Regel belegt die Knöpfe im Stundeneditor vor.
+    """
+    status = phase.get("status")
+    return status if status in NACHBEREITUNG_STATI else "erledigt"
+
 
 @dataclass
 class ReviewResult:
@@ -43,15 +59,24 @@ async def complete_review(
         raise ValueError("Stunde nicht gefunden")
 
     meta = dict(stunde.metadata_ or {})
-    phasen = list(meta.get("phasen", []))
+    # ⚠️ Kopien, nicht die gespeicherten Phasen selbst: Wer sie in place ändert, ändert
+    # auch den Vergleichswert, an dem SQLAlchemy erkennt, ob es etwas zu schreiben gibt —
+    # dann schien alles gleich, und der neue Status kam nie in die Datenbank (gemessen
+    # 04.10.2026: nach „Rückgängig" und erneuter Nachbereitung). Wie `_mutate_phases`.
+    phasen = [dict(p) for p in meta.get("phasen", [])]
     refs_offen_ids = [str(r) for r in (refs_offen or [])]
     refs_offen_set = set(refs_offen_ids)
 
-    # 1. Phasen-Status schreiben
+    # 1. Phasen-Status schreiben — den bisherigen merken, damit „Rückgängig" ihn
+    #    zurückgibt, statt etwa eine vorab gestrichene Phase stillschweigend zu entstreichen.
     for phase in phasen:
         phase_id = str(phase.get("id") or "")
-        status = phasen_status.get(phase_id, "erledigt")
-        phase["status"] = status
+        vorher = phase.get("status")
+        if vorher is None:
+            phase.pop("status_vorher", None)
+        else:
+            phase["status_vorher"] = vorher
+        phase["status"] = phasen_status.get(phase_id) or vorbelegung(phase)
 
     if reflexion is not None:
         meta["reflexion"] = reflexion
@@ -158,8 +183,15 @@ async def undo_review(db: AsyncSession, slot_id: UUID, *, group_id: int) -> int:
             stunde = await db.get(ContextNode, slot.stunde_node_id)
             if stunde:
                 meta = dict(stunde.metadata_ or {})
-                for phase in meta.get("phasen", []):
-                    phase.pop("status", None)
+                # Kopien — aus demselben Grund wie in `complete_review`.
+                meta["phasen"] = [dict(p) for p in meta.get("phasen", [])]
+                for phase in meta["phasen"]:
+                    # Zurück auf den Stand vor der Nachbereitung, nicht auf „kein Status".
+                    vorher = phase.pop("status_vorher", None)
+                    if vorher is None:
+                        phase.pop("status", None)
+                    else:
+                        phase["status"] = vorher
                 meta.pop("reflexion", None)
                 meta["refs_offen"] = []
                 stunde.metadata_ = meta

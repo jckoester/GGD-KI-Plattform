@@ -9,6 +9,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Der PDF-Export eines Stundenentwurfs brach ab, sobald eine Phase keine Dauer hatte. Er
   zeigt die Zeiten jetzt wie der Word-Export.
+- Nach „Rückgängig" behielten die Phasen ihren Nachbereitungsstatus, und eine erneute
+  Nachbereitung wurde oft nicht gespeichert. „Rückgängig" stellt jetzt den Stand vor der
+  Nachbereitung wieder her — eine vorab gestrichene Phase bleibt gestrichen.
+- Die Nachbereitung setzte jede Phase auf „erledigt", auch eine vorab gestrichene — von
+  Hand ebenso wie automatisch. Ein gespeicherter Status bleibt jetzt stehen, solange die
+  Lehrkraft ihn nicht ändert.
 
 ## [0.13.0] – 2026-10-03
 

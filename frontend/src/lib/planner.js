@@ -300,3 +300,26 @@ export function mitPhasenKennungen(phasen) {
         id: typeof p?.id === 'string' && p.id.trim() ? p.id : crypto.randomUUID(),
     }))
 }
+
+/** Was eine Nachbereitung über eine Phase sagen kann (`NACHBEREITUNG_STATI` im Backend). */
+const NACHBEREITUNG_STATI = ['erledigt', 'offen', 'gestrichen']
+
+/**
+ * Die Vorbelegung der Nachbereitungsknöpfe: `phase_id → Status`.
+ *
+ * Ein gespeicherter Status bleibt stehen — eine vorab gestrichene Phase beginnt als
+ * „gestrichen", nicht als „erledigt". Alles andere (kein Status, „geplant" aus einer
+ * Übertragung) beginnt als „erledigt". Dieselbe Regel wie `vorbelegung()` in
+ * `backend/app/planning/review_service.py`; bis 0.13.0 begann hier jede Phase als
+ * „erledigt", und das Absenden überschrieb den gespeicherten Stand.
+ *
+ * @param {Array<object>} phasen
+ * @returns {Record<string, string>}
+ */
+export function nachbereitungsVorbelegung(phasen) {
+    const stati = {}
+    for (const p of phasen ?? []) {
+        stati[p?.id ?? ''] = NACHBEREITUNG_STATI.includes(p?.status) ? p.status : 'erledigt'
+    }
+    return stati
+}

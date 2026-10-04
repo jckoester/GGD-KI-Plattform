@@ -181,6 +181,12 @@ offen oder gestrichen wurden, und schreiben optional eine Kurzreflexion. Die
 behandelten Kompetenzen fließen damit in den Lernstand der Klasse ein (das nutzen
 die Schüler-Assistenten als „Vorwissen").
 
+Die Knöpfe beginnen mit dem Stand, den eine Phase schon hat: Eine Phase, die der
+Assistent vorab gestrichen hat, steht bereits auf *gestrichen*, alle übrigen auf
+*erledigt*. Bleibt eine Stunde ohne Nachbereitung und hat die Gruppe danach schon die
+nächste gehabt, gilt sie über Nacht mit genau dieser Vorbelegung als nachbereitet
+(Kennzeichen **„✓ auto"**); **„Rückgängig"** öffnet sie wieder.
+
 Blieben **Phasen offen**, bietet der Abschluss-Dialog **„Verschiebe-Dialog starten"**
 an — damit übertragen Sie die offenen Inhalte mit dem Assistenten auf die
 Folgestunde (siehe unten).
