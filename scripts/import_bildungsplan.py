@@ -296,6 +296,10 @@ def sort_nodes_by_import_order(nodes: list[dict]) -> list[dict]:
 def build_metadata(node: dict) -> dict:
     """Baut das metadata-Dict aus JSONL-Feldern zusammen."""
     meta = dict(node.get("metadata", {}))
+    # Die Operator-Synonyme reisen im JSONL als `metadata.aliase`, gehören aber seit
+    # Migration 0057 in `node_aliases` (`ergaenze_aliase`). Bis 0.13.0 landeten sie hier —
+    # in einem Feld, das niemand mehr liest.
+    meta.pop("aliase", None)
     meta["bp_id"] = node["bp_id"]
     meta["content_hash"] = node.get("content_hash", "")
     # `or ""` statt eines Standardwerts: Ein Knoten mit ausdruecklichem None
@@ -303,6 +307,40 @@ def build_metadata(node: dict) -> dict:
     # Leitperspektiven ist "keine Edition" ein gueltiger Zustand.
     meta["bp_version"] = node.get("bp_version") or ""
     return meta
+
+
+def _aliase_von(cur, node_id) -> list[str]:
+    cur.execute(
+        "SELECT alias FROM node_aliases WHERE node_id = %s ORDER BY id", (str(node_id),)
+    )
+    return [zeile[0] for zeile in cur.fetchall()]
+
+
+def ergaenze_aliase(cur, node_id, aliase: list) -> bool:
+    """Trägt fehlende weitere Namen nach; ``True``, wenn sich etwas geändert hat.
+
+    **Ergänzt, ersetzt nicht.** Was eine Lehrkraft oder ein Admin an einem
+    Bildungsplan-Knoten selbst nachgetragen hat, bleibt — dieselbe Rücksicht wie
+    `title_locked` beim Titel. Der Preis: Ein Synonym, das der Scraper nicht mehr liefert,
+    bleibt stehen, bis es jemand im Editor entfernt.
+
+    In Reihenfolge — sie geht in den Embedding-Input der Operatoren ein. Reines SQL, weil
+    das Skript auch ohne `app`-Paket laufen soll; Dubletten fängt der eindeutige Index auf
+    dem normalisierten Namen ab (`ON CONFLICT DO NOTHING`). Verglichen wird deshalb der
+    Stand **in der Datenbank** vorher und nachher, nicht die Eingabe: „Think-Pair-Share"
+    neben „think-pair-share" sähe sonst bei jedem Lauf neu aus und kostete jedes Mal
+    einen Vektor.
+    """
+    vorher = _aliase_von(cur, node_id)
+    for alias in aliase:
+        wert = str(alias or "").strip()
+        if wert:
+            cur.execute(
+                "INSERT INTO node_aliases (node_id, alias) VALUES (%s, %s) "
+                "ON CONFLICT DO NOTHING",
+                (str(node_id), wert),
+            )
+    return _aliase_von(cur, node_id) != vorher
 
 
 def upsert_node(
@@ -323,6 +361,8 @@ def upsert_node(
     new_hash = node.get("content_hash", "")
     visibility = node.get("visibility", "global")
     metadata = build_metadata(node)
+    # Nur Operatoren bringen Aliase mit; alle anderen lassen die Tabelle unberührt.
+    aliase = (node.get("metadata") or {}).get("aliase")
 
     # Neue Felder aus JSONL
     min_grade = node.get("min_grade")
@@ -376,6 +416,8 @@ def upsert_node(
             ),
         )
         node_id = cur.fetchone()[0]
+        if aliase is not None:
+            ergaenze_aliase(cur, node_id, aliase)
         return "inserted", node_id
 
     existing_id, existing_hash = row
@@ -404,6 +446,16 @@ def upsert_node(
                 (title, json.dumps(metadata), subject_id, min_grade, max_grade,
                  niveau, bp_version, existing_id),
             )
+            # Auch hier ergänzen, obwohl der Hash die Aliase enthält: Ein Import zwischen
+            # 0.9.0 (Migration 0057) und 0.13.0 legte sie ins tote `metadata.aliase`, die
+            # Tabelle blieb leer — und das Metadaten-UPDATE oben räumt dieses Feld gerade
+            # weg. Ohne das Ergänzen wären sie danach verloren. Geändert hat sich nur
+            # etwas, wenn die Tabelle vorher lückenhaft war; nur dann ist der Vektor alt.
+            if aliase is not None and ergaenze_aliase(cur, existing_id, aliase):
+                cur.execute(
+                    "UPDATE context_nodes SET embedding = NULL WHERE id = %s",
+                    (existing_id,),
+                )
         return "skipped", UUID(str(existing_id))
 
     # UPDATE (Hash geaendert -> embedding zuruecksetzen, auch neue Felder aktualisieren)
@@ -428,6 +480,8 @@ def upsert_node(
             (content, title, json.dumps(metadata, ensure_ascii=False),
              subject_id, min_grade, max_grade, niveau, bp_version, existing_id),
         )
+        if aliase is not None:
+            ergaenze_aliase(cur, existing_id, aliase)
     return "updated", UUID(str(existing_id))
 
 

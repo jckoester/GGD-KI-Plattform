@@ -15,6 +15,27 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Die Nachbereitung setzte jede Phase auf „erledigt", auch eine vorab gestrichene — von
   Hand ebenso wie automatisch. Ein gespeicherter Status bleibt jetzt stehen, solange die
   Lehrkraft ihn nicht ändert.
+- Die Vorschläge für Methode und Sozialform im Stundenentwurf und die Filterfelder der
+  Sammlungen fanden Bausteine nicht mehr über ihre weiteren Namen (etwa „Ich-Du-Wir" →
+  Think-Pair-Share).
+- Bildungsplan-Import, Methoden-Grundvokabular (`seed_methodik.py`) und
+  `POST/PATCH /context/nodes` legten weitere Namen seit 0.9.0 an einer Stelle ab, die
+  niemand liest: Nach einem Import fehlten die Synonyme der Operatoren in Suche,
+  Vorschlägen und Vektoren. Die API weist `metadata.aliase` jetzt ab; weitere Namen
+  gehören in das Feld `aliase`.
+
+### Nach dem Update
+
+Direkt nach dem Update einmal nachziehen, was bis dahin im alten Feld gelandet ist
+(betrifft jede Instanz, auf der seit 0.9.0 ein Bildungsplan-Import oder der Methodik-Seed
+lief). Bis dahin lassen sich betroffene Bausteine im Editor nicht speichern:
+
+```bash
+docker compose exec backend python scripts/aliase_nachziehen.py --dry-run
+docker compose exec backend python scripts/aliase_nachziehen.py
+```
+
+Verworfene Vektoren rechnet der nächtliche Backfill neu.
 
 ## [0.13.0] – 2026-10-03
 

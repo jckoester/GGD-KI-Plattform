@@ -51,11 +51,12 @@ def _ist(**abweichungen):
         "embedding_vorhanden": True,
     }
     zustand.update(abweichungen)
-    # `aliase` und `ablauf` stehen in Wahrheit in den Metadaten — hier genauso, sonst
-    # prüfte der Test einen Zustand, den `_ist_zustand()` nie erzeugt.
-    for feld in ("aliase", "ablauf"):
-        if feld in abweichungen:
-            zustand["metadata"] = {**zustand["metadata"], feld: abweichungen[feld]}
+    # `ablauf` steht in Wahrheit in den Metadaten — hier genauso, sonst prüfte der Test
+    # einen Zustand, den `_ist_zustand()` nie erzeugt. `aliase` dagegen kommt seit
+    # Migration 0057 aus `node_aliases` und steht **nicht** dort (bis 0.13.0 tat es das
+    # hier, und der Test bestätigte damit den Fehler des Seeds).
+    if "ablauf" in abweichungen:
+        zustand["metadata"] = {**zustand["metadata"], "ablauf": abweichungen["ablauf"]}
     return zustand
 
 
@@ -65,10 +66,11 @@ def _anwenden(ist, aenderung):
     for name, wert in aenderung.felder.items():
         if name == "metadata_":
             neu["metadata"] = wert
-            neu["aliase"] = list(wert.get("aliase") or [])
             neu["ablauf"] = wert.get("ablauf") or ""
         else:
             neu[name] = wert
+    if aenderung.aliase is not None:
+        neu["aliase"] = list(aenderung.aliase)
     if aenderung.embedding_verwerfen:
         neu["embedding_vorhanden"] = False
     return neu
@@ -83,7 +85,8 @@ class TestNeuerKnoten:
         assert a.felder["read_scope"] == "school"
         assert a.felder["write_scope"] == "school"
         assert a.felder["write_scope_group_id"] is None
-        assert a.metadata["aliase"] == ["Platzdeckchen"]
+        assert a.aliase == ["Platzdeckchen"]
+        assert "aliase" not in a.metadata
         assert STUB_MARKIERUNG not in a.metadata
 
     def test_ohne_text_wird_als_unvollstaendig_markiert(self, seed):
@@ -142,7 +145,7 @@ class TestSchulbearbeitungBleibt:
         baustein = seed.Baustein("Placemat", ("Platzdeckchen",), content="Seed")
         a = seed.plane_aenderung(_ist(aliase=["Eigene Bezeichnung"]), baustein, "methode")
 
-        assert "aliase" not in a.felder.get("metadata_", {})
+        assert a.aliase is None
         assert "Aliase" in a.behalten
 
     def test_leere_aliase_werden_gefuellt(self, seed):
@@ -150,7 +153,7 @@ class TestSchulbearbeitungBleibt:
         baustein = seed.Baustein("Placemat", ("Platzdeckchen",), content="Seed")
         a = seed.plane_aenderung(_ist(aliase=[]), baustein, "methode")
 
-        assert a.metadata["aliase"] == ["Platzdeckchen"]
+        assert a.aliase == ["Platzdeckchen"]
 
 
 class TestAblaufsatz:

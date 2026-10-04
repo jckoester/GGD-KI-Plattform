@@ -78,7 +78,16 @@ def validate_node_metadata(content_type: str | None, metadata: dict | None) -> N
     Pflichtfelder erzwingt :func:`validate_node_content` bzw. der Editor — hier geht es
     nur darum, dass ein **vorhandener** Wert brauchbar ist. Ein leeres Feld ist ein
     unvollständiger Eintrag, kein kaputter.
+
+    ⚠️ **`aliase` wird abgewiesen, für jeden Typ.** Seit Migration 0057 stehen die
+    weiteren Namen in `node_aliases`; in den Metadaten liest sie niemand mehr. Bis 0.13.0
+    nahm die API sie dort trotzdem an — sie verschwanden ohne Fehler.
     """
+    if metadata and "aliase" in metadata:
+        raise ValueError(
+            "Weitere Namen gehören in das Feld `aliase` des Bausteins, nicht in die "
+            "Metadaten."
+        )
     schema = feld_schema(content_type)
     if not schema or not metadata:
         return

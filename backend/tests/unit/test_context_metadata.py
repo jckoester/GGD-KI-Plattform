@@ -300,3 +300,19 @@ class TestBegriffFelderAusDemFachbegriffsPilot:
             "begriff",
             {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "…"}]},
         )
+
+
+class TestAliaseNichtInDenMetadaten:
+    """Seit Migration 0057 stehen weitere Namen in `node_aliases` (0.13.1).
+
+    Bis 0.13.0 nahm die API `metadata.aliase` an — dort liest sie aber niemand mehr: nicht
+    die Suche, nicht der Namensfilter, nicht der Embedding-Input. Sie verschwanden lautlos.
+    """
+
+    @pytest.mark.parametrize("typ", ["methode", "operator", "begriff", None])
+    def test_wird_fuer_jeden_typ_abgewiesen(self, typ):
+        with pytest.raises(ValueError, match="Feld `aliase`"):
+            validate_node_metadata(typ, {"aliase": ["Ich-Du-Wir"]})
+
+    def test_ohne_aliase_unveraendert(self):
+        validate_node_metadata("methode", {"ablauf": "Erst allein, dann zu zweit."})

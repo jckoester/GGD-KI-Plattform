@@ -48,6 +48,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.context import aliase as aliase_modul
 from app.context.metadata import STUB_MARKIERUNG
 from app.context.taxonomy import (
     CONTENT_TYPE_TO_CATEGORY,
@@ -354,6 +355,9 @@ class Aenderung:
 
     felder: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Die neuen weiteren Namen, oder `None` für „unverändert". Eigenes Feld, weil sie seit
+    # Migration 0057 in `node_aliases` stehen und nicht in den Metadaten.
+    aliase: list[str] | None = None
     geaendert: list[str] = field(default_factory=list)
     behalten: list[str] = field(default_factory=list)
     embedding_verwerfen: bool = False
@@ -411,7 +415,7 @@ def plane_aenderung(
         if ist_aliase and not ueberschreiben:
             aenderung.behalten.append("Aliase")
         else:
-            aenderung.metadata["aliase"] = soll_aliase
+            aenderung.aliase = soll_aliase
             aenderung.geaendert.append("Aliase")
             aenderung.embedding_verwerfen = True
 
@@ -451,12 +455,15 @@ def plane_aenderung(
     return aenderung
 
 
-def _ist_zustand(node: ContextNode) -> dict[str, Any]:
+def _ist_zustand(node: ContextNode, aliase: list[str]) -> dict[str, Any]:
+    """⚠️ Die Aliase kommen aus `node_aliases`, nicht aus den Metadaten. Bis 0.13.0 las
+    der Seed `metadata.aliase` — seit Migration 0057 leer —, hielt jeden Eintrag für
+    unbearbeitet und schrieb die Aliase dorthin zurück, wo niemand sie liest."""
     metadata = dict(node.metadata_ or {})
     return {
         "content": node.content,
         "ablauf": metadata.get("ablauf") or "",
-        "aliase": list(metadata.get("aliase") or []),
+        "aliase": list(aliase),
         "metadata": metadata,
         "read_scope": node.read_scope,
         "write_scope": node.write_scope,
@@ -493,7 +500,11 @@ async def _upsert(
         )
     ).scalar_one_or_none()
 
-    ist = _ist_zustand(vorhanden) if vorhanden else {}
+    ist = (
+        _ist_zustand(vorhanden, await aliase_modul.lade(db, vorhanden.id))
+        if vorhanden
+        else {}
+    )
     aenderung = plane_aenderung(ist, baustein, content_type, ueberschreiben=ueberschreiben)
 
     if aenderung.behalten:
@@ -507,16 +518,18 @@ async def _upsert(
 
     if vorhanden is None:
         felder = {k: v for k, v in aenderung.felder.items() if k != "metadata_"}
-        db.add(
-            ContextNode(
-                category=CONTENT_TYPE_TO_CATEGORY[content_type],
-                content_type=content_type,
-                title=baustein.titel,
-                status="active",
-                metadata_=aenderung.metadata,
-                **felder,
-            )
+        neu = ContextNode(
+            category=CONTENT_TYPE_TO_CATEGORY[content_type],
+            content_type=content_type,
+            title=baustein.titel,
+            status="active",
+            metadata_=aenderung.metadata,
+            **felder,
         )
+        db.add(neu)
+        if aenderung.aliase:
+            await db.flush()  # für die Kennung, an der die Aliase hängen
+            await aliase_modul.setze(db, neu.id, aenderung.aliase)
         bilanz.neu += 1
         return
 
@@ -526,6 +539,8 @@ async def _upsert(
 
     for name, wert in aenderung.felder.items():
         setattr(vorhanden, name, wert)
+    if aenderung.aliase is not None:
+        await aliase_modul.setze(db, vorhanden.id, aenderung.aliase)
     if aenderung.embedding_verwerfen:
         vorhanden.embedding = None
         bilanz.neu_einzubetten += 1

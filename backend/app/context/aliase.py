@@ -11,13 +11,14 @@ Meldung. Deshalb wird überall nach `id` sortiert (= Einfügereihenfolge), nie a
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.lookup import normalisiere_titel, titel_normalisiert_sql
-from app.db.models import NodeAlias
+from app.db.models import ContextNode, NodeAlias, ohne_aenderungsstempel
 
 #: Derselbe Ausdruck, auf dem die Indizes aus Migration 0057 liegen. Weicht eine Abfrage
 #: davon ab, benutzt PostgreSQL sie stillschweigend nicht (vgl. `filters.TITEL_NORMALISIERT`).
@@ -66,6 +67,22 @@ async def lade_viele(
     return ergebnis
 
 
+def hat_alias_wie(muster: str):
+    """``EXISTS``: Der Knoten hat einen Alias, der ``ILIKE muster`` erfüllt.
+
+    Für den Namensfilter ``?q=`` (`filters.wende_an`). Dort ist das korrelierte
+    ``EXISTS`` unbedenklich — anders als in der Identifikation, wo es den Index-Scan auf
+    dem Titelausdruck zerstört (`search.knoten_mit_alias`): Der Titelteil des Filters,
+    ``title ILIKE '%…%'``, kann ohnehin keinen Index nutzen, die Abfrage ist mit und
+    ohne ``EXISTS`` ein Durchlauf. Gemessen am 04.10.2026 auf Dev (18 969 Knoten, Median
+    aus neun Läufen): Vorschlagsfeld Methode 0,02 → 0,36 ms, Sammlung Operatoren
+    1,0 → 1,5 ms, ohne Typ 17 → 14 ms (Rauschen).
+    """
+    return sa.exists().where(
+        NodeAlias.node_id == ContextNode.id, NodeAlias.alias.ilike(muster)
+    )
+
+
 def bereinige(aliase: list[str] | None) -> list[str]:
     """Leeres weg, Dubletten weg — Reihenfolge und Schreibweise des ersten Vorkommens
     bleiben.
@@ -99,3 +116,82 @@ async def setze(db: AsyncSession, node_id: UUID, aliase: list[str] | None) -> li
         db.add(NodeAlias(node_id=node_id, alias=alias))
     await db.flush()
     return sauber
+
+
+# ── Nachzügler im toten Feld (0.13.1) ────────────────────────────────────────────
+#
+# Migration 0057 hat `metadata.aliase` einmal in die Tabelle übernommen und das Feld
+# geleert. Danach schrieben drei Wege weiter dorthin, wo niemand mehr liest: der
+# Bildungsplan-Import (Operator-Synonyme), der Methodik-Seed und `POST/PATCH
+# /context/nodes`. Alle drei sind in 0.13.1 behoben; was sie bis dahin abgelegt haben,
+# holt `nachziehen()` einmal nach.
+#
+# **Ergänzt, ersetzt nicht** — anders als der Backfill in 0057, der in eine leere Tabelle
+# schrieb: Ein Knoten kann hier Aliase an beiden Orten haben, und was in der Tabelle
+# steht, hat womöglich jemand im Editor gepflegt. Neue Namen kommen hinten dazu, in der
+# Reihenfolge aus dem Feld; Dubletten (auch in anderer Schreibweise) weist der eindeutige
+# Index ab.
+
+_NACHZUG_SQL = """
+    INSERT INTO node_aliases (node_id, alias)
+    SELECT n.id, btrim(a.alias)
+      FROM context_nodes n
+      CROSS JOIN LATERAL jsonb_array_elements_text(n.metadata->'aliase')
+           WITH ORDINALITY AS a(alias, ord)
+     WHERE jsonb_typeof(n.metadata->'aliase') = 'array'
+       AND btrim(a.alias) <> ''
+     ORDER BY n.id, a.ord
+    ON CONFLICT DO NOTHING
+    RETURNING node_id
+"""
+
+_FELD_RAEUMEN_SQL = """
+    UPDATE context_nodes SET metadata = metadata - 'aliase'
+     WHERE metadata ? 'aliase'
+    RETURNING id
+"""
+
+
+@dataclass
+class Nachzug:
+    knoten_mit_altfeld: int = 0
+    neue_aliase: int = 0
+    knoten_mit_neuen_aliasen: int = 0
+    vektoren_verworfen: int = 0
+
+
+async def nachziehen(db: AsyncSession) -> Nachzug:
+    """Übernimmt `metadata.aliase` in die Tabelle und räumt das Feld. Committet nicht.
+
+    Ein Knoten, der dabei neue Namen bekommt **und** sie im Embedding-Input trägt (etwa
+    `methode`, `operator`; `embedding.braucht_aliase`), verliert seinen Vektor: Er
+    entstand ohne diese Namen. Den neuen rechnet der nächtliche Backfill. Ein zweiter
+    Lauf findet nichts mehr.
+    """
+    from app.context.embedding import braucht_aliase
+
+    neu = [zeile[0] for zeile in (await db.execute(sa.text(_NACHZUG_SQL))).all()]
+    geraeumt = (await db.execute(sa.text(_FELD_RAEUMEN_SQL))).all()
+    bilanz = Nachzug(
+        knoten_mit_altfeld=len(geraeumt),
+        neue_aliase=len(neu),
+        knoten_mit_neuen_aliasen=len(set(neu)),
+    )
+    if neu:
+        mit_vektor = (
+            await db.execute(
+                sa.select(ContextNode.id, ContextNode.category, ContextNode.content_type)
+                .where(ContextNode.id.in_(set(neu)), ContextNode.embedding.is_not(None))
+            )
+        ).all()
+        verwerfen = [k.id for k in mit_vektor if braucht_aliase(k)]
+        if verwerfen:
+            # Kein Änderungsstempel: Der Knoten liest sich danach wie gedacht, nur sein
+            # Vektor wird neu gerechnet (`ohne_aenderungsstempel`).
+            await db.execute(
+                sa.update(ContextNode)
+                .where(ContextNode.id.in_(verwerfen))
+                .values(embedding=None, **ohne_aenderungsstempel())
+            )
+        bilanz.vektoren_verworfen = len(verwerfen)
+    return bilanz

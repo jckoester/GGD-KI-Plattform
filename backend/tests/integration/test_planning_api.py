@@ -749,7 +749,13 @@ async def test_lesson_sozialform_roundtrip(
 
 @pytest.mark.asyncio
 async def test_context_nodes_aliassuche(test_client, auth_headers):
-    """GET /context/nodes?q=<alias> findet den Knoten über metadata.aliase."""
+    """GET /context/nodes?q=<alias> findet den Knoten über seine weiteren Namen.
+
+    ⚠️ Angelegt wird über das Feld `aliase` (→ `node_aliases`), wie Editor und API es tun.
+    Bis 0.13.0 legte dieser Test über `metadata.aliase` an — genau das Feld, das der Filter
+    noch las und Migration 0057 geleert hatte. So blieb er grün, während der Filter im
+    Betrieb nichts mehr fand.
+    """
     create = await test_client.post(
         "/context/nodes",
         json={
@@ -759,20 +765,19 @@ async def test_context_nodes_aliassuche(test_client, auth_headers):
             # Pflichtfeld seit AP5 — ohne Beschreibung wäre der Vektor der Titel.
             "content": "Erst allein, dann zu zweit, dann in der Klasse.",
             "read_scope": "school",
-            "metadata": {"aliase": ["Ich-Du-Wir XYZ"]},
+            "aliase": ["Ich-Du-Wir XYZ"],
         },
         headers=auth_headers,
     )
     assert create.status_code == 201
     node_id = create.json()["id"]
 
-    # Treffer über Alias
-    by_alias = (
-        await test_client.get(
-            "/context/nodes", params={"q": "Ich-Du-Wir XYZ"}, headers=auth_headers
-        )
-    ).json()
-    assert any(n["id"] == node_id for n in by_alias)
+    # Treffer über Alias — ganz und als Teil, wie beim Tippen im Vorschlagsfeld
+    for q in ("Ich-Du-Wir XYZ", "du-wir x"):
+        by_alias = (
+            await test_client.get("/context/nodes", params={"q": q}, headers=auth_headers)
+        ).json()
+        assert any(n["id"] == node_id for n in by_alias), q
 
     # Treffer über Titel
     by_title = (

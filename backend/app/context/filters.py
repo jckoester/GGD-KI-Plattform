@@ -16,6 +16,7 @@ from datetime import date
 import sqlalchemy as sa
 from sqlalchemy import and_, or_
 
+from app.context.aliase import hat_alias_wie
 from app.context.lookup import titel_normalisiert_sql
 from app.db.models import ContextNode, Group, LessonSlot, Subject
 
@@ -149,13 +150,14 @@ def wende_an(stmt, f: Knotenfilter):
         stmt = stmt.where(ContextNode.owner_pseudonym == f.owner_pseudonym)
 
     if f.q:
-        # Titel ODER ein Synonym aus metadata_.aliase (JSONB-Textmatch). So sind
-        # Aliase systemweit suchbar (Krücke bis zum echten Alias-Feld am Knoten).
+        # Titel ODER einer der weiteren Namen. Die stehen seit Migration 0057 in
+        # `node_aliases`; bis 0.13.0 las der Filter noch `metadata.aliase`, das die
+        # Migration geleert hatte — „Ich-Du-Wir" fand Think-Pair-Share nicht mehr.
         wie = f"%{f.q}%"
         stmt = stmt.where(
             or_(
                 ContextNode.title.ilike(wie),
-                ContextNode.metadata_["aliase"].astext.ilike(wie),
+                hat_alias_wie(wie),
             )
         )
 

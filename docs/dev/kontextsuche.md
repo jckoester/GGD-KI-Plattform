@@ -223,7 +223,16 @@ bestehenden nicht mehr vergleichbar sind. Deshalb hat `node_aliases` eine aufste
 Grund verbindet die Quelle `aliases` mit `" | "` und nicht mit `", "`: So verband der
 alte Metadaten-Weg eine Liste.
 
-Gelesen und geschrieben wird ausschließlich über `app/context/aliase.py`.
+Gelesen und geschrieben wird ausschließlich über `app/context/aliase.py`. **Eine
+Ausnahme:** Der Bildungsplan-Import (`scripts/import_bildungsplan.py`) schreibt die
+Operator-Synonyme mit reinem SQL, weil er auch ohne `app`-Paket laufen soll. Er
+**ergänzt** nur, damit im Editor nachgetragene Namen einen Neu-Import überstehen.
+
+⚠️ **`metadata.aliase` ist tot.** Bis 0.13.0 schrieben Import, Methodik-Seed und
+`POST/PATCH /context/nodes` weiter dorthin — ohne Fehler und ohne Wirkung, weil seit
+0057 niemand das Feld liest; der Namensfilter `?q=` las es als Einziger noch. Seit 0.13.1
+weist `validate_node_metadata` das Feld ab, und `scripts/aliase_nachziehen.py` holt
+einmal nach, was bis dahin dort gelandet ist.
 
 ---
 
