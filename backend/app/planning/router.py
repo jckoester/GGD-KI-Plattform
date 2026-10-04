@@ -32,6 +32,7 @@ from app.db.models import (
     ContextNode,
     Group,
     GroupMembership,
+    GroupSourceClass,
     GroupWeekPattern,
     LessonSlot,
     ParkedLessonContent,
@@ -39,6 +40,8 @@ from app.db.models import (
     Subject,
 )
 from app.db.session import get_db
+from app.groups.aktualitaet import gruppen_mit_beleg, ist_aktuell
+from app.groups.jahrgang import jahrgang_aus
 from app.planning.calendar import ab_schultage, load_school_year
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
@@ -1571,6 +1574,126 @@ async def export_lesson(
         )
     else:
         raise HTTPException(status_code=422, detail=f"Unbekanntes Format: {format}")
+
+
+# ── GET /planning/groups ──────────────────────────────────────────────────────
+
+
+class FachKurzRead(BaseModel):
+    id: int
+    slug: str
+    name: str
+    # Bildungsplan-Kürzel, z. B. "CH", "M" — daraus baut das Obsidian-Plugin den
+    # vorbelegten Ordnernamen.
+    fach_code: str | None
+
+
+class PlanungsgruppeRead(BaseModel):
+    id: int
+    # `Group.anzeigename`, wie `GroupOut.name` in `/groups/me` — nicht der rohe Name.
+    name: str
+    fach: FachKurzRead | None
+    # Der tatsächliche Jahrgang, dieselbe Regel wie die Curriculum-Auswahl
+    # (`groups.jahrgang.jahrgang_aus`), nicht nur die von Hand gesetzte Festlegung.
+    jahrgang: int | None
+    # Anzeigenamen der Quellklassen, sortiert; leer bei Kursen ohne Klassenverband.
+    klassen: list[str]
+    # Wie `aktuell` in `/groups/me` (`ist_aktuell`).
+    aktuell: bool
+    # Slots im laufenden Schuljahr (`beginn`..`ende` aus `school_year.yaml`).
+    termine: int
+
+
+class PlanungsgruppenRead(BaseModel):
+    items: list[PlanungsgruppeRead]
+
+
+@router.get("/groups", response_model=PlanungsgruppenRead)
+async def list_planungsgruppen(
+    db: AsyncSession = Depends(get_db),
+    user: JwtPayload = Depends(_TEACHER_OR_ADMIN),
+):
+    """Die Unterrichtsgruppen, in denen der Nutzer **Lehrkraft** ist — für Zugangstoken.
+
+    Genau die Gruppen, für die `require_group_teacher` durchließe. `/groups/me` reicht
+    dafür nicht: Es liefert jede Mitgliedschaft ohne `role_in_group`, vom Fach nur die
+    Kennung und als Jahrgang nur die Festlegung. Das Obsidian-Plugin müsste je Kandidat
+    eine Probe schicken (Plan *Unterrichtsgruppen-Liste*, G1).
+
+    ⚠️ **Der Filter ist die Zugriffsregel** — wie bei `mein-tag`. Fällt er weg oder wird
+    er gelockert, sieht die Lehrkraft fremde Gruppen. Kein Admin-Sonderfall.
+
+    **Eine feste Zahl von Abfragen**, nicht eine je Gruppe: Gruppen mit Fach, Quellklassen,
+    Belege fürs laufende Schuljahr, Termine — vier, ob zwei Gruppen oder zwanzig.
+    """
+    cfg = load_school_year()
+    eigene = sa.select(GroupMembership.group_id).where(
+        GroupMembership.pseudonym == user.sub,
+        GroupMembership.role_in_group == "teacher",
+    )
+    paare = (
+        await db.execute(
+            sa.select(Group, Subject)
+            .outerjoin(Subject, Subject.id == Group.subject_id)
+            .where(Group.id.in_(eigene), Group.type == "teaching_group")
+        )
+    ).all()
+    ids = [g.id for g, _ in paare]
+
+    # Quellklassen aller Gruppen auf einmal: roher Name für die Jahrgangsregel (wie in
+    # der Curriculum-Auflösung), Anzeigename für die Liste.
+    roh: dict[int, list[str]] = {}
+    anzeige: dict[int, list[str]] = {}
+    if ids:
+        klassengruppe = sa.orm.aliased(Group)
+        for gid, name, display in (
+            await db.execute(
+                sa.select(
+                    GroupSourceClass.group_id, klassengruppe.name, klassengruppe.display_name
+                )
+                .join(klassengruppe, klassengruppe.id == GroupSourceClass.class_group_id)
+                .where(GroupSourceClass.group_id.in_(ids))
+            )
+        ).all():
+            roh.setdefault(gid, []).append(name)
+            anzeige.setdefault(gid, []).append(display or name)
+
+    # Wer eine Quellklasse hat, steht schon in `roh` — dieselbe Menge, die
+    # `gruppen_mit_quellklasse` lieferte, ohne eine fünfte Abfrage.
+    beleg = await gruppen_mit_beleg(db, ids, cfg)
+    termine: dict[int, int] = {}
+    if ids:
+        termine = dict(
+            (
+                await db.execute(
+                    sa.select(LessonSlot.group_id, sa.func.count())
+                    .where(
+                        LessonSlot.group_id.in_(ids),
+                        LessonSlot.date.between(cfg.beginn, cfg.ende),
+                    )
+                    .group_by(LessonSlot.group_id)
+                )
+            ).all()
+        )
+
+    items = [
+        PlanungsgruppeRead(
+            id=g.id,
+            name=g.anzeigename,
+            fach=(
+                FachKurzRead(id=f.id, slug=f.slug, name=f.name, fach_code=f.fach_code)
+                if f is not None
+                else None
+            ),
+            jahrgang=jahrgang_aus(g, roh.get(g.id, []), schuljahr_ende=cfg.ende.year),
+            klassen=sorted(anzeige.get(g.id, [])),
+            aktuell=ist_aktuell(g, beleg, cfg, set(roh)),
+            termine=termine.get(g.id, 0),
+        )
+        for g, f in paare
+    ]
+    items.sort(key=lambda gruppe: gruppe.name.casefold())
+    return PlanungsgruppenRead(items=items)
 
 
 # ── GET /planning/mein-tag ────────────────────────────────────────────────────

@@ -13,9 +13,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.context.grades import parse_class_grade
 from app.context.stunden import als_stundenzahl
-from app.groups.jahrgang import leite_jahrgang_ab
+from app.groups.jahrgang import jahrgang_aus
 from app.planning.calendar import load_school_year
 from app.db.models import ContextEdge, ContextNode, Group, GroupSourceClass
 
@@ -50,34 +49,20 @@ class GroupCurriculaResult:
 
 
 async def _group_grade(db: AsyncSession, group: Group) -> int | None:
-    """Jahrgang der teaching_group aus den verknüpften Klassengruppen ableiten.
+    """Jahrgang der teaching_group — die Regel steht in `groups.jahrgang.jahrgang_aus`.
 
-    ⚠️ **Eine Gruppe kann aus mehreren Klassen stammen** (Alembic 0068), der Jahrgang
-    ist aber genau einer. Genommen wird der **kleinste** — nicht weil er richtiger wäre,
-    sondern weil die Wahl **deterministisch** sein muss: NwT 10a/10b/10c tragen alle
-    denselben Jahrgang, aber ohne feste Ordnung wanderte die Curriculum-Auflösung
-    zwischen zwei Läufen, sobald die Datenbank die Zeilen anders zurückgibt.
-
-    Bei gemischten Jahrgängen (eine Gruppe aus 9 und 10) ist der kleinste eine
-    Festlegung, keine Wahrheit. Das ist hinnehmbar, solange es *eine* Festlegung ist.
+    Hier werden nur die Klassennamen geholt. Die Abfrage entfällt, wenn der Jahrgang
+    festgelegt ist: Dann zählen die Klassen ohnehin nicht.
     """
-    # 1. Die Entscheidung gewinnt (Alembic 0073).
-    if group.jahrgang is not None:
-        return group.jahrgang
-
-    # 2. Sonst die Klassen, aus denen die Gruppe stammt.
-    zeilen = await db.execute(
-        sa.select(Group.name)
-        .join(GroupSourceClass, GroupSourceClass.class_group_id == Group.id)
-        .where(GroupSourceClass.group_id == group.id)
-    )
-    jahrgaenge = [g for g in (parse_class_grade(n) for n in zeilen.scalars()) if g is not None]
-    if jahrgaenge:
-        return min(jahrgaenge)
-
-    # 3. Zuletzt der Name — eine Vermutung, ausdrücklich als solche (`jahrgang.py`).
-    # Sie wird **nicht** gespeichert: Gespeichert wird nur, was ein Mensch entschieden hat.
-    return leite_jahrgang_ab(group.anzeigename, schuljahr_ende=load_school_year().ende.year)
+    klassen: list[str] = []
+    if group.jahrgang is None:
+        zeilen = await db.execute(
+            sa.select(Group.name)
+            .join(GroupSourceClass, GroupSourceClass.class_group_id == Group.id)
+            .where(GroupSourceClass.group_id == group.id)
+        )
+        klassen = list(zeilen.scalars())
+    return jahrgang_aus(group, klassen, schuljahr_ende=load_school_year().ende.year)
 
 
 async def group_grade(db: AsyncSession, group_id: int) -> int | None:

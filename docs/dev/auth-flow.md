@@ -150,6 +150,20 @@ damit keine Bindung stillschweigend verlorengeht.
 Geprüft wird symmetrisch: Eine gebundene Aktion **braucht** eine ID, eine ressourcenlose
 darf keine tragen — sonst gäbe es zwei Lesarten desselben Tokens.
 
+### Die eigenen Gruppen: `GET /planning/groups`
+
+Die Unterrichtsgruppen, in denen der Nutzer **Lehrkraft** ist — genau die, für die
+`/planning/groups/{id}/…` durchlässt (`planning:read`). Je Gruppe: Anzeigename, Fach mit
+Bildungsplan-Kürzel (`fach.fach_code`), Jahrgang (dieselbe Regel wie die
+Curriculum-Auswahl, `groups.jahrgang.jahrgang_aus`), Quellklassen, `aktuell` wie in
+`/groups/me` und die Zahl der Termine im laufenden Schuljahr. `/groups/me` taugt dafür
+nicht: Es liefert jede Mitgliedschaft ohne Rolle, vom Fach nur die Kennung.
+
+⚠️ **Die Gruppen-ID wechselt nicht immer mit dem Schuljahr.** Ein Kursstufenkurs behält
+Gruppe und Mitgliedschaft über zwei Jahre und gilt in beiden als `aktuell`. Wer Daten
+einem Schuljahr zuordnet, nimmt das Datum des Termins, nicht die Gruppe und nicht
+`overview.schuljahr` (das ist das eingestellte Jahr).
+
 ### Nebenläufig schreiben: `expected_updated_at`
 
 `PATCH /planning/slots/{id}` und `PATCH /planning/lessons/{id}` nehmen optional den

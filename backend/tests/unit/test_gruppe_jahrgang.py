@@ -7,7 +7,9 @@ Abi-28-Kurs also „CH Kl. 8" (Befund 24.09.2026).
 """
 import pytest
 
-from app.groups.jahrgang import leite_jahrgang_ab
+from types import SimpleNamespace
+
+from app.groups.jahrgang import jahrgang_aus, leite_jahrgang_ab
 
 ENDE = 2027  # Schuljahr 2026/27
 
@@ -60,3 +62,33 @@ def test_erfindet_keinen_jahrgang(name):
     Eine erfundene Stufe wäre schlimmer als keine: Sie sieht aus wie eine Entscheidung.
     """
     assert leite_jahrgang_ab(name, schuljahr_ende=ENDE) is None
+
+
+
+# ── Die ganze Regel: Festlegung → Klassen → Name (`jahrgang_aus`) ──────────────
+
+
+def _gruppe(name="ch-9d", jahrgang=None):
+    return SimpleNamespace(anzeigename=name, jahrgang=jahrgang)
+
+
+def test_festlegung_gewinnt_vor_den_klassen():
+    assert jahrgang_aus(_gruppe(jahrgang=7), ["9D"], schuljahr_ende=ENDE) == 7
+
+
+def test_aus_mehreren_klassen_der_kleinste():
+    """Deterministisch, nicht „richtiger" — sonst wanderte das Ergebnis mit der
+    Reihenfolge, in der die Datenbank die Zeilen liefert."""
+    assert jahrgang_aus(_gruppe(), ["10C", "9A", "10B"], schuljahr_ende=ENDE) == 9
+
+
+def test_klassen_vor_dem_namen():
+    assert jahrgang_aus(_gruppe("nwt-tl-10abcd"), ["9A"], schuljahr_ende=ENDE) == 9
+
+
+def test_ohne_klasse_der_name():
+    assert jahrgang_aus(_gruppe("ch-tl-abi28"), [], schuljahr_ende=ENDE) == 11
+
+
+def test_unlesbare_klassen_fallen_auf_den_namen_zurueck():
+    assert jahrgang_aus(_gruppe("nwt-tl-10abcd"), ["Kursstufe"], schuljahr_ende=ENDE) == 10

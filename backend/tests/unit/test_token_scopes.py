@@ -16,6 +16,8 @@ class TestWasEinTokenErreicht:
     @pytest.mark.parametrize("methode,pfad,erwartet", [
         ("GET", "/planning/groups/1/overview", "planning:read"),
         ("GET", "/planning", "planning:read"),
+        # Die eigenen Unterrichtsgruppen — das Plugin bietet sie beim Einrichten an (G1).
+        ("GET", "/planning/groups", "planning:read"),
         ("PATCH", "/planning/slots/abc", "planning:write"),
         ("POST", "/planning/groups/1/units", "planning:write"),
         ("DELETE", "/planning/groups/1/units/x", "planning:write"),
@@ -62,6 +64,11 @@ class TestSchreibenEnthaeltKeinLesen:
     def test_nur_leserecht_darf_nicht_schreiben(self):
         with pytest.raises(HTTPException):
             pruefe_zugang(["planning:read"], "PATCH", "/planning/slots/x")
+
+    def test_kontext_lesen_genuegt_nicht_fuer_die_gruppenliste(self):
+        with pytest.raises(HTTPException) as exc:
+            pruefe_zugang(["context:read"], "GET", "/planning/groups")
+        assert exc.value.status_code == 403
 
     def test_beide_zusammen_koennen_beides(self):
         pruefe_zugang(["planning:read", "planning:write"], "GET", "/planning/x")

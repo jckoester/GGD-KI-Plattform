@@ -16,6 +16,9 @@ Curricula des Fachs an, einem Abi-28-Kurs also „CH Kl. 8".
 from __future__ import annotations
 
 import re
+from typing import Iterable
+
+from app.context.grades import parse_class_grade
 
 # Die Kursstufe endet mit dem Abitur. Diese Zahl ist die eine Annahme dieser Datei:
 # G8 in Baden-Württemberg, Abitur am Ende von Jahrgang 12. An einer G9-Schule liegt die
@@ -67,3 +70,31 @@ def leite_jahrgang_ab(name: str | None, *, schuljahr_ende: int) -> int | None:
         if KLEINSTER <= jahrgang <= GROESSTER:
             return jahrgang
     return None
+
+
+def jahrgang_aus(gruppe, klassennamen: Iterable[str], *, schuljahr_ende: int) -> int | None:
+    """Der Jahrgang einer Unterrichtsgruppe — **eine** Regel für alle, die ihn brauchen.
+
+    Drei Lagen, in dieser Reihenfolge:
+
+    1. **Die Festlegung** (`groups.jahrgang`, Alembic 0073) gewinnt.
+    2. **Die Klassen**, aus denen die Gruppe stammt (`group_source_classes`). Eine Gruppe
+       kann aus mehreren kommen (Alembic 0068), der Jahrgang ist aber genau einer:
+       genommen wird der **kleinste** — nicht weil er richtiger wäre, sondern weil die Wahl
+       **deterministisch** sein muss. Bei NwT 10a/10b/10c ist es derselbe; ohne feste
+       Ordnung wanderte das Ergebnis, sobald die Datenbank die Zeilen anders liefert. Bei
+       gemischten Jahrgängen (9 und 10) ist der kleinste eine Festlegung, keine Wahrheit.
+    3. **Der Name** — eine Vermutung, ausdrücklich als solche (`leite_jahrgang_ab`). Sie
+       wird nicht gespeichert: Gespeichert wird nur, was ein Mensch entschieden hat.
+
+    Rein, ohne Datenbank: Die Klassennamen holt der Aufrufer — die Curriculum-Auflösung
+    für eine Gruppe, `GET /planning/groups` für alle in einer Abfrage. Zwei Fassungen
+    derselben Regel liefen auseinander, und das Obsidian-Plugin zeigte dann einen anderen
+    Jahrgang als die Curriculum-Auswahl.
+    """
+    if gruppe.jahrgang is not None:
+        return gruppe.jahrgang
+    jahrgaenge = [j for j in (parse_class_grade(n) for n in klassennamen) if j is not None]
+    if jahrgaenge:
+        return min(jahrgaenge)
+    return leite_jahrgang_ab(gruppe.anzeigename, schuljahr_ende=schuljahr_ende)

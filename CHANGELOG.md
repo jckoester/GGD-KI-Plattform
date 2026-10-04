@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- `GET /planning/groups` nennt die eigenen Unterrichtsgruppen (als Lehrkraft) mit Fach,
+  Jahrgang, Klassen und der Zahl der Termine im laufenden Schuljahr — auch für
+  Zugangstoken mit `planning:read`.
+
 ### Behoben
 
 - Der PDF-Export eines Stundenentwurfs brach ab, sobald eine Phase keine Dauer hatte. Er
