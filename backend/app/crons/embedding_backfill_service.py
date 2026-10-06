@@ -10,9 +10,8 @@ import httpx
 
 from app.context.embedding import (
     EMBEDDING_CONTENT_TYPES,
-    _build_embedding_input,
     braucht_aliase,
-    traegt_substanz,
+    einbettungstext,
     generate_embeddings,
 )
 from app.context import aliase as aliase_modul
@@ -194,17 +193,12 @@ async def backfill_embeddings(
 
         aufgaben: list[tuple[ContextNode, str]] = []
         for node in batch:
-            node_aliase = aliase_je_knoten.get(node.id, [])
-            if not traegt_substanz(node, node_aliase):
-                # Nur der Titel — das wäre eine unscharfe Titelsuche im Vektorraum und
-                # gehört in die Identifikation, nicht hierher. Vertagt, nicht verworfen:
-                # Sobald der Knoten Inhalt oder Kompetenzbezüge bekommt, greift der
-                # nächste Lauf (siehe `traegt_substanz`).
-                stats.skipped += 1
-                continue
-            inp = _build_embedding_input(node, node_aliase)
-            if not inp.strip():
-                # Kein einbettbarer Text (leerer Knoten) → überspringen statt 400.
+            # `None`: nur der Titel (eine unscharfe Titelsuche im Vektorraum, gehört in die
+            # Identifikation — vertagt, nicht verworfen, siehe `traegt_substanz`) oder gar
+            # kein Text (überspringen statt 400). Dieselbe Regel zählt
+            # `fehlende_vektoren` für die Messskripte.
+            inp = einbettungstext(node, aliase_je_knoten.get(node.id, []))
+            if inp is None:
                 stats.skipped += 1
                 continue
             aufgaben.append((node, inp))

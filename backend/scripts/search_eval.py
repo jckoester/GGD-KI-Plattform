@@ -53,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.context.search import _FACHBONUS as FACHBONUS
 from app.config import settings
-from app.context.embedding import generate_embedding
+from app.context.embedding import generate_embedding, vor_einer_messung
 
 PRUEFSATZ_VORGABE = (
     Path(__file__).resolve().parents[2] / "config" / "search_eval.yaml"
@@ -538,7 +538,10 @@ def _erwartung(ist: int, soll: int | None) -> str:
 
 
 async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | None,
-              aufzaehlungen: list[Aufzaehlfall] | None = None) -> int:
+              aufzaehlungen: list[Aufzaehlfall] | None = None, *,
+              trotzdem: bool = False) -> int:
+    # Fehlende Vektoren zuerst — sonst misst der Prüfsatz den Backfill, nicht die Suche.
+    await vor_einer_messung(trotzdem=trotzdem)
     dsn = _dsn()
     ergebnisse: list[Ergebnis] = []
     fach_ids = await _fach_ids(dsn)
@@ -609,6 +612,8 @@ def main() -> None:
     p.add_argument("--top-k", type=int, help="Trefferzahl (Vorgabe aus dem Prüfsatz)")
     p.add_argument("--details", action="store_true", help="Trefferlisten mit ausgeben")
     p.add_argument("--json", type=Path, help="Ergebnisse zusätzlich als JSON schreiben")
+    p.add_argument("--trotzdem", action="store_true",
+                   help="Auch messen, wenn Knoten ohne Vektor sind (sonst Abbruch)")
     args = p.parse_args()
 
     aufzaehlungen: list[Aufzaehlfall] = []
@@ -626,7 +631,8 @@ def main() -> None:
             p.error(f"Prüfsatz enthält keine Fälle: {args.pruefsatz}")
         top_k = args.top_k or top_k
 
-    sys.exit(asyncio.run(run(faelle, top_k, args.details, args.json, aufzaehlungen)))
+    sys.exit(asyncio.run(run(faelle, top_k, args.details, args.json, aufzaehlungen,
+                             trotzdem=args.trotzdem)))
 
 
 if __name__ == "__main__":

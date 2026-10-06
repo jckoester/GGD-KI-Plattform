@@ -11,11 +11,12 @@ zu den drei nächsten Bausteinen. `VORAB_SCHWELLE` in `app/context/search.py` ge
 Jeder neue Baustein kann diese Lücke schließen — dann muss die Regel enger werden
 (Typen, Fachbezug), nicht die Schwelle weicher.
 """
-import asyncio, sys
+import argparse, asyncio, sys
 sys.path.insert(0, ".")
 import sqlalchemy as sa
 from app.db.session import AsyncSessionLocal
 from app.db.models import ContextNode, Subject
+from app.context.embedding import vor_einer_messung
 from app.context.search import vektor_oder_none
 from app.context.taxonomy import VORAB_TYPEN
 
@@ -37,7 +38,10 @@ BEILAEUFIG = [
     "Ich muss ein Gedicht von Goethe interpretieren.",
 ]
 
-async def main():
+async def main(trotzdem: bool):
+    # ⚠️ Am 06.10.2026 zeigte dieses Skript eine scheinbar zerbrochene Schwelle — gemessen
+    # war, dass 100 von 107 Begriffen keinen Vektor hatten. Deshalb zuerst die Lücken.
+    await vor_einer_messung(VORAB_TYPEN, trotzdem=trotzdem)
     async with AsyncSessionLocal() as db:
         for name, fragen in (("FACHLICH", FACHLICH), ("BEILÄUFIG", BEILAEUFIG)):
             print(f"\n── {name} ──")
@@ -56,4 +60,7 @@ async def main():
                 beste = " · ".join(f"{t} {x:.3f}" for t, x in zeilen)
                 print(f" {zeilen[0][1]:.3f}  {f[:44]:<46} {beste}")
 
-asyncio.run(main())
+_p = argparse.ArgumentParser(description="Schwelle der Vorab-Suche nachmessen")
+_p.add_argument("--trotzdem", action="store_true",
+                help="Auch messen, wenn Knoten ohne Vektor sind (sonst Abbruch)")
+asyncio.run(main(_p.parse_args().trotzdem))

@@ -454,8 +454,9 @@ python scripts/search_eval.py --json /tmp/vorher.json
 python scripts/search_eval.py --json /tmp/nachher.json
 ```
 
-Voraussetzungen: importierter Bildungsplan, laufender LiteLLM-Proxy (für das Embedding
-der Anfragen), und für die S2-Fälle die Testknoten:
+Voraussetzungen: importierter Bildungsplan, **vollständige Vektoren** (siehe *Messfalle*
+unten — das Skript prüft es selbst und bricht sonst ab), laufender LiteLLM-Proxy (für das
+Embedding der Anfragen), und für die S2-Fälle die Testknoten:
 
 ```bash
 python scripts/seed_search_eval_nodes.py            # anlegen
@@ -478,6 +479,26 @@ Exit-Code 1, wenn eine Zusage bricht:
 `3.4.1.1` (einmal mit, einmal ohne Fachbezug) und Informatik `3.1.2(1)`. Beide Knoten
 gibt es; sie werden von ähnlicheren verdrängt. Wer daran arbeitet, prüft zuerst, ob die
 Erwartung stimmt — der Bericht sagt das bei jedem Fall dazu.
+
+**Nachgemessen 06.10.2026** (107 Fachbegriffe statt 36, vollständige Vektoren): 30/35 ·
+**50/54** · 100 % · 2/2 · Deckel **gerissen**. Neu rot: „Was passiert, wenn man Säure und
+Lauge mischt?" findet die Neutralisation nicht mehr; der Deckel reißt bei
+„Elektronenpaarbindung" (4 Namensträger). Beides in `Todo.md`, nicht untersucht.
+
+**Für Änderungen am Prompt-Inhalt der Vorab-Suche** gibt es ein zweites Werkzeug:
+`scripts/kontextblock.py` zeigt den Kontextblock, den eine Frage in den Prompt bringt —
+ohne Modell, deterministisch, in einer Konversation im angegebenen Fach, die am Ende
+zurückgerollt wird. Ein `diff` zweier Ausgabeverzeichnisse zeigt genau, was sich am Prompt
+geändert hat; was das Modell daraus macht, misst `chat_probe.py`.
+
+```bash
+python scripts/kontextblock.py --datei scripts/szenarien/ap7_chemie.txt \
+    --fach CH --stufe 8 --ausgabe /tmp/vorher
+```
+
+Mit `--gruppe` statt `--fach` misst es dieselbe Lage wie `chat_probe.py --gruppe`: Fach und
+Stufe kommen dann aus der Gruppe. Die Testassistenten auf Dev sind an Unterrichtsgruppen
+gebunden; `chat_probe` braucht dafür eine Schülerin, die dort Mitglied ist (`--pseudonym`).
 
 ### `typ:` — warum ein Fall ohne ihn lügen kann
 
@@ -569,6 +590,17 @@ Datenbankverbindung ohne Statement-Cache**. Sonst hält PostgreSQL den Plan des
 vorbereiteten Statements fest, und die zweite Messung läuft mit dem Plan der ersten. Bei
 der ersten Fassung des Prüfsatzes kam so für jede Anfrage ein Recall von 100 % heraus —
 verglichen wurde in Wahrheit der exakte Durchlauf mit sich selbst.
+
+⚠️ **Die zweite Messfalle: fehlende Vektoren.** Am 06.10.2026 zeigte `vorab_schwelle.py`
+eine scheinbar zerbrochene Schwelle — drei von sechs Fachfragen über 0,45, „Was ist eine
+Oxidation?" fand den Begriff Oxidation gar nicht. Auf Dev hatten seit einem Neuimport
+100 von 107 Begriffen keinen Vektor; Dev hat keinen nächtlichen Backfill. Gemessen war der
+Zustand der Vektoren, nicht die Suche. Seitdem prüfen `search_eval.py`,
+`vorab_schwelle.py`, `kontextblock.py` und `chat_probe.py` zuerst
+(`embedding.vor_einer_messung`) und brechen mit Exit-Code 2 ab, solange Knoten fehlen;
+`--trotzdem` übergeht das. „Fehlend" heißt dasselbe wie für den Backfill
+(`einbettungstext`): Ein Knoten, der nur seinen Titel trüge, bekommt absichtlich keinen
+Vektor und zählt nicht.
 
 ---
 

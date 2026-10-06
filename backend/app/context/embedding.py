@@ -10,6 +10,7 @@ aendert (siehe docs/runbooks/modellwechsel.md).
 
 import asyncio
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -204,6 +205,96 @@ def traegt_substanz(node: ContextNode, aliase: list[str]) -> bool:
         return True
     eingabe = _build_embedding_input(node, aliase).strip()
     return bool(eingabe) and eingabe != (node.title or "").strip()
+
+
+def einbettungstext(node: ContextNode, aliase: list[str]) -> str | None:
+    """Der Text, aus dem der Vektor entsteht — oder ``None``, wenn der Knoten keinen bekommt.
+
+    Keinen bekommt, wer nur seinen Titel trüge (:func:`traegt_substanz`) oder gar keinen
+    Text hat. **Eine Regel für zwei Leser:** Der Backfill bettet genau diese Knoten ein,
+    und :func:`fehlende_vektoren` zählt genau diese als fehlend. Zählte die Prüfung anders,
+    meldete sie die absichtlich übersprungenen Knoten bei jedem Lauf als Lücke.
+    """
+    if not traegt_substanz(node, aliase):
+        return None
+    eingabe = _build_embedding_input(node, aliase)
+    return eingabe if eingabe.strip() else None
+
+
+async def fehlende_vektoren(
+    db: AsyncSession, typen: Iterable[str] | None = None
+) -> dict[str, int]:
+    """Aktive Knoten ohne Vektor, die einen haben sollten — je ``content_type``.
+
+    ⚠️ **Die Voraussetzung jeder Messung an der Suche** (0.14, Schritt 1). Am 06.10.2026
+    hatten auf Dev 100 von 107 Begriffen keinen Vektor — seit einem Neuimport am 01.10.,
+    und Dev hat keinen nächtlichen Backfill. `vorab_schwelle.py` zeigte daraufhin eine
+    scheinbar zerbrochene Schwelle; „Was ist eine Oxidation?" fand den Begriff Oxidation
+    gar nicht. Gemessen war der Zustand der Vektoren, nicht die Suche.
+
+    ``typen`` grenzt auf die gemessenen Typen ein (``None`` = alle einbettbaren).
+    """
+    from sqlalchemy import select
+
+    from app.context import aliase as aliase_modul
+
+    gewaehlt = list(EMBEDDING_CONTENT_TYPES if typen is None else
+                    [t for t in typen if t in EMBEDDING_CONTENT_TYPES])
+    if not gewaehlt:
+        return {}
+    knoten = (
+        await db.execute(
+            select(ContextNode).where(
+                ContextNode.embedding.is_(None),
+                ContextNode.status == "active",
+                ContextNode.content_type.in_(gewaehlt),
+            )
+        )
+    ).scalars().all()
+    aliase_je_knoten = await aliase_modul.lade_viele(
+        db, [k.id for k in knoten if braucht_aliase(k)]
+    )
+    fehlend: dict[str, int] = {}
+    for k in knoten:
+        if einbettungstext(k, aliase_je_knoten.get(k.id, [])) is not None:
+            fehlend[k.content_type] = fehlend.get(k.content_type, 0) + 1
+    return fehlend
+
+
+def vektor_luecken_meldung(fehlend: dict[str, int]) -> str | None:
+    """Die Meldung für ein Messskript — ``None``, wenn nichts fehlt."""
+    if not fehlend:
+        return None
+    teile = ", ".join(f"{typ} {anzahl}" for typ, anzahl in sorted(fehlend.items()))
+    return (
+        f"⚠️ {sum(fehlend.values())} Knoten ohne Vektor ({teile}). Eine Messung jetzt "
+        "misst den Zustand der Vektoren, nicht die Suche.\n"
+        "   Abhilfe: python scripts/embedding_backfill.py — "
+        "oder bewusst messen mit --trotzdem."
+    )
+
+
+async def vor_einer_messung(
+    typen: Iterable[str] | None = None, *, trotzdem: bool = False
+) -> None:
+    """Für Messskripte: Abbruch mit Exit-Code 2, wenn Vektoren fehlen.
+
+    Aufgerufen von `vorab_schwelle.py`, `search_eval.py` und `chat_probe.py`. Mit
+    ``trotzdem`` wird nur gewarnt — für den seltenen Fall, dass gerade der Zustand mit
+    Lücken gemessen werden soll.
+    """
+    import sys
+
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        meldung = vektor_luecken_meldung(await fehlende_vektoren(db, typen))
+    if meldung is None:
+        return
+    print(meldung, file=sys.stderr)
+    if not trotzdem:
+        raise SystemExit(2)
+    print("   --trotzdem: Es wird trotzdem gemessen.", file=sys.stderr)
 
 
 def _build_embedding_input(node: ContextNode, aliase: list[str]) -> str:

@@ -22,6 +22,7 @@ bewusst draußen, weil dort der Suchtext der Nutzer:in steht. Wer die Treffer br
 stellt die Suche mit demselben Profil nach.
 """
 import argparse
+import asyncio
 import json
 import re
 import sys
@@ -33,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.auth.dependencies import get_jwt_service
 from app.config import settings
+from app.context.embedding import vor_einer_messung
 
 
 def frage_stellen(
@@ -133,6 +135,8 @@ def main() -> None:
     p.add_argument("--rolle", default="student", choices=["student", "teacher"])
     p.add_argument("--basis", default="http://localhost:8000")
     p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    p.add_argument("--trotzdem", action="store_true",
+                   help="Auch fragen, wenn Knoten ohne Vektor sind (sonst Abbruch)")
     args = p.parse_args()
 
     if settings.environment == "production":
@@ -147,6 +151,9 @@ def main() -> None:
                    if z.strip() and not z.startswith("#")]
     if not fragen:
         p.error("Keine Frage angegeben")
+
+    # Fehlen Vektoren, findet die Vorab-Suche weniger — und die Antworten messen das mit.
+    asyncio.run(vor_einer_messung(trotzdem=args.trotzdem))
 
     # ⚠️ **Jede Frage in einer eigenen Konversation.** Im Testlauf vom 26.09.2026 stand
     # Szenario (f) an sechster Stelle, nach fünf ausführlichen Antworten des Modells —
