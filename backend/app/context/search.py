@@ -1323,6 +1323,9 @@ async def vorab(
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
             if t["node_id"] in gesehen:
                 continue
+            # Für die Zeile „Kontext" unter der Antwort (0.14): wie nah der Treffer lag.
+            # Ins Modell geht sie nicht — `fuer_modell` streift sie ab.
+            t["distanz"] = float(z["distanz"])
             treffer.append(t)
             gesehen.add(t["node_id"])
 

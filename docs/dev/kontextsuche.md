@@ -236,6 +236,33 @@ einmal nach, was bis dahin dort gelandet ist.
 
 ---
 
+## Die Bausteine einer Antwort (0.14)
+
+Zu jeder Assistenten-Nachricht hält `message_context_nodes` fest, welche Bausteine beim
+Antworten **vorlagen** — nicht, welche das Modell benutzt hat; das weiß nur das Modell.
+Deshalb heißt die Zeile darunter „Kontext", nicht „Quellen".
+
+- **Zwei Herkünfte:** `vorab` sind die Treffer der Grundschicht, also **dieselben**, die in
+  den Prompt gehen (`_grundschicht` liefert beides aus einer Trefferliste); `werkzeug` ist,
+  was `search_context_nodes` und `list_context_nodes` dem Modell zusätzlich geliefert
+  haben. Die Werkzeuge hängen es an einen Sammler am `ToolContext` — eine Liste je Anfrage,
+  weil der `ToolContext` je Aufruf neu entsteht.
+- **Nicht dabei:** Ankerkontext, angeheftete Knoten, Lernstand (`app/context/bausteine.py`).
+- **Reihenfolge des ersten Auftretens**, jeder Knoten einmal; was vorab da war, bleibt
+  `vorab`.
+- **Ähnlichkeit** (1 − Kosinusdistanz) nur bei thematischen Vorab-Treffern. Die Distanz
+  reist dafür am Treffer mit (`distanz`) und wird in `fuer_modell` **abgestreift** — sonst
+  stünde sie im Prompt. Ob der Prompt nach einer solchen Änderung zeichengleich bleibt,
+  zeigt `scripts/kontextblock.py` per `diff`.
+- **Gespeichert im selben Commit wie die Nachricht** (`_persist`), nur für Knoten, die es
+  dann noch gibt — ein in der Zwischenzeit gelöschter Baustein darf die Antwort nicht
+  mitreißen. Löschkaskade an Nachricht und Knoten.
+
+`get_context_for_query` liefert weiter nur den Text; den Text **und** die Bausteine liefert
+`kontext_fuer_frage`.
+
+---
+
 ## Warum der `@`-Weg anders ist
 
 Der `@`-Shortcode im Chat ist **Namensvervollständigung**, nicht Suche: Man tippt einen

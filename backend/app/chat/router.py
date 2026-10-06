@@ -57,7 +57,9 @@ from app.chat.image_store import (
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
-from app.context.service import get_context_for_query, stufe_der_person
+from app.context.bausteine import WERKZEUG, aus_treffern, vereinige
+from app.context.bausteine import speichere as bausteine_speichern
+from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.context.filters import Knotenfilter
 from app.context.lookup import normalisiere_titel
 from app.context.search import (
@@ -581,6 +583,11 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
             abschnitt[:] = sortiere_passende_nach_vorn(abschnitt, vermerke)
         thematisch = sortiere_passende_nach_vorn(thematisch, vermerke)
 
+    if ctx.bausteine is not None:
+        # In der Reihenfolge, in der das Modell sie liest: exakt, ähnlich benannt, nah.
+        ctx.bausteine.extend(aus_treffern(
+            nach_art["exakt"] + nach_art["teilweise"] + thematisch, WERKZEUG
+        ))
     antwort: dict = {
         "exakte_namenstraeger": fuer_modell(nach_art["exakt"], grenzen, vermerke),
         "gesamt": ident.gesamt,
@@ -794,6 +801,8 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
         await bp_baender_zu(ctx.db, abschnitt.treffer, stufe) if stufe is not None else {}
     )
     vermerke = stufen_vermerke(abschnitt.treffer, stufe, baender)
+    if ctx.bausteine is not None:
+        ctx.bausteine.extend(aus_treffern(abschnitt.treffer, WERKZEUG))
     antwort: dict = {
         "gesamt": abschnitt.gesamt,
         "geliefert": abschnitt.geliefert,
@@ -1452,6 +1461,7 @@ async def _persist(
     skip_user_message: bool = False,
     generated_image_ids: Optional[list] = None,
     provider_model: Optional[str] = None,
+    bausteine: Optional[list] = None,
 ) -> Optional[UUID]:
     """Schreibt Nachrichten + Konversations-Update. Gibt die ID der Assistant-Nachricht
     zurück — das Frontend braucht sie, um später die Herkunft eines daraus gespeicherten
@@ -1487,6 +1497,9 @@ async def _persist(
     await db.flush()
     if generated_image_ids:
         await link_images_to_message(db, generated_image_ids, assistant_msg.id)
+    # Im selben Commit wie die Nachricht — sonst gäbe es Antworten ohne ihre Bausteine.
+    if bausteine:
+        await bausteine_speichern(db, assistant_msg.id, bausteine)
 
     update_values: dict = {"last_message_at": func.now()}
     if cost_usd is not None:
@@ -1812,8 +1825,9 @@ async def chat(
     # Dokumente für den Assistenten laden (falls vorhanden) - 2-5
     assistant_id_for_docs = active_assistant_id
 
-    # Kontext aus Kontextspeicher laden — immer, auch ohne Assistenten (KS-Phase-5)
-    context_str = await get_context_for_query(
+    # Kontext aus Kontextspeicher laden — immer, auch ohne Assistenten (KS-Phase-5).
+    # Mit den Bausteinen der Vorab-Suche für die Zeile „Kontext" unter der Antwort (0.14).
+    kontext = await kontext_fuer_frage(
         assistant_id=active_assistant_id,
         pseudonym=current_user.sub,
         query_text=user_message,
@@ -1824,6 +1838,7 @@ async def chat(
         # aus der sich Stufe und Fach ableiten ließen.
         jwt_stufe=current_user.grade,
     )
+    context_str = kontext.text
 
     llm_messages: list[dict] = []
 
@@ -2035,6 +2050,9 @@ async def chat(
         # letzte, ein Zug mit drei Runden belastete das Budget also um zwei Drittel zu
         # wenig.
         _request_ids: list[str] = []
+        # Was die Suchwerkzeuge in diesem Zug geliefert haben (0.14) — eine Liste für alle
+        # Runden, jeder `ToolContext` bekommt sie durchgereicht.
+        _werkzeug_bausteine: list = []
         cost_usd: Optional[float] = None
         # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
         # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
@@ -2136,6 +2154,7 @@ async def chat(
                         litellm_key=litellm_key,
                         assistant=active_assistant,
                         erlaubte_modelle=_erlaubte_modelle,
+                        bausteine=_werkzeug_bausteine,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:
@@ -2305,6 +2324,7 @@ async def chat(
                 skip_user_message=crisis_record is not None,
                 generated_image_ids=_generated_image_ids,
                 provider_model=await anbietermodell(_deployment_id, model_used),
+                bausteine=vereinige(kontext.bausteine, _werkzeug_bausteine),
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)

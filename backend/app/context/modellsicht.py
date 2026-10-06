@@ -223,10 +223,13 @@ def fuer_modell(
             continue
         # `subject_id` ist eine interne Zahl — für das Modell wertlos und irreführend.
         # Sie wird durch den Fachnamen ersetzt, den `fach` trägt.
+        # `distanz` trägt die Vorab-Suche für die Zeile „Kontext" unter der Antwort
+        # (0.14) — dem Modell sagt sie nichts, und ein Prompt-Feld mehr wäre eine
+        # Prompt-Änderung ohne Messung.
         eintrag = {
             k: v for k, v in t.items()
             if k not in ("node_id", "content", "subject_id", "fach", "metadata",
-                         "aliase")
+                         "aliase", "distanz")
         }
         if t.get("fach"):
             eintrag["fach"] = t["fach"]

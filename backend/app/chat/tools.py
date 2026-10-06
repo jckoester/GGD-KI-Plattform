@@ -48,6 +48,11 @@ class ToolContext:
     # Modell-Allowlist der Nutzer:in (None = unbekannt, dann nicht filtern). Derselbe
     # Grund wie oben: Was das Schema verbirgt, muss der Handler auch ablehnen.
     erlaubte_modelle: set[str] | None = None
+    # Sammler für die Zeile „Kontext" unter der Antwort (0.14): Die Suchwerkzeuge hängen
+    # an, was sie dem Modell geliefert haben. **Eine Liste je Anfrage**, nicht je Aufruf —
+    # der Router legt sie einmal an und reicht sie jedem `ToolContext` durch, denn der
+    # entsteht je Werkzeugaufruf neu. `None` = niemand sammelt.
+    bausteine: list | None = None
 
 
 @dataclass

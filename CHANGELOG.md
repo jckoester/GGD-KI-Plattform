@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Migration
+
+`alembic upgrade head` führt `0083` aus: Tabelle `message_context_nodes` — je Antwort die
+Bausteine, die beim Antworten vorlagen. Rückrollbar; dabei gehen nur diese Verweise
+verloren, die Antworten bleiben.
+
 ## [0.13.1] – 2026-10-04
 
 Fehlerbehebungen an Stundenentwurf und Nachbereitung, weitere Namen von Bausteinen wirken

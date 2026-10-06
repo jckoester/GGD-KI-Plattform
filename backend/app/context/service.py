@@ -17,6 +17,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context.bausteine import VORAB, Baustein, Kontext, aus_treffern
 from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
@@ -184,13 +185,14 @@ async def _grundschicht(
     anchor_ids: Sequence[UUID],
     jwt_stufe: str | None,
     vektor,
-) -> tuple[list[dict], set[str]]:
+) -> tuple[list[dict], set[str], list[Baustein]]:
     """Die Vorab-Suche und ihre Aufbereitung fürs Modell (Paket 9, N11).
 
     Liefert die fertigen Einträge **und** ihre ``node_id``s — die Einträge selbst tragen
     sie nicht mehr (``fuer_modell`` streift sie ab, sie nützen dem Modell nichts). Der
     Aufrufer braucht sie, um dieselben Knoten nicht ein zweites Mal aus dem Teilgraphen
-    eines Ankers zu holen.
+    eines Ankers zu holen. Dazu die Bausteine für die Zeile „Kontext" unter der Antwort
+    (0.14) — aus **denselben** Treffern, die in den Prompt gehen.
 
     **Das Fach** kommt aus der Konversation (N11): ihre Unterrichtsgruppe, sonst ihre
     Fachzuordnung. Das Fach eines Assistenten steckt bereits darin — der Chat-Router
@@ -215,7 +217,7 @@ async def _grundschicht(
     )
     treffer = await vorab(frage, profil, db, vektor=vektor)
     if not treffer:
-        return [], set()
+        return [], set(), []
 
     grenzen = await abgrenzungen_zu(db, [t["node_id"] for t in treffer])
     baender = await bp_baender_zu(db, treffer, stufe) if stufe is not None else {}
@@ -223,6 +225,7 @@ async def _grundschicht(
     return (
         fuer_modell(treffer, grenzen, merkmale),
         {t["node_id"] for t in treffer},
+        aus_treffern(treffer, VORAB),
     )
 
 
@@ -235,7 +238,31 @@ async def get_context_for_query(
     rollen: Sequence[str] = (),
     jwt_stufe: str | None = None,
 ) -> str:
-    """Assembliert den Kontext-String für einen Chat-Prompt.
+    """Der Kontext-String für einen Chat-Prompt — :func:`kontext_fuer_frage` ohne Bausteine.
+
+    Bleibt für alle Aufrufer, die nur den Text brauchen. Der Text ist **derselbe** — diese
+    Funktion gibt nur einen Teil des Ergebnisses zurück, sie baut nichts eigenes.
+    """
+    kontext = await kontext_fuer_frage(
+        assistant_id, pseudonym, query_text, chat_id, db,
+        rollen=rollen, jwt_stufe=jwt_stufe,
+    )
+    return kontext.text
+
+
+async def kontext_fuer_frage(
+    assistant_id: int | None,
+    pseudonym: str,
+    query_text: str,
+    chat_id: UUID | None,
+    db: AsyncSession,
+    rollen: Sequence[str] = (),
+    jwt_stufe: str | None = None,
+) -> Kontext:
+    """Assembliert den Kontext für einen Chat-Prompt: Text **und** Bausteine (0.14).
+
+    Die Bausteine sind die Treffer der Vorab-Suche — nicht der Ankerkontext, nicht die
+    angehefteten Knoten, nicht der Lernstand (Begründung: :mod:`app.context.bausteine`).
 
     Kombiniert die **Vorab-Suche** (N11), semantische Suche im Teilgraphen eines Ankers,
     Engagement-Retrieval und explizit gepinnte Knoten.
@@ -284,7 +311,7 @@ async def get_context_for_query(
     # Datenbank arbeitet.
     vektor_task = asyncio.create_task(vektor_oder_none(query_text))
     try:
-        vorab_eintraege, vorab_ids = await _grundschicht(
+        vorab_eintraege, vorab_ids, vorab_bausteine = await _grundschicht(
             query_text,
             db,
             pseudonym=pseudonym,
@@ -348,8 +375,10 @@ async def get_context_for_query(
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
     planning_block = await _planning_block(db, chat_id)
     if planning_block:
-        return f"{planning_block}\n\n{base}" if base else planning_block
-    return base
+        text = f"{planning_block}\n\n{base}" if base else planning_block
+    else:
+        text = base
+    return Kontext(text=text, bausteine=vorab_bausteine)
 
 
 async def stufe_der_person(

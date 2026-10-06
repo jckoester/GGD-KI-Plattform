@@ -6,7 +6,7 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger, SmallInteger
+from sqlalchemy import Numeric, Boolean, BigInteger, Float, SmallInteger
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -1590,6 +1590,38 @@ class ChatContextNode(Base):
     )
     added_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+
+class MessageContextNode(Base):
+    """Ein Baustein, der beim Antworten vorlag (0.14, Schritt 2).
+
+    „Gefunden", nicht „verwendet" — was das Modell davon benutzt hat, weiß nur das Modell.
+    ``herkunft`` ist `vorab` (die Grundschicht zur Frage) oder `werkzeug` (eine Suchrunde
+    des Modells). ``position`` hält die Reihenfolge des ersten Auftretens; ``aehnlichkeit``
+    gibt es nur für thematische Vorab-Treffer (1 − Kosinusdistanz).
+
+    Löschkaskade auf **beiden** Seiten: Verschwindet die Nachricht (90-Tage-Regel,
+    Löschen der Konversation) oder der Baustein, verschwindet der Verweis mit.
+    """
+
+    __tablename__ = "message_context_nodes"
+
+    message_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True
+    )
+    node_id: Mapped[UUIDType] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    herkunft: Mapped[str] = mapped_column(Text, nullable=False)
+    aehnlichkeit: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "herkunft IN ('vorab', 'werkzeug')", name="check_message_context_nodes_herkunft"
+        ),
+        Index("idx_message_context_nodes_node", "node_id"),
     )
 
 
