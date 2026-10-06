@@ -57,7 +57,9 @@ from app.chat.image_store import (
 from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
-from app.context.bausteine import WERKZEUG, aus_treffern, vereinige
+from app.context.bausteine import (
+    WERKZEUG, KontextBaustein, aus_treffern, kontext_der_nachrichten, vereinige,
+)
 from app.context.bausteine import speichere as bausteine_speichern
 from app.context.service import kontext_fuer_frage, stufe_der_person
 from app.context.filters import Knotenfilter
@@ -134,6 +136,10 @@ class MessageItem(BaseModel):
     assistant_id: Optional[int] = None
     assistant_name: Optional[str] = None
     images: list[GeneratedImageRef] = []
+    # Die Bausteine, die beim Antworten vorlagen (0.14) — dieselbe Liste wie im
+    # SSE-Ereignis `kontext`. Nur an Antworten; ob und wie ausführlich sie erscheint,
+    # entscheidet die Profileinstellung `kontext_anzeige` im Frontend.
+    kontext: list[KontextBaustein] = []
     # Hilfe-Ressourcen zu einem Krisenhinweis (ADR-008 Teil 3/4). Hängt an der
     # **auslösenden** Nachricht — dorthin zeigt auch das Flag. Bis 09/2026 kam das
     # Banner nur live über SSE und war nach dem Neuladen weg.
@@ -2314,6 +2320,7 @@ async def chat(
             )
 
         _nachricht_id = None
+        _bausteine = vereinige(kontext.bausteine, _werkzeug_bausteine)
         try:
             _nachricht_id = await _persist(
                 db, conversation_id, user_message, last_attachments,
@@ -2324,10 +2331,24 @@ async def chat(
                 skip_user_message=crisis_record is not None,
                 generated_image_ids=_generated_image_ids,
                 provider_model=await anbietermodell(_deployment_id, model_used),
-                bausteine=vereinige(kontext.bausteine, _werkzeug_bausteine),
+                bausteine=_bausteine,
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
+
+        if _nachricht_id is not None and _bausteine:
+            # Aus der Datenbank, nicht aus `_bausteine`: Dieselbe Abfrage liefert die
+            # Liste nach dem Neuladen — so kann der Stream nichts zeigen, was danach
+            # fehlt. Ohne Bausteine kein Ereignis, also auch keine leere Zeile.
+            try:
+                _kontext = (await kontext_der_nachrichten(
+                    db, [_nachricht_id], current_user.sub, current_user.roles,
+                )).get(_nachricht_id, [])
+                if _kontext:
+                    _nutzlast = [b.model_dump(mode="json") for b in _kontext]
+                    yield f"event: kontext\ndata: {json.dumps({'bausteine': _nutzlast})}\n\n"
+            except Exception:
+                logger.exception("Bausteine der Nachricht %s nicht lesbar", _nachricht_id)
 
         if _nachricht_id is not None:
             yield (
@@ -2913,6 +2934,11 @@ async def get_conversation_messages(
 
     # Generierte Bilder je Nachricht (Phase 16, Schritt 6: History-Rehydrierung).
     img_map = await list_message_images(db, conversation_id)
+    # Bausteine je Antwort (0.14) — dieselbe Abfrage wie im Stream.
+    kontext_map = await kontext_der_nachrichten(
+        db, [row.Message.id for row in rows if row.Message.role == "assistant"],
+        current_user.sub, current_user.roles,
+    )
 
     # Hilfe-Banner je Nachricht rekonstruieren (ADR-008 Teil 3/4).
     #
@@ -2987,6 +3013,7 @@ async def get_conversation_messages(
                 "assistant_id": msg.assistant_id,
                 "assistant_name": asst_name,
                 "images": img_map.get(msg.id, []),
+                "kontext": kontext_map.get(msg.id, []),
             })
 
     assistant_name: Optional[str] = None

@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Unter einer Antwort im Chat steht „Kontext (n)": aufgeklappt die Bausteine, die beim
+  Antworten vorlagen, mit Link und Fach — auch nach dem Neuladen. Wie ausführlich, stellt
+  jede Person im Profil ein („Kontext zur Antwort": gar nicht, kurz, ausführlich mit
+  Fundweg und Änderungsdatum).
+
 ### Migration
 
 `alembic upgrade head` führt `0083` aus: Tabelle `message_context_nodes` — je Antwort die

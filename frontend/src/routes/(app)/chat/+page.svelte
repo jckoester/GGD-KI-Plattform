@@ -11,6 +11,7 @@
         Search,
     } from "lucide-svelte";
     import MessageBubble from "$lib/components/MessageBubble.svelte";
+    import { kontextStufe } from "$lib/kontext_anzeige.js";
     import { mehrdeutigeFassungen } from "$lib/bp_fassung.js";
     import { mentionAnfrage, ohneMentionFragment } from "$lib/mention.js";
     import { uebernehmen } from "$lib/context_handover.js";
@@ -305,6 +306,7 @@
     }
 
     let granularity = $derived($user?.preferences?.cost_granularity ?? "none");
+    let kontextAnzeige = $derived(kontextStufe($user?.preferences));
 
     function adjustTextareaHeight() {
         if (!textarea) return;
@@ -742,6 +744,16 @@
                     kostenNachschlagen(conversationId);
                     continue;
                 }
+                // Bausteine der Antwort (0.14) — kommen nach dem Speichern, wie
+                // `message.kontext` beim Neuladen.
+                if (item.type === "kontext") {
+                    messages[assistantIndex] = {
+                        ...messages[assistantIndex],
+                        kontext: item.bausteine,
+                    };
+                    messages = messages;
+                    continue;
+                }
                 if (item.type === "image") {
                     messages[assistantIndex] = {
                         ...messages[assistantIndex],
@@ -1056,6 +1068,7 @@
                     assistantId: m.assistant_id ?? null,
                     assistantName: m.assistant_name ?? null,
                     images: m.images?.length ? m.images : undefined,
+                    kontext: m.kontext?.length ? m.kontext : undefined,
                 }));
                 messages = insertSeparators(rawMessages);
                 conversationId = data.id;
@@ -1274,6 +1287,7 @@
                         isStreaming={isStreaming && i === messages.length - 1}
                         kostenSichtbar={granularity === "message" ||
                             granularity === "both"}
+                        kontextStufe={kontextAnzeige}
                         costEur={granularity === "message" ||
                         granularity === "both"
                             ? kostenEinheiten(

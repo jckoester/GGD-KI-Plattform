@@ -1,5 +1,5 @@
 <script>
-    import { AlertCircle, BookmarkPlus, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2 } from 'lucide-svelte';
+    import { AlertCircle, BookmarkPlus, BookOpen, Check, Download, FileText, FileEdit, Image, RefreshCw, Loader2, Info, Copy, Share2 } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { renderMarkdown } from '$lib/markdown.js';
     import { renderDiagrams } from '$lib/diagrams.js';
@@ -18,6 +18,8 @@
     import { kostenAnzeige, kostenErklaerung } from '$lib/budget_text.js';
     import { nurTextHinweis } from '$lib/workshop.js';
     import WarningBanner from './WarningBanner.svelte';
+    import KontextListe from './KontextListe.svelte';
+    import { kontextEintraege } from '$lib/kontext_anzeige.js';
     // `userPrompt`: die vorangegangene Nutzernachricht — sie gehört als eigene
     // Eingabe in die Quellenangabe, steht aber in einer anderen Nachricht.
     let {
@@ -30,6 +32,9 @@
         // nicht ermittelt" — und im zweiten Fall gehört ein Hinweis hin, im ersten
         // nicht.
         kostenSichtbar = true,
+        // `aus` | `kurz` | `ausfuehrlich` (Profileinstellung `kontext_anzeige`). Vorgabe
+        // `aus`: Außerhalb des Chats (Testchat im Editor, Einsicht) gibt es keine Zeile.
+        kontextStufe = 'aus',
     } = $props();
 
     // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
@@ -66,6 +71,11 @@
     );
     let hatHerkunftsangaben = $derived(!!antwortModell || bildHerkuenfte.length > 0);
     let erzeugtAm = $derived(zeitpunkt(message.created_at));
+
+    // ── Kontext (0.14): die Bausteine, die beim Antworten vorlagen ───────────
+    // Eingeklappt wie die Herkunft — ein Nachweis, keine Aufforderung (ADR-017).
+    let kontextOffen = $state(false);
+    let kontext = $derived(kontextEintraege(message, kontextStufe, isStreaming));
 
     let zitat = $derived(
         zitatText({
@@ -531,7 +541,7 @@
                     {/if}
                 </div>
             {/if}
-            {#if kosten !== null || (hatHerkunftsangaben && !isStreaming)}
+            {#if kosten !== null || (hatHerkunftsangaben && !isStreaming) || kontext}
                 <div class="flex items-center gap-3 text-xs text-light-tx-2 dark:text-dark-tx-2
                             mt-2 pt-1 border-t border-light-ui-3 dark:border-dark-ui-3">
                     {#if kosten !== null}
@@ -554,6 +564,18 @@
                         >
                             <Info class="w-3.5 h-3.5" />
                             Herkunft
+                        </button>
+                    {/if}
+                    {#if kontext}
+                        <button
+                            type="button"
+                            onclick={() => (kontextOffen = !kontextOffen)}
+                            aria-expanded={kontextOffen}
+                            title="Welche Bausteine lagen beim Antworten vor?"
+                            class="inline-flex items-center gap-1 hover:text-light-tx dark:hover:text-dark-tx"
+                        >
+                            <BookOpen class="w-3.5 h-3.5" />
+                            Kontext ({kontext.length})
                         </button>
                     {/if}
                 </div>
@@ -589,6 +611,9 @@
                             {/if}
                         </button>
                     </div>
+                {/if}
+                {#if kontext && kontextOffen}
+                    <KontextListe eintraege={kontext} />
                 {/if}
             {/if}
         </div>

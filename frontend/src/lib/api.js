@@ -456,6 +456,17 @@ export async function* streamChat(
         continue;
       }
 
+      // Die Bausteine, die beim Antworten vorlagen (0.14) — nach dem Speichern, vor
+      // `message`. Dieselbe Liste liefert das Neuladen als `message.kontext`.
+      if (currentEventType === "kontext") {
+        try {
+          const { bausteine } = JSON.parse(payload);
+          yield { type: "kontext", bausteine: bausteine ?? [] };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       // Nachrichten-ID, unmittelbar vor [DONE]. Belegt später die Herkunft eines aus
       // dieser Antwort gespeicherten Diagramms oder Dokuments.
       if (currentEventType === "message") {

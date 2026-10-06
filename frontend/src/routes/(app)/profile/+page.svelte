@@ -20,6 +20,7 @@
         uiStufe,
     } from "$lib/stores/uiLevel.js";
     import { patchPreferences, getPreferences } from "$lib/api.js";
+    import { kontextStufe, kontextStufenOptionen } from "$lib/kontext_anzeige.js";
     import { onMount } from "svelte";
     import Zugangstoken from "$lib/components/Zugangstoken.svelte";
     import { KACHELN, schalteKachel, zeigtKachel } from "$lib/stores/startkacheln.js";
@@ -360,6 +361,37 @@
                     disabled={loading}
                 >
                     {#each costGranularityOptions as { value, label }}
+                        <option {value}>{label}</option>
+                    {/each}
+                </select>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <h2
+                class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
+            >
+                Kontext zur Antwort
+            {#if quittung === "kontext_anzeige"}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === "kontext_anzeige"}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
+            </h2>
+            <div>
+                <label
+                    for="kontext-anzeige"
+                    class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
+                >
+                    Unter einer Antwort zeigen, welche Bausteine dabei vorlagen
+                </label>
+                <select
+                    id="kontext-anzeige"
+                    onchange={(e) =>
+                        updatePreference("kontext_anzeige", e.target.value)}
+                    value={kontextStufe(preferences)}
+                    class="w-full max-w-sm px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
+                       focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                >
+                    {#each kontextStufenOptionen as { value, label }}
                         <option {value}>{label}</option>
                     {/each}
                 </select>

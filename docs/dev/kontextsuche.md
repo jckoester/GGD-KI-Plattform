@@ -261,6 +261,21 @@ Deshalb heißt die Zeile darunter „Kontext", nicht „Quellen".
 `get_context_for_query` liefert weiter nur den Text; den Text **und** die Bausteine liefert
 `kontext_fuer_frage`.
 
+**Die Zeile unter der Antwort** liest die Liste mit `kontext_der_nachrichten` — live wie
+nach dem Neuladen **dieselbe** Abfrage: Der Stream schickt nach dem Speichern das Ereignis
+`kontext` (vor `message`), `GET /conversations/{id}/messages` trägt dasselbe als
+`message.kontext`. Was der Stream zeigt, kann so nach dem Neuladen nicht fehlen.
+
+- ⚠️ **Sichtbarkeit beim Lesen erneut geprüft** (`read_scope_clause`): Ein Baustein, der
+  inzwischen privat ist oder einer Gruppe gehört, aus der die Person ausgetreten ist,
+  verschwindet aus der Liste. `updated_at` ist der **heutige** Stand des Knotens.
+- **Keine leere Zeile:** Ohne Bausteine gibt es kein Ereignis und keine Zeile — auch nicht,
+  wenn alle Bausteine seitdem gelöscht oder unlesbar sind.
+- Wie ausführlich, entscheidet `preferences.kontext_anzeige` (`aus` | `kurz` |
+  `ausfuehrlich`, Vorgabe `kurz`) allein im Frontend (`$lib/kontext_anzeige.js`).
+  `ausfuehrlich` ist zugleich das Diagnosewerkzeug für die Vorab-Suche: Fundweg (vorab /
+  vom Assistenten nachgeschlagen), Ähnlichkeit oder „über den Namen".
+
 ---
 
 ## Warum der `@`-Weg anders ist

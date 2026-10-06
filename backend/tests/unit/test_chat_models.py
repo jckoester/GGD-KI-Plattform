@@ -371,6 +371,95 @@ async def test_stream_bleibt_heil_wenn_das_speichern_scheitert():
     assert "event: message" not in ausgabe
 
 
+# ── Kontext unter der Antwort (0.14, Schritt 3) ────────────────────────────────
+#
+# Der Stream schickt die Liste, die die Datenbank **nach** dem Speichern liefert — dieselbe
+# Abfrage wie beim Neuladen (`kontext_der_nachrichten`). Die Abfrage selbst prüft
+# `tests/integration/test_kontext_unter_der_antwort.py`.
+
+async def _chat_mit_bausteinen(bausteine, lader):
+    from app.context.bausteine import Kontext
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=_FakeHttpClient()), \
+         patch("app.chat.router._persist", new=AsyncMock(return_value=_NACHRICHT)), \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value=None)), \
+         patch("app.chat.router.kontext_fuer_frage",
+               new=AsyncMock(return_value=Kontext(text="", bausteine=bausteine))), \
+         patch("app.chat.router.kontext_der_nachrichten", new=lader), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        return await _stream_text(response)
+
+
+_NACHRICHT = uuid4()
+
+
+def _vorab_baustein():
+    from app.context.bausteine import VORAB, Baustein
+    return Baustein(str(uuid4()), "Oxidation", "begriff", "Chemie", VORAB, 0.751)
+
+
+@pytest.mark.asyncio
+async def test_stream_schickt_die_gespeicherte_liste_vor_der_nachrichten_id():
+    import json as _json
+    from app.context.bausteine import KontextBaustein
+
+    gespeichert = KontextBaustein(node_id=uuid4(), title="Oxidation", content_type="begriff",
+                                  fach="Chemie", herkunft="vorab", aehnlichkeit=0.751)
+    lader = AsyncMock(return_value={_NACHRICHT: [gespeichert]})
+    ausgabe = await _chat_mit_bausteinen([_vorab_baustein()], lader)
+
+    assert "event: kontext" in ausgabe
+    assert ausgabe.index("event: kontext") < ausgabe.index("event: message")
+    # Gelesen für genau diese Nachricht und mit den Rechten der Person.
+    assert lader.await_args.args[1:] == ([_NACHRICHT], "pseudo-1", ["student"])
+    zeile = ausgabe.split("event: kontext\ndata: ", 1)[1].split("\n", 1)[0]
+    assert _json.loads(zeile) == {"bausteine": [gespeichert.model_dump(mode="json")]}
+
+
+@pytest.mark.asyncio
+async def test_ohne_bausteine_kein_ereignis_und_keine_abfrage():
+    lader = AsyncMock(return_value={})
+    ausgabe = await _chat_mit_bausteinen([], lader)
+    assert "event: kontext" not in ausgabe
+    lader.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_leere_gespeicherte_liste_gibt_kein_ereignis():
+    """Alle Bausteine inzwischen gelöscht oder unlesbar — dann keine leere Zeile."""
+    ausgabe = await _chat_mit_bausteinen([_vorab_baustein()], AsyncMock(return_value={}))
+    assert "event: kontext" not in ausgabe
+    assert "event: message" in ausgabe
+
+
+@pytest.mark.asyncio
+async def test_fehler_beim_lesen_der_liste_zerreisst_den_stream_nicht():
+    lader = AsyncMock(side_effect=RuntimeError("DB weg"))
+    ausgabe = await _chat_mit_bausteinen([_vorab_baustein()], lader)
+    assert "event: kontext" not in ausgabe
+    assert "event: message" in ausgabe and "[DONE]" in ausgabe
+
+
 # ── Erschöpftes Budget im Chat ──────────────────────────────────────────────────────
 #
 # LiteLLM 1.83.7 meldet es als HTTP **400** mit `type: budget_exceeded` (gemessen

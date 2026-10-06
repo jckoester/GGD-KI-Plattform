@@ -14,17 +14,23 @@ Zwei Herkünfte, in dieser Reihenfolge:
 ⚠️ **Nicht dabei:** der Ankerkontext eines Assistenten (sein Gegenstand, nicht die Antwort
 auf diese Frage, und er wechselt nicht von Nachricht zu Nachricht), angeheftete Knoten (die
 hat die Person selbst gewählt) und der Lernstand.
+
+Gezeigt wird die Liste unter der Antwort (Schritt 3) — live und nach dem Neuladen aus
+**derselben** Abfrage, :func:`kontext_der_nachrichten`.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Iterable
 from uuid import UUID
 
 import sqlalchemy as sa
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ContextNode, MessageContextNode
+from app.context.visibility import read_scope_clause
+from app.db.models import ContextNode, MessageContextNode, Subject
 
 VORAB = "vorab"
 WERKZEUG = "werkzeug"
@@ -105,3 +111,65 @@ async def speichere(db: AsyncSession, message_id: UUID, bausteine: list[Baustein
             herkunft=b.herkunft,
             aehnlichkeit=b.aehnlichkeit,
         ))
+
+
+class KontextBaustein(BaseModel):
+    """Ein Baustein, wie er unter der Antwort steht. ``fach`` ist der Fachname, wie in den
+    Suchtreffern; ``updated_at`` ist der Aktualitätshinweis (Entscheidung Jan, 27.09.2026)
+    — **heutiger** Stand des Knotens, nicht der beim Antworten."""
+
+    node_id: UUID
+    title: str
+    #: Fassung eines Begriffs (`metadata.fassung`, z. B. „Elektronenabgabe"). Ohne sie
+    #: stünden die beiden Oxidationen (ab Kl. 8 und ab Kl. 10) gleichlautend untereinander.
+    fassung: str | None = None
+    content_type: str | None = None
+    fach: str | None = None
+    herkunft: str
+    aehnlichkeit: float | None = None
+    updated_at: datetime | None = None
+
+
+async def kontext_der_nachrichten(
+    db: AsyncSession,
+    message_ids: Iterable[UUID],
+    pseudonym: str,
+    rollen: Iterable[str] = (),
+) -> dict[UUID, list[KontextBaustein]]:
+    """Die Bausteine je Nachricht, in der gespeicherten Reihenfolge. Nachrichten ohne
+    Bausteine fehlen im Ergebnis.
+
+    ⚠️ **Die Sichtbarkeit wird beim Lesen erneut geprüft.** Beim Antworten durfte die Person
+    jeden dieser Knoten lesen; seitdem kann einer privat geworden sein oder einer Gruppe
+    gehören, aus der sie ausgetreten ist. Sein Titel bliebe sonst unter der alten Antwort
+    stehen — und der Link führte ins Leere.
+    """
+    message_ids = list(message_ids)
+    if not message_ids:
+        return {}
+    zeilen = (await db.execute(
+        sa.select(
+            MessageContextNode.message_id,
+            ContextNode.id,
+            ContextNode.title,
+            ContextNode.metadata_["fassung"].astext,
+            ContextNode.content_type,
+            Subject.name,
+            MessageContextNode.herkunft,
+            MessageContextNode.aehnlichkeit,
+            ContextNode.updated_at,
+        )
+        .join(ContextNode, ContextNode.id == MessageContextNode.node_id)
+        .outerjoin(Subject, Subject.id == ContextNode.subject_id)
+        .where(MessageContextNode.message_id.in_(message_ids))
+        .where(read_scope_clause(pseudonym, rollen))
+        .order_by(MessageContextNode.message_id, MessageContextNode.position)
+    )).all()
+    ergebnis: dict[UUID, list[KontextBaustein]] = {}
+    for (message_id, node_id, titel, fassung, typ, fach, herkunft, aehnlichkeit,
+         geaendert) in zeilen:
+        ergebnis.setdefault(message_id, []).append(KontextBaustein(
+            node_id=node_id, title=titel, fassung=fassung or None, content_type=typ,
+            fach=fach, herkunft=herkunft, aehnlichkeit=aehnlichkeit, updated_at=geaendert,
+        ))
+    return ergebnis
