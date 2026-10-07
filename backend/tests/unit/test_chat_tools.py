@@ -20,7 +20,7 @@ def _make_tool(name: str, group: str, writes: bool = False) -> ChatTool:
 
     return ChatTool(
         name=name,
-        group=group,
+        groups=frozenset({group}),
         definition={"type": "function", "function": {"name": name, "parameters": {}}},
         handler=_handler,
         writes=writes,
@@ -203,7 +203,7 @@ def test_get_operatoren_registered_as_context_search():
     from app.chat import router  # noqa: F401 — registriert das Tool
     tool = TOOL_REGISTRY.get("get_operatoren")
     assert tool is not None
-    assert tool.group == "context_search"
+    assert tool.groups == {"context_search"}
     assert tool.writes is False
 
 
@@ -307,7 +307,136 @@ def test_student_sees_only_student_planning_not_planning_tools():
         mod.TOOL_REGISTRY.update(saved)
 
 
-# ── generate_image (Bildgenerierung Phase 16) ─────────────────────────────────
+# ── lesson_planning (0.15, Stundenentwurfs-Assistent) ─────────────────────────
+
+
+def _assistent(*faehigkeiten):
+    assistant = MagicMock()
+    assistant.tool_groups = list(faehigkeiten)
+    return assistant
+
+
+class TestStundenplanungFreischaltung:
+    """`lesson_planning` hängt an der Rolle, nicht am Gruppenbezug — anders als `planning`.
+
+    Sonst ließe sich eine Stunde nicht im freien Chat finden (Plan F9). Den Zugang zur
+    einzelnen Stunde prüft das Werkzeug; hier geht es nur darum, wer es überhaupt bekommt.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _registry(self):
+        mod, saved = _swap_registry(
+            stunde_lesen=_make_tool("stunde_lesen", "lesson_planning"),
+            plan_lesen=_make_tool("plan_lesen", "planning"),
+        )
+        yield
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)
+
+    @staticmethod
+    def _namen(assistant, group_id=None, is_group_teacher=False, **kw):
+        return {t.name for t in tools_for(assistant, group_id, is_group_teacher, **kw)}
+
+    def test_lehrkraft_ohne_gruppenbezug(self):
+        assert "stunde_lesen" in self._namen(_assistent("lesson_planning"), rollen=["teacher"])
+
+    def test_admin_mit_lehrkraftrolle(self):
+        assert "stunde_lesen" in self._namen(
+            _assistent("lesson_planning"), rollen=["teacher", "admin"])
+
+    @pytest.mark.parametrize("group_id,is_group_teacher", [(None, False), (5, False), (5, True)])
+    def test_schuelerin_nie(self, group_id, is_group_teacher):
+        """Auch nicht mit Gruppenbezug — und nicht einmal, wenn eine Mitgliedschaft als
+        Lehrkraft gemeldet würde: Die Rolle entscheidet."""
+        assert "stunde_lesen" not in self._namen(
+            _assistent("lesson_planning"), group_id, is_group_teacher, rollen=["student"])
+
+    def test_ohne_rollen_bleibt_sie_aus(self):
+        """Wer `tools_for` die Rollen nicht reicht, schaltet nichts frei."""
+        assert "stunde_lesen" not in self._namen(_assistent("lesson_planning"), 5, True)
+
+    def test_nicht_ohne_die_faehigkeit(self):
+        assert "stunde_lesen" not in self._namen(
+            _assistent("planning"), 5, True, rollen=["teacher"])
+
+    def test_planning_ohne_gruppenbezug_bleibt_aus(self):
+        namen = self._namen(_assistent("planning", "lesson_planning"), rollen=["teacher"])
+        assert "plan_lesen" not in namen
+        assert "stunde_lesen" in namen
+
+
+def test_werkzeug_in_zwei_faehigkeiten_greift_ueber_jede_und_nur_einmal():
+    async def _handler(args, ctx):
+        return {}
+
+    beide = ChatTool(
+        name="einheit_lesen", groups=frozenset({"planning", "lesson_planning"}),
+        definition={"type": "function", "function": {"name": "einheit_lesen", "parameters": {}}},
+        handler=_handler,
+    )
+    mod, saved = _swap_registry(einheit_lesen=beide)
+    try:
+        def namen(assistant, group_id, is_group_teacher, rollen):
+            return [t.name for t in tools_for(assistant, group_id, is_group_teacher, rollen=rollen)]
+
+        assert namen(_assistent("lesson_planning"), None, False, ["teacher"]) == ["einheit_lesen"]
+        assert namen(_assistent("planning"), 5, True, ["teacher"]) == ["einheit_lesen"]
+        assert namen(_assistent("planning", "lesson_planning"), 5, True, ["teacher"]) == ["einheit_lesen"]
+        assert namen(_assistent("planning"), None, False, ["teacher"]) == []
+    finally:
+        mod.TOOL_REGISTRY.clear()
+        mod.TOOL_REGISTRY.update(saved)
+
+
+class TestWerkzeugschnitt:
+    """Plan F2: Stundenwerkzeuge wandern zur Stundenplanung, die Einheit brauchen beide.
+
+    Gegen die echte Registry — so, wie der Chat sie sieht.
+    """
+
+    STUNDE = {"get_lesson_detail", "update_lesson_phases"}
+
+    @pytest.fixture(autouse=True)
+    def _registriert(self):
+        import app.chat.router  # noqa: F401 — füllt TOOL_REGISTRY
+
+    def test_zuordnung(self):
+        for name in self.STUNDE:
+            assert TOOL_REGISTRY[name].groups == {"lesson_planning"}, name
+        assert TOOL_REGISTRY["get_unit_detail"].groups == {"planning", "lesson_planning"}
+
+    def test_jahresplanung_bekommt_die_stundenwerkzeuge_nicht_mehr(self):
+        namen = {t.name for t in tools_for(
+            _assistent("planning"), 5, True, rollen=["teacher"])}
+        assert not (self.STUNDE & namen)
+        assert {"get_unit_detail", "create_lessons", "apply_plan_operations"} <= namen
+
+    def test_stundenassistent_bekommt_keine_jahresplanung(self):
+        namen = {t.name for t in tools_for(
+            _assistent("lesson_planning"), None, False, rollen=["teacher"])}
+        assert self.STUNDE | {"get_unit_detail"} <= namen
+        nur_jahresplanung = {n for n, t in TOOL_REGISTRY.items() if t.groups == {"planning"}}
+        assert nur_jahresplanung and not (nur_jahresplanung & namen)
+
+
+def test_der_chat_reicht_die_rollen_durch():
+    """Ohne `rollen` bliebe die Stundenplanung im Chat still aus — `tools_for` ist dann
+    fail-closed, und kein anderer Test liefe rot. Deshalb am Quelltext festgehalten."""
+    import ast
+    import inspect
+
+    from app.chat import router
+
+    aufrufe = [
+        knoten for knoten in ast.walk(ast.parse(inspect.getsource(router)))
+        if isinstance(knoten, ast.Call) and getattr(knoten.func, "id", None) == "tools_for"
+    ]
+    assert len(aufrufe) == 1
+    argumente = {k.arg: ast.unparse(k.value) for k in aufrufe[0].keywords}
+    assert argumente.get("rollen") == "current_user.roles"
+
+
+# ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────
 
 
 def test_generate_image_registered_as_image_generation():
@@ -315,7 +444,7 @@ def test_generate_image_registered_as_image_generation():
     from app.chat import router  # noqa: F401 — registriert das Tool
     tool = TOOL_REGISTRY.get("generate_image")
     assert tool is not None
-    assert tool.group == "image_generation"
+    assert tool.groups == {"image_generation"}
 
 
 def test_generate_image_gated_by_tool_group():
@@ -486,7 +615,7 @@ def test_registrierte_gruppen_sind_erklaert():
 
     assert TOOL_REGISTRY, "Registry leer — der Import hat die Werkzeuge nicht eingetragen."
 
-    nicht_erklaert = {t.group for t in TOOL_REGISTRY.values()} - set(FAEHIGKEITEN)
+    nicht_erklaert = {g for t in TOOL_REGISTRY.values() for g in t.groups} - set(FAEHIGKEITEN)
     assert nicht_erklaert == set(), (
         f"Diese Werkzeug-Gruppen fehlen in FAEHIGKEITEN: {sorted(nicht_erklaert)}. "
         f"Ohne Eintrag verwirft der YAML-Import sie als unbekannt."

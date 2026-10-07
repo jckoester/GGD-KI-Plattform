@@ -608,7 +608,7 @@ async def _search_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="search_context_nodes",
-    group="context_search",
+    groups=frozenset({"context_search"}),
     writes=False,
     definition=_SEARCH_CONTEXT_NODES_TOOL,
     handler=_search_context_nodes_handler,
@@ -832,7 +832,7 @@ async def _list_context_nodes_handler(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="list_context_nodes",
-    group="context_search",
+    groups=frozenset({"context_search"}),
     writes=False,
     definition=_LIST_CONTEXT_NODES_TOOL,
     handler=_list_context_nodes_handler,
@@ -985,7 +985,7 @@ async def _get_operatoren_handler(args: dict, ctx: ToolContext) -> list[dict] | 
 
 register_tool(ChatTool(
     name="get_operatoren",
-    group="context_search",
+    groups=frozenset({"context_search"}),
     writes=False,
     definition=_GET_OPERATOREN_TOOL,
     handler=_get_operatoren_handler,
@@ -1433,7 +1433,7 @@ async def _generate_image_handler(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="generate_image",
-    group="image_generation",
+    groups=frozenset({"image_generation"}),
     writes=False,
     # Callable, nicht Dict: Das Schema hängt von den Bildarten des Assistenten ab.
     definition=_generate_image_definition,
@@ -1954,7 +1954,8 @@ async def chat(
     )
 
     _active_tools = tools_for(
-        active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle
+        active_assistant, conversation_group_id, _is_group_teacher, _erlaubte_modelle,
+        rollen=current_user.roles,
     )
     _tool_defs = [t.definition for t in _active_tools]
     _tool_map = {t.name: t for t in _active_tools}
@@ -2188,7 +2189,7 @@ async def chat(
                 # bekam ungefragt eine Auswahlliste über sein Eingabefeld gelegt.
                 # Befüllt wird das Fenster jetzt allein vom Suchknopf über
                 # `POST /context/search`.
-                if tool.group == "context_search":
+                if "context_search" in tool.groups:
                     # Serialisierung **und** Lesehinweis liegen in einer Funktion —
                     # siehe `werkzeug_nutzlast`, dort auch die beiden Ergebnisformen.
                     tool_result_str = werkzeug_nutzlast(tool_result)

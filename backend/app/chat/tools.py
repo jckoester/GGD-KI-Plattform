@@ -8,6 +8,12 @@ Freischaltungslogik:
   planning       — nur wenn (a) 'planning' in assistant.tool_groups,
                             (b) conversation.group_id ist gesetzt,
                             (c) Nutzer ist Lehrkraft der Gruppe
+  lesson_planning — Stundenentwurf (0.15): nur wenn 'lesson_planning' in
+                            assistant.tool_groups und die Person die Lehrkraft-Rolle
+                            hat — **ohne** Gruppenbezug, damit sich eine Stunde auch
+                            im freien Chat finden lässt. Den Zugang zur einzelnen
+                            Stunde prüft deshalb jedes Werkzeug selbst
+                            (`zugang_zur_stunde`), nicht die Freischaltung.
   student_planning — read-only (z. B. get_exam_scope): nur wenn
                             'student_planning' in assistant.tool_groups und
                             conversation.group_id gesetzt (auch für Schüler).
@@ -21,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field, replace
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Iterable
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,7 +79,10 @@ class SchemaContext:
 @dataclass
 class ChatTool:
     name: str
-    group: str                   # 'context_search' | 'planning' | 'student_planning' | 'image_generation'
+    # Die Fähigkeiten (`FAEHIGKEITEN`), zu denen das Werkzeug gehört. Meist genau eine;
+    # `get_unit_detail` brauchen Jahres- und Stundenplanung beide. Aktiv ist das Werkzeug,
+    # sobald **eine** davon in der Konversation greift.
+    groups: frozenset[str]
     # OpenAI-Function-Schema für LiteLLM — entweder fest oder als Funktion des Kontexts.
     #
     # Ein Callable ist nötig, sobald das Schema von der Konfiguration abhängt: Die
@@ -99,7 +108,8 @@ class ChatTool:
 FAEHIGKEITEN: frozenset[str] = frozenset({
     "context_search",      # Wissensgraph — immer an, nicht am Assistenten schaltbar
     "planning",            # Unterrichtsplanung (schreibend, nur Lehrkraft der Gruppe)
-    "student_planning",    # Planungsdaten lesen (Schüler:innen, mit Gruppenbezug)
+    "lesson_planning",     # Stundenentwurf (Lehrkraft-Rolle, auch ohne Gruppenbezug)
+    "student_planning",   # Planungsdaten lesen (Schüler:innen, mit Gruppenbezug)
     "image_generation",    # Bildgenerierung
 })
 
@@ -126,6 +136,8 @@ def tools_for(
     group_id: int | None,
     is_group_teacher: bool,
     erlaubte_modelle: set[str] | None = None,
+    *,
+    rollen: Iterable[str] = (),
 ) -> list[ChatTool]:
     """Gibt die für diese Konversation freigeschalteten Tools zurück.
 
@@ -133,30 +145,30 @@ def tools_for(
 
     ``assistant`` kann None sein (kein Assistent aktiv). ``erlaubte_modelle`` ist die
     Modell-Allowlist der Nutzer:in oder None (unbekannt → es wird nicht gefiltert).
+    ``rollen`` sind die Rollen der Person (``JwtPayload.roles``). Die Stundenplanung hängt
+    an der **Rolle**, nicht an der Mitgliedschaft in der Gruppe der Konversation (das ist
+    ``is_group_teacher``). Ohne Angabe bleibt sie aus.
     """
-    result: list[ChatTool] = []
     asst_tool_groups: list[str] = getattr(assistant, "tool_groups", None) or []
 
-    for tool in TOOL_REGISTRY.values():
-        if tool.group == "context_search":
-            result.append(tool)
-        elif tool.group == "planning":
-            if (
-                "planning" in asst_tool_groups
-                and group_id is not None
-                and is_group_teacher
-            ):
-                result.append(tool)
-        elif tool.group == "student_planning":
-            # Read-only Planungsdaten — kein Lehrkraft-Recht nötig, nur Gruppenbezug.
-            if "student_planning" in asst_tool_groups and group_id is not None:
-                result.append(tool)
-        elif tool.group == "image_generation":
-            # Bildgenerierung — freigeschaltet, wenn der Assistent die Tool-Gruppe
-            # führt. Kein Gruppen-/Lehrkraft-Bezug nötig; die Bild-Modell-Freigabe je
-            # Team greift zusätzlich am LiteLLM-Proxy (Schritt 8).
-            if "image_generation" in asst_tool_groups:
-                result.append(tool)
+    # Welche Fähigkeiten in dieser Konversation greifen.
+    greifen: set[str] = {"context_search"}
+    if "planning" in asst_tool_groups and group_id is not None and is_group_teacher:
+        greifen.add("planning")
+    if "lesson_planning" in asst_tool_groups and "teacher" in rollen:
+        # Ohne Gruppenbezug: Die Stunde kann erst im Chat gefunden werden. Wer sie lesen
+        # oder schreiben darf, entscheidet das Werkzeug an der Stunde selbst.
+        greifen.add("lesson_planning")
+    if "student_planning" in asst_tool_groups and group_id is not None:
+        # Read-only Planungsdaten — kein Lehrkraft-Recht nötig, nur Gruppenbezug.
+        greifen.add("student_planning")
+    if "image_generation" in asst_tool_groups:
+        # Bildgenerierung — freigeschaltet, wenn der Assistent die Tool-Gruppe
+        # führt. Kein Gruppen-/Lehrkraft-Bezug nötig; die Bild-Modell-Freigabe je
+        # Team greift zusätzlich am LiteLLM-Proxy (Schritt 8).
+        greifen.add("image_generation")
+
+    result = [tool for tool in TOOL_REGISTRY.values() if tool.groups & greifen]
 
     schema_ctx = SchemaContext(assistant=assistant, erlaubte_modelle=erlaubte_modelle)
     return [_mit_aufgeloestem_schema(t, schema_ctx) for t in result]

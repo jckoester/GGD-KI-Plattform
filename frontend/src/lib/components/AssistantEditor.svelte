@@ -1862,6 +1862,24 @@
                             <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
                                 <input
                                     type="checkbox"
+                                    checked={form.tool_groups.includes('lesson_planning')}
+                                    onchange={(e) => {
+                                        if (e.currentTarget.checked) {
+                                            form.tool_groups = [...form.tool_groups.filter(g => g !== 'lesson_planning'), 'lesson_planning']
+                                        } else {
+                                            form.tool_groups = form.tool_groups.filter(g => g !== 'lesson_planning')
+                                        }
+                                    }}
+                                    class="rounded border-light-ui-3 dark:border-dark-ui-3"
+                                />
+                                Stundenplanung
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    (Phasen, Stundenziel, Kompetenzen)
+                                </span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-light-tx dark:text-dark-tx cursor-pointer">
+                                <input
+                                    type="checkbox"
                                     checked={form.tool_groups.includes('image_generation')}
                                     onchange={(e) => {
                                         if (e.currentTarget.checked) {

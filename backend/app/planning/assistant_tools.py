@@ -1,7 +1,9 @@
 """Planungs-Tools für den Jahresplan-Assistenten.
 
 Registriert sich beim Import in TOOL_REGISTRY.
-Alle Tools erfordern eine group_id im ToolContext.
+Die Tools der Fähigkeit `planning` erfordern eine group_id im ToolContext. Die der
+Stundenplanung (`lesson_planning`: `get_lesson_detail`, `update_lesson_phases`,
+`get_unit_detail`) nicht — sie prüfen den Zugang an der Stunde bzw. Einheit (`_zugang`).
 Schreib-Tools erzeugen Auto-Snapshots (reason='assistant').
 """
 
@@ -12,6 +14,7 @@ from datetime import date
 from uuid import UUID
 
 import sqlalchemy as sa
+from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +25,7 @@ from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
-from app.planning.permissions import require_group_teacher
+from app.planning.permissions import zugang_zur_stunde
 from app.planning.reflow_service import build_reflow_context
 from app.planning.snapshots import restore_snapshot
 from app.planning.student_context import get_exam_scope
@@ -82,6 +85,25 @@ async def _build_compact_balance(db: AsyncSession, group_id: int) -> dict:
     return balance.model_dump()
 
 
+async def _zugang(node: ContextNode, ctx: ToolContext) -> bool | None:
+    """Darf diese Person den Knoten ändern (True), nur lesen (False) oder gar nicht (None)?
+
+    ⚠️ **Die Zugangsprüfung der Stundenplanung.** `lesson_planning` greift ohne
+    Gruppenbezug (`tools_for`); welche Stunde gemeint ist, sagt allein das Modell. Also
+    entscheidet der Knoten, nicht die Konversation — mit derselben Regel wie die
+    Entwurfsansicht (`zugang_zur_stunde`): Lehrkraft der Gruppe liest und ändert, die
+    Eigentümerin ohne Mitgliedschaft liest nur. Eine Einheit trägt Gruppe und Eigentum
+    genauso (`create_unit_node`) und folgt derselben Regel.
+
+    Kein Zugang wird zu derselben Antwort wie „gibt es nicht" — sonst verriete das
+    Werkzeug, welche Kennungen existieren.
+    """
+    try:
+        return await zugang_zur_stunde(node, ctx.user, ctx.db)
+    except HTTPException:
+        return None
+
+
 # ── get_lesson_slots ──────────────────────────────────────────────────────────
 
 
@@ -112,7 +134,7 @@ async def _handle_get_lesson_slots(args: dict, ctx: ToolContext) -> list[dict]:
 
 register_tool(ChatTool(
     name="get_lesson_slots",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -179,7 +201,7 @@ async def _handle_get_curriculum_chapters(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_curriculum_chapters",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -211,7 +233,7 @@ async def _handle_get_plan_balance(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_plan_balance",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -269,7 +291,7 @@ async def _handle_create_teaching_unit(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="create_teaching_unit",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -341,7 +363,7 @@ async def _handle_assign_slots_to_unit(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="assign_slots_to_unit",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -392,7 +414,7 @@ async def _handle_set_slot_topics(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="set_slot_topics",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -453,7 +475,7 @@ async def _handle_set_slot_category(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="set_slot_category",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -485,10 +507,6 @@ register_tool(ChatTool(
 
 
 async def _handle_get_unit_detail(args: dict, ctx: ToolContext) -> dict:
-    group_id = ctx.group_id
-    if group_id is None:
-        return {"error": "Kein Gruppenkontext"}
-
     unit_str = args.get("unit_node_id", "")
     if not unit_str:
         return {"error": "unit_node_id erforderlich"}
@@ -502,6 +520,11 @@ async def _handle_get_unit_detail(args: dict, ctx: ToolContext) -> dict:
     unit = await db.get(ContextNode, unit_id)
     if unit is None or unit.status != "active" or unit.content_type != "unterrichtseinheit":
         return {"error": "UE nicht gefunden"}
+    # Am Knoten geprüft, nicht an der Gruppe der Konversation: Die Stundenplanung hat
+    # keine, und mit Gruppe galt bisher jede Einheit, deren Kennung das Modell nannte.
+    if await _zugang(unit, ctx) is None:
+        return {"error": "UE nicht gefunden"}
+    group_id = unit.write_scope_group_id
 
     # Kapitel-Verknüpfung
     chapter_info = None
@@ -567,7 +590,7 @@ async def _handle_get_unit_detail(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_unit_detail",
-    group="planning",
+    groups=frozenset({"planning", "lesson_planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -679,7 +702,7 @@ async def _handle_create_lessons(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="create_lessons",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -726,10 +749,6 @@ register_tool(ChatTool(
 
 
 async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
-    group_id = ctx.group_id
-    if group_id is None:
-        return {"error": "Kein Gruppenkontext"}
-
     node_str = args.get("node_id", "")
     if not node_str:
         return {"error": "node_id erforderlich"}
@@ -738,8 +757,8 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
     node = await db.get(ContextNode, UUID(node_str))
     if node is None or node.status != "active" or node.content_type != "unterrichtsstunde":
         return {"error": "Stunde nicht gefunden"}
-    if node.write_scope_group_id != group_id:
-        return {"error": "Stunde gehört nicht zur Gruppe"}
+    if await _zugang(node, ctx) is None:
+        return {"error": "Stunde nicht gefunden"}
 
     meta = node.metadata_ or {}
     slot_result = await db.execute(
@@ -763,7 +782,7 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_lesson_detail",
-    group="planning",
+    groups=frozenset({"lesson_planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -793,10 +812,6 @@ register_tool(ChatTool(
 
 
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
-    group_id = ctx.group_id
-    if group_id is None:
-        return {"error": "Kein Gruppenkontext"}
-
     node_str = args.get("node_id", "")
     phasen = args.get("phasen")
     if not node_str or phasen is None:
@@ -806,8 +821,13 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node = await db.get(ContextNode, UUID(node_str))
     if node is None or node.status != "active" or node.content_type != "unterrichtsstunde":
         return {"error": "Stunde nicht gefunden"}
-    if node.write_scope_group_id != group_id:
-        return {"error": "Stunde gehört nicht zur Gruppe"}
+    darf_aendern = await _zugang(node, ctx)
+    if darf_aendern is None:
+        return {"error": "Stunde nicht gefunden"}
+    if not darf_aendern:
+        return {"error": "Stunde nur lesbar: keine Lehrkraft der Gruppe"}
+    # Snapshot und Rückgängig gehören der Gruppe der Stunde, nicht der Konversation.
+    group_id = node.write_scope_group_id
 
     from app.planning.schemas import VALID_PRIOS
     from app.planning.snapshots import create_snapshot
@@ -886,7 +906,7 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="update_lesson_phases",
-    group="planning",
+    groups=frozenset({"lesson_planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -965,7 +985,7 @@ async def _handle_get_exam_scope(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_exam_scope",
-    group="student_planning",
+    groups=frozenset({"student_planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -1003,7 +1023,7 @@ async def _handle_get_reflow_context(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="get_reflow_context",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=False,
     definition={
         "type": "function",
@@ -1060,7 +1080,7 @@ async def _handle_apply_plan_operations(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="apply_plan_operations",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",
@@ -1147,7 +1167,7 @@ async def _handle_undo_last_change(args: dict, ctx: ToolContext) -> dict:
 
 register_tool(ChatTool(
     name="undo_last_change",
-    group="planning",
+    groups=frozenset({"planning"}),
     writes=True,
     definition={
         "type": "function",

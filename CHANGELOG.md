@@ -5,6 +5,22 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- Fähigkeit **„Stundenplanung"** im Assistenten-Editor: Stundenentwurf lesen und Phasen
+  schreiben. Sie greift für Lehrkräfte auch im Chat ohne Gruppenbezug; den Zugang zur
+  einzelnen Stunde prüft jeder Zugriff.
+
+### Geändert
+
+- Assistenten mit „Unterrichtsplanung" lesen und schreiben keine Stundenentwürfe mehr —
+  das übernimmt die Stundenplanung.
+
+### Behoben
+
+- Der Planungsassistent las eine Unterrichtseinheit auch dann, wenn sie zu einer fremden
+  Gruppe gehörte und das Modell ihre Kennung nannte.
+
 ## [0.14.1] – 2026-10-07
 
 Abbildungen mit eingebettetem Rasterbild werden wieder übernommen. Keine Migration, keine

@@ -453,7 +453,7 @@ class TestAufzaehlungsWerkzeug:
         from app.chat.tools import TOOL_REGISTRY
 
         werkzeug = TOOL_REGISTRY["list_context_nodes"]
-        assert werkzeug.group == "context_search" and werkzeug.writes is False
+        assert werkzeug.groups == {"context_search"} and werkzeug.writes is False
 
 
 class TestEineSichtbarkeitsregel:
