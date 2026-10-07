@@ -52,6 +52,32 @@ Alternativ tippen Sie **`@`** ins Textfeld, um direkt nach einem Baustein zu suc
 
 Mehr dazu: [Kontextspeicher](kontext.md)
 
+## Kontext unter der Antwort
+
+Unter einer Antwort steht oft **„Kontext (n)“**. Aufgeklappt zeigt die Zeile die Bausteine
+aus dem Wissensspeicher der Schule, die der KI beim Antworten **vorlagen** — mit Fach und
+einem Link zum Baustein. Die Plattform sucht zu jeder Nachricht selbst passende Bausteine
+heraus; schlägt der Assistent beim Antworten weitere nach, stehen sie mit dabei.
+
+**Die Zeile ist keine Quellenangabe.** Sie sagt, was vorlag — nicht, was die KI davon
+tatsächlich verwendet hat, und nicht, dass die Antwort stimmt. Eine Antwort kann falsch
+sein und trotzdem passende Bausteine unter sich haben. Im Zweifel öffnen Sie den Baustein
+und lesen selbst nach.
+
+Steht keine Zeile da, lag zu dieser Frage nichts aus dem Wissensspeicher vor — oder Sie
+haben die Zeile im Profil ausgeschaltet. Bei Antworten von vor Oktober 2026 fehlt sie
+immer.
+
+Wie ausführlich die Zeile ist, stellen Sie im [Profil](profil.md) unter **„Kontext zur
+Antwort“** ein. „Ausführlich“ zeigt zusätzlich:
+
+- den **Fundweg**: „vorab zur Frage gefunden“ (die Plattform hat gesucht) oder „vom
+  Assistenten nachgeschlagen“ (das Modell hat selbst gesucht), bei der Vorab-Suche dazu
+  die **Ähnlichkeit** zur Frage oder „über den Namen“;
+- das **Änderungsdatum** — wann zuletzt jemand an dem Baustein gearbeitet hat;
+- die **Abbildungen** des Bausteins, etwa ein Gefahrenpiktogramm oder eine
+  Strukturformel.
+
 ## Formeln, Chemie und Diagramme
 
 Mathematische Formeln, chemische Gleichungen und einfache Diagramme werden im Chat

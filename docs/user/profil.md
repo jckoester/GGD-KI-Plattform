@@ -97,6 +97,18 @@ tatsächliche Betrag ist dann **höher**, nie niedriger.
 > Ihr Budget ist davon unberührt: Die Grenze zieht der Abrechnungsdienst selbst,
 > nicht diese Anzeige.
 
+## Kontext zur Antwort
+
+Unter einer Antwort im Chat kann stehen, welche Bausteine aus dem Wissensspeicher dabei
+vorlagen („Kontext (n)“). Wie ausführlich, wählen Sie selbst:
+
+- **Gar nicht** — keine Zeile
+- **Kurz** *(Vorgabe)* — Titel und Fach, jeweils mit Link zum Baustein
+- **Ausführlich** — dazu, wie der Baustein gefunden wurde, wann er zuletzt geändert
+  wurde, und seine Abbildungen
+
+Was die Zeile bedeutet — und was nicht —, steht unter [Den Chat nutzen](chat.md).
+
 ## Kontext-Suche
 
 Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen können Sie diesen Wert erhöhen:
