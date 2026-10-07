@@ -660,6 +660,14 @@ Zustand der Vektoren, nicht die Suche. Seitdem prüfen `search_eval.py`,
 (`einbettungstext`): Ein Knoten, der nur seinen Titel trüge, bekommt absichtlich keinen
 Vektor und zählt nicht.
 
+**Die Schwelle nachmessen** ist ein Aufruf: `vorab_schwelle.py` gibt am Ende den größten
+erwünschten und den kleinsten unerwünschten Abstand aus, die Lücke dazwischen und ob
+`VORAB_SCHWELLE` darin liegt — wenn nicht, mit Exit-Code 1. Fälle, in denen ein Treffer
+richtig wäre, die aber keine Schwelle trennt (das Goethe-Gedicht), stehen gesondert als
+Grenzfall und zählen zu keiner Grenze. Stand 06.10.2026: 0,433 gegen 0,481, Lücke 0,048
+— wie am 26.09., bei dreimal so vielen Begriffen. Die Tabelle steht am Kommentar der
+Konstanten.
+
 ---
 
 ## Verbotene Wiedergänger

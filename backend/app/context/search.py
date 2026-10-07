@@ -1216,26 +1216,37 @@ async def suche(
 #: Wie nah ein Treffer sein muss, um **ungefragt** in den Prompt zu kommen —
 #: Kosinus-Distanz, kleiner ist näher.
 #:
-#: **Gemessen am 26.09.2026** (bge-m3, Pilotbestand Chemie plus Methoden- und
-#: Operatorenblätter), je Nachricht die Distanz zum nächsten Treffer:
+#: **Gemessen am 26.09. und 06.10.2026** (bge-m3), je Nachricht die Distanz zum
+#: nächsten Treffer. Am 26.09. der Pilotbestand Chemie (36 Begriffe) plus Methoden- und
+#: Operatorenblätter; am 06.10. 107 Begriffe und 13 Stoffsteckbriefe, **alle mit Vektor**
+#: (der erste Lauf des Tages fand 100 Begriffe ohne und zeigte eine scheinbar zerbrochene
+#: Schwelle — seither prüft das Skript das vorab). Treffer nach dem Stand vom 06.10.:
 #:
-#: ===================================================== =======
-#: Nachricht                                             Distanz
-#: ===================================================== =======
-#: „Was ist eine Oxidation?" → Oxidation                   0,249
-#: „Ist Salzsäure eine Säure?" → Salzsäure                 0,292
-#: „Wie heißt die Bindung im Wassermolekül?" → Wasser      0,357
-#: „Zeichen mit der Flamme?" → Flamme (GHS02)              0,432
-#: ----------------------------------------------------- -------
-#: „Hilf mir bei meiner Bewerbung" → Operatorenblatt       0,481
-#: „Wie geht es dir?" → Gesundheitsgefahr (GHS08)          0,590
-#: „Danke!" → Donator-Akzeptor-Prinzip                     0,609
-#: „Wann sind die Sommerferien?" → Totenkopf (GHS06)       0,688
-#: ===================================================== =======
+#: ===================================================== ======= =======
+#: Nachricht                                             26.09.  06.10.
+#: ===================================================== ======= =======
+#: „Was ist eine Oxidation?" → Oxidation                   0,249   0,249
+#: „Ist Salzsäure eine Säure?" → Salzsäure                 0,292   0,292
+#: „Beim Sieden zerfällt Wasser …?" → Wasser                 —     0,344
+#: „Wie heißt die Bindung im Wassermolekül?" → Wasser      0,357   0,353
+#: „Wie viel Mol sind 18 g Wasser?" → Stoffmenge             —     0,362
+#: „Zeichen mit der Flamme?" → Flamme (GHS02)              0,432   0,433
+#: ----------------------------------------------------- ------- -------
+#: „Hilf mir bei meiner Bewerbung" → Operatorenblatt       0,481   0,481
+#: „Was heißt ‚to consider'?" → Expositions-Risiko-Bez.      —     0,577
+#: „Kannst du mir einen Witz erzählen?" → GHS06              —     0,581
+#: „Wie geht es dir?" → Gesundheitsgefahr (GHS08)          0,590   0,590
+#: „Danke!" → Donator-Akzeptor-Prinzip                     0,609   0,608
+#: „Wann sind die Sommerferien?" → Elektronegativität      0,688¹  0,644
+#: ===================================================== ======= =======
+#:
+#: ¹ am 26.09. → Totenkopf (GHS06). **Die Lücke hält: 0,048**, obwohl sich der Bestand
+#: verdreifacht hat. Näher gerückt ist ein unerwünschter Fall, der weit weg lag
+#: (Sommerferien, 0,688 → 0,644), nicht der entscheidende (Bewerbung, 0,481).
 #:
 #: ⚠️ **Die Verteilungen überlappen, und zwar an einer lehrreichen Stelle.** Zwischen
-#: dem letzten erwünschten (0,432) und dem ersten unerwünschten Treffer (0,481) liegen
-#: 0,05 — und genau dazwischen fällt ein Fall, der **richtig** wäre: „Ich muss ein
+#: dem letzten erwünschten (0,433) und dem ersten unerwünschten Treffer (0,481) liegen
+#: 0,048 — und genau dazwischen fällt ein Fall, der **richtig** wäre: „Ich muss ein
 #: Gedicht von Goethe interpretieren" findet das Merkblatt zur Gedichtanalyse bei 0,482.
 #: Keine Schwelle trennt ihn vom Bewerbungsschreiben. Der Wert steht deshalb **unter**
 #: beiden: Lieber kein Kontext als ein falscher — ein verfehlter Treffer kostet nur,
@@ -1243,8 +1254,10 @@ async def suche(
 #: im Prompt und wird geglaubt.
 #:
 #: ⚠️ **Der Wert hängt am Bestand und ist nachzumessen, wenn er wächst** —
-#: `backend/scripts/vorab_schwelle.py` fährt die Messung. Der Abstand zum
-#: GHS02-Fall beträgt nur 0,018.
+#: `backend/scripts/vorab_schwelle.py` fährt die Messung und sagt am Ende, ob der Wert
+#: noch in der Lücke liegt (Exit-Code 1, wenn nicht). Der Abstand zum GHS02-Fall beträgt
+#: nur 0,017. Nicht geändert in 0.14 (F5): Den Gedicht-Fall hereinzuholen verlangte eine
+#: Regel (Fachbezug), und dafür ist ein einzelner Fall zu wenig.
 VORAB_SCHWELLE = 0.45
 
 #: Wie viele Treffer die Grundschicht höchstens beisteuert. Das Werkzeug darf mehr; hier
