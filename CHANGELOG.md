@@ -5,6 +5,33 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.14.1] – 2026-10-07
+
+Abbildungen mit eingebettetem Rasterbild werden wieder übernommen. Keine Migration, keine
+neue Konfiguration — nach dem Update aber einmal die Fachbegriffe neu importieren (unten).
+
+### Behoben
+
+- Abbildungen in Fachbegriffen, die ein Rasterbild (PNG, JPEG, GIF, WebP) in die SVG
+  einbetten, wurden beim Import über die Oberfläche als „Verweis nach außen" abgelehnt —
+  betroffen waren etwa die Orbital-Darstellungen.
+
+### Geändert
+
+- Auch der Fachbegriffe-Import per Skript (`seed_fachbegriffe.py`) prüft Abbildungen jetzt
+  wie der Dialog; abgewiesene stehen mit Grund im Bericht.
+
+### Nach dem Update
+
+Den Vault-Stand der betroffenen Fächer einmal neu importieren; die abgelehnten Bilder
+kommen dabei zurück. Welche Abbildungen ohne Bild dastehen, zeigt vorher:
+
+```bash
+docker compose exec db psql -U postgres -d ggd_ki -c \
+  "SELECT n.title, e->>'datei' FROM context_nodes n, jsonb_array_elements(n.metadata->'illustrationen') e
+    WHERE jsonb_typeof(n.metadata->'illustrationen') = 'array' AND NOT (e ? 'svg');"
+```
+
 ## [0.14.0] – 2026-10-07
 
 Unter jeder Antwort steht, welche Bausteine aus dem Wissensspeicher dabei vorlagen; der
