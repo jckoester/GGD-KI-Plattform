@@ -1717,7 +1717,8 @@ async def test_schuelerin_sieht_den_stundenentwurf_nicht(
 
 
 def _tag_ohne_stunden(cur, gruppen: tuple[int, ...], start) -> "date":
-    """Das erste Datum ab `start`, an dem keine der Gruppen eine Stunde hat.
+    """Das erste Datum ab `start`, an dem weder eine der Gruppen noch **irgendeine Gruppe
+    von teacher1** eine Stunde hat.
 
     ⚠️ **Nicht Vorsicht, sondern Notwendigkeit.** Ein früherer Test dieser Datei erzeugt
     über `POST /planning/groups/100/slots/generate` Slots für **jeden Montag** des
@@ -1729,6 +1730,14 @@ def _tag_ohne_stunden(cur, gruppen: tuple[int, ...], start) -> "date":
     erwartete `betroffen == 2` und bekam 3. Am Vortag war derselbe Test grün. Ein
     Prüflauf, dessen Ergebnis vom Wochentag abhängt, ist keiner.
 
+    ⚠️ **Die aufgezählten Gruppen reichen nicht** (07.10.2026): „ganzer Tag" trifft
+    **alle** Gruppen der Lehrkraft, auch die, die ein anderes Modul angelegt hat.
+    `test_optimistisches_sperren.py` erzeugte Donnerstags-Slots für seine Gruppe 730 —
+    lief der Prüflauf an einem Mittwoch, war `heute + 22` ein Donnerstag, und der Test
+    bekam wieder 3 statt 2. Deshalb zählen hier zusätzlich alle Gruppen, in denen
+    teacher1 Lehrkraft ist; die Aufzählung bleibt für Gruppen, die erst danach
+    angelegt werden (103).
+
     Bewusst **kein** Löschen der fremden Slots: Sie gehören einem anderen Test, der sie
     später noch zählt.
     """
@@ -1737,8 +1746,12 @@ def _tag_ohne_stunden(cur, gruppen: tuple[int, ...], start) -> "date":
     tag = start
     while True:
         cur.execute(
-            "SELECT 1 FROM lesson_slots WHERE group_id = ANY(%s) AND date = %s LIMIT 1",
-            (list(gruppen), tag),
+            "SELECT 1 FROM lesson_slots WHERE date = %s AND ("
+            "  group_id = ANY(%s) OR group_id IN ("
+            "    SELECT group_id FROM group_memberships"
+            "     WHERE pseudonym = %s AND role_in_group = 'teacher')"
+            ") LIMIT 1",
+            (tag, list(gruppen), TEACHER1_PSEUDO),
         )
         if cur.fetchone() is None:
             return tag

@@ -16,6 +16,13 @@ FACH = 730
 
 @pytest.fixture(scope="module")
 def sperr_gruppe(db_url, run_migrations):
+    """Fach und Gruppe für dieses Modul — und danach wieder weg.
+
+    ⚠️ **Das Wegräumen ist nicht Kosmetik** (07.10.2026): Die Gruppe gehört teacher1, und
+    der Fixture `slot` erzeugt in ihr Donnerstags-Slots für das ganze Halbjahr. Blieben
+    sie stehen, träfe ein „ganzer Tag"-Ausfall in `test_planning_api.py` sie mit — an
+    jedem Mittwoch war jener Test dadurch rot.
+    """
     conn = psycopg2.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
     with conn.cursor() as cur:
         cur.execute(
@@ -34,6 +41,18 @@ def sperr_gruppe(db_url, run_migrations):
             "VALUES (%s, %s, 'teacher', 'eigen') ON CONFLICT DO NOTHING",
             (GRUPPE, TEACHER1_PSEUDO),
         )
+    conn.commit()
+    yield
+    with conn.cursor() as cur:
+        # Erst die Planungsknoten: Beim Löschen der Gruppe würde ihr `read_scope_group_id`
+        # auf NULL gesetzt — für einen Knoten mit Scope `group` verboten.
+        cur.execute(
+            "DELETE FROM context_nodes WHERE read_scope_group_id = %s OR subject_id = %s",
+            (GRUPPE, FACH),
+        )
+        # Slots, Muster, Mitgliedschaft und Snapshots gehen per Kaskade mit.
+        cur.execute("DELETE FROM groups WHERE id = %s", (GRUPPE,))
+        cur.execute("DELETE FROM subjects WHERE id = %s", (FACH,))
     conn.commit()
     conn.close()
 
