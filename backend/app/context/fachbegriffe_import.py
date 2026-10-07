@@ -60,6 +60,7 @@ import hashlib
 import json
 import logging
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Collection, Mapping
@@ -1191,13 +1192,22 @@ def lies_buendel(
     Unterstrich. Das hält `_Format.md` draußen und alles unter `_Abb/` — Letzteres wird
     nicht übersprungen, sondern über :func:`lade_svg` an seinem Pfad gesucht.
     """
+    # ⚠️ **Alles auf NFC, an dieser einen Stelle** — Dateinamen und Text. macOS schreibt
+    # Umlaute in Dateinamen oft **zerlegt** (`u` + U+0308); `_slug` kennt nur das
+    # zusammengesetzte „ü", und aus `Hückel-Regel` wurde `hu-ckel-regel`. Dieselbe Datei
+    # einzeln hochgeladen, aus einer Zip oder über das Skript ergäbe sonst je nach Weg
+    # eine andere Kennung — und Wikilinks fänden ihr Ziel nicht, wenn Link und Dateiname
+    # verschieden zerlegt sind. NFC ändert an einem richtig geschriebenen Text nichts.
+    dateien = {unicodedata.normalize("NFC", p): inhalt for p, inhalt in dateien.items()}
     gelesen: list[Quelldatei] = []
     for pfad in sorted(dateien):
         name = pfad.rsplit("/", 1)[-1]
         if "/" in pfad or not name.endswith(".md") or name.startswith("_"):
             continue
         try:
-            quelle = lies_datei(name[:-3], dateien[pfad].decode("utf-8"))
+            quelle = lies_datei(
+                name[:-3], unicodedata.normalize("NFC", dateien[pfad].decode("utf-8"))
+            )
         except UnicodeDecodeError:
             bilanz.warnungen.append(f"{name}: nicht lesbar — keine UTF-8-Kodierung")
             continue

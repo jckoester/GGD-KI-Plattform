@@ -132,6 +132,32 @@ def _pruefe_svg_oder_warne(pfad: str, inhalt: bytes, warnungen: list[str]) -> bo
     return True
 
 
+#: Bit 11 der Allzweck-Flags: Der Name im Archiv ist UTF-8 (APPNOTE 4.4.4).
+_UTF8_KENNZEICHEN = 0x800
+
+
+def eintragsname(eintrag: zipfile.ZipInfo) -> str:
+    """Der Name eines Zip-Eintrags, wie er gemeint war.
+
+    ⚠️ **Ohne UTF-8-Kennzeichen liest `zipfile` den Namen als CP437** — die Kodierung
+    von MS-DOS, die die Zip-Spezifikation als Vorgabe nennt. Viele Packer (auch der von
+    macOS) schreiben aber UTF-8, **ohne** das Kennzeichen zu setzen. Aus einem zerlegten
+    „ü" (`u` + U+0308) wurde so `u╠ê`, aus `Hückel-Regel` die Kennung `ch-hu-ckel-regel`
+    — und der nächste Import mit richtig gelesenen Namen legte einen zweiten Knoten an
+    (gefunden 06.10.2026: 15 Knoten auf Dev, 17 auf Prod).
+
+    Deshalb: Lässt sich der Name als UTF-8 lesen, ist er das; sonst bleibt es bei CP437.
+    Ein echter CP437-Name mit Umlaut (`Ü` = 0x9A) ist kein gültiges UTF-8 und fällt
+    durch. Zerlegte Umlaute bringt danach `lies_buendel` auf NFC.
+    """
+    if eintrag.flag_bits & _UTF8_KENNZEICHEN:
+        return eintrag.filename
+    try:
+        return eintrag.filename.encode("cp437").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return eintrag.filename
+
+
 def _aus_zip(
     dateiname: str, roh: bytes, grenzen: Grenzen, warnungen: list[str]
 ) -> dict[str, bytes]:
@@ -142,13 +168,13 @@ def _aus_zip(
 
     eintraege = [
         z for z in archiv.infolist()
-        if not z.is_dir() and not z.filename.startswith("__MACOSX/")
+        if not z.is_dir() and not eintragsname(z).startswith("__MACOSX/")
     ]
     for z in eintraege:
-        if _ist_gefaehrlicher_pfad(z.filename):
+        if _ist_gefaehrlicher_pfad(eintragsname(z)):
             raise BuendelFehler(
                 400,
-                f"{dateiname}: Der Eintrag „{z.filename}“ zeigt aus dem Archiv heraus.",
+                f"{dateiname}: Der Eintrag „{eintragsname(z)}“ zeigt aus dem Archiv heraus.",
             )
     if len(eintraege) > grenzen.dateien:
         raise BuendelFehler(
@@ -168,10 +194,10 @@ def _aus_zip(
             f"{grenzen.gesamt_bytes // (1024 * 1024)} MB.",
         )
 
-    pfade = _ohne_wurzelverzeichnis([z.filename for z in eintraege])
+    pfade = _ohne_wurzelverzeichnis([eintragsname(z) for z in eintraege])
     buendel: dict[str, bytes] = {}
     for z in eintraege:
-        pfad = pfade[z.filename]
+        pfad = pfade[eintragsname(z)]
         endung = _endung(pfad)
         if endung not in (".md", ".svg"):
             warnungen.append(f"{pfad}: übergangen — nur .md und .svg werden gelesen")

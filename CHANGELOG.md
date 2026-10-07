@@ -24,12 +24,28 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Nach dem Öffnen eines Chats stand die Antwort teils über der Frage. Dasselbe galt für die
   Krisen-Einsicht und den Gesprächsverlauf im Feedback.
+- Ein Fachbegriffe-Import aus einer Zip las Umlaute und andere Sonderzeichen im
+  Dateinamen falsch. Der nächste Import derselben Dateien hätte die Einträge doppelt
+  angelegt.
 
 ### Migration
 
 `alembic upgrade head` führt `0083` aus: Tabelle `message_context_nodes` — je Antwort die
 Bausteine, die beim Antworten vorlagen. Rückrollbar; dabei gehen nur diese Verweise
 verloren, die Antworten bleiben.
+
+### Nach dem Update
+
+Einmal die Fachbegriffe reparieren, die ein Zip-Import mit falsch gelesenen Dateinamen
+angelegt hat — **vor** dem nächsten Fachbegriffe-Import:
+
+```bash
+docker compose exec backend python scripts/fachbegriffe_namen_reparieren.py --dry-run
+docker compose exec backend python scripts/fachbegriffe_namen_reparieren.py
+```
+
+Danach denselben Vault-Stand einmal neu importieren; das ergänzt Verknüpfungen, die
+damals fehlten.
 
 ## [0.13.1] – 2026-10-04
 

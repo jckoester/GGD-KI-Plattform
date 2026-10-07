@@ -957,3 +957,69 @@ class TestVektorenSofort:
         )
         assert einbettung.await_count == vorher
         assert _vektor_da(sync_conn, fach["id"]) == {"Alpha": False}
+
+
+# ── Umlaute im Dateinamen (0.14, Schritt 8) ──────────────────────────────────
+
+def _kennungen(sync_conn, subject_id) -> dict[str, tuple[str, str]]:
+    with sync_conn.cursor() as cur:
+        cur.execute("SELECT title, metadata->>'seed_id', metadata->>'seed_quelle'"
+                    " FROM context_nodes WHERE subject_id = %s", (subject_id,))
+        return {t: (k, q) for t, k, q in cur.fetchall()}
+
+
+class TestUmlauteImDateinamen:
+    """Bis 0.14 ergab eine Zip ohne UTF-8-Kennzeichen eine andere Kennung als dieselbe
+    Datei einzeln — und der nächste Import einen zweiten Knoten."""
+
+    @pytest.mark.asyncio
+    async def test_zip_ohne_kennzeichen_ergibt_die_richtige_kennung(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        import unicodedata
+        from tests.unit.test_fachbegriffe_namen import zip_ohne_kennzeichen
+
+        nfd = unicodedata.normalize("NFD", "Hückel-Regel")
+        archiv = zip_ohne_kennzeichen(f"{nfd}.md".encode("utf-8"), _md("Hückel-Regel"))
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("vault.zip", archiv)], headers=fachschaft_headers,
+        )
+        assert antwort.status_code == 200, antwort.text
+        kennung, quelle = _kennungen(sync_conn, fach["id"])["Hückel-Regel"]
+        assert kennung.endswith("-hueckel-regel")
+        assert quelle == "Hückel-Regel" and unicodedata.is_normalized("NFC", quelle)
+
+        # Dieselbe Datei einzeln, mit zerlegtem Namen: derselbe Knoten, kein zweiter.
+        einzeln = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei(f"{nfd}.md", _md("Hückel-Regel"))], headers=fachschaft_headers,
+        )
+        assert einzeln.json()["neu"] == 0, einzeln.json()
+        assert len(_kennungen(sync_conn, fach["id"])) == 1
+
+    @pytest.mark.asyncio
+    async def test_wikilink_mit_zerlegtem_ziel_findet_die_datei(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        import unicodedata
+
+        ziel_nfd = unicodedata.normalize("NFD", "Hückel-Regel")
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[
+                _datei("Hückel-Regel.md", _md("Hückel-Regel")),
+                _datei("Aromaten.md", _md("Aromaten", zusatz=f'oberbegriff: "[[{ziel_nfd}]]"\n')),
+            ],
+            headers=fachschaft_headers,
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.json()["offene_ziele"] == [], "das Ziel wurde nicht gefunden"
+        with sync_conn.cursor() as cur:
+            cur.execute(
+                "SELECT count(*) FROM context_edges e"
+                " JOIN context_nodes v ON v.id = e.from_node_id"
+                " JOIN context_nodes n ON n.id = e.to_node_id"
+                " WHERE v.title = 'Aromaten' AND n.title = 'Hückel-Regel'"
+                " AND v.subject_id = %s", (fach["id"],))
+            assert cur.fetchone()[0] == 1
