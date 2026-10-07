@@ -261,9 +261,9 @@
                 <div class="mt-3">
                     <InfoBanner
                         message="Über Namen und Aliase sind die Einträge sofort zu
-                                 finden. Damit der Assistent sie auch inhaltlich findet,
-                                 läuft nachts die Einbettung — bis dahin taucht Neues im
-                                 Chat noch nicht von selbst auf."
+                                 finden, inhaltlich in wenigen Augenblicken — so lange
+                                 dauert die Einbettung, die jetzt im Hintergrund läuft.
+                                 Klappt sie nicht, holt der nächtliche Lauf sie nach."
                     />
                 </div>
             {/if}

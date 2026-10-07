@@ -10,9 +10,11 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi import (
+    APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile,
+)
 from sqlalchemy import and_, or_, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import sqlalchemy as sa
 
@@ -2227,6 +2229,7 @@ def _zaehlung(counter) -> list[ZielZaehlung]:
 
 @router.post("/fachbegriffe/import", response_model=FachbegriffImportBericht)
 async def importiere_fachbegriffe(
+    hintergrund: BackgroundTasks,
     fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
     probelauf: bool = Query(
         True, description="True: nichts schreiben, nur den Bericht liefern"
@@ -2281,6 +2284,20 @@ async def importiere_fachbegriffe(
             "Fachbegriff-Import %s durch %s: %d neu, %d aktualisiert, %d unverändert",
             fach_slug, user.sub, bilanz.neu, bilanz.aktualisiert,
             bilanz.unveraendert,
+        )
+        # ⚠️ **Gleich einbetten, nicht erst nachts** (0.14, F7). Der Import setzt
+        # `embedding = NULL` und überließ das Neuberechnen dem Backfill um 3:15 Uhr — aus
+        # der Zeit, als er ein Skript ohne Proxy war. Wer über die Oberfläche importiert
+        # und gleich ausprobiert, fand seine neuen Begriffe in der Vorab-Suche nicht.
+        # Alle Knoten des Laufs, nicht nur neue und geänderte: Wer schon einen Vektor
+        # hat, fällt heraus, und einer, dem er seit früher fehlt, wird mitgenommen.
+        # Eigene Sitzung am **selben** Engine wie die Anfrage — die ist danach zu.
+        from app.crons.embedding_backfill_service import einbetten_nach_import
+
+        hintergrund.add_task(
+            einbetten_nach_import,
+            [UUID(str(d.node_id)) for d in bilanz.dateien if d.node_id],
+            async_sessionmaker(db.bind, class_=AsyncSession, expire_on_commit=False),
         )
 
     return FachbegriffImportBericht(

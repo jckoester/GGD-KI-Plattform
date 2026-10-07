@@ -125,8 +125,9 @@ export function eingespielt(bericht) {
  * Müssen Vektoren neu berechnet werden?
  *
  * Neue und geänderte Knoten sind sofort über Namen und Aliase auffindbar, über die
- * **Bedeutung** aber erst nach dem nächtlichen Lauf. Das gehört in die Rückmeldung:
- * Sonst sucht jemand direkt nach dem Import im Chat danach und findet nichts.
+ * **Bedeutung** erst, wenn ihr Vektor da ist. Seit 0.14 rechnet der Endpunkt ihn gleich
+ * nach dem Import im Hintergrund (vorher erst nachts) — ein paar Augenblicke bleiben,
+ * und scheitert es, holt der nächtliche Lauf es nach. Das gehört in die Rückmeldung.
  */
 export function brauchtEinbettung(bericht) {
   return (bericht?.neu ?? 0) > 0 || (bericht?.neu_einzubetten ?? 0) > 0;

@@ -17,6 +17,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Lange Fachbegriffe erreichen den Assistenten vollständig: Definition und Erklärung bis
   2 500 Zeichen statt bisher abgeschnitten bei 1 500.
 - Zu Bauteilen kennt der Assistent Beschreibung und Kennzeichen des Schaltzeichens.
+- Nach einem Import über die Oberfläche findet der Assistent neue und geänderte
+  Fachbegriffe gleich auch inhaltlich, nicht erst nach dem nächtlichen Lauf.
 
 ### Behoben
 

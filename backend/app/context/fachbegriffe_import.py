@@ -48,7 +48,9 @@ ist die Arbeitsliste für die Breite, und ein erneuter Lauf schließt die Kanten
 die Ziele da sind.
 
 Geänderte Knoten verlieren ihr Embedding (`embedding = NULL`) und bekommen beim nächsten
-Backfill ein neues — der Import selbst braucht keinen laufenden LiteLLM-Proxy.
+Backfill ein neues — der Import selbst braucht keinen laufenden LiteLLM-Proxy. Der
+**Endpunkt** stößt diesen Backfill seit 0.14 gleich nach dem Speichern an, beschränkt auf
+die Knoten des Laufs (`einbetten_nach_import`); das Skript nicht.
 """
 # Bewusst **ohne** `from __future__ import annotations`: Das Admin-Skript lädt in Tests
 # über `spec_from_file_location`, ohne sich in `sys.modules` einzutragen. `@dataclass`

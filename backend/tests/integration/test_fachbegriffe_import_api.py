@@ -20,9 +20,13 @@ Router-Pfade ohne /api-Präfix (CLAUDE.md: FastAPI sieht /api nie).
 import io
 import uuid
 import zipfile
+from unittest.mock import AsyncMock, patch
 
 import psycopg2
 import pytest
+
+from app.config import settings
+from app.context.embedding import EmbeddingStapel
 
 PFAD = "/context/fachbegriffe/import"
 
@@ -133,6 +137,27 @@ def ohne_drossel():
     store.reset()
     yield
     store.reset()
+
+
+#: Seit 0.14 (F7) bettet der Endpunkt nach einem echten Lauf im Hintergrund ein.
+STAPEL = "app.crons.embedding_backfill_service.generate_embeddings"
+
+
+@pytest.fixture(autouse=True)
+def einbettung():
+    """Eine Attrappe für jeden Test hier — sonst ginge jeder echte Lauf an den Proxy.
+
+    Je Text derselbe Vektor in der konfigurierten Breite; die Tests unten lesen die
+    Aufrufe mit.
+    """
+    async def _f(texte):
+        return EmbeddingStapel(
+            vektoren=[[0.5] * settings.embedding_dimensions for _ in texte],
+            tokens=len(texte) * 10,
+        )
+    attrappe = AsyncMock(side_effect=_f)
+    with patch(STAPEL, attrappe):
+        yield attrappe
 
 
 @pytest.fixture(autouse=True)
@@ -834,3 +859,101 @@ class TestVorlageHerunterladen:
         assert bericht["neu"] == 3, bericht
         assert bericht["warnungen"] == [], bericht["warnungen"]
         assert len(_knoten(sync_conn, fach["id"])) == 3
+
+
+# ── Vektoren gleich nach dem Import (0.14, F7) ───────────────────────────────
+
+def _vektor_da(sync_conn, subject_id) -> dict[str, bool]:
+    with sync_conn.cursor() as cur:
+        cur.execute("SELECT title, embedding IS NOT NULL FROM context_nodes"
+                    " WHERE subject_id = %s", (subject_id,))
+        return dict(cur.fetchall())
+
+
+class TestVektorenSofort:
+    """Bis 0.14 setzte der Import `embedding = NULL` und wartete auf den Backfill um
+    3:15 Uhr. Wer importierte und gleich fragte, fand die neuen Begriffe in der
+    Vorab-Suche nicht."""
+
+    @pytest.mark.asyncio
+    async def test_neuer_begriff_hat_nach_dem_import_einen_vektor(
+        self, test_client, fach, fachschaft_headers, sync_conn, einbettung
+    ):
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert _vektor_da(sync_conn, fach["id"]) == {"Alpha": True}
+        texte = [t for aufruf in einbettung.await_args_list for t in aufruf.args[0]]
+        assert any("Ein Text über Alpha" in t for t in texte)
+
+    @pytest.mark.asyncio
+    async def test_geaenderter_begriff_bekommt_einen_neuen(
+        self, test_client, fach, fachschaft_headers, sync_conn, einbettung
+    ):
+        for zusatz in ("", "ab_klasse: 9\n"):
+            await test_client.post(
+                PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+                files=[_datei("Alpha.md", _md("Alpha", zusatz=zusatz))],
+                headers=fachschaft_headers,
+            )
+        assert _vektor_da(sync_conn, fach["id"]) == {"Alpha": True}
+        assert einbettung.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_probelauf_bettet_nicht_ein(
+        self, test_client, fach, fachschaft_headers, einbettung
+    ):
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "true"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        einbettung.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unveraenderter_lauf_bettet_nichts_neu_ein(
+        self, test_client, fach, fachschaft_headers, einbettung
+    ):
+        for _ in range(2):
+            await test_client.post(
+                PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+                files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+            )
+        assert einbettung.await_count == 1, "der zweite Lauf hat einen Vektor neu berechnet"
+
+    @pytest.mark.asyncio
+    async def test_scheitert_das_einbetten_bleibt_der_import_stehen(
+        self, test_client, fach, fachschaft_headers, sync_conn, einbettung
+    ):
+        """Proxy weg: Der Import ist gespeichert, der Knoten wartet auf die Nacht."""
+        einbettung.side_effect = RuntimeError("Proxy nicht erreichbar")
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        assert antwort.status_code == 200, antwort.text
+        assert antwort.json()["neu"] == 1
+        assert _vektor_da(sync_conn, fach["id"]) == {"Alpha": False}
+
+    @pytest.mark.asyncio
+    async def test_probelauf_beruehrt_auch_bestehende_knoten_ohne_vektor_nicht(
+        self, test_client, fach, fachschaft_headers, sync_conn, einbettung
+    ):
+        """⚠️ Die Zusage „ein Probelauf schreibt nichts" gilt auch für Vektoren — ein
+        Knoten, dem seit früher einer fehlt, bleibt im Probelauf ohne."""
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        with sync_conn.cursor() as cur:
+            cur.execute("UPDATE context_nodes SET embedding = NULL WHERE subject_id = %s",
+                        (fach["id"],))
+        sync_conn.commit()
+        vorher = einbettung.await_count
+        await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "true"},
+            files=[_datei("Alpha.md", _md("Alpha"))], headers=fachschaft_headers,
+        )
+        assert einbettung.await_count == vorher
+        assert _vektor_da(sync_conn, fach["id"]) == {"Alpha": False}

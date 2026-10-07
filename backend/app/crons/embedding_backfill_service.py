@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from time import perf_counter
 
@@ -69,6 +70,7 @@ async def backfill_embeddings(
     limit: int | None = None,
     dry_run: bool = False,
     content_types: list[str] | None = None,
+    node_ids: Iterable | None = None,
 ) -> EmbeddingBackfillStats:
     stats = EmbeddingBackfillStats()
     started = perf_counter()
@@ -100,6 +102,10 @@ async def backfill_embeddings(
         )
         .order_by(ContextNode.created_at.asc())
     )
+    # Nur diese Knoten — etwa die eines Imports (`einbetten_nach_import`). Wer schon
+    # einen Vektor hat, fällt über `embedding IS NULL` ohnehin heraus.
+    if node_ids is not None:
+        query = query.where(ContextNode.id.in_(list(node_ids)))
     if limit is not None:
         query = query.limit(limit)
 
@@ -270,4 +276,32 @@ async def backfill_embeddings(
         stats.skipped,
         stats.duration_ms,
     )
+    return stats
+
+
+async def einbetten_nach_import(node_ids: Iterable, sitzungen) -> EmbeddingBackfillStats | None:
+    """Die Knoten eines Imports gleich einbetten, statt bis 3:15 Uhr zu warten (0.14, F7).
+
+    Läuft als Hintergrundaufgabe **nach** der Antwort und in einer eigenen Sitzung aus
+    ``sitzungen`` — die der Anfrage ist dann schon zu. Dieselbe Funktion wie der nächtliche
+    Lauf, beschränkt auf diese IDs: gleiche Regeln (nur Titel → kein Vektor), gleiche
+    Fehlerbehandlung (Fehlermarke am Knoten).
+
+    ⚠️ **Scheitern ist hier kein Fehler des Imports.** Der ist längst gespeichert und
+    gemeldet. Was hier nicht klappt — Proxy weg, Budget leer —, landet im Log, und der
+    nächtliche Lauf holt es nach: Der Knoten steht weiter mit ``embedding IS NULL`` da.
+    """
+    ids = list(node_ids)
+    if not ids:
+        return None
+    try:
+        async with sitzungen() as db:
+            stats = await backfill_embeddings(db, node_ids=ids)
+    except Exception:
+        logger.exception("Einbetten nach dem Import gescheitert (%d Knoten) — "
+                         "der nächtliche Lauf holt es nach", len(ids))
+        return None
+    if stats.errors or stats.abgebrochen:
+        logger.warning("Einbetten nach dem Import: %d ok, %d Fehler — der nächtliche Lauf "
+                       "holt den Rest nach", stats.ok, stats.errors)
     return stats

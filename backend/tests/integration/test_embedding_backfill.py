@@ -484,3 +484,53 @@ class TestAbbruchBeiFehlerserie:
         assert stats.abgebrochen is False
         assert stats.errors == 1, "nur der schuldige Text scheitert"
         assert stats.ok == 39, "die uebrigen 39 Knoten bekommen ihren Vektor"
+
+
+# ── Beschränkt auf bestimmte Knoten (0.14, F7) ───────────────────────────────
+
+class TestNurDieseKnoten:
+    """Nach einem Import über die Oberfläche bettet der Endpunkt **nur** die Knoten
+    dieses Laufs ein — nicht den ganzen Rückstand der Schule."""
+
+    async def _zwei_ik(self, session_factory):
+        async with session_factory() as db:
+            knoten = [
+                ContextNode(id=uuid.uuid4(), title=f"Test-IK {n}", content="Die SuS können etwas.",
+                            category="knowledge", content_type="ik_kompetenz", status="active",
+                            read_scope="global", write_scope="global", metadata_={})
+                for n in (1, 2)
+            ]
+            db.add_all(knoten)
+            await db.commit()
+            return [k.id for k in knoten]
+
+    @pytest.mark.asyncio
+    async def test_nur_die_genannten_knoten(self, session_factory):
+        eins, zwei = await self._zwei_ik(session_factory)
+        with patch(STAPEL, new=_liefert([0.1] * DIM)):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db, node_ids=[eins])
+        assert (stats.found, stats.ok) == (1, 1)
+        async with session_factory() as db:
+            assert (await db.get(ContextNode, eins)).embedding is not None
+            assert (await db.get(ContextNode, zwei)).embedding is None
+
+    @pytest.mark.asyncio
+    async def test_leere_liste_heisst_keiner(self, session_factory):
+        await self._zwei_ik(session_factory)
+        attrappe = _liefert([0.1] * DIM)
+        with patch(STAPEL, new=attrappe):
+            async with session_factory() as db:
+                stats = await backfill_embeddings(db, node_ids=[])
+        assert stats.found == 0
+        attrappe.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_nach_import_schluckt_jeden_fehler(self, session_factory):
+        """Die Hintergrundaufgabe läuft nach der Antwort — ein Fehler darf nur ins Log."""
+        from app.crons.embedding_backfill_service import einbetten_nach_import
+
+        eins, _ = await self._zwei_ik(session_factory)
+        with patch("app.crons.embedding_backfill_service.backfill_embeddings",
+                   new=AsyncMock(side_effect=RuntimeError("Datenbank weg"))):
+            assert await einbetten_nach_import([eins], session_factory) is None

@@ -192,8 +192,9 @@ Vorschau eine Frage stellt.
 ### Wann die Einträge auffindbar sind
 
 Über **Namen und Suchbegriffe** sofort. Damit ein Assistent sie auch **inhaltlich**
-findet, muss die Plattform sie erst verarbeiten; das läuft nachts. Wenn Sie direkt nach
-dem Einspielen im Chat danach suchen und nichts kommt: morgen noch einmal versuchen.
+findet, muss die Plattform sie erst verarbeiten; das beginnt gleich nach dem Einspielen
+und dauert wenige Augenblicke. Klappt es einmal nicht — etwa weil der KI-Dienst gerade
+nicht erreichbar ist —, holt die Plattform es in der Nacht nach.
 
 ## Umbenennen und die Kennung `id`
 
