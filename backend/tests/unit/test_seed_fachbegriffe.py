@@ -303,6 +303,41 @@ class TestAbbildungen:
         seed.lade_svg(metadata, _buendel())
         assert metadata["illustrationen"][0]["tex"] == "Irgendwo/im/Vault/schema.tex"
 
+    def test_abgelehntes_svg_wird_nicht_gespeichert(self, seed):
+        """0.14.1: Dieselbe Prüfung wie beim Upload — auch im Skriptweg, der bis dahin
+        speicherte, was im Ordner lag."""
+        boese = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+        metadata = {"illustrationen": [{"datei": "_Abb/boese.svg", "beschreibung": "x"}]}
+        abgelehnt: list[str] = []
+        fehlend = seed.lade_svg(metadata, {"_Abb/boese.svg": boese}, abgelehnt)
+        assert "svg" not in metadata["illustrationen"][0]
+        assert fehlend == [], "abgelehnt ist nicht „nicht gefunden“"
+        assert len(abgelehnt) == 1 and "script" in abgelehnt[0]
+
+    def test_auch_ohne_meldeliste_wird_nicht_gespeichert(self, seed):
+        boese = b'<svg xmlns="http://www.w3.org/2000/svg"><image href="https://x.example/a.png"/></svg>'
+        metadata = {"illustrationen": [{"datei": "_Abb/boese.svg"}]}
+        seed.lade_svg(metadata, {"_Abb/boese.svg": boese})
+        assert "svg" not in metadata["illustrationen"][0]
+
+    def test_eingebettetes_png_kommt_durch(self, seed):
+        orbital = (b'<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,'
+                   b'iVBORw0KGgo=" width="1" height="1"/></svg>')
+        metadata = {"illustrationen": [{"datei": "_Abb/s-Orbital.svg"}]}
+        abgelehnt: list[str] = []
+        seed.lade_svg(metadata, {"_Abb/s-Orbital.svg": orbital}, abgelehnt)
+        assert metadata["illustrationen"][0]["svg"] == orbital.decode()
+        assert abgelehnt == []
+
+    def test_bericht_nennt_die_ablehnung(self, seed):
+        """Der Skriptweg meldet über `bilanz.warnungen` — wie der Dialog."""
+        md = ("---\nknotentyp: begriff\ntitel: Alpha\nfach: Chemie\nillustrationen:\n"
+              "  - datei: _Abb/boese.svg\n---\n\nText.\n").encode()
+        boese = b'<svg xmlns="http://www.w3.org/2000/svg" onload="x()"/>'
+        bilanz = seed.Bilanz()
+        seed.lies_buendel({"Alpha.md": md, "_Abb/boese.svg": boese}, bilanz)
+        assert any("Abbildung abgelehnt" in w and "onload" in w for w in bilanz.warnungen), bilanz.warnungen
+
     def test_platzhalter_ohne_eintrag_wird_gemeldet(self, seed, fiktivum):
         """Sonst steht in der Oberfläche eine leere Stelle und beim Modell ein nacktes
         `[Abbildung]` — und niemand erfährt, dass ein Bild fehlt."""

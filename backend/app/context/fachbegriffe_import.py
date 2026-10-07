@@ -72,6 +72,7 @@ from sqlalchemy.orm import attributes
 
 from app.context import aliase as alias_dienst
 from app.context.metadata import STUB_MARKIERUNG, validate_node_metadata
+from app.context.svg_pruefung import pruefe_svg
 from app.context.taxonomy import (
     CONTENT_TYPE_TO_CATEGORY,
     EMBEDDING_CONTENT_TYPES,
@@ -486,7 +487,9 @@ def lies_datei(dateiname: str, roh: str) -> Quelldatei | None:
     )
 
 
-def lade_svg(metadata: dict[str, Any], dateien: Mapping[str, bytes]) -> list[str]:
+def lade_svg(
+    metadata: dict[str, Any], dateien: Mapping[str, bytes], abgelehnt: list[str] | None = None
+) -> list[str]:
     """SVG-Dateien der `illustrationen` einlesen und inline ablegen.
 
     Gibt die Namen zurück, die **nicht** gefunden wurden. Der Inhalt geht in
@@ -501,6 +504,12 @@ def lade_svg(metadata: dict[str, Any], dateien: Mapping[str, bytes]) -> list[str
     Datei ohne Ordner. Die Oberfläche vergleicht an derselben Stelle schon immer
     Dateinamen statt Pfade (`abbildungen.js`); eine Abbildung, die im Bündel liegt und
     trotzdem als fehlend gemeldet wird, wäre für niemanden erklärlich.
+
+    ⚠️ **Jedes SVG geht durch `pruefe_svg`, bevor es gespeichert wird** (0.14.1). Bis dahin
+    prüfte nur der Upload-Dialog; der Skriptweg (`seed_fachbegriffe.py`) speicherte, was im
+    Ordner lag. Ein Admin sieht vor dem Import nicht jede Datei an — und dieselben Bytes
+    gehen in die Anzeige und in den PDF-Export. Hier, an der Stelle des Speicherns, gilt
+    die Regel für jeden Weg. Abgelehnte Dateien stehen mit Grund in ``abgelehnt``.
     """
     nach_name: dict[str, bytes] = {}
     for pfad, inhalt in dateien.items():
@@ -518,9 +527,15 @@ def lade_svg(metadata: dict[str, Any], dateien: Mapping[str, bytes]) -> list[str
             fehlend.append(str(abb["datei"]))
             continue
         try:
-            abb["svg"] = roh.decode("utf-8")
+            text = roh.decode("utf-8")
         except UnicodeDecodeError:
             fehlend.append(str(abb["datei"]))
+            continue
+        if grund := pruefe_svg(text):
+            if abgelehnt is not None:
+                abgelehnt.append(f"{angabe} — {grund}")
+            continue
+        abb["svg"] = text
     return fehlend
 
 
@@ -1218,10 +1233,12 @@ def lies_buendel(
             continue
         if not quelle.fach and fach_vorgabe:
             quelle.fach = fach_vorgabe
+        abgelehnt: list[str] = []
         bilanz.warnungen += [
             f"{quelle.datei}: SVG nicht gefunden — {n}"
-            for n in lade_svg(quelle.metadata, dateien)
+            for n in lade_svg(quelle.metadata, dateien, abgelehnt)
         ]
+        bilanz.warnungen += [f"{quelle.datei}: Abbildung abgelehnt — {a}" for a in abgelehnt]
         bilanz.warnungen += [
             f"{quelle.datei}: Abbildung im Text ohne Eintrag unter illustrationen — {n}"
             for n in pruefe_abbildungen(quelle)

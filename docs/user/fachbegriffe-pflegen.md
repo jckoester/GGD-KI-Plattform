@@ -154,7 +154,9 @@ er sieht die Zeichnung nicht — und das, was ein Screenreader vorliest.
 
 > **Nur SVG, und nur ohne Beiwerk.** Zeichnungen mit Skripten, eingebetteten Dokumenten
 > oder Verweisen auf fremde Server werden abgewiesen. Der Eintrag wird trotzdem
-> eingespielt, nur ohne das Bild; der Grund steht im Bericht.
+> eingespielt, nur ohne das Bild; der Grund steht im Bericht. Ein **Foto oder gerendertes
+> Bild in der SVG** (PNG, JPEG, GIF oder WebP, in die Datei eingebettet) ist erlaubt —
+> so exportieren viele Programme etwa Orbital-Darstellungen.
 
 ## Einspielen: erst Vorschau, dann bestätigen
 

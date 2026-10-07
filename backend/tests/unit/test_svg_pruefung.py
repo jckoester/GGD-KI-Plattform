@@ -105,3 +105,44 @@ class TestWasAbgewiesenWird:
         """Nicht nur die erste Ebene: Geprüft wird jedes Element."""
         inhalt = "<g><g><g><script>x</script></g></g></g>"
         assert pruefe_svg(RUMPF.format(inhalt)) is not None
+
+
+PNG = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+       "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+
+
+class TestEingebettetesRasterbild:
+    """0.14.1: Ein PNG, das als `data:` im SVG steckt, lädt nichts nach. Bis 0.14.0 galt es
+    als „Verweis nach außen" — und die Orbital-Abbildungen der Chemie fielen beim Import
+    über den Dialog weg."""
+
+    @pytest.mark.parametrize("attribut", ['href', 'xlink:href'])
+    def test_png_an_image_kommt_durch(self, attribut):
+        xlink = ' xmlns:xlink="http://www.w3.org/1999/xlink"' if attribut.startswith("xlink") else ""
+        inhalt = f'<image{xlink} {attribut}="{PNG}" width="10" height="10"/>'
+        assert pruefe_svg(RUMPF.format(inhalt)) is None
+
+    @pytest.mark.parametrize("art", ["jpeg", "jpg", "gif", "webp", "PNG"])
+    def test_andere_rasterformate(self, art):
+        inhalt = f'<image href="data:image/{art};base64,AAAA" width="1" height="1"/>'
+        assert pruefe_svg(RUMPF.format(inhalt)) is None
+
+    def test_svg_als_daten_bleibt_draussen(self):
+        """Ein zweites SVG ginge an dieser Prüfung vorbei — der PDF-Export löst darin
+        Verweise nach außen auf."""
+        inhalt = '<image href="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" width="1" height="1"/>'
+        grund = pruefe_svg(RUMPF.format(inhalt))
+        assert grund and "Rasterbild" in grund and "nach außen" not in grund
+
+    def test_daten_an_einem_link_bleiben_draussen(self):
+        grund = pruefe_svg(RUMPF.format(f'<a href="{PNG}"><rect width="1" height="1"/></a>'))
+        assert grund and "<a>" in grund
+
+    def test_ohne_base64_bleibt_draussen(self):
+        """Nur die Form, die ein Zeichenprogramm schreibt — kein Freitext in der URI."""
+        inhalt = '<image href="data:image/png,%89PNG" width="1" height="1"/>'
+        assert pruefe_svg(RUMPF.format(inhalt)) is not None
+
+    def test_fremde_url_an_image_weiter_nach_aussen(self):
+        grund = pruefe_svg(RUMPF.format('<image href="https://fremde.example/x.png"/>'))
+        assert grund and "nach außen" in grund

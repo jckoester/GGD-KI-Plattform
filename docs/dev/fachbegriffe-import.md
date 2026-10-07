@@ -99,10 +99,18 @@ ein nacktes 413 vom nginx statt eines Satzes, der sagt, was zu tun ist —
 `tests/unit/test_upload_grenzen_passen.py` hält beide zusammen. Für Betreiber steht das
 in [Upload-Grenzen](../admin/konfiguration.md#upload-grenzen).
 
-⚠️ **Jedes SVG wird geprüft, nicht umgeschrieben** (`app/context/svg_pruefung.py`).
+⚠️ **Jedes SVG wird geprüft, nicht umgeschrieben** (`app/context/svg_pruefung.py`) — auf
+**beiden** Wegen: im Dialog schon beim Entpacken, und seit 0.14.1 für jeden Weg dort, wo
+das SVG gespeichert wird (`lade_svg`). Bis dahin speicherte das Skript ungeprüft, was im
+Ordner lag; ein Admin sieht vor dem Import aber nicht jede Datei an.
 Abgewiesen wird, was Verhalten mitbringt oder nach außen zeigt: `<script>`,
 `<foreignObject>`, Animationselemente, `on…`-Attribute, `javascript:`, `href`/`url()`
-außerhalb des Dokuments, Entity-Deklarationen, ein fehlender SVG-Namensraum. Die
+außerhalb des Dokuments, Entity-Deklarationen, ein fehlender SVG-Namensraum. **Eine
+Ausnahme** (0.14.1): ein eingebettetes Rasterbild an `<image>` —
+`data:image/png|jpeg|gif|webp;base64,…`. Es lädt nichts nach; bis 0.14.0 galt es als
+Verweis nach außen, und die Orbital-Abbildungen der Chemie fielen beim Dialog-Import weg.
+Ein eingebettetes **SVG** (`data:image/svg+xml`) bleibt verboten: Es ginge an der Prüfung
+vorbei, und der PDF-Export löste darin Verweise nach außen auf. Die
 Abbildung fällt dann weg, **der Knoten bleibt** — dieselbe Verhältnismäßigkeit wie bei
 einem verworfenen Metadatenfeld, und der Grund steht im Bericht.
 

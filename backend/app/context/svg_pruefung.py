@@ -6,7 +6,9 @@ Render-Sidecar, matplotlib. `app/render/export.py` schreibt diese Annahme sogar 
 („die SVGs stammen aus den eigenen Renderern"). Mit dem Upload-Dialog (AP3) stimmt sie
 nicht mehr: Eine Lehrkraft lädt eine Datei hoch, deren Inhalt niemand gesehen hat, und
 sie landet in `metadata.illustrationen[].svg` — also in der Datenbank, im Chat-Kontext,
-in der Detailansicht und im PDF-Export.
+in der Detailansicht und im PDF-Export. Seit 0.14.1 prüft auch der Skriptweg
+(`fachbegriffe_import.lade_svg`): Ein Admin, der einen Ordner einspielt, hat die Dateien
+ebenso wenig alle angesehen.
 
 **Geprüft, nicht umgeschrieben.** Ein Sanitisierer, der ein Bild „repariert", gibt der
 Autorin etwas anderes zurück, als sie hochgeladen hat, und sie erfährt es nicht. Wer
@@ -40,6 +42,20 @@ _DEKLARATION = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
 #: `url(…)` in einem Attributwert oder in `<style>` — erlaubt ist nur der Verweis auf
 #: eine Stelle **im selben Dokument** (`url(#clip1)`, so arbeiten Clip-Pfade).
 _URL = re.compile(r"url\(\s*['\"]?\s*([^)'\"]*)", re.IGNORECASE)
+
+#: Ein **eingebettetes Rasterbild** — das einzige `href`, das nicht im Dokument bleibt und
+#: trotzdem durchgeht, und nur an `<image>` (0.14.1).
+#:
+#: ⚠️ **Bis 0.14.0 galt jedes `href` außer `#…` als Verweis nach außen** — auch ein PNG, das
+#: als `data:` in der Datei selbst steckt und nichts nachlädt. Abgewiesen wurden damit die
+#: Orbital-Abbildungen der Chemie (gerenderte Orbitale in einer SVG-Hülle), und der
+#: Dialog-Import ersetzte sie durch Einträge ohne Bild. Ein Rasterbild lädt nichts nach und
+#: führt nichts aus; die Anzeige lässt es durch (DOMPurify: `image` gehört zu den
+#: Daten-URI-Elementen), der PDF-Export stellt es dar.
+#:
+#: **Nicht** `data:image/svg+xml`: Das wäre ein zweites SVG, das an dieser Prüfung vorbeigeht
+#: — im Browser harmlos (Bildkontext), aber der PDF-Export löst darin Verweise nach außen auf.
+_RASTERBILD = re.compile(r"data:image/(?:png|jpe?g|gif|webp);base64,", re.IGNORECASE)
 
 #: Elemente, die ein Bild nicht braucht und die Verhalten mitbringen: Skript, fremdes
 #: Markup, eingebettete Dokumente, Animation. Ein importierter Fachbegriff zeigt eine
@@ -105,8 +121,15 @@ def pruefe_svg(roh: str) -> str | None:
                 return f"enthält `javascript:` in `{kurz}`"
             if kurz == "href" and not wert.strip().startswith("#"):
                 # `<use xlink:href="#g0-1">` ist der Normalfall aus dvisvgm; alles
-                # andere holt etwas von außen oder führt etwas aus.
-                return f"verweist mit `{kurz}` nach außen — `{wert.strip()[:40]}`"
+                # andere holt etwas von außen oder führt etwas aus — bis auf ein
+                # eingebettetes Rasterbild (`_RASTERBILD`).
+                ziel = wert.strip()
+                if name == "image" and _RASTERBILD.match(ziel):
+                    continue
+                if ziel.lower().startswith("data:"):
+                    return (f"bettet mit `{kurz}` an <{name}> Daten ein — erlaubt ist nur ein "
+                            f"Rasterbild (PNG, JPEG, GIF, WebP) an <image> — `{ziel[:40]}`")
+                return f"verweist mit `{kurz}` nach außen — `{ziel[:40]}`"
             if grund := _url_grund(wert, f"`{kurz}`"):
                 return grund
     return None

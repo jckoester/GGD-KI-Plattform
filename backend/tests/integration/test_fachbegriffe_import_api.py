@@ -470,6 +470,69 @@ class TestGrenzenAmEndpunkt:
         (_, metadata), = _knoten(sync_conn, fach["id"])
         assert "svg" not in metadata["illustrationen"][0]
 
+    @pytest.mark.asyncio
+    async def test_abbildung_mit_eingebettetem_png(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        """0.14.1: Die Orbital-Abbildungen der Chemie sind PNGs in einer SVG-Hülle. Bis
+        0.14.0 meldete der Import „verweist mit `href` nach außen" und legte den Eintrag
+        ohne Bild an."""
+        png = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlE"
+               "QVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+        orbital = ('<svg xmlns="http://www.w3.org/2000/svg" '
+                   'xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+                   f'<image xlink:href="{png}" width="10" height="10"/></svg>')
+        zusatz = (
+            "illustrationen:\n  - datei: _Abb/p_z-Orbital.svg\n"
+            "    beschreibung: \"Hantelförmiges p-Orbital.\"\n"
+        )
+        roh = _zip({
+            "Alpha.md": _md("Alpha", zusatz=zusatz),
+            "_Abb/p_z-Orbital.svg": orbital.encode("utf-8"),
+        })
+        antwort = await test_client.post(
+            PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+            files=[_datei("pilot.zip", roh)], headers=fachschaft_headers,
+        )
+        assert antwort.json()["warnungen"] == [], antwort.json()["warnungen"]
+        (_, metadata), = _knoten(sync_conn, fach["id"])
+        assert metadata["illustrationen"][0]["svg"] == orbital
+
+    @pytest.mark.asyncio
+    async def test_neuimport_bringt_das_abgelehnte_bild_zurueck(
+        self, test_client, fach, fachschaft_headers, sync_conn
+    ):
+        """Die Zusage im CHANGELOG zu 0.14.1: Nach dem Update genügt ein Neuimport.
+
+        Erster Lauf wie unter 0.14.0 (Prüfung lehnt ab, Eintrag ohne Bild); zweiter Lauf
+        mit denselben Dateien. Er darf den Knoten nicht für handbearbeitet halten — sonst
+        bliebe er „übersprungen" und das Bild weg."""
+        from unittest.mock import patch
+
+        png = "data:image/png;base64,iVBORw0KGgo="
+        orbital = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">'
+                   f'<image href="{png}" width="1" height="1"/></svg>')
+        zusatz = "illustrationen:\n  - datei: _Abb/s-Orbital.svg\n    beschreibung: \"Kugel.\"\n"
+        roh = _zip({"Alpha.md": _md("Alpha", zusatz=zusatz),
+                    "_Abb/s-Orbital.svg": orbital.encode("utf-8")})
+
+        def senden():
+            return test_client.post(
+                PFAD, params={"fach": fach["slug"], "probelauf": "false"},
+                files=[_datei("pilot.zip", roh)], headers=fachschaft_headers,
+            )
+
+        with patch("app.context.fachbegriffe_upload.pruefe_svg",
+                   return_value="verweist mit `href` nach außen — `data:image/png`"):
+            await senden()
+        (_, metadata), = _knoten(sync_conn, fach["id"])
+        assert "svg" not in metadata["illustrationen"][0], "Stand 0.14.0 nicht nachgestellt"
+
+        bericht = (await senden()).json()
+        assert [z["zustand"] for z in bericht["dateien"]] == ["aktualisiert"], bericht
+        (_, metadata), = _knoten(sync_conn, fach["id"])
+        assert metadata["illustrationen"][0]["svg"] == orbital
+
 
 class TestVorschau:
     """Was der Dialog anzeigt (AP4): eine Zeile je Datei, nicht nur Summen."""
