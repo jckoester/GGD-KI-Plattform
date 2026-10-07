@@ -531,7 +531,7 @@ Exit-Code 1, wenn eine Zusage bricht:
 | Recall@10 | Wächter gegen einen wiederkehrenden Vektorindex | 100 % |
 | Aufzählungen wie erwartet | Zählung und Fächerzahl der Filterabfrage | 2/2 |
 | Anker-Fälle (`anker:`) | Suche im Teilgraphen eines Assistenten | 3/3, zwei davon auf Rang 1 |
-| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf | 8 solcher Fälle, größter Abschnitt 3 |
+| Deckel `IDENT_DECKEL` = 3 | Wie viele Namensträger ein **thematischer** Fall höchstens erzeugen darf — thematisch heißt: mit `fach:` und **ohne** einen Knoten beim Namen zu nennen (`ist_thematisch`) | 8 solcher Fälle, größter Abschnitt 3 |
 
 ⚠️ **Die drei roten Fälle sind Altbestand** und kein Rückschritt: zweimal Deutsch
 `3.4.1.1` (einmal mit, einmal ohne Fachbezug) und Informatik `3.1.2(1)`. Beide Knoten
@@ -542,6 +542,15 @@ Erwartung stimmt — der Bericht sagt das bei jedem Fall dazu.
 **50/54** · 100 % · 2/2 · Deckel **gerissen**. Neu rot: „Was passiert, wenn man Säure und
 Lauge mischt?" findet die Neutralisation nicht mehr; der Deckel reißt bei
 „Elektronenpaarbindung" (4 Namensträger). Beides in `Todo.md`, nicht untersucht.
+
+**Untersucht 07.10.2026:** Beides ist kein Fehler der Suche. Die **Neutralisation** steht
+auf Platz 16 (Distanz 0,546) — „Lauge" kommt weder in ihrem Text noch in ihren
+Suchbegriffen vor; das ergänzt die Fachschaft im Vault. Der **Deckel** riss an einer
+Fehleinordnung des Prüfsatzes: „Elektronenpaarbindung", „Oxidation" und „Energie" nennen
+einen Knoten beim Namen, galten aber als thematisch, weil sie ein Fach tragen. Seitdem
+zählt nur als thematisch, wo kein Namensträger genau den Begriff trägt, den die
+Suchschicht aus der Frage liest (`nachschlage_begriff`). Ergebnis: 5 thematische Fälle,
+größter Abschnitt 2 — Exit-Code 0.
 
 **Für Änderungen am Prompt-Inhalt der Vorab-Suche** gibt es ein zweites Werkzeug:
 `scripts/kontextblock.py` zeigt den Kontextblock, den eine Frage in den Prompt bringt —

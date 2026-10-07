@@ -35,6 +35,8 @@
         // `aus` | `kurz` | `ausfuehrlich` (Profileinstellung `kontext_anzeige`). Vorgabe
         // `aus`: Außerhalb des Chats (Testchat im Editor, Einsicht) gibt es keine Zeile.
         kontextStufe = 'aus',
+        // Wohin „Zurück“ aus einem Baustein der Kontextliste führt (`/chat?id=…`).
+        kontextZurueck = null,
     } = $props();
 
     // Beide Übernahmen legen ein Markdown-Dokument an und nehmen nur `content` mit.
@@ -75,7 +77,7 @@
     // ── Kontext (0.14): die Bausteine, die beim Antworten vorlagen ───────────
     // Eingeklappt wie die Herkunft — ein Nachweis, keine Aufforderung (ADR-017).
     let kontextOffen = $state(false);
-    let kontext = $derived(kontextEintraege(message, kontextStufe, isStreaming));
+    let kontext = $derived(kontextEintraege(message, kontextStufe, isStreaming, kontextZurueck));
 
     let zitat = $derived(
         zitatText({

@@ -64,6 +64,22 @@ describe("kontextEintraege", () => {
         ]);
     });
 
+    it("der Link führt mit ?back= in den Chat zurück — Pfad und Query", () => {
+        const [erster] = kontextEintraege(antwort, "kurz", false, "/chat?id=k-1");
+        expect(erster.href).toBe("/knowledge/n1?back=%2Fchat%3Fid%3Dk-1");
+        // Ohne Ziel (außerhalb des Chats) der schlichte Link.
+        expect(kontextEintraege(antwort, "kurz")[0].href).toBe("/knowledge/n1");
+    });
+
+    it("die Chatseite gibt die Konversation als Rückweg mit", async () => {
+        // ⚠️ Nicht `$page.url`: Ein neuer Chat steht dort als `/chat` ohne `?id=`.
+        const { readFileSync } = await import("node:fs");
+        const quelle = readFileSync(
+            new URL("../routes/(app)/chat/+page.svelte", import.meta.url), "utf-8",
+        );
+        expect(quelle).toMatch(/kontextZurueck=\{conversationId \? `\/chat\?id=\$\{conversationId\}`/);
+    });
+
     it("kurz: Titel, Fach und Link — keine Details", () => {
         const [erster, , dritter] = kontextEintraege(antwort, "kurz");
         expect(erster).toEqual({

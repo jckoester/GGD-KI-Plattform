@@ -54,6 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.context.search import _FACHBONUS as FACHBONUS
 from app.config import settings
 from app.context.embedding import generate_embedding, vor_einer_messung
+from app.context.lookup import nachschlage_begriff, normalisiere_titel
 
 PRUEFSATZ_VORGABE = (
     Path(__file__).resolve().parents[2] / "config" / "search_eval.yaml"
@@ -68,8 +69,13 @@ INDEXNAME = "idx_context_nodes_embedding"
 # Schwelle aktuell **null**; der Deckel lässt Luft für neue Inhalte im Wissensgraphen und
 # schlägt an, bevor ein Block in der Oberfläche spürbar wird.
 #
-# „Thematisch" heißt hier: Der Fall erwartet einen Fachtreffer (`fach:`), fragt also nach
-# einem Thema und nicht nach einem Namen.
+# „Thematisch" heißt hier: Der Fall erwartet einen Fachtreffer (`fach:`) **und** nennt
+# keinen Knoten wörtlich beim Namen (`ist_thematisch`).
+#
+# ⚠️ **Bis 07.10.2026 genügte `fach:`.** Dann riss der Deckel bei „Elektronenpaarbindung"
+# mit vier Namensträgern — Begriff, Lernsequenz, „polare …", „Polare und unpolare …",
+# alle richtig. Die Frage *ist* ein Name; dass dazu mehrere gleich- und ähnlich benannte
+# Knoten kommen, ist der Zweck der Identifikation, keine Überschwemmung.
 IDENT_DECKEL = 3
 
 # Bewusst so nah wie möglich an der thematischen Auswahl der Suchschicht: Gemessen
@@ -169,6 +175,8 @@ class Ergebnis:
     # Änderung am Matching thematische Anfragen mit Namensträgern überschwemmt.
     ident_n: int = 0
     thema_n: int = 0
+    # Zählt für den Deckel (siehe `ist_thematisch`).
+    thematisch: bool = False
     operatoren_top3: int = 0
     warnungen: list[str] = field(default_factory=list)
 
@@ -251,6 +259,19 @@ def _rang(
     return None
 
 
+def ist_thematisch(fall: Fall, namenstreffer: list[Treffer]) -> bool:
+    """Fragt der Fall nach einem Thema — oder nennt er einen Knoten beim Namen?
+
+    Beim Namen heißt: Einer der Namensträger trägt genau den Begriff, den die Suchschicht
+    aus der Frage herausliest (`nachschlage_begriff`, dieselbe Erkennung wie dort). Dann
+    ist ein Block von Namensträgern gewollt und zählt nicht gegen den Deckel.
+    """
+    if not fall.fach:
+        return False
+    begriff = nachschlage_begriff(fall.frage)
+    return not (begriff and any(normalisiere_titel(t.titel) == begriff for t in namenstreffer))
+
+
 def _bewerte(
     fall: Fall, index: Lauf, exakt: Lauf, produktiv: list[Treffer],
     ident_n: int, thema_n: int,
@@ -274,6 +295,7 @@ def _bewerte(
         fall=fall, index=index, exakt=exakt, produktiv=produktiv,
         nachschlagen=nachschlagen, recall=recall,
         ident_n=ident_n, thema_n=thema_n,
+        thematisch=ist_thematisch(fall, produktiv[:ident_n]),
         fach_ok=(produktiv[0].fach == fall.fach) if (fall.fach and produktiv) else None,
         rang=_rang(produktiv, fall.knoten, fall.typ),
         operatoren_top3=sum(1 for t in produktiv[:3] if t.content_type == "operator"),
@@ -332,8 +354,8 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> int:
           f"{sum(1 for e in ergebnisse if e.ident_n):>2}/{n}"
           f"   (größter Abschnitt: {max((e.ident_n for e in ergebnisse), default=0)})")
     # Wächter für AP4: Eine thematische Anfrage soll keinen großen Namensträger-Block
-    # bekommen. „Thematisch" heißt hier: Der Prüfsatz erwartet einen Fachtreffer.
-    thematische = [e for e in ergebnisse if e.fall.fach and e.ident_n]
+    # bekommen. Was „thematisch" heißt, steht an `IDENT_DECKEL`.
+    thematische = [e for e in ergebnisse if e.thematisch and e.ident_n]
     if thematische:
         groesster = max(e.ident_n for e in thematische)
         marke = "  ⚠️ Deckel gerissen" if groesster > IDENT_DECKEL else ""
@@ -350,7 +372,7 @@ def _ausgabe(ergebnisse: list[Ergebnis], top_k: int, details: bool) -> int:
           f"exakt {sum(e.exakt.ms for e in ergebnisse)/n:.0f} ms")
 
     ueber_deckel = sum(
-        1 for e in ergebnisse if e.fall.fach and e.ident_n > IDENT_DECKEL
+        1 for e in ergebnisse if e.thematisch and e.ident_n > IDENT_DECKEL
     )
 
     warnungen = [(e.fall.frage, w) for e in ergebnisse for w in e.warnungen]
@@ -582,7 +604,8 @@ async def run(faelle: list[Fall], top_k: int, details: bool, json_pfad: Path | N
                 "anker": e.fall.anker,
                 "ident_n": e.ident_n, "thema_n": e.thema_n,
                 "recall": e.recall, "fach_ok": e.fach_ok, "rang": e.rang,
-                "nachschlagen": e.nachschlagen, "operatoren_top3": e.operatoren_top3,
+                "nachschlagen": e.nachschlagen, "thematisch": e.thematisch,
+                "operatoren_top3": e.operatoren_top3,
                 "planart_index": e.index.planart, "ms_index": e.index.ms,
                 "ms_exakt": e.exakt.ms, "spanne_exakt": _spanne(e.exakt),
                 "top_exakt": [

@@ -1288,6 +1288,7 @@
                         kostenSichtbar={granularity === "message" ||
                             granularity === "both"}
                         kontextStufe={kontextAnzeige}
+                        kontextZurueck={conversationId ? `/chat?id=${conversationId}` : null}
                         costEur={granularity === "message" ||
                         granularity === "both"
                             ? kostenEinheiten(

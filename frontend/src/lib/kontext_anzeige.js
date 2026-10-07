@@ -30,8 +30,13 @@ export function kontextStufe(preferences) {
  * ⚠️ **Keine leere Zeile.** „Kontext (0)" sagte „dazu gab es keinen Kontext" — das stimmt
  * nur, wenn tatsächlich gesucht wurde, und für Antworten von vor 0.14 stimmt es nie.
  * Während des Streams auch nichts: Die Liste kommt erst nach dem Speichern.
+ *
+ * `zurueck` ist die Adresse, auf die „Zurück“ in der Detailansicht führen soll
+ * (Konvention im Wissensgraphen: `?back=`). Im Chat ist das `/chat?id=…` — **nicht** die
+ * aktuelle URL: Ein neu begonnener Chat steht dort noch als `/chat`, und das öffnete
+ * beim Zurückkehren einen leeren.
  */
-export function kontextEintraege(message, stufe, isStreaming = false) {
+export function kontextEintraege(message, stufe, isStreaming = false, zurueck = null) {
     if (stufe === "aus" || isStreaming) return null;
     const bausteine = message?.kontext ?? [];
     if (!bausteine.length) return null;
@@ -40,7 +45,9 @@ export function kontextEintraege(message, stufe, isStreaming = false) {
         // Wie der Dateiname eines Begriffs: „Oxidation (Elektronenabgabe)".
         titel: b.fassung ? `${b.title} (${b.fassung})` : b.title,
         fach: b.fach ?? null,
-        href: `/knowledge/${b.node_id}`,
+        href: zurueck
+            ? `/knowledge/${b.node_id}?back=${encodeURIComponent(zurueck)}`
+            : `/knowledge/${b.node_id}`,
         details: stufe === "ausfuehrlich" ? details(b) : [],
         // Nur ausführlich (Entscheidung Jan, 27.09.2026) — und geladen wird erst, wenn
         // die Liste aufgeklappt ist, also die Komponente steht.
