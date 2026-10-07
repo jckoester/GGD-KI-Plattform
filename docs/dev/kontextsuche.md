@@ -119,15 +119,23 @@ Vorab-Suche. Dort stehen auch die beiden Regeln, die den Text betreffen:
   auf einer Zeilengrenze, sichtbares „…". Alle anderen Arten behalten den harten Schnitt
   bei 800. Gemessen am Pilotbestand: Der Beispiel-Abschnitt erreichte das Modell vorher
   in 11 von 36 Fällen, jetzt in 30; die Bildplatzhalter in 2 von 5, jetzt in 4.
+  **Seit 0.14 (F4) hat der Kern einen eigenen Deckel** (`INHALT_MAX_ZEICHEN_KERN`, 2 500):
+  Ist er länger als das Gesamtbudget, kommt er ganz, nur ohne Beispiele. Bei 1 500
+  verloren 15 von 112 Begriffen Teile ihres Kerns, darunter Antwortrelevantes („Ein
+  Magnesiumbrand wird mit trockenem Sand abgedeckt"); die AP7-Kontextblöcke wuchsen durch
+  den Deckel um 0,5 %. Welche Kerne betroffen sind, zeigt `scripts/kern_kuerzung.py`
+  (`--text` mit dem abgeschnittenen Teil).
 
 
 Nicht alles, was an einem Knoten steht, geht in den Modellkontext — und was geht, ist
-beschriftet. Entschieden wird das an **einer** Stelle, `_fuer_modell` in
-`app/chat/router.py`.
+beschriftet. Entschieden wird das an **einer** Stelle, `fuer_modell` in
+`app/context/modellsicht.py` — für beide Wege, Vorab-Suche und Werkzeug. Leere Felder
+(`None`, `""`, `[]`, `{}`) fallen dort weg (0.14, F3); bis dahin trug jeder Fachbegriff
+`"nr": null` und `"bp_version": null` in den Prompt.
 
 | Feld | Herkunft | Warum es so heißt |
 |---|---|---|
-| `content` | Knotentext, auf `_INHALT_MAX_ZEICHEN` gekürzt | Abbildungsplatzhalter werden **vor** dem Kürzen zur Beschreibung aufgelöst |
+| `content` | Knotentext, gekürzt mit `kuerze` (siehe oben) | Abbildungsplatzhalter werden **vor** dem Kürzen zur Beschreibung aufgelöst |
 | Metadaten je Typ | `MODELL_METADATA` in `taxonomy.py` | Whitelist, kein „alles Metadata“ — die Spalte trägt auch Import-Interna und ganze SVG-Dokumente |
 | `suchbegriffe` | `node_aliases` | ⚠️ **Die Beschriftung ist die Maßnahme.** Unbenannt („aliase") standen sie gleichberechtigt neben dem bevorzugten Begriff, und das Modell verwendete sie: Es antwortete „Wasserstoffbrückenbindung“, obwohl der Knoten „Wasserstoffbrücken“ heißt. Aliase sind das, **wonach gefragt wird**, auch in schiefer Form („Mol“ für die Stoffmenge) |
 | `abgrenzungen` | Kanten `related_to` mit `art: abgrenzung` | Wovon sich der Knoten unterscheidet und wodurch. Höchstens fünf je Treffer, nur **aktive** Ziele, Titel statt IDs |

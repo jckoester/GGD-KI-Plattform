@@ -16,6 +16,7 @@ ADR-017/AP1 entfallen. Die Form**prüfung**, die er brauchte, ist damit ebenfall
 from app.context.modellsicht import (
     INHALT_MAX_ZEICHEN,
     INHALT_MAX_ZEICHEN_ABSCHNITTE,
+    INHALT_MAX_ZEICHEN_KERN,
     abbildungen_aufgeloest,
     fuer_modell,
     ohne_svg,
@@ -306,15 +307,16 @@ class TestMetadataFuersModell:
         # ⚠️ Die Schnittkante hängt an der **Knotenart**: `begriff` wird seit N14
         # abschnittsweise gekürzt und hat ein größeres Budget. Der Test rechnete bis zum
         # 27.09.2026 mit 800 und prüfte danach an einem Text, der gar nicht mehr
-        # geschnitten wurde — die Zusage wäre still ungeprüft geblieben.
-        vorlauf = "A" * (INHALT_MAX_ZEICHEN_ABSCHNITTE - 10)
+        # geschnitten wurde — die Zusage wäre still ungeprüft geblieben. Seit 0.14 (F4)
+        # schneidet ein Text **ohne** Beispiele erst am Kerndeckel; dieselbe Falle.
+        vorlauf = "A" * (INHALT_MAX_ZEICHEN_KERN - 10)
         [e] = fuer_modell([self._begriff(
             {"illustrationen": [{"datei": "_Abb/x.svg", "beschreibung": "Ein Bild"}]},
             content=vorlauf + "{{abbildung:x.svg}}",
         )])
         assert "{" not in e["content"] and "}" not in e["content"]
         assert e["content"].startswith(vorlauf + "[Abbildung")
-        assert len(e["content"]) == INHALT_MAX_ZEICHEN_ABSCHNITTE + 2
+        assert len(e["content"]) == INHALT_MAX_ZEICHEN_KERN + 2
 
     def test_metadata_ohne_dict_stuerzt_nicht_ab(self):
         [e] = fuer_modell([self._begriff(None)])
@@ -472,9 +474,9 @@ class TestAbschnittsweiseKuerzung:
     def test_ueberlanger_kern_wird_trotzdem_geschnitten(self):
         """⚠️ Die Zusage lautet „Beispiele zuerst", nicht „der Kern ist heilig" — sonst
         füllte ein einzelner Baustein den halben Prompt."""
-        from app.context.modellsicht import kuerze, INHALT_MAX_ZEICHEN_ABSCHNITTE
+        from app.context.modellsicht import kuerze, INHALT_MAX_ZEICHEN_KERN
         aus = kuerze(self._knoten_text(erklaerung_laenge=4000, beispiele=3), "begriff")
-        assert len(aus) <= INHALT_MAX_ZEICHEN_ABSCHNITTE + 2
+        assert len(aus) <= INHALT_MAX_ZEICHEN_KERN + 2
         assert aus.endswith("…")
 
     def test_andere_knotenarten_behalten_den_harten_schnitt(self):
@@ -501,3 +503,84 @@ class TestAbschnittsweiseKuerzung:
         assert "[Abbildung: " in e["content"]
         assert "{" not in e["content"] and "}" not in e["content"]
         assert len(e["content"]) <= INHALT_MAX_ZEICHEN_ABSCHNITTE + 2
+
+
+class TestPromptHygiene:
+    """0.14, Schritt 5: leere Felder (F3), Bauteile (F6), Kerndeckel (F4)."""
+
+    def test_keine_leeren_felder_im_ergebnis(self):
+        """`nr` und `bp_version` kamen an jedem Fachbegriff als `null` mit (F3)."""
+        [e] = fuer_modell([_knoten(content="x", content_type="begriff", nr=None,
+                                   bp_version="", leer_liste=[], leer_dict={},
+                                   metadata={"fassung": "", "ab_klasse": 8})])
+        for schluessel, wert in e.items():
+            assert wert not in (None, "", [], {}), f"leeres Feld {schluessel!r} im Prompt"
+        assert e["ab_klasse"] == 8
+
+    def test_gesetzte_felder_bleiben_auch_null_und_falsch(self):
+        [e] = fuer_modell([_knoten(content="x", nr="3.2.1(4)", bp_version="V3", stufe_x=0,
+                                   flag=False)])
+        assert (e["nr"], e["bp_version"], e["stufe_x"], e["flag"]) == ("3.2.1(4)", "V3", 0, False)
+
+    def test_bauteil_gibt_beschreibung_und_kennung_mit_nicht_norm_und_svg(self):
+        [e] = fuer_modell([_knoten(content_type="bauteil", content="Begrenzt den Strom.",
+                                   metadata={"schaltzeichen": {
+                                       "beschreibung": "Rechteck mit zwei Anschlüssen",
+                                       "kennung": "R", "norm": "DIN EN 60617-4",
+                                       "svg": "<svg>…</svg>"}})])
+        assert e["schaltzeichen"] == {"beschreibung": "Rechteck mit zwei Anschlüssen",
+                                      "kennung": "R"}
+
+    def test_bauteil_ohne_schaltzeichen_bekommt_kein_leeres_objekt(self):
+        for metadata in ({}, {"schaltzeichen": {"norm": "X", "svg": "<svg/>"}},
+                         {"schaltzeichen": "kaputt"}):
+            [e] = fuer_modell([_knoten(content_type="bauteil", content="x",
+                                       metadata=metadata)])
+            assert "schaltzeichen" not in e, metadata
+
+
+class TestKerndeckel:
+    """Variante (b) aus F4: Der Kern darf länger sein als das Gesamtbudget — dann ganz,
+    aber ohne Beispiele; erst ab `INHALT_MAX_ZEICHEN_KERN` wird er hart geschnitten."""
+
+    def _text(self, kern_laenge, beispiele=3):
+        kern = "Definition.\n\n### Erklärung\n\n" + "E" * kern_laenge
+        if not beispiele:
+            return kern
+        return kern + "\n\n### Beispiele\n\n" + "\n".join(f"- B{i}" for i in range(beispiele))
+
+    def test_langer_kern_kommt_ganz_ohne_beispiele(self, monkeypatch):
+        from app.context import modellsicht
+        monkeypatch.setattr(modellsicht, "INHALT_MAX_ZEICHEN_KERN", 2500)
+        text = self._text(2000)
+        aus = modellsicht.kuerze(text, "begriff")
+        assert "E" * 2000 in aus
+        assert "### Beispiele" not in aus
+        assert aus.endswith("\n\n…"), "Beispiele weggelassen, aber ohne sichtbares Zeichen"
+
+    def test_langer_kern_ohne_beispiele_bekommt_kein_zeichen(self, monkeypatch):
+        from app.context import modellsicht
+        monkeypatch.setattr(modellsicht, "INHALT_MAX_ZEICHEN_KERN", 2500)
+        text = self._text(2000, beispiele=0)
+        assert modellsicht.kuerze(text, "begriff") == text
+
+    def test_ueber_dem_deckel_wird_geschnitten(self, monkeypatch):
+        from app.context import modellsicht
+        monkeypatch.setattr(modellsicht, "INHALT_MAX_ZEICHEN_KERN", 2500)
+        aus = modellsicht.kuerze(self._text(4000), "begriff")
+        assert len(aus) == 2500 + 2 and aus.endswith(" …")
+
+    def test_gemessene_kerne_kommen_ganz(self):
+        """⚠️ **Die Entscheidung, nicht die Zahl** (F4, 07.10.2026): Der längste gemessene
+        Kern (elektrophile Substitution, 2260 Zeichen) kam bei 1500 abgeschnitten im Prompt
+        an. Ohne Patch: Wer den Deckel senkt, muss diesen Test bewusst ändern."""
+        from app.context.modellsicht import kuerze
+        text = self._text(2260 - len("Definition.\n\n### Erklärung\n\n"))
+        aus = kuerze(text, "begriff")
+        assert aus.startswith(text[: text.index("### Beispiele")].rstrip())
+
+    def test_kurzer_kern_unveraendert_mit_beispielen(self, monkeypatch):
+        from app.context import modellsicht
+        monkeypatch.setattr(modellsicht, "INHALT_MAX_ZEICHEN_KERN", 2500)
+        text = self._text(200)
+        assert modellsicht.kuerze(text, "begriff") == text

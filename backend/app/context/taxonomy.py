@@ -544,6 +544,13 @@ MODELL_METADATA: Final[dict[str, tuple[str, ...]]] = {
         "nachweis",
         "fehlvorstellungen",
     ),
+    # Punktpfade holen einzelne Unterfelder (`metadata_fuers_modell`). Beschreibung und
+    # Kennzeichen („R") tragen im Gespräch; die Normnummer nicht (F6, Jan 06.10.2026).
+    # Das SVG filtert `ohne_svg` ohnehin.
+    "bauteil": (
+        "schaltzeichen.beschreibung",
+        "schaltzeichen.kennung",
+    ),
 }
 
 

@@ -401,12 +401,18 @@ Drei Regeln dazu:
 - **Gliedert der Typ seinen Text in Abschnitte, gehört er in `ABSCHNITTS_TYPEN`.**
   Sonst schneidet die Kürzung bei 800 Zeichen mitten hinein. `begriff` und
   `stoffsteckbrief` folgen `_Format.md` (Definition, „### Erklärung", „### Beispiele")
-  und werden deshalb abschnittsweise gekürzt: Kern vollständig, Beispiele nach Budget.
-  Für Typen ohne solche Gliederung ist der harte Schnitt richtig.
+  und werden deshalb abschnittsweise gekürzt: Kern vollständig (bis 2 500 Zeichen),
+  Beispiele nach Budget (1 500 insgesamt). Für Typen ohne solche Gliederung ist der harte
+  Schnitt richtig.
+- **Ein Unterfeld statt des ganzen Objekts: Punktpfad.** `"schaltzeichen.kennung"` in der
+  Whitelist holt nur dieses Unterfeld und legt es unter demselben Pfad ab — so kommt
+  `schaltzeichen.norm` nicht mit, nur weil die Kennung gebraucht wird (`bauteil`, 0.14).
 - **Ein Feld, das nicht im Feldschema steht, ist begründungspflichtig.** Ein Test
   (`test_context_taxonomy.py::TestModellMetadata`) prüft die Whitelist gegen `felder:`
   und lässt Ausnahmen nur dort zu, wo sie namentlich eingetragen sind — heute
-  `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann.
+  `stoffsteckbrief.eigenschaften`, das als verschachteltes Objekt kein Feldtyp sein kann,
+  und die beiden Unterfelder des Schaltzeichens bei `bauteil` (der Typ hat kein
+  Feldschema).
 
 ### 17. Darf der Typ ungefragt in einen Chat?
 

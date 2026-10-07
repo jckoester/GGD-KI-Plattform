@@ -71,14 +71,29 @@ def metadata_fuers_modell(content_type, metadata) -> dict:
     """
     if not isinstance(metadata, dict):
         return {}
-    erlaubt = modell_metadata_felder(content_type)
-    # Leere Werte weglassen: `"fassung": ""` an jedem Treffer ist Rauschen, und ein
-    # leeres Feld sagt dem Modell nichts, was das Fehlen nicht auch sagte.
-    return {
-        feld: ohne_svg(metadata[feld])
-        for feld in erlaubt
-        if metadata.get(feld) not in (None, "", [], {})
-    }
+    ergebnis: dict = {}
+    for feld in modell_metadata_felder(content_type):
+        # Ein Punktpfad (`schaltzeichen.kennung`) holt ein **einzelnes** Unterfeld und
+        # legt es unter demselben Pfad ab — so kommt nicht das ganze Objekt mit, nur
+        # weil ein Teil davon gebraucht wird (F6: die Norm eines Schaltzeichens nicht).
+        *eltern, blatt = feld.split(".")
+        quelle, ziel = metadata, ergebnis
+        for teil in eltern:
+            quelle = quelle.get(teil) if isinstance(quelle, dict) else None
+            ziel = ziel.setdefault(teil, {})
+        wert = quelle.get(blatt) if isinstance(quelle, dict) else None
+        # Leere Werte weglassen: `"fassung": ""` an jedem Treffer ist Rauschen, und ein
+        # leeres Feld sagt dem Modell nichts, was das Fehlen nicht auch sagte.
+        if not _leer(wert):
+            ziel[blatt] = ohne_svg(wert)
+    # Ein Elternobjekt ohne gesetztes Unterfeld bleibt hier als `{}` stehen; weg nimmt
+    # es der Leerfilter in `fuer_modell` — die eine Stelle für diese Regel.
+    return ergebnis
+
+
+def _leer(wert) -> bool:
+    """Leer heißt: ``None``, ``""``, ``[]`` oder ``{}`` — **nicht** ``0`` oder ``False``."""
+    return wert is None or (isinstance(wert, (str, list, dict)) and len(wert) == 0)
 
 
 def abbildungen_aufgeloest(inhalt: str, metadata) -> str:
@@ -130,6 +145,19 @@ ABSCHNITTS_TYPEN: tuple[str, ...] = ("begriff", "stoffsteckbrief")
 #: Hinweis, dass es dazu ein Bild gibt.
 INHALT_MAX_ZEICHEN_ABSCHNITTE = 1500
 
+#: Wie lang der **Kern** (Definition und Erklärung) eines solchen Bausteins höchstens
+#: werden darf (0.14, F4). Bis zum Gesamtbudget füllen Beispiele den Rest auf; ist der
+#: Kern länger als das Gesamtbudget, kommt er **ohne** Beispiele, aber bis zu dieser
+#: Grenze ganz.
+#:
+#: ⚠️ **Gemessen, nicht gesetzt** (07.10.2026): Bei 1500 verloren 15 von 112 Begriffen
+#: und Stoffsteckbriefen Teile ihres Kerns — darunter Antwortrelevantes: „Ein
+#: Magnesiumbrand wird mit trockenem Sand abgedeckt" (der Prompt endete bei „Ein
+#: Magnesiumbra …"), die Benennungsregel der Anionen bei „Ion", der letzte Schritt der
+#: elektrophilen Substitution. Alle 15 passen unter 2500; die Kontextblöcke der
+#: AP7-Fragen wuchsen dabei um 0,5 %.
+INHALT_MAX_ZEICHEN_KERN = 2500
+
 #: Weniger Platz als das lohnt sich für ein Beispiel nicht — ein angefangener Satz
 #: kostet Tokens und sagt nichts.
 _BEISPIEL_MINDESTPLATZ = 120
@@ -150,10 +178,10 @@ def kuerze(inhalt: str, content_type: str | None) -> str:
     :data:`INHALT_MAX_ZEICHEN` — eine Bildungsplan-Kompetenz hat keine Beispiele, die
     man schonen könnte, und liegt im Median ohnehin bei 137 Zeichen.
 
-    ⚠️ **Auch der Kern ist nicht unbegrenzt.** Wären Definition und Erklärung zusammen
-    länger als das Budget, würde ein einzelner Baustein den halben Prompt füllen; dann
-    greift derselbe harte Schnitt. Die Zusage lautet „Beispiele werden zuerst geopfert",
-    nicht „der Kern ist heilig".
+    ⚠️ **Auch der Kern ist nicht unbegrenzt.** Ist er länger als das Gesamtbudget, kommt
+    er ohne Beispiele, aber ganz — bis :data:`INHALT_MAX_ZEICHEN_KERN`. Darüber greift
+    derselbe harte Schnitt, sonst füllte ein einzelner Baustein den halben Prompt. Die
+    Zusage lautet „Beispiele werden zuerst geopfert", nicht „der Kern ist heilig".
 
     Bildbeschreibungen zählen mit: :func:`abbildungen_aufgeloest` läuft **vor** dieser
     Funktion, ihr Ergebnis ist Teil des Textes.
@@ -165,8 +193,12 @@ def kuerze(inhalt: str, content_type: str | None) -> str:
     kern = inhalt[: treffer.start()].rstrip() if treffer else inhalt.rstrip()
     beispiele = inhalt[treffer.start():].rstrip() if treffer else ""
 
+    if len(kern) >= INHALT_MAX_ZEICHEN_KERN:
+        return _hart(kern, INHALT_MAX_ZEICHEN_KERN)
     if len(kern) >= INHALT_MAX_ZEICHEN_ABSCHNITTE:
-        return _hart(kern, INHALT_MAX_ZEICHEN_ABSCHNITTE)
+        # Länger als das Gesamtbudget, kürzer als der Kerndeckel: Der Kern kommt ganz,
+        # für Beispiele bleibt kein Platz — sichtbar, damit das Modell es weiß.
+        return kern + ("\n\n…" if beispiele else "")
     if not beispiele:
         return kern
 
@@ -253,12 +285,17 @@ def fuer_modell(
         if vermerk:
             eintrag["stufe"] = vermerk
         eintrag |= metadata_fuers_modell(t.get("content_type"), t.get("metadata"))
+        # ⚠️ **Leere Felder weglassen** (0.14, F3) — an einer Stelle, für beide Wege.
+        # `nr` und `bp_version` kamen an jedem Fachbegriff als `null` mit: Rauschen, das
+        # dem Modell nichts sagt, was das Fehlen nicht auch sagte.
+        eintrag = {k: v for k, v in eintrag.items() if not _leer(v)}
         inhalt = (t.get("content") or "").strip()
         if inhalt:
             # ⚠️ **Auflösen vor dem Kürzen.** Andersherum bliebe ein halber Platzhalter
             # stehen (`{{abbildung:EN_H`). Der Preis: Eine Bildbeschreibung ist rund
-            # 200 Zeichen lang und verdrängt damit ein Viertel des Kürzungsbudgets —
-            # AP7 misst, ob 800 Zeichen für Begriffe noch reichen.
+            # 200 Zeichen lang und zählt zum Budget. Für Begriffe und Stoffsteckbriefe
+            # gilt seit N14 ein eigenes, abschnittsweises Budget (`kuerze`), seit 0.14
+            # dazu ein Deckel für den Kern (`INHALT_MAX_ZEICHEN_KERN`).
             inhalt = abbildungen_aufgeloest(inhalt, t.get("metadata"))
             eintrag["content"] = kuerze(inhalt, t.get("content_type"))
         aufbereitet.append(eintrag)

@@ -319,7 +319,15 @@ class TestModellMetadata:
     # Schlüsseln). Ungeprüft heißt nicht wertlos: Die Tabelle ist der Zweck des
     # Steckbriefs, und im Gespräch wird nach ihr gefragt. Wer hier etwas ergänzt,
     # nimmt es damit ausdrücklich von der Feldprüfung aus.
-    OHNE_FELDSCHEMA = {"stoffsteckbrief": {"eigenschaften"}}
+    #
+    # `bauteil` hat gar kein Feldschema: `schaltzeichen` ist ebenfalls ein Objekt
+    # (`beschreibung`, `kennung`, `norm`, `svg`). Freigegeben sind zwei Unterfelder
+    # (0.14, F6); den Pfad der Beschreibung nennt `taxonomy.yaml` selbst, als
+    # `embedding_enrichment`.
+    OHNE_FELDSCHEMA = {
+        "stoffsteckbrief": {"eigenschaften"},
+        "bauteil": {"schaltzeichen.beschreibung", "schaltzeichen.kennung"},
+    }
 
     def test_nur_felder_die_es_gibt(self):
         from app.context.taxonomy import MODELL_METADATA, feld_schema

@@ -12,6 +12,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   jede Person im Profil ein („Kontext zur Antwort": gar nicht, kurz, ausführlich mit
   Fundweg, Änderungsdatum und den Abbildungen der Bausteine).
 
+### Geändert
+
+- Lange Fachbegriffe erreichen den Assistenten vollständig: Definition und Erklärung bis
+  2 500 Zeichen statt bisher abgeschnitten bei 1 500.
+- Zu Bauteilen kennt der Assistent Beschreibung und Kennzeichen des Schaltzeichens.
+
 ### Migration
 
 `alembic upgrade head` führt `0083` aus: Tabelle `message_context_nodes` — je Antwort die
