@@ -42,6 +42,18 @@ fi
 
 PYTHON="$WURZEL/backend/venv/bin/python"
 
+# ⚠️ **Kein Bytecode aus dem Arbeitsbaum.** Python hält eine `.pyc` für gültig, wenn
+# Änderungszeit (auf die Sekunde) und Größe der Quelle stimmen. Wird eine Datei für eine
+# Gegenprobe gebrochen und in derselben Sekunde zurückkopiert — und hat die Änderung die
+# Länge nicht verändert (`max` → `min`) —, liest der nächste Lauf den gebrochenen Stand
+# aus dem Cache. Passiert am 23.09. und 07.10.2026; das zweite Mal war dieser Prüflauf
+# rot gegen einen korrekten Quelltext. `PYTHONDONTWRITEBYTECODE` hilft dagegen **nicht**
+# (es verhindert nur das Schreiben, nachgestellt 07.10.); ein eigenes, leeres Cache-
+# Verzeichnis je Lauf schon — auch pytest legt seine umgeschriebenen Tests dort ab.
+PYCACHE="$(mktemp -d)"
+export PYTHONPYCACHEPREFIX="$PYCACHE"
+trap 'rm -rf "$PYCACHE"' EXIT
+
 if [ ! -x "$PYTHON" ]; then
   echo "${ROT}Keine virtuelle Umgebung unter backend/venv.${AUS}" >&2
   echo "Anlegen: siehe docs/dev/dev-setup.md, Abschnitt „Backend“." >&2
