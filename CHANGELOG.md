@@ -5,13 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.14.0] – 2026-10-07
+
+Unter jeder Antwort steht, welche Bausteine aus dem Wissensspeicher dabei vorlagen; der
+Assistent bekommt lange Fachbegriffe vollständig, und neu importierte findet er sofort.
+Eine Migration, keine neue Konfiguration — nach dem Update aber einmal
+`fachbegriffe_namen_reparieren.py` (unten).
+
 ### Neu
 
 - Unter einer Antwort im Chat steht „Kontext (n)": aufgeklappt die Bausteine, die beim
   Antworten vorlagen, mit Link und Fach — auch nach dem Neuladen; „Zurück" führt vom
-  Baustein in den Chat. Wie ausführlich, stellt
-  jede Person im Profil ein („Kontext zur Antwort": gar nicht, kurz, ausführlich mit
-  Fundweg, Änderungsdatum und den Abbildungen der Bausteine).
+  Baustein in den Chat. Wie ausführlich, stellt jede Person im Profil ein („Kontext zur
+  Antwort": gar nicht, kurz, ausführlich mit Fundweg, Änderungsdatum und den Abbildungen
+  der Bausteine).
 
 ### Geändert
 
@@ -38,7 +45,9 @@ verloren, die Antworten bleiben.
 ### Nach dem Update
 
 Einmal die Fachbegriffe reparieren, die ein Zip-Import mit falsch gelesenen Dateinamen
-angelegt hat — **vor** dem nächsten Fachbegriffe-Import:
+angelegt hat — **vor** dem nächsten Fachbegriffe-Import und erst nach `up -d` (das Skript
+liegt im neuen Image). Meldet es eine Kollision, endet es mit Exit-Code 1 und nennt beide
+Knoten:
 
 ```bash
 docker compose exec backend python scripts/fachbegriffe_namen_reparieren.py --dry-run
