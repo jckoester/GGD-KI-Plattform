@@ -19,7 +19,12 @@
     import { renderInlineMath, renderMarkdown } from "$lib/markdown.js";
     import { renderDiagrams } from "$lib/diagrams.js";
     import { renderServerBlocks } from "$lib/serverRender.js";
-    import { fuelleAbbildungen, ohneEinbettung } from "$lib/abbildungen.js";
+    import {
+        SCHALTZEICHEN,
+        alleAbbildungen as abbildungenDes,
+        fuelleAbbildungen,
+        ohneEinbettung,
+    } from "$lib/abbildungen.js";
     import { feldSchema } from "$lib/collections.js";
     import { user } from "$lib/stores/user.js";
     import { subjectMap } from "$lib/stores/subjects.js";
@@ -186,17 +191,11 @@
     // deshalb umschließt `inhaltWurzel` beide Bereiche.
     const illustrationen = $derived(node?.metadata?.illustrationen ?? []);
 
-    // Ein Schaltzeichen ist eine Abbildung wie jede andere, nur ohne Datei. Der
-    // Pseudoname hängt es an denselben Renderer, statt einen zweiten zu bauen.
-    const SCHALTZEICHEN = "schaltzeichen";
+    // Illustrationen und — bei einem Bauteil — das Schaltzeichen. Die Regel steht in
+    // `$lib/abbildungen.js`, weil die Kontextliste im Chat dieselbe braucht.
+    const alleAbbildungen = $derived(abbildungenDes(node));
     const schaltzeichen = $derived(
-        node?.content_type === "bauteil" && node?.metadata?.schaltzeichen?.svg
-            ? { ...node.metadata.schaltzeichen, datei: SCHALTZEICHEN }
-            : null,
-    );
-
-    const alleAbbildungen = $derived(
-        schaltzeichen ? [...illustrationen, schaltzeichen] : illustrationen,
+        alleAbbildungen.find((abb) => abb.datei === SCHALTZEICHEN) ?? null,
     );
 
     // Abbildungen, die im Text nicht vorkommen — sie stehen am Ende, statt zu fehlen.

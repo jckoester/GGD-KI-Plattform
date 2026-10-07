@@ -128,6 +128,31 @@ class KontextBaustein(BaseModel):
     herkunft: str
     aehnlichkeit: float | None = None
     updated_at: datetime | None = None
+    #: Ob der Knoten Abbildungen trägt (Schritt 4). Die SVGs selbst holt die Oberfläche
+    #: erst beim Aufklappen über `GET /context/nodes/{id}` — mitgeschickt wöge eine
+    #: Konversation beim Neuladen schnell Megabytes: Ein Knoten mit Abbildungen trägt im
+    #: Mittel 36 KB SVG, bis 126 KB (Dev, 07.10.2026; die meisten Antworten haben
+    #: Bausteine).
+    hat_abbildungen: bool = False
+
+
+_ILLUSTRATIONEN = ContextNode.metadata_["illustrationen"]
+
+#: Wie in der Detailansicht: `illustrationen`, bei einem Bauteil dazu das Schaltzeichen.
+#: ⚠️ ``CASE`` statt ``AND``: `illustrationen` ist nicht validiert; `jsonb_array_length`
+#: auf etwas anderem als einem Array bräche die ganze Abfrage ab, und die Reihenfolge
+#: der Glieder eines ``AND`` legt Postgres selbst fest.
+_HAT_ABBILDUNGEN = sa.or_(
+    sa.case(
+        (sa.func.jsonb_typeof(_ILLUSTRATIONEN) == "array",
+         sa.func.jsonb_array_length(_ILLUSTRATIONEN) > 0),
+        else_=False,
+    ),
+    sa.and_(
+        ContextNode.content_type == "bauteil",
+        ContextNode.metadata_["schaltzeichen"]["svg"].astext.is_not(None),
+    ),
+)
 
 
 async def kontext_der_nachrichten(
@@ -158,6 +183,7 @@ async def kontext_der_nachrichten(
             MessageContextNode.herkunft,
             MessageContextNode.aehnlichkeit,
             ContextNode.updated_at,
+            _HAT_ABBILDUNGEN,
         )
         .join(ContextNode, ContextNode.id == MessageContextNode.node_id)
         .outerjoin(Subject, Subject.id == ContextNode.subject_id)
@@ -167,9 +193,10 @@ async def kontext_der_nachrichten(
     )).all()
     ergebnis: dict[UUID, list[KontextBaustein]] = {}
     for (message_id, node_id, titel, fassung, typ, fach, herkunft, aehnlichkeit,
-         geaendert) in zeilen:
+         geaendert, abbildungen) in zeilen:
         ergebnis.setdefault(message_id, []).append(KontextBaustein(
             node_id=node_id, title=titel, fassung=fassung or None, content_type=typ,
             fach=fach, herkunft=herkunft, aehnlichkeit=aehnlichkeit, updated_at=geaendert,
+            hat_abbildungen=bool(abbildungen),
         ))
     return ergebnis

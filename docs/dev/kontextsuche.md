@@ -275,6 +275,14 @@ nach dem Neuladen **dieselbe** Abfrage: Der Stream schickt nach dem Speichern da
   `ausfuehrlich`, Vorgabe `kurz`) allein im Frontend (`$lib/kontext_anzeige.js`).
   `ausfuehrlich` ist zugleich das Diagnosewerkzeug für die Vorab-Suche: Fundweg (vorab /
   vom Assistenten nachgeschlagen), Ähnlichkeit oder „über den Namen".
+- **Abbildungen** (nur `ausfuehrlich`): Die Liste trägt nur `hat_abbildungen`; die SVGs
+  holt die Oberfläche erst beim Aufklappen über `GET /context/nodes/{id}`, einmal je
+  Knoten und Seitenaufruf (`ladeAbbildungen`). Mitgeschickt wöge eine Konversation beim
+  Neuladen schnell Megabytes — ein Knoten mit Abbildungen trägt im Mittel 36 KB SVG, bis
+  126 KB (Dev, 07.10.2026). Gesetzt werden sie von `fuelleAbbildungen`, also sanitisiert wie
+  in der Detailansicht; welche Abbildungen ein Knoten hat (Illustrationen, beim Bauteil das
+  Schaltzeichen), sagt `alleAbbildungen` in `$lib/abbildungen.js` — dieselbe Regel steht als
+  SQL in `bausteine._HAT_ABBILDUNGEN`.
 
 ---
 

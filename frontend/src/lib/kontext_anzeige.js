@@ -5,13 +5,15 @@
  * „Kontext" und nicht „Quellen" (Entscheidung Jan, 27.09.2026). Wie ausführlich, wählt
  * jede Person im Profil (`kontext_anzeige`), nicht die Rolle — wie bei der Kostenanzeige.
  */
+import { getContextNode } from "./api.js";
+import { HUELLE, alleAbbildungen, fuelleAbbildungen } from "./abbildungen.js";
 
 export const KONTEXT_VORGABE = "kurz";
 
 export const kontextStufenOptionen = [
     { value: "aus", label: "Gar nicht" },
     { value: "kurz", label: "Kurz: Titel und Fach" },
-    { value: "ausfuehrlich", label: "Ausführlich: dazu Fundweg und Änderungsdatum" },
+    { value: "ausfuehrlich", label: "Ausführlich: dazu Fundweg, Datum und Abbildungen" },
 ];
 
 const STUFEN = kontextStufenOptionen.map((o) => o.value);
@@ -40,6 +42,9 @@ export function kontextEintraege(message, stufe, isStreaming = false) {
         fach: b.fach ?? null,
         href: `/knowledge/${b.node_id}`,
         details: stufe === "ausfuehrlich" ? details(b) : [],
+        // Nur ausführlich (Entscheidung Jan, 27.09.2026) — und geladen wird erst, wenn
+        // die Liste aufgeklappt ist, also die Komponente steht.
+        abbildungen: stufe === "ausfuehrlich" && !!b.hat_abbildungen,
     }));
 }
 
@@ -65,4 +70,55 @@ function tag(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
     return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// ── Abbildungen (Schritt 4) ─────────────────────────────────────────────────
+
+const geladen = new Map();
+
+/**
+ * Die Abbildungen eines Bausteins, die sich zeigen lassen (mit SVG) — einmal je Knoten
+ * und Seitenaufruf geholt. Wer dieselbe Liste auf- und zuklappt oder denselben Baustein
+ * unter zwei Antworten hat, löst keine zweite Anfrage aus.
+ *
+ * Ein Fehler (Knoten inzwischen weg, Netz) heißt „keine Abbildungen" und wird nicht
+ * gemerkt: Beim nächsten Aufklappen wird es noch einmal versucht.
+ */
+export function ladeAbbildungen(nodeId, holen = getContextNode) {
+    if (!geladen.has(nodeId)) {
+        geladen.set(nodeId, holen(nodeId)
+            .then((node) => alleAbbildungen(node).filter((abb) => abb?.svg))
+            .catch(() => {
+                geladen.delete(nodeId);
+                return [];
+            }));
+    }
+    return geladen.get(nodeId);
+}
+
+/** Nur für Tests: den Zwischenspeicher leeren. */
+export function vergiss() {
+    geladen.clear();
+}
+
+/**
+ * Die Abbildungen unter `wurzel` setzen — je eine Hülle, gefüllt von derselben Funktion
+ * wie in der Detailansicht (`fuelleAbbildungen`).
+ *
+ * ⚠️ **Nicht selbst `innerHTML` setzen.** Das SVG stammt aus einem Vault und ist
+ * ungeprüft; die Sanitisierung steckt in `fuelleAbbildungen`, und nur dort — eine
+ * zweite Stelle mit eigenem DOMPurify-Profil wäre die Drift, vor der `abbildungen.js`
+ * warnt (Phase 17: eine eigene `ALLOWED_URI_REGEXP` strich das `d`-Attribut).
+ */
+export function zeigeAbbildungen(wurzel, abbildungen) {
+    if (!wurzel) return;
+    wurzel.replaceChildren(
+        ...(abbildungen ?? []).map((abb) => {
+            const huelle = document.createElement("span");
+            huelle.className = HUELLE;
+            huelle.dataset.datei = abb.datei;
+            return huelle;
+        }),
+    );
+    fuelleAbbildungen(wurzel, abbildungen);
 }

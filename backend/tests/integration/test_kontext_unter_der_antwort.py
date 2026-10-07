@@ -32,8 +32,8 @@ async def antwort(async_engine):
         await s.flush()
         ids["fach"] = fach.id
 
-        def knoten(titel, **extra):
-            return ContextNode(category="concept", content_type="begriff", title=titel,
+        def knoten(titel, content_type="begriff", **extra):
+            return ContextNode(category="concept", content_type=content_type, title=titel,
                                content="Text.", read_scope="school", write_scope="school",
                                status="active", **extra)
 
@@ -41,11 +41,17 @@ async def antwort(async_engine):
         # Datenbank sonst liefern könnte: Nach node_id und in jeder Einfügereihenfolge
         # (Knoten wie Verweise) kommt `ohne_fach` zuerst, nach `position` `mit_fach`.
         klein, gross = sorted([uuid4(), uuid4()])
-        ohne_fach = knoten("Kontextprobe Wasser", id=klein)
+        # `illustrationen` ist nicht validiert — eine kaputte Angabe darf die Abfrage nicht
+        # abbrechen, sie heißt nur „keine Abbildungen".
+        ohne_fach = knoten("Kontextprobe Wasser", id=klein,
+                           metadata_={"illustrationen": {"kaputt": True}})
         mit_fach = knoten("Kontextprobe Oxidation", subject_id=fach.id, id=gross,
-                          metadata_={"fassung": "Elektronenabgabe"})
+                          metadata_={"fassung": "Elektronenabgabe", "illustrationen": [
+                              {"datei": "_Abb/ox.svg", "svg": "<svg/>"}]})
         fremd_privat = knoten("Kontextprobe Geheim")
-        for k in (ohne_fach, mit_fach, fremd_privat):
+        bauteil = knoten("Kontextprobe Widerstand", content_type="bauteil",
+                         metadata_={"schaltzeichen": {"svg": "<svg/>", "kennung": "R"}})
+        for k in (ohne_fach, mit_fach, fremd_privat, bauteil):
             s.add(k)
             await s.flush()
 
@@ -67,6 +73,8 @@ async def antwort(async_engine):
                                herkunft=VORAB, aehnlichkeit=0.616),
             MessageContextNode(message_id=antwort.id, node_id=fremd_privat.id, position=2,
                                herkunft=VORAB),
+            MessageContextNode(message_id=antwort.id, node_id=bauteil.id, position=3,
+                               herkunft=WERKZEUG),
         ):
             s.add(verweis)
             await s.flush()
@@ -77,7 +85,8 @@ async def antwort(async_engine):
         fremd_privat.owner_pseudonym = "jemand-anderes"
         await s.commit()
         ids.update(konv=konv.id, frage=frage.id, antwort=antwort.id, ohne=ohne.id,
-                   mit_fach=mit_fach.id, ohne_fach=ohne_fach.id, fremd=fremd_privat.id)
+                   mit_fach=mit_fach.id, ohne_fach=ohne_fach.id, fremd=fremd_privat.id,
+                   bauteil=bauteil.id)
 
     yield ids
 
@@ -93,14 +102,17 @@ async def test_liste_in_gespeicherter_reihenfolge_mit_fach_und_datum(db_session,
         db_session, [antwort["antwort"], antwort["ohne"]], TEACHER1_PSEUDO, ["teacher"],
     )
     liste = ergebnis[antwort["antwort"]]
-    assert [b.node_id for b in liste] == [antwort["mit_fach"], antwort["ohne_fach"]]
-    erster, zweiter = liste
+    assert [b.node_id for b in liste] == [
+        antwort["mit_fach"], antwort["ohne_fach"], antwort["bauteil"]]
+    erster, zweiter, dritter = liste
     assert (erster.title, erster.fassung, erster.fach, erster.herkunft) == (
         "Kontextprobe Oxidation", "Elektronenabgabe", "Kontextprobe-Chemie", VORAB)
     assert erster.aehnlichkeit == pytest.approx(0.616)
     assert erster.updated_at is not None
     assert (zweiter.fassung, zweiter.fach, zweiter.herkunft, zweiter.aehnlichkeit) == (
         None, None, WERKZEUG, None)
+    # Abbildungen: Illustration ja · kaputte Angabe nein · Schaltzeichen eines Bauteils ja.
+    assert [b.hat_abbildungen for b in liste] == [True, False, True]
     # Eine Antwort ohne Bausteine fehlt — sie bekommt keine (leere) Liste.
     assert antwort["ohne"] not in ergebnis
 
@@ -128,9 +140,11 @@ async def test_neuladen_liefert_die_liste_an_der_antwort(test_client, auth_heade
     nachrichten = {m["id"]: m for m in resp.json()["messages"]}
 
     liste = nachrichten[str(antwort["antwort"])]["kontext"]
-    assert [b["node_id"] for b in liste] == [str(antwort["mit_fach"]), str(antwort["ohne_fach"])]
+    assert [b["node_id"] for b in liste] == [
+        str(antwort["mit_fach"]), str(antwort["ohne_fach"]), str(antwort["bauteil"])]
+    # Nur das Kennzeichen, nie die SVGs selbst — die holt die Oberfläche beim Aufklappen.
     assert set(liste[0]) == {"node_id", "title", "fassung", "content_type", "fach",
-                             "herkunft", "aehnlichkeit", "updated_at"}
+                             "herkunft", "aehnlichkeit", "updated_at", "hat_abbildungen"}
     assert liste[0]["fach"] == "Kontextprobe-Chemie"
     assert nachrichten[str(antwort["ohne"])]["kontext"] == []
     assert nachrichten[str(antwort["frage"])]["kontext"] == []

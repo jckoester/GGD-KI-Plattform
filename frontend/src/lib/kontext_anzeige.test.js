@@ -56,11 +56,19 @@ describe("kontextEintraege", () => {
         ]);
     });
 
+    it("Abbildungen nur ausführlich und nur bei Bausteinen, die welche haben", () => {
+        const mit = { kontext: [{ ...OXIDATION, hat_abbildungen: true }, NAME] };
+        expect(kontextEintraege(mit, "kurz").map((e) => e.abbildungen)).toEqual([false, false]);
+        expect(kontextEintraege(mit, "ausfuehrlich").map((e) => e.abbildungen)).toEqual([
+            true, false,
+        ]);
+    });
+
     it("kurz: Titel, Fach und Link — keine Details", () => {
         const [erster, , dritter] = kontextEintraege(antwort, "kurz");
         expect(erster).toEqual({
             node_id: "n1", titel: "Oxidation", fach: "Chemie", href: "/knowledge/n1",
-            details: [],
+            details: [], abbildungen: false,
         });
         expect(dritter.fach).toBeNull();
     });

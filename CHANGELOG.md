@@ -10,7 +10,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Unter einer Antwort im Chat steht „Kontext (n)": aufgeklappt die Bausteine, die beim
   Antworten vorlagen, mit Link und Fach — auch nach dem Neuladen. Wie ausführlich, stellt
   jede Person im Profil ein („Kontext zur Antwort": gar nicht, kurz, ausführlich mit
-  Fundweg und Änderungsdatum).
+  Fundweg, Änderungsdatum und den Abbildungen der Bausteine).
 
 ### Migration
 

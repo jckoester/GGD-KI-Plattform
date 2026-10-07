@@ -3,6 +3,7 @@
     // dasteht, entscheidet `kontextEintraege` in `$lib/kontext_anzeige.js`. Titel mit
     // Formeln wie in `ContextNodeLabel` — `renderInlineMath` maskiert den Rest.
     import { renderInlineMath } from "$lib/markdown.js";
+    import KontextAbbildungen from "./KontextAbbildungen.svelte";
 
     let { eintraege } = $props();
 </script>
@@ -14,6 +15,9 @@
             {#if e.fach}<span> · {e.fach}</span>{/if}
             {#if e.details.length}
                 <span class="block pl-3">{e.details.join(' · ')}</span>
+            {/if}
+            {#if e.abbildungen}
+                <KontextAbbildungen nodeId={e.node_id} />
             {/if}
         </li>
     {/each}

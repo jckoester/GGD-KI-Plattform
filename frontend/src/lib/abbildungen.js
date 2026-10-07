@@ -68,6 +68,25 @@ export function intrinsischeBreite(svg) {
     return kasten.length === 4 && breite > 0 ? breite : null;
 }
 
+/** Pseudoname des Schaltzeichens: Es ist eine Abbildung wie jede andere, nur ohne
+ *  Datei — der Name hängt es an denselben Renderer, statt einen zweiten zu bauen. */
+export const SCHALTZEICHEN = 'schaltzeichen';
+
+/**
+ * Alle Abbildungen eines Knotens: `illustrationen`, bei einem Bauteil dazu das
+ * Schaltzeichen. Eine Regel für die Detailansicht und die Kontextliste im Chat.
+ * (Dieselbe steht als SQL in `app/context/bausteine.py`, `_HAT_ABBILDUNGEN`.)
+ */
+export function alleAbbildungen(node) {
+    const illustrationen = Array.isArray(node?.metadata?.illustrationen)
+        ? node.metadata.illustrationen
+        : [];
+    const schaltzeichen = node?.content_type === 'bauteil' && node?.metadata?.schaltzeichen?.svg
+        ? { ...node.metadata.schaltzeichen, datei: SCHALTZEICHEN }
+        : null;
+    return schaltzeichen ? [...illustrationen, schaltzeichen] : illustrationen;
+}
+
 /** Nur der Dateiname, nie der Pfad: Im Vault steht im Text die bare Form
  *  (`EN_H2O.svg`), im Frontmatter eine Pfadangabe (`_Abb/EN_H2O.svg`). */
 export function dateiname(pfad) {
