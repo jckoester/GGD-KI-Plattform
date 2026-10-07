@@ -6,7 +6,7 @@ from uuid import UUID, UUID as UUIDType
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint, event, text, TIMESTAMP, Text, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY as PGARRAY
-from sqlalchemy import Numeric, Boolean, BigInteger, Float, SmallInteger
+from sqlalchemy import Numeric, Boolean, BigInteger, Float, SmallInteger, case
 from pgvector.sqlalchemy import Vector
 
 import enum
@@ -579,6 +579,23 @@ class Message(Base):
         Index("idx_messages_assistant_id", "assistant_id"),
         Index("idx_messages_created_at", "created_at"),
     )
+
+
+#: Die Reihenfolge eines Gesprächs — für **jede** Abfrage, die Nachrichten in Folge
+#: braucht: `.order_by(*NACHRICHTEN_FOLGE)`.
+#:
+#: ⚠️ **`created_at` allein ist mehrdeutig.** Frage und Antwort eines Zuges entstehen in
+#: einer Transaktion (`_persist`), und `now()` ist in PostgreSQL deren **Beginn** — beide
+#: tragen denselben Zeitstempel. Bei Gleichstand lieferte die Datenbank die Folge, die
+#: ihr Abfrageplan zufällig ergab. Am 07.10.2026 kippte der Plan des Chat-Ladewegs auf
+#: einen Hash Right Join (Statistiken nach vielen Messläufen): Er gibt die Nachrichten mit
+#: Assistent zuerst aus, und jede Antwort stand über ihrer Frage. Innerhalb eines
+#: Zeitpunkts kommt deshalb die Frage zuerst — das gilt auch für den ganzen Bestand,
+#: ohne Migration.
+NACHRICHTEN_FOLGE = (
+    Message.created_at.asc(),
+    case((Message.role == "user", 0), else_=1),
+)
 
 
 # 6b. generated_images (Phase 16 — Bildgenerierung)

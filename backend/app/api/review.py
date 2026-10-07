@@ -24,6 +24,7 @@ from app.db.models import (
     ConversationAccessRequest,
     ConversationFlag,
     Message,
+    NACHRICHTEN_FOLGE,
 )
 from app.config import settings
 from app.core.client_ip import client_ip
@@ -256,7 +257,7 @@ async def _build_reader_payload(
         await db.execute(
             select(Message)
             .where(Message.conversation_id == req.conversation_id)
-            .order_by(Message.created_at.asc())
+            .order_by(*NACHRICHTEN_FOLGE)
         )
     ).scalars().all()
 

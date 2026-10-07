@@ -18,7 +18,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Conversation, Message
+from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message
 
 # Genug, um einen Fehler im Verlauf zu verstehen; wenig genug, dass der Anhang kein
 # Zweitarchiv der Chathistorie wird.
@@ -63,11 +63,12 @@ async def lade(db: AsyncSession, conversation_id: UUID, pseudonym: str) -> dict 
     # `now()` ist in PostgreSQL die **Transaktionszeit**, zwei im selben Zug
     # geschriebene Nachrichten tragen denselben Zeitstempel. Ein `LIMIT` auf einer
     # mehrdeutigen Sortierung schnitte dann willkürlich mitten in ein Paar. Eine
-    # Konversation hat höchstens einige hundert Zeilen — das trägt.
+    # Konversation hat höchstens einige hundert Zeilen — das trägt. Die Sortierung
+    # selbst ist seit 07.10.2026 eindeutig (`NACHRICHTEN_FOLGE`).
     ergebnis = await db.execute(
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
+        .order_by(*NACHRICHTEN_FOLGE)
     )
     nachrichten = list(ergebnis.scalars().all())[-GEKUERZT_AUF:]
     return baue(konversation, nachrichten)

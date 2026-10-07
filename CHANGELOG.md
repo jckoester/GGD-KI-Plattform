@@ -18,6 +18,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   2 500 Zeichen statt bisher abgeschnitten bei 1 500.
 - Zu Bauteilen kennt der Assistent Beschreibung und Kennzeichen des Schaltzeichens.
 
+### Behoben
+
+- Nach dem Öffnen eines Chats stand die Antwort teils über der Frage. Dasselbe galt für die
+  Krisen-Einsicht und den Gesprächsverlauf im Feedback.
+
 ### Migration
 
 `alembic upgrade head` führt `0083` aus: Tabelle `message_context_nodes` — je Antwort die

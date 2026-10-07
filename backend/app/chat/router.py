@@ -54,7 +54,7 @@ from app.chat.image_store import (
     save_generated_image,
     unlink_paths,
 )
-from app.db.models import Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
+from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, ConversationFlag, PseudonymAudit, Assistant, Subject, Group, GroupMembership, AssistantDocument, SiteConfig, ContextNode
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
 from app.context.bausteine import (
@@ -2928,7 +2928,7 @@ async def get_conversation_messages(
         select(Message, Assistant.name.label("assistant_name"))
         .outerjoin(Assistant, Assistant.id == Message.assistant_id)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
+        .order_by(*NACHRICHTEN_FOLGE)
     )
     rows = messages_result.all()
 
