@@ -550,7 +550,9 @@ Fehleinordnung des Prüfsatzes: „Elektronenpaarbindung", „Oxidation" und „
 einen Knoten beim Namen, galten aber als thematisch, weil sie ein Fach tragen. Seitdem
 zählt nur als thematisch, wo kein Namensträger genau den Begriff trägt, den die
 Suchschicht aus der Frage liest (`nachschlage_begriff`). Ergebnis: 5 thematische Fälle,
-größter Abschnitt 2 — Exit-Code 0.
+größter Abschnitt 2 — Exit-Code 0. Nach dem Suchbegriff „Lauge" an der Neutralisation
+(Vault, 07.10.): **51/54**, die Neutralisation auf Rang 3. Rot sind wieder nur die drei
+Fälle aus dem Altbestand (Deutsch `3.4.1.1` zweimal, Informatik `3.1.2(1)`).
 
 **Für Änderungen am Prompt-Inhalt der Vorab-Suche** gibt es ein zweites Werkzeug:
 `scripts/kontextblock.py` zeigt den Kontextblock, den eine Frage in den Prompt bringt —
