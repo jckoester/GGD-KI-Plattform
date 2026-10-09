@@ -28,11 +28,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Knopf die Auswahl auf. Entwurfsansicht und ✦ öffnen den Stundenassistenten statt der
   Jahresplanung; fehlt ein passender, sagt der Chat das.
 - Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
+- Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
+  die Lehrkraft welche will.
 
 ### Behoben
 
 - Der Planungsassistent las eine Unterrichtseinheit auch dann, wenn sie zu einer fremden
   Gruppe gehörte und das Modell ihre Kennung nannte.
+- Der Assistent konnte Phasen mit ungültiger Dauer speichern (0 Minuten, Text statt Zahl);
+  er prüft jetzt nach derselben Regel wie der Planer.
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.

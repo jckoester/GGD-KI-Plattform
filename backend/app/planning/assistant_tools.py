@@ -826,6 +826,42 @@ register_tool(ChatTool(
 # ── update_lesson_phases ──────────────────────────────────────────────────────
 
 
+def _phasen_pruefen(phasen) -> tuple[list[dict] | None, str | None]:
+    """Die Phasen des Modells nach der Regel des Planers (`LessonPhaseItem`). → (Phasen, Fehler)
+
+    Bis 0.15 prüfte das Werkzeug nur `prio`; `"minimum": 1` für die Dauer stand allein im
+    Schema, als Bitte an das Modell. Ein `dauer_min: 0` oder `"zehn"` landete so in den
+    Metadaten. Jetzt gilt dasselbe wie beim Speichern im Planer: Dauer fehlt oder `null`
+    (offen) oder 1–480, Name nicht leer, bekannte Prio.
+
+    Zurück kommen die Phasen **so, wie der Planer sie speichert** (`model_dump`, alle
+    Schemafelder): Eine weggelassene Dauer steht dann als `null` da, nicht als fehlender
+    Schlüssel — zwei Wege, eine Form.
+    """
+    from app.planning.schemas import LessonPhaseItem
+
+    if not isinstance(phasen, list):
+        return None, "phasen muss eine Liste von Phasen sein"
+    geprueft: list[dict] = []
+    for nr, phase in enumerate(phasen, 1):
+        name = phase.get("name") if isinstance(phase, dict) else None
+        wo = f"Phase {nr}" + (f" („{name}“)" if name else "")
+        try:
+            item = LessonPhaseItem.model_validate(phase)
+            item.validate_prio()
+        except ValidationError as e:
+            fehler = e.errors()[0]
+            feld = ".".join(str(t) for t in fehler["loc"]) or "Phase"
+            if feld == "dauer_min":
+                return None, (f"{wo}: dauer_min muss zwischen 1 und 480 liegen — ohne Dauer "
+                              "das Feld weglassen, nie 0.")
+            return None, f"{wo}: {feld} — {fehler['msg']}"
+        except ValueError as e:
+            return None, f"{wo}: {e}"
+        geprueft.append(item.model_dump(exclude_none=False, mode="json"))
+    return geprueft, None
+
+
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node_str = _stunden_kennung(args, ctx)
     phasen = args.get("phasen")
@@ -846,13 +882,13 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     # Snapshot und Rückgängig gehören der Gruppe der Stunde, nicht der Konversation.
     group_id = node.write_scope_group_id
 
-    from app.planning.schemas import VALID_PRIOS
     from app.planning.snapshots import create_snapshot
     from datetime import datetime, timezone
 
-    for p in phasen:
-        if p.get("prio", "kern") not in VALID_PRIOS:
-            return {"error": f"Ungültige Prio: {p.get('prio')}"}
+    # Vor dem Snapshot: Ein abgewiesener Aufruf hinterlässt keinen Rückgängig-Schritt.
+    phasen, fehler = _phasen_pruefen(phasen)
+    if fehler:
+        return {"error": fehler}
 
     await create_snapshot(db, group_id, reason="assistant", created_by=ctx.user.sub)
 
@@ -930,10 +966,16 @@ register_tool(ChatTool(
         "function": {
             "name": "update_lesson_phases",
             "description": (
-                "Schreibt das Phasen-Array einer Stunde. Jede Phase kann sozialform und "
-                "methode tragen (je {typ:'text',wert} oder {typ:'node',node_id,titel}). "
+                "Schreibt das Phasen-Array einer Stunde — immer das ganze: Eine Phase, die "
+                "fehlt, ist danach gelöscht. Regeln: (1) Bestehende Phasen behalten ihre id "
+                "aus get_lesson_detail unverändert; neue Phasen ohne id. (2) dauer_min nur, "
+                "wenn die Dauer feststeht — eine Skizze ohne Minuten bleibt ohne, bis die "
+                "Lehrkraft Minuten will; dann das Feld weglassen, nie 0. (3) sozialform und "
+                "methode: Steht der Begriff im Vokabular (search_context_nodes, Arten "
+                "'sozialform' bzw. 'methode'), als {typ:'node',node_id,titel}, sonst als "
+                "{typ:'text',wert}. (4) refs nur setzen, wenn die Lehrkraft zugestimmt hat. "
                 "Gibt suggested_refs zurück: Kompetenzen aus verknüpften Material-Knoten, "
-                "die noch nicht in refs stehen. Nur nach Bestätigung durch die Lehrkraft übernehmen."
+                "die noch nicht in refs stehen — nur vorschlagen, nicht ungefragt übernehmen."
             ),
             "parameters": {
                 "type": "object",
@@ -960,14 +1002,21 @@ register_tool(ChatTool(
                                     ),
                                 },
                                 "name": {"type": "string"},
-                                "dauer_min": {"type": "integer", "minimum": 1},
+                                "dauer_min": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "description": "Minuten; weglassen, solange die Dauer offen ist.",
+                                },
                                 "beschreibung": {"type": "string"},
                                 "prio": {"type": "string", "enum": ["kern", "uebung", "vertiefung"]},
                                 "sozialform": {"type": "object"},
                                 "methode": {"type": "object"},
                                 "material": {"type": "array", "items": {"type": "object"}},
                             },
-                            "required": ["name", "dauer_min"],
+                            # `dauer_min` optional seit 0.15 (Plan F5): Eine Skizze der
+                            # Lehrkraft hat oft noch keine Minuten, und das Modell soll sie
+                            # nicht erfinden müssen.
+                            "required": ["name"],
                         },
                         "description": "Vollständiges Phasen-Array (überschreibt bestehende Phasen)",
                     },

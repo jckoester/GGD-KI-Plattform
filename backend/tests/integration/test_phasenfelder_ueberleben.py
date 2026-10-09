@@ -222,3 +222,87 @@ async def test_antwort_ohne_phasen_im_aufruf_nennt_die_gespeicherten(test_client
     assert resp.status_code == 200
     assert [p["name"] for p in resp.json()["phasen"]] == ["Einstieg", "Erarbeitung", "Sicherung"]
     assert resp.json()["stundenziel"] == ""
+
+
+# ── 0.15, Schritt 5: Skizzen ohne Dauer über das Werkzeug ────────────────────
+
+
+async def _werkzeug(async_engine, stunde, phasen):
+    from types import SimpleNamespace
+
+    from app.chat.tools import ToolContext
+    from app.planning.assistant_tools import _handle_update_lesson_phases
+
+    async with _sitzungen(async_engine)() as db:
+        ctx = ToolContext(db=db, user=SimpleNamespace(sub=TEACHER1_PSEUDO), group_id=None,
+                          conversation_id=None)
+        return await _handle_update_lesson_phases({"node_id": stunde, "phasen": phasen}, ctx)
+
+
+async def _dauern(client, h, stunde):
+    phasen = (await client.get(f"/planning/lessons/{stunde}", headers=h)).json()["phasen"]
+    return [(p["name"], p["dauer_min"]) for p in phasen]
+
+
+async def _snapshots(async_engine):
+    import sqlalchemy as sa
+
+    from app.db.models import SlotPlanSnapshot
+
+    async with _sitzungen(async_engine)() as db:
+        return (await db.execute(sa.select(sa.func.count()).select_from(SlotPlanSnapshot)
+                                 .where(SlotPlanSnapshot.group_id == GRUPPE))).scalar_one()
+
+
+@pytest.mark.asyncio
+async def test_skizze_ohne_dauer_bleibt_ohne(test_client, auth_headers, gruppe, async_engine):
+    h = auth_headers
+    slot = (await _slots(test_client, h))[10]["id"]
+    stunde = await _stunde(test_client, h, slot)
+
+    aus = await _werkzeug(async_engine, stunde, [
+        {"name": "Einstieg"},                              # weggelassen
+        {"name": "Erarbeitung", "dauer_min": None},        # ausdrücklich offen
+        {"name": "Sicherung", "dauer_min": 10},
+    ])
+    assert aus.get("ok") is True, aus
+    assert await _dauern(test_client, h, stunde) == [
+        ("Einstieg", None), ("Erarbeitung", None), ("Sicherung", 10)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dauer", [0, "zehn"])
+async def test_null_minuten_bleiben_abgewiesen(test_client, auth_headers, gruppe, async_engine, dauer):
+    """Und zwar vor dem Schreiben: kein geänderter Stand, kein Rückgängig-Schritt."""
+    h = auth_headers
+    slot = (await _slots(test_client, h))[11]["id"]
+    stunde = await _stunde(test_client, h, slot)
+    vorher = await _dauern(test_client, h, stunde)
+    snapshots = await _snapshots(async_engine)
+
+    aus = await _werkzeug(async_engine, stunde, [{"name": "Einstieg", "dauer_min": dauer}])
+    assert "dauer_min" in aus.get("error", ""), aus
+    assert await _dauern(test_client, h, stunde) == vorher
+    assert await _snapshots(async_engine) == snapshots
+
+
+@pytest.mark.asyncio
+async def test_nachbereitung_ueberlebt_die_skizze(test_client, auth_headers, gruppe, async_engine):
+    """P2 über das Werkzeug: Eine als „offen" nachbereitete Phase behält ihren Status, auch
+    wenn der Assistent sie ohne Dauer zurückschreibt."""
+    h = auth_headers
+    slot = (await _slots(test_client, h))[12]["id"]
+    stunde = await _stunde(test_client, h, slot)
+    phasen = await _phasen(test_client, h, stunde)
+    await test_client.post(f"/planning/slots/{slot}/review", headers=h,
+                           json={"phasen_status": {phasen[1]["id"]: "offen"}})
+
+    aus = await _werkzeug(async_engine, stunde, [
+        {"id": phasen[1]["id"], "name": "Erarbeitung"},
+        {"name": "Ausblick"},
+    ])
+    assert aus.get("ok") is True, aus
+    nachher = await _phasen(test_client, h, stunde)
+    assert nachher[0]["id"] == phasen[1]["id"] and nachher[0]["status"] == "offen"
+    assert nachher[0].get("dauer_min") is None
+    assert "status" not in nachher[1]
