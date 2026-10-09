@@ -25,6 +25,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ContextNode, Group, LessonSlot
+from app.planning.mein_tag import stundenbezeichnung
 from app.planning.permissions import zugang_zur_stunde
 from app.planning.student_context import _fmt_datum
 
@@ -73,11 +74,7 @@ async def bezugszeile(db: AsyncSession, stunde_id: UUID | None, user) -> str | N
     if slot is not None:
         angaben.append(_fmt_datum(slot.date))
         if slot.start_period:
-            ende = slot.start_period + slot.periods - 1
-            angaben.append(
-                f"{slot.start_period}. Stunde" if ende == slot.start_period
-                else f"{slot.start_period}.–{ende}. Stunde"
-            )
+            angaben.append(f"{stundenbezeichnung(slot.start_period, slot.periods)} Stunde")
     klammer = f" ({', '.join(angaben)})" if angaben else ""
     return (
         f"Bezugsstunde dieser Unterhaltung: „{stunde.title}“{klammer}, Kennung {stunde.id}. "

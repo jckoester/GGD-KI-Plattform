@@ -13,6 +13,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Ein Chat aus der Entwurfsansicht bezieht sich auf **diese Stunde**: Der Assistent weiß,
   um welche Stunde es geht — auch nach dem Wiederöffnen aus der Historie. Wer die Gruppe
   des Chats ändert, hebt den Bezug auf.
+- Eine Stunde **im Chat finden**: „meine Stunde morgen in der 9d" genügt. Gesucht wird nur
+  in den eigenen Unterrichtsgruppen; bei mehreren Treffern fragt der Assistent nach, einen
+  fehlenden Entwurf legt er nur nach Zustimmung an.
 
 ### Geändert
 

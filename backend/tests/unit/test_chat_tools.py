@@ -394,7 +394,7 @@ class TestWerkzeugschnitt:
     Gegen die echte Registry — so, wie der Chat sie sieht.
     """
 
-    STUNDE = {"get_lesson_detail", "update_lesson_phases"}
+    STUNDE = {"get_lesson_detail", "update_lesson_phases", "finde_stunde", "waehle_stunde"}
 
     @pytest.fixture(autouse=True)
     def _registriert(self):
@@ -434,6 +434,25 @@ def test_der_chat_reicht_die_rollen_durch():
     assert len(aufrufe) == 1
     argumente = {k.arg: ast.unparse(k.value) for k in aufrufe[0].keywords}
     assert argumente.get("rollen") == "current_user.roles"
+
+
+def test_der_chat_uebernimmt_einen_gewaehlten_bezug():
+    """`waehle_stunde` setzt Bezug und Gruppe am Werkzeugkontext (0.15, Schritt 3). Der
+    Router muss beides für die folgenden Aufrufe derselben Anfrage übernehmen — sonst
+    schriebe `update_lesson_phases` ohne Kennung in den vorigen Bezug. Die Schleife läuft
+    nur mit einem echten Modell; deshalb am Quelltext festgehalten."""
+    import ast
+    import inspect
+
+    from app.chat import router
+
+    zuweisungen = {
+        ast.unparse(knoten)
+        for knoten in ast.walk(ast.parse(inspect.getsource(router)))
+        if isinstance(knoten, ast.Assign)
+    }
+    assert "conversation_stunde_id = tool_ctx.stunde_node_id" in zuweisungen
+    assert "conversation_group_id = tool_ctx.group_id" in zuweisungen
 
 
 # ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────

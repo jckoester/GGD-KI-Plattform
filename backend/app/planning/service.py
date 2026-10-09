@@ -10,7 +10,8 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
-from app.db.models import ContextEdge, ContextNode, LessonSlot
+from app.db.models import ContextEdge, ContextNode, Group, LessonSlot
+from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 
 
@@ -279,3 +280,90 @@ async def set_slot_category(
     await db.commit()
     await db.refresh(slot)
     return slot
+
+async def entwurf_am_termin(
+    db: AsyncSession, slot: LessonSlot, user: JwtPayload
+) -> tuple[ContextNode, bool]:
+    """Der Entwurf eines Termins — angelegt, wenn es noch keinen gibt. → (Stunde, neu?)
+
+    Für `POST /planning/slots/{id}/lesson` und das Werkzeug `waehle_stunde` (0.15): Beide
+    legen **denselben** Entwurf an. Die Berechtigung prüft der Aufrufer (Lehrkraft der
+    Gruppe des Slots); hier wird nur angelegt.
+    """
+    # ⚠️ **Idempotent.** Der Aufruf hängt an einem Klick auf den Stundentitel; ein
+    # Doppelklick oder ein zweiter Tab darf keinen zweiten Entwurf erzeugen. Der Slot
+    # führt nur *einen* — der Überzählige wäre unauffindbar und bliebe für immer liegen.
+    if slot.stunde_node_id:
+        vorhanden = await db.get(ContextNode, slot.stunde_node_id)
+        if vorhanden is not None and vorhanden.status == "active":
+            return vorhanden, False
+
+    ue_node = None
+    if slot.ue_node_id:
+        kandidat = await db.get(ContextNode, slot.ue_node_id)
+        if kandidat is not None and kandidat.status == "active":
+            ue_node = kandidat
+
+    if ue_node is not None:
+        subject_id = ue_node.subject_id
+    else:
+        group = await db.get(Group, slot.group_id)
+        subject_id = group.subject_id if group else None
+
+    stunde = ContextNode(
+        category="artifact",
+        content_type="unterrichtsstunde",
+        title=(slot.thema or "").strip() or "Neue Stunde",
+        read_scope="group_teachers",
+        write_scope="group_teachers",
+        read_scope_group_id=slot.group_id,
+        write_scope_group_id=slot.group_id,
+        owner_pseudonym=user.sub,
+        subject_id=subject_id,
+        metadata_={"phasen": []},
+        status="active",
+    )
+    db.add(stunde)
+    await db.flush()
+
+    # Einordnung nur, wenn es eine Einheit gibt — sonst hängt die Stunde am Slot allein.
+    if ue_node is not None:
+        db.add(ContextEdge(
+            from_node_id=stunde.id,
+            to_node_id=ue_node.id,
+            relation="part_of",
+            metadata_={},
+        ))
+        vorgaenger = await db.execute(
+            sa.select(ContextNode)
+            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+            .where(
+                ContextEdge.to_node_id == ue_node.id,
+                ContextEdge.relation == "part_of",
+                ContextNode.content_type == "unterrichtsstunde",
+                ContextNode.status == "active",
+                ContextNode.id != stunde.id,
+            )
+            .order_by(ContextNode.created_at.desc())
+            .limit(1)
+        )
+        letzte = vorgaenger.scalar_one_or_none()
+        if letzte is not None:
+            db.add(ContextEdge(
+                from_node_id=stunde.id,
+                to_node_id=letzte.id,
+                relation="follows",
+                metadata_={},
+            ))
+
+    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
+    slot.stunde_node_id = stunde.id
+    slot.updated_at = datetime.now(timezone.utc)
+    # Heute ohne Wirkung — der Entwurf beginnt ohne Phasen. Der Aufruf steht trotzdem hier:
+    # Wer ihn einmal vorbelegt, hätte sonst Material ohne Kanten
+    # (`test_material_edges_abdeckung`).
+    await synchronisiere_materialkanten(db, stunde.id, stunde.metadata_)
+
+    await db.commit()
+    await db.refresh(stunde)
+    return stunde, True

@@ -3,7 +3,8 @@
 Registriert sich beim Import in TOOL_REGISTRY.
 Die Tools der Fähigkeit `planning` erfordern eine group_id im ToolContext. Die der
 Stundenplanung (`lesson_planning`: `get_lesson_detail`, `update_lesson_phases`,
-`get_unit_detail`) nicht — sie prüfen den Zugang an der Stunde bzw. Einheit (`_zugang`).
+`get_unit_detail`, `finde_stunde`, `waehle_stunde`) nicht — sie prüfen den Zugang an der
+Stunde, der Einheit bzw. über die eigenen Gruppen.
 Schreib-Tools erzeugen Auto-Snapshots (reason='assistant').
 """
 
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.context.stunden import als_stundenzahl
 from app.chat.tools import ChatTool, ToolContext, register_tool
+from app.planning import stunde_finden
 from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
 from app.planning.curriculum_resolver import resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
@@ -981,6 +983,127 @@ register_tool(ChatTool(
         },
     },
     handler=_handle_update_lesson_phases,
+))
+
+
+# ── finde_stunde / waehle_stunde (0.15, Schritt 3) ────────────────────────────
+#
+# Die Stunde im Chat finden, ohne die Planungsansicht (Plan F9). Was die Werkzeuge tun und
+# warum der Mitgliedschaftsfilter die Zugriffsregel ist: `app/planning/stunde_finden.py`.
+
+
+async def _handle_finde_stunde(args: dict, ctx: ToolContext) -> dict:
+    suche = stunde_finden.Suche(
+        wann=(args.get("wann") or "").strip(),
+        datum=args.get("datum"),
+        wochentag=args.get("wochentag"),
+        gruppe=args.get("gruppe"),
+        fach=args.get("fach"),
+        thema=args.get("thema"),
+    )
+    return await stunde_finden.finde_stunden(ctx.db, ctx.user.sub, suche, heute=date.today())
+
+
+register_tool(ChatTool(
+    name="finde_stunde",
+    groups=frozenset({"lesson_planning"}),
+    writes=False,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "finde_stunde",
+            "description": (
+                "Sucht Termine in den eigenen Unterrichtsgruppen der Lehrkraft — für "
+                "Anliegen wie 'meine Stunde morgen in der 9d' oder 'die Chemie-Stunde am "
+                "Donnerstag', wenn die Unterhaltung noch keine Bezugsstunde hat. Das Datum "
+                "rechnet die Plattform; gib selbst nur eines an, wenn die Lehrkraft es nennt "
+                "(dann wann='datum'). Genau ein Treffer → waehle_stunde. Mehrere → frage, "
+                "welcher gemeint ist. Keiner → sage, wonach gesucht wurde ('gesucht')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "wann": {
+                        "type": "string",
+                        "enum": list(stunde_finden.WANN),
+                        "description": (
+                            "naechste = je Gruppe der nächste Termin ab heute; morgen = der "
+                            "Kalendertag nach heute; datum = das Datum aus 'datum'."
+                        ),
+                    },
+                    "datum": {
+                        "type": "string",
+                        "description": "Nur mit wann='datum': wie genannt, z. B. '15.10.' oder '2026-10-15'.",
+                    },
+                    "wochentag": {
+                        "type": "string",
+                        "enum": list(stunde_finden.WOCHENTAGE),
+                        "description": "Nur Termine an diesem Wochentag — 'am Donnerstag' = wann 'naechste' mit 'do'.",
+                    },
+                    "gruppe": {
+                        "type": "string",
+                        "description": "Name oder Klasse der Gruppe; ein Teil genügt ('9d').",
+                    },
+                    "fach": {"type": "string", "description": "Fachname; ein Teil genügt."},
+                    "thema": {
+                        "type": "string",
+                        "description": "Stichwort aus Thema, Stundentitel oder Unterrichtseinheit.",
+                    },
+                },
+                "required": ["wann"],
+            },
+        },
+    },
+    handler=_handle_finde_stunde,
+))
+
+
+async def _handle_waehle_stunde(args: dict, ctx: ToolContext) -> dict:
+    try:
+        slot_id = UUID(str(args.get("slot_id") or ""))
+    except ValueError:
+        return {"error": "Ungültige slot_id"}
+    wahl = await stunde_finden.waehle(
+        ctx.db, ctx.user, ctx.conversation_id, slot_id, anlegen=bool(args.get("anlegen")),
+    )
+    if wahl.stunde is None:
+        return wahl.antwort
+    # Gilt sofort, nicht erst ab der nächsten Nachricht: Der Router übernimmt beides nach
+    # dem Aufruf für die folgenden Werkzeuge dieser Anfrage.
+    ctx.stunde_node_id = wahl.stunde.id
+    ctx.group_id = wahl.group_id
+    entwurf = await _handle_get_lesson_detail({"node_id": str(wahl.stunde.id)}, ctx)
+    return {**entwurf, "bezugsstunde_gesetzt": True, "neu_angelegt": wahl.neu}
+
+
+register_tool(ChatTool(
+    name="waehle_stunde",
+    groups=frozenset({"lesson_planning"}),
+    writes=True,
+    definition={
+        "type": "function",
+        "function": {
+            "name": "waehle_stunde",
+            "description": (
+                "Macht einen Termin aus finde_stunde zur Bezugsstunde dieser Unterhaltung und "
+                "liefert seinen Stundenentwurf wie get_lesson_detail. Hat der Termin noch "
+                "keinen Entwurf, legt es nur mit anlegen=true einen an — frage die Lehrkraft "
+                "vorher."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slot_id": {"type": "string", "description": "slot_id aus finde_stunde"},
+                    "anlegen": {
+                        "type": "boolean",
+                        "description": "Entwurf anlegen, falls keiner da ist — nur nach Zustimmung.",
+                    },
+                },
+                "required": ["slot_id"],
+            },
+        },
+    },
+    handler=_handle_waehle_stunde,
 ))
 
 

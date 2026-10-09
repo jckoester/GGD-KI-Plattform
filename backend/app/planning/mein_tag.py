@@ -50,6 +50,24 @@ SCHUELER_HINWEISE = {
 }
 
 
+def stundenbezeichnung(start_period: Optional[int], periods: Optional[int]) -> str:
+    """„3." oder „1.–2." — die Zeitangabe, die das System hat.
+
+    **Ohne das Wort „Stunde"** (Jan, 24.09.2026): In einer Tagesliste steht es in jeder
+    Zeile und kostet Platz, den der Titel besser braucht. Die Ordnungszahl allein ist
+    eindeutig — und ein angehängtes „h" wäre es gerade **nicht**, weil es sich als Uhrzeit
+    lesen ließe, die es hier nicht gibt.
+
+    Auch für die Werkzeuge der Stundenplanung (`stunde_finden`, `stundenbezug`) — eine
+    Schreibweise für dieselbe Angabe.
+    """
+    if start_period is None:
+        return "ohne Angabe"
+    if (periods or 1) > 1:
+        return f"{start_period}.–{start_period + periods - 1}."
+    return f"{start_period}."
+
+
 class SlotArtig(Protocol):
     """Was die Regel von einem Slot braucht — ORM-Objekt oder Attrappe."""
 
@@ -84,18 +102,8 @@ class StundeAmTag:
 
     @property
     def stundenbezeichnung(self) -> str:
-        """„3." oder „1.–2." — die Zeitangabe, die das System hat.
-
-        **Ohne das Wort „Stunde"** (Jan, 24.09.2026): In einer Tagesliste steht es in
-        jeder Zeile und kostet Platz, den der Titel besser braucht. Die Ordnungszahl
-        allein ist eindeutig — und ein angehängtes „h" wäre es gerade **nicht**, weil es
-        sich als Uhrzeit lesen ließe, die es hier nicht gibt.
-        """
-        if self.start_period is None:
-            return "ohne Angabe"
-        if self.periods > 1:
-            return f"{self.start_period}.–{self.start_period + self.periods - 1}."
-        return f"{self.start_period}."
+        """Siehe :func:`stundenbezeichnung`."""
+        return stundenbezeichnung(self.start_period, self.periods)
 
     @property
     def schueler_hinweis(self) -> Optional[str]:

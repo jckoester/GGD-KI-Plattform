@@ -87,7 +87,7 @@ from app.planning.schemas import (
     WeekPatternRead,
     WeekPatternSet,
 )
-from app.planning.service import create_unit_node, delete_unit_node, update_unit_node
+from app.planning.service import create_unit_node, delete_unit_node, entwurf_am_termin, update_unit_node
 from app.planning.reflow_service import OverhangFinding, detect_overhang
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
@@ -1031,79 +1031,8 @@ async def create_lesson_for_slot(
 
     await require_group_teacher(slot.group_id, user, db)
 
-    # ⚠️ **Idempotent.** Der Aufruf hängt an einem Klick auf den Stundentitel; ein
-    # Doppelklick oder ein zweiter Tab darf keinen zweiten Entwurf erzeugen. Der Slot
-    # führt nur *einen* — der Überzählige wäre unauffindbar und bliebe für immer liegen.
-    if slot.stunde_node_id:
-        vorhanden = await db.get(ContextNode, slot.stunde_node_id)
-        if vorhanden is not None and vorhanden.status == "active":
-            return {"id": str(vorhanden.id), "title": vorhanden.title, "neu": False}
-
-    ue_node = None
-    if slot.ue_node_id:
-        kandidat = await db.get(ContextNode, slot.ue_node_id)
-        if kandidat is not None and kandidat.status == "active":
-            ue_node = kandidat
-
-    if ue_node is not None:
-        subject_id = ue_node.subject_id
-    else:
-        group = await db.get(Group, slot.group_id)
-        subject_id = group.subject_id if group else None
-
-    stunde = ContextNode(
-        category="artifact",
-        content_type="unterrichtsstunde",
-        title=(slot.thema or "").strip() or "Neue Stunde",
-        read_scope="group_teachers",
-        write_scope="group_teachers",
-        read_scope_group_id=slot.group_id,
-        write_scope_group_id=slot.group_id,
-        owner_pseudonym=user.sub,
-        subject_id=subject_id,
-        metadata_={"phasen": []},
-        status="active",
-    )
-    db.add(stunde)
-    await db.flush()
-
-    # Einordnung nur, wenn es eine Einheit gibt — sonst hängt die Stunde am Slot allein.
-    if ue_node is not None:
-        db.add(ContextEdge(
-            from_node_id=stunde.id,
-            to_node_id=ue_node.id,
-            relation="part_of",
-            metadata_={},
-        ))
-        vorgaenger = await db.execute(
-            sa.select(ContextNode)
-            .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
-            .where(
-                ContextEdge.to_node_id == ue_node.id,
-                ContextEdge.relation == "part_of",
-                ContextNode.content_type == "unterrichtsstunde",
-                ContextNode.status == "active",
-                ContextNode.id != stunde.id,
-            )
-            .order_by(ContextNode.created_at.desc())
-            .limit(1)
-        )
-        letzte = vorgaenger.scalar_one_or_none()
-        if letzte is not None:
-            db.add(ContextEdge(
-                from_node_id=stunde.id,
-                to_node_id=letzte.id,
-                relation="follows",
-                metadata_={},
-            ))
-
-    await create_snapshot(db, slot.group_id, reason="edit", created_by=user.sub)
-    slot.stunde_node_id = stunde.id
-    slot.updated_at = datetime.now(timezone.utc)
-
-    await db.commit()
-    await db.refresh(stunde)
-    return {"id": str(stunde.id), "title": stunde.title, "neu": True}
+    stunde, neu = await entwurf_am_termin(db, slot, user)
+    return {"id": str(stunde.id), "title": stunde.title, "neu": neu}
 
 # ── GET /planning/groups/{group_id}/balance ───────────────────────────────────
 

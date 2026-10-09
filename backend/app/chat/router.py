@@ -2094,8 +2094,8 @@ async def chat(
         # gälte es dadurch als lokale Variable dieser Funktion — und das Lesen vor der
         # ersten Zuweisung endete in einem UnboundLocalError, den das `except` beim
         # Persistieren stillschweigend schluckte: Der Chat sähe normal aus, es würde nur
-        # nichts mehr gespeichert.
-        nonlocal _deployment_id
+        # nichts mehr gespeichert. Dasselbe gilt für Stundenbezug und Gruppe (unten).
+        nonlocal _deployment_id, conversation_stunde_id, conversation_group_id
 
         full_content: list[str] = []
         usage: dict = {}
@@ -2213,6 +2213,11 @@ async def chat(
                         stunde_node_id=conversation_stunde_id,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
+                    # Ein Werkzeug darf den Stundenbezug setzen (`waehle_stunde`, 0.15). Er
+                    # gilt sofort für die folgenden Aufrufe dieser Anfrage — sonst schriebe
+                    # ein Aufruf ohne Kennung noch in den vorigen Bezug.
+                    conversation_stunde_id = tool_ctx.stunde_node_id
+                    conversation_group_id = tool_ctx.group_id
                 except Exception:
                     logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
                     tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
