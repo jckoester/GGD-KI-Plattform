@@ -1070,6 +1070,12 @@ async def test_mein_tag_liefert_stundenbezeichnung_statt_uhrzeit(
         # Ohne das Wort „Stunde“ — in einer Tagesliste steht es in jeder Zeile.
         assert stunde["stunde"] == "3.–4."
         assert "uhrzeit" not in stunde
+        # Das Fach je Stunde — es entscheidet mit, welcher Stundenassistent zuerst kommt
+        # (0.15, F7).
+        with conn.cursor() as cur:
+            cur.execute("SELECT subject_id FROM groups WHERE id = 100")
+            fach = cur.fetchone()[0]
+        assert fach is not None and stunde["subject_id"] == fach
     finally:
         with conn.cursor() as cur:
             # Nur die eigene Zeile — fremde Slots dieses Tages gehören anderen Tests.

@@ -453,6 +453,8 @@ def test_der_chat_uebernimmt_einen_gewaehlten_bezug():
     }
     assert "conversation_stunde_id = tool_ctx.stunde_node_id" in zuweisungen
     assert "conversation_group_id = tool_ctx.group_id" in zuweisungen
+    # … und meldet die Änderung der Chatseite, die sonst die alte Gruppe anzeigt (Schritt 4).
+    assert "event: bezug" in inspect.getsource(router)
 
 
 # ── generate_image (Bildgenerierung Phase 16)─────────────────────────────────

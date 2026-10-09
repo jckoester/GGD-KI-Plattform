@@ -12,6 +12,7 @@ import {
     stundenZeile,
     titelAktion,
     titelText,
+    zeigtAssistent,
     zeigtTag,
     zweiteUeberschrift,
 } from "./mein_tag.js"
@@ -271,5 +272,25 @@ describe("leerSatz — Rückfalltext", () => {
         const satz = leerSatz({ grund: "kein_unterricht" }, { hatGruppen: true, hatPlanung: true })
         expect(satz).not.toMatch(/kein Unterricht/i)
         expect(satz).toContain("eingetragen")
+    })
+})
+
+
+describe("zeigtAssistent", () => {
+    const stunde = { slot_id: "s1", group_id: 3, kategorie: "unterricht" }
+
+    it("je geplanter Stunde — mit oder ohne Entwurf", () => {
+        expect(zeigtAssistent(stunde)).toBe(true)
+        expect(zeigtAssistent({ ...stunde, kategorie: "vertretung" })).toBe(true)
+    })
+
+    it("nicht, wenn sie ausfällt", () => {
+        expect(zeigtAssistent({ ...stunde, kategorie: "ausfall" })).toBe(false)
+    })
+
+    it("nicht ohne Termin oder Gruppe", () => {
+        expect(zeigtAssistent({ ...stunde, slot_id: null })).toBe(false)
+        expect(zeigtAssistent({ ...stunde, group_id: null })).toBe(false)
+        expect(zeigtAssistent(null)).toBe(false)
     })
 })

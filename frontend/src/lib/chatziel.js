@@ -23,12 +23,19 @@
  *
  * `stundeId` ist der Stundenbezug (0.15): die Kennung einer Unterrichtsstunde. Der Server
  * leitet daraus die Gruppe ab; eine mitgegebene `groupId` muss dazu passen.
+ *
+ * `assistantId` (→ `assistant_id`) und `frage` (→ `q`) liest die Chatseite seit jeher
+ * selbst; hier stehen sie, damit ein Einstieg den ganzen Pfad an einer Stelle baut.
  */
-export function neuerChatPfad({ subjectId = null, groupId = null, stundeId = null } = {}) {
+export function neuerChatPfad({
+  subjectId = null, groupId = null, stundeId = null, assistantId = null, frage = null,
+} = {}) {
   const params = new URLSearchParams();
   if (subjectId != null) params.set("subject_id", String(subjectId));
   if (groupId != null) params.set("group_id", String(groupId));
   if (stundeId != null) params.set("stunde_id", String(stundeId));
+  if (assistantId != null) params.set("assistant_id", String(assistantId));
+  if (frage) params.set("q", frage);
   const query = params.toString();
   return query ? `/chat?${query}` : "/chat";
 }

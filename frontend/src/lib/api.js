@@ -458,6 +458,21 @@ export async function* streamChat(
         continue;
       }
 
+      // Stundenbezug und Gruppe, von einem Werkzeug gesetzt (`waehle_stunde`, 0.15).
+      if (currentEventType === "bezug") {
+        try {
+          const { group_id, subject_id, stunde_node_id } = JSON.parse(payload);
+          yield {
+            type: "bezug",
+            groupId: group_id ?? null,
+            subjectId: subject_id ?? null,
+            stundeId: stunde_node_id ?? null,
+          };
+        } catch {}
+        currentEventType = null;
+        continue;
+      }
+
       // Die Bausteine, die beim Antworten vorlagen (0.14) — nach dem Speichern, vor
       // `message`. Dieselbe Liste liefert das Neuladen als `message.kontext`.
       if (currentEventType === "kontext") {

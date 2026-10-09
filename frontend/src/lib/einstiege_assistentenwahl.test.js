@@ -1,0 +1,67 @@
+/**
+ * Wächter: Jeder Einstieg wählt seinen Assistenten über `passendeAssistenten` (0.15, Plan F7).
+ *
+ * Bis 0.14 nahm jeder Planungs-Einstieg „den ersten Assistenten mit `planning`" — mit einem
+ * zweiten solchen Assistenten entschied die Sortierreihenfolge, wer antwortet. Die Regel steht
+ * jetzt an **einer** Stelle (`$lib/assistentenwahl.js`, dort mit ihren Tests); hier wird nur
+ * festgehalten, dass die Einstiege sie benutzen und keiner eine eigene Abkürzung nimmt.
+ *
+ * Quelltext statt Verhalten — aus demselben Grund wie in `picker_tastatur.test.js`: Das
+ * Projekt mountet keine Svelte-Komponenten.
+ */
+import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
+const lies = (pfad) => readFileSync(join(SRC, pfad), "utf8");
+
+const EINSTIEGE = [
+    "routes/(app)/chat/+page.svelte",
+    "routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte",
+    "lib/components/TagesKachel.svelte",
+];
+
+function svelteDateien(verzeichnis) {
+    return readdirSync(verzeichnis).flatMap((name) => {
+        const pfad = join(verzeichnis, name);
+        if (statSync(pfad).isDirectory()) return svelteDateien(pfad);
+        return name.endsWith(".svelte") ? [pfad] : [];
+    });
+}
+
+describe("Einstiege und ihr Assistent", () => {
+    it.each(EINSTIEGE)("%s wählt über passendeAssistenten", (pfad) => {
+        expect(lies(pfad)).toMatch(/passendeAssistenten\(/);
+    });
+
+    it("keine Komponente sucht selbst nach der Fähigkeit", () => {
+        // Die Checkboxen des Editors dürfen die Fähigkeit nennen — sie wählen nichts aus.
+        const abkuerzungen = svelteDateien(SRC)
+            .filter((pfad) => !pfad.endsWith("AssistantEditor.svelte"))
+            .filter((pfad) => /tool_groups\.includes\(\s*["'](lesson_)?planning["']/.test(
+                readFileSync(pfad, "utf8")))
+            .map((pfad) => relative(SRC, pfad));
+        expect(abkuerzungen).toEqual([]);
+    });
+
+    it("gewählt wird aus GET /assistants, nicht aus einer Anzeigeliste", () => {
+        // Die Entwurfsansicht und die Startseite laden die Liste selbst; die Chatseite
+        // ebenso (`loadAssistants`). Eine gefilterte oder sortierte Anzeige (Päckchen C)
+        // darf die Wahl nicht treffen.
+        for (const pfad of [
+            "routes/(app)/chat/+page.svelte",
+            "routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte",
+            "routes/(app)/welcome/+page.svelte",
+        ]) {
+            expect(lies(pfad), pfad).toMatch(/getAssistants\(\)/);
+        }
+    });
+
+    it("der geteilte Knopf zeigt den Pfeil nur bei mehr als einem Kandidaten", () => {
+        expect(lies("lib/components/AssistentenKnopf.svelte")).toMatch(
+            /\{#if kandidaten\.length > 1\}/,
+        );
+    });
+});

@@ -1640,6 +1640,8 @@ class StundeAmTagRead(BaseModel):
     # überfliegen lässt, ohne jeden Gruppennamen zu lesen.
     subject_icon: str | None
     subject_color: str | None
+    # Das Fach entscheidet mit, welcher Stundenassistent zuerst angeboten wird (0.15, F7).
+    subject_id: int | None = None
     start_period: int | None
     periods: int
     stunde: str
@@ -1703,7 +1705,7 @@ async def get_mein_tag(
     zeilen = await db.execute(
         sa.select(
             LessonSlot, Group.name, Group.display_name,
-            Subject.slug, Subject.icon, Subject.color,
+            Subject.slug, Subject.icon, Subject.color, Subject.id,
         )
         .join(Group, Group.id == LessonSlot.group_id)
         .outerjoin(Subject, Subject.id == Group.subject_id)
@@ -1711,11 +1713,11 @@ async def get_mein_tag(
     )
     slots: list[LessonSlot] = []
     namen: dict[int, str] = {}
-    faecher: dict[int, tuple[str | None, str | None, str | None]] = {}
-    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe in zeilen.all():
+    faecher: dict[int, tuple[str | None, str | None, str | None, int | None]] = {}
+    for slot, name, anzeige, fach_slug, fach_icon, fach_farbe, fach_id in zeilen.all():
         slots.append(slot)
         namen[slot.group_id] = anzeige or name
-        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe)
+        faecher[slot.group_id] = (fach_slug, fach_icon, fach_farbe, fach_id)
 
     auswahl = mein_tag_modul.waehle(slots, heute, cfg)
 
@@ -1744,9 +1746,10 @@ async def get_mein_tag(
                     slot_id=s.slot_id,
                     group_id=s.group_id,
                     gruppe=namen.get(s.group_id, ""),
-                    subject_slug=faecher.get(s.group_id, (None, None, None))[0],
-                    subject_icon=faecher.get(s.group_id, (None, None, None))[1],
-                    subject_color=faecher.get(s.group_id, (None, None, None))[2],
+                    subject_slug=faecher.get(s.group_id, (None, None, None, None))[0],
+                    subject_icon=faecher.get(s.group_id, (None, None, None, None))[1],
+                    subject_color=faecher.get(s.group_id, (None, None, None, None))[2],
+                    subject_id=faecher.get(s.group_id, (None, None, None, None))[3],
                     start_period=s.start_period,
                     periods=s.periods,
                     stunde=s.stundenbezeichnung,

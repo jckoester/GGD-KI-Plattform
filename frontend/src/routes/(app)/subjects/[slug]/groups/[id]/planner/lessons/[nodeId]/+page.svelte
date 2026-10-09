@@ -1,6 +1,8 @@
 <script>
   import { dauerZusatz } from '$lib/phasendauer.js'
   import { neuerChatPfad } from '$lib/chatziel.js'
+  import { passendeAssistenten } from '$lib/assistentenwahl.js'
+  import { user } from '$lib/stores/user.js'
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
   import {
@@ -9,6 +11,7 @@
     exportLesson,
     createReview,
     deleteReview,
+    getAssistants,
   } from '$lib/api.js'
   import {
     dateLabel,
@@ -21,6 +24,7 @@
   import LoadingBanner from '$lib/components/LoadingBanner.svelte'
   import CompetenceBar from '$lib/components/planner/CompetenceBar.svelte'
   import PhaseTable from '$lib/components/planner/PhaseTable.svelte'
+  import AssistentenKnopf from '$lib/components/AssistentenKnopf.svelte'
 
   const { data } = $props()
   const nodeId = $derived(data.nodeId)
@@ -74,6 +78,18 @@
       loading = false
     }
   }
+
+  // Die Assistenten, die diese Person benutzen darf — gewählt wird daraus (Plan F7).
+  let assistenten = $state([])
+  $effect(() => {
+    getAssistants().then((d) => { assistenten = d.items ?? [] }).catch(() => {})
+  })
+  const stundenAssistenten = $derived(
+    passendeAssistenten(assistenten, 'lesson_planning', {
+      pseudonym: $user?.pseudonym ?? null,
+      fachId: lesson?.subject_id ?? null,
+    }),
+  )
 
   $effect(() => {
     if (nodeId) {
@@ -168,9 +184,12 @@
   }
 
   // ── Assistent öffnen ─────────────────────────────────────────────────────────
-  function openAssistant() {
-    // Mit Stundenbezug (0.15): Der Assistent weiß, um welche Stunde es geht.
-    goto(neuerChatPfad({ groupId, stundeId: nodeId }))
+  // Mit Stundenbezug (0.15): Der Assistent weiß, um welche Stunde es geht. Ohne
+  // passenden Assistenten (`null`) öffnet der Chat trotzdem — und sagt, dass keiner da ist.
+  function openAssistant(assistent) {
+    goto(neuerChatPfad({
+      subjectId: lesson?.subject_id, groupId, stundeId: nodeId, assistantId: assistent?.id,
+    }))
   }
 
   // ── Verschiebe-Dialog bei offenen Phasen (UP-6 Schritt 5) ────────────────────
@@ -182,11 +201,16 @@
   }
 
   // ── Material-Erzeugung (✦ Szenario 6) ───────────────────────────────────────
+  // Derselbe Stundenassistent wie der Knopf oben, mit Bezug (Plan F7) — bis 0.14 die
+  // Jahresplanung, die von der Stunde nichts wusste.
   function openMaterialCreate(phase) {
-    const prompt = encodeURIComponent(
-      `Erstelle Material für Phase "${phase.name}"${dauerZusatz(phase.dauer_min)} im Stundenentwurf "${titel}".`
-    )
-    goto(`/chat?group_id=${groupId}&q=${prompt}`)
+    goto(neuerChatPfad({
+      subjectId: lesson?.subject_id,
+      groupId,
+      stundeId: nodeId,
+      assistantId: stundenAssistenten[0]?.id,
+      frage: `Erstelle Material für Phase "${phase.name}"${dauerZusatz(phase.dauer_min)} im Stundenentwurf "${titel}".`,
+    }))
   }
 
   // ── Slot-Label ───────────────────────────────────────────────────────────────
@@ -352,21 +376,11 @@
               </a>
             </div>
 
-            <!-- Assistent -->
-            <button
-              onclick={openAssistant}
-              class="h-8 inline-flex items-center gap-1.5 px-3 text-sm rounded-md
-                     bg-primary dark:bg-primary-dark text-white font-medium
-                     hover:opacity-90 transition-opacity"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                   stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 8v4l3 3"/>
-              </svg>
-              Assistent
-            </button>
+            <!-- Assistent — im Lesemodus nicht: Einen Bezug setzt nur, wer die Stunde
+                 bearbeiten darf (sonst 403 beim ersten Senden). -->
+            {#if !nurLesen}
+              <AssistentenKnopf kandidaten={stundenAssistenten} onwaehle={openAssistant} />
+            {/if}
 
             <!-- Nachbereiten -->
             {#if isReviewed}

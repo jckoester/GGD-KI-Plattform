@@ -248,6 +248,17 @@ export function plannerLink(s) {
 }
 
 /**
+ * Bekommt diese Stunde das Assistenten-Symbol (0.15, Plan F9)?
+ *
+ * Nicht, wenn sie ausfällt — eine Stunde zu planen, die nicht stattfindet, ist kein
+ * Anliegen, und das Symbol lüde dazu ein. Ob es überhaupt einen Stundenassistenten gibt,
+ * entscheidet die Kachel: ohne Kandidaten kein Symbol in jeder Zeile.
+ */
+export function zeigtAssistent(s) {
+    return !!s?.slot_id && !!s?.group_id && s.kategorie !== "ausfall"
+}
+
+/**
  * Der Satz über offene Gruppen-Entscheidungen — `null`, wenn keine offen sind.
  *
  * Zwei Quellen, ein Satz: Vorschläge aus dem Stundenplan und Angebote aus dem

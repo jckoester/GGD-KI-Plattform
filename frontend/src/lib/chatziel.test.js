@@ -29,6 +29,13 @@ describe('neuerChatPfad', () => {
       `/chat?group_id=3&stunde_id=${STUNDE}`,
     )
   })
+
+  it('gibt Assistent und Frage mit — so, wie die Chatseite sie liest', () => {
+    const pfad = neuerChatPfad({ stundeId: STUNDE, assistantId: 12, frage: 'Erstelle Material für „Einstieg"' })
+    const p = params(pfad.split('?')[1])
+    expect(p.get('assistant_id')).toBe('12')
+    expect(p.get('q')).toBe('Erstelle Material für „Einstieg"')
+  })
 })
 
 describe('chatVorgaben', () => {

@@ -16,11 +16,18 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine Stunde **im Chat finden**: „meine Stunde morgen in der 9d" genügt. Gesucht wird nur
   in den eigenen Unterrichtsgruppen; bei mehreren Treffern fragt der Assistent nach, einen
   fehlenden Entwurf legt er nur nach Zustimmung an.
+- Auf der **Startseite** öffnet ein Symbol je Stunde den Stundenassistenten mit Bezug; fehlt
+  der Entwurf, wird er zuerst angelegt.
 
 ### Geändert
 
 - Assistenten mit „Unterrichtsplanung" lesen und schreiben keine Stundenentwürfe mehr —
   das übernimmt die Stundenplanung.
+- Welcher Assistent sich aus der Planung öffnet, folgt einer festen Reihenfolge: eigener vor
+  fremdem, passendes Fach vor keinem vor abweichendem. Gibt es mehrere, klappt ein Pfeil am
+  Knopf die Auswahl auf. Entwurfsansicht und ✦ öffnen den Stundenassistenten statt der
+  Jahresplanung; fehlt ein passender, sagt der Chat das.
+- Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
 
 ### Behoben
 

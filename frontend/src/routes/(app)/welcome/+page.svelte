@@ -2,7 +2,7 @@
     import { goto } from '$app/navigation'
     import { MessageSquare } from 'lucide-svelte'
     import { user } from '$lib/stores/user.js'
-    import { getMeinTag, getMeinTagSchueler } from '$lib/api.js'
+    import { getAssistants, getMeinTag, getMeinTagSchueler } from '$lib/api.js'
     import {
         KEIN_NAECHSTER,
         zeigtSchuelerTag,
@@ -42,6 +42,16 @@
         laden()
             .then((d) => (tag = d))
             .catch((e) => (tagFehler = e.message))
+    })
+
+    // Für das Assistenten-Symbol je Stunde (0.15) — einmal für beide Kacheln. Fehlt die
+    // Liste, fehlt nur das Symbol.
+    let assistenten = $state([])
+    $effect(() => {
+        if (!isTeacher) return
+        getAssistants()
+            .then((d) => (assistenten = d.items ?? []))
+            .catch(() => {})
     })
 
     /**
@@ -150,7 +160,7 @@
         {#if isTeacher}
             {#if tag}
                 {#if kacheln.heute}
-                    <TagesKachel titel="Heute" tag={tag.heute} lage={lage} />
+                    <TagesKachel titel="Heute" tag={tag.heute} lage={lage} {assistenten} />
                 {/if}
                 {#if kacheln.naechster}
                     <TagesKachel
@@ -158,6 +168,7 @@
                         tag={tag.naechster}
                         lage={lage}
                         leerHinweis={tag.naechster ? null : KEIN_NAECHSTER}
+                        {assistenten}
                     />
                 {/if}
                 {#if kacheln.gruppen}

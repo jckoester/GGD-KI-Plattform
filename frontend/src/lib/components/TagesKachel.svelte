@@ -17,12 +17,19 @@
     stundenVorspann,
     titelAktion,
     titelText,
+    zeigtAssistent,
   } from "$lib/mein_tag.js"
   import { createLessonForSlot } from "$lib/api.js"
+  import { passendeAssistenten } from "$lib/assistentenwahl.js"
+  import { neuerChatPfad } from "$lib/chatziel.js"
+  import { user } from "$lib/stores/user.js"
+  import AssistentenKnopf from "$lib/components/AssistentenKnopf.svelte"
   import ErrorBanner from "$lib/components/ErrorBanner.svelte"
   import SubjectIcon from "$lib/components/SubjectIcon.svelte"
 
-  let { titel, tag, lage = {}, leerHinweis = null } = $props()
+  // `assistenten`: was `GET /assistants` liefert — die Startseite lädt es einmal für beide
+  // Kacheln. Leer → kein Assistenten-Symbol.
+  let { titel, tag, lage = {}, leerHinweis = null, assistenten = [] } = $props()
 
   const stunden = $derived(tag?.stunden ?? [])
 
@@ -47,6 +54,35 @@
       fehler = e.message ?? "Der Entwurf konnte nicht angelegt werden."
       legtAn = null
     }
+  }
+
+  // Die Stundenassistenten in der Reihenfolge aus F7 — das Fach der Gruppe entscheidet mit.
+  function kandidaten(s) {
+    return passendeAssistenten(assistenten, "lesson_planning", {
+      pseudonym: $user?.pseudonym ?? null,
+      fachId: s.subject_id ?? null,
+    })
+  }
+
+  // Zum Assistenten mit Stundenbezug (0.15, F9) — wie aus der Entwurfsansicht. Ohne Entwurf
+  // wird er zuerst angelegt, derselbe Weg wie beim Titel.
+  async function zumAssistenten(s, assistent) {
+    if (legtAn) return
+    let stundeId = s.stunde_node_id
+    if (!stundeId) {
+      legtAn = s.slot_id
+      fehler = null
+      try {
+        stundeId = (await createLessonForSlot(s.slot_id)).id
+      } catch (e) {
+        fehler = e.message ?? "Der Entwurf konnte nicht angelegt werden."
+        legtAn = null
+        return
+      }
+    }
+    await goto(neuerChatPfad({
+      subjectId: s.subject_id, groupId: s.group_id, stundeId, assistantId: assistent?.id,
+    }))
   }
 </script>
 
@@ -101,6 +137,19 @@
             <span class="flex-shrink-0 text-xs text-light-tx-2 dark:text-dark-tx-2">
               {hinweis.text}
             </span>
+          {/if}
+          {#if zeigtAssistent(s)}
+            {@const auswahl = kandidaten(s)}
+            {#if auswahl.length}
+              <span class="flex-shrink-0 mt-0.5">
+                <AssistentenKnopf
+                  kandidaten={auswahl}
+                  kompakt
+                  beschaeftigt={legtAn === s.slot_id}
+                  onwaehle={(a) => zumAssistenten(s, a)}
+                />
+              </span>
+            {/if}
           {/if}
         </li>
       {/each}

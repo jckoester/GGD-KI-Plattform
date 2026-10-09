@@ -28,6 +28,12 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { chatVorgaben } from "$lib/chatziel.js";
+    import {
+        einstiegsFaehigkeit,
+        FAEHIGKEIT_NAMEN,
+        passendeAssistenten,
+    } from "$lib/assistentenwahl.js";
+    import WarningBanner from "$lib/components/WarningBanner.svelte";
     import { tick } from "svelte";
     import {
         streamChat,
@@ -90,6 +96,10 @@
     let legendeOffen = $state(false);
     let availableAssistants = $state([]);
     let selectedAssistant = $state(null);
+    // Ein Einstieg suchte einen Assistenten mit dieser Fähigkeit und fand keinen (0.15).
+    let fehlendeFaehigkeit = $state(null);
+    // Erst nach dem Laden ist „keiner da" eine Auskunft — vorher nur „noch nicht da".
+    let assistentenGeladen = $state(false);
     let pickerOpen = $state(false);
     let conversationAssistant = $state(null); // Assistenten-Objekt für laufende Konversation
     let assistantSwitchHint = $state(null); // string | null
@@ -694,6 +704,13 @@
                     }
                     continue;
                 }
+                // Stundenbezug und Gruppe, von einem Werkzeug gesetzt (`waehle_stunde`, 0.15) —
+                // sonst stimmte die Fachanzeige über dem Eingabefeld erst nach dem Neuladen.
+                if (item.type === "bezug") {
+                    activeConversationGroupId.set(item.groupId);
+                    activeConversationSubjectId.set(item.subjectId);
+                    continue;
+                }
                 // Titel-Event
                 if (item.type === "title") {
                     updateConversationTitle(conversationId, item.title);
@@ -1191,12 +1208,25 @@
         }
         if (groupId !== null && !conversationId) {
             pendingGroupId = groupId;
-            if (availableAssistants.length > 0 && !selectedAssistant) {
-                const planningAssistant = availableAssistants.find(
-                    (a) => Array.isArray(a.tool_groups) && a.tool_groups.includes("planning"),
-                );
-                if (planningAssistant) selectedAssistant = planningAssistant;
-            }
+        }
+        // Nennt der Einstieg keinen Assistenten, sucht er einen nach Fähigkeit — in der
+        // festen Reihenfolge aus F7 (`$lib/assistentenwahl.js`). Bis 0.14 hieß das „der erste
+        // mit `planning`", und ein zweiter solcher Assistent machte die Wahl zum Zufall.
+        const faehigkeit = einstiegsFaehigkeit({ stundeId, groupId });
+        fehlendeFaehigkeit = null;
+        if (
+            faehigkeit &&
+            !conversationId &&
+            !$page.url.searchParams.get("assistant_id") &&
+            assistentenGeladen &&
+            !selectedAssistant
+        ) {
+            const [erster] = passendeAssistenten(availableAssistants, faehigkeit, {
+                pseudonym: $user?.pseudonym ?? null,
+                fachId: subjectId,
+            });
+            if (erster) selectedAssistant = erster;
+            else fehlendeFaehigkeit = faehigkeit;
         }
     });
 
@@ -1217,6 +1247,7 @@
         try {
             const data = await getAssistants();
             availableAssistants = data.items;
+            assistentenGeladen = true;
         } catch {
             // kein hard fail — Assistenten sind optional
         }
@@ -1285,6 +1316,13 @@
             <div class="flex items-center justify-center h-full">
                 <div class="text-center text-light-tx-2 dark:text-dark-tx-2">
                     <p class="text-lg">Womit kann ich helfen?</p>
+                    {#if fehlendeFaehigkeit && !selectedAssistant}
+                        <div class="mt-4 max-w-md text-left">
+                            <WarningBanner
+                                message={`Kein Assistent mit der Fähigkeit „${FAEHIGKEIT_NAMEN[fehlendeFaehigkeit]}“ verfügbar — dieser Chat läuft ohne Assistenten und kann ${fehlendeFaehigkeit === "lesson_planning" ? "die Stunde" : "den Plan"} nicht bearbeiten.`}
+                            />
+                        </div>
+                    {/if}
                 </div>
             </div>
         {:else}

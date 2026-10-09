@@ -2199,6 +2199,7 @@ async def chat(
                     f"data: {json.dumps({'tool': _tc_name, 'round': _round + 1})}\n\n"
                 )
 
+                _bezug_vorher = (conversation_stunde_id, conversation_group_id)
                 try:
                     args = json.loads("".join(_tc_args) or "{}")
                     tool_ctx = ToolContext(
@@ -2221,6 +2222,17 @@ async def chat(
                 except Exception:
                     logger.exception("Tool '%s' fehlgeschlagen", _tc_name)
                     tool_result = {"error": "Tool-Ausführung fehlgeschlagen"}
+
+                # Die Chatseite zeigt Fach und Gruppe über dem Eingabefeld — ohne dieses
+                # Ereignis stimmte die Anzeige nach `waehle_stunde` erst nach dem Neuladen.
+                if (conversation_stunde_id, conversation_group_id) != _bezug_vorher:
+                    _gruppe = await db.get(Group, conversation_group_id) if conversation_group_id else None
+                    _bezug = {
+                        "group_id": conversation_group_id,
+                        "subject_id": _gruppe.subject_id if _gruppe else None,
+                        "stunde_node_id": str(conversation_stunde_id) if conversation_stunde_id else None,
+                    }
+                    yield f"event: bezug\ndata: {json.dumps(_bezug)}\n\n"
 
                 # Welches Werkzeug gegriffen hat, ließ sich bisher nirgends ablesen: Das
                 # SSE-Ereignis `tool_status` trägt den Namen, wird im Frontend aber von
