@@ -1660,6 +1660,31 @@ async def assistent_fuer_chat(
     return assistant
 
 
+_KEINE_EIGENE_GRUPPE = "Gruppe nicht gefunden oder keine Mitgliedschaft"
+
+
+async def _eigene_unterrichtsgruppe(db: AsyncSession, group_id: int, pseudonym: str) -> Group | None:
+    """Die Unterrichtsgruppe, sofern die Person ihr angehört — sonst None.
+
+    ⚠️ **Jede Stelle, die einer Konversation eine Gruppe gibt, geht hier durch.** An der
+    Gruppe hängt, was ungefragt in den Prompt kommt (Block „Aktueller Unterricht",
+    `_planning_block`: Themen, Stundenziele, Klassenarbeit), und welche Werkzeuge greifen.
+    Bis 0.14 prüfte nur `PATCH /conversations`; eine neue Konversation übernahm die
+    Gruppe aus der Anfrage ungeprüft.
+    """
+    return (
+        await db.execute(
+            select(Group)
+            .join(GroupMembership, GroupMembership.group_id == Group.id)
+            .where(
+                Group.id == group_id,
+                Group.type == "teaching_group",
+                GroupMembership.pseudonym == pseudonym,
+            )
+        )
+    ).scalar_one_or_none()
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -1719,13 +1744,13 @@ async def chat(
 
         # Kontext aus Request oder Assistent ableiten
         if request.group_id is not None:
-            # group_id gesetzt: subject_id aus Gruppe ableiten
-            grp_result = await db.execute(
-                select(Group).where(Group.id == request.group_id)
-            )
-            grp = grp_result.scalar_one_or_none()
-            subject_id = grp.subject_id if grp else None
-            group_id = request.group_id
+            # group_id gesetzt: nur eine eigene Unterrichtsgruppe; subject_id aus ihr ableiten
+            grp = await _eigene_unterrichtsgruppe(db, request.group_id, current_user.sub)
+            if grp is None:
+                await client.aclose()
+                raise HTTPException(status_code=404, detail=_KEINE_EIGENE_GRUPPE)
+            subject_id = grp.subject_id
+            group_id = grp.id
         elif request.subject_id is not None:
             # Nur subject_id gesetzt (Lehrkraft: Fach-Ebene ohne Gruppe)
             subject_id = request.subject_id
@@ -2498,21 +2523,9 @@ async def update_conversation(
     if 'group_id' in request.model_fields_set:
         if request.group_id is not None:
             # Gruppe laden, Typ prüfen, Mitgliedschaft prüfen
-            grp_result = await db.execute(
-                select(Group)
-                .join(GroupMembership, GroupMembership.group_id == Group.id)
-                .where(
-                    Group.id == request.group_id,
-                    Group.type == 'teaching_group',
-                    GroupMembership.pseudonym == current_user.sub,
-                )
-            )
-            grp = grp_result.scalar_one_or_none()
+            grp = await _eigene_unterrichtsgruppe(db, request.group_id, current_user.sub)
             if grp is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Gruppe nicht gefunden oder keine Mitgliedschaft"
-                )
+                raise HTTPException(status_code=404, detail=_KEINE_EIGENE_GRUPPE)
             conversation.group_id = grp.id
             conversation.subject_id = grp.subject_id  # immer ableiten
         else:

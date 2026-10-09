@@ -20,6 +20,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Der Planungsassistent las eine Unterrichtseinheit auch dann, wenn sie zu einer fremden
   Gruppe gehörte und das Modell ihre Kennung nannte.
+- Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
+  `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
+  den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.
 
 ## [0.14.1] – 2026-10-07
 
