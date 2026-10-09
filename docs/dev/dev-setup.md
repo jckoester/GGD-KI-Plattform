@@ -272,6 +272,43 @@ npm run dev
 # /api wird automatisch an http://localhost:8000 proxied (vite.config.js)
 ```
 
+### Von anderen Geräten im Netz testen (Handy, Tablet)
+
+Standardmäßig lauscht der Dev-Server nur auf `localhost`. Mit `--host` lauscht er auf allen
+Netzwerkschnittstellen:
+
+```bash
+cd frontend
+npm run dev -- --host
+#   ➜  Local:   http://localhost:5173/
+#   ➜  Network: http://192.168.x.y:5173/   ← diese Adresse auf dem Gerät öffnen
+```
+
+Das Gerät muss im selben Netz sein (WLAN). Die eigene Adresse zeigt Vite unter „Network" an,
+sonst `ipconfig getifaddr en0` (macOS).
+
+**Nur das Frontend wird freigegeben.** Backend, LiteLLM und Postgres bleiben auf `localhost`:
+Alle Aufrufe gehen über den Vite-Proxy (`/api` → `localhost:8000`), das Gerät spricht nur mit
+Vite. Deshalb ist auch sonst nichts umzustellen:
+
+- **Anmeldung:** Die Cookies tragen in `ENVIRONMENT=development` kein `Secure`
+  (`app/auth/router.py`), sie funktionieren also über `http://` mit IP-Adresse.
+- **`FRONTEND_ORIGIN`** bleibt `http://localhost:5173`. Es steuert CORS und die Links in
+  Krisen-Benachrichtigungen; über den Proxy ist jede Anfrage same-origin, CORS greift nicht.
+- **`ALLOWED_HOSTS`** ist in Dev nicht gesetzt (`*`). Wer es lokal setzt, muss die IP
+  ergänzen — sonst antwortet das Backend mit 400.
+
+Zwei Dinge, die auffallen können:
+
+- **macOS-Firewall:** Beim ersten Start mit `--host` fragt macOS womöglich, ob `node`
+  eingehende Verbindungen annehmen darf. Ohne Zustimmung lädt die Seite auf dem Gerät nicht.
+- **Hostname statt IP** (`http://macbook.local:5173`): Vite lässt fremde Hostnamen erst zu,
+  wenn sie in `server.allowedHosts` (`vite.config.js`) stehen. Mit der IP-Adresse ist nichts
+  einzutragen.
+
+⚠️ Mit `--host` ist der Dev-Server für **jedes Gerät im Netz** erreichbar, samt
+Test-Anmeldung (`yaml_test`). Nur im eigenen WLAN so starten, nicht in fremden Netzen.
+
 ## Render-Sidecar (für Schaltpläne & PDF-Mathe)
 
 Server-Rendering (CircuiTikZ, MathJax-Mathe im PDF) läuft über einen **eigenen Node-Dienst**,

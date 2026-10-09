@@ -64,4 +64,14 @@ describe("Einstiege und ihr Assistent", () => {
             /\{#if kandidaten\.length > 1\}/,
         );
     });
+
+    it("kompakt ab zwei Kandidaten öffnet immer das Menü, nie den ersten", () => {
+        // Jan, 09.10.2026: Auf dem Telefon traf man statt des kleinen Pfeils den Hauptteil
+        // und landete ungefragt beim ersten Assistenten.
+        const quelle = lies("lib/components/AssistentenKnopf.svelte");
+        expect(quelle).toMatch(/const nurMenue = \$derived\(kompakt && kandidaten\.length > 1\)/);
+        const zweig = quelle.slice(quelle.indexOf("{#if nurMenue}"), quelle.indexOf("{:else}"));
+        expect(zweig).toMatch(/onclick=\{\(\) => \(offen = !offen\)\}/);
+        expect(zweig).not.toMatch(/waehle\(/);
+    });
 });

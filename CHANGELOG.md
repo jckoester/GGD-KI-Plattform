@@ -16,8 +16,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine Stunde **im Chat finden**: „meine Stunde morgen in der 9d" genügt. Gesucht wird nur
   in den eigenen Unterrichtsgruppen; bei mehreren Treffern fragt der Assistent nach, einen
   fehlenden Entwurf legt er nur nach Zustimmung an.
-- Auf der **Startseite** öffnet ein Symbol je Stunde den Stundenassistenten mit Bezug; fehlt
-  der Entwurf, wird er zuerst angelegt.
+- Auf der **Startseite** öffnet ein Symbol je Stunde den Stundenassistenten mit Bezug — gibt
+  es mehrere, zuerst die Auswahl. Fehlt der Entwurf, wird er zuerst angelegt.
 
 ### Geändert
 
