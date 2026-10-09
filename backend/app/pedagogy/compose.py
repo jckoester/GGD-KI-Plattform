@@ -59,16 +59,18 @@ def compose_system_content(
     assistant_system_prompt: str | None,
     disabled_augmentations: list[str] | None = None,
     stufe: int | None = None,
+    bezug: str | None = None,
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
     Reihenfolge: universelle Basis · Zielgruppen-Erweiterung · [Klassenstufe — nur
-    Schüler-Behandlung] · [Wissens-Kontext + Assistenten-Prompt] ·
+    Schüler-Behandlung] · [Bezugsstunde] · [Wissens-Kontext + Assistenten-Prompt] ·
     [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
 
     ``stufe`` steht **vor** dem Kontext, nicht darin: Sie gilt für die ganze Antwort,
-    auch wenn die Suche nichts gefunden hat.
+    auch wenn die Suche nichts gefunden hat. Für ``bezug`` (die Zeile aus
+    `app.planning.stundenbezug.bezugszeile`) gilt dasselbe — für die ganze Unterhaltung.
     """
     extension = (
         pedagogy.preambles.student_extension
@@ -84,6 +86,9 @@ def compose_system_content(
         hinweis = stufen_hinweis(stufe)
         if hinweis:
             parts.append(hinweis)
+
+    if bezug:
+        parts.append(bezug.strip())
 
     ctx = (context_str or "").strip()
     prompt = (assistant_system_prompt or "").strip()

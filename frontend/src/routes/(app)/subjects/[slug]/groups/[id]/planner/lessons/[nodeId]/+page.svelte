@@ -1,5 +1,6 @@
 <script>
   import { dauerZusatz } from '$lib/phasendauer.js'
+  import { neuerChatPfad } from '$lib/chatziel.js'
   import { goto } from '$app/navigation'
   import { page } from '$app/stores'
   import {
@@ -168,7 +169,8 @@
 
   // ── Assistent öffnen ─────────────────────────────────────────────────────────
   function openAssistant() {
-    goto(`/chat?group_id=${groupId}&node_id=${nodeId}`)
+    // Mit Stundenbezug (0.15): Der Assistent weiß, um welche Stunde es geht.
+    goto(neuerChatPfad({ groupId, stundeId: nodeId }))
   }
 
   // ── Verschiebe-Dialog bei offenen Phasen (UP-6 Schritt 5) ────────────────────

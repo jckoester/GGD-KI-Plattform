@@ -99,6 +99,8 @@
     // Pending-Kontext für neue Konversation (gesetzt per #-Shortcut vor erstem Send)
     let pendingSubjectId = $state(null);
     let pendingGroupId = $state(null);
+    // Stundenbezug (0.15) — nur aus der Adresse (`?stunde_id=`), nur für die neue Konversation.
+    let pendingStundeId = $state(null);
 
     // @-Mention State für Kontext-Knoten
     let mentionQuery = $state("");
@@ -595,6 +597,7 @@
                 false, // isTest
                 pendingSubjectId, // subjectId
                 pendingGroupId, // groupId
+                pendingStundeId, // stundeId
             )) {
                 // Start-Event mit conversationId
                 if (item.type === "start") {
@@ -671,6 +674,7 @@
                         pendingSubjectId = null;
                         pendingGroupId = null;
                     }
+                    if (wasNewConversation) pendingStundeId = null;
                     // Sidebar-Zähler aktualisieren für neue Konversation
                     if (wasNewConversation) {
                         refreshConversationCounts();
@@ -1020,7 +1024,10 @@
                 console.error("Fehler beim Fach-Zuweisen:", err);
             }
         } else {
-            // Neue Konversation: pending speichern (null → Kontext entfernen)
+            // Neue Konversation: pending speichern (null → Kontext entfernen). Ein anderer
+            // Kontext passt nicht mehr zur Stunde — der Bezug fällt weg, wie beim Server
+            // (`PATCH /conversations`).
+            pendingStundeId = null;
             pendingGroupId =
                 item == null ? null : item.type === "group" ? item.id : null;
             pendingSubjectId =
@@ -1139,6 +1146,7 @@
             subjectPickerOpen = false;
             pendingSubjectId = null;
             pendingGroupId = null;
+            pendingStundeId = null;
             contextNodes = [];
             // Bausteine, die von der Suchseite mitgegeben wurden („Neuen Chat damit
             // starten"). Einmalig — `uebernehmen()` verbraucht die Übergabe, sonst
@@ -1174,9 +1182,12 @@
     // bekam damit eine schlechtere Suche als über den Umweg „Fach von Hand wählen".
     // Was der Link schreibt und was hier gelesen wird, steht in `$lib/chatziel.js`.
     $effect(() => {
-        const { subjectId, groupId } = chatVorgaben($page.url.searchParams);
+        const { subjectId, groupId, stundeId } = chatVorgaben($page.url.searchParams);
         if (subjectId !== null && !conversationId) {
             pendingSubjectId = subjectId;
+        }
+        if (stundeId !== null && !conversationId) {
+            pendingStundeId = stundeId;
         }
         if (groupId !== null && !conversationId) {
             pendingGroupId = groupId;

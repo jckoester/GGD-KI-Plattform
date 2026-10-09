@@ -18,14 +18,22 @@
  * kennt, ist kein Parameter.
  */
 
-/** Der Pfad für einen neuen Chat mit Vorbelegung. */
-export function neuerChatPfad({ subjectId = null, groupId = null } = {}) {
+/**
+ * Der Pfad für einen neuen Chat mit Vorbelegung.
+ *
+ * `stundeId` ist der Stundenbezug (0.15): die Kennung einer Unterrichtsstunde. Der Server
+ * leitet daraus die Gruppe ab; eine mitgegebene `groupId` muss dazu passen.
+ */
+export function neuerChatPfad({ subjectId = null, groupId = null, stundeId = null } = {}) {
   const params = new URLSearchParams();
   if (subjectId != null) params.set("subject_id", String(subjectId));
   if (groupId != null) params.set("group_id", String(groupId));
+  if (stundeId != null) params.set("stunde_id", String(stundeId));
   const query = params.toString();
   return query ? `/chat?${query}` : "/chat";
 }
+
+const UUID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Die Vorbelegung aus der Adresse — `null`, wo nichts steht.
@@ -41,5 +49,10 @@ export function chatVorgaben(searchParams) {
     const wert = Number.parseInt(roh, 10);
     return Number.isNaN(wert) ? null : wert;
   };
-  return { subjectId: zahl("subject_id"), groupId: zahl("group_id") };
+  const roheStunde = searchParams?.get?.("stunde_id");
+  return {
+    subjectId: zahl("subject_id"),
+    groupId: zahl("group_id"),
+    stundeId: roheStunde && UUID_FORM.test(roheStunde) ? roheStunde : null,
+  };
 }

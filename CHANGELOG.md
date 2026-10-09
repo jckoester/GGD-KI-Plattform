@@ -10,6 +10,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Fähigkeit **„Stundenplanung"** im Assistenten-Editor: Stundenentwurf lesen und Phasen
   schreiben. Sie greift für Lehrkräfte auch im Chat ohne Gruppenbezug; den Zugang zur
   einzelnen Stunde prüft jeder Zugriff.
+- Ein Chat aus der Entwurfsansicht bezieht sich auf **diese Stunde**: Der Assistent weiß,
+  um welche Stunde es geht — auch nach dem Wiederöffnen aus der Historie. Wer die Gruppe
+  des Chats ändert, hebt den Bezug auf.
 
 ### Geändert
 
@@ -23,6 +26,11 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.
+
+### Migration
+
+`alembic upgrade head` führt `0084` aus: Spalte `conversations.stunde_node_id` — der
+Stundenbezug eines Chats. Rückrollbar; dabei gehen nur die gesetzten Bezüge verloren.
 
 ## [0.14.1] – 2026-10-07
 

@@ -748,10 +748,20 @@ register_tool(ChatTool(
 # ── get_lesson_detail ─────────────────────────────────────────────────────────
 
 
+_OHNE_STUNDE = "node_id erforderlich — die Unterhaltung hat keine Bezugsstunde"
+
+
+def _stunden_kennung(args: dict, ctx: ToolContext) -> str:
+    """Die genannte Kennung, sonst die Bezugsstunde der Konversation, sonst leer."""
+    if args.get("node_id"):
+        return args["node_id"]
+    return str(ctx.stunde_node_id) if ctx.stunde_node_id else ""
+
+
 async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
-    node_str = args.get("node_id", "")
+    node_str = _stunden_kennung(args, ctx)
     if not node_str:
-        return {"error": "node_id erforderlich"}
+        return {"error": _OHNE_STUNDE}
 
     db = ctx.db
     node = await db.get(ContextNode, UUID(node_str))
@@ -797,10 +807,13 @@ register_tool(ChatTool(
                 "properties": {
                     "node_id": {
                         "type": "string",
-                        "description": "UUID der Unterrichtsstunde",
+                        "description": (
+                            "UUID der Unterrichtsstunde; ohne Angabe die Bezugsstunde "
+                            "der Unterhaltung"
+                        ),
                     },
                 },
-                "required": ["node_id"],
+                "required": [],
             },
         },
     },
@@ -812,10 +825,12 @@ register_tool(ChatTool(
 
 
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
-    node_str = args.get("node_id", "")
+    node_str = _stunden_kennung(args, ctx)
     phasen = args.get("phasen")
-    if not node_str or phasen is None:
-        return {"error": "node_id und phasen erforderlich"}
+    if phasen is None:
+        return {"error": "phasen erforderlich"}
+    if not node_str:
+        return {"error": _OHNE_STUNDE}
 
     db = ctx.db
     node = await db.get(ContextNode, UUID(node_str))
@@ -921,7 +936,13 @@ register_tool(ChatTool(
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "node_id": {"type": "string", "description": "UUID der Unterrichtsstunde"},
+                    "node_id": {
+                        "type": "string",
+                        "description": (
+                            "UUID der Unterrichtsstunde; ohne Angabe die Bezugsstunde "
+                            "der Unterhaltung"
+                        ),
+                    },
                     "phasen": {
                         "type": "array",
                         "items": {
@@ -955,7 +976,7 @@ register_tool(ChatTool(
                         "description": "Kompetenz-Refs (optional; nur setzen wenn Lehrkraft bestätigt)",
                     },
                 },
-                "required": ["node_id", "phasen"],
+                "required": ["phasen"],
             },
         },
     },

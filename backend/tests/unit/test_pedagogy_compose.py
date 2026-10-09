@@ -166,3 +166,28 @@ class TestKlassenstufeImSystemkontext:
     def test_stufe_vor_dem_kontext(self):
         inhalt = self._inhalt(stufe=9, context_str="## Relevante Lerninhalte\n\nX")
         assert inhalt.index("Klasse 9") < inhalt.index("Relevante Lerninhalte")
+
+
+class TestBezugsstunde:
+    """Die Zeile zum Stundenbezug (0.15, Päckchen A Schritt 2) — für jede Behandlung, vor dem
+    Kontext und vor dem Assistenten-Prompt: Sie gilt für die ganze Unterhaltung."""
+
+    ZEILE = "Bezugsstunde dieser Unterhaltung: „Hebel“ (9b, Mo 3.3.), Kennung abc."
+
+    def _inhalt(self, **kwargs):
+        vorgaben = dict(
+            student_treatment=False, context_str="## Kontext\n\nX",
+            assistant_system_prompt="Du bist der Stundenassistent.",
+        )
+        return compose_system_content(load_pedagogy(), **{**vorgaben, **kwargs})
+
+    @pytest.mark.parametrize("student_treatment", [False, True])
+    def test_steht_drin(self, student_treatment):
+        assert self.ZEILE in self._inhalt(bezug=self.ZEILE, student_treatment=student_treatment)
+
+    def test_ohne_bezug_keine_zeile(self):
+        assert "Bezugsstunde" not in self._inhalt(bezug=None)
+
+    def test_vor_kontext_und_prompt(self):
+        inhalt = self._inhalt(bezug=self.ZEILE)
+        assert inhalt.index("Bezugsstunde") < inhalt.index("## Kontext") < inhalt.index("Stundenassistent")

@@ -49,6 +49,8 @@ class ChatRequest(BaseModel):
     is_test: bool = False
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
+    # Stundenbezug (0.15) — wie `group_id` nur beim Anlegen einer Konversation ausgewertet.
+    stunde_node_id: Optional[UUID] = None
 
     @model_validator(mode="after")
     def at_least_one_message(self):

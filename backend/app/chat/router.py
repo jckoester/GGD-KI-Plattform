@@ -87,6 +87,7 @@ from app.pedagogy.hausversuche import (
     gefahr_fuer as hausversuch_gefahr,
 )
 from app.pedagogy.compose import compose_system_content, is_student_treatment
+from app.planning.stundenbezug import bezugszeile, stunde_fuer_bezug
 from app.litellm.client import ImageGenerationError, LiteLLMClient
 from app.litellm.errors import BUDGET_MELDUNG, ist_budget_erschoepft
 from app.litellm.teams import STUDENT_TEAM_PREFIX, TEACHER_TEAM_ID
@@ -1742,10 +1743,29 @@ async def chat(
 
         first_user_msg = next((_user_text(m) for m in request.messages if m.role == "user"), "")
 
+        # Stundenbezug (0.15): Die Stunde bringt ihre Gruppe mit. Eine abweichend genannte
+        # Gruppe ist ein Widerspruch, kein Vorrang — sonst trüge die Konversation eine
+        # Stunde, die nicht zu ihrer Gruppe gehört.
+        gewuenschte_gruppe = request.group_id
+        conversation_stunde_id = None
+        if request.stunde_node_id is not None:
+            try:
+                stunde = await stunde_fuer_bezug(db, request.stunde_node_id, current_user)
+            except HTTPException:
+                await client.aclose()
+                raise
+            if gewuenschte_gruppe is not None and gewuenschte_gruppe != stunde.write_scope_group_id:
+                await client.aclose()
+                raise HTTPException(
+                    status_code=422, detail="Die Stunde gehört nicht zu dieser Gruppe"
+                )
+            gewuenschte_gruppe = stunde.write_scope_group_id
+            conversation_stunde_id = stunde.id
+
         # Kontext aus Request oder Assistent ableiten
-        if request.group_id is not None:
+        if gewuenschte_gruppe is not None:
             # group_id gesetzt: nur eine eigene Unterrichtsgruppe; subject_id aus ihr ableiten
-            grp = await _eigene_unterrichtsgruppe(db, request.group_id, current_user.sub)
+            grp = await _eigene_unterrichtsgruppe(db, gewuenschte_gruppe, current_user.sub)
             if grp is None:
                 await client.aclose()
                 raise HTTPException(status_code=404, detail=_KEINE_EIGENE_GRUPPE)
@@ -1768,6 +1788,7 @@ async def chat(
             assistant_id=request.assistant_id,
             subject_id=subject_id,
             group_id=group_id,
+            stunde_node_id=conversation_stunde_id,
             system_prompt_snapshot=system_prompt_snapshot,
             is_test=request.is_test,
         )
@@ -1796,6 +1817,7 @@ async def chat(
         system_prompt_snapshot = existing.system_prompt_snapshot
         active_assistant_id = existing.assistant_id
         conversation_group_id = existing.group_id
+        conversation_stunde_id = existing.stunde_node_id
         conversation_is_test = existing.is_test
         active_assistant: Optional[Assistant] = None
 
@@ -1910,6 +1932,7 @@ async def chat(
             pedagogy,
             student_treatment=student_treatment,
             stufe=await stufe_der_person(db, conversation_id, current_user.grade),
+            bezug=await bezugszeile(db, conversation_stunde_id, current_user),
             context_str=context_str,
             assistant_system_prompt=system_prompt_snapshot,
             disabled_augmentations=disabled_aug,
@@ -2187,6 +2210,7 @@ async def chat(
                         assistant=active_assistant,
                         erlaubte_modelle=_erlaubte_modelle,
                         bausteine=_werkzeug_bausteine,
+                        stunde_node_id=conversation_stunde_id,
                     )
                     tool_result = await tool.handler(args, tool_ctx)
                 except Exception:
@@ -2520,6 +2544,7 @@ async def update_conversation(
     if 'title' in request.model_fields_set and request.title is not None:
         conversation.title = request.title
 
+    gruppe_vorher = conversation.group_id
     if 'group_id' in request.model_fields_set:
         if request.group_id is not None:
             # Gruppe laden, Typ prüfen, Mitgliedschaft prüfen
@@ -2545,6 +2570,11 @@ async def update_conversation(
                 raise HTTPException(status_code=404, detail="Fach nicht gefunden")
         conversation.subject_id = request.subject_id
         conversation.group_id = None  # Fach-Ebene impliziert kein group_id
+
+    # Der Stundenbezug gehört zur Gruppe (0.15): Wer sie wechselt oder entfernt, verliert
+    # ihn — sonst trüge die Konversation eine Stunde einer Gruppe, in der sie nicht steht.
+    if conversation.group_id != gruppe_vorher:
+        conversation.stunde_node_id = None
 
     await db.commit()
     await db.refresh(conversation)

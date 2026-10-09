@@ -494,6 +494,11 @@ class Conversation(Base):
     group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("groups.id", ondelete="SET NULL")
     )
+    # Ab 0.15: Stundenbezug (Päckchen A, F4). Gehört immer zur Gruppe oben — gesetzt nur
+    # mit ihr zusammen (`app/planning/stundenbezug.py`), und wer die Gruppe ändert, verliert ihn.
+    stunde_node_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("context_nodes.id", ondelete="SET NULL"), nullable=True
+    )
     # Ab Phase 8: aktuell aktiver Assistent (wird bei Wechsel mid-Chat aktualisiert)
     assistant_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("assistants.id", ondelete="SET NULL")
@@ -524,6 +529,8 @@ class Conversation(Base):
         Index("idx_conversations_pseudonym", "pseudonym"),
         Index("idx_conversations_last_message_at", "last_message_at"),
         Index("idx_conversations_group_id", "group_id"),
+        Index("idx_conversations_stunde_node_id", "stunde_node_id",
+              postgresql_where=text("stunde_node_id IS NOT NULL")),
     )
 
 

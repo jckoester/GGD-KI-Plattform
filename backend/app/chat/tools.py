@@ -59,6 +59,9 @@ class ToolContext:
     # der Router legt sie einmal an und reicht sie jedem `ToolContext` durch, denn der
     # entsteht je Werkzeugaufruf neu. `None` = niemand sammelt.
     bausteine: list | None = None
+    # Stundenbezug der Konversation (0.15): Vorgabe für `node_id` der Stundenwerkzeuge.
+    # Eine Vorgabe, keine Erlaubnis — den Zugang prüft das Werkzeug wie bei jeder Kennung.
+    stunde_node_id: UUID | None = None
 
 
 @dataclass

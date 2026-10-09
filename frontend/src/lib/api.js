@@ -353,6 +353,7 @@ export async function* streamChat(
   isTest = false,
   subjectId = null,
   groupId = null,
+  stundeId = null,
 ) {
   let res;
   try {
@@ -364,6 +365,7 @@ export async function* streamChat(
     if (!conversationId) {
       if (subjectId != null) body.subject_id = subjectId;
       if (groupId != null) body.group_id = groupId;
+      if (stundeId != null) body.stunde_node_id = stundeId;
     }
     res = await fetch(`${BASE}/chat`, {
       method: "POST",
