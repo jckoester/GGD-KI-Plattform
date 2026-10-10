@@ -69,6 +69,7 @@ def frage_stellen(
     werkzeuge: list[dict] = []
     stuecke: list[str] = []
     ereignisse: dict[str, int] = {}
+    fehler: str | None = None
 
     with client.stream("POST", "/chat", json=rumpf) as strom:
         if strom.status_code != 200:
@@ -90,6 +91,9 @@ def frage_stellen(
             nutzlast = zeile[6:]
             if name == "tool_status":
                 werkzeuge.append(json.loads(nutzlast))
+            elif name == "fehler":
+                # Abbruch mitten im Strom (0.15): Lese-Timeout, Verbindung, abgelehnte Runde.
+                fehler = json.loads(nutzlast).get("detail") or "Abbruch"
             elif name is None and nutzlast != "[DONE]":
                 try:
                     brocken = json.loads(nutzlast)["choices"][0]["delta"]
@@ -105,6 +109,7 @@ def frage_stellen(
         "werkzeuge": werkzeuge,
         "ereignisse": ereignisse,
         "antwort": antwort,
+        "fehler": fehler,
         # Die Kennzahlen aus dem Messplan (N8): Kürze und Rückfragen sind das, was die
         # neue Präambel ändern soll — sie hier mitzuzählen erspart das Nachzählen von
         # Hand und macht zwei Läufe vergleichbar.

@@ -8,8 +8,13 @@
 #
 # Je Fall: `stunde` (Gruppe und Datum des Termins) wird zur Bezugsstunde, `zuege` gehen
 # nacheinander in **eine** Konversation. Ab `zustimmung_ab` (1-basiert) darf geschrieben
-# werden; davor nicht. `neue_phasen_hoechstens`: so viele Phasen dürfen nach dem Schreiben
-# eine Kennung tragen, die es vorher nicht gab — mehr heißt, Kennungen gingen verloren.
+# werden; davor nicht.
+#
+# `erwartung`: was eine brauchbare Antwort inhaltlich leistet. Die Kriterien prüfen den
+# Ablauf; ob die Antwort taugt, beurteilt Jan im Verlauf (Kästchen unter jedem Lauf).
+#
+# `kompetenzen.praefixe`: Kompetenznummern, die zu Fach und Stufe der Stunde gehören.
+# Jede genannte Nummer muss mit einem davon beginnen und im Fach existieren.
 
 lehrkraft_der_gruppe: 33
 
@@ -20,7 +25,11 @@ faelle:
       - "Arbeite die Phasen „Übungsaufgaben (einfach bis mittel)“ und „Vertiefte Übungen“ aus: Was genau sollen die Schüler:innen dort tun?"
       - "Ja, übernehmen."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 0
+    erwartung: >-
+      Beschreibt für beide Phasen konkret, was die Schüler:innen tun, passend zu „alle
+      Rechenregeln für Potenzen" — einfach bis mittel bzw. vertieft unterscheidbar. Aufgaben nur
+      aus dem Entwurf oder als Platzhalter, keine erfundenen Buchseiten. Dauer und übrige Phasen
+      unverändert.
 
   - id: phase-ergaenzen
     stunde: {gruppe: 36, datum: 2026-10-12}
@@ -28,7 +37,10 @@ faelle:
       - "Ergänze nach „Erarbeitung II: Fallunterscheidung“ eine kurze Phase, in der die Fallunterscheidung an der Tafel festgehalten wird."
       - "Passt, so übernehmen."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 1
+    erwartung: >-
+      Genau eine kurze Phase direkt nach „Erarbeitung II", die die Fallunterscheidung (gerade und
+      ungerade Hochzahlen) als Tafelbild bzw. Hefteintrag festhält. Sonst nichts geändert; die
+      Zeitbilanz wird genannt.
 
   - id: methode-tauschen
     stunde: {gruppe: 40, datum: 2026-09-15}
@@ -36,7 +48,9 @@ faelle:
       - "In „Organisatorisches“ möchte ich statt Lehrervortrag lieber ein Unterrichtsgespräch."
       - "Ja, mach das so."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 0
+    erwartung: >-
+      Ersetzt in „Organisatorisches" die Methode durch „Unterrichtsgespräch" (aus dem Vokabular,
+      wenn vorhanden) und ändert sonst nichts.
 
   - id: zeit-kuerzen
     stunde: {gruppe: 33, datum: 2026-10-13}
@@ -44,17 +58,41 @@ faelle:
       - "Ich habe in dieser Stunde nur 70 Minuten. Wie kürze ich den Entwurf?"
       - "Ja, so übernehmen."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 0
+    erwartung: >-
+      Kommt durch Kürzen und Streichen auf höchstens 70 Minuten — Vertiefung zuerst —, ohne neue
+      Phasen. Je Änderung eine Zeile mit Grund, Beschreibungen unverändert, Zeitbilanz „… von 70".
 
   - id: kompetenz-vorschlagen
     stunde: {gruppe: 33, datum: 2026-10-12}
     zuege:
       - "Welche Kompetenzen aus dem Bildungsplan fördert diese Stunde?"
+    kompetenzen:
+      praefixe: ["3.4.", "2."]     # Chemie, Leistungsfach Kursstufe (BW 2016 V2)
+    erwartung: >-
+      Nennt Kompetenzen des Leistungsfachs Chemie (Bildungsplan BW 2016, Kursstufe: 3.4.x und
+      prozessbezogen 2.x), die zum Inhalt der Stunde passen — Bromierung von Benzol im
+      Praktikum —, mit Nummer und Wortlaut. Beispiele aus dem Entwurf (etwa zu 3.4.5(2) die
+      Stellvertretersubstanz Benzaldehyd statt Bromdämpfe). Keine Mittelstufe, kein anderer Plan.
 
   - id: rueckfrage-ohne-schreibwunsch
     stunde: {gruppe: 36, datum: 2026-10-05}
     zuege:
       - "Ist die Stunde mit 80 von 90 Minuten zu knapp oder zu locker geplant?"
+    erwartung: >-
+      Beurteilt die Phasen einzeln an ihrem Inhalt (etwa 7 Minuten für „Beispiele für alle
+      Rechenregeln", 5 Minuten für die Kontrolle mit Eintragung); sagt, dass sich die
+      Übungsphasen ohne die Aufgaben nicht einschätzen lassen, und fragt danach. Wiederholt nicht
+      nur die Zahlen.
+
+  # D6: dieselbe Stunde, die Frage ohne vorgelegte Zahlen — rechnet das Modell dann noch nach?
+  - id: rueckfrage-ohne-zahlen
+    stunde: {gruppe: 36, datum: 2026-10-05}
+    zuege:
+      - "Reicht die Zeit für die Übungsaufgaben?"
+    erwartung: >-
+      Bezieht sich auf die Übungsphasen (einfach bis mittel, vertieft, Transfer); sagt, dass sich
+      ihre Dauer ohne die Aufgaben nicht einschätzen lässt, und fragt, welche und wie viele es
+      sind. Wenn schon eine Einschätzung, dann begründet.
 
   - id: skizze-ohne-dauer
     stunde: {gruppe: 36, datum: 2026-10-12}
@@ -62,7 +100,10 @@ faelle:
       - "Mach aus „Sicherung wird HA“ eine richtige Hausaufgabenphase mit Beschreibung."
       - "Ja, übernehmen."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 0
+    erwartung: >-
+      Die Hausaufgabe leistet die Sicherung: Ergebnis zu Hause festhalten (Merksatz, Hefteintrag
+      zur Fallunterscheidung bzw. zu Potenzgleichungen) — keine Übungsaufgaben, keine erfundenen
+      Seiten. Du- oder Ihr-Form. Die Phase bleibt ohne Dauer.
 
   - id: stundenziel
     stunde: {gruppe: 36, datum: 2026-10-12}
@@ -70,4 +111,7 @@ faelle:
       - "Formuliere ein Stundenziel für diese Stunde."
       - "Gut, übernimm das."
     zustimmung_ab: 2
-    neue_phasen_hoechstens: 0
+    erwartung: >-
+      Ein knappes, überprüfbares Stundenziel aus den Inhalten des Entwurfs (Potenzgleichungen
+      x^n = a lösen, Fallunterscheidung gerade/ungerade Hochzahl) — nichts, was nicht im Entwurf
+      steht.

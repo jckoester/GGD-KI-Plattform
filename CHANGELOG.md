@@ -65,6 +65,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 `alembic upgrade head` führt `0084` aus: Spalte `conversations.stunde_node_id` — der
 Stundenbezug eines Chats. Rückrollbar; dabei gehen nur die gesetzten Bezüge verloren.
 
+In `config/pedagogy.yaml` unter `universal_base` den geltenden Bildungsplan nennen — Vorlage im
+Kommentar der `pedagogy.example.yaml`. Danach das Backend neu starten.
+
 ### Nach dem Update
 
 Den Assistenten „Stundenentwurf" einmal anlegen — per Seed, der nur anlegt, was fehlt:
@@ -75,9 +78,6 @@ docker compose exec backend python scripts/seed_assistants.py --config config/as
 
 Oder im Editor: schulweiter Assistent für Lehrkräfte, Fähigkeit „Stundenplanung", Prompt aus
 `config/prompts/stundenentwurf_assistent.md`.
-
-In `config/pedagogy.yaml` unter `universal_base` den geltenden Bildungsplan nennen — Vorlage im
-Kommentar der `pedagogy.example.yaml`. Danach das Backend neu starten.
 
 ## [0.14.1] – 2026-10-07
 

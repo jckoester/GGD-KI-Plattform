@@ -28,6 +28,15 @@ wo geschrieben wurde — der Entwurf vorher und nachher. Dazu die Kriterien des 
 Ein Lauf ist bestanden, wenn jedes zutreffende Kriterium erfüllt ist; ein Fall, wenn alle
 Läufe bestanden sind.
 
+**Die Kriterien prüfen den Ablauf, nicht die Brauchbarkeit** — in Messung 3 bestand
+„Rückfrage ohne Schreibwunsch" 3/3 und war unbrauchbar. Deshalb trägt jeder Fall eine
+inhaltliche `erwartung`; sie steht im Verlauf unter jedem Lauf, mit drei Kästchen zum
+Ankreuzen (brauchbar / teilweise / unbrauchbar). Ausgezählt wird mit
+
+    python scripts/stundenassistent_messung.py --bewertung verlauf.md
+
+Die Abnahme schließt diese Bewertung ein.
+
 ⚠️ Nur für Entwicklungsinstanzen — wie `chat_probe.py`: eigener Sitzungs-Token, echte
 Modellaufrufe auf Kosten des Budgets der Lehrkraft.
 """
@@ -36,7 +45,9 @@ import asyncio
 import hashlib
 import importlib.util
 import json
+import re
 import sys
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 
@@ -57,6 +68,8 @@ chat_probe = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(chat_probe)
 
 LESEN, SUCHEN, SCHREIBEN = "get_lesson_detail", "finde_stunde", "update_lesson_phases"
+KONTEXTSUCHE = ("search_context_nodes", "list_context_nodes")
+BEWERTUNGEN = ("brauchbar", "teilweise", "unbrauchbar")
 
 
 # ── Datenbank: Stand festhalten und wiederherstellen ─────────────────────────
@@ -143,6 +156,25 @@ def zuruecksetzen(conn, ausgang: dict, gruppen: list[int]) -> None:
             cur.execute("DELETE FROM context_edges WHERE id::text = ANY(%s)", (neue_kanten,))
 
 
+def kompetenznummern_des_fachs(conn, stunde: str) -> set[str]:
+    """Alle Kompetenznummern im Fach der Stunde — aktiv wie archiviert (ein Curriculum
+    verweist teils auf Knoten eines älteren Imports). Für D2: Gibt es die Nummer überhaupt?"""
+    return {nr for (nr,) in _alle(conn, """
+        SELECT DISTINCT k.metadata->>'kompetenz_nr' FROM context_nodes k
+        JOIN context_nodes s ON s.id::text = %s
+        WHERE k.content_type IN ('ik_kompetenz', 'pk_kompetenz') AND k.subject_id = s.subject_id
+          AND k.metadata ? 'kompetenz_nr'""", stunde)}
+
+
+def hat_kapitel(conn, stunde: str) -> bool:
+    """Bringt der Entwurf ein Curriculum-Kapitel mit (Stunde → Einheit → Kapitel, A1)?"""
+    return bool(_eins(conn, """
+        SELECT 1 FROM context_edges teil
+        JOIN context_edges ref ON ref.from_node_id = teil.to_node_id AND ref.relation = 'references'
+        JOIN context_nodes k ON k.id = ref.to_node_id AND k.content_type = 'kapitel'
+        WHERE teil.from_node_id::text = %s AND teil.relation = 'part_of' LIMIT 1""", stunde))
+
+
 # ── Ein Lauf und seine Bewertung ─────────────────────────────────────────────
 
 
@@ -173,15 +205,44 @@ def _phasen(entwurf) -> list[dict]:
     return list((entwurf or {}).get("metadata", {}).get("phasen") or [])
 
 
+# Eine Kompetenznummer: „3.4.5(4)", „3.4.5 (4)", „2.1(1)" — oder eine prozessbezogene ohne
+# Klammer mit drei Stufen („2.3.11", so in Chemie). Eine bloße Abschnittsnummer („3.4.5")
+# ist keine; ebenso wenig ein Datum („13.10.2026") — davor steht keine Ziffer.
+_NUMMER = re.compile(r"(?<![\d.])([123](?:\.\d{1,2}){1,3})(?:[\s  ]*\((\d{1,2})\))?")
+# Andere Länder und Länderpläne. Baden-Württemberg fehlt absichtlich.
+_FREMDER_PLAN = re.compile(
+    r"österreich|schweiz|lehrplan\s*21|bayer|nordrhein|niedersachs|hessen|hessisch|sachsen|"
+    r"thüring|brandenburg|berlin|rheinland|saarland|hamburg|bremen|schleswig|mecklenburg",
+    re.IGNORECASE,
+)
+
+
+def kompetenznummern(text: str) -> list[str]:
+    """Die Kompetenznummern einer Antwort, vereinheitlicht wie `kompetenz_nr` („3.4.5(4)")."""
+    gefunden = []
+    for basis, klammer in _NUMMER.findall(text):
+        if klammer:
+            gefunden.append(f"{basis}({klammer})")
+        elif basis.startswith("2.") and basis.count(".") == 2:
+            gefunden.append(basis)
+    return list(dict.fromkeys(gefunden))
+
+
 def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
-            ziel: str | None = None) -> dict[str, bool]:
+            ziel: str | None = None, nummern: set[str] | None = None,
+            kapitel: bool = False) -> dict[str, bool]:
     """Die Kriterien aus dem Plan — je Fall nur die, die auf ihn zutreffen.
 
     ``stunde`` ist die Bezugsstunde des Falls (oder None), ``ziel`` der Entwurf des Termins
-    aus ``waehlt``. Ohne Datenbank, damit sich prüfen lässt, dass die Kriterien Fehlgriffe
+    aus ``waehlt``. Für Fälle mit ``kompetenzen``: ``nummern`` sind die Kompetenznummern,
+    die es im Fach der Stunde gibt, ``kapitel`` sagt, ob der Entwurf ein Curriculum-Kapitel
+    mitbringt. Ohne Datenbank, damit sich prüfen lässt, dass die Kriterien Fehlgriffe
     überhaupt erkennen (`tests/unit/test_stundenassistent_messung.py`).
     """
     k: dict[str, bool] = {}
+
+    # 0. Jede Antwort hat Text, kein Zug endete mit einem Abbruch (D1).
+    k["antwort_nicht_leer"] = all(z["antwort"].strip() and not z.get("fehler") for z in zuege)
 
     # 1. Zuerst gelesen (mit Bezug) bzw. gesucht (ohne).
     erste = _werkzeuge(zuege[0])
@@ -203,25 +264,55 @@ def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
                        and nachher != vorher)
         k["schreibt_nach_zustimmung"] = geschrieben
         if geschrieben:
-            alte = {p.get("id") for p in _phasen(vorher)}
-            neu = [p for p in _phasen(nachher) if p.get("id") not in alte]
-            k["kennungen_erhalten"] = len(neu) <= fall.get("neue_phasen_hoechstens", 0)
+            # Verlust heißt: Eine alte Phase fehlt, und eine gleichnamige steht ohne ihre
+            # Kennung da — sie wurde neu geschrieben statt übernommen (D1). Bis Messung 3
+            # zählte jede neue Kennung; damit schlug auch ein gewolltes Zusammenlegen an.
+            alte_ids = {p.get("id") for p in _phasen(vorher)}
+            neue_ids = {p.get("id") for p in _phasen(nachher)}
+            neu_geschrieben = {_name(p) for p in _phasen(nachher) if p.get("id") not in alte_ids}
+            verloren = [p for p in _phasen(vorher)
+                        if p.get("id") not in neue_ids and _name(p) in neu_geschrieben]
+            k["kennungen_erhalten"] = not verloren
             offen = {p.get("id") for p in _phasen(vorher) if p.get("dauer_min") is None}
             k["skizze_ohne_dauer"] = all(p.get("dauer_min") is None
                                          for p in _phasen(nachher) if p.get("id") in offen)
 
-    # Ohne Bezug: der richtige Termin gewählt — oder nachgefragt, ohne zu wählen.
+    # Ohne Bezug: der richtige Termin gewählt — oder nachgefragt, ohne zu wählen. Ob und wie
+    # gut gefragt wird, beurteilt Jan im Verlauf; ein Fragezeichen zu zählen sagte nichts (D1).
     if "waehlt" in fall:
         k["waehlt_den_termin"] = ziel is not None and zuege[0]["bezug"] == ziel
     if fall.get("nachfrage"):
-        k["fragt_nach"] = zuege[0]["bezug"] is None and "?" in zuege[0]["antwort"]
+        k["fragt_nach"] = zuege[0]["bezug"] is None
+
+    # Kompetenzen (D2): aus einer Quelle, nicht aus dem Gedächtnis; jede genannte Nummer gibt
+    # es im Fach und sie gehört zur Stufe; kein anderer Plan.
+    if "kompetenzen" in fall:
+        text = "\n".join(z["antwort"] for z in zuege)
+        genannt = kompetenznummern(text)
+        praefixe = tuple(fall["kompetenzen"]["praefixe"])
+        k["kompetenz_aus_quelle"] = kapitel or any(
+            w in KONTEXTSUCHE for z in zuege for w in _werkzeuge(z))
+        k["kompetenzen_genannt"] = bool(genannt)
+        k["kompetenzen_der_stufe"] = all(
+            n.startswith(praefixe) and (nummern is None or n in nummern) for n in genannt)
+        k["kein_fremder_plan"] = not _FREMDER_PLAN.search(text)
     return k
+
+
+def _name(phase: dict) -> str:
+    return (phase.get("name") or "").strip().rstrip(":").casefold()
 
 
 # ── Verlauf zum Nachlesen ────────────────────────────────────────────────────
 
 
 def _phase_kurz(p: dict) -> str:
+    """Eine Phase in einer Zeile — die Beschreibung **vollständig**.
+
+    Bis Messung 3 stand hier nur die erste Zeile, auf 90 Zeichen gekürzt. In „Skizze ohne
+    Dauer" las sich das wie eine unvollständig gespeicherte Phase, nachprüfen ließ es sich
+    nicht mehr: Die Messung setzt den Stand zurück (D7). Zeilenumbrüche werden zu „ / ".
+    """
     def eintrag(feld):
         e = p.get(feld) or {}
         return e.get("titel") or e.get("wert") or ""
@@ -229,14 +320,41 @@ def _phase_kurz(p: dict) -> str:
              p.get("prio") or "kern"]
     teile += [t for t in (eintrag("sozialform"), eintrag("methode")) if t]
     zeile = f"{p.get('name')} ({', '.join(teile)})"
-    beschreibung = (p.get("beschreibung") or "").strip().splitlines()
-    return zeile + (f" — {beschreibung[0][:90]}" if beschreibung else "")
+    beschreibung = " / ".join(z.strip() for z in (p.get("beschreibung") or "").splitlines() if z.strip())
+    return zeile + (f" — {beschreibung}" if beschreibung else "")
 
 
-def _zitat(text: str) -> str:
+def _zitat(text: str, fehler: str | None = None) -> str:
+    zeilen = []
+    if fehler:
+        zeilen.append(f"> [!failure] Abbruch\n> {fehler}")
     if not text.strip():
-        return "> [!warning] Assistent\n> *(leere Antwort)*"
-    return "> [!quote] Assistent\n" + "\n".join(f"> {z}" for z in text.splitlines())
+        zeilen.append("> [!warning] Assistent\n> *(leere Antwort)*")
+    else:
+        zeilen.append("> [!quote] Assistent\n" + "\n".join(f"> {z}" for z in text.splitlines()))
+    return "\n\n".join(zeilen)
+
+
+def _bewertungsblock(erwartung: str) -> list[str]:
+    """Erwartung und drei Kästchen — in Obsidian anklickbar, ausgezählt von `bewertungen`."""
+    return (["> [!example] Erwartung", f"> {erwartung.strip()}", "", "**Bewertung:**", ""]
+            + [f"- [ ] {b}" for b in BEWERTUNGEN] + ["", "Notiz: ", ""])
+
+
+def bewertungen(markdown: str) -> dict[str, Counter]:
+    """Zählt die angekreuzten Bewertungen eines Verlaufs je Fall.
+
+    Je Lauf zählt genau ein Kreuz; keines heißt „offen", mehrere „mehrdeutig".
+    """
+    ergebnis: dict[str, Counter] = {}
+    for abschnitt in re.split(r"\n(?=## )", markdown):
+        kopf = re.match(r"## (\S+) · Lauf \d+", abschnitt)
+        if not kopf or "**Bewertung:**" not in abschnitt:
+            continue
+        kreuze = re.findall(r"^- \[[xX]\] (" + "|".join(BEWERTUNGEN) + r")\s*$", abschnitt, re.M)
+        wert = kreuze[0] if len(kreuze) == 1 else "offen" if not kreuze else "mehrdeutig"
+        ergebnis.setdefault(kopf.group(1), Counter())[wert] += 1
+    return ergebnis
 
 
 def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
@@ -256,13 +374,15 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
             werkzeuge = " → ".join(z["werkzeuge"]) or "—"
             zeilen += [f"**Lehrkraft** ({z['zeit']}): {z['frage']}", "",
                        f"*Werkzeuge:* {werkzeuge}" + (" ⚠️ Rundenlimit erreicht" if len(z["werkzeuge"]) >= 6 else ""),
-                       "", _zitat(z["antwort"]), ""]
+                       "", _zitat(z["antwort"], z.get("fehler")), ""]
         if l.get("vorher") is not None and l.get("nachher") != l.get("vorher"):
             zeilen += ["**Entwurf vorher:**", ""] + [f"{i}. {_phase_kurz(p)}" for i, p in enumerate(l["vorher"], 1)]
             zeilen += ["", "**Entwurf nachher:**", ""] + [f"{i}. {_phase_kurz(p)}" for i, p in enumerate(l["nachher"] or [], 1)]
             if l.get("ziel_nachher") != l.get("ziel_vorher"):
                 zeilen += ["", f"Stundenziel: „{l.get('ziel_vorher') or ''}“ → „{l.get('ziel_nachher') or ''}“"]
             zeilen.append("")
+        if l.get("erwartung"):
+            zeilen += _bewertungsblock(l["erwartung"])
     return "\n".join(zeilen) + "\n"
 
 
@@ -271,7 +391,7 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Messung zum Stundenassistenten")
-    p.add_argument("--datei", type=Path, required=True)
+    p.add_argument("--datei", type=Path, help="Szenariendatei (nicht nötig mit --bewertung)")
     p.add_argument("--laeufe", type=int, default=3)
     p.add_argument("--assistent", type=int, default=None)
     p.add_argument("--nur", action="append", default=[], help="nur diesen Fall (mehrfach möglich)")
@@ -279,7 +399,19 @@ def main() -> None:
     p.add_argument("--json", type=Path, default=None, help="Ergebnis mit allen Antworten hierhin")
     p.add_argument("--verlauf", type=Path, default=None, help="Chatverlauf zum Nachlesen (Markdown)")
     p.add_argument("--trotzdem", action="store_true", help="auch ohne vollständige Vektoren")
+    p.add_argument("--bewertung", type=Path, default=None,
+                   help="angekreuzte Bewertungen eines Verlaufs auszählen und beenden")
     args = p.parse_args()
+
+    if args.bewertung:
+        tabelle = bewertungen(args.bewertung.read_text(encoding="utf-8"))
+        spalten = (*BEWERTUNGEN, "offen", "mehrdeutig")
+        print(f"{'Fall':<30} " + " ".join(f"{s:>11}" for s in spalten))
+        for fall, zaehler in tabelle.items():
+            print(f"{fall:<30} " + " ".join(f"{zaehler.get(s, 0):>11}" for s in spalten))
+        return
+    if not args.datei:
+        p.error("--datei fehlt")
 
     if settings.environment == "production":
         p.error("Nicht auf einer Produktivinstanz (eigener Token, echtes Budget, schreibt Entwürfe).")
@@ -327,10 +459,12 @@ def main() -> None:
                         continue
                     if konversation:
                         konversationen.append(konversation)
+                    bezug = stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None
                     kriterien = bewerte(
-                        fall, ausgang, zuege,
-                        stunde=stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None,
+                        fall, ausgang, zuege, stunde=bezug,
                         ziel=stunde_am(conn, **fall["waehlt"]) if "waehlt" in fall else None,
+                        nummern=kompetenznummern_des_fachs(conn, bezug) if bezug and "kompetenzen" in fall else None,
+                        kapitel=bool(bezug) and hat_kapitel(conn, bezug),
                     )
                     bestanden = all(kriterien.values())
                     werkzeuge = " | ".join(" → ".join(_werkzeuge(z)) or "—" for z in zuege)
@@ -339,9 +473,11 @@ def main() -> None:
                           f"[{werkzeuge}]{'  fehlt: ' + fehlend if fehlend else ''}", flush=True)
                     ergebnisse.append({
                         "fall": fall["id"], "lauf": nr, "bestanden": bestanden, "kriterien": kriterien,
-                        "modell": zuege[0].get("modell"),
+                        "modell": zuege[0].get("modell"), "erwartung": fall.get("erwartung"),
+                        "kompetenznummern": kompetenznummern("\n".join(z["antwort"] for z in zuege))
+                        if "kompetenzen" in fall else None,
                         "zuege": [{"frage": z["frage"], "werkzeuge": _werkzeuge(z),
-                                   "antwort": z["antwort"]} for z in zuege],
+                                   "antwort": z["antwort"], "fehler": z.get("fehler")} for z in zuege],
                     })
                     kopf["modell"] = zuege[0].get("modell") or kopf["modell"]
                     stunde = stunde_am(conn, **fall["stunde"]) if "stunde" in fall else None
@@ -356,7 +492,8 @@ def main() -> None:
                         "ziel_vorher": (vorher or {}).get("metadata", {}).get("stundenziel"),
                         "ziel_nachher": (nachher or {}).get("metadata", {}).get("stundenziel"),
                         "zuege": [{"frage": z["frage"], "werkzeuge": _werkzeuge(z), "antwort": z["antwort"],
-                                   "zeit": z["zeit"]} for z in zuege],
+                                   "zeit": z["zeit"], "fehler": z.get("fehler")} for z in zuege],
+                        "erwartung": fall.get("erwartung"),
                     })
                     if args.verlauf:
                         args.verlauf.write_text(verlauf_als_markdown(kopf, laeufe), encoding="utf-8")
