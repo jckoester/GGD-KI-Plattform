@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
 from app.db.models import ContextNode, LessonSlot, SlotPlanSnapshot
+from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
 
 SNAPSHOT_LIMIT = 50
@@ -123,9 +124,13 @@ async def restore_snapshot(
         if slot is None:
             skipped.append(slot_data["slot_id"])
             continue
+        # Als Zeichenketten vergleichen: Im Snapshot stehen sie so, am Slot als UUID.
+        vorher = tuple(str(x) if x else None for x in (slot.ue_node_id, slot.stunde_node_id))
         slot.kategorie = slot_data["kategorie"]
         slot.ue_node_id = slot_data.get("ue_node_id")
         slot.stunde_node_id = slot_data.get("stunde_node_id")
+        if tuple(str(x) if x else None for x in (slot.ue_node_id, slot.stunde_node_id)) != vorher:
+            await ordne_entwurf_ein(db, slot)
         slot.thema = slot_data.get("thema")
         slot.pinned = slot_data.get("pinned", False)
         slot.anpassung_noetig = slot_data.get("anpassung_noetig", False)

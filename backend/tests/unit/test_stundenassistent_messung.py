@@ -189,3 +189,40 @@ def test_die_szenarien_tragen_erwartungen():
         faelle = yaml.safe_load((_PFAD.parent / "szenarien" / datei).read_text(encoding="utf-8"))["faelle"]
         assert all(f.get("erwartung", "").strip() for f in faelle), datei
         assert not any("neue_phasen_hoechstens" in f for f in faelle), "seit D1 ohne Wirkung"
+
+
+# ── Kompetenzen aus dem Kapitel (A4) ─────────────────────────────────────────
+
+FALL_KAP = {"id": "kap", "stunde": {}, "zuege": ["…"],
+            "kompetenzen": {"praefixe": ["3.4.", "2."], "kapitel": True}}
+KAPITEL = {"3.4.5(1)", "3.4.5(2)", "3.4.5(3)", "3.4.5(4)", "3.4.5(5)"}
+BEKANNT_K = KAPITEL | {"3.4.1(6)", "2.3.11"}
+
+
+def _kap(antwort):
+    return _bewerte([_zug(["get_lesson_detail"], antwort=antwort)], FALL_KAP, nummern=BEKANNT_K,
+                    kapitel=True, kapitel_nummern=KAPITEL)
+
+
+def test_kompetenzen_aus_dem_kapitel():
+    k = _kap("Aus dem Kapitel: 3.4.5(4) Mechanismus, 3.4.5(2) Gefährdung; dazu 2.3.11.")
+    assert k["kompetenzen_aus_dem_kapitel"] and k["kompetenz_aus_quelle"], k
+
+
+@pytest.mark.parametrize("antwort", [
+    "3.4.5(4) Mechanismus und 3.4.1(6) Entropie.",      # späteres Thema derselben Stufe
+    "Prozessbezogen: 2.3.11.",                          # keine einzige aus dem Kapitel
+])
+def test_kapitel_fehlgriffe_werden_erkannt(antwort):
+    k = _kap(antwort)
+    assert k["kompetenzen_aus_dem_kapitel"] is False
+    if "3.4.1(6)" in antwort:
+        assert k["kompetenzen_der_stufe"], "die Präfixe allein sähen es nicht — deshalb das Kriterium"
+
+
+def test_aufbau_wird_vorher_geprueft():
+    assert messung.aufbau_fehler(FALL_KAP, kapitel=True) is None
+    assert "braucht" in messung.aufbau_fehler(FALL_KAP, kapitel=False)
+    ohne = {**FALL_KAP, "kompetenzen": {"praefixe": ["3.4."], "kapitel": False}}
+    assert "darf kein" in messung.aufbau_fehler(ohne, kapitel=True)
+    assert messung.aufbau_fehler({"id": "x"}, kapitel=True) is None

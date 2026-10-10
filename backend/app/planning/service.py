@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
 from app.db.models import ContextEdge, ContextNode, Group, LessonSlot
+from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 
@@ -220,6 +221,7 @@ async def assign_slots_to_unit(
             continue
         slot.ue_node_id = unit_node_id
         slot.updated_at = now
+        await ordne_entwurf_ein(db, slot)
         updated.append(slot)
 
     await db.commit()

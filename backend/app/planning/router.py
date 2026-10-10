@@ -89,6 +89,7 @@ from app.planning.schemas import (
 )
 from app.planning.service import create_unit_node, delete_unit_node, entwurf_am_termin, update_unit_node
 from app.planning.reflow_service import OverhangFinding, detect_overhang
+from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.snapshots import create_snapshot, restore_snapshot
 from app.planning.slot_generator import generate_slots
 
@@ -501,6 +502,8 @@ async def update_slot(
         setattr(slot, field, value)
     if neue_kategorie is not None:
         ausfall_modul.setze_kategorie(slot, neue_kategorie, herkunft="eigen")
+    if {"ue_node_id", "stunde_node_id"} & update_data.keys():
+        await ordne_entwurf_ein(db, slot)
 
     slot.updated_at = datetime.now(timezone.utc)
     await db.commit()

@@ -15,6 +15,13 @@
 #
 # `kompetenzen.praefixe`: Kompetenznummern, die zu Fach und Stufe der Stunde gehören.
 # Jede genannte Nummer muss mit einem davon beginnen und im Fach existieren.
+# `kompetenzen.kapitel`: `true` — die Stunde gehört zu einer Einheit mit Curriculum-Kapitel,
+# und jede genannte inhaltsbezogene Kompetenz stammt aus diesem Kapitel (A4); `false` — sie
+# hat keins. Passt die Instanz nicht dazu, bricht die Messung vorher ab.
+#
+# Aufbau für A4 (Jan, 10.10.2026): Gruppe 33 hat eine Einheit „Aromaten" mit dem 12.10.,
+# verknüpft mit einem Kapitel „Aromaten" in „LF CH", dessen Lernsequenz auf 3.4.5(1)–(5)
+# verweist. Der 13.10. bleibt bewusst ohne Einheit — so misst je ein Fall jeden Weg.
 
 lehrkraft_der_gruppe: 33
 
@@ -68,11 +75,27 @@ faelle:
       - "Welche Kompetenzen aus dem Bildungsplan fördert diese Stunde?"
     kompetenzen:
       praefixe: ["3.4.", "2."]     # Chemie, Leistungsfach Kursstufe (BW 2016 V2)
+      kapitel: true                # Einheit „Aromaten" mit Kapitel
     erwartung: >-
-      Nennt Kompetenzen des Leistungsfachs Chemie (Bildungsplan BW 2016, Kursstufe: 3.4.x und
-      prozessbezogen 2.x), die zum Inhalt der Stunde passen — Bromierung von Benzol im
-      Praktikum —, mit Nummer und Wortlaut. Beispiele aus dem Entwurf (etwa zu 3.4.5(2) die
-      Stellvertretersubstanz Benzaldehyd statt Bromdämpfe). Keine Mittelstufe, kein anderer Plan.
+      Nimmt die Kompetenzen aus dem Kapitel der Einheit „Aromaten" (3.4.5) und wählt die, die
+      zum Inhalt der Stunde passen — Bromierung von Benzol im Praktikum —, mit Nummer und
+      Wortlaut. Kein späteres Thema (etwa 3.4.1 Energetik). Beispiele aus dem Entwurf (etwa zu
+      3.4.5(2) die Stellvertretersubstanz Benzaldehyd statt Bromdämpfe).
+
+  # Derselbe Kurs, eine Stunde ohne Einheit: Weg über die Suche (Curriculum „LF CH" als
+  # Hinweis auf Stufe und Fassung).
+  - id: kompetenz-ohne-einheit
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    zuege:
+      - "Welche Kompetenzen aus dem Bildungsplan fördert diese Stunde?"
+    kompetenzen:
+      praefixe: ["3.4.", "2."]
+      kapitel: false
+    erwartung: >-
+      Sucht gezielt und nennt Kompetenzen des Leistungsfachs Chemie (BW 2016, Kursstufe: 3.4.x,
+      prozessbezogen 2.x) zum Mechanismus der elektrophilen aromatischen Substitution, mit
+      Nummer und Wortlaut — vor allem 3.4.5(4). Keine Mittelstufe, kein anderer Plan, nichts
+      aus dem Gedächtnis.
 
   - id: rueckfrage-ohne-schreibwunsch
     stunde: {gruppe: 36, datum: 2026-10-05}

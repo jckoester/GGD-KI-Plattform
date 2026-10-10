@@ -48,6 +48,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   die es nicht gibt. Jetzt nur noch vorhandene, mit dem Wortlaut des Bildungsplans.
 - Ersetzte oder verschmolz der Assistent eine bereits nachbereitete Phase, ging ihr Status still
   verloren. Nachbereitete Phasen lassen sich durch ihn jetzt nur noch ändern.
+- Bekam ein Termin mit Entwurf nachträglich eine Einheit, gehörte der Entwurf nicht dazu: Die
+  Entwurfsansicht zeigte keine Einheit. Jetzt folgt der Entwurf der Einheit seines Termins —
+  beim Zuweisen, Umhängen, Entfernen und beim Wiederherstellen eines Stands.
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.

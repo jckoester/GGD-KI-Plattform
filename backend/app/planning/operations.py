@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.planning.ausfall import setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
+from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.snapshots import create_snapshot
 from app.planning import zuordnung
@@ -350,6 +351,7 @@ async def apply_operations(
             slots[op.slot_id].thema = op.thema
         elif isinstance(op, SetUnit):
             slots[op.slot_id].ue_node_id = op.unit_node_id
+            await ordne_entwurf_ein(db, slots[op.slot_id])
         elif isinstance(op, SetCategory):
             # ⚠️ **Die Herkunft wandert mit der Kategorie.** Setzt der Assistent einen
             # Ausfall, gehört er nicht dem Stundenplan — sonst überschriebe der nächste
@@ -364,6 +366,7 @@ async def apply_operations(
             ziel.ue_node_id = eintrag.ue_node_id
             ziel.stunde_node_id = eintrag.stunde_node_id
             ziel.thema = eintrag.thema
+            await ordne_entwurf_ein(db, ziel)
             # Der Termin ist ein anderer als der ursprüngliche — was dort geplant war,
             # passt nicht ungeprüft. Denselben Marker setzt das Umhängen selbst.
             ziel.anpassung_noetig = True

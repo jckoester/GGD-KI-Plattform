@@ -166,6 +166,30 @@ def kompetenznummern_des_fachs(conn, stunde: str) -> set[str]:
           AND k.metadata ? 'kompetenz_nr'""", stunde)}
 
 
+def kompetenznummern_des_kapitels(conn, stunde: str) -> set[str]:
+    """Die IK-Nummern aus den Lernsequenzen des Kapitels, auf das die Einheit der Stunde
+    verweist (Stunde → Einheit → Kapitel → Lernsequenz → IK) — das, was A1 mitliefert."""
+    return {nr for (nr,) in _alle(conn, """
+        SELECT DISTINCT ik.metadata->>'kompetenz_nr' FROM context_edges teil
+        JOIN context_edges ref ON ref.from_node_id = teil.to_node_id AND ref.relation = 'references'
+        JOIN context_nodes k ON k.id = ref.to_node_id AND k.content_type = 'kapitel'
+        JOIN context_edges seq ON seq.to_node_id = k.id AND seq.relation = 'part_of'
+        JOIN context_nodes l ON l.id = seq.from_node_id AND l.content_type = 'lernsequenz'
+        JOIN context_edges r ON r.from_node_id = l.id AND r.relation = 'references'
+        JOIN context_nodes ik ON ik.id = r.to_node_id AND ik.content_type = 'ik_kompetenz'
+        WHERE teil.from_node_id::text = %s AND teil.relation = 'part_of'""", stunde)}
+
+
+def aufbau_fehler(fall: dict, kapitel: bool) -> str | None:
+    """Passt die Instanz zum Fall? `kompetenzen.kapitel: true` verlangt eine Stunde mit
+    Curriculum-Kapitel, `false` eine ohne — sonst misst der Fall still den anderen Weg."""
+    soll = (fall.get("kompetenzen") or {}).get("kapitel")
+    if soll is None or soll == kapitel:
+        return None
+    return (f"{fall['id']}: Die Stunde {'braucht' if soll else 'darf kein'} ein Curriculum-Kapitel "
+            f"über ihre Einheit{'' if soll else ' haben'} — Jahresplan und Curriculum prüfen.")
+
+
 def hat_kapitel(conn, stunde: str) -> bool:
     """Bringt der Entwurf ein Curriculum-Kapitel mit (Stunde → Einheit → Kapitel, A1)?"""
     return bool(_eins(conn, """
@@ -230,7 +254,7 @@ def kompetenznummern(text: str) -> list[str]:
 
 def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
             ziel: str | None = None, nummern: set[str] | None = None,
-            kapitel: bool = False) -> dict[str, bool]:
+            kapitel: bool = False, kapitel_nummern: set[str] | None = None) -> dict[str, bool]:
     """Die Kriterien aus dem Plan — je Fall nur die, die auf ihn zutreffen.
 
     ``stunde`` ist die Bezugsstunde des Falls (oder None), ``ziel`` der Entwurf des Termins
@@ -296,6 +320,13 @@ def bewerte(fall: dict, ausgang: dict, zuege: list[dict], *, stunde: str | None,
         k["kompetenzen_der_stufe"] = all(
             n.startswith(praefixe) and (nummern is None or n in nummern) for n in genannt)
         k["kein_fremder_plan"] = not _FREMDER_PLAN.search(text)
+        # A4: Hat die Stunde ein Kapitel, stammen die inhaltsbezogenen Kompetenzen von dort —
+        # nicht aus einem späteren Thema derselben Stufe (3.4.1(6) Entropie statt Aromaten).
+        # Die Präfixe allein sähen das nicht. Prozessbezogene (2.x) bleiben frei.
+        if fall["kompetenzen"].get("kapitel"):
+            ik = [n for n in genannt if n.startswith("3.")]
+            k["kompetenzen_aus_dem_kapitel"] = bool(ik) and all(
+                n in (kapitel_nummern or set()) for n in ik)
     return k
 
 
@@ -429,6 +460,8 @@ def main() -> None:
     for fall in faelle:
         if "stunde" in fall and stunde_am(conn, **fall["stunde"]) is None:
             raise SystemExit(f"{fall['id']}: kein Entwurf am {fall['stunde']} — falsche Instanz?")
+        if "stunde" in fall and (fehler := aufbau_fehler(fall, hat_kapitel(conn, stunde_am(conn, **fall["stunde"])))):
+            raise SystemExit(fehler)
 
     ausgang = stand(conn, gruppen)
     beginn = _eins(conn, "SELECT now()")
@@ -465,6 +498,7 @@ def main() -> None:
                         ziel=stunde_am(conn, **fall["waehlt"]) if "waehlt" in fall else None,
                         nummern=kompetenznummern_des_fachs(conn, bezug) if bezug and "kompetenzen" in fall else None,
                         kapitel=bool(bezug) and hat_kapitel(conn, bezug),
+                        kapitel_nummern=kompetenznummern_des_kapitels(conn, bezug) if bezug else None,
                     )
                     bestanden = all(kriterien.values())
                     werkzeuge = " | ".join(" → ".join(_werkzeuge(z)) or "—" for z in zuege)
