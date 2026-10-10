@@ -23,3 +23,22 @@ assistants:
     tags:
       - planung
       - jahresplan
+
+  - name: Stundenentwurf
+    description: >
+      Hilft Lehrkräften, eine einzelne Stunde zu planen und ihren Entwurf zu
+      überarbeiten: Phasen, Sozialformen, Methoden, Kompetenzen. Öffnet sich aus der
+      Entwurfsansicht und von der Startseite mit der Stunde; im Chat findet er sie auch
+      selbst („meine nächste Stunde in der 9c"). Sein Prompt ist die Vorlage für eigene
+      Stundenassistenten der Lehrkräfte.
+    audience: teacher
+    scope: teachers
+    status: active
+    # Stundenplanung greift ohne Gruppenbezug; den Zugang zur einzelnen Stunde prüft jedes
+    # Werkzeug selbst. Die Jahresplanung (`planning`) gehört bewusst nicht dazu.
+    tool_groups:
+      - lesson_planning
+    system_prompt_file: config/prompts/stundenentwurf_assistent.md
+    tags:
+      - planung
+      - stundenentwurf

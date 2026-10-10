@@ -31,7 +31,7 @@ def test_die_beschreibung_nennt_die_regeln():
     text = _funktion()["description"]
     assert "id" in text and "unverändert" in text            # Kennungen behalten
     assert "nie 0" in text                                    # Skizze ohne Dauer
-    assert "search_context_nodes" in text                     # Vokabular nachschlagen
+    assert "vokabular aus get_lesson_detail" in text          # Vokabular kommt mit dem Entwurf
     assert "{typ:'node'" in text and "{typ:'text'" in text    # node vs. text
     assert "refs nur setzen, wenn die Lehrkraft zugestimmt hat" in text
 

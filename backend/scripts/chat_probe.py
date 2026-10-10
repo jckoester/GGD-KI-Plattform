@@ -39,20 +39,30 @@ from app.context.embedding import vor_einer_messung
 
 def frage_stellen(
     client: httpx.Client, frage: str, *, assistent: int | None, gruppe: int | None,
-    modell: str | None = None,
+    modell: str | None = None, stunde: str | None = None,
+    verlauf: list[dict] | None = None, konversation: str | None = None,
 ) -> dict:
     """Eine Frage senden und den Rohstrom auswerten.
+
+    ``stunde`` setzt den Stundenbezug einer **neuen** Konversation (0.15). ``verlauf`` und
+    ``konversation`` setzen eine bestehende fort — der Chat bekommt den ganzen Verlauf, wie
+    ihn die Oberfläche schickt (`stundenassistent_messung.py` braucht das für
+    „Vorschlag, dann Zustimmung").
 
     ⚠️ **Die Ereignisgrenze ist die Leerzeile.** Ein SSE-Block ohne `event:`-Zeile ist
     ein Standardereignis (die Token der Antwort). Wer den zuletzt gelesenen Namen über
     die Leerzeile hinaus stehen lässt, zählt den halben Antworttext als
     Werkzeugaufruf — beim ersten Versuch genau so passiert.
     """
-    rumpf: dict = {"messages": [{"role": "user", "content": frage}]}
+    rumpf: dict = {"messages": [*(verlauf or []), {"role": "user", "content": frage}]}
+    if konversation is not None:
+        rumpf["conversation_id"] = konversation
     if assistent is not None:
         rumpf["assistant_id"] = assistent
-    if gruppe is not None:
+    if gruppe is not None and konversation is None:
         rumpf["group_id"] = gruppe
+    if stunde is not None and konversation is None:
+        rumpf["stunde_node_id"] = stunde
     if modell is not None:
         rumpf["model_id"] = modell
 
@@ -64,6 +74,8 @@ def frage_stellen(
         if strom.status_code != 200:
             strom.read()
             raise SystemExit(f"HTTP {strom.status_code}: {strom.text[:400]}")
+        konversation = strom.headers.get("X-Conversation-Id") or konversation
+        modell_genutzt = strom.headers.get("X-Model-Id") or None
         name: str | None = None
         for zeile in strom.iter_lines():
             if not zeile.strip():
@@ -88,6 +100,8 @@ def frage_stellen(
     antwort = "".join(stuecke)
     return {
         "frage": frage,
+        "konversation": konversation,
+        "modell": modell_genutzt,
         "werkzeuge": werkzeuge,
         "ereignisse": ereignisse,
         "antwort": antwort,
@@ -127,6 +141,8 @@ def main() -> None:
     p.add_argument("--datei", type=Path, help="Datei mit einer Frage je Zeile")
     p.add_argument("--assistent", type=int, default=None)
     p.add_argument("--gruppe", type=int, default=None)
+    p.add_argument("--stunde", default=None,
+                   help="Kennung einer Unterrichtsstunde als Stundenbezug (nur mit --rolle teacher)")
     p.add_argument("--modell", default=None,
                    help="Modell-Alias, sonst das des Assistenten (z. B. chat-komplex)")
     p.add_argument("--pseudonym", default="probe-schueler",
@@ -170,7 +186,7 @@ def main() -> None:
         for frage in fragen:
             ergebnisse.append(
                 frage_stellen(client, frage, assistent=args.assistent,
-                              gruppe=args.gruppe, modell=args.modell)
+                              gruppe=args.gruppe, modell=args.modell, stunde=args.stunde)
             )
 
     if args.json:

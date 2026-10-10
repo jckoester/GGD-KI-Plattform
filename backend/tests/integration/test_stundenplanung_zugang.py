@@ -215,3 +215,56 @@ async def test_fremde_einheit_bleibt_zu(
     aus = await _rufe(async_engine, _handle_get_unit_detail, {"unit_node_id": ue},
                       TEACHER1_PSEUDO, gruppe_der_konversation)
     assert aus == {"error": "UE nicht gefunden"}
+
+
+# ── Das Vokabular kommt mit dem Entwurf (Messung 1 zu Schritt 6) ─────────────
+
+
+@pytest.mark.asyncio
+async def test_entwurf_bringt_das_lesbare_vokabular_mit(test_client, auth_headers, gruppen, async_engine):
+    """Schulweit und eigen ja, samt Aliasen; fremd-privat und fremdes Fach nein."""
+    from app.context.taxonomy import CONTENT_TYPE_TO_CATEGORY
+    from app.db.models import ContextNode, NodeAlias
+
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Vokabular")
+    async with _sitzungen(async_engine)() as db:
+        fach_der_stunde = (await db.get(ContextNode, UUID(stunde))).subject_id
+
+        def knoten(titel, art="methode", **kw):
+            n = ContextNode(category=CONTENT_TYPE_TO_CATEGORY[art], content_type=art,
+                            title=f"Zugang-Vokabular {titel}", status="active", metadata_={},
+                            read_scope=kw.pop("read_scope", "school"),
+                            write_scope=kw.pop("write_scope", "school"), **kw)
+            db.add(n)
+            return n
+
+        schulweit = knoten("Unterrichtsgespräch")
+        sozialform = knoten("Einzelarbeit", art="sozialform")
+        eigen = knoten("Meine Methode", read_scope="private", write_scope="private",
+                       owner_pseudonym=TEACHER1_PSEUDO)
+        knoten("Fremde Methode", read_scope="private", write_scope="private",
+               owner_pseudonym=TEACHER2_PSEUDO)
+        # Fachgebunden, schulweit lesbar — es geht um den Fachfilter, nicht um den Scope.
+        knoten("Andere Fachschaft", subject_id=FREMDE)            # Fach 747 ≠ Fach der Stunde
+        knoten("Eigene Fachschaft", subject_id=fach_der_stunde)
+        await db.flush()
+        db.add(NodeAlias(node_id=schulweit.id, alias="LSG"))
+        db.add(NodeAlias(node_id=sozialform.id, alias="EA"))
+        await db.commit()
+
+    try:
+        detail = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde}, TEACHER1_PSEUDO)
+        methoden = {m["titel"].removeprefix("Zugang-Vokabular "): m for m in detail["vokabular"]["methoden"]
+                    if m["titel"].startswith("Zugang-Vokabular ")}
+        sozialformen = {s["titel"].removeprefix("Zugang-Vokabular "): s for s in detail["vokabular"]["sozialformen"]
+                        if s["titel"].startswith("Zugang-Vokabular ")}
+        assert set(methoden) == {"Unterrichtsgespräch", "Meine Methode", "Eigene Fachschaft"}
+        assert methoden["Unterrichtsgespräch"]["aliase"] == ["LSG"]
+        assert methoden["Unterrichtsgespräch"]["node_id"] == str(schulweit.id)
+        assert sozialformen["Einzelarbeit"]["aliase"] == ["EA"]
+        assert "aliase" not in methoden["Meine Methode"]
+        assert str(eigen.id) in {m["node_id"] for m in methoden.values()}
+    finally:
+        with gruppen.cursor() as cur:
+            cur.execute("DELETE FROM context_nodes WHERE title LIKE 'Zugang-Vokabular %%'")
+        gruppen.commit()

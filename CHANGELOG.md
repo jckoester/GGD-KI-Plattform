@@ -7,6 +7,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
+- Assistent **„Stundenentwurf"**: plant mit der Lehrkraft eine einzelne Stunde — liest den
+  Entwurf, schlägt vor, schreibt erst nach Zustimmung. Wird einmalig angelegt (unten).
 - Fähigkeit **„Stundenplanung"** im Assistenten-Editor: Stundenentwurf lesen und Phasen
   schreiben. Sie greift für Lehrkräfte auch im Chat ohne Gruppenbezug; den Zugang zur
   einzelnen Stunde prüft jeder Zugriff.
@@ -45,6 +47,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 `alembic upgrade head` führt `0084` aus: Spalte `conversations.stunde_node_id` — der
 Stundenbezug eines Chats. Rückrollbar; dabei gehen nur die gesetzten Bezüge verloren.
+
+### Nach dem Update
+
+Den Assistenten „Stundenentwurf" einmal anlegen — per Seed, der nur anlegt, was fehlt:
+
+```bash
+docker compose exec backend python scripts/seed_assistants.py --config config/assistants.example.yaml
+```
+
+Oder im Editor: schulweiter Assistent für Lehrkräfte, Fähigkeit „Stundenplanung", Prompt aus
+`config/prompts/stundenentwurf_assistent.md`.
 
 ## [0.14.1] – 2026-10-07
 

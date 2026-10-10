@@ -1,0 +1,37 @@
+# Messung zu Päckchen A, Schritt 6: die Stunde im freien Chat finden (ohne Bezug).
+#
+#   python scripts/stundenassistent_messung.py --datei scripts/szenarien/stunde_finden.yaml
+#
+# „Morgen", „am Montag" hängen am heutigen Tag. Die Fälle sind auf `heute` geschnitten
+# (Samstag, 10.10.2026, Dev-Instanz); an einem anderen Tag bricht die Messung ab, statt
+# stillschweigend etwas anderes zu messen.
+#
+# `waehlt`: Dieser Termin muss danach die Bezugsstunde sein. `nachfrage`: Es darf keine
+# Bezugsstunde gesetzt sein, und die Antwort fragt nach. Einen Entwurf anzulegen ist in
+# keinem Fall erlaubt — keiner enthält eine Zustimmung.
+
+lehrkraft_der_gruppe: 33
+heute: 2026-10-10
+
+faelle:
+  - id: ein-treffer-gruppe
+    zuege: ["Ich will meine nächste Stunde in der 9C vorbereiten."]
+    waehlt: {gruppe: 36, datum: 2026-10-12}
+
+  - id: ein-treffer-wochentag
+    zuege: ["Hilf mir mit der Chemie-Stunde am Dienstag."]
+    waehlt: {gruppe: 33, datum: 2026-10-13}
+
+  - id: mehrdeutig
+    # Montag, 12.10.: drei Gruppen (ch-ks-9d, 9C, ch-tl-abi28)
+    zuege: ["Lass uns meine Stunde am Montag planen."]
+    nachfrage: true
+
+  - id: kein-treffer
+    zuege: ["Ich brauche Hilfe bei meiner Stunde in der 7a."]
+    nachfrage: true
+
+  - id: ohne-entwurf
+    # Donnerstag, 15.10.: Chemie nur in ch-tl-abi28, ohne Entwurf
+    zuege: ["Plane mit mir die Chemie-Stunde am Donnerstag."]
+    nachfrage: true

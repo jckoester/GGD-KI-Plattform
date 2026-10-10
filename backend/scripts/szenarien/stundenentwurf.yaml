@@ -1,0 +1,73 @@
+# Messung zu Päckchen A, Schritt 6: der Stundenassistent mit Bezugsstunde.
+#
+#   python scripts/stundenassistent_messung.py --datei scripts/szenarien/stundenentwurf.yaml
+#
+# Die Fälle sind aus den fünf Stundenentwürfen der Dev-Instanz geschnitten (Plan, Abschnitt
+# „Vorab"): Gruppe 33 (Chemie Kursstufe), 36 (Mathe 9c), 40 (IuM 6d). Auf einer anderen
+# Instanz gibt es diese Stunden nicht — die Messung bricht dann mit einer Meldung ab.
+#
+# Je Fall: `stunde` (Gruppe und Datum des Termins) wird zur Bezugsstunde, `zuege` gehen
+# nacheinander in **eine** Konversation. Ab `zustimmung_ab` (1-basiert) darf geschrieben
+# werden; davor nicht. `neue_phasen_hoechstens`: so viele Phasen dürfen nach dem Schreiben
+# eine Kennung tragen, die es vorher nicht gab — mehr heißt, Kennungen gingen verloren.
+
+lehrkraft_der_gruppe: 33
+
+faelle:
+  - id: skizze-ausarbeiten
+    stunde: {gruppe: 36, datum: 2026-10-05}
+    zuege:
+      - "Arbeite die Phasen „Übungsaufgaben (einfach bis mittel)“ und „Vertiefte Übungen“ aus: Was genau sollen die Schüler:innen dort tun?"
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 0
+
+  - id: phase-ergaenzen
+    stunde: {gruppe: 36, datum: 2026-10-12}
+    zuege:
+      - "Ergänze nach „Erarbeitung II: Fallunterscheidung“ eine kurze Phase, in der die Fallunterscheidung an der Tafel festgehalten wird."
+      - "Passt, so übernehmen."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 1
+
+  - id: methode-tauschen
+    stunde: {gruppe: 40, datum: 2026-09-15}
+    zuege:
+      - "In „Organisatorisches“ möchte ich statt Lehrervortrag lieber ein Unterrichtsgespräch."
+      - "Ja, mach das so."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 0
+
+  - id: zeit-kuerzen
+    stunde: {gruppe: 33, datum: 2026-10-13}
+    zuege:
+      - "Ich habe in dieser Stunde nur 70 Minuten. Wie kürze ich den Entwurf?"
+      - "Ja, so übernehmen."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 0
+
+  - id: kompetenz-vorschlagen
+    stunde: {gruppe: 33, datum: 2026-10-12}
+    zuege:
+      - "Welche Kompetenzen aus dem Bildungsplan fördert diese Stunde?"
+
+  - id: rueckfrage-ohne-schreibwunsch
+    stunde: {gruppe: 36, datum: 2026-10-05}
+    zuege:
+      - "Ist die Stunde mit 80 von 90 Minuten zu knapp oder zu locker geplant?"
+
+  - id: skizze-ohne-dauer
+    stunde: {gruppe: 36, datum: 2026-10-12}
+    zuege:
+      - "Mach aus „Sicherung wird HA“ eine richtige Hausaufgabenphase mit Beschreibung."
+      - "Ja, übernehmen."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 0
+
+  - id: stundenziel
+    stunde: {gruppe: 36, datum: 2026-10-12}
+    zuege:
+      - "Formuliere ein Stundenziel für diese Stunde."
+      - "Gut, übernimm das."
+    zustimmung_ab: 2
+    neue_phasen_hoechstens: 0

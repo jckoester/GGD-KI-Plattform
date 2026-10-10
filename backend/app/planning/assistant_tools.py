@@ -760,6 +760,45 @@ def _stunden_kennung(args: dict, ctx: ToolContext) -> str:
     return str(ctx.stunde_node_id) if ctx.stunde_node_id else ""
 
 
+async def _vokabular(ctx: ToolContext, fach_id: int | None) -> dict:
+    """Sozialformen und Methoden, die diese Person lesen darf — samt Aliasen.
+
+    Kommt mit dem Entwurf, damit das Modell nicht jeden Begriff einzeln nachschlägt: In der
+    Messung zu Schritt 6 (10.10.2026) suchte es nach dem Lesen fünfmal mit
+    `search_context_nodes`, und die sechs Werkzeugrunden des Chats waren verbraucht, bevor
+    es schreiben konnte — die Lehrkraft bekam eine leere Antwort. Das Vokabular ist klein
+    (heute 20 Einträge). Fachgebundene Einträge nur aus dem Fach der Stunde; was andere
+    Fachschaften pflegen, wäre hier Rauschen.
+    """
+    from app.context.visibility import read_scope_clause
+    from app.db.models import NodeAlias
+
+    zeilen = (await ctx.db.execute(
+        sa.select(ContextNode.id, ContextNode.title, ContextNode.content_type)
+        .where(
+            ContextNode.content_type.in_(("sozialform", "methode")),
+            ContextNode.status == "active",
+            read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+            sa.or_(ContextNode.subject_id.is_(None), ContextNode.subject_id == fach_id),
+        )
+        .order_by(ContextNode.title)
+    )).all()
+    aliase: dict = {}
+    if zeilen:
+        for node_id, alias in (await ctx.db.execute(
+            sa.select(NodeAlias.node_id, NodeAlias.alias)
+            .where(NodeAlias.node_id.in_([z[0] for z in zeilen]))
+        )).all():
+            aliase.setdefault(node_id, []).append(alias)
+    vokabular: dict = {"sozialformen": [], "methoden": []}
+    for node_id, titel, art in zeilen:
+        eintrag = {"node_id": str(node_id), "titel": titel}
+        if aliase.get(node_id):
+            eintrag["aliase"] = sorted(aliase[node_id])
+        vokabular["sozialformen" if art == "sozialform" else "methoden"].append(eintrag)
+    return vokabular
+
+
 async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
     node_str = _stunden_kennung(args, ctx)
     if not node_str:
@@ -789,6 +828,7 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
             "periods": slot.periods,
             "verfuegbare_min": slot.periods * 45,
         } if slot else None,
+        "vokabular": await _vokabular(ctx, node.subject_id),
     }
 
 
@@ -801,8 +841,10 @@ register_tool(ChatTool(
         "function": {
             "name": "get_lesson_detail",
             "description": (
-                "Gibt den vollständigen Stundenentwurf zurück: "
-                "Titel, Stundenziel, Phasen-Array, Kompetenzen und Slot-Kontext."
+                "Gibt den vollständigen Stundenentwurf zurück: Titel, Stundenziel, "
+                "Phasen-Array, Kompetenzen und Slot-Kontext — dazu das Vokabular der "
+                "Sozialformen und Methoden (node_id, titel, aliase), aus dem sozialform "
+                "und methode als Knoten eingetragen werden."
             ),
             "parameters": {
                 "type": "object",
@@ -971,9 +1013,9 @@ register_tool(ChatTool(
                 "aus get_lesson_detail unverändert; neue Phasen ohne id. (2) dauer_min nur, "
                 "wenn die Dauer feststeht — eine Skizze ohne Minuten bleibt ohne, bis die "
                 "Lehrkraft Minuten will; dann das Feld weglassen, nie 0. (3) sozialform und "
-                "methode: Steht der Begriff im Vokabular (search_context_nodes, Arten "
-                "'sozialform' bzw. 'methode'), als {typ:'node',node_id,titel}, sonst als "
-                "{typ:'text',wert}. (4) refs nur setzen, wenn die Lehrkraft zugestimmt hat. "
+                "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "
+                "Alias), als {typ:'node',node_id,titel}, sonst als {typ:'text',wert} — nicht "
+                "einzeln nachschlagen. (4) refs nur setzen, wenn die Lehrkraft zugestimmt hat. "
                 "Gibt suggested_refs zurück: Kompetenzen aus verknüpften Material-Knoten, "
                 "die noch nicht in refs stehen — nur vorschlagen, nicht ungefragt übernehmen."
             ),
