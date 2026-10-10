@@ -1044,6 +1044,35 @@ def _phasen_pruefen(phasen) -> tuple[list[dict] | None, str | None]:
     return geprueft, None
 
 
+def _nachbereitete_fehlen(gespeichert, neu: list[dict]) -> str | None:
+    """Fehlt im neuen Array eine nachbereitete Phase? → Fehlertext, sonst None.
+
+    Eine Phase mit Nachbereitungsstatus („erledigt", „offen", „gestrichen") ist Geschichte:
+    Reflow, Übertrag und Kompetenzverlauf hängen an ihrem Status, und der reist über die
+    Kennung (`uebernimm_zusatzfelder`). Schreibt das Modell sie ohne Kennung neu — beim
+    Zusammenlegen tat es das in 10 von 10 Läufen, auch gegen ausdrückliche Anweisung
+    (Messung zu Schritt 3, 10.10.2026) —, wäre der Status still weg. Deshalb wird der Aufruf
+    abgewiesen. Ändern bleibt erlaubt, mit Kennung; entfernen geht in der Entwurfsansicht.
+    Übertragene Phasen („geplant") sind nicht geschützt: Sie zu streichen ist Planung.
+    """
+    from app.planning.review_service import NACHBEREITUNG_STATI
+
+    neue_ids = {p.get("id") for p in neu if isinstance(p, dict) and p.get("id")}
+    fehlend = [
+        p for p in (gespeichert or [])
+        if isinstance(p, dict) and p.get("status") in NACHBEREITUNG_STATI
+        and p.get("id") not in neue_ids
+    ]
+    if not fehlend:
+        return None
+    namen = ", ".join(f"„{p.get('name')}“ ({p.get('status')})" for p in fehlend)
+    return (f"Nicht gespeichert: Nachbereitete Phasen fehlen — {namen}. Sie lassen sich "
+            "ändern (mit ihrer id aus get_lesson_detail), aber nicht entfernen, ersetzen oder "
+            "zusammenlegen. Nimm eine zusammengelegte oder ersetzende neue Phase wieder heraus "
+            "und ändere die nachbereiteten einzeln — oder sag der Lehrkraft, dass sich eine "
+            "nachbereitete Phase nur in der Entwurfsansicht entfernen lässt.")
+
+
 # typ → was der Knoten dazu sein muss: Bausteinart (ik, pk) bzw. Kategorie (concept).
 _REF_TYPEN = {"ik": "ik_kompetenz", "pk": "pk_kompetenz", "concept": None}
 
@@ -1135,6 +1164,9 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     phasen, fehler = _phasen_pruefen(phasen)
     if fehler:
         return {"error": fehler}
+    fehler = _nachbereitete_fehlen((node.metadata_ or {}).get("phasen"), phasen)
+    if fehler:
+        return {"error": fehler}
     refs = args.get("refs")
     if refs is not None:
         refs, fehler = await _refs_pruefen(ctx, refs)
@@ -1220,7 +1252,8 @@ register_tool(ChatTool(
                 "fehlt, ist danach gelöscht. Regeln: (1) Bestehende Phasen behalten ihre id "
                 "aus get_lesson_detail unverändert; neue Phasen ohne id. Legst du Phasen "
                 "zusammen, trägt die zusammengelegte die id der ersten — auch wenn sie neu "
-                "heißt. (2) dauer_min nur, "
+                "heißt. Phasen mit status (nachbereitet) bleiben mit ihrer id im Array; "
+                "fehlt eine, wird der Aufruf abgewiesen. (2) dauer_min nur, "
                 "wenn die Dauer feststeht — eine Skizze ohne Minuten bleibt ohne, bis die "
                 "Lehrkraft Minuten will; dann das Feld weglassen, nie 0. (3) sozialform und "
                 "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "

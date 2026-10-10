@@ -46,6 +46,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   er prüft jetzt nach derselben Regel wie der Planer.
 - Der Assistent konnte Kompetenzen in beliebiger Form an eine Stunde schreiben, auch solche,
   die es nicht gibt. Jetzt nur noch vorhandene, mit dem Wortlaut des Bildungsplans.
+- Ersetzte oder verschmolz der Assistent eine bereits nachbereitete Phase, ging ihr Status still
+  verloren. Nachbereitete Phasen lassen sich durch ihn jetzt nur noch ändern.
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.

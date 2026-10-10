@@ -173,15 +173,20 @@ async def test_planungsassistent_behaelt_den_status(test_client, auth_headers, g
     async with _sitzungen(async_engine)() as db:
         ctx = ToolContext(db=db, user=SimpleNamespace(sub=TEACHER1_PSEUDO), group_id=GRUPPE,
                           conversation_id=None)
+        # Die übrigen Phasen stehen nach der Nachbereitung auf „erledigt" und bleiben mit
+        # ihrer Kennung drin — nachbereitete Phasen darf der Assistent nicht weglassen (0.15).
         aus = await _handle_update_lesson_phases({"node_id": stunde, "phasen": [
+            {"id": phasen[0]["id"], "name": phasen[0]["name"], "dauer_min": phasen[0]["dauer_min"]},
             {"id": phasen[1]["id"], "name": "Erarbeitung (überarbeitet)", "dauer_min": 25},
+            *[{"id": q["id"], "name": q["name"], "dauer_min": q["dauer_min"]} for q in phasen[2:]],
             {"name": "Vertiefung", "dauer_min": 10, "prio": "vertiefung"},
         ]}, ctx)
     assert "error" not in aus, aus
 
     nachher = await _phasen(test_client, h, stunde)
-    assert nachher[0]["status"] == "offen" and nachher[0]["name"] == "Erarbeitung (überarbeitet)"
-    assert "status" not in nachher[1]
+    assert nachher[1]["status"] == "offen" and nachher[1]["name"] == "Erarbeitung (überarbeitet)"
+    assert nachher[0]["status"] == "erledigt"
+    assert "status" not in nachher[-1]
 
 
 # ── P3: Die Antwort nennt den gespeicherten Stand ────────────────────────────
@@ -297,12 +302,15 @@ async def test_nachbereitung_ueberlebt_die_skizze(test_client, auth_headers, gru
     await test_client.post(f"/planning/slots/{slot}/review", headers=h,
                            json={"phasen_status": {phasen[1]["id"]: "offen"}})
 
+    # Die übrigen, als „erledigt" nachbereiteten Phasen bleiben mit ihrer Kennung drin (0.15).
     aus = await _werkzeug(async_engine, stunde, [
+        *[{"id": q["id"], "name": q["name"], "dauer_min": q["dauer_min"]} for q in phasen[:1]],
         {"id": phasen[1]["id"], "name": "Erarbeitung"},
+        *[{"id": q["id"], "name": q["name"], "dauer_min": q["dauer_min"]} for q in phasen[2:]],
         {"name": "Ausblick"},
     ])
     assert aus.get("ok") is True, aus
     nachher = await _phasen(test_client, h, stunde)
-    assert nachher[0]["id"] == phasen[1]["id"] and nachher[0]["status"] == "offen"
-    assert nachher[0].get("dauer_min") is None
-    assert "status" not in nachher[1]
+    assert nachher[1]["id"] == phasen[1]["id"] and nachher[1]["status"] == "offen"
+    assert nachher[1].get("dauer_min") is None
+    assert "status" not in nachher[-1]

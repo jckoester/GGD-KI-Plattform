@@ -503,3 +503,68 @@ async def test_fremde_private_kompetenz_ist_keine(test_client, auth_headers, gru
         assert "keine passende Kompetenz" in aus.get("error", ""), aus
     finally:
         _aufraeumen(gruppen)
+
+
+# ── Nachbereitete Phasen gehen nicht verloren (0.15) ─────────────────────────
+#
+# Beim Zusammenlegen schrieb das Modell die neue Phase in 10 von 10 Läufen ohne Kennung —
+# auch gegen ausdrückliche Anweisung. Bei einer nachbereiteten Stunde wäre damit der Status
+# still weg; Reflow und Kompetenzverlauf hängen daran.
+
+
+async def _mit_status(async_engine, stunde, status_je_name: dict):
+    from app.db.models import ContextNode
+    async with _sitzungen(async_engine)() as db:
+        knoten = await db.get(ContextNode, UUID(stunde))
+        meta = dict(knoten.metadata_)
+        meta["phasen"] = [{**p, "status": status_je_name[p["name"]]} if p["name"] in status_je_name else p
+                          for p in meta["phasen"]]
+        knoten.metadata_ = meta
+        await db.commit()
+        return {p["name"]: p["id"] for p in meta["phasen"]}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("schreibe", [
+    lambda ids: [{"id": ids["Einstieg"], "name": "Einstieg", "dauer_min": 10}],                 # weggelassen
+    lambda ids: [{"id": ids["Einstieg"], "name": "Einstieg", "dauer_min": 10},
+                 {"name": "Erarbeitung", "dauer_min": 25}],                                     # ohne Kennung neu
+    lambda ids: [{"id": ids["Einstieg"], "name": "Einstieg & Erarbeitung", "dauer_min": 35}],  # zusammengelegt
+], ids=["weggelassen", "neu_geschrieben", "zusammengelegt"])
+async def test_nachbereitete_phase_bleibt(test_client, auth_headers, gruppen, async_engine, schreibe):
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Nachbereitet")
+    ids = await _mit_status(async_engine, stunde, {"Erarbeitung": "erledigt"})
+    vorher = await _snapshots(async_engine, EIGENE)
+
+    aus = await _rufe(async_engine, _handle_update_lesson_phases,
+                      {"node_id": stunde, "phasen": schreibe(ids)}, TEACHER1_PSEUDO)
+    assert "„Erarbeitung“ (erledigt)" in aus.get("error", ""), aus
+    assert await _phasennamen(test_client, auth_headers, stunde) == ["Einstieg", "Erarbeitung"]
+    assert await _snapshots(async_engine, EIGENE) == vorher
+
+
+@pytest.mark.asyncio
+async def test_nachbereitete_phase_aendern_geht(test_client, auth_headers, gruppen, async_engine):
+    """Mit ihrer Kennung bleibt die Phase änderbar — und behält ihren Status."""
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Ändern")
+    ids = await _mit_status(async_engine, stunde, {"Erarbeitung": "offen"})
+
+    aus = await _rufe(async_engine, _handle_update_lesson_phases, {"node_id": stunde, "phasen": [
+        {"id": ids["Erarbeitung"], "name": "Erarbeitung mit Lösungsblatt", "dauer_min": 20},
+    ]}, TEACHER1_PSEUDO)   # „Einstieg" ohne Status darf weg
+    assert aus.get("ok") is True, aus
+    gelesen = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde}, TEACHER1_PSEUDO)
+    assert [(p["id"], p["name"], p.get("status")) for p in gelesen["phasen"]] == [
+        (ids["Erarbeitung"], "Erarbeitung mit Lösungsblatt", "offen")]
+
+
+@pytest.mark.asyncio
+async def test_uebertragene_phase_darf_weg(test_client, auth_headers, gruppen, async_engine):
+    """„geplant" setzt das Übertragen, nicht die Nachbereitung — sie zu streichen ist Planung."""
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Übertragen")
+    ids = await _mit_status(async_engine, stunde, {"Erarbeitung": "geplant"})
+
+    aus = await _rufe(async_engine, _handle_update_lesson_phases, {"node_id": stunde, "phasen": [
+        {"id": ids["Einstieg"], "name": "Einstieg", "dauer_min": 10}]}, TEACHER1_PSEUDO)
+    assert aus.get("ok") is True, aus
+    assert await _phasennamen(test_client, auth_headers, stunde) == ["Einstieg"]
