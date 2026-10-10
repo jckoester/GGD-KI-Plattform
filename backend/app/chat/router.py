@@ -186,8 +186,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
-_LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=None, pool=10.0)
+# Lese-Timeout: wie lange der Strom zwischen **zwei Teilen** stocken darf, nicht wie lange
+# die Antwort dauert — httpx misst ihn je Lesevorgang, eine lange Antwort, die fließt,
+# bricht er nicht ab. Bis 10/2026 stand hier `read=None`: Stockte LiteLLM, hing die Anfrage
+# unbegrenzt (Messung 3 zu 0.15: 300 s, bis das Messskript aufgab).
+#
+# **Gemessen (10.10.2026)** mit rund 10 000 Tokens Kontext: längste Pause im Strom 0,4 s
+# (chat-standard) und 0,9 s (chat-komplex) — auch das Denken kommt gestreamt
+# (`reasoning_content`). Wer ein lokales Modell ohne GPU einträgt, braucht womöglich
+# allein für das Einlesen eines langen Kontexts länger; dann hier anheben.
+_LITELLM_LESE_TIMEOUT = 60.0
+_LITELLM_TIMEOUT = httpx.Timeout(connect=10.0, read=_LITELLM_LESE_TIMEOUT, write=None, pool=10.0)
 _TITLE_TIMEOUT = httpx.Timeout(5.0)
+# Was die Oberfläche bei einem Abbruch zeigt — vor dem Strom als 504, im Strom als
+# Ereignis `fehler`.
+_ABBRUCH_ZEIT = "Der KI-Dienst hat zu lange nicht geantwortet. Schick die Nachricht bitte noch einmal ab."
+_ABBRUCH_VERBINDUNG = "Die Verbindung zum KI-Dienst ist abgebrochen. Schick die Nachricht bitte noch einmal ab."
+_ABBRUCH_ABGELEHNT = (
+    "Der KI-Dienst hat die Anfrage mittendrin abgelehnt. Schick die Nachricht bitte noch einmal ab."
+)
 # Wartezeiten vor den Abfragen der SpendLogs, gestaffelt. Abgebrochen wird, sobald alle
 # Anfragen des Zuges abgerechnet sind — die Staffel ist die Obergrenze, nicht die Regel.
 #
@@ -211,6 +228,64 @@ _TITLE_TIMEOUT = httpx.Timeout(5.0)
 # also die teuerste. Fehlt eine, fehlt meist die größte.
 _SPEND_LOG_WARTEZEITEN: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0)
 _MAX_TOOL_ROUNDS: int = 6
+# Am Rundenlimit geht die Anfrage nach dem letzten erlaubten Werkzeugaufruf mit
+# `tool_choice: "none"` hinaus und endet mit diesem Hinweis als eigener `user`-Nachricht.
+# Bis 10/2026 brach die Schleife ab, sobald das Modell ein weiteres Werkzeug wollte — die
+# Antwort blieb leer.
+#
+# ⚠️ **Gemessen (10.10.2026)** an der echten letzten Anfrage des Stundenassistenten, der
+# noch `waehle_stunde` und `get_lesson_detail` vor sich hatte. Entscheidend ist der Hinweis:
+# chat-standard (gpt-oss-120b) ruft sonst ein Werkzeug — auch mit `tool_choice: "none"`
+# und auch, wenn die Anfrage gar keine `tools` enthält.
+#
+#   `tool_choice: "none"`                       0/3 Antworten (chat-standard)
+#   ohne `tools`, Hinweis im Werkzeugergebnis   0/3
+#   ohne `tools`, Hinweis als `user`            3/3 — aber Anthropic: HTTP 400, LiteLLM
+#                                               verlangt `tools`, sobald der Verlauf
+#                                               Werkzeugaufrufe enthält
+#   `tool_choice: "none"` + Hinweis als `user`  chat-standard 3/3, ant-haiku 3/3,
+#                                               ant-sonnet, chat-komplex, mistral-small,
+#                                               gpt-4.1-mini, gpt-5-mini je 2/2
+#
+# Als `system`-Nachricht lehnt chat-komplex (Qwen) die Anfrage mit HTTP 400 ab.
+_RUNDENLIMIT_HINWEIS = (
+    "Für diese Anfrage stehen keine Werkzeuge mehr zur Verfügung. Antworte jetzt ohne "
+    "Werkzeugaufruf mit dem, was du bisher erfahren hast, und sag knapp, was offen "
+    "geblieben ist."
+)
+
+
+def _rundentrenner(bisher: str) -> str:
+    """Was vor den Text einer neuen Runde gehört, damit er als eigener Absatz beginnt.
+
+    Schreibt ein Modell vor einem Werkzeugaufruf schon Text (Anthropic: „Ich suche deine
+    Chemie-Stunde …"), hing der Text der nächsten Runde bis 10/2026 ohne Trenner daran:
+    „…13.10.2026.Ich habe die Stunde gefunden".
+    """
+    if not bisher or bisher.endswith("\n\n"):
+        return ""
+    return "\n" if bisher.endswith("\n") else "\n\n"
+
+
+def _unbekanntes_werkzeug(name: str, verfuegbar: list[str]) -> ChatTool:
+    """Ersatz für ein Werkzeug, das das Modell erfunden hat — es antwortet mit den Namen,
+    die es gibt. So läuft der Aufruf durch dieselbe Schleife wie jeder andere und zählt
+    gegen das Rundenlimit.
+
+    Bis 10/2026 brach ein unbekannter Name den Zug ab, die Antwort blieb leer. Gemessen
+    (10.10.2026): chat-standard rief im Chat ohne Stundenbezug in 2 von 9 Läufen
+    `find_stunde` statt `finde_stunde`.
+    """
+    meldung = (
+        f"Ein Werkzeug „{name}“ gibt es nicht. Verfügbar: {', '.join(verfuegbar)}."
+        if verfuegbar else
+        f"Ein Werkzeug „{name}“ gibt es nicht; in diesem Chat stehen keine Werkzeuge zur Verfügung."
+    )
+
+    async def _antwort(args: dict, ctx: ToolContext) -> dict:
+        return {"error": meldung}
+
+    return ChatTool(name=name, groups=frozenset(), definition={}, handler=_antwort)
 
 # Guardrail-Prompt-Cache
 _GUARDRAIL_TTL = 60.0  # Sekunden
@@ -2033,6 +2108,8 @@ async def chat(
     except httpx.HTTPError as exc:
         await client.aclose()
         logger.error("LiteLLM nicht erreichbar (%s): %s", type(exc).__name__, exc)
+        if isinstance(exc, httpx.ReadTimeout):
+            raise HTTPException(status_code=504, detail=_ABBRUCH_ZEIT)
         if isinstance(exc, httpx.ReadError) and any(
             isinstance(msg.content, list) and any(isinstance(p, ImageUrlPart) for p in msg.content)
             for msg in request.messages
@@ -2114,9 +2191,41 @@ async def chat(
         cost_status: Optional[str] = None
         _generated_image_ids: list = []  # mid-Stream erzeugte Bilder (→ message_id in _persist)
         _image_cost_total: float = 0.0   # summierte Bild-Kosten (→ zur Text-Kostensumme addiert)
+        _abbruch: str | None = None      # Meldung, wenn der Strom abriss oder LiteLLM ablehnte
 
         current_messages = list(llm_messages)
         current_response = response
+        # Die zuletzt gesendete Nutzlast — die Wiederholung am Rundenlimit schickt sie erneut.
+        next_payload = litellm_payload
+
+        async def _folgeanfrage(nutzlast: dict):
+            """Schickt eine Folgeanfrage des Zuges. Gibt den Strom zurück — oder, wenn
+            LiteLLM ablehnt, `None` und den Satz für die Oberfläche.
+
+            Bis 10/2026 prüfte nur die erste Anfrage den Status. Lehnte LiteLLM eine
+            Folgerunde ab (etwa Budget mitten im Zug erschöpft), las die Schleife den
+            Fehlerkörper als Strom — die Antwort blieb leer, ohne Meldung.
+            """
+            antwort = await client.send(
+                client.build_request(
+                    "POST",
+                    f"{settings.litellm_proxy_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {litellm_key}"},
+                    json=nutzlast,
+                ),
+                stream=True,
+            )
+            _extra_responses.append(antwort)
+            if antwort.status_code != 200:
+                koerper = await antwort.aread()
+                logger.warning(
+                    "LiteLLM lehnte eine Folgeanfrage ab: status=%s body=%s",
+                    antwort.status_code, koerper[:500].decode("utf-8", errors="replace"),
+                )
+                return None, (
+                    BUDGET_MELDUNG if ist_budget_erschoepft(koerper) else _ABBRUCH_ABGELEHNT
+                )
+            return antwort, None
 
         # Hilfe-Ressourcen-Banner (ADR-008 Teil 3) zuerst — erreicht die Schüler:in
         # auch dann, wenn der LLM-Stream später abbricht.
@@ -2125,12 +2234,19 @@ async def chat(
             yield _crisis_event
 
         try:
-            for _round in range(_MAX_TOOL_ROUNDS + 1):
+            # Eine Runde mehr als erlaubt: für die eine Wiederholung am Rundenlimit (s. u.).
+            for _round in range(_MAX_TOOL_ROUNDS + 2):
+                # Im Werkzeug-Loop kann ein anderes Deployment antworten (Fallback,
+                # Lastverteilung) — die letzte Antwort ist die, die den Text erzeugt.
+                _deployment_id = (
+                    current_response.headers.get("x-litellm-model-id") or _deployment_id
+                )
                 _tc_id: str | None = None
                 _tc_name: str | None = None
                 _tc_args: list[str] = []
                 _finish_reason: str | None = None
                 _runden_id: str | None = None
+                _runde_hat_text = False
 
                 async for line in current_response.aiter_lines():
                     if not line:
@@ -2171,6 +2287,18 @@ async def chat(
 
                         token = delta.get("content") or ""
                         if token:
+                            # Erster Text dieser Runde nach Text aus einer früheren: als
+                            # eigener Absatz — im Strom wie in der gespeicherten Nachricht.
+                            if not _runde_hat_text:
+                                _runde_hat_text = True
+                                trenner = _rundentrenner("".join(full_content[-3:]))
+                                if trenner:
+                                    full_content.append(trenner)
+                                    yield (
+                                        "data: "
+                                        + json.dumps({"choices": [{"delta": {"content": trenner}}]})
+                                        + "\n\n"
+                                    )
                             full_content.append(token)
                             yield f"{line}\n\n"
                         if "usage" in chunk:
@@ -2185,14 +2313,32 @@ async def chat(
                 if _finish_reason != "tool_calls" or not _tc_name:
                     break
 
+                # Die letzte Anfrage verlangte eine Antwort (s. u.), das Modell rief trotzdem
+                # ein Werkzeug — gpt-oss in rund einem von acht Fällen (gemessen 10.10.2026).
+                # Ausgeführt wird nichts mehr; dieselbe Anfrage geht einmal neu hinaus.
                 if _round >= _MAX_TOOL_ROUNDS:
-                    logger.warning("MAX_TOOL_ROUNDS (%d) erreicht — stoppe Tool-Loop", _MAX_TOOL_ROUNDS)
-                    break
+                    if _round > _MAX_TOOL_ROUNDS:
+                        logger.warning(
+                            "Werkzeugaufruf trotz Rundenlimit (%d), auch nach Wiederholung — "
+                            "stoppe Tool-Loop", _MAX_TOOL_ROUNDS,
+                        )
+                        break
+                    logger.warning(
+                        "Werkzeugaufruf trotz Rundenlimit (%d) — letzte Anfrage wird wiederholt",
+                        _MAX_TOOL_ROUNDS,
+                    )
+                    current_response, _abbruch = await _folgeanfrage(next_payload)
+                    if _abbruch:
+                        break
+                    continue
 
                 tool = _tool_map.get(_tc_name)
                 if tool is None:
-                    logger.warning("Unbekanntes Tool '%s' — stoppe Tool-Loop", _tc_name)
-                    break
+                    logger.warning(
+                        "Unbekanntes Tool '%s' (Runde %d) — das Modell bekommt die verfügbaren Namen",
+                        _tc_name, _round + 1,
+                    )
+                    tool = _unbekanntes_werkzeug(_tc_name, sorted(_tool_map))
 
                 yield (
                     f"event: tool_status\n"
@@ -2303,21 +2449,22 @@ async def chat(
                     },
                 ]
 
-                # Nächste Runde: Request MIT Tools (damit weitere Tool-Calls möglich sind)
+                # Nächste Runde mit Werkzeugen, damit weitere Aufrufe möglich sind — außer
+                # nach dem letzten erlaubten: Dann muss sie antworten (`_RUNDENLIMIT_HINWEIS`).
                 next_payload = {**litellm_payload, "messages": current_messages}
-                req_next = client.build_request(
-                    "POST",
-                    f"{settings.litellm_proxy_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {litellm_key}"},
-                    json=next_payload,
-                )
-                current_response = await client.send(req_next, stream=True)
-                # Im Werkzeug-Loop kann ein anderes Deployment antworten (Fallback,
-                # Lastverteilung) — die letzte Antwort ist die, die den Text erzeugt.
-                _deployment_id = (
-                    current_response.headers.get("x-litellm-model-id") or _deployment_id
-                )
-                _extra_responses.append(current_response)
+                if _round + 1 >= _MAX_TOOL_ROUNDS:
+                    logger.info(
+                        "Rundenlimit (%d) erreicht — letzte Anfrage ohne Werkzeugwahl",
+                        _MAX_TOOL_ROUNDS,
+                    )
+                    if "tools" in next_payload:
+                        next_payload["tool_choice"] = "none"
+                    next_payload["messages"] = current_messages + [
+                        {"role": "user", "content": _RUNDENLIMIT_HINWEIS},
+                    ]
+                current_response, _abbruch = await _folgeanfrage(next_payload)
+                if _abbruch:
+                    break
 
             # -- Title-Task abwarten --
             if title_task:
@@ -2345,21 +2492,22 @@ async def chat(
                 except Exception:
                     logger.exception("Fehler beim Warten auf Titel-Task")
 
-            # -- Kosten: hier wird nicht mehr gewartet --
-            #
-            # Die SpendLogs kommen verzögert; bis 09/2026 hielt diese Stelle den
-            # Stream dafür bis zu 15 s offen, nachdem der Antworttext längst
-            # dastand. Jetzt trägt eine Aufgabe sie nach (`kosten_nachtrag`), und
-            # die Nachricht startet mit `cost_status = 'ausstehend'`.
-            #
-            # Bildkosten sind die Ausnahme: Sie stehen im Antwortkopf, sind also
-            # sofort und exakt bekannt und gehen gleich mit in die Nachricht.
-            if _image_cost_total > 0:
-                cost_usd = _image_cost_total
-            if _request_ids:
-                cost_status = "ausstehend"
-            elif _image_cost_total > 0:
-                cost_status = "vollstaendig"
+        except httpx.HTTPError as exc:
+            # Stockt oder reißt der Strom zu LiteLLM, endet der Zug mit dem, was bis dahin
+            # da ist: gespeichert wie jede Antwort, samt den Kosten der fertigen Runden, und
+            # mit einer lesbaren Meldung (Ereignis `fehler`). Vorher riss der Strom einfach
+            # ab — die Oberfläche zeigte einen Netzwerkfehler, gespeichert war nichts.
+            logger.warning(
+                "LiteLLM-Strom abgebrochen (%s) in Runde %d: Konversation %s, Modell %s",
+                type(exc).__name__, _round + 1, conversation_id, model_used,
+            )
+            _abbruch = (
+                _ABBRUCH_ZEIT if isinstance(exc, httpx.TimeoutException) else _ABBRUCH_VERBINDUNG
+            )
+            # Die abgerissene Runde kann trotzdem gekostet haben. Taucht sie in den
+            # SpendLogs nie auf, meldet der Nachtrag die Summe als unvollständig.
+            if _runden_id and _runden_id not in _request_ids:
+                _request_ids.append(_runden_id)
 
         finally:
             await response.aclose()
@@ -2370,6 +2518,22 @@ async def chat(
                     pass
             await client.aclose()
 
+        # -- Kosten: hier wird nicht mehr gewartet --
+        #
+        # Die SpendLogs kommen verzögert; bis 09/2026 hielt diese Stelle den
+        # Stream dafür bis zu 15 s offen, nachdem der Antworttext längst
+        # dastand. Jetzt trägt eine Aufgabe sie nach (`kosten_nachtrag`), und
+        # die Nachricht startet mit `cost_status = 'ausstehend'`.
+        #
+        # Bildkosten sind die Ausnahme: Sie stehen im Antwortkopf, sind also
+        # sofort und exakt bekannt und gehen gleich mit in die Nachricht.
+        if _image_cost_total > 0:
+            cost_usd = _image_cost_total
+        if _request_ids:
+            cost_status = "ausstehend"
+        elif _image_cost_total > 0:
+            cost_status = "vollstaendig"
+
         # Erst speichern, dann `[DONE]`: Die Nachrichten-ID entsteht beim Schreiben, und
         # das Frontend braucht sie, um die Herkunft eines später gespeicherten Diagramms
         # belegen zu können. `[DONE]` heißt damit auch „alles ist abgelegt".
@@ -2377,8 +2541,9 @@ async def chat(
         # der wahrheitsgemäße Vermerk, dass eine Anfrage lief, Kosten anfielen und
         # nichts zurückkam. Erfundener Ersatztext ginge später als Kontext ans
         # Modell zurück. Sichtbar macht sie die Oberfläche (`istLeereAntwort`);
-        # zählbar wird sie hier, sonst bliebe die Häufigkeit unbekannt.
-        if not "".join(full_content) and not _generated_image_ids:
+        # zählbar wird sie hier, sonst bliebe die Häufigkeit unbekannt. Ein Abbruch ist
+        # oben schon gezählt.
+        if not "".join(full_content) and not _generated_image_ids and not _abbruch:
             logger.warning(
                 "Leere Modellantwort: Konversation %s, Modell %s, %d Werkzeugrunden, "
                 "Kosten %s",
@@ -2435,6 +2600,11 @@ async def chat(
                     request_ids=list(_request_ids),
                     wartezeiten=_SPEND_LOG_WARTEZEITEN,
                 )
+
+        # Zuletzt, damit die Oberfläche die Nachrichten-ID vorher noch übernimmt: Sie bricht
+        # beim Ereignis `fehler` ab und zeigt die Meldung.
+        if _abbruch:
+            yield f"event: fehler\ndata: {json.dumps({'detail': _abbruch})}\n\n"
 
         yield "data: [DONE]\n\n"
 

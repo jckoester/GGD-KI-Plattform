@@ -495,6 +495,18 @@ export async function* streamChat(
         continue;
       }
 
+      // Der Strom zu LiteLLM ist abgerissen (Lese-Timeout, Verbindungsabbruch). Kommt als
+      // Letztes vor [DONE] — Text und Nachrichten-ID sind schon da; der Fehler läuft über
+      // denselben Weg wie jeder andere. 504 hat in `chat_errors.js` bewusst keinen festen
+      // Satz: Es gilt, was das Backend schickt.
+      if (currentEventType === "fehler") {
+        let detail;
+        try {
+          ({ detail } = JSON.parse(payload));
+        } catch {}
+        throw new ApiError(504, detail);
+      }
+
       if (payload === "[DONE]") return;
       try {
         const token = JSON.parse(payload).choices?.[0]?.delta?.content;

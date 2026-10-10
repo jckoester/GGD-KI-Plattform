@@ -11,7 +11,11 @@
 //     Nutzerin sah stattdessen den rohen Fehlerkörper des Proxys.
 // Deshalb hat 429 hier keinen Eintrag mehr: Beide Fälle unterscheidet nur das Backend.
 
-/** Sätze für Fälle, in denen das Backend nichts Verwertbares mitschicken kann. */
+/**
+ * Sätze für Fälle, in denen das Backend nichts Verwertbares mitschicken kann.
+ * 504 gehört nicht hierher: Mit diesem Status meldet das Backend einen Abbruch des
+ * KI-Dienstes in eigenen Worten (auch mitten im Strom, Ereignis `fehler`).
+ */
 const OHNE_AUSKUNFT = {
     0: "Verbindung zum Server fehlgeschlagen.",
     502: "Der KI-Dienst ist gerade nicht erreichbar.",

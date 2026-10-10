@@ -42,6 +42,16 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.
+- Brauchte ein Assistent mehr Werkzeugaufrufe als erlaubt, blieb die Antwort leer. Jetzt
+  antwortet er mit dem, was er bis dahin hat, und sagt, was offen ist.
+- Stockte der KI-Dienst mitten in einer Antwort, wartete der Chat unbegrenzt. Nach 60
+  Sekunden ohne Daten bricht er jetzt ab, behält den bisherigen Text und meldet den Abbruch.
+- Rief das Modell ein Werkzeug unter falschem Namen, blieb die Antwort leer. Jetzt erfährt
+  es die richtigen Namen und macht weiter.
+- War das Budget mitten in einer Antwort mit Werkzeugaufrufen aufgebraucht, blieb die
+  Antwort leer, ohne Hinweis. Jetzt erscheint die Budgetmeldung.
+- Schrieb das Modell vor einem Werkzeugaufruf schon Text, klebte der Rest der Antwort ohne
+  Absatz daran („…13.10.2026.Ich habe die Stunde gefunden").
 
 ### Migration
 
