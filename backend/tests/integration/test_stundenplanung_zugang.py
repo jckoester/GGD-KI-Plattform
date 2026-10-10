@@ -268,3 +268,150 @@ async def test_entwurf_bringt_das_lesbare_vokabular_mit(test_client, auth_header
         with gruppen.cursor() as cur:
             cur.execute("DELETE FROM context_nodes WHERE title LIKE 'Zugang-Vokabular %%'")
         gruppen.commit()
+
+
+# ── Der Zusammenhang kommt mit dem Entwurf (0.15, A1) ────────────────────────
+#
+# Ohne ihn suchte das Modell blind (Untersuchung „Kompetenz vorschlagen"): Der Entwurf
+# nannte weder Fach noch Jahrgang noch Einheit, das Modell riet die Stufe und mischte
+# Kurs- und Mittelstufe.
+
+PRAEFIX = "Zugang-Curriculum "
+
+
+async def _curriculum_mit_kapitel(db, *, read_scope="school", owner=None):
+    """Curriculum (Kl. 9, Fach der Gruppe EIGENE) → Kapitel → zwei Lernsequenzen mit
+    IK-Kompetenzen. Die zuletzt angelegte und alphabetisch letzte Sequenz kommt laut
+    `reihenfolge` zuerst — sonst prüfte der Test die Sortierung nicht."""
+    from app.db.models import ContextEdge, ContextNode
+
+    def knoten(art, titel, **kw):
+        n = ContextNode(category="knowledge", content_type=art, title=PRAEFIX + titel,
+                        status="active", read_scope=read_scope, write_scope=read_scope,
+                        owner_pseudonym=owner, **kw)
+        db.add(n)
+        return n
+
+    cur = knoten("curriculum", "M Kl. 9", subject_id=EIGENE, min_grade=9, max_grade=9,
+                 metadata_={"jahrgangsstufe": "9", "bp_version": "2016.V2"})
+    kap = knoten("kapitel", "Potenzen", subject_id=EIGENE, metadata_={"reihenfolge": 1, "std": 20})
+    spaeter = knoten("lernsequenz", "Potenzfunktionen", subject_id=EIGENE,
+                     metadata_={"reihenfolge": 2, "std": 6})
+    frueher = knoten("lernsequenz", "Zahlen in Normdarstellung", subject_id=EIGENE,
+                     metadata_={"reihenfolge": 1, "std": 4})
+    ik_a = ContextNode(category="knowledge", content_type="ik_kompetenz", status="active",
+                       read_scope="global", write_scope="global",
+                       title=PRAEFIX + "3.3.1(1) Zahlen in Normdarstellung angeben",
+                       metadata_={"kompetenz_nr": "3.3.1(1)"})
+    ik_b = ContextNode(category="knowledge", content_type="ik_kompetenz", status="active",
+                       read_scope="global", write_scope="global",
+                       title=PRAEFIX + "3.3.4(1) Graphen der Potenzfunktionen beschreiben",
+                       metadata_={"kompetenz_nr": "3.3.4(1)"})
+    db.add_all([ik_a, ik_b])
+    await db.flush()
+    db.add_all([
+        ContextEdge(from_node_id=kap.id, to_node_id=cur.id, relation="part_of"),
+        ContextEdge(from_node_id=frueher.id, to_node_id=kap.id, relation="part_of"),
+        ContextEdge(from_node_id=spaeter.id, to_node_id=kap.id, relation="part_of"),
+        ContextEdge(from_node_id=frueher.id, to_node_id=ik_a.id, relation="references",
+                    metadata_={"partiell": "true"}),
+        ContextEdge(from_node_id=spaeter.id, to_node_id=ik_b.id, relation="references",
+                    metadata_={"partiell": "false"}),
+    ])
+    await db.flush()
+    return kap, ik_a, ik_b
+
+
+async def _verknuepfe(async_engine, ue, kapitel_id):
+    from app.db.models import ContextEdge
+    async with _sitzungen(async_engine)() as db:
+        db.add(ContextEdge(from_node_id=UUID(ue), to_node_id=kapitel_id, relation="references"))
+        await db.commit()
+
+
+def _aufraeumen(conn):
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM context_nodes WHERE title LIKE %s", (PRAEFIX + "%",))
+    conn.commit()
+
+
+@pytest.mark.asyncio
+async def test_entwurf_bringt_einheit_kapitel_und_kompetenzen_mit(
+    test_client, auth_headers, gruppen, async_engine,
+):
+    ue, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Potenzen")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            kap, ik_a, ik_b = await _curriculum_mit_kapitel(db)
+            await db.commit()
+        await _verknuepfe(async_engine, ue, kap.id)
+
+        z = (await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde},
+                         TEACHER1_PSEUDO))["zusammenhang"]
+        assert z["fach"] == f"Stundenzugang {EIGENE}"
+        assert z["gruppe"] == f"9z Zugang {EIGENE}"
+        assert z["jahrgang"] == 9
+        assert z["einheit"] == {"id": ue, "titel": "Potenzen"}
+        k = z["kapitel"]
+        assert (k["curriculum"], k["bildungsplan"], k["jahrgangsstufe"], k["std"]) == (
+            PRAEFIX + "M Kl. 9", "2016.V2", "9", 20)
+        # In der Reihenfolge des Curriculums, nicht nach Titel oder Anlage.
+        assert [(s["titel"], s["std"]) for s in k["lernsequenzen"]] == [
+            (PRAEFIX + "Zahlen in Normdarstellung", 4), (PRAEFIX + "Potenzfunktionen", 6)]
+        # In der Form von `refs` — nach Zustimmung unverändert zu übernehmen.
+        assert k["lernsequenzen"][0]["kompetenzen"] == [{
+            "node_id": str(ik_a.id), "typ": "ik", "code": "3.3.1(1)",
+            "titel": ik_a.title, "partiell": True,
+        }]
+        assert k["lernsequenzen"][1]["kompetenzen"] == [{
+            "node_id": str(ik_b.id), "typ": "ik", "code": "3.3.4(1)", "titel": ik_b.title,
+        }]
+        assert "curricula" not in z
+
+        # Dasselbe Kapitel über die Einheit — bis 0.15 dort immer ohne Lernsequenzen.
+        einheit = await _rufe(async_engine, _handle_get_unit_detail, {"unit_node_id": ue}, TEACHER1_PSEUDO)
+        assert einheit["kapitel"] == k
+    finally:
+        _aufraeumen(gruppen)
+
+
+@pytest.mark.asyncio
+async def test_ohne_einheit_die_curricula_der_gruppe(test_client, auth_headers, gruppen, async_engine):
+    """Ohne Jahresplan wenigstens Stufe und Fassung — der Fall der Kursstufe in der
+    Untersuchung, deren Gruppe keine Einheiten hatte."""
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Lose")
+    async with _sitzungen(async_engine)() as db:
+        from app.db.models import ContextEdge
+        await db.execute(sa.delete(ContextEdge).where(
+            ContextEdge.from_node_id == UUID(stunde), ContextEdge.relation == "part_of"))
+        await _curriculum_mit_kapitel(db)
+        await db.commit()
+    try:
+        z = (await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde},
+                         TEACHER1_PSEUDO))["zusammenhang"]
+        assert z["einheit"] is None and z["kapitel"] is None
+        assert z["jahrgang"] == 9
+        assert {"titel": PRAEFIX + "M Kl. 9", "jahrgangsstufe": "9", "bildungsplan": "2016.V2"} in z["curricula"]
+    finally:
+        _aufraeumen(gruppen)
+
+
+@pytest.mark.asyncio
+async def test_fremdes_privates_kapitel_bleibt_zu(test_client, auth_headers, gruppen, async_engine):
+    """Die Einheit gehört der Gruppe; das Kapitel, auf das sie zeigt, prüft seine eigene
+    Sichtbarkeit."""
+    ue, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Privat")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            kap, _, _ = await _curriculum_mit_kapitel(db, read_scope="private", owner=TEACHER2_PSEUDO)
+            await db.commit()
+        await _verknuepfe(async_engine, ue, kap.id)
+
+        z = (await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde},
+                         TEACHER1_PSEUDO))["zusammenhang"]
+        assert z["einheit"]["id"] == ue
+        assert z["kapitel"] is None
+        einheit = await _rufe(async_engine, _handle_get_unit_detail, {"unit_node_id": ue}, TEACHER1_PSEUDO)
+        assert einheit["kapitel"] is None
+    finally:
+        _aufraeumen(gruppen)

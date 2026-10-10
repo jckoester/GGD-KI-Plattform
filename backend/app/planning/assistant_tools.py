@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.context.stunden import als_stundenzahl
 from app.chat.tools import ChatTool, ToolContext, register_tool
 from app.planning import stunde_finden
-from app.db.models import ContextEdge, ContextNode, LessonSlot, SlotPlanSnapshot
-from app.planning.curriculum_resolver import resolve_group_curricula
+from app.db.models import ContextEdge, ContextNode, Group, LessonSlot, SlotPlanSnapshot, Subject
+from app.planning.curriculum_resolver import group_grade, resolve_group_curricula
 from app.planning.material_edges import synchronisiere_materialkanten
 from app.planning.operations import apply_operations, parse_operations
 from app.planning.phasen import sichere_phasen_kennungen, uebernimm_zusatzfelder
@@ -505,6 +505,156 @@ register_tool(ChatTool(
 ))
 
 
+# ── Kapitel und Zusammenhang einer Stunde (0.15) ──────────────────────────────
+
+
+async def _kapitel_der_einheit(db: AsyncSession, unit_id: UUID) -> UUID | None:
+    """Das Curriculum-Kapitel, auf das die Einheit verweist (UE↔Kapitel-Picker)."""
+    return (await db.execute(
+        sa.select(ContextEdge.to_node_id)
+        .join(ContextNode, ContextNode.id == ContextEdge.to_node_id)
+        .where(
+            ContextEdge.from_node_id == unit_id,
+            ContextEdge.relation == "references",
+            ContextNode.content_type == "kapitel",
+        )
+    )).scalars().first()
+
+
+async def _kapitel(ctx: ToolContext, kapitel_id: UUID) -> dict | None:
+    """Ein Kapitel des Schulcurriculums: Curriculum, Bildungsplan-Fassung und die
+    Lernsequenzen samt ihren inhaltsbezogenen Kompetenzen.
+
+    Die Kompetenzen stehen in der Form von `refs` am Stundenentwurf (`LessonRefItem`), damit
+    sie sich nach Zustimmung unverändert übernehmen lassen. Gelesen wie in
+    `load_curriculum_tree`: über die Kanten `references`, archivierte IK-Knoten
+    eingeschlossen — ein Curriculum verweist teils auf Knoten eines älteren Imports.
+
+    ⚠️ Bis 0.15 las `get_unit_detail` die Lernsequenzen aus `metadata.lernsequenzen` am
+    Kapitel. Das Feld gibt es nicht — Lernsequenzen sind eigene Knoten —, geliefert wurde
+    immer eine leere Liste.
+    """
+    from app.context.visibility import read_scope_clause
+
+    db = ctx.db
+    kap = (await db.execute(
+        sa.select(ContextNode).where(
+            ContextNode.id == kapitel_id,
+            ContextNode.content_type == "kapitel",
+            ContextNode.status == "active",
+            read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+        )
+    )).scalar_one_or_none()
+    if kap is None:
+        return None
+
+    curriculum = (await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+        .where(
+            ContextEdge.from_node_id == kap.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "curriculum",
+            ContextNode.status == "active",
+        )
+    )).scalars().first()
+    sequenzen = (await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.from_node_id == ContextNode.id)
+        .where(
+            ContextEdge.to_node_id == kap.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "lernsequenz",
+            ContextNode.status == "active",
+        )
+        .order_by(ContextNode.metadata_["reihenfolge"].as_integer().nullslast(), ContextNode.title)
+    )).scalars().all()
+
+    kompetenzen: dict[UUID, list[dict]] = {}
+    if sequenzen:
+        for ls_id, k_id, titel, nr, partiell in (await db.execute(
+            sa.select(
+                ContextEdge.from_node_id, ContextNode.id, ContextNode.title,
+                ContextNode.metadata_["kompetenz_nr"].as_string(),
+                ContextEdge.metadata_["partiell"].as_string(),
+            )
+            .join(ContextNode, ContextNode.id == ContextEdge.to_node_id)
+            .where(
+                ContextEdge.from_node_id.in_([s.id for s in sequenzen]),
+                ContextEdge.relation == "references",
+                ContextNode.content_type == "ik_kompetenz",
+            )
+            .order_by(ContextNode.title)
+        )).all():
+            eintrag = {"node_id": str(k_id), "typ": "ik", "code": nr, "titel": titel}
+            if partiell == "true":
+                eintrag["partiell"] = True
+            kompetenzen.setdefault(ls_id, []).append(eintrag)
+
+    cur_meta = (curriculum.metadata_ or {}) if curriculum else {}
+    return {
+        "id": str(kap.id),
+        "titel": kap.title,
+        "std": als_stundenzahl((kap.metadata_ or {}).get("std")),
+        "curriculum": curriculum.title if curriculum else None,
+        "bildungsplan": cur_meta.get("bp_version"),
+        "jahrgangsstufe": cur_meta.get("jahrgangsstufe"),
+        "lernsequenzen": [
+            {
+                "titel": s.title,
+                "std": als_stundenzahl((s.metadata_ or {}).get("std")),
+                "kompetenzen": kompetenzen.get(s.id, []),
+            }
+            for s in sequenzen
+        ],
+    }
+
+
+async def _zusammenhang(ctx: ToolContext, stunde: ContextNode) -> dict:
+    """Wo die Stunde steht: Fach, Gruppe, Jahrgang, Einheit und — über deren Kapitel — das
+    Curriculum mit Bildungsplan-Fassung, Lernsequenzen und Kompetenzen. Ohne Kapitel die
+    Curricula, die zu Fach und Jahrgang der Gruppe passen.
+
+    Ohne das suchte das Modell blind (Untersuchung „Kompetenz vorschlagen", 10.10.2026):
+    Der Entwurf nannte weder Fach noch Jahrgang noch Einheit; das Modell riet die Stufe,
+    mischte Kurs- und Mittelstufe und konnte `get_unit_detail` aus der Stunde heraus gar
+    nicht rufen. Die Einheit kommt über `part_of`, wie in der Entwurfsansicht.
+    """
+    db = ctx.db
+    gruppe = await db.get(Group, stunde.write_scope_group_id) if stunde.write_scope_group_id else None
+    fach = await db.get(Subject, stunde.subject_id) if stunde.subject_id else None
+    einheit = (await db.execute(
+        sa.select(ContextNode)
+        .join(ContextEdge, ContextEdge.to_node_id == ContextNode.id)
+        .where(
+            ContextEdge.from_node_id == stunde.id,
+            ContextEdge.relation == "part_of",
+            ContextNode.content_type == "unterrichtseinheit",
+            ContextNode.status == "active",
+        )
+    )).scalars().first()
+    kapitel_id = await _kapitel_der_einheit(db, einheit.id) if einheit else None
+    kapitel = await _kapitel(ctx, kapitel_id) if kapitel_id else None
+
+    zusammenhang: dict = {
+        "fach": fach.name if fach else None,
+        "gruppe": (gruppe.display_name or gruppe.name) if gruppe else None,
+        "jahrgang": None,
+        "einheit": {"id": str(einheit.id), "titel": einheit.title} if einheit else None,
+        "kapitel": kapitel,
+    }
+    if gruppe is not None and kapitel is None:
+        aufgeloest = await resolve_group_curricula(db, gruppe.id)
+        zusammenhang["jahrgang"] = aufgeloest.grade
+        zusammenhang["curricula"] = [
+            {"titel": c.titel, "jahrgangsstufe": c.jahrgangsstufe, "bildungsplan": c.bildungsplan}
+            for c in aufgeloest.curricula
+        ]
+    elif gruppe is not None:
+        zusammenhang["jahrgang"] = await group_grade(db, gruppe.id)
+    return zusammenhang
+
+
 # ── get_unit_detail ───────────────────────────────────────────────────────────
 
 
@@ -529,24 +679,8 @@ async def _handle_get_unit_detail(args: dict, ctx: ToolContext) -> dict:
     group_id = unit.write_scope_group_id
 
     # Kapitel-Verknüpfung
-    chapter_info = None
-    ref_edge = (
-        await db.execute(
-            sa.select(ContextEdge).where(
-                ContextEdge.from_node_id == unit_id,
-                ContextEdge.relation == "references",
-            )
-        )
-    ).scalar_one_or_none()
-    if ref_edge:
-        ch = await db.get(ContextNode, ref_edge.to_node_id)
-        if ch:
-            chapter_info = {
-                "id": str(ch.id),
-                "titel": ch.title,
-                "std": als_stundenzahl((ch.metadata_ or {}).get("std")),
-                "lernsequenzen": (ch.metadata_ or {}).get("lernsequenzen", []),
-            }
+    kapitel_id = await _kapitel_der_einheit(db, unit_id)
+    chapter_info = await _kapitel(ctx, kapitel_id) if kapitel_id else None
 
     # Zugewiesene Slots
     slots_result = await db.execute(
@@ -599,8 +733,9 @@ register_tool(ChatTool(
         "function": {
             "name": "get_unit_detail",
             "description": (
-                "Gibt Detailinfos zu einer Unterrichtseinheit: "
-                "Kapitel mit Lernsequenzen, zugewiesene Slots und bereits angelegte Stunden."
+                "Gibt Detailinfos zu einer Unterrichtseinheit: Kapitel des "
+                "Schulcurriculums mit Bildungsplan-Fassung und Lernsequenzen samt "
+                "Kompetenzen, zugewiesene Slots und bereits angelegte Stunden."
             ),
             "parameters": {
                 "type": "object",
@@ -828,6 +963,7 @@ async def _handle_get_lesson_detail(args: dict, ctx: ToolContext) -> dict:
             "periods": slot.periods,
             "verfuegbare_min": slot.periods * 45,
         } if slot else None,
+        "zusammenhang": await _zusammenhang(ctx, node),
         "vokabular": await _vokabular(ctx, node.subject_id),
     }
 
@@ -842,9 +978,13 @@ register_tool(ChatTool(
             "name": "get_lesson_detail",
             "description": (
                 "Gibt den vollständigen Stundenentwurf zurück: Titel, Stundenziel, "
-                "Phasen-Array, Kompetenzen und Slot-Kontext — dazu das Vokabular der "
-                "Sozialformen und Methoden (node_id, titel, aliase), aus dem sozialform "
-                "und methode als Knoten eingetragen werden."
+                "Phasen-Array, Kompetenzen und Slot-Kontext. Dazu zusammenhang: Fach, "
+                "Gruppe, jahrgang (null = unbekannt), die Unterrichtseinheit und — wenn sie "
+                "auf ein Kapitel des Schulcurriculums verweist — dessen Curriculum, "
+                "Bildungsplan-Fassung und Lernsequenzen mit ihren Kompetenzen (in der Form "
+                "von refs); ohne Kapitel die Curricula, die zu Fach und Jahrgang der Gruppe "
+                "passen. Und das Vokabular der Sozialformen und Methoden (node_id, titel, "
+                "aliase), aus dem sozialform und methode als Knoten eingetragen werden."
             ),
             "parameters": {
                 "type": "object",

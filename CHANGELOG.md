@@ -20,6 +20,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   fehlenden Entwurf legt er nur nach Zustimmung an.
 - Auf der **Startseite** öffnet ein Symbol je Stunde den Stundenassistenten mit Bezug — gibt
   es mehrere, zuerst die Auswahl. Fehlt der Entwurf, wird er zuerst angelegt.
+- Der Stundenassistent kennt den **Zusammenhang der Stunde**: Fach, Jahrgang, Unterrichtseinheit
+  und aus dem Schulcurriculum Kapitel, Lernsequenzen und Kompetenzen. Ohne Jahresplan kennt er
+  wenigstens das passende Curriculum und die Fassung des Bildungsplans.
 
 ### Geändert
 
@@ -37,6 +40,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 - Der Planungsassistent las eine Unterrichtseinheit auch dann, wenn sie zu einer fremden
   Gruppe gehörte und das Modell ihre Kennung nannte.
+- Zu einer Unterrichtseinheit bekam der Planungsassistent die Lernsequenzen ihres Kapitels nie
+  mit — die Liste war immer leer.
 - Der Assistent konnte Phasen mit ungültiger Dauer speichern (0 Minuten, Text statt Zahl);
   er prüft jetzt nach derselben Regel wie der Planer.
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über

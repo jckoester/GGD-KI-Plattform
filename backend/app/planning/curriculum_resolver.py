@@ -34,6 +34,10 @@ class CurriculumChapters:
     titel: str
     jahrgangsstufe: str | None
     kapitel: list[KapitelInfo] = field(default_factory=list)
+    # Fassung des Bildungsplans, aus dem das Curriculum gebaut ist (`bp_version`, etwa
+    # „2016.V2"). Für die Stundenplanung (0.15): Ohne sie suchte das Modell Kompetenzen
+    # ohne zu wissen, welcher Plan gilt.
+    bildungsplan: str | None = None
 
 
 @dataclass
@@ -185,6 +189,7 @@ async def resolve_group_curricula(db: AsyncSession, group_id: int) -> GroupCurri
                 titel=cur.title,
                 jahrgangsstufe=(cur.metadata_ or {}).get("jahrgangsstufe"),
                 kapitel=kapitel,
+                bildungsplan=(cur.metadata_ or {}).get("bp_version"),
             )
         )
 
