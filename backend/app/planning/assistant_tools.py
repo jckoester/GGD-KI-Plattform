@@ -1044,6 +1044,70 @@ def _phasen_pruefen(phasen) -> tuple[list[dict] | None, str | None]:
     return geprueft, None
 
 
+# typ → was der Knoten dazu sein muss: Bausteinart (ik, pk) bzw. Kategorie (concept).
+_REF_TYPEN = {"ik": "ik_kompetenz", "pk": "pk_kompetenz", "concept": None}
+
+
+async def _refs_pruefen(ctx: ToolContext, refs) -> tuple[list[dict] | None, str | None]:
+    """Die Kompetenzen des Modells nach der Regel des Planers (`LessonRefItem`). → (Refs, Fehler)
+
+    Bis 0.15 schrieb das Werkzeug `refs` ungeprüft in die Metadaten — anders als die Phasen.
+    Ein unbekannter `typ` verschwand dann still aus der Kompetenzleiste, die nach ik/pk
+    filtert; eine erfundene Kennung stand als Kompetenz ohne Knoten da.
+
+    Geprüft wird die Form, ein bekannter `typ` und dass es den Knoten gibt, passend zum Typ
+    und für die Person lesbar. **Titel und Nummer kommen aus dem Knoten**, nicht vom Modell:
+    In der Leiste steht der Wortlaut des Bildungsplans. Doppelte entfallen. Archivierte
+    Knoten zählen — ein Curriculum verweist teils auf Knoten eines älteren Imports.
+    """
+    from app.context.visibility import read_scope_clause
+    from app.planning.schemas import LessonRefItem
+
+    if not isinstance(refs, list):
+        return None, "refs muss eine Liste von Kompetenzen sein"
+    items = []
+    for nr, ref in enumerate(refs, 1):
+        try:
+            item = LessonRefItem.model_validate(ref)
+        except ValidationError as e:
+            fehler = e.errors()[0]
+            feld = ".".join(str(t) for t in fehler["loc"]) or "Eintrag"
+            return None, f"refs, Eintrag {nr}: {feld} — {fehler['msg']}"
+        if item.typ not in _REF_TYPEN:
+            return None, f"refs, Eintrag {nr}: typ muss ik, pk oder concept sein"
+        items.append(item)
+
+    knoten = {}
+    if items:
+        knoten = {n.id: n for n in (await ctx.db.execute(
+            sa.select(ContextNode).where(
+                ContextNode.id.in_([i.node_id for i in items]),
+                read_scope_clause(ctx.user.sub, getattr(ctx.user, "roles", None) or ()),
+            )
+        )).scalars()}
+
+    geprueft: list[dict] = []
+    gesehen: set = set()
+    for nr, item in enumerate(items, 1):
+        n = knoten.get(item.node_id)
+        art = _REF_TYPEN[item.typ]
+        passt = n is not None and (
+            n.content_type == art if art else n.category == "concept"
+        )
+        if not passt:
+            return None, (f"refs, Eintrag {nr}: keine passende Kompetenz mit node_id "
+                          f"{item.node_id} — übernimm Kompetenzen so, wie sie im Kapitel "
+                          "oder im Treffer stehen")
+        if item.node_id in gesehen:
+            continue
+        gesehen.add(item.node_id)
+        item.titel = n.title
+        if art:
+            item.code = (n.metadata_ or {}).get("kompetenz_nr") or item.code
+        geprueft.append(item.model_dump(mode="json"))
+    return geprueft, None
+
+
 async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     node_str = _stunden_kennung(args, ctx)
     phasen = args.get("phasen")
@@ -1071,6 +1135,11 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     phasen, fehler = _phasen_pruefen(phasen)
     if fehler:
         return {"error": fehler}
+    refs = args.get("refs")
+    if refs is not None:
+        refs, fehler = await _refs_pruefen(ctx, refs)
+        if fehler:
+            return {"error": fehler}
 
     await create_snapshot(db, group_id, reason="assistant", created_by=ctx.user.sub)
 
@@ -1086,7 +1155,6 @@ async def _handle_update_lesson_phases(args: dict, ctx: ToolContext) -> dict:
     stundenziel = args.get("stundenziel")
     if stundenziel is not None:
         meta["stundenziel"] = stundenziel
-    refs = args.get("refs")
     if refs is not None:
         meta["refs"] = refs
 
@@ -1150,7 +1218,9 @@ register_tool(ChatTool(
             "description": (
                 "Schreibt das Phasen-Array einer Stunde — immer das ganze: Eine Phase, die "
                 "fehlt, ist danach gelöscht. Regeln: (1) Bestehende Phasen behalten ihre id "
-                "aus get_lesson_detail unverändert; neue Phasen ohne id. (2) dauer_min nur, "
+                "aus get_lesson_detail unverändert; neue Phasen ohne id. Legst du Phasen "
+                "zusammen, trägt die zusammengelegte die id der ersten — auch wenn sie neu "
+                "heißt. (2) dauer_min nur, "
                 "wenn die Dauer feststeht — eine Skizze ohne Minuten bleibt ohne, bis die "
                 "Lehrkraft Minuten will; dann das Feld weglassen, nie 0. (3) sozialform und "
                 "methode: Steht der Begriff im vokabular aus get_lesson_detail (Titel oder "
@@ -1205,8 +1275,23 @@ register_tool(ChatTool(
                     "stundenziel": {"type": "string", "description": "Stundenziel (optional)"},
                     "refs": {
                         "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Kompetenz-Refs (optional; nur setzen wenn Lehrkraft bestätigt)",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "node_id": {"type": "string"},
+                                "typ": {"type": "string", "enum": ["ik", "pk", "concept"]},
+                                "code": {"type": "string"},
+                                "titel": {"type": "string"},
+                                "partiell": {"type": "boolean"},
+                            },
+                            "required": ["node_id", "typ"],
+                        },
+                        "description": (
+                            "Kompetenzen der Stunde (optional; nur setzen, wenn die Lehrkraft "
+                            "zugestimmt hat). Immer die ganze Liste: bestehende aus "
+                            "get_lesson_detail behalten, neue so übernehmen, wie sie im Kapitel "
+                            "oder im Treffer stehen."
+                        ),
                     },
                 },
                 "required": ["phasen"],

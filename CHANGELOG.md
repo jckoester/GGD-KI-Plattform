@@ -44,6 +44,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   mit — die Liste war immer leer.
 - Der Assistent konnte Phasen mit ungültiger Dauer speichern (0 Minuten, Text statt Zahl);
   er prüft jetzt nach derselben Regel wie der Planer.
+- Der Assistent konnte Kompetenzen in beliebiger Form an eine Stunde schreiben, auch solche,
+  die es nicht gibt. Jetzt nur noch vorhandene, mit dem Wortlaut des Bildungsplans.
 - Ein neuer Chat übernahm eine Unterrichtsgruppe ohne Prüfung der Mitgliedschaft — über
   `/chat?group_id=…` kamen Themen, Stundenziele und Klassenarbeit einer fremden Gruppe in
   den Chat. Jetzt nur noch für eigene Gruppen, wie schon beim nachträglichen Zuordnen.
@@ -73,6 +75,9 @@ docker compose exec backend python scripts/seed_assistants.py --config config/as
 
 Oder im Editor: schulweiter Assistent für Lehrkräfte, Fähigkeit „Stundenplanung", Prompt aus
 `config/prompts/stundenentwurf_assistent.md`.
+
+In `config/pedagogy.yaml` unter `universal_base` den geltenden Bildungsplan nennen — Vorlage im
+Kommentar der `pedagogy.example.yaml`. Danach das Backend neu starten.
 
 ## [0.14.1] – 2026-10-07
 

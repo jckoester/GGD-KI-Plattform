@@ -14,6 +14,15 @@
 preambles:
 
   # Gilt für ALLE Assistenten, unabhängig von der Zielgruppe.
+  #
+  # Nennen Sie hier, welcher Bildungsplan gilt — als eigenen Absatz nach Grundsatz 3,
+  # ohne Nummer. Ohne diese Angabe kennt das Modell ihn nicht und greift auf irgendeinen
+  # zurück (gemessen: Kompetenzen „aus dem österreichischen Lehrplan" für einen Kurs in
+  # Baden-Württemberg). Zum Beispiel:
+  #
+  #   Die Schule ist ein allgemeinbildendes Gymnasium in Baden-Württemberg. Es gilt der
+  #   baden-württembergische Bildungsplan 2016: Kompetenzen, Leitideen und Operatoren
+  #   beziehen sich auf ihn, nie auf den Plan eines anderen Landes.
   universal_base: |
     Du arbeitest in einem schulischen Umfeld. Unabhängig von deiner konkreten
     Aufgabe gelten immer folgende Grundsätze:

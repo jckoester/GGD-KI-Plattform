@@ -415,3 +415,91 @@ async def test_fremdes_privates_kapitel_bleibt_zu(test_client, auth_headers, gru
         assert einheit["kapitel"] is None
     finally:
         _aufraeumen(gruppen)
+
+
+# ── Kompetenzen beim Schreiben prüfen (0.15) ─────────────────────────────────
+#
+# Bis 0.15 landeten `refs` ungeprüft in den Metadaten. Ein unbekannter `typ` verschwand
+# still aus der Kompetenzleiste (sie filtert nach ik/pk), eine erfundene Kennung stand
+# als Kompetenz ohne Knoten da.
+
+
+async def _kompetenzen_der_stunde(client, h, stunde):
+    return (await client.get(f"/planning/lessons/{stunde}", headers=h)).json()["refs"]
+
+
+@pytest.mark.asyncio
+async def test_kompetenzen_mit_dem_wortlaut_des_knotens(test_client, auth_headers, gruppen, async_engine):
+    """Titel und Nummer kommen aus dem Knoten, nicht vom Modell; Doppelte entfallen."""
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Refs")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            _, ik_a, ik_b = await _curriculum_mit_kapitel(db)
+            await db.commit()
+        gelesen = await _rufe(async_engine, _handle_get_lesson_detail, {"node_id": stunde}, TEACHER1_PSEUDO)
+        phasen = [{"id": p["id"], "name": p["name"], "dauer_min": p["dauer_min"]} for p in gelesen["phasen"]]
+
+        aus = await _rufe(async_engine, _handle_update_lesson_phases, {"node_id": stunde, "phasen": phasen, "refs": [
+            {"node_id": str(ik_a.id), "typ": "ik", "code": "9.9(9)", "titel": "Erfundener Wortlaut", "partiell": True},
+            {"node_id": str(ik_b.id), "typ": "ik"},
+            {"node_id": str(ik_a.id), "typ": "ik"},
+        ]}, TEACHER1_PSEUDO)
+        assert aus.get("ok") is True, aus
+        assert await _kompetenzen_der_stunde(test_client, auth_headers, stunde) == [
+            {"node_id": str(ik_a.id), "typ": "ik", "code": "3.3.1(1)", "titel": ik_a.title, "partiell": True},
+            {"node_id": str(ik_b.id), "typ": "ik", "code": "3.3.4(1)", "titel": ik_b.title, "partiell": False},
+        ]
+    finally:
+        _aufraeumen(gruppen)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("refs, im_fehler", [
+    ("keine Liste", "Liste"),
+    ([{"typ": "ik"}], "node_id"),
+    ([{"node_id": "kein-uuid", "typ": "ik"}], "node_id"),
+    ([{"node_id": "IK_A", "typ": "kompetenz"}], "typ muss"),
+    ([{"node_id": "IK_A", "typ": "pk"}], "keine passende Kompetenz"),          # IK als PK
+    ([{"node_id": str(uuid4()), "typ": "ik"}], "keine passende Kompetenz"),    # erfunden
+])
+async def test_falsche_kompetenzen_werden_abgewiesen(
+    test_client, auth_headers, gruppen, async_engine, refs, im_fehler,
+):
+    """Abgewiesen wird der ganze Aufruf — vor dem Snapshot, also ohne Rückgängig-Schritt."""
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Refs falsch")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            _, ik_a, _ = await _curriculum_mit_kapitel(db)
+            await db.commit()
+        if isinstance(refs, list):
+            refs = [{**r, "node_id": str(ik_a.id)} if r.get("node_id") == "IK_A" else r for r in refs]
+        vorher = await _snapshots(async_engine, EIGENE)
+
+        aus = await _rufe(async_engine, _handle_update_lesson_phases, {
+            "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}], "refs": refs,
+        }, TEACHER1_PSEUDO)
+        assert im_fehler in aus.get("error", ""), aus
+        assert await _phasennamen(test_client, auth_headers, stunde) == ["Einstieg", "Erarbeitung"]
+        assert await _snapshots(async_engine, EIGENE) == vorher
+    finally:
+        _aufraeumen(gruppen)
+
+
+@pytest.mark.asyncio
+async def test_fremde_private_kompetenz_ist_keine(test_client, auth_headers, gruppen, async_engine):
+    from app.db.models import ContextNode
+    _, stunde = await _einheit_und_stunde(test_client, auth_headers, EIGENE, titel="Refs privat")
+    try:
+        async with _sitzungen(async_engine)() as db:
+            fremd = ContextNode(category="concept", content_type="begriff", title=PRAEFIX + "Privatbegriff",
+                                status="active", read_scope="private", write_scope="private",
+                                owner_pseudonym=TEACHER2_PSEUDO, metadata_={})
+            db.add(fremd)
+            await db.commit()
+        aus = await _rufe(async_engine, _handle_update_lesson_phases, {
+            "node_id": stunde, "phasen": [{"name": "Neu", "dauer_min": 45}],
+            "refs": [{"node_id": str(fremd.id), "typ": "concept"}],
+        }, TEACHER1_PSEUDO)
+        assert "keine passende Kompetenz" in aus.get("error", ""), aus
+    finally:
+        _aufraeumen(gruppen)

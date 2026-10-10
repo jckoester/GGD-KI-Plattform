@@ -73,3 +73,22 @@ class TestStundenentwurf:
         abschnitt = text.split("## Meine Planungsgewohnheiten", 1)[1]
         assert abschnitt.count("[…]") >= 4
         assert "gilt nicht" in abschnitt
+
+    def test_genannte_bausteinarten_gibt_es(self):
+        """In der Untersuchung „Kompetenz vorschlagen" (10.10.2026) suchte das Modell mit
+        einem Typ „kompetenz", den es nicht gibt. Nennt der Prompt eine Bausteinart, muss sie
+        existieren — sonst leitet er genau dazu an."""
+        from app.context.taxonomy import CONTENT_TYPE_TO_CATEGORY
+
+        text = _prompt(_eintrag("Stundenentwurf"))
+        genannt = re.findall(r'`content_type` „([a-z_]+)[“"]', text)
+        assert genannt, "der Prompt nennt keine Bausteinart mehr — Test anpassen"
+        assert set(genannt) <= set(CONTENT_TYPE_TO_CATEGORY), genannt
+
+    def test_zusammenhang_und_phasenbedeutung(self):
+        """Der Entwurf bringt seinen Zusammenhang mit (A1); die Phasen haben eine Aufgabe —
+        ohne sie machte das Modell aus „Sicherung" neue Übungsaufgaben (Messung 3)."""
+        text = _prompt(_eintrag("Stundenentwurf"))
+        assert "`zusammenhang`" in text
+        abschnitt = text.split("## Was die Phasen bedeuten", 1)[1].split("\n## ", 1)[0]
+        assert "**Sicherung:**" in abschnitt

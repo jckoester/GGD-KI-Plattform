@@ -558,7 +558,9 @@ Die Pfade lassen sich über `CRISIS_TRIGGERS_PATH` / `HELP_RESOURCES_PATH` in `.
 Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferenziert):
 
 - `preambles.universal_base` — gilt für **alle** Assistenten (Faktentreue,
-  Prompt-Injection-Abwehr, Krisen-Hinweispflicht).
+  Prompt-Injection-Abwehr, Krisen-Hinweispflicht). Nennen Sie hier auch, **welcher
+  Bildungsplan gilt** (Vorlage im Kommentar der `pedagogy.example.yaml`): Ohne diese Angabe
+  kennt das Modell ihn nicht und zitiert womöglich den Plan eines anderen Landes.
 - `preambles.student_extension` / `teacher_extension` — Zielgruppen-Erweiterung; das
   Backend wählt nach `assistant.audience` (bzw. bei `audience: all` und ohne Assistent
   nach der Rolle der anfragenden Person).
