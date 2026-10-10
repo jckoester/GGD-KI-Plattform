@@ -35,6 +35,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
 - Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
   die Lehrkraft welche will.
+- Alle Assistenten duzen durchgehend, wie die Oberfläche — bisher wechselten sie zwischen „du"
+  und „Sie".
 
 ### Behoben
 
@@ -71,7 +73,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 Stundenbezug eines Chats. Rückrollbar; dabei gehen nur die gesetzten Bezüge verloren.
 
 In `config/pedagogy.yaml` unter `universal_base` den geltenden Bildungsplan nennen — Vorlage im
-Kommentar der `pedagogy.example.yaml`. Danach das Backend neu starten.
+Kommentar der `pedagogy.example.yaml` — und den neuen Absatz zur Anrede aus der
+`pedagogy.example.yaml` übernehmen. Danach das Backend neu starten.
 
 ### Nach dem Update
 

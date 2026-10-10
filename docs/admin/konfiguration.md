@@ -560,7 +560,9 @@ Steuert die **pädagogischen Leitplanken** im System-Prompt (zielgruppendifferen
 - `preambles.universal_base` — gilt für **alle** Assistenten (Faktentreue,
   Prompt-Injection-Abwehr, Krisen-Hinweispflicht). Nennen Sie hier auch, **welcher
   Bildungsplan gilt** (Vorlage im Kommentar der `pedagogy.example.yaml`): Ohne diese Angabe
-  kennt das Modell ihn nicht und zitiert womöglich den Plan eines anderen Landes.
+  kennt das Modell ihn nicht und zitiert womöglich den Plan eines anderen Landes. Ebenso die
+  **Anrede**: Mitgeliefert ist „du", wie in der Oberfläche; ohne Vorgabe wechseln die Modelle
+  zwischen „du" und „Sie".
 - `preambles.student_extension` / `teacher_extension` — Zielgruppen-Erweiterung; das
   Backend wählt nach `assistant.audience` (bzw. bei `audience: all` und ohne Assistent
   nach der Rolle der anfragenden Person).
