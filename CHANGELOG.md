@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.15.0] – 2026-10-11
+
+Lehrkräfte planen eine einzelne Stunde im Gespräch mit dem neuen Stundenassistenten — aus der
+Entwurfsansicht, von der Startseite oder im Chat — und legen sich auf Wunsch einen eigenen an.
+Die Jahresplanung trägt Ausfälle zuverlässig ein und lässt nachrücken; im Gruppen-Chat kennt der
+Assistent die letzte Stunde auch vor der Nachbereitung. Eine Migration, zwei Absätze in
+`pedagogy.yaml` — nach dem Update den Stundenassistenten anlegen und zwei Prompts im Editor
+nachziehen (unten).
+
 ### Neu
 
 - Assistent **„Stundenentwurf"**: plant mit der Lehrkraft eine einzelne Stunde — liest den
