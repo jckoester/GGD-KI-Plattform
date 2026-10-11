@@ -215,7 +215,7 @@
     const offen = (reviewResult?.open_phases ?? []).join(', ')
     const p = `In der Stunde „${titel}" sind Phasen offen geblieben (${offen}). `
       + `Bitte hilf mir, die offenen Inhalte auf die Folgestunde zu übertragen.`
-    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`)
+    goto(neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p }))
   }
 
   // ── Material-Erzeugung (✦ Szenario 6) ───────────────────────────────────────

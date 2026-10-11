@@ -22,6 +22,7 @@
    * der eine spätere Phase ankündigt, ist genau das, was diese Seite loswerden soll.
    */
   import { goto } from '$app/navigation'
+  import { neuerChatPfad } from '$lib/chatziel.js'
   import {
     getConversations,
     getPlanningJetzt,
@@ -315,7 +316,7 @@
         </a>
       {/if}
       <button
-        onclick={() => goto('/chat')}
+        onclick={() => goto(neuerChatPfad({ subjectId: subject?.id, groupId: group?.id }))}
         class="text-sm px-3 py-1.5 rounded-md bg-primary dark:bg-primary-dark
                text-white font-medium hover:opacity-90 transition-opacity"
       >

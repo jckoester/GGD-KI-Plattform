@@ -59,6 +59,32 @@ describe("Einstiege und ihr Assistent", () => {
         }
     });
 
+    it("kein Einstieg baut einen Chat-Link mit Gruppe von Hand", () => {
+        // Seit 0.15 sagt ein Planungs-Einstieg ausdrücklich, welche Fähigkeit er sucht
+        // (`faehigkeit=planning`). Ein handgebautes `/chat?group_id=…` sucht keine mehr —
+        // es öffnete einen gewöhnlichen Chat statt der Jahresplanung.
+        const handgebaut = svelteDateien(SRC)
+            .filter((pfad) => readFileSync(pfad, "utf8").includes("/chat?group_id"))
+            .map((pfad) => relative(SRC, pfad));
+        expect(handgebaut).toEqual([]);
+    });
+
+    it.each([
+        "routes/(app)/subjects/[slug]/groups/[id]/planner/+page.svelte",
+        "routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte",
+        "lib/components/planner/ReflowAssistbar.svelte",
+    ])("%s nennt die Jahresplanung ausdrücklich", (pfad) => {
+        expect(lies(pfad)).toMatch(/neuerChatPfad\(\{ groupId, faehigkeit: 'planning'/);
+    });
+
+    it("„Neuer Chat“ auf der Gruppenseite: mit Gruppe und Fach, ohne Fähigkeit", () => {
+        // Todo „Schüler:in fragt nach der letzten Stunde", Punkt 1: Ohne Gruppenbezug fehlt
+        // der Block „Aktueller Unterricht" — Schüler:innen landen genau hier.
+        const quelle = lies("lib/components/GruppenUebersicht.svelte");
+        expect(quelle).toMatch(/goto\(neuerChatPfad\(\{ subjectId: subject\?\.id, groupId: group\?\.id \}\)\)/);
+        expect(quelle).not.toMatch(/goto\(['"]\/chat['"]\)/);
+    });
+
     it("der geteilte Knopf zeigt den Pfeil erst bei zwei Kandidaten — oder zum Anlegen", () => {
         const quelle = lies("lib/components/AssistentenKnopf.svelte");
         expect(quelle).toMatch(

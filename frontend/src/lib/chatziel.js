@@ -24,23 +24,35 @@
  * `stundeId` ist der Stundenbezug (0.15): die Kennung einer Unterrichtsstunde. Der Server
  * leitet daraus die Gruppe ab; eine mitgegebene `groupId` muss dazu passen.
  *
+ * `faehigkeit` (→ `faehigkeit`): Der Einstieg will einen Assistenten mit dieser Fähigkeit,
+ * nennt aber keinen bestimmten — die Chatseite wählt ihn (`$lib/assistentenwahl.js`). Die
+ * Planungs-Einstiege setzen `planning`. ⚠️ **Ausdrücklich, nicht aus der Gruppe geschlossen**
+ * (0.15): Bis dahin hieß „nur `group_id`" die Jahresplanung — ein „Neuer Chat" auf der
+ * Gruppenseite hätte so die Jahresplanung geöffnet, bei Schüler:innen den Hinweis „kein
+ * Assistent verfügbar". Ein Chat mit Gruppenbezug ist zuerst ein Chat.
+ *
  * `assistantId` (→ `assistant_id`) und `frage` (→ `q`) liest die Chatseite seit jeher
  * selbst; hier stehen sie, damit ein Einstieg den ganzen Pfad an einer Stelle baut.
  */
 export function neuerChatPfad({
   subjectId = null, groupId = null, stundeId = null, assistantId = null, frage = null,
+  faehigkeit = null,
 } = {}) {
   const params = new URLSearchParams();
   if (subjectId != null) params.set("subject_id", String(subjectId));
   if (groupId != null) params.set("group_id", String(groupId));
   if (stundeId != null) params.set("stunde_id", String(stundeId));
   if (assistantId != null) params.set("assistant_id", String(assistantId));
+  if (faehigkeit) params.set("faehigkeit", faehigkeit);
   if (frage) params.set("q", frage);
   const query = params.toString();
   return query ? `/chat?${query}` : "/chat";
 }
 
 const UUID_FORM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Fähigkeiten, nach denen ein Einstieg fragen darf — andere Werte gelten als nicht genannt. */
+const EINSTIEGS_FAEHIGKEITEN = new Set(["planning", "lesson_planning"]);
 
 /**
  * Die Vorbelegung aus der Adresse — `null`, wo nichts steht.
@@ -57,9 +69,11 @@ export function chatVorgaben(searchParams) {
     return Number.isNaN(wert) ? null : wert;
   };
   const roheStunde = searchParams?.get?.("stunde_id");
+  const roheFaehigkeit = searchParams?.get?.("faehigkeit");
   return {
     subjectId: zahl("subject_id"),
     groupId: zahl("group_id"),
     stundeId: roheStunde && UUID_FORM.test(roheStunde) ? roheStunde : null,
+    faehigkeit: EINSTIEGS_FAEHIGKEITEN.has(roheFaehigkeit) ? roheFaehigkeit : null,
   };
 }

@@ -2,6 +2,7 @@
   // `eintragFrage` und `ruecknahmeWarnung` stehen jetzt im Dialog — hier bleibt nur
   // der Satz, mit dem der Assistent den Fall übernimmt.
   import { assistentFrage } from '$lib/ausfall.js'
+  import { neuerChatPfad } from '$lib/chatziel.js'
   import { page } from '$app/stores'
   import { goto, afterNavigate } from '$app/navigation'
   import { subjectMap } from '$lib/stores/subjects.js'
@@ -68,13 +69,13 @@
     const p = `Ich möchte Inhalte zwischen der Stunde am ${fmt(dr.a.date)} und dem Slot `
       + `am ${fmt(dr.b.date)} umverteilen — eine davon ist bereits ausgeplant. `
       + `Bitte hilf mir, das sauber umzuplanen.`
-    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+    return neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p })
   }
   function parkplatzDeepLink() {
     const p = `Beim Umhängen der Jahresplanung sind ${parkplatz.items.length} Stunden `
       + `ohne Termin übrig geblieben. Bitte hilf mir, sie durch Kürzen oder Umplanen `
       + `wieder einzugliedern.`
-    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+    return neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p })
   }
 
   function reflowDeepLink(b) {
@@ -82,7 +83,7 @@
     const datum = `${+d}.${+m}.${y}`
     const p = `Am ${datum} ist eine geplante Stunde ausgefallen. Bitte hilf mir, die Inhalte `
       + `auf die folgenden Stunden zu verschieben.`
-    return `/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`
+    return neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p })
   }
 
   async function loadOverview() {
@@ -256,7 +257,7 @@
       }
       return
     }
-    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(assistentFrage(weg, datum))}`)
+    goto(neuerChatPfad({ groupId, faehigkeit: 'planning', frage: assistentFrage(weg, datum) }))
   }
 
   /** Aus der Zeile heraus — betrifft genau diese eine Stunde. */
@@ -432,7 +433,7 @@
     <div class="flex items-center gap-2">
       <!-- Assistent-Link -->
       <a
-        href={`/chat?group_id=${groupId}`}
+        href={neuerChatPfad({ groupId, faehigkeit: 'planning' })}
         class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
                bg-primary dark:bg-primary-dark text-white font-medium
                hover:opacity-90 transition-opacity"

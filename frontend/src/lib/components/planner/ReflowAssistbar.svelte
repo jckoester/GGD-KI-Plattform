@@ -5,6 +5,7 @@
    * (Chat mit Gruppenbezug + vorbefülltem Prompt). Dismiss pro Befund (Session).
    */
   import { goto } from '$app/navigation'
+  import { neuerChatPfad } from '$lib/chatziel.js'
 
   let { findings = [], groupId } = $props()
 
@@ -26,7 +27,7 @@
   function open(f, apply) {
     let p = `${befundText(f)} Bitte schlage vor, wie ich kürzen oder umverteilen kann.`
     if (apply) p += ' Wende deinen Vorschlag direkt an.'
-    goto(`/chat?group_id=${groupId}&q=${encodeURIComponent(p)}`)
+    goto(neuerChatPfad({ groupId, faehigkeit: 'planning', frage: p }))
   }
 
   function dismiss(id) {

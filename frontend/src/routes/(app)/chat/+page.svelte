@@ -1199,7 +1199,7 @@
     // bekam damit eine schlechtere Suche als über den Umweg „Fach von Hand wählen".
     // Was der Link schreibt und was hier gelesen wird, steht in `$lib/chatziel.js`.
     $effect(() => {
-        const { subjectId, groupId, stundeId } = chatVorgaben($page.url.searchParams);
+        const { subjectId, groupId, stundeId, faehigkeit: genannt } = chatVorgaben($page.url.searchParams);
         if (subjectId !== null && !conversationId) {
             pendingSubjectId = subjectId;
         }
@@ -1212,7 +1212,7 @@
         // Nennt der Einstieg keinen Assistenten, sucht er einen nach Fähigkeit — in der
         // festen Reihenfolge aus F7 (`$lib/assistentenwahl.js`). Bis 0.14 hieß das „der erste
         // mit `planning`", und ein zweiter solcher Assistent machte die Wahl zum Zufall.
-        const faehigkeit = einstiegsFaehigkeit({ stundeId, groupId });
+        const faehigkeit = einstiegsFaehigkeit({ stundeId, faehigkeit: genannt });
         fehlendeFaehigkeit = null;
         if (
             faehigkeit &&

@@ -77,6 +77,8 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Jahresplanungs-Assistent brach ohne Meldung mitten in der Antwort ab, sobald er die
   Stundenbilanz einer Gruppe mit Unterrichtseinheit las. Ein Werkzeugergebnis, das sich nicht
   übertragen lässt, beendet die Antwort jetzt auch sonst nicht mehr.
+- „+ Neuer Chat" auf der Seite einer Unterrichtsgruppe öffnete einen Chat ohne Gruppe — der
+  Assistent wusste nichts vom aktuellen Unterricht. Jetzt gehört der Chat zur Gruppe und zum Fach.
 - Eigene aktive oder abgeschaltete Assistenten ließen sich nicht löschen, obwohl sie es
   dürfen. Jetzt unter „Meine Assistenten" und im Editor; bei schulweit freigegebenen steht,
   dass die Löschung beantragt wird. Admins konnten auch ihre eigenen privaten nicht löschen.

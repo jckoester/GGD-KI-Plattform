@@ -107,9 +107,16 @@ describe('passendeAssistenten — Einzelfälle', () => {
 })
 
 describe('einstiegsFaehigkeit', () => {
-  it('Stundenbezug → Stundenplanung, nur Gruppe → Unterrichtsplanung', () => {
-    expect(einstiegsFaehigkeit({ stundeId: 'x', groupId: 3 })).toBe('lesson_planning')
-    expect(einstiegsFaehigkeit({ groupId: 3 })).toBe('planning')
+  it('Stundenbezug → Stundenplanung, sonst die genannte Fähigkeit', () => {
+    expect(einstiegsFaehigkeit({ stundeId: 'x' })).toBe('lesson_planning')
+    expect(einstiegsFaehigkeit({ stundeId: 'x', faehigkeit: 'planning' })).toBe('lesson_planning')
+    expect(einstiegsFaehigkeit({ faehigkeit: 'planning' })).toBe('planning')
     expect(einstiegsFaehigkeit({})).toBeNull()
+  })
+
+  it('eine Gruppe allein sucht keinen Assistenten (0.15)', () => {
+    // „Neuer Chat" auf der Gruppenseite: Bis 0.15 hieß „nur Gruppe" Jahresplanung — eine
+    // Schüler:in hätte den Hinweis „kein Assistent verfügbar" bekommen.
+    expect(einstiegsFaehigkeit({ groupId: 3 })).toBeNull()
   })
 })

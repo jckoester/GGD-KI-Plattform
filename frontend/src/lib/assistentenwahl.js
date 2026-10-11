@@ -53,11 +53,12 @@ export function passendeAssistenten(assistenten, faehigkeit, { pseudonym = null,
 /**
  * Welche Fähigkeit ein Einstieg sucht, wenn er keinen Assistenten nennt.
  *
- * Mit Stundenbezug die Stundenplanung (Entwurfsansicht, Startseite, ✦-Material); nur mit
- * Gruppe die Unterrichtsplanung (Jahresplaner, Verschiebe-Auslöser). Sonst keine.
+ * Mit Stundenbezug die Stundenplanung (Entwurfsansicht, Startseite, ✦-Material); sonst die,
+ * die der Einstieg **ausdrücklich** nennt (`faehigkeit=planning`: Jahresplaner,
+ * Verschiebe-Auslöser). Eine Gruppe allein sucht nichts — „Neuer Chat" auf der Gruppenseite
+ * ist ein gewöhnlicher Chat mit Gruppenbezug (0.15; bis dahin hieß „nur Gruppe" Jahresplanung).
  */
-export function einstiegsFaehigkeit({ stundeId = null, groupId = null } = {}) {
+export function einstiegsFaehigkeit({ stundeId = null, faehigkeit = null } = {}) {
   if (stundeId != null) return "lesson_planning";
-  if (groupId != null) return "planning";
-  return null;
+  return faehigkeit ?? null;
 }
