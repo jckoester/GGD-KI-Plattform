@@ -81,6 +81,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Assistent die vorletzte als „zuletzt behandelt" und erklärte deren Thema. Der Hinweis zum
   aktuellen Unterricht nennt jetzt die letzte und die vorletzte Stunde mit ihren Inhalten
   (Kompetenzen, Fachbegriffe) — eine noch nicht nachbereitete als „laut Plan".
+- „Rückgängig" nach einem Ausfall setzte die Stunde zurück, ließ aber die Angabe stehen, wer
+  den Ausfall eingetragen hatte; umgekehrt verlor ein wiederhergestellter Ausfall diese Angabe —
+  und damit den Schutz vor dem Stundenplan-Abgleich.
+- Der Jahresplanungs-Assistent gab gelegentlich ein Beispiel aus seinem Prompt („34 Slots bis
+  Februar …") als Bilanz der Gruppe aus. Prompt angepasst, ebenso der des Verschiebe-Assistenten
+  (siehe „Nach dem Update").
 - „+ Neuer Chat" auf der Seite einer Unterrichtsgruppe öffnete einen Chat ohne Gruppe — der
   Assistent wusste nichts vom aktuellen Unterricht. Jetzt gehört der Chat zur Gruppe und zum Fach.
 - Eigene aktive oder abgeschaltete Assistenten ließen sich nicht löschen, obwohl sie es
@@ -106,6 +112,14 @@ docker compose exec backend python scripts/seed_assistants.py --config config/as
 
 Oder im Editor: schulweiter Assistent für Lehrkräfte, Fähigkeit „Stundenplanung", Prompt aus
 `config/prompts/stundenentwurf_assistent.md`.
+
+Die Prompts der vorhandenen Planungsassistenten ändert das Update nicht — sie liegen in der
+Datenbank. Im Editor nachziehen:
+
+- **„Jahresplanung":** die Zeile **„Bilanz-Stil"** unter „Goldene Regeln" durch die aus
+  `config/prompts/jahresplan_assistent.md` ersetzen.
+- **Verschiebe-Assistent** (falls nach der Admin-Doku angelegt): in **„Schritt 4"** den ersten
+  Satz durch den aus `config/prompts/verschiebe_assistent.md` ersetzen.
 
 ## [0.14.1] – 2026-10-07
 

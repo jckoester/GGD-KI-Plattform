@@ -34,8 +34,9 @@ Wenn Stoff weichen muss, kürze in dieser Reihenfolge:
 3. `kern` **nur** mit ausdrücklichem Hinweis und Rückfrage an die Lehrkraft.
 
 **Schritt 4 – Konsequenz benennen, dann anwenden**
-Benenne vor jeder Übernahme die Folge in Zahlen aus dem Kontext, z. B.
-„UE Messen verliert dadurch 2 von 18 Std." Wende erst nach Zustimmung
+Benenne vor jeder Übernahme die Folge in Zahlen aus dem Kontext — etwa, wie viele ihrer
+Stunden eine UE dadurch verliert; jede Zahl aus `get_reflow_context` bzw. `get_plan_balance`.
+Wende erst nach Zustimmung
 `apply_plan_operations` an. Gib eine prägnante `summary` mit (sie wird zum
 Undo-Label), z. B. „KW43-Ausfall aufgefangen: 2 Themen geschoben, Vertiefung gestrichen".
 

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JwtPayload
 from app.db.models import ContextNode, LessonSlot, SlotPlanSnapshot
+from app.planning.ausfall import setze_kategorie
 from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
 
@@ -52,6 +53,9 @@ async def create_snapshot(
                 "slot_id": str(s.id),
                 "date": s.date.isoformat(),
                 "kategorie": s.kategorie,
+                # Seit 0.15: Herkunft und Vorher gehören zur Kategorie (`ausfall.setze_kategorie`).
+                "ausfall_herkunft": s.ausfall_herkunft,
+                "ausfall_vorher": s.ausfall_vorher,
                 "ue_node_id": str(s.ue_node_id) if s.ue_node_id else None,
                 "stunde_node_id": str(s.stunde_node_id) if s.stunde_node_id else None,
                 "thema": s.thema,
@@ -126,7 +130,20 @@ async def restore_snapshot(
             continue
         # Als Zeichenketten vergleichen: Im Snapshot stehen sie so, am Slot als UUID.
         vorher = tuple(str(x) if x else None for x in (slot.ue_node_id, slot.stunde_node_id))
-        slot.kategorie = slot_data["kategorie"]
+        # ⚠️ **Kategorie, Herkunft und Vorher zusammen** (0.15). Bis dahin setzte der Restore
+        # nur die Kategorie: Nach „Rückgängig" auf einen Ausfall des Assistenten stand der
+        # Termin wieder auf `unterricht`, trug aber noch `ausfall_herkunft` — genau die
+        # Inkonsistenz, vor der `setze_kategorie` warnt; umgekehrt verlor ein wiederhergestellter
+        # Ausfall seine Herkunft und war für den Stundenplan-Abgleich ungeschützt.
+        if "ausfall_herkunft" in slot_data:
+            slot.kategorie = slot_data["kategorie"]
+            slot.ausfall_herkunft = slot_data["ausfall_herkunft"]
+            slot.ausfall_vorher = slot_data.get("ausfall_vorher")
+        elif slot_data["kategorie"] != slot.kategorie:
+            # Ältere Snapshots kennen beides nicht. Zurück aus dem Ausfall leert
+            # `setze_kategorie` die Felder; zurück in den Ausfall bekommt er die Herkunft
+            # `eigen` — „Rückgängig" ist eine Handlung der Lehrkraft, kein Abgleich.
+            setze_kategorie(slot, slot_data["kategorie"], herkunft="eigen")
         slot.ue_node_id = slot_data.get("ue_node_id")
         slot.stunde_node_id = slot_data.get("stunde_node_id")
         if tuple(str(x) if x else None for x in (slot.ue_node_id, slot.stunde_node_id)) != vorher:

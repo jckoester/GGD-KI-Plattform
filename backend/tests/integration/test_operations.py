@@ -442,3 +442,69 @@ async def test_ohne_nachruecken_bleibt_alles_stehen(db_session, seed_ops_group):
     a, b, frei = await _reihe(db_session, "A", "B", None)
     res = await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=a.id)])
     assert res.errors == [] and (a.kategorie, a.thema, b.thema, frei.thema) == ("ausfall", "A", "B", None)
+
+
+# ── Rückgängig nach einem Ausfall (0.15) ─────────────────────────────────────
+
+
+async def _rueckgaengig(db_session, snapshot_id):
+    """restore_snapshot mit commit→flush, wie `_apply`."""
+    import unittest.mock as m
+    from types import SimpleNamespace
+    from uuid import UUID
+
+    from app.planning.snapshots import restore_snapshot
+
+    async def _commit_as_flush():
+        await db_session.flush()
+    with m.patch.object(db_session, "commit", new=_commit_as_flush), \
+         m.patch.object(db_session, "refresh", new=m.AsyncMock()):
+        return await restore_snapshot(db_session, UUID(snapshot_id), SimpleNamespace(sub="t"))
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_nach_ausfall_leert_die_herkunft(db_session, seed_ops_group):
+    """Bis 0.15 stand der Termin danach auf `unterricht`, trug aber noch die Herkunft."""
+    s = _slot(D0, kategorie="pruefung")
+    db_session.add(s)
+    await db_session.flush()
+    res = await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=s.id)])
+    assert (s.kategorie, s.ausfall_herkunft) == ("ausfall", "assistent")
+
+    await _rueckgaengig(db_session, res.snapshot_id)
+    assert (s.kategorie, s.ausfall_herkunft, s.ausfall_vorher) == ("pruefung", None, None)
+
+
+@pytest.mark.asyncio
+async def test_rueckgaengig_bringt_den_ausfall_mit_herkunft_zurueck(db_session, seed_ops_group):
+    """Umgekehrt: Ein wiederhergestellter Ausfall verlor seine Herkunft — und damit den
+    Schutz vor dem Stundenplan-Abgleich."""
+    s = _slot(D0)
+    db_session.add(s)
+    await db_session.flush()
+    await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=s.id)])
+    res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id, kategorie="unterricht")])
+    assert s.ausfall_herkunft is None
+
+    await _rueckgaengig(db_session, res.snapshot_id)
+    assert (s.kategorie, s.ausfall_herkunft, s.ausfall_vorher) == ("ausfall", "assistent", "unterricht")
+
+
+@pytest.mark.asyncio
+async def test_aelterer_snapshot_ohne_herkunft(db_session, seed_ops_group):
+    """Snapshots vor 0.15 kennen die Felder nicht — `setze_kategorie` hält sie zusammen."""
+    from app.db.models import SlotPlanSnapshot
+
+    raus, rein = _slot(D0, kategorie="ausfall"), _slot(D0 + timedelta(days=1))
+    raus.ausfall_herkunft, raus.ausfall_vorher = "assistent", "unterricht"
+    db_session.add_all([raus, rein])
+    alt = SlotPlanSnapshot(group_id=GROUP_ID, reason="reflow", label="alt", payload={"slots": [
+        {"slot_id": str(raus.id), "kategorie": "unterricht", "pinned": False},
+        {"slot_id": str(rein.id), "kategorie": "ausfall", "pinned": False},
+    ]})
+    db_session.add(alt)
+    await db_session.flush()
+
+    await _rueckgaengig(db_session, str(alt.id))
+    assert (raus.kategorie, raus.ausfall_herkunft, raus.ausfall_vorher) == ("unterricht", None, None)
+    assert (rein.kategorie, rein.ausfall_herkunft, rein.ausfall_vorher) == ("ausfall", "eigen", "unterricht")

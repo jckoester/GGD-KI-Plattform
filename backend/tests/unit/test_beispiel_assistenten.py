@@ -49,6 +49,19 @@ def test_prompt_nennt_nur_werkzeuge_seiner_faehigkeiten(eintrag):
     assert werkzeugnamen <= erreichbar, sorted(werkzeugnamen - erreichbar)
 
 
+@pytest.mark.parametrize("datei", sorted((WURZEL / "config" / "prompts").glob("*.md")),
+                         ids=lambda p: p.name)
+def test_kein_bilanzbeispiel_mit_zahlen(datei):
+    """Ein Beispiel mit Zahlen schreibt das Modell als Bilanz ab: „34 Slots bis Februar, 36 Std.
+    geplant — 2 Std. Überhang" stand im Jahresplanungs-Prompt und kam in den Entfall-Messungen
+    zu 0.15 einmal je Messung als Bilanz einer Gruppe mit 12 Terminen heraus — trotz „Niemals
+    selbst rechnen". Platzhalter (X, Y) sind unverdächtig; Ziffern vor „Slots"/„Std." nicht.
+    Alle Prompt-Dateien, nicht nur die mit Seed-Eintrag: Den Verschiebe-Assistenten legen
+    Admins von Hand aus `verschiebe_assistent.md` an — dort stand „2 von 18 Std."."""
+    beispiele = re.findall(r"\d+\s*(?:Slots|Std\.|Stunden)", datei.read_text(encoding="utf-8"))
+    assert beispiele == [], beispiele
+
+
 class TestStundenentwurf:
     """Der schulweite Stundenassistent (0.15, Päckchen A Schritt 6)."""
 
