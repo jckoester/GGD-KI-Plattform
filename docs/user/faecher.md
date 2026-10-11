@@ -17,7 +17,7 @@ Unterrichtsgruppe, nur aus zwei Richtungen.
 | Abschnitt | Inhalt |
 |---|---|
 | **Jetzt** *(Lehrkräfte)* | Laufende und nächste Unterrichtseinheit, die zuletzt gehaltene und die nächsten Stunden |
-| **Weiterarbeiten** | Ihre letzten Chats in dieser Gruppe — und **„+ Neuer Chat"** für einen Chat, der zu dieser Gruppe gehört: Der Assistent kennt dann den aktuellen Unterricht (zuletzt behandelt, nächstes Thema, nächste Klassenarbeit) |
+| **Weiterarbeiten** | Ihre letzten Chats in dieser Gruppe — und **„+ Neuer Chat"** für einen Chat, der zu dieser Gruppe gehört: Der Assistent kennt dann den aktuellen Unterricht (letzte und vorletzte Stunde mit ihren Inhalten, nächstes Thema, nächste Klassenarbeit) |
 | **Assistenten** | Die Assistenten, die für diese Gruppe freigegeben sind |
 | **Zuletzt entstanden** | Ihre Bausteine und Artefakte aus dieser Gruppe, gemischt und nach Datum |
 | **Nachschlagen** | Fachbegriffe, Methoden- und Operatorenblätter, Suche |

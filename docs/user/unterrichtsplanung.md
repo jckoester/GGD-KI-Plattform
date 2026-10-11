@@ -329,8 +329,15 @@ wieder eine Klassenarbeit, nicht bloß „Unterricht".
 ## Was Schüler:innen mitbekommen
 
 Damit Schüler-Assistenten sinnvoll helfen können, erhält ein Chat **mit
-Gruppenbezug** einen kleinen Hinweisblock zum **aktuellen Unterricht**: zuletzt
-behandeltes und nächstes Thema sowie Termin und Umfang der nächsten Klassenarbeit.
+Gruppenbezug** einen kleinen Hinweisblock zum **aktuellen Unterricht**: Thema und
+Inhalte der letzten und vorletzten Stunde, das nächste Thema sowie Termin und Umfang der
+nächsten Klassenarbeit. „Ich habe die letzte Stunde nicht verstanden" führt so zur richtigen
+Stunde.
+
+Die **Inhalte** sind die Kompetenzen (und Fachbegriffe) aus Ihrem Stundenentwurf. Haben Sie
+die Stunde nachbereitet, stehen dort die eingeführten — ohne die, die Sie als offen markiert
+haben; sonst die geplanten, ausdrücklich als **„laut Plan"** gekennzeichnet. Die Nachbereitung
+lohnt sich also auch hier: Erst sie sagt dem Assistenten, was wirklich drankam.
 
 **Nicht** weitergegeben werden interne Planungsfelder wie Ihre Kommentare,
 Reflexionen, der Pin-Status oder Phasen-Details. Mehr dazu unter

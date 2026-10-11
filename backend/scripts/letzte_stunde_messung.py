@@ -124,8 +124,14 @@ def knoten(conn, fach: str, *, begriff: str | None = None, kompetenz: str | None
     return zeile[0]
 
 
-def aufbauen(conn, lehrkraft: httpx.Client, daten: dict, lehrer: str, schueler: str, heute: date) -> dict:
-    """Baut die Messgruppe auf; liefert die Termine (vergangen, kommend) als Datum → Slot-ID."""
+def aufbauen(conn, lehrkraft: httpx.Client, daten: dict, lehrer: str, schueler: str, heute: date,
+             *, mit_begriffen: bool = False) -> dict:
+    """Baut die Messgruppe auf; liefert die Termine (vergangen, kommend) als Datum → Slot-ID.
+
+    ``mit_begriffen``: Die Begriffe stehen zusätzlich als `refs` am Entwurf — das bringt erst
+    Päckchen A1; heute legt die Oberfläche dort nur Kompetenzen ab. Ohne den Schalter misst
+    die Messung also den heutigen Stand, mit ihm eine Vorschau.
+    """
     from app.planning.calendar import load_school_year
 
     gruppe = daten["gruppe"]
@@ -156,11 +162,13 @@ def aufbauen(conn, lehrkraft: httpx.Client, daten: dict, lehrer: str, schueler: 
         entwurf = ok(lehrkraft.post(f"/planning/slots/{slots[tag]}/lesson"))["id"]
         begriff_id, begriff_titel = knoten(conn, fach, begriff=stunde["begriff"])
         ik_id, ik_text = knoten(conn, fach, kompetenz=stunde["kompetenz"])
+        refs = [{"node_id": ik_id, "typ": "ik", "code": stunde["kompetenz"], "titel": ik_text}]
+        if mit_begriffen:
+            refs.append({"node_id": begriff_id, "typ": "concept", "titel": begriff_titel})
         ok(lehrkraft.patch(f"/planning/lessons/{entwurf}", json={
             "titel": stunde["thema"],
             "phasen": [{"name": "Erarbeitung", "dauer_min": 30}, {"name": "Sicherung", "dauer_min": 10}],
-            "refs": [{"node_id": ik_id, "typ": "ik", "code": stunde["kompetenz"], "titel": ik_text},
-                     {"node_id": begriff_id, "typ": "concept", "titel": begriff_titel}],
+            "refs": refs,
         }))
     for tag, thema in zip(kommend, daten["kommende"]):
         ok(lehrkraft.patch(f"/planning/slots/{slots[tag]}", json={"ue_node_id": ue, "thema": thema}))
@@ -259,6 +267,7 @@ def _zitat(text: str) -> str:
 def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
     teile = [f"# Messung „letzte Stunde“ — {kopf['beginn']}", "",
              f"Chat ohne Assistent, als Schüler:in, Gruppenbezug · Modell {kopf['modell']} · "
+             f"refs: {'Kompetenzen und Begriffe (Vorschau A1)' if kopf.get('mit_begriffen') else 'nur Kompetenzen'} · "
              f"Datei `{kopf['datei']}`. Termine: {kopf['termine']}.", "",
              "**Falsche Stunde als die letzte?** Je Lauf beim Lesen entscheiden — Verdachtssätze sind "
              "markiert, entscheidend ist der ganze Text.", ""]
@@ -290,6 +299,11 @@ def main() -> None:
     p.add_argument("--verlauf", type=Path, default=None)
     p.add_argument("--trotzdem", action="store_true", help="auch ohne vollständige Vektoren")
     p.add_argument("--nur-aufbau", action="store_true", help="aufbauen, Plan und Block zeigen, abbauen")
+    p.add_argument("--mit-begriffen", action="store_true",
+                   help="Begriffe zusätzlich als refs (Vorschau auf Päckchen A1)")
+    p.add_argument("--nur", action="append", default=[], help="nur diesen Fall (mehrfach möglich)")
+    p.add_argument("--ohne-nachbereitete", action="store_true",
+                   help="nur die Fälle ohne Nachbereitung der letzten Stunde (keine Strich-Fälle)")
     args = p.parse_args()
     if settings.environment == "production":
         p.error("Nicht auf einer Produktivinstanz (eigene Token, echtes Budget, legt Gruppen an).")
@@ -307,14 +321,14 @@ def main() -> None:
     gid = daten["gruppe"]["id"]
     laeufe: list[dict] = []
     kopf = {"datei": args.datei.name, "beginn": datetime.now().strftime("%d.%m.%Y, %H:%M"), "modell": "?",
-            "bloecke": {}}
+            "bloecke": {}, "mit_begriffen": args.mit_begriffen}
     # ⚠️ **Vor dem Aufbau prüfen, nicht danach.** Die Entwürfe der Messgruppe haben in den
     # ersten Sekunden noch keinen Vektor, und die Prüfung brach daran ab (erster Lauf,
     # 11.10.2026). Für die Messung zählen sie nicht: Schüler:innen lesen `group_teachers` nicht.
     if not args.nur_aufbau:
         asyncio.run(vor_einer_messung(trotzdem=args.trotzdem))
     try:
-        termin = aufbauen(conn, lehrkraft, daten, lehrer, schueler, heute)
+        termin = aufbauen(conn, lehrkraft, daten, lehrer, schueler, heute, mit_begriffen=args.mit_begriffen)
         vergangen = termin["vergangen"]
         kopf["termine"] = " · ".join(
             f"{d:%a %d.%m.} {s['thema']}{' (nachbereitet)' if i < len(vergangen) - 1 else ''}"
@@ -326,10 +340,11 @@ def main() -> None:
             print("— nach Nachbereitung der letzten —")
             print(block(gid))
             return
-        for phase, suffix in (("ohne Nachbereitung der letzten", ""), ("letzte nachbereitet", STRICH)):
+        phasen = (("ohne Nachbereitung der letzten", ""), ("letzte nachbereitet", STRICH))
+        for phase, suffix in phasen[:1] if args.ohne_nachbereitete else phasen:
             if suffix:
                 nachbereiten(lehrkraft, vergangen[-1][1])
-            for fall in daten["faelle"]:
+            for fall in [f for f in daten["faelle"] if not args.nur or f["id"] in args.nur]:
                 name = fall["id"] + suffix
                 for nr in range(1, args.laeufe + 1):
                     try:

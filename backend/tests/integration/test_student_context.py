@@ -80,8 +80,8 @@ async def test_current_topic_zuletzt_und_naechste(db_session, seed_sc_group):
 
     topic = await get_current_topic(db_session, GROUP_ID, TODAY)
     assert topic is not None
-    assert topic.zuletzt.thema == "Zahlen runden"
-    assert topic.zuletzt.ue_titel == "Die Natürlichen Zahlen"
+    assert topic.vergangene[0].thema == "Zahlen runden"
+    assert topic.vergangene[0].ue_titel == "Die Natürlichen Zahlen"
     assert [s.thema for s in topic.naechste] == ["Stellenwertsysteme verstehen", "Übungen"]
     assert topic.naechste[0].stundenziel == "SuS verstehen Stellenwerte"
 
@@ -100,13 +100,44 @@ async def test_current_topic_ausfall_uebersprungen(db_session, seed_sc_group):
 
 
 @pytest.mark.asyncio
-async def test_current_topic_nicht_nachbereitet_kein_zuletzt(db_session, seed_sc_group):
-    # Vergangener, belegter, aber NICHT nachbereiteter Slot → zählt nicht als behandelt.
-    db_session.add(_slot(date(2026, 3, 10), thema="Ungesichert", nachbereitet=False))
+async def test_nicht_nachbereitete_letzte_stunde_steht_laut_plan(db_session, seed_sc_group):
+    """⚠️ **Bis 0.15 fehlte sie** — der Block nannte die vorletzte als „Zuletzt behandelt",
+    und das Modell erklärte auf „Ich habe die letzte Stunde nicht verstanden" deren Thema
+    (Messung 11.10.2026: 3 von 3). Jetzt steht sie da, als „laut Plan" gekennzeichnet."""
+    db_session.add_all([
+        _slot(date(2026, 3, 10), thema="Metallbindung", nachbereitet=True),
+        _slot(date(2026, 3, 12), thema="Elektronegativität", nachbereitet=False),
+    ])
     await db_session.flush()
 
     topic = await get_current_topic(db_session, GROUP_ID, TODAY)
-    assert topic is None  # kein zuletzt, kein naechste
+    assert [(s.thema, s.nachbereitet) for s in topic.vergangene] == [
+        ("Elektronegativität", False), ("Metallbindung", True)]
+    md = render_topic_block(topic, "Chemie, 10x")
+    assert "- Letzte Stunde (Do 12.3., laut Plan — noch nicht nachbereitet): Elektronegativität" in md
+    assert "- Vorletzte Stunde (Di 10.3., behandelt): Metallbindung" in md
+
+
+@pytest.mark.asyncio
+async def test_nur_die_letzten_zwei_neueste_zuerst(db_session, seed_sc_group):
+    db_session.add_all([
+        _slot(date(2026, 3, 9), thema="A", nachbereitet=True),
+        _slot(date(2026, 3, 11), thema="B", nachbereitet=True),
+        _slot(date(2026, 3, 13), thema="C2", start_period=5),
+        _slot(date(2026, 3, 13), thema="C1", start_period=1),
+        _slot(date(2026, 3, 15), thema="Heute"),   # heute zählt als nächste Stunde
+    ])
+    await db_session.flush()
+
+    topic = await get_current_topic(db_session, GROUP_ID, TODAY)
+    assert [s.thema for s in topic.vergangene] == ["C2", "C1"]
+    assert topic.naechste[0].thema == "Heute"
+
+
+def test_auto_bestaetigt_heisst_vermutlich():
+    topic = CurrentTopic(vergangene=[TopicSlot(date(2026, 3, 12), "unterricht", "X", None, None,
+                                               auto_bestaetigt=True, nachbereitet=True)])
+    assert "(Do 12.3., vermutlich behandelt): X" in render_topic_block(topic, "G")
 
 
 @pytest.mark.asyncio
@@ -120,14 +151,16 @@ async def test_current_topic_leer_none(db_session, seed_sc_group):
 
 def test_render_topic_block_felder():
     topic = CurrentTopic(
-        zuletzt=TopicSlot(date(2026, 10, 13), "unterricht", "Zahlen runden", None,
-                          "Die Natürlichen Zahlen"),
+        vergangene=[TopicSlot(date(2026, 10, 13), "unterricht", "Zahlen runden", None,
+                              "Die Natürlichen Zahlen", nachbereitet=True,
+                              inhalte=["Runden", "1.1 Zahlen runden"])],
         naechste=[TopicSlot(date(2026, 10, 15), "unterricht", "Stellenwertsysteme",
                             "Ziel X", "Die Natürlichen Zahlen")],
     )
     md = render_topic_block(topic, "Mathematik, 5b")
     assert "## Aktueller Unterricht (Mathematik, 5b)" in md
-    assert '13.10.): Zahlen runden (UE „Die Natürlichen Zahlen")' in md
+    assert ('13.10., behandelt): Zahlen runden (UE „Die Natürlichen Zahlen") — eingeführt: '
+            'Runden · 1.1 Zahlen runden') in md
     assert "15.10.): Stellenwertsysteme — Ziel X" in md
     assert "Nächste Stunde" in md
 
@@ -303,3 +336,65 @@ async def test_lernstand_eingefuehrte_kompetenz_im_schuelerkontext(db_session, s
     titles = {e.node.title for e in entries}
     assert "Zahlen runden K" in titles
     assert "Nicht eingeführt K" not in titles
+
+
+# ── 0.15: Inhalte der vergangenen Stunden ─────────────────────────────────────
+
+
+def _inhaltsknoten(titel, *, scope="school", gruppe=None, art="ik_kompetenz"):
+    return ContextNode(
+        id=uuid4(), category="knowledge", content_type=art, title=titel, metadata_={},
+        read_scope=scope, read_scope_group_id=gruppe, status="active",
+    )
+
+
+@pytest.mark.asyncio
+async def test_inhalte_geplant_und_eingefuehrt_nur_lesbare(db_session, seed_sc_group, seed_test_group):
+    """Geplant: alle `refs` des Entwurfs. Eingeführt: ohne `refs_offen`. In beiden nur, was
+    jedes Mitglied der Gruppe lesen darf — kein privater Begriff, kein Planungsknoten, nichts
+    aus einer fremden Gruppe."""
+    kompetenz = _inhaltsknoten("3.2.1.3(4) Elektronegativität vergleichen")
+    begriff = _inhaltsknoten("Elektronegativität", art="begriff")
+    gruppe = _inhaltsknoten("Merkblatt der Gruppe", scope="group", gruppe=GROUP_ID, art="begriff")
+    privat = _inhaltsknoten("Privater Begriff", scope="private", art="begriff")
+    lehrkraefte = _inhaltsknoten("Nur Lehrkräfte", scope="group_teachers", gruppe=GROUP_ID)
+    fremd = _inhaltsknoten("Fremde Gruppe", scope="group", gruppe=seed_test_group)
+    offen = _inhaltsknoten("3.2.1.3(2) Metallbindung erklären")
+    eingef = _inhaltsknoten("3.2.1.3(1) Ionenbindung erklären")
+    knoten = [kompetenz, begriff, gruppe, privat, lehrkraefte, fremd, offen, eingef]
+    db_session.add_all(knoten)
+    refs = lambda *ns: [{"node_id": str(n.id), "typ": "ik"} for n in ns]  # noqa: E731
+    geplant = _stunde_mit_refs("Elektronegativität",
+                               refs(kompetenz, begriff, gruppe, privat, lehrkraefte, fremd))
+    nachbereitet = _stunde_mit_refs("Bindungen", refs(eingef, offen), refs_offen=[str(offen.id)])
+    db_session.add_all([geplant, nachbereitet])
+    db_session.add_all([
+        _slot(date(2026, 3, 10), stunde_id=nachbereitet.id, nachbereitet=True),
+        _slot(date(2026, 3, 12), stunde_id=geplant.id),
+    ])
+    await db_session.flush()
+
+    letzte, vorletzte = (await get_current_topic(db_session, GROUP_ID, TODAY)).vergangene
+    assert letzte.inhalte == ["3.2.1.3(4) Elektronegativität vergleichen", "Elektronegativität",
+                              "Merkblatt der Gruppe"]
+    assert vorletzte.inhalte == ["3.2.1.3(1) Ionenbindung erklären"]
+    md = render_topic_block(CurrentTopic(vergangene=[letzte, vorletzte]), "Chemie")
+    assert "— geplant: 3.2.1.3(4) Elektronegativität vergleichen · Elektronegativität" in md
+    assert "— eingeführt: 3.2.1.3(1) Ionenbindung erklären" in md
+
+
+@pytest.mark.asyncio
+async def test_inhalte_begrenzt_und_gekuerzt(db_session, seed_sc_group):
+    from app.planning.student_context import INHALT_ZEICHEN, INHALTE_JE_STUNDE
+
+    lang = _inhaltsknoten("x" * (INHALT_ZEICHEN + 50))
+    viele = [_inhaltsknoten(f"K{i}") for i in range(INHALTE_JE_STUNDE + 2)]
+    db_session.add_all([lang, *viele])
+    stunde = _stunde_mit_refs("Viel", [{"node_id": str(n.id)} for n in [lang, *viele]])
+    db_session.add(stunde)
+    db_session.add(_slot(date(2026, 3, 12), stunde_id=stunde.id))
+    await db_session.flush()
+
+    (letzte,) = (await get_current_topic(db_session, GROUP_ID, TODAY)).vergangene
+    assert len(letzte.inhalte) == INHALTE_JE_STUNDE
+    assert len(letzte.inhalte[0]) == INHALT_ZEICHEN and letzte.inhalte[0].endswith("…")

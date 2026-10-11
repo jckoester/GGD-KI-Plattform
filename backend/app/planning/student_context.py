@@ -1,9 +1,11 @@
 """UP-7 Schritt 1+3: Planungsdaten für den Schüler-/Lehrkraft-Kontext.
 
 Liefert datenschutzkonform (Whitelist, siehe UP-Phase-7-Plan) das „aktuelle Thema"
-einer Unterrichtsgruppe (zuletzt behandelt / nächste Stunden) und den
+einer Unterrichtsgruppe (letzte und vorletzte Stunde / nächste Stunden) und den
 Klassenarbeits-Scope. Nur lesend; keine internen Planungsfelder
-(`note`, `anpassung_noetig`, Pin, Phasen-Details, Reflexion) verlassen das Backend.
+(`note`, `anpassung_noetig`, Pin, Phasen-Details, Reflexion, Material) verlassen das Backend.
+Seit 0.15 gehören die **Inhalte** der vergangenen Stunden dazu — Kompetenzen und Begriffe aus
+den `refs` des Entwurfs, soweit jedes Mitglied der Gruppe sie lesen darf.
 """
 
 from __future__ import annotations
@@ -20,6 +22,14 @@ from app.db.models import ContextNode, LessonSlot
 # Kategorien, die als „behandelter/geplanter Unterricht" gelten (Prüfungen separat).
 BEHANDELT_KATEGORIEN: tuple[str, ...] = ("unterricht", "vertretung")
 
+#: Vergangene Stunden im Block: die letzte und die vorletzte (0.15). Mit der vorletzten
+#: daneben kann das Modell eine Verwechslung („letzte Stunde … Metallbindung") auflösen.
+VERGANGENE_STUNDEN = 2
+#: Inhalte je Stunde im Block — mehr ist eine Liste, keine Auskunft.
+INHALTE_JE_STUNDE = 5
+#: Länge eines Inhalts im Block; Kompetenztitel tragen Nummer und ganzen Text.
+INHALT_ZEICHEN = 100
+
 
 @dataclass
 class TopicSlot:
@@ -31,11 +41,16 @@ class TopicSlot:
     stundenziel: str | None
     ue_titel: str | None
     auto_bestaetigt: bool = False  # vergangene Slots: per Auto-Cron bestätigt ("vermutlich")
+    # Vergangene Slots (0.15): nachbereitet oder nur „laut Plan", und ihre Inhalte —
+    # eingeführt (nachbereitet, ohne `refs_offen`) bzw. geplant (alle `refs`).
+    nachbereitet: bool = False
+    inhalte: list[str] = field(default_factory=list)
 
 
 @dataclass
 class CurrentTopic:
-    zuletzt: TopicSlot | None
+    #: Die vergangenen Stunden, die jüngste zuerst — nachbereitet oder nicht (0.15).
+    vergangene: list[TopicSlot] = field(default_factory=list)
     naechste: list[TopicSlot] = field(default_factory=list)
 
 
@@ -62,6 +77,62 @@ async def _resolve_nodes(db: AsyncSession, slots: list[LessonSlot]) -> dict[UUID
     return {n.id: n for n in rows}
 
 
+def _fuer_alle_lesbar(node: ContextNode, group_id: int) -> bool:
+    """Darf **jedes** Mitglied der Gruppe den Knoten lesen? Der Block ist für alle derselbe.
+
+    Dieselben Scopes wie `context.visibility.read_scope_clause` für eine Schüler:in der
+    Gruppe — ohne Eigentum, das an einer Person hängt. `private` und `group_teachers` fallen
+    heraus (etwa ein privater Begriff der Lehrkraft), ebenso eine fremde Gruppe.
+    """
+    from app.context.visibility import OFFENE_SCOPES
+
+    return node.read_scope in OFFENE_SCOPES or (
+        node.read_scope == "group" and node.read_scope_group_id == group_id
+    )
+
+
+def _inhalt(node: ContextNode) -> str:
+    titel = (node.title or "").strip()
+    return titel if len(titel) <= INHALT_ZEICHEN else titel[: INHALT_ZEICHEN - 1].rstrip() + "…"
+
+
+async def _inhalte(
+    db: AsyncSession, group_id: int, slots: list[LessonSlot], nodes: dict[UUID, ContextNode]
+) -> dict[UUID, list[str]]:
+    """Inhalte je vergangenem Slot aus den `refs` seines Entwurfs.
+
+    **Nachbereitet:** `refs` ohne `refs_offen` — dasselbe, was die Nachbereitung als
+    „eingeführt" in den Lernstand schreibt (dort zusätzlich Material und Methode, die hier
+    fehlen). **Nicht nachbereitet:** alle `refs` — „laut Plan". Kompetenzen und Begriffe,
+    nur lesbare (`_fuer_alle_lesbar`).
+    """
+    wunsch: dict[UUID, list[UUID]] = {}
+    for slot in slots:
+        stunde = nodes.get(slot.stunde_node_id) if slot.stunde_node_id else None
+        meta = stunde.metadata_ if stunde is not None and isinstance(stunde.metadata_, dict) else {}
+        offen = {str(x) for x in (meta.get("refs_offen") or [])} if slot.nachbereitet_at else set()
+        ids = []
+        for ref in meta.get("refs") or []:
+            nid = ref.get("node_id") if isinstance(ref, dict) else None
+            if nid and str(nid) not in offen:
+                try:
+                    ids.append(UUID(str(nid)))
+                except ValueError:
+                    continue
+        wunsch[slot.id] = ids
+    alle = {i for ids in wunsch.values() for i in ids}
+    if not alle:
+        return {}
+    gelesen = {
+        n.id: n for n in (await db.execute(sa.select(ContextNode).where(ContextNode.id.in_(alle)))).scalars()
+        if _fuer_alle_lesbar(n, group_id)
+    }
+    return {
+        sid: [_inhalt(gelesen[i]) for i in ids if i in gelesen][:INHALTE_JE_STUNDE]
+        for sid, ids in wunsch.items()
+    }
+
+
 def _to_topic_slot(slot: LessonSlot, nodes: dict[UUID, ContextNode]) -> TopicSlot:
     stunde = nodes.get(slot.stunde_node_id) if slot.stunde_node_id else None
     ue = nodes.get(slot.ue_node_id) if slot.ue_node_id else None
@@ -75,6 +146,7 @@ def _to_topic_slot(slot: LessonSlot, nodes: dict[UUID, ContextNode]) -> TopicSlo
         stundenziel=stundenziel,
         ue_titel=ue.title if ue else None,
         auto_bestaetigt=slot.nachbereitet_auto,
+        nachbereitet=slot.nachbereitet_at is not None,
     )
 
 
@@ -213,11 +285,19 @@ def render_topic_block(
     """Token-kompakter Markdown-Block „Aktueller Unterricht" für den Chat-Kontext."""
     lines = [f"## Aktueller Unterricht ({group_label})"]
     if topic is not None:
-        if topic.zuletzt is not None:
-            z = topic.zuletzt
+        # „Letzte" und „Vorletzte" wie in der Frage der Schüler:in. Der Stand sagt ehrlich,
+        # woher das Thema stammt: nachbereitet, per Auto-Bestätigung — oder nur aus dem Plan.
+        for i, z in enumerate(topic.vergangene):
+            label = "Letzte Stunde" if i == 0 else "Vorletzte Stunde"
+            if not z.nachbereitet:
+                stand, wort = "laut Plan — noch nicht nachbereitet", "geplant"
+            elif z.auto_bestaetigt:
+                stand, wort = "vermutlich behandelt", "eingeführt"
+            else:
+                stand, wort = "behandelt", "eingeführt"
             ue = f' (UE „{z.ue_titel}")' if z.ue_titel else ""
-            prefix = "Vermutlich behandelt" if z.auto_bestaetigt else "Zuletzt behandelt"
-            lines.append(f"- {prefix} ({_fmt_datum(z.datum)}): {z.thema or '—'}{ue}")
+            inhalte = f" — {wort}: {' · '.join(z.inhalte)}" if z.inhalte else ""
+            lines.append(f"- {label} ({_fmt_datum(z.datum)}, {stand}): {z.thema or '—'}{ue}{inhalte}")
         for i, s in enumerate(topic.naechste):
             label = "Nächste Stunde" if i == 0 else "Danach"
             ziel = f" — {s.stundenziel}" if s.stundenziel else ""
@@ -231,26 +311,35 @@ def render_topic_block(
 async def get_current_topic(
     db: AsyncSession, group_id: int, today: date
 ) -> CurrentTopic | None:
-    """Zuletzt behandelter + die nächsten 1–2 belegten Slots der Gruppe.
+    """Die letzten zwei vergangenen + die nächsten 1–2 belegten Slots der Gruppe.
 
-    „Zuletzt behandelt" ist der jüngste vergangene, belegte Slot, der **nachbereitet**
-    ist (manuell oder per Auto-Cron) — UP-5-Grundsatz: was die Klasse nie gesehen hat,
-    gilt nicht als behandelt. Gibt None zurück, wenn weder Vergangenes noch Kommendes
-    belegt ist. `ausfall`/`puffer` werden über das Belegt-Kriterium übersprungen.
+    ⚠️ **Vergangen heißt vergangen, nicht nachbereitet** (0.15, Messung „letzte Stunde",
+    11.10.2026). Bis dahin zählte nur ein **nachbereiteter** Slot — UP-5: was die Klasse nie
+    gesehen hat, gilt nicht als behandelt. Die Auto-Bestätigung bestätigt eine Stunde aber erst,
+    wenn die nächste vorbei ist; zwischen letzter und nächster Stunde nannte der Block also die
+    **vorletzte** als „Zuletzt behandelt". Auf „Ich habe die letzte Stunde nicht verstanden"
+    erklärte das Modell darauf dreimal von drei das Thema der vorletzten. Jetzt steht die
+    letzte vergangene Stunde da — und ob sie nachbereitet ist oder nur geplant war, sagt der
+    Block (`render_topic_block`). Der UP-5-Grundsatz bleibt im Wort: „behandelt" heißt nur, was
+    nachbereitet ist.
+
+    Gibt None zurück, wenn weder Vergangenes noch Kommendes belegt ist. `ausfall`/`puffer`
+    werden über das Belegt-Kriterium übersprungen.
     """
-    zuletzt_slot = (
-        await db.execute(
-            sa.select(LessonSlot)
-            .where(
-                LessonSlot.group_id == group_id,
-                LessonSlot.date < today,
-                LessonSlot.nachbereitet_at.isnot(None),
-                _belegt_filter(),
+    vergangene_slots = list(
+        (
+            await db.execute(
+                sa.select(LessonSlot)
+                .where(
+                    LessonSlot.group_id == group_id,
+                    LessonSlot.date < today,
+                    _belegt_filter(),
+                )
+                .order_by(LessonSlot.date.desc(), LessonSlot.start_period.desc().nullslast())
+                .limit(VERGANGENE_STUNDEN)
             )
-            .order_by(LessonSlot.date.desc(), LessonSlot.start_period.desc().nullslast())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+        ).scalars().all()
+    )
 
     naechste_slots = list(
         (
@@ -267,11 +356,17 @@ async def get_current_topic(
         ).scalars().all()
     )
 
-    if zuletzt_slot is None and not naechste_slots:
+    if not vergangene_slots and not naechste_slots:
         return None
 
-    nodes = await _resolve_nodes(db, [s for s in [zuletzt_slot, *naechste_slots] if s])
+    nodes = await _resolve_nodes(db, [*vergangene_slots, *naechste_slots])
+    inhalte = await _inhalte(db, group_id, vergangene_slots, nodes)
+    vergangene = []
+    for slot in vergangene_slots:
+        topic_slot = _to_topic_slot(slot, nodes)
+        topic_slot.inhalte = inhalte.get(slot.id, [])
+        vergangene.append(topic_slot)
     return CurrentTopic(
-        zuletzt=_to_topic_slot(zuletzt_slot, nodes) if zuletzt_slot else None,
+        vergangene=vergangene,
         naechste=[_to_topic_slot(s, nodes) for s in naechste_slots],
     )

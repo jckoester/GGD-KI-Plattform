@@ -77,6 +77,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Jahresplanungs-Assistent brach ohne Meldung mitten in der Antwort ab, sobald er die
   Stundenbilanz einer Gruppe mit Unterrichtseinheit las. Ein Werkzeugergebnis, das sich nicht
   übertragen lässt, beendet die Antwort jetzt auch sonst nicht mehr.
+- Fragte eine Schüler:in nach der letzten Stunde, bevor diese nachbereitet war, bekam der
+  Assistent die vorletzte als „zuletzt behandelt" und erklärte deren Thema. Der Hinweis zum
+  aktuellen Unterricht nennt jetzt die letzte und die vorletzte Stunde mit ihren Inhalten
+  (Kompetenzen, Fachbegriffe) — eine noch nicht nachbereitete als „laut Plan".
 - „+ Neuer Chat" auf der Seite einer Unterrichtsgruppe öffnete einen Chat ohne Gruppe — der
   Assistent wusste nichts vom aktuellen Unterricht. Jetzt gehört der Chat zur Gruppe und zum Fach.
 - Eigene aktive oder abgeschaltete Assistenten ließen sich nicht löschen, obwohl sie es
