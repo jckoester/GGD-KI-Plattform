@@ -20,6 +20,7 @@ from app.planning.ausfall import AUSFALL, setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
+from app.planning.reflow_service import _is_fixpunkt
 from app.planning.snapshots import create_snapshot
 from app.planning import zuordnung
 
@@ -88,12 +89,17 @@ class CancelLesson(BaseModel):
     der Handlung heißt, statt nach dem Feld, das sie setzt; `set_category` nimmt `ausfall`
     seitdem nicht mehr an — ein Weg, nicht zwei.
 
-    Thema, Einheit und Entwurf bleiben am Termin (zur Nachvollziehbarkeit, wie beim Ausfall
-    aus der Planungsansicht); weiter wandern sie mit `move_content` im selben Stapel.
+    Ohne `nachruecken` bleiben Thema, Einheit und Entwurf am Termin (zur Nachvollziehbarkeit,
+    wie beim Ausfall aus der Planungsansicht). **`nachruecken`** (Jan, 11.10.2026, nach
+    Messung 2): Der Inhalt und alle folgenden Unterrichtsstunden rücken eins weiter, bis
+    zum ersten freien Termin — die Regeln in `_nachrueck_kette`. „Fällt aus, alles eins nach
+    hinten" waren bis dahin bis zu elf Operationen; in Messung 2 reichten die Runden dafür
+    nicht, und der Ausfall blieb liegen.
     """
 
     op: Literal["cancel_lesson"]
     slot_id: UUID
+    nachruecken: bool = False
 
 
 class MarkNeedsAdjustment(BaseModel):
@@ -222,6 +228,21 @@ async def _validate(
             s = slots.get(op.slot_id)
             if s is not None and s.kategorie == "ausfall" and op.thema:
                 errors.append(f"{ctx}: Ausfall-Slot nimmt kein Thema auf")
+        elif isinstance(op, CancelLesson):
+            s = slots.get(op.slot_id)
+            if op.nachruecken and s is not None and occ.get(op.slot_id):
+                kette, grenze = _nachrueck_kette(s, slots.values(), lambda x: bool(occ.get(x.id)))
+                if kette is None:
+                    bis = (f"vor dem Fixpunkt am {grenze.date:%d.%m.%Y}" if grenze is not None
+                           else "bis zum Halbjahresende")
+                    errors.append(
+                        f"{ctx}: Nachrücken geht nicht — {bis} ist kein Termin frei, der Stoff "
+                        "fiele hinten heraus. Erst Platz schaffen (Thema streichen, Stunden "
+                        "zusammenlegen) oder ohne nachruecken eintragen und selbst verteilen."
+                    )
+                else:
+                    occ[op.slot_id] = False
+                    occ[kette[-1].id] = True
         elif isinstance(op, SetCategory):
             if op.kategorie == AUSFALL:
                 errors.append(f"{ctx}: Einen Ausfall trägt cancel_lesson{{slot_id}} ein, nicht set_category.")
@@ -275,6 +296,79 @@ def _apply_move(src: LessonSlot, dst: LessonSlot) -> None:
     src.anpassung_noetig = False
 
 
+def _nachrueck_kette(
+    quelle: LessonSlot, slots, belegt,
+) -> tuple[list[LessonSlot] | None, LessonSlot | None]:
+    """Über welche Termine der Inhalt eines ausfallenden Termins eins weiter rückt.
+
+    Die Regeln sind die des Verschiebe-Assistenten (`config/prompts/verschiebe_assistent.md`):
+
+    * **Fenster:** nach der Quelle, im selben Halbjahr, **bis vor den nächsten Fixpunkt**
+      (gepinnt oder Prüfung, `_is_fixpunkt` — dieselbe Grenze wie `get_reflow_context`).
+      Stoff rutscht nicht hinter eine Klassenarbeit.
+    * **Mit rücken nur Unterrichtsstunden.** Ausfall, Vertretung und belegte Puffer bleiben,
+      wie sie sind.
+    * **Die Kette endet am ersten freien Termin** — einer leeren Unterrichtsstunde oder einem
+      leeren Puffer; den verbraucht das Nachrücken (`_ruecke_nach`).
+
+    Liefert ``(kette, None)`` mit der Quelle vorn und dem freien Termin hinten — oder
+    ``(None, grenze)``, wenn vor dem Fixpunkt ``grenze`` (``None``: Halbjahresende) nichts
+    frei ist. ``belegt``: Hat der Termin Inhalt? (Die Prüfung rechnet mit der simulierten
+    Belegung des Stapels, das Anwenden mit dem Stand.)
+
+    ⚠️ **Kein Parkplatz für den Überhang.** Umhängen parkt, was übrig bleibt; hier hieße das
+    nach „Rückgängig" denselben Inhalt doppelt — der Snapshot kennt den Parkplatz nicht.
+    """
+    def schluessel(s: LessonSlot):
+        return (s.date, s.start_period or 0)
+
+    kette = [quelle]
+    folgende = sorted(
+        (s for s in slots if s.halbjahr == quelle.halbjahr and schluessel(s) > schluessel(quelle)),
+        key=schluessel,
+    )
+    for s in folgende:
+        if _is_fixpunkt(s):
+            return None, s
+        if s.kategorie == "unterricht" or (s.kategorie == "puffer" and not belegt(s)):
+            kette.append(s)
+            if not belegt(s):
+                return kette, None
+    return None, None
+
+
+def _ruecke_nach(kette: list[LessonSlot]) -> list[str]:
+    """Rückt den Inhalt entlang der Kette eins weiter — vom Ende her, jedes Ziel ist dann leer.
+
+    Ein verbrauchter Puffer wird Unterricht. Landet ein **Entwurf** in einem Termin anderer
+    Länge (Doppel- statt Einzelstunde), markiert „Anpassung nötig" ihn — eine 90′-Planung
+    passt nicht stillschweigend in 45 Minuten. Die Hinweise sagen dem Modell, was geschah:
+    In Messung 1 meldete es „alles nach hinten verschoben", als das Thema noch am Ausfall stand.
+    """
+    anpassen = []
+    puffer = kette[-1] if kette[-1].kategorie == "puffer" else None
+    for vorher, ziel in reversed(list(zip(kette, kette[1:]))):
+        markiert = vorher.anpassung_noetig
+        _apply_move(vorher, ziel)
+        if ziel.kategorie == "puffer":
+            setze_kategorie(ziel, "unterricht", herkunft="assistent")
+        if ziel.stunde_node_id is not None and ziel.periods != vorher.periods:
+            anpassen.append(ziel)
+        ziel.anpassung_noetig = markiert or ziel in anpassen
+    hinweise = [
+        f"Nachgerückt: {' → '.join(f'{s.date:%d.%m.}' for s in kette)} — "
+        f"{len(kette) - 1} Termin(e) eins weiter; der letzte war frei."
+    ]
+    if puffer is not None:
+        hinweise.append(f"Der Puffer am {puffer.date:%d.%m.} ist dabei verbraucht — jetzt Unterricht.")
+    if anpassen:
+        hinweise.append(
+            "Entwurf in einem Termin anderer Länge, als „Anpassung nötig“ markiert: "
+            + ", ".join(f"{s.date:%d.%m.} ({s.periods} Std.)" for s in anpassen)
+        )
+    return hinweise
+
+
 def _apply_swap(a: LessonSlot, b: LessonSlot) -> None:
     a.ue_node_id, b.ue_node_id = b.ue_node_id, a.ue_node_id
     a.stunde_node_id, b.stunde_node_id = b.stunde_node_id, a.stunde_node_id
@@ -324,16 +418,13 @@ async def apply_operations(
     slot_ids = {sid for op in ops for sid in _slot_ids(op)}
     lesson_ids = {lid for op in ops for lid in _lesson_ids(op)}
 
-    slots = {
-        s.id: s
-        for s in (
-            await db.execute(
-                sa.select(LessonSlot).where(
-                    LessonSlot.group_id == group_id, LessonSlot.id.in_(slot_ids or {None})
-                )
-            )
-        ).scalars().all()
-    }
+    # Nachrücken berührt Termine, die keine Operation nennt — dann alle der Gruppe.
+    welche = (
+        LessonSlot.group_id == group_id
+        if any(isinstance(op, CancelLesson) and op.nachruecken for op in ops)
+        else sa.and_(LessonSlot.group_id == group_id, LessonSlot.id.in_(slot_ids or {None}))
+    )
+    slots = {s.id: s for s in (await db.execute(sa.select(LessonSlot).where(welche))).scalars().all()}
     lessons = {
         n.id: n
         for n in (
@@ -362,6 +453,7 @@ async def apply_operations(
 
     snap = await create_snapshot(db, group_id, reason="reflow", label=summary, created_by=created_by)
 
+    nachrueck_hinweise: list[str] = []
     for op in ops:
         if isinstance(op, MoveContent):
             _apply_move(slots[op.from_slot_id], slots[op.to_slot_id])
@@ -380,7 +472,12 @@ async def apply_operations(
             # Zurücknehmen auf eine Kategorie, die niemand gesetzt hat.
             setze_kategorie(slots[op.slot_id], op.kategorie, herkunft="assistent")
         elif isinstance(op, CancelLesson):
-            setze_kategorie(slots[op.slot_id], AUSFALL, herkunft="assistent")
+            quelle = slots[op.slot_id]
+            setze_kategorie(quelle, AUSFALL, herkunft="assistent")
+            if op.nachruecken and _has_content(quelle):
+                kette, _ = _nachrueck_kette(quelle, slots.values(), _has_content)
+                nachrueck_hinweise += _ruecke_nach(kette) if kette else [
+                    f"Am {quelle.date:%d.%m.} ist nichts nachgerückt — kein freier Termin mehr."]
         elif isinstance(op, MarkNeedsAdjustment):
             slots[op.slot_id].anpassung_noetig = op.value
         elif isinstance(op, UnparkContent):
@@ -418,7 +515,7 @@ async def apply_operations(
     for lesson in lessons.values():
         await synchronisiere_materialkanten(db, lesson.id, lesson.metadata_)
 
-    hinweise = await _pruefe_halben_umzug(db, group_id, ops)
+    hinweise = nachrueck_hinweise + await _pruefe_halben_umzug(db, group_id, ops)
 
     await db.commit()
     return ExecutionResult(

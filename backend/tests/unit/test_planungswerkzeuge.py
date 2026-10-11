@@ -58,7 +58,9 @@ def test_jede_operation_wird_erklaert(op_beschreibung, op):
     Sonst bliebe die nächste Verwechslung genauso unvorbereitet — und sie fiele
     wieder erst im Betrieb auf.
     """
-    stelle = op_beschreibung.index(f"{op}{{")
+    # Der Listeneintrag, nicht die erste Erwähnung: Die Kurzbeschreibung nennt seit 0.15
+    # `cancel_lesson{slot_id}` selbst — der Test prüfte sonst dort und nicht in der Liste.
+    stelle = op_beschreibung.index(f"- {op}{{")
     satz = op_beschreibung[stelle:].split("\n")[0]
     # Hinter der Signatur muss Text stehen, nicht nur ein Komma zur nächsten.
     nach_signatur = satz[satz.index("}") + 1:].strip(" :,")
@@ -101,3 +103,15 @@ def test_puffer_ist_kein_ausfall(op_beschreibung):
     assert "cancel_lesson" in satz
     kategorie = TOOL_REGISTRY["set_slot_category"].definition["function"]["description"]
     assert "cancel_lesson" in kategorie and "kein Ausfall" in kategorie
+
+
+def test_nachruecken_wird_angeboten(op_beschreibung):
+    """„Alles eins nach hinten" ist **eine** Operation (Jan, 11.10.2026) — in Messung 2
+    reichten die Runden für zehn `move_content` und den Ausfall nicht. Die Grenze an
+    Prüfung und gepinntem Termin muss das Modell kennen, sonst schlägt es vor, was der
+    Server ablehnt."""
+    kurz = TOOL_REGISTRY["apply_plan_operations"].definition["function"]["description"]
+    assert "nachruecken" in kurz
+    stelle = op_beschreibung[op_beschreibung.index("- cancel_lesson{"):]
+    satz = stelle[: stelle.index("\n")]
+    assert "nachruecken" in satz and "Prüfung" in satz and "hinweise" in satz

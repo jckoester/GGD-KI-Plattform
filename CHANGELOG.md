@@ -38,9 +38,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Jahresplanung; fehlt ein passender, sagt der Chat das.
 - Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
 - Die Fachauswahl im Assistenten-Editor bietet Lehrkräften nur noch ihre eigenen Fächer an.
-- Der Jahresplanungs-Assistent trägt einen Ausfall mit einer eigenen Operation ein. Bisher
-  vergaß er ihn beim Verschieben gelegentlich oder setzte stattdessen „Puffer" — beides
-  zählte weiter als gehaltene Stunde.
+- Der Jahresplanungs-Assistent trägt einen Ausfall mit einer eigenen Operation ein und lässt
+  auf Wunsch die folgenden Stunden nachrücken — bis zum nächsten freien Termin, nie über eine
+  Prüfung oder einen fixierten Termin hinweg. Bisher vergaß er den Ausfall beim Verschieben
+  gelegentlich oder setzte stattdessen „Puffer" — beides zählte weiter als gehaltene Stunde.
 - Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
   die Lehrkraft welche will.
 - Alle Assistenten duzen durchgehend, wie die Oberfläche — bisher wechselten sie zwischen „du"

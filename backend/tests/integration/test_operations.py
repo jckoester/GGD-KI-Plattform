@@ -31,9 +31,10 @@ def seed_ops_group(db_url, run_migrations):
     conn.close()
 
 
-def _slot(d, *, kategorie="unterricht", thema=None, ue_id=None, stunde_id=None, pinned=False):
+def _slot(d, *, kategorie="unterricht", thema=None, ue_id=None, stunde_id=None, pinned=False,
+          periods=1, halbjahr=1):
     return LessonSlot(
-        id=uuid4(), group_id=GROUP_ID, date=d, halbjahr=1, periods=1, start_period=3,
+        id=uuid4(), group_id=GROUP_ID, date=d, halbjahr=halbjahr, periods=periods, start_period=3,
         kategorie=kategorie, thema=thema, ue_node_id=ue_id, stunde_node_id=stunde_id, pinned=pinned,
     )
 
@@ -327,3 +328,117 @@ async def test_unterricht_hebt_den_ausfall_wieder_auf(db_session, seed_ops_group
     res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id, kategorie="unterricht")])
     assert res.errors == []
     assert (s.kategorie, s.ausfall_herkunft, s.ausfall_vorher) == ("unterricht", None, None)
+
+
+# ── cancel_lesson mit nachruecken (Jan, 11.10.2026, nach Messung 2) ──────────
+
+
+def _tage(*n):
+    return [D0 + timedelta(days=i) for i in n]
+
+
+async def _reihe(db_session, *termine):
+    """Termine in Reihenfolge; ein String ist ein Thema, None ein leerer Unterrichtstermin,
+    ein Dict die Angaben für `_slot`."""
+    slots = []
+    for tag, t in zip(_tage(*range(len(termine))), termine):
+        angaben = t if isinstance(t, dict) else {"thema": t}
+        slots.append(_slot(tag, **angaben))
+    db_session.add_all(slots)
+    await db_session.flush()
+    return slots
+
+
+async def _nachruecken(db_session, quelle):
+    return await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=quelle.id, nachruecken=True)])
+
+
+@pytest.mark.asyncio
+async def test_nachruecken_bis_zum_ersten_freien_termin(db_session, seed_ops_group):
+    a, b, c, frei, d = await _reihe(db_session, "A", "B", "C", None, "D")
+    res = await _nachruecken(db_session, a)
+    assert res.errors == []
+    assert (a.kategorie, a.thema) == ("ausfall", None)
+    assert [b.thema, c.thema, frei.thema, d.thema] == ["A", "B", "C", "D"]
+    assert any("Nachgerückt" in h and "3 Termin" in h for h in res.hinweise)
+
+
+@pytest.mark.asyncio
+async def test_nachruecken_nimmt_einheit_und_entwurf_mit(db_session, seed_ops_group):
+    stunde = _stunde("A")
+    db_session.add(stunde)
+    await db_session.flush()
+    a, frei = await _reihe(db_session, {"thema": "A", "stunde_id": stunde.id}, None)
+    await _nachruecken(db_session, a)
+    assert (frei.thema, frei.stunde_node_id) == ("A", stunde.id) and a.stunde_node_id is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fixpunkt", [{"kategorie": "pruefung"}, {"thema": "Fix", "pinned": True}])
+async def test_nachruecken_nie_ueber_einen_fixpunkt(db_session, seed_ops_group, fixpunkt):
+    """Stoff rutscht nicht hinter eine Klassenarbeit — dann wird gar nichts angewandt."""
+    a, b, fix, frei = await _reihe(db_session, "A", "B", fixpunkt, None)
+    res = await _nachruecken(db_session, a)
+    assert res.applied == 0 and any("Fixpunkt" in f for f in res.errors)
+    assert (a.kategorie, a.thema, b.thema, frei.thema) == ("unterricht", "A", "B", None)
+
+
+@pytest.mark.asyncio
+async def test_nachruecken_nicht_ins_naechste_halbjahr(db_session, seed_ops_group):
+    a, b, frei = await _reihe(db_session, "A", "B", {"thema": None, "halbjahr": 2})
+    res = await _nachruecken(db_session, a)
+    assert res.applied == 0 and any("Halbjahresende" in f for f in res.errors)
+
+
+@pytest.mark.asyncio
+async def test_nachruecken_ueberspringt_ausfall_vertretung_und_belegten_puffer(db_session, seed_ops_group):
+    a, aus, vert, puffer, b, frei = await _reihe(
+        db_session, "A", {"kategorie": "ausfall"}, {"kategorie": "vertretung"},
+        {"kategorie": "puffer", "thema": "Wiederholung"}, "B", None)
+    res = await _nachruecken(db_session, a)
+    assert res.errors == []
+    assert [b.thema, frei.thema] == ["A", "B"]
+    assert (aus.thema, vert.thema, puffer.thema, puffer.kategorie) == (None, None, "Wiederholung", "puffer")
+
+
+@pytest.mark.asyncio
+async def test_ein_leerer_puffer_wird_verbraucht(db_session, seed_ops_group):
+    a, b, puffer = await _reihe(db_session, "A", "B", {"kategorie": "puffer"})
+    res = await _nachruecken(db_session, a)
+    assert res.errors == []
+    assert (puffer.thema, puffer.kategorie) == ("B", "unterricht")
+    assert any("Puffer" in h and "verbraucht" in h for h in res.hinweise)
+
+
+@pytest.mark.asyncio
+async def test_entwurf_in_einem_termin_anderer_laenge_wird_markiert(db_session, seed_ops_group):
+    """Verschiebe-Assistent: Eine 90′-Planung passt nicht stillschweigend in einen Einzelslot.
+    Ein bloßes Thema schon — es wird nicht markiert."""
+    stunde = _stunde("A")
+    db_session.add(stunde)
+    await db_session.flush()
+    a, einzel, doppel, frei = await _reihe(
+        db_session, {"thema": "A", "stunde_id": stunde.id, "periods": 2}, "B",
+        {"thema": "C", "periods": 2}, {"thema": None, "periods": 1})
+    res = await _nachruecken(db_session, a)
+    assert res.errors == []
+    assert einzel.stunde_node_id == stunde.id and einzel.anpassung_noetig
+    assert doppel.thema == "B" and not doppel.anpassung_noetig
+    assert frei.thema == "C" and not frei.anpassung_noetig
+    assert any("Anpassung nötig" in h for h in res.hinweise)
+
+
+@pytest.mark.asyncio
+async def test_quelle_ohne_inhalt_rueckt_nichts(db_session, seed_ops_group):
+    a, b, frei = await _reihe(db_session, None, "B", None)
+    res = await _nachruecken(db_session, a)
+    assert res.errors == [] and a.kategorie == "ausfall"
+    assert (b.thema, frei.thema) == ("B", None)
+    assert not any("Nachgerückt" in h for h in res.hinweise)
+
+
+@pytest.mark.asyncio
+async def test_ohne_nachruecken_bleibt_alles_stehen(db_session, seed_ops_group):
+    a, b, frei = await _reihe(db_session, "A", "B", None)
+    res = await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=a.id)])
+    assert res.errors == [] and (a.kategorie, a.thema, b.thema, frei.thema) == ("ausfall", "A", "B", None)
