@@ -1267,6 +1267,23 @@ export async function createMyAssistant(data) {
   return res.json(); // TeacherAssistantResponse
 }
 
+/**
+ * Legt einen privaten Stundenassistenten mit dem aktuellen Prompt des schulweiten an (0.15).
+ * `subjectId`: das Fach der Stunde, aus der heraus angelegt wird — im Editor änderbar.
+ * 404 mit lesbarem `detail`, wenn es keinen schulweiten gibt.
+ */
+export async function legeEigenenStundenassistentenAn({ subjectId = null } = {}) {
+  const res = await fetch(`${BASE}/assistants/eigener-stundenassistent`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subject_id: subjectId }),
+  });
+  if (!res.ok)
+    throw new ApiError(res.status, (await res.json().catch(() => ({}))).detail);
+  return res.json(); // AssistantResponse
+}
+
 export async function updateMyAssistant(id, data) {
   const res = await fetch(`${BASE}/assistants/${id}`, {
     method: "PATCH",

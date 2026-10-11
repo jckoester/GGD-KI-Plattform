@@ -23,6 +23,10 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 - Der Stundenassistent kennt den **Zusammenhang der Stunde**: Fach, Jahrgang, Unterrichtseinheit
   und aus dem Schulcurriculum Kapitel, Lernsequenzen und Kompetenzen. Ohne Jahresplan kennt er
   wenigstens das passende Curriculum und die Fassung des Bildungsplans.
+- **Eigener Stundenassistent:** Lehrkräfte legen mit einem Klick einen privaten
+  Stundenassistenten an, der den aktuellen Prompt des schulweiten trägt, und passen ihn im
+  Editor an — unter „Meine Assistenten" und im Auswahlmenü des Assistenten-Knopfs der
+  Entwurfsansicht, dort mit dem Fach der Stunde.
 
 ### Geändert
 
@@ -33,6 +37,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Knopf die Auswahl auf. Entwurfsansicht und ✦ öffnen den Stundenassistenten statt der
   Jahresplanung; fehlt ein passender, sagt der Chat das.
 - Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
+- Die Fachauswahl im Assistenten-Editor bietet Lehrkräften nur noch ihre eigenen Fächer an.
 - Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
   die Lehrkraft welche will.
 - Alle Assistenten duzen durchgehend, wie die Oberfläche — bisher wechselten sie zwischen „du"
@@ -66,6 +71,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Antwort leer, ohne Hinweis. Jetzt erscheint die Budgetmeldung.
 - Schrieb das Modell vor einem Werkzeugaufruf schon Text, klebte der Rest der Antwort ohne
   Absatz daran („…13.10.2026.Ich habe die Stunde gefunden").
+- Eigene aktive oder abgeschaltete Assistenten ließen sich nicht löschen, obwohl sie es
+  dürfen. Jetzt unter „Meine Assistenten" und im Editor; bei schulweit freigegebenen steht,
+  dass die Löschung beantragt wird. Admins konnten auch ihre eigenen privaten nicht löschen.
 
 ### Migration
 

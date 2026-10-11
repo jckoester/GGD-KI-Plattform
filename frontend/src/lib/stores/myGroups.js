@@ -184,6 +184,31 @@ export function auswahlMitBestand(gruppen, gewaehlteId) {
   return bestand ? [...aktuell, bestand] : aktuell
 }
 
+/**
+ * Fächerauswahl für den Assistenten-Editor einer Lehrkraft: ihre Fächer, plus das schon
+ * gesetzte.
+ *
+ * „Ihre" wie in der Seitenleiste (`sidebarSections.js`): Fächer der aktuellen
+ * Unterrichtsgruppen und der Fachschaften. Das gesetzte bleibt aus demselben Grund wie bei
+ * `auswahlMitBestand` — sonst zeigte die Liste „Kein Fach", und das nächste Speichern
+ * nähme dem Assistenten sein Fach. Ohne ein einziges eigenes Fach (noch keine Gruppe) die
+ * ganze Liste: Ein Feld, das nur „Kein Fach" anbietet, hilft niemandem.
+ *
+ * @param {Array} faecher  alle Fächer (`GET /subjects`), in Anzeigereihenfolge
+ * @param {Array} gruppen  alle eigenen Gruppen (`GET /groups/me`)
+ * @param {number|null} gesetztId
+ */
+export function eigeneFaecher(faecher, gruppen, gesetztId) {
+  const eigene = new Set(
+    (gruppen ?? [])
+      .filter((g) => g.subject_id != null)
+      .filter((g) => (g.type === 'teaching_group' && g.aktuell !== false) || g.type === 'subject_department')
+      .map((g) => g.subject_id),
+  )
+  if (eigene.size === 0) return faecher ?? []
+  return (faecher ?? []).filter((f) => eigene.has(f.id) || f.id === gesetztId)
+}
+
 export function gueltigeGruppenwahl(id, gruppen) {
     return (gruppen ?? []).some((g) => g.id === id) ? id : null
 }

@@ -15,6 +15,10 @@
    * Pfeils den Hauptteil und landete ungefragt beim ersten Assistenten. Ab zwei Kandidaten
    * öffnet die ganze Fläche deshalb immer das Menü; mit einem öffnet sie ihn direkt — ein
    * Menü mit einem Eintrag wäre nur ein Tipp mehr.
+   *
+   * `onanlegen` (Plan Schritt 7): Am Ende des Menüs steht dann „Eigenen Stundenassistenten
+   * anlegen …", und der Pfeil erscheint schon bei einem Kandidaten. Nur in der vollen Fassung —
+   * die kompakte öffnet mit einem Kandidaten weiterhin direkt.
    */
   import { Bot, ChevronDown } from 'lucide-svelte'
 
@@ -24,6 +28,7 @@
     beschriftung = 'Assistent',
     kompakt = false,
     beschaeftigt = false,
+    onanlegen = null,
   } = $props()
 
   let offen = $state(false)
@@ -31,6 +36,8 @@
 
   const erster = $derived(kandidaten[0] ?? null)
   const nurMenue = $derived(kompakt && kandidaten.length > 1)
+  const anlegen = $derived(!kompakt && onanlegen ? onanlegen : null)
+  const mitPfeil = $derived(kandidaten.length > 1 || anlegen !== null)
   const titel = $derived(erster ? `Mit „${erster.name}“ öffnen` : 'Assistent öffnen')
 
   function waehle(assistent) {
@@ -78,12 +85,12 @@
       title={titel}
       aria-label={kompakt ? titel : undefined}
       class="{kompakt ? `${klein} ${flaeche}` : `${voll} px-3`}
-             {kandidaten.length > 1 ? 'rounded-l-md' : 'rounded-md'}"
+             {mitPfeil ? 'rounded-l-md' : 'rounded-md'}"
     >
       <Bot size={kompakt ? 15 : 14} aria-hidden="true" />
       {#if !kompakt}{beschriftung}{/if}
     </button>
-    {#if kandidaten.length > 1}
+    {#if mitPfeil}
       <button
         type="button"
         onclick={() => (offen = !offen)}
@@ -117,6 +124,19 @@
           </button>
         </li>
       {/each}
+      {#if anlegen}
+        <li role="none" class="mt-1 pt-1 border-t border-light-ui-3 dark:border-dark-ui-3">
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => { offen = false; anlegen() }}
+            class="w-full text-left px-3 py-1.5 text-sm
+                   text-light-tx-2 dark:text-dark-tx-2 hover:bg-light-bg-2 dark:hover:bg-dark-bg-2"
+          >
+            Eigenen Stundenassistenten anlegen …
+          </button>
+        </li>
+      {/if}
     </ul>
   {/if}
 </div>

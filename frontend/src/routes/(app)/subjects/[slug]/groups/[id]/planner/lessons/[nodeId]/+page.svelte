@@ -12,6 +12,7 @@
     createReview,
     deleteReview,
     getAssistants,
+    legeEigenenStundenassistentenAn,
   } from '$lib/api.js'
   import {
     dateLabel,
@@ -190,6 +191,23 @@
     goto(neuerChatPfad({
       subjectId: lesson?.subject_id, groupId, stundeId: nodeId, assistantId: assistent?.id,
     }))
+  }
+
+  // Eigener Stundenassistent (Plan Schritt 7): eine Kopie des schulweiten mit dem Fach dieser
+  // Stunde, danach der Editor.
+  let legtAn = $state(false)
+  let anlegenFehler = $state(null)
+  async function eigenenAnlegen() {
+    legtAn = true
+    anlegenFehler = null
+    try {
+      const assistent = await legeEigenenStundenassistentenAn({ subjectId: lesson?.subject_id ?? null })
+      goto(`/assistants/my/${assistent.id}`)
+    } catch (e) {
+      anlegenFehler = e.message
+    } finally {
+      legtAn = false
+    }
   }
 
   // ── Verschiebe-Dialog bei offenen Phasen (UP-6 Schritt 5) ────────────────────
@@ -379,7 +397,13 @@
             <!-- Assistent — im Lesemodus nicht: Einen Bezug setzt nur, wer die Stunde
                  bearbeiten darf (sonst 403 beim ersten Senden). -->
             {#if !nurLesen}
-              <AssistentenKnopf kandidaten={stundenAssistenten} onwaehle={openAssistant} />
+              <!-- Ohne Kandidaten gibt es auch keine Vorlage zum Kopieren. -->
+              <AssistentenKnopf
+                kandidaten={stundenAssistenten}
+                onwaehle={openAssistant}
+                onanlegen={stundenAssistenten.length ? eigenenAnlegen : null}
+                beschaeftigt={legtAn}
+              />
             {/if}
 
             <!-- Nachbereiten -->
@@ -449,6 +473,9 @@
       {/if}
       {#if saveError}
         <p class="text-xs text-light-re dark:text-dark-re mt-1">{saveError}</p>
+      {/if}
+      {#if anlegenFehler}
+        <p class="text-xs text-light-re dark:text-dark-re mt-1">{anlegenFehler}</p>
       {/if}
       {#if saving}
         <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-1">Speichern …</p>

@@ -43,6 +43,9 @@ LEHRKRAFT = JwtPayload(
 FREMDE = JwtPayload(
     sub="lk2", roles=["teacher"], grade=None, jti="j", iat=1, exp=9_999_999_999
 )
+ADMIN = JwtPayload(
+    sub="adm", roles=["teacher", "admin"], grade=None, jti="j", iat=1, exp=9_999_999_999
+)
 
 EIGENE = ["private", "teaching_group", "subject_department", "activity_group"]
 SCHULWEIT = sorted(SCHOOLWIDE_SCOPES)
@@ -138,21 +141,45 @@ def test_schulweit_nur_vor_der_freigabe_selbst_loeschbar(scope):
     )
 
 
+def _admin_darf_loeschen(assistent) -> bool:
+    try:
+        _check_assistant_delete_permission(assistent, ADMIN, True)
+        return True
+    except HTTPException:
+        return False
+
+
+@pytest.mark.parametrize("scope", EIGENE)
+def test_admin_loescht_eigene_wie_eine_lehrkraft(scope):
+    """Rollenmodell (0.15): In „Meine Assistenten" ist ein Admin eine Lehrkraft. Bis dahin
+    galt für ihn auch beim eigenen privaten Assistenten die Verwaltungsregel — 409."""
+    assert _admin_darf_loeschen(_assistent(scope, "active", besitzer="adm"))
+    assert not _admin_darf_loeschen(_assistent(scope, "active", besitzer="lk1")), (
+        "Fremde aktive Assistenten: weiter die Verwaltungsregel."
+    )
+
+
+@pytest.mark.parametrize("scope", SCHULWEIT)
+def test_eigene_schulweite_des_admins_bleiben_bei_der_verwaltungsregel(scope):
+    assert not _admin_darf_loeschen(_assistent(scope, "active", besitzer="adm"))
+    assert _admin_darf_loeschen(_assistent(scope, "disabled", besitzer="adm"))
+
+
 # ── Die Menge gibt es zweimal ────────────────────────────────────────────────
 
 def test_frontend_kennt_dieselben_schulweiten_reichweiten():
     """⚠️ **Genau dieses Auseinanderlaufen war der Fehler.**
 
-    Die Oberfläche entscheidet mit derselben Menge über die Bearbeitbarkeit
-    (`AssistantEditor.svelte`). Kennt sie eine Reichweite als „nicht schulweit", die der
-    Server als schulweit führt, bietet sie ein Feld an, das das Speichern mit 409
-    ablehnt — und niemand sieht warum.
+    Die Oberfläche entscheidet mit derselben Menge über Bearbeitbarkeit und Löschen
+    (`$lib/assistant_lebenszyklus.js`, benutzt von Editor und „Meine Assistenten"). Kennt
+    sie eine Reichweite als „nicht schulweit", die der Server als schulweit führt, bietet
+    sie an, was der Server mit 409 ablehnt — und niemand sieht warum.
     """
-    quelle = (
-        Path(__file__).resolve().parents[3]
-        / "frontend/src/lib/components/AssistantEditor.svelte"
-    )
-    text = quelle.read_text(encoding="utf-8")
+    frontend = Path(__file__).resolve().parents[3] / "frontend/src/lib"
+    # Bis 0.15 stand die Menge im Editor selbst; eine zweite Kopie dort liefe unbemerkt weg.
+    editor = (frontend / "components/AssistantEditor.svelte").read_text(encoding="utf-8")
+    assert "SCHOOLWIDE_SCOPES = new Set" not in editor
+    text = (frontend / "assistant_lebenszyklus.js").read_text(encoding="utf-8")
     zeile = next(z for z in text.splitlines() if "SCHOOLWIDE_SCOPES = new Set" in z)
     im_frontend = set(teil.strip(' "\'') for teil in zeile.split("[")[1].split("]")[0].split(","))
     assert im_frontend == SCHOOLWIDE_SCOPES, (

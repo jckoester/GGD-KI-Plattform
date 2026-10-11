@@ -5,7 +5,8 @@
     import { kurshinweis } from "$lib/einheiten.js";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
-    import { auswahlMitBestand } from "$lib/stores/myGroups.js";
+    import { auswahlMitBestand, eigeneFaecher } from "$lib/stores/myGroups.js";
+    import { GETEILT_SCOPES, SCHOOLWIDE_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
     import {
         Bot,
         Send,
@@ -38,6 +39,7 @@
         submitMyAssistant,
         withdrawMyAssistant,
         disableMyAssistant,
+        deleteMyAssistant,
         enableMyAssistant,
         requestAssistantDeletion,
         withdrawAssistantDeletionRequest,
@@ -86,6 +88,11 @@
     );
     let subjects = $state([]);
     let groups = $state([]);
+    // Lehrkräfte wählen aus ihren eigenen Fächern (plus dem schon gesetzten); die
+    // Verwaltung braucht alle — sie pflegt auch schulweite Assistenten.
+    let faecherAuswahl = $derived(
+        isAdmin ? subjects : eigeneFaecher(subjects, groups, savedForm.subject_id),
+    );
     let augmentations = $state([]); // [{ key, label }] — Lernverhalten-Leitplanken
     let imageKinds = $state([]); // konfigurierte Bildarten (Modell + Formate)
     // false = Proxy war nicht erreichbar. Dann NICHT warnen: Eine Falschwarnung bei
@@ -341,11 +348,8 @@
 
     // ── Abgeleitete Werte ─────────────────────────────────────────────────────
     let isNew = $derived(assistantId === "neu");
-    // ⚠️ **Dieselbe Menge führt das Backend** (`app/api/assistants.py`). Laufen sie
-    // auseinander, bietet die Oberfläche ein Feld an, das der Server mit 409 ablehnt —
-    // genau der Fall, der bis zum 25.09.2026 bestand. Ein Wächter hält sie zusammen
-    // (`tests/unit/test_assistant_lebenszyklus.py`).
-    const SCHOOLWIDE_SCOPES = new Set(["teachers", "grade", "all_students", "all"]);
+    // `SCHOOLWIDE_SCOPES` steht in `$lib/assistant_lebenszyklus.js` — dieselbe Menge führt
+    // das Backend, ein Wächter hält beide zusammen.
     let isDraft = $derived(isNew || form.status === "draft");
     // Lehrkräfte können auch aktive Assistenten bearbeiten, sofern kein schulweiter Scope
     // (schulweite Assistenten wurden bereits von einem Admin freigegeben)
@@ -677,6 +681,24 @@
     // und danach den Löschantrag, der **nichts abschaltet**.
     let schulweit = $derived(SCHOOLWIDE_SCOPES.has(form.scope));
     let loeschantragOffen = $derived(!!form.deletion_requested_at);
+    // Gespeicherter Stand, nicht das Formular: Gelöscht wird, was auf dem Server steht.
+    let loeschbar = $derived(!isAdmin && !isNew && loeschsperre(savedForm) === null);
+
+    async function loeschen() {
+        const geteilt = GETEILT_SCOPES.has(savedForm.scope)
+            ? " Wer ihn in der Gruppe nutzt, verliert den Zugang."
+            : "";
+        if (!confirm(`„${savedForm.name}“ endgültig löschen?${geteilt} Die Chats mit ihm bleiben erhalten.`)) return;
+        submitting = true;
+        error = null;
+        try {
+            await deleteMyAssistant(assistantId);
+            goto(backUrl);
+        } catch (e) {
+            error = e.message ?? "Löschen fehlgeschlagen.";
+            submitting = false;
+        }
+    }
 
     async function lebenszyklus(aktion, erfolgstext) {
         if (!assistantId || isNew) return;
@@ -1060,6 +1082,17 @@
                 </button>
             {/if}
 
+            {#if loeschbar}
+                <button
+                    onclick={loeschen}
+                    disabled={submitting}
+                    class="px-3 py-1.5 bg-light-ui dark:bg-dark-ui text-light-re dark:text-dark-re rounded-lg
+                   hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors disabled:opacity-50 text-sm"
+                >
+                    Löschen
+                </button>
+            {/if}
+
             {#if !isAdmin && !isNew && schulweit && !isDraft && form.status !== "pending_review"}
                 <button
                     onclick={() => {
@@ -1237,7 +1270,7 @@
                      px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <option value="">— Kein Fach —</option>
-                            {#each subjects as subject}
+                            {#each faecherAuswahl as subject (subject.id)}
                                 <option value={subject.id}
                                     >{subject.name}</option
                                 >

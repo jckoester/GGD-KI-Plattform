@@ -15,8 +15,10 @@
     Upload,
     X,
     Download,
+    Bot,
   } from "lucide-svelte";
   import ErrorBanner from "$lib/components/ErrorBanner.svelte";
+  import { GETEILT_SCOPES, loeschsperre } from "$lib/assistant_lebenszyklus.js";
   import SuccessBanner from "$lib/components/SuccessBanner.svelte";
   import {
     getMyAssistants,
@@ -25,6 +27,7 @@
     importAssistant,
     exportAssistant,
     getModels,
+    legeEigenenStundenassistentenAn,
   } from "$lib/api.js";
 
   // ── Konstanten ────────────────────────────────────────────────────────────
@@ -165,6 +168,23 @@
     }
   }
 
+  // ── Eigener Stundenassistent (0.15) ──────────────────────────────────────
+  // Kopie des schulweiten mit seinem aktuellen Prompt; danach der Editor.
+  let stundenassistentLaeuft = $state(false);
+
+  async function stundenassistentAnlegen() {
+    stundenassistentLaeuft = true;
+    error = null;
+    try {
+      const result = await legeEigenenStundenassistentenAn();
+      goto(`/assistants/my/${result.id}`);
+    } catch (e) {
+      error = e.message;
+    } finally {
+      stundenassistentLaeuft = false;
+    }
+  }
+
   // ── Export ───────────────────────────────────────────────────────────────
   async function doExportItem(item) {
       const slug = item.name.toLowerCase().replace(/\s+/g, "-");
@@ -253,6 +273,19 @@
       >
         <Upload size={16} />
         Importieren
+      </button>
+      <button
+        onclick={stundenassistentAnlegen}
+        disabled={stundenassistentLaeuft}
+        title="Legt einen eigenen Assistenten mit dem Prompt des schulweiten Stundenassistenten an"
+        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
+               border border-light-ui-3 dark:border-dark-ui-3
+               text-light-tx dark:text-dark-tx
+               hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+               disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Bot size={16} />
+        Stundenassistent anlegen
       </button>
       <button
         onclick={() => goto("/assistants/my/neu")}
@@ -398,14 +431,6 @@
                     >
                       <Send size={14} />
                     </button>
-                    <button
-                      onclick={() => (deleteTarget = item.id)}
-                      title="Löschen"
-                      class="p-1.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
-                             text-light-re dark:text-dark-re transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
                   {:else if item.status === "pending_review"}
                     <button
                       onclick={() => goto(`/assistants/my/${item.id}`)}
@@ -414,14 +439,6 @@
                              text-light-tx-2 dark:text-dark-tx-2 transition-colors"
                     >
                       <Play size={14} />
-                    </button>
-                    <button
-                      onclick={() => (deleteTarget = item.id)}
-                      title="Löschen"
-                      class="p-1.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
-                             text-light-re dark:text-dark-re transition-colors"
-                    >
-                      <Trash2 size={14} />
                     </button>
                   {:else}
                     <button
@@ -442,6 +459,27 @@
                             <Download size={14} />
                         </button>
                     {/if}
+                  {/if}
+                  <!-- Löschen: eigene jederzeit, schulweit freigegebene nur per Antrag
+                       (`loeschsperre`). Gesperrt bleibt das Symbol sichtbar und sagt warum. -->
+                  {#if loeschsperre(item) === null}
+                    <button
+                      onclick={() => (deleteTarget = item.id)}
+                      title="Löschen"
+                      class="p-1.5 rounded-md hover:bg-light-re/10 dark:hover:bg-dark-re/10
+                             text-light-re dark:text-dark-re transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  {:else}
+                    <span
+                      role="img"
+                      title={loeschsperre(item)}
+                      aria-label={loeschsperre(item)}
+                      class="p-1.5 cursor-help text-light-tx-2 dark:text-dark-tx-2 opacity-40"
+                    >
+                      <Trash2 size={14} />
+                    </span>
                   {/if}
                 </div>
               </td>
@@ -471,7 +509,11 @@
           wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
         </p>
         <p class="text-xs text-light-tx-3 dark:text-dark-tx-3 mb-6">
-          Nur Assistenten im Status "Entwurf" oder "In Prüfung" können gelöscht werden.
+          {#if GETEILT_SCOPES.has(items.find(i => i.id === deleteTarget)?.scope)}
+            Geteilt ({scopeLabel(items.find(i => i.id === deleteTarget))}): Wer ihn dort nutzt,
+            verliert den Zugang.
+          {/if}
+          Die Chats mit diesem Assistenten bleiben erhalten.
         </p>
         <div class="flex justify-end gap-3">
           <button

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { get } from "svelte/store"
 import { readFileSync } from "node:fs"
-import { auswahlMitBestand, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gruppenMitFach, gueltigeGruppenwahl } from "./myGroups.js"
+import { auswahlMitBestand, eigeneFaecher, fachWirdAngeboten, freigegebeneGruppen, gruppenFuerScope, gruppenMitFach, gueltigeGruppenwahl } from "./myGroups.js"
 
 const UNTERRICHT = [
   { id: 1, name: "10a Mathe", type: "teaching_group" },
@@ -281,5 +281,28 @@ describe("gruppenMitFach", () => {
     // Praxis nicht vorkommt. Der Test hält die Prüfung auf `!= null` fest.
     const nullte = { id: 5, name: "y", subject_id: 0 }
     expect(gruppenMitFach([nullte])).toEqual([nullte])
+  })
+})
+
+describe("eigeneFaecher (Assistenten-Editor, 0.15)", () => {
+  const FAECHER = [{ id: 1, name: "Mathematik" }, { id: 2, name: "Chemie" }, { id: 3, name: "NwT" }, { id: 4, name: "Kunst" }]
+  const GRUPPEN = [
+    { id: 10, type: "teaching_group", subject_id: 2, aktuell: true },
+    { id: 11, type: "teaching_group", subject_id: 4, aktuell: false },   // früheres Schuljahr
+    { id: 12, type: "subject_department", subject_id: 3 },
+    { id: 13, type: "class", subject_id: null },
+  ]
+  const ids = (liste) => liste.map((f) => f.id)
+
+  it("Fächer der aktuellen Unterrichtsgruppen und der Fachschaften, in Anzeigereihenfolge", () => {
+    expect(ids(eigeneFaecher(FAECHER, GRUPPEN, null))).toEqual([2, 3])
+  })
+
+  it("das gesetzte bleibt wählbar, auch wenn es kein eigenes ist", () => {
+    expect(ids(eigeneFaecher(FAECHER, GRUPPEN, 1))).toEqual([1, 2, 3])
+  })
+
+  it("ohne eigenes Fach die ganze Liste", () => {
+    expect(ids(eigeneFaecher(FAECHER, [], null))).toEqual([1, 2, 3, 4])
   })
 })

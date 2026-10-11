@@ -59,10 +59,35 @@ describe("Einstiege und ihr Assistent", () => {
         }
     });
 
-    it("der geteilte Knopf zeigt den Pfeil nur bei mehr als einem Kandidaten", () => {
-        expect(lies("lib/components/AssistentenKnopf.svelte")).toMatch(
-            /\{#if kandidaten\.length > 1\}/,
+    it("der geteilte Knopf zeigt den Pfeil erst bei zwei Kandidaten — oder zum Anlegen", () => {
+        const quelle = lies("lib/components/AssistentenKnopf.svelte");
+        expect(quelle).toMatch(
+            /const mitPfeil = \$derived\(kandidaten\.length > 1 \|\| anlegen !== null\)/,
         );
+        expect(quelle).toMatch(/\{#if mitPfeil\}/);
+    });
+
+    it("„Eigenen Stundenassistenten anlegen“ nur in der vollen Fassung (Plan Schritt 7)", () => {
+        // Die kompakte der Startseite öffnet mit einem Kandidaten direkt (Jan, 09.10.2026);
+        // ein Menüeintrag zum Anlegen machte daraus wieder einen Tipp mehr.
+        expect(lies("lib/components/AssistentenKnopf.svelte")).toMatch(
+            /const anlegen = \$derived\(!kompakt && onanlegen \? onanlegen : null\)/,
+        );
+    });
+
+    it.each([
+        "routes/(app)/subjects/[slug]/groups/[id]/planner/lessons/[nodeId]/+page.svelte",
+        "routes/(app)/assistants/my/+page.svelte",
+    ])("%s legt den eigenen Stundenassistenten an und öffnet den Editor", (pfad) => {
+        const quelle = lies(pfad);
+        expect(quelle).toMatch(/await legeEigenenStundenassistentenAn\(/);
+        expect(quelle).toMatch(/goto\(`\/assistants\/my\/\$\{/);
+    });
+
+    it("die Entwurfsansicht bietet das Anlegen im geteilten Knopf an — mit dem Fach der Stunde", () => {
+        const quelle = lies(EINSTIEGE[1]);
+        expect(quelle).toMatch(/onanlegen=\{stundenAssistenten\.length \? eigenenAnlegen : null\}/);
+        expect(quelle).toMatch(/legeEigenenStundenassistentenAn\(\{ subjectId: lesson\?\.subject_id/);
     });
 
     it("kompakt ab zwei Kandidaten öffnet immer das Menü, nie den ersten", () => {

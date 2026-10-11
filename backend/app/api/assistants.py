@@ -1,6 +1,7 @@
 import json
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import jsonschema
@@ -375,8 +376,8 @@ GROUP_SCOPES = {"subject_department", "activity_group", "teaching_group"}
 # Lehrkräfte" erreicht das ganze Kollegium; er stand bis dahin weder in dieser Menge noch
 # in `GROUP_SCOPES` und entstand deshalb ohne Freigabe und ohne Bearbeitungsschutz.
 #
-# ⚠️ **Diese Menge gibt es ein zweites Mal im Frontend** (`AssistantEditor.svelte`), wo
-# sie über die Bearbeitbarkeit entscheidet. Laufen die beiden auseinander, bietet die
+# ⚠️ **Diese Menge gibt es ein zweites Mal im Frontend** (`$lib/assistant_lebenszyklus.js`),
+# wo sie über Bearbeitbarkeit und Löschen entscheidet. Laufen die beiden auseinander, bietet die
 # Oberfläche ein Feld an, das der Server ablehnt — genau der Fall, der bis zum 25.09.2026
 # bestand. Ein Wächter hält sie zusammen (`tests/unit/test_assistant_lebenszyklus.py`).
 SCHOOLWIDE_SCOPES = {"teachers", "grade", "all_students", "all"}
@@ -521,8 +522,16 @@ def _check_assistant_update_permission(assistant: Assistant, current_user: JwtPa
 
 
 def _check_assistant_delete_permission(assistant: Assistant, current_user: JwtPayload, is_admin: bool) -> None:
-    """Prueft Berechtigung fuer DELETE-Operationen."""
+    """Prueft Berechtigung fuer DELETE-Operationen.
+
+    ⚠️ **Eigene nicht schulweite löscht auch ein Admin jederzeit** (0.15). Die Statusregel
+    unten gehört zur Verwaltung; in „Meine Assistenten" ist ein Admin eine Lehrkraft
+    (Rollenmodell) — sonst verweigerte der Server ihm den eigenen privaten Assistenten, den
+    jede Lehrkraft löschen darf.
+    """
     if is_admin:
+        if assistant.created_by == current_user.sub and assistant.scope not in SCHOOLWIDE_SCOPES:
+            return
         if assistant.status not in ("draft", "disabled", "archived"):
             raise HTTPException(
                 status_code=409,
@@ -597,6 +606,108 @@ async def list_my_assistants(
         items=[AssistantResponse.model_validate(a) for a in assistants],
         total=total,
     )
+
+
+# ── Eigener Stundenassistent (0.15) ──────────────────────────────────────────
+#
+# Vorlage ist der schulweite Stundenassistent selbst, keine Datei: Admins pflegen seinen
+# Prompt im Editor, und die Kopie nimmt die Fassung von heute mit. Sie folgt späteren
+# Änderungen nicht — sie gehört der Lehrkraft, die ihre Planungsgewohnheiten einträgt.
+
+#: Name der Kopie; die laufende Nummer hängt `_naechster_name` an.
+EIGENER_STUNDENASSISTENT = "Mein Stundenassistent"
+
+
+async def _stundenassistent_vorlage(db: AsyncSession, current_user: JwtPayload) -> Optional[Assistant]:
+    """Der erste schulweite Assistent mit Stundenplanung, den diese Person benutzen darf.
+
+    „Erster" in der Reihenfolge der Assistentenliste. Gefiltert mit `sichtbar_klausel`: Kopiert
+    wird nur, was die Person ohnehin benutzen darf — ein Entwurf oder ein abgelaufener
+    Assistent gibt keine Vorlage ab.
+    """
+    from app.assistants.sichtbarkeit import lade_zugang, sichtbar_klausel
+
+    zugang = await lade_zugang(db, current_user)
+    return (await db.execute(
+        select(Assistant)
+        .where(
+            sichtbar_klausel(zugang),
+            Assistant.scope.in_(sorted(SCHOOLWIDE_SCOPES)),
+            Assistant.tool_groups.contains(["lesson_planning"]),
+        )
+        .order_by(Assistant.sort_order.asc(), Assistant.name.asc(), Assistant.id.asc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
+async def _naechster_name(db: AsyncSession, pseudonym: str) -> str:
+    """„Mein Stundenassistent 2", wenn es die 1 schon gibt — umbenannte zählen nicht mehr."""
+    namen = (await db.execute(
+        select(Assistant.name).where(
+            Assistant.created_by == pseudonym,
+            Assistant.name.like(f"{EIGENER_STUNDENASSISTENT} %"),
+        )
+    )).scalars()
+    muster = re.compile(rf"{re.escape(EIGENER_STUNDENASSISTENT)} (\d+)")
+    nummern = [int(m.group(1)) for n in namen if (m := muster.fullmatch(n))]
+    return f"{EIGENER_STUNDENASSISTENT} {max(nummern, default=0) + 1}"
+
+
+class EigenerStundenassistentRequest(BaseModel):
+    # Das Fach der Stunde, aus der heraus angelegt wird (Entwurfsansicht); ändern oder
+    # entfernen lässt es sich im Editor.
+    subject_id: Optional[int] = None
+
+
+@router.post("/eigener-stundenassistent", response_model=AssistantResponse, status_code=201)
+async def eigenen_stundenassistenten_anlegen(
+    request: Optional[EigenerStundenassistentRequest] = None,
+    current_user: JwtPayload = Depends(require_any_role(["teacher", "admin"])),
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Legt einen privaten Stundenassistenten mit dem aktuellen Prompt des schulweiten an.
+
+    Sofort aktiv, auch für Admins: Er ist privat, geprüft werden muss nichts. Die Fähigkeit
+    setzt der Endpunkt — im Editor kann das nur ein Admin, und weil die Lehrkraft beim
+    Speichern `tool_groups` nicht mitschickt, bleibt sie stehen. Mehrfaches Anlegen ist
+    erlaubt (etwa einer je Fach).
+    """
+    subject_id = request.subject_id if request else None
+    if subject_id is not None and await db.get(Subject, subject_id) is None:
+        raise HTTPException(status_code=422, detail="Unbekanntes Fach")
+    vorlage = await _stundenassistent_vorlage(db, current_user)
+    if vorlage is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Es ist kein schulweiter Stundenassistent eingerichtet, der als Vorlage "
+                   "dienen kann. Das übernimmt die Administration.",
+        )
+
+    jetzt = datetime.now(timezone.utc)
+    assistant = Assistant(
+        name=await _naechster_name(db, current_user.sub),
+        description=f"Eigene Fassung von „{vorlage.name}“, angelegt am {date.today():%d.%m.%Y}.",
+        subject_id=subject_id,
+        system_prompt=vorlage.system_prompt,
+        # Modell und Parameter gehören zur Vorlage: Ist sie bewusst an ein Modell gebunden,
+        # plant die Kopie sonst mit einem anderen.
+        model=vorlage.model,
+        temperature=vorlage.temperature,
+        max_tokens=vorlage.max_tokens,
+        status="active",
+        audience="teacher",
+        scope="private",
+        tool_groups=["lesson_planning"],
+        creator_role="admin" if "admin" in current_user.roles else "teacher",
+        created_by=current_user.sub,
+        updated_by_pseudonym=current_user.sub,
+        created_at=jetzt,
+        updated_at=jetzt,
+    )
+    db.add(assistant)
+    await db.commit()
+    await db.refresh(assistant)
+    return AssistantResponse.model_validate(assistant)
 
 
 # ── Einzelabruf ─────────────────────────────────────────────────────────────
