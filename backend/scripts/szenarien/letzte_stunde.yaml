@@ -1,0 +1,57 @@
+# Messung „Schüler:in fragt nach der letzten Stunde" (0.15, Todo → Chat, Punkt 2).
+#
+#   python scripts/letzte_stunde_messung.py --datei scripts/szenarien/letzte_stunde.yaml
+#
+# Frage: Weiß das Modell, was in der letzten Stunde drankam, wenn sie noch **nicht**
+# nachbereitet ist? Der Block „Aktueller Unterricht" nennt nur nachbereitete Stunden — und die
+# Auto-Bestätigung bestätigt eine Stunde erst, wenn die nächste vorbei ist. Zwischen letzter und
+# nächster Stunde nennt er also die vorletzte als „Zuletzt behandelt".
+#
+# **Eigene Messgruppe** (wie die Entfall-Messung): Das Skript baut sie auf und löscht sie am
+# Ende samt Konversationen. Die Termine liegen relativ zu heute: die drei letzten Mo/Mi/Fr vor
+# heute, die zwei nächsten danach. Schüler:in ist ein vorhandenes Dev-Konto mit
+# vorübergehender Mitgliedschaft; Chat **ohne Assistent** — der Weg über „+ Neuer Chat" der
+# Gruppenseite —, mit Gruppenbezug.
+#
+# Ablauf: Fälle a–c mit nicht nachbereiteter letzter Stunde, dann wird sie über den Endpunkt
+# nachbereitet, dann dieselben Fälle als a′–c′.
+#
+# Kriterium (Jan, 11.10.2026, vor dem ersten Lauf): Plan B wird gebaut, wenn ohne Nachbereitung
+# in (a) in einem von drei Läufen der Knoten zu XY fehlt oder in (a)–(c) in einem Lauf eine
+# falsche Stunde als die letzte behandelt wird.
+
+lehrkraft_der_gruppe: 33
+
+gruppe:
+  id: 98016
+  name: "Messung letzte Stunde 10x"
+  fach: chemie
+  wochentage: [0, 2, 4]        # Mo, Mi, Fr
+  einheit: Chemische Bindung
+
+# Von alt nach neu — die drei letzten Termine vor heute.
+stunden:
+  - thema: Ionenbindung und Ionengitter
+    begriff: Ionenbindung
+    kompetenz: "3.2.1.3(1)"
+  - thema: Metallbindung
+    begriff: Metallbindung
+    kompetenz: "3.2.1.3(2)"
+  - thema: Elektronegativität
+    begriff: Elektronegativität
+    kompetenz: "3.2.1.3(4)"
+# Die beiden ersten werden nachbereitet, die letzte erst vor den Strich-Fällen.
+
+kommende:
+  - Polare Elektronenpaarbindung und Dipol
+  - Wasserstoffbrücken
+
+faelle:
+  - id: a
+    frage: "Letzte Stunde haben wir etwas über Elektronegativität gelernt, das ich nicht ganz verstanden habe."
+    xy: Elektronegativität
+  - id: b
+    frage: "Ich habe die letzte Stunde nicht verstanden."
+  - id: c
+    frage: "Letzte Stunde haben wir etwas über Metallbindung gelernt, das ich nicht ganz verstanden habe."
+    xy: Metallbindung
