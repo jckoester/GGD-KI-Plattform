@@ -44,8 +44,7 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   gelegentlich oder setzte stattdessen „Puffer" — beides zählte weiter als gehaltene Stunde.
 - Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
   die Lehrkraft welche will.
-- Alle Assistenten duzen durchgehend, wie die Oberfläche — bisher wechselten sie zwischen „du"
-  und „Sie".
+- Alle Assistenten duzen durchgehend — bisher wechselten sie zwischen „du" und „Sie".
 
 ### Behoben
 

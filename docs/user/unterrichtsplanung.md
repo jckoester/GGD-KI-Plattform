@@ -172,6 +172,47 @@ liegen oder einen Überhang haben.
 Den fertigen Entwurf exportieren Sie über die Export-Zeile im Kopf als **Markdown**
 (zum Kopieren in die Zwischenablage, z. B. für Obsidian), **PDF** oder **DOCX**.
 
+### Mit dem Stundenassistenten planen
+
+Der Knopf **Assistent** im Kopf des Entwurfs öffnet einen Chat mit dem
+**Stundenassistenten** — bezogen auf **diese** Stunde. Er kennt den Entwurf, die
+Unterrichtseinheit und aus dem Schulcurriculum Kapitel, Lernsequenzen und Kompetenzen; Sie
+müssen ihm die Stunde nicht beschreiben. Er arbeitet Skizzen aus, ergänzt oder kürzt Phasen,
+formuliert ein Stundenziel und schlägt Kompetenzen vor. **Geschrieben wird erst, wenn Sie
+zustimmen.** Eine Phase ohne Dauer bleibt ohne, bis Sie Minuten wollen; bereits
+nachbereitete Phasen behalten ihren Stand.
+
+Der Bezug bleibt am Chat: Öffnen Sie ihn später aus dem Verlauf, weiß der Assistent noch,
+um welche Stunde es geht. Weitere Wege zu ihm:
+
+- **✦ an einer Phase** — Material für diese Phase, mit derselben Stunde als Bezug.
+- **Startseite** — in „Mein Tag" steht an jeder Stunde ein Assistenten-Symbol. Fehlt der
+  Entwurf, wird er zuerst angelegt.
+- **Im Chat** — „Hilf mir mit meiner Stunde morgen in der 9d" genügt. Der Assistent sucht in
+  Ihren Unterrichtsgruppen, fragt bei mehreren Treffern nach und arbeitet dann mit Bezug
+  weiter. Einen fehlenden Entwurf legt er nur nach Rückfrage an.
+
+Eine Stunde aus einem früheren Schuljahr (Lesemodus) bietet keinen Assistenten an.
+
+> **Voraussetzung:** Den schulweiten Stundenassistenten richtet Ihre Schul-Administration
+> ein. Fehlt er, sagt Ihnen der Chat das.
+
+#### Ein eigener Stundenassistent
+
+Plant der Assistent nicht so wie Sie — andere Phasennamen, feste Bestandteile, ein anderer
+Ton —, legen Sie sich einen eigenen an: über den **Pfeil** neben dem Knopf **Assistent** →
+**„Eigenen Stundenassistenten anlegen …"** oder unter **Meine Assistenten → „Stundenassistent
+anlegen"**. Er beginnt als Kopie des schulweiten Assistenten mit dessen heutigem Prompt, ist
+privat und öffnet sich gleich im Editor. Am Ende des Prompts steht der Abschnitt **„Meine
+Planungsgewohnheiten"** mit Lücken (`[…]`) — füllen Sie aus, was für Sie gilt; eine Zeile mit
+offener Lücke bleibt wirkungslos.
+
+Aus der Entwurfsansicht angelegt, trägt er schon das Fach der Stunde. Sie können mehrere
+anlegen, etwa einen je Fach. Welcher sich öffnet, regelt eine feste Reihenfolge: Ihr eigener
+mit passendem Fach, dann Ihr eigener ohne Fach, dann der schulweite; die übrigen stehen in
+der Auswahl hinter dem Pfeil. Spätere Änderungen am schulweiten Assistenten übernimmt Ihrer
+nicht — er gehört Ihnen.
+
 ---
 
 ## Nachbereiten
@@ -264,6 +305,14 @@ Stunde etwas geplant war, bietet die Zeile deshalb drei Wege an:
 Der Hinweis steht **an der betroffenen Stunde** und bleibt dort, bis Sie entschieden
 haben — auch nach dem Neuladen. War an der Stunde nichts geplant, fragt die Plattform
 gar nicht erst.
+
+**Im Chat mit der Jahresplanung** geht es auch in einem Satz: „Am 15.10. fällt meine Stunde
+aus, schieb alles eine Stunde nach hinten." Der Assistent trägt den Ausfall ein und lässt —
+nach Ihrer Zustimmung — die folgenden Stunden bis zum nächsten freien Termin nachrücken. Über
+eine Klassenarbeit oder eine angepinnte Stunde rückt nichts hinweg; reicht der Platz davor
+nicht, sagt er es und ändert nichts. Ein leerer Puffer wird dabei aufgebraucht. Landet ein
+Entwurf in einer Stunde anderer Länge — Doppel- statt Einzelstunde —, ist er als
+**„Anpassung nötig"** markiert.
 
 ### Zurücknehmen
 

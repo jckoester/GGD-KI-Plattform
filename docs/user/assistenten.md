@@ -52,14 +52,21 @@ wie alt er ist.
 **Privat, Unterrichtsgruppe, Fachschaft, AG:** Der Assistent gehört Ihnen. Er ist sofort
 einsatzbereit, ohne Freigabe, und Sie können ihn jederzeit ändern, abschalten und
 löschen. „Abschalten" nimmt ihn aus der Auswahl, ohne ihn wegzuwerfen — praktisch am Ende
-einer Unterrichtsreihe. Beim Löschen bleiben die bisherigen Chats erhalten; nur der
-Assistent verschwindet aus ihnen.
+einer Unterrichtsreihe. Gelöscht wird über den Papierkorb unter **Meine Assistenten** oder
+den Knopf **Löschen** im Editor. Beim Löschen bleiben die bisherigen Chats erhalten; nur der
+Assistent verschwindet aus ihnen. Ist er mit einer Gruppe oder Fachschaft geteilt, verlieren
+die anderen dort den Zugang — die Rückfrage sagt es Ihnen.
+
+Als **Fach** stehen im Editor Ihre eigenen Fächer zur Wahl: die Ihrer Unterrichtsgruppen und
+Fachschaften. Das Fach entscheidet mit, welcher Assistent sich aus der Planung zuerst öffnet.
+Einen eigenen **Stundenassistenten** legen Sie mit einem Klick als Kopie des schulweiten an —
+siehe [Unterrichtsplanung](unterrichtsplanung.md#ein-eigener-stundenassistent).
 
 **Alle Lehrkräfte, Jahrgang, alle Schüler:innen, alle:** Diese Reichweiten gehen durch
 eine **Freigabe**. Solange Ihr Entwurf eingereicht ist, können Sie ihn nicht ändern —
 aber Sie können die **Einreichung zurückziehen** und weiterarbeiten. Ist er freigegeben,
 bleibt er so, wie er geprüft wurde: Änderungen und Löschen laufen dann über die
-Administration.
+Administration. Unter **Meine Assistenten** ist sein Papierkorb deshalb ausgegraut.
 
 Wollen Sie einen freigegebenen Assistenten loswerden, beantragen Sie die **Löschung** —
 mit einer kurzen Begründung, wenn Sie mögen. ⚠️ **Der Antrag schaltet nichts ab:** Der

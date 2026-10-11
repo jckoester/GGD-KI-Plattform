@@ -251,11 +251,28 @@ Danach ist der Assistent einsatzbereit — er nutzt das schulweite Standardmodel
 > ihn daran — er funktioniert nicht mehr, sobald dieses Modell aus der LiteLLM-Config
 > fällt. Für die meisten Assistenten ist der Standard die wartungsärmere Wahl.
 
-**Verhalten in der UI:** Öffnet eine Lehrkraft die Planungsansicht einer
-Unterrichtsgruppe und klickt auf „Assistent", wird der Chat mit diesem
-Assistenten automatisch vorausgewählt. Existieren mehrere Assistenten mit
-aktivierter Unterrichtsplanung, wird der erste in der Sortierreihenfolge
-verwendet.
+**Verhalten in der UI:** Jeder Einstieg wählt seinen Assistenten über die **Fähigkeit**:
+
+| Einstieg | Fähigkeit |
+|---|---|
+| Jahresplaner („Assistent"), Verschiebe-Auslöser | `planning` |
+| Entwurfsansicht („Assistent", ✦ an einer Phase), Symbol an einer Stunde auf der Startseite | `lesson_planning` — mit Bezug auf die Stunde |
+
+Gibt es mehrere passende Assistenten, gilt eine feste Reihenfolge — **eigener vor fremdem,
+passendes Fach vor keinem vor abweichendem**:
+
+1. eigener mit dem Fach der Gruppe,
+2. eigener ohne Fach,
+3. fremder mit dem Fach der Gruppe (schulweit oder von einer Kollegin geteilt),
+4. fremder ohne Fach — etwa der schulweite allgemeine,
+5. eigener mit anderem Fach,
+6. fremder mit anderem Fach.
+
+Innerhalb einer Stufe nach Name. Der Knopf öffnet den ersten; ab zwei Kandidaten klappt ein
+Pfeil daneben die Auswahl auf (auf der Startseite öffnet das Symbol dann gleich die Auswahl).
+Gemerkt wird keine Wahl. Gibt es keinen passenden Assistenten, sagt der Chat das, statt still
+den Standard-Chat zu öffnen. Die Sortierreihenfolge aus der Verwaltung spielt dafür keine
+Rolle.
 
 ### Fähigkeiten (`tool_groups`)
 
@@ -269,13 +286,30 @@ Feld `tool_groups`; im Editor ist es der Abschnitt *Fähigkeiten*.
 
 | Fähigkeit | Funktionen | Freischaltung |
 |---|---|---|
-| `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
+| `planning` | Plan lesen/schreiben: Slots, UE-Zuordnung, Themen, Kategorien, Ausfall (mit Nachrücken) sowie der **Verschiebe-Dialog** (`get_reflow_context`, `apply_plan_operations`, `undo_last_change`) | nur **Lehrkräfte** der Gruppe, Chat mit Gruppenbezug |
+| `lesson_planning` | **Stundenplanung:** Stundenentwurf lesen und Phasen, Stundenziel, Kompetenzen schreiben (`get_lesson_detail`, `update_lesson_phases`); eine Stunde aus Angaben im Chat finden und als Bezug setzen (`finde_stunde`, `waehle_stunde`); Einheit samt Kapitel lesen (`get_unit_detail`, auch in `planning`) | **Lehrkräfte**, auch **ohne Gruppenbezug** — den Zugang zur einzelnen Stunde prüft jede Funktion selbst |
 | `student_planning` | nur lesend `get_exam_scope` (Termin + Umfang der nächsten Klassenarbeit) | jede:r mit Gruppenbezug — auch **Schüler:innen** |
 | `image_generation` | Bildgenerierung im Chat (`generate_image`) | Assistent führt die Gruppe **und** ein Bild-Modell ist fürs Team freigeschaltet; schülersichtbare schulweite Bild-Assistenten erst nach Admin-Freigabe |
 
 Schreibende Planungs-Funktionen bleiben damit strikt an die Lehrkraft-Rolle gebunden;
 für Lernplan-/Prüfungsvorbereitungs-Assistenten von Schüler:innen genügt
 `student_planning`.
+
+### Stundenentwurfs-Assistent einrichten
+
+Der Assistent „Stundenentwurf" plant mit der Lehrkraft eine einzelne Stunde: Er liest den
+Entwurf samt Einheit, Kapitel und Kompetenzen, schlägt vor und schreibt erst nach Zustimmung.
+Angelegt wird er wie die Jahresplanung per Seed (Eintrag in `config/assistants.example.yaml`,
+Prompt `config/prompts/stundenentwurf_assistent.md`) oder im Editor: schulweit für
+Lehrkräfte (`teachers`), Fähigkeit **Stundenplanung** (`lesson_planning`) — **nicht**
+`planning`, sonst wäre er auch ein Kandidat für den Jahresplaner.
+
+**Er ist zugleich die Vorlage für eigene Stundenassistenten.** „Eigenen Stundenassistenten
+anlegen" (Lehrkraft: Pfeil am Assistenten-Knopf der Entwurfsansicht oder *Meine Assistenten*)
+kopiert vom **ersten aktiven schulweiten** Assistenten mit Stundenplanung den **aktuellen**
+Prompt, dazu Modell, Temperatur und max. Tokens, in einen privaten Assistenten. Den pflegen
+Sie also im Editor wie jeden anderen; eine Änderung gilt für Kopien, die danach entstehen —
+vorhandene folgen ihr nicht. Gibt es keinen schulweiten, bekommt die Lehrkraft eine Meldung.
 
 ### Verschiebe-Assistent einrichten
 

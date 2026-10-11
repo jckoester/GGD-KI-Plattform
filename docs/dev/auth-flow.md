@@ -164,6 +164,14 @@ Gruppe und Mitgliedschaft über zwei Jahre und gilt in beiden als `aktuell`. Wer
 einem Schuljahr zuordnet, nimmt das Datum des Termins, nicht die Gruppe und nicht
 `overview.schuljahr` (das ist das eingestellte Jahr).
 
+### Kein Chat über Token — auch kein Stundenbezug
+
+`/chat` und `/conversations` stehen nicht in `_ZUSTAENDIG`. Den Stundenbezug eines Chats
+(`conversations.stunde_node_id`, 0.15) setzt deshalb nur die Oberfläche — beim Anlegen über
+`POST /chat` oder ein Werkzeug des Stundenassistenten (`waehle_stunde`); Felder und Ereignis
+`bezug` in [chat-streaming.md](chat-streaming.md). Ein Sync-Client, der Stunden liest oder
+schreibt, braucht ihn nicht: Er spricht die Stunde über `/planning/lessons/{id}` direkt an.
+
 ### Nebenläufig schreiben: `expected_updated_at`
 
 `PATCH /planning/slots/{id}` und `PATCH /planning/lessons/{id}` nehmen optional den
