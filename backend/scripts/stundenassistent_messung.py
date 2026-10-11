@@ -388,6 +388,22 @@ def bewertungen(markdown: str) -> dict[str, Counter]:
     return ergebnis
 
 
+def notizen(markdown: str) -> list[tuple[str, str]]:
+    """Die Notizen eines Verlaufs: (Fall · Lauf, Text) — nur ausgefüllte.
+
+    Die Notiz steht unter „Notiz:", in derselben Zeile oder darunter, bis zum Ende des Laufs.
+    """
+    gefunden = []
+    for abschnitt in re.split(r"\n(?=## )", markdown):
+        kopf = re.match(r"## (\S+ · Lauf \d+)", abschnitt)
+        if not kopf or "Notiz:" not in abschnitt:
+            continue
+        text = abschnitt.split("Notiz:", 1)[1].split("\n---", 1)[0].strip()
+        if text:
+            gefunden.append((kopf.group(1), " ".join(text.split())))
+    return gefunden
+
+
 def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
     zeilen = [
         f"# Verlauf der Messung — {kopf['datei']}", "",
@@ -440,6 +456,11 @@ def main() -> None:
         print(f"{'Fall':<30} " + " ".join(f"{s:>11}" for s in spalten))
         for fall, zaehler in tabelle.items():
             print(f"{fall:<30} " + " ".join(f"{zaehler.get(s, 0):>11}" for s in spalten))
+        notiert = notizen(args.bewertung.read_text(encoding="utf-8"))
+        if notiert:
+            print("\nNotizen:")
+            for wo, text in notiert:
+                print(f"  {wo}: {text}")
         return
     if not args.datei:
         p.error("--datei fehlt")

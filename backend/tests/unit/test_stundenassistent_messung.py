@@ -226,3 +226,13 @@ def test_aufbau_wird_vorher_geprueft():
     ohne = {**FALL_KAP, "kompetenzen": {"praefixe": ["3.4."], "kapitel": False}}
     assert "darf kein" in messung.aufbau_fehler(ohne, kapitel=True)
     assert messung.aufbau_fehler({"id": "x"}, kapitel=True) is None
+
+
+def test_notizen_unter_der_bewertung():
+    """Die Notiz steht in der Regel eine Leerzeile unter „Notiz:" — so übersah eine Suche
+    nur nach derselben Zeile alle Notizen von Messung 4."""
+    text = _verlauf(erwartung="E.")
+    darunter = text.replace("Notiz: \n", "Notiz: \n\nDie Phase ist eine Sicherung,\naber nicht so benannt.\n")
+    assert messung.notizen(darunter) == [("x · Lauf 1", "Die Phase ist eine Sicherung, aber nicht so benannt.")]
+    assert messung.notizen(text.replace("Notiz: ", "Notiz: gleich daneben")) == [("x · Lauf 1", "gleich daneben")]
+    assert messung.notizen(text) == []
