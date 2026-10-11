@@ -710,13 +710,13 @@ class _Modell(_FakeHttpClient):
         return self._antwort(request, len(self.nutzlasten))
 
 
-async def _chat_mit_werkzeug(modell):
+async def _chat_mit_werkzeug(modell, ergebnis=None):
     """Ein Chat mit genau einem Werkzeug `probe`; liefert Ausgabe, Aufrufe und `_persist`."""
     aufrufe: list = []
 
     async def _probe(args, ctx):
         aufrufe.append(args)
-        return {"ok": True}
+        return ergebnis if ergebnis is not None else {"ok": True}
 
     probe = ChatTool(
         name="probe", groups=frozenset({"planning"}), handler=_probe,
@@ -940,6 +940,28 @@ async def test_erfundenes_werkzeug_bekommt_die_verfuegbaren_namen():
     ausgabe, aufrufe, persist = await _chat_mit_werkzeug(_Modell(_antwort))
 
     assert len(aufrufe) == 1, "das richtige Werkzeug lief genau einmal, das erfundene nie"
+    assert "Fertig." in ausgabe
+    assert persist.await_args.args[4] == "Fertig."
+
+
+@pytest.mark.asyncio
+async def test_nicht_serialisierbares_ergebnis_reisst_den_strom_nicht_ab():
+    """`get_plan_balance` lieferte eine UUID; `json.dumps` scheiterte nach dem `try` um den
+    Aufruf, und der Strom brach ohne Meldung ab (11.10.2026). Jetzt erfährt das Modell den
+    Fehler und antwortet."""
+    gesehen = []
+
+    def _antwort(req, n):
+        letzte = req["messages"][-1]
+        if letzte.get("role") == "tool":
+            gesehen.append(letzte["content"])
+            return _text("Fertig.")
+        return _werkzeugaufruf("probe")
+
+    ausgabe, aufrufe, persist = await _chat_mit_werkzeug(_Modell(_antwort), ergebnis={"id": uuid4()})
+
+    assert len(aufrufe) == 1
+    assert gesehen and "fehlgeschlagen" in gesehen[0]
     assert "Fertig." in ausgabe
     assert persist.await_args.args[4] == "Fertig."
 

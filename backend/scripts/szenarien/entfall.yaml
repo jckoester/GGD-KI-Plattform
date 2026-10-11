@@ -1,0 +1,80 @@
+# Messung zu Päckchen A, Schritt 8: Trägt der Jahresplanungs-Assistent einen Entfall ein?
+#
+#   python scripts/entfall_messung.py --datei scripts/szenarien/entfall.yaml
+#
+# Anlass (Todo „Idee: eine eigene Operation für den Entfall", 24.09.2026): „Diese Stunde
+# fällt aus und der Inhalt wandert" verlangt zwei Operationen — `set_category{…,'ausfall'}`
+# und `move_content`. Am 24.09. kam nur die zweite; der Quelltermin blieb `unterricht` und
+# zählte weiter in der Stundenbilanz. Gebaut wird `cancel_lesson`, wenn das noch vorkommt.
+#
+# **Die Messung läuft in einer eigenen Gruppe** (`gruppe.id`), die das Skript vor jedem Lauf
+# neu aufbaut und am Ende löscht — samt Terminen, Einheiten, Entwürfen, Snapshots und
+# Konversationen. Bestehende Gruppen der Instanz bleiben unberührt. Lehrkraft ist die der
+# Gruppe `lehrkraft_der_gruppe`; während der Messung steht die Gruppe in ihrer Seitenleiste.
+#
+# Je Fall: `zuege` gehen nacheinander in eine Konversation mit Gruppenbezug; der zweite Zug
+# ist die Zustimmung. `stoff_weiter`: Die Lehrkraft sagt ausdrücklich, dass der Inhalt
+# weiterwandern soll (sonst offen gelassen).
+
+lehrkraft_der_gruppe: 33
+quelle: 2026-10-15          # der Termin, der ausfällt — in jedem Fall derselbe
+
+gruppe:
+  id: 98015
+  name: "Messung Entfall 8x"
+  fach: mathematik          # Slug in `subjects`
+  # Mo Doppelstunde (1.–2.), Do Einzelstunde (3.), sechs Wochen, keine Ferien auf Dev.
+  termine:
+    - {wochentag: 0, start: 1, stunden: 2}
+    - {wochentag: 3, start: 3, stunden: 1}
+  von: 2026-10-12
+  bis: 2026-11-19
+  einheiten:
+    - titel: Potenzen
+      themen:
+        - Potenzen mit natürlichen Exponenten
+        - Potenzgesetze bei gleicher Basis
+        - Potenzgesetze bei gleichem Exponenten
+        - Potenzen von Potenzen
+        - Negative Exponenten
+        - Übung und Wiederholung
+        - Wissenschaftliche Schreibweise
+    - titel: Wurzeln
+      themen:
+        - Quadratwurzeln
+        - n-te Wurzeln
+        - Wurzeln als Potenzen
+        - Rechnen mit Wurzeln
+  # Entwürfe für die Termine rund um den Ausfall — `move_content` nimmt sie mit.
+  entwuerfe: [2026-10-12, 2026-10-15, 2026-10-19, 2026-10-22]
+
+faelle:
+  - id: wandertag-stoff-weiter
+    stoff_weiter: true
+    zuege:
+      - "Am Donnerstag, 15.10., fällt meine Stunde wegen des Wandertags aus. Der Stoff soll aber weiter, ich will nichts streichen."
+      - "Ja, bitte so umsetzen."
+
+  - id: fortbildung-nach-hinten
+    stoff_weiter: true
+    zuege:
+      - "Ich bin am 15.10. auf Fortbildung, die Stunde entfällt. Schieb bitte alles ab da eine Stunde nach hinten."
+      - "Ja, bitte so umsetzen."
+
+  - id: klassenfahrt-naechste-stunde
+    stoff_weiter: true
+    zuege:
+      - "Die Stunde am 15.10. findet nicht statt, ich bin mit der 10b auf Klassenfahrt. Was dort geplant war, soll in die nächste Stunde rutschen und alles danach eins weiter."
+      - "Ja, bitte so umsetzen."
+
+  - id: knapp-faellt-aus
+    stoff_weiter: false
+    zuege:
+      - "Mein Unterricht am 15.10. fällt aus."
+      - "Ja, bitte so umsetzen."
+
+  - id: studientag-eintragen
+    stoff_weiter: false
+    zuege:
+      - "Trag für den 15.10. einen Ausfall ein, da ist Studientag."
+      - "Ja, bitte so umsetzen."

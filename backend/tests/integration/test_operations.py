@@ -8,7 +8,7 @@ import pytest
 from app.db.models import ContextNode, LessonSlot
 from app.planning import operations as ops_mod
 from app.planning.operations import (
-    MoveContent, SetCategory, SetTopic, StrikePhase, TransferPhases,
+    CancelLesson, MoveContent, SetCategory, SetTopic, StrikePhase, TransferPhases,
     apply_operations, parse_operations,
 )
 from datetime import date, timedelta
@@ -214,8 +214,7 @@ async def test_ein_gewoehnlicher_ausfall_mit_inhalt_meldet_nichts(
     db_session.add(s)
     await db_session.flush()
 
-    res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id,
-                                                kategorie="ausfall")])
+    res = await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=s.id)])
     assert res.errors == []
     assert res.hinweise == []
 
@@ -271,3 +270,60 @@ async def test_phasenoperation_kommt_in_der_datenbank_an(async_engine, seed_ops_
         assert phase["status"] == "gestrichen" and phase["kuerzung"] is True
     else:
         assert phase["dauer_min"] == 5 and phase["kuerzung"] is True
+
+
+# ── cancel_lesson (0.15, Päckchen A Schritt 8) ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_cancel_lesson_traegt_den_ausfall_ein(db_session, seed_ops_group):
+    """Wie der Ausfall aus der Planungsansicht: Kategorie, Herkunft und Vorher in einem Zug
+    (`ausfall.setze_kategorie`); der Inhalt bleibt am Termin."""
+    s = _slot(D0, kategorie="pruefung", thema="Titration")
+    db_session.add(s)
+    await db_session.flush()
+
+    res = await _apply(db_session, parse_operations([{"op": "cancel_lesson", "slot_id": str(s.id)}]))
+    assert res.errors == [] and res.applied == 1
+    assert (s.kategorie, s.ausfall_herkunft, s.ausfall_vorher) == ("ausfall", "assistent", "pruefung")
+    assert s.thema == "Titration"
+
+
+@pytest.mark.asyncio
+async def test_ausfall_und_verschieben_in_einem_stapel(db_session, seed_ops_group):
+    """Der Fall aus der Messung: „fällt aus, der Stoff soll weiter"."""
+    src, dst = _slot(D0, thema="Titration"), _slot(D0 + timedelta(days=3))
+    db_session.add_all([src, dst])
+    await db_session.flush()
+
+    res = await _apply(db_session, [
+        CancelLesson(op="cancel_lesson", slot_id=src.id),
+        MoveContent(op="move_content", from_slot_id=src.id, to_slot_id=dst.id),
+    ])
+    assert res.errors == []
+    assert src.kategorie == "ausfall" and src.thema is None
+    assert dst.thema == "Titration" and dst.kategorie == "unterricht"
+
+
+@pytest.mark.asyncio
+async def test_set_category_nimmt_keinen_ausfall_an(db_session, seed_ops_group):
+    """Ein Weg, nicht zwei — sonst laufen die beiden auseinander (Todo, 24.09.2026)."""
+    s = _slot(D0)
+    db_session.add(s)
+    await db_session.flush()
+
+    res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id, kategorie="ausfall")])
+    assert res.applied == 0 and s.kategorie == "unterricht"
+    assert any("cancel_lesson" in f for f in res.errors)
+
+
+@pytest.mark.asyncio
+async def test_unterricht_hebt_den_ausfall_wieder_auf(db_session, seed_ops_group):
+    s = _slot(D0)
+    db_session.add(s)
+    await db_session.flush()
+    await _apply(db_session, [CancelLesson(op="cancel_lesson", slot_id=s.id)])
+
+    res = await _apply(db_session, [SetCategory(op="set_category", slot_id=s.id, kategorie="unterricht")])
+    assert res.errors == []
+    assert (s.kategorie, s.ausfall_herkunft, s.ausfall_vorher) == ("unterricht", None, None)

@@ -38,6 +38,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Jahresplanung; fehlt ein passender, sagt der Chat das.
 - Eine nur noch lesbare Stunde (Archiv) bietet keinen Assistenten mehr an.
 - Die Fachauswahl im Assistenten-Editor bietet Lehrkräften nur noch ihre eigenen Fächer an.
+- Der Jahresplanungs-Assistent trägt einen Ausfall mit einer eigenen Operation ein. Bisher
+  vergaß er ihn beim Verschieben gelegentlich oder setzte stattdessen „Puffer" — beides
+  zählte weiter als gehaltene Stunde.
 - Der Assistent kann Phasen **ohne Dauer** schreiben: Eine Skizze bleibt ohne Minuten, bis
   die Lehrkraft welche will.
 - Alle Assistenten duzen durchgehend, wie die Oberfläche — bisher wechselten sie zwischen „du"
@@ -71,6 +74,9 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
   Antwort leer, ohne Hinweis. Jetzt erscheint die Budgetmeldung.
 - Schrieb das Modell vor einem Werkzeugaufruf schon Text, klebte der Rest der Antwort ohne
   Absatz daran („…13.10.2026.Ich habe die Stunde gefunden").
+- Der Jahresplanungs-Assistent brach ohne Meldung mitten in der Antwort ab, sobald er die
+  Stundenbilanz einer Gruppe mit Unterrichtseinheit las. Ein Werkzeugergebnis, das sich nicht
+  übertragen lässt, beendet die Antwort jetzt auch sonst nicht mehr.
 - Eigene aktive oder abgeschaltete Assistenten ließen sich nicht löschen, obwohl sie es
   dürfen. Jetzt unter „Meine Assistenten" und im Editor; bei schulweit freigegebenen steht,
   dass die Löschung beantragt wird. Admins konnten auch ihre eigenen privaten nicht löschen.

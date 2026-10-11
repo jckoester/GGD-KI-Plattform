@@ -255,6 +255,22 @@ _RUNDENLIMIT_HINWEIS = (
 )
 
 
+def _werkzeug_json(name: str, ergebnis) -> str:
+    """Das Ergebnis eines Werkzeugs als JSON für das Modell.
+
+    ⚠️ **Außerhalb des `try` um den Aufruf.** Ein Ergebnis, das sich nicht serialisieren
+    ließ (eine UUID aus `model_dump()` ohne `mode="json"`), riss bis 0.15 den ganzen
+    Antwortstrom ab: keine Meldung, keine Antwort — `get_plan_balance` tat das bei jeder
+    Gruppe mit Einheit. Jetzt wie ein fehlgeschlagener Aufruf: im Log, und das Modell
+    erfährt es und antwortet trotzdem.
+    """
+    try:
+        return json.dumps(ergebnis)
+    except (TypeError, ValueError):
+        logger.exception("Ergebnis von Tool '%s' nicht serialisierbar", name)
+        return json.dumps({"error": "Tool-Ausführung fehlgeschlagen"})
+
+
 def _rundentrenner(bisher: str) -> str:
     """Was vor den Text einer neuen Runde gehört, damit er als eigener Absatz beginnt.
 
@@ -2427,7 +2443,7 @@ async def chat(
                         k: v for k, v in tool_result.items() if k not in ("cost_usd", "image_id")
                     })
                 else:
-                    tool_result_str = json.dumps(tool_result)
+                    tool_result_str = _werkzeug_json(_tc_name, tool_result)
 
                 current_messages = current_messages + [
                     {

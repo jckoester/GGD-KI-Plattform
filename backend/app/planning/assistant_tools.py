@@ -84,7 +84,10 @@ async def _build_compact_balance(db: AsyncSession, group_id: int) -> dict:
     slots = slots_result.scalars().all()
     units = await _load_units(db, group_id)
     balance = await _build_balance(db, group_id, units, slots)
-    return balance.model_dump()
+    # ⚠️ `mode="json"`: `UnitBalanceItem.ue_node_id` ist eine UUID. Ohne den Modus kam sie als
+    # Objekt heraus, `json.dumps` im Chat scheiterte, und der Antwortstrom riss ab — bei jeder
+    # Gruppe mit Einheit, seit es den Jahresplanungs-Assistenten gibt (gefunden 11.10.2026).
+    return balance.model_dump(mode="json")
 
 
 async def _zugang(node: ContextNode, ctx: ToolContext) -> bool | None:
@@ -486,6 +489,8 @@ register_tool(ChatTool(
             "description": (
                 "Setzt die Kategorie eines Slots auf pruefung, puffer, vertretung "
                 "oder zurück auf unterricht. "
+                "Einen Ausfall trägt apply_plan_operations mit cancel_lesson ein — "
+                "puffer ist eine Reservestunde, die stattfindet, kein Ausfall. "
                 "Pinned-Status wird vom Assistenten nie gesetzt."
             ),
             "parameters": {
@@ -1588,11 +1593,12 @@ register_tool(ChatTool(
                 "Thema, Unterrichtseinheit UND Stundenentwurf mit. set_topic setzt nur "
                 "die Überschrift und lässt Einheit und Entwurf am alten Termin zurück; "
                 "es ist für Termine ohne Entwurf gedacht.\n"
-                "WICHTIG: Ein Ausfall muss eigens eingetragen werden — mit "
-                "set_category{slot_id,'ausfall'} im selben Stapel. move_content räumt "
-                "den Quelltermin nur leer; seine Kategorie bleibt 'unterricht', und er "
-                "zählt weiter als gehaltene Stunde in der Stundenbilanz. Nennt die "
-                "Lehrkraft einen Entfall, gehören beide Operationen zusammen."
+                "WICHTIG: Fällt eine Stunde aus (Wandertag, Fortbildung, Klassenfahrt, "
+                "Studientag, Krankheit), trägt cancel_lesson{slot_id} den Ausfall ein. "
+                "Soll der Stoff weiter, kommt move_content in denselben Stapel — "
+                "move_content allein räumt den Termin nur leer; er bliebe 'unterricht' "
+                "und zählte weiter als gehaltene Stunde in der Stundenbilanz. Ein Ausfall "
+                "ist kein Puffer: puffer ist eine Reservestunde, die stattfindet."
             ),
             "parameters": {
                 "type": "object",
@@ -1608,7 +1614,11 @@ register_tool(ChatTool(
                             "Operation für 'Stunde verschieben'. Die **Kategorie** der "
                             "Quelle ändert sie NICHT: Ein ausgefallener Termin bleibt "
                             "sonst 'unterricht' und zählt weiter mit — dafür zusätzlich "
-                            "set_category.\n"
+                            "cancel_lesson.\n"
+                            "- cancel_lesson{slot_id}: trägt einen Ausfall ein — die "
+                            "Stunde findet nicht statt und zählt nicht mehr in der "
+                            "Stundenbilanz. Thema, Einheit und Entwurf bleiben am Termin, "
+                            "bis move_content sie weiterschiebt.\n"
                             "- swap_content{slot_a,slot_b}: tauscht den Inhalt zweier "
                             "Termine vollständig.\n"
                             "- set_topic{slot_id,thema}: setzt NUR die Überschrift eines "
@@ -1617,7 +1627,9 @@ register_tool(ChatTool(
                             "- set_unit{slot_id,unit_node_id}: ordnet einem Termin eine "
                             "Unterrichtseinheit zu (null löst die Zuordnung).\n"
                             "- set_category{slot_id,kategorie}: unterricht | pruefung | "
-                            "puffer | ausfall | vertretung.\n"
+                            "puffer | vertretung. puffer ist eine Reservestunde, die "
+                            "stattfindet und mitzählt — für einen Ausfall cancel_lesson. "
+                            "unterricht hebt auch einen Ausfall wieder auf.\n"
                             "- mark_needs_adjustment{slot_id,value}: markiert, dass an "
                             "diesem Termin noch etwas zu entscheiden ist.\n"
                             "- transfer_phases{from_lesson_id,to_lesson_id,phase_ids}: "

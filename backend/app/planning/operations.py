@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.planning.ausfall import setze_kategorie
+from app.planning.ausfall import AUSFALL, setze_kategorie
 from app.db.models import ContextNode, LessonSlot, ParkedLessonContent
 from app.planning.einordnung import ordne_entwurf_ein
 from app.planning.material_edges import synchronisiere_materialkanten
@@ -78,6 +78,24 @@ class SetCategory(BaseModel):
     kategorie: str
 
 
+class CancelLesson(BaseModel):
+    """Ein Termin fällt aus (0.15, Päckchen A Schritt 8).
+
+    ⚠️ **Gemessen, dann gebaut.** Bis 0.15 hieß „diese Stunde fällt aus" für das Modell
+    `set_category{…,'ausfall'}` — und soll der Stoff weiter, zusätzlich `move_content`. In 15
+    Läufen (11.10.2026) verschob es einmal nur und ließ den Quelltermin `unterricht`, dreimal
+    setzte es `puffer` — beides zählt weiter als gehaltene Stunde. Eine Operation, die nach
+    der Handlung heißt, statt nach dem Feld, das sie setzt; `set_category` nimmt `ausfall`
+    seitdem nicht mehr an — ein Weg, nicht zwei.
+
+    Thema, Einheit und Entwurf bleiben am Termin (zur Nachvollziehbarkeit, wie beim Ausfall
+    aus der Planungsansicht); weiter wandern sie mit `move_content` im selben Stapel.
+    """
+
+    op: Literal["cancel_lesson"]
+    slot_id: UUID
+
+
 class MarkNeedsAdjustment(BaseModel):
     op: Literal["mark_needs_adjustment"]
     slot_id: UUID
@@ -106,7 +124,7 @@ class StrikePhase(BaseModel):
 
 PlanOperation = Annotated[
     Union[
-        MoveContent, SwapContent, SetTopic, SetUnit, SetCategory,
+        MoveContent, SwapContent, SetTopic, SetUnit, SetCategory, CancelLesson,
         MarkNeedsAdjustment, TransferPhases, ShortenPhase, StrikePhase,
         UnparkContent,
     ],
@@ -205,7 +223,9 @@ async def _validate(
             if s is not None and s.kategorie == "ausfall" and op.thema:
                 errors.append(f"{ctx}: Ausfall-Slot nimmt kein Thema auf")
         elif isinstance(op, SetCategory):
-            if op.kategorie not in VALID_KATEGORIEN:
+            if op.kategorie == AUSFALL:
+                errors.append(f"{ctx}: Einen Ausfall trägt cancel_lesson{{slot_id}} ein, nicht set_category.")
+            elif op.kategorie not in VALID_KATEGORIEN:
                 errors.append(f"{ctx}: ungültige Kategorie {op.kategorie!r}")
         elif isinstance(op, UnparkContent):
             eintrag = (parked or {}).get(op.parkplatz_id)
@@ -359,6 +379,8 @@ async def apply_operations(
             # Angaben weg: Ein zurückgebliebenes `ausfall_vorher` führte beim nächsten
             # Zurücknehmen auf eine Kategorie, die niemand gesetzt hat.
             setze_kategorie(slots[op.slot_id], op.kategorie, herkunft="assistent")
+        elif isinstance(op, CancelLesson):
+            setze_kategorie(slots[op.slot_id], AUSFALL, herkunft="assistent")
         elif isinstance(op, MarkNeedsAdjustment):
             slots[op.slot_id].anpassung_noetig = op.value
         elif isinstance(op, UnparkContent):

@@ -49,7 +49,7 @@ def test_die_wahl_steht_in_der_hauptbeschreibung(op_beschreibung):
 
 
 @pytest.mark.parametrize("op", [
-    "move_content", "swap_content", "set_topic", "set_unit", "set_category",
+    "move_content", "swap_content", "set_topic", "set_unit", "set_category", "cancel_lesson",
     "mark_needs_adjustment", "transfer_phases", "shorten_phase", "strike_phase",
 ])
 def test_jede_operation_wird_erklaert(op_beschreibung, op):
@@ -76,15 +76,28 @@ def test_ein_entfall_muss_eigens_eingetragen_werden(op_beschreibung):
 
     `move_content` **soll** die Kategorie nicht anfassen — eine Verlegung ohne Entfall
     ist legitim (eine Einheit nach vorn zusammenziehen). Also muss die Beschreibung
-    sagen, dass beides zusammengehört.
+    sagen, dass beides zusammengehört. Seit 0.15 trägt `cancel_lesson` den Ausfall ein
+    (gemessen: 1 von 15 Läufen ohne Ausfall, 3 mit `puffer`).
     """
-    assert "set_category" in op_beschreibung
     stelle = op_beschreibung[op_beschreibung.index("move_content{"):]
     satz = stelle[: stelle.index("\n")]
     assert "Kategorie" in satz, "move_content sagt nicht, dass es die Kategorie nicht ändert"
+    assert "cancel_lesson" in satz
 
 
 def test_die_regel_steht_auch_in_der_kurzbeschreibung():
     """Manche Modelle lesen die Kurzbeschreibung genauer als die Parameter."""
     kurz = TOOL_REGISTRY["apply_plan_operations"].definition["function"]["description"]
-    assert "Ausfall" in kurz and "set_category" in kurz
+    assert "Ausfall" in kurz and "cancel_lesson" in kurz
+    assert "kein Puffer" in kurz
+
+
+def test_puffer_ist_kein_ausfall(op_beschreibung):
+    """Dreimal in 15 Läufen setzte das Modell `puffer`, wo eine Stunde ausfiel (11.10.2026) —
+    eine Pufferstunde zählt mit. Beide Beschreibungen, die `puffer` anbieten, sagen es."""
+    stelle = op_beschreibung[op_beschreibung.index("set_category{"):]
+    satz = stelle[: stelle.index("\n")]
+    assert "ausfall" not in satz.split(":")[1].split(".")[0], "set_category bietet ausfall noch an"
+    assert "cancel_lesson" in satz
+    kategorie = TOOL_REGISTRY["set_slot_category"].definition["function"]["description"]
+    assert "cancel_lesson" in kategorie and "kein Ausfall" in kategorie
