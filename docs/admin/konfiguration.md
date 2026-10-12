@@ -37,6 +37,27 @@ die alte Konfiguration bleibt in Kraft.
 Beide schreiben die YAML-Datei *und* verwerfen den Zwischenspeicher. Wer dieselben Dateien
 von Hand im Editor ändert, braucht trotzdem den Neustart.
 
+### `config/` muss für das Backend schreibbar sein
+
+Dafür muss das Backend in `config/` **schreiben** dürfen — in das Verzeichnis, nicht nur in
+die beiden Dateien: Geschrieben wird über eine temporäre Datei daneben. Die mitgelieferte
+`docker-compose.yml` hängt `./config` beim Backend deshalb ohne `:ro` ein (bis 0.15.0 war es
+schreibgeschützt, und beide Seiten scheiterten beim Speichern); der `cron` liest nur und
+bleibt bei `:ro`.
+
+Ist das Verzeichnis trotzdem nicht schreibbar — etwa weil es auf dem Host einer anderen
+Nutzerkennung gehört —, meldet das der Start:
+
+```bash
+docker compose logs backend | grep "Nicht schreibbar"
+```
+
+Die beiden Seiten zeigen dann eine Warnung und sperren „Speichern"; der Ferienkalender lässt
+sich weiter kopieren und von Hand eintragen. Der übrige Betrieb läuft unverändert — ein
+schreibgeschütztes `config/` ist zulässig, wenn Sie die Dateien ohnehin von Hand pflegen.
+Dieselbe Startprüfung gilt für die Ablagen unter `data/` (erzeugte Bilder, Bibliothek,
+Export-Vorlagen).
+
 > **`subjects.yaml` braucht zusätzlich einen Seed-Lauf.** Der Neustart macht die Datei nur
 > für die Editionslogik wirksam; die Fächer-Tabelle der Datenbank füllt
 > `python scripts/seed_subjects.py` (siehe [Updates & Wartung](updates-und-wartung.md#fächer-ändern-subjectsyaml)).

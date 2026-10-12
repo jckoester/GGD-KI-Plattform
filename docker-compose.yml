@@ -124,7 +124,10 @@ services:
       ARTIFACT_STORAGE_DIR: /app/data/artifacts
       EXPORT_TEMPLATE_DIR: /app/data/export_templates
     volumes:
-      - ./config:/app/config:ro
+      # Schreibbar, nicht `:ro`: `/budget` und der Ferienkalender schreiben
+      # `budget_tiers.yaml` bzw. `school_year.yaml` (bis 0.15.0 schreibgeschützt —
+      # beide scheiterten). Der Start meldet, wenn es trotzdem nicht geht.
+      - ./config:/app/config
       - ./static:/app/static:ro
       - ./data:/app/data
     depends_on:

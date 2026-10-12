@@ -210,6 +210,11 @@ async def lifespan(app: FastAPI):
     from app.litellm.systemkonto import pruefe_beim_start as pruefe_systemkonto
     pruefe_systemkonto()
 
+    # Startup-Check: schreibbare Verzeichnisse (`config/`, Ablagen unter `data/`). Weich —
+    # ein schreibgeschütztes `config/` ist zulässig; die betroffenen Seiten sagen es selbst.
+    from app.core.schreibbar import pruefe_beim_start as pruefe_schreibbar
+    pruefe_schreibbar()
+
     # Startup-Check: Standard-Chatmodell gesetzt?
     if not settings.chat_default_model:
         logger.error(

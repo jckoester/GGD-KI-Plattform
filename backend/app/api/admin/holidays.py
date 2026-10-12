@@ -23,6 +23,7 @@ from app.calendar.holidays import (
     write_school_year,
 )
 from app.calendar.service import get_adapter, is_configured
+from app.core.schreibbar import schreibschutz
 from app.planning.calendar import _DEFAULT_PATH, SchoolYearConfig, load_school_year
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,9 @@ def _antwort(cfg, proposal, bounds, hinweise, years=None, gewaehlt=None) -> dict
         "freie_wochentage": proposal.freie_wochentage,
         "yaml": render_school_year(proposal, cfg, bounds),
         "pfad": str(_DEFAULT_PATH),
+        # Gesetzt, wenn `config/` schreibgeschützt ist: Die Seite sperrt dann
+        # „Übernehmen" — der Inhalt lässt sich weiter kopieren und von Hand eintragen.
+        "schreibschutz": schreibschutz(_DEFAULT_PATH),
     }
 
 
@@ -165,6 +169,10 @@ async def holiday_apply(
     """`school_year.yaml` schreiben. Die bisherige Fassung wird daneben gesichert."""
     if not is_configured():
         raise HTTPException(status_code=409, detail="Keine Stundenplanquelle eingerichtet.")
+    # Vor dem Abruf: Ohne Schreibrecht wäre er umsonst, und der Fehler käme als 500.
+    gesperrt = schreibschutz(_DEFAULT_PATH)
+    if gesperrt:
+        raise HTTPException(status_code=503, detail=gesperrt)
     try:
         cfg, holidays, bounds, _years = await _hole_vorschlag(payload.schuljahr)
     except NoActiveSchoolYearError as exc:
@@ -191,7 +199,14 @@ async def holiday_apply(
             detail=f"Der erzeugte Kalender ist ungültig und wurde nicht geschrieben: {exc}",
         ) from None
 
-    backup = write_school_year(_DEFAULT_PATH, inhalt)
+    try:
+        backup = write_school_year(_DEFAULT_PATH, inhalt)
+    except OSError as exc:
+        logger.error("school_year.yaml nicht geschrieben: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"{_DEFAULT_PATH} ließ sich nicht schreiben ({exc.strerror or exc}).",
+        ) from None
     # Ohne das Leeren arbeitet der laufende Prozess mit dem alten Stand weiter.
     load_school_year.cache_clear()
     neu = load_school_year()

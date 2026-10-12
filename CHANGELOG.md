@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Budget-Stufen (`/budget`) und Ferienkalender ließen sich in der Compose-Installation nicht
+  speichern: `config/` war für das Backend schreibgeschützt eingehängt. Ist das Verzeichnis
+  nicht schreibbar, sagen beide Seiten es jetzt und sperren das Speichern, und der Start meldet
+  es im Log — ebenso für die Ablagen unter `data/`.
+
+### Nach dem Update
+
+Die `docker-compose.yml` aus dem Update übernehmen (oder beim Dienst `backend` das `:ro` an
+`./config` entfernen), dann `docker compose up -d` — ein `restart` übernimmt die geänderte
+Einbindung nicht. Meldet der Start danach noch „Nicht schreibbar", fehlen dem Backend die
+Rechte am Verzeichnis auf dem Host (siehe Admin-Doku, „Konfigurationsdateien").
+
 ## [0.15.0] – 2026-10-11
 
 Lehrkräfte planen eine einzelne Stunde im Gespräch mit dem neuen Stundenassistenten — aus der

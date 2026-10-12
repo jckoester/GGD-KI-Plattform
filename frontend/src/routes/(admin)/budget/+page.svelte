@@ -3,6 +3,7 @@
     import { getBudgetGrades, saveBudgetGrades } from '$lib/api.js';
     import { PiggyBank, ArrowLeft, LoaderCircle } from 'lucide-svelte';
     import ErrorBanner from '$lib/components/ErrorBanner.svelte';
+    import WarningBanner from '$lib/components/WarningBanner.svelte';
     import ZuschlagAufbuchen from '$lib/components/ZuschlagAufbuchen.svelte';
     import BudgetVerlauf from '$lib/components/BudgetVerlauf.svelte';
     import { zeigbar } from '$lib/budgetverlauf.js';
@@ -135,6 +136,9 @@
             <LoaderCircle class="w-8 h-8 animate-spin" />
         </div>
     {:else if data}
+        {#if data.schreibschutz}
+            <div class="mb-6"><WarningBanner message={data.schreibschutz} /></div>
+        {/if}
         {#if saveResult}
             <div class="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded mb-6">
                 {saveResult.updated_users} LiteLLM-Budget(s) aktualisiert
@@ -311,7 +315,7 @@
 
         <div class="mt-6">
             <button
-                disabled={!isValid || changedGrades.length === 0}
+                disabled={!isValid || changedGrades.length === 0 || !!data.schreibschutz}
                 onclick={() => showConfirm = true}
                 class="px-6 py-2 rounded bg-light-ma dark:bg-dark-ma text-light-tx dark:text-dark-tx
                        hover:bg-light-ma/90 dark:hover:bg-dark-ma/90

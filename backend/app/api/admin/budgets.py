@@ -24,6 +24,7 @@ from app.budget.tiers import (
 from app.budget.zuschlag import buche_auf
 from app.config import settings
 from app.core.paths import aufloesen
+from app.core.schreibbar import schreibschutz
 from app.db.models import Group, GroupMembership, PseudonymAudit
 from app.db.session import get_db
 from app.planning.calendar import load_school_year
@@ -87,6 +88,9 @@ class BudgetGradesResponse(BaseModel):
     #: Einbettungen für Suche und Import — keinem Nutzerbudget angerechnet und in
     #: Hochrechnung und Verlauf nicht enthalten. `None`, wenn nicht ermittelbar.
     system: Optional[SystemInfo] = None
+    #: Warum sich die Budget-Stufen nicht speichern lassen (`config/` schreibgeschützt).
+    #: `None`, wenn Speichern geht — die Seite sperrt sonst „Speichern" und zeigt den Text.
+    schreibschutz: Optional[str] = None
 
 
 class GradeUpdate(BaseModel):
@@ -159,6 +163,7 @@ async def get_budget_grades(
         # Zuletzt: Scheitert die Abfrage (Migration fehlt), ist die Sitzung danach
         # unbrauchbar — davor stehende Abfragen wären mit ihr gescheitert.
         system=await _systemverbrauch(db, eur_usd_rate),
+        schreibschutz=schreibschutz(aufloesen(settings.budget_tiers_path)),
     )
 
 
@@ -274,8 +279,14 @@ async def update_budget_grades(
             detail=f"Unbekannte Keys: {sorted(unknown)}"
         )
 
-    # 3. YAML lesen (aktueller Stand)
+    # 3. Schreibbar? Vor jeder Änderung — sonst bräche der Lauf nach dem Lesen ab, und
+    # die Meldung wäre ein 500 statt eines Satzes, mit dem ein Admin etwas anfangen kann.
     config_path = aufloesen(settings.budget_tiers_path)
+    gesperrt = schreibschutz(config_path)
+    if gesperrt:
+        raise HTTPException(status_code=503, detail=gesperrt)
+
+    # YAML lesen (aktueller Stand)
     with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
@@ -295,9 +306,16 @@ async def update_budget_grades(
 
     # 5. Atomar schreiben
     tmp = config_path.with_suffix(".yaml.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        yaml.dump(raw, f, allow_unicode=True, default_flow_style=False)
-    tmp.replace(config_path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            yaml.dump(raw, f, allow_unicode=True, default_flow_style=False)
+        tmp.replace(config_path)
+    except OSError as exc:
+        logger.error("budget_tiers.yaml nicht geschrieben: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"{config_path} ließ sich nicht schreiben ({exc.strerror or exc}).",
+        ) from None
 
     # 6. Cache invalidieren
     invalidate_budget_tiers_cache()

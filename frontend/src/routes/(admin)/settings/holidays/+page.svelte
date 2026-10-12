@@ -192,10 +192,17 @@
             {/if}
 
             <section>
+                {#if vorschlag.schreibschutz}
+                    <div class="mb-3">
+                        <WarningBanner
+                            message={`${vorschlag.schreibschutz} Bis dahin den Inhalt unten kopieren und von Hand in school_year.yaml eintragen.`}
+                        />
+                    </div>
+                {/if}
                 <div class="flex flex-wrap items-center gap-3 mb-3">
                     <button
                         onclick={uebernehmen}
-                        disabled={uebernehme}
+                        disabled={uebernehme || !!vorschlag.schreibschutz}
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg
                                bg-primary dark:bg-primary-dark text-white
                                disabled:opacity-50"
