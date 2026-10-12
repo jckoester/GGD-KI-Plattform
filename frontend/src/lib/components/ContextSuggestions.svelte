@@ -3,10 +3,11 @@
      * Das Vorschlagsfenster des Suchknopfs im Chat (ADR-017, AP8).
      *
      * Es steht **im Fluss über dem Eingabefeld** — jede Zeile, die es wachsen lässt,
-     * schiebt das Eingabefeld nach unten. Deshalb ist seine Höhe an den Viewport
-     * gebunden und nur die Trefferliste scrollt: Kopfzeile und Aktionsleiste bleiben
-     * stehen, sodass „Hinzufügen" in jeder Bildschirmhöhe erreichbar ist, ohne erst ans
-     * Listenende zu scrollen. Bei Anzeigelimit 30 (Profil-Einstellung, Obergrenze in
+     * schiebt das Eingabefeld nach unten. Deshalb ist seine Höhe an die sichtbare Höhe
+     * gebunden (`--sichtbare-hoehe` aus `stores/geraet.js`, sonst `100dvh` — mit offener
+     * Bildschirmtastatur ist `dvh` noch die volle Höhe), und nur die Trefferliste
+     * scrollt: Kopfzeile und Aktionsleiste bleiben stehen, sodass „Hinzufügen" in jeder
+     * Bildschirmhöhe erreichbar ist, ohne erst ans Listenende zu scrollen. Bei Anzeigelimit 30 (Profil-Einstellung, Obergrenze in
      * `backend/app/preferences/service.py`) liefert der Umschlag bis zu 60 Treffer —
      * gemessen am 01.09.2026 mit „nennen": 59 Treffer, 62 Listenzeilen. Ohne Deckel
      * deckte das Fenster den halben Chat zu.
@@ -65,7 +66,7 @@
 </script>
 
 <div
-    class="flex flex-col max-h-[35dvh] sm:max-h-[40dvh]
+    class="flex flex-col max-h-[calc(var(--sichtbare-hoehe,100dvh)*0.35)] sm:max-h-[calc(var(--sichtbare-hoehe,100dvh)*0.4)]
            rounded-lg border border-light-ui-3 dark:border-dark-ui-3
            bg-light-bg-2 dark:bg-dark-bg-2 text-sm"
 >

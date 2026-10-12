@@ -272,6 +272,13 @@ npm run dev
 # /api wird automatisch an http://localhost:8000 proxied (vite.config.js)
 ```
 
+`npm run dev` und `npm run build` erzeugen vorher `src/lib/taxonomy.js` aus
+`backend/app/context/taxonomy.yaml` (`scripts/generate_taxonomy.py`, braucht PyYAML). Dafür
+nehmen sie das Python der Backend-venv, falls es `backend/venv` gibt, sonst `python3` — so
+wie im Frontend-Image, das `python3-yaml` mitbringt. Das System-`python3` zu nehmen, ging
+schief, sobald Homebrew es auf eine neue Version hob: Dort fehlte PyYAML, und der Start
+brach mit `ModuleNotFoundError: No module named 'yaml'` ab (11.10.2026, Python 3.15).
+
 ### Von anderen Geräten im Netz testen (Handy, Tablet)
 
 Standardmäßig lauscht der Dev-Server nur auf `localhost`. Mit `--host` lauscht er auf allen

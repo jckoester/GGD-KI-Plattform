@@ -109,6 +109,20 @@ vorlagen („Kontext (n)“). Wie ausführlich, wählen Sie selbst:
 
 Was die Zeile bedeutet — und was nicht —, steht unter [Den Chat nutzen](chat.md).
 
+## Enter-Taste im Chat
+
+Was die Enter-Taste beim Schreiben im Chat tut:
+
+- **Automatisch** *(Vorgabe)* — am Computer sendet Enter, auf Tablet und Smartphone gibt
+  es eine neue Zeile
+- **Enter sendet, Umschalt+Enter neue Zeile** — wie am Computer, auf jedem Gerät
+- **Enter neue Zeile, Senden per Knopf** — auf jedem Gerät
+
+**Strg + Enter** (Mac und iPad: **⌘ + Enter**) sendet in jeder Einstellung.
+
+Ob am Tablet eine Tastatur angeschlossen ist, kann die Plattform nicht erkennen. Schreiben
+Sie am iPad mit Tastaturhülle, wählen Sie **„Enter sendet"**, wenn Enter abschicken soll.
+
 ## Kontext-Suche
 
 Wenn Sie den Suche-Button im Chat nutzen, werden standardmäßig bis zu **8 Treffer** aus dem Kontextspeicher angezeigt. Bei komplexen Themen mit vielen möglichen Bausteinen können Sie diesen Wert erhöhen:

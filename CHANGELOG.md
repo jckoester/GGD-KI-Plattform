@@ -5,8 +5,17 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Geändert
+
+- Auf Tablet und Smartphone macht **Enter** im Chat eine neue Zeile; gesendet wird mit dem
+  Knopf. Strg/⌘+Enter sendet überall. Einstellbar im Profil unter „Enter-Taste im Chat".
+- Bei wenig Platz — Tablet im Querformat mit offener Tastatur, Smartphone — rückt der
+  Eingabebereich im Chat zusammen, damit die Antwort darüber lesbar bleibt.
+
 ### Behoben
 
+- Enter während der Eingabe über eine Eingabemethode (Chinesisch, Japanisch, manche
+  Android-Tastaturen) schickte die Nachricht ab, statt das Wort zu bestätigen.
 - Budget-Stufen (`/budget`) und Ferienkalender ließen sich in der Compose-Installation nicht
   speichern: `config/` war für das Backend schreibgeschützt eingehängt. Ist das Verzeichnis
   nicht schreibbar, sagen beide Seiten es jetzt und sperren das Speichern, und der Start meldet

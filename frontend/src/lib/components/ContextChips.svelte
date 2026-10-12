@@ -34,10 +34,11 @@
 
 {#if nodes.length > 0}
     <!-- Ausgeklappt bleibt die Leiste gedeckelt und scrollt selbst, statt den Chat
-         hochzuschieben. -->
+         hochzuschieben. Gedeckelt an der **sichtbaren** Höhe (`stores/geraet.js`), nicht
+         an `dvh` — mit offener Tastatur wäre ein Fünftel der vollen Höhe zu viel. -->
     <div
         class="flex flex-wrap gap-1.5 {klappbar && offen
-            ? 'max-h-[20dvh] overflow-y-auto'
+            ? 'max-h-[calc(var(--sichtbare-hoehe,100dvh)*0.2)] overflow-y-auto'
             : ''}"
     >
         {#each sichtbar as node (node.node_id)}

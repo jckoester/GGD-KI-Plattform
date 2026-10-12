@@ -2,7 +2,9 @@
 
 ## Nachrichten schreiben und senden
 
-Tippen Sie Ihre Nachricht in das Textfeld am unteren Rand des Chatfensters. Mit **Enter** wird die Nachricht abgeschickt. Mit **Shift + Enter** können Sie innerhalb der Eingabe einen Zeilenumbruch einfügen, ohne die Nachricht abzusenden.
+Tippen Sie Ihre Nachricht in das Textfeld am unteren Rand des Chatfensters. Am Computer schickt **Enter** die Nachricht ab, **Umschalt + Enter** fügt einen Zeilenumbruch ein. Auf Tablet und Smartphone macht Enter eine neue Zeile — gesendet wird dort mit dem Senden-Knopf. **Strg + Enter** (Mac und iPad: **⌘ + Enter**) sendet überall. Wie sich Enter verhält, können Sie im [Profil](profil.md#enter-taste-im-chat) festlegen, etwa wenn Sie am iPad mit einer Tastatur schreiben.
+
+Bei wenig Platz — auf dem Tablet im Querformat mit offener Bildschirmtastatur oder auf dem Smartphone — rückt der Bereich unter dem Eingabefeld zusammen, damit die Antwort darüber lesbar bleibt: Das Eingabefeld wächst nur auf drei Zeilen, Modellauswahl, Kostenanzeige und Tastenhinweise erscheinen wieder, sobald die Tastatur geschlossen ist.
 
 Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten bisherigen Verlauf des aktuellen Gesprächs — Sie müssen Zusammenhänge nicht jedes Mal neu erklären.
 

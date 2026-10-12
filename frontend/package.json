@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate:taxonomy": "python3 ../scripts/generate_taxonomy.py",
+    "generate:taxonomy": "if [ -x ../backend/venv/bin/python ]; then ../backend/venv/bin/python ../scripts/generate_taxonomy.py; else python3 ../scripts/generate_taxonomy.py; fi",
     "prebuild": "npm run generate:taxonomy",
     "dev": "npm run generate:taxonomy && vite dev",
     "build": "vite build",

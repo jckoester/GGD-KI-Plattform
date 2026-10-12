@@ -100,7 +100,7 @@ verloren geht.
 
 1. Klicken Sie in der Seitenleiste auf **„Neuer Chat"**.
 2. Tippen Sie Ihre Frage oder Aufgabe in das Eingabefeld am unteren Rand.
-3. Senden Sie die Nachricht mit **Enter** oder dem Senden-Button.
+3. Senden Sie die Nachricht mit dem Senden-Button oder am Computer mit **Enter**.
 4. Die KI antwortet direkt im Chatfenster. Sie können die Antwort lesen und
    im gleichen Gespräch weiter fragen — die KI kennt den bisherigen Gesprächsverlauf.
 

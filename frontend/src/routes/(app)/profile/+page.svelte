@@ -21,6 +21,7 @@
     } from "$lib/stores/uiLevel.js";
     import { patchPreferences, getPreferences } from "$lib/api.js";
     import { kontextStufe, kontextStufenOptionen } from "$lib/kontext_anzeige.js";
+    import { ENTER_OPTIONEN, ENTER_SCHLUESSEL, enterModus } from "$lib/chat_eingabe.js";
     import { onMount } from "svelte";
     import Zugangstoken from "$lib/components/Zugangstoken.svelte";
     import { KACHELN, schalteKachel, zeigtKachel } from "$lib/stores/startkacheln.js";
@@ -395,6 +396,44 @@
                         <option {value}>{label}</option>
                     {/each}
                 </select>
+            </div>
+        </section>
+
+        <!-- Enter-Taste im Chat (0.15.1, Beta-Rückmeldung): Auf der Bildschirmtastatur
+             schickte Enter ab, wo eine neue Zeile gemeint war. „Automatisch" entscheidet
+             nach dem Zeigegerät; eine Hardware-Tastatur am Tablet erkennt der Browser
+             nicht — dafür die beiden festen Varianten. -->
+        <section class="mb-8">
+            <h2
+                class="text-base font-semibold mb-3 text-light-tx-2 dark:text-dark-tx-2"
+            >
+                Enter-Taste im Chat
+            {#if quittung === ENTER_SCHLUESSEL}<span class="ml-2 text-xs font-medium text-light-gr dark:text-dark-gr" aria-live="polite">✓ Gespeichert</span>{:else if quittungFehler === ENTER_SCHLUESSEL}<span class="ml-2 text-xs font-medium text-light-re dark:text-dark-re" aria-live="polite">Nicht gespeichert</span>{/if}
+            </h2>
+            <div>
+                <label
+                    for="chat-enter"
+                    class="block text-sm font-medium text-light-tx-2 dark:text-dark-tx-2 mb-2"
+                >
+                    Was die Enter-Taste beim Schreiben tut
+                </label>
+                <select
+                    id="chat-enter"
+                    onchange={(e) => updatePreference(ENTER_SCHLUESSEL, e.target.value)}
+                    value={enterModus(preferences)}
+                    class="w-full max-w-sm px-3 py-2 rounded-lg border border-light-ui-3 dark:border-dark-ui-3
+                       bg-light-ui dark:bg-dark-ui text-light-tx dark:text-dark-tx
+                       focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={loading}
+                >
+                    {#each ENTER_OPTIONEN as { value, label } (value)}
+                        <option {value}>{label}</option>
+                    {/each}
+                </select>
+                <p class="text-xs text-light-tx-2 dark:text-dark-tx-2 mt-2 max-w-prose">
+                    {ENTER_OPTIONEN.find((o) => o.value === enterModus(preferences))?.hinweis}
+                    Strg+Enter bzw. ⌘+Enter sendet immer.
+                </p>
             </div>
         </section>
 

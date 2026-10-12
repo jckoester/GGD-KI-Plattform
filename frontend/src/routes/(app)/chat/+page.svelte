@@ -52,6 +52,14 @@
     import { refreshConversations } from "$lib/stores/conversations.js";
     import { refreshConversationCounts } from "$lib/stores/conversationCounts.js";
     import { user } from "$lib/stores/user.js";
+    import { grobZeiger, sichtbareHoehe } from "$lib/stores/geraet.js";
+    import {
+        enterModus,
+        enterSendet,
+        istKompakt,
+        tastenAktion,
+        zeilenMax,
+    } from "$lib/chat_eingabe.js";
     import { budget, refreshBudget } from "$lib/stores/budget.js";
     import { subjectMap } from "$lib/stores/subjects.js";
     import { myGroups } from "$lib/stores/myGroups.js";
@@ -320,15 +328,27 @@
     let granularity = $derived($user?.preferences?.cost_granularity ?? "none");
     let kontextAnzeige = $derived(kontextStufe($user?.preferences));
 
+    // Wenig sichtbare Höhe — auf dem iPad im Querformat mit offener Tastatur bleibt rund
+    // ein Drittel des Bildschirms. Dann verdichtet sich der Eingabebereich, damit die
+    // Antwort lesbar bleibt (0.15.1, `$lib/chat_eingabe.js`).
+    let kompakt = $derived(istKompakt($sichtbareHoehe));
+    let enterModusWert = $derived(enterModus($user?.preferences));
+
     function adjustTextareaHeight() {
         if (!textarea) return;
         // Direktes DOM-Reset nötig: reaktiver State-Update ist async,
         // scrollHeight würde sonst noch die alte Höhe liefern.
         textarea.rows = 1;
-        const rows = Math.min(Math.ceil(textarea.scrollHeight / 24), 6);
+        const rows = Math.min(Math.ceil(textarea.scrollHeight / 24), zeilenMax(kompakt));
         textarea.rows = rows;
         textAreaRows = rows;
     }
+
+    // Geht die Tastatur auf oder zu, gilt eine andere Höchstzahl an Zeilen.
+    $effect(() => {
+        void kompakt;
+        adjustTextareaHeight();
+    });
 
     import { updateConversationTitle } from "$lib/stores/conversations.js";
     async function loadModels() {
@@ -859,10 +879,23 @@
             }
         }
 
-        if (e.key === "Enter" && !e.shiftKey) {
+        // Ob Enter sendet, entscheidet die Einstellung — auf Touch-Geräten macht Enter
+        // sonst eine neue Zeile (0.15.1). Strg/⌘+Enter sendet immer.
+        const aktion = tastenAktion(e, {
+            modus: enterModusWert,
+            beruehrung: $grobZeiger,
+        });
+        if (aktion === "senden") {
             e.preventDefault();
             if (subjectPickerOpen || pickerOpen || mentionOpen) return;
             handleSubmit();
+        } else if (
+            e.key === "Enter" &&
+            !e.shiftKey &&
+            (subjectPickerOpen || pickerOpen || mentionOpen)
+        ) {
+            // Enter wählt dort aus — keine neue Zeile im Textfeld.
+            e.preventDefault();
         }
     }
 
@@ -1353,7 +1386,9 @@
     </div>
 
     <div
-        class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 px-4 pt-3 pb-4"
+        class="flex-shrink-0 border-t border-light-ui-3 dark:border-dark-ui-3 px-4 {kompakt
+            ? 'pt-2 pb-2'
+            : 'pt-3 pb-4'}"
     >
         <div class="max-w-4xl mx-auto space-y-2 relative">
             <!-- AssistantPicker Overlay -->
@@ -1384,8 +1419,8 @@
                 />
             {/if}
 
-            <!-- Konversationskosten -->
-            {#if (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
+            <!-- Konversationskosten (verdichtet ausgeblendet) -->
+            {#if !kompakt && (granularity === "conversation" || granularity === "both") && totalCostUsd != null}
                 <div
                     class="text-xs text-right text-light-tx-2 dark:text-dark-tx-2"
                 >
@@ -1518,6 +1553,9 @@
                     bind:this={textarea}
                     rows={textAreaRows}
                     onkeydown={handleKeydown}
+                    enterkeyhint={enterSendet(enterModusWert, $grobZeiger)
+                        ? "send"
+                        : "enter"}
                     oninput={handleInput}
                     onblur={handleTextareaBlur}
                     bind:value={input}
@@ -1611,8 +1649,14 @@
                     {/if}
                 </div>
             {/if}
-            <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte -->
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <!-- Toolbar-Zeile: Modell-Auswahl / Assistenten-Anzeige + Hinweistexte.
+                 Verdichtet ausgeblendet: Mit offener Tastatur wählt niemand ein Modell,
+                 und jede Zeile hier fehlt der Antwort darüber. -->
+            <div
+                class="flex flex-wrap items-center gap-x-3 gap-y-1 {kompakt
+                    ? 'hidden'
+                    : ''}"
+            >
                 {#if conversationAssistant || selectedAssistant}
                     <!-- Assistenten-Anzeige statt Modell -->
                     <span
@@ -1680,7 +1724,8 @@
                      (Entscheidung Jan, 18.09.2026). Die Tastenkürzel-Legende darunter ist
                      reine Bedienhilfe — auf einem schmalen Telefon nahm sie drei bis vier
                      Zeilen, die dem Chatverlauf fehlten, und klappt deshalb unterhalb
-                     `sm` hinter den i-Knopf. Ab `sm` steht sie unverändert da.
+                     `sm` hinter den i-Knopf. Ab `sm` steht sie unverändert da — außer
+                     verdichtet (wenig sichtbare Höhe, 0.15.1): Dann klappt sie ebenso.
 
                      Nachgesehen, weil die ursprüngliche Notiz eine Zusage vermutete:
                      WEDER ADR-008 NOCH ADR-009 verlangen diesen Satz. Die Pflicht aus
@@ -1699,7 +1744,9 @@
                     >
                     <button
                         type="button"
-                        class="sm:hidden shrink-0 rounded hover:text-light-tx dark:hover:text-dark-tx"
+                        class="{kompakt
+                            ? ''
+                            : 'sm:hidden'} shrink-0 rounded hover:text-light-tx dark:hover:text-dark-tx"
                         aria-label="Tastenkürzel anzeigen"
                         aria-expanded={legendeOffen}
                         aria-controls="chat-legende"
@@ -1712,7 +1759,7 @@
                     id="chat-legende"
                     class="text-xs text-light-tx-2 dark:text-dark-tx-2 {legendeOffen
                         ? ''
-                        : 'hidden'} sm:block"
+                        : 'hidden'} {kompakt ? '' : 'sm:block'}"
                 >
                     {#if availableAssistants.length > 0}
                         Verwende <code>/</code> um {selectedAssistant ||
