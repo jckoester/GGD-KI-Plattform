@@ -6,6 +6,8 @@ Tippen Sie Ihre Nachricht in das Textfeld am unteren Rand des Chatfensters. Am C
 
 Bei wenig Platz — auf dem Tablet im Querformat mit offener Bildschirmtastatur oder auf dem Smartphone — rückt der Bereich unter dem Eingabefeld zusammen, damit die Antwort darüber lesbar bleibt: Das Eingabefeld wächst nur auf drei Zeilen, Modellauswahl, Kostenanzeige und Tastenhinweise erscheinen wieder, sobald die Tastatur geschlossen ist.
 
+Auf dem Tablet schreibt es sich im **Hochformat** bequemer: Im Querformat nimmt die Bildschirmtastatur etwa die Hälfte des Bildschirms ein, und von der Antwort bleiben nur wenige Zeilen sichtbar. Wer quer arbeiten möchte, zieht die Tastatur auf dem iPad mit zwei Fingern zusammen — sie schwebt dann klein über dem Chat — oder schließt eine Tastatur an.
+
 Die KI antwortet direkt im Gesprächsfenster. Sie sieht dabei immer den gesamten bisherigen Verlauf des aktuellen Gesprächs — Sie müssen Zusammenhänge nicht jedes Mal neu erklären.
 
 > 📷 *Screenshot folgt: Eingabefeld mit Büroklammer (Datei), Suche-Button und Modell-Auswahl.*

@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.15.1] – 2026-10-12
+
+Budget-Stufen und Ferienkalender lassen sich in der Compose-Installation speichern, und im Chat
+schreibt es sich auf Tablet und Smartphone besser. Keine Migration, keine neue Konfiguration —
+wer die `docker-compose.yml` angepasst hat, entfernt dort das `:ro` an `./config` (unten).
+
 ### Geändert
 
 - Auf Tablet und Smartphone macht **Enter** im Chat eine neue Zeile; gesendet wird mit dem
