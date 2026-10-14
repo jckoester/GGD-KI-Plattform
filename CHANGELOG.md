@@ -7,11 +7,19 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ### Neu
 
-- **Fachbegriffe im Satz:** Nennt eine Nachricht einen Fachbegriff mitten im Satz („Letzte
-  Stunde haben wir etwas über Elektronegativität gelernt …"), kommt sein Eintrag jetzt in den
-  Kontext des Chats — auch gebeugt („eines Alkans" zu „Alkane"). Bisher klappte das nur bei
-  kurzen Fragen. Im Chat eines Fachs zählen die Begriffe dieses Fachs, seiner Bezugsfächer und
-  fachlose.
+- **Fachbegriffe im Satz werden angeboten:** Nennt eine Nachricht einen Fachbegriff mitten im
+  Satz („Letzte Stunde haben wir etwas über Elektronegativität gelernt …"), steht sein Titel
+  jetzt als Angebot im Systemtext — auch gebeugt („eines Alkans" zu „Alkane"). Den Inhalt holt
+  das Modell mit der Suche im Wissensspeicher, wenn er für die Antwort zählt. Ebenso angeboten
+  werden Einträge, die der Nachricht nahe, aber nicht sicher genug für den Prompt sind. Im Chat
+  eines Fachs zählen die Begriffe dieses Fachs, seiner Bezugsfächer und fachlose.
+- **Vorrang des Wissensspeichers:** neuer, optionaler Satz in `pedagogy.yaml`
+  (`wissensspeicher_vorrang`).
+
+### Geändert
+
+- **Suche im Wissensspeicher:** Die Werkzeugbeschreibung fordert das Modell auf, bei
+  Fachbegriffen, Methoden und Operatoren vor der Antwort im Wissensspeicher zu suchen.
 
 ### Migration
 
@@ -30,6 +38,10 @@ docker compose exec backend python scripts/seed_subjects.py
 
 Nennt ein Eintrag ein Fach, das nicht in der Datei steht, schreibt der Seed nichts und meldet
 den Eintrag.
+
+In `config/pedagogy.yaml` unter `preambles` den Schlüssel `wissensspeicher_vorrang` aus der
+`pedagogy.example.yaml` übernehmen — oder bewusst weglassen, wenn die Schule keinen
+Wissensspeicher pflegt; dann steht kein Vorrangsatz im Prompt. Danach das Backend neu starten.
 
 ## [0.15.2] – 2026-10-14
 

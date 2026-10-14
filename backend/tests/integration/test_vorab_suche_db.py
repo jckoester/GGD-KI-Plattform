@@ -17,8 +17,8 @@ import uuid
 import pytest
 
 from app.config import settings
-from app.context.search import (_KANDIDATEN_FAKTOR, VORAB_MAX, VORAB_SCHWELLE, VORAB_TOR_ALIAS,
-                                VORAB_TOR_TITEL, Suchprofil, vorab)
+from app.context.search import (_KANDIDATEN_FAKTOR, VORAB_ANGEBOT, VORAB_ANGEBOT_MAX, VORAB_MAX,
+                                VORAB_SCHWELLE, Suchprofil, Vorabergebnis, vorab)
 from app.db.models import ContextNode, NodeAlias, Subject
 
 pytestmark = pytest.mark.asyncio
@@ -64,8 +64,9 @@ def _profil(**extra) -> Suchprofil:
 
 
 async def _titel(db, **extra) -> list[str]:
-    treffer = await vorab("egal", _profil(**extra), db, vektor=FRAGE)
-    return [t["title"] for t in treffer]
+    """Die Titel der **sicheren** Stufe — was als Inhalt in den Prompt geht."""
+    ergebnis = await vorab("egal", _profil(**extra), db, vektor=FRAGE)
+    return [t["title"] for t in ergebnis.sicher]
 
 
 class TestSchwelle:
@@ -182,7 +183,7 @@ class TestBezugsfaecher:
 
         async def _vorab(frage, profil, db, *, vektor):
             gesehen.append(profil)
-            return []
+            return Vorabergebnis()
         monkeypatch.setattr(service, "vorab", _vorab)
         await service._grundschicht("egal", db_session, pseudonym="p-n11", rollen=("student",),
                                     chat_id=konv.id, anchor_ids=(), jwt_stufe=None, vektor=FRAGE)
@@ -204,126 +205,194 @@ class TestBezugsfaecher:
         assert profil.bezugsfaecher == ()
 
 
-class TestNennung:
-    """Weg 2 der Vorab-Suche: der im Satz genannte Begriff (0.16, Schritt 3).
+class TestAngebot:
+    """Die zweite Stufe der Vorab-Suche (0.16): Titel ohne Inhalt.
 
-    Die Nennung bringt nur Kandidaten; herein kommt, wessen **rohe** Distanz unter dem Tor
-    liegt — weiter als die Schwelle, für Aliase enger als für Titel —, und nur aus dem Fach
-    der Konversation, seinen Bezugsfächern oder fachlos.
+    Angeboten wird, was **nicht sicher** ist und roh höchstens :data:`VORAB_ANGEBOT` entfernt
+    liegt — zuerst im Satz Genanntes (aus dem Fach der Konversation, seinen Bezugsfächern
+    oder fachlos), dann Nähe aus derselben Kandidatenabfrage wie die sichere Stufe.
     """
 
     SATZ = "Letzte Stunde haben wir etwas über {} gelernt, das ich nicht ganz verstanden habe."
-    ZWISCHEN = (VORAB_SCHWELLE + VORAB_TOR_ALIAS) / 2          # über der Schwelle, unter beiden Toren
-    ZWISCHEN_TOREN = (VORAB_TOR_ALIAS + VORAB_TOR_TITEL) / 2   # nur für Titel nah genug
+    IM_BAND = (VORAB_SCHWELLE + VORAB_ANGEBOT) / 2      # über der Schwelle, im Angebot
 
-    async def _vorab(self, db, frage, **extra):
+    async def _vorab(self, db, frage, **extra) -> Vorabergebnis:
         return await vorab(frage, _profil(**extra), db, vektor=FRAGE)
 
-    async def test_genannt_und_nah_genug_kommt_mit(self, db_session, bestand):
-        _, _, knoten = bestand
-        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
-        await db_session.flush()
-        treffer = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
-        assert [(t["title"], t.get("genannt")) for t in treffer] == [("Elektronegativität", True)]
+    @staticmethod
+    def _angebot(ergebnis: Vorabergebnis) -> list[tuple[str, str]]:
+        return [(t["title"], t["quelle"]) for t in ergebnis.angebot]
 
-    async def test_ohne_nennung_bleibt_er_draussen(self, db_session, bestand):
-        """Gegenprobe: derselbe Knoten, derselbe Abstand — nur nicht genannt."""
+    async def test_genannt_im_band_wird_angeboten_nicht_eingefuegt(self, db_session, bestand):
         _, _, knoten = bestand
-        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        db_session.add(knoten("begriff", "Elektronegativität", self.IM_BAND))
         await db_session.flush()
-        assert await self._vorab(db_session, self.SATZ.format("die Bindung")) == []
+        ergebnis = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert ergebnis.sicher == []
+        assert self._angebot(ergebnis) == [("Elektronegativität", "nennung")]
+        assert ergebnis.angebot[0]["fach"] == "Testfach N11"
 
-    async def test_hinter_dem_tor_bleibt_er_draussen(self, db_session, bestand):
-        """„Ein Eis essen" nennt den Steckbrief Wasser — gemeint ist er nicht."""
+    async def test_ungenannt_im_band_kommt_ueber_die_distanz(self, db_session, bestand):
+        """Gegenprobe zur Quelle: derselbe Knoten, nicht genannt — angeboten wird er trotzdem,
+        nur aus der Distanz."""
         _, _, knoten = bestand
-        db_session.add(knoten("begriff", "Eis", VORAB_TOR_TITEL + 0.05))
+        db_session.add(knoten("begriff", "Elektronegativität", self.IM_BAND))
         await db_session.flush()
-        assert await self._vorab(db_session, "Wir wollen nachher ein Eis essen.") == []
+        ergebnis = await self._vorab(db_session, self.SATZ.format("die Bindung"))
+        assert self._angebot(ergebnis) == [("Elektronegativität", "distanz")]
 
-    async def test_alias_hat_das_engere_tor(self, db_session, bestand):
+    async def test_hinter_dem_band_kein_angebot(self, db_session, bestand):
+        """„Wie geht es dir?" und „ein Eis essen": Ohne Nähe kein Angebot — auch nicht, wenn
+        der Titel im Satz steht. Das Band ist die einzige Grenze."""
         _, _, knoten = bestand
-        k = knoten("begriff", "Edelgasregel", self.ZWISCHEN_TOREN)
+        db_session.add_all([knoten("begriff", "Eis", VORAB_ANGEBOT + 0.05),
+                            knoten("begriff", "Elektronegativität", VORAB_ANGEBOT + 0.05)])
+        await db_session.flush()
+        for frage in ("Wie geht es dir?", "Wir wollen nachher ein Eis essen."):
+            ergebnis = await self._vorab(db_session, frage)
+            assert (ergebnis.sicher, ergebnis.angebot) == ([], []), frage
+
+    async def test_alltagswort_hoechstens_als_angebot(self, db_session, bestand):
+        """„Dein Hemd ist aus einem tollen Stoff." nennt die Stoffe — höchstens als Titel,
+        nie als Inhalt (Reihe 2, 14.10.2026)."""
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Stoffe", self.IM_BAND))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, "Dein Hemd ist aus einem tollen Stoff.")
+        assert ergebnis.sicher == []
+        assert self._angebot(ergebnis) == [("Stoffe", "nennung")]
+
+    async def test_sicherer_treffer_nicht_zusaetzlich_im_angebot(self, db_session, bestand):
+        _, _, knoten = bestand
+        db_session.add(knoten("begriff", "Elektronegativität", VORAB_SCHWELLE - 0.05))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert [t["title"] for t in ergebnis.sicher] == ["Elektronegativität"]
+        assert ergebnis.angebot == []
+
+    async def test_hoechstens_fuenf_titel_nennungen_vorn(self, db_session, bestand):
+        """Sechs Kandidaten im Band, zwei davon genannt: fünf Titel, die genannten zuerst —
+        obwohl die ungenannten näher liegen."""
+        _, _, knoten = bestand
+        db_session.add_all([knoten("begriff", f"Nachbar {i}", VORAB_SCHWELLE + 0.005 + i / 1000)
+                            for i in range(4)])
+        db_session.add_all([knoten("begriff", "Elektronegativität", VORAB_ANGEBOT - 0.01),
+                            knoten("begriff", "Oxidation", VORAB_ANGEBOT - 0.005)])
+        await db_session.flush()
+        frage = "Was haben Elektronegativität und Oxidation miteinander zu tun?"
+        ergebnis = await self._vorab(db_session, frage)
+        assert len(ergebnis.angebot) == VORAB_ANGEBOT_MAX
+        assert self._angebot(ergebnis) == [
+            ("Elektronegativität", "nennung"), ("Oxidation", "nennung"),
+            ("Nachbar 0", "distanz"), ("Nachbar 1", "distanz"), ("Nachbar 2", "distanz"),
+        ]
+
+    async def test_vom_deckel_verdraengt_wird_angeboten(self, db_session, bestand):
+        """Ein Knoten unter der Schwelle, den der Deckel aus der sicheren Stufe drängt, fällt
+        nicht durch beide Stufen — genannt wie ungenannt."""
+        _, _, knoten = bestand
+        db_session.add_all([knoten("begriff", f"Nachbar {i}", 0.10 + i / 1000)
+                            for i in range(VORAB_MAX + 1)])
+        db_session.add(knoten("begriff", "Elektronegativität", VORAB_SCHWELLE - 0.05))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert [t["title"] for t in ergebnis.sicher] == [f"Nachbar {i}" for i in range(VORAB_MAX)]
+        assert self._angebot(ergebnis) == [
+            ("Elektronegativität", "nennung"), (f"Nachbar {VORAB_MAX}", "distanz"),
+        ]
+
+    async def test_nennung_auch_hinter_vielen_naeheren(self, db_session, bestand):
+        """F4: Mehr nähere Knoten, als die Abfrage an Kandidaten holt, verdrängen den genannten
+        nicht aus dem Angebot."""
+        _, _, knoten = bestand
+        n = VORAB_MAX * _KANDIDATEN_FAKTOR + 1
+        db_session.add_all([knoten("begriff", f"Nachbar {i:02d}", 0.10 + i / 1000) for i in range(n)])
+        db_session.add(knoten("begriff", "Elektronegativität", self.IM_BAND))
+        await db_session.flush()
+        ergebnis = await self._vorab(db_session, self.SATZ.format("Elektronegativität"))
+        assert len(ergebnis.sicher) == VORAB_MAX
+        assert self._angebot(ergebnis)[0] == ("Elektronegativität", "nennung")
+
+    async def test_alias_fuehrt_zum_angebot(self, db_session, bestand):
+        _, _, knoten = bestand
+        k = knoten("begriff", "Edelgasregel", self.IM_BAND)
         db_session.add(k)
         await db_session.flush()
         db_session.add(NodeAlias(node_id=k.id, alias="Oktettregel"))
         await db_session.flush()
-        assert await self._vorab(db_session, self.SATZ.format("die Oktettregel")) == []
-        titel = [t["title"] for t in await self._vorab(db_session, self.SATZ.format("die Edelgasregel"))]
-        assert titel == ["Edelgasregel"]
+        ergebnis = await self._vorab(db_session, self.SATZ.format("die Oktettregel"))
+        assert self._angebot(ergebnis) == [("Edelgasregel", "nennung")]
 
     async def test_endungen_im_satz(self, db_session, bestand):
         _, _, knoten = bestand
-        db_session.add(knoten("begriff", "Ion", self.ZWISCHEN))
+        db_session.add(knoten("begriff", "Ion", self.IM_BAND))
         await db_session.flush()
-        assert [t["title"] for t in await self._vorab(db_session, "Ich verstehe Ionen nicht.")] == ["Ion"]
+        ergebnis = await self._vorab(db_session, "Ich verstehe Ionen nicht.")
+        assert self._angebot(ergebnis) == [("Ion", "nennung")]
 
-    async def test_fach_ohne_bezug_kommt_ueber_die_nennung_nicht(self, db_session, bestand):
+    async def test_fach_ohne_bezug_nicht_ueber_die_nennung(self, db_session, bestand):
+        """Der Fachfilter der Nennung bleibt (Kriterium 7 von Schritt 1). Über die Distanz darf
+        der Knoten kommen — geprüft wird die Quelle, nicht sein Fehlen (Plan § 7.7 Nr. 5)."""
         fach, anderes, knoten = bestand
-        db_session.add(knoten("begriff", "Fotosynthese", self.ZWISCHEN, subject=anderes))
+        db_session.add(knoten("begriff", "Fotosynthese", self.IM_BAND, subject=anderes))
         await db_session.flush()
         frage = self.SATZ.format("die Fotosynthese")
-        assert await self._vorab(db_session, frage, subject_id=fach.id) == []
+        ohne_bezug = await self._vorab(db_session, frage, subject_id=fach.id)
+        assert self._angebot(ohne_bezug) == [("Fotosynthese", "distanz")]
         mit_bezug = await self._vorab(db_session, frage, subject_id=fach.id, bezugsfaecher=(anderes.id,))
-        assert [t["title"] for t in mit_bezug] == ["Fotosynthese"]
-        assert [t["title"] for t in await self._vorab(db_session, frage)] == ["Fotosynthese"]
+        assert self._angebot(mit_bezug) == [("Fotosynthese", "nennung")]
+        assert self._angebot(await self._vorab(db_session, frage)) == [("Fotosynthese", "nennung")]
 
     async def test_fachlose_zaehlen_immer(self, db_session, bestand):
         fach, _, knoten = bestand
-        k = knoten("methodenblatt", "Gruppenpuzzle", self.ZWISCHEN, category="knowledge")
+        k = knoten("methodenblatt", "Gruppenpuzzle", self.IM_BAND, category="knowledge")
         k.subject_id = None
         db_session.add(k)
         await db_session.flush()
-        treffer = await self._vorab(db_session, "Wir machen ein Gruppenpuzzle.", subject_id=fach.id)
-        assert [t["title"] for t in treffer] == ["Gruppenpuzzle"]
+        ergebnis = await self._vorab(db_session, "Wir machen ein Gruppenpuzzle.", subject_id=fach.id)
+        assert self._angebot(ergebnis) == [("Gruppenpuzzle", "nennung")]
 
-    async def test_fachfremd_aber_nah_kommt_wie_bisher(self, db_session, bestand):
-        """Kriterium 2: Die Nennung kostet keinen heutigen Treffer. Ohne Bezug zählt sie nicht —
-        unter der Schwelle kommt der Knoten trotzdem, über die Distanz (F8 ist offen)."""
+    async def test_fachfremd_aber_nah_bleibt_sicher(self, db_session, bestand):
+        """Die sichere Stufe filtert nicht nach Fach (F8 ist offen): Unter der Schwelle kommt
+        der Knoten als Inhalt, wie bis 0.15."""
         fach, anderes, knoten = bestand
         db_session.add(knoten("begriff", "Addition", VORAB_SCHWELLE - 0.05, subject=anderes))
         await db_session.flush()
-        treffer = await self._vorab(db_session, "Wie funktioniert die schriftliche Addition?",
-                                    subject_id=fach.id)
-        assert [(t["title"], t.get("genannt")) for t in treffer] == [("Addition", None)]
+        ergebnis = await self._vorab(db_session, "Wie funktioniert die schriftliche Addition?",
+                                     subject_id=fach.id)
+        assert [t["title"] for t in ergebnis.sicher] == ["Addition"]
+        assert ergebnis.angebot == []
 
-    async def test_fachbonus_oeffnet_das_tor_nicht(self, db_session, bestand):
-        """Wie bei der Schwelle: Das Tor gilt auf der rohen Distanz, nicht auf der sortierten."""
+    async def test_fachbonus_oeffnet_das_band_nicht(self, db_session, bestand):
+        """Wie bei der Schwelle: Das Band gilt auf der rohen Distanz, nicht auf der sortierten."""
         fach, _, knoten = bestand
-        db_session.add(knoten("begriff", "Elektronegativität", VORAB_TOR_TITEL + 0.02))
+        db_session.add(knoten("begriff", "Elektronegativität", VORAB_ANGEBOT + 0.02))
         await db_session.flush()
         frage = self.SATZ.format("Elektronegativität")
-        assert await self._vorab(db_session, frage, subject_id=fach.id) == []
+        ergebnis = await self._vorab(db_session, frage, subject_id=fach.id)
+        assert ergebnis.angebot == []
 
-    async def test_nennungen_zuerst(self, db_session, bestand):
-        """F4: Nähere, ungenannte Knoten verdrängen den genannten nicht — auch nicht, wenn es
-        mehr sind, als die Abfrage an Kandidaten holt."""
+    async def test_ohne_vektor_kein_angebot(self, db_session, bestand):
+        """Das Band braucht eine Distanz — ohne Embedding kein Rückfall auf den Namen im Satz."""
         _, _, knoten = bestand
-        n = VORAB_MAX * _KANDIDATEN_FAKTOR + 1
-        db_session.add_all([knoten("begriff", f"Nachbar {i:02d}", 0.10 + i / 1000) for i in range(n)])
-        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
-        await db_session.flush()
-        titel = [t["title"] for t in await self._vorab(db_session, self.SATZ.format("Elektronegativität"))]
-        assert len(titel) == VORAB_MAX and titel[0] == "Elektronegativität"
-        assert titel[1:] == [f"Nachbar {i:02d}" for i in range(VORAB_MAX - 1)]
-
-    async def test_ohne_vektor_keine_nennung(self, db_session, bestand):
-        """Das Tor braucht eine Distanz — ohne Embedding kein Rückfall auf den Namen allein."""
-        _, _, knoten = bestand
-        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        db_session.add(knoten("begriff", "Elektronegativität", self.IM_BAND))
         await db_session.flush()
         frage = self.SATZ.format("Elektronegativität")
-        assert await vorab(frage, _profil(), db_session, vektor=None) == []
+        ergebnis = await vorab(frage, _profil(), db_session, vektor=None)
+        assert (ergebnis.sicher, ergebnis.angebot) == ([], [])
 
     async def test_index_kennt_neue_begriffe_erst_nach_dem_verwerfen(self, db_session, bestand):
-        """Der Namensindex liegt im Speicher — wer ihn nicht verwirft, sieht den alten Stand."""
+        """Der Namensindex liegt im Speicher — wer ihn nicht verwirft, sieht den alten Stand.
+        Bis dahin kommt der Knoten nur über die Distanz."""
         from app.context import nennung
         _, _, knoten = bestand
-        assert await self._vorab(db_session, self.SATZ.format("Elektronegativität")) == []
-        db_session.add(knoten("begriff", "Elektronegativität", self.ZWISCHEN))
+        frage = self.SATZ.format("Elektronegativität")
+        assert (await self._vorab(db_session, frage)).angebot == []
+        db_session.add(knoten("begriff", "Elektronegativität", self.IM_BAND))
         await db_session.flush()
-        assert await self._vorab(db_session, self.SATZ.format("Elektronegativität")) == []
+        assert self._angebot(await self._vorab(db_session, frage)) == [("Elektronegativität", "distanz")]
         nennung.verwerfen()
-        assert len(await self._vorab(db_session, self.SATZ.format("Elektronegativität"))) == 1
+        assert self._angebot(await self._vorab(db_session, frage)) == [("Elektronegativität", "nennung")]
 
 
 class TestAnker:
@@ -353,8 +422,8 @@ class TestNamenstreffer:
     """
 
     async def _titel(self, db, frage, **extra):
-        treffer = await vorab(frage, _profil(**extra), db, vektor=None)
-        return [t["title"] for t in treffer]
+        ergebnis = await vorab(frage, _profil(**extra), db, vektor=None)
+        return [t["title"] for t in ergebnis.sicher]
 
     async def test_exakter_titel_wird_gefunden(self, db_session, bestand):
         _, _, knoten = bestand
@@ -430,3 +499,71 @@ class TestImKontextblock:
             chat_id=None, db=db_session, rollen=("student",),
         )
         assert "Wissensspeicher der Schule" not in ctx
+
+    async def _kontext(self, db_session, monkeypatch):
+        from app.context import service
+
+        async def _vektor(_frage):
+            return FRAGE
+        monkeypatch.setattr(service, "vektor_oder_none", _vektor)
+        return await service.kontext_fuer_frage(
+            None, "p-n11", "egal", None, db_session, rollen=("student",),
+        )
+
+    async def test_angebot_als_satz_ohne_inhalt(self, db_session, bestand, monkeypatch):
+        """Nur ein Angebot: ein Satz mit Titel und Fach, kein JSON-Block, kein Inhalt."""
+        _, _, knoten = bestand
+        k = knoten("begriff", "Elektronegativität", TestAngebot.IM_BAND)
+        k.content = "Unverwechselbarer Inhalt"
+        db_session.add(k)
+        await db_session.flush()
+        kontext = await self._kontext(db_session, monkeypatch)
+        assert ("Im Wissensspeicher der Schule gibt es dazu: Elektronegativität (Testfach N11) — "
+                "den Inhalt holst du mit dem Werkzeug, wenn er für die Antwort zählt.") in kontext.text
+        assert "Unverwechselbarer Inhalt" not in kontext.text
+        assert "automatisch zur letzten Nachricht" not in kontext.text
+        assert kontext.bausteine == []
+        assert [(a.titel, a.quelle) for a in kontext.angebot] == [("Elektronegativität", "distanz")]
+
+    async def test_was_der_anker_als_inhalt_bringt_wird_nicht_angeboten(
+        self, db_session, bestand, monkeypatch,
+    ):
+        """Ein Anker-Assistent bekommt die Bausteine seines Teilgraphen als Inhalt — ein
+        Angebot dafür schickte das Modell nach etwas suchen, das schon dasteht."""
+        from app.context import service
+        from app.db.models import Assistant, AssistantContextAnchor, ContextEdge
+        _, _, knoten = bestand
+        anker = knoten("themengebiet", "Anker N11", 0.90, category="knowledge")
+        drin = knoten("begriff", "Elektronegativität", TestAngebot.IM_BAND)
+        drin.content = "Unverwechselbarer Inhalt"
+        db_session.add_all([anker, drin])
+        await db_session.flush()
+        db_session.add(ContextEdge(from_node_id=drin.id, to_node_id=anker.id,
+                                   relation="part_of", metadata_={}))
+        assistent = Assistant(name="Anker-Helfer N11", system_prompt="Hilf.",
+                              model="chat-standard", status="active")
+        db_session.add(assistent)
+        await db_session.flush()
+        db_session.add(AssistantContextAnchor(assistant_id=assistent.id, node_id=anker.id,
+                                              role="retrieval_scope"))
+        await db_session.flush()
+
+        async def _vektor(_frage):
+            return FRAGE
+        monkeypatch.setattr(service, "vektor_oder_none", _vektor)
+        kontext = await service.kontext_fuer_frage(
+            assistent.id, "p-n11", "egal", None, db_session, rollen=("student",),
+        )
+        assert "Unverwechselbarer Inhalt" in kontext.text
+        assert "gibt es dazu" not in kontext.text
+        assert kontext.angebot == []
+
+    async def test_angebot_hinter_den_sicheren_heisst_ausserdem(self, db_session, bestand, monkeypatch):
+        _, _, knoten = bestand
+        db_session.add_all([knoten("begriff", "Elektronenpaarbindung", 0.10),
+                            knoten("begriff", "Elektronegativität", TestAngebot.IM_BAND)])
+        await db_session.flush()
+        text = (await self._kontext(db_session, monkeypatch)).text
+        assert text.index("automatisch zur letzten Nachricht") < text.index(
+            "Im Wissensspeicher der Schule gibt es außerdem: Elektronegativität (Testfach N11)")
+        assert "gibt es dazu" not in text

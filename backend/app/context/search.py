@@ -1270,20 +1270,31 @@ VORAB_SCHWELLE = 0.45
 #: geht es um Platz im Prompt **jeder** Nachricht, nicht nur der nachgeschlagenen.
 VORAB_MAX = 5
 
-#: Das **Tor** für einen im Satz genannten Begriff (0.16, Schritt 3; `app.context.nennung`):
-#: Er kommt herein, wenn seine **rohe** Distanz zur Nachricht darunter liegt — weiter als
-#: :data:`VORAB_SCHWELLE`, weil die Nennung schon sagt, dass er gemeint sein kann, aber nicht
-#: beliebig weit, weil „ein Eis essen" den Steckbrief Wasser nennt, ohne ihn zu meinen.
-#: Aliase sind strenger: Sie sind laut Pflege-Doku bewusst locker („Power" für Energie).
+#: Das **Angebot** (0.16, Plan „Vorab-Suche-Begriffe" § 7): Bis zu dieser rohen Distanz steht
+#: ein Knoten, der nicht als Inhalt vorliegt, als **Titel** im Systemtext — „gibt es dazu: …,
+#: den Inhalt holst du mit dem Werkzeug". Ein Inhalt wird geglaubt, also muss er sicher sein
+#: (:data:`VORAB_SCHWELLE`); ein Titel kostet nichts, also darf er breit sein.
 #:
-#: Festgelegt am 14.10.2026 nach der vorab bestimmten Regel (Plan „Vorab-Suche-Begriffe",
-#: Schritt 3) am Tor-Raster des Prüfsatzes `vorab_begriffe.py`: kein neuer Fehltreffer, darunter
-#: die meisten Erzählsätze — 218 von 240. Zuvor hatte der Steckbrief Umwelt (GHS09) den Alias
-#: „Umwelt"; „Ich will etwas für die Umwelt tun." traf ihn bei 0,476, und die Regel wählte 0,46.
-#: ⚠️ **Das Tor fängt nicht jeden schlecht gewählten Alias.** Ein Alias wird genannt, sobald das
-#: Wort im Satz steht; ein Themenwort statt eines zweiten Namens ist dann ein Fehltreffer.
-VORAB_TOR_TITEL = 0.55
-VORAB_TOR_ALIAS = 0.50
+#: Gemessen am 14.10.2026 (Variante 4): Ohne Angebot sucht gpt-oss praktisch nie, mit Angebot
+#: in rund 60 % der Fälle, und ein liegengelassener falscher Titel verbiegt die Antwort nicht.
+#: Kein Tor trennt Alltagswörter („Stoff", „Probe") von gewollten Nennungen — beide liegen
+#: zwischen 0,46 und 0,55; deshalb führt eine Nennung nur noch zum Angebot, nie zum Inhalt.
+VORAB_ANGEBOT = 0.50
+
+#: Wie viele Titel das Angebot höchstens nennt — Nennungen zuerst, dann Distanz.
+VORAB_ANGEBOT_MAX = 5
+
+
+@dataclass
+class Vorabergebnis:
+    """Was :func:`vorab` liefert: die sichere Stufe und das Angebot (0.16)."""
+
+    #: Treffer, deren **Inhalt** in den Prompt geht — höchstens :data:`VORAB_MAX`.
+    sicher: list[dict] = field(default_factory=list)
+    #: Treffer, deren **Titel** angeboten wird — höchstens :data:`VORAB_ANGEBOT_MAX`. Jeder
+    #: trägt ``quelle`` (``nennung`` oder ``distanz``) und ``distanz``; beides nur für
+    #: Messung und Statistik, ins Modell gehen Titel und Fach.
+    angebot: list[dict] = field(default_factory=list)
 
 
 def _nennbar(profil: Suchprofil) -> set[int] | None:
@@ -1296,39 +1307,46 @@ def _nennbar(profil: Suchprofil) -> set[int] | None:
 
 async def vorab(
     frage: str, profil: Suchprofil, db: AsyncSession, *, vektor=_SELBST_HOLEN
-) -> list[dict]:
+) -> Vorabergebnis:
     """Was ohne Nachfrage in den Prompt darf — die Grundschicht jedes Chats (N11).
 
-    Drei Wege hinein, und alle müssen **eng** sein, weil hier niemand um Kontext
-    gebeten hat — in dieser Reihenfolge, bis :data:`VORAB_MAX` erreicht ist:
+    **Zwei Stufen** (0.16), weil hier niemand um Kontext gebeten hat:
+
+    *Sicher* — der Inhalt geht in den Prompt, bis :data:`VORAB_MAX`. Zwei Wege, beide
+    **eng**:
 
     1. **Exakter Namens- oder Suchbegriff-Treffer.** Wer „Was ist ein Mol?" schreibt,
        nennt den Eintrag beim Namen — dafür braucht es keine Ähnlichkeitsschwelle.
-    2. **Im Satz genannt** (0.16, :mod:`app.context.nennung`): Titel oder Alias steht als
+    2. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
+
+    *Angebot* — nur der Titel, bis :data:`VORAB_ANGEBOT_MAX`. Was nicht sicher ist und
+    roh höchstens :data:`VORAB_ANGEBOT` entfernt liegt, aus zwei Quellen:
+
+    1. **Im Satz genannt** (:mod:`app.context.nennung`): Titel oder Alias steht als
        Wortfolge in der Nachricht, der Knoten stammt aus dem Fach der Konversation, einem
-       Bezugsfach oder keinem — und seine rohe Distanz liegt unter dem **Tor**
-       (:data:`VORAB_TOR_TITEL`, :data:`VORAB_TOR_ALIAS`). Ohne Tor holte „ein Eis essen"
-       den Steckbrief Wasser herein.
-    3. **Semantische Nähe unterhalb von** :data:`VORAB_SCHWELLE`.
+       Bezugsfach oder keinem. Zuerst, weil die Nennung sagt, dass er gemeint sein kann.
+    2. **Distanz** — aus denselben Kandidaten wie Weg 2 der sicheren Stufe, ohne eigene
+       Abfrage. So fällt auch ein Knoten unter der Schwelle, den der Deckel aus der
+       sicheren Stufe gedrängt hat, nicht durch beide Stufen.
 
     Beschränkt auf :data:`app.context.taxonomy.VORAB_TYPEN` — die Arten, die
     Schüler:innen im Unterricht in die Hand bekommen. Bildungsplan-Kompetenzen und
     Curricula bleiben dem Werkzeug vorbehalten; sie beantworten die Frage einer
     Lehrkraft und sind zahlreich genug, jeden Prompt zu füllen.
 
-    ⚠️ **Die Schwelle gilt auf der rohen Distanz, nicht auf der sortierten.** Fach- und
+    ⚠️ **Die Schwellen gelten auf der rohen Distanz, nicht auf der sortierten.** Fach- und
     Eigentümerbonus verschieben die *Reihenfolge*; zöge man sie vor dem Vergleich ab,
     rutschte ein fachfremder Knoten allein deshalb unter die Schwelle, weil er aus dem
     richtigen Fach kommt. Die Gegenprobe dazu steht in den Tests.
 
-    ⚠️ **Kein ILIKE-Rückfall.** Gibt es kein Embedding, steuern Weg 2 und 3 nichts bei —
-    auch die Nennung nicht, weil ihr Tor eine Distanz braucht. Eine Teilstringsuche über
-    *jede* Nachricht schriebe bei „Wie geht es dir?" alles in den Prompt, was irgendwo
-    „wie" enthält — im Werkzeugweg ist der Rückfall richtig, weil dort jemand ausdrücklich
-    gesucht hat.
+    ⚠️ **Kein ILIKE-Rückfall.** Gibt es kein Embedding, bleibt es beim Namenstreffer —
+    auch die Nennung steuert nichts bei, weil das Angebot eine Distanz braucht. Eine
+    Teilstringsuche über *jede* Nachricht schriebe bei „Wie geht es dir?" alles in den
+    Prompt, was irgendwo „wie" enthält — im Werkzeugweg ist der Rückfall richtig, weil
+    dort jemand ausdrücklich gesucht hat.
     """
     aus_profil = replace(profil, identifikation=VORAB_MAX)
-    treffer: list[dict] = []
+    sicher: list[dict] = []
     gesehen: set[str] = set()
 
     kandidaten = _kandidaten(frage)
@@ -1340,66 +1358,77 @@ async def vorab(
         )).mappings().all()
         for z in zeilen:
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
-            treffer.append(t)
+            sicher.append(t)
             gesehen.add(t["node_id"])
 
     if vektor is _SELBST_HOLEN:
         vektor = await vektor_oder_none(frage)
+    if vektor is None:
+        return Vorabergebnis(sicher=await _auf_geltende_fassung(sicher[:VORAB_MAX], profil, db))
 
-    if vektor is not None and len(treffer) < VORAB_MAX:
-        # Weg 2 liefert nur Kandidaten; ob sie hereinkommen, entscheidet unten das Tor.
-        nennungen = {
-            k: art for k, art in genannt(frage, await namensindex(db), _nennbar(profil)).items()
-            if k not in gesehen
-        }
-        roh = ContextNode.embedding.cosine_distance(vektor)
-        sortiert = roh
-        aus_dem_fach = _aus_dem_fach(profil)
-        if aus_dem_fach is not None:
-            sortiert = sortiert - _bonus(aus_dem_fach, _FACHBONUS)
-        aus_eigenem_fach = _aus_eigenem_fach(profil)
-        if aus_eigenem_fach is not None:
-            sortiert = sortiert - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
-        basis = (
-            _grundabfrage(profil)
-            .add_columns(roh.label("distanz"))
-            .where(ContextNode.content_type.in_(VORAB_TYPEN))
-            .where(ContextNode.embedding.is_not(None))
-        )
-        durchs_tor = []
-        if nennungen:
-            # Die genannten Knoten **eigens** über ihre Kennung — nur sie, nur wenn es welche
-            # gibt. Sie in die Distanzabfrage zu falten (Rang als Spalte, genannte zuerst)
-            # kostete jede Nachricht 0,7 ms, auch ohne Nennung (A/B, 14.10.2026).
-            tor = {"titel": VORAB_TOR_TITEL, "alias": VORAB_TOR_ALIAS}
-            genannte = (await db.execute(
-                basis.where(ContextNode.id.in_([UUID(k) for k in nennungen]))
-            )).mappings().all()
-            durchs_tor = sorted(
-                (z for z in genannte if z["distanz"] <= tor[nennungen[str(z["id"])]]),
-                key=lambda z: z["distanz"],
-            )
-        vorn = {str(z["id"]) for z in durchs_tor}
-        # Was nicht durchs Tor kam, bleibt Kandidat der Distanz wie jeder andere: Es muss die
-        # Schwelle schaffen — eine Nennung kostet nie einen Treffer.
-        uebrige = (await db.execute(
-            basis.order_by(sortiert).limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
+    roh = ContextNode.embedding.cosine_distance(vektor)
+    sortiert = roh
+    aus_dem_fach = _aus_dem_fach(profil)
+    if aus_dem_fach is not None:
+        sortiert = sortiert - _bonus(aus_dem_fach, _FACHBONUS)
+    aus_eigenem_fach = _aus_eigenem_fach(profil)
+    if aus_eigenem_fach is not None:
+        sortiert = sortiert - _bonus(aus_eigenem_fach, _GRUPPENFACH_BONUS)
+    basis = (
+        _grundabfrage(profil)
+        .add_columns(roh.label("distanz"))
+        .where(ContextNode.content_type.in_(VORAB_TYPEN))
+        .where(ContextNode.embedding.is_not(None))
+    )
+    naechste = (await db.execute(
+        basis.order_by(sortiert).limit(VORAB_MAX * _KANDIDATEN_FAKTOR)
+    )).mappings().all()
+    for z in naechste:
+        if len(sicher) >= VORAB_MAX:
+            break
+        if z["distanz"] > VORAB_SCHWELLE:
+            continue
+        t = _treffer(z, mit_metadaten=profil.mit_metadaten)
+        if t["node_id"] in gesehen:
+            continue
+        # Für die Zeile „Kontext" unter der Antwort (0.14): wie nah der Treffer lag.
+        # Ins Modell geht sie nicht — `fuer_modell` streift sie ab.
+        t["distanz"] = float(z["distanz"])
+        sicher.append(t)
+        gesehen.add(t["node_id"])
+
+    nennungen = [
+        k for k in genannt(frage, await namensindex(db), _nennbar(profil)) if k not in gesehen
+    ]
+    # Genannte Knoten, die schon unter den Kandidaten stehen, kommen aus deren Zeilen; nur die
+    # übrigen **eigens** über ihre Kennung. Alle immer eigens zu holen kostete mit Nennung
+    # +9,7 % gegenüber 0.15, so +1,5 %; sie in die Distanzabfrage zu falten (Rang als Spalte)
+    # kostete jede Nachricht 0,7 ms, auch ohne Nennung (A/B, 14.10.2026).
+    schon_da = {str(z["id"]): z for z in naechste}
+    genannte = [schon_da[k] for k in nennungen if k in schon_da]
+    fehlen = [k for k in nennungen if k not in schon_da]
+    if fehlen:
+        genannte += (await db.execute(
+            basis.where(ContextNode.id.in_([UUID(k) for k in fehlen]))
         )).mappings().all()
-        for z in [*durchs_tor, *(z for z in uebrige if str(z["id"]) not in vorn)]:
-            if len(treffer) >= VORAB_MAX:
+    genannte.sort(key=lambda z: z["distanz"])
+    angebot: list[dict] = []
+    for quelle, zeilen in (("nennung", genannte), ("distanz", naechste)):
+        for z in zeilen:
+            if len(angebot) >= VORAB_ANGEBOT_MAX:
                 break
-            ist_nennung = str(z["id"]) in vorn
-            if not ist_nennung and z["distanz"] > VORAB_SCHWELLE:
+            if z["distanz"] > VORAB_ANGEBOT or str(z["id"]) in gesehen:
                 continue
             t = _treffer(z, mit_metadaten=profil.mit_metadaten)
-            if t["node_id"] in gesehen:
-                continue
-            # Für die Zeile „Kontext" unter der Antwort (0.14): wie nah der Treffer lag.
-            # Ins Modell geht sie nicht — `fuer_modell` streift sie ab, ebenso `genannt`.
             t["distanz"] = float(z["distanz"])
-            if ist_nennung:
-                t["genannt"] = True
-            treffer.append(t)
+            t["quelle"] = quelle
+            angebot.append(t)
             gesehen.add(t["node_id"])
 
-    return await _auf_geltende_fassung(treffer[:VORAB_MAX], profil, db)
+    # Beide Stufen in **einem** Durchgang: Die sicheren stehen vorn, also bleiben sie, wie
+    # sie allein blieben — und eine andere Fassung desselben Begriffs fällt aus dem Angebot.
+    alle = await _auf_geltende_fassung([*sicher[:VORAB_MAX], *angebot], profil, db)
+    return Vorabergebnis(
+        sicher=[t for t in alle if "quelle" not in t],
+        angebot=[t for t in alle if "quelle" in t],
+    )

@@ -1,4 +1,4 @@
-"""Begriffsnennung im Satz — der dritte Weg der Vorab-Suche (0.16, Schritt 3).
+"""Begriffsnennung im Satz — die erste Quelle des Vorab-Angebots (0.16).
 
 Schreibt eine Schüler:in „Letzte Stunde haben wir etwas über Elektronegativität gelernt, das
 ich nicht ganz verstanden habe", nennt sie den Begriff beim Namen — aber in einem Satz. Der
@@ -14,10 +14,12 @@ nennt die Veresterung nicht.
 ⚠️ **Eine Nennung allein genügt nicht.** Ohne weitere Prüfung brächte „Wir wollen nachher ein
 Eis essen" den Steckbrief Wasser (Alias „Eis") in den Prompt, „Wie hoch ist der Eiffelturm?"
 die Potenz (Alias „hoch"). Wortlisten oder eine Mindestlänge hälfen nicht („Untersuchung",
-„Mechanismus", „Resonanz"). Deshalb liefert dieses Modul nur **Kandidaten**; über die Aufnahme
-entscheidet in `search.vorab()` ein **Tor** auf der rohen Distanz — weiter als die Schwelle,
-aber nicht beliebig weit, für Aliase strenger als für Titel (Plan
-„Vorab-Suche-Begriffe", F1–F3).
+„Mechanismus", „Resonanz"). Auch ein Tor auf der Distanz trennt sie nicht: „Stoff", „Probe"
+und „Reduktion" im Alltagssinn liegen so nah wie gewollte Nennungen (Reihe 2, 14.10.2026).
+Deshalb liefert dieses Modul nur **Kandidaten**, und eine Nennung führt in `search.vorab()`
+nur zum **Angebot** — der Titel steht im Systemtext, den Inhalt holt das Modell, wenn er für
+die Antwort zählt. Ein liegengelassener Titel verbiegt die Antwort nicht; ein Inhalt würde
+geglaubt (Plan „Vorab-Suche-Begriffe", § 7).
 
 **Fachbezug:** In einem Chat mit Fach zählen nur Begriffe dieses Fachs, seiner Bezugsfächer
 (`subjects.bezugsfaecher`) und fachlose. Ein Begriff außerhalb kommt über die Nennung nicht

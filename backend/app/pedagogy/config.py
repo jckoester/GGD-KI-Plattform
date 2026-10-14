@@ -44,6 +44,10 @@ class Augmentation(BaseModel):
 
 class Preambles(BaseModel):
     universal_base: str
+    #: Vorrang des Wissensspeichers (0.16) — steht direkt nach der universellen Basis, wie
+    #: gemessen. **Optional:** Fehlt der Schlüssel oder ist er leer, steht kein Satz im
+    #: Prompt. Eine Schule ohne gepflegten Wissensspeicher soll ihn weglassen können.
+    wissensspeicher_vorrang: str = ""
     student_extension: str
     teacher_extension: str
 

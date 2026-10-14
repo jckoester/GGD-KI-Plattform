@@ -58,7 +58,8 @@ from app.db.models import NACHRICHTEN_FOLGE, Conversation, Message, Conversation
 from app.db.session import get_db, AsyncSessionLocal
 from app.assistants.sichtbarkeit import darf_nutzen, lade_zugang
 from app.context.bausteine import (
-    WERKZEUG, KontextBaustein, aus_treffern, kontext_der_nachrichten, vereinige,
+    WERKZEUG, Angebot, Baustein, KontextBaustein, aus_treffern, kontext_der_nachrichten,
+    vereinige,
 )
 from app.context.bausteine import speichere as bausteine_speichern
 from app.context.service import kontext_fuer_frage, stufe_der_person
@@ -312,12 +313,12 @@ _SEARCH_CONTEXT_NODES_TOOL = {
     "function": {
         "name": "search_context_nodes",
         "description": (
-            "Sucht Bausteine im Kontextspeicher der Plattform. Zur letzten Nachricht "
-            "stehen unter „Einträge aus dem Wissensspeicher der Schule\" möglicherweise "
-            "schon passende Bausteine im Systemtext — sieh zuerst dort nach. Dieses "
-            "Werkzeug brauchst du, wenn dort nichts Passendes steht, wenn du einen "
-            "anderen Begriff suchen willst oder wenn du wissen musst, ob es zu einem "
-            "Namen überhaupt einen Baustein gibt.\n"
+            # Die positive Regel zuerst (0.16), wie gemessen (Plan „Vorab-Suche-Begriffe",
+            # § 7, Variante 4). „Sieh zuerst im Systemtext nach" passt nicht mehr, seit dort
+            # auch Titel ohne Inhalt stehen, die das Modell erst holen muss.
+            "Sucht Bausteine im Kontextspeicher der Plattform. Bei Fachbegriffen, Methoden "
+            "oder Operatoren aus dem Unterricht suchst du vor der Antwort im "
+            "Wissensspeicher der Schule.\n"
             "Die Antwort hat drei getrennte Abschnitte, die du unterschiedlich "
             "behandeln musst:\n"
             "- 'exakte_namenstraeger': Bausteine, die genau so HEISSEN. Dazu gehört "
@@ -348,6 +349,36 @@ _SEARCH_CONTEXT_NODES_TOOL = {
         },
     },
 }
+
+
+def _vorab_debug_ereignis(
+    angebot: list[Angebot], werkzeug_bausteine: list[Baustein], suchanfragen: list[str],
+) -> str | None:
+    """Messkanal der Vorab-Suche (0.16, Plan „Vorab-Suche-Begriffe" § 7.2) — **nur außerhalb
+    der Produktion**.
+
+    Trägt, was sonst nirgends sichtbar ist: welche Knoten angeboten wurden (gespeichert
+    werden nur sichere Treffer und Werkzeugergebnisse), welche davon im Werkzeugergebnis
+    derselben Antwort standen und mit welchen Suchanfragen das Modell suchte. Prüfsatz und
+    Test-Chats lesen es; die Oberfläche ignoriert es.
+
+    ⚠️ **An die Umgebung gebunden, nicht an** ``is_test``: Das ist der Vorschaumodus des
+    Editors (ADR-016). Mess-Chats sind keine Vorschau und sollen in der Statistik zählen.
+    Die Suchanfragen sind Nutzereingabe — deshalb nie im Log und nie in der Produktion;
+    hier gehen sie nur an die Person zurück, die sie geschrieben hat.
+    """
+    if settings.environment == "production":
+        return None
+    im_ergebnis = {b.node_id for b in werkzeug_bausteine}
+    nutzlast = {
+        "angebot": [
+            {"node_id": a.node_id, "titel": a.titel, "fach": a.fach, "quelle": a.quelle}
+            for a in angebot
+        ],
+        "nachgeschlagen": [a.node_id for a in angebot if a.node_id in im_ergebnis],
+        "suchanfragen": suchanfragen,
+    }
+    return f"event: vorab_debug\ndata: {json.dumps(nutzlast, ensure_ascii=False)}\n\n"
 
 
 def _team_id_for_user(payload: JwtPayload) -> str | None:
@@ -2201,6 +2232,8 @@ async def chat(
         # Was die Suchwerkzeuge in diesem Zug geliefert haben (0.14) — eine Liste für alle
         # Runden, jeder `ToolContext` bekommt sie durchgereicht.
         _werkzeug_bausteine: list = []
+        # Die Suchanfragen des Modells — nur für den Messkanal `vorab_debug` (0.16).
+        _suchanfragen: list[str] = []
         cost_usd: Optional[float] = None
         # `None` heißt „keine Aussage" — so bleibt es für Züge ohne einzige
         # LLM-Anfrage (etwa ein reiner Werkzeugaufruf, der abbricht).
@@ -2364,6 +2397,8 @@ async def chat(
                 _bezug_vorher = (conversation_stunde_id, conversation_group_id)
                 try:
                     args = json.loads("".join(_tc_args) or "{}")
+                    if _tc_name == "search_context_nodes":
+                        _suchanfragen.append(str(args.get("query", "")))
                     tool_ctx = ToolContext(
                         db=db,
                         user=current_user,
@@ -2583,6 +2618,10 @@ async def chat(
             )
         except Exception:
             logger.exception("Fehler beim Persistieren der Konversation %s", conversation_id)
+
+        _debug = _vorab_debug_ereignis(kontext.angebot, _werkzeug_bausteine, _suchanfragen)
+        if _debug:
+            yield _debug
 
         if _nachricht_id is not None and _bausteine:
             # Aus der Datenbank, nicht aus `_bausteine`: Dieselbe Abfrage liefert die

@@ -58,6 +58,37 @@ def test_ohne_xy_wird_nichts_gezaehlt():
     assert k["xy_knoten"] is None and k["fragt_nach"]
 
 
+# ── Als Angebot (0.16, Messkanal `vorab_debug`) ──────────────────────────────
+
+def _kanal(*angebot, nachgeschlagen=()):
+    return {"angebot": [{"node_id": i, "titel": t, "fach": "Chemie", "quelle": "nennung"} for i, t in angebot],
+            "nachgeschlagen": list(nachgeschlagen), "suchanfragen": []}
+
+
+def test_xy_als_angebot_und_nachgeschlagen():
+    k = messung.bewerte(FALL_A, "…", [], STUNDEN, VORLETZTE,
+                        _kanal(("n-1", "Elektronegativität"), nachgeschlagen=["n-1"]))
+    assert k["xy_angeboten"] is True and k["xy_nachgeschlagen"] is True
+
+
+def test_angeboten_aber_liegengelassen():
+    k = messung.bewerte(FALL_A, "…", [], STUNDEN, VORLETZTE, _kanal(("n-1", "Elektronegativität")))
+    assert k["xy_angeboten"] is True and k["xy_nachgeschlagen"] is False
+
+
+def test_anderes_angebot_ist_nicht_xy():
+    """Gegenprobe: Ein Angebot zu einem anderen Begriff zählt nicht, auch wenn es nachgeschlagen wurde."""
+    k = messung.bewerte(FALL_A, "…", [], STUNDEN, VORLETZTE,
+                        _kanal(("n-2", "Metallbindung"), nachgeschlagen=["n-2"]))
+    assert k["xy_angeboten"] is False and k["xy_nachgeschlagen"] is False
+
+
+def test_ohne_messkanal_keine_aussage():
+    """Ohne `vorab_debug` (Produktion, Stand vor 0.16) ist „nicht angeboten" nicht belegt."""
+    k = _bewerte("…")
+    assert k["xy_angeboten"] is None and k["xy_nachgeschlagen"] is None
+
+
 def test_termine_vor_und_nach_heute():
     # Sonntag, 11.10.2026: zurück Fr, Mi, Mo; vor Mo, Mi.
     vergangen, kommend = messung.termine([0, 2, 4], date(2026, 10, 11), 3, 2)

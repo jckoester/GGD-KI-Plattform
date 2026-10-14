@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prüfsatz „Begriff im Satz" für die Vorab-Suche (0.16, Schritt 1).
+"""Prüfsatz „Begriff im Satz" für die Vorab-Suche (0.16, Schritte 1 und 3b).
 
     cd backend && venv/bin/python scripts/vorab_begriffe.py --datei scripts/szenarien/vorab_begriffe.yaml \\
         --protokoll vorab-protokoll.md --json vorab.json
@@ -15,20 +15,28 @@ Schülerprofil (Stufe aus der Szenariodatei) — ohne Fach und mit Fach, wie im 
 (`context.service._grundschicht`). „Ohne Fach" heißt hier freier Chat ohne
 Unterrichtsgruppen; `eigene_faecher` bleibt leer.
 
-**Die Schwelle abtasten:** Je Nachricht **ein** Embedding; danach läuft `vorab()` je Schwelle
-von 0,40 bis 0,52 mit diesem Vektor. Dafür wird `search.VORAB_SCHWELLE` vorübergehend
-umgesetzt — `vorab()` liest den Wert bei jedem Aufruf aus dem Modul. Zwei Selbstprüfungen
-sichern das ab: Bei der geltenden Schwelle muss dasselbe herauskommen wie ohne Umsetzen, und
-über den ganzen Prüfsatz muss sich zwischen 0,40 und 0,52 etwas ändern — sonst bindet
-`vorab()` die Schwelle inzwischen anders, und die Abtastung wäre wirkungslos.
+**Zwei Stufen** (0.16, Plan § 7): Die **sichere** Stufe bringt den Inhalt (Name oder Distanz
+unter `VORAB_SCHWELLE`), das **Angebot** nur Titel (Nennung oder Distanz bis `VORAB_ANGEBOT`).
+Jeder Treffer trägt seine Stufe und seinen Weg.
+
+**Abtasten:** Je Nachricht **ein** Embedding; danach läuft `vorab()` je Schwelle von 0,40 bis
+0,52 (sichere Stufe) und je Band von 0,46 bis 0,55 (Angebot) mit diesem Vektor. Dafür werden
+`search.VORAB_SCHWELLE` und `search.VORAB_ANGEBOT` vorübergehend umgesetzt — `vorab()` liest
+die Werte bei jedem Aufruf aus dem Modul. Selbstprüfungen sichern das ab: Beim geltenden Wert
+muss dasselbe herauskommen wie ohne Umsetzen, und über den ganzen Prüfsatz muss sich zwischen
+kleinstem und größtem Wert etwas ändern — sonst bindet `vorab()` die Werte inzwischen anders,
+und die Abtastung wäre wirkungslos. Das Band-Raster ist für spätere Nachjustierung da (wie
+viele Angebote bekäme eine Gegenprobe bei einem breiteren Band?); gewählt wird darüber nichts.
 
 **Ausgewertet** (Kriterien abgestimmt mit Jan am 12./13.10.2026, Plan Schritt 1):
 
 * Fachliche Nachrichten: Ist der erwartete Knoten unter den Vorab-Treffern, über welchen Weg
   (Name oder Distanz), mit welcher Distanz — je Form (Stichwort, Frage, Ich-Satz, Erzählsatz).
   Alle weiteren Treffer sind **Nebentreffer**; ob einer stört, entscheidet das Lesen.
-* Gegenproben: **Jeder** Treffer ist ein Fehltreffer, nicht nur der nächste. Mit Fachbonus
-  steht vorn in der Reihenfolge nicht unbedingt der rohe nächste Treffer.
+* Gegenproben: **Jeder** Treffer der sicheren Stufe ist ein Fehltreffer, nicht nur der
+  nächste. Mit Fachbonus steht vorn in der Reihenfolge nicht unbedingt der rohe nächste
+  Treffer. Angebote in Gegenproben werden gezählt und gelistet — ein Titel kostet nichts,
+  solange das Modell ihn liegen lässt; das zeigen die Test-Chats.
 * Über Fachgrenzen: Begriffe eines **Bezugsfachs** im Chat eines anderen Fachs; bei den
   Gegenproben getrennt ausgewiesen, welche Fehltreffer aus einem Fach **ohne** Bezug kommen.
   Die Bezugsfächer kommen aus der Datenbank (`subjects.bezugsfaecher`, geseedet aus
@@ -38,8 +46,9 @@ sichern das ab: Bei der geltenden Schwelle muss dasselbe herauskommen wie ohne U
 
 **Test-Chats** (``--chats``): die Erzählsätze (je Begriff einer, Rahmen reihum), die schulnahen
 und die Alltags-Gegenproben als echte Chats in vorübergehenden Messgruppen ohne Stunden — je
-Chat Nachricht, Bausteine (vorab/werkzeug), Werkzeugaufrufe, Antwort. Sie werden gelesen, sie
-sind kein eigenes Kriterium. Schüler:in ist ein vorhandenes Dev-Konto mit Restbudget und
+Chat Nachricht, Bausteine (vorab/werkzeug), Werkzeugaufrufe, Antwort und Dauer; dazu aus dem
+Messkanal `vorab_debug` (nur außerhalb der Produktion) das Angebot, was davon nachgeschlagen
+wurde, und die Suchanfragen des Modells. Sie werden gelesen, sie sind kein eigenes Kriterium. Schüler:in ist ein vorhandenes Dev-Konto mit Restbudget und
 vorübergehender Mitgliedschaft; ihr Pseudonym wird nicht ausgegeben. Am Ende sind die Gruppen
 samt Konversationen gelöscht.
 
@@ -65,11 +74,9 @@ FORMEN = ("stichwort", "frage", "ich", "erzaehlung")
 FORM_NAMEN = {"stichwort": "Stichwort", "frage": "Frage", "ich": "Ich-Satz", "erzaehlung": "Erzählsatz"}
 GEGENPROBEN = ("beilaeufig", "schulnah", "alltag", "anderes_fach")
 SCHWELLEN = tuple(round(0.40 + 0.01 * i, 2) for i in range(13))
-#: Tor-Raster (0.16, Schritt 3): (Titel, Alias), ``None`` = aus. (None, None) ist „Nennung
-#: aus" — der Vergleich für „neu". Gewählt wird nach der Regel im Plan (`tore_waehlen`).
-TOR_AUS = (None, None)
-TOR_RASTER = (TOR_AUS, *((t, a) for t in (0.50, 0.52, 0.54, 0.55, 0.56, 0.58)
-                         for a in (None, 0.46, 0.48, 0.50, 0.52)))
+#: Band-Raster des Angebots (0.16, Plan § 7.6): von knapp über der Schwelle bis 0,55 — dort
+#: lagen die Alltagswörter der Reihe 2.
+BAENDER = tuple(round(0.46 + 0.01 * i, 2) for i in range(10))
 #: Schlüssel einer Szenariodatei. Die zweite Gegenprobenreihe (Jan) kennt nur `alltag` und
 #: `erzaehlsaetze` auf oberster Ebene; was keiner kennt, bricht ab, statt still zu fehlen.
 SZENARIO_SCHLUESSEL = {"stufe", "rahmen", "ich", "begriffe", "fachgrenzen", "umschreibungen",
@@ -122,8 +129,9 @@ class Nachricht:
 class Treffer:
     titel: str
     fach: str | None                 # Slug, None = fachlos
-    weg: str                         # name | distanz
+    weg: str                         # sicher: name | distanz · Angebot: nennung | distanz
     distanz: float | None            # roh — bei Namenstreffern nachgeschlagen
+    stufe: str = "sicher"            # sicher | angebot
 
 
 # ── Szenario ─────────────────────────────────────────────────────────────────
@@ -307,51 +315,43 @@ def abtastung_wirkungslos(laeufe: list[dict]) -> bool:
                == [_schluessel(t) for t in l["treffer"][SCHWELLEN[-1]]] for l in laeufe)
 
 
-def raster_zeile(laeufe: list[dict], tore: tuple, basis: tuple = TOR_AUS) -> dict:
-    """Die Kennzahlen eines Tor-Paars — „neu" heißt: gegenüber ``basis`` (Nennung aus) im
-    selben Lauf dazugekommen. Gegenproben: **jeder** neue Treffer ist ein neuer Fehltreffer."""
-    z = {"formen": {f: [0, 0] for f in FORMEN}, "fachgrenze": [0, 0], "gegenproben_neu": [0, 0],
-         "fehltreffer_neu": 0, "nebentreffer_neu": 0}
+def band_zeile(laeufe: list[dict], band: float, bezug: dict) -> dict:
+    """Die Kennzahlen des Angebots bei einem Band. Fachlich: erwarteter Knoten **angeboten**
+    (nicht sicher — der steht in :func:`zaehle`). Gegenproben: **jeder** angebotene Titel."""
+    z = {"formen": {f: [0, 0] for f in FORMEN}, "fachgrenze": [0, 0], "gegenproben": [0, 0],
+         "titel_gegenproben": 0, "ohne_bezug": 0, "nebenangebote": 0}
     for lauf in laeufe:
-        n = lauf["nachricht"]
-        jetzt, vorher = lauf["raster"][tore], lauf["raster"][basis]
-        alt = {_schluessel(t) for t in vorher}
+        n, angebot = lauf["nachricht"], lauf["band"][band]
         if n.art == "fachlich":
-            z["formen"][n.form][0] += gefunden(n, jetzt) is not None
+            z["formen"][n.form][0] += gefunden(n, angebot) is not None
             z["formen"][n.form][1] += 1
         elif n.art == "fachgrenze" and n.bezug:
-            z["fachgrenze"][0] += gefunden(n, jetzt) is not None
+            z["fachgrenze"][0] += gefunden(n, angebot) is not None
             z["fachgrenze"][1] += 1
         elif n.art == "gegenprobe":
-            neu = [t for t in fehltreffer(n, jetzt) if _schluessel(t) not in alt]
-            z["gegenproben_neu"][0] += bool(neu)
-            z["gegenproben_neu"][1] += 1
-            z["fehltreffer_neu"] += len(neu)
+            z["gegenproben"][0] += bool(angebot)
+            z["gegenproben"][1] += 1
+            z["titel_gegenproben"] += len(angebot)
+            z["ohne_bezug"] += len(ohne_bezug(lauf["profil"], angebot, bezug))
         if n.art in ("fachlich", "fachgrenze"):
-            z["nebentreffer_neu"] += sum(1 for t in nebentreffer(n, jetzt) if _schluessel(t) not in alt)
+            z["nebenangebote"] += len(nebentreffer(n, angebot))
     return z
 
 
-def raster_wirkungslos(laeufe: list[dict]) -> bool:
-    """Bringt das weiteste Tor-Paar nirgends etwas anderes als „Nennung aus", liest `vorab()`
-    die Tore nicht mehr aus dem Modul — oder die Nennung ist abgeklemmt."""
-    weitestes = max((t for t in TOR_RASTER if t != TOR_AUS), key=lambda t: (t[0], t[1] or 0.0))
-    return all([_schluessel(t) for t in l["raster"][TOR_AUS]]
-               == [_schluessel(t) for t in l["raster"][weitestes]] for l in laeufe)
+def band_wirkungslos(laeufe: list[dict]) -> bool:
+    """Bringt das breiteste Band nirgends etwas anderes als das schmalste, liest `vorab()`
+    das Band nicht mehr aus dem Modul — oder das Angebot ist abgeklemmt."""
+    return all([_schluessel(t) for t in l["band"][BAENDER[0]]]
+               == [_schluessel(t) for t in l["band"][BAENDER[-1]]] for l in laeufe)
 
 
-def tore_waehlen(laeufe: list[dict]) -> tuple | None:
-    """Die Regel aus dem Plan (14.10.2026, vor dem ersten Lauf): zulässig nur ohne neuen
-    Fehltreffer; darunter die meisten Erzählsätze; bei Gleichstand die engere — kleineres
-    Titel-Tor, dann kleineres Alias-Tor, „aus" am engsten. ``None``, wenn keine zulässig ist."""
-    zulaessig = []
-    for tore in TOR_RASTER:
-        if tore == TOR_AUS:
-            continue
-        z = raster_zeile(laeufe, tore)
-        if z["fehltreffer_neu"] == 0:
-            zulaessig.append((z["formen"]["erzaehlung"][0], -tore[0], -(tore[1] or 0.0), tore))
-    return max(zulaessig)[-1] if zulaessig else None
+def im_kontext(n: Nachricht, lauf: dict, schwelle: float) -> str | None:
+    """Wo der erwartete Knoten steht: ``sicher``, ``angebot`` oder nirgends (``None``)."""
+    if gefunden(n, lauf["treffer"][schwelle]):
+        return "sicher"
+    if gefunden(n, lauf["angebot"]):
+        return "angebot"
+    return None
 
 
 # ── Messung ──────────────────────────────────────────────────────────────────
@@ -401,10 +401,11 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
     from app.db.models import Subject
     from app.db.session import AsyncSessionLocal
 
-    geltend = search.VORAB_SCHWELLE
-    tore = (search.VORAB_TOR_TITEL, search.VORAB_TOR_ALIAS)
+    geltend, band_geltend = search.VORAB_SCHWELLE, search.VORAB_ANGEBOT
     if geltend not in SCHWELLEN:
         raise SystemExit(f"VORAB_SCHWELLE {geltend} liegt nicht im abgetasteten Bereich.")
+    if band_geltend not in BAENDER:
+        raise SystemExit(f"VORAB_ANGEBOT {band_geltend} liegt nicht im abgetasteten Bereich.")
     faecher = {f for n in liste for f in n.faecher if f} | {n.erwartet[0] for n in liste if n.erwartet}
     laeufe, vektoren = [], {}
     async with AsyncSessionLocal() as db:
@@ -420,10 +421,10 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
             raise SystemExit("Bezugsfächer passen nicht zum Szenario:\n  " + "\n  ".join(abweichend))
         bezug_ids = {f: await bezugsfaecher_von(db, slug_zu_id[f]) for f in faecher}
 
-        def als_treffer(t: dict, distanzen: dict) -> Treffer:
-            weg = "nennung" if t.get("genannt") else "distanz" if "distanz" in t else "name"
+        def als_treffer(t: dict, distanzen: dict, stufe: str = "sicher") -> Treffer:
+            weg = t["quelle"] if stufe == "angebot" else "distanz" if "distanz" in t else "name"
             return Treffer(t["title"], id_zu_slug.get(t.get("subject_id")), weg,
-                           t.get("distanz", distanzen.get(t["node_id"])))
+                           t.get("distanz", distanzen.get(t["node_id"])), stufe)
 
         for nr, n in enumerate(liste, start=1):
             if n.text not in vektoren:
@@ -445,45 +446,44 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
                 try:
                     for s in SCHWELLEN:
                         search.VORAB_SCHWELLE = s
-                        roh[s] = await vorab(n.text, profil, db, vektor=v)
+                        roh[s] = (await vorab(n.text, profil, db, vektor=v)).sicher
                 finally:
                     search.VORAB_SCHWELLE = geltend
-                if [t["node_id"] for t in roh[geltend]] != [t["node_id"] for t in heute]:
+                if [t["node_id"] for t in roh[geltend]] != [t["node_id"] for t in heute.sicher]:
                     raise SystemExit(f"Selbstprüfung: Bei {geltend} weicht die Abtastung vom "
                                      f"normalen Aufruf ab („{n.text}“).")
-                raster = {}
+                band = {}
                 try:
-                    for titel_tor, alias_tor in TOR_RASTER:
-                        search.VORAB_TOR_TITEL = -1.0 if titel_tor is None else titel_tor
-                        search.VORAB_TOR_ALIAS = -1.0 if alias_tor is None else alias_tor
-                        raster[(titel_tor, alias_tor)] = await vorab(n.text, profil, db, vektor=v)
+                    for b in BAENDER:
+                        search.VORAB_ANGEBOT = b
+                        band[b] = (await vorab(n.text, profil, db, vektor=v)).angebot
                 finally:
-                    search.VORAB_TOR_TITEL, search.VORAB_TOR_ALIAS = tore
-                if tore in raster and [t["node_id"] for t in raster[tore]] != [t["node_id"] for t in heute]:
-                    raise SystemExit(f"Selbstprüfung: Bei den geltenden Toren weicht das Raster vom "
+                    search.VORAB_ANGEBOT = band_geltend
+                if [t["node_id"] for t in band[band_geltend]] != [t["node_id"] for t in heute.angebot]:
+                    raise SystemExit(f"Selbstprüfung: Bei {band_geltend} weicht das Band-Raster vom "
                                      f"normalen Aufruf ab („{n.text}“).")
                 erwartet_ids = ({k for t in (n.erwartet[1], *n.auch) for k in knoten.get((n.erwartet[0], t), ())}
                                 if n.erwartet else set())
                 distanzen = await _distanzen(
-                    db, v, {t["node_id"] for ts in [*roh.values(), *raster.values()] for t in ts}
-                    | erwartet_ids)
+                    db, v, {t["node_id"] for ts in roh.values() for t in ts} | erwartet_ids)
                 laeufe.append({
                     "nachricht": n, "profil": fach,
                     "treffer": {s: [als_treffer(t, distanzen) for t in ts] for s, ts in roh.items()},
-                    "raster": {k: [als_treffer(t, distanzen) for t in ts] for k, ts in raster.items()},
+                    "angebot": [als_treffer(t, distanzen, "angebot") for t in heute.angebot],
+                    "band": {b: [als_treffer(t, distanzen, "angebot") for t in ts] for b, ts in band.items()},
                     "d_erwartet": min((distanzen[str(k)] for k in erwartet_ids if str(k) in distanzen),
                                       default=None),
                     "zeit_ms": zeit_ms, "emb_ms": emb_ms,
                 })
             if nr % 25 == 0:
                 print(f"  {nr}/{len(liste)} Nachrichten", flush=True)
-    if raster_wirkungslos(laeufe):
-        raise SystemExit("Selbstprüfung: Das Tor-Raster ändert nichts — liest vorab() die Tore "
-                         "noch aus dem Modul?")
+    if band_wirkungslos(laeufe):
+        raise SystemExit("Selbstprüfung: Zwischen 0,46 und 0,55 ändert sich am Angebot nichts — "
+                         "liest vorab() das Band noch aus dem Modul?")
     if abtastung_wirkungslos(laeufe):
         raise SystemExit("Selbstprüfung: Zwischen 0,40 und 0,52 ändert sich nichts — liest "
                          "vorab() die Schwelle noch aus dem Modul?")
-    return laeufe, {"schwelle": geltend, "tore": tore, "bezug": bezug}
+    return laeufe, {"schwelle": geltend, "band": band_geltend, "bezug": bezug}
 
 
 # ── Protokoll ────────────────────────────────────────────────────────────────
@@ -503,22 +503,21 @@ def _treffer_text(t: Treffer) -> str:
     return f"{t.titel} ({t.fach or 'fachlos'}, {weg})"
 
 
-def _tor(x: float | None) -> str:
-    return "aus" if x is None else _d(x)
-
-
 def _profil(p: str | None) -> str:
     return p or "ohne Fach"
 
 
 def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
-    s0 = kopf["schwelle"]
+    s0, b0 = kopf["schwelle"], kopf["band"]
     z = zaehle(laeufe, s0, bezug)
+    za = band_zeile(laeufe, b0, bezug)
+    erzaehl = [l for l in laeufe if l["nachricht"].art == "fachlich" and l["nachricht"].form == "erzaehlung"]
     zeiten = [l["zeit_ms"] for l in laeufe]
     emb = list({l["nachricht"].text: l["emb_ms"] for l in laeufe}.values())
     teile = [
         f"# Vorab-Prüfsatz „Begriff im Satz“ — {kopf['beginn']}", "",
-        f"Datei `{kopf['datei']}` · `VORAB_SCHWELLE` {_d(s0)} · Profil Schüler:in, Stufe {kopf['stufe']}, "
+        f"Datei `{kopf['datei']}` · `VORAB_SCHWELLE` {_d(s0)} · `VORAB_ANGEBOT` {_d(b0)} · "
+        f"Profil Schüler:in, Stufe {kopf['stufe']}, "
         f"ohne Fach und mit Fach · {len({l['nachricht'].text for l in laeufe})} Nachrichten, {len(laeufe)} Läufe.",
         "", "**Bestand (Vorab-Typen je Fach):** " + kopf["bestand"], "",
         "**Bezugsfächer (`subjects.bezugsfaecher` der Instanz):** "
@@ -526,7 +525,9 @@ def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
         f"**Zeit:** `vorab()` ohne Embedding Median {statistics.median(zeiten):.1f} ms "
         f"(90. Perzentil {statistics.quantiles(zeiten, n=10)[-1]:.1f} ms); Embedding Median "
         f"{statistics.median(emb):.0f} ms.", "",
-        f"## Ausgangswerte bei {_d(s0)}", "",
+        f"## Ausgangswerte bei {_d(s0)} (sicher) und {_d(b0)} (Angebot)", "",
+        "Die Nummern 1–7 sind die Kriterien von Schritt 1 und betreffen die **sichere** Stufe; die "
+        "Zeilen „Angebot“ sind Beobachtung (Plan § 7.4).", "",
         "| Kriterium | Wert |", "|---|---|",
         f"| 1 Erzählsätze — erwarteter Knoten unter den Treffern | {_anteil(z['formen']['erzaehlung'])} |",
         *[f"| 2 {FORM_NAMEN[f]} — gefunden (je Fall, Liste unten) | {_anteil(z['formen'][f])} |"
@@ -536,7 +537,14 @@ def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
         f"| 6 Zeit `vorab()` Median | {statistics.median(zeiten):.1f} ms |",
         f"| 7 Fachgrenze mit Bezug — gefunden | {_anteil(z['fachgrenze'])} |",
         f"| 7 Fehltreffer aus einem Fach ohne Bezug | {z['ohne_bezug']} |",
-        f"| — Umschreibungen (keinem Kriterium zugeordnet) | {_anteil(z['umschreibung'])} |", "",
+        f"| — Umschreibungen (keinem Kriterium zugeordnet) | {_anteil(z['umschreibung'])} |",
+        f"| Angebot: Erzählsätze — erwarteter Knoten angeboten | {_anteil(za['formen']['erzaehlung'])} |",
+        f"| Angebot: Erzählsätze — sicher oder angeboten | "
+        f"{_anteil([sum(im_kontext(l['nachricht'], l, s0) is not None for l in erzaehl), len(erzaehl)])} |",
+        f"| Angebot: Fachgrenze mit Bezug — angeboten | {_anteil(za['fachgrenze'])} |",
+        f"| Angebot: Gegenproben mit Angebot · angebotene Titel · davon ohne Bezug | "
+        f"{_anteil(za['gegenproben'])} · {za['titel_gegenproben']} · {za['ohne_bezug']} |",
+        f"| Angebot: Nebenangebote bei fachlichen Nachrichten | {za['nebenangebote']} |", "",
         "## Abtastung", "",
         "| Schwelle | Stichwort | Frage | Ich-Satz | Erzählsatz | Fachgrenze | Umschreibung "
         "| Gegenproben mit Treffer | Fehltreffer | davon ohne Bezug | Nebentreffer |",
@@ -579,7 +587,7 @@ def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
             teile += [f"  - „{text}“ → {tt} — {', '.join(p)}" for (text, tt), p in gesammelt.items()]
         teile.append("")
 
-    teile += raster_als_markdown(kopf, laeufe)
+    teile += band_als_markdown(kopf, laeufe)
     teile += [f"## Alle Nachrichten bei {_d(s0)}", ""]
     abschnitte = [("fachlich", "Fachliche Nachrichten"), ("fachgrenze", "Über Fachgrenzen"),
                   ("umschreibung", "Umschreibungen"), ("gegenprobe", "Gegenproben"),
@@ -590,62 +598,58 @@ def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
             continue
         teile += [f"### {titel}", ""]
         if art == "gegenprobe" or art == "grenzfall":
-            teile += ["| Art | Nachricht | Wort | Profil | Treffer |", "|---|---|---|---|---|"]
+            teile += ["| Art | Nachricht | Wort | Profil | Treffer (sicher) | Angebot |",
+                      "|---|---|---|---|---|---|"]
             for l in eigene:
                 n = l["nachricht"]
                 teile.append(f"| {n.form} | {n.text} | {n.wort or '—'} | {_profil(l['profil'])} | "
-                             f"{' · '.join(_treffer_text(t) for t in l['treffer'][s0]) or '—'} |")
+                             f"{' · '.join(_treffer_text(t) for t in l['treffer'][s0]) or '—'} | "
+                             f"{' · '.join(_treffer_text(t) for t in l['angebot']) or '—'} |")
         else:
-            teile += ["| Erwartet | Was | Form | Nachricht | Profil | gefunden | d(erwartet) | weitere Treffer |",
-                      "|---|---|---|---|---|---|---|---|"]
+            teile += ["| Erwartet | Was | Form | Nachricht | Profil | gefunden | d(erwartet) "
+                      "| weitere Treffer (sicher) | weitere Angebote |",
+                      "|---|---|---|---|---|---|---|---|---|"]
             for l in eigene:
                 n = l["nachricht"]
                 treffer = l["treffer"][s0]
                 g = gefunden(n, treffer)
+                a = gefunden(n, l["angebot"])
                 was = n.gruppe + ("" if n.bezug else ", ohne Bezug")
                 form = FORM_NAMEN.get(n.form, n.form) + (f" {n.rahmen}" if n.rahmen else "")
+                stelle = (("✓ " + {"name": "Name"}.get(g.weg, "Distanz")) if g
+                          else (f"Angebot ({'Nennung' if a.weg == 'nennung' else 'Distanz'})" if a else "✗"))
                 teile.append(
                     f"| {n.erwartet[1]} ({n.erwartet[0]}) | {was} | {form} | {n.text} | {_profil(l['profil'])} "
-                    f"| {('✓ ' + {'name': 'Name', 'nennung': 'Nennung'}.get(g.weg, 'Distanz')) if g else '✗'} | {_d(l['d_erwartet'])} "
-                    f"| {' · '.join(_treffer_text(t) for t in nebentreffer(n, treffer)) or '—'} |")
+                    f"| {stelle} | {_d(l['d_erwartet'])} "
+                    f"| {' · '.join(_treffer_text(t) for t in nebentreffer(n, treffer)) or '—'} "
+                    f"| {' · '.join(_treffer_text(t) for t in nebentreffer(n, l['angebot'])) or '—'} |")
         teile.append("")
     return "\n".join(teile)
 
 
-def raster_als_markdown(kopf: dict, laeufe: list[dict]) -> list[str]:
-    """Tor-Raster bei der geltenden Schwelle, die Wahl nach der Regel und was die geltenden
-    Tore gegenüber „Nennung aus" neu bringen."""
-    gewaehlt = tore_waehlen(laeufe)
-    teile = [f"## Tor-Raster bei {_d(kopf['schwelle'])}", "",
-             "Neu = gegenüber „Nennung aus“ im selben Lauf. Regel (Plan, 14.10.2026): zulässig nur "
-             "ohne neuen Fehltreffer, darunter die meisten Erzählsätze, bei Gleichstand die engere.", "",
-             "| Titel-Tor | Alias-Tor | Stichwort | Frage | Ich-Satz | Erzählsatz | Fachgrenze "
-             "| Gegenproben mit neuem Treffer | neue Fehltreffer | neue Nebentreffer |",
+def band_als_markdown(kopf: dict, laeufe: list[dict]) -> list[str]:
+    """Band-Raster des Angebots und die Angebote in Gegenproben beim geltenden Band — die
+    Liste, die gelesen wird (Plan § 7.4 Nr. 6)."""
+    b0 = kopf["band"]
+    teile = [f"## Band-Raster des Angebots (Schwelle {_d(kopf['schwelle'])})", "",
+             "Fachlich: erwarteter Knoten **angeboten** (nicht sicher). Gegenproben: jeder angebotene "
+             "Titel. Gewählt wird hier nichts — das Raster ist für spätere Nachjustierung.", "",
+             "| Band | Stichwort | Frage | Ich-Satz | Erzählsatz | Fachgrenze | Gegenproben mit Angebot "
+             "| angebotene Titel | davon ohne Bezug | Nebenangebote |",
              "|---|---|---|---|---|---|---|---|---|---|"]
-    for tore in TOR_RASTER:
-        z = raster_zeile(laeufe, tore)
+    for b in BAENDER:
+        z = band_zeile(laeufe, b, kopf["bezug"])
         f = z["formen"]
-        marke = " **(Regel)**" if tore == gewaehlt else ""
-        marke += " *(geltend)*" if tore == kopf["tore"] else ""
         teile.append(
-            f"| {_tor(tore[0])}{marke} | {_tor(tore[1])} | {_anteil(f['stichwort'])} | {_anteil(f['frage'])} "
+            f"| {'**' + _d(b) + '**' if b == b0 else _d(b)} | {_anteil(f['stichwort'])} | {_anteil(f['frage'])} "
             f"| {_anteil(f['ich'])} | {_anteil(f['erzaehlung'])} | {_anteil(z['fachgrenze'])} "
-            f"| {_anteil(z['gegenproben_neu'])} | {z['fehltreffer_neu']} | {z['nebentreffer_neu']} |")
-    teile += ["", f"**Wahl nach der Regel:** " + (f"Titel {_tor(gewaehlt[0])}, Alias {_tor(gewaehlt[1])}"
-                                                  if gewaehlt else "keine zulässige Kombination"), ""]
-    if kopf["tore"] in TOR_RASTER:
-        teile += [f"### Neu bei den geltenden Toren (Titel {_tor(kopf['tore'][0])}, "
-                  f"Alias {_tor(kopf['tore'][1])}) gegenüber „Nennung aus“", ""]
-        for lauf in laeufe:
-            n = lauf["nachricht"]
-            alt = {_schluessel(t) for t in lauf["raster"][TOR_AUS]}
-            neben = [t for t in lauf["raster"][kopf["tore"]]
-                     if _schluessel(t) not in alt and not ist_erwartet(n, t)]
-            if neben:
-                rolle = "Fehltreffer" if n.art == "gegenprobe" else "Nebentreffer"
-                teile.append(f"- {rolle}: „{n.text}“ ({_profil(lauf['profil'])}) → "
-                             + " · ".join(_treffer_text(t) for t in neben))
-        teile.append("")
+            f"| {_anteil(z['gegenproben'])} | {z['titel_gegenproben']} | {z['ohne_bezug']} "
+            f"| {z['nebenangebote']} |")
+    teile += ["", f"### Angebote in Gegenproben bei {_d(b0)}", ""]
+    gegen = [l for l in laeufe if l["nachricht"].art == "gegenprobe" and l["band"][b0]]
+    teile += [f"- „{l['nachricht'].text}“ ({_profil(l['profil'])}) → "
+              + " · ".join(_treffer_text(t) for t in l["band"][b0]) for l in gegen] or ["- keine"]
+    teile.append("")
     return teile
 
 
@@ -656,7 +660,8 @@ def als_json(laeufe: list[dict]) -> list[dict]:
         "erwartet": l["nachricht"].erwartet, "bezug": l["nachricht"].bezug, "wort": l["nachricht"].wort,
         "profil": l["profil"], "d_erwartet": l["d_erwartet"], "zeit_ms": l["zeit_ms"], "emb_ms": l["emb_ms"],
         "treffer": {f"{s:.2f}": [t.__dict__ for t in ts] for s, ts in l["treffer"].items()},
-        "raster": {f"{_tor(a)}/{_tor(b)}": [t.__dict__ for t in ts] for (a, b), ts in l["raster"].items()},
+        "angebot": [t.__dict__ for t in l["angebot"]],
+        "band": {f"{b:.2f}": [t.__dict__ for t in ts] for b, ts in l["band"].items()},
     } for l in laeufe]
 
 
@@ -708,12 +713,20 @@ def verlauf_als_markdown(kopf: dict, chats: list[dict]) -> str:
         if "grund" in c:
             teile += [f"abgebrochen — {c['grund']}", ""]
             continue
+        angeboten = [a["titel"] for a in c.get("angebot") or []]
         if n.erwartet:
             herkunft = sorted({b["herkunft"] for b in c["bausteine"] if b["titel"] == n.erwartet[1]})
-            teile.append(f"- Erwarteter Knoten: {'✓ ' + ', '.join(herkunft) if herkunft else '✗ fehlt'}")
+            stelle = ("✓ " + ", ".join(herkunft) if herkunft
+                      else "angeboten, nicht nachgeschlagen" if n.erwartet[1] in angeboten else "✗ fehlt")
+            teile.append(f"- Erwarteter Knoten: {stelle}")
         teile += [f"- Werkzeuge: {' → '.join(c['werkzeuge']) or '—'}",
-                  f"- Bausteine: {', '.join(b['titel'] + ' (' + b['herkunft'] + ')' for b in c['bausteine']) or '—'}",
-                  "", _zitat(c["antwort"]), ""]
+                  f"- Bausteine: {', '.join(b['titel'] + ' (' + b['herkunft'] + ')' for b in c['bausteine']) or '—'}"]
+        if "angebot" in c:
+            nach = set(c.get("nachgeschlagen") or [])
+            teile += [f"- Angebot: {', '.join(a['titel'] + (' ✓' if a['node_id'] in nach else '') for a in c['angebot']) or '—'}"
+                      f" (✓ = nachgeschlagen)",
+                      f"- Suchanfragen: {' · '.join('„' + q + '“' for q in c.get('suchanfragen') or []) or '—'}"]
+        teile += ["", _zitat(c["antwort"]), ""]
     return "\n".join(teile)
 
 
@@ -762,6 +775,12 @@ def chats_fahren(args, daten: dict, liste: list[Nachricht]) -> list[dict]:
             kopf["modell"] = zug.get("modell") or kopf["modell"]
             eintrag.update(antwort=zug["antwort"], bausteine=letzte.bausteine(conn, zug["konversation"]),
                            werkzeuge=[w["tool"] for w in zug["werkzeuge"]], fehler=zug.get("fehler"))
+            # Messkanal (0.16): Fehlt er, läuft das Backend in der Produktion oder vor 3b — dann
+            # gibt es kein Angebot zu berichten, und der Eintrag bleibt ohne diese Felder.
+            if zug.get("vorab_debug") is not None:
+                eintrag.update(angebot=zug["vorab_debug"]["angebot"],
+                               nachgeschlagen=zug["vorab_debug"]["nachgeschlagen"],
+                               suchanfragen=zug["vorab_debug"]["suchanfragen"])
             treffer = ""
             if n.erwartet:
                 treffer = "✓" if any(b["titel"] == n.erwartet[1] for b in eintrag["bausteine"]) else "✗"
@@ -831,9 +850,9 @@ def main() -> None:
     print(f"Fachgrenze {_anteil(z['fachgrenze'])} · Umschreibung {_anteil(z['umschreibung'])} · "
           f"Gegenproben mit Treffer {_anteil(z['gegenproben'])}, Fehltreffer {z['fehltreffer']} "
           f"(ohne Bezug {z['ohne_bezug']}) · Nebentreffer {z['nebentreffer']}")
-    gewaehlt = tore_waehlen(laeufe)
-    print("Tore nach der Regel: " + (f"Titel {_tor(gewaehlt[0])}, Alias {_tor(gewaehlt[1])}"
-                                     if gewaehlt else "keine zulässige Kombination"))
+    za = band_zeile(laeufe, kopf["band"], bezug)
+    print(f"Angebot bei {_d(kopf['band'])}: Erzählsätze angeboten {_anteil(za['formen']['erzaehlung'])} · "
+          f"Gegenproben mit Angebot {_anteil(za['gegenproben'])}, angebotene Titel {za['titel_gegenproben']}")
     if args.protokoll:
         args.protokoll.write_text(protokoll_als_markdown(kopf, laeufe, bezug), encoding="utf-8")
     if args.json:

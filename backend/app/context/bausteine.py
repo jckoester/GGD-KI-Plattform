@@ -7,9 +7,13 @@ Antwort „Kontext", nicht „Quellen" (Entscheidung Jan, 27.09.2026).
 
 Zwei Herkünfte, in dieser Reihenfolge:
 
-- ``vorab`` — die Grundschicht zur Frage (höchstens fünf, :func:`app.context.search.vorab`),
+- ``vorab`` — die sichere Stufe der Grundschicht zur Frage (höchstens fünf,
+  :func:`app.context.search.vorab`),
 - ``werkzeug`` — was das Modell in einer Suchrunde zusätzlich bekam (``search_context_nodes``,
   ``list_context_nodes``).
+
+Das **Angebot** der Grundschicht (0.16) ist keine Herkunft: Dort stand nur ein Titel, der
+Inhalt lag nicht vor (:class:`Angebot`).
 
 ⚠️ **Nicht dabei:** der Ankerkontext eines Assistenten (sein Gegenstand, nicht die Antwort
 auf diese Frage, und er wechselt nicht von Nachricht zu Nachricht), angeheftete Knoten (die
@@ -48,12 +52,30 @@ class Baustein:
     aehnlichkeit: float | None = None
 
 
+@dataclass(frozen=True)
+class Angebot:
+    """Ein Knoten, dessen **Titel** im Systemtext angeboten wurde (0.16) — sein Inhalt nicht.
+
+    ⚠️ **Kein Baustein.** Er wird nicht an die Nachricht gehängt und nicht unter der Antwort
+    gezeigt: Er lag nicht vor. Holt das Modell ihn per Werkzeug, steht er dort als
+    ``werkzeug``. Gebraucht wird er nur, um das abzugleichen (Statistik, Messkanal).
+    """
+
+    node_id: str
+    titel: str
+    fach: str | None
+    #: ``nennung`` (Titel oder Alias im Satz) oder ``distanz``.
+    quelle: str
+
+
 @dataclass
 class Kontext:
-    """Was :func:`app.context.service.kontext_fuer_frage` liefert: Prompt-Text und Bausteine."""
+    """Was :func:`app.context.service.kontext_fuer_frage` liefert: Prompt-Text, Bausteine
+    und die angebotenen Knoten."""
 
     text: str
     bausteine: list[Baustein] = field(default_factory=list)
+    angebot: list[Angebot] = field(default_factory=list)
 
 
 def aus_treffern(treffer: Iterable, herkunft: str) -> list[Baustein]:

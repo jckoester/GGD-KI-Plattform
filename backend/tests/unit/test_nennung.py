@@ -1,9 +1,8 @@
 """Begriffsnennung im Satz (0.16, Schritt 3) — was als Nennung zählt.
 
-Nur die Kandidaten; über die Aufnahme entscheidet das Tor in `vorab()` (Integrationstests in
-`test_vorab_suche_db.py`, Klasse `TestNennung`).
+Nur die Kandidaten; was daraus angeboten wird, entscheidet `vorab()` (Integrationstests in
+`test_vorab_suche_db.py`, Klasse `TestAngebot`).
 """
-from app.context.modellsicht import fuer_modell
 from app.context.nennung import MAX_WOERTER, Namensindex, genannt, schluessel, stamm
 
 CHEMIE, MATHE, NWT = 1, 2, 3
@@ -101,13 +100,3 @@ def test_fremdes_fach_blockiert_keine_kuerzere_nennung():
     """Ein Name, der nicht zählen darf, belegt auch keine Wörter."""
     index = _index(("fg", CHEMIE, "funktionelle Gruppe"), ("gr", MATHE, "Gruppe"))
     assert genannt("Was sind funktionelle Gruppen?", index, {MATHE}) == {"gr": "titel"}
-
-
-# ── Was das Modell sieht ─────────────────────────────────────────────────────
-
-
-def test_genannt_geht_nicht_ins_modell():
-    """Ein Messmerkmal wie `distanz` — ein Prompt-Feld mehr wäre eine Prompt-Änderung."""
-    eintrag = fuer_modell([{"node_id": "x", "title": "Ion", "content": "…", "distanz": 0.5,
-                            "genannt": True}])[0]
-    assert "genannt" not in eintrag and "distanz" not in eintrag

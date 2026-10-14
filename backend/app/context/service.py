@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.context.bausteine import VORAB, Baustein, Kontext, aus_treffern
+from app.context.bausteine import VORAB, Angebot, Baustein, Kontext, aus_treffern
 from app.context.stunden import als_stundenzahl
 from app.context.embedding import enqueue_embedding_job
 from app.context.grades import parse_grade_band
@@ -61,7 +61,21 @@ _RELATION_LABELS: dict[str, str] = {
 }
 
 
-def _vorab_block(eintraege: list[dict]) -> str:
+def _angebotssatz(angebot: Sequence[Angebot], *, ausserdem: bool) -> str:
+    """Das Angebot als ein Satz (0.16): Titel mit Fach, ohne Inhalt.
+
+    Wortlaut wie gemessen (Variante 4, 14.10.2026) — „außerdem", wenn sichere Einträge
+    davorstehen, sonst „dazu". Gemessen hat gpt-oss daraufhin in rund 60 % der Fälle
+    nachgeschlagen, ohne Angebot praktisch nie.
+    """
+    titel = ", ".join(f"{a.titel} ({a.fach})" if a.fach else a.titel for a in angebot)
+    return (
+        f"Im Wissensspeicher der Schule gibt es {'außerdem' if ausserdem else 'dazu'}: "
+        f"{titel} — den Inhalt holst du mit dem Werkzeug, wenn er für die Antwort zählt."
+    )
+
+
+def _vorab_block(eintraege: list[dict], angebot: Sequence[Angebot] = ()) -> str:
     """Die Grundschicht als Prompt-Abschnitt (Paket 9, N11).
 
     ⚠️ **Als JSON, nicht als Fließtext** — anders als „Relevante Lerninhalte" darunter.
@@ -73,13 +87,21 @@ def _vorab_block(eintraege: list[dict]) -> str:
     Die Leseregeln davor stehen in ``pedagogy.yaml`` und sind dieselben wie am
     Werkzeugergebnis (N13). Der Zusatz hier ist nur der Satz, der die **Herkunft**
     erklärt: Diese Treffer hat niemand angefordert, sie können also auch danebenliegen.
+
+    Das **Angebot** (0.16) steht dahinter als ein Satz — ohne Lesehinweis, wenn es allein
+    steht: Es gibt dann keine Felder, die zu lesen wären.
     """
-    return (
-        mit_lesehinweis(json.dumps(eintraege, ensure_ascii=False, indent=1))
-        + "\n\nDiese Einträge wurden automatisch zur letzten Nachricht herausgesucht; "
-        "was nicht passt, lässt du weg. Brauchst du etwas anderes, such mit deinem "
-        "Werkzeug."
-    )
+    teile: list[str] = []
+    if eintraege:
+        teile.append(
+            mit_lesehinweis(json.dumps(eintraege, ensure_ascii=False, indent=1))
+            + "\n\nDiese Einträge wurden automatisch zur letzten Nachricht herausgesucht; "
+            "was nicht passt, lässt du weg. Brauchst du etwas anderes, such mit deinem "
+            "Werkzeug."
+        )
+    if angebot:
+        teile.append(_angebotssatz(angebot, ausserdem=bool(eintraege)))
+    return "\n\n".join(teile)
 
 
 def _assemble_context(
@@ -87,6 +109,7 @@ def _assemble_context(
     engagement_entries: list[EngagementEntry],
     pinned_nodes: list[ContextNode],
     vorab_eintraege: list[dict] | None = None,
+    vorab_angebot: Sequence[Angebot] = (),
 ) -> str:
     """Den Kontext-Block für den Prompt bauen.
 
@@ -100,8 +123,8 @@ def _assemble_context(
     """
     sections: list[str] = []
 
-    if vorab_eintraege:
-        sections.append(_vorab_block(vorab_eintraege))
+    if vorab_eintraege or vorab_angebot:
+        sections.append(_vorab_block(vorab_eintraege or [], vorab_angebot))
 
     if semantic_treffer:
         lines = ["## Relevante Lerninhalte\n"]
@@ -204,14 +227,15 @@ async def _grundschicht(
     anchor_ids: Sequence[UUID],
     jwt_stufe: str | None,
     vektor,
-) -> tuple[list[dict], set[str], list[Baustein]]:
+) -> tuple[list[dict], set[str], list[Baustein], list[Angebot]]:
     """Die Vorab-Suche und ihre Aufbereitung fürs Modell (Paket 9, N11).
 
     Liefert die fertigen Einträge **und** ihre ``node_id``s — die Einträge selbst tragen
     sie nicht mehr (``fuer_modell`` streift sie ab, sie nützen dem Modell nichts). Der
     Aufrufer braucht sie, um dieselben Knoten nicht ein zweites Mal aus dem Teilgraphen
     eines Ankers zu holen. Dazu die Bausteine für die Zeile „Kontext" unter der Antwort
-    (0.14) — aus **denselben** Treffern, die in den Prompt gehen.
+    (0.14) — aus **denselben** Treffern, die in den Prompt gehen. Zuletzt das Angebot
+    (0.16): Titel, deren Inhalt nicht vorliegt.
 
     **Das Fach** kommt aus der Konversation (N11): ihre Unterrichtsgruppe, sonst ihre
     Fachzuordnung. Das Fach eines Assistenten steckt bereits darin — der Chat-Router
@@ -236,9 +260,14 @@ async def _grundschicht(
         # Wie im Werkzeugweg: roh holen, in `fuer_modell` auswählen.
         mit_metadaten=True,
     )
-    treffer = await vorab(frage, profil, db, vektor=vektor)
+    ergebnis = await vorab(frage, profil, db, vektor=vektor)
+    angebot = [
+        Angebot(node_id=t["node_id"], titel=t["title"], fach=t.get("fach"), quelle=t["quelle"])
+        for t in ergebnis.angebot
+    ]
+    treffer = ergebnis.sicher
     if not treffer:
-        return [], set(), []
+        return [], set(), [], angebot
 
     grenzen = await abgrenzungen_zu(db, [t["node_id"] for t in treffer])
     baender = await bp_baender_zu(db, treffer, stufe) if stufe is not None else {}
@@ -247,6 +276,7 @@ async def _grundschicht(
         fuer_modell(treffer, grenzen, merkmale),
         {t["node_id"] for t in treffer},
         aus_treffern(treffer, VORAB),
+        angebot,
     )
 
 
@@ -332,7 +362,7 @@ async def kontext_fuer_frage(
     # Datenbank arbeitet.
     vektor_task = asyncio.create_task(vektor_oder_none(query_text))
     try:
-        vorab_eintraege, vorab_ids, vorab_bausteine = await _grundschicht(
+        vorab_eintraege, vorab_ids, vorab_bausteine, angebot = await _grundschicht(
             query_text,
             db,
             pseudonym=pseudonym,
@@ -388,9 +418,13 @@ async def kontext_fuer_frage(
             query_text, profil, db, ausschluss=vorab_ids, vektor=await vektor_task
         )
         semantic_treffer = thematisch_abschnitt.treffer
+        # Was der Anker-Weg als Inhalt bringt, liegt vor — ein Angebot dafür schickte das
+        # Modell nach etwas suchen, das schon dasteht.
+        im_inhalt = {t.get("node_id") for t in semantic_treffer}
+        angebot = [a for a in angebot if a.node_id not in im_inhalt]
 
     base = _assemble_context(
-        semantic_treffer, engagement_entries, pinned_nodes, vorab_eintraege
+        semantic_treffer, engagement_entries, pinned_nodes, vorab_eintraege, angebot
     )
 
     # UP-7: Planungs-Block „Aktueller Unterricht" für Conversations mit Gruppenbezug.
@@ -399,7 +433,7 @@ async def kontext_fuer_frage(
         text = f"{planning_block}\n\n{base}" if base else planning_block
     else:
         text = base
-    return Kontext(text=text, bausteine=vorab_bausteine)
+    return Kontext(text=text, bausteine=vorab_bausteine, angebot=angebot)
 
 
 async def stufe_der_person(

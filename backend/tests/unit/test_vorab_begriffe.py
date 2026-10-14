@@ -211,60 +211,60 @@ def test_unerwarteter_bezug_faellt_auf():
     assert len(abweichend) == 1 and "Standardabweichung" in abweichend[0]
 
 
-# ── Tor-Raster und Wahl der Tore (Schritt 3) ─────────────────────────────────
+# ── Band-Raster des Angebots (Schritt 3b) ────────────────────────────────────
 
 ALKAN = M.Nachricht("Erzählsatz zu Alkanen", "fachlich", "erzaehlung", (None, "chemie"), ("chemie", "Alkane"),
                     rahmen=1)
 
 
-def _raster(n, je_tor, profil=None):
-    """``je_tor``: Treffer je Tor-Paar; fehlende Paare = wie „Nennung aus"."""
-    aus = je_tor.get(M.TOR_AUS, [])
-    return {"nachricht": n, "profil": profil, "raster": {k: je_tor.get(k, aus) for k in M.TOR_RASTER}}
+def _band(n, je_band, profil=None, sicher=(), angebot=None):
+    """``je_band``: Angebote je Band; fehlende Bänder = wie das schmalste."""
+    schmal = je_band.get(M.BAENDER[0], [])
+    band = {b: je_band.get(b, schmal) for b in M.BAENDER}
+    return {"nachricht": n, "profil": profil, "treffer": {0.45: list(sicher)}, "band": band,
+            "angebot": band[0.50] if angebot is None else angebot}
 
 
-def test_raster_zaehlt_neue_fehltreffer_gegen_nennung_aus():
-    w, u = T("Wasser", "chemie", "nennung", 0.49), T("Umwelt (GHS09)", "chemie", "nennung", 0.47)
-    lauf = _raster(EIS, {M.TOR_AUS: [w], (0.55, 0.50): [w, u]})
-    assert M.raster_zeile([lauf], M.TOR_AUS)["fehltreffer_neu"] == 0
-    z = M.raster_zeile([lauf], (0.55, 0.50))
-    assert z["fehltreffer_neu"] == 1 and z["gegenproben_neu"] == [1, 1]
+def A(titel, fach, weg="nennung", distanz=0.48):
+    return T(titel, fach, weg, distanz, "angebot")
 
 
-def test_raster_zaehlt_erzaehlsaetze_und_neue_nebentreffer():
-    alk = T("Alkane", "chemie", "nennung", 0.52)
-    alkine = T("Alkine", "chemie", "distanz", 0.44)
-    lauf = _raster(ALKAN, {M.TOR_AUS: [alkine], (0.55, None): [alk, alkine]})
-    z = M.raster_zeile([lauf], (0.55, None))
-    assert z["formen"]["erzaehlung"] == [1, 1] and z["nebentreffer_neu"] == 0
+def test_baender_von_046_bis_055():
+    assert M.BAENDER[0] == 0.46 and M.BAENDER[-1] == 0.55 and len(M.BAENDER) == 10
+    assert 0.50 in M.BAENDER
 
 
-def test_wahl_schliesst_jeden_neuen_fehltreffer_aus():
-    """Das weitere Tor fände mehr Erzählsätze — aber es brächte einen Fehltreffer."""
-    alk = T("Alkane", "chemie", "nennung", 0.57)
-    eis = T("Wasser", "chemie", "nennung", 0.57)
-    laeufe = [_raster(ALKAN, {(0.58, a): [alk] for a in (None, 0.46, 0.48, 0.50, 0.52)}),
-              _raster(EIS, {(0.58, a): [eis] for a in (None, 0.46, 0.48, 0.50, 0.52)})]
-    assert M.tore_waehlen(laeufe) == (0.50, None)     # alle anderen gleich gut → die engste
+def test_band_zaehlt_jeden_titel_in_gegenproben():
+    lauf = _band(EIS, {0.50: [A("Wasser", "chemie"), A("Umwelt", "chemie", "distanz")]})
+    z = M.band_zeile([lauf], 0.50, BEZUG)
+    assert z["gegenproben"] == [1, 1] and z["titel_gegenproben"] == 2
+    assert M.band_zeile([lauf], 0.46, BEZUG)["gegenproben"] == [0, 1]
 
 
-def test_wahl_nimmt_die_meisten_erzaehlsaetze_dann_die_engere():
-    alk = T("Alkane", "chemie", "nennung", 0.53)
-    ab_054 = {(t, a): [alk] for t in (0.54, 0.55, 0.56, 0.58) for a in (None, 0.46, 0.48, 0.50, 0.52)}
-    assert M.tore_waehlen([_raster(ALKAN, ab_054)]) == (0.54, None)
+def test_band_zaehlt_angebote_ohne_bezug_in_gegenproben():
+    lauf = _band(EIS, {0.50: [A("Wasser", "chemie"), A("Zelle", "biologie")]}, profil="mathematik")
+    assert M.band_zeile([lauf], 0.50, {"mathematik": ["nwt"]})["ohne_bezug"] == 2
+    assert M.band_zeile([lauf], 0.50, {"mathematik": ["chemie"]})["ohne_bezug"] == 1
 
 
-def test_keine_zulaessige_kombination():
-    eis = T("Wasser", "chemie", "nennung", 0.40)
-    alle = {k: [eis] for k in M.TOR_RASTER if k != M.TOR_AUS}
-    assert M.tore_waehlen([_raster(EIS, alle)]) is None
+def test_band_zaehlt_erzaehlsaetze_und_nebenangebote():
+    lauf = _band(ALKAN, {0.50: [A("Alkane", "chemie"), A("Alkine", "chemie", "distanz")]})
+    z = M.band_zeile([lauf], 0.50, BEZUG)
+    assert z["formen"]["erzaehlung"] == [1, 1] and z["nebenangebote"] == 1
 
 
-def test_raster_ohne_jede_wirkung_faellt_auf():
-    gleich = _raster(ALKAN, {M.TOR_AUS: []})
-    assert M.raster_wirkungslos([gleich])
-    anders = _raster(ALKAN, {(0.58, 0.52): [T("Alkane", "chemie", "nennung", 0.57)]})
-    assert not M.raster_wirkungslos([gleich, anders])
+def test_wo_der_erwartete_knoten_steht():
+    sicher = _band(ALKAN, {}, sicher=[T("Alkane", "chemie", "distanz", 0.40)])
+    angeboten = _band(ALKAN, {0.50: [A("Alkane", "chemie")]})
+    weder = _band(ALKAN, {0.50: [A("Alkine", "chemie")]})
+    assert [M.im_kontext(ALKAN, l, 0.45) for l in (sicher, angeboten, weder)] == ["sicher", "angebot", None]
+
+
+def test_band_ohne_jede_wirkung_faellt_auf():
+    gleich = _band(ALKAN, {})
+    assert M.band_wirkungslos([gleich])
+    anders = _band(ALKAN, {0.55: [A("Alkane", "chemie", distanz=0.54)]})
+    assert not M.band_wirkungslos([gleich, anders])
 
 
 # ── Zweite Gegenprobenreihe (Format, nicht Inhalt) ───────────────────────────

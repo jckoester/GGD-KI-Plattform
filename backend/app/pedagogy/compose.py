@@ -63,9 +63,10 @@ def compose_system_content(
 ) -> str:
     """Kombinierter Pädagogik-/Assistenten-System-Inhalt.
 
-    Reihenfolge: universelle Basis · Zielgruppen-Erweiterung · [Klassenstufe — nur
-    Schüler-Behandlung] · [Bezugsstunde] · [Wissens-Kontext + Assistenten-Prompt] ·
-    [Lernverhalten-Augmentierungen — nur Schüler-Behandlung].
+    Reihenfolge: universelle Basis · [Vorrang des Wissensspeichers] ·
+    Zielgruppen-Erweiterung · [Klassenstufe — nur Schüler-Behandlung] · [Bezugsstunde] ·
+    [Wissens-Kontext + Assistenten-Prompt] · [Lernverhalten-Augmentierungen — nur
+    Schüler-Behandlung].
     ``output_format`` hängt der Aufrufer separat als letzte System-Message an.
 
     ``stufe`` steht **vor** dem Kontext, nicht darin: Sie gilt für die ganze Antwort,
@@ -77,7 +78,11 @@ def compose_system_content(
         if student_treatment
         else pedagogy.preambles.teacher_extension
     )
-    parts: list[str] = [pedagogy.preambles.universal_base.strip(), extension.strip()]
+    parts: list[str] = [pedagogy.preambles.universal_base.strip()]
+    vorrang = pedagogy.preambles.wissensspeicher_vorrang.strip()
+    if vorrang:
+        parts.append(vorrang)
+    parts.append(extension.strip())
 
     # ⚠️ **Nur bei Schüler-Behandlung.** Eine Lehrkraft, die den Unterricht einer
     # neunten Klasse vorbereitet, braucht alle Fassungen ohne Zurückhaltung — sie

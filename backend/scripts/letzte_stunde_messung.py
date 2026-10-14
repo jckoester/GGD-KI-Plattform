@@ -16,7 +16,10 @@ Nachbereitung in (a) in einem von drei Läufen der Knoten zu XY fehlt **oder** i
 einem Lauf eine falsche Stunde als die letzte behandelt wird.
 
 * **Knoten zu XY** — steht der Begriffsknoten in den Bausteinen der Antwort
-  (`message_context_nodes`, Vorab oder Werkzeug)? Das prüft das Skript.
+  (`message_context_nodes`, Vorab oder Werkzeug)? Das prüft das Skript. Seit 0.16 zusätzlich:
+  Stand er **als Angebot** im Systemtext (Messkanal `vorab_debug`), und wurde er nachgeschlagen?
+  Plan „Vorab-Suche-Begriffe" § 7.4 Nr. 8: Angebot 3/3 ist das Ziel, ob nachgeschlagen, wird
+  gelesen und protokolliert.
 * **Falsche Stunde als die letzte** — die Antwort sagt oder setzt voraus, dass die vorletzte
   Stunde (Thema oder Datum) die letzte war. Das Skript **markiert** Verdachtssätze („letzte"
   oder „zuletzt" zusammen mit Thema oder Datum der vorletzten Stunde); entschieden wird beim
@@ -242,15 +245,24 @@ def verdachtssaetze(antwort: str, thema_stamm: str, tag: date) -> list[str]:
     return treffer
 
 
-def bewerte(fall: dict, antwort: str, vorlagen: list[dict], stunden: list[dict], vorletzte_tag: date) -> dict:
-    """Was ein Lauf zeigt. ``stunden`` von alt nach neu; die vorletzte ist ``stunden[-2]``."""
+def bewerte(fall: dict, antwort: str, vorlagen: list[dict], stunden: list[dict], vorletzte_tag: date,
+            vorab_debug: dict | None = None) -> dict:
+    """Was ein Lauf zeigt. ``stunden`` von alt nach neu; die vorletzte ist ``stunden[-2]``.
+
+    ``vorab_debug`` ist der Messkanal (0.16); ohne ihn bleiben ``xy_angeboten`` und
+    ``xy_nachgeschlagen`` ``None`` — keine Aussage, nicht „nein"."""
     xy = fall.get("xy")
     xy_herkunft = sorted({b["herkunft"] for b in vorlagen if xy and b["art"] == "begriff" and b["titel"] == xy})
     stamm = lambda s: s["begriff"][:13]  # „Elektronegativ…" trifft auch „elektronegativer"
+    angebot = [a for a in (vorab_debug or {}).get("angebot", []) if xy and a["titel"] == xy]
+    nachgeschlagen = set((vorab_debug or {}).get("nachgeschlagen", []))
+    mit_kanal = vorab_debug is not None and xy
     return {
         "xy": xy,
         "xy_knoten": bool(xy_herkunft) if xy else None,
         "xy_herkunft": xy_herkunft,
+        "xy_angeboten": bool(angebot) if mit_kanal else None,
+        "xy_nachgeschlagen": any(a["node_id"] in nachgeschlagen for a in angebot) if mit_kanal else None,
         "genannt": [s["begriff"] for s in stunden if stamm(s).lower() in (antwort or "").lower()],
         "verdacht": verdachtssaetze(antwort, stamm(stunden[-2]), vorletzte_tag),
         "fragt_nach": "?" in (antwort or ""),
@@ -281,6 +293,10 @@ def verlauf_als_markdown(kopf: dict, laeufe: list[dict]) -> str:
         k = l["kriterien"]
         if k["xy"]:
             teile.append(f"- Knoten „{k['xy']}“: {'✓ ' + ', '.join(k['xy_herkunft']) if k['xy_knoten'] else '✗ fehlt'}")
+            if k.get("xy_angeboten") is not None:
+                teile.append(f"- Als Angebot: {'ja' if k['xy_angeboten'] else 'nein'}"
+                             + (f" · nachgeschlagen: {'ja' if k['xy_nachgeschlagen'] else 'nein'}"
+                                if k["xy_angeboten"] else ""))
         teile += [f"- Genannt: {', '.join(k['genannt']) or '—'} · Rückfrage: {'ja' if k['fragt_nach'] else 'nein'}",
                   f"- Werkzeuge: {' → '.join(l['werkzeuge']) or '—'}",
                   f"- Bausteine: {', '.join(b['titel'] + ' (' + b['herkunft'] + ')' for b in l['bausteine']) or '—'}"]
@@ -357,9 +373,11 @@ def main() -> None:
                     if phase not in kopf["bloecke"]:
                         kopf["bloecke"][phase] = block(gid)
                     vorlagen = bausteine(conn, zug["konversation"])
-                    k = bewerte(fall, zug["antwort"], vorlagen, daten["stunden"], vergangen[-2][0])
+                    k = bewerte(fall, zug["antwort"], vorlagen, daten["stunden"], vergangen[-2][0],
+                                zug.get("vorab_debug"))
                     kopf["modell"] = zug.get("modell") or kopf["modell"]
                     xy = "" if k["xy"] is None else ("XY ✓ " if k["xy_knoten"] else "XY ✗ ")
+                    xy += "Angebot ✓ " if k["xy_angeboten"] else ""
                     print(f"{name:<4} Lauf {nr}  {xy}genannt: {', '.join(k['genannt']) or '—'}"
                           f"{'  ⚠️ Verdacht' if k['verdacht'] else ''}{'  ?' if k['fragt_nach'] else ''}", flush=True)
                     laeufe.append({"fall": name, "lauf": nr, "frage": fall["frage"], "kriterien": k,
@@ -375,11 +393,14 @@ def main() -> None:
 
     if args.nur_aufbau:
         return
-    print("\nFall  XY-Knoten  Verdacht  Rückfrage")
+    print("\nFall  XY-Knoten  Angebot  Verdacht  Rückfrage")
     for fall in dict.fromkeys(l["fall"] for l in laeufe):
         eigene = [l["kriterien"] for l in laeufe if l["fall"] == fall and "kriterien" in l]
         xy = sum(1 for k in eigene if k["xy_knoten"]) if eigene and eigene[0]["xy"] else None
+        ang = (sum(1 for k in eigene if k["xy_angeboten"])
+               if eigene and eigene[0]["xy_angeboten"] is not None else None)
         print(f"{fall:<5} {('%d/%d' % (xy, len(eigene))) if xy is not None else '—':<10} "
+              f"{('%d/%d' % (ang, len(eigene))) if ang is not None else '—':<8} "
               f"{sum(1 for k in eigene if k['verdacht'])}/{len(eigene):<7} {sum(k['fragt_nach'] for k in eigene)}/{len(eigene)}")
     if args.json:
         args.json.write_text(json.dumps(laeufe, ensure_ascii=False, indent=2, default=str), encoding="utf-8")

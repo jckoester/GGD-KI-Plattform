@@ -1046,3 +1046,82 @@ async def test_ohne_text_vor_dem_aufruf_kein_trenner():
 
     assert _tokens(ausgabe) == "Gefunden."
     assert persist.await_args.args[4] == "Gefunden."
+
+
+# ── Messkanal der Vorab-Suche (0.16, Schritt 3b) ──────────────────────────────
+#
+# Angebot, Werkzeugergebnis und Suchanfrage desselben Zuges — nur außerhalb der Produktion.
+# Die Form des Ereignisses prüft `test_vorab_angebot.py`; hier die Verdrahtung im Strom.
+
+async def _chat_mit_angebot(umgebung: str):
+    from app.context.bausteine import WERKZEUG, Angebot, Kontext, aus_treffern
+
+    angebot = [Angebot("n-1", "Elektronegativität", "Chemie", "nennung"),
+               Angebot("n-2", "Gruppenpuzzle", None, "distanz")]
+
+    async def _suche(args, ctx):
+        ctx.bausteine.extend(aus_treffern([{"node_id": "n-1", "title": "Elektronegativität"}],
+                                          WERKZEUG))
+        return {"exakte_namenstraeger": []}
+
+    suche = ChatTool(
+        name="search_context_nodes", groups=frozenset({"context_search"}), handler=_suche,
+        definition={"type": "function", "function": {
+            "name": "search_context_nodes", "parameters": {"type": "object", "properties": {}}}},
+    )
+    aufruf = _Strom([_zeile({"tool_calls": [{"id": "call-1", "function": {
+        "name": "search_context_nodes", "arguments": '{"query": "Elektronegativität"}'}}]},
+        "tool_calls")])
+    modell = _Modell(lambda req, n: aufruf if n == 1 else _text("Fertig."))
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = _make_execute_mock()
+
+    async def _refresh(obj):
+        obj.id = uuid4()
+
+    db.refresh = AsyncMock(side_effect=_refresh)
+    request = ChatRequest(messages=[{"role": "user", "content": "Hallo"}], model_id=None)
+
+    with patch("app.chat.router.httpx.AsyncClient", return_value=modell), \
+         patch("app.chat.router.tools_for", return_value=[suche]), \
+         patch("app.chat.router._get_model_info", new=AsyncMock(return_value={})), \
+         patch("app.chat.router.kontext_fuer_frage",
+               new=AsyncMock(return_value=Kontext(text="", angebot=angebot))), \
+         patch("app.chat.router.kontext_der_nachrichten", new=AsyncMock(return_value={})), \
+         patch("app.chat.router._persist", new=AsyncMock(return_value=uuid4())), \
+         patch("app.chat.router.anbietermodell", new=AsyncMock(return_value=None)), \
+         patch("app.chat.router.kosten_nachtrag.nachtragen"), \
+         patch("app.chat.router.settings") as mock_settings:
+        mock_settings.chat_default_model = "chat-standard"
+        mock_settings.litellm_verify_ssl = True
+        mock_settings.title_model = ""
+        mock_settings.litellm_proxy_url = "http://litellm:4000"
+        mock_settings.litellm_master_key = "test-key"
+        mock_settings.upload_max_files = 3
+        mock_settings.environment = umgebung
+
+        response = await chat(request, current_user=_fake_payload(), db=db)
+        return await _stream_text(response)
+
+
+@pytest.mark.asyncio
+async def test_messkanal_traegt_angebot_ergebnis_und_suchanfrage():
+    import json as _json
+
+    ausgabe = await _chat_mit_angebot("development")
+    zeile = ausgabe.split("event: vorab_debug\ndata: ", 1)[1].split("\n", 1)[0]
+    daten = _json.loads(zeile)
+    assert [a["node_id"] for a in daten["angebot"]] == ["n-1", "n-2"]
+    assert daten["nachgeschlagen"] == ["n-1"]
+    assert daten["suchanfragen"] == ["Elektronegativität"]
+    assert ausgabe.index("event: vorab_debug") < ausgabe.index("event: message")
+
+
+@pytest.mark.asyncio
+async def test_messkanal_nie_in_der_produktion_auch_nicht_im_strom():
+    ausgabe = await _chat_mit_angebot("production")
+    assert "vorab_debug" not in ausgabe
+    assert "Fertig." in ausgabe

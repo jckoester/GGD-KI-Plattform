@@ -70,6 +70,7 @@ def frage_stellen(
     stuecke: list[str] = []
     ereignisse: dict[str, int] = {}
     fehler: str | None = None
+    vorab_debug: dict | None = None
 
     with client.stream("POST", "/chat", json=rumpf) as strom:
         if strom.status_code != 200:
@@ -91,6 +92,10 @@ def frage_stellen(
             nutzlast = zeile[6:]
             if name == "tool_status":
                 werkzeuge.append(json.loads(nutzlast))
+            elif name == "vorab_debug":
+                # Messkanal der Vorab-Suche (0.16): Angebot, Nachgeschlagenes, Suchanfragen —
+                # nur außerhalb der Produktion gesendet, sonst bleibt es `None`.
+                vorab_debug = json.loads(nutzlast)
             elif name == "fehler":
                 # Abbruch mitten im Strom (0.15): Lese-Timeout, Verbindung, abgelehnte Runde.
                 fehler = json.loads(nutzlast).get("detail") or "Abbruch"
@@ -110,6 +115,7 @@ def frage_stellen(
         "ereignisse": ereignisse,
         "antwort": antwort,
         "fehler": fehler,
+        "vorab_debug": vorab_debug,
         # Die Kennzahlen aus dem Messplan (N8): Kürze und Rückfragen sind das, was die
         # neue Präambel ändern soll — sie hier mitzuzählen erspart das Nachzählen von
         # Hand und macht zwei Läufe vergleichbar.

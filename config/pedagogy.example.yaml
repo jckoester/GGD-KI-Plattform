@@ -6,6 +6,7 @@
 #
 # Aufbau pro Chat (Auswahl durch das Backend nach assistant.audience):
 #   universal_base  (immer)
+#   + wissensspeicher_vorrang  (wenn gesetzt)
 #   + student_extension ODER teacher_extension
 #   + Assistenten-System-Prompt
 #   + student_augmentations  (nur Schüler-Behandlung, pro Assistent abschaltbar)
@@ -49,6 +50,14 @@ preambles:
     Schüler:innen keine fertigen Lösungen zu geben, betrifft ausgearbeitete Lösungswege und
     Fließtext-Antworten — nicht Diagramme. Ein hilfreiches Diagramm oder eine passende
     Schaltung darfst du daher auch Schüler:innen direkt zeichnen.
+
+  # Vorrang des Wissensspeichers (0.16) — steht direkt nach universal_base, für alle
+  # Zielgruppen. Gemessen mit genau diesem Satz. Pflegt Ihre Schule keinen
+  # Wissensspeicher, lassen Sie den Wert leer oder den Schlüssel weg: Dann steht kein
+  # Satz im Prompt.
+  wissensspeicher_vorrang: >-
+    Für Fachliches gilt der Wissensspeicher der Schule: Was dort steht, hat Vorrang vor
+    deinem eigenen Wissen.
 
   # Erweiterung für Schüler:innen-Assistenten (audience: student) bzw. Schüler:innen
   # an audience:all-Assistenten.
