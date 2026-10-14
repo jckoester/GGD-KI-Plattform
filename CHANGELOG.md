@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+## [0.15.2] – 2026-10-14
+
+Fachbegriffe erscheinen im Tab „weiterer Kontext" der Fachseite, die Fachschaft kann sie
+bearbeiten, und Admins spielen sie in jedes Fach ein — auch in eines ohne Fachschaft. Keine
+Migration, keine neue Konfiguration.
+
 ### Neu
 
 - **Einstellungen → Fachbegriffe** (Admin): Fachbegriffe und Stoffsteckbriefe in jedes Fach
