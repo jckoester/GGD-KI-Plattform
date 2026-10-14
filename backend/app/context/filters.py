@@ -100,8 +100,14 @@ def wende_an(stmt, f: Knotenfilter):
             )
         )
 
-    # Knoten, deren Scope-Gruppe zu diesem Fach gehört, plus schulweite/globale
-    # knowledge-Knoten mit passendem oder ohne Fach.
+    # Knoten, deren Scope-Gruppe zu diesem Fach gehört, plus schulweite/globale Knoten
+    # dieses Fachs, plus fachlose schulweite/globale **knowledge**-Knoten.
+    #
+    # ⚠️ **Die Kategorie gilt nur für die fachlosen.** Bis 0.15.1 verlangte die Bedingung
+    # `knowledge` auch für Knoten des Fachs — geschrieben, bevor es `concept` gab. Der Tab
+    # „weiterer Kontext" einer Fachseite zeigte damit keinen einzigen Begriff und keinen
+    # Stoffsteckbrief, obwohl dort ihr Import sitzt. Für fachlose bleibt sie: Sonst
+    # stünden fachlose Dokumente und Artefakte in jedem Fach.
     if f.subject_slug:
         gruppen_des_fachs = (
             sa.select(Group.id)
@@ -117,10 +123,12 @@ def wende_an(stmt, f: Knotenfilter):
                 ContextNode.read_scope_group_id.in_(gruppen_des_fachs),
                 and_(
                     ContextNode.read_scope.in_(["global", "school"]),
-                    ContextNode.category == "knowledge",
                     or_(
                         ContextNode.subject_id == fach_id,
-                        ContextNode.subject_id.is_(None),
+                        and_(
+                            ContextNode.subject_id.is_(None),
+                            ContextNode.category == "knowledge",
+                        ),
                     ),
                 ),
             )

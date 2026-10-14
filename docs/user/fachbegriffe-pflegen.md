@@ -31,7 +31,7 @@ Einen einzelnen Eintrag holen Sie in seiner Detailansicht über **Als Markdown**
 
 **Wer darf das?** Lehrkräfte des Fachs — genauer: wer in der **Fachschaftsgruppe** des
 Fachs ist. Eine Rolle „Fachschaftsleitung" gibt es nicht; innerhalb der Fachschaft sind
-alle gleichberechtigt.
+alle gleichberechtigt. Dasselbe gilt für das Ändern, Archivieren und Verknüpfen im Editor.
 
 > Die Fachschaftsgruppe übernimmt die Plattform aus Ihrem Schulkonto. Wenn Sie das Fach
 > unterrichten, die Schaltfläche aber mit einer Absage antwortet, fehlt diese Gruppe —

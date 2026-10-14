@@ -117,11 +117,26 @@ async def _check_anchor_permission(
 async def _check_write_permission(
     node: ContextNode, user: JwtPayload, db: AsyncSession
 ) -> None:
-    """403 wenn weder Admin noch Owner noch Gruppen-Lehrkraft (bei write_scope='group')."""
+    """403 wenn weder Admin noch Owner noch Gruppen-Lehrkraft (bei write_scope='group')
+    noch Fachschaft (bei write_scope='subject').
+
+    ⚠️ **Die Fachschaft fehlte hier bis 0.15.1.** Import und Editor vergeben für
+    Fachschaftsgut `write_scope = subject`; geprüft wurde aber nur `group`. Ändern konnten
+    die Begriffe einer Fachschaft damit nur Admins — wer selbst Admin ist, bemerkte es nie.
+    """
     if "admin" in user.roles:
         return
     if node.owner_pseudonym == user.sub:
         return
+    if (
+        node.write_scope == "subject"
+        and node.subject_id is not None
+        and "teacher" in user.roles
+    ):
+        from app.context.service import fachschafts_faecher
+
+        if node.subject_id in await fachschafts_faecher(db, user.sub):
+            return
     if (
         node.write_scope in ("group", "group_teachers")
         and node.write_scope_group_id is not None
@@ -307,6 +322,22 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
         )
         eigene_gruppen = {gid for (gid,) in rows}
 
+    # Fachschaftsgut (`write_scope = subject`) — auch hier einmal je Liste.
+    eigene_fachschaften: set[int] = set()
+    if (
+        not ist_admin
+        and "teacher" in user.roles
+        and any(
+            n.owner_pseudonym != user.sub
+            and n.write_scope == "subject"
+            and n.subject_id is not None
+            for n in nodes
+        )
+    ):
+        from app.context.service import fachschafts_faecher
+
+        eigene_fachschaften = await fachschafts_faecher(db, user.sub)
+
     for node in nodes:
         node.darf_schreiben = (
             ist_admin
@@ -314,6 +345,10 @@ async def _schreibrechte_setzen(nodes, user: JwtPayload, db: AsyncSession) -> No
             or (
                 node.write_scope == "group"
                 and node.write_scope_group_id in eigene_gruppen
+            )
+            or (
+                node.write_scope == "subject"
+                and node.subject_id in eigene_fachschaften
             )
         )
 

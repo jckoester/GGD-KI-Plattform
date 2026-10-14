@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Behoben
+
+- Der Tab „weiterer Kontext" einer Fachseite zeigte keine Fachbegriffe und Stoffsteckbriefe —
+  ebenso die Wissensliste mit Fachfilter.
+- Mitglieder einer Fachschaft konnten die Begriffe ihres Fachs nicht bearbeiten, archivieren
+  oder verknüpfen; das ging nur für Admins.
+
 ## [0.15.1] – 2026-10-12
 
 Budget-Stufen und Ferienkalender lassen sich in der Compose-Installation speichern, und im Chat

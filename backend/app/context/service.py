@@ -669,6 +669,29 @@ async def is_subject_department_member(
     return result.scalar_one_or_none() is not None
 
 
+async def fachschafts_faecher(db: AsyncSession, pseudonym: str) -> set[int]:
+    """Die Fächer, in deren Fachschaft die Person ist — das Schreibrecht bei
+    ``write_scope = subject``.
+
+    Dieselbe Regel wie :func:`is_subject_department_member`, nur für alle Fächer auf
+    einmal: Es zählt **jede** Fachschaftsgruppe des Fachs, nicht nur die eine, die am
+    Knoten steht. Der Import trägt die erste ein (``write_scope_group_id``); wer in einer
+    zweiten Fachschaftsgruppe desselben Fachs ist, darf trotzdem ändern — wie er auch
+    importieren darf.
+    """
+    zeilen = await db.execute(
+        sa.select(Group.subject_id)
+        .join(GroupMembership, GroupMembership.group_id == Group.id)
+        .where(
+            Group.type == "subject_department",
+            Group.subject_id.isnot(None),
+            GroupMembership.pseudonym == pseudonym,
+        )
+        .distinct()
+    )
+    return {fach_id for (fach_id,) in zeilen}
+
+
 _LP_PRAEFIX = re.compile(r"^\(?L\)?\s+", re.IGNORECASE)
 
 
