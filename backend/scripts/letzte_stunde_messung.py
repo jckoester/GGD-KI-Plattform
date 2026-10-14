@@ -88,7 +88,7 @@ def termine(wochentage: list[int], heute: date, vorher: int, nachher: int) -> tu
 MINDESTBUDGET_USD = 0.5
 
 
-def schuelerin(conn) -> tuple[str, str | None]:
+def schuelerin(conn, mindestens: float = MINDESTBUDGET_USD) -> tuple[str, str | None]:
     """Ein Dev-Konto mit Schülerrolle, LiteLLM-Schlüssel und Restbudget.
 
     Ohne Schlüssel antwortet der Chat 503, ohne Budget 429 — der erste Messlauf (11.10.2026)
@@ -103,9 +103,9 @@ def schuelerin(conn) -> tuple[str, str | None]:
             antwort = litellm.get("/user/info", params={"user_id": pseudonym})
             info = antwort.json().get("user_info") or {} if antwort.status_code == 200 else {}
             grenze, ausgaben = info.get("max_budget"), info.get("spend") or 0.0
-            if grenze is None or grenze - ausgaben >= MINDESTBUDGET_USD:
+            if grenze is None or grenze - ausgaben >= mindestens:
                 return pseudonym, str(stufe) if stufe is not None else None
-    raise SystemExit(f"Kein Schüler:innen-Konto mit Schlüssel und mindestens {MINDESTBUDGET_USD} USD Restbudget.")
+    raise SystemExit(f"Kein Schüler:innen-Konto mit Schlüssel und mindestens {mindestens} USD Restbudget.")
 
 
 def knoten(conn, fach: str, *, begriff: str | None = None, kompetenz: str | None = None) -> tuple[str, str]:

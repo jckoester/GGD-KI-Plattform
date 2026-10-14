@@ -1,0 +1,207 @@
+# Prüfsatz „Begriff im Satz" für die Vorab-Suche (0.16, Schritt 1).
+#
+#   cd backend && venv/bin/python scripts/vorab_begriffe.py --datei scripts/szenarien/vorab_begriffe.yaml
+#
+# Plan: PKM `Plaene/Vorab-Suche-Begriffe-Plan.md`, Schritt 1. Kriterien mit Jan abgestimmt am
+# 12.10.2026 (Kriterium 7 am 13.10.), vor dem ersten Lauf.
+#
+# **Begriffe** — je Fach, gruppiert nach dem, was sie prüfen (`art`): einwort, gebeugt (Plural,
+# Genitiv), kompositum, mehrwort (gebeugt), plural_titel („ein Alkan" zu „Alkane"), alias (nur
+# über einen Alias genannt), stoffsteckbrief, mehrdeutig (kurz, auch alltagssprachlich).
+# Je Begriff vier Formen: `stichwort`, `frage`, Ich-Satz (`ich`, sonst „Ich verstehe {akk}
+# nicht.") und Erzählsatz — **jeder** der vier Rahmen unten, mit `akk` eingesetzt. Alle Rahmen
+# verlangen den Akkusativ, deshalb genügt eine Angabe je Begriff. Profile: ohne Fach und mit dem
+# Fach des Begriffs.
+#
+# **Fachgrenzen** — Chat-Fach ≠ Fach des Begriffs; Profil nur das Chat-Fach. `bezug: false`
+# heißt: Das Chat-Fach hat den Begriffsfach nicht als Bezugsfach — ein Grenzfall, gezeigt,
+# keinem Kriterium zugeordnet.
+#
+# **Gegenproben** — jeder Treffer ist ein Fehltreffer, nicht nur der nächste. `wort` nennt das
+# Wort aus Titel oder Alias, das die Nachricht reizt (nur zum Lesen).
+
+stufe: 10
+
+rahmen:
+  - "Letzte Stunde haben wir etwas über {akk} gelernt, das ich nicht ganz verstanden habe."
+  - "Wir schreiben Freitag eine Arbeit über {akk}, kannst du mir helfen?"
+  - "Unsere Lehrerin hat heute {akk} erklärt, aber ich war krank."
+  - "Bei den Hausaufgaben soll ich {akk} erklären."
+
+ich: "Ich verstehe {akk} nicht."
+
+# Annahme bis Schritt 2 (dann `config/subjects.yaml`): gerichtet, „Chat-Fach liest mit".
+# Abgeleitet aus den Querverweisen des Bildungsplans auf Dev (13.10.2026): BNT ↔ NwT 20,
+# Biologie → NwT 18, Physik → NwT 12, Chemie → NwT 7, Physik → Mathematik 6, Mathematik → Physik 5.
+bezugsfaecher:
+  nwt: [biologie, chemie, physik, mathematik, bnt]
+  physik: [mathematik]
+  mathematik: [physik]
+
+begriffe:
+  chemie:
+    - {titel: Elektronegativität, art: einwort, stichwort: Elektronegativität,
+       frage: "Was ist Elektronegativität?", akk: die Elektronegativität}
+    - {titel: Metallbindung, art: einwort, stichwort: Metallbindung,
+       frage: "Was ist eine Metallbindung?", akk: die Metallbindung}
+    - {titel: funktionelle Gruppe, art: mehrwort, stichwort: funktionelle Gruppen,
+       frage: "Was ist eine funktionelle Gruppe?", akk: die funktionellen Gruppen}
+    - {titel: Alkane, art: plural_titel, stichwort: Alkan,
+       frage: "Was ist ein Alkan?", akk: den Aufbau eines Alkans}
+    - {titel: Edelgasregel, art: alias, stichwort: Oktettregel,
+       frage: "Was besagt die Oktettregel?", akk: die Oktettregel}
+    - {titel: Salzsäure, art: stoffsteckbrief, stichwort: Salzsäure,
+       frage: "Ist Salzsäure gefährlich?", akk: die Eigenschaften von Salzsäure}
+    - {titel: Kohlenstoffdioxid, art: stoffsteckbrief, stichwort: Kohlenstoffdioxid,
+       frage: "Was ist Kohlenstoffdioxid?", akk: die Bildung von Kohlenstoffdioxid}
+    - {titel: Bindung, art: mehrdeutig, stichwort: Bindung,
+       frage: "Was ist eine Bindung?", akk: die Bindungen zwischen den Atomen}
+    - {titel: Ion, art: mehrdeutig, stichwort: Ion,
+       frage: "Was ist ein Ion?", akk: Ionen}
+    - {titel: Veresterung, art: kompositum, stichwort: Veresterung,
+       frage: "Was ist eine Veresterung?", akk: die Veresterungsreaktion}
+  mathematik:
+    - {titel: Mitternachtsformel, art: einwort, stichwort: Mitternachtsformel,
+       frage: "Was ist die Mitternachtsformel?", akk: die Mitternachtsformel}
+    - {titel: binomische Formeln, art: mehrwort, stichwort: binomische Formeln,
+       frage: "Was sind binomische Formeln?", akk: die binomischen Formeln}
+    - {titel: Distributivgesetz, art: einwort, stichwort: Distributivgesetz,
+       frage: "Was ist das Distributivgesetz?", akk: das Distributivgesetz}
+    - {titel: Mittelwert, art: gebeugt, stichwort: Mittelwert,
+       frage: "Was ist der Mittelwert?", akk: die Berechnung des Mittelwerts}
+    - {titel: Rechengesetze für Potenzen, art: alias, stichwort: Potenzgesetze,
+       frage: "Was sind Potenzgesetze?", akk: die Potenzgesetze}
+    - {titel: Satz vom Nullprodukt, art: mehrwort, stichwort: Satz vom Nullprodukt,
+       frage: "Was ist der Satz vom Nullprodukt?", akk: den Satz vom Nullprodukt}
+    - {titel: Term, art: mehrdeutig, stichwort: Term,
+       frage: "Was ist ein Term?", akk: Terme}
+    - {titel: Äquivalenzumformung, art: gebeugt, stichwort: Äquivalenzumformung,
+       frage: "Was ist eine Äquivalenzumformung?", akk: Äquivalenzumformungen}
+    - {titel: Probe, art: mehrdeutig, stichwort: Probe,
+       frage: "Wie macht man eine Probe?", akk: die Probe beim Lösen von Gleichungen}
+    - {titel: Exponent, art: gebeugt, stichwort: negative Exponenten,
+       frage: "Was ist ein negativer Exponent?", akk: negative Exponenten}
+  nwt:
+    - {titel: Standardabweichung, art: einwort, stichwort: Standardabweichung,
+       frage: "Was ist die Standardabweichung?", akk: die Standardabweichung}
+    - {titel: Reliabilität, art: einwort, stichwort: Reliabilität,
+       frage: "Was bedeutet Reliabilität?", akk: die Reliabilität}
+    - {titel: systematischer Messfehler, art: mehrwort, stichwort: systematische Messfehler,
+       frage: "Was ist ein systematischer Messfehler?", akk: systematische Messfehler}
+    - {titel: Gütekriterien, art: plural_titel, stichwort: Gütekriterium,
+       frage: "Was ist ein Gütekriterium?", akk: ein Gütekriterium,
+       ich: "Ich verstehe nicht, was ein Gütekriterium ist."}
+    - {titel: Box-Plot, art: alias, stichwort: Boxplot,
+       frage: "Wie liest man einen Boxplot?", akk: einen Boxplot}
+    - {titel: Hypothese, art: gebeugt, stichwort: Hypothese,
+       frage: "Was ist eine Hypothese?", akk: das Aufstellen einer Hypothese}
+    - {titel: Stickstoffkreislauf, art: einwort, stichwort: Stickstoffkreislauf,
+       frage: "Was ist der Stickstoffkreislauf?", akk: den Stickstoffkreislauf}
+    - {titel: Minimumsprinzip, art: alias, stichwort: Gesetz vom Minimum,
+       frage: "Was ist das Gesetz vom Minimum?", akk: das Gesetz vom Minimum}
+    - {titel: Parameter, art: mehrdeutig, stichwort: Parameter,
+       frage: "Was ist ein Parameter?", akk: den Parameter in unserem Versuch}
+    - {titel: Laborbuch, art: kompositum, stichwort: Laborbuch,
+       frage: "Was gehört in ein Laborbuch?", akk: den Laborbucheintrag}
+
+fachgrenzen:
+  - {chat: nwt, fach: biologie, titel: Fotosynthese, art: einwort, stichwort: Fotosynthese,
+     frage: "Was ist Fotosynthese?", akk: die Fotosynthese}
+  - {chat: nwt, fach: chemie, titel: Redoxreaktion, art: gebeugt, stichwort: Redoxreaktion,
+     frage: "Was ist eine Redoxreaktion?", akk: Redoxreaktionen}
+  - {chat: nwt, fach: chemie, titel: Katalysator, art: gebeugt, stichwort: Katalysator,
+     frage: "Was macht ein Katalysator?", akk: die Wirkung eines Katalysators}
+  - {chat: nwt, fach: mathematik, titel: Median, art: einwort, stichwort: Median,
+     frage: "Was ist der Median?", akk: den Median}
+  - {chat: physik, fach: mathematik, titel: Äquivalenzumformung, art: gebeugt,
+     stichwort: Äquivalenzumformung, frage: "Was ist eine Äquivalenzumformung?",
+     akk: Äquivalenzumformungen}
+  - {chat: physik, fach: mathematik, titel: Normdarstellung, art: einwort, stichwort: Normdarstellung,
+     frage: "Was ist die Normdarstellung?", akk: die Normdarstellung}
+  # Mathematik hat NwT nicht als Bezugsfach — fachlich ist die Standardabweichung aber Mathematik.
+  - {chat: mathematik, fach: nwt, titel: Standardabweichung, art: einwort, bezug: false,
+     stichwort: Standardabweichung, frage: "Was ist die Standardabweichung?",
+     akk: die Standardabweichung}
+
+# Ohne den Namen des Begriffs — zeigt, ob (b) aus F1 nötig wäre. Keinem Kriterium zugeordnet.
+umschreibungen:
+  - {fach: chemie, titel: Elektronegativität, satz: "Wie stark zieht ein Atom die Elektronen in einer Bindung an?"}
+  - {fach: chemie, titel: Metallbindung, satz: "Warum leiten Metalle eigentlich Strom?"}
+  - {fach: mathematik, titel: Mittelwert, satz: "Wie rechne ich aus, welche Note ich im Schnitt habe?"}
+  - {fach: mathematik, titel: Mitternachtsformel, satz: "Wie löse ich x² + 3x − 4 = 0?"}
+  - {fach: nwt, titel: Reliabilität, satz: "Woran erkenne ich, ob meine Messung bei Wiederholung dasselbe Ergebnis liefert?"}
+  - {fach: nwt, titel: Stickstoffkreislauf, satz: "Wie kommt der Stickstoff aus der Luft in die Pflanzen?"}
+
+gegenproben:
+  # Aus `vorab_schwelle.py` — dort die untere Grenze der Unerwünschten.
+  beilaeufig:
+    faecher: [chemie, mathematik, nwt]
+    saetze:
+      - "Danke!"
+      - "Hilf mir bei meiner Bewerbung um ein Praktikum."
+      - "Was heißt „to consider“ auf Deutsch?"
+      - "Wie geht es dir?"
+      - "Kannst du mir einen Witz erzählen?"
+      - "Wann sind nochmal die Sommerferien?"
+  # Schulnah, aber ohne Fachbegriff — darunter die vier Rahmen ohne Begriff: Trifft der
+  # Rahmen allein, liegt es am Rahmen.
+  schulnah:
+    faecher: [chemie, mathematik, nwt]
+    saetze:
+      - "Letzte Stunde haben wir etwas gelernt, das ich nicht ganz verstanden habe."
+      - "Wir schreiben Freitag eine Arbeit, kannst du mir helfen?"
+      - "Unsere Lehrerin hat heute etwas erklärt, aber ich war krank."
+      - "Bei den Hausaufgaben soll ich etwas erklären."
+      - "Ich verstehe die Aufgabe nicht."
+      - "Kannst du mir beim Lernen für die Arbeit helfen?"
+      - "Wie viele Seiten muss mein Referat haben?"
+      - "Kannst du meinen Text auf Rechtschreibfehler prüfen?"
+      - "Ich habe die Hausaufgaben vergessen, was soll ich tun?"
+      - "Wie lerne ich am besten für einen Test?"
+      - "Erklär mir das bitte nochmal einfacher."
+      - "Ich bin in Mathe schlecht, was kann ich tun?"
+  # Alltag mit einem Wort aus Titel oder Alias; Profil: ohne Fach und das Fach des Wortes —
+  # dort wäre eine Nennung im Fach erlaubt, die Gefahr also am größten.
+  alltag:
+    - {fach: chemie, wort: Bindung, satz: "Ich habe eine starke Bindung zu meiner Oma."}
+    - {fach: chemie, wort: Eis, satz: "Wir wollen nachher ein Eis essen."}
+    - {fach: chemie, wort: Umwelt, satz: "Ich will etwas für die Umwelt tun."}
+    - {fach: chemie, wort: giftig, satz: "Ist der Pilz giftig?"}
+    - {fach: chemie, wort: Resonanz, satz: "Die Resonanz auf unser Schulfest war super."}
+    - {fach: chemie, wort: Stoffe, satz: "Welche Stoffe eignen sich für ein Sommerkleid?"}
+    - {fach: chemie, wort: Nebel, satz: "Heute Morgen war so viel Nebel, dass der Bus zu spät kam."}
+    - {fach: chemie, wort: Mechanismus, satz: "Der Mechanismus meiner Uhr ist kaputt."}
+    - {fach: chemie, wort: Gemisch, satz: "Ich habe ein Gemisch aus Wut und Traurigkeit gefühlt."}
+    - {fach: chemie, wort: n, satz: "Hast du n Tipp für mich?"}
+    - {fach: mathematik, wort: hoch, satz: "Wie hoch ist der Eiffelturm?"}
+    - {fach: mathematik, wort: Produkt, satz: "Das Produkt ist gerade im Angebot."}
+    - {fach: mathematik, wort: Probe, satz: "Morgen ist die letzte Probe für unser Theaterstück."}
+    - {fach: mathematik, wort: Basis, satz: "Auf welcher Basis entscheidet die Schule das?"}
+    - {fach: mathematik, wort: Summe, satz: "Die Summe auf der Rechnung stimmt nicht."}
+    - {fach: mathematik, wort: Buchstabe, satz: "Mit welchem Buchstaben fängt mein Name an?"}
+    - {fach: mathematik, wort: zusammenfassen, satz: "Kannst du das kurz zusammenfassen?"}
+    - {fach: mathematik, wort: Faktor, satz: "Spaß ist für mich ein wichtiger Faktor bei der Berufswahl."}
+    - {fach: nwt, wort: mode, satz: "Ich interessiere mich sehr für Mode."}
+    - {fach: nwt, wort: Vermutung, satz: "Ich habe eine Vermutung, wer meinen Stift hat."}
+    - {fach: nwt, wort: Review, satz: "Kannst du ein Review zu dem Film schreiben?"}
+    - {fach: nwt, wort: Untersuchung, satz: "Ich hatte heute eine Untersuchung beim Arzt."}
+    - {fach: nwt, wort: Antenne, satz: "Die Antenne von unserem Radio ist abgebrochen."}
+    - {fach: nwt, wort: zuverlässig, satz: "Er ist ein sehr zuverlässiger Freund."}
+    - {fach: nwt, wort: gültig, satz: "Ist mein Busticket noch gültig?"}
+    - {fach: nwt, wort: Humus, satz: "Im Garten haben wir frischen Humus verteilt."}
+  # Ein anderes Fach im Profil, ohne Bezug zum Fach des Wortes.
+  anderes_fach:
+    - {fach: mathematik, wort: Addition, satz: "Wie funktioniert die schriftliche Addition?"}
+    - {fach: deutsch, wort: Endung, satz: "Welche Endung hat das Verb im Präteritum?"}
+    - {fach: deutsch, wort: These, satz: "Was ist die These in einer Erörterung?"}
+    - {fach: geographie, wort: "Kondensation, Wasserdampf", satz: "Warum entstehen bei der Kondensation von Wasserdampf Wolken?"}
+    - {fach: geographie, wort: hoch, satz: "Wie hoch ist die Zugspitze?"}
+    - {fach: gemeinschaftskunde, wort: Basis, satz: "Was ist die Basis einer Demokratie?"}
+    - {fach: geschichte, wort: Faktor, satz: "Welche Faktoren führten zum Ersten Weltkrieg?"}
+    - {fach: musik, wort: Resonanz, satz: "Was bedeutet Resonanz bei einer Gitarre?"}
+    - {fach: bildende-kunst, wort: Stoffe, satz: "Welche Stoffe eignen sich zum Batiken?"}
+
+# Weder erwünscht noch Gegenprobe — gezeigt, keinem Kriterium zugeordnet.
+grenzfaelle:
+  - {fach: mathematik, wort: Durchschnitt, satz: "Im Durchschnitt schlafe ich sieben Stunden."}
+  - {fach: nwt, wort: Hypothese, satz: "Ich habe eine Hypothese, warum mein Bruder immer so schlecht gelaunt ist."}
