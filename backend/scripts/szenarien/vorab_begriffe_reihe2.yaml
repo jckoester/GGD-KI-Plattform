@@ -1,0 +1,24 @@
+alltag:
+  - {fach: chemie, wort: reizend, satz: "Das ist ja reizend von dir, danke!"}
+  - {fach: chemie, title: Stoff, satz: "Dein Hemd ist aus einem tollen Stoff." }
+  - {fach: chemie, wort: Radikal, satz: "Die Position der Linkspartei ist mir zu radikal"}
+  - {fach: chemie, wort: Reduktion, satz: "Eine Reduktion der Arbeitszeit ist dringend angebracht."}
+  - {fach: chemie, wort: Suspension, satz: "Aufgrund von schwerem Fehlverhalten wurde mit einer Suspension von 3 Tagen bestraft."}
+  - {fach: chemie, wort: Stoffmenge, satz: "Die Stoffmenge für die nächste KLassenarbeit ist viel zu groß!"}
+  - {fach: chemie, wort: Aromaten, satz: "Nach dem scharfen Anbraten Aromaten wie Rosmarin oder Thymian zugeben."}
+  - {fach: chemie, wort: organisch, satz: "Die Programmstruktur ist organisch gewachsen."}
+  - {fach: chemie , wort: Bindung , satz: "Die Bindung zwischen Mutter und Kind ist besonders stark."}
+  - {fach: mathematik, wort: Ausklammern, satz: "Das Thema können wir ausklammern."}
+  - {fach: mathematik, wort: Betrag, satz: "Bitte überweisen Sie den Betrag bis 1.1."}
+  - {fach: mathematik, wort: Probe , satz: "Am Samstag ist wieder Probe."}
+  - {fach: mathematik, wort: Produkt, satz: "Das Produkt ist viel zu teuer."}
+  - {fach: mathematik, wort: Wurzel, satz: "Social media ist die Wurzel allen Übels"}
+  - {fach: mathematik, wort: Basis, satz: "Auf Basis der vorliegenden Daten kann man das nicht entscheiden."}
+  - {fach: nwt, wort: Objektivität, satz: "Der Artikel lässt die Objektivität des Autors vermissen."}
+  - {fach: nwt, wort: Ausreißer, satz: "Da ist ja unser kleiner Ausreißer."}
+  - {fach: chemie, wort: , satz: ""}  
+  - {fach: mathematik, wort: , satz: "Das ist ein entscheidender Faktor für die wirtschaftliche Entwicklung des Landes"}
+  - {fach: mathematik, wort: Potenz, satz: "Im Alter lässt die Potenz des Mannes stark nach."}    
+erzaehlsaetze:
+    - {fach: mathematik, titel: Mitternachtsformel, satz: "Mein Nachhilfelehrer meinte, ich soll bei der Aufgabe die Mitternachtsformel nehmen."}
+    - {fach: chemie, title: , satz: ""}

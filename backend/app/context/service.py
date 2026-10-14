@@ -16,6 +16,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.context.bausteine import VORAB, Baustein, Kontext, aus_treffern
 from app.context.stunden import als_stundenzahl
@@ -175,6 +176,24 @@ async def _faecher_der_person(db: AsyncSession, pseudonym: str) -> tuple[int, ..
     return tuple(r[0] for r in zeilen.all())
 
 
+async def bezugsfaecher_von(db: AsyncSession, subject_id: int | None) -> tuple[int, ...]:
+    """Die Bezugsfächer eines Fachs als IDs — gerichtet, wie in `subjects.yaml` eingetragen.
+
+    Gespeichert sind Slugs (der Seed prüft sie); ein Slug ohne Fach fällt hier still heraus,
+    weil der Seed ihn gar nicht erst schreibt.
+    """
+    if subject_id is None:
+        return ()
+    bezug = aliased(Subject)
+    zeilen = await db.execute(
+        sa.select(bezug.id)
+        .join(Subject, bezug.slug == sa.func.any(Subject.bezugsfaecher))
+        .where(Subject.id == subject_id)
+        .order_by(bezug.id)
+    )
+    return tuple(r[0] for r in zeilen.all())
+
+
 async def _grundschicht(
     frage: str,
     db: AsyncSession,
@@ -203,6 +222,7 @@ async def _grundschicht(
     """
     subject_id = await _conversation_subject(db, chat_id)
     eigene = () if subject_id else await _faecher_der_person(db, pseudonym)
+    bezug = await bezugsfaecher_von(db, subject_id)
     stufe = await stufe_der_person(db, chat_id, jwt_stufe)
 
     profil = Suchprofil(
@@ -210,6 +230,7 @@ async def _grundschicht(
         rollen=rollen,
         subject_id=subject_id,
         eigene_faecher=eigene,
+        bezugsfaecher=bezug,
         anchor_ids=tuple(anchor_ids),
         grade=stufe,
         # Wie im Werkzeugweg: roh holen, in `fuer_modell` auswählen.

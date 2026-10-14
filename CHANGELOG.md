@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Migration
+
+`alembic upgrade head` führt `0085` aus: Spalte `subjects.bezugsfaecher` — die Fächer, deren
+Fachbegriffe ein Fach mitliest. Rückrollbar.
+
+### Nach dem Update
+
+In `config/subjects.yaml` je Fach die `bezugsfaecher` eintragen (Beschreibung im Kopf der
+`subjects.example.yaml`, z. B. `bezugsfaecher: [biologie, chemie, physik, mathematik]` bei
+NwT), dann die Fächer neu einspielen:
+
+```bash
+docker compose exec backend python scripts/seed_subjects.py
+```
+
+Nennt ein Eintrag ein Fach, das nicht in der Datei steht, schreibt der Seed nichts und meldet
+den Eintrag.
+
 ## [0.15.2] – 2026-10-14
 
 Fachbegriffe erscheinen im Tab „weiterer Kontext" der Fachseite, die Fachschaft kann sie

@@ -90,6 +90,11 @@ class Suchprofil:
     # „Energie" ist dann für eine Physikschülerin eher der Physikbegriff als der aus
     # Ethik, ohne dass Ethik verschwände.
     eigene_faecher: tuple[int, ...] = ()
+    # Bezugsfächer des Fachs der Konversation (`subjects.bezugsfaecher`, gerichtet): NwT
+    # liest Biologie, Chemie, Physik und Mathematik mit. Leer ohne `subject_id`. Noch ohne
+    # Wirkung auf die Suche — die Begriffsnennung (0.16, Schritt 3) zählt sie wie das
+    # eigene Fach.
+    bezugsfaecher: tuple[int, ...] = ()
 
 
 # ── Ergebnisumschlag ─────────────────────────────────────────────────────────

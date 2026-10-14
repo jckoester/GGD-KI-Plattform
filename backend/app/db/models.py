@@ -118,6 +118,11 @@ class Subject(Base):
     untis_codes: Mapped[list[str]] = mapped_column(
         PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
     )
+    # Fächer, die dieses Fach „mitliest" (Slugs, gerichtet): NwT → Biologie, Chemie …
+    # Aus subjects.yaml geseedet, dort gegen die Slugs geprüft — siehe Alembic 0085.
+    bezugsfaecher: Mapped[list[str]] = mapped_column(
+        PGARRAY(Text), nullable=False, server_default=text("'{}'"), default=list
+    )
 
     __table_args__ = (
         # Partiell-unique: Fächer ohne Bildungsplan-Code (fach_code IS NULL) dürfen

@@ -11,6 +11,10 @@
 #         Kursstufe, groß = Leistungskurs bzw. regulärer Unterricht in Sek I.),
 #         sso_aliases (optional, Liste alternativer SSO-Gruppennamen für den
 #         Gruppenimport, z.B. [bildende.kunst] für die Gruppe fs.bildende.kunst)
+#         bezugsfaecher (optional, Liste von Slugs: Fächer, deren Fachbegriffe dieses
+#         Fach mitliest — z.B. [biologie, chemie, physik, mathematik] bei NwT.
+#         Gerichtet: NwT → Biologie heißt nicht Biologie → NwT. Jeder Slug muss in
+#         dieser Datei stehen, sonst schreibt seed_subjects.py nichts.)
 #
 schulart: GYM # Bildungsplan-Schulart (GYM, RS, GMS, GS, BSO)
 

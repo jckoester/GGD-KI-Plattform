@@ -31,7 +31,9 @@ sichern das ab: Bei der geltenden Schwelle muss dasselbe herauskommen wie ohne U
   steht vorn in der Reihenfolge nicht unbedingt der rohe nächste Treffer.
 * Über Fachgrenzen: Begriffe eines **Bezugsfachs** im Chat eines anderen Fachs; bei den
   Gegenproben getrennt ausgewiesen, welche Fehltreffer aus einem Fach **ohne** Bezug kommen.
-  Die Bezugsfächer stehen bis Schritt 2 als Annahme in der Szenariodatei.
+  Die Bezugsfächer kommen aus der Datenbank (`subjects.bezugsfaecher`, geseedet aus
+  `subjects.yaml`) — wie im Chat. Passt ein Fall der Szenariodatei (`bezug`) nicht zu ihnen,
+  bricht das Skript ab, statt still etwas anderes zu messen.
 * Zeit: `vorab()` bei der geltenden Schwelle, ohne Embedding; das Embedding getrennt.
 
 **Test-Chats** (``--chats``): die Erzählsätze (je Begriff einer, Rahmen reihum), die schulnahen
@@ -179,6 +181,16 @@ def ohne_bezug(chat_fach: str | None, treffer: list[Treffer], bezug: dict) -> li
     return [t for t in treffer if t.fach is not None and t.fach not in erlaubt]
 
 
+def bezug_abweichungen(liste: list[Nachricht], bezug: dict) -> list[str]:
+    """Fälle über Fachgrenzen, deren Angabe `bezug` nicht zu den Bezugsfächern der Instanz
+    passt — dann zählte Kriterium 7 einen Grenzfall mit oder ließe einen echten Fall weg."""
+    faelle = {(n.faecher[0], n.erwartet, n.bezug) for n in liste if n.art == "fachgrenze"}
+    return [f"{titel} ({fach}) im {chat}-Chat: Szenario sagt {'mit' if mit else 'ohne'} Bezug, "
+            f"die Instanz {'ohne' if mit else 'mit'}"
+            for chat, (fach, titel), mit in sorted(faelle)
+            if (fach in bezug.get(chat, ())) != mit]
+
+
 def _schluessel(t: Treffer) -> tuple:
     return (t.fach, t.titel)
 
@@ -279,8 +291,12 @@ async def _distanzen(db, vektor, kennungen: set) -> dict:
 
 
 async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
+    import sqlalchemy as sa
+
     from app.context import search
     from app.context.search import Suchprofil, vektor_oder_none, vorab
+    from app.context.service import bezugsfaecher_von
+    from app.db.models import Subject
     from app.db.session import AsyncSessionLocal
 
     geltend = search.VORAB_SCHWELLE
@@ -293,6 +309,12 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
         fehlend = sorted({n.erwartet for n in liste if n.erwartet} - set(knoten))
         if fehlend:
             raise SystemExit("Erwartete Knoten fehlen: " + ", ".join(f"{t} ({f})" for f, t in fehlend))
+        bezug = {s: list(b) for s, b in (await db.execute(
+            sa.select(Subject.slug, Subject.bezugsfaecher).order_by(Subject.slug))).all() if b}
+        abweichend = bezug_abweichungen(liste, bezug)
+        if abweichend:
+            raise SystemExit("Bezugsfächer passen nicht zum Szenario:\n  " + "\n  ".join(abweichend))
+        bezug_ids = {f: await bezugsfaecher_von(db, slug_zu_id[f]) for f in faecher}
 
         def als_treffer(t: dict, distanzen: dict) -> Treffer:
             weg = "distanz" if "distanz" in t else "name"
@@ -310,6 +332,7 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
             for fach in n.faecher:
                 profil = Suchprofil(pseudonym=PSEUDONYM, rollen=("student",),
                                     subject_id=slug_zu_id[fach] if fach else None,
+                                    bezugsfaecher=bezug_ids[fach] if fach else (),
                                     grade=stufe, mit_metadaten=True)
                 beginn = time.perf_counter()
                 heute = await vorab(n.text, profil, db, vektor=v)
@@ -339,7 +362,7 @@ async def messen(liste: list[Nachricht], stufe: int) -> tuple[list[dict], dict]:
     if abtastung_wirkungslos(laeufe):
         raise SystemExit("Selbstprüfung: Zwischen 0,40 und 0,52 ändert sich nichts — liest "
                          "vorab() die Schwelle noch aus dem Modul?")
-    return laeufe, {"schwelle": geltend}
+    return laeufe, {"schwelle": geltend, "bezug": bezug}
 
 
 # ── Protokoll ────────────────────────────────────────────────────────────────
@@ -372,7 +395,7 @@ def protokoll_als_markdown(kopf: dict, laeufe: list[dict], bezug: dict) -> str:
         f"Datei `{kopf['datei']}` · `VORAB_SCHWELLE` {_d(s0)} · Profil Schüler:in, Stufe {kopf['stufe']}, "
         f"ohne Fach und mit Fach · {len({l['nachricht'].text for l in laeufe})} Nachrichten, {len(laeufe)} Läufe.",
         "", "**Bestand (Vorab-Typen je Fach):** " + kopf["bestand"], "",
-        "**Bezugsfächer (Annahme bis Schritt 2):** "
+        "**Bezugsfächer (`subjects.bezugsfaecher` der Instanz):** "
         + "; ".join(f"{f} → {', '.join(b)}" for f, b in bezug.items()), "",
         f"**Zeit:** `vorab()` ohne Embedding Median {statistics.median(zeiten):.1f} ms "
         f"(90. Perzentil {statistics.quantiles(zeiten, n=10)[-1]:.1f} ms); Embedding Median "
@@ -612,7 +635,6 @@ def main() -> None:
 
     daten = yaml.safe_load(args.datei.read_text(encoding="utf-8"))
     liste = nachrichten(daten)
-    bezug = daten.get("bezugsfaecher") or {}
 
     if args.chats:
         ergebnisse = chats_fahren(args, daten, liste)
@@ -634,6 +656,7 @@ def main() -> None:
 
     laeufe, kopf = asyncio.run(lauf())
     kopf.update(datei=args.datei.name, beginn=datetime.now().strftime("%d.%m.%Y, %H:%M"), stufe=daten["stufe"])
+    bezug = kopf["bezug"]
     z = zaehle(laeufe, kopf["schwelle"], bezug)
     print(f"\nbei {_d(kopf['schwelle'])}: " + " · ".join(
         f"{FORM_NAMEN[f]} {_anteil(z['formen'][f])}" for f in FORMEN))

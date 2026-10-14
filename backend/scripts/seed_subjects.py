@@ -62,6 +62,33 @@ async def _count_references(db: AsyncSession, subject_id: int) -> dict[str, int]
     return counts
 
 
+def bezugsfaecher(subjects: list[dict]) -> tuple[dict[str, list[str]], list[str]]:
+    """Die Bezugsfächer je Slug, normalisiert — und was daran falsch ist.
+
+    ⚠️ **Ein Tippfehler hier wäre stumm:** Ein unbekannter Slug ergäbe einfach keinen Bezug,
+    und NwT fände die Biologie-Begriffe nicht, ohne dass es jemand merkt. Deshalb ist jeder
+    Eintrag ein Fehler, der nicht auf ein Fach **derselben Datei** zeigt, ebenso ein Fach,
+    das sich selbst nennt. Der Seed schreibt dann nichts.
+    """
+    bekannt = {str(e["slug"]).lower() for e in subjects}
+    ergebnis: dict[str, list[str]] = {}
+    fehler: list[str] = []
+    for entry in subjects:
+        slug = str(entry["slug"]).lower()
+        roh = entry.get("bezugsfaecher") or []
+        if not isinstance(roh, list):
+            fehler.append(f"Fach '{slug}': bezugsfaecher muss eine Liste sein")
+            continue
+        liste = sorted({str(b).strip().lower() for b in roh if b and str(b).strip()})
+        for b in liste:
+            if b == slug:
+                fehler.append(f"Fach '{slug}': nennt sich selbst als Bezugsfach")
+            elif b not in bekannt:
+                fehler.append(f"Fach '{slug}': Bezugsfach '{b}' steht nicht in subjects.yaml")
+        ergebnis[slug] = liste
+    return ergebnis, fehler
+
+
 async def seed(yaml_path: Path, *, prune: bool = False) -> None:
     with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
@@ -69,6 +96,12 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
     subjects = data.get("subjects", [])
     if not subjects:
         logger.error("Keine Fächer in %s gefunden.", yaml_path)
+        sys.exit(1)
+    bezug, fehler = bezugsfaecher(subjects)
+    if fehler:
+        for zeile in fehler:
+            logger.error("%s", zeile)
+        logger.error("Nichts geschrieben — erst die Bezugsfächer in %s berichtigen.", yaml_path)
         sys.exit(1)
 
     engine = create_async_engine(settings.database_url)
@@ -113,6 +146,7 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
                 existing.sort_order = entry.get("sort_order", 0)
                 existing.sso_aliases = sso_aliases
                 existing.untis_codes = untis_codes
+                existing.bezugsfaecher = bezug[slug]
                 updated += 1
             else:
                 db.add(
@@ -127,6 +161,7 @@ async def seed(yaml_path: Path, *, prune: bool = False) -> None:
                         sort_order=entry.get("sort_order", 0),
                         sso_aliases=sso_aliases,
                         untis_codes=untis_codes,
+                        bezugsfaecher=bezug[slug],
                     )
                 )
                 inserted += 1

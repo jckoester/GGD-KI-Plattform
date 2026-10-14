@@ -155,6 +155,54 @@ class TestFachwahl:
         assert titel[0] == "Aus meinem Fach"
 
 
+class TestBezugsfaecher:
+    """Die Bezugsfächer des Chat-Fachs im Suchprofil (0.16, Schritt 2).
+
+    Noch ohne Wirkung auf die Suche — hier geht es nur darum, dass das Profil sie trägt,
+    gerichtet und aus dem Fach der Konversation.
+    """
+
+    async def test_aufgeloest_und_gerichtet(self, db_session, bestand):
+        from app.context.service import bezugsfaecher_von
+        fach, anderes, _ = bestand
+        fach.bezugsfaecher = [anderes.slug, "gibt-es-nicht"]
+        await db_session.flush()
+        assert await bezugsfaecher_von(db_session, fach.id) == (anderes.id,)
+        assert await bezugsfaecher_von(db_session, anderes.id) == ()
+        assert await bezugsfaecher_von(db_session, None) == ()
+
+    async def _profil_im_chat(self, db_session, monkeypatch, subject_id):
+        from app.context import service
+        from app.db.models import Conversation
+        konv = Conversation(pseudonym="p-n11", model_used="chat-standard", subject_id=subject_id)
+        db_session.add(konv)
+        await db_session.flush()
+        gesehen = []
+
+        async def _vorab(frage, profil, db, *, vektor):
+            gesehen.append(profil)
+            return []
+        monkeypatch.setattr(service, "vorab", _vorab)
+        await service._grundschicht("egal", db_session, pseudonym="p-n11", rollen=("student",),
+                                    chat_id=konv.id, anchor_ids=(), jwt_stufe=None, vektor=FRAGE)
+        return gesehen[0]
+
+    async def test_profil_traegt_die_bezugsfaecher_des_chat_fachs(self, db_session, bestand, monkeypatch):
+        fach, anderes, _ = bestand
+        fach.bezugsfaecher = [anderes.slug]
+        await db_session.flush()
+        profil = await self._profil_im_chat(db_session, monkeypatch, fach.id)
+        assert profil.bezugsfaecher == (anderes.id,)
+
+    async def test_ohne_fach_keine_bezugsfaecher(self, db_session, bestand, monkeypatch):
+        """Gegenprobe: Der freie Chat hat kein Fach, also auch nichts, das es mitliest."""
+        fach, anderes, _ = bestand
+        fach.bezugsfaecher = [anderes.slug]
+        await db_session.flush()
+        profil = await self._profil_im_chat(db_session, monkeypatch, None)
+        assert profil.bezugsfaecher == ()
+
+
 class TestAnker:
     async def test_anker_schraenkt_weiter_ein(self, db_session, bestand):
         """Ein Assistent mit Wissensbereich findet auch vorab nur, was darunter hängt."""

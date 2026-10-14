@@ -14,8 +14,11 @@
 # Fach des Begriffs.
 #
 # **Fachgrenzen** — Chat-Fach ≠ Fach des Begriffs; Profil nur das Chat-Fach. `bezug: false`
-# heißt: Das Chat-Fach hat den Begriffsfach nicht als Bezugsfach — ein Grenzfall, gezeigt,
-# keinem Kriterium zugeordnet.
+# heißt: Das Chat-Fach hat das Begriffsfach nicht als Bezugsfach — ein Grenzfall, gezeigt,
+# keinem Kriterium zugeordnet. Die Bezugsfächer selbst stehen in `config/subjects.yaml`
+# (seit 0.16, Schritt 2); das Skript bricht ab, wenn `bezug` nicht zu ihnen passt. Auf Dev
+# gilt die Annahme aus den Querverweisen des Bildungsplans (13.10.2026): NwT → Biologie,
+# Chemie, Physik, Mathematik, BNT; Physik ↔ Mathematik.
 #
 # **Gegenproben** — jeder Treffer ist ein Fehltreffer, nicht nur der nächste. `wort` nennt das
 # Wort aus Titel oder Alias, das die Nachricht reizt (nur zum Lesen).
@@ -29,14 +32,6 @@ rahmen:
   - "Bei den Hausaufgaben soll ich {akk} erklären."
 
 ich: "Ich verstehe {akk} nicht."
-
-# Annahme bis Schritt 2 (dann `config/subjects.yaml`): gerichtet, „Chat-Fach liest mit".
-# Abgeleitet aus den Querverweisen des Bildungsplans auf Dev (13.10.2026): BNT ↔ NwT 20,
-# Biologie → NwT 18, Physik → NwT 12, Chemie → NwT 7, Physik → Mathematik 6, Mathematik → Physik 5.
-bezugsfaecher:
-  nwt: [biologie, chemie, physik, mathematik, bnt]
-  physik: [mathematik]
-  mathematik: [physik]
 
 begriffe:
   chemie:

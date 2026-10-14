@@ -165,7 +165,8 @@ def test_gegenproben_profile_und_chats():
 
 def test_szenariodatei_ist_vollstaendig():
     """Die echte Datei: jeder Rahmen setzt den Begriff ein, je Fach 8–10 Begriffe, jede Art
-    bekannt, und jedes Fach der Fachgrenzen hat seine Bezugsfächer eingetragen."""
+    bekannt. Ob die Fachgrenzen zu den Bezugsfächern passen, prüft das Skript gegen die
+    Instanz (`bezug_abweichungen`)."""
     daten = yaml.safe_load((_SKRIPTE / "szenarien" / "vorab_begriffe.yaml").read_text(encoding="utf-8"))
     assert len(daten["rahmen"]) == 4 and all("{akk}" in r for r in daten["rahmen"])
     arten = {"einwort", "gebeugt", "kompositum", "mehrwort", "plural_titel", "alias", "stoffsteckbrief",
@@ -173,5 +174,38 @@ def test_szenariodatei_ist_vollstaendig():
     for fach, eintraege in daten["begriffe"].items():
         assert 8 <= len(eintraege) <= 10, fach
         assert {e["art"] for e in eintraege} <= arten, fach
-    for e in daten["fachgrenzen"]:
-        assert (e["fach"] in daten["bezugsfaecher"].get(e["chat"], [])) == e.get("bezug", True), e["titel"]
+    assert "bezugsfaecher" not in daten, "Bezugsfächer gehören nach config/subjects.yaml"
+
+
+# ── Bezugsfächer der Instanz gegen das Szenario ──────────────────────────────
+
+GRENZFAELLE = {
+    "rahmen": MINI["rahmen"], "ich": MINI["ich"], "begriffe": {}, "gegenproben": {
+        "beilaeufig": {"faecher": [], "saetze": []}, "schulnah": {"faecher": [], "saetze": []},
+        "alltag": [], "anderes_fach": []},
+    "fachgrenzen": [
+        {"chat": "nwt", "fach": "biologie", "titel": "Fotosynthese", "art": "einwort",
+         "stichwort": "Fotosynthese", "frage": "Was ist Fotosynthese?", "akk": "die Fotosynthese"},
+        {"chat": "mathematik", "fach": "nwt", "titel": "Standardabweichung", "art": "einwort",
+         "bezug": False, "stichwort": "Standardabweichung", "frage": "Was ist sie?", "akk": "sie"},
+    ],
+}
+
+
+def test_passende_bezugsfaecher_ergeben_keine_abweichung():
+    liste = M.nachrichten(GRENZFAELLE)
+    assert M.bezug_abweichungen(liste, {"nwt": ["biologie", "chemie"]}) == []
+
+
+def test_fehlendes_bezugsfach_faellt_auf_einmal_je_fall():
+    """NwT ohne Biologie: Der Fall „mit Bezug" stimmt nicht mehr — einmal gemeldet, nicht
+    je Form (sieben Nachrichten)."""
+    abweichend = M.bezug_abweichungen(M.nachrichten(GRENZFAELLE), {"nwt": ["chemie"]})
+    assert len(abweichend) == 1 and "Fotosynthese" in abweichend[0]
+
+
+def test_unerwarteter_bezug_faellt_auf():
+    """Gegenrichtung: Hat Mathematik doch NwT als Bezugsfach, ist der Grenzfall keiner mehr."""
+    abweichend = M.bezug_abweichungen(M.nachrichten(GRENZFAELLE),
+                                      {"nwt": ["biologie"], "mathematik": ["nwt"]})
+    assert len(abweichend) == 1 and "Standardabweichung" in abweichend[0]
