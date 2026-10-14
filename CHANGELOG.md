@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an der GGD-KI-Plattform. Versionierung nach
 
 ## [Unreleased]
 
+### Neu
+
+- **Einstellungen → Fachbegriffe** (Admin): Fachbegriffe und Stoffsteckbriefe in jedes Fach
+  einspielen und exportieren — jede Datei in das Fach, das sie nennt, auch mehrere Fächer in
+  einem Lauf und auch in eines ohne Fachschaftsgruppe. Dessen Einträge ändern dann vorerst
+  nur Admins; gibt es die Gruppe später, hängt ein erneuter Import sie an die Fachschaft.
+
 ### Behoben
 
 - Der Tab „weiterer Kontext" einer Fachseite zeigte keine Fachbegriffe und Stoffsteckbriefe —

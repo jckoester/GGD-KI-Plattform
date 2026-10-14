@@ -36,6 +36,10 @@ alle gleichberechtigt. Dasselbe gilt für das Ändern, Archivieren und Verknüpf
 > Die Fachschaftsgruppe übernimmt die Plattform aus Ihrem Schulkonto. Wenn Sie das Fach
 > unterrichten, die Schaltfläche aber mit einer Absage antwortet, fehlt diese Gruppe —
 > das ist eine Sache der Administration, nicht Ihres Kontos.
+>
+> **Begriffe eines anderen Fachs** spielen Sie nicht in Ihr Fach ein — dort pflegt sie
+> dessen Fachschaft. Fehlen sie, kann die Administration sie unter **Einstellungen →
+> Fachbegriffe** in das richtige Fach einspielen, auch wenn es dort keine Fachschaft gibt.
 
 ## Eine Datei ist ein Eintrag
 

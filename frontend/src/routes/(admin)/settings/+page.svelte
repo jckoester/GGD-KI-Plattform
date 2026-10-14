@@ -8,6 +8,7 @@
         Users,
         FileText,
         CalendarDays,
+        BookOpen,
     } from "lucide-svelte";
     import { onMount } from "svelte";
     import {
@@ -117,6 +118,19 @@
             <div class="font-medium text-light-tx dark:text-dark-tx">Export-Vorlagen</div>
             <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
                 Schulweites Layout für PDF/Word/ODT der Material-Werkstatt
+            </div>
+        </a>
+        <!-- Fachbegriffe in jedes Fach (0.15.2) -->
+        <a
+            href="/settings/fachbegriffe"
+            class="bg-light-ui dark:bg-dark-ui border border-light-ui-3 dark:border-dark-ui-3
+                    rounded-lg p-5 hover:bg-light-ui-2 dark:hover:bg-dark-ui-2 transition-colors
+                    block no-underline"
+        >
+            <BookOpen class="w-6 h-6 mb-2 text-light-tx-2 dark:text-dark-tx-2" />
+            <div class="font-medium text-light-tx dark:text-dark-tx">Fachbegriffe</div>
+            <div class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                In jedes Fach einspielen — auch ohne Fachschaft
             </div>
         </a>
         <!-- Ferienkalender (UP-8 Schritt 4) -->

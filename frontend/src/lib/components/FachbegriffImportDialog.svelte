@@ -25,7 +25,12 @@
     import WarningBanner from "$lib/components/WarningBanner.svelte";
     import SuccessBanner from "$lib/components/SuccessBanner.svelte";
 
-    let { fach, fachname, onclose, onfertig } = $props();
+    /**
+     * `ausDatei` (Admin-Seite, 0.15.2): Jede Datei geht in das Fach, das sie unter
+     * `fach:` nennt; `fach` ist dann nur die Vorgabe für Dateien ohne Angabe und darf
+     * fehlen. Die Vorschau nennt deshalb je Zeile das Fach.
+     */
+    let { fach, fachname, ausDatei = false, onclose, onfertig } = $props();
 
     let dateien = $state([]);
     let bericht = $state(null);
@@ -62,6 +67,7 @@
             const antwort = await importiereFachbegriffe(fach, dateien, {
                 probelauf,
                 ueberschreiben,
+                ausDatei,
             });
             if (probelauf) {
                 bericht = antwort;
@@ -84,13 +90,27 @@
                border border-light-ui-3 dark:border-dark-ui-3"
     >
         <h2 class="text-lg font-semibold text-light-tx dark:text-dark-tx">
-            Fachbegriffe einspielen — {fachname}
+            {#if ausDatei}
+                Fachbegriffe einspielen — Fach aus den Dateien
+            {:else}
+                Fachbegriffe einspielen — {fachname}
+            {/if}
         </h2>
         <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
             Markdown-Dateien einzeln oder als Zip-Bündel mit Abbildungen unter
             <code>_Abb/</code>. Was eingespielt wird, ist sofort für alle sichtbar, die
             das Fach lesen dürfen — auch für Schüler:innen.
         </p>
+        {#if ausDatei}
+            <p class="text-sm text-light-tx-2 dark:text-dark-tx-2 mt-1">
+                Jede Datei geht in das Fach, das sie unter <code>fach:</code> nennt.
+                {#if fachname}
+                    Dateien ohne Angabe gehen nach {fachname}.
+                {:else}
+                    Dateien ohne Angabe werden übersprungen.
+                {/if}
+            </p>
+        {/if}
 
         {#if !fertig}
             <label
@@ -197,7 +217,9 @@
                                                 class="text-xs text-light-tx-3
                                                        dark:text-dark-tx-3"
                                             >
-                                                ({zeile.datei}) — mit der Datei
+                                                ({zeile.datei}{ausDatei && zeile.fach
+                                                    ? ` · ${zeile.fach}`
+                                                    : ""}) — mit der Datei
                                                 überschreiben
                                             </span>
                                         </span>
@@ -209,6 +231,13 @@
                                     >
                                         ({zeile.datei})
                                     </span>
+                                    {#if ausDatei && zeile.fach}
+                                        <span
+                                            class="text-xs text-light-tx-2 dark:text-dark-tx-2"
+                                        >
+                                            → {zeile.fach}
+                                        </span>
+                                    {/if}
                                 {/if}
                             </li>
                         {/each}
@@ -279,6 +308,11 @@
                                 {zeile.titel}
                                 <ExternalLink size="12" />
                             </a>
+                            {#if ausDatei && zeile.fach}
+                                <span class="text-xs text-light-tx-2 dark:text-dark-tx-2">
+                                    → {zeile.fach}
+                                </span>
+                            {/if}
                         </li>
                     {/each}
                 </ul>

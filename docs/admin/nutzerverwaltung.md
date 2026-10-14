@@ -116,6 +116,17 @@ erscheint die Schaltfläche zwar, jeder Versuch endet aber mit einer Absage. Pr�
 lässt sich der Stand unter `/settings/users`; die Meldung nennt das Fach, um das es
 geht. Siehe [Fachbegriffe pflegen](../user/fachbegriffe-pflegen.md).
 
+**Admins spielen in jedes Fach ein** — unter **Einstellungen → Fachbegriffe**
+(`/settings/fachbegriffe`). Das ist der Weg für Begriffe, die ein anderes Fach braucht,
+und für Fächer, in deren Fachschaft niemand ist. Anders als auf der Fachseite geht dort
+**jede Datei in das Fach, das sie unter `fach:` nennt** — ein Bündel darf mehrere Fächer
+enthalten, und die Vorschau zeigt je Datei, wohin sie geht. Das oben gewählte Fach ist nur
+die Vorgabe für Dateien ohne Angabe; ist keines gewählt, werden sie übersprungen. Es
+bestimmt außerdem, was Liste und „Als Zip" zeigen. Hat ein Fach **keine**
+Fachschaftsgruppe, spielt die Seite trotzdem ein; die Einträge ändern dann vorerst nur
+Admins, und der Bericht sagt es. Gibt es die Gruppe später, hängt ein erneuter Import der
+Dateien die Einträge an die Fachschaft — auch unveränderte.
+
 ⚠️ **Angelegt werden sie nicht alle gleich.** Fachschaften, Schulklassen, Lehrkräfte- und
 Arbeitsgruppen entstehen automatisch. **Unterrichtsgruppen nicht** — sie werden der
 Lehrkraft als *Angebot* vorgelegt (siehe unten). Bis zum 23.09.2026 entstanden auch sie

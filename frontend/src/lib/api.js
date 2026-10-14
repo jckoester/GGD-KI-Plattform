@@ -1465,15 +1465,19 @@ export async function searchContextNodesLegacy(query, contentTypes = []) {
  * fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung. Derselbe Aufruf
  * liefert in beiden Fällen denselben Bericht — nur einmal mit und einmal ohne Wirkung.
  *
- * @param {string} fach Kürzel, Slug oder Name
+ * @param {string | null} fach Kürzel, Slug oder Name — bei `ausDatei` nur die Vorgabe für
+ *   Dateien ohne `fach:`, und dann darf es fehlen
  * @param {File[]} dateien `.md`, `.svg` oder ein `.zip`
- * @param {{ probelauf?: boolean, ueberschreiben?: string[] }} optionen
+ * @param {{ probelauf?: boolean, ueberschreiben?: string[], ausDatei?: boolean }} optionen
  *   `ueberschreiben` nennt die Dateien, deren handveränderte Knoten ersetzt werden
- *   sollen — je Zeile entschieden, nicht für den ganzen Lauf.
+ *   sollen — je Zeile entschieden, nicht für den ganzen Lauf. `ausDatei` (nur Admins,
+ *   0.15.2): Jede Datei geht in das Fach, das sie nennt.
  */
 export async function importiereFachbegriffe(fach, dateien, optionen = {}) {
-  const { probelauf = true, ueberschreiben = [] } = optionen;
-  const params = new URLSearchParams({ fach, probelauf: String(probelauf) });
+  const { probelauf = true, ueberschreiben = [], ausDatei = false } = optionen;
+  const params = new URLSearchParams({ probelauf: String(probelauf) });
+  if (fach) params.set("fach", fach);
+  if (ausDatei) params.set("fach_aus_datei", "true");
   for (const datei of ueberschreiben) params.append("ueberschreiben", datei);
 
   const fd = new FormData();

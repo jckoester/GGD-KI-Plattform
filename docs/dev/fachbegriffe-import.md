@@ -59,6 +59,24 @@ Fachs, oder Admin. ⚠️ Strenger als `/curricula/new`: Gibt es zum Fach gar ke
 Fachschaft, ist das hier ein 403 und kein „dann eben ohne Prüfung" — der Import hängt
 seine Knoten an genau diese Gruppe und meldete sonst jede Datei als übersprungen.
 
+**Admins auch ohne Fachschaft** (0.15.2, Admin-Seite `/settings/fachbegriffe`): Der
+Endpunkt ruft `importiere(…, ohne_fachschaft=True)` für Admins. Fehlt die Gruppe, entsteht
+der Knoten mit `write_scope = private` **ohne** Eigentümer — ändern dürfen ihn nur Admins
+(`_schreibbereich`). `subject` verlangt eine Gruppe (CHECK), `school` hieße nach ADR-019
+„jede Lehrkraft", `global` verbietet die Rangfolge gegenüber `read_scope = school`. Gibt
+es die Gruppe später, hängt `_an_fachschaft_haengen` den Knoten beim nächsten Lauf an
+sie — **vor** dem Zweig „unverändert", sonst griffe es nur bei geänderten Dateien. Der
+Bericht nennt das Fach einmal unter den Hinweisen. Das Skript bleibt beim Überspringen.
+
+**Fach aus der Datei** (`fach_aus_datei=true`, nur Admins, 0.15.2): Der Lauf ist dann
+**nicht** an ein Fach gebunden (`nur_fach=None`); jede Datei geht in das Fach ihres
+`fach:`, wie beim Skript. `fach` ist optional und nur die Vorgabe für Dateien ohne
+Angabe; ohne Vorgabe werden sie mit „keine Fachangabe" übersprungen — fachlose Begriffe
+entstehen nicht. Jede Zeile der Vorschau trägt `fach`. Weil `nach_datei` den ganzen Lauf
+kennt, lösen sich Verweise zwischen Dateien verschiedener Fächer im selben Lauf auf. Ohne
+den Schalter verlangt der Endpunkt `fach` (422), und eine Lehrkraft bekommt mit ihm 403 —
+die Fachseite bleibt gebunden, auch für Admins.
+
 **Ein Fach.** Der Lauf ist an das Fach gebunden, für das die Rechte geprüft wurden.
 Eine Datei ohne `fach:` landet dort; eine Datei mit einem **anderen** `fach:` wird
 gemeldet und übersprungen — nicht umgehängt.

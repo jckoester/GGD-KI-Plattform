@@ -2224,7 +2224,9 @@ async def _fach_mit_schreibrecht(
     Fachschaftsgruppe, wird nicht geprüft. Hier wäre das sinnlos — der Import hängt
     seine Knoten an genau diese Gruppe (`write_scope = subject`) und meldete ohne sie
     jede Datei als übersprungen. Ein 403 mit Klartext ist ehrlicher als ein leerer
-    Bericht. Admins bleiben ausgenommen; sie machen das heute über das Skript.
+    Bericht. Admins bleiben ausgenommen — für jedes Fach, über die Admin-Seite
+    `/settings/fachbegriffe` (0.15.2), auch ohne Fachschaftsgruppe (dann ändern die
+    Einträge vorerst nur Admins, `fachbegriffe_import._schreibbereich`).
     """
     from app.context.service import is_subject_department_member
 
@@ -2265,7 +2267,15 @@ def _zaehlung(counter) -> list[ZielZaehlung]:
 @router.post("/fachbegriffe/import", response_model=FachbegriffImportBericht)
 async def importiere_fachbegriffe(
     hintergrund: BackgroundTasks,
-    fach: str = Query(..., description="Kürzel, Slug oder Name des Fachs"),
+    fach: str | None = Query(
+        default=None,
+        description="Kürzel, Slug oder Name des Fachs. Pflicht, außer bei `fach_aus_datei`; "
+                    "dort nur die Vorgabe für Dateien ohne `fach:`.",
+    ),
+    fach_aus_datei: bool = Query(
+        False,
+        description="Nur Admins: Jede Datei geht in das Fach, das sie nennt (Admin-Seite).",
+    ),
     probelauf: bool = Query(
         True, description="True: nichts schreiben, nur den Bericht liefern"
     ),
@@ -2285,7 +2295,8 @@ async def importiere_fachbegriffe(
 
     Derselbe Kern wie `scripts/seed_fachbegriffe.py` — hier mit einem Bündel aus dem
     Formular statt aus einem Ordner, gebunden an **ein** Fach und hinter einer
-    Rechteprüfung.
+    Rechteprüfung. Admins können die Bindung lösen (`fach_aus_datei`); dann geht jede
+    Datei in das Fach, das sie nennt.
 
     ⚠️ **`probelauf=true` ist die Vorgabe.** Der Weg über die Oberfläche zeigt erst
     den Bericht und fragt dann; ein Schreiblauf ist eine ausdrückliche Entscheidung,
@@ -2295,12 +2306,25 @@ async def importiere_fachbegriffe(
     from app.context.fachbegriffe_import import importiere
     from app.context.fachbegriffe_upload import BuendelFehler, baue_buendel
 
-    fach_zeile = await _fach_mit_schreibrecht(fach, db, user)
+    # **Fach aus der Datei** (Admin-Seite, 0.15.2): Die Bindung an ein Fach schützt die
+    # Fachschaft — sie darf nur in ihr Fach. Einem Admin, der jedes Fach darf, nimmt sie
+    # nur Arbeit ab, die die Datei schon getan hat. Die Fachseite bleibt gebunden, auch
+    # für Admins: Dort steht ein Fach fest, und eine Datei mit anderem `fach:` ist dort
+    # eher ein Versehen als eine Absicht.
+    if fach_aus_datei and "admin" not in user.roles:
+        raise HTTPException(
+            status_code=403, detail="Das Fach aus der Datei übernehmen dürfen nur Admins."
+        )
+    if fach is None and not fach_aus_datei:
+        raise HTTPException(status_code=422, detail="Es fehlt das Fach (`fach`).")
+
+    fach_zeile = await _fach_mit_schreibrecht(fach, db, user) if fach else None
     # ⚠️ **Vor der Transaktionsentscheidung ablesen.** `rollback()` macht jedes Objekt
     # der Sitzung ungültig — auch das Fach. Ein `fach_zeile.name` danach löste ein
     # Nachladen aus, und das scheitert in asyncio. Der Probelauf wäre also genau der
     # Fall gewesen, der nie funktioniert.
-    fach_name, fach_slug = fach_zeile.name, fach_zeile.slug
+    fach_name = fach_zeile.name if fach_zeile else ""
+    fach_slug = fach_zeile.slug if fach_zeile else None
 
     hochgeladen = [(d.filename or "", await d.read()) for d in dateien]
     try:
@@ -2308,8 +2332,17 @@ async def importiere_fachbegriffe(
     except BuendelFehler as fehler:
         raise HTTPException(status_code=fehler.status, detail=fehler.text)
 
+    # Ein Fach ohne Fachschaftsgruppe nimmt nur ein Admin an (Admin-Seite, 0.15.2) —
+    # die Einträge ändern dann vorerst nur Admins. Lehrkräfte kommen ohne Gruppe gar
+    # nicht bis hierher (`_fach_mit_schreibrecht`).
     bilanz = await importiere(
-        db, buendel, nur_fach=fach_zeile, ueberschreiben=set(ueberschreiben)
+        db, buendel,
+        # Gebunden an das Fach — oder, aus der Datei, nur als Vorgabe für Dateien ohne
+        # `fach:`. Ohne Vorgabe werden die übersprungen; fachlos entsteht nichts.
+        nur_fach=None if fach_aus_datei else fach_zeile,
+        fach_vorgabe=fach_slug if fach_aus_datei else None,
+        ueberschreiben=set(ueberschreiben),
+        ohne_fachschaft="admin" in user.roles,
     )
     if probelauf:
         await db.rollback()
@@ -2317,7 +2350,7 @@ async def importiere_fachbegriffe(
         await db.commit()
         logger.info(
             "Fachbegriff-Import %s durch %s: %d neu, %d aktualisiert, %d unverändert",
-            fach_slug, user.sub, bilanz.neu, bilanz.aktualisiert,
+            fach_slug or "(Fach aus den Dateien)", user.sub, bilanz.neu, bilanz.aktualisiert,
             bilanz.unveraendert,
         )
         # ⚠️ **Gleich einbetten, nicht erst nachts** (0.14, F7). Der Import setzt
@@ -2348,7 +2381,7 @@ async def importiere_fachbegriffe(
         dateien=[
             DateiErgebnisRead(
                 datei=d.datei, titel=d.titel, zustand=d.zustand, node_id=d.node_id,
-                pruefstatus=d.pruefstatus, entwurf=d.entwurf,
+                pruefstatus=d.pruefstatus, entwurf=d.entwurf, fach=d.fach,
             )
             for d in bilanz.dateien
         ],

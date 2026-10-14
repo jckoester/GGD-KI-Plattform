@@ -657,6 +657,9 @@ class DateiErgebnis:
     node_id: Any = None
     #: `pruefstatus:` im Wortlaut der Datei, leer wenn keiner dasteht.
     pruefstatus: str = ""
+    #: Das Fach, in das die Datei geht — beim Lauf über mehrere Fächer (Admin-Seite,
+    #: 0.15.2) die Antwort auf „wohin?". Der Name, sonst die Angabe der Datei.
+    fach: str = ""
 
     @property
     def entwurf(self) -> bool:
@@ -851,11 +854,25 @@ async def _finde_knoten(
     )).scalars().first()
 
 
+def _schreibbereich(gruppe_id: int | None) -> str:
+    """Wer den Knoten ändern darf: die Fachschaft — oder, ohne sie, nur Admins.
+
+    Ohne Fachschaftsgruppe spielt seit 0.15.2 ein **Admin** trotzdem ein
+    (`ohne_fachschaft`). `subject` ginge dann nicht (der CHECK verlangt eine Gruppe), und
+    `school` oder `global` wären andere Zusagen: `school` heißt nach ADR-019 „jede
+    Lehrkraft", und `global` verbietet die Rangfolge gegenüber `read_scope = school`.
+    `private` ohne Eigentümer heißt: niemand außer Admins (`_check_write_permission`).
+    Kommt die Fachschaft später dazu, hängt ein erneuter Import die Knoten an sie um —
+    auch unveränderte (:func:`_an_fachschaft_haengen`).
+    """
+    return "subject" if gruppe_id is not None else "private"
+
+
 async def _schreibe_knoten(
     db: AsyncSession,
     quelle: Quelldatei,
     fach: Subject,
-    gruppe_id: int,
+    gruppe_id: int | None,
     bilanz: Bilanz,
     *,
     stabile_id: str,
@@ -896,7 +913,7 @@ async def _schreibe_knoten(
             metadata_=metadata,
             # Das Zielbild aus ADR-019: Fachschaftsgut, alle lesen.
             read_scope="school",
-            write_scope="subject",
+            write_scope=_schreibbereich(gruppe_id),
             read_scope_group_id=None,
             write_scope_group_id=gruppe_id,
         )
@@ -908,6 +925,7 @@ async def _schreibe_knoten(
 
     ist = _ist_zustand(vorhanden, await alias_dienst.lade(db, vorhanden.id))
     await _trage_kennung_nach(db, vorhanden, stabile_id)
+    await _an_fachschaft_haengen(db, vorhanden, gruppe_id)
     if ist["hash"] == metadata[SEED_HASH]:
         bilanz.unveraendert += 1
         return vorhanden.id, "unveraendert"
@@ -925,7 +943,7 @@ async def _schreibe_knoten(
     vorhanden.content = quelle.content
     vorhanden.metadata_ = metadata
     vorhanden.read_scope = "school"
-    vorhanden.write_scope = "subject"
+    vorhanden.write_scope = _schreibbereich(gruppe_id)
     vorhanden.write_scope_group_id = gruppe_id
     await alias_dienst.setze(db, vorhanden.id, quelle.aliase)
     if ist["embedding_vorhanden"] and quelle.knotentyp in EMBEDDING_CONTENT_TYPES:
@@ -963,6 +981,39 @@ async def _trage_kennung_nach(
     # gewöhnliche Zuweisung löste beim Flush ein zweites UPDATE samt `onupdate` aus,
     # `expire()` einen Nachladeversuch — und der bricht in asyncio ab.
     attributes.set_committed_value(knoten, "metadata_", neu)
+
+
+async def _an_fachschaft_haengen(
+    db: AsyncSession, knoten: ContextNode, gruppe_id: int | None
+) -> None:
+    """Einen Knoten, den bisher nur Admins ändern durften, der Fachschaft übergeben.
+
+    So entsteht er, wenn ein Admin in ein Fach ohne Fachschaftsgruppe einspielt
+    (:func:`_schreibbereich`). Gibt es die Gruppe inzwischen, gehört er ihr — und zwar
+    **auch, wenn sich die Datei nicht geändert hat**: Der Zweig „unverändert" kehrt
+    sonst vorher zurück, und die Zusage „ein erneuter Import hängt sie an die
+    Fachschaft" hielte nur für Dateien, an denen zufällig jemand gearbeitet hat.
+
+    Nur in diese eine Richtung und nur für Knoten ohne Eigentümer — ein anderer
+    Schreibbereich ist eine Entscheidung, die der Import nicht überstimmt. Ohne
+    Änderungsstempel wie :func:`_trage_kennung_nach`: Wer ändern darf, ist keine
+    Änderung am Inhalt.
+    """
+    if (
+        gruppe_id is None
+        or knoten.write_scope != "private"
+        or knoten.owner_pseudonym is not None
+    ):
+        return
+    await db.execute(
+        sa.update(ContextNode)
+        .where(ContextNode.id == knoten.id)
+        .values(write_scope="subject", write_scope_group_id=gruppe_id,
+                **ohne_aenderungsstempel())
+        .execution_options(synchronize_session=False)
+    )
+    attributes.set_committed_value(knoten, "write_scope", "subject")
+    attributes.set_committed_value(knoten, "write_scope_group_id", gruppe_id)
 
 
 async def _schreibe_kanten(
@@ -1074,6 +1125,7 @@ async def seed_in_session(
     *,
     nur_fach: Subject | None = None,
     ueberschreiben: "bool | Collection[str]" = False,
+    ohne_fachschaft: bool = False,
 ) -> None:
     """Der Schreibteil — mit einer **übergebenen** Sitzung.
 
@@ -1098,8 +1150,13 @@ async def seed_in_session(
     #: Knoten-ID → Datei. Dieselbe Falle über Bande: Datei A trifft den Knoten über die
     #: Kennung, Datei B über die Herkunftsdatei.
     beansprucht: dict[Any, str] = {}
+    #: Fächer ohne Fachschaftsgruppe, zu denen der Hinweis schon im Bericht steht.
+    ohne_gruppe_gemeldet: set[int] = set()
 
     for quelle in gelesen:
+        # Vor `uebergangen`: Die Zeile der Vorschau nennt das Fach dieser Datei.
+        fach = faecher.get(quelle.fach.casefold()) if quelle.fach else None
+
         def uebergangen(grund: str) -> None:
             """Gelesen, aber nicht geschrieben — Zeile **und** Warnung.
 
@@ -1111,9 +1168,14 @@ async def seed_in_session(
             bilanz.dateien.append(DateiErgebnis(
                 datei=quelle.datei, titel=quelle.titel, zustand="uebergangen",
                 pruefstatus=quelle.pruefstatus,
+                fach=fach.name if fach is not None else quelle.fach,
             ))
 
-        fach = faecher.get(quelle.fach.casefold())
+        if not quelle.fach:
+            # Nur möglich, wenn der Lauf das Fach aus den Dateien nimmt und keines
+            # vorgibt (Admin-Seite). Fachlose Begriffe entstehen nicht.
+            uebergangen("keine Fachangabe (`fach:`) — übersprungen")
+            continue
         if fach is None:
             uebergangen(f"Fach „{quelle.fach}“ unbekannt")
             continue
@@ -1128,13 +1190,21 @@ async def seed_in_session(
                 Group.subject_id == fach.id, Group.type == "subject_department"
             ).order_by(Group.id).limit(1)
         )).scalar_one_or_none()
-        if gruppe_id is None:
+        if gruppe_id is None and not ohne_fachschaft:
             # `write_scope = subject` **verlangt** eine Gruppe (CHECK
             # `check_context_nodes_write_group_id`). Auf `school` auszuweichen wäre kein
             # Notbehelf, sondern eine andere Zusage: Dann dürfte jede Lehrkraft den
             # Eintrag ändern, nicht die Fachschaft.
             uebergangen(f"Fach „{fach.name}“ hat keine Fachschaftsgruppe — übersprungen")
             continue
+        if gruppe_id is None and fach.id not in ohne_gruppe_gemeldet:
+            # Ein Admin spielt trotzdem ein (Admin-Seite, 0.15.2) — einmal je Fach gesagt.
+            ohne_gruppe_gemeldet.add(fach.id)
+            bilanz.warnungen.append(
+                f"Fach „{fach.name}“ hat keine Fachschaftsgruppe: Die Einträge ändern "
+                "vorerst nur Admins. Gibt es eine, hängt ein erneuter Import sie an die "
+                "Fachschaft."
+            )
 
         stabile_id = quelle.id_angabe or leite_id_ab(
             fach.fach_code or fach.slug, quelle.datei
@@ -1167,7 +1237,7 @@ async def seed_in_session(
         )
         bilanz.dateien.append(DateiErgebnis(
             datei=quelle.datei, titel=quelle.titel, zustand=zustand,
-            node_id=knoten_id, pruefstatus=quelle.pruefstatus,
+            node_id=knoten_id, pruefstatus=quelle.pruefstatus, fach=fach.name,
         ))
         if knoten_id is not None:
             beansprucht[knoten_id] = quelle.datei
@@ -1255,6 +1325,7 @@ async def importiere(
     fach_vorgabe: str | None = None,
     nur_fach: Subject | None = None,
     ueberschreiben: "bool | Collection[str]" = False,
+    ohne_fachschaft: bool = False,
 ) -> Bilanz:
     """Ein Bündel einlesen und schreiben — der eine Weg, den Skript und Endpunkt gehen.
 
@@ -1263,7 +1334,8 @@ async def importiere(
     Transaktion und legt dieselbe Bilanz vor.
 
     ``nur_fach`` bindet den Lauf an ein Fach und ist zugleich die Vorgabe für Dateien
-    ohne `fach:`; siehe :func:`seed_in_session`.
+    ohne `fach:`; siehe :func:`seed_in_session`. ``ohne_fachschaft`` erlaubt Fächer ohne
+    Fachschaftsgruppe — nur für Admins (:func:`_schreibbereich`).
     """
     bilanz = Bilanz()
     if nur_fach is not None and fach_vorgabe is None:
@@ -1271,6 +1343,7 @@ async def importiere(
         fach_vorgabe = nur_fach.slug
     gelesen = lies_buendel(dateien, bilanz, fach_vorgabe)
     await seed_in_session(
-        db, gelesen, bilanz, nur_fach=nur_fach, ueberschreiben=ueberschreiben
+        db, gelesen, bilanz, nur_fach=nur_fach, ueberschreiben=ueberschreiben,
+        ohne_fachschaft=ohne_fachschaft,
     )
     return bilanz

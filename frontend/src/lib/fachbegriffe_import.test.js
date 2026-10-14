@@ -148,6 +148,28 @@ describe('importiereFachbegriffe', () => {
     expect(url).toContain('ueberschreiben=Beta')
   })
 
+  it('Fach aus der Datei: Schalter gesetzt, Fach nur, wenn eines gewählt ist', async () => {
+    // Admin-Seite (0.15.2). Ein `fach=null` im Query hieße für das Backend „das Fach
+    // namens null" — es muss ganz fehlen.
+    global.fetch = mockFetch(200, bericht())
+    await importiereFachbegriffe(null, [datei('A.md')], { ausDatei: true })
+    const [ohne] = global.fetch.mock.calls[0]
+    expect(ohne).toContain('fach_aus_datei=true')
+    expect(ohne).not.toMatch(/[?&]fach=/)
+
+    await importiereFachbegriffe('chemie', [datei('A.md')], { ausDatei: true })
+    const [mit] = global.fetch.mock.calls[1]
+    expect(mit).toContain('fach_aus_datei=true')
+    expect(mit).toContain('fach=chemie')
+  })
+
+  it('ohne den Schalter bleibt der Lauf gebunden', async () => {
+    global.fetch = mockFetch(200, bericht())
+    await importiereFachbegriffe('chemie', [datei('A.md')])
+    const [url] = global.fetch.mock.calls[0]
+    expect(url).not.toContain('fach_aus_datei')
+  })
+
   it('schickt die Dateien unter dem Feldnamen `dateien`', async () => {
     global.fetch = mockFetch(200, bericht())
     await importiereFachbegriffe('chemie', [datei('A.md'), datei('B.svg')])

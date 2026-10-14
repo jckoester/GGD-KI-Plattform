@@ -708,6 +708,8 @@ class DateiErgebnisRead(BaseModel):
     #: Trägt die Datei einen anderen Stand als „geprüft"? Import ist Freigabe — die
     #: Vorschau fragt dann nach, verhindert aber nichts.
     entwurf: bool = False
+    #: Wohin die Datei geht — beim Lauf über mehrere Fächer (Admin-Seite, 0.15.2).
+    fach: str = ""
 
 
 class FachbegriffImportBericht(BaseModel):
@@ -719,6 +721,7 @@ class FachbegriffImportBericht(BaseModel):
     """
 
     probelauf: bool
+    #: Das Fach des Laufs; leer, wenn jede Datei ihr Fach selbst nennt (`fach_aus_datei`).
     fach: str
     neu: int = 0
     aktualisiert: int = 0
